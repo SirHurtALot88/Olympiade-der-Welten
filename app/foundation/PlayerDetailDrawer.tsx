@@ -171,6 +171,59 @@ function formatSourceFreeDetail(value: string | null | undefined) {
     .replace(/\b\w/g, (letter) => letter.toUpperCase());
 }
 
+function formatDevelopmentTrend(value: string | null | undefined) {
+  switch (value) {
+    case "strong_positive":
+      return "stark positiv";
+    case "positive":
+      return "positiv";
+    case "neutral":
+      return "Stagnation";
+    case "negative":
+      return "leicht negativ";
+    case "strong_negative":
+      return "Regression-Risiko";
+    default:
+      return "—";
+  }
+}
+
+function formatRegressionRisk(value: string | null | undefined) {
+  switch (value) {
+    case "none":
+      return "kein";
+    case "low":
+      return "niedrig";
+    case "medium":
+      return "mittel";
+    case "high":
+      return "hoch";
+    default:
+      return "—";
+  }
+}
+
+function formatDevelopmentRoute(value: string | null | undefined) {
+  switch (value) {
+    case "star_growth":
+      return "Star-Entwicklung";
+    case "core_growth":
+      return "Core-Entwicklung";
+    case "depth_growth":
+      return "Breite entwickeln";
+    case "prospect_growth":
+      return "Prospect-Route";
+    case "maintenance":
+      return "Niveau halten";
+    case "stagnation_watch":
+      return "Stagnation beobachten";
+    case "free_agent_ambient":
+      return "Markt-Entwicklung";
+    default:
+      return "—";
+  }
+}
+
 function formatBoardTrustPolicy(
   policy: NonNullable<PlayerDetailDrawerData["boardTrust"]>["renewalPolicy"],
   salaryCapMultiplier: number | null | undefined,
@@ -442,9 +495,11 @@ export default function PlayerDetailDrawer({
               {data.progressionForecast ? (
                 <>
                   <article className="metric-card">
-                    <span>XP Forecast</span>
-                    <strong>{formatValue(data.progressionForecast.seasonProjectedXP, 0)}</strong>
-                    <small>{formatSourceFreeDetail(data.progressionForecast.trainingMode)}</small>
+                    <span>Netto-XP</span>
+                    <strong className={getDeltaToneClass(data.progressionForecast.netDevelopmentXP)}>
+                      {formatValue(data.progressionForecast.netDevelopmentXP, 0)}
+                    </strong>
+                    <small>{formatDevelopmentTrend(data.progressionForecast.xpTrend)}</small>
                   </article>
                   <article className="metric-card">
                     <span>XP frei / spent</span>
@@ -453,8 +508,23 @@ export default function PlayerDetailDrawer({
                     </strong>
                   </article>
                   <article className="metric-card">
-                    <span>Training</span>
-                    <strong>{formatValue(data.progressionForecast.baseTrainingXP, 0)}</strong>
+                    <span>Training Form</span>
+                    <strong>{data.progressionForecast.trainingFormTier}</strong>
+                    <small>{formatSourceFreeDetail(data.progressionForecast.trainingMode)}</small>
+                  </article>
+                  <article className="metric-card">
+                    <span>CA / PO</span>
+                    <strong>
+                      {data.progressionForecast.currentAbilityStars ?? "—"} / {data.progressionForecast.potentialStars ?? "—"}
+                    </strong>
+                    <small>
+                      {data.progressionForecast.currentAbilityTier ?? "—"} → {data.progressionForecast.potentialTier ?? "—"}
+                    </small>
+                  </article>
+                  <article className="metric-card">
+                    <span>Regression Risk</span>
+                    <strong>{formatRegressionRisk(data.progressionForecast.regressionRisk)}</strong>
+                    <small>{formatDevelopmentRoute(data.progressionForecast.developmentRoute)}</small>
                   </article>
                   <article className="metric-card">
                     <span>Upgrade Range</span>
@@ -642,41 +712,50 @@ export default function PlayerDetailDrawer({
 
           {data.progressionForecast ? (
             <section className="player-drawer-section">
-              <h3>XP Forecast</h3>
+              <h3>Development Forecast</h3>
               <div className="player-drawer-list-grid player-drawer-list-grid-wide">
                 <article className="metric-card">
-                  <span>Training-XP</span>
-                  <strong>{formatValue(data.progressionForecast.baseTrainingXP, 0)}</strong>
-                  <small>{data.progressionForecast.trainingMode}</small>
+                  <span>Verdiente XP</span>
+                  <strong>{formatValue(data.progressionForecast.earnedXP, 0)}</strong>
+                  <small>Training + Einsatz + Leistung</small>
                 </article>
                 <article className="metric-card">
-                  <span>Einsatz-XP</span>
-                  <strong>{formatValue(data.progressionForecast.appearanceXP, 0)}</strong>
-                  <small>{data.progressionForecast.sourceStatus.appearances}</small>
+                  <span>Erhaltung</span>
+                  <strong>-{formatValue(data.progressionForecast.maintenanceXP, 0)}</strong>
+                  <small>CA, Rolle, Potentialnaehe</small>
                 </article>
                 <article className="metric-card">
-                  <span>MVS-XP</span>
-                  <strong>{formatValue(data.progressionForecast.mvsXP, 0)}</strong>
-                  <small>{data.progressionForecast.sourceStatus.mvs}</small>
+                  <span>Regression</span>
+                  <strong className={data.progressionForecast.regressionPressure > 0 ? "is-negative" : ""}>
+                    -{formatValue(data.progressionForecast.regressionPressure, 0)}
+                  </strong>
+                  <small>{formatRegressionRisk(data.progressionForecast.regressionRisk)}</small>
                 </article>
                 <article className="metric-card">
-                  <span>PPs-Bonus</span>
-                  <strong>{formatValue(data.progressionForecast.ppsBonusXP, 0)}</strong>
-                  <small>gedeckelt</small>
+                  <span>Netto</span>
+                  <strong className={getDeltaToneClass(data.progressionForecast.netDevelopmentXP)}>
+                    {formatValue(data.progressionForecast.netDevelopmentXP, 0)}
+                  </strong>
+                  <small>{formatDevelopmentTrend(data.progressionForecast.xpTrend)}</small>
                 </article>
                 <article className="metric-card">
-                  <span>Top/Highlight</span>
-                  <strong>{formatValue(data.progressionForecast.topPlayerXP + data.progressionForecast.highlightXP, 0)}</strong>
-                  <small>{data.progressionForecast.sourceStatus.highlights}</small>
+                  <span>Spendbare XP</span>
+                  <strong>{formatValue(data.progressionForecast.seasonProjectedXP, 0)}</strong>
+                  <small>negative Netto-XP schreiben keine XP weg</small>
                 </article>
                 <article className="metric-card">
-                  <span>Trait-Mod</span>
-                  <strong>{formatSignedPercent(data.progressionForecast.traitModifierPct)}</strong>
-                  <small>{data.progressionForecast.audit.seasonEndOnly ? "Season-End" : "—"}</small>
+                  <span>Faktoren</span>
+                  <strong>
+                    {data.progressionForecast.trainingFormTier} · {formatSourceFreeDetail(data.progressionForecast.developmentRoute)}
+                  </strong>
+                  <small>
+                    TF x{formatValue(data.progressionForecast.developmentFactors.trainingFormFactor, 2)} · PO x
+                    {formatValue(data.progressionForecast.developmentFactors.potentialGapFactor, 2)}
+                  </small>
                 </article>
               </div>
               <p className="muted" style={{ marginTop: 12 }}>
-                {data.progressionForecast.audit.mvsPpsCoupling}
+                Netto = verdiente XP minus Erhaltungsdruck und Regression. Historische MVS/PPs bleiben unveraendert.
               </p>
               {data.progressionEvents.length > 0 ? (
                 <div className="player-drawer-callout" style={{ marginTop: 12 }}>

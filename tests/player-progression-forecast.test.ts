@@ -188,7 +188,7 @@ describe("player progression forecast", () => {
     expect(forecast.performanceXP).toBeGreaterThan(forecast.baseTrainingXP);
   });
 
-  it("gives unused players only training XP", () => {
+  it("lets unused players stagnate instead of auto-growing", () => {
     const player = createPlayer();
     const forecast = buildPlayerProgressionForecast({
       gameState: createGameState(player),
@@ -198,7 +198,10 @@ describe("player progression forecast", () => {
       trainingModeByPlayerId: { [player.id]: "mittel" },
     });
 
-    expect(forecast.seasonProjectedXP).toBe(70);
+    expect(forecast.earnedXP).toBeGreaterThan(0);
+    expect(forecast.netDevelopmentXP).toBeLessThanOrEqual(0);
+    expect(forecast.seasonProjectedXP).toBe(0);
+    expect(["negative", "neutral"]).toContain(forecast.xpTrend);
     expect(forecast.performanceXP).toBe(0);
   });
 
@@ -275,9 +278,11 @@ describe("player progression forecast", () => {
     });
 
     expect(diligentForecast.traitModifierPct).toBe(10);
-    expect(diligentForecast.seasonProjectedXP).toBeGreaterThan(70);
+    expect(diligentForecast.trainingFormTier).toBe("B");
+    expect(lazyForecast.trainingFormTier).toBe("D");
+    expect(diligentForecast.earnedXP).toBeGreaterThan(lazyForecast.earnedXP);
     expect(lazyForecast.traitModifierPct).toBe(-8);
-    expect(lazyForecast.seasonProjectedXP).toBeLessThan(70);
+    expect(lazyForecast.regressionPressure).toBeGreaterThan(diligentForecast.regressionPressure);
   });
 
   it("exposes rating-tier costs and stays preview-only season-end-only", () => {
@@ -292,9 +297,95 @@ describe("player progression forecast", () => {
     expect(forecast.ratingTierCosts.F).toBeLessThan(forecast.ratingTierCosts.C ?? 0);
     expect(forecast.ratingTierCosts.S).toBeGreaterThan(forecast.ratingTierCosts.B ?? 0);
     expect(forecast.ratingTierCosts["99"]).toBeNull();
-    expect(forecast.possibleUpgradeSummary).toContain("F/D-Upgrades");
+    expect(forecast.possibleUpgradeSummary).toBe("unter 1 niedriges Upgrade");
     expect(forecast.audit.seasonEndOnly).toBe(true);
     expect(forecast.audit.productiveWrites).toBe(false);
     expect(forecast.sourceStatus.writes).toBe("preview_only");
+  });
+
+  it("moves top performers into positive net development", () => {
+    const player = createPlayer({ potential: 92, traitsPositive: ["Diligent", "Motivated", "Disciplined"] });
+    const forecast = buildPlayerProgressionForecast({
+      gameState: createGameState(player),
+      player,
+      playerRating: createRating({ ovrNormalized: 68, mvs: 16, ppsSeason: 42 }),
+      seasonPerformance: createSeasonPerformance({ appearances: 8, totalPoints: 42, top10Count: 2, mvpCount: 1 }),
+      trainingModeByPlayerId: { [player.id]: "mittel" },
+    });
+
+    expect(forecast.netDevelopmentXP).toBeGreaterThan(0);
+    expect(["positive", "strong_positive"]).toContain(forecast.xpTrend);
+    expect(forecast.regressionRisk).not.toBe("high");
+  });
+
+  it("can keep a middle player in stagnation", () => {
+    const player = createPlayer({ potential: 63, rating: 60 });
+    const gameState = createGameState(player);
+    gameState.rosters = [{ teamId: "team-1", playerId: player.id, role: "starter", joinedSeasonId: "season-1" }];
+    const forecast = buildPlayerProgressionForecast({
+      gameState,
+      player,
+      playerRating: createRating({ ovrNormalized: 60, mvs: 2, ppsSeason: 4 }),
+      seasonPerformance: createSeasonPerformance({ appearances: 4, totalPoints: 4 }),
+      trainingModeByPlayerId: { [player.id]: "mittel" },
+    });
+
+    expect(Math.abs(forecast.netDevelopmentXP)).toBeLessThanOrEqual(30);
+    expect(forecast.xpTrend).toBe("neutral");
+  });
+
+  it("pushes low-playtime underperformers into negative development", () => {
+    const player = createPlayer({ traitsNegative: ["Lazy", "Diva"], potential: 58, rating: 62 });
+    const forecast = buildPlayerProgressionForecast({
+      gameState: createGameState(player),
+      player,
+      playerRating: createRating({ ovrNormalized: 62, mvs: 1, ppsSeason: 1 }),
+      seasonPerformance: createSeasonPerformance({ appearances: 1, totalPoints: 1 }),
+      trainingModeByPlayerId: { [player.id]: "leicht" },
+    });
+
+    expect(forecast.netDevelopmentXP).toBeLessThan(0);
+    expect(["negative", "strong_negative"]).toContain(forecast.xpTrend);
+    expect(forecast.regressionPressure).toBeGreaterThan(0);
+  });
+
+  it("warns expensive stars with bad performance through regression pressure", () => {
+    const player = createPlayer({ marketValue: 90000, salaryDemand: 20000, potential: 80, rating: 78 });
+    const gameState = createGameState(player);
+    gameState.rosters = [{ teamId: "team-1", playerId: player.id, role: "star", joinedSeasonId: "season-1" }];
+    const forecast = buildPlayerProgressionForecast({
+      gameState,
+      player,
+      playerRating: createRating({ ovrNormalized: 78, mvs: 2, ppsSeason: 5 }),
+      seasonPerformance: createSeasonPerformance({ appearances: 7, totalPoints: 5 }),
+      boardTrustScore: 24,
+    });
+
+    expect(forecast.regressionBreakdown.boardTrust).toBeGreaterThan(0);
+    expect(forecast.regressionBreakdown.starUnderperformance).toBeGreaterThan(0);
+    expect(forecast.regressionRisk).not.toBe("none");
+  });
+
+  it("charges more maintenance for high CA and small CA-PO gaps", () => {
+    const lowCa = createPlayer({ id: "low", rating: 45, potential: 90 });
+    const highCa = createPlayer({ id: "high", rating: 88, potential: 90 });
+    const lowForecast = buildPlayerProgressionForecast({ gameState: createGameState(lowCa), player: lowCa, playerRating: createRating({ ovrNormalized: 45 }), seasonPerformance: null });
+    const highForecast = buildPlayerProgressionForecast({ gameState: createGameState(highCa), player: highCa, playerRating: createRating({ ovrNormalized: 88 }), seasonPerformance: null });
+
+    expect(highForecast.maintenanceXP).toBeGreaterThan(lowForecast.maintenanceXP);
+    expect(highForecast.developmentFactors.potentialGapFactor).toBeLessThan(lowForecast.developmentFactors.potentialGapFactor);
+  });
+
+  it("gives free agents an ambient development/decay pass", () => {
+    const player = createPlayer({ traitsNegative: ["Mercenary"], potential: 50, rating: 60 });
+    const forecast = buildPlayerProgressionForecast({
+      gameState: createGameState(player),
+      player,
+      playerRating: createRating({ ovrNormalized: 60 }),
+      seasonPerformance: null,
+    });
+
+    expect(forecast.developmentRoute).toBe("free_agent_ambient");
+    expect(forecast.netDevelopmentXP).not.toBe(0);
   });
 });

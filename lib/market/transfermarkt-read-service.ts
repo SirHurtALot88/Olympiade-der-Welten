@@ -20,6 +20,7 @@ import { LegacyLineupRepository } from "@/lib/lineups/legacy-lineup-repository";
 import { buildPlayerRatingContractRows } from "@/lib/foundation/player-rating-contract";
 import { buildTransfermarktPoolAudit, type TransfermarktPoolAudit } from "@/lib/market/transfermarkt-pool-audit";
 import type { Player } from "@/lib/data/olyDataTypes";
+import type { PlayerDevelopmentTrend, PlayerProgressionRatingTier, PlayerRegressionRisk, PlayerTrainingFormTier } from "@/lib/training/training-plan-types";
 import { db } from "@/src/server/db";
 
 export type TransfermarktAvailabilityReason = "free_agent" | "no_active_player";
@@ -84,6 +85,11 @@ export type TransfermarktFreeAgentItem = {
   spiritRating: TransfermarktRatingTier | null;
   tormentRating: TransfermarktRatingTier | null;
   topDisciplineScores: TransfermarktDisciplineScore[];
+  currentAbilityTier: PlayerProgressionRatingTier | null;
+  potentialTier: PlayerProgressionRatingTier | null;
+  trainingFormTier: PlayerTrainingFormTier | null;
+  developmentTrend: PlayerDevelopmentTrend | null;
+  regressionRisk: PlayerRegressionRisk | null;
   portraitPath: string | null;
   portraitUrl: string | null;
   imageUrl: string | null;
@@ -670,6 +676,11 @@ export async function listTransfermarktFreeAgents(
           scoreTier: getTransfermarktTierFromPoints(entry.score),
           ppsLastSeason: null,
         })),
+      currentAbilityTier: null,
+      potentialTier: null,
+      trainingFormTier: null,
+      developmentTrend: null,
+      regressionRisk: null,
       portraitPath: player.portraitPath ?? null,
       portraitUrl: player.portraitUrl ?? null,
       imageUrl: browserSafePortrait,

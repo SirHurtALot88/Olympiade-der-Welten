@@ -472,8 +472,10 @@ export function buildSeasonEndProgressionPreview(input: {
     const baseTrainingXP = forecast?.baseTrainingXP ?? 0;
     const performanceXP = forecast?.performanceXP ?? 0;
     const trainingFacilityXp = applyTrainingXpFacilityModifiers(baseTrainingXP, normalizedFacilities);
+    const facilityTrainingDelta = trainingFacilityXp.after - trainingFacilityXp.before;
+    const spendableDevelopmentXP = Math.max(0, (forecast?.netDevelopmentXP ?? 0) + facilityTrainingDelta);
     const cost = getSeasonEndUpgradeCost({ tier: tierBefore, attribute: selectedAttribute, facilities });
-    const availableXP = trainingFacilityXp.after + performanceXP;
+    const availableXP = spendableDevelopmentXP;
     const blockReason =
       attributeBefore == null
         ? "attribute_source_missing"

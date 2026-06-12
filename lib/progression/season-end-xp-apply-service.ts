@@ -190,8 +190,10 @@ function getSeasonXp(input: {
     lifetimeXP: input.player.lifetimeXP ?? null,
   });
   const trainingFacilityXp = applyTrainingXpFacilityModifiers(forecast.baseTrainingXP, input.facilities);
+  const facilityTrainingDelta = trainingFacilityXp.after - trainingFacilityXp.before;
+  const earnedSeasonXP = Math.max(0, forecast.netDevelopmentXP + facilityTrainingDelta);
   return {
-    earnedSeasonXP: trainingFacilityXp.after + forecast.performanceXP,
+    earnedSeasonXP,
     trainingXPAfterFacilities: trainingFacilityXp.after,
     performanceXP: forecast.performanceXP,
     warnings: forecast.audit.warnings,

@@ -2958,6 +2958,42 @@ function formatTopDisciplineScores(item: TransfermarktFreeAgentItem) {
   );
 }
 
+function formatMarketDevelopmentTrend(value: string | null | undefined) {
+  switch (value) {
+    case "strong_positive":
+      return "++";
+    case "positive":
+      return "+";
+    case "neutral":
+      return "0";
+    case "negative":
+      return "-";
+    case "strong_negative":
+      return "--";
+    default:
+      return "—";
+  }
+}
+
+function formatMarketRisk(value: string | null | undefined) {
+  switch (value) {
+    case "none":
+      return "kein";
+    case "low":
+      return "niedr.";
+    case "medium":
+      return "mittel";
+    case "high":
+      return "hoch";
+    default:
+      return "—";
+  }
+}
+
+function getMarketTierStyle(value: string | null | undefined) {
+  return getConfirmedTierStyle(value === "99" ? "S+" : value);
+}
+
 function formatFitDisplay(item: TransfermarktFreeAgentItem) {
   if (!item.teamContextAvailable) {
     return "Team waehlen";
@@ -7501,6 +7537,8 @@ export default function FoundationPageClient({ initialReadSource, initialSelecte
       { id: "spe", label: "SPE", dataKey: "spe", defaultWidth: 86, minWidth: 72 },
       { id: "men", label: "MEN", dataKey: "men", defaultWidth: 86, minWidth: 72 },
       { id: "soc", label: "SOC", dataKey: "soc", defaultWidth: 86, minWidth: 72 },
+      { id: "histPoints", label: "Hist. Punkte", dataKey: "histPoints", defaultWidth: 126, minWidth: 104 },
+      { id: "avgPoints", label: "Ø Punkte", dataKey: "avgPoints", defaultWidth: 108, minWidth: 90 },
       { id: "gold", label: "Gold", dataKey: "gold", defaultWidth: 82, minWidth: 70 },
       { id: "silver", label: "Silber", dataKey: "silver", defaultWidth: 84, minWidth: 72 },
       { id: "bronze", label: "Bronze", dataKey: "bronze", defaultWidth: 90, minWidth: 78 },
@@ -7807,7 +7845,7 @@ export default function FoundationPageClient({ initialReadSource, initialSelecte
           label: "Finance",
           description: "Cash, GuV und Sponsorwerte im Fokus.",
           order: defaultOrder,
-          visibleColumnIds: ["team", "overallRank", "cash", "guv", "roster", "mw", "salary", "sponsor", "avgRank"],
+          visibleColumnIds: ["team", "overallRank", "cash", "guv", "roster", "mw", "salary", "sponsor", "histPoints", "avgPoints"],
           pinnedLeft: ["team", "overallRank"],
         },
         {
@@ -7815,7 +7853,7 @@ export default function FoundationPageClient({ initialReadSource, initialSelecte
           label: "Performance",
           description: "Historische Achsen und Platzierungen.",
           order: defaultOrder,
-          visibleColumnIds: ["team", "overallRank", "pow", "spe", "men", "soc", "gold", "silver", "bronze", "top5", "top10", "avgRank"],
+          visibleColumnIds: ["team", "overallRank", "pow", "spe", "men", "soc", "histPoints", "avgPoints", "gold", "silver", "bronze", "top5", "top10"],
           pinnedLeft: ["team", "overallRank"],
         },
       ];
@@ -8661,6 +8699,8 @@ export default function FoundationPageClient({ initialReadSource, initialSelecte
           historicalMen: row.historicalMen,
           historicalSoc: row.historicalSoc,
           historicalPointsTotal: row.historicalPointsTotal,
+          historicalAvgPoints: row.historicalAvgPoints,
+          historicalPointsBySeason: row.historicalPointsBySeason,
           historicalHasData: row.historicalHasData,
           historicalSeasonsPlayed: row.historicalSeasonsPlayed,
           historicalBestRank: row.historicalBestRank,
@@ -8676,6 +8716,7 @@ export default function FoundationPageClient({ initialReadSource, initialSelecte
           silverCount: row.historicalSilverCount,
           bronzeCount: row.historicalBronzeCount,
           avgRank: row.historicalAvgRank,
+          avgPoints: row.historicalAvgPoints,
           top5: row.historicalTop5Count,
           top10: row.historicalTop10Count,
         };
@@ -8689,6 +8730,50 @@ export default function FoundationPageClient({ initialReadSource, initialSelecte
         return (left.avgRank ?? Number.POSITIVE_INFINITY) - (right.avgRank ?? Number.POSITIVE_INFINITY);
       });
   }, [currentAreaRanksByTeamId, seasonStandRows]);
+  const teamHistorySeasonPointColumns = useMemo(() => {
+    const seasonMap = new Map<string, { seasonId: string; seasonName: string }>();
+    for (const row of teamsViewRows) {
+      for (const entry of row.historicalPointsBySeason ?? []) {
+        seasonMap.set(entry.seasonId, {
+          seasonId: entry.seasonId,
+          seasonName: entry.seasonName,
+        });
+      }
+    }
+
+    return Array.from(seasonMap.values()).sort((left, right) =>
+      left.seasonId.localeCompare(right.seasonId, "de", { numeric: true }),
+    );
+  }, [teamsViewRows]);
+  const teamHistoryPointRankMaps = useMemo(() => {
+    const total = buildNullableSharedRankMap(
+      teamsViewRows.map((row) => ({
+        teamId: row.team.teamId,
+        value: row.historicalPointsTotal,
+      })),
+    );
+    const average = buildNullableSharedRankMap(
+      teamsViewRows.map((row) => ({
+        teamId: row.team.teamId,
+        value: row.historicalAvgPoints,
+      })),
+    );
+    const bySeason = new Map(
+      teamHistorySeasonPointColumns.map((seasonColumn) => [
+        seasonColumn.seasonId,
+        buildNullableSharedRankMap(
+          teamsViewRows.map((row) => ({
+            teamId: row.team.teamId,
+            value:
+              row.historicalPointsBySeason.find((entry) => entry.seasonId === seasonColumn.seasonId)?.points ??
+              null,
+          })),
+        ),
+      ]),
+    );
+
+    return { total, average, bySeason };
+  }, [teamHistorySeasonPointColumns, teamsViewRows]);
 
   const teamsViewSummary = useMemo(() => {
     if (!selectedTeam) {
@@ -10152,6 +10237,22 @@ export default function FoundationPageClient({ initialReadSource, initialSelecte
       netTransferBalance: sellFee - buyFee,
     };
   }, [transferHistoryRows]);
+  const transferHistorySeasonBreakdown = useMemo(() => {
+    const counts = new Map<string, number>();
+    for (const entry of historyFeed?.items ?? []) {
+      const label = entry.seasonLabel ?? entry.seasonId;
+      counts.set(label, (counts.get(label) ?? 0) + 1);
+    }
+
+    return Array.from(counts.entries()).sort(([left], [right]) =>
+      left.localeCompare(right, "de", { numeric: true }),
+    );
+  }, [historyFeed]);
+  const transferHistoryRequestedSeasonLabel = historyFeed?.saveContext?.requestedSeasonId ?? "Alle Seasons";
+  const transferHistoryResolvedSeasonLabel =
+    historyFeed?.saveContext?.requestedSeasonId == null
+      ? "Alle Seasons"
+      : historyFeed?.saveContext?.resolvedSeasonId ?? historyFeed?.scope?.seasonId ?? gameState.season.id;
 
   const standingsPreviewRows = useMemo(() => standingsPreviewFeed?.items ?? [], [standingsPreviewFeed]);
   const matchdaySummaryOptions = useMemo(() => getMatchdaySummaryOptions(gameState, gameState.season.id), [gameState]);
@@ -10551,6 +10652,8 @@ export default function FoundationPageClient({ initialReadSource, initialSelecte
         spe: (row) => -(row.currentSpeRank ?? Number.POSITIVE_INFINITY),
         men: (row) => -(row.currentMenRank ?? Number.POSITIVE_INFINITY),
         soc: (row) => -(row.currentSocRank ?? Number.POSITIVE_INFINITY),
+        histPoints: (row) => row.historicalPointsTotal ?? Number.NEGATIVE_INFINITY,
+        avgPoints: (row) => row.avgPoints ?? Number.NEGATIVE_INFINITY,
         gold: (row) => row.goldCount,
         silver: (row) => row.silverCount,
         bronze: (row) => row.bronzeCount,
@@ -10687,6 +10790,11 @@ export default function FoundationPageClient({ initialReadSource, initialSelecte
         salary: (row) => row.item.salary ?? Number.NEGATIVE_INFINITY,
         ovr: (row) => row.item.ovr ?? Number.NEGATIVE_INFINITY,
         mvs: (row) => row.item.mvs ?? Number.NEGATIVE_INFINITY,
+        currentAbilityTier: (row) => row.item.currentAbilityTier ?? "",
+        potentialTier: (row) => row.item.potentialTier ?? "",
+        trainingFormTier: (row) => row.item.trainingFormTier ?? "",
+        developmentTrend: (row) => row.item.developmentTrend ?? "",
+        regressionRisk: (row) => row.item.regressionRisk ?? "",
         marketValueSalaryRatio: (row) => row.item.marketValueSalaryRatio ?? Number.NEGATIVE_INFINITY,
         bracket: (row) => row.item.bracket ?? Number.NEGATIVE_INFINITY,
         pow: (row) => row.item.pow ?? Number.NEGATIVE_INFINITY,
@@ -17181,8 +17289,12 @@ export default function FoundationPageClient({ initialReadSource, initialSelecte
                   <strong>{teamsViewSummary.bronzeCount}</strong>
                 </article>
                 <article className="metric-card teams-summary-card">
-                  <span>Avg Rank</span>
-                  <strong>{teamsViewSummary.avgRank != null ? formatWholeNumber(teamsViewSummary.avgRank) : "—"}</strong>
+                  <span>Ø Punkte</span>
+                  <strong>{teamsViewSummary.avgPoints != null ? formatLocalePoints(teamsViewSummary.avgPoints, 1) : "—"}</strong>
+                </article>
+                <article className="metric-card teams-summary-card">
+                  <span>Hist. Punkte</span>
+                  <strong>{teamsViewSummary.historicalPointsTotal != null ? formatLocalePoints(teamsViewSummary.historicalPointsTotal, 1) : "—"}</strong>
                 </article>
               </div>
             ) : null}
@@ -17251,6 +17363,14 @@ export default function FoundationPageClient({ initialReadSource, initialSelecte
                         if (column.id === "spe") return <td key={column.id} title={row.rosterCount === 0 ? "Kein aktiver Kader vorhanden" : undefined} className={`teams-view-axis-cell teams-view-axis-cell-spe ${row.currentSpeRank != null ? getRankHeatClass(row.currentSpeRank, gameState.teams.length) : ""}`}>{row.currentSpeRank != null ? formatWholeNumber(row.currentSpeRank) : "—"}</td>;
                         if (column.id === "men") return <td key={column.id} title={row.rosterCount === 0 ? "Kein aktiver Kader vorhanden" : undefined} className={`teams-view-axis-cell teams-view-axis-cell-men ${row.currentMenRank != null ? getRankHeatClass(row.currentMenRank, gameState.teams.length) : ""}`}>{row.currentMenRank != null ? formatWholeNumber(row.currentMenRank) : "—"}</td>;
                         if (column.id === "soc") return <td key={column.id} title={row.rosterCount === 0 ? "Kein aktiver Kader vorhanden" : undefined} className={`teams-view-axis-cell teams-view-axis-cell-soc ${row.currentSocRank != null ? getRankHeatClass(row.currentSocRank, gameState.teams.length) : ""}`}>{row.currentSocRank != null ? formatWholeNumber(row.currentSocRank) : "—"}</td>;
+                        if (column.id === "histPoints") {
+                          const rank = teamHistoryPointRankMaps.total.get(row.team.teamId);
+                          return <td key={column.id} className={`teams-view-history-points-cell ${rank != null ? getRankHeatClass(rank, gameState.teams.length) : ""}`}>{row.historicalPointsTotal != null ? formatLocalePoints(row.historicalPointsTotal, 1) : "—"}</td>;
+                        }
+                        if (column.id === "avgPoints") {
+                          const rank = teamHistoryPointRankMaps.average.get(row.team.teamId);
+                          return <td key={column.id} className={`teams-view-history-points-cell ${rank != null ? getRankHeatClass(rank, gameState.teams.length) : ""}`}>{row.avgPoints != null ? formatLocalePoints(row.avgPoints, 1) : "—"}</td>;
+                        }
                         if (column.id === "gold") return <td key={column.id} className="teams-view-medal-cell">{row.goldCount}</td>;
                         if (column.id === "silver") return <td key={column.id} className="teams-view-medal-cell">{row.silverCount}</td>;
                         if (column.id === "bronze") return <td key={column.id} className="teams-view-medal-cell">{row.bronzeCount}</td>;
@@ -17275,6 +17395,12 @@ export default function FoundationPageClient({ initialReadSource, initialSelecte
                     <tr>
                       <th>Team</th>
                       <th>Hist. Punkte</th>
+                      <th>Ø Punkte</th>
+                      {teamHistorySeasonPointColumns.map((seasonColumn) => (
+                        <th key={`history-head-${seasonColumn.seasonId}`}>
+                          {seasonColumn.seasonName.replace("Season ", "S")}
+                        </th>
+                      ))}
                       <th className="teams-view-head-pow">POW</th>
                       <th className="teams-view-head-spe">SPE</th>
                       <th className="teams-view-head-men">MEN</th>
@@ -17302,9 +17428,39 @@ export default function FoundationPageClient({ initialReadSource, initialSelecte
                             {row.team.name}
                           </button>
                         </td>
-                        <td className="teams-view-finance-cell">
+                        <td
+                          className={`teams-view-history-points-cell ${
+                            teamHistoryPointRankMaps.total.get(row.team.teamId) != null
+                              ? getRankHeatClass(teamHistoryPointRankMaps.total.get(row.team.teamId)!, gameState.teams.length)
+                              : ""
+                          }`}
+                        >
                           {row.historicalPointsTotal != null ? formatWholeNumber(row.historicalPointsTotal) : "—"}
                         </td>
+                        <td
+                          className={`teams-view-history-points-cell ${
+                            teamHistoryPointRankMaps.average.get(row.team.teamId) != null
+                              ? getRankHeatClass(teamHistoryPointRankMaps.average.get(row.team.teamId)!, gameState.teams.length)
+                              : ""
+                          }`}
+                        >
+                          {row.avgPoints != null ? formatLocalePoints(row.avgPoints, 1) : "—"}
+                        </td>
+                        {teamHistorySeasonPointColumns.map((seasonColumn) => {
+                          const seasonEntry = row.historicalPointsBySeason.find(
+                            (entry) => entry.seasonId === seasonColumn.seasonId,
+                          );
+                          const rank = teamHistoryPointRankMaps.bySeason.get(seasonColumn.seasonId)?.get(row.team.teamId);
+                          return (
+                            <td
+                              key={`history-cell-${row.team.teamId}-${seasonColumn.seasonId}`}
+                              className={`teams-view-history-points-cell ${rank != null ? getRankHeatClass(rank, gameState.teams.length) : ""}`}
+                              title={seasonEntry?.rank != null ? `Rang ${seasonEntry.rank}` : undefined}
+                            >
+                              {seasonEntry?.points != null ? formatLocalePoints(seasonEntry.points, 1) : "—"}
+                            </td>
+                          );
+                        })}
                         <td className={`teams-view-axis-cell teams-view-axis-cell-pow ${row.historicalPow != null ? getHeatClass(row.historicalPow, [120, 220, 320]) : ""}`}>
                           {row.historicalPow != null ? formatWholeNumber(row.historicalPow) : "—"}
                         </td>
@@ -19255,6 +19411,11 @@ export default function FoundationPageClient({ initialReadSource, initialSelecte
                           if (column.id === "traitNeg2") return <td key={column.id}>{renderPillValue(row.item.traitsNegative[1] ?? null)}</td>;
                           if (column.id === "traitNeg3") return <td key={column.id}>{renderPillValue(row.item.traitsNegative[2] ?? null)}</td>;
                           if (column.id === "topDisciplineScores") return <td key={column.id}>{formatTopDisciplineScores(row.item)}</td>;
+                          if (column.id === "currentAbilityTier") return <td key={column.id} style={getMarketTierStyle(row.item.currentAbilityTier)}>{row.item.currentAbilityTier ?? "—"}</td>;
+                          if (column.id === "potentialTier") return <td key={column.id} style={getMarketTierStyle(row.item.potentialTier)}>{row.item.potentialTier ?? "—"}</td>;
+                          if (column.id === "trainingFormTier") return <td key={column.id} style={getMarketTierStyle(row.item.trainingFormTier)}>{row.item.trainingFormTier ?? "—"}</td>;
+                          if (column.id === "developmentTrend") return <td key={column.id}>{formatMarketDevelopmentTrend(row.item.developmentTrend)}</td>;
+                          if (column.id === "regressionRisk") return <td key={column.id}>{formatMarketRisk(row.item.regressionRisk)}</td>;
                           if (column.id === "availabilityReason") return <td key={column.id}>{row.item.availabilityReason}</td>;
                           if (column.id === "affordabilityStatus") return <td key={column.id}>{row.item.teamContextAvailable ? row.item.affordabilityStatus ?? "—" : "Team waehlen"}</td>;
                           if (column.id === "teamCash") {
@@ -22362,14 +22523,25 @@ export default function FoundationPageClient({ initialReadSource, initialSelecte
               </strong>
               <span>
                 Angefragt: {historyFeed?.saveContext?.requestedSaveId ?? activeSaveId} /{" "}
-                {historyFeed?.saveContext?.requestedSeasonId ?? gameState.season.id}
+                {transferHistoryRequestedSeasonLabel}
                 {" · "}
                 Aufgeloest: {historyFeed?.saveContext?.resolvedSaveId ?? historyFeed?.scope?.saveId ?? activeSaveId} /{" "}
-                {historyFeed?.saveContext?.resolvedSeasonId ?? historyFeed?.scope?.seasonId ?? gameState.season.id}
+                {transferHistoryResolvedSeasonLabel}
                 {" · "}
                 Transfers: {historyFeed?.total ?? 0}
               </span>
             </div>
+            {transferHistorySeasonBreakdown.length > 0 ? (
+              <div className="metric-grid compact" style={{ marginBottom: 12 }}>
+                {transferHistorySeasonBreakdown.map(([seasonLabel, count]) => (
+                  <article className="metric-card" key={seasonLabel}>
+                    <span>{seasonLabel}</span>
+                    <strong>{count}</strong>
+                    <small>Transfers im geladenen Feed</small>
+                  </article>
+                ))}
+              </div>
+            ) : null}
             {historyFeed?.saveContext?.scopeWarning ? (
               <div className="transfer-callout is-warning" style={{ marginBottom: 12 }}>
                 <strong>Scope-Warnung</strong>

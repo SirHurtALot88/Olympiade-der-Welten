@@ -47,6 +47,17 @@ export type PlayerProgressionXpEvent = {
 };
 
 export type PlayerProgressionRatingTier = "F" | "E" | "D" | "C" | "B" | "A" | "S" | "S+" | "99";
+export type PlayerTrainingFormTier = Exclude<PlayerProgressionRatingTier, "99">;
+export type PlayerDevelopmentTrend = "strong_positive" | "positive" | "neutral" | "negative" | "strong_negative";
+export type PlayerRegressionRisk = "none" | "low" | "medium" | "high";
+export type PlayerDevelopmentRoute =
+  | "star_growth"
+  | "core_growth"
+  | "depth_growth"
+  | "prospect_growth"
+  | "maintenance"
+  | "stagnation_watch"
+  | "free_agent_ambient";
 
 export type PlayerProgressionForecast = {
   playerId: string;
@@ -55,6 +66,43 @@ export type PlayerProgressionForecast = {
   spentXP: number;
   lifetimeXP: number | null;
   seasonProjectedXP: number;
+  earnedXP: number;
+  maintenanceXP: number;
+  regressionPressure: number;
+  netDevelopmentXP: number;
+  trainingFormTier: PlayerTrainingFormTier;
+  xpTrend: PlayerDevelopmentTrend;
+  regressionRisk: PlayerRegressionRisk;
+  developmentRoute: PlayerDevelopmentRoute;
+  currentAbilityRating: number | null;
+  currentAbilityTier: PlayerProgressionRatingTier | null;
+  currentAbilityStars: string | null;
+  potentialRating: number | null;
+  potentialTier: PlayerProgressionRatingTier | null;
+  potentialStars: string | null;
+  developmentFactors: {
+    playtimeFactor: number;
+    performanceFactor: number;
+    trainingFormFactor: number;
+    potentialGapFactor: number;
+    traitFactor: number;
+    routeFitFactor: number;
+  };
+  maintenanceBreakdown: {
+    currentAbility: number;
+    role: number;
+    potentialProximity: number;
+    overPotential: number;
+  };
+  regressionBreakdown: {
+    lowPlaytime: number;
+    poorPerformance: number;
+    sharpness: number;
+    boardTrust: number;
+    negativeTraits: number;
+    routeConflict: number;
+    starUnderperformance: number;
+  };
   baseTrainingXP: number;
   appearanceXP: number;
   mvsXP: number;

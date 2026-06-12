@@ -5,6 +5,7 @@ import { getImportedPlayerDisplayMarketValue, getImportedPlayerDisplaySalary } f
 import { resolvePlayerEconomyContract } from "@/lib/foundation/player-economy-contract";
 import { buildPlayerRatingContractMap } from "@/lib/foundation/player-rating-contract";
 import { getTeamStrategyProfile } from "@/lib/foundation/team-strategy-profiles";
+import { buildPlayerProgressionForecast } from "@/lib/training/player-progression-forecast";
 import { createPersistenceService } from "@/lib/persistence/persistence-service";
 import { calculateTransfermarktFit, getTransfermarktBracket, hasMercenaryTrait } from "@/lib/market/transfermarkt-fit";
 import { buildContractNegotiationPreview } from "@/lib/market/contract-negotiation-preview";
@@ -253,6 +254,17 @@ export function listLocalTransfermarktFreeAgents(input: TransfermarktReadParams 
       const marketValue = getPlayerMarketValue(player);
       const salary = getPlayerSalary(player);
       const mercenary = hasMercenaryTrait(player);
+      const playerRating = playerRatingsById.get(player.id) ?? null;
+      const progressionForecast = buildPlayerProgressionForecast({
+        gameState,
+        player,
+        playerRating,
+        seasonPerformance: null,
+        trainingModeByPlayerId: player.trainingMode ? { [player.id]: player.trainingMode } : null,
+        currentXP: player.currentXP ?? 0,
+        spentXP: player.spentXP ?? 0,
+        lifetimeXP: player.lifetimeXP ?? null,
+      });
 
       return {
         playerId: player.id,
@@ -275,8 +287,8 @@ export function listLocalTransfermarktFreeAgents(input: TransfermarktReadParams 
         traitNeg2: player.traitsNegative[1] ?? null,
         traitNeg3: player.traitsNegative[2] ?? null,
         marketValue,
-        ovr: playerRatingsById.get(player.id)?.ovrNormalized ?? null,
-        mvs: playerRatingsById.get(player.id)?.mvs ?? null,
+        ovr: playerRating?.ovrNormalized ?? null,
+        mvs: playerRating?.mvs ?? null,
         salary,
         marketValueSalaryRatio:
           marketValue != null && salary != null && salary > 0 ? roundValue(marketValue / salary, 2) : null,
@@ -307,6 +319,11 @@ export function listLocalTransfermarktFreeAgents(input: TransfermarktReadParams 
         spiritRating: normalizeTransfermarktTier(player.attributeSheetRatings?.spiritRating),
         tormentRating: normalizeTransfermarktTier(player.attributeSheetRatings?.tormentRating),
         topDisciplineScores: getTopDisciplineScores(gameState, player),
+        currentAbilityTier: progressionForecast.currentAbilityTier,
+        potentialTier: progressionForecast.potentialTier,
+        trainingFormTier: progressionForecast.trainingFormTier,
+        developmentTrend: progressionForecast.xpTrend,
+        regressionRisk: progressionForecast.regressionRisk,
         portraitPath: player.portraitPath ?? null,
         portraitUrl: player.portraitUrl ?? null,
         imageUrl: null,
