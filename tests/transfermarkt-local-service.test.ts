@@ -988,7 +988,7 @@ describe("transfermarkt local service", () => {
     });
 
     expect(fiveYears.expectedSalary ?? 0).toBeLessThan(oneYear.expectedSalary ?? 0);
-    expect((fiveYears.expectedSalary ?? 0) / (oneYear.expectedSalary ?? 1)).toBeCloseTo(0.72, 2);
+    expect((fiveYears.expectedSalary ?? 0) / (oneYear.expectedSalary ?? 1)).toBeCloseTo(0.695, 3);
     expect(fiveYears.totalSalary ?? 0).toBeGreaterThan(oneYear.totalSalary ?? 0);
     expect(fiveYears.scoreBreakdown.some((entry) => entry.key === "contract_length_security" && entry.points > 0)).toBe(true);
     expect(oneYear.scoreBreakdown.some((entry) => entry.key === "contract_length_security" && entry.points === 0)).toBe(true);
@@ -1087,6 +1087,45 @@ describe("transfermarkt local service", () => {
     expect(fitDiscount.teamFit ?? 0).toBeGreaterThanOrEqual(25);
     expect((fitDiscount.expectedSalary ?? 0) / (noFitDiscount.expectedSalary ?? 1)).toBeCloseTo(0.9, 2);
     expect(fitDiscount.scoreBreakdown.find((entry) => entry.key === "contract_length_security")?.reason).toContain("10% Fit-Rabatt");
+  });
+
+  it("keeps five-year high-fit standard deals in the 60 to 65 percent annual salary window", () => {
+    const team = persistenceState.save!.gameState.teams[0]!;
+    const player = createPlayer("five-year-fit-target", {
+      salaryDemand: 100,
+      displaySalary: 10,
+      race: "Human",
+      alignment: "N",
+      traitsPositive: ["Loyal"],
+      traitsNegative: [],
+    });
+    const rosterPlayers = Array.from({ length: 10 }, (_, index) =>
+      createPlayer(`five-year-fit-context-${index}`, {
+        race: "Human",
+        alignment: "N",
+        traitsPositive: ["Loyal"],
+        traitsNegative: [],
+      }),
+    );
+
+    const fiveYears = buildContractNegotiationPreview({
+      saveId: "save-singleplayer-dev",
+      seasonId: "season-1",
+      team,
+      teamIdentity: null,
+      teamStrategyProfile: null,
+      player,
+      rosterPlayers,
+      contractLength: 5,
+      contractShape: "balanced",
+      offeredSalary: 10,
+      seasonLabelBase: "Season 1",
+    });
+    const annualRatio = (fiveYears.expectedSalary ?? 0) / (fiveYears.baseExpectedSalary ?? 1);
+
+    expect(fiveYears.teamFit ?? 0).toBeGreaterThanOrEqual(25);
+    expect(annualRatio).toBeGreaterThanOrEqual(0.6);
+    expect(annualRatio).toBeLessThanOrEqual(0.65);
   });
 
   it("uses negotiated salary for local buy roster salary and team salary preview", async () => {

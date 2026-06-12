@@ -326,7 +326,7 @@ const RETOOL_STANDARD_CONTRACT_SALARY_RANGES: Record<number, { min: number; max:
   2: { min: 0.86, max: 1.02 },
   3: { min: 0.8, max: 0.96 },
   4: { min: 0.72, max: 0.88 },
-  5: { min: 0.64, max: 0.8 },
+  5: { min: 0.61, max: 0.78 },
 };
 
 const RETOOL_MERCENARY_CONTRACT_SALARY_RANGES: Record<number, { min: number; max: number }> = {
