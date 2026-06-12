@@ -1,0 +1,11 @@
+// term: aiTeamNeeds
+// id: aiTransferPicksSkillWeighted
+// type: datasource
+// subtype: JavascriptQuery
+// page: transfermarktPage
+// folder: unknown
+// updatedAt: unknown
+// codeField: value
+// dependencies: packageInspectMetaMarkdown.value
+// extractionStatus: complete_or_primary_match
+{{ packageInspectMetaMarkdown.value }}

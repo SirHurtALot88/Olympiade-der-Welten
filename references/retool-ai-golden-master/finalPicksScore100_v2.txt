@@ -1,0 +1,552 @@
+// term: aiTeamNeeds
+// id: finalPicksScore100_v2
+// type: function
+// subtype: Function
+// page: transfermarktPage
+// folder: unknown
+// updatedAt: unknown
+// codeField: funcBody
+// dependencies: filterTeam.value | getActivePlayersByTeam.data | getTeamRatingsTransfermarkt.data | getTeamPlanHistory.data | getSalaryFactorsTransfermarkt.data | getCashFromSaisonstand.value?.cash
+// extractionStatus: complete_or_primary_match
+// transfermarktSalaryBudgetLogic v2.4_salaryFactors5Forecast
+// Fix:
+// - Reads full 5-year salary factor forecast from getSalaryFactorsTransfermarkt.
+// - Exposes salaryFactors5 / salary_factor_forecast_5 for AI2_04_Planner.
+// - Exposes factor-scaled sponsor forecast so Planner does not repeat one bad year forever.
+// - Still scope-safe: no direct access to Preisgeld-page scoped salaryFactors.
+
+const n = (v) => Number.isFinite(Number(v)) ? Number(v) : 0;
+const s = (v) => String(v ?? '').trim();
+const lower = (v) => String(v ?? '').trim().toLowerCase();
+const clamp = (v, lo, hi) => Math.max(lo, Math.min(hi, v));
+
+const VERSION = 'transfermarktSalaryBudgetLogic.v2.4_salaryFactors5Forecast';
+
+const team = s({{ filterTeam.value }} || '');
+
+if (!team) {
+  return {
+    version: VERSION,
+    reason: 'missing_team'
+  };
+}
+
+const maybeFormatDataAsArray = (src) => {
+  try {
+    if (typeof formatDataAsArray === 'function') {
+      const out = formatDataAsArray(src);
+      if (Array.isArray(out)) return out;
+    }
+  } catch (e) {}
+
+  return null;
+};
+
+const objectColumnsToRows = (src) => {
+  if (!src || typeof src !== 'object' || Array.isArray(src)) return [];
+
+  const keys = Object.keys(src);
+  if (!keys.length) return [];
+
+  const arrayKeys = keys.filter((k) => Array.isArray(src[k]));
+  if (!arrayKeys.length) return [];
+
+  const len = Math.max(...arrayKeys.map((k) => src[k].length));
+  if (!(len > 0)) return [];
+
+  const rows = [];
+
+  for (let i = 0; i < len; i++) {
+    const row = {};
+
+    for (const k of arrayKeys) {
+      row[k] = src[k][i];
+    }
+
+    rows.push(row);
+  }
+
+  return rows;
+};
+
+const coerceRows = (src) => {
+  if (Array.isArray(src)) return src.filter(Boolean);
+
+  const viaFDA = maybeFormatDataAsArray(src);
+  if (Array.isArray(viaFDA) && viaFDA.length) {
+    return viaFDA.filter(Boolean);
+  }
+
+  const viaCols = objectColumnsToRows(src);
+  if (Array.isArray(viaCols) && viaCols.length) {
+    return viaCols.filter(Boolean);
+  }
+
+  return [];
+};
+
+const parseNumberArray = (value) => {
+  if (value == null) return [];
+
+  if (Array.isArray(value)) {
+    return value
+      .map((x) => n(x))
+      .filter((x) => Number.isFinite(x) && x > 0);
+  }
+
+  if (typeof value === 'string') {
+    return value
+      .replace(/^\[/, '')
+      .replace(/\]$/, '')
+      .replace(/^\{/, '')
+      .replace(/\}$/, '')
+      .split(/[;,|]/g)
+      .map((x) => n(x))
+      .filter((x) => Number.isFinite(x) && x > 0);
+  }
+
+  return [];
+};
+
+const matchTeamRow = (row, code) => {
+  const wanted = lower(code);
+
+  const values = [
+    row?.team_code,
+    row?.teamCode,
+    row?.team,
+    row?.team_name,
+    row?.teamName,
+    row?.name,
+    row?.Name,
+    row?.Team
+  ]
+    .map((x) => lower(x))
+    .filter(Boolean);
+
+  return values.includes(wanted);
+};
+
+const roster = coerceRows({{ getActivePlayersByTeam.data }});
+const trRows = coerceRows({{ getTeamRatingsTransfermarkt.data }});
+const historyRows = coerceRows({{ getTeamPlanHistory.data }});
+
+// IMPORTANT: page query on transfermarktPage
+const salaryFactorRows = coerceRows({{ getSalaryFactorsTransfermarkt.data }});
+
+const tr =
+  trRows.find((row) => matchTeamRow(row, team)) ||
+  trRows[0] ||
+  {};
+
+const hist = [...historyRows]
+  .filter((row) => matchTeamRow(row, team))
+  .sort((a, b) => n(b.season) - n(a.season));
+
+const latest = hist[0] || {};
+const prev = hist[1] || {};
+
+const salaryFactorRow = salaryFactorRows[0] || {};
+
+const cash = n({{ getCashFromSaisonstand.value?.cash }} || 0);
+
+const ambition = clamp(n(tr?.ambition) || 5, 1, 10);
+const finances = clamp(n(tr?.finances) || 5, 1, 10);
+const harmony = clamp(n(tr?.harmony) || 5, 1, 10);
+
+const player_min = clamp(
+  Math.round(
+    n(
+      tr?.player_min ||
+      tr?.playerMin ||
+      tr?.min_players ||
+      tr?.minPlayers ||
+      tr?.min_player ||
+      tr?.minPlayer ||
+      0
+    ) || (finances >= 7 ? 10 : 9)
+  ),
+  7,
+  12
+);
+
+const optimum = clamp(
+  Math.round(
+    n(
+      tr?.optimum ||
+      tr?.player_optimum ||
+      tr?.playerOptimum ||
+      tr?.optimal_players ||
+      tr?.optimalPlayers ||
+      tr?.target_players ||
+      tr?.targetPlayers ||
+      tr?.roster_target ||
+      tr?.rosterTarget ||
+      0
+    ) || Math.max(player_min, finances >= 6 ? 11 : 10)
+  ),
+  player_min,
+  12
+);
+
+const roster_size = roster.length;
+const missing_to_min = Math.max(0, player_min - roster_size);
+const missing_to_optimum = Math.max(0, optimum - roster_size);
+
+const current_rank = n(latest?.total_rank || latest?.platz || 32) || 32;
+const previous_rank = n(prev?.total_rank || prev?.platz || current_rank) || current_rank;
+const rank_trend_recent = previous_rank - current_rank;
+
+const trend_up01 = clamp(rank_trend_recent / 8, 0, 1);
+const trend_down01 = clamp(-rank_trend_recent / 8, 0, 1);
+const current_rank01 = clamp((current_rank - 1) / 31, 0, 1);
+
+// ------------------------------------------------------------------
+// Salary factor forecast from DB
+// ------------------------------------------------------------------
+
+const factorArrayFromQuery = parseNumberArray(
+  salaryFactorRow?.salary_factors_5 ||
+  salaryFactorRow?.salaryFactors5 ||
+  salaryFactorRow?.salary_factor_forecast_5 ||
+  salaryFactorRow?.salaryFactorForecast5
+);
+
+const salaryFactorCurrentRaw =
+  salaryFactorRow?.salary_factor_current ??
+  salaryFactorRow?.salaryFactorCurrent ??
+  salaryFactorRow?.factor_current ??
+  salaryFactorRow?.factorCurrent ??
+  1;
+
+const factor0 = n(salaryFactorCurrentRaw) || 1;
+
+const factor1 = n(
+  salaryFactorRow?.salary_factor_1 ??
+  salaryFactorRow?.salaryFactor1 ??
+  salaryFactorRow?.factor_1 ??
+  salaryFactorRow?.factor1 ??
+  factor0
+) || factor0;
+
+const factor2 = n(
+  salaryFactorRow?.salary_factor_2 ??
+  salaryFactorRow?.salaryFactor2 ??
+  salaryFactorRow?.factor_2 ??
+  salaryFactorRow?.factor2 ??
+  factor1
+) || factor1;
+
+const factor3 = n(
+  salaryFactorRow?.salary_factor_3 ??
+  salaryFactorRow?.salaryFactor3 ??
+  salaryFactorRow?.factor_3 ??
+  salaryFactorRow?.factor3 ??
+  factor2
+) || factor2;
+
+const factor4 = n(
+  salaryFactorRow?.salary_factor_4 ??
+  salaryFactorRow?.salaryFactor4 ??
+  salaryFactorRow?.factor_4 ??
+  salaryFactorRow?.factor4 ??
+  factor3
+) || factor3;
+
+let salaryFactors5 = factorArrayFromQuery.length >= 5
+  ? factorArrayFromQuery.slice(0, 5)
+  : [factor0, factor1, factor2, factor3, factor4];
+
+salaryFactors5 = salaryFactors5
+  .map((x) => clamp(n(x) || 1, 0.25, 2.5))
+  .filter((x) => Number.isFinite(x) && x > 0);
+
+while (salaryFactors5.length < 5) {
+  salaryFactors5.push(salaryFactors5[salaryFactors5.length - 1] || 1);
+}
+
+salaryFactors5 = salaryFactors5.slice(0, 5);
+
+const salary_factor_current = clamp(
+  salaryFactors5[0] || 1,
+  0.25,
+  2.5
+);
+
+// ------------------------------------------------------------------
+// Known salary / market value from roster
+// ------------------------------------------------------------------
+
+const roster_salary_known = roster.reduce((acc, r) => {
+  return acc + n(
+    r?.salary ||
+    r?.gehalt ||
+    r?.expected_salary ||
+    r?.season_salary ||
+    r?.season_wage ||
+    r?.wage ||
+    0
+  );
+}, 0);
+
+const roster_market_value = roster.reduce((acc, r) => {
+  return acc + n(r?.marktwert || r?.market_value || r?.mw || r?.MW || 0);
+}, 0);
+
+const avg_known_salary_per_player =
+  roster_size > 0 ? roster_salary_known / Math.max(1, roster_size) : 0;
+
+// factor applies to future / projected salary burden
+const estimated_missing_salary =
+  avg_known_salary_per_player > 0
+    ? avg_known_salary_per_player * missing_to_optimum * salary_factor_current
+    : 0;
+
+const market_based_salary_estimate =
+  roster_market_value > 0
+    ? roster_market_value * salary_factor_current
+    : 0;
+
+const roster_salary_floor =
+  optimum * (3.6 + ambition * 0.25 + finances * 0.10);
+
+const full_roster_salary_projection =
+  roster_salary_known > 0
+    ? roster_salary_known + estimated_missing_salary
+    : market_based_salary_estimate;
+
+const expected_salary_base = Math.max(
+  full_roster_salary_projection,
+  roster_salary_floor
+);
+
+// ------------------------------------------------------------------
+// Sponsor / prize support
+// ------------------------------------------------------------------
+
+const sponsor_support_raw = n(
+  tr?.sponsor_income ||
+  tr?.sponsors ||
+  tr?.sponsor_expected ||
+  latest?.sponsors ||
+  latest?.sponsor_income ||
+  0
+);
+
+const sponsor_support_estimated =
+  sponsor_support_raw > 0
+    ? sponsor_support_raw
+    : Math.max(10, 14 + (32 - current_rank) * 0.9 + ambition * 0.8);
+
+const sponsor_support =
+  sponsor_support_raw > 0 ? sponsor_support_raw : sponsor_support_estimated;
+
+// Since the factor controls the league prize/sponsor environment,
+// expose a simple factor-scaled 5-year sponsor forecast.
+// This prevents the Planner from repeating one bad sponsor year forever.
+const sponsorSupportForecast5 = salaryFactors5.map((factor) => {
+  const scaled =
+    sponsor_support *
+    (factor / Math.max(0.0001, salary_factor_current));
+
+  return Number(Math.max(0, scaled).toFixed(2));
+});
+
+// ------------------------------------------------------------------
+// Reserve / budget logic
+// ------------------------------------------------------------------
+
+const salary_savings_share = clamp(
+  0.30 +
+  (finances - 5) * 0.06 +
+  (ambition - 5) * 0.025,
+  0.15,
+  0.85
+);
+
+const protected_salary_reserve = Math.max(
+  0,
+  expected_salary_base * (1 - salary_savings_share) - sponsor_support * 0.70
+);
+
+const salary_burden_ratio =
+  cash > 0 ? expected_salary_base / Math.max(1, cash) : 1;
+
+const cash_runway_ratio =
+  expected_salary_base > 0 ? cash / Math.max(1, expected_salary_base) : 0;
+
+const cash_runway01 = clamp((cash_runway_ratio - 1.2) / 3.8, 0, 1);
+
+const finance_safety_reserve =
+  10 +
+  finances * 2.4 +
+  harmony * 0.8 +
+  (missing_to_min > 0 ? 0 : 4) +
+  (missing_to_optimum <= 1 ? 4 : 0);
+
+const cash_relief = cash_runway01 * (6 + ambition * 0.4);
+const salary_burden_add = clamp(salary_burden_ratio, 0, 1.5) * 10;
+
+const reserve_target_min = clamp(
+  finance_safety_reserve * 0.68 +
+  protected_salary_reserve * 0.50 +
+  salary_burden_add * 0.40 -
+  cash_relief * 0.55,
+  12,
+  Math.max(18, cash * 0.10)
+);
+
+const reserve_target_base = clamp(
+  finance_safety_reserve +
+  protected_salary_reserve +
+  salary_burden_add -
+  cash_relief,
+  16,
+  Math.max(22, cash * 0.18)
+);
+
+const reserve_target_max = clamp(
+  finance_safety_reserve * 1.22 +
+  protected_salary_reserve * 1.18 +
+  salary_burden_add * 1.10 -
+  cash_relief * 0.75,
+  20,
+  Math.max(28, cash * 0.32)
+);
+
+const aggression01 = clamp(
+  0.26 * ((ambition - 1) / 9) +
+  0.24 * current_rank01 +
+  0.20 * trend_down01 +
+  0.16 * clamp(missing_to_min / 4, 0, 1) +
+  0.10 * clamp(missing_to_optimum / 4, 0, 1) +
+  0.04 * cash_runway01,
+  0,
+  1
+);
+
+const caution01 = clamp(
+  0.36 * ((finances - 1) / 9) +
+  0.14 * ((harmony - 1) / 9) +
+  0.14 * trend_up01 +
+  0.10 * (missing_to_min <= 0 ? 1 : 0) +
+  0.26 * clamp(salary_burden_ratio / 0.45, 0, 1) -
+  0.14 * cash_runway01,
+  0,
+  1
+);
+
+const spend_posture_score = clamp(aggression01 - caution01, -1, 1);
+
+const reserve_policy =
+  spend_posture_score >= 0.22 ? 'aggressive' :
+  spend_posture_score <= -0.18 ? 'conservative' :
+  'balanced';
+
+const reserve_target =
+  reserve_policy === 'aggressive'
+    ? reserve_target_min
+    : reserve_policy === 'conservative'
+    ? reserve_target_max
+    : reserve_target_base;
+
+const raw_budget_max = clamp(cash, 0, cash);
+const allowed_budget_for_search = clamp(raw_budget_max - reserve_target, 0, cash);
+
+const spend_window_floor = clamp(cash - reserve_target_max, 0, cash);
+const spend_window_base = clamp(cash - reserve_target_base, 0, cash);
+const spend_window_ceiling = clamp(cash - reserve_target_min, 0, cash);
+
+// ------------------------------------------------------------------
+// Return
+// ------------------------------------------------------------------
+
+return {
+  version: VERSION,
+  team,
+
+  cash: Number(cash.toFixed(2)),
+  roster_size,
+  player_min,
+  optimum,
+  missing_to_min,
+  missing_to_optimum,
+
+  ambition,
+  finances,
+  harmony,
+
+  current_rank,
+  previous_rank,
+  rank_trend_recent,
+
+  salary_factor_current: Number(salary_factor_current.toFixed(4)),
+
+  // New forecast fields for AI2_04_Planner v6.6+
+  salaryFactors5,
+  salary_factors_5: salaryFactors5,
+  salaryFactorForecast5: salaryFactors5,
+  salary_factor_forecast_5: salaryFactors5,
+
+  sponsorSupportForecast5,
+  sponsor_support_forecast_5: sponsorSupportForecast5,
+  expectedSponsorForecast5: sponsorSupportForecast5,
+  expected_sponsor_forecast_5: sponsorSupportForecast5,
+
+  sponsor_support: Number(sponsor_support.toFixed(2)),
+  sponsor_support_raw: Number(sponsor_support_raw.toFixed(2)),
+  sponsor_support_estimated: Number(sponsor_support_estimated.toFixed(2)),
+
+  roster_salary_known: Number(roster_salary_known.toFixed(2)),
+  roster_market_value: Number(roster_market_value.toFixed(2)),
+  avg_known_salary_per_player: Number(avg_known_salary_per_player.toFixed(2)),
+  estimated_missing_salary: Number(estimated_missing_salary.toFixed(2)),
+  market_based_salary_estimate: Number(market_based_salary_estimate.toFixed(2)),
+  full_roster_salary_projection: Number(full_roster_salary_projection.toFixed(2)),
+  roster_salary_floor: Number(roster_salary_floor.toFixed(2)),
+  expected_salary_base: Number(expected_salary_base.toFixed(2)),
+
+  salary_savings_share: Number(salary_savings_share.toFixed(3)),
+  protected_salary_reserve: Number(protected_salary_reserve.toFixed(2)),
+
+  salary_burden_ratio: Number(salary_burden_ratio.toFixed(3)),
+  cash_runway_ratio: Number(cash_runway_ratio.toFixed(3)),
+  cash_runway01: Number(cash_runway01.toFixed(3)),
+
+  finance_safety_reserve: Number(finance_safety_reserve.toFixed(2)),
+  cash_relief: Number(cash_relief.toFixed(2)),
+  salary_burden_add: Number(salary_burden_add.toFixed(2)),
+
+  reserve_target_min: Number(reserve_target_min.toFixed(2)),
+  reserve_target_base: Number(reserve_target_base.toFixed(2)),
+  reserve_target_max: Number(reserve_target_max.toFixed(2)),
+  reserve_target: Number(reserve_target.toFixed(2)),
+  reserve_policy,
+
+  aggression01: Number(aggression01.toFixed(3)),
+  caution01: Number(caution01.toFixed(3)),
+  spend_posture_score: Number(spend_posture_score.toFixed(3)),
+
+  raw_budget_max: Number(raw_budget_max.toFixed(2)),
+  allowed_budget_for_search: Number(allowed_budget_for_search.toFixed(2)),
+
+  spend_window_floor: Number(spend_window_floor.toFixed(2)),
+  spend_window_base: Number(spend_window_base.toFixed(2)),
+  spend_window_ceiling: Number(spend_window_ceiling.toFixed(2)),
+
+  debug: {
+    notes: [
+      'salaryFactors5 comes from DB query getSalaryFactorsTransfermarkt',
+      'if getSalaryFactorsTransfermarkt has only factor_current, factors repeat',
+      'sponsorSupportForecast5 is factor-scaled from current sponsor_support',
+      'factor affects projected missing-roster salary burden',
+      'AI2_04_Planner can now distinguish bad gap year vs multi-year forecast'
+    ],
+
+    salaryFactorRows_length: salaryFactorRows.length,
+    salaryFactorRow_keys: Object.keys(salaryFactorRow || {}).slice(0, 25),
+    salaryFactorRow_sample: salaryFactorRow,
+    salaryFactors5,
+    sponsorSupportForecast5
+  }
+};

@@ -1,0 +1,25 @@
+{
+  "source": "retool_or_sheet",
+  "capturedAt": "TODO_RETOOL_OR_SHEET_EXPORT_REQUIRED",
+  "saveId": null,
+  "seasonId": "TODO_RETOOL_OR_SHEET_EXPORT_REQUIRED",
+  "matchdayId": null,
+  "inputs": {
+    "exportIntent": "rank_to_points_table"
+  },
+  "outputs": {
+    "status": "TODO_RETOOL_OR_SHEET_EXPORT_REQUIRED",
+    "rows": [
+      {
+        "rank": "TODO_RETOOL_OR_SHEET_EXPORT_REQUIRED",
+        "pointsAwarded": "TODO_RETOOL_OR_SHEET_EXPORT_REQUIRED"
+      }
+    ]
+  },
+  "notes": [
+    "Diese Datei beschreibt die aktuelle Rang-zu-Punkte-Tabelle der Online-App-Version.",
+    "Keine Fame-, Draw- oder Allianzfelder verwenden."
+  ],
+  "ignoredFields": [],
+  "toleratedFloatDelta": 0
+}

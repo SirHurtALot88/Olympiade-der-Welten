@@ -1,0 +1,23 @@
+// term: playerExhaustionMap
+// id: saveLineupSimple
+// type: datasource
+// subtype: JavascriptQuery
+// page: Saisonstand
+// folder: unknown
+// updatedAt: unknown
+// codeField: funcBody
+// dependencies: formatDataAsArray(getFormkartenPoolEinsatz.data) | selectFormkarteDiszi2.value | selectFormkarteDiszi2Second.value
+// extractionStatus: complete_or_primary_match
+// Returns array of disabled formkarten IDs for D1 (for disabledValues property)
+const rows = {{ formatDataAsArray(getFormkartenPoolEinsatz.data) }} || [];
+const d2SelectedId = {{ selectFormkarteDiszi2.value }};
+const d2SecondId = {{ selectFormkarteDiszi2Second.value }};
+
+return rows.
+filter((r) => Number(r.card_value) !== 0).
+filter((r) => {
+  const isUsed = !!r.is_used;
+  const isSelectedInD2 = String(r.id) === String(d2SelectedId) || String(r.id) === String(d2SecondId);
+  return isUsed || isSelectedInD2;
+}).
+map((r) => r.id);

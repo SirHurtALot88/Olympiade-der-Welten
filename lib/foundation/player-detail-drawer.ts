@@ -1,0 +1,1227 @@
+import { getPlayerPortraitBrowserUrl } from "@/lib/data/mediaAssets";
+import type { GameState, Player, RosterEntry, Team, TeamStrategyProfile } from "@/lib/data/olyDataTypes";
+import {
+  assessPlayerBoardTrust,
+  type PlayerBoardTrustMood,
+  type PlayerBoardTrustRenewalPolicy,
+} from "@/lib/ai/player-board-trust-service";
+import type { PlayerEconomyCompareRow } from "@/lib/foundation/player-economy-compare-service";
+import { buildPlayerEconomyCompareMap } from "@/lib/foundation/player-economy-compare-service";
+import { resolvePlayerEconomyContract } from "@/lib/foundation/player-economy-contract";
+import {
+  buildPlayerRatingContractMap,
+  buildPlayerRatingContractRows,
+  type PlayerRatingContractRow,
+} from "@/lib/foundation/player-rating-contract";
+import { buildPlayerSeasonPerformance, buildPlayerSeasonPerformanceMap } from "@/lib/foundation/player-season-performance";
+import { getTeamStrategyProfile } from "@/lib/foundation/team-strategy-profiles";
+import type { LegacyLineupLoadedContext } from "@/lib/lineups/legacy-lineup-types";
+import { normalizeTransfermarktToken } from "@/lib/market/transfermarkt-fit";
+import type { PlayerScoutPotential } from "@/lib/progression/player-potential-service";
+import { buildPlayerProgressionForecast } from "@/lib/training/player-progression-forecast";
+import type { PlayerProgressionForecast } from "@/lib/training/training-plan-types";
+
+type PlayerDrawerAxisCard = {
+  id: "pow" | "spe" | "men" | "soc";
+  label: "POW" | "SPE" | "MEN" | "SOC";
+  tone: "power" | "speed" | "mental" | "social";
+  value: number | null;
+  valueRank: number | null;
+  seasonPoints: number | null;
+  seasonPointsRank: number | null;
+};
+
+type PlayerDrawerHistoryRow = {
+  seasonId: string | null;
+  seasonName: string;
+  isActiveSeason: boolean;
+  sourceLabel: string;
+  teamName: string | null;
+  teamCode: string | null;
+  appearances: number | null;
+  totalPoints: number | null;
+  pow: number | null;
+  spe: number | null;
+  men: number | null;
+  soc: number | null;
+  ovr: number | null;
+  ovrRank: number | null;
+  pps: number | null;
+  ppsRank: number | null;
+  mvs: number | null;
+  mvsRank: number | null;
+  marketValue: number | null;
+  salary: number | null;
+  contractLength: number | null;
+  averageContribution: number | null;
+  averageFinalScore: number | null;
+  bestDisciplineLabel: string | null;
+  warnings: string[];
+};
+
+export type PlayerDetailDrawerData = {
+  playerId: string;
+  activePlayerId: string | null;
+  source: "sqlite" | "prisma";
+  sourceLabel: string;
+  name: string;
+  portraitUrl: string | null;
+  teamName: string | null;
+  teamCode: string | null;
+  transferStatus: string;
+  className: string | null;
+  race: string | null;
+  subclasses: string[];
+  traitsPositive: string[];
+  traitsNegative: string[];
+  pow: number | null;
+  spe: number | null;
+  men: number | null;
+  soc: number | null;
+  ovr: number | null;
+  ovrRank: number | null;
+  ovrDelta: number | null;
+  ovrDeltaSourceLabel: string | null;
+  ovrSourceLabel: string;
+  pps: number | null;
+  ppsRank: number | null;
+  ppsDelta: number | null;
+  ppsDeltaSourceLabel: string | null;
+  ppsRating: number | null;
+  ppsSourceLabel: string;
+  mvs: number | null;
+  mvsRank: number | null;
+  mvsDelta: number | null;
+  mvsDeltaSourceLabel: string | null;
+  mvsSourceLabel: string;
+  marketValue: number | null;
+  marketValueSource: string;
+  salary: number | null;
+  salarySource: string;
+  purchasePrice: number | null;
+  purchasePriceSource: string;
+  contractLength: number | null;
+  contractLengthSource: string;
+  isImportedEconomy: boolean;
+  economyStatus: string;
+  economyCompare: PlayerEconomyCompareRow | null;
+  boardTrust: {
+    trustScore: number;
+    mood: PlayerBoardTrustMood;
+    smiley: string;
+    renewalPolicy: PlayerBoardTrustRenewalPolicy;
+    salaryCapMultiplier: number | null;
+    reasons: string[];
+    warnings: string[];
+    sourceLabel: string;
+  } | null;
+  fatigue: number | null;
+  form: number | null;
+  potential: number | null;
+  scoutPotential: PlayerScoutPotential | null;
+  attributeStats: Array<{
+    key: string;
+    label: string;
+    value: number | null;
+    ratingLabel: string | null;
+  }>;
+  axisCards: PlayerDrawerAxisCard[];
+  disciplineValues: Array<{
+    id: string;
+    label: string;
+    value: number | null;
+    seasonPoints: number | null;
+    seasonAppearances: number | null;
+    lastSeasonPoints: number | null;
+    lastSeasonAppearances: number | null;
+    lastSeasonId: string | null;
+    upgradeDelta: number | null;
+    lastSeasonDisciplineValues: number | null;
+    currentDisciplineValues: number | null;
+    disciplineDelta: number | null;
+    rank: number | null;
+    playerCount: number | null;
+  }>;
+  progressionForecast: PlayerProgressionForecast | null;
+  progressionEvents: Array<{
+    eventId: string;
+    seasonId: string;
+    xpSpent: number;
+    timestamp: string;
+    upgrades: Array<{
+      attribute: string;
+      fromValue: number;
+      toValue: number;
+      cost: number;
+    }>;
+  }>;
+  progressionEconomyPreview: {
+    marketValuePreview: number | null;
+    currentContractSalary: number | null;
+    renewalSalaryPreview: number | null;
+    salaryExpectation: number | null;
+    ovrPreview: number | null;
+    mvsUnchanged: number | null;
+    warningLevel: "none" | "gt_25_pct" | "gt_50_pct" | "gt_90_pct" | null;
+    marketValueWarnings: string[];
+    salaryWarnings: string[];
+    updatedAt: string | null;
+  } | null;
+  seasonPerformance: {
+    seasonId: string | null;
+    seasonName: string | null;
+    sourceLabel: string;
+    appearances: number;
+    totalPoints: number | null;
+    pointsByArea: {
+      pow: number | null;
+      spe: number | null;
+      men: number | null;
+      soc: number | null;
+    };
+    averageContribution: number | null;
+    averageFinalScore: number | null;
+    top10Count: number;
+    mvpCount: number;
+    bestDisciplineLabel: string | null;
+    bestDisciplineScore: number | null;
+    weakestDisciplineLabel: string | null;
+    weakestDisciplineScore: number | null;
+    latestDisciplineLabel: string | null;
+    latestFinalScore: number | null;
+    latestContribution: number | null;
+    latestRankInDiscipline: number | null;
+    latestMatchdayId: string | null;
+    topDisciplineRows: Array<{
+      disciplineId: string;
+      disciplineName: string;
+      totalContribution: number | null;
+      averageContribution: number | null;
+      averageFinalScore: number | null;
+    }>;
+    matchdayBreakdown: Array<{
+      matchdayId: string;
+      appearances: number;
+      totalContribution: number | null;
+      averageFinalScore: number | null;
+      bestDisciplineLabel: string | null;
+      bestContribution: number | null;
+    }>;
+    disciplineBreakdown: Array<{
+      disciplineId: string;
+      disciplineName: string;
+      appearances: number;
+      totalContribution: number | null;
+      averageContribution: number | null;
+      averageFinalScore: number | null;
+    }>;
+    warnings: string[];
+  } | null;
+  transferContext: {
+    roleTag: RosterEntry["roleTag"] | null;
+    joinedSeasonId: string | null;
+    purchasePrice: number | null;
+    currentValue: number | null;
+    expectedSellValue: number | null;
+    lastTransfer: {
+      transferType: "buy" | "sell";
+      seasonLabel: string;
+      matchdayId: string | null;
+      phase: string | null;
+      fee: number | null;
+      salary: number | null;
+      happenedAt: string;
+      fromTeamId: string | null;
+      toTeamId: string | null;
+    } | null;
+  };
+  transferHistory: Array<{
+    id: string;
+    transferType: "buy" | "sell";
+    seasonLabel: string;
+    matchdayId: string | null;
+    phase: string | null;
+    happenedAt: string;
+    fromTeamName: string | null;
+    toTeamName: string | null;
+    fee: number | null;
+    salary: number | null;
+    marketValue: number | null;
+    remainingContractLength: number | null;
+  }>;
+  seasonHistory: Array<{
+    seasonId: string;
+    seasonName: string;
+    teamName: string | null;
+    teamCode: string | null;
+    appearances: number;
+    totalPoints: number | null;
+    averageContribution: number | null;
+    averageFinalScore: number | null;
+    top10Count: number;
+    mvpCount: number;
+    bestDisciplineLabel: string | null;
+    bestDisciplineScore: number | null;
+    warnings: string[];
+  }>;
+  historyRows: PlayerDrawerHistoryRow[];
+  ratingWarnings: string[];
+};
+
+function isFiniteNumber(value: number | null | undefined): value is number {
+  return typeof value === "number" && Number.isFinite(value);
+}
+
+function roundValue(value: number, digits = 1) {
+  return Number(value.toFixed(digits));
+}
+
+function buildSharedRankMap(values: Array<{ playerId: string; value: number | null }>) {
+  const sorted = [...values].sort((left, right) => {
+    const leftValue = left.value ?? Number.NEGATIVE_INFINITY;
+    const rightValue = right.value ?? Number.NEGATIVE_INFINITY;
+    if (rightValue !== leftValue) {
+      return rightValue - leftValue;
+    }
+    return left.playerId.localeCompare(right.playerId, "de");
+  });
+
+  const rankMap = new Map<string, number | null>();
+  let previousValue: number | null = null;
+  let previousRank = 0;
+
+  sorted.forEach((entry, index) => {
+    if (entry.value == null) {
+      rankMap.set(entry.playerId, null);
+      return;
+    }
+
+    if (previousValue != null && entry.value === previousValue) {
+      rankMap.set(entry.playerId, previousRank);
+      return;
+    }
+
+    previousValue = entry.value;
+    previousRank = index + 1;
+    rankMap.set(entry.playerId, previousRank);
+  });
+
+  return rankMap;
+}
+
+function buildAttributeStats(
+  player: Pick<Player, "attributeSheetStats" | "attributeSheetRatings"> | null,
+) {
+  const stats = player?.attributeSheetStats;
+  const ratings = player?.attributeSheetRatings;
+  return [
+    { key: "power", label: "Power", value: stats?.power ?? null, ratingLabel: ratings?.powerRating ?? null },
+    { key: "health", label: "Health", value: stats?.health ?? null, ratingLabel: ratings?.healthRating ?? null },
+    { key: "stamina", label: "Stamina", value: stats?.stamina ?? null, ratingLabel: ratings?.staminaRating ?? null },
+    { key: "intelligence", label: "Intelligence", value: stats?.intelligence ?? null, ratingLabel: ratings?.intelligenceRating ?? null },
+    { key: "awareness", label: "Awareness", value: stats?.awareness ?? null, ratingLabel: ratings?.awarenessRating ?? null },
+    { key: "determination", label: "Determination", value: stats?.determination ?? null, ratingLabel: ratings?.determinationRating ?? null },
+    { key: "speed", label: "Speed", value: stats?.speed ?? null, ratingLabel: ratings?.speedRating ?? null },
+    { key: "dexterity", label: "Dexterity", value: stats?.dexterity ?? null, ratingLabel: ratings?.dexterityRating ?? null },
+    { key: "charisma", label: "Charisma", value: stats?.charisma ?? null, ratingLabel: ratings?.charismaRating ?? null },
+    { key: "will", label: "Will", value: stats?.will ?? null, ratingLabel: ratings?.willRating ?? null },
+    { key: "spirit", label: "Spirit", value: stats?.spirit ?? null, ratingLabel: ratings?.spiritRating ?? null },
+    { key: "torment", label: "Torment", value: stats?.torment ?? null, ratingLabel: ratings?.tormentRating ?? null },
+  ];
+}
+
+function buildDisciplineValuesFromPlayer(
+  player: Pick<Player, "disciplineRatings" | "previousDisciplineRatings" | "lastSeasonDisciplineValues" | "currentDisciplineValues" | "disciplineDelta"> | null,
+  disciplines: Array<{ id: string; name: string; playerCount?: number | null }>,
+  performance?: {
+    seasonId: string | null;
+    disciplineBreakdown: Array<{
+      disciplineId: string;
+      appearances: number;
+      totalContribution: number | null;
+    }>;
+  } | null,
+  latestArchivedPerformance?: {
+    seasonId: string | null;
+    disciplineBreakdown?: Array<{
+      disciplineId: string;
+      appearances?: number | null;
+      totalContribution?: number | null;
+    }>;
+  } | null,
+) {
+  if (!player) {
+    return [];
+  }
+  const seasonByDisciplineId = new Map((performance?.disciplineBreakdown ?? []).map((entry) => [entry.disciplineId, entry] as const));
+  const lastSeasonByDisciplineId = new Map((latestArchivedPerformance?.disciplineBreakdown ?? []).map((entry) => [entry.disciplineId, entry] as const));
+
+  return disciplines
+    .map((discipline) => {
+      const seasonRow = seasonByDisciplineId.get(discipline.id) ?? null;
+      const lastSeasonRow = lastSeasonByDisciplineId.get(discipline.id) ?? null;
+      const previous =
+        player.lastSeasonDisciplineValues?.[discipline.id] != null && player.currentDisciplineValues?.[discipline.id] != null
+          ? player.lastSeasonDisciplineValues[discipline.id]
+          : player.previousDisciplineRatings?.[discipline.id] != null && player.disciplineRatings?.[discipline.id] != null
+            ? player.previousDisciplineRatings[discipline.id]
+            : null;
+      const current =
+        player.currentDisciplineValues?.[discipline.id] != null
+          ? player.currentDisciplineValues[discipline.id]
+          : player.disciplineRatings?.[discipline.id] ?? null;
+      const delta =
+        player.disciplineDelta?.[discipline.id] != null
+          ? player.disciplineDelta[discipline.id]
+          : previous != null && current != null
+            ? roundValue(current - previous, 0)
+            : null;
+      return {
+        id: discipline.id,
+        label: discipline.name,
+        value: current,
+        seasonPoints: seasonRow?.totalContribution ?? null,
+        seasonAppearances: seasonRow?.appearances ?? null,
+        lastSeasonPoints: lastSeasonRow?.totalContribution ?? null,
+        lastSeasonAppearances: lastSeasonRow?.appearances ?? null,
+        lastSeasonId: latestArchivedPerformance?.seasonId ?? null,
+        upgradeDelta: delta,
+        lastSeasonDisciplineValues: previous,
+        currentDisciplineValues: current,
+        disciplineDelta: delta,
+        playerCount: discipline.playerCount ?? null,
+      };
+    })
+    .sort((left, right) => (right.value ?? Number.NEGATIVE_INFINITY) - (left.value ?? Number.NEGATIVE_INFINITY))
+    .map((entry, index) => ({
+      ...entry,
+      rank: entry.value == null ? null : index + 1,
+    }));
+}
+
+function buildCoreAxisRankMaps(players: Player[], rankPoolPlayerIds?: string[] | null) {
+  const rankPoolSet = rankPoolPlayerIds != null ? new Set(rankPoolPlayerIds.filter(Boolean)) : null;
+  const rankedPlayers = rankPoolSet ? players.filter((player) => rankPoolSet.has(player.id)) : players;
+  return {
+    pow: buildSharedRankMap(rankedPlayers.map((player) => ({ playerId: player.id, value: player.coreStats.pow ?? null }))),
+    spe: buildSharedRankMap(rankedPlayers.map((player) => ({ playerId: player.id, value: player.coreStats.spe ?? null }))),
+    men: buildSharedRankMap(rankedPlayers.map((player) => ({ playerId: player.id, value: player.coreStats.men ?? null }))),
+    soc: buildSharedRankMap(rankedPlayers.map((player) => ({ playerId: player.id, value: player.coreStats.soc ?? null }))),
+  };
+}
+
+function buildAxisCards(input: {
+  player: Pick<Player, "id" | "coreStats">;
+  playerRating: PlayerRatingContractRow | null;
+  coreAxisRankMaps: ReturnType<typeof buildCoreAxisRankMaps>;
+}): PlayerDrawerAxisCard[] {
+  return [
+    {
+      id: "pow",
+      label: "POW",
+      tone: "power",
+      value: input.player.coreStats.pow ?? null,
+      valueRank: input.coreAxisRankMaps.pow.get(input.player.id) ?? null,
+      seasonPoints: input.playerRating?.ppPow ?? null,
+      seasonPointsRank: input.playerRating?.ppPowRank ?? null,
+    },
+    {
+      id: "spe",
+      label: "SPE",
+      tone: "speed",
+      value: input.player.coreStats.spe ?? null,
+      valueRank: input.coreAxisRankMaps.spe.get(input.player.id) ?? null,
+      seasonPoints: input.playerRating?.ppSpe ?? null,
+      seasonPointsRank: input.playerRating?.ppSpeRank ?? null,
+    },
+    {
+      id: "men",
+      label: "MEN",
+      tone: "mental",
+      value: input.player.coreStats.men ?? null,
+      valueRank: input.coreAxisRankMaps.men.get(input.player.id) ?? null,
+      seasonPoints: input.playerRating?.ppMen ?? null,
+      seasonPointsRank: input.playerRating?.ppMenRank ?? null,
+    },
+    {
+      id: "soc",
+      label: "SOC",
+      tone: "social",
+      value: input.player.coreStats.soc ?? null,
+      valueRank: input.coreAxisRankMaps.soc.get(input.player.id) ?? null,
+      seasonPoints: input.playerRating?.ppSoc ?? null,
+      seasonPointsRank: input.playerRating?.ppSocRank ?? null,
+    },
+  ];
+}
+
+function buildPlayerRatingWithSeasonFallback(
+  gameState: GameState,
+  playerRating: PlayerRatingContractRow | null,
+  playerId: string,
+): PlayerRatingContractRow | null {
+  if (!playerRating) return null;
+  if (playerRating.ppsSeason != null) return playerRating;
+
+  const performanceMap = buildPlayerSeasonPerformanceMap(gameState);
+  const activePlayerIds = Array.from(new Set((gameState.rosters ?? []).map((entry) => entry.playerId).filter(Boolean)));
+  const activePlayerIdSet = new Set(activePlayerIds);
+  const activeSummaries = activePlayerIds
+    .map((candidateId) => ({ playerId: candidateId, summary: performanceMap.get(candidateId) ?? null }))
+    .filter((entry) => entry.summary?.totalPoints != null);
+  const summary = performanceMap.get(playerId) ?? null;
+  if (!summary || summary.totalPoints == null) return playerRating;
+
+  const ppsRankMap = buildSharedRankMap(activeSummaries.map((entry) => ({ playerId: entry.playerId, value: entry.summary?.totalPoints ?? null })));
+  const powRankMap = buildSharedRankMap(activeSummaries.map((entry) => ({ playerId: entry.playerId, value: entry.summary?.pointsByArea.pow ?? null })));
+  const speRankMap = buildSharedRankMap(activeSummaries.map((entry) => ({ playerId: entry.playerId, value: entry.summary?.pointsByArea.spe ?? null })));
+  const menRankMap = buildSharedRankMap(activeSummaries.map((entry) => ({ playerId: entry.playerId, value: entry.summary?.pointsByArea.men ?? null })));
+  const socRankMap = buildSharedRankMap(activeSummaries.map((entry) => ({ playerId: entry.playerId, value: entry.summary?.pointsByArea.soc ?? null })));
+
+  return {
+    ...playerRating,
+    ppsSeason: summary.totalPoints,
+    ppsSeasonRank: activePlayerIdSet.has(playerId) ? ppsRankMap.get(playerId) ?? null : null,
+    ppPow: summary.pointsByArea.pow,
+    ppPowRank: activePlayerIdSet.has(playerId) ? powRankMap.get(playerId) ?? null : null,
+    ppSpe: summary.pointsByArea.spe,
+    ppSpeRank: activePlayerIdSet.has(playerId) ? speRankMap.get(playerId) ?? null : null,
+    ppMen: summary.pointsByArea.men,
+    ppMenRank: activePlayerIdSet.has(playerId) ? menRankMap.get(playerId) ?? null : null,
+    ppSoc: summary.pointsByArea.soc,
+    ppSocRank: activePlayerIdSet.has(playerId) ? socRankMap.get(playerId) ?? null : null,
+    sourceStatus: {
+      ...playerRating.sourceStatus,
+      ppsSeason: "ready",
+    },
+  };
+}
+
+function resolveRosterEntry(
+  rosters: RosterEntry[],
+  playerId: string,
+  activePlayerId?: string | null,
+) {
+  if (activePlayerId) {
+    return rosters.find((entry) => entry.id === activePlayerId) ?? null;
+  }
+
+  return rosters.find((entry) => entry.playerId === playerId) ?? null;
+}
+
+function resolveTeam(
+  teams: Team[],
+  rosterEntry: Pick<RosterEntry, "teamId"> | null,
+) {
+  if (!rosterEntry) {
+    return null;
+  }
+
+  return teams.find((team) => team.teamId === rosterEntry.teamId) ?? null;
+}
+
+function getSourceLabel(source: "sqlite" | "prisma") {
+  return source === "prisma" ? "Prisma / Referenz read-only" : "SQLite / lokal";
+}
+
+function buildSeasonHistory(gameState: GameState, playerId: string) {
+  return [...(gameState.seasonState.seasonSnapshots ?? [])]
+    .sort((left, right) => right.seasonId.localeCompare(left.seasonId, "de"))
+    .map((snapshot) => {
+      const row = snapshot.playerPerformances.find((entry) => entry.playerId === playerId) ?? null;
+      if (!row) {
+        return null;
+      }
+      return {
+        seasonId: snapshot.seasonId,
+        seasonName: snapshot.seasonName,
+        teamName: row.teamName ?? null,
+        teamCode: row.teamCode ?? null,
+        appearances: row.appearances,
+        totalPoints: row.totalPoints ?? row.totalContribution ?? null,
+        averageContribution: row.averageContribution,
+        averageFinalScore: row.averageFinalScore,
+        top10Count: row.top10Count,
+        mvpCount: row.mvpCount,
+        bestDisciplineLabel: row.bestDisciplineLabel ?? null,
+        bestDisciplineScore: row.bestDisciplineScore ?? null,
+        warnings: row.warnings ?? [],
+      };
+    })
+    .filter((entry): entry is NonNullable<typeof entry> => Boolean(entry));
+}
+
+function findLatestArchivedPlayerPerformance(gameState: GameState, playerId: string) {
+  return [...(gameState.seasonState.seasonSnapshots ?? [])]
+    .filter((snapshot) => snapshot.seasonId !== gameState.season.id)
+    .sort((left, right) => right.seasonId.localeCompare(left.seasonId, "de"))
+    .map((snapshot) => {
+      const row = snapshot.playerPerformances.find((entry) => entry.playerId === playerId) ?? null;
+      return row ? { ...row, seasonId: snapshot.seasonId } : null;
+    })
+    .find((entry): entry is NonNullable<typeof entry> => Boolean(entry)) ?? null;
+}
+
+function buildMetricDelta(currentValue: number | null, previousValue: number | null) {
+  if (!isFiniteNumber(currentValue) || !isFiniteNumber(previousValue)) {
+    return null;
+  }
+  return roundValue(currentValue - previousValue, 1);
+}
+
+function buildHistoryRows(input: {
+  gameState: GameState;
+  teamName: string | null;
+  teamCode: string | null;
+  seasonPerformance: PlayerDetailDrawerData["seasonPerformance"];
+  playerRating: PlayerRatingContractRow | null;
+  marketValue: number | null;
+  salary: number | null;
+  contractLength: number | null;
+  seasonHistory: PlayerDetailDrawerData["seasonHistory"];
+}) {
+  const activeSeasonRow: PlayerDrawerHistoryRow = {
+    seasonId: input.gameState.season.id,
+    seasonName: input.gameState.season.name,
+    isActiveSeason: true,
+    sourceLabel: input.seasonPerformance?.sourceLabel ?? "Aktive Season / Live-State",
+    teamName: input.teamName,
+    teamCode: input.teamCode,
+    appearances: input.seasonPerformance?.appearances ?? null,
+    totalPoints: input.seasonPerformance?.totalPoints ?? null,
+    pow: input.playerRating?.ppPow ?? null,
+    spe: input.playerRating?.ppSpe ?? null,
+    men: input.playerRating?.ppMen ?? null,
+    soc: input.playerRating?.ppSoc ?? null,
+    ovr: input.playerRating?.ovrNormalized ?? null,
+    ovrRank: input.playerRating?.ovrRank ?? null,
+    pps: input.playerRating?.ppsSeason ?? null,
+    ppsRank: input.playerRating?.ppsSeasonRank ?? null,
+    mvs: input.playerRating?.mvs ?? null,
+    mvsRank: input.playerRating?.mvsRank ?? null,
+    marketValue: input.marketValue,
+    salary: input.salary,
+    contractLength: input.contractLength,
+    averageContribution: input.seasonPerformance?.averageContribution ?? null,
+    averageFinalScore: input.seasonPerformance?.averageFinalScore ?? null,
+    bestDisciplineLabel: input.seasonPerformance?.bestDisciplineLabel ?? null,
+    warnings: input.seasonPerformance?.warnings ?? [],
+  };
+
+  const archivedRows: PlayerDrawerHistoryRow[] = input.seasonHistory
+    .filter((entry) => entry.seasonId !== input.gameState.season.id)
+    .map((entry) => ({
+      seasonId: entry.seasonId,
+      seasonName: entry.seasonName,
+      isActiveSeason: false,
+      sourceLabel: "Season Snapshot",
+      teamName: entry.teamName,
+      teamCode: entry.teamCode,
+      appearances: entry.appearances,
+      totalPoints: entry.totalPoints,
+      pow: null,
+      spe: null,
+      men: null,
+      soc: null,
+      ovr: null,
+      ovrRank: null,
+      pps: entry.totalPoints,
+      ppsRank: null,
+      mvs: null,
+      mvsRank: null,
+      marketValue: null,
+      salary: null,
+      contractLength: null,
+      averageContribution: entry.averageContribution,
+      averageFinalScore: entry.averageFinalScore,
+      bestDisciplineLabel: entry.bestDisciplineLabel,
+      warnings: entry.warnings,
+    }));
+
+  return [activeSeasonRow, ...archivedRows];
+}
+
+function buildTransferContext(gameState: GameState, playerId: string, rosterEntry: RosterEntry | null) {
+  const lastTransfer = [...gameState.transferHistory]
+    .filter((entry) => entry.playerId === playerId)
+    .sort((left, right) => right.happenedAt.localeCompare(left.happenedAt, "de"))[0] ?? null;
+
+  return {
+    roleTag: rosterEntry?.roleTag ?? null,
+    joinedSeasonId: rosterEntry?.joinedSeasonId ?? null,
+    purchasePrice: rosterEntry?.purchasePrice ?? null,
+    currentValue: rosterEntry?.currentValue ?? null,
+    expectedSellValue: rosterEntry?.currentValue ?? rosterEntry?.purchasePrice ?? null,
+    lastTransfer: lastTransfer
+      ? {
+          transferType: lastTransfer.transferType,
+          seasonLabel: lastTransfer.seasonLabel,
+          matchdayId: lastTransfer.matchdayId ?? null,
+          phase: lastTransfer.phase ?? null,
+          fee: lastTransfer.fee ?? null,
+          salary: lastTransfer.salary ?? null,
+          happenedAt: lastTransfer.happenedAt,
+          fromTeamId: lastTransfer.fromTeamId ?? null,
+          toTeamId: lastTransfer.toTeamId ?? null,
+        }
+      : null,
+  };
+}
+
+function buildTransferHistory(gameState: GameState, playerId: string) {
+  const teamNamesById = new Map(gameState.teams.map((team) => [team.teamId, team.name] as const));
+
+  return [...gameState.transferHistory]
+    .filter((entry) => entry.playerId === playerId)
+    .sort((left, right) => right.happenedAt.localeCompare(left.happenedAt, "de"))
+    .map((entry) => ({
+      id: entry.id,
+      transferType: entry.transferType,
+      seasonLabel: entry.seasonLabel,
+      matchdayId: entry.matchdayId ?? null,
+      phase: entry.phase ?? null,
+      happenedAt: entry.happenedAt,
+      fromTeamName: entry.fromTeamId ? (teamNamesById.get(entry.fromTeamId) ?? entry.fromTeamId) : null,
+      toTeamName: entry.toTeamId ? (teamNamesById.get(entry.toTeamId) ?? entry.toTeamId) : null,
+      fee: entry.fee ?? null,
+      salary: entry.salary ?? null,
+      marketValue: entry.marketValue ?? null,
+      remainingContractLength: entry.remainingContractLength ?? null,
+    }));
+}
+
+function getPlayerStrategyTokens(player: Player) {
+  return [
+    player.className,
+    player.race,
+    ...(player.subclasses ?? []),
+    ...(player.traitsPositive ?? []),
+    ...(player.traitsNegative ?? []),
+  ]
+    .map(normalizeTransfermarktToken)
+    .filter(Boolean);
+}
+
+function countStrategyMatches(values: string[] | undefined, candidateTokens: string[]) {
+  const normalizedValues = (values ?? []).map(normalizeTransfermarktToken).filter(Boolean);
+  return normalizedValues.filter((token) =>
+    candidateTokens.some((candidate) => candidate === token || candidate.includes(token) || token.includes(candidate)),
+  ).length;
+}
+
+function matchesTrustHardNoGo(profile: TeamStrategyProfile | null, player: Player) {
+  if (!profile || profile.hardNoGos.length === 0) {
+    return false;
+  }
+
+  const tokens = getPlayerStrategyTokens(player);
+  const normalizedRace = normalizeTransfermarktToken(player.race);
+  return profile.hardNoGos.some((entry) => {
+    const normalized = normalizeTransfermarktToken(entry);
+    if (!normalized) {
+      return false;
+    }
+    if (normalized.includes("nonhuman") && normalizedRace !== "human") {
+      return true;
+    }
+    if (normalized.includes("human") && normalized.includes("anti") && normalizedRace === "human") {
+      return true;
+    }
+    return tokens.some((token) => token === normalized || token.includes(normalized) || normalized.includes(token));
+  });
+}
+
+function buildBoardTrust(input: {
+  gameState: GameState;
+  team: Team | null;
+  player: Player;
+  rosterEntry: RosterEntry | null;
+  playerRating: PlayerRatingContractRow | null;
+  economy: {
+    marketValue: number | null;
+    salary: number | null;
+  };
+  coreAxisRankMaps: ReturnType<typeof buildCoreAxisRankMaps>;
+  seasonPerformance: ReturnType<typeof buildPlayerSeasonPerformance> | null;
+}): PlayerDetailDrawerData["boardTrust"] {
+  if (!input.team || !input.rosterEntry) {
+    return null;
+  }
+
+  const identity = input.gameState.teamIdentities.find((entry) => entry.teamId === input.team?.teamId) ?? null;
+  const profile = getTeamStrategyProfile(input.gameState, input.team.teamId);
+  const tokens = getPlayerStrategyTokens(input.player);
+  const preferredHits =
+    countStrategyMatches(profile?.preferredRaces, [normalizeTransfermarktToken(input.player.race)]) +
+    countStrategyMatches(profile?.preferredClasses, [normalizeTransfermarktToken(input.player.className)]) +
+    countStrategyMatches(profile?.preferredTraits, tokens) +
+    countStrategyMatches(profile?.preferredArchetypes, tokens);
+  const avoidedHits =
+    countStrategyMatches(profile?.avoidedRaces, [normalizeTransfermarktToken(input.player.race)]) +
+    countStrategyMatches(profile?.avoidedClasses, [normalizeTransfermarktToken(input.player.className)]) +
+    countStrategyMatches(profile?.dislikedTraits, tokens) +
+    countStrategyMatches(profile?.avoidedArchetypes, tokens);
+  const hardNoGoHit = matchesTrustHardNoGo(profile, input.player);
+  const weakTeamFit = avoidedHits > preferredHits || hardNoGoHit;
+  const axisCandidates = [
+    {
+      axis: "pow",
+      value: input.player.coreStats.pow ?? null,
+      expectedAxisRank: input.coreAxisRankMaps.pow.get(input.player.id) ?? null,
+      actualAxisPpsRank: input.playerRating?.ppPowRank ?? null,
+    },
+    {
+      axis: "spe",
+      value: input.player.coreStats.spe ?? null,
+      expectedAxisRank: input.coreAxisRankMaps.spe.get(input.player.id) ?? null,
+      actualAxisPpsRank: input.playerRating?.ppSpeRank ?? null,
+    },
+    {
+      axis: "men",
+      value: input.player.coreStats.men ?? null,
+      expectedAxisRank: input.coreAxisRankMaps.men.get(input.player.id) ?? null,
+      actualAxisPpsRank: input.playerRating?.ppMenRank ?? null,
+    },
+    {
+      axis: "soc",
+      value: input.player.coreStats.soc ?? null,
+      expectedAxisRank: input.coreAxisRankMaps.soc.get(input.player.id) ?? null,
+      actualAxisPpsRank: input.playerRating?.ppSocRank ?? null,
+    },
+  ].sort((left, right) => (right.value ?? Number.NEGATIVE_INFINITY) - (left.value ?? Number.NEGATIVE_INFINITY))[0] ?? null;
+  const assessment = assessPlayerBoardTrust({
+    boardConfidence: identity?.boardConfidence ?? null,
+    appearances: input.seasonPerformance?.appearances ?? 0,
+    averageContribution: input.seasonPerformance?.averageContribution ?? null,
+    averageFinalScore: input.seasonPerformance?.averageFinalScore ?? null,
+    expectedPerformanceValue: input.playerRating?.ovrNormalized ?? input.player.rating ?? null,
+    contractLength: input.rosterEntry.contractLength ?? null,
+    roleTag: input.rosterEntry.roleTag ?? null,
+    salary: input.economy.salary,
+    marketValue: input.economy.marketValue,
+    purchasePrice: input.rosterEntry.purchasePrice ?? null,
+    currentValue: input.rosterEntry.currentValue ?? null,
+    ovrRank: input.playerRating?.ovrRank ?? null,
+    actualPpsRank: input.playerRating?.ppsSeasonRank ?? null,
+    actualMvsRank: input.playerRating?.mvsRank ?? null,
+    expectedAxisRank: axisCandidates?.expectedAxisRank ?? null,
+    actualAxisPpsRank: axisCandidates?.actualAxisPpsRank ?? null,
+    weakTeamFit,
+    hardNoGoHit,
+  });
+
+  return {
+    ...assessment,
+    sourceLabel:
+      identity?.boardConfidence != null
+        ? `Board Confidence ${Math.round(identity.boardConfidence)}`
+        : "Board Confidence neutral",
+  };
+}
+
+export function buildPlayerDrawerDataFromGameState(input: {
+  gameState: GameState;
+  playerId: string;
+  source: "sqlite" | "prisma";
+  activePlayerId?: string | null;
+}): PlayerDetailDrawerData | null {
+  const player = input.gameState.players.find((entry) => entry.id === input.playerId) ?? null;
+  if (!player) {
+    return null;
+  }
+
+  const rosterEntry = resolveRosterEntry(input.gameState.rosters, input.playerId, input.activePlayerId);
+  const team = resolveTeam(input.gameState.teams, rosterEntry);
+  const seasonPerformance = buildPlayerSeasonPerformance(input.gameState, player.id);
+  const playerRatingsById = buildPlayerRatingContractMap(input.gameState);
+  const playerRating = buildPlayerRatingWithSeasonFallback(input.gameState, playerRatingsById.get(player.id) ?? null, player.id);
+  const activePlayerIds = Array.from(new Set((input.gameState.rosters ?? []).map((entry) => entry.playerId).filter(Boolean)));
+  const coreAxisRankMaps = buildCoreAxisRankMaps(input.gameState.players, activePlayerIds);
+  const economyCompare = buildPlayerEconomyCompareMap({ gameState: input.gameState }).get(player.id) ?? null;
+  const economy = resolvePlayerEconomyContract({
+    playerId: player.id,
+    player,
+    rosterEntry,
+  });
+  const boardTrust = buildBoardTrust({
+    gameState: input.gameState,
+    team,
+    player,
+    rosterEntry,
+    playerRating,
+    economy: {
+      marketValue: economy.marketValue,
+      salary: economy.salary,
+    },
+    coreAxisRankMaps,
+    seasonPerformance,
+  });
+  const seasonHistory = buildSeasonHistory(input.gameState, player.id);
+  const latestArchivedPerformance = findLatestArchivedPlayerPerformance(input.gameState, player.id);
+  const historyRows = buildHistoryRows({
+    gameState: input.gameState,
+    teamName: team?.name ?? null,
+    teamCode: team?.shortCode ?? null,
+    seasonPerformance,
+    playerRating,
+    marketValue: economy.marketValue,
+    salary: economy.salary,
+    contractLength: economy.contractLength,
+    seasonHistory,
+  });
+  const previousHistoryRow = historyRows.find((entry) => !entry.isActiveSeason) ?? null;
+  const progressionForecast = buildPlayerProgressionForecast({
+    gameState: input.gameState,
+    player,
+    playerRating,
+    seasonPerformance,
+    trainingModeByPlayerId: player.trainingMode ? { [player.id]: player.trainingMode } : null,
+    currentXP: player.currentXP ?? 0,
+    spentXP: player.spentXP ?? 0,
+    lifetimeXP: player.lifetimeXP ?? null,
+  });
+  const progressionEvents = [...(input.gameState.playerProgressionEvents ?? [])]
+    .filter((event) => event.playerId === player.id)
+    .sort((left, right) => right.timestamp.localeCompare(left.timestamp, "de"))
+    .slice(0, 5)
+    .map((event) => ({
+      eventId: event.eventId,
+      seasonId: event.seasonId,
+      xpSpent: event.xpSpent,
+      timestamp: event.timestamp,
+      upgrades: event.upgrades.map((upgrade) => ({
+        attribute: upgrade.attribute,
+        fromValue: upgrade.fromValue,
+        toValue: upgrade.toValue,
+        cost: upgrade.cost,
+      })),
+    }));
+
+  return {
+    playerId: player.id,
+    activePlayerId: rosterEntry?.id ?? null,
+    source: input.source,
+    sourceLabel: getSourceLabel(input.source),
+    name: player.name,
+    portraitUrl: getPlayerPortraitBrowserUrl(player.id, player.portraitUrl ?? null, player.portraitPath ?? null),
+    teamName: team?.name ?? null,
+    teamCode: team?.shortCode ?? null,
+    transferStatus: rosterEntry ? "Active Player" : "Free Agent",
+    className: player.className ?? null,
+    race: player.race ?? null,
+    subclasses: player.subclasses ?? [],
+    traitsPositive: player.traitsPositive ?? [],
+    traitsNegative: player.traitsNegative ?? [],
+    pow: player.coreStats.pow ?? null,
+    spe: player.coreStats.spe ?? null,
+    men: player.coreStats.men ?? null,
+    soc: player.coreStats.soc ?? null,
+    ovr: playerRating?.ovrNormalized ?? null,
+    ovrRank: playerRating?.ovrRank ?? null,
+    ovrDelta: buildMetricDelta(playerRating?.ovrNormalized ?? null, previousHistoryRow?.ovr ?? null),
+    ovrDeltaSourceLabel: previousHistoryRow?.ovr != null ? `Vergleich zu ${previousHistoryRow.seasonName}` : null,
+    ovrSourceLabel:
+      playerRating?.sourceStatus.normalizedOvr === "ready"
+        ? "Pool-normalisiert aus rating"
+        : playerRating?.sourceStatus.normalizedOvr === "pool_no_spread"
+          ? "OVR blockiert: ovr_pool_no_spread"
+          : "OVR blockiert: ovr_raw_source_missing",
+    pps: playerRating?.ppsSeason ?? null,
+    ppsRank: playerRating?.ppsSeasonRank ?? null,
+    ppsDelta: buildMetricDelta(playerRating?.ppsSeason ?? null, previousHistoryRow?.pps ?? null),
+    ppsDeltaSourceLabel: previousHistoryRow?.pps != null ? `Vergleich zu ${previousHistoryRow.seasonName}` : null,
+    ppsRating: playerRating?.ratingPps ?? null,
+    ppsSourceLabel:
+      playerRating?.sourceStatus.ppsSeason === "ready"
+        ? "Season PPs aus gespeicherten Results"
+        : "Keine gespeicherten Season-PPs",
+    mvs: playerRating?.mvs ?? null,
+    mvsRank: playerRating?.mvsRank ?? null,
+    mvsDelta: buildMetricDelta(playerRating?.mvs ?? null, previousHistoryRow?.mvs ?? null),
+    mvsDeltaSourceLabel: previousHistoryRow?.mvs != null ? `Vergleich zu ${previousHistoryRow.seasonName}` : null,
+    mvsSourceLabel:
+      playerRating?.sourceStatus.mvs === "ready"
+        ? "MVS aus Season-Platzierungen via Rank→Diszi-MW"
+        : "Keine belegte MVS-Quelle",
+    marketValue: economy.marketValue,
+    marketValueSource: economy.marketValueSource,
+    salary: economy.salary,
+    salarySource: economy.salarySource,
+    purchasePrice: economy.purchasePrice,
+    purchasePriceSource: economy.purchasePriceSource,
+    contractLength: economy.contractLength,
+    contractLengthSource: economy.contractLengthSource,
+    isImportedEconomy: economy.isImportedEconomy,
+    economyStatus: economy.economyStatus,
+    economyCompare,
+    boardTrust,
+    progressionEconomyPreview: player.economyAfterUpgradePreview
+      ? {
+          marketValuePreview: player.economyAfterUpgradePreview.marketValuePreview,
+          currentContractSalary: player.economyAfterUpgradePreview.currentContractSalary,
+          renewalSalaryPreview: player.economyAfterUpgradePreview.renewalSalaryPreview,
+          salaryExpectation: player.economyAfterUpgradePreview.salaryExpectation,
+          ovrPreview: player.economyAfterUpgradePreview.ovrPreview,
+          mvsUnchanged: player.economyAfterUpgradePreview.mvsUnchanged,
+          warningLevel: player.economyAfterUpgradePreview.warningLevel ?? null,
+          marketValueWarnings: player.economyAfterUpgradePreview.marketValueWarnings ?? [],
+          salaryWarnings: player.economyAfterUpgradePreview.salaryWarnings ?? [],
+          updatedAt: player.economyAfterUpgradePreview.updatedAt,
+        }
+      : null,
+    fatigue: player.fatigue ?? null,
+    form: player.form ?? null,
+    potential: player.potential ?? null,
+    scoutPotential: progressionForecast.scoutPotential,
+    attributeStats: buildAttributeStats(player),
+    axisCards: buildAxisCards({
+      player,
+      playerRating,
+      coreAxisRankMaps,
+    }),
+    disciplineValues: buildDisciplineValuesFromPlayer(
+      player,
+      input.gameState.disciplines,
+      seasonPerformance,
+      latestArchivedPerformance,
+    ),
+    progressionForecast,
+    progressionEvents,
+    seasonPerformance,
+    transferContext: {
+      ...buildTransferContext(input.gameState, player.id, rosterEntry),
+      purchasePrice: economy.purchasePrice,
+      currentValue: economy.marketValue,
+      expectedSellValue: economy.marketValue,
+    },
+    transferHistory: buildTransferHistory(input.gameState, player.id),
+    seasonHistory,
+    historyRows,
+    ratingWarnings: playerRating?.warnings ?? [],
+  };
+}
+
+export function buildPlayerDrawerDataFromLegacyContext(input: {
+  context: LegacyLineupLoadedContext;
+  playerId: string;
+  source: "sqlite" | "prisma";
+  activePlayerId?: string | null;
+  playerCatalogById?: Map<string, Player>;
+}): PlayerDetailDrawerData | null {
+  const catalogPlayer = input.playerCatalogById?.get(input.playerId) ?? null;
+  const rosterPlayer = input.context.rosterPlayers.find((entry) => entry.id === input.playerId) ?? null;
+  if (!catalogPlayer && !rosterPlayer) {
+    return null;
+  }
+
+  const activePlayer = input.context.activePlayers.find((entry) =>
+    input.activePlayerId ? entry.id === input.activePlayerId : entry.playerId === input.playerId,
+  ) ?? null;
+  const playerCatalog = input.playerCatalogById ? [...input.playerCatalogById.values()] : catalogPlayer ? [catalogPlayer] : [];
+  const activePlayerIds = Array.from(new Set(input.context.activePlayers.map((entry) => entry.playerId).filter(Boolean)));
+  const coreAxisRankMaps = buildCoreAxisRankMaps(playerCatalog, activePlayerIds);
+  const playerRating = buildPlayerRatingContractRows({
+    players: playerCatalog,
+    normalizationPoolPlayerIds: activePlayerIds,
+    rankPoolPlayerIds: activePlayerIds,
+  }).find((entry) => entry.playerId === input.playerId) ?? null;
+  const economy = resolvePlayerEconomyContract({
+    playerId: input.playerId,
+    player: catalogPlayer,
+    rosterEntry: activePlayer
+      ? {
+          salary: activePlayer.salary ?? null,
+          purchasePrice: null,
+          currentValue: activePlayer.marketValue ?? null,
+          contractLength: activePlayer.contractLength ?? null,
+        }
+      : null,
+  });
+
+  const disciplineValues = catalogPlayer
+    ? buildDisciplineValuesFromPlayer(catalogPlayer, input.context.disciplines)
+    : input.context.disciplineScores
+        .filter((entry) => entry.playerId === input.playerId)
+        .map((entry) => ({
+          id: entry.disciplineId,
+          label:
+            input.context.disciplines.find((discipline) => discipline.id === entry.disciplineId)?.name ?? entry.disciplineId,
+          value: entry.score,
+          seasonPoints: null,
+          seasonAppearances: null,
+          lastSeasonPoints: null,
+          lastSeasonAppearances: null,
+          lastSeasonId: null,
+          upgradeDelta: null,
+          lastSeasonDisciplineValues: null,
+          currentDisciplineValues: entry.score,
+          disciplineDelta: null,
+          playerCount:
+            (input.context.disciplines.find((discipline) => discipline.id === entry.disciplineId) as { playerCount?: number | null } | undefined)
+              ?.playerCount ?? null,
+        }))
+        .sort((left, right) => (right.value ?? Number.NEGATIVE_INFINITY) - (left.value ?? Number.NEGATIVE_INFINITY))
+        .map((entry, index) => ({
+          ...entry,
+          rank: entry.value == null ? null : index + 1,
+        }));
+  const axisCards =
+    catalogPlayer && playerCatalog.length > 0
+      ? buildAxisCards({
+          player: catalogPlayer,
+          playerRating,
+          coreAxisRankMaps,
+        })
+      : [
+          {
+            id: "pow",
+            label: "POW",
+            tone: "power",
+            value: rosterPlayer?.coreStats.pow ?? null,
+            valueRank: null,
+            seasonPoints: null,
+            seasonPointsRank: null,
+          },
+          {
+            id: "spe",
+            label: "SPE",
+            tone: "speed",
+            value: rosterPlayer?.coreStats.spe ?? null,
+            valueRank: null,
+            seasonPoints: null,
+            seasonPointsRank: null,
+          },
+          {
+            id: "men",
+            label: "MEN",
+            tone: "mental",
+            value: rosterPlayer?.coreStats.men ?? null,
+            valueRank: null,
+            seasonPoints: null,
+            seasonPointsRank: null,
+          },
+          {
+            id: "soc",
+            label: "SOC",
+            tone: "social",
+            value: rosterPlayer?.coreStats.soc ?? null,
+            valueRank: null,
+            seasonPoints: null,
+            seasonPointsRank: null,
+          },
+        ] satisfies PlayerDrawerAxisCard[];
+  const historyRows: PlayerDrawerHistoryRow[] = [
+    {
+      seasonId: input.context.matchday.id ?? null,
+      seasonName: input.context.matchday.id ?? "Kontext",
+      isActiveSeason: true,
+      sourceLabel: "Lineup-Kontext",
+      teamName: input.context.team.name,
+      teamCode: input.context.team.shortCode,
+      appearances: null,
+      totalPoints: null,
+      pow: null,
+      spe: null,
+      men: null,
+      soc: null,
+      ovr: playerRating?.ovrNormalized ?? null,
+      ovrRank: playerRating?.ovrRank ?? null,
+      pps: null,
+      ppsRank: null,
+      mvs: playerRating?.mvs ?? null,
+      mvsRank: playerRating?.mvsRank ?? null,
+      marketValue: economy.marketValue,
+      salary: economy.salary,
+      contractLength: economy.contractLength,
+      averageContribution: null,
+      averageFinalScore: null,
+      bestDisciplineLabel: disciplineValues[0]?.label ?? null,
+      warnings: [],
+    },
+  ];
+
+  return {
+    playerId: input.playerId,
+    activePlayerId: activePlayer?.id ?? null,
+    source: input.source,
+    sourceLabel: getSourceLabel(input.source),
+    name: catalogPlayer?.name ?? rosterPlayer?.name ?? input.playerId,
+    portraitUrl: catalogPlayer
+      ? getPlayerPortraitBrowserUrl(
+          catalogPlayer.id,
+          catalogPlayer.portraitUrl ?? null,
+          catalogPlayer.portraitPath ?? null,
+        )
+      : getPlayerPortraitBrowserUrl(input.playerId, rosterPlayer?.portraitUrl ?? null, null),
+    teamName: input.context.team.name,
+    teamCode: input.context.team.shortCode,
+    transferStatus: activePlayer ? "Active Player" : "Preview / Kontextspieler",
+    className: catalogPlayer?.className ?? rosterPlayer?.className ?? null,
+    race: catalogPlayer?.race ?? null,
+    subclasses: catalogPlayer?.subclasses ?? [],
+    traitsPositive: catalogPlayer?.traitsPositive ?? rosterPlayer?.traitsPositive ?? [],
+    traitsNegative: catalogPlayer?.traitsNegative ?? rosterPlayer?.traitsNegative ?? [],
+    pow: catalogPlayer?.coreStats.pow ?? rosterPlayer?.coreStats.pow ?? null,
+    spe: catalogPlayer?.coreStats.spe ?? rosterPlayer?.coreStats.spe ?? null,
+    men: catalogPlayer?.coreStats.men ?? rosterPlayer?.coreStats.men ?? null,
+    soc: catalogPlayer?.coreStats.soc ?? rosterPlayer?.coreStats.soc ?? null,
+    ovr: playerRating?.ovrNormalized ?? null,
+    ovrRank: playerRating?.ovrRank ?? null,
+    ovrDelta: null,
+    ovrDeltaSourceLabel: null,
+    ovrSourceLabel:
+      playerRating?.sourceStatus.normalizedOvr === "ready"
+        ? "Pool-normalisiert aus rating"
+        : playerRating?.sourceStatus.normalizedOvr === "pool_no_spread"
+          ? "OVR blockiert: ovr_pool_no_spread"
+          : "OVR blockiert: ovr_raw_source_missing",
+    pps: null,
+    ppsRank: null,
+    ppsDelta: null,
+    ppsDeltaSourceLabel: null,
+    ppsRating: playerRating?.ratingPps ?? catalogPlayer?.pps ?? rosterPlayer?.pps ?? null,
+    ppsSourceLabel: "Kontextansicht ohne gespeicherte Season-PPs",
+    mvs: playerRating?.mvs ?? null,
+    mvsRank: playerRating?.mvsRank ?? null,
+    mvsDelta: null,
+    mvsDeltaSourceLabel: null,
+    mvsSourceLabel:
+      playerRating?.sourceStatus.mvs === "ready"
+        ? "MVS aus Season-Platzierungen via Rank→Diszi-MW"
+        : "Keine belegte MVS-Quelle",
+    marketValue: economy.marketValue,
+    marketValueSource: economy.marketValueSource,
+    salary: economy.salary,
+    salarySource: economy.salarySource,
+    purchasePrice: economy.purchasePrice,
+    purchasePriceSource: economy.purchasePriceSource,
+    contractLength: economy.contractLength,
+    contractLengthSource: economy.contractLengthSource,
+    isImportedEconomy: economy.isImportedEconomy,
+    economyStatus: economy.economyStatus,
+    economyCompare: null,
+    boardTrust: null,
+    fatigue: catalogPlayer?.fatigue ?? rosterPlayer?.fatigue ?? null,
+    form: catalogPlayer?.form ?? rosterPlayer?.form ?? null,
+    potential: catalogPlayer?.potential ?? rosterPlayer?.potential ?? null,
+    attributeStats: buildAttributeStats(catalogPlayer),
+    axisCards,
+    disciplineValues,
+    progressionForecast: null,
+    progressionEvents: [],
+    progressionEconomyPreview: null,
+    seasonPerformance: null,
+    transferContext: {
+      roleTag: null,
+      joinedSeasonId: null,
+      purchasePrice: economy.purchasePrice,
+      currentValue: economy.marketValue,
+      expectedSellValue: economy.marketValue,
+      lastTransfer: null,
+    },
+    transferHistory: [],
+    seasonHistory: [],
+    historyRows,
+    ratingWarnings: playerRating?.warnings ?? [],
+  };
+}

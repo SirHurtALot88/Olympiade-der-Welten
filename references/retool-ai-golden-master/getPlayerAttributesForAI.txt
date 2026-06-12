@@ -1,0 +1,47 @@
+// term: disciplineRecipesGlobal
+// id: getPlayerAttributesForAI
+// type: script
+// subtype: SqlQueryUnified
+// page: transfermarktPage
+// folder: unknown
+// updatedAt: unknown
+// codeField: funcBody
+// dependencies: none
+// extractionStatus: complete_or_primary_match
+// Single source of truth for discipline attribute-weight recipes.
+//
+// IMPORTANT:
+//   Keep this 1:1 aligned with attribute availability in getPlayerAttributesForAI.
+//   All downstream logic should reference this object (not re-declare weights).
+//
+// Returns:
+//   Record<string, Record<string, number>> // discipline_field -> { attr -> weight }
+
+return {
+  // red
+  tdm: { power: 0.50, determination: 0.25, stamina: 0.15, health: 0.10 },
+  mini_dm: { health: 0.35, stamina: 0.35, will: 0.20, spirit: 0.10 },
+  gewichtheben: { power: 0.60, health: 0.20, stamina: 0.20 },
+  hockey: { power: 0.30, speed: 0.25, dexterity: 0.25, stamina: 0.20 },
+  breaking: { speed: 0.35, dexterity: 0.30, power: 0.20, stamina: 0.15 },
+
+  // green
+  staffel: { speed: 0.50, stamina: 0.30, determination: 0.20 },
+  time_trial: { speed: 0.45, stamina: 0.30, dexterity: 0.15, determination: 0.10 },
+  spurt: { speed: 0.60, power: 0.25, determination: 0.15 },
+  climbing: { stamina: 0.35, dexterity: 0.30, power: 0.20, determination: 0.15 },
+  fechten: { dexterity: 0.40, speed: 0.30, awareness: 0.30 },
+
+  // blue
+  schach: { intelligence: 0.50, awareness: 0.30, determination: 0.20 },
+  takeshi: { awareness: 0.35, dexterity: 0.30, speed: 0.20, intelligence: 0.15 },
+  tennis: { dexterity: 0.35, speed: 0.30, intelligence: 0.20, stamina: 0.15 },
+  i_spy: { awareness: 0.50, intelligence: 0.35, dexterity: 0.15 },
+  wettessen: { health: 0.35, stamina: 0.35, will: 0.20, spirit: 0.10 },
+
+  // yellow
+  basketball: { speed: 0.30, dexterity: 0.25, charisma: 0.20, intelligence: 0.15, stamina: 0.10 },
+  football: { power: 0.30, speed: 0.25, stamina: 0.20, determination: 0.15, charisma: 0.10 },
+  battlefield: { power: 0.25, awareness: 0.25, determination: 0.20, stamina: 0.15, intelligence: 0.15 },
+  eiskunst: { dexterity: 0.35, charisma: 0.30, spirit: 0.20, awareness: 0.15 },
+  showcase: { charisma: 0.40, spirit: 0.30, awareness: 0.20, intelligence: 0.10 } };

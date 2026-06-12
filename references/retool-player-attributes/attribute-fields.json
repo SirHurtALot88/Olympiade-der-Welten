@@ -1,0 +1,44 @@
+{
+  "queryName": "getPlayerAttributesForAI",
+  "sourceKind": "SqlQueryUnified",
+  "page": "transfermarktPage",
+  "resourceDisplayName": null,
+  "spreadsheetId": null,
+  "sheetName": null,
+  "tableName": null,
+  "fields": [
+    "power",
+    "health",
+    "stamina",
+    "determination",
+    "speed",
+    "dexterity",
+    "intelligence",
+    "awareness",
+    "will",
+    "charisma",
+    "spirit",
+    "torment"
+  ],
+  "ratings": [
+    "power_rating",
+    "health_rating",
+    "stamina_rating",
+    "determination_rating",
+    "speed_rating",
+    "dexterity_rating",
+    "intelligence_rating",
+    "awareness_rating",
+    "will_rating",
+    "charisma_rating",
+    "spirit_rating",
+    "torment_rating"
+  ],
+  "extractionQuality": "quirky",
+  "dataEmbedded": false,
+  "notes": [
+    "Project reference contains only metadata for the attribute query.",
+    "Query found, data not embedded."
+  ],
+  "sourcePath": "/Users/chrisfalk/Documents/Codex/Olympiade der Welten/references/retool-ai-golden-master/getPlayerAttributesForAI.state.js"
+}

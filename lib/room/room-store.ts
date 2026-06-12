@@ -1,0 +1,370 @@
+import { createActionLogEntry } from "@/lib/game/action-log";
+import { createInitialRoomState } from "@/lib/game/create-room-state";
+import { MAX_ACTIVE_PLAYERS } from "@/lib/game/constants";
+import { createRoomCode } from "@/lib/room/room-code";
+import {
+  applyOwnershipPresetToState,
+  buildParticipant,
+  buildTurnState,
+  canParticipantControlTeam,
+  syncParticipantControlledTeams,
+} from "@/lib/room/online-room-model";
+import { buildRoomFlowState, getNextRoomFlowStepId } from "@/lib/room/room-flow-controller";
+import { findSeatByToken } from "@/lib/room/rejoin";
+import { createSeatToken } from "@/lib/room/seat-tokens";
+import type { RoomOwnershipPreset } from "@/types/events";
+import type { CoachRole } from "@/types/game";
+import type { RoomSeat, RuntimeRoom } from "@/types/room";
+
+const runtimeRooms = new Map<string, RuntimeRoom>();
+
+function getSeatCount(room: RuntimeRoom) {
+  return Object.values(room.seats).filter(Boolean).length;
+}
+
+function buildSeat(role: CoachRole, socketId: string, participantId: string): RoomSeat {
+  return {
+    role,
+    participantId,
+    seatToken: createSeatToken(),
+    socketId,
+    connected: true,
+    joinedAt: new Date().toISOString(),
+  };
+}
+
+function syncPlayers(room: RuntimeRoom) {
+  const ownership = room.state.teamOwnership;
+  const roomParticipants = syncParticipantControlledTeams(
+    room.state.roomParticipants.map((participant) => ({
+      ...participant,
+      connectionStatus: Object.values(room.seats).some(
+        (seat) => seat?.participantId === participant.participantId && seat.connected,
+      )
+        ? "online"
+        : "offline",
+    })),
+    ownership,
+  );
+  const multiplayerRoom = {
+    ...room.state.multiplayerRoom,
+    status: getSeatCount(room) > 0 ? room.state.multiplayerRoom.status : "paused",
+    updatedAt: new Date().toISOString(),
+  };
+
+  const turnState = buildTurnState({
+    roomStatus: multiplayerRoom.status,
+    participants: roomParticipants,
+    ownership,
+    currentStep: room.state.turnState.currentStep,
+  });
+  const systemControlledTeamIds = ownership.filter((entry) => entry.controllerType === "ai").map((entry) => entry.teamId);
+
+  room.state = {
+    ...room.state,
+    status: getSeatCount(room) === MAX_ACTIVE_PLAYERS ? "active" : "waiting",
+    multiplayerRoom,
+    roomParticipants,
+    systemControlledTeamIds,
+    turnState,
+    roomFlowState: buildRoomFlowState({
+      state: {
+        multiplayerRoom,
+        roomParticipants,
+        teamOwnership: ownership,
+        systemControlledTeamIds,
+        turnState,
+      },
+      currentStep: turnState.currentStep,
+      aiAutoCompletedTeamIds: room.state.roomFlowState?.aiAutoCompletedTeamIds,
+    }),
+    players: {
+      A: room.seats.A && {
+        role: "A",
+        connected: room.seats.A.connected,
+        joinedAt: room.seats.A.joinedAt,
+      },
+      B: room.seats.B && {
+        role: "B",
+        connected: room.seats.B.connected,
+        joinedAt: room.seats.B.joinedAt,
+      },
+    },
+  };
+}
+
+export function createRoom(
+  socketId: string,
+  input?: {
+    displayName?: string | null;
+    saveId?: string | null;
+    preset?: RoomOwnershipPreset | null;
+  },
+) {
+  let roomCode = createRoomCode();
+
+  while (runtimeRooms.has(roomCode)) {
+    roomCode = createRoomCode();
+  }
+
+  const participantId = `participant-${crypto.randomUUID()}`;
+  const room: RuntimeRoom = {
+    roomCode,
+    state: createInitialRoomState(roomCode, {
+      saveId: input?.saveId,
+      hostParticipantId: participantId,
+      hostUserId: `user-${participantId}`,
+      hostDisplayName: input?.displayName?.trim() || "Chris",
+    }),
+    seats: {
+      A: buildSeat("A", socketId, participantId),
+    },
+  };
+
+  syncPlayers(room);
+  if (input?.preset) {
+    room.state = applyOwnershipPresetToState(room.state, input.preset);
+    syncPlayers(room);
+  }
+  runtimeRooms.set(roomCode, room);
+
+  return {
+    room,
+    seat: room.seats.A!,
+  };
+}
+
+export function joinRoom(roomCode: string, socketId: string, input?: { displayName?: string | null }) {
+  const normalizedCode = roomCode.trim().toUpperCase();
+  const room = runtimeRooms.get(normalizedCode);
+
+  if (!room) {
+    return { ok: false as const, error: "Dieser Raum wurde nicht gefunden." };
+  }
+
+  if (room.seats.B) {
+    return { ok: false as const, error: "Der Raum hat bereits zwei aktive Coaches." };
+  }
+
+  const participantId = `participant-${crypto.randomUUID()}`;
+  room.seats.B = buildSeat("B", socketId, participantId);
+  room.state.roomParticipants = [
+    ...room.state.roomParticipants,
+    buildParticipant({
+      participantId,
+      userId: `user-${participantId}`,
+      displayName: input?.displayName?.trim() || "Franky",
+      role: "player",
+    }),
+  ];
+  room.state = applyOwnershipPresetToState(room.state, "chris_4_franky_4_rest_ai");
+  room.state.actionLog.push(
+    createActionLogEntry({
+      turnNumber: room.state.turnNumber,
+      actorRole: "B",
+      type: "player_joined",
+      message: "Coach B ist dem Raum beigetreten.",
+    }),
+  );
+  syncPlayers(room);
+
+  return { ok: true as const, room, seat: room.seats.B };
+}
+
+export function rejoinRoom(roomCode: string, seatToken: string, socketId: string) {
+  const normalizedCode = roomCode.trim().toUpperCase();
+  const room = runtimeRooms.get(normalizedCode);
+
+  if (!room) {
+    return { ok: false as const, error: "Der Raum existiert nicht mehr." };
+  }
+
+  const role = findSeatByToken(room, seatToken);
+  if (!role) {
+    return { ok: false as const, error: "Der gespeicherte Sitzplatz ist ungueltig." };
+  }
+
+  const seat = room.seats[role]!;
+  seat.connected = true;
+  seat.socketId = socketId;
+  room.state.roomParticipants = room.state.roomParticipants.map((participant) =>
+    participant.participantId === seat.participantId
+      ? { ...participant, connectionStatus: "online", lastSeenAt: new Date().toISOString() }
+      : participant,
+  );
+  room.state.actionLog.push(
+    createActionLogEntry({
+      turnNumber: room.state.turnNumber,
+      actorRole: role,
+      type: "player_rejoined",
+      message: `Coach ${role} hat den Raum erneut verbunden.`,
+    }),
+  );
+  syncPlayers(room);
+
+  return { ok: true as const, room, seat };
+}
+
+export function markDisconnected(socketId: string) {
+  for (const room of runtimeRooms.values()) {
+    for (const role of ["A", "B"] as const) {
+      const seat = room.seats[role];
+      if (seat?.socketId === socketId) {
+        seat.connected = false;
+        seat.socketId = null;
+        room.state.roomParticipants = room.state.roomParticipants.map((participant) =>
+          participant.participantId === seat.participantId
+            ? { ...participant, connectionStatus: "offline", lastSeenAt: new Date().toISOString() }
+            : participant,
+        );
+        syncPlayers(room);
+      }
+    }
+  }
+}
+
+export function getRoom(roomCode: string) {
+  return runtimeRooms.get(roomCode.trim().toUpperCase()) ?? null;
+}
+
+export function applyRoomOwnershipPreset(roomCode: string, seatToken: string, preset: RoomOwnershipPreset) {
+  const room = getRoom(roomCode);
+  if (!room) {
+    return { ok: false as const, error: "Der Raum existiert nicht mehr." };
+  }
+  const role = findSeatByToken(room, seatToken);
+  if (role !== "A") {
+    return { ok: false as const, error: "Nur der Host darf Team-Presets setzen." };
+  }
+
+  room.state = applyOwnershipPresetToState(room.state, preset);
+  syncPlayers(room);
+  return { ok: true as const, room };
+}
+
+export function setParticipantReadyState(roomCode: string, seatToken: string, ready: boolean) {
+  const room = getRoom(roomCode);
+  if (!room) {
+    return { ok: false as const, error: "Der Raum existiert nicht mehr." };
+  }
+  const role = findSeatByToken(room, seatToken);
+  if (!role) {
+    return { ok: false as const, error: "Dein Sitzplatz ist nicht gueltig." };
+  }
+  const participantId = room.seats[role]?.participantId;
+  room.state.roomParticipants = room.state.roomParticipants.map((participant) =>
+    participant.participantId === participantId
+      ? { ...participant, readyState: ready ? "ready" : "not_ready", lastSeenAt: new Date().toISOString() }
+      : participant,
+  );
+  syncPlayers(room);
+  return { ok: true as const, room };
+}
+
+export function startRoom(roomCode: string, seatToken: string) {
+  const room = getRoom(roomCode);
+  if (!room) {
+    return { ok: false as const, error: "Der Raum existiert nicht mehr." };
+  }
+  const role = findSeatByToken(room, seatToken);
+  if (role !== "A") {
+    return { ok: false as const, error: "Nur der Host darf den Room starten." };
+  }
+  if (!room.state.turnState.canAdvance) {
+    return { ok: false as const, error: "Nicht alle erforderlichen Teilnehmer sind bereit." };
+  }
+
+  room.state = {
+    ...room.state,
+    multiplayerRoom: {
+      ...room.state.multiplayerRoom,
+      status: "season_active",
+      updatedAt: new Date().toISOString(),
+    },
+    roomParticipants: room.state.roomParticipants.map((participant) => ({ ...participant, readyState: "not_ready" })),
+    turnState: {
+      ...room.state.turnState,
+      currentStep: "training",
+      readyParticipants: [],
+      canAdvance: false,
+    },
+    roomFlowState: {
+      ...room.state.roomFlowState,
+      step: "training",
+      completedParticipantIds: [],
+      aiAutoCompletedTeamIds: [],
+      canHostAdvance: false,
+    },
+  };
+  syncPlayers(room);
+  return { ok: true as const, room };
+}
+
+export function runRoomAiAutoStep(roomCode: string, seatToken: string) {
+  const room = getRoom(roomCode);
+  if (!room) {
+    return { ok: false as const, error: "Der Raum existiert nicht mehr." };
+  }
+  const role = findSeatByToken(room, seatToken);
+  if (role !== "A") {
+    return { ok: false as const, error: "Nur der Host darf AI-Teams vorbereiten." };
+  }
+
+  const aiTeamIds = room.state.teamOwnership.filter((entry) => entry.controllerType === "ai").map((entry) => entry.teamId);
+  room.state = {
+    ...room.state,
+    roomFlowState: {
+      ...room.state.roomFlowState,
+      aiAutoCompletedTeamIds: aiTeamIds,
+      warnings: [...room.state.roomFlowState.warnings.filter((warning) => warning !== "ai_auto_step_pending"), "source:sandbox_auto_ready"],
+    },
+  };
+  syncPlayers(room);
+  return { ok: true as const, room };
+}
+
+export function advanceRoomFlow(roomCode: string, seatToken: string) {
+  const room = getRoom(roomCode);
+  if (!room) {
+    return { ok: false as const, error: "Der Raum existiert nicht mehr." };
+  }
+  const role = findSeatByToken(room, seatToken);
+  if (role !== "A") {
+    return { ok: false as const, error: "Nur der Host darf den Room-Flow fortsetzen." };
+  }
+  if (!room.state.roomFlowState.canHostAdvance) {
+    return { ok: false as const, error: "Room-Flow ist noch blockiert: Human- oder AI-Schritte sind offen." };
+  }
+
+  const nextStep = getNextRoomFlowStepId(room.state.roomFlowState.step);
+  room.state = {
+    ...room.state,
+    roomParticipants: room.state.roomParticipants.map((participant) => ({ ...participant, readyState: "not_ready" })),
+    turnState: {
+      ...room.state.turnState,
+      currentStep: nextStep,
+      readyParticipants: [],
+      canAdvance: false,
+    },
+    roomFlowState: {
+      ...room.state.roomFlowState,
+      step: nextStep,
+      completedParticipantIds: [],
+      aiAutoCompletedTeamIds: [],
+      canHostAdvance: false,
+      warnings: [],
+    },
+  };
+  syncPlayers(room);
+  return { ok: true as const, room };
+}
+
+export function canSeatControlTeam(roomCode: string, seatToken: string, teamId: string) {
+  const room = getRoom(roomCode);
+  if (!room) {
+    return false;
+  }
+  const role = findSeatByToken(room, seatToken);
+  const participantId = role ? room.seats[role]?.participantId : null;
+  return participantId ? canParticipantControlTeam(room.state, participantId, teamId) : false;
+}

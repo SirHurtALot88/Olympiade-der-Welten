@@ -1,0 +1,13 @@
+// term: formkarten_v2
+// id: getFormkartenPoolAllTeams
+// type: script
+// subtype: SqlQueryUnified
+// page: Saisonstand
+// folder: unknown
+// updatedAt: unknown
+// codeField: unknown
+// dependencies: none
+// extractionStatus: partial_match_only
+// Partial match only.
+// No direct code/value block could be extracted for formkarten_v2.
+

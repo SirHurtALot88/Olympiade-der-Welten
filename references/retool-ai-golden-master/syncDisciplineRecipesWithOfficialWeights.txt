@@ -1,0 +1,39 @@
+// term: disciplineRecipesGlobal
+// id: syncDisciplineRecipesWithOfficialWeights
+// type: datasource
+// subtype: JavascriptQuery
+// page: einsatzlisteSlotsV2Page
+// folder: unknown
+// updatedAt: unknown
+// codeField: funcBody
+// dependencies: none
+// extractionStatus: complete_or_primary_match
+// Resolve discipline display name to field key used in DB/queries.
+// Keeps the same override behavior used across Einsatzliste v2 logic.
+
+function safeStr(x) {
+  return String(x ?? '').trim();
+}
+
+function toField(name) {
+  return safeStr(name).
+  toLowerCase().
+  replace(/\s+/g, '_').
+  replace(/-/g, '_');
+}
+
+const disciplineFieldOverrides = {
+  speed_schach: 'schach',
+  takeshis_castle: 'takeshi',
+  eiskunstlauf: 'eiskunst',
+
+  'speed schach': 'schach',
+  'takeshis castle': 'takeshi',
+  'eiskunst': 'eiskunst' };
+
+
+return (name) => {
+  const k = safeStr(name).toLowerCase();
+  if (!k) return '';
+  return disciplineFieldOverrides[k] || toField(name);
+};

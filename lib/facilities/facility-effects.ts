@@ -1,0 +1,155 @@
+import type { GameState, PlayerGeneratorAttributeName, TeamFacilityCollection } from "@/lib/data/olyDataTypes";
+import {
+  FACILITY_CATALOG,
+  FACILITY_CATALOG_BY_ID,
+  getFacilityLevelDefinition,
+  SPECIALIST_WING_VARIANTS,
+  type FacilityId,
+  type SpecialistWingVariant,
+} from "@/lib/facilities/facility-catalog";
+import type { PlayerProgressionRatingTier } from "@/lib/training/training-plan-types";
+
+export type FacilityStateSource = GameState | { gameState: GameState };
+
+function roundValue(value: number, digits = 2) {
+  return Number(value.toFixed(digits));
+}
+
+function clampLevel(level: number | null | undefined) {
+  if (typeof level !== "number" || !Number.isFinite(level)) {
+    return 0;
+  }
+  return Math.max(0, Math.min(5, Math.round(level)));
+}
+
+function resolveGameState(source: FacilityStateSource) {
+  return "gameState" in source ? source.gameState : source;
+}
+
+export function getTeamFacilityState(source: FacilityStateSource, teamId: string): TeamFacilityCollection {
+  const gameState = resolveGameState(source);
+  const stored = gameState.seasonState.teamFacilities?.[teamId]?.facilities ?? {};
+  const facilities = Object.fromEntries(
+    FACILITY_CATALOG.map((catalogEntry) => {
+      const existing = stored[catalogEntry.facilityId];
+      const level = clampLevel(existing?.level);
+      return [
+        catalogEntry.facilityId,
+        {
+          level,
+          enabled: existing?.enabled ?? level > 0,
+          activeVariant: existing?.activeVariant,
+          lastPaidSeasonId: existing?.lastPaidSeasonId,
+          disabledReason: existing?.disabledReason ?? (level > 0 ? undefined : "not_built"),
+        },
+      ];
+    }),
+  ) as TeamFacilityCollection["facilities"];
+
+  return { facilities };
+}
+
+export function getFacilityLevel(teamFacilities: TeamFacilityCollection | null | undefined, facilityId: FacilityId) {
+  const entry = teamFacilities?.facilities?.[facilityId];
+  if (!entry?.enabled) {
+    return 0;
+  }
+  return clampLevel(entry?.level);
+}
+
+export function calculateFacilityUpkeep(teamFacilities: TeamFacilityCollection | null | undefined) {
+  return roundValue(
+    FACILITY_CATALOG.reduce((sum, facility) => {
+      const level = getFacilityLevel(teamFacilities, facility.facilityId);
+      return sum + (getFacilityLevelDefinition(facility.facilityId, level)?.seasonUpkeep ?? 0);
+    }, 0),
+  );
+}
+
+export function calculateFacilityIncome(teamFacilities: TeamFacilityCollection | null | undefined) {
+  return roundValue(
+    FACILITY_CATALOG.reduce((sum, facility) => {
+      const level = getFacilityLevel(teamFacilities, facility.facilityId);
+      return sum + (getFacilityLevelDefinition(facility.facilityId, level)?.seasonIncome ?? 0);
+    }, 0),
+  );
+}
+
+export function applyTrainingXpFacilityModifiers(baseTrainingXp: number, facilities: TeamFacilityCollection | null | undefined) {
+  const level = getFacilityLevel(facilities, "training_center");
+  const modifierPct = getFacilityLevelDefinition("training_center", level)?.modifierPct ?? 0;
+  return {
+    before: baseTrainingXp,
+    modifierPct,
+    after: roundValue(baseTrainingXp * (1 + modifierPct / 100), 0),
+  };
+}
+
+export function applyRecoveryFacilityModifiers(baseRecovery: number, facilities: TeamFacilityCollection | null | undefined) {
+  const level = getFacilityLevel(facilities, "recovery_center");
+  const modifierPct = getFacilityLevelDefinition("recovery_center", level)?.modifierPct ?? 0;
+  return {
+    before: baseRecovery,
+    modifierPct,
+    after: roundValue(baseRecovery * (1 + modifierPct / 100), 2),
+  };
+}
+
+function getAcademyDiscountPct(ratingTier: PlayerProgressionRatingTier, facilities: TeamFacilityCollection | null | undefined) {
+  if (ratingTier !== "F" && ratingTier !== "E" && ratingTier !== "D") {
+    return 0;
+  }
+  const level = getFacilityLevel(facilities, "academy");
+  return getFacilityLevelDefinition("academy", level)?.discountPct ?? 0;
+}
+
+function normalizeSpecialistVariant(value: string | null | undefined): SpecialistWingVariant {
+  return value && Object.prototype.hasOwnProperty.call(SPECIALIST_WING_VARIANTS, value)
+    ? (value as SpecialistWingVariant)
+    : "power_gym";
+}
+
+function getSpecialistDiscountPct(attribute: PlayerGeneratorAttributeName, facilities: TeamFacilityCollection | null | undefined) {
+  const level = getFacilityLevel(facilities, "specialist_wing");
+  const variant = normalizeSpecialistVariant(facilities?.facilities?.specialist_wing?.activeVariant);
+  const matchesVariant = SPECIALIST_WING_VARIANTS[variant].attributes.includes(attribute);
+  return matchesVariant ? getFacilityLevelDefinition("specialist_wing", level)?.discountPct ?? 0 : 0;
+}
+
+export function applyUpgradeCostFacilityModifiers(
+  attribute: PlayerGeneratorAttributeName,
+  ratingTier: PlayerProgressionRatingTier,
+  baseCost: number,
+  facilities: TeamFacilityCollection | null | undefined,
+) {
+  const academyDiscountPct = getAcademyDiscountPct(ratingTier, facilities);
+  const specialistDiscountPct = getSpecialistDiscountPct(attribute, facilities);
+  const facilityDiscountPct = academyDiscountPct + specialistDiscountPct;
+  return {
+    costBeforeFacility: baseCost,
+    academyDiscountPct,
+    specialistDiscountPct,
+    facilityDiscountPct,
+    costAfterFacility: Math.max(1, Math.ceil(baseCost * (1 - facilityDiscountPct / 100))),
+    appliedEffects: [
+      academyDiscountPct > 0 ? `academy_low_tier_discount:${academyDiscountPct}pct` : null,
+      specialistDiscountPct > 0 ? `specialist_wing_discount:${specialistDiscountPct}pct` : null,
+    ].filter((entry): entry is string => Boolean(entry)),
+  };
+}
+
+export function getScoutingConfidence(facilities: TeamFacilityCollection | null | undefined) {
+  const level = getFacilityLevel(facilities, "scouting_office");
+  return {
+    level,
+    label: level === 0 ? "none" : FACILITY_CATALOG_BY_ID.scouting_office.levels[level - 1]?.effectDescription ?? "unknown",
+  };
+}
+
+export function getAnalyticsForecastQuality(facilities: TeamFacilityCollection | null | undefined) {
+  const level = getFacilityLevel(facilities, "analytics_room");
+  return {
+    level,
+    label: level === 0 ? "baseline" : FACILITY_CATALOG_BY_ID.analytics_room.levels[level - 1]?.effectDescription ?? "unknown",
+  };
+}

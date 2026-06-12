@@ -1,0 +1,13 @@
+// term: formkarten_v2
+// id: checkFormkartenData
+// type: datasource
+// subtype: SqlQueryUnified
+// page: Saisonstand
+// folder: Spielerbilder
+// updatedAt: unknown
+// codeField: unknown
+// dependencies: none
+// extractionStatus: partial_match_only
+// Partial match only.
+// No direct code/value block could be extracted for formkarten_v2.
+

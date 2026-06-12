@@ -1,0 +1,1364 @@
+// term: aiTeamNeeds
+// id: aiTeamPlan
+// type: function
+// subtype: Function
+// page: transfermarktPage
+// folder: unknown
+// updatedAt: unknown
+// codeField: funcBody
+// dependencies: filterTeam.value | getActivePlayersByTeam.data | teamIdentityOverrides.value | getCashFromSaisonstand.value?.cash | transfermarktSalaryBudgetLogic.value | getTeamRatingsTransfermarkt.data | getTeamPlanHistory.data | aiTeamNeedsSnapshot.value | aiTeamNeedsQuery.data | aiVarianceConfig.value
+// extractionStatus: complete_or_primary_match
+// aiTeamPlan v3.5
+// Manager-first team planning:
+// facts/context + aiTeamNeeds anchors -> seeded manager strategy -> roster fill strategy -> planned_buys_now -> lane counts -> budget tracks
+//
+// Added / fixed:
+// - robust team-ratings row matching by selected team
+// - robust player_min / optimum reading across multiple field aliases
+// - roster_fill_strategy: fill_to_min / fill_to_optimum / at_optimum / legacy_window
+// - when roster targets exist, planned_buys_now is driven by missing_to_min / missing_to_optimum
+// - fill modes get dedicated lane mix + budget track behavior
+// - extra debug for matched ratings row + available keys
+// - top-level red/green/blue/yellow and pow/spe/men/soc included for compatibility
+
+const n = (v) => Number.isFinite(Number(v)) ? Number(v) : 0;
+const s = (v) => String(v ?? '').trim();
+const lower = (v) => String(v ?? '').trim().toLowerCase();
+const clamp = (v, lo, hi) => Math.max(lo, Math.min(hi, v));
+
+const hashStr = (input) => {
+  const str = String(input ?? '');
+  let h = 2166136261;
+  for (let i = 0; i < str.length; i++) {
+    h ^= str.charCodeAt(i);
+    h += (h << 1) + (h << 4) + (h << 7) + (h << 8) + (h << 24);
+  }
+  return h >>> 0;
+};
+
+const rand01FromKey = (key) => {
+  const h = hashStr(key);
+  return (h % 1000000) / 1000000;
+};
+
+const safeJson = (v) => {
+  if (v && typeof v === 'object') return v;
+  try {
+    return JSON.parse(String(v || '{}'));
+  } catch (e) {
+    return {};
+  }
+};
+
+const firstPositiveNumber = (...vals) => {
+  for (const v of vals) {
+    const x = n(v);
+    if (x > 0) return x;
+  }
+  return 0;
+};
+
+const normalizeToBudget = (weightsObj, allowedBudget, activeKeys, keepPct = 0.99) => {
+  const out = { star: 0, core: 0, depth: 0, reserve: 0, diszi: 0 };
+  const act = (Array.isArray(activeKeys) ? activeKeys : []).filter(Boolean);
+  const target = Math.max(0, n(allowedBudget) * keepPct);
+
+  if (!act.length || target <= 0) return out;
+
+  let sum = 0;
+  for (const k of act) sum += Math.max(0, n(weightsObj?.[k] || 0));
+
+  if (sum <= 0) {
+    const each = target / act.length;
+    for (const k of act) out[k] = Number(each.toFixed(2));
+    return out;
+  }
+
+  const f = target / sum;
+  for (const k of act) out[k] = Number((Math.max(0, n(weightsObj?.[k] || 0)) * f).toFixed(2));
+  return out;
+};
+
+const team = s({{ filterTeam.value }});
+if (!team) return null;
+
+// ------------------------------------------------------------
+// Roster
+// ------------------------------------------------------------
+const roster = (
+  typeof formatDataAsArray === 'function'
+    ? formatDataAsArray({{ getActivePlayersByTeam.data }}) || []
+    : {{ getActivePlayersByTeam.data }} || []
+).filter(Boolean);
+
+const roster_size = roster.length;
+
+// ------------------------------------------------------------
+// Team identity overrides
+// ------------------------------------------------------------
+const identityOverrides = {{ teamIdentityOverrides.value }} || {};
+const override = identityOverrides[team] || null;
+const archetype = lower(override?.archetype || 'default');
+
+const hard_roster_max = 12;
+
+let legacy_target_roster_size = 12;
+let legacy_target_roster_size_reason = 'default: standard competitive target (12)';
+
+if (override?.roster?.target) {
+  legacy_target_roster_size = clamp(n(override.roster.target), 0, hard_roster_max);
+  legacy_target_roster_size_reason =
+    `identity_override (${archetype || 'custom'}): target=${legacy_target_roster_size}, rationale=${s(override?.roster?.rationale)}`;
+}
+
+// ------------------------------------------------------------
+// Budget
+// ------------------------------------------------------------
+const cash = n({{ getCashFromSaisonstand.value?.cash }});
+const salaryBudgetObj = {{ transfermarktSalaryBudgetLogic.value }} || {};
+
+const allowed_budget_for_search =
+  n(salaryBudgetObj.allowed_budget_for_search || 0) || Math.max(0, cash * 0.62);
+
+const reserve_target = n(salaryBudgetObj.reserve_target || 0);
+const salary_factor_current = n(salaryBudgetObj.salary_factor_current || 1);
+
+// ------------------------------------------------------------
+// Team ratings
+// ------------------------------------------------------------
+const trRows =
+  typeof formatDataAsArray === 'function'
+    ? formatDataAsArray({{ getTeamRatingsTransfermarkt.data }}) || []
+    : {{ getTeamRatingsTransfermarkt.data }} || [];
+
+const matchTeamRow = (row, teamName) => {
+  const keys = [
+    row?.team,
+    row?.team_name,
+    row?.teamName,
+    row?.team_code,
+    row?.teamCode,
+    row?.name,
+    row?.Name,
+    row?.Team
+  ].map((x) => lower(x)).filter(Boolean);
+
+  return keys.includes(lower(teamName));
+};
+
+const trMatchedRow =
+  trRows.find((row) => matchTeamRow(row, team)) ||
+  trRows?.[0] ||
+  {};
+
+const tr = trMatchedRow;
+
+const tr_match_source =
+  trRows.find((row) => matchTeamRow(row, team))
+    ? 'matched_by_team'
+    : trRows?.length
+      ? 'fallback_first_row'
+      : 'no_rows';
+
+const tr_matched_row_team =
+  s(
+    tr?.team ||
+    tr?.team_name ||
+    tr?.teamName ||
+    tr?.team_code ||
+    tr?.teamCode ||
+    tr?.name ||
+    tr?.Name ||
+    tr?.Team ||
+    ''
+  );
+
+const ambition = clamp(n(tr.ambition) || 5, 1, 10);
+const finances = clamp(n(tr.finances) || 5, 1, 10);
+const harmony = clamp(n(tr.harmony) || 5, 1, 10);
+
+const ambition01 = clamp((ambition - 1) / 9, 0, 1);
+const finances01 = clamp((finances - 1) / 9, 0, 1);
+const harmony01 = clamp((harmony - 1) / 9, 0, 1);
+
+// NEW: roster target columns from team ratings
+const ratings_player_min_raw = clamp(
+  firstPositiveNumber(
+    tr.player_min,
+    tr.playerMin,
+    tr.min_players,
+    tr.minPlayers,
+    tr.min_player,
+    tr.minPlayer,
+    tr.player_minimum,
+    tr.playerMinimum,
+    tr.minimum,
+    override?.roster?.player_min,
+    override?.roster?.min
+  ),
+  0,
+  hard_roster_max
+);
+
+const ratings_optimum_raw = clamp(
+  firstPositiveNumber(
+    tr.optimum,
+    tr.player_optimum,
+    tr.playerOptimum,
+    tr.optimal_players,
+    tr.optimalPlayers,
+    tr.target_players,
+    tr.targetPlayers,
+    tr.roster_target,
+    tr.rosterTarget,
+    override?.roster?.optimum,
+    override?.roster?.target
+  ),
+  0,
+  hard_roster_max
+);
+
+const has_explicit_roster_targets = ratings_player_min_raw > 0 || ratings_optimum_raw > 0;
+
+let player_min = 0;
+let optimum = legacy_target_roster_size;
+let target_roster_size = legacy_target_roster_size;
+let target_roster_size_reason = legacy_target_roster_size_reason;
+let roster_target_source = 'legacy_target';
+
+if (has_explicit_roster_targets) {
+  player_min = clamp(
+    ratings_player_min_raw > 0 ? ratings_player_min_raw : ratings_optimum_raw,
+    0,
+    hard_roster_max
+  );
+
+  optimum = clamp(
+    ratings_optimum_raw > 0 ? Math.max(ratings_optimum_raw, player_min) : player_min,
+    player_min,
+    hard_roster_max
+  );
+
+  target_roster_size = optimum;
+  target_roster_size_reason = [
+    `team_ratings`,
+    `player_min=${player_min}`,
+    `optimum=${optimum}`,
+    archetype ? `archetype=${archetype}` : ''
+  ].filter(Boolean).join(' | ');
+
+  roster_target_source = 'team_ratings';
+}
+
+const missing_to_min = player_min > 0 ? Math.max(0, player_min - roster_size) : 0;
+const missing_to_optimum = Math.max(0, optimum - roster_size);
+const missing_slots = missing_to_optimum;
+
+let roster_fill_strategy = 'legacy_window';
+if (has_explicit_roster_targets) {
+  if (missing_to_min > 0) roster_fill_strategy = 'fill_to_min';
+  else if (missing_to_optimum > 0) roster_fill_strategy = 'fill_to_optimum';
+  else roster_fill_strategy = 'at_optimum';
+}
+
+const active_target_roster_size =
+  roster_fill_strategy === 'fill_to_min'
+    ? player_min
+    : optimum;
+
+const active_missing_slots = Math.max(0, active_target_roster_size - roster_size);
+
+// IMPORTANT:
+// buy window may go up to 12
+const max_window_buys = Math.min(
+  has_explicit_roster_targets ? active_missing_slots : missing_slots,
+  hard_roster_max
+);
+
+// ------------------------------------------------------------
+// Class -> color / axis (case-insensitive)
+// ------------------------------------------------------------
+const classToAxis = {
+  Berserker: 'pow', Warlord: 'pow', Tank: 'pow',
+  Sprinter: 'spe', Rogue: 'spe', Charger: 'spe',
+  Mage: 'men', Overseer: 'men', Templar: 'men',
+  Bard: 'soc', Hero: 'soc', Badass: 'soc', Tactician: 'men'
+};
+
+const classToColor = {
+  Berserker: 'red', Warlord: 'red', Tank: 'red',
+  Sprinter: 'green', Rogue: 'green', Charger: 'green',
+  Mage: 'blue', Overseer: 'blue', Templar: 'blue',
+  Bard: 'yellow', Hero: 'yellow', Badass: 'yellow', Tactician: 'yellow'
+};
+
+const classToAxisLower = Object.fromEntries(
+  Object.entries(classToAxis).map(([k, v]) => [lower(k), v])
+);
+const classToColorLower = Object.fromEntries(
+  Object.entries(classToColor).map(([k, v]) => [lower(k), v])
+);
+
+const getAxisOfClass = (klasse) => {
+  const k = s(klasse);
+  if (!k) return '';
+  return classToAxis[k] || classToAxisLower[lower(k)] || '';
+};
+
+const getColorOfClass = (klasse) => {
+  const k = s(klasse);
+  if (!k) return '';
+  return classToColor[k] || classToColorLower[lower(k)] || '';
+};
+
+const colorCounts = { red: 0, green: 0, blue: 0, yellow: 0 };
+const axisCounts = { pow: 0, spe: 0, men: 0, soc: 0 };
+
+for (const p of roster) {
+  const klasse = s(p?.klasse || p?.Klasse || '');
+  const color = getColorOfClass(klasse);
+  const axis = getAxisOfClass(klasse);
+  if (color && colorCounts[color] != null) colorCounts[color] += 1;
+  if (axis && axisCounts[axis] != null) axisCounts[axis] += 1;
+}
+
+const maxColorCount = Math.max(...Object.values(colorCounts), 0);
+const colorSpread01 =
+  roster_size > 0 ? clamp(1 - maxColorCount / Math.max(1, roster_size), 0, 1) : 1;
+
+// ------------------------------------------------------------
+// Rank / history context
+// ------------------------------------------------------------
+const historyRows =
+  typeof formatDataAsArray === 'function'
+    ? formatDataAsArray({{ getTeamPlanHistory.data }}) || []
+    : {{ getTeamPlanHistory.data }} || [];
+
+const hist = [...historyRows].sort((a, b) => n(b.season) - n(a.season));
+
+const latest = hist[0] || {};
+const prev = hist[1] || {};
+
+const current_season = n(latest.season || 0);
+const current_rank = n(latest.total_rank || latest.platz || 32) || 32;
+const previous_rank = n(prev.total_rank || prev.platz || current_rank) || current_rank;
+
+const rank_trend_recent = previous_rank - current_rank;
+
+let season_direction = 'flat';
+if (rank_trend_recent >= 2) season_direction = 'up';
+else if (rank_trend_recent <= -2) season_direction = 'down';
+
+const league_size = 32;
+const current_rank01 = clamp((current_rank - 1) / Math.max(1, league_size - 1), 0, 1);
+const trend_up01 = clamp(rank_trend_recent / 8, 0, 1);
+const trend_down01 = clamp((-rank_trend_recent) / 8, 0, 1);
+
+const currentPowRank = n(latest.pow_rank || 32) || 32;
+const currentSpeRank = n(latest.spe_rank || 32) || 32;
+const currentMenRank = n(latest.men_rank || 32) || 32;
+const currentSocRank = n(latest.soc_rank || 32) || 32;
+
+const axisRankMap = {
+  pow: currentPowRank,
+  spe: currentSpeRank,
+  men: currentMenRank,
+  soc: currentSocRank
+};
+
+const axisRanks = Object.values(axisRankMap).filter((x) => n(x) > 0);
+const best_axis_rank = axisRanks.length ? Math.min(...axisRanks) : 32;
+const worst_axis_rank = axisRanks.length ? Math.max(...axisRanks) : 32;
+
+const disziRankFields = [
+  'tdm_rank', 'mini_dm_rank', 'gewichtheben_rank', 'hockey_rank', 'breaking_rank',
+  'staffel_rank', 'time_trial_rank', 'spurt_rank', 'climbing_rank', 'fechten_rank',
+  'schach_rank', 'takeshi_rank', 'tennis_rank', 'i_spy_rank', 'wettessen_rank',
+  'basketball_rank', 'football_rank', 'battlefield_rank', 'eiskunst_rank', 'showcase_rank'
+];
+
+const disziRanks = disziRankFields.map((k) => n(latest[k] || 0)).filter((x) => x > 0);
+const best_diszi_rank = disziRanks.length ? Math.min(...disziRanks) : 32;
+const worst_diszi_rank = disziRanks.length ? Math.max(...disziRanks) : 32;
+
+// ------------------------------------------------------------
+// Pressure / rebuild mode
+// ------------------------------------------------------------
+const pressure_to_improve = clamp(
+  0.45 * current_rank01 +
+  0.25 * trend_down01 +
+  0.20 * ambition01 +
+  0.10 * (1 - finances01),
+  0,
+  1
+);
+
+let rebuild_mode = 'none';
+if (current_rank >= 24 && trend_down01 >= 0.20) rebuild_mode = 'fast';
+else if (current_rank >= 18 || trend_down01 >= 0.15) rebuild_mode = 'slow';
+
+// ------------------------------------------------------------
+// AI Needs anchor
+// ------------------------------------------------------------
+const aiNeedsSnapshotRaw = {{ aiTeamNeedsSnapshot.value }};
+const aiNeedsQueryRaw = {{ aiTeamNeedsQuery.data }};
+const aiVarianceCfg = {{ aiVarianceConfig.value }} || {};
+
+const coerceNeedRows = (src) => {
+  if (Array.isArray(src)) return src;
+  if (Array.isArray(src?.needs)) return src.needs;
+  if (Array.isArray(src?.data)) return src.data;
+  return [];
+};
+
+let aiNeedRows = coerceNeedRows(aiNeedsSnapshotRaw);
+if (!aiNeedRows.length) aiNeedRows = coerceNeedRows(aiNeedsQueryRaw);
+
+const getNeedScore = (row) =>
+  n(
+    row?.importance_score ??
+    row?.importance ??
+    row?.imp ??
+    row?.Imp ??
+    row?.score ??
+    row?.need_score ??
+    0
+  );
+
+const getNeedType = (row) =>
+  lower(
+    row?.need_type ??
+    row?.type ??
+    ''
+  );
+
+const getNeedLabel = (row) =>
+  s(
+    row?.need_label ??
+    row?.label ??
+    row?.need ??
+    row?.name ??
+    ''
+  );
+
+const getNeedSlotKey = (row) =>
+  lower(
+    row?.need_slot_key ??
+    row?.need_key ??
+    ''
+  );
+
+const getNeedProfile = (row) =>
+  safeJson(
+    row?.search_profile ??
+    row?.searchProfile ??
+    row?.profile ??
+    {}
+  );
+
+const disciplineKeys = [
+  'mini_dm', 'time_trial', 'i_spy',
+  'tdm', 'gewichtheben', 'hockey', 'breaking',
+  'staffel', 'spurt', 'climbing', 'fechten',
+  'schach', 'takeshi', 'tennis', 'wettessen',
+  'basketball', 'football', 'battlefield', 'eiskunst', 'showcase'
+];
+
+const extractAxis = (row) => {
+  const type = getNeedType(row);
+  const slot = getNeedSlotKey(row);
+  const label = lower(getNeedLabel(row));
+  const profile = getNeedProfile(row);
+
+  const direct = lower(profile?.axis_focus || profile?.axis || '');
+  if (['pow', 'spe', 'men', 'soc'].includes(direct)) return direct;
+
+  if (slot.startsWith('axis_')) return slot.replace(/^axis_/, '');
+
+  const blob = [type, slot, label, lower(JSON.stringify(profile))].join(' | ');
+  if (blob.includes('pow')) return 'pow';
+  if (blob.includes('spe')) return 'spe';
+  if (blob.includes('men')) return 'men';
+  if (blob.includes('soc')) return 'soc';
+  return '';
+};
+
+const extractColor = (row) => {
+  const type = getNeedType(row);
+  const slot = getNeedSlotKey(row);
+  const label = lower(getNeedLabel(row));
+  const profile = getNeedProfile(row);
+
+  const direct = lower(profile?.desired_class_color || profile?.color || '');
+  if (['red', 'green', 'blue', 'yellow'].includes(direct)) return direct;
+
+  if (slot.startsWith('color_')) return slot.replace(/^color_/, '');
+  if (slot.startsWith('card_')) return slot.replace(/^card_/, '');
+
+  const blob = [type, slot, label, lower(JSON.stringify(profile))].join(' | ');
+  if (blob.includes('yellow')) return 'yellow';
+  if (blob.includes('blue')) return 'blue';
+  if (blob.includes('green')) return 'green';
+  if (blob.includes('red')) return 'red';
+  return '';
+};
+
+const extractDiszi = (row) => {
+  const type = getNeedType(row);
+  const slot = getNeedSlotKey(row);
+  const label = lower(getNeedLabel(row));
+  const profile = getNeedProfile(row);
+
+  const direct = lower(
+    profile?.target_discipline_field ||
+    profile?.discipline ||
+    profile?.diszi ||
+    ''
+  );
+  if (direct) return direct;
+
+  if (slot.startsWith('diszi_')) return slot.replace(/^diszi_/, '');
+
+  const blob = [type, slot, label, lower(JSON.stringify(profile))].join(' | ');
+
+  for (const d of disciplineKeys) {
+    if (blob.includes(d)) return d;
+  }
+  return '';
+};
+
+const upsertTop = (arr, candidate) => {
+  if (!candidate?.value) return;
+  const idx = arr.findIndex((x) => x.value === candidate.value && x.kind === candidate.kind);
+  if (idx < 0) arr.push(candidate);
+  else if (candidate.score > arr[idx].score) arr[idx] = candidate;
+};
+
+const axisCandidates = [];
+const colorCandidates = [];
+const cardCandidates = [];
+const disziCandidates = [];
+const focusCandidates = [];
+
+for (const row of aiNeedRows) {
+  const score = getNeedScore(row);
+  if (score <= 0) continue;
+
+  const needType = getNeedType(row);
+  const needLabel = getNeedLabel(row);
+  const needSlotKey = getNeedSlotKey(row);
+
+  const axis = extractAxis(row);
+  const color = extractColor(row);
+  const diszi = extractDiszi(row);
+
+  const isAxis =
+    needType.includes('axis') ||
+    needSlotKey.startsWith('axis_') ||
+    needType.includes('upgrade');
+
+  const isColor =
+    needType.includes('color') ||
+    needSlotKey.startsWith('color_') ||
+    needType.includes('economy') ||
+    lower(needLabel).includes('farbe') ||
+    lower(needLabel).includes('color');
+
+  const isCard =
+    needType.includes('card') ||
+    needSlotKey.startsWith('card_') ||
+    needType.includes('economy') ||
+    lower(needLabel).includes('karte') ||
+    lower(needLabel).includes('card') ||
+    lower(needLabel).includes('form');
+
+  const isDiszi =
+    needType.includes('discipline') ||
+    needType.includes('diszi') ||
+    needSlotKey.startsWith('diszi_') ||
+    needType.includes('specialist') ||
+    lower(needLabel).includes('loch') ||
+    lower(needLabel).includes('discipline');
+
+  if (isAxis && axis) {
+    const cand = { kind: 'axis', value: axis, score, label: needLabel };
+    upsertTop(axisCandidates, cand);
+    upsertTop(focusCandidates, cand);
+  }
+
+  if (isColor && color) {
+    const cand = { kind: 'color', value: color, score, label: needLabel };
+    upsertTop(colorCandidates, cand);
+    upsertTop(focusCandidates, cand);
+  }
+
+  if ((isCard || needType.includes('economy')) && color) {
+    const cand = { kind: 'card', value: color, score, label: needLabel };
+    upsertTop(cardCandidates, cand);
+    upsertTop(focusCandidates, cand);
+  }
+
+  if (isDiszi && diszi) {
+    const cand = { kind: 'diszi', value: diszi, score, label: needLabel };
+    upsertTop(disziCandidates, cand);
+    upsertTop(focusCandidates, cand);
+  }
+}
+
+const byScoreDesc = (a, b) => n(b.score) - n(a.score);
+
+axisCandidates.sort(byScoreDesc);
+colorCandidates.sort(byScoreDesc);
+cardCandidates.sort(byScoreDesc);
+disziCandidates.sort(byScoreDesc);
+focusCandidates.sort(byScoreDesc);
+
+const strategic_focus_primary = focusCandidates[0]
+  ? (focusCandidates[0].kind === 'axis'
+      ? focusCandidates[0].value
+      : `${focusCandidates[0].kind}_${focusCandidates[0].value}`)
+  : '';
+
+const strategic_focus_secondary = focusCandidates[1]
+  ? (focusCandidates[1].kind === 'axis'
+      ? focusCandidates[1].value
+      : `${focusCandidates[1].kind}_${focusCandidates[1].value}`)
+  : '';
+
+const primary_axis_need = axisCandidates[0]?.value || '';
+const secondary_axis_need = axisCandidates[1]?.value || '';
+const primary_color_need = colorCandidates[0]?.value || '';
+const primary_card_need = cardCandidates[0]?.value || '';
+const primary_diszi_need = disziCandidates[0]?.value || '';
+
+const primary_axis_need_score_01 = clamp(n(axisCandidates[0]?.score) / 100, 0, 1);
+const primary_color_need_score_01 = clamp(n(colorCandidates[0]?.score) / 100, 0, 1);
+const primary_card_need_score_01 = clamp(n(cardCandidates[0]?.score) / 100, 0, 1);
+const primary_diszi_need_score_01 = clamp(n(disziCandidates[0]?.score) / 100, 0, 1);
+
+const card_or_color_need_score_01 = Math.max(primary_color_need_score_01, primary_card_need_score_01);
+
+const axis_dominance_01 = clamp(
+  primary_axis_need_score_01 - Math.max(card_or_color_need_score_01, primary_diszi_need_score_01),
+  0,
+  1
+);
+
+const team_plan_strategy_reason_need_anchor = [
+  `needs_rows=${aiNeedRows.length}`,
+  `focus1=${strategic_focus_primary || 'none'}`,
+  `focus2=${strategic_focus_secondary || 'none'}`,
+  `axis1=${primary_axis_need || 'none'}`,
+  `axis2=${secondary_axis_need || 'none'}`,
+  `color1=${primary_color_need || 'none'}`,
+  `card1=${primary_card_need || 'none'}`,
+  `diszi1=${primary_diszi_need || 'none'}`
+].join(' | ');
+
+// ------------------------------------------------------------
+// Seed / variation
+// ------------------------------------------------------------
+const teamVariationFactor = n(aiVarianceCfg?.team_variation_factor || 0);
+const varianceSeedBits = [
+  teamVariationFactor,
+  n(aiVarianceCfg?.cashUsageTarget?.sampled || 0),
+  n(aiVarianceCfg?.fitMinSoft?.sampled || 0),
+  n(aiVarianceCfg?.holeGate01?.sampled || 0)
+].join('|');
+
+const team_plan_seed_key = [
+  team,
+  current_season,
+  current_rank,
+  previous_rank,
+  roster_size,
+  missing_slots,
+  active_missing_slots,
+  player_min,
+  optimum,
+  roster_fill_strategy,
+  Math.round(allowed_budget_for_search * 10),
+  ambition,
+  finances,
+  harmony,
+  archetype,
+  strategic_focus_primary,
+  strategic_focus_secondary,
+  varianceSeedBits
+].join('|');
+
+const team_plan_seed = hashStr(team_plan_seed_key);
+
+const strategy_roll = rand01FromKey(team_plan_seed_key + '|strategy');
+const buy_count_roll = rand01FromKey(team_plan_seed_key + '|buycount');
+const slot_mix_roll = rand01FromKey(team_plan_seed_key + '|slotmix');
+
+// ------------------------------------------------------------
+// Strategy bias signals
+// ------------------------------------------------------------
+const push_strength_bias_01 = clamp(
+  0.30 * trend_up01 +
+  0.20 * (1 - current_rank01) +
+  0.20 * ambition01 +
+  0.15 * primary_axis_need_score_01 +
+  0.15 * (archetype === 'cash_creator' ? 1 : 0),
+  0,
+  1
+);
+
+const fix_weakness_bias_01 = clamp(
+  0.45 * primary_axis_need_score_01 +
+  0.20 * primary_diszi_need_score_01 +
+  0.20 * pressure_to_improve +
+  0.15 * (1 - harmony01),
+  0,
+  1
+);
+
+const strength_vs_weakness_bias_01 = clamp(
+  push_strength_bias_01 / Math.max(0.001, push_strength_bias_01 + fix_weakness_bias_01),
+  0,
+  1
+);
+
+const card_bias_01 = clamp(
+  0.22 * clamp(missing_slots / Math.max(1, target_roster_size || 1), 0, 1) +
+  0.15 * (archetype === 'cash_creator' ? 1 : 0) +
+  0.08 * (1 - finances01) +
+  0.08 * colorSpread01 +
+  0.10 * (rebuild_mode !== 'none' ? 1 : 0) +
+  0.37 * card_or_color_need_score_01,
+  0,
+  1
+);
+
+const risk_bias_01 = clamp(
+  0.30 * ambition01 +
+  0.25 * trend_down01 +
+  0.15 * pressure_to_improve +
+  0.10 * trend_up01 +
+  0.10 * (rebuild_mode === 'fast' ? 1 : rebuild_mode === 'slow' ? 0.5 : 0) +
+  0.10 * (archetype === 'cash_creator' ? 1 : 0),
+  0,
+  1
+);
+
+const value_bias_01 = clamp(
+  0.35 * (1 - finances01) +
+  0.18 * (rebuild_mode !== 'none' ? 1 : 0) +
+  0.15 * (archetype === 'cash_creator' ? 1 : 0) +
+  0.12 * card_bias_01 +
+  0.20 * (1 - risk_bias_01),
+  0,
+  1
+);
+
+const fit_tolerance_01 = clamp(
+  0.25 * ambition01 +
+  0.25 * risk_bias_01 +
+  0.15 * (rebuild_mode === 'fast' ? 1 : rebuild_mode === 'slow' ? 0.5 : 0) +
+  0.10 * (archetype === 'cash_creator' ? 1 : 0) +
+  0.25 * (1 - harmony01),
+  0,
+  1
+);
+
+const diszi_attack_bias_01 = clamp(
+  0.55 * primary_diszi_need_score_01 +
+  0.15 * trend_up01 +
+  0.10 * ambition01 +
+  0.10 * strength_vs_weakness_bias_01 +
+  0.10 * (rebuild_mode === 'none' ? 1 : 0),
+  0,
+  1
+);
+
+// ------------------------------------------------------------
+// Strategy choice
+// ------------------------------------------------------------
+let strategyWeights = {
+  breadth_cards:
+    0.14 +
+    0.24 * card_bias_01 +
+    0.10 * (1 - finances01) +
+    0.10 * (archetype === 'cash_creator' ? 1 : 0) +
+    0.08 * (missing_slots >= 4 ? 1 : 0) -
+    0.06 * pressure_to_improve +
+    0.14 * card_or_color_need_score_01 -
+    0.14 * axis_dominance_01,
+
+  depth_strengthen:
+    0.16 +
+    0.18 * strength_vs_weakness_bias_01 +
+    0.10 * trend_up01 +
+    0.10 * (current_rank <= 12 ? 1 : 0) +
+    0.30 * primary_axis_need_score_01 +
+    0.12 * axis_dominance_01,
+
+  core_focus:
+    0.14 +
+    0.22 * pressure_to_improve +
+    0.16 * ambition01 +
+    0.14 * (allowed_budget_for_search >= 20 ? 1 : 0) +
+    0.18 * primary_axis_need_score_01 +
+    0.06 * risk_bias_01,
+
+  diszi_attack:
+    0.10 +
+    0.36 * diszi_attack_bias_01 +
+    0.10 * ambition01 +
+    0.08 * trend_up01,
+
+  opportunistic_value:
+    0.14 +
+    0.28 * value_bias_01 +
+    0.12 * (rebuild_mode !== 'none' ? 1 : 0) +
+    0.10 * (archetype === 'cash_creator' ? 1 : 0) +
+    0.06 * (missing_slots >= 3 ? 1 : 0) -
+    0.12 * primary_axis_need_score_01
+};
+
+if (rebuild_mode === 'fast') {
+  strategyWeights.breadth_cards *= 1.08;
+  strategyWeights.opportunistic_value *= 1.18;
+  strategyWeights.core_focus *= 0.88;
+}
+if (season_direction === 'up') {
+  strategyWeights.depth_strengthen *= 1.06;
+  strategyWeights.diszi_attack *= 1.05;
+}
+if (current_rank <= 10 && ambition >= 7) {
+  strategyWeights.core_focus *= 1.08;
+  strategyWeights.depth_strengthen *= 1.04;
+}
+if (primary_axis_need && axis_dominance_01 >= 0.12) {
+  strategyWeights.depth_strengthen *= 1.10;
+  strategyWeights.core_focus *= 1.06;
+  strategyWeights.opportunistic_value *= 0.90;
+}
+if (primary_diszi_need && primary_diszi_need_score_01 >= 0.35) {
+  strategyWeights.diszi_attack *= 1.12;
+}
+
+if (roster_fill_strategy === 'fill_to_min') {
+  strategyWeights.breadth_cards *= 1.10;
+  strategyWeights.depth_strengthen *= 1.08;
+  strategyWeights.opportunistic_value *= 1.06;
+  strategyWeights.core_focus *= 0.88;
+}
+if (roster_fill_strategy === 'fill_to_optimum') {
+  strategyWeights.breadth_cards *= 1.06;
+  strategyWeights.depth_strengthen *= 1.04;
+  strategyWeights.opportunistic_value *= 1.03;
+  strategyWeights.core_focus *= 0.94;
+}
+
+const strategyKeys = Object.keys(strategyWeights);
+const strategyTotal = strategyKeys.reduce((acc, k) => acc + Math.max(0.001, n(strategyWeights[k])), 0);
+
+let pickPoint = strategy_roll * strategyTotal;
+let team_plan_strategy = strategyKeys[0];
+
+for (const k of strategyKeys) {
+  pickPoint -= Math.max(0.001, n(strategyWeights[k]));
+  if (pickPoint <= 0) {
+    team_plan_strategy = k;
+    break;
+  }
+}
+
+// ------------------------------------------------------------
+// planned_buys_now
+// ------------------------------------------------------------
+const maxPlanned = Math.max(1, Math.min(max_window_buys, hard_roster_max));
+let planned_buys_now = 1;
+
+const breadthBoost =
+  (archetype === 'cash_creator' ? 1 : 0) ||
+  card_or_color_need_score_01 >= 0.45 ||
+  missing_slots >= 6;
+
+if (missing_slots <= 0) {
+  planned_buys_now = 0;
+} else if (roster_fill_strategy === 'fill_to_min') {
+  planned_buys_now = missing_to_min;
+} else if (roster_fill_strategy === 'fill_to_optimum') {
+  planned_buys_now = missing_to_optimum;
+} else if (roster_fill_strategy === 'at_optimum') {
+  planned_buys_now = 0;
+} else if (team_plan_strategy === 'breadth_cards') {
+  planned_buys_now =
+    buy_count_roll >= 0.92 && maxPlanned >= 7 ? 7 :
+    buy_count_roll >= 0.82 && maxPlanned >= 6 ? 6 :
+    buy_count_roll >= 0.70 && maxPlanned >= 5 ? 5 :
+    buy_count_roll >= 0.48 && maxPlanned >= 4 ? 4 :
+    Math.min(maxPlanned, 3);
+} else if (team_plan_strategy === 'depth_strengthen') {
+  planned_buys_now =
+    buy_count_roll >= 0.86 && maxPlanned >= 5 ? 5 :
+    buy_count_roll >= 0.62 && maxPlanned >= 4 ? 4 :
+    buy_count_roll >= 0.32 && maxPlanned >= 3 ? 3 :
+    Math.min(maxPlanned, 2);
+} else if (team_plan_strategy === 'core_focus') {
+  planned_buys_now =
+    breadthBoost && buy_count_roll >= 0.82 && maxPlanned >= 5 ? 5 :
+    breadthBoost && buy_count_roll >= 0.52 && maxPlanned >= 4 ? 4 :
+    buy_count_roll >= 0.25 && maxPlanned >= 3 ? 3 :
+    Math.min(maxPlanned, 2);
+} else if (team_plan_strategy === 'diszi_attack') {
+  planned_buys_now =
+    buy_count_roll >= 0.82 && maxPlanned >= 4 ? 4 :
+    buy_count_roll >= 0.42 && maxPlanned >= 3 ? 3 :
+    Math.min(maxPlanned, 2);
+} else {
+  planned_buys_now =
+    buy_count_roll >= 0.84 && maxPlanned >= 4 ? 4 :
+    buy_count_roll >= 0.44 && maxPlanned >= 3 ? 3 :
+    Math.min(maxPlanned, 2);
+}
+
+planned_buys_now = clamp(
+  planned_buys_now,
+  0,
+  Math.min(
+    hard_roster_max - roster_size,
+    hard_roster_max,
+    has_explicit_roster_targets ? active_missing_slots : Math.min(max_window_buys, missing_slots)
+  )
+);
+
+const avg_slot_budget_missing = missing_slots > 0
+  ? allowed_budget_for_search / Math.max(1, missing_slots)
+  : 0;
+
+const avg_slot_budget_active_target = active_missing_slots > 0
+  ? allowed_budget_for_search / Math.max(1, active_missing_slots)
+  : 0;
+
+const avg_slot_budget = planned_buys_now > 0
+  ? allowed_budget_for_search / Math.max(1, planned_buys_now)
+  : 0;
+
+// downstream should use buy-now window
+const slots_max = planned_buys_now;
+
+// ------------------------------------------------------------
+// Lane counts
+// ------------------------------------------------------------
+let star_slots_remaining = 0;
+let core_slots_remaining = 0;
+let depth_slots_remaining = 0;
+let reserve_slots_remaining = 0;
+let diszi_slots_remaining = 0;
+
+const fillRemainderTo = (preferredOrder, targetTotal) => {
+  let cur =
+    star_slots_remaining +
+    core_slots_remaining +
+    depth_slots_remaining +
+    reserve_slots_remaining +
+    diszi_slots_remaining;
+
+  while (cur < targetTotal) {
+    const next = preferredOrder[cur % preferredOrder.length] || 'depth';
+    if (next === 'star') star_slots_remaining += 1;
+    else if (next === 'core') core_slots_remaining += 1;
+    else if (next === 'reserve') reserve_slots_remaining += 1;
+    else if (next === 'diszi') diszi_slots_remaining += 1;
+    else depth_slots_remaining += 1;
+    cur += 1;
+  }
+
+  while (cur > targetTotal) {
+    if (depth_slots_remaining > 0) depth_slots_remaining -= 1;
+    else if (reserve_slots_remaining > 0) reserve_slots_remaining -= 1;
+    else if (core_slots_remaining > 0) core_slots_remaining -= 1;
+    else if (diszi_slots_remaining > 0) diszi_slots_remaining -= 1;
+    else if (star_slots_remaining > 0) star_slots_remaining -= 1;
+    cur -= 1;
+  }
+};
+
+if (planned_buys_now > 0) {
+  if (roster_fill_strategy === 'fill_to_min' || roster_fill_strategy === 'fill_to_optimum') {
+    const allowCore =
+      avg_slot_budget >= 18 &&
+      planned_buys_now >= 3;
+
+    if (allowCore) core_slots_remaining = 1;
+
+    const allowDiszi =
+      Boolean(primary_diszi_need) &&
+      primary_diszi_need_score_01 >= 0.35 &&
+      planned_buys_now >= 5 &&
+      avg_slot_budget >= 16 &&
+      slot_mix_roll > 0.45;
+
+    if (allowDiszi) diszi_slots_remaining = 1;
+
+    let rem = planned_buys_now - core_slots_remaining - diszi_slots_remaining;
+
+    let reserveTarget =
+      planned_buys_now >= 6 ? 2 :
+      planned_buys_now >= 3 ? 1 :
+      0;
+
+    if (card_or_color_need_score_01 >= 0.45 && rem >= reserveTarget + 1) {
+      reserveTarget += 1;
+    }
+
+    reserve_slots_remaining = Math.min(rem, reserveTarget);
+    rem -= reserve_slots_remaining;
+
+    depth_slots_remaining = Math.max(0, rem);
+
+    fillRemainderTo(['depth', 'reserve', 'depth', 'core', 'depth'], planned_buys_now);
+  }
+
+  else if (team_plan_strategy === 'breadth_cards') {
+    reserve_slots_remaining = Math.max(1, Math.round(planned_buys_now * 0.55));
+    depth_slots_remaining = Math.max(0, planned_buys_now - reserve_slots_remaining);
+
+    if (avg_slot_budget >= 18 && planned_buys_now >= 3 && slot_mix_roll > 0.76) {
+      core_slots_remaining = 1;
+      if (depth_slots_remaining > 0) depth_slots_remaining -= 1;
+    }
+
+    fillRemainderTo(['reserve', 'depth', 'reserve', 'depth'], planned_buys_now);
+  }
+
+  else if (team_plan_strategy === 'depth_strengthen') {
+    depth_slots_remaining = Math.max(1, Math.round(planned_buys_now * 0.55));
+    core_slots_remaining = Math.max(0, planned_buys_now - depth_slots_remaining);
+
+    if (primary_diszi_need && planned_buys_now >= 3 && slot_mix_roll > 0.46) {
+      diszi_slots_remaining = 1;
+      if (depth_slots_remaining >= core_slots_remaining && depth_slots_remaining > 0) depth_slots_remaining -= 1;
+      else if (core_slots_remaining > 0) core_slots_remaining -= 1;
+    }
+
+    fillRemainderTo(['depth', 'core', 'depth', 'reserve'], planned_buys_now);
+  }
+
+  else if (team_plan_strategy === 'core_focus') {
+    const starAllowed =
+      avg_slot_budget >= 45 &&
+      planned_buys_now >= 2 &&
+      pressure_to_improve >= 0.65 &&
+      slot_mix_roll > 0.60;
+
+    if (starAllowed) star_slots_remaining = 1;
+    else core_slots_remaining = 1;
+
+    let rem =
+      planned_buys_now -
+      star_slots_remaining -
+      core_slots_remaining;
+
+    if (rem >= 2) {
+      reserve_slots_remaining = 1;
+      rem -= 1;
+    }
+
+    depth_slots_remaining = Math.max(0, rem);
+
+    if (primary_diszi_need && planned_buys_now >= 3 && slot_mix_roll > 0.82) {
+      diszi_slots_remaining = 1;
+      if (depth_slots_remaining > 0) depth_slots_remaining -= 1;
+      else if (reserve_slots_remaining > 0) reserve_slots_remaining -= 1;
+    }
+
+    fillRemainderTo(['core', 'reserve', 'depth', 'depth'], planned_buys_now);
+  }
+
+  else if (team_plan_strategy === 'diszi_attack') {
+    diszi_slots_remaining = 1;
+    let rem = Math.max(0, planned_buys_now - 1);
+
+    if (avg_slot_budget >= 20 && rem >= 2) {
+      core_slots_remaining = 1;
+      rem -= 1;
+    }
+
+    depth_slots_remaining = Math.max(0, rem);
+
+    fillRemainderTo(['diszi', 'depth', 'core', 'depth'], planned_buys_now);
+  }
+
+  else {
+    if (avg_slot_budget >= 16 && planned_buys_now >= 2) core_slots_remaining = 1;
+    if (planned_buys_now >= 4 || (planned_buys_now >= 3 && slot_mix_roll > 0.70)) reserve_slots_remaining = 1;
+
+    depth_slots_remaining = Math.max(
+      0,
+      planned_buys_now - core_slots_remaining - reserve_slots_remaining
+    );
+
+    if (primary_diszi_need && slot_mix_roll > 0.74 && depth_slots_remaining > 0) {
+      diszi_slots_remaining = 1;
+      depth_slots_remaining -= 1;
+    }
+
+    fillRemainderTo(['core', 'depth', 'reserve', 'depth'], planned_buys_now);
+  }
+}
+
+// ------------------------------------------------------------
+// Active lanes
+// ------------------------------------------------------------
+const active_lanes = [];
+if (star_slots_remaining > 0) active_lanes.push('star');
+if (core_slots_remaining > 0) active_lanes.push('core');
+if (depth_slots_remaining > 0) active_lanes.push('depth');
+if (reserve_slots_remaining > 0) active_lanes.push('reserve');
+if (diszi_slots_remaining > 0) active_lanes.push('diszi');
+
+// ------------------------------------------------------------
+// Budget tracks
+// ------------------------------------------------------------
+let budgetWeights = { star: 0, core: 0, depth: 0, reserve: 0, diszi: 0 };
+
+if (roster_fill_strategy === 'fill_to_min' || roster_fill_strategy === 'fill_to_optimum') {
+  if (core_slots_remaining > 0 && diszi_slots_remaining > 0) {
+    budgetWeights = { core: 0.20, depth: 0.48, reserve: 0.18, diszi: 0.14 };
+  } else if (core_slots_remaining > 0) {
+    budgetWeights = { core: 0.24, depth: 0.54, reserve: 0.22 };
+  } else if (diszi_slots_remaining > 0) {
+    budgetWeights = { diszi: 0.18, depth: 0.58, reserve: 0.24 };
+  } else {
+    budgetWeights = { depth: 0.70, reserve: 0.30 };
+  }
+}
+
+else if (team_plan_strategy === 'breadth_cards') {
+  budgetWeights = core_slots_remaining > 0
+    ? { core: 0.22, reserve: 0.30, depth: 0.48 }
+    : { reserve: 0.35, depth: 0.65 };
+}
+
+else if (team_plan_strategy === 'depth_strengthen') {
+  budgetWeights = diszi_slots_remaining > 0
+    ? { core: 0.26, depth: 0.54, diszi: 0.20 }
+    : { core: 0.34, depth: 0.66 };
+}
+
+else if (team_plan_strategy === 'core_focus') {
+  if (star_slots_remaining > 0) {
+    budgetWeights = diszi_slots_remaining > 0
+      ? { star: 0.55, depth: 0.18, reserve: 0.10, diszi: 0.17 }
+      : { star: 0.60, depth: 0.25, reserve: 0.15 };
+  } else {
+    budgetWeights = diszi_slots_remaining > 0
+      ? { core: 0.58, depth: 0.17, reserve: 0.10, diszi: 0.15 }
+      : { core: 0.64, depth: 0.24, reserve: 0.12 };
+  }
+}
+
+else if (team_plan_strategy === 'diszi_attack') {
+  budgetWeights = core_slots_remaining > 0
+    ? { diszi: 0.34, core: 0.24, depth: 0.42 }
+    : { diszi: 0.40, depth: 0.60 };
+}
+
+else {
+  budgetWeights = diszi_slots_remaining > 0
+    ? { core: 0.28, depth: 0.37, reserve: 0.20, diszi: 0.15 }
+    : { core: 0.32, depth: 0.43, reserve: 0.25 };
+}
+
+const budget_tracks = normalizeToBudget(
+  budgetWeights,
+  allowed_budget_for_search,
+  active_lanes,
+  0.99
+);
+
+// ------------------------------------------------------------
+// Strategy reason
+// ------------------------------------------------------------
+const team_plan_strategy_reason = [
+  `strategy=${team_plan_strategy}`,
+  `fill_strategy=${roster_fill_strategy}`,
+  `seed=${team_plan_seed}`,
+  `roll=${strategy_roll.toFixed(4)}`,
+  `rank=${current_rank}`,
+  `prev_rank=${previous_rank}`,
+  `trend=${rank_trend_recent >= 0 ? '+' : ''}${rank_trend_recent}`,
+  `direction=${season_direction}`,
+  `pressure=${pressure_to_improve.toFixed(2)}`,
+  `rebuild=${rebuild_mode}`,
+  `card_bias=${card_bias_01.toFixed(2)}`,
+  `strength_bias=${strength_vs_weakness_bias_01.toFixed(2)}`,
+  `risk_bias=${risk_bias_01.toFixed(2)}`,
+  `value_bias=${value_bias_01.toFixed(2)}`,
+  `need_anchor=${team_plan_strategy_reason_need_anchor}`
+].join(' | ');
+
+const budget_track_reason = [
+  `allowed_budget=${allowed_budget_for_search.toFixed(1)}`,
+  `reserve_target=${reserve_target.toFixed(1)}`,
+  `salary_factor=${salary_factor_current.toFixed(2)}`,
+  `player_min=${player_min || 0}`,
+  `optimum=${optimum}`,
+  `target_roster_size=${target_roster_size}`,
+  `active_target=${active_target_roster_size}`,
+  `missing_to_min=${missing_to_min}`,
+  `missing_to_optimum=${missing_to_optimum}`,
+  `active_missing=${active_missing_slots}`,
+  `planned_buys_now=${planned_buys_now}`,
+  `avg_slot_budget_missing=${avg_slot_budget_missing.toFixed(2)}`,
+  `avg_slot_budget_active=${avg_slot_budget_active_target.toFixed(2)}`,
+  `avg_slot_budget_now=${avg_slot_budget.toFixed(2)}`,
+  `strategy=${team_plan_strategy}`,
+  `fill_strategy=${roster_fill_strategy}`,
+  `active_lanes=${active_lanes.join(',') || 'none'}`,
+  `star=${budget_tracks.star}M`,
+  `core=${budget_tracks.core}M`,
+  `depth=${budget_tracks.depth}M`,
+  `reserve=${budget_tracks.reserve}M`,
+  `diszi=${budget_tracks.diszi}M`
+].join(' | ');
+
+return {
+  version: 'aiTeamPlan.v3.5',
+  team,
+
+  roster_size,
+  roster_count_now: roster_size,
+
+  player_min,
+  optimum,
+  hard_roster_max,
+  roster_target_source,
+  roster_fill_strategy,
+
+  target_roster_size,
+  target_roster_size_reason,
+  active_target_roster_size,
+
+  missing_slots,
+  missing_to_min,
+  missing_to_optimum,
+  active_missing_slots,
+  slots_max,
+
+  cash: Number(cash.toFixed(2)),
+  allowed_budget_for_search: Number(allowed_budget_for_search.toFixed(2)),
+  reserve_target: Number(reserve_target.toFixed(2)),
+  salary_factor_current: Number(salary_factor_current.toFixed(2)),
+
+  current_season,
+  current_rank,
+  previous_rank,
+  rank_trend_recent,
+  season_direction,
+  pressure_to_improve: Number(pressure_to_improve.toFixed(3)),
+  rebuild_mode,
+
+  strategic_focus_primary,
+  strategic_focus_secondary,
+  primary_axis_need,
+  secondary_axis_need,
+  primary_color_need,
+  primary_card_need,
+  primary_diszi_need,
+  team_plan_strategy_reason_need_anchor,
+
+  team_plan_seed,
+  strategy_roll: Number(strategy_roll.toFixed(6)),
+  team_plan_strategy,
+  team_plan_strategy_reason,
+
+  card_bias_01: Number(card_bias_01.toFixed(3)),
+  value_bias_01: Number(value_bias_01.toFixed(3)),
+  risk_bias_01: Number(risk_bias_01.toFixed(3)),
+  fit_tolerance_01: Number(fit_tolerance_01.toFixed(3)),
+  strength_vs_weakness_bias_01: Number(strength_vs_weakness_bias_01.toFixed(3)),
+  diszi_attack_bias_01: Number(diszi_attack_bias_01.toFixed(3)),
+
+  primary_axis_need_score_01: Number(primary_axis_need_score_01.toFixed(3)),
+  primary_color_need_score_01: Number(primary_color_need_score_01.toFixed(3)),
+  primary_card_need_score_01: Number(primary_card_need_score_01.toFixed(3)),
+  primary_diszi_need_score_01: Number(primary_diszi_need_score_01.toFixed(3)),
+  axis_dominance_01: Number(axis_dominance_01.toFixed(3)),
+
+  planned_buys_now,
+  avg_slot_budget_missing: Number(avg_slot_budget_missing.toFixed(2)),
+  avg_slot_budget_active_target: Number(avg_slot_budget_active_target.toFixed(2)),
+  avg_slot_budget: Number(avg_slot_budget.toFixed(2)),
+
+  active_lanes,
+  star_slots_remaining,
+  core_slots_remaining,
+  depth_slots_remaining,
+  reserve_slots_remaining,
+  diszi_slots_remaining,
+
+  budget_tracks,
+  budget_star: budget_tracks.star,
+  budget_core: budget_tracks.core,
+  budget_depth: budget_tracks.depth,
+  budget_reserve: budget_tracks.reserve,
+  budget_diszi: budget_tracks.diszi,
+  budget_track_reason,
+
+  archetype: archetype || 'default',
+  ambition,
+  finances,
+  harmony,
+
+  best_axis_rank,
+  worst_axis_rank,
+  best_diszi_rank,
+  worst_diszi_rank,
+
+  color_counts: colorCounts,
+  axis_counts: axisCounts,
+
+  red: colorCounts.red,
+  green: colorCounts.green,
+  blue: colorCounts.blue,
+  yellow: colorCounts.yellow,
+  pow: axisCounts.pow,
+  spe: axisCounts.spe,
+  men: axisCounts.men,
+  soc: axisCounts.soc,
+
+  history_rows_used: hist.length,
+  latest_history_row: latest,
+  previous_history_row: prev,
+
+  ai_needs_rows_used: aiNeedRows.length,
+  ai_needs_axis_candidates: axisCandidates,
+  ai_needs_color_candidates: colorCandidates,
+  ai_needs_card_candidates: cardCandidates,
+  ai_needs_diszi_candidates: disziCandidates,
+  variance_seed_bits: varianceSeedBits,
+
+  debug: {
+    history_rows_used: hist.length,
+    latest_history_row: latest,
+    previous_history_row: prev,
+
+    legacy_target_roster_size,
+    legacy_target_roster_size_reason,
+    has_explicit_roster_targets,
+    ratings_player_min_raw,
+    ratings_optimum_raw,
+
+    tr_match_source,
+    tr_matched_row_team,
+    tr_available_keys: Object.keys(tr || {}).slice(0, 50),
+
+    strategy_weights: strategyWeights,
+    budget_weights: budgetWeights,
+    buy_count_roll: Number(buy_count_roll.toFixed(6)),
+    slot_mix_roll: Number(slot_mix_roll.toFixed(6)),
+    ai_needs_rows_used: aiNeedRows.length,
+    ai_needs_axis_candidates: axisCandidates,
+    ai_needs_color_candidates: colorCandidates,
+    ai_needs_card_candidates: cardCandidates,
+    ai_needs_diszi_candidates: disziCandidates,
+    variance_seed_bits: varianceSeedBits
+  }
+};

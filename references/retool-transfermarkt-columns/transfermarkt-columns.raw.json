@@ -1,0 +1,3729 @@
+[
+  {
+    "componentName": "playersTable",
+    "componentId": "playersTable",
+    "page": "transfermarktPage",
+    "subtype": "TableWidget2",
+    "tableTitle": "Keine Spieler gefunden",
+    "dataSource": "{{ _.orderBy(playersWithTeamFitBreakdown.value, ['marktwert'], ['desc']) }}",
+    "columns": [
+      {
+        "id": "62cbc",
+        "label": "Bild",
+        "dataKey": "image_url",
+        "visible": true,
+        "hiddenExpression": "",
+        "order": 0,
+        "width": 172,
+        "type": "image",
+        "format": "image",
+        "numberFormat": null,
+        "currencyFormat": null,
+        "percentFormat": null,
+        "decimalSettings": null,
+        "prefix": null,
+        "suffix": null,
+        "alignment": "center",
+        "sortable": true,
+        "filterable": true,
+        "editable": false,
+        "valueFormatting": null,
+        "conditionalFormatting": [
+          "#E0E0E0"
+        ],
+        "formattingExpressions": [
+          "#E0E0E0"
+        ],
+        "expressionRefs": [],
+        "foundColorCodes": [
+          "#E0E0E0"
+        ]
+      },
+      {
+        "id": "48156",
+        "label": "Name",
+        "dataKey": "name",
+        "visible": true,
+        "hiddenExpression": "",
+        "order": 1,
+        "width": 153.765625,
+        "type": "string",
+        "format": "string",
+        "numberFormat": null,
+        "currencyFormat": null,
+        "percentFormat": null,
+        "decimalSettings": null,
+        "prefix": null,
+        "suffix": null,
+        "alignment": "left",
+        "sortable": true,
+        "filterable": true,
+        "editable": false,
+        "valueFormatting": null,
+        "conditionalFormatting": [
+          "#E0E0E0"
+        ],
+        "formattingExpressions": [
+          "#E0E0E0"
+        ],
+        "expressionRefs": [],
+        "foundColorCodes": [
+          "#E0E0E0"
+        ]
+      },
+      {
+        "id": "75b6d",
+        "label": "Marktwert",
+        "dataKey": "marktwert",
+        "visible": true,
+        "hiddenExpression": "",
+        "order": 2,
+        "width": 121.546875,
+        "type": "currency",
+        "format": "currency",
+        "numberFormat": null,
+        "currencyFormat": "currency",
+        "percentFormat": null,
+        "decimalSettings": null,
+        "prefix": null,
+        "suffix": null,
+        "alignment": "right",
+        "sortable": true,
+        "filterable": true,
+        "editable": false,
+        "valueFormatting": null,
+        "conditionalFormatting": [
+          "#E0E0E0"
+        ],
+        "formattingExpressions": [
+          "#E0E0E0"
+        ],
+        "expressionRefs": [],
+        "foundColorCodes": [
+          "#E0E0E0"
+        ]
+      },
+      {
+        "id": "16518",
+        "label": "Gehalt",
+        "dataKey": "gehalt",
+        "visible": true,
+        "hiddenExpression": "",
+        "order": 3,
+        "width": 100,
+        "type": "currency",
+        "format": "currency",
+        "numberFormat": null,
+        "currencyFormat": "currency",
+        "percentFormat": null,
+        "decimalSettings": null,
+        "prefix": null,
+        "suffix": null,
+        "alignment": "right",
+        "sortable": true,
+        "filterable": true,
+        "editable": false,
+        "valueFormatting": null,
+        "conditionalFormatting": [
+          "#E0E0E0"
+        ],
+        "formattingExpressions": [
+          "#E0E0E0"
+        ],
+        "expressionRefs": [],
+        "foundColorCodes": [
+          "#E0E0E0"
+        ]
+      },
+      {
+        "id": "f3ff6",
+        "label": "Pow",
+        "dataKey": "pow",
+        "visible": true,
+        "hiddenExpression": "false",
+        "order": 4,
+        "width": 65,
+        "type": "decimal",
+        "format": "decimal",
+        "numberFormat": "decimal",
+        "currencyFormat": null,
+        "percentFormat": null,
+        "decimalSettings": null,
+        "prefix": null,
+        "suffix": null,
+        "alignment": "right",
+        "sortable": true,
+        "filterable": true,
+        "editable": false,
+        "valueFormatting": "{{ Math.round(Number(item)) }}",
+        "conditionalFormatting": [
+          "{{ ((v)=> v>=86?'#1565C0':v>=76?'#42A5F5':v>=66?'#2E7D32':v>=56?'#66BB6A':v>=46?'#F9A825':v>=36?'#FFEB3B':v>=21?'#FF9800':'#EF5350') (Number(item)) }}",
+          "#000000"
+        ],
+        "formattingExpressions": [
+          "{{ Math.round(Number(item)) }}",
+          "{{ ((v)=> v>=86?'#1565C0':v>=76?'#42A5F5':v>=66?'#2E7D32':v>=56?'#66BB6A':v>=46?'#F9A825':v>=36?'#FFEB3B':v>=21?'#FF9800':'#EF5350') (Number(item)) }}",
+          "#000000",
+          "false"
+        ],
+        "expressionRefs": [
+          "item"
+        ],
+        "foundColorCodes": [
+          "#1565C0",
+          "#42A5F5",
+          "#2E7D32",
+          "#66BB6A",
+          "#F9A825",
+          "#FFEB3B",
+          "#FF9800",
+          "#EF5350",
+          "#000000"
+        ]
+      },
+      {
+        "id": "f96e5",
+        "label": "Spe",
+        "dataKey": "spe",
+        "visible": true,
+        "hiddenExpression": "false",
+        "order": 5,
+        "width": 71,
+        "type": "decimal",
+        "format": "decimal",
+        "numberFormat": "decimal",
+        "currencyFormat": null,
+        "percentFormat": null,
+        "decimalSettings": null,
+        "prefix": null,
+        "suffix": null,
+        "alignment": "right",
+        "sortable": true,
+        "filterable": true,
+        "editable": false,
+        "valueFormatting": "{{ Math.round(Number(item)) }}",
+        "conditionalFormatting": [
+          "{{ ((v)=> v>=86?'#1565C0':v>=76?'#42A5F5':v>=66?'#2E7D32':v>=56?'#66BB6A':v>=46?'#F9A825':v>=36?'#FFEB3B':v>=21?'#FF9800':'#EF5350') (Number(item)) }}",
+          "#000000"
+        ],
+        "formattingExpressions": [
+          "{{ Math.round(Number(item)) }}",
+          "{{ ((v)=> v>=86?'#1565C0':v>=76?'#42A5F5':v>=66?'#2E7D32':v>=56?'#66BB6A':v>=46?'#F9A825':v>=36?'#FFEB3B':v>=21?'#FF9800':'#EF5350') (Number(item)) }}",
+          "#000000",
+          "false"
+        ],
+        "expressionRefs": [
+          "item"
+        ],
+        "foundColorCodes": [
+          "#1565C0",
+          "#42A5F5",
+          "#2E7D32",
+          "#66BB6A",
+          "#F9A825",
+          "#FFEB3B",
+          "#FF9800",
+          "#EF5350",
+          "#000000"
+        ]
+      },
+      {
+        "id": "729b6",
+        "label": "Men",
+        "dataKey": "men",
+        "visible": true,
+        "hiddenExpression": "false",
+        "order": 6,
+        "width": 71,
+        "type": "decimal",
+        "format": "decimal",
+        "numberFormat": "decimal",
+        "currencyFormat": null,
+        "percentFormat": null,
+        "decimalSettings": null,
+        "prefix": null,
+        "suffix": null,
+        "alignment": "right",
+        "sortable": true,
+        "filterable": true,
+        "editable": false,
+        "valueFormatting": "{{ Math.round(Number(item)) }}",
+        "conditionalFormatting": [
+          "{{ ((v)=> v>=86?'#1565C0':v>=76?'#42A5F5':v>=66?'#2E7D32':v>=56?'#66BB6A':v>=46?'#F9A825':v>=36?'#FFEB3B':v>=21?'#FF9800':'#EF5350') (Number(item)) }}",
+          "#000000"
+        ],
+        "formattingExpressions": [
+          "{{ Math.round(Number(item)) }}",
+          "{{ ((v)=> v>=86?'#1565C0':v>=76?'#42A5F5':v>=66?'#2E7D32':v>=56?'#66BB6A':v>=46?'#F9A825':v>=36?'#FFEB3B':v>=21?'#FF9800':'#EF5350') (Number(item)) }}",
+          "#000000",
+          "false"
+        ],
+        "expressionRefs": [
+          "item"
+        ],
+        "foundColorCodes": [
+          "#1565C0",
+          "#42A5F5",
+          "#2E7D32",
+          "#66BB6A",
+          "#F9A825",
+          "#FFEB3B",
+          "#FF9800",
+          "#EF5350",
+          "#000000"
+        ]
+      },
+      {
+        "id": "1c147",
+        "label": "Soc",
+        "dataKey": "soc",
+        "visible": true,
+        "hiddenExpression": "false",
+        "order": 7,
+        "width": 63,
+        "type": "decimal",
+        "format": "decimal",
+        "numberFormat": "decimal",
+        "currencyFormat": null,
+        "percentFormat": null,
+        "decimalSettings": null,
+        "prefix": null,
+        "suffix": null,
+        "alignment": "right",
+        "sortable": true,
+        "filterable": true,
+        "editable": false,
+        "valueFormatting": "{{ Math.round(Number(item)) }}",
+        "conditionalFormatting": [
+          "{{ ((v)=> v>=86?'#1565C0':v>=76?'#42A5F5':v>=66?'#2E7D32':v>=56?'#66BB6A':v>=46?'#F9A825':v>=36?'#FFEB3B':v>=21?'#FF9800':'#EF5350') (Number(item)) }}",
+          "#000000"
+        ],
+        "formattingExpressions": [
+          "{{ Math.round(Number(item)) }}",
+          "{{ ((v)=> v>=86?'#1565C0':v>=76?'#42A5F5':v>=66?'#2E7D32':v>=56?'#66BB6A':v>=46?'#F9A825':v>=36?'#FFEB3B':v>=21?'#FF9800':'#EF5350') (Number(item)) }}",
+          "#000000",
+          "false"
+        ],
+        "expressionRefs": [
+          "item"
+        ],
+        "foundColorCodes": [
+          "#1565C0",
+          "#42A5F5",
+          "#2E7D32",
+          "#66BB6A",
+          "#F9A825",
+          "#FFEB3B",
+          "#FF9800",
+          "#EF5350",
+          "#000000"
+        ]
+      },
+      {
+        "id": "7a25f",
+        "label": "Klasse",
+        "dataKey": "klasse",
+        "visible": true,
+        "hiddenExpression": "",
+        "order": 8,
+        "width": 151,
+        "type": "tag",
+        "format": "tag",
+        "numberFormat": null,
+        "currencyFormat": null,
+        "percentFormat": null,
+        "decimalSettings": null,
+        "prefix": null,
+        "suffix": null,
+        "alignment": "left",
+        "sortable": true,
+        "filterable": true,
+        "editable": false,
+        "valueFormatting": null,
+        "conditionalFormatting": [
+          "{{ ((c)=>({'Berserker':'#ff8a80','Warlord':'#ff8a80','Tank':'#ff8a80','Sprinter':'#a5d6a7','Rogue':'#a5d6a7','Charger':'#a5d6a7','Mage':'#90caf9','Overseer':'#90caf9','Templar':'#90caf9','Bard':'#ffe082','Hero':'#ffe082','Badass':'#ffe082','Tactician':'#ffe082'})[c] || '') (item) }}",
+          "{{ ((c)=>({'Berserker':'#b71c1c','Warlord':'#b71c1c','Tank':'#b71c1c','Sprinter':'#1b5e20','Rogue':'#1b5e20','Charger':'#1b5e20','Mage':'#0d47a1','Overseer':'#0d47a1','Templar':'#0d47a1','Bard':'#e65100','Hero':'#e65100','Badass':'#e65100','Tactician':'#e65100'})[c] || '') (item) }}"
+        ],
+        "formattingExpressions": [
+          "{{ ((c)=>({'Berserker':'#ff8a80','Warlord':'#ff8a80','Tank':'#ff8a80','Sprinter':'#a5d6a7','Rogue':'#a5d6a7','Charger':'#a5d6a7','Mage':'#90caf9','Overseer':'#90caf9','Templar':'#90caf9','Bard':'#ffe082','Hero':'#ffe082','Badass':'#ffe082','Tactician':'#ffe082'})[c] || '') (item) }}",
+          "{{ ((c)=>({'Berserker':'#b71c1c','Warlord':'#b71c1c','Tank':'#b71c1c','Sprinter':'#1b5e20','Rogue':'#1b5e20','Charger':'#1b5e20','Mage':'#0d47a1','Overseer':'#0d47a1','Templar':'#0d47a1','Bard':'#e65100','Hero':'#e65100','Badass':'#e65100','Tactician':'#e65100'})[c] || '') (item) }}"
+        ],
+        "expressionRefs": [
+          "item"
+        ],
+        "foundColorCodes": [
+          "#ff8a80",
+          "#a5d6a7",
+          "#90caf9",
+          "#ffe082",
+          "#b71c1c",
+          "#1b5e20",
+          "#0d47a1",
+          "#e65100"
+        ]
+      },
+      {
+        "id": "d4a2b",
+        "label": "Fit",
+        "dataKey": "team_fit",
+        "visible": true,
+        "hiddenExpression": "",
+        "order": 9,
+        "width": 84.84375,
+        "type": "decimal",
+        "format": "decimal",
+        "numberFormat": "decimal",
+        "currencyFormat": null,
+        "percentFormat": null,
+        "decimalSettings": null,
+        "prefix": null,
+        "suffix": null,
+        "alignment": "right",
+        "sortable": true,
+        "filterable": true,
+        "editable": false,
+        "valueFormatting": null,
+        "conditionalFormatting": [
+          "#E0E0E0"
+        ],
+        "formattingExpressions": [
+          "#E0E0E0"
+        ],
+        "expressionRefs": [],
+        "foundColorCodes": [
+          "#E0E0E0"
+        ]
+      },
+      {
+        "id": "b6f15",
+        "label": "Bracket",
+        "dataKey": "Bracket",
+        "visible": true,
+        "hiddenExpression": "",
+        "order": 10,
+        "width": 100,
+        "type": "string",
+        "format": "string",
+        "numberFormat": null,
+        "currencyFormat": null,
+        "percentFormat": null,
+        "decimalSettings": null,
+        "prefix": null,
+        "suffix": null,
+        "alignment": "left",
+        "sortable": true,
+        "filterable": true,
+        "editable": false,
+        "valueFormatting": null,
+        "conditionalFormatting": [
+          "#E0E0E0"
+        ],
+        "formattingExpressions": [
+          "#E0E0E0"
+        ],
+        "expressionRefs": [],
+        "foundColorCodes": [
+          "#E0E0E0"
+        ]
+      },
+      {
+        "id": "fb219",
+        "label": "Rasse",
+        "dataKey": "rasse",
+        "visible": true,
+        "hiddenExpression": "",
+        "order": 11,
+        "width": 120,
+        "type": "tag",
+        "format": "tag",
+        "numberFormat": null,
+        "currencyFormat": null,
+        "percentFormat": null,
+        "decimalSettings": null,
+        "prefix": null,
+        "suffix": null,
+        "alignment": "left",
+        "sortable": true,
+        "filterable": true,
+        "editable": false,
+        "valueFormatting": "{{ _.startCase(item) }}",
+        "conditionalFormatting": [
+          "#E0E0E0"
+        ],
+        "formattingExpressions": [
+          "{{ _.startCase(item) }}",
+          "#E0E0E0"
+        ],
+        "expressionRefs": [
+          "item"
+        ],
+        "foundColorCodes": [
+          "#E0E0E0"
+        ]
+      },
+      {
+        "id": "c4dac",
+        "label": ">20",
+        "dataKey": "count_gt20",
+        "visible": true,
+        "hiddenExpression": "",
+        "order": 12,
+        "width": 90,
+        "type": "decimal",
+        "format": "decimal",
+        "numberFormat": "decimal",
+        "currencyFormat": null,
+        "percentFormat": null,
+        "decimalSettings": null,
+        "prefix": null,
+        "suffix": null,
+        "alignment": "right",
+        "sortable": true,
+        "filterable": true,
+        "editable": false,
+        "valueFormatting": null,
+        "conditionalFormatting": [
+          "{{ (() => {\n  const data = filteredPlayersWithTeamFit.value || [];\n  const vals = data.map(r => Number(r.count_gt20 ?? r[\"20\"]) || 0).filter(v => !isNaN(v));\n  const v = Number(item) || 0;\n  if (!vals.length) { return \"\"; }\n  const min = Math.min(...vals);\n  const max = Math.max(...vals);\n  const range = max - min || 1;\n  const ratio = (v - min) / range;\n  if (ratio >= 2/3) { return \"#4CAF50\"; }      // high = green\n  if (ratio >= 1/3) { return \"#FFEB3B\"; }      // mid = yellow\n  return \"#F44336\";                            // low = red\n})() }}",
+          "{{ (() => {\n  const data = filteredPlayersWithTeamFit.value || [];\n  const vals = data.map(r => Number(r.count_gt20 ?? r[\"20\"]) || 0).filter(v => !isNaN(v));\n  const v = Number(item) || 0;\n  if (!vals.length) { return \"#E0E0E0\"; }\n  const min = Math.min(...vals);\n  const max = Math.max(...vals);\n  const range = max - min || 1;\n  const ratio = (v - min) / range;\n  const bg = ratio >= 2/3 ? \"#4CAF50\" : (ratio >= 1/3 ? \"#FFEB3B\" : \"#F44336\");\n  // Dark text on yellow, light text on red/green\n  if (bg === \"#FFEB3B\") { return \"#000000\"; }\n  return \"#FFFFFF\";\n})() }}"
+        ],
+        "formattingExpressions": [
+          "{{ (() => {\n  const data = filteredPlayersWithTeamFit.value || [];\n  const vals = data.map(r => Number(r.count_gt20 ?? r[\"20\"]) || 0).filter(v => !isNaN(v));\n  const v = Number(item) || 0;\n  if (!vals.length) { return \"\"; }\n  const min = Math.min(...vals);\n  const max = Math.max(...vals);\n  const range = max - min || 1;\n  const ratio = (v - min) / range;\n  if (ratio >= 2/3) { return \"#4CAF50\"; }      // high = green\n  if (ratio >= 1/3) { return \"#FFEB3B\"; }      // mid = yellow\n  return \"#F44336\";                            // low = red\n})() }}",
+          "{{ (() => {\n  const data = filteredPlayersWithTeamFit.value || [];\n  const vals = data.map(r => Number(r.count_gt20 ?? r[\"20\"]) || 0).filter(v => !isNaN(v));\n  const v = Number(item) || 0;\n  if (!vals.length) { return \"#E0E0E0\"; }\n  const min = Math.min(...vals);\n  const max = Math.max(...vals);\n  const range = max - min || 1;\n  const ratio = (v - min) / range;\n  const bg = ratio >= 2/3 ? \"#4CAF50\" : (ratio >= 1/3 ? \"#FFEB3B\" : \"#F44336\");\n  // Dark text on yellow, light text on red/green\n  if (bg === \"#FFEB3B\") { return \"#000000\"; }\n  return \"#FFFFFF\";\n})() }}"
+        ],
+        "expressionRefs": [
+          "item",
+          "value"
+        ],
+        "foundColorCodes": [
+          "#4CAF50",
+          "#FFEB3B",
+          "#F44336",
+          "#E0E0E0",
+          "#000000",
+          "#FFFFFF"
+        ]
+      },
+      {
+        "id": "a612f",
+        "label": ">40",
+        "dataKey": "count_gt40",
+        "visible": true,
+        "hiddenExpression": "",
+        "order": 13,
+        "width": 90,
+        "type": "decimal",
+        "format": "decimal",
+        "numberFormat": "decimal",
+        "currencyFormat": null,
+        "percentFormat": null,
+        "decimalSettings": null,
+        "prefix": null,
+        "suffix": null,
+        "alignment": "right",
+        "sortable": true,
+        "filterable": true,
+        "editable": false,
+        "valueFormatting": null,
+        "conditionalFormatting": [
+          "{{ (() => {\n  const data = filteredPlayersWithTeamFit.value || [];\n  const vals = data.map(r => Number(r.count_gt40 ?? r[\"40\"]) || 0).filter(v => !isNaN(v));\n  const v = Number(item) || 0;\n  if (!vals.length) { return \"\"; }\n  const min = Math.min(...vals);\n  const max = Math.max(...vals);\n  const range = max - min || 1;\n  const ratio = (v - min) / range;\n  if (ratio >= 2/3) { return \"#4CAF50\"; }\n  if (ratio >= 1/3) { return \"#FFEB3B\"; }\n  return \"#F44336\";\n})() }}",
+          "{{ (() => {\n  const data = filteredPlayersWithTeamFit.value || [];\n  const vals = data.map(r => Number(r.count_gt40 ?? r[\"40\"]) || 0).filter(v => !isNaN(v));\n  const v = Number(item) || 0;\n  if (!vals.length) { return \"#E0E0E0\"; }\n  const min = Math.min(...vals);\n  const max = Math.max(...vals);\n  const range = max - min || 1;\n  const ratio = (v - min) / range;\n  const bg = ratio >= 2/3 ? \"#4CAF50\" : (ratio >= 1/3 ? \"#FFEB3B\" : \"#F44336\");\n  if (bg === \"#FFEB3B\") { return \"#000000\"; }\n  return \"#FFFFFF\";\n})() }}"
+        ],
+        "formattingExpressions": [
+          "{{ (() => {\n  const data = filteredPlayersWithTeamFit.value || [];\n  const vals = data.map(r => Number(r.count_gt40 ?? r[\"40\"]) || 0).filter(v => !isNaN(v));\n  const v = Number(item) || 0;\n  if (!vals.length) { return \"\"; }\n  const min = Math.min(...vals);\n  const max = Math.max(...vals);\n  const range = max - min || 1;\n  const ratio = (v - min) / range;\n  if (ratio >= 2/3) { return \"#4CAF50\"; }\n  if (ratio >= 1/3) { return \"#FFEB3B\"; }\n  return \"#F44336\";\n})() }}",
+          "{{ (() => {\n  const data = filteredPlayersWithTeamFit.value || [];\n  const vals = data.map(r => Number(r.count_gt40 ?? r[\"40\"]) || 0).filter(v => !isNaN(v));\n  const v = Number(item) || 0;\n  if (!vals.length) { return \"#E0E0E0\"; }\n  const min = Math.min(...vals);\n  const max = Math.max(...vals);\n  const range = max - min || 1;\n  const ratio = (v - min) / range;\n  const bg = ratio >= 2/3 ? \"#4CAF50\" : (ratio >= 1/3 ? \"#FFEB3B\" : \"#F44336\");\n  if (bg === \"#FFEB3B\") { return \"#000000\"; }\n  return \"#FFFFFF\";\n})() }}"
+        ],
+        "expressionRefs": [
+          "item",
+          "value"
+        ],
+        "foundColorCodes": [
+          "#4CAF50",
+          "#FFEB3B",
+          "#F44336",
+          "#E0E0E0",
+          "#000000",
+          "#FFFFFF"
+        ]
+      },
+      {
+        "id": "efd36",
+        "label": ">60",
+        "dataKey": "count_gt60",
+        "visible": true,
+        "hiddenExpression": "",
+        "order": 14,
+        "width": 90,
+        "type": "decimal",
+        "format": "decimal",
+        "numberFormat": "decimal",
+        "currencyFormat": null,
+        "percentFormat": null,
+        "decimalSettings": null,
+        "prefix": null,
+        "suffix": null,
+        "alignment": "right",
+        "sortable": true,
+        "filterable": true,
+        "editable": false,
+        "valueFormatting": null,
+        "conditionalFormatting": [
+          "{{ (() => {\n  const data = filteredPlayersWithTeamFit.value || [];\n  const vals = data.map(r => Number(r.count_gt60 ?? r[\"60\"]) || 0).filter(v => !isNaN(v));\n  const v = Number(item) || 0;\n  if (!vals.length) { return \"\"; }\n  const min = Math.min(...vals);\n  const max = Math.max(...vals);\n  const range = max - min || 1;\n  const ratio = (v - min) / range;\n  if (ratio >= 2/3) { return \"#4CAF50\"; }\n  if (ratio >= 1/3) { return \"#FFEB3B\"; }\n  return \"#F44336\";\n})() }}",
+          "{{ (() => {\n  const data = filteredPlayersWithTeamFit.value || [];\n  const vals = data.map(r => Number(r.count_gt60 ?? r[\"60\"]) || 0).filter(v => !isNaN(v));\n  const v = Number(item) || 0;\n  if (!vals.length) { return \"#E0E0E0\"; }\n  const min = Math.min(...vals);\n  const max = Math.max(...vals);\n  const range = max - min || 1;\n  const ratio = (v - min) / range;\n  const bg = ratio >= 2/3 ? \"#4CAF50\" : (ratio >= 1/3 ? \"#FFEB3B\" : \"#F44336\");\n  if (bg === \"#FFEB3B\") { return \"#000000\"; }\n  return \"#FFFFFF\";\n})() }}"
+        ],
+        "formattingExpressions": [
+          "{{ (() => {\n  const data = filteredPlayersWithTeamFit.value || [];\n  const vals = data.map(r => Number(r.count_gt60 ?? r[\"60\"]) || 0).filter(v => !isNaN(v));\n  const v = Number(item) || 0;\n  if (!vals.length) { return \"\"; }\n  const min = Math.min(...vals);\n  const max = Math.max(...vals);\n  const range = max - min || 1;\n  const ratio = (v - min) / range;\n  if (ratio >= 2/3) { return \"#4CAF50\"; }\n  if (ratio >= 1/3) { return \"#FFEB3B\"; }\n  return \"#F44336\";\n})() }}",
+          "{{ (() => {\n  const data = filteredPlayersWithTeamFit.value || [];\n  const vals = data.map(r => Number(r.count_gt60 ?? r[\"60\"]) || 0).filter(v => !isNaN(v));\n  const v = Number(item) || 0;\n  if (!vals.length) { return \"#E0E0E0\"; }\n  const min = Math.min(...vals);\n  const max = Math.max(...vals);\n  const range = max - min || 1;\n  const ratio = (v - min) / range;\n  const bg = ratio >= 2/3 ? \"#4CAF50\" : (ratio >= 1/3 ? \"#FFEB3B\" : \"#F44336\");\n  if (bg === \"#FFEB3B\") { return \"#000000\"; }\n  return \"#FFFFFF\";\n})() }}"
+        ],
+        "expressionRefs": [
+          "item",
+          "value"
+        ],
+        "foundColorCodes": [
+          "#4CAF50",
+          "#FFEB3B",
+          "#F44336",
+          "#E0E0E0",
+          "#000000",
+          "#FFFFFF"
+        ]
+      },
+      {
+        "id": "aae25",
+        "label": ">80",
+        "dataKey": "count_gt80",
+        "visible": true,
+        "hiddenExpression": "",
+        "order": 15,
+        "width": 90,
+        "type": "decimal",
+        "format": "decimal",
+        "numberFormat": "decimal",
+        "currencyFormat": null,
+        "percentFormat": null,
+        "decimalSettings": null,
+        "prefix": null,
+        "suffix": null,
+        "alignment": "right",
+        "sortable": true,
+        "filterable": true,
+        "editable": false,
+        "valueFormatting": null,
+        "conditionalFormatting": [
+          "{{ (() => {\n  const data = filteredPlayersWithTeamFit.value || [];\n  const vals = data.map(r => Number(r.count_gt80 ?? r[\"80\"]) || 0).filter(v => !isNaN(v));\n  const v = Number(item) || 0;\n  if (!vals.length) { return \"\"; }\n  const min = Math.min(...vals);\n  const max = Math.max(...vals);\n  const range = max - min || 1;\n  const ratio = (v - min) / range;\n  if (ratio >= 2/3) { return \"#4CAF50\"; }\n  if (ratio >= 1/3) { return \"#FFEB3B\"; }\n  return \"#F44336\";\n})() }}",
+          "{{ (() => {\n  const data = filteredPlayersWithTeamFit.value || [];\n  const vals = data.map(r => Number(r.count_gt80 ?? r[\"80\"]) || 0).filter(v => !isNaN(v));\n  const v = Number(item) || 0;\n  if (!vals.length) { return \"#E0E0E0\"; }\n  const min = Math.min(...vals);\n  const max = Math.max(...vals);\n  const range = max - min || 1;\n  const ratio = (v - min) / range;\n  const bg = ratio >= 2/3 ? \"#4CAF50\" : (ratio >= 1/3 ? \"#FFEB3B\" : \"#F44336\");\n  if (bg === \"#FFEB3B\") { return \"#000000\"; }\n  return \"#FFFFFF\";\n})() }}"
+        ],
+        "formattingExpressions": [
+          "{{ (() => {\n  const data = filteredPlayersWithTeamFit.value || [];\n  const vals = data.map(r => Number(r.count_gt80 ?? r[\"80\"]) || 0).filter(v => !isNaN(v));\n  const v = Number(item) || 0;\n  if (!vals.length) { return \"\"; }\n  const min = Math.min(...vals);\n  const max = Math.max(...vals);\n  const range = max - min || 1;\n  const ratio = (v - min) / range;\n  if (ratio >= 2/3) { return \"#4CAF50\"; }\n  if (ratio >= 1/3) { return \"#FFEB3B\"; }\n  return \"#F44336\";\n})() }}",
+          "{{ (() => {\n  const data = filteredPlayersWithTeamFit.value || [];\n  const vals = data.map(r => Number(r.count_gt80 ?? r[\"80\"]) || 0).filter(v => !isNaN(v));\n  const v = Number(item) || 0;\n  if (!vals.length) { return \"#E0E0E0\"; }\n  const min = Math.min(...vals);\n  const max = Math.max(...vals);\n  const range = max - min || 1;\n  const ratio = (v - min) / range;\n  const bg = ratio >= 2/3 ? \"#4CAF50\" : (ratio >= 1/3 ? \"#FFEB3B\" : \"#F44336\");\n  if (bg === \"#FFEB3B\") { return \"#000000\"; }\n  return \"#FFFFFF\";\n})() }}"
+        ],
+        "expressionRefs": [
+          "item",
+          "value"
+        ],
+        "foundColorCodes": [
+          "#4CAF50",
+          "#FFEB3B",
+          "#F44336",
+          "#E0E0E0",
+          "#000000",
+          "#FFFFFF"
+        ]
+      },
+      {
+        "id": "f58f6",
+        "label": "Pow",
+        "dataKey": "power_rating",
+        "visible": "conditional",
+        "hiddenExpression": "{{ !showAttributes.value }}",
+        "order": 16,
+        "width": 71.5625,
+        "type": "string",
+        "format": "string",
+        "numberFormat": null,
+        "currencyFormat": null,
+        "percentFormat": null,
+        "decimalSettings": null,
+        "prefix": null,
+        "suffix": null,
+        "alignment": "left",
+        "sortable": true,
+        "filterable": true,
+        "editable": false,
+        "valueFormatting": null,
+        "conditionalFormatting": [
+          "{{ ((m)=>({'S+':'#1565C0','S':'#42A5F5','A':'#2E7D32','B':'#66BB6A','C':'#F9A825','D':'#FFEB3B','E':'#FF9800','F':'#EF5350'})[m]) (item) }}",
+          "{{ ((m)=>({'S+':'#FFFFFF','S':'#FFFFFF','A':'#FFFFFF','B':'#000000','C':'#000000','D':'#000000','E':'#000000','F':'#000000'})[m]) (item) }}"
+        ],
+        "formattingExpressions": [
+          "{{ ((m)=>({'S+':'#1565C0','S':'#42A5F5','A':'#2E7D32','B':'#66BB6A','C':'#F9A825','D':'#FFEB3B','E':'#FF9800','F':'#EF5350'})[m]) (item) }}",
+          "{{ ((m)=>({'S+':'#FFFFFF','S':'#FFFFFF','A':'#FFFFFF','B':'#000000','C':'#000000','D':'#000000','E':'#000000','F':'#000000'})[m]) (item) }}",
+          "{{ !showAttributes.value }}"
+        ],
+        "expressionRefs": [
+          "item",
+          "value"
+        ],
+        "foundColorCodes": [
+          "#1565C0",
+          "#42A5F5",
+          "#2E7D32",
+          "#66BB6A",
+          "#F9A825",
+          "#FFEB3B",
+          "#FF9800",
+          "#EF5350",
+          "#FFFFFF",
+          "#000000"
+        ]
+      },
+      {
+        "id": "d547f",
+        "label": "Hea",
+        "dataKey": "health_rating",
+        "visible": "conditional",
+        "hiddenExpression": "{{ !showAttributes.value }}",
+        "order": 17,
+        "width": 72,
+        "type": "string",
+        "format": "string",
+        "numberFormat": null,
+        "currencyFormat": null,
+        "percentFormat": null,
+        "decimalSettings": null,
+        "prefix": null,
+        "suffix": null,
+        "alignment": "left",
+        "sortable": true,
+        "filterable": true,
+        "editable": false,
+        "valueFormatting": null,
+        "conditionalFormatting": [
+          "{{ ((m)=>({'S+':'#1565C0','S':'#42A5F5','A':'#2E7D32','B':'#66BB6A','C':'#F9A825','D':'#FFEB3B','E':'#FF9800','F':'#EF5350'})[m]) (item) }}",
+          "{{ ((m)=>({'S+':'#FFFFFF','S':'#FFFFFF','A':'#FFFFFF','B':'#000000','C':'#000000','D':'#000000','E':'#000000','F':'#000000'})[m]) (item) }}"
+        ],
+        "formattingExpressions": [
+          "{{ ((m)=>({'S+':'#1565C0','S':'#42A5F5','A':'#2E7D32','B':'#66BB6A','C':'#F9A825','D':'#FFEB3B','E':'#FF9800','F':'#EF5350'})[m]) (item) }}",
+          "{{ ((m)=>({'S+':'#FFFFFF','S':'#FFFFFF','A':'#FFFFFF','B':'#000000','C':'#000000','D':'#000000','E':'#000000','F':'#000000'})[m]) (item) }}",
+          "{{ !showAttributes.value }}"
+        ],
+        "expressionRefs": [
+          "item",
+          "value"
+        ],
+        "foundColorCodes": [
+          "#1565C0",
+          "#42A5F5",
+          "#2E7D32",
+          "#66BB6A",
+          "#F9A825",
+          "#FFEB3B",
+          "#FF9800",
+          "#EF5350",
+          "#FFFFFF",
+          "#000000"
+        ]
+      },
+      {
+        "id": "f1aba",
+        "label": "Sta",
+        "dataKey": "stamina_rating",
+        "visible": "conditional",
+        "hiddenExpression": "{{ !showAttributes.value }}",
+        "order": 18,
+        "width": 65.109375,
+        "type": "string",
+        "format": "string",
+        "numberFormat": null,
+        "currencyFormat": null,
+        "percentFormat": null,
+        "decimalSettings": null,
+        "prefix": null,
+        "suffix": null,
+        "alignment": "left",
+        "sortable": true,
+        "filterable": true,
+        "editable": false,
+        "valueFormatting": null,
+        "conditionalFormatting": [
+          "{{ ((m)=>({'S+':'#1565C0','S':'#42A5F5','A':'#2E7D32','B':'#66BB6A','C':'#F9A825','D':'#FFEB3B','E':'#FF9800','F':'#EF5350'})[m]) (item) }}",
+          "{{ ((m)=>({'S+':'#FFFFFF','S':'#FFFFFF','A':'#FFFFFF','B':'#000000','C':'#000000','D':'#000000','E':'#000000','F':'#000000'})[m]) (item) }}"
+        ],
+        "formattingExpressions": [
+          "{{ ((m)=>({'S+':'#1565C0','S':'#42A5F5','A':'#2E7D32','B':'#66BB6A','C':'#F9A825','D':'#FFEB3B','E':'#FF9800','F':'#EF5350'})[m]) (item) }}",
+          "{{ ((m)=>({'S+':'#FFFFFF','S':'#FFFFFF','A':'#FFFFFF','B':'#000000','C':'#000000','D':'#000000','E':'#000000','F':'#000000'})[m]) (item) }}",
+          "{{ !showAttributes.value }}"
+        ],
+        "expressionRefs": [
+          "item",
+          "value"
+        ],
+        "foundColorCodes": [
+          "#1565C0",
+          "#42A5F5",
+          "#2E7D32",
+          "#66BB6A",
+          "#F9A825",
+          "#FFEB3B",
+          "#FF9800",
+          "#EF5350",
+          "#FFFFFF",
+          "#000000"
+        ]
+      },
+      {
+        "id": "5c8aa",
+        "label": "Int",
+        "dataKey": "intelligence_rating",
+        "visible": "conditional",
+        "hiddenExpression": "{{ !showAttributes.value }}",
+        "order": 19,
+        "width": 63,
+        "type": "string",
+        "format": "string",
+        "numberFormat": null,
+        "currencyFormat": null,
+        "percentFormat": null,
+        "decimalSettings": null,
+        "prefix": null,
+        "suffix": null,
+        "alignment": "left",
+        "sortable": true,
+        "filterable": true,
+        "editable": false,
+        "valueFormatting": null,
+        "conditionalFormatting": [
+          "{{ ((m)=>({'S+':'#1565C0','S':'#42A5F5','A':'#2E7D32','B':'#66BB6A','C':'#F9A825','D':'#FFEB3B','E':'#FF9800','F':'#EF5350'})[m]) (item) }}",
+          "{{ ((m)=>({'S+':'#FFFFFF','S':'#FFFFFF','A':'#FFFFFF','B':'#000000','C':'#000000','D':'#000000','E':'#000000','F':'#000000'})[m]) (item) }}"
+        ],
+        "formattingExpressions": [
+          "{{ ((m)=>({'S+':'#1565C0','S':'#42A5F5','A':'#2E7D32','B':'#66BB6A','C':'#F9A825','D':'#FFEB3B','E':'#FF9800','F':'#EF5350'})[m]) (item) }}",
+          "{{ ((m)=>({'S+':'#FFFFFF','S':'#FFFFFF','A':'#FFFFFF','B':'#000000','C':'#000000','D':'#000000','E':'#000000','F':'#000000'})[m]) (item) }}",
+          "{{ !showAttributes.value }}"
+        ],
+        "expressionRefs": [
+          "item",
+          "value"
+        ],
+        "foundColorCodes": [
+          "#1565C0",
+          "#42A5F5",
+          "#2E7D32",
+          "#66BB6A",
+          "#F9A825",
+          "#FFEB3B",
+          "#FF9800",
+          "#EF5350",
+          "#FFFFFF",
+          "#000000"
+        ]
+      },
+      {
+        "id": "59761",
+        "label": "Det",
+        "dataKey": "determination_rating",
+        "visible": "conditional",
+        "hiddenExpression": "{{ !showAttributes.value }}",
+        "order": 20,
+        "width": 69.5625,
+        "type": "string",
+        "format": "string",
+        "numberFormat": null,
+        "currencyFormat": null,
+        "percentFormat": null,
+        "decimalSettings": null,
+        "prefix": null,
+        "suffix": null,
+        "alignment": "left",
+        "sortable": true,
+        "filterable": true,
+        "editable": false,
+        "valueFormatting": null,
+        "conditionalFormatting": [
+          "{{ ((m)=>({'S+':'#1565C0','S':'#42A5F5','A':'#2E7D32','B':'#66BB6A','C':'#F9A825','D':'#FFEB3B','E':'#FF9800','F':'#EF5350'})[m]) (item) }}",
+          "{{ ((m)=>({'S+':'#FFFFFF','S':'#FFFFFF','A':'#FFFFFF','B':'#000000','C':'#000000','D':'#000000','E':'#000000','F':'#000000'})[m]) (item) }}"
+        ],
+        "formattingExpressions": [
+          "{{ ((m)=>({'S+':'#1565C0','S':'#42A5F5','A':'#2E7D32','B':'#66BB6A','C':'#F9A825','D':'#FFEB3B','E':'#FF9800','F':'#EF5350'})[m]) (item) }}",
+          "{{ ((m)=>({'S+':'#FFFFFF','S':'#FFFFFF','A':'#FFFFFF','B':'#000000','C':'#000000','D':'#000000','E':'#000000','F':'#000000'})[m]) (item) }}",
+          "{{ !showAttributes.value }}"
+        ],
+        "expressionRefs": [
+          "item",
+          "value"
+        ],
+        "foundColorCodes": [
+          "#1565C0",
+          "#42A5F5",
+          "#2E7D32",
+          "#66BB6A",
+          "#F9A825",
+          "#FFEB3B",
+          "#FF9800",
+          "#EF5350",
+          "#FFFFFF",
+          "#000000"
+        ]
+      },
+      {
+        "id": "fc84a",
+        "label": "Awa",
+        "dataKey": "awareness_rating",
+        "visible": "conditional",
+        "hiddenExpression": "{{ !showAttributes.value }}",
+        "order": 21,
+        "width": 66.625,
+        "type": "string",
+        "format": "string",
+        "numberFormat": null,
+        "currencyFormat": null,
+        "percentFormat": null,
+        "decimalSettings": null,
+        "prefix": null,
+        "suffix": null,
+        "alignment": "left",
+        "sortable": true,
+        "filterable": true,
+        "editable": false,
+        "valueFormatting": null,
+        "conditionalFormatting": [
+          "{{ ((m)=>({'S+':'#1565C0','S':'#42A5F5','A':'#2E7D32','B':'#66BB6A','C':'#F9A825','D':'#FFEB3B','E':'#FF9800','F':'#EF5350'})[m]) (item) }}",
+          "{{ ((m)=>({'S+':'#FFFFFF','S':'#FFFFFF','A':'#FFFFFF','B':'#000000','C':'#000000','D':'#000000','E':'#000000','F':'#000000'})[m]) (item) }}"
+        ],
+        "formattingExpressions": [
+          "{{ ((m)=>({'S+':'#1565C0','S':'#42A5F5','A':'#2E7D32','B':'#66BB6A','C':'#F9A825','D':'#FFEB3B','E':'#FF9800','F':'#EF5350'})[m]) (item) }}",
+          "{{ ((m)=>({'S+':'#FFFFFF','S':'#FFFFFF','A':'#FFFFFF','B':'#000000','C':'#000000','D':'#000000','E':'#000000','F':'#000000'})[m]) (item) }}",
+          "{{ !showAttributes.value }}"
+        ],
+        "expressionRefs": [
+          "item",
+          "value"
+        ],
+        "foundColorCodes": [
+          "#1565C0",
+          "#42A5F5",
+          "#2E7D32",
+          "#66BB6A",
+          "#F9A825",
+          "#FFEB3B",
+          "#FF9800",
+          "#EF5350",
+          "#FFFFFF",
+          "#000000"
+        ]
+      },
+      {
+        "id": "06d92",
+        "label": "Spe",
+        "dataKey": "speed_rating",
+        "visible": "conditional",
+        "hiddenExpression": "{{ !showAttributes.value }}",
+        "order": 22,
+        "width": 62.390625,
+        "type": "string",
+        "format": "string",
+        "numberFormat": null,
+        "currencyFormat": null,
+        "percentFormat": null,
+        "decimalSettings": null,
+        "prefix": null,
+        "suffix": null,
+        "alignment": "left",
+        "sortable": true,
+        "filterable": true,
+        "editable": false,
+        "valueFormatting": null,
+        "conditionalFormatting": [
+          "{{ ((m)=>({'S+':'#1565C0','S':'#42A5F5','A':'#2E7D32','B':'#66BB6A','C':'#F9A825','D':'#FFEB3B','E':'#FF9800','F':'#EF5350'})[m]) (item) }}",
+          "{{ ((m)=>({'S+':'#FFFFFF','S':'#FFFFFF','A':'#FFFFFF','B':'#000000','C':'#000000','D':'#000000','E':'#000000','F':'#000000'})[m]) (item) }}"
+        ],
+        "formattingExpressions": [
+          "{{ ((m)=>({'S+':'#1565C0','S':'#42A5F5','A':'#2E7D32','B':'#66BB6A','C':'#F9A825','D':'#FFEB3B','E':'#FF9800','F':'#EF5350'})[m]) (item) }}",
+          "{{ ((m)=>({'S+':'#FFFFFF','S':'#FFFFFF','A':'#FFFFFF','B':'#000000','C':'#000000','D':'#000000','E':'#000000','F':'#000000'})[m]) (item) }}",
+          "{{ !showAttributes.value }}"
+        ],
+        "expressionRefs": [
+          "item",
+          "value"
+        ],
+        "foundColorCodes": [
+          "#1565C0",
+          "#42A5F5",
+          "#2E7D32",
+          "#66BB6A",
+          "#F9A825",
+          "#FFEB3B",
+          "#FF9800",
+          "#EF5350",
+          "#FFFFFF",
+          "#000000"
+        ]
+      },
+      {
+        "id": "84a8d",
+        "label": "Dex",
+        "dataKey": "dexterity_rating",
+        "visible": "conditional",
+        "hiddenExpression": "{{ !showAttributes.value }}",
+        "order": 23,
+        "width": 62.5625,
+        "type": "string",
+        "format": "string",
+        "numberFormat": null,
+        "currencyFormat": null,
+        "percentFormat": null,
+        "decimalSettings": null,
+        "prefix": null,
+        "suffix": null,
+        "alignment": "left",
+        "sortable": true,
+        "filterable": true,
+        "editable": false,
+        "valueFormatting": null,
+        "conditionalFormatting": [
+          "{{ ((m)=>({'S+':'#1565C0','S':'#42A5F5','A':'#2E7D32','B':'#66BB6A','C':'#F9A825','D':'#FFEB3B','E':'#FF9800','F':'#EF5350'})[m]) (item) }}",
+          "{{ ((m)=>({'S+':'#FFFFFF','S':'#FFFFFF','A':'#FFFFFF','B':'#000000','C':'#000000','D':'#000000','E':'#000000','F':'#000000'})[m]) (item) }}"
+        ],
+        "formattingExpressions": [
+          "{{ ((m)=>({'S+':'#1565C0','S':'#42A5F5','A':'#2E7D32','B':'#66BB6A','C':'#F9A825','D':'#FFEB3B','E':'#FF9800','F':'#EF5350'})[m]) (item) }}",
+          "{{ ((m)=>({'S+':'#FFFFFF','S':'#FFFFFF','A':'#FFFFFF','B':'#000000','C':'#000000','D':'#000000','E':'#000000','F':'#000000'})[m]) (item) }}",
+          "{{ !showAttributes.value }}"
+        ],
+        "expressionRefs": [
+          "item",
+          "value"
+        ],
+        "foundColorCodes": [
+          "#1565C0",
+          "#42A5F5",
+          "#2E7D32",
+          "#66BB6A",
+          "#F9A825",
+          "#FFEB3B",
+          "#FF9800",
+          "#EF5350",
+          "#FFFFFF",
+          "#000000"
+        ]
+      },
+      {
+        "id": "8fa4a",
+        "label": "Cha",
+        "dataKey": "charisma_rating",
+        "visible": "conditional",
+        "hiddenExpression": "{{ !showAttributes.value }}",
+        "order": 24,
+        "width": 68.375,
+        "type": "string",
+        "format": "string",
+        "numberFormat": null,
+        "currencyFormat": null,
+        "percentFormat": null,
+        "decimalSettings": null,
+        "prefix": null,
+        "suffix": null,
+        "alignment": "left",
+        "sortable": true,
+        "filterable": true,
+        "editable": false,
+        "valueFormatting": null,
+        "conditionalFormatting": [
+          "{{ ((m)=>({'S+':'#1565C0','S':'#42A5F5','A':'#2E7D32','B':'#66BB6A','C':'#F9A825','D':'#FFEB3B','E':'#FF9800','F':'#EF5350'})[m]) (item) }}",
+          "{{ ((m)=>({'S+':'#FFFFFF','S':'#FFFFFF','A':'#FFFFFF','B':'#000000','C':'#000000','D':'#000000','E':'#000000','F':'#000000'})[m]) (item) }}"
+        ],
+        "formattingExpressions": [
+          "{{ ((m)=>({'S+':'#1565C0','S':'#42A5F5','A':'#2E7D32','B':'#66BB6A','C':'#F9A825','D':'#FFEB3B','E':'#FF9800','F':'#EF5350'})[m]) (item) }}",
+          "{{ ((m)=>({'S+':'#FFFFFF','S':'#FFFFFF','A':'#FFFFFF','B':'#000000','C':'#000000','D':'#000000','E':'#000000','F':'#000000'})[m]) (item) }}",
+          "{{ !showAttributes.value }}"
+        ],
+        "expressionRefs": [
+          "item",
+          "value"
+        ],
+        "foundColorCodes": [
+          "#1565C0",
+          "#42A5F5",
+          "#2E7D32",
+          "#66BB6A",
+          "#F9A825",
+          "#FFEB3B",
+          "#FF9800",
+          "#EF5350",
+          "#FFFFFF",
+          "#000000"
+        ]
+      },
+      {
+        "id": "2e892",
+        "label": "Wil",
+        "dataKey": "will_rating",
+        "visible": "conditional",
+        "hiddenExpression": "{{ !showAttributes.value }}",
+        "order": 25,
+        "width": 67.71875,
+        "type": "string",
+        "format": "string",
+        "numberFormat": null,
+        "currencyFormat": null,
+        "percentFormat": null,
+        "decimalSettings": null,
+        "prefix": null,
+        "suffix": null,
+        "alignment": "left",
+        "sortable": true,
+        "filterable": true,
+        "editable": false,
+        "valueFormatting": null,
+        "conditionalFormatting": [
+          "{{ ((m)=>({'S+':'#1565C0','S':'#42A5F5','A':'#2E7D32','B':'#66BB6A','C':'#F9A825','D':'#FFEB3B','E':'#FF9800','F':'#EF5350'})[m]) (item) }}",
+          "{{ ((m)=>({'S+':'#FFFFFF','S':'#FFFFFF','A':'#FFFFFF','B':'#000000','C':'#000000','D':'#000000','E':'#000000','F':'#000000'})[m]) (item) }}"
+        ],
+        "formattingExpressions": [
+          "{{ ((m)=>({'S+':'#1565C0','S':'#42A5F5','A':'#2E7D32','B':'#66BB6A','C':'#F9A825','D':'#FFEB3B','E':'#FF9800','F':'#EF5350'})[m]) (item) }}",
+          "{{ ((m)=>({'S+':'#FFFFFF','S':'#FFFFFF','A':'#FFFFFF','B':'#000000','C':'#000000','D':'#000000','E':'#000000','F':'#000000'})[m]) (item) }}",
+          "{{ !showAttributes.value }}"
+        ],
+        "expressionRefs": [
+          "item",
+          "value"
+        ],
+        "foundColorCodes": [
+          "#1565C0",
+          "#42A5F5",
+          "#2E7D32",
+          "#66BB6A",
+          "#F9A825",
+          "#FFEB3B",
+          "#FF9800",
+          "#EF5350",
+          "#FFFFFF",
+          "#000000"
+        ]
+      },
+      {
+        "id": "514a8",
+        "label": "Spi",
+        "dataKey": "spirit_rating",
+        "visible": "conditional",
+        "hiddenExpression": "{{ !showAttributes.value }}",
+        "order": 26,
+        "width": 70.484375,
+        "type": "string",
+        "format": "string",
+        "numberFormat": null,
+        "currencyFormat": null,
+        "percentFormat": null,
+        "decimalSettings": null,
+        "prefix": null,
+        "suffix": null,
+        "alignment": "left",
+        "sortable": true,
+        "filterable": true,
+        "editable": false,
+        "valueFormatting": null,
+        "conditionalFormatting": [
+          "{{ ((m)=>({'S+':'#1565C0','S':'#42A5F5','A':'#2E7D32','B':'#66BB6A','C':'#F9A825','D':'#FFEB3B','E':'#FF9800','F':'#EF5350'})[m]) (item) }}",
+          "{{ ((m)=>({'S+':'#FFFFFF','S':'#FFFFFF','A':'#FFFFFF','B':'#000000','C':'#000000','D':'#000000','E':'#000000','F':'#000000'})[m]) (item) }}"
+        ],
+        "formattingExpressions": [
+          "{{ ((m)=>({'S+':'#1565C0','S':'#42A5F5','A':'#2E7D32','B':'#66BB6A','C':'#F9A825','D':'#FFEB3B','E':'#FF9800','F':'#EF5350'})[m]) (item) }}",
+          "{{ ((m)=>({'S+':'#FFFFFF','S':'#FFFFFF','A':'#FFFFFF','B':'#000000','C':'#000000','D':'#000000','E':'#000000','F':'#000000'})[m]) (item) }}",
+          "{{ !showAttributes.value }}"
+        ],
+        "expressionRefs": [
+          "item",
+          "value"
+        ],
+        "foundColorCodes": [
+          "#1565C0",
+          "#42A5F5",
+          "#2E7D32",
+          "#66BB6A",
+          "#F9A825",
+          "#FFEB3B",
+          "#FF9800",
+          "#EF5350",
+          "#FFFFFF",
+          "#000000"
+        ]
+      },
+      {
+        "id": "e93b8",
+        "label": "Tor",
+        "dataKey": "torment_rating",
+        "visible": "conditional",
+        "hiddenExpression": "{{ !showAttributes.value }}",
+        "order": 27,
+        "width": 64.1875,
+        "type": "string",
+        "format": "string",
+        "numberFormat": null,
+        "currencyFormat": null,
+        "percentFormat": null,
+        "decimalSettings": null,
+        "prefix": null,
+        "suffix": null,
+        "alignment": "left",
+        "sortable": true,
+        "filterable": true,
+        "editable": false,
+        "valueFormatting": null,
+        "conditionalFormatting": [
+          "{{ ((m)=>({'S+':'#1565C0','S':'#42A5F5','A':'#2E7D32','B':'#66BB6A','C':'#F9A825','D':'#FFEB3B','E':'#FF9800','F':'#EF5350'})[m]) (item) }}",
+          "{{ ((m)=>({'S+':'#FFFFFF','S':'#FFFFFF','A':'#FFFFFF','B':'#000000','C':'#000000','D':'#000000','E':'#000000','F':'#000000'})[m]) (item) }}"
+        ],
+        "formattingExpressions": [
+          "{{ ((m)=>({'S+':'#1565C0','S':'#42A5F5','A':'#2E7D32','B':'#66BB6A','C':'#F9A825','D':'#FFEB3B','E':'#FF9800','F':'#EF5350'})[m]) (item) }}",
+          "{{ ((m)=>({'S+':'#FFFFFF','S':'#FFFFFF','A':'#FFFFFF','B':'#000000','C':'#000000','D':'#000000','E':'#000000','F':'#000000'})[m]) (item) }}",
+          "{{ !showAttributes.value }}"
+        ],
+        "expressionRefs": [
+          "item",
+          "value"
+        ],
+        "foundColorCodes": [
+          "#1565C0",
+          "#42A5F5",
+          "#2E7D32",
+          "#66BB6A",
+          "#F9A825",
+          "#FFEB3B",
+          "#FF9800",
+          "#EF5350",
+          "#FFFFFF",
+          "#000000"
+        ]
+      },
+      {
+        "id": "6a3e2",
+        "label": "Subclass 2",
+        "dataKey": "subclass_2",
+        "visible": true,
+        "hiddenExpression": "",
+        "order": 28,
+        "width": 114,
+        "type": "string",
+        "format": "string",
+        "numberFormat": null,
+        "currencyFormat": null,
+        "percentFormat": null,
+        "decimalSettings": null,
+        "prefix": null,
+        "suffix": null,
+        "alignment": "left",
+        "sortable": true,
+        "filterable": true,
+        "editable": false,
+        "valueFormatting": null,
+        "conditionalFormatting": [
+          "#E0E0E0"
+        ],
+        "formattingExpressions": [
+          "#E0E0E0"
+        ],
+        "expressionRefs": [],
+        "foundColorCodes": [
+          "#E0E0E0"
+        ]
+      },
+      {
+        "id": "04394",
+        "label": "Subclass 1",
+        "dataKey": "subclass_1",
+        "visible": true,
+        "hiddenExpression": "",
+        "order": 29,
+        "width": 121,
+        "type": "string",
+        "format": "string",
+        "numberFormat": null,
+        "currencyFormat": null,
+        "percentFormat": null,
+        "decimalSettings": null,
+        "prefix": null,
+        "suffix": null,
+        "alignment": "left",
+        "sortable": true,
+        "filterable": true,
+        "editable": false,
+        "valueFormatting": null,
+        "conditionalFormatting": [
+          "#E0E0E0"
+        ],
+        "formattingExpressions": [
+          "#E0E0E0"
+        ],
+        "expressionRefs": [],
+        "foundColorCodes": [
+          "#E0E0E0"
+        ]
+      },
+      {
+        "id": "fed53",
+        "label": "Subclass 3",
+        "dataKey": "subclass_3",
+        "visible": true,
+        "hiddenExpression": "",
+        "order": 30,
+        "width": 117.15625,
+        "type": "string",
+        "format": "string",
+        "numberFormat": null,
+        "currencyFormat": null,
+        "percentFormat": null,
+        "decimalSettings": null,
+        "prefix": null,
+        "suffix": null,
+        "alignment": "left",
+        "sortable": true,
+        "filterable": true,
+        "editable": false,
+        "valueFormatting": null,
+        "conditionalFormatting": [
+          "#E0E0E0"
+        ],
+        "formattingExpressions": [
+          "#E0E0E0"
+        ],
+        "expressionRefs": [],
+        "foundColorCodes": [
+          "#E0E0E0"
+        ]
+      },
+      {
+        "id": "bdd67",
+        "label": "Alignment",
+        "dataKey": "alignment",
+        "visible": true,
+        "hiddenExpression": "",
+        "order": 31,
+        "width": 120,
+        "type": "tag",
+        "format": "tag",
+        "numberFormat": null,
+        "currencyFormat": null,
+        "percentFormat": null,
+        "decimalSettings": null,
+        "prefix": null,
+        "suffix": null,
+        "alignment": "left",
+        "sortable": true,
+        "filterable": true,
+        "editable": false,
+        "valueFormatting": "{{ _.startCase(item) }}",
+        "conditionalFormatting": [
+          "#E0E0E0"
+        ],
+        "formattingExpressions": [
+          "{{ _.startCase(item) }}",
+          "#E0E0E0"
+        ],
+        "expressionRefs": [
+          "item"
+        ],
+        "foundColorCodes": [
+          "#E0E0E0"
+        ]
+      },
+      {
+        "id": "dce3f",
+        "label": "Trait+1",
+        "dataKey": "trait_pos_1",
+        "visible": true,
+        "hiddenExpression": "",
+        "order": 32,
+        "width": 145,
+        "type": "tag",
+        "format": "tag",
+        "numberFormat": null,
+        "currencyFormat": null,
+        "percentFormat": null,
+        "decimalSettings": null,
+        "prefix": null,
+        "suffix": null,
+        "alignment": "left",
+        "sortable": true,
+        "filterable": true,
+        "editable": false,
+        "valueFormatting": null,
+        "conditionalFormatting": [
+          "#E0E0E0"
+        ],
+        "formattingExpressions": [
+          "#E0E0E0"
+        ],
+        "expressionRefs": [],
+        "foundColorCodes": [
+          "#E0E0E0"
+        ]
+      },
+      {
+        "id": "9a5d7",
+        "label": "Trait+2",
+        "dataKey": "trait_pos_2",
+        "visible": true,
+        "hiddenExpression": "",
+        "order": 33,
+        "width": 137,
+        "type": "tag",
+        "format": "tag",
+        "numberFormat": null,
+        "currencyFormat": null,
+        "percentFormat": null,
+        "decimalSettings": null,
+        "prefix": null,
+        "suffix": null,
+        "alignment": "left",
+        "sortable": true,
+        "filterable": true,
+        "editable": false,
+        "valueFormatting": null,
+        "conditionalFormatting": [
+          "#E0E0E0"
+        ],
+        "formattingExpressions": [
+          "#E0E0E0"
+        ],
+        "expressionRefs": [],
+        "foundColorCodes": [
+          "#E0E0E0"
+        ]
+      },
+      {
+        "id": "6a629",
+        "label": "Trait+3",
+        "dataKey": "trait_pos_3",
+        "visible": true,
+        "hiddenExpression": "",
+        "order": 34,
+        "width": 132,
+        "type": "tag",
+        "format": "tag",
+        "numberFormat": null,
+        "currencyFormat": null,
+        "percentFormat": null,
+        "decimalSettings": null,
+        "prefix": null,
+        "suffix": null,
+        "alignment": "left",
+        "sortable": true,
+        "filterable": true,
+        "editable": false,
+        "valueFormatting": null,
+        "conditionalFormatting": [
+          "#E0E0E0"
+        ],
+        "formattingExpressions": [
+          "#E0E0E0"
+        ],
+        "expressionRefs": [],
+        "foundColorCodes": [
+          "#E0E0E0"
+        ]
+      },
+      {
+        "id": "0fdda",
+        "label": "Trait-1",
+        "dataKey": "trait_neg_1",
+        "visible": true,
+        "hiddenExpression": "",
+        "order": 35,
+        "width": 147,
+        "type": "tag",
+        "format": "tag",
+        "numberFormat": null,
+        "currencyFormat": null,
+        "percentFormat": null,
+        "decimalSettings": null,
+        "prefix": null,
+        "suffix": null,
+        "alignment": "left",
+        "sortable": true,
+        "filterable": true,
+        "editable": false,
+        "valueFormatting": null,
+        "conditionalFormatting": [
+          "#E0E0E0"
+        ],
+        "formattingExpressions": [
+          "#E0E0E0"
+        ],
+        "expressionRefs": [],
+        "foundColorCodes": [
+          "#E0E0E0"
+        ]
+      },
+      {
+        "id": "acd7f",
+        "label": "Trait-2",
+        "dataKey": "trait_neg_2",
+        "visible": true,
+        "hiddenExpression": "",
+        "order": 36,
+        "width": 145,
+        "type": "tag",
+        "format": "tag",
+        "numberFormat": null,
+        "currencyFormat": null,
+        "percentFormat": null,
+        "decimalSettings": null,
+        "prefix": null,
+        "suffix": null,
+        "alignment": "left",
+        "sortable": true,
+        "filterable": true,
+        "editable": false,
+        "valueFormatting": null,
+        "conditionalFormatting": [
+          "#E0E0E0"
+        ],
+        "formattingExpressions": [
+          "#E0E0E0"
+        ],
+        "expressionRefs": [],
+        "foundColorCodes": [
+          "#E0E0E0"
+        ]
+      },
+      {
+        "id": "bf96d",
+        "label": "Trait-3",
+        "dataKey": "trait_neg_3",
+        "visible": true,
+        "hiddenExpression": "",
+        "order": 37,
+        "width": 87,
+        "type": "tags",
+        "format": "tags",
+        "numberFormat": null,
+        "currencyFormat": null,
+        "percentFormat": null,
+        "decimalSettings": null,
+        "prefix": null,
+        "suffix": null,
+        "alignment": "left",
+        "sortable": true,
+        "filterable": true,
+        "editable": false,
+        "valueFormatting": null,
+        "conditionalFormatting": [
+          "#E0E0E0"
+        ],
+        "formattingExpressions": [
+          "#E0E0E0"
+        ],
+        "expressionRefs": [],
+        "foundColorCodes": [
+          "#E0E0E0"
+        ]
+      },
+      {
+        "id": "4ad96",
+        "label": "Geschlecht",
+        "dataKey": "geschlecht",
+        "visible": true,
+        "hiddenExpression": "",
+        "order": 38,
+        "width": 120,
+        "type": "tag",
+        "format": "tag",
+        "numberFormat": null,
+        "currencyFormat": null,
+        "percentFormat": null,
+        "decimalSettings": null,
+        "prefix": null,
+        "suffix": null,
+        "alignment": "left",
+        "sortable": true,
+        "filterable": true,
+        "editable": false,
+        "valueFormatting": "{{ _.startCase(item) }}",
+        "conditionalFormatting": [
+          "#E0E0E0"
+        ],
+        "formattingExpressions": [
+          "{{ _.startCase(item) }}",
+          "#E0E0E0"
+        ],
+        "expressionRefs": [
+          "item"
+        ],
+        "foundColorCodes": [
+          "#E0E0E0"
+        ]
+      },
+      {
+        "id": "3cb5e",
+        "label": "Marktwert gehalt ratio",
+        "dataKey": "marktwert_gehalt_ratio",
+        "visible": false,
+        "hiddenExpression": "true",
+        "order": 39,
+        "width": 120,
+        "type": "decimal",
+        "format": "decimal",
+        "numberFormat": "decimal",
+        "currencyFormat": null,
+        "percentFormat": null,
+        "decimalSettings": null,
+        "prefix": null,
+        "suffix": null,
+        "alignment": "right",
+        "sortable": true,
+        "filterable": true,
+        "editable": false,
+        "valueFormatting": null,
+        "conditionalFormatting": [
+          "#E0E0E0"
+        ],
+        "formattingExpressions": [
+          "#E0E0E0",
+          "true"
+        ],
+        "expressionRefs": [],
+        "foundColorCodes": [
+          "#E0E0E0"
+        ]
+      },
+      {
+        "id": "8177d",
+        "label": "Fit Rasse",
+        "dataKey": "fit_rasse",
+        "visible": true,
+        "hiddenExpression": "",
+        "order": 40,
+        "width": 120,
+        "type": "decimal",
+        "format": "decimal",
+        "numberFormat": "decimal",
+        "currencyFormat": null,
+        "percentFormat": null,
+        "decimalSettings": null,
+        "prefix": null,
+        "suffix": null,
+        "alignment": "right",
+        "sortable": true,
+        "filterable": true,
+        "editable": false,
+        "valueFormatting": null,
+        "conditionalFormatting": [
+          "#E0E0E0"
+        ],
+        "formattingExpressions": [
+          "#E0E0E0"
+        ],
+        "expressionRefs": [],
+        "foundColorCodes": [
+          "#E0E0E0"
+        ]
+      },
+      {
+        "id": "05d0e",
+        "label": "Fit Subclasses",
+        "dataKey": "fit_subclasses",
+        "visible": true,
+        "hiddenExpression": "",
+        "order": 41,
+        "width": 140,
+        "type": "decimal",
+        "format": "decimal",
+        "numberFormat": "decimal",
+        "currencyFormat": null,
+        "percentFormat": null,
+        "decimalSettings": null,
+        "prefix": null,
+        "suffix": null,
+        "alignment": "right",
+        "sortable": true,
+        "filterable": true,
+        "editable": false,
+        "valueFormatting": null,
+        "conditionalFormatting": [
+          "#E0E0E0"
+        ],
+        "formattingExpressions": [
+          "#E0E0E0"
+        ],
+        "expressionRefs": [],
+        "foundColorCodes": [
+          "#E0E0E0"
+        ]
+      },
+      {
+        "id": "2364a",
+        "label": "Fit Traits",
+        "dataKey": "fit_traits",
+        "visible": true,
+        "hiddenExpression": "",
+        "order": 42,
+        "width": 120,
+        "type": "decimal",
+        "format": "decimal",
+        "numberFormat": "decimal",
+        "currencyFormat": null,
+        "percentFormat": null,
+        "decimalSettings": null,
+        "prefix": null,
+        "suffix": null,
+        "alignment": "right",
+        "sortable": true,
+        "filterable": true,
+        "editable": false,
+        "valueFormatting": null,
+        "conditionalFormatting": [
+          "#E0E0E0"
+        ],
+        "formattingExpressions": [
+          "#E0E0E0"
+        ],
+        "expressionRefs": [],
+        "foundColorCodes": [
+          "#E0E0E0"
+        ]
+      },
+      {
+        "id": "398d9",
+        "label": "Fit Alignment",
+        "dataKey": "fit_alignment",
+        "visible": true,
+        "hiddenExpression": "",
+        "order": 43,
+        "width": 130,
+        "type": "decimal",
+        "format": "decimal",
+        "numberFormat": "decimal",
+        "currencyFormat": null,
+        "percentFormat": null,
+        "decimalSettings": null,
+        "prefix": null,
+        "suffix": null,
+        "alignment": "right",
+        "sortable": true,
+        "filterable": true,
+        "editable": false,
+        "valueFormatting": null,
+        "conditionalFormatting": [
+          "#E0E0E0"
+        ],
+        "formattingExpressions": [
+          "#E0E0E0"
+        ],
+        "expressionRefs": [],
+        "foundColorCodes": [
+          "#E0E0E0"
+        ]
+      },
+      {
+        "id": "fc5a4",
+        "label": "",
+        "dataKey": "",
+        "visible": true,
+        "hiddenExpression": "false",
+        "order": 44,
+        "width": 16,
+        "type": "string",
+        "format": "string",
+        "numberFormat": null,
+        "currencyFormat": null,
+        "percentFormat": null,
+        "decimalSettings": null,
+        "prefix": null,
+        "suffix": null,
+        "alignment": "center",
+        "sortable": false,
+        "filterable": true,
+        "editable": false,
+        "valueFormatting": null,
+        "conditionalFormatting": [],
+        "formattingExpressions": [
+          "false"
+        ],
+        "expressionRefs": [],
+        "foundColorCodes": []
+      }
+    ],
+    "rowActions": [
+      {
+        "label": "Pick",
+        "event": null,
+        "method": null,
+        "script": null
+      },
+      {
+        "label": "Kaufen",
+        "event": "clickAction",
+        "method": null,
+        "script": null
+      }
+    ],
+    "dependencies": {
+      "queries": [
+        "_.orderBy(playersWithTeamFitBreakdown.value, ['marktwert'], ['desc'])",
+        "playersWithTeamFitBreakdown"
+      ],
+      "transformers": [],
+      "states": [],
+      "components": [],
+      "all": [
+        "_.orderBy(playersWithTeamFitBreakdown.value, ['marktwert'], ['desc'])",
+        "playersWithTeamFitBreakdown"
+      ]
+    }
+  },
+  {
+    "componentName": "aiTeamNeedsTable",
+    "componentId": "aiTeamNeedsTable",
+    "page": "transfermarktPage",
+    "subtype": "TableWidget2",
+    "tableTitle": "AI2 Needs noch nicht berechnet — bitte „AI Needs berechnen“ klicken.",
+    "dataSource": "{{ (Array.isArray(ai2NeedsSnapshot.value) ? ai2NeedsSnapshot.value : []).filter(r => ['identity','discipline'].includes(String(r?.category))) }}",
+    "columns": [
+      {
+        "id": "ed1fd",
+        "label": "id",
+        "dataKey": "id",
+        "visible": false,
+        "hiddenExpression": "true",
+        "order": 0,
+        "width": 180,
+        "type": "string",
+        "format": "string",
+        "numberFormat": null,
+        "currencyFormat": null,
+        "percentFormat": null,
+        "decimalSettings": null,
+        "prefix": null,
+        "suffix": null,
+        "alignment": "left",
+        "sortable": true,
+        "filterable": true,
+        "editable": false,
+        "valueFormatting": null,
+        "conditionalFormatting": [],
+        "formattingExpressions": [
+          "true"
+        ],
+        "expressionRefs": [],
+        "foundColorCodes": []
+      },
+      {
+        "id": "7794a",
+        "label": "Weight",
+        "dataKey": "weight",
+        "visible": true,
+        "hiddenExpression": "false",
+        "order": 1,
+        "width": 95,
+        "type": "decimal",
+        "format": "decimal",
+        "numberFormat": "decimal",
+        "currencyFormat": null,
+        "percentFormat": null,
+        "decimalSettings": null,
+        "prefix": null,
+        "suffix": null,
+        "alignment": "right",
+        "sortable": true,
+        "filterable": true,
+        "editable": false,
+        "valueFormatting": null,
+        "conditionalFormatting": [
+          "#E0E0E0"
+        ],
+        "formattingExpressions": [
+          "#E0E0E0",
+          "false"
+        ],
+        "expressionRefs": [],
+        "foundColorCodes": [
+          "#E0E0E0"
+        ]
+      },
+      {
+        "id": "0f1cc",
+        "label": "Category",
+        "dataKey": "category",
+        "visible": true,
+        "hiddenExpression": "false",
+        "order": 2,
+        "width": 120,
+        "type": "tag",
+        "format": "tag",
+        "numberFormat": null,
+        "currencyFormat": null,
+        "percentFormat": null,
+        "decimalSettings": null,
+        "prefix": null,
+        "suffix": null,
+        "alignment": "left",
+        "sortable": true,
+        "filterable": true,
+        "editable": false,
+        "valueFormatting": null,
+        "conditionalFormatting": [
+          "#E0E0E0"
+        ],
+        "formattingExpressions": [
+          "#E0E0E0",
+          "false"
+        ],
+        "expressionRefs": [],
+        "foundColorCodes": [
+          "#E0E0E0"
+        ]
+      },
+      {
+        "id": "a871a",
+        "label": "Weight (0-100)",
+        "dataKey": "weight",
+        "visible": true,
+        "hiddenExpression": "false",
+        "order": 3,
+        "width": 125,
+        "type": "decimal",
+        "format": "decimal",
+        "numberFormat": "decimal",
+        "currencyFormat": null,
+        "percentFormat": null,
+        "decimalSettings": null,
+        "prefix": null,
+        "suffix": null,
+        "alignment": "right",
+        "sortable": true,
+        "filterable": true,
+        "editable": false,
+        "valueFormatting": "{{ (() => {\n  const v = Number(item ?? currentSourceRow?.weight ?? 0);\n  if (!Number.isFinite(v)) return null;\n  return Math.round(v * 1000) / 10; // 1 decimal\n})() }}",
+        "conditionalFormatting": [
+          "{{ (() => {\n  const v = Number(currentSourceRow?.weight ?? 0) * 100;\n  if (!Number.isFinite(v)) return '';\n  if (v >= 80) return '#B71C1C';\n  if (v >= 60) return '#EF6C00';\n  if (v >= 40) return '#F9A825';\n  if (v >= 20) return '#2E7D32';\n  return '#455A64';\n})() }}",
+          "#FFFFFF"
+        ],
+        "formattingExpressions": [
+          "{{ (() => {\n  const v = Number(item ?? currentSourceRow?.weight ?? 0);\n  if (!Number.isFinite(v)) return null;\n  return Math.round(v * 1000) / 10; // 1 decimal\n})() }}",
+          "{{ (() => {\n  const v = Number(currentSourceRow?.weight ?? 0) * 100;\n  if (!Number.isFinite(v)) return '';\n  if (v >= 80) return '#B71C1C';\n  if (v >= 60) return '#EF6C00';\n  if (v >= 40) return '#F9A825';\n  if (v >= 20) return '#2E7D32';\n  return '#455A64';\n})() }}",
+          "#FFFFFF",
+          "false"
+        ],
+        "expressionRefs": [
+          "currentSourceRow",
+          "item"
+        ],
+        "foundColorCodes": [
+          "#B71C1C",
+          "#EF6C00",
+          "#F9A825",
+          "#2E7D32",
+          "#455A64",
+          "#FFFFFF"
+        ]
+      },
+      {
+        "id": "dde0b",
+        "label": "Market atk (0-1)",
+        "dataKey": "market_attackability01",
+        "visible": "conditional",
+        "hiddenExpression": "{{ String(currentSourceRow?.category) !== 'discipline' }}",
+        "order": 4,
+        "width": 120,
+        "type": "decimal",
+        "format": "decimal",
+        "numberFormat": "decimal",
+        "currencyFormat": null,
+        "percentFormat": null,
+        "decimalSettings": null,
+        "prefix": null,
+        "suffix": null,
+        "alignment": "right",
+        "sortable": true,
+        "filterable": true,
+        "editable": false,
+        "valueFormatting": null,
+        "conditionalFormatting": [],
+        "formattingExpressions": [
+          "{{ String(currentSourceRow?.category) !== 'discipline' }}"
+        ],
+        "expressionRefs": [
+          "currentSourceRow"
+        ],
+        "foundColorCodes": []
+      },
+      {
+        "id": "cb0ce",
+        "label": "Market top",
+        "dataKey": "market_top",
+        "visible": "conditional",
+        "hiddenExpression": "{{ String(currentSourceRow?.category) !== 'discipline' }}",
+        "order": 5,
+        "width": 95,
+        "type": "decimal",
+        "format": "decimal",
+        "numberFormat": "decimal",
+        "currencyFormat": null,
+        "percentFormat": null,
+        "decimalSettings": null,
+        "prefix": null,
+        "suffix": null,
+        "alignment": "right",
+        "sortable": true,
+        "filterable": true,
+        "editable": false,
+        "valueFormatting": null,
+        "conditionalFormatting": [],
+        "formattingExpressions": [
+          "{{ String(currentSourceRow?.category) !== 'discipline' }}"
+        ],
+        "expressionRefs": [
+          "currentSourceRow"
+        ],
+        "foundColorCodes": []
+      },
+      {
+        "id": "2eae9",
+        "label": "Market c80",
+        "dataKey": "market_count_ge_80",
+        "visible": "conditional",
+        "hiddenExpression": "{{ String(currentSourceRow?.category) !== 'discipline' }}",
+        "order": 6,
+        "width": 95,
+        "type": "bigint",
+        "format": "bigint",
+        "numberFormat": null,
+        "currencyFormat": null,
+        "percentFormat": null,
+        "decimalSettings": null,
+        "prefix": null,
+        "suffix": null,
+        "alignment": "right",
+        "sortable": true,
+        "filterable": true,
+        "editable": false,
+        "valueFormatting": null,
+        "conditionalFormatting": [],
+        "formattingExpressions": [
+          "{{ String(currentSourceRow?.category) !== 'discipline' }}"
+        ],
+        "expressionRefs": [
+          "currentSourceRow"
+        ],
+        "foundColorCodes": []
+      },
+      {
+        "id": "cf8d4",
+        "label": "Reason",
+        "dataKey": "reason",
+        "visible": true,
+        "hiddenExpression": "false",
+        "order": 7,
+        "width": 420,
+        "type": "multilineString",
+        "format": "multilineString",
+        "numberFormat": null,
+        "currencyFormat": null,
+        "percentFormat": null,
+        "decimalSettings": null,
+        "prefix": null,
+        "suffix": null,
+        "alignment": "left",
+        "sortable": true,
+        "filterable": true,
+        "editable": false,
+        "valueFormatting": null,
+        "conditionalFormatting": [
+          "#E0E0E0"
+        ],
+        "formattingExpressions": [
+          "#E0E0E0",
+          "false"
+        ],
+        "expressionRefs": [],
+        "foundColorCodes": [
+          "#E0E0E0"
+        ]
+      },
+      {
+        "id": "ac422",
+        "label": "meta (raw)",
+        "dataKey": "meta",
+        "visible": false,
+        "hiddenExpression": "true",
+        "order": 8,
+        "width": 260,
+        "type": "json",
+        "format": "json",
+        "numberFormat": null,
+        "currencyFormat": null,
+        "percentFormat": null,
+        "decimalSettings": null,
+        "prefix": null,
+        "suffix": null,
+        "alignment": "left",
+        "sortable": true,
+        "filterable": true,
+        "editable": false,
+        "valueFormatting": null,
+        "conditionalFormatting": [],
+        "formattingExpressions": [
+          "true"
+        ],
+        "expressionRefs": [],
+        "foundColorCodes": []
+      },
+      {
+        "id": "fda99",
+        "label": "Meta",
+        "dataKey": "meta",
+        "visible": true,
+        "hiddenExpression": "false",
+        "order": 9,
+        "width": 360,
+        "type": "multilineString",
+        "format": "multilineString",
+        "numberFormat": null,
+        "currencyFormat": null,
+        "percentFormat": null,
+        "decimalSettings": null,
+        "prefix": null,
+        "suffix": null,
+        "alignment": "left",
+        "sortable": true,
+        "filterable": true,
+        "editable": false,
+        "valueFormatting": "{{ (() => {\n  const m = currentSourceRow?.meta;\n  if (!m || typeof m !== 'object') return '';\n  const pick = (k) => (m?.[k] == null ? null : m[k]);\n\n  // Common roster meta fields\n  const rosterNow = pick('rosterNow');\n  const minPlayers = pick('minPlayers');\n  const targetPlayers = pick('targetPlayers');\n  const missingMin = pick('missingMin');\n  const missingTarget = pick('missingTarget');\n\n  const bits = [];\n  if (rosterNow != null && minPlayers != null) bits.push(`Roster: ${rosterNow}/${minPlayers}`);\n  if (targetPlayers != null) bits.push(`Target: ${targetPlayers}`);\n  if (missingMin != null) bits.push(`missingMin: ${missingMin}`);\n  if (missingTarget != null) bits.push(`missingTarget: ${missingTarget}`);\n\n  // Fallback: show keys\n  if (!bits.length) {\n    const keys = Object.keys(m).slice(0, 6);\n    return keys.length ? `meta keys: ${keys.join(', ')}${Object.keys(m).length > keys.length ? '…' : ''}` : '';\n  }\n\n  return bits.join(' · ');\n})() }}",
+        "conditionalFormatting": [
+          "#E0E0E0"
+        ],
+        "formattingExpressions": [
+          "{{ (() => {\n  const m = currentSourceRow?.meta;\n  if (!m || typeof m !== 'object') return '';\n  const pick = (k) => (m?.[k] == null ? null : m[k]);\n\n  // Common roster meta fields\n  const rosterNow = pick('rosterNow');\n  const minPlayers = pick('minPlayers');\n  const targetPlayers = pick('targetPlayers');\n  const missingMin = pick('missingMin');\n  const missingTarget = pick('missingTarget');\n\n  const bits = [];\n  if (rosterNow != null && minPlayers != null) bits.push(`Roster: ${rosterNow}/${minPlayers}`);\n  if (targetPlayers != null) bits.push(`Target: ${targetPlayers}`);\n  if (missingMin != null) bits.push(`missingMin: ${missingMin}`);\n  if (missingTarget != null) bits.push(`missingTarget: ${missingTarget}`);\n\n  // Fallback: show keys\n  if (!bits.length) {\n    const keys = Object.keys(m).slice(0, 6);\n    return keys.length ? `meta keys: ${keys.join(', ')}${Object.keys(m).length > keys.length ? '…' : ''}` : '';\n  }\n\n  return bits.join(' · ');\n})() }}",
+          "#E0E0E0",
+          "false"
+        ],
+        "expressionRefs": [
+          "currentSourceRow"
+        ],
+        "foundColorCodes": [
+          "#E0E0E0"
+        ]
+      },
+      {
+        "id": "a7f45",
+        "label": "Team",
+        "dataKey": "team",
+        "visible": false,
+        "hiddenExpression": "true",
+        "order": 10,
+        "width": 100,
+        "type": "string",
+        "format": "string",
+        "numberFormat": null,
+        "currencyFormat": null,
+        "percentFormat": null,
+        "decimalSettings": null,
+        "prefix": null,
+        "suffix": null,
+        "alignment": "left",
+        "sortable": true,
+        "filterable": true,
+        "editable": false,
+        "valueFormatting": null,
+        "conditionalFormatting": [],
+        "formattingExpressions": [
+          "true"
+        ],
+        "expressionRefs": [],
+        "foundColorCodes": []
+      },
+      {
+        "id": "655ee",
+        "label": "Version",
+        "dataKey": "version",
+        "visible": false,
+        "hiddenExpression": "true",
+        "order": 11,
+        "width": 140,
+        "type": "string",
+        "format": "string",
+        "numberFormat": null,
+        "currencyFormat": null,
+        "percentFormat": null,
+        "decimalSettings": null,
+        "prefix": null,
+        "suffix": null,
+        "alignment": "left",
+        "sortable": true,
+        "filterable": true,
+        "editable": false,
+        "valueFormatting": null,
+        "conditionalFormatting": [],
+        "formattingExpressions": [
+          "true"
+        ],
+        "expressionRefs": [],
+        "foundColorCodes": []
+      },
+      {
+        "id": "e79f0",
+        "label": "Debug notes",
+        "dataKey": "debug",
+        "visible": false,
+        "hiddenExpression": "true",
+        "order": 12,
+        "width": 240,
+        "type": "multilineString",
+        "format": "multilineString",
+        "numberFormat": null,
+        "currencyFormat": null,
+        "percentFormat": null,
+        "decimalSettings": null,
+        "prefix": null,
+        "suffix": null,
+        "alignment": "left",
+        "sortable": true,
+        "filterable": true,
+        "editable": false,
+        "valueFormatting": "{{ (() => {\n  const d = currentSourceRow?.debug;\n  const notes = Array.isArray(d?.notes) ? d.notes : [];\n  return notes.join(' | ');\n})() }}",
+        "conditionalFormatting": [],
+        "formattingExpressions": [
+          "{{ (() => {\n  const d = currentSourceRow?.debug;\n  const notes = Array.isArray(d?.notes) ? d.notes : [];\n  return notes.join(' | ');\n})() }}",
+          "true"
+        ],
+        "expressionRefs": [
+          "currentSourceRow"
+        ],
+        "foundColorCodes": []
+      }
+    ],
+    "rowActions": [],
+    "dependencies": {
+      "queries": [],
+      "transformers": [],
+      "states": [
+        "(Array.isArray(ai2NeedsSnapshot.value) ? ai2NeedsSnapshot.value : []).filter(r => ['identity','discipline'].includes(String(r?.category)))",
+        "ai2NeedsSnapshot"
+      ],
+      "components": [],
+      "all": [
+        "(Array.isArray(ai2NeedsSnapshot.value) ? ai2NeedsSnapshot.value : []).filter(r => ['identity','discipline'].includes(String(r?.category)))",
+        "ai2NeedsSnapshot"
+      ]
+    }
+  },
+  {
+    "componentName": "playersTable2",
+    "componentId": "playersTable2",
+    "page": "transfermarktPage",
+    "subtype": "TableWidget2",
+    "tableTitle": "Füge Spieler zur Wishlist hinzu, um sie hier zu vergleichen.",
+    "dataSource": "{{ wishlistWithImages.value }}",
+    "columns": [
+      {
+        "id": "4ccde",
+        "label": "Bild",
+        "dataKey": "image_url",
+        "visible": true,
+        "hiddenExpression": "",
+        "order": 0,
+        "width": 110,
+        "type": "image",
+        "format": "image",
+        "numberFormat": null,
+        "currencyFormat": null,
+        "percentFormat": null,
+        "decimalSettings": null,
+        "prefix": null,
+        "suffix": null,
+        "alignment": "center",
+        "sortable": true,
+        "filterable": true,
+        "editable": false,
+        "valueFormatting": null,
+        "conditionalFormatting": [],
+        "formattingExpressions": [],
+        "expressionRefs": [],
+        "foundColorCodes": []
+      },
+      {
+        "id": "75107",
+        "label": "Name",
+        "dataKey": "name",
+        "visible": true,
+        "hiddenExpression": "",
+        "order": 1,
+        "width": 147,
+        "type": "string",
+        "format": "string",
+        "numberFormat": null,
+        "currencyFormat": null,
+        "percentFormat": null,
+        "decimalSettings": null,
+        "prefix": null,
+        "suffix": null,
+        "alignment": "left",
+        "sortable": true,
+        "filterable": true,
+        "editable": false,
+        "valueFormatting": null,
+        "conditionalFormatting": [],
+        "formattingExpressions": [],
+        "expressionRefs": [],
+        "foundColorCodes": []
+      },
+      {
+        "id": "191fa",
+        "label": "Marktwert",
+        "dataKey": "marktwert",
+        "visible": true,
+        "hiddenExpression": "",
+        "order": 2,
+        "width": 130,
+        "type": "decimal",
+        "format": "decimal",
+        "numberFormat": "decimal",
+        "currencyFormat": null,
+        "percentFormat": null,
+        "decimalSettings": null,
+        "prefix": null,
+        "suffix": null,
+        "alignment": "right",
+        "sortable": true,
+        "filterable": true,
+        "editable": false,
+        "valueFormatting": null,
+        "conditionalFormatting": [],
+        "formattingExpressions": [],
+        "expressionRefs": [],
+        "foundColorCodes": []
+      },
+      {
+        "id": "926cd",
+        "label": "Gehalt",
+        "dataKey": "gehalt",
+        "visible": true,
+        "hiddenExpression": "",
+        "order": 3,
+        "width": 110,
+        "type": "decimal",
+        "format": "decimal",
+        "numberFormat": "decimal",
+        "currencyFormat": null,
+        "percentFormat": null,
+        "decimalSettings": null,
+        "prefix": null,
+        "suffix": null,
+        "alignment": "right",
+        "sortable": true,
+        "filterable": true,
+        "editable": false,
+        "valueFormatting": null,
+        "conditionalFormatting": [],
+        "formattingExpressions": [],
+        "expressionRefs": [],
+        "foundColorCodes": []
+      },
+      {
+        "id": "e0244",
+        "label": "Fit",
+        "dataKey": "team_fit",
+        "visible": true,
+        "hiddenExpression": "",
+        "order": 4,
+        "width": 75,
+        "type": "decimal",
+        "format": "decimal",
+        "numberFormat": "decimal",
+        "currencyFormat": null,
+        "percentFormat": null,
+        "decimalSettings": null,
+        "prefix": null,
+        "suffix": null,
+        "alignment": "right",
+        "sortable": true,
+        "filterable": true,
+        "editable": false,
+        "valueFormatting": null,
+        "conditionalFormatting": [],
+        "formattingExpressions": [],
+        "expressionRefs": [],
+        "foundColorCodes": []
+      },
+      {
+        "id": "29705",
+        "label": "Pow",
+        "dataKey": "pow",
+        "visible": true,
+        "hiddenExpression": "",
+        "order": 5,
+        "width": 72,
+        "type": "decimal",
+        "format": "decimal",
+        "numberFormat": "decimal",
+        "currencyFormat": null,
+        "percentFormat": null,
+        "decimalSettings": null,
+        "prefix": null,
+        "suffix": null,
+        "alignment": "right",
+        "sortable": true,
+        "filterable": true,
+        "editable": false,
+        "valueFormatting": "{{ Math.round(Number(item)) }}",
+        "conditionalFormatting": [
+          "{{ (() => { const v = Number(item); if (!Number.isFinite(v)) return ''; if (v >= 90) return '#1565C0'; if (v >= 80) return '#BBDEFB'; if (v >= 70) return '#81C784'; if (v >= 60) return '#C8E6C9'; if (v >= 50) return '#FFF59D'; if (v >= 40) return '#FFE082'; if (v >= 30) return '#FFCC80'; if (v >= 20) return '#FFAB91'; return '#EF9A9A'; })() }}",
+          "#000000"
+        ],
+        "formattingExpressions": [
+          "{{ Math.round(Number(item)) }}",
+          "{{ (() => { const v = Number(item); if (!Number.isFinite(v)) return ''; if (v >= 90) return '#1565C0'; if (v >= 80) return '#BBDEFB'; if (v >= 70) return '#81C784'; if (v >= 60) return '#C8E6C9'; if (v >= 50) return '#FFF59D'; if (v >= 40) return '#FFE082'; if (v >= 30) return '#FFCC80'; if (v >= 20) return '#FFAB91'; return '#EF9A9A'; })() }}",
+          "#000000"
+        ],
+        "expressionRefs": [
+          "item"
+        ],
+        "foundColorCodes": [
+          "#1565C0",
+          "#BBDEFB",
+          "#81C784",
+          "#C8E6C9",
+          "#FFF59D",
+          "#FFE082",
+          "#FFCC80",
+          "#FFAB91",
+          "#EF9A9A",
+          "#000000"
+        ]
+      },
+      {
+        "id": "2dfc1",
+        "label": "Spe",
+        "dataKey": "spe",
+        "visible": true,
+        "hiddenExpression": "",
+        "order": 6,
+        "width": 72,
+        "type": "decimal",
+        "format": "decimal",
+        "numberFormat": "decimal",
+        "currencyFormat": null,
+        "percentFormat": null,
+        "decimalSettings": null,
+        "prefix": null,
+        "suffix": null,
+        "alignment": "right",
+        "sortable": true,
+        "filterable": true,
+        "editable": false,
+        "valueFormatting": "{{ Math.round(Number(item)) }}",
+        "conditionalFormatting": [
+          "{{ (() => { const v = Number(item); if (!Number.isFinite(v)) return ''; if (v >= 90) return '#1565C0'; if (v >= 80) return '#BBDEFB'; if (v >= 70) return '#81C784'; if (v >= 60) return '#C8E6C9'; if (v >= 50) return '#FFF59D'; if (v >= 40) return '#FFE082'; if (v >= 30) return '#FFCC80'; if (v >= 20) return '#FFAB91'; return '#EF9A9A'; })() }}",
+          "#000000"
+        ],
+        "formattingExpressions": [
+          "{{ Math.round(Number(item)) }}",
+          "{{ (() => { const v = Number(item); if (!Number.isFinite(v)) return ''; if (v >= 90) return '#1565C0'; if (v >= 80) return '#BBDEFB'; if (v >= 70) return '#81C784'; if (v >= 60) return '#C8E6C9'; if (v >= 50) return '#FFF59D'; if (v >= 40) return '#FFE082'; if (v >= 30) return '#FFCC80'; if (v >= 20) return '#FFAB91'; return '#EF9A9A'; })() }}",
+          "#000000"
+        ],
+        "expressionRefs": [
+          "item"
+        ],
+        "foundColorCodes": [
+          "#1565C0",
+          "#BBDEFB",
+          "#81C784",
+          "#C8E6C9",
+          "#FFF59D",
+          "#FFE082",
+          "#FFCC80",
+          "#FFAB91",
+          "#EF9A9A",
+          "#000000"
+        ]
+      },
+      {
+        "id": "e17c3",
+        "label": "Men",
+        "dataKey": "men",
+        "visible": true,
+        "hiddenExpression": "",
+        "order": 7,
+        "width": 72,
+        "type": "decimal",
+        "format": "decimal",
+        "numberFormat": "decimal",
+        "currencyFormat": null,
+        "percentFormat": null,
+        "decimalSettings": null,
+        "prefix": null,
+        "suffix": null,
+        "alignment": "right",
+        "sortable": true,
+        "filterable": true,
+        "editable": false,
+        "valueFormatting": "{{ Math.round(Number(item)) }}",
+        "conditionalFormatting": [
+          "{{ (() => { const v = Number(item); if (!Number.isFinite(v)) return ''; if (v >= 90) return '#1565C0'; if (v >= 80) return '#BBDEFB'; if (v >= 70) return '#81C784'; if (v >= 60) return '#C8E6C9'; if (v >= 50) return '#FFF59D'; if (v >= 40) return '#FFE082'; if (v >= 30) return '#FFCC80'; if (v >= 20) return '#FFAB91'; return '#EF9A9A'; })() }}",
+          "#000000"
+        ],
+        "formattingExpressions": [
+          "{{ Math.round(Number(item)) }}",
+          "{{ (() => { const v = Number(item); if (!Number.isFinite(v)) return ''; if (v >= 90) return '#1565C0'; if (v >= 80) return '#BBDEFB'; if (v >= 70) return '#81C784'; if (v >= 60) return '#C8E6C9'; if (v >= 50) return '#FFF59D'; if (v >= 40) return '#FFE082'; if (v >= 30) return '#FFCC80'; if (v >= 20) return '#FFAB91'; return '#EF9A9A'; })() }}",
+          "#000000"
+        ],
+        "expressionRefs": [
+          "item"
+        ],
+        "foundColorCodes": [
+          "#1565C0",
+          "#BBDEFB",
+          "#81C784",
+          "#C8E6C9",
+          "#FFF59D",
+          "#FFE082",
+          "#FFCC80",
+          "#FFAB91",
+          "#EF9A9A",
+          "#000000"
+        ]
+      },
+      {
+        "id": "aedc3",
+        "label": "Soc",
+        "dataKey": "soc",
+        "visible": true,
+        "hiddenExpression": "",
+        "order": 8,
+        "width": 72,
+        "type": "decimal",
+        "format": "decimal",
+        "numberFormat": "decimal",
+        "currencyFormat": null,
+        "percentFormat": null,
+        "decimalSettings": null,
+        "prefix": null,
+        "suffix": null,
+        "alignment": "right",
+        "sortable": true,
+        "filterable": true,
+        "editable": false,
+        "valueFormatting": "{{ Math.round(Number(item)) }}",
+        "conditionalFormatting": [
+          "{{ (() => { const v = Number(item); if (!Number.isFinite(v)) return ''; if (v >= 90) return '#1565C0'; if (v >= 80) return '#BBDEFB'; if (v >= 70) return '#81C784'; if (v >= 60) return '#C8E6C9'; if (v >= 50) return '#FFF59D'; if (v >= 40) return '#FFE082'; if (v >= 30) return '#FFCC80'; if (v >= 20) return '#FFAB91'; return '#EF9A9A'; })() }}",
+          "#000000"
+        ],
+        "formattingExpressions": [
+          "{{ Math.round(Number(item)) }}",
+          "{{ (() => { const v = Number(item); if (!Number.isFinite(v)) return ''; if (v >= 90) return '#1565C0'; if (v >= 80) return '#BBDEFB'; if (v >= 70) return '#81C784'; if (v >= 60) return '#C8E6C9'; if (v >= 50) return '#FFF59D'; if (v >= 40) return '#FFE082'; if (v >= 30) return '#FFCC80'; if (v >= 20) return '#FFAB91'; return '#EF9A9A'; })() }}",
+          "#000000"
+        ],
+        "expressionRefs": [
+          "item"
+        ],
+        "foundColorCodes": [
+          "#1565C0",
+          "#BBDEFB",
+          "#81C784",
+          "#C8E6C9",
+          "#FFF59D",
+          "#FFE082",
+          "#FFCC80",
+          "#FFAB91",
+          "#EF9A9A",
+          "#000000"
+        ]
+      },
+      {
+        "id": "9846d",
+        "label": "Klasse",
+        "dataKey": "klasse",
+        "visible": true,
+        "hiddenExpression": "",
+        "order": 9,
+        "width": 150,
+        "type": "tag",
+        "format": "tag",
+        "numberFormat": null,
+        "currencyFormat": null,
+        "percentFormat": null,
+        "decimalSettings": null,
+        "prefix": null,
+        "suffix": null,
+        "alignment": "left",
+        "sortable": true,
+        "filterable": true,
+        "editable": false,
+        "valueFormatting": null,
+        "conditionalFormatting": [
+          "{{ (() => { const k = currentSourceRow.Klasse ?? currentSourceRow.klasse; if (['Berserker','Warlord','Tank'].includes(k)) return '#ff8a80'; if (['Sprinter','Rogue','Charger'].includes(k)) return '#a5d6a7'; if (['Mage','Overseer','Templar'].includes(k)) return '#90caf9'; if (['Bard','Hero','Badass','Tactician'].includes(k)) return '#ffe082'; return ''; })() }}",
+          "{{ (() => { const k = currentSourceRow.Klasse ?? currentSourceRow.klasse; if (['Berserker','Warlord','Tank'].includes(k)) return '#b71c1c'; if (['Sprinter','Rogue','Charger'].includes(k)) return '#1b5e20'; if (['Mage','Overseer','Templar'].includes(k)) return '#0d47a1'; if (['Bard','Hero','Badass','Tactician'].includes(k)) return '#e65100'; return ''; })() }}"
+        ],
+        "formattingExpressions": [
+          "{{ (() => { const k = currentSourceRow.Klasse ?? currentSourceRow.klasse; if (['Berserker','Warlord','Tank'].includes(k)) return '#ff8a80'; if (['Sprinter','Rogue','Charger'].includes(k)) return '#a5d6a7'; if (['Mage','Overseer','Templar'].includes(k)) return '#90caf9'; if (['Bard','Hero','Badass','Tactician'].includes(k)) return '#ffe082'; return ''; })() }}",
+          "{{ (() => { const k = currentSourceRow.Klasse ?? currentSourceRow.klasse; if (['Berserker','Warlord','Tank'].includes(k)) return '#b71c1c'; if (['Sprinter','Rogue','Charger'].includes(k)) return '#1b5e20'; if (['Mage','Overseer','Templar'].includes(k)) return '#0d47a1'; if (['Bard','Hero','Badass','Tactician'].includes(k)) return '#e65100'; return ''; })() }}"
+        ],
+        "expressionRefs": [
+          "currentSourceRow"
+        ],
+        "foundColorCodes": [
+          "#ff8a80",
+          "#a5d6a7",
+          "#90caf9",
+          "#ffe082",
+          "#b71c1c",
+          "#1b5e20",
+          "#0d47a1",
+          "#e65100"
+        ]
+      },
+      {
+        "id": "4bba1",
+        "label": "Rasse",
+        "dataKey": "rasse",
+        "visible": true,
+        "hiddenExpression": "",
+        "order": 10,
+        "width": 120,
+        "type": "tag",
+        "format": "tag",
+        "numberFormat": null,
+        "currencyFormat": null,
+        "percentFormat": null,
+        "decimalSettings": null,
+        "prefix": null,
+        "suffix": null,
+        "alignment": "left",
+        "sortable": true,
+        "filterable": true,
+        "editable": false,
+        "valueFormatting": "{{ _.startCase(item) }}",
+        "conditionalFormatting": [],
+        "formattingExpressions": [
+          "{{ _.startCase(item) }}"
+        ],
+        "expressionRefs": [
+          "item"
+        ],
+        "foundColorCodes": []
+      },
+      {
+        "id": "96ded",
+        "label": ">20",
+        "dataKey": "count_gt20",
+        "visible": true,
+        "hiddenExpression": "",
+        "order": 11,
+        "width": 70,
+        "type": "decimal",
+        "format": "decimal",
+        "numberFormat": "decimal",
+        "currencyFormat": null,
+        "percentFormat": null,
+        "decimalSettings": null,
+        "prefix": null,
+        "suffix": null,
+        "alignment": "right",
+        "sortable": true,
+        "filterable": true,
+        "editable": false,
+        "valueFormatting": null,
+        "conditionalFormatting": [
+          "{{ (()=>{ const col = 'count_gt20'; const rows = playersTable2.data || []; const vals = rows.map(r=>Number(r?.[col] ?? 0)); const min = vals.length? Math.min(...vals):0; const max = vals.length? Math.max(...vals):0; const v = Number(currentSourceRow?.[col] ?? 0); const norm = (v - min)/((max - min)||1); return norm>=0.75?'#2E7D32':norm>=0.5?'#66BB6A':norm>=0.25?'#FFEB3B':'#EF5350'; })() }}",
+          "{{ (()=>{ const col = 'count_gt20'; const rows = playersTable2.data || []; const vals = rows.map(r=>Number(r?.[col] ?? 0)); const min = vals.length? Math.min(...vals):0; const max = vals.length? Math.max(...vals):0; const v = Number(currentSourceRow?.[col] ?? 0); const norm = (v - min)/((max - min)||1); const bg = norm>=0.75?'#2E7D32':norm>=0.5?'#66BB6A':norm>=0.25?'#FFEB3B':'#EF5350'; return bg==='#EF5350' ? '#FFFFFF' : '#000000'; })() }}"
+        ],
+        "formattingExpressions": [
+          "{{ (()=>{ const col = 'count_gt20'; const rows = playersTable2.data || []; const vals = rows.map(r=>Number(r?.[col] ?? 0)); const min = vals.length? Math.min(...vals):0; const max = vals.length? Math.max(...vals):0; const v = Number(currentSourceRow?.[col] ?? 0); const norm = (v - min)/((max - min)||1); return norm>=0.75?'#2E7D32':norm>=0.5?'#66BB6A':norm>=0.25?'#FFEB3B':'#EF5350'; })() }}",
+          "{{ (()=>{ const col = 'count_gt20'; const rows = playersTable2.data || []; const vals = rows.map(r=>Number(r?.[col] ?? 0)); const min = vals.length? Math.min(...vals):0; const max = vals.length? Math.max(...vals):0; const v = Number(currentSourceRow?.[col] ?? 0); const norm = (v - min)/((max - min)||1); const bg = norm>=0.75?'#2E7D32':norm>=0.5?'#66BB6A':norm>=0.25?'#FFEB3B':'#EF5350'; return bg==='#EF5350' ? '#FFFFFF' : '#000000'; })() }}"
+        ],
+        "expressionRefs": [
+          "currentSourceRow",
+          "row"
+        ],
+        "foundColorCodes": [
+          "#2E7D32",
+          "#66BB6A",
+          "#FFEB3B",
+          "#EF5350",
+          "#FFFFFF",
+          "#000000"
+        ]
+      },
+      {
+        "id": "4511e",
+        "label": ">40",
+        "dataKey": "count_gt40",
+        "visible": true,
+        "hiddenExpression": "",
+        "order": 12,
+        "width": 70,
+        "type": "decimal",
+        "format": "decimal",
+        "numberFormat": "decimal",
+        "currencyFormat": null,
+        "percentFormat": null,
+        "decimalSettings": null,
+        "prefix": null,
+        "suffix": null,
+        "alignment": "right",
+        "sortable": true,
+        "filterable": true,
+        "editable": false,
+        "valueFormatting": null,
+        "conditionalFormatting": [
+          "{{ (()=>{ const col = 'count_gt40'; const rows = playersTable2.data || []; const vals = rows.map(r=>Number(r?.[col] ?? 0)); const min = vals.length? Math.min(...vals):0; const max = vals.length? Math.max(...vals):0; const v = Number(currentSourceRow?.[col] ?? 0); const norm = (v - min)/((max - min)||1); return norm>=0.75?'#2E7D32':norm>=0.5?'#66BB6A':norm>=0.25?'#FFEB3B':'#EF5350'; })() }}",
+          "{{ (()=>{ const col = 'count_gt40'; const rows = playersTable2.data || []; const vals = rows.map(r=>Number(r?.[col] ?? 0)); const min = vals.length? Math.min(...vals):0; const max = vals.length? Math.max(...vals):0; const v = Number(currentSourceRow?.[col] ?? 0); const norm = (v - min)/((max - min)||1); const bg = norm>=0.75?'#2E7D32':norm>=0.5?'#66BB6A':norm>=0.25?'#FFEB3B':'#EF5350'; return bg==='#EF5350' ? '#FFFFFF' : '#000000'; })() }}"
+        ],
+        "formattingExpressions": [
+          "{{ (()=>{ const col = 'count_gt40'; const rows = playersTable2.data || []; const vals = rows.map(r=>Number(r?.[col] ?? 0)); const min = vals.length? Math.min(...vals):0; const max = vals.length? Math.max(...vals):0; const v = Number(currentSourceRow?.[col] ?? 0); const norm = (v - min)/((max - min)||1); return norm>=0.75?'#2E7D32':norm>=0.5?'#66BB6A':norm>=0.25?'#FFEB3B':'#EF5350'; })() }}",
+          "{{ (()=>{ const col = 'count_gt40'; const rows = playersTable2.data || []; const vals = rows.map(r=>Number(r?.[col] ?? 0)); const min = vals.length? Math.min(...vals):0; const max = vals.length? Math.max(...vals):0; const v = Number(currentSourceRow?.[col] ?? 0); const norm = (v - min)/((max - min)||1); const bg = norm>=0.75?'#2E7D32':norm>=0.5?'#66BB6A':norm>=0.25?'#FFEB3B':'#EF5350'; return bg==='#EF5350' ? '#FFFFFF' : '#000000'; })() }}"
+        ],
+        "expressionRefs": [
+          "currentSourceRow",
+          "row"
+        ],
+        "foundColorCodes": [
+          "#2E7D32",
+          "#66BB6A",
+          "#FFEB3B",
+          "#EF5350",
+          "#FFFFFF",
+          "#000000"
+        ]
+      },
+      {
+        "id": "20c09",
+        "label": ">60",
+        "dataKey": "count_gt60",
+        "visible": true,
+        "hiddenExpression": "",
+        "order": 13,
+        "width": 70,
+        "type": "decimal",
+        "format": "decimal",
+        "numberFormat": "decimal",
+        "currencyFormat": null,
+        "percentFormat": null,
+        "decimalSettings": null,
+        "prefix": null,
+        "suffix": null,
+        "alignment": "right",
+        "sortable": true,
+        "filterable": true,
+        "editable": false,
+        "valueFormatting": null,
+        "conditionalFormatting": [
+          "{{ (()=>{ const col = 'count_gt60'; const rows = playersTable2.data || []; const vals = rows.map(r=>Number(r?.[col] ?? 0)); const min = vals.length? Math.min(...vals):0; const max = vals.length? Math.max(...vals):0; const v = Number(currentSourceRow?.[col] ?? 0); const norm = (v - min)/((max - min)||1); return norm>=0.75?'#2E7D32':norm>=0.5?'#66BB6A':norm>=0.25?'#FFEB3B':'#EF5350'; })() }}",
+          "{{ (()=>{ const col = 'count_gt60'; const rows = playersTable2.data || []; const vals = rows.map(r=>Number(r?.[col] ?? 0)); const min = vals.length? Math.min(...vals):0; const max = vals.length? Math.max(...vals):0; const v = Number(currentSourceRow?.[col] ?? 0); const norm = (v - min)/((max - min)||1); const bg = norm>=0.75?'#2E7D32':norm>=0.5?'#66BB6A':norm>=0.25?'#FFEB3B':'#EF5350'; return bg==='#EF5350' ? '#FFFFFF' : '#000000'; })() }}"
+        ],
+        "formattingExpressions": [
+          "{{ (()=>{ const col = 'count_gt60'; const rows = playersTable2.data || []; const vals = rows.map(r=>Number(r?.[col] ?? 0)); const min = vals.length? Math.min(...vals):0; const max = vals.length? Math.max(...vals):0; const v = Number(currentSourceRow?.[col] ?? 0); const norm = (v - min)/((max - min)||1); return norm>=0.75?'#2E7D32':norm>=0.5?'#66BB6A':norm>=0.25?'#FFEB3B':'#EF5350'; })() }}",
+          "{{ (()=>{ const col = 'count_gt60'; const rows = playersTable2.data || []; const vals = rows.map(r=>Number(r?.[col] ?? 0)); const min = vals.length? Math.min(...vals):0; const max = vals.length? Math.max(...vals):0; const v = Number(currentSourceRow?.[col] ?? 0); const norm = (v - min)/((max - min)||1); const bg = norm>=0.75?'#2E7D32':norm>=0.5?'#66BB6A':norm>=0.25?'#FFEB3B':'#EF5350'; return bg==='#EF5350' ? '#FFFFFF' : '#000000'; })() }}"
+        ],
+        "expressionRefs": [
+          "currentSourceRow",
+          "row"
+        ],
+        "foundColorCodes": [
+          "#2E7D32",
+          "#66BB6A",
+          "#FFEB3B",
+          "#EF5350",
+          "#FFFFFF",
+          "#000000"
+        ]
+      },
+      {
+        "id": "597c5",
+        "label": ">80",
+        "dataKey": "count_gt80",
+        "visible": true,
+        "hiddenExpression": "",
+        "order": 14,
+        "width": 70,
+        "type": "decimal",
+        "format": "decimal",
+        "numberFormat": "decimal",
+        "currencyFormat": null,
+        "percentFormat": null,
+        "decimalSettings": null,
+        "prefix": null,
+        "suffix": null,
+        "alignment": "right",
+        "sortable": true,
+        "filterable": true,
+        "editable": false,
+        "valueFormatting": null,
+        "conditionalFormatting": [
+          "{{ (()=>{ const col = 'count_gt80'; const rows = playersTable2.data || []; const vals = rows.map(r=>Number(r?.[col] ?? 0)); const min = vals.length? Math.min(...vals):0; const max = vals.length? Math.max(...vals):0; const v = Number(currentSourceRow?.[col] ?? 0); const norm = (v - min)/((max - min)||1); return norm>=0.75?'#2E7D32':norm>=0.5?'#66BB6A':norm>=0.25?'#FFEB3B':'#EF5350'; })() }}",
+          "{{ (()=>{ const col = 'count_gt80'; const rows = playersTable2.data || []; const vals = rows.map(r=>Number(r?.[col] ?? 0)); const min = vals.length? Math.min(...vals):0; const max = vals.length? Math.max(...vals):0; const v = Number(currentSourceRow?.[col] ?? 0); const norm = (v - min)/((max - min)||1); const bg = norm>=0.75?'#2E7D32':norm>=0.5?'#66BB6A':norm>=0.25?'#FFEB3B':'#EF5350'; return bg==='#EF5350' ? '#FFFFFF' : '#000000'; })() }}"
+        ],
+        "formattingExpressions": [
+          "{{ (()=>{ const col = 'count_gt80'; const rows = playersTable2.data || []; const vals = rows.map(r=>Number(r?.[col] ?? 0)); const min = vals.length? Math.min(...vals):0; const max = vals.length? Math.max(...vals):0; const v = Number(currentSourceRow?.[col] ?? 0); const norm = (v - min)/((max - min)||1); return norm>=0.75?'#2E7D32':norm>=0.5?'#66BB6A':norm>=0.25?'#FFEB3B':'#EF5350'; })() }}",
+          "{{ (()=>{ const col = 'count_gt80'; const rows = playersTable2.data || []; const vals = rows.map(r=>Number(r?.[col] ?? 0)); const min = vals.length? Math.min(...vals):0; const max = vals.length? Math.max(...vals):0; const v = Number(currentSourceRow?.[col] ?? 0); const norm = (v - min)/((max - min)||1); const bg = norm>=0.75?'#2E7D32':norm>=0.5?'#66BB6A':norm>=0.25?'#FFEB3B':'#EF5350'; return bg==='#EF5350' ? '#FFFFFF' : '#000000'; })() }}"
+        ],
+        "expressionRefs": [
+          "currentSourceRow",
+          "row"
+        ],
+        "foundColorCodes": [
+          "#2E7D32",
+          "#66BB6A",
+          "#FFEB3B",
+          "#EF5350",
+          "#FFFFFF",
+          "#000000"
+        ]
+      },
+      {
+        "id": "6798b",
+        "label": "Cha",
+        "dataKey": "charisma_rating",
+        "visible": "conditional",
+        "hiddenExpression": "{{ !showWishlistAttributes.value }}",
+        "order": 15,
+        "width": 90,
+        "type": "tag",
+        "format": "tag",
+        "numberFormat": null,
+        "currencyFormat": null,
+        "percentFormat": null,
+        "decimalSettings": null,
+        "prefix": null,
+        "suffix": null,
+        "alignment": "left",
+        "sortable": true,
+        "filterable": true,
+        "editable": false,
+        "valueFormatting": null,
+        "conditionalFormatting": [
+          "{{ ((m)=>({'S+':'#BBDEFB','S':'#E3F2FD','A':'#C8E6C9','B':'#E8F5E9','C':'#FFF9C4','D':'#FFFDE7','E':'#FFE0B2','F':'#FFCDD2'})[m]) (item) }}",
+          "{{ ((m)=>({'S+':'#002366','S':'#0052CC','A':'#0D5E1F','B':'#2E7D32','C':'#B8860B','D':'#F9A825','E':'#E65100','F':'#B71C1C'})[m]) (item) }}"
+        ],
+        "formattingExpressions": [
+          "{{ ((m)=>({'S+':'#BBDEFB','S':'#E3F2FD','A':'#C8E6C9','B':'#E8F5E9','C':'#FFF9C4','D':'#FFFDE7','E':'#FFE0B2','F':'#FFCDD2'})[m]) (item) }}",
+          "{{ ((m)=>({'S+':'#002366','S':'#0052CC','A':'#0D5E1F','B':'#2E7D32','C':'#B8860B','D':'#F9A825','E':'#E65100','F':'#B71C1C'})[m]) (item) }}",
+          "{{ !showWishlistAttributes.value }}"
+        ],
+        "expressionRefs": [
+          "item",
+          "value"
+        ],
+        "foundColorCodes": [
+          "#BBDEFB",
+          "#E3F2FD",
+          "#C8E6C9",
+          "#E8F5E9",
+          "#FFF9C4",
+          "#FFFDE7",
+          "#FFE0B2",
+          "#FFCDD2",
+          "#002366",
+          "#0052CC",
+          "#0D5E1F",
+          "#2E7D32",
+          "#B8860B",
+          "#F9A825",
+          "#E65100",
+          "#B71C1C"
+        ]
+      },
+      {
+        "id": "60423",
+        "label": "Int",
+        "dataKey": "intelligence_rating",
+        "visible": "conditional",
+        "hiddenExpression": "{{ !showWishlistAttributes.value }}",
+        "order": 16,
+        "width": 90,
+        "type": "tag",
+        "format": "tag",
+        "numberFormat": null,
+        "currencyFormat": null,
+        "percentFormat": null,
+        "decimalSettings": null,
+        "prefix": null,
+        "suffix": null,
+        "alignment": "left",
+        "sortable": true,
+        "filterable": true,
+        "editable": false,
+        "valueFormatting": null,
+        "conditionalFormatting": [
+          "{{ ((m)=>({'S+':'#BBDEFB','S':'#E3F2FD','A':'#C8E6C9','B':'#E8F5E9','C':'#FFF9C4','D':'#FFFDE7','E':'#FFE0B2','F':'#FFCDD2'})[m]) (item) }}",
+          "{{ ((m)=>({'S+':'#002366','S':'#0052CC','A':'#0D5E1F','B':'#2E7D32','C':'#B8860B','D':'#F9A825','E':'#E65100','F':'#B71C1C'})[m]) (item) }}"
+        ],
+        "formattingExpressions": [
+          "{{ ((m)=>({'S+':'#BBDEFB','S':'#E3F2FD','A':'#C8E6C9','B':'#E8F5E9','C':'#FFF9C4','D':'#FFFDE7','E':'#FFE0B2','F':'#FFCDD2'})[m]) (item) }}",
+          "{{ ((m)=>({'S+':'#002366','S':'#0052CC','A':'#0D5E1F','B':'#2E7D32','C':'#B8860B','D':'#F9A825','E':'#E65100','F':'#B71C1C'})[m]) (item) }}",
+          "{{ !showWishlistAttributes.value }}"
+        ],
+        "expressionRefs": [
+          "item",
+          "value"
+        ],
+        "foundColorCodes": [
+          "#BBDEFB",
+          "#E3F2FD",
+          "#C8E6C9",
+          "#E8F5E9",
+          "#FFF9C4",
+          "#FFFDE7",
+          "#FFE0B2",
+          "#FFCDD2",
+          "#002366",
+          "#0052CC",
+          "#0D5E1F",
+          "#2E7D32",
+          "#B8860B",
+          "#F9A825",
+          "#E65100",
+          "#B71C1C"
+        ]
+      },
+      {
+        "id": "bdbde",
+        "label": "Wil",
+        "dataKey": "will_rating",
+        "visible": "conditional",
+        "hiddenExpression": "{{ !showWishlistAttributes.value }}",
+        "order": 17,
+        "width": 90,
+        "type": "tag",
+        "format": "tag",
+        "numberFormat": null,
+        "currencyFormat": null,
+        "percentFormat": null,
+        "decimalSettings": null,
+        "prefix": null,
+        "suffix": null,
+        "alignment": "left",
+        "sortable": true,
+        "filterable": true,
+        "editable": false,
+        "valueFormatting": null,
+        "conditionalFormatting": [
+          "{{ ((m)=>({'S+':'#BBDEFB','S':'#E3F2FD','A':'#C8E6C9','B':'#E8F5E9','C':'#FFF9C4','D':'#FFFDE7','E':'#FFE0B2','F':'#FFCDD2'})[m]) (item) }}",
+          "{{ ((m)=>({'S+':'#002366','S':'#0052CC','A':'#0D5E1F','B':'#2E7D32','C':'#B8860B','D':'#F9A825','E':'#E65100','F':'#B71C1C'})[m]) (item) }}"
+        ],
+        "formattingExpressions": [
+          "{{ ((m)=>({'S+':'#BBDEFB','S':'#E3F2FD','A':'#C8E6C9','B':'#E8F5E9','C':'#FFF9C4','D':'#FFFDE7','E':'#FFE0B2','F':'#FFCDD2'})[m]) (item) }}",
+          "{{ ((m)=>({'S+':'#002366','S':'#0052CC','A':'#0D5E1F','B':'#2E7D32','C':'#B8860B','D':'#F9A825','E':'#E65100','F':'#B71C1C'})[m]) (item) }}",
+          "{{ !showWishlistAttributes.value }}"
+        ],
+        "expressionRefs": [
+          "item",
+          "value"
+        ],
+        "foundColorCodes": [
+          "#BBDEFB",
+          "#E3F2FD",
+          "#C8E6C9",
+          "#E8F5E9",
+          "#FFF9C4",
+          "#FFFDE7",
+          "#FFE0B2",
+          "#FFCDD2",
+          "#002366",
+          "#0052CC",
+          "#0D5E1F",
+          "#2E7D32",
+          "#B8860B",
+          "#F9A825",
+          "#E65100",
+          "#B71C1C"
+        ]
+      },
+      {
+        "id": "23a59",
+        "label": "Spe",
+        "dataKey": "speed_rating",
+        "visible": "conditional",
+        "hiddenExpression": "{{ !showWishlistAttributes.value }}",
+        "order": 18,
+        "width": 90,
+        "type": "tag",
+        "format": "tag",
+        "numberFormat": null,
+        "currencyFormat": null,
+        "percentFormat": null,
+        "decimalSettings": null,
+        "prefix": null,
+        "suffix": null,
+        "alignment": "left",
+        "sortable": true,
+        "filterable": true,
+        "editable": false,
+        "valueFormatting": null,
+        "conditionalFormatting": [
+          "{{ ((m)=>({'S+':'#BBDEFB','S':'#E3F2FD','A':'#C8E6C9','B':'#E8F5E9','C':'#FFF9C4','D':'#FFFDE7','E':'#FFE0B2','F':'#FFCDD2'})[m]) (item) }}",
+          "{{ ((m)=>({'S+':'#002366','S':'#0052CC','A':'#0D5E1F','B':'#2E7D32','C':'#B8860B','D':'#F9A825','E':'#E65100','F':'#B71C1C'})[m]) (item) }}"
+        ],
+        "formattingExpressions": [
+          "{{ ((m)=>({'S+':'#BBDEFB','S':'#E3F2FD','A':'#C8E6C9','B':'#E8F5E9','C':'#FFF9C4','D':'#FFFDE7','E':'#FFE0B2','F':'#FFCDD2'})[m]) (item) }}",
+          "{{ ((m)=>({'S+':'#002366','S':'#0052CC','A':'#0D5E1F','B':'#2E7D32','C':'#B8860B','D':'#F9A825','E':'#E65100','F':'#B71C1C'})[m]) (item) }}",
+          "{{ !showWishlistAttributes.value }}"
+        ],
+        "expressionRefs": [
+          "item",
+          "value"
+        ],
+        "foundColorCodes": [
+          "#BBDEFB",
+          "#E3F2FD",
+          "#C8E6C9",
+          "#E8F5E9",
+          "#FFF9C4",
+          "#FFFDE7",
+          "#FFE0B2",
+          "#FFCDD2",
+          "#002366",
+          "#0052CC",
+          "#0D5E1F",
+          "#2E7D32",
+          "#B8860B",
+          "#F9A825",
+          "#E65100",
+          "#B71C1C"
+        ]
+      },
+      {
+        "id": "7d0b9",
+        "label": "Sta",
+        "dataKey": "stamina_rating",
+        "visible": "conditional",
+        "hiddenExpression": "{{ !showWishlistAttributes.value }}",
+        "order": 19,
+        "width": 95,
+        "type": "tag",
+        "format": "tag",
+        "numberFormat": null,
+        "currencyFormat": null,
+        "percentFormat": null,
+        "decimalSettings": null,
+        "prefix": null,
+        "suffix": null,
+        "alignment": "left",
+        "sortable": true,
+        "filterable": true,
+        "editable": false,
+        "valueFormatting": null,
+        "conditionalFormatting": [
+          "{{ ((m)=>({'S+':'#BBDEFB','S':'#E3F2FD','A':'#C8E6C9','B':'#E8F5E9','C':'#FFF9C4','D':'#FFFDE7','E':'#FFE0B2','F':'#FFCDD2'})[m]) (item) }}",
+          "{{ ((m)=>({'S+':'#002366','S':'#0052CC','A':'#0D5E1F','B':'#2E7D32','C':'#B8860B','D':'#F9A825','E':'#E65100','F':'#B71C1C'})[m]) (item) }}"
+        ],
+        "formattingExpressions": [
+          "{{ ((m)=>({'S+':'#BBDEFB','S':'#E3F2FD','A':'#C8E6C9','B':'#E8F5E9','C':'#FFF9C4','D':'#FFFDE7','E':'#FFE0B2','F':'#FFCDD2'})[m]) (item) }}",
+          "{{ ((m)=>({'S+':'#002366','S':'#0052CC','A':'#0D5E1F','B':'#2E7D32','C':'#B8860B','D':'#F9A825','E':'#E65100','F':'#B71C1C'})[m]) (item) }}",
+          "{{ !showWishlistAttributes.value }}"
+        ],
+        "expressionRefs": [
+          "item",
+          "value"
+        ],
+        "foundColorCodes": [
+          "#BBDEFB",
+          "#E3F2FD",
+          "#C8E6C9",
+          "#E8F5E9",
+          "#FFF9C4",
+          "#FFFDE7",
+          "#FFE0B2",
+          "#FFCDD2",
+          "#002366",
+          "#0052CC",
+          "#0D5E1F",
+          "#2E7D32",
+          "#B8860B",
+          "#F9A825",
+          "#E65100",
+          "#B71C1C"
+        ]
+      },
+      {
+        "id": "6c010",
+        "label": "Hea",
+        "dataKey": "health_rating",
+        "visible": "conditional",
+        "hiddenExpression": "{{ !showWishlistAttributes.value }}",
+        "order": 20,
+        "width": 95,
+        "type": "tag",
+        "format": "tag",
+        "numberFormat": null,
+        "currencyFormat": null,
+        "percentFormat": null,
+        "decimalSettings": null,
+        "prefix": null,
+        "suffix": null,
+        "alignment": "left",
+        "sortable": true,
+        "filterable": true,
+        "editable": false,
+        "valueFormatting": null,
+        "conditionalFormatting": [
+          "{{ ((m)=>({'S+':'#BBDEFB','S':'#E3F2FD','A':'#C8E6C9','B':'#E8F5E9','C':'#FFF9C4','D':'#FFFDE7','E':'#FFE0B2','F':'#FFCDD2'})[m]) (item) }}",
+          "{{ ((m)=>({'S+':'#002366','S':'#0052CC','A':'#0D5E1F','B':'#2E7D32','C':'#B8860B','D':'#F9A825','E':'#E65100','F':'#B71C1C'})[m]) (item) }}"
+        ],
+        "formattingExpressions": [
+          "{{ ((m)=>({'S+':'#BBDEFB','S':'#E3F2FD','A':'#C8E6C9','B':'#E8F5E9','C':'#FFF9C4','D':'#FFFDE7','E':'#FFE0B2','F':'#FFCDD2'})[m]) (item) }}",
+          "{{ ((m)=>({'S+':'#002366','S':'#0052CC','A':'#0D5E1F','B':'#2E7D32','C':'#B8860B','D':'#F9A825','E':'#E65100','F':'#B71C1C'})[m]) (item) }}",
+          "{{ !showWishlistAttributes.value }}"
+        ],
+        "expressionRefs": [
+          "item",
+          "value"
+        ],
+        "foundColorCodes": [
+          "#BBDEFB",
+          "#E3F2FD",
+          "#C8E6C9",
+          "#E8F5E9",
+          "#FFF9C4",
+          "#FFFDE7",
+          "#FFE0B2",
+          "#FFCDD2",
+          "#002366",
+          "#0052CC",
+          "#0D5E1F",
+          "#2E7D32",
+          "#B8860B",
+          "#F9A825",
+          "#E65100",
+          "#B71C1C"
+        ]
+      },
+      {
+        "id": "63d04",
+        "label": "Awa",
+        "dataKey": "awareness_rating",
+        "visible": "conditional",
+        "hiddenExpression": "{{ !showWishlistAttributes.value }}",
+        "order": 21,
+        "width": 90,
+        "type": "tag",
+        "format": "tag",
+        "numberFormat": null,
+        "currencyFormat": null,
+        "percentFormat": null,
+        "decimalSettings": null,
+        "prefix": null,
+        "suffix": null,
+        "alignment": "left",
+        "sortable": true,
+        "filterable": true,
+        "editable": false,
+        "valueFormatting": null,
+        "conditionalFormatting": [
+          "{{ ((m)=>({'S+':'#BBDEFB','S':'#E3F2FD','A':'#C8E6C9','B':'#E8F5E9','C':'#FFF9C4','D':'#FFFDE7','E':'#FFE0B2','F':'#FFCDD2'})[m]) (item) }}",
+          "{{ ((m)=>({'S+':'#002366','S':'#0052CC','A':'#0D5E1F','B':'#2E7D32','C':'#B8860B','D':'#F9A825','E':'#E65100','F':'#B71C1C'})[m]) (item) }}"
+        ],
+        "formattingExpressions": [
+          "{{ ((m)=>({'S+':'#BBDEFB','S':'#E3F2FD','A':'#C8E6C9','B':'#E8F5E9','C':'#FFF9C4','D':'#FFFDE7','E':'#FFE0B2','F':'#FFCDD2'})[m]) (item) }}",
+          "{{ ((m)=>({'S+':'#002366','S':'#0052CC','A':'#0D5E1F','B':'#2E7D32','C':'#B8860B','D':'#F9A825','E':'#E65100','F':'#B71C1C'})[m]) (item) }}",
+          "{{ !showWishlistAttributes.value }}"
+        ],
+        "expressionRefs": [
+          "item",
+          "value"
+        ],
+        "foundColorCodes": [
+          "#BBDEFB",
+          "#E3F2FD",
+          "#C8E6C9",
+          "#E8F5E9",
+          "#FFF9C4",
+          "#FFFDE7",
+          "#FFE0B2",
+          "#FFCDD2",
+          "#002366",
+          "#0052CC",
+          "#0D5E1F",
+          "#2E7D32",
+          "#B8860B",
+          "#F9A825",
+          "#E65100",
+          "#B71C1C"
+        ]
+      },
+      {
+        "id": "55eb2",
+        "label": "Dex",
+        "dataKey": "dexterity_rating",
+        "visible": "conditional",
+        "hiddenExpression": "{{ !showWishlistAttributes.value }}",
+        "order": 22,
+        "width": 90,
+        "type": "tag",
+        "format": "tag",
+        "numberFormat": null,
+        "currencyFormat": null,
+        "percentFormat": null,
+        "decimalSettings": null,
+        "prefix": null,
+        "suffix": null,
+        "alignment": "left",
+        "sortable": true,
+        "filterable": true,
+        "editable": false,
+        "valueFormatting": null,
+        "conditionalFormatting": [
+          "{{ ((m)=>({'S+':'#BBDEFB','S':'#E3F2FD','A':'#C8E6C9','B':'#E8F5E9','C':'#FFF9C4','D':'#FFFDE7','E':'#FFE0B2','F':'#FFCDD2'})[m]) (item) }}",
+          "{{ ((m)=>({'S+':'#002366','S':'#0052CC','A':'#0D5E1F','B':'#2E7D32','C':'#B8860B','D':'#F9A825','E':'#E65100','F':'#B71C1C'})[m]) (item) }}"
+        ],
+        "formattingExpressions": [
+          "{{ ((m)=>({'S+':'#BBDEFB','S':'#E3F2FD','A':'#C8E6C9','B':'#E8F5E9','C':'#FFF9C4','D':'#FFFDE7','E':'#FFE0B2','F':'#FFCDD2'})[m]) (item) }}",
+          "{{ ((m)=>({'S+':'#002366','S':'#0052CC','A':'#0D5E1F','B':'#2E7D32','C':'#B8860B','D':'#F9A825','E':'#E65100','F':'#B71C1C'})[m]) (item) }}",
+          "{{ !showWishlistAttributes.value }}"
+        ],
+        "expressionRefs": [
+          "item",
+          "value"
+        ],
+        "foundColorCodes": [
+          "#BBDEFB",
+          "#E3F2FD",
+          "#C8E6C9",
+          "#E8F5E9",
+          "#FFF9C4",
+          "#FFFDE7",
+          "#FFE0B2",
+          "#FFCDD2",
+          "#002366",
+          "#0052CC",
+          "#0D5E1F",
+          "#2E7D32",
+          "#B8860B",
+          "#F9A825",
+          "#E65100",
+          "#B71C1C"
+        ]
+      },
+      {
+        "id": "c373f",
+        "label": "Det",
+        "dataKey": "determination_rating",
+        "visible": "conditional",
+        "hiddenExpression": "{{ !showWishlistAttributes.value }}",
+        "order": 23,
+        "width": 90,
+        "type": "tag",
+        "format": "tag",
+        "numberFormat": null,
+        "currencyFormat": null,
+        "percentFormat": null,
+        "decimalSettings": null,
+        "prefix": null,
+        "suffix": null,
+        "alignment": "left",
+        "sortable": true,
+        "filterable": true,
+        "editable": false,
+        "valueFormatting": null,
+        "conditionalFormatting": [
+          "{{ ((m)=>({'S+':'#BBDEFB','S':'#E3F2FD','A':'#C8E6C9','B':'#E8F5E9','C':'#FFF9C4','D':'#FFFDE7','E':'#FFE0B2','F':'#FFCDD2'})[m]) (item) }}",
+          "{{ ((m)=>({'S+':'#002366','S':'#0052CC','A':'#0D5E1F','B':'#2E7D32','C':'#B8860B','D':'#F9A825','E':'#E65100','F':'#B71C1C'})[m]) (item) }}"
+        ],
+        "formattingExpressions": [
+          "{{ ((m)=>({'S+':'#BBDEFB','S':'#E3F2FD','A':'#C8E6C9','B':'#E8F5E9','C':'#FFF9C4','D':'#FFFDE7','E':'#FFE0B2','F':'#FFCDD2'})[m]) (item) }}",
+          "{{ ((m)=>({'S+':'#002366','S':'#0052CC','A':'#0D5E1F','B':'#2E7D32','C':'#B8860B','D':'#F9A825','E':'#E65100','F':'#B71C1C'})[m]) (item) }}",
+          "{{ !showWishlistAttributes.value }}"
+        ],
+        "expressionRefs": [
+          "item",
+          "value"
+        ],
+        "foundColorCodes": [
+          "#BBDEFB",
+          "#E3F2FD",
+          "#C8E6C9",
+          "#E8F5E9",
+          "#FFF9C4",
+          "#FFFDE7",
+          "#FFE0B2",
+          "#FFCDD2",
+          "#002366",
+          "#0052CC",
+          "#0D5E1F",
+          "#2E7D32",
+          "#B8860B",
+          "#F9A825",
+          "#E65100",
+          "#B71C1C"
+        ]
+      },
+      {
+        "id": "d9236",
+        "label": "Pow",
+        "dataKey": "power_rating",
+        "visible": "conditional",
+        "hiddenExpression": "{{ !showWishlistAttributes.value }}",
+        "order": 24,
+        "width": 95,
+        "type": "tag",
+        "format": "tag",
+        "numberFormat": null,
+        "currencyFormat": null,
+        "percentFormat": null,
+        "decimalSettings": null,
+        "prefix": null,
+        "suffix": null,
+        "alignment": "left",
+        "sortable": true,
+        "filterable": true,
+        "editable": false,
+        "valueFormatting": null,
+        "conditionalFormatting": [
+          "{{ ((m)=>({'S+':'#BBDEFB','S':'#E3F2FD','A':'#C8E6C9','B':'#E8F5E9','C':'#FFF9C4','D':'#FFFDE7','E':'#FFE0B2','F':'#FFCDD2'})[m]) (item) }}",
+          "{{ ((m)=>({'S+':'#002366','S':'#0052CC','A':'#0D5E1F','B':'#2E7D32','C':'#B8860B','D':'#F9A825','E':'#E65100','F':'#B71C1C'})[m]) (item) }}"
+        ],
+        "formattingExpressions": [
+          "{{ ((m)=>({'S+':'#BBDEFB','S':'#E3F2FD','A':'#C8E6C9','B':'#E8F5E9','C':'#FFF9C4','D':'#FFFDE7','E':'#FFE0B2','F':'#FFCDD2'})[m]) (item) }}",
+          "{{ ((m)=>({'S+':'#002366','S':'#0052CC','A':'#0D5E1F','B':'#2E7D32','C':'#B8860B','D':'#F9A825','E':'#E65100','F':'#B71C1C'})[m]) (item) }}",
+          "{{ !showWishlistAttributes.value }}"
+        ],
+        "expressionRefs": [
+          "item",
+          "value"
+        ],
+        "foundColorCodes": [
+          "#BBDEFB",
+          "#E3F2FD",
+          "#C8E6C9",
+          "#E8F5E9",
+          "#FFF9C4",
+          "#FFFDE7",
+          "#FFE0B2",
+          "#FFCDD2",
+          "#002366",
+          "#0052CC",
+          "#0D5E1F",
+          "#2E7D32",
+          "#B8860B",
+          "#F9A825",
+          "#E65100",
+          "#B71C1C"
+        ]
+      },
+      {
+        "id": "4e521",
+        "label": "Spi",
+        "dataKey": "spirit_rating",
+        "visible": "conditional",
+        "hiddenExpression": "{{ !showWishlistAttributes.value }}",
+        "order": 25,
+        "width": 90,
+        "type": "tag",
+        "format": "tag",
+        "numberFormat": null,
+        "currencyFormat": null,
+        "percentFormat": null,
+        "decimalSettings": null,
+        "prefix": null,
+        "suffix": null,
+        "alignment": "left",
+        "sortable": true,
+        "filterable": true,
+        "editable": false,
+        "valueFormatting": null,
+        "conditionalFormatting": [
+          "{{ ((m)=>({'S+':'#BBDEFB','S':'#E3F2FD','A':'#C8E6C9','B':'#E8F5E9','C':'#FFF9C4','D':'#FFFDE7','E':'#FFE0B2','F':'#FFCDD2'})[m]) (item) }}",
+          "{{ ((m)=>({'S+':'#002366','S':'#0052CC','A':'#0D5E1F','B':'#2E7D32','C':'#B8860B','D':'#F9A825','E':'#E65100','F':'#B71C1C'})[m]) (item) }}"
+        ],
+        "formattingExpressions": [
+          "{{ ((m)=>({'S+':'#BBDEFB','S':'#E3F2FD','A':'#C8E6C9','B':'#E8F5E9','C':'#FFF9C4','D':'#FFFDE7','E':'#FFE0B2','F':'#FFCDD2'})[m]) (item) }}",
+          "{{ ((m)=>({'S+':'#002366','S':'#0052CC','A':'#0D5E1F','B':'#2E7D32','C':'#B8860B','D':'#F9A825','E':'#E65100','F':'#B71C1C'})[m]) (item) }}",
+          "{{ !showWishlistAttributes.value }}"
+        ],
+        "expressionRefs": [
+          "item",
+          "value"
+        ],
+        "foundColorCodes": [
+          "#BBDEFB",
+          "#E3F2FD",
+          "#C8E6C9",
+          "#E8F5E9",
+          "#FFF9C4",
+          "#FFFDE7",
+          "#FFE0B2",
+          "#FFCDD2",
+          "#002366",
+          "#0052CC",
+          "#0D5E1F",
+          "#2E7D32",
+          "#B8860B",
+          "#F9A825",
+          "#E65100",
+          "#B71C1C"
+        ]
+      },
+      {
+        "id": "6b52e",
+        "label": "Tor",
+        "dataKey": "torment_rating",
+        "visible": "conditional",
+        "hiddenExpression": "{{ !showWishlistAttributes.value }}",
+        "order": 26,
+        "width": 90,
+        "type": "tag",
+        "format": "tag",
+        "numberFormat": null,
+        "currencyFormat": null,
+        "percentFormat": null,
+        "decimalSettings": null,
+        "prefix": null,
+        "suffix": null,
+        "alignment": "left",
+        "sortable": true,
+        "filterable": true,
+        "editable": false,
+        "valueFormatting": null,
+        "conditionalFormatting": [
+          "{{ ((m)=>({'S+':'#BBDEFB','S':'#E3F2FD','A':'#C8E6C9','B':'#E8F5E9','C':'#FFF9C4','D':'#FFFDE7','E':'#FFE0B2','F':'#FFCDD2'})[m]) (item) }}",
+          "{{ ((m)=>({'S+':'#002366','S':'#0052CC','A':'#0D5E1F','B':'#2E7D32','C':'#B8860B','D':'#F9A825','E':'#E65100','F':'#B71C1C'})[m]) (item) }}"
+        ],
+        "formattingExpressions": [
+          "{{ ((m)=>({'S+':'#BBDEFB','S':'#E3F2FD','A':'#C8E6C9','B':'#E8F5E9','C':'#FFF9C4','D':'#FFFDE7','E':'#FFE0B2','F':'#FFCDD2'})[m]) (item) }}",
+          "{{ ((m)=>({'S+':'#002366','S':'#0052CC','A':'#0D5E1F','B':'#2E7D32','C':'#B8860B','D':'#F9A825','E':'#E65100','F':'#B71C1C'})[m]) (item) }}",
+          "{{ !showWishlistAttributes.value }}"
+        ],
+        "expressionRefs": [
+          "item",
+          "value"
+        ],
+        "foundColorCodes": [
+          "#BBDEFB",
+          "#E3F2FD",
+          "#C8E6C9",
+          "#E8F5E9",
+          "#FFF9C4",
+          "#FFFDE7",
+          "#FFE0B2",
+          "#FFCDD2",
+          "#002366",
+          "#0052CC",
+          "#0D5E1F",
+          "#2E7D32",
+          "#B8860B",
+          "#F9A825",
+          "#E65100",
+          "#B71C1C"
+        ]
+      },
+      {
+        "id": "a51ca",
+        "label": "Subclass 1",
+        "dataKey": "subclass_1",
+        "visible": true,
+        "hiddenExpression": "",
+        "order": 27,
+        "width": 120,
+        "type": "string",
+        "format": "string",
+        "numberFormat": null,
+        "currencyFormat": null,
+        "percentFormat": null,
+        "decimalSettings": null,
+        "prefix": null,
+        "suffix": null,
+        "alignment": "left",
+        "sortable": true,
+        "filterable": true,
+        "editable": false,
+        "valueFormatting": null,
+        "conditionalFormatting": [],
+        "formattingExpressions": [],
+        "expressionRefs": [],
+        "foundColorCodes": []
+      },
+      {
+        "id": "4555e",
+        "label": "Subclass 2",
+        "dataKey": "subclass_2",
+        "visible": true,
+        "hiddenExpression": "",
+        "order": 28,
+        "width": 120,
+        "type": "string",
+        "format": "string",
+        "numberFormat": null,
+        "currencyFormat": null,
+        "percentFormat": null,
+        "decimalSettings": null,
+        "prefix": null,
+        "suffix": null,
+        "alignment": "left",
+        "sortable": true,
+        "filterable": true,
+        "editable": false,
+        "valueFormatting": null,
+        "conditionalFormatting": [],
+        "formattingExpressions": [],
+        "expressionRefs": [],
+        "foundColorCodes": []
+      },
+      {
+        "id": "b0728",
+        "label": "Subclass 3",
+        "dataKey": "subclass_3",
+        "visible": true,
+        "hiddenExpression": "",
+        "order": 29,
+        "width": 120,
+        "type": "string",
+        "format": "string",
+        "numberFormat": null,
+        "currencyFormat": null,
+        "percentFormat": null,
+        "decimalSettings": null,
+        "prefix": null,
+        "suffix": null,
+        "alignment": "left",
+        "sortable": true,
+        "filterable": true,
+        "editable": false,
+        "valueFormatting": null,
+        "conditionalFormatting": [],
+        "formattingExpressions": [],
+        "expressionRefs": [],
+        "foundColorCodes": []
+      },
+      {
+        "id": "8a9d6",
+        "label": "Alignment",
+        "dataKey": "alignment",
+        "visible": true,
+        "hiddenExpression": "",
+        "order": 30,
+        "width": 120,
+        "type": "string",
+        "format": "string",
+        "numberFormat": null,
+        "currencyFormat": null,
+        "percentFormat": null,
+        "decimalSettings": null,
+        "prefix": null,
+        "suffix": null,
+        "alignment": "left",
+        "sortable": true,
+        "filterable": true,
+        "editable": false,
+        "valueFormatting": null,
+        "conditionalFormatting": [],
+        "formattingExpressions": [],
+        "expressionRefs": [],
+        "foundColorCodes": []
+      },
+      {
+        "id": "c2cf7",
+        "label": "Trait+1",
+        "dataKey": "trait_pos_1",
+        "visible": true,
+        "hiddenExpression": "",
+        "order": 31,
+        "width": 145,
+        "type": "tag",
+        "format": "tag",
+        "numberFormat": null,
+        "currencyFormat": null,
+        "percentFormat": null,
+        "decimalSettings": null,
+        "prefix": null,
+        "suffix": null,
+        "alignment": "left",
+        "sortable": true,
+        "filterable": true,
+        "editable": false,
+        "valueFormatting": null,
+        "conditionalFormatting": [],
+        "formattingExpressions": [],
+        "expressionRefs": [],
+        "foundColorCodes": []
+      },
+      {
+        "id": "e3b95",
+        "label": "Trait+2",
+        "dataKey": "trait_pos_2",
+        "visible": true,
+        "hiddenExpression": "",
+        "order": 32,
+        "width": 140,
+        "type": "tag",
+        "format": "tag",
+        "numberFormat": null,
+        "currencyFormat": null,
+        "percentFormat": null,
+        "decimalSettings": null,
+        "prefix": null,
+        "suffix": null,
+        "alignment": "left",
+        "sortable": true,
+        "filterable": true,
+        "editable": false,
+        "valueFormatting": null,
+        "conditionalFormatting": [],
+        "formattingExpressions": [],
+        "expressionRefs": [],
+        "foundColorCodes": []
+      },
+      {
+        "id": "2839b",
+        "label": "Trait+3",
+        "dataKey": "trait_pos_3",
+        "visible": true,
+        "hiddenExpression": "",
+        "order": 33,
+        "width": 140,
+        "type": "tag",
+        "format": "tag",
+        "numberFormat": null,
+        "currencyFormat": null,
+        "percentFormat": null,
+        "decimalSettings": null,
+        "prefix": null,
+        "suffix": null,
+        "alignment": "left",
+        "sortable": true,
+        "filterable": true,
+        "editable": false,
+        "valueFormatting": null,
+        "conditionalFormatting": [],
+        "formattingExpressions": [],
+        "expressionRefs": [],
+        "foundColorCodes": []
+      },
+      {
+        "id": "1cf51",
+        "label": "Trait-1",
+        "dataKey": "trait_neg_1",
+        "visible": true,
+        "hiddenExpression": "",
+        "order": 34,
+        "width": 145,
+        "type": "tag",
+        "format": "tag",
+        "numberFormat": null,
+        "currencyFormat": null,
+        "percentFormat": null,
+        "decimalSettings": null,
+        "prefix": null,
+        "suffix": null,
+        "alignment": "left",
+        "sortable": true,
+        "filterable": true,
+        "editable": false,
+        "valueFormatting": null,
+        "conditionalFormatting": [],
+        "formattingExpressions": [],
+        "expressionRefs": [],
+        "foundColorCodes": []
+      },
+      {
+        "id": "da39a",
+        "label": "Trait-2",
+        "dataKey": "trait_neg_2",
+        "visible": true,
+        "hiddenExpression": "",
+        "order": 35,
+        "width": 145,
+        "type": "tag",
+        "format": "tag",
+        "numberFormat": null,
+        "currencyFormat": null,
+        "percentFormat": null,
+        "decimalSettings": null,
+        "prefix": null,
+        "suffix": null,
+        "alignment": "left",
+        "sortable": true,
+        "filterable": true,
+        "editable": false,
+        "valueFormatting": null,
+        "conditionalFormatting": [],
+        "formattingExpressions": [],
+        "expressionRefs": [],
+        "foundColorCodes": []
+      },
+      {
+        "id": "781c7",
+        "label": "Trait-3",
+        "dataKey": "trait_neg_3",
+        "visible": true,
+        "hiddenExpression": "",
+        "order": 36,
+        "width": 145,
+        "type": "tags",
+        "format": "tags",
+        "numberFormat": null,
+        "currencyFormat": null,
+        "percentFormat": null,
+        "decimalSettings": null,
+        "prefix": null,
+        "suffix": null,
+        "alignment": "left",
+        "sortable": true,
+        "filterable": true,
+        "editable": false,
+        "valueFormatting": null,
+        "conditionalFormatting": [],
+        "formattingExpressions": [],
+        "expressionRefs": [],
+        "foundColorCodes": []
+      },
+      {
+        "id": "43fd2",
+        "label": "Geschlecht",
+        "dataKey": "geschlecht",
+        "visible": true,
+        "hiddenExpression": "",
+        "order": 37,
+        "width": 120,
+        "type": "tag",
+        "format": "tag",
+        "numberFormat": null,
+        "currencyFormat": null,
+        "percentFormat": null,
+        "decimalSettings": null,
+        "prefix": null,
+        "suffix": null,
+        "alignment": "left",
+        "sortable": true,
+        "filterable": true,
+        "editable": false,
+        "valueFormatting": "{{ _.startCase(item) }}",
+        "conditionalFormatting": [],
+        "formattingExpressions": [
+          "{{ _.startCase(item) }}"
+        ],
+        "expressionRefs": [
+          "item"
+        ],
+        "foundColorCodes": []
+      }
+    ],
+    "rowActions": [
+      {
+        "label": "Entfernen",
+        "event": "doubleClickRow",
+        "method": "run",
+        "script": "// FIXED: Use currentRow to ensure we get the clicked row, not the selected one\nconst current = pickedPlayers.value || [];\nconst clickedRow = currentRow || playersTable2.selectedSourceRow;\nconst name = clickedRow?.name;\n\nif (!name) {\n  console.warn('No player name found to remove');\n  return;\n}\n\n// Filter out the player from the wishlist\nconst updated = current.filter(p => p.name !== name);\npickedPlayers.setValue(updated);\n\nutils.showNotification({\n  title: 'Spieler entfernt',\n  description: `${name} wurde aus der Wishlist entfernt`,\n  notificationType: 'info'\n});"
+      },
+      {
+        "label": "Kaufen",
+        "event": "doubleClickRow",
+        "method": "run",
+        "script": "// FIXED: Use currentRow to ensure we get the clicked row, not the selected one\nconst current = pickedPlayers.value || [];\nconst clickedRow = currentRow || playersTable2.selectedSourceRow;\nconst name = clickedRow?.name;\n\nif (!name) {\n  console.warn('No player name found to remove');\n  return;\n}\n\n// Filter out the player from the wishlist\nconst updated = current.filter(p => p.name !== name);\npickedPlayers.setValue(updated);\n\nutils.showNotification({\n  title: 'Spieler entfernt',\n  description: `${name} wurde aus der Wishlist entfernt`,\n  notificationType: 'info'\n});"
+      }
+    ],
+    "dependencies": {
+      "queries": [],
+      "transformers": [
+        "wishlistWithImages",
+        "wishlistWithImages.value"
+      ],
+      "states": [
+        "pickedPlayers"
+      ],
+      "components": [],
+      "all": [
+        "pickedPlayers",
+        "wishlistWithImages",
+        "wishlistWithImages.value"
+      ]
+    }
+  }
+]

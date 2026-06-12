@@ -1,0 +1,35 @@
+{
+  "source": "retool",
+  "capturedAt": "TODO_RETOOL_EXPORT_REQUIRED",
+  "saveId": "TODO_RETOOL_EXPORT_REQUIRED",
+  "seasonId": "TODO_RETOOL_EXPORT_REQUIRED",
+  "matchdayId": null,
+  "inputs": {
+    "exportIntent": "season_end_cash_before",
+    "requiredTeams": [
+      "placement_top_team",
+      "mid_table_team",
+      "low_table_team"
+    ]
+  },
+  "outputs": {
+    "status": "TODO_RETOOL_EXPORT_REQUIRED",
+    "teams": [
+      {
+        "teamId": "TODO_RETOOL_EXPORT_REQUIRED",
+        "teamName": "TODO_RETOOL_EXPORT_REQUIRED",
+        "placement": "TODO_RETOOL_EXPORT_REQUIRED",
+        "cash": "TODO_RETOOL_EXPORT_REQUIRED",
+        "budget": "TODO_RETOOL_EXPORT_REQUIRED",
+        "salary": "TODO_RETOOL_EXPORT_REQUIRED",
+        "rosterCount": "TODO_RETOOL_EXPORT_REQUIRED"
+      }
+    ]
+  },
+  "notes": [
+    "Keine Fake-Werte eintragen.",
+    "Diese Datei muss den echten Retool-Stand direkt vor dem Season-End-Cash-/Preisgeldschritt zeigen."
+  ],
+  "ignoredFields": [],
+  "toleratedFloatDelta": 0
+}

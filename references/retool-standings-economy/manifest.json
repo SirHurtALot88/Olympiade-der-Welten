@@ -1,0 +1,14 @@
+{
+  "generatedAt": "2026-06-04T12:59:04.703Z",
+  "sourceDir": "/Users/chrisfalk/Documents/Codex/Olympiade der Welten/references/retool-ai-golden-master",
+  "sourceAppExportPath": "/Users/chrisfalk/Downloads/Olympiade%20der%20Welten%20Draftboard (7).json",
+  "docsUsed": [
+    "/Users/chrisfalk/Documents/Codex/Olympiade der Welten/docs/README_RETOOL_SYSTEM.md",
+    "/Users/chrisfalk/Documents/Codex/Olympiade der Welten/docs/SYSTEM_MAP_RETOOL_REFERENCE.md"
+  ],
+  "groups": {
+    "standings": 80,
+    "scoring": 62,
+    "cashPrize": 60
+  }
+}

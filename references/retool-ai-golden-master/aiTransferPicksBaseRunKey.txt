@@ -1,0 +1,49 @@
+// term: aiTeamNeeds
+// id: aiTransferPicksBaseRunKey
+// type: function
+// subtype: Function
+// page: transfermarktPage
+// folder: unknown
+// updatedAt: unknown
+// codeField: funcBody
+// dependencies: aiTransferPicksBase.value | aiTeamNeedsSnapshot.value
+// extractionStatus: complete_or_primary_match
+// Documentation:
+//   Enriches aiTransferPicksBase rows with the importance of the originating need.
+//   We keep aiTransferPicksBase itself unchanged (it's large/heavy), and add fields here.
+// Returns:
+//   Array<Record<string, any>> // aiTransferPicksBase rows + { need_importance_score, need_importance01, need_rank }
+
+const rows = Array.isArray({{ aiTransferPicksBase.value }}) ? {{ aiTransferPicksBase.value }} : [];
+const needs = Array.isArray({{ aiTeamNeedsSnapshot.value }}) ? {{ aiTeamNeedsSnapshot.value }} : [];
+
+const n = (v) => Number.isFinite(Number(v)) ? Number(v) : 0;
+const s = (v) => String(v ?? '').trim();
+const clamp = (v, lo, hi) => Math.max(lo, Math.min(hi, v));
+
+if (!rows.length) return [];
+
+// Build a robust lookup by (need_type + need_label), since these fields exist on the base rows.
+const needLookup = new Map();
+for (const nd of needs) {
+  const key = `${s(nd?.need_type)}||${s(nd?.need_label)}`;
+  needLookup.set(key, {
+    need_rank: n(nd?.need_rank),
+    importance_score: n(nd?.importance_score) });
+
+}
+
+return rows.map((r) => {
+  const key = `${s(r?.need_type)}||${s(r?.need_label)}`;
+  const nd = needLookup.get(key) || { need_rank: null, importance_score: 50 };
+
+  const imp = n(nd?.importance_score);
+  const imp01 = clamp(imp / 100, 0, 1);
+
+  return {
+    ...r,
+    need_rank: nd?.need_rank ?? r?.need_rank ?? null,
+    need_importance_score: imp,
+    need_importance01: Number(imp01.toFixed(3)) };
+
+});

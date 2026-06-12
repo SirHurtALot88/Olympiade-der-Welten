@@ -1,0 +1,12 @@
+ALTER TYPE "PlayerAttributeKey" ADD VALUE IF NOT EXISTS 'power';
+ALTER TYPE "PlayerAttributeKey" ADD VALUE IF NOT EXISTS 'health';
+ALTER TYPE "PlayerAttributeKey" ADD VALUE IF NOT EXISTS 'determination';
+ALTER TYPE "PlayerAttributeKey" ADD VALUE IF NOT EXISTS 'stamina';
+ALTER TYPE "PlayerAttributeKey" ADD VALUE IF NOT EXISTS 'speed';
+ALTER TYPE "PlayerAttributeKey" ADD VALUE IF NOT EXISTS 'dexterity';
+ALTER TYPE "PlayerAttributeKey" ADD VALUE IF NOT EXISTS 'awareness';
+ALTER TYPE "PlayerAttributeKey" ADD VALUE IF NOT EXISTS 'intelligence';
+ALTER TYPE "PlayerAttributeKey" ADD VALUE IF NOT EXISTS 'will';
+ALTER TYPE "PlayerAttributeKey" ADD VALUE IF NOT EXISTS 'charisma';
+ALTER TYPE "PlayerAttributeKey" ADD VALUE IF NOT EXISTS 'spirit';
+ALTER TYPE "PlayerAttributeKey" ADD VALUE IF NOT EXISTS 'torment';

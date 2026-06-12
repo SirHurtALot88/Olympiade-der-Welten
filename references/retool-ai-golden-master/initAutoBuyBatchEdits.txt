@@ -1,0 +1,78 @@
+// term: AI2_06_SimulatePicks
+// id: initAutoBuyBatchEdits
+// type: datasource
+// subtype: JavascriptQuery
+// page: transfermarktPage
+// folder: unknown
+// updatedAt: unknown
+// codeField: funcBody
+// dependencies: autoBuyBatchPicksData.value
+// extractionStatus: complete_or_primary_match
+return (() => {
+  const rows = Array.isArray({{ autoBuyBatchPicksData.value }}) ? {{ autoBuyBatchPicksData.value }} : [];
+
+  const n = (v) => Number.isFinite(Number(v)) ? Number(v) : 0;
+  const clamp = (v, lo, hi) => Math.max(lo, Math.min(hi, v));
+
+  // Same ranges as calculateContractSalary, but deterministic expected factor.
+  const standardRanges = {
+    1: { min: 0.92, max: 1.08 },
+    2: { min: 0.84, max: 1.0 },
+    3: { min: 0.76, max: 0.92 },
+    4: { min: 0.68, max: 0.84 },
+    5: { min: 0.6, max: 0.76 } };
+
+
+  const mercenaryRanges = {
+    1: { min: 0.92, max: 1.08 },
+    2: { min: 0.88, max: 1.04 },
+    3: { min: 0.84, max: 1.0 },
+    4: { min: 0.8, max: 0.96 },
+    5: { min: 0.76, max: 0.92 } };
+
+
+  const round2 = (x) => Math.round(n(x) * 100) / 100;
+
+  const perPick = {};
+
+  for (const r of rows) {
+    const pickNr = String(r?.pick_nr ?? '');
+    if (!pickNr) continue;
+
+    const years = clamp(Math.round(n(r?.contract_years) || 1), 1, 5);
+    const base = n(r?.base_gehalt);
+    const teamFit = n(r?.team_fit);
+    const isMerc = Boolean(r?.is_mercenary);
+
+    const ranges = isMerc ? mercenaryRanges : standardRanges;
+    const range = ranges[years] || ranges[1];
+
+    // Team Fit bonus: if team_fit > 25, apply extra 10% discount
+    const teamFitMultiplier = teamFit > 25 ? 0.9 : 1;
+
+    const minSalary = base * range.min * teamFitMultiplier;
+    const maxSalary = base * range.max * teamFitMultiplier;
+
+    // Deterministic expected: midpoint of min/max.
+    const expectedFactor = (range.min + range.max) / 2;
+    const expectedSalary = base * expectedFactor * teamFitMultiplier;
+
+    perPick[pickNr] = {
+      pick_nr: n(r?.pick_nr),
+      player_name: String(r?.player_name || ''),
+      contract_years: years,
+      is_mercenary: isMerc,
+      teamFit,
+      teamFitBonusActive: teamFit > 25,
+
+      base_gehalt: round2(base),
+      minSalary: round2(minSalary),
+      maxSalary: round2(maxSalary),
+      expectedSalary: round2(expectedSalary),
+
+      expectedFactorPct: round2(expectedFactor * 100) };
+
+  }
+
+  return { perPick };
+})();

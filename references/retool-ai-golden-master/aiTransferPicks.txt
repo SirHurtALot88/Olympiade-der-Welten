@@ -1,0 +1,590 @@
+// term: aiTeamNeeds
+// id: aiTransferPicks
+// type: function
+// subtype: Function
+// page: transfermarktPage
+// folder: unknown
+// updatedAt: unknown
+// codeField: funcBody
+// dependencies: filterTeam.value | getCashFromSaisonstand.value | aiTeamNeedsSnapshot.value | aiTransferCandidatePool.value | aiRunSeedState.value | aiVariationSeed.value | formatDataAsArray(getActivePlayersByTeam.data) | formatDataAsArray(getTeamRatingsTransfermarkt.data)
+// extractionStatus: complete_or_primary_match
+// Documentation:
+//   Computes AI transfer picks for the selected team (aiTeamNeedsSnapshot + aiTransferCandidatePool).
+//   Same scoring as before, but exploration jitter is deterministic per run.
+//   Seed source:
+//     - aiVariationSeed (set by runAiSearch from team + runId)
+//     - fallback: aiRunSeedState.seedInt
+//
+// IMPORTANT:
+//   - No Math.random() here (reactive transformer -> would flicker)
+//
+// Returns:
+//   Array<Record<string, any>>
+
+const team = String({{ filterTeam.value }} || '').trim();
+if (!team) return [];
+
+const n = (v) => Number.isFinite(Number(v)) ? Number(v) : 0;
+const s = (v) => String(v ?? '').trim();
+const clamp = (v, lo, hi) => Math.max(lo, Math.min(hi, v));
+
+const cash = n({{ getCashFromSaisonstand.value }}?.cash || 0);
+
+const needs = Array.isArray({{ aiTeamNeedsSnapshot.value }}) ? {{ aiTeamNeedsSnapshot.value }} : [];
+if (!needs.length) return [];
+
+const raw = Array.isArray({{ aiTransferCandidatePool.value }}) ? {{ aiTransferCandidatePool.value }} : [];
+if (!raw.length) return [];
+
+// --------------------------------------------------
+// Stable seed (per AI run)
+// --------------------------------------------------
+const seedState = {{ aiRunSeedState.value }} || null;
+let baseSeed = n({{ aiVariationSeed.value }});
+if (!Number.isFinite(baseSeed) || baseSeed <= 0) baseSeed = n(seedState?.seedInt);
+if (!Number.isFinite(baseSeed) || baseSeed <= 0) baseSeed = 1;
+
+const xfnv1a = (str) => {
+  let h = 2166136261;
+  const txt = String(str || '');
+  for (let i = 0; i < txt.length; i++) {
+    h ^= txt.charCodeAt(i);
+    h = Math.imul(h, 16777619);
+  }
+  return h >>> 0;
+};
+
+const mulberry32 = (a) => {
+  let t = a >>> 0 || 1;
+  return () => {
+    t += 0x6D2B79F5;
+    let x = t;
+    x = Math.imul(x ^ x >>> 15, x | 1);
+    x ^= x + Math.imul(x ^ x >>> 7, x | 61);
+    return ((x ^ x >>> 14) >>> 0) / 4294967296;
+  };
+};
+
+const rand01ForKey = (key) => {
+  const h = xfnv1a(String(key || ''));
+  const subSeed = (Number(baseSeed) ^ h ^ 0x9E3779B9) >>> 0;
+  const r = mulberry32(subSeed);
+  return r();
+};
+
+// --------------------------------------------------
+// Team baseline for identity score
+// --------------------------------------------------
+const roster = ({{ formatDataAsArray(getActivePlayersByTeam.data) }} || []).filter(Boolean);
+
+const teamAvg = {
+  pow: roster.length ? roster.reduce((a, r) => a + n(r?.pow), 0) / roster.length : 0,
+  spe: roster.length ? roster.reduce((a, r) => a + n(r?.spe), 0) / roster.length : 0,
+  men: roster.length ? roster.reduce((a, r) => a + n(r?.men), 0) / roster.length : 0,
+  soc: roster.length ? roster.reduce((a, r) => a + n(r?.soc), 0) / roster.length : 0 };
+
+
+// --------------------------------------------------
+// Helpers
+// --------------------------------------------------
+const classToColor = {
+  Berserker: 'red', Warlord: 'red', Tank: 'red',
+  Sprinter: 'green', Rogue: 'green', Charger: 'green',
+  Mage: 'blue', Overseer: 'blue', Templar: 'blue',
+  Bard: 'yellow', Hero: 'yellow', Badass: 'yellow', Tactician: 'yellow' };
+
+
+const colorOfClass = (klasse) => classToColor[s(klasse)] || '';
+
+const safeJson = (txt) => {
+  try {return JSON.parse(String(txt || '{}'));} catch (e) {return {};}
+};
+
+const minMax = (arr, key) => {
+  const vals = (arr || []).map((x) => n(x?.[key])).filter((v) => Number.isFinite(v));
+  const lo = vals.length ? Math.min(...vals) : 0;
+  const hi = vals.length ? Math.max(...vals) : 1;
+  return { lo, hi, den: hi - lo || 1 };
+};
+
+const norm01 = (v, mm) => clamp((n(v) - mm.lo) / (mm.den || 1), 0, 1);
+
+// --------------------------------------------------
+// Thin-roster / depth pressure
+// --------------------------------------------------
+const rosterSize = Array.isArray(roster) ? roster.length : 0;
+
+const thinRosterPressure =
+rosterSize <= 5 ? 1.00 :
+rosterSize === 6 ? 0.90 :
+rosterSize === 7 ? 0.72 :
+rosterSize === 8 ? 0.50 :
+rosterSize <= 10 ? 0.18 :
+0.00;
+
+// --------------------------------------------------
+// Formcard color coverage / flexibility
+// --------------------------------------------------
+const rosterColorCounts = (roster || []).reduce((acc, r) => {
+  const color = colorOfClass(r?.klasse);
+  if (!color) return acc;
+  acc[color] = (acc[color] || 0) + 1;
+  return acc;
+}, { red: 0, green: 0, blue: 0, yellow: 0 });
+
+const colorEntries = Object.entries(rosterColorCounts).sort((a, b) => n(b[1]) - n(a[1]));
+const primaryColors = colorEntries.slice(0, 2).map(([color]) => color);
+
+const playableColors = colorEntries.
+filter(([color, count], idx) => n(count) >= 1 || idx < 3).
+map(([color]) => color);
+
+const formcardFlexImportance =
+rosterSize <= 7 ? 0.20 :
+rosterSize <= 9 ? 0.45 :
+rosterSize <= 12 ? 0.80 :
+1.00;
+
+const targetColorCoverage = (color) => {
+  if (primaryColors.includes(color)) {
+    return rosterSize >= 10 ? 3 : rosterSize >= 7 ? 2 : 1;
+  }
+  if (playableColors.includes(color)) {
+    return rosterSize >= 10 ? 2 : 1;
+  }
+  return 0;
+};
+
+const colorCoverageGap = (color) => {
+  const target = targetColorCoverage(color);
+  const current = n(rosterColorCounts[color] || 0);
+  return Math.max(0, target - current);
+};
+
+// --------------------------------------------------
+// Candidate adapter
+// --------------------------------------------------
+const candidates = raw.
+filter((c) => c && s(c.name)).
+map((c) => {
+  const name = s(c.name);
+  const mw = n(c.marktwert ?? c.mw_neu ?? c.MW ?? c.market_value);
+  const salaryNom = n(c.gehalt ?? c.gehalt_rechnung ?? c.Gehalt ?? c.salary);
+  const fit = c.team_fit == null ? 0 : n(c.team_fit);
+
+  const salaryEff = fit > 25 ? salaryNom * 0.90 : salaryNom;
+
+  const pow = n(c.pow);
+  const spe = n(c.spe);
+  const men = n(c.men);
+  const soc = n(c.soc);
+  const core = (pow + spe + men + soc) / 4;
+
+  const gt20 = n(c.count_gt20 ?? c.gt20 ?? c['20'] ?? 0);
+  const gt40 = n(c.count_gt40 ?? c.gt40 ?? c['40'] ?? 0);
+  const gt60 = n(c.count_gt60 ?? c.gt60 ?? c['60'] ?? 0);
+  const gt80 = n(c.count_gt80 ?? c.gt80 ?? c['80'] ?? 0);
+  const peakPts = n(c.peak_points ?? 0);
+
+  const ratioRaw = salaryEff > 0 ? mw / salaryEff : mw > 0 ? 999 : 0;
+  const ratio = clamp(ratioRaw, 0, 999);
+
+  const idDist =
+  Math.abs(pow - teamAvg.pow) +
+  Math.abs(spe - teamAvg.spe) +
+  Math.abs(men - teamAvg.men) +
+  Math.abs(soc - teamAvg.soc);
+
+  return {
+    __raw: c,
+    name,
+    klasse: s(c.klasse),
+    rasse: s(c.rasse ?? c.race),
+    subclass1: s(c.subclass1),
+    subclass2: s(c.subclass2),
+    subclass3: s(c.subclass3),
+    current_team: s(c.team || ''),
+    market_value: mw,
+    salary_nominal: salaryNom,
+    salary: salaryEff,
+    fit,
+    ratio,
+    gt20,
+    gt40,
+    gt60,
+    gt80,
+    peak_points: peakPts,
+    pow,
+    spe,
+    men,
+    soc,
+    core,
+    class_color: colorOfClass(c.klasse),
+    identity_dist: idDist,
+    health: n(c.health),
+    stamina: n(c.stamina),
+    intelligence: n(c.intelligence),
+    awareness: n(c.awareness),
+    determination: n(c.determination),
+    dexterity: n(c.dexterity),
+    charisma: n(c.charisma),
+    will: n(c.will),
+    spirit: n(c.spirit),
+    torment: n(c.torment),
+    image: s(c.image ?? c.bild ?? c.img ?? '') };
+
+}).
+filter((c) => n(c.market_value) > 0);
+
+if (!candidates.length) return [];
+
+// --------------------------------------------------
+// Normalization
+// --------------------------------------------------
+const mmFee = minMax(candidates, 'market_value');
+const mmSal = minMax(candidates, 'salary');
+const mmFit = minMax(candidates, 'fit');
+const mmCore = minMax(candidates, 'core');
+const mmRatio = minMax(candidates, 'ratio');
+const mmGt60 = minMax(candidates, 'gt60');
+const mmGt80 = minMax(candidates, 'gt80');
+const mmPeakPts = minMax(candidates, 'peak_points');
+const mmIdDist = minMax(candidates, 'identity_dist');
+
+const mmPow = minMax(candidates, 'pow');
+const mmSpe = minMax(candidates, 'spe');
+const mmMen = minMax(candidates, 'men');
+const mmSoc = minMax(candidates, 'soc');
+const mmGt20 = minMax(candidates, 'gt20');
+const mmGt40 = minMax(candidates, 'gt40');
+
+// --------------------------------------------------
+// Team ratings -> budget discipline
+// --------------------------------------------------
+const trRows = ({{ formatDataAsArray(getTeamRatingsTransfermarkt.data) }} || []).filter(Boolean);
+
+const tr = trRows?.[0] || {};
+const ambition = clamp(n(tr.ambition) || 5, 1, 10);
+const finances = clamp(n(tr.finances) || 5, 1, 10);
+
+const budgetDiscipline = clamp((finances - 5) / 5, -1, 1);
+const ambitionAggro = clamp((ambition - 5) / 5, -1, 1);
+
+const maxFeeGlobal = Math.max(0, cash * (0.90 + 0.20 * ambitionAggro - 0.25 * budgetDiscipline));
+
+const pool = candidates.filter((c) => c.market_value <= Math.max(1, maxFeeGlobal));
+const usePool = pool.length ? pool : candidates;
+
+// --------------------------------------------------
+// Base score components
+// --------------------------------------------------
+const scoreSkill = (c) => norm01(c.core, mmCore) * 100;
+const scoreFit = (c) => norm01(c.fit, mmFit) * 100;
+
+const scorePeakPoints = (c) => norm01(c.peak_points, mmPeakPts) * 100;
+
+const scorePeak = (c) => (
+0.38 * norm01(c.gt60, mmGt60) +
+0.30 * norm01(c.gt80, mmGt80) +
+0.17 * norm01(c.peak_points, mmPeakPts) +
+0.15 * norm01(c.core, mmCore)) *
+100;
+
+const scoreBreadth = (c) => (
+0.24 * norm01(c.gt20, mmGt20) +
+0.24 * norm01(c.gt40, mmGt40) +
+0.20 * norm01(c.gt60, mmGt60) +
+0.16 * norm01(c.core, mmCore) +
+0.08 * norm01(c.pow, mmPow) +
+0.08 * norm01(c.spe, mmSpe)) *
+100;
+
+const scoreRatio = (c) => norm01(c.ratio, mmRatio) * 100;
+const scoreIdentity = (c) => (1 - norm01(c.identity_dist, mmIdDist)) * 100;
+
+const scoreValue = (c) => {
+  const fee01 = 1 - norm01(c.market_value, mmFee);
+  const sal01 = 1 - norm01(c.salary, mmSal);
+
+  const wSal = clamp(0.60 + 0.05 * finances, 0.35, 0.90);
+  return (fee01 * (1 - wSal) + sal01 * wSal) * 100;
+};
+
+const scoreAxis = (c, axis) => {
+  if (axis === 'pow') return norm01(c.pow, mmPow) * 100;
+  if (axis === 'spe') return norm01(c.spe, mmSpe) * 100;
+  if (axis === 'men') return norm01(c.men, mmMen) * 100;
+  if (axis === 'soc') return norm01(c.soc, mmSoc) * 100;
+  return 0;
+};
+
+const scoreAxisUpgradeVsTeam = (c, axis) => {
+  if (!axis) return 0;
+  const diff =
+  axis === 'pow' ? c.pow - teamAvg.pow :
+  axis === 'spe' ? c.spe - teamAvg.spe :
+  axis === 'men' ? c.men - teamAvg.men :
+  axis === 'soc' ? c.soc - teamAvg.soc :
+  0;
+
+  return clamp(50 + diff * 2.0, 0, 100);
+};
+
+const scoreFormcardFlex = (c) => {
+  const color = s(c.class_color).toLowerCase();
+  if (!color) return 0;
+
+  const gap = colorCoverageGap(color);
+  if (gap <= 0) return 0;
+
+  const isPrimary = primaryColors.includes(color);
+  const isPlayable = playableColors.includes(color);
+
+  let base = isPrimary ? 45 : isPlayable ? 78 : 20;
+  base += gap >= 2 ? 18 : 8;
+  base *= 0.60 + 0.40 * formcardFlexImportance;
+
+  return clamp(base, 0, 100);
+};
+
+const getNeedMode = (need) => {
+  const txt = `${s(need.need_label)} | ${s(need.search_profile_pretty)} | ${s(need.search_profile)}`.toLowerCase();
+  if (txt.includes('peak')) return 'peak';
+  if (txt.includes('depth')) return 'depth';
+  return 'normal';
+};
+
+// Deterministic exploration jitter (stable within run)
+const explorationJitter = (baseScore, bestBaseScore, mode, key) => {
+  const gap = bestBaseScore - baseScore;
+  const closeness01 = clamp(1 - gap / 12, 0, 1);
+
+  const topStability = gap <= 3 ? 0.25 : gap <= 8 ? 0.65 : 1.0;
+  const modeFactor = mode === 'peak' ? 0.85 : mode === 'depth' ? 1.05 : 1.0;
+
+  const amp = 6 * closeness01 * topStability * modeFactor;
+  const centered = rand01ForKey(String(key || 'jit')) - 0.5;
+  return centered * amp;
+};
+
+const rows = [];
+
+for (const need of needs) {
+  const needLabel = s(need.need_label || need.need || need.label);
+  const needType = s(need.need_type || need.type);
+  const imp = n(need.importance_score || 50);
+  const mode = getNeedMode(need);
+
+  const profile = safeJson(need.search_profile || '{}');
+  const axisFocus = s(profile.axis_focus || profile.desired_axis || '').toLowerCase();
+  const desiredColor = s(profile.desired_class_color || '').toLowerCase();
+  const historyMode = s(profile.history_mode || '').toLowerCase();
+
+  // per-need budget cap
+  let budgetMax = cash;
+  if (n(profile.budget_max) > 0) budgetMax = n(profile.budget_max);
+
+  const modeCap =
+  mode === 'peak' ? budgetMax * 1.00 :
+  mode === 'depth' ? budgetMax * 0.70 :
+  budgetMax * 0.85;
+
+  const perNeedPool = usePool.filter((c) => c.market_value <= Math.max(1, modeCap));
+  if (!perNeedPool.length) continue;
+
+  const scored = perNeedPool.map((c) => {
+    const scSkill = scoreSkill(c);
+    const scValue = scoreValue(c);
+    const scFit = scoreFit(c);
+    const scPeak = scorePeak(c);
+    const scBreadth = scoreBreadth(c);
+    const scRatio = scoreRatio(c);
+    const scIdentity = scoreIdentity(c);
+    const scPeakPts = scorePeakPoints(c);
+
+    const scAxis = axisFocus ? scoreAxis(c, axisFocus) : 0;
+    const scAxisUpgrade = axisFocus ? scoreAxisUpgradeVsTeam(c, axisFocus) : 0;
+    const scColorMatch = desiredColor && c.class_color === desiredColor ? 100 : 0;
+    const scFormcardFlex = scoreFormcardFlex(c);
+
+    const W =
+    mode === 'peak' ?
+    { skill: 0.24, peak: 0.30, value: 0.14, fit: 0.15, ratio: 0.08, identity: 0.05 } :
+    mode === 'depth' ?
+    { skill: 0.20, peak: 0.14, value: 0.31, fit: 0.18, ratio: 0.13, identity: 0.04 } :
+    { skill: 0.23, peak: 0.20, value: 0.23, fit: 0.18, ratio: 0.10, identity: 0.04 };
+
+    let total =
+    W.skill * scSkill +
+    W.peak * scPeak +
+    W.value * scValue +
+    W.fit * scFit +
+    W.ratio * scRatio +
+    W.identity * scIdentity;
+
+    total += 0.04 * scPeakPts;
+
+    if (needType === 'axis_upgrade') total += 0.16 * scAxis + 0.14 * scAxisUpgrade;
+    if (needType === 'color_economy') total += 0.14 * scColorMatch + 0.10 * scAxis;
+    if (needType === 'historical_peak_opportunity') total += 0.14 * scPeakPts + 0.10 * scPeak;
+    if (needType === 'historical_breadth_opportunity') total += 0.14 * scBreadth + 0.06 * scSkill;
+
+    if (historyMode === 'peak') total += 0.06 * scPeakPts + 0.04 * scPeak;
+    if (historyMode === 'breadth') total += 0.06 * scBreadth;
+
+    const feeUsage = cash > 0 ? c.market_value / cash : 1;
+
+    const depthValueBlend =
+    0.38 * scValue +
+    0.28 * scFit +
+    0.18 * scRatio +
+    0.16 * scSkill;
+
+    total += thinRosterPressure * 0.16 * depthValueBlend;
+
+    if (feeUsage <= 0.22) total += thinRosterPressure * 8;else
+    if (feeUsage <= 0.32) total += thinRosterPressure * 5;else
+    if (feeUsage <= 0.45) total += thinRosterPressure * 2;
+
+    if (feeUsage >= 0.70) total -= thinRosterPressure * 10;else
+    if (feeUsage >= 0.55) total -= thinRosterPressure * 6;
+
+    total += (0.04 + 0.06 * formcardFlexImportance) * scFormcardFlex;
+
+    total *= 0.94 + clamp((imp - 50) / 100, -0.10, 0.18);
+
+    const usage = cash > 0 ? c.market_value / cash : 1;
+    const usagePenalty = usage <= 0.45 ? 0 : usage <= 0.70 ? 4 : usage <= 0.90 ? 10 : 18;
+
+    return {
+      ...c,
+      __base: total - usagePenalty,
+      __parts: {
+        scSkill,
+        scPeak,
+        scBreadth,
+        scValue,
+        scFit,
+        scRatio,
+        scIdentity,
+        scPeakPts,
+        scAxis,
+        scAxisUpgrade,
+        scColorMatch,
+        scFormcardFlex,
+        usagePenalty } };
+
+
+  });
+
+  const bestBase = Math.max(...scored.map((x) => n(x.__base)));
+
+  const ranked = scored.
+  map((c) => {
+    const jitKey = `jit.v1|${team}|${seedState?.runId ?? ''}|${needType}|${c.name}`;
+    const jit = explorationJitter(n(c.__base), bestBase, mode, jitKey);
+    return { ...c, __sc: n(c.__base) + jit, __jitter: jit };
+  }).
+  sort((a, b) => n(b.__sc) - n(a.__sc)).
+  slice(0, 8);
+
+  ranked.forEach((c, idx) => {
+    const fee = n(c.market_value);
+    const remaining = cash - fee;
+
+    const budget_status =
+    fee <= cash ?
+    fee <= cash * 0.70 ?
+    'feasible' :
+    'top plan' :
+    'not feasible now';
+
+    rows.push({
+      pick_id: `${team}::${needType}::${c.name}::${idx + 1}`,
+      need_label: needLabel,
+      need_type: needType,
+      target_rank: idx + 1,
+      player_name: c.name,
+      current_team: c.current_team,
+      market_value: Number(fee.toFixed(2)),
+      salary: Number(n(c.salary).toFixed(2)),
+      salary_nominal: Number(n(c.salary_nominal).toFixed(2)),
+      fit: Number(n(c.fit).toFixed(1)),
+      klasse: s(c.klasse),
+      class_color: s(c.class_color),
+      rasse: s(c.rasse),
+      subclass1: s(c.subclass1),
+      subclass2: s(c.subclass2),
+      subclass3: s(c.subclass3),
+      pow: Number(n(c.pow).toFixed(0)),
+      spe: Number(n(c.spe).toFixed(0)),
+      men: Number(n(c.men).toFixed(0)),
+      soc: Number(n(c.soc).toFixed(0)),
+      count_gt20: Number(n(c.gt20)),
+      count_gt40: Number(n(c.gt40)),
+      count_gt60: Number(n(c.gt60)),
+      count_gt80: Number(n(c.gt80)),
+      image: s(c.image),
+
+      shortlist_score: Number(n(c.__sc).toFixed(1)),
+      score_total: Number(n(c.__sc).toFixed(1)),
+      score_skill: Number(n(c.__parts.scSkill).toFixed(1)),
+      score_value: Number(n(c.__parts.scValue).toFixed(1)),
+      score_peak: Number(n(c.__parts.scPeak).toFixed(1)),
+      score_breadth: Number(n(c.__parts.scBreadth).toFixed(1)),
+      score_fit: Number(n(c.__parts.scFit).toFixed(1)),
+      score_identity: Number(n(c.__parts.scIdentity).toFixed(1)),
+      score_ratio: Number(n(c.__parts.scRatio).toFixed(1)),
+      score_axis: Number(n(c.__parts.scAxis).toFixed(1)),
+      score_axis_upgrade: Number(n(c.__parts.scAxisUpgrade).toFixed(1)),
+      score_color_match: Number(n(c.__parts.scColorMatch).toFixed(1)),
+      score_formcard_flex: Number(n(c.__parts.scFormcardFlex).toFixed(1)),
+      score_peak_gt60: Number((norm01(c.gt60, mmGt60) * 100).toFixed(1)),
+      score_peak_gt80: Number((norm01(c.gt80, mmGt80) * 100).toFixed(1)),
+      score_peak_points: Number(n(c.__parts.scPeakPts).toFixed(1)),
+
+      roster_size: rosterSize,
+      thin_roster_pressure: Number(thinRosterPressure.toFixed(2)),
+
+      primary_need_type: needType,
+      primary_need: needLabel,
+      remaining_cash_after_pick: Number(remaining.toFixed(2)),
+      budget_status,
+
+      health: Number(n(c.health).toFixed(0)),
+      stamina: Number(n(c.stamina).toFixed(0)),
+      intelligence: Number(n(c.intelligence).toFixed(0)),
+      awareness: Number(n(c.awareness).toFixed(0)),
+      determination: Number(n(c.determination).toFixed(0)),
+      dexterity: Number(n(c.dexterity).toFixed(0)),
+      charisma: Number(n(c.charisma).toFixed(0)),
+      will: Number(n(c.will).toFixed(0)),
+      spirit: Number(n(c.spirit).toFixed(0)),
+      torment: Number(n(c.torment).toFixed(0)),
+
+      reason_short:
+      `mode:${mode}` +
+      ` · Skill:${c.__parts.scSkill.toFixed(0)}` +
+      ` · Peak:${c.__parts.scPeak.toFixed(0)}` +
+      ` · Breadth:${c.__parts.scBreadth.toFixed(0)}` +
+      ` · PeakPts:${c.__parts.scPeakPts.toFixed(0)}` +
+      ` · Value:${c.__parts.scValue.toFixed(0)}` +
+      ` · Fit:${c.__parts.scFit.toFixed(0)}` +
+      ` · Id:${c.__parts.scIdentity.toFixed(0)}` +
+      ` · Ratio:${c.__parts.scRatio.toFixed(0)}` +
+      ` · Axis:${c.__parts.scAxis.toFixed(0)}` +
+      ` · AxisUp:${c.__parts.scAxisUpgrade.toFixed(0)}` +
+      ` · Color:${c.__parts.scColorMatch.toFixed(0)}` +
+      ` · FCFlex:${c.__parts.scFormcardFlex.toFixed(0)}` +
+      ` · jit:${n(c.__jitter).toFixed(1)}` +
+      ` · salEff:${n(c.salary).toFixed(2)}` +
+      `${n(c.fit) > 25 && n(c.salary_nominal) > 0 ? ` (nom:${n(c.salary_nominal).toFixed(2)})` : ''}` +
+      ` · usagePen:${c.__parts.usagePenalty}` });
+
+  });
+}
+
+return rows.sort((a, b) => {
+  if (s(a.need_label) !== s(b.need_label)) return s(a.need_label).localeCompare(s(b.need_label));
+  return n(b.shortlist_score) - n(a.shortlist_score);
+});

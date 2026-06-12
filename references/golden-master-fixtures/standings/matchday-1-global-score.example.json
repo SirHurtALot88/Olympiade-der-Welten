@@ -1,0 +1,29 @@
+{
+  "source": "retool_or_sheet",
+  "capturedAt": "TODO_RETOOL_OR_SHEET_EXPORT_REQUIRED",
+  "saveId": "TODO_RETOOL_OR_SHEET_EXPORT_REQUIRED",
+  "seasonId": "TODO_RETOOL_OR_SHEET_EXPORT_REQUIRED",
+  "matchdayId": "matchday-1",
+  "inputs": {
+    "exportIntent": "global_total_score_ranking"
+  },
+  "outputs": {
+    "status": "TODO_RETOOL_OR_SHEET_EXPORT_REQUIRED",
+    "teams": [
+      {
+        "teamId": "TODO_RETOOL_OR_SHEET_EXPORT_REQUIRED",
+        "teamName": "TODO_RETOOL_OR_SHEET_EXPORT_REQUIRED",
+        "matchdayRank": "TODO_RETOOL_OR_SHEET_EXPORT_REQUIRED",
+        "d1Score": "TODO_RETOOL_OR_SHEET_EXPORT_REQUIRED",
+        "d2Score": "TODO_RETOOL_OR_SHEET_EXPORT_REQUIRED",
+        "totalScore": "TODO_RETOOL_OR_SHEET_EXPORT_REQUIRED"
+      }
+    ]
+  },
+  "notes": [
+    "Keine Fake-Werte eintragen.",
+    "Diese Datei braucht den echten globalen Matchday-Score-Export aller Teams."
+  ],
+  "ignoredFields": [],
+  "toleratedFloatDelta": 0
+}

@@ -1,0 +1,29 @@
+{
+  "source": "retool",
+  "capturedAt": "TODO_RETOOL_EXPORT_REQUIRED",
+  "saveId": null,
+  "seasonId": "TODO_RETOOL_EXPORT_REQUIRED",
+  "matchdayId": null,
+  "inputs": {
+    "exportIntent": "prize_money_table",
+    "requiredScope": "season_end_prize_definition"
+  },
+  "outputs": {
+    "status": "TODO_RETOOL_EXPORT_REQUIRED",
+    "rows": [
+      {
+        "placement": "TODO_RETOOL_EXPORT_REQUIRED",
+        "prizeMoney": "TODO_RETOOL_EXPORT_REQUIRED",
+        "bonus": "TODO_RETOOL_EXPORT_REQUIRED",
+        "malus": "TODO_RETOOL_EXPORT_REQUIRED",
+        "notes": "TODO_RETOOL_EXPORT_REQUIRED"
+      }
+    ]
+  },
+  "notes": [
+    "Diese Datei soll die echte Retool-Preisgeldstaffel enthalten.",
+    "Wenn Retool mehrere Tabellen oder Liga-Varianten nutzt, muessen sie hier explizit auftauchen."
+  ],
+  "ignoredFields": [],
+  "toleratedFloatDelta": 0
+}

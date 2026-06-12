@@ -1,0 +1,48 @@
+# dependencies
+node_modules/
+
+# Next.js / build output
+.next/
+.next-dev/
+.turbo/
+out/
+dist/
+build/
+coverage/
+
+# local runtime data and generated reports
+tmp/
+test-results/
+playwright-report/
+outputs/
+
+# local databases / saves
+*.sqlite
+*.sqlite3
+*.db
+*.db-journal
+data/local-dev.sqlite
+data/persistence/
+data/persistence/*.sqlite
+
+# environment files with secrets
+.env
+.env.*
+!.env.example
+!.env.reference.example
+
+# TypeScript / logs
+*.tsbuildinfo
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+
+# OS / editor
+.DS_Store
+.idea/
+.vscode/
+
+# Codex scratch artifacts
+.codex-temp-*

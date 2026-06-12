@@ -1,0 +1,205 @@
+// term: aiTeamNeeds
+// id: validateAiTeamNeedsThinRoster
+// type: datasource
+// subtype: JavascriptQuery
+// page: transfermarktPage
+// folder: unknown
+// updatedAt: unknown
+// codeField: funcBody
+// dependencies: finalPickRecommendationsDisplay.value | getCashFromSaisonstand.value
+// extractionStatus: complete_or_primary_match
+// Canonical final ordering for Final Pick Recommendations.
+// Goal: eliminate inconsistencies between Rank, Final Total, and Tier.
+//
+// Rules implemented:
+// 1) Exactly one canonical sort key: final_total_raw
+// 2) Sort strictly DESC by final_total_raw
+// 3) Recompute rank AFTER sorting: final_rank = index + 1, and also overwrite rank
+// 4) Provide display rounding: final_total_display
+// 5) Tier is derived from the *final* score (and mildly aware of affordability)
+// 6) Expose requested debug fields
+//
+// NOTE (tiering): Tier is computed *after* ordering. We do NOT change ordering.
+// Tier bands are relative-to-top + rank bands + affordability modulation.
+
+const rows = Array.isArray({{ finalPickRecommendationsDisplay.value }}) ? {{ finalPickRecommendationsDisplay.value }} : [];
+if (!rows.length) return [];
+
+const n = (v) => Number.isFinite(Number(v)) ? Number(v) : 0;
+const s = (v) => String(v ?? '').trim();
+const clamp = (v, lo, hi) => Math.max(lo, Math.min(hi, v));
+
+// Canonical score key
+const final_total_raw = (r) => {
+  // Prefer final_total_score; fall back only if missing.
+  const v = r?.final_total_score;
+  if (Number.isFinite(Number(v))) return Number(v);
+  const alt = r?.shortlist_score ?? r?.score_total ?? r?.score;
+  return n(alt);
+};
+
+// Budget context (for debug + tier modulation)
+const cash = n({{ getCashFromSaisonstand.value }}?.cash);
+
+const fee = (r) => n(r?.mw ?? r?.market_value ?? r?.marktwert ?? r?.MW);
+
+const affordability_signal = (r) => {
+  const price = fee(r);
+  if (!(cash > 0) || !(price > 0)) return 'unknown';
+  if (price <= cash * 0.55) return 'easy';
+  if (price <= cash * 0.78) return 'ok';
+  if (price <= cash) return 'stretch';
+  return 'not_payable';
+};
+
+// ------------------------------------------------------------
+// Tier logic (relative + rank + affordability modulation)
+// ------------------------------------------------------------
+
+const TIER_RANK = { 'S+': 7, S: 6, A: 5, B: 4, C: 3, D: 2, E: 1, F: 0 };
+const tierRank = (tier) => TIER_RANK[String(tier || '').toUpperCase()] ?? 0;
+const tierByRank = (rk) => rk >= 7 ? 'S+' : rk >= 6 ? 'S' : rk >= 5 ? 'A' : rk >= 4 ? 'B' : rk >= 3 ? 'C' : rk >= 2 ? 'D' : rk >= 1 ? 'E' : 'F';
+
+const bumpDownOne = (tier) => tierByRank(tierRank(tier) - 1);
+
+// Cash context buckets (for debug + modulation)
+const cash_bucket = (() => {
+  if (!(cash > 0)) return 'unknown';
+  if (cash >= 200) return 'very_high';
+  if (cash >= 150) return 'high';
+  if (cash >= 95) return 'mid';
+  return 'low';
+})();
+
+// Rich teams are allowed to chase expensive players with less tier penalty
+const rich = cash_bucket === 'very_high' || cash_bucket === 'high';
+
+// positional args to avoid transformer type inference issues
+const tierFromBands = (rel, finalRank, afford, score) => {
+  const r = Number(rel);
+  const rank = Number(finalRank);
+
+  // If we can't compute relative score, fall back to stable absolute (old) thresholds.
+  if (!Number.isFinite(r) || r <= 0) {
+    let t = 'F';
+    const v = n(score);
+    if (v >= 114) t = 'S+';else
+    if (v >= 108) t = 'S';else
+    if (v >= 102) t = 'A';else
+    if (v >= 96) t = 'B';else
+    if (v >= 90) t = 'C';else
+    if (v >= 84) t = 'D';else
+    if (v >= 78) t = 'E';
+
+    return { tier: t, reason: 'Fallback abs score band (no rel_to_top)' };
+  }
+
+  // Base tier from relative-to-top + rank slot
+  // (Sketch: S+ >=0.97 + affordable + rank<=2; S >=0.92 + affordable + rank<=5; etc.)
+  let tier = 'F';
+  let baseReason = '';
+
+  const affOk = afford === 'easy' || afford === 'ok' || rich && afford === 'stretch';
+
+  if (r >= 0.97 && rank <= 2 && affOk) {
+    tier = 'S+';
+    baseReason = `Top ${rank} & ≥97% of best`;
+  } else if (r >= 0.92 && rank <= 5 && affOk) {
+    tier = 'S';
+    baseReason = `Top ${rank} & ≥92% of best`;
+  } else if (r >= 0.87 && rank <= 8) {
+    tier = 'A';
+    baseReason = 'Strong band (≥87% of best)';
+  } else if (r >= 0.82 && rank <= 12) {
+    tier = 'B';
+    baseReason = 'Good band (≥82% of best)';
+  } else if (r >= 0.76) {
+    tier = 'C';
+    baseReason = 'Playable (≥76% of best)';
+  } else if (r >= 0.70) {
+    tier = 'D';
+    baseReason = 'Longshot (≥70% of best)';
+  } else if (r >= 0.62) {
+    tier = 'E';
+    baseReason = 'Deep option (≥62% of best)';
+  } else {
+    tier = 'F';
+    baseReason = 'Below band (<62% of best)';
+  }
+
+  // Affordability modulation: at most one grade penalty, and only when NOT rich.
+  let modReason = '';
+  if (!rich) {
+    if (afford === 'not_payable') {
+      tier = bumpDownOne(tier);
+      modReason = 'Not payable → -1 tier';
+    } else if (afford === 'stretch') {
+      tier = bumpDownOne(tier);
+      modReason = 'Budget stretch → -1 tier';
+    }
+  }
+
+  // Small sanity: if rank==1 and r very high, don't drop below B even if stretch/not_payable.
+  if (rank === 1 && r >= 0.95 && tierRank(tier) < tierRank('B')) {
+    tier = 'B';
+    modReason = modReason ? modReason + ' (floored at B for #1)' : 'Floored at B for #1';
+  }
+
+  const reason = [baseReason, modReason].filter(Boolean).join(' · ');
+  return { tier, reason };
+};
+
+// Strict canonical sorting
+const sorted = [...rows].sort((a, b) => {
+  const d = final_total_raw(b) - final_total_raw(a);
+  if (d !== 0) return d;
+  // Stable tie-breakers (do NOT override canonical ordering; only for identical scores)
+  return n(b?.fit ?? b?.team_fit) - n(a?.fit ?? a?.team_fit) || fee(a) - fee(b);
+});
+
+const bestScore = final_total_raw(sorted[0]);
+
+// Re-rank and attach debug fields
+return sorted.map((r, idx) => {
+  const raw = final_total_raw(r);
+  const display = Number(raw.toFixed(2));
+  const aff = affordability_signal(r);
+
+  const relative_to_top = bestScore > 0 ? clamp(raw / bestScore, 0, 1) : null;
+
+  const tierObj = tierFromBands(relative_to_top, idx + 1, aff, raw);
+  const tier_final = tierObj.tier;
+  const tier_reason_short = tierObj.reason;
+
+  const cash_context = {
+    cash: Number(cash.toFixed(2)),
+    cash_bucket,
+    allowed_budget_for_search: Number(n(r?.allowed_budget_for_search).toFixed?.(2) ?? n(r?.allowed_budget_for_search)),
+    finance_posture_cap: Number(n(r?.finance_posture_cap).toFixed?.(2) ?? n(r?.finance_posture_cap)) };
+
+
+  return {
+    ...r,
+
+    // canonical output ordering + fields
+    final_total_raw: Number(raw.toFixed(6)),
+    final_total_display: display,
+    final_rank: idx + 1,
+    relative_to_top,
+
+    // keep UI compatible
+    rank: idx + 1,
+    final_total_score: display,
+
+    // tier derived from final state
+    tier_final,
+    recommendation_tier: tier_final,
+    tier_reason_short,
+
+    // debug fields requested
+    player_name: s(r?.player_name || r?.player || r?.name),
+    cash_context,
+    affordability_signal: aff,
+    sort_key_used: 'final_total_raw' };
+
+});

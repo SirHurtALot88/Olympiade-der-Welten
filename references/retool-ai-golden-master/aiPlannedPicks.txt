@@ -1,0 +1,1427 @@
+// term: aiTeamNeeds
+// id: aiPlannedPicks
+// type: function
+// subtype: Function
+// page: transfermarktPage
+// folder: unknown
+// updatedAt: unknown
+// codeField: funcBody
+// dependencies: aiTeamPlan.value | aiTeamSlotPlan.value | filterTeam.value | aiTransferCandidatePool.value | aiTeamNeedsSnapshot.value | aiTeamNeedsQuery.data | aiVarianceConfig.value | bracketConfig.value | getActivePlayersByTeam.data
+// extractionStatus: complete_or_primary_match
+return (() => {
+  // aiPlannedPicks v4.3_hotfix
+  // Unified planning chain:
+  // aiTeamPlan -> aiTeamSlotPlan -> aiTeamNeeds -> aiPlannedPicks
+  //
+  // Improvements:
+  // - stable object output instead of silent []
+  // - robust slot_plan coercion / fallback
+  // - fallback needs if aiTeamNeeds is empty
+  // - active lane / budget fallback handling
+  // - hard affordability guard
+  // - sequential need re-evaluation
+  // - better debug fields
+
+  const n = (v) => Number.isFinite(Number(v)) ? Number(v) : 0;
+  const s = (v) => String(v ?? '').trim();
+  const lower = (v) => String(v ?? '').trim().toLowerCase();
+  const clamp = (v, lo, hi) => Math.max(lo, Math.min(hi, v));
+
+  const hashStr = (input) => {
+    const str = String(input ?? '');
+    let h = 2166136261;
+    for (let i = 0; i < str.length; i++) {
+      h ^= str.charCodeAt(i);
+      h += (h << 1) + (h << 4) + (h << 7) + (h << 8) + (h << 24);
+    }
+    return h >>> 0;
+  };
+
+  const rand01FromKey = (key) => {
+    const h = hashStr(key);
+    return (h % 1000000) / 1000000;
+  };
+
+  const safeJson = (v) => {
+    if (v && typeof v === 'object') return v;
+    try {
+      return JSON.parse(String(v || '{}'));
+    } catch (e) {
+      return {};
+    }
+  };
+
+  const fmtM = (x) => {
+    const v = n(x);
+    return Number.isFinite(v) ? v.toFixed(2) + 'M' : '—';
+  };
+
+  const quantile = (arr, q) => {
+    const xs = [...arr]
+      .map((x) => n(x))
+      .filter((x) => x > 0)
+      .sort((a, b) => a - b);
+
+    if (!xs.length) return 0;
+    if (xs.length === 1) return xs[0];
+
+    const pos = (xs.length - 1) * clamp(q, 0, 1);
+    const base = Math.floor(pos);
+    const rest = pos - base;
+
+    if (xs[base + 1] == null) return xs[base];
+    return xs[base] + rest * (xs[base + 1] - xs[base]);
+  };
+
+  // ------------------------------------------------------------
+  // Base inputs
+  // ------------------------------------------------------------
+  const plan = {{ aiTeamPlan.value }};
+  const slotPlanObj = {{ aiTeamSlotPlan.value }};
+  const filterTeamValue = {{ filterTeam.value }};
+
+  const rawCandidates = Array.isArray({{ aiTransferCandidatePool.value }})
+    ? {{ aiTransferCandidatePool.value }}
+    : [];
+
+  const aiNeedsSnapshotRaw = {{ aiTeamNeedsSnapshot.value }};
+  const aiNeedsQueryRaw = {{ aiTeamNeedsQuery.data }};
+  const aiVarianceCfg = {{ aiVarianceConfig.value }} || {};
+  const bracketCfg = {{ bracketConfig.value }} || {};
+
+  const rosterRaw = (
+    typeof formatDataAsArray === 'function'
+      ? formatDataAsArray({{ getActivePlayersByTeam.data }}) || []
+      : {{ getActivePlayersByTeam.data }} || []
+  );
+
+  const baseRoster = Array.isArray(rosterRaw) ? rosterRaw.filter(Boolean) : [];
+  const team = s(plan?.team || filterTeamValue || '');
+
+  const emptyResult = (reason = '', extra = {}) => ({
+    version: 'aiPlannedPicks.v4.3_hotfix',
+    team,
+    avg_slot_budget: n(plan?.avg_slot_budget),
+    active_lanes: Array.isArray(plan?.active_lanes) ? plan.active_lanes : [],
+    slot_plan_used: [],
+    slots_simulated: 0,
+    budget_start: Number(n(plan?.allowed_budget_for_search).toFixed(2)),
+    budget_remaining: Number(n(plan?.allowed_budget_for_search).toFixed(2)),
+    needs_rows_used: 0,
+    used_needs_fallback: false,
+    needs_source: 'none',
+    reason,
+    picks: [],
+    ...extra
+  });
+
+  if (!plan || !team) {
+    return emptyResult('missing_plan_or_team');
+  }
+
+  if (!rawCandidates.length) {
+    return emptyResult('empty_candidate_pool');
+  }
+
+  // ------------------------------------------------------------
+  // Helpers
+  // ------------------------------------------------------------
+  const classToAxis = {
+    Berserker: 'pow', Warlord: 'pow', Tank: 'pow',
+    Sprinter: 'spe', Rogue: 'spe', Charger: 'spe',
+    Mage: 'men', Overseer: 'men', Templar: 'men',
+    Bard: 'soc', Hero: 'soc', Badass: 'soc', Tactician: 'men'
+  };
+
+  const classToColor = {
+    Berserker: 'red', Warlord: 'red', Tank: 'red',
+    Sprinter: 'green', Rogue: 'green', Charger: 'green',
+    Mage: 'blue', Overseer: 'blue', Templar: 'blue',
+    Bard: 'yellow', Hero: 'yellow', Badass: 'yellow', Tactician: 'yellow'
+  };
+
+  const classToAxisLower = Object.fromEntries(
+    Object.entries(classToAxis).map(([k, v]) => [lower(k), v])
+  );
+  const classToColorLower = Object.fromEntries(
+    Object.entries(classToColor).map(([k, v]) => [lower(k), v])
+  );
+
+  const axisOfClass = (klasse) => {
+    const k = s(klasse);
+    if (!k) return '';
+    return classToAxis[k] || classToAxisLower[lower(k)] || '';
+  };
+
+  const colorOfClass = (klasse) => {
+    const k = s(klasse);
+    if (!k) return '';
+    return classToColor[k] || classToColorLower[lower(k)] || '';
+  };
+
+  const getAxis = (c) =>
+    axisOfClass(c?.klasse || c?.Klasse || c?.__raw?.klasse || c?.__raw?.Klasse || '');
+
+  const getColor = (c) =>
+    colorOfClass(c?.klasse || c?.Klasse || c?.__raw?.klasse || c?.__raw?.Klasse || '');
+
+  const getBracketFromMw = (mw) => {
+    const x = n(mw);
+    const fn = bracketCfg?.getBracket;
+    const br = typeof fn === 'function' ? n(fn(x)) : null;
+    return Number.isFinite(br) && br >= 1 ? br : null;
+  };
+
+  const getPlayerBracket = (c) => {
+    const raw = c?.Bracket ?? c?.bracket ?? c?.bracket_id ?? null;
+    const parsed = n(raw);
+    if (parsed >= 1) return parsed;
+
+    const mw = n(c?.marktwert ?? c?.market_value ?? c?.mw ?? c?.MW ?? 0);
+    return getBracketFromMw(mw);
+  };
+
+  const preferredBracketWindow = (track) => {
+    const t = lower(track);
+    if (t === 'star') return { min: 7, max: 8 };
+    if (t === 'core') return { min: 4, max: 6 };
+    if (t === 'depth') return { min: 2, max: 4 };
+    if (t === 'diszi') return { min: 3, max: 6 };
+    if (t === 'reserve') return { min: 1, max: 3 };
+    return { min: 2, max: 4 };
+  };
+
+  const computeBracketFitScore = (playerBracket, prefMin, prefMax) => {
+    const br = n(playerBracket);
+    const lo = n(prefMin);
+    const hi = n(prefMax);
+
+    if (!br || !lo || !hi) return 0;
+    if (br >= lo && br <= hi) return 5;
+    if (br === lo - 1 || br === hi + 1) return 2;
+
+    const dist = br < lo ? lo - br : br - hi;
+    if (dist === 2) return -3;
+    if (dist >= 3) return -5;
+    return 0;
+  };
+
+  const getBestDiszi = (c) => {
+    const disziScores = c?.diszi_attr_scores || {};
+    let best = '';
+    let bestVal = -Infinity;
+
+    for (const [d, v] of Object.entries(disziScores)) {
+      const nv = n(v);
+      if (nv > bestVal) {
+        bestVal = nv;
+        best = lower(d);
+      }
+    }
+
+    return best;
+  };
+
+  const getDisziScore = (c, disziField) => {
+    if (!disziField) return 0;
+    const d = lower(disziField);
+
+    const fromObj = n(c?.diszi_attr_scores?.[d]);
+    if (fromObj > 0) return fromObj;
+
+    const direct = n(c?.[d]);
+    if (direct > 0) return direct;
+
+    const alt = n(c?.[String(d).replace(/_/g, '')]);
+    if (alt > 0) return alt;
+
+    return 0;
+  };
+
+  const getPeakScore = (c) => {
+    const gt60 = n(c?.count_gt60 || c?.gt60 || 0);
+    const gt80 = n(c?.count_gt80 || c?.gt80 || 0);
+    const peakPts = n(c?.peak_points || 0);
+    return gt80 * 2 + gt60 * 0.8 + peakPts * 0.3;
+  };
+
+  const getVersatilityScore = (c) => {
+    const obj = c?.diszi_attr_scores || {};
+    const vals = Object.values(obj).map((x) => n(x)).filter((x) => x > 0);
+    if (!vals.length) return 0;
+
+    const gt70 = vals.filter((x) => x >= 70).length;
+    const gt60 = vals.filter((x) => x >= 60).length;
+    const avgTop3 =
+      vals.slice().sort((a, b) => b - a).slice(0, 3).reduce((a, b) => a + b, 0) /
+      Math.max(1, Math.min(3, vals.length));
+
+    return gt70 * 8 + gt60 * 3 + avgTop3 * 0.12;
+  };
+
+  const candidateCore = (c) => {
+    const pow = n(c?.pow || c?.attr_power || 0);
+    const spe = n(c?.spe || c?.attr_speed || 0);
+    const men = n(c?.men || c?.attr_intelligence || 0);
+    const soc = n(c?.soc || c?.attr_charisma || 0);
+    return { pow, spe, men, soc, core: (pow + spe + men + soc) / 4 };
+  };
+
+  const disciplineKeys = [
+    'mini_dm', 'time_trial', 'i_spy',
+    'tdm', 'gewichtheben', 'hockey', 'breaking',
+    'staffel', 'spurt', 'climbing', 'fechten',
+    'schach', 'takeshi', 'tennis', 'wettessen',
+    'basketball', 'football', 'battlefield', 'eiskunst', 'showcase'
+  ];
+
+  // ------------------------------------------------------------
+  // Slot plan coercion
+  // ------------------------------------------------------------
+  const buildSlotPlanFallbackFromCounts = (srcPlan) => {
+    const arr = [];
+
+    const pushMany = (role, count) => {
+      const c = Math.max(0, Math.round(n(count)));
+      for (let i = 0; i < c; i++) arr.push(String(role));
+    };
+
+    pushMany('star', srcPlan?.star_slots_remaining);
+    pushMany('core', srcPlan?.core_slots_remaining);
+    pushMany('diszi', srcPlan?.diszi_slots_remaining);
+    pushMany('depth', srcPlan?.depth_slots_remaining);
+    pushMany('reserve', srcPlan?.reserve_slots_remaining);
+
+    const target = Math.max(
+      0,
+      Math.round(
+        n(srcPlan?.slots_max || 0) ||
+        n(srcPlan?.planned_buys_now || 0) ||
+        arr.length
+      )
+    );
+
+    while (arr.length > target) arr.pop();
+    while (arr.length < target) arr.push('depth');
+
+    return arr;
+  };
+
+  const coerceSlotPlan = (src, srcPlan) => {
+    if (Array.isArray(src)) return src.map((x) => String(x));
+    if (Array.isArray(src?.slot_plan)) return src.slot_plan.map((x) => String(x));
+    if (Array.isArray(src?.data)) return src.data.map((x) => String(x));
+
+    if (src && typeof src === 'object') {
+      const numericKeys = Object.keys(src)
+        .filter((k) => /^\d+$/.test(String(k)))
+        .map((k) => Number(k))
+        .sort((a, b) => a - b);
+
+      if (numericKeys.length) {
+        return numericKeys.map((k) => String(src[k]));
+      }
+    }
+
+    return buildSlotPlanFallbackFromCounts(srcPlan);
+  };
+
+  const slotPlanRaw = coerceSlotPlan(slotPlanObj, plan);
+  const slots_max = Math.max(
+    0,
+    Math.round(
+      n(plan?.slots_max || 0) ||
+      n(plan?.planned_buys_now || 0) ||
+      n(slotPlanRaw.length || 0)
+    )
+  );
+
+  const slotPlan = slotPlanRaw.slice(0, slots_max);
+  while (slotPlan.length < slots_max) slotPlan.push('depth');
+
+  if (slots_max <= 0) {
+    return emptyResult('no_slots_to_simulate', {
+      slot_plan_used: slotPlan
+    });
+  }
+
+  const slotPlanCounts = slotPlan.reduce((acc, role) => {
+    const r = lower(role);
+    acc[r] = (acc[r] || 0) + 1;
+    return acc;
+  }, { star: 0, core: 0, depth: 0, reserve: 0, diszi: 0 });
+
+  // ------------------------------------------------------------
+  // Need rows coercion / fallback
+  // ------------------------------------------------------------
+  const coerceNeedRows = (src) => {
+    if (Array.isArray(src)) return src;
+    if (Array.isArray(src?.needs)) return src.needs;
+    if (Array.isArray(src?.data)) return src.data;
+    return [];
+  };
+
+  const buildFallbackNeedRowsFromPlan = (srcPlan, roster) => {
+    const rows = [];
+
+    const rosterAxisCounts = { pow: 0, spe: 0, men: 0, soc: 0 };
+    const rosterColorCounts = { red: 0, green: 0, blue: 0, yellow: 0 };
+
+    for (const p of Array.isArray(roster) ? roster : []) {
+      const ax = getAxis(p);
+      const col = getColor(p);
+      if (ax && rosterAxisCounts[ax] != null) rosterAxisCounts[ax] += 1;
+      if (col && rosterColorCounts[col] != null) rosterColorCounts[col] += 1;
+    }
+
+    const axisCountsFromPlan = {
+      pow: n(srcPlan?.pow || rosterAxisCounts.pow || 0),
+      spe: n(srcPlan?.spe || rosterAxisCounts.spe || 0),
+      men: n(srcPlan?.men || rosterAxisCounts.men || 0),
+      soc: n(srcPlan?.soc || rosterAxisCounts.soc || 0)
+    };
+
+    const colorCountsFromPlan = {
+      red: n(srcPlan?.red || rosterColorCounts.red || 0),
+      green: n(srcPlan?.green || rosterColorCounts.green || 0),
+      blue: n(srcPlan?.blue || rosterColorCounts.blue || 0),
+      yellow: n(srcPlan?.yellow || rosterColorCounts.yellow || 0)
+    };
+
+    const weakestAxes = Object.entries(axisCountsFromPlan)
+      .sort((a, b) => n(a[1]) - n(b[1]))
+      .map(([k]) => k);
+
+    const weakestColors = Object.entries(colorCountsFromPlan)
+      .sort((a, b) => n(a[1]) - n(b[1]))
+      .map(([k]) => k);
+
+    const explicitAxes = [
+      lower(srcPlan?.primary_axis_need || ''),
+      lower(srcPlan?.secondary_axis_need || '')
+    ].filter((x) => ['pow', 'spe', 'men', 'soc'].includes(x));
+
+    const explicitColors = [
+      lower(srcPlan?.primary_color_need || ''),
+      lower(srcPlan?.primary_card_need || '')
+    ].filter((x) => ['red', 'green', 'blue', 'yellow'].includes(x));
+
+    const explicitDiszi = lower(srcPlan?.primary_diszi_need || '');
+
+    const chosenAxes = Array.from(new Set([
+      ...explicitAxes,
+      ...weakestAxes.slice(0, 2)
+    ])).slice(0, 2);
+
+    const chosenColors = Array.from(new Set([
+      ...explicitColors,
+      ...weakestColors.slice(0, 2)
+    ])).slice(0, 2);
+
+    if (explicitDiszi) {
+      rows.push({
+        need_type: 'discipline_hole',
+        need_label: `Fallback discipline ${explicitDiszi}`,
+        importance_score: 76,
+        search_profile: { target_discipline_field: explicitDiszi }
+      });
+    }
+
+    if (chosenAxes[0]) {
+      rows.push({
+        need_type: 'axis_upgrade',
+        need_label: `Fallback axis ${chosenAxes[0]}`,
+        importance_score: 72,
+        search_profile: { axis_focus: chosenAxes[0] }
+      });
+    }
+
+    if (chosenAxes[1]) {
+      rows.push({
+        need_type: 'axis_upgrade',
+        need_label: `Fallback secondary axis ${chosenAxes[1]}`,
+        importance_score: 60,
+        search_profile: { axis_focus: chosenAxes[1] }
+      });
+    }
+
+    if (chosenColors[0]) {
+      rows.push({
+        need_type: 'color_economy',
+        need_label: `Fallback color ${chosenColors[0]}`,
+        importance_score: 60,
+        search_profile: { desired_class_color: chosenColors[0] }
+      });
+    }
+
+    if (chosenColors[1]) {
+      rows.push({
+        need_type: 'color_economy',
+        need_label: `Fallback secondary color ${chosenColors[1]}`,
+        importance_score: 48,
+        search_profile: { desired_class_color: chosenColors[1] }
+      });
+    }
+
+    rows.push({
+      need_type: 'historical_peak_opportunity',
+      need_label: 'Fallback peak',
+      importance_score: 54,
+      search_profile: {}
+    });
+
+    rows.push({
+      need_type: 'historical_breadth_opportunity',
+      need_label: 'Fallback breadth',
+      importance_score: 50,
+      search_profile: {}
+    });
+
+    return rows;
+  };
+
+  let aiNeedRows = [];
+  let needs_source = 'none';
+
+  const needsFromSnapshot = coerceNeedRows(aiNeedsSnapshotRaw);
+  const needsFromQuery = coerceNeedRows(aiNeedsQueryRaw);
+
+  if (needsFromSnapshot.length) {
+    aiNeedRows = needsFromSnapshot;
+    needs_source = 'snapshot';
+  } else if (needsFromQuery.length) {
+    aiNeedRows = needsFromQuery;
+    needs_source = 'query';
+  }
+
+  let used_needs_fallback = false;
+  if (!aiNeedRows.length) {
+    aiNeedRows = buildFallbackNeedRowsFromPlan(plan, baseRoster);
+    used_needs_fallback = aiNeedRows.length > 0;
+    if (used_needs_fallback) needs_source = 'fallback';
+  }
+
+  if (!aiNeedRows.length) {
+    return emptyResult('empty_needs_and_no_fallback', {
+      slot_plan_used: slotPlan,
+      needs_rows_used: 0,
+      used_needs_fallback,
+      needs_source
+    });
+  }
+
+  // ------------------------------------------------------------
+  // Need parsing
+  // ------------------------------------------------------------
+  const extractAxis = (row) => {
+    const type = lower(row?.need_type || row?.type || '');
+    const slot = lower(row?.need_slot_key || row?.need_key || '');
+    const label = lower(row?.need_label || row?.label || '');
+    const profile = safeJson(row?.search_profile || row?.searchProfile || row?.profile || {});
+
+    const direct = lower(profile?.axis_focus || profile?.axis || '');
+    if (['pow', 'spe', 'men', 'soc'].includes(direct)) return direct;
+
+    if (slot.startsWith('axis_')) return slot.replace(/^axis_/, '');
+
+    const blob = [type, slot, label, lower(JSON.stringify(profile))].join(' | ');
+    if (blob.includes('pow')) return 'pow';
+    if (blob.includes('spe')) return 'spe';
+    if (blob.includes('men')) return 'men';
+    if (blob.includes('soc')) return 'soc';
+    return '';
+  };
+
+  const extractColor = (row) => {
+    const type = lower(row?.need_type || row?.type || '');
+    const slot = lower(row?.need_slot_key || row?.need_key || '');
+    const label = lower(row?.need_label || row?.label || '');
+    const profile = safeJson(row?.search_profile || row?.searchProfile || row?.profile || {});
+
+    const direct = lower(profile?.desired_class_color || profile?.color || '');
+    if (['red', 'green', 'blue', 'yellow'].includes(direct)) return direct;
+
+    if (slot.startsWith('color_')) return slot.replace(/^color_/, '');
+    if (slot.startsWith('card_')) return slot.replace(/^card_/, '');
+
+    const blob = [type, slot, label, lower(JSON.stringify(profile))].join(' | ');
+    if (blob.includes('yellow')) return 'yellow';
+    if (blob.includes('blue')) return 'blue';
+    if (blob.includes('green')) return 'green';
+    if (blob.includes('red')) return 'red';
+    return '';
+  };
+
+  const extractDiszi = (row) => {
+    const type = lower(row?.need_type || row?.type || '');
+    const slot = lower(row?.need_slot_key || row?.need_key || '');
+    const label = lower(row?.need_label || row?.label || '');
+    const profile = safeJson(row?.search_profile || row?.searchProfile || row?.profile || {});
+
+    const direct = lower(
+      profile?.target_discipline_field ||
+      profile?.discipline ||
+      profile?.diszi ||
+      ''
+    );
+    if (direct) return direct;
+    if (slot.startsWith('diszi_')) return slot.replace(/^diszi_/, '');
+
+    const blob = [type, slot, label, lower(JSON.stringify(profile))].join(' | ');
+    for (const d of disciplineKeys) {
+      if (blob.includes(d)) return d;
+    }
+    return '';
+  };
+
+  const parseNeedRows = (rows) => {
+    return (Array.isArray(rows) ? rows : [])
+      .map((row) => {
+        const type = lower(row?.need_type || row?.type || '');
+        const label = s(row?.need_label || row?.label || row?.name || '');
+        const importance = n(row?.importance_score || row?.importance || row?.score || 0);
+        const profile = safeJson(row?.search_profile || row?.searchProfile || row?.profile || {});
+
+        if (importance <= 0) return null;
+
+        if (type === 'axis_upgrade' || type.includes('axis')) {
+          return {
+            family: 'axis',
+            label,
+            importance,
+            axis: extractAxis(row),
+            profile
+          };
+        }
+
+        if (type === 'discipline_hole' || type.includes('discipline') || type.includes('diszi')) {
+          return {
+            family: 'diszi',
+            label,
+            importance,
+            diszi: extractDiszi(row),
+            profile
+          };
+        }
+
+        if (type === 'color_economy' || type.includes('economy') || type.includes('color') || type.includes('card')) {
+          return {
+            family: 'card',
+            label,
+            importance,
+            color: extractColor(row),
+            profile
+          };
+        }
+
+        if (type === 'historical_peak_opportunity') {
+          return {
+            family: 'peak',
+            label,
+            importance,
+            profile
+          };
+        }
+
+        if (type === 'historical_breadth_opportunity') {
+          return {
+            family: 'breadth',
+            label,
+            importance,
+            profile
+          };
+        }
+
+        return null;
+      })
+      .filter(Boolean);
+  };
+
+  const parsedNeeds = parseNeedRows(aiNeedRows);
+
+  if (!parsedNeeds.length) {
+    return emptyResult('no_parsed_needs', {
+      slot_plan_used: slotPlan,
+      needs_rows_used: Array.isArray(aiNeedRows) ? aiNeedRows.length : 0,
+      used_needs_fallback,
+      needs_source
+    });
+  }
+
+  // ------------------------------------------------------------
+  // Simulated roster state
+  // ------------------------------------------------------------
+  const axisCounts = { pow: 0, spe: 0, men: 0, soc: 0 };
+  const colorCounts = { red: 0, green: 0, blue: 0, yellow: 0 };
+  const cardCounts = { red: 0, green: 0, blue: 0, yellow: 0 };
+  const disziCounts = {};
+
+  for (const p of baseRoster) {
+    const ax = getAxis(p);
+    const col = getColor(p);
+
+    if (ax && axisCounts[ax] != null) axisCounts[ax] += 1;
+    if (col && colorCounts[col] != null) {
+      colorCounts[col] += 1;
+      cardCounts[col] += 2;
+    }
+
+    const dz = lower(p?.discipline || p?.diszi || p?.disziplin || '');
+    if (dz) disziCounts[dz] = (disziCounts[dz] || 0) + 1;
+  }
+
+  // ------------------------------------------------------------
+  // Budget / lanes
+  // ------------------------------------------------------------
+  let remainingBudget = n(plan.allowed_budget_for_search);
+
+  const buildBudgetTracksFallback = (slotPlanArr, totalBudget) => {
+    const tracks = { star: 0, core: 0, depth: 0, reserve: 0, diszi: 0 };
+    const cnt = Array.isArray(slotPlanArr) ? slotPlanArr.length : 0;
+    if (cnt <= 0 || totalBudget <= 0) return tracks;
+
+    const perSlot = totalBudget / Math.max(1, cnt);
+
+    for (const role of slotPlanArr) {
+      const r = lower(role);
+      if (tracks[r] == null) continue;
+      tracks[r] += perSlot;
+    }
+
+    return Object.fromEntries(
+      Object.entries(tracks).map(([k, v]) => [k, Number(n(v).toFixed(2))])
+    );
+  };
+
+  const budgetTracksFallback = buildBudgetTracksFallback(
+    slotPlan,
+    n(plan.allowed_budget_for_search)
+  );
+
+  const rawBudgetTracks = plan?.budget_tracks || {};
+  const budget_tracks = {
+    star: n(rawBudgetTracks?.star || budgetTracksFallback.star || 0),
+    core: n(rawBudgetTracks?.core || budgetTracksFallback.core || 0),
+    depth: n(rawBudgetTracks?.depth || budgetTracksFallback.depth || 0),
+    reserve: n(rawBudgetTracks?.reserve || budgetTracksFallback.reserve || 0),
+    diszi: n(rawBudgetTracks?.diszi || budgetTracksFallback.diszi || 0)
+  };
+
+  const coerceActiveLanes = (src, slotPlanArr, tracks) => {
+    if (Array.isArray(src)) {
+      return Array.from(new Set(src.map((x) => lower(x)).filter(Boolean)));
+    }
+
+    if (src && typeof src === 'object') {
+      const numericKeys = Object.keys(src)
+        .filter((k) => /^\d+$/.test(String(k)))
+        .map((k) => Number(k))
+        .sort((a, b) => a - b);
+
+      if (numericKeys.length) {
+        return Array.from(new Set(numericKeys.map((k) => lower(src[k])).filter(Boolean)));
+      }
+    }
+
+    const fromSlotPlan = Array.from(new Set(
+      (Array.isArray(slotPlanArr) ? slotPlanArr : []).map((x) => lower(x)).filter(Boolean)
+    ));
+
+    if (fromSlotPlan.length) return fromSlotPlan;
+
+    return Object.keys(tracks).filter((k) => n(tracks[k]) > 0);
+  };
+
+  const activeLanes = coerceActiveLanes(plan?.active_lanes, slotPlan, budget_tracks);
+
+  const laneSpent = { star: 0, core: 0, depth: 0, reserve: 0, diszi: 0 };
+  const lanePickCounts = { star: 0, core: 0, depth: 0, reserve: 0, diszi: 0 };
+  const pickedNames = new Set();
+  const picks = [];
+
+  const isLaneActive = (lane) => activeLanes.includes(lower(lane));
+
+  const laneCountFromPlan = (track) => {
+    const t = lower(track);
+    const direct =
+      t === 'star' ? n(plan?.star_slots_remaining) :
+      t === 'core' ? n(plan?.core_slots_remaining) :
+      t === 'depth' ? n(plan?.depth_slots_remaining) :
+      t === 'reserve' ? n(plan?.reserve_slots_remaining) :
+      t === 'diszi' ? n(plan?.diszi_slots_remaining) :
+      0;
+
+    return Math.max(0, direct || n(slotPlanCounts[t] || 0));
+  };
+
+  const laneSlotsRemaining = (track) => {
+    const t = lower(track);
+    return Math.max(0, laneCountFromPlan(t) - n(lanePickCounts[t] || 0));
+  };
+
+  const laneBudgetRemaining = (track) => {
+    const t = lower(track);
+    const laneBudgetTotal = n(budget_tracks?.[t] || 0);
+    const raw = Math.max(0, laneBudgetTotal - n(laneSpent?.[t] || 0));
+    return Math.max(0, Math.min(raw, remainingBudget));
+  };
+
+  const hasLaneCapacity = (track) => {
+    const t = lower(track);
+    return isLaneActive(t) && laneSlotsRemaining(t) > 0 && laneBudgetRemaining(t) > 0;
+  };
+
+  const resolveUsableTrack = (requestedTrack) => {
+    const t = lower(requestedTrack);
+    if (hasLaneCapacity(t)) return t;
+
+    const fallbackMap = {
+      star: ['core', 'depth', 'reserve', 'diszi'],
+      core: ['depth', 'reserve', 'diszi', 'star'],
+      depth: ['reserve', 'core', 'diszi', 'star'],
+      reserve: ['depth', 'core', 'diszi', 'star'],
+      diszi: ['depth', 'core', 'reserve', 'star']
+    };
+
+    const order = fallbackMap[t] || ['depth', 'core', 'reserve', 'diszi', 'star'];
+
+    for (const lane of order) {
+      if (hasLaneCapacity(lane)) return lane;
+    }
+
+    return '';
+  };
+
+  const computeMarketRoleAnchor = (track, budgetCap) => {
+    const pref = preferredBracketWindow(track);
+
+    let pool = rawCandidates
+      .filter((c) => !pickedNames.has(lower(c?.name || '')))
+      .map((c) => ({
+        price: n(c?.marktwert || c?.market_value || c?.mw || c?.MW || 0),
+        bracket: getPlayerBracket(c)
+      }))
+      .filter((x) => x.price > 0 && x.price <= Math.max(0, n(budgetCap)));
+
+    if (!pool.length) return { min: 0, target: 0, max: 0, count: 0 };
+
+    let rolePool = pool.filter((x) => n(x.bracket) >= n(pref.min) && n(x.bracket) <= n(pref.max));
+    if (rolePool.length < 4) {
+      rolePool = pool.filter((x) => n(x.bracket) >= n(pref.min) - 1 && n(x.bracket) <= n(pref.max) + 1);
+    }
+    if (rolePool.length < 4) rolePool = pool;
+
+    const prices = rolePool.map((x) => n(x.price)).filter((x) => x > 0);
+    if (!prices.length) return { min: 0, target: 0, max: 0, count: 0 };
+
+    return {
+      min: Number(quantile(prices, 0.20).toFixed(2)),
+      target: Number(quantile(prices, 0.50).toFixed(2)),
+      max: Number(quantile(prices, 0.85).toFixed(2)),
+      count: prices.length
+    };
+  };
+
+  const computeLaneBudgetContext = (requestedTrack) => {
+    const track = resolveUsableTrack(requestedTrack);
+
+    if (!track) {
+      return {
+        budget_track: '',
+        lane_budget_total: 0,
+        lane_budget_remaining: 0,
+        lane_slots_remaining: 0,
+        lane_target_fee: 0,
+        lane_min_fee: 0,
+        lane_max_fee: 0,
+        effective_pick_cap: 0,
+        preferred_bracket_min: 0,
+        preferred_bracket_max: 0,
+        market_role_min_fee: 0,
+        market_role_target_fee: 0,
+        market_role_max_fee: 0,
+        market_role_pool_count: 0
+      };
+    }
+
+    const lane_budget_total = n(budget_tracks?.[track] || 0);
+    const lane_budget_remaining = laneBudgetRemaining(track);
+    const lane_slots_remaining = laneSlotsRemaining(track);
+
+    if (lane_budget_remaining <= 0 || lane_slots_remaining <= 0) {
+      return {
+        budget_track: track,
+        lane_budget_total,
+        lane_budget_remaining,
+        lane_slots_remaining,
+        lane_target_fee: 0,
+        lane_min_fee: 0,
+        lane_max_fee: 0,
+        effective_pick_cap: 0,
+        preferred_bracket_min: 0,
+        preferred_bracket_max: 0,
+        market_role_min_fee: 0,
+        market_role_target_fee: 0,
+        market_role_max_fee: 0,
+        market_role_pool_count: 0
+      };
+    }
+
+    const budget_target_fee = lane_budget_remaining / Math.max(1, lane_slots_remaining);
+    const marketRole = computeMarketRoleAnchor(track, Math.min(lane_budget_remaining, remainingBudget));
+    const pref = preferredBracketWindow(track);
+
+    let lane_target_fee = budget_target_fee;
+    let lane_min_fee = 0;
+    let lane_max_fee = 0;
+
+    if (marketRole.count > 0) {
+      const marketTarget = n(marketRole.target);
+
+      lane_target_fee = marketTarget > 0
+        ? Math.min(Math.max(marketRole.min, marketTarget), lane_budget_remaining, remainingBudget)
+        : Math.min(budget_target_fee, lane_budget_remaining, remainingBudget);
+
+      lane_min_fee = Math.min(n(marketRole.min), lane_target_fee);
+      lane_max_fee = Math.min(
+        Math.max(n(marketRole.max), lane_target_fee),
+        lane_budget_remaining,
+        remainingBudget
+      );
+    } else {
+      const mult = (() => {
+        const t = lower(track);
+        if (t === 'star') return { min: 0.60, max: 1.35 };
+        if (t === 'core') return { min: 0.65, max: 1.25 };
+        if (t === 'depth') return { min: 0.35, max: 1.10 };
+        if (t === 'reserve') return { min: 0.35, max: 1.00 };
+        if (t === 'diszi') return { min: 0.50, max: 1.20 };
+        return { min: 0.35, max: 1.10 };
+      })();
+
+      lane_target_fee = Math.min(budget_target_fee, lane_budget_remaining, remainingBudget);
+      lane_min_fee = lane_target_fee * n(mult.min);
+      lane_max_fee = Math.min(lane_target_fee * n(mult.max), lane_budget_remaining, remainingBudget);
+    }
+
+    const effective_pick_cap = Math.max(
+      0,
+      Math.min(remainingBudget, lane_budget_remaining, lane_max_fee > 0 ? lane_max_fee : remainingBudget)
+    );
+
+    return {
+      budget_track: track,
+      lane_budget_total,
+      lane_budget_remaining,
+      lane_slots_remaining,
+      lane_target_fee,
+      lane_min_fee,
+      lane_max_fee,
+      effective_pick_cap,
+      preferred_bracket_min: n(pref.min),
+      preferred_bracket_max: n(pref.max),
+      market_role_min_fee: n(marketRole.min),
+      market_role_target_fee: n(marketRole.target),
+      market_role_max_fee: n(marketRole.max),
+      market_role_pool_count: n(marketRole.count)
+    };
+  };
+
+  // ------------------------------------------------------------
+  // Dynamic need evaluation
+  // ------------------------------------------------------------
+  const evalDynamicNeed = (need, plannedRole) => {
+    const simRosterSize = Math.max(1, baseRoster.length + picks.length);
+
+    if (need.family === 'axis') {
+      const axis = lower(need.axis || '');
+      const desiredShare = clamp(n(need.profile?.desired_share || 0.25), 0, 1);
+      const currentShare = axis && axisCounts[axis] != null
+        ? clamp(n(axisCounts[axis]) / simRosterSize, 0, 1)
+        : 0;
+
+      const gap01 = clamp(desiredShare - currentShare, 0, 1);
+      const primaryBoost = axis && axis === lower(plan.primary_axis_need || '') ? 8 : 0;
+      const dynamicImportance = n(need.importance) * (0.50 + 0.50 * gap01) + primaryBoost;
+
+      return { ...need, dynamicImportance, meta: { gap01, currentShare, desiredShare } };
+    }
+
+    if (need.family === 'diszi') {
+      const d = lower(need.diszi || '');
+      const cnt = n(disziCounts[d] || 0);
+      const gapFactor = cnt <= 0 ? 1 : cnt === 1 ? 0.60 : 0.25;
+      const primaryBoost = d && d === lower(plan.primary_diszi_need || '') ? 8 : 0;
+      const dynamicImportance = n(need.importance) * gapFactor + primaryBoost;
+
+      return { ...need, dynamicImportance, meta: { currentCount: cnt, gapFactor } };
+    }
+
+    if (need.family === 'card') {
+      const c = lower(need.color || '');
+      const cards = n(cardCounts[c] || 0);
+      const gapFactor = cards <= 2 ? 1 : cards <= 4 ? 0.65 : 0.25;
+      const primaryBoost =
+        c && (c === lower(plan.primary_color_need || '') || c === lower(plan.primary_card_need || ''))
+          ? 8
+          : 0;
+
+      const dynamicImportance = n(need.importance) * gapFactor + primaryBoost;
+      return { ...need, dynamicImportance, meta: { currentCards: cards, gapFactor } };
+    }
+
+    if (need.family === 'peak') {
+      const roleBoost = ['core', 'star'].includes(lower(plannedRole)) ? 1.0 : 0.60;
+      return { ...need, dynamicImportance: n(need.importance) * roleBoost, meta: { roleBoost } };
+    }
+
+    if (need.family === 'breadth') {
+      const roleBoost = ['reserve', 'depth'].includes(lower(plannedRole)) ? 1.0 : 0.60;
+      return { ...need, dynamicImportance: n(need.importance) * roleBoost, meta: { roleBoost } };
+    }
+
+    return { ...need, dynamicImportance: n(need.importance), meta: {} };
+  };
+
+  const roleFamilyBias = {
+    reserve: { card: 18, breadth: 14, axis: -3, diszi: -4, peak: -6 },
+    depth:   { axis: 14, diszi: 11, card: 2, breadth: 1, peak: 0 },
+    core:    { axis: 20, peak: 14, diszi: 7, card: -4, breadth: -6 },
+    star:    { peak: 20, axis: 12, diszi: 4, card: -6, breadth: -8 },
+    diszi:   { diszi: 20, axis: 4, card: -2, breadth: -3, peak: 0 }
+  };
+
+  const getEvaluatedNeeds = (plannedRole) => {
+    const role = lower(plannedRole || 'depth');
+    const bias = roleFamilyBias[role] || roleFamilyBias.depth;
+
+    return parsedNeeds
+      .map((need) => {
+        const ev = evalDynamicNeed(need, role);
+        const familyBonus = n(bias[lower(ev.family)] || 0);
+
+        return {
+          ...ev,
+          roleBiasScore: familyBonus,
+          roleWeightedImportance: n(ev.dynamicImportance) + familyBonus
+        };
+      })
+      .sort((a, b) => {
+        const delta = n(b.roleWeightedImportance) - n(a.roleWeightedImportance);
+        if (Math.abs(delta) > 6) return delta;
+        return n(b.dynamicImportance) - n(a.dynamicImportance);
+      });
+  };
+
+  const pickTopNeedForRole = (evaluatedNeeds, plannedRole) => {
+    const role = lower(plannedRole || 'depth');
+
+    const familiesByRole = {
+      core: ['axis', 'peak', 'diszi'],
+      depth: ['axis', 'diszi', 'card'],
+      reserve: ['card', 'breadth'],
+      diszi: ['diszi'],
+      star: ['peak', 'axis']
+    };
+
+    const preferred = familiesByRole[role] || ['axis', 'diszi', 'card'];
+
+    const strictPool = evaluatedNeeds.filter((x) => preferred.includes(lower(x.family)));
+    const fallbackPool = evaluatedNeeds;
+
+    if ((role === 'reserve' || role === 'diszi') && strictPool.length) {
+      return {
+        topNeed: strictPool[0],
+        selectionMode: `strict_${role}`
+      };
+    }
+
+    if ((role === 'core' || role === 'star') && strictPool.length) {
+      const strictTop = strictPool[0];
+      const allTop = fallbackPool[0];
+
+      if (n(strictTop.roleWeightedImportance) >= n(allTop.roleWeightedImportance) - 8) {
+        return {
+          topNeed: strictTop,
+          selectionMode: `preferred_${role}`
+        };
+      }
+    }
+
+    if (role === 'depth' && strictPool.length) {
+      return {
+        topNeed: strictPool[0],
+        selectionMode: 'preferred_depth'
+      };
+    }
+
+    return {
+      topNeed: fallbackPool[0] || null,
+      selectionMode: 'default'
+    };
+  };
+
+  // ------------------------------------------------------------
+  // Strategic focus matching
+  // ------------------------------------------------------------
+  const focusTokens = [
+    s(plan.strategic_focus_primary || ''),
+    s(plan.strategic_focus_secondary || '')
+  ].filter(Boolean);
+
+  const candidateMatchesFocus = (c, focusToken) => {
+    const token = lower(focusToken);
+    const candAxis = getAxis(c);
+    const candColor = getColor(c);
+    const candBestDiszi = getBestDiszi(c);
+
+    if (!token) return false;
+    if (['pow', 'spe', 'men', 'soc'].includes(token)) return candAxis === token;
+    if (token.startsWith('color_')) return candColor === token.replace(/^color_/, '');
+    if (token.startsWith('card_')) return candColor === token.replace(/^card_/, '');
+    if (token.startsWith('diszi_')) return candBestDiszi === token.replace(/^diszi_/, '');
+
+    return false;
+  };
+
+  const candidateNeedCoverage = (c, need) => {
+    const candAxis = getAxis(c);
+    const candColor = getColor(c);
+    const candBestDiszi = getBestDiszi(c);
+
+    if (need.family === 'axis') return candAxis === lower(need.axis || '') ? 1 : 0;
+    if (need.family === 'card') return candColor === lower(need.color || '') ? 1 : 0;
+
+    if (need.family === 'diszi') {
+      const d = lower(need.diszi || '');
+      if (candBestDiszi === d) return 1;
+      return getDisziScore(c, d) >= 65 ? 0.6 : 0;
+    }
+
+    if (need.family === 'peak') return getPeakScore(c) >= 20 ? 1 : getPeakScore(c) >= 12 ? 0.5 : 0;
+    if (need.family === 'breadth') return getVersatilityScore(c) >= 18 ? 1 : getVersatilityScore(c) >= 10 ? 0.5 : 0;
+
+    return 0;
+  };
+
+  // ------------------------------------------------------------
+  // Candidate scoring
+  // ------------------------------------------------------------
+  const teamVariationFactor = n(aiVarianceCfg?.team_variation_factor || 0);
+
+  const scoreCandidate = (c, need, evaluatedNeeds, laneCtx, plannedRole, pick_nr) => {
+    const price = n(c?.marktwert || c?.market_value || c?.mw || c?.MW || 0);
+    if (price <= 0) return { score: -Infinity };
+
+    const effectiveCap = Math.max(0, n(laneCtx?.effective_pick_cap || 0));
+    if (effectiveCap <= 0) return { score: -Infinity };
+    if (price > effectiveCap + 0.001) return { score: -Infinity };
+    if (price > remainingBudget + 0.001) return { score: -Infinity };
+
+    const target = Math.max(0.01, n(laneCtx?.lane_target_fee || 0));
+    const laneMin = Math.max(0, n(laneCtx?.lane_min_fee || 0));
+    const laneMax = Math.max(0, n(laneCtx?.lane_max_fee || 0));
+    if (laneMax > 0 && price > laneMax + 0.001) return { score: -Infinity };
+
+    const { pow, spe, men, soc, core } = candidateCore(c);
+    const fit = n(c?.team_fit || c?.fit || 0);
+    const peakScore = getPeakScore(c);
+    const versatilityScore = getVersatilityScore(c);
+    const candAxis = getAxis(c);
+    const candColor = getColor(c);
+    const candBestDiszi = getBestDiszi(c);
+
+    let posMatch = 0.25;
+    let qualityForNeed = core;
+
+    if (need.family === 'axis') {
+      const axis = lower(need.axis || '');
+      posMatch = candAxis === axis ? 1.0 : 0.35;
+      qualityForNeed =
+        axis === 'pow' ? pow :
+        axis === 'spe' ? spe :
+        axis === 'men' ? men :
+        axis === 'soc' ? soc :
+        core;
+    }
+
+    else if (need.family === 'diszi') {
+      const d = lower(need.diszi || '');
+      const disziScore = getDisziScore(c, d);
+      posMatch = candBestDiszi === d ? 1.0 : disziScore > 0 ? 0.60 : 0.25;
+      qualityForNeed = disziScore > 0 ? disziScore : core * 0.60;
+    }
+
+    else if (need.family === 'card') {
+      const color = lower(need.color || '');
+      posMatch = candColor === color ? 1.0 : 0.25;
+      qualityForNeed = core * 0.55 + versatilityScore * 0.45;
+    }
+
+    else if (need.family === 'peak') {
+      posMatch = 1.0;
+      qualityForNeed = peakScore * 3.1 + core * 0.35;
+    }
+
+    else if (need.family === 'breadth') {
+      posMatch = 1.0;
+      qualityForNeed = versatilityScore * 2.2 + core * 0.45;
+    }
+
+    const deviation01 = Math.abs(price - target) / Math.max(target, 0.01);
+    const budget_fit_score = clamp(1 - deviation01, 0, 1) * 12;
+
+    const player_bracket = getPlayerBracket(c);
+    const preferred_bracket_min = n(laneCtx?.preferred_bracket_min || 0);
+    const preferred_bracket_max = n(laneCtx?.preferred_bracket_max || 0);
+    const bracket_fit_score = computeBracketFitScore(player_bracket, preferred_bracket_min, preferred_bracket_max);
+
+    const isStarOrCore = ['star', 'core'].includes(lower(laneCtx?.budget_track || ''));
+
+    const under = laneMin > 0 && price < laneMin;
+    const underRatio = under ? (laneMin - price) / Math.max(laneMin, 0.01) : 0;
+    const under_spend_penalty = under && isStarOrCore ? clamp(underRatio, 0, 1) * 18 : 0;
+
+    let over_spend_penalty = 0;
+    if (laneMax > 0 && price > laneMax) {
+      const overRatio = (price - laneMax) / Math.max(laneMax, 0.01);
+      over_spend_penalty = clamp(overRatio, 0, 1) * 30;
+    }
+
+    const depthBonus =
+      lower(plannedRole) === 'depth' && effectiveCap > 0
+        ? clamp((effectiveCap - price) / Math.max(effectiveCap, 1), 0, 1) * 4
+        : 0;
+
+    const matchedFocuses = focusTokens.filter((token) => candidateMatchesFocus(c, token));
+    const multi_need_bonus =
+      (matchedFocuses.length >= 1 ? 1.5 : 0) +
+      Math.max(0, matchedFocuses.length - 1) * 3;
+
+    const secondary_need_bonus = evaluatedNeeds
+      .slice(1, 4)
+      .reduce((acc, nd) => {
+        const cover = candidateNeedCoverage(c, nd);
+        const value = Math.min(4, n(nd.roleWeightedImportance) * 0.04);
+        return acc + cover * value;
+      }, 0);
+
+    const jitterKey = [
+      plan.team_plan_seed,
+      teamVariationFactor,
+      pick_nr,
+      s(c?.name || ''),
+      lower(plannedRole || ''),
+      lower(need.family || ''),
+      lower(need.axis || need.color || need.diszi || '')
+    ].join('|');
+
+    const score_jitter = (rand01FromKey(jitterKey) - 0.5) * (1.2 + teamVariationFactor * 2);
+
+    const score =
+      qualityForNeed * 0.30 * posMatch +
+      fit * 0.18 +
+      budget_fit_score +
+      bracket_fit_score +
+      depthBonus +
+      multi_need_bonus +
+      secondary_need_bonus +
+      score_jitter -
+      under_spend_penalty -
+      over_spend_penalty;
+
+    return {
+      score,
+      budget_fit_score,
+      under_spend_penalty,
+      over_spend_penalty,
+      player_bracket: player_bracket ?? null,
+      preferred_bracket_min: preferred_bracket_min || null,
+      preferred_bracket_max: preferred_bracket_max || null,
+      bracket_fit_score: Number(n(bracket_fit_score).toFixed(2)),
+      matchedFocuses,
+      multi_need_bonus: Number(n(multi_need_bonus).toFixed(2)),
+      secondary_need_bonus: Number(n(secondary_need_bonus).toFixed(2)),
+      score_jitter: Number(n(score_jitter).toFixed(3))
+    };
+  };
+
+  // ------------------------------------------------------------
+  // Simulation loop
+  // ------------------------------------------------------------
+  for (let pick_nr = 1; pick_nr <= slots_max; pick_nr++) {
+    if (remainingBudget <= 0) break;
+
+    const plannedRole = Array.isArray(slotPlan) ? slotPlan[pick_nr - 1] ?? null : null;
+    const requestedTrack = plannedRole != null ? plannedRole : 'depth';
+
+    const laneCtx = computeLaneBudgetContext(requestedTrack);
+
+    if (
+      !laneCtx?.budget_track ||
+      n(laneCtx.effective_pick_cap) <= 0 ||
+      n(laneCtx.lane_slots_remaining) <= 0
+    ) {
+      break;
+    }
+
+    const budgetTrack = laneCtx.budget_track;
+    const evaluatedNeeds = getEvaluatedNeeds(plannedRole || budgetTrack);
+    const pickedNeed = pickTopNeedForRole(evaluatedNeeds, plannedRole || budgetTrack);
+    const topNeed = pickedNeed?.topNeed || null;
+    const top_need_selection_mode = s(pickedNeed?.selectionMode || 'default');
+
+    if (!topNeed) break;
+
+    let bestCandidate = null;
+    let bestExplain = null;
+    let bestScore = -Infinity;
+
+    for (const c of rawCandidates) {
+      const cname = lower(c?.name || '');
+      if (!cname || pickedNames.has(cname)) continue;
+
+      const res = scoreCandidate(c, topNeed, evaluatedNeeds, laneCtx, plannedRole || budgetTrack, pick_nr);
+      const sc = n(res?.score);
+
+      if (sc > bestScore) {
+        bestScore = sc;
+        bestCandidate = c;
+        bestExplain = res;
+      }
+    }
+
+    if (!bestCandidate || !bestExplain || !Number.isFinite(bestScore)) break;
+
+    const price = n(bestCandidate?.marktwert || bestCandidate?.market_value || bestCandidate?.mw || bestCandidate?.MW || 0);
+    const effective_pick_cap = n(laneCtx.effective_pick_cap);
+
+    if (
+      price <= 0 ||
+      price > remainingBudget + 0.001 ||
+      price > effective_pick_cap + 0.001 ||
+      price > n(laneCtx.lane_max_fee) + 0.001
+    ) {
+      break;
+    }
+
+    pickedNames.add(lower(bestCandidate?.name || ''));
+
+    remainingBudget = Number((remainingBudget - price).toFixed(2));
+
+    laneSpent[budgetTrack] = Number((n(laneSpent[budgetTrack]) + price).toFixed(2));
+    lanePickCounts[budgetTrack] = n(lanePickCounts[budgetTrack]) + 1;
+
+    const candAxis = getAxis(bestCandidate);
+    const candColor = getColor(bestCandidate);
+    const candBestDiszi = getBestDiszi(bestCandidate);
+
+    if (candAxis && axisCounts[candAxis] != null) axisCounts[candAxis] += 1;
+
+    if (candColor && colorCounts[candColor] != null) {
+      colorCounts[candColor] += 1;
+      cardCounts[candColor] += 2;
+    }
+
+    if (candBestDiszi) {
+      disziCounts[candBestDiszi] = (disziCounts[candBestDiszi] || 0) + 1;
+    }
+
+    const slot_role_fallback_used = Boolean(
+      plannedRole &&
+      budgetTrack &&
+      lower(plannedRole) !== lower(budgetTrack)
+    );
+
+    const slot_role_fallback_reason = slot_role_fallback_used
+      ? 'planned_track_inactive_or_exhausted'
+      : '';
+
+    const rationale = [
+      `Planned role ${s(plannedRole || '—')}, used ${s(budgetTrack || '—')}.`,
+      `Need: ${s(topNeed.label || topNeed.family || '—')}.`,
+      `Mode ${top_need_selection_mode}.`,
+      `Price ${fmtM(price)} vs target ${fmtM(laneCtx.lane_target_fee)}, cap ${fmtM(effective_pick_cap)}.`,
+      `Market role band ${fmtM(laneCtx.market_role_min_fee)}-${fmtM(laneCtx.market_role_max_fee)}.`,
+      `Bracket ${bestExplain.player_bracket ?? '—'}, fit ${n(bestExplain.bracket_fit_score).toFixed(2)}.`,
+      `Focus matches ${bestExplain.matchedFocuses?.length || 0}, secondary bonus ${n(bestExplain.secondary_need_bonus).toFixed(2)}, jitter ${n(bestExplain.score_jitter).toFixed(3)}.`,
+      slot_role_fallback_used
+        ? 'Fallback used (planned role inactive or exhausted).'
+        : 'No fallback.'
+    ].join(' ');
+
+    picks.push({
+      pick_nr,
+
+      slot_role_planned: plannedRole,
+      slot_role_used: budgetTrack,
+      slot_role_fallback_used,
+      slot_role_fallback_reason,
+
+      top_need_family: topNeed.family,
+      top_need_selection_mode,
+      need_label: topNeed.label,
+      need_dynamic_score: Number(
+        n(topNeed.roleWeightedImportance || topNeed.dynamicImportance || 0).toFixed(2)
+      ),
+
+      player_name: s(bestCandidate?.name || '—'),
+      klasse: s(bestCandidate?.klasse || '—'),
+      color: candColor || '',
+      rasse: s(bestCandidate?.rasse || '—'),
+
+      budget_track_requested: requestedTrack,
+      budget_track: budgetTrack,
+
+      lane_budget_total: Number(n(laneCtx.lane_budget_total).toFixed(2)),
+      lane_budget_remaining: Number(n(laneCtx.lane_budget_remaining).toFixed(2)),
+      lane_slots_remaining: Number(n(laneCtx.lane_slots_remaining).toFixed(0)),
+      lane_target_fee: Number(n(laneCtx.lane_target_fee).toFixed(2)),
+      lane_min_fee: Number(n(laneCtx.lane_min_fee).toFixed(2)),
+      lane_max_fee: Number(n(laneCtx.lane_max_fee).toFixed(2)),
+      effective_pick_cap: Number(effective_pick_cap.toFixed(2)),
+
+      market_role_min_fee: Number(n(laneCtx.market_role_min_fee).toFixed(2)),
+      market_role_target_fee: Number(n(laneCtx.market_role_target_fee).toFixed(2)),
+      market_role_max_fee: Number(n(laneCtx.market_role_max_fee).toFixed(2)),
+      market_role_pool_count: Number(n(laneCtx.market_role_pool_count).toFixed(0)),
+
+      player_bracket: bestExplain.player_bracket ?? null,
+      preferred_bracket_min: bestExplain.preferred_bracket_min ?? null,
+      preferred_bracket_max: bestExplain.preferred_bracket_max ?? null,
+      bracket_fit_score: Number(n(bestExplain.bracket_fit_score).toFixed(2)),
+
+      strategic_focus_matches: Array.isArray(bestExplain.matchedFocuses) ? bestExplain.matchedFocuses : [],
+      multi_need_bonus: Number(n(bestExplain.multi_need_bonus).toFixed(2)),
+      secondary_need_bonus: Number(n(bestExplain.secondary_need_bonus).toFixed(2)),
+      score_jitter: Number(n(bestExplain.score_jitter).toFixed(3)),
+
+      price: Number(price.toFixed(2)),
+      budget_after: Number(Math.max(0, remainingBudget).toFixed(2)),
+
+      budget_fit_score: Number(n(bestExplain.budget_fit_score).toFixed(2)),
+      under_spend_penalty: Number(n(bestExplain.under_spend_penalty).toFixed(2)),
+      over_spend_penalty: Number(n(bestExplain.over_spend_penalty).toFixed(2)),
+
+      roster_size_after: baseRoster.length + picks.length + 1,
+      score: Number(bestScore.toFixed(2)),
+      rationale
+    });
+  }
+
+  return {
+    version: 'aiPlannedPicks.v4.3_hotfix',
+    team,
+    avg_slot_budget: n(plan?.avg_slot_budget),
+    active_lanes: activeLanes,
+    slot_plan_used: slotPlan,
+    slots_simulated: picks.length,
+    budget_start: Number(n(plan.allowed_budget_for_search).toFixed(2)),
+    budget_remaining: Number(Math.max(0, remainingBudget).toFixed(2)),
+    needs_rows_used: Array.isArray(aiNeedRows) ? aiNeedRows.length : 0,
+    used_needs_fallback,
+    needs_source,
+    reason: picks.length > 0 ? 'ok' : 'no_pick_selected',
+    picks
+  };
+})();

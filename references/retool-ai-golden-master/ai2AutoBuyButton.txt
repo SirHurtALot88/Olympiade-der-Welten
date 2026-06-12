@@ -1,0 +1,13 @@
+// term: AI2_RunNeeds
+// id: ai2AutoBuyButton
+// type: widget
+// subtype: ButtonWidget2
+// page: transfermarktPage
+// folder: unknown
+// updatedAt: unknown
+// codeField: unknown
+// dependencies: none
+// extractionStatus: partial_match_only
+// Partial match only.
+// No direct code/value block could be extracted for AI2_RunNeeds.
+

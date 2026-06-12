@@ -1,0 +1,11 @@
+// term: aiPackageScoringConfig
+// id: unknown
+// type: unknown
+// subtype: unknown
+// page: transfermarktPage
+// folder: unknown
+// updatedAt: unknown
+// codeField: funcBody
+// dependencies: none
+// extractionStatus: complete_or_primary_match
+return {};

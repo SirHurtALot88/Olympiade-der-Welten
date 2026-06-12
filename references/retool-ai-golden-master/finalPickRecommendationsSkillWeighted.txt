@@ -1,0 +1,791 @@
+// term: aiTeamNeeds
+// id: finalPickRecommendationsSkillWeighted
+// type: datasource
+// subtype: JavascriptQuery
+// page: transfermarktPage
+// folder: unknown
+// updatedAt: unknown
+// codeField: funcBody
+// dependencies: aiTransferPicksSnapshot.value | getCashFromSaisonstand.value?.cash | aiTeamNeedsSnapshot.value | playersTable.data | aiTransferCandidatePool.value | getTeamRatingsTransfermarkt.data | bracketConfig.value
+// extractionStatus: complete_or_primary_match
+// Final Pick Recommendations V4.3a (Explainability + sanity guards + cap-aligned usagePenalty + robust discipline extraction)
+// Returns: Array<Record<string, any>>
+
+const picks = Array.isArray({{ aiTransferPicksSnapshot.value }}) ? {{ aiTransferPicksSnapshot.value }} : [];
+const cash = Number({{ getCashFromSaisonstand.value?.cash }} || 0);
+const activeNeeds = Array.isArray({{ aiTeamNeedsSnapshot.value }}) ? {{ aiTeamNeedsSnapshot.value }} : [];
+
+const n = (v) => Number.isFinite(Number(v)) ? Number(v) : 0;
+const s = (v) => String(v ?? '').trim();
+const norm = (v) => s(v).toLowerCase();
+const clamp = (v, lo, hi) => Math.max(lo, Math.min(hi, v));
+
+if (!picks.length) return [];
+
+// ------------------------------------------------------------
+// Player visuals + core stats
+// ------------------------------------------------------------
+const players = Array.isArray({{ playersTable.data }})
+  ? {{ playersTable.data }}
+  : typeof formatDataAsArray === 'function'
+    ? formatDataAsArray({{ playersTable.data }}) || []
+    : [];
+
+const imageByName = new Map();
+const coreByName = new Map();
+for (const p of players) {
+  const name = s(p?.name);
+  if (!name) continue;
+  const key = norm(name);
+
+  const url = s(p?.image_url);
+  if (url && !imageByName.has(key)) imageByName.set(key, url);
+
+  if (!coreByName.has(key)) {
+    coreByName.set(key, {
+      pow: Math.round(n(p?.pow)),
+      spe: Math.round(n(p?.spe)),
+      men: Math.round(n(p?.men)),
+      soc: Math.round(n(p?.soc)),
+    });
+  }
+}
+
+// ------------------------------------------------------------
+// Candidate pool (discipline attribute-weighted scores)
+// ------------------------------------------------------------
+const candPool = Array.isArray({{ aiTransferCandidatePool.value }}) ? {{ aiTransferCandidatePool.value }} : [];
+const disziByName = new Map();
+for (const c of candPool) {
+  const name = s(c?.name || c?.player_name);
+  if (!name) continue;
+  const key = norm(name);
+  if (!disziByName.has(key)) disziByName.set(key, c?.diszi_attr_scores || {});
+}
+
+// ------------------------------------------------------------
+// Team ratings → allowed_budget_for_search
+// ------------------------------------------------------------
+const trRows = typeof formatDataAsArray === 'function'
+  ? formatDataAsArray({{ getTeamRatingsTransfermarkt.data }}) || []
+  : {{ getTeamRatingsTransfermarkt.data }} || [];
+
+const tr = trRows?.[0] || {};
+
+const finances_strength = clamp(n(tr.finances) || 5, 1, 10);
+const ambition = clamp(n(tr.ambition) || 5, 1, 10);
+const board_confidence = clamp(n(tr.board_confidence) || 5, 1, 10);
+const harmony = clamp(n(tr.harmony) || 5, 1, 10);
+
+// Proxy for spending discipline (0..1): high harmony + high board_confidence => conservative
+const spending_discipline_proxy = clamp(
+  0.55 * ((harmony - 1) / 9) + 0.45 * ((board_confidence - 1) / 9),
+  0,
+  1
+);
+
+const ambitionAggro = clamp((ambition - 5) / 5, -1, 1);
+const financesStrength01 = clamp((finances_strength - 1) / 9, 0, 1);
+
+const capFactor = clamp(
+  0.62 + 0.28 * financesStrength01 + 0.12 * ambitionAggro - 0.10 * spending_discipline_proxy,
+  0.15,
+  0.98
+);
+
+const finance_posture_cap = Math.max(0, cash * capFactor);
+const reserve_buffer = Math.max(0, cash - finance_posture_cap);
+const allowed_budget_for_search = finance_posture_cap;
+const max_single_affordable = finance_posture_cap;
+const max_package_affordable = finance_posture_cap;
+
+// ------------------------------------------------------------
+// Active needs lookup
+// ------------------------------------------------------------
+const needByLabel = new Map();
+const needByType = new Map();
+for (const nd of activeNeeds) {
+  const lbl = norm(nd?.need_label || '');
+  const typ = norm(nd?.need_type || '');
+  if (lbl) needByLabel.set(lbl, nd);
+  if (typ && !needByType.has(typ)) needByType.set(typ, nd);
+}
+
+const safeJson = (txt) => {
+  try {
+    return JSON.parse(String(txt || '{}'));
+  } catch (e) {
+    return {};
+  }
+};
+
+const bracketCfg = {{ bracketConfig.value }};
+const getBracket = (mw) => {
+  const fn = bracketCfg?.getBracket;
+  if (typeof fn === 'function') return fn(mw);
+  return null;
+};
+const getBracketRange = (br) => {
+  const ranges = bracketCfg?.ranges;
+  if (!ranges || br == null) return '';
+  return String(ranges[br] ?? '');
+};
+
+// ------------------------------------------------------------
+// Need-tag helpers
+// ------------------------------------------------------------
+const DISCI_LABEL_TO_TAG = {
+  TDM: 'TDM+',
+  'Mini DM': 'MiniDM+',
+  Gewichtheben: 'GEW+',
+  Hockey: 'HOC+',
+  Breaking: 'BRK+',
+  Staffel: 'STA+',
+  'Time Trial': 'TT+',
+  Spurt: 'SPU+',
+  Climbing: 'CLM+',
+  Fechten: 'FEC+',
+  Schach: 'SCH+',
+  Takeshi: 'TAK+',
+  Tennis: 'TEN+',
+  'I Spy': 'SPY+',
+  Wettessen: 'WET+',
+  Basketball: 'BSK+',
+  Football: 'FOO+',
+  Battlefield: 'BTL+',
+  Eiskunst: 'EIS+',
+  Showcase: 'SHW+',
+};
+
+const DISCIPLINE_LABELS_SORTED = Object.keys(DISCI_LABEL_TO_TAG).sort((a, b) => b.length - a.length);
+
+const COLOR_TAG = (color) => {
+  const c = String(color || '').toLowerCase();
+  if (!c) return 'Color+';
+  return `Color:${c.toUpperCase()}+`;
+};
+
+// robust string-based extraction without regex
+const extractDisciplineFromNeedLabel = (label) => {
+  const txt = s(label);
+  if (!txt) return '';
+
+  const parts = txt.split(':');
+  if (parts.length < 2) return '';
+
+  let right = parts.slice(1).join(':').trim();
+  right = right.split('(')[0].trim();
+
+  if (!right) return '';
+
+  const rightNorm = norm(right);
+
+  // exact-ish / contains matching against known labels, longest first
+  for (const disci of DISCIPLINE_LABELS_SORTED) {
+    const dn = norm(disci);
+    if (rightNorm === dn) return disci;
+    if (rightNorm.includes(dn)) return disci;
+  }
+
+  return right;
+};
+
+// ------------------------------------------------------------
+// Penalties / scores
+// ------------------------------------------------------------
+
+// changed: usagePenalty now uses allowed_budget_for_search
+const usagePenalty = (mw) => {
+  const budget = n(allowed_budget_for_search);
+  if (budget <= 0) return mw > 0 ? 18 : 0;
+  const usage = mw / budget;
+  return usage <= 0.45 ? 0 : usage <= 0.7 ? 4 : usage <= 0.9 ? 10 : 18;
+};
+
+const affordabilityScore = (mw) => {
+  const budget = n(allowed_budget_for_search);
+  if (budget <= 0 || mw <= 0) return 0;
+  const remaining = budget - mw;
+  const remainingPct = remaining / budget;
+  return clamp(remainingPct * 100, 0, 100);
+};
+
+const tierFromQuality = (qualityScore) => {
+  const v = n(qualityScore);
+  if (v >= 88) return 'S+';
+  if (v >= 82) return 'S';
+  if (v >= 76) return 'A';
+  if (v >= 70) return 'B';
+  if (v >= 64) return 'C';
+  if (v >= 58) return 'D';
+  if (v >= 52) return 'E';
+  return 'F';
+};
+
+// ------------------------------------------------------------
+// Sanity guard: soften need-hit dominance
+// ------------------------------------------------------------
+const effectiveNeedHits = (hits) => {
+  const h = clamp(n(hits), 0, 10);
+  return Math.min(3, h);
+};
+
+const computeFinalRerankScore = (p) => {
+  const finalTotal = n(p?.finalTotal);
+  const activeNeedMatchRaw = n(p?.activeNeedMatch);
+  const activeNeedMatchEff = effectiveNeedHits(activeNeedMatchRaw);
+
+  const disciplineMatch = n(p?.disciplineMatch);
+  const colorMatch = n(p?.colorMatch);
+  const axisMatch = n(p?.axisMatch);
+  const affordability = n(p?.affordability);
+  const fit = n(p?.fit);
+  const value = n(p?.value);
+  const peak = n(p?.peak);
+  const skill = n(p?.skill);
+
+  const needHit01 = clamp(activeNeedMatchEff / 3, 0, 1);
+  const discipline01 = clamp(disciplineMatch / 12, 0, 1);
+  const color01 = clamp(colorMatch / 100, 0, 1);
+  const axis01 = clamp(axisMatch / 200, 0, 1);
+  const afford01 = clamp(affordability / 100, 0, 1);
+
+  const fit01 = clamp(fit / 100, 0, 1);
+  const value01 = clamp(value / 100, 0, 1);
+  const peak01 = clamp(peak / 100, 0, 1);
+  const skill01 = clamp(skill / 100, 0, 1);
+
+  const W = {
+    needHit: 0.3,
+    discipline: 0.18,
+    axis: 0.14,
+    color: 0.08,
+    affordability: 0.14,
+    fit: 0.06,
+    value: 0.06,
+    peak: 0.03,
+    skill: 0.01,
+  };
+
+  const score01 =
+    W.needHit * needHit01 +
+    W.discipline * discipline01 +
+    W.axis * axis01 +
+    W.color * color01 +
+    W.affordability * afford01 +
+    W.fit * fit01 +
+    W.value * value01 +
+    W.peak * peak01 +
+    W.skill * skill01;
+
+  const total01 = clamp(finalTotal / 100, 0, 1);
+  const rerank = 100 * score01 + 6 * total01;
+
+  return {
+    rerank: Number(rerank.toFixed(2)),
+    active_need_match_effective: activeNeedMatchEff,
+  };
+};
+
+const computeNeedCoupledRowScore = (row) => {
+  const mw = n(row?.market_value);
+  const axisMatch = n(row?.score_axis) + n(row?.score_axis_upgrade);
+  const colorMatch = n(row?.score_color_match) >= 80 ? n(row?.score_color_match) : 0;
+  const disciplineMatch = n(row?.discipline_bonus);
+  const affordability = affordabilityScore(mw);
+  const finalTotal = n(row?.final_total_score ?? row?.shortlist_score);
+
+  return computeFinalRerankScore({
+    finalTotal,
+    activeNeedMatch: 1,
+    disciplineMatch,
+    colorMatch,
+    axisMatch,
+    affordability,
+    fit: n(row?.score_fit),
+    value: n(row?.score_value),
+    peak: n(row?.score_peak),
+    skill: n(row?.score_skill),
+  }).rerank;
+};
+
+const computeQualityScore = (row) => {
+  const scSkill = n(row?.score_skill);
+  const scPeak = n(row?.score_peak);
+  const scBreadth = n(row?.score_breadth);
+  const scValue = n(row?.score_value);
+  const scFit = n(row?.score_fit);
+
+  const q = 0.34 * scSkill + 0.18 * scPeak + 0.14 * scBreadth + 0.20 * scValue + 0.14 * scFit;
+  return Number(clamp(q, 0, 100).toFixed(2));
+};
+
+const computeNeedMatchForPick = (pickRow) => {
+  const needType = norm(s(pickRow?.need_type || pickRow?.primary_need_type || ''));
+  const needLabel = norm(s(pickRow?.need_label || pickRow?.primary_need || ''));
+
+  const matchedNeedLabels = new Set();
+  const matchedTags = [];
+
+  const scAxis = n(pickRow?.score_axis);
+  const scAxisUp = n(pickRow?.score_axis_upgrade);
+  const scColor = n(pickRow?.score_color_match);
+  const disciBonus = n(pickRow?.discipline_bonus);
+
+  if (needType === 'axis_upgrade' || needLabel.includes('upgrade')) {
+    const nd = needByLabel.get(needLabel) || needByType.get('axis_upgrade');
+    if (nd) {
+      const profile = safeJson(nd.search_profile);
+      const axis = s(profile.axis_focus || '').toUpperCase();
+      if (axis && scAxis + scAxisUp >= 65) {
+        matchedNeedLabels.add(norm(nd.need_label));
+        matchedTags.push(`${axis}+`);
+      }
+    }
+  }
+
+  if (needType === 'color_economy' || needLabel.includes('farbe')) {
+    if (scColor >= 80) {
+      matchedNeedLabels.add(needLabel);
+      const nd = needByLabel.get(needLabel) || needByType.get('color_economy');
+      const profile = nd ? safeJson(nd.search_profile) : {};
+      const desired = s(profile.desired_class_color || profile.color || '').toLowerCase();
+      matchedTags.push(COLOR_TAG(desired));
+    }
+  }
+
+  if (needType === 'discipline_hole' || needLabel.includes('loch')) {
+    if (disciBonus > 0) {
+      matchedNeedLabels.add(needLabel);
+      const parts = s(pickRow?.need_label || '').split(':');
+      const disciName = parts.length > 1 ? parts[1].trim() : 'Diszi';
+      matchedTags.push(DISCI_LABEL_TO_TAG[disciName] || 'Diszi+');
+    }
+  }
+
+  if (needType === 'discipline_profile_need' || needLabel.includes('diszi-profil')) {
+    if (n(pickRow?.shortlist_score ?? pickRow?.score_total) >= 70) {
+      matchedNeedLabels.add(needLabel);
+      const disci = extractDisciplineFromNeedLabel(pickRow?.need_label);
+      matchedTags.push(disci ? (DISCI_LABEL_TO_TAG[disci] || 'Profile+') : 'Profile+');
+    }
+  }
+
+  if (needType === 'specialist_push' || needLabel.includes('specialist')) {
+    if (n(pickRow?.shortlist_score ?? pickRow?.score_total) >= 72) {
+      matchedNeedLabels.add(needLabel);
+      const disci = extractDisciplineFromNeedLabel(pickRow?.need_label);
+      matchedTags.push(disci ? (DISCI_LABEL_TO_TAG[disci] || 'Spec+') : 'Spec+');
+    }
+  }
+
+  if (needType === 'historical_peak_opportunity' && n(pickRow?.score_peak_points) >= 60) {
+    matchedNeedLabels.add(needLabel);
+    matchedTags.push('Peak+');
+  }
+
+  if (needType === 'historical_breadth_opportunity' && n(pickRow?.score_breadth) >= 60) {
+    matchedNeedLabels.add(needLabel);
+    matchedTags.push('VAR+');
+  }
+
+  return { matchedNeedLabels, matchedTags };
+};
+
+const tagPriority = (tag) => {
+  const t = String(tag || '');
+  if (!t) return 999;
+  const up = t.toUpperCase();
+
+  if (up.endsWith('+')) {
+    const base = up.replace('+', '');
+    const disciCodes = new Set([
+      'TDM', 'MINIDM', 'GEW', 'HOC', 'BRK', 'STA', 'TT', 'SPU', 'CLM',
+      'FEC', 'SCH', 'TAK', 'TEN', 'SPY', 'WET', 'BSK', 'FOO', 'BTL', 'EIS', 'SHW'
+    ]);
+    if (disciCodes.has(base)) return 10;
+  }
+
+  if (up.startsWith('POW+') || up.startsWith('SPE+') || up.startsWith('MEN+') || up.startsWith('SOC+')) return 20;
+  if (up.startsWith('COLOR:')) return 30;
+  if (up === 'COLOR+') return 35;
+  if (up === 'PROFILE+') return 40;
+  if (up === 'SPEC+') return 45;
+  if (up === 'PEAK+') return 60;
+  if (up === 'VAR+') return 65;
+  if (up === 'CARD') return 80;
+  if (t.endsWith('★')) return 90;
+  return 70;
+};
+
+const sortTags = (tags) => {
+  const arr = (Array.isArray(tags) ? tags : []).map((x) => s(x)).filter(Boolean);
+  const uniq = [...new Set(arr)];
+  return uniq.sort((a, b) => tagPriority(a) - tagPriority(b) || a.localeCompare(b));
+};
+
+// ------------------------------------------------------------
+// Star tags
+// ------------------------------------------------------------
+const DISC_FIELDS = [
+  'tdm', 'mini_dm', 'gewichtheben', 'hockey', 'breaking', 'staffel', 'time_trial',
+  'spurt', 'climbing', 'fechten', 'schach', 'takeshi', 'tennis', 'i_spy',
+  'wettessen', 'basketball', 'football', 'battlefield', 'eiskunst', 'showcase'
+];
+
+const DISZI_STAR_TAG = {
+  tdm: 'TDM★',
+  mini_dm: 'MiniDM★',
+  gewichtheben: 'GEW★',
+  hockey: 'HOC★',
+  breaking: 'BRK★',
+  staffel: 'STA★',
+  time_trial: 'TT★',
+  spurt: 'SPU★',
+  climbing: 'CLM★',
+  fechten: 'FEC★',
+  schach: 'SCH★',
+  takeshi: 'TAK★',
+  tennis: 'TEN★',
+  i_spy: 'SPY★',
+  wettessen: 'WET★',
+  basketball: 'BSK★',
+  football: 'FOO★',
+  battlefield: 'BTL★',
+  eiskunst: 'EIS★',
+  showcase: 'SHW★',
+};
+
+const pct = (arr, p) => {
+  const a = (Array.isArray(arr) ? arr : []).filter((x) => Number.isFinite(n(x))).sort((x, y) => x - y);
+  if (!a.length) return null;
+  return a[Math.max(0, Math.min(a.length - 1, Math.round((a.length - 1) * p)))];
+};
+
+const topCutoffByField = {};
+for (const f of DISC_FIELDS) {
+  const vals = candPool.map((c) => n(c?.diszi_attr_scores?.[f])).filter((x) => Number.isFinite(x) && x > 0);
+  topCutoffByField[f] = pct(vals, 0.9);
+}
+
+const disciplineStarTags = (playerKey) => {
+  const scores = disziByName.get(playerKey) || {};
+  return Object.keys(DISZI_STAR_TAG)
+    .map((field) => ({ field, v: n(scores?.[field]), cutoff: topCutoffByField[field] }))
+    .filter((x) => x.cutoff != null && x.v >= x.cutoff && x.v >= 80)
+    .sort((a, b) => b.v - a.v)
+    .slice(0, 2)
+    .map((c) => DISZI_STAR_TAG[c.field]);
+};
+
+// ------------------------------------------------------------
+// Build per-player best-row picks
+// ------------------------------------------------------------
+const byPlayer = new Map();
+for (const row of picks) {
+  const name = s(row?.player_name || row?.player || row?.name);
+  if (!name) continue;
+  const key = norm(name);
+  if (!byPlayer.has(key)) byPlayer.set(key, []);
+  byPlayer.get(key).push(row);
+}
+
+const out = [];
+
+for (const [playerKey, rows] of byPlayer.entries()) {
+  const sorted = [...rows].sort((a, b) => {
+    const aRow = computeNeedCoupledRowScore(a);
+    const bRow = computeNeedCoupledRowScore(b);
+    if (bRow !== aRow) return bRow - aRow;
+
+    const aScore = n(a?.final_total_score ?? a?.shortlist_score);
+    const bScore = n(b?.final_total_score ?? b?.shortlist_score);
+    if (bScore !== aScore) return bScore - aScore;
+
+    const aFit = n(a?.fit);
+    const bFit = n(b?.fit);
+    if (bFit !== aFit) return bFit - aFit;
+
+    const aMw = n(a?.market_value);
+    const bMw = n(b?.market_value);
+    return aMw - bMw;
+  });
+
+  const best = sorted[0];
+  if (!best) continue;
+
+  const primaryNeed = s(best?.need_label || best?.primary_need || '');
+  const mw = n(best?.market_value);
+
+  const allNeedTags = new Set();
+  const primaryNeedMatches = [];
+
+  for (const row of rows) {
+    const { matchedNeedLabels, matchedTags } = computeNeedMatchForPick(row);
+    for (const t of matchedTags) allNeedTags.add(t);
+    for (const lbl of matchedNeedLabels) {
+      if (!primaryNeedMatches.includes(lbl)) primaryNeedMatches.push(lbl);
+    }
+  }
+
+  for (const t of disciplineStarTags(playerKey)) allNeedTags.add(t);
+  const top5NeedTags = sortTags([...allNeedTags]).slice(0, 5);
+
+  // Components from best-row
+  const scSkill = n(best?.score_skill);
+  const scPeak = n(best?.score_peak);
+  const scBreadth = n(best?.score_breadth);
+  const scValue = n(best?.score_value);
+  const scFit = n(best?.score_fit);
+  const scIdentity = n(best?.score_identity);
+  const scAxis = n(best?.score_axis);
+  const scAxisUp = n(best?.score_axis_upgrade);
+  const scColor = n(best?.score_color_match);
+  const scRatio = n(best?.score_ratio);
+
+  const uPenalty = usagePenalty(mw);
+
+  const active_need_match = primaryNeedMatches.length;
+  const active_need_match_effective = effectiveNeedHits(active_need_match);
+
+  const discipline_match = n(best?.discipline_bonus);
+  const color_match = scColor >= 80 ? scColor : 0;
+  const axis_match = scAxis + scAxisUp;
+  const affordability = affordabilityScore(mw);
+
+  const final_total_score = n(best?.final_total_score ?? best?.shortlist_score);
+
+  const rerankObj = computeFinalRerankScore({
+    finalTotal: final_total_score,
+    activeNeedMatch: active_need_match,
+    disciplineMatch: discipline_match,
+    colorMatch: color_match,
+    axisMatch: axis_match,
+    affordability,
+    fit: scFit,
+    value: scValue,
+    peak: scPeak,
+    skill: scSkill,
+  });
+
+  const final_rerank_score_base = rerankObj.rerank;
+
+  const best_row_need_coupled_score = Number(computeNeedCoupledRowScore(best).toFixed(2));
+  const quality_score = computeQualityScore(best);
+
+  let secondaryNeed = '';
+  for (const row of sorted.slice(1)) {
+    const lbl = s(row?.need_label || row?.primary_need || '');
+    if (lbl && norm(lbl) !== norm(primaryNeed)) {
+      secondaryNeed = lbl;
+      break;
+    }
+  }
+
+  const bracket = getBracket(mw);
+  const image_url = imageByName.get(playerKey) || s(best?.image || '');
+  const core = coreByName.get(playerKey) || { pow: null, spe: null, men: null, soc: null };
+
+  // ----------------------
+  // Explainability fields
+  // ----------------------
+  const budget_status_cap =
+    mw <= allowed_budget_for_search
+      ? (mw <= allowed_budget_for_search * 0.7 ? 'feasible' : 'top plan')
+      : 'over cap';
+
+  const budget_status_cash =
+    mw <= cash
+      ? (mw <= cash * 0.7 ? 'feasible' : 'top plan')
+      : 'not payable';
+
+  const fee_usage = cash > 0 ? mw / cash : null;
+  const cap_usage = allowed_budget_for_search > 0 ? mw / allowed_budget_for_search : null;
+  const cash_remaining_after_fee = cash - mw;
+  const cap_remaining_after_fee = allowed_budget_for_search - mw;
+
+  out.push({
+    rank: 0,
+
+    recommendation_tier: tierFromQuality(quality_score),
+    quality_score,
+
+    // budget
+    budget_status: s(best?.budget_status || ''),
+    budget_status_cap,
+    budget_status_cash,
+
+    // explainability
+    fee_usage: fee_usage == null ? null : Number(fee_usage.toFixed(3)),
+    cap_usage: cap_usage == null ? null : Number(cap_usage.toFixed(3)),
+    cash_remaining_after_fee: Number(cash_remaining_after_fee.toFixed(2)),
+    cap_remaining_after_fee: Number(cap_remaining_after_fee.toFixed(2)),
+
+    image_url,
+    player: s(best?.player_name || best?.player || best?.name),
+    pow: core.pow,
+    spe: core.spe,
+    men: core.men,
+    soc: core.soc,
+
+    primary_need: primaryNeed,
+    secondary_need: secondaryNeed,
+    need_tags_short: top5NeedTags,
+
+    // scores
+    skill_score: Number(scSkill.toFixed(1)),
+    peak_score: Number(scPeak.toFixed(1)),
+    breadth_score: Number(scBreadth.toFixed(1)),
+    value_score: Number(scValue.toFixed(1)),
+    fit_score: Number(scFit.toFixed(1)),
+    identity_score: Number(scIdentity.toFixed(1)),
+    axis_score: Number(scAxis.toFixed(1)),
+    axis_upgrade_score: Number(scAxisUp.toFixed(1)),
+    color_score: Number(scColor.toFixed(1)),
+    ratio_score: Number(scRatio.toFixed(1)),
+
+    // budget penalty
+    usage_penalty: uPenalty,
+
+    // need coupling
+    active_need_match,
+    active_need_match_effective,
+    axis_match: Number(axis_match.toFixed(1)),
+    color_match: Number(color_match.toFixed(1)),
+    discipline_match: Number(discipline_match.toFixed(2)),
+    affordability: Number(affordability.toFixed(1)),
+
+    mw,
+    salary: n(best?.salary),
+    fit: n(best?.fit),
+    cash_after_pick: Number((cash - mw).toFixed(2)),
+
+    bracket,
+    bracket_range: getBracketRange(bracket),
+    Bracket: bracket,
+
+    final_total_score: Number(final_total_score.toFixed(2)),
+
+    // ordering scores
+    final_rerank_score_base,
+    final_rerank_score: final_rerank_score_base,
+
+    // diversification debug
+    diversification_penalty: 0,
+
+    // debug/transparency
+    best_row_need_coupled_score,
+
+    raw_cash: Number(cash.toFixed(2)),
+    allowed_budget_for_search: Number(allowed_budget_for_search.toFixed(2)),
+    reserve_buffer: Number(reserve_buffer.toFixed(2)),
+    finance_posture_cap: Number(finance_posture_cap.toFixed(2)),
+    max_single_affordable: Number(max_single_affordable.toFixed(2)),
+    max_package_affordable: Number(max_package_affordable.toFixed(2)),
+
+    finances_strength,
+    spending_discipline_proxy: Number(spending_discipline_proxy.toFixed(3)),
+
+    primary_need_matches: primaryNeedMatches.slice(0, 5),
+    top_5_need_tags: top5NeedTags,
+
+    player_name: s(best?.player_name),
+    current_team: s(best?.current_team),
+    klasse: s(best?.klasse),
+    need_label: s(best?.need_label),
+    need_type: s(best?.need_type),
+
+    disci_plug_field: best?.target_discipline_field || null,
+    disci_plug_bonus: discipline_match > 0 ? Number(discipline_match.toFixed(2)) : null,
+  });
+}
+
+// Base order
+out.sort((a, b) =>
+  n(b.final_rerank_score_base) - n(a.final_rerank_score_base) ||
+  n(b.active_need_match_effective) - n(a.active_need_match_effective) ||
+  n(b.affordability) - n(a.affordability) ||
+  n(b.fit) - n(a.fit) ||
+  n(a.mw) - n(b.mw)
+);
+
+// ------------------------------------------------------------
+// Soft diversification
+// ------------------------------------------------------------
+const DIVERSIFY = {
+  enabled: true,
+  topWindow: 12,
+  startAfter: 3,
+  stepPenalty: 2.2,
+  cap: 8.0,
+};
+
+const penaltyFor = (needCounts, needType, slot1) => {
+  if (!DIVERSIFY.enabled) return 0;
+  if (slot1 <= DIVERSIFY.startAfter) return 0;
+  const typ = norm(needType || '');
+  if (!typ) return 0;
+  const count = n(needCounts[typ] || 0);
+  return clamp(count * DIVERSIFY.stepPenalty, 0, DIVERSIFY.cap);
+};
+
+const remaining = [...out];
+const diversified = [];
+const needCounts = {};
+
+const windowN = Math.min(DIVERSIFY.topWindow, remaining.length);
+for (let slot = 1; slot <= windowN; slot++) {
+  let bestIdx = 0;
+  let bestAdj = -Infinity;
+  let bestPen = 0;
+
+  for (let i = 0; i < remaining.length; i++) {
+    const cand = remaining[i];
+    const pen = penaltyFor(needCounts, cand?.need_type, slot);
+    const adj = n(cand.final_rerank_score_base) - pen;
+
+    if (
+      adj > bestAdj ||
+      (adj === bestAdj && n(cand.final_rerank_score_base) > n(remaining[bestIdx]?.final_rerank_score_base))
+    ) {
+      bestAdj = adj;
+      bestIdx = i;
+      bestPen = pen;
+    }
+  }
+
+  const chosen = remaining.splice(bestIdx, 1)[0];
+  const typ = norm(chosen?.need_type || '');
+  if (typ) needCounts[typ] = n(needCounts[typ] || 0) + 1;
+
+  diversified.push({
+    ...chosen,
+    diversification_penalty: Number(bestPen.toFixed(2)),
+    final_rerank_score: Number(bestAdj.toFixed(2)),
+  });
+}
+
+for (const r of remaining) diversified.push(r);
+
+// ------------------------------------------------------------
+// Reason code
+// ------------------------------------------------------------
+const computeReasonCode = (row) => {
+  const mw = n(row?.mw);
+  const fit = n(row?.fit);
+  const value = n(row?.value_score);
+  const needHits = n(row?.active_need_match_effective ?? row?.active_need_match);
+
+  if (n(allowed_budget_for_search) > 0 && mw > n(allowed_budget_for_search)) return 'over_cap';
+  if (n(cash) > 0 && mw > n(cash)) return 'not_payable';
+  if (fit > 0 && fit < 18) return 'low_fit';
+  if (value > 0 && value < 42) return 'weak_value';
+  if (needHits <= 0) return 'low_need_match';
+  return 'ok';
+};
+
+return diversified.map((r, idx) => ({
+  ...r,
+  rank: idx + 1,
+  reason_code: computeReasonCode(r),
+}));

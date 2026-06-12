@@ -1,0 +1,13 @@
+// term: aiTeamNeeds
+// id: 563c2352
+// type: widget
+// subtype: TableWidget2
+// page: transfermarktPage
+// folder: unknown
+// updatedAt: unknown
+// codeField: unknown
+// dependencies: none
+// extractionStatus: partial_match_only
+// Partial match only.
+// No direct code/value block could be extracted for aiTeamNeeds.
+
