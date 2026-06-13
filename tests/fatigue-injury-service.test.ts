@@ -261,6 +261,46 @@ describe("fatigue injury service", () => {
     expect(recovery.injuryRecovery).toBe(recovery.normalRecovery * 0.5);
   });
 
+  it("applies normal recovery with facility bonus to active roster players who sit out the matchday", () => {
+    const gameState = createGameState("player-1", 20);
+    gameState.players.push({
+      id: "bench-player",
+      name: "Bench Runner",
+      className: "Runner",
+      race: "Human",
+      marketValue: 10,
+      salary: 2,
+      fatigue: 48,
+      attributes: {},
+      disciplineRatings: {},
+    } as never);
+    gameState.rosters.push({
+      teamId: "A-A",
+      playerId: "bench-player",
+      role: "bench",
+      joinedSeasonId: "season-1",
+    } as never);
+    const recovery = calculateTeamRecovery(gameState, "A-A");
+
+    const result = applyFatigueAndInjuryAfterMatchday({
+      gameState,
+      saveId: "save-1",
+      seasonId: "season-1",
+      matchdayId: "md-1",
+      matchdayResultId: "result-1",
+      timestamp: "2026-06-13T00:00:00.000Z",
+    });
+
+    const usedPlayer = result.gameState.players.find((player) => player.id === "player-1");
+    const benchPlayer = result.gameState.players.find((player) => player.id === "bench-player");
+    const benchAvailability = getPlayerAvailabilityView(result.gameState, "bench-player", "A-A", "md-2");
+
+    expect(usedPlayer?.fatigue).toBe(32);
+    expect(benchPlayer?.fatigue).toBe(Math.max(0, Number((48 - recovery.normalRecovery).toFixed(2))));
+    expect(benchAvailability.fatigue).toBe(benchPlayer?.fatigue);
+    expect(benchAvailability.blocker).toBeNull();
+  });
+
   it("blocks human lineups that still reference an injured player", () => {
     const context: LegacyLineupContext = {
       saveId: "save-1",

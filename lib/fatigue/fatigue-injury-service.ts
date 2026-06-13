@@ -258,6 +258,7 @@ export function applyFatigueAndInjuryAfterMatchday(input: {
   timestamp: string;
 }): { gameState: GameState; injuryEvents: InjuryEventRecord[] } {
   const usedPlayers = collectMatchdayUses(input.gameState, input.seasonId, input.matchdayId);
+  const usedPlayerKeys = new Set(usedPlayers.map((use) => `${use.teamId}::${use.playerId}`));
   const nextMatchdayId = getNextMatchdayId(input.gameState, input.matchdayId);
   let nextAvailability = (input.gameState.seasonState.playerAvailabilityState ?? []).filter((entry) =>
     isActiveRosterPlayer(input.gameState, entry.playerId, entry.teamId),
@@ -267,20 +268,38 @@ export function applyFatigueAndInjuryAfterMatchday(input: {
   const playerNameById = new Map(input.gameState.players.map((player) => [player.id, player.name] as const));
   const newEvents: InjuryEventRecord[] = [];
 
-  for (const state of nextAvailability) {
-    const view = getPlayerAvailabilityView(input.gameState, state.playerId, state.teamId, input.matchdayId);
-    if (!view.isUnavailable) continue;
-    const recovery = calculateTeamRecovery(input.gameState, state.teamId);
-    const fatigueAfterRecovery = clampFatigue(state.fatigue - recovery.injuryRecovery);
+  for (const roster of input.gameState.rosters) {
+    const playerIndex = playerIndexById.get(roster.playerId);
+    if (playerIndex == null) continue;
+    const player = nextPlayers[playerIndex];
+    const usedKey = `${roster.teamId}::${roster.playerId}`;
+    const view = getPlayerAvailabilityView(
+      { ...input.gameState, players: nextPlayers, seasonState: { ...input.gameState.seasonState, playerAvailabilityState: nextAvailability } },
+      roster.playerId,
+      roster.teamId,
+      input.matchdayId,
+    );
+    if (usedPlayerKeys.has(usedKey) && !view.isUnavailable) continue;
+    const recovery = calculateTeamRecovery(input.gameState, roster.teamId);
+    const currentFatigue = getPlayerCurrentFatigue(
+      { ...input.gameState, players: nextPlayers, seasonState: { ...input.gameState.seasonState, playerAvailabilityState: nextAvailability } },
+      player,
+      roster.teamId,
+    );
+    const recoveryValue = view.isUnavailable ? recovery.injuryRecovery : recovery.normalRecovery;
+    const fatigueAfterRecovery = clampFatigue(currentFatigue - recoveryValue);
     nextAvailability = updateAvailability(nextAvailability, {
-      ...state,
+      playerId: roster.playerId,
+      teamId: roster.teamId,
       fatigue: fatigueAfterRecovery,
-      injuryStatus: state.injuryUntilMatchday === input.matchdayId ? "recovering" : state.injuryStatus,
+      injuryStatus: view.injuryUntilMatchday === input.matchdayId ? "recovering" : view.injuryStatus,
+      injuryUntilMatchday: view.injuryUntilMatchday,
+      injuredAtSeasonId: view.injuredAtSeasonId,
+      injuredAtMatchdayId: view.injuredAtMatchdayId,
+      injuryReason: view.injuryReason,
+      injuryRiskLastRoll: view.injuryRiskLastRoll,
     });
-    const playerIndex = playerIndexById.get(state.playerId);
-    if (playerIndex != null) {
-      nextPlayers[playerIndex] = { ...nextPlayers[playerIndex], fatigue: fatigueAfterRecovery };
-    }
+    nextPlayers[playerIndex] = { ...player, fatigue: fatigueAfterRecovery };
   }
 
   for (const use of usedPlayers) {

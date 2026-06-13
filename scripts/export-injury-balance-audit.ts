@@ -306,6 +306,11 @@ function main() {
 
         for (const player of players) {
           if (selectedIds.has(player.playerId)) continue;
+          const fatigueBeforeRecovery = player.fatigue;
+          const canRecoverNormally = !(player.injuryStatus === "injured" && (player.injuredUntilMatchdayIndex ?? -1) >= matchdayIndex);
+          if (canRecoverNormally) {
+            player.fatigue = clampFatigue(player.fatigue - recovery.normalRecovery);
+          }
           playerRows.push({
             scenarioId,
             matchdayIndex,
@@ -314,7 +319,7 @@ function main() {
             teamName: team.name,
             playerId: player.playerId,
             playerName: player.playerName,
-            fatigueBeforeMatchday: player.fatigue,
+            fatigueBeforeMatchday: fatigueBeforeRecovery,
             fatigueAfterMatchday: player.fatigue,
             injuryRiskBand: getInjuryRiskBand(player.fatigue).label,
             injuryRiskPercent: getInjuryRiskBand(player.fatigue).riskPercent,
@@ -329,7 +334,7 @@ function main() {
             teamRosterSize: players.length,
             availablePlayers: availableBefore,
             blockedPlayers: blockedBefore,
-            source: player.isVirtualRotationSlot ? "rotation_cap_preview_virtual_slot" : "not_selected_recovered_or_resting",
+            source: player.isVirtualRotationSlot ? "rotation_cap_preview_virtual_slot" : "not_selected_normal_recovery",
           });
         }
 
@@ -558,9 +563,9 @@ function main() {
       "max_14_15_use_virtual_rotation_slots_not_real_players",
       "rotation_model_picks_lowest_fatigue_available_players",
       "injured_players_blocked_for_next_matchday",
-      "current_service_only_applies_recovery_to_injured_unavailable_players",
+      "non_selected_active_roster_players_receive_normal_recovery",
       `matchday_fatigue_load_${MATCHDAY_FATIGUE_LOAD}`,
-      `base_recovery_${BASE_MATCHDAY_RECOVERY}_plus_facilities_reported_for_comparison`,
+      `base_recovery_${BASE_MATCHDAY_RECOVERY}_plus_facilities`,
     ],
     summaries,
     recommendation,
@@ -601,7 +606,7 @@ function main() {
     "",
     "- Wenn Max 14 die Lineup-Druck-Teams deutlich senkt, sollte zuerst Max 14 getestet werden statt die 85+-Kurve zu nerfen.",
     "- Wenn Max 15 kaum besser ist als Max 14, ist 14 der sauberere erste Balancing-Test.",
-    "- Der Audit bildet den aktuellen Service ab: normale Recovery wird berichtet, aber nur verletzte/unavailable Spieler erhalten aktuell die halbierte Injury-Recovery.",
+    "- Nicht eingesetzte aktive Kaderspieler erhalten normale Recovery inklusive Facility-Boni; verletzte/unavailable Spieler erhalten die halbierte Injury-Recovery.",
     "- Wenn Verletzungen hoch bleiben, obwohl Lineup-Druck verschwindet, ist eher Recovery/AI-Rotation als Roster-Max die Stellschraube.",
     "",
     "## Exporte",
