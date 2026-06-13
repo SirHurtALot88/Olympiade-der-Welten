@@ -46,6 +46,7 @@
     "player:baseline-audit": "tsx scripts/export-player-baseline-audit.ts",
     "player:morale-audit": "tsx scripts/export-player-morale-audit.ts",
     "fatigue:injury-audit": "tsx scripts/export-fatigue-injury-audit.ts",
+    "fatigue:balance-audit": "tsx scripts/export-injury-balance-audit.ts",
     "player:audit-attributes-source": "node ./scripts/audit-player-attributes-source.ts",
     "player:audit-retool-attribute-mapping": "tsx scripts/audit-retool-attribute-mapping.ts",
     "player:sync-attribute-sheet-db": "tsx scripts/sync-player-attribute-sheet-to-db.ts",
