@@ -13,11 +13,20 @@ export function validateLegacyLineupContext(
   const enforceCompleteness = options.enforceCompleteness ?? true;
 
   const activePlayerById = new Map(input.activePlayers.map((player) => [player.id, player]));
+  const rosterPlayerById = new Map((input.rosterPlayers ?? []).map((player) => [player.id, player]));
   const playerUsageByMatchday = new Map<string, string>();
   const entriesByDisciplineSide = new Map<string, number>();
   const captainCountByDisciplineSide = new Map<string, number>();
 
   for (const entry of input.entries) {
+    const rosterPlayer = rosterPlayerById.get(entry.playerId);
+    if (rosterPlayer?.availabilityBlocker === "player_injured_unavailable") {
+      errors.push(
+        `player_injured_unavailable: Player ${entry.playerId} is injured and unavailable until ${rosterPlayer.injuryUntilMatchday ?? "next matchday"}.`,
+      );
+      continue;
+    }
+
     if (!entry.activePlayerId) {
       errors.push(`Entry ${entry.disciplineId}/${entry.disciplineSide}/slot-${entry.slotIndex} is missing activePlayerId.`);
       continue;

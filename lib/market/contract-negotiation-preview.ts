@@ -10,7 +10,9 @@ import type {
   TeamStrategyProfile,
 } from "@/lib/data/olyDataTypes";
 import { resolvePlayerEconomyContract } from "@/lib/foundation/player-economy-contract";
+import { buildTransfermarktSaleFactorBreakdown, normalizeVisibleRosterMoney } from "@/lib/market/transfermarkt-sale-factor";
 import { calculateTransfermarktFit, getTransfermarktBracket, normalizeTransfermarktToken } from "@/lib/market/transfermarkt-fit";
+import { assessPlayerMorale } from "@/lib/morale/player-morale-service";
 import { loadPlayerFormulaSources } from "@/lib/player-formulas/formula-source-loader";
 import { getCanonicalSeasonLabelAtOffset } from "@/lib/season/season-label";
 
@@ -90,6 +92,17 @@ export type TeamContractSeasonRow = {
   contractLength: number;
   totalSalary: number | null;
   buyoutCost: number | null;
+  exitValue: number | null;
+  saleFactor: number | null;
+  marketValueAtExit: number | null;
+  purchasePrice: number | null;
+  profitLoss: number | null;
+  morale: number | null;
+  moraleMood: string | null;
+  moraleSmiley: string | null;
+  moraleContractIntent: string | null;
+  moraleSalaryModifier: number | null;
+  moraleRenewalRisk: number | null;
   yearlySalarySchedule: ContractYearSalary[];
 };
 
@@ -834,6 +847,14 @@ export function buildTeamContractSeasonTable(input: {
     .map<TeamContractSeasonRow>((entry) => {
       const player = input.gameState.players.find((candidate) => candidate.id === entry.playerId) ?? null;
       const economy = resolvePlayerEconomyContract({ player, rosterEntry: entry });
+      const saleFactorBreakdown = buildTransfermarktSaleFactorBreakdown(input.gameState, player, entry);
+      const marketValueAtExit = saleFactorBreakdown.baseMarketValue ?? economy.marketValue ?? null;
+      const exitValue = saleFactorBreakdown.salePrice ?? economy.marketValue ?? null;
+      const purchasePrice = normalizeVisibleRosterMoney(entry.purchasePrice, economy.purchasePrice);
+      const profitLoss =
+        exitValue != null && purchasePrice != null
+          ? roundMoney(Math.abs(exitValue - purchasePrice) < 0.005 ? 0 : exitValue - purchasePrice, 2)
+          : null;
       const preview = buildContractSalarySchedule({
         annualSalary: economy.salary,
         contractLength: entry.contractLength,
@@ -841,6 +862,14 @@ export function buildTeamContractSeasonTable(input: {
         seasonIdBase: input.gameState.season.id,
         seasonLabelBase: input.seasonLabelBase,
       });
+      const morale = player
+        ? assessPlayerMorale({
+            gameState: input.gameState,
+            playerId: player.id,
+            teamId: input.teamId,
+            renewalSalaryPreview: economy.salary,
+          })
+        : null;
 
       return {
         rowId: entry.id,
@@ -852,6 +881,17 @@ export function buildTeamContractSeasonTable(input: {
         contractLength: entry.contractLength,
         totalSalary: preview.totalSalary,
         buyoutCost: calculateOpenBuyoutCost(preview.yearlySalarySchedule, 0),
+        exitValue,
+        saleFactor: saleFactorBreakdown.saleFactor,
+        marketValueAtExit,
+        purchasePrice,
+        profitLoss,
+        morale: morale?.morale ?? null,
+        moraleMood: morale?.moodLabel ?? null,
+        moraleSmiley: morale?.smiley ?? null,
+        moraleContractIntent: morale?.contractIntent ?? null,
+        moraleSalaryModifier: morale?.moraleSalaryModifier ?? null,
+        moraleRenewalRisk: morale?.moraleRenewalRisk ?? null,
         yearlySalarySchedule: preview.yearlySalarySchedule,
       };
     });
@@ -868,6 +908,17 @@ export function buildTeamContractSeasonTable(input: {
       contractLength: draft.contractLength,
       totalSalary: draft.totalSalary,
       buyoutCost: draft.buyoutCost,
+      exitValue: null,
+      saleFactor: null,
+      marketValueAtExit: null,
+      purchasePrice: null,
+      profitLoss: null,
+      morale: null,
+      moraleMood: null,
+      moraleSmiley: null,
+      moraleContractIntent: null,
+      moraleSalaryModifier: null,
+      moraleRenewalRisk: null,
       yearlySalarySchedule: draft.yearlySalarySchedule,
     }));
 

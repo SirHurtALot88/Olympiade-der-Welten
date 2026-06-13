@@ -1,4 +1,5 @@
 import { evaluateAiNeeds } from "@/lib/ai/aiNeedsEngine";
+import { getTeamObjectiveAiBias, type TeamObjectiveAiBias } from "@/lib/board/team-season-objectives-service";
 import type { GameState, Team, TeamControlMode, TeamStrategyProfile } from "@/lib/data/olyDataTypes";
 import { resolvePlayerEconomyContract } from "@/lib/foundation/player-economy-contract";
 import { getTeamControlSettings } from "@/lib/foundation/team-control-settings";
@@ -331,6 +332,29 @@ function getStrategyPriorityBoost(item: TransfermarktFreeAgentItem, strategyProf
   return exactPreferredClassHits * 55 + preferredClassHits * 18 + preferredArchetypeHits * 12 + preferredRaceHits * 6;
 }
 
+function getPotentialValueScore(item: TransfermarktFreeAgentItem) {
+  const bandScore =
+    item.potentialBand === "elite"
+      ? 1
+      : item.potentialBand === "high"
+        ? 0.72
+        : item.potentialBand === "medium"
+          ? 0.38
+          : item.potentialBand === "low"
+            ? 0.12
+            : 0;
+  const confidenceFactor = item.scoutingConfidence == null ? 0.55 : clamp(item.scoutingConfidence / 100, 0.25, 1);
+  return bandScore * confidenceFactor;
+}
+
+function getPotentialStrategyWeight(team: Team, strategyProfile: ReturnType<typeof getTeamStrategyProfile>) {
+  const teamToken = `${team.teamId} ${team.name} ${strategyProfile?.strategySummary ?? ""} ${strategyProfile?.buyStyle ?? ""}`.toLowerCase();
+  if (teamToken.includes("cash creator") || teamToken.includes("value")) return 0.16;
+  if (teamToken.includes("teacher") || teamToken.includes("development") || teamToken.includes("academy")) return 0.14;
+  if (teamToken.includes("mayhem") || teamToken.includes("champion") || teamToken.includes("topteam")) return 0.05;
+  return 0.09;
+}
+
 function buildNeedSummary(input: {
   weakestAxes: Array<"pow" | "spe" | "men" | "soc">;
   rosterStatus: AiTransferPreviewTeamEntry["rosterStatus"];
@@ -563,6 +587,7 @@ function scoreCandidate(input: {
   team: Team;
   context: ResolvedPreviewContext;
   rosterClassCounts: Map<string, number>;
+  objectiveBias?: TeamObjectiveAiBias | null;
 }) {
   const { item, budgetStatus, rosterStatus, weakestAxes, needs } = input;
   const preview = buildCandidatePreview(input.context, input.team, item);
@@ -591,6 +616,8 @@ function scoreCandidate(input: {
   const isSpamSensitiveClass = ["berserker", "warlord"].includes(normalizeTransfermarktToken(item.className));
 
   const valueScore = clamp((item.marketValueSalaryRatio ?? 0) / 20, 0, 1);
+  const potentialValueScore = getPotentialValueScore(item);
+  const potentialStrategyWeight = getPotentialStrategyWeight(input.team, strategyProfile);
   const disciplineNeedScore = clamp(
     item.topDisciplineScores.filter((entry) => needs.topNeedDisciplineIds.includes(entry.disciplineId)).length / 2,
     0,
@@ -628,6 +655,12 @@ function scoreCandidate(input: {
       : 0;
   const wagePenalty = salaryPenaltyBase * ((strategyProfile?.bias.wageSensitivity ?? 5) / 10);
   const riskPenalty = budgetStatus === "critical" ? 0.35 : budgetStatus === "tight" ? 0.18 : 0;
+  const objectiveBuyBonus = input.objectiveBias
+    ? input.objectiveBias.rosterUrgency * 0.08 + input.objectiveBias.buyAggression * 0.05 + Math.max(input.objectiveBias.pressure - 7, 0) * 0.015
+    : 0;
+  const objectiveFinancePenalty = input.objectiveBias
+    ? input.objectiveBias.budgetConservatism * salaryPenaltyBase * 0.18
+    : 0;
   const strategyBonus =
     preferredRaceHits * 0.08 +
     exactPreferredClassHits * 0.95 +
@@ -652,10 +685,13 @@ function scoreCandidate(input: {
     axisNeedScore * 0.18 +
     disciplineNeedScore * 0.1 +
     valueScore * 0.12 +
+    potentialValueScore * potentialStrategyWeight +
     fitScore * 0.1 +
     identityAxisAlignment * 0.3 +
+    objectiveBuyBonus +
     strategyBonus -
     wagePenalty * 0.16 -
+    objectiveFinancePenalty -
     riskPenalty -
     strategyPenalty -
     themeMismatchPenalty -
@@ -675,6 +711,18 @@ function scoreCandidate(input: {
   if (preferredClassHits > 0) strategyNotes.push(`passt zur Wunsch-Klasse ${item.className}`);
   if (preferredArchetypeHits > 0) strategyNotes.push("passt zum hinterlegten Team-Stil");
   if (identityAxisAlignment >= 0.62) strategyNotes.push("passt zu den Teamachsen");
+  if (potentialValueScore >= 0.5 && potentialStrategyWeight >= 0.09) {
+    strategyNotes.push(`Scouting sieht ${item.potentialBand}-Potential (${item.scoutingConfidence ?? 0}% Confidence)`);
+  }
+  if (potentialValueScore >= 0.5 && potentialStrategyWeight < 0.09) {
+    fitNotes.push("Potential ist nett, Sofort-Impact bleibt wichtiger");
+  }
+  if (input.objectiveBias?.rosterUrgency != null && input.objectiveBias.rosterUrgency >= 0.7) {
+    strategyNotes.push("Roster-Ziel erhoeht Kaufprioritaet");
+  }
+  if (input.objectiveBias?.pressure != null && input.objectiveBias.pressure >= 8) {
+    strategyNotes.push("Boarddruck macht den Markt aggressiver");
+  }
   if (avoidedRaceHits > 0) riskNotes.push(`Teamprofil meidet ${item.race}`);
   if (avoidedClassHits > 0) riskNotes.push(`Teamprofil meidet ${item.className}`);
   if (avoidedArchetypeHits > 0) riskNotes.push("Archetyp kollidiert mit dem Team-Stil");
@@ -702,6 +750,9 @@ function scoreCandidate(input: {
   }
   if (budgetStatus !== "healthy" && preview.cashAfter != null && preview.cashAfter < (preview.cashBefore ?? 0) * 0.2) {
     riskNotes.push("Cash nach Kauf wird sehr eng");
+  }
+  if (input.objectiveBias?.budgetConservatism != null && input.objectiveBias.budgetConservatism >= 0.65) {
+    riskNotes.push("Finance-Ziel bremst riskante Ausgaben");
   }
   if (item.salary != null && item.teamCash != null && item.salary > item.teamCash * 0.2) {
     riskNotes.push("Gehalt frisst viel Rest-Cash");
@@ -838,6 +889,7 @@ export async function buildAiTransfermarktPreview(params: AiTransferPreviewParam
     candidateTeams.map(async (team) => {
       const control = getTeamControlSettings(context.gameState, team.teamId);
       const strategyProfile = getTeamStrategyProfile(context.gameState, team.teamId);
+      const objectiveBias = getTeamObjectiveAiBias(context.gameState, team.teamId);
       const needs = evaluateAiNeeds(context.gameState, team.teamId);
       const identity = context.gameState.teamIdentities.find((entry) => entry.teamId === team.teamId) ?? null;
       const rosterEconomy = getRosterEconomyContext(context.gameState, team.teamId);
@@ -860,6 +912,8 @@ export async function buildAiTransfermarktPreview(params: AiTransferPreviewParam
         !params.buyNeedOnly ||
         requestedTeam != null ||
         (control?.controlMode === "ai" && directRosterStatus !== "at_or_above_opt") ||
+        (control?.controlMode === "ai" && (objectiveBias?.rosterUrgency ?? 0) >= 0.7) ||
+        (control?.controlMode === "ai" && (objectiveBias?.pressure ?? 0) >= 8) ||
         forceBuyScanTeamIds.has(team.teamId);
       const freeAgents = shouldDeepScanBuyCandidates
         ? await loadFreeAgentsForTeam(context, team.teamId, limit)
@@ -890,6 +944,7 @@ export async function buildAiTransfermarktPreview(params: AiTransferPreviewParam
       if (control?.controlMode === "ai" && !control.aiTransferPreviewEnabled) {
         warnings.push("AI-Transfer-Preview ist fuer dieses Team deaktiviert");
       }
+      warnings.push(...(objectiveBias?.warnings ?? []));
       const scopedFreeAgents = (freeAgents?.items ?? []).filter((item) => !globallyExcludedPlayerIds.has(item.playerId));
       if (!scopedFreeAgents.length) {
         if (shouldDeepScanBuyCandidates) {
@@ -915,6 +970,7 @@ export async function buildAiTransfermarktPreview(params: AiTransferPreviewParam
             team,
             context,
             rosterClassCounts,
+            objectiveBias,
           }),
         }))
         .sort((left, right) => right.scored.score - left.scored.score);

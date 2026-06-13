@@ -15,6 +15,7 @@ import {
   setParticipantReadyState,
   startRoom,
 } from "@/lib/room/room-store";
+import { authorizeServerRoomWrite } from "@/lib/room/server-authoritative-write-guard";
 import type { ClientToServerEvents, EndTurnRequest, MoveTokenRequest, ServerToClientEvents } from "@/types/events";
 import type { CoachRole } from "@/types/game";
 
@@ -44,6 +45,19 @@ function resolveRole(roomCode: string, seatToken: string): CoachRole | null {
   }
 
   return null;
+}
+
+function publicAuthorizationErrorCode(reason: string) {
+  if (reason === "participant_missing" || reason === "room_not_found") {
+    return "not_room_participant" as const;
+  }
+  if (reason === "confirm_token_invalid_or_stale" || reason === "room_save_mismatch") {
+    return "stale_save_version" as const;
+  }
+  if (reason === "host_only_action") {
+    return "wrong_phase" as const;
+  }
+  return "forbidden_team_control" as const;
 }
 
 export function ensureSocketServer(httpServer: HttpServer) {
@@ -161,6 +175,45 @@ export function ensureSocketServer(httpServer: HttpServer) {
       }
 
       io.to(result.room.roomCode).emit("roomState", result.room.state);
+    });
+
+    socket.on("authorizeRoomWrite", (payload, callback) => {
+      const authorization = authorizeServerRoomWrite({
+        roomCode: payload.roomCode,
+        participantId: payload.participantId,
+        seatToken: payload.seatToken,
+        userId: payload.userId,
+        saveId: payload.saveId,
+        teamId: payload.teamId,
+        action: payload.writeAction,
+        source: "sqlite",
+        dryRun: payload.dryRun ?? true,
+        confirmToken: payload.confirmToken,
+        expectedConfirmToken: payload.expectedConfirmToken,
+      });
+
+      callback(
+        authorization.allowed
+          ? {
+              success: true,
+              authorization: {
+                allowed: true,
+                participantId: authorization.participant?.participantId ?? null,
+                teamId: authorization.ownership?.teamId ?? payload.teamId ?? null,
+                warnings: authorization.warnings,
+              },
+            }
+          : {
+              success: false,
+              authorization: {
+                allowed: false,
+                code: publicAuthorizationErrorCode(authorization.reason),
+                reason: authorization.reason,
+                status: authorization.status,
+                warnings: authorization.warnings,
+              },
+            },
+      );
     });
 
     socket.on("moveToken", (payload: MoveTokenRequest) => {

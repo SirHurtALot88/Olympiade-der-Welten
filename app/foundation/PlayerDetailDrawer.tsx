@@ -241,6 +241,36 @@ function formatBoardTrustPolicy(
   return "Normal";
 }
 
+function formatMoraleContractIntent(intent: NonNullable<PlayerDetailDrawerData["morale"]>["contractIntent"]) {
+  switch (intent) {
+    case "willing_to_extend":
+      return "verlängerungsbereit";
+    case "short_term_only":
+      return "nur kurz binden";
+    case "demands_raise":
+      return "fordert Aufwertung";
+    case "considering_exit":
+      return "denkt an Wechsel";
+    case "refuses_extension":
+      return "blockt Verlängerung";
+    default:
+      return "neutral";
+  }
+}
+
+function formatAvailabilityStatus(data: PlayerDetailDrawerData["availability"]) {
+  if (data.isUnavailable) {
+    return `Verletzt bis ${data.injuryUntilMatchday ?? "naechster Matchday"}`;
+  }
+  if (data.injuryStatus === "recovering") {
+    return "Recovering";
+  }
+  if (data.injuryRiskPercent > 0) {
+    return `${data.injuryRiskLabel} (${formatValue(data.injuryRiskPercent, 0)}%)`;
+  }
+  return data.injuryRiskLabel || "gesund";
+}
+
 function formatScoutPotentialRange(data: PlayerDetailDrawerData["scoutPotential"]) {
   if (!data?.potentialRange) return "—";
   return `${data.potentialRange.min}-${data.potentialRange.max}`;
@@ -293,6 +323,7 @@ export default function PlayerDetailDrawer({
     ? "Keine gespeicherte Season-Performance."
     : "Aktiver Spieler, aber noch kein gespeicherter Season-Einsatz.";
   const topDisciplineCards = data.disciplineValues.slice(0, 5);
+  const baselineAttributeDeltas = data.baselineAttributeDeltas.filter((entry) => entry.delta != null && entry.delta !== 0);
   const headlineMetrics = [
     {
       key: "ovr",
@@ -451,6 +482,19 @@ export default function PlayerDetailDrawer({
                 <span>Vertrag / LZ</span>
                 <strong>{data.contractLength ?? "—"}</strong>
               </article>
+              <article className={`metric-card ${data.availability.isUnavailable ? "is-negative" : data.availability.injuryRiskBand === "sehr_stark" || data.availability.injuryRiskBand === "stark" ? "is-negative" : data.availability.injuryRiskPercent > 0 ? "is-warning" : ""}`}>
+                <span>Verfügbarkeit</span>
+                <strong>{formatAvailabilityStatus(data.availability)}</strong>
+                <small>
+                  Fatigue {formatValue(data.fatigue, 0)} · Recovery {formatValue(data.availability.normalRecovery, 1)}
+                  {data.availability.injuryRecovery != null ? ` / verletzt ${formatValue(data.availability.injuryRecovery, 1)}` : ""}
+                </small>
+                {data.availability.lastRoll ? (
+                  <small>
+                    Letzter Roll {formatValue(data.availability.lastRoll.roll, 2)} / Risiko {formatValue(data.availability.lastRoll.riskPercent, 0)}% · {data.availability.lastRoll.result === "injured" ? "verletzt" : "gesund"}
+                  </small>
+                ) : null}
+              </article>
                {data.boardTrust ? (
                  <article className={`metric-card player-drawer-board-trust-card is-${data.boardTrust.mood}`}>
                    <span>Board Trust</span>
@@ -467,14 +511,44 @@ export default function PlayerDetailDrawer({
                    ) : null}
                  </article>
                ) : null}
+              {data.morale ? (
+                <article className={`metric-card player-drawer-morale-card is-${data.morale.visibleMood}`}>
+                  <span>Moral</span>
+                  <strong>
+                    {data.morale.smiley} {formatValue(data.morale.morale, 0)}
+                  </strong>
+                  <small>
+                    {data.morale.moodLabel} · {formatMoraleContractIntent(data.morale.contractIntent)}
+                  </small>
+                  <small>
+                    Gehalt x{formatValue(data.morale.salaryModifier, 2)}
+                    {data.morale.contractLengthLimit != null ? ` · max ${data.morale.contractLengthLimit}J` : ""}
+                    {` · Risiko ${formatValue(data.morale.renewalRisk, 0)}%`}
+                  </small>
+                  {data.morale.reasons.length ? (
+                    <div className="player-drawer-board-trust-reasons">
+                      {data.morale.reasons.slice(0, 3).map((reason) => (
+                        <span key={`morale-${reason.reasonId}`}>
+                          {reason.valueDelta > 0 ? "+" : ""}
+                          {formatValue(reason.valueDelta, 0)} {reason.label}
+                        </span>
+                      ))}
+                    </div>
+                  ) : null}
+                </article>
+              ) : null}
               {data.scoutPotential ? (
                 <article className="metric-card player-drawer-scout-potential-card">
-                  <span>Scout Potential</span>
+                  <span>Potential / Scouting</span>
                   <strong>
                     {formatScoutPotentialRange(data.scoutPotential)} · {data.scoutPotential.starRating}
                   </strong>
                   <small>
-                    Training x{data.scoutPotential.trainingSpeedMultiplier.toFixed(2)} · MW{" "}
+                    {data.scoutPotential.band.toUpperCase()} · Confidence {data.scoutPotential.confidence}% · Scouting L
+                    {data.scoutPotential.scoutingLevel}
+                  </small>
+                  <small>
+                    Growth x{data.scoutPotential.trainingSpeedMultiplier.toFixed(2)} · MW Preview{" "}
                     {data.scoutPotential.marketValuePotentialPremiumPct > 0 ? "+" : ""}
                     {formatValue(data.scoutPotential.marketValuePotentialPremiumPct, 1)}%
                   </small>
@@ -685,6 +759,20 @@ export default function PlayerDetailDrawer({
                 </article>
               ))}
             </div>
+            {baselineAttributeDeltas.length > 0 ? (
+              <div className="player-drawer-baseline-delta">
+                <h4>Baseline-Delta</h4>
+                <div className="player-drawer-chip-row">
+                  {baselineAttributeDeltas.slice(0, 8).map((entry) => (
+                    <span key={`baseline-delta-${entry.key}`} className={`player-drawer-chip${getDeltaToneClass(entry.delta)}`}>
+                      {entry.label} {formatValue(entry.baselineValue, 0)} → {formatValue(entry.currentValue, 0)} (
+                      {entry.delta != null && entry.delta > 0 ? "+" : ""}
+                      {formatValue(entry.delta, 0)})
+                    </span>
+                  ))}
+                </div>
+              </div>
+            ) : null}
           </section>
 
           {isFreeAgent && onOpenBuyPreview ? (

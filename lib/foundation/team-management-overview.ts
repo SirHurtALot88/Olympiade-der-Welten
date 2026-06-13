@@ -130,7 +130,14 @@ export type TeamManagementSnapshotRow = {
   historicalTop5Count: number;
   historicalTop10Count: number;
   historicalAvgRank: number | null;
+  historicalAvgPoints: number | null;
   historicalPointsTotal: number | null;
+  historicalPointsBySeason: Array<{
+    seasonId: string;
+    seasonName: string;
+    points: number | null;
+    rank: number | null;
+  }>;
   historicalSeasonsPlayed: number;
   historicalBestRank: number | null;
   historicalLastSeasonRank: number | null;
@@ -377,6 +384,27 @@ export function buildTeamSeasonOverviewRows(input: TeamManagementSnapshotInput):
       );
     const historicalHasData = allTimeRow?.hasHistory ?? teamHistoricalSnapshots.length > 0;
     const historicalPointsTotal = allTimeRow?.totalHistoricalPoints ?? null;
+    const historicalPointsBySeason = [...teamHistoricalSnapshots]
+      .sort((left, right) => left.snapshot.seasonId.localeCompare(right.snapshot.seasonId, "de", { numeric: true }))
+      .map((entry) => ({
+        seasonId: entry.snapshot.seasonId,
+        seasonName: entry.snapshot.seasonName,
+        points:
+          entry.standing.disciplinePoints != null
+            ? roundValue(entry.standing.disciplinePoints, 1)
+            : entry.standing.points != null
+              ? roundValue(entry.standing.points, 1)
+              : null,
+        rank: entry.standing.rank ?? null,
+      }));
+    const historicalAvgPoints =
+      historicalPointsBySeason.length > 0
+        ? roundValue(
+            historicalPointsBySeason.reduce((sum, entry) => sum + (entry.points ?? 0), 0) /
+              historicalPointsBySeason.length,
+            1,
+          )
+        : null;
     const latestHistoricalEntry =
       [...teamHistoricalSnapshots].sort((left, right) => {
         const leftTs = Date.parse(left.snapshot.archivedAt ?? "");
@@ -444,7 +472,9 @@ export function buildTeamSeasonOverviewRows(input: TeamManagementSnapshotInput):
       historicalTop5Count: allTimeRow?.top5 ?? 0,
       historicalTop10Count: allTimeRow?.top10 ?? 0,
       historicalAvgRank: allTimeRow?.avgRank ?? null,
+      historicalAvgPoints,
       historicalPointsTotal,
+      historicalPointsBySeason,
       historicalSeasonsPlayed: allTimeRow?.seasonsPlayed ?? teamHistoricalSnapshots.length,
       historicalBestRank: allTimeRow?.bestRank ?? null,
       historicalLastSeasonRank: latestHistoricalEntry?.standing.rank ?? allTimeRow?.lastSeasonRank ?? null,

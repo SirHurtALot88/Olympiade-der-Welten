@@ -196,6 +196,7 @@ describe("season-end XP spend apply service", () => {
 
   it("applies local attributes, XP, discipline deltas and progression event", () => {
     const save = createSave(createPlayer({ attributeSheetStats: { ...baseAttributes, power: 98 }, currentXP: 500 }));
+    const baselineChecksumBefore = save.gameState.playerBaselines?.[0]?.checksum;
     const preview = previewSeasonEndXpSpend(save, "team-1", [upgrade()]);
     const { persistence, getSavedState } = createPersistence();
 
@@ -219,11 +220,23 @@ describe("season-end XP spend apply service", () => {
     expect(savedPlayer?.economyAfterUpgradePreview?.renewalSalaryPreview).not.toBeUndefined();
     expect(savedPlayer?.salaryDemand).toBe(1);
     expect(getSavedState()?.playerBaselines?.[0]?.attributes.power).toBe(98);
-    expect(getSavedState()?.playerBaselines?.[0]?.baselineVersion).toBe("player-baseline-v1");
+    expect(getSavedState()?.playerBaselines?.[0]?.baselineVersion).toBe("player-baseline-v2");
+    expect(getSavedState()?.playerBaselines?.[0]?.checksum).toBe(baselineChecksumBefore);
   });
 
   it("can materialize earned season XP without spending it", () => {
-    const save = createSave(createPlayer({ currentXP: 35, spentXP: 20, lifetimeXP: 55 }));
+    const lowAttributes = Object.fromEntries(Object.keys(baseAttributes).map((key) => [key, 10])) as PlayerGeneratorAttributes;
+    const save = createSave(
+      createPlayer({
+        attributeSheetStats: lowAttributes,
+        rating: 10,
+        potential: 100,
+        traitsPositive: ["Diligent", "Motivated", "Disciplined"],
+        currentXP: 35,
+        spentXP: 20,
+        lifetimeXP: 55,
+      }),
+    );
     const preview = previewSeasonEndXpSpend(save, "team-1", []);
     const { persistence, getSavedState } = createPersistence();
 

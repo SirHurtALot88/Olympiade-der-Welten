@@ -811,6 +811,11 @@ describe("team management overview", () => {
     expect(result[0]?.historicalTop5Count).toBe(1);
     expect(result[0]?.historicalTop10Count).toBe(2);
     expect(result[0]?.historicalAvgRank).toBe(3.5);
+    expect(result[0]?.historicalAvgPoints).toBe(99.5);
+    expect(result[0]?.historicalPointsBySeason).toEqual([
+      { seasonId: "season-1", seasonName: "Season 1", points: 109, rank: 1 },
+      { seasonId: "season-2", seasonName: "Season 2", points: 90, rank: 6 },
+    ]);
     expect(result[0]?.historicalSeasonsPlayed).toBe(2);
     expect(result[0]?.historicalBestRank).toBe(1);
     expect(result[0]?.historicalLastSeasonRank).toBe(6);

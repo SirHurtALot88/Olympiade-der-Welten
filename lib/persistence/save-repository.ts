@@ -8,6 +8,7 @@ import type {
   MatchdayState,
   Player,
   PlayerBaselineRecord,
+  PlayerBaselineWriteGuardEvent,
   RosterEntry,
   Season,
   SeasonState,
@@ -22,7 +23,7 @@ import { createGameStateFromSeed, loadSeedData } from "@/lib/data/dataAdapter";
 import { hydrateGameStateMedia } from "@/lib/data/mediaAssets";
 import { getDatabase } from "@/lib/persistence/sqlite";
 import { buildScenarioMeta, withScenarioMeta } from "@/lib/persistence/scenario-meta";
-import { ensurePlayerBaselines } from "@/lib/players/player-baseline-service";
+import { ensurePlayerBaselines, guardPlayerBaselineWrite } from "@/lib/players/player-baseline-service";
 import { withNormalizedSeasonDisciplineSchedule } from "@/lib/season/season-discipline-schedule";
 import type { PersistedSaveGame, SaveRepository, SaveStatus, SaveSummary } from "@/lib/persistence/types";
 
@@ -38,12 +39,16 @@ type GameMetadata = {
   gamePhase?: GamePhase;
   seasonTransition?: SeasonTransitionState;
   scenarioMeta?: ScenarioMeta;
+  saveVersion?: number;
+  lastAppliedEventId?: string | null;
+  appliedEventIds?: string[];
   transitionStatus?: SeasonTransitionState["status"];
   currentStep?: string;
   completedSteps?: string[];
   seasonReviewState?: unknown;
   preSeasonWorkflowState?: unknown;
   playerBaselines?: PlayerBaselineRecord[];
+  baselineWriteGuardEvents?: PlayerBaselineWriteGuardEvent[];
 };
 
 function parseJsonColumn<T>(value: string): T {
@@ -225,11 +230,19 @@ function materializePersistedSave(row: SaveRow): PersistedSaveGame | null {
     ...(gamePhase ? { gamePhase } : {}),
     ...(gameMetadata?.seasonTransition ? { seasonTransition: gameMetadata.seasonTransition } : {}),
     ...(gameMetadata?.scenarioMeta ? { scenarioMeta: gameMetadata.scenarioMeta } : {}),
+    ...(Number.isFinite(gameMetadata?.saveVersion) ? { saveVersion: gameMetadata?.saveVersion } : {}),
+    ...(gameMetadata?.lastAppliedEventId !== undefined
+      ? { lastAppliedEventId: gameMetadata.lastAppliedEventId }
+      : {}),
+    ...(gameMetadata?.appliedEventIds ? { appliedEventIds: gameMetadata.appliedEventIds } : {}),
     ...(gameMetadata?.seasonReviewState !== undefined ? { seasonReviewState: gameMetadata.seasonReviewState } : {}),
     ...(gameMetadata?.preSeasonWorkflowState !== undefined
       ? { preSeasonWorkflowState: gameMetadata.preSeasonWorkflowState }
       : {}),
     ...(gameMetadata?.playerBaselines ? { playerBaselines: gameMetadata.playerBaselines } : {}),
+    ...(gameMetadata?.baselineWriteGuardEvents
+      ? { baselineWriteGuardEvents: gameMetadata.baselineWriteGuardEvents }
+      : {}),
     season,
     seasonState,
     matchdayState,
@@ -287,6 +300,23 @@ function createPersistedSaveRecord(input: {
     sourcePlayers: loadBaselineSourcePlayers(),
     createdAt,
   }).gameState;
+  const existingMetadata = loadSingleton<GameMetadata>("game_metadata", input.saveId);
+  const guardedBaselineWrite = guardPlayerBaselineWrite({
+    previous: existingMetadata?.playerBaselines,
+    next: normalizedGameState.playerBaselines,
+    attemptedSource: "save_repository",
+    timestamp: updatedAt,
+  });
+  const baselineWriteGuardEvents = [
+    ...(existingMetadata?.baselineWriteGuardEvents ?? []),
+    ...(normalizedGameState.baselineWriteGuardEvents ?? []),
+    ...guardedBaselineWrite.events,
+  ];
+  const guardedGameState: GameState = {
+    ...normalizedGameState,
+    playerBaselines: guardedBaselineWrite.baselines,
+    baselineWriteGuardEvents,
+  };
 
   const upsertSave = database.prepare(`
     INSERT INTO saves (save_id, name, status, created_at, updated_at)
@@ -306,32 +336,36 @@ function createPersistedSaveRecord(input: {
       updatedAt,
     });
 
-    replaceSingleton("seasons", input.saveId, normalizedGameState.season);
-    replaceSingleton("season_states", input.saveId, normalizedGameState.seasonState);
-    replaceSingleton("matchday_states", input.saveId, normalizedGameState.matchdayState);
-    const transition = normalizedGameState.seasonTransition;
+    replaceSingleton("seasons", input.saveId, guardedGameState.season);
+    replaceSingleton("season_states", input.saveId, guardedGameState.seasonState);
+    replaceSingleton("matchday_states", input.saveId, guardedGameState.matchdayState);
+    const transition = guardedGameState.seasonTransition;
     replaceSingleton("game_metadata", input.saveId, {
-      gamePhase: normalizedGameState.gamePhase,
+      gamePhase: guardedGameState.gamePhase,
       seasonTransition: transition,
-      scenarioMeta: buildScenarioMeta({ gameState: normalizedGameState }),
+      scenarioMeta: buildScenarioMeta({ gameState: guardedGameState }),
+      saveVersion: guardedGameState.saveVersion,
+      lastAppliedEventId: guardedGameState.lastAppliedEventId,
+      appliedEventIds: guardedGameState.appliedEventIds,
       transitionStatus: transition?.status,
       currentStep: transition?.currentStep,
       completedSteps: transition?.completedSteps,
-      seasonReviewState: normalizedGameState.seasonReviewState,
-      preSeasonWorkflowState: normalizedGameState.preSeasonWorkflowState,
-      playerBaselines: normalizedGameState.playerBaselines,
+      seasonReviewState: guardedGameState.seasonReviewState,
+      preSeasonWorkflowState: guardedGameState.preSeasonWorkflowState,
+      playerBaselines: guardedGameState.playerBaselines,
+      baselineWriteGuardEvents: guardedGameState.baselineWriteGuardEvents,
     } satisfies GameMetadata);
-    replaceSingleton("mapping_reports", input.saveId, normalizedGameState.mappingReport);
+    replaceSingleton("mapping_reports", input.saveId, guardedGameState.mappingReport);
 
-    replaceCollection("teams", "team_id", input.saveId, normalizedGameState.teams, (team) => team.teamId);
-    replaceCollection("team_identities", "team_id", input.saveId, normalizedGameState.teamIdentities, (identity) => identity.teamId);
-    replaceCollection("players", "player_id", input.saveId, normalizedGameState.players, (player) => player.id);
-    replaceCollection("disciplines", "discipline_id", input.saveId, normalizedGameState.disciplines, (discipline) => discipline.id);
-    replaceCollection("rosters", "roster_id", input.saveId, normalizedGameState.rosters, (roster) => roster.id);
-    replaceCollection("contracts", "contract_id", input.saveId, normalizedGameState.contracts, (contract) => contract.id);
-    replaceCollection("transfer_listings", "listing_id", input.saveId, normalizedGameState.transferListings, (listing) => listing.id);
-    replaceCollection("transfer_history", "history_id", input.saveId, normalizedGameState.transferHistory, (entry) => entry.id);
-    replaceCollection("game_logs", "log_id", input.saveId, normalizedGameState.logs, (log) => log.id);
+    replaceCollection("teams", "team_id", input.saveId, guardedGameState.teams, (team) => team.teamId);
+    replaceCollection("team_identities", "team_id", input.saveId, guardedGameState.teamIdentities, (identity) => identity.teamId);
+    replaceCollection("players", "player_id", input.saveId, guardedGameState.players, (player) => player.id);
+    replaceCollection("disciplines", "discipline_id", input.saveId, guardedGameState.disciplines, (discipline) => discipline.id);
+    replaceCollection("rosters", "roster_id", input.saveId, guardedGameState.rosters, (roster) => roster.id);
+    replaceCollection("contracts", "contract_id", input.saveId, guardedGameState.contracts, (contract) => contract.id);
+    replaceCollection("transfer_listings", "listing_id", input.saveId, guardedGameState.transferListings, (listing) => listing.id);
+    replaceCollection("transfer_history", "history_id", input.saveId, guardedGameState.transferHistory, (entry) => entry.id);
+    replaceCollection("game_logs", "log_id", input.saveId, guardedGameState.logs, (log) => log.id);
   });
 
   transaction();

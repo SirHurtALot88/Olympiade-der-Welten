@@ -27,12 +27,19 @@ describe("matchday arena ui contract", () => {
     expect(foundationText).toContain('"matchdayResult"');
     expect(foundationText).toContain('{ id: "matchdayArena", label: "Arena" }');
     expect(foundationText).not.toContain('{ id: "matchdayResult", label: "Result" }');
+    const secondaryViewsBlock = foundationText.slice(
+      foundationText.indexOf("const foundationSecondaryViews"),
+      foundationText.indexOf("const foundationInternalViews"),
+    );
+    expect(secondaryViewsBlock).not.toContain('{ id: "matchdayResult"');
+    expect(foundationText).toContain("const foundationInternalViews");
     expect(foundationText).toContain('{ id: "matchdayResult", label: "Spieltagsergebnis" }');
     expect(foundationText).toContain("<MatchdayArenaClient");
     expect(foundationText).toContain("buildMatchdaySummary");
     expect(foundationText).toContain('id="foundation-matchday-result"');
     expect(foundationText).toContain('id="arena-result-summary"');
     expect(foundationText).toContain('data-testid="arena-result-summary"');
+    expect(foundationText).toContain("arena-result-empty-state");
     expect(foundationText).toContain("Noch kein Spieltagsergebnis vorhanden");
     expect(foundationText).toContain("Spieltagsergebnis");
     expect(foundationText).toContain("Saisonstand anzeigen");
@@ -44,6 +51,7 @@ describe("matchday arena ui contract", () => {
     expect(foundationText).toContain("tagName === \"input\"");
     expect(foundationText).toContain("tagName === \"textarea\"");
     expect(foundationText).toContain("tagName === \"select\"");
+    expect(foundationText).toContain("targetPanel");
     expect(arenaText).toContain("Matchday Arena");
     expect(arenaText).toContain("resolveArenaTeamId");
     expect(arenaText).toContain("teamId: resolveArenaTeamId(props.teams, props.defaultTeamId)");

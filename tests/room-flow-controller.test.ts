@@ -19,6 +19,8 @@ describe("room flow controller", () => {
       "standings",
       "season_review",
     ]);
+    expect(ROOM_FLOW_STEPS.find((step) => step.stepId === "result")?.targetView).toBe("matchdayArena");
+    expect(ROOM_FLOW_STEPS.some((step) => step.targetView === "matchdayResult")).toBe(false);
   });
 
   it("blocks host advance until Chris, Franky and AI readiness are complete", () => {

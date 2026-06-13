@@ -4,13 +4,13 @@ export type TransferHistoryReadParams = {
   saveId?: string | null;
   seasonId?: string | null;
   teamId?: string | null;
-  type?: "buy" | "sell" | null;
+  type?: "buy" | "sell" | "contract_exit" | null;
   limit?: number | null;
 };
 
 export type TransferHistoryItem = {
   transferId: string;
-  type: "buy" | "sell";
+  type: "buy" | "sell" | "contract_exit";
   playerId: string;
   playerName: string;
   fromTeamId: string | null;
@@ -37,7 +37,7 @@ export type TransferHistoryReadResult = {
     saveId: string;
     seasonId: string;
     teamId: string | null;
-    type: "buy" | "sell" | null;
+    type: "buy" | "sell" | "contract_exit" | null;
   };
   saveContext: {
     source: "prisma" | "sqlite";

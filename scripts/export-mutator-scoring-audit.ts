@@ -8,6 +8,9 @@ import { getRankToPointsValue } from "@/lib/resolve/rank-to-points";
 const OUTPUT_DIR =
   process.env.OLY_OUTPUT_DIR ??
   "/Users/chrisfalk/Documents/Codex/2026-06-11/wir-machen-weiter-mit-dem-olympiade/outputs";
+const TARGET_SAVE_ID = process.env.OLY_TARGET_SAVE_ID ?? null;
+const TARGET_SEASON_ID = process.env.OLY_TARGET_SEASON_ID ?? null;
+const TARGET_MATCHDAY_ID = process.env.OLY_TARGET_MATCHDAY_ID ?? null;
 
 function roundValue(value: number, digits = 4) {
   return Number(value.toFixed(digits));
@@ -41,15 +44,15 @@ function rankByScore<T>(rows: T[], accessor: (row: T) => number) {
 
 async function main() {
   const persistence = createPersistenceService();
-  const activeSave = persistence.getActiveSave();
+  const activeSave = (TARGET_SAVE_ID ? persistence.getSaveById(TARGET_SAVE_ID) : null) ?? persistence.getActiveSave();
   if (!activeSave) {
     throw new Error("No active local save found for mutator scoring audit.");
   }
 
   const scope = {
     saveId: activeSave.saveId,
-    seasonId: activeSave.gameState.season.id,
-    matchdayId: activeSave.gameState.matchdayState.matchdayId,
+    seasonId: TARGET_SEASON_ID ?? activeSave.gameState.season.id,
+    matchdayId: TARGET_MATCHDAY_ID ?? activeSave.gameState.matchdayState.matchdayId,
   };
   const warnings: string[] = [];
   const teamRows: Array<Record<string, unknown>> = [];

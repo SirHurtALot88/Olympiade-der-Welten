@@ -1,6 +1,8 @@
 import type { RoomOwnershipPreset } from "@/types/events";
 import type {
   MultiplayerRoomMeta,
+  RoomRealtimeEvent,
+  RoomRealtimeEventType,
   MultiplayerTurnState,
   OlyRoomState,
   RoomParticipant,
@@ -68,6 +70,7 @@ export function createMultiplayerRoomMeta(input: {
     roomId: `room-${input.roomCode.toLowerCase()}`,
     roomCode: input.roomCode,
     saveId: input.saveId ?? "local-sandbox-active-save",
+    hostUserId: input.createdByUserId,
     status: "lobby",
     createdByUserId: input.createdByUserId,
     activeSeasonId: "season-1",
@@ -116,7 +119,13 @@ export type TeamWriteAction =
   | "lineup_save"
   | "facility_apply"
   | "xp_spend"
-  | "training_update";
+  | "contract_renewal"
+  | "training_update"
+  | "formcards"
+  | "matchday_resolve"
+  | "season_transition"
+  | "cash_prize_apply"
+  | "standings_apply";
 
 export type TeamWriteAuthorizationReason =
   | "ok"
@@ -302,5 +311,41 @@ export function applyOwnershipPresetToState(state: OlyRoomState, preset: RoomOwn
       },
     }),
     serverWritePolicy: SERVER_AUTHORITATIVE_WRITE_POLICY,
+  };
+}
+
+export function createRoomEvent(input: {
+  type: RoomRealtimeEventType;
+  roomId: string;
+  saveId: string;
+  payload?: Record<string, unknown>;
+  now?: string;
+}): RoomRealtimeEvent {
+  return {
+    eventId: `room-event-${crypto.randomUUID()}`,
+    type: input.type,
+    roomId: input.roomId,
+    saveId: input.saveId,
+    timestamp: input.now ?? new Date().toISOString(),
+    payload: input.payload,
+  };
+}
+
+export function appendRoomEvent(
+  state: OlyRoomState,
+  type: RoomRealtimeEventType,
+  payload?: Record<string, unknown>,
+): OlyRoomState {
+  return {
+    ...state,
+    roomEvents: [
+      ...state.roomEvents,
+      createRoomEvent({
+        type,
+        roomId: state.multiplayerRoom.roomId,
+        saveId: state.multiplayerRoom.saveId,
+        payload,
+      }),
+    ],
   };
 }

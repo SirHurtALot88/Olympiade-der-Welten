@@ -599,6 +599,12 @@ a {
     rgba(28, 28, 28, 0.92);
 }
 
+.arena-result-empty-state {
+  max-width: 760px;
+  margin: 0;
+  padding: 12px 14px;
+}
+
 .foundation-flow-menu-button {
   min-height: 34px;
   padding-inline: 10px;
@@ -1037,11 +1043,70 @@ a {
 }
 
 .foundation-home-news-list {
+	  display: grid;
+	  gap: 8px;
+	  margin: 0;
+	  padding-left: 18px;
+	  color: rgba(255, 255, 255, 0.78);
+}
+
+.foundation-text-button {
   display: grid;
-  gap: 8px;
-  margin: 0;
-  padding-left: 18px;
-  color: rgba(255, 255, 255, 0.78);
+  gap: 2px;
+  width: 100%;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+
+.foundation-text-button span {
+  color: rgba(255, 255, 255, 0.62);
+  font-size: 0.9rem;
+}
+
+.foundation-filter-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(210px, 1fr));
+  gap: 12px;
+  margin: 14px 0;
+}
+
+.foundation-inbox-list {
+  display: grid;
+  gap: 10px;
+}
+
+.foundation-inbox-item {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 14px;
+  padding: 14px;
+  border: 1px solid rgba(255, 255, 255, 0.09);
+  border-radius: 18px;
+  background: rgba(255, 255, 255, 0.045);
+}
+
+.foundation-inbox-item.is-critical {
+  border-color: rgba(210, 92, 82, 0.45);
+  background: linear-gradient(90deg, rgba(210, 92, 82, 0.14), rgba(255, 255, 255, 0.04));
+}
+
+.foundation-inbox-item.is-warning {
+  border-color: rgba(237, 190, 88, 0.38);
+  background: linear-gradient(90deg, rgba(237, 190, 88, 0.12), rgba(255, 255, 255, 0.04));
+}
+
+.foundation-inbox-item h3 {
+  margin: 8px 0 4px;
+}
+
+.foundation-inbox-item p {
+  margin: 0 0 6px;
+  color: rgba(255, 255, 255, 0.74);
 }
 
 .foundation-home-players {
@@ -2862,8 +2927,13 @@ a {
 .teams-view-meta-cell,
 .teams-view-medal-cell,
 .teams-view-axis-cell,
+.teams-view-history-points-cell,
 .teams-view-finance-cell {
   text-align: right;
+}
+
+.teams-view-history-points-cell {
+  font-weight: 700;
 }
 
 .teams-view-cash-cell {
@@ -4296,7 +4366,20 @@ a {
   overflow: hidden;
 }
 
+.player-drawer-morale-card {
+  position: relative;
+  overflow: hidden;
+}
+
 .player-drawer-board-trust-card::before {
+  content: "";
+  position: absolute;
+  inset: 0 auto 0 0;
+  width: 4px;
+  background: rgba(148, 163, 184, 0.72);
+}
+
+.player-drawer-morale-card::before {
   content: "";
   position: absolute;
   inset: 0 auto 0 0;
@@ -4308,7 +4391,19 @@ a {
   background: rgba(124, 209, 136, 0.92);
 }
 
+.player-drawer-morale-card.is-excellent::before {
+  background: rgba(92, 205, 145, 0.95);
+}
+
+.player-drawer-morale-card.is-happy::before {
+  background: rgba(124, 209, 136, 0.92);
+}
+
 .player-drawer-board-trust-card.is-neutral::before {
+  background: rgba(226, 184, 86, 0.9);
+}
+
+.player-drawer-morale-card.is-neutral::before {
   background: rgba(226, 184, 86, 0.9);
 }
 
@@ -4316,7 +4411,15 @@ a {
   background: rgba(232, 148, 91, 0.92);
 }
 
+.player-drawer-morale-card.is-unhappy::before {
+  background: rgba(232, 148, 91, 0.92);
+}
+
 .player-drawer-board-trust-card.is-critical::before {
+  background: rgba(225, 94, 86, 0.95);
+}
+
+.player-drawer-morale-card.is-angry::before {
   background: rgba(225, 94, 86, 0.95);
 }
 
@@ -6038,6 +6141,45 @@ a {
   text-align: center;
 }
 
+.transfermarkt-scouting-cell {
+  display: inline-grid;
+  grid-template-columns: auto 1fr;
+  gap: 2px 6px;
+  align-items: center;
+  min-width: 96px;
+  line-height: 1.05;
+}
+
+.transfermarkt-scouting-cell small {
+  grid-column: 1 / -1;
+  font-size: 0.68rem;
+}
+
+.transfermarkt-scouting-badge {
+  border-radius: 999px;
+  padding: 3px 7px;
+  text-align: center;
+  background: rgba(96, 142, 213, 0.2);
+  border: 1px solid rgba(145, 185, 244, 0.26);
+}
+
+.transfermarkt-scouting-badge-elite {
+  background: rgba(89, 142, 215, 0.34);
+}
+
+.transfermarkt-scouting-badge-high {
+  background: rgba(116, 164, 93, 0.32);
+}
+
+.transfermarkt-scouting-badge-medium {
+  background: rgba(235, 181, 74, 0.24);
+}
+
+.transfermarkt-scouting-badge-low,
+.transfermarkt-scouting-badge-unknown {
+  background: rgba(207, 90, 80, 0.2);
+}
+
 .cockpit-grid {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
@@ -7620,6 +7762,144 @@ a {
 
 .balance-table {
   min-width: 980px;
+}
+
+.cockpit-feature-audit {
+  display: grid;
+  gap: 1rem;
+  overflow: hidden;
+  border-color: rgba(116, 162, 234, 0.26);
+  background:
+    radial-gradient(circle at 8% 0%, rgba(116, 162, 234, 0.16), transparent 32%),
+    radial-gradient(circle at 88% 8%, rgba(237, 190, 88, 0.12), transparent 30%),
+    rgba(22, 23, 25, 0.94);
+}
+
+.feature-audit-summary-card {
+  min-height: 92px;
+}
+
+.feature-audit-summary-card.is-good {
+  border-color: rgba(119, 173, 124, 0.4);
+  background: linear-gradient(145deg, rgba(38, 82, 46, 0.36), rgba(255, 255, 255, 0.045));
+}
+
+.feature-audit-summary-card.is-warning {
+  border-color: rgba(237, 190, 88, 0.42);
+  background: linear-gradient(145deg, rgba(115, 79, 21, 0.3), rgba(255, 255, 255, 0.045));
+}
+
+.feature-audit-summary-card.is-danger {
+  border-color: rgba(214, 98, 84, 0.46);
+  background: linear-gradient(145deg, rgba(108, 43, 34, 0.34), rgba(255, 255, 255, 0.045));
+}
+
+.feature-audit-filterbar,
+.feature-audit-blocker-strip {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.45rem;
+}
+
+.feature-audit-table-shell {
+  max-height: 520px;
+  overflow: auto;
+}
+
+.feature-audit-table {
+  min-width: 1040px;
+}
+
+.feature-audit-table td:first-child {
+  min-width: 230px;
+}
+
+.feature-audit-table td:first-child small {
+  display: block;
+  margin-top: 0.2rem;
+  color: rgba(255, 255, 255, 0.55);
+}
+
+.feature-audit-status.is-preview,
+.feature-audit-status.is-planned {
+  background: rgba(237, 190, 88, 0.18);
+  color: #f2d28b;
+}
+
+.feature-audit-status.is-local_write,
+.feature-audit-status.is-sandbox_ready {
+  background: rgba(119, 173, 124, 0.2);
+  color: #bfe1b6;
+}
+
+.feature-audit-status.is-multiplayer_ready,
+.feature-audit-status.is-prod_ready {
+  background: rgba(116, 162, 234, 0.22);
+  color: #c5d9ff;
+}
+
+.foundation-shell .warning-pill {
+  border-color: rgba(237, 190, 88, 0.4);
+  background: rgba(104, 73, 24, 0.45);
+  color: #f3d99b;
+}
+
+.foundation-shell .success-pill {
+  border-color: rgba(119, 173, 124, 0.38);
+  background: rgba(38, 82, 46, 0.42);
+  color: #c9eac4;
+}
+
+.foundation-shell .checkbox-field {
+  align-items: center;
+  flex-direction: row;
+  gap: 0.55rem;
+  min-height: 56px;
+}
+
+.foundation-shell .checkbox-field input {
+  width: 1rem;
+  height: 1rem;
+  accent-color: #74a2ea;
+}
+
+.team-chip-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(190px, 1fr));
+  gap: 0.55rem;
+  max-height: 360px;
+  overflow: auto;
+  padding-right: 0.25rem;
+}
+
+.team-settings-team-card {
+  display: grid;
+  gap: 0.25rem;
+  padding: 0.75rem;
+  border: 1px solid rgba(255, 255, 255, 0.09);
+  border-radius: 16px;
+  background: linear-gradient(145deg, rgba(255, 255, 255, 0.055), rgba(255, 255, 255, 0.018));
+}
+
+.team-settings-team-card > span,
+.team-settings-team-card > small {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.team-settings-team-card.is-owned-by-user {
+  border-color: rgba(116, 162, 234, 0.46);
+  background:
+    linear-gradient(90deg, rgba(116, 162, 234, 0.22), transparent 72%),
+    rgba(38, 55, 76, 0.42);
+}
+
+.team-settings-team-card.is-owned-by-remote {
+  border-color: rgba(119, 173, 124, 0.42);
+  background:
+    linear-gradient(90deg, rgba(119, 173, 124, 0.2), transparent 72%),
+    rgba(34, 65, 45, 0.38);
 }
 
 @media (max-width: 1320px) {

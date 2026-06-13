@@ -15,6 +15,7 @@ import { AUTO_ROSTER_FILL_CONFIRM_TOKEN } from "@/lib/ai/auto-roster-fill-contra
 import { AI_MARKET_APPLY_CONFIRM_TOKEN } from "@/lib/ai/ai-market-plan-apply-contract";
 import { buildAiTransferIntents } from "@/lib/ai/aiTransferMarket";
 import { runAiTurn } from "@/lib/ai/aiTurnEngine";
+import { buildTeamObjectiveOverview } from "@/lib/board/team-season-objectives-service";
 import {
   FACILITY_CATALOG,
   SPECIALIST_WING_VARIANTS,
@@ -54,8 +55,9 @@ import type { TransfermarktFreeAgentItem } from "@/lib/market/transfermarkt-read
 import { SEASON_START_RESET_CONFIRM_TOKEN } from "@/lib/persistence/season-start-reset-contract";
 import type { SaveSummary } from "@/lib/persistence/types";
 import type {
-  GameState,
-  MappingWarning,
+	  GameState,
+	  GameInboxItem,
+	  MappingWarning,
   Player,
   PlayerGeneratorDraft,
   ContractNegotiationDraft,
@@ -116,7 +118,16 @@ import {
   type MultiSeasonBalancePlayerRow,
   type MultiSeasonBalanceTeamRow,
 } from "@/lib/foundation/multiseason-balance-dashboard";
+import {
+  buildFeatureAuditMatrix,
+  featureAuditFilters,
+  filterFeatureAuditEntries,
+  getFeatureAuditFlags,
+  type FeatureAuditFilter,
+  type FeatureAuditStatus,
+} from "@/lib/foundation/feature-audit-matrix";
 import { buildGameFlowState, type GameFlowStepStatus, type GameFlowView } from "@/lib/foundation/game-flow-controller";
+import { buildGameInboxItems, filterGameInboxItems, getPrimaryInboxTask } from "@/lib/foundation/game-inbox-service";
 import { buildMatchdaySummary, getMatchdaySummaryOptions } from "@/lib/foundation/matchday-summary";
 import { normalizeLineupDisciplineFieldName } from "@/lib/lineups/team-discipline-ranks";
 import { getPlayerPortraitBrowserUrl } from "@/lib/data/mediaAssets";
@@ -161,8 +172,9 @@ type SeasonEndAttributeDraft = PlayerGeneratorAttributeName;
 type FoundationView =
   | "home"
   | "season"
-  | "cockpit"
-  | "seasonPreview"
+	  | "cockpit"
+	  | "inbox"
+	  | "seasonPreview"
   | "lineup"
   | "matchdayArena"
   | "matchdayResult"
@@ -305,6 +317,30 @@ type TransfermarktBuyApiResponse = {
   warnings: string[];
   error?: string;
   scope?: Omit<TransfermarktBuyRequestContext, "view"> & { view?: FoundationView };
+};
+
+type ContractRenewalApiResponse = {
+  success: boolean;
+  summary: {
+    ok: boolean;
+    applied?: boolean;
+    confirmToken: string;
+    warnings: string[];
+    blockingReasons: string[];
+    negotiationPreview?: {
+      expectedSalary: number | null;
+    } | null;
+    contractEvent?: {
+      eventType: string;
+      oldSalary: number | null;
+      newSalary: number | null;
+      oldLength: number | null;
+      newLength: number | null;
+    };
+  } | null;
+  warnings?: string[];
+  blockingReasons?: string[];
+  error?: string;
 };
 
 type MarketNegotiationOutcome = {
@@ -1691,6 +1727,68 @@ type SaveActionRequest =
   | { action: "activate"; saveId: string }
   | { action: "fresh-season-1"; name?: string };
 
+type NewGamePresetId = "solo_1" | "solo_2" | "solo_4" | "online_4v4" | "custom";
+type NewGameTeamPreview = {
+  teamId: string;
+  shortCode: string;
+  name: string;
+  budget: number;
+  startRank: number;
+  controlMode: TeamControlMode;
+  ownerId: string;
+  ownerLabel: string;
+};
+type NewGameSetupPreview = {
+  mode: "preview";
+  presetId: NewGamePresetId;
+  saveName: string;
+  sandbox: boolean;
+  scenarioType: string;
+  chrisTeamIds: string[];
+  frankyTeamIds: string[];
+  aiTeamIds: string[];
+  teams: NewGameTeamPreview[];
+  counts: { chris: number; franky: number; ai: number; passive: number; total: number };
+  baseline: { playerCount: number; baselineCount: number; resetPlayers: number };
+  seasonSetup: {
+    seasonId: string;
+    currentMatchday: number;
+    gamePhase: string;
+    matchdayCount: number;
+    scheduleCount: number;
+    formCardsStatus: string;
+    lineupsStatus: string;
+    standingsStatus: string;
+  };
+  room: { enabled: false } | { enabled: true; host: string; pendingParticipant: string; roomCode: string };
+  warnings: string[];
+  blockers: string[];
+  confirmToken: string;
+};
+type NewGameSetupApiResponse = {
+  preview?: NewGameSetupPreview;
+  result?: {
+    mode: "applied";
+    save: { saveId: string; name: string };
+    previousActiveSaveId: string | null;
+    preview: NewGameSetupPreview;
+  };
+  error?: string;
+};
+
+const NEW_GAME_PRESET_DEFAULTS: Record<NewGamePresetId, { label: string; chrisTeamIds: string[]; frankyTeamIds: string[]; online: boolean }> = {
+  solo_1: { label: "Solo 1 Team", chrisTeamIds: ["M-M"], frankyTeamIds: [], online: false },
+  solo_2: { label: "Solo 2 Teams", chrisTeamIds: ["M-M", "D-P"], frankyTeamIds: [], online: false },
+  solo_4: { label: "Solo 4 Teams", chrisTeamIds: ["P-S", "D-P", "M-M", "V-W"], frankyTeamIds: [], online: false },
+  online_4v4: {
+    label: "Online 4v4",
+    chrisTeamIds: ["P-S", "D-P", "M-M", "V-W"],
+    frankyTeamIds: ["M-S", "P-C", "C-S", "G-G"],
+    online: true,
+  },
+  custom: { label: "Custom", chrisTeamIds: ["M-M"], frankyTeamIds: [], online: false },
+};
+
 type TeamIdentityDraftMap = Record<string, TeamIdentity>;
 type TeamControlDraftMap = Record<string, TeamControlSettings>;
 type TeamStrategyDraftMap = Record<string, TeamStrategyProfile>;
@@ -1836,7 +1934,7 @@ const teamStrategySportsBiasAxisMap = {
 
 type FoundationTransferHistoryItem = {
   transferId: string;
-  type: "buy" | "sell";
+  type: "buy" | "sell" | "contract_exit";
   playerId: string;
   playerName: string;
   fromTeamId: string | null;
@@ -1863,7 +1961,7 @@ type FoundationTransferHistoryResponse = {
     saveId: string;
     seasonId: string;
     teamId: string | null;
-    type: "buy" | "sell" | null;
+    type: "buy" | "sell" | "contract_exit" | null;
   } | null;
   saveContext?: {
     source: "sqlite" | "prisma";
@@ -1884,7 +1982,7 @@ type FoundationTransferRecapItem = {
   playerName: string;
   fromTeam: string | null;
   toTeam: string | null;
-  type: "buy" | "sell";
+  type: "buy" | "sell" | "contract_exit";
   amount: number;
   salary: number;
   marketValue: number;
@@ -2693,19 +2791,38 @@ const foundationPrimaryViews: Array<{ id: FoundationView; label: string }> = [
 ];
 
 const foundationAdminViews: Array<{ id: FoundationView; label: string }> = [
-  { id: "cockpit", label: "Spieltag" },
-  { id: "generator", label: "Player Generator" },
+	  { id: "cockpit", label: "Spieltag" },
+	  { id: "inbox", label: "Inbox" },
+	  { id: "generator", label: "Player Generator" },
   { id: "teamSettings", label: "Team Settings" },
   { id: "admin", label: "Admin" },
 ];
 
 const foundationSecondaryViews: Array<{ id: FoundationView; label: string }> = [
-  { id: "matchdayResult", label: "Spieltagsergebnis" },
   { id: "seasonPreview", label: "Saisonstand Preview" },
   { id: "debug", label: "Debug" },
 ];
 
-const foundationViews = [...foundationPrimaryViews, ...foundationAdminViews, ...foundationSecondaryViews];
+const foundationInternalViews: Array<{ id: FoundationView; label: string }> = [
+  { id: "matchdayResult", label: "Spieltagsergebnis" },
+];
+
+const homeTaskLabelContract = [
+  "Spieler verkaufen",
+  "Spieler kaufen",
+  "Training prüfen",
+  "XP verteilen",
+  "Facility Upgrade möglich",
+  "Formkarten setzen",
+  "Arena starten",
+  "Ergebnis ansehen",
+] as const;
+
+const foundationViews = [...foundationPrimaryViews, ...foundationAdminViews, ...foundationSecondaryViews, ...foundationInternalViews];
+
+function normalizeInboxTargetView(view: string | null | undefined): FoundationView {
+  return foundationViews.some((entry) => entry.id === view) ? (view as FoundationView) : "home";
+}
 
 function parseFoundationViewFromUrl() {
   if (typeof window === "undefined") {
@@ -2977,6 +3094,28 @@ function formatTopDisciplineScores(item: TransfermarktFreeAgentItem) {
   );
 }
 
+function formatPotentialRange(item: TransfermarktFreeAgentItem) {
+  if (!item.potentialRange) {
+    return "Range —";
+  }
+  return `${item.potentialRange.min}-${item.potentialRange.max}`;
+}
+
+function renderTransfermarktPotential(item: TransfermarktFreeAgentItem) {
+  const hasWarning = item.scoutingWarnings.length > 0 || item.potentialBand === "unknown";
+  return (
+    <div className="transfermarkt-scouting-cell" title={item.scoutingWarnings.join(" · ") || "Scouting Range und Confidence"}>
+      <strong className={`transfermarkt-scouting-badge transfermarkt-scouting-badge-${item.potentialBand}`}>
+        {item.potentialTier ?? "?"}
+      </strong>
+      <span>{formatPotentialRange(item)}</span>
+      <small className={hasWarning ? "negative" : "muted"}>
+        {item.scoutingConfidence == null ? "Conf —" : `${item.scoutingConfidence}% Conf`}
+      </small>
+    </div>
+  );
+}
+
 function formatMarketDevelopmentTrend(value: string | null | undefined) {
   switch (value) {
     case "strong_positive":
@@ -3117,11 +3256,12 @@ function PlayerPortrait({
   return <img className={className} src={src} alt={alt} style={style} onError={() => setFailed(true)} />;
 }
 
-function getTransferTypeLabel(type: "buy" | "sell") {
+function getTransferTypeLabel(type: "buy" | "sell" | "contract_exit") {
+  if (type === "contract_exit") return "Contract Exit";
   return type === "buy" ? "Kauf" : "Verkauf";
 }
 
-function getTransferTypePillClass(type: "buy" | "sell") {
+function getTransferTypePillClass(type: "buy" | "sell" | "contract_exit") {
   return `transfer-status-pill ${type === "buy" ? "is-ready" : "is-warning"}`;
 }
 
@@ -3426,6 +3566,16 @@ function formatScenarioTypeLabel(scenarioType?: string | null) {
   }
 }
 
+function formatFeatureAuditStatus(status: FeatureAuditStatus) {
+  if (status === "planned") return "Geplant";
+  if (status === "preview") return "Preview";
+  if (status === "local_write") return "Local Write";
+  if (status === "sandbox_ready") return "Sandbox";
+  if (status === "multiplayer_ready") return "Multiplayer";
+  if (status === "prod_ready") return "Prod";
+  return status;
+}
+
 function resolveScenarioMetaLabel(meta?: SaveSummary["scenarioMeta"] | null) {
   if (!meta) return "default/fresh";
   switch (meta.scenarioType) {
@@ -3542,8 +3692,9 @@ function buildViewContextWarning(
 }
 
 function getViewSourceBadgeLabel(view: FoundationView, meta?: SaveSummary["scenarioMeta"] | null) {
-  if (view === "home") return "source: manager home snapshot";
-  if (view === "season") return meta?.containsFinalStandings ? "source: local season results" : "source: active local save";
+	  if (view === "home") return "source: manager home snapshot";
+	  if (view === "inbox") return "source: derived inbox";
+	  if (view === "season") return meta?.containsFinalStandings ? "source: local season results" : "source: active local save";
   if (view === "prize") return "source: season-end forecast";
   if (view === "market") return "source: active local save";
   if (view === "training") return "source: local roster/progression";
@@ -3615,6 +3766,17 @@ function formatContractShapeLabel(shape: ContractShape | null | undefined) {
     return "Balanced";
   }
   return "—";
+}
+
+function formatMoraleContractIntentLabel(value: string | null | undefined) {
+  const labels: Record<string, string> = {
+    willing_to_extend: "verlängerungsbereit",
+    short_term_only: "nur kurz binden",
+    demands_raise: "fordert Aufwertung",
+    considering_exit: "denkt an Wechsel",
+    refuses_extension: "blockt Verlängerung",
+  };
+  return value ? labels[value] ?? value.replaceAll("_", " ") : "—";
 }
 
 function formatChancePercent(value: number | null | undefined) {
@@ -3763,6 +3925,18 @@ function getGameFlowStatusClass(status: GameFlowStepStatus) {
   if (status === "optional") return "is-optional";
   if (status === "applying") return "is-applying";
   return "is-warning";
+}
+
+function getInboxSeverityLabel(severity: GameInboxItem["severity"]) {
+  if (severity === "critical") return "kritisch";
+  if (severity === "warning") return "Warnung";
+  return "Info";
+}
+
+function getInboxSeverityPillClass(severity: GameInboxItem["severity"]) {
+  if (severity === "critical") return "transfer-status-pill is-blocked";
+  if (severity === "warning") return "transfer-status-pill is-warning";
+  return "transfer-status-pill is-info";
 }
 
 function mapAutoRunStatusToCockpitStatus(
@@ -4241,8 +4415,13 @@ export default function FoundationPageClient({ initialReadSource, initialSelecte
   const [activeOwnerId, setActiveOwnerId] = useState<string>(() => readStoredFoundationActiveOwnerId());
   const [teamContextFilter, setTeamContextFilter] = useState<TeamControlFilter>(() => readStoredFoundationTeamFilter());
   const [activeManagerTeamWarning, setActiveManagerTeamWarning] = useState<string | null>(null);
-  const [activeView, setActiveView] = useState<FoundationView>("home");
-  const [showGameFlowPanel, setShowGameFlowPanel] = useState<boolean>(false);
+	  const [activeView, setActiveView] = useState<FoundationView>("home");
+	  const [showGameFlowPanel, setShowGameFlowPanel] = useState<boolean>(false);
+	  const [inboxTeamFilter, setInboxTeamFilter] = useState<string>("ALL");
+	  const [inboxCategoryFilter, setInboxCategoryFilter] = useState<string>("ALL");
+	  const [inboxIncludeDone, setInboxIncludeDone] = useState<boolean>(false);
+	  const [inboxIncludeDismissed, setInboxIncludeDismissed] = useState<boolean>(false);
+	  const [featureAuditFilter, setFeatureAuditFilter] = useState<FeatureAuditFilter>("all");
   const [matchdaySummaryTab, setMatchdaySummaryTab] = useState<"matchday" | "season">("matchday");
   const [selectedMatchdaySummaryId, setSelectedMatchdaySummaryId] = useState<string | null>(null);
   const [teamSettingsSearch, setTeamSettingsSearch] = useState<string>("");
@@ -4305,6 +4484,15 @@ export default function FoundationPageClient({ initialReadSource, initialSelecte
   const [marketBuyError, setMarketBuyError] = useState<string | null>(null);
   const [marketBuySuccess, setMarketBuySuccess] = useState<string | null>(null);
   const [freshSeasonStartMessage, setFreshSeasonStartMessage] = useState<string | null>(null);
+  const [newGamePresetId, setNewGamePresetId] = useState<NewGamePresetId>("solo_1");
+  const [newGameChrisTeamIds, setNewGameChrisTeamIds] = useState<string[]>(NEW_GAME_PRESET_DEFAULTS.solo_1.chrisTeamIds);
+  const [newGameFrankyTeamIds, setNewGameFrankyTeamIds] = useState<string[]>(NEW_GAME_PRESET_DEFAULTS.solo_1.frankyTeamIds);
+  const [newGameSandbox, setNewGameSandbox] = useState<boolean>(false);
+  const [newGameSaveName, setNewGameSaveName] = useState<string>("");
+  const [newGamePreview, setNewGamePreview] = useState<NewGameSetupPreview | null>(null);
+  const [newGameBusy, setNewGameBusy] = useState<boolean>(false);
+  const [newGameError, setNewGameError] = useState<string | null>(null);
+  const [newGameSuccess, setNewGameSuccess] = useState<string | null>(null);
   const [marketBuyPreview, setMarketBuyPreview] = useState<TransfermarktBuySummary | null>(null);
   const [marketBuyPreviewContext, setMarketBuyPreviewContext] = useState<TransfermarktBuyRequestContext | null>(null);
   const [marketNegotiationOutcome, setMarketNegotiationOutcome] = useState<MarketNegotiationOutcome | null>(null);
@@ -4315,6 +4503,9 @@ export default function FoundationPageClient({ initialReadSource, initialSelecte
   const [marketSellError, setMarketSellError] = useState<string | null>(null);
   const [marketSellSuccess, setMarketSellSuccess] = useState<string | null>(null);
   const [marketSellPreview, setMarketSellPreview] = useState<TransfermarktSellSummary | null>(null);
+  const [contractRenewalBusy, setContractRenewalBusy] = useState<string | null>(null);
+  const [contractRenewalMessage, setContractRenewalMessage] = useState<string | null>(null);
+  const [contractRenewalError, setContractRenewalError] = useState<string | null>(null);
   const [marketSellModalOpen, setMarketSellModalOpen] = useState<boolean>(false);
   const [marketSellSubject, setMarketSellSubject] = useState<TransfermarktSellPreviewSubject | null>(null);
   const [marketContractLengthDraft, setMarketContractLengthDraft] = useState<number>(1);
@@ -7055,6 +7246,93 @@ export default function FoundationPageClient({ initialReadSource, initialSelecte
     }
   }
 
+  async function runContractRenewalAction(input: {
+    teamId: string;
+    playerId: string;
+    playerName: string;
+    action: "renew" | "release";
+    contractLength?: number | null;
+    offeredSalary?: number | null;
+  }) {
+    if (readMeta.readOnly || readMeta.source === "prisma") {
+      showReadOnlyNotice();
+      return;
+    }
+
+    const busyKey = `${input.action}:${input.teamId}:${input.playerId}`;
+    setContractRenewalBusy(busyKey);
+    setContractRenewalError(null);
+    setContractRenewalMessage(null);
+
+    try {
+      const previewResponse = await fetch("/api/contracts/renewal", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          saveId: activeSaveId,
+          teamId: input.teamId,
+          playerId: input.playerId,
+          action: input.action,
+          contractLength: input.contractLength,
+          offeredSalary: input.offeredSalary,
+          dryRun: true,
+          source: readMeta.source,
+        }),
+      });
+      const previewPayload = (await previewResponse.json()) as ContractRenewalApiResponse;
+      if (!previewResponse.ok || previewPayload.error || !previewPayload.summary?.confirmToken) {
+        setContractRenewalError(
+          previewPayload.error ??
+            previewPayload.summary?.blockingReasons?.[0] ??
+            `${input.playerName}: Vertragsvorschau blockiert.`,
+        );
+        return;
+      }
+
+      const applyResponse = await fetch("/api/contracts/renewal", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          saveId: activeSaveId,
+          teamId: input.teamId,
+          playerId: input.playerId,
+          action: input.action,
+          contractLength: input.contractLength,
+          offeredSalary: input.offeredSalary ?? previewPayload.summary.negotiationPreview?.expectedSalary ?? null,
+          dryRun: false,
+          confirmToken: previewPayload.summary.confirmToken,
+          source: readMeta.source,
+        }),
+      });
+      const applyPayload = (await applyResponse.json()) as ContractRenewalApiResponse;
+      if (!applyResponse.ok || applyPayload.error || !applyPayload.summary?.applied) {
+        setContractRenewalError(
+          applyPayload.error ??
+            applyPayload.summary?.blockingReasons?.[0] ??
+            `${input.playerName}: Vertragsaktion blockiert.`,
+        );
+        return;
+      }
+
+      setContractRenewalMessage(
+        input.action === "renew"
+          ? `${input.playerName} wurde verlaengert.`
+          : `${input.playerName} wurde freigegeben.`,
+      );
+      await Promise.all([
+        loadSave(activeSaveId),
+        reloadMarketFeed(input.teamId),
+        reloadHistoryFeed(),
+        reloadSeasonManagementOverview(),
+      ]);
+      setMarketReloadToken((current) => current + 1);
+    } catch {
+      setContractRenewalError(`${input.playerName}: Vertragsaktion konnte nicht ausgefuehrt werden.`);
+    } finally {
+      setContractRenewalBusy(null);
+    }
+  }
+
   async function runSaveAction(
     body: SaveActionRequest,
   ) {
@@ -7108,6 +7386,107 @@ export default function FoundationPageClient({ initialReadSource, initialSelecte
       if (requestVersion === saveActionRequestVersion.current) {
         setIsSaveBusy(false);
       }
+    }
+  }
+
+  function applyNewGamePreset(presetId: NewGamePresetId) {
+    const preset = NEW_GAME_PRESET_DEFAULTS[presetId];
+    setNewGamePresetId(presetId);
+    setNewGameChrisTeamIds(preset.chrisTeamIds);
+    setNewGameFrankyTeamIds(preset.frankyTeamIds);
+    setNewGamePreview(null);
+    setNewGameError(null);
+    setNewGameSuccess(null);
+  }
+
+  function toggleNewGameTeam(owner: "chris" | "franky", teamId: string) {
+    setNewGamePresetId("custom");
+    setNewGamePreview(null);
+    setNewGameError(null);
+    setNewGameSuccess(null);
+    if (owner === "chris") {
+      setNewGameChrisTeamIds((current) =>
+        current.includes(teamId)
+          ? current.filter((entry) => entry !== teamId)
+          : [...current, teamId].filter((entry) => !newGameFrankyTeamIds.includes(entry)),
+      );
+      return;
+    }
+
+    setNewGameFrankyTeamIds((current) =>
+      current.includes(teamId)
+        ? current.filter((entry) => entry !== teamId)
+        : [...current, teamId].filter((entry) => !newGameChrisTeamIds.includes(entry)),
+    );
+  }
+
+  async function runNewGameSetup(dryRun: boolean) {
+    if (readMeta.readOnly) {
+      showReadOnlyNotice();
+      return;
+    }
+
+    if (!dryRun && (!newGamePreview || newGamePreview.blockers.length > 0)) {
+      setNewGameError("Bitte erst ein gueltiges New-Game-Setup pruefen.");
+      return;
+    }
+
+    if (!dryRun) {
+      const confirmed = window.confirm(
+        "Neuen lokalen Spielstand erstellen und aktivieren? Der aktuelle Save bleibt erhalten, aber die App wechselt danach auf den neuen Save.",
+      );
+      if (!confirmed) {
+        return;
+      }
+    }
+
+    setNewGameBusy(true);
+    setNewGameError(null);
+    setNewGameSuccess(null);
+
+    try {
+      const response = await fetch("/api/new-game", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          presetId: newGamePresetId,
+          chrisTeamIds: newGameChrisTeamIds,
+          frankyTeamIds: newGameFrankyTeamIds,
+          sandbox: newGameSandbox,
+          saveName: newGameSaveName.trim() || undefined,
+          dryRun,
+          confirmToken: dryRun ? null : newGamePreview?.confirmToken,
+        }),
+      });
+      const payload = (await response.json()) as NewGameSetupApiResponse;
+      if (!response.ok || payload.error) {
+        setNewGameError(payload.error ?? "New-Game-Setup konnte nicht ausgefuehrt werden.");
+        return;
+      }
+
+      if (dryRun && payload.preview) {
+        setNewGamePreview(payload.preview);
+        return;
+      }
+
+      if (payload.result?.save.saveId) {
+        clearSaveScopedFeeds();
+        await loadSave(payload.result.save.saveId);
+        const firstTeamId = payload.result.preview.chrisTeamIds[0] ?? payload.result.preview.frankyTeamIds[0] ?? null;
+        if (firstTeamId) {
+          setActiveManagerTeam(firstTeamId, "manual_select");
+        }
+        setNewGamePreview(payload.result.preview);
+        setNewGameSuccess(`Neuer Spielstand aktiv: ${payload.result.save.name}`);
+        setActiveView("home");
+        syncFoundationViewInUrl("home");
+      }
+    } catch {
+      setNewGameError("New-Game-Setup konnte nicht geladen werden.");
+    } finally {
+      setNewGameBusy(false);
     }
   }
 
@@ -7262,14 +7641,40 @@ export default function FoundationPageClient({ initialReadSource, initialSelecte
   }, [gameState.matchdayState.matchdayId, gameState.season.currentMatchday]);
   const readSourceLabel = readMeta.source === "prisma" ? "Prisma/Supabase · Read-only" : "SQLite/local";
   const isReadOnlyMode = readMeta.readOnly || readMeta.source === "prisma";
-  const gameFlowState = useMemo(
-    () => buildGameFlowState({ gameState, activeTeamId: activeManagerTeamId }),
-    [activeManagerTeamId, gameState],
-  );
-  const gameFlowActionStep = gameFlowState.currentStep.status === "completed"
-    ? gameFlowState.nextStep ?? gameFlowState.currentStep
-    : gameFlowState.currentStep;
-  const gameFlowCanAutoFix = Boolean(activeContextMeta?.allowTestWrites && gameFlowActionStep.status === "blocked");
+	  const gameFlowState = useMemo(
+	    () => buildGameFlowState({ gameState, activeTeamId: activeManagerTeamId }),
+	    [activeManagerTeamId, gameState],
+	  );
+	  const gameInboxItems = useMemo(
+	    () =>
+	      buildGameInboxItems({
+	        gameState,
+	        saveId: activeSaveId,
+	        activeTeamId: activeManagerTeamId,
+	        activeOwnerId: effectiveActiveOwnerId,
+	        hostMode: teamContextFilter === "all",
+	        gameFlowState,
+	      }),
+	    [activeManagerTeamId, activeSaveId, effectiveActiveOwnerId, gameFlowState, gameState, teamContextFilter],
+	  );
+	  const visibleInboxItems = useMemo(
+	    () =>
+	      filterGameInboxItems(gameInboxItems, {
+	        teamId: inboxTeamFilter,
+	        category: inboxCategoryFilter,
+	        includeDone: inboxIncludeDone,
+	        includeDismissed: inboxIncludeDismissed,
+	      }),
+	    [gameInboxItems, inboxCategoryFilter, inboxIncludeDismissed, inboxIncludeDone, inboxTeamFilter],
+	  );
+	  const primaryInboxItem = useMemo(
+	    () => getPrimaryInboxTask(filterGameInboxItems(gameInboxItems, { includeDismissed: false, includeDone: false })),
+	    [gameInboxItems],
+	  );
+	  const gameFlowActionStep = gameFlowState.currentStep.status === "completed"
+	    ? gameFlowState.nextStep ?? gameFlowState.currentStep
+	    : gameFlowState.currentStep;
+	  const gameFlowCanAutoFix = Boolean(activeContextMeta?.allowTestWrites && gameFlowActionStep.status === "blocked");
   const navigateToGameFlowStep = (targetView: GameFlowView, teamId?: string | null, targetPanel?: string | null) => {
     if (teamId && teamId !== activeManagerTeamId) {
       setActiveManagerTeam(teamId, "manual_select");
@@ -7279,14 +7684,44 @@ export default function FoundationPageClient({ initialReadSource, initialSelecte
     if (targetPanel) {
       window.setTimeout(() => {
         document.getElementById(targetPanel)?.scrollIntoView({ behavior: "smooth", block: "start" });
-      }, 80);
-    }
-  };
-  const globalNextDisabled = gameFlowActionStep.status === "blocked" || gameFlowActionStep.status === "applying";
-  const triggerGlobalNext = () => {
-    if (globalNextDisabled) {
-      setShowGameFlowPanel(true);
-      return;
+	      }, 80);
+	    }
+	  };
+	  const navigateToInboxItem = (item: GameInboxItem) => {
+	    if (item.teamId && item.teamId !== activeManagerTeamId) {
+	      setActiveManagerTeam(item.teamId, "manual_select");
+	    }
+	    setFoundationView(normalizeInboxTargetView(item.targetView), setActiveView);
+	    setShowGameFlowPanel(false);
+	    const panel = typeof item.targetParams.panel === "string" ? item.targetParams.panel : null;
+	    if (panel) {
+	      window.setTimeout(() => {
+	        document.getElementById(panel)?.scrollIntoView({ behavior: "smooth", block: "start" });
+	      }, 80);
+	    }
+	  };
+	  const globalNextDisabled = primaryInboxItem ? false : gameFlowActionStep.status === "blocked" || gameFlowActionStep.status === "applying";
+	  const globalNextLabel = primaryInboxItem?.title ?? gameFlowActionStep.label;
+	  const globalNextTitle = primaryInboxItem
+	    ? `${primaryInboxItem.title}: ${primaryInboxItem.description}`
+	    : globalNextDisabled
+	      ? gameFlowActionStep.blockers.map(formatCockpitReason).join(" · ") || "Aktueller Schritt ist blockiert."
+	      : "Leertaste: Weiter";
+	  const globalNextStatusClass = primaryInboxItem
+	    ? primaryInboxItem.severity === "critical"
+	      ? "is-blocked"
+	      : primaryInboxItem.severity === "warning"
+	        ? "is-warning"
+	        : "is-ready"
+	    : getGameFlowStatusClass(gameFlowActionStep.status);
+	  const triggerGlobalNext = () => {
+	    if (primaryInboxItem) {
+	      navigateToInboxItem(primaryInboxItem);
+	      return;
+	    }
+	    if (globalNextDisabled) {
+	      setShowGameFlowPanel(true);
+	      return;
     }
     navigateToGameFlowStep(gameFlowActionStep.targetView, gameFlowActionStep.teamId, gameFlowActionStep.targetPanel);
   };
@@ -7309,7 +7744,7 @@ export default function FoundationPageClient({ initialReadSource, initialSelecte
     };
     window.addEventListener("keydown", onKeyDown);
     return () => window.removeEventListener("keydown", onKeyDown);
-  }, [activeManagerTeamId, gameFlowActionStep, globalNextDisabled]);
+	  }, [activeManagerTeamId, gameFlowActionStep, globalNextDisabled, primaryInboxItem]);
 
   const selectedIdentity = useMemo(
     () =>
@@ -8446,6 +8881,23 @@ export default function FoundationPageClient({ initialReadSource, initialSelecte
   const selectedStandingRow = useMemo(
     () => seasonStandRows.find((row) => row.teamId === selectedTeam?.teamId) ?? null,
     [seasonStandRows, selectedTeam],
+  );
+  const teamObjectiveOverview = useMemo(
+    () => buildTeamObjectiveOverview(gameState),
+    [gameState],
+  );
+  const selectedTeamObjectives = useMemo(
+    () => teamObjectiveOverview.objectives.filter((objective) => objective.teamId === selectedTeam?.teamId),
+    [selectedTeam?.teamId, teamObjectiveOverview.objectives],
+  );
+  const selectedBoardConfidence = selectedTeam ? teamObjectiveOverview.boardConfidence[selectedTeam.teamId] ?? null : null;
+  const selectedAtRiskObjectives = useMemo(
+    () => selectedTeamObjectives.filter((objective) => objective.status === "at_risk" || objective.status === "failed"),
+    [selectedTeamObjectives],
+  );
+  const selectedOpenObjectives = useMemo(
+    () => selectedTeamObjectives.filter((objective) => objective.status === "open" || objective.status === "at_risk"),
+    [selectedTeamObjectives],
   );
 
   const seasonPointsLedger = useMemo(
@@ -9654,6 +10106,11 @@ export default function FoundationPageClient({ initialReadSource, initialSelecte
     () => buildMultiSeasonBalanceDashboard(gameState),
     [gameState],
   );
+  const featureAuditMatrix = useMemo(() => buildFeatureAuditMatrix(), []);
+  const filteredFeatureAuditEntries = useMemo(
+    () => filterFeatureAuditEntries(featureAuditMatrix.entries, featureAuditFilter),
+    [featureAuditFilter, featureAuditMatrix.entries],
+  );
   const sortedMultiSeasonTeamRows = useMemo(
     () =>
       sortRows(multiSeasonBalanceDashboard.teamRows, tableSorts.multiSeasonTeamBalanceTable, {
@@ -10492,122 +10949,23 @@ export default function FoundationPageClient({ initialReadSource, initialSelecte
         .slice(0, 8),
     [playerRatingsById, playerSeasonPerformanceMap, selectedRosterTableRows],
   );
-  const homeTasks = useMemo(
-    () =>
-      [
-        {
-          id: "next",
-          label: gameFlowActionStep.label,
-          status: getGameFlowStatusLabel(gameFlowActionStep.status),
-          targetView: gameFlowActionStep.targetView as FoundationView,
-          primary: true,
-          blocker: gameFlowActionStep.blockers[0] ? formatCockpitReason(gameFlowActionStep.blockers[0]) : null,
-        },
-        {
-          id: "lineup",
-          label: homeNextMatchdayStatus.openSlots > 0 ? "Lineup setzen" : "Lineup prüfen",
-          status: homeNextMatchdayStatus.statusLabel,
-          targetView: "lineup" as FoundationView,
-          blocker: homeNextMatchdayStatus.openSlots > 0 ? `${homeNextMatchdayStatus.openSlots} Slots offen` : null,
-        },
-        {
-          id: "formcards",
-          label: "Formkarten setzen",
-          status: homeNextMatchdayStatus.hasFormCards ? "bereit" : "offen",
-          targetView: "lineup" as FoundationView,
-          blocker: homeNextMatchdayStatus.hasFormCards ? null : "Formkarten prüfen",
-        },
-        {
-          id: "training",
-          label: "Training prüfen",
-          status: "prüfen",
-          targetView: "training" as FoundationView,
-          blocker: null,
-        },
-        {
-          id: "xp",
-          label: "XP verteilen",
-          status: homePlayerCards.some((row) => row.xp > 0) ? "XP verfügbar" : "kein akuter XP-Hinweis",
-          targetView: "training" as FoundationView,
-          blocker: null,
-        },
-        {
-          id: "facilities",
-          label: "Facility Upgrade möglich",
-          status: "Preview",
-          targetView: "training" as FoundationView,
-          blocker: null,
-        },
-        {
-          id: "sell",
-          label: "Spieler verkaufen",
-          status: selectedRoster.length > (selectedIdentity?.playerOpt ?? 12) ? "Kader zu groß" : "optional",
-          targetView: "teams" as FoundationView,
-          blocker: null,
-        },
-        {
-          id: "buy",
-          label: selectedRoster.length < (selectedIdentity?.playerMin ?? 7) ? "Spieler kaufen" : "Transfermarkt prüfen",
-          status: selectedRoster.length < (selectedIdentity?.playerMin ?? 7) ? "Kader unter Minimum" : "optional",
-          targetView: "market" as FoundationView,
-          blocker: null,
-        },
-        {
-          id: "arena",
-          label: "Arena starten",
-          status: homeNextMatchdayStatus.openSlots === 0 ? "bereit" : "Lineup fehlt",
-          targetView: "matchdayArena" as FoundationView,
-          blocker: homeNextMatchdayStatus.openSlots === 0 ? null : "erst Lineup setzen",
-        },
-        {
-          id: "result",
-          label: "Ergebnis ansehen",
-          status: homeNextMatchdayStatus.resultAvailable ? "verfügbar" : "offen",
-          targetView: "matchdayResult" as FoundationView,
-          blocker: homeNextMatchdayStatus.resultAvailable ? null : "noch kein Result",
-        },
-        {
-          id: "season",
-          label: "Saisonstand ansehen",
-          status: hasSeasonResultsForHome ? "Daten vorhanden" : "noch ohne Ergebnisse",
-          targetView: "season" as FoundationView,
-          blocker: null,
-        },
-      ],
-    [
-      gameFlowActionStep,
-      hasSeasonResultsForHome,
-      homeNextMatchdayStatus,
-      homePlayerCards,
-      selectedIdentity?.playerMin,
-    selectedIdentity?.playerOpt,
-      selectedRoster.length,
-    ],
-  );
-  const homeNewsItems = useMemo(() => {
-    const items: string[] = [];
-    const latestSnapshot = [...(gameState.seasonState.seasonSnapshots ?? [])].reverse().find((snapshot) => snapshot.status === "completed");
-    const champion = latestSnapshot?.finalStandings?.find((row) => row.rank === 1);
-    if (champion?.teamName) {
-      items.push(`Letzter Champion: ${champion.teamName}`);
-    }
-    const topMatchdayTeam = matchdaySummary.teamRows[0];
-    if (topMatchdayTeam) {
-      items.push(`Letzter Spieltag: ${topMatchdayTeam.teamName} vorne`);
-    }
-    const topMatchdayPlayer = matchdaySummary.topPlayers[0];
-    if (topMatchdayPlayer) {
-      items.push(`Top-Spieler: ${topMatchdayPlayer.playerName}`);
-    }
-    const latestTransfer = (historyFeed?.items ?? [])[0];
-    if (latestTransfer) {
-      items.push(`Transfer: ${latestTransfer.playerName} (${getTransferTypeLabel(latestTransfer.type)})`);
-    }
-    if (homePlayerCards.some((row) => row.xp > 0)) {
-      items.push("XP-Upgrades verfügbar");
-    }
-    return items;
-  }, [gameState.seasonState.seasonSnapshots, historyFeed?.items, homePlayerCards, matchdaySummary.teamRows, matchdaySummary.topPlayers]);
+	  const homeTasks = useMemo(
+	    () =>
+	      filterGameInboxItems(gameInboxItems, { includeDismissed: false, includeDone: false })
+	        .filter((item) => item.category === "task" || item.category === "warning" || item.severity === "critical")
+	        .slice(0, 5),
+	    [gameInboxItems],
+	  );
+	  const homeNewsItems = useMemo(() => {
+	    return gameInboxItems
+	      .filter((item) => item.status === "open" && ["news", "result", "finance", "transfer", "facility"].includes(item.category))
+	      .slice(0, 5);
+	  }, [gameInboxItems]);
+	  const homeStoryItems = useMemo(() => {
+	    return gameInboxItems
+	      .filter((item) => item.status === "open" && item.source.startsWith("story:"))
+	      .slice(0, 3);
+	  }, [gameInboxItems]);
 
   const sortedSeasonStandRows = useMemo(
     () =>
@@ -11585,16 +11943,16 @@ export default function FoundationPageClient({ initialReadSource, initialSelecte
         ))}
         <div className="foundation-topnav-spacer" />
         <button
-          className={`primary-button foundation-global-next-button ${getGameFlowStatusClass(gameFlowActionStep.status)}`}
-          data-testid="foundation-global-next-button"
-          type="button"
-          onClick={triggerGlobalNext}
-          title={globalNextDisabled ? gameFlowActionStep.blockers.map(formatCockpitReason).join(" · ") || "Aktueller Schritt ist blockiert." : "Leertaste: Weiter"}
-        >
-          <span>Weiter</span>
-          <strong>{gameFlowActionStep.label}</strong>
-          <small>Leertaste</small>
-        </button>
+	          className={`primary-button foundation-global-next-button ${globalNextStatusClass}`}
+	          data-testid="foundation-global-next-button"
+	          type="button"
+	          onClick={triggerGlobalNext}
+	          title={globalNextTitle}
+	        >
+	          <span>Weiter</span>
+	          <strong>{globalNextLabel}</strong>
+	          <small>Leertaste</small>
+	        </button>
         {foundationAdminViews.map((view, index) => (
           <button
             key={view.id}
@@ -11982,6 +12340,48 @@ export default function FoundationPageClient({ initialReadSource, initialSelecte
               </article>
             </div>
 
+            <article className="foundation-home-card" data-testid="home-board-objectives">
+              <div className="panel-header compact">
+                <div className="stack">
+                  <h2>Board & Saisonziele</h2>
+                  <p className="muted">Ziele sind Preview-first: Sponsor-Boni/Mali werden angezeigt, aber noch nicht angewendet.</p>
+                </div>
+                <div className="room-meta foundation-admin-meta">
+                  <span className={`transfer-status-pill${(selectedBoardConfidence?.pressure ?? 0) >= 8 ? " is-warning" : " is-ready"}`}>
+                    Druck {selectedBoardConfidence?.pressure ?? "—"}/10
+                  </span>
+                  <span className="pill">Trust {selectedBoardConfidence?.value ?? "—"}/10</span>
+                </div>
+              </div>
+              <div className="foundation-home-owner-grid">
+                {selectedOpenObjectives.slice(0, 4).map((objective) => (
+                  <article key={`home-objective-${objective.objectiveId}`} className="metric-card teams-summary-card">
+                    <span>{objective.category.toUpperCase()}</span>
+                    <strong>{objective.label}</strong>
+                    <small className="muted">
+                      {String(objective.currentValue ?? "—")} / {String(objective.targetValue ?? "—")}
+                    </small>
+                    <div className="room-meta foundation-admin-meta">
+                      <span className={`transfer-status-pill${objective.status === "completed" ? " is-ready" : objective.status === "failed" || objective.status === "at_risk" ? " is-warning" : ""}`}>
+                        {objective.status}
+                      </span>
+                      {objective.rewardCash != null ? <span className="pill">Bonus {formatMoney(objective.rewardCash)}</span> : null}
+                      {objective.penaltyCash != null ? <span className="pill">Malus {formatMoney(objective.penaltyCash)}</span> : null}
+                    </div>
+                  </article>
+                ))}
+                {selectedOpenObjectives.length === 0 ? (
+                  <div className="transfer-callout is-ready">
+                    <strong>Alle aktiven Board-Ziele sind stabil.</strong>
+                    <span>Weiter beobachten: Season Review bewertet die Ziele nach echten Ergebnissen.</span>
+                  </div>
+                ) : null}
+              </div>
+              {teamObjectiveOverview.warnings.length > 0 ? (
+                <p className="muted">Warnings: {teamObjectiveOverview.warnings.join(", ")}</p>
+              ) : null}
+            </article>
+
             <article className="foundation-home-card foundation-home-players" data-testid="home-player-cards">
               <div className="panel-header compact">
                 <div className="stack">
@@ -12136,42 +12536,80 @@ export default function FoundationPageClient({ initialReadSource, initialSelecte
                   <button className="secondary-button inline-button" type="button" onClick={() => setFoundationView("matchdayArena", setActiveView)}>
                     Arena
                   </button>
-                  <button className="secondary-button inline-button" type="button" onClick={() => setFoundationView("matchdayResult", setActiveView)}>
+                  <button
+                    className="secondary-button inline-button"
+                    type="button"
+                    onClick={() => {
+                      setFoundationView("matchdayArena", setActiveView);
+                      window.setTimeout(() => {
+                        document.getElementById("arena-result-summary")?.scrollIntoView({ behavior: "smooth", block: "start" });
+                      }, 80);
+                    }}
+                  >
                     Ergebnis ansehen
                   </button>
                 </div>
               </article>
 
-              <article className="foundation-home-card foundation-home-tasks" data-testid="home-task-list">
+	              <article className="foundation-home-card foundation-home-tasks" data-testid="home-task-list">
+	                <div className="panel-header compact">
+	                  <h2>Aufgaben</h2>
+	                  <button className="secondary-button inline-button" type="button" onClick={() => setFoundationView("inbox", setActiveView)}>
+	                    Alle anzeigen
+	                  </button>
+	                </div>
+	                {homeTasks.map((task) => (
+	                  <button
+	                    key={`home-task-${task.itemId}`}
+	                    className={`foundation-home-task${task.itemId === primaryInboxItem?.itemId ? " is-primary" : ""}`}
+	                    type="button"
+	                    onClick={() => navigateToInboxItem(task)}
+	                  >
+	                    <span>
+	                      <strong>{task.title}</strong>
+	                      <small>{task.description}</small>
+	                    </span>
+	                    <span className={getInboxSeverityPillClass(task.severity)}>{getInboxSeverityLabel(task.severity)}</span>
+	                  </button>
+	                ))}
+	              </article>
+
+              <article className="foundation-home-card foundation-home-story-cards" data-testid="home-story-cards">
                 <div className="panel-header compact">
-                  <h2>Aufgaben</h2>
+                  <h2>Story Cards</h2>
+                  <span className="pill">{homeStoryItems.length} echte Quelle(n)</span>
                 </div>
-                {homeTasks.map((task) => (
-                  <button
-                    key={`home-task-${task.id}`}
-                    className={`foundation-home-task${task.primary ? " is-primary" : ""}`}
-                    type="button"
-                    onClick={() => setFoundationView(task.targetView, setActiveView)}
-                  >
-                    <span>
-                      <strong>{task.label}</strong>
-                      <small>{task.blocker ?? task.status}</small>
-                    </span>
-                    <span className="transfer-status-pill">{task.status}</span>
-                  </button>
-                ))}
+                {homeStoryItems.length > 0 ? (
+                  <ul className="foundation-home-news-list">
+                    {homeStoryItems.map((item) => (
+                      <li key={`home-story-${item.itemId}`}>
+                        <button className="foundation-text-button" type="button" onClick={() => navigateToInboxItem(item)}>
+                          <strong>{item.title.replace("Story Card: ", "")}</strong>
+                          <span>{item.description}</span>
+                        </button>
+                      </li>
+                    ))}
+                  </ul>
+                ) : (
+                  <p className="muted">Noch keine Story Card aus echten Result-, Snapshot- oder XP-Daten.</p>
+                )}
               </article>
 
               <article className="foundation-home-card">
                 <div className="panel-header compact">
                   <h2>News</h2>
                 </div>
-                {homeNewsItems.length > 0 ? (
-                  <ul className="foundation-home-news-list">
-                    {homeNewsItems.map((item) => (
-                      <li key={`home-news-${item}`}>{item}</li>
-                    ))}
-                  </ul>
+	                {homeNewsItems.length > 0 ? (
+	                  <ul className="foundation-home-news-list">
+	                    {homeNewsItems.map((item) => (
+	                      <li key={`home-news-${item.itemId}`}>
+	                        <button className="foundation-text-button" type="button" onClick={() => navigateToInboxItem(item)}>
+	                          <strong>{item.title}</strong>
+	                          <span>{item.description}</span>
+	                        </button>
+	                      </li>
+	                    ))}
+	                  </ul>
                 ) : (
                   <p className="muted">Noch keine belastbaren News aus echten Save-Daten.</p>
                 )}
@@ -12220,9 +12658,91 @@ export default function FoundationPageClient({ initialReadSource, initialSelecte
                 </div>
               </article>
             ) : null}
-          </section>
+	          </section>
 
-          <section className={`panel${getViewClass("teamSettings")}`} id="foundation-team-settings">
+	          <section className={`panel foundation-inbox-panel${getViewClass("inbox")}`} data-testid="foundation-inbox" id="foundation-inbox">
+	            <div className="panel-header">
+	              <div>
+	                <h2>Inbox</h2>
+	                <p className="muted">Aufgaben, Warnungen und News aus echten Save-Quellen. Keine automatisch erzeugten Fantasie-Meldungen.</p>
+	              </div>
+	              <div className="room-meta foundation-admin-meta">
+	                <span className="pill foundation-source-pill">{getViewSourceBadgeLabel("inbox", activeContextMeta)}</span>
+	                <span className="pill">{gameInboxItems.filter((item) => item.status === "open").length} offen</span>
+	                <span className="pill">{gameInboxItems.filter((item) => item.severity === "critical" && item.status === "open").length} kritisch</span>
+	              </div>
+	            </div>
+	            <div className="foundation-filter-grid">
+	              <label className="filter-field">
+	                <span>Team</span>
+	                <select className="input" value={inboxTeamFilter} onChange={(event) => setInboxTeamFilter(event.target.value)}>
+	                  <option value="ALL">Alle sichtbaren Teams</option>
+	                  {managerTeamOptions.map((team) => (
+	                    <option key={`inbox-team-${team.teamId}`} value={team.teamId}>
+	                      {team.shortCode} · {team.name}
+	                    </option>
+	                  ))}
+	                </select>
+	              </label>
+	              <label className="filter-field">
+	                <span>Kategorie</span>
+	                <select className="input" value={inboxCategoryFilter} onChange={(event) => setInboxCategoryFilter(event.target.value)}>
+	                  <option value="ALL">Alle Kategorien</option>
+	                  <option value="task">Aufgaben</option>
+	                  <option value="warning">Warnungen</option>
+	                  <option value="news">News</option>
+	                  <option value="result">Results</option>
+	                  <option value="finance">Finanzen</option>
+	                  <option value="transfer">Transfers</option>
+	                  <option value="training">Training</option>
+	                  <option value="contract">Verträge</option>
+	                  <option value="facility">Facilities</option>
+	                </select>
+	              </label>
+	              <label className="filter-field checkbox-field">
+	                <input type="checkbox" checked={inboxIncludeDone} onChange={(event) => setInboxIncludeDone(event.target.checked)} />
+	                <span>Erledigte anzeigen</span>
+	              </label>
+	              <label className="filter-field checkbox-field">
+	                <input type="checkbox" checked={inboxIncludeDismissed} onChange={(event) => setInboxIncludeDismissed(event.target.checked)} />
+	                <span>Ausgeblendete anzeigen</span>
+	              </label>
+	            </div>
+	            <div className="foundation-inbox-list">
+	              {visibleInboxItems.length > 0 ? (
+	                visibleInboxItems.map((item) => {
+	                  const team = item.teamId ? gameState.teams.find((candidate) => candidate.teamId === item.teamId) : null;
+	                  return (
+	                    <article key={`inbox-item-${item.itemId}`} className={`foundation-inbox-item is-${item.severity}`}>
+	                      <div>
+	                        <div className="room-meta foundation-admin-meta">
+	                          <span className={getInboxSeverityPillClass(item.severity)}>{getInboxSeverityLabel(item.severity)}</span>
+	                          <span className="pill">{item.category}</span>
+	                          <span className="pill">{item.status}</span>
+	                          {team ? <span className="pill">{team.shortCode}</span> : <span className="pill">global</span>}
+	                        </div>
+	                        <h3>{item.title}</h3>
+	                        <p>{item.description}</p>
+	                        <small className="muted">
+	                          {item.source} · {item.matchday ?? item.seasonId}
+	                        </small>
+	                      </div>
+	                      <button className="primary-button inline-button" type="button" onClick={() => navigateToInboxItem(item)}>
+	                        Öffnen
+	                      </button>
+	                    </article>
+	                  );
+	                })
+	              ) : (
+	                <div className="transfer-callout">
+	                  <strong>Keine Inbox-Einträge</strong>
+	                  <span>Für die aktuellen Filter gibt es keine offenen echten Aufgaben oder News.</span>
+	                </div>
+	              )}
+	            </div>
+	          </section>
+
+	          <section className={`panel${getViewClass("teamSettings")}`} id="foundation-team-settings">
             <div className="panel-header">
               <h2>Team Settings</h2>
             </div>
@@ -12286,6 +12806,205 @@ export default function FoundationPageClient({ initialReadSource, initialSelecte
                       ))}
                     </select>
                   </label>
+
+                  <section className="panel" data-testid="new-game-setup-wizard">
+                    <div className="panel-header">
+                      <h3>Neues Spiel starten</h3>
+                      <span className="pill">Baseline · Startbudget · Ownership</span>
+                    </div>
+                    <p className="muted">
+                      Erst pruefen, dann erstellen. Der aktuelle Save bleibt erhalten; beim Confirm wird ein neuer lokaler Save aktiv.
+                    </p>
+                    <div className="filter-grid">
+                      <label className="filter-field">
+                        <span>Spielmodus</span>
+                        <select
+                          className="input"
+                          value={newGamePresetId}
+                          disabled={newGameBusy || isReadOnlyMode}
+                          onChange={(event) => applyNewGamePreset(event.target.value as NewGamePresetId)}
+                        >
+                          {Object.entries(NEW_GAME_PRESET_DEFAULTS).map(([presetId, preset]) => (
+                            <option key={presetId} value={presetId}>
+                              {preset.label}
+                            </option>
+                          ))}
+                        </select>
+                      </label>
+                      <label className="filter-field">
+                        <span>Save-Name</span>
+                        <input
+                          className="input"
+                          value={newGameSaveName}
+                          disabled={newGameBusy || isReadOnlyMode}
+                          placeholder="Optional, sonst automatisch"
+                          onChange={(event) => {
+                            setNewGameSaveName(event.target.value);
+                            setNewGamePreview(null);
+                          }}
+                        />
+                      </label>
+                      <label className="filter-field checkbox-field">
+                        <input
+                          type="checkbox"
+                          checked={newGameSandbox}
+                          disabled={newGameBusy || isReadOnlyMode}
+                          onChange={(event) => {
+                            setNewGameSandbox(event.target.checked);
+                            setNewGamePreview(null);
+                          }}
+                        />
+                        <span>als Sandbox/Testsave markieren</span>
+                      </label>
+                    </div>
+
+                    <div className="metric-grid compact">
+                      <article className="metric-card">
+                        <span>Chris/User</span>
+                        <strong>{newGameChrisTeamIds.length}</strong>
+                        <small>{newGameChrisTeamIds.join(" · ") || "kein Team"}</small>
+                      </article>
+                      <article className="metric-card">
+                        <span>Franky</span>
+                        <strong>{newGameFrankyTeamIds.length}</strong>
+                        <small>{newGameFrankyTeamIds.join(" · ") || "kein Team"}</small>
+                      </article>
+                      <article className="metric-card">
+                        <span>Rest</span>
+                        <strong>{Math.max(0, gameState.teams.length - newGameChrisTeamIds.length - newGameFrankyTeamIds.length)}</strong>
+                        <small>AI-Teams</small>
+                      </article>
+                    </div>
+
+                    <div className="team-chip-grid">
+                      {[...gameState.teams]
+                        .sort((a, b) => (b.budget ?? 0) - (a.budget ?? 0) || a.shortCode.localeCompare(b.shortCode))
+                        .map((team) => {
+                          const isChris = newGameChrisTeamIds.includes(team.teamId);
+                          const isFranky = newGameFrankyTeamIds.includes(team.teamId);
+                          return (
+                            <div
+                              key={`new-game-team-${team.teamId}`}
+                              className={`team-settings-team-card${isChris ? " is-owned-by-user" : ""}${isFranky ? " is-owned-by-remote" : ""}`}
+                            >
+                              <strong>{team.shortCode}</strong>
+                              <span>{team.name}</span>
+                              <small>Budget {formatMoney(team.budget)}</small>
+                              <div className="foundation-save-actions save-summary-actions">
+                                <button
+                                  className={isChris ? "primary-button inline-button" : "secondary-button inline-button"}
+                                  type="button"
+                                  disabled={newGameBusy || isReadOnlyMode || isFranky}
+                                  onClick={() => toggleNewGameTeam("chris", team.teamId)}
+                                >
+                                  Chris
+                                </button>
+                                <button
+                                  className={isFranky ? "primary-button inline-button" : "secondary-button inline-button"}
+                                  type="button"
+                                  disabled={newGameBusy || isReadOnlyMode || isChris}
+                                  onClick={() => toggleNewGameTeam("franky", team.teamId)}
+                                >
+                                  Franky
+                                </button>
+                              </div>
+                            </div>
+                          );
+                        })}
+                    </div>
+
+                    <div className="foundation-save-actions">
+                      <button
+                        className="secondary-button"
+                        type="button"
+                        disabled={newGameBusy || isReadOnlyMode}
+                        onClick={() => void runNewGameSetup(true)}
+                      >
+                        {newGameBusy ? "Prueft..." : "Setup pruefen"}
+                      </button>
+                      <button
+                        className="primary-button"
+                        type="button"
+                        disabled={
+                          newGameBusy ||
+                          isReadOnlyMode ||
+                          !newGamePreview ||
+                          newGamePreview.blockers.length > 0
+                        }
+                        onClick={() => void runNewGameSetup(false)}
+                      >
+                        Neues Spiel erstellen
+                      </button>
+                    </div>
+
+                    {newGameError ? <p className="text-negative">{newGameError}</p> : null}
+                    {newGameSuccess ? <p className="text-positive">{newGameSuccess}</p> : null}
+                    {newGamePreview ? (
+                      <section className="panel">
+                        <div className="panel-header">
+                          <h3>New-Game Preview</h3>
+                          <span className={newGamePreview.blockers.length > 0 ? "transfer-status-pill is-danger" : "transfer-status-pill is-ready"}>
+                            {newGamePreview.blockers.length > 0 ? "blockiert" : "ready"}
+                          </span>
+                        </div>
+                        <div className="metric-grid compact">
+                          <article className="metric-card">
+                            <span>Baseline</span>
+                            <strong>{newGamePreview.baseline.baselineCount}/{newGamePreview.baseline.playerCount}</strong>
+                            <small>Spieler werden auf Ursprung gesetzt</small>
+                          </article>
+                          <article className="metric-card">
+                            <span>Season</span>
+                            <strong>{newGamePreview.seasonSetup.seasonId}</strong>
+                            <small>{newGamePreview.seasonSetup.matchdayCount} Spieltage · Matchday {newGamePreview.seasonSetup.currentMatchday}</small>
+                          </article>
+                          <article className="metric-card">
+                            <span>Ownership</span>
+                            <strong>{newGamePreview.counts.chris}+{newGamePreview.counts.franky}+{newGamePreview.counts.ai}</strong>
+                            <small>Chris · Franky · AI</small>
+                          </article>
+                          <article className="metric-card">
+                            <span>Room</span>
+                            <strong>{newGamePreview.room.enabled ? "Online vorbereitet" : "Solo"}</strong>
+                            <small>{newGamePreview.room.enabled ? "Code beim Erstellen" : "kein Room"}</small>
+                          </article>
+                        </div>
+                        <div className="table-shell">
+                          <table className="data-table compact-table">
+                            <thead>
+                              <tr>
+                                <th>StartRank</th>
+                                <th>Team</th>
+                                <th>Budget</th>
+                                <th>Owner</th>
+                                <th>Mode</th>
+                              </tr>
+                            </thead>
+                            <tbody>
+                              {newGamePreview.teams
+                                .filter((team) => team.ownerLabel !== "AI" || team.startRank <= 5 || team.teamId === "R-R")
+                                .sort((a, b) => a.startRank - b.startRank)
+                                .map((team) => (
+                                  <tr key={`new-game-preview-${team.teamId}`}>
+                                    <td>{team.startRank}</td>
+                                    <td>{team.shortCode} · {team.name}</td>
+                                    <td>{formatMoney(team.budget)}</td>
+                                    <td>{team.ownerLabel}</td>
+                                    <td>{team.controlMode}</td>
+                                  </tr>
+                                ))}
+                            </tbody>
+                          </table>
+                        </div>
+                        {newGamePreview.warnings.length > 0 ? (
+                          <p className="muted">Warnings: {newGamePreview.warnings.join(" · ")}</p>
+                        ) : null}
+                        {newGamePreview.blockers.length > 0 ? (
+                          <p className="text-negative">Blocker: {newGamePreview.blockers.join(" · ")}</p>
+                        ) : null}
+                      </section>
+                    ) : null}
+                  </section>
 
                   <div className="foundation-save-actions">
                     <button
@@ -13807,6 +14526,154 @@ export default function FoundationPageClient({ initialReadSource, initialSelecte
                     </table>
                   </div>
                 </article>
+              </div>
+            </section>
+
+            <section className="panel cockpit-feature-audit" data-testid="feature-audit-matrix">
+              <div className="panel-header">
+                <div className="stack season-panel-head">
+                  <h3>Feature Audit</h3>
+                  <p className="muted">
+                    Lebende Matrix fuer Kernfeatures, Tests, Smokes, Write-Safety, Multiplayer-Stand und bekannte Luecken.
+                  </p>
+                </div>
+                <div className="cockpit-actions balance-export-links">
+                  <a className="secondary-button" href="/outputs/feature-audit-matrix.md">
+                    Markdown
+                  </a>
+                  <a className="secondary-button" href="/outputs/feature-audit-matrix.csv">
+                    CSV
+                  </a>
+                </div>
+              </div>
+
+              <div className="metric-grid cockpit-summary-grid">
+                <article className="metric-card feature-audit-summary-card">
+                  <span>Features</span>
+                  <strong>{featureAuditMatrix.summary.total}</strong>
+                  <small>zentral erfasst</small>
+                </article>
+                <article className="metric-card feature-audit-summary-card is-good">
+                  <span>Sandbox+</span>
+                  <strong>{featureAuditMatrix.summary.sandboxReadyOrBetter}</strong>
+                  <small>sandbox/multiplayer/prod</small>
+                </article>
+                <article className="metric-card feature-audit-summary-card is-warning">
+                  <span>Preview</span>
+                  <strong>{featureAuditMatrix.summary.previewOnly}</strong>
+                  <small>noch nicht voll angewendet</small>
+                </article>
+                <article className="metric-card feature-audit-summary-card is-danger">
+                  <span>Blocker</span>
+                  <strong>{featureAuditMatrix.summary.blockerCount}</strong>
+                  <small>offene Punkte</small>
+                </article>
+                <article className="metric-card feature-audit-summary-card">
+                  <span>Tests fehlen</span>
+                  <strong>{featureAuditMatrix.summary.missingTests}</strong>
+                  <small>test_missing</small>
+                </article>
+                <article className="metric-card feature-audit-summary-card">
+                  <span>Smoke fehlt</span>
+                  <strong>{featureAuditMatrix.summary.missingSmoke}</strong>
+                  <small>smoke_missing</small>
+                </article>
+                <article className="metric-card feature-audit-summary-card">
+                  <span>Write-Safety fehlt</span>
+                  <strong>{featureAuditMatrix.summary.localWriteWithoutWriteSafety}</strong>
+                  <small>local_write ohne Gate</small>
+                </article>
+                <article className="metric-card feature-audit-summary-card">
+                  <span>MP fehlt</span>
+                  <strong>{featureAuditMatrix.summary.multiplayerMissing}</strong>
+                  <small>noch nicht room-ready</small>
+                </article>
+              </div>
+
+              <div className="feature-audit-filterbar" aria-label="Feature Audit Filter">
+                {featureAuditFilters.map((filter) => (
+                  <button
+                    key={filter.id}
+                    className={`secondary-button inline-button${featureAuditFilter === filter.id ? " is-active" : ""}`}
+                    type="button"
+                    onClick={() => setFeatureAuditFilter(filter.id)}
+                  >
+                    {filter.label}
+                  </button>
+                ))}
+              </div>
+
+              {featureAuditMatrix.summary.topBlockers.length > 0 ? (
+                <div className="feature-audit-blocker-strip" data-testid="feature-audit-top-blockers">
+                  {featureAuditMatrix.summary.topBlockers.slice(0, 5).map((blocker) => (
+                    <span key={`${blocker.featureId}-${blocker.blocker}`} className="pill warning-pill">
+                      {blocker.label}: {formatCockpitReason(blocker.blocker)}
+                    </span>
+                  ))}
+                </div>
+              ) : null}
+
+              <div className="compact-table-shell feature-audit-table-shell">
+                <table className="compact-table feature-audit-table">
+                  <thead>
+                    <tr>
+                      <th>Feature</th>
+                      <th>Status</th>
+                      <th>Tests</th>
+                      <th>Smoke</th>
+                      <th>Write Safety</th>
+                      <th>Multiplayer</th>
+                      <th>Blocker</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {filteredFeatureAuditEntries.map((entry) => {
+                      const flags = getFeatureAuditFlags(entry);
+                      return (
+                        <tr key={entry.featureId}>
+                          <td>
+                            <strong>{entry.label}</strong>
+                            <small>
+                              {entry.category} · {entry.views.slice(0, 4).join(", ")}
+                            </small>
+                          </td>
+                          <td>
+                            <span className={`pill feature-audit-status is-${entry.status}`}>
+                              {formatFeatureAuditStatus(entry.status)}
+                            </span>
+                          </td>
+                          <td>
+                            <span className={`pill${flags.missingTests ? " warning-pill" : ""}`}>
+                              {flags.missingTests ? "test_missing" : `${entry.testCoverage.length} Tests`}
+                            </span>
+                          </td>
+                          <td>
+                            <span className={`pill${flags.missingSmoke ? " warning-pill" : ""}`}>
+                              {flags.missingSmoke ? "smoke_missing" : entry.smokeCoverage.slice(0, 2).join(", ")}
+                            </span>
+                          </td>
+                          <td>
+                            <span className={`pill${flags.localWriteWithoutWriteSafety ? " warning-pill" : ""}`}>
+                              {flags.localWriteWithoutWriteSafety ? "missing" : entry.writeSafety}
+                            </span>
+                          </td>
+                          <td>
+                            <span className={`pill${entry.multiplayerReady ? " success-pill" : " warning-pill"}`}>
+                              {entry.multiplayerReady ? "ready" : "missing"}
+                            </span>
+                          </td>
+                          <td>
+                            {entry.knownBlockers.length > 0 ? (
+                              <span>{entry.knownBlockers.slice(0, 2).map(formatCockpitReason).join(" · ")}</span>
+                            ) : (
+                              <span className="muted">—</span>
+                            )}
+                          </td>
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                </table>
               </div>
             </section>
 
@@ -15909,7 +16776,7 @@ export default function FoundationPageClient({ initialReadSource, initialSelecte
                     </div>
                   </div>
                   {matchdaySummary.topTeams.length === 0 && matchdaySummary.bottomTeams.length === 0 ? (
-                    <div className="transfer-callout is-warning">
+                    <div className="transfer-callout is-warning arena-result-empty-state">
                       <strong>Noch kein Spieltagsergebnis vorhanden</strong>
                       <span>Nach dem finalen Reveal erscheinen hier Tageswertung, Rangänderung und Top Player.</span>
                     </div>
@@ -18037,6 +18904,42 @@ export default function FoundationPageClient({ initialReadSource, initialSelecte
                 </div>
               </section>
 
+              <section className={`panel team-objectives-panel${getViewClass("teams")}`} data-testid="team-board-objectives">
+                <div className="panel-header compact">
+                  <div className="stack">
+                    <h2>Board-Ziele</h2>
+                    <p className="muted">Saisonziele fuer Sport, Finanzen, Transfers, Kader, Facilities und Entwicklung.</p>
+                  </div>
+                  <div className="room-meta foundation-admin-meta">
+                    <span className="pill">Confidence {selectedBoardConfidence?.value ?? "—"}/10</span>
+                    <span className={`transfer-status-pill${(selectedBoardConfidence?.pressure ?? 0) >= 8 ? " is-warning" : " is-ready"}`}>
+                      Druck {selectedBoardConfidence?.pressure ?? "—"}/10
+                    </span>
+                  </div>
+                </div>
+                <div className="teams-summary-grid history-summary-grid">
+                  {selectedTeamObjectives.map((objective) => (
+                    <article key={`team-objective-${objective.objectiveId}`} className="metric-card teams-summary-card">
+                      <span>{objective.category.toUpperCase()}</span>
+                      <strong>{objective.label}</strong>
+                      <small className="muted">
+                        Ist {String(objective.currentValue ?? "—")} · Ziel {String(objective.targetValue ?? "—")}
+                      </small>
+                      <div className="room-meta foundation-admin-meta">
+                        <span className={`transfer-status-pill${objective.status === "completed" ? " is-ready" : objective.status === "failed" || objective.status === "at_risk" ? " is-warning" : ""}`}>
+                          {objective.status}
+                        </span>
+                        {objective.rewardCash != null ? <span className="pill">Bonus {formatMoney(objective.rewardCash)}</span> : null}
+                        {objective.penaltyCash != null ? <span className="pill">Malus {formatMoney(objective.penaltyCash)}</span> : null}
+                      </div>
+                    </article>
+                  ))}
+                </div>
+                {selectedBoardConfidence?.warnings.length ? (
+                  <p className="muted">Board-Warnings: {selectedBoardConfidence.warnings.join(", ")}</p>
+                ) : null}
+              </section>
+
               <section className={`panel team-focus-panel${getViewClass("teams")}`}>
                 <div className="panel-header team-focus-header">
                   <div className="team-focus-title-wrap">
@@ -18288,19 +19191,35 @@ export default function FoundationPageClient({ initialReadSource, initialSelecte
                         <strong>Restgehalt komplett</strong>
                       </article>
                     </div>
-                    <div className="table-shell team-focus-table-shell">
-                      <table className="team-table team-contracts-table">
-                        <thead>
+                    {contractRenewalMessage ? (
+                      <div className="status-banner is-success">{contractRenewalMessage}</div>
+                    ) : null}
+	                    {contractRenewalError ? (
+	                      <div className="status-banner is-warning">{contractRenewalError}</div>
+	                    ) : null}
+	                    <div className="transfer-callout">
+	                      <strong>Contract Exit Value</strong>
+	                      <span>Wenn ein Vertrag ausläuft oder ein Spieler freigegeben wird, erhält das Team den aktuellen VK-Wert.</span>
+	                    </div>
+	                    <div className="table-shell team-focus-table-shell">
+	                      <table className="team-table team-contracts-table">
+	                        <thead>
                           <tr>
                             <th>Spieler</th>
                             <th>Status</th>
                             <th>Form</th>
-                            <th>LZ</th>
-                            <th>Gesamt</th>
-                            <th>Buyout</th>
-                            {selectedTeamContractTable?.seasonLabels.map((label) => (
-                              <th key={label}>{label}</th>
-                            ))}
+	                            <th>LZ</th>
+	                            <th>Moral</th>
+	                            <th>Intent</th>
+	                            <th>Gesamt</th>
+	                            <th>Buyout</th>
+	                            <th>MW</th>
+	                            <th>Faktor</th>
+	                            <th>VK bei Abgang</th>
+	                            <th>GuV</th>
+	                            {selectedTeamContractTable?.seasonLabels.map((label) => (
+	                              <th key={label}>{label}</th>
+	                            ))}
                           </tr>
                         </thead>
                         <tbody>
@@ -18336,17 +19255,79 @@ export default function FoundationPageClient({ initialReadSource, initialSelecte
                                         >
                                           Verkaufen
                                         </button>
+                                        {row.contractLength <= 1 && selectedTeam ? (
+                                          <>
+                                            <button
+                                              className="secondary-button inline-button"
+                                              type="button"
+                                              disabled={contractRenewalBusy != null}
+                                              onClick={() =>
+                                                void runContractRenewalAction({
+                                                  teamId: selectedTeam.teamId,
+                                                  playerId: row.playerId,
+                                                  playerName: row.playerName,
+                                                  action: "renew",
+                                                  contractLength: 2,
+                                                })
+                                              }
+                                            >
+                                              Verlängern
+                                            </button>
+                                            <button
+                                              className="secondary-button inline-button"
+                                              type="button"
+                                              disabled={contractRenewalBusy != null}
+                                              onClick={() =>
+                                                void runContractRenewalAction({
+                                                  teamId: selectedTeam.teamId,
+                                                  playerId: row.playerId,
+                                                  playerName: row.playerName,
+                                                  action: "release",
+                                                })
+                                              }
+                                            >
+                                              Freigeben
+                                            </button>
+                                          </>
+                                        ) : null}
                                       </div>
                                     ) : null}
                                   </div>
                                 </td>
                                 <td>{row.status === "preview" ? "Preview" : "Aktiv"}</td>
                                 <td>{formatContractShapeLabel(row.contractShape)}</td>
-                                <td>{formatWholeNumber(row.contractLength)}</td>
-                                <td>{row.totalSalary != null ? formatDisplayMoney(row.totalSalary) : "—"}</td>
-                                <td>{row.buyoutCost != null ? formatDisplayMoney(row.buyoutCost) : "—"}</td>
-                                {selectedTeamContractTable.seasonLabels.map((label, index) => (
-                                  <td key={`${row.rowId}-${label}`}>
+	                                <td>{formatWholeNumber(row.contractLength)}</td>
+	                                <td>
+	                                  {row.morale != null ? (
+	                                    <span title={row.moraleMood ?? "Moral"}>
+	                                      {row.moraleSmiley ?? ""} {formatWholeNumber(row.morale)}
+	                                      {row.moraleSalaryModifier != null ? ` · x${formatLocalePoints(row.moraleSalaryModifier, 2)}` : ""}
+	                                    </span>
+	                                  ) : (
+	                                    "—"
+	                                  )}
+	                                </td>
+	                                <td>
+	                                  {row.moraleContractIntent ? (
+	                                    <span title={row.moraleRenewalRisk != null ? `Renewal Risk ${formatWholeNumber(row.moraleRenewalRisk)}%` : undefined}>
+	                                      {formatMoraleContractIntentLabel(row.moraleContractIntent)}
+	                                    </span>
+	                                  ) : (
+	                                    "—"
+	                                  )}
+	                                </td>
+	                                <td>{row.totalSalary != null ? formatDisplayMoney(row.totalSalary) : "—"}</td>
+	                                <td>{row.buyoutCost != null ? formatDisplayMoney(row.buyoutCost) : "—"}</td>
+	                                <td>{row.marketValueAtExit != null ? formatDisplayMoney(row.marketValueAtExit) : "—"}</td>
+	                                <td>{row.saleFactor != null ? `${formatLocalePoints(row.saleFactor, 2)}x` : "—"}</td>
+	                                <td>{row.exitValue != null ? formatDisplayMoney(row.exitValue) : "—"}</td>
+	                                <td>
+	                                  <span className={row.profitLoss != null && row.profitLoss < 0 ? "negative-value" : row.profitLoss != null && row.profitLoss > 0 ? "positive-value" : undefined}>
+	                                    {row.profitLoss != null ? formatDisplayMoney(row.profitLoss) : "—"}
+	                                  </span>
+	                                </td>
+	                                {selectedTeamContractTable.seasonLabels.map((label, index) => (
+	                                  <td key={`${row.rowId}-${label}`}>
                                     {row.yearlySalarySchedule[index]?.salary != null
                                       ? formatDisplayMoney(row.yearlySalarySchedule[index]!.salary)
                                       : "—"}
@@ -18354,24 +19335,24 @@ export default function FoundationPageClient({ initialReadSource, initialSelecte
                                 ))}
                               </tr>
                             ))
-                          ) : (
-                            <tr>
-                              <td colSpan={6 + (selectedTeamContractTable?.seasonLabels.length ?? 0)} className="muted">
-                                Noch keine Vertragsdaten im aktuellen Scope.
-                              </td>
-                            </tr>
+	                          ) : (
+	                            <tr>
+	                              <td colSpan={12 + (selectedTeamContractTable?.seasonLabels.length ?? 0)} className="muted">
+	                                Noch keine Vertragsdaten im aktuellen Scope.
+	                              </td>
+	                            </tr>
                           )}
                         </tbody>
-                        {selectedTeamContractTable ? (
-                          <tfoot>
-                            <tr>
-                              <td colSpan={6}><strong>Summe aktiv</strong></td>
+	                        {selectedTeamContractTable ? (
+	                          <tfoot>
+	                            <tr>
+	                              <td colSpan={12}><strong>Summe aktiv</strong></td>
                               {selectedTeamContractTable.totalsCommitted.map((entry) => (
                                 <td key={`committed-${entry.label}`}><strong>{formatDisplayMoney(entry.salary)}</strong></td>
                               ))}
                             </tr>
                             <tr>
-                              <td colSpan={6}><strong>Summe mit Preview</strong></td>
+                              <td colSpan={12}><strong>Summe mit Preview</strong></td>
                               {selectedTeamContractTable.totalsWithPreview.map((entry) => (
                                 <td key={`preview-${entry.label}`}><strong>{formatDisplayMoney(entry.salary)}</strong></td>
                               ))}
@@ -19451,7 +20432,7 @@ export default function FoundationPageClient({ initialReadSource, initialSelecte
                           if (column.id === "traitNeg3") return <td key={column.id}>{renderPillValue(row.item.traitsNegative[2] ?? null)}</td>;
                           if (column.id === "topDisciplineScores") return <td key={column.id}>{formatTopDisciplineScores(row.item)}</td>;
                           if (column.id === "currentAbilityTier") return <td key={column.id} style={getMarketTierStyle(row.item.currentAbilityTier)}>{row.item.currentAbilityTier ?? "—"}</td>;
-                          if (column.id === "potentialTier") return <td key={column.id} style={getMarketTierStyle(row.item.potentialTier)}>{row.item.potentialTier ?? "—"}</td>;
+                          if (column.id === "potentialTier") return <td key={column.id}>{renderTransfermarktPotential(row.item)}</td>;
                           if (column.id === "trainingFormTier") return <td key={column.id} style={getMarketTierStyle(row.item.trainingFormTier)}>{row.item.trainingFormTier ?? "—"}</td>;
                           if (column.id === "developmentTrend") return <td key={column.id}>{formatMarketDevelopmentTrend(row.item.developmentTrend)}</td>;
                           if (column.id === "regressionRisk") return <td key={column.id}>{formatMarketRisk(row.item.regressionRisk)}</td>;

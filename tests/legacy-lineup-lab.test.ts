@@ -79,6 +79,11 @@ describe("legacy lineup lab helpers", () => {
         fechten: null,
       },
       fatigueCount: null,
+      injuryStatus: "healthy",
+      injuryUntilMatchday: null,
+      injuryRiskPercent: null,
+      injuryRiskBand: null,
+      injuryRiskLabel: null,
     });
   });
 

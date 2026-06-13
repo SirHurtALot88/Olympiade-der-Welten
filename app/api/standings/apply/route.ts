@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 
+import { authorizeServerRoomWrite } from "@/lib/room/server-authoritative-write-guard";
 import { executeStandingsApply, previewStandingsApply } from "@/lib/standings/standings-apply-service";
 
 type ApplyRequestBody = {
@@ -11,11 +12,15 @@ type ApplyRequestBody = {
   execute?: boolean;
   confirm?: string;
   forceReplace?: boolean;
+  roomCode?: string | null;
+  participantId?: string | null;
+  seatToken?: string | null;
+  userId?: string | null;
 };
 
 export async function POST(request: Request) {
   try {
-    const body = (await request.json()) as ApplyRequestBody;
+    const body = (await request.json().catch(() => ({}))) as ApplyRequestBody;
     const saveId = body.saveId?.trim() ?? "";
     const seasonId = body.seasonId?.trim() ?? "";
     const matchdayId = body.matchdayId?.trim() ?? "";
@@ -27,6 +32,24 @@ export async function POST(request: Request) {
       return NextResponse.json(
         { error: "saveId, seasonId and matchdayId are required." },
         { status: 400 },
+      );
+    }
+
+    const writeAuth = authorizeServerRoomWrite({
+      roomCode: body.roomCode,
+      participantId: body.participantId,
+      seatToken: body.seatToken,
+      userId: body.userId,
+      saveId,
+      action: "standings_apply",
+      source,
+      dryRun,
+      confirmToken: body.confirm,
+    });
+    if (!writeAuth.allowed) {
+      return NextResponse.json(
+        { success: false, error: writeAuth.reason, warnings: writeAuth.warnings, blockingReasons: [writeAuth.reason] },
+        { status: writeAuth.status },
       );
     }
 
@@ -62,7 +85,7 @@ export async function POST(request: Request) {
       dryRun: result.dryRun,
       applied: result.applied,
       summary: result,
-      warnings: result.warnings,
+      warnings: [...writeAuth.warnings, ...result.warnings],
     });
   } catch (error) {
     const message = error instanceof Error ? error.message : "Standings apply preview could not be loaded.";

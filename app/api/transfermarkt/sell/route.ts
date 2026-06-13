@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 
 import { executeLocalTransfermarktSell, previewLocalTransfermarktSell } from "@/lib/market/transfermarkt-local-service";
+import { authorizeServerRoomWrite } from "@/lib/room/server-authoritative-write-guard";
 
 type SellRequestBody = {
   saveId?: string;
@@ -9,11 +10,19 @@ type SellRequestBody = {
   activePlayerId?: string;
   dryRun?: boolean;
   source?: "sqlite" | "prisma";
+  roomCode?: string | null;
+  participantId?: string | null;
+  seatToken?: string | null;
+  userId?: string | null;
+  activeManagerTeamId?: string | null;
+  controlMode?: "human" | "ai" | "passive" | "manual" | null;
+  confirmToken?: string | null;
+  expectedConfirmToken?: string | null;
 };
 
 export async function POST(request: Request) {
   try {
-    const body = (await request.json()) as SellRequestBody;
+    const body = (await request.json().catch(() => ({}))) as SellRequestBody;
     const saveId = body.saveId?.trim() ?? "";
     const seasonId = body.seasonId?.trim() ?? "";
     const teamId = body.teamId?.trim() ?? "";
@@ -45,6 +54,33 @@ export async function POST(request: Request) {
       );
     }
 
+    const writeAuth = authorizeServerRoomWrite({
+      roomCode: body.roomCode,
+      participantId: body.participantId,
+      seatToken: body.seatToken,
+      userId: body.userId,
+      saveId,
+      teamId,
+      action: "sell",
+      source,
+      dryRun,
+      confirmToken: body.confirmToken,
+      expectedConfirmToken: body.expectedConfirmToken,
+      activeManagerTeamId: body.activeManagerTeamId,
+      controlMode: body.controlMode,
+    });
+    if (!writeAuth.allowed) {
+      return NextResponse.json(
+        {
+          success: false,
+          error: writeAuth.reason,
+          summary: null,
+          warnings: writeAuth.warnings,
+        },
+        { status: writeAuth.status },
+      );
+    }
+
     const params = { saveId, seasonId, teamId, activePlayerId };
     const summary = dryRun ? previewLocalTransfermarktSell(params) : executeLocalTransfermarktSell(params);
 
@@ -52,7 +88,7 @@ export async function POST(request: Request) {
       {
         success: summary.canSell,
         summary,
-        warnings: summary.warnings,
+        warnings: [...writeAuth.warnings, ...summary.warnings],
       },
       { status: summary.canSell ? 200 : 409 },
     );

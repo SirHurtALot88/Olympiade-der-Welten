@@ -40,6 +40,12 @@ export type LegacyRosterPlayerRef = {
   ovr?: number | null;
   pps?: number | null;
   fatigue?: number | null;
+  injuryStatus?: "healthy" | "injured" | "recovering" | null;
+  injuryUntilMatchday?: string | null;
+  injuryRiskPercent?: number | null;
+  injuryRiskBand?: string | null;
+  injuryRiskLabel?: string | null;
+  availabilityBlocker?: "player_injured_unavailable" | null;
   form?: number | null;
   traitsPositive?: string[];
   traitsNegative?: string[];
@@ -71,6 +77,7 @@ export type LegacyLineupContext = {
   disciplineSidePlayerCounts?: Record<string, number>;
   disciplineSideCaptainCounts?: Record<string, number>;
   activePlayers: LegacyActivePlayerRef[];
+  rosterPlayers?: LegacyRosterPlayerRef[];
   disciplineScores: LegacyDisciplineScoreRef[];
 };
 

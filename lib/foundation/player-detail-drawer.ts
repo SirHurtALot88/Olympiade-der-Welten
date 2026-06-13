@@ -8,6 +8,7 @@ import {
 import type { PlayerEconomyCompareRow } from "@/lib/foundation/player-economy-compare-service";
 import { buildPlayerEconomyCompareMap } from "@/lib/foundation/player-economy-compare-service";
 import { resolvePlayerEconomyContract } from "@/lib/foundation/player-economy-contract";
+import { calculateTeamRecovery, getInjuryRiskBand, getInjuryRiskPercent, getPlayerAvailabilityView } from "@/lib/fatigue/fatigue-injury-service";
 import {
   buildPlayerRatingContractMap,
   buildPlayerRatingContractRows,
@@ -17,6 +18,7 @@ import { buildPlayerSeasonPerformance, buildPlayerSeasonPerformanceMap } from "@
 import { getTeamStrategyProfile } from "@/lib/foundation/team-strategy-profiles";
 import type { LegacyLineupLoadedContext } from "@/lib/lineups/legacy-lineup-types";
 import { normalizeTransfermarktToken } from "@/lib/market/transfermarkt-fit";
+import { assessPlayerMorale, type PlayerMoraleAssessment } from "@/lib/morale/player-morale-service";
 import type { PlayerScoutPotential } from "@/lib/progression/player-potential-service";
 import { buildPlayerProgressionForecast } from "@/lib/training/player-progression-forecast";
 import type { PlayerProgressionForecast } from "@/lib/training/training-plan-types";
@@ -115,7 +117,55 @@ export type PlayerDetailDrawerData = {
     warnings: string[];
     sourceLabel: string;
   } | null;
+  morale: {
+    morale: number;
+    visibleMood: PlayerMoraleAssessment["visibleMood"];
+    smiley: string;
+    moodLabel: string;
+    contractIntent: PlayerMoraleAssessment["contractIntent"];
+    salaryModifier: number;
+    contractLengthLimit: number | null;
+    renewalRisk: number;
+    reasons: Array<{
+      reasonId: string;
+      label: string;
+      valueDelta: number;
+      source: string;
+    }>;
+    suggestedActions: string[];
+    warnings: string[];
+    source: PlayerMoraleAssessment["source"];
+  } | null;
   fatigue: number | null;
+  availability: {
+    injuryStatus: "healthy" | "injured" | "recovering";
+    injuryUntilMatchday: string | null;
+    injuryRiskPercent: number;
+    injuryRiskBand: string;
+    injuryRiskLabel: string;
+    isUnavailable: boolean;
+    blocker: "player_injured_unavailable" | null;
+    lastRoll: {
+      fatigueBefore: number;
+      riskPercent: number;
+      roll: number;
+      result: "healthy" | "injured";
+      source: string;
+    } | null;
+    normalRecovery: number | null;
+    injuryRecovery: number | null;
+    injuryHistory: Array<{
+      eventId: string;
+      seasonId: string;
+      matchdayId: string;
+      fatigueBefore: number;
+      riskPercent: number;
+      roll: number;
+      result: "healthy" | "injured";
+      unavailableUntil: string | null;
+      timestamp: string;
+    }>;
+  };
   form: number | null;
   potential: number | null;
   scoutPotential: PlayerScoutPotential | null;
@@ -124,6 +174,14 @@ export type PlayerDetailDrawerData = {
     label: string;
     value: number | null;
     ratingLabel: string | null;
+  }>;
+  baselineAttributeDeltas: Array<{
+    key: string;
+    label: string;
+    baselineValue: number | null;
+    currentValue: number | null;
+    delta: number | null;
+    source: string | null;
   }>;
   axisCards: PlayerDrawerAxisCard[];
   disciplineValues: Array<{
@@ -224,7 +282,7 @@ export type PlayerDetailDrawerData = {
     currentValue: number | null;
     expectedSellValue: number | null;
     lastTransfer: {
-      transferType: "buy" | "sell";
+      transferType: "buy" | "sell" | "contract_exit";
       seasonLabel: string;
       matchdayId: string | null;
       phase: string | null;
@@ -237,7 +295,7 @@ export type PlayerDetailDrawerData = {
   };
   transferHistory: Array<{
     id: string;
-    transferType: "buy" | "sell";
+    transferType: "buy" | "sell" | "contract_exit";
     seasonLabel: string;
     matchdayId: string | null;
     phase: string | null;
@@ -328,6 +386,34 @@ function buildAttributeStats(
     { key: "spirit", label: "Spirit", value: stats?.spirit ?? null, ratingLabel: ratings?.spiritRating ?? null },
     { key: "torment", label: "Torment", value: stats?.torment ?? null, ratingLabel: ratings?.tormentRating ?? null },
   ];
+}
+
+function buildBaselineAttributeDeltas(
+  player: Pick<Player, "id" | "attributeSheetStats"> | null,
+  gameState: GameState,
+  progressionEvents: PlayerDetailDrawerData["progressionEvents"],
+): PlayerDetailDrawerData["baselineAttributeDeltas"] {
+  if (!player) return [];
+  const baseline = gameState.playerBaselines?.find((entry) => entry.playerId === player.id) ?? null;
+  if (!baseline) return [];
+  const latestEvent = progressionEvents[0] ?? null;
+  return buildAttributeStats(player).map((entry) => {
+    const key = entry.key as keyof NonNullable<Player["attributeSheetStats"]>;
+    const baselineValue = baseline.attributes[key] ?? null;
+    const currentValue = player.attributeSheetStats?.[key] ?? null;
+    const delta =
+      typeof baselineValue === "number" && typeof currentValue === "number"
+        ? currentValue - baselineValue
+        : null;
+    return {
+      key: entry.key,
+      label: entry.label,
+      baselineValue,
+      currentValue,
+      delta,
+      source: delta && delta !== 0 ? latestEvent?.eventId ?? "progression_event_source_missing" : null,
+    };
+  });
 }
 
 function buildDisciplineValuesFromPlayer(
@@ -856,6 +942,14 @@ export function buildPlayerDrawerDataFromGameState(input: {
     coreAxisRankMaps,
     seasonPerformance,
   });
+  const moraleAssessment = team && rosterEntry
+    ? assessPlayerMorale({
+        gameState: input.gameState,
+        playerId: player.id,
+        teamId: team.teamId,
+        renewalSalaryPreview: player.economyAfterUpgradePreview?.renewalSalaryPreview ?? null,
+      })
+    : null;
   const seasonHistory = buildSeasonHistory(input.gameState, player.id);
   const latestArchivedPerformance = findLatestArchivedPlayerPerformance(input.gameState, player.id);
   const historyRows = buildHistoryRows({
@@ -895,6 +989,30 @@ export function buildPlayerDrawerDataFromGameState(input: {
         toValue: upgrade.toValue,
         cost: upgrade.cost,
       })),
+    }));
+  const playerTeamId = rosterEntry?.teamId ?? team?.teamId ?? "";
+  const availability = getPlayerAvailabilityView(
+    input.gameState,
+    player.id,
+    playerTeamId,
+    input.gameState.matchdayState.matchdayId,
+  );
+  const recovery = playerTeamId ? calculateTeamRecovery(input.gameState, playerTeamId) : null;
+  const injuryRiskBand = getInjuryRiskBand(availability.fatigue ?? player.fatigue ?? 0);
+  const injuryHistory = [...(input.gameState.seasonState.injuryEvents ?? [])]
+    .filter((event) => event.playerId === player.id)
+    .sort((left, right) => right.timestamp.localeCompare(left.timestamp, "de"))
+    .slice(0, 5)
+    .map((event) => ({
+      eventId: event.eventId,
+      seasonId: event.seasonId,
+      matchdayId: event.matchdayId,
+      fatigueBefore: event.fatigueBefore,
+      riskPercent: event.riskPercent,
+      roll: event.roll,
+      result: event.result,
+      unavailableUntil: event.unavailableUntil ?? null,
+      timestamp: event.timestamp,
     }));
 
   return {
@@ -955,6 +1073,22 @@ export function buildPlayerDrawerDataFromGameState(input: {
     economyStatus: economy.economyStatus,
     economyCompare,
     boardTrust,
+    morale: moraleAssessment
+      ? {
+          morale: moraleAssessment.morale,
+          visibleMood: moraleAssessment.visibleMood,
+          smiley: moraleAssessment.smiley,
+          moodLabel: moraleAssessment.moodLabel,
+          contractIntent: moraleAssessment.contractIntent,
+          salaryModifier: moraleAssessment.moraleSalaryModifier,
+          contractLengthLimit: moraleAssessment.moraleContractLengthLimit,
+          renewalRisk: moraleAssessment.moraleRenewalRisk,
+          reasons: moraleAssessment.reasons,
+          suggestedActions: moraleAssessment.suggestedActions,
+          warnings: moraleAssessment.warnings,
+          source: moraleAssessment.source,
+        }
+      : null,
     progressionEconomyPreview: player.economyAfterUpgradePreview
       ? {
           marketValuePreview: player.economyAfterUpgradePreview.marketValuePreview,
@@ -969,11 +1103,33 @@ export function buildPlayerDrawerDataFromGameState(input: {
           updatedAt: player.economyAfterUpgradePreview.updatedAt,
         }
       : null,
-    fatigue: player.fatigue ?? null,
+    fatigue: availability.fatigue ?? player.fatigue ?? null,
+    availability: {
+      injuryStatus: availability.injuryStatus,
+      injuryUntilMatchday: availability.injuryUntilMatchday ?? null,
+      injuryRiskPercent: injuryRiskBand.riskPercent,
+      injuryRiskBand: injuryRiskBand.label,
+      injuryRiskLabel: injuryRiskBand.uiLabel,
+      isUnavailable: availability.isUnavailable,
+      blocker: availability.blocker,
+      lastRoll: availability.injuryRiskLastRoll
+        ? {
+            fatigueBefore: availability.injuryRiskLastRoll.fatigueBefore,
+            riskPercent: availability.injuryRiskLastRoll.riskPercent,
+            roll: availability.injuryRiskLastRoll.roll,
+            result: availability.injuryRiskLastRoll.result,
+            source: availability.injuryRiskLastRoll.source,
+          }
+        : null,
+      normalRecovery: recovery?.normalRecovery ?? null,
+      injuryRecovery: recovery?.injuryRecovery ?? null,
+      injuryHistory,
+    },
     form: player.form ?? null,
     potential: player.potential ?? null,
     scoutPotential: progressionForecast.scoutPotential,
     attributeStats: buildAttributeStats(player),
+    baselineAttributeDeltas: buildBaselineAttributeDeltas(player, input.gameState, progressionEvents),
     axisCards: buildAxisCards({
       player,
       playerRating,
@@ -1201,11 +1357,26 @@ export function buildPlayerDrawerDataFromLegacyContext(input: {
     economyStatus: economy.economyStatus,
     economyCompare: null,
     boardTrust: null,
-    fatigue: catalogPlayer?.fatigue ?? rosterPlayer?.fatigue ?? null,
+    morale: null,
+    fatigue: rosterPlayer ? rosterPlayer.fatigue ?? catalogPlayer?.fatigue ?? 0 : 0,
+    availability: {
+      injuryStatus: rosterPlayer?.injuryStatus ?? "healthy",
+      injuryUntilMatchday: rosterPlayer ? rosterPlayer.injuryUntilMatchday ?? null : null,
+      injuryRiskPercent: rosterPlayer?.injuryRiskPercent ?? 0,
+      injuryRiskBand: rosterPlayer ? getInjuryRiskBand(rosterPlayer.fatigue ?? catalogPlayer?.fatigue ?? 0).label : "none",
+      injuryRiskLabel: rosterPlayer ? getInjuryRiskBand(rosterPlayer.fatigue ?? catalogPlayer?.fatigue ?? 0).uiLabel : "kein Risiko",
+      isUnavailable: rosterPlayer?.availabilityBlocker === "player_injured_unavailable",
+      blocker: rosterPlayer?.availabilityBlocker ?? null,
+      lastRoll: null,
+      normalRecovery: null,
+      injuryRecovery: null,
+      injuryHistory: [],
+    },
     form: catalogPlayer?.form ?? rosterPlayer?.form ?? null,
     potential: catalogPlayer?.potential ?? rosterPlayer?.potential ?? null,
     scoutPotential: null,
     attributeStats: buildAttributeStats(catalogPlayer),
+    baselineAttributeDeltas: [],
     axisCards,
     disciplineValues,
     progressionForecast: null,

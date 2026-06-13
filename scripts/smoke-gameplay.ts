@@ -200,8 +200,18 @@ function shortSaveId(saveId: string) {
   return saveId.length <= 14 ? saveId : `${saveId.slice(0, 8)}…${saveId.slice(-5)}`;
 }
 
-function isDestructiveSmokeRequest(entry: { method: string; url: string }) {
+function isPreviewOnlyMutation(entry: { method: string; url: string; postDataJson?: unknown }) {
   if (!["POST", "PUT", "PATCH", "DELETE"].includes(entry.method)) return false;
+  if (entry.postDataJson && typeof entry.postDataJson === "object") {
+    const body = entry.postDataJson as { dryRun?: unknown; execute?: unknown };
+    return body.dryRun !== false && body.execute !== true;
+  }
+  return false;
+}
+
+function isDestructiveSmokeRequest(entry: { method: string; url: string; postDataJson?: unknown }) {
+  if (!["POST", "PUT", "PATCH", "DELETE"].includes(entry.method)) return false;
+  if (isPreviewOnlyMutation(entry)) return false;
   const destructiveFragments = [
     "/api/transfermarkt/buy",
     "/api/transfermarkt/sell",
@@ -430,7 +440,7 @@ async function main() {
   await fs.mkdir(OUTPUT_DIR, { recursive: true });
   const startedServer = await ensureServer(args);
   const startedAt = new Date().toISOString();
-  const mutatingRequests: Array<{ method: string; url: string }> = [];
+  const mutatingRequests: Array<{ method: string; url: string; postDataJson?: unknown }> = [];
   let browser: Browser | null = null;
 
   try {
@@ -446,7 +456,13 @@ async function main() {
     await page.route("**/api/media/**", (route) => route.abort());
     page.on("request", (request) => {
       if (["POST", "PUT", "PATCH", "DELETE"].includes(request.method())) {
-        mutatingRequests.push({ method: request.method(), url: request.url() });
+        let postDataJson: unknown;
+        try {
+          postDataJson = request.postDataJSON();
+        } catch {
+          postDataJson = undefined;
+        }
+        mutatingRequests.push({ method: request.method(), url: request.url(), postDataJson });
       }
     });
 

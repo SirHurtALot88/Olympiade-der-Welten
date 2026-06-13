@@ -6,7 +6,13 @@ export type DisciplineCategory =
 
 export type TeamArchetype = "balanced" | "sprinter_factory" | "powerhouse" | "youth_focus" | "value_hunter";
 
-export type ContractStatus = "active" | "expiring" | "free_agent";
+export type ContractStatus =
+  | "active"
+  | "expiring"
+  | "renewal_pending"
+  | "out_of_contract"
+  | "released"
+  | "free_agent";
 
 export type TransferListingStatus = "open" | "pending" | "closed";
 export type ContractShape = "balanced" | "front_loaded" | "back_loaded";
@@ -37,6 +43,7 @@ export type SeasonTransitionState = {
 
 export type ScenarioType =
   | "fresh_start"
+  | "new_game"
   | "ai_redraft_test"
   | "season1_simulation"
   | "season1_completed"
@@ -62,6 +69,81 @@ export type ScenarioMeta = {
   gamePhase?: string;
   roomId?: string;
   roomCode?: string;
+  roomParticipants?: Array<{
+    participantId: string;
+    userId: string;
+    displayName: string;
+    role: "host" | "player" | "spectator";
+    connectionStatus: "online" | "offline" | "reconnecting";
+    controlledTeamIds: string[];
+    readyState: "not_ready" | "ready" | "waiting";
+    lastSeenAt: string;
+  }>;
+  teamOwnership?: Array<{
+    teamId: string;
+    controllerType: "human" | "ai" | "passive";
+    userId?: string;
+    participantId?: string;
+    ownerDisplayName?: string;
+  }>;
+};
+
+export type GameInboxCategory =
+  | "task"
+  | "warning"
+  | "news"
+  | "result"
+  | "finance"
+  | "transfer"
+  | "training"
+  | "contract"
+  | "facility";
+
+export type GameInboxSeverity = "info" | "warning" | "critical";
+export type GameInboxStatus = "open" | "done" | "dismissed";
+
+export type GameInboxItem = {
+  itemId: string;
+  saveId: string;
+  seasonId: string;
+  matchday?: number | string | null;
+  teamId?: string | null;
+  playerId?: string | null;
+  category: GameInboxCategory;
+  severity: GameInboxSeverity;
+  title: string;
+  description: string;
+  targetView: string;
+  targetParams: Record<string, string | number | boolean | null>;
+  status: GameInboxStatus;
+  createdAt: string;
+  source: string;
+};
+
+export type PlayerMoraleVisibleMood = "angry" | "unhappy" | "neutral" | "happy" | "excellent";
+
+export type PlayerMoraleContractIntent =
+  | "willing_to_extend"
+  | "short_term_only"
+  | "demands_raise"
+  | "considering_exit"
+  | "refuses_extension";
+
+export type PlayerMoraleReason = {
+  reasonId: string;
+  label: string;
+  valueDelta: number;
+  source: string;
+};
+
+export type PlayerMoraleState = {
+  playerId: string;
+  teamId: string;
+  morale: number;
+  visibleMood: PlayerMoraleVisibleMood;
+  lastUpdatedSeasonId: string;
+  reasons: PlayerMoraleReason[];
+  contractIntent: PlayerMoraleContractIntent;
 };
 
 export type StandingRecord = {
@@ -185,9 +267,24 @@ export type PlayerBaselineRecord = {
   disciplineRatings: Record<string, number>;
   imageRef: string | null;
   source: "import" | "seed" | "legacy";
+  sourceFile?: string | null;
+  sourceHash?: string | null;
   baselineVersion: string;
+  checksum?: string;
+  checksumAlgorithm?: "sha256";
   createdAt: string;
+  importedAt?: string;
   reconstructionWarning?: "baseline_reconstructed_from_mutated_state";
+};
+
+export type PlayerBaselineWriteGuardEvent = {
+  eventId: string;
+  playerId: string;
+  reason: "player_baseline_write_blocked";
+  attemptedSource: string;
+  previousChecksum: string | null;
+  attemptedChecksum: string | null;
+  timestamp: string;
 };
 
 export type TeamIdentity = {
@@ -503,6 +600,21 @@ export type Player = {
   potential: number;
 };
 
+export type PlayerPotentialBand = "low" | "medium" | "high" | "elite" | "unknown";
+export type PlayerPotentialSource = "generated" | "imported" | "scouted" | "missing";
+
+export type PlayerPotentialRecord = {
+  playerId: string;
+  potentialBand: PlayerPotentialBand;
+  hiddenPotentialScore?: number;
+  revealedPotentialRange?: {
+    min: number;
+    max: number;
+  };
+  confidence: number;
+  source: PlayerPotentialSource;
+};
+
 export type Team = {
   teamId: string;
   shortCode: string;
@@ -650,6 +762,99 @@ export type FacilityEventRecord = {
   source: "manual_facility_upgrade" | "facility_upkeep_paid" | "facility_upkeep_unpaid" | "facility_income_collected";
 };
 
+export type TeamSeasonObjectiveCategory = "sport" | "finance" | "transfer" | "roster" | "facility" | "development";
+
+export type TeamSeasonObjectiveStatus = "open" | "completed" | "failed" | "at_risk";
+
+export type TeamSeasonObjectiveRecord = {
+  seasonId: string;
+  teamId: string;
+  objectiveId: string;
+  category: TeamSeasonObjectiveCategory;
+  label: string;
+  targetValue: number | string | boolean | null;
+  currentValue: number | string | boolean | null;
+  status: TeamSeasonObjectiveStatus;
+  rewardCash?: number;
+  penaltyCash?: number;
+  boardConfidenceDelta?: number;
+  source: string;
+};
+
+export type TeamBoardConfidenceRecord = {
+  teamId: string;
+  value: number;
+  pressure: number;
+  warnings: string[];
+};
+
+export type ContractEventRecord = {
+  eventId: string;
+  seasonId: string;
+  teamId: string;
+  playerId: string;
+  eventType: "contract_renewed" | "contract_expired" | "player_released" | "contract_expired_exit";
+  exitValue?: number | null;
+  saleFactor?: number | null;
+  marketValueAtExit?: number | null;
+  purchasePrice?: number | null;
+  profitLoss?: number | null;
+  oldSalary: number | null;
+  newSalary: number | null;
+  oldLength: number | null;
+  newLength: number | null;
+  timestamp: string;
+  source:
+    | "season_end_contract_tick"
+    | "manual_contract_renewal"
+    | "ai_contract_renewal"
+    | "manual_player_release"
+    | "ai_player_release"
+    | "manual_contract_expiry"
+    | "ai_contract_expiry";
+};
+
+export type PlayerInjuryStatus = "healthy" | "injured" | "recovering";
+
+export type PlayerInjuryRiskRollRecord = {
+  fatigueBefore: number;
+  riskPercent: number;
+  roll: number;
+  result: "healthy" | "injured";
+  source: "fatigue_injury_risk_v1";
+};
+
+export type PlayerAvailabilityStateRecord = {
+  playerId: string;
+  teamId: string;
+  fatigue: number;
+  injuryStatus: PlayerInjuryStatus;
+  injuryUntilMatchday?: string;
+  injuredAtSeasonId?: string;
+  injuredAtMatchdayId?: string;
+  injuryReason?: string;
+  injuryRiskLastRoll?: PlayerInjuryRiskRollRecord;
+};
+
+export type InjuryEventRecord = {
+  eventId: string;
+  seasonId: string;
+  matchdayId: string;
+  teamId: string;
+  playerId: string;
+  fatigueBefore: number;
+  riskPercent: number;
+  roll: number;
+  result: "healthy" | "injured";
+  unavailableForMatchdays: 1;
+  unavailableUntil?: string | null;
+  normalRecovery?: number | null;
+  injuryRecovery?: number | null;
+  fatigueAfterRecovery?: number | null;
+  source: "fatigue_injury_risk_v1";
+  timestamp: string;
+};
+
 export type PreSeasonWorkflowLogRecord = {
   logId: string;
   saveId: string;
@@ -680,6 +885,7 @@ export type RosterEntry = {
   teamId: string;
   playerId: string;
   contractLength: number;
+  contractStatus?: ContractStatus;
   salary: number;
   upkeep: number;
   purchasePrice?: number | null;
@@ -769,12 +975,13 @@ export type TransferListing = {
 export type TransferHistoryEntry = {
   id: string;
   playerId: string;
+  playerName?: string | null;
   seasonId: string;
   matchdayId?: string | null;
   phase?: string | null;
   source?: string | null;
   seasonLabel: string;
-  transferType: "buy" | "sell";
+  transferType: "buy" | "sell" | "contract_exit";
   fromTeamId: string | null;
   toTeamId: string | null;
   fee: number;
@@ -901,7 +1108,7 @@ export type DisciplineHighlightRecord = {
   id: string;
   matchdayResultId: string;
   disciplineId: string | null;
-  highlightType: "best_player_discipline" | "strongest_team_score" | "closest_score_gap" | "missing_lineup_warning";
+  highlightType: "best_player_discipline" | "strongest_team_score" | "closest_score_gap" | "missing_lineup_warning" | "injury_event";
   teamId: string | null;
   playerId: string | null;
   relatedTeamId: string | null;
@@ -1004,7 +1211,7 @@ export type SeasonSnapshotTransferRecord = {
   fromTeamName: string | null;
   toTeamId: string | null;
   toTeamName: string | null;
-  type: "buy" | "sell";
+  type: "buy" | "sell" | "contract_exit";
   amount: number | null;
   salary: number | null;
   marketValue: number | null;
@@ -1039,6 +1246,11 @@ export type SeasonState = {
   teamStrategyProfiles?: Record<string, TeamStrategyProfile>;
   teamFacilities?: Record<string, TeamFacilityCollection>;
   facilityEvents?: FacilityEventRecord[];
+  teamSeasonObjectives?: TeamSeasonObjectiveRecord[];
+  boardConfidence?: Record<string, TeamBoardConfidenceRecord>;
+  contractEvents?: ContractEventRecord[];
+  playerAvailabilityState?: PlayerAvailabilityStateRecord[];
+  injuryEvents?: InjuryEventRecord[];
   preSeasonWorkflowLogs?: PreSeasonWorkflowLogRecord[];
   playerGeneratorDrafts?: PlayerGeneratorDraft[];
   contractNegotiationDrafts?: ContractNegotiationDraft[];
@@ -1143,6 +1355,9 @@ export type GameState = {
   gamePhase?: GamePhase;
   seasonTransition?: SeasonTransitionState;
   scenarioMeta?: ScenarioMeta;
+  saveVersion?: number;
+  lastAppliedEventId?: string | null;
+  appliedEventIds?: string[];
   seasonReviewState?: unknown;
   preSeasonWorkflowState?: unknown;
   season: Season;
@@ -1157,7 +1372,11 @@ export type GameState = {
   transferListings: TransferListing[];
   transferHistory: TransferHistoryEntry[];
   playerBaselines?: PlayerBaselineRecord[];
+  baselineWriteGuardEvents?: PlayerBaselineWriteGuardEvent[];
+  playerPotential?: PlayerPotentialRecord[];
+  playerMoraleState?: PlayerMoraleState[];
   playerProgressionEvents?: PlayerProgressionSpendEventRecord[];
+  gameInboxItems?: GameInboxItem[];
   logs: GameLogEntry[];
   mappingReport: MappingReport;
 };
@@ -1170,6 +1389,71 @@ export type SaveGameState = {
   updatedAt: string;
   gameState: GameState;
 };
+
+export type ServerGameSaveRecord = {
+  saveId: string;
+  roomId: string | null;
+  ownerUserId: string | null;
+  activeSeasonId: string;
+  activeMatchday: string | number | null;
+  gamePhase: GamePhase;
+  scenarioMeta?: ScenarioMeta;
+  version: number;
+  createdAt: string;
+  updatedAt: string;
+};
+
+export type ServerGameStatePayload = {
+  players: Player[];
+  playerBaselines: PlayerBaselineRecord[];
+  teams: Team[];
+  teamIdentities: TeamIdentity[];
+  rosters: RosterEntry[];
+  contracts: Contract[];
+  transferListings: TransferListing[];
+  transferHistory: TransferHistoryEntry[];
+  facilities: NonNullable<SeasonState["teamFacilities"]>;
+  facilityEvents: NonNullable<SeasonState["facilityEvents"]>;
+  progressionEvents: NonNullable<GameState["playerProgressionEvents"]>;
+  lineups: NonNullable<SeasonState["lineupDrafts"]>;
+  formCards: NonNullable<SeasonState["formCards"]>;
+  mutators: {
+    source: "lineup_modifiers" | "missing_source";
+    lineupModifiers: Array<{
+      lineupId: string;
+      seasonId: string;
+      matchdayId: string;
+      teamId: string;
+      modifiers: LineupDraftModifiers | null;
+    }>;
+  };
+  matchdayResults: NonNullable<SeasonState["matchdayResults"]>;
+  disciplineResults: NonNullable<SeasonState["disciplineResults"]>;
+  playerDisciplinePerformances: NonNullable<SeasonState["playerDisciplinePerformances"]>;
+  standings: SeasonState["standings"];
+  seasonHistory: NonNullable<SeasonState["seasonSnapshots"]>;
+  workflowLogs: NonNullable<SeasonState["preSeasonWorkflowLogs"]>;
+  roomParticipants: NonNullable<SeasonState["teamControlSettings"]>;
+  teamOwnership: NonNullable<SeasonState["teamControlSettings"]>;
+  scenarioMeta?: ScenarioMeta;
+};
+
+export type ServerActionRequest = {
+  roomId: string;
+  saveId: string;
+  userId: string;
+  teamId?: string | null;
+  actionType: string;
+  payload: Record<string, unknown>;
+  confirmToken?: string | null;
+  expectedSaveVersion: number;
+  idempotencyKey?: string | null;
+};
+
+export type ServerActionConflictCode =
+  | "save_version_conflict"
+  | "action_already_applied"
+  | "confirm_token_stale";
 
 export type OlySeedData = {
   teamIdentities: TeamIdentity[];

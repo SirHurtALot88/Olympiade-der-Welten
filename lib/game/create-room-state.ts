@@ -7,6 +7,7 @@ import {
   buildOwnershipForPreset,
   buildParticipant,
   buildTurnState,
+  createRoomEvent,
   createMultiplayerRoomMeta,
   syncParticipantControlledTeams,
 } from "@/lib/room/online-room-model";
@@ -57,6 +58,14 @@ export function createInitialRoomState(
     systemControlledTeamIds: ownership.filter((entry) => entry.controllerType === "ai").map((entry) => entry.teamId),
     turnState,
     roomFlowState: buildRoomFlowState({ state: flowStateBase }),
+    roomEvents: [
+      createRoomEvent({
+        type: "room_state_updated",
+        roomId: multiplayerRoom.roomId,
+        saveId: multiplayerRoom.saveId,
+        payload: { source: "create_initial_room_state", status: multiplayerRoom.status },
+      }),
+    ],
     serverWritePolicy: SERVER_AUTHORITATIVE_WRITE_POLICY,
     activeRole: INITIAL_ACTIVE_ROLE,
     turnNumber: INITIAL_TURN_NUMBER,

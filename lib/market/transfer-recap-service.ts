@@ -23,7 +23,7 @@ export type TransferRecapEntry = {
   playerName: string;
   fromTeam: string | null;
   toTeam: string | null;
-  type: "buy" | "sell";
+  type: "buy" | "sell" | "contract_exit";
   amount: number;
   salary: number;
   marketValue: number;

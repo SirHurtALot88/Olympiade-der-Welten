@@ -7,6 +7,7 @@ import {
 import type { LineupDraftModifiers } from "@/lib/data/olyDataTypes";
 import { LegacyLineupService } from "@/lib/lineups/legacy-lineup-service";
 import type { LegacyLineupEntryInput, LegacyLineupKeyParams } from "@/lib/lineups/legacy-lineup-types";
+import { authorizeServerRoomWrite } from "@/lib/room/server-authoritative-write-guard";
 
 function parseKeyParams(request: Request): LegacyLineupKeyParams | null {
   const { searchParams } = new URL(request.url);
@@ -24,6 +25,18 @@ function parseKeyParams(request: Request): LegacyLineupKeyParams | null {
 
 function parseSource(request: Request) {
   return new URL(request.url).searchParams.get("source")?.trim() === "prisma" ? "prisma" : "sqlite";
+}
+
+function parseRoomWriteContext(request: Request) {
+  const { searchParams } = new URL(request.url);
+  return {
+    roomCode: searchParams.get("roomCode"),
+    participantId: searchParams.get("participantId"),
+    seatToken: searchParams.get("seatToken"),
+    userId: searchParams.get("userId"),
+    activeManagerTeamId: searchParams.get("activeManagerTeamId"),
+    controlMode: searchParams.get("controlMode") as "human" | "ai" | "passive" | "manual" | null,
+  };
 }
 
 export async function GET(request: Request) {
@@ -54,6 +67,18 @@ export async function PUT(request: Request) {
   }
 
   if (parseSource(request) !== "prisma") {
+    const writeAuth = authorizeServerRoomWrite({
+      ...parseRoomWriteContext(request),
+      saveId: params.saveId,
+      teamId: params.teamId,
+      action: "lineup_save",
+      source: "sqlite",
+      dryRun: false,
+    });
+    if (!writeAuth.allowed) {
+      return NextResponse.json({ error: writeAuth.reason, warnings: writeAuth.warnings }, { status: writeAuth.status });
+    }
+
     const result = saveLocalLegacyLineupDraft(params, body.entries, body.modifiers);
     if (!result.ok) {
       return NextResponse.json(
@@ -67,7 +92,7 @@ export async function PUT(request: Request) {
 
     return NextResponse.json({
       draft: result.draft,
-      warnings: result.warnings,
+      warnings: [...writeAuth.warnings, ...result.warnings],
       source: "sqlite",
       readOnly: false,
     });

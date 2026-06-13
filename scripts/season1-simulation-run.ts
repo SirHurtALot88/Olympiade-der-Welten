@@ -21,6 +21,10 @@ const EXPECTED_MATCHDAY_COUNT = 10;
 const TARGET_SEASON_ID = process.env.OLY_TARGET_SEASON_ID ?? "season-1";
 const EXPORT_PREFIX = process.env.OLY_EXPORT_PREFIX ?? "season1";
 const CREATE_COMPLETION_SNAPSHOT = process.env.OLY_CREATE_COMPLETION_SNAPSHOT === "1";
+const TARGET_SAVE_ID = process.env.OLY_TARGET_SAVE_ID ?? null;
+const MAX_MATCHDAYS = Number(process.env.OLY_MAX_MATCHDAYS ?? "0");
+const ADVANCE_AFTER_MATCHDAY = process.env.OLY_ADVANCE_AFTER_MATCHDAY !== "0";
+const FORCE_REPLACE_RESULTS = process.env.OLY_FORCE_REPLACE_RESULTS === "1";
 
 type CandidateEntry = {
   activePlayerId: string;
@@ -216,7 +220,7 @@ function buildVariantEntries(params: LegacyLineupKeyParams, variantIndex: number
 function getActiveSave() {
   const persistence = createPersistenceService();
   const bootstrapped = persistence.bootstrapSingleplayerSave();
-  const save = persistence.getActiveSave() ?? bootstrapped.save;
+  const save = (TARGET_SAVE_ID ? persistence.getSaveById(TARGET_SAVE_ID) : null) ?? persistence.getActiveSave() ?? bootstrapped.save;
   if (!save) throw new Error("No active local save found.");
   return { persistence, save };
 }
@@ -260,6 +264,7 @@ function buildPreflight(gameState: GameState) {
 
 function assertPreflightReady(preflight: ReturnType<typeof buildPreflight>) {
   const blockers: string[] = [];
+  const expectedLineupCount = MAX_MATCHDAYS > 0 ? EXPECTED_TEAM_COUNT * MAX_MATCHDAYS : EXPECTED_TEAM_COUNT * EXPECTED_MATCHDAY_COUNT;
   if (preflight.seasonId !== TARGET_SEASON_ID) blockers.push(`season_not_${TARGET_SEASON_ID}:${preflight.seasonId}`);
   if (preflight.currentMatchday !== "matchday-1") blockers.push(`matchday_not_1:${preflight.currentMatchday}`);
   if (preflight.matchdayCount !== EXPECTED_MATCHDAY_COUNT) blockers.push(`matchday_count:${preflight.matchdayCount}`);
@@ -268,9 +273,9 @@ function assertPreflightReady(preflight: ReturnType<typeof buildPreflight>) {
   if (preflight.oversizedTeams.length > 0) blockers.push(`teams_over_12:${preflight.oversizedTeams.join("|")}`);
   if (preflight.duplicateRosterPlayerCount > 0) blockers.push(`duplicate_rosters:${preflight.duplicateRosterPlayerCount}`);
   if (preflight.negativeCashTeams.length > 0) blockers.push(`negative_cash:${preflight.negativeCashTeams.join("|")}`);
-  if (preflight.lineupDraftCount < EXPECTED_TEAM_COUNT * EXPECTED_MATCHDAY_COUNT) blockers.push(`lineups_missing:${preflight.lineupDraftCount}`);
+  if (preflight.lineupDraftCount < expectedLineupCount) blockers.push(`lineups_missing:${preflight.lineupDraftCount}/${expectedLineupCount}`);
   if (preflight.formCardCount < EXPECTED_TEAM_COUNT) blockers.push(`formcards_missing:${preflight.formCardCount}`);
-  if (preflight.resultCount > 0) blockers.push(`save_already_has_results:${preflight.resultCount}`);
+  if (preflight.resultCount > 0 && !FORCE_REPLACE_RESULTS) blockers.push(`save_already_has_results:${preflight.resultCount}`);
   if (blockers.length > 0) {
     throw new Error(`Preflight blocked: ${blockers.join(" | ")}`);
   }
@@ -365,7 +370,7 @@ async function resolveAndApplyMatchday(input: {
       source: "sqlite",
       execute: true,
       confirm: APPLY_CONFIRM_TOKEN,
-      forceReplace: attempt > 0,
+      forceReplace: FORCE_REPLACE_RESULTS || attempt > 0,
     });
     if (!resultApply.ok || !resultApply.applied) {
       const reason = resultApply.ok ? "not_applied" : resultApply.error;
@@ -394,6 +399,7 @@ async function resolveAndApplyMatchday(input: {
         source: "sqlite",
         execute: true,
         confirm: STANDINGS_APPLY_CONFIRM_TOKEN,
+        forceReplace: FORCE_REPLACE_RESULTS,
       }, input.persistence);
       if (!standingsApply.ok || !standingsApply.applied) {
         report.blockers.push(`standings_apply:${standingsApply.blockingReasons.join("|")}`);
@@ -811,7 +817,12 @@ async function main() {
     : [];
   const openBlockers: string[] = [];
 
-  if (!args.exportOnly) for (const [index, matchdayId] of save.gameState.season.matchdayIds.entries()) {
+  const matchdayIdsToRun =
+    !args.exportOnly && MAX_MATCHDAYS > 0
+      ? save.gameState.season.matchdayIds.slice(0, MAX_MATCHDAYS)
+      : save.gameState.season.matchdayIds;
+
+  if (!args.exportOnly) for (const [index, matchdayId] of matchdayIdsToRun.entries()) {
     const currentSave = persistence.getSaveById(saveId);
     if (!currentSave) throw new Error(`Save ${saveId} disappeared before ${matchdayId}.`);
     if (args.write && currentSave.gameState.matchdayState.matchdayId !== matchdayId) {
@@ -830,7 +841,7 @@ async function main() {
         `${matchdayId}: tie_groups_require_confirmed_policy durch ${report.tieFixAttempts} Lineup-Variant-Retry(s) gelöst (${Array.from(new Set(report.tieFixTeams)).join(", ")})`,
       );
     }
-    if (args.write && index < save.gameState.season.matchdayIds.length - 1) {
+    if (args.write && ADVANCE_AFTER_MATCHDAY && index < matchdayIdsToRun.length - 1) {
       const advance = await executeMatchdayAdvance({
         saveId,
         seasonId,

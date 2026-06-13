@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 
 import { executeLocalTransfermarktBuy, previewLocalTransfermarktBuy } from "@/lib/market/transfermarkt-local-service";
 import type { ContractShape } from "@/lib/data/olyDataTypes";
+import { authorizeServerRoomWrite } from "@/lib/room/server-authoritative-write-guard";
 
 type BuyRequestBody = {
   saveId?: string;
@@ -13,11 +14,19 @@ type BuyRequestBody = {
   offeredSalary?: number;
   dryRun?: boolean;
   source?: "sqlite" | "prisma";
+  roomCode?: string | null;
+  participantId?: string | null;
+  seatToken?: string | null;
+  userId?: string | null;
+  activeManagerTeamId?: string | null;
+  controlMode?: "human" | "ai" | "passive" | "manual" | null;
+  confirmToken?: string | null;
+  expectedConfirmToken?: string | null;
 };
 
 export async function POST(request: Request) {
   try {
-    const body = (await request.json()) as BuyRequestBody;
+    const body = (await request.json().catch(() => ({}))) as BuyRequestBody;
     const saveId = body.saveId?.trim() ?? "";
     const seasonId = body.seasonId?.trim() ?? "";
     const teamId = body.teamId?.trim() ?? "";
@@ -61,6 +70,34 @@ export async function POST(request: Request) {
       );
     }
 
+    const writeAuth = authorizeServerRoomWrite({
+      roomCode: body.roomCode,
+      participantId: body.participantId,
+      seatToken: body.seatToken,
+      userId: body.userId,
+      saveId,
+      teamId,
+      action: "buy",
+      source,
+      dryRun,
+      confirmToken: body.confirmToken,
+      expectedConfirmToken: body.expectedConfirmToken,
+      activeManagerTeamId: body.activeManagerTeamId,
+      controlMode: body.controlMode,
+    });
+    if (!writeAuth.allowed) {
+      return NextResponse.json(
+        {
+          success: false,
+          error: writeAuth.reason,
+          summary: null,
+          warnings: writeAuth.warnings,
+          scope: { saveId, seasonId, teamId, playerId, dryRun, source, roomCode: body.roomCode ?? null },
+        },
+        { status: writeAuth.status },
+      );
+    }
+
     const summary = dryRun
       ? previewLocalTransfermarktBuy(params)
       : executeLocalTransfermarktBuy(params);
@@ -69,7 +106,7 @@ export async function POST(request: Request) {
       {
         success: summary.canBuy,
         summary,
-        warnings: summary.warnings,
+        warnings: [...writeAuth.warnings, ...summary.warnings],
         scope: { saveId, seasonId, teamId, playerId, dryRun, source },
       },
       { status: summary.canBuy ? 200 : 409 },

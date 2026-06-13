@@ -1,4 +1,5 @@
 import type { CoachRole, OlyRoomState } from "@/types/game";
+import type { TeamWriteAction } from "@/lib/room/online-room-model";
 
 export type RoomOwnershipPreset =
   | "chris_1_rest_ai"
@@ -74,6 +75,37 @@ export type RoomErrorPayload = {
   message: string;
 };
 
+export type AuthorizeRoomWriteRequest = {
+  roomCode: string;
+  participantId?: string | null;
+  seatToken?: string | null;
+  userId?: string | null;
+  saveId: string;
+  teamId?: string | null;
+  writeAction: TeamWriteAction;
+  dryRun?: boolean;
+  confirmToken?: string | null;
+  expectedConfirmToken?: string | null;
+};
+
+export type AuthorizeRoomWriteResponse = {
+  success: boolean;
+  authorization:
+    | {
+        allowed: true;
+        participantId: string | null;
+        teamId: string | null;
+        warnings: string[];
+      }
+    | {
+        allowed: false;
+        code: "forbidden_team_control" | "not_room_participant" | "wrong_phase" | "stale_save_version";
+        reason: string;
+        status: number;
+        warnings: string[];
+      };
+};
+
 export type ClientToServerEvents = {
   createRoom: (payload: CreateRoomRequest) => void;
   joinRoom: (payload: JoinRoomRequest) => void;
@@ -83,6 +115,7 @@ export type ClientToServerEvents = {
   startRoom: (payload: StartRoomRequest) => void;
   runRoomAiAutoStep: (payload: RunRoomAiAutoStepRequest) => void;
   advanceRoomFlow: (payload: AdvanceRoomFlowRequest) => void;
+  authorizeRoomWrite: (payload: AuthorizeRoomWriteRequest, callback: (response: AuthorizeRoomWriteResponse) => void) => void;
   moveToken: (payload: MoveTokenRequest) => void;
   endTurn: (payload: EndTurnRequest) => void;
 };

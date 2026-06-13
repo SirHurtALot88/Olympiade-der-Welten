@@ -4,6 +4,7 @@ import { MAX_ACTIVE_PLAYERS } from "@/lib/game/constants";
 import { createRoomCode } from "@/lib/room/room-code";
 import {
   applyOwnershipPresetToState,
+  appendRoomEvent,
   buildParticipant,
   buildTurnState,
   canParticipantControlTeam,
@@ -126,6 +127,7 @@ export function createRoom(
     room.state = applyOwnershipPresetToState(room.state, input.preset);
     syncPlayers(room);
   }
+  room.state = appendRoomEvent(room.state, "room_state_updated", { source: "room_created", preset: input?.preset ?? "default" });
   runtimeRooms.set(roomCode, room);
 
   return {
@@ -158,6 +160,7 @@ export function joinRoom(roomCode: string, socketId: string, input?: { displayNa
     }),
   ];
   room.state = applyOwnershipPresetToState(room.state, "chris_4_franky_4_rest_ai");
+  room.state = appendRoomEvent(room.state, "participant_joined", { participantId, displayName: input?.displayName?.trim() || "Franky" });
   room.state.actionLog.push(
     createActionLogEntry({
       turnNumber: room.state.turnNumber,
@@ -200,6 +203,7 @@ export function rejoinRoom(roomCode: string, seatToken: string, socketId: string
       message: `Coach ${role} hat den Raum erneut verbunden.`,
     }),
   );
+  room.state = appendRoomEvent(room.state, "room_state_updated", { source: "participant_rejoined", participantId: seat.participantId });
   syncPlayers(room);
 
   return { ok: true as const, room, seat };
@@ -217,6 +221,7 @@ export function markDisconnected(socketId: string) {
             ? { ...participant, connectionStatus: "offline", lastSeenAt: new Date().toISOString() }
             : participant,
         );
+        room.state = appendRoomEvent(room.state, "participant_left", { participantId: seat.participantId, connectionStatus: "offline" });
         syncPlayers(room);
       }
     }
@@ -238,6 +243,7 @@ export function applyRoomOwnershipPreset(roomCode: string, seatToken: string, pr
   }
 
   room.state = applyOwnershipPresetToState(room.state, preset);
+  room.state = appendRoomEvent(room.state, "room_state_updated", { source: "ownership_preset_applied", preset });
   syncPlayers(room);
   return { ok: true as const, room };
 }
@@ -257,6 +263,7 @@ export function setParticipantReadyState(roomCode: string, seatToken: string, re
       ? { ...participant, readyState: ready ? "ready" : "not_ready", lastSeenAt: new Date().toISOString() }
       : participant,
   );
+  room.state = appendRoomEvent(room.state, "team_ready_changed", { participantId, ready });
   syncPlayers(room);
   return { ok: true as const, room };
 }
@@ -296,6 +303,7 @@ export function startRoom(roomCode: string, seatToken: string) {
       canHostAdvance: false,
     },
   };
+  room.state = appendRoomEvent(room.state, "flow_step_changed", { step: "training", source: "start_room" });
   syncPlayers(room);
   return { ok: true as const, room };
 }
@@ -319,6 +327,7 @@ export function runRoomAiAutoStep(roomCode: string, seatToken: string) {
       warnings: [...room.state.roomFlowState.warnings.filter((warning) => warning !== "ai_auto_step_pending"), "source:sandbox_auto_ready"],
     },
   };
+  room.state = appendRoomEvent(room.state, "save_updated", { source: "sandbox_ai_auto_step", aiTeamCount: aiTeamIds.length });
   syncPlayers(room);
   return { ok: true as const, room };
 }
@@ -355,6 +364,7 @@ export function advanceRoomFlow(roomCode: string, seatToken: string) {
       warnings: [],
     },
   };
+  room.state = appendRoomEvent(room.state, "flow_step_changed", { step: nextStep, source: "advance_room_flow" });
   syncPlayers(room);
   return { ok: true as const, room };
 }

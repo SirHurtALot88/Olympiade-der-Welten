@@ -49,6 +49,24 @@ describe("foundation transfermarkt ui contract", () => {
     expect(fileText).toContain("entry.item.mercenary || (entry.item.fit ?? Number.NEGATIVE_INFINITY) > 0");
   });
 
+  it("shows scouting potential as range and confidence instead of exact hidden values", async () => {
+    const fileText = await fs.readFile(
+      "/Users/chrisfalk/Documents/Codex/Olympiade der Welten/app/foundation/FoundationPageClient.tsx",
+      "utf8",
+    );
+    const drawerText = await fs.readFile(
+      "/Users/chrisfalk/Documents/Codex/Olympiade der Welten/app/foundation/PlayerDetailDrawer.tsx",
+      "utf8",
+    );
+
+    expect(fileText).toContain("renderTransfermarktPotential");
+    expect(fileText).toContain("formatPotentialRange");
+    expect(fileText).toContain("scoutingConfidence");
+    expect(drawerText).toContain("Potential / Scouting");
+    expect(drawerText).toContain("Confidence");
+    expect(drawerText).toContain("MW Preview");
+  });
+
   it("keeps manager quick switch scoped to the active owner teams", async () => {
     const fileText = await fs.readFile(
       "/Users/chrisfalk/Documents/Codex/Olympiade der Welten/app/foundation/FoundationPageClient.tsx",
@@ -178,6 +196,10 @@ describe("foundation transfermarkt ui contract", () => {
     expect(fileText).toContain("AI Needs/Picks Compare");
     expect(fileText).toContain("AI Verkaufsvorschlaege");
     expect(fileText).toContain("Transfer Recap");
+    expect(fileText).toContain("transferHistorySeasonBreakdown");
+    expect(fileText).toContain("transferHistoryRequestedSeasonLabel");
+    expect(fileText).toContain("transferHistoryResolvedSeasonLabel");
+    expect(fileText).toContain("Transfers im geladenen Feed");
     expect(fileText).toContain("Recap neu laden");
     expect(fileText).toContain("Top Transfers In");
     expect(fileText).toContain("Top Transfers Out");
@@ -1000,11 +1022,16 @@ describe("foundation transfermarkt ui contract", () => {
     expect(fileText).toContain("Kein aktiver Kader vorhanden");
     expect(fileText).toContain("Ø Marktwert (Season)");
     expect(fileText).toContain("Ø Gehalt (Season)");
-    expect(fileText).toContain("Avg Rank");
+    expect(fileText).toContain("Ø Punkte");
+    expect(fileText).toContain("Hist. Punkte");
+    expect(fileText).toContain("teamHistorySeasonPointColumns");
+    expect(fileText).toContain("teamHistoryPointRankMaps");
     expect(fileText).toContain("teams-overview-shell");
     expect(fileText).toContain("Ewige Tabelle / Historische Punkte");
     expect(fileText).toContain("Nur echte archivierte Seasons aus dem lokalen Save.");
     expect(fileText).toContain("historicalPointsTotal");
+    expect(fileText).toContain("historicalAvgPoints");
+    expect(fileText).toContain("historicalPointsBySeason");
     expect(fileText).toContain("Historische Punkte gesamt");
     expect(fileText).toContain("Seasons gespielt");
     expect(fileText).toContain("Beste Platzierung");

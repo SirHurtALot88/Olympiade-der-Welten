@@ -97,6 +97,7 @@ const OUTPUT_DIR =
   process.env.OLY_AUTOPREP_OUTPUT_DIR ??
   "/Users/chrisfalk/Documents/Codex/2026-06-11/wir-machen-weiter-mit-dem-olympiade/outputs";
 const WRITE_ENABLED = process.argv.includes("--write");
+const TARGET_SAVE_ID = process.env.OLY_TARGET_SAVE_ID ?? null;
 const TARGET_SEASON_ID = process.env.OLY_TARGET_SEASON_ID ?? "season-1";
 const EXPORT_PREFIX = process.env.OLY_EXPORT_PREFIX ?? "season1";
 
@@ -634,7 +635,7 @@ function main() {
   fs.mkdirSync(OUTPUT_DIR, { recursive: true });
   const persistence = createPersistenceService();
   const bootstrapped = persistence.bootstrapSingleplayerSave();
-  const save = persistence.getActiveSave() ?? bootstrapped.save;
+  const save = (TARGET_SAVE_ID ? persistence.getSaveById(TARGET_SAVE_ID) : null) ?? persistence.getActiveSave() ?? bootstrapped.save;
   if (!save) {
     throw new Error("No active local save available.");
   }

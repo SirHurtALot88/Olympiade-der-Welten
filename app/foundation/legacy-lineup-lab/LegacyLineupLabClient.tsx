@@ -2652,7 +2652,13 @@ export default function LegacyLineupLabClient(props: LegacyLineupLabClientProps)
     disciplineId: string | null | undefined,
   ) {
     const score = disciplineId ? option.disciplineScores[disciplineId] ?? null : null;
-    return `${option.name} · ${score != null ? formatScore(score) : "—"} · ${formatExhaustionPoints(score, option.fatigueCount ?? null)}`;
+    const injuryLabel =
+      option.injuryStatus === "recovering"
+        ? " · frisch zurück"
+        : option.injuryRiskPercent != null && option.injuryRiskPercent > 0
+          ? ` · ${option.injuryRiskLabel ?? "Verletzungsrisiko"} ${option.injuryRiskPercent}%`
+          : "";
+    return `${option.name} · ${score != null ? formatScore(score) : "—"} · ${formatExhaustionPoints(score, option.fatigueCount ?? null)}${injuryLabel}`;
   }
 
   function sortOptionsByDisciplineSkill(

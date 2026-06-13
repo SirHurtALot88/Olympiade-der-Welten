@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 
 import { createPersistenceService } from "@/lib/persistence/persistence-service";
+import { authorizeServerRoomWrite } from "@/lib/room/server-authoritative-write-guard";
 import { buildSeasonTransitionPreview, startSeasonTransition } from "@/lib/season/season-transition-service";
 
 type SeasonTransitionBody = {
@@ -8,6 +9,10 @@ type SeasonTransitionBody = {
   dryRun?: boolean;
   action?: "start_transition" | "preview";
   source?: "sqlite" | "prisma";
+  roomCode?: string | null;
+  participantId?: string | null;
+  seatToken?: string | null;
+  userId?: string | null;
 };
 
 export async function POST(request: Request) {
@@ -30,6 +35,23 @@ export async function POST(request: Request) {
       return NextResponse.json({ success: false, error: "save_not_found", summary: null }, { status: 404 });
     }
 
+    const writeAuth = authorizeServerRoomWrite({
+      roomCode: body.roomCode,
+      participantId: body.participantId,
+      seatToken: body.seatToken,
+      userId: body.userId,
+      saveId,
+      action: "season_transition",
+      source,
+      dryRun,
+    });
+    if (!writeAuth.allowed) {
+      return NextResponse.json(
+        { success: false, error: writeAuth.reason, summary: null, warnings: writeAuth.warnings, blockingReasons: [writeAuth.reason] },
+        { status: writeAuth.status },
+      );
+    }
+
     const summary = dryRun || body.action !== "start_transition"
       ? buildSeasonTransitionPreview(save)
       : startSeasonTransition(save, persistence);
@@ -39,7 +61,7 @@ export async function POST(request: Request) {
       {
         success,
         summary,
-        warnings: summary.warnings,
+        warnings: [...writeAuth.warnings, ...summary.warnings],
         blockingReasons: summary.blockingReasons,
       },
       { status: success || dryRun ? 200 : 409 },

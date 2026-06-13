@@ -119,6 +119,8 @@ function createGameState(input?: {
   players?: Player[];
   rosters?: RosterEntry[];
   transferHistory?: TransferHistoryEntry[];
+  playerPotential?: GameState["playerPotential"];
+  teamFacilities?: GameState["seasonState"]["teamFacilities"];
 }): GameState {
   const teams = input?.teams ?? [createTeam()];
   return {
@@ -133,6 +135,7 @@ function createGameState(input?: {
       seasonId: "season-1",
       schedule: [],
       standings: Object.fromEntries(teams.map((team) => [team.teamId, { points: 0 }])),
+      teamFacilities: input?.teamFacilities,
     },
     matchdayState: {
       matchdayId: "matchday-1",
@@ -148,6 +151,7 @@ function createGameState(input?: {
     contracts: [],
     transferListings: [],
     transferHistory: input?.transferHistory ?? [],
+    playerPotential: input?.playerPotential,
     logs: [],
     mappingReport: {
       mappingSource: "",
@@ -217,6 +221,66 @@ describe("transfermarkt local service", () => {
 
     expect(result.items).toHaveLength(10);
     expect(result.items.slice(0, 4).map((item) => item.marketValue)).toEqual([1, 2, 3, 4]);
+  });
+
+  it("uses save-stable potential records and scouting office level for transfermarkt scouting", async () => {
+    persistenceState.save = {
+      saveId: "save-singleplayer-dev",
+      gameState: createGameState({
+        teams: [createTeam({ teamId: "A-A", shortCode: "A-A", cash: 175 })],
+        players: [
+          createPlayer("p1", { marketValue: 40, displayMarketValue: 40, salaryDemand: 10, displaySalary: 10 }),
+          createPlayer("fa-1", { marketValue: 25, displayMarketValue: 25, salaryDemand: 6, displaySalary: 6 }),
+        ],
+        rosters: [createRosterEntry("r1", "p1", { salary: 10, contractLength: 3, currentValue: 40, purchasePrice: 40 })],
+        playerPotential: [
+          {
+            playerId: "fa-1",
+            potentialBand: "elite",
+            hiddenPotentialScore: 92,
+            confidence: 0,
+            source: "generated",
+          },
+        ],
+      }),
+    };
+
+    const { listLocalTransfermarktFreeAgents } = await import("@/lib/market/transfermarkt-local-service");
+
+    const level0 = listLocalTransfermarktFreeAgents({
+      saveId: "save-singleplayer-dev",
+      seasonId: "season-1",
+      teamId: "A-A",
+      limit: 10,
+    }).items.find((item) => item.playerId === "fa-1");
+
+    expect(level0?.potentialBand).toBe("elite");
+    expect(level0?.potentialRange).toEqual({ min: 76, max: 99 });
+    expect(level0?.scoutingConfidence).toBe(20);
+    expect(level0?.scoutingWarnings).toContain("potential_range_uncertain");
+
+    persistenceState.save.gameState.seasonState.teamFacilities = {
+      "A-A": {
+        facilities: {
+          scouting_office: {
+            level: 3,
+            enabled: true,
+          },
+        },
+      },
+    };
+
+    const level3 = listLocalTransfermarktFreeAgents({
+      saveId: "save-singleplayer-dev",
+      seasonId: "season-1",
+      teamId: "A-A",
+      limit: 10,
+    }).items.find((item) => item.playerId === "fa-1");
+
+    expect(level3?.potentialBand).toBe("elite");
+    expect(level3?.potentialRange).toEqual({ min: 86, max: 98 });
+    expect(level3?.scoutingConfidence).toBe(70);
+    expect(level3?.marketValuePotentialPremiumPct).toBeGreaterThan(0);
   });
 
   it("updates local roster, cash, salary total, market value and transfer history after a buy", async () => {

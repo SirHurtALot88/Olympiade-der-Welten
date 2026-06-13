@@ -4,7 +4,8 @@ export type ResolveHighlightType =
   | "best_player_discipline"
   | "strongest_team_score"
   | "closest_score_gap"
-  | "missing_lineup_warning";
+  | "missing_lineup_warning"
+  | "injury_event";
 
 export type ResolvePreviewStatus =
   | "ready"

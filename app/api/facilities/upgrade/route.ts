@@ -3,6 +3,7 @@ import { NextResponse } from "next/server";
 import { FACILITY_CATALOG_BY_ID, type FacilityId } from "@/lib/facilities/facility-catalog";
 import { applyFacilityUpgrade, previewFacilityUpgrade } from "@/lib/facilities/facility-upgrade-service";
 import { createPersistenceService } from "@/lib/persistence/persistence-service";
+import { authorizeServerRoomWrite } from "@/lib/room/server-authoritative-write-guard";
 
 type FacilityUpgradeBody = {
   saveId?: string;
@@ -12,6 +13,12 @@ type FacilityUpgradeBody = {
   dryRun?: boolean;
   confirmToken?: string | null;
   source?: "sqlite" | "prisma";
+  roomCode?: string | null;
+  participantId?: string | null;
+  seatToken?: string | null;
+  userId?: string | null;
+  activeManagerTeamId?: string | null;
+  controlMode?: "human" | "ai" | "passive" | "manual" | null;
 };
 
 function normalizeFacilityId(value: string | undefined): FacilityId | null {
@@ -43,8 +50,37 @@ export async function POST(request: Request) {
       return NextResponse.json({ success: false, error: "save_not_found", summary: null }, { status: 404 });
     }
 
+    const preview = previewFacilityUpgrade(save, teamId, facilityId, body.variant);
+    const writeAuth = authorizeServerRoomWrite({
+      roomCode: body.roomCode,
+      participantId: body.participantId,
+      seatToken: body.seatToken,
+      userId: body.userId,
+      saveId,
+      teamId,
+      action: "facility_apply",
+      source,
+      dryRun,
+      confirmToken: body.confirmToken,
+      expectedConfirmToken: preview.confirmToken,
+      activeManagerTeamId: body.activeManagerTeamId,
+      controlMode: body.controlMode,
+    });
+    if (!writeAuth.allowed) {
+      return NextResponse.json(
+        {
+          success: false,
+          error: writeAuth.reason,
+          summary: null,
+          warnings: writeAuth.warnings,
+          blockingReasons: [writeAuth.reason],
+        },
+        { status: writeAuth.status },
+      );
+    }
+
     const summary = dryRun
-      ? previewFacilityUpgrade(save, teamId, facilityId, body.variant)
+      ? preview
       : applyFacilityUpgrade(save, teamId, facilityId, body.confirmToken ?? null, body.variant, persistence);
     const success = "applied" in summary ? summary.applied : summary.ok;
 
@@ -52,7 +88,7 @@ export async function POST(request: Request) {
       {
         success,
         summary,
-        warnings: summary.warnings,
+        warnings: [...writeAuth.warnings, ...summary.warnings],
         blockingReasons: summary.blockingReasons,
       },
       { status: success || dryRun ? 200 : 409 },

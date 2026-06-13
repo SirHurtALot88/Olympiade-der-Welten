@@ -3,7 +3,11 @@ import path from "node:path";
 
 import { createGameStateFromSeed, loadSeedData } from "@/lib/data/dataAdapter";
 import { createPersistenceService } from "@/lib/persistence/persistence-service";
-import { buildPlayerBaselineAudit, ensurePlayerBaselines } from "@/lib/players/player-baseline-service";
+import {
+  buildPlayerBaselineAudit,
+  createNewGameFromPlayerBaseline,
+  ensurePlayerBaselines,
+} from "@/lib/players/player-baseline-service";
 
 const OUTPUT_DIR =
   process.env.OLY_OUTPUT_DIR ??
@@ -60,6 +64,57 @@ function main() {
     source: baseline.source,
     warning: baseline.reconstructionWarning,
   }));
+  const checksumRows = audit.checksumRows.map((row) => ({
+    playerId: row.playerId,
+    playerName: row.playerName,
+    baselineVersion: row.baselineVersion,
+    source: row.source,
+    sourceFile: row.sourceFile,
+    sourceHash: row.sourceHash,
+    checksum: row.checksum,
+    checksumValid: row.checksumValid,
+    importedAt: row.importedAt,
+    createdAt: row.createdAt,
+    reconstructionWarning: row.reconstructionWarning,
+  }));
+  const proofPlayer = save.gameState.players.find((player) => player.attributeSheetStats?.power != null) ?? save.gameState.players[0] ?? null;
+  const proofBaseline = proofPlayer
+    ? save.gameState.playerBaselines?.find((baseline) => baseline.playerId === proofPlayer.id) ?? null
+    : null;
+  const mutatedForProof =
+    proofPlayer && proofBaseline
+      ? {
+          ...save.gameState,
+          players: save.gameState.players.map((player) =>
+            player.id === proofPlayer.id
+              ? {
+                  ...player,
+                  attributeSheetStats: { ...(player.attributeSheetStats ?? {}), power: 99 },
+                  currentXP: 123,
+                  spentXP: 45,
+                  lifetimeXP: 999,
+                  fatigue: 88,
+                  currentDisciplineValues: {},
+                }
+              : player,
+          ),
+          playerProgressionEvents: [
+            ...(save.gameState.playerProgressionEvents ?? []),
+            {
+              eventId: "baseline-reset-proof-event",
+              seasonId: save.gameState.season.id,
+              teamId: "proof",
+              playerId: proofPlayer.id,
+              upgrades: [],
+              xpSpent: 45,
+              timestamp: new Date().toISOString(),
+              source: "manual_season_end_xp_spend" as const,
+            },
+          ],
+        }
+      : null;
+  const resetProof = mutatedForProof ? createNewGameFromPlayerBaseline({ gameState: mutatedForProof }) : null;
+  const resetProofPlayer = resetProof?.gameState.players.find((player) => player.id === proofPlayer?.id) ?? null;
 
   const summary = {
     saveId: save.saveId,
@@ -82,6 +137,46 @@ function main() {
     "player-baseline-delta.csv",
     toCsv(deltaRows, ["playerId", "playerName", "attribute", "baselineValue", "currentValue", "delta"]),
   );
+  const checksumCsvPath = writeOutput(
+    "player-baseline-checksum-audit.csv",
+    toCsv(checksumRows, [
+      "playerId",
+      "playerName",
+      "baselineVersion",
+      "source",
+      "sourceFile",
+      "sourceHash",
+      "checksum",
+      "checksumValid",
+      "importedAt",
+      "createdAt",
+      "reconstructionWarning",
+    ]),
+  );
+  const resetProofPath = writeOutput(
+    "player-baseline-reset-proof.json",
+    JSON.stringify(
+      {
+        ok: resetProof?.ok ?? false,
+        proofPlayerId: proofPlayer?.id ?? null,
+        proofPlayerName: proofPlayer?.name ?? null,
+        baselinePower: proofBaseline?.attributes.power ?? null,
+        resetPower: resetProofPlayer?.attributeSheetStats?.power ?? null,
+        resetCurrentXP: resetProofPlayer?.currentXP ?? null,
+        resetSpentXP: resetProofPlayer?.spentXP ?? null,
+        resetLifetimeXP: resetProofPlayer?.lifetimeXP ?? null,
+        resetFatigue: resetProofPlayer?.fatigue ?? null,
+        resetProgressionEvents: resetProof?.gameState.playerProgressionEvents?.length ?? null,
+        currentDisciplineValuesFromBaseline:
+          proofBaseline && resetProofPlayer
+            ? JSON.stringify(resetProofPlayer.currentDisciplineValues ?? {}) === JSON.stringify(proofBaseline.disciplineRatings ?? {})
+            : false,
+        blockers: resetProof?.blockers ?? [],
+      },
+      null,
+      2,
+    ),
+  );
   const markdownPath = writeOutput(
     "player-baseline-audit.md",
     [
@@ -95,6 +190,8 @@ function main() {
       `- Delta-Zeilen: ${summary.deltaRowCount}`,
       `- Rekonstruierte Baselines: ${summary.reconstructedBaselineCount}`,
       `- Baseline-Versionen: ${summary.baselineVersions.join(", ") || "—"}`,
+      `- Ungültige Checksums: ${summary.invalidChecksumCount}`,
+      `- Write-Guard Events: ${summary.writeGuardEventCount}`,
       `- Baselines in diesem Run persistiert: ${summary.persistedBaselinesThisRun ? "ja" : "nein"}`,
       `- Warnings: ${summary.ensureWarnings.length > 0 ? summary.ensureWarnings.join(" | ") : "none"}`,
       "",
@@ -103,6 +200,30 @@ function main() {
       `- JSON: ${jsonPath}`,
       `- Missing CSV: ${missingCsvPath}`,
       `- Delta CSV: ${deltaCsvPath}`,
+      `- Checksum CSV: ${checksumCsvPath}`,
+      `- Reset Proof: ${resetProofPath}`,
+      "",
+    ].join("\n"),
+  );
+  const hardeningMarkdownPath = writeOutput(
+    "player-baseline-hardening-audit.md",
+    [
+      "# Player Baseline Hardening Audit",
+      "",
+      `- Save: ${save.name} (${save.saveId})`,
+      `- Baseline-Versionen: ${summary.baselineVersions.join(", ") || "—"}`,
+      `- Source Hashes vorhanden: ${checksumRows.filter((row) => row.sourceHash).length}/${checksumRows.length}`,
+      `- Checksums gueltig: ${checksumRows.filter((row) => row.checksumValid).length}/${checksumRows.length}`,
+      `- Write-Guard Events: ${summary.writeGuardEventCount}`,
+      `- Reset Proof OK: ${resetProof?.ok ? "ja" : "nein"}`,
+      `- Reset Proof XP leer: ${resetProofPlayer?.currentXP === 0 && resetProofPlayer?.spentXP === 0 ? "ja" : "nein"}`,
+      `- Reset Proof Progression-Events leer: ${(resetProof?.gameState.playerProgressionEvents?.length ?? -1) === 0 ? "ja" : "nein"}`,
+      "",
+      "## Dateien",
+      "",
+      `- Checksum CSV: ${checksumCsvPath}`,
+      `- Reset Proof: ${resetProofPath}`,
+      `- Legacy Audit: ${markdownPath}`,
       "",
     ].join("\n"),
   );
@@ -114,9 +235,12 @@ function main() {
         summary,
         exports: {
           markdown: markdownPath,
+          hardeningMarkdown: hardeningMarkdownPath,
           json: jsonPath,
           missingCsv: missingCsvPath,
           deltaCsv: deltaCsvPath,
+          checksumCsv: checksumCsvPath,
+          resetProof: resetProofPath,
         },
       },
       null,

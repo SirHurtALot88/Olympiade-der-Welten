@@ -112,10 +112,15 @@ async function ensureServerManifestFile(filePath: string, fallbackValue: unknown
   await writeFile(filePath, JSON.stringify(alternate ?? fallbackValue, null, 2), "utf8");
 }
 
-async function ensureServerBuildManifests(projectDir: string, options: { includeAppPaths?: boolean } = {}) {
+async function ensureServerBuildManifests(
+  projectDir: string,
+  options: { includeAppPaths?: boolean; includePagesManifest?: boolean } = {},
+) {
   const distDir = path.join(projectDir, ".next");
   const serverDir = path.join(distDir, "server");
-  await ensureServerManifestFile(path.join(serverDir, "pages-manifest.json"), buildPagesManifestFallback());
+  if (options.includePagesManifest !== false) {
+    await ensureServerManifestFile(path.join(serverDir, "pages-manifest.json"), buildPagesManifestFallback());
+  }
   if (options.includeAppPaths) {
     await ensureServerManifestFile(path.join(serverDir, "app-paths-manifest.json"), {});
   }
@@ -198,10 +203,17 @@ async function main() {
     },
   });
 
+  const manifestKeepAlive = setInterval(() => {
+    ensureServerBuildManifests(projectDir, { includeAppPaths: false, includePagesManifest: false }).catch(
+      () => undefined,
+    );
+  }, 10);
+
   const exitCode = await new Promise<number>((resolve, reject) => {
     child.once("error", reject);
     child.once("exit", (code) => resolve(code ?? 1));
   });
+  clearInterval(manifestKeepAlive);
 
   if (exitCode === 0) {
     await ensureClientStaticManifests(projectDir);

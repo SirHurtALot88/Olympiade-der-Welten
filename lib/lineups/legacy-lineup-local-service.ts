@@ -29,6 +29,7 @@ import type {
   LegacyLineupValidationOptions,
 } from "@/lib/lineups/legacy-lineup-types";
 import { getImportedPlayerDisplayMarketValue, getImportedPlayerDisplaySalary } from "@/lib/data/player-economy-display";
+import { getInjuryRiskBand, getPlayerAvailabilityView } from "@/lib/fatigue/fatigue-injury-service";
 import { validateLegacyLineupContext } from "@/lib/lineups/legacy-lineup-validator";
 import { officialDisciplineWeightTable, playerGeneratorAttributeKeys, type OfficialDisciplineWeightId } from "@/lib/player-generator/official-discipline-weights";
 import { getSeasonDisciplineScheduleEntry, withNormalizedSeasonDisciplineSchedule } from "@/lib/season/season-discipline-schedule";
@@ -262,6 +263,13 @@ function buildContextFromGameState(gameState: GameState, params: LegacyLineupKey
       player: playersById.get(entry.playerId) ?? null,
     }))
     .filter((item): item is { entry: (typeof rosterEntries)[number]; player: NonNullable<ReturnType<typeof playersById.get>> } => Boolean(item.player));
+  const availabilityByPlayerId = new Map(
+    activePlayers.map(({ entry }) => [
+      entry.playerId,
+      getPlayerAvailabilityView(normalizedGameState, entry.playerId, params.teamId, params.matchdayId),
+    ] as const),
+  );
+  const selectableActivePlayers = activePlayers.filter(({ entry }) => !availabilityByPlayerId.get(entry.playerId)?.isUnavailable);
   const existingDraft = getStoredDraft(normalizedGameState, params);
   const existingDraftLineupId = existingDraft?.lineupId ?? null;
   const teamStatus = buildTeamStatus(normalizedGameState, params.teamId, params.seasonId);
@@ -315,7 +323,7 @@ function buildContextFromGameState(gameState: GameState, params: LegacyLineupKey
           .filter((entry): entry is NonNullable<typeof entry> => Boolean(entry))
           .map((entry) => [`${entry.disciplineId}::${entry.disciplineSide}`, entry.requiredCaptains] as const),
       ),
-      activePlayers: activePlayers.map(({ entry }) => ({
+      activePlayers: selectableActivePlayers.map(({ entry }) => ({
         id: entry.id,
         saveId: params.saveId,
         seasonId: params.seasonId,
@@ -326,7 +334,7 @@ function buildContextFromGameState(gameState: GameState, params: LegacyLineupKey
         upkeep: entry.upkeep,
         marketValue: entry.currentValue ?? entry.purchasePrice ?? null,
       })),
-      disciplineScores: activePlayers.flatMap(({ player }) =>
+      disciplineScores: selectableActivePlayers.flatMap(({ player }) =>
         requiredDisciplineIds.map((disciplineId) => ({
           playerId: player.id,
           disciplineId,
@@ -387,7 +395,11 @@ function buildContextFromGameState(gameState: GameState, params: LegacyLineupKey
           };
         })
         .filter((entry): entry is NonNullable<typeof entry> => Boolean(entry)),
-      rosterPlayers: activePlayers.map(({ player }) => ({
+      rosterPlayers: activePlayers.map(({ player }) => {
+        const availability = availabilityByPlayerId.get(player.id) ?? getPlayerAvailabilityView(normalizedGameState, player.id, params.teamId, params.matchdayId);
+        const fatigue = availability.fatigue ?? player.fatigue ?? null;
+        const injuryRiskBand = getInjuryRiskBand(fatigue ?? 0);
+        return ({
         id: player.id,
         name: player.name,
         portraitUrl: player.portraitUrl ?? null,
@@ -398,7 +410,13 @@ function buildContextFromGameState(gameState: GameState, params: LegacyLineupKey
         potential: player.potential ?? null,
         ovr: player.ovr ?? player.rating ?? null,
         pps: player.pps ?? null,
-        fatigue: player.fatigue ?? null,
+        fatigue,
+        injuryStatus: availability.injuryStatus,
+        injuryUntilMatchday: availability.injuryUntilMatchday ?? null,
+        injuryRiskPercent: fatigue != null ? injuryRiskBand.riskPercent : null,
+        injuryRiskBand: fatigue != null ? injuryRiskBand.label : null,
+        injuryRiskLabel: fatigue != null ? injuryRiskBand.uiLabel : null,
+        availabilityBlocker: availability.blocker,
         form: player.form ?? null,
         traitsPositive: player.traitsPositive ?? [],
         traitsNegative: player.traitsNegative ?? [],
@@ -423,7 +441,8 @@ function buildContextFromGameState(gameState: GameState, params: LegacyLineupKey
           men: player.coreStats.men,
           soc: player.coreStats.soc,
         },
-      })),
+      });
+      }),
       disciplines: normalizedGameState.disciplines.map((discipline) => ({
         id: discipline.id,
         name: discipline.name,

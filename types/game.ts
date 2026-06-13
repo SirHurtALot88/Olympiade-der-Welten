@@ -1,17 +1,27 @@
 export type CoachRole = "A" | "B";
 
 export type RoomStatus = "waiting" | "active";
-export type MultiplayerRoomStatus = "lobby" | "draft_setup" | "season_active" | "paused" | "completed";
+export type MultiplayerRoomStatus = "lobby" | "setup" | "draft_setup" | "season_active" | "paused" | "completed";
 export type RoomConnectionStatus = "online" | "offline" | "reconnecting";
 export type RoomParticipantRole = "host" | "player" | "spectator";
 export type RoomReadyState = "not_ready" | "ready" | "waiting";
 export type TeamControllerType = "human" | "ai" | "passive";
 
+// Auth-facing room user contract. V1 may be backed by local/mock auth, but
+// write permissions must still be checked against RoomParticipant + TeamOwnership.
+export type RoomUser = {
+  userId: string;
+  displayName: string;
+  role: RoomParticipantRole;
+};
+
 export type MultiplayerRoomMeta = {
   roomId: string;
   roomCode: string;
+  hostUserId: string;
   saveId: string;
   status: MultiplayerRoomStatus;
+  // Back-compat alias for older local room state. New code should prefer hostUserId.
   createdByUserId: string;
   activeSeasonId: string;
   activeMatchday: number;
@@ -89,6 +99,24 @@ export type RoomFlowState = {
   warnings: string[];
 };
 
+export type RoomRealtimeEventType =
+  | "room_state_updated"
+  | "participant_joined"
+  | "participant_left"
+  | "team_ready_changed"
+  | "save_updated"
+  | "flow_step_changed"
+  | "matchday_resolved";
+
+export type RoomRealtimeEvent = {
+  eventId: string;
+  type: RoomRealtimeEventType;
+  roomId: string;
+  saveId: string;
+  timestamp: string;
+  payload?: Record<string, unknown>;
+};
+
 export type ServerAuthoritativeWritePolicy = {
   clientMayWriteDirectly: false;
   serverValidatesRoomMembership: true;
@@ -139,6 +167,7 @@ export type OlyRoomState = {
   systemControlledTeamIds: string[];
   turnState: MultiplayerTurnState;
   roomFlowState: RoomFlowState;
+  roomEvents: RoomRealtimeEvent[];
   serverWritePolicy: ServerAuthoritativeWritePolicy;
   activeRole: CoachRole;
   turnNumber: number;

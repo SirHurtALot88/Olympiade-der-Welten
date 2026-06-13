@@ -1,7 +1,7 @@
 import type { GameState, Player, PlayerDisciplinePerformanceRecord } from "@/lib/data/olyDataTypes";
 import type { PlayerRatingContractRow } from "@/lib/foundation/player-rating-contract";
 import type { PlayerSeasonPerformanceSummary } from "@/lib/foundation/player-season-performance";
-import { buildPlayerScoutPotential } from "@/lib/progression/player-potential-service";
+import { buildPlayerScoutPotentialFromGameState } from "@/lib/progression/player-potential-service";
 import { buildTrainingTraitSignal } from "@/lib/training/trait-training-signal";
 import type {
   PlayerDevelopmentRoute,
@@ -397,7 +397,11 @@ export function buildPlayerProgressionForecast(input: {
   });
   const traitMultiplier = traitSignal.trainingTraitMultiplier;
   const traitModifierPct = getTraitModifierPct(traitMultiplier);
-  const scoutPotential = buildPlayerScoutPotential({ player: input.player });
+  const scoutPotential = buildPlayerScoutPotentialFromGameState({
+    gameState: input.gameState,
+    player: input.player,
+    saveId: input.gameState.season.id,
+  });
   const potentialTrainingMultiplier = scoutPotential.trainingSpeedMultiplier;
   const performances = (input.gameState.seasonState.playerDisciplinePerformances ?? []).filter((entry) => {
     const result = (input.gameState.seasonState.matchdayResults ?? []).find((candidate) => candidate.id === entry.matchdayResultId);

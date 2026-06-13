@@ -197,6 +197,25 @@ describe("legacy ai lineup suggestion", () => {
     expect(suggestion.entries.every((entry) => activeIds.has(entry.playerId))).toBe(true);
   });
 
+  it("avoids injured roster players because they are not selectable active players", () => {
+    const context = createContext();
+    context.activePlayers = context.activePlayers.filter((player) => player.playerId !== "p1");
+    context.rosterPlayers = context.rosterPlayers.map((player) =>
+      player.id === "p1"
+        ? {
+            ...player,
+            injuryStatus: "injured",
+            injuryUntilMatchday: "matchday-2",
+            availabilityBlocker: "player_injured_unavailable",
+          }
+        : player,
+    );
+
+    const suggestion = buildAiLegacyLineupSuggestion(context);
+
+    expect(suggestion.entries.some((entry) => entry.playerId === "p1")).toBe(false);
+  });
+
   it("uses the legacy score engine consistently", () => {
     const context = createContext();
     const suggestion = buildAiLegacyLineupSuggestion(context);

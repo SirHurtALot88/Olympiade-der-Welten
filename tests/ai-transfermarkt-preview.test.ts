@@ -350,6 +350,50 @@ describe("ai transfermarkt preview service", () => {
     expect(result.teams[0].skippedTargets.some((entry) => entry.reason.includes("insufficient_cash"))).toBe(true);
   });
 
+  it("lets value teams use scouted high-potential players as an AI buy signal", async () => {
+    persistenceState.save!.gameState.playerPotential = [
+      {
+        playerId: "fa-value",
+        potentialBand: "elite",
+        hiddenPotentialScore: 95,
+        confidence: 0,
+        source: "generated",
+      },
+      {
+        playerId: "fa-human",
+        potentialBand: "medium",
+        hiddenPotentialScore: 66,
+        confidence: 0,
+        source: "generated",
+      },
+    ];
+    persistenceState.save!.gameState.seasonState.teamFacilities = {
+      "C-C": {
+        facilities: {
+          scouting_office: {
+            level: 3,
+            enabled: true,
+          },
+        },
+      },
+    };
+
+    const { buildAiTransfermarktPreview } = await import("@/lib/ai/ai-transfermarkt-preview-service");
+    const result = await buildAiTransfermarktPreview({
+      source: "sqlite",
+      saveId: "save-ai-market",
+      teamId: "C-C",
+      teamScope: "all",
+    });
+
+    const cashCreators = result.teams[0];
+    const valueHunter = cashCreators?.recommendedBuys.find((entry) => entry.playerId === "fa-value");
+
+    expect(valueHunter?.strategyNotes.join(" ")).toContain("Scouting sieht elite-Potential");
+    expect(valueHunter?.overallRecommendationScore).toBeGreaterThan(0);
+    expect(cashCreators?.recommendedBuys[0]?.playerId).toBe("fa-value");
+  });
+
   it("marks disabled ai preview teams without executing any buy", async () => {
     persistenceState.save!.gameState.seasonState.teamControlSettings!["D-L"]!.aiTransferPreviewEnabled = false;
 

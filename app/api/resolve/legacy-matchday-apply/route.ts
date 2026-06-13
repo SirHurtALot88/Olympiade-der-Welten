@@ -3,6 +3,7 @@ import { NextResponse } from "next/server";
 import {
   LegacyMatchdayResultApplyService,
 } from "@/lib/resolve/legacy-matchday-result-apply-service";
+import { authorizeServerRoomWrite } from "@/lib/room/server-authoritative-write-guard";
 
 type ApplyBody = {
   saveId?: string;
@@ -14,10 +15,14 @@ type ApplyBody = {
   confirm?: string;
   forceReplace?: boolean;
   allowIncompleteOverride?: boolean;
+  roomCode?: string | null;
+  participantId?: string | null;
+  seatToken?: string | null;
+  userId?: string | null;
 };
 
 export async function POST(request: Request) {
-  const body = (await request.json()) as ApplyBody;
+  const body = (await request.json().catch(() => ({}))) as ApplyBody;
   const saveId = body.saveId?.trim() ?? "";
   const seasonId = body.seasonId?.trim() ?? "";
   const matchdayId = body.matchdayId?.trim() ?? "";
@@ -29,6 +34,28 @@ export async function POST(request: Request) {
     return NextResponse.json(
       { error: "saveId, seasonId and matchdayId are required." },
       { status: 400 },
+    );
+  }
+
+  const writeAuth = authorizeServerRoomWrite({
+    roomCode: body.roomCode,
+    participantId: body.participantId,
+    seatToken: body.seatToken,
+    userId: body.userId,
+    saveId,
+    action: "matchday_resolve",
+    source,
+    dryRun,
+    confirmToken: body.confirm,
+  });
+  if (!writeAuth.allowed) {
+    return NextResponse.json(
+      {
+        success: false,
+        error: writeAuth.reason,
+        warnings: writeAuth.warnings,
+      },
+      { status: writeAuth.status },
     );
   }
 
@@ -66,6 +93,6 @@ export async function POST(request: Request) {
     applied: result.applied,
     previewStatus: result.previewStatus,
     summary: result,
-    warnings: result.blockingReasons,
+    warnings: [...writeAuth.warnings, ...result.blockingReasons],
   });
 }

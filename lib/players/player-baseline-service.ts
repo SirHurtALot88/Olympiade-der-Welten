@@ -2,10 +2,13 @@ import type {
   GameState,
   Player,
   PlayerBaselineRecord,
+  PlayerBaselineWriteGuardEvent,
   PlayerGeneratorAttributeName,
 } from "@/lib/data/olyDataTypes";
 
-export const PLAYER_BASELINE_VERSION = "player-baseline-v1";
+export const PLAYER_BASELINE_VERSION = "player-baseline-v2";
+const PLAYER_BASELINE_CHECKSUM_ALGORITHM = "sha256" as const;
+const DEFAULT_BASELINE_SOURCE_FILE = "data/source/seed";
 
 const ATTRIBUTE_KEYS: PlayerGeneratorAttributeName[] = [
   "power",
@@ -26,10 +29,170 @@ function clone<T>(value: T): T {
   return structuredClone(value);
 }
 
+function sha256Hex(input: string) {
+  const bytes = new TextEncoder().encode(input);
+  const words: number[] = [];
+  const k = [
+    0x428a2f98, 0x71374491, 0xb5c0fbcf, 0xe9b5dba5, 0x3956c25b, 0x59f111f1, 0x923f82a4, 0xab1c5ed5,
+    0xd807aa98, 0x12835b01, 0x243185be, 0x550c7dc3, 0x72be5d74, 0x80deb1fe, 0x9bdc06a7, 0xc19bf174,
+    0xe49b69c1, 0xefbe4786, 0x0fc19dc6, 0x240ca1cc, 0x2de92c6f, 0x4a7484aa, 0x5cb0a9dc, 0x76f988da,
+    0x983e5152, 0xa831c66d, 0xb00327c8, 0xbf597fc7, 0xc6e00bf3, 0xd5a79147, 0x06ca6351, 0x14292967,
+    0x27b70a85, 0x2e1b2138, 0x4d2c6dfc, 0x53380d13, 0x650a7354, 0x766a0abb, 0x81c2c92e, 0x92722c85,
+    0xa2bfe8a1, 0xa81a664b, 0xc24b8b70, 0xc76c51a3, 0xd192e819, 0xd6990624, 0xf40e3585, 0x106aa070,
+    0x19a4c116, 0x1e376c08, 0x2748774c, 0x34b0bcb5, 0x391c0cb3, 0x4ed8aa4a, 0x5b9cca4f, 0x682e6ff3,
+    0x748f82ee, 0x78a5636f, 0x84c87814, 0x8cc70208, 0x90befffa, 0xa4506ceb, 0xbef9a3f7, 0xc67178f2,
+  ];
+  let h0 = 0x6a09e667;
+  let h1 = 0xbb67ae85;
+  let h2 = 0x3c6ef372;
+  let h3 = 0xa54ff53a;
+  let h4 = 0x510e527f;
+  let h5 = 0x9b05688c;
+  let h6 = 0x1f83d9ab;
+  let h7 = 0x5be0cd19;
+  for (let index = 0; index < bytes.length; index += 1) {
+    words[index >> 2] |= bytes[index]! << (24 - (index % 4) * 8);
+  }
+  words[bytes.length >> 2] |= 0x80 << (24 - (bytes.length % 4) * 8);
+  words[(((bytes.length + 8) >> 6) << 4) + 15] = bytes.length * 8;
+  const w = new Array<number>(64);
+  for (let block = 0; block < words.length; block += 16) {
+    let a = h0;
+    let b = h1;
+    let c = h2;
+    let d = h3;
+    let e = h4;
+    let f = h5;
+    let g = h6;
+    let h = h7;
+    for (let index = 0; index < 64; index += 1) {
+      if (index < 16) {
+        w[index] = words[block + index] | 0;
+      } else {
+        const s0 = rightRotate(w[index - 15]!, 7) ^ rightRotate(w[index - 15]!, 18) ^ (w[index - 15]! >>> 3);
+        const s1 = rightRotate(w[index - 2]!, 17) ^ rightRotate(w[index - 2]!, 19) ^ (w[index - 2]! >>> 10);
+        w[index] = (w[index - 16]! + s0 + w[index - 7]! + s1) | 0;
+      }
+      const s1 = rightRotate(e, 6) ^ rightRotate(e, 11) ^ rightRotate(e, 25);
+      const ch = (e & f) ^ (~e & g);
+      const temp1 = (h + s1 + ch + k[index]! + w[index]!) | 0;
+      const s0 = rightRotate(a, 2) ^ rightRotate(a, 13) ^ rightRotate(a, 22);
+      const maj = (a & b) ^ (a & c) ^ (b & c);
+      const temp2 = (s0 + maj) | 0;
+      h = g;
+      g = f;
+      f = e;
+      e = (d + temp1) | 0;
+      d = c;
+      c = b;
+      b = a;
+      a = (temp1 + temp2) | 0;
+    }
+    h0 = (h0 + a) | 0;
+    h1 = (h1 + b) | 0;
+    h2 = (h2 + c) | 0;
+    h3 = (h3 + d) | 0;
+    h4 = (h4 + e) | 0;
+    h5 = (h5 + f) | 0;
+    h6 = (h6 + g) | 0;
+    h7 = (h7 + h) | 0;
+  }
+  return [h0, h1, h2, h3, h4, h5, h6, h7]
+    .map((value) => (value >>> 0).toString(16).padStart(8, "0"))
+    .join("");
+}
+
+function rightRotate(value: number, bits: number) {
+  return (value >>> bits) | (value << (32 - bits));
+}
+
+function stableSortValue(value: unknown): unknown {
+  if (Array.isArray(value)) {
+    return value.map(stableSortValue);
+  }
+  if (value && typeof value === "object") {
+    return Object.fromEntries(
+      Object.entries(value as Record<string, unknown>)
+        .sort(([left], [right]) => left.localeCompare(right))
+        .map(([key, entry]) => [key, stableSortValue(entry)]),
+    );
+  }
+  return value;
+}
+
+function stableHash(value: unknown) {
+  return sha256Hex(JSON.stringify(stableSortValue(value)));
+}
+
 function buildBaselineAttributes(player: Player) {
   return Object.fromEntries(
     ATTRIBUTE_KEYS.map((key) => [key, player.attributeSheetStats?.[key] ?? null]).filter(([, value]) => typeof value === "number"),
   ) as Partial<Record<PlayerGeneratorAttributeName, number>>;
+}
+
+function buildChecksumPayload(baseline: Pick<
+  PlayerBaselineRecord,
+  | "playerId"
+  | "name"
+  | "race"
+  | "className"
+  | "subclasses"
+  | "traits"
+  | "traitsPositive"
+  | "traitsNegative"
+  | "attributes"
+  | "marketValue"
+  | "salary"
+  | "bracket"
+  | "disciplineRatings"
+>) {
+  return {
+    playerId: baseline.playerId,
+    name: baseline.name,
+    race: baseline.race,
+    className: baseline.className,
+    subclasses: [...baseline.subclasses].sort(),
+    traits: [...baseline.traits].sort(),
+    traitsPositive: [...(baseline.traitsPositive ?? [])].sort(),
+    traitsNegative: [...(baseline.traitsNegative ?? [])].sort(),
+    attributes: Object.fromEntries(ATTRIBUTE_KEYS.map((key) => [key, baseline.attributes[key] ?? null])),
+    marketValue: baseline.marketValue ?? null,
+    salary: baseline.salary ?? null,
+    bracket: baseline.bracket ?? null,
+    disciplineRatings: baseline.disciplineRatings ?? {},
+  };
+}
+
+export function calculatePlayerBaselineChecksum(baseline: PlayerBaselineRecord) {
+  return stableHash(buildChecksumPayload(baseline));
+}
+
+export function normalizePlayerBaselineRecord(
+  baseline: PlayerBaselineRecord,
+  options?: { createdAt?: string; importedAt?: string; sourceFile?: string | null },
+): PlayerBaselineRecord {
+  const normalizedTraitsPositive = baseline.traitsPositive ?? [];
+  const normalizedTraitsNegative = baseline.traitsNegative ?? [];
+  const normalizedTraits =
+    baseline.traits.length > 0 ? baseline.traits : [...normalizedTraitsPositive, ...normalizedTraitsNegative];
+  const sourceFile = baseline.sourceFile ?? options?.sourceFile ?? DEFAULT_BASELINE_SOURCE_FILE;
+  const normalized: PlayerBaselineRecord = {
+    ...baseline,
+    traits: normalizedTraits,
+    traitsPositive: normalizedTraitsPositive,
+    traitsNegative: normalizedTraitsNegative,
+    sourceFile,
+    baselineVersion: PLAYER_BASELINE_VERSION,
+    checksumAlgorithm: PLAYER_BASELINE_CHECKSUM_ALGORITHM,
+    createdAt: baseline.createdAt ?? options?.createdAt ?? new Date().toISOString(),
+    importedAt: baseline.importedAt ?? options?.importedAt ?? baseline.createdAt ?? options?.createdAt ?? new Date().toISOString(),
+  };
+  const checksum = calculatePlayerBaselineChecksum(normalized);
+  return {
+    ...normalized,
+    checksum,
+    sourceHash: normalized.sourceHash ?? stableHash({ sourceFile, checksum }),
+  };
 }
 
 export function createPlayerBaselineFromPlayer(
@@ -37,10 +200,12 @@ export function createPlayerBaselineFromPlayer(
   options?: {
     source?: PlayerBaselineRecord["source"];
     createdAt?: string;
+    importedAt?: string;
+    sourceFile?: string | null;
     reconstructionWarning?: PlayerBaselineRecord["reconstructionWarning"];
   },
 ): PlayerBaselineRecord {
-  return {
+  return normalizePlayerBaselineRecord({
     playerId: player.id,
     name: player.name,
     race: player.race,
@@ -58,8 +223,10 @@ export function createPlayerBaselineFromPlayer(
     source: options?.source ?? "seed",
     baselineVersion: PLAYER_BASELINE_VERSION,
     createdAt: options?.createdAt ?? new Date().toISOString(),
+    importedAt: options?.importedAt ?? options?.createdAt ?? new Date().toISOString(),
+    sourceFile: options?.sourceFile ?? DEFAULT_BASELINE_SOURCE_FILE,
     ...(options?.reconstructionWarning ? { reconstructionWarning: options.reconstructionWarning } : {}),
-  };
+  });
 }
 
 export function createPlayerBaselinesForPlayers(
@@ -67,12 +234,16 @@ export function createPlayerBaselinesForPlayers(
   options?: {
     source?: PlayerBaselineRecord["source"];
     createdAt?: string;
+    importedAt?: string;
+    sourceFile?: string | null;
   },
 ) {
   return players.map((player) =>
     createPlayerBaselineFromPlayer(player, {
       source: options?.source ?? "seed",
       createdAt: options?.createdAt,
+      importedAt: options?.importedAt,
+      sourceFile: options?.sourceFile,
     }),
   );
 }
@@ -91,9 +262,10 @@ export function ensurePlayerBaselines(
     const existing = existingByPlayerId.get(player.id);
     const sourcePlayer = sourceByPlayerId.get(player.id);
     if (existing) {
+      const normalizedExisting = normalizePlayerBaselineRecord(existing, { createdAt: options?.createdAt });
       if (sourcePlayer) {
         const sourceAttributes = buildBaselineAttributes(sourcePlayer);
-        const mergedAttributes = { ...existing.attributes };
+        const mergedAttributes = { ...normalizedExisting.attributes };
         let backfilled = false;
         for (const key of ATTRIBUTE_KEYS) {
           if (mergedAttributes[key] == null && typeof sourceAttributes[key] === "number") {
@@ -103,20 +275,20 @@ export function ensurePlayerBaselines(
         }
         if (backfilled) {
           warnings.push(`baseline_attribute_backfilled:${player.id}`);
-          return {
-            ...existing,
+          return normalizePlayerBaselineRecord({
+            ...normalizedExisting,
             attributes: mergedAttributes,
-            baselineVersion: existing.baselineVersion || PLAYER_BASELINE_VERSION,
-          };
+          });
         }
       }
-      return existing;
+      return normalizedExisting;
     }
 
     if (sourcePlayer) {
       return createPlayerBaselineFromPlayer(sourcePlayer, {
         source: "seed",
         createdAt: options?.createdAt,
+        sourceFile: DEFAULT_BASELINE_SOURCE_FILE,
       });
     }
 
@@ -137,26 +309,82 @@ export function ensurePlayerBaselines(
   };
 }
 
+export function guardPlayerBaselineWrite(input: {
+  previous?: PlayerBaselineRecord[] | null;
+  next?: PlayerBaselineRecord[] | null;
+  attemptedSource: string;
+  timestamp?: string;
+}) {
+  const timestamp = input.timestamp ?? new Date().toISOString();
+  const previousByPlayerId = new Map(
+    (input.previous ?? []).map((baseline) => {
+      const normalized = normalizePlayerBaselineRecord(baseline);
+      return [normalized.playerId, normalized] as const;
+    }),
+  );
+  const events: PlayerBaselineWriteGuardEvent[] = [];
+  const guarded = (input.next ?? []).map((baseline) => {
+    const normalizedNext = normalizePlayerBaselineRecord(baseline);
+    const previous = previousByPlayerId.get(normalizedNext.playerId);
+    if (!previous) {
+      return normalizedNext;
+    }
+
+    const previousChecksum = previous.checksum ?? calculatePlayerBaselineChecksum(previous);
+    const attemptedChecksum = normalizedNext.checksum ?? calculatePlayerBaselineChecksum(normalizedNext);
+    if (previousChecksum === attemptedChecksum) {
+      return {
+        ...previous,
+        baselineVersion: normalizedNext.baselineVersion || previous.baselineVersion,
+        checksum: previousChecksum,
+      };
+    }
+
+    events.push({
+      eventId: `baseline-write-blocked-${normalizedNext.playerId}-${timestamp.replace(/\W+/g, "-")}`,
+      playerId: normalizedNext.playerId,
+      reason: "player_baseline_write_blocked",
+      attemptedSource: input.attemptedSource,
+      previousChecksum,
+      attemptedChecksum,
+      timestamp,
+    });
+    return previous;
+  });
+
+  for (const previous of previousByPlayerId.values()) {
+    if (!guarded.some((baseline) => baseline.playerId === previous.playerId)) {
+      guarded.push(previous);
+    }
+  }
+
+  return {
+    baselines: guarded,
+    events,
+  };
+}
+
 function applyBaselineToPlayer(player: Player, baseline: PlayerBaselineRecord): Player {
+  const normalizedBaseline = normalizePlayerBaselineRecord(baseline);
   return {
     ...player,
-    name: baseline.name,
-    race: baseline.race,
-    className: baseline.className,
-    subclasses: [...baseline.subclasses],
-    traitsPositive: [...(baseline.traitsPositive ?? baseline.traits)],
-    traitsNegative: [...(baseline.traitsNegative ?? [])],
+    name: normalizedBaseline.name,
+    race: normalizedBaseline.race,
+    className: normalizedBaseline.className,
+    subclasses: [...normalizedBaseline.subclasses],
+    traitsPositive: [...(normalizedBaseline.traitsPositive ?? normalizedBaseline.traits)],
+    traitsNegative: [...(normalizedBaseline.traitsNegative ?? [])],
     attributeSheetStats: {
       ...(player.attributeSheetStats ?? {}),
-      ...baseline.attributes,
+      ...normalizedBaseline.attributes,
     },
-    marketValue: baseline.marketValue ?? player.marketValue,
-    salaryDemand: baseline.salary ?? player.salaryDemand,
-    bracketLabel: baseline.bracket,
-    disciplineRatings: { ...baseline.disciplineRatings },
+    marketValue: normalizedBaseline.marketValue ?? player.marketValue,
+    salaryDemand: normalizedBaseline.salary ?? player.salaryDemand,
+    bracketLabel: normalizedBaseline.bracket,
+    disciplineRatings: { ...normalizedBaseline.disciplineRatings },
     previousDisciplineRatings: undefined,
     lastSeasonDisciplineValues: undefined,
-    currentDisciplineValues: undefined,
+    currentDisciplineValues: { ...normalizedBaseline.disciplineRatings },
     disciplineDelta: undefined,
     economyAfterUpgradePreview: null,
     currentXP: 0,
@@ -216,7 +444,10 @@ export function createNewGameFromPlayerBaseline(input: {
 }
 
 export function buildPlayerBaselineAudit(gameState: GameState) {
-  const baselineByPlayerId = new Map((gameState.playerBaselines ?? []).map((baseline) => [baseline.playerId, baseline]));
+  const baselineByPlayerId = new Map((gameState.playerBaselines ?? []).map((baseline) => {
+    const normalized = normalizePlayerBaselineRecord(baseline);
+    return [normalized.playerId, normalized] as const;
+  }));
   const missing = gameState.players.filter((player) => !baselineByPlayerId.has(player.id));
   const deltaRows = gameState.players.flatMap((player) => {
     const baseline = baselineByPlayerId.get(player.id);
@@ -239,7 +470,24 @@ export function buildPlayerBaselineAudit(gameState: GameState) {
     }).filter((row) => row.delta != null && row.delta !== 0);
   });
   const reconstructed = (gameState.playerBaselines ?? []).filter((baseline) => baseline.reconstructionWarning);
-  const versions = Array.from(new Set((gameState.playerBaselines ?? []).map((baseline) => baseline.baselineVersion)));
+  const normalizedBaselines = (gameState.playerBaselines ?? []).map((baseline) => normalizePlayerBaselineRecord(baseline));
+  const versions = Array.from(new Set(normalizedBaselines.map((baseline) => baseline.baselineVersion)));
+  const invalidChecksumRows = normalizedBaselines.filter(
+    (baseline) => baseline.checksum !== calculatePlayerBaselineChecksum(baseline),
+  );
+  const checksumRows = normalizedBaselines.map((baseline) => ({
+    playerId: baseline.playerId,
+    playerName: baseline.name,
+    baselineVersion: baseline.baselineVersion,
+    source: baseline.source,
+    sourceFile: baseline.sourceFile ?? null,
+    sourceHash: baseline.sourceHash ?? null,
+    checksum: baseline.checksum ?? null,
+    checksumValid: baseline.checksum === calculatePlayerBaselineChecksum(baseline),
+    importedAt: baseline.importedAt ?? null,
+    createdAt: baseline.createdAt,
+    reconstructionWarning: baseline.reconstructionWarning ?? null,
+  }));
 
   return {
     summary: {
@@ -250,10 +498,14 @@ export function buildPlayerBaselineAudit(gameState: GameState) {
       deltaRowCount: deltaRows.length,
       reconstructedBaselineCount: reconstructed.length,
       baselineVersions: versions,
+      invalidChecksumCount: invalidChecksumRows.length,
+      writeGuardEventCount: gameState.baselineWriteGuardEvents?.length ?? 0,
     },
     missing,
     deltaRows,
+    checksumRows,
     reconstructed,
+    writeGuardEvents: gameState.baselineWriteGuardEvents ?? [],
   };
 }
 

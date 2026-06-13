@@ -22,6 +22,7 @@ import type { LegacyResolvePreviewOptions } from "@/lib/lineups/legacy-lineup-ty
 import { createPersistenceService } from "@/lib/persistence/persistence-service";
 import type { PersistenceService } from "@/lib/persistence/types";
 import { db } from "@/src/server/db";
+import { applyFatigueAndInjuryAfterMatchday } from "@/lib/fatigue/fatigue-injury-service";
 
 type DbClient = typeof db;
 
@@ -614,7 +615,16 @@ export class LegacyMatchdayResultApplyService {
       },
     };
 
-    this.persistence.saveSingleplayerState(save.saveId, nextGameState);
+    const injuryResult = applyFatigueAndInjuryAfterMatchday({
+      gameState: nextGameState,
+      saveId: params.saveId,
+      seasonId: params.seasonId,
+      matchdayId: params.matchdayId,
+      matchdayResultId,
+      timestamp: now,
+    });
+
+    this.persistence.saveSingleplayerState(save.saveId, injuryResult.gameState);
 
     return {
       ok: true,
@@ -629,7 +639,7 @@ export class LegacyMatchdayResultApplyService {
       resultsWritten: counts.disciplineResults,
       playerPerformancesWritten: counts.playerPerformances,
       highlightsWritten: counts.highlights,
-      warningsCount: prepared.writePayload.matchdayResultPayload.warningsCount,
+      warningsCount: prepared.writePayload.matchdayResultPayload.warningsCount + injuryResult.injuryEvents.filter((event) => event.result === "injured").length,
       replacedExisting: Boolean(existingResult),
       counts,
       dryRunSummary,

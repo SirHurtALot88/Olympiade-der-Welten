@@ -6,6 +6,7 @@ import {
   type SeasonEndXpSpendPlannedUpgradeInput,
 } from "@/lib/progression/season-end-xp-apply-service";
 import { createPersistenceService } from "@/lib/persistence/persistence-service";
+import { authorizeServerRoomWrite } from "@/lib/room/server-authoritative-write-guard";
 
 type SeasonEndXpSpendBody = {
   saveId?: string;
@@ -14,6 +15,12 @@ type SeasonEndXpSpendBody = {
   dryRun?: boolean;
   confirmToken?: string | null;
   source?: "sqlite" | "prisma";
+  roomCode?: string | null;
+  participantId?: string | null;
+  seatToken?: string | null;
+  userId?: string | null;
+  activeManagerTeamId?: string | null;
+  controlMode?: "human" | "ai" | "passive" | "manual" | null;
 };
 
 export async function POST(request: Request) {
@@ -41,8 +48,37 @@ export async function POST(request: Request) {
       return NextResponse.json({ success: false, error: "save_not_found", summary: null }, { status: 404 });
     }
 
+    const preview = previewSeasonEndXpSpend(save, teamId, plannedUpgrades);
+    const writeAuth = authorizeServerRoomWrite({
+      roomCode: body.roomCode,
+      participantId: body.participantId,
+      seatToken: body.seatToken,
+      userId: body.userId,
+      saveId,
+      teamId,
+      action: "xp_spend",
+      source,
+      dryRun,
+      confirmToken: body.confirmToken,
+      expectedConfirmToken: preview.confirmToken,
+      activeManagerTeamId: body.activeManagerTeamId,
+      controlMode: body.controlMode,
+    });
+    if (!writeAuth.allowed) {
+      return NextResponse.json(
+        {
+          success: false,
+          error: writeAuth.reason,
+          summary: null,
+          warnings: writeAuth.warnings,
+          blockingReasons: [writeAuth.reason],
+        },
+        { status: writeAuth.status },
+      );
+    }
+
     const summary = dryRun
-      ? previewSeasonEndXpSpend(save, teamId, plannedUpgrades)
+      ? preview
       : applySeasonEndXpSpend(save, teamId, plannedUpgrades, body.confirmToken ?? null, persistence);
     const success = "applied" in summary ? summary.applied : summary.ok;
 
@@ -50,7 +86,7 @@ export async function POST(request: Request) {
       {
         success,
         summary,
-        warnings: summary.warnings,
+        warnings: [...writeAuth.warnings, ...summary.warnings],
         blockingReasons: summary.blockingReasons,
       },
       { status: success || dryRun ? 200 : 409 },

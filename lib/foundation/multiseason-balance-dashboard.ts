@@ -498,6 +498,9 @@ function buildWarnings(input: {
   }
   const buySellByPlayer = new Map<string, Set<"buy" | "sell">>();
   for (const entry of aiMarketTransfers) {
+    if (entry.transferType !== "buy" && entry.transferType !== "sell") {
+      continue;
+    }
     buySellByPlayer.set(entry.playerId, new Set([...(buySellByPlayer.get(entry.playerId) ?? []), entry.transferType]));
   }
   for (const [playerId, types] of buySellByPlayer.entries()) {

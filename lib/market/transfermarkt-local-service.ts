@@ -6,6 +6,8 @@ import { resolvePlayerEconomyContract } from "@/lib/foundation/player-economy-co
 import { buildPlayerRatingContractMap } from "@/lib/foundation/player-rating-contract";
 import { getTeamStrategyProfile } from "@/lib/foundation/team-strategy-profiles";
 import { buildPlayerProgressionForecast } from "@/lib/training/player-progression-forecast";
+import { getFacilityLevel, getTeamFacilityState } from "@/lib/facilities/facility-effects";
+import { buildPlayerScoutPotentialFromGameState } from "@/lib/progression/player-potential-service";
 import { createPersistenceService } from "@/lib/persistence/persistence-service";
 import { calculateTransfermarktFit, getTransfermarktBracket, hasMercenaryTrait } from "@/lib/market/transfermarkt-fit";
 import { buildContractNegotiationPreview } from "@/lib/market/contract-negotiation-preview";
@@ -141,6 +143,13 @@ const localFreeAgentBaseCache = new Map<string, TransfermarktFreeAgentItem[]>();
 const getPlayerMarketValue = getImportedPlayerDisplayMarketValue;
 const getPlayerSalary = getImportedPlayerDisplaySalary;
 
+function getPlayerPotentialCacheSignature(gameState: GameState) {
+  return (gameState.playerPotential ?? [])
+    .map((entry) => `${entry.playerId}:${entry.hiddenPotentialScore ?? "-"}:${entry.confidence ?? 0}:${entry.source}`)
+    .sort()
+    .join("|");
+}
+
 function normalizeTransfermarktTier(value: string | null | undefined): TransfermarktRatingTier | null {
   if (!value) {
     return null;
@@ -243,6 +252,7 @@ export function listLocalTransfermarktFreeAgents(input: TransfermarktReadParams 
     gameState.players.length,
     gameState.rosters.length,
     gameState.transferHistory.length,
+    getPlayerPotentialCacheSignature(gameState),
   ].join(":");
 
   let baseItems = localFreeAgentBaseCache.get(cacheKey) ?? null;
@@ -251,22 +261,28 @@ export function listLocalTransfermarktFreeAgents(input: TransfermarktReadParams 
     baseItems = gameState.players
       .filter((player) => !rosterPlayerIds.has(player.id))
       .map<TransfermarktFreeAgentItem>((player) => {
-      const marketValue = getPlayerMarketValue(player);
-      const salary = getPlayerSalary(player);
-      const mercenary = hasMercenaryTrait(player);
-      const playerRating = playerRatingsById.get(player.id) ?? null;
-      const progressionForecast = buildPlayerProgressionForecast({
-        gameState,
-        player,
-        playerRating,
-        seasonPerformance: null,
-        trainingModeByPlayerId: player.trainingMode ? { [player.id]: player.trainingMode } : null,
-        currentXP: player.currentXP ?? 0,
-        spentXP: player.spentXP ?? 0,
-        lifetimeXP: player.lifetimeXP ?? null,
-      });
+        const marketValue = getPlayerMarketValue(player);
+        const salary = getPlayerSalary(player);
+        const mercenary = hasMercenaryTrait(player);
+        const playerRating = playerRatingsById.get(player.id) ?? null;
+        const progressionForecast = buildPlayerProgressionForecast({
+          gameState,
+          player,
+          playerRating,
+          seasonPerformance: null,
+          trainingModeByPlayerId: player.trainingMode ? { [player.id]: player.trainingMode } : null,
+          currentXP: player.currentXP ?? 0,
+          spentXP: player.spentXP ?? 0,
+          lifetimeXP: player.lifetimeXP ?? null,
+        });
+        const scoutPotential = buildPlayerScoutPotentialFromGameState({
+          gameState,
+          player,
+          saveId: save.saveId,
+          scoutingLevel: 0,
+        });
 
-      return {
+        return {
         playerId: player.id,
         name: player.name,
         className: player.className,
@@ -320,7 +336,16 @@ export function listLocalTransfermarktFreeAgents(input: TransfermarktReadParams 
         tormentRating: normalizeTransfermarktTier(player.attributeSheetRatings?.tormentRating),
         topDisciplineScores: getTopDisciplineScores(gameState, player),
         currentAbilityTier: progressionForecast.currentAbilityTier,
-        potentialTier: progressionForecast.potentialTier,
+        potentialTier:
+          scoutPotential.scoutRating == null
+            ? progressionForecast.potentialTier
+            : getTransfermarktTierFromPoints(scoutPotential.scoutRating),
+        potentialBand: scoutPotential.band,
+        potentialRange: scoutPotential.potentialRange,
+        scoutingConfidence: scoutPotential.confidence,
+        scoutingSource: scoutPotential.source,
+        scoutingWarnings: scoutPotential.warnings,
+        marketValuePotentialPremiumPct: scoutPotential.marketValuePotentialPremiumPct,
         trainingFormTier: progressionForecast.trainingFormTier,
         developmentTrend: progressionForecast.xpTrend,
         regressionRisk: progressionForecast.regressionRisk,
@@ -352,6 +377,9 @@ export function listLocalTransfermarktFreeAgents(input: TransfermarktReadParams 
 
   const playerById = new Map(gameState.players.map((player) => [player.id, player]));
   const selectedRosterPlayers = selectedTeamRoster.map((item) => item.player);
+  const selectedScoutingLevel = selectedTeam
+    ? getFacilityLevel(getTeamFacilityState(gameState, selectedTeam.teamId), "scouting_office")
+    : 0;
   const items = baseItems.map<TransfermarktFreeAgentItem>((baseItem) => {
     const player = playerById.get(baseItem.playerId) ?? null;
     const fitBreakdown =
@@ -364,9 +392,28 @@ export function listLocalTransfermarktFreeAgents(input: TransfermarktReadParams 
             fitAlignment: 0,
             teamFit: selectedTeam ? 0 : null,
           };
+    const scoutPotential = player
+      ? buildPlayerScoutPotentialFromGameState({
+          gameState,
+          player,
+          saveId: save.saveId,
+          scoutingLevel: selectedScoutingLevel,
+        })
+      : null;
 
     return {
       ...baseItem,
+      potentialTier:
+        scoutPotential?.scoutRating == null
+          ? baseItem.potentialTier
+          : getTransfermarktTierFromPoints(scoutPotential.scoutRating),
+      potentialBand: scoutPotential?.band ?? baseItem.potentialBand,
+      potentialRange: scoutPotential?.potentialRange ?? baseItem.potentialRange,
+      scoutingConfidence: scoutPotential?.confidence ?? baseItem.scoutingConfidence,
+      scoutingSource: scoutPotential?.source ?? baseItem.scoutingSource,
+      scoutingWarnings: scoutPotential?.warnings ?? baseItem.scoutingWarnings,
+      marketValuePotentialPremiumPct:
+        scoutPotential?.marketValuePotentialPremiumPct ?? baseItem.marketValuePotentialPremiumPct,
       teamContextAvailable: Boolean(selectedTeam),
       teamCash: selectedTeam?.cash ?? null,
       teamSalary: selectedTeam ? teamSalary : null,

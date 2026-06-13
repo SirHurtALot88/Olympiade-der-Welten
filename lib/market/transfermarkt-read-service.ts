@@ -19,7 +19,9 @@ import { LegacyLineupContextLoader } from "@/lib/lineups/legacy-lineup-context-l
 import { LegacyLineupRepository } from "@/lib/lineups/legacy-lineup-repository";
 import { buildPlayerRatingContractRows } from "@/lib/foundation/player-rating-contract";
 import { buildTransfermarktPoolAudit, type TransfermarktPoolAudit } from "@/lib/market/transfermarkt-pool-audit";
+import { buildPlayerScoutPotential } from "@/lib/progression/player-potential-service";
 import type { Player } from "@/lib/data/olyDataTypes";
+import type { PlayerPotentialBand, PlayerPotentialSource } from "@/lib/data/olyDataTypes";
 import type { PlayerDevelopmentTrend, PlayerProgressionRatingTier, PlayerRegressionRisk, PlayerTrainingFormTier } from "@/lib/training/training-plan-types";
 import { db } from "@/src/server/db";
 
@@ -87,6 +89,12 @@ export type TransfermarktFreeAgentItem = {
   topDisciplineScores: TransfermarktDisciplineScore[];
   currentAbilityTier: PlayerProgressionRatingTier | null;
   potentialTier: PlayerProgressionRatingTier | null;
+  potentialBand: PlayerPotentialBand;
+  potentialRange: { min: number; max: number } | null;
+  scoutingConfidence: number | null;
+  scoutingSource: PlayerPotentialSource;
+  scoutingWarnings: string[];
+  marketValuePotentialPremiumPct: number | null;
   trainingFormTier: PlayerTrainingFormTier | null;
   developmentTrend: PlayerDevelopmentTrend | null;
   regressionRisk: PlayerRegressionRisk | null;
@@ -591,6 +599,7 @@ export async function listTransfermarktFreeAgents(
     const negativeTraitSlots = getArraySlots(traitsNegative);
     const mercenary = hasMercenaryTrait({ traitsPositive, traitsNegative });
     const playerRating = playerRatingById.get(player.id) ?? null;
+    const scoutPotential = buildPlayerScoutPotential({ player: { potential: player.attributes?.rating ?? 0 }, scoutingLevel: 0 });
     const fitBreakdown = teamContext
         ? calculateTransfermarktFit(
             {
@@ -677,7 +686,13 @@ export async function listTransfermarktFreeAgents(
           ppsLastSeason: null,
         })),
       currentAbilityTier: null,
-      potentialTier: null,
+      potentialTier: scoutPotential.scoutRating == null ? null : getTransfermarktTierFromPoints(scoutPotential.scoutRating),
+      potentialBand: scoutPotential.band,
+      potentialRange: scoutPotential.potentialRange,
+      scoutingConfidence: scoutPotential.confidence,
+      scoutingSource: scoutPotential.source,
+      scoutingWarnings: scoutPotential.warnings,
+      marketValuePotentialPremiumPct: scoutPotential.marketValuePotentialPremiumPct,
       trainingFormTier: null,
       developmentTrend: null,
       regressionRisk: null,

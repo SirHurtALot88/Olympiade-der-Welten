@@ -2,6 +2,7 @@ import type { GamePhase, GameState, ScenarioMeta, ScenarioType } from "@/lib/dat
 
 const scenarioLabels: Record<ScenarioType, string> = {
   fresh_start: "Fresh Start",
+  new_game: "New Game",
   ai_redraft_test: "AI Redraft Test",
   season1_simulation: "Season 1 Simulation",
   season1_completed: "Season 1 Completed",

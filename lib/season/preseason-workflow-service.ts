@@ -1,5 +1,6 @@
 import { createHash, randomUUID } from "node:crypto";
 
+import { previewSeasonEndContracts } from "@/lib/contracts/contract-renewal-service";
 import { buildGeneratedFormCardRecordsForSeason } from "@/lib/lineups/legacy-lineup-modifiers";
 import type { Fixture, GameState, PreSeasonWorkflowLogRecord, SeasonState, StandingRecord } from "@/lib/data/olyDataTypes";
 import { previewFacilitySeasonEndFinance } from "@/lib/facilities/facility-season-end-service";
@@ -467,6 +468,7 @@ export async function buildPreSeasonWorkflowPreview(
     forecastsByPlayerId,
     upgradeRequests: save.gameState.rosters.map((entry) => ({ playerId: entry.playerId, attribute: "power" })),
   });
+  const contractPreview = previewSeasonEndContracts(save);
   const marketPreviewWarning = "market_candidate_scan_deferred_use_transfermarkt_tab_or_ai_market_apply_service";
   const nextSeasonConfirmToken = buildConfirmToken({
     saveId: save.saveId,
@@ -559,12 +561,20 @@ export async function buildPreSeasonWorkflowPreview(
     {
       stepId: "contract_renewal",
       label: "Verlängern",
-      status: "preview_only",
-      productive: false,
-      summary: { renewalServiceReady: false, previewOnly: true },
-      warnings: ["contract_renewal_step_visible_not_implemented_yet"],
-      blockingReasons: [],
-      confirmToken: null,
+      status: contractPreview.blockingReasons.length > 0 ? "blocked" : contractPreview.expiringCount > 0 ? "warning" : "ready",
+      productive: true,
+      summary: {
+        renewalServiceReady: true,
+        expiringContracts: contractPreview.expiringCount,
+        outOfContractAfterTick: contractPreview.outOfContractAfterTickCount,
+        manualDecisionsRequired: contractPreview.manualDecisionCount,
+        aiRenewalCandidates: contractPreview.aiRenewalCandidates,
+        aiReleaseCandidates: contractPreview.aiReleaseCandidates,
+        contractEventsExisting: save.gameState.seasonState.contractEvents?.length ?? 0,
+      },
+      warnings: contractPreview.warnings,
+      blockingReasons: contractPreview.blockingReasons,
+      confirmToken: contractPreview.confirmToken,
     },
     {
       stepId: "transfer_buy_phase",

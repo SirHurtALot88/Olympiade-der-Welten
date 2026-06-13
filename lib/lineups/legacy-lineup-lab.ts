@@ -19,6 +19,11 @@ export type LegacyLineupLabPlayerOption = {
   name: string;
   disciplineScores: Record<string, number | null>;
   fatigueCount: number | null;
+  injuryStatus: LegacyRosterPlayerRef["injuryStatus"];
+  injuryUntilMatchday: string | null;
+  injuryRiskPercent: number | null;
+  injuryRiskBand: string | null;
+  injuryRiskLabel: string | null;
 };
 
 export function buildLegacyLineupLabSlots(context: LegacyLineupLoadedContext): LegacyLineupLabSlot[] {
@@ -76,6 +81,11 @@ export function buildLegacyLineupLabPlayerOptions(context: LegacyLineupLoadedCon
         ]),
       ),
       fatigueCount: context.fatigueByPlayerId?.[activePlayer.playerId]?.count ?? null,
+      injuryStatus: player?.injuryStatus ?? "healthy",
+      injuryUntilMatchday: player?.injuryUntilMatchday ?? null,
+      injuryRiskPercent: player?.injuryRiskPercent ?? null,
+      injuryRiskBand: player?.injuryRiskBand ?? null,
+      injuryRiskLabel: player?.injuryRiskLabel ?? null,
     };
   });
 }
