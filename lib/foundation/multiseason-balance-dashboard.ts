@@ -134,7 +134,8 @@ function avg(values: number[]) {
 }
 
 function sum(values: Array<number | null | undefined>) {
-  return round(values.reduce((total, value) => total + (typeof value === "number" && Number.isFinite(value) ? value : 0), 0), 2);
+  const total = values.reduce<number>((acc, value) => acc + (typeof value === "number" && Number.isFinite(value) ? value : 0), 0);
+  return round(total, 2);
 }
 
 function isNumber(value: unknown): value is number {
@@ -153,7 +154,7 @@ function getTeamName(gameState: GameState, teamId: string) {
 
 function buildCurrentSeasonSnapshot(gameState: GameState): SeasonSnapshotRecord | null {
   const standings = Object.entries(gameState.seasonState.standings ?? {})
-    .map(([teamId, standing]) => {
+    .map<SeasonSnapshotTeamRecord | null>(([teamId, standing]) => {
       const team = gameState.teams.find((entry) => entry.teamId === teamId);
       if (!team) return null;
       const roster = gameState.rosters.filter((entry) => entry.teamId === teamId);
@@ -178,7 +179,7 @@ function buildCurrentSeasonSnapshot(gameState: GameState): SeasonSnapshotRecord 
         transferBuyCount: 0,
         transferSellCount: 0,
         transferNet: 0,
-      } satisfies SeasonSnapshotTeamRecord;
+      };
     })
     .filter((entry): entry is SeasonSnapshotTeamRecord => Boolean(entry));
 

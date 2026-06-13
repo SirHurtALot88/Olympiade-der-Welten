@@ -132,6 +132,7 @@ function createStaticPersistence(save: PersistedSaveGame): PersistenceService {
     createSave: () => save,
     createFreshSeasonOneSave: () => save,
     cloneSave: () => save,
+    createScenarioSnapshot: () => save,
     activateSave: () => save,
     listSaves: () => [],
   };

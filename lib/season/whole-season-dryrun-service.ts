@@ -212,6 +212,9 @@ function createInMemoryPersistenceService(initialSave: PersistedSaveGame): Persi
     cloneSave() {
       throw new Error("Whole season dryrun does not clone saves through persistence.");
     },
+    createScenarioSnapshot() {
+      throw new Error("Whole season dryrun does not create scenario snapshots through persistence.");
+    },
     activateSave(saveId) {
       return currentSave.saveId === saveId ? cloneCurrentSave() : null;
     },

@@ -187,25 +187,14 @@ async function main() {
   const projectDir = getProjectDir();
   process.chdir(projectDir);
   await removeStaleTypeScriptBuildInfo(projectDir);
-  await ensureServerBuildManifests(projectDir, { includeAppPaths: true });
-  const manifestKeepAlive = setInterval(() => {
-    void ensureServerBuildManifests(projectDir, { includeAppPaths: true }).catch(() => undefined);
-    void ensureClientStaticManifests(projectDir).catch(() => undefined);
-  }, 50);
-  let traceKeepAlive: NodeJS.Timeout | null = null;
-  const traceKeepAliveDelay = setTimeout(() => {
-    traceKeepAlive = setInterval(() => {
-      void ensureKnownAppTraceFallbacks(projectDir).catch(() => undefined);
-    }, 50);
-  }, 5000);
 
   const nextBin = path.join(projectDir, "node_modules", "next", "dist", "bin", "next");
-  const child = spawn(process.execPath, [nextBin, "build", "--webpack", "--experimental-build-mode", "compile"], {
+  const child = spawn(process.execPath, [nextBin, "build", "--webpack"], {
     cwd: projectDir,
     stdio: "inherit",
     env: {
       ...process.env,
-      NEXT_PRIVATE_BUILD_WORKER: process.env.NEXT_PRIVATE_BUILD_WORKER ?? "1",
+      NEXT_PRIVATE_BUILD_WORKER: "0",
     },
   });
 
@@ -213,11 +202,6 @@ async function main() {
     child.once("error", reject);
     child.once("exit", (code) => resolve(code ?? 1));
   });
-  clearInterval(manifestKeepAlive);
-  clearTimeout(traceKeepAliveDelay);
-  if (traceKeepAlive) {
-    clearInterval(traceKeepAlive);
-  }
 
   if (exitCode === 0) {
     await ensureClientStaticManifests(projectDir);

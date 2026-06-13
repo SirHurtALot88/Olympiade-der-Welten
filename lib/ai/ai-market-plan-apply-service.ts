@@ -17,6 +17,7 @@ import type {
   TeamControlMode,
   TeamStrategyProfile,
 } from "@/lib/data/olyDataTypes";
+import { getTeamControlSettings } from "@/lib/foundation/team-control-settings";
 import { getTeamStrategyProfile } from "@/lib/foundation/team-strategy-profiles";
 import { buildTransfermarktSaleFactorBreakdown } from "@/lib/market/transfermarkt-sale-factor";
 import {
@@ -631,7 +632,7 @@ function getTeamStateSnapshot(gameState: GameState, teamId: string) {
 
 function buildPreflightTeamResult(gameState: GameState, team: GameState["teams"][number]): AiMarketPlanApplyTeamResult {
   const snapshot = getTeamStateSnapshot(gameState, team.teamId);
-  const controlMode = ((team.controlMode ?? "ai") as TeamControlMode);
+  const controlMode = getTeamControlSettings(gameState, team.teamId)?.controlMode ?? (team.humanControlled ? "manual" : "ai");
   return {
     teamId: team.teamId,
     teamCode: team.shortCode ?? team.teamId,
@@ -685,7 +686,7 @@ export async function applyAiMarketPlanLocally(input: AiMarketPlanApplyParams): 
   const preflightGameState = preflightSave.gameState;
   const aiTeamIds = new Set(
     preflightGameState.teams
-      .filter((team) => (team.controlMode ?? "ai") === "ai")
+      .filter((team) => getTeamControlSettings(preflightGameState, team.teamId)?.controlMode === "ai")
       .map((team) => team.teamId),
   );
   const preflightRosterCounts = new Map<string, number>();
@@ -976,7 +977,7 @@ export async function applyAiMarketPlanLocally(input: AiMarketPlanApplyParams): 
       nextResult.result = "hold";
       nextResult.plannedBuyDetails = [];
       nextResult.plannedBuys = 0;
-      nextResult.projectedCash = effectiveSellPlan.cashAfterSell ?? team.currentState.cash;
+      nextResult.projectedCash = effectiveProjectedState.cashAfterPlan ?? team.currentState.cash;
       nextResult.projectedRoster = effectiveSellPlan.rosterAfterSell ?? team.currentState.rosterCount;
       nextResult.cashAfter = nextResult.projectedCash;
       nextResult.rosterAfter = nextResult.projectedRoster;

@@ -349,6 +349,7 @@ export default function LegacyResolveLabClient({
       fatigue: null,
       form: null,
       potential: player.potential,
+      scoutPotential: null,
       attributeStats: [],
       axisCards: [
         { id: "pow", label: "POW", tone: "power", value: player.pow, valueRank: null, seasonPoints: null, seasonPointsRank: null },
@@ -370,8 +371,10 @@ export default function LegacyResolveLabClient({
         rank: entry.value == null ? null : index + 1,
         playerCount: null,
       })),
+      boardTrust: null,
       progressionForecast: null,
       progressionEvents: [],
+      progressionEconomyPreview: null,
       seasonPerformance: null,
       transferContext: {
         roleTag: null,

@@ -45,6 +45,7 @@ import {
   formatTransfermarktRatio,
   getConfirmedAxisHeatStyle,
   getConfirmedTierStyle,
+  type TransfermarktTier,
 } from "@/lib/market/transfermarkt-formatting-contract";
 import { LOCAL_TRANSFER_WINDOW_PHASE } from "@/lib/market/transfer-window-policy";
 import { getTransfermarktPortraitModel } from "@/lib/market/transfermarkt-lab";
@@ -2614,6 +2615,24 @@ function loadFoundationTablePreferences(): PersistedFoundationTablePreferences {
   }
 }
 
+function normalizeFoundationTablePreferenceEntry(
+  entry?: PersistedFoundationTablePreferenceEntry,
+): PersistedFoundationTablePreferenceEntry {
+  const normalized = normalizeGlobalTablePreferenceEntry(entry);
+  const activePreset =
+    normalized.activePreset === "retool_default" ||
+    normalized.activePreset === "compact" ||
+    normalized.activePreset === "finance" ||
+    normalized.activePreset === "performance" ||
+    normalized.activePreset === "custom"
+      ? normalized.activePreset
+      : null;
+  return {
+    ...normalized,
+    activePreset,
+  };
+}
+
 function getDefaultTableWidths(columns: FoundationTableColumn[]) {
   return getDefaultGlobalTableWidths(columns);
 }
@@ -2990,8 +3009,22 @@ function formatMarketRisk(value: string | null | undefined) {
   }
 }
 
+function normalizeMarketTier(value: string | null | undefined): TransfermarktTier | null {
+  const normalized = value === "99" ? "S+" : value;
+  return normalized === "S+" ||
+    normalized === "S" ||
+    normalized === "A" ||
+    normalized === "B" ||
+    normalized === "C" ||
+    normalized === "D" ||
+    normalized === "E" ||
+    normalized === "F"
+    ? normalized
+    : null;
+}
+
 function getMarketTierStyle(value: string | null | undefined) {
-  return getConfirmedTierStyle(value === "99" ? "S+" : value);
+  return getConfirmedTierStyle(normalizeMarketTier(value));
 }
 
 function formatFitDisplay(item: TransfermarktFreeAgentItem) {
@@ -4366,7 +4399,7 @@ export default function FoundationPageClient({ initialReadSource, initialSelecte
     Object.fromEntries(
       Object.entries(loadFoundationTablePreferences()).map(([tableId, entry]) => [
         tableId,
-        normalizeGlobalTablePreferenceEntry(entry),
+        normalizeFoundationTablePreferenceEntry(entry),
       ]),
     ),
   );
@@ -4929,6 +4962,8 @@ export default function FoundationPageClient({ initialReadSource, initialSelecte
       playerName: summary.player.name,
       preview: {
         expectedSalary: summary.expectedSalary ?? null,
+        baseExpectedSalary: summary.baseExpectedSalary ?? null,
+        demandMultiplier: summary.demandMultiplier ?? null,
         offeredSalary: summary.offeredSalary ?? null,
         offerRatio: summary.offerRatio ?? null,
         contractLength: summary.contractLength,
@@ -4943,6 +4978,7 @@ export default function FoundationPageClient({ initialReadSource, initialSelecte
         acceptChance: summary.acceptChance ?? null,
         counterChance: summary.counterChance ?? null,
         rejectChance: summary.rejectChance ?? null,
+        scoreBreakdown: summary.negotiationScoreBreakdown ?? [],
         reasons: summary.negotiationReasons ?? [],
         warnings: summary.negotiationWarnings ?? [],
         blockingReasons: summary.negotiationBlockingReasons ?? [],
@@ -4974,6 +5010,8 @@ export default function FoundationPageClient({ initialReadSource, initialSelecte
       playerName: summary.player.name,
       preview: {
         expectedSalary: summary.expectedSalary ?? null,
+        baseExpectedSalary: summary.baseExpectedSalary ?? null,
+        demandMultiplier: summary.demandMultiplier ?? null,
         offeredSalary: summary.offeredSalary ?? null,
         offerRatio: summary.offerRatio ?? null,
         contractLength: summary.contractLength,
@@ -4988,6 +5026,7 @@ export default function FoundationPageClient({ initialReadSource, initialSelecte
         acceptChance: summary.acceptChance ?? null,
         counterChance: summary.counterChance ?? null,
         rejectChance: summary.rejectChance ?? null,
+        scoreBreakdown: summary.negotiationScoreBreakdown ?? [],
         reasons: summary.negotiationReasons ?? [],
         warnings: [...(summary.negotiationWarnings ?? []), ...extraWarnings],
         blockingReasons: summary.negotiationBlockingReasons ?? [],
@@ -10502,7 +10541,7 @@ export default function FoundationPageClient({ initialReadSource, initialSelecte
         {
           id: "sell",
           label: "Spieler verkaufen",
-          status: selectedRoster.length > (selectedIdentity?.playerMax ?? 12) ? "Kader zu groß" : "optional",
+          status: selectedRoster.length > (selectedIdentity?.playerOpt ?? 12) ? "Kader zu groß" : "optional",
           targetView: "teams" as FoundationView,
           blocker: null,
         },
@@ -10541,7 +10580,7 @@ export default function FoundationPageClient({ initialReadSource, initialSelecte
       homeNextMatchdayStatus,
       homePlayerCards,
       selectedIdentity?.playerMin,
-      selectedIdentity?.playerMax,
+    selectedIdentity?.playerOpt,
       selectedRoster.length,
     ],
   );

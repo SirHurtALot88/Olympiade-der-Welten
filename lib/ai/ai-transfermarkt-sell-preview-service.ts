@@ -3,7 +3,7 @@ import type { GameState, Player, RosterEntry, SeasonSnapshotRecord, Team, TeamCo
 import { loadFoundationSnapshotFromPrisma } from "@/lib/db/read/foundation-read-repository";
 import { projectFoundationStateFromPrisma } from "@/lib/db/read/foundation-read-projection";
 import { resolvePlayerEconomyContract } from "@/lib/foundation/player-economy-contract";
-import { buildPlayerRatingContractMap } from "@/lib/foundation/player-rating-contract";
+import { buildPlayerRatingContractMap, type PlayerRatingContractRow } from "@/lib/foundation/player-rating-contract";
 import { getTeamControlSettings, withNormalizedTeamControlSettings } from "@/lib/foundation/team-control-settings";
 import { getTeamStrategyProfile, withNormalizedTeamStrategyProfiles } from "@/lib/foundation/team-strategy-profiles";
 import { normalizeTransfermarktToken } from "@/lib/market/transfermarkt-fit";
@@ -325,7 +325,7 @@ function buildExpectedSellValue(context: ResolvedPreviewContext, teamId: string,
 
 function buildCandidate(
   context: ResolvedPreviewContext,
-  playerRatingsById: Map<string, { ovrNormalized: number | null; mvs: number | null }>,
+  playerRatingsById: Map<string, PlayerRatingContractRow>,
   team: Team,
   roster: RosterEntry,
   player: Player,

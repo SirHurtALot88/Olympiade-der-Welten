@@ -340,7 +340,7 @@ async function main() {
   let facilityApplyResults: FacilitySeasonEndFinanceApplyResult[] = [];
   let marketAfterRewards: AiMarketPlanApplyResult | null = null;
   let marketApply: AiMarketPlanApplyResult | null = null;
-  let nextSeasonApply: Awaited<ReturnType<typeof applyPreSeasonNextSeasonSetup>> | null = null;
+  let nextSeasonApply: Awaited<ReturnType<typeof applyPreSeasonNextSeasonSetupLightweight>> | null = null;
   const blockers: string[] = [];
   const fixes: string[] = [];
   const cashAlreadyApplied = cashPreview.duplicateDetected || cashPreview.blockingReasons.includes("duplicate_apply_for_save_season_block");

@@ -110,7 +110,7 @@ async function main() {
   console.log("topFreeAgents:");
 
   for (const item of freeAgents.items) {
-    const topDisciplines = item.topDisciplineScores.map((entry) => `${entry.disciplineId}:${entry.score}`).join(", ");
+    const topDisciplines = item.topDisciplineScores.map((entry) => `${entry.disciplineId}:${entry.scoreTier ?? "—"}`).join(", ");
     console.log(
       [
         `- ${item.name}`,

@@ -17,7 +17,7 @@ export type GlobalTableId =
   | "balance-player"
   | "balance-gameplay";
 
-export type GlobalTableColumnGroup = "core" | "finance" | "attributes" | "history" | "expert";
+export type GlobalTableColumnGroup = "core" | "finance" | "attributes" | "history" | "expert" | "detail" | "fit";
 
 export type GlobalTableColumnConfig = {
   id: string;

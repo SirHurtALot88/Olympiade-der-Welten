@@ -60,6 +60,8 @@ export type ScenarioMeta = {
   activeSeasonId?: string;
   activeMatchday?: number;
   gamePhase?: string;
+  roomId?: string;
+  roomCode?: string;
 };
 
 export type StandingRecord = {
@@ -511,6 +513,8 @@ export type Team = {
   identityId: string;
   humanControlled: boolean;
   rosterLimit: number;
+  rosterMinTarget?: number | null;
+  rosterOptTarget?: number | null;
 };
 
 export type TeamControlMode = "manual" | "ai" | "passive";

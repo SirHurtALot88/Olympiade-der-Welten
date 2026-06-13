@@ -1204,6 +1204,7 @@ export function buildPlayerDrawerDataFromLegacyContext(input: {
     fatigue: catalogPlayer?.fatigue ?? rosterPlayer?.fatigue ?? null,
     form: catalogPlayer?.form ?? rosterPlayer?.form ?? null,
     potential: catalogPlayer?.potential ?? rosterPlayer?.potential ?? null,
+    scoutPotential: null,
     attributeStats: buildAttributeStats(catalogPlayer),
     axisCards,
     disciplineValues,

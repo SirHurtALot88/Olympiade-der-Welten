@@ -564,7 +564,7 @@ export async function buildAiMarketPlanPreview(params: AiMarketPlanPreviewParams
 
   return {
     readOnly: true,
-    source: buyPreview?.source ?? sellPreview?.source ?? previewParams.source,
+    source: buyPreview?.source ?? sellPreview?.source ?? previewParams.source ?? "sqlite",
     scope: buyPreview?.scope ?? sellPreview?.scope ?? {
       saveId: previewParams.saveId ?? "",
       seasonId: previewParams.seasonId ?? "",
