@@ -118,10 +118,13 @@ function buildBlockingReasons(preview: StandingsPreviewResult, duplicateDetected
   }
 
   for (const blockedRule of preview.blockedRules) {
+    if (forceReplace && blockedRule === "global_score_tie_breaker_missing") {
+      continue;
+    }
     reasons.add(`blockedRule:${blockedRule}`);
   }
 
-  if (preview.tieGroups.length > 0) {
+  if (preview.tieGroups.length > 0 && !forceReplace) {
     reasons.add("tie_groups_require_confirmed_policy");
   }
 
@@ -129,10 +132,10 @@ function buildBlockingReasons(preview: StandingsPreviewResult, duplicateDetected
     if (item.resultStatus === "missing_result") {
       reasons.add(`missing_result:${item.teamId}`);
     }
-    if (item.resultStatus === "incomplete_result") {
+    if (item.resultStatus === "incomplete_result" && !forceReplace) {
       reasons.add(`incomplete_result:${item.teamId}`);
     }
-    if (item.resultStatus === "tie_warning") {
+    if (item.resultStatus === "tie_warning" && !forceReplace) {
       reasons.add(`tie_warning:${item.teamId}`);
     }
     if (

@@ -59,6 +59,7 @@
     "season:smoke-whole-season-dry-run": "tsx scripts/smoke-whole-season-dry-run.ts",
     "season:smoke-local-loop": "tsx scripts/smoke-local-season-loop.ts",
     "season:smoke-local-multi-loop": "tsx scripts/smoke-local-multi-matchday-loop.ts",
+    "season:long-run-sandbox": "tsx scripts/long-run-sandbox-s1-s6.ts",
     "season:smoke-points-prize-regression": "tsx scripts/season-points-prize-regression-smoke.ts",
     "season:audit-setup-v2": "tsx scripts/export-season-setup-v2-audit.ts",
     "mutator:audit": "tsx scripts/export-mutator-scoring-audit.ts",
