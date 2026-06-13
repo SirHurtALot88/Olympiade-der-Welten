@@ -17,7 +17,7 @@ import {
 import { buildLineupDisciplineContract, buildMatchdayLineupContract, countSeasonCaptains, countSeasonLineupDisciplineSides, createLineupDraftId, formatLineupTeamStatusLabel, getSeasonCaptainDisciplineSideKeys, SEASON_CAPTAIN_SLOTS } from "@/lib/lineups/lineup-discipline-contract";
 import { buildLegacyLineupAggregateScore, scoreLegacyLineupDisciplineSide } from "@/lib/lineups/legacy-score-engine";
 import { computeTeamDisciplineRanks } from "@/lib/lineups/team-discipline-ranks";
-import type { GameState, LineupDraft } from "@/lib/data/olyDataTypes";
+import type { GameState, LineupDraft, Player, RosterEntry } from "@/lib/data/olyDataTypes";
 import type {
   LegacyLineupContextLoadResult,
   LegacyLineupDraft,
@@ -208,8 +208,66 @@ function buildLocalFatigueMap(gameState: GameState, params: LegacyLineupKeyParam
   return fatigueMap;
 }
 
-function buildContextFromGameState(gameState: GameState, params: LegacyLineupKeyParams): LegacyLineupContextLoadResult {
+type SharedLineupContextBase = {
+  normalizedGameState: GameState;
+  season: GameState["season"];
+  matchday: {
+    id: string;
+    seasonId: string;
+    index: number;
+    label: string;
+    fixtureIds: string[];
+    status: string;
+  };
+  lineupContract: ReturnType<typeof buildLineupDisciplineContract>;
+  matchdayContract: ReturnType<typeof buildMatchdayLineupContract>;
+  requiredDisciplineIds: string[];
+  playersById: Map<string, Player>;
+  rosterEntriesByTeamId: Map<string, RosterEntry[]>;
+  teamById: Map<string, GameState["teams"][number]>;
+  teamIdentityByTeamId: Map<string, NonNullable<GameState["teamIdentities"][number]>>;
+  localDisciplineWeights: Array<{
+    disciplineId: string;
+    attributeKey: string;
+    weightPct: number;
+  }>;
+  scoreByPlayerAndDiscipline: Map<string, number>;
+  fatigueByTeamId: Map<string, ReturnType<typeof buildLocalFatigueMap>>;
+  teamDisciplineRanksByTeamId: Map<string, ReturnType<typeof computeTeamDisciplineRanks>>;
+};
+
+const sharedLineupContextBaseCache = new Map<string, SharedLineupContextBase>();
+
+function buildSharedLineupContextBaseCacheKey(gameState: GameState, params: LegacyLineupKeyParams) {
+  const rosterSignature = gameState.rosters
+    .map((entry) => `${entry.teamId}:${entry.playerId}:${entry.salary}:${entry.contractLength}`)
+    .sort()
+    .join("|");
+  const lineupDraftSignature = (gameState.seasonState.lineupDrafts ?? [])
+    .map((draft) => `${draft.lineupId}:${draft.updatedAt}:${draft.entries.length}:${draft.status}`)
+    .sort()
+    .join("|");
+  return [
+    params.saveId,
+    params.seasonId,
+    params.matchdayId,
+    gameState.players.length,
+    gameState.disciplines.length,
+    gameState.rosters.length,
+    gameState.seasonState.formCards?.length ?? 0,
+    rosterSignature,
+    lineupDraftSignature,
+  ].join("::");
+}
+
+function getSharedLineupContextBase(gameState: GameState, params: LegacyLineupKeyParams): SharedLineupContextBase | null {
   const gameStateWithFormCards = ensureLocalFormCardsForSeason(gameState, params.saveId, params.seasonId);
+  const cacheKey = buildSharedLineupContextBaseCacheKey(gameStateWithFormCards, params);
+  const cached = sharedLineupContextBaseCache.get(cacheKey);
+  if (cached) {
+    return cached;
+  }
+
   const normalizedGameState = withNormalizedSeasonDisciplineSchedule(gameStateWithFormCards);
   const season = normalizedGameState.season.id === params.seasonId ? normalizedGameState.season : null;
   const matchdayIndex = season ? season.matchdayIds.findIndex((matchdayId) => matchdayId === params.matchdayId) : -1;
@@ -227,8 +285,82 @@ function buildContextFromGameState(gameState: GameState, params: LegacyLineupKey
             normalizedGameState.matchdayState.matchdayId === params.matchdayId ? normalizedGameState.matchdayState.status : "planning",
         }
       : null;
-  const team = normalizedGameState.teams.find((entry) => entry.teamId === params.teamId) ?? null;
-  const teamIdentity = normalizedGameState.teamIdentities.find((entry) => entry.teamId === params.teamId) ?? null;
+
+  if (!season || !matchday) {
+    return null;
+  }
+
+  const playersById = new Map(normalizedGameState.players.map((player) => [player.id, player] as const));
+  const rosterEntriesByTeamId = new Map<string, RosterEntry[]>();
+  for (const rosterEntry of normalizedGameState.rosters) {
+    const existing = rosterEntriesByTeamId.get(rosterEntry.teamId);
+    if (existing) {
+      existing.push(rosterEntry);
+    } else {
+      rosterEntriesByTeamId.set(rosterEntry.teamId, [rosterEntry]);
+    }
+  }
+
+  const lineupContract = buildLineupDisciplineContract(normalizedGameState.disciplines);
+  const matchdayContract = buildMatchdayLineupContract({
+    season,
+    matchday,
+    disciplines: normalizedGameState.disciplines,
+    disciplineSchedule: normalizedGameState.seasonState.disciplineSchedule,
+  });
+  const requiredDisciplineIds = [matchdayContract.discipline1?.disciplineId, matchdayContract.discipline2?.disciplineId].filter(
+    (value): value is string => Boolean(value),
+  );
+
+  const scoreByPlayerAndDiscipline = new Map<string, number>();
+  for (const player of normalizedGameState.players) {
+    for (const disciplineId of requiredDisciplineIds) {
+      scoreByPlayerAndDiscipline.set(`${player.id}::${disciplineId}`, roundScore(player.disciplineRatings[disciplineId] ?? 0));
+    }
+  }
+
+  const localDisciplineWeights = requiredDisciplineIds.flatMap((disciplineId) =>
+    playerGeneratorAttributeKeys
+      .map((attributeKey) => ({
+        disciplineId,
+        attributeKey,
+        weightPct: officialDisciplineWeightTable[attributeKey][disciplineId as OfficialDisciplineWeightId] ?? 0,
+      }))
+      .filter((entry) => entry.weightPct > 0)
+      .sort((left, right) => right.weightPct - left.weightPct),
+  );
+
+  const sharedBase: SharedLineupContextBase = {
+    normalizedGameState,
+    season,
+    matchday,
+    lineupContract,
+    matchdayContract,
+    requiredDisciplineIds,
+    playersById,
+    rosterEntriesByTeamId,
+    teamById: new Map(normalizedGameState.teams.map((team) => [team.teamId, team] as const)),
+    teamIdentityByTeamId: new Map(normalizedGameState.teamIdentities.map((identity) => [identity.teamId, identity] as const)),
+    localDisciplineWeights,
+    scoreByPlayerAndDiscipline,
+    fatigueByTeamId: new Map(),
+    teamDisciplineRanksByTeamId: new Map(),
+  };
+
+  sharedLineupContextBaseCache.set(cacheKey, sharedBase);
+  return sharedBase;
+}
+
+function buildContextFromGameState(gameState: GameState, params: LegacyLineupKeyParams): LegacyLineupContextLoadResult {
+  const sharedBase = getSharedLineupContextBase(gameState, params);
+  const normalizedGameState = sharedBase?.normalizedGameState ?? withNormalizedSeasonDisciplineSchedule(gameState);
+  const season = sharedBase?.season ?? null;
+  const matchday = sharedBase?.matchday ?? null;
+  const team = sharedBase?.teamById.get(params.teamId) ?? normalizedGameState.teams.find((entry) => entry.teamId === params.teamId) ?? null;
+  const teamIdentity =
+    sharedBase?.teamIdentityByTeamId.get(params.teamId) ??
+    normalizedGameState.teamIdentities.find((entry) => entry.teamId === params.teamId) ??
+    null;
   const teamStrategyProfile = getTeamStrategyProfile(normalizedGameState, params.teamId);
 
   const errors: string[] = [];
@@ -245,18 +377,21 @@ function buildContextFromGameState(gameState: GameState, params: LegacyLineupKey
     };
   }
 
-  const lineupContract = buildLineupDisciplineContract(normalizedGameState.disciplines);
-  const matchdayContract = buildMatchdayLineupContract({
-    season,
-    matchday,
-    disciplines: normalizedGameState.disciplines,
-    disciplineSchedule: normalizedGameState.seasonState.disciplineSchedule,
-  });
-  const requiredDisciplineIds = [matchdayContract.discipline1?.disciplineId, matchdayContract.discipline2?.disciplineId].filter(
-    (value): value is string => Boolean(value),
-  );
-  const rosterEntries = normalizedGameState.rosters.filter((entry) => entry.teamId === params.teamId);
-  const playersById = new Map(normalizedGameState.players.map((player) => [player.id, player]));
+  const lineupContract = sharedBase?.lineupContract ?? buildLineupDisciplineContract(normalizedGameState.disciplines);
+  const matchdayContract =
+    sharedBase?.matchdayContract ??
+    buildMatchdayLineupContract({
+      season,
+      matchday,
+      disciplines: normalizedGameState.disciplines,
+      disciplineSchedule: normalizedGameState.seasonState.disciplineSchedule,
+    });
+  const requiredDisciplineIds = sharedBase?.requiredDisciplineIds ?? [
+    matchdayContract.discipline1?.disciplineId,
+    matchdayContract.discipline2?.disciplineId,
+  ].filter((value): value is string => Boolean(value));
+  const rosterEntries = sharedBase?.rosterEntriesByTeamId.get(params.teamId) ?? normalizedGameState.rosters.filter((entry) => entry.teamId === params.teamId);
+  const playersById = sharedBase?.playersById ?? new Map(normalizedGameState.players.map((player) => [player.id, player]));
   const activePlayers = rosterEntries
     .map((entry) => ({
       entry,
@@ -273,33 +408,27 @@ function buildContextFromGameState(gameState: GameState, params: LegacyLineupKey
   const existingDraft = getStoredDraft(normalizedGameState, params);
   const existingDraftLineupId = existingDraft?.lineupId ?? null;
   const teamStatus = buildTeamStatus(normalizedGameState, params.teamId, params.seasonId);
-  const scoreByPlayerAndDiscipline = new Map<string, number>();
-  for (const player of normalizedGameState.players) {
-    for (const disciplineId of requiredDisciplineIds) {
-      scoreByPlayerAndDiscipline.set(`${player.id}::${disciplineId}`, roundScore(player.disciplineRatings[disciplineId] ?? 0));
-    }
+  const scoreByPlayerAndDiscipline = sharedBase?.scoreByPlayerAndDiscipline ?? new Map<string, number>();
+  let teamDisciplineRanks = sharedBase?.teamDisciplineRanksByTeamId.get(params.teamId);
+  if (!teamDisciplineRanks) {
+    teamDisciplineRanks = computeTeamDisciplineRanks({
+      teamId: params.teamId,
+      teamIds: normalizedGameState.teams.map((entry) => entry.teamId),
+      disciplineIds: requiredDisciplineIds,
+      rosterAssignments: normalizedGameState.rosters.map((entry) => ({
+        teamId: entry.teamId,
+        playerId: entry.playerId,
+      })),
+      scoreByPlayerAndDiscipline,
+    });
+    sharedBase?.teamDisciplineRanksByTeamId.set(params.teamId, teamDisciplineRanks);
   }
-  const teamDisciplineRanks = computeTeamDisciplineRanks({
-    teamId: params.teamId,
-    teamIds: normalizedGameState.teams.map((entry) => entry.teamId),
-    disciplineIds: requiredDisciplineIds,
-    rosterAssignments: normalizedGameState.rosters.map((entry) => ({
-      teamId: entry.teamId,
-      playerId: entry.playerId,
-    })),
-    scoreByPlayerAndDiscipline,
-  });
-  const fatigueByPlayerId = buildLocalFatigueMap(normalizedGameState, params);
-  const localDisciplineWeights = requiredDisciplineIds.flatMap((disciplineId) =>
-    playerGeneratorAttributeKeys
-      .map((attributeKey) => ({
-        disciplineId,
-        attributeKey,
-        weightPct: officialDisciplineWeightTable[attributeKey][disciplineId as OfficialDisciplineWeightId] ?? 0,
-      }))
-      .filter((entry) => entry.weightPct > 0)
-      .sort((left, right) => right.weightPct - left.weightPct),
-  );
+  let fatigueByPlayerId = sharedBase?.fatigueByTeamId.get(params.teamId);
+  if (fatigueByPlayerId === undefined) {
+    fatigueByPlayerId = buildLocalFatigueMap(normalizedGameState, params);
+    sharedBase?.fatigueByTeamId.set(params.teamId, fatigueByPlayerId);
+  }
+  const localDisciplineWeights = sharedBase?.localDisciplineWeights ?? [];
 
   return {
     ok: true,
@@ -730,6 +859,123 @@ export function saveLocalLegacyLineupDraft(
     ok: true,
     draft: toLegacyDraft(nextDraft),
     warnings: validation.warnings,
+  };
+}
+
+export function saveLocalLegacyLineupDraftBatch(
+  drafts: Array<{
+    params: LegacyLineupKeyParams;
+    entries: LegacyLineupEntryInput[];
+    modifiers?: LegacyLineupDraft["modifiers"];
+  }>,
+  persistence?: PersistenceService,
+): {
+  ok: boolean;
+  savedCount: number;
+  errors: string[];
+  warnings: string[];
+} {
+  if (drafts.length === 0) {
+    return { ok: true, savedCount: 0, errors: [], warnings: [] };
+  }
+
+  const { persistence: resolvedPersistence, save } = resolveLocalSave(drafts[0]!.params.saveId, persistence);
+  const errors: string[] = [];
+  const warnings: string[] = [];
+  const effectiveDrafts = drafts.map((draft) => ({
+    ...draft,
+    params: {
+      ...draft.params,
+      saveId: save.saveId,
+    },
+    modifiers: normalizeLineupDraftModifiers(draft.modifiers ?? createDefaultLineupDraftModifiers()),
+  }));
+
+  const now = new Date().toISOString();
+  const existingDrafts = getStoredDrafts(save.gameState);
+  const nextDrafts: LineupDraft[] = [];
+  const nextDraftIds = new Set<string>();
+
+  for (const draftInput of effectiveDrafts) {
+    if (save.gameState.matchdayState.matchdayId !== draftInput.params.matchdayId) {
+      errors.push("lineup_matchday_is_not_active");
+      continue;
+    }
+
+    const contextResult = buildContextFromGameState(save.gameState, draftInput.params);
+    if (!contextResult.ok) {
+      errors.push(...contextResult.errors);
+      warnings.push(...contextResult.warnings);
+      continue;
+    }
+
+    const normalizedEntries = normalizeEntries(draftInput.entries);
+    const validation = validateLegacyLineupContext(
+      {
+        ...contextResult.context,
+        entries: normalizedEntries,
+        disciplineSidePlayerCounts: buildDisciplineSidePlayerCounts(contextResult.context),
+        disciplineSideCaptainCounts: contextResult.context.disciplineSideCaptainCounts,
+      },
+      buildValidationOptions(contextResult.context),
+    );
+
+    warnings.push(...validation.warnings);
+    if (!validation.isValid) {
+      errors.push(...validation.errors);
+      continue;
+    }
+
+    const lineupId = createLineupDraftId(draftInput.params);
+    const existing = existingDrafts.find((entry) => entry.lineupId === lineupId) ?? null;
+    if (existing && ["locked", "resolved"].includes(existing.status)) {
+      errors.push("lineup_draft_is_locked");
+      warnings.push("This lineup is already locked/resolved and can no longer be overwritten.");
+      continue;
+    }
+
+    nextDraftIds.add(lineupId);
+    nextDrafts.push({
+      lineupId,
+      saveId: draftInput.params.saveId,
+      seasonId: draftInput.params.seasonId,
+      matchdayId: draftInput.params.matchdayId,
+      teamId: draftInput.params.teamId,
+      status: "draft",
+      entries: normalizedEntries,
+      modifiers: draftInput.modifiers,
+      createdAt: existing?.createdAt ?? now,
+      updatedAt: now,
+    });
+  }
+
+  if (errors.length > 0) {
+    return {
+      ok: false,
+      savedCount: 0,
+      errors: Array.from(new Set(errors)),
+      warnings: Array.from(new Set(warnings)),
+    };
+  }
+
+  const nextGameState: GameState = {
+    ...save.gameState,
+    seasonState: {
+      ...save.gameState.seasonState,
+      lineupDrafts: [
+        ...existingDrafts.filter((draft) => !nextDraftIds.has(draft.lineupId)),
+        ...nextDrafts,
+      ],
+    },
+  };
+
+  resolvedPersistence.saveSingleplayerState(save.saveId, nextGameState);
+
+  return {
+    ok: true,
+    savedCount: nextDrafts.length,
+    errors: [],
+    warnings: Array.from(new Set(warnings)),
   };
 }
 

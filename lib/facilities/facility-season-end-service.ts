@@ -6,7 +6,8 @@ import {
   getFacilityLevelDefinition,
   type FacilityId,
 } from "@/lib/facilities/facility-catalog";
-import { getFacilityLevel, getTeamFacilityState } from "@/lib/facilities/facility-effects";
+import { getFacilityEfficiency, getFacilityLevel, getTeamFacilityState } from "@/lib/facilities/facility-effects";
+import { degradeFacilityCondition } from "@/lib/facilities/facility-condition";
 import { createPersistenceService } from "@/lib/persistence/persistence-service";
 import type { PersistedSaveGame, PersistenceService } from "@/lib/persistence/types";
 
@@ -88,6 +89,7 @@ function buildRows(teamFacilities: TeamFacilityCollection, cashBefore: number | 
     const state = teamFacilities.facilities[facility.facilityId];
     const rawLevel = getRawFacilityLevel(teamFacilities, facility.facilityId);
     const effectLevel = getFacilityLevel(teamFacilities, facility.facilityId);
+    const efficiencyPct = getFacilityEfficiency(teamFacilities, facility.facilityId).efficiencyPct;
     const definition = getFacilityLevelDefinition(facility.facilityId, effectLevel);
     const enabled = Boolean(state?.enabled) && rawLevel > 0;
     return {
@@ -96,7 +98,7 @@ function buildRows(teamFacilities: TeamFacilityCollection, cashBefore: number | 
       level: rawLevel,
       enabled,
       upkeep: roundValue(definition?.seasonUpkeep ?? 0),
-      income: roundValue(definition?.seasonIncome ?? 0),
+      income: roundValue(((definition?.seasonIncome ?? 0) * efficiencyPct) / 100),
       status: rawLevel <= 0 ? "not_built" : enabled ? "enabled" : "disabled",
       warning: !enabled && rawLevel > 0 ? state?.disabledReason ?? "facility_disabled" : null,
     } satisfies FacilitySeasonEndFinanceFacilityRow;
@@ -223,11 +225,14 @@ export function applyFacilitySeasonEndFinance(
     const eventId = `facility-event-${randomUUID()}`;
     eventIds.push(eventId);
     const previous = nextFacilities.facilities[row.facilityId];
+    const previousConditionPct = getFacilityEfficiency(teamFacilities, row.facilityId).conditionPct;
+    const nextConditionPct = degradeFacilityCondition(previousConditionPct, row.status === "paid");
     nextFacilities.facilities[row.facilityId] = {
       ...previous,
-      enabled: row.status === "paid",
+      enabled: row.status === "paid" && nextConditionPct > 0,
       lastPaidSeasonId: row.status === "paid" ? save.gameState.season.id : previous?.lastPaidSeasonId,
-      disabledReason: row.status === "paid" ? undefined : "facility_upkeep_unpaid",
+      conditionPct: nextConditionPct,
+      disabledReason: row.status === "paid" ? (nextConditionPct <= 0 ? "facility_condition_broken" : undefined) : "facility_upkeep_unpaid",
     };
     events.push({
       eventId,
@@ -239,6 +244,8 @@ export function applyFacilitySeasonEndFinance(
       cost: row.status === "paid" ? row.upkeep : 0,
       timestamp: new Date().toISOString(),
       source: row.status === "paid" ? "facility_upkeep_paid" : "facility_upkeep_unpaid",
+      previousConditionPct,
+      nextConditionPct,
     });
   }
   const incomeEventId = preview.facilityIncomeTotal > 0 ? `facility-event-${randomUUID()}` : null;

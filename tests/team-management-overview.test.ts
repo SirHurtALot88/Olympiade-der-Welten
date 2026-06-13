@@ -199,7 +199,7 @@ describe("team management overview", () => {
     });
 
     expect(result[0]?.rosterCount).toBe(3);
-    expect(result[0]?.salaryTotal).toBe(300);
+    expect(result[0]?.salaryTotal).toBe(6000);
     expect(result[0]?.avgContractLength).toBe(4);
   });
 
@@ -217,7 +217,7 @@ describe("team management overview", () => {
       gameState: createGameState({ players, rosters }),
     });
 
-    expect(result[0]?.salaryTotal).toBe(15.75);
+    expect(result[0]?.salaryTotal).toBe(15000);
   });
 
   it("uses current local team cash instead of a stale standings cash projection", () => {
@@ -404,11 +404,12 @@ describe("team management overview", () => {
 
     const result = buildTeamSeasonOverviewRows({ gameState });
 
-    expect(result[0]?.ppsPow).toBe(45.5);
-    expect(result[0]?.ppsSpe).toBe(36.5);
+    expect(result[0]?.points).toBe(40);
+    expect(result[0]?.ppsPow).toBe(21.5);
+    expect(result[0]?.ppsSpe).toBe(18.5);
     expect(result[0]?.ppsMen).toBe(0);
     expect(result[0]?.ppsSoc).toBe(0);
-    expect(result[0]?.ppsTotal).toBe(82);
+    expect(result[0]?.ppsTotal).toBe(40);
     expect(result[0]?.avgPps).toBe(40);
   });
 
@@ -682,12 +683,12 @@ describe("team management overview", () => {
 
     expect(before?.rosterCount).toBe(3);
     expect(afterBuy?.rosterCount).toBe(4);
-    expect(afterBuy?.salaryTotal).toBe(400);
+    expect(afterBuy?.salaryTotal).toBe(10000);
     expect(afterBuy?.avgContractLength).toBe(4.5);
     expect(afterBuy?.cash).toBe(46000);
 
     expect(afterSell?.rosterCount).toBe(2);
-    expect(afterSell?.salaryTotal).toBe(200);
+    expect(afterSell?.salaryTotal).toBe(5000);
     expect(afterSell?.avgContractLength).toBe(4.5);
     expect(afterSell?.cash).toBe(53000);
   });

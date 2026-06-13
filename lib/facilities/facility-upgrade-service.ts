@@ -11,9 +11,11 @@ import {
 import {
   calculateFacilityIncome,
   calculateFacilityUpkeep,
+  getFacilityEfficiency,
   getFacilityLevel,
   getTeamFacilityState,
 } from "@/lib/facilities/facility-effects";
+import { FACILITY_CONDITION_FULL } from "@/lib/facilities/facility-condition";
 import { createPersistenceService } from "@/lib/persistence/persistence-service";
 import type { PersistedSaveGame, PersistenceService } from "@/lib/persistence/types";
 
@@ -101,6 +103,7 @@ function buildNextFacilityState(input: {
         ...existing,
         level: input.nextLevel,
         enabled: true,
+        conditionPct: FACILITY_CONDITION_FULL,
         activeVariant: input.variant ?? existing?.activeVariant,
         lastPaidSeasonId: input.seasonId,
         disabledReason: undefined,
@@ -298,6 +301,8 @@ export function applyFacilityUpgrade(
           cost: preview.upgradeCost,
           timestamp: new Date().toISOString(),
           source: "manual_facility_upgrade",
+          previousConditionPct: getFacilityEfficiency(currentFacilities, facilityId).conditionPct,
+          nextConditionPct: FACILITY_CONDITION_FULL,
         },
         ...(save.gameState.seasonState.facilityEvents ?? []),
       ],

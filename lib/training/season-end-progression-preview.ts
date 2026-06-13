@@ -374,12 +374,26 @@ function buildEconomyAudit(input: {
   const rosterEntry = input.gameState.rosters.find((entry) => entry.playerId === input.player.id) ?? null;
   const economy = resolvePlayerEconomyContract({ playerId: input.player.id, player: input.player, rosterEntry });
   const beforeReport = buildPlayerEconomyCompareReport({ gameState: input.gameState });
+  const salaryMarketValueOverridesByPlayerId = new Map(
+    beforeReport.players
+      .filter((row) => row.calculationBreakdown.salaryMarketValue != null)
+      .map((row) => [row.playerId, row.calculationBreakdown.salaryMarketValue as number] as const),
+  );
+  const baseMarketValueOverridesByPlayerId = new Map(
+    beforeReport.players
+      .filter((row) => row.calculationBreakdown.baseMarketValue != null)
+      .map((row) => [row.playerId, row.calculationBreakdown.baseMarketValue as number] as const),
+  );
   const beforeRow = beforeReport.players.find((entry) => entry.playerId === input.player.id) ?? null;
   const previewGameState: GameState = {
     ...input.gameState,
     players: input.gameState.players.map((entry) => (entry.id === input.player.id ? input.previewPlayer : entry)),
   };
-  const afterReport = buildPlayerEconomyCompareReport({ gameState: previewGameState });
+  const afterReport = buildPlayerEconomyCompareReport({
+    gameState: previewGameState,
+    salaryMarketValueOverridesByPlayerId,
+    baseMarketValueOverridesByPlayerId,
+  });
   const afterRow = afterReport.players.find((entry) => entry.playerId === input.player.id) ?? null;
   const beforeRating = buildPlayerRatingContractMap(input.gameState).get(input.player.id) ?? null;
   const afterRating = buildPlayerRatingContractMap(previewGameState).get(input.player.id) ?? null;

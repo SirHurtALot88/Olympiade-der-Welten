@@ -69,7 +69,7 @@ export type PlayerFormulaSourceBundle = PlayerFormulaStatusSnapshot & {
 };
 
 export type SalaryEngineInput = {
-  marketValueNew: number;
+  salaryMarketValue: number;
   attributes: PlayerGeneratorAttributes;
   traitsPositive?: string[];
   traitsNegative?: string[];
@@ -80,8 +80,12 @@ export type SalaryEngineInput = {
 export type SalaryEngineBreakdown = {
   totalAttributes: number;
   weightedAttributeSalaryBlock: number;
+  weightedAttributeTerm: number;
+  salaryMarketValueTerm: number;
+  totalAttributesTerm: number;
   basisSalary: number;
   rawFinalSalary: number;
+  traitPercentSum: number;
   traitEffects: Array<{
     trait: string;
     factor: number | null;
@@ -108,6 +112,26 @@ export type MarketValueFixtureResult = {
   marketValueBaseOffset: number;
   calcWithoutBaseOffset: number;
   marketValueNew: number;
+};
+
+export type AllrounderBonusBreakdown = {
+  threshold: number;
+  bonus: number;
+};
+
+export type MarketValueBonusBreakdown = {
+  over20: number;
+  over40: number;
+  over60: number;
+  over80: number;
+  over20Excess: number;
+  over40Excess: number;
+  over60Excess: number;
+  over80Excess: number;
+  dynamicRateTotal: number;
+  fixedSpecialistBonus: number;
+  allrounderBonus: number;
+  specialistBonus: number;
 };
 
 export type MarketValueEngineResult =

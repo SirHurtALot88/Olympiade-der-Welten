@@ -13,6 +13,8 @@ import { applyFacilitySeasonEndFinance, previewFacilitySeasonEndFinance } from "
 import { buildTeamControlSettingsMap } from "@/lib/foundation/team-control-settings";
 import { executeLocalTransfermarktBuy } from "@/lib/market/transfermarkt-local-service";
 import { createPersistenceService } from "@/lib/persistence/persistence-service";
+import { SEASON_START_RESET_CONFIRM_TOKEN } from "@/lib/persistence/season-start-reset-contract";
+import { runSeasonStartReset } from "@/lib/persistence/season-start-reset-service";
 import { withScenarioMeta } from "@/lib/persistence/scenario-meta";
 import type { PersistedSaveGame, PersistenceService } from "@/lib/persistence/types";
 import { APPLY_CONFIRM_TOKEN, LegacyMatchdayResultApplyService } from "@/lib/resolve/legacy-matchday-result-apply-service";
@@ -151,6 +153,35 @@ function setAllTeamsAi(save: PersistedSaveGame, persistence: PersistenceService)
     },
   );
   return persistence.saveSingleplayerState(save.saveId, gameState);
+}
+
+function assertCleanLongRunStart(save: PersistedSaveGame, stage: string) {
+  const state = save.gameState;
+  const issues = [
+    state.rosters.length > 0 ? `rosters:${state.rosters.length}` : null,
+    state.contracts.length > 0 ? `contracts:${state.contracts.length}` : null,
+    state.transferHistory.length > 0 ? `transferHistory:${state.transferHistory.length}` : null,
+    state.transferListings.length > 0 ? `transferListings:${state.transferListings.length}` : null,
+    (state.seasonState.lineupDrafts ?? []).length > 0
+      ? `lineupDrafts:${(state.seasonState.lineupDrafts ?? []).length}`
+      : null,
+    (state.seasonState.matchdayResults ?? []).length > 0
+      ? `matchdayResults:${(state.seasonState.matchdayResults ?? []).length}`
+      : null,
+    (state.seasonState.disciplineResults ?? []).length > 0
+      ? `disciplineResults:${(state.seasonState.disciplineResults ?? []).length}`
+      : null,
+    (state.seasonState.playerDisciplinePerformances ?? []).length > 0
+      ? `playerDisciplinePerformances:${(state.seasonState.playerDisciplinePerformances ?? []).length}`
+      : null,
+    Object.keys(state.seasonState.standings ?? {}).length > 0
+      ? `standings:${Object.keys(state.seasonState.standings ?? {}).length}`
+      : null,
+  ].filter((entry): entry is string => Boolean(entry));
+
+  if (issues.length > 0) {
+    throw new Error(`Long-run clean start failed at ${stage}: ${issues.join(" | ")}`);
+  }
 }
 
 function topUpSeasonOneToTargets(saveId: string, persistence: PersistenceService) {
@@ -662,7 +693,20 @@ async function main() {
     const created = persistence.createFreshSeasonOneSave({
       name: `${RUN_LABEL} ${new Date().toLocaleString("de-DE")}`,
     });
-    save = setAllTeamsAi(created, persistence);
+    const reset = await runSeasonStartReset({
+      source: "sqlite",
+      saveId: created.saveId,
+      seasonId: created.gameState.season.id,
+      dryRun: false,
+      confirmToken: SEASON_START_RESET_CONFIRM_TOKEN,
+    });
+    if (reset.status !== "applied") {
+      throw new Error(`S1 clean reset blocked: ${reset.blockingReasons.join(" | ") || reset.warnings.join(" | ")}`);
+    }
+    save = persistence.getSaveById(created.saveId) ?? created;
+    assertCleanLongRunStart(save, "after season-start-reset before S1 top-up");
+    save = setAllTeamsAi(save, persistence);
+    assertCleanLongRunStart(save, "after AI control setup before S1 top-up");
     console.error(`[long-run] created ${save.saveId}`);
     const topUp = topUpSeasonOneToTargets(save.saveId, persistence);
     if (topUp.blockers.length > 0) {

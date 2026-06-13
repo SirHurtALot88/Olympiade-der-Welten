@@ -8,7 +8,6 @@ import {
 } from "../lib/data/dataAdapter";
 import type { TeamIdentity } from "../lib/data/olyDataTypes";
 import {
-  mapActivePlayerRecord,
   mapDisciplineRecord,
   mapDisciplineWeightRecord,
   mapPlayerAttributeRecord,
@@ -185,13 +184,6 @@ async function seedSeasonState(seed: ReturnType<typeof loadSeedData>, saveId: st
       identity: teamIdentityById.get(team.teamId),
     }),
   );
-  const activePlayerRecords = seed.rosters.map((rosterEntry) =>
-    mapActivePlayerRecord({
-      saveId,
-      seasonId,
-      rosterEntry,
-    }),
-  );
   const matchdayRecords = foundationSeedMatchdays.map((matchday) => {
     return {
       id: matchday.id,
@@ -206,13 +198,6 @@ async function seedSeasonState(seed: ReturnType<typeof loadSeedData>, saveId: st
 
   await createManyInBatches(teamStateRecords, STATE_BATCH_SIZE, async (batch) => {
     await prisma.teamSeasonState.createMany({
-      data: batch,
-      skipDuplicates: true,
-    });
-  });
-
-  await createManyInBatches(activePlayerRecords, STATE_BATCH_SIZE, async (batch) => {
-    await prisma.activePlayer.createMany({
       data: batch,
       skipDuplicates: true,
     });

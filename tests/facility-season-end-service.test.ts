@@ -17,7 +17,7 @@ function gameState(input?: {
   teamFacilities?: GameState["seasonState"]["teamFacilities"];
 }): GameState {
   return {
-    season: { id: "season-1", name: "Season 1", currentMatchday: 10, totalMatchdays: 10, isCompleted: true },
+    season: { id: "season-1", name: "Season 1", year: 1, currentMatchday: 10, matchdayIds: ["matchday-10"] },
     seasonState: { seasonId: "season-1", schedule: [], standings: {}, teamFacilities: input?.teamFacilities },
     matchdayState: { matchdayId: "matchday-10", status: "resolved", pendingTeamIds: [], resolvedFixtureIds: [] },
     teams: [
@@ -159,6 +159,49 @@ describe("facility season-end finance service", () => {
     expect(savedState.seasonState.teamFacilities?.["team-1"].facilities.training_center.lastPaidSeasonId).toBe("season-1");
     expect(savedState.seasonState.facilityEvents?.some((event) => event.source === "facility_upkeep_paid")).toBe(true);
     expect(savedState.seasonState.facilityEvents?.some((event) => event.source === "facility_income_collected")).toBe(true);
+  });
+
+  it("degrades facility condition at season end and keeps paid facilities active until broken", () => {
+    const sourceSave = save({
+      cash: 10,
+      teamFacilities: {
+        "team-1": facilities({
+          training_center: { level: 1, enabled: true, conditionPct: 76 },
+        }),
+      },
+    });
+    const preview = previewFacilitySeasonEndFinance(sourceSave, "team-1");
+    const { persistence, saveSingleplayerState } = persistenceMock(sourceSave);
+
+    applyFacilitySeasonEndFinance(sourceSave, "team-1", preview.confirmToken, persistence);
+    const savedState = saveSingleplayerState.mock.calls[0]?.[1];
+
+    if (!savedState) throw new Error("Expected paid facility season-end apply to persist state.");
+    expect(savedState.seasonState.teamFacilities?.["team-1"].facilities.training_center).toMatchObject({
+      enabled: true,
+      conditionPct: 68,
+    });
+    expect(savedState.seasonState.facilityEvents?.some((event) => event.source === "facility_upkeep_paid")).toBe(true);
+    expect(savedState.seasonState.facilityEvents?.[0]).toMatchObject({
+      previousConditionPct: 76,
+      nextConditionPct: 68,
+    });
+  });
+
+  it("scales facility income by condition efficiency", () => {
+    const preview = previewFacilitySeasonEndFinance(
+      save({
+        teamFacilities: {
+          "team-1": facilities({
+            fan_shop: { level: 2, enabled: true, conditionPct: 35 },
+          }),
+        },
+      }),
+      "team-1",
+    );
+
+    expect(preview.fanShopIncome).toBe(2.5);
+    expect(preview.facilityIncomeTotal).toBe(2.5);
   });
 
   it("does not invent income for missing sponsor-like sources", () => {

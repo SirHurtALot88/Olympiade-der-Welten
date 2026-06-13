@@ -353,6 +353,9 @@ describe("singleplayer game state", () => {
     expect(persistence.getSaveById(first.save.saveId)?.saveId).toBe(first.save.saveId);
     expect(persistence.getActiveSave()?.saveId).toBe(fresh.saveId);
     expect(fresh.gameState.transferHistory).toHaveLength(0);
+    expect(fresh.gameState.rosters).toHaveLength(0);
+    expect(fresh.gameState.contracts).toHaveLength(0);
+    expect(fresh.gameState.teams.every((team) => fresh.gameState.rosters.filter((entry) => entry.teamId === team.teamId).length === 0)).toBe(true);
     expect(fresh.gameState.teams).toHaveLength(32);
     expect(fresh.gameState.season.matchdayIds).toHaveLength(10);
     expect(fresh.gameState.teams.every((team) => team.cash === team.budget)).toBe(true);

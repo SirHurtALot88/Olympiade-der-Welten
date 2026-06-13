@@ -4,6 +4,7 @@ import type { GameState, LineupDraft } from "@/lib/data/olyDataTypes";
 import {
   applyFatigueAndInjuryAfterMatchday,
   BASE_MATCHDAY_RECOVERY,
+  calculatePlayerRecovery,
   calculateTeamRecovery,
   getInjuryRiskBand,
   getInjuryRiskPercent,
@@ -259,6 +260,44 @@ describe("fatigue injury service", () => {
 
     expect(recovery.normalRecovery).toBeGreaterThan(BASE_MATCHDAY_RECOVERY);
     expect(recovery.injuryRecovery).toBe(recovery.normalRecovery * 0.5);
+  });
+
+  it("reduces inactive player recovery when training mode is hard", () => {
+    const gameState = createGameState("player-1", 20);
+    gameState.players.push({
+      id: "hard-bench-player",
+      name: "Hard Bench Runner",
+      className: "Runner",
+      race: "Human",
+      marketValue: 10,
+      salary: 2,
+      fatigue: 60,
+      trainingMode: "hart",
+      attributes: {},
+      disciplineRatings: {},
+    } as never);
+    gameState.rosters.push({
+      teamId: "A-A",
+      playerId: "hard-bench-player",
+      role: "bench",
+      joinedSeasonId: "season-1",
+    } as never);
+    const teamRecovery = calculateTeamRecovery(gameState, "A-A");
+    const hardRecovery = calculatePlayerRecovery(gameState, "A-A", "hart");
+
+    const result = applyFatigueAndInjuryAfterMatchday({
+      gameState,
+      saveId: "save-1",
+      seasonId: "season-1",
+      matchdayId: "md-1",
+      matchdayResultId: "result-1",
+      timestamp: "2026-06-13T00:00:00.000Z",
+    });
+
+    const benchPlayer = result.gameState.players.find((player) => player.id === "hard-bench-player");
+
+    expect(hardRecovery.normalRecovery).toBeLessThan(teamRecovery.normalRecovery);
+    expect(benchPlayer?.fatigue).toBe(Math.max(0, Number((60 - hardRecovery.normalRecovery).toFixed(2))));
   });
 
   it("applies normal recovery with facility bonus to active roster players who sit out the matchday", () => {

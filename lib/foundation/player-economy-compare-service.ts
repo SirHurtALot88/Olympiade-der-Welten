@@ -7,7 +7,12 @@ import type {
 } from "@/lib/data/olyDataTypes";
 import { resolvePlayerEconomyContract } from "@/lib/foundation/player-economy-contract";
 import { buildPlayerRatingContractMap } from "@/lib/foundation/player-rating-contract";
-import { calculateMarketValueFromRankTable } from "@/lib/player-formulas/market-value-engine";
+import {
+  calculateAllrounderBonus,
+  calculateMarketValueBonuses,
+  calculateMarketValueFromRankTable,
+  deriveBaseMarketValueFromFinal,
+} from "@/lib/player-formulas/market-value-engine";
 import { loadPlayerFormulaSources } from "@/lib/player-formulas/formula-source-loader";
 import { calculateSalaryFromMarketValue } from "@/lib/player-formulas/salary-engine";
 
@@ -34,7 +39,16 @@ export type PlayerEconomyCompareBreakdown = {
   attributeModifier: number | null;
   traitModifier: number | null;
   classModifier: number | null;
+  baseMarketValue: number | null;
+  salaryMarketValue: number | null;
+  allrounderBonus: number | null;
+  specialistBonus: number | null;
   finalMarketValue: number | null;
+  finalMarketValueDifferenceToBenchmark: number | null;
+  totalAttributes: number | null;
+  attributeWeightedTerm: number | null;
+  salaryMarketValueTerm: number | null;
+  traitPercentSum: number | null;
   salaryBase: number | null;
   salaryModifier: number | null;
   finalSalary: number | null;
@@ -404,6 +418,8 @@ function buildSummary(rows: PlayerEconomyCompareRow[]): PlayerEconomyCompareSumm
 export function buildPlayerEconomyCompareReport(input: {
   gameState: GameState;
   economyMode?: PlayerEconomyMode;
+  salaryMarketValueOverridesByPlayerId?: Map<string, number>;
+  baseMarketValueOverridesByPlayerId?: Map<string, number>;
 }): PlayerEconomyCompareReport {
   const economyMode = input.economyMode ?? "compare";
   const gameState = input.gameState;
@@ -433,6 +449,8 @@ export function buildPlayerEconomyCompareReport(input: {
       playerId: player.id,
       player,
       rosterEntry,
+      salaryMarketValueOverride: input.salaryMarketValueOverridesByPlayerId?.get(player.id) ?? null,
+      baseMarketValueOverride: input.baseMarketValueOverridesByPlayerId?.get(player.id) ?? null,
     });
     const playerRating = ratingByPlayerId.get(player.id) ?? null;
     const topDisciplineScores = Object.values(player.disciplineRatings ?? {})
@@ -461,8 +479,14 @@ export function buildPlayerEconomyCompareReport(input: {
       playerFormulaSources.traitSalaryFactors &&
       marketValueBreakdown
     ) {
+      const baseMarketValue = legacyEconomy.baseMarketValue ?? deriveBaseMarketValueFromFinal({
+        finalMarketValue: legacyEconomy.marketValue ?? 0,
+        coreStats: player.coreStats,
+        disciplineRatings: player.disciplineRatings,
+      });
+      const salaryMarketValue = legacyEconomy.salaryMarketValue ?? baseMarketValue;
       salaryBreakdown = calculateSalaryFromMarketValue({
-        marketValueNew: marketValueBreakdown.marketValueNew,
+        salaryMarketValue,
         attributes: generatorAttributes,
         traitsPositive: player.traitsPositive,
         traitsNegative: player.traitsNegative,
@@ -472,8 +496,8 @@ export function buildPlayerEconomyCompareReport(input: {
       economyWarnings.push(...salaryBreakdown.warnings);
     }
 
-    const calculatedMarketValue = marketValueBreakdown?.marketValueNew ?? null;
-    const calculatedSalary = salaryBreakdown?.finalSalary ?? null;
+    const calculatedMarketValue = legacyEconomy.marketValue ?? marketValueBreakdown?.marketValueNew ?? null;
+    const calculatedSalary = legacyEconomy.expectedSalary ?? salaryBreakdown?.finalSalary ?? null;
     const salaryFloorApplied = salaryBreakdown?.warnings.includes("salary_floor_applied") ?? false;
     const marketValueDelta = calculateDelta(calculatedMarketValue, legacyEconomy.marketValue);
     const salaryDelta = calculateDelta(calculatedSalary, legacyEconomy.salary);
@@ -505,6 +529,15 @@ export function buildPlayerEconomyCompareReport(input: {
       missingSources.includes("attribute_sheet_stats_missing") ? "attribute_sheet_stats_missing" : null,
       missingSources.length > 0 ? "missing_source" : null,
     ].filter((value): value is string => Boolean(value));
+
+    const marketValueBonuses =
+      legacyEconomy.baseMarketValue != null
+        ? calculateMarketValueBonuses({
+            baseMarketValue: legacyEconomy.baseMarketValue,
+            coreStats: player.coreStats,
+            disciplineRatings: player.disciplineRatings,
+          })
+        : null;
 
     return {
       playerId: player.id,
@@ -559,7 +592,16 @@ export function buildPlayerEconomyCompareReport(input: {
           averageAttributes != null ? roundValue((averageAttributes - 50) / 50, 3) : null,
         traitModifier,
         classModifier: null,
+        baseMarketValue: legacyEconomy.baseMarketValue ?? null,
+        salaryMarketValue: legacyEconomy.salaryMarketValue ?? null,
+        allrounderBonus: marketValueBonuses?.allrounderBonus ?? calculateAllrounderBonus(player.coreStats),
+        specialistBonus: marketValueBonuses?.specialistBonus ?? null,
         finalMarketValue: calculatedMarketValue,
+        finalMarketValueDifferenceToBenchmark: calculateDelta(calculatedMarketValue, legacyEconomy.marketValue),
+        totalAttributes: salaryBreakdown?.totalAttributes ?? null,
+        attributeWeightedTerm: salaryBreakdown?.weightedAttributeTerm ?? null,
+        salaryMarketValueTerm: salaryBreakdown?.salaryMarketValueTerm ?? null,
+        traitPercentSum: salaryBreakdown?.traitPercentSum ?? null,
         salaryBase: salaryBreakdown?.basisSalary ?? null,
         salaryModifier,
         finalSalary: calculatedSalary,

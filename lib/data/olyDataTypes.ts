@@ -741,6 +741,7 @@ export type FormCardRecord = {
 export type TeamFacilityRecord = {
   level: number;
   enabled: boolean;
+  conditionPct?: number;
   activeVariant?: string;
   lastPaidSeasonId?: string;
   disabledReason?: string;
@@ -759,7 +760,15 @@ export type FacilityEventRecord = {
   nextLevel: number;
   cost: number;
   timestamp: string;
-  source: "manual_facility_upgrade" | "facility_upkeep_paid" | "facility_upkeep_unpaid" | "facility_income_collected";
+  source:
+    | "manual_facility_upgrade"
+    | "facility_upkeep_paid"
+    | "facility_upkeep_unpaid"
+    | "facility_income_collected"
+    | "facility_condition_decay"
+    | "manual_facility_maintenance";
+  previousConditionPct?: number;
+  nextConditionPct?: number;
 };
 
 export type TeamSeasonObjectiveCategory = "sport" | "finance" | "transfer" | "roster" | "facility" | "development";

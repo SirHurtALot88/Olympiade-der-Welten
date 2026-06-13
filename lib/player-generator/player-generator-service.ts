@@ -762,7 +762,7 @@ function deriveGeneratedEconomy(input: {
   }
 
   const salaryBreakdown = calculateSalaryFromMarketValue({
-    marketValueNew: marketValue,
+    salaryMarketValue: marketValue,
     attributes: input.attributes,
     traitsPositive: input.traitsPositive,
     traitsNegative: input.traitsNegative,

@@ -62,6 +62,8 @@ describe("new-game-setup-service", () => {
     expect(proofPlayer.marketValue).toBe(proofBaseline.marketValue);
     expect(proofPlayer.salaryDemand).toBe(proofBaseline.salary);
     expect(gameState.transferHistory).toEqual([]);
+    expect(gameState.rosters).toEqual([]);
+    expect(gameState.contracts).toEqual([]);
     expect(gameState.playerProgressionEvents).toEqual([]);
     expect(gameState.seasonState.formCards).toEqual([]);
     expect(gameState.seasonState.lineupDrafts).toEqual([]);

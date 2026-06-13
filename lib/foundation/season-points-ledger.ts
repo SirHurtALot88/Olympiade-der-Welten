@@ -329,6 +329,7 @@ export function buildSeasonPointsLedger(
   );
 
   const teamSummariesByTeamId = new Map<string, SeasonTeamPointsSummary>();
+  const expectedRankPointsByTeamId = new Map<string, number>();
   for (const team of gameState.teams) {
     teamSummariesByTeamId.set(team.teamId, {
       teamId: team.teamId,
@@ -343,27 +344,19 @@ export function buildSeasonPointsLedger(
 
   for (const result of seasonDisciplineResults) {
     const summary = teamSummariesByTeamId.get(result.teamId);
-    if (!summary) {
+    const performances = groupedPerformances.get(toDisciplineResultKey(result)) ?? [];
+    if (!summary || performances.length > 0) {
       continue;
     }
 
-    const rankPoints = deriveRankPointsFromPerformances(
-      gameState,
-      matchdayResultById.get(result.matchdayResultId)?.matchdayId ?? null,
-      groupedPerformances.get(toDisciplineResultKey(result)) ?? [],
-      result,
-    )?.teamPoints;
-
-    const teamDisciplinePoints = rankPoints ?? result.totalScore;
-
-    summary.totalPoints = roundValue(summary.totalPoints + teamDisciplinePoints, 1);
+    summary.totalPoints = roundValue(summary.totalPoints + result.totalScore, 4);
     summary.pointsByDiscipline[result.disciplineId] = roundValue(
-      (summary.pointsByDiscipline[result.disciplineId] ?? 0) + teamDisciplinePoints,
-      1,
+      (summary.pointsByDiscipline[result.disciplineId] ?? 0) + result.totalScore,
+      4,
     );
     const category = disciplineCategoryById.get(result.disciplineId);
     if (category) {
-      summary.pointsByArea[category] = roundValue(summary.pointsByArea[category] + teamDisciplinePoints, 1);
+      summary.pointsByArea[category] = roundValue(summary.pointsByArea[category] + result.totalScore, 4);
     }
   }
 
@@ -398,28 +391,65 @@ export function buildSeasonPointsLedger(
 
     const teamSummary = teamSummariesByTeamId.get(entry.teamId);
     if (teamSummary) {
+      teamSummary.totalPoints = roundValue(teamSummary.totalPoints + entry.basePoints, 4);
+      teamSummary.pointsByDiscipline[entry.disciplineId] = roundValue(
+        (teamSummary.pointsByDiscipline[entry.disciplineId] ?? 0) + entry.basePoints,
+        4,
+      );
+      if (category) {
+        teamSummary.pointsByArea[category] = roundValue(teamSummary.pointsByArea[category] + entry.basePoints, 4);
+      }
       teamSummary.playerDerivedTotal = roundValue(teamSummary.playerDerivedTotal + entry.basePoints, 4);
       teamSummary.warnings = Array.from(new Set([...teamSummary.warnings, ...entry.warnings]));
     }
   }
 
+  for (const result of seasonDisciplineResults) {
+    const rankPoints = deriveRankPointsFromPerformances(
+      gameState,
+      matchdayResultById.get(result.matchdayResultId)?.matchdayId ?? null,
+      groupedPerformances.get(toDisciplineResultKey(result)) ?? [],
+      result,
+    )?.teamPoints;
+
+    if (!isFiniteNumber(rankPoints)) {
+      continue;
+    }
+
+    expectedRankPointsByTeamId.set(
+      result.teamId,
+      roundValue((expectedRankPointsByTeamId.get(result.teamId) ?? 0) + rankPoints, 4),
+    );
+  }
+
   for (const teamSummary of teamSummariesByTeamId.values()) {
-    if (teamSummary.totalPoints === 0 && teamSummary.playerDerivedTotal === 0) {
+    teamSummary.totalPoints = roundValue(teamSummary.totalPoints, 1);
+    teamSummary.pointsByArea = {
+      power: roundValue(teamSummary.pointsByArea.power, 1),
+      speed: roundValue(teamSummary.pointsByArea.speed, 1),
+      mental: roundValue(teamSummary.pointsByArea.mental, 1),
+      social: roundValue(teamSummary.pointsByArea.social, 1),
+    };
+    teamSummary.pointsByDiscipline = Object.fromEntries(
+      Object.entries(teamSummary.pointsByDiscipline).map(([disciplineId, value]) => [disciplineId, roundValue(value, 1)] as const),
+    );
+
+    const expectedRankPoints = expectedRankPointsByTeamId.get(teamSummary.teamId) ?? 0;
+
+    if (teamSummary.totalPoints === 0 && expectedRankPoints === 0) {
       teamSummary.reconciliationStatus = "reconciled";
       continue;
     }
 
-    if (teamSummary.playerDerivedTotal === 0) {
+    if (teamSummary.totalPoints === 0 && expectedRankPoints > 0) {
       teamSummary.reconciliationStatus = "missing_player_points";
       continue;
     }
 
-    teamSummary.reconciliationStatus = isWithinTolerance(
-      teamSummary.playerDerivedTotal,
-      teamSummary.totalPoints,
-    )
-      ? "reconciled"
-      : "reconciliation_failed";
+    teamSummary.reconciliationStatus =
+      expectedRankPoints === 0 || isWithinTolerance(teamSummary.totalPoints, expectedRankPoints)
+        ? "reconciled"
+        : "reconciliation_failed";
 
     if (teamSummary.reconciliationStatus === "reconciliation_failed") {
       const warning = `team_reconciliation_failed:${teamSummary.teamId}`;

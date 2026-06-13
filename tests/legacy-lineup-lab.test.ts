@@ -129,6 +129,10 @@ describe("legacy lineup lab helpers", () => {
       "/Users/chrisfalk/Documents/Codex/Olympiade der Welten/lib/lineups/matchday-slot-roles.ts",
       "utf8",
     );
+    const dragDropText = await fs.readFile(
+      "/Users/chrisfalk/Documents/Codex/Olympiade der Welten/lib/lineups/legacy-lineup-drag-drop.ts",
+      "utf8",
+    );
 
     expect(fileText).toContain("AI-Vorschlag geladen und in die Slots uebernommen. Noch nicht gespeichert.");
     expect(fileText).toContain("applyAiPreviewToUiDraft");
@@ -204,6 +208,12 @@ describe("legacy lineup lab helpers", () => {
     expect(fileText).toContain("Verfuegbar");
     expect(fileText).toContain("Freier Slot");
     expect(fileText).toContain("Projected ");
+    expect(fileText).toContain("Drag Preview");
+    expect(fileText).toContain("Score Δ");
+    expect(fileText).toContain("Slot-Regel");
+    expect(dragDropText).toContain("player_injured_unavailable");
+    expect(dragDropText).toContain("Captain nicht erlaubt");
+    expect(dragDropText).toContain("bereits in anderer Diszi eingesetzt");
     expect(fileText).toContain("Einsatzstufe");
     expect(fileText).toContain("Schonen");
     expect(fileText).toContain("Push");
@@ -226,6 +236,11 @@ describe("legacy lineup lab helpers", () => {
     expect(fileText).toContain("legacy-lineup-focus-switch");
     expect(fileText).toContain("legacy-lineup-weight-band");
     expect(fileText).toContain("legacy-lineup-arena-slot");
+    expect(fileText).toContain("legacy-lineup-slot-drag-callout");
+    expect(fileText).toContain("legacy-lineup-slot-fit-pill");
+    expect(fileText).toContain("getDragFitTierClass");
+    expect(fileText).toContain("resolveLegacyLineupDragBlockReason");
+    expect(fileText).toContain("handleDropOnSlot");
     expect(fileText).toContain("attributeRatings");
     expect(fileText).toContain("resolveAttributeGrade");
     expect(fileText).toContain("TOR");

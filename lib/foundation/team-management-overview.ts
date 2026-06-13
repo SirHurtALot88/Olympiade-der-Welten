@@ -178,11 +178,14 @@ function getRosterDisplaySalary(entry: RosterEntry, player?: Player | null) {
   return resolvePlayerEconomyContract({ player, rosterEntry: entry }).salary ?? 0;
 }
 
-function getRosterPlayers(gameState: GameState, roster: RosterEntry[]) {
+function getRosterPlayers(
+  playersById: Map<string, Player>,
+  roster: RosterEntry[],
+) {
   return roster
     .map((entry) => ({
       entry,
-      player: gameState.players.find((candidate) => candidate.id === entry.playerId),
+      player: playersById.get(entry.playerId),
     }))
     .filter((item): item is { entry: RosterEntry; player: Player } => Boolean(item.player));
 }
@@ -243,6 +246,34 @@ export function buildTeamSeasonOverviewRows(input: TeamManagementSnapshotInput):
   const { gameState, standingsByTeamId = {}, needScoreByTeamId = {}, transferSummaryByTeamId = {} } = input;
   const derivedTransferSummaryByTeamId = buildTransferSummaryByTeamIdFromHistory(gameState);
   const seasonSnapshots = gameState.seasonState.seasonSnapshots ?? [];
+  const playersById = new Map(gameState.players.map((player) => [player.id, player] as const));
+  const rostersByTeamId = new Map<string, RosterEntry[]>();
+  for (const rosterEntry of gameState.rosters) {
+    const existing = rostersByTeamId.get(rosterEntry.teamId);
+    if (existing) {
+      existing.push(rosterEntry);
+      continue;
+    }
+    rostersByTeamId.set(rosterEntry.teamId, [rosterEntry]);
+  }
+  const historicalStandingsByTeamId = new Map<
+    string,
+    Array<{
+      snapshot: (typeof seasonSnapshots)[number];
+      standing: (typeof seasonSnapshots)[number]["finalStandings"][number];
+    }>
+  >();
+  for (const snapshot of seasonSnapshots) {
+    for (const standing of snapshot.finalStandings) {
+      const existing = historicalStandingsByTeamId.get(standing.teamId);
+      const item = { snapshot, standing };
+      if (existing) {
+        existing.push(item);
+        continue;
+      }
+      historicalStandingsByTeamId.set(standing.teamId, [item]);
+    }
+  }
   const latestCompletedSnapshot =
     [...seasonSnapshots]
       .filter((snapshot) => snapshot.status == null || snapshot.status === "completed")
@@ -267,8 +298,8 @@ export function buildTeamSeasonOverviewRows(input: TeamManagementSnapshotInput):
   );
 
   const baseRows = gameState.teams.map((team) => {
-    const roster = gameState.rosters.filter((entry) => entry.teamId === team.teamId);
-    const rosterPlayers = getRosterPlayers(gameState, roster);
+    const roster = rostersByTeamId.get(team.teamId) ?? [];
+    const rosterPlayers = getRosterPlayers(playersById, roster);
     const standing = standingsByTeamId[team.teamId] ?? null;
     const transferSummary = transferSummaryByTeamId[team.teamId] ?? derivedTransferSummaryByTeamId[team.teamId] ?? null;
     const avgContractLength =
@@ -299,9 +330,12 @@ export function buildTeamSeasonOverviewRows(input: TeamManagementSnapshotInput):
         : null;
     const seasonPointsSummary = seasonPointsLedger.teamSummariesByTeamId.get(team.teamId) ?? null;
     const latestCompletedStanding = latestCompletedStandingByTeamId.get(team.teamId) ?? null;
-    const hasCurrentSportPoints =
-      (seasonPointsSummary?.totalPoints ?? 0) > 0 ||
-      (standing?.points != null && Number.isFinite(standing.points) && standing.points > 0);
+    const currentPpsTotal = roundValue(seasonPointsSummary?.totalPoints ?? 0, 1);
+    const hasCurrentPps = (seasonPointsSummary?.playerDerivedTotal ?? 0) > 0;
+    const fallbackPpsTotal = roundValue(
+      latestCompletedStanding?.disciplinePoints ?? latestCompletedStanding?.points ?? 0,
+      1,
+    );
     const ppsValues = rosterPlayers.map((item) => seasonPointsLedger.playerSummariesByPlayerId.get(item.player.id)?.totalPoints ?? 0);
     const avgPps =
       ppsValues.length > 0
@@ -315,25 +349,22 @@ export function buildTeamSeasonOverviewRows(input: TeamManagementSnapshotInput):
         ? roundValue(ovrValues.reduce((sum, value) => sum + value, 0) / ovrValues.length, 2)
         : null;
     const ppsPow = roundValue(
-      hasCurrentSportPoints ? seasonPointsSummary?.pointsByArea.power ?? 0 : latestCompletedStanding?.disciplinePointsByArea.pow ?? 0,
+      hasCurrentPps ? seasonPointsSummary?.pointsByArea.power ?? 0 : latestCompletedStanding?.disciplinePointsByArea.pow ?? 0,
       1,
     );
     const ppsSpe = roundValue(
-      hasCurrentSportPoints ? seasonPointsSummary?.pointsByArea.speed ?? 0 : latestCompletedStanding?.disciplinePointsByArea.spe ?? 0,
+      hasCurrentPps ? seasonPointsSummary?.pointsByArea.speed ?? 0 : latestCompletedStanding?.disciplinePointsByArea.spe ?? 0,
       1,
     );
     const ppsMen = roundValue(
-      hasCurrentSportPoints ? seasonPointsSummary?.pointsByArea.mental ?? 0 : latestCompletedStanding?.disciplinePointsByArea.men ?? 0,
+      hasCurrentPps ? seasonPointsSummary?.pointsByArea.mental ?? 0 : latestCompletedStanding?.disciplinePointsByArea.men ?? 0,
       1,
     );
     const ppsSoc = roundValue(
-      hasCurrentSportPoints ? seasonPointsSummary?.pointsByArea.social ?? 0 : latestCompletedStanding?.disciplinePointsByArea.soc ?? 0,
+      hasCurrentPps ? seasonPointsSummary?.pointsByArea.social ?? 0 : latestCompletedStanding?.disciplinePointsByArea.soc ?? 0,
       1,
     );
-    const ppsTotal = roundValue(
-      hasCurrentSportPoints ? seasonPointsSummary?.totalPoints ?? 0 : latestCompletedStanding?.disciplinePoints ?? latestCompletedStanding?.points ?? 0,
-      1,
-    );
+    const ppsTotal = hasCurrentPps ? currentPpsTotal : fallbackPpsTotal;
     const formAvg =
       rosterPlayers.length > 0
         ? roundValue(
@@ -362,6 +393,14 @@ export function buildTeamSeasonOverviewRows(input: TeamManagementSnapshotInput):
       standing?.points != null && Number.isFinite(standing.points)
         ? roundValue(standing.points, 1)
         : null;
+    const currentVisiblePoints =
+      storedStandingPoints != null && storedStandingPoints > 0
+        ? storedStandingPoints
+        : visibleSeasonPoints != null && visibleSeasonPoints > 0
+          ? visibleSeasonPoints
+          : hasCurrentPps
+            ? ppsTotal
+            : null;
     const sponsorSeason =
       standing?.sponsorTotal != null &&
       standing?.sponsorBasis != null &&
@@ -369,19 +408,7 @@ export function buildTeamSeasonOverviewRows(input: TeamManagementSnapshotInput):
         ? roundValue(standing.sponsorTotal - standing.sponsorBasis - standing.sponsorRank, 2)
         : null;
     const allTimeRow = allTimeTableByTeamId.get(team.teamId) ?? null;
-    const teamHistoricalSnapshots = seasonSnapshots
-      .map((snapshot) => ({
-        snapshot,
-        standing: snapshot.finalStandings.find((standingRow) => standingRow.teamId === team.teamId) ?? null,
-      }))
-      .filter(
-        (
-          entry,
-        ): entry is {
-          snapshot: (typeof seasonSnapshots)[number];
-          standing: NonNullable<(typeof entry)["standing"]>;
-        } => Boolean(entry.standing),
-      );
+    const teamHistoricalSnapshots = historicalStandingsByTeamId.get(team.teamId) ?? [];
     const historicalHasData = allTimeRow?.hasHistory ?? teamHistoricalSnapshots.length > 0;
     const historicalPointsTotal = allTimeRow?.totalHistoricalPoints ?? null;
     const historicalPointsBySeason = [...teamHistoricalSnapshots]
@@ -420,10 +447,10 @@ export function buildTeamSeasonOverviewRows(input: TeamManagementSnapshotInput):
       teamId: team.teamId,
       teamCode: team.shortCode,
       teamName: team.name,
-      rank: hasCurrentSportPoints ? standing?.rank ?? null : latestCompletedStanding?.rank ?? standing?.rank ?? null,
-      points: hasCurrentSportPoints
-        ? storedStandingPoints ?? visibleSeasonPoints
-        : latestCompletedStanding?.disciplinePoints ?? latestCompletedStanding?.points ?? storedStandingPoints ?? visibleSeasonPoints,
+      rank: hasCurrentPps ? standing?.rank ?? null : latestCompletedStanding?.rank ?? standing?.rank ?? null,
+      points: hasCurrentPps
+        ? currentVisiblePoints
+        : latestCompletedStanding?.disciplinePoints ?? latestCompletedStanding?.points ?? currentVisiblePoints,
       rosterCount: roster.length,
       salaryTotal,
       avgContractLength,

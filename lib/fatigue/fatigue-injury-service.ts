@@ -7,6 +7,8 @@ import type {
   PlayerInjuryRiskRollRecord,
 } from "@/lib/data/olyDataTypes";
 import { applyRecoveryFacilityModifiers, getTeamFacilityState } from "@/lib/facilities/facility-effects";
+import { applyTrainingRecoveryImpact } from "@/lib/training/training-recovery-impact";
+import type { PlayerTrainingMode } from "@/lib/training/training-plan-types";
 
 export const FATIGUE_INJURY_SOURCE = "fatigue_injury_risk_v1" as const;
 export const MATCHDAY_FATIGUE_LOAD = 12;
@@ -115,6 +117,23 @@ export function calculateTeamRecovery(gameState: GameState, teamId: string) {
   return {
     normalRecovery,
     injuryRecovery: round(normalRecovery * 0.5, 2),
+  };
+}
+
+export function calculatePlayerRecovery(
+  gameState: GameState,
+  teamId: string,
+  trainingMode: PlayerTrainingMode | null | undefined,
+) {
+  const teamRecovery = calculateTeamRecovery(gameState, teamId);
+  const modeRecovery = applyTrainingRecoveryImpact(teamRecovery.normalRecovery, trainingMode ?? "mittel");
+  return {
+    teamNormalRecovery: teamRecovery.normalRecovery,
+    normalRecovery: modeRecovery.after,
+    injuryRecovery: round(modeRecovery.after * 0.5, 2),
+    trainingMode: trainingMode ?? "mittel",
+    trainingRecoveryModifierPct: modeRecovery.modifierPct,
+    trainingRecoveryLabel: modeRecovery.label,
   };
 }
 
@@ -280,7 +299,7 @@ export function applyFatigueAndInjuryAfterMatchday(input: {
       input.matchdayId,
     );
     if (usedPlayerKeys.has(usedKey) && !view.isUnavailable) continue;
-    const recovery = calculateTeamRecovery(input.gameState, roster.teamId);
+    const recovery = calculatePlayerRecovery(input.gameState, roster.teamId, player.trainingMode);
     const currentFatigue = getPlayerCurrentFatigue(
       { ...input.gameState, players: nextPlayers, seasonState: { ...input.gameState.seasonState, playerAvailabilityState: nextAvailability } },
       player,
@@ -338,7 +357,7 @@ export function applyFatigueAndInjuryAfterMatchday(input: {
       playerId: use.playerId,
       fatigueBefore: fatigueBeforeRoll,
     });
-    const recovery = calculateTeamRecovery(input.gameState, use.teamId);
+    const recovery = calculatePlayerRecovery(input.gameState, use.teamId, player.trainingMode);
     const event: InjuryEventRecord = {
       eventId: buildInjuryEventId({
         saveId: input.saveId,

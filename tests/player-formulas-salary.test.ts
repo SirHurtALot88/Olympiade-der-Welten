@@ -15,55 +15,45 @@ describe("player formula salary engine", () => {
     expect(sources.classEngineStatus).toBe("heuristic");
   });
 
-  it("calculates basis salary and trait effects from marketValueNew, attributes and traits", () => {
+  it("calculates basis salary and trait effects from salaryMarketValue, attributes and traits", () => {
     const sources = loadPlayerFormulaSources();
     const result = calculateSalaryFromMarketValue({
-      marketValueNew: 42.5,
+      salaryMarketValue: 54,
       attributes: {
-        power: 70,
-        health: 55,
-        stamina: 60,
-        intelligence: 48,
-        awareness: 62,
-        determination: 51,
-        speed: 66,
-        dexterity: 64,
-        charisma: 58,
-        will: 72,
-        spirit: 57,
-        torment: 45,
+        power: 86,
+        health: 79,
+        stamina: 74,
+        intelligence: 42,
+        awareness: 48,
+        determination: 81,
+        speed: 33,
+        dexterity: 28,
+        charisma: 67,
+        will: 76,
+        spirit: 18,
+        torment: 84,
       },
-      traitsPositive: ["Disciplined"],
-      traitsNegative: ["Lazy"],
+      traitsPositive: ["Fearless", "Disciplined", "Cool"],
+      traitsNegative: ["Cruel", "Vindictive", "Mercenary"],
       attributeSalaryModifiers: sources.attributeSalaryModifiers!,
       traitSalaryFactors: sources.traitSalaryFactors!,
     });
 
-    expect(result.totalAttributes).toBe(708);
-    expect(result.weightedAttributeSalaryBlock).toBe(1.99);
-    expect(result.basisSalary).toBe(7.19);
-    expect(result.traitEffects).toEqual([
-      {
-        trait: "Disciplined",
-        factor: 0.15,
-        effect: 1.08,
-        known: true,
-      },
-      {
-        trait: "Lazy",
-        factor: -0.2,
-        effect: -1.44,
-        known: true,
-      },
-    ]);
-    expect(result.finalSalary).toBe(6.83);
+    expect(result.totalAttributes).toBe(716);
+    expect(result.weightedAttributeSalaryBlock).toBe(3.26);
+    expect(result.salaryMarketValueTerm).toBe(10.8);
+    expect(result.weightedAttributeTerm).toBe(0.65);
+    expect(result.totalAttributesTerm).toBe(2.15);
+    expect(result.basisSalary).toBe(13.6);
+    expect(result.traitPercentSum).toBe(0.235);
+    expect(result.finalSalary).toBe(16.8);
     expect(result.warnings).toEqual([]);
   });
 
   it("warns on unknown traits without inventing a salary effect", () => {
     const sources = loadPlayerFormulaSources();
     const result = calculateSalaryFromMarketValue({
-      marketValueNew: 20,
+      salaryMarketValue: 20,
       attributes: {
         power: 50,
         health: 50,
@@ -96,7 +86,7 @@ describe("player formula salary engine", () => {
   it("floors negative calculated salaries and marks the floor in warnings", () => {
     const sources = loadPlayerFormulaSources();
     const result = calculateSalaryFromMarketValue({
-      marketValueNew: 42.5,
+      salaryMarketValue: 42.5,
       attributes: {
         power: 70,
         health: 55,
@@ -112,7 +102,7 @@ describe("player formula salary engine", () => {
         torment: 45,
       },
       traitsPositive: [],
-      traitsNegative: ["Lazy", "Relaxed", "Cheater", "FaintHearted", "Paranoid", "Caring", "Diva"],
+      traitsNegative: Array.from({ length: 20 }, () => "Timid"),
       attributeSalaryModifiers: sources.attributeSalaryModifiers!,
       traitSalaryFactors: sources.traitSalaryFactors!,
     });

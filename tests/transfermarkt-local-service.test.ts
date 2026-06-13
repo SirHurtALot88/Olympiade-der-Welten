@@ -679,6 +679,95 @@ describe("transfermarkt local service", () => {
     expect(topPreview.salePrice).toBeGreaterThan(lowerPreview.salePrice ?? 0);
   });
 
+  it("keeps the second-best MVS player in a three-player bracket above market value", async () => {
+    persistenceState.save = {
+      saveId: "save-singleplayer-dev",
+      gameState: createGameState({
+        teams: [createTeam({ teamId: "P-S", shortCode: "P-S", cash: 300 })],
+        players: [
+          createPlayer("p1", { name: "Bracket Leader", marketValue: 55700, displayMarketValue: 55.7, salaryDemand: 10, displaySalary: 10 }),
+          createPlayer("p2", { name: "Akaryu Case", marketValue: 55350, displayMarketValue: 55.35, salaryDemand: 10, displaySalary: 10 }),
+          createPlayer("p3", { name: "Bracket Third", marketValue: 55230, displayMarketValue: 55.23, salaryDemand: 10, displaySalary: 10 }),
+        ],
+        rosters: [
+          createRosterEntry("r1", "p1", { teamId: "P-S", purchasePrice: 55.7, currentValue: 55.7 }),
+          createRosterEntry("r2", "p2", { teamId: "P-S", purchasePrice: 55.35, currentValue: 55.35 }),
+          createRosterEntry("r3", "p3", { teamId: "P-S", purchasePrice: 55.23, currentValue: 55.23 }),
+        ],
+      }),
+    };
+    persistenceState.save.gameState.seasonState.playerDisciplinePerformances = [
+      {
+        id: "perf-1",
+        matchdayResultId: "result-1",
+        teamId: "P-S",
+        playerId: "p1",
+        activePlayerId: "r1",
+        disciplineId: "d1",
+        disciplineSide: "d1",
+        slotIndex: 0,
+        baseValue: 80,
+        finalPlayerScore: 99,
+        scoreContribution: 99,
+        rankInTeam: 1,
+        rankInDiscipline: 1,
+        isTop10: true,
+        isMvpCandidate: true,
+        storyWeight: 1,
+        createdAt: "2026-06-10T12:00:00.000Z",
+      },
+      {
+        id: "perf-2",
+        matchdayResultId: "result-1",
+        teamId: "P-S",
+        playerId: "p2",
+        activePlayerId: "r2",
+        disciplineId: "d1",
+        disciplineSide: "d1",
+        slotIndex: 1,
+        baseValue: 78,
+        finalPlayerScore: 95,
+        scoreContribution: 95,
+        rankInTeam: 2,
+        rankInDiscipline: 2,
+        isTop10: true,
+        isMvpCandidate: true,
+        storyWeight: 1,
+        createdAt: "2026-06-10T12:00:00.000Z",
+      },
+      {
+        id: "perf-3",
+        matchdayResultId: "result-1",
+        teamId: "P-S",
+        playerId: "p3",
+        activePlayerId: "r3",
+        disciplineId: "d1",
+        disciplineSide: "d1",
+        slotIndex: 2,
+        baseValue: 70,
+        finalPlayerScore: 86,
+        scoreContribution: 86,
+        rankInTeam: 3,
+        rankInDiscipline: 3,
+        isTop10: true,
+        isMvpCandidate: false,
+        storyWeight: 0.7,
+        createdAt: "2026-06-10T12:00:00.000Z",
+      },
+    ];
+
+    const { previewLocalTransfermarktSell } = await import("@/lib/market/transfermarkt-local-service");
+    const preview = previewLocalTransfermarktSell({
+      saveId: "save-singleplayer-dev",
+      seasonId: "season-1",
+      teamId: "P-S",
+      activePlayerId: "r2",
+    });
+
+    expect(preview.saleFactor).toBeGreaterThan(1);
+    expect(preview.salePrice).toBeGreaterThan(preview.marketValueReference ?? 0);
+  });
+
   it("uses the latest completed season snapshot for sale factors after a season reset", async () => {
     persistenceState.save = {
       saveId: "save-singleplayer-dev",

@@ -464,7 +464,7 @@ describe("foundation transfermarkt ui contract", () => {
     expect(fileText).toContain('label: "Letzte Leistung"');
     expect(fileText).toContain('label: "Traits"');
     expect(fileText).toContain('row.team?.name ?? "Free Agent"');
-    expect(fileText).toContain("Standardansicht zeigt nur aktive Kaderspieler");
+    expect(fileText).toContain("Standardansicht des aktuellen Kaders.");
     expect(fileText).toContain("OVR und PPs nur pro Spieler, nicht als Teamwert");
     expect(fileText).toContain('label: "MVS"');
     expect(drawerDataText).toContain("seasonPerformance");
@@ -494,7 +494,7 @@ describe("foundation transfermarkt ui contract", () => {
     expect(helperText).toContain("disciplineValues");
     expect(helperText).toContain("deriveVisibleSeasonPoints");
     expect(helperText).toContain('columnKey !== "bonuspunkte"');
-    expect(helperText).toContain("points: hasCurrentSportPoints");
+    expect(helperText).toContain("points: hasCurrentPps");
     expect(helperText).toContain("latestCompletedStanding?.disciplinePoints");
     expect(helperText).toContain("const transferNet = standing?.transfers ?? transferSummary?.transferNet ?? 0;");
     expect(helperText).toContain("teamCash: team.cash ?? standing?.cash ?? null");
@@ -1267,7 +1267,7 @@ describe("foundation transfermarkt ui contract", () => {
     expect(fileText).toContain('value: selectedStandingRow != null ? formatMoney(selectedStandingRow.salaryTotal) : "—"');
     expect(fileText).toContain('value:');
     expect(fileText).toContain('selectedStandingRow?.marketValueTotal != null');
-    expect(fileText).toContain('if (column.id === "race") return <td key={column.id}>{player.race}</td>;');
+    expect(fileText).toContain('if (column.id === "race") return <td key={column.id}><RaceIcon race={player.race} showLabel={false} /></td>;');
     expect(fileText).toContain('OVR {formatWholeNumber(playerRatingsById.get(player.id)?.ovrNormalized ?? null)} · MVS');
     expect(fileText).toContain('Spielerwerte</span>');
     expect(fileText).toContain('OVR und PPs nur pro Spieler, nicht als Teamwert');

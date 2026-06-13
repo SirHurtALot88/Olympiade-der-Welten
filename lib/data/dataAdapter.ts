@@ -453,6 +453,8 @@ export function loadFreshSeasonOneSeedData(): OlySeedData {
       ...team,
       rosterLimit: Math.max(team.rosterLimit, Math.min(teamOptById.get(team.teamId) ?? team.rosterLimit, 12)),
     })),
+    rosters: [],
+    contracts: [],
     transferHistory: [],
   };
 }

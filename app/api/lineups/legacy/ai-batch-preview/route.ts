@@ -140,7 +140,7 @@ async function resolvePrismaBatchContext(input: {
       seasonId: season.id,
       matchdayId: matchday.id,
     },
-    teams: teamStates.map((state) => ({
+    teams: teamStates.map((state: (typeof teamStates)[number]) => ({
       teamId: state.teamId,
       teamCode: state.team.shortCode ?? state.teamId,
       teamName: state.team.name,
@@ -212,7 +212,7 @@ export async function GET(request: Request) {
         : await resolveSqliteBatchContext(baseParams);
 
     const teams = await Promise.all(
-      baseContext.teams.map(async (team) => {
+      baseContext.teams.map(async (team: (typeof baseContext.teams)[number]) => {
         const params: LegacyLineupKeyParams = {
           ...baseContext.params,
           teamId: team.teamId,

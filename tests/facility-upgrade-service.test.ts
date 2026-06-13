@@ -12,7 +12,7 @@ function baseGameState(input?: {
   teamFacilities?: GameState["seasonState"]["teamFacilities"];
 }): GameState {
   return {
-    season: { id: "season-1", name: "Season 1", currentMatchday: 1, totalMatchdays: 10, isCompleted: false },
+    season: { id: "season-1", name: "Season 1", year: 1, currentMatchday: 1, matchdayIds: ["matchday-1"] },
     seasonState: { seasonId: "season-1", schedule: [], standings: {}, teamFacilities: input?.teamFacilities },
     matchdayState: { matchdayId: "matchday-1", status: "planning", pendingTeamIds: [], resolvedFixtureIds: [] },
     teams: [
@@ -159,6 +159,7 @@ describe("facility upgrade service", () => {
       level: 1,
       enabled: true,
       disabledReason: undefined,
+      conditionPct: 100,
     });
     expect(savedState.seasonState.facilityEvents?.[0]).toMatchObject({
       eventId: result.facilityEventId,
@@ -169,6 +170,34 @@ describe("facility upgrade service", () => {
       nextLevel: 1,
       cost: 8,
       source: "manual_facility_upgrade",
+      previousConditionPct: 0,
+      nextConditionPct: 100,
+    });
+  });
+
+  it("restores worn facilities to full condition when upgrading", () => {
+    const sourceSave = save({
+      teamFacilities: {
+        "team-1": facilities({
+          training_center: { level: 1, enabled: true, conditionPct: 42 },
+        }),
+      },
+    });
+    const preview = previewFacilityUpgrade(sourceSave, "team-1", "training_center");
+    const { persistence, saveSingleplayerState } = persistenceMock(sourceSave);
+
+    const result = applyFacilityUpgrade(sourceSave, "team-1", "training_center", preview.confirmToken, null, persistence);
+    const savedState = saveSingleplayerState.mock.calls[0]?.[1];
+
+    expect(result.applied).toBe(true);
+    if (!savedState) throw new Error("Expected facility apply to persist the next game state.");
+    expect(savedState.seasonState.teamFacilities?.["team-1"].facilities.training_center).toMatchObject({
+      level: 2,
+      conditionPct: 100,
+    });
+    expect(savedState.seasonState.facilityEvents?.[0]).toMatchObject({
+      previousConditionPct: 42,
+      nextConditionPct: 100,
     });
   });
 

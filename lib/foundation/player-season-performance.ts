@@ -115,6 +115,7 @@ function buildSummaryFromSnapshotRow(
   const breakdown = [...(row.disciplineBreakdown ?? [])].sort(
     (left, right) => (right.totalContribution ?? Number.NEGATIVE_INFINITY) - (left.totalContribution ?? Number.NEGATIVE_INFINITY),
   );
+  const hasSnapshotPointData = typeof row.totalPoints === "number" && Number.isFinite(row.totalPoints);
   const weakest = [...breakdown]
     .filter((entry) => entry.averageFinalScore != null)
     .sort((left, right) => (left.averageFinalScore ?? Number.POSITIVE_INFINITY) - (right.averageFinalScore ?? Number.POSITIVE_INFINITY))[0] ?? null;
@@ -124,8 +125,10 @@ function buildSummaryFromSnapshotRow(
     seasonName: snapshot?.seasonName ?? gameState.season.name,
     sourceLabel: "Season Snapshot",
     appearances: row.appearances,
-    totalPoints: row.totalPoints ?? row.totalContribution ?? null,
-    pointsByArea: buildAreaPointsFromDisciplineBreakdown(breakdown, disciplineCategoryById),
+    totalPoints: hasSnapshotPointData ? row.totalPoints ?? null : null,
+    pointsByArea: hasSnapshotPointData
+      ? buildAreaPointsFromDisciplineBreakdown(breakdown, disciplineCategoryById)
+      : buildEmptyAreaPoints(),
     averageContribution: row.averageContribution,
     averageFinalScore: row.averageFinalScore,
     top10Count: row.top10Count,
@@ -148,7 +151,7 @@ function buildSummaryFromSnapshotRow(
     })),
     matchdayBreakdown: [],
     disciplineBreakdown: breakdown,
-    warnings: row.warnings ?? [],
+    warnings: hasSnapshotPointData ? (row.warnings ?? []) : Array.from(new Set([...(row.warnings ?? []), "snapshot_player_points_missing"])),
   };
 }
 

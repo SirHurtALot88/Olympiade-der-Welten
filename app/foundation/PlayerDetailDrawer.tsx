@@ -4,7 +4,10 @@ import { useEffect } from "react";
 
 import type { PlayerDetailDrawerData } from "@/lib/foundation/player-detail-drawer";
 
-import ClassColorChip, { getClassColorClassName } from "./ClassColorChip";
+import { getClassColorClassName } from "./ClassColorChip";
+import ClassIcon from "./ClassIcon";
+import DisciplineIcon from "./DisciplineIcon";
+import RaceIcon from "./RaceIcon";
 import { getCanonicalSeasonLabel } from "@/lib/season/season-label";
 
 function formatValue(value: number | null | undefined, digits = 0) {
@@ -383,10 +386,10 @@ export default function PlayerDetailDrawer({
                 {data.teamName ?? "Kein aktives Team"}
                 {data.teamCode ? ` · ${data.teamCode}` : ""}
               </p>
-              <p className="player-drawer-subline">
-                <ClassColorChip className={data.className} /> · {data.race ?? "—"}
-                {data.subclasses.length ? ` · ${data.subclasses.join(", ")}` : ""}
-              </p>
+              <div className="player-drawer-identity-row">
+                <ClassIcon classNameValue={data.className} className="player-drawer-class-chip" iconClassName="player-drawer-class-icon" />
+                <RaceIcon race={data.race} className="player-drawer-race-chip" iconClassName="player-drawer-race-icon" />
+              </div>
               <div className="player-drawer-chip-row">
                 {data.subclasses.map((subclass) => (
                   <span key={`header-subclass-${subclass}`} className="player-drawer-chip is-subclass">
@@ -419,14 +422,9 @@ export default function PlayerDetailDrawer({
                   <span className="player-drawer-overline">Scouting-Profil</span>
                   <h3>{data.teamName ?? "Free Agent"}</h3>
                   <p className="player-drawer-subline">
-                    {formatRoleTag(transferContext.roleTag)} · <ClassColorChip className={data.className} /> · {data.race ?? "—"}
+                    {formatRoleTag(transferContext.roleTag)}
                   </p>
                   <div className="player-drawer-chip-row">
-                    {data.subclasses.map((subclass) => (
-                      <span key={`profile-subclass-${subclass}`} className="player-drawer-chip is-subclass">
-                        {subclass}
-                      </span>
-                    ))}
                     {data.traitsPositive.slice(0, 4).map((trait) => (
                       <span key={`positive-${trait}`} className="player-drawer-chip is-positive">
                         + {trait}
@@ -672,7 +670,7 @@ export default function PlayerDetailDrawer({
                           key={`top-discipline-${entry.id}`}
                           className={`metric-card player-drawer-discipline-card ${getDisciplineHeatClass(entry.rank)}`}
                         >
-                          <span>{entry.label}</span>
+                          <span><DisciplineIcon disciplineId={entry.id} label={entry.label} className="discipline-icon-chip-inline" /></span>
                           <strong>{formatDisciplineValue(entry.value, entry.upgradeDelta)}</strong>
                           <small>
                             {formatRankLabel(entry.rank)}
@@ -725,7 +723,7 @@ export default function PlayerDetailDrawer({
                     {topDisciplineCards.map((entry) => (
                       <tr key={`discipline-breakdown-${entry.id}`}>
                         <td>
-                          {entry.label}
+                          <DisciplineIcon disciplineId={entry.id} label={entry.label} className="discipline-icon-chip-inline" />
                           {entry.playerCount != null ? ` (${entry.playerCount})` : ""}
                         </td>
                         <td>{formatDisciplineValue(entry.value, entry.upgradeDelta)}</td>

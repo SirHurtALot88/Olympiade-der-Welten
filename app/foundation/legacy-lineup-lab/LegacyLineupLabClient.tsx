@@ -19,6 +19,13 @@ import {
   type MatchdayIntensityStage,
   type MatchdaySlotRoleDefinition,
 } from "@/lib/lineups/matchday-slot-roles";
+import {
+  formatLegacyLineupDragBlockReason,
+  getLegacyLineupDragFitTier,
+  resolveLegacyLineupDragBlockReason,
+  type LegacyLineupDragBlockReason,
+  type LegacyLineupDragFitTier,
+} from "@/lib/lineups/legacy-lineup-drag-drop";
 import { getTransfermarktTierFromPoints } from "@/lib/market/transfermarkt-sheet-stats";
 import type {
   LegacyLineupDraft,
@@ -294,6 +301,9 @@ type LineupPlayerTableRow = {
   marketValue: number | null;
   traitsPositive: string[];
   traitsNegative: string[];
+  injuryStatus: "healthy" | "injured" | "recovering" | null;
+  injuryRiskLabel: string | null;
+  availabilityBlocker: string | null;
   attributeStats: PlayerAttributeSheetStats | null;
   attributeRatings: Partial<Record<keyof PlayerAttributeSheetStats, string | null>> | null;
 };
@@ -329,6 +339,18 @@ type MatchdaySlotPreviewCard = {
   projected: ReturnType<typeof calculateMatchdayProjectedPreview>;
   selectedScore: number | null;
   selectedPlayerName: string | null;
+};
+
+type MatchdaySlotDragPreviewCard = {
+  slotKey: string;
+  activePlayerId: string;
+  disciplineSide: "d1" | "d2";
+  projected: ReturnType<typeof calculateMatchdayProjectedPreview>;
+  currentProjectedScore: number | null;
+  scoreDelta: number | null;
+  blockReason: LegacyLineupDragBlockReason | null;
+  fitTier: LegacyLineupDragFitTier;
+  slotRuleLabel: string | null;
 };
 
 type MatchdayCardRoleInsight = {
@@ -503,6 +525,31 @@ function resolveBestCardRoleInsight(
   });
 
   return insights[0] ?? null;
+}
+
+function normalizeClassHintToken(value: string | null | undefined) {
+  return (value ?? "")
+    .trim()
+    .toLowerCase()
+    .replace(/[_-]+/g, " ")
+    .replace(/\s+/g, " ");
+}
+
+function getDragFitTierClass(fitTier: LegacyLineupDragFitTier | null) {
+  switch (fitTier) {
+    case "best":
+      return "is-fit-best";
+    case "great":
+      return "is-fit-great";
+    case "okay":
+      return "is-fit-okay";
+    case "poor":
+      return "is-fit-poor";
+    case "blocked":
+      return "is-fit-blocked";
+    default:
+      return "";
+  }
 }
 
 function LegacyLineupTableCustomization({
@@ -1271,6 +1318,9 @@ export default function LegacyLineupLabClient(props: LegacyLineupLabClientProps)
           marketValue: player.displayMarketValue ?? activePlayer?.marketValue ?? null,
           traitsPositive: player.traitsPositive ?? [],
           traitsNegative: player.traitsNegative ?? [],
+          injuryStatus: player.injuryStatus ?? null,
+          injuryRiskLabel: player.injuryRiskLabel ?? null,
+          availabilityBlocker: player.availabilityBlocker ?? null,
           attributeStats: player.attributeStats ?? null,
           attributeRatings: player.attributeRatings ?? null,
         };
@@ -1478,6 +1528,16 @@ export default function LegacyLineupLabClient(props: LegacyLineupLabClientProps)
         .map((player) => [player.activePlayerId as string, player]),
     );
   }, [matchdayRosterCards]);
+  const captainSideByActivePlayerId = useMemo(() => {
+    const next = new Map<string, "d1" | "d2">();
+    if (captains.d1) {
+      next.set(captains.d1, "d1");
+    }
+    if (captains.d2) {
+      next.set(captains.d2, "d2");
+    }
+    return next;
+  }, [captains.d1, captains.d2]);
 
   const slotRoleByKey = useMemo(() => {
     const d1Roles = resolveSlotRolesForDiscipline(
@@ -1567,6 +1627,161 @@ export default function LegacyLineupLabClient(props: LegacyLineupLabClientProps)
     slotRoleByKey,
     slots,
   ]);
+  const slotCandidateSummaryByKey = useMemo(() => {
+    return new Map(
+      slots.map((slot) => {
+        const currentProjected = slotPreviewByKey.get(slot.key)?.projected.totalProjected ?? null;
+        const role = slotRoleByKey.get(slot.key) ?? null;
+        const topCandidates = sortOptionsByDisciplineSkill(getAvailableOptionsForSlot(slot.key), slot.disciplineId)
+          .slice(0, 3)
+          .map((option) => {
+            const rosterCard = rosterCardByActivePlayerId.get(option.activePlayerId) ?? null;
+            const projected = calculateMatchdayProjectedPreview({
+              baseScore: option.disciplineScores[slot.disciplineId] ?? null,
+              role,
+              attributeStats: rosterCard?.attributeStats ?? null,
+              currentFatigueCount: option.fatigueCount ?? null,
+              intensity: slotIntensity[slot.key] ?? "normal",
+              knownModifierBonus: 0,
+              revealVariance: 0,
+            });
+            return {
+              activePlayerId: option.activePlayerId,
+              name: option.name,
+              projectedScore: projected.totalProjected ?? null,
+              scoreDelta:
+                projected.totalProjected != null && currentProjected != null
+                  ? Number((projected.totalProjected - currentProjected).toFixed(1))
+                  : null,
+            };
+          });
+
+        return [slot.key, { topCandidates, currentProjected }] as const;
+      }),
+    );
+  }, [rosterCardByActivePlayerId, slotIntensity, slotPreviewByKey, slotRoleByKey, slots]);
+  const playerBestSlotSummaryByActivePlayerId = useMemo(() => {
+    return new Map(
+      playerOptions.map((option) => {
+        const candidateSlots = slots
+          .map((slot) => {
+            const rosterCard = rosterCardByActivePlayerId.get(option.activePlayerId) ?? null;
+            const role = slotRoleByKey.get(slot.key) ?? null;
+            const projected = calculateMatchdayProjectedPreview({
+              baseScore: option.disciplineScores[slot.disciplineId] ?? null,
+              role,
+              attributeStats: rosterCard?.attributeStats ?? null,
+              currentFatigueCount: option.fatigueCount ?? null,
+              intensity: slotIntensity[slot.key] ?? "normal",
+              knownModifierBonus: 0,
+              revealVariance: 0,
+            });
+            const currentProjected = slotPreviewByKey.get(slot.key)?.projected.totalProjected ?? null;
+            return {
+              slotKey: slot.key,
+              disciplineSide: slot.disciplineSide,
+              slotIndex: slot.slotIndex,
+              projectedScore: projected.totalProjected ?? null,
+              projectedDelta:
+                projected.totalProjected != null && currentProjected != null
+                  ? Number((projected.totalProjected - currentProjected).toFixed(1))
+                  : null,
+            };
+          })
+          .filter((entry) => entry.projectedScore != null)
+          .sort((left, right) => {
+            if ((right.projectedScore ?? Number.NEGATIVE_INFINITY) !== (left.projectedScore ?? Number.NEGATIVE_INFINITY)) {
+              return (right.projectedScore ?? Number.NEGATIVE_INFINITY) - (left.projectedScore ?? Number.NEGATIVE_INFINITY);
+            }
+            return left.slotKey.localeCompare(right.slotKey, "de");
+          })
+          .slice(0, 2);
+
+        return [option.activePlayerId, candidateSlots] as const;
+      }),
+    );
+  }, [playerOptions, rosterCardByActivePlayerId, slotIntensity, slotPreviewByKey, slotRoleByKey, slots]);
+  const slotDragPreviewByKey = useMemo(() => {
+    if (!draggedActivePlayerId) {
+      return new Map<string, MatchdaySlotDragPreviewCard>();
+    }
+
+    const draggedOption = getSelectedOptionMeta(draggedActivePlayerId);
+    const draggedRosterCard = rosterCardByActivePlayerId.get(draggedActivePlayerId) ?? null;
+    if (!draggedOption || !draggedRosterCard) {
+      return new Map<string, MatchdaySlotDragPreviewCard>();
+    }
+
+    const normalizedClassName = normalizeClassHintToken(draggedRosterCard.className);
+    const previews = slots.map((slot) => {
+      const role = slotRoleByKey.get(slot.key) ?? null;
+      const baseScore = draggedOption.disciplineScores[slot.disciplineId] ?? null;
+      const projected = calculateMatchdayProjectedPreview({
+        baseScore,
+        role,
+        attributeStats: draggedRosterCard.attributeStats ?? null,
+        currentFatigueCount: draggedOption.fatigueCount ?? null,
+        intensity: slotIntensity[slot.key] ?? "normal",
+        knownModifierBonus: 0,
+        revealVariance: 0,
+      });
+      const slotRuleLabel =
+        role?.classHints?.length && normalizedClassName
+          ? role.classHints.some((hint) => normalizeClassHintToken(hint) === normalizedClassName)
+            ? `Slot-Regel ok: ${role.classHints.join(" / ")}`
+            : `Off-Role: ${role.classHints.join(" / ")}`
+          : role?.classHints?.length
+            ? `Slot-Regel: ${role.classHints.join(" / ")}`
+            : null;
+      const blockReason = resolveLegacyLineupDragBlockReason({
+        availabilityBlocker: draggedRosterCard.availabilityBlocker,
+        selectedSides: draggedRosterCard.selectedSides,
+        targetDisciplineSide: slot.disciplineSide,
+        captainSide: captainSideByActivePlayerId.get(draggedActivePlayerId) ?? null,
+        hasBaseScore: baseScore != null,
+      });
+      const currentProjectedScore = slotPreviewByKey.get(slot.key)?.projected.totalProjected ?? null;
+      return {
+        slotKey: slot.key,
+        activePlayerId: draggedActivePlayerId,
+        disciplineSide: slot.disciplineSide,
+        projected,
+        currentProjectedScore,
+        scoreDelta:
+          projected.totalProjected != null && currentProjectedScore != null
+            ? Number((projected.totalProjected - currentProjectedScore).toFixed(1))
+            : null,
+        blockReason,
+        fitTier: "blocked" as const,
+        slotRuleLabel,
+      };
+    });
+
+    const bestProjectedScore = previews.reduce<number | null>((best, preview) => {
+      if (preview.blockReason || preview.projected.totalProjected == null) {
+        return best;
+      }
+      if (best == null || preview.projected.totalProjected > best) {
+        return preview.projected.totalProjected;
+      }
+      return best;
+    }, null);
+
+    return new Map(
+      previews.map((preview) => [
+        preview.slotKey,
+        {
+          ...preview,
+          fitTier: getLegacyLineupDragFitTier({
+            blocked: Boolean(preview.blockReason),
+            projectedScore: preview.projected.totalProjected,
+            bestProjectedScore,
+            currentProjectedScore: preview.currentProjectedScore,
+          }),
+        },
+      ]),
+    );
+  }, [captainSideByActivePlayerId, draggedActivePlayerId, rosterCardByActivePlayerId, slotIntensity, slotPreviewByKey, slotRoleByKey, slots]);
 
   const visibleTopPlayerCards = useMemo(() => {
     const scoreboardByTeamId = new Map(visibleMatchdayScoreboard.map((entry) => [entry.teamId, entry]));
@@ -2544,6 +2759,12 @@ export default function LegacyLineupLabClient(props: LegacyLineupLabClientProps)
     if (!droppedActivePlayerId) {
       return;
     }
+    const dragPreview = slotDragPreviewByKey.get(slotKey) ?? null;
+    if (dragPreview?.blockReason) {
+      setMessage(formatLegacyLineupDragBlockReason(dragPreview.blockReason) ?? "Drop blockiert.");
+      setDraggedActivePlayerId(null);
+      return;
+    }
     updateSelection(slotKey, droppedActivePlayerId);
     setDraggedActivePlayerId(null);
   }
@@ -2994,7 +3215,7 @@ export default function LegacyLineupLabClient(props: LegacyLineupLabClientProps)
             <strong>
               {context?.teamStatus?.lineupFilledCount ?? 0}/{context?.teamStatus?.totalLineupSides ?? "—"}
             </strong>
-            <span>Lineups</span>
+            <span>Saisonstatus gespeichert</span>
           </span>
           <span className="legacy-lineup-status-card">
             <strong>
@@ -3008,7 +3229,7 @@ export default function LegacyLineupLabClient(props: LegacyLineupLabClientProps)
           </span>
           <span className="legacy-lineup-status-card">
             <strong>{draft ? "gespeichert" : "offen"}</strong>
-            <span>Draft</span>
+            <span>Aktueller Room-Draft</span>
           </span>
         </div>
         <div className="legacy-lineup-rank-row">
@@ -3196,6 +3417,37 @@ export default function LegacyLineupLabClient(props: LegacyLineupLabClientProps)
                             )}
                           </span>
                           {player.captainEligible ? <span className="legacy-matchday-player-score-chip">Captain moeglich</span> : null}
+                          {player.injuryStatus && player.injuryStatus !== "healthy" ? (
+                            <span className="legacy-matchday-player-score-chip is-heat-low">
+                              {player.injuryStatus === "recovering" ? "Recovery" : "Verletzt"}
+                            </span>
+                          ) : null}
+                        </div>
+                        <div className="legacy-matchday-player-summary-grid">
+                          <div className="legacy-matchday-player-summary-card">
+                            <span>Beste Slots</span>
+                            <strong>
+                              {(playerBestSlotSummaryByActivePlayerId.get(player.activePlayerId ?? "") ?? [])
+                                .map((entry) => `${entry.disciplineSide.toUpperCase()}-${entry.slotIndex + 1}`)
+                                .join(" · ") || "—"}
+                            </strong>
+                            <small>
+                              {(playerBestSlotSummaryByActivePlayerId.get(player.activePlayerId ?? "") ?? [])
+                                .map((entry) => formatNullableScore(entry.projectedScore))
+                                .join(" / ") || "Keine Projektion"}
+                            </small>
+                          </div>
+                          <div className="legacy-matchday-player-summary-card">
+                            <span>Status</span>
+                            <strong>
+                              {player.availabilityBlocker
+                                ? "Blockiert"
+                                : player.injuryStatus === "recovering"
+                                  ? "Recovery"
+                                  : "Verfuegbar"}
+                            </strong>
+                            <small>{player.injuryRiskLabel ?? formatFatigueHint(Math.max(player.discipline1Score ?? 0, player.discipline2Score ?? 0), player.fatigueCount)}</small>
+                          </div>
                         </div>
                         {roleInsight?.role ? (
                           <div
@@ -3310,19 +3562,57 @@ export default function LegacyLineupLabClient(props: LegacyLineupLabClientProps)
                       {disciplineSide === "d1" ? lineupMeta.d1Selected : lineupMeta.d2Selected}/{discipline?.requiredPlayers ?? "—"}
                     </span>
                   </div>
+                  <div className="legacy-lineup-side-meta">
+                    <span>
+                      <strong>Saisonstatus:</strong> {context?.teamStatus?.lineupFilledCount ?? 0}/{context?.teamStatus?.totalLineupSides ?? "—"}
+                    </span>
+                    <span>
+                      <strong>Room jetzt:</strong> {disciplineSide === "d1" ? lineupMeta.d1Selected : lineupMeta.d2Selected}/{discipline?.requiredPlayers ?? "—"}
+                    </span>
+                    <span>
+                      <strong>Gespeichert:</strong> {(draft?.entries ?? []).filter((entry) => entry.disciplineSide === disciplineSide).length}/{discipline?.requiredPlayers ?? "—"}
+                    </span>
+                    <span>
+                      <strong>Captain:</strong> {captains[disciplineSide] ? "gesetzt" : "offen"}
+                    </span>
+                  </div>
                   <div className="legacy-lineup-side-body legacy-lineup-arena-slot-grid">
                     {sideSlots.map((slot) => (
                       <label
                         key={slot.key}
-                        className={`legacy-lineup-lab-slot-row legacy-lineup-slot-dropzone legacy-lineup-arena-slot ${draggedActivePlayerId ? "is-drop-ready" : ""}`}
+                        className={`legacy-lineup-lab-slot-row legacy-lineup-slot-dropzone legacy-lineup-arena-slot ${draggedActivePlayerId ? "is-drop-ready" : ""} ${getDragFitTierClass(slotDragPreviewByKey.get(slot.key)?.fitTier ?? null)}`.trim()}
                         onDoubleClick={() => openPlayerDetailsForActivePlayer(selections[slot.key])}
                         onDragOver={(event) => {
+                          const dragPreview = slotDragPreviewByKey.get(slot.key) ?? null;
+                          if (dragPreview?.blockReason) {
+                            return;
+                          }
                           event.preventDefault();
+                          event.dataTransfer.dropEffect = "move";
                         }}
                         onDrop={(event) => {
                           event.preventDefault();
                           handleDropOnSlot(slot.key, event.dataTransfer.getData("text/plain") || draggedActivePlayerId);
                         }}
+                        title={(() => {
+                          const dragPreview = slotDragPreviewByKey.get(slot.key) ?? null;
+                          if (!dragPreview || !draggedActivePlayerId) {
+                            return undefined;
+                          }
+                          const blockerLabel = formatLegacyLineupDragBlockReason(dragPreview.blockReason);
+                          return [
+                            blockerLabel ? `Blocker: ${blockerLabel}` : "Drop möglich",
+                            `Projected Score: ${dragPreview.projected.totalProjected != null ? formatScore(dragPreview.projected.totalProjected) : "—"}`,
+                            `Score Δ: ${dragPreview.scoreDelta != null ? `${dragPreview.scoreDelta >= 0 ? "+" : ""}${formatDecimalScore(dragPreview.scoreDelta, 1)}` : "—"}`,
+                            `Base: ${dragPreview.projected.baseScore != null ? formatScore(dragPreview.projected.baseScore) : "—"}`,
+                            `Fatigue: -${formatDecimalScore(dragPreview.projected.fatigueModifier ?? 0, 1)} (${Math.round(dragPreview.projected.fatiguePenaltyPercent ?? 0)}%)`,
+                            `Form: Preview benutzt den aktuellen Save-Stand; Detailbonus kommt nach Revalidate`,
+                            `Captain: ${captainSideByActivePlayerId.get(dragPreview.activePlayerId) ? "bereits anders gebunden" : "frei"}`,
+                            `Mutator: Nach Drop über bestehende Preview aktualisiert`,
+                            dragPreview.slotRuleLabel ?? "Slot-Regel: Standard",
+                          ].join("\n");
+                        })()}
+                        aria-disabled={Boolean(slotDragPreviewByKey.get(slot.key)?.blockReason)}
                       >
                         {(() => {
                           const selectedOption = getSelectedOptionMeta(selections[slot.key]);
@@ -3330,6 +3620,8 @@ export default function LegacyLineupLabClient(props: LegacyLineupLabClientProps)
                           const selectedRosterCard = rosterCardByActivePlayerId.get(selections[slot.key] ?? "");
                           const sideEntry = sidePreview?.entries.find((entry) => entry.slotIndex === slot.slotIndex) ?? null;
                           const slotPreview = slotPreviewByKey.get(slot.key) ?? null;
+                          const slotCandidateSummary = slotCandidateSummaryByKey.get(slot.key) ?? null;
+                          const dragPreview = slotDragPreviewByKey.get(slot.key) ?? null;
                           const role = slotRoleByKey.get(slot.key) ?? null;
                           const intensity = slotIntensity[slot.key] ?? "normal";
                           const intensityConfig = getMatchdayIntensityConfig(intensity);
@@ -3357,17 +3649,81 @@ export default function LegacyLineupLabClient(props: LegacyLineupLabClientProps)
                             <>
                               <div className="legacy-lineup-arena-slot-head">
                                 <span className="legacy-lineup-arena-slot-title">Slot {slot.slotIndex + 1}</span>
-                                <span
-                                  className="legacy-lineup-arena-slot-role"
-                                  title={
-                                    role
-                                      ? `${role.label} · ${role.description} · Major ${attributeShortLabels[role.majorPositiveAttribute]} · Minor ${attributeShortLabels[role.minorPositiveAttribute]} · Strain ${attributeShortLabels[role.strainAttribute]}`
-                                      : `Slot ${slot.slotIndex + 1}`
-                                  }
-                                >
-                                  {role?.label ?? `Slot ${slot.slotIndex + 1}`}
-                                </span>
+                                <div className="legacy-lineup-slot-head-tags">
+                                  {dragPreview ? (
+                                    <span className={`legacy-lineup-slot-fit-pill ${getDragFitTierClass(dragPreview.fitTier)}`}>
+                                      {dragPreview.fitTier === "best"
+                                        ? "Optimal"
+                                        : dragPreview.fitTier === "great"
+                                          ? "Gut"
+                                          : dragPreview.fitTier === "okay"
+                                            ? "Okay"
+                                            : dragPreview.fitTier === "poor"
+                                              ? "Schlecht"
+                                              : "Blockiert"}
+                                    </span>
+                                  ) : null}
+                                  <span
+                                    className="legacy-lineup-arena-slot-role"
+                                    title={
+                                      role
+                                        ? `${role.label} · ${role.description} · Major ${attributeShortLabels[role.majorPositiveAttribute]} · Minor ${attributeShortLabels[role.minorPositiveAttribute]} · Strain ${attributeShortLabels[role.strainAttribute]}`
+                                        : `Slot ${slot.slotIndex + 1}`
+                                    }
+                                  >
+                                    {role?.label ?? `Slot ${slot.slotIndex + 1}`}
+                                  </span>
+                                </div>
                               </div>
+                              <div className="legacy-lineup-slot-summary-grid">
+                                <div className="legacy-lineup-slot-summary-card">
+                                  <span>Zweck</span>
+                                  <strong>{role?.label ?? "Standard"}</strong>
+                                  <small>{role?.description ?? `${discipline?.displayName ?? "Diszi"} Slot`}</small>
+                                </div>
+                                <div className="legacy-lineup-slot-summary-card">
+                                  <span>Current</span>
+                                  <strong>{slotPreview?.projected.totalProjected != null ? formatScore(slotPreview.projected.totalProjected) : "—"}</strong>
+                                  <small>Base {selectedScore != null ? formatScore(selectedScore) : "—"}</small>
+                                </div>
+                                <div className="legacy-lineup-slot-summary-card">
+                                  <span>Drag Preview</span>
+                                  <strong>{dragPreview?.projected.totalProjected != null ? formatScore(dragPreview.projected.totalProjected) : "—"}</strong>
+                                  <small>
+                                    Δ {dragPreview?.scoreDelta != null ? `${dragPreview.scoreDelta >= 0 ? "+" : ""}${formatDecimalScore(dragPreview.scoreDelta, 1)}` : "—"}
+                                  </small>
+                                </div>
+                                <div className="legacy-lineup-slot-summary-card">
+                                  <span>Beste Kandidaten</span>
+                                  <strong>
+                                    {slotCandidateSummary?.topCandidates.slice(0, 2).map((candidate) => candidate.name).join(" · ") || "—"}
+                                  </strong>
+                                  <small>
+                                    {slotCandidateSummary?.topCandidates
+                                      .slice(0, 2)
+                                      .map((candidate) =>
+                                        candidate.scoreDelta != null
+                                          ? `${formatNullableScore(candidate.projectedScore)} (${candidate.scoreDelta >= 0 ? "+" : ""}${formatDecimalScore(candidate.scoreDelta, 1)})`
+                                          : formatNullableScore(candidate.projectedScore),
+                                      )
+                                      .join(" / ") || "Keine Alternative"}
+                                  </small>
+                                </div>
+                              </div>
+                              {dragPreview ? (
+                                <div className={`legacy-lineup-slot-drag-callout ${getDragFitTierClass(dragPreview.fitTier)}`}>
+                                  <strong>
+                                    {formatLegacyLineupDragBlockReason(dragPreview.blockReason) ??
+                                      `Projected ${dragPreview.projected.totalProjected != null ? formatScore(dragPreview.projected.totalProjected) : "—"}`}
+                                  </strong>
+                                  <span>
+                                    Score Δ {dragPreview.scoreDelta != null ? `${dragPreview.scoreDelta >= 0 ? "+" : ""}${formatDecimalScore(dragPreview.scoreDelta, 1)}` : "—"} ·
+                                    {" "}Base {dragPreview.projected.baseScore != null ? formatScore(dragPreview.projected.baseScore) : "—"} ·
+                                    {" "}Fatigue -{formatDecimalScore(dragPreview.projected.fatigueModifier ?? 0, 1)} ·
+                                    {" "}{dragPreview.slotRuleLabel ?? "Slot-Regel: Standard"}
+                                  </span>
+                                </div>
+                              ) : null}
                               {selectedRosterCard ? (
                                 <div className="legacy-lineup-slot-player-card">
                                   <div className="legacy-lineup-slot-player-head">
@@ -3603,9 +3959,9 @@ export default function LegacyLineupLabClient(props: LegacyLineupLabClientProps)
               <small>Risiko-Level {matchdayPreviewCards.riskLevel}</small>
             </article>
             <article className="metric-card">
-              <span>Captain</span>
-              <strong>{captains.d1 && captains.d2 ? "gesetzt" : "offen"}</strong>
-              <small>{captains.d1 ? `${d1Label} gesetzt` : `${d1Label} offen`} · {captains.d2 ? `${d2Label} gesetzt` : `${d2Label} offen`}</small>
+              <span>Status jetzt</span>
+              <strong>{draft ? "gespeichert" : "offen"}</strong>
+              <small>Room {lineupMeta.d1Selected + lineupMeta.d2Selected} Slots · Save {(draft?.entries ?? []).length}</small>
             </article>
             <article className="metric-card">
               <span>Formkartenstatus</span>

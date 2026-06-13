@@ -1,6 +1,6 @@
 import { evaluateAiNeeds } from "@/lib/ai/aiNeedsEngine";
 import { getTeamObjectiveAiBias, type TeamObjectiveAiBias } from "@/lib/board/team-season-objectives-service";
-import type { GameState, Team, TeamControlMode, TeamStrategyProfile } from "@/lib/data/olyDataTypes";
+import type { GameState, Player, Team, TeamControlMode, TeamStrategyProfile } from "@/lib/data/olyDataTypes";
 import { resolvePlayerEconomyContract } from "@/lib/foundation/player-economy-contract";
 import { getTeamControlSettings } from "@/lib/foundation/team-control-settings";
 import { getTeamStrategyProfile, withNormalizedTeamStrategyProfiles } from "@/lib/foundation/team-strategy-profiles";
@@ -12,6 +12,7 @@ import { listLocalTransfermarktFreeAgents, previewLocalTransfermarktBuy } from "
 import { listTransfermarktFreeAgents } from "@/lib/market/transfermarkt-read-service";
 import {
   MERCENARY_NEGATIVE_FIT_PENALTY_REASON,
+  calculateTransfermarktFit,
   getMercenaryNegativeFitPenalty,
   normalizeTransfermarktToken,
 } from "@/lib/market/transfermarkt-fit";
@@ -205,20 +206,22 @@ function expandSemanticTokens(values: string[]) {
 }
 
 function getTeamMarketValueTotal(gameState: GameState, teamId: string) {
+  const playersById = new Map(gameState.players.map((player) => [player.id, player] as const));
   return gameState.rosters
     .filter((entry) => entry.teamId === teamId)
     .reduce((sum, entry) => {
-      const player = gameState.players.find((candidate) => candidate.id === entry.playerId) ?? null;
+      const player = playersById.get(entry.playerId) ?? null;
       return sum + (resolvePlayerEconomyContract({ player, rosterEntry: entry }).marketValue ?? 0);
     }, 0);
 }
 
 function getRosterEconomyContext(gameState: GameState, teamId: string) {
+  const playersById = new Map(gameState.players.map((player) => [player.id, player] as const));
   const rosterPlayers = gameState.rosters
     .filter((entry) => entry.teamId === teamId)
     .map((entry) => ({
       entry,
-      player: gameState.players.find((candidate) => candidate.id === entry.playerId) ?? null,
+      player: playersById.get(entry.playerId) ?? null,
     }))
     .filter((item): item is { entry: (typeof gameState.rosters)[number]; player: (typeof gameState.players)[number] } => Boolean(item.player));
   return {
@@ -388,10 +391,161 @@ function getPlayerById(gameState: GameState, playerId: string) {
   return gameState.players.find((entry) => entry.id === playerId) ?? null;
 }
 
+function buildRosterByTeamId(gameState: GameState) {
+  const rosterByTeamId = new Map<string, GameState["rosters"]>();
+  for (const rosterEntry of gameState.rosters) {
+    const existing = rosterByTeamId.get(rosterEntry.teamId);
+    if (existing) {
+      existing.push(rosterEntry);
+    } else {
+      rosterByTeamId.set(rosterEntry.teamId, [rosterEntry]);
+    }
+  }
+  return rosterByTeamId;
+}
+
+function buildRecentlySoldByTeamPlayerMap(gameState: GameState) {
+  const byTeamPlayer = new Map<string, Set<string>>();
+  const currentSeasonId = gameState.season.id;
+  for (const entry of gameState.transferHistory) {
+    if (
+      entry.seasonId !== currentSeasonId ||
+      entry.transferType !== "sell" ||
+      entry.fromTeamId == null ||
+      entry.playerId == null
+    ) {
+      continue;
+    }
+    const existing = byTeamPlayer.get(entry.fromTeamId) ?? new Set<string>();
+    existing.add(entry.playerId);
+    byTeamPlayer.set(entry.fromTeamId, existing);
+  }
+  return byTeamPlayer;
+}
+
+function getCandidatePrimaryAxis(item: TransfermarktFreeAgentItem): "pow" | "spe" | "men" | "soc" {
+  const axisValues: Array<["pow" | "spe" | "men" | "soc", number]> = [
+    ["pow", item.pow ?? 0],
+    ["spe", item.spe ?? 0],
+    ["men", item.men ?? 0],
+    ["soc", item.soc ?? 0],
+  ];
+  axisValues.sort((left, right) => right[1] - left[1]);
+  return axisValues[0]?.[0] ?? "pow";
+}
+
+function matchesHardNoGoCandidate(profile: TeamStrategyProfile | null, item: TransfermarktFreeAgentItem) {
+  if (!profile || profile.hardNoGos.length === 0) {
+    return false;
+  }
+
+  const tokens = getCombinedCandidateTokens(item);
+  const normalizedRace = normalizeTransfermarktToken(item.race);
+  return profile.hardNoGos.some((entry) => {
+    const normalized = normalizeTransfermarktToken(entry);
+    if (!normalized) {
+      return false;
+    }
+    if (normalized.includes("nonhuman") && normalizedRace !== "human") {
+      return true;
+    }
+    if (normalized.includes("human") && normalized.includes("anti") && normalizedRace === "human") {
+      return true;
+    }
+    return tokens.some((token) => token === normalized || token.includes(normalized) || normalized.includes(token));
+  });
+}
+
+function buildCheapCandidateScore(input: {
+  item: TransfermarktFreeAgentItem;
+  weakestAxes: Array<"pow" | "spe" | "men" | "soc">;
+  needs: ReturnType<typeof evaluateAiNeeds>;
+  strategyProfile: TeamStrategyProfile | null;
+}) {
+  const { item, weakestAxes, needs, strategyProfile } = input;
+  const valueScore = clamp((item.marketValueSalaryRatio ?? 0) / 20, 0, 1);
+  const axisMap = {
+    pow: clamp((item.pow ?? 0) / 100, 0, 1),
+    spe: clamp((item.spe ?? 0) / 100, 0, 1),
+    men: clamp((item.men ?? 0) / 100, 0, 1),
+    soc: clamp((item.soc ?? 0) / 100, 0, 1),
+  };
+  const axisNeedScore =
+    weakestAxes.length > 0
+      ? clamp(weakestAxes.reduce((sum, axis) => sum + axisMap[axis], 0) / weakestAxes.length, 0, 1)
+      : axisMap[getCandidatePrimaryAxis(item)];
+  const disciplineNeedScore = clamp(
+    item.topDisciplineScores.filter((entry) => needs.topNeedDisciplineIds.includes(entry.disciplineId)).length / 2,
+    0,
+    1,
+  );
+  const strategyBoost = getStrategyPriorityBoost(item, strategyProfile);
+  return (
+    axisNeedScore * 42 +
+    disciplineNeedScore * 28 +
+    valueScore * 16 +
+    clamp((item.ovr ?? 0) / 100, 0, 1) * 18 +
+    strategyBoost
+  );
+}
+
+function enrichCandidateForTeam(input: {
+  context: ResolvedPreviewContext;
+  team: Team;
+  item: TransfermarktFreeAgentItem;
+  rosterPlayers: Player[];
+  playerMin: number | null;
+  playerOpt: number | null;
+}): TransfermarktFreeAgentItem {
+  const player = getPlayerById(input.context.gameState, input.item.playerId);
+  const fitBreakdown =
+    player
+      ? calculateTransfermarktFit(player, input.rosterPlayers, { teamId: input.team.teamId })
+      : {
+          fitRace: 0,
+          fitSubclasses: 0,
+          fitTraits: 0,
+          fitAlignment: 0,
+          teamFit: 0,
+        };
+
+  return {
+    ...input.item,
+    teamContextAvailable: true,
+    teamCash: input.team.cash ?? null,
+    teamSalary: null,
+    rosterCount: input.rosterPlayers.length,
+    playerMin: input.playerMin,
+    playerOpt: input.playerOpt,
+    affordabilityStatus:
+      input.item.marketValue == null
+        ? null
+        : input.team.cash >= input.item.marketValue
+          ? "affordable"
+          : "too_expensive",
+    rosterPressureStatus:
+      input.playerMin == null || input.playerOpt == null
+        ? null
+        : input.rosterPlayers.length < input.playerMin
+          ? "under_min"
+          : input.rosterPlayers.length < input.playerOpt
+            ? "under_opt"
+            : "at_or_above_opt",
+    fitRace: fitBreakdown.fitRace,
+    fitSubclasses: fitBreakdown.fitSubclasses,
+    fitTraits: fitBreakdown.fitTraits,
+    fitAlignment: fitBreakdown.fitAlignment,
+    fit: fitBreakdown.teamFit,
+    fitDisplay: input.item.mercenary ? `${fitBreakdown.teamFit ?? 0} · Mercenary` : `${fitBreakdown.teamFit ?? 0}`,
+    fitSource: "local_approximation_not_golden_master" as const,
+  };
+}
+
 function buildRosterClassCounts(gameState: GameState, teamId: string) {
+  const playersById = new Map(gameState.players.map((player) => [player.id, player] as const));
   const counts = new Map<string, number>();
   for (const rosterEntry of gameState.rosters.filter((entry) => entry.teamId === teamId)) {
-    const player = getPlayerById(gameState, rosterEntry.playerId);
+    const player = playersById.get(rosterEntry.playerId) ?? null;
     const classToken = normalizeTransfermarktToken(player?.className ?? "");
     if (!classToken) {
       continue;
@@ -885,6 +1039,20 @@ export async function buildAiTransfermarktPreview(params: AiTransferPreviewParam
     return control?.controlMode === "ai";
   });
 
+  const baseFreeAgentFeed =
+    context.source === "sqlite"
+      ? listLocalTransfermarktFreeAgents({
+          saveId: context.saveId,
+          seasonId: context.seasonId,
+          limit: Math.max(context.gameState.players.length, 5000),
+        })
+      : null;
+  const baseFreeAgents = baseFreeAgentFeed?.items ?? [];
+  const rosterByTeamId = buildRosterByTeamId(context.gameState);
+  const playerById = new Map(context.gameState.players.map((player) => [player.id, player] as const));
+  const recentlySoldByTeamPlayer = buildRecentlySoldByTeamPlayerMap(context.gameState);
+  const shortlistSize = 72;
+
   const teams = await Promise.all(
     candidateTeams.map(async (team) => {
       const control = getTeamControlSettings(context.gameState, team.teamId);
@@ -915,20 +1083,21 @@ export async function buildAiTransfermarktPreview(params: AiTransferPreviewParam
         (control?.controlMode === "ai" && (objectiveBias?.rosterUrgency ?? 0) >= 0.7) ||
         (control?.controlMode === "ai" && (objectiveBias?.pressure ?? 0) >= 8) ||
         forceBuyScanTeamIds.has(team.teamId);
-      const freeAgents = shouldDeepScanBuyCandidates
-        ? await loadFreeAgentsForTeam(context, team.teamId, limit)
-        : null;
+      const teamRosterEntries = rosterByTeamId.get(team.teamId) ?? [];
+      const rosterPlayers = teamRosterEntries
+        .map((entry) => playerById.get(entry.playerId) ?? null)
+        .filter((entry): entry is Player => Boolean(entry));
       const rosterClassCounts = buildRosterClassCounts(context.gameState, team.teamId);
       const effectivePlayerMin = Math.max(
-        capRosterTarget(freeAgents?.teamContext?.playerMin ?? identity?.playerMin ?? null, team.rosterLimit),
+        capRosterTarget(identity?.playerMin ?? null, team.rosterLimit),
         capRosterTarget(currentMatchdayRosterRequirement ?? null, team.rosterLimit),
       );
       const effectivePlayerOpt = Math.max(
-        capRosterTarget(freeAgents?.teamContext?.playerOpt ?? identity?.playerOpt ?? null, team.rosterLimit),
+        capRosterTarget(identity?.playerOpt ?? null, team.rosterLimit),
         effectivePlayerMin,
       );
       const rosterStatus = getRosterStatus({
-        rosterCount: freeAgents?.teamContext?.rosterCount ?? rosterEconomy.rosterCount,
+        rosterCount: rosterEconomy.rosterCount,
         playerMin: effectivePlayerMin > 0 ? effectivePlayerMin : null,
         playerOpt: effectivePlayerOpt > 0 ? effectivePlayerOpt : null,
       });
@@ -945,7 +1114,19 @@ export async function buildAiTransfermarktPreview(params: AiTransferPreviewParam
         warnings.push("AI-Transfer-Preview ist fuer dieses Team deaktiviert");
       }
       warnings.push(...(objectiveBias?.warnings ?? []));
-      const scopedFreeAgents = (freeAgents?.items ?? []).filter((item) => !globallyExcludedPlayerIds.has(item.playerId));
+      const scopedFreeAgents = !shouldDeepScanBuyCandidates
+        ? []
+        : context.source !== "sqlite"
+          ? (await loadFreeAgentsForTeam(context, team.teamId, limit)).items.filter((item) => !globallyExcludedPlayerIds.has(item.playerId))
+          : baseFreeAgents.filter((item) => {
+              if (globallyExcludedPlayerIds.has(item.playerId)) return false;
+              if (item.marketValue == null || item.salary == null) return false;
+              if (teamRosterEntries.length >= team.rosterLimit) return false;
+              if (team.cash < item.marketValue) return false;
+              if (recentlySoldByTeamPlayer.get(team.teamId)?.has(item.playerId)) return false;
+              if (matchesHardNoGoCandidate(strategyProfile, item)) return false;
+              return true;
+            });
       if (!scopedFreeAgents.length) {
         if (shouldDeepScanBuyCandidates) {
           warnings.push("keine Free Agents im aktuellen Scope gefunden");
@@ -958,7 +1139,33 @@ export async function buildAiTransfermarktPreview(params: AiTransferPreviewParam
         warnings.push(`aktueller Spieltag braucht ${Math.min(currentMatchdayRosterRequirement, team.rosterLimit)} aktive Slots`);
       }
 
-      const scored = scopedFreeAgents
+      const roughShortlist =
+        context.source === "sqlite"
+          ? scopedFreeAgents
+              .map((item) => ({
+                item,
+                roughScore: buildCheapCandidateScore({
+                  item,
+                  weakestAxes,
+                  needs,
+                  strategyProfile,
+                }),
+              }))
+              .sort((left, right) => right.roughScore - left.roughScore)
+              .slice(0, Math.max(shortlistSize, limit * 3))
+              .map((entry) =>
+                enrichCandidateForTeam({
+                  context,
+                  team,
+                  item: entry.item,
+                  rosterPlayers,
+                  playerMin: effectivePlayerMin > 0 ? effectivePlayerMin : null,
+                  playerOpt: effectivePlayerOpt > 0 ? effectivePlayerOpt : null,
+                }),
+              )
+          : scopedFreeAgents;
+
+      const scored = roughShortlist
         .map((item) => ({
           item,
           scored: scoreCandidate({
@@ -976,9 +1183,7 @@ export async function buildAiTransfermarktPreview(params: AiTransferPreviewParam
         .sort((left, right) => right.scored.score - left.scored.score);
 
       const affordableCandidates = buildDiverseCandidateSlice(
-        scored
-        .filter((entry) => entry.scored.preview.canBuy && entry.scored.score >= 35)
-        ,
+        scored.filter((entry) => entry.scored.preview.canBuy && entry.scored.score >= 35),
         24,
         2,
       );
@@ -1057,10 +1262,10 @@ export async function buildAiTransfermarktPreview(params: AiTransferPreviewParam
         aiTransferPreviewEnabled: control?.aiTransferPreviewEnabled ?? false,
         status,
         cash: team.cash ?? null,
-        salary: freeAgents?.teamContext?.teamSalary ?? rosterEconomy.salaryTotal,
-        salaryTotal: freeAgents?.teamContext?.teamSalary ?? rosterEconomy.salaryTotal,
-        rosterSize: freeAgents?.teamContext?.rosterCount ?? rosterEconomy.rosterCount,
-        rosterCount: freeAgents?.teamContext?.rosterCount ?? rosterEconomy.rosterCount,
+        salary: rosterEconomy.salaryTotal,
+        salaryTotal: rosterEconomy.salaryTotal,
+        rosterSize: rosterEconomy.rosterCount,
+        rosterCount: rosterEconomy.rosterCount,
         targetRosterMin: effectivePlayerMin > 0 ? effectivePlayerMin : null,
         targetRosterOpt: effectivePlayerOpt > 0 ? effectivePlayerOpt : null,
         marketValueTotal: rosterEconomy.marketValueTotal,

@@ -7,6 +7,9 @@ import type { CSSProperties, Dispatch, SetStateAction } from "react";
 import PlayerDetailDrawer from "@/app/foundation/PlayerDetailDrawer";
 import PlayerGeneratorPanel from "@/app/foundation/PlayerGeneratorPanel";
 import ClassColorChip, { getClassColorClassName } from "@/app/foundation/ClassColorChip";
+import ClassIcon from "@/app/foundation/ClassIcon";
+import DisciplineIcon from "@/app/foundation/DisciplineIcon";
+import RaceIcon from "@/app/foundation/RaceIcon";
 import MatchdayArenaClient from "@/app/foundation/matchday-arena/MatchdayArenaClient";
 import TeamDetailDrawer, { type TeamDetailDrawerData } from "@/app/foundation/TeamDetailDrawer";
 import LegacyLineupLabClient from "@/app/foundation/legacy-lineup-lab/LegacyLineupLabClient";
@@ -23,12 +26,17 @@ import {
   type SpecialistWingVariant,
 } from "@/lib/facilities/facility-catalog";
 import {
+  calculateFacilityMaintenanceCost,
+  getFacilityConditionStatus,
+} from "@/lib/facilities/facility-condition";
+import {
   applyRecoveryFacilityModifiers,
   applyTrainingXpFacilityModifiers,
   applyUpgradeCostFacilityModifiers,
   calculateFacilityIncome,
   calculateFacilityUpkeep,
   getAnalyticsForecastQuality,
+  getFacilityEfficiency,
   getFacilityLevel,
   getScoutingConfidence,
   getTeamFacilityState,
@@ -113,6 +121,7 @@ import {
 import { buildTeamSeasonOverviewRows } from "@/lib/foundation/team-management-overview";
 import {
   buildMultiSeasonBalanceDashboard,
+  type MultiSeasonBalanceDashboard,
   type MultiSeasonBalanceEconomyRow,
   type MultiSeasonBalanceGameplayRow,
   type MultiSeasonBalancePlayerRow,
@@ -123,6 +132,7 @@ import {
   featureAuditFilters,
   filterFeatureAuditEntries,
   getFeatureAuditFlags,
+  type FeatureAuditMatrix,
   type FeatureAuditFilter,
   type FeatureAuditStatus,
 } from "@/lib/foundation/feature-audit-matrix";
@@ -138,10 +148,13 @@ import {
   buildPlayerProgressionForecast,
   PLAYER_PROGRESSION_XP_CONSTANTS,
 } from "@/lib/training/player-progression-forecast";
+import { BASE_MATCHDAY_RECOVERY } from "@/lib/fatigue/fatigue-injury-service";
+import { applyTrainingRecoveryImpact, TRAINING_RECOVERY_IMPACT } from "@/lib/training/training-recovery-impact";
 import {
   buildSeasonEndProgressionPreview,
   SEASON_END_ATTRIBUTE_LABELS,
   type SeasonEndFacilityPreviewInput,
+  type SeasonEndProgressionPreview,
 } from "@/lib/training/season-end-progression-preview";
 import type {
   SeasonEndXpSpendPlannedUpgradeInput,
@@ -160,6 +173,7 @@ import {
   uniqueGlobalColumnIds,
   type GlobalTableColumnConfig,
 } from "@/lib/ui/global-table-layout";
+import type { PlayerEconomyCompareReport } from "@/lib/foundation/player-economy-compare-service";
 
 type SortDirection = "asc" | "desc";
 type SortState = {
@@ -190,6 +204,99 @@ type FoundationView =
   | "generator"
   | "teamSettings"
   | "admin";
+
+const EMPTY_MULTI_SEASON_BALANCE_DASHBOARD: MultiSeasonBalanceDashboard = {
+  generatedAt: "deferred",
+  sourceSummary: {
+    saveId: null,
+    activeSeasonId: "deferred",
+    snapshotSeasons: [],
+    completedSeasonCount: 0,
+    hasCurrentSeasonData: false,
+    missingSeasonIds: [],
+    seasonQuality: [],
+  },
+  summaryCards: [],
+  teamRows: [],
+  economyRows: [],
+  playerRows: [],
+  gameplayRows: [],
+  warnings: [],
+  exportLinks: [],
+};
+
+const EMPTY_FEATURE_AUDIT_MATRIX: FeatureAuditMatrix = {
+  generatedAt: "deferred",
+  entries: [],
+  summary: {
+    total: 0,
+    statusCounts: {
+      planned: 0,
+      preview: 0,
+      local_write: 0,
+      sandbox_ready: 0,
+      multiplayer_ready: 0,
+      prod_ready: 0,
+    },
+    prodReady: 0,
+    sandboxReadyOrBetter: 0,
+    previewOnly: 0,
+    localWrite: 0,
+    multiplayerReady: 0,
+    missingTests: 0,
+    missingSmoke: 0,
+    localWriteWithoutWriteSafety: 0,
+    multiplayerMissing: 0,
+    blockerCount: 0,
+    topBlockers: [],
+  },
+};
+
+const EMPTY_PLAYER_ECONOMY_COMPARE_REPORT: PlayerEconomyCompareReport = {
+  economyMode: "compare",
+  activeTransferEconomyMode: "legacy",
+  benchmarkSource: "legacy_imported_display",
+  players: [],
+  summary: {
+    comparedPlayers: 0,
+    missingMarketValueSources: 0,
+    missingSalarySources: 0,
+    missingSourceCount: 0,
+    salaryFloorAppliedCount: 0,
+    averageMarketValueDelta: null,
+    medianMarketValueDelta: null,
+    averageSalaryDelta: null,
+    medianSalaryDelta: null,
+    topLegacyOvervaluedPlayers: [],
+    topLegacyUndervaluedPlayers: [],
+    topSalaryOutliers: [],
+    salaryFloorAppliedPlayers: [],
+    playersWithMissingSources: [],
+    byTeam: [],
+    byClass: [],
+    byRace: [],
+    marketValueOutliersByTeam: [],
+    marketValueOutliersByClass: [],
+    salaryOutliersByTeam: [],
+    salaryOutliersByClass: [],
+  },
+  warnings: [],
+  formulaStatus: {
+    marketValueEngine: "deferred",
+    salaryEngine: "deferred",
+    rankToDisciplineMarketValue: "deferred",
+    attributeSalaryModifiers: "deferred",
+    traitSalaryFactors: "deferred",
+  },
+};
+
+const EMPTY_SEASON_END_PROGRESSION_PREVIEW: SeasonEndProgressionPreview = {
+  status: "ready",
+  productiveWrites: false,
+  rows: [],
+  warnings: [],
+};
+
 type SeasonTableMode = "compact" | "expert";
 type FoundationReadSource = "sqlite" | "prisma";
 type FoundationReadMeta = {
@@ -382,6 +489,40 @@ type FacilityUpgradeSummary = {
 type FacilityUpgradeApiResponse = {
   success: boolean;
   summary: FacilityUpgradeSummary | null;
+  warnings?: string[];
+  blockingReasons?: string[];
+  error?: string;
+};
+
+type FacilityMaintenanceSummary = {
+  ok: boolean;
+  dryRun: boolean;
+  applied?: boolean;
+  confirmToken: string | null;
+  facilityEventId?: string | null;
+  team: { teamId: string; shortCode: string; name: string } | null;
+  facility: { facilityId: FacilityId; label: string } | null;
+  level: number;
+  conditionPct: number;
+  nextConditionPct: number;
+  efficiencyPct: number;
+  nextEfficiencyPct: number;
+  conditionStatus: ReturnType<typeof getFacilityConditionStatus>;
+  maintenanceCost: number;
+  cashBefore: number | null;
+  cashAfter: number | null;
+  warnings: string[];
+  blockingReasons: string[];
+  saveContext: {
+    saveId: string;
+    seasonId: string;
+    saveStatus: string;
+  };
+};
+
+type FacilityMaintenanceApiResponse = {
+  success: boolean;
+  summary: FacilityMaintenanceSummary | null;
   warnings?: string[];
   blockingReasons?: string[];
   error?: string;
@@ -3203,19 +3344,19 @@ const trainingModeConfigs: Record<
     label: "Leicht",
     baseXp: PLAYER_PROGRESSION_XP_CONSTANTS.trainingByMode.leicht,
     fatigueRisk: "niedrig",
-    note: "Schonend, weniger Base-XP, kaum Belastung.",
+    note: "Schonend, weniger Base-XP, bessere Regeneration.",
   },
   mittel: {
     label: "Mittel",
     baseXp: PLAYER_PROGRESSION_XP_CONSTANTS.trainingByMode.mittel,
     fatigueRisk: "mittel",
-    note: "Standardfokus fuer stabile Entwicklung.",
+    note: "Standardfokus fuer stabile Entwicklung und normale Erholung.",
   },
   hart: {
     label: "Hart",
     baseXp: PLAYER_PROGRESSION_XP_CONSTANTS.trainingByMode.hart,
     fatigueRisk: "hoch",
-    note: "Mehr Base-XP, aber hoeheres Fatigue-/Risk-Signal.",
+    note: "Mehr Base-XP, aber spuerbar schlechtere Regeneration.",
   },
 };
 
@@ -4154,23 +4295,12 @@ function getPoolHeatClass(value: number | null | undefined, pool: Array<number |
   }
 
   if (upperIndex < 0) {
-    return "heat-weak";
+    return "heat-band-1";
   }
 
   const percentile = upperIndex / Math.max(1, sorted.length - 1);
-  if (percentile >= 0.92) {
-    return "heat-elite";
-  }
-  if (percentile >= 0.7) {
-    return "heat-strong";
-  }
-  if (percentile >= 0.45) {
-    return "heat-good";
-  }
-  if (percentile >= 0.2) {
-    return "heat-warn";
-  }
-  return "heat-weak";
+  const bucketIndex = Math.min(7, Math.max(0, Math.floor(percentile * 8)));
+  return `heat-band-${bucketIndex + 1}`;
 }
 
 function getSeasonCashHeatClass(value: number, rows: Array<{ cash: number | null }>) {
@@ -4207,8 +4337,11 @@ function getPpSummaryRankClass(rank: number) {
   if (rank <= 3) {
     return "pp-rank-top";
   }
-  if (rank <= 10) {
+  if (rank <= 7) {
     return "pp-rank-chase";
+  }
+  if (rank <= 10) {
+    return "pp-rank-watch";
   }
   return "pp-rank-muted";
 }
@@ -4218,8 +4351,11 @@ function getSeasonMatrixRankClass(rank: number) {
   if (rank <= 3) {
     return "pp-rank-top";
   }
-  if (rank <= 10) {
+  if (rank <= 7) {
     return "pp-rank-chase";
+  }
+  if (rank <= 10) {
+    return "pp-rank-watch";
   }
   return "pp-rank-muted";
 }
@@ -4416,6 +4552,18 @@ export default function FoundationPageClient({ initialReadSource, initialSelecte
   const [teamContextFilter, setTeamContextFilter] = useState<TeamControlFilter>(() => readStoredFoundationTeamFilter());
   const [activeManagerTeamWarning, setActiveManagerTeamWarning] = useState<string | null>(null);
 	  const [activeView, setActiveView] = useState<FoundationView>("home");
+  const shouldBuildDisciplineRanks =
+    activeView === "teams" ||
+    activeView === "ranks" ||
+    activeView === "seasonPreview" ||
+    activeView === "season" ||
+    activeView === "prize";
+  const shouldBuildTeamHistory = activeView === "teams";
+  const shouldBuildTrainingView = activeView === "training";
+  const shouldBuildPlayerDirectory = activeView === "players";
+  const shouldBuildMarketView = activeView === "market";
+  const shouldBuildTransferHistoryView = activeView === "history";
+  const shouldBuildDebugView = activeView === "debug";
 	  const [showGameFlowPanel, setShowGameFlowPanel] = useState<boolean>(false);
 	  const [inboxTeamFilter, setInboxTeamFilter] = useState<string>("ALL");
 	  const [inboxCategoryFilter, setInboxCategoryFilter] = useState<string>("ALL");
@@ -4558,6 +4706,10 @@ export default function FoundationPageClient({ initialReadSource, initialSelecte
   const [facilityUpgradePreview, setFacilityUpgradePreview] = useState<FacilityUpgradeSummary | null>(null);
   const [facilityUpgradeError, setFacilityUpgradeError] = useState<string | null>(null);
   const [facilityUpgradeSuccess, setFacilityUpgradeSuccess] = useState<string | null>(null);
+  const [facilityMaintenanceBusy, setFacilityMaintenanceBusy] = useState<boolean>(false);
+  const [facilityMaintenancePreview, setFacilityMaintenancePreview] = useState<FacilityMaintenanceSummary | null>(null);
+  const [facilityMaintenanceError, setFacilityMaintenanceError] = useState<string | null>(null);
+  const [facilityMaintenanceSuccess, setFacilityMaintenanceSuccess] = useState<string | null>(null);
   const [specialistWingVariantDraft, setSpecialistWingVariantDraft] = useState<SpecialistWingVariant>("power_gym");
   const [preSeasonWorkflowBusy, setPreSeasonWorkflowBusy] = useState<boolean>(false);
   const [preSeasonWorkflowFeed, setPreSeasonWorkflowFeed] = useState<PreSeasonWorkflowSummaryResponse | null>(null);
@@ -5771,6 +5923,92 @@ export default function FoundationPageClient({ initialReadSource, initialSelecte
       setFacilityUpgradeError("Facility-Upgrade konnte nicht ausgefuehrt werden.");
     } finally {
       setFacilityUpgradeBusy(false);
+    }
+  }
+
+  async function runFacilityMaintenancePreview(facilityId: FacilityId) {
+    if (readMeta.source === "prisma") {
+      setFacilityMaintenanceError("Prisma-Referenz ist read-only. Facility-Wartung laeuft nur im lokalen Save.");
+      return;
+    }
+
+    setTrainingFacilityPreviewId(facilityId);
+    setFacilityMaintenanceBusy(true);
+    setFacilityMaintenanceError(null);
+    setFacilityMaintenanceSuccess(null);
+
+    try {
+      const response = await fetch("/api/facilities/maintenance", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          source: readMeta.source,
+          saveId: activeSaveId,
+          teamId: selectedTeam.teamId,
+          facilityId,
+          dryRun: true,
+        }),
+      });
+      const payload = (await response.json()) as FacilityMaintenanceApiResponse;
+      setFacilityMaintenancePreview(payload.summary ?? null);
+      if (!response.ok || payload.error) {
+        setFacilityMaintenanceError(payload.error ?? payload.blockingReasons?.join(" · ") ?? "Facility-Wartung blockiert.");
+      }
+    } catch {
+      setFacilityMaintenanceError("Facility-Wartung konnte nicht geladen werden.");
+      setFacilityMaintenancePreview(null);
+    } finally {
+      setFacilityMaintenanceBusy(false);
+    }
+  }
+
+  async function confirmFacilityMaintenance() {
+    if (!facilityMaintenancePreview?.facility?.facilityId || !facilityMaintenancePreview.confirmToken) {
+      setFacilityMaintenanceError("facility_maintenance_preview_missing: Bitte Wartung erneut pruefen.");
+      return;
+    }
+    if (
+      facilityMaintenancePreview.saveContext.saveId !== activeSaveId ||
+      facilityMaintenancePreview.team?.teamId !== selectedTeam.teamId
+    ) {
+      setFacilityMaintenanceError("facility_maintenance_preview_stale: Save oder Team hat sich geaendert. Bitte Preview neu laden.");
+      return;
+    }
+
+    setFacilityMaintenanceBusy(true);
+    setFacilityMaintenanceError(null);
+    setFacilityMaintenanceSuccess(null);
+
+    try {
+      const response = await fetch("/api/facilities/maintenance", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          source: readMeta.source,
+          saveId: activeSaveId,
+          teamId: selectedTeam.teamId,
+          facilityId: facilityMaintenancePreview.facility.facilityId,
+          dryRun: false,
+          confirmToken: facilityMaintenancePreview.confirmToken,
+        }),
+      });
+      const payload = (await response.json()) as FacilityMaintenanceApiResponse;
+      setFacilityMaintenancePreview(payload.summary ?? null);
+      if (!response.ok || !payload.success || !payload.summary) {
+        setFacilityMaintenanceError(payload.error ?? payload.blockingReasons?.join(" · ") ?? "Facility-Wartung blockiert.");
+        return;
+      }
+      setFacilityMaintenanceSuccess(
+        `${payload.summary.facility?.label ?? "Facility"} gewartet. Zustand ${formatWholeNumber(payload.summary.conditionPct)}% → ${formatWholeNumber(
+          payload.summary.nextConditionPct,
+        )}%.`,
+      );
+      await Promise.all([loadSave(activeSaveId), reloadPrizePreviewFeed(), reloadStandingsPreviewFeed()]);
+      setMarketReloadToken((current) => current + 1);
+    } catch {
+      setFacilityMaintenanceError("Facility-Wartung konnte nicht ausgefuehrt werden.");
+    } finally {
+      setFacilityMaintenanceBusy(false);
     }
   }
 
@@ -8986,6 +9224,10 @@ export default function FoundationPageClient({ initialReadSource, initialSelecte
   );
 
   const disciplineRankRows = useMemo(() => {
+    if (!shouldBuildDisciplineRanks) {
+      return [];
+    }
+
     const rosterByTeamId = new Map<string, Player[]>();
     const playerById = new Map(gameState.players.map((player) => [player.id, player] as const));
 
@@ -9152,7 +9394,7 @@ export default function FoundationPageClient({ initialReadSource, initialSelecte
         }
         return left.team.name.localeCompare(right.team.name, "de");
       });
-  }, [gameState, orderedDisciplines]);
+  }, [gameState, orderedDisciplines, shouldBuildDisciplineRanks]);
   const currentAreaRanksByTeamId = useMemo(
     () =>
       new Map(
@@ -9170,6 +9412,10 @@ export default function FoundationPageClient({ initialReadSource, initialSelecte
   );
 
   const teamsViewRows = useMemo(() => {
+    if (!shouldBuildTeamHistory) {
+      return [];
+    }
+
     const seasonStandRowByTeamId = new Map(seasonStandRows.map((row) => [row.teamId, row] as const));
     return [...seasonStandRows]
       .map((row) => {
@@ -9220,7 +9466,7 @@ export default function FoundationPageClient({ initialReadSource, initialSelecte
         }
         return (left.avgRank ?? Number.POSITIVE_INFINITY) - (right.avgRank ?? Number.POSITIVE_INFINITY);
       });
-  }, [currentAreaRanksByTeamId, seasonStandRows]);
+  }, [currentAreaRanksByTeamId, seasonStandRows, shouldBuildTeamHistory]);
   const teamHistorySeasonPointColumns = useMemo(() => {
     const seasonMap = new Map<string, { seasonId: string; seasonName: string }>();
     for (const row of teamsViewRows) {
@@ -9642,14 +9888,27 @@ export default function FoundationPageClient({ initialReadSource, initialSelecte
   }, [gameState.players, gameState.rosters, playerRatingsById]);
 
   const playerSeasonPerformanceMap = useMemo(
-    () => buildPlayerSeasonPerformanceMap(gameState),
-    [gameState],
+    () => (shouldBuildTrainingView || shouldBuildPlayerDirectory || shouldBuildMarketView ? buildPlayerSeasonPerformanceMap(gameState) : new Map()),
+    [gameState, shouldBuildMarketView, shouldBuildPlayerDirectory, shouldBuildTrainingView],
+  );
+  const selectedTeamFacilityState = useMemo(
+    () => getTeamFacilityState(gameState, selectedTeam.teamId),
+    [gameState, selectedTeam.teamId],
+  );
+  const teamBaseRecoveryForecast = useMemo(
+    () => applyRecoveryFacilityModifiers(BASE_MATCHDAY_RECOVERY, selectedTeamFacilityState),
+    [selectedTeamFacilityState],
   );
   const trainingPlayerForecastRows = useMemo(
-    () =>
-      rosterPlayers.map(({ entry, player }) => {
+    () => {
+      if (!shouldBuildTrainingView) {
+        return [];
+      }
+
+      return rosterPlayers.map(({ entry, player }) => {
         const mode = trainingModeDraft[player.id] ?? "mittel";
         const modeConfig = trainingModeConfigs[mode];
+        const recoveryForecast = applyTrainingRecoveryImpact(teamBaseRecoveryForecast.after, mode);
         const seasonPerformance = playerSeasonPerformanceMap.get(player.id) ?? null;
         const rating = playerRatingsById.get(player.id) ?? null;
         const forecast = buildPlayerProgressionForecast({
@@ -9678,35 +9937,46 @@ export default function FoundationPageClient({ initialReadSource, initialSelecte
           totalXp: forecast.seasonProjectedXP,
           upgradeEstimate: forecast.possibleUpgradeSummary,
           fatigueWarning: forecast.fatigueStrain.warning,
+          recoveryForecast,
           playerMvs: rating?.mvs ?? null,
           playerPps: rating?.ppsSeason ?? seasonPerformance?.totalPoints ?? null,
         };
-      }),
-    [gameState, playerRatingsById, playerSeasonPerformanceMap, rosterPlayers, trainingModeDraft],
+      });
+    },
+    [gameState, playerRatingsById, playerSeasonPerformanceMap, rosterPlayers, shouldBuildTrainingView, teamBaseRecoveryForecast.after, trainingModeDraft],
   );
   const trainingForecastSummary = useMemo(() => {
     const trainingXp = trainingPlayerForecastRows.reduce((sum, row) => sum + row.trainingXp, 0);
     const performanceXp = trainingPlayerForecastRows.reduce((sum, row) => sum + row.performanceXp, 0);
+    const recoveryAfterTraining =
+      trainingPlayerForecastRows.length > 0
+        ? trainingPlayerForecastRows.reduce((sum, row) => sum + row.recoveryForecast.after, 0) / trainingPlayerForecastRows.length
+        : teamBaseRecoveryForecast.after;
 
     return {
       trainingXp,
       performanceXp,
       totalXp: trainingXp + performanceXp,
       hardModeCount: trainingPlayerForecastRows.filter((row) => row.mode === "hart").length,
+      lightModeCount: trainingPlayerForecastRows.filter((row) => row.mode === "leicht").length,
+      recoveryBeforeTraining: teamBaseRecoveryForecast.after,
+      recoveryAfterTraining,
     };
-  }, [trainingPlayerForecastRows]);
-  const selectedTeamFacilityState = useMemo(
-    () => getTeamFacilityState(gameState, selectedTeam.teamId),
-    [gameState, selectedTeam.teamId],
-  );
+  }, [teamBaseRecoveryForecast.after, trainingPlayerForecastRows]);
   const trainingFacilityRows = useMemo(
-    () =>
-      FACILITY_CATALOG.map((facility) => {
+    () => {
+      if (!shouldBuildTrainingView) {
+        return [];
+      }
+
+      return FACILITY_CATALOG.map((facility) => {
         const level = getFacilityLevel(selectedTeamFacilityState, facility.facilityId);
         const currentLevel = facility.levels.find((entry) => entry.level === level) ?? null;
         const nextLevel = Math.min(level + 1, facility.maxLevel);
         const nextLevelDefinition = facility.levels.find((entry) => entry.level === nextLevel) ?? null;
         const state = selectedTeamFacilityState.facilities[facility.facilityId];
+        const efficiency = getFacilityEfficiency(selectedTeamFacilityState, facility.facilityId);
+        const conditionStatus = getFacilityConditionStatus(efficiency.conditionPct);
 
         return {
           id: facility.facilityId,
@@ -9720,13 +9990,22 @@ export default function FoundationPageClient({ initialReadSource, initialSelecte
           nextUpkeep: nextLevelDefinition?.seasonUpkeep ?? currentLevel?.seasonUpkeep ?? 0,
           currentIncome: currentLevel?.seasonIncome ?? 0,
           nextIncome: nextLevelDefinition?.seasonIncome ?? currentLevel?.seasonIncome ?? 0,
+          conditionPct: efficiency.conditionPct,
+          efficiencyPct: efficiency.efficiencyPct,
+          conditionStatus,
+          maintenanceCost: calculateFacilityMaintenanceCost({
+            facilityId: facility.facilityId,
+            level,
+            conditionPct: efficiency.conditionPct,
+          }),
           status: "preview_only" as const,
           sourceStatus: state?.disabledReason ?? (level > 0 ? "save_state" : "not_built"),
           currentEffect: currentLevel?.effectDescription ?? "Level 0: kein Effekt",
           nextLevelEffect: nextLevelDefinition?.effectDescription ?? "Max Level erreicht",
         };
-      }),
-    [selectedTeamFacilityState],
+      });
+    },
+    [selectedTeamFacilityState, shouldBuildTrainingView],
   );
   const selectedTrainingFacilityPreview = useMemo(
     () => trainingFacilityRows.find((facility) => facility.id === trainingFacilityPreviewId) ?? null,
@@ -9754,6 +10033,20 @@ export default function FoundationPageClient({ initialReadSource, initialSelecte
     };
   }, [selectedTeam.cash, selectedTeamFacilityState, selectedTrainingFacilityPreview]);
   const trainingFacilitySeasonEndFinance = useMemo(() => {
+    if (!shouldBuildTrainingView) {
+      return {
+        rows: [],
+        incomeTotal: 0,
+        upkeepTotal: 0,
+        netFacilityResult: 0,
+        cashBeforeFacilities: selectedTeam.cash,
+        cashAfterFacilities: selectedTeam.cash,
+        fanShopIncome: 0,
+        arenaIncome: 0,
+        disabledFacilities: [],
+      };
+    }
+
     const rows = trainingFacilityRows.map((facility) => ({
       ...facility,
       net: facility.currentIncome - facility.currentUpkeep,
@@ -9781,10 +10074,10 @@ export default function FoundationPageClient({ initialReadSource, initialSelecte
       arenaIncome: rows.find((row) => row.id === "arena_upgrade")?.currentIncome ?? 0,
       disabledFacilities,
     };
-  }, [selectedTeam.cash, selectedTeamFacilityState, trainingFacilityRows]);
+  }, [selectedTeam.cash, selectedTeamFacilityState, shouldBuildTrainingView, trainingFacilityRows]);
   const trainingFacilityEffectPreview = useMemo(() => {
     const trainingXp = applyTrainingXpFacilityModifiers(trainingForecastSummary.trainingXp, selectedTeamFacilityState);
-    const recovery = applyRecoveryFacilityModifiers(100, selectedTeamFacilityState);
+    const recovery = applyRecoveryFacilityModifiers(BASE_MATCHDAY_RECOVERY, selectedTeamFacilityState);
     const academyLowTier = applyUpgradeCostFacilityModifiers("power", "D", PLAYER_PROGRESSION_XP_CONSTANTS.ratingTierUpgradeCost.D, selectedTeamFacilityState);
     const specialistPower = applyUpgradeCostFacilityModifiers("power", "B", PLAYER_PROGRESSION_XP_CONSTANTS.ratingTierUpgradeCost.B, selectedTeamFacilityState);
     const specialistSpeed = applyUpgradeCostFacilityModifiers("speed", "B", PLAYER_PROGRESSION_XP_CONSTANTS.ratingTierUpgradeCost.B, selectedTeamFacilityState);
@@ -9794,6 +10087,7 @@ export default function FoundationPageClient({ initialReadSource, initialSelecte
     return {
       trainingXp,
       recovery,
+      recoveryAfterTraining: trainingForecastSummary.recoveryAfterTraining,
       academyLowTier,
       specialistPower,
       specialistSpeed,
@@ -9804,7 +10098,7 @@ export default function FoundationPageClient({ initialReadSource, initialSelecte
         analytics.level > 0 ? "forecast_uncertainty_reduced_no_fake_values" : null,
       ].filter((entry): entry is string => Boolean(entry)),
     };
-  }, [selectedTeamFacilityState, trainingForecastSummary.trainingXp]);
+  }, [selectedTeamFacilityState, trainingForecastSummary.recoveryAfterTraining, trainingForecastSummary.trainingXp]);
   const seasonEndFacilityInput = useMemo<SeasonEndFacilityPreviewInput>(
     () => ({
       teamFacilities: {
@@ -9829,6 +10123,10 @@ export default function FoundationPageClient({ initialReadSource, initialSelecte
     [selectedTeamFacilityState, trainingFacilityPreviewId],
   );
   const seasonEndProgressionPreview = useMemo(() => {
+    if (!shouldBuildTrainingView) {
+      return EMPTY_SEASON_END_PROGRESSION_PREVIEW;
+    }
+
     const forecastsByPlayerId = new Map(trainingPlayerForecastRows.map((row) => [row.player.id, row.forecast] as const));
     return buildSeasonEndProgressionPreview({
       gameState,
@@ -9840,7 +10138,7 @@ export default function FoundationPageClient({ initialReadSource, initialSelecte
       })),
       facilities: seasonEndFacilityInput,
     });
-  }, [gameState, rosterPlayers, seasonEndAttributeDraft, seasonEndFacilityInput, selectedTeam.teamId, trainingPlayerForecastRows]);
+  }, [gameState, rosterPlayers, seasonEndAttributeDraft, seasonEndFacilityInput, selectedTeam.teamId, shouldBuildTrainingView, trainingPlayerForecastRows]);
   const seasonEndXpSpendPlayerMap = useMemo(
     () => new Map((seasonEndXpSpendPreview?.players ?? []).map((player) => [player.playerId, player] as const)),
     [seasonEndXpSpendPreview],
@@ -9867,6 +10165,18 @@ export default function FoundationPageClient({ initialReadSource, initialSelecte
       soc: [] as number[],
       disciplines: disciplinePools,
     };
+
+    if (
+      !shouldBuildPlayerDirectory &&
+      !shouldBuildMarketView &&
+      !shouldBuildTrainingView &&
+      !shouldBuildTeamHistory &&
+      activeView !== "season" &&
+      activeView !== "seasonPreview" &&
+      activeView !== "ranks"
+    ) {
+      return pools;
+    }
 
     for (const player of gameState.players) {
       const playerRating = playerRatingsById.get(player.id) ?? null;
@@ -9900,8 +10210,21 @@ export default function FoundationPageClient({ initialReadSource, initialSelecte
     }
 
     return pools;
-  }, [gameState.disciplines, gameState.players, playerRatingsById]);
+  }, [
+    activeView,
+    gameState.disciplines,
+    gameState.players,
+    playerRatingsById,
+    shouldBuildMarketView,
+    shouldBuildPlayerDirectory,
+    shouldBuildTeamHistory,
+    shouldBuildTrainingView,
+  ]);
   const playerScopeRows = useMemo(() => {
+    if (!shouldBuildPlayerDirectory) {
+      return [];
+    }
+
     const teamById = new Map(gameState.teams.map((team) => [team.teamId, team] as const));
     const rosterByPlayerId = new Map(gameState.rosters.map((roster) => [roster.playerId, roster] as const));
 
@@ -9942,7 +10265,7 @@ export default function FoundationPageClient({ initialReadSource, initialSelecte
 
         return true;
       });
-  }, [gameState.players, gameState.rosters, gameState.teams, playerRatingsById, playerScope, playerSeasonPerformanceMap]);
+  }, [gameState.players, gameState.rosters, gameState.teams, playerRatingsById, playerScope, playerSeasonPerformanceMap, shouldBuildPlayerDirectory]);
   const playerClassOptions = useMemo(
     () => Array.from(new Set(playerScopeRows.map((row) => row.player.className))).sort((left, right) => left.localeCompare(right)),
     [playerScopeRows],
@@ -10103,10 +10426,13 @@ export default function FoundationPageClient({ initialReadSource, initialSelecte
     [multiSeasonGameplayColumns, tableColumnPreferences],
   );
   const multiSeasonBalanceDashboard = useMemo(
-    () => buildMultiSeasonBalanceDashboard(gameState),
-    [gameState],
+    () => (shouldBuildDebugView ? buildMultiSeasonBalanceDashboard(gameState) : EMPTY_MULTI_SEASON_BALANCE_DASHBOARD),
+    [gameState, shouldBuildDebugView],
   );
-  const featureAuditMatrix = useMemo(() => buildFeatureAuditMatrix(), []);
+  const featureAuditMatrix = useMemo(
+    () => (shouldBuildDebugView ? buildFeatureAuditMatrix() : EMPTY_FEATURE_AUDIT_MATRIX),
+    [shouldBuildDebugView],
+  );
   const filteredFeatureAuditEntries = useMemo(
     () => filterFeatureAuditEntries(featureAuditMatrix.entries, featureAuditFilter),
     [featureAuditFilter, featureAuditMatrix.entries],
@@ -10607,8 +10933,11 @@ export default function FoundationPageClient({ initialReadSource, initialSelecte
       .sort((left, right) => (right.playerOvr ?? Number.NEGATIVE_INFINITY) - (left.playerOvr ?? Number.NEGATIVE_INFINITY));
   }, [playerClassFilter, playerScopeRows, playerTeamFilter]);
   const playerEconomyCompareReport = useMemo(
-    () => buildPlayerEconomyCompareReport({ gameState, economyMode: "compare" }),
-    [gameState],
+    () =>
+      shouldBuildPlayerDirectory
+        ? buildPlayerEconomyCompareReport({ gameState, economyMode: "compare" })
+        : EMPTY_PLAYER_ECONOMY_COMPARE_REPORT,
+    [gameState, shouldBuildPlayerDirectory],
   );
 
   const historyPlayerById = useMemo(
@@ -12395,17 +12724,21 @@ export default function FoundationPageClient({ initialReadSource, initialSelecte
               <div className="foundation-home-player-grid">
                 {homePlayerCards.map((row) => (
                   <article key={`home-player-${row.player.id}`} className="foundation-home-player-card">
-                    <PlayerPortrait
-                      src={row.portrait.src}
-                      initials={row.portrait.initials}
-                      alt={row.player.name}
-                      className="foundation-home-player-portrait player-avatar-fallback"
-                    />
+                    <div className="foundation-home-player-hero">
+                      <PlayerPortrait
+                        src={row.portrait.src}
+                        initials={row.portrait.initials}
+                        alt={row.player.name}
+                        className="foundation-home-player-portrait player-avatar-fallback"
+                      />
+                      <div className="stack">
+                        <strong>{row.player.name}</strong>
+                        <span className="muted">
+                          {row.entry.roleTag ?? "—"} · <ClassColorChip className={row.player.className} /> · <RaceIcon race={row.player.race} className="race-icon-chip-inline" />
+                        </span>
+                      </div>
+                    </div>
                     <div className="stack">
-                      <strong>{row.player.name}</strong>
-                      <span className="muted">
-                        {row.entry.roleTag ?? "—"} · <ClassColorChip className={row.player.className} />
-                      </span>
                       <div className="foundation-home-player-stats">
                         <span>OVR {row.playerOvr != null ? formatLocalePoints(row.playerOvr, 1) : "—"}</span>
                         <span>MVS {row.playerMvs != null ? formatLocalePoints(row.playerMvs, 1) : "—"}</span>
@@ -17872,8 +18205,8 @@ export default function FoundationPageClient({ initialReadSource, initialSelecte
                           return <td key={column.id}><div className="table-player-cell"><strong>{row.player.name}</strong><span>{row.seasonPerformance?.sourceLabel ?? row.transferStatus}</span></div></td>;
                         }
                         if (column.id === "team") return <td key={column.id}>{row.team?.name ?? "Free Agent"}</td>;
-                        if (column.id === "class") return <td key={column.id}><ClassColorChip className={row.player.className} /></td>;
-                        if (column.id === "race") return <td key={column.id}>{row.player.race}</td>;
+                        if (column.id === "class") return <td key={column.id}><ClassIcon classNameValue={row.player.className} showLabel={false} /></td>;
+                        if (column.id === "race") return <td key={column.id}><RaceIcon race={row.player.race} showLabel={false} /></td>;
                         if (column.id === "pps") return <td key={column.id} className={row.playerPps != null ? getPoolHeatClass(row.playerPps, leaguePlayerHeatPools.pps) : ""}>{row.playerPps != null ? formatPpsValue(row.playerPps) : "—"}</td>;
                         if (column.id === "ovr") return <td key={column.id} className={row.playerOvr != null ? getPoolHeatClass(row.playerOvr, leaguePlayerHeatPools.ovr) : ""}>{formatWholeNumber(row.playerOvr)}</td>;
                         if (column.id === "mvs") return <td key={column.id} className={row.playerMvs != null ? getPoolHeatClass(row.playerMvs, leaguePlayerHeatPools.mvs) : ""}>{row.playerMvs != null ? formatPpsValue(row.playerMvs) : "—"}</td>;
@@ -17881,7 +18214,13 @@ export default function FoundationPageClient({ initialReadSource, initialSelecte
                         if (column.id === "salary") return <td key={column.id}>{formatLocalePoints(row.roster ? getRosterEntryDisplaySalary(row.roster, row.player) : getPlayerDisplaySalary(row.player), 2)}</td>;
                         if (column.id === "contract") return <td key={column.id}>{row.roster ? row.roster.contractLength : "—"}</td>;
                         if (column.id === "appearances") return <td key={column.id}>{row.seasonPerformance ? row.seasonPerformance.appearances : "—"}</td>;
-                        if (column.id === "bestDiscipline") return <td key={column.id}>{row.bestDiscipline ?? "—"}</td>;
+                        if (column.id === "bestDiscipline") {
+                          return (
+                            <td key={column.id}>
+                              <DisciplineIcon label={row.bestDiscipline ?? "—"} showLabel={Boolean(row.bestDiscipline)} />
+                            </td>
+                          );
+                        }
                         if (column.id === "lastPerformance") return <td key={column.id}>{row.lastPerformance != null ? formatWholeNumber(row.lastPerformance) : "—"}</td>;
                         const traits = [
                           ...row.player.traitsPositive,
@@ -17895,7 +18234,7 @@ export default function FoundationPageClient({ initialReadSource, initialSelecte
               </table>
             </div>
             <p className="muted players-footnote">
-              Standardansicht zeigt nur aktive Kaderspieler aus dem lokalen Save. PPs sind die echten Season-Punkte. Einsaetze und letzte Leistungen kommen nur aus gespeicherten Results oder bleiben —.
+              Farben sind liga-relativ: jede Stufe steht fuer ein Achtel des aktuellen Liga-Pools. So sticht auch ein POW 61 klar hervor, wenn er ligaweit in den Top 12,5% liegt.
             </p>
             <div className="teams-summary-grid teams-summary-grid-retool" style={{ marginTop: 16 }}>
               <article className="metric-card teams-summary-card">
@@ -19106,8 +19445,8 @@ export default function FoundationPageClient({ initialReadSource, initialSelecte
                                       </td>
                                     );
                                   }
-                                  if (column.id === "class") return <td key={column.id}><ClassColorChip className={player.className} /></td>;
-                                  if (column.id === "race") return <td key={column.id}>{player.race}</td>;
+                                  if (column.id === "class") return <td key={column.id}><ClassIcon classNameValue={player.className} showLabel={false} /></td>;
+                                  if (column.id === "race") return <td key={column.id}><RaceIcon race={player.race} showLabel={false} /></td>;
                                   if (column.id === "mw") return <td key={column.id}>{formatLocalePoints(getPlayerDisplayMarketValue(player), 2)}</td>;
                                   if (column.id === "salary") return <td key={column.id}>{formatDisplayMoney(getRosterEntryDisplaySalary(entry, player))}</td>;
                                   if (column.id === "contract") return <td key={column.id}>{entry.contractLength}</td>;
@@ -19390,15 +19729,23 @@ export default function FoundationPageClient({ initialReadSource, initialSelecte
                   </div>
                   <div className="roster-grid">
                     {starters.map(({ entry, player }) => (
-                      <article className={`player-card ${getClassColorClassName(player.className, "player-card-class-frame")}`} key={entry.id}>
-                        <div className="player-card-head">
-                          <div>
+                      <article className={`player-card player-card-spotlight ${getClassColorClassName(player.className, "player-card-class-frame")}`} key={entry.id}>
+                        <div className="player-card-hero">
+                          <PlayerPortrait
+                            src={getPlayerPortraitModel(player).src}
+                            initials={getPlayerPortraitModel(player).initials}
+                            alt={player.name}
+                            className="player-card-portrait player-avatar-fallback"
+                          />
+                          <div className="player-card-head">
+                            <div>
                             <strong>{player.name}</strong>
                             <p className="muted">
-                              <ClassColorChip className={player.className} /> · {player.race}
+                              <ClassIcon classNameValue={player.className} className="class-icon-chip-inline" /> · <RaceIcon race={player.race} className="race-icon-chip-inline" />
                             </p>
+                            </div>
+                            <span className="rating-pill">{formatWholeNumber(playerRatingsById.get(player.id)?.ovrNormalized ?? null)}</span>
                           </div>
-                          <span className="rating-pill">{formatWholeNumber(playerRatingsById.get(player.id)?.ovrNormalized ?? null)}</span>
                         </div>
                         <div className="axis-row">
                           <span>POW {formatLocalePoints(player.coreStats.pow)}</span>
@@ -19431,15 +19778,23 @@ export default function FoundationPageClient({ initialReadSource, initialSelecte
                   </div>
                   <div className="roster-grid">
                     {bench.map(({ entry, player }) => (
-                      <article className={`player-card compact ${getClassColorClassName(player.className, "player-card-class-frame")}`} key={entry.id}>
-                        <div className="player-card-head">
-                          <div>
+                      <article className={`player-card compact player-card-spotlight ${getClassColorClassName(player.className, "player-card-class-frame")}`} key={entry.id}>
+                        <div className="player-card-hero">
+                          <PlayerPortrait
+                            src={getPlayerPortraitModel(player).src}
+                            initials={getPlayerPortraitModel(player).initials}
+                            alt={player.name}
+                            className="player-card-portrait player-avatar-fallback"
+                          />
+                          <div className="player-card-head">
+                            <div>
                             <strong>{player.name}</strong>
                             <p className="muted">
-                              {entry.roleTag} · <ClassColorChip className={player.className} /> · {player.gender}
+                              {entry.roleTag} · <ClassColorChip className={player.className} /> · <RaceIcon race={player.race} className="race-icon-chip-inline" />
                             </p>
+                            </div>
+                            <span className="rating-pill">{formatWholeNumber(playerRatingsById.get(player.id)?.ovrNormalized ?? null)}</span>
                           </div>
-                          <span className="rating-pill">{formatWholeNumber(playerRatingsById.get(player.id)?.ovrNormalized ?? null)}</span>
                         </div>
                         <div className="axis-row">
                           <span>POW {formatLocalePoints(player.coreStats.pow)}</span>
@@ -19515,9 +19870,19 @@ export default function FoundationPageClient({ initialReadSource, initialSelecte
                       <article className="free-agent-card" key={player.id}>
                         <div>
                           <strong>{player.name}</strong>
-                          <p className="muted">
-                            <ClassColorChip className={player.className} /> · {player.preferredDisciplineIds.slice(0, 2).join(", ") || "Allround"}
-                          </p>
+                            <p className="muted">
+                              <ClassColorChip className={player.className} /> ·{" "}
+                              {player.preferredDisciplineIds.length ? (
+                                player.preferredDisciplineIds.slice(0, 2).map((disciplineId, index) => (
+                                  <span key={`${player.id}-pref-diszi-${disciplineId}`} style={{ display: "inline-flex", alignItems: "center" }}>
+                                    {index > 0 ? " · " : ""}
+                                    <DisciplineIcon disciplineId={disciplineId} label={disciplineId} className="discipline-icon-chip-inline" />
+                                  </span>
+                                ))
+                              ) : (
+                                "Allround"
+                              )}
+                            </p>
                         </div>
                         <div className="free-agent-stats">
                           <span>{formatWholeNumber(playerRatingsById.get(player.id)?.ovrNormalized ?? null)}</span>
@@ -19703,6 +20068,14 @@ export default function FoundationPageClient({ initialReadSource, initialSelecte
                     </small>
                   </article>
                   <article className="metric-card">
+                    <span>Ø Regeneration</span>
+                    <strong>
+                      {formatPpsValue(trainingForecastSummary.recoveryBeforeTraining)} →{" "}
+                      {formatPpsValue(trainingForecastSummary.recoveryAfterTraining)}
+                    </strong>
+                    <small className="muted">nach Trainingslast · Bank/Nicht-Einsatz</small>
+                  </article>
+                  <article className="metric-card">
                     <span>Performance-XP</span>
                     <strong>{formatWholeNumber(trainingForecastSummary.performanceXp)}</strong>
                     <small className="muted">Einsatz · MVS · gedeckelte PPs</small>
@@ -19710,14 +20083,16 @@ export default function FoundationPageClient({ initialReadSource, initialSelecte
                   <article className="metric-card">
                     <span>XP-Forecast gesamt</span>
                     <strong>{formatWholeNumber(trainingForecastSummary.totalXp)}</strong>
-                    <small className="muted">{trainingForecastSummary.hardModeCount} hart</small>
+                    <small className="muted">
+                      {trainingForecastSummary.lightModeCount} leicht · {trainingForecastSummary.hardModeCount} hart
+                    </small>
                   </article>
                 </div>
 
                 <div className="training-warning-strip">
                   <span className="transfer-status-pill is-warning">Season-End Preview</span>
                   <span>
-                    Facilities wirken lokal/auditierbar: Unterhalt und Income im Forecast, XP/Recovery/Discounts als Preview. Keine Prisma-Writes.
+                    Trainingslast beeinflusst jetzt auch Regeneration: hart gibt mehr XP, kostet aber Erholung; Recovery Center wirkt davor.
                   </span>
                 </div>
 
@@ -19783,19 +20158,36 @@ export default function FoundationPageClient({ initialReadSource, initialSelecte
                                 ))}
                               </select>
                             </label>
-                            <div className="training-forecast-line">
-                              <strong>
-                                {row.modeConfig.label} · +{row.trainingXp} Base ·{" "}
-                                {row.performanceXp > 0 ? `+${row.performanceXp} Performance` : "nur Training-XP"}
-                              </strong>
-                              <span>Forecast {formatWholeNumber(row.totalXp)} XP · {row.upgradeEstimate}</span>
+                            <div className="training-impact-grid">
+                              <div className="training-impact-card is-xp">
+                                <span>XP Forecast</span>
+                                <strong>{formatWholeNumber(row.totalXp)}</strong>
+                                <small>
+                                  +{row.trainingXp} Training ·{" "}
+                                  {row.performanceXp > 0 ? `+${row.performanceXp} Performance` : "keine Performance-XP"}
+                                </small>
+                              </div>
+                              <div className="training-impact-card is-recovery">
+                                <span>Regeneration</span>
+                                <strong>
+                                  {formatPpsValue(row.recoveryForecast.before)} → {formatPpsValue(row.recoveryForecast.after)}
+                                </strong>
+                                <small>
+                                  {row.recoveryForecast.modifierPct === 0
+                                    ? "normale Erholung"
+                                    : `${formatSignedPercent(row.recoveryForecast.modifierPct)} durch ${row.modeConfig.label}`}
+                                </small>
+                              </div>
                             </div>
                             <div className="training-forecast-line">
-                              <span>
-                                Einsatz {formatWholeNumber(row.forecast.appearanceXP)} · MVS {formatWholeNumber(row.forecast.mvsXP)} · PPs{" "}
-                                {formatWholeNumber(row.forecast.ppsBonusXP)} · Top/HL{" "}
-                                {formatWholeNumber(row.forecast.topPlayerXP + row.forecast.highlightXP)}
-                              </span>
+                              <strong>{row.modeConfig.note}</strong>
+                              <span>{row.upgradeEstimate}</span>
+                            </div>
+                            <div className="training-xp-breakdown">
+                              <span>Einsatz {formatWholeNumber(row.forecast.appearanceXP)}</span>
+                              <span>MVS {formatWholeNumber(row.forecast.mvsXP)}</span>
+                              <span>PPs {formatWholeNumber(row.forecast.ppsBonusXP)}</span>
+                              <span>Top/HL {formatWholeNumber(row.forecast.topPlayerXP + row.forecast.highlightXP)}</span>
                               <span>Traits {formatSignedPercent(row.forecast.traitModifierPct)}</span>
                             </div>
                             <div className="training-risk-line">
@@ -19827,18 +20219,45 @@ export default function FoundationPageClient({ initialReadSource, initialSelecte
                         <article className="training-facility-card" key={facility.id}>
                           <div className="training-facility-card-head">
                             <strong>{facility.name}</strong>
-                            <span className="transfer-status-pill is-warning">preview-only</span>
+                            <span
+                              className={`transfer-status-pill ${
+                                facility.conditionStatus === "broken" || facility.conditionStatus === "critical"
+                                  ? "is-danger"
+                                  : facility.conditionStatus === "worn"
+                                    ? "is-warning"
+                                    : "is-ready"
+                              }`}
+                            >
+                              Zustand {formatWholeNumber(facility.conditionPct)}%
+                            </span>
                           </div>
                           <div className="training-facility-stats">
                             <span>Level {facility.level}</span>
                             <span>Nächstes {facility.nextLevel}</span>
+                            <span>Effizienz {formatWholeNumber(facility.efficiencyPct)}%</span>
+                            <span>Wartung {facility.maintenanceCost > 0 ? formatTransfermarktCurrency(facility.maintenanceCost) : "voll"}</span>
                             <span>Kosten {facility.upgradeCost != null ? formatTransfermarktCurrency(facility.upgradeCost) : "Max"}</span>
                             <span>Unterhalt {formatTransfermarktCurrency(facility.nextUpkeep)}</span>
                             <span>Income {formatTransfermarktCurrency(facility.nextIncome)}</span>
                           </div>
-                          <p className="muted">Jetzt: {facility.currentEffect}</p>
-                          <p className="muted">Nächstes: {facility.nextLevelEffect}</p>
-                          <p className="muted">Quelle: {facility.sourceStatus}</p>
+                          <div className="training-facility-effect-grid">
+                            <div>
+                              <span>Aktuell</span>
+                              <strong>{facility.currentEffect}</strong>
+                            </div>
+                            <div>
+                              <span>Upgrade</span>
+                              <strong>{facility.nextLevelEffect}</strong>
+                            </div>
+                          </div>
+                          <span className="training-source-chip">
+                            {facility.sourceStatus === "not_built" ? "noch nicht gebaut" : facility.sourceStatus}
+                          </span>
+                          {facility.level > 0 && facility.conditionPct < 70 ? (
+                            <p className="muted text-negative">
+                              Leistung faellt: Dieses Gebaeude wirkt nur noch mit {formatWholeNumber(facility.efficiencyPct)}%.
+                            </p>
+                          ) : null}
                           {facility.id === "specialist_wing" && facility.level === 0 ? (
                             <label className="filter-field">
                               <span>Variante</span>
@@ -19858,12 +20277,28 @@ export default function FoundationPageClient({ initialReadSource, initialSelecte
                           <button
                             className="secondary-button inline-button"
                             type="button"
-                            disabled={facilityUpgradeBusy}
+                            disabled={facilityUpgradeBusy || facilityMaintenanceBusy}
                             onClick={() => {
                               void runFacilityUpgradePreview(facility.id);
                             }}
                           >
                             {facilityUpgradeBusy && selectedTrainingFacilityPreview?.id === facility.id ? "Prueft..." : "Upgrade prüfen"}
+                          </button>
+                          <button
+                            className="secondary-button inline-button"
+                            type="button"
+                            disabled={
+                              facilityUpgradeBusy ||
+                              facilityMaintenanceBusy ||
+                              facility.level <= 0 ||
+                              facility.conditionPct >= 100 ||
+                              readMeta.source === "prisma"
+                            }
+                            onClick={() => {
+                              void runFacilityMaintenancePreview(facility.id);
+                            }}
+                          >
+                            {facilityMaintenanceBusy && selectedTrainingFacilityPreview?.id === facility.id ? "Wartung prueft..." : "Wartung prüfen"}
                           </button>
                         </article>
                       ))}
@@ -19920,6 +20355,8 @@ export default function FoundationPageClient({ initialReadSource, initialSelecte
                         </strong>
                         <span>Recovery-Center Bonus</span>
                         <strong>{formatSignedPercent(trainingFacilityEffectPreview.recovery.modifierPct)}</strong>
+                        <span>Ø Recovery nach Training</span>
+                        <strong>{formatPpsValue(trainingFacilityEffectPreview.recoveryAfterTraining)}</strong>
                         <span>Academy Low-Tier Cost</span>
                         <strong>
                           {trainingFacilityEffectPreview.academyLowTier.costBeforeFacility} →{" "}
@@ -19954,6 +20391,11 @@ export default function FoundationPageClient({ initialReadSource, initialSelecte
                             {facilityUpgradePreview
                               ? `${facilityUpgradePreview.currentLevel} → ${facilityUpgradePreview.nextLevel ?? "—"}`
                               : `${selectedTrainingFacilityPreview.level} → ${selectedTrainingFacilityPreview.nextLevel}`}
+                          </strong>
+                          <span>Zustand</span>
+                          <strong>
+                            {formatWholeNumber(selectedTrainingFacilityPreview.conditionPct)}% · Effizienz{" "}
+                            {formatWholeNumber(selectedTrainingFacilityPreview.efficiencyPct)}%
                           </strong>
                           <span>Effekt</span>
                           <strong>{facilityUpgradePreview?.currentEffect ?? selectedTrainingFacilityPreview.currentEffect}</strong>
@@ -19997,6 +20439,69 @@ export default function FoundationPageClient({ initialReadSource, initialSelecte
                             }}
                           >
                             {facilityUpgradeBusy ? "Upgrade laeuft..." : "Upgrade bestätigen"}
+                          </button>
+                          <button
+                            className="secondary-button"
+                            type="button"
+                            disabled={
+                              facilityMaintenanceBusy ||
+                              readMeta.source === "prisma" ||
+                              selectedTrainingFacilityPreview.level <= 0 ||
+                              selectedTrainingFacilityPreview.conditionPct >= 100
+                            }
+                            onClick={() => {
+                              void runFacilityMaintenancePreview(selectedTrainingFacilityPreview.id);
+                            }}
+                          >
+                            {facilityMaintenanceBusy ? "Wartung prueft..." : "Wartung pruefen"}
+                          </button>
+                        </div>
+                      </div>
+                    ) : null}
+                    {facilityMaintenancePreview ? (
+                      <div className="training-upgrade-preview">
+                        <strong>{facilityMaintenancePreview.facility?.label ?? "Facility"} · Wartung Preview</strong>
+                        <div className="training-cash-grid">
+                          <span>Status</span>
+                          <strong>{facilityMaintenancePreview.ok ? "confirm-ready" : "preview-only"}</strong>
+                          <span>Zustand</span>
+                          <strong>
+                            {formatWholeNumber(facilityMaintenancePreview.conditionPct)}% →{" "}
+                            {formatWholeNumber(facilityMaintenancePreview.nextConditionPct)}%
+                          </strong>
+                          <span>Effizienz</span>
+                          <strong>
+                            {formatWholeNumber(facilityMaintenancePreview.efficiencyPct)}% →{" "}
+                            {formatWholeNumber(facilityMaintenancePreview.nextEfficiencyPct)}%
+                          </strong>
+                          <span>Wartungskosten</span>
+                          <strong>{formatTransfermarktCurrency(facilityMaintenancePreview.maintenanceCost)}</strong>
+                          <span>Cash nach Wartung</span>
+                          <strong>{formatTransfermarktCurrency(facilityMaintenancePreview.cashAfter)}</strong>
+                        </div>
+                        {facilityMaintenancePreview.warnings.length ? (
+                          <p className="muted text-negative">Warnungen: {facilityMaintenancePreview.warnings.join(" · ")}</p>
+                        ) : null}
+                        {facilityMaintenancePreview.blockingReasons.length ? (
+                          <p className="muted text-negative">Blocker: {facilityMaintenancePreview.blockingReasons.join(" · ")}</p>
+                        ) : null}
+                        {facilityMaintenanceError ? <p className="muted text-negative">{facilityMaintenanceError}</p> : null}
+                        {facilityMaintenanceSuccess ? <p className="text-positive">{facilityMaintenanceSuccess}</p> : null}
+                        <div className="foundation-save-actions" style={{ marginTop: 12 }}>
+                          <button
+                            className="primary-button"
+                            type="button"
+                            disabled={
+                              facilityMaintenanceBusy ||
+                              readMeta.source === "prisma" ||
+                              !facilityMaintenancePreview.ok ||
+                              !facilityMaintenancePreview.confirmToken
+                            }
+                            onClick={() => {
+                              void confirmFacilityMaintenance();
+                            }}
+                          >
+                            {facilityMaintenanceBusy ? "Wartung laeuft..." : "Wartung bestaetigen"}
                           </button>
                         </div>
                       </div>
@@ -20316,7 +20821,7 @@ export default function FoundationPageClient({ initialReadSource, initialSelecte
                                 <div className="table-player-cell">
                                   <strong>{row.item.name}</strong>
                                   <span>
-                                    <ClassColorChip className={row.item.className} /> · {row.item.race}
+                                    <ClassColorChip className={row.item.className} /> · <RaceIcon race={row.item.race} className="race-icon-chip-inline" />
                                     {row.item.mercenary ? " · Mercenary" : ""}
                                   </span>
                                   <div className="transfermarkt-inline-actions">
@@ -20774,7 +21279,7 @@ export default function FoundationPageClient({ initialReadSource, initialSelecte
                                                 <span className="pill">{formatLocalePoints(entry.score, 1)}</span>
                                               </div>
                                               <p className="muted">
-                                                <ClassColorChip className={entry.className} /> · {entry.race}
+                                                <ClassColorChip className={entry.className} /> · <RaceIcon race={entry.race} className="race-icon-chip-inline" />
                                               </p>
                                               <p className="muted">{entry.fitSummary}</p>
                                               <p className="muted">{entry.sportsSummary}</p>
@@ -21110,7 +21615,7 @@ export default function FoundationPageClient({ initialReadSource, initialSelecte
                                               <span className="pill">{formatLocalePoints(entry.score, 1)}</span>
                                             </div>
                                             <p className="muted">
-                                              <ClassColorChip className={entry.className} /> · {entry.race}
+                                              <ClassColorChip className={entry.className} /> · <RaceIcon race={entry.race} className="race-icon-chip-inline" />
                                             </p>
                                             <p className="muted">
                                               OVR {formatWholeNumber(entry.ovr)} · MVS {entry.mvs != null ? formatPpsValue(entry.mvs) : "—"}
@@ -21160,7 +21665,7 @@ export default function FoundationPageClient({ initialReadSource, initialSelecte
                                               <span className="pill">{entry.sellPriority}</span>
                                             </div>
                                             <p className="muted">
-                                              <ClassColorChip className={entry.className} /> · {entry.race}
+                                              <ClassColorChip className={entry.className} /> · <RaceIcon race={entry.race} className="race-icon-chip-inline" />
                                             </p>
                                             <p className="muted">
                                               OVR {formatWholeNumber(entry.ovr)} · MVS {entry.mvs != null ? formatPpsValue(entry.mvs) : "—"}
@@ -21553,7 +22058,7 @@ export default function FoundationPageClient({ initialReadSource, initialSelecte
                                               <span className="pill">{formatLocalePoints(entry.finalScore, 1)}</span>
                                             </div>
                                             <p className="muted">
-                                              {entry.lane.toUpperCase()} · <ClassColorChip className={entry.className} /> · {entry.race}
+                                              {entry.lane.toUpperCase()} · <ClassColorChip className={entry.className} /> · <RaceIcon race={entry.race} className="race-icon-chip-inline" />
                                             </p>
                                             <p className="muted">
                                               Lane {formatTransfermarktCurrency(entry.laneBudgetUsed)} / {formatTransfermarktCurrency(entry.laneBudgetLimit)} · {entry.laneReason}
@@ -21596,7 +22101,7 @@ export default function FoundationPageClient({ initialReadSource, initialSelecte
                                               <span className="pill">{formatLocalePoints(entry.finalScore, 1)}</span>
                                             </div>
                                             <p className="muted">
-                                              <ClassColorChip className={entry.className} /> · {entry.race} · Achse {entry.candidateAxis?.toUpperCase() ?? "—"}
+                                              <ClassColorChip className={entry.className} /> · <RaceIcon race={entry.race} className="race-icon-chip-inline" /> · Achse {entry.candidateAxis?.toUpperCase() ?? "—"}
                                             </p>
                                             <p className="muted">
                                               Quality {formatLocalePoints(entry.scoreBreakdown.playerQualityScore, 1)} · Budget {formatLocalePoints(entry.scoreBreakdown.budgetFitScore, 1)} · Value {formatLocalePoints(entry.scoreBreakdown.valueScore, 1)}
@@ -21846,9 +22351,9 @@ export default function FoundationPageClient({ initialReadSource, initialSelecte
                                             </button>
                                             <span className="pill">Keep</span>
                                           </div>
-                                          <p className="muted">
-                                            <ClassColorChip className={entry.className} /> · {entry.raceName}
-                                          </p>
+                                            <p className="muted">
+                                              <ClassColorChip className={entry.className} /> · <RaceIcon race={entry.raceName} className="race-icon-chip-inline" />
+                                            </p>
                                           <p className="muted">
                                             OVR {formatWholeNumber(entry.ovr)} · MVS {entry.mvs != null ? formatPpsValue(entry.mvs) : "—"}
                                           </p>
@@ -21880,7 +22385,7 @@ export default function FoundationPageClient({ initialReadSource, initialSelecte
                                             <span className="pill">{entry.sellPriority}</span>
                                           </div>
                                           <p className="muted">
-                                            <ClassColorChip className={entry.className} /> · {entry.raceName}
+                                            <ClassColorChip className={entry.className} /> · <RaceIcon race={entry.raceName} className="race-icon-chip-inline" />
                                           </p>
                                           <p className="muted">
                                             OVR {formatWholeNumber(entry.ovr)} · MVS {entry.mvs != null ? formatPpsValue(entry.mvs) : "—"}
@@ -22438,7 +22943,7 @@ export default function FoundationPageClient({ initialReadSource, initialSelecte
                                   <div className="table-player-cell">
                                     <strong>{entry.playerName}</strong>
                                     <span>
-                                      <ClassColorChip className={entry.className} /> · {entry.race}
+                                      <ClassColorChip className={entry.className} /> · <RaceIcon race={entry.race} className="race-icon-chip-inline" />
                                     </span>
                                   </div>
                                 </div>

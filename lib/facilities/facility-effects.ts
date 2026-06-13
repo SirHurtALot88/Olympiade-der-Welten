@@ -7,6 +7,7 @@ import {
   type FacilityId,
   type SpecialistWingVariant,
 } from "@/lib/facilities/facility-catalog";
+import { clampFacilityCondition, getFacilityEfficiencyPct } from "@/lib/facilities/facility-condition";
 import type { PlayerProgressionRatingTier } from "@/lib/training/training-plan-types";
 
 export type FacilityStateSource = GameState | { gameState: GameState };
@@ -38,6 +39,7 @@ export function getTeamFacilityState(source: FacilityStateSource, teamId: string
         {
           level,
           enabled: existing?.enabled ?? level > 0,
+          conditionPct: level > 0 ? clampFacilityCondition(existing?.conditionPct) : 0,
           activeVariant: existing?.activeVariant,
           lastPaidSeasonId: existing?.lastPaidSeasonId,
           disabledReason: existing?.disabledReason ?? (level > 0 ? undefined : "not_built"),
@@ -51,10 +53,22 @@ export function getTeamFacilityState(source: FacilityStateSource, teamId: string
 
 export function getFacilityLevel(teamFacilities: TeamFacilityCollection | null | undefined, facilityId: FacilityId) {
   const entry = teamFacilities?.facilities?.[facilityId];
-  if (!entry?.enabled) {
+  if (!entry?.enabled || clampFacilityCondition(entry.conditionPct) <= 0) {
     return 0;
   }
   return clampLevel(entry?.level);
+}
+
+export function getFacilityEfficiency(teamFacilities: TeamFacilityCollection | null | undefined, facilityId: FacilityId) {
+  const entry = teamFacilities?.facilities?.[facilityId];
+  if (!entry?.enabled || clampLevel(entry?.level) <= 0) {
+    return { conditionPct: 0, efficiencyPct: 0 };
+  }
+  const conditionPct = clampFacilityCondition(entry.conditionPct);
+  return {
+    conditionPct,
+    efficiencyPct: getFacilityEfficiencyPct(conditionPct),
+  };
 }
 
 export function calculateFacilityUpkeep(teamFacilities: TeamFacilityCollection | null | undefined) {
@@ -70,14 +84,16 @@ export function calculateFacilityIncome(teamFacilities: TeamFacilityCollection |
   return roundValue(
     FACILITY_CATALOG.reduce((sum, facility) => {
       const level = getFacilityLevel(teamFacilities, facility.facilityId);
-      return sum + (getFacilityLevelDefinition(facility.facilityId, level)?.seasonIncome ?? 0);
+      const efficiencyPct = getFacilityEfficiency(teamFacilities, facility.facilityId).efficiencyPct;
+      return sum + ((getFacilityLevelDefinition(facility.facilityId, level)?.seasonIncome ?? 0) * efficiencyPct) / 100;
     }, 0),
   );
 }
 
 export function applyTrainingXpFacilityModifiers(baseTrainingXp: number, facilities: TeamFacilityCollection | null | undefined) {
   const level = getFacilityLevel(facilities, "training_center");
-  const modifierPct = getFacilityLevelDefinition("training_center", level)?.modifierPct ?? 0;
+  const efficiencyPct = getFacilityEfficiency(facilities, "training_center").efficiencyPct;
+  const modifierPct = roundValue(((getFacilityLevelDefinition("training_center", level)?.modifierPct ?? 0) * efficiencyPct) / 100);
   return {
     before: baseTrainingXp,
     modifierPct,
@@ -87,7 +103,8 @@ export function applyTrainingXpFacilityModifiers(baseTrainingXp: number, facilit
 
 export function applyRecoveryFacilityModifiers(baseRecovery: number, facilities: TeamFacilityCollection | null | undefined) {
   const level = getFacilityLevel(facilities, "recovery_center");
-  const modifierPct = getFacilityLevelDefinition("recovery_center", level)?.modifierPct ?? 0;
+  const efficiencyPct = getFacilityEfficiency(facilities, "recovery_center").efficiencyPct;
+  const modifierPct = roundValue(((getFacilityLevelDefinition("recovery_center", level)?.modifierPct ?? 0) * efficiencyPct) / 100);
   return {
     before: baseRecovery,
     modifierPct,
@@ -100,7 +117,8 @@ function getAcademyDiscountPct(ratingTier: PlayerProgressionRatingTier, faciliti
     return 0;
   }
   const level = getFacilityLevel(facilities, "academy");
-  return getFacilityLevelDefinition("academy", level)?.discountPct ?? 0;
+  const efficiencyPct = getFacilityEfficiency(facilities, "academy").efficiencyPct;
+  return roundValue(((getFacilityLevelDefinition("academy", level)?.discountPct ?? 0) * efficiencyPct) / 100);
 }
 
 function normalizeSpecialistVariant(value: string | null | undefined): SpecialistWingVariant {
@@ -111,9 +129,10 @@ function normalizeSpecialistVariant(value: string | null | undefined): Specialis
 
 function getSpecialistDiscountPct(attribute: PlayerGeneratorAttributeName, facilities: TeamFacilityCollection | null | undefined) {
   const level = getFacilityLevel(facilities, "specialist_wing");
+  const efficiencyPct = getFacilityEfficiency(facilities, "specialist_wing").efficiencyPct;
   const variant = normalizeSpecialistVariant(facilities?.facilities?.specialist_wing?.activeVariant);
   const matchesVariant = SPECIALIST_WING_VARIANTS[variant].attributes.includes(attribute);
-  return matchesVariant ? getFacilityLevelDefinition("specialist_wing", level)?.discountPct ?? 0 : 0;
+  return matchesVariant ? roundValue(((getFacilityLevelDefinition("specialist_wing", level)?.discountPct ?? 0) * efficiencyPct) / 100) : 0;
 }
 
 export function applyUpgradeCostFacilityModifiers(

@@ -19,7 +19,7 @@ function facilities(entries: TeamFacilityCollection["facilities"]): TeamFacility
 
 function gameStateWithFacilities(teamFacilities?: GameState["seasonState"]["teamFacilities"]): GameState {
   return {
-    season: { id: "season-1", name: "Season 1", currentMatchday: 1, totalMatchdays: 10, isCompleted: false },
+    season: { id: "season-1", name: "Season 1", year: 1, currentMatchday: 1, matchdayIds: ["matchday-1"] },
     seasonState: { seasonId: "season-1", schedule: [], standings: {}, teamFacilities },
     matchdayState: { matchdayId: "matchday-1", status: "planning", pendingTeamIds: [], resolvedFixtureIds: [] },
     teams: [],
@@ -95,6 +95,15 @@ describe("facility effects", () => {
     expect(base.modifierPct).toBe(10);
     expect(base.after).toBe(110);
     expect(base.after + performanceXp).toBe(160);
+  });
+
+  it("scales facility effects by condition below 70 percent and reaches zero when broken", () => {
+    const wornFacilities = facilities({ training_center: { level: 2, enabled: true, conditionPct: 35 } });
+    const brokenFacilities = facilities({ training_center: { level: 2, enabled: true, conditionPct: 0 } });
+
+    expect(applyTrainingXpFacilityModifiers(100, wornFacilities).modifierPct).toBe(5);
+    expect(applyTrainingXpFacilityModifiers(100, wornFacilities).after).toBe(105);
+    expect(applyTrainingXpFacilityModifiers(100, brokenFacilities).after).toBe(100);
   });
 
   it("recovery center increases recovery", () => {

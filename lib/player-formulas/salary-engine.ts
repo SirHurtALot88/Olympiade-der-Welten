@@ -51,21 +51,40 @@ function collectTraitEffects(traits: string[], basisSalary: number, traitSalaryF
   return { effects, warnings };
 }
 
-export function calculateSalaryFromMarketValue(input: SalaryEngineInput): SalaryEngineBreakdown {
+export function deriveSalaryMarketValueFromFinalSalary(input: Omit<SalaryEngineInput, "salaryMarketValue"> & {
+  finalSalary: number;
+}) {
   const totalAttributes = Object.values(input.attributes).reduce((sum, value) => sum + value, 0);
   const weightedAttributeSalaryBlock = roundTo2(
     (Object.entries(attributeKeyMap) as Array<[AttributeSalaryModifierName, keyof PlayerGeneratorAttributes]>).reduce((sum, [modifierName, attributeKey]) => {
       return sum + input.attributes[attributeKey] * input.attributeSalaryModifiers[modifierName];
     }, 0),
   );
-  const basisSalary = roundTo2(
-    (input.marketValueNew / 5) * (weightedAttributeSalaryBlock / 5) * ((totalAttributes / 1000) * 3),
+  const weightedAttributeTerm = roundTo2(weightedAttributeSalaryBlock / 5);
+  const totalAttributesTerm = roundTo2((totalAttributes / 1000) * 3);
+  const traitInputs = [...(input.traitsPositive ?? []), ...(input.traitsNegative ?? [])];
+  const traitPercentSum = traitInputs.reduce((sum, trait) => sum + (input.traitSalaryFactors[trait] ?? 0), 0);
+  const salaryBase = roundTo2(input.finalSalary / (1 + traitPercentSum));
+  return roundTo2(Math.max(0, (salaryBase - weightedAttributeTerm - totalAttributesTerm) * 5));
+}
+
+export function calculateSalaryFromMarketValue(input: SalaryEngineInput): SalaryEngineBreakdown {
+  const totalAttributes = Object.values(input.attributes).reduce((sum, value) => sum + value, 0);
+  const weightedAttributeSalaryBlock = roundTo2(
+    (Object.entries(attributeKeyMap) as Array<[AttributeSalaryModifierName, keyof PlayerGeneratorAttributes]>).reduce((sum, [modifierName, attributeKey]) => {
+        return sum + input.attributes[attributeKey] * input.attributeSalaryModifiers[modifierName];
+    }, 0),
   );
+  const salaryMarketValueTerm = roundTo2(input.salaryMarketValue / 5);
+  const weightedAttributeTerm = roundTo2(weightedAttributeSalaryBlock / 5);
+  const totalAttributesTerm = roundTo2((totalAttributes / 1000) * 3);
+  const basisSalary = roundTo2(salaryMarketValueTerm + weightedAttributeTerm + totalAttributesTerm);
   const traitInputs = [...(input.traitsPositive ?? []), ...(input.traitsNegative ?? [])];
   const traitBreakdown = collectTraitEffects(traitInputs, basisSalary, input.traitSalaryFactors);
-  const rawFinalSalary = roundTo2(
-    basisSalary + traitBreakdown.effects.reduce((sum, effect) => sum + effect.effect, 0),
+  const traitPercentSum = Number(
+    traitBreakdown.effects.reduce((sum, effect) => sum + (effect.factor ?? 0), 0).toFixed(3),
   );
+  const rawFinalSalary = roundTo2(basisSalary * (1 + traitPercentSum));
   const finalSalary = roundTo2(Math.max(0, rawFinalSalary));
   const warnings = [...traitBreakdown.warnings];
   if (rawFinalSalary < 0) {
@@ -75,8 +94,12 @@ export function calculateSalaryFromMarketValue(input: SalaryEngineInput): Salary
   return {
     totalAttributes,
     weightedAttributeSalaryBlock,
+    weightedAttributeTerm,
+    salaryMarketValueTerm,
+    totalAttributesTerm,
     basisSalary,
     rawFinalSalary,
+    traitPercentSum,
     traitEffects: traitBreakdown.effects,
     finalSalary,
     warnings,

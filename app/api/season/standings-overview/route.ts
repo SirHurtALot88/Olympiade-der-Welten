@@ -114,18 +114,18 @@ export async function GET(request: Request) {
     const localPrizeSummaryByTeamId =
       source === "sqlite"
         ? (() => {
-            const hasCashPrizeApply = (localSave!.gameState.seasonState.cashPrizeApplyLogs ?? []).some(
-              (entry) => entry.seasonId === localSave!.gameState.season.id,
-            );
             const playerById = new Map(localSave!.gameState.players.map((player) => [player.id, player] as const));
             const transferSummaryByTeamId = new Map<string, number>();
 
             for (const entry of localSave!.gameState.transferHistory) {
+              if (entry.seasonId !== localSave!.gameState.season.id) {
+                continue;
+              }
               const amount = entry.fee ?? 0;
               if (entry.transferType === "buy" && entry.toTeamId) {
                 transferSummaryByTeamId.set(entry.toTeamId, (transferSummaryByTeamId.get(entry.toTeamId) ?? 0) - amount);
               }
-              if (entry.transferType === "sell" && entry.fromTeamId) {
+              if ((entry.transferType === "sell" || entry.transferType === "contract_exit") && entry.fromTeamId) {
                 transferSummaryByTeamId.set(entry.fromTeamId, (transferSummaryByTeamId.get(entry.fromTeamId) ?? 0) + amount);
               }
             }
@@ -141,18 +141,13 @@ export async function GET(request: Request) {
                   const standing = localSave!.gameState.seasonState.standings[team.teamId] ?? null;
                   const derivedRank = standing?.rank ?? localCashRankByTeamId?.get(team.teamId) ?? 0;
                   const transfers = transferSummaryByTeamId.get(team.teamId) ?? 0;
-                  const displayedCash =
-                    !hasCashPrizeApply && team.budget != null
-                      ? Number((team.budget + transfers).toFixed(2))
-                      : team.cash;
-
                   return {
                     rank: derivedRank,
                     startPlace: standing?.rank ?? derivedRank,
                     team: {
                       teamId: team.teamId,
                       name: team.name,
-                      cash: displayedCash,
+                      cash: team.cash,
                     },
                     upkeep,
                     transfers,
@@ -171,22 +166,13 @@ export async function GET(request: Request) {
               const row = localSheetRowByTeamId?.get(team.teamId) ?? null;
               const derivedCashRank = localCashRankByTeamId?.get(team.teamId) ?? null;
               const prizeSummary = localPrizeSummaryByTeamId?.get(team.teamId) ?? null;
-              const hasCashPrizeApply = (localSave!.gameState.seasonState.cashPrizeApplyLogs ?? []).some(
-                (entry) => entry.seasonId === localSave!.gameState.season.id,
-              );
-              const localTransferNet = prizeSummary?.transfers ?? 0;
-              const displayedCash =
-                !hasCashPrizeApply && team.budget != null
-                  ? Number((team.budget + localTransferNet).toFixed(2))
-                  : team.cash;
-
               return {
                 teamId: team.teamId,
                 teamName: team.name,
                 teamCode: team.shortCode,
                 rank: standing?.rank ?? derivedCashRank,
                 points: standing?.points ?? 0,
-                cash: displayedCash,
+                cash: team.cash,
                 cashFc: prizeSummary?.cashForecast ?? null,
                 startplatz: standing?.rank ?? derivedCashRank,
                 rankDiff: prizeSummary?.rankDiff ?? null,

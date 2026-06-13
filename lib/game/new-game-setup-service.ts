@@ -416,14 +416,8 @@ export function buildNewGameStateFromBaseline(input: NewGameSetupInput & { saveI
       cash: team.budget,
       humanControlled: humanTeamIds.has(team.teamId),
     })),
-    rosters: resetGameState.rosters.map((roster) => ({
-      ...roster,
-      joinedSeasonId: "season-1",
-    })),
-    contracts: resetGameState.contracts.map((contract) => ({
-      ...contract,
-      status: contract.teamId ? "active" : "free_agent",
-    })),
+    rosters: [],
+    contracts: [],
     transferHistory: [],
     playerPotential: buildPlayerPotentialRecordsForSave({
       saveId: input.saveId ?? "season-1-new-game-preview",

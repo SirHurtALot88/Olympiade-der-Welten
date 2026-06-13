@@ -457,10 +457,11 @@ export function buildContractNegotiationPreview(input: NegotiationPreviewInput):
   const blockingReasons: string[] = [];
   const scoreBreakdown: NegotiationScoreBreakdownEntry[] = [];
 
-  const baseExpectedSalary =
+  const economy =
     input.player || input.rosterEntry
-      ? resolvePlayerEconomyContract({ player: input.player, rosterEntry: input.rosterEntry }).salary
+      ? resolvePlayerEconomyContract({ player: input.player, rosterEntry: input.rosterEntry })
       : null;
+  const baseExpectedSalary = economy?.expectedSalary ?? null;
   let expectedSalary = baseExpectedSalary;
   const offeredSalary =
     typeof input.offeredSalary === "number" && Number.isFinite(input.offeredSalary) && input.offeredSalary > 0

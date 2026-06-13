@@ -9,6 +9,7 @@ import type {
 import { buildTeamControlSettingsMap, DEFAULT_ACTIVE_OWNER_ID, getTeamOwner } from "@/lib/foundation/team-control-settings";
 import { FACILITY_CATALOG } from "@/lib/facilities/facility-catalog";
 import { calculateFacilityIncome, calculateFacilityUpkeep, getTeamFacilityState } from "@/lib/facilities/facility-effects";
+import { FACILITY_CONDITION_WARNING, getFacilityConditionStatus } from "@/lib/facilities/facility-condition";
 import { buildMatchdaySummary } from "@/lib/foundation/matchday-summary";
 
 export type GameInboxTargetView =
@@ -328,6 +329,33 @@ function buildTeamTasks(input: BuildGameInboxInput, visibleTeamIds: Set<string>,
     }
 
     const facilities = getTeamFacilityState(input.gameState, team.teamId);
+    const wornFacility = FACILITY_CATALOG.map((facility) => {
+      const state = facilities.facilities[facility.facilityId];
+      return {
+        facility,
+        conditionPct: state?.conditionPct ?? 0,
+        level: state?.level ?? 0,
+      };
+    }).find((entry) => entry.level > 0 && entry.conditionPct < FACILITY_CONDITION_WARNING);
+    if (wornFacility) {
+      const status = getFacilityConditionStatus(wornFacility.conditionPct);
+      items.push(
+        createItem({
+          itemId: `facility_condition_low:${input.saveId}:${input.gameState.season.id}:${team.teamId}:${wornFacility.facility.facilityId}`,
+          saveId: input.saveId,
+          seasonId: input.gameState.season.id,
+          teamId: team.teamId,
+          category: "facility",
+          severity: status === "critical" || status === "broken" ? "critical" : "warning",
+          title: "Gebäude-Zustand kritisch",
+          description: `${team.shortCode}: ${wornFacility.facility.label} ist bei ${wornFacility.conditionPct}% und verliert Leistung.`,
+          targetView: "training",
+          targetParams: { team: team.teamId, panel: "facilities" },
+          source: "facility_condition_forecast",
+          createdAt,
+        }),
+      );
+    }
     const upkeep = calculateFacilityUpkeep(facilities);
     const income = calculateFacilityIncome(facilities);
     if (upkeep > 0 && team.cash + income - upkeep < 0) {

@@ -74,12 +74,7 @@ function getRankBonus(rank: number, total: number) {
     : null;
 
   if (topBonus != null && bottomBonus != null) {
-    const middleRank = (total + 1) / 2;
-    if (Number.isInteger(middleRank) && rank === middleRank) {
-      return 0;
-    }
-
-    return rank < middleRank ? topBonus : bottomBonus;
+    return rank <= Math.ceil(total / 2) ? topBonus : bottomBonus;
   }
 
   return topBonus ?? bottomBonus ?? 0;
