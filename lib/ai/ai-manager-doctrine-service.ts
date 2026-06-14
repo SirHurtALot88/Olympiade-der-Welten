@@ -14,6 +14,7 @@ import type {
   TeamStrategyProfile,
 } from "@/lib/data/olyDataTypes";
 import { getTeamStrategyProfile } from "@/lib/foundation/team-strategy-profiles";
+import { getTeamThemeCompositionTarget } from "@/lib/ai/team-theme-composition-service";
 
 export type DoctrineSeasonTeamReviewRow = {
   teamId: string;
@@ -196,7 +197,8 @@ function doctrineNameFor(teamRow: Team, profile: TeamStrategyProfile, identityRo
   return overrides[teamRow.teamId] ?? profile.fantasyTheme ?? `${teamRow.name} Doctrine ${identityRow?.playerType ?? "Core"}`;
 }
 
-function buildIdentityPillars(profile: TeamStrategyProfile, identityRow: TeamIdentity | null) {
+function buildIdentityPillars(teamId: string, profile: TeamStrategyProfile, identityRow: TeamIdentity | null) {
+  const themeTarget = getTeamThemeCompositionTarget(teamId);
   const axis = identityRow
     ? [
         ["POW", identityRow.pow],
@@ -211,6 +213,7 @@ function buildIdentityPillars(profile: TeamStrategyProfile, identityRow: TeamIde
 
   return [
     profile.fantasyTheme ?? null,
+    themeTarget ? `Theme ${themeTarget.primaryThemeTags.join("/")}` : null,
     ...profile.preferredArchetypes.slice(0, 3),
     ...profile.preferredClasses.slice(0, 2),
     ...axis,
@@ -325,13 +328,13 @@ export function buildTeamDoctrineMap(gameState: GameState): Record<string, TeamD
       const doctrine: TeamDoctrineRecord = {
         teamId: teamRow.teamId,
         doctrineName: doctrineNameFor(teamRow, safeProfile, identityRow),
-        identityPillars: buildIdentityPillars(safeProfile, identityRow),
+        identityPillars: buildIdentityPillars(teamRow.teamId, safeProfile, identityRow),
         preferredWinPath: preferredWinPath(safeProfile, identityRow),
         secondaryWinPath:
           safeProfile.bias.rosterDepthPreference >= 7
             ? "Tiefe Rotation und Fatigue-Stabilitaet."
             : "Gezielte Need-Reparatur ohne Identitaetsverlust.",
-        forbiddenPaths: [...safeProfile.hardNoGos, ...safeProfile.avoidedArchetypes.slice(0, 3)],
+        forbiddenPaths: [...safeProfile.hardNoGos, ...safeProfile.avoidedArchetypes.slice(0, 3), ...(getTeamThemeCompositionTarget(teamRow.teamId)?.avoidTags ?? []).map((tag) => `avoid-theme:${tag}`)],
         rosterPhilosophy: safeProfile.rosterStyle,
         transferPhilosophy: safeProfile.buyStyle,
         trainingPhilosophy:

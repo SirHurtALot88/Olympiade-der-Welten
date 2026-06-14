@@ -6,6 +6,12 @@ import { getImportedPlayerDisplayMarketValue, getImportedPlayerDisplaySalary } f
 import { buildPlayerRatingContractMap } from "@/lib/foundation/player-rating-contract";
 import { buildTeamStrategyProfileMap } from "@/lib/foundation/team-strategy-profiles";
 import {
+  buildTeamThemeCompositionAudit,
+  calculateThemeCompositionScore,
+  getTeamThemeCompositionTarget,
+  type TeamThemeCompositionScore,
+} from "@/lib/ai/team-theme-composition-service";
+import {
   createLocalTransfermarktRunContext,
   executeLocalTransfermarktBuy,
   flushLocalTransfermarktRunContext,
@@ -67,6 +73,10 @@ export type ChunkedRedraftPickRow = {
   classFit?: number;
   identityFit?: number;
   valueScore?: number;
+  themeCompositionScore?: number;
+  themeTier?: string;
+  themeTags?: string;
+  themeReason?: string;
   salaryImpact?: number;
   budgetFit?: number;
   topRejectedCandidates?: string;
@@ -145,6 +155,10 @@ type ScoredCandidate = Candidate & {
   selectedScore: number;
   identityFit: number;
   valueScore: number;
+  themeCompositionScore: number;
+  themeTier: TeamThemeCompositionScore["themeTier"];
+  themeTags: string[];
+  themeReason: string;
   salaryImpact: number;
   budgetFit: number;
   potentialScore: number;
@@ -409,6 +423,8 @@ type ManagerMarketBoardRow = {
   salaryRisk: number;
   traitRisk: number;
   themeFit: number;
+  themeCompositionScore: number;
+  themeTier: string;
   boardTier: MarketBoardTier;
   reason: string;
 };
@@ -1029,6 +1045,7 @@ function buildRosterBlueprint(input: {
 }): RosterBlueprintPlan {
   const target = input.targetPlan;
   const targetSize = target.desiredRosterTarget;
+  const themeTarget = getTeamThemeCompositionTarget(input.team);
   return {
     teamId: input.team.teamId,
     teamName: input.team.name,
@@ -1043,7 +1060,9 @@ function buildRosterBlueprint(input: {
     requiredAxisCoverage: target.preferredAxes,
     requiredClassCoverage: target.requiredClassBias,
     requiredDisciplineCoverage: "top_matchday_needs",
-    preferredThemes: input.strategyProfile?.preferredArchetypes.join("|") ?? "",
+    preferredThemes: themeTarget
+      ? `${themeTarget.primaryThemeTags.join("|")};target=${themeTarget.targetShare};min=${themeTarget.minimumShare}`
+      : input.strategyProfile?.preferredArchetypes.join("|") ?? "",
     preferredRaces: input.strategyProfile?.preferredRaces.join("|") ?? "",
     preferredClasses: input.strategyProfile?.preferredClasses.join("|") ?? "",
     preferredSubclasses: input.strategyProfile?.secondaryArchetypes?.join("|") ?? "",
@@ -1070,8 +1089,8 @@ function buildManagerMarketBoard(input: {
     const needFit = candidate.teamNeed.includes("POW") ? candidate.pow : candidate.teamNeed.includes("SPE") ? candidate.spe : candidate.teamNeed.includes("MEN") ? candidate.men : candidate.soc;
     const salaryRisk = candidate.salary == null ? 0 : roundValue(candidate.salary / Math.max(1, input.team.cash), 4);
     const traitRisk = (candidate.player.traitsNegative?.length ?? 0) * 4;
-    const themeFit = candidate.classFit + candidate.identityFit * 0.08;
-    const boardScore = candidate.selectedScore + candidate.identityFit * 0.35 + candidate.valueScore * 6 - salaryRisk * 18 - traitRisk;
+    const themeFit = candidate.classFit + candidate.identityFit * 0.08 + candidate.themeCompositionScore;
+    const boardScore = candidate.selectedScore + candidate.identityFit * 0.35 + candidate.valueScore * 6 + candidate.themeCompositionScore * 0.8 - salaryRisk * 18 - traitRisk;
     const boardTier: MarketBoardTier =
       candidate.marketValue > input.team.cash
         ? "Avoid"
@@ -1102,8 +1121,10 @@ function buildManagerMarketBoard(input: {
       salaryRisk,
       traitRisk,
       themeFit: roundValue(themeFit, 2),
+      themeCompositionScore: candidate.themeCompositionScore,
+      themeTier: candidate.themeTier,
       boardTier,
-      reason: `${boardTier};need=${candidate.teamNeed};blueprint=${input.blueprint.targetMode};profile=${input.profile.managerArchetype}`,
+      reason: `${boardTier};need=${candidate.teamNeed};theme=${candidate.themeTier};blueprint=${input.blueprint.targetMode};profile=${input.profile.managerArchetype}`,
     };
   });
 }
@@ -1114,6 +1135,7 @@ function scoreCandidateForTeam(input: {
   gameState: GameState;
   teamIdentity: TeamIdentity | null | undefined;
   strategyProfile: TeamStrategyProfile | null | undefined;
+  team: GameState["teams"][number];
   phase: ChunkedRedraftPhase;
   maxRecommendedSpend: number;
 }): ScoredCandidate {
@@ -1126,18 +1148,29 @@ function scoreCandidateForTeam(input: {
   const wageSensitivity = toBias(input.strategyProfile?.bias?.wageSensitivity);
   const depthBias = toBias(input.strategyProfile?.bias?.rosterDepthPreference);
   const potentialScore = roundValue(input.candidate.player.potential ?? 0, 2);
+  const themeScore = calculateThemeCompositionScore({
+    gameState: input.gameState,
+    team: input.team,
+    player: input.candidate.player,
+    candidateQuality: input.candidate.quality,
+    candidateRoleFit: classFit,
+    currentTeamNeeds: [],
+    phase: input.phase,
+  });
+  const themeWeight = input.phase === "phase_a_minimum" ? 0.45 : input.phase === "phase_b_core_optimum" ? 0.95 : 1.1;
   const budgetFit =
     input.candidate.marketValue <= input.maxRecommendedSpend
       ? 8
       : -Math.min(input.phase === "phase_a_minimum" ? 42 : 24, (input.candidate.marketValue - input.maxRecommendedSpend) * (input.phase === "phase_a_minimum" ? 1.35 : 0.6));
   const phaseScore =
     input.phase === "phase_a_minimum"
-      ? input.candidate.quality * 0.55 + valueScore * (28 + valueBias * 1.2) + classFit * 0.45 - salaryImpact * 0.45 + budgetFit * 1.75
+      ? input.candidate.quality * 0.55 + valueScore * (28 + valueBias * 1.2) + classFit * 0.45 + themeScore.themeCompositionScore * themeWeight - salaryImpact * 0.45 + budgetFit * 1.75
       : input.phase === "phase_b_core_optimum"
         ? input.candidate.quality * (1.15 + starBias * 0.04) +
           identityFit * 0.75 +
           valueScore * (9 + valueBias * 0.9) +
           potentialScore * 0.12 +
+          themeScore.themeCompositionScore * themeWeight +
           classFit -
           salaryImpact * (0.2 + wageSensitivity * 0.035) +
           budgetFit * 0.55
@@ -1145,6 +1178,7 @@ function scoreCandidateForTeam(input: {
           identityFit * 0.45 +
           valueScore * (10 + valueBias) +
           potentialScore * 0.08 +
+          themeScore.themeCompositionScore * themeWeight +
           classFit * 1.15 +
           depthBias * 0.8 -
           salaryImpact * (0.35 + wageSensitivity * 0.04) +
@@ -1162,6 +1196,10 @@ function scoreCandidateForTeam(input: {
     identityFit,
     classFit,
     valueScore,
+    themeCompositionScore: themeScore.themeCompositionScore,
+    themeTier: themeScore.themeTier,
+    themeTags: themeScore.playerThemeTags,
+    themeReason: themeScore.reason,
     salaryImpact,
     budgetFit: roundValue(budgetFit, 2),
     potentialScore,
@@ -1919,6 +1957,10 @@ function writeReports(input: {
       classFit: pick.classFit ?? "",
       identityFit: pick.identityFit ?? "",
       valueScore: pick.valueScore ?? "",
+      themeCompositionScore: pick.themeCompositionScore ?? "",
+      themeTier: pick.themeTier ?? "",
+      themeTags: pick.themeTags ?? "",
+      themeReason: pick.themeReason ?? "",
       salaryImpact: pick.salaryImpact ?? "",
       budgetFit: (pick as ChunkedRedraftPickRow & { budgetFit?: number }).budgetFit ?? "",
       topRejectedCandidates: pick.topRejectedCandidates ?? "",
@@ -1952,6 +1994,9 @@ function writeReports(input: {
       classFit: pick.classFit ?? "",
       identityFit: pick.identityFit ?? "",
       valueScore: pick.valueScore ?? "",
+      themeCompositionScore: pick.themeCompositionScore ?? "",
+      themeTier: pick.themeTier ?? "",
+      themeTags: pick.themeTags ?? "",
       salaryImpact: pick.salaryImpact ?? "",
       qualityTier: pick.qualityTier ?? "",
       reason: pick.reasons,
@@ -1995,12 +2040,16 @@ function writeReports(input: {
       classFit: pick.classFit ?? "",
       identityFit: pick.identityFit ?? "",
       valueScore: pick.valueScore ?? "",
+      themeCompositionScore: pick.themeCompositionScore ?? "",
+      themeTier: pick.themeTier ?? "",
+      themeTags: pick.themeTags ?? "",
       salaryImpact: pick.salaryImpact ?? "",
       budgetFit: pick.budgetFit ?? "",
       reason: pick.reasons,
     })),
   );
   writeCsv(input.outputDir, "chunked-redraft-team-status.csv", buildTeamRows(input.finalSave, input.warningRows) as unknown as Array<Record<string, unknown>>);
+  writeCsv(input.outputDir, "team-theme-composition-audit.csv", buildTeamThemeCompositionAudit(input.finalSave.gameState) as unknown as Array<Record<string, unknown>>);
   writeCsv(input.outputDir, "chunked-redraft-phase-b-team-status.csv", buildTeamRows(input.finalSave, input.warningRows) as unknown as Array<Record<string, unknown>>);
   writeCsv(input.outputDir, "chunked-redraft-memory.csv", input.memoryRows as unknown as Array<Record<string, unknown>>);
   writeCsv(input.outputDir, "topup-memory-by-team.csv", input.memoryRows as unknown as Array<Record<string, unknown>>);
@@ -2177,6 +2226,7 @@ export function runChunkedRedraftTopup(params: ChunkedRedraftTopupParams) {
             gameState: runContext.save.gameState,
             teamIdentity,
             strategyProfile,
+            team: latestTeam,
             phase: phasePlan.phase,
             maxRecommendedSpend: phasePlan.maxRecommendedSpend,
           }),
@@ -2298,13 +2348,17 @@ export function runChunkedRedraftTopup(params: ChunkedRedraftTopupParams) {
           classFit: candidate.classFit,
           identityFit: candidate.identityFit,
           valueScore: candidate.valueScore,
+          themeCompositionScore: candidate.themeCompositionScore,
+          themeTier: candidate.themeTier,
+          themeTags: candidate.themeTags.join("|"),
+          themeReason: candidate.themeReason,
           salaryImpact: candidate.salaryImpact,
           budgetFit: candidate.budgetFit,
           topRejectedCandidates: getTopRejectedCandidates(scoredCandidates, candidate.player.id),
           ...rejectedFields,
           previewCalls,
           candidateCount: shortlist.length,
-          reasons: `${phasePlan.phase};teamNeed=${candidate.teamNeed};quality=${roundValue(candidate.quality, 2)};identityFit=${candidate.identityFit};valueScore=${candidate.valueScore};potential=${candidate.potentialScore};marketValue=${candidate.marketValue};cashReservePct=${phasePlan.cashReservePct}`,
+          reasons: `${phasePlan.phase};teamNeed=${candidate.teamNeed};quality=${roundValue(candidate.quality, 2)};identityFit=${candidate.identityFit};theme=${candidate.themeTier}:${candidate.themeCompositionScore};valueScore=${candidate.valueScore};potential=${candidate.potentialScore};marketValue=${candidate.marketValue};cashReservePct=${phasePlan.cashReservePct}`,
           durationMs: Date.now() - pickStartedAt,
         });
         phaseRows.push({

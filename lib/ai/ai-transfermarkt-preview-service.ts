@@ -19,6 +19,7 @@ import {
 } from "@/lib/market/transfermarkt-fit";
 import { createPersistenceService } from "@/lib/persistence/persistence-service";
 import { getSeasonDisciplineScheduleEntry } from "@/lib/season/season-discipline-schedule";
+import { calculateThemeCompositionScore, getTeamThemeCompositionTarget } from "@/lib/ai/team-theme-composition-service";
 
 export type AiTransferPreviewSource = "sqlite" | "prisma";
 export type AiTransferPreviewTeamScope = "ai" | "all";
@@ -57,6 +58,9 @@ export type AiTransferPreviewRecommendation = {
   warnings: string[];
   overallRecommendationScore: number;
   score: number;
+  themeCompositionScore?: number;
+  themeTier?: string;
+  themeTags?: string[];
   reason: string;
   fitNotes: string[];
   riskNotes: string[];
@@ -775,6 +779,7 @@ function scoreCandidate(input: {
   const preview = buildCandidatePreview(input.context, input.team, item);
   const candidateTokens = getCombinedCandidateTokens(item);
   const strategyProfile = getTeamStrategyProfile(input.context.gameState, input.team.teamId);
+  const player = getPlayerById(input.context.gameState, item.playerId);
 
   const preferredRaceHits = countListMatches(strategyProfile?.preferredRaces ?? [], [normalizeTransfermarktToken(item.race)]);
   const avoidedRaceHits = countListMatches(strategyProfile?.avoidedRaces ?? [], [normalizeTransfermarktToken(item.race)]);
@@ -866,6 +871,19 @@ function scoreCandidate(input: {
     return normalizeTransfermarktToken(rosterPlayer?.race) === normalizeTransfermarktToken(item.race);
   });
   const raceContinuityBonus = rosterRaceContinuity ? 0.22 : 0;
+  const phase =
+    rosterStatus === "under_min" ? "phase_a_minimum" : rosterStatus === "under_opt" ? "phase_b_core_optimum" : "phase_c_depth_luxury";
+  const themeComposition = player
+    ? calculateThemeCompositionScore({
+        gameState: input.context.gameState,
+        team: input.team,
+        player,
+        candidateQuality: item.ovr ?? player.ovr ?? player.rating ?? 0,
+        candidateRoleFit: (item.fit ?? 0) + exactPreferredClassHits,
+        phase,
+      })
+    : null;
+  const themeBoost = themeComposition ? clamp(themeComposition.themeCompositionScore / 100, -0.32, 0.42) : 0;
 
   const rawScore =
     0.18 +
@@ -877,6 +895,7 @@ function scoreCandidate(input: {
     fitScore * 0.1 +
     identityAxisAlignment * 0.3 +
     raceContinuityBonus +
+    themeBoost +
     objectiveBuyBonus +
     strategyBonus -
     wagePenalty * 0.16 -
@@ -897,6 +916,9 @@ function scoreCandidate(input: {
   const blockingReasons = [...preview.blockingReasons];
 
   if (preferredRaceHits > 0) strategyNotes.push(`passt zur Wunsch-Rasse ${item.race}`);
+  if (themeComposition && getTeamThemeCompositionTarget(input.team)) {
+    strategyNotes.push(`Theme ${themeComposition.themeTier} (${roundValue(themeComposition.themeCompositionScore, 1)})`);
+  }
   if (rosterRaceContinuity) strategyNotes.push(`haelt Rassenkern ${item.race} stabil`);
   if (preferredClassHits > 0) strategyNotes.push(`passt zur Wunsch-Klasse ${item.className}`);
   if (preferredArchetypeHits > 0) strategyNotes.push("passt zum hinterlegten Team-Stil");
@@ -917,6 +939,8 @@ function scoreCandidate(input: {
   if (avoidedClassHits > 0) riskNotes.push(`Teamprofil meidet ${item.className}`);
   if (avoidedArchetypeHits > 0) riskNotes.push("Archetyp kollidiert mit dem Team-Stil");
   if (themeMismatchPenalty > 0) riskNotes.push("klare Themenvorgaben werden nicht getroffen");
+  if (themeComposition?.themeTier === "outsider") riskNotes.push("Theme Composition: Außenseiter ohne klare Ausnahme");
+  if (themeComposition?.themeTier === "avoid") riskNotes.push("Theme Composition: Avoid-Tag getroffen");
   if (missingPreferredClassPenalty > 0) riskNotes.push("passt zu keiner bevorzugten Klasse");
   if (missingPreferredArchetypePenalty > 0) riskNotes.push("passt zu keinem bevorzugten Archetyp");
   if (classRepeatPenalty > 0.1) riskNotes.push(`Klasse ${item.className} ist im Team schon stark vertreten`);
@@ -994,6 +1018,7 @@ function scoreCandidate(input: {
     fitNotes,
     riskNotes,
     strategyNotes,
+    themeComposition,
   };
 }
 
@@ -1042,6 +1067,9 @@ function toPreviewRecommendation(entry: {
     warnings: entry.scored.warnings,
     overallRecommendationScore: entry.scored.score,
     score: entry.scored.score,
+    themeCompositionScore: entry.scored.themeComposition?.themeCompositionScore,
+    themeTier: entry.scored.themeComposition?.themeTier,
+    themeTags: entry.scored.themeComposition?.playerThemeTags,
     reason: entry.scored.reason,
     fitNotes: entry.scored.fitNotes,
     riskNotes: entry.scored.riskNotes,
