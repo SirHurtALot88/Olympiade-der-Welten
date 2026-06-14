@@ -230,6 +230,70 @@ describe("ai manager apply service", () => {
     expect(getAiManagerMarketSpendableCash(state, "T-1", 100)).toBe(18);
   });
 
+  it("subtracts building budget before exposing AI market spendable cash", () => {
+    const state = gameState({
+      cash: 100,
+      budgetReservations: {
+        "T-1": {
+          teamId: "T-1",
+          seasonId: "season-1",
+          sourcePlanId: "test-plan",
+          cashReserve: 10,
+          salaryReserve: 10,
+          transferBudget: 80,
+          buildingBudget: 35,
+          maintenanceBudget: 15,
+          emergencyBudget: 5,
+          updatedAt: "2026-06-14T00:00:00.000Z",
+        },
+      },
+    });
+
+    expect(getAiManagerMarketSpendableCash(state, "T-1", 100)).toBe(25);
+  });
+
+  it("applies maintenance through the facility service and restores condition", () => {
+    const source = save();
+    const mock = persistenceMock(source);
+    const result = applyAiManagerPlan({
+      save: source,
+      dryRun: false,
+      actionTypes: ["maintain_building"],
+      persistence: mock.persistence,
+    });
+
+    const appliedMaintenance = result.actions.find((action) => action.actionType === "maintain_building" && action.applied);
+    const team = mock.current.gameState.teams.find((entry) => entry.teamId === "T-1");
+    const trainingCenter = mock.current.gameState.seasonState.teamFacilities?.["T-1"]?.facilities.training_center;
+
+    expect(appliedMaintenance).toBeTruthy();
+    expect(team?.cash).toBeLessThan(80);
+    expect(trainingCenter?.conditionPct).toBe(100);
+    expect(mock.current.gameState.seasonState.facilityEvents?.[0]?.source).toBe("manual_facility_maintenance");
+  });
+
+  it("applies building upgrades through the facility service and resets condition", () => {
+    const source = save(gameState({ cash: 200 }));
+    const mock = persistenceMock(source);
+    const result = applyAiManagerPlan({
+      save: source,
+      dryRun: false,
+      actionTypes: ["upgrade_building", "buy_building"],
+      persistence: mock.persistence,
+    });
+
+    const appliedUpgrade = result.actions.find(
+      (action) => (action.actionType === "upgrade_building" || action.actionType === "buy_building") && action.applied,
+    );
+    const team = mock.current.gameState.teams.find((entry) => entry.teamId === "T-1");
+    const facilityId = appliedUpgrade?.facilityId;
+
+    expect(appliedUpgrade).toBeTruthy();
+    expect(team?.cash).toBeLessThan(200);
+    expect(facilityId ? mock.current.gameState.seasonState.teamFacilities?.["T-1"]?.facilities[facilityId]?.conditionPct : null).toBe(100);
+    expect(mock.current.gameState.seasonState.facilityEvents?.[0]?.source).toBe("manual_facility_upgrade");
+  });
+
   it("stores team training settings and player training modes through the training service", () => {
     const source = save();
     const mock = persistenceMock(source);

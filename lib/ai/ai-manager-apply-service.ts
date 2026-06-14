@@ -110,7 +110,18 @@ function getTeamCash(gameState: GameState, teamId: string) {
 
 function marketSpendableCash(cash: number, buckets: AiManagementBudgetBuckets) {
   return round(
-    Math.max(0, Math.min(buckets.transferBudget, cash - buckets.cashReserve - buckets.salaryReserve - buckets.maintenanceBudget - buckets.emergencyBudget)),
+    Math.max(
+      0,
+      Math.min(
+        buckets.transferBudget,
+        cash -
+          buckets.cashReserve -
+          buckets.salaryReserve -
+          buckets.buildingBudget -
+          buckets.maintenanceBudget -
+          buckets.emergencyBudget,
+      ),
+    ),
   );
 }
 
@@ -543,7 +554,15 @@ export function getAiManagerMarketSpendableCash(gameState: GameState, teamId: st
   if (!reservation) return cash;
   return round(
     clamp(
-      Math.min(reservation.transferBudget, cash - reservation.cashReserve - reservation.salaryReserve - reservation.maintenanceBudget - reservation.emergencyBudget),
+      Math.min(
+        reservation.transferBudget,
+        cash -
+          reservation.cashReserve -
+          reservation.salaryReserve -
+          reservation.buildingBudget -
+          reservation.maintenanceBudget -
+          reservation.emergencyBudget,
+      ),
       0,
       cash,
     ),

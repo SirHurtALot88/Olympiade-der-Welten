@@ -8,6 +8,7 @@ import type {
 } from "@/lib/data/olyDataTypes";
 import { previewFacilitySeasonEndFinance } from "@/lib/facilities/facility-season-end-service";
 import { FACILITY_CATALOG, getFacilityLevelDefinition, type FacilityId } from "@/lib/facilities/facility-catalog";
+import { calculateFacilityMaintenanceCost, FACILITY_CONDITION_FULL } from "@/lib/facilities/facility-condition";
 import { applyRecoveryFacilityModifiers, applyTrainingXpFacilityModifiers, getTeamFacilityState } from "@/lib/facilities/facility-effects";
 import { assessPlayerMorale, type PlayerMoraleAssessment } from "@/lib/morale/player-morale-service";
 import { loadPlayerFormulaSources } from "@/lib/player-formulas/formula-source-loader";
@@ -450,11 +451,25 @@ function buildBudgetPlan(gameState: GameState, context: TeamContext): AiTeamBudg
     updatedAt: "",
     gameState,
   }, context.team.teamId);
+  const teamFacilities = getTeamFacilityState(gameState, context.team.teamId);
+  const facilityMaintenanceCost = round(
+    sum(
+      FACILITY_CATALOG.map((facility) => {
+        const record = teamFacilities.facilities[facility.facilityId];
+        const level = record?.level ?? 0;
+        const conditionPct = record?.conditionPct ?? FACILITY_CONDITION_FULL;
+        return level > 0 && conditionPct < FACILITY_CONDITION_FULL
+          ? calculateFacilityMaintenanceCost({ facilityId: facility.facilityId, level, conditionPct })
+          : 0;
+      }),
+    ),
+    2,
+  );
   const cash = context.team.cash ?? 0;
   const ambition = identitySignal(context.identity.ambition);
   const finances = identitySignal(context.identity.finances);
   const salaryReserve = round(Math.max(context.salarySumBudget * 0.5, context.expectedSalarySum * 0.35), 2);
-  const maintenanceBudget = round(Math.max(facilityPreview.facilityUpkeepTotal, 0), 2);
+  const maintenanceBudget = round(Math.max(facilityPreview.facilityUpkeepTotal, facilityMaintenanceCost, 0), 2);
   const emergencyBudget = round(Math.max(5, cash * (context.injuryCount > 0 ? 0.14 : 0.08)), 2);
   const cashReserveRate = clamp(
     0.13 + Math.max(0, finances - 55) / 450 - Math.max(0, ambition - 65) / 900,
