@@ -3,6 +3,8 @@ import { NextResponse } from "next/server";
 import { FACILITY_CATALOG_BY_ID, type FacilityId } from "@/lib/facilities/facility-catalog";
 import { applyFacilityMaintenance, previewFacilityMaintenance } from "@/lib/facilities/facility-maintenance-service";
 import { createPersistenceService } from "@/lib/persistence/persistence-service";
+import { notifyRoomGameplayWrite } from "@/lib/room/room-gameplay-write-notifier";
+import { authorizeServerRoomWrite } from "@/lib/room/server-authoritative-write-guard";
 
 type FacilityMaintenanceRequestBody = {
   saveId?: string;
@@ -10,6 +12,12 @@ type FacilityMaintenanceRequestBody = {
   facilityId?: string;
   dryRun?: boolean;
   confirmToken?: string | null;
+  roomCode?: string | null;
+  participantId?: string | null;
+  seatToken?: string | null;
+  userId?: string | null;
+  activeManagerTeamId?: string | null;
+  controlMode?: "human" | "ai" | "passive" | "manual" | null;
 };
 
 function normalizeFacilityId(value: string | undefined): FacilityId | null {
@@ -44,13 +52,51 @@ export async function POST(request: Request) {
   }
 
   const dryRun = body.dryRun ?? true;
+  const preview = previewFacilityMaintenance(save, teamId, facilityId);
+  const writeAuth = authorizeServerRoomWrite({
+    roomCode: body.roomCode,
+    participantId: body.participantId,
+    seatToken: body.seatToken,
+    userId: body.userId,
+    saveId,
+    teamId,
+    action: "facility_apply",
+    source,
+    dryRun,
+    confirmToken: body.confirmToken,
+    expectedConfirmToken: preview.confirmToken,
+    activeManagerTeamId: body.activeManagerTeamId,
+    controlMode: body.controlMode,
+  });
+  if (!writeAuth.allowed) {
+    return NextResponse.json(
+      {
+        success: false,
+        error: writeAuth.reason,
+        summary: null,
+        warnings: writeAuth.warnings,
+        blockingReasons: [writeAuth.reason],
+      },
+      { status: writeAuth.status },
+    );
+  }
   const summary = dryRun
-    ? previewFacilityMaintenance(save, teamId, facilityId)
+    ? preview
     : applyFacilityMaintenance(save, teamId, facilityId, body.confirmToken ?? null, persistence);
   const success = dryRun ? summary.ok : "applied" in summary && summary.applied;
+  notifyRoomGameplayWrite(writeAuth, {
+    saveId,
+    teamId,
+    action: "facility_maintenance",
+    eventType: "facility_updated",
+    affectedViews: ["home", "team", "facilities"],
+    dryRun,
+    success,
+  });
   return NextResponse.json({
     success,
     summary,
+    warnings: [...writeAuth.warnings, ...summary.warnings],
     blockingReasons: summary.blockingReasons,
     error: success ? null : summary.blockingReasons.join(" · ") || "facility_maintenance_blocked",
   });

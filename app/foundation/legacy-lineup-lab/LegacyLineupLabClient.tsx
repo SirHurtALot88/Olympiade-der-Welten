@@ -7,6 +7,11 @@ import { TooltipHeading } from "@/components/ui/TooltipHeading";
 import { getPlayerPortraitBrowserUrl, getTeamLogoBrowserUrl } from "@/lib/data/mediaAssets";
 import type { LineupDraftModifiers, Player, PlayerAttributeSheetStats } from "@/lib/data/olyDataTypes";
 import {
+  appendRoomContextToParams,
+  readFoundationRoomContextFromLocation,
+  type FoundationRoomContext,
+} from "@/lib/room/foundation-room-context-client";
+import {
   buildLegacyLineupEntriesFromSelections,
   buildLegacyLineupLabPlayerOptions,
   buildLegacyLineupLabSlots,
@@ -1160,6 +1165,7 @@ export default function LegacyLineupLabClient(props: LegacyLineupLabClientProps)
   const [warnings, setWarnings] = useState<string[]>([]);
   const [message, setMessage] = useState<string>("");
   const [isReadOnly, setIsReadOnly] = useState<boolean>(source === "prisma");
+  const [roomContext, setRoomContext] = useState<FoundationRoomContext | null>(null);
   const [playerFilter, setPlayerFilter] = useState("");
   const [showManagedTeams, setShowManagedTeams] = useState(false);
   const [draggedActivePlayerId, setDraggedActivePlayerId] = useState<string | null>(null);
@@ -1180,6 +1186,14 @@ export default function LegacyLineupLabClient(props: LegacyLineupLabClientProps)
   const lastAutoPersistKeyRef = useRef("");
   const lastAutoPreviewKeyRef = useRef("");
   const skipNextAutoPersistRef = useRef(false);
+  useEffect(() => {
+    setRoomContext(readFoundationRoomContextFromLocation());
+  }, []);
+
+  function withRoomQuery(query: URLSearchParams) {
+    return appendRoomContextToParams(query, roomContext);
+  }
+
   const resolvedPreview = preview?.ok ? preview : null;
   const d1Label = context?.matchdayContract?.discipline1?.displayName ?? "—";
   const d2Label = context?.matchdayContract?.discipline2?.displayName ?? "—";
@@ -2316,6 +2330,7 @@ export default function LegacyLineupLabClient(props: LegacyLineupLabClientProps)
     try {
       const query = new URLSearchParams(params);
       query.set("source", source);
+      withRoomQuery(query);
       const response = await fetch(`/api/lineups/legacy?${query.toString()}`, {
         method: "PUT",
         headers: {
@@ -2595,6 +2610,7 @@ export default function LegacyLineupLabClient(props: LegacyLineupLabClientProps)
         matchdayId: params.matchdayId,
         source,
       });
+      withRoomQuery(query);
       const response = await fetch(`/api/lineups/legacy/ai-batch-apply?${query.toString()}`, {
         method: "POST",
         headers: {

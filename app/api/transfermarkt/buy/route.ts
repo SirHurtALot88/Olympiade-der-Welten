@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 
 import { executeLocalTransfermarktBuy, previewLocalTransfermarktBuy } from "@/lib/market/transfermarkt-local-service";
 import type { ContractShape } from "@/lib/data/olyDataTypes";
+import { notifyRoomGameplayWrite } from "@/lib/room/room-gameplay-write-notifier";
 import { authorizeServerRoomWrite } from "@/lib/room/server-authoritative-write-guard";
 
 type BuyRequestBody = {
@@ -101,6 +102,15 @@ export async function POST(request: Request) {
     const summary = dryRun
       ? previewLocalTransfermarktBuy(params)
       : executeLocalTransfermarktBuy(params);
+    notifyRoomGameplayWrite(writeAuth, {
+      saveId,
+      teamId,
+      action: "transfermarkt_buy",
+      eventType: "transfer_completed",
+      affectedViews: ["home", "team", "market", "contracts"],
+      dryRun,
+      success: summary.canBuy,
+    });
 
     return NextResponse.json(
       {

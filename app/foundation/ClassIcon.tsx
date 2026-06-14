@@ -24,7 +24,17 @@ export default function ClassIcon({
       className={`class-icon-chip ${colorClassName}${showLabel ? " has-label" : ""}${className ? ` ${className}` : ""}`}
       title={label}
     >
-      {src ? <img className={`class-icon${iconClassName ? ` ${iconClassName}` : ""}`} src={src} alt={label} /> : null}
+      {src ? (
+        <img
+          className={`class-icon${iconClassName ? ` ${iconClassName}` : ""}`}
+          src={src}
+          alt={label}
+          width={32}
+          height={32}
+          loading="eager"
+          decoding="async"
+        />
+      ) : null}
       {showLabel ? <span className="class-icon-label">{label}</span> : null}
     </span>
   );

@@ -1,4 +1,4 @@
-import type { CoachRole, OlyRoomState } from "@/types/game";
+import type { CoachRole, OlyRoomState, RoomRealtimeEvent } from "@/types/game";
 import type { TeamWriteAction } from "@/lib/room/online-room-model";
 
 export type RoomOwnershipPreset =
@@ -123,5 +123,6 @@ export type ClientToServerEvents = {
 export type ServerToClientEvents = {
   roomJoined: (payload: RoomJoinedPayload) => void;
   roomState: (payload: OlyRoomState) => void;
+  roomGameplayEvent: (payload: RoomRealtimeEvent) => void;
   roomError: (payload: RoomErrorPayload) => void;
 };

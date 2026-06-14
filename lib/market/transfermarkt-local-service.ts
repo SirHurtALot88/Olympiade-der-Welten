@@ -9,6 +9,7 @@ import { buildPlayerProgressionForecast } from "@/lib/training/player-progressio
 import { getFacilityLevel, getTeamFacilityState } from "@/lib/facilities/facility-effects";
 import { buildPlayerScoutPotentialFromGameState } from "@/lib/progression/player-potential-service";
 import { createPersistenceService } from "@/lib/persistence/persistence-service";
+import type { PersistenceService, PersistedSaveGame } from "@/lib/persistence/types";
 import { calculateTransfermarktFit, getTransfermarktBracket, hasMercenaryTrait } from "@/lib/market/transfermarkt-fit";
 import { buildContractNegotiationPreview } from "@/lib/market/contract-negotiation-preview";
 import {
@@ -146,9 +147,35 @@ const localNegotiationPreviewCache = new Map<string, ReturnType<typeof buildCont
 const getPlayerMarketValue = getImportedPlayerDisplayMarketValue;
 const getPlayerSalary = getImportedPlayerDisplaySalary;
 
+export type LocalTransfermarktRunContext = {
+  persistence: PersistenceService;
+  save: PersistedSaveGame;
+  deferredWrites: number;
+};
+
 function getPlayerPotentialCacheSignature(gameState: GameState) {
   return (gameState.playerPotential ?? [])
     .map((entry) => `${entry.playerId}:${entry.hiddenPotentialScore ?? "-"}:${entry.confidence ?? 0}:${entry.source}`)
+    .sort()
+    .join("|");
+}
+
+function getPlayerMarketCacheSignature(gameState: GameState) {
+  return gameState.players
+    .map((player) =>
+      [
+        player.id,
+        player.name,
+        player.className,
+        player.race,
+        getPlayerMarketValue(player) ?? "-",
+        getPlayerSalary(player) ?? "-",
+        player.coreStats.pow,
+        player.coreStats.spe,
+        player.coreStats.men,
+        player.coreStats.soc,
+      ].join(":"),
+    )
     .sort()
     .join("|");
 }
@@ -238,6 +265,31 @@ function resolveLocalSave(saveId?: string) {
   return { persistence, save };
 }
 
+function getLocalRunContext(params: TransfermarktBuyParams): LocalTransfermarktRunContext | null {
+  const candidate = params.localRunContext as LocalTransfermarktRunContext | null | undefined;
+  if (!candidate || typeof candidate !== "object" || !candidate.save || !candidate.persistence) {
+    return null;
+  }
+  return candidate;
+}
+
+export function createLocalTransfermarktRunContext(input: {
+  save: PersistedSaveGame;
+  persistence?: PersistenceService;
+}): LocalTransfermarktRunContext {
+  return {
+    persistence: input.persistence ?? createPersistenceService(),
+    save: input.save,
+    deferredWrites: 0,
+  };
+}
+
+export function flushLocalTransfermarktRunContext(context: LocalTransfermarktRunContext) {
+  context.save = context.persistence.saveSingleplayerState(context.save.saveId, context.save.gameState);
+  context.deferredWrites = 0;
+  return context.save;
+}
+
 type LocalTransfermarktBuyContext = {
   marketContext: LocalMarketContext;
   save: ReturnType<typeof resolveLocalSave>["save"];
@@ -301,6 +353,7 @@ function getLocalMarketContextKey(save: ReturnType<typeof resolveLocalSave>["sav
     gameState.rosters.length,
     gameState.transferHistory.length,
     getPlayerPotentialCacheSignature(gameState),
+    getPlayerMarketCacheSignature(gameState),
   ].join(":");
 }
 
@@ -478,7 +531,8 @@ function buildLocalTransfermarktBuyPreviewFromContext(
 }
 
 function resolveLocalTransfermarktBuyContext(params: TransfermarktBuyParams): LocalTransfermarktBuyContext {
-  const { save } = resolveLocalSave(params.saveId);
+  const runContext = getLocalRunContext(params);
+  const save = runContext?.save ?? resolveLocalSave(params.saveId).save;
   const marketContext = buildLocalMarketContext(save);
   const { gameState } = marketContext;
   const teamContext = marketContext.teamContextsById.get(params.teamId) ?? null;
@@ -845,7 +899,8 @@ export function previewLocalTransfermarktBuy(params: TransfermarktBuyParams): Tr
 }
 
 export function executeLocalTransfermarktBuy(params: TransfermarktBuyParams): TransfermarktBuyExecuteResult {
-  const { persistence } = resolveLocalSave(params.saveId);
+  const runContext = getLocalRunContext(params);
+  const { persistence } = runContext ?? resolveLocalSave(params.saveId);
   const context = resolveLocalTransfermarktBuyContext(params);
   const { save } = context;
   const preview = buildLocalTransfermarktBuyPreviewFromContext(params, context);
@@ -911,7 +966,18 @@ export function executeLocalTransfermarktBuy(params: TransfermarktBuyParams): Tr
     ],
   };
 
-  persistence.saveSingleplayerState(save.saveId, nextState);
+  if (runContext) {
+    runContext.save = {
+      ...runContext.save,
+      gameState: nextState,
+    };
+    runContext.deferredWrites += 1;
+    if (!params.deferPersist) {
+      flushLocalTransfermarktRunContext(runContext);
+    }
+  } else {
+    persistence.saveSingleplayerState(save.saveId, nextState);
+  }
 
   return {
     ...preview,

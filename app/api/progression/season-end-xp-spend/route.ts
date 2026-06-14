@@ -6,6 +6,7 @@ import {
   type SeasonEndXpSpendPlannedUpgradeInput,
 } from "@/lib/progression/season-end-xp-apply-service";
 import { createPersistenceService } from "@/lib/persistence/persistence-service";
+import { notifyRoomGameplayWrite } from "@/lib/room/room-gameplay-write-notifier";
 import { authorizeServerRoomWrite } from "@/lib/room/server-authoritative-write-guard";
 
 type SeasonEndXpSpendBody = {
@@ -81,6 +82,15 @@ export async function POST(request: Request) {
       ? preview
       : applySeasonEndXpSpend(save, teamId, plannedUpgrades, body.confirmToken ?? null, persistence);
     const success = "applied" in summary ? summary.applied : summary.ok;
+    notifyRoomGameplayWrite(writeAuth, {
+      saveId,
+      teamId,
+      action: "xp_spend",
+      eventType: "training_updated",
+      affectedViews: ["home", "team", "training"],
+      dryRun,
+      success,
+    });
 
     return NextResponse.json(
       {

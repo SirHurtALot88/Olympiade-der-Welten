@@ -252,7 +252,15 @@ export default function TransfermarktLabClient({ initialData = null, initialErro
                           return (
                             <td key={column.id}>
                               {portrait.src ? (
-                                <img className="transfermarkt-portrait" src={portrait.src} alt={item.name} />
+                                <img
+                                  className="transfermarkt-portrait"
+                                  src={portrait.src}
+                                  alt={item.name}
+                                  width={56}
+                                  height={56}
+                                  loading="lazy"
+                                  decoding="async"
+                                />
                               ) : (
                                 <div className="transfermarkt-portrait transfermarkt-portrait-placeholder" aria-label={`${item.name} placeholder`}>
                                   {portrait.initials}

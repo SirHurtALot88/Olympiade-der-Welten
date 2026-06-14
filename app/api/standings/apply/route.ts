@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 
+import { notifyRoomGameplayWrite } from "@/lib/room/room-gameplay-write-notifier";
 import { authorizeServerRoomWrite } from "@/lib/room/server-authoritative-write-guard";
 import { executeStandingsApply, previewStandingsApply } from "@/lib/standings/standings-apply-service";
 
@@ -78,6 +79,14 @@ export async function POST(request: Request) {
         { status: source === "prisma" ? 409 : 422 },
       );
     }
+    notifyRoomGameplayWrite(writeAuth, {
+      saveId,
+      action: "standings_apply",
+      eventType: "standings_updated",
+      affectedViews: ["home", "season", "standings"],
+      dryRun,
+      success: result.applied === true,
+    });
 
     return NextResponse.json({
       success: true,

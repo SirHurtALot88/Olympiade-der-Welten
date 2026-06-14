@@ -19,7 +19,11 @@ import { getTeamStrategyProfile } from "@/lib/foundation/team-strategy-profiles"
 import type { LegacyLineupLoadedContext } from "@/lib/lineups/legacy-lineup-types";
 import { normalizeTransfermarktToken } from "@/lib/market/transfermarkt-fit";
 import { assessPlayerMorale, type PlayerMoraleAssessment } from "@/lib/morale/player-morale-service";
-import type { PlayerScoutPotential } from "@/lib/progression/player-potential-service";
+import {
+  buildPlayerDevelopmentInsight,
+  type PlayerDevelopmentInsight,
+  type PlayerScoutPotential,
+} from "@/lib/progression/player-potential-service";
 import { buildPlayerProgressionForecast } from "@/lib/training/player-progression-forecast";
 import type { PlayerProgressionForecast } from "@/lib/training/training-plan-types";
 
@@ -169,6 +173,7 @@ export type PlayerDetailDrawerData = {
   form: number | null;
   potential: number | null;
   scoutPotential: PlayerScoutPotential | null;
+  developmentInsight: PlayerDevelopmentInsight | null;
   attributeStats: Array<{
     key: string;
     label: string;
@@ -1128,6 +1133,13 @@ export function buildPlayerDrawerDataFromGameState(input: {
     form: player.form ?? null,
     potential: player.potential ?? null,
     scoutPotential: progressionForecast.scoutPotential,
+    developmentInsight: buildPlayerDevelopmentInsight({
+      gameState: input.gameState,
+      player,
+      currentRating: progressionForecast.currentAbilityRating,
+      performanceRating: playerRating?.ratingPps ?? playerRating?.ppsSeason ?? null,
+      scoutPotential: progressionForecast.scoutPotential,
+    }),
     attributeStats: buildAttributeStats(player),
     baselineAttributeDeltas: buildBaselineAttributeDeltas(player, input.gameState, progressionEvents),
     axisCards: buildAxisCards({
@@ -1375,6 +1387,7 @@ export function buildPlayerDrawerDataFromLegacyContext(input: {
     form: catalogPlayer?.form ?? rosterPlayer?.form ?? null,
     potential: catalogPlayer?.potential ?? rosterPlayer?.potential ?? null,
     scoutPotential: null,
+    developmentInsight: null,
     attributeStats: buildAttributeStats(catalogPlayer),
     baselineAttributeDeltas: [],
     axisCards,

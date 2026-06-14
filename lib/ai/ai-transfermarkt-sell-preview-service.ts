@@ -1,5 +1,14 @@
 import { evaluateAiNeeds } from "@/lib/ai/aiNeedsEngine";
-import type { GameState, Player, RosterEntry, SeasonSnapshotRecord, Team, TeamControlMode, TeamStrategyProfile } from "@/lib/data/olyDataTypes";
+import type {
+  GameState,
+  Player,
+  PlayerDisciplinePerformanceRecord,
+  RosterEntry,
+  SeasonSnapshotRecord,
+  Team,
+  TeamControlMode,
+  TeamStrategyProfile,
+} from "@/lib/data/olyDataTypes";
 import { loadFoundationSnapshotFromPrisma } from "@/lib/db/read/foundation-read-repository";
 import { projectFoundationStateFromPrisma } from "@/lib/db/read/foundation-read-projection";
 import { resolvePlayerEconomyContract } from "@/lib/foundation/player-economy-contract";
@@ -7,7 +16,7 @@ import { buildPlayerRatingContractMap, type PlayerRatingContractRow } from "@/li
 import { getTeamControlSettings, withNormalizedTeamControlSettings } from "@/lib/foundation/team-control-settings";
 import { getTeamStrategyProfile, withNormalizedTeamStrategyProfiles } from "@/lib/foundation/team-strategy-profiles";
 import { normalizeTransfermarktToken } from "@/lib/market/transfermarkt-fit";
-import { previewLocalTransfermarktSell } from "@/lib/market/transfermarkt-local-service";
+import { buildTransfermarktSaleFactorBreakdown } from "@/lib/market/transfermarkt-sale-factor";
 import { createPersistenceService } from "@/lib/persistence/persistence-service";
 import { assessPlayerBoardTrust, type PlayerBoardTrustRenewalPolicy } from "@/lib/ai/player-board-trust-service";
 
@@ -108,6 +117,13 @@ export type AiSellPreviewResult = {
   warningTeams: number;
   blockedTeams: number;
   teams: AiSellPreviewTeamEntry[];
+  debugPerformance?: {
+    durationMs: number;
+    candidateCount: number;
+    sellValuePreviewCount: number;
+    needsEvaluationCount: number;
+    snapshotLookupCount: number;
+  };
 };
 
 type ResolvedPreviewContext = {
@@ -123,6 +139,12 @@ type PlayerPerformanceSummary = {
   averageFinalScore: number | null;
   top10Count: number;
   mvpCount: number;
+};
+
+type SellPreviewRunCache = {
+  latestSnapshot: SeasonSnapshotRecord | null;
+  performanceByTeamPlayer: Map<string, PlayerPerformanceSummary>;
+  needsByTeamId: Map<string, ReturnType<typeof evaluateAiNeeds>>;
 };
 
 function clamp(value: number, min: number, max: number) {
@@ -171,47 +193,66 @@ function getLatestCompletedSeasonSnapshot(gameState: GameState): SeasonSnapshotR
     })[0] ?? null;
 }
 
-function getPlayerPerformanceSummary(gameState: GameState, teamId: string, playerId: string): PlayerPerformanceSummary {
-  const performances = (gameState.seasonState.playerDisciplinePerformances ?? []).filter(
-    (entry) => entry.teamId === teamId && entry.playerId === playerId,
-  );
+function teamPlayerKey(teamId: string, playerId: string) {
+  return `${teamId}::${playerId}`;
+}
 
-  if (performances.length === 0) {
-    const snapshotPerformance = getLatestCompletedSeasonSnapshot(gameState)?.playerPerformances.find(
-      (entry) => entry.playerId === playerId && (entry.teamId == null || entry.teamId === teamId),
-    ) ?? null;
+function buildSellPreviewRunCache(gameState: GameState): SellPreviewRunCache {
+  const latestSnapshot = getLatestCompletedSeasonSnapshot(gameState);
+  const grouped = new Map<string, PlayerDisciplinePerformanceRecord[]>();
+  for (const performance of gameState.seasonState.playerDisciplinePerformances ?? []) {
+    const key = teamPlayerKey(performance.teamId, performance.playerId);
+    const rows = grouped.get(key) ?? [];
+    rows.push(performance);
+    grouped.set(key, rows);
+  }
+  const performanceByTeamPlayer = new Map<string, PlayerPerformanceSummary>();
+  for (const [key, performances] of grouped) {
+    performanceByTeamPlayer.set(key, {
+      appearances: performances.length,
+      averageContribution: roundValue(
+        performances.reduce((sum, entry) => sum + entry.scoreContribution, 0) / performances.length,
+        1,
+      ),
+      averageFinalScore: roundValue(
+        performances.reduce((sum, entry) => sum + entry.finalPlayerScore, 0) / performances.length,
+        1,
+      ),
+      top10Count: performances.filter((entry) => entry.isTop10).length,
+      mvpCount: performances.filter((entry) => entry.isMvpCandidate).length,
+    });
+  }
+  return {
+    latestSnapshot,
+    performanceByTeamPlayer,
+    needsByTeamId: new Map(),
+  };
+}
 
-    if (snapshotPerformance) {
-      return {
-        appearances: snapshotPerformance.appearances,
-        averageContribution: snapshotPerformance.averageContribution,
-        averageFinalScore: snapshotPerformance.averageFinalScore,
-        top10Count: snapshotPerformance.top10Count,
-        mvpCount: snapshotPerformance.mvpCount,
-      };
-    }
+function getPlayerPerformanceSummary(cache: SellPreviewRunCache, teamId: string, playerId: string): PlayerPerformanceSummary {
+  const cached = cache.performanceByTeamPlayer.get(teamPlayerKey(teamId, playerId));
+  if (cached) return cached;
 
+  const snapshotPerformance = cache.latestSnapshot?.playerPerformances.find(
+    (entry) => entry.playerId === playerId && (entry.teamId == null || entry.teamId === teamId),
+  ) ?? null;
+
+  if (snapshotPerformance) {
     return {
-      appearances: 0,
-      averageContribution: null,
-      averageFinalScore: null,
-      top10Count: 0,
-      mvpCount: 0,
+      appearances: snapshotPerformance.appearances,
+      averageContribution: snapshotPerformance.averageContribution,
+      averageFinalScore: snapshotPerformance.averageFinalScore,
+      top10Count: snapshotPerformance.top10Count,
+      mvpCount: snapshotPerformance.mvpCount,
     };
   }
 
   return {
-    appearances: performances.length,
-    averageContribution: roundValue(
-      performances.reduce((sum, entry) => sum + entry.scoreContribution, 0) / performances.length,
-      1,
-    ),
-    averageFinalScore: roundValue(
-      performances.reduce((sum, entry) => sum + entry.finalPlayerScore, 0) / performances.length,
-      1,
-    ),
-    top10Count: performances.filter((entry) => entry.isTop10).length,
-    mvpCount: performances.filter((entry) => entry.isMvpCandidate).length,
+    appearances: 0,
+    averageContribution: null,
+    averageFinalScore: null,
+    top10Count: 0,
+    mvpCount: 0,
   };
 }
 
@@ -308,19 +349,14 @@ function buildSportValueSummary(player: Player, performance: PlayerPerformanceSu
   return `${performance.appearances} Einsaetze · Beitrag Ø ${performance.averageContribution ?? "—"} · Final Score Ø ${performance.averageFinalScore ?? "—"} · Top 10 ${performance.top10Count}.`;
 }
 
-function buildExpectedSellValue(context: ResolvedPreviewContext, teamId: string, roster: RosterEntry) {
+function buildExpectedSellValue(context: ResolvedPreviewContext, player: Player, roster: RosterEntry) {
+  const economy = resolvePlayerEconomyContract({ player, rosterEntry: roster });
   if (context.source !== "sqlite") {
-    return resolvePlayerEconomyContract({ rosterEntry: roster }).marketValue;
+    return economy.marketValue;
   }
 
-  const preview = previewLocalTransfermarktSell({
-    saveId: context.saveId,
-    seasonId: context.seasonId,
-    teamId,
-    activePlayerId: roster.id,
-  });
-
-  return preview.salePrice ?? null;
+  const saleFactorBreakdown = buildTransfermarktSaleFactorBreakdown(context.gameState, player, roster);
+  return saleFactorBreakdown.salePrice ?? economy.marketValue ?? null;
 }
 
 function buildCandidate(
@@ -333,13 +369,15 @@ function buildCandidate(
   salaryTotal: number,
   playerMin: number | null,
   playerOpt: number | null,
+  cache: SellPreviewRunCache,
 ) {
   const profile = getTeamStrategyProfile(context.gameState, team.teamId);
   const playerRating = playerRatingsById.get(player.id) ?? null;
-  const performance = getPlayerPerformanceSummary(context.gameState, team.teamId, player.id);
-  const needs = evaluateAiNeeds(context.gameState, team.teamId);
+  const performance = getPlayerPerformanceSummary(cache, team.teamId, player.id);
+  const needs = cache.needsByTeamId.get(team.teamId) ?? evaluateAiNeeds(context.gameState, team.teamId);
+  cache.needsByTeamId.set(team.teamId, needs);
   const identity = context.gameState.teamIdentities.find((entry) => entry.teamId === team.teamId) ?? null;
-  const expectedSellValue = buildExpectedSellValue(context, team.teamId, roster);
+  const expectedSellValue = buildExpectedSellValue(context, player, roster);
   const economy = resolvePlayerEconomyContract({ player, rosterEntry: roster });
   const marketValue = economy.marketValue;
   const purchasePrice = economy.purchasePrice;
@@ -609,10 +647,13 @@ function getTeamStatus(entry: {
 }
 
 export async function buildAiTransfermarktSellPreview(params: AiSellPreviewParams = {}): Promise<AiSellPreviewResult> {
+  const startedAt = Date.now();
   const context = await resolvePreviewContext(params);
   const playerRatingsById = buildPlayerRatingContractMap(context.gameState);
+  const runCache = buildSellPreviewRunCache(context.gameState);
   const teamScope = params.teamScope === "all" ? "all" : "ai";
   const limit = typeof params.limit === "number" && Number.isFinite(params.limit) ? Math.max(1, Math.round(params.limit)) : 5;
+  let candidateCount = 0;
 
   const requestedTeam =
     params.teamId != null
@@ -674,9 +715,11 @@ export async function buildAiTransfermarktSellPreview(params: AiSellPreviewParam
           salaryTotal,
           playerMin,
           playerOpt,
+          runCache,
         ),
       )
       .sort((left, right) => right.sellPriority - left.sellPriority || left.playerName.localeCompare(right.playerName, "de"));
+    candidateCount += allCandidates.length;
 
     const keepCore = [...allCandidates]
       .sort((left, right) => {
@@ -751,7 +794,7 @@ export async function buildAiTransfermarktSellPreview(params: AiSellPreviewParam
     return left.teamName.localeCompare(right.teamName, "de");
   });
 
-  return {
+  const result: AiSellPreviewResult = {
     readOnly: true,
     source: context.source,
     scope: {
@@ -769,5 +812,13 @@ export async function buildAiTransfermarktSellPreview(params: AiSellPreviewParam
     warningTeams: sortedTeams.filter((team) => team.status === "warning" || team.status === "no_sell_need" || team.status === "low_roster_depth" || team.status === "no_candidates").length,
     blockedTeams: sortedTeams.filter((team) => team.status === "blocked").length,
     teams: sortedTeams,
+    debugPerformance: {
+      durationMs: Date.now() - startedAt,
+      candidateCount,
+      sellValuePreviewCount: candidateCount,
+      needsEvaluationCount: runCache.needsByTeamId.size,
+      snapshotLookupCount: runCache.latestSnapshot ? 1 : 0,
+    },
   };
+  return result;
 }

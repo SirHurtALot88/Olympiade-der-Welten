@@ -22,6 +22,7 @@ export default function HomePage() {
   const [preset, setPreset] = useState<RoomOwnershipPreset>("chris_1_rest_ai");
   const [error, setError] = useState<string | null>(null);
   const [isBusy, setIsBusy] = useState(false);
+  const [activeSaveId, setActiveSaveId] = useState<string | null>(null);
 
   useEffect(() => {
     const socket = getClientSocket();
@@ -45,6 +46,25 @@ export default function HomePage() {
       socket.off("roomError", handleError);
     };
   }, [router]);
+
+  useEffect(() => {
+    let cancelled = false;
+    fetch("/api/singleplayer-state?source=sqlite", { cache: "no-store" })
+      .then((response) => (response.ok ? response.json() : null))
+      .then((payload: { save?: { saveId?: string } } | null) => {
+        if (!cancelled) {
+          setActiveSaveId(payload?.save?.saveId ?? null);
+        }
+      })
+      .catch(() => {
+        if (!cancelled) {
+          setActiveSaveId(null);
+        }
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, []);
 
   return (
     <main className="app-shell">
@@ -83,7 +103,7 @@ export default function HomePage() {
               onClick={() => {
                 setError(null);
                 setIsBusy(true);
-                getClientSocket().emit("createRoom", { displayName, preset });
+                getClientSocket().emit("createRoom", { displayName, preset, saveId: activeSaveId ?? undefined });
               }}
             >
               Raum erstellen

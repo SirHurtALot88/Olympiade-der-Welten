@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 
+import { notifyRoomGameplayWrite } from "@/lib/room/room-gameplay-write-notifier";
 import { authorizeServerRoomWrite } from "@/lib/room/server-authoritative-write-guard";
 import { executeCashPrizeApply, previewCashPrizeApply } from "@/lib/season/cash-prize-apply-service";
 
@@ -67,6 +68,14 @@ export async function POST(request: Request) {
         { status: source === "prisma" ? 409 : 422 },
       );
     }
+    notifyRoomGameplayWrite(writeAuth, {
+      saveId,
+      action: "cash_prize_apply",
+      eventType: "save_updated",
+      affectedViews: ["home", "team", "season"],
+      dryRun,
+      success: result.applied === true,
+    });
 
     return NextResponse.json({
       success: true,

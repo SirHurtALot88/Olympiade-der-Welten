@@ -7,6 +7,7 @@ import {
 } from "@/lib/contracts/contract-renewal-service";
 import type { ContractShape } from "@/lib/data/olyDataTypes";
 import { createPersistenceService } from "@/lib/persistence/persistence-service";
+import { notifyRoomGameplayWrite } from "@/lib/room/room-gameplay-write-notifier";
 import { authorizeServerRoomWrite } from "@/lib/room/server-authoritative-write-guard";
 
 type ContractRenewalBody = {
@@ -105,7 +106,16 @@ export async function POST(request: Request) {
           contractShape: body.contractShape,
           source: action === "renew" ? "manual_contract_renewal" : "manual_player_release",
         });
-    const success = "applied" in summary ? summary.applied : summary.ok;
+    const success = "applied" in summary ? Boolean(summary.applied) : Boolean(summary.ok);
+    notifyRoomGameplayWrite(writeAuth, {
+      saveId,
+      teamId,
+      action: `contract_${action}`,
+      eventType: "save_updated",
+      affectedViews: ["home", "team", "contracts"],
+      dryRun,
+      success,
+    });
 
     return NextResponse.json(
       {

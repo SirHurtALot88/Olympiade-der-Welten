@@ -823,6 +823,51 @@ export type ContractEventRecord = {
     | "ai_contract_expiry";
 };
 
+export type AiManagerBudgetReservationRecord = {
+  teamId: string;
+  seasonId: string;
+  sourcePlanId: string;
+  cashReserve: number;
+  salaryReserve: number;
+  transferBudget: number;
+  buildingBudget: number;
+  maintenanceBudget: number;
+  emergencyBudget: number;
+  updatedAt: string;
+};
+
+export type AiManagerTrainingSettingRecord = {
+  teamId: string;
+  seasonId: string;
+  sourcePlanId: string;
+  trainingFocus: "POW" | "SPE" | "MEN" | "SOC" | "BALANCED" | "RECOVERY";
+  trainingIntensity: "light" | "normal" | "hard";
+  playerTrainingMode: "leicht" | "mittel" | "hart";
+  expectedXpEffect: number;
+  expectedRecoveryEffect: number;
+  expectedInjuryRiskEffect: number;
+  updatedAt: string;
+};
+
+export type AiManagerContractStrategy =
+  | "extend_core"
+  | "salary_cap"
+  | "sell_if_offer"
+  | "do_not_renew"
+  | "wait_and_see"
+  | "prospect_hold"
+  | "market_test";
+
+export type AiManagerContractStrategyRecord = {
+  teamId: string;
+  playerId: string;
+  seasonId: string;
+  strategy: AiManagerContractStrategy;
+  reason: string;
+  sourcePlanId: string;
+  updatedAt: string;
+};
+
 export type PlayerInjuryStatus = "healthy" | "injured" | "recovering";
 
 export type PlayerInjuryRiskRollRecord = {
@@ -1245,6 +1290,185 @@ export type SeasonSnapshotRecord = {
   warnings?: string[];
 };
 
+export type AiLifecyclePhase =
+  | "new_game_setup"
+  | "preseason_review"
+  | "preseason_strategy"
+  | "preseason_market"
+  | "preseason_facilities"
+  | "preseason_training_setup"
+  | "matchday_preparation"
+  | "matchday_resolve"
+  | "matchday_review"
+  | "midseason_check"
+  | "season_end_review"
+  | "postseason_management"
+  | "season_transition";
+
+export type AiLifecyclePhaseStatus = "pending" | "running" | "completed" | "failed" | "blocked" | "skipped" | "degraded";
+
+export type AiLifecyclePhaseRunRecord = {
+  runId: string;
+  saveId: string;
+  seasonId: string;
+  matchdayId?: string | null;
+  phase: AiLifecyclePhase;
+  status: AiLifecyclePhaseStatus;
+  startedAt: string;
+  completedAt?: string | null;
+  durationMs?: number | null;
+  memoryPeakMb?: number | null;
+  warnings: string[];
+  blockers: string[];
+  affectedTeams: string[];
+  affectedPlayers: string[];
+  outputFiles: string[];
+  canResume: boolean;
+};
+
+export type AiManagerMemoryRecord = {
+  teamId: string;
+  seasonId: string;
+  lastSeasonRank: number | null;
+  lastSeasonPoints: number | null;
+  prizeMoney: number | null;
+  cashTrend: "up" | "down" | "flat" | "unknown";
+  salaryTrend: "up" | "down" | "flat" | "unknown";
+  rosterSizeTrend: "up" | "down" | "flat" | "unknown";
+  playerPerformanceNotes: string[];
+  underperformingPlayers: string[];
+  breakoutPlayers: string[];
+  injuryProblems: string[];
+  fatigueProblems: string[];
+  disciplineWeaknesses: string[];
+  disciplineStrengths: string[];
+  boardTrustTrend: "up" | "down" | "flat" | "unknown";
+  moraleTrend: "up" | "down" | "flat" | "unknown";
+  transferMistakes: string[];
+  goodTransfers: string[];
+  facilityNeeds: string[];
+  trainingEffectiveness: string[];
+  nextSeasonHints: string[];
+  source: "ai_lifecycle_season_review";
+  generatedAt: string;
+};
+
+export type AiSeasonStrategy =
+  | "win_now_push"
+  | "balanced_growth"
+  | "rebuild_prospect"
+  | "eco_round"
+  | "roster_repair"
+  | "cash_recovery"
+  | "facility_push"
+  | "salary_control"
+  | "market_attack"
+  | "depth_repair";
+
+export type AiTacticalMode =
+  | "standard"
+  | "injury_crisis"
+  | "fatigue_crisis"
+  | "protect_lead"
+  | "chase_top10"
+  | "salary_freeze"
+  | "rotate_more"
+  | "train_light"
+  | "overpay_for_core"
+  | "market_window"
+  | "morale_repair";
+
+export type AiLineupStrategy =
+  | "best_score_now"
+  | "protect_stars"
+  | "rotate_depth"
+  | "develop_prospects"
+  | "avoid_injury"
+  | "captain_star"
+  | "captain_safe"
+  | "risk_high_ceiling"
+  | "preserve_for_later_matchday";
+
+export type TeamDoctrineRecord = {
+  teamId: string;
+  doctrineName: string;
+  identityPillars: string[];
+  preferredWinPath: string;
+  secondaryWinPath: string;
+  forbiddenPaths: string[];
+  rosterPhilosophy: string;
+  transferPhilosophy: string;
+  trainingPhilosophy: string;
+  facilityPhilosophy: string;
+  contractPhilosophy: string;
+  riskPhilosophy: string;
+  identityStrictness: "low" | "medium" | "high";
+  adaptationFlexibility: "low" | "medium" | "high";
+};
+
+export type AiStrategyShiftRecord = {
+  trigger: string;
+  oldStrategy: AiSeasonStrategy;
+  newStrategy: AiSeasonStrategy;
+  doctrineCompatibility: "green" | "yellow" | "red";
+  benefit: string;
+  risk: string;
+  boardAcceptance: "low" | "medium" | "high";
+  identityRisk: "low" | "medium" | "high";
+  duration: string;
+  reviewPoint: string;
+};
+
+export type AiIdentityGuardResult = {
+  teamId: string;
+  decisionType: string;
+  identityScore: number;
+  doctrineFit: "green" | "yellow" | "red";
+  identityRisk: "low" | "medium" | "high";
+  adaptationAllowed: boolean;
+  reason: string;
+  hardFails: string[];
+};
+
+export type AiManagerDecisionJournalEntry = {
+  season: string;
+  phase: AiLifecyclePhase | "audit";
+  teamId: string;
+  decisionType:
+    | "strategy_shift"
+    | "roster_target"
+    | "player_buy"
+    | "player_sell"
+    | "renewal"
+    | "training_change"
+    | "building_maintenance"
+    | "building_upgrade"
+    | "eco_round"
+    | "overpay"
+    | "stop_under_opt"
+    | "tactical_adjustment";
+  decision: string;
+  strategyBefore: AiSeasonStrategy | AiTacticalMode | "unknown";
+  strategyAfter: AiSeasonStrategy | AiTacticalMode | "unknown";
+  doctrineFit: "green" | "yellow" | "red";
+  expectedOutcome: string;
+  actualOutcome?: string | null;
+  reason: string;
+  rejectedAlternatives: string[];
+  risk: "low" | "medium" | "high";
+  wasCorrect?: boolean | null;
+};
+
+export type AiSeasonStrategyStateRecord = {
+  teamId: string;
+  seasonId: string;
+  seasonStrategy: AiSeasonStrategy;
+  tacticalMode: AiTacticalMode;
+  doctrineCompatibility: "green" | "yellow" | "red";
+  reason: string;
+  updatedAt: string;
+};
+
 export type SeasonState = {
   seasonId: string;
   schedule: Fixture[];
@@ -1275,6 +1499,15 @@ export type SeasonState = {
   disciplineHighlights?: DisciplineHighlightRecord[];
   resultAuditLogs?: ResultAuditLogRecord[];
   seasonSnapshots?: SeasonSnapshotRecord[];
+  aiManagerBudgetReservations?: Record<string, AiManagerBudgetReservationRecord>;
+  aiManagerTrainingSettings?: Record<string, AiManagerTrainingSettingRecord>;
+  aiManagerContractStrategies?: Record<string, AiManagerContractStrategyRecord>;
+  aiManagerSellStrategies?: Record<string, AiManagerContractStrategyRecord>;
+  aiLifecyclePhaseRuns?: AiLifecyclePhaseRunRecord[];
+  aiManagerMemory?: Record<string, AiManagerMemoryRecord>;
+  teamDoctrines?: Record<string, TeamDoctrineRecord>;
+  aiSeasonStrategyState?: Record<string, AiSeasonStrategyStateRecord>;
+  aiManagerDecisionJournal?: AiManagerDecisionJournalEntry[];
 };
 
 export type MatchdayState = {

@@ -1,5 +1,7 @@
 import { NextResponse } from "next/server";
 
+import { notifyRoomGameplayWrite } from "@/lib/room/room-gameplay-write-notifier";
+import { authorizeServerRoomWrite } from "@/lib/room/server-authoritative-write-guard";
 import { executeMatchdayAdvance, previewMatchdayAdvance } from "@/lib/season/matchday-progress-service";
 
 type MatchdayAdvanceRequestBody = {
@@ -9,6 +11,10 @@ type MatchdayAdvanceRequestBody = {
   dryRun?: boolean;
   execute?: boolean;
   confirm?: string;
+  roomCode?: string | null;
+  participantId?: string | null;
+  seatToken?: string | null;
+  userId?: string | null;
 };
 
 export async function POST(request: Request) {
@@ -22,6 +28,24 @@ export async function POST(request: Request) {
 
     if (!saveId || !seasonId) {
       return NextResponse.json({ error: "saveId and seasonId are required." }, { status: 400 });
+    }
+
+    const writeAuth = authorizeServerRoomWrite({
+      roomCode: body.roomCode,
+      participantId: body.participantId,
+      seatToken: body.seatToken,
+      userId: body.userId,
+      saveId,
+      action: "season_transition",
+      source,
+      dryRun,
+      confirmToken: body.confirm,
+    });
+    if (!writeAuth.allowed) {
+      return NextResponse.json(
+        { success: false, error: writeAuth.reason, warnings: writeAuth.warnings, blockingReasons: [writeAuth.reason] },
+        { status: writeAuth.status },
+      );
     }
 
     const params = { saveId, seasonId, source, dryRun, execute, confirm: body.confirm };
@@ -40,6 +64,14 @@ export async function POST(request: Request) {
         { status: source === "prisma" ? 409 : 422 },
       );
     }
+    notifyRoomGameplayWrite(writeAuth, {
+      saveId,
+      action: "matchday_advance",
+      eventType: "season_advanced",
+      affectedViews: ["home", "season", "matchday", "standings"],
+      dryRun,
+      success: result.applied === true,
+    });
 
     return NextResponse.json({
       success: true,
@@ -47,7 +79,7 @@ export async function POST(request: Request) {
       dryRun: result.dryRun,
       applied: result.applied,
       summary: result,
-      warnings: result.warnings,
+      warnings: [...writeAuth.warnings, ...result.warnings],
     });
   } catch (error) {
     const message = error instanceof Error ? error.message : "Matchday advance preview could not be loaded.";

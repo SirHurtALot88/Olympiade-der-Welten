@@ -1,4 +1,4 @@
-import { getRoom } from "@/lib/room/room-store";
+import { getActiveRoomBySaveId, getRoom } from "@/lib/room/room-store";
 import { findSeatByToken } from "@/lib/room/rejoin";
 import { authorizeTeamWrite, type TeamWriteAction } from "@/lib/room/online-room-model";
 import type { RoomParticipant, TeamControllerType, TeamOwnershipRecord } from "@/types/game";
@@ -82,7 +82,17 @@ export function authorizeServerRoomWrite(input: ServerRoomWriteContext): ServerR
     };
   }
 
+  const activeRoomForSave = getActiveRoomBySaveId(input.saveId);
+
   if (!input.roomCode) {
+    if (activeRoomForSave) {
+      return {
+        allowed: false,
+        status: 401,
+        reason: "room_context_required_for_room_save",
+        warnings,
+      };
+    }
     return {
       allowed: true,
       room: null,
@@ -95,6 +105,15 @@ export function authorizeServerRoomWrite(input: ServerRoomWriteContext): ServerR
   const room = getRoom(input.roomCode);
   if (!room) {
     return { allowed: false, status: 404, reason: "room_not_found", warnings };
+  }
+
+  if (activeRoomForSave && activeRoomForSave.roomCode !== room.roomCode) {
+    return {
+      allowed: false,
+      status: 409,
+      reason: "save_bound_to_different_room",
+      warnings,
+    };
   }
 
   if (room.state.multiplayerRoom.saveId !== input.saveId) {

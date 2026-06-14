@@ -256,7 +256,15 @@ export default function TeamDetailDrawer({
                   >
                     <div className="team-drawer-player-head">
                       {player.portraitUrl ? (
-                        <img className="team-drawer-player-portrait" src={player.portraitUrl} alt={player.name} />
+                        <img
+                          className="team-drawer-player-portrait"
+                          src={player.portraitUrl}
+                          alt={player.name}
+                          width={56}
+                          height={56}
+                          loading="lazy"
+                          decoding="async"
+                        />
                       ) : (
                         <div className="team-drawer-player-portrait team-drawer-player-portrait-placeholder">{player.portraitInitials}</div>
                       )}

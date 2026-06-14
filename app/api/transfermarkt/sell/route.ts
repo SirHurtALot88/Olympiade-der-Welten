@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 
 import { executeLocalTransfermarktSell, previewLocalTransfermarktSell } from "@/lib/market/transfermarkt-local-service";
+import { notifyRoomGameplayWrite } from "@/lib/room/room-gameplay-write-notifier";
 import { authorizeServerRoomWrite } from "@/lib/room/server-authoritative-write-guard";
 
 type SellRequestBody = {
@@ -83,6 +84,15 @@ export async function POST(request: Request) {
 
     const params = { saveId, seasonId, teamId, activePlayerId };
     const summary = dryRun ? previewLocalTransfermarktSell(params) : executeLocalTransfermarktSell(params);
+    notifyRoomGameplayWrite(writeAuth, {
+      saveId,
+      teamId,
+      action: "transfermarkt_sell",
+      eventType: "transfer_completed",
+      affectedViews: ["home", "team", "market", "contracts"],
+      dryRun,
+      success: summary.canSell,
+    });
 
     return NextResponse.json(
       {

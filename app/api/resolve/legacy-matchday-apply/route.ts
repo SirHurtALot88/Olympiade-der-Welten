@@ -3,6 +3,7 @@ import { NextResponse } from "next/server";
 import {
   LegacyMatchdayResultApplyService,
 } from "@/lib/resolve/legacy-matchday-result-apply-service";
+import { notifyRoomGameplayWrite } from "@/lib/room/room-gameplay-write-notifier";
 import { authorizeServerRoomWrite } from "@/lib/room/server-authoritative-write-guard";
 
 type ApplyBody = {
@@ -85,6 +86,14 @@ export async function POST(request: Request) {
       { status: source === "prisma" ? 409 : 422 },
     );
   }
+  notifyRoomGameplayWrite(writeAuth, {
+    saveId,
+    action: "matchday_apply",
+    eventType: "matchday_applied",
+    affectedViews: ["home", "season", "matchday", "standings"],
+    dryRun,
+    success: result.applied === true,
+  });
 
   return NextResponse.json({
     success: true,

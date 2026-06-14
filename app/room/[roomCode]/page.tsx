@@ -99,10 +99,23 @@ function RoomScreen({ roomCode }: { roomCode: string }) {
   const currentFlowStep = state ? getRoomFlowStep(state.roomFlowState.step) : null;
   const aiTeamCount = state?.teamOwnership.filter((entry) => entry.controllerType === "ai").length ?? 0;
   const aiReadyCount = state?.roomFlowState.aiAutoCompletedTeamIds.length ?? 0;
-  const foundationHref =
-    roomFlowButton && state
-      ? `/foundation?view=${encodeURIComponent(roomFlowButton.targetView)}&team=${encodeURIComponent(roomFlowButton.activeTeamId ?? currentParticipant?.controlledTeamIds[0] ?? "A-A")}`
-      : "/foundation";
+  function buildFoundationHref(view: string, teamId?: string | null) {
+    const params = new URLSearchParams({
+      view,
+      team: teamId ?? currentParticipant?.controlledTeamIds[0] ?? "A-A",
+    });
+    if (state && currentParticipant && seatToken) {
+      params.set("roomCode", roomCode.toUpperCase());
+      params.set("participantId", currentParticipant.participantId);
+      params.set("userId", currentParticipant.userId);
+      params.set("seatToken", seatToken);
+      params.set("saveId", state.multiplayerRoom.saveId);
+    }
+    return `/foundation?${params.toString()}`;
+  }
+  const foundationHref = roomFlowButton
+    ? buildFoundationHref(roomFlowButton.targetView, roomFlowButton.activeTeamId)
+    : buildFoundationHref("home");
 
   const infoText = useMemo(() => {
     if (!state || !role) {
@@ -213,7 +226,7 @@ function RoomScreen({ roomCode }: { roomCode: string }) {
                     <Link
                       key={entry.stepId}
                       className={`pill${entry.stepId === state.roomFlowState.step ? " is-ready" : ""}`}
-                      href={`/foundation?view=${encodeURIComponent(entry.targetView)}&team=${encodeURIComponent(currentParticipant?.controlledTeamIds[0] ?? "A-A")}`}
+                      href={buildFoundationHref(entry.targetView)}
                     >
                       {entry.label}
                     </Link>

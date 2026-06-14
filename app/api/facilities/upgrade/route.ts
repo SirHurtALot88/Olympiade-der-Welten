@@ -3,6 +3,7 @@ import { NextResponse } from "next/server";
 import { FACILITY_CATALOG_BY_ID, type FacilityId } from "@/lib/facilities/facility-catalog";
 import { applyFacilityUpgrade, previewFacilityUpgrade } from "@/lib/facilities/facility-upgrade-service";
 import { createPersistenceService } from "@/lib/persistence/persistence-service";
+import { notifyRoomGameplayWrite } from "@/lib/room/room-gameplay-write-notifier";
 import { authorizeServerRoomWrite } from "@/lib/room/server-authoritative-write-guard";
 
 type FacilityUpgradeBody = {
@@ -83,6 +84,15 @@ export async function POST(request: Request) {
       ? preview
       : applyFacilityUpgrade(save, teamId, facilityId, body.confirmToken ?? null, body.variant, persistence);
     const success = "applied" in summary ? summary.applied : summary.ok;
+    notifyRoomGameplayWrite(writeAuth, {
+      saveId,
+      teamId,
+      action: "facility_upgrade",
+      eventType: "facility_updated",
+      affectedViews: ["home", "team", "facilities"],
+      dryRun,
+      success,
+    });
 
     return NextResponse.json(
       {

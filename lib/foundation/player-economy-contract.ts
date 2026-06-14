@@ -233,16 +233,17 @@ export function resolvePlayerEconomyContract(input: {
 
   const salary =
     rosterSalary ??
+    importedSalary ??
     salaryBreakdown?.finalSalary ??
     null;
   const salarySource =
     rosterSalary != null
-      ? "active_contract"
-      : salaryBreakdown?.finalSalary != null
-        ? importedSalary != null
+        ? "active_contract"
+        : importedSalary != null
           ? resolveImportedSalarySource(player)
-          : "calculated_preview"
-        : "missing_source";
+          : salaryBreakdown?.finalSalary != null
+            ? "calculated_preview"
+            : "missing_source";
 
   const purchasePrice =
     visibleFinalMarketValue ??
@@ -267,7 +268,7 @@ export function resolvePlayerEconomyContract(input: {
   let economyStatus: PlayerEconomyStatus = "imported_ready";
   if (marketValue == null) {
     economyStatus = isGeneratorDraftPlayer(playerId, player) ? "generator_missing_engine" : "missing_market_value";
-  } else if ((rosterSalary ?? salaryBreakdown?.finalSalary) == null) {
+  } else if ((importedSalary ?? rosterSalary ?? salaryBreakdown?.finalSalary) == null) {
     economyStatus = isGeneratorDraftPlayer(playerId, player) ? "generator_missing_engine" : "missing_salary";
   } else if (!player && !rosterEntry) {
     economyStatus = "manual_draft_required";

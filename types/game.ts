@@ -105,6 +105,15 @@ export type RoomRealtimeEventType =
   | "participant_left"
   | "team_ready_changed"
   | "save_updated"
+  | "roster_updated"
+  | "transfer_completed"
+  | "lineup_updated"
+  | "facility_updated"
+  | "training_updated"
+  | "matchday_applied"
+  | "standings_updated"
+  | "season_advanced"
+  | "ready_invalidated"
   | "flow_step_changed"
   | "matchday_resolved";
 

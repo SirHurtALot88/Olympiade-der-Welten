@@ -8,6 +8,7 @@ import { withNormalizedTeamControlSettings } from "@/lib/foundation/team-control
 import { withNormalizedTeamStrategyProfiles } from "@/lib/foundation/team-strategy-profiles";
 import { createPersistenceService } from "@/lib/persistence/persistence-service";
 import { buildScenarioMeta } from "@/lib/persistence/scenario-meta";
+import { getActiveRoomBySaveId } from "@/lib/room/room-store";
 
 type SaveActionBody =
   | { action: "create"; name: string }
@@ -144,6 +145,18 @@ export async function PUT(request: Request) {
   const body = (await request.json()) as { saveId?: string; gameState?: GameState };
   if (!body.saveId || !body.gameState) {
     return NextResponse.json({ error: "saveId and gameState are required." }, { status: 400 });
+  }
+
+  const activeRoom = getActiveRoomBySaveId(body.saveId);
+  if (activeRoom) {
+    return NextResponse.json(
+      {
+        error: "room_save_generic_write_forbidden",
+        roomCode: activeRoom.roomCode,
+        message: "Room-Saves duerfen nicht ueber den Singleplayer-Fallback geschrieben werden.",
+      },
+      { status: 409 },
+    );
   }
 
   const persistence = createPersistenceService();

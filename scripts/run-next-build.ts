@@ -24,6 +24,8 @@ function buildPagesManifestFallback() {
   return {
     "/_app": require.resolve("next/dist/pages/_app.js"),
     "/_document": require.resolve("next/dist/pages/_document.js"),
+    "/_build-compat": "pages/_build-compat.js",
+    "/build-compat": "pages/build-compat.js",
   };
 }
 
@@ -204,7 +206,7 @@ async function main() {
   });
 
   const manifestKeepAlive = setInterval(() => {
-    ensureServerBuildManifests(projectDir, { includeAppPaths: false, includePagesManifest: false }).catch(
+    ensureServerBuildManifests(projectDir, { includeAppPaths: true, includePagesManifest: true }).catch(
       () => undefined,
     );
   }, 10);

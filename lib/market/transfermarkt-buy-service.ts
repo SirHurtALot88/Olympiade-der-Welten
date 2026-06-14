@@ -21,6 +21,8 @@ export type TransfermarktBuyParams = {
   offeredSalary?: number;
   transferSource?: string;
   allowRecentlySoldRebuyOverride?: boolean;
+  localRunContext?: unknown;
+  deferPersist?: boolean;
 };
 
 export type TransfermarktBuyPreview = {

@@ -14,7 +14,7 @@ import { buildRoomFlowState, getNextRoomFlowStepId } from "@/lib/room/room-flow-
 import { findSeatByToken } from "@/lib/room/rejoin";
 import { createSeatToken } from "@/lib/room/seat-tokens";
 import type { RoomOwnershipPreset } from "@/types/events";
-import type { CoachRole } from "@/types/game";
+import type { CoachRole, RoomRealtimeEventType } from "@/types/game";
 import type { RoomSeat, RuntimeRoom } from "@/types/room";
 
 const runtimeRooms = new Map<string, RuntimeRoom>();
@@ -230,6 +230,73 @@ export function markDisconnected(socketId: string) {
 
 export function getRoom(roomCode: string) {
   return runtimeRooms.get(roomCode.trim().toUpperCase()) ?? null;
+}
+
+export function getActiveRoomBySaveId(saveId: string) {
+  for (const room of runtimeRooms.values()) {
+    if (
+      room.state.multiplayerRoom.saveId === saveId &&
+      room.state.multiplayerRoom.status !== "completed" &&
+      room.state.multiplayerRoom.status !== "paused"
+    ) {
+      return room;
+    }
+  }
+  return null;
+}
+
+export function recordRoomGameplayWrite(input: {
+  roomCode: string;
+  saveId: string;
+  teamId?: string | null;
+  participantId?: string | null;
+  action: string;
+  eventType: RoomRealtimeEventType;
+  affectedViews?: string[];
+}) {
+  const room = getRoom(input.roomCode);
+  if (!room || room.state.multiplayerRoom.saveId !== input.saveId) {
+    return { ok: false as const, room: null };
+  }
+
+  const participantId = input.participantId ?? null;
+  const shouldInvalidateReady = Boolean(
+    participantId &&
+      room.state.roomParticipants.some(
+        (participant) => participant.participantId === participantId && participant.readyState === "ready",
+      ),
+  );
+
+  room.state = {
+    ...room.state,
+    roomParticipants: room.state.roomParticipants.map((participant) =>
+      participant.participantId === participantId
+        ? { ...participant, readyState: "not_ready", lastSeenAt: new Date().toISOString() }
+        : participant,
+    ),
+  };
+  room.state = appendRoomEvent(room.state, input.eventType, {
+    roomCode: room.roomCode,
+    saveId: input.saveId,
+    teamId: input.teamId ?? null,
+    action: input.action,
+    participantId,
+    affectedViews: input.affectedViews ?? [],
+    timestamp: new Date().toISOString(),
+  });
+  if (shouldInvalidateReady) {
+    room.state = appendRoomEvent(room.state, "ready_invalidated", {
+      roomCode: room.roomCode,
+      saveId: input.saveId,
+      teamId: input.teamId ?? null,
+      action: input.action,
+      participantId,
+      affectedViews: input.affectedViews ?? [],
+      timestamp: new Date().toISOString(),
+    });
+  }
+  syncPlayers(room);
+  return { ok: true as const, room };
 }
 
 export function applyRoomOwnershipPreset(roomCode: string, seatToken: string, preset: RoomOwnershipPreset) {

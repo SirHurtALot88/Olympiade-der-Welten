@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 
 import { createPersistenceService } from "@/lib/persistence/persistence-service";
+import { notifyRoomGameplayWrite } from "@/lib/room/room-gameplay-write-notifier";
 import { authorizeServerRoomWrite } from "@/lib/room/server-authoritative-write-guard";
 import { buildSeasonTransitionPreview, startSeasonTransition } from "@/lib/season/season-transition-service";
 
@@ -56,6 +57,14 @@ export async function POST(request: Request) {
       ? buildSeasonTransitionPreview(save)
       : startSeasonTransition(save, persistence);
     const success = "applied" in summary ? Boolean(summary.applied) : summary.ok;
+    notifyRoomGameplayWrite(writeAuth, {
+      saveId,
+      action: "season_transition",
+      eventType: "season_advanced",
+      affectedViews: ["home", "season", "team", "contracts"],
+      dryRun,
+      success,
+    });
 
     return NextResponse.json(
       {

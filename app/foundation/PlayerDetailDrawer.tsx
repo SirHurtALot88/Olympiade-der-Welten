@@ -279,6 +279,28 @@ function formatScoutPotentialRange(data: PlayerDetailDrawerData["scoutPotential"
   return `${data.potentialRange.min}-${data.potentialRange.max}`;
 }
 
+function formatDevelopmentRange(data: PlayerDetailDrawerData["developmentInsight"]) {
+  if (!data?.potentialRangeDisplay) return "—";
+  return `${data.potentialRangeDisplay.min}-${data.potentialRangeDisplay.max}`;
+}
+
+function formatGrowthOutlook(value: NonNullable<PlayerDetailDrawerData["developmentInsight"]>["growthOutlook"] | null | undefined) {
+  switch (value) {
+    case "breakout":
+      return "Breakout";
+    case "growth":
+      return "Growth";
+    case "stable":
+      return "Stable";
+    case "stagnation":
+      return "Stagnation";
+    case "regression_risk":
+      return "Regression Risk";
+    default:
+      return "—";
+  }
+}
+
 function formatCompactSeasonLabel(value: string | null | undefined) {
   const canonical = getCanonicalSeasonLabel({ seasonName: value ?? null });
   const match = canonical.match(/Season\s+(\d+)/i);
@@ -438,8 +460,8 @@ export default function PlayerDetailDrawer({
                   </div>
                   <div className="player-drawer-mini-facts">
                     <span>PPs Rating {formatValue(data.ppsRating, 1)}</span>
-                    <span>Scout RTG {formatScoutPotentialRange(data.scoutPotential)}</span>
-                    <span>Potential {data.scoutPotential?.starRating ?? "—"}</span>
+                    <span>Scout RTG {formatDevelopmentRange(data.developmentInsight)}</span>
+                    <span>{data.developmentInsight?.potentialLabel ?? data.scoutPotential?.starRating ?? "—"}</span>
                     <span>Fatigue {formatValue(data.fatigue, 0)}</span>
                     <span>Form {formatValue(data.form, 0)}</span>
                   </div>
@@ -539,17 +561,32 @@ export default function PlayerDetailDrawer({
                 <article className="metric-card player-drawer-scout-potential-card">
                   <span>Potential / Scouting</span>
                   <strong>
-                    {formatScoutPotentialRange(data.scoutPotential)} · {data.scoutPotential.starRating}
+                    {formatDevelopmentRange(data.developmentInsight)} · {data.developmentInsight?.potentialLabel ?? data.scoutPotential.starRating}
                   </strong>
                   <small>
-                    {data.scoutPotential.band.toUpperCase()} · Confidence {data.scoutPotential.confidence}% · Scouting L
+                    Current {formatValue(data.developmentInsight?.currentRating, 1)} · Gap{" "}
+                    {data.developmentInsight?.developmentGap != null && data.developmentInsight.developmentGap > 0 ? "+" : ""}
+                    {formatValue(data.developmentInsight?.developmentGap, 1)}
+                  </small>
+                  <small>
+                    {formatGrowthOutlook(data.developmentInsight?.growthOutlook)} · Confidence {data.scoutPotential.confidence}% · Scouting L
                     {data.scoutPotential.scoutingLevel}
                   </small>
                   <small>
-                    Growth x{data.scoutPotential.trainingSpeedMultiplier.toFixed(2)} · MW Preview{" "}
+                    Route {data.developmentInsight?.developmentRoute ?? "—"} · Growth x{data.scoutPotential.trainingSpeedMultiplier.toFixed(2)} · MW Preview{" "}
                     {data.scoutPotential.marketValuePotentialPremiumPct > 0 ? "+" : ""}
                     {formatValue(data.scoutPotential.marketValuePotentialPremiumPct, 1)}%
                   </small>
+                  {data.developmentInsight?.reasonChips?.length ? (
+                    <div className="player-drawer-chip-row">
+                      {data.developmentInsight.reasonChips.slice(0, 6).map((chip) => (
+                        <span key={`potential-chip-${chip}`} className="player-drawer-chip">
+                          {chip}
+                        </span>
+                      ))}
+                    </div>
+                  ) : null}
+                  {data.developmentInsight?.recommendation ? <small>{data.developmentInsight.recommendation}</small> : null}
                 </article>
               ) : null}
               <article className="metric-card">

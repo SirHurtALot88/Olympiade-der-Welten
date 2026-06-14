@@ -47,7 +47,17 @@ export default function RaceIcon({ race, showLabel = true, className = "", iconC
 
   return (
     <span className={`race-icon-chip${showLabel ? " has-label" : ""}${className ? ` ${className}` : ""}`} title={label}>
-      {src ? <img className={`race-icon${iconClassName ? ` ${iconClassName}` : ""}`} src={src} alt={label} /> : null}
+      {src ? (
+        <img
+          className={`race-icon${iconClassName ? ` ${iconClassName}` : ""}`}
+          src={src}
+          alt={label}
+          width={32}
+          height={32}
+          loading="eager"
+          decoding="async"
+        />
+      ) : null}
       {showLabel ? <span className="race-icon-label">{label}</span> : null}
     </span>
   );

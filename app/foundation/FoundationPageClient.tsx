@@ -161,6 +161,13 @@ import type {
   SeasonEndXpSpendPreview,
   SeasonEndXpSpendApplyResult,
 } from "@/lib/progression/season-end-xp-apply-service";
+import {
+  appendRoomContextToParams,
+  readFoundationRoomContextFromLocation,
+  withRoomContextBody,
+  type FoundationRoomContext,
+} from "@/lib/room/foundation-room-context-client";
+import { getClientSocket } from "@/lib/socket/client";
 import type { PlayerTrainingMode } from "@/lib/training/training-plan-types";
 import {
   GLOBAL_TABLE_LAYOUT_VERSION,
@@ -174,6 +181,7 @@ import {
   type GlobalTableColumnConfig,
 } from "@/lib/ui/global-table-layout";
 import type { PlayerEconomyCompareReport } from "@/lib/foundation/player-economy-compare-service";
+import type { RoomRealtimeEvent } from "@/types/game";
 
 type SortDirection = "asc" | "desc";
 type SortState = {
@@ -3378,12 +3386,14 @@ function PlayerPortrait({
   alt,
   className,
   style,
+  loading = "lazy",
 }: {
   src: string | null;
   initials: string;
   alt: string;
   className: string;
   style?: CSSProperties;
+  loading?: "eager" | "lazy";
 }) {
   const [failed, setFailed] = useState(false);
   if (!src || failed) {
@@ -3394,7 +3404,17 @@ function PlayerPortrait({
     );
   }
 
-  return <img className={className} src={src} alt={alt} style={style} onError={() => setFailed(true)} />;
+  return (
+    <img
+      className={className}
+      src={src}
+      alt={alt}
+      style={style}
+      loading={loading}
+      decoding="async"
+      onError={() => setFailed(true)}
+    />
+  );
 }
 
 function getTransferTypeLabel(type: "buy" | "sell" | "contract_exit") {
@@ -4534,6 +4554,7 @@ export default function FoundationPageClient({ initialReadSource, initialSelecte
   const [teamStrategyMessage, setTeamStrategyMessage] = useState<string | null>(null);
   const [saveSummaries, setSaveSummaries] = useState<SaveSummary[]>([]);
   const [activeSaveId, setActiveSaveId] = useState<string>("save-singleplayer-dev");
+  const [roomContext, setRoomContext] = useState<FoundationRoomContext | null>(null);
   const [activeSaveName, setActiveSaveName] = useState<string>("Singleplayer Foundation");
   const [isSaveBusy, setIsSaveBusy] = useState<boolean>(false);
   const [readMeta, setReadMeta] = useState<FoundationReadMeta>({
@@ -4611,6 +4632,14 @@ export default function FoundationPageClient({ initialReadSource, initialSelecte
   const [marketSubclassFilter, setMarketSubclassFilter] = useState<string>("ALL");
   const [marketAlignmentFilter, setMarketAlignmentFilter] = useState<string>("ALL");
   const [marketGenderFilter, setMarketGenderFilter] = useState<string>("ALL");
+
+  useEffect(() => {
+    setRoomContext(readFoundationRoomContextFromLocation());
+  }, []);
+
+  function withRoomBody<T extends Record<string, unknown>>(body: T) {
+    return withRoomContextBody(body, roomContext);
+  }
   const [marketPositiveTraitFilter, setMarketPositiveTraitFilter] = useState<string>("ALL");
   const [marketNegativeTraitFilter, setMarketNegativeTraitFilter] = useState<string>("ALL");
   const [marketBracketFilter, setMarketBracketFilter] = useState<string>("ALL");
@@ -5501,14 +5530,14 @@ export default function FoundationPageClient({ initialReadSource, initialSelecte
         headers: {
           "Content-Type": "application/json",
         },
-        body: JSON.stringify({
+        body: JSON.stringify(withRoomBody({
           saveId: activeSaveId,
           seasonId: gameState.season.id,
           teamId: effectiveTeamId,
           activePlayerId: subject.activePlayerId,
           dryRun: true,
           source: readMeta.source,
-        }),
+        })),
       });
       const payload = (await response.json()) as TransfermarktSellApiResponse;
       if (payload.summary) {
@@ -5566,14 +5595,14 @@ export default function FoundationPageClient({ initialReadSource, initialSelecte
         headers: {
           "Content-Type": "application/json",
         },
-        body: JSON.stringify({
+        body: JSON.stringify(withRoomBody({
           saveId: activeSaveId,
           seasonId: gameState.season.id,
           teamId: marketSellPreview.team.id,
           activePlayerId: marketSellPreview.activePlayer.id,
           dryRun: false,
           source: readMeta.source,
-        }),
+        })),
       });
       const payload = (await response.json()) as TransfermarktSellApiResponse;
       if (payload.summary) {
@@ -5607,12 +5636,12 @@ export default function FoundationPageClient({ initialReadSource, initialSelecte
   }
 
   function buildCockpitScopeParams() {
-    return new URLSearchParams({
+    return appendRoomContextToParams(new URLSearchParams({
       saveId: activeSaveId,
       seasonId: gameState.season.id,
       matchdayId: gameState.matchdayState.matchdayId,
       source: readMeta.source,
-    });
+    }), roomContext);
   }
 
   async function reloadResolvePreview() {
@@ -5860,14 +5889,14 @@ export default function FoundationPageClient({ initialReadSource, initialSelecte
       const response = await fetch("/api/facilities/upgrade", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
+        body: JSON.stringify(withRoomBody({
           source: readMeta.source,
           saveId: activeSaveId,
           teamId: selectedTeam.teamId,
           facilityId,
           variant: facilityId === "specialist_wing" ? specialistWingVariantDraft : null,
           dryRun: true,
-        }),
+        })),
       });
       const payload = (await response.json()) as FacilityUpgradeApiResponse;
       setFacilityUpgradePreview(payload.summary ?? null);
@@ -5900,7 +5929,7 @@ export default function FoundationPageClient({ initialReadSource, initialSelecte
       const response = await fetch("/api/facilities/upgrade", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
+        body: JSON.stringify(withRoomBody({
           source: readMeta.source,
           saveId: activeSaveId,
           teamId: selectedTeam.teamId,
@@ -5908,7 +5937,7 @@ export default function FoundationPageClient({ initialReadSource, initialSelecte
           variant: facilityUpgradePreview.facility.variant,
           dryRun: false,
           confirmToken: facilityUpgradePreview.confirmToken,
-        }),
+        })),
       });
       const payload = (await response.json()) as FacilityUpgradeApiResponse;
       setFacilityUpgradePreview(payload.summary ?? null);
@@ -5941,13 +5970,13 @@ export default function FoundationPageClient({ initialReadSource, initialSelecte
       const response = await fetch("/api/facilities/maintenance", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
+        body: JSON.stringify(withRoomBody({
           source: readMeta.source,
           saveId: activeSaveId,
           teamId: selectedTeam.teamId,
           facilityId,
           dryRun: true,
-        }),
+        })),
       });
       const payload = (await response.json()) as FacilityMaintenanceApiResponse;
       setFacilityMaintenancePreview(payload.summary ?? null);
@@ -5983,14 +6012,14 @@ export default function FoundationPageClient({ initialReadSource, initialSelecte
       const response = await fetch("/api/facilities/maintenance", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
+        body: JSON.stringify(withRoomBody({
           source: readMeta.source,
           saveId: activeSaveId,
           teamId: selectedTeam.teamId,
           facilityId: facilityMaintenancePreview.facility.facilityId,
           dryRun: false,
           confirmToken: facilityMaintenancePreview.confirmToken,
-        }),
+        })),
       });
       const payload = (await response.json()) as FacilityMaintenanceApiResponse;
       setFacilityMaintenancePreview(payload.summary ?? null);
@@ -6060,14 +6089,14 @@ export default function FoundationPageClient({ initialReadSource, initialSelecte
       const response = await fetch("/api/progression/season-end-xp-spend", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
+        body: JSON.stringify(withRoomBody({
           source: readMeta.source,
           saveId: activeSaveId,
           teamId: selectedTeam.teamId,
           plannedUpgrades: plannedXpUpgrades,
           dryRun: false,
           confirmToken: seasonEndXpSpendPreview.confirmToken,
-        }),
+        })),
       });
       const payload = (await response.json()) as SeasonEndXpSpendApiResponse;
       if (!response.ok || !payload.success || !payload.summary || !("applied" in payload.summary)) {
@@ -6208,7 +6237,7 @@ export default function FoundationPageClient({ initialReadSource, initialSelecte
       const response = await fetch("/api/resolve/legacy-matchday-apply", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
+        body: JSON.stringify(withRoomBody({
           saveId: activeSaveId,
           seasonId: gameState.season.id,
           matchdayId: gameState.matchdayState.matchdayId,
@@ -6216,7 +6245,7 @@ export default function FoundationPageClient({ initialReadSource, initialSelecte
           dryRun: !execute,
           execute,
           confirm: execute ? RESULT_APPLY_CONFIRM_TOKEN : undefined,
-        }),
+        })),
       });
       const payload = (await response.json()) as FoundationApplySummary;
       setResultApplyFeed(payload);
@@ -6240,7 +6269,7 @@ export default function FoundationPageClient({ initialReadSource, initialSelecte
       const response = await fetch("/api/standings/apply", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
+        body: JSON.stringify(withRoomBody({
           saveId: activeSaveId,
           seasonId: gameState.season.id,
           matchdayId: gameState.matchdayState.matchdayId,
@@ -6248,7 +6277,7 @@ export default function FoundationPageClient({ initialReadSource, initialSelecte
           dryRun: !execute,
           execute,
           confirm: execute ? STANDINGS_APPLY_CONFIRM_TOKEN : undefined,
-        }),
+        })),
       });
       const payload = (await response.json()) as FoundationApplySummary;
       setStandingsApplyFeed(payload);
@@ -6273,7 +6302,7 @@ export default function FoundationPageClient({ initialReadSource, initialSelecte
       const response = await fetch("/api/season/cash-prize-apply", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
+        body: JSON.stringify(withRoomBody({
           saveId: activeSaveId,
           seasonId: gameState.season.id,
           matchdayId: gameState.matchdayState.matchdayId,
@@ -6282,7 +6311,7 @@ export default function FoundationPageClient({ initialReadSource, initialSelecte
           dryRun: !execute,
           execute,
           confirm: execute ? CASH_APPLY_CONFIRM_TOKEN : undefined,
-        }),
+        })),
       });
       const payload = (await response.json()) as FoundationApplySummary;
       setCashApplyFeed(payload);
@@ -6309,11 +6338,11 @@ export default function FoundationPageClient({ initialReadSource, initialSelecte
       const response = await fetch("/api/season/preseason-workflow", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
+        body: JSON.stringify(withRoomBody({
           saveId: activeSaveId,
           source: readMeta.source,
           dryRun: true,
-        }),
+        })),
       });
       const payload = (await response.json()) as PreSeasonWorkflowApiResponse;
       setPreSeasonWorkflowFeed(payload.summary ?? null);
@@ -6343,12 +6372,12 @@ export default function FoundationPageClient({ initialReadSource, initialSelecte
       const response = await fetch("/api/season/transition", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
+        body: JSON.stringify(withRoomBody({
           saveId: activeSaveId,
           source: readMeta.source,
           dryRun: action !== "start_transition",
           action,
-        }),
+        })),
       });
       const payload = (await response.json()) as SeasonTransitionApiResponse;
       setSeasonTransitionFeed(payload.summary ?? null);
@@ -6381,14 +6410,14 @@ export default function FoundationPageClient({ initialReadSource, initialSelecte
       const response = await fetch("/api/season/advance-matchday", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
+        body: JSON.stringify(withRoomBody({
           saveId: activeSaveId,
           seasonId: gameState.season.id,
           source: readMeta.source,
           dryRun: !execute,
           execute,
           confirm: execute ? ADVANCE_MATCHDAY_CONFIRM_TOKEN : undefined,
-        }),
+        })),
       });
       const payload = (await response.json()) as FoundationApplySummary;
       setMatchdayAdvanceFeed(payload);
@@ -6619,13 +6648,13 @@ export default function FoundationPageClient({ initialReadSource, initialSelecte
       method: "POST",
       headers: { "Content-Type": "application/json" },
       signal: controller.signal,
-      body: JSON.stringify({
+      body: JSON.stringify(withRoomBody({
         source: readMeta.source,
         saveId: activeSaveId,
         teamId: selectedTeamId,
         plannedUpgrades: plannedXpUpgrades,
         dryRun: true,
-      }),
+      })),
     })
       .then(async (response) => {
         const payload = (await response.json()) as SeasonEndXpSpendApiResponse;
@@ -7066,6 +7095,43 @@ export default function FoundationPageClient({ initialReadSource, initialSelecte
   }
 
   useEffect(() => {
+    if (!roomContext) {
+      return undefined;
+    }
+
+    const currentRoomContext = roomContext;
+    const socket = getClientSocket();
+    function handleRoomGameplayEvent(event: RoomRealtimeEvent) {
+      if (event.saveId !== activeSaveId) {
+        return;
+      }
+      const actorParticipantId = typeof event.payload?.participantId === "string" ? event.payload.participantId : null;
+      if (actorParticipantId === currentRoomContext.participantId) {
+        return;
+      }
+      const affectedViews = Array.isArray(event.payload?.affectedViews)
+        ? event.payload.affectedViews.filter((view): view is string => typeof view === "string")
+        : [];
+
+      void (async () => {
+        await loadSave(activeSaveId);
+        if (affectedViews.some((view) => ["market", "team", "contracts"].includes(view))) {
+          await Promise.all([reloadMarketFeed(), reloadHistoryFeed(), reloadTransferRecapFeed()]);
+        }
+        if (affectedViews.some((view) => ["season", "standings", "matchday"].includes(view))) {
+          await Promise.all([reloadResolvePreview(), reloadStandingsPreviewFeed(), reloadPrizePreviewFeed()]);
+        }
+        setMarketReloadToken((current) => current + 1);
+      })();
+    }
+
+    socket.on("roomGameplayEvent", handleRoomGameplayEvent);
+    return () => {
+      socket.off("roomGameplayEvent", handleRoomGameplayEvent);
+    };
+  }, [activeSaveId, roomContext, readMeta.source]);
+
+  useEffect(() => {
     const shouldLoadMarketFeed = activeView === "market";
     if (!shouldLoadMarketFeed) {
       return undefined;
@@ -7346,7 +7412,7 @@ export default function FoundationPageClient({ initialReadSource, initialSelecte
         headers: {
           "Content-Type": "application/json",
         },
-        body: JSON.stringify({
+        body: JSON.stringify(withRoomBody({
           saveId: requestContext.saveId,
           seasonId: requestContext.seasonId,
           teamId: requestContext.teamId,
@@ -7356,7 +7422,7 @@ export default function FoundationPageClient({ initialReadSource, initialSelecte
           offeredSalary: effectiveOfferedSalary,
           dryRun: true,
           source: readMeta.source,
-        }),
+        })),
       });
       const payload = (await response.json()) as TransfermarktBuyApiResponse;
       if (requestVersion !== marketBuyPreviewRequestVersion.current) {
@@ -7434,7 +7500,7 @@ export default function FoundationPageClient({ initialReadSource, initialSelecte
         headers: {
           "Content-Type": "application/json",
         },
-        body: JSON.stringify({
+        body: JSON.stringify(withRoomBody({
           saveId: buyContext.saveId,
           seasonId: buyContext.seasonId,
           teamId: buyContext.teamId,
@@ -7444,7 +7510,7 @@ export default function FoundationPageClient({ initialReadSource, initialSelecte
           offeredSalary: marketOfferedSalaryDraft,
           dryRun: false,
           source: buyContext.source,
-        }),
+        })),
       });
       const payload = (await response.json()) as TransfermarktBuyApiResponse;
       if (payload.summary) {
@@ -7506,7 +7572,7 @@ export default function FoundationPageClient({ initialReadSource, initialSelecte
       const previewResponse = await fetch("/api/contracts/renewal", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
+        body: JSON.stringify(withRoomBody({
           saveId: activeSaveId,
           teamId: input.teamId,
           playerId: input.playerId,
@@ -7515,7 +7581,7 @@ export default function FoundationPageClient({ initialReadSource, initialSelecte
           offeredSalary: input.offeredSalary,
           dryRun: true,
           source: readMeta.source,
-        }),
+        })),
       });
       const previewPayload = (await previewResponse.json()) as ContractRenewalApiResponse;
       if (!previewResponse.ok || previewPayload.error || !previewPayload.summary?.confirmToken) {
@@ -7530,7 +7596,7 @@ export default function FoundationPageClient({ initialReadSource, initialSelecte
       const applyResponse = await fetch("/api/contracts/renewal", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
+        body: JSON.stringify(withRoomBody({
           saveId: activeSaveId,
           teamId: input.teamId,
           playerId: input.playerId,
@@ -7540,7 +7606,7 @@ export default function FoundationPageClient({ initialReadSource, initialSelecte
           dryRun: false,
           confirmToken: previewPayload.summary.confirmToken,
           source: readMeta.source,
-        }),
+        })),
       });
       const applyPayload = (await applyResponse.json()) as ContractRenewalApiResponse;
       if (!applyResponse.ok || applyPayload.error || !applyPayload.summary?.applied) {
@@ -18192,7 +18258,15 @@ export default function FoundationPageClient({ initialReadSource, initialSelecte
                           return (
                             <td key={column.id}>
                               {portrait.src ? (
-                                <img className="transfermarkt-portrait" src={portrait.src} alt={row.player.name} />
+                                <img
+                                  className="transfermarkt-portrait"
+                                  src={portrait.src}
+                                  alt={row.player.name}
+                                  width={56}
+                                  height={56}
+                                  loading="lazy"
+                                  decoding="async"
+                                />
                               ) : (
                                 <div className="transfermarkt-portrait transfermarkt-portrait-placeholder" aria-label={`${row.player.name} placeholder`}>
                                   {portrait.initials}
@@ -20800,6 +20874,10 @@ export default function FoundationPageClient({ initialReadSource, initialSelecte
                                     className="transfermarkt-portrait"
                                     src={portrait.src}
                                     alt={row.item.name}
+                                    width={portraitSize}
+                                    height={portraitSize}
+                                    loading="lazy"
+                                    decoding="async"
                                     style={{ width: `${portraitSize}px`, height: `${portraitSize}px` }}
                                   />
                                 ) : (
@@ -23310,7 +23388,15 @@ export default function FoundationPageClient({ initialReadSource, initialSelecte
                   <div className="transfer-buy-player-line">
                     <div className="transfer-modal-player-hero">
                       {portraitSrc ? (
-                        <img className="transfermarkt-portrait" src={portraitSrc} alt={playerName} />
+                        <img
+                          className="transfermarkt-portrait"
+                          src={portraitSrc}
+                          alt={playerName}
+                          width={56}
+                          height={56}
+                          loading="lazy"
+                          decoding="async"
+                        />
                       ) : (
                         <div className="transfermarkt-portrait transfermarkt-portrait-placeholder" aria-label={`${playerName} placeholder`}>
                           {playerName.slice(0, 2).toUpperCase()}
@@ -23817,7 +23903,15 @@ export default function FoundationPageClient({ initialReadSource, initialSelecte
                   <div className="transfer-buy-player-line">
                     <div className="transfer-modal-player-hero">
                       {portraitSrc ? (
-                        <img className="transfermarkt-portrait" src={portraitSrc} alt={playerName} />
+                        <img
+                          className="transfermarkt-portrait"
+                          src={portraitSrc}
+                          alt={playerName}
+                          width={56}
+                          height={56}
+                          loading="lazy"
+                          decoding="async"
+                        />
                       ) : (
                         <div className="transfermarkt-portrait transfermarkt-portrait-placeholder" aria-label={`${playerName} placeholder`}>
                           {playerName.slice(0, 2).toUpperCase()}
@@ -24411,6 +24505,10 @@ export default function FoundationPageClient({ initialReadSource, initialSelecte
                                     className="transfermarkt-portrait"
                                     src={row.portraitUrl}
                                     alt={row.playerName}
+                                    width={portraitSize}
+                                    height={portraitSize}
+                                    loading="lazy"
+                                    decoding="async"
                                     style={{ width: `${portraitSize}px`, height: `${portraitSize}px` }}
                                   />
                                 ) : (

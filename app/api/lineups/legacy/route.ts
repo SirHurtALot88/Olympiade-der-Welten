@@ -7,6 +7,7 @@ import {
 import type { LineupDraftModifiers } from "@/lib/data/olyDataTypes";
 import { LegacyLineupService } from "@/lib/lineups/legacy-lineup-service";
 import type { LegacyLineupEntryInput, LegacyLineupKeyParams } from "@/lib/lineups/legacy-lineup-types";
+import { notifyRoomGameplayWrite } from "@/lib/room/room-gameplay-write-notifier";
 import { authorizeServerRoomWrite } from "@/lib/room/server-authoritative-write-guard";
 
 function parseKeyParams(request: Request): LegacyLineupKeyParams | null {
@@ -89,6 +90,15 @@ export async function PUT(request: Request) {
         { status: 422 },
       );
     }
+    notifyRoomGameplayWrite(writeAuth, {
+      saveId: params.saveId,
+      teamId: params.teamId,
+      action: "lineup_save",
+      eventType: "lineup_updated",
+      affectedViews: ["home", "lineup", "matchday"],
+      dryRun: false,
+      success: true,
+    });
 
     return NextResponse.json({
       draft: result.draft,

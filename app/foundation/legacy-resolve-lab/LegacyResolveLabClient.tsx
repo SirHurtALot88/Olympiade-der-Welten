@@ -363,6 +363,7 @@ export default function LegacyResolveLabClient({
       form: null,
       potential: player.potential,
       scoutPotential: null,
+      developmentInsight: null,
       attributeStats: [],
       baselineAttributeDeltas: [],
       axisCards: [

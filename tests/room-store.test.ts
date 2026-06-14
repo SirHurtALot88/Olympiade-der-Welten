@@ -6,6 +6,7 @@ import {
   canSeatControlTeam,
   createRoom,
   joinRoom,
+  recordRoomGameplayWrite,
   rejoinRoom,
   runRoomAiAutoStep,
   setParticipantReadyState,
@@ -14,6 +15,30 @@ import {
 import { authorizeTeamWrite } from "@/lib/room/online-room-model";
 
 describe("room store", () => {
+  it("records gameplay writes and invalidates the acting participant ready state", () => {
+    const created = createRoom("socket-gameplay-a", { displayName: "Chris", preset: "chris_4_rest_ai", saveId: "room-gameplay-save" });
+    const chris = created.room.state.roomParticipants[0];
+    expect(chris).toBeTruthy();
+    if (!chris) return;
+
+    expect(setParticipantReadyState(created.room.roomCode, created.seat.seatToken, true).ok).toBe(true);
+    const recorded = recordRoomGameplayWrite({
+      roomCode: created.room.roomCode,
+      saveId: "room-gameplay-save",
+      teamId: "P-S",
+      participantId: chris.participantId,
+      action: "transfermarkt_buy",
+      eventType: "transfer_completed",
+      affectedViews: ["team", "market"],
+    });
+
+    expect(recorded.ok).toBe(true);
+    if (!recorded.ok) return;
+    expect(recorded.room.state.roomParticipants[0]?.readyState).toBe("not_ready");
+    expect(recorded.room.state.roomEvents.at(-2)?.type).toBe("transfer_completed");
+    expect(recorded.room.state.roomEvents.at(-1)?.type).toBe("ready_invalidated");
+  });
+
   it("creates, joins and rejoins a room", () => {
     const created = createRoom("socket-a", { displayName: "Chris" });
     expect(created.seat.role).toBe("A");

@@ -4,6 +4,71 @@ import { createRoom, joinRoom, markDisconnected, rejoinRoom } from "@/lib/room/r
 import { authorizeServerRoomWrite } from "@/lib/room/server-authoritative-write-guard";
 
 describe("server-authoritative room write guard", () => {
+  it("blocks active room saves without room context but keeps singleplayer saves writable", () => {
+    createRoom("guard-context-a", {
+      displayName: "Chris",
+      saveId: "room-bound-save",
+      preset: "chris_4_rest_ai",
+    });
+
+    expect(
+      authorizeServerRoomWrite({
+        saveId: "room-bound-save",
+        teamId: "P-S",
+        action: "buy",
+        source: "sqlite",
+        dryRun: false,
+      }),
+    ).toMatchObject({
+      allowed: false,
+      status: 401,
+      reason: "room_context_required_for_room_save",
+    });
+
+    expect(
+      authorizeServerRoomWrite({
+        saveId: "singleplayer-save-without-room",
+        teamId: "P-S",
+        action: "buy",
+        source: "sqlite",
+        dryRun: false,
+      }).allowed,
+    ).toBe(true);
+  });
+
+  it("blocks writes when a save is bound to a different active room", () => {
+    const firstRoom = createRoom("guard-context-b", {
+      displayName: "Chris",
+      saveId: "room-bound-save-mismatch",
+      preset: "chris_4_rest_ai",
+    });
+    const secondRoom = createRoom("guard-context-c", {
+      displayName: "Chris",
+      saveId: "another-room-save",
+      preset: "chris_4_rest_ai",
+    });
+    const chris = secondRoom.room.state.roomParticipants[0];
+    expect(chris).toBeTruthy();
+    if (!chris) return;
+
+    expect(
+      authorizeServerRoomWrite({
+        roomCode: secondRoom.room.roomCode,
+        participantId: chris.participantId,
+        userId: chris.userId,
+        saveId: firstRoom.room.state.multiplayerRoom.saveId,
+        teamId: "P-S",
+        action: "buy",
+        source: "sqlite",
+        dryRun: false,
+      }),
+    ).toMatchObject({
+      allowed: false,
+      status: 409,
+      reason: "save_bound_to_different_room",
+    });
+  });
+
   it("allows owned team writes and blocks UI-focus-only writes", () => {
     const created = createRoom("guard-socket-a", {
       displayName: "Chris",
