@@ -209,6 +209,7 @@ async function main() {
     ensureServerBuildManifests(projectDir, { includeAppPaths: true, includePagesManifest: true }).catch(
       () => undefined,
     );
+    ensureClientStaticManifests(projectDir).catch(() => undefined);
   }, 10);
 
   const exitCode = await new Promise<number>((resolve, reject) => {
