@@ -389,6 +389,7 @@ export default function LegacyResolveLabClient({
       boardTrust: null,
       morale: null,
       progressionForecast: null,
+      developmentLevelup: null,
       progressionEvents: [],
       progressionEconomyPreview: null,
       seasonPerformance: null,

@@ -148,6 +148,7 @@ import {
   buildPlayerProgressionForecast,
   PLAYER_PROGRESSION_XP_CONSTANTS,
 } from "@/lib/training/player-progression-forecast";
+import { buildPlayerDevelopmentLevelupModel, TRAINING_ATTRIBUTE_LABELS } from "@/lib/training/training-levelup-service";
 import { BASE_MATCHDAY_RECOVERY } from "@/lib/fatigue/fatigue-injury-service";
 import { applyTrainingRecoveryImpact, TRAINING_RECOVERY_IMPACT } from "@/lib/training/training-recovery-impact";
 import {
@@ -20649,6 +20650,7 @@ export default function FoundationPageClient({ initialReadSource, initialSelecte
                   {seasonEndXpSpendSuccess ? <p className="text-positive">{seasonEndXpSpendSuccess}</p> : null}
                   <div className="training-player-grid">
                     {seasonEndProgressionPreview.rows.map((row) => {
+                      const rosterPlayer = rosterPlayers.find((entry) => entry.player.id === row.playerId)?.player ?? null;
                       const xpSpendPlayer = seasonEndXpSpendPlayerMap.get(row.playerId) ?? null;
                       const topDeltas = (xpSpendPlayer?.disciplineDeltas ?? row.disciplineDeltas)
                         .filter((entry) => (entry.disciplineDelta ?? 0) > 0)
@@ -20665,6 +20667,15 @@ export default function FoundationPageClient({ initialReadSource, initialSelecte
                         currentAttributePlan.length > 0
                           ? currentAttributePlan.reduce((sum, upgrade) => sum + upgrade.cost, 0)
                           : row.upgradeCost;
+                      const developmentLevelup = rosterPlayer
+                        ? buildPlayerDevelopmentLevelupModel({
+                            gameState,
+                            player: rosterPlayer,
+                            forecast: trainingPlayerForecastRows.find((forecastRow) => forecastRow.player.id === row.playerId)?.forecast ?? null,
+                            teamId: selectedTeam.teamId,
+                            profile: getTeamStrategyProfile(gameState, selectedTeam.teamId),
+                          })
+                        : null;
                       return (
                         <article className="training-player-card" key={`season-end-${row.playerId}`}>
                           <div className="training-player-main">
@@ -20732,6 +20743,21 @@ export default function FoundationPageClient({ initialReadSource, initialSelecte
                               {formatWholeNumber(xpSpendPlayer?.remainingXP ?? row.remainingXP)}
                             </span>
                           </div>
+                          {developmentLevelup ? (
+                            <div className="training-development-strip">
+                              <span>
+                                Lv {developmentLevelup.level.developmentLevel} · {developmentLevelup.level.progressPct}% ·{" "}
+                                {developmentLevelup.level.trainingPointsAvailable} TP
+                              </span>
+                              <span>
+                                ★ {developmentLevelup.affinity.signatureAttributes.map((attribute) => TRAINING_ATTRIBUTE_LABELS[attribute]).join(" / ")}
+                              </span>
+                              <span>◆ Weak {TRAINING_ATTRIBUTE_LABELS[developmentLevelup.affinity.weakAttribute]}</span>
+                              <span className={`training-development-trend is-${developmentLevelup.level.lastTrend}`}>
+                                {developmentLevelup.level.lastTrend}
+                              </span>
+                            </div>
+                          ) : null}
                           <div className="training-forecast-line">
                             <span>
                               XP vor Facility {formatWholeNumber(row.facilityEffects.xpBeforeFacility)} · Modifier{" "}

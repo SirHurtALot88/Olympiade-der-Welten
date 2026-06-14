@@ -4551,6 +4551,65 @@ a {
   font-size: 0.78rem;
 }
 
+.player-drawer-star-rating {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  vertical-align: middle;
+}
+
+.player-drawer-star-rating.is-empty {
+  color: rgba(235, 239, 247, 0.62);
+}
+
+.player-drawer-star-rating.is-compact {
+  gap: 4px;
+}
+
+.player-drawer-star-label {
+  min-width: 2.1ch;
+  color: rgba(235, 239, 247, 0.66);
+  font-size: 0.72rem;
+  font-weight: 900;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.player-drawer-stars {
+  display: inline-flex;
+  gap: 1px;
+  line-height: 1;
+  filter: drop-shadow(0 0 7px rgba(245, 183, 64, 0.24));
+}
+
+.player-drawer-star {
+  position: relative;
+  display: inline-block;
+  width: 0.86em;
+  color: rgba(148, 120, 57, 0.42);
+  font-size: 0.96rem;
+}
+
+.player-drawer-star-fill {
+  position: absolute;
+  inset: 0 auto 0 0;
+  width: 0;
+  overflow: hidden;
+  color: #f4c24d;
+  text-shadow:
+    0 0 7px rgba(245, 183, 64, 0.55),
+    0 1px 0 rgba(80, 45, 10, 0.4);
+}
+
+.player-drawer-star-empty {
+  color: rgba(148, 120, 57, 0.34);
+}
+
+.player-drawer-star-stack {
+  display: grid;
+  gap: 5px;
+}
+
 .player-drawer-board-trust-card {
   position: relative;
   overflow: hidden;
@@ -4632,6 +4691,92 @@ a {
 
 .player-drawer-attribute-card strong {
   font-size: 1.15rem;
+}
+
+.player-drawer-attribute-title {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.player-drawer-affinity-badge {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 24px;
+  height: 24px;
+  border-radius: 999px;
+  font-size: 0.9rem;
+  font-weight: 900;
+}
+
+.player-drawer-affinity-badge.is-signature,
+.player-drawer-chip.is-affinity-signature {
+  color: #1f1605;
+  background: linear-gradient(180deg, #ffd872, #b88424);
+  border-color: rgba(255, 217, 116, 0.55);
+  box-shadow: 0 0 14px rgba(244, 194, 77, 0.22);
+}
+
+.player-drawer-affinity-badge.is-weak,
+.player-drawer-chip.is-affinity-weak {
+  color: rgba(235, 239, 247, 0.86);
+  background: linear-gradient(180deg, rgba(94, 101, 116, 0.72), rgba(49, 55, 66, 0.72));
+  border-color: rgba(196, 203, 216, 0.24);
+}
+
+.player-drawer-chip.is-affinity-neutral {
+  color: rgba(235, 239, 247, 0.76);
+  background: rgba(255, 255, 255, 0.055);
+}
+
+.player-drawer-attribute-card.is-affinity-signature {
+  border-color: rgba(255, 216, 116, 0.28);
+  background: linear-gradient(180deg, rgba(132, 93, 26, 0.24), rgba(255, 255, 255, 0.035));
+}
+
+.player-drawer-attribute-card.is-affinity-weak {
+  border-color: rgba(180, 190, 210, 0.16);
+  background: linear-gradient(180deg, rgba(80, 86, 99, 0.22), rgba(255, 255, 255, 0.035));
+}
+
+.player-drawer-delta-line {
+  display: block;
+  margin-top: 8px;
+  font-size: 0.72rem;
+  font-weight: 800;
+}
+
+.player-drawer-development-hero {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 10px;
+}
+
+.player-drawer-development-card {
+  min-height: 118px;
+}
+
+.player-drawer-progress-track {
+  height: 8px;
+  margin: 9px 0 6px;
+  overflow: hidden;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.09);
+  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.05);
+}
+
+.player-drawer-progress-track span {
+  display: block;
+  height: 100%;
+  border-radius: inherit;
+  background: linear-gradient(90deg, #78d6ff, #7fdc8d 55%, #f3c969);
+  box-shadow: 0 0 16px rgba(120, 214, 255, 0.26);
+}
+
+.player-drawer-affinity-row {
+  margin-top: 12px;
 }
 
 .player-drawer-discipline-card {
@@ -6322,6 +6467,10 @@ a {
 }
 
 @media (max-width: 1100px) {
+  .player-drawer-development-hero {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
   .legacy-matchday-room-kpis {
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
@@ -7936,6 +8085,47 @@ a {
 .training-forecast-line span {
   color: rgba(255, 255, 255, 0.72);
   font-size: 0.9rem;
+}
+
+.training-development-strip {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-top: 8px;
+}
+
+.training-development-strip span {
+  border: 1px solid rgba(255, 255, 255, 0.11);
+  border-radius: 999px;
+  padding: 4px 8px;
+  color: rgba(235, 239, 247, 0.82);
+  background: rgba(255, 255, 255, 0.055);
+  font-size: 0.74rem;
+  font-weight: 800;
+}
+
+.training-development-strip span:nth-child(2) {
+  color: #1f1605;
+  border-color: rgba(255, 217, 116, 0.55);
+  background: linear-gradient(180deg, #ffd872, #b88424);
+}
+
+.training-development-trend.is-growth {
+  color: #bdf2c4;
+  border-color: rgba(123, 220, 141, 0.35);
+  background: rgba(65, 145, 80, 0.24);
+}
+
+.training-development-trend.is-regression {
+  color: #ffc4bd;
+  border-color: rgba(230, 103, 91, 0.38);
+  background: rgba(142, 47, 42, 0.24);
+}
+
+.training-development-trend.is-stagnation {
+  color: #ffe0a3;
+  border-color: rgba(230, 180, 85, 0.38);
+  background: rgba(143, 99, 34, 0.22);
 }
 
 .training-xp-breakdown {

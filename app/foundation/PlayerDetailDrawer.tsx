@@ -227,6 +227,46 @@ function formatDevelopmentRoute(value: string | null | undefined) {
   }
 }
 
+function formatDevelopmentLevelTrend(value: string | null | undefined) {
+  switch (value) {
+    case "growth":
+      return "Entwicklung";
+    case "stable":
+      return "stabil";
+    case "stagnation":
+      return "Stagnation";
+    case "regression":
+      return "Regression";
+    default:
+      return "—";
+  }
+}
+
+function getDevelopmentLevelTrendClass(value: string | null | undefined) {
+  switch (value) {
+    case "growth":
+      return " is-positive";
+    case "regression":
+      return " is-negative";
+    case "stagnation":
+      return " is-warning";
+    default:
+      return " is-neutral";
+  }
+}
+
+function getAffinityIcon(value: string | null | undefined) {
+  if (value === "signature") return "★";
+  if (value === "weak") return "◆";
+  return "";
+}
+
+function getAffinityLabel(value: string | null | undefined) {
+  if (value === "signature") return "Signature";
+  if (value === "weak") return "Weak";
+  return "Neutral";
+}
+
 function formatBoardTrustPolicy(
   policy: NonNullable<PlayerDetailDrawerData["boardTrust"]>["renewalPolicy"],
   salaryCapMultiplier: number | null | undefined,
@@ -301,6 +341,59 @@ function formatGrowthOutlook(value: NonNullable<PlayerDetailDrawerData["developm
   }
 }
 
+function parseStarValue(value: string | number | null | undefined) {
+  if (typeof value === "number") {
+    return Number.isFinite(value) ? value : null;
+  }
+  if (!value) {
+    return null;
+  }
+  const match = value.replace(",", ".").match(/(\d+(?:\.\d+)?)/);
+  if (!match) {
+    return null;
+  }
+  const parsed = Number(match[1]);
+  return Number.isFinite(parsed) ? parsed : null;
+}
+
+function StarRating({
+  value,
+  label,
+  compact = false,
+}: {
+  value: string | number | null | undefined;
+  label?: string;
+  compact?: boolean;
+}) {
+  const rating = parseStarValue(value);
+  if (rating == null) {
+    return <span className="player-drawer-star-rating is-empty">—</span>;
+  }
+
+  return (
+    <span
+      className={`player-drawer-star-rating${compact ? " is-compact" : ""}`}
+      aria-label={`${label ? `${label}: ` : ""}${formatValue(rating, 1)} von 5 Sternen`}
+      title={`${label ? `${label}: ` : ""}${formatValue(rating, 1)} / 5`}
+    >
+      {label ? <span className="player-drawer-star-label">{label}</span> : null}
+      <span className="player-drawer-stars" aria-hidden="true">
+        {[0, 1, 2, 3, 4].map((index) => {
+          const fillPct = Math.max(0, Math.min(100, (rating - index) * 100));
+          return (
+            <span key={`star-${index}`} className="player-drawer-star">
+              <span className="player-drawer-star-empty">★</span>
+              <span className="player-drawer-star-fill" style={{ width: `${fillPct}%` }}>
+                ★
+              </span>
+            </span>
+          );
+        })}
+      </span>
+    </span>
+  );
+}
+
 function formatCompactSeasonLabel(value: string | null | undefined) {
   const canonical = getCanonicalSeasonLabel({ seasonName: value ?? null });
   const match = canonical.match(/Season\s+(\d+)/i);
@@ -349,6 +442,10 @@ export default function PlayerDetailDrawer({
     : "Aktiver Spieler, aber noch kein gespeicherter Season-Einsatz.";
   const topDisciplineCards = data.disciplineValues.slice(0, 5);
   const baselineAttributeDeltas = data.baselineAttributeDeltas.filter((entry) => entry.delta != null && entry.delta !== 0);
+  const developmentLevelup = data.developmentLevelup;
+  const developmentPreviewByAttribute = new Map<string, NonNullable<PlayerDetailDrawerData["developmentLevelup"]>["upgradePreview"][number]>(
+    (developmentLevelup?.upgradePreview ?? []).map((entry) => [entry.attribute, entry] as const),
+  );
   const headlineMetrics = [
     {
       key: "ovr",
@@ -461,7 +558,9 @@ export default function PlayerDetailDrawer({
                   <div className="player-drawer-mini-facts">
                     <span>PPs Rating {formatValue(data.ppsRating, 1)}</span>
                     <span>Scout RTG {formatDevelopmentRange(data.developmentInsight)}</span>
-                    <span>{data.developmentInsight?.potentialLabel ?? data.scoutPotential?.starRating ?? "—"}</span>
+                    <span>
+                      <StarRating value={data.developmentInsight?.potentialLabel ?? data.scoutPotential?.starRating} compact />
+                    </span>
                     <span>Fatigue {formatValue(data.fatigue, 0)}</span>
                     <span>Form {formatValue(data.form, 0)}</span>
                   </div>
@@ -557,38 +656,6 @@ export default function PlayerDetailDrawer({
                   ) : null}
                 </article>
               ) : null}
-              {data.scoutPotential ? (
-                <article className="metric-card player-drawer-scout-potential-card">
-                  <span>Potential / Scouting</span>
-                  <strong>
-                    {formatDevelopmentRange(data.developmentInsight)} · {data.developmentInsight?.potentialLabel ?? data.scoutPotential.starRating}
-                  </strong>
-                  <small>
-                    Current {formatValue(data.developmentInsight?.currentRating, 1)} · Gap{" "}
-                    {data.developmentInsight?.developmentGap != null && data.developmentInsight.developmentGap > 0 ? "+" : ""}
-                    {formatValue(data.developmentInsight?.developmentGap, 1)}
-                  </small>
-                  <small>
-                    {formatGrowthOutlook(data.developmentInsight?.growthOutlook)} · Confidence {data.scoutPotential.confidence}% · Scouting L
-                    {data.scoutPotential.scoutingLevel}
-                  </small>
-                  <small>
-                    Route {data.developmentInsight?.developmentRoute ?? "—"} · Growth x{data.scoutPotential.trainingSpeedMultiplier.toFixed(2)} · MW Preview{" "}
-                    {data.scoutPotential.marketValuePotentialPremiumPct > 0 ? "+" : ""}
-                    {formatValue(data.scoutPotential.marketValuePotentialPremiumPct, 1)}%
-                  </small>
-                  {data.developmentInsight?.reasonChips?.length ? (
-                    <div className="player-drawer-chip-row">
-                      {data.developmentInsight.reasonChips.slice(0, 6).map((chip) => (
-                        <span key={`potential-chip-${chip}`} className="player-drawer-chip">
-                          {chip}
-                        </span>
-                      ))}
-                    </div>
-                  ) : null}
-                  {data.developmentInsight?.recommendation ? <small>{data.developmentInsight.recommendation}</small> : null}
-                </article>
-              ) : null}
               <article className="metric-card">
                 <span>Einsätze</span>
                 <strong>{hasSeasonPerformance ? seasonPerformance.appearances : "—"}</strong>
@@ -601,46 +668,6 @@ export default function PlayerDetailDrawer({
                 <span>Avg Beitrag</span>
                 <strong>{formatValue(seasonPerformance?.averageContribution, 1)}</strong>
               </article>
-              {data.progressionForecast ? (
-                <>
-                  <article className="metric-card">
-                    <span>Netto-XP</span>
-                    <strong className={getDeltaToneClass(data.progressionForecast.netDevelopmentXP)}>
-                      {formatValue(data.progressionForecast.netDevelopmentXP, 0)}
-                    </strong>
-                    <small>{formatDevelopmentTrend(data.progressionForecast.xpTrend)}</small>
-                  </article>
-                  <article className="metric-card">
-                    <span>XP frei / spent</span>
-                    <strong>
-                      {formatValue(data.progressionForecast.currentXP, 0)} / {formatValue(data.progressionForecast.spentXP, 0)}
-                    </strong>
-                  </article>
-                  <article className="metric-card">
-                    <span>Training Form</span>
-                    <strong>{data.progressionForecast.trainingFormTier}</strong>
-                    <small>{formatSourceFreeDetail(data.progressionForecast.trainingMode)}</small>
-                  </article>
-                  <article className="metric-card">
-                    <span>CA / PO</span>
-                    <strong>
-                      {data.progressionForecast.currentAbilityStars ?? "—"} / {data.progressionForecast.potentialStars ?? "—"}
-                    </strong>
-                    <small>
-                      {data.progressionForecast.currentAbilityTier ?? "—"} → {data.progressionForecast.potentialTier ?? "—"}
-                    </small>
-                  </article>
-                  <article className="metric-card">
-                    <span>Regression Risk</span>
-                    <strong>{formatRegressionRisk(data.progressionForecast.regressionRisk)}</strong>
-                    <small>{formatDevelopmentRoute(data.progressionForecast.developmentRoute)}</small>
-                  </article>
-                  <article className="metric-card">
-                    <span>Upgrade Range</span>
-                    <strong>{data.progressionForecast.possibleUpgradeSummary}</strong>
-                  </article>
-                </>
-              ) : null}
             </div>
           </section>
 
@@ -782,17 +809,47 @@ export default function PlayerDetailDrawer({
           <section className="player-drawer-section player-drawer-panel">
             <h3>Attribute</h3>
             <div className="player-drawer-attribute-grid">
-              {data.attributeStats.map((entry) => (
-                <article key={entry.key} className="metric-card player-drawer-attribute-card">
-                  <span>{entry.label}</span>
-                  <strong>{formatValue(entry.value, 0)}</strong>
-                  <div className="player-drawer-chip-row">
-                    <span className={`player-drawer-chip ${getAttributeTierClass(entry.ratingLabel)}`}>
-                      {entry.ratingLabel ?? "—"}
+              {data.attributeStats.map((entry) => {
+                const preview = developmentPreviewByAttribute.get(entry.key);
+                return (
+                  <article key={entry.key} className={`metric-card player-drawer-attribute-card is-affinity-${preview?.affinity ?? "neutral"}`}>
+                    <span className="player-drawer-attribute-title">
+                      {entry.label}
+                      {preview?.affinity && preview.affinity !== "neutral" ? (
+                        <span
+                          className={`player-drawer-affinity-badge is-${preview.affinity}`}
+                          title={preview.reason}
+                          aria-label={`${entry.label} ${getAffinityLabel(preview.affinity)}: ${preview.reason}`}
+                        >
+                          {getAffinityIcon(preview.affinity)}
+                        </span>
+                      ) : null}
                     </span>
-                  </div>
-                </article>
-              ))}
+                    <strong className={getDeltaToneClass(preview?.attributeDelta)}>
+                      {formatValue(entry.value, 0)}
+                      {preview?.attributeDelta ? ` → ${formatValue(preview.nextValue, 0)}` : ""}
+                    </strong>
+                    <div className="player-drawer-chip-row">
+                      <span className={`player-drawer-chip ${getAttributeTierClass(entry.ratingLabel)}`}>
+                        {entry.ratingLabel ?? "—"}
+                      </span>
+                      {preview ? (
+                        <span className={`player-drawer-chip is-affinity-${preview.affinity}`} title={preview.reason}>
+                          {getAffinityLabel(preview.affinity)} · {preview.finalCost ?? "—"} TP
+                        </span>
+                      ) : null}
+                    </div>
+                    {preview?.topDisciplineDeltas.length ? (
+                      <small className="player-drawer-delta-line is-positive">
+                        {preview.topDisciplineDeltas
+                          .slice(0, 2)
+                          .map((delta) => `${delta.label} +${formatValue(delta.delta, 2)}`)
+                          .join(" · ")}
+                      </small>
+                    ) : null}
+                  </article>
+                );
+              })}
             </div>
             {baselineAttributeDeltas.length > 0 ? (
               <div className="player-drawer-baseline-delta">
@@ -809,6 +866,143 @@ export default function PlayerDetailDrawer({
               </div>
             ) : null}
           </section>
+
+          {developmentLevelup ? (
+            <section className="player-drawer-section player-drawer-panel">
+              <h3>Development</h3>
+              <div className="player-drawer-development-hero">
+                <article className="metric-card player-drawer-development-card">
+                  <span>Development Level</span>
+                  <strong>Lv {developmentLevelup.level.developmentLevel}</strong>
+                  <div className="player-drawer-progress-track" aria-label={`Fortschritt ${formatValue(developmentLevelup.level.progressPct, 1)} Prozent`}>
+                    <span style={{ width: `${Math.max(0, Math.min(100, developmentLevelup.level.progressPct))}%` }} />
+                  </div>
+                  <small>
+                    {formatValue(developmentLevelup.level.progressXp, 0)} / 180 XP · {formatValue(developmentLevelup.level.xpToNextLevel, 0)} bis Level-Up
+                  </small>
+                </article>
+                <article className="metric-card player-drawer-development-card">
+                  <span>Trainingspunkte</span>
+                  <strong>{developmentLevelup.level.trainingPointsAvailable} TP</strong>
+                  <small>Jeder Level-Up gibt exakt 10 TP.</small>
+                </article>
+                <article className="metric-card player-drawer-development-card">
+                  <span>Trend</span>
+                  <strong className={getDevelopmentLevelTrendClass(developmentLevelup.level.lastTrend)}>
+                    {formatDevelopmentLevelTrend(developmentLevelup.level.lastTrend)}
+                  </strong>
+                  <small>
+                    Form {developmentLevelup.level.trainingForm} · {formatDevelopmentRoute(developmentLevelup.level.developmentRoute)}
+                  </small>
+                </article>
+                <article className="metric-card player-drawer-development-card">
+                  <span>Regression</span>
+                  <strong className={developmentLevelup.regressionEvent.delta < 0 ? "is-negative" : ""}>
+                    {formatRegressionRisk(developmentLevelup.level.regressionRisk)}
+                  </strong>
+                  <small>
+                    {developmentLevelup.regressionEvent.delta < 0 && developmentLevelup.regressionEvent.attribute
+                      ? `${developmentLevelup.regressionEvent.attribute} -1 moeglich`
+                      : developmentLevelup.regressionEvent.reason}
+                  </small>
+                </article>
+              </div>
+              <div className="player-drawer-chip-row player-drawer-affinity-row">
+                {developmentLevelup.affinity.signatureAttributes.map((attribute) => (
+                  <span key={`signature-${attribute}`} className="player-drawer-chip is-affinity-signature" title="Signature: Dieses Attribut entwickelt sich bei diesem Spieler guenstiger.">
+                    ★ {attribute}
+                  </span>
+                ))}
+                <span className="player-drawer-chip is-affinity-weak" title="Weak Development: Dieses Attribut ist fuer diesen Spieler schwerer zu steigern.">
+                  ◆ Weak {developmentLevelup.affinity.weakAttribute}
+                </span>
+              </div>
+              <p className="muted">
+                ContractSalary bleibt stabil. MW und expectedSalary sind nur Preview-Werte bei Attribut-Upgrades.
+              </p>
+            </section>
+          ) : null}
+
+          {(data.scoutPotential || data.progressionForecast) ? (
+            <section className="player-drawer-section player-drawer-panel">
+              <h3>Potential / Scouting</h3>
+              <div className="player-drawer-list-grid player-drawer-list-grid-wide">
+                {data.scoutPotential ? (
+                  <article className="metric-card player-drawer-scout-potential-card">
+                    <span>Potential / Scouting</span>
+                    <strong>
+                      {formatDevelopmentRange(data.developmentInsight)} <StarRating value={data.developmentInsight?.potentialLabel ?? data.scoutPotential.starRating} compact />
+                    </strong>
+                    <small>
+                      Current {formatValue(data.developmentInsight?.currentRating, 1)} · Gap{" "}
+                      {data.developmentInsight?.developmentGap != null && data.developmentInsight.developmentGap > 0 ? "+" : ""}
+                      {formatValue(data.developmentInsight?.developmentGap, 1)}
+                    </small>
+                    <small>
+                      {formatGrowthOutlook(data.developmentInsight?.growthOutlook)} · Confidence {data.scoutPotential.confidence}% · Scouting L
+                      {data.scoutPotential.scoutingLevel}
+                    </small>
+                    <small>
+                      Route {data.developmentInsight?.developmentRoute ?? "—"} · Growth x{data.scoutPotential.trainingSpeedMultiplier.toFixed(2)} · MW Preview{" "}
+                      {data.scoutPotential.marketValuePotentialPremiumPct > 0 ? "+" : ""}
+                      {formatValue(data.scoutPotential.marketValuePotentialPremiumPct, 1)}%
+                    </small>
+                    {data.developmentInsight?.reasonChips?.length ? (
+                      <div className="player-drawer-chip-row">
+                        {data.developmentInsight.reasonChips.slice(0, 6).map((chip) => (
+                          <span key={`potential-chip-${chip}`} className="player-drawer-chip">
+                            {chip}
+                          </span>
+                        ))}
+                      </div>
+                    ) : null}
+                    {data.developmentInsight?.recommendation ? <small>{data.developmentInsight.recommendation}</small> : null}
+                  </article>
+                ) : null}
+                {data.progressionForecast ? (
+                  <>
+                    <article className="metric-card">
+                      <span>Netto-XP</span>
+                      <strong className={getDeltaToneClass(data.progressionForecast.netDevelopmentXP)}>
+                        {formatValue(data.progressionForecast.netDevelopmentXP, 0)}
+                      </strong>
+                      <small>{formatDevelopmentTrend(data.progressionForecast.xpTrend)}</small>
+                    </article>
+                    <article className="metric-card">
+                      <span>XP frei / spent</span>
+                      <strong>
+                        {formatValue(data.progressionForecast.currentXP, 0)} / {formatValue(data.progressionForecast.spentXP, 0)}
+                      </strong>
+                    </article>
+                    <article className="metric-card">
+                      <span>Training Form</span>
+                      <strong>{data.progressionForecast.trainingFormTier}</strong>
+                      <small>{formatSourceFreeDetail(data.progressionForecast.trainingMode)}</small>
+                    </article>
+                    <article className="metric-card">
+                      <span>CA / PO</span>
+                      <strong className="player-drawer-star-stack">
+                        <StarRating value={data.progressionForecast.currentAbilityStars} label="CA" />
+                        <StarRating value={data.progressionForecast.potentialStars} label="PO" />
+                      </strong>
+                      <small>
+                        {data.progressionForecast.currentAbilityTier ?? "—"} → {data.progressionForecast.potentialTier ?? "—"}
+                      </small>
+                    </article>
+                    <article className="metric-card">
+                      <span>Regression Risk</span>
+                      <strong>{formatRegressionRisk(data.progressionForecast.regressionRisk)}</strong>
+                      <small>{formatDevelopmentRoute(data.progressionForecast.developmentRoute)}</small>
+                    </article>
+                    <article className="metric-card">
+                      <span>Upgrade Range</span>
+                      <strong>{data.progressionForecast.possibleUpgradeSummary}</strong>
+                    </article>
+                  </>
+                ) : null}
+              </div>
+            </section>
+          ) : null}
 
           {isFreeAgent && onOpenBuyPreview ? (
             <section className="player-drawer-section player-drawer-panel">

@@ -25,6 +25,10 @@ import {
   type PlayerScoutPotential,
 } from "@/lib/progression/player-potential-service";
 import { buildPlayerProgressionForecast } from "@/lib/training/player-progression-forecast";
+import {
+  buildPlayerDevelopmentLevelupModel,
+  type PlayerDevelopmentLevelupModel,
+} from "@/lib/training/training-levelup-service";
 import type { PlayerProgressionForecast } from "@/lib/training/training-plan-types";
 
 type PlayerDrawerAxisCard = {
@@ -206,6 +210,7 @@ export type PlayerDetailDrawerData = {
     playerCount: number | null;
   }>;
   progressionForecast: PlayerProgressionForecast | null;
+  developmentLevelup: PlayerDevelopmentLevelupModel | null;
   progressionEvents: Array<{
     eventId: string;
     seasonId: string;
@@ -979,6 +984,13 @@ export function buildPlayerDrawerDataFromGameState(input: {
     spentXP: player.spentXP ?? 0,
     lifetimeXP: player.lifetimeXP ?? null,
   });
+  const developmentLevelup = buildPlayerDevelopmentLevelupModel({
+    gameState: input.gameState,
+    player,
+    forecast: progressionForecast,
+    teamId: team?.teamId ?? null,
+    profile: team?.teamId ? getTeamStrategyProfile(input.gameState, team.teamId) : null,
+  });
   const progressionEvents = [...(input.gameState.playerProgressionEvents ?? [])]
     .filter((event) => event.playerId === player.id)
     .sort((left, right) => right.timestamp.localeCompare(left.timestamp, "de"))
@@ -1154,6 +1166,7 @@ export function buildPlayerDrawerDataFromGameState(input: {
       latestArchivedPerformance,
     ),
     progressionForecast,
+    developmentLevelup,
     progressionEvents,
     seasonPerformance,
     transferContext: {
@@ -1393,6 +1406,14 @@ export function buildPlayerDrawerDataFromLegacyContext(input: {
     axisCards,
     disciplineValues,
     progressionForecast: null,
+    developmentLevelup: catalogPlayer
+      ? buildPlayerDevelopmentLevelupModel({
+          player: catalogPlayer,
+          forecast: null,
+          teamId: null,
+          profile: null,
+        })
+      : null,
     progressionEvents: [],
     progressionEconomyPreview: null,
     seasonPerformance: null,

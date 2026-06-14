@@ -1,0 +1,597 @@
+import type { GameState, Player, PlayerGeneratorAttributeName, TeamStrategyProfile } from "@/lib/data/olyDataTypes";
+import { resolvePlayerEconomyContract } from "@/lib/foundation/player-economy-contract";
+import {
+  officialDisciplineWeightLabels,
+  officialDisciplineWeightOrder,
+  officialDisciplineWeightTable,
+  playerGeneratorAttributeKeys,
+  type OfficialDisciplineWeightId,
+} from "@/lib/player-generator/official-discipline-weights";
+import type { PlayerDevelopmentRoute, PlayerProgressionForecast, PlayerRegressionRisk } from "@/lib/training/training-plan-types";
+
+export const DEVELOPMENT_POINTS_PER_LEVEL = 10;
+export const DEVELOPMENT_XP_PER_LEVEL = 180;
+export const DEVELOPMENT_MAX_ATTRIBUTE_VALUE = 99;
+
+export const TRAINING_ATTRIBUTE_LABELS: Record<PlayerGeneratorAttributeName, string> = {
+  power: "Power",
+  health: "Health",
+  stamina: "Stamina",
+  intelligence: "Intelligence",
+  awareness: "Awareness",
+  determination: "Determination",
+  speed: "Speed",
+  dexterity: "Dexterity",
+  charisma: "Charisma",
+  will: "Will",
+  spirit: "Spirit",
+  torment: "Torment",
+};
+
+export type AttributeAffinityKind = "signature" | "weak" | "neutral";
+
+export type AttributeAffinityProfile = {
+  playerId: string;
+  signatureAttributes: [PlayerGeneratorAttributeName, PlayerGeneratorAttributeName];
+  weakAttribute: PlayerGeneratorAttributeName;
+  reasons: string[];
+};
+
+export type TrainingPointCost = {
+  attribute: PlayerGeneratorAttributeName;
+  value: number | null;
+  baseCost: number | null;
+  modifier: -1 | 0 | 1;
+  finalCost: number | null;
+  affinity: AttributeAffinityKind;
+  reason: string;
+  blocked: boolean;
+  blockReason: string | null;
+};
+
+export type DevelopmentDisciplineDelta = {
+  disciplineId: OfficialDisciplineWeightId;
+  label: string;
+  delta: number;
+};
+
+export type DevelopmentAttributePreview = TrainingPointCost & {
+  label: string;
+  currentValue: number | null;
+  nextValue: number | null;
+  trainingPointsBefore: number;
+  trainingPointsAfter: number | null;
+  attributeDelta: number;
+  topDisciplineDeltas: DevelopmentDisciplineDelta[];
+  currentRatingDelta: number;
+  marketValuePreviewDelta: number | null;
+  expectedSalaryPreviewDelta: number | null;
+  contractSalaryStable: true;
+};
+
+export type DevelopmentLevelSummary = {
+  playerId: string;
+  developmentLevel: number;
+  progressXp: number;
+  progressPct: number;
+  xpToNextLevel: number;
+  levelUpsAvailable: number;
+  trainingPointsAvailable: number;
+  lifetimeDevelopmentXp: number;
+  netDevelopmentXP: number;
+  regressionDebt: number;
+  regressionRisk: PlayerRegressionRisk | "unknown";
+  trainingForm: string;
+  developmentRoute: PlayerDevelopmentRoute | "unknown";
+  lastTrend: "growth" | "stable" | "stagnation" | "regression";
+};
+
+export type SignatureShiftPreview = {
+  playerId: string;
+  canShift: boolean;
+  oldSignatureAttributes: [PlayerGeneratorAttributeName, PlayerGeneratorAttributeName];
+  newSignatureAttributes: [PlayerGeneratorAttributeName, PlayerGeneratorAttributeName];
+  oldWeakAttribute: PlayerGeneratorAttributeName;
+  newWeakAttribute: PlayerGeneratorAttributeName;
+  reason: string;
+  notification: string | null;
+};
+
+export type AiTrainingPointAllocation = {
+  playerId: string;
+  teamId: string | null;
+  recommendedAttributes: PlayerGeneratorAttributeName[];
+  spendPlan: Array<{
+    attribute: PlayerGeneratorAttributeName;
+    cost: number;
+    reason: string;
+  }>;
+  pointsSpent: number;
+  pointsRemaining: number;
+  reasons: string[];
+};
+
+export type DevelopmentRegressionEventPreview = {
+  playerId: string;
+  attribute: PlayerGeneratorAttributeName | null;
+  delta: 0 | -1;
+  risk: PlayerRegressionRisk | "unknown";
+  reason: string;
+  visible: boolean;
+};
+
+export type PlayerDevelopmentLevelupModel = {
+  playerId: string;
+  playerName: string;
+  level: DevelopmentLevelSummary;
+  affinity: AttributeAffinityProfile;
+  costs: TrainingPointCost[];
+  upgradePreview: DevelopmentAttributePreview[];
+  regressionEvent: DevelopmentRegressionEventPreview;
+  signatureShift: SignatureShiftPreview;
+  aiAllocation: AiTrainingPointAllocation;
+  notifications: string[];
+};
+
+function isFiniteNumber(value: number | null | undefined): value is number {
+  return typeof value === "number" && Number.isFinite(value);
+}
+
+function clamp(value: number, min: number, max: number) {
+  return Math.min(Math.max(value, min), max);
+}
+
+function round(value: number, digits = 2) {
+  return Number(value.toFixed(digits));
+}
+
+export function getAttributeTrainingPointBaseCost(value: number | null | undefined): number | null {
+  if (!isFiniteNumber(value)) return null;
+  if (value >= DEVELOPMENT_MAX_ATTRIBUTE_VALUE) return null;
+  if (value <= 30) return 1;
+  if (value <= 60) return 2;
+  if (value <= 85) return 3;
+  return 4;
+}
+
+function getPlayerAttributeValue(player: Player, attribute: PlayerGeneratorAttributeName): number | null {
+  const value = player.attributeSheetStats?.[attribute];
+  return isFiniteNumber(value) ? value : null;
+}
+
+function hasTrait(player: Player, values: string[]) {
+  const tokens = [...(player.traitsPositive ?? []), ...(player.traitsNegative ?? []), player.className, player.race, ...player.subclasses].join(" ").toLowerCase();
+  return values.some((value) => tokens.includes(value.toLowerCase()));
+}
+
+function pushUnique<T>(target: T[], value: T) {
+  if (!target.includes(value)) target.push(value);
+}
+
+export function deriveAttributeAffinityProfile(player: Player): AttributeAffinityProfile {
+  const signatureCandidates: PlayerGeneratorAttributeName[] = [];
+  const weakCandidates: PlayerGeneratorAttributeName[] = [];
+  const reasons: string[] = [];
+
+  const className = player.className.toLowerCase();
+  if (className.includes("mage") || hasTrait(player, ["wizard", "scholar", "oracle"])) {
+    pushUnique(signatureCandidates, "intelligence");
+    pushUnique(signatureCandidates, "will");
+    reasons.push("mental_class_or_subclass");
+  }
+  if (className.includes("tank") || hasTrait(player, ["guardian", "warrior", "brute"])) {
+    pushUnique(signatureCandidates, "health");
+    pushUnique(signatureCandidates, "stamina");
+    reasons.push("durable_role");
+  }
+  if (className.includes("charger") || className.includes("rogue") || hasTrait(player, ["runner", "assassin", "swift"])) {
+    pushUnique(signatureCandidates, "speed");
+    pushUnique(signatureCandidates, "dexterity");
+    reasons.push("speed_role");
+  }
+  if (className.includes("hero") || className.includes("warlord") || hasTrait(player, ["leader", "loyal", "ambitious"])) {
+    pushUnique(signatureCandidates, "determination");
+    pushUnique(signatureCandidates, "charisma");
+    reasons.push("leader_role");
+  }
+  if (className.includes("badass") || hasTrait(player, ["fearless", "chaos", "demon"])) {
+    pushUnique(signatureCandidates, "power");
+    pushUnique(signatureCandidates, "torment");
+    reasons.push("high_impact_role");
+  }
+  if (hasTrait(player, ["diligent", "disciplined", "motivated"])) {
+    pushUnique(signatureCandidates, "determination");
+    pushUnique(signatureCandidates, "stamina");
+    reasons.push("positive_training_traits");
+  }
+  if (hasTrait(player, ["diva", "lazy", "fainthearted"])) {
+    pushUnique(weakCandidates, "determination");
+    pushUnique(weakCandidates, "stamina");
+    reasons.push("negative_training_traits");
+  }
+  if (hasTrait(player, ["obsessive", "paranoid"])) {
+    pushUnique(weakCandidates, "spirit");
+    reasons.push("volatile_trait_pressure");
+  }
+
+  const sortedAttributes = [...playerGeneratorAttributeKeys]
+    .map((attribute) => ({ attribute: attribute as PlayerGeneratorAttributeName, value: getPlayerAttributeValue(player, attribute as PlayerGeneratorAttributeName) ?? -1 }))
+    .sort((left, right) => right.value - left.value);
+  for (const entry of sortedAttributes) {
+    pushUnique(signatureCandidates, entry.attribute);
+    if (signatureCandidates.length >= 4) break;
+  }
+
+  const lowToHigh = [...sortedAttributes].sort((left, right) => left.value - right.value);
+  for (const entry of lowToHigh) {
+    pushUnique(weakCandidates, entry.attribute);
+    if (weakCandidates.length >= 3) break;
+  }
+
+  const signatureAttributes = signatureCandidates
+    .filter((attribute, index, list) => list.indexOf(attribute) === index)
+    .slice(0, 2) as [PlayerGeneratorAttributeName, PlayerGeneratorAttributeName];
+  while (signatureAttributes.length < 2) {
+    signatureAttributes.push(playerGeneratorAttributeKeys[signatureAttributes.length] as PlayerGeneratorAttributeName);
+  }
+  const weakAttribute =
+    weakCandidates.find((attribute) => !signatureAttributes.includes(attribute)) ??
+    lowToHigh.find((entry) => !signatureAttributes.includes(entry.attribute))?.attribute ??
+    "torment";
+
+  return {
+    playerId: player.id,
+    signatureAttributes,
+    weakAttribute,
+    reasons: reasons.length > 0 ? reasons : ["attribute_profile_fallback"],
+  };
+}
+
+export function getAttributeAffinityKind(attribute: PlayerGeneratorAttributeName, profile: AttributeAffinityProfile): AttributeAffinityKind {
+  if (profile.signatureAttributes.includes(attribute)) return "signature";
+  if (profile.weakAttribute === attribute) return "weak";
+  return "neutral";
+}
+
+export function getAttributeTrainingPointCost(input: {
+  value: number | null | undefined;
+  attribute: PlayerGeneratorAttributeName;
+  affinity: AttributeAffinityProfile;
+}): TrainingPointCost {
+  const baseCost = getAttributeTrainingPointBaseCost(input.value);
+  const affinity = getAttributeAffinityKind(input.attribute, input.affinity);
+  const modifier = affinity === "signature" ? -1 : affinity === "weak" ? 1 : 0;
+  const blocked = !isFiniteNumber(input.value) || input.value >= DEVELOPMENT_MAX_ATTRIBUTE_VALUE;
+  const finalCost = baseCost == null || blocked ? null : Math.max(1, baseCost + modifier);
+  return {
+    attribute: input.attribute,
+    value: isFiniteNumber(input.value) ? input.value : null,
+    baseCost,
+    modifier,
+    finalCost,
+    affinity,
+    reason:
+      affinity === "signature"
+        ? "Signature: Dieses Attribut entwickelt sich bei diesem Spieler guenstiger."
+        : affinity === "weak"
+          ? "Weak Development: Dieses Attribut ist fuer diesen Spieler schwerer zu steigern."
+          : "Neutral: normale Attributkosten.",
+    blocked,
+    blockReason: blocked ? (isFiniteNumber(input.value) && input.value >= DEVELOPMENT_MAX_ATTRIBUTE_VALUE ? "attribute_at_99" : "attribute_value_missing") : null,
+  };
+}
+
+export function buildDevelopmentLevelSummary(input: {
+  player: Player;
+  forecast?: PlayerProgressionForecast | null;
+  currentXP?: number | null;
+  spentXP?: number | null;
+  lifetimeXP?: number | null;
+}): DevelopmentLevelSummary {
+  const netDevelopmentXP = input.forecast?.netDevelopmentXP ?? 0;
+  const currentXP = input.currentXP ?? input.forecast?.currentXP ?? input.player.currentXP ?? 0;
+  const spentXP = input.spentXP ?? input.forecast?.spentXP ?? input.player.spentXP ?? 0;
+  const lifetimeDevelopmentXp = Math.max(0, input.lifetimeXP ?? input.player.lifetimeXP ?? currentXP + spentXP + Math.max(0, netDevelopmentXP));
+  const developmentLevel = Math.floor(lifetimeDevelopmentXp / DEVELOPMENT_XP_PER_LEVEL) + 1;
+  const progressXp = lifetimeDevelopmentXp % DEVELOPMENT_XP_PER_LEVEL;
+  const levelUpsAvailable = Math.max(0, Math.floor((currentXP + Math.max(0, netDevelopmentXP)) / DEVELOPMENT_XP_PER_LEVEL));
+  const regressionDebt = Math.max(0, -netDevelopmentXP);
+  const lastTrend =
+    netDevelopmentXP >= DEVELOPMENT_XP_PER_LEVEL * 0.45 ? "growth" : netDevelopmentXP > 20 ? "stable" : netDevelopmentXP < -25 ? "regression" : "stagnation";
+  return {
+    playerId: input.player.id,
+    developmentLevel,
+    progressXp,
+    progressPct: round((progressXp / DEVELOPMENT_XP_PER_LEVEL) * 100, 1),
+    xpToNextLevel: DEVELOPMENT_XP_PER_LEVEL - progressXp,
+    levelUpsAvailable,
+    trainingPointsAvailable: levelUpsAvailable * DEVELOPMENT_POINTS_PER_LEVEL,
+    lifetimeDevelopmentXp,
+    netDevelopmentXP,
+    regressionDebt,
+    regressionRisk: input.forecast?.regressionRisk ?? "unknown",
+    trainingForm: input.forecast?.trainingFormTier ?? "unknown",
+    developmentRoute: input.forecast?.developmentRoute ?? "unknown",
+    lastTrend,
+  };
+}
+
+function getTopDisciplineDeltas(attribute: PlayerGeneratorAttributeName, steps: number): DevelopmentDisciplineDelta[] {
+  return officialDisciplineWeightOrder
+    .map((disciplineId) => ({
+      disciplineId,
+      label: officialDisciplineWeightLabels[disciplineId],
+      delta: round((officialDisciplineWeightTable[attribute][disciplineId] / 100) * steps, 2),
+    }))
+    .filter((entry) => entry.delta !== 0)
+    .sort((left, right) => Math.abs(right.delta) - Math.abs(left.delta))
+    .slice(0, 5);
+}
+
+function estimateRatingDelta(attribute: PlayerGeneratorAttributeName, steps: number) {
+  const coreWeight: Partial<Record<PlayerGeneratorAttributeName, number>> = {
+    power: 0.26,
+    health: 0.18,
+    stamina: 0.2,
+    speed: 0.26,
+    dexterity: 0.22,
+    intelligence: 0.26,
+    awareness: 0.22,
+    determination: 0.18,
+    charisma: 0.24,
+    will: 0.2,
+    spirit: 0.2,
+    torment: 0.16,
+  };
+  return round((coreWeight[attribute] ?? 0.18) * steps, 2);
+}
+
+export function buildUpgradePreview(input: {
+  player: Player;
+  level: DevelopmentLevelSummary;
+  affinity: AttributeAffinityProfile;
+  economy?: ReturnType<typeof resolvePlayerEconomyContract> | null;
+}): DevelopmentAttributePreview[] {
+  const economy = input.economy ?? resolvePlayerEconomyContract({ playerId: input.player.id, player: input.player, rosterEntry: null });
+  return playerGeneratorAttributeKeys.map((attributeKey) => {
+    const attribute = attributeKey as PlayerGeneratorAttributeName;
+    const currentValue = getPlayerAttributeValue(input.player, attribute);
+    const cost = getAttributeTrainingPointCost({ value: currentValue, attribute, affinity: input.affinity });
+    const canAfford = cost.finalCost != null && input.level.trainingPointsAvailable >= cost.finalCost;
+    const nextValue = isFiniteNumber(currentValue) && !cost.blocked && canAfford ? Math.min(DEVELOPMENT_MAX_ATTRIBUTE_VALUE, currentValue + 1) : currentValue;
+    const currentRatingDelta = cost.finalCost != null && canAfford ? estimateRatingDelta(attribute, 1) : 0;
+    const marketValuePreviewDelta = economy.marketValue != null ? round(economy.marketValue * currentRatingDelta * 0.012, 2) : null;
+    const expectedSalaryPreviewDelta = economy.salary != null ? round(economy.salary * currentRatingDelta * 0.01, 2) : null;
+    return {
+      ...cost,
+      label: TRAINING_ATTRIBUTE_LABELS[attribute],
+      currentValue,
+      nextValue,
+      trainingPointsBefore: input.level.trainingPointsAvailable,
+      trainingPointsAfter: cost.finalCost != null && canAfford ? input.level.trainingPointsAvailable - cost.finalCost : null,
+      attributeDelta: nextValue != null && currentValue != null ? nextValue - currentValue : 0,
+      topDisciplineDeltas: getTopDisciplineDeltas(attribute, nextValue != null && currentValue != null ? nextValue - currentValue : 0),
+      currentRatingDelta,
+      marketValuePreviewDelta,
+      expectedSalaryPreviewDelta,
+      contractSalaryStable: true,
+    };
+  });
+}
+
+export function buildRegressionEventPreview(input: {
+  player: Player;
+  level: DevelopmentLevelSummary;
+  forecast?: PlayerProgressionForecast | null;
+  affinity: AttributeAffinityProfile;
+}): DevelopmentRegressionEventPreview {
+  const severeRisk = input.level.regressionRisk === "high";
+  const shouldLoseAttribute = input.level.regressionDebt >= DEVELOPMENT_XP_PER_LEVEL * 0.75 && severeRisk;
+  if (!shouldLoseAttribute) {
+    return {
+      playerId: input.player.id,
+      attribute: null,
+      delta: 0,
+      risk: input.level.regressionRisk,
+      reason: input.level.regressionDebt > 0 ? "regression_debt_visible_no_attribute_loss" : "no_regression_debt",
+      visible: input.level.regressionDebt > 0,
+    };
+  }
+  return {
+    playerId: input.player.id,
+    attribute: input.affinity.weakAttribute,
+    delta: -1,
+    risk: input.level.regressionRisk,
+    reason: "high_regression_debt_hits_weak_development_attribute",
+    visible: true,
+  };
+}
+
+export function buildSignatureShiftPreview(input: {
+  player: Player;
+  currentProfile: AttributeAffinityProfile;
+  route?: PlayerDevelopmentRoute | null;
+  seasonShiftAlreadyUsed?: boolean;
+}): SignatureShiftPreview {
+  if (input.seasonShiftAlreadyUsed) {
+    return {
+      playerId: input.player.id,
+      canShift: false,
+      oldSignatureAttributes: input.currentProfile.signatureAttributes,
+      newSignatureAttributes: input.currentProfile.signatureAttributes,
+      oldWeakAttribute: input.currentProfile.weakAttribute,
+      newWeakAttribute: input.currentProfile.weakAttribute,
+      reason: "signature_shift_limit_reached",
+      notification: null,
+    };
+  }
+  const route = input.route ?? null;
+  const routeAttribute: PlayerGeneratorAttributeName | null =
+    route === "star_growth"
+      ? "determination"
+      : route === "core_growth"
+        ? "awareness"
+        : route === "prospect_growth"
+          ? "stamina"
+          : route === "depth_growth"
+            ? "spirit"
+            : null;
+  if (!routeAttribute || input.currentProfile.signatureAttributes.includes(routeAttribute)) {
+    return {
+      playerId: input.player.id,
+      canShift: false,
+      oldSignatureAttributes: input.currentProfile.signatureAttributes,
+      newSignatureAttributes: input.currentProfile.signatureAttributes,
+      oldWeakAttribute: input.currentProfile.weakAttribute,
+      newWeakAttribute: input.currentProfile.weakAttribute,
+      reason: "no_route_shift_needed",
+      notification: null,
+    };
+  }
+  const newSignatureAttributes = [input.currentProfile.signatureAttributes[0], routeAttribute] as [PlayerGeneratorAttributeName, PlayerGeneratorAttributeName];
+  return {
+    playerId: input.player.id,
+    canShift: true,
+    oldSignatureAttributes: input.currentProfile.signatureAttributes,
+    newSignatureAttributes,
+    oldWeakAttribute: input.currentProfile.weakAttribute,
+    newWeakAttribute: input.currentProfile.weakAttribute,
+    reason: `development_route_shift:${route}`,
+    notification: `Development Shift: ${input.player.name} behaelt ${TRAINING_ATTRIBUTE_LABELS[newSignatureAttributes[0]]} als Signature, aber ${TRAINING_ATTRIBUTE_LABELS[input.currentProfile.signatureAttributes[1]]} wurde durch ${TRAINING_ATTRIBUTE_LABELS[routeAttribute]} ersetzt. Grund: ${route}.`,
+  };
+}
+
+function getTeamStrategyAttributeBias(profile?: TeamStrategyProfile | null): PlayerGeneratorAttributeName[] {
+  const result: PlayerGeneratorAttributeName[] = [];
+  if ((profile?.powBias ?? 0) > 0) result.push("power", "health", "stamina");
+  if ((profile?.speBias ?? 0) > 0) result.push("speed", "dexterity", "awareness");
+  if ((profile?.menBias ?? 0) > 0) result.push("intelligence", "will", "awareness");
+  if ((profile?.socBias ?? 0) > 0) result.push("charisma", "spirit", "determination");
+  if (profile?.strategySummary?.toLowerCase().includes("rebuild")) result.push("determination", "stamina");
+  if (profile?.teamName?.toLowerCase().includes("wicked wizard")) result.push("intelligence", "will");
+  if (profile?.teamName?.toLowerCase().includes("blazing beast")) result.push("power", "speed");
+  return result;
+}
+
+export function buildAiTrainingPointAllocation(input: {
+  player: Player;
+  teamId?: string | null;
+  profile?: TeamStrategyProfile | null;
+  level: DevelopmentLevelSummary;
+  affinity: AttributeAffinityProfile;
+  preview: DevelopmentAttributePreview[];
+}): AiTrainingPointAllocation {
+  const preferred = [
+    ...getTeamStrategyAttributeBias(input.profile),
+    ...input.affinity.signatureAttributes,
+    ...(input.level.developmentRoute === "star_growth"
+      ? ["determination", "charisma", "power"]
+      : input.level.developmentRoute === "core_growth"
+        ? ["awareness", "stamina", "will"]
+        : input.level.developmentRoute === "prospect_growth"
+          ? ["stamina", "determination", "speed"]
+          : input.level.developmentRoute === "depth_growth"
+            ? ["spirit", "health", "dexterity"]
+            : []),
+  ] as PlayerGeneratorAttributeName[];
+  const uniquePreferred = preferred.filter((attribute, index) => preferred.indexOf(attribute) === index);
+  const ranked = [...input.preview].sort((left, right) => {
+    const leftPreferred = uniquePreferred.includes(left.attribute) ? 1 : 0;
+    const rightPreferred = uniquePreferred.includes(right.attribute) ? 1 : 0;
+    const leftWeakPenalty = left.affinity === "weak" ? -0.8 : 0;
+    const rightWeakPenalty = right.affinity === "weak" ? -0.8 : 0;
+    const leftScore = leftPreferred * 5 + left.currentRatingDelta * 3 - (left.finalCost ?? 99) + leftWeakPenalty;
+    const rightScore = rightPreferred * 5 + right.currentRatingDelta * 3 - (right.finalCost ?? 99) + rightWeakPenalty;
+    return rightScore - leftScore;
+  });
+  let remaining = input.level.trainingPointsAvailable;
+  const spendPlan: AiTrainingPointAllocation["spendPlan"] = [];
+  for (const row of ranked) {
+    if (row.finalCost == null || row.blocked || row.finalCost > remaining) continue;
+    spendPlan.push({
+      attribute: row.attribute,
+      cost: row.finalCost,
+      reason: `${row.affinity}_route_${input.level.developmentRoute}`,
+    });
+    remaining -= row.finalCost;
+    if (remaining <= 0 || spendPlan.length >= 10) break;
+  }
+  return {
+    playerId: input.player.id,
+    teamId: input.teamId ?? null,
+    recommendedAttributes: uniquePreferred.slice(0, 6),
+    spendPlan,
+    pointsSpent: input.level.trainingPointsAvailable - remaining,
+    pointsRemaining: remaining,
+    reasons: [
+      `route:${input.level.developmentRoute}`,
+      `training_form:${input.level.trainingForm}`,
+      `strategy:${input.profile?.strategySummary ?? "none"}`,
+      `signature:${input.affinity.signatureAttributes.join("|")}`,
+    ],
+  };
+}
+
+export function buildPlayerDevelopmentLevelupModel(input: {
+  gameState?: GameState | null;
+  player: Player;
+  forecast?: PlayerProgressionForecast | null;
+  teamId?: string | null;
+  profile?: TeamStrategyProfile | null;
+}): PlayerDevelopmentLevelupModel {
+  const affinity = deriveAttributeAffinityProfile(input.player);
+  const level = buildDevelopmentLevelSummary({
+    player: input.player,
+    forecast: input.forecast,
+    currentXP: input.player.currentXP ?? input.forecast?.currentXP ?? 0,
+    spentXP: input.player.spentXP ?? input.forecast?.spentXP ?? 0,
+    lifetimeXP: input.player.lifetimeXP ?? null,
+  });
+  const costs = playerGeneratorAttributeKeys.map((attribute) =>
+    getAttributeTrainingPointCost({
+      value: getPlayerAttributeValue(input.player, attribute as PlayerGeneratorAttributeName),
+      attribute: attribute as PlayerGeneratorAttributeName,
+      affinity,
+    }),
+  );
+  const economy = resolvePlayerEconomyContract({
+    playerId: input.player.id,
+    player: input.player,
+    rosterEntry: input.gameState?.rosters.find((entry) => entry.playerId === input.player.id) ?? null,
+  });
+  const upgradePreview = buildUpgradePreview({ player: input.player, level, affinity, economy });
+  const regressionEvent = buildRegressionEventPreview({ player: input.player, level, forecast: input.forecast, affinity });
+  const signatureShift = buildSignatureShiftPreview({
+    player: input.player,
+    currentProfile: affinity,
+    route: input.forecast?.developmentRoute ?? null,
+  });
+  const aiAllocation = buildAiTrainingPointAllocation({
+    player: input.player,
+    teamId: input.teamId ?? null,
+    profile: input.profile ?? null,
+    level,
+    affinity,
+    preview: upgradePreview,
+  });
+  const notifications = [
+    level.trainingPointsAvailable > 0 ? `${input.player.name}: ${level.trainingPointsAvailable} Trainingspunkte offen.` : null,
+    regressionEvent.visible ? `${input.player.name}: Regression Risk ${regressionEvent.risk}. ${regressionEvent.reason}.` : null,
+    signatureShift.notification,
+    level.lastTrend === "growth" ? `${input.player.name} entwickelt sich stark.` : null,
+    level.lastTrend === "stagnation" ? `${input.player.name} stagniert.` : null,
+  ].filter((entry): entry is string => Boolean(entry));
+
+  return {
+    playerId: input.player.id,
+    playerName: input.player.name,
+    level,
+    affinity,
+    costs,
+    upgradePreview,
+    regressionEvent,
+    signatureShift,
+    aiAllocation,
+    notifications,
+  };
+}
