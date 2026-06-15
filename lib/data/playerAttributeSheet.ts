@@ -7,6 +7,7 @@ export const ATTRIBUTE_SHEET_ALIASES: Record<string, string> = {
 
 export type PlayerAttributeSheetRow = {
   name: string;
+  height: number | null;
   power: number | null;
   health: number | null;
   stamina: number | null;
@@ -117,6 +118,7 @@ function toRating(value: string | undefined) {
 function toPlayerAttributeSheetRow(record: CsvRecord): PlayerAttributeSheetRow {
   return {
     name: record.Name?.trim() ?? "",
+    height: toNumber(record.Height ?? record.height ?? record.Size ?? record.Groesse ?? record["Größe"]),
     power: toNumber(record.Power),
     health: toNumber(record.Health),
     stamina: toNumber(record.Stamina),

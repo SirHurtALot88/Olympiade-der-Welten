@@ -54,10 +54,10 @@ function collectTraitEffects(traits: string[], basisSalary: number, traitSalaryF
 export function deriveSalaryMarketValueFromFinalSalary(input: Omit<SalaryEngineInput, "salaryMarketValue"> & {
   finalSalary: number;
 }) {
-  const totalAttributes = Object.values(input.attributes).reduce((sum, value) => sum + value, 0);
+  const totalAttributes = Object.values(input.attributes).reduce<number>((sum, value) => sum + (value ?? 0), 0);
   const weightedAttributeSalaryBlock = roundTo2(
-    (Object.entries(attributeKeyMap) as Array<[AttributeSalaryModifierName, keyof PlayerGeneratorAttributes]>).reduce((sum, [modifierName, attributeKey]) => {
-      return sum + input.attributes[attributeKey] * input.attributeSalaryModifiers[modifierName];
+    (Object.entries(attributeKeyMap) as Array<[AttributeSalaryModifierName, keyof PlayerGeneratorAttributes]>).reduce<number>((sum, [modifierName, attributeKey]) => {
+      return sum + (input.attributes[attributeKey] ?? 0) * input.attributeSalaryModifiers[modifierName];
     }, 0),
   );
   const weightedAttributeTerm = roundTo2(weightedAttributeSalaryBlock / 5);
@@ -69,10 +69,10 @@ export function deriveSalaryMarketValueFromFinalSalary(input: Omit<SalaryEngineI
 }
 
 export function calculateSalaryFromMarketValue(input: SalaryEngineInput): SalaryEngineBreakdown {
-  const totalAttributes = Object.values(input.attributes).reduce((sum, value) => sum + value, 0);
+  const totalAttributes = Object.values(input.attributes).reduce<number>((sum, value) => sum + (value ?? 0), 0);
   const weightedAttributeSalaryBlock = roundTo2(
-    (Object.entries(attributeKeyMap) as Array<[AttributeSalaryModifierName, keyof PlayerGeneratorAttributes]>).reduce((sum, [modifierName, attributeKey]) => {
-        return sum + input.attributes[attributeKey] * input.attributeSalaryModifiers[modifierName];
+    (Object.entries(attributeKeyMap) as Array<[AttributeSalaryModifierName, keyof PlayerGeneratorAttributes]>).reduce<number>((sum, [modifierName, attributeKey]) => {
+        return sum + (input.attributes[attributeKey] ?? 0) * input.attributeSalaryModifiers[modifierName];
     }, 0),
   );
   const salaryMarketValueTerm = roundTo2(input.salaryMarketValue / 5);

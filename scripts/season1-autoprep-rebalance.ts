@@ -3,6 +3,7 @@ import {
   executeLocalTransfermarktSell,
   listLocalTransfermarktFreeAgents,
 } from "@/lib/market/transfermarkt-local-service";
+import { deriveRosterTargets } from "@/lib/foundation/roster-limits";
 import { createPersistenceService } from "@/lib/persistence/persistence-service";
 import type { PersistedSaveGame } from "@/lib/persistence/types";
 
@@ -13,10 +14,8 @@ const ALLOW_NON_SEASON1 = process.argv.includes("--allow-non-season1");
 function getTargetRoster(save: PersistedSaveGame, teamId: string) {
   const team = save.gameState.teams.find((entry) => entry.teamId === teamId) ?? null;
   const identity = save.gameState.teamIdentities.find((entry) => entry.teamId === teamId) ?? null;
-  const playerMin = Number.isFinite(identity?.playerMin) ? Math.round(identity?.playerMin ?? 7) : 7;
-  const playerOpt = Number.isFinite(identity?.playerOpt) ? Math.round(identity?.playerOpt ?? playerMin) : playerMin;
-  const rosterLimit = Number.isFinite(team?.rosterLimit) ? Math.round(team?.rosterLimit ?? 12) : 12;
-  return Math.min(Math.max(playerOpt, playerMin), rosterLimit, 12);
+  const { playerMin, playerOpt, playerMax } = deriveRosterTargets(team, identity);
+  return Math.min(Math.max(playerOpt, playerMin), playerMax);
 }
 
 function getSave(saveId: string) {

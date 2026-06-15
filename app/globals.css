@@ -2029,11 +2029,13 @@ a {
 }
 
 .race-icon-chip {
+  --race-chip-text: var(--muted);
   display: inline-flex;
   align-items: center;
   gap: 0.5rem;
   min-width: 0;
   vertical-align: middle;
+  color: var(--race-chip-text);
 }
 
 .race-icon-chip-inline {
@@ -2053,8 +2055,62 @@ a {
 }
 
 .race-icon-label {
+  color: var(--race-chip-text);
+  font-weight: 850;
   line-height: 1.1;
   white-space: nowrap;
+}
+
+.race-icon-alien,
+.race-icon-voidborn {
+  --race-chip-text: #b8a6ff;
+}
+
+.race-icon-animal,
+.race-icon-tauren {
+  --race-chip-text: #e5a94f;
+}
+
+.race-icon-aqua {
+  --race-chip-text: #6bd9f0;
+}
+
+.race-icon-construct,
+.race-icon-gnom,
+.race-icon-gnome {
+  --race-chip-text: #64d8f2;
+}
+
+.race-icon-demon,
+.race-icon-mutant {
+  --race-chip-text: #ff6b5d;
+}
+
+.race-icon-divine {
+  --race-chip-text: #f3c969;
+}
+
+.race-icon-dragon,
+.race-icon-lizard {
+  --race-chip-text: #79d66f;
+}
+
+.race-icon-dwarf {
+  --race-chip-text: #f09a45;
+}
+
+.race-icon-elf,
+.race-icon-plant {
+  --race-chip-text: #8ee073;
+}
+
+.race-icon-goblin,
+.race-icon-orc {
+  --race-chip-text: #9fe14c;
+}
+
+.race-icon-human {
+  --race-chip-text: #d9c4a1;
 }
 
 .class-icon-chip,
@@ -2094,8 +2150,50 @@ a {
 
 .class-icon-label,
 .discipline-icon-label {
+  color: var(--class-chip-text, currentColor);
+  font-weight: 850;
   line-height: 1.1;
   white-space: nowrap;
+}
+
+.table-identity-icon-chip {
+  display: inline-flex;
+  flex-direction: column;
+  justify-content: center;
+  align-items: center;
+  gap: 0.35rem;
+  min-width: 4.25rem;
+  padding: 0;
+  background: transparent;
+  border-color: transparent;
+  box-shadow: none;
+  text-align: center;
+}
+
+.table-identity-icon-chip.class-icon-chip {
+  background: transparent;
+  border-color: transparent;
+}
+
+.table-identity-icon-chip .class-icon-label,
+.table-identity-icon-chip .race-icon-label {
+  max-width: 5.8rem;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  font-size: 0.78rem;
+  letter-spacing: 0.03em;
+  text-transform: uppercase;
+}
+
+.table-identity-icon-image {
+  width: 56px;
+  height: 56px;
+  flex-basis: 56px;
+  border-radius: 16px;
+  background: radial-gradient(circle at 50% 35%, rgba(255, 255, 255, 0.18), rgba(255, 255, 255, 0.03) 62%);
+  box-shadow:
+    inset 0 0 0 1px rgba(255, 255, 255, 0.12),
+    0 8px 18px rgba(0, 0, 0, 0.28);
 }
 
 .roster-grid,
@@ -2295,6 +2393,10 @@ a {
   min-height: 560px;
 }
 
+.transfermarkt-actions-col {
+  width: 154px;
+}
+
 .transfer-filter-panel {
   position: sticky;
   top: 18px;
@@ -2340,6 +2442,45 @@ a {
   margin-top: 0;
 }
 
+.transfermarkt-row-actions-header,
+.transfermarkt-row-actions-cell {
+  position: sticky;
+  right: 0;
+  z-index: 5;
+  min-width: 154px;
+  background: linear-gradient(90deg, rgba(43, 43, 43, 0.78), rgba(43, 43, 43, 0.98) 24%);
+  box-shadow: -14px 0 20px rgba(0, 0, 0, 0.18);
+}
+
+.transfermarkt-row-actions-header {
+  z-index: 12;
+}
+
+.transfermarkt-row-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+  opacity: 0;
+  pointer-events: none;
+  transform: translateX(8px);
+  transition: opacity 140ms ease, transform 140ms ease;
+}
+
+.transfer-table tbody tr:hover .transfermarkt-row-actions,
+.transfer-table tbody tr:focus-within .transfermarkt-row-actions,
+.transfermarkt-row-actions.transfermarkt-row-actions-visible {
+  opacity: 1;
+  pointer-events: auto;
+  transform: translateX(0);
+}
+
+.transfermarkt-name-meta {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  color: rgba(236, 241, 250, 0.72);
+}
+
 .class-pill {
   display: inline-flex;
   align-items: center;
@@ -2354,6 +2495,34 @@ a {
 
 .transfer-wishlist-panel {
   margin-top: 14px;
+}
+
+.transfer-market-wishlist-strip {
+  display: grid;
+  gap: 10px;
+  margin-top: 14px;
+  padding: 14px;
+  border-radius: 18px;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  background:
+    radial-gradient(circle at top left, rgba(92, 142, 220, 0.12), transparent 36%),
+    rgba(255, 255, 255, 0.025);
+}
+
+.transfer-market-wishlist-strip.is-empty {
+  padding: 12px 14px;
+}
+
+.transfer-market-wishlist-strip.is-empty .panel-header {
+  margin-bottom: 0;
+}
+
+.transfer-market-wishlist-table-shell {
+  max-height: min(42vh, 420px);
+}
+
+.transfer-wishlist-table {
+  min-width: 1120px;
 }
 
 .transfer-wishlist-grid {
@@ -3348,6 +3517,24 @@ a {
   min-width: 1320px;
 }
 
+.prize-forecast-panel {
+  background:
+    radial-gradient(circle at top left, rgba(221, 174, 83, 0.14), transparent 34%),
+    rgba(255, 255, 255, 0.025);
+}
+
+.prize-forecast-rank-select {
+  min-width: 180px;
+}
+
+.prize-forecast-table-shell {
+  margin-top: 12px;
+}
+
+.prize-forecast-table {
+  min-width: 680px;
+}
+
 .table-link-button {
   background: none;
   border: none;
@@ -3368,6 +3555,53 @@ a {
 
 .text-negative {
   color: #f08e86;
+}
+
+.players-table-team-cell {
+  display: inline-flex;
+  align-items: center;
+  gap: 9px;
+  min-width: 0;
+}
+
+.players-table-team-logo {
+  width: 30px;
+  height: 30px;
+  border-radius: 999px;
+  object-fit: cover;
+  flex: 0 0 auto;
+  background: rgba(255, 255, 255, 0.08);
+  box-shadow:
+    inset 0 0 0 1px rgba(255, 255, 255, 0.18),
+    0 5px 14px rgba(0, 0, 0, 0.22);
+}
+
+.players-table-team-logo-placeholder {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  color: #dce6f5;
+  font-size: 0.68rem;
+  font-weight: 800;
+  letter-spacing: 0.02em;
+}
+
+.transfer-history-money-stack {
+  display: inline-flex;
+  align-items: baseline;
+  justify-content: flex-end;
+  gap: 6px;
+  white-space: nowrap;
+}
+
+.transfer-history-money-stack .text-positive,
+.transfer-history-money-stack .text-negative {
+  font-size: 0.82em;
+  font-weight: 800;
+}
+
+.transfer-history-axis-header {
+  background-clip: padding-box;
 }
 
 .heat-band-8,
@@ -6625,6 +6859,26 @@ a {
   border-color: rgba(145, 185, 244, 0.2);
 }
 
+.transfermarkt-trait-list {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  min-width: 0;
+}
+
+.transfermarkt-trait-pill {
+  color: rgba(232, 241, 255, 0.9);
+  border-color: rgba(255, 255, 255, 0.12);
+}
+
+.transfermarkt-trait-pill-positive {
+  background: rgba(83, 150, 97, 0.22);
+}
+
+.transfermarkt-trait-pill-negative {
+  background: rgba(154, 76, 76, 0.22);
+}
+
 .transfermarkt-top-diszi-list {
   display: grid;
   grid-template-columns: 42px 48px 54px;
@@ -6633,6 +6887,11 @@ a {
   font-size: 0.78rem;
   line-height: 1.1;
   min-width: 144px;
+}
+
+.transfermarkt-top-diszi-list-compact {
+  grid-template-columns: 42px 48px;
+  min-width: 96px;
 }
 
 .transfermarkt-top-diszi-head {
@@ -8557,6 +8816,78 @@ a {
   background:
     linear-gradient(90deg, rgba(119, 173, 124, 0.2), transparent 72%),
     rgba(34, 65, 45, 0.38);
+}
+
+.contract-preference-card {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 0.9rem;
+  align-items: center;
+  margin-top: 0.8rem;
+  padding: 0.85rem 0.95rem;
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  border-radius: 18px;
+  background:
+    radial-gradient(circle at top left, rgba(116, 162, 234, 0.18), transparent 42%),
+    rgba(14, 18, 26, 0.58);
+}
+
+.contract-preference-card.is-preferred {
+  border-color: rgba(119, 173, 124, 0.42);
+  background:
+    radial-gradient(circle at top left, rgba(119, 173, 124, 0.22), transparent 42%),
+    rgba(14, 26, 18, 0.56);
+}
+
+.contract-preference-card.is-mismatch {
+  border-color: rgba(214, 98, 84, 0.42);
+  background:
+    radial-gradient(circle at top left, rgba(214, 98, 84, 0.2), transparent 42%),
+    rgba(32, 18, 18, 0.58);
+}
+
+.contract-preference-impact {
+  display: grid;
+  gap: 0.25rem;
+  justify-items: end;
+  white-space: nowrap;
+}
+
+.contract-forecast-panel {
+  display: grid;
+  gap: 0.75rem;
+  padding: 0.95rem;
+  border: 1px solid rgba(237, 190, 88, 0.24);
+  border-radius: 20px;
+  background:
+    linear-gradient(135deg, rgba(237, 190, 88, 0.12), rgba(255, 255, 255, 0.035)),
+    rgba(17, 19, 24, 0.55);
+}
+
+.contract-forecast-grid {
+  display: grid;
+  grid-template-columns: repeat(5, minmax(120px, 1fr));
+  gap: 0.65rem;
+}
+
+.contract-forecast-card {
+  display: grid;
+  gap: 0.18rem;
+  padding: 0.7rem 0.8rem;
+  border: 1px solid rgba(255, 255, 255, 0.09);
+  border-radius: 16px;
+  background: rgba(255, 255, 255, 0.045);
+}
+
+.contract-forecast-card span {
+  color: rgba(255, 255, 255, 0.62);
+  font-size: 0.78rem;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+
+.contract-forecast-card strong {
+  font-size: 1.15rem;
 }
 
 @media (max-width: 1320px) {

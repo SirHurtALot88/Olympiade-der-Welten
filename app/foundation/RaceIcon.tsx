@@ -44,9 +44,10 @@ type RaceIconProps = {
 export default function RaceIcon({ race, showLabel = true, className = "", iconClassName = "" }: RaceIconProps) {
   const label = race?.trim() || "—";
   const src = getRaceIconSrc(race);
+  const raceKey = normalizeRaceKey(race) || "unknown";
 
   return (
-    <span className={`race-icon-chip${showLabel ? " has-label" : ""}${className ? ` ${className}` : ""}`} title={label}>
+    <span className={`race-icon-chip race-icon-${raceKey}${showLabel ? " has-label" : ""}${className ? ` ${className}` : ""}`} title={label}>
       {src ? (
         <img
           className={`race-icon${iconClassName ? ` ${iconClassName}` : ""}`}

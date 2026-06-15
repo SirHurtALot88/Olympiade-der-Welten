@@ -18,6 +18,7 @@ import type {
   TeamStrategyProfile,
 } from "@/lib/data/olyDataTypes";
 import { getTeamControlSettings } from "@/lib/foundation/team-control-settings";
+import { deriveRosterTargets } from "@/lib/foundation/roster-limits";
 import { getTeamStrategyProfile } from "@/lib/foundation/team-strategy-profiles";
 import { buildTransfermarktSaleFactorBreakdown } from "@/lib/market/transfermarkt-sale-factor";
 import {
@@ -698,14 +699,7 @@ export async function applyAiMarketPlanLocally(input: AiMarketPlanApplyParams): 
     .filter((team) => {
       const identity = preflightGameState.teamIdentities.find((entry) => entry.teamId === team.teamId) ?? null;
       const rosterCount = preflightRosterCounts.get(team.teamId) ?? 0;
-      const identityOpt = identity?.playerOpt != null && Number.isFinite(identity.playerOpt) ? Math.round(identity.playerOpt) : null;
-      const identityMin = identity?.playerMin != null && Number.isFinite(identity.playerMin) ? Math.round(identity.playerMin) : null;
-      const rosterLimit =
-        typeof team.rosterLimit === "number" && Number.isFinite(team.rosterLimit)
-          ? Math.min(Math.max(team.rosterLimit, identityOpt ?? 0, identityMin ?? 0), 12)
-          : 12;
-      const playerMin = Math.min(identity?.playerMin ?? 7, rosterLimit);
-      const playerOpt = Math.min(Math.max(identity?.playerOpt ?? 10, playerMin), rosterLimit);
+      const { playerMin, playerOpt } = deriveRosterTargets(team, identity);
       return rosterCount < playerOpt;
     })
     .map((team) => team.teamId);
@@ -714,14 +708,7 @@ export async function applyAiMarketPlanLocally(input: AiMarketPlanApplyParams): 
     .filter((team) => {
       const identity = preflightGameState.teamIdentities.find((entry) => entry.teamId === team.teamId) ?? null;
       const rosterCount = preflightRosterCounts.get(team.teamId) ?? 0;
-      const identityOpt = identity?.playerOpt != null && Number.isFinite(identity.playerOpt) ? Math.round(identity.playerOpt) : null;
-      const identityMin = identity?.playerMin != null && Number.isFinite(identity.playerMin) ? Math.round(identity.playerMin) : null;
-      const rosterLimit =
-        typeof team.rosterLimit === "number" && Number.isFinite(team.rosterLimit)
-          ? Math.min(Math.max(team.rosterLimit, identityOpt ?? 0, identityMin ?? 0), 12)
-          : 12;
-      const playerMin = Math.min(identity?.playerMin ?? 7, rosterLimit);
-      const playerOpt = Math.min(Math.max(identity?.playerOpt ?? 10, playerMin), rosterLimit);
+      const { playerMin, playerOpt } = deriveRosterTargets(team, identity);
       return (
         rosterCount > playerOpt ||
         (typeof team.cash === "number" && Number.isFinite(team.cash) && team.cash < 0) ||

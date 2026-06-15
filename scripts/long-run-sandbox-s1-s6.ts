@@ -14,6 +14,7 @@ import { FACILITY_CATALOG } from "@/lib/facilities/facility-catalog";
 import { getFacilityEfficiency, getFacilityLevel, getTeamFacilityState } from "@/lib/facilities/facility-effects";
 import { applyFacilitySeasonEndFinance, previewFacilitySeasonEndFinance } from "@/lib/facilities/facility-season-end-service";
 import { resolvePlayerEconomyContract } from "@/lib/foundation/player-economy-contract";
+import { getTeamPlayerMax } from "@/lib/foundation/roster-limits";
 import { buildTeamControlSettingsMap } from "@/lib/foundation/team-control-settings";
 import { buildPlayerMoraleAudit } from "@/lib/morale/player-morale-service";
 import { createPersistenceService } from "@/lib/persistence/persistence-service";
@@ -270,9 +271,9 @@ function writeSimulationStartState(save: PersistedSaveGame, previousActiveSave: 
     rosterCount: roster.length,
     playerMin: identity?.playerMin ?? null,
     playerOpt: identity?.playerOpt ?? null,
-    playerMax: team.rosterLimit,
+    playerMax: getTeamPlayerMax(team, identity),
     belowMin: identity?.playerMin != null ? roster.length < identity.playerMin : roster.length < 7,
-    aboveMax: roster.length > team.rosterLimit,
+    aboveMax: roster.length > getTeamPlayerMax(team, identity),
   }));
   const payload = {
     generatedAt: new Date().toISOString(),
@@ -769,7 +770,7 @@ function collectAuditRows(save: PersistedSaveGame, seasonId: string, seasonEnd: 
       rosterSize: roster.length,
       playerMin: identity?.playerMin ?? null,
       playerOpt: identity?.playerOpt ?? null,
-      playerMax: team.rosterLimit ?? 12,
+      playerMax: getTeamPlayerMax(team, identity),
       buys: teamTransfers.filter((entry) => entry.transferType === "buy").length,
       sells: teamTransfers.filter((entry) => entry.transferType === "sell").length,
       contractExits: teamTransfers.filter((entry) => entry.transferType === "contract_exit").length,

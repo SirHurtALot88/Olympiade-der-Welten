@@ -57,6 +57,21 @@ export type NegotiationScoreBreakdownEntry = {
   reason: string;
 };
 
+export type PlayerContractLengthPreference = "short" | "medium" | "long";
+
+export type PlayerContractPreference = {
+  lengthPreference: PlayerContractLengthPreference;
+  shapePreference: ContractShape;
+  preferredMinLength: number;
+  preferredMaxLength: number;
+  idealLength: number;
+  salaryAdjustmentPct: number;
+  scoreAdjustment: number;
+  matchQuality: "preferred" | "acceptable" | "mismatch";
+  reasons: string[];
+  warnings: string[];
+};
+
 export type ContractNegotiationPreview = {
   expectedSalary: number | null;
   baseExpectedSalary: number | null;
@@ -75,6 +90,7 @@ export type ContractNegotiationPreview = {
   acceptChance: number | null;
   counterChance: number | null;
   rejectChance: number | null;
+  contractPreference?: PlayerContractPreference | null;
   scoreBreakdown: NegotiationScoreBreakdownEntry[];
   reasons: string[];
   warnings: string[];
@@ -264,6 +280,176 @@ function deriveContractStyleAdjustment(contractLength: number, contractShape: Co
   }
 
   return score;
+}
+
+function getPlayerTraitTokens(player: Player) {
+  return [...player.traitsPositive, ...player.traitsNegative].map((trait) => normalizeTransfermarktToken(trait));
+}
+
+function hasToken(tokens: string[], candidates: string[]) {
+  return candidates.some((candidate) => tokens.includes(normalizeTransfermarktToken(candidate)));
+}
+
+export function buildPlayerContractPreference(
+  player: Player | null,
+  profile: TeamStrategyProfile | null = null,
+  input?: {
+    contractLength?: number | null;
+    contractShape?: ContractShape | null;
+  },
+): PlayerContractPreference | null {
+  if (!player) {
+    return null;
+  }
+
+  const tokens = getPlayerTraitTokens(player);
+  const seed = hashToUnitInterval(`${player.id}:${player.name}:contract-preference`);
+  let longScore = 0;
+  let shortScore = 0;
+  const reasons: string[] = [];
+  const warnings: string[] = [];
+
+  if (hasToken(tokens, ["loyal", "disciplined", "diligent", "humble", "teamplayer", "honorable", "stable"])) {
+    longScore += 3;
+    reasons.push("Traits sprechen fuer Sicherheit und langfristige Bindung.");
+  }
+  if (hasToken(tokens, ["ambitious", "motivated", "leader", "royalty", "lord"])) {
+    longScore += 1;
+    reasons.push("Ambition/Status mag ein klares Commitment.");
+  }
+  if (hasToken(tokens, ["mercenary", "opportunist", "manipulative", "devious", "independent"])) {
+    shortScore += 3;
+    reasons.push("Flexibilitaets- oder Geldmotiv bevorzugt kuerzere Bindung.");
+  }
+  if (hasToken(tokens, ["diva", "egomaniac", "scandalous", "chaotic", "relaxed", "coldblooded"])) {
+    shortScore += 2;
+    warnings.push("Volatile Persoenlichkeit verlangt bei langer Bindung eher Premium.");
+  }
+
+  if ((profile?.bias.longContractPreference ?? 0) >= 8) {
+    longScore += 1;
+  }
+  if ((profile?.bias.shortContractPreference ?? 0) >= 8 || (profile?.bias.sellForProfitAggression ?? 0) >= 8) {
+    shortScore += 1;
+  }
+
+  if (seed > 0.74) {
+    longScore += 1;
+  } else if (seed < 0.26) {
+    shortScore += 1;
+  }
+
+  const lengthPreference: PlayerContractLengthPreference =
+    longScore - shortScore >= 2 ? "long" : shortScore - longScore >= 2 ? "short" : "medium";
+  const idealLength =
+    lengthPreference === "long"
+      ? seed > 0.58 ? 5 : 4
+      : lengthPreference === "short"
+        ? seed > 0.5 ? 2 : 1
+        : seed > 0.66
+          ? 3
+          : 2;
+  const preferredMinLength = lengthPreference === "long" ? 3 : lengthPreference === "short" ? 1 : 2;
+  const preferredMaxLength = lengthPreference === "long" ? 5 : lengthPreference === "short" ? 2 : 4;
+
+  let shapePreference: ContractShape = "balanced";
+  if ((profile?.bias.cashPriority ?? 0) >= 8 || (profile?.bias.wageSensitivity ?? 0) >= 8) {
+    shapePreference = "back_loaded";
+    reasons.push("Teamprofil schont kurzfristig Cash und bevorzugt back-loaded Deals.");
+  } else if ((profile?.bias.starPriority ?? 0) >= 8 || (profile?.bias.riskTolerance ?? 0) >= 8) {
+    shapePreference = "front_loaded";
+    reasons.push("Ambitioniertes Team kann frueh mehr zahlen, um Stars zu sichern.");
+  } else if (lengthPreference === "long") {
+    shapePreference = "balanced";
+  }
+
+  const contractLength = normalizeContractLength(input?.contractLength ?? idealLength);
+  const contractShape = input?.contractShape ?? shapePreference;
+  const lengthMismatch =
+    contractLength < preferredMinLength ? preferredMinLength - contractLength : contractLength > preferredMaxLength ? contractLength - preferredMaxLength : 0;
+  const shapeMatches = contractShape === shapePreference;
+  const matchQuality: PlayerContractPreference["matchQuality"] =
+    lengthMismatch === 0 && shapeMatches ? "preferred" : lengthMismatch <= 1 ? "acceptable" : "mismatch";
+
+  let salaryAdjustmentPct = 0;
+  let scoreAdjustment = 0;
+  if (matchQuality === "preferred") {
+    salaryAdjustmentPct -= lengthPreference === "long" ? 0.04 : 0.025;
+    scoreAdjustment += lengthPreference === "long" ? 5 : 3;
+  } else if (matchQuality === "acceptable") {
+    salaryAdjustmentPct += shapeMatches ? 0 : 0.015;
+    scoreAdjustment += shapeMatches ? 1 : -1;
+  } else {
+    salaryAdjustmentPct += lengthPreference === "long" ? 0.075 : 0.06;
+    scoreAdjustment -= lengthPreference === "long" ? 8 : 6;
+    warnings.push(
+      lengthPreference === "long"
+        ? "Spieler bevorzugt lange Sicherheit; kurzer Deal kostet Vertrauen und Gehalt."
+        : "Spieler bevorzugt Flexibilitaet; langer Deal braucht Premium.",
+    );
+  }
+  if (!shapeMatches) {
+    salaryAdjustmentPct += 0.02;
+    scoreAdjustment -= 2;
+  }
+
+  const label = lengthPreference === "long" ? "lange Vertraege" : lengthPreference === "short" ? "kurze Vertraege" : "mittlere Vertraege";
+  reasons.unshift(`Praeferenz: ${label}, ideal ${idealLength} Season(s), Form ${shapePreference}.`);
+
+  return {
+    lengthPreference,
+    shapePreference,
+    preferredMinLength,
+    preferredMaxLength,
+    idealLength,
+    salaryAdjustmentPct: roundMoney(clamp(salaryAdjustmentPct, -0.08, 0.12), 4),
+    scoreAdjustment: Math.round(clamp(scoreAdjustment, -12, 8)),
+    matchQuality,
+    reasons: Array.from(new Set(reasons)),
+    warnings: Array.from(new Set(warnings)),
+  };
+}
+
+export function recommendContractOfferForPlayer(input: {
+  player: Player | null;
+  teamStrategyProfile?: TeamStrategyProfile | null;
+  teamCash?: number | null;
+  marketValue?: number | null;
+}): { contractLength: number; contractShape: ContractShape; preference: PlayerContractPreference | null; reasons: string[] } {
+  const basePreference = buildPlayerContractPreference(input.player, input.teamStrategyProfile);
+  const reasons = [...(basePreference?.reasons ?? [])];
+  if (!basePreference) {
+    return { contractLength: 1, contractShape: "balanced", preference: null, reasons: ["fallback_no_player_preference"] };
+  }
+
+  let contractLength = basePreference.idealLength;
+  let contractShape = basePreference.shapePreference;
+  const cash = input.teamCash ?? null;
+  const marketValue = input.marketValue ?? null;
+  const cashTight = cash != null && marketValue != null && cash < marketValue * 1.35;
+
+  if (cashTight && contractLength >= 4) {
+    contractShape = "back_loaded";
+    reasons.push("Cash ist eng: back-loaded Empfehlung schont diese Season.");
+  }
+  if ((input.teamStrategyProfile?.bias.shortContractPreference ?? 0) >= 8 && basePreference.lengthPreference !== "long") {
+    contractLength = Math.min(contractLength, 2);
+    reasons.push("Teamstrategie bevorzugt kurze Vertraege.");
+  }
+  if ((input.teamStrategyProfile?.bias.longContractPreference ?? 0) >= 8 && basePreference.lengthPreference !== "short") {
+    contractLength = Math.max(contractLength, 3);
+    reasons.push("Teamstrategie bevorzugt Bindung fuer Kernspieler.");
+  }
+
+  return {
+    contractLength: clamp(Math.round(contractLength), 1, 5),
+    contractShape,
+    preference: buildPlayerContractPreference(input.player, input.teamStrategyProfile, {
+      contractLength,
+      contractShape,
+    }),
+    reasons: Array.from(new Set(reasons)),
+  };
 }
 
 function hashToUnitInterval(input: string) {
@@ -509,6 +695,10 @@ export function buildContractNegotiationPreview(input: NegotiationPreviewInput):
   const teamFit = fitBreakdown.teamFit ?? 0;
   const fit25Bonus = deriveFitPolicyBonus(input.teamIdentity);
   let demandMultiplier: number | null = null;
+  const contractPreference = buildPlayerContractPreference(input.player, input.teamStrategyProfile, {
+    contractLength,
+    contractShape,
+  });
 
   if (input.player && baseExpectedSalary != null && baseExpectedSalary > 0) {
     const cultureSignals = deriveTraitCultureSignals(input.player, input.teamIdentity);
@@ -519,6 +709,7 @@ export function buildContractNegotiationPreview(input: NegotiationPreviewInput):
         cultureSignals.salaryMultiplier *
         (input.priorBadExperience ? 1.12 : 1) *
         contractLengthSignal.salaryMultiplier *
+        (1 + (contractPreference?.salaryAdjustmentPct ?? 0)) *
         (1 + moodDemand),
       0.5,
       1.45,
@@ -532,6 +723,10 @@ export function buildContractNegotiationPreview(input: NegotiationPreviewInput):
     }
     if (contractLengthSignal.reason) {
       reasons.push(contractLengthSignal.reason);
+    }
+    if (contractPreference) {
+      reasons.push(...contractPreference.reasons);
+      warnings.push(...contractPreference.warnings);
     }
     reasons.push(...cultureSignals.reasons);
   }
@@ -606,6 +801,16 @@ export function buildContractNegotiationPreview(input: NegotiationPreviewInput):
         category: "contract",
         points: contractStyleScore,
         reason: "Laenge/Form passen zur Team- oder Spielerlogik.",
+      });
+    }
+
+    if (contractPreference && contractPreference.scoreAdjustment !== 0) {
+      pushScoreBreakdown(scoreBreakdown, {
+        key: "player_contract_preference",
+        label: "Spieler-Vertragspraeferenz",
+        category: "contract",
+        points: contractPreference.scoreAdjustment,
+        reason: contractPreference.reasons[0] ?? "Laufzeit/Form beeinflussen die Verhandlung.",
       });
     }
 
@@ -790,6 +995,7 @@ export function buildContractNegotiationPreview(input: NegotiationPreviewInput):
     acceptChance,
     counterChance,
     rejectChance,
+    contractPreference,
     scoreBreakdown,
     reasons,
     warnings: Array.from(new Set(warnings)),
@@ -924,7 +1130,7 @@ export function buildTeamContractSeasonTable(input: {
     }));
 
   const rows = [...rosterRows, ...previewRows];
-  const seasonCount = Math.max(1, ...rows.map((row) => row.yearlySalarySchedule.length));
+  const seasonCount = Math.max(5, ...rows.map((row) => row.yearlySalarySchedule.length));
   const seasonLabels = Array.from({ length: seasonCount }, (_, index) =>
     buildSeasonLabel(input.seasonLabelBase, index, input.gameState.season.id),
   );

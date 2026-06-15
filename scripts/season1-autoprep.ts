@@ -4,6 +4,7 @@ import path from "node:path";
 import { buildAiLegacyLineupPreview } from "@/lib/ai/ai-legacy-lineup-engine";
 import type { GameState, LineupDraft, LineupDraftModifiers, Player } from "@/lib/data/olyDataTypes";
 import { getTeamControlSettings } from "@/lib/foundation/team-control-settings";
+import { getTeamPlayerMax } from "@/lib/foundation/roster-limits";
 import { getTeamFacilityState, applyTrainingXpFacilityModifiers } from "@/lib/facilities/facility-effects";
 import {
   buildGeneratedFormCardRecordsForSeason,
@@ -41,7 +42,7 @@ type PreflightReport = {
   transferHistoryCount: number;
   duplicateRosterPlayers: Array<{ playerId: string; count: number }>;
   teamsUnderSeven: Array<{ teamId: string; roster: number }>;
-  teamsOverTwelve: Array<{ teamId: string; roster: number }>;
+  teamsOverMax: Array<{ teamId: string; roster: number; playerMax: number }>;
   negativeCashTeams: Array<{ teamId: string; cash: number }>;
   aiPurchaseCount: number;
 };
@@ -160,9 +161,12 @@ function buildPreflight(save: ReturnType<ReturnType<typeof createPersistenceServ
     teamsUnderSeven: gameState.teams
       .map((team) => ({ teamId: team.teamId, roster: rosterCounts.get(team.teamId) ?? 0 }))
       .filter((entry) => entry.roster < 7),
-    teamsOverTwelve: gameState.teams
-      .map((team) => ({ teamId: team.teamId, roster: rosterCounts.get(team.teamId) ?? 0 }))
-      .filter((entry) => entry.roster > 12),
+    teamsOverMax: gameState.teams
+      .map((team) => {
+        const identity = gameState.teamIdentities.find((entry) => entry.teamId === team.teamId);
+        return { teamId: team.teamId, roster: rosterCounts.get(team.teamId) ?? 0, playerMax: getTeamPlayerMax(team, identity) };
+      })
+      .filter((entry) => entry.roster > entry.playerMax),
     negativeCashTeams: gameState.teams
       .map((team) => ({ teamId: team.teamId, cash: team.cash }))
       .filter((entry) => entry.cash < 0),
@@ -173,7 +177,7 @@ function buildPreflight(save: ReturnType<ReturnType<typeof createPersistenceServ
   if (gameState.teams.length !== 32) report.blockers.push(`team_count_not_32:${gameState.teams.length}`);
   if (report.duplicateRosterPlayers.length > 0) report.blockers.push("duplicate_roster_players");
   if (report.teamsUnderSeven.length > 0) report.blockers.push("teams_under_7");
-  if (report.teamsOverTwelve.length > 0) report.blockers.push("teams_over_12");
+  if (report.teamsOverMax.length > 0) report.blockers.push("teams_over_playerMax");
   if (report.negativeCashTeams.length > 0) report.blockers.push("negative_cash");
   if (report.aiPurchaseCount === 0) report.warnings.push("ai_purchases_not_detected_in_transfer_history_source");
   report.ok = report.blockers.length === 0;
@@ -598,7 +602,7 @@ Status: **${readiness.ok ? "READY" : "BLOCKED"}**
 ## Preflight
 - Duplikate: ${readiness.preflight.duplicateRosterPlayers.length}
 - Teams unter 7: ${readiness.preflight.teamsUnderSeven.length}
-- Teams ueber 12: ${readiness.preflight.teamsOverTwelve.length}
+- Teams ueber Max: ${readiness.preflight.teamsOverMax.length}
 - Negatives Cash: ${readiness.preflight.negativeCashTeams.length}
 - Blocker: ${readiness.blockers.length > 0 ? readiness.blockers.join(" | ") : "keine"}
 

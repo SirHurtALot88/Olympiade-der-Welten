@@ -569,8 +569,10 @@ function applyStatSilhouette(
     });
   }
 
+  const getGeneratedAttributeValues = () =>
+    Object.values(attributes).filter((value): value is number => typeof value === "number" && Number.isFinite(value));
   const threshold = input.roleIntent === "allround" ? 12 : Math.max(roleProfile.spreadFloor, strength.spreadFloor);
-  let values = Object.values(attributes);
+  let values = getGeneratedAttributeValues();
   let spread = Math.max(...values) - Math.min(...values);
 
   while (spread < threshold) {
@@ -578,7 +580,7 @@ function applyStatSilhouette(
     const lowestWeak = weakAttributes[0] ?? roleProfile.weakAttributes[0] ?? "charisma";
     attributes[highestPeak] = clamp(attributes[highestPeak] + 3, 1, strength.max);
     attributes[lowestWeak] = clamp(attributes[lowestWeak] - 3, 1, strength.max);
-    values = Object.values(attributes);
+    values = getGeneratedAttributeValues();
     spread = Math.max(...values) - Math.min(...values);
   }
 
@@ -601,7 +603,7 @@ function applyStatSilhouette(
     attributes[weak] = clamp(attributes[weak] - 2, 1, strength.max);
   }
 
-  const recenter = () => average(Object.values(attributes));
+  const recenter = () => average(getGeneratedAttributeValues());
   const ensurePeaksAboveCenter = (targets: PlayerGeneratorAttributeName[], delta: number, count: number) => {
     let center = recenter();
     targets.slice(0, count).forEach((attribute) => {
@@ -633,7 +635,7 @@ function applyStatSilhouette(
     ensurePeaksAboveCenter(getRolePeakAttributes(input, roleProfile), 5, roleProfile.minPeakCount);
   }
 
-  values = Object.values(attributes);
+  values = getGeneratedAttributeValues();
   spread = Math.max(...values) - Math.min(...values);
   const minimumSpread =
     input.roleIntent === "allround"
@@ -648,7 +650,7 @@ function applyStatSilhouette(
     const lowestWeak = weakAttributes[0] ?? roleProfile.weakAttributes[0] ?? "charisma";
     attributes[highestPeak] = clamp(attributes[highestPeak] + 2, 1, strength.max);
     attributes[lowestWeak] = clamp(attributes[lowestWeak] - 2, 1, strength.max);
-    values = Object.values(attributes);
+    values = getGeneratedAttributeValues();
     spread = Math.max(...values) - Math.min(...values);
   }
 }
@@ -955,7 +957,9 @@ function pickTraits(
 }
 
 function sortAttributeEntries(attributes: PlayerGeneratorAttributes) {
-  return (Object.entries(attributes) as Array<[PlayerGeneratorAttributeName, number]>).sort((left, right) => right[1] - left[1]);
+  return (Object.entries(attributes) as Array<[keyof PlayerGeneratorAttributes, number | null | undefined]>)
+    .filter((entry): entry is [PlayerGeneratorAttributeName, number] => entry[0] !== "height" && typeof entry[1] === "number" && Number.isFinite(entry[1]))
+    .sort((left, right) => right[1] - left[1]);
 }
 
 function buildArchetypeValidation(
@@ -1014,7 +1018,7 @@ function buildRoleValidation(
   generated: PlayerGeneratorDraft["generated"],
   roleProfile: PlayerGeneratorRoleProfile,
 ) {
-  const entries = Object.values(generated.attributes);
+  const entries = Object.values(generated.attributes).filter((value): value is number => typeof value === "number" && Number.isFinite(value));
   const center = average(entries);
   const peaks = getRolePeakAttributes(input, roleProfile);
   const weaknesses = getRoleWeakAttributes(input, roleProfile);
@@ -1077,7 +1081,7 @@ function buildRoleValidation(
 }
 
 function countFlatAttributes(attributes: PlayerGeneratorAttributes, band: number) {
-  const values = Object.values(attributes);
+  const values = Object.values(attributes).filter((value): value is number => typeof value === "number" && Number.isFinite(value));
   const center = average(values);
   return values.filter((value) => Math.abs(value - center) <= band).length;
 }

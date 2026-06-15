@@ -7,6 +7,7 @@ import type { GameState, LineupDraft, PlayerDisciplinePerformanceRecord } from "
 import { loadLocalLegacyLineupContext, saveLocalLegacyLineupDraft } from "@/lib/lineups/legacy-lineup-local-service";
 import type { LegacyLineupEntryInput, LegacyLineupKeyParams } from "@/lib/lineups/legacy-lineup-types";
 import { createPersistenceService } from "@/lib/persistence/persistence-service";
+import { getTeamPlayerMax } from "@/lib/foundation/roster-limits";
 import { APPLY_CONFIRM_TOKEN, LegacyMatchdayResultApplyService } from "@/lib/resolve/legacy-matchday-result-apply-service";
 import { buildLegacyMatchdayResolvePreview } from "@/lib/resolve/legacy-matchday-resolve-engine";
 import { ADVANCE_MATCHDAY_CONFIRM_TOKEN, executeMatchdayAdvance } from "@/lib/season/matchday-progress-service";
@@ -239,7 +240,7 @@ function buildPreflight(gameState: GameState) {
     .filter((team) => (rosterByTeam.get(team.teamId) ?? 0) < 7)
     .map((team) => team.teamId);
   const oversizedTeams = gameState.teams
-    .filter((team) => (rosterByTeam.get(team.teamId) ?? 0) > 12)
+    .filter((team) => (rosterByTeam.get(team.teamId) ?? 0) > getTeamPlayerMax(team, gameState.teamIdentities.find((identity) => identity.teamId === team.teamId)))
     .map((team) => team.teamId);
   const negativeCashTeams = gameState.teams.filter((team) => team.cash < 0).map((team) => team.teamId);
   const seasonLineups = gameState.seasonState.lineupDrafts?.filter((draft) => draft.seasonId === gameState.season.id) ?? [];
@@ -270,7 +271,7 @@ function assertPreflightReady(preflight: ReturnType<typeof buildPreflight>) {
   if (preflight.matchdayCount !== EXPECTED_MATCHDAY_COUNT) blockers.push(`matchday_count:${preflight.matchdayCount}`);
   if (preflight.teamCount !== EXPECTED_TEAM_COUNT) blockers.push(`team_count:${preflight.teamCount}`);
   if (preflight.shortTeams.length > 0) blockers.push(`teams_under_7:${preflight.shortTeams.join("|")}`);
-  if (preflight.oversizedTeams.length > 0) blockers.push(`teams_over_12:${preflight.oversizedTeams.join("|")}`);
+  if (preflight.oversizedTeams.length > 0) blockers.push(`teams_over_playerMax:${preflight.oversizedTeams.join("|")}`);
   if (preflight.duplicateRosterPlayerCount > 0) blockers.push(`duplicate_rosters:${preflight.duplicateRosterPlayerCount}`);
   if (preflight.negativeCashTeams.length > 0) blockers.push(`negative_cash:${preflight.negativeCashTeams.join("|")}`);
   if (preflight.lineupDraftCount < expectedLineupCount) blockers.push(`lineups_missing:${preflight.lineupDraftCount}/${expectedLineupCount}`);
@@ -287,7 +288,7 @@ function assertFinalStateReady(preflight: ReturnType<typeof buildPreflight>) {
   if (preflight.matchdayCount !== EXPECTED_MATCHDAY_COUNT) blockers.push(`matchday_count:${preflight.matchdayCount}`);
   if (preflight.teamCount !== EXPECTED_TEAM_COUNT) blockers.push(`team_count:${preflight.teamCount}`);
   if (preflight.shortTeams.length > 0) blockers.push(`teams_under_7:${preflight.shortTeams.join("|")}`);
-  if (preflight.oversizedTeams.length > 0) blockers.push(`teams_over_12:${preflight.oversizedTeams.join("|")}`);
+  if (preflight.oversizedTeams.length > 0) blockers.push(`teams_over_playerMax:${preflight.oversizedTeams.join("|")}`);
   if (preflight.duplicateRosterPlayerCount > 0) blockers.push(`duplicate_rosters:${preflight.duplicateRosterPlayerCount}`);
   if (preflight.negativeCashTeams.length > 0) blockers.push(`negative_cash:${preflight.negativeCashTeams.join("|")}`);
   if (preflight.lineupDraftCount < EXPECTED_TEAM_COUNT * EXPECTED_MATCHDAY_COUNT) blockers.push(`lineups_missing:${preflight.lineupDraftCount}`);

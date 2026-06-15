@@ -4,7 +4,7 @@ import { randomUUID } from "node:crypto";
 import { buildActivePlayerId } from "@/lib/db/seed/mappers";
 import { db } from "@/src/server/db";
 import type { ContractShape, ContractYearSalary } from "@/lib/data/olyDataTypes";
-import type { NegotiationScoreBreakdownEntry } from "@/lib/market/contract-negotiation-preview";
+import type { NegotiationScoreBreakdownEntry, PlayerContractPreference } from "@/lib/market/contract-negotiation-preview";
 
 type PrismaLike = Pick<
   PrismaClient,
@@ -69,6 +69,7 @@ export type TransfermarktBuyPreview = {
   acceptChance?: number | null;
   counterChance?: number | null;
   rejectChance?: number | null;
+  contractPreference?: PlayerContractPreference | null;
   negotiationScoreBreakdown?: NegotiationScoreBreakdownEntry[];
   negotiationReasons?: string[];
   negotiationWarnings?: string[];

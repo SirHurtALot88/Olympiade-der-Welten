@@ -136,6 +136,107 @@ describe("chunked redraft topup service", () => {
     expect(duplicatePlayerIds(finalSave!)).toEqual([]);
     expect(fs.existsSync(path.join(outputDir, "chunked-redraft-summary.json"))).toBe(true);
     expect(fs.existsSync(path.join(outputDir, "topup-memory-audit.md"))).toBe(true);
+    expect(fs.existsSync(path.join(outputDir, "redraft-progress-log.csv"))).toBe(true);
+    expect(fs.existsSync(path.join(outputDir, "redraft-candidate-counters.csv"))).toBe(true);
+    expect(fs.existsSync(path.join(outputDir, "redraft-first-pick-debug.md"))).toBe(true);
+  });
+
+  it("writes progress logs and candidate counters during a dry first-pick proof", () => {
+    const save = createSmallEmptySeasonOneSave();
+    const persistence = createInMemoryPersistence(save);
+    const outputDir = fs.mkdtempSync(path.join(os.tmpdir(), "chunked-first-pick-proof-"));
+
+    const result = runChunkedRedraftTopup({
+      persistence,
+      saveId: save.saveId,
+      seasonId: "season-1",
+      dryRun: true,
+      mode: "full_clean_redraft",
+      target: "playerMin",
+      roundLimit: 1,
+      maxTeams: 1,
+      outputDir,
+    });
+
+    const progressLog = fs.readFileSync(path.join(outputDir, "redraft-progress-log.csv"), "utf8");
+    const counters = JSON.parse(`[${fs.readFileSync(path.join(outputDir, "redraft-candidate-counters.csv"), "utf8").trim().split("\n").slice(1).join("\n")}]`);
+    expect(result.picks.length).toBeGreaterThan(0);
+    expect(progressLog).toContain("runner_start");
+    expect(progressLog).toContain("candidate_stage0_start");
+    expect(progressLog).toContain("pick_selected");
+    expect(fs.existsSync(path.join(outputDir, "redraft-first-team-trace.json"))).toBe(true);
+    expect(counters.length).toBeGreaterThan(0);
+  });
+
+  it("aborts with a blocker report when the watchdog threshold is exceeded", () => {
+    const save = createSmallEmptySeasonOneSave();
+    const persistence = createInMemoryPersistence(save);
+    const outputDir = fs.mkdtempSync(path.join(os.tmpdir(), "chunked-watchdog-test-"));
+
+    expect(() =>
+      runChunkedRedraftTopup({
+        persistence,
+        saveId: save.saveId,
+        seasonId: "season-1",
+        dryRun: true,
+        mode: "full_clean_redraft",
+        target: "playerMin",
+        roundLimit: 1,
+        maxTeams: 1,
+        watchdogMs: 0,
+        outputDir,
+      }),
+    ).toThrow("phase_watchdog_timeout");
+    expect(fs.existsSync(path.join(outputDir, "redraft-first-pick-blocker.md"))).toBe(true);
+  });
+
+  it("runs one round with at least one and at most one pick per team", () => {
+    const save = createSmallEmptySeasonOneSave();
+    const persistence = createInMemoryPersistence(save);
+    const outputDir = fs.mkdtempSync(path.join(os.tmpdir(), "chunked-one-round-proof-"));
+
+    const result = runChunkedRedraftTopup({
+      persistence,
+      saveId: save.saveId,
+      seasonId: "season-1",
+      dryRun: false,
+      confirmToken: CHUNKED_REDRAFT_TOPUP_CONFIRM_TOKEN,
+      mode: "season1_initial_topup",
+      target: "playerOpt",
+      roundLimit: 1,
+      outputDir,
+    });
+
+    expect(result.picks.length).toBeGreaterThan(0);
+    expect(result.picks.length).toBeLessThanOrEqual(save.gameState.teams.length);
+    expect(result.summary.duplicatePlayers).toEqual([]);
+  });
+
+  it("keeps theme scoring bounded for a single-team first-pick proof", () => {
+    const save = createSmallEmptySeasonOneSave();
+    const persistence = createInMemoryPersistence(save);
+    const outputDir = fs.mkdtempSync(path.join(os.tmpdir(), "chunked-theme-counter-test-"));
+
+    runChunkedRedraftTopup({
+      persistence,
+      saveId: save.saveId,
+      seasonId: "season-1",
+      dryRun: true,
+      mode: "full_clean_redraft",
+      target: "playerMin",
+      roundLimit: 1,
+      maxTeams: 1,
+      outputDir,
+    });
+
+    const countersCsv = fs.readFileSync(path.join(outputDir, "redraft-candidate-counters.csv"), "utf8");
+    const [headerLine, valueLine] = countersCsv.trim().split("\n");
+    const headers = headerLine.split(",");
+    const values = valueLine.split(",");
+    const row = Object.fromEntries(headers.map((header, index) => [header, Number(values[index])]));
+    expect(row.themeScoreCalls).toBeGreaterThan(0);
+    expect(row.themeScoreCalls).toBeLessThanOrEqual(row.freeAgentsStart);
+    expect(row.buyPreviewCalls).toBeLessThanOrEqual(24);
   });
 
   it("resumes from a completed round without duplicating previous picks", () => {
@@ -235,6 +336,7 @@ describe("chunked redraft topup service", () => {
       mode: "full_clean_redraft",
       target: "playerOpt",
       roundLimit: 1,
+      maxTeams: 1,
       outputDir,
     });
 

@@ -2,6 +2,7 @@ import fs from "node:fs";
 import path from "node:path";
 
 import { createSaveRepository } from "@/lib/persistence/save-repository";
+import { getTeamPlayerMax } from "@/lib/foundation/roster-limits";
 
 type ExecutePick = {
   step: number;
@@ -169,8 +170,10 @@ function main() {
 
   const teamRows = execute.teams.map((team) => {
     const currentTeam = teamMap.get(team.teamId);
+    const currentIdentity = save.gameState.teamIdentities.find((identity) => identity.teamId === team.teamId);
     const liveRoster = rosterByTeam.get(team.teamId) ?? [];
     const liveTransfers = team.transferHistoryIds ?? [];
+    const playerMax = getTeamPlayerMax(currentTeam, currentIdentity);
     return {
       teamId: team.teamId,
       teamCode: team.teamCode,
@@ -186,6 +189,7 @@ function main() {
       targetRosterMin: team.targetRosterMin ?? "",
       targetRosterOpt: team.targetRosterOpt ?? "",
       targetRosterSize: team.targetRosterSize ?? "",
+      playerMax,
       transferCount: liveTransfers.length,
       warnings: (team.warnings ?? []).join(" | "),
       blockingReasons: (team.blockingReasons ?? []).join(" | "),
@@ -288,7 +292,7 @@ function main() {
     qualityGate: execute.qualityGate ?? null,
     integrity: {
       teamsUnder7: teamRows.filter((team) => Number(team.rosterInSave) < 7).map((team) => team.teamId),
-      teamsOver12: teamRows.filter((team) => Number(team.rosterInSave) > 12).map((team) => team.teamId),
+      teamsOverMax: teamRows.filter((team) => Number(team.rosterInSave) > Number(team.playerMax)).map((team) => team.teamId),
       cashNeverNegative: minCash >= 0,
       minCash,
       maxCash,
@@ -323,7 +327,7 @@ function main() {
     "## Integrity",
     "",
     `- Teams under 7: ${teamRows.filter((team) => Number(team.rosterInSave) < 7).length}`,
-    `- Teams over 12: ${teamRows.filter((team) => Number(team.rosterInSave) > 12).length}`,
+    `- Teams over Max: ${teamRows.filter((team) => Number(team.rosterInSave) > Number(team.playerMax)).length}`,
     `- Cash below zero: ${minCash < 0 ? "yes" : "no"}`,
     `- All bought players removed from free-agent pool: ${pickRows.every((row) => !freeAgents.some((player) => player.id === row.playerId)) ? "yes" : "no"}`,
     `- Transfers saved: ${save.gameState.transferHistory.length}`,

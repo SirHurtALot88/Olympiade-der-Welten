@@ -1,4 +1,3 @@
-import { getImportedPlayerDisplayMarketValue, getImportedPlayerDisplaySalary } from "@/lib/data/player-economy-display";
 import type { Player, PlayerGeneratorAttributes, RosterEntry } from "@/lib/data/olyDataTypes";
 import { loadPlayerFormulaSources } from "@/lib/player-formulas/formula-source-loader";
 import {
@@ -26,6 +25,7 @@ type EconomyRosterEntry = {
 };
 
 export type PlayerEconomyMarketValueSource =
+  | "calculated_stored"
   | "imported_display"
   | "imported_raw"
   | "calculated_preview"
@@ -34,6 +34,7 @@ export type PlayerEconomyMarketValueSource =
   | "missing_source";
 
 export type PlayerEconomySalarySource =
+  | "calculated_stored"
   | "imported_display"
   | "imported_raw"
   | "calculated_preview"
@@ -41,6 +42,8 @@ export type PlayerEconomySalarySource =
   | "missing_source";
 
 export type PlayerEconomyPurchasePriceSource =
+  | "calculated_stored"
+  | "calculated_preview"
   | "imported_display"
   | "imported_raw"
   | "active_purchase_price"
@@ -50,6 +53,7 @@ export type PlayerEconomyPurchasePriceSource =
 export type PlayerEconomyContractLengthSource = "active_contract" | "missing_source";
 
 export type PlayerEconomyStatus =
+  | "calculated_ready"
   | "imported_ready"
   | "missing_market_value"
   | "missing_salary"
@@ -83,6 +87,18 @@ type ImportedPurchasePriceSource = Extract<PlayerEconomyPurchasePriceSource, "im
 
 function toFiniteNumber(value: number | null | undefined) {
   return typeof value === "number" && Number.isFinite(value) ? value : null;
+}
+
+function normalizeStoredEconomyValue(value: number | null | undefined) {
+  const numericValue = toFiniteNumber(value);
+  if (numericValue == null) {
+    return null;
+  }
+  if (numericValue > 1000) {
+    return null;
+  }
+
+  return numericValue;
 }
 
 function resolveImportedMarketValueSource(player?: EconomyPlayer | null): ImportedMarketValueSource {
@@ -151,23 +167,25 @@ export function resolvePlayerEconomyContract(input: {
   const rosterEntry = input.rosterEntry ?? null;
   const playerId = input.playerId ?? player?.id ?? null;
 
-  const importedMarketValue = player ? getImportedPlayerDisplayMarketValue(player) : null;
-  const importedSalary = player ? getImportedPlayerDisplaySalary(player) : null;
+  const storedCalculatedMarketValue = normalizeStoredEconomyValue(player?.marketValue);
+  const storedCalculatedSalary = normalizeStoredEconomyValue(player?.salaryDemand);
+  const legacyDisplayMarketValue = toFiniteNumber(player?.displayMarketValue);
+  const legacyDisplaySalary = toFiniteNumber(player?.displaySalary);
   const rosterPurchasePrice = toFiniteNumber(rosterEntry?.purchasePrice);
   const rosterSalary = toFiniteNumber(rosterEntry?.salary);
   const contractLength = toFiniteNumber(rosterEntry?.contractLength);
   const playerEntity = player as Player | null;
   const formulaSources = loadPlayerFormulaSources();
   const generatorAttributes = toGeneratorAttributes(playerEntity);
-  const salaryMarketValue =
+  const salaryMarketValueFromStoredSalary =
     input.salaryMarketValueOverride != null
       ? input.salaryMarketValueOverride
-      : importedSalary != null &&
+      : storedCalculatedSalary != null &&
     generatorAttributes &&
     formulaSources.attributeSalaryModifiers &&
     formulaSources.traitSalaryFactors
       ? deriveSalaryMarketValueFromFinalSalary({
-          finalSalary: importedSalary,
+          finalSalary: storedCalculatedSalary,
           attributes: generatorAttributes,
           traitsPositive: playerEntity?.traitsPositive ?? [],
           traitsNegative: playerEntity?.traitsNegative ?? [],
@@ -175,17 +193,34 @@ export function resolvePlayerEconomyContract(input: {
           attributeSalaryModifiers: formulaSources.attributeSalaryModifiers,
         })
       : null;
-  const visibleFinalMarketValue = importedMarketValue ?? null;
+  const salaryMarketValueFromLegacySalary =
+    salaryMarketValueFromStoredSalary == null &&
+    legacyDisplaySalary != null &&
+    generatorAttributes &&
+    formulaSources.attributeSalaryModifiers &&
+    formulaSources.traitSalaryFactors
+      ? deriveSalaryMarketValueFromFinalSalary({
+          finalSalary: legacyDisplaySalary,
+          attributes: generatorAttributes,
+          traitsPositive: playerEntity?.traitsPositive ?? [],
+          traitsNegative: playerEntity?.traitsNegative ?? [],
+          traitSalaryFactors: formulaSources.traitSalaryFactors,
+          attributeSalaryModifiers: formulaSources.attributeSalaryModifiers,
+        })
+      : null;
+  const visibleFinalMarketValue = storedCalculatedMarketValue ?? legacyDisplayMarketValue ?? null;
   const baseMarketValue =
     input.baseMarketValueOverride ??
-    salaryMarketValue ??
     (visibleFinalMarketValue != null
       ? deriveBaseMarketValueFromFinal({
           finalMarketValue: visibleFinalMarketValue,
           coreStats: playerEntity?.coreStats,
           disciplineRatings: playerEntity?.disciplineRatings,
         })
-      : null);
+      : null) ??
+    salaryMarketValueFromStoredSalary ??
+    salaryMarketValueFromLegacySalary;
+  const salaryMarketValue = salaryMarketValueFromStoredSalary ?? salaryMarketValueFromLegacySalary ?? baseMarketValue;
   const marketValueBonuses =
     baseMarketValue != null
       ? calculateMarketValueBonuses({
@@ -218,43 +253,55 @@ export function resolvePlayerEconomyContract(input: {
       : null;
 
   const marketValue =
-    importedMarketValue ??
     calculatedFinalMarketValue ??
+    storedCalculatedMarketValue ??
+    legacyDisplayMarketValue ??
     rosterPurchasePrice ??
     null;
   const marketValueSource =
-    importedMarketValue != null
-      ? resolveImportedMarketValueSource(player)
-      : calculatedFinalMarketValue != null
+    calculatedFinalMarketValue != null
         ? "calculated_preview"
-      : rosterPurchasePrice != null
-        ? "active_purchase_price"
-        : "missing_source";
+        : storedCalculatedMarketValue != null
+          ? "calculated_stored"
+          : legacyDisplayMarketValue != null
+            ? resolveImportedMarketValueSource(player)
+            : rosterPurchasePrice != null
+              ? "active_purchase_price"
+              : "missing_source";
 
   const salary =
     rosterSalary ??
-    importedSalary ??
     salaryBreakdown?.finalSalary ??
+    storedCalculatedSalary ??
+    legacyDisplaySalary ??
     null;
   const salarySource =
     rosterSalary != null
         ? "active_contract"
-        : importedSalary != null
-          ? resolveImportedSalarySource(player)
-          : salaryBreakdown?.finalSalary != null
+        : salaryBreakdown?.finalSalary != null
             ? "calculated_preview"
-            : "missing_source";
+            : storedCalculatedSalary != null
+              ? "calculated_stored"
+              : legacyDisplaySalary != null
+                ? resolveImportedSalarySource(player)
+                : "missing_source";
 
   const purchasePrice =
-    visibleFinalMarketValue ??
+    calculatedFinalMarketValue ??
+    storedCalculatedMarketValue ??
     rosterPurchasePrice ??
+    legacyDisplayMarketValue ??
     null;
   const purchasePriceSource =
-    visibleFinalMarketValue != null
-      ? resolveImportedMarketValueSource(player)
-      : rosterPurchasePrice != null
+    calculatedFinalMarketValue != null
+      ? "calculated_preview"
+      : storedCalculatedMarketValue != null
+        ? "calculated_stored"
+        : rosterPurchasePrice != null
         ? "active_purchase_price"
-        : "missing_source";
+        : legacyDisplayMarketValue != null
+          ? resolveImportedMarketValueSource(player)
+          : "missing_source";
 
   const contractLengthSource = contractLength != null ? "active_contract" : "missing_source";
   const isImportedEconomy =
@@ -265,10 +312,10 @@ export function resolvePlayerEconomyContract(input: {
     purchasePriceSource === "imported_display" ||
     purchasePriceSource === "imported_raw";
 
-  let economyStatus: PlayerEconomyStatus = "imported_ready";
+  let economyStatus: PlayerEconomyStatus = isImportedEconomy ? "imported_ready" : "calculated_ready";
   if (marketValue == null) {
     economyStatus = isGeneratorDraftPlayer(playerId, player) ? "generator_missing_engine" : "missing_market_value";
-  } else if ((importedSalary ?? rosterSalary ?? salaryBreakdown?.finalSalary) == null) {
+  } else if ((storedCalculatedSalary ?? rosterSalary ?? salaryBreakdown?.finalSalary ?? legacyDisplaySalary) == null) {
     economyStatus = isGeneratorDraftPlayer(playerId, player) ? "generator_missing_engine" : "missing_salary";
   } else if (!player && !rosterEntry) {
     economyStatus = "manual_draft_required";
@@ -288,7 +335,7 @@ export function resolvePlayerEconomyContract(input: {
     salaryMarketValue: salaryMarketValue != null ? roundTo2(salaryMarketValue) : null,
     allrounderBonus: marketValueBonuses?.allrounderBonus ?? null,
     specialistBonus: marketValueBonuses?.specialistBonus ?? null,
-    expectedSalary: salaryBreakdown?.finalSalary ?? importedSalary ?? null,
+    expectedSalary: salaryBreakdown?.finalSalary ?? storedCalculatedSalary ?? legacyDisplaySalary ?? null,
     salaryBase: salaryBreakdown?.basisSalary ?? null,
     traitPercentSum: salaryBreakdown?.traitPercentSum ?? null,
     isImportedEconomy,

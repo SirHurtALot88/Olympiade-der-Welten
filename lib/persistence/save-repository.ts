@@ -22,6 +22,7 @@ import type {
 import { createGameStateFromSeed, loadSeedData } from "@/lib/data/dataAdapter";
 import { hydrateGameStateMedia } from "@/lib/data/mediaAssets";
 import { getDatabase } from "@/lib/persistence/sqlite";
+import { getTeamPlayerMax } from "@/lib/foundation/roster-limits";
 import { buildScenarioMeta, withScenarioMeta } from "@/lib/persistence/scenario-meta";
 import { ensurePlayerBaselines, guardPlayerBaselineWrite } from "@/lib/players/player-baseline-service";
 import { withNormalizedSeasonDisciplineSchedule } from "@/lib/season/season-discipline-schedule";
@@ -83,8 +84,7 @@ function normalizeLegacyRosterTargets(gameState: GameState): GameState {
     const identity = identityByTeamId.get(team.teamId);
     const playerMin = Number.isFinite(identity?.playerMin) ? Math.round(identity!.playerMin) : null;
     const playerOpt = Number.isFinite(identity?.playerOpt) ? Math.round(identity!.playerOpt) : null;
-    const targetLimit = Math.max(team.rosterLimit, playerOpt ?? team.rosterLimit, playerMin ?? team.rosterLimit);
-    const rosterLimit = Math.min(Math.max(targetLimit, 7), 12);
+    const rosterLimit = getTeamPlayerMax(team, identity);
     const rosterMinTarget = team.rosterMinTarget ?? playerMin;
     const rosterOptTarget = team.rosterOptTarget ?? playerOpt;
     if (

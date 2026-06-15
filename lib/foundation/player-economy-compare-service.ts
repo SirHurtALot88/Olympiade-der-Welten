@@ -510,8 +510,11 @@ export function buildPlayerEconomyCompareReport(input: {
             ? "market_value_missing_source"
             : "salary_missing_source";
 
-    const averageAttributes = generatorAttributes
-      ? average(Object.values(generatorAttributes))
+    const averageAttributeValues = generatorAttributes
+      ? Object.values(generatorAttributes).filter((value): value is number => typeof value === "number" && Number.isFinite(value))
+      : [];
+    const averageAttributes = averageAttributeValues.length > 0
+      ? average(averageAttributeValues)
       : null;
     const salaryModifier =
       salaryBreakdown != null

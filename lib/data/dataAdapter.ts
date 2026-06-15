@@ -4,6 +4,7 @@ import teamsSource from "@/data/source/teams.json";
 import { attachTeamLogoPath, getMediaMappingSummary, hydrateGameStateMedia } from "@/lib/data/mediaAssets";
 import { loadImportedPlayerStats } from "@/lib/data/playerStatsAdapter";
 import { buildTeamControlSettingsMap } from "@/lib/foundation/team-control-settings";
+import { getTeamPlayerMax } from "@/lib/foundation/roster-limits";
 import { buildTeamStrategyProfileMap } from "@/lib/foundation/team-strategy-profiles";
 import { createPlayerBaselinesForPlayers } from "@/lib/players/player-baseline-service";
 import { loadSeasonManagementReferenceRows, mapSeasonManagementRowsToTeams } from "@/lib/foundation/season-management-sheet";
@@ -446,12 +447,12 @@ export function loadSeedData(): OlySeedData {
 
 export function loadFreshSeasonOneSeedData(): OlySeedData {
   const seed = loadSeedData();
-  const teamOptById = new Map(seed.teamIdentities.map((identity) => [identity.teamId, Math.round(identity.playerOpt)]));
+  const identityByTeamId = new Map(seed.teamIdentities.map((identity) => [identity.teamId, identity]));
   return {
     ...seed,
     teams: seed.teams.map((team) => ({
       ...team,
-      rosterLimit: Math.max(team.rosterLimit, Math.min(teamOptById.get(team.teamId) ?? team.rosterLimit, 12)),
+      rosterLimit: getTeamPlayerMax(team, identityByTeamId.get(team.teamId)),
     })),
     rosters: [],
     contracts: [],

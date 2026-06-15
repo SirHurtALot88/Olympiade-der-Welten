@@ -4,11 +4,15 @@ import path from "node:path";
 import type { GameState, Player, RosterEntry, TeamIdentity, TeamStrategyProfile } from "@/lib/data/olyDataTypes";
 import { getImportedPlayerDisplayMarketValue, getImportedPlayerDisplaySalary } from "@/lib/data/player-economy-display";
 import { buildPlayerRatingContractMap } from "@/lib/foundation/player-rating-contract";
+import { deriveRosterTargets } from "@/lib/foundation/roster-limits";
+import { buildTeamStrategyScores } from "@/lib/foundation/team-strategy-score-service";
 import { buildTeamStrategyProfileMap } from "@/lib/foundation/team-strategy-profiles";
 import {
   buildTeamThemeCompositionAudit,
   calculateThemeCompositionScore,
+  derivePlayerThemeTags,
   getTeamThemeCompositionTarget,
+  type TeamThemeCompositionTarget,
   type TeamThemeCompositionScore,
 } from "@/lib/ai/team-theme-composition-service";
 import {
@@ -16,6 +20,7 @@ import {
   executeLocalTransfermarktBuy,
   flushLocalTransfermarktRunContext,
 } from "@/lib/market/transfermarkt-local-service";
+import { recommendContractOfferForPlayer } from "@/lib/market/contract-negotiation-preview";
 import { createPersistenceService } from "@/lib/persistence/persistence-service";
 import type { PersistedSaveGame, PersistenceService } from "@/lib/persistence/types";
 
@@ -135,6 +140,9 @@ export type ChunkedRedraftTopupParams = {
   target?: ChunkedRedraftTarget;
   roundLimit?: number;
   teamTimeLimitMs?: number;
+  maxTeams?: number;
+  watchdogMs?: number;
+  reportMode?: "full" | "light";
   outputDir?: string;
   persistence?: PersistenceService;
 };
@@ -215,6 +223,45 @@ type PhaseRow = {
   note?: string | null;
 };
 
+type ProgressLogRow = {
+  timestamp: string;
+  elapsedMs: number;
+  phase: string;
+  round?: number | null;
+  teamId?: string | null;
+  rosterCount?: number | null;
+  freeAgentCount?: number | null;
+  candidateCount?: number | null;
+  shortlistCount?: number | null;
+  previewCount?: number | null;
+  memoryMb: number;
+  warning?: string | null;
+  blocker?: string | null;
+};
+
+type RedraftCandidateCounters = {
+  teamsTotal: number;
+  freeAgentsStart: number;
+  activeRostersStart: number;
+  candidateScans: number;
+  themeScoreCalls: number;
+  marketValueLookups: number;
+  salaryLookups: number;
+  buyPreviewCalls: number;
+  negotiationPreviewCalls: number;
+  fullPreviewCalls: number;
+  rejectedByAlreadyPicked: number;
+  rejectedByCash: number;
+  rejectedByRosterMax: number;
+  rejectedByThemeHardAvoid: number;
+  rejectedByHardNoGo: number;
+  rejectedBySalary: number;
+  selectedCandidates: number;
+  successfulBuys: number;
+  failedBuys: number;
+  saveFlushes: number;
+};
+
 type PhasePlan = {
   phase: ChunkedRedraftPhase;
   targetRoster: number;
@@ -281,6 +328,15 @@ type UnderOptPolicy = "never" | "only_if_readiness_high" | "eco_allowed" | "mark
 type ProspectPolicy = "avoid" | "limited" | "normal" | "high";
 type SalaryDiscipline = "loose" | "normal" | "strict";
 type StrictnessLevel = "low" | "medium" | "high";
+type DraftDoctrine =
+  | "all_in_star_push"
+  | "star_core"
+  | "theme_specialist"
+  | "salary_value"
+  | "pure_value"
+  | "rebuild_value"
+  | "depth_rotation"
+  | "balanced";
 type SeasonStrategy =
   | "win_now_push"
   | "balanced_growth"
@@ -294,6 +350,7 @@ type SeasonStrategy =
   | "salary_control";
 type MarketBoardTier = "S Target" | "A Strong Fit" | "B Solid Fit" | "C Depth/Emergency" | "Avoid";
 type StopSeverity = "green" | "yellow" | "red";
+type DraftPickRole = "star" | "core" | "starter" | "value" | "prospect" | "depth" | "theme";
 
 type TeamManagerProfile = {
   teamId: string;
@@ -308,6 +365,7 @@ type TeamManagerProfile = {
   salaryDiscipline: SalaryDiscipline;
   identityStrictness: StrictnessLevel;
   themeStrictness: StrictnessLevel;
+  draftDoctrine: DraftDoctrine;
   reason: string;
 };
 
@@ -429,6 +487,24 @@ type ManagerMarketBoardRow = {
   reason: string;
 };
 
+type DraftRoleBoardRow = {
+  round: number;
+  teamId: string;
+  teamName: string;
+  desiredRole: DraftPickRole;
+  rank: number;
+  playerId: string;
+  playerName: string;
+  roleScore: number;
+  baseScore: number;
+  quality: number;
+  marketValue: number;
+  salary: number | null;
+  themeTier: string;
+  themeCompositionScore: number;
+  reason: string;
+};
+
 type ManagerStopReasonRow = {
   teamId: string;
   teamName: string;
@@ -486,6 +562,113 @@ function memorySnapshot() {
   };
 }
 
+function createRedraftCounters(): RedraftCandidateCounters {
+  return {
+    teamsTotal: 0,
+    freeAgentsStart: 0,
+    activeRostersStart: 0,
+    candidateScans: 0,
+    themeScoreCalls: 0,
+    marketValueLookups: 0,
+    salaryLookups: 0,
+    buyPreviewCalls: 0,
+    negotiationPreviewCalls: 0,
+    fullPreviewCalls: 0,
+    rejectedByAlreadyPicked: 0,
+    rejectedByCash: 0,
+    rejectedByRosterMax: 0,
+    rejectedByThemeHardAvoid: 0,
+    rejectedByHardNoGo: 0,
+    rejectedBySalary: 0,
+    selectedCandidates: 0,
+    successfulBuys: 0,
+    failedBuys: 0,
+    saveFlushes: 0,
+  };
+}
+
+class RedraftWatchdogError extends Error {
+  constructor(
+    message: string,
+    readonly row: ProgressLogRow,
+  ) {
+    super(message);
+    this.name = "RedraftWatchdogError";
+  }
+}
+
+class RedraftProfiler {
+  readonly rows: ProgressLogRow[] = [];
+  private readonly runStartedAt = Date.now();
+
+  constructor(
+    private readonly outputDir: string,
+    private readonly watchdogMs = 30_000,
+  ) {}
+
+  log(phase: string, details: Partial<Omit<ProgressLogRow, "timestamp" | "elapsedMs" | "phase" | "memoryMb">> = {}) {
+    const row: ProgressLogRow = {
+      timestamp: new Date().toISOString(),
+      elapsedMs: Date.now() - this.runStartedAt,
+      phase,
+      round: details.round ?? null,
+      teamId: details.teamId ?? null,
+      rosterCount: details.rosterCount ?? null,
+      freeAgentCount: details.freeAgentCount ?? null,
+      candidateCount: details.candidateCount ?? null,
+      shortlistCount: details.shortlistCount ?? null,
+      previewCount: details.previewCount ?? null,
+      memoryMb: memorySnapshot().heapUsedMb,
+      warning: details.warning ?? null,
+      blocker: details.blocker ?? null,
+    };
+    this.rows.push(row);
+    return row;
+  }
+
+  start(phase: string, details: Partial<Omit<ProgressLogRow, "timestamp" | "elapsedMs" | "phase" | "memoryMb">> = {}) {
+    this.log(`${phase}_start`, details);
+    return Date.now();
+  }
+
+  end(
+    phase: string,
+    startedAt: number,
+    details: Partial<Omit<ProgressLogRow, "timestamp" | "elapsedMs" | "phase" | "memoryMb">> = {},
+  ) {
+    const durationMs = Date.now() - startedAt;
+    const row = this.log(`${phase}_end`, details);
+    if (this.watchdogMs <= 0 || durationMs > this.watchdogMs) {
+      const blocker = `phase_watchdog_timeout:${phase}:${durationMs}ms`;
+      row.blocker = blocker;
+      this.writeBlocker(blocker, row);
+      throw new RedraftWatchdogError(blocker, row);
+    }
+    return durationMs;
+  }
+
+  writeBlocker(blocker: string, row: ProgressLogRow) {
+    writeMarkdown(
+      this.outputDir,
+      "redraft-first-pick-blocker.md",
+      [
+        "# Redraft First-Pick Blocker",
+        "",
+        `- Blocker: ${blocker}`,
+        `- Phase: ${row.phase}`,
+        `- Elapsed: ${row.elapsedMs}ms`,
+        `- Round: ${row.round ?? ""}`,
+        `- Team: ${row.teamId ?? ""}`,
+        `- RosterCount: ${row.rosterCount ?? ""}`,
+        `- FreeAgents: ${row.freeAgentCount ?? ""}`,
+        `- Candidates: ${row.candidateCount ?? ""}`,
+        `- Shortlist: ${row.shortlistCount ?? ""}`,
+        `- Memory: ${row.memoryMb} MB`,
+      ].join("\n"),
+    );
+  }
+}
+
 function groupRostersByTeam(rosters: RosterEntry[]) {
   const map = new Map<string, RosterEntry[]>();
   for (const roster of rosters) {
@@ -509,26 +692,30 @@ function getPlayerAxisValue(player: Player, axis: "pow" | "spe" | "men" | "soc")
 function getTeamTarget(gameState: GameState, teamId: string, target: ChunkedRedraftTarget) {
   const team = gameState.teams.find((entry) => entry.teamId === teamId);
   const identity = gameState.teamIdentities.find((entry) => entry.teamId === teamId);
-  const playerMin = Number.isFinite(identity?.playerMin) ? Math.max(0, Math.round(identity?.playerMin ?? 7)) : 7;
-  const playerOpt = Number.isFinite(identity?.playerOpt) ? Math.max(playerMin, Math.round(identity?.playerOpt ?? playerMin)) : playerMin;
-  const playerMax = Number.isFinite(team?.rosterLimit) ? Math.max(playerMin, Math.round(team?.rosterLimit ?? 12)) : 12;
+  const { playerMin, playerOpt, playerMax } = deriveRosterTargets(team, identity);
   const requested = target === "playerMax" ? playerMax : target === "playerOpt" ? playerOpt : playerMin;
   return {
     playerMin,
     playerOpt,
     playerMax,
-    targetRoster: Math.min(requested, playerMax, 12),
+    targetRoster: Math.min(requested, playerMax),
   };
 }
 
-function buildCandidatePool(gameState: GameState, pickedPlayerIds: Set<string>) {
+function buildCandidatePool(gameState: GameState, pickedPlayerIds: Set<string>, counters?: RedraftCandidateCounters) {
   const rosteredPlayerIds = new Set(gameState.rosters.map((entry) => entry.playerId));
   const ratingsByPlayer = buildPlayerRatingContractMap(gameState);
+  if (counters) {
+    counters.candidateScans += 1;
+    counters.rejectedByAlreadyPicked += gameState.players.filter((player) => rosteredPlayerIds.has(player.id) || pickedPlayerIds.has(player.id)).length;
+  }
   return gameState.players
     .filter((player) => !rosteredPlayerIds.has(player.id) && !pickedPlayerIds.has(player.id))
     .map<Candidate | null>((player) => {
+      if (counters) counters.marketValueLookups += 1;
       const marketValue = getImportedPlayerDisplayMarketValue(player);
       if (marketValue == null || marketValue <= 0) return null;
+      if (counters) counters.salaryLookups += 1;
       const salary = getImportedPlayerDisplaySalary(player);
       const rating = ratingsByPlayer.get(player.id);
       const quality = rating?.ovrNormalized ?? player.ovr ?? player.rating ?? 0;
@@ -650,6 +837,254 @@ function getClassFit(candidate: Candidate, roster: RosterEntry[], gameState: Gam
   const playersById = new Map(gameState.players.map((player) => [player.id, player] as const));
   const sameClassCount = roster.filter((entry) => playersById.get(entry.playerId)?.className === candidate.player.className).length;
   return sameClassCount === 0 ? 8 : sameClassCount === 1 ? 3 : -4;
+}
+
+function getCheapThemePriority(candidate: Candidate, target: TeamThemeCompositionTarget | null) {
+  if (!target) return 0;
+  const tags = new Set(derivePlayerThemeTags(candidate.player).playerThemeTags);
+  if (target.avoidTags.some((tag) => tags.has(tag))) return -10;
+  if (target.primaryThemeTags.some((tag) => tags.has(tag))) return 4;
+  if (target.secondaryThemeTags.some((tag) => tags.has(tag))) return 3;
+  if (target.softPreferredTags.some((tag) => tags.has(tag))) return 2;
+  if (target.allowedOutsiderTags.some((tag) => tags.has(tag))) return 1;
+  return 0;
+}
+
+function selectScoringPool(input: {
+  planningPool: Candidate[];
+  cap: number;
+  themeTarget: TeamThemeCompositionTarget | null;
+  phase: ChunkedRedraftPhase;
+}) {
+  if (input.planningPool.length <= input.cap) return input.planningPool;
+  const indexed = input.planningPool.map((candidate, index) => ({
+    candidate,
+    index,
+    themePriority: getCheapThemePriority(candidate, input.themeTarget),
+  }));
+  const baseShare = input.themeTarget && input.phase !== "phase_c_depth_luxury" ? 0.55 : 0.75;
+  const baseLimit = Math.max(32, Math.floor(input.cap * baseShare));
+  const selected = new Map<string, Candidate>();
+  for (const row of indexed.slice(0, baseLimit)) {
+    selected.set(row.candidate.player.id, row.candidate);
+  }
+  const themedRows = indexed
+    .filter((row) => row.themePriority > 0)
+    .sort((left, right) => {
+      if (right.themePriority !== left.themePriority) return right.themePriority - left.themePriority;
+      if (right.candidate.quality !== left.candidate.quality) return right.candidate.quality - left.candidate.quality;
+      return left.index - right.index;
+    });
+  for (const row of themedRows) {
+    if (selected.size >= input.cap) break;
+    selected.set(row.candidate.player.id, row.candidate);
+  }
+  for (const row of indexed) {
+    if (selected.size >= input.cap) break;
+    selected.set(row.candidate.player.id, row.candidate);
+  }
+  return [...selected.values()];
+}
+
+function buildDraftRoleSequence(input: {
+  profile: TeamManagerProfile | null | undefined;
+  blueprint: RosterBlueprintPlan | null | undefined;
+  targetPlan: RosterTargetPlan | null | undefined;
+}) {
+  const targetSize = input.blueprint?.desiredRosterTarget ?? input.targetPlan?.desiredRosterTarget ?? 10;
+  const fill = (roles: DraftPickRole[]) => {
+    const sequence: DraftPickRole[] = [];
+    while (sequence.length < targetSize) sequence.push(...roles);
+    return sequence.slice(0, targetSize);
+  };
+  switch (input.profile?.draftDoctrine) {
+    case "all_in_star_push":
+      return fill(["star", "star", "core", "star", "theme", "starter", "core", "depth", "star", "value"]);
+    case "star_core":
+      return fill(["star", "core", "core", "starter", "theme", "star", "depth", "value"]);
+    case "theme_specialist":
+      return fill(["theme", "theme", "core", "theme", "starter", "theme", "value", "depth"]);
+    case "salary_value":
+      return fill(["theme", "value", "theme", "star", "theme", "value", "theme", "core", "depth", "value"]);
+    case "pure_value":
+      return fill(["value", "value", "core", "prospect", "value", "starter", "depth"]);
+    case "rebuild_value":
+      return fill(["prospect", "value", "prospect", "core", "starter", "value", "depth"]);
+    case "depth_rotation":
+      return fill(["core", "starter", "depth", "starter", "value", "depth", "theme"]);
+    case "balanced":
+    case undefined:
+      break;
+  }
+  if (input.profile?.managerArchetype === "theme_collector") {
+    return fill(["theme", "theme", "core", "theme", "starter", "theme", "value", "depth"]);
+  }
+  switch (input.profile?.rosterStyle) {
+    case "star_heavy":
+      return fill(["star", "star", "core", "theme", "starter", "core", "depth", "value"]);
+    case "small_elite":
+      return fill(["star", "core", "core", "theme", "starter", "value", "depth"]);
+    case "budget_squad":
+      return fill(["value", "core", "value", "prospect", "starter", "value", "depth"]);
+    case "prospect_pool":
+      return fill(["prospect", "value", "core", "prospect", "starter", "theme", "depth"]);
+    case "wide_depth":
+      return fill(["core", "starter", "depth", "starter", "value", "depth", "theme"]);
+    default:
+      return fill(["core", "starter", "value", "theme", "depth", "prospect"]);
+  }
+}
+
+function getPrimaryThemeCountForRoster(input: {
+  gameState: GameState;
+  roster: RosterEntry[];
+  target: TeamThemeCompositionTarget | null;
+}) {
+  if (!input.target || input.roster.length === 0) return 0;
+  const playerById = new Map(input.gameState.players.map((player) => [player.id, player] as const));
+  return input.roster.reduce((count, entry) => {
+    const player = playerById.get(entry.playerId);
+    if (!player) return count;
+    const tags = new Set(derivePlayerThemeTags(player).playerThemeTags);
+    return input.target?.primaryThemeTags.some((tag) => tags.has(tag)) ? count + 1 : count;
+  }, 0);
+}
+
+function needsThemePickToProtectMinimum(input: {
+  gameState: GameState;
+  roster: RosterEntry[];
+  target: TeamThemeCompositionTarget | null;
+  phase: ChunkedRedraftPhase;
+}) {
+  const target = input.target;
+  if (!target || input.phase === "phase_c_depth_luxury") return false;
+  if (target.strictness !== "hard" && target.strictness !== "strong") return false;
+  const rosterCount = input.roster.length;
+  const primaryCount = getPrimaryThemeCountForRoster({ gameState: input.gameState, roster: input.roster, target });
+  const currentShare = rosterCount > 0 ? primaryCount / rosterCount : 0;
+  const projectedNonThemeShare = primaryCount / Math.max(1, rosterCount + 1);
+  return currentShare < target.minimumShare || projectedNonThemeShare < target.minimumShare;
+}
+
+function getDesiredDraftRole(input: {
+  rosterCount: number;
+  roster: RosterEntry[];
+  gameState: GameState;
+  phase: ChunkedRedraftPhase;
+  profile: TeamManagerProfile | null | undefined;
+  blueprint: RosterBlueprintPlan | null | undefined;
+  targetPlan: RosterTargetPlan | null | undefined;
+  themeTarget: TeamThemeCompositionTarget | null;
+}) {
+  if (
+    needsThemePickToProtectMinimum({
+      gameState: input.gameState,
+      roster: input.roster,
+      target: input.themeTarget,
+      phase: input.phase,
+    })
+  ) {
+    return "theme" satisfies DraftPickRole;
+  }
+  if (input.phase === "phase_c_depth_luxury") return "depth" satisfies DraftPickRole;
+  const minimumGap = Math.max(0, (input.targetPlan?.minTarget ?? input.targetPlan?.playerMin ?? 0) - input.rosterCount);
+  if (
+    input.phase === "phase_a_minimum" &&
+    minimumGap > 0 &&
+    minimumGap <= 2 &&
+    input.profile?.managerArchetype !== "win_now" &&
+    input.profile?.managerArchetype !== "chaotic_aggressive" &&
+    input.profile?.managerArchetype !== "small_elite"
+  ) {
+    return "value" satisfies DraftPickRole;
+  }
+  const sequence = buildDraftRoleSequence(input);
+  return sequence[Math.min(input.rosterCount, sequence.length - 1)] ?? "core";
+}
+
+function scoreCandidateForDraftRole(candidate: ScoredCandidate, role: DraftPickRole) {
+  const marketValue = candidate.marketValue ?? 0;
+  const salary = candidate.salaryImpact ?? 0;
+  const theme = candidate.themeCompositionScore ?? 0;
+  const potential = candidate.potentialScore ?? 0;
+  const premiumSignal = Math.sqrt(Math.max(0, marketValue)) * 5;
+  const salaryValueRatio = candidate.quality / Math.max(1, salary * 5);
+  const themeTierBonus =
+    candidate.themeTier === "core_theme"
+      ? 120
+      : candidate.themeTier === "secondary_theme"
+        ? 42
+        : candidate.themeTier === "soft_theme"
+          ? 12
+          : candidate.themeTier === "outsider_exception"
+            ? -65
+            : candidate.themeTier === "outsider"
+              ? -120
+              : candidate.themeTier === "avoid"
+                ? -180
+                : 0;
+  const base =
+    role === "star"
+      ? candidate.quality * 2.55 + premiumSignal + marketValue * 0.28 + candidate.identityFit * 0.45 + theme * 0.4 - salary * 0.08
+      : role === "core"
+        ? candidate.quality * 1.3 + candidate.identityFit * 0.7 + theme * 0.8 + candidate.valueScore * 5 + Math.min(12, marketValue * 0.1) - salary * 0.25
+        : role === "starter"
+          ? candidate.quality * 1.05 + candidate.classFit * 1.4 + candidate.identityFit * 0.55 + theme * 0.65 + candidate.valueScore * 8 - salary * 0.28
+          : role === "value"
+            ? candidate.quality * 0.72 + candidate.valueScore * 34 + salaryValueRatio * 22 + theme * 0.35 - marketValue * 0.13 - salary * 0.75
+            : role === "prospect"
+              ? potential * 0.75 + candidate.quality * 0.55 + candidate.valueScore * 18 + theme * 0.5 - salary * 0.25
+              : role === "theme"
+                ? theme * 2.8 + themeTierBonus + candidate.quality * 0.65 + candidate.identityFit * 0.35 + candidate.classFit * 0.35 - salary * 0.15
+                : candidate.classFit * 3 + candidate.valueScore * 25 + candidate.quality * 0.45 + theme * 0.4 - marketValue * 0.45 - salary * 0.35;
+  return roundValue(base, 4);
+}
+
+function applyDraftRoleIntent(candidates: ScoredCandidate[], role: DraftPickRole) {
+  return candidates
+    .map((candidate) => {
+      const roleScore = scoreCandidateForDraftRole(candidate, role);
+      const baseWeight = role === "theme" ? 0.2 : 0.52;
+      const roleWeight = role === "theme" ? 0.8 : 0.48;
+      return {
+        ...candidate,
+        selectedScore: roundValue(candidate.selectedScore * baseWeight + roleScore * roleWeight, 4),
+        roleScore,
+        desiredDraftRole: role,
+      };
+    })
+    .sort((left, right) => {
+      if (right.selectedScore !== left.selectedScore) return right.selectedScore - left.selectedScore;
+      if (right.roleScore !== left.roleScore) return right.roleScore - left.roleScore;
+      if (right.quality !== left.quality) return right.quality - left.quality;
+      return left.marketValue - right.marketValue;
+    });
+}
+
+function buildDraftRoleBoardRows(input: {
+  round: number;
+  team: GameState["teams"][number];
+  desiredRole: DraftPickRole;
+  candidates: Array<ScoredCandidate & { roleScore?: number; desiredDraftRole?: DraftPickRole }>;
+  limit?: number;
+}): DraftRoleBoardRow[] {
+  return input.candidates.slice(0, input.limit ?? 20).map((candidate, index) => ({
+    round: input.round,
+    teamId: input.team.teamId,
+    teamName: input.team.name,
+    desiredRole: input.desiredRole,
+    rank: index + 1,
+    playerId: candidate.player.id,
+    playerName: candidate.player.name,
+    roleScore: roundValue(candidate.roleScore ?? scoreCandidateForDraftRole(candidate, input.desiredRole), 4),
+    baseScore: candidate.selectedScore,
+    quality: roundValue(candidate.quality, 2),
+    marketValue: candidate.marketValue,
+    salary: candidate.salary,
+    themeTier: candidate.themeTier,
+    themeCompositionScore: candidate.themeCompositionScore,
+    reason: `role=${input.desiredRole};theme=${candidate.themeTier};quality=${roundValue(candidate.quality, 2)};value=${candidate.valueScore};identity=${candidate.identityFit}`,
+  }));
 }
 
 function getSeasonLegalMin(playerMin: number) {
@@ -911,16 +1346,35 @@ function compileTeamManagerProfile(input: {
 }): TeamManagerProfile {
   const text = `${input.team.teamId} ${input.team.name} ${input.strategyProfile?.strategySummary ?? ""} ${input.strategyProfile?.buyStyle ?? ""}`.toLowerCase();
   const bias = input.strategyProfile?.bias;
-  const starHigh = levelHigh(bias?.starPriority) || levelHigh(input.identity?.ambition);
-  const valueHigh = levelHigh(bias?.valuePriority) || levelHigh(input.identity?.finances);
-  const cashHigh = levelHigh(bias?.cashPriority) || levelHigh(input.identity?.finances);
-  const riskHigh = levelHigh(bias?.riskTolerance);
-  const depthHigh = levelHigh(bias?.rosterDepthPreference);
-  const eliteSmallHigh = levelHigh(bias?.eliteSmallRosterPreference);
-  const themeHigh = (input.strategyProfile?.preferredClasses.length ?? 0) + (input.strategyProfile?.preferredRaces.length ?? 0) + (input.strategyProfile?.preferredArchetypes.length ?? 0) >= 3;
+  const strategyScores = buildTeamStrategyScores({ identity: input.identity, profile: input.strategyProfile });
+  const starHigh = strategyScores.starHunting >= 75 || levelHigh(bias?.starPriority) || levelHigh(input.identity?.ambition);
+  const valueHigh = strategyScores.valueDiscipline >= 75 || levelHigh(bias?.valuePriority) || levelHigh(input.identity?.finances);
+  const cashHigh = strategyScores.cashReserveDiscipline >= 75 || levelHigh(bias?.cashPriority) || levelHigh(input.identity?.finances);
+  const riskHigh = strategyScores.riskAppetite >= 75 || levelHigh(bias?.riskTolerance);
+  const depthHigh = strategyScores.depthPreference >= 75 || levelHigh(bias?.rosterDepthPreference);
+  const eliteSmallHigh = strategyScores.smallElitePreference >= 75 || levelHigh(bias?.eliteSmallRosterPreference);
+  const themeHigh =
+    strategyScores.themeCommitment >= 75 ||
+    (input.strategyProfile?.preferredClasses.length ?? 0) + (input.strategyProfile?.preferredRaces.length ?? 0) + (input.strategyProfile?.preferredArchetypes.length ?? 0) >= 3;
 
   let managerArchetype: ManagerArchetype = "rebuild";
-  if (input.team.teamId === "C-C" || text.includes("cash creators") || text.includes("value") || text.includes("bank der olympiade")) {
+  if (strategyScores.archetype === "all_in_contender") {
+    managerArchetype = "win_now";
+  } else if (strategyScores.archetype === "opportunistic_risk_taker") {
+    managerArchetype = "chaotic_aggressive";
+  } else if (strategyScores.archetype === "small_elite") {
+    managerArchetype = "small_elite";
+  } else if (strategyScores.archetype === "profit_flipper" || strategyScores.archetype === "salary_value_trader") {
+    managerArchetype = "value_builder";
+  } else if (strategyScores.archetype === "harmony_builder") {
+    managerArchetype = "harmony_builder";
+  } else if (strategyScores.archetype === "theme_guardian") {
+    managerArchetype = "theme_collector";
+  }
+
+  if (input.team.teamId === "R-R") {
+    managerArchetype = "value_builder";
+  } else if (input.team.teamId === "C-C" || text.includes("cash creators") || text.includes("value") || text.includes("bank der olympiade")) {
     managerArchetype = "value_builder";
   } else if (input.team.teamId === "W-L" || text.includes("wrecking legionnaires") || text.includes("soeldner") || text.includes("mercenary")) {
     managerArchetype = "mercenary_market";
@@ -930,7 +1384,7 @@ function compileTeamManagerProfile(input: {
     managerArchetype = input.team.teamId === "Z-H" ? "chaotic_aggressive" : "win_now";
   } else if (input.team.teamId === "B-P" || eliteSmallHigh || text.includes("kleine elite")) {
     managerArchetype = "small_elite";
-  } else if (input.team.teamId === "W-W" || input.team.teamId === "R-C" || input.team.teamId === "R-R" || text.includes("royal") || text.includes("aqua") || text.includes("magier")) {
+  } else if (getTeamThemeCompositionTarget(input.team) || text.includes("royal") || text.includes("aqua") || text.includes("magier")) {
     managerArchetype = "theme_collector";
   } else if (levelHigh(input.identity?.harmony) || text.includes("harmony") || text.includes("teacher")) {
     managerArchetype = "harmony_builder";
@@ -954,7 +1408,7 @@ function compileTeamManagerProfile(input: {
             : valueHigh
               ? "prospect_pool"
               : "balanced_core";
-  const riskTolerance: ManagerRiskTolerance = managerArchetype === "chaotic_aggressive" ? "chaotic" : riskHigh ? "high" : levelLow(bias?.riskTolerance) ? "low" : "medium";
+  const riskTolerance: ManagerRiskTolerance = managerArchetype === "chaotic_aggressive" ? "chaotic" : riskHigh ? "high" : strategyScores.riskAppetite <= 35 || levelLow(bias?.riskTolerance) ? "low" : "medium";
   const qualityFloor: ManagerQualityFloor = managerArchetype === "win_now" || managerArchetype === "small_elite" ? "high" : starHigh ? "high" : spendingStyle === "emergency" ? "low" : "medium";
   const underOptPolicy: UnderOptPolicy =
     managerArchetype === "win_now" || managerArchetype === "chaotic_aggressive"
@@ -964,6 +1418,22 @@ function compileTeamManagerProfile(input: {
         : managerArchetype === "value_builder" || managerArchetype === "conservative_finance"
           ? "eco_allowed"
           : "market_wait_allowed";
+  const draftDoctrine: DraftDoctrine =
+    input.team.teamId === "R-R"
+      ? "salary_value"
+      : managerArchetype === "win_now" || managerArchetype === "chaotic_aggressive"
+        ? "all_in_star_push"
+        : managerArchetype === "small_elite"
+          ? "star_core"
+          : managerArchetype === "theme_collector"
+            ? "theme_specialist"
+            : managerArchetype === "value_builder" || managerArchetype === "conservative_finance"
+              ? "pure_value"
+              : managerArchetype === "harmony_builder" || rosterStyle === "wide_depth"
+                ? "depth_rotation"
+                : valueHigh || (input.identity?.ambition ?? 5) <= 4
+                  ? "rebuild_value"
+                  : "balanced";
 
   return {
     teamId: input.team.teamId,
@@ -978,7 +1448,8 @@ function compileTeamManagerProfile(input: {
     salaryDiscipline: spendingStyle === "aggressive" ? "loose" : spendingStyle === "value" || spendingStyle === "conservative" ? "strict" : "normal",
     identityStrictness: themeHigh || managerArchetype === "theme_collector" ? "high" : managerArchetype === "value_builder" ? "medium" : "low",
     themeStrictness: themeHigh || managerArchetype === "theme_collector" ? "high" : "medium",
-    reason: `team=${input.team.teamId};cash=${roundValue(input.team.cash)};star=${bias?.starPriority ?? ""};value=${bias?.valuePriority ?? ""};risk=${bias?.riskTolerance ?? ""};roster=${input.roster.length}`,
+    draftDoctrine,
+    reason: `team=${input.team.teamId};cash=${roundValue(input.team.cash)};scores=${strategyScores.archetype};star=${strategyScores.starHunting};value=${strategyScores.valueDiscipline};risk=${strategyScores.riskAppetite};theme=${strategyScores.themeCommitment};doctrine=${draftDoctrine};roster=${input.roster.length}`,
   };
 }
 
@@ -1138,6 +1609,7 @@ function scoreCandidateForTeam(input: {
   team: GameState["teams"][number];
   phase: ChunkedRedraftPhase;
   maxRecommendedSpend: number;
+  counters?: RedraftCandidateCounters;
 }): ScoredCandidate {
   const identityFit = getIdentityFit(input.candidate, input.teamIdentity);
   const classFit = getClassFit(input.candidate, input.roster, input.gameState);
@@ -1148,6 +1620,7 @@ function scoreCandidateForTeam(input: {
   const wageSensitivity = toBias(input.strategyProfile?.bias?.wageSensitivity);
   const depthBias = toBias(input.strategyProfile?.bias?.rosterDepthPreference);
   const potentialScore = roundValue(input.candidate.player.potential ?? 0, 2);
+  if (input.counters) input.counters.themeScoreCalls += 1;
   const themeScore = calculateThemeCompositionScore({
     gameState: input.gameState,
     team: input.team,
@@ -1650,6 +2123,43 @@ function buildUnderOptStopAudit(input: {
     .filter((row) => row.rosterCount < row.playerOpt);
 }
 
+function writeRedraftInstrumentationArtifacts(input: {
+  outputDir: string;
+  progressRows: ProgressLogRow[];
+  counters: RedraftCandidateCounters;
+  memoryRows?: MemoryRow[];
+  phaseRows?: PhaseRow[];
+  picks?: ChunkedRedraftPickRow[];
+  warningRows?: WarningRow[];
+}) {
+  writeCsv(input.outputDir, "redraft-progress-log.csv", input.progressRows as unknown as Array<Record<string, unknown>>);
+  writeCsv(input.outputDir, "redraft-candidate-counters.csv", [input.counters] as unknown as Array<Record<string, unknown>>);
+  writeCsv(input.outputDir, "redraft-memory-trace.csv", (input.memoryRows ?? []) as unknown as Array<Record<string, unknown>>);
+  writeJson(input.outputDir, "redraft-first-team-trace.json", {
+    rows: input.progressRows.filter((row) => row.teamId && row.teamId !== "ALL").slice(0, 240),
+    phaseRows: (input.phaseRows ?? []).filter((row) => row.teamId && row.teamId !== "ALL").slice(0, 120),
+    picks: (input.picks ?? []).slice(0, 10),
+    warnings: (input.warningRows ?? []).slice(0, 40),
+  });
+  writeMarkdown(
+    input.outputDir,
+    "redraft-first-pick-debug.md",
+    [
+      "# Redraft First Pick Debug",
+      "",
+      `- Progress rows: ${input.progressRows.length}`,
+      `- Candidate scans: ${input.counters.candidateScans}`,
+      `- Theme score calls: ${input.counters.themeScoreCalls}`,
+      `- Buy preview calls: ${input.counters.buyPreviewCalls}`,
+      `- Successful buys: ${input.counters.successfulBuys}`,
+      `- Failed buys: ${input.counters.failedBuys}`,
+      `- Save flushes: ${input.counters.saveFlushes}`,
+      `- Last phase: ${input.progressRows.at(-1)?.phase ?? "n/a"}`,
+      `- Last blocker: ${input.progressRows.findLast((row) => row.blocker)?.blocker ?? "none"}`,
+    ].join("\n"),
+  );
+}
+
 function writeReports(input: {
   outputDir: string;
   summary: ChunkedRedraftSummary;
@@ -1663,10 +2173,14 @@ function writeReports(input: {
   seasonStrategies?: Map<string, SeasonStrategyPlan>;
   rosterBlueprints?: Map<string, RosterBlueprintPlan>;
   marketBoardRows?: ManagerMarketBoardRow[];
+  draftRoleBoardRows?: DraftRoleBoardRow[];
   candidatePool?: Candidate[];
   memoryRows: MemoryRow[];
   warningRows: WarningRow[];
   phaseRows: PhaseRow[];
+  progressRows?: ProgressLogRow[];
+  counters?: RedraftCandidateCounters;
+  reportMode?: "full" | "light";
 }) {
   writeJson(input.outputDir, "chunked-redraft-state.json", input.state);
   writeJson(input.outputDir, "chunked-redraft-summary.json", input.summary);
@@ -1715,6 +2229,84 @@ function writeReports(input: {
       `- Langsamster Pick: ${input.summary.slowestPick ? `${input.summary.slowestPick.teamId}/${input.summary.slowestPick.playerId} ${input.summary.slowestPick.durationMs}ms` : "n/a"}`,
     ].join("\n"),
   );
+  if (input.reportMode === "light") {
+    const targetPlanRows = [...(input.targetPlans?.values() ?? [])].map(planToCsvRow);
+    const managerProfileRows = [...(input.managerProfiles?.values() ?? [])];
+    const seasonStrategyRows = [...(input.seasonStrategies?.values() ?? [])];
+    const rosterBlueprintRows = [...(input.rosterBlueprints?.values() ?? [])];
+    const marketBoardRows = input.marketBoardRows ?? [];
+    const draftRoleBoardRows = input.draftRoleBoardRows ?? [];
+    const managerStopRows = input.targetPlans && input.managerProfiles
+      ? buildManagerStopReasons({
+          finalSave: input.finalSave,
+          targetPlans: input.targetPlans,
+          managerProfiles: input.managerProfiles,
+          warningRows: input.warningRows,
+          marketBoardRows,
+        })
+      : [];
+    writeJson(input.outputDir, "roster-target-plan.json", [...(input.targetPlans?.values() ?? [])]);
+    writeCsv(input.outputDir, "team-manager-profile-preview.csv", managerProfileRows as unknown as Array<Record<string, unknown>>);
+    writeCsv(input.outputDir, "manager-ai-profile-preview.csv", managerProfileRows as unknown as Array<Record<string, unknown>>);
+    writeCsv(input.outputDir, "season-strategy-plan.csv", seasonStrategyRows as unknown as Array<Record<string, unknown>>);
+    writeCsv(input.outputDir, "roster-blueprint-plan.csv", rosterBlueprintRows as unknown as Array<Record<string, unknown>>);
+    writeCsv(input.outputDir, "market-board-preview.csv", marketBoardRows as unknown as Array<Record<string, unknown>>);
+    writeCsv(input.outputDir, "draft-role-board-preview.csv", draftRoleBoardRows as unknown as Array<Record<string, unknown>>);
+    writeCsv(
+      input.outputDir,
+      "manager-pick-audit.csv",
+      input.picks.map((pick) => ({
+        round: pick.round,
+        teamId: pick.teamId,
+        playerId: pick.playerId,
+        selectedPlayer: pick.playerName,
+        selectedScore: pick.selectedScore ?? pick.pickScore,
+        roleFilled: pick.roleFilled ?? pick.role ?? "",
+        blueprintNeed: pick.blueprintNeed ?? pick.teamNeed ?? "",
+        marketBoardTier: pick.marketBoardTier ?? "",
+        topRejectedCandidates: pick.topRejectedCandidates ?? "",
+        whySelected: pick.whySelected ?? pick.reasons,
+        whyRejectedOthers: pick.whyRejectedOthers ?? "",
+        cashBefore: pick.cashBefore,
+        cashAfter: pick.cashAfter,
+        salaryAfter: pick.salary,
+        rosterBefore: pick.rosterBefore,
+        rosterAfter: pick.rosterAfter,
+        targetProgress: pick.targetProgress ?? "",
+      })),
+    );
+    writeCsv(input.outputDir, "manager-stop-reasons.csv", managerStopRows as unknown as Array<Record<string, unknown>>);
+    writeCsv(input.outputDir, "roster-target-plan.csv", targetPlanRows);
+    writeMarkdown(
+      input.outputDir,
+      "manager-ai-redraft-summary.md",
+      [
+        "# Manager AI Redraft Summary",
+        "",
+        `- DRAFT_VALID: ${input.summary.draftValid ? "true" : "false"}`,
+        `- Teams unter Min: ${input.summary.teamsBelowMin.length}`,
+        `- Picks: ${input.summary.picksTotal}`,
+        `- Report Mode: light`,
+      ].join("\n"),
+    );
+    writeCsv(input.outputDir, "chunked-redraft-picks.csv", input.picks as unknown as Array<Record<string, unknown>>);
+    writeCsv(input.outputDir, "redraft-phase-timings.csv", input.phaseRows as unknown as Array<Record<string, unknown>>);
+    writeCsv(input.outputDir, "chunked-redraft-team-status.csv", buildTeamRows(input.finalSave, input.warningRows) as unknown as Array<Record<string, unknown>>);
+    writeCsv(input.outputDir, "chunked-redraft-memory.csv", input.memoryRows as unknown as Array<Record<string, unknown>>);
+    writeCsv(input.outputDir, "chunked-redraft-warnings.csv", input.warningRows as unknown as Array<Record<string, unknown>>);
+    if (input.progressRows && input.counters) {
+      writeRedraftInstrumentationArtifacts({
+        outputDir: input.outputDir,
+        progressRows: input.progressRows,
+        counters: input.counters,
+        memoryRows: input.memoryRows,
+        phaseRows: input.phaseRows,
+        picks: input.picks,
+        warningRows: input.warningRows,
+      });
+    }
+    return;
+  }
   const phaseBCashAudit = buildPhaseBCashAudit({
     initialSave: input.initialSave,
     finalSave: input.finalSave,
@@ -1729,6 +2321,7 @@ function writeReports(input: {
   const seasonStrategyRows = [...(input.seasonStrategies?.values() ?? [])];
   const rosterBlueprintRows = [...(input.rosterBlueprints?.values() ?? [])];
   const marketBoardRows = input.marketBoardRows ?? [];
+  const draftRoleBoardRows = input.draftRoleBoardRows ?? [];
   const managerStopRows = input.targetPlans && input.managerProfiles
     ? buildManagerStopReasons({
         finalSave: input.finalSave,
@@ -1787,6 +2380,7 @@ function writeReports(input: {
   writeCsv(input.outputDir, "season-strategy-plan.csv", seasonStrategyRows as unknown as Array<Record<string, unknown>>);
   writeCsv(input.outputDir, "roster-blueprint-plan.csv", rosterBlueprintRows as unknown as Array<Record<string, unknown>>);
   writeCsv(input.outputDir, "market-board-preview.csv", marketBoardRows as unknown as Array<Record<string, unknown>>);
+  writeCsv(input.outputDir, "draft-role-board-preview.csv", draftRoleBoardRows as unknown as Array<Record<string, unknown>>);
   writeCsv(
     input.outputDir,
     "manager-pick-audit.csv",
@@ -1935,6 +2529,17 @@ function writeReports(input: {
     [...input.picks].sort((left, right) => right.durationMs - left.durationMs).slice(0, 20) as unknown as Array<Record<string, unknown>>,
   );
   writeCsv(input.outputDir, "redraft-phase-timings.csv", input.phaseRows as unknown as Array<Record<string, unknown>>);
+  if (input.progressRows && input.counters) {
+    writeRedraftInstrumentationArtifacts({
+      outputDir: input.outputDir,
+      progressRows: input.progressRows,
+      counters: input.counters,
+      memoryRows: input.memoryRows,
+      phaseRows: input.phaseRows,
+      picks: input.picks,
+      warningRows: input.warningRows,
+    });
+  }
   writeCsv(
     input.outputDir,
     "redraft-pick-quality.csv",
@@ -2049,13 +2654,43 @@ function writeReports(input: {
     })),
   );
   writeCsv(input.outputDir, "chunked-redraft-team-status.csv", buildTeamRows(input.finalSave, input.warningRows) as unknown as Array<Record<string, unknown>>);
-  writeCsv(input.outputDir, "team-theme-composition-audit.csv", buildTeamThemeCompositionAudit(input.finalSave.gameState) as unknown as Array<Record<string, unknown>>);
+  writeCsv(
+    input.outputDir,
+    "team-theme-composition-audit.csv",
+    buildTeamThemeCompositionAudit(input.finalSave.gameState, { candidateMissLimit: 300 }) as unknown as Array<Record<string, unknown>>,
+  );
   writeCsv(input.outputDir, "chunked-redraft-phase-b-team-status.csv", buildTeamRows(input.finalSave, input.warningRows) as unknown as Array<Record<string, unknown>>);
   writeCsv(input.outputDir, "chunked-redraft-memory.csv", input.memoryRows as unknown as Array<Record<string, unknown>>);
   writeCsv(input.outputDir, "topup-memory-by-team.csv", input.memoryRows as unknown as Array<Record<string, unknown>>);
   writeCsv(input.outputDir, "chunked-redraft-warnings.csv", input.warningRows as unknown as Array<Record<string, unknown>>);
   writeCsv(input.outputDir, "chunked-redraft-phase-b-warnings.csv", input.warningRows as unknown as Array<Record<string, unknown>>);
   writeCsv(input.outputDir, "chunked-redraft-phase-b-performance.csv", input.phaseRows as unknown as Array<Record<string, unknown>>);
+}
+
+function writeRedraftAbortArtifacts(input: {
+  outputDir: string;
+  profiler: RedraftProfiler;
+  counters: RedraftCandidateCounters;
+  error: unknown;
+  memoryRows?: MemoryRow[];
+  phaseRows?: PhaseRow[];
+  picks?: ChunkedRedraftPickRow[];
+  warningRows?: WarningRow[];
+}) {
+  const message = input.error instanceof Error ? input.error.message : String(input.error);
+  const existingBlocker = input.profiler.rows.findLast((row) => row.blocker);
+  const row = existingBlocker ?? input.profiler.log("runner_abort", { blocker: message });
+  if (!row.blocker) row.blocker = message;
+  input.profiler.writeBlocker(message, row);
+  writeRedraftInstrumentationArtifacts({
+    outputDir: input.outputDir,
+    progressRows: input.profiler.rows,
+    counters: input.counters,
+    memoryRows: input.memoryRows,
+    phaseRows: input.phaseRows,
+    picks: input.picks,
+    warningRows: input.warningRows,
+  });
 }
 
 export function runChunkedRedraftTopup(params: ChunkedRedraftTopupParams) {
@@ -2065,8 +2700,17 @@ export function runChunkedRedraftTopup(params: ChunkedRedraftTopupParams) {
   const target = params.target ?? "playerMin";
   const roundLimit = Math.max(1, Math.round(params.roundLimit ?? 16));
   const teamTimeLimitMs = Math.max(100, Math.round(params.teamTimeLimitMs ?? 10_000));
+  const watchdogMs = Number.isFinite(params.watchdogMs) ? Math.round(params.watchdogMs ?? 30_000) : 30_000;
+  const profiler = new RedraftProfiler(outputDir, watchdogMs);
+  const counters = createRedraftCounters();
+  const maxTeams = params.maxTeams != null && Number.isFinite(params.maxTeams) ? Math.max(1, Math.round(params.maxTeams)) : null;
+  const reportMode = params.reportMode ?? (dryRun && maxTeams ? "light" : "full");
+  profiler.log("runner_start", { warning: dryRun ? "dryRun" : null });
+  const loadSaveStartedAt = profiler.start("load_save");
   const save = persistence.getSaveById(params.saveId);
+  profiler.end("load_save", loadSaveStartedAt, { warning: save ? null : "save_missing" });
   if (!save) {
+    writeRedraftAbortArtifacts({ outputDir, profiler, counters, error: new Error(`chunked_redraft_save_not_found:${params.saveId}`) });
     throw new Error(`chunked_redraft_save_not_found:${params.saveId}`);
   }
   if (save.gameState.season.id !== params.seasonId) {
@@ -2093,27 +2737,57 @@ export function runChunkedRedraftTopup(params: ChunkedRedraftTopupParams) {
   const picks: ChunkedRedraftPickRow[] = [];
   const rejectedRows: RejectedCandidateRow[] = [];
   const marketBoardRows: ManagerMarketBoardRow[] = [];
+  const draftRoleBoardRows: DraftRoleBoardRow[] = [];
   const memoryRows: MemoryRow[] = [];
   const warningRows: WarningRow[] = [];
   const phaseRows: PhaseRow[] = [];
   const roundDurations: Array<{ round: number; durationMs: number; picks: number }> = [];
+  try {
+  const contextStartedAt = profiler.start("build_game_state_context");
   const runContext = createLocalTransfermarktRunContext({ save, persistence });
+  profiler.end("build_game_state_context", contextStartedAt, {
+    rosterCount: runContext.save.gameState.rosters.length,
+    freeAgentCount: runContext.save.gameState.players.length - runContext.save.gameState.rosters.length,
+  });
+  counters.teamsTotal = runContext.save.gameState.teams.length;
+  counters.activeRostersStart = runContext.save.gameState.rosters.length;
+  const teamMapsStartedAt = profiler.start("build_team_maps");
   const strategyProfiles = buildTeamStrategyProfileMap(
     runContext.save.gameState.teams,
     runContext.save.gameState.teamIdentities,
     runContext.save.gameState.seasonState.teamStrategyProfiles,
   );
-  const initialCandidatePool = buildCandidatePool(runContext.save.gameState, pickedPlayerIds);
+  profiler.end("build_team_maps", teamMapsStartedAt, { candidateCount: Object.keys(strategyProfiles).length });
+  const rosterMapsStartedAt = profiler.start("build_roster_maps");
+  groupRostersByTeam(runContext.save.gameState.rosters);
+  profiler.end("build_roster_maps", rosterMapsStartedAt, { rosterCount: runContext.save.gameState.rosters.length });
+  const poolStartedAt = profiler.start("build_free_agent_pool");
+  const initialCandidatePool = buildCandidatePool(runContext.save.gameState, pickedPlayerIds, counters);
+  counters.freeAgentsStart = initialCandidatePool.length;
+  profiler.end("build_free_agent_pool", poolStartedAt, { freeAgentCount: initialCandidatePool.length, candidateCount: initialCandidatePool.length });
+  const marketCacheStartedAt = profiler.start("build_market_value_cache", { candidateCount: initialCandidatePool.length });
+  profiler.end("build_market_value_cache", marketCacheStartedAt, { candidateCount: initialCandidatePool.length });
+  const salaryCacheStartedAt = profiler.start("build_salary_cache", { candidateCount: initialCandidatePool.length });
+  profiler.end("build_salary_cache", salaryCacheStartedAt, { candidateCount: initialCandidatePool.length });
+  const themeTargetsStartedAt = profiler.start("build_theme_targets");
+  const themeTargetCount = runContext.save.gameState.teams.filter((team) => getTeamThemeCompositionTarget(team.teamId)).length;
+  profiler.end("build_theme_targets", themeTargetsStartedAt, { candidateCount: themeTargetCount });
+  const managerProfilesStartedAt = profiler.start("build_manager_profiles");
   const managerProfiles = buildManagerProfiles({
     gameState: runContext.save.gameState,
     strategyProfiles,
   });
+  profiler.end("build_manager_profiles", managerProfilesStartedAt, { candidateCount: managerProfiles.size });
+  const targetPlansStartedAt = profiler.start("build_roster_target_plans", { candidateCount: initialCandidatePool.length });
   const targetPlans = buildRosterTargetPlans({
     gameState: runContext.save.gameState,
     target,
     strategyProfiles,
     candidatePool: initialCandidatePool,
   });
+  profiler.end("build_roster_target_plans", targetPlansStartedAt, { candidateCount: targetPlans.size });
+  const marketBoardsStartedAt = profiler.start("build_market_boards");
+  profiler.end("build_market_boards", marketBoardsStartedAt, { candidateCount: 0 });
   const seasonStrategies = new Map(
     runContext.save.gameState.teams.map((team) => [
       team.teamId,
@@ -2143,9 +2817,10 @@ export function runChunkedRedraftTopup(params: ChunkedRedraftTopupParams) {
     const roundStartedAt = Date.now();
     let roundPicks = 0;
     const completedTeamsInRound: string[] = [];
+    profiler.log("round_start", { round, rosterCount: runContext.save.gameState.rosters.length });
     const setupStartedAt = Date.now();
     const memoryAtRoundStart = memorySnapshot();
-    const candidatePool = buildCandidatePool(runContext.save.gameState, pickedPlayerIds);
+    const candidatePool = buildCandidatePool(runContext.save.gameState, pickedPlayerIds, counters);
     phaseRows.push({
       round,
       teamId: "ALL",
@@ -2163,11 +2838,18 @@ export function runChunkedRedraftTopup(params: ChunkedRedraftTopupParams) {
       break;
     }
 
-    for (const team of runContext.save.gameState.teams) {
+    const teamsForRound = maxTeams ? runContext.save.gameState.teams.slice(0, maxTeams) : runContext.save.gameState.teams;
+    for (const team of teamsForRound) {
       const teamStartedAt = Date.now();
       const memoryBefore = memorySnapshot();
       const latestTeam = runContext.save.gameState.teams.find((entry) => entry.teamId === team.teamId) ?? team;
       const rosterCount = rostersByTeam.get(team.teamId)?.length ?? 0;
+      profiler.log("team_planning_start", {
+        round,
+        teamId: team.teamId,
+        rosterCount,
+        freeAgentCount: candidatePool.length,
+      });
       const teamRoster = rostersByTeam.get(team.teamId) ?? [];
       const teamTarget = getTeamTarget(runContext.save.gameState, team.teamId, target);
       const teamIdentity = runContext.save.gameState.teamIdentities.find((entry) => entry.teamId === team.teamId) ?? null;
@@ -2193,32 +2875,90 @@ export function runChunkedRedraftTopup(params: ChunkedRedraftTopupParams) {
           reason: "team_target_reached",
           detail: `${rosterCount}/${phasePlan.targetRoster};${phasePlan.phase};mode=${targetPlan?.targetMode ?? ""}`,
         });
+        profiler.log("team_planning_end", {
+          round,
+          teamId: team.teamId,
+          rosterCount,
+          freeAgentCount: candidatePool.length,
+          warning: "team_target_reached",
+        });
         continue;
       }
       if (rosterCount >= teamTarget.playerMax) {
         warningRows.push({ round, teamId: team.teamId, reason: "team_player_max_reached", detail: `${rosterCount}/${teamTarget.playerMax}` });
+        counters.rejectedByRosterMax += candidatePool.length;
+        profiler.log("team_planning_end", {
+          round,
+          teamId: team.teamId,
+          rosterCount,
+          freeAgentCount: candidatePool.length,
+          warning: "team_player_max_reached",
+        });
         continue;
       }
 
       const filterStartedAt = Date.now();
+      const stage0StartedAt = profiler.start("candidate_stage0", {
+        round,
+        teamId: team.teamId,
+        rosterCount,
+        freeAgentCount: candidatePool.length,
+      });
       const cashAffordableCandidates = candidatePool
         .filter((candidate) => !pickedPlayerIds.has(candidate.player.id))
         .filter((candidate) => latestTeam.cash * (1 - phasePlan.cashReservePct) >= candidate.marketValue);
+      counters.rejectedByCash += Math.max(0, candidatePool.length - cashAffordableCandidates.length);
+      profiler.end("candidate_stage0", stage0StartedAt, {
+        round,
+        teamId: team.teamId,
+        rosterCount,
+        freeAgentCount: candidatePool.length,
+        candidateCount: cashAffordableCandidates.length,
+      });
+      const stage1StartedAt = profiler.start("candidate_stage1", {
+        round,
+        teamId: team.teamId,
+        rosterCount,
+        candidateCount: cashAffordableCandidates.length,
+      });
       const qualitySafeCandidates = cashAffordableCandidates.filter((candidate) => candidate.quality >= phasePlan.qualityFloor);
       const affordableCandidates =
         phasePlan.phase === "phase_a_minimum" && qualitySafeCandidates.length < Math.min(4, cashAffordableCandidates.length)
           ? cashAffordableCandidates
           : qualitySafeCandidates;
       const budgetSafeCandidates = affordableCandidates.filter((candidate) => candidate.marketValue <= phasePlan.maxRecommendedSpend);
+      const phaseAMinimumFallbackCandidates =
+        phasePlan.phase === "phase_a_minimum" && budgetSafeCandidates.length === 0
+          ? [...affordableCandidates].sort((left, right) => {
+              if (left.marketValue !== right.marketValue) return left.marketValue - right.marketValue;
+              return right.quality - left.quality;
+            })
+          : [];
+      const usingPhaseAMinimumFallback = phaseAMinimumFallbackCandidates.length > 0 && budgetSafeCandidates.length === 0;
       const planningPool =
         phasePlan.phase === "phase_b_core_optimum"
           ? affordableCandidates
           : phasePlan.phase === "phase_a_minimum" && budgetSafeCandidates.length > 0
             ? budgetSafeCandidates
+            : phaseAMinimumFallbackCandidates.length > 0
+            ? phaseAMinimumFallbackCandidates
             : budgetSafeCandidates.length >= Math.min(8, affordableCandidates.length)
             ? budgetSafeCandidates
             : affordableCandidates;
-      const scoredCandidates = planningPool
+      const scoringPoolCap =
+        phasePlan.phase === "phase_a_minimum"
+          ? Math.max(160, phasePlan.shortlistCap)
+          : Math.max(192, phasePlan.shortlistCap * 2);
+      const themeTarget = getTeamThemeCompositionTarget(latestTeam);
+      const scoringPool = usingPhaseAMinimumFallback
+        ? planningPool.slice(0, scoringPoolCap)
+        : selectScoringPool({
+            planningPool,
+            cap: scoringPoolCap,
+            themeTarget,
+            phase: phasePlan.phase,
+          });
+      const baseScoredCandidates = scoringPool
         .map((candidate) =>
           scoreCandidateForTeam({
             candidate,
@@ -2229,6 +2969,7 @@ export function runChunkedRedraftTopup(params: ChunkedRedraftTopupParams) {
             team: latestTeam,
             phase: phasePlan.phase,
             maxRecommendedSpend: phasePlan.maxRecommendedSpend,
+            counters,
           }),
         )
         .sort((left, right) => {
@@ -2236,8 +2977,60 @@ export function runChunkedRedraftTopup(params: ChunkedRedraftTopupParams) {
           if (right.quality !== left.quality) return right.quality - left.quality;
           return left.marketValue - right.marketValue;
         });
+      const protectThemeMinimum = needsThemePickToProtectMinimum({
+        gameState: runContext.save.gameState,
+        roster: teamRoster,
+        target: themeTarget,
+        phase: phasePlan.phase,
+      });
+      const desiredDraftRole = protectThemeMinimum
+        ? "theme"
+        : usingPhaseAMinimumFallback
+          ? "value"
+          : getDesiredDraftRole({
+            rosterCount,
+            roster: teamRoster,
+            gameState: runContext.save.gameState,
+            phase: phasePlan.phase,
+            profile: managerProfile,
+            blueprint: rosterBlueprint,
+            targetPlan,
+            themeTarget,
+          });
+      const scoredCandidates = applyDraftRoleIntent(baseScoredCandidates, desiredDraftRole);
+      draftRoleBoardRows.push(
+        ...buildDraftRoleBoardRows({
+          round,
+          team: latestTeam,
+          desiredRole: desiredDraftRole,
+          candidates: scoredCandidates,
+          limit: 20,
+        }),
+      );
+      profiler.end("candidate_stage1", stage1StartedAt, {
+        round,
+        teamId: team.teamId,
+        rosterCount,
+        candidateCount: scoredCandidates.length,
+        warning: planningPool.length > scoringPool.length
+          ? `scoring_pool_capped:${scoringPool.length}/${planningPool.length};role=${desiredDraftRole};fallback=${usingPhaseAMinimumFallback}`
+          : `role=${desiredDraftRole};fallback=${usingPhaseAMinimumFallback}`,
+      });
+      const shortlistStartedAt = profiler.start("candidate_shortlist", {
+        round,
+        teamId: team.teamId,
+        rosterCount,
+        candidateCount: scoredCandidates.length,
+      });
       const shortlistCap = phasePlan.shortlistCap;
       const shortlist = scoredCandidates.slice(0, shortlistCap);
+      profiler.end("candidate_shortlist", shortlistStartedAt, {
+        round,
+        teamId: team.teamId,
+        rosterCount,
+        candidateCount: scoredCandidates.length,
+        shortlistCount: shortlist.length,
+      });
       const teamMarketBoardRows = rosterBlueprint && managerProfile
         ? buildManagerMarketBoard({
             team: latestTeam,
@@ -2259,11 +3052,20 @@ export function runChunkedRedraftTopup(params: ChunkedRedraftTopupParams) {
         shortlistCount: shortlist.length,
         hardBlockersCount: candidatePool.length - cashAffordableCandidates.length,
         freeAgentsRemaining: candidatePool.length,
-        note: `phase=${phasePlan.phase};${phasePlan.description};cashAffordable=${cashAffordableCandidates.length};qualitySafe=${qualitySafeCandidates.length};budgetSafe=${budgetSafeCandidates.length};maxRecommendedSpend=${roundValue(phasePlan.maxRecommendedSpend)};cashReservePct=${phasePlan.cashReservePct};qualityFloor=${roundValue(phasePlan.qualityFloor)}`,
+        note: `phase=${phasePlan.phase};${phasePlan.description};cashAffordable=${cashAffordableCandidates.length};qualitySafe=${qualitySafeCandidates.length};budgetSafe=${budgetSafeCandidates.length};scoringPool=${scoringPool.length}/${planningPool.length};maxRecommendedSpend=${roundValue(phasePlan.maxRecommendedSpend)};cashReservePct=${phasePlan.cashReservePct};qualityFloor=${roundValue(phasePlan.qualityFloor)}`,
       });
 
       if (shortlist.length === 0) {
         warningRows.push({ round, teamId: team.teamId, reason: "no_affordable_candidate", detail: `cash=${latestTeam.cash}` });
+        profiler.log("team_planning_end", {
+          round,
+          teamId: team.teamId,
+          rosterCount,
+          freeAgentCount: candidatePool.length,
+          candidateCount: scoredCandidates.length,
+          shortlistCount: 0,
+          warning: "no_affordable_candidate",
+        });
         continue;
       }
 
@@ -2277,17 +3079,57 @@ export function runChunkedRedraftTopup(params: ChunkedRedraftTopupParams) {
         const pickStartedAt = Date.now();
         const cashBefore = latestTeam.cash;
         previewCalls += 1;
+        counters.buyPreviewCalls += 1;
+        counters.fullPreviewCalls += 1;
+        const buyPreviewStartedAt = profiler.start("buy_preview", {
+          round,
+          teamId: team.teamId,
+          rosterCount,
+          shortlistCount: shortlist.length,
+          previewCount: previewCalls,
+        });
+        const buyExecuteStartedAt = profiler.start("buy_execute", {
+          round,
+          teamId: team.teamId,
+          rosterCount,
+          shortlistCount: shortlist.length,
+          previewCount: previewCalls,
+        });
+        const contractOffer = recommendContractOfferForPlayer({
+          player: candidate.player,
+          teamStrategyProfile: strategyProfiles[team.teamId] ?? null,
+          teamCash: latestTeam.cash,
+          marketValue: candidate.marketValue,
+        });
         const result = executeLocalTransfermarktBuy({
           saveId: runContext.save.saveId,
           seasonId: runContext.save.gameState.season.id,
           teamId: team.teamId,
           playerId: candidate.player.id,
-          contractLength: 1,
+          contractLength: contractOffer.contractLength,
+          contractShape: contractOffer.contractShape,
           transferSource: "season1_autoprep_topup",
           localRunContext: runContext,
           deferPersist: true,
         });
+        profiler.end("buy_execute", buyExecuteStartedAt, {
+          round,
+          teamId: team.teamId,
+          rosterCount: result.rosterAfter ?? rosterCount,
+          shortlistCount: shortlist.length,
+          previewCount: previewCalls,
+          warning: result.canBuy ? null : result.blockingReasons.join("|"),
+        });
+        profiler.end("buy_preview", buyPreviewStartedAt, {
+          round,
+          teamId: team.teamId,
+          rosterCount: result.rosterAfter ?? rosterCount,
+          shortlistCount: shortlist.length,
+          previewCount: previewCalls,
+          warning: result.canBuy ? null : result.blockingReasons.join("|"),
+        });
         if (!result.canBuy) {
+          counters.failedBuys += 1;
           warningRows.push({
             round,
             teamId: team.teamId,
@@ -2296,6 +3138,8 @@ export function runChunkedRedraftTopup(params: ChunkedRedraftTopupParams) {
           });
           continue;
         }
+        counters.successfulBuys += 1;
+        counters.selectedCandidates += 1;
         pickedPlayerIds.add(candidate.player.id);
         roundPicks += 1;
         picked = true;
@@ -2331,13 +3175,13 @@ export function runChunkedRedraftTopup(params: ChunkedRedraftTopupParams) {
           roleFilled: candidate.player.className,
           blueprintNeed: rosterBlueprint?.requiredAxisCoverage || candidate.teamNeed,
           marketBoardTier: selectedBoardRow?.boardTier ?? "B Solid Fit",
-          whySelected: `${selectedBoardRow?.reason ?? phasePlan.description};score=${candidate.selectedScore}`,
+          whySelected: `${selectedBoardRow?.reason ?? phasePlan.description};draftRole=${desiredDraftRole};score=${candidate.selectedScore}`,
           whyRejectedOthers: pickRejectedRows.map((row) => `${row.rejectedPlayerName}:${row.rejectionCategory}`).join("|"),
           targetProgress,
           pickScore: candidate.pickScore,
           selectedScore: candidate.selectedScore,
           teamNeed: candidate.teamNeed,
-          role: candidate.player.className,
+          role: desiredDraftRole,
           currentRating: roundValue(candidate.quality, 2),
           potentialRange: getPotentialRange(candidate.player.potential),
           qualityTier: getQualityTier(candidate.quality),
@@ -2358,7 +3202,7 @@ export function runChunkedRedraftTopup(params: ChunkedRedraftTopupParams) {
           ...rejectedFields,
           previewCalls,
           candidateCount: shortlist.length,
-          reasons: `${phasePlan.phase};teamNeed=${candidate.teamNeed};quality=${roundValue(candidate.quality, 2)};identityFit=${candidate.identityFit};theme=${candidate.themeTier}:${candidate.themeCompositionScore};valueScore=${candidate.valueScore};potential=${candidate.potentialScore};marketValue=${candidate.marketValue};cashReservePct=${phasePlan.cashReservePct}`,
+          reasons: `${phasePlan.phase};draftRole=${desiredDraftRole};teamNeed=${candidate.teamNeed};quality=${roundValue(candidate.quality, 2)};identityFit=${candidate.identityFit};theme=${candidate.themeTier}:${candidate.themeCompositionScore};valueScore=${candidate.valueScore};potential=${candidate.potentialScore};marketValue=${candidate.marketValue};cashReservePct=${phasePlan.cashReservePct}`,
           durationMs: Date.now() - pickStartedAt,
         });
         phaseRows.push({
@@ -2371,6 +3215,15 @@ export function runChunkedRedraftTopup(params: ChunkedRedraftTopupParams) {
           selectedCandidate: candidate.player.id,
           shortlistCount: shortlist.length,
           note: phasePlan.phase,
+        });
+        profiler.log("pick_selected", {
+          round,
+          teamId: team.teamId,
+          rosterCount: result.rosterAfter ?? rosterCount + 1,
+          freeAgentCount: Math.max(0, candidatePool.length - 1),
+          candidateCount: scoredCandidates.length,
+          shortlistCount: shortlist.length,
+          previewCount: previewCalls,
         });
         break;
       }
@@ -2403,6 +3256,16 @@ export function runChunkedRedraftTopup(params: ChunkedRedraftTopupParams) {
         selectedCandidate: picked ? picks[picks.length - 1]?.playerId ?? null : null,
         note: phasePlan.phase,
       });
+      profiler.log("team_planning_end", {
+        round,
+        teamId: team.teamId,
+        rosterCount: picked ? (picks[picks.length - 1]?.rosterAfter ?? rosterCount + 1) : rosterCount,
+        freeAgentCount: candidatePool.length,
+        candidateCount: scoredCandidates.length,
+        shortlistCount: shortlist.length,
+        previewCount: previewCalls,
+        warning: picked ? null : "no_legal_candidate_after_preview",
+      });
       if (memoryAfter.heapUsedMb - memoryBefore.heapUsedMb > 100) {
         warningRows.push({
           round,
@@ -2415,7 +3278,20 @@ export function runChunkedRedraftTopup(params: ChunkedRedraftTopupParams) {
 
     if (!dryRun && runContext.deferredWrites > 0) {
       const flushStartedAt = Date.now();
+      const flushPhaseStartedAt = profiler.start("round_flush", {
+        round,
+        teamId: "ALL",
+        rosterCount: runContext.save.gameState.rosters.length,
+        freeAgentCount: candidatePool.length,
+      });
       flushLocalTransfermarktRunContext(runContext);
+      counters.saveFlushes += 1;
+      profiler.end("round_flush", flushPhaseStartedAt, {
+        round,
+        teamId: "ALL",
+        rosterCount: runContext.save.gameState.rosters.length,
+        freeAgentCount: candidatePool.length,
+      });
       phaseRows.push({
         round,
         teamId: "ALL",
@@ -2438,6 +3314,13 @@ export function runChunkedRedraftTopup(params: ChunkedRedraftTopupParams) {
       resumeTested,
     });
     const reportStartedAt = Date.now();
+    const reportPhaseStartedAt = profiler.start("report_export", {
+      round,
+      teamId: "ALL",
+      rosterCount: runContext.save.gameState.rosters.length,
+      freeAgentCount: candidatePool.length,
+      candidateCount: picks.length,
+    });
     writeReports({
       outputDir,
       summary,
@@ -2451,10 +3334,21 @@ export function runChunkedRedraftTopup(params: ChunkedRedraftTopupParams) {
       seasonStrategies,
       rosterBlueprints,
       marketBoardRows,
+      draftRoleBoardRows,
       candidatePool,
       memoryRows,
       warningRows,
       phaseRows,
+      progressRows: profiler.rows,
+      counters,
+      reportMode,
+    });
+    profiler.end("report_export", reportPhaseStartedAt, {
+      round,
+      teamId: "ALL",
+      rosterCount: runContext.save.gameState.rosters.length,
+      freeAgentCount: candidatePool.length,
+      candidateCount: picks.length,
     });
     phaseRows.push({
       round,
@@ -2497,6 +3391,12 @@ export function runChunkedRedraftTopup(params: ChunkedRedraftTopupParams) {
     roundDurations,
     resumeTested,
   });
+  profiler.log("runner_complete", {
+    round,
+    rosterCount: finalSave.gameState.rosters.length,
+    freeAgentCount: Math.max(0, finalSave.gameState.players.length - finalSave.gameState.rosters.length),
+    candidateCount: picks.length,
+  });
   writeReports({
     outputDir,
     summary: finalSummary,
@@ -2510,10 +3410,14 @@ export function runChunkedRedraftTopup(params: ChunkedRedraftTopupParams) {
     seasonStrategies,
     rosterBlueprints,
     marketBoardRows,
+    draftRoleBoardRows,
     candidatePool: buildCandidatePool(finalSave.gameState, pickedPlayerIds),
     memoryRows,
     warningRows,
     phaseRows,
+    progressRows: profiler.rows,
+    counters,
+    reportMode,
   });
 
   return {
@@ -2526,4 +3430,17 @@ export function runChunkedRedraftTopup(params: ChunkedRedraftTopupParams) {
     warnings,
     outputDir,
   };
+  } catch (error) {
+    writeRedraftAbortArtifacts({
+      outputDir,
+      profiler,
+      counters,
+      error,
+      memoryRows,
+      phaseRows,
+      picks,
+      warningRows,
+    });
+    throw error;
+  }
 }

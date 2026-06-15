@@ -4,6 +4,7 @@ import type { ContractShape, GameState, Player, RosterEntry, TransferHistoryEntr
 import { getImportedPlayerDisplayMarketValue, getImportedPlayerDisplaySalary } from "@/lib/data/player-economy-display";
 import { resolvePlayerEconomyContract } from "@/lib/foundation/player-economy-contract";
 import { buildPlayerRatingContractMap } from "@/lib/foundation/player-rating-contract";
+import { getTeamPlayerMax } from "@/lib/foundation/roster-limits";
 import { getTeamStrategyProfile } from "@/lib/foundation/team-strategy-profiles";
 import { buildPlayerProgressionForecast } from "@/lib/training/player-progression-forecast";
 import { getFacilityLevel, getTeamFacilityState } from "@/lib/facilities/facility-effects";
@@ -11,7 +12,7 @@ import { buildPlayerScoutPotentialFromGameState } from "@/lib/progression/player
 import { createPersistenceService } from "@/lib/persistence/persistence-service";
 import type { PersistenceService, PersistedSaveGame } from "@/lib/persistence/types";
 import { calculateTransfermarktFit, getTransfermarktBracket, hasMercenaryTrait } from "@/lib/market/transfermarkt-fit";
-import { buildContractNegotiationPreview } from "@/lib/market/contract-negotiation-preview";
+import { buildContractNegotiationPreview, recommendContractOfferForPlayer } from "@/lib/market/contract-negotiation-preview";
 import {
   getRecentlySoldBySameTeam,
   isRecentlySoldBySameTeam,
@@ -523,6 +524,7 @@ function buildLocalTransfermarktBuyPreviewFromContext(
     acceptChance: negotiationPreview.acceptChance,
     counterChance: negotiationPreview.counterChance,
     rejectChance: negotiationPreview.rejectChance,
+    contractPreference: negotiationPreview.contractPreference,
     negotiationScoreBreakdown: negotiationPreview.scoreBreakdown,
     negotiationReasons: negotiationPreview.reasons,
     negotiationWarnings: negotiationPreview.warnings,
@@ -555,11 +557,20 @@ function resolveLocalTransfermarktBuyContext(params: TransfermarktBuyParams): Lo
   const salaryBefore = teamContext?.salaryTotal ?? 0;
   const marketValueBefore = teamContext?.marketValueTotal ?? 0;
   const rosterBefore = teamContext?.rosterCount ?? 0;
+  const recommendedContract = recommendContractOfferForPlayer({
+    player,
+    teamStrategyProfile,
+    teamCash: cashBefore,
+    marketValue: purchasePrice,
+  });
   const contractLength =
     typeof params.contractLength === "number" && Number.isFinite(params.contractLength)
       ? Math.max(1, Math.round(params.contractLength))
-      : 1;
-  const contractShape = normalizeContractShape(params.contractShape);
+      : recommendedContract.contractLength;
+  const contractShape =
+    params.contractShape != null
+      ? normalizeContractShape(params.contractShape)
+      : recommendedContract.contractShape;
   const blockingReasons: string[] = [];
   const warnings: string[] = [];
 
@@ -568,12 +579,14 @@ function resolveLocalTransfermarktBuyContext(params: TransfermarktBuyParams): Lo
   if (playerAlreadyOwned) blockingReasons.push("player_not_free_agent_in_scope");
   if (purchasePrice == null || purchasePrice <= 0) blockingReasons.push("market_value_missing");
   if (salary == null || salary <= 0) blockingReasons.push("salary_demand_missing");
-  if (team && rosterBefore >= team.rosterLimit) blockingReasons.push("roster_limit_reached");
+  if (team && rosterBefore >= getTeamPlayerMax(team, teamIdentity)) blockingReasons.push("roster_limit_reached");
   if (team && purchasePrice != null && team.cash < purchasePrice) blockingReasons.push("insufficient_cash");
   if (recentlySoldBySameTeam && !params.allowRecentlySoldRebuyOverride) {
     blockingReasons.push(RECENTLY_SOLD_SAME_PRESEASON_BLOCKER);
   }
-  if (contractLength !== 1) warnings.push("contract_length_override_in_effect");
+  if (typeof params.contractLength === "number" && contractLength !== recommendedContract.contractLength) {
+    warnings.push("contract_length_override_in_effect");
+  }
   if (recentlySoldBySameTeam && params.allowRecentlySoldRebuyOverride) {
     warnings.push(RECENTLY_SOLD_SAME_PRESEASON_OVERRIDE_WARNING);
   }
@@ -720,6 +733,7 @@ export function listLocalTransfermarktFreeAgents(input: TransfermarktReadParams 
         marketValuePotentialPremiumPct: scoutPotential.marketValuePotentialPremiumPct,
         trainingFormTier: progressionForecast.trainingFormTier,
         developmentTrend: progressionForecast.xpTrend,
+        developmentRoute: progressionForecast.developmentRoute,
         regressionRisk: progressionForecast.regressionRisk,
         portraitPath: player.portraitPath ?? null,
         portraitUrl: player.portraitUrl ?? null,

@@ -409,7 +409,9 @@ function buildBaselineAttributeDeltas(
   const latestEvent = progressionEvents[0] ?? null;
   return buildAttributeStats(player).map((entry) => {
     const key = entry.key as keyof NonNullable<Player["attributeSheetStats"]>;
-    const baselineValue = baseline.attributes[key] ?? null;
+    const baselineValue = Object.prototype.hasOwnProperty.call(baseline.attributes, key)
+      ? baseline.attributes[key as keyof typeof baseline.attributes] ?? null
+      : null;
     const currentValue = player.attributeSheetStats?.[key] ?? null;
     const delta =
       typeof baselineValue === "number" && typeof currentValue === "number"

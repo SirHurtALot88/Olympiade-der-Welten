@@ -22,7 +22,13 @@ import { buildTransfermarktPoolAudit, type TransfermarktPoolAudit } from "@/lib/
 import { buildPlayerScoutPotential } from "@/lib/progression/player-potential-service";
 import type { Player } from "@/lib/data/olyDataTypes";
 import type { PlayerPotentialBand, PlayerPotentialSource } from "@/lib/data/olyDataTypes";
-import type { PlayerDevelopmentTrend, PlayerProgressionRatingTier, PlayerRegressionRisk, PlayerTrainingFormTier } from "@/lib/training/training-plan-types";
+import type {
+  PlayerDevelopmentRoute,
+  PlayerDevelopmentTrend,
+  PlayerProgressionRatingTier,
+  PlayerRegressionRisk,
+  PlayerTrainingFormTier,
+} from "@/lib/training/training-plan-types";
 import { db } from "@/src/server/db";
 
 export type TransfermarktAvailabilityReason = "free_agent" | "no_active_player";
@@ -97,6 +103,7 @@ export type TransfermarktFreeAgentItem = {
   marketValuePotentialPremiumPct: number | null;
   trainingFormTier: PlayerTrainingFormTier | null;
   developmentTrend: PlayerDevelopmentTrend | null;
+  developmentRoute: PlayerDevelopmentRoute | null;
   regressionRisk: PlayerRegressionRisk | null;
   portraitPath: string | null;
   portraitUrl: string | null;
@@ -695,6 +702,7 @@ export async function listTransfermarktFreeAgents(
       marketValuePotentialPremiumPct: scoutPotential.marketValuePotentialPremiumPct,
       trainingFormTier: null,
       developmentTrend: null,
+      developmentRoute: null,
       regressionRisk: null,
       portraitPath: player.portraitPath ?? null,
       portraitUrl: player.portraitUrl ?? null,

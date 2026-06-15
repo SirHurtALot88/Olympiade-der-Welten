@@ -46,13 +46,13 @@ import {
   buildContractNegotiationDraft,
   buildTeamContractSeasonTable,
   type NegotiationScoreBreakdownEntry,
+  type PlayerContractPreference,
 } from "@/lib/market/contract-negotiation-preview";
 import { getTransfermarktAdvancedColumns, getTransfermarktBaseColumns } from "@/lib/market/transfermarkt-column-contract";
 import {
   formatTransfermarktCurrency,
   formatTransfermarktPoints,
   formatTransfermarktRatio,
-  getConfirmedAxisHeatStyle,
   getConfirmedTierStyle,
   type TransfermarktTier,
 } from "@/lib/market/transfermarkt-formatting-contract";
@@ -416,6 +416,7 @@ type TransfermarktBuySummary = {
   acceptChance?: number | null;
   counterChance?: number | null;
   rejectChance?: number | null;
+  contractPreference?: PlayerContractPreference | null;
   negotiationScoreBreakdown?: NegotiationScoreBreakdownEntry[];
   negotiationReasons?: string[];
   negotiationWarnings?: string[];
@@ -3229,15 +3230,13 @@ function formatTopDisciplineScores(item: TransfermarktFreeAgentItem) {
   }
 
   return (
-    <div className="transfermarkt-top-diszi-list" aria-label="Top-Diszis mit Scouting-Score und PPs der Vorsaison">
+    <div className="transfermarkt-top-diszi-list transfermarkt-top-diszi-list-compact" aria-label="Top-Diszis mit Scouting-Score">
       <span className="transfermarkt-top-diszi-head">Diszi</span>
       <span className="transfermarkt-top-diszi-head">Score</span>
-      <span className="transfermarkt-top-diszi-head">PPs -1</span>
       {item.topDisciplineScores.map((entry) => (
         <span className="transfermarkt-top-diszi-row" key={entry.disciplineId}>
           <span title={entry.disciplineName}>{abbreviateDisciplineName(entry.disciplineName)}</span>
           <strong style={getConfirmedTierStyle(entry.scoreTier)}>{entry.scoreTier ?? "—"}</strong>
-          <span>{entry.ppsLastSeason == null ? "—" : formatPpsValue(entry.ppsLastSeason)}</span>
         </span>
       ))}
     </div>
@@ -3278,6 +3277,27 @@ function formatMarketDevelopmentTrend(value: string | null | undefined) {
       return "-";
     case "strong_negative":
       return "--";
+    default:
+      return "—";
+  }
+}
+
+function formatMarketDevelopmentRoute(value: string | null | undefined) {
+  switch (value) {
+    case "star_growth":
+      return "Star Growth";
+    case "core_growth":
+      return "Core Growth";
+    case "depth_growth":
+      return "Depth Growth";
+    case "prospect_growth":
+      return "Prospect";
+    case "maintenance":
+      return "Maintenance";
+    case "stagnation_watch":
+      return "Stagnation";
+    case "free_agent_ambient":
+      return "FA Scout";
     default:
       return "—";
   }
@@ -3334,6 +3354,27 @@ function renderPillValue(value: string | null | undefined) {
   }
 
   return <span className="pill">{value}</span>;
+}
+
+function renderMarketTraitList(item: TransfermarktFreeAgentItem) {
+  const traits = [
+    ...item.traitsPositive.map((trait) => ({ trait, tone: "positive" as const })),
+    ...item.traitsNegative.map((trait) => ({ trait, tone: "negative" as const })),
+  ];
+
+  if (traits.length === 0) {
+    return "—";
+  }
+
+  return (
+    <span className="transfermarkt-trait-list">
+      {traits.map(({ trait, tone }) => (
+        <span key={`${tone}-${trait}`} className={`pill transfermarkt-trait-pill transfermarkt-trait-pill-${tone}`}>
+          {tone === "positive" ? "+" : "-"} {trait}
+        </span>
+      ))}
+    </span>
+  );
 }
 
 function clampValue(value: number, min: number, max: number) {
@@ -3908,6 +3949,15 @@ function formatSignedDisplayMoney(value: number | null | undefined) {
   return `${prefix}${formatDisplayMoney(value)}`;
 }
 
+function formatSignedTransfermarktCurrency(value: number | null | undefined) {
+  if (value == null || !Number.isFinite(value)) {
+    return "—";
+  }
+
+  const prefix = value > 0 ? "+" : "";
+  return `${prefix}${formatTransfermarktCurrency(value)}`;
+}
+
 function formatSignedPercent(value: number | null | undefined) {
   if (value == null || !Number.isFinite(value)) {
     return "—";
@@ -3927,6 +3977,20 @@ function formatContractShapeLabel(shape: ContractShape | null | undefined) {
   if (shape === "balanced") {
     return "Balanced";
   }
+  return "—";
+}
+
+function formatContractLengthPreferenceLabel(value: PlayerContractPreference["lengthPreference"] | null | undefined) {
+  if (value === "long") return "bevorzugt lange Verträge";
+  if (value === "short") return "bevorzugt kurze Verträge";
+  if (value === "medium") return "mag mittlere Verträge";
+  return "keine klare Präferenz";
+}
+
+function formatContractPreferenceMatchLabel(value: PlayerContractPreference["matchQuality"] | null | undefined) {
+  if (value === "preferred") return "passt sehr gut";
+  if (value === "acceptable") return "brauchbar";
+  if (value === "mismatch") return "kostet Vertrauen";
   return "—";
 }
 
@@ -4322,6 +4386,14 @@ function getPoolHeatClass(value: number | null | undefined, pool: Array<number |
   const percentile = upperIndex / Math.max(1, sorted.length - 1);
   const bucketIndex = Math.min(7, Math.max(0, Math.floor(percentile * 8)));
   return `heat-band-${bucketIndex + 1}`;
+}
+
+function getTransferHistoryAxisHeaderClass(columnId: string) {
+  if (columnId === "pow") return "transfer-history-axis-header transfer-history-axis-header-pow heat-band-1";
+  if (columnId === "spe") return "transfer-history-axis-header transfer-history-axis-header-spe heat-band-6";
+  if (columnId === "men") return "transfer-history-axis-header transfer-history-axis-header-men heat-band-8";
+  if (columnId === "soc") return "transfer-history-axis-header transfer-history-axis-header-soc heat-band-3";
+  return "";
 }
 
 function getSeasonCashHeatClass(value: number, rows: Array<{ cash: number | null }>) {
@@ -4749,6 +4821,7 @@ export default function FoundationPageClient({ initialReadSource, initialSelecte
   const [seasonTransitionError, setSeasonTransitionError] = useState<string | null>(null);
   const [seasonStandingsFeed, setSeasonStandingsFeed] = useState<FoundationSeasonStandingsOverviewResponse | null>(null);
   const [prizePreviewFeed, setPrizePreviewFeed] = useState<FoundationPrizePreviewResponse | null>(null);
+  const [prizeForecastRank, setPrizeForecastRank] = useState<number>(1);
   const [cashApplyFeed, setCashApplyFeed] = useState<FoundationApplySummary | null>(null);
   const [matchdayAdvanceFeed, setMatchdayAdvanceFeed] = useState<FoundationApplySummary | null>(null);
   const [matchdayAutoRunFeed, setMatchdayAutoRunFeed] = useState<FoundationMatchdayAutoRunSummary | null>(null);
@@ -8859,6 +8932,34 @@ export default function FoundationPageClient({ initialReadSource, initialSelecte
     });
   };
 
+  const setTransferMarketAdvancedColumnsVisible = (nextVisible: boolean) => {
+    setMarketShowAdvancedColumns(nextVisible);
+    setTableColumnPreferences((current) => {
+      const advancedIds = getTransfermarktAdvancedColumns().map((column) => column.id);
+      const hidden = new Set(current.transferMarketTable?.hiddenColumnIds ?? []);
+      const columnVisibility = { ...(current.transferMarketTable?.columnVisibility ?? {}) };
+
+      for (const columnId of advancedIds) {
+        if (nextVisible) {
+          hidden.delete(columnId);
+        } else {
+          hidden.add(columnId);
+        }
+        columnVisibility[columnId] = nextVisible;
+      }
+
+      return {
+        ...current,
+        transferMarketTable: {
+          ...markTableAsCustom(current.transferMarketTable),
+          widths: current.transferMarketTable?.widths ?? {},
+          hiddenColumnIds: Array.from(hidden),
+          columnVisibility,
+        },
+      };
+    });
+  };
+
   const adjustTableColumnWidth = (tableId: string, column: FoundationTableColumn, delta: number) => {
     if (tableId === "seasonTable" && seasonTableMode === "expert") {
       return;
@@ -11065,6 +11166,15 @@ export default function FoundationPageClient({ initialReadSource, initialSelecte
         });
         const playerRating = playerRatingsById.get(entry.playerId) ?? null;
         const normalizedSource = entry.source ?? "missing_source";
+        const economyBenchmark = player ? resolvePlayerEconomyContract({ playerId: player.id, player }) : null;
+        const salaryBenchmark =
+          entry.type === "buy" && economyBenchmark?.expectedSalary != null
+            ? economyBenchmark.expectedSalary
+            : null;
+        const salaryDelta =
+          salaryBenchmark != null && Number.isFinite(entry.salary)
+            ? roundViewNumber(entry.salary - salaryBenchmark, 2)
+            : null;
 
         return {
           ...entry,
@@ -11081,6 +11191,8 @@ export default function FoundationPageClient({ initialReadSource, initialSelecte
           pps: playerRating?.ppsSeason ?? null,
           mvs: playerRating?.mvs ?? null,
           guv: entry.type === "sell" ? transferHistoryProfitById.get(entry.transferId) ?? null : null,
+          salaryBenchmark,
+          salaryDelta,
           sourceKey: normalizedSource,
           sourceLabel: getTransferSourceLabel(entry.source),
         };
@@ -11576,6 +11688,7 @@ export default function FoundationPageClient({ initialReadSource, initialSelecte
         imageUrl: (row) => row.item.imageUrl ?? "",
         className: (row) => row.item.className,
         subclasses: (row) => row.item.subclasses.join(", "),
+        traits: (row) => [...row.item.traitsPositive, ...row.item.traitsNegative].join(", "),
         race: (row) => row.item.race,
         alignment: (row) => row.item.alignment,
         gender: (row) => row.item.gender,
@@ -11587,6 +11700,7 @@ export default function FoundationPageClient({ initialReadSource, initialSelecte
         potentialTier: (row) => row.item.potentialTier ?? "",
         trainingFormTier: (row) => row.item.trainingFormTier ?? "",
         developmentTrend: (row) => row.item.developmentTrend ?? "",
+        developmentRoute: (row) => row.item.developmentRoute ?? "",
         regressionRisk: (row) => row.item.regressionRisk ?? "",
         marketValueSalaryRatio: (row) => row.item.marketValueSalaryRatio ?? Number.NEGATIVE_INFINITY,
         bracket: (row) => row.item.bracket ?? Number.NEGATIVE_INFINITY,
@@ -11652,6 +11766,15 @@ export default function FoundationPageClient({ initialReadSource, initialSelecte
       }),
     [tableSorts.transferHistory, transferHistoryRows],
   );
+  const transferHistoryAxisHeatPools = useMemo(
+    () => ({
+      pow: sortedTransferHistoryRows.map((row) => row.pow),
+      spe: sortedTransferHistoryRows.map((row) => row.spe),
+      men: sortedTransferHistoryRows.map((row) => row.men),
+      soc: sortedTransferHistoryRows.map((row) => row.soc),
+    }),
+    [sortedTransferHistoryRows],
+  );
 
   const prizePreviewRows = useMemo(() => prizePreviewFeed?.items ?? [], [prizePreviewFeed]);
   const prizePreviewGlobalWarnings = useMemo(() => prizePreviewFeed?.globalWarnings ?? [], [prizePreviewFeed]);
@@ -11666,6 +11789,72 @@ export default function FoundationPageClient({ initialReadSource, initialSelecte
     () => prizePreviewRows.find((row) => row.teamId === selectedTeam?.teamId) ?? null,
     [prizePreviewRows, selectedTeam?.teamId],
   );
+  useEffect(() => {
+    const defaultRank = selectedPrizePreviewRow?.rank ?? selectedStandingRow?.rank ?? 1;
+    setPrizeForecastRank(clampValue(Math.round(defaultRank), 1, 32));
+  }, [selectedPrizePreviewRow?.rank, selectedStandingRow?.rank, selectedTeam?.teamId]);
+  const prizeForecastRankRow = useMemo(
+    () => prizePreviewRows.find((row) => row.rank === prizeForecastRank) ?? null,
+    [prizeForecastRank, prizePreviewRows],
+  );
+  const prizeForecastSalaryTotal = useMemo(() => {
+    if (selectedPrizePreviewRow?.salaryTotal != null) {
+      return selectedPrizePreviewRow.salaryTotal;
+    }
+
+    if (!selectedTeam) {
+      return null;
+    }
+
+    return roundViewNumber(
+      selectedRoster.reduce((sum, rosterEntry) => {
+        const player = gameState.players.find((candidate) => candidate.id === rosterEntry.playerId) ?? null;
+        return sum + (resolvePlayerEconomyContract({ player, rosterEntry }).salary ?? 0);
+      }, 0),
+      1,
+    );
+  }, [gameState.players, selectedPrizePreviewRow?.salaryTotal, selectedRoster, selectedTeam]);
+  const prizeForecastRows = useMemo(() => {
+    const startCash = selectedPrizePreviewRow?.currentCash ?? selectedTeam?.cash ?? null;
+    const salaryTotal = prizeForecastSalaryTotal;
+    const rankRow = prizeForecastRankRow;
+
+    if (startCash == null || salaryTotal == null || !rankRow) {
+      return [];
+    }
+
+    const seasonPrizeRows = [
+      { label: "GuV", prizeMoney: rankRow.prizeMoney ?? null },
+      ...(rankRow.futureSeasons ?? []).slice(0, 4).map((entry, index) => ({
+        label: `GuV +${index + 1}`,
+        prizeMoney: entry.prizeMoney ?? null,
+      })),
+    ];
+
+    const paddedRows = [
+      ...seasonPrizeRows,
+      ...Array.from({ length: Math.max(0, 5 - seasonPrizeRows.length) }, (_, index) => ({
+        label: `GuV +${seasonPrizeRows.length + index}`,
+        prizeMoney: rankRow.prizeMoney ?? null,
+      })),
+    ].slice(0, 5);
+
+    let runningCash = startCash;
+    return paddedRows.map((row) => {
+      const guv = row.prizeMoney == null ? null : roundViewNumber(row.prizeMoney - salaryTotal, 1);
+      const cashAfter = guv == null ? null : roundViewNumber(runningCash + guv, 1);
+      if (cashAfter != null) {
+        runningCash = cashAfter;
+      }
+
+      return {
+        ...row,
+        salaryTotal,
+        guv,
+        cashAfter,
+      };
+    });
+  }, [prizeForecastRankRow, prizeForecastSalaryTotal, selectedPrizePreviewRow?.currentCash, selectedTeam?.cash]);
   const seasonEndChampionRow = useMemo(
     () =>
       [...seasonStandRows]
@@ -18279,9 +18468,37 @@ export default function FoundationPageClient({ initialReadSource, initialSelecte
                         if (column.id === "name") {
                           return <td key={column.id}><div className="table-player-cell"><strong>{row.player.name}</strong><span>{row.seasonPerformance?.sourceLabel ?? row.transferStatus}</span></div></td>;
                         }
-                        if (column.id === "team") return <td key={column.id}>{row.team?.name ?? "Free Agent"}</td>;
-                        if (column.id === "class") return <td key={column.id}><ClassIcon classNameValue={row.player.className} showLabel={false} /></td>;
-                        if (column.id === "race") return <td key={column.id}><RaceIcon race={row.player.race} showLabel={false} /></td>;
+                        if (column.id === "team") {
+                          const teamLogo = row.team ? getTeamLogoModel(row.team) : null;
+                          return (
+                            <td key={column.id}>
+                              <div className="players-table-team-cell">
+                                {teamLogo?.src ? (
+                                  <img className="players-table-team-logo" src={teamLogo.src} alt={`${row.team?.name ?? "Team"} Logo`} />
+                                ) : (
+                                  <span className="players-table-team-logo players-table-team-logo-placeholder" aria-label={`${row.team?.name ?? "Free Agent"} Logo Platzhalter`}>
+                                    {teamLogo?.initials ?? "FA"}
+                                  </span>
+                                )}
+                                <span>{row.team?.name ?? "Free Agent"}</span>
+                              </div>
+                            </td>
+                          );
+                        }
+                        if (column.id === "class") {
+                          return (
+                            <td key={column.id}>
+                              <ClassIcon classNameValue={row.player.className} className="table-identity-icon-chip" iconClassName="table-identity-icon-image" />
+                            </td>
+                          );
+                        }
+                        if (column.id === "race") {
+                          return (
+                            <td key={column.id}>
+                              <RaceIcon race={row.player.race} className="table-identity-icon-chip" iconClassName="table-identity-icon-image" />
+                            </td>
+                          );
+                        }
                         if (column.id === "pps") return <td key={column.id} className={row.playerPps != null ? getPoolHeatClass(row.playerPps, leaguePlayerHeatPools.pps) : ""}>{row.playerPps != null ? formatPpsValue(row.playerPps) : "—"}</td>;
                         if (column.id === "ovr") return <td key={column.id} className={row.playerOvr != null ? getPoolHeatClass(row.playerOvr, leaguePlayerHeatPools.ovr) : ""}>{formatWholeNumber(row.playerOvr)}</td>;
                         if (column.id === "mvs") return <td key={column.id} className={row.playerMvs != null ? getPoolHeatClass(row.playerMvs, leaguePlayerHeatPools.mvs) : ""}>{row.playerMvs != null ? formatPpsValue(row.playerMvs) : "—"}</td>;
@@ -19165,6 +19382,82 @@ export default function FoundationPageClient({ initialReadSource, initialSelecte
                 RankChange: Season 1 nutzt Startbudget als StartRank; spätere Seasons nutzen den Vorjahresrang, falls als Quelle vorhanden. Fehlende Quelle bleibt Warning, kein Fake-Bonus.
               </p>
             </div>
+            <div className="panel prize-forecast-panel" style={{ marginTop: 16, marginBottom: 16 }}>
+              <div className="panel-header">
+                <div>
+                  <h3>5-Seasons GuV Forecast</h3>
+                  <p className="muted">
+                    Simple Rechnung: simuliertes Preisgeld nach Platz minus aktuelle Gehaltssumme. Keine Transfers, Facilities oder Bonus-Fakes.
+                  </p>
+                </div>
+                <label className="filter-field prize-forecast-rank-select">
+                  <span>Platz simulieren</span>
+                  <select
+                    className="input"
+                    value={prizeForecastRank}
+                    onChange={(event) => setPrizeForecastRank(clampValue(Number(event.target.value), 1, 32))}
+                  >
+                    {Array.from({ length: Math.max(32, prizePreviewFeed?.summary.prizeRowsCount ?? 0) }, (_, index) => index + 1).map((rank) => (
+                      <option key={rank} value={rank}>
+                        Platz {rank}
+                      </option>
+                    ))}
+                  </select>
+                </label>
+              </div>
+              <div className="teams-summary-grid history-summary-grid">
+                <article className="metric-card">
+                  <span>Start Cash</span>
+                  <strong>{formatLocalePoints(selectedPrizePreviewRow?.currentCash ?? selectedTeam?.cash ?? null, 1)}</strong>
+                </article>
+                <article className="metric-card">
+                  <span>Aktuelles Gehalt</span>
+                  <strong>{formatLocalePoints(prizeForecastSalaryTotal, 1)}</strong>
+                </article>
+                <article className="metric-card">
+                  <span>Simulierter Platz</span>
+                  <strong>{prizeForecastRankRow ? `${prizeForecastRank}.` : "—"}</strong>
+                </article>
+                <article className="metric-card">
+                  <span>Preisgeld aktuell</span>
+                  <strong>{formatLocalePoints(prizeForecastRankRow?.prizeMoney ?? null, 1)}</strong>
+                </article>
+              </div>
+              {prizeForecastRows.length === 0 ? (
+                <p className="muted cockpit-step-hint">
+                  Forecast wartet auf Preisgeld-Preview, Team-Cash und Gehaltssumme.
+                </p>
+              ) : (
+                <div className="table-shell prize-forecast-table-shell">
+                  <table className="team-table prize-forecast-table">
+                    <thead>
+                      <tr>
+                        <th>Season</th>
+                        <th>Preisgeld</th>
+                        <th>Gehalt</th>
+                        <th>GuV</th>
+                        <th>Cash nachher</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {prizeForecastRows.map((row) => (
+                        <tr key={row.label}>
+                          <td>{row.label}</td>
+                          <td>{formatLocalePoints(row.prizeMoney, 1)}</td>
+                          <td>{formatLocalePoints(row.salaryTotal, 1)}</td>
+                          <td className={row.guv == null ? undefined : row.guv >= 0 ? "text-positive" : "text-negative"}>
+                            {formatSignedDisplayMoney(row.guv)}
+                          </td>
+                          <td className={row.cashAfter == null ? undefined : row.cashAfter >= 0 ? "text-positive" : "text-negative"}>
+                            {formatLocalePoints(row.cashAfter, 1)}
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              )}
+            </div>
             <div className="teams-summary-grid history-summary-grid">
               <article className="metric-card">
                 <span>Preisgeld-Zeilen</span>
@@ -19520,8 +19813,20 @@ export default function FoundationPageClient({ initialReadSource, initialSelecte
                                       </td>
                                     );
                                   }
-                                  if (column.id === "class") return <td key={column.id}><ClassIcon classNameValue={player.className} showLabel={false} /></td>;
-                                  if (column.id === "race") return <td key={column.id}><RaceIcon race={player.race} showLabel={false} /></td>;
+                                  if (column.id === "class") {
+                                    return (
+                                      <td key={column.id}>
+                                        <ClassIcon classNameValue={player.className} className="table-identity-icon-chip" iconClassName="table-identity-icon-image" />
+                                      </td>
+                                    );
+                                  }
+                                  if (column.id === "race") {
+                                    return (
+                                      <td key={column.id}>
+                                        <RaceIcon race={player.race} className="table-identity-icon-chip" iconClassName="table-identity-icon-image" />
+                                      </td>
+                                    );
+                                  }
                                   if (column.id === "mw") return <td key={column.id}>{formatLocalePoints(getPlayerDisplayMarketValue(player), 2)}</td>;
                                   if (column.id === "salary") return <td key={column.id}>{formatDisplayMoney(getRosterEntryDisplaySalary(entry, player))}</td>;
                                   if (column.id === "contract") return <td key={column.id}>{entry.contractLength}</td>;
@@ -19615,6 +19920,28 @@ export default function FoundationPageClient({ initialReadSource, initialSelecte
 	                      <strong>Contract Exit Value</strong>
 	                      <span>Wenn ein Vertrag ausläuft oder ein Spieler freigegeben wird, erhält das Team den aktuellen VK-Wert.</span>
 	                    </div>
+                    {selectedTeamContractTable ? (
+                      <div className="contract-forecast-panel">
+                        <div className="transfer-callout-title">
+                          <strong>5-Seasons Gehaltsforecast</strong>
+                          <span className="muted">NBA-Style: gebundene Gehälter je Season</span>
+                        </div>
+                        <div className="contract-forecast-grid">
+                          {selectedTeamContractTable.totalsCommitted.map((entry, index) => {
+                            const preview = selectedTeamContractTable.totalsWithPreview[index];
+                            return (
+                              <article className="contract-forecast-card" key={entry.label}>
+                                <span>{entry.label}</span>
+                                <strong>{formatDisplayMoney(entry.salary)}</strong>
+                                <small className="muted">
+                                  mit Preview {preview ? formatDisplayMoney(preview.salary) : "—"}
+                                </small>
+                              </article>
+                            );
+                          })}
+                        </div>
+                      </div>
+                    ) : null}
 	                    <div className="table-shell team-focus-table-shell">
 	                      <table className="team-table team-contracts-table">
 	                        <thead>
@@ -20852,6 +21179,7 @@ export default function FoundationPageClient({ initialReadSource, initialSelecte
                     {visibleTransfermarktColumns.map((column) => (
                       <col key={column.id} style={{ width: `${getTableColumnWidth("transferMarketTable", column)}px` }} />
                     ))}
+                    <col className="transfermarkt-actions-col" />
                   </colgroup>
                   <thead>
                     <tr>
@@ -20884,6 +21212,7 @@ export default function FoundationPageClient({ initialReadSource, initialSelecte
                           </div>
                         </th>
                       ))}
+                      <th className="transfermarkt-row-actions-header" aria-label="Aktionen" />
                     </tr>
                   </thead>
                   <tbody>
@@ -20919,38 +21248,15 @@ export default function FoundationPageClient({ initialReadSource, initialSelecte
                             );
                           }
                           if (column.id === "name") {
-                            const isWishlisted = transferWishlistByPlayerId.has(row.item.playerId);
                             return (
                               <td key={column.id}>
                                 <div className="table-player-cell">
                                   <strong>{row.item.name}</strong>
-                                  <span>
-                                    <ClassColorChip className={row.item.className} /> · <RaceIcon race={row.item.race} className="race-icon-chip-inline" />
+                                  <span className="transfermarkt-name-meta">
+                                    <RaceIcon race={row.item.race} className="race-icon-chip-inline" />
+                                    <span>{row.item.race}</span>
                                     {row.item.mercenary ? " · Mercenary" : ""}
                                   </span>
-                                  <div className="transfermarkt-inline-actions">
-                                    <button
-                                      className="secondary-button inline-button"
-                                      type="button"
-                                      disabled={!marketTeamId || (marketBuyBusy && marketPreviewPlayerId === row.item.playerId)}
-                                      onClick={() => {
-                                        void openMarketBuyModal(row.item);
-                                      }}
-                                    >
-                                      {!marketTeamId
-                                        ? "Team waehlen"
-                                        : marketBuyBusy && marketPreviewPlayerId === row.item.playerId
-                                          ? "Pruefe..."
-                                          : "Buy"}
-                                    </button>
-                                    <button
-                                      className={`secondary-button inline-button${isWishlisted ? " is-active" : ""}`}
-                                      type="button"
-                                      onClick={() => toggleTransferWishlist(row.item)}
-                                    >
-                                      {isWishlisted ? "Gemerkt" : "Merken"}
-                                    </button>
-                                  </div>
                                 </div>
                               </td>
                             );
@@ -20979,6 +21285,7 @@ export default function FoundationPageClient({ initialReadSource, initialSelecte
                               </td>
                             );
                           }
+                          if (column.id === "traits") return <td key={column.id}>{renderMarketTraitList(row.item)}</td>;
                           if (column.id === "race") return <td key={column.id}>{row.item.race}</td>;
                           if (column.id === "alignment") return <td key={column.id}>{renderPillValue(row.item.alignment)}</td>;
                           if (column.id === "gender") return <td key={column.id}>{row.item.gender || "—"}</td>;
@@ -21003,16 +21310,32 @@ export default function FoundationPageClient({ initialReadSource, initialSelecte
                           }
                           if (column.id === "bracket") return <td key={column.id}>{row.item.bracket ?? "—"}</td>;
                           if (column.id === "pow") {
-                            return <td key={column.id} style={getConfirmedTierStyle(row.item.powTier)}>{row.item.powTier ?? "—"}</td>;
+                            return (
+                              <td key={column.id} className={row.item.pow != null ? getPoolHeatClass(row.item.pow, leaguePlayerHeatPools.pow) : ""}>
+                                {row.item.pow == null ? "—" : formatLocalePoints(row.item.pow, 1)}
+                              </td>
+                            );
                           }
                           if (column.id === "spe") {
-                            return <td key={column.id} style={getConfirmedTierStyle(row.item.speTier)}>{row.item.speTier ?? "—"}</td>;
+                            return (
+                              <td key={column.id} className={row.item.spe != null ? getPoolHeatClass(row.item.spe, leaguePlayerHeatPools.spe) : ""}>
+                                {row.item.spe == null ? "—" : formatLocalePoints(row.item.spe, 1)}
+                              </td>
+                            );
                           }
                           if (column.id === "men") {
-                            return <td key={column.id} style={getConfirmedTierStyle(row.item.menTier)}>{row.item.menTier ?? "—"}</td>;
+                            return (
+                              <td key={column.id} className={row.item.men != null ? getPoolHeatClass(row.item.men, leaguePlayerHeatPools.men) : ""}>
+                                {row.item.men == null ? "—" : formatLocalePoints(row.item.men, 1)}
+                              </td>
+                            );
                           }
                           if (column.id === "soc") {
-                            return <td key={column.id} style={getConfirmedTierStyle(row.item.socTier)}>{row.item.socTier ?? "—"}</td>;
+                            return (
+                              <td key={column.id} className={row.item.soc != null ? getPoolHeatClass(row.item.soc, leaguePlayerHeatPools.soc) : ""}>
+                                {row.item.soc == null ? "—" : formatLocalePoints(row.item.soc, 1)}
+                              </td>
+                            );
                           }
                           if (column.id === "above20") return <td key={column.id}>{row.item.above20 ?? "—"}</td>;
                           if (column.id === "above40") return <td key={column.id}>{row.item.above40 ?? "—"}</td>;
@@ -21044,6 +21367,7 @@ export default function FoundationPageClient({ initialReadSource, initialSelecte
                           if (column.id === "potentialTier") return <td key={column.id}>{renderTransfermarktPotential(row.item)}</td>;
                           if (column.id === "trainingFormTier") return <td key={column.id} style={getMarketTierStyle(row.item.trainingFormTier)}>{row.item.trainingFormTier ?? "—"}</td>;
                           if (column.id === "developmentTrend") return <td key={column.id}>{formatMarketDevelopmentTrend(row.item.developmentTrend)}</td>;
+                          if (column.id === "developmentRoute") return <td key={column.id}>{formatMarketDevelopmentRoute(row.item.developmentRoute)}</td>;
                           if (column.id === "regressionRisk") return <td key={column.id}>{formatMarketRisk(row.item.regressionRisk)}</td>;
                           if (column.id === "availabilityReason") return <td key={column.id}>{row.item.availabilityReason}</td>;
                           if (column.id === "affordabilityStatus") return <td key={column.id}>{row.item.teamContextAvailable ? row.item.affordabilityStatus ?? "—" : "Team waehlen"}</td>;
@@ -21067,6 +21391,31 @@ export default function FoundationPageClient({ initialReadSource, initialSelecte
                           if (column.id === "fitAlignment") return <td key={column.id}>{row.item.teamContextAvailable ? row.item.fitAlignment ?? "—" : "Team waehlen"}</td>;
                           return <td key={column.id}>—</td>;
                         })}
+                        <td className="transfermarkt-row-actions-cell">
+                          <div className="transfermarkt-row-actions">
+                            <button
+                              className="secondary-button inline-button"
+                              type="button"
+                              disabled={!marketTeamId || (marketBuyBusy && marketPreviewPlayerId === row.item.playerId)}
+                              onClick={() => {
+                                void openMarketBuyModal(row.item);
+                              }}
+                            >
+                              {!marketTeamId
+                                ? "Team waehlen"
+                                : marketBuyBusy && marketPreviewPlayerId === row.item.playerId
+                                  ? "Pruefe..."
+                                  : "Buy"}
+                            </button>
+                            <button
+                              className={`secondary-button inline-button${transferWishlistByPlayerId.has(row.item.playerId) ? " is-active" : ""}`}
+                              type="button"
+                              onClick={() => toggleTransferWishlist(row.item)}
+                            >
+                              {transferWishlistByPlayerId.has(row.item.playerId) ? "Gemerkt" : "Merken"}
+                            </button>
+                          </div>
+                        </td>
                       </tr>
                     ))}
                   </tbody>
@@ -22727,7 +23076,7 @@ export default function FoundationPageClient({ initialReadSource, initialSelecte
                         <button
                           className="secondary-button"
                           type="button"
-                          onClick={() => setMarketShowAdvancedColumns((current) => !current)}
+                          onClick={() => setTransferMarketAdvancedColumnsVisible(!marketShowAdvancedColumns)}
                         >
                           {marketShowAdvancedColumns ? "Attribute ausblenden" : "Attribute einblenden"}
                         </button>
@@ -23018,76 +23367,118 @@ export default function FoundationPageClient({ initialReadSource, initialSelecte
                         </button>
                       </div>
                     </div>
-
-                    <div className="transfer-panel-section transfer-panel-section--wishlist">
-                      <div className="panel-header">
-                        <h3>Wishlist</h3>
-                        <span className="pill">{transferWishlistRows.length}</span>
-                      </div>
-                      {transferWishlistRows.length === 0 ? (
-                        <p className="muted">Noch keine gemerkten Spieler.</p>
-                      ) : (
-                        <div className="transfer-wishlist-grid transfer-wishlist-grid-compact">
-                          {transferWishlistRows.map(({ entry, liveItem, available }) => {
-                            const portrait = liveItem ? getTransfermarktPortraitModel(liveItem) : null;
-                            return (
-                              <article className="transfer-wishlist-card transfer-wishlist-card-compact" key={entry.id}>
-                                <div className="transfer-wishlist-card-head">
-                                  {portrait?.src ? (
-                                    <img
-                                      className="transfermarkt-portrait transfermarkt-portrait-small"
-                                      src={portrait.src}
-                                      alt={entry.playerName}
-                                    />
-                                  ) : (
-                                    <div className="transfermarkt-portrait transfermarkt-portrait-placeholder transfermarkt-portrait-small">
-                                      {entry.playerName.slice(0, 2).toUpperCase()}
-                                    </div>
-                                  )}
-                                  <div className="table-player-cell">
-                                    <strong>{entry.playerName}</strong>
-                                    <span>
-                                      <ClassColorChip className={entry.className} /> · <RaceIcon race={entry.race} className="race-icon-chip-inline" />
-                                    </span>
-                                  </div>
-                                </div>
-                                <div className="transfer-wishlist-compact-metrics">
-                                  <span>MW {formatTransfermarktCurrency(liveItem?.marketValue ?? entry.marketValue)}</span>
-                                  <span>Gehalt {formatTransfermarktCurrency(liveItem?.salary ?? entry.salary)}</span>
-                                  <span>Bracket {liveItem?.bracket ?? entry.bracket ?? "—"}</span>
-                                  <span>{available ? "verfuegbar" : "nicht verfuegbar"}</span>
-                                </div>
-                                <div className="transfermarkt-inline-actions transfermarkt-inline-actions-compact">
-                                  <button
-                                    className="secondary-button inline-button"
-                                    type="button"
-                                    disabled={!available || !liveItem || !marketTeamId}
-                                    onClick={() => {
-                                      if (liveItem) {
-                                        void openMarketBuyModal(liveItem);
-                                      }
-                                    }}
-                                  >
-                                    Buy
-                                  </button>
-                                  <button
-                                    className="secondary-button inline-button"
-                                    type="button"
-                                    onClick={() => removeTransferWishlistEntry(entry.playerId)}
-                                  >
-                                    Remove
-                                  </button>
-                                </div>
-                              </article>
-                            );
-                          })}
-                        </div>
-                      )}
-                    </div>
                   </section>
                 </div>
               </aside>
             </div>
+            <section className={`transfer-market-wishlist-strip${transferWishlistRows.length === 0 ? " is-empty" : ""}`} aria-label="Transfermarkt Wishlist">
+              <div className="panel-header">
+                <div>
+                  <h3>Wishlist</h3>
+                  <p className="muted">
+                    Gemerkte Spieler fuer {marketSelectedTeam?.name ?? "das ausgewaehlte Team"}.
+                  </p>
+                </div>
+                <span className="pill">{transferWishlistRows.length}</span>
+              </div>
+              {transferWishlistRows.length === 0 ? (
+                <p className="muted">Noch leer. Fahre ueber eine Markt-Zeile und klicke „Merken“, wenn ein Spieler interessant ist.</p>
+              ) : (
+                <div className="table-shell transfer-market-wishlist-table-shell">
+                  <table className="team-table transfer-table transfer-wishlist-table">
+                    <thead>
+                      <tr>
+                        <th>Bild</th>
+                        <th>Name</th>
+                        <th>MW</th>
+                        <th>Gehalt</th>
+                        <th>POW</th>
+                        <th>SPE</th>
+                        <th>MEN</th>
+                        <th>SOC</th>
+                        <th>Klasse</th>
+                        <th>Fit</th>
+                        <th>Status</th>
+                        <th aria-label="Aktionen" />
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {transferWishlistRows.map(({ entry, liveItem, available }) => {
+                        const portrait = liveItem ? getTransfermarktPortraitModel(liveItem) : null;
+                        return (
+                          <tr key={entry.id} onDoubleClick={() => openPlayerDrawerById(entry.playerId)}>
+                            <td>
+                              {portrait?.src ? (
+                                <img
+                                  className="transfermarkt-portrait transfermarkt-portrait-small"
+                                  src={portrait.src}
+                                  alt={entry.playerName}
+                                  loading="lazy"
+                                  decoding="async"
+                                />
+                              ) : (
+                                <div className="transfermarkt-portrait transfermarkt-portrait-placeholder transfermarkt-portrait-small">
+                                  {entry.playerName.slice(0, 2).toUpperCase()}
+                                </div>
+                              )}
+                            </td>
+                            <td>
+                              <div className="table-player-cell">
+                                <strong>{entry.playerName}</strong>
+                                <span className="transfermarkt-name-meta">
+                                  <RaceIcon race={liveItem?.race ?? entry.race} className="race-icon-chip-inline" />
+                                  <span>{liveItem?.race ?? entry.race}</span>
+                                </span>
+                              </div>
+                            </td>
+                            <td>{formatTransfermarktCurrency(liveItem?.marketValue ?? entry.marketValue)}</td>
+                            <td>{formatTransfermarktCurrency(liveItem?.salary ?? entry.salary)}</td>
+                            <td className={liveItem?.pow != null ? getPoolHeatClass(liveItem.pow, leaguePlayerHeatPools.pow) : ""}>
+                              {liveItem?.pow == null ? "—" : formatLocalePoints(liveItem.pow, 1)}
+                            </td>
+                            <td className={liveItem?.spe != null ? getPoolHeatClass(liveItem.spe, leaguePlayerHeatPools.spe) : ""}>
+                              {liveItem?.spe == null ? "—" : formatLocalePoints(liveItem.spe, 1)}
+                            </td>
+                            <td className={liveItem?.men != null ? getPoolHeatClass(liveItem.men, leaguePlayerHeatPools.men) : ""}>
+                              {liveItem?.men == null ? "—" : formatLocalePoints(liveItem.men, 1)}
+                            </td>
+                            <td className={liveItem?.soc != null ? getPoolHeatClass(liveItem.soc, leaguePlayerHeatPools.soc) : ""}>
+                              {liveItem?.soc == null ? "—" : formatLocalePoints(liveItem.soc, 1)}
+                            </td>
+                            <td><ClassColorChip className={liveItem?.className ?? entry.className} /></td>
+                            <td>{liveItem ? formatFitDisplay(liveItem) : "—"}</td>
+                            <td>{available ? "verfuegbar" : "nicht verfuegbar"}</td>
+                            <td className="transfermarkt-row-actions-cell">
+                              <div className="transfermarkt-row-actions transfermarkt-row-actions-visible">
+                                <button
+                                  className="secondary-button inline-button"
+                                  type="button"
+                                  disabled={!available || !liveItem || !marketTeamId}
+                                  onClick={() => {
+                                    if (liveItem) {
+                                      void openMarketBuyModal(liveItem);
+                                    }
+                                  }}
+                                >
+                                  Buy
+                                </button>
+                                <button
+                                  className="secondary-button inline-button"
+                                  type="button"
+                                  onClick={() => removeTransferWishlistEntry(entry.playerId)}
+                                >
+                                  Entfernen
+                                </button>
+                              </div>
+                            </td>
+                          </tr>
+                        );
+                      })}
+                    </tbody>
+                  </table>
+                </div>
+              )}
+            </section>
           {transferMarketRows.length === 0 ? (
               <p className="muted">Mit den aktuellen Filtern wurden keine verfuegbaren Spieler gefunden.</p>
             ) : null}
@@ -23562,7 +23953,17 @@ export default function FoundationPageClient({ initialReadSource, initialSelecte
                           <select
                             className="input"
                             value={marketContractLengthDraft}
-                            onChange={(event) => setMarketContractLengthDraft(Math.max(1, Math.round(Number(event.target.value))))}
+                            onChange={(event) => {
+                              const nextLength = Math.max(1, Math.round(Number(event.target.value)));
+                              setMarketContractLengthDraft(nextLength);
+                              if (marketBuySubject) {
+                                void requestTransfermarktBuyPreview(marketBuySubject, marketBuyPreview.team?.id ?? marketTeamId, {
+                                  contractLength: nextLength,
+                                  contractShape: marketContractShapeDraft,
+                                  offeredSalary: marketOfferedSalaryDraft,
+                                });
+                              }
+                            }}
                           >
                             {[1, 2, 3, 4, 5].map((years) => (
                               <option key={years} value={years}>
@@ -23576,7 +23977,17 @@ export default function FoundationPageClient({ initialReadSource, initialSelecte
                           <select
                             className="input"
                             value={marketContractShapeDraft}
-                            onChange={(event) => setMarketContractShapeDraft(event.target.value as ContractShape)}
+                            onChange={(event) => {
+                              const nextShape = event.target.value as ContractShape;
+                              setMarketContractShapeDraft(nextShape);
+                              if (marketBuySubject) {
+                                void requestTransfermarktBuyPreview(marketBuySubject, marketBuyPreview.team?.id ?? marketTeamId, {
+                                  contractLength: marketContractLengthDraft,
+                                  contractShape: nextShape,
+                                  offeredSalary: marketOfferedSalaryDraft,
+                                });
+                              }
+                            }}
                           >
                             <option value="balanced">Balanced</option>
                             <option value="front_loaded">Front-loaded</option>
@@ -23621,6 +24032,36 @@ export default function FoundationPageClient({ initialReadSource, initialSelecte
                           </label>
                         ) : null}
                         </div>
+
+                        {marketBuyPreview.contractPreference ? (
+                          <div className={`contract-preference-card is-${marketBuyPreview.contractPreference.matchQuality}`}>
+                            <div>
+                              <span className="eyebrow">Spielerpräferenz</span>
+                              <strong>{formatContractLengthPreferenceLabel(marketBuyPreview.contractPreference.lengthPreference)}</strong>
+                              <p className="muted">
+                                Ideal {marketBuyPreview.contractPreference.idealLength} Season(s) ·{" "}
+                                {formatContractShapeLabel(marketBuyPreview.contractPreference.shapePreference)} ·{" "}
+                                {formatContractPreferenceMatchLabel(marketBuyPreview.contractPreference.matchQuality)}
+                              </p>
+                            </div>
+                            <div className="contract-preference-impact">
+                              <span className={marketBuyPreview.contractPreference.salaryAdjustmentPct <= 0 ? "positive-value" : "negative-value"}>
+                                {formatSignedPercent(marketBuyPreview.contractPreference.salaryAdjustmentPct * 100)} Gehalt
+                              </span>
+                              <span className={marketBuyPreview.contractPreference.scoreAdjustment >= 0 ? "positive-value" : "negative-value"}>
+                                {marketBuyPreview.contractPreference.scoreAdjustment > 0 ? "+" : ""}
+                                {marketBuyPreview.contractPreference.scoreAdjustment} Score
+                              </span>
+                            </div>
+                            {marketBuyPreview.contractPreference.warnings.length ? (
+                              <p className="muted">
+                                {marketBuyPreview.contractPreference.warnings[0]}
+                              </p>
+                            ) : (
+                              <p className="muted">{marketBuyPreview.contractPreference.reasons[0]}</p>
+                            )}
+                          </div>
+                        ) : null}
 
                         <div className="transfer-negotiation-actions">
                           <button
@@ -24501,7 +24942,10 @@ export default function FoundationPageClient({ initialReadSource, initialSelecte
                         <th
                           key={column.id}
                           {...getTableHeaderDragProps("transferHistoryTable", column, visibleTransferHistoryColumns)}
-                          className={transferHistoryPinnedOffsets.has(column.id) ? "transfer-history-sticky-cell" : undefined}
+                          className={[
+                            transferHistoryPinnedOffsets.has(column.id) ? "transfer-history-sticky-cell" : "",
+                            getTransferHistoryAxisHeaderClass(column.id),
+                          ].filter(Boolean).join(" ") || undefined}
                           style={{
                             width: `${getTableColumnWidth("transferHistoryTable", column)}px`,
                             minWidth: `${column.minWidth}px`,
@@ -24563,7 +25007,20 @@ export default function FoundationPageClient({ initialReadSource, initialSelecte
                           if (column.id === "type") return <td key={column.id}><span className={getTransferTypePillClass(row.type)}>{getTransferTypeLabel(row.type)}</span></td>;
                           if (column.id === "from") return <td key={column.id}>{row.fromTeamName ?? row.fromTeamId ?? "FA"}</td>;
                           if (column.id === "to") return <td key={column.id}>{row.toTeamName ?? row.toTeamId ?? "FA"}</td>;
-                          if (column.id === "fee") return <td key={column.id} className="transfer-history-number-cell">{formatTransfermarktCurrency(row.fee)}</td>;
+                          if (column.id === "fee") {
+                            return (
+                              <td key={column.id} className="transfer-history-number-cell">
+                                <span className="transfer-history-money-stack">
+                                  <span>{formatTransfermarktCurrency(row.fee)}</span>
+                                  {row.type === "sell" && row.guv != null ? (
+                                    <span className={row.guv >= 0 ? "text-positive" : "text-negative"}>
+                                      ({formatSignedTransfermarktCurrency(row.guv)})
+                                    </span>
+                                  ) : null}
+                                </span>
+                              </td>
+                            );
+                          }
                           if (column.id === "guv") {
                             return (
                               <td key={column.id} className={`transfer-history-number-cell ${row.guv == null ? "" : row.guv >= 0 ? "text-positive" : "text-negative"}`}>
@@ -24576,11 +25033,27 @@ export default function FoundationPageClient({ initialReadSource, initialSelecte
                             );
                           }
                           if (column.id === "marketValue") return <td key={column.id} className="transfer-history-number-cell">{formatTransfermarktCurrency(row.marketValue)}</td>;
-                          if (column.id === "pow") return <td key={column.id} className="transfer-history-axis-cell" style={getConfirmedAxisHeatStyle(row.pow)}>{formatTransfermarktPoints(row.pow)}</td>;
-                          if (column.id === "spe") return <td key={column.id} className="transfer-history-axis-cell" style={getConfirmedAxisHeatStyle(row.spe)}>{formatTransfermarktPoints(row.spe)}</td>;
-                          if (column.id === "men") return <td key={column.id} className="transfer-history-axis-cell" style={getConfirmedAxisHeatStyle(row.men)}>{formatTransfermarktPoints(row.men)}</td>;
-                          if (column.id === "soc") return <td key={column.id} className="transfer-history-axis-cell" style={getConfirmedAxisHeatStyle(row.soc)}>{formatTransfermarktPoints(row.soc)}</td>;
-                          if (column.id === "salary") return <td key={column.id} className="transfer-history-number-cell">{formatTransfermarktCurrency(row.salary)}</td>;
+                          if (column.id === "pow") return <td key={column.id} className={`transfer-history-axis-cell ${getPoolHeatClass(row.pow, transferHistoryAxisHeatPools.pow)}`}>{formatTransfermarktPoints(row.pow)}</td>;
+                          if (column.id === "spe") return <td key={column.id} className={`transfer-history-axis-cell ${getPoolHeatClass(row.spe, transferHistoryAxisHeatPools.spe)}`}>{formatTransfermarktPoints(row.spe)}</td>;
+                          if (column.id === "men") return <td key={column.id} className={`transfer-history-axis-cell ${getPoolHeatClass(row.men, transferHistoryAxisHeatPools.men)}`}>{formatTransfermarktPoints(row.men)}</td>;
+                          if (column.id === "soc") return <td key={column.id} className={`transfer-history-axis-cell ${getPoolHeatClass(row.soc, transferHistoryAxisHeatPools.soc)}`}>{formatTransfermarktPoints(row.soc)}</td>;
+                          if (column.id === "salary") {
+                            return (
+                              <td key={column.id} className="transfer-history-number-cell">
+                                <span className="transfer-history-money-stack">
+                                  <span>{formatTransfermarktCurrency(row.salary)}</span>
+                                  {row.type === "buy" && row.salaryDelta != null ? (
+                                    <span
+                                      className={row.salaryDelta <= 0 ? "text-positive" : "text-negative"}
+                                      title={row.salaryBenchmark != null ? `Benchmark ${formatTransfermarktCurrency(row.salaryBenchmark)}` : undefined}
+                                    >
+                                      ({formatSignedTransfermarktCurrency(row.salaryDelta)})
+                                    </span>
+                                  ) : null}
+                                </span>
+                              </td>
+                            );
+                          }
                           if (column.id === "className") {
                             return (
                               <td key={column.id}>

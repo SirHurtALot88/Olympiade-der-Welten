@@ -309,6 +309,7 @@ export type TeamIdentity = {
 export type TeamIdentityOverride = Partial<Omit<TeamIdentity, "teamId">>;
 
 export type PlayerAttributeSheetStats = {
+  height?: number | null;
   power?: number | null;
   health?: number | null;
   stamina?: number | null;
@@ -393,9 +394,10 @@ export type PlayerGeneratorAttributes = {
   will: number;
   spirit: number;
   torment: number;
+  height?: number | null;
 };
 
-export type PlayerGeneratorAttributeName = keyof PlayerGeneratorAttributes;
+export type PlayerGeneratorAttributeName = Exclude<keyof PlayerGeneratorAttributes, "height">;
 
 export type PlayerGeneratorMatchState = "ok" | "warning" | "failed";
 

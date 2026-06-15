@@ -427,6 +427,7 @@ const attributeLabels: Record<keyof PlayerAttributeSheetStats, string> = {
   will: "Will",
   spirit: "Spirit",
   torment: "Torment",
+  height: "Height",
 };
 
 const attributeShortLabels: Record<keyof PlayerAttributeSheetStats, string> = {
@@ -442,6 +443,7 @@ const attributeShortLabels: Record<keyof PlayerAttributeSheetStats, string> = {
   will: "WIL",
   spirit: "SPI",
   torment: "TOR",
+  height: "HGT",
 };
 
 function loadLegacyLineupTablePreferences(): LegacyLineupTablePreferences {
