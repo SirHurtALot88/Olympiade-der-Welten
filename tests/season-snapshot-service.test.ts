@@ -266,6 +266,7 @@ function createGameState(): GameState {
         purchasePrice: 95,
         currentValue: 110,
         roleTag: "starter",
+        promisedRole: "starter",
         joinedSeasonId: "season-1",
       },
     ],
@@ -363,6 +364,7 @@ describe("season snapshot service", () => {
     expect(snapshot.playerPerformances[0]?.marketValue).not.toBeNull();
     expect(snapshot.playerPerformances[0]?.salary).not.toBeNull();
     expect(snapshot.playerPerformances[0]?.contractLength).toBe(3);
+    expect(snapshot.playerPerformances[0]?.promisedRole).toBe("starter");
     expect(snapshot.playerPerformances[0]?.top10Count).toBe(2);
     expect(snapshot.playerPerformances[0]?.mvpCount).toBe(1);
     expect(snapshot.transferSnapshots).toHaveLength(1);

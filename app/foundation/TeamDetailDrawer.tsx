@@ -14,6 +14,7 @@ export type TeamDetailDrawerPlayerCard = {
   portraitUrl: string | null;
   portraitInitials: string;
   roleTag: string | null;
+  promisedRole: string | null;
   className: string | null;
   race: string | null;
   ovr: number | null;
@@ -110,6 +111,9 @@ function getRoleLabel(roleTag: string | null | undefined) {
   }
   if (roleTag === "bench") {
     return "Bank";
+  }
+  if (roleTag === "rotation") {
+    return "Rotation";
   }
   if (roleTag === "prospect") {
     return "Prospect";
@@ -375,7 +379,8 @@ export default function TeamDetailDrawer({
                       <div className="team-drawer-player-title">
                         <strong>{player.name}</strong>
                         <span>
-                          {getRoleLabel(player.roleTag)} · <ClassColorChip className={player.className} /> · {player.race ?? "—"}
+                          {getRoleLabel(player.roleTag)}
+                          {player.promisedRole ? ` · versprochen ${getRoleLabel(player.promisedRole)}` : ""} · <ClassColorChip className={player.className} /> · {player.race ?? "—"}
                         </span>
                       </div>
                     </div>

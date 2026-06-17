@@ -73,6 +73,9 @@ function formatRoleTag(value: string | null | undefined) {
   if (value === "bench") {
     return "Bank";
   }
+  if (value === "rotation") {
+    return "Rotation";
+  }
   if (value === "prospect") {
     return "Prospect";
   }
@@ -606,7 +609,8 @@ export default function PlayerDetailDrawer({
                   <span className="player-drawer-overline">Scouting-Profil</span>
                   <h3>{data.teamName ?? "Free Agent"}</h3>
                   <p className="player-drawer-subline">
-                    {formatRoleTag(transferContext.roleTag)}
+                    Rolle {formatRoleTag(transferContext.roleTag)}
+                    {transferContext.promisedRole ? ` · Versprochen ${formatRoleTag(transferContext.promisedRole)}` : ""}
                   </p>
                   <div className="player-drawer-chip-row">
                     {data.traitsPositive.slice(0, 4).map((trait) => (
@@ -682,6 +686,7 @@ export default function PlayerDetailDrawer({
               <article className="metric-card">
                 <span>Vertrag / LZ</span>
                 <strong>{data.contractLength ?? "—"}</strong>
+                {transferContext.promisedRole ? <small>Versprechen: {formatRoleTag(transferContext.promisedRole)}</small> : null}
               </article>
               <article className={`metric-card ${data.availability.isUnavailable ? "is-negative" : data.availability.injuryRiskBand === "sehr_stark" || data.availability.injuryRiskBand === "stark" ? "is-negative" : data.availability.injuryRiskPercent > 0 ? "is-warning" : ""}`}>
                 <span>Verfügbarkeit</span>

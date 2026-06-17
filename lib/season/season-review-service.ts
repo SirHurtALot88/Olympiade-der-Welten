@@ -3,6 +3,8 @@ import type {
   GameState,
   Player,
   PlayerDisciplinePerformanceRecord,
+  PlayerProgressionSpendEventRecord,
+  RosterPromisedRole,
   Team,
   TransferHistoryEntry,
 } from "@/lib/data/olyDataTypes";
@@ -43,6 +45,41 @@ export type SeasonReviewTransferHighlight = {
   source: string;
 };
 
+export type SeasonReviewPromisedRoleSignal = {
+  playerId: string;
+  playerName: string;
+  teamId: string;
+  teamName: string;
+  roleTag: string;
+  promisedRole: RosterPromisedRole;
+  appearances: number;
+  expectedAppearances: number;
+  source: string;
+};
+
+export type SeasonReviewXpDevelopmentRow = {
+  playerId: string;
+  playerName: string;
+  teamId: string;
+  teamName: string;
+  seasonId: string;
+  xpEarned: number;
+  xpSpent: number;
+  attributeDelta: number;
+  marketValueDelta: number | null;
+  salaryPreviewDelta: number | null;
+  fairSnapshot: boolean;
+  label: string;
+  source: string;
+};
+
+export type SeasonReviewXpDevelopmentReport = {
+  topImproved: SeasonReviewXpDevelopmentRow[];
+  bottom20: SeasonReviewXpDevelopmentRow[];
+  bottomLabel: "least_improved" | "declined";
+  missingFairSnapshot: SeasonReviewXpDevelopmentRow[];
+};
+
 export type SeasonReview = {
   championTeam: SeasonReviewNamedValue | null;
   finalTable: SeasonReviewNamedValue[];
@@ -52,6 +89,8 @@ export type SeasonReview = {
   storylines: Array<{ storylineId: string; text: string; source: string }>;
   transferHighlights: SeasonReviewTransferHighlight[];
   teamHighlights: SeasonReviewNamedValue[];
+  promisedRoleSignals: SeasonReviewPromisedRoleSignal[];
+  xpDevelopmentRankings: SeasonReviewXpDevelopmentReport;
   warnings: string[];
 };
 
@@ -69,6 +108,13 @@ function teamLabel(team: Team | null | undefined) {
 
 function playerLabel(player: Player | null | undefined) {
   return player?.name ?? "—";
+}
+
+function getPromisedRoleExpectedAppearances(role: RosterPromisedRole) {
+  if (role === "starter") return 7;
+  if (role === "rotation") return 4;
+  if (role === "bench") return 2;
+  return 1;
 }
 
 function getSeasonMatchdayResultIds(gameState: GameState) {
@@ -201,6 +247,87 @@ function buildDisciplineHighlights(gameState: GameState, resultIds: Set<string>)
     .slice(0, 8);
 }
 
+function buildPromisedRoleSignals(gameState: GameState) {
+  const playersById = new Map(gameState.players.map((player) => [player.id, player]));
+  const teamsById = new Map(gameState.teams.map((team) => [team.teamId, team]));
+  const performances = buildPlayerSeasonPerformanceMap(gameState);
+  return gameState.rosters
+    .map((roster): SeasonReviewPromisedRoleSignal | null => {
+      const promisedRole = roster.promisedRole ?? null;
+      if (!promisedRole) return null;
+      const expectedAppearances = getPromisedRoleExpectedAppearances(promisedRole);
+      const appearances = performances.get(roster.playerId)?.appearances ?? 0;
+      if (appearances >= expectedAppearances) return null;
+      const player = playersById.get(roster.playerId);
+      const team = teamsById.get(roster.teamId);
+      return {
+        playerId: roster.playerId,
+        playerName: playerLabel(player),
+        teamId: roster.teamId,
+        teamName: teamLabel(team),
+        roleTag: roster.roleTag,
+        promisedRole,
+        appearances,
+        expectedAppearances,
+        source: "rosters.promisedRole + player-season-performance",
+      };
+    })
+    .filter((entry): entry is SeasonReviewPromisedRoleSignal => Boolean(entry))
+    .sort((left, right) => (right.expectedAppearances - right.appearances) - (left.expectedAppearances - left.appearances))
+    .slice(0, 12);
+}
+
+function buildXpDevelopmentRow(
+  gameState: GameState,
+  event: PlayerProgressionSpendEventRecord,
+): SeasonReviewXpDevelopmentRow {
+  const player = gameState.players.find((entry) => entry.id === event.playerId) ?? null;
+  const team = gameState.teams.find((entry) => entry.teamId === event.teamId) ?? null;
+  const attributeDelta = event.upgrades.reduce((sum, upgrade) => sum + Math.max(0, upgrade.toValue - upgrade.fromValue), 0);
+  const beforeMarket = event.progressionSnapshotBefore?.marketValue;
+  const afterMarket = event.progressionSnapshotAfter?.marketValuePreview ?? event.progressionSnapshotAfter?.marketValue;
+  const beforeSalary = event.progressionSnapshotBefore?.salary;
+  const afterSalary = event.progressionSnapshotAfter?.salaryPreview ?? event.progressionSnapshotAfter?.salary;
+  const fairSnapshot = event.progressionSnapshotBefore != null && event.progressionSnapshotAfter != null;
+  return {
+    playerId: event.playerId,
+    playerName: playerLabel(player),
+    teamId: event.teamId,
+    teamName: teamLabel(team),
+    seasonId: event.seasonId,
+    xpEarned: Math.round(event.xpEarned ?? 0),
+    xpSpent: Math.round(event.xpSpent ?? 0),
+    attributeDelta,
+    marketValueDelta:
+      typeof beforeMarket === "number" && typeof afterMarket === "number" ? roundValue(afterMarket - beforeMarket, 2) : null,
+    salaryPreviewDelta:
+      typeof beforeSalary === "number" && typeof afterSalary === "number" ? roundValue(afterSalary - beforeSalary, 2) : null,
+    fairSnapshot,
+    label: `${attributeDelta} Attribute · ${Math.round(event.xpEarned ?? 0)} XP earned · ${Math.round(event.xpSpent ?? 0)} XP spent`,
+    source: fairSnapshot ? "playerProgressionEvents.beforeAfterSnapshots" : "playerProgressionEvents.missingBeforeAfterSnapshot",
+  };
+}
+
+function buildXpDevelopmentRankings(gameState: GameState): SeasonReviewXpDevelopmentReport {
+  const seasonEvents = (gameState.playerProgressionEvents ?? [])
+    .filter((event) => event.seasonId === gameState.season.id)
+    .map((event) => buildXpDevelopmentRow(gameState, event));
+  const fairRows = seasonEvents.filter((entry) => entry.fairSnapshot);
+  const topImproved = [...fairRows]
+    .sort((left, right) => (right.attributeDelta - left.attributeDelta) || (right.xpSpent - left.xpSpent) || (right.xpEarned - left.xpEarned))
+    .slice(0, 20);
+  const hasRegression = fairRows.some((entry) => entry.attributeDelta < 0);
+  const bottom20 = [...fairRows]
+    .sort((left, right) => (left.attributeDelta - right.attributeDelta) || (left.xpSpent - right.xpSpent) || (left.xpEarned - right.xpEarned))
+    .slice(0, 20);
+  return {
+    topImproved,
+    bottom20,
+    bottomLabel: hasRegression ? "declined" : "least_improved",
+    missingFairSnapshot: seasonEvents.filter((entry) => !entry.fairSnapshot).slice(0, 20),
+  };
+}
+
 function findDominantDisciplineWin(gameState: GameState, resultIds: Set<string>) {
   const disciplineById = new Map(gameState.disciplines.map((discipline) => [discipline.id, discipline]));
   const teamsById = new Map(gameState.teams.map((team) => [team.teamId, team]));
@@ -281,6 +408,10 @@ export function buildSeasonReview(gameState: GameState): SeasonReview {
   const topDisciplinePerformances = buildDisciplineHighlights(gameState, resultIds);
   const dominantDisciplineWin = findDominantDisciplineWin(gameState, resultIds);
   const transferHighlights = buildTransferHighlights(gameState);
+  const promisedRoleSignals = buildPromisedRoleSignals(gameState);
+  const xpDevelopmentRankings = buildXpDevelopmentRankings(gameState);
+  if (promisedRoleSignals.length > 0) warnings.push("promised_role_usage_gap");
+  if (xpDevelopmentRankings.missingFairSnapshot.length > 0) warnings.push("xp_development_before_after_snapshot_missing");
   const teamHighlights = [
     ...buildTeamAxisHighlights(gameState),
     ...(dominantDisciplineWin ? [dominantDisciplineWin] : []),
@@ -373,6 +504,8 @@ export function buildSeasonReview(gameState: GameState): SeasonReview {
     topPlayers[0] ? { storylineId: "player-season-leader", text: `${topPlayers[0].name} war der prägendste Spieler der Saison (${topPlayers[0].label}).`, source: topPlayers[0].source } : null,
     dominantDisciplineWin ? { storylineId: "dominant-discipline-win", text: `${dominantDisciplineWin.name} lieferte den dominantesten Diszi-Sieg: ${dominantDisciplineWin.label}.`, source: dominantDisciplineWin.source } : null,
     transferHighlights[0] ? { storylineId: "transfer-headline", text: `${transferHighlights[0].playerName} war der Transfer-Aufmacher: ${transferHighlights[0].label}.`, source: transferHighlights[0].source } : null,
+    promisedRoleSignals[0] ? { storylineId: "promised-role-gap", text: `${promisedRoleSignals[0].playerName} bekam als ${promisedRoleSignals[0].promisedRole} nur ${promisedRoleSignals[0].appearances}/${promisedRoleSignals[0].expectedAppearances} Einsätze.`, source: promisedRoleSignals[0].source } : null,
+    xpDevelopmentRankings.topImproved[0] ? { storylineId: "xp-development-leader", text: `${xpDevelopmentRankings.topImproved[0].playerName} führt die XP-Entwicklung an (${xpDevelopmentRankings.topImproved[0].label}).`, source: xpDevelopmentRankings.topImproved[0].source } : null,
   ].filter((entry): entry is { storylineId: string; text: string; source: string } => Boolean(entry));
 
   return {
@@ -384,6 +517,8 @@ export function buildSeasonReview(gameState: GameState): SeasonReview {
     storylines,
     transferHighlights,
     teamHighlights,
+    promisedRoleSignals,
+    xpDevelopmentRankings,
     warnings,
   };
 }

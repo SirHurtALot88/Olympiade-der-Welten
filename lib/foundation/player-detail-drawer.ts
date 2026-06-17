@@ -289,6 +289,7 @@ export type PlayerDetailDrawerData = {
   } | null;
   transferContext: {
     roleTag: RosterEntry["roleTag"] | null;
+    promisedRole: RosterEntry["promisedRole"] | null;
     joinedSeasonId: string | null;
     purchasePrice: number | null;
     currentValue: number | null;
@@ -796,6 +797,7 @@ function buildTransferContext(gameState: GameState, playerId: string, rosterEntr
 
   return {
     roleTag: rosterEntry?.roleTag ?? null,
+    promisedRole: rosterEntry?.promisedRole ?? null,
     joinedSeasonId: rosterEntry?.joinedSeasonId ?? null,
     purchasePrice: rosterEntry?.purchasePrice ?? null,
     currentValue: rosterEntry?.currentValue ?? null,
@@ -1485,6 +1487,7 @@ export function buildPlayerDrawerDataFromLegacyContext(input: {
     seasonPerformance: null,
     transferContext: {
       roleTag: null,
+      promisedRole: null,
       joinedSeasonId: null,
       purchasePrice: economy.purchasePrice,
       currentValue: economy.marketValue,

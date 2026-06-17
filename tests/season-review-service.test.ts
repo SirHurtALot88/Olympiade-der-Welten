@@ -44,13 +44,49 @@ function gameState(input?: { withResults?: boolean; withTransfers?: boolean }): 
     disciplines: [{ id: "fencing", name: "Fechten", category: "power", weight: 1 }],
     rosters: [
       { id: "r-1", teamId: "team-1", playerId: "player-1", salary: 2, upkeep: 2, purchasePrice: 10, currentValue: 20, contractLength: 1, roleTag: "starter", joinedSeasonId: "season-1" },
-      { id: "r-2", teamId: "team-2", playerId: "player-2", salary: 1, upkeep: 1, purchasePrice: 8, currentValue: 12, contractLength: 1, roleTag: "starter", joinedSeasonId: "season-1" },
+      { id: "r-2", teamId: "team-2", playerId: "player-2", salary: 1, upkeep: 1, purchasePrice: 8, currentValue: 12, contractLength: 1, roleTag: "prospect", promisedRole: "starter", joinedSeasonId: "season-1" },
     ],
     contracts: [],
     transferListings: [],
     transferHistory: withTransfers
       ? [{ id: "transfer-1", playerId: "player-1", seasonId: "season-1", seasonLabel: "Season 1", transferType: "buy", fromTeamId: null, toTeamId: "team-1", fee: 10, salary: 2, marketValue: 20, remainingContractLength: 1, happenedAt: "2026-06-11T00:00:00.000Z", source: "test" }]
       : [],
+    playerProgressionEvents: [
+      {
+        eventId: "progression-player-1",
+        seasonId: "season-1",
+        teamId: "team-1",
+        playerId: "player-1",
+        upgrades: [{ playerId: "player-1", attribute: "power", fromValue: 50, toValue: 51, cost: 70, source: "manual_xp_spend_preview" }],
+        xpEarned: 120,
+        xpSpent: 70,
+        currentXPBefore: 10,
+        currentXPAfter: 60,
+        lifetimeXPBefore: 20,
+        lifetimeXPAfter: 140,
+        progressionSnapshotBefore: { attributes: { power: 50 }, disciplineRatings: { fencing: 80 }, ovr: 60, mvs: 10, marketValue: 20, salary: 2, bracket: "core" },
+        progressionSnapshotAfter: { attributes: { power: 51 }, disciplineRatings: { fencing: 81 }, ovr: 61, mvs: 10, marketValue: 21, salary: 2, marketValuePreview: 21, salaryPreview: 2.2, bracket: "core", bracketPreview: "core" },
+        timestamp: "2026-06-11T00:00:00.000Z",
+        source: "manual_season_end_xp_spend",
+      },
+      {
+        eventId: "progression-player-2",
+        seasonId: "season-1",
+        teamId: "team-2",
+        playerId: "player-2",
+        upgrades: [],
+        xpEarned: 40,
+        xpSpent: 0,
+        currentXPBefore: 0,
+        currentXPAfter: 40,
+        lifetimeXPBefore: 0,
+        lifetimeXPAfter: 40,
+        progressionSnapshotBefore: { attributes: { speed: 50 }, disciplineRatings: { fencing: 70 }, ovr: 50, mvs: 4, marketValue: 12, salary: 1, bracket: "prospect" },
+        progressionSnapshotAfter: { attributes: { speed: 50 }, disciplineRatings: { fencing: 70 }, ovr: 50, mvs: 4, marketValue: 12, salary: 1, marketValuePreview: 12, salaryPreview: 1, bracket: "prospect", bracketPreview: "prospect" },
+        timestamp: "2026-06-11T00:00:00.000Z",
+        source: "manual_season_end_xp_spend",
+      },
+    ],
     logs: [],
     mappingReport: { mappingSource: "test", teamSource: "test", generatedAt: "2026-06-11T00:00:00.000Z", processedMappingRows: 0, importedPlayerCount: 0, matchedRosterCount: 0, teamCount: 2, unmappedPlayers: [], teamsWithoutPlayers: [], mappingRowsWithoutPlayerMatch: [], duplicateMappedPlayers: [], unknownTeamCodes: [], duplicateTeamCodes: [], warnings: [] },
   };
@@ -83,5 +119,20 @@ describe("season review service", () => {
     expect(review.transferHighlights[0]?.label).toBe("teuerster Kauf");
     expect(review.topDisciplinePerformances[0]?.name).toBe("Alpha Ace");
     expect(review.teamHighlights.some((entry) => entry.source === "seasonState.disciplineResults")).toBe(true);
+  });
+
+  it("reports promised-role gaps and XP development rankings from stored snapshots", () => {
+    const review = buildSeasonReview(gameState());
+
+    expect(review.promisedRoleSignals[0]).toMatchObject({
+      playerId: "player-2",
+      promisedRole: "starter",
+      appearances: 1,
+      expectedAppearances: 7,
+    });
+    expect(review.warnings).toContain("promised_role_usage_gap");
+    expect(review.xpDevelopmentRankings.topImproved[0]?.playerId).toBe("player-1");
+    expect(review.xpDevelopmentRankings.bottomLabel).toBe("least_improved");
+    expect(review.xpDevelopmentRankings.bottom20[0]?.playerId).toBe("player-2");
   });
 });

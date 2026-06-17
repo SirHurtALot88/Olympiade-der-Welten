@@ -420,6 +420,7 @@ function buildSeasonSnapshotRecord(gameState: GameState, seasonId: string = game
         marketValue: economy?.marketValue ?? rosterEntry?.currentValue ?? rosterEntry?.purchasePrice ?? null,
         salary: economy?.salary ?? rosterEntry?.salary ?? null,
         contractLength: economy?.contractLength ?? rosterEntry?.contractLength ?? null,
+        promisedRole: rosterEntry?.promisedRole ?? null,
         top10Count: entry.top10Count,
         mvpCount: entry.mvpCount,
         bestDisciplineId: entry.bestDisciplineId,

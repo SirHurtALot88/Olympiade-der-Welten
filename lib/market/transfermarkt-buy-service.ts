@@ -3,7 +3,7 @@ import { randomUUID } from "node:crypto";
 
 import { buildActivePlayerId } from "@/lib/db/seed/mappers";
 import { db } from "@/src/server/db";
-import type { ContractShape, ContractYearSalary } from "@/lib/data/olyDataTypes";
+import type { ContractShape, ContractYearSalary, RosterPromisedRole } from "@/lib/data/olyDataTypes";
 import type { NegotiationScoreBreakdownEntry, PlayerContractPreference } from "@/lib/market/contract-negotiation-preview";
 
 type PrismaLike = Pick<
@@ -19,6 +19,7 @@ export type TransfermarktBuyParams = {
   contractLength?: number;
   contractShape?: ContractShape;
   offeredSalary?: number;
+  promisedRole?: RosterPromisedRole;
   transferSource?: string;
   allowRecentlySoldRebuyOverride?: boolean;
   localRunContext?: unknown;
@@ -52,6 +53,7 @@ export type TransfermarktBuyPreview = {
   salary: number | null;
   contractLength: number;
   contractShape?: ContractShape;
+  promisedRole?: RosterPromisedRole | null;
   currentValue: number | null;
   joinedSeasonId: string;
   expectedSalary?: number | null;

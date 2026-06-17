@@ -11,6 +11,7 @@ import { applyTrainingRecoveryImpact } from "@/lib/training/training-recovery-im
 import type { PlayerTrainingMode } from "@/lib/training/training-plan-types";
 
 export const FATIGUE_INJURY_SOURCE = "fatigue_injury_risk_v1" as const;
+export const FATIGUE_INJURY_REHEARSAL_SOURCE = "fatigue_injury_rehearsal_v1" as const;
 export const MATCHDAY_FATIGUE_LOAD = 12;
 export const BASE_MATCHDAY_RECOVERY = 20;
 
@@ -29,6 +30,13 @@ export type InjuryRiskBand = (typeof injuryRiskBands)[number];
 export type PlayerAvailabilityView = PlayerAvailabilityStateRecord & {
   isUnavailable: boolean;
   blocker: "player_injured_unavailable" | null;
+};
+
+export type InjuryRehearsalOptions = {
+  enabled: boolean;
+  seed?: string;
+  maxInjuries?: number;
+  riskPercentOverride?: number;
 };
 
 type MatchdayUse = {
@@ -108,6 +116,29 @@ export function rollInjuryRisk(input: {
     roll,
     result: riskPercent > 0 && roll < riskPercent ? "injured" : "healthy",
     source: FATIGUE_INJURY_SOURCE,
+  };
+}
+
+function rollInjuryRiskForRehearsal(input: {
+  saveId: string;
+  seasonId: string;
+  matchdayId: string;
+  playerId: string;
+  fatigueBefore: number;
+  options: InjuryRehearsalOptions;
+}): PlayerInjuryRiskRollRecord {
+  const riskPercent = Math.max(
+    0,
+    Math.min(100, input.options.riskPercentOverride ?? getInjuryRiskPercent(input.fatigueBefore)),
+  );
+  const seed = `${input.saveId}:${input.seasonId}:${input.matchdayId}:${input.playerId}:${FATIGUE_INJURY_REHEARSAL_SOURCE}:${input.options.seed ?? "default"}`;
+  const roll = round((stableHash(seed) % 10_000) / 100, 2);
+  return {
+    fatigueBefore: clampFatigue(input.fatigueBefore),
+    riskPercent,
+    roll,
+    result: riskPercent > 0 && roll < riskPercent ? "injured" : "healthy",
+    source: FATIGUE_INJURY_REHEARSAL_SOURCE,
   };
 }
 
@@ -275,10 +306,14 @@ export function applyFatigueAndInjuryAfterMatchday(input: {
   matchdayId: string;
   matchdayResultId: string;
   timestamp: string;
+  injuryRehearsal?: InjuryRehearsalOptions | null;
 }): { gameState: GameState; injuryEvents: InjuryEventRecord[] } {
   const usedPlayers = collectMatchdayUses(input.gameState, input.seasonId, input.matchdayId);
   const usedPlayerKeys = new Set(usedPlayers.map((use) => `${use.teamId}::${use.playerId}`));
   const nextMatchdayId = getNextMatchdayId(input.gameState, input.matchdayId);
+  const injuryRehearsal = input.injuryRehearsal?.enabled ? input.injuryRehearsal : null;
+  const maxRehearsalInjuries = injuryRehearsal ? Math.max(0, injuryRehearsal.maxInjuries ?? 3) : Number.POSITIVE_INFINITY;
+  let rehearsalInjuriesCreated = 0;
   let nextAvailability = (input.gameState.seasonState.playerAvailabilityState ?? []).filter((entry) =>
     isActiveRosterPlayer(input.gameState, entry.playerId, entry.teamId),
   );
@@ -350,13 +385,29 @@ export function applyFatigueAndInjuryAfterMatchday(input: {
       nextPlayers[playerIndex] = { ...player, fatigue: fatigueBeforeRoll };
       continue;
     }
-    const roll = rollInjuryRisk({
-      saveId: input.saveId,
-      seasonId: input.seasonId,
-      matchdayId: input.matchdayId,
-      playerId: use.playerId,
-      fatigueBefore: fatigueBeforeRoll,
-    });
+    const initialRoll = injuryRehearsal
+      ? rollInjuryRiskForRehearsal({
+          saveId: input.saveId,
+          seasonId: input.seasonId,
+          matchdayId: input.matchdayId,
+          playerId: use.playerId,
+          fatigueBefore: fatigueBeforeRoll,
+          options: injuryRehearsal,
+        })
+      : rollInjuryRisk({
+          saveId: input.saveId,
+          seasonId: input.seasonId,
+          matchdayId: input.matchdayId,
+          playerId: use.playerId,
+          fatigueBefore: fatigueBeforeRoll,
+        });
+    const roll =
+      initialRoll.result === "injured" && rehearsalInjuriesCreated >= maxRehearsalInjuries
+        ? { ...initialRoll, result: "healthy" as const }
+        : initialRoll;
+    if (roll.result === "injured" && injuryRehearsal) {
+      rehearsalInjuriesCreated += 1;
+    }
     const recovery = calculatePlayerRecovery(input.gameState, use.teamId, player.trainingMode);
     const event: InjuryEventRecord = {
       eventId: buildInjuryEventId({
@@ -379,7 +430,7 @@ export function applyFatigueAndInjuryAfterMatchday(input: {
       normalRecovery: recovery.normalRecovery,
       injuryRecovery: roll.result === "injured" ? recovery.injuryRecovery : null,
       fatigueAfterRecovery: null,
-      source: FATIGUE_INJURY_SOURCE,
+      source: roll.source,
       timestamp: input.timestamp,
     };
     newEvents.push(event);

@@ -70,6 +70,7 @@ function createRosterEntry(playerId: string, partial?: Partial<RosterEntry>): Ro
     purchasePrice: partial?.purchasePrice ?? 42,
     currentValue: partial?.currentValue ?? 42,
     roleTag: partial?.roleTag ?? "starter",
+    promisedRole: partial?.promisedRole ?? null,
     joinedSeasonId: partial?.joinedSeasonId ?? "season-1",
   };
 }
@@ -95,7 +96,7 @@ function createGameState(input: {
     playerId: player.id,
     activePlayerId: roster.id,
     disciplineId: "climb",
-    disciplineSide: "d1",
+    disciplineSide: "d1" as const,
     slotIndex: index,
     baseValue: 70,
     finalPlayerScore: input.averageContribution ?? 10,
@@ -199,6 +200,33 @@ describe("player morale service", () => {
 
     expect(usedMorale?.morale).toBeGreaterThan(unusedMorale?.morale ?? 100);
     expect(unusedMorale?.reasons.map((reason) => reason.reasonId)).toContain("star_not_used");
+  });
+
+  it("uses promisedRole as contract expectation separately from roster roleTag", () => {
+    const promisedStarter = createPlayer("promised-starter");
+    const prospectWithoutPromise = createPlayer("prospect-no-promise");
+
+    const promisedMorale = assessPlayerMorale({
+      gameState: createGameState({
+        player: promisedStarter,
+        roster: createRosterEntry(promisedStarter.id, { roleTag: "prospect", promisedRole: "starter" }),
+        appearances: 0,
+      }),
+      playerId: promisedStarter.id,
+      teamId: "M-M",
+    });
+    const prospectMorale = assessPlayerMorale({
+      gameState: createGameState({
+        player: prospectWithoutPromise,
+        roster: createRosterEntry(prospectWithoutPromise.id, { roleTag: "prospect", promisedRole: null }),
+        appearances: 0,
+      }),
+      playerId: prospectWithoutPromise.id,
+      teamId: "M-M",
+    });
+
+    expect(promisedMorale?.morale).toBeLessThan(prospectMorale?.morale ?? 0);
+    expect(promisedMorale?.reasons.map((reason) => reason.reasonId)).toContain("star_not_used");
   });
 
   it("makes mercenary players more salary-sensitive", () => {

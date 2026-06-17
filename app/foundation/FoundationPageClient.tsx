@@ -394,6 +394,7 @@ type TransfermarktBuySummary = {
   salary: number | null;
   contractLength: number;
   contractShape?: ContractShape;
+  promisedRole?: RosterEntry["promisedRole"] | null;
   currentValue: number | null;
   joinedSeasonId: string;
   expectedSalary?: number | null;
@@ -656,6 +657,34 @@ type SeasonReviewTransferHighlightResponse = {
   source: string;
 };
 
+type SeasonReviewPromisedRoleSignalResponse = {
+  playerId: string;
+  playerName: string;
+  teamId: string;
+  teamName: string;
+  roleTag: string;
+  promisedRole: string;
+  appearances: number;
+  expectedAppearances: number;
+  source: string;
+};
+
+type SeasonReviewXpDevelopmentRowResponse = {
+  playerId: string;
+  playerName: string;
+  teamId: string;
+  teamName: string;
+  seasonId: string;
+  xpEarned: number;
+  xpSpent: number;
+  attributeDelta: number;
+  marketValueDelta: number | null;
+  salaryPreviewDelta: number | null;
+  fairSnapshot: boolean;
+  label: string;
+  source: string;
+};
+
 type SeasonReviewResponse = {
   championTeam: SeasonReviewNamedValueResponse | null;
   finalTable: SeasonReviewNamedValueResponse[];
@@ -665,6 +694,13 @@ type SeasonReviewResponse = {
   storylines: Array<{ storylineId: string; text: string; source: string }>;
   transferHighlights: SeasonReviewTransferHighlightResponse[];
   teamHighlights: SeasonReviewNamedValueResponse[];
+  promisedRoleSignals?: SeasonReviewPromisedRoleSignalResponse[];
+  xpDevelopmentRankings?: {
+    topImproved: SeasonReviewXpDevelopmentRowResponse[];
+    bottom20: SeasonReviewXpDevelopmentRowResponse[];
+    bottomLabel: "least_improved" | "declined";
+    missingFairSnapshot: SeasonReviewXpDevelopmentRowResponse[];
+  };
   warnings: string[];
 };
 
@@ -10056,6 +10092,7 @@ export default function FoundationPageClient({ initialReadSource, initialSelecte
           portraitUrl: portrait.src,
           portraitInitials: portrait.initials,
           roleTag: entry.roleTag ?? null,
+          promisedRole: entry.promisedRole ?? null,
           className: player.className ?? null,
           race: player.race ?? null,
           ovr: rating?.ovrNormalized ?? null,
@@ -17437,6 +17474,27 @@ export default function FoundationPageClient({ initialReadSource, initialSelecte
                               ))}
                               {seasonTransitionFeed.seasonReview.storylines.length === 0 ? <span>source_missing</span> : null}
                             </div>
+                            <div>
+                              <strong>XP Entwicklung</strong>
+                              {(seasonTransitionFeed.seasonReview.xpDevelopmentRankings?.topImproved ?? []).slice(0, 3).map((entry) => (
+                                <span key={`review-xp-top-${entry.playerId}`}>{entry.playerName} · +{entry.attributeDelta} Attr · {entry.xpEarned} XP</span>
+                              ))}
+                              {(seasonTransitionFeed.seasonReview.xpDevelopmentRankings?.topImproved.length ?? 0) === 0 ? <span>noch keine fairen Before/After-Snapshots</span> : null}
+                            </div>
+                            <div>
+                              <strong>{seasonTransitionFeed.seasonReview.xpDevelopmentRankings?.bottomLabel === "declined" ? "Regression Bottom" : "Least improved"}</strong>
+                              {(seasonTransitionFeed.seasonReview.xpDevelopmentRankings?.bottom20 ?? []).slice(0, 3).map((entry) => (
+                                <span key={`review-xp-bottom-${entry.playerId}`}>{entry.playerName} · {entry.attributeDelta} Attr · {entry.xpSpent} XP spent</span>
+                              ))}
+                              {(seasonTransitionFeed.seasonReview.xpDevelopmentRankings?.bottom20.length ?? 0) === 0 ? <span>—</span> : null}
+                            </div>
+                            <div>
+                              <strong>Role-Versprechen</strong>
+                              {(seasonTransitionFeed.seasonReview.promisedRoleSignals ?? []).slice(0, 3).map((entry) => (
+                                <span key={`review-promised-${entry.playerId}`}>{entry.playerName} · {entry.promisedRole}: {entry.appearances}/{entry.expectedAppearances}</span>
+                              ))}
+                              {(seasonTransitionFeed.seasonReview.promisedRoleSignals?.length ?? 0) === 0 ? <span>keine offenen Widersprueche</span> : null}
+                            </div>
                           </div>
                           <button className="primary-button inline-button" type="button" disabled>
                             Weiter zu Finanzen
@@ -24527,6 +24585,7 @@ export default function FoundationPageClient({ initialReadSource, initialSelecte
                         )}
                         <p className="muted" style={{ marginTop: 8 }}>
                           Buyout zahlt das komplette Restgehalt.
+                          {marketBuyPreview.promisedRole ? ` · Versprochene Rolle: ${marketBuyPreview.promisedRole}` : ""}
                         </p>
                       </div>
 

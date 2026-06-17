@@ -111,6 +111,7 @@ function createRosterEntry(id: string, playerId: string, partial?: Partial<Roste
     purchasePrice: partial?.purchasePrice ?? 5000,
     currentValue: partial?.currentValue ?? 5500,
     roleTag: partial?.roleTag ?? "starter",
+    promisedRole: partial?.promisedRole ?? null,
     joinedSeasonId: partial?.joinedSeasonId ?? "season-1",
   };
 }
@@ -307,17 +308,20 @@ describe("transfermarkt local service", () => {
       seasonId: "season-1",
       teamId: "A-A",
       playerId: "fa-1",
+      promisedRole: "rotation",
     });
 
     expect(preview.canBuy).toBe(true);
     expect(preview.rosterAfter).toBe(3);
     expect(preview.cashAfter).toBe(150);
+    expect(preview.promisedRole).toBe("rotation");
 
     const result = executeLocalTransfermarktBuy({
       saveId: "save-singleplayer-dev",
       seasonId: "season-1",
       teamId: "A-A",
       playerId: "fa-1",
+      promisedRole: "rotation",
     });
 
     expect(result.canBuy).toBe(true);
@@ -330,6 +334,8 @@ describe("transfermarkt local service", () => {
     expect(afterRow?.cash).toBe((beforeRow?.cash ?? 0) - 25);
     expect(afterRow?.salaryTotal).toBe((beforeRow?.salaryTotal ?? 0) + (result.offeredSalary ?? result.salary ?? 0));
     expect(afterRow?.marketValueTotal).toBe((beforeRow?.marketValueTotal ?? 0) + 25);
+    expect(afterState.rosters.find((entry) => entry.playerId === "fa-1")?.roleTag).toBe("prospect");
+    expect(afterState.rosters.find((entry) => entry.playerId === "fa-1")?.promisedRole).toBe("rotation");
 
     const afterFreeAgents = listLocalTransfermarktFreeAgents({
       saveId: "save-singleplayer-dev",
@@ -1240,6 +1246,7 @@ describe("transfermarkt local service", () => {
       rosterPlayers: [],
       contractLength: 1,
       contractShape: "balanced",
+      offeredSalary: null,
       seasonLabelBase: "Season 1",
     });
     const fiveYears = buildContractNegotiationPreview({
@@ -1252,6 +1259,7 @@ describe("transfermarkt local service", () => {
       rosterPlayers: [],
       contractLength: 5,
       contractShape: "balanced",
+      offeredSalary: null,
       seasonLabelBase: "Season 1",
     });
 

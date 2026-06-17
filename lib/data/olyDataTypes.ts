@@ -885,7 +885,7 @@ export type PlayerInjuryRiskRollRecord = {
   riskPercent: number;
   roll: number;
   result: "healthy" | "injured";
-  source: "fatigue_injury_risk_v1";
+  source: "fatigue_injury_risk_v1" | "fatigue_injury_rehearsal_v1";
 };
 
 export type PlayerAvailabilityStateRecord = {
@@ -915,7 +915,7 @@ export type InjuryEventRecord = {
   normalRecovery?: number | null;
   injuryRecovery?: number | null;
   fatigueAfterRecovery?: number | null;
-  source: "fatigue_injury_risk_v1";
+  source: "fatigue_injury_risk_v1" | "fatigue_injury_rehearsal_v1";
   timestamp: string;
 };
 
@@ -944,6 +944,8 @@ export type Discipline = {
   mutator2?: string | null;
 };
 
+export type RosterPromisedRole = "starter" | "rotation" | "bench" | "prospect";
+
 export type RosterEntry = {
   id: string;
   teamId: string;
@@ -955,6 +957,7 @@ export type RosterEntry = {
   purchasePrice?: number | null;
   currentValue?: number | null;
   roleTag: "starter" | "bench" | "prospect";
+  promisedRole?: RosterPromisedRole | null;
   joinedSeasonId: string;
 };
 
@@ -1267,6 +1270,7 @@ export type SeasonSnapshotPlayerPerformanceRecord = {
   marketValue?: number | null;
   salary?: number | null;
   contractLength?: number | null;
+  promisedRole?: RosterPromisedRole | null;
   top10Count: number;
   mvpCount: number;
   bestDisciplineId: string | null;

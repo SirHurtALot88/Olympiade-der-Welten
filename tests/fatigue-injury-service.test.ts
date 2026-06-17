@@ -201,6 +201,55 @@ describe("fatigue injury service", () => {
     expect(laterAvailability.injuryStatus).toBe("recovering");
   });
 
+  it("supports an explicitly marked deterministic injury rehearsal mode without changing normal rates", () => {
+    const gameState = createGameState("player-1", 83);
+    const draft = gameState.seasonState.lineupDrafts?.[0];
+    gameState.players.push({
+      id: "player-2",
+      name: "Second Risk Runner",
+      className: "Runner",
+      race: "Human",
+      marketValue: 10,
+      salary: 2,
+      fatigue: 83,
+      attributes: {},
+      disciplineRatings: {},
+    } as never);
+    gameState.rosters.push({
+      teamId: "A-A",
+      playerId: "player-2",
+      role: "bench",
+      joinedSeasonId: "season-1",
+    } as never);
+    draft?.entries.push({
+      disciplineId: "tdm",
+      disciplineSide: "d1",
+      slotIndex: 2,
+      playerId: "player-2",
+      activePlayerId: "active-player-2",
+    });
+
+    const result = applyFatigueAndInjuryAfterMatchday({
+      gameState,
+      saveId: "save-1",
+      seasonId: "season-1",
+      matchdayId: "md-1",
+      matchdayResultId: "result-1",
+      timestamp: "2026-06-13T00:00:00.000Z",
+      injuryRehearsal: {
+        enabled: true,
+        seed: "rehearsal-seed",
+        maxInjuries: 1,
+        riskPercentOverride: 100,
+      },
+    });
+
+    const injuredEvents = result.injuryEvents.filter((event) => event.result === "injured");
+    expect(injuredEvents).toHaveLength(1);
+    expect(result.injuryEvents.every((event) => event.source === "fatigue_injury_rehearsal_v1")).toBe(true);
+    expect(result.gameState.seasonState.injuryEvents?.filter((event) => event.result === "injured")).toHaveLength(1);
+  });
+
   it("treats sold and transfer-market players as healthy with zero fatigue", () => {
     const gameState = createGameState("player-1", 88);
     gameState.rosters = [];

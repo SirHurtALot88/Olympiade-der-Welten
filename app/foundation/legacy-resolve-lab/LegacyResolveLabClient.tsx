@@ -397,6 +397,7 @@ export default function LegacyResolveLabClient({
       seasonPerformance: null,
       transferContext: {
         roleTag: null,
+        promisedRole: null,
         joinedSeasonId: null,
         purchasePrice: null,
         currentValue: null,

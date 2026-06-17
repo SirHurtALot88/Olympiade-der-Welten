@@ -1,6 +1,6 @@
 import { randomUUID } from "node:crypto";
 
-import type { ContractShape, GameState, Player, RosterEntry, TransferHistoryEntry } from "@/lib/data/olyDataTypes";
+import type { ContractShape, GameState, Player, RosterEntry, RosterPromisedRole, TransferHistoryEntry } from "@/lib/data/olyDataTypes";
 import { getImportedPlayerDisplayMarketValue } from "@/lib/data/player-economy-display";
 import { resolvePlayerEconomyContract } from "@/lib/foundation/player-economy-contract";
 import { buildPlayerRatingContractMap } from "@/lib/foundation/player-rating-contract";
@@ -56,7 +56,7 @@ function buildDiverseFreeAgentSlice(items: TransfermarktFreeAgentItem[], limit: 
     if (axisDelta !== 0) {
       return axisDelta;
     }
-    return left.name.localeCompare(right.name, "de");
+    return left.name.localeCompare(right.name, "de", { numeric: true, sensitivity: "base" });
   });
 
   const classBuckets = new Map<string, TransfermarktFreeAgentItem[]>();
@@ -224,6 +224,25 @@ function getTopDisciplineScores(disciplinesById: Map<string, string>, player: Pl
     }));
 }
 
+function derivePromisedRoleForBuy(input: {
+  explicitRole?: RosterPromisedRole | null;
+  contractLength: number;
+  purchasePrice: number | null;
+  rosterBefore: number;
+}): RosterPromisedRole {
+  if (input.explicitRole) {
+    return input.explicitRole;
+  }
+
+  if (input.contractLength >= 4 || (input.purchasePrice ?? 0) >= 35 || input.rosterBefore < 6) {
+    return "starter";
+  }
+  if (input.contractLength >= 2 || (input.purchasePrice ?? 0) >= 18) {
+    return "rotation";
+  }
+  return "prospect";
+}
+
 function resolveLocalSave(saveId?: string) {
   const persistence = createPersistenceService();
   const bootstrapped = persistence.bootstrapSingleplayerSave();
@@ -289,6 +308,7 @@ type LocalTransfermarktBuyContext = {
   contractLength: number;
   contractShape: ContractShape;
   priorRejectedNegotiation: boolean;
+  promisedRole: RosterPromisedRole;
   blockingReasons: string[];
   warnings: string[];
 };
@@ -416,6 +436,7 @@ function buildLocalTransfermarktBuyPreviewFromContext(
     rosterBefore,
     contractLength,
     contractShape,
+    promisedRole,
     blockingReasons,
     warnings,
     priorRejectedNegotiation,
@@ -484,6 +505,7 @@ function buildLocalTransfermarktBuyPreviewFromContext(
     salary,
     contractLength,
     contractShape,
+    promisedRole,
     currentValue: purchasePrice,
     joinedSeasonId: gameState.season.id,
     expectedSalary: negotiationPreview.expectedSalary,
@@ -544,6 +566,12 @@ function resolveLocalTransfermarktBuyContext(params: TransfermarktBuyParams): Lo
     typeof params.contractLength === "number" && Number.isFinite(params.contractLength)
       ? Math.max(1, Math.round(params.contractLength))
       : recommendedContract.contractLength;
+  const promisedRole = derivePromisedRoleForBuy({
+    explicitRole: params.promisedRole ?? null,
+    contractLength,
+    purchasePrice,
+    rosterBefore,
+  });
   const contractShape =
     params.contractShape != null
       ? normalizeContractShape(params.contractShape)
@@ -596,6 +624,7 @@ function resolveLocalTransfermarktBuyContext(params: TransfermarktBuyParams): Lo
     rosterBefore,
     contractLength,
     contractShape,
+    promisedRole,
     priorRejectedNegotiation,
     blockingReasons,
     warnings,
@@ -929,6 +958,7 @@ export function executeLocalTransfermarktBuy(params: TransfermarktBuyParams): Tr
         purchasePrice: preview.purchasePrice,
         currentValue: preview.currentValue,
         roleTag: "prospect",
+        promisedRole: preview.promisedRole ?? null,
         joinedSeasonId: save.gameState.season.id,
       },
     ],

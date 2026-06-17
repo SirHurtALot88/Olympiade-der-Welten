@@ -121,6 +121,7 @@ function getContractIntent(morale: number, player: Player): PlayerMoraleContract
 function getRoleExpectedAppearances(roleTag: string | null | undefined) {
   const role = (roleTag ?? "").toLowerCase();
   if (role.includes("starter") || role.includes("star") || role.includes("core")) return 7;
+  if (role.includes("rotation")) return 4;
   if (role.includes("bench") || role.includes("depth")) return 3;
   if (role.includes("prospect")) return 2;
   return 4;
@@ -279,10 +280,11 @@ function computePlayerMorale(input: {
     appearances: 0,
     averageContribution: null,
   };
-  const expectedAppearances = getRoleExpectedAppearances(rosterEntry.roleTag);
+  const expectationRole = rosterEntry.promisedRole ?? rosterEntry.roleTag;
+  const expectedAppearances = getRoleExpectedAppearances(expectationRole);
   const appearanceGap = seasonPerformance.appearances - expectedAppearances;
   if (seasonPerformance.appearances > 0) {
-    const usageDelta = clamp(appearanceGap * (rosterEntry.roleTag === "starter" ? 2.4 : 1.6), -14, 10);
+    const usageDelta = clamp(appearanceGap * (expectationRole === "starter" ? 2.4 : 1.6), -14, 10);
     morale += usageDelta;
     addReason(
       reasons,
@@ -291,9 +293,9 @@ function computePlayerMorale(input: {
       usageDelta,
       "season_performance",
     );
-  } else if (rosterEntry.roleTag === "starter") {
+  } else if (expectationRole === "starter") {
     morale -= 12;
-    addReason(reasons, "star_not_used", "Starter ohne Einsatzzeit", -12, "season_performance");
+    addReason(reasons, "star_not_used", "Versprochener Starter ohne Einsatzzeit", -12, "season_performance");
   }
 
   if (seasonPerformance.averageContribution != null) {
