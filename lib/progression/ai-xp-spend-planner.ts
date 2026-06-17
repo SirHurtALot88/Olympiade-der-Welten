@@ -13,6 +13,7 @@ import { getTeamStrategyProfile } from "@/lib/foundation/team-strategy-profiles"
 import { buildPlayerRatingContractMap } from "@/lib/foundation/player-rating-contract";
 import { buildPlayerSeasonPerformance } from "@/lib/foundation/player-season-performance";
 import type { PersistedSaveGame, PersistenceService } from "@/lib/persistence/types";
+import { getTeamFacilityState } from "@/lib/facilities/facility-effects";
 import {
   applySeasonEndXpSpend,
   previewSeasonEndXpSpend,
@@ -25,6 +26,7 @@ import {
   officialDisciplineWeightTable,
   type OfficialDisciplineWeightId,
 } from "@/lib/player-generator/official-discipline-weights";
+import { getProgressionRatingTier, getSeasonEndUpgradeCost } from "@/lib/training/season-end-progression-preview";
 
 export type AiXpPlayerRole = "star" | "core" | "specialist" | "depth" | "young";
 
@@ -274,6 +276,21 @@ function buildCandidatePlan(input: {
   ];
 }
 
+function getAffordableUpgradeCost(input: {
+  gameState: GameState;
+  teamId: string;
+  attribute: PlayerGeneratorAttributeName;
+  currentValue: number | null | undefined;
+}) {
+  if (!isFiniteNumber(input.currentValue) || input.currentValue >= 99) return null;
+  const cost = getSeasonEndUpgradeCost({
+    tier: getProgressionRatingTier(input.currentValue),
+    attribute: input.attribute,
+    facilities: { teamFacilities: getTeamFacilityState(input.gameState, input.teamId) },
+  });
+  return cost.costAfterFacility;
+}
+
 export function previewAiSeasonEndXpSpend(save: PersistedSaveGame, teamId: string): AiXpSpendPlan {
   const gameState = save.gameState;
   const team = gameState.teams.find((entry) => entry.teamId === teamId) ?? null;
@@ -334,6 +351,8 @@ export function previewAiSeasonEndXpSpend(save: PersistedSaveGame, teamId: strin
       warnings.push(`no_xp_available:${player.id}`);
       continue;
     }
+    let remainingXP = Math.max(0, Math.round(initialPlayerPreview?.availableXP ?? player.currentXP ?? 0));
+    const simulatedAttributes = { ...player.attributeSheetStats };
 
     for (let step = 0; step < maxUpgrades; step += 1) {
       let best:
@@ -341,24 +360,18 @@ export function previewAiSeasonEndXpSpend(save: PersistedSaveGame, teamId: strin
             attribute: PlayerGeneratorAttributeName;
             score: number;
             reasons: string[];
-            preview: SeasonEndXpSpendPreview;
+            cost: number;
         }
         | null = null;
 
       for (const { attribute, staticScore } of candidateAttributes) {
-        const trialPlan = buildCandidatePlan({ currentPlan: plannedInputs, playerId: player.id, attribute });
-        const preview = previewSeasonEndXpSpend(save, teamId, trialPlan);
-        const playerPreview = getPlayerPlanFromPreview(preview, player.id);
-        if (!playerPreview || playerPreview.blockers.length > 0 || preview.blockingReasons.some((reason) => reason.includes(player.id))) {
-          continue;
-        }
-        const upgrade = playerPreview.plannedUpgrades[playerPreview.plannedUpgrades.length - 1] ?? null;
-        if (!upgrade || upgrade.attribute !== attribute) continue;
-        const deltaScore = playerPreview.disciplineDeltas.reduce((sum, delta) => sum + (delta.disciplineDelta ?? 0), 0);
-        const costPenalty = upgrade.cost / (team!.teamId === "C-C" ? 18 : role === "depth" ? 16 : 24);
-        const score = staticScore.score + deltaScore * 2 - costPenalty;
+        const currentValue = simulatedAttributes?.[attribute];
+        const cost = getAffordableUpgradeCost({ gameState, teamId: team!.teamId, attribute, currentValue });
+        if (cost == null || cost > remainingXP) continue;
+        const costPenalty = cost / (team!.teamId === "C-C" ? 18 : role === "depth" ? 16 : 24);
+        const score = staticScore.score - costPenalty;
         if (!best || score > best.score) {
-          best = { attribute, score, reasons: staticScore.reasons, preview };
+          best = { attribute, score, reasons: staticScore.reasons, cost };
         }
       }
 
@@ -367,7 +380,9 @@ export function previewAiSeasonEndXpSpend(save: PersistedSaveGame, teamId: strin
         break;
       }
 
-      plannedInputs.push({ playerId: player.id, attribute: best.attribute, source: "manual_xp_spend_preview" });
+      plannedInputs.push(buildCandidatePlan({ currentPlan: [], playerId: player.id, attribute: best.attribute })[0]!);
+      simulatedAttributes[best.attribute] = Math.min(99, (simulatedAttributes[best.attribute] ?? 0) + 1);
+      remainingXP -= best.cost;
       acceptedForPlayer += 1;
       reasonsByPlayerId.set(player.id, [...new Set([...(reasonsByPlayerId.get(player.id) ?? []), ...best.reasons])]);
     }

@@ -22,6 +22,8 @@ import { SEASON_START_RESET_CONFIRM_TOKEN } from "@/lib/persistence/season-start
 import { runSeasonStartReset } from "@/lib/persistence/season-start-reset-service";
 import { withScenarioMeta } from "@/lib/persistence/scenario-meta";
 import type { PersistedSaveGame, PersistenceService } from "@/lib/persistence/types";
+import { previewAiSeasonEndXpSpend } from "@/lib/progression/ai-xp-spend-planner";
+import { applySeasonEndXpSpend } from "@/lib/progression/season-end-xp-apply-service";
 import { APPLY_CONFIRM_TOKEN, LegacyMatchdayResultApplyService } from "@/lib/resolve/legacy-matchday-result-apply-service";
 import { ADVANCE_MATCHDAY_CONFIRM_TOKEN, executeMatchdayAdvance } from "@/lib/season/matchday-progress-service";
 import { applyPreSeasonNextSeasonSetupLightweight, buildPreSeasonNextSeasonSetupToken } from "@/lib/season/preseason-workflow-service";
@@ -572,6 +574,63 @@ async function runSeasonMatchdays(saveId: string, persistence: PersistenceServic
   return { matchdayRows, performanceRows, blockers };
 }
 
+async function recoverNegativeCashBeforeSeasonStart(saveId: string, seasonId: string, persistence: PersistenceService) {
+  const performanceRows: PhaseMetric[] = [];
+  const blockers: string[] = [];
+  let save = persistence.getSaveById(saveId);
+  if (!save) throw new Error("Long-run save disappeared before cash recovery.");
+  const negativeBefore = save.gameState.teams.filter((team) => team.cash < 0);
+  if (negativeBefore.length === 0) {
+    return { performanceRows, blockers, recovered: false };
+  }
+
+  console.error(`[long-run] cash-recovery ${seasonId}: ${negativeBefore.map((team) => team.shortCode).join(",")}`);
+  const startedAt = Date.now();
+  const recovery = await applyAiMarketPlanLocally({
+    source: "sqlite",
+    saveId,
+    seasonId,
+    teamScope: "all",
+    dryRun: false,
+    confirmToken: AI_MARKET_APPLY_CONFIRM_TOKEN,
+    transferPhase: "manual_transfer_window",
+    options: {
+      includeWarningTeams: true,
+      applySellSteps: true,
+      applyBuySteps: false,
+      maxBuysPerTeam: 0,
+      maxSellsPerTeam: 4,
+      previewBuyLimit: 0,
+      previewSellLimit: 16,
+      performanceBudgetMs: 8_000,
+      stopOnTeamFailure: false,
+    },
+  });
+  save = persistence.getSaveById(saveId);
+  if (!save) throw new Error("Long-run save disappeared after cash recovery.");
+  const negativeAfter = save.gameState.teams.filter((team) => team.cash < 0);
+  if (recovery.status === "blocked") blockers.push(...recovery.blockingReasons.map((entry) => `cash_recovery:${entry}`));
+  if (negativeAfter.length > 0) {
+    blockers.push(
+      ...negativeAfter.map((team) => `negative_cash_after_recovery:${team.shortCode}:${round(team.cash)}`),
+    );
+  }
+  recordPhase(performanceRows, {
+    seasonId,
+    phase: "season start negative cash recovery sell-only",
+    startedAt,
+    itemCount: recovery.summary.appliedSells,
+    status: blockers.length > 0 ? "blocked" : "ok",
+    note: [
+      `before:${negativeBefore.map((team) => `${team.shortCode}:${round(team.cash)}`).join("|")}`,
+      `after:${negativeAfter.map((team) => `${team.shortCode}:${round(team.cash)}`).join("|")}`,
+      ...recovery.blockingReasons,
+      ...recovery.warnings.slice(0, 10),
+    ].join("|"),
+  });
+  return { performanceRows, blockers, recovered: true };
+}
+
 async function applySeasonEnd(saveId: string, persistence: PersistenceService) {
   const rows: Record<string, unknown>[] = [];
   const performanceRows: PhaseMetric[] = [];
@@ -644,18 +703,47 @@ async function applySeasonEnd(saveId: string, persistence: PersistenceService) {
   let xpPositive = 0;
   let xpStagnant = 0;
   let xpNegative = 0;
-  const xpAuditNote = "ai_xp_apply_skipped_performance_block";
-  const rosteredPlayerIds = new Set(save.gameState.rosters.map((entry) => entry.playerId));
-  const rosteredPlayers = save.gameState.players.filter((player) => rosteredPlayerIds.has(player.id));
-  xpPositive = rosteredPlayers.filter((player) => Number((player as { currentXP?: number; xp?: number }).currentXP ?? (player as { currentXP?: number; xp?: number }).xp ?? 0) > 0).length;
-  xpStagnant = rosteredPlayers.length - xpPositive;
+  const xpWarnings: string[] = [];
+  const xpBlockers: string[] = [];
+  for (const team of save.gameState.teams) {
+    const latest = persistence.getSaveById(saveId);
+    if (!latest) throw new Error("Long-run save disappeared during AI XP.");
+    const plan = previewAiSeasonEndXpSpend(latest, team.teamId);
+    xpWarnings.push(...plan.warnings.map((entry) => `${team.shortCode}:${entry}`));
+    if (plan.blockers.length > 0) {
+      if (plan.blockers.every((entry) => entry === "season_xp_no_unmaterialized_xp")) {
+        xpWarnings.push(`${team.shortCode}:season_xp_no_unmaterialized_xp`);
+        continue;
+      }
+      xpBlockers.push(...plan.blockers.map((entry) => `${team.shortCode}:${entry}`));
+      continue;
+    }
+    if (!plan.confirmToken || plan.normalizedPlannedUpgrades.length === 0) {
+      continue;
+    }
+    const applied = applySeasonEndXpSpend(latest, team.teamId, plan.plannedUpgrades, plan.confirmToken, persistence, {
+      allowAiTeams: true,
+    });
+    if (!applied.applied) {
+      xpBlockers.push(...applied.blockingReasons.map((entry) => `${team.shortCode}:${entry}`));
+      continue;
+    }
+    xpAppliedPlayers += applied.players.filter((player) => player.plannedUpgrades.length > 0).length;
+  }
+  save = persistence.getSaveById(saveId);
+  if (!save) throw new Error("Long-run save disappeared after AI XP.");
+  const seasonXpEvents = (save.gameState.playerProgressionEvents ?? []).filter((entry) => entry.seasonId === seasonId);
+  xpPositive = seasonXpEvents.filter((entry) => (entry.upgrades?.length ?? 0) > 0).length;
+  xpStagnant = seasonXpEvents.filter((entry) => (entry.upgrades?.length ?? 0) === 0).length;
+  xpNegative = seasonXpEvents.filter((entry) => (entry.xpEarned ?? 0) < 0).length;
+  if (xpBlockers.length > 0) blockers.push(...xpBlockers.map((entry) => `ai_xp:${entry}`));
   recordPhase(performanceRows, {
     seasonId,
     phase: "season end training/development",
     startedAt,
-    itemCount: rosteredPlayers.length,
-    status: "skipped",
-    note: xpAuditNote,
+    itemCount: seasonXpEvents.length,
+    status: xpBlockers.length > 0 ? "blocked" : "ok",
+    note: [...xpWarnings.slice(0, 20), ...xpBlockers.slice(0, 20)].join("|"),
   });
 
   save = persistence.getSaveById(saveId);
@@ -683,34 +771,56 @@ async function applySeasonEnd(saveId: string, persistence: PersistenceService) {
   if (!save) throw new Error("Long-run save disappeared before AI market.");
   console.error(`[long-run] season-end ${seasonId}: ai-market`);
   startedAt = Date.now();
-  const market = await applyAiMarketPlanLocally({
-    source: "sqlite",
-    saveId,
-    seasonId,
-    teamScope: "all",
-    dryRun: false,
-    confirmToken: AI_MARKET_APPLY_CONFIRM_TOKEN,
-    transferPhase: "manual_transfer_window",
-    options: {
-      includeWarningTeams: true,
-      applySellSteps: false,
-      applyBuySteps: true,
-      maxBuysPerTeam: null,
-      maxSellsPerTeam: 0,
-      previewBuyLimit: 48,
-      previewSellLimit: 0,
-      performanceBudgetMs: 8_000,
-      stopOnTeamFailure: false,
-    },
-  });
-  if (market.status === "blocked") blockers.push(...market.blockingReasons.map((entry) => `ai_market:${entry}`));
+  const existingMarketTransfers = save.gameState.transferHistory.filter(
+    (entry) =>
+      entry.seasonId === seasonId &&
+      entry.matchdayId === save.gameState.matchdayState.matchdayId &&
+      (entry.source === "manual_transfer_window" ||
+        entry.source === "ai_preseason_market_buy" ||
+        entry.source === "ai_preseason_market_sell"),
+  );
+  let marketStatus = existingMarketTransfers.length > 0 ? "already_applied" : "not_started";
+  let marketAppliedBuys = existingMarketTransfers.filter((entry) => entry.transferType === "buy").length;
+  let marketAppliedSells = existingMarketTransfers.filter((entry) => entry.transferType === "sell").length;
+  let marketBlockedTeams = 0;
+  let marketWarnings = existingMarketTransfers.length > 0 ? [`existing_market_transfers:${existingMarketTransfers.length}`] : [];
+  let marketBlockers: string[] = [];
+  if (existingMarketTransfers.length === 0) {
+    const market = await applyAiMarketPlanLocally({
+      source: "sqlite",
+      saveId,
+      seasonId,
+      teamScope: "all",
+      dryRun: false,
+      confirmToken: AI_MARKET_APPLY_CONFIRM_TOKEN,
+      transferPhase: "manual_transfer_window",
+      options: {
+        includeWarningTeams: true,
+        applySellSteps: true,
+        applyBuySteps: true,
+        maxBuysPerTeam: null,
+        maxSellsPerTeam: 1,
+        previewBuyLimit: 48,
+        previewSellLimit: 6,
+        performanceBudgetMs: 8_000,
+        stopOnTeamFailure: false,
+      },
+    });
+    marketStatus = market.status;
+    marketAppliedBuys = market.summary.appliedBuys;
+    marketAppliedSells = market.summary.appliedSells;
+    marketBlockedTeams = market.summary.blockedTeams;
+    marketWarnings = market.warnings;
+    marketBlockers = market.blockingReasons;
+    if (market.status === "blocked") blockers.push(...market.blockingReasons.map((entry) => `ai_market:${entry}`));
+  }
   recordPhase(performanceRows, {
     seasonId,
     phase: "season end ai market",
     startedAt,
-    itemCount: market.summary.appliedBuys + market.summary.appliedSells,
-    status: market.status === "blocked" ? "blocked" : "ok",
-    note: [...market.blockingReasons, ...market.warnings].join("|"),
+    itemCount: marketAppliedBuys + marketAppliedSells,
+    status: marketStatus === "blocked" ? "blocked" : "ok",
+    note: [...marketBlockers, ...marketWarnings].join("|"),
   });
 
   rows.push({
@@ -721,19 +831,19 @@ async function applySeasonEnd(saveId: string, persistence: PersistenceService) {
     xpPositive,
     xpStagnant,
     xpNegative,
-    xpAuditNote,
+    xpAuditNote: xpBlockers.length > 0 ? xpBlockers.join("|") : xpWarnings.slice(0, 20).join("|"),
     contractReleasedPlayers: contractApply?.releasedPlayers ?? 0,
     contractRenewedPlayers: contractApply?.renewedPlayers ?? 0,
     contractEventsWritten: contractApply?.contractEventsWritten ?? 0,
-    aiMarketStatus: market.status,
-    aiMarketExecutedSells: market.summary.appliedSells,
-    aiMarketExecutedBuys: market.summary.appliedBuys,
-    aiMarketBlockedTeams: market.summary.blockedTeams,
-    aiMarketWarnings: market.warnings.join("|"),
+    aiMarketStatus: marketStatus,
+    aiMarketExecutedSells: marketAppliedSells,
+    aiMarketExecutedBuys: marketAppliedBuys,
+    aiMarketBlockedTeams: marketBlockedTeams,
+    aiMarketWarnings: marketWarnings.join("|"),
     blockers: blockers.join("|"),
   });
 
-  return { rows, performanceRows, blockers, totalPrizeMoney, aiMarketStatus: market.status };
+  return { rows, performanceRows, blockers, totalPrizeMoney, aiMarketStatus: marketStatus };
 }
 
 function collectAuditRows(save: PersistedSaveGame, seasonId: string, seasonEnd: { totalPrizeMoney: number; aiMarketStatus: string }) {
@@ -986,13 +1096,21 @@ async function main() {
   const balanceIssues: string[] = [];
   const matchdayRows: Record<string, unknown>[] = [];
 
-  for (let seasonNumber = 1; seasonNumber <= TARGET_FINAL_SEASON; seasonNumber += 1) {
+  const startSeasonNumber = Math.max(1, parseSeasonNumber(save.gameState.season.id));
+  for (let seasonNumber = startSeasonNumber; seasonNumber <= TARGET_FINAL_SEASON; seasonNumber += 1) {
     save = persistence.getSaveById(save.saveId) ?? save;
     const seasonId = save.gameState.season.id;
     if (parseSeasonNumber(seasonId) !== seasonNumber) {
       throw new Error(`Expected season-${seasonNumber}, got ${seasonId}.`);
     }
     console.error(`[long-run] season ${seasonId} start`);
+    const cashRecovery = await recoverNegativeCashBeforeSeasonStart(save.saveId, seasonId, persistence);
+    performanceRows.push(...cashRecovery.performanceRows);
+    if (cashRecovery.blockers.length > 0) {
+      openTechnicalBugs.push(...cashRecovery.blockers);
+      break;
+    }
+    save = persistence.getSaveById(save.saveId) ?? save;
     if (save.gameState.matchdayState.matchdayId === save.gameState.season.matchdayIds[0]) {
       const startedAt = Date.now();
       prepSeasonLineups(save.saveId, seasonId);

@@ -51,11 +51,8 @@ export function createPersistenceService(): PersistenceService {
       return saveRepository.getSaveById(saveId);
     },
     saveSingleplayerState(saveId, gameState) {
-      const existing = saveRepository.getSaveById(saveId);
       return saveRepository.saveGameState({
         saveId,
-        name: existing?.name ?? SINGLEPLAYER_SAVE_NAME,
-        status: existing?.status ?? "active",
         gameState,
       });
     },

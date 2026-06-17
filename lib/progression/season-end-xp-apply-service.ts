@@ -97,6 +97,11 @@ export type SeasonEndXpSpendApplyOptions = {
   allowAiTeams?: boolean;
 };
 
+type EconomyPreviewContext = {
+  beforeReport: ReturnType<typeof buildPlayerEconomyCompareReport>;
+  beforeRatings: ReturnType<typeof buildPlayerRatingContractMap>;
+};
+
 const ATTRIBUTE_KEYS: PlayerGeneratorAttributeName[] = [
   "power",
   "health",
@@ -205,18 +210,22 @@ function buildEconomyAudit(input: {
   gameState: GameState;
   player: Player;
   previewPlayer: Player;
+  context: EconomyPreviewContext;
+  hasAttributeChanges: boolean;
 }): SeasonEndProgressionEconomyAudit {
-  const beforeReport = buildPlayerEconomyCompareReport({ gameState: input.gameState });
+  const beforeReport = input.context.beforeReport;
   const beforeRow = beforeReport.players.find((entry) => entry.playerId === input.player.id) ?? null;
-  const previewGameState: GameState = {
-    ...input.gameState,
-    players: input.gameState.players.map((entry) => (entry.id === input.player.id ? input.previewPlayer : entry)),
-  };
-  const afterReport = buildPlayerEconomyCompareReport({ gameState: previewGameState });
+  const previewGameState: GameState | null = input.hasAttributeChanges
+    ? {
+        ...input.gameState,
+        players: input.gameState.players.map((entry) => (entry.id === input.player.id ? input.previewPlayer : entry)),
+      }
+    : null;
+  const afterReport = previewGameState ? buildPlayerEconomyCompareReport({ gameState: previewGameState }) : beforeReport;
   const afterRow = afterReport.players.find((entry) => entry.playerId === input.player.id) ?? null;
   const rosterEntry = input.gameState.rosters.find((entry) => entry.playerId === input.player.id) ?? null;
-  const beforeRating = buildPlayerRatingContractMap(input.gameState).get(input.player.id) ?? null;
-  const afterRating = buildPlayerRatingContractMap(previewGameState).get(input.player.id) ?? null;
+  const beforeRating = input.context.beforeRatings.get(input.player.id) ?? null;
+  const afterRating = previewGameState ? buildPlayerRatingContractMap(previewGameState).get(input.player.id) ?? null : beforeRating;
   const marketValueDeltaAbs =
     beforeRow?.calculatedMarketValue != null && input.player.marketValue != null
       ? roundValue(beforeRow.calculatedMarketValue - input.player.marketValue, 2)
@@ -327,6 +336,7 @@ function buildPreviewPlayer(input: {
   player: Player;
   plannedInputs: SeasonEndXpSpendPlannedUpgradeInput[];
   facilities: TeamFacilityCollection;
+  economyContext: EconomyPreviewContext;
 }): SeasonEndXpSpendPreviewPlayer {
   const blockers: string[] = [];
   const warnings: string[] = [];
@@ -419,7 +429,13 @@ function buildPreviewPlayer(input: {
     previousDisciplineRatings: input.player.disciplineRatings,
     disciplineRatings: previewDisciplineRatings,
   };
-  const economyAudit = buildEconomyAudit({ gameState: input.save.gameState, player: input.player, previewPlayer });
+  const economyAudit = buildEconomyAudit({
+    gameState: input.save.gameState,
+    player: input.player,
+    previewPlayer,
+    context: input.economyContext,
+    hasAttributeChanges: plannedUpgrades.length > 0,
+  });
   const progressionSnapshotBefore = buildProgressionSnapshot({
     player: input.player,
     attributes: attributesBefore ?? {},
@@ -512,13 +528,17 @@ export function previewSeasonEndXpSpend(
   }
 
   const facilities = getTeamFacilities(gameState, teamId);
+  const economyContext: EconomyPreviewContext = {
+    beforeReport: buildPlayerEconomyCompareReport({ gameState }),
+    beforeRatings: buildPlayerRatingContractMap(gameState),
+  };
   const players = [...inputsByPlayerId.entries()].map(([playerId, inputs]) => {
     const player = gameState.players.find((entry) => entry.id === playerId) ?? null;
     if (!player) {
       blockingReasons.push(`player_not_found:${playerId}`);
       return null;
     }
-    return buildPreviewPlayer({ save, teamId, player, plannedInputs: inputs, facilities });
+    return buildPreviewPlayer({ save, teamId, player, plannedInputs: inputs, facilities, economyContext });
   }).filter((entry): entry is SeasonEndXpSpendPreviewPlayer => {
     if (!entry) return false;
     if (plannedUpgrades.length > 0) return true;

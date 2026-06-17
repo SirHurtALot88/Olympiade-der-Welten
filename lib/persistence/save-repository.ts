@@ -210,6 +210,13 @@ function loadScenarioMetaForSummary(saveId: string, createdAt: string) {
   };
 }
 
+function loadSaveRow(saveId: string) {
+  const database = getDatabase();
+  return database
+    .prepare("SELECT save_id, name, status, created_at, updated_at FROM saves WHERE save_id = ?")
+    .get(saveId) as SaveRow | undefined;
+}
+
 function loadBaselineSourcePlayers() {
   return createGameStateFromSeed(loadSeedData()).players;
 }
@@ -375,13 +382,21 @@ function createPersistedSaveRecord(input: {
 
   transaction();
 
-  return materializePersistedSave({
-    save_id: input.saveId,
+  const gameStateWithScenarioMeta = guardedGameState.scenarioMeta
+    ? guardedGameState
+    : {
+        ...guardedGameState,
+        scenarioMeta: buildScenarioMeta({ gameState: guardedGameState }),
+      };
+
+  return {
+    saveId: input.saveId,
     name: input.name,
     status: input.status,
-    created_at: createdAt,
-    updated_at: updatedAt,
-  });
+    createdAt,
+    updatedAt,
+    gameState: gameStateWithScenarioMeta,
+  };
 }
 
 export function createSaveRepository(): SaveRepository {
@@ -394,10 +409,7 @@ export function createSaveRepository(): SaveRepository {
       return row ? materializePersistedSave(row) : null;
     },
     getSaveById(saveId: string) {
-      const database = getDatabase();
-      const row = database
-        .prepare("SELECT save_id, name, status, created_at, updated_at FROM saves WHERE save_id = ?")
-        .get(saveId) as SaveRow | undefined;
+      const row = loadSaveRow(saveId);
       return row ? materializePersistedSave(row) : null;
     },
     listSaves() {
@@ -492,12 +504,12 @@ export function createSaveRepository(): SaveRepository {
       return persisted;
     },
     saveGameState({ saveId, name, status, gameState }) {
-      const existing = this.getSaveById(saveId);
+      const existing = loadSaveRow(saveId);
       const persisted = createPersistedSaveRecord({
         saveId,
         name: name ?? existing?.name ?? "Oly Save",
         status: status ?? existing?.status ?? "active",
-        createdAt: existing?.createdAt,
+        createdAt: existing?.created_at,
         gameState,
       });
 

@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 
 import type { GameState, Player, PlayerGeneratorAttributes, Team, TeamIdentity } from "@/lib/data/olyDataTypes";
 import type { PersistedSaveGame, PersistenceService } from "@/lib/persistence/types";
+import { createPlayerBaselinesForPlayers } from "@/lib/players/player-baseline-service";
 import { applyAiSeasonEndXpSpend, previewAiSeasonEndXpSpend } from "@/lib/progression/ai-xp-spend-planner";
 import { applySeasonEndXpSpend } from "@/lib/progression/season-end-xp-apply-service";
 
@@ -127,6 +128,7 @@ function createSave(input: {
     contracts: [],
     transferListings: [],
     transferHistory: [],
+    playerBaselines: createPlayerBaselinesForPlayers(players, { source: "seed", createdAt: "2026-06-12T00:00:00.000Z" }),
     playerProgressionEvents: input.priorProgressionEvents
       ? players.map((player) => ({
           eventId: `existing-${player.id}`,
