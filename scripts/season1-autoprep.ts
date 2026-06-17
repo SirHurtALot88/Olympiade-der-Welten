@@ -409,13 +409,18 @@ function prepLineups(gameState: GameState, saveId: string): { gameState: GameSta
 
       const preview = buildAiLegacyLineupPreview(contextResult.context, "sqlite");
       const modifiers = buildModifiers({ context: contextResult.context, entries: preview.entries });
+      const activePlayersCount = contextResult.context.activePlayers.length;
+      const allowPartialLineup = activePlayersCount >= 7 && activePlayersCount < (
+        (contextResult.context.matchdayContract?.discipline1?.requiredPlayers ?? 0) +
+        (contextResult.context.matchdayContract?.discipline2?.requiredPlayers ?? 0)
+      );
       const validation = validateLegacyLineupContext(
         {
           ...contextResult.context,
           entries: preview.entries,
         },
         {
-          enforceCompleteness: true,
+          enforceCompleteness: !allowPartialLineup,
           seasonCaptainLimit: contextResult.context.matchdayContract?.seasonCaptainSlots ?? 3,
           captainUsedBeforeCurrentDraft: contextResult.context.teamStatus?.captainUsedCount ?? 0,
           captainUsedBeforeCurrentDraftSides: contextResult.context.teamStatus?.captainUsedSides ?? [],
@@ -424,8 +429,23 @@ function prepLineups(gameState: GameState, saveId: string): { gameState: GameSta
       const d1 = contextResult.context.matchdayContract?.discipline1;
       const d2 = contextResult.context.matchdayContract?.discipline2;
       const required = (d1?.requiredPlayers ?? 0) + (d2?.requiredPlayers ?? 0);
-      const warnings = Array.from(new Set([...(preview.warnings ?? []), ...validation.warnings]));
-      const blockers = validation.isValid && preview.status !== "blocked" ? [] : [...validation.errors, ...(preview.status === "blocked" ? preview.warnings : [])];
+      const minimumDeployableEntries = Math.min(activePlayersCount, required);
+      const missingDeployableEntries = Math.max(0, minimumDeployableEntries - preview.entries.length);
+      const warnings = Array.from(new Set([
+        ...(preview.warnings ?? []),
+        ...validation.warnings,
+        ...(allowPartialLineup ? [`partial_lineup_allowed:${preview.entries.length}/${required}:active=${activePlayersCount}`] : []),
+      ]));
+      const blockers =
+        validation.isValid && preview.status !== "blocked" && missingDeployableEntries === 0
+          ? []
+          : [
+              ...validation.errors,
+              ...(preview.status === "blocked" ? preview.warnings : []),
+              ...(missingDeployableEntries > 0
+                ? [`lineup_resting_available_players:${preview.entries.length}/${minimumDeployableEntries}`]
+                : []),
+            ];
       const source = control.controlMode === "manual" ? "test_auto_lineup_for_simulation" : "ai_auto_lineup_for_simulation";
 
       if (blockers.length === 0) {

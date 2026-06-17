@@ -1,5 +1,5 @@
 import type { GameState, Player, RosterEntry, Team, TransferHistoryEntry } from "@/lib/data/olyDataTypes";
-import { getImportedPlayerDisplayMarketValue, getImportedPlayerDisplaySalary } from "@/lib/data/player-economy-display";
+import { getImportedPlayerDisplayMarketValue } from "@/lib/data/player-economy-display";
 import { resolvePlayerEconomyContract } from "@/lib/foundation/player-economy-contract";
 import { runAiPickAuditReset } from "@/lib/ai/ai-pick-audit-reset-service";
 import { AI_PICK_IMPORT_CONFIRM_TOKEN } from "@/lib/ai/ai-pick-import-contract";
@@ -270,7 +270,7 @@ function buildReplayPreview(input: {
     const salaryBefore = teamId ? getVisibleRosterSalaryTotal(rosterPlayersBefore) : null;
     const cashBefore = team?.cash ?? null;
     const purchasePriceReplay = player ? getImportedPlayerDisplayMarketValue(player) : null;
-    const salaryReplay = player ? getImportedPlayerDisplaySalary(player) : null;
+    const salaryReplay = player ? resolvePlayerEconomyContract({ player }).salary : null;
     const blocking: string[] = [];
     const rowWarnings: string[] = [];
 

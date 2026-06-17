@@ -335,6 +335,8 @@ export default function LegacyResolveLabClient({
       marketValueSource: player.marketValue == null ? "missing_source" : "preview_catalog",
       salary: player.salary,
       salarySource: player.salary == null ? "missing_source" : "preview_catalog",
+      normalSalary: player.salary,
+      normalSalarySource: player.salary == null ? "missing_source" : "preview_catalog",
       purchasePrice: player.marketValue,
       purchasePriceSource: player.marketValue == null ? "missing_source" : "preview_catalog",
       contractLength: player.contractLength,

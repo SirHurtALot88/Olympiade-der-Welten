@@ -256,7 +256,7 @@ describe("runWholeSeasonDryRun", () => {
         options: {
           includeWarningLineups: true,
           overwriteExistingLineups: true,
-          stopOnTie: true,
+          stopOnTie: false,
           stopOnMissingManualLineups: true,
           advanceAfterEachMatchday: true,
           includeMarketPhase: false,

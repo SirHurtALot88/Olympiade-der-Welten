@@ -87,6 +87,28 @@ function shouldFlagMissingSources(
   return score.fatigueStatus !== "mapped";
 }
 
+const LEGACY_MATCHDAY_MINIMUM_PLAYERS = 7;
+
+function isPartialLineupAllowed(context: LegacyLineupLoadedContext) {
+  const requiredTotalUniquePlayers = getDisciplineSideMeta(context).reduce((sum, meta) => {
+    return (
+      sum +
+      (
+        context.disciplineSidePlayerCounts?.[`${meta.disciplineId}::${meta.disciplineSide}`] ??
+        context.disciplinePlayerCounts[meta.disciplineId] ??
+        0
+      )
+    );
+  }, 0);
+  const selectedPlayerIds = new Set((context.existingDraft?.entries ?? []).map((entry) => entry.playerId));
+
+  return (
+    context.activePlayers.length >= LEGACY_MATCHDAY_MINIMUM_PLAYERS &&
+    context.activePlayers.length < requiredTotalUniquePlayers &&
+    selectedPlayerIds.size === context.activePlayers.length
+  );
+}
+
 export function buildLegacyMatchdayResolvePreview(
   contexts: LegacyLineupLoadedContext[],
   options?: LegacyResolvePreviewOptions,
@@ -117,6 +139,10 @@ export function buildLegacyMatchdayResolvePreview(
     const draft = context.existingDraft;
     const warnings = [...(draft ? [] : ["No existing legacy lineup draft was found for this team and matchday."])];
     const missingLineup = !draft;
+    const allowPartialLineup = !missingLineup && isPartialLineupAllowed(context);
+    if (allowPartialLineup) {
+      warnings.push(`partial_lineup_allowed:${context.activePlayers.length}_active_players`);
+    }
     if (missingLineup) {
       missingLineups.push({ teamId: context.team.id, teamName: context.team.name });
     }
@@ -217,7 +243,7 @@ export function buildLegacyMatchdayResolvePreview(
           disciplineId: meta.disciplineId,
           missingLineup,
           missingScores: score.missingScores,
-          isComplete: score.isComplete !== false,
+          isComplete: score.isComplete !== false || allowPartialLineup,
           missingSources: shouldFlagMissingSources(score, resolveOptions),
         });
       } else {
@@ -227,12 +253,12 @@ export function buildLegacyMatchdayResolvePreview(
           disciplineId: meta.disciplineId,
           missingLineup,
           missingScores: score.missingScores,
-          isComplete: score.isComplete !== false,
+          isComplete: score.isComplete !== false || allowPartialLineup,
           missingSources: shouldFlagMissingSources(score, resolveOptions),
         });
       }
 
-      if (!missingLineup && score.isComplete === false) {
+      if (!missingLineup && score.isComplete === false && !allowPartialLineup) {
         incompleteLineups.push({
           teamId: context.team.id,
           teamName: context.team.name,

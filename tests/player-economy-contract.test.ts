@@ -79,13 +79,14 @@ function buildRosterEntry(overrides: Partial<RosterEntry> = {}): RosterEntry {
 }
 
 describe("player economy contract", () => {
-  it("matches the Torgar benchmark split between final market value and salary market value", () => {
+  it("matches the Torgar benchmark with salary based on the internal market value basis", () => {
     const economy = resolvePlayerEconomyContract({ player: buildPlayer() });
 
-    expect(economy.salaryMarketValue).toBeCloseTo(54, 0);
+    expect(economy.salaryMarketValue).toBeCloseTo(60.8, 1);
     expect(economy.marketValue).toBeCloseTo(62.5, 1);
-    expect(economy.salaryBase).toBeCloseTo(13.6, 1);
-    expect(economy.expectedSalary).toBeCloseTo(16.8, 1);
+    expect(economy.salaryBase).toBeCloseTo(15, 1);
+    expect(economy.expectedSalary).toBeCloseTo(18.5, 1);
+    expect(economy.salarySource).toBe("calculated_preview");
   });
 
   it("keeps active contract salary stable while expected salary can differ", () => {
@@ -96,7 +97,7 @@ describe("player economy contract", () => {
 
     expect(economy.salary).toBe(11.4);
     expect(economy.salarySource).toBe("active_contract");
-    expect(economy.expectedSalary).toBeCloseTo(16.8, 1);
+    expect(economy.expectedSalary).toBeCloseTo(18.5, 1);
   });
 
   it("updates expected salary after an attribute upgrade without changing contract salary", () => {

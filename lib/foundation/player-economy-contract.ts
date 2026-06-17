@@ -177,37 +177,7 @@ export function resolvePlayerEconomyContract(input: {
   const playerEntity = player as Player | null;
   const formulaSources = loadPlayerFormulaSources();
   const generatorAttributes = toGeneratorAttributes(playerEntity);
-  const salaryMarketValueFromStoredSalary =
-    input.salaryMarketValueOverride != null
-      ? input.salaryMarketValueOverride
-      : storedCalculatedSalary != null &&
-    generatorAttributes &&
-    formulaSources.attributeSalaryModifiers &&
-    formulaSources.traitSalaryFactors
-      ? deriveSalaryMarketValueFromFinalSalary({
-          finalSalary: storedCalculatedSalary,
-          attributes: generatorAttributes,
-          traitsPositive: playerEntity?.traitsPositive ?? [],
-          traitsNegative: playerEntity?.traitsNegative ?? [],
-          traitSalaryFactors: formulaSources.traitSalaryFactors,
-          attributeSalaryModifiers: formulaSources.attributeSalaryModifiers,
-        })
-      : null;
-  const salaryMarketValueFromLegacySalary =
-    salaryMarketValueFromStoredSalary == null &&
-    legacyDisplaySalary != null &&
-    generatorAttributes &&
-    formulaSources.attributeSalaryModifiers &&
-    formulaSources.traitSalaryFactors
-      ? deriveSalaryMarketValueFromFinalSalary({
-          finalSalary: legacyDisplaySalary,
-          attributes: generatorAttributes,
-          traitsPositive: playerEntity?.traitsPositive ?? [],
-          traitsNegative: playerEntity?.traitsNegative ?? [],
-          traitSalaryFactors: formulaSources.traitSalaryFactors,
-          attributeSalaryModifiers: formulaSources.attributeSalaryModifiers,
-        })
-      : null;
+  const salaryMarketValueOverride = toFiniteNumber(input.salaryMarketValueOverride);
   const visibleFinalMarketValue = storedCalculatedMarketValue ?? legacyDisplayMarketValue ?? null;
   const baseMarketValue =
     input.baseMarketValueOverride ??
@@ -217,10 +187,25 @@ export function resolvePlayerEconomyContract(input: {
           coreStats: playerEntity?.coreStats,
           disciplineRatings: playerEntity?.disciplineRatings,
         })
-      : null) ??
-    salaryMarketValueFromStoredSalary ??
-    salaryMarketValueFromLegacySalary;
-  const salaryMarketValue = salaryMarketValueFromStoredSalary ?? salaryMarketValueFromLegacySalary ?? baseMarketValue;
+      : null);
+  const fallbackFinalSalary = storedCalculatedSalary ?? legacyDisplaySalary;
+  const salaryMarketValueFromLegacySalary =
+    salaryMarketValueOverride == null &&
+    baseMarketValue == null &&
+    fallbackFinalSalary != null &&
+    generatorAttributes &&
+    formulaSources.attributeSalaryModifiers &&
+    formulaSources.traitSalaryFactors
+      ? deriveSalaryMarketValueFromFinalSalary({
+          finalSalary: fallbackFinalSalary,
+          attributes: generatorAttributes,
+          traitsPositive: playerEntity?.traitsPositive ?? [],
+          traitsNegative: playerEntity?.traitsNegative ?? [],
+          traitSalaryFactors: formulaSources.traitSalaryFactors,
+          attributeSalaryModifiers: formulaSources.attributeSalaryModifiers,
+        })
+      : null;
+  const salaryMarketValue = salaryMarketValueOverride ?? baseMarketValue ?? salaryMarketValueFromLegacySalary;
   const marketValueBonuses =
     baseMarketValue != null
       ? calculateMarketValueBonuses({

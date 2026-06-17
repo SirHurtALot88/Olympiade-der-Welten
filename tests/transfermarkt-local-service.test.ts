@@ -328,7 +328,7 @@ describe("transfermarkt local service", () => {
 
     expect(afterRow?.rosterCount).toBe((beforeRow?.rosterCount ?? 0) + 1);
     expect(afterRow?.cash).toBe((beforeRow?.cash ?? 0) - 25);
-    expect(afterRow?.salaryTotal).toBe((beforeRow?.salaryTotal ?? 0) + 6);
+    expect(afterRow?.salaryTotal).toBe((beforeRow?.salaryTotal ?? 0) + (result.offeredSalary ?? result.salary ?? 0));
     expect(afterRow?.marketValueTotal).toBe((beforeRow?.marketValueTotal ?? 0) + 25);
 
     const afterFreeAgents = listLocalTransfermarktFreeAgents({
@@ -1219,6 +1219,45 @@ describe("transfermarkt local service", () => {
     expect(fiveYears.totalSalary ?? 0).toBeGreaterThan(oneYear.totalSalary ?? 0);
     expect(fiveYears.scoreBreakdown.some((entry) => entry.key === "contract_length_security" && entry.points > 0)).toBe(true);
     expect(oneYear.scoreBreakdown.some((entry) => entry.key === "contract_length_security" && entry.points === 0)).toBe(true);
+  });
+
+  it("uses the reduced expected salary as the automatic offer for longer contracts", () => {
+    const team = persistenceState.save!.gameState.teams[0]!;
+    const player = createPlayer("auto-long-term-target", {
+      salaryDemand: 100,
+      displaySalary: 10,
+      traitsPositive: ["Loyal"],
+      traitsNegative: [],
+    });
+
+    const oneYear = buildContractNegotiationPreview({
+      saveId: "save-singleplayer-dev",
+      seasonId: "season-1",
+      team,
+      teamIdentity: null,
+      teamStrategyProfile: null,
+      player,
+      rosterPlayers: [],
+      contractLength: 1,
+      contractShape: "balanced",
+      seasonLabelBase: "Season 1",
+    });
+    const fiveYears = buildContractNegotiationPreview({
+      saveId: "save-singleplayer-dev",
+      seasonId: "season-1",
+      team,
+      teamIdentity: null,
+      teamStrategyProfile: null,
+      player,
+      rosterPlayers: [],
+      contractLength: 5,
+      contractShape: "balanced",
+      seasonLabelBase: "Season 1",
+    });
+
+    expect(fiveYears.expectedSalary ?? 0).toBeLessThan(oneYear.expectedSalary ?? 0);
+    expect(fiveYears.offeredSalary).toBe(fiveYears.expectedSalary);
+    expect(fiveYears.offeredSalary ?? 0).toBeLessThan(oneYear.offeredSalary ?? 0);
   });
 
   it("still gives pricey personalities a smaller long-contract annual discount", () => {

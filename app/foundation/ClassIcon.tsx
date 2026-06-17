@@ -31,8 +31,9 @@ export default function ClassIcon({
           alt={label}
           width={32}
           height={32}
-          loading="eager"
+          loading="lazy"
           decoding="async"
+          fetchPriority="low"
         />
       ) : null}
       {showLabel ? <span className="class-icon-label">{label}</span> : null}

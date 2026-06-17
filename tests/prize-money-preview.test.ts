@@ -180,6 +180,38 @@ describe("prize money preview", () => {
     });
   });
 
+  it("subtracts team salary from season-end projected cash instead of adding sponsor only", async () => {
+    const { persistence } = createPersistenceMock();
+    const save = persistence.getActiveSave();
+    if (save) {
+      save.gameState.rosters = [
+        {
+          id: "roster-wage-1",
+          teamId: "W-W",
+          playerId: "missing-player-ok",
+          salary: 20,
+          upkeep: 20,
+          contractLength: 2,
+          purchasePrice: 10,
+          currentValue: 10,
+          roleTag: "starter",
+          joinedSeasonId: "season-1",
+        },
+      ] as GameState["rosters"];
+    }
+
+    const result = await buildPrizeMoneyPreview(
+      { saveId: "save-local", seasonId: "season-1", source: "sqlite" },
+      persistence as never,
+    );
+
+    const row = result.items.find((item) => item.teamId === "W-W");
+    expect(row?.salaryTotal).toBe(20);
+    expect(row?.projectedCash).toBe(122.1);
+    expect(row?.projectedCash).not.toBe(142.1);
+    expect(row?.futureSeasons.find((entry) => entry.seasonLabel === "Season +1")?.projectedCash).toBe(117.6);
+  });
+
   it("marks missing rank without faking a zero prize", async () => {
     const { persistence } = createPersistenceMock();
     const result = await buildPrizeMoneyPreview(

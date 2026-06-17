@@ -262,7 +262,7 @@ function calculateDisciplineValueFromAttributes(attributes: PlayerGeneratorAttri
     return sum + attributes[attribute as PlayerGeneratorAttributeName] * weights[disciplineId];
   }, 0);
   const weightSum = Object.values(officialDisciplineWeightTable).reduce((sum, weights) => sum + weights[disciplineId], 0);
-  return weightSum > 0 ? roundValue(clamp(weighted / weightSum, 1, 99), 0) : null;
+  return weightSum > 0 ? roundValue(clamp(weighted / weightSum, 1, 99), 2) : null;
 }
 
 export function buildPreviewDisciplineRatingsFromAttributes(input: {
@@ -277,7 +277,7 @@ export function buildPreviewDisciplineRatingsFromAttributes(input: {
   for (const disciplineId of officialDisciplineWeightOrder) {
     const next = calculateDisciplineValueFromAttributes(input.attributesAfter, disciplineId);
     if (next != null && Object.prototype.hasOwnProperty.call(nextRatings, disciplineId)) {
-      nextRatings[disciplineId] = Math.max(nextRatings[disciplineId] ?? next, next);
+      nextRatings[disciplineId] = next;
     }
   }
   return nextRatings;
@@ -313,10 +313,34 @@ export function buildSeasonEndDisciplineDeltas(input: {
           disciplineId,
         lastSeasonDisciplineValues: before,
         currentDisciplineValues: after,
-        disciplineDelta: before != null && after != null ? Math.max(0, roundValue(after - before, 0)) : null,
+        disciplineDelta: before != null && after != null ? Math.max(0, roundValue(after - before, 2)) : null,
       } satisfies SeasonEndProgressionDisciplineDelta;
     })
     .sort((left, right) => (right.disciplineDelta ?? 0) - (left.disciplineDelta ?? 0) || left.label.localeCompare(right.label, "de"));
+}
+
+export function buildCoreStatsFromDisciplineRatings(input: {
+  disciplines: GameState["disciplines"];
+  disciplineRatings: Record<string, number>;
+  fallback: Player["coreStats"];
+}): Player["coreStats"] {
+  const axisByCategory = {
+    power: "pow",
+    speed: "spe",
+    mental: "men",
+    social: "soc",
+  } as const;
+  const next = { ...input.fallback };
+  for (const [category, axis] of Object.entries(axisByCategory) as Array<[keyof typeof axisByCategory, (typeof axisByCategory)[keyof typeof axisByCategory]]>) {
+    const values = input.disciplines
+      .filter((discipline) => discipline.category === category)
+      .map((discipline) => input.disciplineRatings[discipline.id])
+      .filter(isFiniteNumber);
+    if (values.length > 0) {
+      next[axis] = roundValue(values.reduce((sum, value) => sum + value, 0) / values.length, 2);
+    }
+  }
+  return next;
 }
 
 function getWarningLevel(deltaPct: number | null) {
@@ -500,10 +524,15 @@ export function buildSeasonEndProgressionPreview(input: {
             : availableXP < cost.costAfterFacility
               ? "xp_insufficient"
               : null;
+    const baselineAttributes = toGeneratorAttributes(player);
+    const baselineDisciplineRatings = buildPreviewDisciplineRatingsFromAttributes({
+      player,
+      attributesAfter: baselineAttributes,
+    });
     const previewDisciplineRatings = buildPreviewDisciplineRatings({ player, attribute: selectedAttribute, attributeAfter });
     const disciplineDeltas = buildSeasonEndDisciplineDeltas({
       disciplines: input.gameState.disciplines,
-      lastSeasonDisciplineValues: player.disciplineRatings,
+      lastSeasonDisciplineValues: baselineDisciplineRatings,
       currentDisciplineValues: previewDisciplineRatings,
     });
     const previewPlayer: Player = {
@@ -514,7 +543,12 @@ export function buildSeasonEndProgressionPreview(input: {
             [selectedAttribute]: attributeAfter ?? player.attributeSheetStats[selectedAttribute],
           }
         : player.attributeSheetStats,
-      previousDisciplineRatings: player.disciplineRatings,
+      coreStats: buildCoreStatsFromDisciplineRatings({
+        disciplines: input.gameState.disciplines,
+        disciplineRatings: previewDisciplineRatings,
+        fallback: player.coreStats,
+      }),
+      previousDisciplineRatings: baselineDisciplineRatings,
       disciplineRatings: previewDisciplineRatings,
     };
     const economyAudit = buildEconomyAudit({ gameState: input.gameState, player, previewPlayer });

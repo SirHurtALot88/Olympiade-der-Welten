@@ -194,7 +194,7 @@ function normalizeStrategyProfile(team: Team, identity: TeamIdentity | null | un
 
 const strategySeedsByTeamId: Record<string, StrategySeed> = {
   "C-C": createProfile({
-    strategySummary: "Ambassador-/Manipulator-Team mit harter MW-zu-Gehalt-Ratio. Denkt saisonweise, verkauft profitabel und reinvestiert logisch in die aktuelle Saison.",
+    strategySummary: "Bank der Olympiade: Ambassador-/Manipulator-Team mit harter MW-zu-Gehalt-Ratio. Denkt saisonweise, verkauft profitabel und reinvestiert logisch in die aktuelle Saison.",
     buyStyle: "Kauft flexible Ambassador-/Manipulator-/Value-Fits, die sofort helfen und spaeter mit Gewinn oder sauberer Ratio weitergedreht werden koennen.",
     sellStyle: "Verkauft konsequent, wenn Profit, kuerzere Bindung oder bessere aktuelle Saisonlogik entsteht.",
     contractStyle: "Kurz bis mittel, weil jede Saison neu optimiert wird.",
@@ -218,7 +218,7 @@ const strategySeedsByTeamId: Record<string, StrategySeed> = {
     },
   }),
   "W-W": createProfile({
-    strategySummary: "Intelligente Wizards. Mental ist der Hauptfokus, danach kommt Magie-/Arcane-Fit und erst dann allgemeine Qualitaet.",
+    strategySummary: "Magier, Zauberwirker und Golems: Intelligente Wizards. Mental ist der Hauptfokus, danach kommt Magie-/Arcane-Fit und erst dann allgemeine Qualitaet.",
     buyStyle: "Sucht Wizards, Mages, Scholar und mentale Profile mit klarer MEN-Decke.",
     sellStyle: "Trennt sich eher von dumpfen Fehlfits als von Mental-Stars.",
     contractStyle: "Bindet echte Spell-Core-Spieler gern mittel bis lang.",
@@ -883,7 +883,7 @@ const strategySeedsByTeamId: Record<string, StrategySeed> = {
     },
   }),
   "Z-H": createProfile({
-    strategySummary: "Ultimative Opportunisten mit Cash-Push-Historie. Nicht beliebt, Lizard-Pakte moeglich, 110% Risiko um ganz oben zu landen.",
+    strategySummary: "Underground-Opportunisten mit Cash-Push-Historie. Nicht beliebt, Lizard-Pakte moeglich, 110% Risiko um ganz oben zu landen.",
     buyStyle: "Kauft High-upside, Lizard-/Pact- und Star-Risiken aggressiv und nimmt lieber Overpay als Mittelmass.",
     sellStyle: "Verkauft nur, wenn Upgrade oder Machtgewinn klar ist.",
     contractStyle: "Opportunistisch; bindet Difference-Maker, wenn der Sprung echt ist.",
@@ -957,7 +957,7 @@ const strategySeedsByTeamId: Record<string, StrategySeed> = {
     },
   }),
   "M-M": createProfile({
-    strategySummary: "Topteam mit Risiko-Appetit. Verteidigt seinen Platz aggressiv, verkauft aber auch profitabel, um teure Gehaelter tragen zu koennen.",
+    strategySummary: "Multi-Champion-Topteam mit Risiko-Appetit. Verteidigt seinen Platz aggressiv, verkauft aber auch profitabel, um teure Gehaelter tragen zu koennen.",
     buyStyle: "Kauft Stars, Core-Aces und Exploit-Fits aggressiv, wenn sie den Titelhebel vergroessern.",
     sellStyle: "Verkauft Ueberfluessiges oder second-tier Stars profitabel fuer den naechsten Edge.",
     contractStyle: "Bindet echte Titeltraeger, dreht am Rest opportunistisch.",

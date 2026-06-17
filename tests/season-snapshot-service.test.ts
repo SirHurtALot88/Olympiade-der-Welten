@@ -357,6 +357,12 @@ describe("season snapshot service", () => {
     expect(snapshot.playerPerformances[0]?.playerId).toBe("p1");
     expect(snapshot.playerPerformances[0]?.appearances).toBe(2);
     expect(snapshot.playerPerformances[0]?.averageContribution).toBe(19.3);
+    expect(snapshot.playerPerformances[0]?.pps).toBe(38.5);
+    expect(snapshot.playerPerformances[0]).toHaveProperty("mvs");
+    expect(snapshot.playerPerformances[0]?.ovr).not.toBeNull();
+    expect(snapshot.playerPerformances[0]?.marketValue).not.toBeNull();
+    expect(snapshot.playerPerformances[0]?.salary).not.toBeNull();
+    expect(snapshot.playerPerformances[0]?.contractLength).toBe(3);
     expect(snapshot.playerPerformances[0]?.top10Count).toBe(2);
     expect(snapshot.playerPerformances[0]?.mvpCount).toBe(1);
     expect(snapshot.transferSnapshots).toHaveLength(1);
@@ -378,6 +384,32 @@ describe("season snapshot service", () => {
     expect(result.coverage.cashAppliedMatchdays).toBe(0);
     expect(result.warnings.some((warning) => warning.includes("Missing cash apply logs"))).toBe(true);
     expect(result.snapshot.status).toBe("completed");
+  });
+
+  it("treats one season-end cash apply log as full season cash coverage", () => {
+    const gameState = createGameState();
+    gameState.seasonState.cashPrizeApplyLogs = [
+      {
+        id: "cash-season-end",
+        saveId: "save-local",
+        seasonId: "season-1",
+        matchdayId: "matchday-2",
+        action: "apply",
+        payload: {
+          idempotencyKey: "cash-season-end",
+          totalTeams: 2,
+          appliedTeams: 2,
+          totalPrizeMoney: 10,
+        },
+        createdAt: "2026-06-06T00:00:00.000Z",
+      },
+    ];
+
+    const result = buildSeasonSnapshotDryRun(gameState, { saveId: "save-local" });
+
+    expect(result.coverage.cashAppliedMatchdays).toBe(result.coverage.totalMatchdays);
+    expect(result.coverage.missingCashMatchdayIds).toEqual([]);
+    expect(result.warnings.some((warning) => warning.includes("Missing cash apply logs"))).toBe(false);
   });
 
   it("creates a local snapshot only after explicit confirm", () => {

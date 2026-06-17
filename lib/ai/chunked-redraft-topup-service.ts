@@ -2,8 +2,8 @@ import fs from "node:fs";
 import path from "node:path";
 
 import type { GameState, Player, RosterEntry, TeamIdentity, TeamStrategyProfile } from "@/lib/data/olyDataTypes";
-import { getImportedPlayerDisplayMarketValue, getImportedPlayerDisplaySalary } from "@/lib/data/player-economy-display";
-import { buildPlayerRatingContractMap } from "@/lib/foundation/player-rating-contract";
+import { getImportedPlayerDisplayMarketValue } from "@/lib/data/player-economy-display";
+import { resolvePlayerEconomyContract } from "@/lib/foundation/player-economy-contract";
 import { deriveRosterTargets } from "@/lib/foundation/roster-limits";
 import { buildTeamStrategyScores } from "@/lib/foundation/team-strategy-score-service";
 import { buildTeamStrategyProfileMap } from "@/lib/foundation/team-strategy-profiles";
@@ -20,6 +20,7 @@ import {
   executeLocalTransfermarktBuy,
   flushLocalTransfermarktRunContext,
 } from "@/lib/market/transfermarkt-local-service";
+import { calculateTransfermarktFit, hasMercenaryTrait } from "@/lib/market/transfermarkt-fit";
 import { recommendContractOfferForPlayer } from "@/lib/market/contract-negotiation-preview";
 import { createPersistenceService } from "@/lib/persistence/persistence-service";
 import type { PersistedSaveGame, PersistenceService } from "@/lib/persistence/types";
@@ -29,6 +30,10 @@ export const CHUNKED_REDRAFT_TOPUP_CONFIRM_TOKEN = "CONFIRM_CHUNKED_REDRAFT_TOPU
 export type ChunkedRedraftMode = "season1_initial_topup" | "full_clean_redraft";
 export type ChunkedRedraftTarget = "playerMin" | "playerOpt" | "playerMax";
 export type ChunkedRedraftPhase = "phase_a_minimum" | "phase_b_core_optimum" | "phase_c_depth_luxury";
+
+function getCalculatedPlayerSalary(player: Player) {
+  return resolvePlayerEconomyContract({ player }).salary;
+}
 
 export type ChunkedRedraftState = {
   saveId: string;
@@ -66,6 +71,7 @@ export type ChunkedRedraftPickRow = {
   targetProgress?: string;
   pickScore: number;
   selectedScore?: number;
+  draftVariance?: number;
   teamNeed?: string;
   role?: string;
   currentRating?: number;
@@ -77,6 +83,8 @@ export type ChunkedRedraftPickRow = {
   axisFitSoc?: number;
   classFit?: number;
   identityFit?: number;
+  premiumAxisFit?: number;
+  axisFocusStrength?: number;
   valueScore?: number;
   themeCompositionScore?: number;
   themeTier?: string;
@@ -162,6 +170,8 @@ type Candidate = {
 type ScoredCandidate = Candidate & {
   selectedScore: number;
   identityFit: number;
+  premiumAxisFit: number;
+  axisFocusStrength: number;
   valueScore: number;
   themeCompositionScore: number;
   themeTier: TeamThemeCompositionScore["themeTier"];
@@ -173,6 +183,7 @@ type ScoredCandidate = Candidate & {
   phaseScore: number;
   classFit: number;
   teamNeed: string;
+  draftVariance: number;
 };
 
 type TeamStatusRow = {
@@ -683,10 +694,12 @@ function getRosterSalary(roster: RosterEntry[]) {
   return roundValue(roster.reduce((sum, entry) => sum + (entry.salary ?? 0), 0), 2);
 }
 
-function getPlayerAxisValue(player: Player, axis: "pow" | "spe" | "men" | "soc") {
+export function getPlayerAxisValue(player: Player, axis: "pow" | "spe" | "men" | "soc") {
+  const coreValue = player.coreStats?.[axis];
+  if (typeof coreValue === "number" && Number.isFinite(coreValue)) return coreValue;
   const direct = (player as unknown as Record<string, unknown>)[axis];
   if (typeof direct === "number" && Number.isFinite(direct)) return direct;
-  return player.ovr ?? player.rating ?? 0;
+  return 50;
 }
 
 function getTeamTarget(gameState: GameState, teamId: string, target: ChunkedRedraftTarget) {
@@ -704,7 +717,6 @@ function getTeamTarget(gameState: GameState, teamId: string, target: ChunkedRedr
 
 function buildCandidatePool(gameState: GameState, pickedPlayerIds: Set<string>, counters?: RedraftCandidateCounters) {
   const rosteredPlayerIds = new Set(gameState.rosters.map((entry) => entry.playerId));
-  const ratingsByPlayer = buildPlayerRatingContractMap(gameState);
   if (counters) {
     counters.candidateScans += 1;
     counters.rejectedByAlreadyPicked += gameState.players.filter((player) => rosteredPlayerIds.has(player.id) || pickedPlayerIds.has(player.id)).length;
@@ -716,13 +728,12 @@ function buildCandidatePool(gameState: GameState, pickedPlayerIds: Set<string>, 
       const marketValue = getImportedPlayerDisplayMarketValue(player);
       if (marketValue == null || marketValue <= 0) return null;
       if (counters) counters.salaryLookups += 1;
-      const salary = getImportedPlayerDisplaySalary(player);
-      const rating = ratingsByPlayer.get(player.id);
-      const quality = rating?.ovrNormalized ?? player.ovr ?? player.rating ?? 0;
+      const salary = getCalculatedPlayerSalary(player);
       const pow = getPlayerAxisValue(player, "pow");
       const spe = getPlayerAxisValue(player, "spe");
       const men = getPlayerAxisValue(player, "men");
       const soc = getPlayerAxisValue(player, "soc");
+      const quality = roundValue((pow + spe + men + soc) / 4, 2);
       return {
         player,
         marketValue,
@@ -732,13 +743,11 @@ function buildCandidatePool(gameState: GameState, pickedPlayerIds: Set<string>, 
         spe,
         men,
         soc,
-        pickScore: roundValue(quality * 10 - marketValue, 4),
+        pickScore: 0,
       };
     })
     .filter((entry): entry is Candidate => Boolean(entry))
     .sort((left, right) => {
-      if (right.quality !== left.quality) return right.quality - left.quality;
-      if (left.marketValue !== right.marketValue) return left.marketValue - right.marketValue;
       return left.player.name.localeCompare(right.player.name, "de");
     });
 }
@@ -777,7 +786,6 @@ function buildPhasePlan(input: {
         ? input.teamTarget.playerOpt
         : input.teamTarget.playerMin);
   const remainingSlots = Math.max(1, targetRoster - input.rosterCount);
-  const averageQuality = avg(input.candidatePool.map((candidate) => candidate.quality)) ?? 0;
   const starBias = toBias(input.strategyProfile?.bias?.starPriority);
   const valueBias = toBias(input.strategyProfile?.bias?.valuePriority);
   const cashBias = toBias(input.strategyProfile?.bias?.cashPriority);
@@ -792,7 +800,7 @@ function buildPhasePlan(input: {
       cashReservePct: 0.02,
       shortlistCap: 112,
       maxRecommendedSpend: Math.max(1, (spendableCash / remainingSlots) * 1.05),
-      qualityFloor: Math.max(6, averageQuality * 0.48),
+      qualityFloor: 0,
       description: "Pflicht-Minimum: breit, guenstig, brauchbar, niedrige CashReserve.",
     };
   }
@@ -807,7 +815,7 @@ function buildPhasePlan(input: {
       cashReservePct: roundValue(reservePct, 3),
       shortlistCap,
       maxRecommendedSpend: Math.max(1, ((input.teamCash * (1 - reservePct)) / remainingSlots) * activeSpendMultiplier),
-      qualityFloor: Math.max(10, averageQuality * 0.68),
+      qualityFloor: 0,
       description: "Core/Optimum: Teamfit, Qualitaet, Diszi-Needs und aktive Cash-Nutzung.",
     };
   }
@@ -819,18 +827,52 @@ function buildPhasePlan(input: {
     cashReservePct: roundValue(reservePct, 3),
     shortlistCap: Math.round(32 + depthBias * 3),
     maxRecommendedSpend: Math.max(1, ((input.teamCash * (1 - reservePct)) / remainingSlots) * 0.9),
-    qualityFloor: Math.max(8, averageQuality * 0.55),
+    qualityFloor: 0,
     description: "Depth/Luxus: Rotation, Absicherung und vorsichtigere Budgetnutzung.",
   };
 }
 
 function getIdentityFit(candidate: Candidate, identity: TeamIdentity | null | undefined) {
-  if (!identity) return roundValue(candidate.quality, 2);
+  if (!identity) return roundValue((candidate.pow + candidate.spe + candidate.men + candidate.soc) / 4, 2);
   const total = Math.max(1, identity.pow + identity.spe + identity.men + identity.soc);
   return roundValue(
     (candidate.pow * identity.pow + candidate.spe * identity.spe + candidate.men * identity.men + candidate.soc * identity.soc) / total,
     2,
   );
+}
+
+function getPreferredAxisRows(identity: TeamIdentity | null | undefined) {
+  if (!identity) return [];
+  return [
+    ["pow", identity.pow] as const,
+    ["spe", identity.spe] as const,
+    ["men", identity.men] as const,
+    ["soc", identity.soc] as const,
+  ]
+    .filter(([, weight]) => Number.isFinite(weight) && weight > 0)
+    .sort((left, right) => right[1] - left[1]);
+}
+
+export function computePreferredAxisFit(
+  candidate: Pick<Candidate, "pow" | "spe" | "men" | "soc">,
+  identity: TeamIdentity | null | undefined,
+) {
+  const preferredAxes = getPreferredAxisRows(identity).slice(0, 2);
+  if (preferredAxes.length === 0) return roundValue((candidate.pow + candidate.spe + candidate.men + candidate.soc) / 4, 2);
+  const total = preferredAxes.reduce((sum, [, weight]) => sum + weight, 0);
+  if (total <= 0) return roundValue((candidate.pow + candidate.spe + candidate.men + candidate.soc) / 4, 2);
+  return roundValue(
+    preferredAxes.reduce((sum, [axis, weight]) => sum + candidate[axis] * weight, 0) / total,
+    2,
+  );
+}
+
+function getAxisFocusStrength(identity: TeamIdentity | null | undefined) {
+  const preferredAxes = getPreferredAxisRows(identity);
+  if (preferredAxes.length === 0) return 0;
+  const total = preferredAxes.reduce((sum, [, weight]) => sum + weight, 0);
+  if (total <= 0) return 0;
+  return roundValue(preferredAxes.slice(0, 2).reduce((sum, [, weight]) => sum + weight, 0) / total, 4);
 }
 
 function getClassFit(candidate: Candidate, roster: RosterEntry[], gameState: GameState) {
@@ -855,24 +897,35 @@ function selectScoringPool(input: {
   cap: number;
   themeTarget: TeamThemeCompositionTarget | null;
   phase: ChunkedRedraftPhase;
+  identity: TeamIdentity | null | undefined;
 }) {
   if (input.planningPool.length <= input.cap) return input.planningPool;
   const indexed = input.planningPool.map((candidate, index) => ({
     candidate,
     index,
     themePriority: getCheapThemePriority(candidate, input.themeTarget),
+    identityFit: getIdentityFit(candidate, input.identity),
+    premiumAxisFit: computePreferredAxisFit(candidate, input.identity),
+    salary: candidate.salary ?? 0,
   }));
-  const baseShare = input.themeTarget && input.phase !== "phase_c_depth_luxury" ? 0.55 : 0.75;
-  const baseLimit = Math.max(32, Math.floor(input.cap * baseShare));
+  const baseShare = input.themeTarget && input.phase !== "phase_c_depth_luxury" ? 0.68 : 0.82;
+  const baseLimit = Math.max(80, Math.floor(input.cap * baseShare));
   const selected = new Map<string, Candidate>();
-  for (const row of indexed.slice(0, baseLimit)) {
+  const fitRows = [...indexed].sort((left, right) => {
+    const leftScore = left.premiumAxisFit * 0.55 + left.identityFit * 0.35 + left.themePriority * 8 - left.salary * 0.4;
+    const rightScore = right.premiumAxisFit * 0.55 + right.identityFit * 0.35 + right.themePriority * 8 - right.salary * 0.4;
+    if (rightScore !== leftScore) return rightScore - leftScore;
+    return left.candidate.player.name.localeCompare(right.candidate.player.name, "de");
+  });
+  for (const row of fitRows.slice(0, baseLimit)) {
     selected.set(row.candidate.player.id, row.candidate);
   }
   const themedRows = indexed
     .filter((row) => row.themePriority > 0)
     .sort((left, right) => {
       if (right.themePriority !== left.themePriority) return right.themePriority - left.themePriority;
-      if (right.candidate.quality !== left.candidate.quality) return right.candidate.quality - left.candidate.quality;
+      if (right.premiumAxisFit !== left.premiumAxisFit) return right.premiumAxisFit - left.premiumAxisFit;
+      if (right.identityFit !== left.identityFit) return right.identityFit - left.identityFit;
       return left.index - right.index;
     });
   for (const row of themedRows) {
@@ -884,6 +937,54 @@ function selectScoringPool(input: {
     selected.set(row.candidate.player.id, row.candidate);
   }
   return [...selected.values()];
+}
+
+function getRosterPlayers(gameState: GameState, roster: RosterEntry[]) {
+  const playersById = new Map(gameState.players.map((player) => [player.id, player] as const));
+  return roster.map((entry) => playersById.get(entry.playerId)).filter((player): player is Player => Boolean(player));
+}
+
+function getCandidateTeamFit(input: {
+  gameState: GameState;
+  team: GameState["teams"][number];
+  roster: RosterEntry[];
+  candidate: Candidate;
+}) {
+  return calculateTransfermarktFit(input.candidate.player, getRosterPlayers(input.gameState, input.roster), {
+    teamId: input.team.teamId,
+  }).teamFit ?? 0;
+}
+
+function isAllowedByStandardFit(input: {
+  gameState: GameState;
+  team: GameState["teams"][number];
+  roster: RosterEntry[];
+  candidate: Candidate;
+}) {
+  const teamFit = getCandidateTeamFit(input);
+  const mercenary = hasMercenaryTrait(input.candidate.player);
+  return {
+    allowed: teamFit >= 0 || mercenary,
+    teamFit,
+    mercenary,
+  };
+}
+
+function estimateCheapestFutureCost(input: {
+  sortedCandidates: Candidate[];
+  excludedPlayerId: string;
+  neededCount: number;
+}) {
+  if (input.neededCount <= 0) return 0;
+  let total = 0;
+  let count = 0;
+  for (const candidate of input.sortedCandidates) {
+    if (candidate.player.id === input.excludedPlayerId) continue;
+    total += candidate.marketValue;
+    count += 1;
+    if (count >= input.neededCount) break;
+  }
+  return count >= input.neededCount ? roundValue(total, 2) : Number.POSITIVE_INFINITY;
 }
 
 function buildDraftRoleSequence(input: {
@@ -1003,12 +1104,13 @@ function getDesiredDraftRole(input: {
 }
 
 function scoreCandidateForDraftRole(candidate: ScoredCandidate, role: DraftPickRole) {
-  const marketValue = candidate.marketValue ?? 0;
   const salary = candidate.salaryImpact ?? 0;
   const theme = candidate.themeCompositionScore ?? 0;
   const potential = candidate.potentialScore ?? 0;
-  const premiumSignal = Math.sqrt(Math.max(0, marketValue)) * 5;
-  const salaryValueRatio = candidate.quality / Math.max(1, salary * 5);
+  const salaryValueRatio = (candidate.identityFit + candidate.premiumAxisFit + Math.max(0, theme)) / Math.max(1, salary * 5);
+  const focusedAxisPick = candidate.axisFocusStrength >= 0.65;
+  const premiumAxisPenalty = focusedAxisPick ? Math.max(0, 68 - candidate.premiumAxisFit) * 2.35 : 0;
+  const premiumAxisBonus = candidate.premiumAxisFit * (focusedAxisPick ? 1.15 : 0.35);
   const themeTierBonus =
     candidate.themeTier === "core_theme"
       ? 120
@@ -1025,19 +1127,100 @@ function scoreCandidateForDraftRole(candidate: ScoredCandidate, role: DraftPickR
                 : 0;
   const base =
     role === "star"
-      ? candidate.quality * 2.55 + premiumSignal + marketValue * 0.28 + candidate.identityFit * 0.45 + theme * 0.4 - salary * 0.08
+      ? candidate.identityFit * 0.8 +
+        premiumAxisBonus +
+        candidate.classFit * 0.8 +
+        theme * 0.55 +
+        themeTierBonus * 0.35 -
+        salary * 0.08 -
+        premiumAxisPenalty
       : role === "core"
-        ? candidate.quality * 1.3 + candidate.identityFit * 0.7 + theme * 0.8 + candidate.valueScore * 5 + Math.min(12, marketValue * 0.1) - salary * 0.25
+        ? candidate.identityFit * 0.9 +
+          candidate.premiumAxisFit * (focusedAxisPick ? 0.45 : 0.18) +
+          theme * 0.8 +
+          candidate.classFit * 1.15 +
+          themeTierBonus * 0.25 +
+          salary * -0.25
         : role === "starter"
-          ? candidate.quality * 1.05 + candidate.classFit * 1.4 + candidate.identityFit * 0.55 + theme * 0.65 + candidate.valueScore * 8 - salary * 0.28
+          ? candidate.classFit * 1.4 +
+            candidate.identityFit * 0.48 +
+            candidate.premiumAxisFit * (focusedAxisPick ? 0.32 : 0.12) +
+            theme * 0.65 +
+            salary * -0.28
           : role === "value"
-            ? candidate.quality * 0.72 + candidate.valueScore * 34 + salaryValueRatio * 22 + theme * 0.35 - marketValue * 0.13 - salary * 0.75
+            ? salaryValueRatio * 22 + candidate.identityFit * 0.42 + candidate.premiumAxisFit * 0.35 + theme * 0.35 - salary * 0.75
             : role === "prospect"
-              ? potential * 0.75 + candidate.quality * 0.55 + candidate.valueScore * 18 + theme * 0.5 - salary * 0.25
+              ? potential * 0.75 + candidate.identityFit * 0.35 + candidate.premiumAxisFit * 0.25 + theme * 0.5 - salary * 0.25
               : role === "theme"
-                ? theme * 2.8 + themeTierBonus + candidate.quality * 0.65 + candidate.identityFit * 0.35 + candidate.classFit * 0.35 - salary * 0.15
-                : candidate.classFit * 3 + candidate.valueScore * 25 + candidate.quality * 0.45 + theme * 0.4 - marketValue * 0.45 - salary * 0.35;
+                ? theme * 2.8 + themeTierBonus + candidate.identityFit * 0.35 + candidate.premiumAxisFit * 0.2 + candidate.classFit * 0.35 - salary * 0.15
+                : candidate.classFit * 3 + candidate.identityFit * 0.35 + candidate.premiumAxisFit * 0.25 + theme * 0.4 - salary * 0.35;
   return roundValue(base, 4);
+}
+
+function isPremiumDraftRole(role: DraftPickRole) {
+  return role === "star" || role === "core";
+}
+
+function passesPremiumDraftRoleGate(candidate: ScoredCandidate, role: DraftPickRole) {
+  if (!isPremiumDraftRole(role)) {
+    return true;
+  }
+  if (candidate.themeTier === "avoid" || candidate.themeTier === "outsider") {
+    return false;
+  }
+
+  const focusedAxisPick = candidate.axisFocusStrength >= 0.65;
+  const minPremiumAxis = role === "star" ? 66 : 61;
+  const minIdentityFit = role === "star" ? 60 : 56;
+  const axisFit = focusedAxisPick ? candidate.premiumAxisFit >= minPremiumAxis : true;
+  const identityFit = candidate.identityFit >= (focusedAxisPick ? minIdentityFit : minIdentityFit + 4);
+  if (!axisFit || !identityFit) {
+    return false;
+  }
+
+  if (role === "star") {
+    return candidate.themeTier === "core_theme" || candidate.themeTier === "secondary_theme" || candidate.themeTier === "soft_theme";
+  }
+
+  if (candidate.themeTier === "outsider_exception") {
+    return candidate.premiumAxisFit >= minPremiumAxis + 6 && candidate.identityFit >= minIdentityFit + 6;
+  }
+
+  return true;
+}
+
+function applyPremiumDraftRoleGate<T extends ScoredCandidate & { roleScore?: number; desiredDraftRole?: DraftPickRole }>(
+  candidates: T[],
+  role: DraftPickRole,
+) {
+  if (!isPremiumDraftRole(role)) {
+    return { candidates, blockedCount: 0, usedFallback: false };
+  }
+  const gated = candidates.filter((candidate) => passesPremiumDraftRoleGate(candidate, role));
+  return gated.length > 0
+    ? { candidates: gated, blockedCount: candidates.length - gated.length, usedFallback: false }
+    : { candidates, blockedCount: candidates.length, usedFallback: true };
+}
+
+function hashStringToUnitInterval(value: string) {
+  let hash = 2166136261;
+  for (let index = 0; index < value.length; index += 1) {
+    hash ^= value.charCodeAt(index);
+    hash = Math.imul(hash, 16777619);
+  }
+  return (hash >>> 0) / 0xffffffff;
+}
+
+export function computeRedraftScoreVariance(input: {
+  draftSalt: string;
+  teamId: string;
+  playerId: string;
+  phase: ChunkedRedraftPhase;
+}) {
+  const unit = hashStringToUnitInterval(`${input.draftSalt}:${input.teamId}:${input.playerId}:${input.phase}`);
+  const phaseMagnitude =
+    input.phase === "phase_a_minimum" ? 5 : input.phase === "phase_b_core_optimum" ? 11 : 7;
+  return roundValue((unit * 2 - 1) * phaseMagnitude, 4);
 }
 
 function applyDraftRoleIntent(candidates: ScoredCandidate[], role: DraftPickRole) {
@@ -1056,8 +1239,9 @@ function applyDraftRoleIntent(candidates: ScoredCandidate[], role: DraftPickRole
     .sort((left, right) => {
       if (right.selectedScore !== left.selectedScore) return right.selectedScore - left.selectedScore;
       if (right.roleScore !== left.roleScore) return right.roleScore - left.roleScore;
-      if (right.quality !== left.quality) return right.quality - left.quality;
-      return left.marketValue - right.marketValue;
+      if (right.premiumAxisFit !== left.premiumAxisFit) return right.premiumAxisFit - left.premiumAxisFit;
+      if (right.identityFit !== left.identityFit) return right.identityFit - left.identityFit;
+      return left.player.name.localeCompare(right.player.name, "de");
     });
 }
 
@@ -1083,7 +1267,7 @@ function buildDraftRoleBoardRows(input: {
     salary: candidate.salary,
     themeTier: candidate.themeTier,
     themeCompositionScore: candidate.themeCompositionScore,
-    reason: `role=${input.desiredRole};theme=${candidate.themeTier};quality=${roundValue(candidate.quality, 2)};value=${candidate.valueScore};identity=${candidate.identityFit}`,
+    reason: `role=${input.desiredRole};theme=${candidate.themeTier};quality=${roundValue(candidate.quality, 2)};value=${candidate.valueScore};identity=${candidate.identityFit};premiumAxisFit=${candidate.premiumAxisFit}`,
   }));
 }
 
@@ -1115,8 +1299,6 @@ function buildTeamReadinessScore(input: {
 }): TeamReadinessScore {
   const playersById = new Map(input.gameState.players.map((player) => [player.id, player] as const));
   const rosterPlayers = input.roster.map((entry) => playersById.get(entry.playerId)).filter((player): player is Player => Boolean(player));
-  const qualities = rosterPlayers.map((player) => player.ovr ?? player.rating ?? 0).sort((left, right) => right - left);
-  const topPlayerQuality = avg(qualities.slice(0, 3)) ?? 0;
   const allDisciplineIds = new Set(input.gameState.disciplines.map((discipline) => discipline.id));
   const coveredDisciplineIds = new Set(rosterPlayers.flatMap((player) => player.preferredDisciplineIds ?? []));
   const disciplineCoverage = allDisciplineIds.size > 0 ? (coveredDisciplineIds.size / allDisciplineIds.size) * 100 : 0;
@@ -1127,24 +1309,29 @@ function buildTeamReadinessScore(input: {
   const rosterCountScore = Math.min(100, (input.roster.length / Math.max(1, input.target.playerOpt)) * 100);
   const injuryDepth = Math.min(100, Math.max(0, input.roster.length - input.target.playerMin + 2) * 20);
   const salarySustainability = Math.max(0, Math.min(100, 100 - (salarySum / Math.max(1, cash + salarySum)) * 100));
-  const teamIdentityFit = avg(
-    rosterPlayers.map((player) =>
-      getIdentityFit(
-        {
-          player,
-          marketValue: getImportedPlayerDisplayMarketValue(player) ?? 0,
-          salary: getImportedPlayerDisplaySalary(player),
-          quality: player.ovr ?? player.rating ?? 0,
-          pow: getPlayerAxisValue(player, "pow"),
-          spe: getPlayerAxisValue(player, "spe"),
-          men: getPlayerAxisValue(player, "men"),
-          soc: getPlayerAxisValue(player, "soc"),
-          pickScore: 0,
-        },
-        input.identity,
-      ),
-    ),
-  ) ?? 0;
+  const rosterCandidateShapes = rosterPlayers
+    .map((player) => ({
+      player,
+      marketValue: getImportedPlayerDisplayMarketValue(player) ?? 0,
+      salary: getCalculatedPlayerSalary(player),
+      pow: getPlayerAxisValue(player, "pow"),
+      spe: getPlayerAxisValue(player, "spe"),
+      men: getPlayerAxisValue(player, "men"),
+      soc: getPlayerAxisValue(player, "soc"),
+      pickScore: 0,
+    }))
+    .map((candidate) => ({
+      ...candidate,
+      quality: roundValue((candidate.pow + candidate.spe + candidate.men + candidate.soc) / 4, 2),
+    }));
+  const topPlayerQuality =
+    avg(
+      rosterCandidateShapes
+        .map((candidate) => computePreferredAxisFit(candidate, input.identity))
+        .sort((left, right) => right - left)
+        .slice(0, 3),
+    ) ?? 0;
+  const teamIdentityFit = avg(rosterCandidateShapes.map((candidate) => getIdentityFit(candidate, input.identity))) ?? 0;
   const boardPressureRisk = Math.max(0, 100 - toBias(input.identity?.boardConfidence, 5) * 10);
   const lineupRisk = input.roster.length < input.target.playerMin ? 85 : input.roster.length < input.target.playerOpt ? 45 : 15;
   const teamReadinessScore = roundValue(
@@ -1213,9 +1400,11 @@ function buildRosterTargetPlan(input: {
   const reservePct = Math.max(0.04, Math.min(0.22, 0.14 + cashPriority * 0.006 - starPriority * 0.008));
   const reserveBudget = roundValue(cashStart * reservePct);
   const spendableBudget = roundValue(Math.max(0, cashStart - reserveBudget));
-  const averageCandidateQuality = avg(input.candidatePool.map((candidate) => candidate.quality)) ?? 0;
   const strongAffordableCandidates = input.candidatePool.filter(
-    (candidate) => candidate.marketValue <= spendableBudget && candidate.quality >= Math.max(55, averageCandidateQuality * 0.75),
+    (candidate) =>
+      candidate.marketValue <= spendableBudget &&
+      getIdentityFit(candidate, identity) >= 55 &&
+      computePreferredAxisFit(candidate, identity) >= 55,
   );
   const readiness = buildTeamReadinessScore({
     gameState: input.gameState,
@@ -1290,7 +1479,7 @@ function buildRosterTargetPlan(input: {
     reserveBudget,
     maxTransferSpend,
     maxSalaryIncrease: roundValue(spendableBudget * 0.18),
-    qualityFloor: roundValue(Math.max(8, averageCandidateQuality * (targetMode === "cash_recovery" ? 0.48 : 0.62))),
+    qualityFloor: 0,
     requiredRoles,
     preferredAxes: getPreferredAxes(identity),
     requiredClassBias: input.strategyProfile?.preferredClasses?.slice(0, 3).join("|") ?? "",
@@ -1565,7 +1754,8 @@ function buildManagerMarketBoard(input: {
     const boardTier: MarketBoardTier =
       candidate.marketValue > input.team.cash
         ? "Avoid"
-        : boardScore >= 118 || (input.profile.managerArchetype === "win_now" && candidate.quality >= 75)
+        : boardScore >= 118 ||
+            (input.profile.managerArchetype === "win_now" && candidate.premiumAxisFit >= 72 && candidate.identityFit >= 68)
           ? "S Target"
           : boardScore >= 92
             ? "A Strong Fit"
@@ -1609,11 +1799,13 @@ function scoreCandidateForTeam(input: {
   team: GameState["teams"][number];
   phase: ChunkedRedraftPhase;
   maxRecommendedSpend: number;
+  draftSalt: string;
   counters?: RedraftCandidateCounters;
 }): ScoredCandidate {
   const identityFit = getIdentityFit(input.candidate, input.teamIdentity);
+  const premiumAxisFit = computePreferredAxisFit(input.candidate, input.teamIdentity);
+  const axisFocusStrength = getAxisFocusStrength(input.teamIdentity);
   const classFit = getClassFit(input.candidate, input.roster, input.gameState);
-  const valueScore = roundValue(input.candidate.quality / Math.max(1, input.candidate.marketValue), 4);
   const salaryImpact = roundValue(input.candidate.salary ?? 0, 2);
   const starBias = toBias(input.strategyProfile?.bias?.starPriority);
   const valueBias = toBias(input.strategyProfile?.bias?.valuePriority);
@@ -1625,38 +1817,54 @@ function scoreCandidateForTeam(input: {
     gameState: input.gameState,
     team: input.team,
     player: input.candidate.player,
-    candidateQuality: input.candidate.quality,
+    candidateQuality: Math.max(identityFit, premiumAxisFit),
     candidateRoleFit: classFit,
     currentTeamNeeds: [],
     phase: input.phase,
   });
   const themeWeight = input.phase === "phase_a_minimum" ? 0.45 : input.phase === "phase_b_core_optimum" ? 0.95 : 1.1;
-  const budgetFit =
-    input.candidate.marketValue <= input.maxRecommendedSpend
-      ? 8
-      : -Math.min(input.phase === "phase_a_minimum" ? 42 : 24, (input.candidate.marketValue - input.maxRecommendedSpend) * (input.phase === "phase_a_minimum" ? 1.35 : 0.6));
+  const valueScore = roundValue(
+    (identityFit * 0.45 + premiumAxisFit * 0.35 + Math.max(0, themeScore.themeCompositionScore) * 0.2) /
+      Math.max(1, salaryImpact + 5),
+    4,
+  );
+  const budgetFit = 0;
+  const focusedPremiumAxisPenalty =
+    axisFocusStrength >= 0.65 && input.phase === "phase_b_core_optimum" && starBias >= 8
+      ? Math.max(0, 64 - premiumAxisFit) * 0.85
+      : 0;
   const phaseScore =
     input.phase === "phase_a_minimum"
-      ? input.candidate.quality * 0.55 + valueScore * (28 + valueBias * 1.2) + classFit * 0.45 + themeScore.themeCompositionScore * themeWeight - salaryImpact * 0.45 + budgetFit * 1.75
+      ? identityFit * 0.35 +
+        premiumAxisFit * 0.45 +
+        valueScore * (18 + valueBias * 0.8) +
+        classFit * 0.65 +
+        themeScore.themeCompositionScore * themeWeight -
+        salaryImpact * 0.45
       : input.phase === "phase_b_core_optimum"
-        ? input.candidate.quality * (1.15 + starBias * 0.04) +
-          identityFit * 0.75 +
-          valueScore * (9 + valueBias * 0.9) +
+        ? identityFit * 0.95 +
+          premiumAxisFit * (starBias >= 8 && axisFocusStrength >= 0.65 ? 0.55 : 0.18) +
+          valueScore * (8 + valueBias * 0.7) +
           potentialScore * 0.12 +
           themeScore.themeCompositionScore * themeWeight +
           classFit -
-          salaryImpact * (0.2 + wageSensitivity * 0.035) +
-          budgetFit * 0.55
-        : input.candidate.quality * 0.85 +
-          identityFit * 0.45 +
-          valueScore * (10 + valueBias) +
+          salaryImpact * (0.2 + wageSensitivity * 0.035) -
+          focusedPremiumAxisPenalty
+        : identityFit * 0.55 +
+          premiumAxisFit * (axisFocusStrength >= 0.65 ? 0.28 : 0.1) +
+          valueScore * (8 + valueBias * 0.6) +
           potentialScore * 0.08 +
           themeScore.themeCompositionScore * themeWeight +
           classFit * 1.15 +
           depthBias * 0.8 -
-          salaryImpact * (0.35 + wageSensitivity * 0.04) +
-          budgetFit * 1.1;
-  const selectedScore = roundValue(phaseScore, 4);
+          salaryImpact * (0.35 + wageSensitivity * 0.04);
+  const draftVariance = computeRedraftScoreVariance({
+    draftSalt: input.draftSalt,
+    teamId: input.team.teamId,
+    playerId: input.candidate.player.id,
+    phase: input.phase,
+  });
+  const selectedScore = roundValue(phaseScore + draftVariance, 4);
   const strongestAxis = [
     ["POW", input.candidate.pow],
     ["SPE", input.candidate.spe],
@@ -1667,6 +1875,8 @@ function scoreCandidateForTeam(input: {
     ...input.candidate,
     selectedScore,
     identityFit,
+    premiumAxisFit,
+    axisFocusStrength,
     classFit,
     valueScore,
     themeCompositionScore: themeScore.themeCompositionScore,
@@ -1676,7 +1886,8 @@ function scoreCandidateForTeam(input: {
     salaryImpact,
     budgetFit: roundValue(budgetFit, 2),
     potentialScore,
-    phaseScore: selectedScore,
+    phaseScore: roundValue(phaseScore, 4),
+    draftVariance,
     teamNeed: `${strongestAxis}_coverage`,
   };
 }
@@ -2101,7 +2312,11 @@ function buildUnderOptStopAudit(input: {
       const underOpt = rosterCount < opt;
       const latestWarning = input.warningRows.filter((row) => row.teamId === team.teamId).at(-1);
       const wasStopIntentional = !underOpt || Boolean(plan?.allowedUnderOpt);
-      const goodAffordable = topAffordable != null && topAffordable.quality >= 55;
+      const identity = input.finalSave.gameState.teamIdentities.find((entry) => entry.teamId === team.teamId) ?? null;
+      const goodAffordable =
+        topAffordable != null &&
+        getIdentityFit(topAffordable, identity) >= 55 &&
+        computePreferredAxisFit(topAffordable, identity) >= 55;
       const hardFail = underOpt && !wasStopIntentional && team.cash > 40 && goodAffordable;
       return {
         teamId: team.teamId,
@@ -2561,6 +2776,8 @@ function writeReports(input: {
       teamNeed: pick.teamNeed ?? "",
       classFit: pick.classFit ?? "",
       identityFit: pick.identityFit ?? "",
+      premiumAxisFit: pick.premiumAxisFit ?? "",
+      axisFocusStrength: pick.axisFocusStrength ?? "",
       valueScore: pick.valueScore ?? "",
       themeCompositionScore: pick.themeCompositionScore ?? "",
       themeTier: pick.themeTier ?? "",
@@ -2598,6 +2815,8 @@ function writeReports(input: {
       axisFitSOC: pick.axisFitSoc ?? "",
       classFit: pick.classFit ?? "",
       identityFit: pick.identityFit ?? "",
+      premiumAxisFit: pick.premiumAxisFit ?? "",
+      axisFocusStrength: pick.axisFocusStrength ?? "",
       valueScore: pick.valueScore ?? "",
       themeCompositionScore: pick.themeCompositionScore ?? "",
       themeTier: pick.themeTier ?? "",
@@ -2644,6 +2863,8 @@ function writeReports(input: {
       teamNeed: pick.teamNeed ?? "",
       classFit: pick.classFit ?? "",
       identityFit: pick.identityFit ?? "",
+      premiumAxisFit: pick.premiumAxisFit ?? "",
+      axisFocusStrength: pick.axisFocusStrength ?? "",
       valueScore: pick.valueScore ?? "",
       themeCompositionScore: pick.themeCompositionScore ?? "",
       themeTier: pick.themeTier ?? "",
@@ -2810,6 +3031,607 @@ export function runChunkedRedraftTopup(params: ChunkedRedraftTopupParams) {
     ]),
   );
 
+  if (params.mode === "full_clean_redraft") {
+    const sequentialStartedAt = Date.now();
+    const candidatePool = initialCandidatePool;
+    const teamsForRun = maxTeams
+      ? runContext.save.gameState.teams.slice(0, maxTeams)
+      : [...runContext.save.gameState.teams].sort((teamA, teamB) => {
+          const targetA = getTeamTarget(runContext.save.gameState, teamA.teamId, target);
+          const targetB = getTeamTarget(runContext.save.gameState, teamB.teamId, target);
+          const pressureA = teamA.cash / Math.max(1, targetA.targetRoster);
+          const pressureB = teamB.cash / Math.max(1, targetB.targetRoster);
+          if (pressureA !== pressureB) return pressureA - pressureB;
+          return teamA.teamId.localeCompare(teamB.teamId, "de");
+        });
+    const sequentialTeamRows: Array<Record<string, unknown>> = [];
+    const sequentialPickRows: Array<Record<string, unknown>> = [];
+    const sequentialIdentityRows: Array<Record<string, unknown>> = [];
+    let globalPickIndex = 0;
+
+    profiler.log("team_sequence_draft_start", {
+      round: 1,
+      teamId: "ALL",
+      rosterCount: runContext.save.gameState.rosters.length,
+      freeAgentCount: candidatePool.length,
+      candidateCount: candidatePool.length,
+    });
+
+    for (const team of teamsForRun) {
+      const teamStartedAt = Date.now();
+      let teamPicks = 0;
+      let teamErrors = 0;
+      const teamWarnings: string[] = [];
+      const teamTimeLimit = Math.max(teamTimeLimitMs, 60_000);
+      const teamTarget = getTeamTarget(runContext.save.gameState, team.teamId, target);
+      const teamIdentity = runContext.save.gameState.teamIdentities.find((entry) => entry.teamId === team.teamId) ?? null;
+      const strategyProfile = strategyProfiles[team.teamId] ?? null;
+      const targetPlan = targetPlans.get(team.teamId) ?? null;
+      const managerProfile = managerProfiles.get(team.teamId) ?? null;
+      const seasonStrategy = seasonStrategies.get(team.teamId) ?? null;
+      const rosterBlueprint = rosterBlueprints.get(team.teamId) ?? null;
+      const themeTarget = getTeamThemeCompositionTarget(team);
+      const desiredRosterTarget = Math.min(
+        targetPlan?.desiredRosterTarget ?? teamTarget.targetRoster,
+        teamTarget.playerMax,
+      );
+      const minTarget = Math.min(targetPlan?.minTarget ?? teamTarget.playerMin, teamTarget.playerMax);
+      const maxTeamPicks =
+        dryRun && maxTeams === 1 && roundLimit === 1
+          ? 1
+          : Math.max(0, desiredRosterTarget - runContext.save.gameState.rosters.filter((entry) => entry.teamId === team.teamId).length);
+
+      profiler.log("team_sequence_start", {
+        round: 1,
+        teamId: team.teamId,
+        rosterCount: runContext.save.gameState.rosters.filter((entry) => entry.teamId === team.teamId).length,
+        freeAgentCount: candidatePool.length - pickedPlayerIds.size,
+        candidateCount: candidatePool.length,
+      });
+
+      while (true) {
+        const latestTeam = runContext.save.gameState.teams.find((entry) => entry.teamId === team.teamId) ?? team;
+        const teamRoster = runContext.save.gameState.rosters.filter((entry) => entry.teamId === team.teamId);
+        const rosterCount = teamRoster.length;
+        if (rosterCount >= desiredRosterTarget || rosterCount >= teamTarget.playerMax || teamPicks >= maxTeamPicks) {
+          break;
+        }
+        if (Date.now() - teamStartedAt > teamTimeLimit) {
+          teamWarnings.push("team_sequence_time_limit_reached");
+          warningRows.push({ round: teamPicks + 1, teamId: team.teamId, reason: "team_sequence_time_limit_reached", detail: `${teamTimeLimit}ms` });
+          break;
+        }
+
+        const pickStartedAt = Date.now();
+        const phasePlan = buildPhasePlan({
+          target,
+          rosterCount,
+          teamTarget,
+          targetPlan,
+          teamCash: latestTeam.cash,
+          strategyProfile,
+          candidatePool,
+        });
+        const stage0StartedAt = profiler.start("candidate_stage0", {
+          round: teamPicks + 1,
+          teamId: team.teamId,
+          rosterCount,
+          freeAgentCount: candidatePool.length - pickedPlayerIds.size,
+        });
+        const unpickedCandidates = candidatePool.filter((candidate) => !pickedPlayerIds.has(candidate.player.id));
+        const fitChecked = unpickedCandidates.map((candidate) => ({
+          candidate,
+          fit: isAllowedByStandardFit({
+            gameState: runContext.save.gameState,
+            team: latestTeam,
+            roster: teamRoster,
+            candidate,
+          }),
+        }));
+        const fitLegalCandidates = fitChecked.filter((entry) => entry.fit.allowed).map((entry) => entry.candidate);
+        const cashLegalCandidates = fitLegalCandidates.filter((candidate) => candidate.marketValue <= latestTeam.cash);
+        const negativeFitBlocked = fitChecked.length - fitLegalCandidates.length;
+        const cashBlocked = fitLegalCandidates.length - cashLegalCandidates.length;
+        profiler.end("candidate_stage0", stage0StartedAt, {
+          round: teamPicks + 1,
+          teamId: team.teamId,
+          rosterCount,
+          candidateCount: cashLegalCandidates.length,
+          warning: `negativeFitBlocked=${negativeFitBlocked};cashBlocked=${cashBlocked}`,
+        });
+
+        profiler.log("team_sequence_need_eval", {
+          round: teamPicks + 1,
+          teamId: team.teamId,
+          rosterCount,
+          freeAgentCount: unpickedCandidates.length,
+          candidateCount: cashLegalCandidates.length,
+          warning: `negativeFitBlocked=${negativeFitBlocked};cashBlocked=${cashBlocked}`,
+        });
+
+        if (cashLegalCandidates.length === 0) {
+          teamErrors += 1;
+          teamWarnings.push("no_cash_legal_candidate");
+          warningRows.push({ round: teamPicks + 1, teamId: team.teamId, reason: "no_cash_legal_candidate", detail: `cash=${latestTeam.cash};fitLegal=${fitLegalCandidates.length}` });
+          break;
+        }
+
+        const stage1StartedAt = profiler.start("candidate_stage1", {
+          round: teamPicks + 1,
+          teamId: team.teamId,
+          rosterCount,
+          candidateCount: cashLegalCandidates.length,
+        });
+        const protectThemeMinimum = needsThemePickToProtectMinimum({
+          gameState: runContext.save.gameState,
+          roster: teamRoster,
+          target: themeTarget,
+          phase: phasePlan.phase,
+        });
+        const desiredDraftRole = protectThemeMinimum
+          ? "theme"
+          : getDesiredDraftRole({
+              rosterCount,
+              roster: teamRoster,
+              gameState: runContext.save.gameState,
+              phase: phasePlan.phase,
+              profile: managerProfile,
+              blueprint: rosterBlueprint,
+              targetPlan,
+              themeTarget,
+            });
+        const scoredBase = cashLegalCandidates
+          .map((candidate) =>
+            scoreCandidateForTeam({
+              candidate,
+              roster: teamRoster,
+              gameState: runContext.save.gameState,
+              teamIdentity,
+              strategyProfile,
+              team: latestTeam,
+              phase: phasePlan.phase,
+              maxRecommendedSpend: phasePlan.maxRecommendedSpend,
+              draftSalt: `${save.saveId}:${params.mode}:team_sequence:${teamPicks}`,
+              counters,
+            }),
+          );
+        const roleRankedCandidates = applyDraftRoleIntent(scoredBase, desiredDraftRole);
+        const futureSortedCandidates = fitLegalCandidates
+          .filter((candidate) => candidate.marketValue <= latestTeam.cash)
+          .sort((candidateA, candidateB) => candidateA.marketValue - candidateB.marketValue);
+        const remainingMinAfterPick = Math.max(0, minTarget - (rosterCount + 1));
+        const remainingPlannedAfterPick = Math.max(0, desiredRosterTarget - (rosterCount + 1));
+        const scoredCandidates = roleRankedCandidates
+          .map((candidate) => {
+            const cashAfter = latestTeam.cash - candidate.marketValue;
+            const cheapestFutureCost = estimateCheapestFutureCost({
+              sortedCandidates: futureSortedCandidates,
+              excludedPlayerId: candidate.player.id,
+              neededCount: remainingMinAfterPick,
+            });
+            const cheapestPlannedCost = estimateCheapestFutureCost({
+              sortedCandidates: futureSortedCandidates,
+              excludedPlayerId: candidate.player.id,
+              neededCount: remainingPlannedAfterPick,
+            });
+            const futureGap = remainingMinAfterPick > 0 ? cheapestFutureCost - cashAfter : 0;
+            const futurePenalty = Number.isFinite(futureGap) && futureGap > 0 ? 100_000 + futureGap * 2_000 : !Number.isFinite(cheapestFutureCost) ? 250_000 : 0;
+            const plannedGap = remainingPlannedAfterPick > 0 ? cheapestPlannedCost - cashAfter : 0;
+            const plannedDepthPenalty =
+              Number.isFinite(plannedGap) && plannedGap > 0
+                ? 1_200 + plannedGap * 120
+                : !Number.isFinite(cheapestPlannedCost) && remainingPlannedAfterPick > 0
+                  ? 900
+                  : 0;
+            const minRosterUrgency = rosterCount < minTarget ? (minTarget - rosterCount) * 3 : 0;
+            const valueSafetyBonus = rosterCount < minTarget ? candidate.valueScore * 18 - (candidate.salary ?? 0) * 0.35 : 0;
+            const teamFit = getCandidateTeamFit({
+              gameState: runContext.save.gameState,
+              team: latestTeam,
+              roster: teamRoster,
+              candidate,
+            });
+            const sequenceFitBonus = candidate.identityFit * 0.55 + candidate.premiumAxisFit * 0.75 + Math.max(0, teamFit) * 1.7;
+            const candidatePrice = candidate.marketValue;
+            const infeasibleMinimumFallback =
+              remainingMinAfterPick > 0 && (!Number.isFinite(cheapestFutureCost) || futureGap > 0)
+                ? -candidatePrice * 70 - (candidate.salary ?? 0) * 18 + candidate.valueScore * 30 + sequenceFitBonus
+                : 0;
+            return {
+              ...candidate,
+              selectedScore: roundValue(
+                candidate.selectedScore +
+                  sequenceFitBonus +
+                  valueSafetyBonus +
+                  minRosterUrgency +
+                  infeasibleMinimumFallback -
+                  futurePenalty -
+                  plannedDepthPenalty,
+                4,
+              ),
+              budgetFit: roundValue(-(futurePenalty + plannedDepthPenalty), 2),
+            };
+          })
+          .sort((left, right) => {
+            if (right.selectedScore !== left.selectedScore) return right.selectedScore - left.selectedScore;
+            if (right.premiumAxisFit !== left.premiumAxisFit) return right.premiumAxisFit - left.premiumAxisFit;
+            if (right.identityFit !== left.identityFit) return right.identityFit - left.identityFit;
+            return left.player.name.localeCompare(right.player.name, "de");
+          });
+        profiler.end("candidate_stage1", stage1StartedAt, {
+          round: teamPicks + 1,
+          teamId: team.teamId,
+          rosterCount,
+          candidateCount: scoredCandidates.length,
+          warning: `role=${desiredDraftRole};allPlayersScored=${scoredCandidates.length}`,
+        });
+
+        draftRoleBoardRows.push(
+          ...buildDraftRoleBoardRows({
+            round: teamPicks + 1,
+            team: latestTeam,
+            desiredRole: desiredDraftRole,
+            candidates: scoredCandidates,
+            limit: 20,
+          }),
+        );
+
+        const teamMarketBoardRows = rosterBlueprint && managerProfile
+          ? buildManagerMarketBoard({
+              team: latestTeam,
+              teamName: team.name,
+              candidates: scoredCandidates,
+              blueprint: rosterBlueprint,
+              profile: managerProfile,
+              limit: 24,
+            })
+          : [];
+        marketBoardRows.push(...teamMarketBoardRows.map((row) => ({ ...row, reason: `team_sequence_pick=${teamPicks + 1};${row.reason}` })));
+
+        phaseRows.push({
+          round: teamPicks + 1,
+          teamId: team.teamId,
+          phase: "team_sequence_need_eval",
+          durationMs: Date.now() - pickStartedAt,
+          itemCount: unpickedCandidates.length,
+          freeAgentsRemaining: unpickedCandidates.length,
+          cheapFilterCount: cashLegalCandidates.length,
+          shortlistCount: scoredCandidates.length,
+          hardBlockersCount: negativeFitBlocked + cashBlocked,
+          note: `teamSequence=true;allPlayersScored=${cashLegalCandidates.length};onlyHardFilters=negative_fit_except_mercenary,cash_non_negative;role=${desiredDraftRole};phaseLabel=${phasePlan.phase};minTarget=${minTarget};desiredTarget=${desiredRosterTarget};cash=${roundValue(latestTeam.cash)}`,
+        });
+
+        let picked = false;
+        let previewCalls = 0;
+        for (const candidate of scoredCandidates) {
+          const contractOffer = recommendContractOfferForPlayer({
+            player: candidate.player,
+            teamStrategyProfile: strategyProfiles[team.teamId] ?? null,
+            teamCash: latestTeam.cash,
+            marketValue: candidate.marketValue,
+          });
+          previewCalls += 1;
+          counters.buyPreviewCalls += 1;
+          counters.fullPreviewCalls += 1;
+          const result = executeLocalTransfermarktBuy({
+            saveId: runContext.save.saveId,
+            seasonId: runContext.save.gameState.season.id,
+            teamId: team.teamId,
+            playerId: candidate.player.id,
+            contractLength: contractOffer.contractLength,
+            contractShape: contractOffer.contractShape,
+            transferSource: "season1_autoprep_topup",
+            localRunContext: runContext,
+            deferPersist: true,
+          });
+          if (!result.canBuy) {
+            counters.failedBuys += 1;
+            warningRows.push({
+              round: teamPicks + 1,
+              teamId: team.teamId,
+              reason: "team_sequence_buy_blocked",
+              detail: `${candidate.player.id}:${result.blockingReasons.join("|")}`,
+            });
+            continue;
+          }
+
+          counters.successfulBuys += 1;
+          counters.selectedCandidates += 1;
+          pickedPlayerIds.add(candidate.player.id);
+          globalPickIndex += 1;
+          teamPicks += 1;
+          picked = true;
+          const pickRejectedRows = buildRejectedCandidateRows({
+            round: teamPicks,
+            teamId: team.teamId,
+            selected: candidate,
+            candidates: scoredCandidates,
+            phasePlan,
+            teamCash: latestTeam.cash,
+          });
+          rejectedRows.push(...pickRejectedRows);
+          const rejectedFields = rejectedSummaryFields(pickRejectedRows);
+          const selectedBoardRow = teamMarketBoardRows.find((row) => row.playerId === candidate.player.id) ?? null;
+          const targetProgress = rosterBlueprint
+            ? `${result.rosterAfter ?? rosterCount + 1}/${rosterBlueprint.desiredRosterTarget}`
+            : `${result.rosterAfter ?? rosterCount + 1}/${desiredRosterTarget}`;
+          const fitInfo = isAllowedByStandardFit({
+            gameState: runContext.save.gameState,
+            team: latestTeam,
+            roster: teamRoster,
+            candidate,
+          });
+          picks.push({
+            round: teamPicks,
+            teamId: team.teamId,
+            playerId: candidate.player.id,
+            playerName: candidate.player.name,
+            marketValue: result.purchasePrice,
+            salary: result.offeredSalary ?? result.salary,
+            cashBefore: latestTeam.cash,
+            cashAfter: result.cashAfter,
+            rosterBefore: result.rosterBefore ?? rosterCount,
+            rosterAfter: result.rosterAfter ?? rosterCount + 1,
+            transferHistoryId: result.transferId,
+            phase: phasePlan.phase,
+            managerArchetype: managerProfile?.managerArchetype,
+            seasonStrategy: seasonStrategy?.seasonStrategy,
+            roleFilled: candidate.player.className,
+            blueprintNeed: rosterBlueprint?.requiredAxisCoverage || candidate.teamNeed,
+            marketBoardTier: selectedBoardRow?.boardTier ?? "B Solid Fit",
+            whySelected: `${selectedBoardRow?.reason ?? "team_sequence"};draftRole=${desiredDraftRole};score=${candidate.selectedScore};fit=${fitInfo.teamFit};mercenary=${fitInfo.mercenary}`,
+            whyRejectedOthers: pickRejectedRows.map((row) => `${row.rejectedPlayerName}:${row.rejectionCategory}`).join("|"),
+            targetProgress,
+            pickScore: candidate.pickScore,
+            selectedScore: candidate.selectedScore,
+            draftVariance: candidate.draftVariance,
+            teamNeed: candidate.teamNeed,
+            role: desiredDraftRole,
+            currentRating: roundValue(candidate.quality, 2),
+            potentialRange: getPotentialRange(candidate.player.potential),
+            qualityTier: getQualityTier(candidate.quality),
+            axisFitPow: roundValue(candidate.pow, 2),
+            axisFitSpe: roundValue(candidate.spe, 2),
+            axisFitMen: roundValue(candidate.men, 2),
+            axisFitSoc: roundValue(candidate.soc, 2),
+            classFit: candidate.classFit,
+            identityFit: candidate.identityFit,
+            premiumAxisFit: candidate.premiumAxisFit,
+            axisFocusStrength: candidate.axisFocusStrength,
+            valueScore: candidate.valueScore,
+            themeCompositionScore: candidate.themeCompositionScore,
+            themeTier: candidate.themeTier,
+            themeTags: candidate.themeTags.join("|"),
+            themeReason: candidate.themeReason,
+            salaryImpact: candidate.salaryImpact,
+            budgetFit: candidate.budgetFit,
+            topRejectedCandidates: getTopRejectedCandidates(scoredCandidates, candidate.player.id),
+            ...rejectedFields,
+            previewCalls,
+            candidateCount: scoredCandidates.length,
+            reasons: `team_sequence;pick=${teamPicks};globalPick=${globalPickIndex};role=${desiredDraftRole};teamNeed=${candidate.teamNeed};quality=${roundValue(candidate.quality, 2)};identityFit=${candidate.identityFit};premiumAxisFit=${candidate.premiumAxisFit};axisFocus=${candidate.axisFocusStrength};theme=${candidate.themeTier}:${candidate.themeCompositionScore};valueScore=${candidate.valueScore};potential=${candidate.potentialScore};marketValue=${candidate.marketValue};fit=${fitInfo.teamFit};mercenary=${fitInfo.mercenary}`,
+            durationMs: Date.now() - pickStartedAt,
+          });
+          sequentialPickRows.push({
+            globalPick: globalPickIndex,
+            teamPick: teamPicks,
+            teamId: team.teamId,
+            playerId: candidate.player.id,
+            playerName: candidate.player.name,
+            role: desiredDraftRole,
+            teamNeed: candidate.teamNeed,
+            fit: fitInfo.teamFit,
+            mercenary: fitInfo.mercenary,
+            selectedScore: candidate.selectedScore,
+            identityFit: candidate.identityFit,
+            premiumAxisFit: candidate.premiumAxisFit,
+            pow: candidate.pow,
+            spe: candidate.spe,
+            men: candidate.men,
+            soc: candidate.soc,
+            cashBefore: latestTeam.cash,
+            cashAfter: result.cashAfter,
+            allPlayersScored: scoredCandidates.length,
+            negativeFitBlocked,
+            cashBlocked,
+            durationMs: Date.now() - pickStartedAt,
+          });
+          profiler.log("team_sequence_pick_selected", {
+            round: teamPicks,
+            teamId: team.teamId,
+            rosterCount: result.rosterAfter ?? rosterCount + 1,
+            freeAgentCount: candidatePool.length - pickedPlayerIds.size,
+            candidateCount: scoredCandidates.length,
+            previewCount: previewCalls,
+          });
+          profiler.log("pick_selected", {
+            round: teamPicks,
+            teamId: team.teamId,
+            rosterCount: result.rosterAfter ?? rosterCount + 1,
+            freeAgentCount: candidatePool.length - pickedPlayerIds.size,
+            candidateCount: scoredCandidates.length,
+            previewCount: previewCalls,
+          });
+          break;
+        }
+
+        if (!picked) {
+          teamErrors += 1;
+          teamWarnings.push("no_legal_candidate_after_preview");
+          warningRows.push({ round: teamPicks + 1, teamId: team.teamId, reason: "no_legal_candidate_after_preview", detail: `candidates=${scoredCandidates.length}` });
+          break;
+        }
+      }
+
+      if (!dryRun && runContext.deferredWrites > 0) {
+        const flushStartedAt = Date.now();
+        flushLocalTransfermarktRunContext(runContext);
+        counters.saveFlushes += 1;
+        phaseRows.push({
+          round: teamPicks,
+          teamId: team.teamId,
+          phase: "team_sequence_save_flush",
+          durationMs: Date.now() - flushStartedAt,
+          itemCount: runContext.save.gameState.rosters.filter((entry) => entry.teamId === team.teamId).length,
+          memoryAfterMb: memorySnapshot().heapUsedMb,
+        });
+      }
+
+      const finalRoster = runContext.save.gameState.rosters.filter((entry) => entry.teamId === team.teamId);
+      const finalTeam = runContext.save.gameState.teams.find((entry) => entry.teamId === team.teamId) ?? team;
+      const pickedRows = picks.filter((pick) => pick.teamId === team.teamId);
+      const anchorPickedRows = pickedRows.slice(0, Math.min(2, pickedRows.length));
+      const corePickedRows = pickedRows.slice(0, Math.min(4, pickedRows.length));
+      const avgIdentityFit = avg(pickedRows.map((pick) => pick.identityFit ?? 0)) ?? 0;
+      const avgPremiumAxisFit = avg(pickedRows.map((pick) => pick.premiumAxisFit ?? 0)) ?? 0;
+      const avgThemeScore = avg(pickedRows.map((pick) => pick.themeCompositionScore ?? 0)) ?? 0;
+      const anchorIdentityFit = avg(anchorPickedRows.map((pick) => pick.identityFit ?? 0)) ?? 0;
+      const anchorPremiumAxisFit = avg(anchorPickedRows.map((pick) => pick.premiumAxisFit ?? 0)) ?? 0;
+      const coreIdentityFit = avg(corePickedRows.map((pick) => pick.identityFit ?? 0)) ?? 0;
+      const corePremiumAxisFit = avg(corePickedRows.map((pick) => pick.premiumAxisFit ?? 0)) ?? 0;
+      const coreThemeScore = avg(corePickedRows.map((pick) => pick.themeCompositionScore ?? 0)) ?? 0;
+      const avgPow = avg(pickedRows.map((pick) => pick.axisFitPow ?? 0)) ?? 0;
+      const avgSpe = avg(pickedRows.map((pick) => pick.axisFitSpe ?? 0)) ?? 0;
+      const avgMen = avg(pickedRows.map((pick) => pick.axisFitMen ?? 0)) ?? 0;
+      const avgSoc = avg(pickedRows.map((pick) => pick.axisFitSoc ?? 0)) ?? 0;
+      const status =
+        finalRoster.length < minTarget
+          ? "red_under_min"
+          : anchorIdentityFit < 48 || anchorPremiumAxisFit < 48
+            ? "red_identity_fit"
+            : coreIdentityFit < 55 || corePremiumAxisFit < 55 || avgIdentityFit < 35 || avgPremiumAxisFit < 35
+              ? "yellow_fit_watch"
+              : "green_plausible";
+      sequentialIdentityRows.push({
+        teamId: team.teamId,
+        teamName: team.name,
+        status,
+        rosterCount: finalRoster.length,
+        minTarget,
+        desiredRosterTarget,
+        playerMax: teamTarget.playerMax,
+        cashAfter: roundValue(finalTeam.cash),
+        picks: teamPicks,
+        avgIdentityFit: roundValue(avgIdentityFit, 2),
+        avgPremiumAxisFit: roundValue(avgPremiumAxisFit, 2),
+        avgThemeScore: roundValue(avgThemeScore, 2),
+        anchorIdentityFit: roundValue(anchorIdentityFit, 2),
+        anchorPremiumAxisFit: roundValue(anchorPremiumAxisFit, 2),
+        coreIdentityFit: roundValue(coreIdentityFit, 2),
+        corePremiumAxisFit: roundValue(corePremiumAxisFit, 2),
+        coreThemeScore: roundValue(coreThemeScore, 2),
+        avgPow: roundValue(avgPow, 2),
+        avgSpe: roundValue(avgSpe, 2),
+        avgMen: roundValue(avgMen, 2),
+        avgSoc: roundValue(avgSoc, 2),
+        managerArchetype: managerProfile?.managerArchetype ?? "",
+        strategy: seasonStrategy?.seasonStrategy ?? "",
+        warnings: teamWarnings.join("|"),
+      });
+      sequentialTeamRows.push({
+        teamId: team.teamId,
+        teamName: team.name,
+        picks: teamPicks,
+        rosterCount: finalRoster.length,
+        minTarget,
+        desiredRosterTarget,
+        cashAfter: roundValue(finalTeam.cash),
+        errors: teamErrors,
+        warnings: teamWarnings.join("|"),
+        durationMs: Date.now() - teamStartedAt,
+      });
+      memoryRows.push({
+        round: 1,
+        teamId: team.teamId,
+        phase: "team_sequence",
+        heapUsedMb: memorySnapshot().heapUsedMb,
+        rssMb: memorySnapshot().rssMb,
+        durationMs: Date.now() - teamStartedAt,
+        itemCount: finalRoster.length,
+      });
+      profiler.log("team_sequence_end", {
+        round: 1,
+        teamId: team.teamId,
+        rosterCount: finalRoster.length,
+        freeAgentCount: candidatePool.length - pickedPlayerIds.size,
+        candidateCount: teamPicks,
+        warning: teamWarnings.join("|") || null,
+      });
+    }
+
+    const finalSave = dryRun ? initialSave : persistence.getSaveById(save.saveId) ?? runContext.save;
+    const finalState = buildState(finalSave, pickedPlayerIds, 1, warnings);
+    const finalSummary = buildSummary({
+      initialSave,
+      finalSave,
+      picks,
+      memoryRows,
+      warningRows,
+      roundDurations: [{ round: 1, durationMs: Date.now() - sequentialStartedAt, picks: globalPickIndex }],
+      resumeTested,
+    });
+    profiler.log("team_sequence_draft_complete", {
+      round: 1,
+      teamId: "ALL",
+      rosterCount: finalSave.gameState.rosters.length,
+      freeAgentCount: Math.max(0, finalSave.gameState.players.length - finalSave.gameState.rosters.length),
+      candidateCount: picks.length,
+    });
+    writeReports({
+      outputDir,
+      summary: finalSummary,
+      state: finalState,
+      initialSave,
+      finalSave,
+      picks,
+      rejectedRows,
+      targetPlans,
+      managerProfiles,
+      seasonStrategies,
+      rosterBlueprints,
+      marketBoardRows,
+      draftRoleBoardRows,
+      candidatePool: buildCandidatePool(finalSave.gameState, pickedPlayerIds),
+      memoryRows,
+      warningRows,
+      phaseRows,
+      progressRows: profiler.rows,
+      counters,
+      reportMode,
+    });
+    writeCsv(outputDir, "team-sequential-draft-teams.csv", sequentialTeamRows);
+    writeCsv(outputDir, "team-sequential-draft-picks.csv", sequentialPickRows);
+    writeCsv(outputDir, "team-sequential-identity-audit.csv", sequentialIdentityRows);
+    writeMarkdown(
+      outputDir,
+      "team-sequential-draft-summary.md",
+      [
+        "# Team Sequential Draft Summary",
+        "",
+        `- Save: ${finalSave.saveId}`,
+        `- Draft valid: ${finalSummary.draftValid ? "true" : "false"}`,
+        `- Picks: ${picks.length}`,
+        `- Teams under min: ${finalSummary.teamsBelowMin.length}`,
+        `- Negative cash teams: ${finalSummary.negativeCashTeams.length}`,
+        `- Identity red teams: ${sequentialIdentityRows.filter((row) => String(row.status).startsWith("red")).length}`,
+        `- Duration ms: ${Date.now() - sequentialStartedAt}`,
+        "",
+        "Hard filters: negative team fit except mercenaries, and cash must not go below 0.",
+      ].join("\n"),
+    );
+
+    return {
+      dryRun,
+      executed: !dryRun,
+      status: finalSummary.teamsBelowMin.length === 0 ? "ready" : "warning",
+      summary: finalSummary,
+      state: finalState,
+      picks,
+      warnings,
+      outputDir,
+    };
+  }
+
   let round = Math.max(1, resumeState?.round ?? 1);
   let globalBlocked = false;
 
@@ -2921,43 +3743,25 @@ export function runChunkedRedraftTopup(params: ChunkedRedraftTopupParams) {
         rosterCount,
         candidateCount: cashAffordableCandidates.length,
       });
-      const qualitySafeCandidates = cashAffordableCandidates.filter((candidate) => candidate.quality >= phasePlan.qualityFloor);
-      const affordableCandidates =
-        phasePlan.phase === "phase_a_minimum" && qualitySafeCandidates.length < Math.min(4, cashAffordableCandidates.length)
-          ? cashAffordableCandidates
-          : qualitySafeCandidates;
+      const affordableCandidates = cashAffordableCandidates;
+      const qualitySafeCandidates = affordableCandidates;
       const budgetSafeCandidates = affordableCandidates.filter((candidate) => candidate.marketValue <= phasePlan.maxRecommendedSpend);
-      const phaseAMinimumFallbackCandidates =
-        phasePlan.phase === "phase_a_minimum" && budgetSafeCandidates.length === 0
-          ? [...affordableCandidates].sort((left, right) => {
-              if (left.marketValue !== right.marketValue) return left.marketValue - right.marketValue;
-              return right.quality - left.quality;
-            })
-          : [];
-      const usingPhaseAMinimumFallback = phaseAMinimumFallbackCandidates.length > 0 && budgetSafeCandidates.length === 0;
-      const planningPool =
-        phasePlan.phase === "phase_b_core_optimum"
-          ? affordableCandidates
-          : phasePlan.phase === "phase_a_minimum" && budgetSafeCandidates.length > 0
-            ? budgetSafeCandidates
-            : phaseAMinimumFallbackCandidates.length > 0
-            ? phaseAMinimumFallbackCandidates
-            : budgetSafeCandidates.length >= Math.min(8, affordableCandidates.length)
-            ? budgetSafeCandidates
-            : affordableCandidates;
+      const minimumRosterGap = Math.max(0, (targetPlan?.minTarget ?? teamTarget.playerMin) - rosterCount);
+      const phaseAMinimumGuard = phasePlan.phase === "phase_a_minimum" && minimumRosterGap > 0;
+      const usingPhaseAMinimumFallback = phaseAMinimumGuard && budgetSafeCandidates.length > 0;
+      const planningPool = usingPhaseAMinimumFallback ? budgetSafeCandidates : affordableCandidates;
+      const themeTarget = getTeamThemeCompositionTarget(latestTeam);
       const scoringPoolCap =
         phasePlan.phase === "phase_a_minimum"
-          ? Math.max(160, phasePlan.shortlistCap)
-          : Math.max(192, phasePlan.shortlistCap * 2);
-      const themeTarget = getTeamThemeCompositionTarget(latestTeam);
-      const scoringPool = usingPhaseAMinimumFallback
-        ? planningPool.slice(0, scoringPoolCap)
-        : selectScoringPool({
-            planningPool,
-            cap: scoringPoolCap,
-            themeTarget,
-            phase: phasePlan.phase,
-          });
+          ? Math.max(320, phasePlan.shortlistCap * 3)
+          : Math.max(420, phasePlan.shortlistCap * 4);
+      const scoringPool = selectScoringPool({
+        planningPool,
+        cap: scoringPoolCap,
+        themeTarget,
+        phase: phasePlan.phase,
+        identity: teamIdentity,
+      });
       const baseScoredCandidates = scoringPool
         .map((candidate) =>
           scoreCandidateForTeam({
@@ -2969,13 +3773,15 @@ export function runChunkedRedraftTopup(params: ChunkedRedraftTopupParams) {
             team: latestTeam,
             phase: phasePlan.phase,
             maxRecommendedSpend: phasePlan.maxRecommendedSpend,
+            draftSalt: `${save.saveId}:${params.mode}`,
             counters,
           }),
         )
         .sort((left, right) => {
           if (right.selectedScore !== left.selectedScore) return right.selectedScore - left.selectedScore;
-          if (right.quality !== left.quality) return right.quality - left.quality;
-          return left.marketValue - right.marketValue;
+          if (right.premiumAxisFit !== left.premiumAxisFit) return right.premiumAxisFit - left.premiumAxisFit;
+          if (right.identityFit !== left.identityFit) return right.identityFit - left.identityFit;
+          return left.player.name.localeCompare(right.player.name, "de");
         });
       const protectThemeMinimum = needsThemePickToProtectMinimum({
         gameState: runContext.save.gameState,
@@ -2997,7 +3803,9 @@ export function runChunkedRedraftTopup(params: ChunkedRedraftTopupParams) {
             targetPlan,
             themeTarget,
           });
-      const scoredCandidates = applyDraftRoleIntent(baseScoredCandidates, desiredDraftRole);
+      const roleRankedCandidates = applyDraftRoleIntent(baseScoredCandidates, desiredDraftRole);
+      const premiumRoleGate = applyPremiumDraftRoleGate(roleRankedCandidates, desiredDraftRole);
+      const scoredCandidates = premiumRoleGate.candidates;
       draftRoleBoardRows.push(
         ...buildDraftRoleBoardRows({
           round,
@@ -3013,8 +3821,8 @@ export function runChunkedRedraftTopup(params: ChunkedRedraftTopupParams) {
         rosterCount,
         candidateCount: scoredCandidates.length,
         warning: planningPool.length > scoringPool.length
-          ? `scoring_pool_capped:${scoringPool.length}/${planningPool.length};role=${desiredDraftRole};fallback=${usingPhaseAMinimumFallback}`
-          : `role=${desiredDraftRole};fallback=${usingPhaseAMinimumFallback}`,
+          ? `fit_prefilter:${scoringPool.length}/${planningPool.length};role=${desiredDraftRole};fallback=${usingPhaseAMinimumFallback};premiumGateBlocked=${premiumRoleGate.blockedCount};premiumGateFallback=${premiumRoleGate.usedFallback};no_ovr_mvs_market_value_attractiveness`
+          : `role=${desiredDraftRole};fallback=${usingPhaseAMinimumFallback};premiumGateBlocked=${premiumRoleGate.blockedCount};premiumGateFallback=${premiumRoleGate.usedFallback}`,
       });
       const shortlistStartedAt = profiler.start("candidate_shortlist", {
         round,
@@ -3052,7 +3860,7 @@ export function runChunkedRedraftTopup(params: ChunkedRedraftTopupParams) {
         shortlistCount: shortlist.length,
         hardBlockersCount: candidatePool.length - cashAffordableCandidates.length,
         freeAgentsRemaining: candidatePool.length,
-        note: `phase=${phasePlan.phase};${phasePlan.description};cashAffordable=${cashAffordableCandidates.length};qualitySafe=${qualitySafeCandidates.length};budgetSafe=${budgetSafeCandidates.length};scoringPool=${scoringPool.length}/${planningPool.length};maxRecommendedSpend=${roundValue(phasePlan.maxRecommendedSpend)};cashReservePct=${phasePlan.cashReservePct};qualityFloor=${roundValue(phasePlan.qualityFloor)}`,
+        note: `phase=${phasePlan.phase};${phasePlan.description};cashAffordable=${cashAffordableCandidates.length};qualitySafe=not_used_for_pick;budgetSafe=${budgetSafeCandidates.length};phaseAMinimumGuard=${phaseAMinimumGuard};scoringPool=${scoringPool.length}/${planningPool.length};premiumGateBlocked=${premiumRoleGate.blockedCount};premiumGateFallback=${premiumRoleGate.usedFallback};allLegalCandidatesConsidered=true;fitPrefilter=no_ovr_mvs_market_value_attractiveness;maxRecommendedSpend=${roundValue(phasePlan.maxRecommendedSpend)};cashReservePct=${phasePlan.cashReservePct};qualityFloor=not_used_for_pick`,
       });
 
       if (shortlist.length === 0) {
@@ -3180,6 +3988,7 @@ export function runChunkedRedraftTopup(params: ChunkedRedraftTopupParams) {
           targetProgress,
           pickScore: candidate.pickScore,
           selectedScore: candidate.selectedScore,
+          draftVariance: candidate.draftVariance,
           teamNeed: candidate.teamNeed,
           role: desiredDraftRole,
           currentRating: roundValue(candidate.quality, 2),
@@ -3191,6 +4000,8 @@ export function runChunkedRedraftTopup(params: ChunkedRedraftTopupParams) {
           axisFitSoc: roundValue(candidate.soc, 2),
           classFit: candidate.classFit,
           identityFit: candidate.identityFit,
+          premiumAxisFit: candidate.premiumAxisFit,
+          axisFocusStrength: candidate.axisFocusStrength,
           valueScore: candidate.valueScore,
           themeCompositionScore: candidate.themeCompositionScore,
           themeTier: candidate.themeTier,
@@ -3202,7 +4013,7 @@ export function runChunkedRedraftTopup(params: ChunkedRedraftTopupParams) {
           ...rejectedFields,
           previewCalls,
           candidateCount: shortlist.length,
-          reasons: `${phasePlan.phase};draftRole=${desiredDraftRole};teamNeed=${candidate.teamNeed};quality=${roundValue(candidate.quality, 2)};identityFit=${candidate.identityFit};theme=${candidate.themeTier}:${candidate.themeCompositionScore};valueScore=${candidate.valueScore};potential=${candidate.potentialScore};marketValue=${candidate.marketValue};cashReservePct=${phasePlan.cashReservePct}`,
+          reasons: `${phasePlan.phase};draftRole=${desiredDraftRole};teamNeed=${candidate.teamNeed};quality=${roundValue(candidate.quality, 2)};identityFit=${candidate.identityFit};premiumAxisFit=${candidate.premiumAxisFit};axisFocus=${candidate.axisFocusStrength};theme=${candidate.themeTier}:${candidate.themeCompositionScore};valueScore=${candidate.valueScore};potential=${candidate.potentialScore};marketValue=${candidate.marketValue};cashReservePct=${phasePlan.cashReservePct};draftVariance=${candidate.draftVariance}`,
           durationMs: Date.now() - pickStartedAt,
         });
         phaseRows.push({

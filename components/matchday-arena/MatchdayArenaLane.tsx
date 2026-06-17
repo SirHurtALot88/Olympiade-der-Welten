@@ -2,6 +2,7 @@
 
 import { useLayoutEffect, useRef } from "react";
 
+import OptimizedMediaImage from "@/app/foundation/OptimizedMediaImage";
 import type { MatchdayArenaPhaseBreakdownItem } from "@/lib/season/matchday-arena-presenter";
 
 type MatchdayArenaLaneProps = {
@@ -73,7 +74,13 @@ export default function MatchdayArenaLane({
       <div className="matchday-arena-lane-meta">
         <span className="matchday-arena-lane-rank">#{rank}</span>
         {teamLogoUrl ? (
-          <img className="matchday-arena-lane-logo" src={teamLogoUrl} alt={`${teamName} Logo`} />
+          <OptimizedMediaImage
+            className="matchday-arena-lane-logo"
+            src={teamLogoUrl}
+            alt={`${teamName} Logo`}
+            width={38}
+            height={38}
+          />
         ) : (
           <span className="matchday-arena-lane-logo matchday-arena-lane-logo-fallback">—</span>
         )}

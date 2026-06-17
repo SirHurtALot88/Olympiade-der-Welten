@@ -601,9 +601,6 @@ type LaneMarketAnchors = {
   q85Price: number;
   q90Price: number;
   q95Price: number;
-  q80Ovr: number;
-  q90Ovr: number;
-  q95Ovr: number;
 };
 
 function buildLaneMarketAnchors(candidates: AiTransferPreviewRecommendation[]): LaneMarketAnchors {
@@ -632,35 +629,18 @@ function buildLaneMarketAnchors(candidates: AiTransferPreviewRecommendation[]): 
       candidates.map((entry) => entry.price ?? entry.marketValue ?? null),
       0.95,
     ),
-    q80Ovr: quantile(
-      candidates.map((entry) => entry.ovr ?? null),
-      0.8,
-    ),
-    q90Ovr: quantile(
-      candidates.map((entry) => entry.ovr ?? null),
-      0.9,
-    ),
-    q95Ovr: quantile(
-      candidates.map((entry) => entry.ovr ?? null),
-      0.95,
-    ),
   };
 }
 
 function classifyCandidateTier(input: {
   price: number | null;
-  ovr: number | null;
   anchors: LaneMarketAnchors;
 }) {
   const price = input.price ?? 0;
-  const ovr = input.ovr ?? 0;
-  const isSuperstar =
-    (price > 0 && price >= Math.max(input.anchors.q95Price, input.anchors.q85Price * 1.2)) ||
-    (ovr > 0 && ovr >= Math.max(90, input.anchors.q95Ovr));
+  const isSuperstar = price > 0 && price >= Math.max(input.anchors.q95Price, input.anchors.q85Price * 1.2);
   const isStar =
     isSuperstar ||
-    (price > 0 && price >= Math.max(input.anchors.q85Price, input.anchors.q75Price * 1.15)) ||
-    (ovr > 0 && ovr >= Math.max(82, input.anchors.q90Ovr));
+    (price > 0 && price >= Math.max(input.anchors.q85Price, input.anchors.q75Price * 1.15));
   return {
     isSuperstar,
     isStar,
@@ -774,7 +754,6 @@ function buildAiNeedsCostBandCaps(input: {
 function resolveActualAiPickCostBand(input: {
   price: number | null;
   salary: number | null;
-  ovr: number | null;
   anchors: LaneMarketAnchors;
   expectedMinimumSlotCost?: number | null;
   currentCash?: number | null;
@@ -793,7 +772,6 @@ function resolveActualAiPickCostBand(input: {
     isCheapFillCandidate({
       price: input.price,
       salary: input.salary,
-      ovr: input.ovr,
       anchors: input.anchors,
       expectedMinimumSlotCost: input.expectedMinimumSlotCost,
       currentCash: input.currentCash,
@@ -812,7 +790,6 @@ function resolveActualAiPickCostBand(input: {
 function isCheapFillCandidate(input: {
   price: number | null;
   salary: number | null;
-  ovr: number | null;
   anchors: LaneMarketAnchors;
   expectedMinimumSlotCost?: number | null;
   currentCash?: number | null;
@@ -820,7 +797,6 @@ function isCheapFillCandidate(input: {
 }) {
   const tier = classifyCandidateTier({
     price: input.price,
-    ovr: input.ovr,
     anchors: input.anchors,
   });
   if (tier.isStar || tier.isSuperstar) {
@@ -836,7 +812,7 @@ function isCheapFillCandidate(input: {
   });
   const cheapPriceCap = caps.cheap_fill;
   const cheapSalaryCap = roundValue(Math.max(4.5, Math.min(8.5, cheapPriceCap * 0.21)), 2);
-  return price > 0 && price <= cheapPriceCap && salary <= cheapSalaryCap && (input.ovr ?? 0) < Math.max(78, input.anchors.q90Ovr);
+  return price > 0 && price <= cheapPriceCap && salary <= cheapSalaryCap;
 }
 
 function getMinimumReserve(input: {
@@ -862,11 +838,9 @@ function getMinimumReserve(input: {
       playerId: entry.playerId,
       price: entry.price ?? entry.marketValue ?? null,
       salary: entry.salary ?? null,
-      ovr: entry.ovr ?? null,
       cheapEligible: isCheapFillCandidate({
         price: entry.price ?? entry.marketValue ?? null,
         salary: entry.salary ?? null,
-        ovr: entry.ovr ?? null,
         anchors: input.anchors,
       }),
     }))
@@ -932,7 +906,6 @@ function buildMinimumReservePool(candidates: AiTransferPreviewRecommendation[], 
         cheapEligible: isCheapFillCandidate({
           price,
           salary: entry.salary ?? null,
-          ovr: entry.ovr ?? null,
           anchors,
         }),
       };
@@ -1246,7 +1219,7 @@ const V4_FOCUS_TEAM_PROFILES: Record<string, V4FocusTeamProfile> = {
     preferredAxes: ["pow", "spe"],
     primaryTokens: ["berserker", "assassin", "rogue", "champion", "gladiator", "hunter", "charger", "mercenary"],
     secondaryTokens: ["hero", "sprinter", "warlord", "duelist", "warrior"],
-    avoidTokens: ["teacher", "cleric"],
+    avoidTokens: ["teacher", "cleric", "bard", "social", "charmer", "noble", "royal", "court", "merchant", "broker"],
     namedMetricKeys: ["aggroFit", "eliteFit", "championFit"],
   },
   "C-C": {
@@ -2252,13 +2225,30 @@ function getPlayerPrimaryDiscipline(player: Player) {
   return top ? { disciplineId: top[0], score: Number(top[1] ?? 0) } : null;
 }
 
+function getPlayerSportsQuality(player: Player, candidateAxis: "pow" | "spe" | "men" | "soc" | null) {
+  const coreValues = Object.values(player.coreStats ?? {}).filter((value): value is number => Number.isFinite(value));
+  const disciplineValues = Object.values(player.disciplineRatings ?? {}).filter((value): value is number => Number.isFinite(value));
+  const axisValue = candidateAxis != null ? player.coreStats[candidateAxis] ?? null : null;
+  const topDiscipline = disciplineValues.length > 0 ? Math.max(...disciplineValues) : null;
+  const topCore = coreValues.length > 0 ? Math.max(...coreValues) : null;
+  const coreAverage = coreValues.length > 0 ? coreValues.reduce((sum, value) => sum + value, 0) / coreValues.length : null;
+  const quality = Math.max(axisValue ?? 0, topDiscipline ?? 0, topCore ?? 0, coreAverage ?? 0);
+  return {
+    quality: roundValue(quality, 1),
+    topDiscipline: topDiscipline ?? 0,
+    topCore: topCore ?? 0,
+    strongDisciplineCount: disciplineValues.filter((value) => value >= 60).length,
+    eliteDisciplineCount: disciplineValues.filter((value) => value >= 80).length,
+  };
+}
+
 function getPlayerRoleTag(player: Player, candidateAxis: "pow" | "spe" | "men" | "soc" | null): "superstar" | "star" | "core" | "depth" | "specialist" | "backup" {
-  const ovr = player.ovr ?? player.rating ?? 0;
-  if (ovr >= 90) return "superstar";
-  if (ovr >= 78) return "star";
-  if (candidateAxis && (player.disciplineTierCounts?.above60 ?? 0) >= 3) return "specialist";
-  if (ovr >= 62) return "core";
-  if (ovr >= 48) return "depth";
+  const sportsQuality = getPlayerSportsQuality(player, candidateAxis);
+  if (sportsQuality.topDiscipline >= 90 && sportsQuality.topCore >= 76) return "superstar";
+  if (sportsQuality.topDiscipline >= 82 || sportsQuality.topCore >= 76) return "star";
+  if (candidateAxis && sportsQuality.strongDisciplineCount >= 3) return "specialist";
+  if (sportsQuality.quality >= 64 || sportsQuality.strongDisciplineCount >= 2) return "core";
+  if (sportsQuality.quality >= 48) return "depth";
   return "backup";
 }
 
@@ -4267,18 +4257,17 @@ function scoreCandidate(input: {
   const playerRole = player ? getPlayerRoleTag(player, candidateAxis) : "depth";
   const rawTier = classifyCandidateTier({
     price: input.recommendation.price ?? input.recommendation.marketValue ?? null,
-    ovr: input.recommendation.ovr ?? null,
     anchors: input.anchors,
   });
   const cheapFillEligible = isCheapFillCandidate({
     price: input.recommendation.price ?? input.recommendation.marketValue ?? null,
     salary: input.recommendation.salary ?? null,
-    ovr: input.recommendation.ovr ?? null,
     anchors: input.anchors,
   });
   const bestDisciplineEntry = player ? getPlayerPrimaryDiscipline(player) : null;
+  const sportsQuality = player ? getPlayerSportsQuality(player, candidateAxis) : null;
   const playerQualityScore = roundValue(
-    clamp(((input.recommendation.ovr ?? 0) / 100) * 20 + ((input.recommendation.overallRecommendationScore ?? input.recommendation.score ?? 0) / 100) * 12, 0, 32),
+    clamp(((sportsQuality?.quality ?? 0) / 100) * 24 + ((sportsQuality?.strongDisciplineCount ?? 0) / 5) * 8, 0, 32),
     1,
   );
   const needEntries = input.openNeeds.filter(
@@ -4443,7 +4432,18 @@ function scoreCandidate(input: {
       : 0;
   const valueScore =
     price != null && price > 0
-      ? roundValue(clamp(((input.recommendation.ovr ?? 0) / price) * 3.2, 0, 12), 1)
+      ? roundValue(
+          clamp(
+            (Math.max(0, needMatchScore) * 0.45 +
+              Math.max(0, disciplineCoverageScore) * 0.75 +
+              Math.max(0, teamIdentityScore) * 0.55 +
+              Math.max(0, rosterBalanceScore) * 0.35) /
+              Math.max(1, price * 0.22 + (input.recommendation.salary ?? 0) * 0.65),
+            0,
+            12,
+          ),
+          1,
+        )
       : 0;
   const laneFitScore = roundValue(
     clamp(
@@ -4493,7 +4493,7 @@ function scoreCandidate(input: {
     -clamp(
       (input.recommendation.riskNotes?.length ?? 0) * 2 +
         (price != null && remainingCash != null && price > remainingCash * 0.7 ? 2 : 0) +
-        (input.budgetLane.lane === "cheap_fill" && ((input.recommendation.ovr ?? 0) > 78 || rawTier.isStar) ? 3 : 0),
+        (input.budgetLane.lane === "cheap_fill" && rawTier.isStar ? 3 : 0),
       0,
       10,
     ),
@@ -5640,7 +5640,6 @@ function buildTeamEntry(input: {
     const cheapFillEligibleByCost = isCheapFillCandidate({
       price: top.price,
       salary: top.salary,
-      ovr: top.ovr,
       anchors,
       expectedMinimumSlotCost: cashStrategyWithLanes.expectedMinimumSlotCost,
       currentCash: remainingCash,
@@ -5650,7 +5649,6 @@ function buildTeamEntry(input: {
     const actualCostBand = resolveActualAiPickCostBand({
       price: top.price,
       salary: top.salary,
-      ovr: top.ovr,
       anchors,
       expectedMinimumSlotCost: cashStrategyWithLanes.expectedMinimumSlotCost,
       currentCash: remainingCash,

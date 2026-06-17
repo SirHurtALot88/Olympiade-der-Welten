@@ -86,6 +86,19 @@ function createGameState(input: { player: Player; withRoster?: boolean; snapshot
                     totalPoints: input.snapshotPoints,
                     averageContribution: input.snapshotPoints / 4,
                     averageFinalScore: 44.4,
+                    powPoints: 12.5,
+                    spePoints: 8.5,
+                    menPoints: 4.2,
+                    socPoints: 1.8,
+                    ovr: 64.2,
+                    ovrRank: 7,
+                    pps: input.snapshotPoints,
+                    ppsRank: 5,
+                    mvs: 41.3,
+                    mvsRank: 9,
+                    marketValue: 31.75,
+                    salary: 7.2,
+                    contractLength: 2,
                     top10Count: 1,
                     mvpCount: 0,
                     bestDisciplineId: "d1",
@@ -253,7 +266,38 @@ describe("player detail drawer", () => {
     expect(data?.seasonPerformance?.totalPoints).toBe(88.8);
   });
 
-  it("uses the real player salary source for free agents", () => {
+  it("hydrates archived drawer history with saved player metrics in later seasons", () => {
+    const player = createPlayer({ id: "player-history", pps: 54.4 });
+    const gameState = createGameState({ player, withRoster: true, snapshotPoints: 88.8 });
+    gameState.season = {
+      id: "season-2",
+      name: "Season 2",
+      currentMatchday: 1,
+      totalMatchdays: 10,
+      isCompleted: false,
+    } as GameState["season"];
+    gameState.seasonState.seasonId = "season-2";
+
+    const data = buildPlayerDrawerDataFromGameState({
+      gameState,
+      playerId: player.id,
+      source: "sqlite",
+    });
+    const archived = data?.historyRows.find((row) => row.seasonId === "season-1");
+
+    expect(archived).toBeTruthy();
+    expect(archived?.isActiveSeason).toBe(false);
+    expect(archived?.pps).toBe(88.8);
+    expect(archived?.ppsRank).toBe(5);
+    expect(archived?.ovr).toBe(64.2);
+    expect(archived?.mvs).toBe(41.3);
+    expect(archived?.marketValue).toBe(31.75);
+    expect(archived?.salary).toBe(7.2);
+    expect(archived?.contractLength).toBe(2);
+    expect(archived?.pow).toBe(12.5);
+  });
+
+  it("uses the internal player salary source for free agents", () => {
     const player = createPlayer({ id: "player-free-agent", displaySalary: 14.25, salaryDemand: 14.25 });
     const data = buildPlayerDrawerDataFromGameState({
       gameState: createGameState({ player, withRoster: false }),
@@ -264,7 +308,8 @@ describe("player detail drawer", () => {
     expect(data).toBeTruthy();
     expect(data?.transferStatus).toBe("Free Agent");
     expect(data?.salary).toBe(14.25);
-    expect(data?.salarySource).toBe("imported_display");
+    expect(data?.normalSalary).toBe(14.25);
+    expect(data?.salarySource).toBe("calculated_stored");
   });
 
   it("exposes scout potential as a range and training modifier", () => {
@@ -281,7 +326,7 @@ describe("player detail drawer", () => {
     expect(data?.scoutPotential?.trainingSpeedMultiplier).toBe(1.09);
   });
 
-  it("keeps active-player economy on the imported visible values while contract context stays attached", () => {
+  it("shows current contract salary separately from the normal expected salary", () => {
     const player = createPlayer({
       id: "player-active",
       displayMarketValue: 72.57,
@@ -312,9 +357,11 @@ describe("player detail drawer", () => {
     expect(data).toBeTruthy();
     expect(data?.transferStatus).toBe("Active Player");
     expect(data?.marketValue).toBe(72.57);
-    expect(data?.salary).toBe(16.54);
-    expect(data?.marketValueSource).toBe("imported_display");
-    expect(data?.salarySource).toBe("imported_display");
+    expect(data?.salary).toBe(12.75);
+    expect(data?.normalSalary).not.toBeNull();
+    expect(data?.normalSalary).not.toBe(data?.salary);
+    expect(data?.marketValueSource).toBe("calculated_preview");
+    expect(data?.salarySource).toBe("active_contract");
     expect(data?.contractLength).toBe(3);
     expect(data?.contractLengthSource).toBe("active_contract");
     expect(data?.transferContext.currentValue).toBe(72.57);

@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { useEffect, useMemo, useRef, useState } from "react";
 
+import OptimizedMediaImage from "@/app/foundation/OptimizedMediaImage";
 import { TooltipHeading } from "@/components/ui/TooltipHeading";
 import { getPlayerPortraitBrowserUrl, getTeamLogoBrowserUrl } from "@/lib/data/mediaAssets";
 import type { LineupDraftModifiers, Player, PlayerAttributeSheetStats } from "@/lib/data/olyDataTypes";
@@ -3269,7 +3270,15 @@ export default function LegacyLineupLabClient(props: LegacyLineupLabClientProps)
           <div className="legacy-matchday-room-team">
             <div className="legacy-matchday-room-logo-wrap">
               {teamLogoUrl ? (
-                <img className="legacy-matchday-room-logo" src={teamLogoUrl} alt={`${context?.team.name ?? "Team"} Logo`} />
+                <OptimizedMediaImage
+                  className="legacy-matchday-room-logo"
+                  src={teamLogoUrl}
+                  alt={`${context?.team.name ?? "Team"} Logo`}
+                  width={52}
+                  height={52}
+                  loading="eager"
+                  fetchPriority="high"
+                />
               ) : (
                 <span className="legacy-matchday-room-logo legacy-matchday-room-logo-fallback">{teamLogoInitials || "TM"}</span>
               )}
@@ -3406,7 +3415,13 @@ export default function LegacyLineupLabClient(props: LegacyLineupLabClientProps)
                       >
                         <div className="legacy-matchday-player-head">
                           {player.portraitUrl ? (
-                            <img className="legacy-matchday-player-portrait" src={player.portraitUrl} alt={player.name} />
+                            <OptimizedMediaImage
+                              className="legacy-matchday-player-portrait"
+                              src={player.portraitUrl}
+                              alt={player.name}
+                              width={56}
+                              height={56}
+                            />
                           ) : (
                             <span className="legacy-matchday-player-portrait legacy-matchday-player-portrait-fallback">—</span>
                           )}
@@ -3749,7 +3764,13 @@ export default function LegacyLineupLabClient(props: LegacyLineupLabClientProps)
                                       <span className="legacy-lineup-slot-captain-pill">Captain</span>
                                     ) : null}
                                     {selectedRosterCard.portraitUrl ? (
-                                      <img className="legacy-lineup-slot-player-portrait" src={selectedRosterCard.portraitUrl} alt={selectedRosterCard.name} />
+                                      <OptimizedMediaImage
+                                        className="legacy-lineup-slot-player-portrait"
+                                        src={selectedRosterCard.portraitUrl}
+                                        alt={selectedRosterCard.name}
+                                        width={44}
+                                        height={44}
+                                      />
                                     ) : (
                                       <span className="legacy-lineup-slot-player-portrait legacy-lineup-slot-player-portrait-fallback">—</span>
                                     )}
@@ -4074,7 +4095,13 @@ export default function LegacyLineupLabClient(props: LegacyLineupLabClientProps)
                           <div className="legacy-lineup-top-player-card-head">
                             <span className="legacy-lineup-result-rank">#{entry.rankInDiscipline}</span>
                             {entry.portraitUrl ? (
-                              <img className="legacy-matchday-player-portrait" src={entry.portraitUrl} alt={entry.playerName} />
+                              <OptimizedMediaImage
+                                className="legacy-matchday-player-portrait"
+                                src={entry.portraitUrl}
+                                alt={entry.playerName}
+                                width={56}
+                                height={56}
+                              />
                             ) : (
                               <span className="legacy-matchday-player-portrait legacy-matchday-player-portrait-fallback">—</span>
                             )}
@@ -4246,7 +4273,13 @@ export default function LegacyLineupLabClient(props: LegacyLineupLabClientProps)
                             return (
                               <td key={column.id}>
                                 {player.portraitUrl ? (
-                                  <img className="legacy-lineup-player-portrait" src={player.portraitUrl} alt={player.name} />
+                                  <OptimizedMediaImage
+                                    className="legacy-lineup-player-portrait"
+                                    src={player.portraitUrl}
+                                    alt={player.name}
+                                    width={52}
+                                    height={52}
+                                  />
                                 ) : (
                                   <span className="legacy-lineup-player-portrait legacy-lineup-player-portrait-placeholder">—</span>
                                 )}

@@ -649,21 +649,12 @@ export function buildContractNegotiationPreview(input: NegotiationPreviewInput):
       : null;
   const baseExpectedSalary = economy?.expectedSalary ?? null;
   let expectedSalary = baseExpectedSalary;
-  const offeredSalary =
+  let offeredSalary =
     typeof input.offeredSalary === "number" && Number.isFinite(input.offeredSalary) && input.offeredSalary > 0
       ? roundMoney(input.offeredSalary, 2)
-      : baseExpectedSalary;
+      : null;
   const contractLength = normalizeContractLength(input.contractLength);
   const contractShape = input.contractShape;
-
-  const contractPreview = buildContractSalarySchedule({
-    annualSalary: offeredSalary,
-    contractLength,
-    shape: contractShape,
-    seasonIdBase: input.seasonIdBase,
-    seasonLabelBase: input.seasonLabelBase,
-  });
-  const buyoutCost = calculateOpenBuyoutCost(contractPreview.yearlySalarySchedule, 0);
 
   if (!input.player) {
     blockingReasons.push("player_not_found");
@@ -673,9 +664,6 @@ export function buildContractNegotiationPreview(input: NegotiationPreviewInput):
   }
   if (expectedSalary == null || expectedSalary <= 0) {
     blockingReasons.push("salary_source_missing");
-  }
-  if (offeredSalary == null || offeredSalary <= 0) {
-    blockingReasons.push("offer_salary_missing");
   }
 
   const formulaSources = loadPlayerFormulaSources();
@@ -730,6 +718,20 @@ export function buildContractNegotiationPreview(input: NegotiationPreviewInput):
     }
     reasons.push(...cultureSignals.reasons);
   }
+
+  offeredSalary = offeredSalary ?? expectedSalary ?? baseExpectedSalary;
+  if (offeredSalary == null || offeredSalary <= 0) {
+    blockingReasons.push("offer_salary_missing");
+  }
+
+  const contractPreview = buildContractSalarySchedule({
+    annualSalary: offeredSalary,
+    contractLength,
+    shape: contractShape,
+    seasonIdBase: input.seasonIdBase,
+    seasonLabelBase: input.seasonLabelBase,
+  });
+  const buyoutCost = calculateOpenBuyoutCost(contractPreview.yearlySalarySchedule, 0);
 
   const offerRatio =
     expectedSalary != null && expectedSalary > 0 && offeredSalary != null

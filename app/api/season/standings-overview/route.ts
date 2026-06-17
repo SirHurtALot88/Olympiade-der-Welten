@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 
 import { resolvePlayerEconomyContract } from "@/lib/foundation/player-economy-contract";
 import { createPersistenceService } from "@/lib/persistence/persistence-service";
+import { buildArchivedSeasonStandingsOverviewItems } from "@/lib/season/archived-standings-overview";
 import { buildTeamPrizeSummary } from "@/lib/season/prize-money";
 import {
   extractSeasonStandingsDisciplineValues,
@@ -30,6 +31,34 @@ export async function GET(request: Request) {
             );
           })()
         : null;
+
+    const archivedSnapshot =
+      source === "sqlite" && seasonId !== localSave!.gameState.season.id
+        ? (localSave!.gameState.seasonState.seasonSnapshots ?? []).find((snapshot) => snapshot.seasonId === seasonId) ?? null
+        : null;
+
+    if (archivedSnapshot) {
+      return NextResponse.json({
+        items: buildArchivedSeasonStandingsOverviewItems(archivedSnapshot),
+        missingMappings: [],
+        mappingWarnings: archivedSnapshot.warnings ?? [],
+        source: {
+          kind: "season_snapshot",
+          access: "local_save",
+          detectedColumns: [],
+          disciplineColumns: [
+            { normalizedKey: "pow", sheetColumn: "Archiv Power" },
+            { normalizedKey: "spe", sheetColumn: "Archiv Speed" },
+            { normalizedKey: "men", sheetColumn: "Archiv Mental" },
+            { normalizedKey: "soc", sheetColumn: "Archiv Social" },
+          ],
+        },
+        scope: {
+          saveId: localSave!.saveId,
+          seasonId,
+        },
+      });
+    }
 
     const teamStates =
       source === "sqlite"
@@ -183,6 +212,9 @@ export async function GET(request: Request) {
                 cashTotal: prizeSummary?.cashTotal ?? null,
                 form: null,
                 transfers: prizeSummary?.transfers ?? null,
+                rosterCount: null,
+                salaryTotal: null,
+                marketValueTotal: null,
                 disciplineValues: row ? extractSeasonStandingsDisciplineValues(row) : {},
                 warnings: row?.warnings ?? [],
               };
@@ -206,6 +238,9 @@ export async function GET(request: Request) {
                 cashTotal: row.cashTotal,
                 form: row.form,
                 transfers: row.transfers,
+                rosterCount: null,
+                salaryTotal: null,
+                marketValueTotal: null,
                 disciplineValues: extractSeasonStandingsDisciplineValues(row),
                 warnings: row.warnings,
               })),

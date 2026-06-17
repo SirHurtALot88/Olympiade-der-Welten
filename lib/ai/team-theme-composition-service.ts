@@ -420,17 +420,17 @@ const THEME_TARGETS: Record<string, TeamThemeCompositionTarget> = {
   },
   "M-M": {
     teamId: "M-M",
-    primaryThemeTags: ["Champion", "Star", "Closer", "Risk"],
-    secondaryThemeTags: ["Profit", "TwoWay", "Meta", "Winner"],
-    softPreferredTags: ["Hero", "Demon", "Elite"],
-    allowedOutsiderTags: ["Star", "Elite", "Champion"],
-    avoidTags: ["LowAmbition", "LowCeiling"],
+    primaryThemeTags: ["Champion", "Star", "Closer", "Berserker", "Assassin", "Rogue", "Mercenary"],
+    secondaryThemeTags: ["Winner", "TwoWay", "Hero", "Warlord", "Duelist", "Hunter", "Agile"],
+    softPreferredTags: ["Demon", "Elite", "Risk", "Strength", "Executioner", "Brutal"],
+    allowedOutsiderTags: ["Star", "Elite", "Champion", "Berserker", "Assassin", "Rogue"],
+    avoidTags: ["LowAmbition", "LowCeiling", "Bard", "Social", "Royal", "Noble", "Court", "Trader"],
     targetShare: 0.45,
     minimumShare: 0.25,
-    strictness: "medium",
-    exceptionPolicy: "normal_quality_fit_allowed",
+    strictness: "strong",
+    exceptionPolicy: "audit_required",
     qualityOverrideThreshold: 8,
-    notes: "Mayhem Mavericks: Topteam, Risiko, Titelverteidigung, Profitverkaeufe fuer teure Gehaelter.",
+    notes: "Mayhem Mavericks: Premium-Picks muessen Power/Speed, Killer-Vibe und aggressive Identity tragen; Bard/Social/Royal nur als spaete Ausnahme.",
   },
   "N-W": {
     teamId: "N-W",
@@ -652,6 +652,16 @@ export function derivePlayerThemeTags(player: Player): PlayerThemeTagRow {
       if (value.includes("profit")) addTag(tags, sources, "Profit", source);
     }
 
+    if (valueContains(value, ["bard", "charmer", "charisma", "social", "entertainer", "performer", "musician", "showman", "showcase"])) {
+      if (value.includes("bard")) {
+        addTag(tags, sources, "Bard", source);
+        addTag(tags, sources, "Social", source);
+      }
+      if (value.includes("charmer") || value.includes("charisma")) addTag(tags, sources, "Charisma", source);
+      if (value.includes("social")) addTag(tags, sources, "Social", source);
+      if (valueContains(value, ["entertainer", "performer", "musician", "showman", "showcase"])) addTag(tags, sources, "Showboat", source);
+    }
+
     if (valueContains(value, ["melancholy", "melancholic", "depress", "sad", "outcast", "no quit", "unbreakable", "resilient"])) {
       if (value.includes("melanch")) addTag(tags, sources, "Melancholy", source);
       if (value.includes("depress")) addTag(tags, sources, "Depression", source);
@@ -862,6 +872,15 @@ function getThemedPoolCount(gameState: GameState, target: TeamThemeCompositionTa
   return count;
 }
 
+function getPlayerThemeQuality(player: Player) {
+  const coreValues = Object.values(player.coreStats ?? {}).filter((value): value is number => typeof value === "number" && Number.isFinite(value));
+  const disciplineValues = Object.values(player.disciplineRatings ?? {}).filter((value): value is number => typeof value === "number" && Number.isFinite(value));
+  return Math.max(
+    coreValues.length > 0 ? Math.max(...coreValues) : 0,
+    disciplineValues.length > 0 ? Math.max(...disciplineValues) : 0,
+  );
+}
+
 export function calculateThemeCompositionScore(input: {
   gameState: GameState;
   team: Pick<Team, "teamId" | "name">;
@@ -1002,7 +1021,7 @@ export function buildTeamThemeCompositionAudit(gameState: GameState, options: { 
         gameState,
         team,
         player,
-        candidateQuality: player.ovr ?? player.rating ?? 0,
+        candidateQuality: getPlayerThemeQuality(player),
         candidateRoleFit: 0,
       });
       if (score.themeCompositionScore > bestThemeScore) {
@@ -1011,7 +1030,7 @@ export function buildTeamThemeCompositionAudit(gameState: GameState, options: { 
       }
       if (score.themeTier === "outsider" || score.themeTier === "avoid") {
         outsiders.push(`${player.name}:${score.reason}`);
-        const quality = player.ovr ?? player.rating ?? 0;
+        const quality = getPlayerThemeQuality(player);
         if (quality > worstMissQuality) {
           worstMissQuality = quality;
           worstThemeMiss = `${player.name} (${score.themeTier})`;
@@ -1023,10 +1042,10 @@ export function buildTeamThemeCompositionAudit(gameState: GameState, options: { 
       .slice(0, candidateMissLimit)
       .map((player) => ({
         player,
-        score: calculateThemeCompositionScore({ gameState, team, player, candidateQuality: player.ovr ?? player.rating ?? 0 }),
+        score: calculateThemeCompositionScore({ gameState, team, player, candidateQuality: getPlayerThemeQuality(player) }),
       }))
       .filter((entry) => entry.score.themeTier === "core_theme" || entry.score.themeTier === "secondary_theme")
-      .sort((left, right) => (right.player.ovr ?? right.player.rating ?? 0) - (left.player.ovr ?? left.player.rating ?? 0))
+      .sort((left, right) => getPlayerThemeQuality(right.player) - getPlayerThemeQuality(left.player))
       .slice(0, 5)
       .map((entry) => `${entry.player.name}:${entry.score.themeTier}`)
       .join("|");

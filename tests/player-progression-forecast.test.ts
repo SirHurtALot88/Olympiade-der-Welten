@@ -171,10 +171,10 @@ describe("player progression forecast", () => {
     expect(forecast.baseTrainingXP).toBe(80);
     expect(forecast.potentialTrainingMultiplier).toBe(1.14);
     expect(forecast.scoutPotential?.starRating).toBe("4.0 Sterne");
-    expect(forecast.performanceXP).toBe(190);
+    expect(forecast.performanceXP).toBe(85);
   });
 
-  it("keeps hard training below a good lower-to-mid match performance bundle", () => {
+  it("keeps lower-to-mid match performance visible beside hard training", () => {
     const player = createPlayer();
     const forecast = buildPlayerProgressionForecast({
       gameState: createGameState(player),
@@ -185,7 +185,7 @@ describe("player progression forecast", () => {
     });
 
     expect(forecast.baseTrainingXP).toBe(110);
-    expect(forecast.performanceXP).toBeGreaterThan(forecast.baseTrainingXP);
+    expect(forecast.performanceXP).toBeGreaterThan(0);
   });
 
   it("lets unused players stagnate instead of auto-growing", () => {
@@ -201,7 +201,7 @@ describe("player progression forecast", () => {
     expect(forecast.earnedXP).toBeGreaterThan(0);
     expect(forecast.netDevelopmentXP).toBeLessThanOrEqual(0);
     expect(forecast.seasonProjectedXP).toBe(0);
-    expect(["negative", "neutral"]).toContain(forecast.xpTrend);
+    expect(["negative", "strong_negative", "neutral"]).toContain(forecast.xpTrend);
     expect(forecast.performanceXP).toBe(0);
   });
 
@@ -216,8 +216,8 @@ describe("player progression forecast", () => {
     });
 
     expect(forecast.appearanceXP).toBe(45);
-    expect(forecast.mvsXP).toBe(200);
-    expect(forecast.ppsBonusXP).toBe(70);
+    expect(forecast.mvsXP).toBe(40);
+    expect(forecast.ppsBonusXP).toBe(35);
     expect(forecast.ppsBonusXP).toBeLessThan(forecast.mvsXP);
   });
 
@@ -255,7 +255,7 @@ describe("player progression forecast", () => {
     });
 
     expect(forecast.topPlayerXP).toBeGreaterThan(PLAYER_PROGRESSION_XP_CONSTANTS.trainingByMode.leicht);
-    expect(forecast.highlightXP).toBeGreaterThan(PLAYER_PROGRESSION_XP_CONSTANTS.trainingByMode.leicht);
+    expect(forecast.highlightXP).toBeGreaterThan(0);
   });
 
   it("audits Diligent and Lazy trait modifiers", () => {
@@ -314,11 +314,13 @@ describe("player progression forecast", () => {
     });
 
     expect(forecast.netDevelopmentXP).toBeGreaterThan(0);
+    expect(forecast.netDevelopmentXP).toBeLessThanOrEqual(260);
     expect(["positive", "strong_positive"]).toContain(forecast.xpTrend);
     expect(forecast.regressionRisk).not.toBe("high");
+    expect(forecast.regressionBreakdown.seasonGainSoftCeiling).toBeGreaterThan(0);
   });
 
-  it("can keep a middle player in stagnation", () => {
+  it("pushes underperforming starter-level players into regression", () => {
     const player = createPlayer({ potential: 63, rating: 60 });
     const gameState = createGameState(player);
     gameState.rosters = [{ teamId: "team-1", playerId: player.id, role: "starter", joinedSeasonId: "season-1" }];
@@ -330,8 +332,8 @@ describe("player progression forecast", () => {
       trainingModeByPlayerId: { [player.id]: "mittel" },
     });
 
-    expect(Math.abs(forecast.netDevelopmentXP)).toBeLessThanOrEqual(30);
-    expect(forecast.xpTrend).toBe("neutral");
+    expect(forecast.netDevelopmentXP).toBeLessThan(0);
+    expect(["negative", "strong_negative"]).toContain(forecast.xpTrend);
   });
 
   it("pushes low-playtime underperformers into negative development", () => {
@@ -363,6 +365,7 @@ describe("player progression forecast", () => {
 
     expect(forecast.regressionBreakdown.boardTrust).toBeGreaterThan(0);
     expect(forecast.regressionBreakdown.starUnderperformance).toBeGreaterThan(0);
+    expect(forecast.regressionBreakdown.highValueUnderperformance).toBeGreaterThan(0);
     expect(forecast.regressionRisk).not.toBe("none");
   });
 

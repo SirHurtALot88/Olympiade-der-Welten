@@ -3,6 +3,7 @@
 import { useEffect, useMemo, useState } from "react";
 
 import ClassColorChip, { getClassColorClassName } from "./ClassColorChip";
+import OptimizedMediaImage from "./OptimizedMediaImage";
 
 type TeamDrawerFilter = "all" | "starter" | "bench" | "d1" | "d2" | "contracts" | "issues";
 
@@ -22,7 +23,9 @@ export type TeamDetailDrawerPlayerCard = {
   pps: number | null;
   ppsRank: number | null;
   marketValue: number | null;
+  marketValueDelta: number | null;
   salary: number | null;
+  salaryDelta: number | null;
   contractLength: number | null;
   d1Label: string;
   d1Score: number | null;
@@ -60,6 +63,36 @@ function formatNumber(value: number | null | undefined, digits = 0) {
     maximumFractionDigits: digits,
   }).format(value);
 }
+
+function formatSignedNumber(value: number | null | undefined, digits = 2) {
+  if (value == null || !Number.isFinite(value)) {
+    return "—";
+  }
+  return `${value > 0 ? "+" : ""}${formatNumber(value, digits)}`;
+}
+
+function getMoneyDeltaClass(value: number | null | undefined, positiveDirection: "higher" | "lower") {
+  if (value == null || !Number.isFinite(value) || Math.abs(value) < 0.01) {
+    return "";
+  }
+  const isPositive = positiveDirection === "higher" ? value > 0 : value < 0;
+  return isPositive ? " text-positive" : " text-negative";
+}
+
+function average(values: Array<number | null | undefined>) {
+  const validValues = values.filter((value): value is number => typeof value === "number" && Number.isFinite(value));
+  if (validValues.length === 0) {
+    return null;
+  }
+  return validValues.reduce((sum, value) => sum + value, 0) / validValues.length;
+}
+
+const TEAM_DRAWER_AREA_RANK_CARDS = [
+  { label: "POW", key: "powRank", tone: "is-power" },
+  { label: "SPE", key: "speRank", tone: "is-speed" },
+  { label: "MEN", key: "menRank", tone: "is-mental" },
+  { label: "SOC", key: "socRank", tone: "is-social" },
+] as const;
 
 function getRoleBucket(roleTag: string | null | undefined) {
   if (roleTag === "starter") {
@@ -175,6 +208,21 @@ export default function TeamDetailDrawer({
     return buckets;
   }, [visiblePlayers]);
 
+  const teamSummary = useMemo(() => {
+    const players = data?.players ?? [];
+    const issueCount = players.filter((player) => player.issueTags.length > 0).length;
+    const expiringCount = players.filter((player) => (player.contractLength ?? 0) <= 1).length;
+    return {
+      avgOvr: average(players.map((player) => player.ovr)),
+      avgSalary: average(players.map((player) => player.salary)),
+      issueCount,
+      expiringCount,
+      coreCount: players.filter((player) => getRoleBucket(player.roleTag) === "core").length,
+      rotationCount: players.filter((player) => getRoleBucket(player.roleTag) === "rotation").length,
+      fringeCount: players.filter((player) => getRoleBucket(player.roleTag) === "fringe").length,
+    };
+  }, [data?.players]);
+
   if (!data) {
     return null;
   }
@@ -191,7 +239,15 @@ export default function TeamDetailDrawer({
         <div className="player-drawer-header">
           <div className="player-drawer-hero">
             {data.logoUrl ? (
-              <img className="player-drawer-portrait player-drawer-portrait-large team-drawer-logo" src={data.logoUrl} alt={`${data.teamName} Logo`} />
+              <OptimizedMediaImage
+                className="player-drawer-portrait player-drawer-portrait-large team-drawer-logo"
+                src={data.logoUrl}
+                alt={`${data.teamName} Logo`}
+                width={160}
+                height={160}
+                loading="eager"
+                fetchPriority="high"
+              />
             ) : (
               <div className="player-drawer-portrait player-drawer-portrait-large player-drawer-portrait-placeholder team-drawer-logo">
                 {data.logoInitials}
@@ -221,7 +277,47 @@ export default function TeamDetailDrawer({
         </div>
 
         <div className="player-drawer-body team-drawer-body">
-          <section className="player-drawer-section">
+          <section className="player-drawer-section player-drawer-hero-surface team-drawer-dashboard">
+            <div className="team-drawer-dashboard-grid">
+              <article className="team-drawer-identity-card">
+                <span className="player-drawer-overline">Squad Identity</span>
+                <h3>{data.shortCode}</h3>
+                <p>
+                  {data.rosterSize} Spieler · {teamSummary.coreCount} Core · {teamSummary.rotationCount} Rotation · {teamSummary.fringeCount} Fringe
+                </p>
+                <div className="player-drawer-mini-facts">
+                  <span>Ø OVR {formatNumber(teamSummary.avgOvr, 1)}</span>
+                  <span>Ø Gehalt {formatNumber(teamSummary.avgSalary, 2)}</span>
+                  <span>{teamSummary.expiringCount} laufen aus</span>
+                  <span>{teamSummary.issueCount} Flags</span>
+                </div>
+              </article>
+              <div className="team-drawer-rank-grid">
+                {TEAM_DRAWER_AREA_RANK_CARDS.map(({ label, key, tone }) => (
+                  <article key={label} className={`team-drawer-rank-card ${tone}`}>
+                    <span>{label}</span>
+                    <strong>#{formatNumber(data[key])}</strong>
+                  </article>
+                ))}
+              </div>
+              <div className="team-drawer-finance-grid">
+                <article className="metric-card">
+                  <span>Cash</span>
+                  <strong>{formatNumber(data.cash, 1)}</strong>
+                </article>
+                <article className="metric-card">
+                  <span>Gehalt</span>
+                  <strong>{formatNumber(data.salaryTotal, 2)}</strong>
+                </article>
+                <article className="metric-card">
+                  <span>Marktwert</span>
+                  <strong>{formatNumber(data.marketValueTotal, 2)}</strong>
+                </article>
+              </div>
+            </div>
+          </section>
+
+          <section className="player-drawer-section team-drawer-toolbar">
             <div className="team-drawer-filter-row">
               {[
                 ["all", "Alle"],
@@ -242,11 +338,20 @@ export default function TeamDetailDrawer({
                 </button>
               ))}
             </div>
+            <p className="muted">Doppelklick auf eine Spielerkarte öffnet den Player-Drawer.</p>
           </section>
 
           {(["core", "rotation", "fringe"] as const).map((bucket) => (
             <section className="player-drawer-section" key={bucket}>
-              <h3>{bucket === "core" ? "Core" : bucket === "rotation" ? "Rotation" : "Fringe"}</h3>
+              <div className="team-drawer-section-head">
+                <div>
+                  <h3>{bucket === "core" ? "Core" : bucket === "rotation" ? "Rotation" : "Fringe"}</h3>
+                  <p className="muted">
+                    {groupedPlayers[bucket].length} Spieler · Ø OVR {formatNumber(average(groupedPlayers[bucket].map((player) => player.ovr)), 1)}
+                  </p>
+                </div>
+                <span className="team-drawer-section-count">{groupedPlayers[bucket].length}</span>
+              </div>
               <div className="team-drawer-card-grid">
                 {groupedPlayers[bucket].map((player) => (
                   <article
@@ -256,14 +361,13 @@ export default function TeamDetailDrawer({
                   >
                     <div className="team-drawer-player-head">
                       {player.portraitUrl ? (
-                        <img
+                        <OptimizedMediaImage
                           className="team-drawer-player-portrait"
                           src={player.portraitUrl}
                           alt={player.name}
                           width={56}
                           height={56}
-                          loading="lazy"
-                          decoding="async"
+                          fallback={<div className="team-drawer-player-portrait team-drawer-player-portrait-placeholder">{player.portraitInitials}</div>}
                         />
                       ) : (
                         <div className="team-drawer-player-portrait team-drawer-player-portrait-placeholder">{player.portraitInitials}</div>
@@ -275,17 +379,48 @@ export default function TeamDetailDrawer({
                         </span>
                       </div>
                     </div>
-                    <div className="team-drawer-kpi-row">
-                      <span>OVR {formatNumber(player.ovr)} · #{formatNumber(player.ovrRank)}</span>
-                      <span>MVS {formatNumber(player.mvs, 1)} · #{formatNumber(player.mvsRank)}</span>
-                      <span>PPs {formatNumber(player.pps, 1)} · #{formatNumber(player.ppsRank)}</span>
-                      <span>LZ {formatNumber(player.contractLength)}</span>
+                    <div className="team-drawer-player-spotlight">
+                      <div>
+                        <span>OVR</span>
+                        <strong>{formatNumber(player.ovr)}</strong>
+                        <small>#{formatNumber(player.ovrRank)}</small>
+                      </div>
+                      <div>
+                        <span>PPs</span>
+                        <strong>{formatNumber(player.pps, 1)}</strong>
+                        <small>#{formatNumber(player.ppsRank)}</small>
+                      </div>
+                      <div>
+                        <span>MVS</span>
+                        <strong>{formatNumber(player.mvs, 1)}</strong>
+                        <small>#{formatNumber(player.mvsRank)}</small>
+                      </div>
                     </div>
-                    <div className="team-drawer-kpi-row">
-                      <span>MW {formatNumber(player.marketValue, 2)}</span>
-                      <span>Gehalt {formatNumber(player.salary, 2)}</span>
+                    <div className="team-drawer-economy-strip">
+                      <span>
+                        <em>MW</em>
+                        <strong>{formatNumber(player.marketValue, 2)}</strong>
+                        {player.marketValueDelta != null ? (
+                          <small className={`team-drawer-money-delta${getMoneyDeltaClass(player.marketValueDelta, "higher")}`}>
+                            {formatSignedNumber(player.marketValueDelta, 2)}
+                          </small>
+                        ) : null}
+                      </span>
+                      <span>
+                        <em>Gehalt</em>
+                        <strong>{formatNumber(player.salary, 2)}</strong>
+                        {player.salaryDelta != null ? (
+                          <small className={`team-drawer-money-delta${getMoneyDeltaClass(player.salaryDelta, "lower")}`}>
+                            {formatSignedNumber(player.salaryDelta, 2)}
+                          </small>
+                        ) : null}
+                      </span>
+                      <span>
+                        <em>LZ</em>
+                        <strong>{formatNumber(player.contractLength)}</strong>
+                      </span>
                     </div>
-                    <div className="team-drawer-kpi-row">
+                    <div className="team-drawer-kpi-row team-drawer-discipline-row">
                       {player.topDisciplines.map((discipline) => (
                         <span key={`${player.activePlayerId}-${discipline.label}`}>
                           {discipline.label} {formatNumber(discipline.value)}
@@ -308,8 +443,13 @@ export default function TeamDetailDrawer({
             </section>
           ))}
 
-          <section className="player-drawer-section">
-            <h3>Verträge</h3>
+          <section className="player-drawer-section player-drawer-panel">
+            <div className="team-drawer-section-head">
+              <div>
+                <h3>Verträge</h3>
+                <p className="muted">Committed salary nach Vertragsjahr.</p>
+              </div>
+            </div>
             <div className="team-drawer-contract-grid">
               {data.contractSummaries.map((entry) => (
                 <article key={entry.label} className="metric-card">

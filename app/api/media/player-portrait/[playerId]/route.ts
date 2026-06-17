@@ -1,4 +1,4 @@
-import { readFile } from "node:fs/promises";
+import { readFile, stat } from "node:fs/promises";
 import path from "node:path";
 
 import { NextResponse } from "next/server";
@@ -15,7 +15,7 @@ const MIME_TYPE_BY_EXT: Record<string, string> = {
 export const dynamic = "force-dynamic";
 
 export async function GET(
-  _request: Request,
+  request: Request,
   context: { params: Promise<{ playerId: string }> },
 ) {
   const { playerId } = await context.params;
@@ -26,6 +26,18 @@ export async function GET(
   }
 
   try {
+    const fileStat = await stat(portraitPath);
+    const etag = `"portrait-${playerId}-${fileStat.size}-${Math.floor(fileStat.mtimeMs)}"`;
+    if (request.headers.get("if-none-match") === etag) {
+      return new NextResponse(null, {
+        status: 304,
+        headers: {
+          "Cache-Control": "public, max-age=31536000, immutable",
+          ETag: etag,
+        },
+      });
+    }
+
     const fileBuffer = await readFile(portraitPath);
     const ext = path.extname(portraitPath).toLocaleLowerCase();
     const mimeType = MIME_TYPE_BY_EXT[ext] ?? "application/octet-stream";
@@ -33,7 +45,9 @@ export async function GET(
     return new NextResponse(fileBuffer, {
       headers: {
         "Content-Type": mimeType,
-        "Cache-Control": "public, max-age=3600",
+        "Content-Length": String(fileBuffer.byteLength),
+        "Cache-Control": "public, max-age=31536000, immutable",
+        ETag: etag,
       },
     });
   } catch {

@@ -8,14 +8,12 @@ type SalarySource = {
   salaryDemand?: number | null;
 };
 
-// Transition policy: while the new MW/salary balancing is still work in progress,
-// visible management values stay on the imported display fields.
+// Legacy/import helper for source data only. Runtime salary views use the internal economy contract.
 export function getImportedPlayerDisplayMarketValue(player: MarketValueSource) {
   return player.displayMarketValue ?? player.marketValue ?? null;
 }
 
-// Transition policy: while the new MW/salary balancing is still work in progress,
-// visible management values stay on the imported display fields.
+// Legacy/import helper for compatibility with old exports. New salary flows should use resolvePlayerEconomyContract.
 export function getImportedPlayerDisplaySalary(player: SalarySource) {
   return player.displaySalary ?? player.salaryDemand ?? null;
 }

@@ -1,12 +1,13 @@
 "use client";
 
-import { useEffect } from "react";
+import { useEffect, type ReactNode } from "react";
 
 import type { PlayerDetailDrawerData } from "@/lib/foundation/player-detail-drawer";
 
 import { getClassColorClassName } from "./ClassColorChip";
 import ClassIcon from "./ClassIcon";
 import DisciplineIcon from "./DisciplineIcon";
+import OptimizedMediaImage from "./OptimizedMediaImage";
 import RaceIcon from "./RaceIcon";
 import { getCanonicalSeasonLabel } from "@/lib/season/season-label";
 
@@ -138,6 +139,14 @@ function getDeltaToneClass(value: number | null | undefined) {
   return " is-neutral";
 }
 
+function getMoneyDeltaToneClass(value: number | null | undefined, positiveDirection: "higher" | "lower") {
+  if (value == null || !Number.isFinite(value) || Math.abs(value) < 0.01) {
+    return "";
+  }
+  const isPositive = positiveDirection === "higher" ? value > 0 : value < 0;
+  return isPositive ? " is-positive" : " is-negative";
+}
+
 function getAxisToneClass(tone: "power" | "speed" | "mental" | "social") {
   switch (tone) {
     case "power":
@@ -155,6 +164,11 @@ function getAxisToneClass(tone: "power" | "speed" | "mental" | "social") {
 
 function formatRankLabel(rank: number | null | undefined) {
   return rank == null ? "#" : `#${rank}`;
+}
+
+function formatHistoryMetric(value: number | null | undefined, rank?: number | null | undefined, digits = 1) {
+  const formattedValue = formatValue(value, digits);
+  return rank != null ? `${formattedValue} · #${rank}` : formattedValue;
 }
 
 function formatDisciplineValue(value: number | null | undefined, delta: number | null | undefined) {
@@ -265,6 +279,40 @@ function getAffinityLabel(value: string | null | undefined) {
   if (value === "signature") return "Signature";
   if (value === "weak") return "Weak";
   return "Neutral";
+}
+
+function getAffinityChipText(value: string | null | undefined, label: string, cost: number | null | undefined) {
+  const costLabel = cost != null ? ` · ${cost} TP` : "";
+  if (value === "signature") return `Signature${costLabel}`;
+  if (value === "weak") return `${label}${costLabel}`;
+  return `Neutral${costLabel}`;
+}
+
+function formatDisciplineTier(value: number | null | undefined) {
+  if (value == null || !Number.isFinite(value)) return "—";
+  if (value >= 92) return "S+";
+  if (value >= 82) return "S";
+  if (value >= 72) return "A";
+  if (value >= 60) return "B";
+  if (value >= 48) return "C";
+  if (value >= 36) return "D";
+  if (value >= 24) return "E";
+  return "F";
+}
+
+function HelpLabel({
+  children,
+  title,
+}: {
+  children: ReactNode;
+  title: string;
+}) {
+  return (
+    <span className="player-drawer-help-label" title={title}>
+      {children}
+      <span aria-hidden="true" className="player-drawer-help-dot">?</span>
+    </span>
+  );
 }
 
 function formatBoardTrustPolicy(
@@ -440,9 +488,18 @@ export default function PlayerDetailDrawer({
   const noSeasonPerformanceMessage = isFreeAgent
     ? "Keine gespeicherte Season-Performance."
     : "Aktiver Spieler, aber noch kein gespeicherter Season-Einsatz.";
-  const topDisciplineCards = data.disciplineValues.slice(0, 5);
+  const topDisciplineCards = data.disciplineValues.slice(0, isFreeAgent ? 3 : 5);
   const baselineAttributeDeltas = data.baselineAttributeDeltas.filter((entry) => entry.delta != null && entry.delta !== 0);
   const developmentLevelup = data.developmentLevelup;
+  const marketValueBenchmark = transferContext.currentValue ?? transferContext.purchasePrice ?? null;
+  const marketValueDelta =
+    marketValueBenchmark != null && data.marketValue != null && Math.abs(data.marketValue - marketValueBenchmark) >= 0.01
+      ? data.marketValue - marketValueBenchmark
+      : null;
+  const salaryDelta =
+    data.normalSalary != null && data.salary != null && Math.abs(data.salary - data.normalSalary) >= 0.01
+      ? data.salary - data.normalSalary
+      : null;
   const developmentPreviewByAttribute = new Map<string, NonNullable<PlayerDetailDrawerData["developmentLevelup"]>["upgradePreview"][number]>(
     (developmentLevelup?.upgradePreview ?? []).map((entry) => [entry.attribute, entry] as const),
   );
@@ -491,7 +548,15 @@ export default function PlayerDetailDrawer({
         <div className="player-drawer-header">
           <div className="player-drawer-hero">
             {data.portraitUrl ? (
-              <img className="player-drawer-portrait player-drawer-portrait-large" src={data.portraitUrl} alt={data.name} />
+              <OptimizedMediaImage
+                className="player-drawer-portrait player-drawer-portrait-large"
+                src={data.portraitUrl}
+                alt={data.name}
+                width={160}
+                height={160}
+                loading="eager"
+                fetchPriority="high"
+              />
             ) : (
               <div className="player-drawer-portrait player-drawer-portrait-large player-drawer-portrait-placeholder">{buildInitials(data.name)}</div>
             )}
@@ -556,7 +621,7 @@ export default function PlayerDetailDrawer({
                     ))}
                   </div>
                   <div className="player-drawer-mini-facts">
-                    <span>PPs Rating {formatValue(data.ppsRating, 1)}</span>
+                    {!isFreeAgent ? <span>PPs Rating {formatValue(data.ppsRating, 1)}</span> : null}
                     <span>Scout RTG {formatDevelopmentRange(data.developmentInsight)}</span>
                     <span>
                       <StarRating value={data.developmentInsight?.potentialLabel ?? data.scoutPotential?.starRating} compact />
@@ -566,36 +631,53 @@ export default function PlayerDetailDrawer({
                   </div>
                 </div>
               </div>
-              <div className="player-drawer-kpi-hero-grid">
-                {headlineMetrics.map((metric) => (
-                  <article key={metric.key} className="player-drawer-kpi-hero-card">
-                    <div className="player-drawer-kpi-header">
-                      <span>{metric.label}</span>
-                      <span className="player-drawer-kpi-rank">{formatRankLabel(metric.rank)}</span>
-                    </div>
-                    <strong className="player-drawer-kpi-value">{formatValue(metric.value, metric.digits)}</strong>
-                    <div className="player-drawer-kpi-footer">
-                      {metric.delta != null ? (
-                        <span className={`player-drawer-delta${getDeltaToneClass(metric.delta)}`}>
-                          {metric.delta > 0 ? "+" : ""}
-                          {formatValue(metric.delta, 1)}
-                        </span>
-                      ) : (
-                        <span className="player-drawer-kpi-missing">Kein Verlauf</span>
-                      )}
-                    </div>
-                  </article>
-                ))}
-              </div>
+              {!isFreeAgent ? (
+                <div className="player-drawer-kpi-hero-grid">
+                  {headlineMetrics.map((metric) => (
+                    <article key={metric.key} className="player-drawer-kpi-hero-card">
+                      <div className="player-drawer-kpi-header">
+                        <span>{metric.label}</span>
+                        <span className="player-drawer-kpi-rank">{formatRankLabel(metric.rank)}</span>
+                      </div>
+                      <strong className="player-drawer-kpi-value">{formatValue(metric.value, metric.digits)}</strong>
+                      <div className="player-drawer-kpi-footer">
+                        {metric.delta != null ? (
+                          <span className={`player-drawer-delta${getDeltaToneClass(metric.delta)}`}>
+                            {metric.delta > 0 ? "+" : ""}
+                            {formatValue(metric.delta, 1)}
+                          </span>
+                        ) : (
+                          <span className="player-drawer-kpi-missing">Kein Verlauf</span>
+                        )}
+                      </div>
+                    </article>
+                  ))}
+                </div>
+              ) : (
+                <div className="player-drawer-transfer-note" title="Free Agents haben noch keine gespeicherte Saisonleistung in diesem Save. OVR, PPs und MVS werden deshalb im Transfermarkt bewusst nicht angezeigt.">
+                  <strong>Transfermarkt-Profil</strong>
+                  <span>Keine OVR-, PPs- oder MVS-Anzeige vor dem Kauf.</span>
+                </div>
+              )}
             </div>
             <div className="player-drawer-list-grid player-drawer-list-grid-wide">
               <article className="metric-card">
                 <span>Marktwert</span>
                 <strong>{formatMoney(data.marketValue)}</strong>
+                {marketValueDelta != null ? (
+                  <small className={`player-drawer-money-delta${getMoneyDeltaToneClass(marketValueDelta, "higher")}`}>
+                    {formatSignedMoney(marketValueDelta)}
+                  </small>
+                ) : null}
               </article>
               <article className="metric-card">
-                <span>Gehalt</span>
+                <span>Aktuelles Gehalt</span>
                 <strong>{formatMoney(data.salary)}</strong>
+                {salaryDelta != null ? (
+                  <small className={`player-drawer-money-delta${getMoneyDeltaToneClass(salaryDelta, "lower")}`}>
+                    {formatSignedMoney(salaryDelta)}
+                  </small>
+                ) : null}
               </article>
               <article className="metric-card">
                 <span>Vertrag / LZ</span>
@@ -694,36 +776,41 @@ export default function PlayerDetailDrawer({
                 </article>
               ))}
             </div>
-            <h3>Reale Season-PPs</h3>
-            <p className="muted">
-              Quelle: {seasonPerformance?.sourceLabel ?? "keine gespeicherten Season-PPs"}
-              {seasonPerformance?.seasonName ? ` · ${seasonPerformance.seasonName}` : ""}
-            </p>
-            <div className="player-drawer-category-grid">
-              {data.axisCards.map((card) => (
-                <article key={`season-pps-${card.id}`} className={`player-drawer-category-card ${getAxisToneClass(card.tone)}`}>
-                  <div className="player-drawer-category-head">
-                    <span>{card.label} PPs</span>
-                    <span>{formatRankLabel(card.seasonPointsRank)}</span>
-                  </div>
-                  <strong>{formatValue(card.seasonPoints, 1)}</strong>
-                  <div className="player-drawer-category-meter">
-                    <div
-                      className="player-drawer-category-meter-fill"
-                      style={{ width: `${Math.max(0, Math.min(100, (card.seasonPoints ?? 0) * 2))}%` }}
-                    />
-                  </div>
-                  <div className="player-drawer-category-meta">
-                    <span>echte PPs</span>
-                    <span>PP {formatRankLabel(card.seasonPointsRank)}</span>
-                  </div>
-                </article>
-              ))}
-            </div>
+            {!isFreeAgent ? (
+              <>
+                <h3>Reale Season-PPs</h3>
+                <p className="muted">
+                  Quelle: {seasonPerformance?.sourceLabel ?? "keine gespeicherten Season-PPs"}
+                  {seasonPerformance?.seasonName ? ` · ${seasonPerformance.seasonName}` : ""}
+                </p>
+                <div className="player-drawer-category-grid">
+                  {data.axisCards.map((card) => (
+                    <article key={`season-pps-${card.id}`} className={`player-drawer-category-card ${getAxisToneClass(card.tone)}`}>
+                      <div className="player-drawer-category-head">
+                        <span>{card.label} PPs</span>
+                        <span>{formatRankLabel(card.seasonPointsRank)}</span>
+                      </div>
+                      <strong>{formatValue(card.seasonPoints, 1)}</strong>
+                      <div className="player-drawer-category-meter">
+                        <div
+                          className="player-drawer-category-meter-fill"
+                          style={{ width: `${Math.max(0, Math.min(100, (card.seasonPoints ?? 0) * 2))}%` }}
+                        />
+                      </div>
+                      <div className="player-drawer-category-meta">
+                        <span>echte PPs</span>
+                        <span>PP {formatRankLabel(card.seasonPointsRank)}</span>
+                      </div>
+                    </article>
+                  ))}
+                </div>
+              </>
+            ) : null}
           </section>
 
           <div className="player-drawer-two-column-grid">
-            <section className="player-drawer-section player-drawer-panel">
+            {!isFreeAgent ? (
+              <section className="player-drawer-section player-drawer-panel">
               <h3>Season Performance</h3>
               {seasonPerformance ? (
                 <>
@@ -769,18 +856,19 @@ export default function PlayerDetailDrawer({
                   </p>
                 </div>
               )}
-            </section>
+              </section>
+            ) : null}
 
             <section className="player-drawer-section player-drawer-panel">
-              <h3>Top-Disziplinen</h3>
+              <h3 title={isFreeAgent ? "Transfermarkt zeigt nur die grobe Klasse der besten Disziplinen. Exakte Diszi-Werte werden nicht gespoilert." : "Beste Disziplinen aus dem aktuellen Spielerprofil."}>Top-Disziplinen</h3>
               <div className="table-shell player-drawer-breakdown-table-shell">
                 <table className="team-table player-drawer-breakdown-table">
                   <thead>
                     <tr>
                       <th>Diszi</th>
-                      <th>Wert</th>
-                      <th>Rank</th>
-                      <th>PPs letzte Season</th>
+                      <th>{isFreeAgent ? "Klasse" : "Wert"}</th>
+                      {!isFreeAgent ? <th>Rank</th> : null}
+                      {!isFreeAgent ? <th>PPs letzte Season</th> : null}
                     </tr>
                   </thead>
                   <tbody>
@@ -790,14 +878,24 @@ export default function PlayerDetailDrawer({
                           <DisciplineIcon disciplineId={entry.id} label={entry.label} className="discipline-icon-chip-inline" />
                           {entry.playerCount != null ? ` (${entry.playerCount})` : ""}
                         </td>
-                        <td>{formatDisciplineValue(entry.value, entry.upgradeDelta)}</td>
-                        <td>{formatRankLabel(entry.rank)}</td>
                         <td>
-                          {formatValue(entry.lastSeasonPoints ?? entry.seasonPoints, 1)}
-                          {(entry.lastSeasonAppearances ?? entry.seasonAppearances) != null
-                            ? ` / ${entry.lastSeasonAppearances ?? entry.seasonAppearances} Eins.`
-                            : ""}
+                          {isFreeAgent ? (
+                            <span className={`player-drawer-chip ${getAttributeTierClass(formatDisciplineTier(entry.value))}`} title="Grobe Transfermarkt-Klasse, keine exakte Diszi-Zahl.">
+                              {formatDisciplineTier(entry.value)}
+                            </span>
+                          ) : (
+                            formatDisciplineValue(entry.value, entry.upgradeDelta)
+                          )}
                         </td>
+                        {!isFreeAgent ? <td>{formatRankLabel(entry.rank)}</td> : null}
+                        {!isFreeAgent ? (
+                          <td>
+                            {formatValue(entry.lastSeasonPoints ?? entry.seasonPoints, 1)}
+                            {(entry.lastSeasonAppearances ?? entry.seasonAppearances) != null
+                              ? ` / ${entry.lastSeasonAppearances ?? entry.seasonAppearances} Eins.`
+                              : ""}
+                          </td>
+                        ) : null}
                       </tr>
                     ))}
                   </tbody>
@@ -835,7 +933,7 @@ export default function PlayerDetailDrawer({
                       </span>
                       {preview ? (
                         <span className={`player-drawer-chip is-affinity-${preview.affinity}`} title={preview.reason}>
-                          {getAffinityLabel(preview.affinity)} · {preview.finalCost ?? "—"} TP
+                          {getAffinityChipText(preview.affinity, entry.label, preview.finalCost)}
                         </span>
                       ) : null}
                     </div>
@@ -878,13 +976,14 @@ export default function PlayerDetailDrawer({
                     <span style={{ width: `${Math.max(0, Math.min(100, developmentLevelup.level.progressPct))}%` }} />
                   </div>
                   <small>
-                    {formatValue(developmentLevelup.level.progressXp, 0)} / 180 XP · {formatValue(developmentLevelup.level.xpToNextLevel, 0)} bis Level-Up
+                    {formatValue(developmentLevelup.level.progressXp, 0)} / {formatValue(developmentLevelup.level.xpForCurrentLevel, 0)} XP ·{" "}
+                    {formatValue(developmentLevelup.level.xpToNextLevel, 0)} bis Level-Up
                   </small>
                 </article>
                 <article className="metric-card player-drawer-development-card">
                   <span>Trainingspunkte</span>
                   <strong>{developmentLevelup.level.trainingPointsAvailable} TP</strong>
-                  <small>Jeder Level-Up gibt exakt 10 TP.</small>
+                  <small>5 TP je Level-Up · max. {developmentLevelup.level.seasonLevelUpCap} Level pro Saison.</small>
                 </article>
                 <article className="metric-card player-drawer-development-card">
                   <span>Trend</span>
@@ -914,7 +1013,7 @@ export default function PlayerDetailDrawer({
                   </span>
                 ))}
                 <span className="player-drawer-chip is-affinity-weak" title="Weak Development: Dieses Attribut ist fuer diesen Spieler schwerer zu steigern.">
-                  ◆ Weak {developmentLevelup.affinity.weakAttribute}
+                  {developmentLevelup.affinity.weakAttribute}
                 </span>
               </div>
               <p className="muted">
@@ -925,11 +1024,11 @@ export default function PlayerDetailDrawer({
 
           {(data.scoutPotential || data.progressionForecast) ? (
             <section className="player-drawer-section player-drawer-panel">
-              <h3>Potential / Scouting</h3>
+              <h3 title="Dieser Bereich erklärt Upside, Scouting-Sicherheit, Netto-XP und Regression. Hover ueber die Karten zeigt die Rechenlogik.">Potential / Scouting</h3>
               <div className="player-drawer-list-grid player-drawer-list-grid-wide">
                 {data.scoutPotential ? (
-                  <article className="metric-card player-drawer-scout-potential-card">
-                    <span>Potential / Scouting</span>
+                  <article className="metric-card player-drawer-scout-potential-card" title="Potential ist eine gescoutete Spanne, nicht garantiert. Current ist der aktuelle Leistungswert, Gap ist der Abstand zum geschaetzten Potential. Je niedriger Confidence, desto unsicherer die Spanne.">
+                    <HelpLabel title="Potential-Spanne = geschaetzter Zielbereich. Current = aktueller Stand. Gap = moegliche Entwicklung. Confidence zeigt, wie sicher das Scouting ist.">Potential / Scouting</HelpLabel>
                     <strong>
                       {formatDevelopmentRange(data.developmentInsight)} <StarRating value={data.developmentInsight?.potentialLabel ?? data.scoutPotential.starRating} compact />
                     </strong>
@@ -961,26 +1060,26 @@ export default function PlayerDetailDrawer({
                 ) : null}
                 {data.progressionForecast ? (
                   <>
-                    <article className="metric-card">
-                      <span>Netto-XP</span>
+                    <article className="metric-card" title="Netto-XP = verdiente XP minus Erhaltung und Regression. Positive Netto-XP werden zu freien XP, negative Werte zeigen Rueckschritt-Risiko.">
+                      <HelpLabel title="Netto-XP = Earned XP - Maintenance - Regression. Das ist die wichtigste Development-Zahl.">Netto-XP</HelpLabel>
                       <strong className={getDeltaToneClass(data.progressionForecast.netDevelopmentXP)}>
                         {formatValue(data.progressionForecast.netDevelopmentXP, 0)}
                       </strong>
                       <small>{formatDevelopmentTrend(data.progressionForecast.xpTrend)}</small>
                     </article>
-                    <article className="metric-card">
-                      <span>XP frei / spent</span>
+                    <article className="metric-card" title="Freie XP koennen in Attribut-Upgrades fliessen. Spent zeigt bereits ausgegebene XP. Jeder Level-Up gibt 5 Trainingspunkte, maximal 2 Level-Ups pro Saison.">
+                      <HelpLabel title="Freie XP sind verfuegbar fuer Upgrades. Spent sind bereits ausgegebene XP.">XP frei / spent</HelpLabel>
                       <strong>
                         {formatValue(data.progressionForecast.currentXP, 0)} / {formatValue(data.progressionForecast.spentXP, 0)}
                       </strong>
                     </article>
-                    <article className="metric-card">
-                      <span>Training Form</span>
+                    <article className="metric-card" title="Training Form kommt aus Traits, Trainingsmodus und Form. Gute Form beschleunigt, schlechte Form bremst.">
+                      <HelpLabel title="Training Form bewertet, wie gut der Spieler XP in Entwicklung umsetzt.">Training Form</HelpLabel>
                       <strong>{data.progressionForecast.trainingFormTier}</strong>
                       <small>{formatSourceFreeDetail(data.progressionForecast.trainingMode)}</small>
                     </article>
-                    <article className="metric-card">
-                      <span>CA / PO</span>
+                    <article className="metric-card" title="CA ist Current Ability, PO ist gescoutetes Potential. Sterne sind nur eine lesbare Kurzform der internen Werte.">
+                      <HelpLabel title="CA = aktueller Stand. PO = geschaetztes Potential. Je groesser der Abstand, desto mehr Upside.">CA / PO</HelpLabel>
                       <strong className="player-drawer-star-stack">
                         <StarRating value={data.progressionForecast.currentAbilityStars} label="CA" />
                         <StarRating value={data.progressionForecast.potentialStars} label="PO" />
@@ -989,13 +1088,13 @@ export default function PlayerDetailDrawer({
                         {data.progressionForecast.currentAbilityTier ?? "—"} → {data.progressionForecast.potentialTier ?? "—"}
                       </small>
                     </article>
-                    <article className="metric-card">
-                      <span>Regression Risk</span>
+                    <article className="metric-card" title="Regression steigt bei wenig Einsatz, schlechter Leistung, schlechter Form, Rollen-/Board-Druck und wenn der Spieler nah am oder ueber Potential ist.">
+                      <HelpLabel title="Regression Risk zeigt, wie wahrscheinlich Rueckschritt statt Wachstum ist.">Regression Risk</HelpLabel>
                       <strong>{formatRegressionRisk(data.progressionForecast.regressionRisk)}</strong>
                       <small>{formatDevelopmentRoute(data.progressionForecast.developmentRoute)}</small>
                     </article>
-                    <article className="metric-card">
-                      <span>Upgrade Range</span>
+                    <article className="metric-card" title="Grobe Einordnung, wie viele Upgrades die aktuell verfuegbaren Netto-XP tragen koennten. Die echten Kosten haengen vom Attribut-Tier und Affinity ab.">
+                      <HelpLabel title="Upgrade Range ist eine grobe Orientierung, kein automatischer Spend.">Upgrade Range</HelpLabel>
                       <strong>{data.progressionForecast.possibleUpgradeSummary}</strong>
                     </article>
                   </>
@@ -1022,7 +1121,7 @@ export default function PlayerDetailDrawer({
                 >
                   Kauf prüfen
                 </button>
-                <span className="muted">Öffnet nur die Kaufvorschau.</span>
+                <span className="muted">Öffnet direkt den Kaufdialog.</span>
               </div>
             </section>
           ) : null}
@@ -1136,13 +1235,64 @@ export default function PlayerDetailDrawer({
 
           <section className="player-drawer-section player-drawer-panel">
             <h3>Historie</h3>
-            <div className="player-drawer-callout">
-              <strong>History-Snapshot noch unvollständig</strong>
-              <p className="muted">
-                Spieler- und Teamwerte wie OVR, PPs, MVS, MW, Gehalt, LZ und Diszi-Punkte müssen beim
-                Season-Abschluss vollständig archiviert werden. Bis dahin blenden wir die kaputte Tabelle aus.
-              </p>
-            </div>
+            {data.historyRows.length > 0 ? (
+              <>
+                <div className="table-shell player-drawer-history-table-shell">
+                  <table className="team-table player-drawer-history-table">
+                    <thead>
+                      <tr>
+                        <th>Season</th>
+                        <th>Team</th>
+                        <th>Eins.</th>
+                        <th>PPs</th>
+                        <th>OVR</th>
+                        <th>MVS</th>
+                        <th>POW</th>
+                        <th>SPE</th>
+                        <th>MEN</th>
+                        <th>SOC</th>
+                        <th>MW</th>
+                        <th>Gehalt</th>
+                        <th>LZ</th>
+                        <th>Beste Diszi</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {data.historyRows.map((row) => (
+                        <tr key={`${row.seasonId ?? row.seasonName}-${row.sourceLabel}`}>
+                          <td>
+                            <strong>{row.seasonName}</strong>
+                            {row.isActiveSeason ? <small className="player-drawer-history-tag">live</small> : null}
+                          </td>
+                          <td>{row.teamCode ?? row.teamName ?? "—"}</td>
+                          <td>{formatValue(row.appearances)}</td>
+                          <td>{formatHistoryMetric(row.pps ?? row.totalPoints, row.ppsRank, 1)}</td>
+                          <td>{formatHistoryMetric(row.ovr, row.ovrRank, 1)}</td>
+                          <td>{formatHistoryMetric(row.mvs, row.mvsRank, 1)}</td>
+                          <td>{formatValue(row.pow, 1)}</td>
+                          <td>{formatValue(row.spe, 1)}</td>
+                          <td>{formatValue(row.men, 1)}</td>
+                          <td>{formatValue(row.soc, 1)}</td>
+                          <td>{formatMoney(row.marketValue)}</td>
+                          <td>{formatMoney(row.salary)}</td>
+                          <td>{formatValue(row.contractLength)}</td>
+                          <td>{row.bestDisciplineLabel ?? "—"}</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+                <p className="muted" style={{ marginTop: 10 }}>
+                  Alte Seasons kommen aus gespeicherten Season-Snapshots. Fehlende Felder bedeuten: der damalige Snapshot
+                  wurde noch vor der vollstaendigen Spieler-Metric-Archivierung erstellt.
+                </p>
+              </>
+            ) : (
+              <div className="player-drawer-callout">
+                <strong>Noch keine Historie</strong>
+                <p className="muted">Nach dem ersten Season-Abschluss erscheinen hier PPs, OVR, MVS, Achsenpunkte und Vertragswerte.</p>
+              </div>
+            )}
           </section>
         </div>
       </aside>

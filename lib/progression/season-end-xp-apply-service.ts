@@ -19,6 +19,7 @@ import { createPersistenceService } from "@/lib/persistence/persistence-service"
 import type { PersistedSaveGame, PersistenceService } from "@/lib/persistence/types";
 import { buildPlayerProgressionForecast } from "@/lib/training/player-progression-forecast";
 import {
+  buildCoreStatsFromDisciplineRatings,
   buildPreviewDisciplineRatingsFromAttributes,
   buildSeasonEndDisciplineDeltas,
   getProgressionRatingTier,
@@ -398,14 +399,23 @@ function buildPreviewPlayer(input: {
     player: input.player,
     attributesAfter,
   });
+  const baselineDisciplineRatings = buildPreviewDisciplineRatingsFromAttributes({
+    player: input.player,
+    attributesAfter: attributesBefore,
+  });
   const disciplineDeltas = buildSeasonEndDisciplineDeltas({
     disciplines: input.save.gameState.disciplines,
-    lastSeasonDisciplineValues: input.player.disciplineRatings,
+    lastSeasonDisciplineValues: baselineDisciplineRatings,
     currentDisciplineValues: previewDisciplineRatings,
   });
   const previewPlayer: Player = {
     ...input.player,
     attributeSheetStats: attributesAfter ? { ...input.player.attributeSheetStats, ...attributesAfter } : input.player.attributeSheetStats,
+    coreStats: buildCoreStatsFromDisciplineRatings({
+      disciplines: input.save.gameState.disciplines,
+      disciplineRatings: previewDisciplineRatings,
+      fallback: input.player.coreStats,
+    }),
     previousDisciplineRatings: input.player.disciplineRatings,
     disciplineRatings: previewDisciplineRatings,
   };
@@ -624,20 +634,29 @@ export function applySeasonEndXpSpend(
       player,
       attributesAfter: normalizeAttributes({ ...player, attributeSheetStats: attributesAfter } as Player),
     });
+    const baselineDisciplineRatings = buildPreviewDisciplineRatingsFromAttributes({
+      player,
+      attributesAfter: normalizeAttributes(player),
+    });
     const disciplineDelta = Object.fromEntries(
       Object.entries(nextDisciplineRatings).map(([disciplineId, current]) => [
         disciplineId,
-        Math.max(0, roundValue(current - (player.disciplineRatings?.[disciplineId] ?? current), 0)),
+        Math.max(0, roundValue(current - (baselineDisciplineRatings[disciplineId] ?? current), 2)),
       ]),
     );
     return {
       ...player,
       attributeSheetStats: attributesAfter,
+      coreStats: buildCoreStatsFromDisciplineRatings({
+        disciplines: save.gameState.disciplines,
+        disciplineRatings: nextDisciplineRatings,
+        fallback: player.coreStats,
+      }),
       currentXP: Math.max(0, playerPreview.remainingXP),
       spentXP: (player.spentXP ?? 0) + playerPreview.plannedXP,
       lifetimeXP: playerPreview.lifetimeXPAfter,
-      previousDisciplineRatings: player.disciplineRatings,
-      lastSeasonDisciplineValues: player.disciplineRatings,
+      previousDisciplineRatings: baselineDisciplineRatings,
+      lastSeasonDisciplineValues: baselineDisciplineRatings,
       currentDisciplineValues: nextDisciplineRatings,
       disciplineDelta,
       disciplineRatings: nextDisciplineRatings,

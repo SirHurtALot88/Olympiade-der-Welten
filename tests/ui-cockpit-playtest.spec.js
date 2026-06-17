@@ -319,7 +319,7 @@ test("local cockpit flow is playable through the UI", async ({ page }) => {
   expect(teamOptionValue).toBeTruthy();
   await teamSelect.selectOption(teamOptionValue);
   await expect.poll(
-    async () => marketSection.getByTestId("transfer-buy-preview-button").count(),
+    async () => marketSection.getByTestId("transfer-buy-open-button").count(),
     { timeout: POLL_TIMEOUT_MS },
   ).toBeGreaterThan(0);
 
@@ -335,15 +335,12 @@ test("local cockpit flow is playable through the UI", async ({ page }) => {
   );
   expect(freeAgentsBeforeBuy.items.length).toBeGreaterThan(0);
 
-  console.log("[ui-cockpit] buy preview");
-  await marketSection.getByTestId("transfer-buy-preview-button").first().click();
-  await expect(marketSection.getByRole("heading", { name: "Kaufvorschau" })).toBeVisible({ timeout: STEP_TIMEOUT_MS });
-  const chosenPlayerName = (await marketSection.locator(".transfer-buy-panel p strong").first().innerText()).trim();
-  expect(chosenPlayerName.length).toBeGreaterThan(0);
-  await expect(marketSection.locator(".transfer-buy-panel").getByText(chosenPlayerName, { exact: true })).toBeVisible({ timeout: STEP_TIMEOUT_MS });
-  await marketSection.getByTestId("transfer-buy-dialog-open").click({ timeout: STEP_TIMEOUT_MS });
+  console.log("[ui-cockpit] buy dialog");
+  await marketSection.getByTestId("transfer-buy-open-button").first().click();
   const buyDialog = page.getByRole("dialog", { name: "Kaufdialog" });
   await expect(buyDialog).toBeVisible({ timeout: STEP_TIMEOUT_MS });
+  const chosenPlayerName = (await buyDialog.locator(".transfer-modal-player-head strong").first().innerText()).trim();
+  expect(chosenPlayerName.length).toBeGreaterThan(0);
   await expect(buyDialog.getByTestId("transfer-buy-confirm")).toBeEnabled({ timeout: STEP_TIMEOUT_MS });
   console.log("[ui-cockpit] confirm buy");
   await buyDialog.getByTestId("transfer-buy-confirm").click({ timeout: STEP_TIMEOUT_MS });

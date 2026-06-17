@@ -71,7 +71,16 @@ export default function DisciplineIcon({
       className={`discipline-icon-chip${showLabel ? " has-label" : ""}${className ? ` ${className}` : ""}`}
       title={resolvedLabel}
     >
-      {src ? <img className={`discipline-icon${iconClassName ? ` ${iconClassName}` : ""}`} src={src} alt={resolvedLabel} /> : null}
+      {src ? (
+        <img
+          className={`discipline-icon${iconClassName ? ` ${iconClassName}` : ""}`}
+          src={src}
+          alt={resolvedLabel}
+          loading="lazy"
+          decoding="async"
+          fetchPriority="low"
+        />
+      ) : null}
       {showLabel ? <span className="discipline-icon-label">{resolvedLabel}</span> : null}
     </span>
   );

@@ -496,6 +496,15 @@ a {
   background: rgba(245, 158, 11, 0.14);
 }
 
+.season-history-select {
+  min-width: 220px;
+}
+
+.season-history-select .input {
+  min-height: 38px;
+  border-radius: 999px;
+}
+
 .foundation-context-banner {
   position: relative;
   display: grid;
@@ -2619,17 +2628,6 @@ a {
   font-weight: 700;
 }
 
-.transfer-history-class-chip {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  min-height: 30px;
-  padding: 0 12px;
-  border-radius: 999px;
-  font-weight: 700;
-  white-space: nowrap;
-}
-
 .transfer-panel-section {
   display: grid;
   gap: 10px;
@@ -3828,6 +3826,78 @@ a {
   padding: 0 16px 16px;
 }
 
+.season-archive-overview-grid {
+  margin-bottom: 14px;
+}
+
+.season-archive-discipline-panel {
+  display: grid;
+  gap: 14px;
+  margin-top: 16px;
+  padding: 16px;
+  border-radius: 18px;
+  background:
+    radial-gradient(circle at top left, rgba(245, 158, 11, 0.1), transparent 32%),
+    rgba(255, 255, 255, 0.028);
+  border: 1px solid rgba(245, 158, 11, 0.16);
+}
+
+.season-archive-discipline-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+  gap: 12px;
+}
+
+.season-archive-discipline-card {
+  display: grid;
+  gap: 10px;
+  padding: 14px;
+  border-radius: 16px;
+  background: rgba(8, 12, 20, 0.42);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+}
+
+.season-archive-discipline-card header,
+.season-archive-discipline-card li {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.season-archive-discipline-card header {
+  align-items: baseline;
+}
+
+.season-archive-discipline-card header span,
+.season-archive-discipline-card small {
+  color: rgba(235, 239, 247, 0.62);
+}
+
+.season-archive-discipline-card ol {
+  display: grid;
+  gap: 8px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.season-archive-discipline-card li {
+  align-items: center;
+  padding: 8px 10px;
+  border-radius: 12px;
+  background: rgba(255, 255, 255, 0.035);
+}
+
+.season-archive-discipline-card li > span {
+  display: grid;
+  gap: 2px;
+}
+
+.season-archive-discipline-card li > span:last-child {
+  justify-items: end;
+  font-weight: 800;
+}
+
 .season-pp-table th,
 .season-pp-table td {
   font-family: "RaniraSeason", Georgia, "Times New Roman", serif;
@@ -4813,14 +4883,14 @@ a {
   display: inline-flex;
   gap: 1px;
   line-height: 1;
-  filter: drop-shadow(0 0 7px rgba(245, 183, 64, 0.24));
+  filter: drop-shadow(0 0 9px rgba(255, 198, 64, 0.45));
 }
 
 .player-drawer-star {
   position: relative;
   display: inline-block;
   width: 0.86em;
-  color: rgba(148, 120, 57, 0.42);
+  color: rgba(111, 91, 48, 0.72);
   font-size: 0.96rem;
 }
 
@@ -4829,19 +4899,61 @@ a {
   inset: 0 auto 0 0;
   width: 0;
   overflow: hidden;
-  color: #f4c24d;
+  color: #ffd76a;
   text-shadow:
-    0 0 7px rgba(245, 183, 64, 0.55),
-    0 1px 0 rgba(80, 45, 10, 0.4);
+    0 0 3px rgba(255, 245, 181, 0.95),
+    0 0 9px rgba(255, 191, 49, 0.8),
+    0 1px 0 rgba(85, 47, 7, 0.65);
 }
 
 .player-drawer-star-empty {
-  color: rgba(148, 120, 57, 0.34);
+  color: rgba(103, 89, 61, 0.58);
 }
 
 .player-drawer-star-stack {
   display: grid;
   gap: 5px;
+}
+
+.player-drawer-help-label {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  cursor: help;
+}
+
+.player-drawer-help-dot {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 17px;
+  height: 17px;
+  border-radius: 999px;
+  color: rgba(222, 232, 255, 0.9);
+  background: rgba(94, 123, 180, 0.26);
+  border: 1px solid rgba(156, 183, 235, 0.35);
+  font-size: 0.65rem;
+  font-weight: 900;
+  line-height: 1;
+}
+
+.player-drawer-transfer-note {
+  min-height: 160px;
+  display: grid;
+  align-content: center;
+  gap: 8px;
+  padding: 20px;
+  border: 1px solid rgba(118, 155, 224, 0.28);
+  border-radius: 22px;
+  color: rgba(219, 229, 252, 0.78);
+  background:
+    radial-gradient(circle at 18% 16%, rgba(105, 148, 225, 0.28), transparent 34%),
+    rgba(19, 25, 38, 0.62);
+}
+
+.player-drawer-transfer-note strong {
+  color: rgba(245, 248, 255, 0.95);
+  font-size: 1.04rem;
 }
 
 .player-drawer-board-trust-card {
@@ -4955,9 +5067,10 @@ a {
 
 .player-drawer-affinity-badge.is-weak,
 .player-drawer-chip.is-affinity-weak {
-  color: rgba(235, 239, 247, 0.86);
-  background: linear-gradient(180deg, rgba(94, 101, 116, 0.72), rgba(49, 55, 66, 0.72));
-  border-color: rgba(196, 203, 216, 0.24);
+  color: #ffe6e2;
+  background: linear-gradient(180deg, rgba(171, 49, 43, 0.92), rgba(92, 25, 28, 0.88));
+  border-color: rgba(255, 116, 100, 0.48);
+  box-shadow: 0 0 15px rgba(224, 65, 57, 0.24);
 }
 
 .player-drawer-chip.is-affinity-neutral {
@@ -4971,8 +5084,8 @@ a {
 }
 
 .player-drawer-attribute-card.is-affinity-weak {
-  border-color: rgba(180, 190, 210, 0.16);
-  background: linear-gradient(180deg, rgba(80, 86, 99, 0.22), rgba(255, 255, 255, 0.035));
+  border-color: rgba(255, 102, 92, 0.28);
+  background: linear-gradient(180deg, rgba(127, 38, 36, 0.22), rgba(255, 255, 255, 0.035));
 }
 
 .player-drawer-delta-line {
@@ -5059,15 +5172,111 @@ a {
 
 .team-drawer {
   width: min(1240px, calc(100vw - 32px));
+  background:
+    radial-gradient(circle at 12% 0%, rgba(94, 141, 224, 0.22), transparent 28%),
+    radial-gradient(circle at 82% 12%, rgba(235, 181, 76, 0.12), transparent 32%),
+    linear-gradient(180deg, rgba(20, 24, 32, 0.98), rgba(15, 18, 24, 0.99));
 }
 
 .team-drawer-logo {
   width: 170px;
   height: 170px;
+  box-shadow: 0 18px 48px rgba(0, 0, 0, 0.28);
 }
 
 .team-drawer-body {
   gap: 18px;
+}
+
+.team-drawer-dashboard {
+  overflow: hidden;
+}
+
+.team-drawer-dashboard-grid {
+  display: grid;
+  grid-template-columns: minmax(240px, 0.9fr) minmax(260px, 1fr) minmax(260px, 0.95fr);
+  gap: 14px;
+  align-items: stretch;
+}
+
+.team-drawer-identity-card {
+  display: grid;
+  gap: 12px;
+  padding: 18px;
+  border-radius: 20px;
+  background:
+    radial-gradient(circle at top left, rgba(111, 156, 240, 0.24), transparent 42%),
+    rgba(7, 12, 21, 0.34);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+}
+
+.team-drawer-identity-card h3,
+.team-drawer-identity-card p {
+  margin: 0;
+}
+
+.team-drawer-identity-card h3 {
+  font-size: clamp(2rem, 4vw, 3.15rem);
+  letter-spacing: 0.04em;
+}
+
+.team-drawer-rank-grid,
+.team-drawer-finance-grid {
+  display: grid;
+  gap: 10px;
+}
+
+.team-drawer-rank-grid {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+.team-drawer-rank-card {
+  display: grid;
+  align-content: space-between;
+  min-height: 92px;
+  padding: 14px;
+  border-radius: 18px;
+  background: linear-gradient(180deg, rgba(11, 16, 25, 0.7), rgba(25, 31, 44, 0.52));
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.04);
+}
+
+.team-drawer-rank-card span {
+  color: rgba(235, 239, 247, 0.68);
+  font-size: 0.76rem;
+  font-weight: 800;
+  letter-spacing: 0.1em;
+}
+
+.team-drawer-rank-card strong {
+  font-size: 1.65rem;
+}
+
+.team-drawer-rank-card.is-power {
+  border-color: rgba(211, 83, 72, 0.28);
+  background: linear-gradient(180deg, rgba(92, 33, 34, 0.34), rgba(25, 31, 44, 0.5));
+}
+
+.team-drawer-rank-card.is-speed {
+  border-color: rgba(109, 176, 105, 0.28);
+  background: linear-gradient(180deg, rgba(36, 84, 48, 0.3), rgba(25, 31, 44, 0.5));
+}
+
+.team-drawer-rank-card.is-mental {
+  border-color: rgba(91, 145, 218, 0.3);
+  background: linear-gradient(180deg, rgba(37, 64, 112, 0.32), rgba(25, 31, 44, 0.5));
+}
+
+.team-drawer-rank-card.is-social {
+  border-color: rgba(235, 181, 76, 0.3);
+  background: linear-gradient(180deg, rgba(111, 78, 25, 0.32), rgba(25, 31, 44, 0.5));
+}
+
+.team-drawer-toolbar {
+  padding: 12px;
+  border-radius: 18px;
+  background: rgba(255, 255, 255, 0.025);
+  border: 1px solid rgba(255, 255, 255, 0.06);
 }
 
 .team-drawer-filter-row {
@@ -5076,20 +5285,54 @@ a {
   gap: 10px;
 }
 
+.team-drawer-filter-row .inline-button.is-active {
+  border-color: rgba(123, 171, 255, 0.5);
+  background: rgba(91, 145, 218, 0.28);
+}
+
+.team-drawer-section-head {
+  display: flex;
+  justify-content: space-between;
+  gap: 16px;
+  align-items: flex-start;
+}
+
+.team-drawer-section-head h3,
+.team-drawer-section-head p {
+  margin: 0;
+}
+
+.team-drawer-section-count {
+  display: inline-grid;
+  min-width: 42px;
+  height: 42px;
+  place-items: center;
+  border-radius: 14px;
+  color: #ebeff7;
+  background: rgba(91, 145, 218, 0.18);
+  border: 1px solid rgba(123, 171, 255, 0.2);
+  font-weight: 900;
+}
+
 .team-drawer-card-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
-  gap: 12px;
+  grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+  gap: 14px;
 }
 
 .team-drawer-player-card {
+  position: relative;
   display: grid;
-  gap: 10px;
-  padding: 14px;
-  border-radius: 18px;
-  background: linear-gradient(180deg, rgba(255, 255, 255, 0.045), rgba(255, 255, 255, 0.02));
+  gap: 12px;
+  padding: 15px;
+  border-radius: 22px;
+  background:
+    radial-gradient(circle at top right, rgba(255, 255, 255, 0.07), transparent 36%),
+    linear-gradient(180deg, rgba(255, 255, 255, 0.052), rgba(255, 255, 255, 0.022));
   border: 1px solid rgba(255, 255, 255, 0.08);
   cursor: pointer;
+  box-shadow: 0 16px 34px rgba(0, 0, 0, 0.16);
+  transition: transform 140ms ease, border-color 140ms ease, box-shadow 140ms ease;
 }
 
 .team-drawer-player-class-frame-red {
@@ -5113,8 +5356,9 @@ a {
 }
 
 .team-drawer-player-card:hover {
+  transform: translateY(-2px);
   border-color: rgba(123, 171, 255, 0.28);
-  box-shadow: 0 0 0 1px rgba(123, 171, 255, 0.12);
+  box-shadow: 0 18px 38px rgba(0, 0, 0, 0.22), 0 0 0 1px rgba(123, 171, 255, 0.12);
 }
 
 .team-drawer-player-card.team-drawer-player-class-frame-red:hover {
@@ -5163,6 +5407,12 @@ a {
 .team-drawer-player-title {
   display: grid;
   gap: 4px;
+  min-width: 0;
+}
+
+.team-drawer-player-title strong {
+  font-size: 1.05rem;
+  line-height: 1.1;
 }
 
 .team-drawer-player-title span {
@@ -5188,10 +5438,151 @@ a {
   font-weight: 600;
 }
 
+.team-drawer-player-spotlight {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 8px;
+}
+
+.team-drawer-player-spotlight div {
+  display: grid;
+  gap: 3px;
+  padding: 10px;
+  border-radius: 16px;
+  background: rgba(8, 12, 20, 0.38);
+  border: 1px solid rgba(255, 255, 255, 0.075);
+}
+
+.team-drawer-player-spotlight span,
+.team-drawer-player-spotlight small {
+  color: rgba(235, 239, 247, 0.62);
+  font-size: 0.68rem;
+  font-weight: 800;
+  letter-spacing: 0.07em;
+  text-transform: uppercase;
+}
+
+.team-drawer-player-spotlight strong {
+  color: #f6f8fc;
+  font-size: 1.28rem;
+  line-height: 1;
+}
+
+.team-drawer-economy-strip {
+  display: grid;
+  grid-template-columns: 1fr 1fr auto;
+  gap: 8px;
+}
+
+.team-drawer-economy-strip span {
+  display: grid;
+  gap: 2px;
+  min-height: 52px;
+  padding: 8px 10px;
+  border-radius: 15px;
+  background: rgba(255, 255, 255, 0.04);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+}
+
+.team-drawer-economy-strip em {
+  color: rgba(235, 239, 247, 0.58);
+  font-size: 0.68rem;
+  font-style: normal;
+  font-weight: 800;
+  letter-spacing: 0.07em;
+  text-transform: uppercase;
+}
+
+.team-drawer-economy-strip strong {
+  color: #f4f7fb;
+  font-size: 0.94rem;
+}
+
+.team-drawer-discipline-row span {
+  background: rgba(123, 171, 255, 0.08);
+}
+
+.team-drawer-money-delta {
+  margin-left: 0;
+  font-size: 0.72rem;
+  font-weight: 800;
+}
+
+.player-drawer-money-delta {
+  display: block;
+  margin-top: 4px;
+  font-weight: 800;
+}
+
+.player-drawer-money-delta.is-positive {
+  color: #88d38d;
+}
+
+.player-drawer-money-delta.is-negative {
+  color: #f08e86;
+}
+
+.player-drawer-history-table-shell {
+  max-height: 340px;
+  overflow: auto;
+}
+
+.player-drawer-history-table {
+  min-width: 1120px;
+}
+
+.player-drawer-history-table th,
+.player-drawer-history-table td {
+  white-space: nowrap;
+  font-size: 0.76rem;
+}
+
+.player-drawer-history-table td strong {
+  display: block;
+  font-size: 0.82rem;
+}
+
+.player-drawer-history-tag {
+  display: inline-flex;
+  margin-top: 3px;
+  padding: 2px 7px;
+  border-radius: 999px;
+  color: #ddffe4;
+  background: rgba(46, 154, 64, 0.24);
+  font-size: 0.68rem;
+  font-weight: 800;
+  text-transform: uppercase;
+}
+
 .team-drawer-contract-grid {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
   gap: 10px;
+}
+
+@media (max-width: 1100px) {
+  .team-drawer-dashboard-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .team-drawer-finance-grid {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+}
+
+@media (max-width: 720px) {
+  .team-drawer-card-grid,
+  .team-drawer-rank-grid,
+  .team-drawer-finance-grid,
+  .team-drawer-player-spotlight,
+  .team-drawer-economy-strip {
+    grid-template-columns: 1fr;
+  }
+
+  .team-drawer-logo {
+    width: 118px;
+    height: 118px;
+  }
 }
 
 .season-table-shell {

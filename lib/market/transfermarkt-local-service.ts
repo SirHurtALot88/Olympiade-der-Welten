@@ -1,7 +1,7 @@
 import { randomUUID } from "node:crypto";
 
 import type { ContractShape, GameState, Player, RosterEntry, TransferHistoryEntry } from "@/lib/data/olyDataTypes";
-import { getImportedPlayerDisplayMarketValue, getImportedPlayerDisplaySalary } from "@/lib/data/player-economy-display";
+import { getImportedPlayerDisplayMarketValue } from "@/lib/data/player-economy-display";
 import { resolvePlayerEconomyContract } from "@/lib/foundation/player-economy-contract";
 import { buildPlayerRatingContractMap } from "@/lib/foundation/player-rating-contract";
 import { getTeamPlayerMax } from "@/lib/foundation/roster-limits";
@@ -49,32 +49,18 @@ function roundValue(value: number, digits = 2) {
 }
 
 function buildDiverseFreeAgentSlice(items: TransfermarktFreeAgentItem[], limit: number) {
-  const byMarketValueAscending = [...items].sort((left, right) => {
-    const leftValue = left.marketValue ?? Number.POSITIVE_INFINITY;
-    const rightValue = right.marketValue ?? Number.POSITIVE_INFINITY;
-    if (leftValue !== rightValue) {
-      return leftValue - rightValue;
-    }
-    return left.name.localeCompare(right.name, "de");
-  });
-  const byQuality = [...items].sort((left, right) => {
-    const ovrDelta = (right.ovr ?? 0) - (left.ovr ?? 0);
-    if (ovrDelta !== 0) {
-      return ovrDelta;
-    }
-    const ratioDelta = (right.marketValueSalaryRatio ?? 0) - (left.marketValueSalaryRatio ?? 0);
-    if (ratioDelta !== 0) {
-      return ratioDelta;
-    }
-    const marketValueDelta = (right.marketValue ?? 0) - (left.marketValue ?? 0);
-    if (marketValueDelta !== 0) {
-      return marketValueDelta;
+  const bySportProfile = [...items].sort((left, right) => {
+    const leftAxisAverage = ((left.pow ?? 0) + (left.spe ?? 0) + (left.men ?? 0) + (left.soc ?? 0)) / 4;
+    const rightAxisAverage = ((right.pow ?? 0) + (right.spe ?? 0) + (right.men ?? 0) + (right.soc ?? 0)) / 4;
+    const axisDelta = rightAxisAverage - leftAxisAverage;
+    if (axisDelta !== 0) {
+      return axisDelta;
     }
     return left.name.localeCompare(right.name, "de");
   });
 
   const classBuckets = new Map<string, TransfermarktFreeAgentItem[]>();
-  for (const item of byQuality) {
+  for (const item of bySportProfile) {
     const key = item.className.trim().toLowerCase() || "unknown";
     const bucket = classBuckets.get(key) ?? [];
     bucket.push(item);
@@ -95,19 +81,10 @@ function buildDiverseFreeAgentSlice(items: TransfermarktFreeAgentItem[], limit: 
     seen.add(item.playerId);
   };
 
-  // Keep affordable depth visible before the response limit is applied.
-  const affordableTarget = Math.min(limit, Math.ceil(limit * 0.4));
-  for (const item of byMarketValueAscending) {
+  const sportProfileTarget = Math.min(limit, Math.ceil(limit * 0.55));
+  for (const item of bySportProfile) {
     add(item);
-    if (selected.length >= affordableTarget) {
-      break;
-    }
-  }
-
-  const qualityTarget = Math.min(limit, affordableTarget + Math.ceil(limit * 0.3));
-  for (const item of byQuality) {
-    add(item);
-    if (selected.length >= qualityTarget) {
+    if (selected.length >= sportProfileTarget) {
       break;
     }
   }
@@ -130,7 +107,7 @@ function buildDiverseFreeAgentSlice(items: TransfermarktFreeAgentItem[], limit: 
     }
   }
 
-  for (const item of byQuality) {
+  for (const item of bySportProfile) {
     add(item);
     if (selected.length >= limit) {
       break;
@@ -146,7 +123,7 @@ const localMarketContextCache = new Map<string, LocalMarketContext>();
 const localNegotiationPreviewCache = new Map<string, ReturnType<typeof buildContractNegotiationPreview>>();
 
 const getPlayerMarketValue = getImportedPlayerDisplayMarketValue;
-const getPlayerSalary = getImportedPlayerDisplaySalary;
+const getPlayerSalary = (player: Player) => resolvePlayerEconomyContract({ player }).salary;
 
 export type LocalTransfermarktRunContext = {
   persistence: PersistenceService;
@@ -467,7 +444,7 @@ function buildLocalTransfermarktBuyPreviewFromContext(
       rosterPlayers: rosterPlayers.map((item) => item.player),
       contractLength,
       contractShape,
-      offeredSalary: params.offeredSalary ?? salary,
+      offeredSalary: params.offeredSalary ?? null,
       priorBadExperience: priorRejectedNegotiation,
       seasonIdBase: gameState.season.id,
       seasonLabelBase: gameState.season.name,

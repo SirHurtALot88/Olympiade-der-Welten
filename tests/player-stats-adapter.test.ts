@@ -110,21 +110,21 @@ describe("player stats adapter", () => {
     expect(normalizePlayerOvr((scale.min + scale.max) / 2)).toBeGreaterThan(1);
   });
 
-  it("builds pool-normalized ovr with best player 100 and weakest player 1", () => {
+  it("builds Retool-style season ovr from skills, thresholds, PPs and MVS instead of imported rating", () => {
     const players = [
-      createPlayer({ id: "weak", rating: 10, disciplineRatings: { a: 20 } }),
-      createPlayer({ id: "mid", rating: 55, disciplineRatings: { a: 45 } }),
-      createPlayer({ id: "top", rating: 100, disciplineRatings: { a: 90 } }),
+      createPlayer({ id: "weak", rating: 100, coreStats: { pow: 10, spe: 10, men: 10, soc: 10 } }),
+      createPlayer({ id: "mid", rating: 55, coreStats: { pow: 55, spe: 55, men: 55, soc: 55 } }),
+      createPlayer({ id: "top", rating: 10, coreStats: { pow: 100, spe: 100, men: 100, soc: 100 } }),
     ];
 
-    const result = buildPlayerRatingContractRows({ players });
+    const result = buildPlayerRatingContractRows({ players, mvsPerformances: [] });
     const weak = result.find((entry) => entry.playerId === "weak");
     const mid = result.find((entry) => entry.playerId === "mid");
     const top = result.find((entry) => entry.playerId === "top");
 
     expect(top?.ovrNormalized).toBe(100);
-    expect(weak?.ovrNormalized).toBe(1);
-    expect((mid?.ovrNormalized ?? 0) > 1).toBe(true);
+    expect(weak?.ovrNormalized).toBe(0);
+    expect((mid?.ovrNormalized ?? 0) > 0).toBe(true);
     expect((mid?.ovrNormalized ?? 0) < 100).toBe(true);
   });
 
@@ -225,27 +225,29 @@ describe("player stats adapter", () => {
 
   it("can normalize ovr against an active-player pool while still rating all rows", () => {
     const players = [
-      createPlayer({ id: "active-top", rating: 70 }),
-      createPlayer({ id: "active-low", rating: 40 }),
-      createPlayer({ id: "free-agent-elite", rating: 100 }),
+      createPlayer({ id: "active-top", coreStats: { pow: 70, spe: 70, men: 70, soc: 70 } }),
+      createPlayer({ id: "active-low", coreStats: { pow: 40, spe: 40, men: 40, soc: 40 } }),
+      createPlayer({ id: "free-agent-elite", coreStats: { pow: 100, spe: 100, men: 100, soc: 100 } }),
     ];
 
     const result = buildPlayerRatingContractRows({
       players,
+      mvsPerformances: [],
       normalizationPoolPlayerIds: ["active-top", "active-low"],
     });
 
     expect(result.find((entry) => entry.playerId === "active-top")?.ovrNormalized).toBe(100);
-    expect(result.find((entry) => entry.playerId === "active-low")?.ovrNormalized).toBe(1);
+    expect(result.find((entry) => entry.playerId === "active-low")?.ovrNormalized).toBe(0);
     expect(result.find((entry) => entry.playerId === "free-agent-elite")?.ovrNormalized).toBe(100);
   });
 
-  it("does not fake pool ovr when the raw source is missing", () => {
+  it("does not fake pool ovr when the core-stat source is missing", () => {
     const result = buildPlayerRatingContractRows({
       players: [
-        createPlayer({ id: "raw-missing", rating: Number.NaN, disciplineRatings: { a: 99, b: 98 } }),
-        createPlayer({ id: "source-player", rating: 55, disciplineRatings: { a: 10, b: 11 } }),
+        createPlayer({ id: "raw-missing", coreStats: {} as Player["coreStats"] }),
+        createPlayer({ id: "source-player", coreStats: { pow: 55, spe: 55, men: 55, soc: 55 } }),
       ],
+      mvsPerformances: [],
     });
 
     const missing = result.find((entry) => entry.playerId === "raw-missing");
@@ -255,17 +257,18 @@ describe("player stats adapter", () => {
     expect(missing?.warnings).toContain("ovr_raw_source_missing");
   });
 
-  it("keeps ovr blocked when the player pool has no spread", () => {
+  it("matches Retool no-spread behavior by returning zero instead of blocking ovr", () => {
     const result = buildPlayerRatingContractRows({
       players: [
-        createPlayer({ id: "same-1", rating: 33 }),
-        createPlayer({ id: "same-2", rating: 33 }),
+        createPlayer({ id: "same-1", coreStats: { pow: 33, spe: 33, men: 33, soc: 33 } }),
+        createPlayer({ id: "same-2", coreStats: { pow: 33, spe: 33, men: 33, soc: 33 } }),
       ],
+      mvsPerformances: [],
     });
 
-    expect(result[0]?.ovrNormalized).toBeNull();
-    expect(result[1]?.ovrNormalized).toBeNull();
-    expect(result[0]?.warnings).toContain("ovr_pool_no_spread");
-    expect(result[1]?.warnings).toContain("ovr_pool_no_spread");
+    expect(result[0]?.ovrNormalized).toBe(0);
+    expect(result[1]?.ovrNormalized).toBe(0);
+    expect(result[0]?.warnings).not.toContain("ovr_pool_no_spread");
+    expect(result[1]?.warnings).not.toContain("ovr_pool_no_spread");
   });
 });

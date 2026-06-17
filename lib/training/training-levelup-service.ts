@@ -7,10 +7,17 @@ import {
   playerGeneratorAttributeKeys,
   type OfficialDisciplineWeightId,
 } from "@/lib/player-generator/official-discipline-weights";
+import {
+  DEVELOPMENT_MAX_LEVEL_UPS_PER_SEASON,
+  DEVELOPMENT_POINTS_PER_LEVEL,
+  getDevelopmentLevelProgress,
+  getDevelopmentLevelUpsFromXp,
+  getDevelopmentXpForLevel,
+} from "@/lib/training/development-level-curve";
 import type { PlayerDevelopmentRoute, PlayerProgressionForecast, PlayerRegressionRisk } from "@/lib/training/training-plan-types";
 
-export const DEVELOPMENT_POINTS_PER_LEVEL = 10;
-export const DEVELOPMENT_XP_PER_LEVEL = 180;
+export { DEVELOPMENT_POINTS_PER_LEVEL };
+export const DEVELOPMENT_XP_PER_LEVEL = getDevelopmentXpForLevel(1);
 export const DEVELOPMENT_MAX_ATTRIBUTE_VALUE = 99;
 
 export const TRAINING_ATTRIBUTE_LABELS: Record<PlayerGeneratorAttributeName, string> = {
@@ -74,8 +81,11 @@ export type DevelopmentLevelSummary = {
   developmentLevel: number;
   progressXp: number;
   progressPct: number;
+  xpForCurrentLevel: number;
   xpToNextLevel: number;
+  rawLevelUpsAvailable: number;
   levelUpsAvailable: number;
+  seasonLevelUpCap: number;
   trainingPointsAvailable: number;
   lifetimeDevelopmentXp: number;
   netDevelopmentXP: number;
@@ -292,19 +302,30 @@ export function buildDevelopmentLevelSummary(input: {
   const currentXP = input.currentXP ?? input.forecast?.currentXP ?? input.player.currentXP ?? 0;
   const spentXP = input.spentXP ?? input.forecast?.spentXP ?? input.player.spentXP ?? 0;
   const lifetimeDevelopmentXp = Math.max(0, input.lifetimeXP ?? input.player.lifetimeXP ?? currentXP + spentXP + Math.max(0, netDevelopmentXP));
-  const developmentLevel = Math.floor(lifetimeDevelopmentXp / DEVELOPMENT_XP_PER_LEVEL) + 1;
-  const progressXp = lifetimeDevelopmentXp % DEVELOPMENT_XP_PER_LEVEL;
-  const levelUpsAvailable = Math.max(0, Math.floor((currentXP + Math.max(0, netDevelopmentXP)) / DEVELOPMENT_XP_PER_LEVEL));
+  const levelProgress = getDevelopmentLevelProgress(lifetimeDevelopmentXp);
+  const seasonalLevelXp = Math.max(0, input.forecast ? netDevelopmentXP : currentXP);
+  const rawLevelUpsAvailable = getDevelopmentLevelUpsFromXp({
+    startLevel: levelProgress.developmentLevel,
+    availableXp: seasonalLevelXp,
+  }).levelUps;
+  const levelUpsAvailable = getDevelopmentLevelUpsFromXp({
+    startLevel: levelProgress.developmentLevel,
+    availableXp: seasonalLevelXp,
+    maxLevelUps: DEVELOPMENT_MAX_LEVEL_UPS_PER_SEASON,
+  }).levelUps;
   const regressionDebt = Math.max(0, -netDevelopmentXP);
   const lastTrend =
-    netDevelopmentXP >= DEVELOPMENT_XP_PER_LEVEL * 0.45 ? "growth" : netDevelopmentXP > 20 ? "stable" : netDevelopmentXP < -25 ? "regression" : "stagnation";
+    netDevelopmentXP >= levelProgress.xpForCurrentLevel * 0.45 ? "growth" : netDevelopmentXP > 20 ? "stable" : netDevelopmentXP < -25 ? "regression" : "stagnation";
   return {
     playerId: input.player.id,
-    developmentLevel,
-    progressXp,
-    progressPct: round((progressXp / DEVELOPMENT_XP_PER_LEVEL) * 100, 1),
-    xpToNextLevel: DEVELOPMENT_XP_PER_LEVEL - progressXp,
+    developmentLevel: levelProgress.developmentLevel,
+    progressXp: levelProgress.progressXp,
+    progressPct: levelProgress.progressPct,
+    xpForCurrentLevel: levelProgress.xpForCurrentLevel,
+    xpToNextLevel: levelProgress.xpToNextLevel,
+    rawLevelUpsAvailable,
     levelUpsAvailable,
+    seasonLevelUpCap: DEVELOPMENT_MAX_LEVEL_UPS_PER_SEASON,
     trainingPointsAvailable: levelUpsAvailable * DEVELOPMENT_POINTS_PER_LEVEL,
     lifetimeDevelopmentXp,
     netDevelopmentXP,
@@ -386,7 +407,7 @@ export function buildRegressionEventPreview(input: {
   affinity: AttributeAffinityProfile;
 }): DevelopmentRegressionEventPreview {
   const severeRisk = input.level.regressionRisk === "high";
-  const shouldLoseAttribute = input.level.regressionDebt >= DEVELOPMENT_XP_PER_LEVEL * 0.75 && severeRisk;
+  const shouldLoseAttribute = input.level.regressionDebt >= input.level.xpForCurrentLevel * 0.75 && severeRisk;
   if (!shouldLoseAttribute) {
     return {
       playerId: input.player.id,

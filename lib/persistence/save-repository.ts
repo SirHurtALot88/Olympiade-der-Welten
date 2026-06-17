@@ -50,6 +50,7 @@ type GameMetadata = {
   preSeasonWorkflowState?: unknown;
   playerBaselines?: PlayerBaselineRecord[];
   baselineWriteGuardEvents?: PlayerBaselineWriteGuardEvent[];
+  playerProgressionEvents?: GameState["playerProgressionEvents"];
 };
 
 function parseJsonColumn<T>(value: string): T {
@@ -243,6 +244,9 @@ function materializePersistedSave(row: SaveRow): PersistedSaveGame | null {
     ...(gameMetadata?.baselineWriteGuardEvents
       ? { baselineWriteGuardEvents: gameMetadata.baselineWriteGuardEvents }
       : {}),
+    ...(gameMetadata?.playerProgressionEvents
+      ? { playerProgressionEvents: gameMetadata.playerProgressionEvents }
+      : {}),
     season,
     seasonState,
     matchdayState,
@@ -354,6 +358,7 @@ function createPersistedSaveRecord(input: {
       preSeasonWorkflowState: guardedGameState.preSeasonWorkflowState,
       playerBaselines: guardedGameState.playerBaselines,
       baselineWriteGuardEvents: guardedGameState.baselineWriteGuardEvents,
+      playerProgressionEvents: guardedGameState.playerProgressionEvents,
     } satisfies GameMetadata);
     replaceSingleton("mapping_reports", input.saveId, guardedGameState.mappingReport);
 

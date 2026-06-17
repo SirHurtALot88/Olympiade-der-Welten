@@ -82,6 +82,40 @@ export function loadSeasonManagementReferenceRows(): SeasonManagementSheetRow[] 
   return structuredClone(seasonManagementReferenceRows as SeasonManagementSheetRow[]);
 }
 
+export async function inspectSeasonManagementSheetWithFallback(options?: {
+  fetchImpl?: typeof fetch;
+  timeoutMs?: number;
+}) {
+  const fetchImpl = options?.fetchImpl ?? fetch;
+  const timeoutMs = options?.timeoutMs ?? 5000;
+  const controller = new AbortController();
+  const timeoutId = setTimeout(() => controller.abort(), timeoutMs);
+
+  try {
+    const sheet = await inspectSeasonManagementSheet((input, init) =>
+      fetchImpl(input, {
+        ...init,
+        signal: controller.signal,
+      }),
+    );
+    return {
+      ...sheet,
+      sourceKind: "season_management_sheet" as const,
+      fallbackReason: null,
+    };
+  } catch (error) {
+    const message = error instanceof Error ? error.message : "season_management_sheet_unavailable";
+    return {
+      headers: [],
+      rows: loadSeasonManagementReferenceRows(),
+      sourceKind: "season_management_reference_fallback" as const,
+      fallbackReason: message,
+    };
+  } finally {
+    clearTimeout(timeoutId);
+  }
+}
+
 export async function inspectSeasonManagementSheet(fetchImpl: typeof fetch = fetch) {
   const response = await fetchImpl(SEASON_MANAGEMENT_SHEET_URL, {
     headers: {

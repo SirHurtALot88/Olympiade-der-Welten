@@ -2,6 +2,8 @@
 
 import type { KeyboardEvent } from "react";
 
+import OptimizedMediaImage from "@/app/foundation/OptimizedMediaImage";
+
 type MatchdayArenaPlayerCardProps = {
   rank?: number | null;
   portraitUrl?: string | null;
@@ -50,7 +52,13 @@ export default function MatchdayArenaPlayerCard({
       <div className="matchday-arena-player-card-head">
         {rank != null ? <span className="matchday-arena-player-rank">#{rank}</span> : null}
         {portraitUrl ? (
-          <img className="matchday-arena-player-portrait" src={portraitUrl} alt={playerName} />
+          <OptimizedMediaImage
+            className="matchday-arena-player-portrait"
+            src={portraitUrl}
+            alt={playerName}
+            width={52}
+            height={52}
+          />
         ) : (
           <span className="matchday-arena-player-portrait matchday-arena-player-portrait-fallback">—</span>
         )}

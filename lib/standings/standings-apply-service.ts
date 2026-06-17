@@ -1,6 +1,7 @@
 import type { GameState, StandingsApplyAuditLogRecord } from "@/lib/data/olyDataTypes";
 import { createPersistenceService } from "@/lib/persistence/persistence-service";
 import type { PersistenceService } from "@/lib/persistence/types";
+import { refreshTeamObjectiveState } from "@/lib/board/team-season-objectives-service";
 import {
   buildStandingsPreview,
   type StandingsPreviewInput,
@@ -293,7 +294,7 @@ function writeLocalStandingsApply(input: {
     },
   };
 
-  input.persistence.saveSingleplayerState(save.saveId, nextGameState);
+  input.persistence.saveSingleplayerState(save.saveId, refreshTeamObjectiveState(nextGameState));
 
   return auditLog;
 }

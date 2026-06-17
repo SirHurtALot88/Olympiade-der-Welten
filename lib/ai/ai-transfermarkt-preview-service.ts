@@ -356,7 +356,9 @@ function getStrategyPriorityBoost(item: TransfermarktFreeAgentItem, strategyProf
   const preferredArchetypeHits = countListMatches(strategyProfile.preferredArchetypes ?? [], candidateTokens);
   const preferredRaceHits = countListMatches(strategyProfile.preferredRaces ?? [], candidateTokens);
   const valuePriority = clamp((strategyProfile.bias.valuePriority ?? 5) / 10, 0, 1);
-  const valueBoost = valuePriority >= 0.7 ? (item.marketValueSalaryRatio ?? 0) * valuePriority * 1.8 : 0;
+  const salary = item.salary ?? 0;
+  const axisAverage = ((item.pow ?? 0) + (item.spe ?? 0) + (item.men ?? 0) + (item.soc ?? 0)) / 4;
+  const valueBoost = valuePriority >= 0.7 ? (axisAverage / Math.max(1, salary + 5)) * valuePriority * 1.8 : 0;
 
   return exactPreferredClassHits * 55 + preferredClassHits * 18 + preferredArchetypeHits * 12 + preferredRaceHits * 32 + valueBoost;
 }
@@ -493,7 +495,7 @@ function buildCheapCandidateScore(input: {
   strategyProfile: TeamStrategyProfile | null;
 }) {
   const { item, weakestAxes, needs, strategyProfile } = input;
-  const valueScore = clamp((item.marketValueSalaryRatio ?? 0) / 20, 0, 1);
+  const salary = item.salary ?? 0;
   const axisMap = {
     pow: clamp((item.pow ?? 0) / 100, 0, 1),
     spe: clamp((item.spe ?? 0) / 100, 0, 1),
@@ -513,8 +515,7 @@ function buildCheapCandidateScore(input: {
   return (
     axisNeedScore * 42 +
     disciplineNeedScore * 28 +
-    valueScore * 16 +
-    clamp((item.ovr ?? 0) / 100, 0, 1) * 18 +
+    Math.max(0, 14 - salary) +
     strategyBoost
   );
 }
@@ -802,7 +803,6 @@ function scoreCandidate(input: {
   const currentClassCount = input.rosterClassCounts.get(normalizeTransfermarktToken(item.className)) ?? 0;
   const isSpamSensitiveClass = ["berserker", "warlord"].includes(normalizeTransfermarktToken(item.className));
 
-  const valueScore = clamp((item.marketValueSalaryRatio ?? 0) / 20, 0, 1);
   const potentialValueScore = getPotentialValueScore(item);
   const potentialStrategyWeight = getPotentialStrategyWeight(input.team, strategyProfile);
   const disciplineNeedScore = clamp(
@@ -820,6 +820,12 @@ function scoreCandidate(input: {
     weakestAxes.length > 0
       ? clamp(weakestAxes.reduce((sum, axis) => sum + axisMap[axis], 0) / weakestAxes.length, 0, 1)
       : clamp(Math.max(axisMap.pow, axisMap.spe, axisMap.men, axisMap.soc), 0, 1);
+  const salary = preview.salary ?? item.salary ?? 0;
+  const salaryValueScore = clamp(
+    (axisNeedScore + disciplineNeedScore + Math.max(item.fit ?? 0, 0) / 16) / Math.max(1, salary + 5),
+    0,
+    1,
+  );
   const rosterNeedBonus = rosterStatus === "under_min" ? 1 : rosterStatus === "under_opt" ? 0.6 : 0.15;
   const fitScore = clamp(((item.fit ?? 0) + 8) / 16, 0, 1);
   const mercenaryNegativeFitPenalty = getMercenaryNegativeFitPenalty({
@@ -853,7 +859,7 @@ function scoreCandidate(input: {
     exactPreferredClassHits * 0.95 +
     preferredClassHits * 0.7 +
     preferredArchetypeHits * 0.45 +
-    clamp((strategyProfile?.bias.valuePriority ?? 5) / 10, 0, 1) * valueScore * 0.16 +
+    clamp((strategyProfile?.bias.valuePriority ?? 5) / 10, 0, 1) * salaryValueScore * 0.16 +
     clamp((strategyProfile?.bias.starPriority ?? 5) / 10, 0, 1) * disciplineNeedScore * 0.14;
   const strategyPenalty = avoidedRaceHits * 0.35 + avoidedClassHits * 0.18 + avoidedArchetypeHits * 0.12;
   const themeMismatchPenalty =
@@ -878,7 +884,7 @@ function scoreCandidate(input: {
         gameState: input.context.gameState,
         team: input.team,
         player,
-        candidateQuality: item.ovr ?? player.ovr ?? player.rating ?? 0,
+        candidateQuality: Math.max(item.pow ?? 0, item.spe ?? 0, item.men ?? 0, item.soc ?? 0),
         candidateRoleFit: (item.fit ?? 0) + exactPreferredClassHits,
         phase,
       })
@@ -890,7 +896,7 @@ function scoreCandidate(input: {
     rosterNeedBonus * 0.18 +
     axisNeedScore * 0.18 +
     disciplineNeedScore * 0.1 +
-    valueScore * 0.12 +
+    salaryValueScore * 0.12 +
     potentialValueScore * potentialStrategyWeight +
     fitScore * 0.1 +
     identityAxisAlignment * 0.3 +

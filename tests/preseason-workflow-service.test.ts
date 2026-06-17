@@ -282,6 +282,7 @@ describe("pre-season workflow service", () => {
     expect(rewards.summary.prizeMoney).toBe(30);
     expect(rewards.summary.rankChangePrize).not.toBeUndefined();
     expect(rewards.summary.sponsor).toBe(8);
+    expect(rewards.summary.cashAfterRewards).toBe(210);
     expect(rewards.summary.prizeApplied).toBe(true);
     expect(rewards.warnings).toContain("already_applied");
     expect(facilities.summary.facilityUpkeep).toBeGreaterThan(0);

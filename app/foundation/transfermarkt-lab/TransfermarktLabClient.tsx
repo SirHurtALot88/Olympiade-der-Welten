@@ -260,6 +260,7 @@ export default function TransfermarktLabClient({ initialData = null, initialErro
                                   height={56}
                                   loading="lazy"
                                   decoding="async"
+                                  fetchPriority="low"
                                 />
                               ) : (
                                 <div className="transfermarkt-portrait transfermarkt-portrait-placeholder" aria-label={`${item.name} placeholder`}>

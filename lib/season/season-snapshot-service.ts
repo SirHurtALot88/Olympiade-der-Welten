@@ -7,6 +7,8 @@ import type {
   SeasonSnapshotTransferRecord,
 } from "@/lib/data/olyDataTypes";
 import { getImportedPlayerDisplayMarketValue } from "@/lib/data/player-economy-display";
+import { resolvePlayerEconomyContract } from "@/lib/foundation/player-economy-contract";
+import { buildPlayerRatingContractMap } from "@/lib/foundation/player-rating-contract";
 import { buildSeasonPointsLedger } from "@/lib/foundation/season-points-ledger";
 import { createPersistenceService } from "@/lib/persistence/persistence-service";
 import type { PersistenceService } from "@/lib/persistence/types";
@@ -129,19 +131,22 @@ function buildSeasonCoverage(gameState: GameState, seasonId: string): SeasonSnap
       .filter((log) => log.seasonId === seasonId)
       .map((log) => log.matchdayId),
   );
+  const hasSeasonEndCashApply = cashApplied.size > 0;
 
   return {
     totalMatchdays: matchdayIds.length,
     resultAppliedMatchdays: matchdayIds.filter((matchdayId) => resultApplied.has(matchdayId)).length,
     standingsAppliedMatchdays: matchdayIds.filter((matchdayId) => standingsApplied.has(matchdayId)).length,
-    cashAppliedMatchdays: matchdayIds.filter((matchdayId) => cashApplied.has(matchdayId)).length,
+    cashAppliedMatchdays: hasSeasonEndCashApply
+      ? matchdayIds.length
+      : matchdayIds.filter((matchdayId) => cashApplied.has(matchdayId)).length,
     completedMatchdayIds: matchdayIds.filter(
       (matchdayId) =>
         resultApplied.has(matchdayId) && standingsApplied.has(matchdayId),
     ),
     missingResultMatchdayIds: matchdayIds.filter((matchdayId) => !resultApplied.has(matchdayId)),
     missingStandingsMatchdayIds: matchdayIds.filter((matchdayId) => !standingsApplied.has(matchdayId)),
-    missingCashMatchdayIds: matchdayIds.filter((matchdayId) => !cashApplied.has(matchdayId)),
+    missingCashMatchdayIds: hasSeasonEndCashApply ? [] : matchdayIds.filter((matchdayId) => !cashApplied.has(matchdayId)),
   };
 }
 
@@ -160,13 +165,20 @@ function buildSnapshotId(seasonId: string) {
 function buildSeasonSnapshotRecord(gameState: GameState, seasonId: string = gameState.season.id): SeasonSnapshotRecord {
   const disciplineCategoryById = buildDisciplineCategoryMap(gameState);
   const seasonPointsLedger = buildSeasonPointsLedger(gameState, seasonId);
+  const playerRatingsById = buildPlayerRatingContractMap(gameState);
   const seasonResultIds = buildSeasonResultIdSet(gameState, seasonId);
   const coverage = buildSeasonCoverage(gameState, seasonId);
+  const seasonMatchdayResults = (gameState.seasonState.matchdayResults ?? []).filter(
+    (result) => result.seasonId === seasonId && result.status === "preview_applied",
+  );
   const seasonDisciplineResults = (gameState.seasonState.disciplineResults ?? []).filter((result) =>
     seasonResultIds.has(result.matchdayResultId),
   );
   const seasonPlayerPerformances = (gameState.seasonState.playerDisciplinePerformances ?? []).filter((result) =>
     seasonResultIds.has(result.matchdayResultId),
+  );
+  const seasonDisciplineHighlights = (gameState.seasonState.disciplineHighlights ?? []).filter((highlight) =>
+    seasonResultIds.has(highlight.matchdayResultId),
   );
   const seasonTransfers = gameState.transferHistory.filter((entry) => entry.seasonId === seasonId);
   const warnings: string[] = [];
@@ -288,6 +300,7 @@ function buildSeasonSnapshotRecord(gameState: GameState, seasonId: string = game
       return (right.points ?? Number.NEGATIVE_INFINITY) - (left.points ?? Number.NEGATIVE_INFINITY);
     });
 
+  const rosterByPlayerId = new Map(gameState.rosters.map((entry) => [entry.playerId, entry] as const));
   const playerPerformances: SeasonSnapshotPlayerPerformanceRecord[] = Array.from(
     seasonPlayerPerformances.reduce((map, entry) => {
       const player = gameState.players.find((candidate) => candidate.id === entry.playerId) ?? null;
@@ -374,44 +387,66 @@ function buildSeasonSnapshotRecord(gameState: GameState, seasonId: string = game
       disciplineBreakdown: Map<string, { disciplineId: string; disciplineName: string; appearances: number; totalContribution: number; totalFinalScore: number }>;
     }>()).values(),
   )
-    .map((entry) => ({
-      playerId: entry.playerId,
-      playerName: entry.playerName,
-      teamId: entry.teamId,
-      teamCode: entry.teamCode,
-      teamName: entry.teamName,
-      seasonId,
-      appearances: entry.appearances,
-      totalContribution: roundValue(entry.totalContribution, 1),
-      totalPoints: roundValue(entry.totalPoints, 1),
-      averageContribution: roundValue(entry.totalContribution / entry.appearances, 1),
-      averageFinalScore: roundValue(entry.totalFinalScore / entry.appearances, 1),
-      top10Count: entry.top10Count,
-      mvpCount: entry.mvpCount,
-      bestDisciplineId: entry.bestDisciplineId,
-      bestDisciplineLabel: entry.bestDisciplineLabel,
-      bestDisciplineScore: entry.bestDisciplineScore != null ? roundValue(entry.bestDisciplineScore, 1) : null,
-      teamBreakdown: Array.from(entry.teamBreakdown.values())
-        .map((teamEntry) => ({
-          teamId: teamEntry.teamId,
-          teamCode: teamEntry.teamCode,
-          teamName: teamEntry.teamName,
-          appearances: teamEntry.appearances,
-          totalPoints: roundValue(teamEntry.totalPoints, 1),
-        }))
-        .sort((left, right) => (right.totalPoints ?? Number.NEGATIVE_INFINITY) - (left.totalPoints ?? Number.NEGATIVE_INFINITY)),
-      disciplineBreakdown: Array.from(entry.disciplineBreakdown.values())
-        .map((discipline) => ({
-          disciplineId: discipline.disciplineId,
-          disciplineName: discipline.disciplineName,
-          appearances: discipline.appearances,
-          totalContribution: roundValue(discipline.totalContribution, 1),
-          averageContribution: roundValue(discipline.totalContribution / discipline.appearances, 1),
-          averageFinalScore: roundValue(discipline.totalFinalScore / discipline.appearances, 1),
-        }))
-        .sort((left, right) => (right.totalContribution ?? Number.NEGATIVE_INFINITY) - (left.totalContribution ?? Number.NEGATIVE_INFINITY)),
-      warnings: entry.teamId == null ? ["player_team_missing_in_snapshot"] : [],
-    }))
+    .map((entry) => {
+      const player = gameState.players.find((candidate) => candidate.id === entry.playerId) ?? null;
+      const rosterEntry = rosterByPlayerId.get(entry.playerId) ?? null;
+      const rating = playerRatingsById.get(entry.playerId) ?? null;
+      const economy = player
+        ? resolvePlayerEconomyContract({ playerId: player.id, player, rosterEntry })
+        : null;
+
+      return {
+        playerId: entry.playerId,
+        playerName: entry.playerName,
+        teamId: entry.teamId,
+        teamCode: entry.teamCode,
+        teamName: entry.teamName,
+        seasonId,
+        appearances: entry.appearances,
+        totalContribution: roundValue(entry.totalContribution, 1),
+        totalPoints: roundValue(entry.totalPoints, 1),
+        averageContribution: roundValue(entry.totalContribution / entry.appearances, 1),
+        averageFinalScore: roundValue(entry.totalFinalScore / entry.appearances, 1),
+        powPoints: rating?.ppPow ?? null,
+        spePoints: rating?.ppSpe ?? null,
+        menPoints: rating?.ppMen ?? null,
+        socPoints: rating?.ppSoc ?? null,
+        ovr: rating?.ovrNormalized ?? null,
+        ovrRank: rating?.ovrRank ?? null,
+        pps: rating?.ppsSeason ?? roundValue(entry.totalPoints, 1),
+        ppsRank: rating?.ppsSeasonRank ?? null,
+        mvs: rating?.mvs ?? null,
+        mvsRank: rating?.mvsRank ?? null,
+        marketValue: economy?.marketValue ?? rosterEntry?.currentValue ?? rosterEntry?.purchasePrice ?? null,
+        salary: economy?.salary ?? rosterEntry?.salary ?? null,
+        contractLength: economy?.contractLength ?? rosterEntry?.contractLength ?? null,
+        top10Count: entry.top10Count,
+        mvpCount: entry.mvpCount,
+        bestDisciplineId: entry.bestDisciplineId,
+        bestDisciplineLabel: entry.bestDisciplineLabel,
+        bestDisciplineScore: entry.bestDisciplineScore != null ? roundValue(entry.bestDisciplineScore, 1) : null,
+        teamBreakdown: Array.from(entry.teamBreakdown.values())
+          .map((teamEntry) => ({
+            teamId: teamEntry.teamId,
+            teamCode: teamEntry.teamCode,
+            teamName: teamEntry.teamName,
+            appearances: teamEntry.appearances,
+            totalPoints: roundValue(teamEntry.totalPoints, 1),
+          }))
+          .sort((left, right) => (right.totalPoints ?? Number.NEGATIVE_INFINITY) - (left.totalPoints ?? Number.NEGATIVE_INFINITY)),
+        disciplineBreakdown: Array.from(entry.disciplineBreakdown.values())
+          .map((discipline) => ({
+            disciplineId: discipline.disciplineId,
+            disciplineName: discipline.disciplineName,
+            appearances: discipline.appearances,
+            totalContribution: roundValue(discipline.totalContribution, 1),
+            averageContribution: roundValue(discipline.totalContribution / discipline.appearances, 1),
+            averageFinalScore: roundValue(discipline.totalFinalScore / discipline.appearances, 1),
+          }))
+          .sort((left, right) => (right.totalContribution ?? Number.NEGATIVE_INFINITY) - (left.totalContribution ?? Number.NEGATIVE_INFINITY)),
+        warnings: entry.teamId == null ? ["player_team_missing_in_snapshot"] : [],
+      };
+    })
     .sort((left, right) => {
       if ((right.totalContribution ?? Number.NEGATIVE_INFINITY) !== (left.totalContribution ?? Number.NEGATIVE_INFINITY)) {
         return (right.totalContribution ?? Number.NEGATIVE_INFINITY) - (left.totalContribution ?? Number.NEGATIVE_INFINITY);
@@ -462,6 +497,10 @@ function buildSeasonSnapshotRecord(gameState: GameState, seasonId: string = game
     sourceStatus,
     finalStandings,
     teamSnapshots: finalStandings,
+    matchdayResults: structuredClone(seasonMatchdayResults),
+    disciplineResults: structuredClone(seasonDisciplineResults),
+    playerDisciplinePerformances: structuredClone(seasonPlayerPerformances),
+    disciplineHighlights: structuredClone(seasonDisciplineHighlights),
     playerPerformances,
     playerPerformanceSnapshots: playerPerformances,
     transferSnapshots,
@@ -575,6 +614,10 @@ export function createSeasonSnapshot(
         sourceStatus: "missing_source",
         finalStandings: [],
         teamSnapshots: [],
+        matchdayResults: [],
+        disciplineResults: [],
+        playerDisciplinePerformances: [],
+        disciplineHighlights: [],
         playerPerformances: [],
         playerPerformanceSnapshots: [],
         transferSnapshots: [],

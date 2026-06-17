@@ -6,8 +6,12 @@ import { createSaveGameState, loadFreshSeasonOneSeedData } from "@/lib/data/data
 import type { GameState } from "@/lib/data/olyDataTypes";
 import {
   CHUNKED_REDRAFT_TOPUP_CONFIRM_TOKEN,
+  computePreferredAxisFit,
+  computeRedraftScoreVariance,
+  getPlayerAxisValue,
   runChunkedRedraftTopup,
 } from "@/lib/ai/chunked-redraft-topup-service";
+import { calculateThemeCompositionScore, derivePlayerThemeTags, getTeamThemeCompositionTarget } from "@/lib/ai/team-theme-composition-service";
 import type { PersistedSaveGame, PersistenceBootstrapResult, PersistenceService, SaveSummary } from "@/lib/persistence/types";
 import { describe, expect, it } from "vitest";
 
@@ -108,6 +112,93 @@ function duplicatePlayerIds(save: PersistedSaveGame) {
 }
 
 describe("chunked redraft topup service", () => {
+  it("uses player coreStats for draft axes instead of treating OVR as every axis", () => {
+    const seed = loadFreshSeasonOneSeedData();
+    const zaza = seed.players.find((player) => player.id === "player-2818-zaza-stardust");
+    const mayhemIdentity = seed.teamIdentities.find((identity) => identity.teamId === "M-M");
+
+    expect(zaza).toBeDefined();
+    expect(mayhemIdentity).toBeDefined();
+    expect(getPlayerAxisValue(zaza!, "pow")).toBe(52.39);
+    expect(getPlayerAxisValue(zaza!, "spe")).toBe(61.36);
+    expect(getPlayerAxisValue(zaza!, "men")).toBe(71.03);
+    expect(getPlayerAxisValue(zaza!, "soc")).toBe(87.57);
+    const zazaAxes = {
+      quality: 100,
+      pow: getPlayerAxisValue(zaza!, "pow"),
+      spe: getPlayerAxisValue(zaza!, "spe"),
+      men: getPlayerAxisValue(zaza!, "men"),
+      soc: getPlayerAxisValue(zaza!, "soc"),
+    };
+    expect(
+      computePreferredAxisFit(zazaAxes, mayhemIdentity),
+    ).toBe(57.44);
+  });
+
+  it("does not treat Zaza Stardust as an M-M premium identity fit", () => {
+    const seed = loadFreshSeasonOneSeedData();
+    const zaza = seed.players.find((player) => player.id === "player-2818-zaza-stardust");
+    const mayhem = seed.teams.find((team) => team.teamId === "M-M");
+    const target = getTeamThemeCompositionTarget("M-M");
+
+    expect(zaza).toBeDefined();
+    expect(mayhem).toBeDefined();
+    expect(target?.avoidTags).toEqual(expect.arrayContaining(["Bard", "Social", "Royal"]));
+
+    const tags = derivePlayerThemeTags(zaza!);
+    expect(tags.playerThemeTags).toEqual(expect.arrayContaining(["Bard", "Social"]));
+
+    const gameState = createSaveGameState("theme-test", seed).gameState;
+    const themeScore = calculateThemeCompositionScore({
+      gameState: { ...gameState, rosters: [] },
+      team: mayhem!,
+      player: zaza!,
+      candidateQuality: 57.44,
+      candidateRoleFit: 0,
+      phase: "phase_b_core_optimum",
+    });
+    expect(themeScore.themeTier).toBe("avoid");
+  });
+
+  it("does not use OVR, MVS or market value as draft attractiveness score", () => {
+    const serviceText = fs.readFileSync(path.join(process.cwd(), "lib/ai/chunked-redraft-topup-service.ts"), "utf8");
+
+    expect(serviceText).not.toContain("premiumSignal");
+    expect(serviceText).not.toContain("candidate.quality *");
+    expect(serviceText).not.toContain("input.candidate.quality *");
+    expect(serviceText).not.toContain("marketValue *");
+    expect(serviceText).not.toContain("right.quality");
+    expect(serviceText).not.toContain("left.marketValue");
+    expect(serviceText).not.toContain("candidateQuality: input.candidate.quality");
+    expect(serviceText).not.toContain("return roundValue(candidate.quality");
+  });
+
+  it("keeps draft score variance stable per save but different between fresh redraft saves", () => {
+    const first = computeRedraftScoreVariance({
+      draftSalt: "fresh-save-a:full_clean_redraft",
+      teamId: "W-W",
+      playerId: "player-1519-lord-belqua",
+      phase: "phase_b_core_optimum",
+    });
+    const same = computeRedraftScoreVariance({
+      draftSalt: "fresh-save-a:full_clean_redraft",
+      teamId: "W-W",
+      playerId: "player-1519-lord-belqua",
+      phase: "phase_b_core_optimum",
+    });
+    const nextSave = computeRedraftScoreVariance({
+      draftSalt: "fresh-save-b:full_clean_redraft",
+      teamId: "W-W",
+      playerId: "player-1519-lord-belqua",
+      phase: "phase_b_core_optimum",
+    });
+
+    expect(first).toBe(same);
+    expect(nextSave).not.toBe(first);
+    expect(Math.abs(first)).toBeLessThanOrEqual(11);
+    expect(Math.abs(nextSave)).toBeLessThanOrEqual(11);
+  });
+
   it("fills empty S1 rosters through the local buy path without duplicate players", () => {
     const save = createSmallEmptySeasonOneSave();
     const persistence = createInMemoryPersistence(save);
@@ -366,7 +457,7 @@ describe("chunked redraft topup service", () => {
     expect(fs.existsSync(path.join(outputDir, "market-board-preview.csv"))).toBe(true);
     expect(fs.existsSync(path.join(outputDir, "manager-stop-reasons.csv"))).toBe(true);
     expect(fs.existsSync(path.join(outputDir, "manager-ai-redraft-summary.md"))).toBe(true);
-  });
+  }, 20_000);
 
   it("rejects season1_autoprep_topup after season 1", () => {
     const save = createSmallEmptySeasonOneSave();

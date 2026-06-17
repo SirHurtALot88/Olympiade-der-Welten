@@ -3,6 +3,7 @@ import path from "node:path";
 
 import { loadEnvConfig } from "@next/env";
 
+import { buildAiLegacyLineupPreview } from "@/lib/ai/ai-legacy-lineup-engine";
 import type { GameState, LineupDraft, PlayerDisciplinePerformanceRecord } from "@/lib/data/olyDataTypes";
 import { loadLocalLegacyLineupContext, saveLocalLegacyLineupDraft } from "@/lib/lineups/legacy-lineup-local-service";
 import type { LegacyLineupEntryInput, LegacyLineupKeyParams } from "@/lib/lineups/legacy-lineup-types";
@@ -126,15 +127,32 @@ function selectDisjointLineupVariant(input: {
   variantIndex: number;
 }) {
   const variants: Array<{ d1: CandidateEntry[]; d2: CandidateEntry[]; total: number }> = [];
-  for (const d1 of combinations(input.d1Candidates, input.d1PlayerCount)) {
+  const d1OffsetLimit = Math.min(input.d1Candidates.length, 24);
+  const d2OffsetLimit = Math.min(input.d2Candidates.length, 24);
+
+  function pickRotated(pool: CandidateEntry[], count: number, blocked: Set<string>, offset: number) {
+    const picked: CandidateEntry[] = [];
+    for (let index = 0; index < pool.length && picked.length < count; index += 1) {
+      const candidate = pool[(index + offset) % pool.length];
+      if (!candidate || blocked.has(candidate.activePlayerId)) continue;
+      picked.push(candidate);
+    }
+    return picked;
+  }
+
+  for (let d1Offset = 0; d1Offset < d1OffsetLimit; d1Offset += 1) {
+    const d1 = pickRotated(input.d1Candidates, input.d1PlayerCount, new Set(), d1Offset);
+    if (d1.length < input.d1PlayerCount) continue;
     const d1Ids = new Set(d1.map((entry) => entry.activePlayerId));
-    for (const d2 of combinations(input.d2Candidates, input.d2PlayerCount)) {
-      if (d2.some((entry) => d1Ids.has(entry.activePlayerId))) continue;
+
+    for (let d2Offset = 0; d2Offset < d2OffsetLimit; d2Offset += 1) {
+      const d2 = pickRotated(input.d2Candidates, input.d2PlayerCount, d1Ids, d2Offset);
+      if (d2.length < input.d2PlayerCount) continue;
       variants.push({ d1, d2, total: sumScores(d1) + sumScores(d2) });
     }
   }
   variants.sort((left, right) => right.total - left.total);
-  return variants[input.variantIndex] ?? variants[0] ?? null;
+  return variants[variants.length > 0 ? input.variantIndex % variants.length : 0] ?? null;
 }
 
 function buildEntriesForSide(input: {
@@ -186,9 +204,18 @@ function buildVariantEntries(params: LegacyLineupKeyParams, variantIndex: number
     .filter((entry): entry is CandidateEntry => typeof entry.score === "number")
     .sort((left, right) => right.score - left.score);
 
+  const existingD1Count = existingDraft?.entries.filter(
+    (entry) => entry.disciplineId === d1.disciplineId && entry.disciplineSide === "d1",
+  ).length;
+  const existingD2Count = existingDraft?.entries.filter(
+    (entry) => entry.disciplineId === d2.disciplineId && entry.disciplineSide === "d2",
+  ).length;
+  const d1PlayerCount = Math.min(d1.requiredPlayers, existingD1Count || d1.requiredPlayers, d1Candidates.length);
+  const d2PlayerCount = Math.min(d2.requiredPlayers, existingD2Count || d2.requiredPlayers, d2Candidates.length);
+
   const selected = selectDisjointLineupVariant({
-    d1PlayerCount: d1.requiredPlayers,
-    d2PlayerCount: d2.requiredPlayers,
+    d1PlayerCount,
+    d2PlayerCount,
     d1Candidates,
     d2Candidates,
     variantIndex,
@@ -267,7 +294,9 @@ function assertPreflightReady(preflight: ReturnType<typeof buildPreflight>) {
   const blockers: string[] = [];
   const expectedLineupCount = MAX_MATCHDAYS > 0 ? EXPECTED_TEAM_COUNT * MAX_MATCHDAYS : EXPECTED_TEAM_COUNT * EXPECTED_MATCHDAY_COUNT;
   if (preflight.seasonId !== TARGET_SEASON_ID) blockers.push(`season_not_${TARGET_SEASON_ID}:${preflight.seasonId}`);
-  if (preflight.currentMatchday !== "matchday-1") blockers.push(`matchday_not_1:${preflight.currentMatchday}`);
+  if (preflight.currentMatchday !== "matchday-1" && preflight.resultCount === 0) {
+    blockers.push(`matchday_not_1:${preflight.currentMatchday}`);
+  }
   if (preflight.matchdayCount !== EXPECTED_MATCHDAY_COUNT) blockers.push(`matchday_count:${preflight.matchdayCount}`);
   if (preflight.teamCount !== EXPECTED_TEAM_COUNT) blockers.push(`team_count:${preflight.teamCount}`);
   if (preflight.shortTeams.length > 0) blockers.push(`teams_under_7:${preflight.shortTeams.join("|")}`);
@@ -321,6 +350,42 @@ function getExistingDraft(gameState: GameState, params: LegacyLineupKeyParams) {
   );
 }
 
+function refreshActiveMatchdayLineups(input: {
+  saveId: string;
+  seasonId: string;
+  matchdayId: string;
+  persistence: ReturnType<typeof createPersistenceService>;
+}) {
+  const save = input.persistence.getSaveById(input.saveId);
+  if (!save) throw new Error(`Save disappeared before lineup refresh for ${input.matchdayId}.`);
+
+  for (const team of save.gameState.teams) {
+    const params = {
+      saveId: input.saveId,
+      seasonId: input.seasonId,
+      matchdayId: input.matchdayId,
+      teamId: team.teamId,
+    };
+    const contextResult = loadLocalLegacyLineupContext(params, input.persistence);
+    if (!contextResult.ok) {
+      throw new Error(`${input.matchdayId} lineup refresh context failed for ${team.teamId}: ${contextResult.errors.join(" | ")}`);
+    }
+    const preview = buildAiLegacyLineupPreview(contextResult.context, "sqlite");
+    if (preview.status === "blocked" || preview.status === "missing_scores") {
+      throw new Error(`${input.matchdayId} lineup refresh blocked for ${team.teamId}: ${preview.warnings.join(" | ")}`);
+    }
+    const saveResult = saveLocalLegacyLineupDraft(
+      params,
+      preview.entries,
+      contextResult.context.existingDraft?.modifiers,
+      input.persistence,
+    );
+    if (!saveResult.ok) {
+      throw new Error(`${input.matchdayId} lineup refresh save failed for ${team.teamId}: ${saveResult.errors.join(" | ")}`);
+    }
+  }
+}
+
 async function resolveAndApplyMatchday(input: {
   saveId: string;
   seasonId: string;
@@ -345,6 +410,9 @@ async function resolveAndApplyMatchday(input: {
     blockers: [],
   };
   const resultApplyService = new LegacyMatchdayResultApplyService(undefined, undefined, input.persistence);
+  if (input.write) {
+    refreshActiveMatchdayLineups(input);
+  }
 
   for (let attempt = 0; attempt < 8; attempt += 1) {
     const save = input.persistence.getSaveById(input.saveId);
@@ -818,12 +886,14 @@ async function main() {
     : [];
   const openBlockers: string[] = [];
 
+  const currentMatchdayIndex = Math.max(0, save.gameState.season.matchdayIds.indexOf(currentMatchdayAtStart));
   const matchdayIdsToRun =
     !args.exportOnly && MAX_MATCHDAYS > 0
-      ? save.gameState.season.matchdayIds.slice(0, MAX_MATCHDAYS)
-      : save.gameState.season.matchdayIds;
+      ? save.gameState.season.matchdayIds.slice(currentMatchdayIndex, currentMatchdayIndex + MAX_MATCHDAYS)
+      : save.gameState.season.matchdayIds.slice(args.exportOnly ? 0 : currentMatchdayIndex);
 
-  if (!args.exportOnly) for (const [index, matchdayId] of matchdayIdsToRun.entries()) {
+  if (!args.exportOnly) for (const [runIndex, matchdayId] of matchdayIdsToRun.entries()) {
+    const seasonMatchdayIndex = save.gameState.season.matchdayIds.indexOf(matchdayId);
     const currentSave = persistence.getSaveById(saveId);
     if (!currentSave) throw new Error(`Save ${saveId} disappeared before ${matchdayId}.`);
     if (args.write && currentSave.gameState.matchdayState.matchdayId !== matchdayId) {
@@ -833,7 +903,7 @@ async function main() {
       saveId,
       seasonId,
       matchdayId,
-      matchdayIndex: index + 1,
+      matchdayIndex: seasonMatchdayIndex + 1,
       write: args.write,
       persistence,
     });
@@ -842,7 +912,7 @@ async function main() {
         `${matchdayId}: tie_groups_require_confirmed_policy durch ${report.tieFixAttempts} Lineup-Variant-Retry(s) gelöst (${Array.from(new Set(report.tieFixTeams)).join(", ")})`,
       );
     }
-    if (args.write && ADVANCE_AFTER_MATCHDAY && index < matchdayIdsToRun.length - 1) {
+    if (args.write && ADVANCE_AFTER_MATCHDAY && runIndex < matchdayIdsToRun.length - 1) {
       const advance = await executeMatchdayAdvance({
         saveId,
         seasonId,

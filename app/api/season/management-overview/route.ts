@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 
-import { mapSeasonManagementRowsToTeams, inspectSeasonManagementSheet } from "@/lib/foundation/season-management-sheet";
+import { inspectSeasonManagementSheetWithFallback, mapSeasonManagementRowsToTeams } from "@/lib/foundation/season-management-sheet";
 import { createPersistenceService } from "@/lib/persistence/persistence-service";
 import { db } from "@/src/server/db";
 
@@ -39,7 +39,7 @@ export async function GET(request: Request) {
             },
           });
 
-    const sheet = await inspectSeasonManagementSheet();
+    const sheet = await inspectSeasonManagementSheetWithFallback({ timeoutMs: 5000 });
     const mapping = mapSeasonManagementRowsToTeams(
       sheet.rows,
       teamStates.map((state) => ({
@@ -61,8 +61,9 @@ export async function GET(request: Request) {
         })),
       missingMappings: mapping.missingMappings,
       source: {
-        kind: "season_management_sheet",
+        kind: sheet.sourceKind,
         budgetColumn: "Startbudget",
+        fallbackReason: sheet.fallbackReason,
       },
       scope: {
         saveId,

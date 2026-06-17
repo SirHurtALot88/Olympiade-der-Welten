@@ -281,6 +281,15 @@ function buildDryRunLineupSummary(input: {
     input.gameState.teams,
     input.gameState.seasonState.teamControlSettings,
   );
+  const savedLineupTeamIds = new Set(
+    (input.gameState.seasonState.lineupDrafts ?? [])
+      .filter(
+        (draft) =>
+          draft.seasonId === input.gameState.season.id &&
+          draft.matchdayId === input.gameState.matchdayState.matchdayId,
+      )
+      .map((draft) => draft.teamId),
+  );
   let aiReady = 0;
   let manualReady = 0;
   let manualMissing = 0;
@@ -292,7 +301,7 @@ function buildDryRunLineupSummary(input: {
     const readiness = input.resolve.readinessByTeamId.get(team.teamId);
     const readinessStatus = readiness?.readinessStatus ?? "unknown";
     const isReady = readinessStatus === "ready";
-    const isMissingLineup = readinessStatus === "missing_lineup";
+    const isMissingLineup = !savedLineupTeamIds.has(team.teamId) || readinessStatus === "missing_lineup";
 
     if (controlMode === "ai") {
       if (isReady) {
@@ -623,7 +632,7 @@ export async function runLocalMatchdayAutoRun(
   const standingsPreviewBlockers =
     stopOnTie && (standingsPreview.tieGroups?.length ?? 0) > 0
       ? [...standingsPreview.blockedRules, "tie_groups_require_confirmed_policy"]
-      : standingsPreview.blockedRules;
+      : standingsPreview.blockedRules.filter((rule) => rule !== "global_score_tie_breaker_missing");
   addStep(result, {
     key: "standings_preview",
     label: "Standings Preview",
@@ -660,6 +669,7 @@ export async function runLocalMatchdayAutoRun(
       execute: true,
       dryRun: false,
       confirm: STANDINGS_APPLY_CONFIRM_TOKEN,
+      forceReplace: !stopOnTie,
     },
     persistence,
   );

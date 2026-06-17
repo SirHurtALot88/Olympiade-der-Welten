@@ -10,6 +10,7 @@ import type {
 } from "@/lib/data/olyDataTypes";
 import { buildTeamSeasonOverviewRows, type TeamManagementSnapshotRow } from "@/lib/foundation/team-management-overview";
 import { getTeamStrategyProfile } from "@/lib/foundation/team-strategy-profiles";
+import { assessPlayerMorale } from "@/lib/morale/player-morale-service";
 
 export type TeamObjectiveAiBias = {
   teamId: string;
@@ -20,6 +21,7 @@ export type TeamObjectiveAiBias = {
   budgetConservatism: number;
   facilityPriority: number;
   developmentPriority: number;
+  moralePriority: number;
   rosterUrgency: number;
   warnings: string[];
 };
@@ -87,10 +89,17 @@ function getSportTarget(input: {
 }) {
   const code = input.team.shortCode;
   const starPriority = input.profile?.bias.starPriority ?? 5;
+  const cashPriority = input.profile?.bias.cashPriority ?? input.identity?.finances ?? 5;
+  const sellPriority = input.profile?.bias.sellForProfitAggression ?? 5;
+  const depthPriority = input.profile?.bias.rosterDepthPreference ?? 5;
   const ambition = input.identity?.ambition ?? 5;
   if (code === "M-M") return { rank: 3, label: "Top 3 / Titelkampf erreichen" };
   if (starPriority >= 8 || ambition >= 8) return { rank: 4, label: "Top 4 erreichen" };
   if (code === "A-A") return { rank: 27, label: "Survival: nicht Bottom 5" };
+  if (cashPriority >= 9 && ambition <= 6) return { rank: 16, label: "Value-Saison ohne Cash-Risiko" };
+  if (sellPriority >= 8 && starPriority <= 6) return { rank: 18, label: "Positive Bilanz ohne Absturz" };
+  if (ambition <= 4) return { rank: 20, label: "Rebuild: konkurrenzfaehig bleiben" };
+  if (depthPriority >= 8) return { rank: 12, label: "Breite Playoff-Zone erreichen" };
   return { rank: 10, label: "Top 10 angreifen" };
 }
 
@@ -221,6 +230,104 @@ function getNextMatchdayTop10Objective(gameState: GameState, team: Team): Object
   };
 }
 
+function getRosterPlayerIds(gameState: GameState, teamId: string) {
+  return gameState.rosters.filter((entry) => entry.teamId === teamId).map((entry) => entry.playerId);
+}
+
+function getTeamMoraleObjective(input: {
+  gameState: GameState;
+  team: Team;
+  identity: TeamIdentity | null;
+  profile: TeamStrategyProfile | null;
+}): ObjectiveDraft {
+  const playerIds = getRosterPlayerIds(input.gameState, input.team.teamId);
+  const moraleAssessments = playerIds
+    .map((playerId) => assessPlayerMorale({ gameState: input.gameState, playerId, teamId: input.team.teamId }))
+    .filter((entry): entry is NonNullable<typeof entry> => Boolean(entry));
+  const target = (input.profile?.bias.harmonyStrictness ?? input.identity?.harmony ?? 5) >= 8 ? 68 : 60;
+  const averageMorale = moraleAssessments.length
+    ? roundValue(moraleAssessments.reduce((sum, entry) => sum + entry.morale, 0) / moraleAssessments.length, 1)
+    : null;
+  const status = statusForMin(averageMorale, target);
+
+  return {
+    objectiveId: "morale-team-average",
+    category: "morale",
+    label: target >= 68 ? "Team-Moral hoch halten" : "Kabine stabil halten",
+    targetValue: `>= ${target}`,
+    currentValue: averageMorale == null ? "offen" : averageMorale,
+    status,
+    rewardCash: status === "completed" ? 2 : undefined,
+    penaltyCash: status === "failed" ? 2 : undefined,
+    boardConfidenceDelta: status === "completed" ? 0.45 : status === "failed" ? -0.7 : status === "at_risk" ? -0.15 : 0,
+    source: moraleAssessments.length ? "player_morale_assessment" : "player_morale_pending",
+  };
+}
+
+function getTopPlayerObjective(input: {
+  gameState: GameState;
+  team: Team;
+  identity: TeamIdentity | null;
+  profile: TeamStrategyProfile | null;
+}): ObjectiveDraft | null {
+  const starPriority = input.profile?.bias.starPriority ?? input.identity?.ambition ?? 5;
+  const elitePriority = input.profile?.bias.eliteSmallRosterPreference ?? 5;
+  if (starPriority < 7 && elitePriority < 7) return null;
+
+  const rosterIds = new Set(getRosterPlayerIds(input.gameState, input.team.teamId));
+  const currentSeasonResultIds = new Set(
+    (input.gameState.seasonState.matchdayResults ?? [])
+      .filter((entry) => entry.seasonId === input.gameState.season.id)
+      .map((entry) => entry.id),
+  );
+  const ranks = (input.gameState.seasonState.playerDisciplinePerformances ?? [])
+    .filter((entry) => entry.teamId === input.team.teamId)
+    .filter((entry) => rosterIds.has(entry.playerId))
+    .filter((entry) => currentSeasonResultIds.size === 0 || currentSeasonResultIds.has(entry.matchdayResultId))
+    .map((entry) => entry.rankInDiscipline)
+    .filter((rank) => Number.isFinite(rank));
+  const bestRank = ranks.length ? Math.min(...ranks) : null;
+  const status = bestRank == null ? "open" : bestRank <= 5 ? "completed" : bestRank <= 10 ? "at_risk" : "failed";
+
+  return {
+    objectiveId: "player-top5-discipline-star",
+    category: "player",
+    label: "Top-5 Diszi-Spieler stellen",
+    targetValue: "Top 5",
+    currentValue: bestRank == null ? "offen" : bestRank,
+    status,
+    rewardCash: status === "completed" ? 4 : undefined,
+    boardConfidenceDelta: status === "completed" ? 0.55 : status === "failed" ? -0.35 : status === "at_risk" ? 0.1 : 0,
+    source: ranks.length ? "player_discipline_performance_rank" : "player_performance_pending",
+  };
+}
+
+function getRebuildCashObjective(input: {
+  team: Team;
+  row: TeamManagementSnapshotRow;
+  identity: TeamIdentity | null;
+  profile: TeamStrategyProfile | null;
+}): ObjectiveDraft | null {
+  const cashPriority = input.profile?.bias.cashPriority ?? input.identity?.finances ?? 5;
+  const ambition = input.identity?.ambition ?? 5;
+  if (cashPriority < 8 && ambition > 4) return null;
+  const target = roundValue(Math.max(0, input.team.budget * 0.65), 1);
+  const status = statusForMin(input.row.cash, target);
+
+  return {
+    objectiveId: "finance-rebuild-cash-buffer",
+    category: "finance",
+    label: cashPriority >= 8 ? "Cashpuffer halten" : "Rebuild-Kosten klein halten",
+    targetValue: `>= ${target}`,
+    currentValue: input.row.cash,
+    status,
+    rewardCash: status === "completed" ? 3 : undefined,
+    penaltyCash: status === "failed" ? 2 : undefined,
+    boardConfidenceDelta: status === "completed" ? 0.35 : status === "failed" ? -0.45 : -0.1,
+    source: "team_identity_finance_rebuild",
+  };
+}
+
 function buildTeamObjectives(input: {
   gameState: GameState;
   team: Team;
@@ -284,7 +391,10 @@ function buildTeamObjectives(input: {
     getNextMatchdayTop10Objective(gameState, team),
     getFacilityObjective(gameState, team, profile),
     getDevelopmentObjective(gameState, row, team),
-  ];
+    getTeamMoraleObjective({ gameState, team, identity, profile }),
+    getTopPlayerObjective({ gameState, team, identity, profile }),
+    getRebuildCashObjective({ team, row, identity, profile }),
+  ].filter((objective): objective is ObjectiveDraft => Boolean(objective));
 
   return objectiveDrafts.map((objective) => ({
     seasonId: gameState.season.id,
@@ -331,7 +441,7 @@ function calculateBoardConfidence(input: {
   objectives: TeamSeasonObjectiveRecord[];
   storedBoard?: TeamBoardConfidenceRecord | null;
 }): TeamBoardConfidenceRecord {
-  const base = normalizeBoardConfidence(input.storedBoard?.value ?? input.identity?.boardConfidence ?? null);
+  const base = normalizeBoardConfidence(input.identity?.boardConfidence ?? input.storedBoard?.value ?? null);
   const delta = input.objectives.reduce((sum, objective) => sum + (objective.boardConfidenceDelta ?? 0), 0);
   const failed = input.objectives.filter((objective) => objective.status === "failed").length;
   const atRisk = input.objectives.filter((objective) => objective.status === "at_risk").length;
@@ -361,6 +471,7 @@ function buildAiBias(input: {
   const hasRosterRisk = input.objectives.some((objective) => objective.category === "roster" && objective.status !== "completed");
   const hasFacilityOpen = input.objectives.some((objective) => objective.category === "facility" && objective.status === "open");
   const hasDevelopmentOpen = input.objectives.some((objective) => objective.category === "development" && objective.status !== "completed");
+  const hasMoraleRisk = input.objectives.some((objective) => objective.category === "morale" && objective.status !== "completed");
   const pressureFactor = input.board.pressure / 10;
   const budgetConservatism = clamp((hasFinanceRisk ? 0.65 : 0.35) + pressureFactor * 0.15, 0, 1);
   const sellAggression = clamp((hasFinanceRisk ? 0.7 : 0.35) + pressureFactor * 0.25, 0, 1);
@@ -375,10 +486,12 @@ function buildAiBias(input: {
     budgetConservatism: roundValue(budgetConservatism, 2),
     facilityPriority: hasFacilityOpen ? 0.75 : 0.25,
     developmentPriority: hasDevelopmentOpen ? 0.7 : 0.3,
+    moralePriority: hasMoraleRisk ? 0.8 : 0.25,
     rosterUrgency: hasRosterRisk ? 0.8 : 0.25,
     warnings: [
       hasFinanceRisk ? "objective_bias_finance_caution" : null,
       hasRosterRisk ? "objective_bias_roster_topup" : null,
+      hasMoraleRisk ? "objective_bias_morale_repair" : null,
       input.board.pressure >= 8 ? "objective_bias_high_pressure_aggression" : null,
     ].filter((warning): warning is string => Boolean(warning)),
   };
@@ -425,4 +538,24 @@ export function getTeamObjectives(gameState: GameState, teamId: string) {
 
 export function getTeamObjectiveAiBias(gameState: GameState, teamId: string) {
   return buildTeamObjectiveOverview(gameState).aiBiasByTeamId[teamId] ?? null;
+}
+
+export function refreshTeamObjectiveState(gameState: GameState): GameState {
+  const overview = buildTeamObjectiveOverview(gameState);
+  const currentSeasonId = gameState.season.id;
+  const otherSeasonObjectives = (gameState.seasonState.teamSeasonObjectives ?? []).filter(
+    (objective) => objective.seasonId !== currentSeasonId,
+  );
+
+  return {
+    ...gameState,
+    seasonState: {
+      ...gameState.seasonState,
+      teamSeasonObjectives: [...otherSeasonObjectives, ...overview.objectives],
+      boardConfidence: {
+        ...(gameState.seasonState.boardConfidence ?? {}),
+        ...overview.boardConfidence,
+      },
+    },
+  };
 }

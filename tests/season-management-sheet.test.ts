@@ -1,6 +1,10 @@
 import { describe, expect, it } from "vitest";
 
-import { inspectSeasonManagementSheet, mapSeasonManagementRowsToTeams } from "@/lib/foundation/season-management-sheet";
+import {
+  inspectSeasonManagementSheet,
+  inspectSeasonManagementSheetWithFallback,
+  mapSeasonManagementRowsToTeams,
+} from "@/lib/foundation/season-management-sheet";
 
 describe("season management sheet", () => {
   it("reads Startbudget from the season management sheet export", async () => {
@@ -48,5 +52,21 @@ describe("season management sheet", () => {
       startBudget: 175,
     });
     expect(mapping.missingMappings).toEqual([]);
+  });
+
+  it("falls back to the local reference rows when the sheet fetch times out", async () => {
+    const fakeFetch: typeof fetch = (async (_input, init) =>
+      new Promise<Response>((_resolve, reject) => {
+        init?.signal?.addEventListener("abort", () => reject(new Error("aborted")));
+      })) as typeof fetch;
+
+    const result = await inspectSeasonManagementSheetWithFallback({
+      fetchImpl: fakeFetch,
+      timeoutMs: 1,
+    });
+
+    expect(result.sourceKind).toBe("season_management_reference_fallback");
+    expect(result.rows.length).toBeGreaterThanOrEqual(32);
+    expect(result.rows.some((row) => row.teamName === "Armageddon Aftermath")).toBe(true);
   });
 });

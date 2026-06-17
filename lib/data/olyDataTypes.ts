@@ -773,7 +773,15 @@ export type FacilityEventRecord = {
   nextConditionPct?: number;
 };
 
-export type TeamSeasonObjectiveCategory = "sport" | "finance" | "transfer" | "roster" | "facility" | "development";
+export type TeamSeasonObjectiveCategory =
+  | "sport"
+  | "finance"
+  | "transfer"
+  | "roster"
+  | "facility"
+  | "development"
+  | "morale"
+  | "player";
 
 export type TeamSeasonObjectiveStatus = "open" | "completed" | "failed" | "at_risk";
 
@@ -1246,6 +1254,19 @@ export type SeasonSnapshotPlayerPerformanceRecord = {
   totalPoints?: number | null;
   averageContribution: number | null;
   averageFinalScore: number | null;
+  powPoints?: number | null;
+  spePoints?: number | null;
+  menPoints?: number | null;
+  socPoints?: number | null;
+  ovr?: number | null;
+  ovrRank?: number | null;
+  pps?: number | null;
+  ppsRank?: number | null;
+  mvs?: number | null;
+  mvsRank?: number | null;
+  marketValue?: number | null;
+  salary?: number | null;
+  contractLength?: number | null;
   top10Count: number;
   mvpCount: number;
   bestDisciplineId: string | null;
@@ -1286,6 +1307,10 @@ export type SeasonSnapshotRecord = {
   sourceStatus?: "mapped" | "partial" | "missing_source";
   finalStandings: SeasonSnapshotTeamRecord[];
   teamSnapshots?: SeasonSnapshotTeamRecord[];
+  matchdayResults?: MatchdayResultRecord[];
+  disciplineResults?: DisciplineResultRecord[];
+  playerDisciplinePerformances?: PlayerDisciplinePerformanceRecord[];
+  disciplineHighlights?: DisciplineHighlightRecord[];
   playerPerformances: SeasonSnapshotPlayerPerformanceRecord[];
   playerPerformanceSnapshots?: SeasonSnapshotPlayerPerformanceRecord[];
   transferSnapshots?: SeasonSnapshotTransferRecord[];

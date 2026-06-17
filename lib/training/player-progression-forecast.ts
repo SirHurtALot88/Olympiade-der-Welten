@@ -2,6 +2,12 @@ import type { GameState, Player, PlayerDisciplinePerformanceRecord } from "@/lib
 import type { PlayerRatingContractRow } from "@/lib/foundation/player-rating-contract";
 import type { PlayerSeasonPerformanceSummary } from "@/lib/foundation/player-season-performance";
 import { buildPlayerScoutPotentialFromGameState } from "@/lib/progression/player-potential-service";
+import {
+  DEVELOPMENT_MAX_LEVEL_UPS_PER_SEASON,
+  DEVELOPMENT_TARGET_TOP_SEASON_LEVEL_GAIN,
+  getDevelopmentLevelProgress,
+  getDevelopmentXpForLevelGain,
+} from "@/lib/training/development-level-curve";
 import { buildTrainingTraitSignal } from "@/lib/training/trait-training-signal";
 import type {
   PlayerDevelopmentRoute,
@@ -21,16 +27,16 @@ export const PLAYER_PROGRESSION_XP_CONSTANTS = {
     hart: 110,
   } satisfies Record<PlayerTrainingMode, number>,
   appearanceXp: 15,
-  mvsMultiplier: 20,
-  ppsBonusMultiplier: 12,
+  mvsMultiplier: 4,
+  ppsBonusMultiplier: 4,
   ppsBonusCapPctOfMvsXp: 0.35,
-  ppsBonusNoMvsCap: 60,
-  top10BonusMin: 25,
-  top10BonusMax: 100,
-  rank1BonusMin: 150,
-  rank1BonusMax: 250,
-  highlightBonusMin: 25,
-  highlightBonusMax: 100,
+  ppsBonusNoMvsCap: 35,
+  top10BonusMin: 8,
+  top10BonusMax: 35,
+  rank1BonusMin: 35,
+  rank1BonusMax: 70,
+  highlightBonusMin: 10,
+  highlightBonusMax: 35,
   ratingTierUpgradeCost: {
     F: 45,
     E: 55,
@@ -216,6 +222,19 @@ function getTierFactor(tier: PlayerTrainingFormTier) {
   }[tier];
 }
 
+function getTrainingFormPressure(tier: PlayerTrainingFormTier) {
+  return {
+    "S+": 0,
+    S: 0,
+    A: 0,
+    B: 0,
+    C: 6,
+    D: 16,
+    E: 28,
+    F: 42,
+  }[tier];
+}
+
 function getStarLabel(value: number | null) {
   if (!isFiniteNumber(value)) return null;
   const stars = clamp(Math.round((value / 20) * 2) / 2, 0.5, 5);
@@ -226,6 +245,32 @@ function getCurrentAbility(input: { player: Player; playerRating: PlayerRatingCo
   const coreValues = [input.player.coreStats.pow, input.player.coreStats.spe, input.player.coreStats.men, input.player.coreStats.soc].filter(isFiniteNumber);
   const coreAverage = coreValues.length > 0 ? coreValues.reduce((sum, value) => sum + value, 0) / coreValues.length : null;
   return roundValue(input.playerRating?.ovrNormalized ?? input.player.rating ?? coreAverage ?? input.player.potential ?? null, 1);
+}
+
+function getDisplayMarketValue(player: Player) {
+  const value =
+    isFiniteNumber((player as { displayMarketValue?: number | null }).displayMarketValue)
+      ? (player as { displayMarketValue?: number | null }).displayMarketValue
+      : player.marketValue;
+  if (!isFiniteNumber(value)) return null;
+  return value > 1000 ? value / 1000 : value;
+}
+
+function getMarketValuePressureFactor(player: Player) {
+  const marketValue = getDisplayMarketValue(player);
+  if (marketValue == null) return 0;
+  if (marketValue >= 70) return 1;
+  if (marketValue >= 50) return 0.75;
+  if (marketValue >= 35) return 0.5;
+  if (marketValue >= 22) return 0.25;
+  return 0;
+}
+
+function getPotentialSeasonLevelCap(potentialGap: number) {
+  if (potentialGap <= 0) return 0;
+  if (potentialGap <= 4) return 0.5;
+  if (potentialGap <= 10) return 1;
+  return DEVELOPMENT_MAX_LEVEL_UPS_PER_SEASON;
 }
 
 function buildTrainingFormScore(player: Player, mode: PlayerTrainingMode) {
@@ -291,6 +336,7 @@ function buildNetDevelopment(input: {
   pps: number | null;
   xpAfterTraits: number;
   boardTrustScore: number | null;
+  currentDevelopmentLevel: number;
 }) {
   const role = getRosterRole(input.gameState, input.player.id);
   const isFreeAgent = !input.gameState.rosters.some((entry) => entry.playerId === input.player.id);
@@ -309,17 +355,23 @@ function buildNetDevelopment(input: {
   const routeFitFactor = routeConflict ? 0.92 : 1;
   const earnedXP = roundValue(input.xpAfterTraits * playtimeFactor * performanceFactor * trainingFormFactor * potentialGapFactor * traitFactor * routeFitFactor, 0);
   const roleMaintenance = isStarOrCore(role) ? (role.includes("star") ? 42 : 28) : isProspect(role) ? 8 : 16;
+  const leagueMedianRegression = isProspect(role) ? 180 : isStarOrCore(role) ? (role.includes("star") ? 340 : 300) : 260;
   const potentialProximity = potentialGap <= -1 ? 45 + Math.abs(potentialGap) * 4 : potentialGap <= 4 ? 36 : potentialGap <= 10 ? 20 : 8;
   const currentAbilityMaintenance = ca * 0.65;
   const overPotential = Math.max(0, ca - po) * 8;
   const maintenanceBreakdown = {
+    leagueMedianRegression,
     currentAbility: roundValue(currentAbilityMaintenance, 0),
     role: roleMaintenance,
     potentialProximity: roundValue(potentialProximity, 0),
     overPotential: roundValue(overPotential, 0),
   };
   const maintenanceXP = roundValue(
-    maintenanceBreakdown.currentAbility + maintenanceBreakdown.role + maintenanceBreakdown.potentialProximity + maintenanceBreakdown.overPotential,
+    maintenanceBreakdown.leagueMedianRegression +
+      maintenanceBreakdown.currentAbility +
+      maintenanceBreakdown.role +
+      maintenanceBreakdown.potentialProximity +
+      maintenanceBreakdown.overPotential,
     0,
   );
   const lowPlaytime = input.appearances === 0 ? (isFreeAgent ? 8 : isStarOrCore(role) ? 42 : 24) : input.appearances <= 2 ? 14 : 0;
@@ -329,6 +381,15 @@ function buildNetDevelopment(input: {
   const negativeTraits = input.player.traitsNegative.reduce((sum, trait) => sum + Math.abs(TRAINING_FORM_NEGATIVE_TRAITS[trait] ?? 0) * 0.7, 0);
   const routeConflictPressure = routeConflict ? 14 : 0;
   const starUnderperformance = isStarOrCore(role) && input.appearances >= 4 && ((input.mvs ?? 0) < 8 || (input.pps ?? 0) < 12) ? 24 : 0;
+  const marketValuePressureFactor = getMarketValuePressureFactor(input.player);
+  const highValueUnderperformance =
+    marketValuePressureFactor > 0 && input.appearances >= 3 && ((input.mvs ?? 0) < 8 || (input.pps ?? 0) < 12)
+      ? roundValue((34 + ca * 0.16) * marketValuePressureFactor, 0)
+      : 0;
+  const poorTrainingValuePressure =
+    marketValuePressureFactor > 0
+      ? roundValue((getTrainingFormPressure(input.trainingFormTier) + (input.appearances <= 2 && !isFreeAgent ? 10 : 0)) * marketValuePressureFactor, 0)
+      : 0;
   const regressionBreakdown = {
     lowPlaytime: roundValue(lowPlaytime, 0),
     poorPerformance: roundValue(poorPerformance, 0),
@@ -337,9 +398,27 @@ function buildNetDevelopment(input: {
     negativeTraits: roundValue(negativeTraits, 0),
     routeConflict: roundValue(routeConflictPressure, 0),
     starUnderperformance: roundValue(starUnderperformance, 0),
+    highValueUnderperformance,
+    poorTrainingValuePressure,
   };
-  const regressionPressure = roundValue(Object.values(regressionBreakdown).reduce((sum, value) => sum + value, 0), 0);
+  const baseRegressionPressure = roundValue(Object.values(regressionBreakdown).reduce((sum, value) => sum + value, 0), 0);
+  const preSoftBalanceNetDevelopmentXP = roundValue(earnedXP - maintenanceXP - baseRegressionPressure, 0);
+  const targetSeasonNetXP = getDevelopmentXpForLevelGain(input.currentDevelopmentLevel, DEVELOPMENT_TARGET_TOP_SEASON_LEVEL_GAIN);
+  const hardMaxSeasonNetXP = getDevelopmentXpForLevelGain(input.currentDevelopmentLevel, DEVELOPMENT_MAX_LEVEL_UPS_PER_SEASON);
+  const potentialMaxSeasonNetXP = getDevelopmentXpForLevelGain(input.currentDevelopmentLevel, getPotentialSeasonLevelCap(potentialGap));
+  const softCeilingRegression =
+    preSoftBalanceNetDevelopmentXP > targetSeasonNetXP
+      ? roundValue(preSoftBalanceNetDevelopmentXP - targetSeasonNetXP, 0)
+      : 0;
+  const netAfterSoftCeiling = roundValue(earnedXP - maintenanceXP - baseRegressionPressure - softCeilingRegression, 0);
+  const potentialCeilingRegression =
+    netAfterSoftCeiling > potentialMaxSeasonNetXP ? roundValue(netAfterSoftCeiling - potentialMaxSeasonNetXP, 0) : 0;
+  const netAfterPotentialCeiling = roundValue(netAfterSoftCeiling - potentialCeilingRegression, 0);
+  const hardCapRegression =
+    netAfterPotentialCeiling > hardMaxSeasonNetXP ? roundValue(netAfterPotentialCeiling - hardMaxSeasonNetXP, 0) : 0;
+  const regressionPressure = roundValue(baseRegressionPressure + softCeilingRegression + potentialCeilingRegression + hardCapRegression, 0);
   const netDevelopmentXP = roundValue(earnedXP - maintenanceXP - regressionPressure, 0);
+  const organicRegressionPressure = roundValue(baseRegressionPressure + potentialCeilingRegression, 0);
   return {
     role,
     isFreeAgent,
@@ -347,6 +426,7 @@ function buildNetDevelopment(input: {
     earnedXP,
     maintenanceXP,
     regressionPressure,
+    organicRegressionPressure,
     netDevelopmentXP,
     developmentFactors: {
       playtimeFactor: roundValue(playtimeFactor, 2),
@@ -357,7 +437,12 @@ function buildNetDevelopment(input: {
       routeFitFactor: roundValue(routeFitFactor, 2),
     },
     maintenanceBreakdown,
-    regressionBreakdown,
+    regressionBreakdown: {
+      ...regressionBreakdown,
+      potentialCeiling: potentialCeilingRegression,
+      seasonGainSoftCeiling: softCeilingRegression,
+      seasonGainHardCap: hardCapRegression,
+    },
   };
 }
 
@@ -501,6 +586,9 @@ export function buildPlayerProgressionForecast(input: {
   const currentAbilityRating = getCurrentAbility({ player: input.player, playerRating: input.playerRating });
   const potentialRating = scoutPotential.scoutRating ?? (input.player.potential > 0 ? input.player.potential : currentAbilityRating);
   const trainingFormTier = getTrainingFormTier(buildTrainingFormScore(input.player, mode));
+  const developmentLevelProgress = getDevelopmentLevelProgress(
+    input.lifetimeXP ?? input.player.lifetimeXP ?? (input.currentXP ?? input.player.currentXP ?? 0) + (input.spentXP ?? input.player.spentXP ?? 0),
+  );
   const netDevelopment = buildNetDevelopment({
     player: input.player,
     gameState: input.gameState,
@@ -513,11 +601,7 @@ export function buildPlayerProgressionForecast(input: {
     pps,
     xpAfterTraits,
     boardTrustScore: input.boardTrustScore ?? null,
-  });
-  const xpTrend = getTrend(netDevelopment.netDevelopmentXP);
-  const regressionRisk = getRegressionRisk({
-    netDevelopmentXP: netDevelopment.netDevelopmentXP,
-    regressionPressure: netDevelopment.regressionPressure,
+    currentDevelopmentLevel: developmentLevelProgress.developmentLevel,
   });
   const developmentRoute = buildDevelopmentRoute({
     role: netDevelopment.role,
@@ -525,7 +609,13 @@ export function buildPlayerProgressionForecast(input: {
     netDevelopmentXP: netDevelopment.netDevelopmentXP,
     isFreeAgent: netDevelopment.isFreeAgent,
   });
-  const spendableProjectedXP = Math.max(0, netDevelopment.netDevelopmentXP);
+  const balancedNetDevelopmentXP = netDevelopment.netDevelopmentXP;
+  const xpTrend = getTrend(balancedNetDevelopmentXP);
+  const regressionRisk = getRegressionRisk({
+    netDevelopmentXP: balancedNetDevelopmentXP,
+    regressionPressure: netDevelopment.organicRegressionPressure,
+  });
+  const spendableProjectedXP = Math.max(0, balancedNetDevelopmentXP);
 
   return {
     playerId: input.player.id,
@@ -537,7 +627,7 @@ export function buildPlayerProgressionForecast(input: {
     earnedXP: netDevelopment.earnedXP,
     maintenanceXP: netDevelopment.maintenanceXP,
     regressionPressure: netDevelopment.regressionPressure,
-    netDevelopmentXP: netDevelopment.netDevelopmentXP,
+    netDevelopmentXP: balancedNetDevelopmentXP,
     trainingFormTier,
     xpTrend,
     regressionRisk,
@@ -581,16 +671,28 @@ export function buildPlayerProgressionForecast(input: {
       facilities: "future_source",
       writes: "preview_only",
     },
-    audit: {
-      mvsPpsCoupling: `PPs-Bonus ist auf ${Math.round(PLAYER_PROGRESSION_XP_CONSTANTS.ppsBonusCapPctOfMvsXp * 100)}% der MVS-XP gedeckelt, mindestens ${PLAYER_PROGRESSION_XP_CONSTANTS.ppsBonusNoMvsCap} XP ohne MVS.`,
-      seasonEndOnly: true,
-      productiveWrites: false,
-      warnings: [
-        ...traitSignal.warnings,
-        ...scoutPotential.warnings,
-        ...(netDevelopment.netDevelopmentXP < 0 ? ["net_development_negative"] : []),
-        ...(regressionRisk === "high" ? ["regression_risk_high"] : []),
-      ],
+	    audit: {
+	      mvsPpsCoupling: `PPs-Bonus ist auf ${Math.round(PLAYER_PROGRESSION_XP_CONSTANTS.ppsBonusCapPctOfMvsXp * 100)}% der MVS-XP gedeckelt, mindestens ${PLAYER_PROGRESSION_XP_CONSTANTS.ppsBonusNoMvsCap} XP ohne MVS.`,
+	      seasonEndOnly: true,
+	      productiveWrites: false,
+	      warnings: [
+	        ...traitSignal.warnings,
+	        ...scoutPotential.warnings,
+	        ...(netDevelopment.regressionBreakdown.seasonGainSoftCeiling > 0
+	          ? [`season_gain_soft_ceiling:${netDevelopment.regressionBreakdown.seasonGainSoftCeiling}:${developmentRoute}`]
+	          : []),
+	        ...(netDevelopment.regressionBreakdown.seasonGainHardCap > 0
+	          ? [`season_gain_hard_cap:${netDevelopment.regressionBreakdown.seasonGainHardCap}:${developmentRoute}`]
+	          : []),
+	        ...(netDevelopment.regressionBreakdown.potentialCeiling > 0
+	          ? [`potential_ceiling:${netDevelopment.regressionBreakdown.potentialCeiling}:${developmentRoute}`]
+	          : []),
+	        ...(netDevelopment.regressionBreakdown.highValueUnderperformance > 0
+	          ? [`high_value_underperformance:${netDevelopment.regressionBreakdown.highValueUnderperformance}`]
+	          : []),
+	        ...(netDevelopment.netDevelopmentXP < 0 ? ["net_development_negative"] : []),
+	        ...(regressionRisk === "high" ? ["regression_risk_high"] : []),
+	      ],
     },
   } satisfies PlayerProgressionForecast;
 }

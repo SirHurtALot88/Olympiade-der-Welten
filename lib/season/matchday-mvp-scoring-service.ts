@@ -15,6 +15,7 @@ import {
 } from "@/lib/resolve/legacy-matchday-result-apply-service";
 import { STANDINGS_APPLY_CONFIRM_TOKEN, executeStandingsApply } from "@/lib/standings/standings-apply-service";
 import { getTeamStrategyProfile } from "@/lib/foundation/team-strategy-profiles";
+import { refreshTeamObjectiveState } from "@/lib/board/team-season-objectives-service";
 
 export const MATCHDAY_MVP_SCORING_CONFIRM_TOKEN = "RUN_MATCHDAY_MVP_SCORING";
 
@@ -717,7 +718,7 @@ export async function runMatchdayMvpScoring(
     };
   }
 
-  persistence.saveSingleplayerState(scope.saveId, nextGameState);
+  persistence.saveSingleplayerState(scope.saveId, refreshTeamObjectiveState(nextGameState));
 
   const resultApplyService = new LegacyMatchdayResultApplyService(undefined, undefined, persistence);
   const resultApply = await resultApplyService.applyLegacyMatchdayResult({

@@ -139,6 +139,11 @@ export function assessPlayerBoardTrust(input: PlayerBoardTrustInput): PlayerBoar
   const expiring = (input.contractLength ?? 99) <= 1;
   const lowBoardConfidence = boardConfidence < 42;
   const veryLowBoardConfidence = boardConfidence < 28;
+  const softMissesExpectation =
+    !missesExpectation &&
+    lowBoardConfidence &&
+    expiring &&
+    ((hasSample && performanceRatio < 0.9) || (!hasSample && input.appearances > 0));
   const roleExpectationWeight = getRoleExpectationWeight(input.roleTag);
   const expectedRank = getExpectedCompositeRank(input);
   const actualRank = getActualCompositeRank(input);
@@ -163,8 +168,8 @@ export function assessPlayerBoardTrust(input: PlayerBoardTrustInput): PlayerBoar
     trustScore -= 10;
     reasons.push("low_board_confidence");
   }
-  if (missesExpectation) {
-    const penalty = (badlyMissesExpectation ? 24 : 14) * roleExpectationWeight;
+  if (missesExpectation || softMissesExpectation) {
+    const penalty = (badlyMissesExpectation ? 24 : softMissesExpectation ? 7 : 14) * roleExpectationWeight;
     trustScore -= penalty;
     reasons.push("performance_below_board_expectation");
   }
@@ -201,7 +206,7 @@ export function assessPlayerBoardTrust(input: PlayerBoardTrustInput): PlayerBoar
     trustScore -= 18;
     reasons.push("team_hard_no_go");
   }
-  if (expiring && (missesExpectation || input.weakTeamFit || input.hardNoGoHit)) {
+  if (expiring && (missesExpectation || softMissesExpectation || input.weakTeamFit || input.hardNoGoHit)) {
     trustScore -= 10;
     reasons.push("expiring_contract_trust_review");
   }

@@ -285,7 +285,7 @@ describe("foundation transfermarkt ui contract", () => {
     expect(fileText).toContain("entry.item.traitsNegative.includes(marketNegativeTraitFilter)");
     expect(fileText).toContain("getConfirmedTierStyle");
     expect(contractText).toContain('label: "Diszi (3)"');
-    expect(contractText).toContain('dataKey: "powTier"');
+    expect(contractText).toContain('dataKey: "powerRating"');
     expect(contractText).toContain('label: "Hea"');
     expect(contractText).toContain('label: "Tor"');
     expect(contractText).toContain("Marktwert gehalt ratio");
@@ -497,7 +497,7 @@ describe("foundation transfermarkt ui contract", () => {
     expect(helperText).toContain("points: hasCurrentPps");
     expect(helperText).toContain("latestCompletedStanding?.disciplinePoints");
     expect(helperText).toContain("const transferNet = standing?.transfers ?? transferSummary?.transferNet ?? 0;");
-    expect(helperText).toContain("teamCash: team.cash ?? standing?.cash ?? null");
+    expect(helperText).toContain("teamCash: usesArchivedSnapshotValues ? standing?.cash ?? team.cash ?? null : team.cash ?? standing?.cash ?? null");
     expect(helperText).toContain("derivedCashRankByTeamId");
     expect(helperText).toContain("startplatz: row.startplatz ?? derivedCashRank");
     expect(fileText).toContain("historicalPow");
@@ -1106,7 +1106,7 @@ describe("foundation transfermarkt ui contract", () => {
     expect(fileText).not.toContain("{foundationViews.map((view) => (");
     expect(fileText).toContain('label: "Saisonstand Preview"');
     expect(fileText).toContain("/api/standings/preview");
-    expect(fileText).toContain('const [activeView, setActiveView] = useState<FoundationView>("home")');
+    expect(fileText).toContain('const [activeView, setActiveView] = useState<FoundationView>(() => parseFoundationViewFromUrl() ?? "home")');
     expect(fileText).toContain('{ id: "home", label: "Home" }');
     expect(fileText).toContain('data-testid="foundation-home"');
     expect(fileText).toContain('data-testid="home-league-table"');
@@ -1267,7 +1267,8 @@ describe("foundation transfermarkt ui contract", () => {
     expect(fileText).toContain('value: selectedStandingRow != null ? formatMoney(selectedStandingRow.salaryTotal) : "—"');
     expect(fileText).toContain('value:');
     expect(fileText).toContain('selectedStandingRow?.marketValueTotal != null');
-    expect(fileText).toContain('if (column.id === "race") return <td key={column.id}><RaceIcon race={player.race} showLabel={false} /></td>;');
+    expect(fileText).toContain('if (column.id === "race") {');
+    expect(fileText).toContain("RaceIcon race={player.race}");
     expect(fileText).toContain('OVR {formatWholeNumber(playerRatingsById.get(player.id)?.ovrNormalized ?? null)} · MVS');
     expect(fileText).toContain('Spielerwerte</span>');
     expect(fileText).toContain('OVR und PPs nur pro Spieler, nicht als Teamwert');

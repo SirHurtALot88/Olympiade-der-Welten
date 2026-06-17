@@ -440,7 +440,9 @@ export async function buildPreSeasonWorkflowPreview(
   const totalFacilityIncome = roundValue(facilityPreviews.reduce((sum, item) => sum + item.facilityIncomeTotal, 0));
   const totalSalary = roundValue(save.gameState.teams.reduce((sum, team) => sum + getSalaryTotal(save.gameState, team.teamId), 0));
   const cashBefore = roundValue(save.gameState.teams.reduce((sum, team) => sum + (toFiniteNumber(team.cash) ?? 0), 0));
-  const cashAfterRewards = roundValue(cashBefore + totalPrizeMoney + (totalRankChangePrize ?? 0) + totalSponsor);
+  const cashAfterRewards = roundValue(
+    prizePreview.items.reduce((sum, item) => sum + (item.projectedCash ?? item.currentCash ?? 0), 0),
+  );
   const cashAfterFacilities = roundValue(cashAfterRewards + totalFacilityIncome - totalUpkeep);
   const prizeApplyLogs = save.gameState.seasonState.cashPrizeApplyLogs ?? [];
   const currentSeasonPrizeApplyLogs = prizeApplyLogs.filter((log) => log.seasonId === save.gameState.season.id);

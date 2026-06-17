@@ -51,9 +51,56 @@ function mapRankToMvsPoints(rank: number) {
 }
 
 const playerFormulaSources = loadPlayerFormulaSources();
+const MARKET_VALUE_BRACKET_STARTS = [0, 12.5, 17.5, 22.5, 30, 37.5, 45, 55, 70];
 
 export function getPlayerRawOvrScore(player: Pick<Player, "rating">) {
   return isFiniteNumber(player.rating) ? player.rating : null;
+}
+
+function getCoreStatAverage(player: Pick<Player, "coreStats">) {
+  const values = [
+    player.coreStats?.pow,
+    player.coreStats?.spe,
+    player.coreStats?.men,
+    player.coreStats?.soc,
+  ].filter((value): value is number => isFiniteNumber(value));
+
+  if (values.length === 0) {
+    return null;
+  }
+
+  return values.reduce((sum, value) => sum + value, 0) / values.length;
+}
+
+function getThresholdScore(player: Pick<Player, "coreStats">) {
+  const values = [
+    player.coreStats?.pow,
+    player.coreStats?.spe,
+    player.coreStats?.men,
+    player.coreStats?.soc,
+  ].filter((value): value is number => isFiniteNumber(value));
+
+  if (values.length === 0) {
+    return null;
+  }
+
+  const above60 = values.filter((value) => value > 60).length;
+  const above80 = values.filter((value) => value > 80).length;
+  return above60 + above80 * 2;
+}
+
+function getMarketValueBracketId(marketValue: number | null) {
+  if (marketValue == null || !Number.isFinite(marketValue)) {
+    return 1;
+  }
+
+  for (let index = MARKET_VALUE_BRACKET_STARTS.length - 1; index >= 0; index -= 1) {
+    if (marketValue >= MARKET_VALUE_BRACKET_STARTS[index]) {
+      return index + 1;
+    }
+  }
+
+  return 1;
 }
 
 export function getPlayerImportedRatingPps(player: Pick<Player, "disciplineRatings">) {
@@ -110,7 +157,7 @@ function buildSourceStatus(input: {
   const normalizedOvr =
     input.rawOvrScore == null
       ? "missing_source"
-      : input.poolHasSpread
+      : input.normalizedOvr != null || input.poolHasSpread
         ? "ready"
         : "pool_no_spread";
 
@@ -134,7 +181,7 @@ function buildWarnings(input: {
   }
   if (input.rawOvrScore == null) {
     warnings.push("ovr_raw_source_missing");
-  } else if (!input.poolHasSpread || input.normalizedOvr == null) {
+  } else if (input.normalizedOvr == null) {
     warnings.push("ovr_pool_no_spread");
   }
   return warnings;
@@ -175,7 +222,9 @@ export function buildPlayerRatingContractRows(input: {
 
   const rawRows = players.map((player) => ({
     player,
-    rawOvrScore: getPlayerRawOvrScore(player),
+    importedRawOvrScore: getPlayerRawOvrScore(player),
+    skills: getCoreStatAverage(player),
+    threshold: getThresholdScore(player),
     ratingPps: getPlayerImportedRatingPps(player),
     seasonPointsSummary: seasonPointsLedger?.playerSummariesByPlayerId.get(player.id) ?? null,
     marketValue: getImportedPlayerDisplayMarketValue(player),
@@ -203,36 +252,109 @@ export function buildPlayerRatingContractRows(input: {
         }, new Map<string, number>())
       : new Map<string, number>();
 
-  const rawOvrValues = rawRows
-    .filter((row) => normalizationPoolIdSet == null || normalizationPoolIdSet.has(row.player.id))
-    .map((row) => row.rawOvrScore)
+  const sourceRows = rawRows.map((row) => {
+    const seasonPoints = row.seasonPointsSummary?.totalPoints ?? null;
+    const mvs =
+      performanceRows == null
+        ? null
+        : roundValue(mvsByPlayerId.get(row.player.id) ?? 0, 2);
+
+    return {
+      ...row,
+      seasonPoints,
+      mvs,
+      bracketId: getMarketValueBracketId(row.marketValue),
+    };
+  });
+
+  const ovrCalculationRows = sourceRows.filter((row) => normalizationPoolIdSet == null || normalizationPoolIdSet.has(row.player.id));
+  const maxPPs = Math.max(1, ...ovrCalculationRows.map((row) => row.seasonPoints ?? 0));
+  const maxMVS = Math.max(1, ...ovrCalculationRows.map((row) => row.mvs ?? 0));
+  const maxSkills = Math.max(1, ...ovrCalculationRows.map((row) => row.skills ?? 0));
+  const maxThreshold = Math.max(1, ...ovrCalculationRows.map((row) => row.threshold ?? 0));
+
+  const bracketScoreByPlayerId = new Map<string, number>();
+  const rowsByBracket = new Map<number, typeof sourceRows>();
+  for (const row of ovrCalculationRows) {
+    const currentRows = rowsByBracket.get(row.bracketId) ?? [];
+    currentRows.push(row);
+    rowsByBracket.set(row.bracketId, currentRows);
+  }
+  for (const rowsInBracket of rowsByBracket.values()) {
+    const sorted = rowsInBracket
+      .filter((row) => (row.mvs ?? 0) > 0)
+      .sort((left, right) => {
+        const mvsDelta = (right.mvs ?? 0) - (left.mvs ?? 0);
+        if (mvsDelta !== 0) {
+          return mvsDelta;
+        }
+        const ppsDelta = (right.seasonPoints ?? 0) - (left.seasonPoints ?? 0);
+        if (ppsDelta !== 0) {
+          return ppsDelta;
+        }
+        return left.player.name.localeCompare(right.player.name, "de");
+      });
+    const count = sorted.length;
+    if (count <= 1) {
+      for (const row of sorted) {
+        bracketScoreByPlayerId.set(row.player.id, 1);
+      }
+      continue;
+    }
+    sorted.forEach((row, index) => {
+      bracketScoreByPlayerId.set(row.player.id, 1 - index / (count - 1));
+    });
+  }
+
+  const ovrRawByPlayerId = new Map<string, number | null>();
+  for (const row of sourceRows) {
+    if (row.skills == null || row.threshold == null) {
+      ovrRawByPlayerId.set(row.player.id, null);
+      continue;
+    }
+
+    const skillsComp = (row.skills / maxSkills) * 15;
+    const thresholdComp = (row.threshold / maxThreshold) * 5;
+    const ppsComp = ((row.seasonPoints ?? 0) / maxPPs) * 25;
+    const mvsComp = ((row.mvs ?? 0) / maxMVS) * 20;
+    const bracketPerfComp = (bracketScoreByPlayerId.get(row.player.id) ?? 0) * 20;
+    ovrRawByPlayerId.set(row.player.id, skillsComp + thresholdComp + ppsComp + mvsComp + bracketPerfComp);
+  }
+
+  const rawOvrValues = ovrCalculationRows
+    .map((row) => ovrRawByPlayerId.get(row.player.id) ?? null)
     .filter((value): value is number => value != null);
   const minRawOvrScore = rawOvrValues.length > 0 ? Math.min(...rawOvrValues) : null;
   const maxRawOvrScore = rawOvrValues.length > 0 ? Math.max(...rawOvrValues) : null;
   const poolHasSpread =
     minRawOvrScore != null && maxRawOvrScore != null && maxRawOvrScore > minRawOvrScore;
 
-  const normalizedRows = rawRows.map((row) => {
-    const seasonPoints = row.seasonPointsSummary?.totalPoints ?? null;
+  const normalizedRows = sourceRows.map((row) => {
+    const rawOvrScore = ovrRawByPlayerId.get(row.player.id) ?? null;
+    const normalizationSpread =
+      minRawOvrScore == null || maxRawOvrScore == null
+        ? null
+        : maxRawOvrScore === minRawOvrScore
+          ? 1
+          : maxRawOvrScore - minRawOvrScore;
     const ovrNormalized =
-      row.rawOvrScore == null || !poolHasSpread || minRawOvrScore == null || maxRawOvrScore == null
+      rawOvrScore == null || minRawOvrScore == null || normalizationSpread == null
         ? null
         : roundValue(
-            Math.min(100, Math.max(1, 1 + ((row.rawOvrScore - minRawOvrScore) * 99) / (maxRawOvrScore - minRawOvrScore))),
+            Math.min(
+              100,
+              Math.max(0, Math.sqrt(Math.max(0, Math.min(1, (rawOvrScore - minRawOvrScore) / normalizationSpread))) * 100),
+            ),
             2,
           );
     const areaPoints = buildPointsByArea(row.seasonPointsSummary);
-    const mvs =
-      performanceRows == null
-        ? null
-        : roundValue(mvsByPlayerId.get(row.player.id) ?? 0, 2);
 
     const result = {
       playerId: row.player.id,
-      rawOvrScore: row.rawOvrScore,
+      rawOvrScore,
       ovrNormalized,
       ovrRank: null,
-      ppsSeason: seasonPoints == null ? null : roundValue(seasonPoints, 1),
+      ppsSeason: row.seasonPoints == null ? null : roundValue(row.seasonPoints, 1),
       ppsSeasonRank: null,
       ppPow: areaPoints.ppPow,
       ppPowRank: null,
@@ -243,20 +365,20 @@ export function buildPlayerRatingContractRows(input: {
       ppSoc: areaPoints.ppSoc,
       ppSocRank: null,
       ratingPps: row.ratingPps,
-      mvs,
+      mvs: row.mvs,
       mvsRank: null,
       marketValue: row.marketValue,
       sourceStatus: buildSourceStatus({
-        rawOvrScore: row.rawOvrScore,
+        rawOvrScore,
         normalizedOvr: ovrNormalized,
-        ppsSeason: seasonPoints,
-        mvs,
+        ppsSeason: row.seasonPoints,
+        mvs: row.mvs,
         poolHasSpread,
       }),
       warnings: buildWarnings({
-        rawOvrScore: row.rawOvrScore,
+        rawOvrScore,
         normalizedOvr: ovrNormalized,
-        mvs,
+        mvs: row.mvs,
         poolHasSpread,
       }),
     } satisfies PlayerRatingContractRow;

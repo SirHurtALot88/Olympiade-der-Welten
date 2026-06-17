@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useEffect, useMemo, useRef, useState, useTransition } from "react";
+import { useDeferredValue, useEffect, useMemo, useRef, useState, useTransition } from "react";
 import type { CSSProperties, Dispatch, SetStateAction } from "react";
 
 import PlayerDetailDrawer from "@/app/foundation/PlayerDetailDrawer";
@@ -2370,6 +2370,9 @@ type FoundationSeasonStandingsOverviewItem = {
   cashTotal: number | null;
   form: number | null;
   transfers: number | null;
+  rosterCount: number | null;
+  salaryTotal: number | null;
+  marketValueTotal: number | null;
   disciplineValues: Record<string, number | null>;
   warnings: string[];
 };
@@ -2379,8 +2382,8 @@ type FoundationSeasonStandingsOverviewResponse = {
   missingMappings: string[];
   mappingWarnings: string[];
   source: {
-    kind: "season_standings_sheet";
-    access: "remote_csv" | "local_csv" | "local_json" | "missing";
+    kind: "season_standings_sheet" | "season_snapshot";
+    access: "remote_csv" | "local_csv" | "local_json" | "local_save" | "missing";
     detectedColumns: string[];
     disciplineColumns: Array<{
       normalizedKey: string;
@@ -2845,6 +2848,7 @@ const ADVANCE_MATCHDAY_CONFIRM_TOKEN = "ADVANCE_LOCAL_MATCHDAY";
 const MATCHDAY_MVP_SCORING_CONFIRM_TOKEN = "RUN_MATCHDAY_MVP_SCORING";
 const MATCHDAY_AUTO_RUN_CONFIRM_TOKEN = "RUN_LOCAL_MATCHDAY_AUTO";
 const SEASON_SNAPSHOT_CONFIRM_TOKEN = "CREATE_LOCAL_SEASON_SNAPSHOT";
+const TRANSFER_HISTORY_INITIAL_RENDER_LIMIT = 80;
 
 function loadFoundationTablePreferences(): PersistedFoundationTablePreferences {
   if (typeof window === "undefined") {
@@ -3429,6 +3433,7 @@ function PlayerPortrait({
   className,
   style,
   loading = "lazy",
+  fetchPriority = "low",
 }: {
   src: string | null;
   initials: string;
@@ -3436,6 +3441,7 @@ function PlayerPortrait({
   className: string;
   style?: CSSProperties;
   loading?: "eager" | "lazy";
+  fetchPriority?: "high" | "low" | "auto";
 }) {
   const [failed, setFailed] = useState(false);
   if (!src || failed) {
@@ -3454,6 +3460,7 @@ function PlayerPortrait({
       style={style}
       loading={loading}
       decoding="async"
+      fetchPriority={fetchPriority}
       onError={() => setFailed(true)}
     />
   );
@@ -3509,22 +3516,6 @@ function getTransferSourceLabel(source: string | null | undefined) {
   };
 
   return labels[source] ?? source.replaceAll("_", " ");
-}
-
-function getTransferHistoryClassChipStyle(className: string | null | undefined) {
-  if (!className) {
-    return undefined;
-  }
-
-  const palette = ["#ff8a80", "#b71c1c", "#a5d6a7", "#1b5e20", "#90caf9", "#0d47a1", "#ffe082", "#e65100"];
-  const hash = Array.from(className).reduce((sum, char) => sum + char.charCodeAt(0), 0);
-  const backgroundColor = palette[hash % palette.length] ?? "#90caf9";
-  const darkBackgrounds = new Set(["#b71c1c", "#1b5e20", "#0d47a1", "#e65100"]);
-
-  return {
-    backgroundColor,
-    color: darkBackgrounds.has(backgroundColor) ? "#ffffff" : "#151515",
-  };
 }
 
 function getTeamLogoModel(team: Pick<Team, "teamId" | "name" | "logoPath">) {
@@ -4323,9 +4314,15 @@ function getPlayerOvr(
 
 function getRosterEntryDisplaySalary(
   entry: Pick<RosterEntry, "salary">,
-  player?: Pick<Player, "id" | "displaySalary" | "salaryDemand"> | null,
+  player?: Player | null,
 ) {
   return resolvePlayerEconomyContract({ playerId: player?.id ?? null, player, rosterEntry: entry }).salary ?? entry.salary;
+}
+
+function getRosterEntryNormalSalary(
+  player?: Player | null,
+) {
+  return resolvePlayerEconomyContract({ playerId: player?.id ?? null, player }).expectedSalary;
 }
 
 function roundViewNumber(value: number, digits = 4) {
@@ -4645,7 +4642,7 @@ export default function FoundationPageClient({ initialReadSource, initialSelecte
   const [activeOwnerId, setActiveOwnerId] = useState<string>(() => readStoredFoundationActiveOwnerId());
   const [teamContextFilter, setTeamContextFilter] = useState<TeamControlFilter>(() => readStoredFoundationTeamFilter());
   const [activeManagerTeamWarning, setActiveManagerTeamWarning] = useState<string | null>(null);
-	  const [activeView, setActiveView] = useState<FoundationView>("home");
+	  const [activeView, setActiveView] = useState<FoundationView>(() => parseFoundationViewFromUrl() ?? "home");
   const shouldBuildDisciplineRanks =
     activeView === "teams" ||
     activeView === "ranks" ||
@@ -4820,6 +4817,7 @@ export default function FoundationPageClient({ initialReadSource, initialSelecte
   const [seasonTransitionFeed, setSeasonTransitionFeed] = useState<SeasonTransitionSummaryResponse | null>(null);
   const [seasonTransitionError, setSeasonTransitionError] = useState<string | null>(null);
   const [seasonStandingsFeed, setSeasonStandingsFeed] = useState<FoundationSeasonStandingsOverviewResponse | null>(null);
+  const [seasonOverviewSeasonId, setSeasonOverviewSeasonId] = useState<string>(initialGameState.season.id);
   const [prizePreviewFeed, setPrizePreviewFeed] = useState<FoundationPrizePreviewResponse | null>(null);
   const [prizeForecastRank, setPrizeForecastRank] = useState<number>(1);
   const [cashApplyFeed, setCashApplyFeed] = useState<FoundationApplySummary | null>(null);
@@ -4852,6 +4850,10 @@ export default function FoundationPageClient({ initialReadSource, initialSelecte
   const [isHydrated, setIsHydrated] = useState<boolean>(false);
   const [isPending, startTransition] = useTransition();
   const [isTeamSwitchPending, startTeamSwitchTransition] = useTransition();
+  const deferredMarketSearch = useDeferredValue(marketSearch);
+  const deferredHistorySearch = useDeferredValue(historySearch);
+  const deferredPlayerTeamFilter = useDeferredValue(playerTeamFilter);
+  const deferredPlayerClassFilter = useDeferredValue(playerClassFilter);
   const hasPersistedInitialState = useRef(false);
   const hasLoadedPersistentState = useRef(false);
   const seasonTableShellRef = useRef<HTMLDivElement | null>(null);
@@ -4865,6 +4867,7 @@ export default function FoundationPageClient({ initialReadSource, initialSelecte
   } | null>(null);
   const tableDragState = useRef<{ tableId: string; columnId: string } | null>(null);
   const marketBuyPreviewRequestVersion = useRef(0);
+  const marketSellPreviewRequestVersion = useRef(0);
   const loadSaveRequestVersion = useRef(0);
   const saveActionRequestVersion = useRef(0);
 
@@ -4906,6 +4909,7 @@ export default function FoundationPageClient({ initialReadSource, initialSelecte
     setSeasonTransitionFeed(null);
     setSeasonTransitionError(null);
     setSeasonStandingsFeed(null);
+    setSeasonOverviewSeasonId(gameState.season.id);
     setPrizePreviewFeed(null);
     setCashApplyFeed(null);
     setMatchdayAdvanceFeed(null);
@@ -5579,15 +5583,22 @@ export default function FoundationPageClient({ initialReadSource, initialSelecte
   }
 
   async function requestTransfermarktSellPreview(subject: TransfermarktSellPreviewSubject, teamIdOverride?: string) {
+    const requestVersion = ++marketSellPreviewRequestVersion.current;
     const effectiveTeamId = teamIdOverride ?? selectedTeam?.teamId ?? "";
 
     if (readMeta.source === "prisma") {
+      if (requestVersion !== marketSellPreviewRequestVersion.current) {
+        return;
+      }
       setMarketSellError("Prisma-Referenz ist read-only. Fuer Verkaeufe bitte lokalen Testspielstand nutzen.");
       setMarketSellPreview(null);
       return;
     }
 
     if (!effectiveTeamId) {
+      if (requestVersion !== marketSellPreviewRequestVersion.current) {
+        return;
+      }
       setMarketSellError("Bitte zuerst ein Team im Kaderbereich waehlen.");
       setMarketSellPreview(null);
       return;
@@ -5614,6 +5625,9 @@ export default function FoundationPageClient({ initialReadSource, initialSelecte
         })),
       });
       const payload = (await response.json()) as TransfermarktSellApiResponse;
+      if (requestVersion !== marketSellPreviewRequestVersion.current) {
+        return;
+      }
       if (payload.summary) {
         setMarketSellPreview(payload.summary);
       } else {
@@ -5627,10 +5641,14 @@ export default function FoundationPageClient({ initialReadSource, initialSelecte
         setMarketSellError("Verkaufsvorschau konnte nicht geladen werden.");
       }
     } catch {
-      setMarketSellError("Verkaufsvorschau konnte nicht geladen werden.");
-      setMarketSellPreview(null);
+      if (requestVersion === marketSellPreviewRequestVersion.current) {
+        setMarketSellError("Verkaufsvorschau konnte nicht geladen werden.");
+        setMarketSellPreview(null);
+      }
     } finally {
-      setMarketSellBusy(false);
+      if (requestVersion === marketSellPreviewRequestVersion.current) {
+        setMarketSellBusy(false);
+      }
     }
   }
 
@@ -5645,6 +5663,7 @@ export default function FoundationPageClient({ initialReadSource, initialSelecte
   }
 
   function closeMarketSellModal() {
+    marketSellPreviewRequestVersion.current += 1;
     setMarketSellModalOpen(false);
     setMarketSellSubject(null);
   }
@@ -6799,6 +6818,9 @@ export default function FoundationPageClient({ initialReadSource, initialSelecte
     hasPersistedInitialState.current = false;
     hasLoadedPersistentState.current = true;
     setGameState(nextGameState);
+    if (payload.save.saveId !== activeSaveId) {
+      setSeasonOverviewSeasonId(nextGameState.season.id);
+    }
     setActiveSaveId(payload.save.saveId);
     setActiveSaveName(payload.save.name ?? "Oly Save");
     setSaveSummaries(payload.saves ?? []);
@@ -7138,7 +7160,7 @@ export default function FoundationPageClient({ initialReadSource, initialSelecte
     try {
       const params = new URLSearchParams({
         saveId: activeSaveId,
-        seasonId: gameState.season.id,
+        seasonId: seasonOverviewSeasonId || gameState.season.id,
         source: readMeta.source,
       });
       const response = await fetch(`/api/season/standings-overview?${params.toString()}`, { cache: "no-store" });
@@ -7277,7 +7299,7 @@ export default function FoundationPageClient({ initialReadSource, initialSelecte
     return () => {
       cancelled = true;
     };
-  }, [activeSaveId, gameState.season.id, marketReloadToken, readMeta.source]);
+  }, [activeSaveId, gameState.season.id, marketReloadToken, readMeta.source, seasonOverviewSeasonId]);
 
   useEffect(() => {
     let cancelled = false;
@@ -7476,7 +7498,6 @@ export default function FoundationPageClient({ initialReadSource, initialSelecte
     setMarketBuyError(null);
     setMarketBuySuccess(null);
     setMarketNegotiationOutcome(null);
-    setMarketBuyPreview(null);
     setMarketBuyPreviewContext(null);
     setMarketPreviewPlayerId(item.playerId);
 
@@ -7534,6 +7555,36 @@ export default function FoundationPageClient({ initialReadSource, initialSelecte
       }
     }
   }
+
+  useEffect(() => {
+    if (!marketBuyModalOpen || !marketBuySubject || !marketBuyPreview) {
+      return undefined;
+    }
+
+    const teamId = marketBuyPreview.team?.id ?? marketTeamId;
+    if (!teamId) {
+      return undefined;
+    }
+
+    const timer = window.setTimeout(() => {
+      void requestTransfermarktBuyPreview(marketBuySubject, teamId, {
+        contractLength: marketContractLengthDraft,
+        contractShape: marketContractShapeDraft,
+        offeredSalary: marketOfferedSalaryDraft,
+      });
+    }, 120);
+
+    return () => window.clearTimeout(timer);
+  }, [
+    marketBuyModalOpen,
+    marketBuySubject,
+    marketBuyPreview?.player?.id,
+    marketBuyPreview?.team?.id,
+    marketTeamId,
+    marketContractLengthDraft,
+    marketContractShapeDraft,
+    marketOfferedSalaryDraft,
+  ]);
 
   async function confirmTransfermarktBuy() {
     if (readMeta.source === "prisma") {
@@ -8417,6 +8468,7 @@ export default function FoundationPageClient({ initialReadSource, initialSelecte
       { id: "soc", label: "Social", dataKey: "soc", defaultWidth: 90, minWidth: 72 },
       { id: "salary", label: "Gehalt", dataKey: "salary", defaultWidth: 110, minWidth: 90 },
       { id: "className", label: "Klasse", dataKey: "className", defaultWidth: 120, minWidth: 96 },
+      { id: "race", label: "Rasse", dataKey: "race", defaultWidth: 120, minWidth: 96 },
       { id: "happenedAt", label: "Zeitpunkt", dataKey: "happenedAt", defaultWidth: 180, minWidth: 150 },
       { id: "remainingContractLength", label: "Restlaufzeit", dataKey: "remainingContractLength", defaultWidth: 118, minWidth: 96 },
       { id: "source", label: "Quelle", dataKey: "source", defaultWidth: 132, minWidth: 110, visibleByDefault: false },
@@ -9144,6 +9196,9 @@ export default function FoundationPageClient({ initialReadSource, initialSelecte
             cashTotal: item.cashTotal,
             form: item.form,
             transfers: item.transfers,
+            rosterCount: item.rosterCount,
+            salaryTotal: item.salaryTotal,
+            marketValueTotal: item.marketValueTotal,
             disciplineValues: item.disciplineValues,
           },
         ]),
@@ -9390,6 +9445,107 @@ export default function FoundationPageClient({ initialReadSource, initialSelecte
       ),
     [gameState.seasonState.seasonSnapshots],
   );
+  const seasonOverviewOptions = useMemo(
+    () => {
+      const snapshotOptions = seasonHistorySnapshots.map((snapshot) => ({
+        seasonId: snapshot.seasonId,
+        seasonName: snapshot.seasonName,
+        status: snapshot.status ?? "completed",
+        archivedAt: snapshot.archivedAt ?? null,
+      }));
+      const hasActiveAsSnapshot = snapshotOptions.some((option) => option.seasonId === gameState.season.id);
+      return [
+        {
+          seasonId: gameState.season.id,
+          seasonName: gameState.season.name,
+          status: "active" as const,
+          archivedAt: null,
+        },
+        ...snapshotOptions.filter((option) => !hasActiveAsSnapshot || option.seasonId !== gameState.season.id),
+      ].sort((left, right) => right.seasonId.localeCompare(left.seasonId, "de", { numeric: true }));
+    },
+    [gameState.season.id, gameState.season.name, seasonHistorySnapshots],
+  );
+  const selectedSeasonSnapshot = useMemo(
+    () => seasonHistorySnapshots.find((snapshot) => snapshot.seasonId === seasonOverviewSeasonId) ?? null,
+    [seasonHistorySnapshots, seasonOverviewSeasonId],
+  );
+  const isViewingArchivedSeason = selectedSeasonSnapshot != null && seasonOverviewSeasonId !== gameState.season.id;
+  const selectedSeasonOverviewOption =
+    seasonOverviewOptions.find((option) => option.seasonId === seasonOverviewSeasonId) ?? seasonOverviewOptions[0] ?? null;
+  const selectedSeasonOverviewLabel = selectedSeasonOverviewOption?.seasonName ?? seasonOverviewSeasonId;
+  const seasonOverviewSourceLabel = isViewingArchivedSeason
+    ? `Archiv-Snapshot · ${selectedSeasonSnapshot?.archivedAt ? new Date(selectedSeasonSnapshot.archivedAt).toLocaleString("de-DE") : "lokal"}`
+    : "Aktive Season · lokale Results";
+
+  useEffect(() => {
+    if (seasonOverviewOptions.some((option) => option.seasonId === seasonOverviewSeasonId)) {
+      return;
+    }
+    setSeasonOverviewSeasonId(gameState.season.id);
+  }, [gameState.season.id, seasonOverviewOptions, seasonOverviewSeasonId]);
+
+  const archivedSeasonDisciplineLeaderboards = useMemo(() => {
+    if (!selectedSeasonSnapshot) {
+      return [];
+    }
+
+    const disciplineRows = new Map<
+      string,
+      {
+        disciplineId: string;
+        disciplineName: string;
+        players: Array<{
+          playerId: string;
+          playerName: string;
+          teamCode: string | null;
+          teamName: string | null;
+          appearances: number;
+          totalContribution: number | null;
+          averageContribution: number | null;
+          averageFinalScore: number | null;
+        }>;
+      }
+    >();
+
+    for (const player of selectedSeasonSnapshot.playerPerformances ?? []) {
+      for (const discipline of player.disciplineBreakdown ?? []) {
+        const bucket = disciplineRows.get(discipline.disciplineId) ?? {
+          disciplineId: discipline.disciplineId,
+          disciplineName: discipline.disciplineName,
+          players: [],
+        };
+        bucket.players.push({
+          playerId: player.playerId,
+          playerName: player.playerName,
+          teamCode: player.teamCode ?? null,
+          teamName: player.teamName ?? null,
+          appearances: discipline.appearances,
+          totalContribution: discipline.totalContribution ?? null,
+          averageContribution: discipline.averageContribution ?? null,
+          averageFinalScore: discipline.averageFinalScore ?? null,
+        });
+        disciplineRows.set(discipline.disciplineId, bucket);
+      }
+    }
+
+    return Array.from(disciplineRows.values())
+      .map((entry) => ({
+        ...entry,
+        players: entry.players
+          .sort((left, right) => {
+            const contributionDelta =
+              (right.totalContribution ?? Number.NEGATIVE_INFINITY) -
+              (left.totalContribution ?? Number.NEGATIVE_INFINITY);
+            if (contributionDelta !== 0) {
+              return contributionDelta;
+            }
+            return (right.averageFinalScore ?? Number.NEGATIVE_INFINITY) - (left.averageFinalScore ?? Number.NEGATIVE_INFINITY);
+          })
+          .slice(0, 6),
+      }))
+      .sort((left, right) => left.disciplineName.localeCompare(right.disciplineName, "de"));
+  }, [selectedSeasonSnapshot]);
 
   const disciplineRankRows = useMemo(() => {
     if (!shouldBuildDisciplineRanks) {
@@ -9873,7 +10029,19 @@ export default function FoundationPageClient({ initialReadSource, initialSelecte
         if ((entry.contractLength ?? 0) <= 1) {
           issueTags.push("läuft aus");
         }
-        const salary = getRosterEntryDisplaySalary(entry, player);
+        const economy = resolvePlayerEconomyContract({ playerId: player.id, player, rosterEntry: entry });
+        const marketValue = economy.marketValue;
+        const marketValueBenchmark = entry.currentValue ?? entry.purchasePrice ?? null;
+        const marketValueDelta =
+          marketValueBenchmark != null && marketValue != null && Math.abs(marketValue - marketValueBenchmark) >= 0.01
+            ? roundViewNumber(marketValue - marketValueBenchmark, 2)
+            : null;
+        const salary = economy.salary ?? entry.salary;
+        const normalSalary = economy.expectedSalary;
+        const salaryDelta =
+          normalSalary != null && salary != null && Math.abs(salary - normalSalary) >= 0.01
+            ? roundViewNumber(salary - normalSalary, 2)
+            : null;
         if (overviewRow?.avgSalary != null && salary > overviewRow.avgSalary * 1.35) {
           issueTags.push("teuer");
         }
@@ -9896,8 +10064,10 @@ export default function FoundationPageClient({ initialReadSource, initialSelecte
           mvsRank: rating?.mvsRank ?? null,
           pps: rating?.ppsSeason ?? null,
           ppsRank: rating?.ppsSeasonRank ?? null,
-          marketValue: getPlayerDisplayMarketValue(player),
+          marketValue,
+          marketValueDelta,
           salary,
+          salaryDelta,
           contractLength: entry.contractLength ?? null,
           d1Label: currentMatchdayDisciplineSchedule?.discipline1?.displayName ?? "D1",
           d1Score,
@@ -10914,7 +11084,14 @@ export default function FoundationPageClient({ initialReadSource, initialSelecte
         >
           <span className="season-team-identity">
             {logo.src ? (
-              <img className="season-team-logo" src={logo.src} alt={`${row.teamName} Logo`} />
+              <img
+                className="season-team-logo"
+                src={logo.src}
+                alt={`${row.teamName} Logo`}
+                loading="lazy"
+                decoding="async"
+                fetchPriority="low"
+              />
             ) : (
               <span className="season-team-logo season-team-logo-placeholder" aria-label={`${row.teamName} Logo Platzhalter`}>
                 {logo.initials}
@@ -11026,9 +11203,10 @@ export default function FoundationPageClient({ initialReadSource, initialSelecte
         sortRecommendation: marketSelectedTeam ? item.fitSource : "watch",
       }))
       .filter((entry) => {
+        const normalizedMarketSearch = deferredMarketSearch.trim().toLowerCase();
         const matchesSearch =
-          marketSearch.trim().length === 0 ||
-          entry.item.name.toLowerCase().includes(marketSearch.trim().toLowerCase());
+          normalizedMarketSearch.length === 0 ||
+          entry.item.name.toLowerCase().includes(normalizedMarketSearch);
         const matchesClass = marketClassFilter === "ALL" || entry.item.className === marketClassFilter;
         const matchesRace = marketRaceFilter === "ALL" || entry.item.race === marketRaceFilter;
         const matchesSubclass =
@@ -11086,7 +11264,7 @@ export default function FoundationPageClient({ initialReadSource, initialSelecte
     marketNegativeTraitFilter,
     marketPositiveTraitFilter,
     marketRaceFilter,
-    marketSearch,
+    deferredMarketSearch,
     marketSelectedTeam,
     marketSubclassFilter,
   ]);
@@ -11094,12 +11272,12 @@ export default function FoundationPageClient({ initialReadSource, initialSelecte
   const playersTableRows = useMemo(() => {
     return playerScopeRows
       .filter((row) => {
-        const matchesTeam = playerTeamFilter === "ALL" || row.team?.teamId === playerTeamFilter;
-        const matchesClass = playerClassFilter === "ALL" || row.player.className === playerClassFilter;
+        const matchesTeam = deferredPlayerTeamFilter === "ALL" || row.team?.teamId === deferredPlayerTeamFilter;
+        const matchesClass = deferredPlayerClassFilter === "ALL" || row.player.className === deferredPlayerClassFilter;
         return matchesTeam && matchesClass;
       })
       .sort((left, right) => (right.playerOvr ?? Number.NEGATIVE_INFINITY) - (left.playerOvr ?? Number.NEGATIVE_INFINITY));
-  }, [playerClassFilter, playerScopeRows, playerTeamFilter]);
+  }, [deferredPlayerClassFilter, deferredPlayerTeamFilter, playerScopeRows]);
   const playerEconomyCompareReport = useMemo(
     () =>
       shouldBuildPlayerDirectory
@@ -11183,6 +11361,7 @@ export default function FoundationPageClient({ initialReadSource, initialSelecte
           portraitInitials: portrait.initials,
           seasonLabel: entry.seasonLabel ?? entry.seasonId,
           className: player?.className ?? null,
+          race: player?.race ?? null,
           pow: player?.coreStats.pow ?? null,
           spe: player?.coreStats.spe ?? null,
           men: player?.coreStats.men ?? null,
@@ -11198,6 +11377,7 @@ export default function FoundationPageClient({ initialReadSource, initialSelecte
         };
       })
       .filter((entry) => {
+        const normalizedHistorySearch = deferredHistorySearch.trim().toLowerCase();
         const matchesSeason = historySeasonFilter === "ALL" || entry.seasonLabel === historySeasonFilter;
         const matchesType = historyTypeFilter === "ALL" || entry.type === historyTypeFilter;
         const matchesTeam =
@@ -11205,14 +11385,14 @@ export default function FoundationPageClient({ initialReadSource, initialSelecte
         const matchesClass = historyClassFilter === "ALL" || entry.className === historyClassFilter;
         const matchesSource = historySourceFilter === "ALL" || entry.sourceKey === historySourceFilter;
         const matchesSearch =
-          historySearch.trim().length === 0 ||
-          entry.playerName.toLowerCase().includes(historySearch.trim().toLowerCase());
+          normalizedHistorySearch.length === 0 ||
+          entry.playerName.toLowerCase().includes(normalizedHistorySearch);
 
         return matchesSeason && matchesType && matchesTeam && matchesClass && matchesSource && matchesSearch;
       });
   }, [
     historyFeed,
-    historySearch,
+    deferredHistorySearch,
     historySeasonFilter,
     historyTeamFilter,
     historyTypeFilter,
@@ -11611,6 +11791,50 @@ export default function FoundationPageClient({ initialReadSource, initialSelecte
   );
 
   const seasonTopPlayerRows = useMemo(() => {
+    if (selectedSeasonSnapshot) {
+      return [...(selectedSeasonSnapshot.playerPerformances ?? [])]
+        .map((player) => {
+          const totalPoints = player.pps ?? player.totalPoints ?? player.totalContribution ?? null;
+          const breakdownAreaPoints = (player.disciplineBreakdown ?? []).reduce(
+            (totals, entry) => {
+              const discipline = gameState.disciplines.find((candidate) => candidate.id === entry.disciplineId) ?? null;
+              const value = entry.totalContribution ?? 0;
+              if (discipline?.category === "power") totals.pow += value;
+              if (discipline?.category === "speed") totals.spe += value;
+              if (discipline?.category === "mental") totals.men += value;
+              if (discipline?.category === "social") totals.soc += value;
+              return totals;
+            },
+            { pow: 0, spe: 0, men: 0, soc: 0 },
+          );
+
+          return {
+            playerId: player.playerId,
+            name: player.playerName,
+            teamId: player.teamId ?? null,
+            teamName: player.teamCode ? `${player.teamCode} · ${player.teamName ?? "—"}` : player.teamName ?? "—",
+            pps: totalPoints,
+            ppsRank: player.ppsRank ?? null,
+            ovr: player.ovr ?? null,
+            mvs: player.mvs ?? null,
+            marketValue: player.marketValue ?? null,
+            bracket: getTransfermarktBracket(player.marketValue ?? null),
+            ppPow: player.powPoints ?? (breakdownAreaPoints.pow > 0 ? roundViewNumber(breakdownAreaPoints.pow, 1) : null),
+            ppSpe: player.spePoints ?? (breakdownAreaPoints.spe > 0 ? roundViewNumber(breakdownAreaPoints.spe, 1) : null),
+            ppMen: player.menPoints ?? (breakdownAreaPoints.men > 0 ? roundViewNumber(breakdownAreaPoints.men, 1) : null),
+            ppSoc: player.socPoints ?? (breakdownAreaPoints.soc > 0 ? roundViewNumber(breakdownAreaPoints.soc, 1) : null),
+          };
+        })
+        .sort((left, right) => {
+          const ppsDelta = (right.pps ?? Number.NEGATIVE_INFINITY) - (left.pps ?? Number.NEGATIVE_INFINITY);
+          if (ppsDelta !== 0) {
+            return ppsDelta;
+          }
+          return left.name.localeCompare(right.name, "de");
+        })
+        .slice(0, 32);
+    }
+
     const teamById = new Map(gameState.teams.map((team) => [team.teamId, team] as const));
     const rosterByPlayerId = new Map(gameState.rosters.map((roster) => [roster.playerId, roster] as const));
 
@@ -11658,7 +11882,7 @@ export default function FoundationPageClient({ initialReadSource, initialSelecte
         return left.name.localeCompare(right.name, "de");
       })
       .slice(0, 32);
-  }, [gameState.players, gameState.rosters, gameState.teams, playerRatingsById, playerSeasonPerformanceMap]);
+  }, [gameState.disciplines, gameState.players, gameState.rosters, gameState.teams, playerRatingsById, playerSeasonPerformanceMap, selectedSeasonSnapshot]);
 
   const sortedSelectedRosterTableRows = useMemo(
     () =>
@@ -12669,7 +12893,14 @@ export default function FoundationPageClient({ initialReadSource, initialSelecte
             {(() => {
               const logo = getTeamLogoModel(selectedTeam);
               return logo.src ? (
-                <img className="foundation-manager-team-logo" src={logo.src} alt={`${selectedTeam.name} Logo`} />
+                <img
+                  className="foundation-manager-team-logo"
+                  src={logo.src}
+                  alt={`${selectedTeam.name} Logo`}
+                  loading="eager"
+                  decoding="async"
+                  fetchPriority="high"
+                />
               ) : (
                 <span className="foundation-manager-team-logo team-logo-placeholder">{selectedTeam.shortCode}</span>
               );
@@ -12751,6 +12982,7 @@ export default function FoundationPageClient({ initialReadSource, initialSelecte
                   key={`quick-team-${team.teamId}`}
                   className={`table-link-button${team.teamId === selectedTeam.teamId ? " is-active" : ""}`}
                   type="button"
+                  onDoubleClick={() => openTeamDrawerById(team.teamId)}
                   onClick={() => setActiveManagerTeam(team.teamId, "manual_select")}
                 >
                   {team.shortCode}
@@ -12785,11 +13017,27 @@ export default function FoundationPageClient({ initialReadSource, initialSelecte
       </section>
 
       <div className="foundation-content">
+          {activeView === "home" ? (
           <section className={`panel foundation-home-panel${getViewClass("home")}`} data-testid="foundation-home" id="foundation-home">
             <div className="foundation-home-hero">
-              <div className="foundation-home-team-card">
+              <div
+                className="foundation-home-team-card"
+                onDoubleClick={() => {
+                  if (selectedTeam?.teamId) {
+                    openTeamDrawerById(selectedTeam.teamId);
+                  }
+                }}
+                title="Doppelklick öffnet den Team-Drawer"
+              >
                 {homeActiveTeamLogo?.src ? (
-                  <img className="foundation-home-logo" src={homeActiveTeamLogo.src} alt={`${selectedTeam?.name ?? "Team"} Logo`} />
+                  <img
+                    className="foundation-home-logo"
+                    src={homeActiveTeamLogo.src}
+                    alt={`${selectedTeam?.name ?? "Team"} Logo`}
+                    loading="eager"
+                    decoding="async"
+                    fetchPriority="high"
+                  />
                 ) : (
                   <span className="foundation-home-logo team-logo-placeholder">{homeActiveTeamLogo?.initials ?? selectedTeam?.shortCode ?? "?"}</span>
                 )}
@@ -12877,6 +13125,7 @@ export default function FoundationPageClient({ initialReadSource, initialSelecte
                             getOwnerTeamHighlightClass(resolvedTeamControlSettings[row.teamId]),
                           )}
                           type="button"
+                          onDoubleClick={() => openTeamDrawerById(row.teamId)}
                           onClick={() => {
                             if (row.controlMode !== "ai") {
                               setActiveManagerTeam(row.teamId, "manual_select");
@@ -12979,7 +13228,12 @@ export default function FoundationPageClient({ initialReadSource, initialSelecte
               </div>
               <div className="foundation-home-player-grid">
                 {homePlayerCards.map((row) => (
-                  <article key={`home-player-${row.player.id}`} className="foundation-home-player-card">
+                  <article
+                    key={`home-player-${row.player.id}`}
+                    className="foundation-home-player-card"
+                    onDoubleClick={() => openPlayerDrawerById(row.player.id, row.entry.id)}
+                    title="Doppelklick öffnet den Spieler-Drawer"
+                  >
                     <div className="foundation-home-player-hero">
                       <PlayerPortrait
                         src={row.portrait.src}
@@ -13073,6 +13327,7 @@ export default function FoundationPageClient({ initialReadSource, initialSelecte
                         getOwnerTeamHighlightClass(resolvedTeamControlSettings[row.teamId]),
                       )}
                       type="button"
+                      onDoubleClick={() => openTeamDrawerById(row.teamId)}
                       onClick={() => setActiveManagerTeam(row.teamId, "manual_select")}
                     >
                       <span>{row.rank ?? "—"}</span>
@@ -13231,6 +13486,7 @@ export default function FoundationPageClient({ initialReadSource, initialSelecte
                         getOwnerTeamHighlightClass(resolvedTeamControlSettings[row.teamId]),
                       )}
                       type="button"
+                      onDoubleClick={() => openTeamDrawerById(row.teamId)}
                       onClick={() => setActiveManagerTeam(row.teamId, "manual_select")}
                     >
                       <span>{row.rank ?? "—"}</span>
@@ -13248,6 +13504,7 @@ export default function FoundationPageClient({ initialReadSource, initialSelecte
               </article>
             ) : null}
 	          </section>
+          ) : null}
 
 	          <section className={`panel foundation-inbox-panel${getViewClass("inbox")}`} data-testid="foundation-inbox" id="foundation-inbox">
 	            <div className="panel-header">
@@ -13475,6 +13732,8 @@ export default function FoundationPageClient({ initialReadSource, initialSelecte
                             <div
                               key={`new-game-team-${team.teamId}`}
                               className={`team-settings-team-card${isChris ? " is-owned-by-user" : ""}${isFranky ? " is-owned-by-remote" : ""}`}
+                              onDoubleClick={() => openTeamDrawerById(team.teamId)}
+                              title="Doppelklick öffnet den Team-Drawer"
                             >
                               <strong>{team.shortCode}</strong>
                               <span>{team.name}</span>
@@ -13574,7 +13833,7 @@ export default function FoundationPageClient({ initialReadSource, initialSelecte
                                 .filter((team) => team.ownerLabel !== "AI" || team.startRank <= 5 || team.teamId === "R-R")
                                 .sort((a, b) => a.startRank - b.startRank)
                                 .map((team) => (
-                                  <tr key={`new-game-preview-${team.teamId}`}>
+                                  <tr key={`new-game-preview-${team.teamId}`} onDoubleClick={() => openTeamDrawerById(team.teamId)}>
                                     <td>{team.startRank}</td>
                                     <td>{team.shortCode} · {team.name}</td>
                                     <td>{formatMoney(team.budget)}</td>
@@ -13741,7 +14000,7 @@ export default function FoundationPageClient({ initialReadSource, initialSelecte
                           </thead>
                           <tbody>
                             {seasonStartResetFeed.teams.map((team) => (
-                              <tr key={`season-start-reset-${team.teamId}`}>
+                              <tr key={`season-start-reset-${team.teamId}`} onDoubleClick={() => openTeamDrawerById(team.teamId)}>
                                 <td>{team.teamCode} · {team.teamName}</td>
                                 <td>{formatTransfermarktCurrency(team.currentCash)}</td>
                                 <td>{formatTransfermarktCurrency(team.resetCash)}</td>
@@ -13930,6 +14189,7 @@ export default function FoundationPageClient({ initialReadSource, initialSelecte
                         key={team.teamId}
                         className={`team-selector-card${isActive ? " is-active" : ""}`}
                         type="button"
+                        onDoubleClick={() => openTeamDrawerById(team.teamId)}
                         onClick={() => {
                           selectTeamSettingsTeam(team.teamId);
                           setFoundationView("teamSettings", setActiveView);
@@ -13984,7 +14244,7 @@ export default function FoundationPageClient({ initialReadSource, initialSelecte
                         }
 
                         return (
-                          <tr key={team.teamId}>
+                          <tr key={team.teamId} onDoubleClick={() => openTeamDrawerById(team.teamId)}>
                             <td>
                               <div className="table-team-cell">
                                 <strong>{team.name}</strong>
@@ -14973,7 +15233,7 @@ export default function FoundationPageClient({ initialReadSource, initialSelecte
                       </thead>
                       <tbody>
                         {sortedMultiSeasonTeamRows.slice(0, 12).map((row) => (
-                          <tr key={row.teamId}>
+                          <tr key={row.teamId} onDoubleClick={() => openTeamDrawerById(row.teamId)}>
                             {visibleMultiSeasonTeamBalanceColumns.map((column) => (
                               <td key={`${row.teamId}-${column.id}`}>{renderMultiSeasonTeamCell(row, column.id)}</td>
                             ))}
@@ -15017,7 +15277,7 @@ export default function FoundationPageClient({ initialReadSource, initialSelecte
                       </thead>
                       <tbody>
                         {sortedMultiSeasonEconomyRows.slice(0, 12).map((row) => (
-                          <tr key={row.teamId}>
+                          <tr key={row.teamId} onDoubleClick={() => openTeamDrawerById(row.teamId)}>
                             {visibleMultiSeasonEconomyColumns.map((column) => (
                               <td key={`${row.teamId}-${column.id}`}>{renderMultiSeasonEconomyCell(row, column.id)}</td>
                             ))}
@@ -15061,7 +15321,7 @@ export default function FoundationPageClient({ initialReadSource, initialSelecte
                       </thead>
                       <tbody>
                         {sortedMultiSeasonPlayerRows.slice(0, 12).map((row) => (
-                          <tr key={row.playerId}>
+                          <tr key={row.playerId} onDoubleClick={() => openPlayerDrawerById(row.playerId)}>
                             {visibleMultiSeasonPlayerColumns.map((column) => (
                               <td key={`${row.playerId}-${column.id}`}>{renderMultiSeasonPlayerCell(row, column.id)}</td>
                             ))}
@@ -15849,7 +16109,7 @@ export default function FoundationPageClient({ initialReadSource, initialSelecte
                           </thead>
                           <tbody>
                             {wholeSeasonDryRunFeed.projectedFinalStandings.slice(0, 12).map((row) => (
-                              <tr key={`whole-season-standing-${row.teamId}`}>
+                              <tr key={`whole-season-standing-${row.teamId}`} onDoubleClick={() => openTeamDrawerById(row.teamId)}>
                                 <td>{row.rank ?? "—"}</td>
                                 <td>{row.teamName}</td>
                                 <td>{row.points ?? "—"}</td>
@@ -15959,7 +16219,7 @@ export default function FoundationPageClient({ initialReadSource, initialSelecte
                     )}
                   </span>
                 </div>
-                <p>MW und Gehaelter bleiben auf den importierten Werten. Fuer diesen expliziten Matchday-Setup-Schritt duerfen auch manuelle Teams aufgefuellt werden, aber nur ueber den echten lokalen Buy-Pfad mit Cash-, Gehalts- und Historien-Spur.</p>
+                <p>MW und Gehaelter laufen ueber die interne Economy-/Vertragsberechnung. Fuer diesen expliziten Matchday-Setup-Schritt duerfen auch manuelle Teams aufgefuellt werden, aber nur ueber den echten lokalen Buy-Pfad mit Cash-, Gehalts- und Historien-Spur.</p>
                 <div className="metric-grid cockpit-mini-grid">
                   <article className="metric-card">
                     <span>Teams gesamt</span>
@@ -16098,7 +16358,7 @@ export default function FoundationPageClient({ initialReadSource, initialSelecte
                         </thead>
                         <tbody>
                           {rosterFillFeed.teams.map((entry) => (
-                            <tr key={`roster-fill-${entry.teamId}`}>
+                            <tr key={`roster-fill-${entry.teamId}`} onDoubleClick={() => openTeamDrawerById(entry.teamId)}>
                               <td>{entry.teamName}</td>
                               <td>{entry.controlMode}</td>
                               <td>{entry.rosterBefore}</td>
@@ -16446,7 +16706,7 @@ export default function FoundationPageClient({ initialReadSource, initialSelecte
                         </thead>
                         <tbody>
                           {matchdayMvpScoringFeed.lineupTeams.map((entry) => (
-                            <tr key={`matchday-mvp-lineup-${entry.teamId}`}>
+                            <tr key={`matchday-mvp-lineup-${entry.teamId}`} onDoubleClick={() => openTeamDrawerById(entry.teamId)}>
                               <td>{entry.teamName}</td>
                               <td>{entry.controlMode}</td>
                               <td>{entry.autoGenerated ? "auto_lineup_source" : "existing_lineup"}</td>
@@ -16482,7 +16742,7 @@ export default function FoundationPageClient({ initialReadSource, initialSelecte
                         </thead>
                         <tbody>
                           {matchdayMvpScoringFeed.d1Scoreboard.map((entry) => (
-                            <tr key={`matchday-mvp-d1-${entry.teamId}`}>
+                            <tr key={`matchday-mvp-d1-${entry.teamId}`} onDoubleClick={() => openTeamDrawerById(entry.teamId)}>
                               <td>{entry.rank}</td>
                               <td>{entry.teamName}</td>
                               <td>{formatLocalePoints(entry.baseScore, 0)}</td>
@@ -16523,7 +16783,7 @@ export default function FoundationPageClient({ initialReadSource, initialSelecte
                         </thead>
                         <tbody>
                           {matchdayMvpScoringFeed.d2Scoreboard.map((entry) => (
-                            <tr key={`matchday-mvp-d2-${entry.teamId}`}>
+                            <tr key={`matchday-mvp-d2-${entry.teamId}`} onDoubleClick={() => openTeamDrawerById(entry.teamId)}>
                               <td>{entry.rank}</td>
                               <td>{entry.teamName}</td>
                               <td>{formatLocalePoints(entry.baseScore, 0)}</td>
@@ -16558,7 +16818,7 @@ export default function FoundationPageClient({ initialReadSource, initialSelecte
                         </thead>
                         <tbody>
                           {matchdayMvpScoringFeed.d1TopPlayers.map((entry) => (
-                            <tr key={`matchday-mvp-top-d1-${entry.playerId}-${entry.rankInDiscipline}`}>
+                            <tr key={`matchday-mvp-top-d1-${entry.playerId}-${entry.rankInDiscipline}`} onDoubleClick={() => openPlayerDrawerById(entry.playerId)}>
                               <td>{entry.rankInDiscipline}</td>
                               <td>{entry.playerName}</td>
                               <td>{entry.teamName}</td>
@@ -16587,7 +16847,7 @@ export default function FoundationPageClient({ initialReadSource, initialSelecte
                         </thead>
                         <tbody>
                           {matchdayMvpScoringFeed.d2TopPlayers.map((entry) => (
-                            <tr key={`matchday-mvp-top-d2-${entry.playerId}-${entry.rankInDiscipline}`}>
+                            <tr key={`matchday-mvp-top-d2-${entry.playerId}-${entry.rankInDiscipline}`} onDoubleClick={() => openPlayerDrawerById(entry.playerId)}>
                               <td>{entry.rankInDiscipline}</td>
                               <td>{entry.playerName}</td>
                               <td>{entry.teamName}</td>
@@ -16615,7 +16875,7 @@ export default function FoundationPageClient({ initialReadSource, initialSelecte
                         </thead>
                         <tbody>
                           {matchdayMvpScoringFeed.ppWinners.map((entry) => (
-                            <tr key={`matchday-mvp-pp-${entry.disciplineSide}-${entry.playerId}-${entry.rankInDiscipline}`}>
+                            <tr key={`matchday-mvp-pp-${entry.disciplineSide}-${entry.playerId}-${entry.rankInDiscipline}`} onDoubleClick={() => openPlayerDrawerById(entry.playerId)}>
                               <td>{entry.disciplineName}</td>
                               <td>{entry.playerName}</td>
                               <td>{entry.teamName}</td>
@@ -16770,9 +17030,9 @@ export default function FoundationPageClient({ initialReadSource, initialSelecte
                   </button>
                 </div>
                 <ul className="warning-list compact-list cockpit-detail-list">
-                  <li>Ready Teams: {standingsPreviewFeed?.summary.readyTeams ?? "—"}</li>
-                  <li>Blocked Teams: {standingsPreviewFeed?.summary.blockedTeamCount ?? "—"}</li>
-                  <li>Tie Groups: {standingsPreviewFeed?.tieGroups.length ?? 0}</li>
+                  <li>Ready Teams: {standingsPreviewFeed?.summary?.readyTeams ?? "—"}</li>
+                  <li>Blocked Teams: {standingsPreviewFeed?.summary?.blockedTeamCount ?? "—"}</li>
+                  <li>Tie Groups: {standingsPreviewFeed?.tieGroups?.length ?? 0}</li>
                 </ul>
                 {(standingsPreviewFeed?.blockedRules ?? []).length ? (
                   <ul className="warning-list compact-list cockpit-detail-list cockpit-detail-list-warning">
@@ -17093,7 +17353,13 @@ export default function FoundationPageClient({ initialReadSource, initialSelecte
                                 <>
                                   <div className="season-review-hero-logo">
                                     {logo?.src ? (
-                                      <img src={logo.src} alt={`${champion?.name ?? "Champion"} Logo`} />
+                                      <img
+                                        src={logo.src}
+                                        alt={`${champion?.name ?? "Champion"} Logo`}
+                                        loading="lazy"
+                                        decoding="async"
+                                        fetchPriority="low"
+                                      />
                                     ) : (
                                       <span>{logo?.initials ?? "CH"}</span>
                                     )}
@@ -17123,7 +17389,14 @@ export default function FoundationPageClient({ initialReadSource, initialSelecte
                                 return (
                                   <span className="season-review-player-row" key={`review-player-${entry.id}`}>
                                     <span className="season-review-player-avatar">
-                                      {portrait?.src ? <img src={portrait.src} alt={`${entry.name} Portrait`} /> : portrait?.initials ?? playerIndex + 1}
+                                      {portrait?.src ? (
+                                        <PlayerPortrait
+                                          src={portrait.src}
+                                          initials={portrait.initials}
+                                          alt={`${entry.name} Portrait`}
+                                          className=""
+                                        />
+                                      ) : portrait?.initials ?? playerIndex + 1}
                                     </span>
                                     {entry.name} · {entry.label}
                                   </span>
@@ -17280,6 +17553,7 @@ export default function FoundationPageClient({ initialReadSource, initialSelecte
             </div>
           </section>
 
+          {activeView === "lineup" ? (
           <section className={`panel${getViewClass("lineup")}`} data-testid="foundation-lineup" id="foundation-lineup">
             <div className="panel-header">
               <div className="stack season-panel-head">
@@ -17314,6 +17588,7 @@ export default function FoundationPageClient({ initialReadSource, initialSelecte
               onOpenPlayerDetails={(payload) => openPlayerDrawerById(payload.playerId, payload.activePlayerId)}
             />
           </section>
+          ) : null}
 
           <section className={`panel${getViewClass("matchdayArena")}`} id="foundation-matchday-arena">
             {activeView === "matchdayArena" && saveSummaries.length > 0 && selectedTeamId ? (
@@ -17417,6 +17692,8 @@ export default function FoundationPageClient({ initialReadSource, initialSelecte
                                   row.teamId === activeManagerTeamId && "is-active-team",
                                   getOwnerTeamHighlightClass(resolvedTeamControlSettings[row.teamId]),
                                 )}
+                                onDoubleClick={() => openTeamDrawerById(row.teamId)}
+                                title="Doppelklick öffnet den Team-Drawer"
                               >
                                 <span>#{row.matchdayRank ?? "—"} · {row.teamShortCode}</span>
                                 <strong>{row.teamName}</strong>
@@ -17439,6 +17716,8 @@ export default function FoundationPageClient({ initialReadSource, initialSelecte
                                   row.teamId === activeManagerTeamId && "is-active-team",
                                   getOwnerTeamHighlightClass(resolvedTeamControlSettings[row.teamId]),
                                 )}
+                                onDoubleClick={() => openTeamDrawerById(row.teamId)}
+                                title="Doppelklick öffnet den Team-Drawer"
                               >
                                 <span>#{row.matchdayRank ?? "—"} · {row.teamShortCode}</span>
                                 <strong>{row.teamName}</strong>
@@ -17465,7 +17744,12 @@ export default function FoundationPageClient({ initialReadSource, initialSelecte
                                 onClick={() => openPlayerDrawerById(entry.playerId, entry.activePlayerId)}
                               >
                                 {portrait?.src ? (
-                                  <img src={portrait.src} alt={`${entry.playerName} Portrait`} />
+                                  <PlayerPortrait
+                                    src={portrait.src}
+                                    initials={portrait.initials}
+                                    alt={`${entry.playerName} Portrait`}
+                                    className=""
+                                  />
                                 ) : (
                                   <span className="transfermarkt-portrait transfermarkt-portrait-placeholder">{portrait?.initials ?? "?"}</span>
                                 )}
@@ -17611,6 +17895,8 @@ export default function FoundationPageClient({ initialReadSource, initialSelecte
                           row.teamId === activeManagerTeamId && "is-active-team",
                           getOwnerTeamHighlightClass(resolvedTeamControlSettings[row.teamId]),
                         )}
+                        onDoubleClick={() => openTeamDrawerById(row.teamId)}
+                        title="Doppelklick öffnet den Team-Drawer"
                       >
                         <span>#{row.matchdayRank ?? "—"} · {row.teamShortCode}</span>
                         <strong>{row.teamName}</strong>
@@ -17634,6 +17920,8 @@ export default function FoundationPageClient({ initialReadSource, initialSelecte
                           row.teamId === activeManagerTeamId && "is-active-team",
                           getOwnerTeamHighlightClass(resolvedTeamControlSettings[row.teamId]),
                         )}
+                        onDoubleClick={() => openTeamDrawerById(row.teamId)}
+                        title="Doppelklick öffnet den Team-Drawer"
                       >
                         <span>#{row.matchdayRank ?? "—"} · {row.teamShortCode}</span>
                         <strong>{row.teamName}</strong>
@@ -17670,6 +17958,7 @@ export default function FoundationPageClient({ initialReadSource, initialSelecte
                           row.teamId === activeManagerTeamId && "is-active-team-row",
                           getOwnerTeamHighlightClass(resolvedTeamControlSettings[row.teamId]),
                         )}
+                        onDoubleClick={() => openTeamDrawerById(row.teamId)}
                       >
                         <td><strong>{row.teamShortCode}</strong> · {row.teamName}</td>
                         <td>{row.matchdayRank ?? "—"}</td>
@@ -17706,7 +17995,12 @@ export default function FoundationPageClient({ initialReadSource, initialSelecte
                       onClick={() => openPlayerDrawerById(entry.playerId, entry.activePlayerId)}
                     >
                       {portrait?.src ? (
-                        <img src={portrait.src} alt={`${entry.playerName} Portrait`} />
+                        <PlayerPortrait
+                          src={portrait.src}
+                          initials={portrait.initials}
+                          alt={`${entry.playerName} Portrait`}
+                          className=""
+                        />
                       ) : (
                         <span className="transfermarkt-portrait transfermarkt-portrait-placeholder">{portrait?.initials ?? "?"}</span>
                       )}
@@ -17746,6 +18040,7 @@ export default function FoundationPageClient({ initialReadSource, initialSelecte
             </section>
           </section>
 
+          {activeView === "season" ? (
           <section className={`panel${getViewClass("season")}`} id="team-table">
             <div className="panel-header">
               <div className="stack season-panel-head">
@@ -17755,9 +18050,28 @@ export default function FoundationPageClient({ initialReadSource, initialSelecte
                 >
                   Saisonstand
                 </TooltipHeading>
+                <p className="muted">
+                  Ausgewählt: {selectedSeasonOverviewLabel} · {seasonOverviewSourceLabel}
+                </p>
               </div>
               <div className="season-toolbar">
-                <span className="pill foundation-source-pill">source: local season results</span>
+                <label className="filter-field season-history-select">
+                  <span>Saison anzeigen</span>
+                  <select
+                    className="input"
+                    value={seasonOverviewSeasonId}
+                    onChange={(event) => setSeasonOverviewSeasonId(event.target.value)}
+                  >
+                    {seasonOverviewOptions.map((option) => (
+                      <option key={option.seasonId} value={option.seasonId}>
+                        {option.seasonName} {option.status === "active" ? "(aktiv)" : "(Archiv)"}
+                      </option>
+                    ))}
+                  </select>
+                </label>
+                <span className={`pill foundation-source-pill${isViewingArchivedSeason ? " is-readonly" : ""}`}>
+                  {isViewingArchivedSeason ? "read-only archive" : "source: local season results"}
+                </span>
                 <div className="season-toolbar-expert-tools">
                   <div className="season-jump-links" aria-label="Saisonstand Blöcke">
                     <button className="secondary-button inline-button" type="button" onClick={() => scrollSeasonTableToColumn("platz")}>
@@ -17770,8 +18084,8 @@ export default function FoundationPageClient({ initialReadSource, initialSelecte
                   <button
                     className="primary-button inline-button"
                     type="button"
-                    disabled={isReadOnlyMode || seasonTransitionBusy || !localSeasonTransitionGate.canCompleteSeason}
-                    title={localSeasonTransitionGate.disabledReason ?? "Saisonwechsel-Assistent öffnen"}
+                    disabled={isViewingArchivedSeason || isReadOnlyMode || seasonTransitionBusy || !localSeasonTransitionGate.canCompleteSeason}
+                    title={isViewingArchivedSeason ? "Archivansicht ist read-only." : localSeasonTransitionGate.disabledReason ?? "Saisonwechsel-Assistent öffnen"}
                     onClick={() => {
                       void runSeasonTransition("start_transition");
                     }}
@@ -17782,15 +18096,55 @@ export default function FoundationPageClient({ initialReadSource, initialSelecte
               </div>
             </div>
             <div className="training-warning-strip">
-              <span className={`transfer-status-pill ${localSeasonTransitionGate.canCompleteSeason ? "is-ready" : "is-warning"}`}>
-                GamePhase: {localSeasonTransitionGate.gamePhase}
-              </span>
-              <span>
-                {localSeasonTransitionGate.canCompleteSeason
-                  ? "Letzter Spieltag abgeschlossen · Saisonwechsel-Assistent bereit."
-                  : `Saison abschließen deaktiviert: ${localSeasonTransitionGate.disabledReason ?? "Quelle fehlt"} · letzter Spieltag ${localSeasonTransitionGate.lastMatchdayId}`}
-              </span>
+              {isViewingArchivedSeason ? (
+                <>
+                  <span className="transfer-status-pill is-info">Archivmodus</span>
+                  <span>
+                    Read-only Snapshot: Standings, PPs, Topspieler und Disziplin-Bestenlisten werden aus {selectedSeasonOverviewLabel} geladen.
+                  </span>
+                </>
+              ) : (
+                <>
+                  <span className={`transfer-status-pill ${localSeasonTransitionGate.canCompleteSeason ? "is-ready" : "is-warning"}`}>
+                    GamePhase: {localSeasonTransitionGate.gamePhase}
+                  </span>
+                  <span>
+                    {localSeasonTransitionGate.canCompleteSeason
+                      ? "Letzter Spieltag abgeschlossen · Saisonwechsel-Assistent bereit."
+                      : `Saison abschließen deaktiviert: ${localSeasonTransitionGate.disabledReason ?? "Quelle fehlt"} · letzter Spieltag ${localSeasonTransitionGate.lastMatchdayId}`}
+                  </span>
+                </>
+              )}
             </div>
+            {isViewingArchivedSeason ? (
+              <div className="teams-summary-grid history-summary-grid season-archive-overview-grid">
+                <article className="metric-card">
+                  <span>Archiv-Teams</span>
+                  <strong>{selectedSeasonSnapshot?.finalStandings.length ?? 0}</strong>
+                  <small>{seasonStandingsFeed?.source.kind === "season_snapshot" ? "Snapshot geladen" : "wartet auf Snapshot"}</small>
+                </article>
+                <article className="metric-card">
+                  <span>Spielerleistungen</span>
+                  <strong>{selectedSeasonSnapshot?.playerPerformances.length ?? 0}</strong>
+                  <small>für Top-Player & Drawer-Historie</small>
+                </article>
+                <article className="metric-card">
+                  <span>Disziplin-Boards</span>
+                  <strong>{archivedSeasonDisciplineLeaderboards.length}</strong>
+                  <small>aus Performance-Breakdowns</small>
+                </article>
+                <article className="metric-card">
+                  <span>Diszi-Results</span>
+                  <strong>{selectedSeasonSnapshot?.disciplineResults?.length ?? 0}</strong>
+                  <small>roh im Snapshot gespeichert</small>
+                </article>
+                <article className="metric-card">
+                  <span>Transfers</span>
+                  <strong>{selectedSeasonSnapshot?.transferSnapshots?.length ?? 0}</strong>
+                  <small>historisch im Save</small>
+                </article>
+              </div>
+            ) : null}
             <div className="table-shell season-table-shell" ref={seasonTableShellRef}>
               <table className={`team-table season-standings-table season-standings-table-${seasonTableMode}`}>
                 <colgroup>
@@ -17967,7 +18321,7 @@ export default function FoundationPageClient({ initialReadSource, initialSelecte
                         const menRankClass = row.pps.men > 0 ? getPpSummaryRankClass(row.areaRanks.men) : "";
                         const socRankClass = row.pps.soc > 0 ? getPpSummaryRankClass(row.areaRanks.soc) : "";
                         return (
-                          <tr key={`season-pp-${row.team.teamId}`}>
+                          <tr key={`season-pp-${row.team.teamId}`} onDoubleClick={() => openTeamDrawerById(row.team.teamId)}>
                             <td>{row.rank}</td>
                             <td>{row.team.name}</td>
                             <td className={rankClass || undefined}>{formatPpsValue(row.pps.total)}</td>
@@ -17987,9 +18341,9 @@ export default function FoundationPageClient({ initialReadSource, initialSelecte
                   <div className="stack">
                     <TooltipHeading
                       as="h3"
-                      tooltip="32 beste aktive Spieler nach Season-PPs. Bereiche POW, SPE, MEN und SOC lassen sich kompakt aufklappen."
+                      tooltip="32 beste Spieler der gewählten Season nach gespeicherten Season-PPs. Im Archivmodus kommen die Werte aus dem Season-Snapshot."
                     >
-                      Top Player
+                      Top Player {selectedSeasonOverviewLabel}
                     </TooltipHeading>
                   </div>
                   <button
@@ -18068,6 +18422,52 @@ export default function FoundationPageClient({ initialReadSource, initialSelecte
                 </div>
               </div>
             </div>
+            {isViewingArchivedSeason ? (
+              <section className="season-archive-discipline-panel">
+                <div className="panel-header season-subpanel-header">
+                  <div className="stack">
+                    <TooltipHeading
+                      as="h3"
+                      tooltip="Archivierte Disziplin-Bestenlisten aus den gespeicherten Player-Performance-Breakdowns der gewählten Season. Sortiert nach gespeicherten PPs/Contribution, dann Durchschnittsscore."
+                    >
+                      Disziplin-Ergebnisse {selectedSeasonOverviewLabel}
+                    </TooltipHeading>
+                    <span className="muted">Read-only · keine aktiven S2-Werte gemischt.</span>
+                  </div>
+                </div>
+                <div className="season-archive-discipline-grid">
+                  {archivedSeasonDisciplineLeaderboards.slice(0, 18).map((discipline) => (
+                    <article key={`archive-discipline-${discipline.disciplineId}`} className="season-archive-discipline-card">
+                      <header>
+                        <strong>{discipline.disciplineName}</strong>
+                        <span>{discipline.players.length} Spieler</span>
+                      </header>
+                      <ol>
+                        {discipline.players.map((player, index) => (
+                          <li
+                            key={`${discipline.disciplineId}-${player.playerId}`}
+                            onDoubleClick={() => openPlayerDrawerById(player.playerId)}
+                            title="Doppelklick öffnet den Spieler-Drawer"
+                          >
+                            <span>
+                              <strong>#{index + 1} {player.playerName}</strong>
+                              <small>{player.teamCode ?? player.teamName ?? "—"} · {player.appearances} Eins.</small>
+                            </span>
+                            <span>
+                              {player.totalContribution != null ? formatLocalePoints(player.totalContribution, 1) : "—"}
+                              <small>Ø {player.averageFinalScore != null ? formatLocalePoints(player.averageFinalScore, 1) : "—"}</small>
+                            </span>
+                          </li>
+                        ))}
+                      </ol>
+                    </article>
+                  ))}
+                  {archivedSeasonDisciplineLeaderboards.length === 0 ? (
+                    <p className="muted">Kein gespeicherter Disziplin-Breakdown in diesem Snapshot.</p>
+                  ) : null}
+                </div>
+              </section>
+            ) : null}
             <details className="season-history-panel" open={false}>
               <summary className="season-history-summary">
                 Historie anzeigen
@@ -18150,7 +18550,7 @@ export default function FoundationPageClient({ initialReadSource, initialSelecte
                           </thead>
                           <tbody>
                             {snapshot.finalStandings.map((row) => (
-                              <tr key={`${snapshot.seasonId}-${row.teamId}`}>
+                              <tr key={`${snapshot.seasonId}-${row.teamId}`} onDoubleClick={() => openTeamDrawerById(row.teamId)}>
                                 <td>{row.rank ?? "—"}</td>
                                 <td>{row.teamName}</td>
                                 <td>{row.points != null ? formatLocalePoints(row.points, 1) : "—"}</td>
@@ -18174,6 +18574,7 @@ export default function FoundationPageClient({ initialReadSource, initialSelecte
               )}
             </details>
           </section>
+          ) : null}
 
           <section className={`panel${getViewClass("seasonPreview")}`} id="standings-preview">
             <div className="panel-header">
@@ -18280,7 +18681,7 @@ export default function FoundationPageClient({ initialReadSource, initialSelecte
                 </thead>
                 <tbody>
                   {sortedStandingsPreviewRows.map((row) => (
-                    <tr key={row.teamId}>
+                    <tr key={row.teamId} onDoubleClick={() => openTeamDrawerById(row.teamId)}>
                       {visibleStandingsPreviewColumns.map((column) => {
                         if (column.id === "team") return <td key={column.id}><div className="table-team-cell"><strong>{row.teamName}</strong><span>{row.teamId}</span></div></td>;
                         if (column.id === "warnings") return <td key={column.id}>{row.warnings.join(", ") || "—"}</td>;
@@ -18305,6 +18706,7 @@ export default function FoundationPageClient({ initialReadSource, initialSelecte
             </div>
           </section>
 
+          {activeView === "players" ? (
           <section className={`panel${getViewClass("players")}`} id="players-table">
             <div className="panel-header">
               <h2>Players</h2>
@@ -18456,6 +18858,7 @@ export default function FoundationPageClient({ initialReadSource, initialSelecte
                                   height={56}
                                   loading="lazy"
                                   decoding="async"
+                                  fetchPriority="low"
                                 />
                               ) : (
                                 <div className="transfermarkt-portrait transfermarkt-portrait-placeholder" aria-label={`${row.player.name} placeholder`}>
@@ -18474,7 +18877,14 @@ export default function FoundationPageClient({ initialReadSource, initialSelecte
                             <td key={column.id}>
                               <div className="players-table-team-cell">
                                 {teamLogo?.src ? (
-                                  <img className="players-table-team-logo" src={teamLogo.src} alt={`${row.team?.name ?? "Team"} Logo`} />
+                                  <img
+                                    className="players-table-team-logo"
+                                    src={teamLogo.src}
+                                    alt={`${row.team?.name ?? "Team"} Logo`}
+                                    loading="lazy"
+                                    decoding="async"
+                                    fetchPriority="low"
+                                  />
                                 ) : (
                                   <span className="players-table-team-logo players-table-team-logo-placeholder" aria-label={`${row.team?.name ?? "Free Agent"} Logo Platzhalter`}>
                                     {teamLogo?.initials ?? "FA"}
@@ -18664,7 +19074,7 @@ export default function FoundationPageClient({ initialReadSource, initialSelecte
                 </table>
               </div>
               <p className="muted" style={{ marginTop: 12 }}>
-                Compare Mode ist rein sichtbar. Transfermarkt-Kaeufe und lokale Buy-Previews bleiben weiterhin auf Legacy MW/Gehalt.
+                Compare Mode ist rein sichtbar. Transfermarkt-Kaeufe und lokale Buy-Previews nutzen die interne Economy-/Vertragsberechnung.
               </p>
             </section>
             <div className="player-drawer-two-column-grid" style={{ marginTop: 16 }}>
@@ -18740,7 +19150,9 @@ export default function FoundationPageClient({ initialReadSource, initialSelecte
               </section>
             </div>
           </section>
+          ) : null}
 
+          {activeView === "teams" ? (
           <section className={`panel teams-view-panel${getViewClass("teams")}`} id="teams-view">
             <div className="panel-header">
               <div className="stack">
@@ -18952,7 +19364,7 @@ export default function FoundationPageClient({ initialReadSource, initialSelecte
                   </thead>
                   <tbody>
                     {sortedTeamsViewRows.map((row) => (
-                      <tr key={`history-${row.team.teamId}`}>
+                      <tr key={`history-${row.team.teamId}`} onDoubleClick={() => openTeamDrawerById(row.team.teamId)}>
                         <td className="teams-view-team-cell">
                           <button
                             className="table-link-button"
@@ -19027,6 +19439,7 @@ export default function FoundationPageClient({ initialReadSource, initialSelecte
               <p className="muted teams-view-note">Vergleich aktuell ausgeblendet.</p>
             )}
           </section>
+          ) : null}
 
           <section className={`panel${getViewClass("ranks")}`} id="discipline-ranks">
             <div className="panel-header">
@@ -19096,6 +19509,7 @@ export default function FoundationPageClient({ initialReadSource, initialSelecte
                         row.team.teamId === activeManagerTeamId && "is-active-team-row",
                         getOwnerTeamHighlightClass(resolvedTeamControlSettings[row.team.teamId]),
                       )}
+                      onDoubleClick={() => openTeamDrawerById(row.team.teamId)}
                     >
                       {visibleDisciplineRanksColumns.map((column, columnIndex) => {
                         if (column.id === "team") {
@@ -19285,7 +19699,7 @@ export default function FoundationPageClient({ initialReadSource, initialSelecte
                     const menRankClass = row.pps.men > 0 ? getPpSummaryRankClass(row.areaRanks.men) : "";
                     const socRankClass = row.pps.soc > 0 ? getPpSummaryRankClass(row.areaRanks.soc) : "";
                     return (
-                      <tr key={row.team.teamId}>
+                      <tr key={row.team.teamId} onDoubleClick={() => openTeamDrawerById(row.team.teamId)}>
                         <td>{row.rank}</td>
                         <td>{row.team.name}</td>
                         <td className={rankClass || undefined}>{formatPpsValue(row.pps.total)}</td>
@@ -19515,7 +19929,7 @@ export default function FoundationPageClient({ initialReadSource, initialSelecte
                 </thead>
                 <tbody>
                   {sortedPrizePreviewRows.map((row) => (
-                    <tr key={row.teamId}>
+                    <tr key={row.teamId} onDoubleClick={() => openTeamDrawerById(row.teamId)}>
                       {visiblePrizePreviewColumns.map((column) => {
                         if (column.id === "team") return <td key={column.id}>{row.teamName}</td>;
                         if (column.id === "projectedRank") return <td key={column.id}>{row.rank ?? "—"}</td>;
@@ -19541,7 +19955,7 @@ export default function FoundationPageClient({ initialReadSource, initialSelecte
             </div>
           </section>
 
-          {selectedTeam ? (
+          {activeView === "teams" && selectedTeam ? (
             <>
               <section className={`panel team-hero-panel${getViewClass("teams")}`} id="team-view">
                 <div className="team-hero">
@@ -19653,7 +20067,14 @@ export default function FoundationPageClient({ initialReadSource, initialSelecte
                     {(() => {
                       const logo = getTeamLogoModel(selectedTeam);
                       return logo.src ? (
-                        <img className="team-focus-logo" src={logo.src} alt={`${selectedTeam.name} Logo`} />
+                        <img
+                          className="team-focus-logo"
+                          src={logo.src}
+                          alt={`${selectedTeam.name} Logo`}
+                          loading="eager"
+                          decoding="async"
+                          fetchPriority="high"
+                        />
                       ) : (
                         <div className="team-focus-logo team-logo-placeholder" aria-label={`${selectedTeam.name} Logo Platzhalter`}>
                           {logo.initials}
@@ -19828,7 +20249,20 @@ export default function FoundationPageClient({ initialReadSource, initialSelecte
                                     );
                                   }
                                   if (column.id === "mw") return <td key={column.id}>{formatLocalePoints(getPlayerDisplayMarketValue(player), 2)}</td>;
-                                  if (column.id === "salary") return <td key={column.id}>{formatDisplayMoney(getRosterEntryDisplaySalary(entry, player))}</td>;
+                                  if (column.id === "salary") {
+                                    const currentSalary = getRosterEntryDisplaySalary(entry, player);
+                                    const normalSalary = getRosterEntryNormalSalary(player);
+                                    return (
+                                      <td key={column.id}>
+                                        <span>{formatDisplayMoney(currentSalary)}</span>
+                                        {normalSalary != null && currentSalary != null && Math.abs(normalSalary - currentSalary) >= 0.01 ? (
+                                          <small className={currentSalary < normalSalary ? "text-positive" : "text-negative"}>
+                                            {" "}({formatDisplayMoney(normalSalary)})
+                                          </small>
+                                        ) : null}
+                                      </td>
+                                    );
+                                  }
                                   if (column.id === "contract") return <td key={column.id}>{entry.contractLength}</td>;
                                   if (column.id === "ovr") return <td key={column.id} className={playerOvr != null ? getPoolHeatClass(playerOvr, leaguePlayerHeatPools.ovr) : ""}>{formatWholeNumber(playerOvr)}</td>;
                                   if (column.id === "mvs") return <td key={column.id} className={playerMvs != null ? getPoolHeatClass(playerMvs, leaguePlayerHeatPools.mvs) : ""}>{playerMvs != null ? formatPpsValue(playerMvs) : "—"}</td>;
@@ -20131,7 +20565,12 @@ export default function FoundationPageClient({ initialReadSource, initialSelecte
                   </div>
                   <div className="roster-grid">
                     {starters.map(({ entry, player }) => (
-                      <article className={`player-card player-card-spotlight ${getClassColorClassName(player.className, "player-card-class-frame")}`} key={entry.id}>
+                      <article
+                        className={`player-card player-card-spotlight ${getClassColorClassName(player.className, "player-card-class-frame")}`}
+                        key={entry.id}
+                        onDoubleClick={() => openPlayerDrawerById(player.id, entry.id)}
+                        title="Doppelklick öffnet den Spieler-Drawer"
+                      >
                         <div className="player-card-hero">
                           <PlayerPortrait
                             src={getPlayerPortraitModel(player).src}
@@ -20180,7 +20619,12 @@ export default function FoundationPageClient({ initialReadSource, initialSelecte
                   </div>
                   <div className="roster-grid">
                     {bench.map(({ entry, player }) => (
-                      <article className={`player-card compact player-card-spotlight ${getClassColorClassName(player.className, "player-card-class-frame")}`} key={entry.id}>
+                      <article
+                        className={`player-card compact player-card-spotlight ${getClassColorClassName(player.className, "player-card-class-frame")}`}
+                        key={entry.id}
+                        onDoubleClick={() => openPlayerDrawerById(player.id, entry.id)}
+                        title="Doppelklick öffnet den Spieler-Drawer"
+                      >
                         <div className="player-card-hero">
                           <PlayerPortrait
                             src={getPlayerPortraitModel(player).src}
@@ -20386,6 +20830,7 @@ export default function FoundationPageClient({ initialReadSource, initialSelecte
             </>
           ) : null}
 
+          {activeView === "training" ? (
           <section className={`panel training-facilities-panel${getViewClass("training")}`} data-testid="foundation-training-facilities" id="foundation-training-facilities">
             <div className="panel-header">
               <div className="stack">
@@ -20406,7 +20851,14 @@ export default function FoundationPageClient({ initialReadSource, initialSelecte
                     {(() => {
                       const logo = getTeamLogoModel(selectedTeam);
                       return logo.src ? (
-                        <img className="training-team-logo" src={logo.src} alt={`${selectedTeam.name} Logo`} />
+                        <img
+                          className="training-team-logo"
+                          src={logo.src}
+                          alt={`${selectedTeam.name} Logo`}
+                          loading="eager"
+                          decoding="async"
+                          fetchPriority="high"
+                        />
                       ) : (
                         <div className="training-team-logo team-logo-placeholder" aria-label={`${selectedTeam.name} Logo Platzhalter`}>
                           {logo.initials}
@@ -20513,10 +20965,20 @@ export default function FoundationPageClient({ initialReadSource, initialSelecte
                       {trainingPlayerForecastRows.map((row) => {
                         const portrait = getPlayerPortraitModel(row.player);
                         return (
-                          <article className="training-player-card" key={row.entry.id}>
+                          <article
+                            className="training-player-card"
+                            key={row.entry.id}
+                            onDoubleClick={() => openPlayerDrawerById(row.player.id, row.entry.id)}
+                            title="Doppelklick öffnet den Spieler-Drawer"
+                          >
                             <div className="training-player-main">
                               {portrait.src ? (
-                                <img className="training-player-portrait" src={portrait.src} alt={row.player.name} />
+                                <PlayerPortrait
+                                  className="training-player-portrait"
+                                  src={portrait.src}
+                                  initials={portrait.initials}
+                                  alt={row.player.name}
+                                />
                               ) : (
                                 <div className="training-player-portrait training-player-portrait-placeholder" aria-label={`${row.player.name} placeholder`}>
                                   {portrait.initials}
@@ -21004,7 +21466,12 @@ export default function FoundationPageClient({ initialReadSource, initialSelecte
                           })
                         : null;
                       return (
-                        <article className="training-player-card" key={`season-end-${row.playerId}`}>
+                        <article
+                          className="training-player-card"
+                          key={`season-end-${row.playerId}`}
+                          onDoubleClick={() => openPlayerDrawerById(row.playerId)}
+                          title="Doppelklick öffnet den Spieler-Drawer"
+                        >
                           <div className="training-player-main">
                             <div>
                               <strong>{row.playerName}</strong>
@@ -21074,7 +21541,7 @@ export default function FoundationPageClient({ initialReadSource, initialSelecte
                             <div className="training-development-strip">
                               <span>
                                 Lv {developmentLevelup.level.developmentLevel} · {developmentLevelup.level.progressPct}% ·{" "}
-                                {developmentLevelup.level.trainingPointsAvailable} TP
+                                {developmentLevelup.level.trainingPointsAvailable} TP · max {developmentLevelup.level.seasonLevelUpCap} Lv/Saison
                               </span>
                               <span>
                                 ★ {developmentLevelup.affinity.signatureAttributes.map((attribute) => TRAINING_ATTRIBUTE_LABELS[attribute]).join(" / ")}
@@ -21161,7 +21628,9 @@ export default function FoundationPageClient({ initialReadSource, initialSelecte
               <p className="muted">Kein Team im lokalen Save gefunden.</p>
             )}
           </section>
+          ) : null}
 
+          {activeView === "market" ? (
           <section className={`panel transfer-market-panel${getViewClass("market")}`} data-testid="transfer-market" id="transfer-market">
             <div className="panel-header">
               <TooltipHeading
@@ -21233,6 +21702,7 @@ export default function FoundationPageClient({ initialReadSource, initialSelecte
                                     height={portraitSize}
                                     loading="lazy"
                                     decoding="async"
+                                    fetchPriority="low"
                                     style={{ width: `${portraitSize}px`, height: `${portraitSize}px` }}
                                   />
                                 ) : (
@@ -21395,6 +21865,7 @@ export default function FoundationPageClient({ initialReadSource, initialSelecte
                           <div className="transfermarkt-row-actions">
                             <button
                               className="secondary-button inline-button"
+                              data-testid="transfer-buy-open-button"
                               type="button"
                               disabled={!marketTeamId || (marketBuyBusy && marketPreviewPlayerId === row.item.playerId)}
                               onClick={() => {
@@ -21635,6 +22106,7 @@ export default function FoundationPageClient({ initialReadSource, initialSelecte
                                       <tr
                                         key={`market-ai-${entry.teamId}`}
                                         className={marketAiPreviewSelectedTeamId === entry.teamId ? "is-selected" : undefined}
+                                        onDoubleClick={() => openTeamDrawerById(entry.teamId)}
                                         onClick={() => setMarketAiPreviewSelectedTeamId(entry.teamId)}
                                       >
                                         <td>
@@ -21720,7 +22192,12 @@ export default function FoundationPageClient({ initialReadSource, initialSelecte
                                       <div className="transfer-ai-candidate-list">
                                         {marketAiSelectedTeam.recommendedBuys.map((entry) => {
                                           return (
-                                            <article key={`${marketAiSelectedTeam.teamId}-${entry.playerId}`} className="transfer-ai-candidate-card">
+                                            <article
+                                              key={`${marketAiSelectedTeam.teamId}-${entry.playerId}`}
+                                              className="transfer-ai-candidate-card"
+                                              onDoubleClick={() => openPlayerDrawerById(entry.playerId)}
+                                              title="Doppelklick öffnet den Spieler-Drawer"
+                                            >
                                               <div className="transfer-ai-candidate-head">
                                                 <button
                                                   className="table-link-button"
@@ -21779,7 +22256,7 @@ export default function FoundationPageClient({ initialReadSource, initialSelecte
                                               <div className="transfer-inline-actions">
                                                 <button
                                                   className="secondary-button inline-button"
-                                                  data-testid="transfer-buy-preview-button"
+                                                  data-testid="transfer-buy-open-button"
                                                   type="button"
                                                   disabled={readMeta.source === "prisma"}
                                                   onClick={() => {
@@ -21928,6 +22405,7 @@ export default function FoundationPageClient({ initialReadSource, initialSelecte
                                     <tr
                                       key={`market-plan-${entry.teamId}`}
                                       className={marketAiPlanPreviewSelectedTeamId === entry.teamId ? "is-selected" : undefined}
+                                      onDoubleClick={() => openTeamDrawerById(entry.teamId)}
                                       onClick={() => setMarketAiPlanPreviewSelectedTeamId(entry.teamId)}
                                     >
                                       <td>
@@ -22060,7 +22538,12 @@ export default function FoundationPageClient({ initialReadSource, initialSelecte
                                     ) : (
                                       <div className="transfer-ai-candidate-list">
                                         {marketAiPlanSelectedTeam.buyPlan.candidates.map((entry) => (
-                                          <article key={`${marketAiPlanSelectedTeam.teamId}-plan-buy-${entry.playerId}`} className="transfer-ai-candidate-card">
+                                          <article
+                                            key={`${marketAiPlanSelectedTeam.teamId}-plan-buy-${entry.playerId}`}
+                                            className="transfer-ai-candidate-card"
+                                            onDoubleClick={() => openPlayerDrawerById(entry.playerId)}
+                                            title="Doppelklick öffnet den Spieler-Drawer"
+                                          >
                                             <div className="transfer-ai-candidate-head">
                                               <button className="table-link-button" type="button" onDoubleClick={() => openPlayerDrawerById(entry.playerId)}>
                                                 {entry.name}
@@ -22106,7 +22589,12 @@ export default function FoundationPageClient({ initialReadSource, initialSelecte
                                     ) : (
                                       <div className="transfer-ai-candidate-list">
                                         {marketAiPlanSelectedTeam.sellPlan.candidates.map((entry) => (
-                                          <article key={`${marketAiPlanSelectedTeam.teamId}-plan-sell-${entry.activePlayerId}`} className="transfer-ai-candidate-card">
+                                          <article
+                                            key={`${marketAiPlanSelectedTeam.teamId}-plan-sell-${entry.activePlayerId}`}
+                                            className="transfer-ai-candidate-card"
+                                            onDoubleClick={() => openPlayerDrawerById(entry.playerId, entry.activePlayerId)}
+                                            title="Doppelklick öffnet den Spieler-Drawer"
+                                          >
                                             <div className="transfer-ai-candidate-head">
                                               <button
                                                 className="table-link-button"
@@ -22270,6 +22758,7 @@ export default function FoundationPageClient({ initialReadSource, initialSelecte
                                     <tr
                                       key={`market-ai-compare-${entry.teamId}`}
                                       className={marketAiCompareSelectedTeamId === entry.teamId ? "is-selected" : undefined}
+                                      onDoubleClick={() => openTeamDrawerById(entry.teamId)}
                                       onClick={() => setMarketAiCompareSelectedTeamId(entry.teamId)}
                                     >
                                       <td>
@@ -22503,7 +22992,12 @@ export default function FoundationPageClient({ initialReadSource, initialSelecte
                                     ) : (
                                       <div className="transfer-ai-candidate-list">
                                         {marketAiCompareSelectedTeam.plannedPicks.map((entry) => (
-                                          <article key={`${marketAiCompareSelectedTeam.teamId}-compare-pick-${entry.step}-${entry.playerId}`} className="transfer-ai-candidate-card">
+                                          <article
+                                            key={`${marketAiCompareSelectedTeam.teamId}-compare-pick-${entry.step}-${entry.playerId}`}
+                                            className="transfer-ai-candidate-card"
+                                            onDoubleClick={() => openPlayerDrawerById(entry.playerId)}
+                                            title="Doppelklick öffnet den Spieler-Drawer"
+                                          >
                                             <div className="transfer-ai-candidate-head">
                                               <button className="table-link-button" type="button" onDoubleClick={() => openPlayerDrawerById(entry.playerId)}>
                                                 #{entry.step} {entry.playerName}
@@ -22546,7 +23040,12 @@ export default function FoundationPageClient({ initialReadSource, initialSelecte
                                     ) : (
                                       <div className="transfer-ai-candidate-list">
                                         {marketAiCompareSelectedTeam.candidatePoolTop.map((entry) => (
-                                          <article key={`${marketAiCompareSelectedTeam.teamId}-compare-candidate-${entry.playerId}`} className="transfer-ai-candidate-card">
+                                          <article
+                                            key={`${marketAiCompareSelectedTeam.teamId}-compare-candidate-${entry.playerId}`}
+                                            className="transfer-ai-candidate-card"
+                                            onDoubleClick={() => openPlayerDrawerById(entry.playerId)}
+                                            title="Doppelklick öffnet den Spieler-Drawer"
+                                          >
                                             <div className="transfer-ai-candidate-head">
                                               <button className="table-link-button" type="button" onDoubleClick={() => openPlayerDrawerById(entry.playerId)}>
                                                 {entry.playerName}
@@ -22697,6 +23196,7 @@ export default function FoundationPageClient({ initialReadSource, initialSelecte
                                       <tr
                                         key={`market-ai-sell-${entry.teamId}`}
                                         className={marketAiSellPreviewSelectedTeamId === entry.teamId ? "is-selected" : undefined}
+                                        onDoubleClick={() => openTeamDrawerById(entry.teamId)}
                                         onClick={() => setMarketAiSellPreviewSelectedTeamId(entry.teamId)}
                                       >
                                         <td>
@@ -22793,7 +23293,12 @@ export default function FoundationPageClient({ initialReadSource, initialSelecte
                                   ) : (
                                     <div className="transfer-ai-candidate-list">
                                       {marketAiSellSelectedTeam.keepCore.map((entry) => (
-                                        <article key={`${marketAiSellSelectedTeam.teamId}-keep-${entry.activePlayerId}`} className="transfer-ai-candidate-card">
+                                        <article
+                                          key={`${marketAiSellSelectedTeam.teamId}-keep-${entry.activePlayerId}`}
+                                          className="transfer-ai-candidate-card"
+                                          onDoubleClick={() => openPlayerDrawerById(entry.playerId, entry.activePlayerId)}
+                                          title="Doppelklick öffnet den Spieler-Drawer"
+                                        >
                                           <div className="transfer-ai-candidate-head">
                                             <button
                                               className="table-link-button"
@@ -22826,7 +23331,12 @@ export default function FoundationPageClient({ initialReadSource, initialSelecte
                                   ) : (
                                     <div className="transfer-ai-candidate-list">
                                       {marketAiSellSelectedTeam.sellCandidates.map((entry) => (
-                                        <article key={`${marketAiSellSelectedTeam.teamId}-sell-${entry.activePlayerId}`} className="transfer-ai-candidate-card">
+                                        <article
+                                          key={`${marketAiSellSelectedTeam.teamId}-sell-${entry.activePlayerId}`}
+                                          className="transfer-ai-candidate-card"
+                                          onDoubleClick={() => openPlayerDrawerById(entry.playerId, entry.activePlayerId)}
+                                          title="Doppelklick öffnet den Spieler-Drawer"
+                                        >
                                           <div className="transfer-ai-candidate-head">
                                             <button
                                               className="table-link-button"
@@ -22896,134 +23406,6 @@ export default function FoundationPageClient({ initialReadSource, initialSelecte
                           </>
                         ) : (
                           <p className="muted">Noch keine AI-Verkaufsvorschau geladen.</p>
-                        )}
-                      </section>
-                    </div>
-
-                    <div className="transfer-panel-section transfer-panel-section--active-preview">
-                      <div className="transfer-panel-title">
-                        <h3>Angebotsvorschau</h3>
-                          <p className="muted transfer-panel-note">Erst Angebot prüfen, dann verhandeln.</p>
-                      </div>
-                      <section className="panel transfer-buy-panel">
-                        {!marketTeamId ? (
-                          <p className="muted">Bitte zuerst ein Team waehlen.</p>
-                        ) : null}
-                        {marketBuyError ? (
-                          <div className="transfer-feedback-banner is-error">
-                            <strong>Angebot blockiert</strong>
-                            <span>{marketBuyError}</span>
-                          </div>
-                        ) : null}
-                        {marketBuySuccess ? (
-                          <div className="transfer-feedback-banner is-success">
-                            <strong>Kauf erfolgreich</strong>
-                            <span>{marketBuySuccess}</span>
-                          </div>
-                        ) : null}
-                        {marketBuyPreview ? (
-                          <div className="transfer-buy-summary">
-                            <div className="transfer-buy-player-line">
-                              <p>
-                                <strong
-                                  className="transfer-inline-link"
-                                  onDoubleClick={() => {
-                                    if (marketBuyPreview.player?.id) {
-                                      openPlayerDrawerById(marketBuyPreview.player.id);
-                                    }
-                                  }}
-                                >
-                                  {marketBuyPreview.player?.name ?? "Unbekannt"}
-                                </strong>{" "}
-                                ·{" "}
-                                {marketBuyPreview.team?.shortCode ?? "—"} / {marketBuyPreview.team?.name ?? "—"}
-                              </p>
-                              <div className="transfer-inline-actions">
-                                <span className={`transfer-status-pill${marketBuyPreview.canBuy ? " is-ready" : " is-blocked"}`}>
-                                  {marketBuyPreview.canBuy ? "bereit" : "geblockt"}
-                                </span>
-                                <button
-                                  className="secondary-button inline-button"
-                                  data-testid="transfer-buy-dialog-open"
-                                  type="button"
-                                  disabled={marketBuyBusy}
-                                  onClick={() => {
-                                    setMarketBuyModalOpen(true);
-                                  }}
-                                >
-                                  {marketBuyBusy ? "Kauf laeuft..." : "Kaufdialog oeffnen"}
-                                </button>
-                              </div>
-                            </div>
-                            <div className="metric-grid compact">
-                              <article className="metric-card">
-                                <span>Marktwert / Kaufpreis</span>
-                                <strong>{formatTransfermarktCurrency(marketBuyPreview.purchasePrice)}</strong>
-                              </article>
-                              <article className="metric-card">
-                                <span>Gehalt</span>
-                                <strong>{formatTransfermarktCurrency(marketBuyPreview.salary)}</strong>
-                              </article>
-                              <article className="metric-card">
-                                <span>Cash vorher / nachher</span>
-                                <strong>
-                                  {formatTransfermarktCurrency(marketBuyPreview.cashBefore)} / {formatTransfermarktCurrency(marketBuyPreview.cashAfter)}
-                                </strong>
-                              </article>
-                              <article className="metric-card">
-                                <span>Salary vorher / nachher</span>
-                                <strong>
-                                  {formatTransfermarktCurrency(marketBuyPreview.salaryBefore)} / {formatTransfermarktCurrency(marketBuyPreview.salaryAfter)}
-                                </strong>
-                              </article>
-                              <article className="metric-card">
-                                <span>MW vorher / nachher</span>
-                                <strong>
-                                  {formatTransfermarktCurrency(marketBuyPreview.marketValueBefore)} / {formatTransfermarktCurrency(marketBuyPreview.marketValueAfter)}
-                                </strong>
-                              </article>
-                              <article className="metric-card">
-                                <span>Roster vorher / nachher</span>
-                                <strong>
-                                  {marketBuyPreview.rosterBefore ?? "—"} / {marketBuyPreview.rosterAfter ?? "—"}
-                                </strong>
-                              </article>
-                            </div>
-                            <div className="transfer-buy-meta-grid">
-                              <div className="transfer-callout is-blocked">
-                                <div className="transfer-callout-title">
-                                  <strong>Blocker</strong>
-                                  <span className="muted">{marketBuyPreview.blockingReasons.length}</span>
-                                </div>
-                                {marketBuyPreview.blockingReasons.length > 0 ? (
-                                  <ul className="warning-list negotiation-factor-list">
-                                    {marketBuyPreview.blockingReasons.map((reason) => (
-                                      <li className="negotiation-factor is-negative" key={reason}>{formatNegotiationSignalLabel(reason)}</li>
-                                    ))}
-                                  </ul>
-                                ) : (
-                                  <p className="muted">Keine blockierenden Gruende.</p>
-                                )}
-                              </div>
-                              <div className="transfer-callout is-warning">
-                                <div className="transfer-callout-title">
-                                  <strong>Risiken</strong>
-                                  <span className="muted">{marketBuyPreview.warnings.length}</span>
-                                </div>
-                                {marketBuyPreview.warnings.length > 0 ? (
-                                  <ul className="warning-list negotiation-factor-list">
-                                    {marketBuyPreview.warnings.map((warning) => (
-                                      <li className="negotiation-factor is-negative" key={warning}>{formatNegotiationSignalLabel(warning)}</li>
-                                    ))}
-                                  </ul>
-                                ) : (
-                                  <p className="muted">Keine Warnungen.</p>
-                                )}
-                              </div>
-                            </div>
-                          </div>
-                        ) : (
-                          <p className="muted transfer-empty-hint">Waehle einen Spieler und klicke auf „Angebot pruefen“.</p>
                         )}
                       </section>
                     </div>
@@ -23415,6 +23797,7 @@ export default function FoundationPageClient({ initialReadSource, initialSelecte
                                   alt={entry.playerName}
                                   loading="lazy"
                                   decoding="async"
+                                  fetchPriority="low"
                                 />
                               ) : (
                                 <div className="transfermarkt-portrait transfermarkt-portrait-placeholder transfermarkt-portrait-small">
@@ -23483,7 +23866,9 @@ export default function FoundationPageClient({ initialReadSource, initialSelecte
               <p className="muted">Mit den aktuellen Filtern wurden keine verfuegbaren Spieler gefunden.</p>
             ) : null}
           </section>
+          ) : null}
 
+          {activeView === "market" ? (
           <section className={`panel transfer-market-panel${getViewClass("market")}`} id="transfer-recap">
             <div className="panel-header">
               <h2>Transfer Recap</h2>
@@ -23764,6 +24149,7 @@ export default function FoundationPageClient({ initialReadSource, initialSelecte
               <p className="muted">Noch kein Transfer Recap geladen.</p>
             )}
           </section>
+          ) : null}
 
           {marketBuyModalOpen ? (
             <div className="foundation-modal-backdrop" role="presentation" onClick={closeMarketBuyModal}>
@@ -23813,6 +24199,7 @@ export default function FoundationPageClient({ initialReadSource, initialSelecte
                           height={56}
                           loading="lazy"
                           decoding="async"
+                          fetchPriority="low"
                         />
                       ) : (
                         <div className="transfermarkt-portrait transfermarkt-portrait-placeholder" aria-label={`${playerName} placeholder`}>
@@ -23890,8 +24277,14 @@ export default function FoundationPageClient({ initialReadSource, initialSelecte
                   ) : null}
                   {marketBuyError ? (
                     <div className="transfer-feedback-banner is-error">
-                      <strong>Kaufvorschau blockiert</strong>
+                      <strong>Angebot blockiert</strong>
                       <span>{marketBuyError}</span>
+                    </div>
+                  ) : null}
+                  {marketBuySuccess ? (
+                    <div className="transfer-feedback-banner is-success">
+                      <strong>Kauf erfolgreich</strong>
+                      <span>{marketBuySuccess}</span>
                     </div>
                   ) : null}
                   {marketBuyBusy && !marketBuyPreview ? (
@@ -23956,13 +24349,6 @@ export default function FoundationPageClient({ initialReadSource, initialSelecte
                             onChange={(event) => {
                               const nextLength = Math.max(1, Math.round(Number(event.target.value)));
                               setMarketContractLengthDraft(nextLength);
-                              if (marketBuySubject) {
-                                void requestTransfermarktBuyPreview(marketBuySubject, marketBuyPreview.team?.id ?? marketTeamId, {
-                                  contractLength: nextLength,
-                                  contractShape: marketContractShapeDraft,
-                                  offeredSalary: marketOfferedSalaryDraft,
-                                });
-                              }
                             }}
                           >
                             {[1, 2, 3, 4, 5].map((years) => (
@@ -23980,13 +24366,6 @@ export default function FoundationPageClient({ initialReadSource, initialSelecte
                             onChange={(event) => {
                               const nextShape = event.target.value as ContractShape;
                               setMarketContractShapeDraft(nextShape);
-                              if (marketBuySubject) {
-                                void requestTransfermarktBuyPreview(marketBuySubject, marketBuyPreview.team?.id ?? marketTeamId, {
-                                  contractLength: marketContractLengthDraft,
-                                  contractShape: nextShape,
-                                  offeredSalary: marketOfferedSalaryDraft,
-                                });
-                              }
                             }}
                           >
                             <option value="balanced">Balanced</option>
@@ -24064,20 +24443,9 @@ export default function FoundationPageClient({ initialReadSource, initialSelecte
                         ) : null}
 
                         <div className="transfer-negotiation-actions">
-                          <button
-                            className="secondary-button inline-button"
-                            data-testid="transfer-buy-preview-button"
-                            type="button"
-                            disabled={!marketBuySubject || marketBuyBusy}
-                            onClick={() => {
-                              if (marketBuySubject) {
-                                void requestTransfermarktBuyPreview(marketBuySubject, marketBuyPreview.team?.id ?? marketTeamId);
-                              }
-                            }}
-                          >
-                            Angebot pruefen
-                          </button>
-                          <span className="muted">Gehaltsangebot und Vertragsform veraendern die Verhandlungschancen direkt.</span>
+                          <span className="muted">
+                            Gehaltsangebot, Laufzeit und Vertragsform aktualisieren die Verhandlungschancen live.
+                          </span>
                         </div>
 
                         {marketNegotiationOutcome ? (
@@ -24300,19 +24668,6 @@ export default function FoundationPageClient({ initialReadSource, initialSelecte
                     Abbrechen
                   </button>
                   <button
-                    className="secondary-button"
-                    data-testid="transfer-buy-preview-button"
-                    type="button"
-                    disabled={!marketBuySubject || marketBuyBusy}
-                    onClick={() => {
-                      if (marketBuySubject) {
-                        void requestTransfermarktBuyPreview(marketBuySubject, marketBuyPreview?.team?.id ?? marketTeamId);
-                      }
-                    }}
-                  >
-                    Angebot pruefen
-                  </button>
-                  <button
                     className={marketNegotiationOutcome?.status === "accepted" ? "primary-button" : "secondary-button"}
                     data-testid="transfer-buy-negotiate"
                     type="button"
@@ -24378,6 +24733,7 @@ export default function FoundationPageClient({ initialReadSource, initialSelecte
                           height={56}
                           loading="lazy"
                           decoding="async"
+                          fetchPriority="low"
                         />
                       ) : (
                         <div className="transfermarkt-portrait transfermarkt-portrait-placeholder" aria-label={`${playerName} placeholder`}>
@@ -24582,6 +24938,7 @@ export default function FoundationPageClient({ initialReadSource, initialSelecte
             </div>
           ) : null}
 
+          {activeView === "history" ? (
           <section className={`panel${getViewClass("history")}`} id="transfer-history">
             <div className="panel-header">
               <TooltipHeading
@@ -24807,7 +25164,7 @@ export default function FoundationPageClient({ initialReadSource, initialSelecte
                         </thead>
                         <tbody>
                           {aiPickAuditFeed.teams.map((team) => (
-                            <tr key={team.teamId}>
+                            <tr key={team.teamId} onDoubleClick={() => openTeamDrawerById(team.teamId)}>
                               <td>
                                 <div className="table-player-cell">
                                   <strong>{team.teamName}</strong>
@@ -24927,6 +25284,11 @@ export default function FoundationPageClient({ initialReadSource, initialSelecte
                 <strong>{formatTransfermarktCurrency(transferHistorySummary.netTransferBalance)}</strong>
               </article>
             </div>
+            {sortedTransferHistoryRows.length > TRANSFER_HISTORY_INITIAL_RENDER_LIMIT ? (
+              <p className="muted" style={{ margin: "8px 0 12px" }}>
+                Performance-Modus: zeigt die ersten {TRANSFER_HISTORY_INITIAL_RENDER_LIMIT} Treffer. Nutze Filter/Suche fuer engere Historie.
+              </p>
+            ) : null}
 
             <div className="transfer-market-layout">
               <div className="table-shell transfer-market-table-shell">
@@ -24961,7 +25323,7 @@ export default function FoundationPageClient({ initialReadSource, initialSelecte
                     </tr>
                   </thead>
                   <tbody>
-                    {sortedTransferHistoryRows.slice(0, 180).map((row) => (
+                    {sortedTransferHistoryRows.slice(0, TRANSFER_HISTORY_INITIAL_RENDER_LIMIT).map((row) => (
                       <tr key={row.transferId} onDoubleClick={() => openPlayerDrawerById(row.playerId)}>
                         {visibleTransferHistoryColumns.map((column) => {
                           const stickyStyle = getTransferHistoryStickyStyle(column.id, "body");
@@ -24979,6 +25341,7 @@ export default function FoundationPageClient({ initialReadSource, initialSelecte
                                     height={portraitSize}
                                     loading="lazy"
                                     decoding="async"
+                                    fetchPriority="low"
                                     style={{ width: `${portraitSize}px`, height: `${portraitSize}px` }}
                                   />
                                 ) : (
@@ -24998,7 +25361,7 @@ export default function FoundationPageClient({ initialReadSource, initialSelecte
                               <td key={column.id} className={stickyClass} style={stickyStyle}>
                                 <div className="table-player-cell transfer-history-player-cell">
                                   <strong>{row.playerName}</strong>
-                                  <span>{row.className ?? "—"} · {row.fromTeamName ?? row.toTeamName ?? "Free Agent"}</span>
+                                  <span>{row.fromTeamName ?? row.toTeamName ?? "Free Agent"}</span>
                                 </div>
                               </td>
                             );
@@ -25057,13 +25420,14 @@ export default function FoundationPageClient({ initialReadSource, initialSelecte
                           if (column.id === "className") {
                             return (
                               <td key={column.id}>
-                                {row.className ? (
-                                  <span className="transfer-history-class-chip" style={getTransferHistoryClassChipStyle(row.className)}>
-                                    {row.className}
-                                  </span>
-                                ) : (
-                                  "—"
-                                )}
+                                <ClassIcon classNameValue={row.className} className="table-identity-icon-chip" iconClassName="table-identity-icon-image" />
+                              </td>
+                            );
+                          }
+                          if (column.id === "race") {
+                            return (
+                              <td key={column.id}>
+                                <RaceIcon race={row.race} className="table-identity-icon-chip" iconClassName="table-identity-icon-image" />
                               </td>
                             );
                           }
@@ -25199,6 +25563,7 @@ export default function FoundationPageClient({ initialReadSource, initialSelecte
               </aside>
             </div>
           </section>
+          ) : null}
 
           <div className={`foundation-warning-grid${getViewClass("debug")}`}>
             <WarningList title="Spieler ohne Team" warnings={gameState.mappingReport.unmappedPlayers} />

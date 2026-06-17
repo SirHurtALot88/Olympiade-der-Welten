@@ -237,6 +237,36 @@ describe("season-end XP spend apply service", () => {
         lifetimeXP: 55,
       }),
     );
+    save.gameState.seasonState.matchdayResults = [
+      {
+        id: "result-1",
+        seasonId: "season-1",
+        matchdayId: "matchday-1",
+        status: "preview_applied",
+      },
+    ];
+    save.gameState.seasonState.playerDisciplinePerformances = [
+      {
+        id: "perf-1",
+        matchdayResultId: "result-1",
+        teamId: "team-1",
+        playerId: "player-1",
+        activePlayerId: null,
+        disciplineId: "tdm",
+        disciplineSide: "d1",
+        slotIndex: 0,
+        baseValue: 80,
+        finalPlayerScore: 95,
+        scoreContribution: 25,
+        rankInTeam: 1,
+        rankInDiscipline: 1,
+        isTop10: true,
+        isMvpCandidate: true,
+        storyWeight: null,
+        createdAt: "2026-06-11T00:00:00.000Z",
+      },
+    ];
+
     const preview = previewSeasonEndXpSpend(save, "team-1", []);
     const { persistence, getSavedState } = createPersistence();
 

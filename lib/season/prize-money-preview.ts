@@ -98,6 +98,19 @@ function round1(value: number) {
   return Math.round(value * 10) / 10;
 }
 
+function projectSeasonEndCash(input: {
+  currentCash: number | null;
+  prizeMoney: number | null;
+  salaryTotal: number | null;
+  rankChangePrize?: number | null;
+}) {
+  if (input.currentCash == null || input.prizeMoney == null || input.salaryTotal == null) {
+    return null;
+  }
+
+  return round1(input.currentCash - input.salaryTotal + input.prizeMoney + (input.rankChangePrize ?? 0));
+}
+
 function toFiniteNumber(value: number | null | undefined) {
   return typeof value === "number" && Number.isFinite(value) ? value : null;
 }
@@ -423,13 +436,15 @@ export async function buildPrizeMoneyPreview(
       warnings.add(rankChangePrize.warning);
     }
 
-    const projectedCash =
-      currentCash != null && prizeMoney != null
-        ? round1(currentCash + prizeMoney + (rankChangePrize.bonusMalus ?? 0))
-        : null;
+    const projectedCash = projectSeasonEndCash({
+      currentCash,
+      prizeMoney,
+      salaryTotal,
+      rankChangePrize: rankChangePrize.bonusMalus,
+    });
 
     const buildPlacementScenario = (direction: "better" | "worse") => {
-      if (rank == null || prizeMoney == null || currentCash == null) {
+      if (rank == null || prizeMoney == null || currentCash == null || salaryTotal == null) {
         return {
           payout: null,
           projectedCash: null,
@@ -444,7 +459,7 @@ export async function buildPrizeMoneyPreview(
       if (rankDelta === 0) {
         return {
           payout: prizeMoney,
-          projectedCash: round1(currentCash + prizeMoney),
+          projectedCash: projectSeasonEndCash({ currentCash, prizeMoney, salaryTotal }),
         };
       }
       const placementAmount = placementByRankDelta.get(rankDelta) ?? null;
@@ -458,7 +473,7 @@ export async function buildPrizeMoneyPreview(
       const payout = round1(prizeMoney + placementAmount);
       return {
         payout,
-        projectedCash: round1(currentCash + payout),
+        projectedCash: projectSeasonEndCash({ currentCash, prizeMoney: payout, salaryTotal }),
       };
     };
 
@@ -468,7 +483,7 @@ export async function buildPrizeMoneyPreview(
     const futureSeasons: PrizeMoneyPreviewFutureSeason[] = seasonFactors
       .filter((row) => row.seasonLabel !== "Aktuell")
       .map((row) => {
-        if (basisCash == null || seasonCash == null || currentCash == null || currentFactor == null || row.factor == null) {
+        if (basisCash == null || seasonCash == null || currentCash == null || salaryTotal == null || currentFactor == null || row.factor == null) {
           return {
             seasonLabel: row.seasonLabel,
             factor: row.factor,
@@ -483,7 +498,11 @@ export async function buildPrizeMoneyPreview(
           seasonLabel: row.seasonLabel,
           factor: row.factor,
           prizeMoney: futurePrize,
-          projectedCash: round1(currentCash + futurePrize),
+          projectedCash: projectSeasonEndCash({
+            currentCash,
+            prizeMoney: futurePrize,
+            salaryTotal,
+          }),
         };
       });
 

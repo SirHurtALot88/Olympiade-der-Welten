@@ -61,18 +61,20 @@ function player(overrides: Partial<Player> = {}): Player {
 }
 
 describe("training-levelup-service", () => {
-  it("gibt pro Development-Level-Up exakt 10 Trainingspunkte", () => {
+  it("gibt pro Development-Level-Up 5 Trainingspunkte und deckelt bei 2 Leveln pro Saison", () => {
     const model = buildDevelopmentLevelSummary({
-      player: player({ currentXP: 360, spentXP: 0, lifetimeXP: 360 }),
+      player: player({ currentXP: 999, spentXP: 0, lifetimeXP: 0 }),
       forecast: null,
-      currentXP: 360,
+      currentXP: 999,
       spentXP: 0,
-      lifetimeXP: 360,
+      lifetimeXP: 0,
     });
 
-    expect(DEVELOPMENT_POINTS_PER_LEVEL).toBe(10);
+    expect(DEVELOPMENT_POINTS_PER_LEVEL).toBe(5);
+    expect(model.rawLevelUpsAvailable).toBeGreaterThan(2);
     expect(model.levelUpsAvailable).toBe(2);
-    expect(model.trainingPointsAvailable).toBe(20);
+    expect(model.trainingPointsAvailable).toBe(10);
+    expect(model.xpForCurrentLevel).toBeGreaterThan(0);
   });
 
   it("nutzt die einfachen Attributkosten-Baender", () => {
@@ -199,4 +201,3 @@ describe("training-levelup-service", () => {
     expect(firstImprovement?.expectedSalaryPreviewDelta).not.toBeNull();
   });
 });
-

@@ -318,7 +318,7 @@ describe("ai transfermarkt preview service", () => {
     const manualTeam = result.teams.find((team) => team.teamId === "M-M");
 
     expect(cashCreators?.recommendedBuys[0]?.name).toBe("Value Hunter");
-    expect(cashCreators?.explanation).toContain("Bank der Olympiade");
+    expect(cashCreators?.explanation).toContain("Top-Pick: Value Hunter");
     expect(cashCreators?.recommendedBuys[0]?.overallRecommendationScore).toBeGreaterThan(0);
     expect(cashCreators?.recommendedBuys[0]?.fitSummary).toContain("Need");
     expect(cashCreators?.recommendedBuys[0]?.sportsSummary).toContain("POW");

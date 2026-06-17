@@ -89,6 +89,7 @@ export type PlayerProgressionForecast = {
     routeFitFactor: number;
   };
   maintenanceBreakdown: {
+    leagueMedianRegression: number;
     currentAbility: number;
     role: number;
     potentialProximity: number;
@@ -102,6 +103,11 @@ export type PlayerProgressionForecast = {
     negativeTraits: number;
     routeConflict: number;
     starUnderperformance: number;
+    highValueUnderperformance: number;
+    poorTrainingValuePressure: number;
+    potentialCeiling: number;
+    seasonGainSoftCeiling: number;
+    seasonGainHardCap: number;
   };
   baseTrainingXP: number;
   appearanceXP: number;

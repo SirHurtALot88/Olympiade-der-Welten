@@ -10,7 +10,16 @@ export default function ClassColorChip({ className }: { className: string | null
 
   return (
     <span className={`${getClassColorClassName(className)} class-color-chip-with-icon`}>
-      {iconSrc ? <img className="class-color-chip-icon" src={iconSrc} alt={label} /> : null}
+      {iconSrc ? (
+        <img
+          className="class-color-chip-icon"
+          src={iconSrc}
+          alt={label}
+          loading="lazy"
+          decoding="async"
+          fetchPriority="low"
+        />
+      ) : null}
       <span>{label}</span>
     </span>
   );

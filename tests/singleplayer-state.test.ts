@@ -124,6 +124,43 @@ describe("singleplayer game state", () => {
     });
   });
 
+  it("persists player progression events across sqlite reloads", () => {
+    const persistence = createPersistenceService();
+    const first = persistence.bootstrapSingleplayerSave();
+    const player = first.save.gameState.players[0]!;
+    const nextState = {
+      ...first.save.gameState,
+      playerProgressionEvents: [
+        {
+          eventId: "progression-test-event",
+          seasonId: first.save.gameState.season.id,
+          teamId: first.save.gameState.teams[0]!.teamId,
+          playerId: player.id,
+          upgrades: [],
+          xpEarned: 100,
+          xpSpent: 0,
+          currentXPBefore: 0,
+          currentXPAfter: 100,
+          lifetimeXPBefore: 0,
+          lifetimeXPAfter: 100,
+          timestamp: "2026-06-11T00:00:00.000Z",
+          source: "manual_season_end_xp_spend" as const,
+        },
+      ],
+    };
+
+    persistence.saveSingleplayerState(first.save.saveId, nextState);
+    const reloaded = persistence.getSaveById(first.save.saveId);
+    const metadata = getDatabase()
+      .prepare("SELECT payload_json FROM game_metadata WHERE save_id = ?")
+      .get(first.save.saveId) as { payload_json: string } | undefined;
+
+    expect(reloaded?.gameState.playerProgressionEvents?.[0]?.eventId).toBe("progression-test-event");
+    expect(metadata ? JSON.parse(metadata.payload_json) : null).toMatchObject({
+      playerProgressionEvents: [{ eventId: "progression-test-event", xpEarned: 100 }],
+    });
+  });
+
   it("persists scenario meta and exposes it in save summaries", () => {
     const persistence = createPersistenceService();
     const first = persistence.bootstrapSingleplayerSave();

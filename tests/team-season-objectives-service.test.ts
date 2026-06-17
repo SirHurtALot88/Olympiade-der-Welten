@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 
 import type { GameState, Player, RosterEntry, Team, TeamIdentity, TeamSeasonObjectiveRecord } from "@/lib/data/olyDataTypes";
-import { buildTeamObjectiveOverview, getTeamObjectiveAiBias } from "@/lib/board/team-season-objectives-service";
+import { buildTeamObjectiveOverview, getTeamObjectiveAiBias, refreshTeamObjectiveState } from "@/lib/board/team-season-objectives-service";
 
 function createTeam(partial?: Partial<Team>): Team {
   return {
@@ -160,7 +160,7 @@ function createGameState(input?: {
 }
 
 describe("team season objectives service", () => {
-  it("generates objectives for sport, finance, transfer, roster, facility, and development", () => {
+  it("generates objectives for sport, finance, transfer, roster, facility, development, and morale", () => {
     const overview = buildTeamObjectiveOverview(createGameState());
     const categories = new Set(overview.objectives.map((objective) => objective.category));
 
@@ -170,6 +170,7 @@ describe("team season objectives service", () => {
     expect(categories.has("roster")).toBe(true);
     expect(categories.has("facility")).toBe(true);
     expect(categories.has("development")).toBe(true);
+    expect(categories.has("morale")).toBe(true);
     expect(overview.warnings).toContain("sponsor_objective_source_missing");
   });
 
@@ -336,5 +337,80 @@ describe("team season objectives service", () => {
     expect(formColor?.status).toBe("completed");
     expect(matchdayTop10?.status).toBe("completed");
     expect(matchdayTop10?.label).toContain("Climbing/Football");
+  });
+
+  it("adds top-player and cash-buffer goals for teams whose identity asks for them", () => {
+    const gameState = createGameState({
+      teams: [createTeam({ teamId: "C-C", shortCode: "C-C", budget: 100, cash: 74 })],
+      identities: [createIdentity("C-C", { finances: 10, ambition: 4 })],
+      players: [createPlayer("c1")],
+      rosters: [createRoster("c1", { teamId: "C-C" })],
+    });
+    gameState.seasonState.matchdayResults = [
+      {
+        id: "result-1",
+        saveId: "save-1",
+        seasonId: "season-3",
+        matchdayId: "md-1",
+        status: "preview_applied",
+        sourceVersion: "test",
+        teamsTotal: 1,
+        teamsReady: 1,
+        teamsUnderfilled: 0,
+        teamsMissingLineup: 0,
+        teamsInvalidLineup: 0,
+        teamsMissingScoreCoverage: 0,
+        warningsCount: 0,
+        createdAt: "2026-06-13T10:00:00.000Z",
+        updatedAt: "2026-06-13T10:00:00.000Z",
+      },
+    ];
+    gameState.seasonState.playerDisciplinePerformances = [
+      {
+        id: "perf-1",
+        matchdayResultId: "result-1",
+        teamId: "C-C",
+        playerId: "c1",
+        activePlayerId: null,
+        disciplineId: "d1",
+        disciplineSide: "d1",
+        slotIndex: 0,
+        baseValue: 50,
+        finalPlayerScore: 60,
+        scoreContribution: 12,
+        rankInTeam: 1,
+        rankInDiscipline: 4,
+        isTop10: true,
+        isMvpCandidate: true,
+        storyWeight: null,
+        createdAt: "2026-06-13T10:00:00.000Z",
+      },
+    ];
+
+    const overview = buildTeamObjectiveOverview(gameState);
+    const categories = new Set(overview.objectives.map((objective) => objective.category));
+    const topPlayer = overview.objectives.find((objective) => objective.objectiveId === "player-top5-discipline-star");
+    const cashBuffer = overview.objectives.find((objective) => objective.objectiveId === "finance-rebuild-cash-buffer");
+
+    expect(categories.has("player")).toBe(true);
+    expect(topPlayer?.status).toBe("completed");
+    expect(cashBuffer?.status).toBe("completed");
+  });
+
+  it("refreshes board confidence into season state without compounding saved confidence", () => {
+    const gameState = createGameState({
+      teams: [createTeam({ cash: -8 })],
+      identities: [createIdentity("M-M", { boardConfidence: 4 })],
+      boardConfidence: {
+        "M-M": { teamId: "M-M", value: 10, pressure: 1, warnings: ["old_saved_value"] },
+      },
+    });
+
+    const refreshed = refreshTeamObjectiveState(gameState);
+    const refreshedAgain = refreshTeamObjectiveState(refreshed);
+
+    expect(refreshed.seasonState.teamSeasonObjectives?.length).toBeGreaterThan(0);
+    expect(refreshed.seasonState.boardConfidence?.["M-M"]?.value).toBe(refreshedAgain.seasonState.boardConfidence?.["M-M"]?.value);
+    expect(refreshed.seasonState.boardConfidence?.["M-M"]?.pressure).toBeGreaterThanOrEqual(7);
   });
 });

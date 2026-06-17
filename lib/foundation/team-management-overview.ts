@@ -22,6 +22,9 @@ type TeamManagementSnapshotStanding = {
   cashTotal?: number | null;
   form?: number | null;
   transfers?: number | null;
+  rosterCount?: number | null;
+  salaryTotal?: number | null;
+  marketValueTotal?: number | null;
   budget?: number | null;
   playerMin?: number | null;
   playerOpt?: number | null;
@@ -301,6 +304,10 @@ export function buildTeamSeasonOverviewRows(input: TeamManagementSnapshotInput):
     const roster = rostersByTeamId.get(team.teamId) ?? [];
     const rosterPlayers = getRosterPlayers(playersById, roster);
     const standing = standingsByTeamId[team.teamId] ?? null;
+    const usesArchivedSnapshotValues =
+      standing?.rosterCount != null ||
+      standing?.salaryTotal != null ||
+      standing?.marketValueTotal != null;
     const transferSummary = transferSummaryByTeamId[team.teamId] ?? derivedTransferSummaryByTeamId[team.teamId] ?? null;
     const avgContractLength =
       roster.length > 0
@@ -377,7 +384,7 @@ export function buildTeamSeasonOverviewRows(input: TeamManagementSnapshotInput):
     const budget = standing?.budget ?? team.budget ?? null;
     const transferNet = standing?.transfers ?? transferSummary?.transferNet ?? 0;
     const cash = deriveDisplayedCash({
-      teamCash: team.cash ?? standing?.cash ?? null,
+      teamCash: usesArchivedSnapshotValues ? standing?.cash ?? team.cash ?? null : team.cash ?? standing?.cash ?? null,
       budget,
       transferNet,
       hasCashPrizeApply,
@@ -451,10 +458,10 @@ export function buildTeamSeasonOverviewRows(input: TeamManagementSnapshotInput):
       points: hasCurrentPps
         ? currentVisiblePoints
         : latestCompletedStanding?.disciplinePoints ?? latestCompletedStanding?.points ?? currentVisiblePoints,
-      rosterCount: roster.length,
-      salaryTotal,
+      rosterCount: usesArchivedSnapshotValues ? standing?.rosterCount ?? roster.length : roster.length,
+      salaryTotal: usesArchivedSnapshotValues ? standing?.salaryTotal ?? salaryTotal : salaryTotal,
       avgContractLength,
-      marketValueTotal,
+      marketValueTotal: usesArchivedSnapshotValues ? standing?.marketValueTotal ?? marketValueTotal : marketValueTotal,
       cash,
       cashFc,
       budget,

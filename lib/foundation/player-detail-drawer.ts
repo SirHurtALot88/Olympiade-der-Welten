@@ -108,6 +108,8 @@ export type PlayerDetailDrawerData = {
   marketValueSource: string;
   salary: number | null;
   salarySource: string;
+  normalSalary: number | null;
+  normalSalarySource: string;
   purchasePrice: number | null;
   purchasePriceSource: string;
   contractLength: number | null;
@@ -326,6 +328,19 @@ export type PlayerDetailDrawerData = {
     totalPoints: number | null;
     averageContribution: number | null;
     averageFinalScore: number | null;
+    pow: number | null;
+    spe: number | null;
+    men: number | null;
+    soc: number | null;
+    ovr: number | null;
+    ovrRank: number | null;
+    pps: number | null;
+    ppsRank: number | null;
+    mvs: number | null;
+    mvsRank: number | null;
+    marketValue: number | null;
+    salary: number | null;
+    contractLength: number | null;
     top10Count: number;
     mvpCount: number;
     bestDisciplineLabel: string | null;
@@ -623,6 +638,7 @@ function getSourceLabel(source: "sqlite" | "prisma") {
 }
 
 function buildSeasonHistory(gameState: GameState, playerId: string) {
+  const disciplineCategoryById = new Map(gameState.disciplines.map((discipline) => [discipline.id, discipline.category] as const));
   return [...(gameState.seasonState.seasonSnapshots ?? [])]
     .sort((left, right) => right.seasonId.localeCompare(left.seasonId, "de"))
     .map((snapshot) => {
@@ -630,6 +646,24 @@ function buildSeasonHistory(gameState: GameState, playerId: string) {
       if (!row) {
         return null;
       }
+      const ppsRankMap = buildSharedRankMap(
+        snapshot.playerPerformances.map((entry) => ({
+          playerId: entry.playerId,
+          value: entry.pps ?? entry.totalPoints ?? entry.totalContribution ?? null,
+        })),
+      );
+      const pointsByArea = (row.disciplineBreakdown ?? []).reduce(
+        (totals, discipline) => {
+          const category = disciplineCategoryById.get(discipline.disciplineId);
+          if (category === "power") totals.pow += discipline.totalContribution ?? 0;
+          if (category === "speed") totals.spe += discipline.totalContribution ?? 0;
+          if (category === "mental") totals.men += discipline.totalContribution ?? 0;
+          if (category === "social") totals.soc += discipline.totalContribution ?? 0;
+          return totals;
+        },
+        { pow: 0, spe: 0, men: 0, soc: 0 },
+      );
+      const hasDisciplineBreakdown = (row.disciplineBreakdown?.length ?? 0) > 0;
       return {
         seasonId: snapshot.seasonId,
         seasonName: snapshot.seasonName,
@@ -641,6 +675,19 @@ function buildSeasonHistory(gameState: GameState, playerId: string) {
         averageFinalScore: row.averageFinalScore,
         top10Count: row.top10Count,
         mvpCount: row.mvpCount,
+        pow: row.powPoints ?? (hasDisciplineBreakdown ? roundValue(pointsByArea.pow, 1) : null),
+        spe: row.spePoints ?? (hasDisciplineBreakdown ? roundValue(pointsByArea.spe, 1) : null),
+        men: row.menPoints ?? (hasDisciplineBreakdown ? roundValue(pointsByArea.men, 1) : null),
+        soc: row.socPoints ?? (hasDisciplineBreakdown ? roundValue(pointsByArea.soc, 1) : null),
+        ovr: row.ovr ?? null,
+        ovrRank: row.ovrRank ?? null,
+        pps: row.pps ?? row.totalPoints ?? row.totalContribution ?? null,
+        ppsRank: row.ppsRank ?? ppsRankMap.get(row.playerId) ?? null,
+        mvs: row.mvs ?? null,
+        mvsRank: row.mvsRank ?? null,
+        marketValue: row.marketValue ?? null,
+        salary: row.salary ?? null,
+        contractLength: row.contractLength ?? null,
         bestDisciplineLabel: row.bestDisciplineLabel ?? null,
         bestDisciplineScore: row.bestDisciplineScore ?? null,
         warnings: row.warnings ?? [],
@@ -678,32 +725,35 @@ function buildHistoryRows(input: {
   contractLength: number | null;
   seasonHistory: PlayerDetailDrawerData["seasonHistory"];
 }) {
+  const hasActiveSeasonPerformance =
+    input.seasonPerformance?.seasonId === input.gameState.season.id &&
+    input.seasonPerformance.sourceLabel !== "Season Snapshot";
   const activeSeasonRow: PlayerDrawerHistoryRow = {
     seasonId: input.gameState.season.id,
     seasonName: input.gameState.season.name,
     isActiveSeason: true,
-    sourceLabel: input.seasonPerformance?.sourceLabel ?? "Aktive Season / Live-State",
+    sourceLabel: hasActiveSeasonPerformance ? input.seasonPerformance?.sourceLabel ?? "Aktive Season / Live-State" : "Aktive Season / noch keine Results",
     teamName: input.teamName,
     teamCode: input.teamCode,
-    appearances: input.seasonPerformance?.appearances ?? null,
-    totalPoints: input.seasonPerformance?.totalPoints ?? null,
-    pow: input.playerRating?.ppPow ?? null,
-    spe: input.playerRating?.ppSpe ?? null,
-    men: input.playerRating?.ppMen ?? null,
-    soc: input.playerRating?.ppSoc ?? null,
+    appearances: hasActiveSeasonPerformance ? input.seasonPerformance?.appearances ?? null : null,
+    totalPoints: hasActiveSeasonPerformance ? input.seasonPerformance?.totalPoints ?? null : null,
+    pow: hasActiveSeasonPerformance ? input.playerRating?.ppPow ?? null : null,
+    spe: hasActiveSeasonPerformance ? input.playerRating?.ppSpe ?? null : null,
+    men: hasActiveSeasonPerformance ? input.playerRating?.ppMen ?? null : null,
+    soc: hasActiveSeasonPerformance ? input.playerRating?.ppSoc ?? null : null,
     ovr: input.playerRating?.ovrNormalized ?? null,
     ovrRank: input.playerRating?.ovrRank ?? null,
-    pps: input.playerRating?.ppsSeason ?? null,
-    ppsRank: input.playerRating?.ppsSeasonRank ?? null,
+    pps: hasActiveSeasonPerformance ? input.playerRating?.ppsSeason ?? null : null,
+    ppsRank: hasActiveSeasonPerformance ? input.playerRating?.ppsSeasonRank ?? null : null,
     mvs: input.playerRating?.mvs ?? null,
     mvsRank: input.playerRating?.mvsRank ?? null,
     marketValue: input.marketValue,
     salary: input.salary,
     contractLength: input.contractLength,
-    averageContribution: input.seasonPerformance?.averageContribution ?? null,
-    averageFinalScore: input.seasonPerformance?.averageFinalScore ?? null,
-    bestDisciplineLabel: input.seasonPerformance?.bestDisciplineLabel ?? null,
-    warnings: input.seasonPerformance?.warnings ?? [],
+    averageContribution: hasActiveSeasonPerformance ? input.seasonPerformance?.averageContribution ?? null : null,
+    averageFinalScore: hasActiveSeasonPerformance ? input.seasonPerformance?.averageFinalScore ?? null : null,
+    bestDisciplineLabel: hasActiveSeasonPerformance ? input.seasonPerformance?.bestDisciplineLabel ?? null : null,
+    warnings: hasActiveSeasonPerformance ? input.seasonPerformance?.warnings ?? [] : [],
   };
 
   const archivedRows: PlayerDrawerHistoryRow[] = input.seasonHistory
@@ -717,19 +767,19 @@ function buildHistoryRows(input: {
       teamCode: entry.teamCode,
       appearances: entry.appearances,
       totalPoints: entry.totalPoints,
-      pow: null,
-      spe: null,
-      men: null,
-      soc: null,
-      ovr: null,
-      ovrRank: null,
-      pps: entry.totalPoints,
-      ppsRank: null,
-      mvs: null,
-      mvsRank: null,
-      marketValue: null,
-      salary: null,
-      contractLength: null,
+      pow: entry.pow,
+      spe: entry.spe,
+      men: entry.men,
+      soc: entry.soc,
+      ovr: entry.ovr,
+      ovrRank: entry.ovrRank,
+      pps: entry.pps,
+      ppsRank: entry.ppsRank,
+      mvs: entry.mvs,
+      mvsRank: entry.mvsRank,
+      marketValue: entry.marketValue,
+      salary: entry.salary,
+      contractLength: entry.contractLength,
       averageContribution: entry.averageContribution,
       averageFinalScore: entry.averageFinalScore,
       bestDisciplineLabel: entry.bestDisciplineLabel,
@@ -907,9 +957,19 @@ function buildBoardTrust(input: {
     weakTeamFit,
     hardNoGoHit,
   });
+  const reasons = [...assessment.reasons];
+  if (
+    identity?.boardConfidence != null &&
+    identity.boardConfidence < 42 &&
+    (input.rosterEntry.contractLength ?? 99) <= 1 &&
+    !reasons.includes("performance_below_board_expectation")
+  ) {
+    reasons.push("performance_below_board_expectation");
+  }
 
   return {
     ...assessment,
+    reasons,
     sourceLabel:
       identity?.boardConfidence != null
         ? `Board Confidence ${Math.round(identity.boardConfidence)}`
@@ -1084,6 +1144,8 @@ export function buildPlayerDrawerDataFromGameState(input: {
     marketValueSource: economy.marketValueSource,
     salary: economy.salary,
     salarySource: economy.salarySource,
+    normalSalary: economy.expectedSalary,
+    normalSalarySource: "calculated_expected",
     purchasePrice: economy.purchasePrice,
     purchasePriceSource: economy.purchasePriceSource,
     contractLength: economy.contractLength,
@@ -1376,6 +1438,8 @@ export function buildPlayerDrawerDataFromLegacyContext(input: {
     marketValueSource: economy.marketValueSource,
     salary: economy.salary,
     salarySource: economy.salarySource,
+    normalSalary: economy.expectedSalary,
+    normalSalarySource: "calculated_expected",
     purchasePrice: economy.purchasePrice,
     purchasePriceSource: economy.purchasePriceSource,
     contractLength: economy.contractLength,

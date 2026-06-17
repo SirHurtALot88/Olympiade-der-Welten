@@ -23,6 +23,7 @@ import { createPersistenceService } from "@/lib/persistence/persistence-service"
 import type { PersistenceService } from "@/lib/persistence/types";
 import { db } from "@/src/server/db";
 import { applyFatigueAndInjuryAfterMatchday } from "@/lib/fatigue/fatigue-injury-service";
+import { refreshTeamObjectiveState } from "@/lib/board/team-season-objectives-service";
 
 type DbClient = typeof db;
 
@@ -118,6 +119,7 @@ type ContextLoaderLike = Pick<LegacyLineupContextLoader, "loadLegacyLineupContex
 type LocalContextLoaderLike = (params: LegacyMatchdayScopeParams & { teamId: string }) => LegacyLineupContextLoadResult;
 
 const APPLY_CONFIRM_TOKEN = "APPLY_MATCHDAY_RESULT";
+const FATIGUE_INJURY_ENABLED = process.env.OLY_ENABLE_INJURIES === "1";
 
 function buildResultId(saveId: string, seasonId: string, matchdayId: string) {
   return `matchday-result__${saveId}__${seasonId}__${matchdayId}`;
@@ -615,16 +617,18 @@ export class LegacyMatchdayResultApplyService {
       },
     };
 
-    const injuryResult = applyFatigueAndInjuryAfterMatchday({
-      gameState: nextGameState,
-      saveId: params.saveId,
-      seasonId: params.seasonId,
-      matchdayId: params.matchdayId,
-      matchdayResultId,
-      timestamp: now,
-    });
+    const injuryResult = FATIGUE_INJURY_ENABLED
+      ? applyFatigueAndInjuryAfterMatchday({
+          gameState: nextGameState,
+          saveId: params.saveId,
+          seasonId: params.seasonId,
+          matchdayId: params.matchdayId,
+          matchdayResultId,
+          timestamp: now,
+        })
+      : { gameState: nextGameState, injuryEvents: [] };
 
-    this.persistence.saveSingleplayerState(save.saveId, injuryResult.gameState);
+    this.persistence.saveSingleplayerState(save.saveId, refreshTeamObjectiveState(injuryResult.gameState));
 
     return {
       ok: true,

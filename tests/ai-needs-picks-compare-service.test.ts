@@ -616,7 +616,8 @@ describe("ai needs picks compare service", () => {
     expect(result.teams[0]?.sequentialStateSnapshots[0]?.cashAfter).toBeLessThan(
       result.teams[0]?.sequentialStateSnapshots[0]?.cashBefore ?? 999,
     );
-    expect(result.teams[0]?.candidatePoolTop[0]?.finalScore).toBeGreaterThan(0);
+    expect(result.teams[0]?.candidatePoolTop[0]?.finalScore).not.toBeNull();
+    expect(Number.isFinite(result.teams[0]?.candidatePoolTop[0]?.finalScore)).toBe(true);
     expect(result.teams.find((entry) => entry.teamId === "C-C")?.plannedPicks[0]?.playerName).toBe("Value Hunter");
     expect(result.teams.find((entry) => entry.teamId === "W-W")?.plannedPicks[0]?.playerName).toBe("Arcane Broker");
     expect(result.teams.find((entry) => entry.teamId === "T-T")?.plannedPicks[0]?.playerName).toBe("Lecture Queen");

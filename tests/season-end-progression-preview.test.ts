@@ -3,6 +3,7 @@ import { describe, expect, it } from "vitest";
 import type { GameState, Player } from "@/lib/data/olyDataTypes";
 import type { PlayerProgressionForecast } from "@/lib/training/training-plan-types";
 import {
+  buildCoreStatsFromDisciplineRatings,
   buildSeasonEndProgressionPreview,
   formatSeasonEndProgressionDisciplineValue,
   getProgressionRatingTier,
@@ -117,6 +118,7 @@ function createForecast(partial: Partial<PlayerProgressionForecast> = {}): Playe
       routeFitFactor: 1,
     },
     maintenanceBreakdown: partial.maintenanceBreakdown ?? {
+      leagueMedianRegression: 0,
       currentAbility: 0,
       role: 0,
       potentialProximity: 0,
@@ -130,6 +132,11 @@ function createForecast(partial: Partial<PlayerProgressionForecast> = {}): Playe
       negativeTraits: 0,
       routeConflict: 0,
       starUnderperformance: 0,
+      highValueUnderperformance: 0,
+      poorTrainingValuePressure: 0,
+      potentialCeiling: 0,
+      seasonGainSoftCeiling: 0,
+      seasonGainHardCap: 0,
     },
     baseTrainingXP: partial.baseTrainingXP ?? 70,
     appearanceXP: partial.appearanceXP ?? 0,
@@ -246,6 +253,54 @@ describe("season-end progression preview", () => {
     const row = previewFor(createPlayer({ attributeSheetStats: { power: 98, health: 30, stamina: 30, intelligence: 30, awareness: 30, determination: 30, speed: 30, dexterity: 30, charisma: 30, will: 30, spirit: 30, torment: 30 } }), createForecast({ seasonProjectedXP: 500 }), "power");
 
     expect(row.disciplineDeltas.some((entry) => (entry.disciplineDelta ?? 0) > 0)).toBe(true);
+  });
+
+  it("does not rebase discipline deltas from stale imported values when one attribute increases", () => {
+    const row = previewFor(
+      createPlayer({
+        attributeSheetStats: {
+          power: 33,
+          health: 35,
+          stamina: 69,
+          intelligence: 52,
+          awareness: 32,
+          determination: 59,
+          speed: 46,
+          dexterity: 47,
+          charisma: 90,
+          will: 40,
+          spirit: 42,
+          torment: 30,
+        },
+        disciplineRatings: { tdm: 46, fechten: 46, "speed-schach": 46, showcase: 46, climbing: 46 },
+      }),
+      createForecast({ seasonProjectedXP: 500 }),
+      "stamina",
+    );
+
+    expect(Math.max(...row.disciplineDeltas.map((entry) => entry.disciplineDelta ?? 0))).toBeLessThanOrEqual(1);
+  });
+
+  it("derives POW SPE MEN SOC from the average current discipline values per category", () => {
+    const coreStats = buildCoreStatsFromDisciplineRatings({
+      disciplines: [
+        { id: "tdm", name: "TDM", category: "power", weight: 1 },
+        { id: "gewichtheben", name: "Gewichtheben", category: "power", weight: 1 },
+        { id: "staffel", name: "Staffel", category: "speed", weight: 1 },
+        { id: "schach", name: "Schach", category: "mental", weight: 1 },
+        { id: "showcase", name: "Showcase", category: "social", weight: 1 },
+      ],
+      disciplineRatings: {
+        tdm: 40,
+        gewichtheben: 60,
+        staffel: 70,
+        schach: 80,
+        showcase: 90,
+      },
+      fallback: { pow: 1, spe: 1, men: 1, soc: 1 },
+    });
+
+    expect(coreStats).toEqual({ pow: 50, spe: 70, men: 80, soc: 90 });
   });
 
   it("formats drawer discipline deltas only when positive", () => {
