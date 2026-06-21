@@ -130,7 +130,7 @@ function createGameState(input?: {
 }
 
 describe("team management overview", () => {
-  it("uses the latest completed snapshot for sport standings when the active season has no points, but keeps current cash", () => {
+  it("keeps active season rank on start-budget order while no current points exist", () => {
     const team = createTeam({ cash: 222, budget: 100 });
     const gameState = createGameState({ teams: [team] });
     gameState.season = {
@@ -177,13 +177,15 @@ describe("team management overview", () => {
 
     const result = buildTeamSeasonOverviewRows({ gameState });
 
-    expect(result[0]?.rank).toBe(4);
-    expect(result[0]?.points).toBe(118.4);
-    expect(result[0]?.ppsPow).toBe(40.1);
-    expect(result[0]?.ppsSpe).toBe(30.2);
-    expect(result[0]?.ppsMen).toBe(28.3);
-    expect(result[0]?.ppsSoc).toBe(19.8);
+    expect(result[0]?.rank).toBe(1);
+    expect(result[0]?.points).toBeNull();
+    expect(result[0]?.ppsPow).toBe(0);
+    expect(result[0]?.ppsSpe).toBe(0);
+    expect(result[0]?.ppsMen).toBe(0);
+    expect(result[0]?.ppsSoc).toBe(0);
     expect(result[0]?.cash).toBe(222);
+    expect(result[0]?.historicalLastSeasonRank).toBe(4);
+    expect(result[0]?.historicalLastSeasonPoints).toBe(118.4);
   });
 
   it("aggregates roster count, visible salary total and average contract length", () => {
@@ -467,40 +469,35 @@ describe("team management overview", () => {
         teamsMissingLineup: 0,
         teamsInvalidLineup: 0,
         teamsMissingScoreCoverage: 0,
-        warnings: [],
+        warningsCount: 0,
         createdAt: "2026-06-07T10:00:00.000Z",
+        updatedAt: "2026-06-07T10:00:00.000Z",
       },
     ];
     gameState.seasonState.disciplineResults = [
       {
         id: "discipline-result-1",
         matchdayResultId: "matchday-result-1",
-        seasonId: "season-1",
-        matchdayId: "matchday-1",
         teamId: "A-A",
-        teamCode: "A-A",
         disciplineId: "mini-dm",
         disciplineSide: "d1",
         rank: 1,
+        baseScore: 4.2,
         totalScore: 4.2,
-        playerCount: 1,
-        pointsSource: "rank_to_points",
+        readinessStatus: "ready",
         warnings: [],
         createdAt: "2026-06-07T10:01:00.000Z",
       },
       {
         id: "discipline-result-2",
         matchdayResultId: "matchday-result-1",
-        seasonId: "season-1",
-        matchdayId: "matchday-1",
         teamId: "A-A",
-        teamCode: "A-A",
         disciplineId: "fechten",
         disciplineSide: "d2",
         rank: 2,
+        baseScore: 3.8,
         totalScore: 3.8,
-        playerCount: 1,
-        pointsSource: "rank_to_points",
+        readinessStatus: "ready",
         warnings: [],
         createdAt: "2026-06-07T10:02:00.000Z",
       },
@@ -524,6 +521,90 @@ describe("team management overview", () => {
     expect(result[0]?.disciplineValues.mini_dm).toBe(4.2);
     expect(result[0]?.disciplineValues.fechten).toBe(3.8);
     expect(result[0]?.points).toBe(8);
+  });
+
+  it("keeps selected snapshot discipline values in sync instead of overlaying live ledger values", () => {
+    const player = createPlayer("p1", {
+      disciplineRatings: { "mini-dm": 88, fechten: 75 },
+    });
+    const gameState = createGameState({
+      players: [player],
+      rosters: [createRosterEntry("r1", "p1", { salary: 1000, contractLength: 3 })],
+      disciplines: [
+        { id: "mini-dm", name: "Mini DM", category: "power", weight: 1 },
+        { id: "fechten", name: "Fechten", category: "speed", weight: 1 },
+      ],
+    });
+
+    gameState.seasonState.matchdayResults = [
+      {
+        id: "matchday-result-1",
+        saveId: "save-1",
+        seasonId: "season-1",
+        matchdayId: "matchday-1",
+        status: "preview_applied",
+        sourceVersion: "test",
+        teamsTotal: 1,
+        teamsReady: 1,
+        teamsUnderfilled: 0,
+        teamsMissingLineup: 0,
+        teamsInvalidLineup: 0,
+        teamsMissingScoreCoverage: 0,
+        warningsCount: 0,
+        createdAt: "2026-06-07T10:00:00.000Z",
+        updatedAt: "2026-06-07T10:00:00.000Z",
+      },
+    ];
+    gameState.seasonState.disciplineResults = [
+      {
+        id: "discipline-result-1",
+        matchdayResultId: "matchday-result-1",
+        teamId: "A-A",
+        disciplineId: "mini-dm",
+        disciplineSide: "d1",
+        rank: 1,
+        baseScore: 4.2,
+        totalScore: 4.2,
+        readinessStatus: "ready",
+        warnings: [],
+        createdAt: "2026-06-07T10:01:00.000Z",
+      },
+      {
+        id: "discipline-result-2",
+        matchdayResultId: "matchday-result-1",
+        teamId: "A-A",
+        disciplineId: "fechten",
+        disciplineSide: "d2",
+        rank: 2,
+        baseScore: 3.8,
+        totalScore: 3.8,
+        readinessStatus: "ready",
+        warnings: [],
+        createdAt: "2026-06-07T10:02:00.000Z",
+      },
+    ];
+
+    const result = buildTeamSeasonOverviewRows({
+      gameState,
+      preferStandingDisciplineValues: true,
+      standingsByTeamId: {
+        "A-A": {
+          rank: 1,
+          points: 23,
+          cash: 240,
+          disciplineValues: {
+            mini_dm: 11,
+            fechten: 12,
+          },
+        },
+      },
+    });
+
+    expect(result[0]?.disciplineValues.mini_dm).toBe(11);
+    expect(result[0]?.disciplineValues.fechten).toBe(12);
+    expect(result[0]?.ppsPow).toBe(11);
+    expect(result[0]?.ppsSpe).toBe(12);
+    expect(result[0]?.points).toBe(23);
   });
 
   it("falls back to visible discipline totals only when no stored standing points exist", () => {
@@ -590,17 +671,17 @@ describe("team management overview", () => {
     expect(result[0]?.points).toBe(17);
   });
 
-  it("falls back to cash rank and startplatz when no explicit standing rank exists", () => {
+  it("falls back to start-budget rank and startplatz when no current points exist", () => {
     const teams = [
-      createTeam({ teamId: "M-M", shortCode: "M-M", name: "Mayhem Mavericks", cash: 325, budget: 325 }),
+      createTeam({ teamId: "M-M", shortCode: "M-M", name: "Mayhem Mavericks", cash: 10, budget: 325 }),
       createTeam({ teamId: "R-R", shortCode: "R-R", name: "Riptide Rivers", cash: 170, budget: 170 }),
     ];
 
     const result = buildTeamSeasonOverviewRows({
       gameState: createGameState({ teams, players: [], rosters: [] }),
       standingsByTeamId: {
-        "M-M": { rank: null, points: 0, cash: 325, budget: 325 },
-        "R-R": { rank: null, points: 0, cash: 170, budget: 170 },
+        "M-M": { rank: 6, points: 0, cash: 10, budget: 325 },
+        "R-R": { rank: 1, points: 0, cash: 170, budget: 170 },
       },
     });
 

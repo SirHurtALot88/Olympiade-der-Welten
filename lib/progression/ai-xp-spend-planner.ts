@@ -16,6 +16,7 @@ import type { PersistedSaveGame, PersistenceService } from "@/lib/persistence/ty
 import { getTeamFacilityState } from "@/lib/facilities/facility-effects";
 import {
   applySeasonEndXpSpend,
+  previewSeasonEndXpAvailability,
   previewSeasonEndXpSpend,
   type SeasonEndXpSpendApplyResult,
   type SeasonEndXpSpendPlannedUpgradeInput,
@@ -294,10 +295,11 @@ function getAffordableUpgradeCost(input: {
 export function previewAiSeasonEndXpSpend(save: PersistedSaveGame, teamId: string): AiXpSpendPlan {
   const gameState = save.gameState;
   const team = gameState.teams.find((entry) => entry.teamId === teamId) ?? null;
+  const controlMode = gameState.seasonState.teamControlSettings?.[teamId]?.controlMode ?? (team?.humanControlled === false ? "ai" : "manual");
   const blockers: string[] = [];
   const warnings: string[] = [];
   if (!team) blockers.push("team_not_found");
-  if (team?.humanControlled !== false) blockers.push("team_not_ai_controlled");
+  if (team && controlMode !== "ai") blockers.push("team_not_ai_controlled");
 
   const profile = team ? getTeamStrategyProfile(gameState, team.teamId) : null;
   const identity = getTeamIdentity(gameState, teamId);
@@ -314,10 +316,12 @@ export function previewAiSeasonEndXpSpend(save: PersistedSaveGame, teamId: strin
   const rankByPlayerId = new Map(rankedRoster.map((entry, index) => [entry.player.id, index + 1] as const));
   const plannedInputs: SeasonEndXpSpendPlannedUpgradeInput[] = [];
   const reasonsByPlayerId = new Map<string, string[]>();
-  const firstPreviewByPlayerId = new Map<string, SeasonEndXpSpendPreview["players"][number]>();
-  const initialPreview = previewSeasonEndXpSpend(save, teamId, []);
-  for (const playerPreview of initialPreview.players) {
-    firstPreviewByPlayerId.set(playerPreview.playerId, playerPreview);
+  const firstAvailabilityByPlayerId = new Map<string, ReturnType<typeof previewSeasonEndXpAvailability>["players"][number]>();
+  const initialAvailability = previewSeasonEndXpAvailability(save, teamId);
+  warnings.push(...initialAvailability.warnings);
+  blockers.push(...initialAvailability.blockingReasons);
+  for (const playerPreview of initialAvailability.players) {
+    firstAvailabilityByPlayerId.set(playerPreview.playerId, playerPreview);
   }
 
   const playerOrder = [...rosterRows].sort((left, right) => {
@@ -346,7 +350,7 @@ export function previewAiSeasonEndXpSpend(save: PersistedSaveGame, teamId: strin
       .slice(0, role === "star" || role === "core" ? 6 : 4);
     let acceptedForPlayer = 0;
     reasonsByPlayerId.set(player.id, roleReasons);
-    const initialPlayerPreview = firstPreviewByPlayerId.get(player.id);
+    const initialPlayerPreview = firstAvailabilityByPlayerId.get(player.id);
     if ((player.currentXP ?? 0) <= 0 && (!initialPlayerPreview || initialPlayerPreview.availableXP <= 0)) {
       warnings.push(`no_xp_available:${player.id}`);
       continue;
@@ -375,8 +379,21 @@ export function previewAiSeasonEndXpSpend(save: PersistedSaveGame, teamId: strin
         }
       }
 
-      const threshold = role === "depth" ? 24 : team!.teamId === "C-C" ? 28 : 22;
+      const threshold = role === "depth" ? 22 : team!.teamId === "C-C" ? 24 : 18;
       if (!best || best.score < threshold) {
+        if (
+          acceptedForPlayer === 0 &&
+          best &&
+          role !== "depth" &&
+          best.score >= 12 &&
+          best.cost <= remainingXP
+        ) {
+          plannedInputs.push(buildCandidatePlan({ currentPlan: [], playerId: player.id, attribute: best.attribute })[0]!);
+          simulatedAttributes[best.attribute] = Math.min(99, (simulatedAttributes[best.attribute] ?? 0) + 1);
+          remainingXP -= best.cost;
+          acceptedForPlayer += 1;
+          reasonsByPlayerId.set(player.id, [...new Set([...(reasonsByPlayerId.get(player.id) ?? []), "conservative_ai_xp_materialization", ...best.reasons])]);
+        }
         break;
       }
 
@@ -388,7 +405,7 @@ export function previewAiSeasonEndXpSpend(save: PersistedSaveGame, teamId: strin
     }
 
     if (acceptedForPlayer === 0) {
-      const firstPreview = firstPreviewByPlayerId.get(player.id);
+      const firstPreview = firstAvailabilityByPlayerId.get(player.id);
       if (!firstPreview || firstPreview.availableXP <= 0) warnings.push(`no_xp_available:${player.id}`);
       else warnings.push(`no_ai_upgrade_above_quality_floor:${player.id}`);
     }
@@ -401,20 +418,24 @@ export function previewAiSeasonEndXpSpend(save: PersistedSaveGame, teamId: strin
   }
 
   const preview = previewSeasonEndXpSpend(save, teamId, plannedInputs);
+  const normalizedAiPlannedUpgrades = preview.plannedUpgrades.filter((upgrade) => upgrade.source === "manual_xp_spend_preview");
+  const previewWarnings = preview.warnings.filter((warning) => warning !== "ai_xp_spend_apply_not_enabled_v1");
   const playerPlans = rosterRows.flatMap(({ player, roster }) => {
-    const previewPlayer = getPlayerPlanFromPreview(preview, player.id) ?? firstPreviewByPlayerId.get(player.id) ?? null;
-    if (!previewPlayer && !plannedInputs.some((upgrade) => upgrade.playerId === player.id)) return [];
+    const previewPlayer = getPlayerPlanFromPreview(preview, player.id) ?? null;
+    const firstAvailability = firstAvailabilityByPlayerId.get(player.id) ?? null;
+    const hasAiInputs = plannedInputs.some((upgrade) => upgrade.playerId === player.id);
+    if (!previewPlayer && !hasAiInputs) return [];
     const role = getRole({ player, roster, ovrRankInTeam: rankByPlayerId.get(player.id) ?? 99, rosterSize: rosterRows.length });
     return [
       {
         playerId: player.id,
         playerName: player.name,
         role,
-        availableXP: previewPlayer?.availableXP ?? 0,
-        plannedUpgrades: previewPlayer?.plannedUpgrades ?? [],
+        availableXP: previewPlayer?.availableXP ?? firstAvailability?.availableXP ?? 0,
+        plannedUpgrades: hasAiInputs ? (previewPlayer?.plannedUpgrades ?? []).filter((upgrade) => upgrade.source === "manual_xp_spend_preview") : [],
         reasons: reasonsByPlayerId.get(player.id) ?? getRoleReasons(role),
         disciplineDeltas: previewPlayer?.disciplineDeltas ?? [],
-        xpSpent: previewPlayer?.plannedXP ?? 0,
+        xpSpent: hasAiInputs ? (previewPlayer?.plannedXP ?? 0) : 0,
         xpRemaining: previewPlayer?.remainingXP ?? 0,
       } satisfies AiXpSpendPlayerPlan,
     ];
@@ -425,10 +446,10 @@ export function previewAiSeasonEndXpSpend(save: PersistedSaveGame, teamId: strin
     teamCode: team?.shortCode ?? null,
     teamName: team?.name ?? null,
     plannedUpgrades: plannedInputs,
-    normalizedPlannedUpgrades: preview.plannedUpgrades,
+    normalizedPlannedUpgrades: normalizedAiPlannedUpgrades,
     confirmToken: blockers.length === 0 ? preview.confirmToken : null,
     playerPlans,
-    warnings: [...new Set([...warnings, ...preview.warnings])],
+    warnings: [...new Set([...warnings, ...previewWarnings])],
     blockers: [...new Set([...blockers, ...preview.blockingReasons])],
     preview,
   };

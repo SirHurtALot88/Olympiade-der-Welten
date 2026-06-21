@@ -1,6 +1,7 @@
 import { randomUUID } from "node:crypto";
 
 import type { GamePhase, GameState, SeasonTransitionState } from "@/lib/data/olyDataTypes";
+import { buildFormCardSeasonUsageAudit } from "@/lib/lineups/legacy-lineup-modifiers";
 import { createPersistenceService } from "@/lib/persistence/persistence-service";
 import type { PersistedSaveGame, PersistenceService } from "@/lib/persistence/types";
 import { buildSeasonReview, type SeasonReview } from "@/lib/season/season-review-service";
@@ -132,26 +133,36 @@ function buildStepPreviews(save: PersistedSaveGame, transition: SeasonTransition
   const transferCount = save.gameState.transferHistory.length;
   const lineupCount = save.gameState.seasonState.lineupDrafts?.length ?? 0;
   const formCardCount = save.gameState.seasonState.formCards?.length ?? 0;
+  const formCardUsageAudit = buildFormCardSeasonUsageAudit(save.gameState, save.gameState.season.id);
 
   return SEASON_TRANSITION_STEPS.map((stepId, index) => {
     const blockingReasons = stepId === "season_check" && !seasonComplete ? ["last_matchday_not_completed"] : [];
     const warnings = [
       stepId === "season_rewards" ? "uses_existing_prize_facility_cash_sources_only" : null,
+      stepId === "season_rewards" && formCardUsageAudit.unusedNegativeCards > 0
+        ? `unused_negative_formcards_penalty:${formCardUsageAudit.negativePenaltyPoints}`
+        : null,
+      stepId === "season_rewards" && formCardUsageAudit.unusedPositiveCards > 0
+        ? `unused_positive_formcards_expire:${formCardUsageAudit.unusedPositiveCards}`
+        : null,
       stepId === "player_development" ? "preview_only_no_attribute_writes" : null,
       stepId === "transfer_sell_phase" ? "human_teams_manual_only" : null,
       stepId === "transfer_buy_phase" ? "buy_after_sell_only" : null,
-      stepId === "next_season_ready" ? "no_new_season_apply_in_transition_v1" : null,
+      stepId === "next_season_ready" ? "next_season_apply_requires_preseason_confirm" : null,
     ].filter((entry): entry is string => Boolean(entry));
     const previewByStep: Record<SeasonTransitionStepId, string> = {
       season_check: seasonComplete ? "Letzter Spieltag ist abgeschlossen." : "Letzter Spieltag ist noch nicht abgeschlossen.",
       season_review: `Rückblick liest Saisonstand, ${transferCount} Transfers und Kaderdaten.`,
-      season_rewards: "Preview liest Preisgeld, Sponsor, Facility-Unterhalt und Facility-Income.",
+      season_rewards:
+        formCardUsageAudit.unusedCards > 0
+          ? `Preview liest Preisgeld, Sponsor, Facilities; Formkarten offen: ${formCardUsageAudit.unusedCards} (${formCardUsageAudit.unusedNegativeCards} negative = ${formCardUsageAudit.negativePenaltyPoints} Strafpunkte, positive verfallen).`
+          : "Preview liest Preisgeld, Sponsor, Facility-Unterhalt und Facility-Income. Alle Formkarten wurden verbraucht.",
       player_development: `Preview berechnet XP für ${rosterCount} aktive Spieler ohne Attribut-Writes.`,
       preseason_management: `Training, Gebäude, Scouting und Board-Hinweise als Vorschau; ${formCardCount} Formkarten im Save.`,
       transfer_sell_phase: "AI-Verkäufe werden später über Sell-Service vorbereitet; Human-Teams bleiben manuell.",
       transfer_buy_phase: "AI-Käufe laufen nach Verkäufen über Buy-Service; keine Duplikate/kein negatives Cash als spätere Gate-Regeln.",
       lineup_setup: `${lineupCount} gespeicherte Lineups würden für neue Season geprüft/resetet.`,
-      next_season_ready: "Neue Saison startet erst in einem späteren Confirm-Schritt.",
+      next_season_ready: "Neue Saison startet ueber den bestaetigten Pre-Season Workflow.",
     };
     return {
       stepId,

@@ -1,6 +1,13 @@
 import { createActionLogEntry } from "@/lib/game/action-log";
 import { createInitialRoomState } from "@/lib/game/create-room-state";
 import { MAX_ACTIVE_PLAYERS } from "@/lib/game/constants";
+import {
+  advanceRoomArenaReveal,
+  isRoomArenaReady,
+  setRoomArenaParticipantReady,
+  startRoomArena as buildStartedRoomArenaState,
+  syncRoomArenaParticipants,
+} from "@/lib/room/arena-sync-state";
 import { createRoomCode } from "@/lib/room/room-code";
 import {
   applyOwnershipPresetToState,
@@ -78,6 +85,12 @@ function syncPlayers(room: RuntimeRoom) {
       },
       currentStep: turnState.currentStep,
       aiAutoCompletedTeamIds: room.state.roomFlowState?.aiAutoCompletedTeamIds,
+    }),
+    arenaSyncState: syncRoomArenaParticipants({
+      ...room.state,
+      multiplayerRoom,
+      roomParticipants,
+      systemControlledTeamIds,
     }),
     players: {
       A: room.seats.A && {
@@ -274,6 +287,18 @@ export function recordRoomGameplayWrite(input: {
         ? { ...participant, readyState: "not_ready", lastSeenAt: new Date().toISOString() }
         : participant,
     ),
+    arenaSyncState:
+      input.eventType === "matchday_applied" || input.eventType === "arena_result_applied"
+        ? {
+            ...room.state.arenaSyncState,
+            status: "result_applied",
+            resultStatus: "applied",
+            phaseId: "result",
+            phaseIndex: 6,
+            updatedAt: new Date().toISOString(),
+            version: room.state.arenaSyncState.version + 1,
+          }
+        : room.state.arenaSyncState,
   };
   room.state = appendRoomEvent(room.state, input.eventType, {
     roomCode: room.roomCode,
@@ -295,6 +320,141 @@ export function recordRoomGameplayWrite(input: {
       timestamp: new Date().toISOString(),
     });
   }
+  syncPlayers(room);
+  return { ok: true as const, room };
+}
+
+function findRoomParticipantBySeatToken(room: RuntimeRoom, seatToken: string) {
+  const role = findSeatByToken(room, seatToken);
+  const participantId = role ? room.seats[role]?.participantId ?? null : null;
+  const participant = participantId
+    ? room.state.roomParticipants.find((entry) => entry.participantId === participantId) ?? null
+    : null;
+  return { role, participantId, participant };
+}
+
+export function startRoomArenaSync(
+  roomCode: string,
+  seatToken: string,
+  input?: {
+    seasonId?: string | null;
+    matchdayId?: string | null;
+    disciplineSide?: "d1" | "d2" | "overall" | null;
+    maxSlotRevealIndex?: number | null;
+  },
+) {
+  const room = getRoom(roomCode);
+  if (!room) {
+    return { ok: false as const, error: "Der Raum existiert nicht mehr." };
+  }
+  const { role, participantId } = findRoomParticipantBySeatToken(room, seatToken);
+  if (!role || !participantId) {
+    return { ok: false as const, error: "Dein Sitzplatz ist nicht gueltig." };
+  }
+  if (role !== "A") {
+    return { ok: false as const, error: "Nur der Host darf die gemeinsame Arena starten." };
+  }
+
+  room.state = {
+    ...room.state,
+    roomFlowState: {
+      ...room.state.roomFlowState,
+      step: "arena",
+    },
+    arenaSyncState: buildStartedRoomArenaState({
+      state: room.state,
+      participantId,
+      seasonId: input?.seasonId,
+      matchdayId: input?.matchdayId,
+      disciplineSide: input?.disciplineSide,
+      maxSlotRevealIndex: input?.maxSlotRevealIndex,
+    }),
+  };
+  room.state = appendRoomEvent(room.state, "arena_started", {
+    roomCode: room.roomCode,
+    saveId: room.state.multiplayerRoom.saveId,
+    seasonId: room.state.arenaSyncState.seasonId,
+    matchdayId: room.state.arenaSyncState.matchdayId,
+    disciplineSide: room.state.arenaSyncState.disciplineSide,
+    participantId,
+    affectedViews: ["arena", "matchday"],
+  });
+  syncPlayers(room);
+  return { ok: true as const, room };
+}
+
+export function setRoomArenaReadyState(roomCode: string, seatToken: string, ready: boolean) {
+  const room = getRoom(roomCode);
+  if (!room) {
+    return { ok: false as const, error: "Der Raum existiert nicht mehr." };
+  }
+  const { participantId } = findRoomParticipantBySeatToken(room, seatToken);
+  if (!participantId) {
+    return { ok: false as const, error: "Dein Sitzplatz ist nicht gueltig." };
+  }
+
+  room.state = {
+    ...room.state,
+    arenaSyncState: setRoomArenaParticipantReady({
+      arenaState: room.state.arenaSyncState,
+      participantId,
+      ready,
+    }),
+  };
+  room.state = appendRoomEvent(room.state, "arena_ready_changed", {
+    roomCode: room.roomCode,
+    saveId: room.state.multiplayerRoom.saveId,
+    participantId,
+    ready,
+    readyParticipantIds: room.state.arenaSyncState.readyParticipantIds,
+    requiredParticipantIds: room.state.arenaSyncState.requiredParticipantIds,
+    affectedViews: ["arena"],
+  });
+  syncPlayers(room);
+  return { ok: true as const, room };
+}
+
+export function advanceRoomArenaStep(
+  roomCode: string,
+  seatToken: string,
+  input?: {
+    maxSlotRevealIndex?: number | null;
+    force?: boolean | null;
+  },
+) {
+  const room = getRoom(roomCode);
+  if (!room) {
+    return { ok: false as const, error: "Der Raum existiert nicht mehr." };
+  }
+  const { role, participantId } = findRoomParticipantBySeatToken(room, seatToken);
+  if (!role || !participantId) {
+    return { ok: false as const, error: "Dein Sitzplatz ist nicht gueltig." };
+  }
+  if (role !== "A") {
+    return { ok: false as const, error: "Nur der Host darf den gemeinsamen Arena-Step fortsetzen." };
+  }
+  if (!input?.force && room.state.arenaSyncState.status === "ready_check" && !isRoomArenaReady(room.state.arenaSyncState)) {
+    return { ok: false as const, error: "Arena wartet noch auf Ready von allen aktiven Coaches." };
+  }
+
+  room.state = {
+    ...room.state,
+    arenaSyncState: advanceRoomArenaReveal({
+      arenaState: room.state.arenaSyncState,
+      participantId,
+      maxSlotRevealIndex: input?.maxSlotRevealIndex,
+    }),
+  };
+  room.state = appendRoomEvent(room.state, "arena_step_changed", {
+    roomCode: room.roomCode,
+    saveId: room.state.multiplayerRoom.saveId,
+    participantId,
+    phaseId: room.state.arenaSyncState.phaseId,
+    phaseIndex: room.state.arenaSyncState.phaseIndex,
+    slotRevealIndex: room.state.arenaSyncState.slotRevealIndex,
+    stepIndex: room.state.arenaSyncState.stepIndex,
+    affectedViews: ["arena"],
+  });
   syncPlayers(room);
   return { ok: true as const, room };
 }

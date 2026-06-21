@@ -87,6 +87,26 @@ function runMigrations(database: Database.Database) {
       FOREIGN KEY (save_id) REFERENCES saves(save_id) ON DELETE CASCADE
     );
 
+    CREATE TABLE IF NOT EXISTS player_catalog (
+      player_id TEXT PRIMARY KEY,
+      payload_json TEXT NOT NULL,
+      updated_at TEXT NOT NULL
+    );
+
+    CREATE TABLE IF NOT EXISTS player_baselines (
+      save_id TEXT NOT NULL,
+      player_id TEXT NOT NULL,
+      payload_json TEXT NOT NULL,
+      PRIMARY KEY (save_id, player_id),
+      FOREIGN KEY (save_id) REFERENCES saves(save_id) ON DELETE CASCADE
+    );
+
+    CREATE TABLE IF NOT EXISTS player_baseline_catalog (
+      player_id TEXT PRIMARY KEY,
+      payload_json TEXT NOT NULL,
+      updated_at TEXT NOT NULL
+    );
+
     CREATE TABLE IF NOT EXISTS disciplines (
       save_id TEXT NOT NULL,
       discipline_id TEXT NOT NULL,
@@ -159,12 +179,20 @@ export function getDatabasePath() {
   return resolveDatabasePath();
 }
 
-export function resetDatabaseForTests() {
-  const databasePath = resolveDatabasePath();
+export function closeDatabaseForMaintenance() {
   if (databaseInstance) {
     databaseInstance.close();
     databaseInstance = null;
   }
+}
+
+export function resetDatabaseForTests() {
+  if (process.env.NODE_ENV !== "test" && process.env.VITEST !== "true") {
+    throw new Error("resetDatabaseForTests may only run in the test environment.");
+  }
+
+  const databasePath = resolveDatabasePath();
+  closeDatabaseForMaintenance();
 
   for (const filePath of [databasePath, `${databasePath}-wal`, `${databasePath}-shm`]) {
     if (fs.existsSync(filePath)) {

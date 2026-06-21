@@ -26,13 +26,20 @@ describe("season transition ui contract", () => {
 
     expect(fileText).toContain("Saison abschließen");
     expect(fileText).toContain("last_matchday_not_completed");
-    expect(fileText).toContain("Season Transition Assistent");
+    expect(fileText).toContain("Saisonabschluss & Review");
     expect(fileText).toContain("Assistent previewen");
-    expect(fileText).toContain("V1 ist Preview-/State-Struktur");
+    expect(fileText).toContain("Abschluss pruefen");
+    expect(fileText).toContain("Der echte Write laeuft atomar mit Recovery");
     expect(fileText).toContain("/api/season/transition");
+    expect(fileText).toContain("/api/season/completion");
     expect(fileText).toContain("Transition currentStep");
+    expect(fileText).toContain("AI Einsatz-Audit");
+    expect(fileText).toContain("season-completion-board");
     expect(fileText).toContain("Weiter");
     expect(fileText).toContain("seasonReview");
+    expect(fileText).toContain("objectiveSettlement");
+    expect(fileText).toContain("season-review-objective-settlement");
+    expect(fileText).toContain("Board-Ziele");
     expect(fileText).toContain('data-testid="season-review-preview"');
     expect(fileText).toContain("Weiter zu Finanzen");
   });

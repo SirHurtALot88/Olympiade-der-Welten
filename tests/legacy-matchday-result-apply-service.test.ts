@@ -98,9 +98,11 @@ function createContext(input: {
       playerOpt: 10,
     },
     teamIdentity: { pow: 10, spe: 10, men: 10, soc: 10 },
-    rosterPlayers: draftEntries.map((entry) => ({
+    rosterPlayers: draftEntries.map((entry, index) => ({
       id: entry.playerId,
       name: entry.playerId,
+      traitsPositive: [index % 2 === 0 ? "Motivated" : "Relaxed"],
+      traitsNegative: [index % 3 === 0 ? "Diva" : "Timid"],
       coreStats: { pow: 1, spe: 1, men: 1, soc: 1 },
     })),
     disciplines: [
@@ -121,6 +123,22 @@ function createContext(input: {
           teamId: input.teamId,
           status: "draft",
           entries: draftEntries,
+          modifiers: {
+            d1: {
+              primaryFormCardId: null,
+              secondaryFormCardId: null,
+              mutatorTrait1: null,
+              mutatorTrait2: null,
+              teamPowerId: null,
+            },
+            d2: {
+              primaryFormCardId: null,
+              secondaryFormCardId: null,
+              mutatorTrait1: null,
+              mutatorTrait2: null,
+              teamPowerId: null,
+            },
+          },
           createdAt: "2026-06-03T00:00:00.000Z",
           updatedAt: "2026-06-03T00:00:00.000Z",
         }

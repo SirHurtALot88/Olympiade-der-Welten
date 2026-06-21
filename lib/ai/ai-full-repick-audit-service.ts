@@ -78,6 +78,9 @@ type TeamArtifactSummary = {
     expectedPrizeNextSeason3: number | null;
     expectedPrizeNextSeason4: number | null;
     expectedPrizeFiveSeasonSum: number | null;
+    expectedGuvCurrentSeason?: number | null;
+    expectedGuvFiveSeasonSum?: number | null;
+    expectedProjectedCashAfterFiveSeasons?: number | null;
     expectedPrizeTrend: string | null;
     prizeConfidence: string | null;
     prizeSourceStatus: string | null;

@@ -23,10 +23,16 @@ import { createGameStateFromSeed, loadSeedData } from "@/lib/data/dataAdapter";
 import { hydrateGameStateMedia } from "@/lib/data/mediaAssets";
 import { getDatabase } from "@/lib/persistence/sqlite";
 import { getTeamPlayerMax } from "@/lib/foundation/roster-limits";
+import { withNormalizedTeamIdentityOverrides } from "@/lib/foundation/team-identity-settings";
+import { withNormalizedTeamGeneralManagers } from "@/lib/foundation/team-general-managers";
 import { buildScenarioMeta, withScenarioMeta } from "@/lib/persistence/scenario-meta";
+import { resolveFoundationSaveMode } from "@/lib/persistence/foundation-save-mode";
+import { enforceRollingSaveRetention } from "@/lib/persistence/save-retention";
 import { ensurePlayerBaselines, guardPlayerBaselineWrite } from "@/lib/players/player-baseline-service";
 import { withNormalizedSeasonDisciplineSchedule } from "@/lib/season/season-discipline-schedule";
 import type { PersistedSaveGame, SaveRepository, SaveStatus, SaveSummary } from "@/lib/persistence/types";
+
+export { enforceRollingSaveRetention } from "@/lib/persistence/save-retention";
 
 type SaveRow = {
   save_id: string;
@@ -48,10 +54,21 @@ type GameMetadata = {
   completedSteps?: string[];
   seasonReviewState?: unknown;
   preSeasonWorkflowState?: unknown;
-  playerBaselines?: PlayerBaselineRecord[];
   baselineWriteGuardEvents?: PlayerBaselineWriteGuardEvent[];
   playerProgressionEvents?: GameState["playerProgressionEvents"];
+  playerMoraleState?: GameState["playerMoraleState"];
+  playerRelationshipEvents?: GameState["playerRelationshipEvents"];
 };
+
+type PlayerSavePayload =
+  | {
+      storage: "delta";
+      patch: Partial<Player>;
+    }
+  | {
+      storage: "full";
+      player: Player;
+    };
 
 function parseJsonColumn<T>(value: string): T {
   return JSON.parse(value) as T;
@@ -86,8 +103,8 @@ function normalizeLegacyRosterTargets(gameState: GameState): GameState {
     const playerMin = Number.isFinite(identity?.playerMin) ? Math.round(identity!.playerMin) : null;
     const playerOpt = Number.isFinite(identity?.playerOpt) ? Math.round(identity!.playerOpt) : null;
     const rosterLimit = getTeamPlayerMax(team, identity);
-    const rosterMinTarget = team.rosterMinTarget ?? playerMin;
-    const rosterOptTarget = team.rosterOptTarget ?? playerOpt;
+    const rosterMinTarget = playerMin;
+    const rosterOptTarget = playerOpt;
     if (
       rosterLimit === team.rosterLimit &&
       team.rosterMinTarget === rosterMinTarget &&
@@ -105,6 +122,179 @@ function normalizeLegacyRosterTargets(gameState: GameState): GameState {
   });
 
   return changed ? { ...gameState, teams } : gameState;
+}
+
+function roundMoney(value: number) {
+  return Number(value.toFixed(2));
+}
+
+function toFiniteNumber(value: unknown) {
+  return typeof value === "number" && Number.isFinite(value) ? value : null;
+}
+
+function normalizeLegacyMoneyValue(input: {
+  value: number | null | undefined;
+  threshold: number;
+  budget?: number | null | undefined;
+}) {
+  const numericValue = toFiniteNumber(input.value);
+  if (numericValue == null) {
+    return input.value ?? null;
+  }
+
+  const absoluteValue = Math.abs(numericValue);
+  const budget = Math.abs(toFiniteNumber(input.budget) ?? 0);
+  const lowScaleBudget = budget > 0 && budget <= 1000;
+  const suspiciousByThreshold = absoluteValue > input.threshold;
+  const suspiciousByBudget = lowScaleBudget && absoluteValue > budget * 8;
+
+  if ((suspiciousByThreshold && (lowScaleBudget || input.budget == null)) || suspiciousByBudget) {
+    return roundMoney(numericValue / 100);
+  }
+
+  return roundMoney(numericValue);
+}
+
+export function normalizeLegacyFinanceScale(gameState: GameState): GameState {
+  const budgetByTeamId = new Map(gameState.teams.map((team) => [team.teamId, team.budget] as const));
+  let changed = false;
+
+  const teams = gameState.teams.map((team) => {
+    const normalizedCash = normalizeLegacyMoneyValue({
+      value: team.cash,
+      threshold: 5000,
+      budget: team.budget,
+    });
+    if (normalizedCash === team.cash) {
+      return team;
+    }
+    changed = true;
+    return {
+      ...team,
+      cash: normalizedCash ?? team.cash,
+    };
+  });
+
+  const standingsEntries = Object.entries(gameState.seasonState.standings ?? {});
+  const normalizedStandings = Object.fromEntries(
+    standingsEntries.map(([teamId, standing]) => {
+      const budget = budgetByTeamId.get(teamId);
+      const nextStanding = {
+        ...standing,
+        cashFc: normalizeLegacyMoneyValue({ value: standing.cashFc, threshold: 5000, budget }),
+        cashTotal: normalizeLegacyMoneyValue({ value: standing.cashTotal, threshold: 5000, budget }),
+      };
+      if (
+        nextStanding.cashFc !== standing.cashFc ||
+        nextStanding.cashTotal !== standing.cashTotal
+      ) {
+        changed = true;
+      }
+      return [teamId, nextStanding];
+    }),
+  );
+
+  const transferHistory = (gameState.transferHistory ?? []).map((entry) => {
+    const relatedBudget = budgetByTeamId.get(entry.fromTeamId ?? entry.toTeamId ?? "");
+    const normalizedFee = normalizeLegacyMoneyValue({
+      value: entry.fee,
+      threshold: 5000,
+      budget: relatedBudget,
+    });
+    const normalizedMarketValue = normalizeLegacyMoneyValue({
+      value: entry.marketValue,
+      threshold: 5000,
+      budget: relatedBudget,
+    });
+    const normalizedSalary = normalizeLegacyMoneyValue({
+      value: entry.salary,
+      threshold: 1000,
+      budget: relatedBudget,
+    });
+    if (
+      normalizedFee === entry.fee &&
+      normalizedMarketValue === entry.marketValue &&
+      normalizedSalary === entry.salary
+    ) {
+      return entry;
+    }
+    changed = true;
+    return {
+      ...entry,
+      fee: normalizedFee ?? entry.fee,
+      marketValue: normalizedMarketValue ?? entry.marketValue,
+      salary: normalizedSalary ?? entry.salary,
+    };
+  });
+
+  const contractEvents = (gameState.seasonState.contractEvents ?? []).map((event) => {
+    const budget = budgetByTeamId.get(event.teamId);
+    const normalizedExitValue = normalizeLegacyMoneyValue({
+      value: event.exitValue,
+      threshold: 5000,
+      budget,
+    });
+    const normalizedMarketValueAtExit = normalizeLegacyMoneyValue({
+      value: event.marketValueAtExit,
+      threshold: 5000,
+      budget,
+    });
+    const normalizedPurchasePrice = normalizeLegacyMoneyValue({
+      value: event.purchasePrice,
+      threshold: 5000,
+      budget,
+    });
+    const normalizedProfitLoss = normalizeLegacyMoneyValue({
+      value: event.profitLoss,
+      threshold: 5000,
+      budget,
+    });
+    const normalizedOldSalary = normalizeLegacyMoneyValue({
+      value: event.oldSalary,
+      threshold: 1000,
+      budget,
+    });
+    const normalizedNewSalary = normalizeLegacyMoneyValue({
+      value: event.newSalary,
+      threshold: 1000,
+      budget,
+    });
+    if (
+      normalizedExitValue === event.exitValue &&
+      normalizedMarketValueAtExit === event.marketValueAtExit &&
+      normalizedPurchasePrice === event.purchasePrice &&
+      normalizedProfitLoss === event.profitLoss &&
+      normalizedOldSalary === event.oldSalary &&
+      normalizedNewSalary === event.newSalary
+    ) {
+      return event;
+    }
+    changed = true;
+    return {
+      ...event,
+      exitValue: normalizedExitValue,
+      marketValueAtExit: normalizedMarketValueAtExit,
+      purchasePrice: normalizedPurchasePrice,
+      profitLoss: normalizedProfitLoss,
+      oldSalary: normalizedOldSalary,
+      newSalary: normalizedNewSalary,
+    };
+  });
+
+  if (!changed) {
+    return gameState;
+  }
+
+  return {
+    ...gameState,
+    teams,
+    transferHistory,
+    seasonState: {
+      ...gameState.seasonState,
+      standings: normalizedStandings,
+      contractEvents,
+    },
+  };
 }
 
 function loadCollection<T>(tableName: string, keyColumn: string, saveId: string) {
@@ -217,8 +407,201 @@ function loadSaveRow(saveId: string) {
     .get(saveId) as SaveRow | undefined;
 }
 
+let baselineSourcePlayersCache: Player[] | null = null;
+
 function loadBaselineSourcePlayers() {
-  return createGameStateFromSeed(loadSeedData()).players;
+  baselineSourcePlayersCache ??= createGameStateFromSeed(loadSeedData()).players;
+  return baselineSourcePlayersCache;
+}
+
+function valuesEqual(left: unknown, right: unknown) {
+  return JSON.stringify(left) === JSON.stringify(right);
+}
+
+function compactBaselineWriteGuardEvents(
+  events: PlayerBaselineWriteGuardEvent[],
+  limit = 1000,
+) {
+  const byEventId = new Map<string, PlayerBaselineWriteGuardEvent>();
+  for (const event of events) {
+    byEventId.set(event.eventId, event);
+  }
+  return Array.from(byEventId.values())
+    .sort((left, right) => right.timestamp.localeCompare(left.timestamp, "de"))
+    .slice(0, limit)
+    .sort((left, right) => left.timestamp.localeCompare(right.timestamp, "de"));
+}
+
+function buildPlayerDelta(basePlayer: Player, player: Player) {
+  const patch: Partial<Player> = {};
+  for (const [key, value] of Object.entries(player) as Array<[keyof Player, Player[keyof Player]]>) {
+    if (key === "id") {
+      continue;
+    }
+    if (!valuesEqual(basePlayer[key], value)) {
+      patch[key] = value as never;
+    }
+  }
+  return patch;
+}
+
+function isPlayerSavePayload(value: unknown): value is PlayerSavePayload {
+  return Boolean(
+    value &&
+      typeof value === "object" &&
+      ((value as { storage?: unknown }).storage === "delta" || (value as { storage?: unknown }).storage === "full"),
+  );
+}
+
+function loadPlayerCatalog(database = getDatabase()) {
+  const rows = database
+    .prepare("SELECT player_id, payload_json FROM player_catalog ORDER BY player_id ASC")
+    .all() as Array<{ player_id: string; payload_json: string }>;
+  return new Map(rows.map((row) => [row.player_id, parseJsonColumn<Player>(row.payload_json)]));
+}
+
+function ensurePlayerCatalog(database: ReturnType<typeof getDatabase>, players: Player[], updatedAt: string) {
+  const existingCount = (database.prepare("SELECT COUNT(*) AS count FROM player_catalog").get() as { count: number })
+    .count;
+  if (existingCount >= players.length) {
+    return;
+  }
+
+  const insertStatement = database.prepare(
+    `INSERT OR IGNORE INTO player_catalog (player_id, payload_json, updated_at) VALUES (?, ?, ?)`,
+  );
+  for (const player of players) {
+    insertStatement.run(player.id, JSON.stringify(player), updatedAt);
+  }
+}
+
+function loadPlayersForSave(saveId: string) {
+  const database = getDatabase();
+  const catalog = loadPlayerCatalog(database);
+  const playersById = new Map(catalog);
+  const rows = database
+    .prepare("SELECT player_id, payload_json FROM players WHERE save_id = ? ORDER BY player_id ASC")
+    .all(saveId) as Array<{ player_id: string; payload_json: string }>;
+
+  for (const row of rows) {
+    const payload = parseJsonColumn<unknown>(row.payload_json);
+    if (isPlayerSavePayload(payload)) {
+      if (payload.storage === "full") {
+        playersById.set(row.player_id, payload.player);
+        continue;
+      }
+
+      const basePlayer = catalog.get(row.player_id);
+      if (basePlayer) {
+        playersById.set(row.player_id, { ...basePlayer, ...payload.patch });
+      }
+      continue;
+    }
+
+    playersById.set(row.player_id, payload as Player);
+  }
+
+  return [...playersById.values()].sort((left, right) => left.id.localeCompare(right.id));
+}
+
+function replacePlayersForSave(saveId: string, players: Player[], catalogSourcePlayers: Player[], updatedAt: string) {
+  const database = getDatabase();
+  ensurePlayerCatalog(database, catalogSourcePlayers, updatedAt);
+  const catalog = loadPlayerCatalog(database);
+  const deleteStatement = database.prepare("DELETE FROM players WHERE save_id = ?");
+  const insertStatement = database.prepare(
+    "INSERT INTO players (save_id, player_id, payload_json) VALUES (?, ?, ?)",
+  );
+
+  deleteStatement.run(saveId);
+  for (const player of players) {
+    const basePlayer = catalog.get(player.id);
+    const payload: PlayerSavePayload | null = basePlayer
+      ? (() => {
+          const patch = buildPlayerDelta(basePlayer, player);
+          return Object.keys(patch).length ? { storage: "delta", patch } : null;
+        })()
+      : { storage: "full", player };
+
+    if (payload) {
+      insertStatement.run(saveId, player.id, JSON.stringify(payload));
+    }
+  }
+}
+
+function loadPlayerBaselinesForSave(saveId: string, fallbackBaselines?: PlayerBaselineRecord[]) {
+  const database = getDatabase();
+  const baselineCatalogRows = database
+    .prepare("SELECT player_id, payload_json FROM player_baseline_catalog ORDER BY player_id ASC")
+    .all() as Array<{ player_id: string; payload_json: string }>;
+  const baselinesByPlayerId = new Map(
+    baselineCatalogRows.map((row) => [row.player_id, parseJsonColumn<PlayerBaselineRecord>(row.payload_json)]),
+  );
+  const rows = database
+    .prepare("SELECT payload_json FROM player_baselines WHERE save_id = ? ORDER BY player_id ASC")
+    .all(saveId) as Array<{ payload_json: string }>;
+  for (const row of rows) {
+    const baseline = parseJsonColumn<PlayerBaselineRecord>(row.payload_json);
+    baselinesByPlayerId.set(baseline.playerId, baseline);
+  }
+
+  if (baselinesByPlayerId.size) {
+    return [...baselinesByPlayerId.values()].sort((left, right) => left.playerId.localeCompare(right.playerId));
+  }
+  return fallbackBaselines;
+}
+
+function ensurePlayerBaselineCatalog(
+  database: ReturnType<typeof getDatabase>,
+  baselines: PlayerBaselineRecord[] | undefined,
+  updatedAt: string,
+) {
+  const baselineList = baselines ?? [];
+  if (!baselineList.length) {
+    return;
+  }
+
+  const existingCount = (database.prepare("SELECT COUNT(*) AS count FROM player_baseline_catalog").get() as {
+    count: number;
+  }).count;
+  if (existingCount >= baselineList.length) {
+    return;
+  }
+
+  const insertStatement = database.prepare(
+    `INSERT OR IGNORE INTO player_baseline_catalog (player_id, payload_json, updated_at) VALUES (?, ?, ?)`,
+  );
+  for (const baseline of baselineList) {
+    insertStatement.run(baseline.playerId, JSON.stringify(baseline), updatedAt);
+  }
+}
+
+function replacePlayerBaselinesForSave(
+  saveId: string,
+  baselines: PlayerBaselineRecord[] | undefined,
+  updatedAt: string,
+) {
+  const database = getDatabase();
+  ensurePlayerBaselineCatalog(database, baselines, updatedAt);
+  const baselineCatalogRows = database
+    .prepare("SELECT player_id, payload_json FROM player_baseline_catalog")
+    .all() as Array<{ player_id: string; payload_json: string }>;
+  const baselineCatalog = new Map(
+    baselineCatalogRows.map((row) => [row.player_id, parseJsonColumn<PlayerBaselineRecord>(row.payload_json)]),
+  );
+  const deleteStatement = database.prepare("DELETE FROM player_baselines WHERE save_id = ?");
+  const insertStatement = database.prepare(
+    "INSERT INTO player_baselines (save_id, player_id, payload_json) VALUES (?, ?, ?)",
+  );
+
+  deleteStatement.run(saveId);
+  for (const baseline of baselines ?? []) {
+    const catalogBaseline = baselineCatalog.get(baseline.playerId);
+    if (catalogBaseline && valuesEqual(catalogBaseline, baseline)) {
+      continue;
+    }
+    insertStatement.run(saveId, baseline.playerId, JSON.stringify(baseline));
+  }
 }
 
 function materializePersistedSave(row: SaveRow): PersistedSaveGame | null {
@@ -233,6 +616,10 @@ function materializePersistedSave(row: SaveRow): PersistedSaveGame | null {
     return null;
   }
 
+  const playerBaselines = loadPlayerBaselinesForSave(
+    saveId,
+    (gameMetadata as GameMetadata & { playerBaselines?: PlayerBaselineRecord[] } | null)?.playerBaselines,
+  );
   const gamePhase = inferCompletedGamePhase({ metadata: gameMetadata, season, seasonState, matchdayState });
   const hydrated = hydrateGameStateMedia({
     ...(gamePhase ? { gamePhase } : {}),
@@ -247,19 +634,25 @@ function materializePersistedSave(row: SaveRow): PersistedSaveGame | null {
     ...(gameMetadata?.preSeasonWorkflowState !== undefined
       ? { preSeasonWorkflowState: gameMetadata.preSeasonWorkflowState }
       : {}),
-    ...(gameMetadata?.playerBaselines ? { playerBaselines: gameMetadata.playerBaselines } : {}),
+    ...(playerBaselines ? { playerBaselines } : {}),
     ...(gameMetadata?.baselineWriteGuardEvents
       ? { baselineWriteGuardEvents: gameMetadata.baselineWriteGuardEvents }
       : {}),
     ...(gameMetadata?.playerProgressionEvents
       ? { playerProgressionEvents: gameMetadata.playerProgressionEvents }
       : {}),
+    ...(gameMetadata?.playerMoraleState
+      ? { playerMoraleState: gameMetadata.playerMoraleState }
+      : {}),
+    ...(gameMetadata?.playerRelationshipEvents
+      ? { playerRelationshipEvents: gameMetadata.playerRelationshipEvents }
+      : {}),
     season,
     seasonState,
     matchdayState,
     teams: loadCollection<Team>("teams", "team_id", saveId),
     teamIdentities: loadCollection<TeamIdentity>("team_identities", "team_id", saveId),
-    players: loadCollection<Player>("players", "player_id", saveId),
+    players: loadPlayersForSave(saveId),
     disciplines: loadCollection<Discipline>("disciplines", "discipline_id", saveId),
     rosters: loadCollection<RosterEntry>("rosters", "roster_id", saveId),
     contracts: loadCollection<Contract>("contracts", "contract_id", saveId),
@@ -269,7 +662,11 @@ function materializePersistedSave(row: SaveRow): PersistedSaveGame | null {
     mappingReport,
   });
   const gameStateWithoutBaseline = withNormalizedSeasonDisciplineSchedule(
-    normalizeLegacyRosterTargets(normalizeLegacyCashCreatorsColdSteelCodes(hydrated)),
+    normalizeLegacyRosterTargets(
+      normalizeLegacyFinanceScale(
+        withNormalizedTeamGeneralManagers(withNormalizedTeamIdentityOverrides(normalizeLegacyCashCreatorsColdSteelCodes(hydrated))),
+      ),
+    ),
   );
   const gameState = ensurePlayerBaselines(gameStateWithoutBaseline, {
     sourcePlayers: loadBaselineSourcePlayers(),
@@ -305,24 +702,32 @@ function createPersistedSaveRecord(input: {
   const createdAt = input.createdAt ?? now;
   const updatedAt = input.updatedAt ?? now;
   const normalizedWithoutBaselines = withNormalizedSeasonDisciplineSchedule(
-    normalizeLegacyRosterTargets(normalizeLegacyCashCreatorsColdSteelCodes(input.gameState)),
+    normalizeLegacyRosterTargets(
+      normalizeLegacyFinanceScale(
+        withNormalizedTeamGeneralManagers(withNormalizedTeamIdentityOverrides(normalizeLegacyCashCreatorsColdSteelCodes(input.gameState))),
+      ),
+    ),
   );
   const normalizedGameState = ensurePlayerBaselines(normalizedWithoutBaselines, {
     sourcePlayers: loadBaselineSourcePlayers(),
     createdAt,
   }).gameState;
   const existingMetadata = loadSingleton<GameMetadata>("game_metadata", input.saveId);
+  const existingBaselines = loadPlayerBaselinesForSave(
+    input.saveId,
+    (existingMetadata as GameMetadata & { playerBaselines?: PlayerBaselineRecord[] } | null)?.playerBaselines,
+  );
   const guardedBaselineWrite = guardPlayerBaselineWrite({
-    previous: existingMetadata?.playerBaselines,
+    previous: existingBaselines,
     next: normalizedGameState.playerBaselines,
     attemptedSource: "save_repository",
     timestamp: updatedAt,
   });
-  const baselineWriteGuardEvents = [
+  const baselineWriteGuardEvents = compactBaselineWriteGuardEvents([
     ...(existingMetadata?.baselineWriteGuardEvents ?? []),
     ...(normalizedGameState.baselineWriteGuardEvents ?? []),
     ...guardedBaselineWrite.events,
-  ];
+  ]);
   const guardedGameState: GameState = {
     ...normalizedGameState,
     playerBaselines: guardedBaselineWrite.baselines,
@@ -363,21 +768,24 @@ function createPersistedSaveRecord(input: {
       completedSteps: transition?.completedSteps,
       seasonReviewState: guardedGameState.seasonReviewState,
       preSeasonWorkflowState: guardedGameState.preSeasonWorkflowState,
-      playerBaselines: guardedGameState.playerBaselines,
       baselineWriteGuardEvents: guardedGameState.baselineWriteGuardEvents,
       playerProgressionEvents: guardedGameState.playerProgressionEvents,
+      playerMoraleState: guardedGameState.playerMoraleState,
+      playerRelationshipEvents: guardedGameState.playerRelationshipEvents,
     } satisfies GameMetadata);
     replaceSingleton("mapping_reports", input.saveId, guardedGameState.mappingReport);
+    replacePlayerBaselinesForSave(input.saveId, guardedGameState.playerBaselines, updatedAt);
 
     replaceCollection("teams", "team_id", input.saveId, guardedGameState.teams, (team) => team.teamId);
     replaceCollection("team_identities", "team_id", input.saveId, guardedGameState.teamIdentities, (identity) => identity.teamId);
-    replaceCollection("players", "player_id", input.saveId, guardedGameState.players, (player) => player.id);
+    replacePlayersForSave(input.saveId, guardedGameState.players, loadBaselineSourcePlayers(), updatedAt);
     replaceCollection("disciplines", "discipline_id", input.saveId, guardedGameState.disciplines, (discipline) => discipline.id);
     replaceCollection("rosters", "roster_id", input.saveId, guardedGameState.rosters, (roster) => roster.id);
     replaceCollection("contracts", "contract_id", input.saveId, guardedGameState.contracts, (contract) => contract.id);
     replaceCollection("transfer_listings", "listing_id", input.saveId, guardedGameState.transferListings, (listing) => listing.id);
     replaceCollection("transfer_history", "history_id", input.saveId, guardedGameState.transferHistory, (entry) => entry.id);
     replaceCollection("game_logs", "log_id", input.saveId, guardedGameState.logs, (log) => log.id);
+    enforceRollingSaveRetention(database, [input.saveId]);
   });
 
   transaction();
@@ -425,6 +833,9 @@ export function createSaveRepository(): SaveRepository {
           createdAt: row.created_at,
           updatedAt: row.updated_at,
           scenarioMeta: loadScenarioMetaForSummary(row.save_id, row.created_at),
+      })).map((summary) => ({
+        ...summary,
+        saveMode: resolveFoundationSaveMode(summary),
       }));
     },
     setActiveSave(saveId: string) {
@@ -437,6 +848,7 @@ export function createSaveRepository(): SaveRepository {
       const transaction = database.transaction(() => {
         database.prepare("UPDATE saves SET status = 'archived' WHERE status = 'active' AND save_id != ?").run(saveId);
         database.prepare("UPDATE saves SET status = 'active', updated_at = ? WHERE save_id = ?").run(new Date().toISOString(), saveId);
+        enforceRollingSaveRetention(database, [saveId]);
       });
       transaction();
 

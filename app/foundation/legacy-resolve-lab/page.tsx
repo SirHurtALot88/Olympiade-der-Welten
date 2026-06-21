@@ -1,5 +1,7 @@
 import LegacyResolveLabClient from "@/app/foundation/legacy-resolve-lab/LegacyResolveLabClient";
 
+export const dynamic = "force-dynamic";
+
 type LegacyResolveLabPageProps = {
   searchParams?: Promise<{
     source?: string;

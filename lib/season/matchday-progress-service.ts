@@ -1,4 +1,5 @@
-import type { Fixture, GameLogEntry, GameState, LineupDraft, MatchdayAdvanceLogRecord } from "@/lib/data/olyDataTypes";
+import type { Fixture, GameLogEntry, GameState, LineupDraft, MatchdayAdvanceLogRecord, PlayerMoraleState } from "@/lib/data/olyDataTypes";
+import { assessPlayerMorale } from "@/lib/morale/player-morale-service";
 import { createPersistenceService } from "@/lib/persistence/persistence-service";
 import type { PersistenceService } from "@/lib/persistence/types";
 
@@ -96,6 +97,26 @@ function createSeasonLog(message: string): GameLogEntry {
   };
 }
 
+function buildCurrentMoraleState(gameState: GameState): PlayerMoraleState[] {
+  const rosteredPlayerIds = new Set(gameState.rosters.map((roster) => roster.playerId));
+  const activeRows = gameState.rosters
+    .map((roster) => assessPlayerMorale({ gameState, playerId: roster.playerId, teamId: roster.teamId }))
+    .filter((entry): entry is NonNullable<ReturnType<typeof assessPlayerMorale>> => Boolean(entry))
+    .map((assessment) => ({
+      playerId: assessment.playerId,
+      teamId: assessment.teamId,
+      morale: assessment.morale,
+      visibleMood: assessment.visibleMood,
+      lastUpdatedSeasonId: assessment.lastUpdatedSeasonId,
+      inactiveSeasons: 0,
+      reasons: assessment.reasons,
+      contractIntent: assessment.contractIntent,
+    }));
+
+  const inactiveRows = (gameState.playerMoraleState ?? []).filter((entry) => !rosteredPlayerIds.has(entry.playerId));
+  return [...activeRows, ...inactiveRows];
+}
+
 async function prepareMatchdayProgress(
   params: MatchdayProgressParams,
   persistence: PersistenceService,
@@ -165,7 +186,8 @@ async function prepareMatchdayProgress(
   if (!resultApplied) blockingReasons.push("result_apply_missing_for_current_matchday");
   if (!standingsApplied) blockingReasons.push("standings_apply_missing_for_current_matchday");
   if (duplicateDetected) blockingReasons.push("duplicate_matchday_advance_for_current_scope");
-  if (!nextMatchdayId) blockingReasons.push("no_next_matchday_configured");
+  // A missing next matchday is the normal season-end path. The writer below
+  // already resolves the current matchday and leaves the save on season end.
 
   return {
     source,
@@ -268,11 +290,13 @@ function writeLocalMatchdayAdvance(prepared: PreparedMatchdayProgress, persisten
 
   const nextGameState: GameState = {
     ...save.gameState,
+    gamePhase: prepared.nextMatchdayId ? "season_active" : "season_completed",
     season: {
       ...save.gameState.season,
       currentMatchday: prepared.nextMatchdayIndex ?? save.gameState.season.currentMatchday,
     },
     seasonState: nextSeasonState,
+    playerMoraleState: buildCurrentMoraleState(save.gameState),
     matchdayState: {
       matchdayId: prepared.nextMatchdayId ?? prepared.currentMatchdayId,
       status: prepared.nextMatchdayId ? "planning" : "resolved",

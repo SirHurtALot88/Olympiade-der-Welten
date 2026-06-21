@@ -1,3 +1,5 @@
+export const dynamic = "force-dynamic";
+
 import { NextResponse } from "next/server";
 
 import { listLocalTransfermarktFreeAgents } from "@/lib/market/transfermarkt-local-service";
@@ -22,9 +24,13 @@ export async function GET(request: Request) {
       seasonId: searchParams.get("seasonId")?.trim() || null,
       teamId: searchParams.get("teamId")?.trim() || null,
       limit: parseOptionalNumber(searchParams.get("limit")),
+      offset: parseOptionalNumber(searchParams.get("offset")),
       search: searchParams.get("search")?.trim() || null,
       minMarketValue: parseOptionalNumber(searchParams.get("minMarketValue")),
       maxMarketValue: parseOptionalNumber(searchParams.get("maxMarketValue")),
+      minSalary: parseOptionalNumber(searchParams.get("minSalary")),
+      maxSalary: parseOptionalNumber(searchParams.get("maxSalary")),
+      scoutingLevel: parseOptionalNumber(searchParams.get("scoutingLevel")),
     });
 
     return NextResponse.json(result);
@@ -39,6 +45,10 @@ export async function GET(request: Request) {
         error: message,
         items: [],
         total: 0,
+        offset: 0,
+        limit: 0,
+        returned: 0,
+        hasMore: false,
         scope: null,
         teamContext: null,
         source: "derived_free_agents",
@@ -55,6 +65,21 @@ export async function GET(request: Request) {
             { label: "30-50", count: 0 },
             { label: "50+", count: 0 },
           ],
+          marketValueBrackets: Array.from({ length: 9 }, (_, index) => ({
+            bracket: index + 1,
+            label: `Bracket ${index + 1}`,
+            rangeLabel:
+              index === 0 ? "0-12.5"
+                : index === 1 ? "12.5-17.5"
+                : index === 2 ? "17.5-22.5"
+                : index === 3 ? "22.5-30"
+                : index === 4 ? "30-37.5"
+                : index === 5 ? "37.5-45"
+                : index === 6 ? "45-55"
+                : index === 7 ? "55-70"
+                : "70+",
+            count: 0,
+          })),
           cheapestVisiblePlayer: null,
           cheapestBuyablePlayer: null,
           cheapestCandidatePoolPlayer: null,

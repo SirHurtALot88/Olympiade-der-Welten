@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState, type ChangeEvent, type DragEvent } from "react";
 
 import type {
   Discipline,
@@ -20,6 +20,7 @@ import {
   buildPlayerGeneratorCatalog,
   createDefaultPlayerGeneratorInput,
   generatePlayerDraft,
+  type PlayerGeneratorTeamContext,
   recalculatePlayerGeneratorDraft,
   tightenPlayerGeneratorDraft,
 } from "@/lib/player-generator/player-generator-service";
@@ -46,6 +47,14 @@ const randomnessOptions: Array<{ value: PlayerGeneratorRandomness; label: string
   { value: "low", label: "Low" },
   { value: "medium", label: "Medium" },
   { value: "high", label: "High" },
+];
+
+const contractModeOptions: Array<{ value: NonNullable<PlayerGeneratorInput["contractMode"]>; label: string }> = [
+  { value: "balanced", label: "Balanced" },
+  { value: "value", label: "Value Deal" },
+  { value: "front_loaded", label: "Front-loaded" },
+  { value: "back_loaded", label: "Back-loaded" },
+  { value: "prove_it", label: "Prove-it" },
 ];
 
 const archetypeOptions: Array<{ value: PlayerGeneratorArchetype; label: string }> = [
@@ -102,6 +111,13 @@ function formatValue(value: number | null | undefined, digits = 0) {
   }).format(value);
 }
 
+function formatMoneyValue(value: number | null | undefined) {
+  if (value == null || !Number.isFinite(value)) {
+    return "—";
+  }
+  return `${formatValue(value, 2)} Mio`;
+}
+
 function buildSeed() {
   return `draft-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 6)}`;
 }
@@ -122,6 +138,17 @@ function buildInitials(value: string) {
       .map((part) => part[0]?.toUpperCase() ?? "")
       .join("") || "?"
   );
+}
+
+function normalizePortraitUrl(value: string) {
+  const trimmed = value.trim();
+  if (!trimmed) {
+    return null;
+  }
+  if (trimmed.startsWith("http://") || trimmed.startsWith("https://") || trimmed.startsWith("data:image/") || trimmed.startsWith("/")) {
+    return trimmed;
+  }
+  return null;
 }
 
 function formatValidationStatus(status: PlayerGeneratorDraft["validationStatus"]) {
@@ -309,6 +336,8 @@ export default function PlayerGeneratorPanel({
   players,
   disciplines,
   drafts,
+  teamContexts,
+  activeTeamId,
   readOnly,
   readSourceLabel,
   onSaveDrafts,
@@ -316,6 +345,8 @@ export default function PlayerGeneratorPanel({
   players: Player[];
   disciplines: Discipline[];
   drafts: PlayerGeneratorDraft[];
+  teamContexts: PlayerGeneratorTeamContext[];
+  activeTeamId: string | null;
   readOnly: boolean;
   readSourceLabel: string;
   onSaveDrafts: (nextDrafts: PlayerGeneratorDraft[]) => void;
@@ -323,11 +354,14 @@ export default function PlayerGeneratorPanel({
   const catalog = useMemo(() => buildPlayerGeneratorCatalog(players), [players]);
   const [form, setForm] = useState<PlayerGeneratorInput>(() => ({
     ...createDefaultPlayerGeneratorInput(),
+    targetTeamId: activeTeamId,
     seed: buildSeed(),
   }));
   const [currentDraft, setCurrentDraft] = useState<PlayerGeneratorDraft | null>(null);
   const [selectedDraftId, setSelectedDraftId] = useState<string | null>(null);
   const [message, setMessage] = useState<string | null>(null);
+  const [portraitDraftUrl, setPortraitDraftUrl] = useState("");
+  const [portraitDragActive, setPortraitDragActive] = useState(false);
 
   const savedDrafts = useMemo(
     () =>
@@ -338,12 +372,62 @@ export default function PlayerGeneratorPanel({
       }),
     [drafts],
   );
+  const activeTeamContext = useMemo(
+    () => form.targetTeamId ? teamContexts.find((entry) => entry.team?.teamId === form.targetTeamId) ?? null : null,
+    [form.targetTeamId, teamContexts],
+  );
+  const teamOptions = useMemo(
+    () =>
+      teamContexts
+        .filter((entry): entry is PlayerGeneratorTeamContext & { team: NonNullable<PlayerGeneratorTeamContext["team"]> } => Boolean(entry.team))
+        .sort((left, right) => left.team.name.localeCompare(right.team.name, "de")),
+    [teamContexts],
+  );
+  const teamContextById = useMemo(
+    () => new Map(teamOptions.map((entry) => [entry.team.teamId, entry] as const)),
+    [teamOptions],
+  );
+
+  useEffect(() => {
+    if (!activeTeamId) {
+      return;
+    }
+    setForm((current) => current.targetTeamId ? current : { ...current, targetTeamId: activeTeamId });
+  }, [activeTeamId]);
 
   function updateForm<K extends keyof PlayerGeneratorInput>(key: K, value: PlayerGeneratorInput[K]) {
     setForm((current) => ({
       ...current,
       [key]: value,
     }));
+    setMessage(null);
+  }
+
+  function updateFormAndRecalculate<K extends keyof PlayerGeneratorInput>(key: K, value: PlayerGeneratorInput[K]) {
+    setForm((current) => ({
+      ...current,
+      [key]: value,
+    }));
+    setCurrentDraft((current) => {
+      if (!current) {
+        return current;
+      }
+      const nextInput = {
+        ...current.input,
+        [key]: value,
+      };
+      const targetTeamId = key === "targetTeamId" ? value as string | null : nextInput.targetTeamId ?? activeTeamId;
+      const nextContext = targetTeamId ? teamContextById.get(targetTeamId) ?? activeTeamContext : activeTeamContext;
+      return recalculatePlayerGeneratorDraft({
+        draft: {
+          ...current,
+          input: nextInput,
+        },
+        players,
+        disciplines,
+        teamContext: nextContext,
+      });
+    });
     setMessage(null);
   }
 
@@ -366,9 +450,11 @@ export default function PlayerGeneratorPanel({
       },
       players,
       disciplines,
+      teamContext: activeTeamContext,
     });
     setCurrentDraft(draft);
     setSelectedDraftId(null);
+    setPortraitDraftUrl(draft.generated.portraitUrl ?? "");
     setForm(draft.input);
     setMessage("Neuer Player-Draft wurde lokal erzeugt.");
   }
@@ -386,6 +472,7 @@ export default function PlayerGeneratorPanel({
       draft: currentDraft,
       players,
       disciplines,
+      teamContext: activeTeamContext,
     });
     setCurrentDraft(nextDraft);
     setForm(nextDraft.input);
@@ -395,6 +482,7 @@ export default function PlayerGeneratorPanel({
   function loadDraft(draft: PlayerGeneratorDraft) {
     setCurrentDraft(draft);
     setSelectedDraftId(draft.draftId);
+    setPortraitDraftUrl(draft.generated.portraitUrl ?? "");
     setForm(draft.input);
     setMessage(`Draft ${draft.generated.name} geladen.`);
   }
@@ -449,9 +537,74 @@ export default function PlayerGeneratorPanel({
         return current;
       }
       const nextDraft = updater(current);
-      return recalc ? recalculatePlayerGeneratorDraft({ draft: nextDraft, players, disciplines }) : nextDraft;
+      return recalc ? recalculatePlayerGeneratorDraft({ draft: nextDraft, players, disciplines, teamContext: activeTeamContext }) : nextDraft;
     });
     setMessage(null);
+  }
+
+  function updatePortrait(url: string | null) {
+    updateDraft((draft) => ({
+      ...draft,
+      generated: {
+        ...draft.generated,
+        portraitUrl: url,
+      },
+    }));
+    setPortraitDraftUrl(url ?? "");
+    setMessage(url ? "Portrait wurde im lokalen Draft verknuepft." : "Portrait wurde entfernt.");
+  }
+
+  function readPortraitFile(file: File) {
+    if (!file.type.startsWith("image/")) {
+      setMessage("Bitte nur Bilddateien fuer das Portrait verwenden.");
+      return;
+    }
+    const reader = new FileReader();
+    reader.onload = () => {
+      const result = typeof reader.result === "string" ? reader.result : null;
+      updatePortrait(result);
+    };
+    reader.onerror = () => setMessage("Bild konnte nicht gelesen werden.");
+    reader.readAsDataURL(file);
+  }
+
+  function handlePortraitFileChange(event: ChangeEvent<HTMLInputElement>) {
+    const file = event.target.files?.[0] ?? null;
+    if (file) {
+      readPortraitFile(file);
+    }
+    event.target.value = "";
+  }
+
+  function handlePortraitDrop(event: DragEvent<HTMLDivElement>) {
+    event.preventDefault();
+    setPortraitDragActive(false);
+    if (!currentDraft) {
+      setMessage("Erzeuge zuerst einen Draft, dann kann ein Portrait verknuepft werden.");
+      return;
+    }
+    const file = Array.from(event.dataTransfer.files).find((entry) => entry.type.startsWith("image/"));
+    if (file) {
+      readPortraitFile(file);
+      return;
+    }
+    const droppedUrl =
+      normalizePortraitUrl(event.dataTransfer.getData("text/uri-list")) ??
+      normalizePortraitUrl(event.dataTransfer.getData("text/plain"));
+    if (droppedUrl) {
+      updatePortrait(droppedUrl);
+      return;
+    }
+    setMessage("Kein Bild oder gueltiger Bild-Link im Drop gefunden.");
+  }
+
+  function applyPortraitUrl() {
+    const url = normalizePortraitUrl(portraitDraftUrl);
+    if (!url) {
+      setMessage("Bitte eine Bild-URL, einen lokalen Pfad oder eine Bilddatei verwenden.");
+      return;
+    }
+    updatePortrait(url);
   }
 
   async function copySeed() {
@@ -481,6 +634,12 @@ export default function PlayerGeneratorPanel({
   );
 
   const topDisciplineIds = useMemo(() => new Set(disciplineRows.slice(0, 5).map((entry) => entry.id)), [disciplineRows]);
+  const topDisciplineOutlook = useMemo(
+    () => currentDraft?.generated.disciplineOutlook?.slice(0, 6) ?? [],
+    [currentDraft],
+  );
+  const economyProjection = currentDraft?.generated.economyProjection ?? null;
+  const teamFit = currentDraft?.generated.teamFit ?? null;
 
   return (
     <section className="panel foundation-wide">
@@ -488,7 +647,7 @@ export default function PlayerGeneratorPanel({
         <div className="stack">
           <h2>Player Generator</h2>
           <p className="muted">
-            Lokale Drafts fuer neue Spieler. Disziwerte kommen nur aus offizieller Gewichtung, Marktwert und Gehalt bleiben bewusst offen.
+            Lokale Drafts fuer neue Spieler mit Teamfit, Slot-Ausblick, Economy-Schaetzung und sicherem Review vor jedem echten Commit.
           </p>
         </div>
         <div className="room-meta foundation-admin-meta">
@@ -497,8 +656,26 @@ export default function PlayerGeneratorPanel({
         </div>
       </div>
 
+      <div className="foundation-player-generator-studio-bar">
+        <article>
+          <span>Aktiver Kontext</span>
+          <strong>{activeTeamContext?.team?.name ?? "Kein Zielteam"}</strong>
+          <small>{activeTeamContext?.generalManager?.title ?? "GM offen"} · Roster {activeTeamContext?.rosterCount ?? "—"}</small>
+        </article>
+        <article>
+          <span>Build-Fokus</span>
+          <strong>{roleOptions.find((option) => option.value === form.roleIntent)?.label ?? form.roleIntent}</strong>
+          <small>{form.strengthTier} · {form.randomness} Varianz</small>
+        </article>
+        <article>
+          <span>Economy</span>
+          <strong>{contractModeOptions.find((option) => option.value === (form.contractMode ?? "balanced"))?.label ?? "Balanced"}</strong>
+          <small>Ø Gehalt Team {formatMoneyValue(activeTeamContext?.averageSalary ?? null)}</small>
+        </article>
+      </div>
+
       <div className="foundation-player-generator-layout">
-        <div className="foundation-player-generator-form">
+        <div className="foundation-player-generator-form foundation-player-generator-builder-panel">
           <div className="foundation-player-generator-grid">
             <label className="filter-field">
               <span>Name optional</span>
@@ -509,6 +686,22 @@ export default function PlayerGeneratorPanel({
                 placeholder="Wird sonst automatisch erzeugt"
                 onChange={(event) => updateForm("name", event.target.value || null)}
               />
+            </label>
+
+            <label className="filter-field">
+              <span>Zielteam / Fit-Kontext</span>
+              <select
+                className="input"
+                value={form.targetTeamId ?? ""}
+                onChange={(event) => updateFormAndRecalculate("targetTeamId", event.target.value || null)}
+              >
+                <option value="">Kein Zielteam</option>
+                {teamOptions.map((entry) => (
+                  <option key={entry.team.teamId} value={entry.team.teamId}>
+                    {entry.team.shortCode} · {entry.team.name}
+                  </option>
+                ))}
+              </select>
             </label>
 
             <label className="filter-field">
@@ -549,6 +742,23 @@ export default function PlayerGeneratorPanel({
                 onChange={(event) => updateForm("randomness", event.target.value as PlayerGeneratorRandomness)}
               >
                 {randomnessOptions.map((option) => (
+                  <option key={option.value} value={option.value}>
+                    {option.label}
+                  </option>
+                ))}
+              </select>
+            </label>
+
+            <label className="filter-field">
+              <span>Vertragsarchitektur</span>
+              <select
+                className="input"
+                value={form.contractMode ?? "balanced"}
+                onChange={(event) =>
+                  updateFormAndRecalculate("contractMode", event.target.value as NonNullable<PlayerGeneratorInput["contractMode"]>)
+                }
+              >
+                {contractModeOptions.map((option) => (
                   <option key={option.value} value={option.value}>
                     {option.label}
                   </option>
@@ -679,39 +889,142 @@ export default function PlayerGeneratorPanel({
         <div className="foundation-player-generator-preview">
           {currentDraft ? (
             <>
-              <div className="foundation-player-generator-callout">
-                <div className="panel-header">
-                  <div className="stack">
-                    <h3>Player Draft Preview</h3>
-                    <p className="muted">
-                      Diese Werte sind ein lokaler Draft. Draft speichern speichert nur den Entwurf im lokalen Save.
-                    </p>
+              <div className="foundation-player-generator-builder-hero">
+                <div className="foundation-player-generator-card-hero">
+                  <div
+                    className={`foundation-player-generator-image-drop${portraitDragActive ? " is-dragging" : ""}${currentDraft.generated.portraitUrl ? " has-image" : ""}`}
+                    onDragEnter={(event) => {
+                      event.preventDefault();
+                      setPortraitDragActive(true);
+                    }}
+                    onDragOver={(event) => {
+                      event.preventDefault();
+                      setPortraitDragActive(true);
+                    }}
+                    onDragLeave={() => setPortraitDragActive(false)}
+                    onDrop={handlePortraitDrop}
+                  >
+                    {currentDraft.generated.portraitUrl ? (
+                      <img src={currentDraft.generated.portraitUrl} alt={currentDraft.generated.name} />
+                    ) : (
+                      <div className="foundation-player-generator-portrait">{buildInitials(currentDraft.generated.name)}</div>
+                    )}
+                    <div className="foundation-player-generator-image-drop-copy">
+                      <strong>{currentDraft.generated.portraitUrl ? "Portrait verknuepft" : "Bild hier reinziehen"}</strong>
+                      <span>Bilddatei, Bild-URL oder lokaler Pfad</span>
+                    </div>
+                  </div>
+                  <div className="foundation-player-generator-card-copy">
+                    <div className="foundation-player-generator-card-title">
+                      <span className={`pill${currentDraft.validationStatus === "ready_for_review" ? " is-success" : currentDraft.validationStatus === "blocked_archetype_conflict" ? " is-danger" : " is-warning"}`}>
+                        {formatValidationStatus(currentDraft.validationStatus)}
+                      </span>
+                      <strong>{currentDraft.generated.name}</strong>
+                      <small>
+                        {currentDraft.generated.className} · {currentDraft.generated.race} · {currentDraft.generated.projectedRole ?? "draft"}
+                      </small>
+                    </div>
+                    <div className="foundation-player-generator-portrait-controls">
+                      <input
+                        className="input"
+                        type="text"
+                        value={portraitDraftUrl}
+                        placeholder="Portrait-URL oder /media/pfad einfuegen"
+                        onChange={(event) => setPortraitDraftUrl(event.target.value)}
+                      />
+                      <button className="secondary-button inline-button" type="button" onClick={applyPortraitUrl}>
+                        Link setzen
+                      </button>
+                      <label className="secondary-button inline-button foundation-player-generator-file-button">
+                        Datei
+                        <input accept="image/*" type="file" onChange={handlePortraitFileChange} />
+                      </label>
+                      <button className="secondary-button inline-button" type="button" onClick={() => updatePortrait(null)} disabled={!currentDraft.generated.portraitUrl}>
+                        Entfernen
+                      </button>
+                    </div>
+                    <div className="foundation-player-generator-card-meta">
+                      <span>Ziel {teamFit?.teamName ?? activeTeamContext?.team?.name ?? "Kein Zielteam"}</span>
+                      <span>GM {activeTeamContext?.generalManager?.title ?? "—"}</span>
+                      <span>Seed {currentDraft.input.seed ?? "—"}</span>
+                    </div>
                   </div>
                 </div>
-                <div className="room-meta foundation-admin-meta">
-                  <span className="pill">Draft: lokal</span>
-                  <span className="pill">DB: nicht gespeichert</span>
-                  <span className="pill">Free Agent: nein</span>
-                  <span className="pill">Prisma: read-only</span>
+
+                <div className="foundation-player-generator-score-strip">
+                  <article>
+                    <span>OVR</span>
+                    <strong>{formatValue(currentDraft.generated.ovr, 0)}</strong>
+                  </article>
+                  <article>
+                    <span>PPs</span>
+                    <strong>{formatValue(currentDraft.generated.pps, 1)}</strong>
+                  </article>
+                  <article>
+                    <span>Teamfit</span>
+                    <strong>{formatValue(teamFit?.score, 0)}</strong>
+                  </article>
+                  <article>
+                    <span>Captain</span>
+                    <strong>{formatValue(currentDraft.generated.captaincyScore, 0)}</strong>
+                  </article>
+                  <article>
+                    <span>MW</span>
+                    <strong>{formatMoneyValue(economyProjection?.marketValueEstimate ?? currentDraft.generated.marketValue)}</strong>
+                  </article>
+                  <article>
+                    <span>Gehalt</span>
+                    <strong>{formatMoneyValue(economyProjection?.salaryEstimate ?? currentDraft.generated.salary)}</strong>
+                  </article>
                 </div>
-                <p className="muted" style={{ marginTop: 10 }}>
-                  Als Free Agent uebernehmen bleibt deaktiviert, bis ein sicherer Insert-Pfad gebaut ist.
-                </p>
-                <p className="muted" style={{ marginTop: 8 }}>
-                  Bestehende Spieler nutzen bis zur fertigen MW-/Gehalts-Umstellung weiter die importierten Marktwerte und Gehaelter.
-                </p>
               </div>
 
-              <div className="foundation-player-generator-hero foundation-player-generator-hero-compact">
-                <div className="foundation-player-generator-portrait">{buildInitials(currentDraft.generated.name)}</div>
-                <div className="stack">
-                  <span className={`pill${currentDraft.validationStatus === "ready_for_review" ? " is-success" : currentDraft.validationStatus === "blocked_archetype_conflict" ? " is-danger" : " is-warning"}`}>
-                    {formatValidationStatus(currentDraft.validationStatus)}
-                  </span>
-                  <strong>{currentDraft.generated.name}</strong>
-                  <span className="muted">
-                    {currentDraft.generated.className} · {currentDraft.generated.race}
-                  </span>
+              <div className="foundation-player-generator-decision-grid">
+                <div className="foundation-player-generator-callout">
+                  <strong>Teamfit</strong>
+                  <div className="foundation-player-generator-mini-metrics">
+                    <span>Achse {formatValue(teamFit?.axisFit, 0)}</span>
+                    <span>GM {formatValue(teamFit?.gmFit, 0)}</span>
+                    <span>Traits {formatValue(teamFit?.traitFit, 0)}</span>
+                    <span>Kader {teamFit?.rosterNeed ?? "unknown"}</span>
+                  </div>
+                  <ul className="foundation-inline-list">
+                    {(teamFit?.reasons ?? ["Kein Teamkontext aktiv."]).slice(0, 3).map((reason) => (
+                      <li key={reason}>{reason}</li>
+                    ))}
+                  </ul>
+                </div>
+                <div className="foundation-player-generator-callout">
+                  <strong>Vertrag & Value</strong>
+                  <div className="foundation-player-generator-mini-metrics">
+                    <span>{economyProjection?.contractMode ?? "balanced"}</span>
+                    <span>LZ {economyProjection?.recommendedContractLength ?? "—"}</span>
+                    <span>Ratio {formatValue(economyProjection?.valueRatio, 2)}</span>
+                    <span>Druck {economyProjection?.salaryPressure ?? "unknown"}</span>
+                  </div>
+                  {economyProjection?.salarySchedule.length ? (
+                    <div className="foundation-player-generator-contract-bars">
+                      {economyProjection.salarySchedule.map((entry) => (
+                        <span key={entry.yearIndex}>
+                          {entry.label}: {formatMoneyValue(entry.salary)}
+                        </span>
+                      ))}
+                    </div>
+                  ) : (
+                    <p className="muted">Noch keine Gehaltsstaffel berechenbar.</p>
+                  )}
+                </div>
+                <div className="foundation-player-generator-callout">
+                  <strong>Slot-/Diszi-Ausblick</strong>
+                  <div className="foundation-player-generator-slot-list">
+                    {topDisciplineOutlook.slice(0, 4).map((entry) => (
+                      <article key={entry.disciplineId}>
+                        <span>{entry.disciplineName}</span>
+                        <strong>{formatValue(entry.rating, 0)}</strong>
+                        <small>{entry.bestSlotLabel ?? "Slot offen"} · {entry.keyAttributes.map((attribute) => attributeLabelMap[attribute]).join(" / ") || "—"}</small>
+                      </article>
+                    ))}
+                  </div>
                 </div>
               </div>
 
@@ -741,8 +1054,9 @@ export default function PlayerGeneratorPanel({
                   <ul className="foundation-inline-list">
                     <li>OVR ist eine Draft-Vorschau, kein finaler Pool-Wert.</li>
                     <li>PPs sind Draft-Vorschauwerte und keine Season-PPs.</li>
+                    <li>MW und Gehalt sind Generator-Projections fuer Review und Balancing.</li>
                     <li>Draft speichern legt nur einen lokalen Entwurf ab.</li>
-                    <li>Bestehende Spieler nutzen weiter importierte MW-/Gehaltswerte.</li>
+                    <li>Free-Agent-Commit bleibt deaktiviert, bis der sichere Insert-Pfad gebaut ist.</li>
                   </ul>
                 </div>
 
@@ -794,6 +1108,10 @@ export default function PlayerGeneratorPanel({
                     <strong>{currentDraft.generated.name}</strong>
                   </article>
                   <article className="foundation-player-generator-final-item">
+                    <span>Portrait</span>
+                    <strong>{currentDraft.generated.portraitUrl ? "verknuepft" : "fehlt"}</strong>
+                  </article>
+                  <article className="foundation-player-generator-final-item">
                     <span>Race</span>
                     <strong>{currentDraft.generated.race}</strong>
                   </article>
@@ -812,6 +1130,22 @@ export default function PlayerGeneratorPanel({
                   <article className="foundation-player-generator-final-item">
                     <span>Traits -</span>
                     <strong>{currentDraft.generated.traitsNegative.join(", ") || "—"}</strong>
+                  </article>
+                  <article className="foundation-player-generator-final-item">
+                    <span>Projected Role</span>
+                    <strong>{currentDraft.generated.projectedRole ?? "—"}</strong>
+                  </article>
+                  <article className="foundation-player-generator-final-item">
+                    <span>Teamfit</span>
+                    <strong>{teamFit?.teamName ?? "—"} · {formatValue(teamFit?.score, 0)}</strong>
+                  </article>
+                  <article className="foundation-player-generator-final-item">
+                    <span>Captain Score</span>
+                    <strong>{formatValue(currentDraft.generated.captaincyScore, 0)}</strong>
+                  </article>
+                  <article className="foundation-player-generator-final-item">
+                    <span>MW / Gehalt</span>
+                    <strong>{formatMoneyValue(economyProjection?.marketValueEstimate)} / {formatMoneyValue(economyProjection?.salaryEstimate)}</strong>
                   </article>
                   <article className="foundation-player-generator-final-item">
                     <span>Alignment</span>
@@ -1078,26 +1412,39 @@ export default function PlayerGeneratorPanel({
                   <strong>{formatValue(currentDraft.generated.pps, 0)}</strong>
                 </article>
                 <article className="metric-card">
-                  <span>MW</span>
-                  <strong>{formatValue(currentDraft.generated.marketValue, 2)}</strong>
+                  <span>MW Projection</span>
+                  <strong>{formatMoneyValue(economyProjection?.marketValueEstimate ?? currentDraft.generated.marketValue)}</strong>
                   <small className="muted">{currentDraft.generated.marketValueStatus}</small>
                 </article>
                 <article className="metric-card">
-                  <span>Gehalt</span>
-                  <strong>{formatValue(currentDraft.generated.salary, 2)}</strong>
+                  <span>Gehalt Projection</span>
+                  <strong>{formatMoneyValue(economyProjection?.salaryEstimate ?? currentDraft.generated.salary)}</strong>
                   <small className="muted">{currentDraft.generated.salaryStatus}</small>
                 </article>
               </div>
 
               <div className="foundation-player-generator-section-head">
                 <h3>Disziwerte</h3>
-                <p className="muted">Draft-Disziwerte aus offizieller Gewichtungsmatrix. Top 5 sind hervorgehoben, ohne Season-Punkte zu behaupten.</p>
+                <p className="muted">Draft-Disziwerte aus offizieller Gewichtungsmatrix plus bester Playbook-Slot aus den Slotrollen.</p>
               </div>
               <div className="foundation-player-generator-discipline-grid">
-                {disciplineRows.map((row) => (
-                  <article key={row.id} className={`metric-card${topDisciplineIds.has(row.id) ? " is-highlighted" : ""}`}>
-                    <span>{row.name}</span>
-                    <strong>{formatValue(row.value, 0)}</strong>
+                {(topDisciplineOutlook.length ? topDisciplineOutlook : disciplineRows.map((row) => ({
+                  disciplineId: row.id,
+                  disciplineName: row.name,
+                  rating: row.value ?? 0,
+                  bestSlotLabel: null,
+                  bestSlotScore: null,
+                  keyAttributes: [],
+                }))).map((row) => (
+                  <article key={row.disciplineId} className={`metric-card${topDisciplineIds.has(row.disciplineId) ? " is-highlighted" : ""}`}>
+                    <span>{row.disciplineName}</span>
+                    <strong>{formatValue(row.rating, 0)}</strong>
+                    <small className="muted">
+                      {row.bestSlotLabel ?? "Slot offen"} · Slot {formatValue(row.bestSlotScore, 0)}
+                    </small>
+                    <small className="muted">
+                      {row.keyAttributes.map((attribute) => attributeLabelMap[attribute]).join(" / ") || "—"}
+                    </small>
                   </article>
                 ))}
               </div>

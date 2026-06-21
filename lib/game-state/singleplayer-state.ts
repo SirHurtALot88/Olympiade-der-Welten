@@ -5,6 +5,7 @@ import {
   loadSeedData,
 } from "@/lib/data/dataAdapter";
 import { withNormalizedTeamIdentityOverrides } from "@/lib/foundation/team-identity-settings";
+import { withNormalizedTeamGeneralManagers } from "@/lib/foundation/team-general-managers";
 import { withNormalizedTeamControlSettings } from "@/lib/foundation/team-control-settings";
 import { withNormalizedTeamStrategyProfiles } from "@/lib/foundation/team-strategy-profiles";
 import type { GameLogEntry, GameState, SaveGameState } from "@/lib/data/olyDataTypes";
@@ -20,7 +21,11 @@ function createLog(message: string, type: GameLogEntry["type"]): GameLogEntry {
 }
 
 function withNormalizedLocalTeamSettings(gameState: GameState): GameState {
-  return withNormalizedTeamStrategyProfiles(withNormalizedTeamControlSettings(withNormalizedTeamIdentityOverrides(gameState)));
+  return withNormalizedTeamStrategyProfiles(
+    withNormalizedTeamControlSettings(
+      withNormalizedTeamGeneralManagers(withNormalizedTeamIdentityOverrides(gameState)),
+    ),
+  );
 }
 
 export function createSingleplayerSaveGame(): SaveGameState {

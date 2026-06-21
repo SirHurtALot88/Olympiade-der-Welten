@@ -1,3 +1,5 @@
+export const dynamic = "force-dynamic";
+
 import { NextResponse } from "next/server";
 
 import { runWholeSeasonDryRun } from "@/lib/season/whole-season-dryrun-service";

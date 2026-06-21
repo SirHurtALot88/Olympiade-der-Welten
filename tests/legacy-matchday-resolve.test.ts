@@ -355,9 +355,9 @@ describe("legacy matchday resolve preview", () => {
     expect(betaTeam?.rank).toBe(2);
     expect(alphaTeam?.teamPoints).toBe(6.6);
     expect(betaTeam?.teamPoints).toBe(6.2);
-    expect(alphaPlayer?.mutatorBonus).toBe(0);
-    expect(alphaPlayer?.mutatorPpsBonus).toBe(0.6);
-    expect(alphaPlayer?.finalPlayerScore).toBe(20);
+    expect(alphaPlayer?.mutatorBonus).toBe(12);
+    expect(alphaPlayer?.mutatorPpsBonus).toBe(0.3);
+    expect(alphaPlayer?.finalPlayerScore).toBe(32);
     expect(alphaEntryPoints).toBe(alphaTeam?.teamPoints);
   });
 

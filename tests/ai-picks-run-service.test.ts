@@ -46,6 +46,21 @@ vi.mock("@/lib/market/transfermarkt-local-service", () => ({
   executeLocalTransfermarktBuy,
   listLocalTransferHistory,
   listLocalTransfermarktFreeAgents,
+  createLocalTransfermarktRunContext: ({ save }: { save: typeof persistenceState.save }) => ({
+    save,
+    persistence: {
+      saveSingleplayerState: (_saveId: string, gameState: GameState) => {
+        persistenceState.save = { ...persistenceState.save, gameState };
+        return persistenceState.save;
+      },
+    },
+    deferredWrites: 0,
+  }),
+  flushLocalTransfermarktRunContext: (context: { save: typeof persistenceState.save; deferredWrites: number }) => {
+    persistenceState.save = context.save;
+    context.deferredWrites = 0;
+    return persistenceState.save;
+  },
 }));
 
 vi.mock("@/lib/persistence/persistence-service", () => ({
@@ -554,17 +569,18 @@ describe("ai picks run service", () => {
       team: { id: "team", name: "Team", shortCode: "TEAM" },
     }));
 
-    executeLocalTransfermarktBuy.mockImplementation(({ teamId, playerId }: { teamId: string; playerId: string }) => {
+    executeLocalTransfermarktBuy.mockImplementation(({ teamId, playerId, localRunContext }: { teamId: string; playerId: string; localRunContext?: { save: typeof persistenceState.save; deferredWrites: number } }) => {
       const purchasePrice = playerId === "fa-mage" ? 30 : 18;
       const salary = playerId === "fa-mage" ? 5 : 3;
-      const team = persistenceState.save.gameState.teams.find((entry) => entry.teamId === teamId)!;
-      persistenceState.save.gameState = {
-        ...persistenceState.save.gameState,
-        teams: persistenceState.save.gameState.teams.map((entry) =>
+      const sourceSave = localRunContext?.save ?? persistenceState.save;
+      const team = sourceSave.gameState.teams.find((entry) => entry.teamId === teamId)!;
+      const nextGameState = {
+        ...sourceSave.gameState,
+        teams: sourceSave.gameState.teams.map((entry) =>
           entry.teamId === teamId ? { ...entry, cash: entry.cash - purchasePrice } : entry,
         ),
         rosters: [
-          ...persistenceState.save.gameState.rosters,
+          ...sourceSave.gameState.rosters,
           {
             id: `roster-${playerId}`,
             teamId,
@@ -574,7 +590,7 @@ describe("ai picks run service", () => {
             upkeep: salary,
             purchasePrice,
             currentValue: purchasePrice,
-            roleTag: "prospect",
+            roleTag: "prospect" as const,
             joinedSeasonId: "season-1",
           },
         ],
@@ -587,7 +603,7 @@ describe("ai picks run service", () => {
             phase: "season_setup",
             source: "ai_roster_fill",
             seasonLabel: "Season 1",
-            transferType: "buy",
+            transferType: "buy" as const,
             fromTeamId: null,
             toTeamId: teamId,
             fee: purchasePrice,
@@ -596,9 +612,15 @@ describe("ai picks run service", () => {
             remainingContractLength: 1,
             happenedAt: new Date().toISOString(),
           },
-          ...persistenceState.save.gameState.transferHistory,
+          ...sourceSave.gameState.transferHistory,
         ],
       };
+      if (localRunContext) {
+        localRunContext.save = { ...localRunContext.save, gameState: nextGameState };
+        localRunContext.deferredWrites += 1;
+      } else {
+        persistenceState.save.gameState = nextGameState;
+      }
 
       return {
         canBuy: true,

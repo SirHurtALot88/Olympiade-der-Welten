@@ -1,7 +1,6 @@
 import { getImportedPlayerDisplayMarketValue } from "@/lib/data/player-economy-display";
 import type { GameState, Player, PlayerDisciplinePerformanceRecord } from "@/lib/data/olyDataTypes";
 import { buildSeasonPointsLedger, type SeasonPlayerPointsSummary, type SeasonPointsLedger } from "@/lib/foundation/season-points-ledger";
-import { loadPlayerFormulaSources } from "@/lib/player-formulas/formula-source-loader";
 
 export type PlayerRatingWarning =
   | "ovr_raw_source_missing"
@@ -46,12 +45,8 @@ function isFiniteNumber(value: number | null | undefined): value is number {
   return typeof value === "number" && Number.isFinite(value);
 }
 
-function mapRankToMvsPoints(rank: number) {
-  return playerFormulaSources.rankToDisciplineMarketValue?.find((entry) => entry.rank === rank)?.disciplineMarketValue ?? null;
-}
-
-const playerFormulaSources = loadPlayerFormulaSources();
 const MARKET_VALUE_BRACKET_STARTS = [0, 12.5, 17.5, 22.5, 30, 37.5, 45, 55, 70];
+const RETOOL_MVS_CLUTCH_DISCIPLINES = new Set(["showcase", "eiskunstlauf", "football", "basketball", "battlefield"]);
 
 export function getPlayerRawOvrScore(player: Pick<Player, "rating">) {
   return isFiniteNumber(player.rating) ? player.rating : null;
@@ -205,6 +200,111 @@ function buildPointsByArea(summary: SeasonPlayerPointsSummary | null | undefined
   };
 }
 
+function mapRetoolMvsRankToPoints(rank: number | null | undefined) {
+  const safeRank = Number(rank);
+  if (!Number.isFinite(safeRank)) return 0;
+  if (safeRank === 1) return 10;
+  if (safeRank === 2) return 8;
+  if (safeRank === 3) return 6;
+  if (safeRank >= 4 && safeRank <= 6) return 5;
+  if (safeRank >= 7 && safeRank <= 10) return 4;
+  if (safeRank >= 11 && safeRank <= 15) return 3;
+  if (safeRank >= 16 && safeRank <= 20) return 2;
+  if (safeRank >= 21 && safeRank <= 25) return 1;
+  if (safeRank >= 26 && safeRank <= 30) return 0.5;
+  return 0;
+}
+
+function mapRetoolMvsVersatilityScore(appearances: number) {
+  if (appearances >= 9) return 5;
+  if (appearances >= 7) return 3;
+  if (appearances >= 5) return 1;
+  return 0;
+}
+
+function buildRetoolMvsByPlayerId(input: {
+  players: Player[];
+  seasonPointsLedger?: SeasonPointsLedger | null;
+  mvsPerformances: PlayerDisciplinePerformanceRecord[];
+}) {
+  const playerIds = new Set(input.players.map((player) => player.id));
+  const pointsByPlayerDiscipline = new Map<string, Map<string, number>>();
+  const entries =
+    input.seasonPointsLedger?.pointEntries.map((entry) => ({
+      playerId: entry.playerId,
+      disciplineId: entry.disciplineId,
+      points: entry.points,
+    })) ??
+    input.mvsPerformances.map((entry) => ({
+      playerId: entry.playerId,
+      disciplineId: entry.disciplineId,
+      points: entry.scoreContribution,
+    }));
+
+  for (const entry of entries) {
+    if (!playerIds.has(entry.playerId) || !Number.isFinite(entry.points) || entry.points <= 0) {
+      continue;
+    }
+    const current = pointsByPlayerDiscipline.get(entry.playerId) ?? new Map<string, number>();
+    current.set(entry.disciplineId, roundValue((current.get(entry.disciplineId) ?? 0) + entry.points, 4));
+    pointsByPlayerDiscipline.set(entry.playerId, current);
+  }
+
+  const disciplineIds = Array.from(new Set(entries.map((entry) => entry.disciplineId).filter(Boolean)));
+  const rankByDisciplinePlayer = new Map<string, Map<string, number>>();
+
+  for (const disciplineId of disciplineIds) {
+    const rows = Array.from(pointsByPlayerDiscipline.entries())
+      .map(([playerId, byDiscipline]) => ({ playerId, value: byDiscipline.get(disciplineId) ?? 0 }))
+      .filter((row) => row.value > 0)
+      .sort((left, right) => {
+        if (right.value !== left.value) return right.value - left.value;
+        return left.playerId.localeCompare(right.playerId, "de");
+      });
+
+    const ranks = new Map<string, number>();
+    let previousValue: number | null = null;
+    let previousRank = 0;
+    rows.forEach((row, index) => {
+      if (previousValue != null && row.value === previousValue) {
+        ranks.set(row.playerId, previousRank);
+        return;
+      }
+      const rank = index + 1;
+      previousValue = row.value;
+      previousRank = rank;
+      ranks.set(row.playerId, rank);
+    });
+    rankByDisciplinePlayer.set(disciplineId, ranks);
+  }
+
+  const mvsByPlayerId = new Map<string, number>();
+  for (const player of input.players) {
+    const playerDisciplinePoints = pointsByPlayerDiscipline.get(player.id) ?? new Map<string, number>();
+    let disciplineScore = 0;
+    let clutchScore = 0;
+    let appearanceCount = 0;
+
+    for (const disciplineId of disciplineIds) {
+      const playerPoints = playerDisciplinePoints.get(disciplineId) ?? 0;
+      if (playerPoints <= 0) continue;
+      appearanceCount += 1;
+      const rank = rankByDisciplinePlayer.get(disciplineId)?.get(player.id) ?? null;
+      const rankPoints = mapRetoolMvsRankToPoints(rank);
+      disciplineScore += rankPoints;
+      if (RETOOL_MVS_CLUTCH_DISCIPLINES.has(disciplineId)) {
+        clutchScore += rankPoints * 0.3;
+      }
+    }
+
+    const versatilityScore = mapRetoolMvsVersatilityScore(appearanceCount);
+    const appearanceScore = appearanceCount * 0.5;
+    mvsByPlayerId.set(player.id, roundValue(disciplineScore + clutchScore + versatilityScore + appearanceScore, 2));
+  }
+
+  return mvsByPlayerId;
+}
+
 export function buildPlayerRatingContractRows(input: {
   players: Player[];
   seasonPointsLedger?: SeasonPointsLedger | null;
@@ -235,21 +335,17 @@ export function buildPlayerRatingContractRows(input: {
       ? input.mvsPerformances.filter(
           (entry) =>
             entry.playerId != null &&
-            typeof entry.rankInDiscipline === "number" &&
-            Number.isFinite(entry.rankInDiscipline) &&
-            entry.rankInDiscipline > 0,
+            entry.disciplineId != null &&
+            Number.isFinite(entry.scoreContribution),
         )
       : null;
   const mvsByPlayerId =
-    performanceRows != null && playerFormulaSources.rankToDisciplineMarketValue?.length
-      ? performanceRows.reduce((map, entry) => {
-          const points = mapRankToMvsPoints(entry.rankInDiscipline);
-          if (points == null) {
-            return map;
-          }
-          map.set(entry.playerId, roundValue((map.get(entry.playerId) ?? 0) + points, 2));
-          return map;
-        }, new Map<string, number>())
+    performanceRows != null
+      ? buildRetoolMvsByPlayerId({
+          players,
+          seasonPointsLedger,
+          mvsPerformances: performanceRows,
+        })
       : new Map<string, number>();
 
   const sourceRows = rawRows.map((row) => {
@@ -443,13 +539,13 @@ export function buildPlayerRatingContractRows(input: {
   }));
 }
 
-export function buildPlayerRatingContractMap(gameState: GameState) {
-  const seasonPointsLedger = buildSeasonPointsLedger(gameState);
+export function buildPlayerRatingContractMap(gameState: GameState, seasonPointsLedger?: SeasonPointsLedger) {
+  const pointsLedger = seasonPointsLedger ?? buildSeasonPointsLedger(gameState);
   const activePlayerIds = Array.from(new Set((gameState.rosters ?? []).map((entry) => entry.playerId).filter(Boolean)));
   return new Map(
     buildPlayerRatingContractRows({
       players: gameState.players,
-      seasonPointsLedger,
+      seasonPointsLedger: pointsLedger,
       mvsPerformances: gameState.seasonState.playerDisciplinePerformances ?? [],
       normalizationPoolPlayerIds: activePlayerIds,
       rankPoolPlayerIds: activePlayerIds,

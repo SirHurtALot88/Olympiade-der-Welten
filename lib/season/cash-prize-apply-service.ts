@@ -253,8 +253,9 @@ function writeLocalCashPrizeApply(input: {
 }) {
   const save = resolveLocalSave(input.persistence, input.saveId);
   const now = new Date().toISOString();
+  const previewByTeamId = new Map(input.preview.items.map((item) => [item.teamId, item] as const));
   const nextTeams = save.gameState.teams.map((team) => {
-    const row = input.preview.items.find((item) => item.teamId === team.teamId) ?? null;
+    const row = previewByTeamId.get(team.teamId) ?? null;
     if (!row || row.projectedCash == null) {
       return team;
     }
@@ -263,6 +264,37 @@ function writeLocalCashPrizeApply(input: {
       cash: row.projectedCash,
     };
   });
+  const nextStandings = Object.fromEntries(
+    Object.entries(save.gameState.seasonState.standings ?? {}).map(([teamId, standing]) => {
+      const row = previewByTeamId.get(teamId) ?? null;
+      if (!row) return [teamId, standing] as const;
+      const sponsorBasis = row.basisCash;
+      const sponsorRank = row.rankChangePrize.bonusMalus;
+      const sponsorSeason =
+        row.prizeMoney != null && sponsorBasis != null ? Number((row.prizeMoney - sponsorBasis).toFixed(2)) : null;
+      const sponsorTotal =
+        row.prizeMoney != null ? Number((row.prizeMoney + (sponsorRank ?? 0)).toFixed(2)) : null;
+      const cashFc =
+        row.currentCash != null && row.salaryTotal != null ? Number((row.currentCash - row.salaryTotal).toFixed(2)) : null;
+      const guv =
+        sponsorTotal != null && row.salaryTotal != null ? Number((sponsorTotal - row.salaryTotal).toFixed(2)) : null;
+      return [
+        teamId,
+        {
+          ...standing,
+          cashFc,
+          startplatz: row.rankChangePrize.startRank,
+          rankDiff: row.rankChangePrize.rankDelta,
+          sponsorBasis,
+          sponsorRank,
+          sponsorSeason,
+          sponsorTotal,
+          guv,
+          cashTotal: row.projectedCash,
+        },
+      ] as const;
+    }),
+  );
 
   const totalPrizeMoney = input.preview.items.reduce((sum, item) => sum + (item.prizeMoney ?? 0), 0);
   const auditLog: CashPrizeApplyLogRecord = {
@@ -289,6 +321,7 @@ function writeLocalCashPrizeApply(input: {
     teams: nextTeams,
     seasonState: {
       ...save.gameState.seasonState,
+      standings: nextStandings,
       cashPrizeApplyLogs: [...(save.gameState.seasonState.cashPrizeApplyLogs ?? []), auditLog],
     },
   };

@@ -34,8 +34,8 @@ describe("playerAttributeSheet", () => {
   });
 
   it("normalizes the known Riley alias", () => {
-    expect(ATTRIBUTE_SHEET_ALIASES["Riley Le Rogue"]).toBe("Riley Le Rouge");
-    expect(normalizeAttributeSheetName("Riley Le Rogue")).toBe("Riley Le Rouge");
+    expect(ATTRIBUTE_SHEET_ALIASES["Riley Le Rouge"]).toBe("Riley Le Rogue");
+    expect(normalizeAttributeSheetName("Riley Le Rouge")).toBe("Riley Le Rogue");
   });
 
   it("reports players still missing in the attribute sheet", () => {
@@ -44,6 +44,7 @@ describe("playerAttributeSheet", () => {
       [
         {
           name: "Tyrael",
+          height: null,
           power: 64,
           health: 68,
           stamina: 71,

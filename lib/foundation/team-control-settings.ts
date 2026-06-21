@@ -107,12 +107,80 @@ export function getTeamControlSettings(gameState: GameState, teamId: string) {
   return team ? createDefaultTeamControlSettings(team) : null;
 }
 
+function isLocalUserManualSettings(settings: TeamControlSettings | null | undefined) {
+  if (!settings || settings.controlMode !== "manual") {
+    return false;
+  }
+
+  return normalizeOwnerIdForMode(settings.controlMode, settings.ownerId) === DEFAULT_ACTIVE_OWNER_ID || settings.ownerSlot === "user";
+}
+
 export function withNormalizedTeamControlSettings(gameState: GameState): GameState {
+  const initialSettingsMap = buildTeamControlSettingsMap(gameState.teams, gameState.seasonState.teamControlSettings);
+  const selectedTeamId =
+    gameState.seasonState.newGameFlow?.selectedTeamId ??
+    gameState.teams.find((team) => isLocalUserManualSettings(initialSettingsMap[team.teamId]))?.teamId ??
+    gameState.teams.find((team) => team.humanControlled)?.teamId ??
+    null;
+
+  if (selectedTeamId && initialSettingsMap[selectedTeamId]) {
+    const selectedTeam = gameState.teams.find((team) => team.teamId === selectedTeamId);
+    const current = initialSettingsMap[selectedTeamId];
+    initialSettingsMap[selectedTeamId] = {
+      ...current,
+      teamId: selectedTeamId,
+      controlMode: "manual",
+      ownerId: DEFAULT_ACTIVE_OWNER_ID,
+      ownerSlot: "user",
+      displayLabel: current.displayLabel ?? selectedTeam?.shortCode ?? selectedTeamId,
+      aiLineupPreviewEnabled: false,
+      aiLineupApplyEnabled: false,
+      aiLineupAutoApplyEnabled: false,
+      aiTransferPreviewEnabled: false,
+      aiTransferAutoApplyEnabled: false,
+      aiSellPreviewEnabled: false,
+      aiSellAutoApplyEnabled: false,
+    };
+  }
+
+  const teams = gameState.teams.map((team) => ({
+    ...team,
+    humanControlled: initialSettingsMap[team.teamId]?.controlMode === "manual",
+  }));
+  const settingsMap = buildTeamControlSettingsMap(teams, initialSettingsMap);
+
+  if (selectedTeamId && settingsMap[selectedTeamId]) {
+    const selectedTeam = teams.find((team) => team.teamId === selectedTeamId);
+    const current = settingsMap[selectedTeamId];
+    settingsMap[selectedTeamId] = {
+      ...current,
+      teamId: selectedTeamId,
+      controlMode: "manual",
+      ownerId: DEFAULT_ACTIVE_OWNER_ID,
+      ownerSlot: "user",
+      displayLabel: current.displayLabel ?? selectedTeam?.shortCode ?? selectedTeamId,
+      aiLineupPreviewEnabled: false,
+      aiLineupApplyEnabled: false,
+      aiLineupAutoApplyEnabled: false,
+      aiTransferPreviewEnabled: false,
+      aiTransferAutoApplyEnabled: false,
+      aiSellPreviewEnabled: false,
+      aiSellAutoApplyEnabled: false,
+    };
+  }
+
   return {
     ...gameState,
+    teams,
     seasonState: {
       ...gameState.seasonState,
-      teamControlSettings: buildTeamControlSettingsMap(gameState.teams, gameState.seasonState.teamControlSettings),
+      newGameFlow: gameState.seasonState.newGameFlow
+        ? {
+            ...gameState.seasonState.newGameFlow,
+            selectedTeamId,
+          }
+        : gameState.seasonState.newGameFlow,
+      teamControlSettings: settingsMap,
     },
   };
 }
@@ -154,6 +222,29 @@ export function getTeamOwner(settings: TeamControlSettings | null | undefined) {
   }
 
   return normalizeOwnerIdForMode(settings.controlMode, settings.ownerId);
+}
+
+export function canOwnerManageTeam(
+  settings: TeamControlSettings | null | undefined,
+  activeOwnerId = DEFAULT_ACTIVE_OWNER_ID,
+) {
+  if (!settings || settings.controlMode !== "manual") {
+    return false;
+  }
+
+  return getTeamOwner(settings) === activeOwnerId;
+}
+
+export function canLocalUserManageTeam(
+  gameState: GameState,
+  teamId: string | null | undefined,
+  activeOwnerId = DEFAULT_ACTIVE_OWNER_ID,
+) {
+  if (!teamId) {
+    return false;
+  }
+
+  return canOwnerManageTeam(getTeamControlSettings(gameState, teamId), activeOwnerId);
 }
 
 export function filterTeamsByControlScope(

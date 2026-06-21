@@ -1,11 +1,12 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo } from "react";
+
+import { getGameTermTooltip } from "@/components/ui/GameTerm";
+import type { TeamStrategyBias } from "@/lib/data/olyDataTypes";
 
 import ClassColorChip, { getClassColorClassName } from "./ClassColorChip";
 import OptimizedMediaImage from "./OptimizedMediaImage";
-
-type TeamDrawerFilter = "all" | "starter" | "bench" | "d1" | "d2" | "contracts" | "issues";
 
 export type TeamDetailDrawerPlayerCard = {
   playerId: string;
@@ -32,8 +33,49 @@ export type TeamDetailDrawerPlayerCard = {
   d1Score: number | null;
   d2Label: string;
   d2Score: number | null;
+  coreStats: {
+    pow: number | null;
+    powRank: number | null;
+    spe: number | null;
+    speRank: number | null;
+    men: number | null;
+    menRank: number | null;
+    soc: number | null;
+    socRank: number | null;
+  };
   issueTags: string[];
+  demands: Array<{
+    demandId: string;
+    label: string;
+    detail: string;
+    status: "open" | "fulfilled" | "at_risk" | "failed";
+    priority: "low" | "medium" | "high";
+    targetDisciplineId?: string | null;
+    moraleReward: number;
+    moralePenalty: number;
+  }>;
   topDisciplines: Array<{ label: string; value: number | null }>;
+};
+
+export type TeamDetailDrawerHistoryRow = {
+  seasonId: string;
+  seasonName: string;
+  isLive: boolean;
+  rank: number | null;
+  points: number | null;
+  pps: number | null;
+  ppPow: number | null;
+  ppSpe: number | null;
+  ppMen: number | null;
+  ppSoc: number | null;
+  cash: number | null;
+  salaryTotal: number | null;
+  marketValue: number | null;
+  guv: number | null;
+  topBuyPlayer: string | null;
+  topBuyAmount: number | null;
+  topSellPlayer: string | null;
+  topSellAmount: number | null;
 };
 
 export type TeamDetailDrawerData = {
@@ -43,6 +85,21 @@ export type TeamDetailDrawerData = {
   logoUrl: string | null;
   logoInitials: string;
   controlMode: "manual" | "ai" | "passive";
+  generalManager: {
+    name: string;
+    title: string;
+    description: string;
+    pow: number;
+    spe: number;
+    men: number;
+    soc: number;
+    influencePct: number;
+    playerOptDelta: number;
+    marketDoctrine: string;
+    lineupDoctrine: string;
+    facilityPriorities: string[];
+    bias: Partial<TeamStrategyBias>;
+  } | null;
   rosterSize: number;
   cash: number | null;
   salaryTotal: number | null;
@@ -52,6 +109,59 @@ export type TeamDetailDrawerData = {
   menRank: number | null;
   socRank: number | null;
   contractSummaries: Array<{ label: string; salary: number | null }>;
+  boardConfidence: {
+    value: number;
+    pressure: number;
+    warnings: string[];
+  } | null;
+  relationships: {
+    allies: Array<{
+      teamId: string;
+      teamName: string;
+      shortCode: string;
+      value: number;
+      baseValue: number;
+      delta: number;
+      changed: boolean;
+      changeLabel: string | null;
+      reasons: string[];
+    }>;
+    rivals: Array<{
+      teamId: string;
+      teamName: string;
+      shortCode: string;
+      value: number;
+      baseValue: number;
+      delta: number;
+      changed: boolean;
+      changeLabel: string | null;
+      reasons: string[];
+    }>;
+  };
+  objectives: Array<{
+    objectiveId: string;
+    label: string;
+    detail?: string | null;
+    actionHint?: string | null;
+    category: string;
+    targetValue: number | string | boolean | null;
+    currentValue: number | string | boolean | null;
+    status: "open" | "completed" | "failed" | "at_risk";
+  }>;
+  teamCaptain: {
+    playerId: string;
+    playerName: string;
+    leadershipScore: number;
+    style: string;
+    effects: {
+      moraleBuffer: number;
+      rivalryPressureReductionPct: number;
+      teamPowerModifierPct: number;
+      conflictSoftenChancePct: number;
+    };
+    traitSignals: string[];
+  } | null;
+  history: TeamDetailDrawerHistoryRow[];
   players: TeamDetailDrawerPlayerCard[];
 };
 
@@ -63,6 +173,40 @@ function formatNumber(value: number | null | undefined, digits = 0) {
     minimumFractionDigits: 0,
     maximumFractionDigits: digits,
   }).format(value);
+}
+
+function getGmAxisShareLabels(gm: NonNullable<TeamDetailDrawerData["generalManager"]>) {
+  const axisSum = Math.max(1, gm.pow + gm.spe + gm.men + gm.soc);
+  return {
+    pow: Math.round((gm.pow / axisSum) * 100),
+    spe: Math.round((gm.spe / axisSum) * 100),
+    men: Math.round((gm.men / axisSum) * 100),
+    soc: Math.round((gm.soc / axisSum) * 100),
+  };
+}
+
+const GM_BIAS_LABELS: Array<{ key: keyof TeamStrategyBias; label: string }> = [
+  { key: "cashPriority", label: "Cash" },
+  { key: "valuePriority", label: "Value" },
+  { key: "starPriority", label: "Stars" },
+  { key: "riskTolerance", label: "Risiko" },
+  { key: "wageSensitivity", label: "Gehalt" },
+  { key: "sellForProfitAggression", label: "Verkaufen" },
+  { key: "shortContractPreference", label: "Kurzvertrag" },
+  { key: "longContractPreference", label: "Langvertrag" },
+  { key: "loyaltyBias", label: "Loyalitaet" },
+  { key: "harmonyStrictness", label: "Harmonie" },
+  { key: "rosterDepthPreference", label: "Tiefe" },
+  { key: "eliteSmallRosterPreference", label: "Elite" },
+];
+
+function getVisibleGeneralManagerBiases(bias: Partial<TeamStrategyBias>) {
+  return GM_BIAS_LABELS.map((entry) => ({
+    ...entry,
+    value: bias[entry.key] ?? 5,
+  }))
+    .sort((left, right) => right.value - left.value || left.label.localeCompare(right.label, "de"))
+    .slice(0, 8);
 }
 
 function formatSignedNumber(value: number | null | undefined, digits = 2) {
@@ -95,14 +239,59 @@ const TEAM_DRAWER_AREA_RANK_CARDS = [
   { label: "SOC", key: "socRank", tone: "is-social" },
 ] as const;
 
-function getRoleBucket(roleTag: string | null | undefined) {
-  if (roleTag === "starter") {
-    return "core";
+function getObjectiveTone(status: "open" | "completed" | "failed" | "at_risk") {
+  if (status === "completed") return " is-ready";
+  if (status === "failed") return " is-blocked";
+  if (status === "at_risk") return " is-warning";
+  return "";
+}
+
+function formatObjectiveStatus(status: "open" | "completed" | "failed" | "at_risk") {
+  if (status === "completed") return "erfüllt";
+  if (status === "failed") return "verfehlt";
+  if (status === "at_risk") return "gefährdet";
+  return "offen";
+}
+
+function formatRelationshipList(
+  rows: TeamDetailDrawerData["relationships"]["allies"],
+  emptyLabel: string,
+) {
+  if (rows.length === 0) {
+    return <small className="muted">{emptyLabel}</small>;
   }
-  if (roleTag === "bench") {
-    return "rotation";
+
+  return (
+    <div className="team-drawer-relationship-list">
+      {rows.slice(0, 4).map((row) => (
+        <span
+          key={row.teamId}
+          className={`team-drawer-relationship-chip${row.changed ? " has-change" : ""}`}
+          title={row.reasons.length ? row.reasons.join(" · ") : undefined}
+        >
+          {row.shortCode} {formatNumber(row.value, 1)}
+          {row.changeLabel ? <em>{row.changeLabel}</em> : null}
+        </span>
+      ))}
+    </div>
+  );
+}
+
+function getDemandTone(status: "open" | "fulfilled" | "at_risk" | "failed") {
+  if (status === "fulfilled") return " is-ready";
+  if (status === "failed") return " is-blocked";
+  if (status === "at_risk") return " is-warning";
+  return " is-info";
+}
+
+function formatControlModeLabel(value: TeamDetailDrawerData["controlMode"]) {
+  if (value === "manual") {
+    return "Team geführt";
   }
-  return "fringe";
+  if (value === "ai") {
+    return "Automatisch";
+  }
+  return "Beobachtet";
 }
 
 function getRoleLabel(roleTag: string | null | undefined) {
@@ -119,25 +308,6 @@ function getRoleLabel(roleTag: string | null | undefined) {
     return "Prospect";
   }
   return roleTag ?? "—";
-}
-
-function filterPlayers(players: TeamDetailDrawerPlayerCard[], filter: TeamDrawerFilter) {
-  switch (filter) {
-    case "starter":
-      return players.filter((player) => player.roleTag === "starter");
-    case "bench":
-      return players.filter((player) => player.roleTag === "bench");
-    case "d1":
-      return [...players].sort((left, right) => (right.d1Score ?? -Infinity) - (left.d1Score ?? -Infinity));
-    case "d2":
-      return [...players].sort((left, right) => (right.d2Score ?? -Infinity) - (left.d2Score ?? -Infinity));
-    case "contracts":
-      return [...players].sort((left, right) => (left.contractLength ?? Infinity) - (right.contractLength ?? Infinity));
-    case "issues":
-      return players.filter((player) => player.issueTags.length > 0);
-    default:
-      return players;
-  }
 }
 
 function comparePlayersByOvr(left: TeamDetailDrawerPlayerCard, right: TeamDetailDrawerPlayerCard) {
@@ -163,13 +333,13 @@ export default function TeamDetailDrawer({
   data,
   onClose,
   onOpenPlayer,
+  layerClassName = "",
 }: {
   data: TeamDetailDrawerData | null;
   onClose: () => void;
   onOpenPlayer: (playerId: string, activePlayerId: string) => void;
+  layerClassName?: string;
 }) {
-  const [filter, setFilter] = useState<TeamDrawerFilter>("all");
-
   useEffect(() => {
     if (!data) {
       return undefined;
@@ -185,32 +355,14 @@ export default function TeamDetailDrawer({
     return () => window.removeEventListener("keydown", handleEscape);
   }, [data, onClose]);
 
-  useEffect(() => {
-    setFilter("all");
-  }, [data?.teamId]);
-
   const visiblePlayers = useMemo(
-    () => [...filterPlayers(data?.players ?? [], filter)].sort(comparePlayersByOvr),
-    [data?.players, filter],
+    () => [...(data?.players ?? [])].sort(comparePlayersByOvr),
+    [data?.players],
   );
-
-  const groupedPlayers = useMemo(() => {
-    const buckets = {
-      core: [] as TeamDetailDrawerPlayerCard[],
-      rotation: [] as TeamDetailDrawerPlayerCard[],
-      fringe: [] as TeamDetailDrawerPlayerCard[],
-    };
-
-    for (const player of visiblePlayers) {
-      buckets[getRoleBucket(player.roleTag)].push(player);
-    }
-
-    buckets.core.sort(comparePlayersByOvr);
-    buckets.rotation.sort(comparePlayersByOvr);
-    buckets.fringe.sort(comparePlayersByOvr);
-
-    return buckets;
-  }, [visiblePlayers]);
+  const gmAxisShares = useMemo(
+    () => (data?.generalManager ? getGmAxisShareLabels(data.generalManager) : null),
+    [data?.generalManager],
+  );
 
   const teamSummary = useMemo(() => {
     const players = data?.players ?? [];
@@ -221,9 +373,6 @@ export default function TeamDetailDrawer({
       avgSalary: average(players.map((player) => player.salary)),
       issueCount,
       expiringCount,
-      coreCount: players.filter((player) => getRoleBucket(player.roleTag) === "core").length,
-      rotationCount: players.filter((player) => getRoleBucket(player.roleTag) === "rotation").length,
-      fringeCount: players.filter((player) => getRoleBucket(player.roleTag) === "fringe").length,
     };
   }, [data?.players]);
 
@@ -232,7 +381,11 @@ export default function TeamDetailDrawer({
   }
 
   return (
-    <div className="player-drawer-backdrop" role="presentation" onClick={onClose}>
+    <div
+      className={`player-drawer-backdrop${layerClassName ? ` ${layerClassName}` : ""}`}
+      role="presentation"
+      onClick={onClose}
+    >
       <aside
         className="player-drawer team-drawer"
         role="dialog"
@@ -259,20 +412,9 @@ export default function TeamDetailDrawer({
             )}
             <div className="player-drawer-headline player-drawer-headline-rich">
               <div className="player-drawer-meta-line">
-                <span className="transfer-status-pill is-info">{data.controlMode}</span>
-                <span className="player-drawer-source-chip">{data.shortCode}</span>
+                <span className="transfer-status-pill is-info">{formatControlModeLabel(data.controlMode)}</span>
               </div>
               <h2>{data.teamName}</h2>
-              <p className="player-drawer-subline">
-                Kader {data.rosterSize} · Cash {formatNumber(data.cash, 1)} · Gehalt {formatNumber(data.salaryTotal, 2)}
-              </p>
-              <div className="player-drawer-chip-row">
-                <span className="player-drawer-chip">POW #{formatNumber(data.powRank)}</span>
-                <span className="player-drawer-chip">SPE #{formatNumber(data.speRank)}</span>
-                <span className="player-drawer-chip">MEN #{formatNumber(data.menRank)}</span>
-                <span className="player-drawer-chip">SOC #{formatNumber(data.socRank)}</span>
-                <span className="player-drawer-chip">MW {formatNumber(data.marketValueTotal, 2)}</span>
-              </div>
             </div>
           </div>
           <button className="secondary-button inline-button" type="button" onClick={onClose}>
@@ -284,16 +426,13 @@ export default function TeamDetailDrawer({
           <section className="player-drawer-section player-drawer-hero-surface team-drawer-dashboard">
             <div className="team-drawer-dashboard-grid">
               <article className="team-drawer-identity-card">
-                <span className="player-drawer-overline">Squad Identity</span>
+                <span className="player-drawer-overline">Kaderprofil</span>
                 <h3>{data.shortCode}</h3>
-                <p>
-                  {data.rosterSize} Spieler · {teamSummary.coreCount} Core · {teamSummary.rotationCount} Rotation · {teamSummary.fringeCount} Fringe
-                </p>
+                <p>{data.rosterSize} Spieler · Ø OVR {formatNumber(teamSummary.avgOvr, 1)}</p>
                 <div className="player-drawer-mini-facts">
-                  <span>Ø OVR {formatNumber(teamSummary.avgOvr, 1)}</span>
                   <span>Ø Gehalt {formatNumber(teamSummary.avgSalary, 2)}</span>
                   <span>{teamSummary.expiringCount} laufen aus</span>
-                  <span>{teamSummary.issueCount} Flags</span>
+                  <span>{teamSummary.issueCount} Hinweise</span>
                 </div>
               </article>
               <div className="team-drawer-rank-grid">
@@ -321,148 +460,268 @@ export default function TeamDetailDrawer({
             </div>
           </section>
 
-          <section className="player-drawer-section team-drawer-toolbar">
-            <div className="team-drawer-filter-row">
-              {[
-                ["all", "Alle"],
-                ["starter", "Starter"],
-                ["bench", "Bank"],
-                ["d1", "D1 Fit"],
-                ["d2", "D2 Fit"],
-                ["contracts", "Verträge"],
-                ["issues", "Probleme"],
-              ].map(([key, label]) => (
-                <button
-                  key={key}
-                  className={`secondary-button inline-button${filter === key ? " is-active" : ""}`}
-                  type="button"
-                  onClick={() => setFilter(key as TeamDrawerFilter)}
-                >
-                  {label}
-                </button>
-              ))}
-            </div>
-            <p className="muted">Doppelklick auf eine Spielerkarte öffnet den Player-Drawer.</p>
-          </section>
-
-          {(["core", "rotation", "fringe"] as const).map((bucket) => (
-            <section className="player-drawer-section" key={bucket}>
-              <div className="team-drawer-section-head">
-                <div>
-                  <h3>{bucket === "core" ? "Core" : bucket === "rotation" ? "Rotation" : "Fringe"}</h3>
-                  <p className="muted">
-                    {groupedPlayers[bucket].length} Spieler · Ø OVR {formatNumber(average(groupedPlayers[bucket].map((player) => player.ovr)), 1)}
-                  </p>
-                </div>
-                <span className="team-drawer-section-count">{groupedPlayers[bucket].length}</span>
-              </div>
-              <div className="team-drawer-card-grid">
-                {groupedPlayers[bucket].map((player) => (
-                  <article
-                    key={player.activePlayerId}
-                    className={`team-drawer-player-card ${getClassColorClassName(player.className, "team-drawer-player-class-frame")}`}
-                    onDoubleClick={() => onOpenPlayer(player.playerId, player.activePlayerId)}
-                  >
-                    <div className="team-drawer-player-head">
-                      {player.portraitUrl ? (
-                        <OptimizedMediaImage
-                          className="team-drawer-player-portrait"
-                          src={player.portraitUrl}
-                          alt={player.name}
-                          width={56}
-                          height={56}
-                          fallback={<div className="team-drawer-player-portrait team-drawer-player-portrait-placeholder">{player.portraitInitials}</div>}
-                        />
-                      ) : (
-                        <div className="team-drawer-player-portrait team-drawer-player-portrait-placeholder">{player.portraitInitials}</div>
-                      )}
-                      <div className="team-drawer-player-title">
-                        <strong>{player.name}</strong>
-                        <span>
-                          {getRoleLabel(player.roleTag)}
-                          {player.promisedRole ? ` · versprochen ${getRoleLabel(player.promisedRole)}` : ""} · <ClassColorChip className={player.className} /> · {player.race ?? "—"}
-                        </span>
-                      </div>
-                    </div>
-                    <div className="team-drawer-player-spotlight">
-                      <div>
-                        <span>OVR</span>
-                        <strong>{formatNumber(player.ovr)}</strong>
-                        <small>#{formatNumber(player.ovrRank)}</small>
-                      </div>
-                      <div>
-                        <span>PPs</span>
-                        <strong>{formatNumber(player.pps, 1)}</strong>
-                        <small>#{formatNumber(player.ppsRank)}</small>
-                      </div>
-                      <div>
-                        <span>MVS</span>
-                        <strong>{formatNumber(player.mvs, 1)}</strong>
-                        <small>#{formatNumber(player.mvsRank)}</small>
-                      </div>
-                    </div>
-                    <div className="team-drawer-economy-strip">
-                      <span>
-                        <em>MW</em>
-                        <strong>{formatNumber(player.marketValue, 2)}</strong>
-                        {player.marketValueDelta != null ? (
-                          <small className={`team-drawer-money-delta${getMoneyDeltaClass(player.marketValueDelta, "higher")}`}>
-                            {formatSignedNumber(player.marketValueDelta, 2)}
-                          </small>
-                        ) : null}
-                      </span>
-                      <span>
-                        <em>Gehalt</em>
-                        <strong>{formatNumber(player.salary, 2)}</strong>
-                        {player.salaryDelta != null ? (
-                          <small className={`team-drawer-money-delta${getMoneyDeltaClass(player.salaryDelta, "lower")}`}>
-                            {formatSignedNumber(player.salaryDelta, 2)}
-                          </small>
-                        ) : null}
-                      </span>
-                      <span>
-                        <em>LZ</em>
-                        <strong>{formatNumber(player.contractLength)}</strong>
-                      </span>
-                    </div>
-                    <div className="team-drawer-kpi-row team-drawer-discipline-row">
-                      {player.topDisciplines.map((discipline) => (
-                        <span key={`${player.activePlayerId}-${discipline.label}`}>
-                          {discipline.label} {formatNumber(discipline.value)}
-                        </span>
-                      ))}
-                    </div>
-                    {player.issueTags.length > 0 ? (
-                      <div className="player-drawer-chip-row">
-                        {player.issueTags.map((tag) => (
-                          <span key={`${player.activePlayerId}-${tag}`} className="player-drawer-chip is-negative">
-                            {tag}
-                          </span>
-                        ))}
-                      </div>
-                    ) : null}
-                  </article>
-                ))}
-                {groupedPlayers[bucket].length === 0 ? <p className="muted">Keine Spieler in diesem Bereich.</p> : null}
-              </div>
-            </section>
-          ))}
-
-          <section className="player-drawer-section player-drawer-panel">
+          <section className="player-drawer-section player-drawer-panel team-drawer-objective-section">
             <div className="team-drawer-section-head">
               <div>
-                <h3>Verträge</h3>
-                <p className="muted">Committed salary nach Vertragsjahr.</p>
+                <h3>Board & Führung</h3>
+                <p className="muted">Ziele, Rivalitätsdruck und Teamkapitän.</p>
               </div>
             </div>
-            <div className="team-drawer-contract-grid">
-              {data.contractSummaries.map((entry) => (
-                <article key={entry.label} className="metric-card">
-                  <span>{entry.label}</span>
-                  <strong>{formatNumber(entry.salary, 2)}</strong>
+            <div className="team-drawer-objective-grid">
+              {data.boardConfidence ? (
+                <article className={`metric-card team-drawer-objective-card${data.boardConfidence.pressure >= 8 ? " is-blocked" : data.boardConfidence.value >= 7 ? " is-ready" : ""}`}>
+                  <span>Board Confidence</span>
+                  <strong>{formatNumber(data.boardConfidence.value, 1)}/10</strong>
+                  <small>Druck {formatNumber(data.boardConfidence.pressure, 1)} · {data.boardConfidence.warnings.length} Warnungen</small>
+                </article>
+              ) : null}
+              {data.generalManager ? (
+                <article className="metric-card team-drawer-objective-card is-info">
+                  <span>General Manager</span>
+                  <strong>{data.generalManager.name}</strong>
+                  <small>{data.generalManager.title} · Einfluss {formatNumber(data.generalManager.influencePct)}%</small>
+                  <small>{data.generalManager.marketDoctrine} · {data.generalManager.lineupDoctrine}</small>
+                  {data.generalManager.facilityPriorities.length ? (
+                    <small>Fokus: {data.generalManager.facilityPriorities.slice(0, 3).join(" · ")}</small>
+                  ) : null}
+                  <div className="team-drawer-gm-axis-row" aria-label="GM Achsen">
+                    <span className="is-pow">POW {formatNumber(data.generalManager.pow, 1)} · {gmAxisShares?.pow ?? 0}%</span>
+                    <span className="is-spe">SPE {formatNumber(data.generalManager.spe, 1)} · {gmAxisShares?.spe ?? 0}%</span>
+                    <span className="is-men">MEN {formatNumber(data.generalManager.men, 1)} · {gmAxisShares?.men ?? 0}%</span>
+                    <span className="is-soc">SOC {formatNumber(data.generalManager.soc, 1)} · {gmAxisShares?.soc ?? 0}%</span>
+                  </div>
+                  <div className="team-drawer-gm-bias-grid" aria-label="GM Gewichtungen">
+                    {getVisibleGeneralManagerBiases(data.generalManager.bias).map((bias) => (
+                      <div key={bias.key} className="team-drawer-gm-bias-row">
+                        <span>{bias.label}</span>
+                        <div className="team-drawer-gm-bias-track" aria-hidden="true">
+                          <i style={{ width: `${Math.max(10, Math.min(100, bias.value * 10))}%` }} />
+                        </div>
+                        <strong>{formatNumber(bias.value)}</strong>
+                      </div>
+                    ))}
+                  </div>
+                </article>
+              ) : null}
+              {data.teamCaptain ? (
+                <article className="metric-card team-drawer-objective-card is-ready">
+                  <span>Team Captain</span>
+                  <strong>{data.teamCaptain.playerName}</strong>
+                  <small>
+                    {data.teamCaptain.style} · Lead {formatNumber(data.teamCaptain.leadershipScore, 1)} · Druck -
+                    {formatNumber(data.teamCaptain.effects.rivalryPressureReductionPct, 1)}%
+                  </small>
+                </article>
+              ) : null}
+              <article className="metric-card team-drawer-objective-card is-ready">
+                <span>Ally</span>
+                <strong>{data.relationships.allies.length}</strong>
+                {formatRelationshipList(data.relationships.allies, "Keine Ally-Beziehung ab 4+")}
+              </article>
+              <article className="metric-card team-drawer-objective-card is-blocked">
+                <span>Rival</span>
+                <strong>{data.relationships.rivals.length}</strong>
+                {formatRelationshipList(data.relationships.rivals, "Keine Rivalität ab -4")}
+              </article>
+              {data.objectives.map((objective) => (
+                <article key={objective.objectiveId} className={`metric-card team-drawer-objective-card${getObjectiveTone(objective.status)}`}>
+                  <span>{objective.category}</span>
+                  <strong>{objective.label}</strong>
+                  <small>
+                    {formatObjectiveStatus(objective.status)} · {String(objective.currentValue ?? "—")} / {String(objective.targetValue ?? "—")}
+                  </small>
+                  {objective.detail ? <small className="muted">{objective.detail}</small> : null}
+                  {objective.actionHint ? <small className="muted">{objective.actionHint}</small> : null}
                 </article>
               ))}
             </div>
+          </section>
+
+          <section className="player-drawer-section team-drawer-roster-section">
+            <div className="team-drawer-card-grid">
+              {visiblePlayers.map((player) => (
+                <article
+                  key={player.activePlayerId}
+                  className={`team-drawer-player-card ${getClassColorClassName(player.className, "team-drawer-player-class-frame")}`}
+                  onClick={() => onOpenPlayer(player.playerId, player.activePlayerId)}
+                >
+                  <div className="team-drawer-player-head">
+                    {player.portraitUrl ? (
+                      <OptimizedMediaImage
+                        className="team-drawer-player-portrait"
+                        src={player.portraitUrl}
+                        alt={player.name}
+                        width={86}
+                        height={86}
+                        fallback={<div className="team-drawer-player-portrait team-drawer-player-portrait-placeholder">{player.portraitInitials}</div>}
+                      />
+                    ) : (
+                      <div className="team-drawer-player-portrait team-drawer-player-portrait-placeholder">{player.portraitInitials}</div>
+                    )}
+                    <div className="team-drawer-player-title">
+                      <strong>{player.name}</strong>
+                      <span>
+                        {getRoleLabel(player.roleTag)}
+                        {player.promisedRole ? ` · versprochen ${getRoleLabel(player.promisedRole)}` : ""} · <ClassColorChip className={player.className} /> · {player.race ?? "—"}
+                      </span>
+                    </div>
+                  </div>
+                  <div className="team-drawer-player-spotlight">
+                    <div title={getGameTermTooltip("OVR") ?? undefined}>
+                      <small>{player.ovrRank != null ? `#${formatNumber(player.ovrRank)}` : "#—"}</small>
+                      <span>OVR</span>
+                      <strong>{formatNumber(player.ovr)}</strong>
+                    </div>
+                    <div title={getGameTermTooltip("PPs") ?? undefined}>
+                      <small>{player.ppsRank != null ? `#${formatNumber(player.ppsRank)}` : "#—"}</small>
+                      <span>PPs</span>
+                      <strong>{formatNumber(player.pps, 1)}</strong>
+                    </div>
+                    <div title={getGameTermTooltip("MVS") ?? undefined}>
+                      <small>{player.mvsRank != null ? `#${formatNumber(player.mvsRank)}` : "#—"}</small>
+                      <span>MVS</span>
+                      <strong>{formatNumber(player.mvs, 1)}</strong>
+                    </div>
+                  </div>
+                  <div className="team-drawer-economy-strip">
+                    <span title={getGameTermTooltip("MW") ?? undefined}>
+                      <em>MW</em>
+                      <strong>{formatNumber(player.marketValue, 2)}</strong>
+                      {player.marketValueDelta != null ? (
+                        <small className={`team-drawer-money-delta${getMoneyDeltaClass(player.marketValueDelta, "higher")}`}>
+                          {formatSignedNumber(player.marketValueDelta, 2)}
+                        </small>
+                      ) : null}
+                    </span>
+                    <span>
+                      <em>Gehalt</em>
+                      <strong>{formatNumber(player.salary, 2)}</strong>
+                      {player.salaryDelta != null ? (
+                        <small className={`team-drawer-money-delta${getMoneyDeltaClass(player.salaryDelta, "lower")}`}>
+                          {formatSignedNumber(player.salaryDelta, 2)}
+                        </small>
+                      ) : null}
+                    </span>
+                    <span title={getGameTermTooltip("LZ") ?? undefined}>
+                      <em>LZ</em>
+                      <strong>{formatNumber(player.contractLength)}</strong>
+                    </span>
+                  </div>
+                  <div className="team-drawer-player-core-stats" title="Bereichswerte des Spielers: Power, Speed, Mental und Social.">
+                    <span className="is-power">
+                      <em>
+                        POW <small>{player.coreStats.powRank != null ? `#${formatNumber(player.coreStats.powRank)}` : "#—"}</small>
+                      </em>
+                      <strong>{formatNumber(player.coreStats.pow, 0)}</strong>
+                    </span>
+                    <span className="is-speed">
+                      <em>
+                        SPE <small>{player.coreStats.speRank != null ? `#${formatNumber(player.coreStats.speRank)}` : "#—"}</small>
+                      </em>
+                      <strong>{formatNumber(player.coreStats.spe, 0)}</strong>
+                    </span>
+                    <span className="is-mental">
+                      <em>
+                        MEN <small>{player.coreStats.menRank != null ? `#${formatNumber(player.coreStats.menRank)}` : "#—"}</small>
+                      </em>
+                      <strong>{formatNumber(player.coreStats.men, 0)}</strong>
+                    </span>
+                    <span className="is-social">
+                      <em>
+                        SOC <small>{player.coreStats.socRank != null ? `#${formatNumber(player.coreStats.socRank)}` : "#—"}</small>
+                      </em>
+                      <strong>{formatNumber(player.coreStats.soc, 0)}</strong>
+                    </span>
+                  </div>
+                  {player.demands.length ? (
+                    <div className="team-drawer-player-demand-row">
+                      {player.demands.slice(0, 2).map((demand) => (
+                        <span
+                          key={demand.demandId}
+                          className={`legacy-lineup-missing-chip${getDemandTone(demand.status)}`}
+                          title={`${demand.detail} · Erfüllen ${demand.moraleReward >= 0 ? "+" : ""}${demand.moraleReward} Moral · Ignorieren ${demand.moralePenalty}`}
+                        >
+                          <strong>{demand.label}</strong>
+                          <small>{demand.priority}</small>
+                        </span>
+                      ))}
+                    </div>
+                  ) : null}
+                </article>
+              ))}
+              {visiblePlayers.length === 0 ? <p className="muted">Keine Spieler im Kader.</p> : null}
+            </div>
+          </section>
+
+          <section className="player-drawer-section player-drawer-panel team-drawer-history-section">
+            <div className="team-drawer-section-head">
+              <div>
+                <h3>Historie</h3>
+                <p className="muted">Team-Snapshots: Finanzen, PPs, Bereichsleistung und Transfers.</p>
+              </div>
+              <span className="team-drawer-section-count">{data.history.length}</span>
+            </div>
+            {data.history.length > 0 ? (
+              <div className="team-drawer-history-table-shell">
+                <table className="team-drawer-history-table">
+                  <thead>
+                    <tr>
+                      <th>Saison</th>
+                      <th>Platz</th>
+                      <th>Punkte</th>
+                      <th>PPs</th>
+                      <th>POW</th>
+                      <th>SPE</th>
+                      <th>MEN</th>
+                      <th>SOC</th>
+                      <th>Cash</th>
+                      <th>Gehalt</th>
+                      <th>MW</th>
+                      <th>GuV</th>
+                      <th>Top Einkauf</th>
+                      <th>Top Verkauf</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {data.history.map((row) => (
+                      <tr key={`${row.seasonId}-${row.isLive ? "live" : "archive"}`}>
+                        <td>
+                          <strong>{row.seasonName}</strong>
+                          {row.isLive ? <span className="player-drawer-history-tag">Live</span> : null}
+                        </td>
+                        <td>#{formatNumber(row.rank)}</td>
+                        <td>{formatNumber(row.points, 1)}</td>
+                        <td>{formatNumber(row.pps, 1)}</td>
+                        <td className="team-drawer-history-area is-power">{formatNumber(row.ppPow, 1)}</td>
+                        <td className="team-drawer-history-area is-speed">{formatNumber(row.ppSpe, 1)}</td>
+                        <td className="team-drawer-history-area is-mental">{formatNumber(row.ppMen, 1)}</td>
+                        <td className="team-drawer-history-area is-social">{formatNumber(row.ppSoc, 1)}</td>
+                        <td>{formatNumber(row.cash, 1)}</td>
+                        <td>{formatNumber(row.salaryTotal, 2)}</td>
+                        <td>{formatNumber(row.marketValue, 2)}</td>
+                        <td className={getMoneyDeltaClass(row.guv, "higher")}>{formatSignedNumber(row.guv, 1)}</td>
+                        <td>
+                          {row.topBuyPlayer ? (
+                            <span className="team-drawer-history-transfer text-negative">
+                              {row.topBuyPlayer} · {formatNumber(row.topBuyAmount, 2)}
+                            </span>
+                          ) : "—"}
+                        </td>
+                        <td>
+                          {row.topSellPlayer ? (
+                            <span className="team-drawer-history-transfer text-positive">
+                              {row.topSellPlayer} · {formatNumber(row.topSellAmount, 2)}
+                            </span>
+                          ) : "—"}
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            ) : (
+              <p className="muted">Noch keine archivierten Team-Saisons vorhanden.</p>
+            )}
           </section>
         </div>
       </aside>

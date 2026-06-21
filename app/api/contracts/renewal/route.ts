@@ -1,3 +1,5 @@
+export const dynamic = "force-dynamic";
+
 import { NextResponse } from "next/server";
 
 import {
@@ -6,6 +8,7 @@ import {
   type ContractRenewalAction,
 } from "@/lib/contracts/contract-renewal-service";
 import type { ContractShape } from "@/lib/data/olyDataTypes";
+import { evaluateGamePhaseAction } from "@/lib/foundation/game-phase-action-policy";
 import { createPersistenceService } from "@/lib/persistence/persistence-service";
 import { notifyRoomGameplayWrite } from "@/lib/room/room-gameplay-write-notifier";
 import { authorizeServerRoomWrite } from "@/lib/room/server-authoritative-write-guard";
@@ -26,6 +29,7 @@ type ContractRenewalBody = {
   seatToken?: string | null;
   userId?: string | null;
   activeManagerTeamId?: string | null;
+  activeOwnerId?: string | null;
   controlMode?: "human" | "ai" | "passive" | "manual" | null;
 };
 
@@ -54,6 +58,19 @@ export async function POST(request: Request) {
     if (!save) {
       return NextResponse.json({ success: false, error: "save_not_found", summary: null }, { status: 404 });
     }
+    const phaseGate = evaluateGamePhaseAction(save.gameState, "renew_contract");
+    if (!phaseGate.allowed) {
+      return NextResponse.json(
+        {
+          success: false,
+          error: phaseGate.reason,
+          summary: null,
+          warnings: phaseGate.warnings,
+          blockingReasons: phaseGate.reason ? [phaseGate.reason] : [],
+        },
+        { status: 409 },
+      );
+    }
 
     const preview = previewContractRenewalAction({
       save,
@@ -77,6 +94,7 @@ export async function POST(request: Request) {
       confirmToken: body.confirmToken,
       expectedConfirmToken: preview.confirmToken,
       activeManagerTeamId: body.activeManagerTeamId,
+      activeOwnerId: body.activeOwnerId,
       controlMode: body.controlMode,
     });
     if (!writeAuth.allowed) {
@@ -121,7 +139,7 @@ export async function POST(request: Request) {
       {
         success,
         summary,
-        warnings: [...writeAuth.warnings, ...summary.warnings],
+        warnings: [...phaseGate.warnings, ...writeAuth.warnings, ...summary.warnings],
         blockingReasons: summary.blockingReasons,
       },
       { status: success || dryRun ? 200 : 409 },

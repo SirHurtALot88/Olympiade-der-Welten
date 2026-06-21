@@ -218,7 +218,12 @@ describe("season-end XP spend apply service", () => {
     expect(savedPlayer?.economyAfterUpgradePreview?.source).toBe("season_end_xp_spend_preview");
     expect(savedPlayer?.economyAfterUpgradePreview?.currentContractSalary).toBe(1);
     expect(savedPlayer?.economyAfterUpgradePreview?.renewalSalaryPreview).not.toBeUndefined();
-    expect(savedPlayer?.salaryDemand).toBe(1);
+    expect(savedPlayer?.marketValue).toBe(savedPlayer?.economyAfterUpgradePreview?.marketValuePreview);
+    expect(savedPlayer?.displayMarketValue).toBe(savedPlayer?.economyAfterUpgradePreview?.marketValuePreview);
+    expect(savedPlayer?.salaryDemand).toBe(savedPlayer?.economyAfterUpgradePreview?.salaryExpectation);
+    expect(savedPlayer?.displaySalary).toBe(savedPlayer?.economyAfterUpgradePreview?.salaryExpectation);
+    expect(getSavedState()?.rosters[0]?.salary).toBe(1);
+    expect(getSavedState()?.rosters[0]?.currentValue).toBe(savedPlayer?.economyAfterUpgradePreview?.marketValuePreview);
     expect(getSavedState()?.playerBaselines?.[0]?.attributes.power).toBe(98);
     expect(getSavedState()?.playerBaselines?.[0]?.baselineVersion).toBe("player-baseline-v2");
     expect(getSavedState()?.playerBaselines?.[0]?.checksum).toBe(baselineChecksumBefore);
@@ -279,7 +284,10 @@ describe("season-end XP spend apply service", () => {
     expect(savedPlayer?.spentXP).toBe(20);
     expect(savedPlayer?.lifetimeXP).toBe(55 + (preview.players[0]?.earnedSeasonXP ?? 0));
     expect(getSavedState()?.playerProgressionEvents?.[0]?.xpSpent).toBe(0);
-    expect(getSavedState()?.playerProgressionEvents?.[0]?.upgrades).toEqual([]);
+    const organicUpgrades = getSavedState()?.playerProgressionEvents?.[0]?.upgrades ?? [];
+    expect(organicUpgrades.length).toBeGreaterThan(0);
+    expect(organicUpgrades.every((entry) => entry.source === "organic_season_progression")).toBe(true);
+    expect(savedPlayer?.lastOrganicProgression?.performanceSetpoints).toBeGreaterThan(0);
   });
 
   it("does not materialize the same season XP twice", () => {

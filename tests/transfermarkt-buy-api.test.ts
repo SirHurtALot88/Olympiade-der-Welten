@@ -2,16 +2,50 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 
 const previewLocalTransfermarktBuy = vi.fn();
 const executeLocalTransfermarktBuy = vi.fn();
+const persistenceMocks = vi.hoisted(() => ({
+  getSaveById: vi.fn(),
+}));
 
 vi.mock("@/lib/market/transfermarkt-local-service", () => ({
   previewLocalTransfermarktBuy,
   executeLocalTransfermarktBuy,
 }));
 
+vi.mock("@/lib/persistence/persistence-service", () => ({
+  createPersistenceService: () => ({
+    getSaveById: persistenceMocks.getSaveById,
+  }),
+}));
+
+function phaseSave(gamePhase = "transfer_buy_phase") {
+  return {
+    saveId: "save-singleplayer-dev",
+    status: "active",
+    gameState: {
+      gamePhase,
+      season: { id: "season-1", name: "Season 1", year: 2026, currentMatchday: 1, matchdayIds: ["md-1"] },
+      seasonState: { seasonId: "season-1", schedule: [], standings: {} },
+      matchdayState: { matchdayId: "md-1", status: "planning", pendingTeamIds: [], resolvedFixtureIds: [] },
+      teams: [{ teamId: "M-M", shortCode: "M-M", name: "Mayhem Mavericks", budget: 500, cash: 300, identityId: "M-M", humanControlled: true, rosterLimit: 12 }],
+      rosters: [],
+      players: [],
+      disciplines: [],
+      teamIdentities: [],
+      contracts: [],
+      transferListings: [],
+      transferHistory: [],
+      logs: [],
+      mappingReport: { mappingSource: "", teamSource: "", generatedAt: "", processedMappingRows: 0, importedPlayerCount: 0, matchedRosterCount: 0, teamCount: 1, unmappedPlayers: [], teamsWithoutPlayers: [], mappingRowsWithoutPlayerMatch: [], duplicateMappedPlayers: [], unknownTeamCodes: [], duplicateTeamCodes: [], warnings: [] },
+    },
+  };
+}
+
 describe("transfermarkt buy api", () => {
   beforeEach(() => {
     previewLocalTransfermarktBuy.mockReset();
     executeLocalTransfermarktBuy.mockReset();
+    persistenceMocks.getSaveById.mockReset();
+    persistenceMocks.getSaveById.mockReturnValue(phaseSave());
   });
 
   it("uses the local sqlite preview path by default and writes nothing on dry-run", async () => {
@@ -43,7 +77,7 @@ describe("transfermarkt buy api", () => {
         body: JSON.stringify({
           saveId: "save-singleplayer-dev",
           seasonId: "season-1",
-          teamId: "A-A",
+          teamId: "M-M",
           playerId: "player-1",
         }),
       }),
@@ -57,7 +91,7 @@ describe("transfermarkt buy api", () => {
     expect(body.scope).toMatchObject({
       saveId: "save-singleplayer-dev",
       seasonId: "season-1",
-      teamId: "A-A",
+      teamId: "M-M",
       playerId: "player-1",
       dryRun: true,
       source: "sqlite",
@@ -95,7 +129,7 @@ describe("transfermarkt buy api", () => {
         body: JSON.stringify({
           saveId: "save-singleplayer-dev",
           seasonId: "season-1",
-          teamId: "A-A",
+          teamId: "M-M",
           playerId: "player-1",
           contractLength: 4,
           contractShape: "front_loaded",
@@ -147,7 +181,7 @@ describe("transfermarkt buy api", () => {
         body: JSON.stringify({
           saveId: "save-singleplayer-dev",
           seasonId: "season-1",
-          teamId: "A-A",
+          teamId: "M-M",
           playerId: "player-1",
           dryRun: false,
         }),
@@ -162,7 +196,7 @@ describe("transfermarkt buy api", () => {
     expect(body.scope).toMatchObject({
       saveId: "save-singleplayer-dev",
       seasonId: "season-1",
-      teamId: "A-A",
+      teamId: "M-M",
       playerId: "player-1",
       dryRun: false,
       source: "sqlite",
@@ -207,5 +241,27 @@ describe("transfermarkt buy api", () => {
 
     expect(response.status).toBe(400);
     expect(body.success).toBe(false);
+  });
+
+  it("blocks buys outside the transfer/setup phase", async () => {
+    persistenceMocks.getSaveById.mockReturnValue(phaseSave("season_completed"));
+
+    const { POST } = await import("@/app/api/transfermarkt/buy/route");
+    const response = await POST(
+      new Request("http://localhost/api/transfermarkt/buy", {
+        method: "POST",
+        body: JSON.stringify({
+          saveId: "save-singleplayer-dev",
+          seasonId: "season-1",
+          teamId: "M-M",
+          playerId: "player-1",
+        }),
+      }),
+    );
+    const body = await response.json();
+
+    expect(response.status).toBe(409);
+    expect(body.error).toBe("phase_blocked:buy_players:season_completed");
+    expect(previewLocalTransfermarktBuy).not.toHaveBeenCalled();
   });
 });

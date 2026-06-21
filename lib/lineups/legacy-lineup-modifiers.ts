@@ -62,11 +62,6 @@ const NEGATIVE_MUTATOR_TRAITS = [
   "Vindictive",
 ] as const;
 
-const MVP_FORCED_MUTATOR_LABELS = [
-  "MVP Force I",
-  "MVP Force II",
-] as const;
-
 function hashSeed(input: string) {
   let hash = 2166136261;
   for (let index = 0; index < input.length; index += 1) {
@@ -87,6 +82,8 @@ function createDefaultModifierSide() {
     secondaryFormCardId: null,
     mutatorTrait1: null,
     mutatorTrait2: null,
+    teamPowerId: null,
+    intensity: "normal" as const,
   };
 }
 
@@ -125,6 +122,51 @@ export function getLegacyMutatorTraitOptions(): LegacyMutatorTraitOption[] {
   ];
 }
 
+function normalizeTraitValue(trait: unknown) {
+  return String(trait ?? "").trim();
+}
+
+function normalizeTraitKey(trait: unknown) {
+  return normalizeTraitValue(trait).toLowerCase();
+}
+
+export function getPlayerMutatorTraitSlots(player: Pick<LegacyRosterPlayerRef, "traitsPositive" | "traitsNegative"> | null): string[] {
+  if (!player) {
+    return [];
+  }
+  return [...(player.traitsPositive ?? []), ...(player.traitsNegative ?? [])]
+    .map(normalizeTraitValue)
+    .filter(Boolean);
+}
+
+export function buildLegacyMutatorTraitOptionsForRoster(rosterPlayers: LegacyRosterPlayerRef[]): LegacyMutatorTraitOption[] {
+  const byKey = new Map<string, LegacyMutatorTraitOption>();
+  for (const option of getLegacyMutatorTraitOptions()) {
+    byKey.set(normalizeTraitKey(option.value), option);
+  }
+
+  for (const player of rosterPlayers) {
+    for (const trait of player.traitsPositive ?? []) {
+      const value = normalizeTraitValue(trait);
+      if (!value) continue;
+      const key = normalizeTraitKey(value);
+      if (!byKey.has(key)) {
+        byKey.set(key, { label: value, value, polarity: "positive" });
+      }
+    }
+    for (const trait of player.traitsNegative ?? []) {
+      const value = normalizeTraitValue(trait);
+      if (!value) continue;
+      const key = normalizeTraitKey(value);
+      if (!byKey.has(key)) {
+        byKey.set(key, { label: value, value, polarity: "negative" });
+      }
+    }
+  }
+
+  return [...byKey.values()].sort((left, right) => left.label.localeCompare(right.label));
+}
+
 export function getLegacyFormCardSourceSummary(): LegacyModifierSourceSummary {
   return {
     selectionStatus: "ready",
@@ -138,7 +180,8 @@ export function getLegacyMutatorSourceSummary(): LegacyModifierSourceSummary {
   return {
     selectionStatus: "ready",
     effectStatus: "ready",
-    sourceLabel: "Mutator-Auswahl aus Legacy mutator_trait_1/_2; Effekt: +6 Score pro passendem Mutator und +0.3 Player-PPs pro passendem Spieler.",
+    sourceLabel:
+      "Mutator-Auswahl aus Legacy mutator_trait_1/_2; Effekt: +6 Score pro passendem Mutator und +0.3 Player-PPs pro betroffenem aktivem Spieler, maximal einmal je Diszi-Seite.",
     warnings: [],
   };
 }
@@ -269,6 +312,52 @@ export function getTeamFormCardOptions(input: {
   }));
 }
 
+export type FormCardSeasonUsageAuditTeam = {
+  teamId: string;
+  totalCards: number;
+  usedCards: number;
+  unusedCards: number;
+  unusedPositiveCards: number;
+  unusedNegativeCards: number;
+  negativePenaltyPoints: number;
+};
+
+export function buildFormCardSeasonUsageAudit(gameState: GameState, seasonId: string) {
+  const usage = buildFormCardUsageMap(gameState, seasonId);
+  const rows = [...gameState.teams]
+    .sort((left, right) => left.teamId.localeCompare(right.teamId))
+    .map((team): FormCardSeasonUsageAuditTeam => {
+      const cards = (gameState.seasonState.formCards ?? []).filter(
+        (card) => card.seasonId === seasonId && card.teamId === team.teamId && card.cardValue !== 0,
+      );
+      const usedCards = cards.filter((card) => usage.has(card.id));
+      const unusedCards = cards.filter((card) => !usage.has(card.id));
+      const unusedNegativeCards = unusedCards.filter((card) => card.cardValue < 0).length;
+      const unusedPositiveCards = unusedCards.filter((card) => card.cardValue > 0).length;
+
+      return {
+        teamId: team.teamId,
+        totalCards: cards.length,
+        usedCards: usedCards.length,
+        unusedCards: unusedCards.length,
+        unusedPositiveCards,
+        unusedNegativeCards,
+        negativePenaltyPoints: unusedNegativeCards,
+      };
+    });
+
+  return {
+    seasonId,
+    rows,
+    totalCards: rows.reduce((sum, row) => sum + row.totalCards, 0),
+    usedCards: rows.reduce((sum, row) => sum + row.usedCards, 0),
+    unusedCards: rows.reduce((sum, row) => sum + row.unusedCards, 0),
+    unusedPositiveCards: rows.reduce((sum, row) => sum + row.unusedPositiveCards, 0),
+    unusedNegativeCards: rows.reduce((sum, row) => sum + row.unusedNegativeCards, 0),
+    negativePenaltyPoints: rows.reduce((sum, row) => sum + row.negativePenaltyPoints, 0),
+  };
+}
+
 function normalizeColor(value: string | null | undefined): FormCardColor | null {
   const normalized = String(value ?? "").trim().toLowerCase();
   if (normalized === "red" || normalized === "green" || normalized === "blue" || normalized === "yellow") {
@@ -327,9 +416,7 @@ function countTraitHits(player: LegacyRosterPlayerRef | null, traitSet: Set<stri
   if (!player || traitSet.size === 0) {
     return 0;
   }
-  const allTraits = [...(player.traitsPositive ?? []), ...(player.traitsNegative ?? [])]
-    .map((trait) => String(trait).trim().toLowerCase())
-    .filter(Boolean);
+  const allTraits = Array.from(new Set(getPlayerMutatorTraitSlots(player).map(normalizeTraitKey).filter(Boolean)));
   return allTraits.reduce((hits, trait) => hits + (traitSet.has(trait) ? 1 : 0), 0);
 }
 
@@ -350,50 +437,68 @@ export function calculateMutatorModifierForSide(input: {
   warnings: string[];
 } {
   const selection = getModifierSelectionForSide(input.modifiers, input.disciplineSide);
-  const selectedTraits = [selection.mutatorTrait1, selection.mutatorTrait2]
-    .map((trait) => String(trait ?? "").trim())
-    .filter(Boolean);
+  const selectedTraits = Array.from(
+    new Map(
+      [selection.mutatorTrait1, selection.mutatorTrait2]
+        .map(normalizeTraitValue)
+        .filter(Boolean)
+        .map((trait) => [normalizeTraitKey(trait), trait] as const),
+    ).values(),
+  );
   const warnings: string[] = [];
-  const traitSet = new Set(selectedTraits.map((trait) => trait.toLowerCase()));
+  const traitSet = new Set(selectedTraits.map(normalizeTraitKey));
   const playerById = new Map(input.rosterPlayers.map((player) => [player.id, player]));
+  const playerMutatorBonuses: Record<string, number> = {};
   const playerMutatorPpsBonuses: Record<string, number> = {};
   const affectedPlayerIdsByTrait = new Map<string, Set<string>>();
+  const hitCountByTrait = new Map<string, number>();
+  const ppsPlayerIdsByTrait = new Map<string, Set<string>>();
+  let totalHits = 0;
+  const activePlayerIds = Array.from(
+    new Set(input.entries.map((entry) => String(entry.playerId ?? "").trim()).filter(Boolean)),
+  );
 
-  for (const entry of input.entries) {
-    const player = playerById.get(entry.playerId) ?? null;
+  for (const playerId of activePlayerIds) {
+    const player = playerById.get(playerId) ?? null;
     const hits = countTraitHits(player, traitSet);
+    totalHits += hits;
     if (hits > 0) {
-      playerMutatorPpsBonuses[entry.playerId] = Number((hits * 0.3).toFixed(1));
+      playerMutatorBonuses[playerId] = Number((hits * 6).toFixed(1));
+      playerMutatorPpsBonuses[playerId] = 0.3;
     }
     if (player) {
-      const allTraits = [...(player.traitsPositive ?? []), ...(player.traitsNegative ?? [])]
-        .map((trait) => String(trait).trim().toLowerCase())
-        .filter(Boolean);
+      const allTraits = Array.from(new Set(getPlayerMutatorTraitSlots(player).map(normalizeTraitKey).filter(Boolean)));
+      let assignedPpsTrait = false;
       for (const trait of selectedTraits) {
-        const normalizedTrait = trait.toLowerCase();
-        if (allTraits.includes(normalizedTrait)) {
+        const normalizedTrait = normalizeTraitKey(trait);
+        const traitHits = allTraits.reduce((count, playerTrait) => count + (playerTrait === normalizedTrait ? 1 : 0), 0);
+        if (traitHits > 0) {
+          hitCountByTrait.set(normalizedTrait, (hitCountByTrait.get(normalizedTrait) ?? 0) + traitHits);
           const affectedPlayerIds = affectedPlayerIdsByTrait.get(normalizedTrait) ?? new Set<string>();
-          affectedPlayerIds.add(entry.playerId);
+          affectedPlayerIds.add(playerId);
           affectedPlayerIdsByTrait.set(normalizedTrait, affectedPlayerIds);
+          if (!assignedPpsTrait) {
+            const ppsPlayerIds = ppsPlayerIdsByTrait.get(normalizedTrait) ?? new Set<string>();
+            ppsPlayerIds.add(playerId);
+            ppsPlayerIdsByTrait.set(normalizedTrait, ppsPlayerIds);
+            assignedPpsTrait = true;
+          }
         }
       }
     }
   }
 
-  for (const trait of selectedTraits) {
-    const exists = getLegacyMutatorTraitOptions().some((option) => option.value === trait);
-    if (!exists) {
-      warnings.push(`Mutator-Trait ${trait} ist nicht im bekannten Trait-Pool enthalten.`);
-    }
-  }
-  const matchingMutatorCount = selectedTraits.filter((trait) => (affectedPlayerIdsByTrait.get(trait.toLowerCase())?.size ?? 0) > 0).length;
   const mutatorSlots = selectedTraits.map((trait, index) => {
-    const affectedPlayerIds = [...(affectedPlayerIdsByTrait.get(trait.toLowerCase()) ?? new Set<string>())];
+    const normalizedTrait = normalizeTraitKey(trait);
+    const hitCount = hitCountByTrait.get(normalizedTrait) ?? 0;
+    const affectedPlayerIds = [...(affectedPlayerIdsByTrait.get(normalizedTrait) ?? new Set<string>())];
+    const ppsPlayerCount = ppsPlayerIdsByTrait.get(normalizedTrait)?.size ?? 0;
     return {
       slotKey: index === 0 ? "mutator1" as const : "mutator2" as const,
       label: trait,
-      scoreModifier: affectedPlayerIds.length > 0 ? 6 : 0,
-      playerPpsModifier: affectedPlayerIds.length > 0 ? 0.3 : 0,
+      hitCount,
+      scoreModifier: Number((hitCount * 6).toFixed(1)),
+      playerPpsModifier: Number((ppsPlayerCount * 0.3).toFixed(1)),
       teamPpsModifier: null,
       teamPpsStatus: "missing_source" as const,
       affectedPlayerIds,
@@ -404,8 +509,8 @@ export function calculateMutatorModifierForSide(input: {
   return {
     mutatorMode: "legacy_selected_traits",
     mutatorText: selectedTraits.length > 0 ? selectedTraits.join(", ") : null,
-    mutatorModifier: matchingMutatorCount * 6,
-    playerMutatorBonuses: {},
+    mutatorModifier: Number((totalHits * 6).toFixed(1)),
+    playerMutatorBonuses,
     playerMutatorPpsBonuses,
     mutatorSlots,
     teamPpsModifier: null,
@@ -427,6 +532,7 @@ export function calculateMvpForcedMutatorModifierForSide(input: {
   disciplineSide: LineupDisciplineSide;
   entries: Array<{ playerId: string }>;
   disciplineScores: LegacyDisciplineScoreRef[];
+  rosterPlayers: LegacyRosterPlayerRef[];
 }): {
   mutatorMode: LegacyResolveMutatorMode;
   mutatorText: string | null;
@@ -440,53 +546,86 @@ export function calculateMvpForcedMutatorModifierForSide(input: {
 } {
   const warnings: string[] = [];
   const scoreMap = buildDisciplineScoreMap(input.disciplineScores, input.disciplineId);
-  const rankedPlayerIds = [...input.entries]
-    .map((entry) => ({
-      playerId: entry.playerId,
-      score: scoreMap.get(entry.playerId) ?? 0,
-    }))
-    .sort((left, right) => right.score - left.score)
-    .map((entry) => entry.playerId);
+  const activePlayerIds = Array.from(
+    new Set(input.entries.map((entry) => String(entry.playerId ?? "").trim()).filter(Boolean)),
+  );
+  const playerById = new Map(input.rosterPlayers.map((player) => [player.id, player]));
+  const traitCandidates = new Map<string, {
+    label: string;
+    affectedPlayerIds: Set<string>;
+    hitCount: number;
+    disciplineScoreSum: number;
+  }>();
 
-  const fallbackPlayerId = rankedPlayerIds[0] ?? input.entries[0]?.playerId ?? null;
-  const slotAssignments = [
-    rankedPlayerIds[0] ?? fallbackPlayerId,
-    rankedPlayerIds[1] ?? fallbackPlayerId,
-  ];
-
-  const playerMutatorPpsBonuses: Record<string, number> = {};
-  const mutatorSlots: LegacyMutatorSlotEffect[] = MVP_FORCED_MUTATOR_LABELS.map((label, index) => {
-    const targetPlayerId = slotAssignments[index] ?? null;
-    if (targetPlayerId) {
-      playerMutatorPpsBonuses[targetPlayerId] = Number(((playerMutatorPpsBonuses[targetPlayerId] ?? 0) + 0.3).toFixed(1));
+  for (const playerId of activePlayerIds) {
+    const player = playerById.get(playerId) ?? null;
+    if (!player) {
+      continue;
     }
+    const playerScore = scoreMap.get(playerId) ?? 0;
+    const playerTraits = Array.from(new Map(
+      getPlayerMutatorTraitSlots(player)
+        .map(normalizeTraitValue)
+        .filter(Boolean)
+        .map((trait) => [normalizeTraitKey(trait), trait] as const),
+    ).entries());
 
-    return {
-      slotKey: index === 0 ? "mutator1" : "mutator2",
-      label,
-      scoreModifier: input.entries.length > 0 ? 6 : 0,
-      playerPpsModifier: targetPlayerId ? 0.3 : 0,
-      teamPpsModifier: null,
-      teamPpsStatus: "missing_source",
-      affectedPlayerIds: targetPlayerId ? [targetPlayerId] : [],
-      sourceStatus: "ready",
-    };
-  });
+    for (const [normalizedTrait, label] of playerTraits) {
+      const current = traitCandidates.get(normalizedTrait) ?? {
+        label,
+        affectedPlayerIds: new Set<string>(),
+        hitCount: 0,
+        disciplineScoreSum: 0,
+      };
+      current.affectedPlayerIds.add(playerId);
+      current.hitCount += 1;
+      current.disciplineScoreSum += playerScore;
+      traitCandidates.set(normalizedTrait, current);
+    }
+  }
+
+  const selectedTraits = [...traitCandidates.values()]
+    .sort((left, right) => {
+      if (right.hitCount !== left.hitCount) return right.hitCount - left.hitCount;
+      if (right.disciplineScoreSum !== left.disciplineScoreSum) return right.disciplineScoreSum - left.disciplineScoreSum;
+      return left.label.localeCompare(right.label, "de");
+    })
+    .slice(0, 2)
+    .map((candidate) => candidate.label);
 
   if (input.entries.length === 0) {
-    warnings.push(`MVP forced mutators could not affect ${input.disciplineId}/${input.disciplineSide} because no lineup entries were found.`);
+    warnings.push(`Forced mutators could not affect ${input.disciplineId}/${input.disciplineSide} because no lineup entries were found.`);
   }
+  if (input.entries.length > 0 && selectedTraits.length === 0) {
+    warnings.push(`Forced mutators found no matching player traits for ${input.disciplineId}/${input.disciplineSide}.`);
+  }
+
+  const modifiers: LineupDraftModifiers = {
+    d1: createDefaultModifierSide(),
+    d2: createDefaultModifierSide(),
+  };
+  modifiers[input.disciplineSide] = {
+    ...createDefaultModifierSide(),
+    mutatorTrait1: selectedTraits[0] ?? null,
+    mutatorTrait2: selectedTraits[1] ?? null,
+  };
+  const result = calculateMutatorModifierForSide({
+    modifiers,
+    disciplineSide: input.disciplineSide,
+    entries: input.entries,
+    rosterPlayers: input.rosterPlayers,
+  });
 
   return {
     mutatorMode: "mvp_forced_mutators",
-    mutatorText: mutatorSlots.map((slot) => slot.label).join(" + "),
-    mutatorModifier: Number(mutatorSlots.reduce((sum, slot) => sum + slot.scoreModifier, 0).toFixed(1)),
-    playerMutatorBonuses: {},
-    playerMutatorPpsBonuses,
-    mutatorSlots,
-    teamPpsModifier: null,
-    teamPpsStatus: "missing_source",
-    warnings,
+    mutatorText: result.mutatorText,
+    mutatorModifier: result.mutatorModifier,
+    playerMutatorBonuses: result.playerMutatorBonuses,
+    playerMutatorPpsBonuses: result.playerMutatorPpsBonuses,
+    mutatorSlots: result.mutatorSlots,
+    teamPpsModifier: result.teamPpsModifier,
+    teamPpsStatus: result.teamPpsStatus,
+    warnings: [...warnings, ...result.warnings],
   };
 }
 

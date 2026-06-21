@@ -222,7 +222,7 @@ describe("contract renewal service", () => {
     expect(savedGameState?.seasonState.contractEvents ?? []).toHaveLength(0);
   });
 
-  it("lets AI renew valuable LZ 1 players and writes a renewal event", () => {
+  it("lets AI renew valuable players when the season tick reaches LZ 0", () => {
     const player = createPlayer("p1", { rating: 95 });
     const save = createSave(createGameState({ players: [player], rosters: [createRosterEntry("p1", { contractLength: 1, salary: 6 })] }));
     const persistence = createPersistenceMock();
@@ -237,6 +237,154 @@ describe("contract renewal service", () => {
     expect(savedGameState?.rosters[0]?.contractStatus).not.toBe("renewal_pending");
     expect(savedGameState?.seasonState.contractEvents?.[0]?.eventType).toBe("contract_renewed");
     expect(savedGameState?.seasonState.contractEvents?.[0]?.source).toBe("ai_contract_renewal");
+  });
+
+  it("lets AI choose non-balanced renewal shapes when team profile and cash context support it", () => {
+    const team = createTeam({ teamId: "C-C", shortCode: "C-C", name: "Cash Creators", cash: 220, humanControlled: false });
+    const player = createPlayer("value-core", { rating: 96, marketValue: 48, displayMarketValue: 48, salaryDemand: 8, displaySalary: 8 });
+    const save = createSave(
+      createGameState({
+        teams: [team],
+        players: [player],
+        rosters: [createRosterEntry(player.id, { teamId: team.teamId, contractLength: 1, salary: 6, currentValue: 48 })],
+      }),
+    );
+    const persistence = createPersistenceMock();
+    const preview = previewSeasonEndContracts(save);
+    const row = preview.rows.find((entry) => entry.playerId === player.id);
+
+    const result = applySeasonEndContractTick(save, preview.confirmToken, persistence);
+    const savedGameState = vi.mocked(persistence.saveSingleplayerState).mock.calls[0]?.[1];
+
+    expect(row?.recommendedAction).toBe("renew");
+    expect(row?.recommendedContractShape).toBe("front_loaded");
+    expect(row?.warnings).toContain("ai_contract_shape:front_loaded");
+    expect(result.renewedPlayers).toBe(1);
+    expect(savedGameState?.rosters[0]?.contractShape).toBe("front_loaded");
+    expect(savedGameState?.rosters[0]?.yearlySalarySchedule?.[0]?.salary).toBeGreaterThan(
+      savedGameState?.rosters[0]?.yearlySalarySchedule?.at(-1)?.salary ?? 0,
+    );
+  });
+
+  it("lets AI renew useful players that are already at contract length 0", () => {
+    const player = createPlayer("p1", { rating: 72, marketValue: 32, displayMarketValue: 32, salaryDemand: 6, displaySalary: 6 });
+    const save = createSave(createGameState({ players: [player], rosters: [createRosterEntry("p1", { contractLength: 0, contractStatus: "out_of_contract", salary: 6, currentValue: 32 })] }));
+    const persistence = createPersistenceMock();
+    const preview = previewSeasonEndContracts(save);
+    const row = preview.rows.find((entry) => entry.playerId === "p1");
+
+    const result = applySeasonEndContractTick(save, preview.confirmToken, persistence);
+    const savedGameState = vi.mocked(persistence.saveSingleplayerState).mock.calls[0]?.[1];
+
+    expect(row?.statusBeforeTick).toBe("out_of_contract");
+    expect(row?.statusAfterTick).toBe("out_of_contract");
+    expect(row?.recommendedAction).toBe("renew");
+    expect(result.renewedPlayers).toBe(1);
+    expect(savedGameState?.rosters[0]?.contractLength).toBeGreaterThan(0);
+    expect(savedGameState?.seasonState.contractEvents?.[0]?.eventType).toBe("contract_renewed");
+    expect(savedGameState?.seasonState.contractEvents?.[0]?.oldLength).toBe(0);
+  });
+
+  it("does not pre-renew useful players before their contract reaches LZ 0", () => {
+    const player = createPlayer("p1", { rating: 72, marketValue: 32, displayMarketValue: 32, salaryDemand: 6, displaySalary: 6 });
+    const save = createSave(createGameState({ players: [player], rosters: [createRosterEntry("p1", { contractLength: 2, salary: 6, currentValue: 32 })] }));
+    const persistence = createPersistenceMock();
+    const preview = previewSeasonEndContracts(save);
+    const row = preview.rows.find((entry) => entry.playerId === "p1");
+
+    const result = applySeasonEndContractTick(save, preview.confirmToken, persistence);
+    const savedGameState = vi.mocked(persistence.saveSingleplayerState).mock.calls[0]?.[1];
+
+    expect(row?.statusAfterTick).toBe("expiring");
+    expect(row?.recommendedAction).toBe("no_action");
+    expect(result.renewedPlayers).toBe(0);
+    expect(savedGameState?.rosters).toHaveLength(1);
+    expect(savedGameState?.rosters[0]?.contractLength).toBe(1);
+    expect(savedGameState?.rosters[0]?.contractStatus).toBe("expiring");
+    expect(savedGameState?.seasonState.contractEvents ?? []).toHaveLength(0);
+  });
+
+  it("does not pre-renew expensive low-value players just because they would be LZ 1", () => {
+    const player = createPlayer("p1", { rating: 34, marketValue: 9, displayMarketValue: 9, salaryDemand: 14, displaySalary: 14 });
+    const save = createSave(createGameState({ players: [player], rosters: [createRosterEntry("p1", { contractLength: 2, salary: 14, currentValue: 9 })] }));
+    const persistence = createPersistenceMock();
+    const preview = previewSeasonEndContracts(save);
+    const row = preview.rows.find((entry) => entry.playerId === "p1");
+
+    const result = applySeasonEndContractTick(save, preview.confirmToken, persistence);
+    const savedGameState = vi.mocked(persistence.saveSingleplayerState).mock.calls[0]?.[1];
+
+    expect(row?.statusAfterTick).toBe("expiring");
+    expect(row?.recommendedAction).toBe("no_action");
+    expect(result.renewedPlayers).toBe(0);
+    expect(savedGameState?.rosters[0]?.contractLength).toBe(1);
+    expect(savedGameState?.seasonState.contractEvents ?? []).toHaveLength(0);
+  });
+
+  it("does not let AI renew while team cash is negative", () => {
+    const team = createTeam({ cash: -3, humanControlled: false });
+    const player = createPlayer("p1", { rating: 95, marketValue: 40, displayMarketValue: 40 });
+    const save = createSave(
+      createGameState({
+        teams: [team],
+        players: [player],
+        rosters: [createRosterEntry("p1", { contractLength: 1, salary: 6, currentValue: 40 })],
+      }),
+    );
+    const persistence = createPersistenceMock();
+    const preview = previewSeasonEndContracts(save);
+    const row = preview.rows.find((entry) => entry.playerId === "p1");
+
+    const result = applySeasonEndContractTick(save, preview.confirmToken, persistence);
+    const savedGameState = vi.mocked(persistence.saveSingleplayerState).mock.calls[0]?.[1];
+
+    expect(row?.recommendedAction).toBe("release");
+    expect(row?.warnings.some((warning) => warning.startsWith("ai_cash_buffer_required"))).toBe(true);
+    expect(result.renewedPlayers).toBe(0);
+    expect(savedGameState?.rosters).toHaveLength(0);
+    expect(savedGameState?.seasonState.contractEvents?.[0]?.eventType).toBe("contract_expired_exit");
+  });
+
+  it("keeps Retool length bands intact before applying morale to AI renewal salary", () => {
+    const player = createPlayer("lazkul-like", {
+      rating: 95,
+      marketValue: 34,
+      displayMarketValue: 34,
+      salaryDemand: 12,
+      displaySalary: 12,
+      className: "Warlord",
+      race: "Lizard",
+      traitsPositive: ["FiredUp", "Cool"],
+      traitsNegative: [],
+    });
+    const save = createSave(
+      createGameState({
+        players: [player],
+        rosters: [createRosterEntry(player.id, { contractLength: 0, contractStatus: "renewal_pending", salary: 9.63, roleTag: "starter" })],
+      }),
+    );
+
+    const oneYear = previewContractRenewalAction({
+      save,
+      teamId: "A-A",
+      playerId: player.id,
+      action: "renew",
+      contractLength: 1,
+    });
+    const fourYear = previewContractRenewalAction({
+      save,
+      teamId: "A-A",
+      playerId: player.id,
+      action: "renew",
+      contractLength: 4,
+    });
+    const seasonEndRow = previewSeasonEndContracts(save).rows.find((row) => row.playerId === player.id);
+
+    expect(fourYear.negotiationPreview?.expectedSalary ?? 0).toBeLessThan(oneYear.negotiationPreview?.expectedSalary ?? 0);
+    expect(fourYear.moraleAdjustedExpectedSalary ?? 0).toBeLessThan(oneYear.moraleAdjustedExpectedSalary ?? 0);
+    expect(seasonEndRow?.recommendedLength).toBe(4);
+    expect(seasonEndRow?.renewalSalaryPreview ?? 0).toBeLessThan(oneYear.moraleAdjustedExpectedSalary ?? 0);
+    expect(seasonEndRow?.warnings).not.toContain("long_contract_salary_discount_guard_applied");
   });
 
   it("moves AI release candidates back to the free-agent pool and writes a release event", () => {
@@ -276,7 +424,7 @@ describe("contract renewal service", () => {
 
   it("renews a contract only through preview token and writes salary, length, and event", () => {
     const player = createPlayer("p1");
-    const save = createSave(createGameState({ players: [player], rosters: [createRosterEntry("p1", { contractLength: 1, salary: 6 })] }));
+    const save = createSave(createGameState({ players: [player], rosters: [createRosterEntry("p1", { contractLength: 0, contractStatus: "renewal_pending", salary: 6 })] }));
     const persistence = createPersistenceMock();
     const preview = previewContractRenewalAction({
       save,
@@ -306,6 +454,23 @@ describe("contract renewal service", () => {
     expect(savedGameState?.seasonState.contractEvents?.[0]?.eventType).toBe("contract_renewed");
   });
 
+  it("blocks direct renewals until the contract is at LZ 0", () => {
+    const player = createPlayer("p1");
+    const save = createSave(createGameState({ players: [player], rosters: [createRosterEntry("p1", { contractLength: 1, salary: 6 })] }));
+
+    const preview = previewContractRenewalAction({
+      save,
+      teamId: "A-A",
+      playerId: "p1",
+      action: "renew",
+      contractLength: 4,
+      offeredSalary: 8,
+    });
+
+    expect(preview.ok).toBe(false);
+    expect(preview.blockingReasons).toContain("renewal_only_allowed_at_lz_0");
+  });
+
   it("applies morale to renewal salary and limits very unhappy players to short bridge deals", () => {
     const player = createPlayer("p1", {
       salaryDemand: 12,
@@ -316,7 +481,7 @@ describe("contract renewal service", () => {
     const save = createSave(
       createGameState({
         players: [player],
-        rosters: [createRosterEntry("p1", { contractLength: 1, salary: 3, roleTag: "starter" })],
+        rosters: [createRosterEntry("p1", { contractLength: 0, contractStatus: "renewal_pending", salary: 3, roleTag: "starter" })],
       }),
     );
 

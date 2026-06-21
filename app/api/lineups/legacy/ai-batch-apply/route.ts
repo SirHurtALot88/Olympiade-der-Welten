@@ -1,3 +1,5 @@
+export const dynamic = "force-dynamic";
+
 import { NextResponse } from "next/server";
 
 import { applyAiLegacyLineupBatchLocally } from "@/lib/ai/ai-legacy-lineup-batch-apply-service";
@@ -30,6 +32,7 @@ export async function POST(request: Request) {
     confirm?: boolean;
     includeWarningTeams?: boolean;
     overwriteExisting?: boolean;
+    forceAiTeams?: boolean;
   };
 
   const dryRun = body.dryRun ?? true;
@@ -50,6 +53,7 @@ export async function POST(request: Request) {
       dryRun,
       includeWarningTeams: body.includeWarningTeams ?? false,
       overwriteExisting: body.overwriteExisting ?? false,
+      forceAiTeams: body.forceAiTeams ?? false,
     });
 
     return NextResponse.json(result);

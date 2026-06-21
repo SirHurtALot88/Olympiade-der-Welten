@@ -1,7 +1,10 @@
+export const dynamic = "force-dynamic";
+
 import { NextResponse } from "next/server";
 
 import { FACILITY_CATALOG_BY_ID, type FacilityId } from "@/lib/facilities/facility-catalog";
 import { applyFacilityMaintenance, previewFacilityMaintenance } from "@/lib/facilities/facility-maintenance-service";
+import { evaluateGamePhaseAction } from "@/lib/foundation/game-phase-action-policy";
 import { createPersistenceService } from "@/lib/persistence/persistence-service";
 import { notifyRoomGameplayWrite } from "@/lib/room/room-gameplay-write-notifier";
 import { authorizeServerRoomWrite } from "@/lib/room/server-authoritative-write-guard";
@@ -17,6 +20,7 @@ type FacilityMaintenanceRequestBody = {
   seatToken?: string | null;
   userId?: string | null;
   activeManagerTeamId?: string | null;
+  activeOwnerId?: string | null;
   controlMode?: "human" | "ai" | "passive" | "manual" | null;
 };
 
@@ -50,9 +54,32 @@ export async function POST(request: Request) {
   if (!save) {
     return NextResponse.json({ success: false, error: `Save ${saveId} not found.`, summary: null }, { status: 404 });
   }
-
   const dryRun = body.dryRun ?? true;
+  const phaseGate = evaluateGamePhaseAction(save.gameState, "facility_apply");
+  if (!phaseGate.allowed && !dryRun) {
+    return NextResponse.json(
+      {
+        success: false,
+        error: phaseGate.reason,
+        summary: null,
+        warnings: phaseGate.warnings,
+        blockingReasons: phaseGate.reason ? [phaseGate.reason] : [],
+      },
+      { status: 409 },
+    );
+  }
+
   const preview = previewFacilityMaintenance(save, teamId, facilityId);
+  const phaseAwarePreview =
+    dryRun && !phaseGate.allowed && phaseGate.reason
+      ? {
+          ...preview,
+          ok: false,
+          confirmToken: null,
+          warnings: [...preview.warnings, ...phaseGate.warnings],
+          blockingReasons: [...preview.blockingReasons, phaseGate.reason],
+        }
+      : preview;
   const writeAuth = authorizeServerRoomWrite({
     roomCode: body.roomCode,
     participantId: body.participantId,
@@ -66,6 +93,7 @@ export async function POST(request: Request) {
     confirmToken: body.confirmToken,
     expectedConfirmToken: preview.confirmToken,
     activeManagerTeamId: body.activeManagerTeamId,
+    activeOwnerId: body.activeOwnerId,
     controlMode: body.controlMode,
   });
   if (!writeAuth.allowed) {
@@ -81,7 +109,7 @@ export async function POST(request: Request) {
     );
   }
   const summary = dryRun
-    ? preview
+    ? phaseAwarePreview
     : applyFacilityMaintenance(save, teamId, facilityId, body.confirmToken ?? null, persistence);
   const success = dryRun ? summary.ok : "applied" in summary && summary.applied;
   notifyRoomGameplayWrite(writeAuth, {
@@ -96,7 +124,7 @@ export async function POST(request: Request) {
   return NextResponse.json({
     success,
     summary,
-    warnings: [...writeAuth.warnings, ...summary.warnings],
+    warnings: [...phaseGate.warnings, ...writeAuth.warnings, ...summary.warnings],
     blockingReasons: summary.blockingReasons,
     error: success ? null : summary.blockingReasons.join(" · ") || "facility_maintenance_blocked",
   });

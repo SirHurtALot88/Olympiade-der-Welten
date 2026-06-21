@@ -2,6 +2,7 @@ import playerPortraitMap from "@/data/generated/player-portrait-map.json";
 import teamLogoMap from "@/data/generated/team-logo-map.json";
 import type { GameState, Player, Team } from "@/lib/data/olyDataTypes";
 import { hydratePlayersWithAttributeSheet } from "@/lib/data/playerAttributeSheetData";
+import { repairImportedPlayerData } from "@/lib/data/playerImportRepairs";
 
 const teamLogoPathByTeamId = teamLogoMap as Record<string, string>;
 const portraitPathByPlayerId: Record<string, string> = {
@@ -67,7 +68,7 @@ export function hydrateGameStateMedia(gameState: GameState): GameState {
   return {
     ...gameState,
     teams: gameState.teams.map(attachTeamLogoPath),
-    players: hydratePlayersWithAttributeSheet(gameState.players).map(attachPlayerPortraitPath),
+    players: repairImportedPlayerData(hydratePlayersWithAttributeSheet(gameState.players)).map(attachPlayerPortraitPath),
   };
 }
 

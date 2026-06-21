@@ -172,12 +172,15 @@ describe("prize money preview", () => {
     expect(result.summary.totalRankChangePrize).toBe(11.9);
     expect(result.summary.currentFactor).toBe(1.09);
     expect(result.summary.futureSeasonCount).toBe(4);
-    expect(result.items[0]?.futureSeasons).toContainEqual({
-      seasonLabel: "Season +1",
-      factor: 1.21,
-      prizeMoney: 99.7,
-      projectedCash: 137.6,
-    });
+    expect(result.items[0]?.futureSeasons).toContainEqual(
+      expect.objectContaining({
+        seasonLabel: "Season +1",
+        factor: 1.21,
+        prizeMoney: 99.7,
+        salaryTotal: 0,
+        projectedCash: 137.6,
+      }),
+    );
   });
 
   it("subtracts team salary from season-end projected cash instead of adding sponsor only", async () => {

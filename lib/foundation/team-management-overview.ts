@@ -2,9 +2,11 @@ import type { GameState, Player, RosterEntry, Team } from "@/lib/data/olyDataTyp
 import { resolvePlayerEconomyContract } from "@/lib/foundation/player-economy-contract";
 import { buildPlayerRatingContractMap } from "@/lib/foundation/player-rating-contract";
 import { buildSeasonPointsLedger } from "@/lib/foundation/season-points-ledger";
+import { getTeamGeneralManager } from "@/lib/foundation/team-general-managers";
 import { saisonstandDisciplineColumns } from "@/lib/foundation/saisonstand-column-contract";
 import { normalizeLineupDisciplineFieldName } from "@/lib/lineups/team-discipline-ranks";
 import { buildTeamPrizeSummary } from "@/lib/season/prize-money";
+import { getSeasonEconomyFactorWindow } from "@/lib/season/season-economy-factors";
 import { buildAllTimeTableFromSnapshots } from "@/lib/season/season-snapshot-helpers";
 
 type TeamManagementSnapshotStanding = {
@@ -76,6 +78,8 @@ function buildTransferSummaryByTeamIdFromHistory(gameState: GameState) {
 
 type TeamManagementSnapshotInput = {
   gameState: GameState;
+  seasonId?: string;
+  preferStandingDisciplineValues?: boolean;
   standingsByTeamId?: Record<string, TeamManagementSnapshotStanding>;
   needScoreByTeamId?: Record<string, number | null | undefined>;
   transferSummaryByTeamId?: Record<string, TeamManagementTransferSummary | undefined>;
@@ -86,6 +90,9 @@ export type TeamManagementSnapshotRow = {
   teamId: string;
   teamCode: string;
   teamName: string;
+  generalManagerName: string | null;
+  generalManagerTitle: string | null;
+  generalManagerInfluencePct: number | null;
   rank: number | null;
   points: number | null;
   rosterCount: number;
@@ -177,6 +184,19 @@ function deriveDisplayedCash(input: {
   return input.teamCash;
 }
 
+function buildStartBudgetRankMap(teams: Team[]) {
+  const sorted = [...teams].sort((left, right) => {
+    const leftBudget = Number.isFinite(left.budget) ? left.budget : Number.NEGATIVE_INFINITY;
+    const rightBudget = Number.isFinite(right.budget) ? right.budget : Number.NEGATIVE_INFINITY;
+    if (rightBudget !== leftBudget) {
+      return rightBudget - leftBudget;
+    }
+    return left.name.localeCompare(right.name, "de");
+  });
+
+  return new Map(sorted.map((team, index) => [team.teamId, index + 1] as const));
+}
+
 function getRosterDisplaySalary(entry: RosterEntry, player?: Player | null) {
   return resolvePlayerEconomyContract({ player, rosterEntry: entry }).salary ?? 0;
 }
@@ -215,6 +235,52 @@ function deriveVisibleSeasonPoints(
   return roundValue(numericValues.reduce((sum, value) => sum + value, 0), 1);
 }
 
+function derivePpsByAreaFromDisciplineValues(
+  disciplineValues: Record<string, number | null> | null | undefined,
+  gameState: GameState,
+) {
+  const totals = {
+    total: 0,
+    pow: 0,
+    spe: 0,
+    men: 0,
+    soc: 0,
+  };
+
+  if (!disciplineValues) {
+    return totals;
+  }
+
+  const categoryByDisciplineKey = new Map(
+    gameState.disciplines.map((discipline) => [
+      normalizeLineupDisciplineFieldName(discipline.id),
+      discipline.category,
+    ] as const),
+  );
+
+  for (const disciplineKey of visibleSeasonPointsDisciplineKeys) {
+    const value = disciplineValues[disciplineKey];
+    if (typeof value !== "number" || !Number.isFinite(value)) {
+      continue;
+    }
+
+    const category = categoryByDisciplineKey.get(disciplineKey);
+    totals.total += value;
+    if (category === "power") totals.pow += value;
+    if (category === "speed") totals.spe += value;
+    if (category === "mental") totals.men += value;
+    if (category === "social") totals.soc += value;
+  }
+
+  return {
+    total: roundValue(totals.total, 1),
+    pow: roundValue(totals.pow, 1),
+    spe: roundValue(totals.spe, 1),
+    men: roundValue(totals.men, 1),
+    soc: roundValue(totals.soc, 1),
+  };
+}
+
 function mergeSeasonDisciplineValues(input: {
   standingValues?: Record<string, number | null> | null;
   ledgerValues?: Record<string, number> | null;
@@ -246,7 +312,14 @@ function mergeSeasonDisciplineValues(input: {
 }
 
 export function buildTeamSeasonOverviewRows(input: TeamManagementSnapshotInput): TeamManagementSnapshotRow[] {
-  const { gameState, standingsByTeamId = {}, needScoreByTeamId = {}, transferSummaryByTeamId = {} } = input;
+  const {
+    gameState,
+    seasonId = gameState.season.id,
+    preferStandingDisciplineValues = false,
+    standingsByTeamId = {},
+    needScoreByTeamId = {},
+    transferSummaryByTeamId = {},
+  } = input;
   const derivedTransferSummaryByTeamId = buildTransferSummaryByTeamIdFromHistory(gameState);
   const seasonSnapshots = gameState.seasonState.seasonSnapshots ?? [];
   const playersById = new Map(gameState.players.map((player) => [player.id, player] as const));
@@ -277,30 +350,24 @@ export function buildTeamSeasonOverviewRows(input: TeamManagementSnapshotInput):
       historicalStandingsByTeamId.set(standing.teamId, [item]);
     }
   }
-  const latestCompletedSnapshot =
-    [...seasonSnapshots]
-      .filter((snapshot) => snapshot.status == null || snapshot.status === "completed")
-      .sort((left, right) => {
-        const leftTs = Date.parse(left.archivedAt ?? "");
-        const rightTs = Date.parse(right.archivedAt ?? "");
-        if (Number.isFinite(leftTs) && Number.isFinite(rightTs) && leftTs !== rightTs) {
-          return rightTs - leftTs;
-        }
-        return right.seasonId.localeCompare(left.seasonId, "de");
-      })[0] ?? null;
-  const latestCompletedStandingByTeamId = new Map(
-    (latestCompletedSnapshot?.finalStandings ?? []).map((standing) => [standing.teamId, standing] as const),
-  );
   const hasCashPrizeApply = (gameState.seasonState.cashPrizeApplyLogs ?? []).some(
-    (entry) => entry.seasonId === gameState.season.id,
+    (entry) => entry.seasonId === seasonId,
   );
-  const seasonPointsLedger = buildSeasonPointsLedger(gameState);
+  const seasonPointsLedger = buildSeasonPointsLedger(gameState, seasonId);
   const playerRatingsById = buildPlayerRatingContractMap(gameState);
   const allTimeTableByTeamId = new Map(
     buildAllTimeTableFromSnapshots(seasonSnapshots, gameState.teams).map((row) => [row.teamId, row] as const),
   );
+  const startBudgetRankByTeamId = buildStartBudgetRankMap(gameState.teams);
+  const currentSalaryFactor =
+    getSeasonEconomyFactorWindow({
+      saveId: "team-management-overview",
+      seasonId,
+      seasonState: gameState.seasonState,
+    }).find((row) => row.seasonLabel === "Aktuell")?.factor ?? 1;
 
   const baseRows = gameState.teams.map((team) => {
+    const generalManager = getTeamGeneralManager(gameState, team.teamId);
     const roster = rostersByTeamId.get(team.teamId) ?? [];
     const rosterPlayers = getRosterPlayers(playersById, roster);
     const standing = standingsByTeamId[team.teamId] ?? null;
@@ -336,13 +403,9 @@ export function buildTeamSeasonOverviewRows(input: TeamManagementSnapshotInput):
         ? roundValue(marketValueTotal / rosterPlayers.length, 2)
         : null;
     const seasonPointsSummary = seasonPointsLedger.teamSummariesByTeamId.get(team.teamId) ?? null;
-    const latestCompletedStanding = latestCompletedStandingByTeamId.get(team.teamId) ?? null;
     const currentPpsTotal = roundValue(seasonPointsSummary?.totalPoints ?? 0, 1);
     const hasCurrentPps = (seasonPointsSummary?.playerDerivedTotal ?? 0) > 0;
-    const fallbackPpsTotal = roundValue(
-      latestCompletedStanding?.disciplinePoints ?? latestCompletedStanding?.points ?? 0,
-      1,
-    );
+    const fallbackPpsTotal = 0;
     const ppsValues = rosterPlayers.map((item) => seasonPointsLedger.playerSummariesByPlayerId.get(item.player.id)?.totalPoints ?? 0);
     const avgPps =
       ppsValues.length > 0
@@ -356,19 +419,19 @@ export function buildTeamSeasonOverviewRows(input: TeamManagementSnapshotInput):
         ? roundValue(ovrValues.reduce((sum, value) => sum + value, 0) / ovrValues.length, 2)
         : null;
     const ppsPow = roundValue(
-      hasCurrentPps ? seasonPointsSummary?.pointsByArea.power ?? 0 : latestCompletedStanding?.disciplinePointsByArea.pow ?? 0,
+      hasCurrentPps ? seasonPointsSummary?.pointsByArea.power ?? 0 : 0,
       1,
     );
     const ppsSpe = roundValue(
-      hasCurrentPps ? seasonPointsSummary?.pointsByArea.speed ?? 0 : latestCompletedStanding?.disciplinePointsByArea.spe ?? 0,
+      hasCurrentPps ? seasonPointsSummary?.pointsByArea.speed ?? 0 : 0,
       1,
     );
     const ppsMen = roundValue(
-      hasCurrentPps ? seasonPointsSummary?.pointsByArea.mental ?? 0 : latestCompletedStanding?.disciplinePointsByArea.men ?? 0,
+      hasCurrentPps ? seasonPointsSummary?.pointsByArea.mental ?? 0 : 0,
       1,
     );
     const ppsSoc = roundValue(
-      hasCurrentPps ? seasonPointsSummary?.pointsByArea.social ?? 0 : latestCompletedStanding?.disciplinePointsByArea.soc ?? 0,
+      hasCurrentPps ? seasonPointsSummary?.pointsByArea.social ?? 0 : 0,
       1,
     );
     const ppsTotal = hasCurrentPps ? currentPpsTotal : fallbackPpsTotal;
@@ -393,8 +456,18 @@ export function buildTeamSeasonOverviewRows(input: TeamManagementSnapshotInput):
     const cashDelta = budget != null && cash != null ? roundValue(cash - budget, 2) : null;
     const disciplineValues = mergeSeasonDisciplineValues({
       standingValues: standing?.disciplineValues,
-      ledgerValues: seasonPointsSummary?.pointsByDiscipline ?? null,
+      ledgerValues: preferStandingDisciplineValues ? null : seasonPointsSummary?.pointsByDiscipline ?? null,
     });
+    const fallbackPpsByArea = derivePpsByAreaFromDisciplineValues(disciplineValues, gameState);
+    const displayPpsTotal = hasCurrentPps ? ppsTotal : fallbackPpsByArea.total;
+    const displayPpsPow = hasCurrentPps ? ppsPow : fallbackPpsByArea.pow;
+    const displayPpsSpe = hasCurrentPps ? ppsSpe : fallbackPpsByArea.spe;
+    const displayPpsMen = hasCurrentPps ? ppsMen : fallbackPpsByArea.men;
+    const displayPpsSoc = hasCurrentPps ? ppsSoc : fallbackPpsByArea.soc;
+    disciplineValues.bonuspunkte =
+      hasCurrentPps && seasonPointsSummary != null && seasonPointsSummary.mutatorPpsBonus > 0
+        ? roundValue(seasonPointsSummary.mutatorPpsBonus, 1)
+        : disciplineValues.bonuspunkte ?? null;
     const visibleSeasonPoints = deriveVisibleSeasonPoints(disciplineValues);
     const storedStandingPoints =
       standing?.points != null && Number.isFinite(standing.points)
@@ -406,7 +479,7 @@ export function buildTeamSeasonOverviewRows(input: TeamManagementSnapshotInput):
         : visibleSeasonPoints != null && visibleSeasonPoints > 0
           ? visibleSeasonPoints
           : hasCurrentPps
-            ? ppsTotal
+            ? displayPpsTotal
             : null;
     const sponsorSeason =
       standing?.sponsorTotal != null &&
@@ -448,16 +521,22 @@ export function buildTeamSeasonOverviewRows(input: TeamManagementSnapshotInput):
         }
         return right.snapshot.seasonId.localeCompare(left.snapshot.seasonId, "de");
       })[0] ?? null;
+    const startBudgetRank = startBudgetRankByTeamId.get(team.teamId) ?? null;
+    const activeRank =
+      currentVisiblePoints == null
+        ? startBudgetRank
+        : standing?.rank ?? startBudgetRank;
 
     return {
       team,
       teamId: team.teamId,
       teamCode: team.shortCode,
       teamName: team.name,
-      rank: hasCurrentPps ? standing?.rank ?? null : latestCompletedStanding?.rank ?? standing?.rank ?? null,
-      points: hasCurrentPps
-        ? currentVisiblePoints
-        : latestCompletedStanding?.disciplinePoints ?? latestCompletedStanding?.points ?? currentVisiblePoints,
+      generalManagerName: generalManager?.profile.name ?? null,
+      generalManagerTitle: generalManager?.profile.title ?? null,
+      generalManagerInfluencePct: generalManager?.assignment.influencePct ?? null,
+      rank: activeRank,
+      points: currentVisiblePoints,
       rosterCount: usesArchivedSnapshotValues ? standing?.rosterCount ?? roster.length : roster.length,
       salaryTotal: usesArchivedSnapshotValues ? standing?.salaryTotal ?? salaryTotal : salaryTotal,
       avgContractLength,
@@ -471,11 +550,11 @@ export function buildTeamSeasonOverviewRows(input: TeamManagementSnapshotInput):
       avgMarketValue: averageMarketValue,
       avgPps,
       avgOvr,
-      ppsTotal,
-      ppsPow,
-      ppsSpe,
-      ppsMen,
-      ppsSoc,
+      ppsTotal: displayPpsTotal,
+      ppsPow: displayPpsPow,
+      ppsSpe: displayPpsSpe,
+      ppsMen: displayPpsMen,
+      ppsSoc: displayPpsSoc,
       playerMin,
       playerOpt,
       rosterTarget:
@@ -485,10 +564,10 @@ export function buildTeamSeasonOverviewRows(input: TeamManagementSnapshotInput):
       transferCount: transferSummary?.transferCount ?? 0,
       transferBuyTotal: transferSummary?.transferBuyTotal ?? 0,
       transferSellTotal: transferSummary?.transferSellTotal ?? 0,
-      transferNet: transferSummary?.transferNet ?? 0,
+      transferNet,
       transfersSeasonValue: transferNet,
       cashDelta,
-      startplatz: standing?.startplatz ?? null,
+      startplatz: currentVisiblePoints == null ? startBudgetRank : standing?.startplatz ?? startBudgetRank,
       rankDiff: standing?.rankDiff ?? null,
       sponsorBasis: standing?.sponsorBasis ?? null,
       sponsorRank: standing?.sponsorRank ?? null,
@@ -523,38 +602,38 @@ export function buildTeamSeasonOverviewRows(input: TeamManagementSnapshotInput):
     };
   });
 
-  const cashRankRows = [...baseRows]
-    .filter((row) => row.cash != null)
+  const startRankRows = [...baseRows]
+    .filter((row) => row.budget != null)
     .sort((left, right) => {
-      if ((right.cash ?? Number.NEGATIVE_INFINITY) !== (left.cash ?? Number.NEGATIVE_INFINITY)) {
-        return (right.cash ?? Number.NEGATIVE_INFINITY) - (left.cash ?? Number.NEGATIVE_INFINITY);
+      if ((right.budget ?? Number.NEGATIVE_INFINITY) !== (left.budget ?? Number.NEGATIVE_INFINITY)) {
+        return (right.budget ?? Number.NEGATIVE_INFINITY) - (left.budget ?? Number.NEGATIVE_INFINITY);
       }
       return left.teamName.localeCompare(right.teamName, "de");
     });
 
-  const derivedCashRankByTeamId = new Map<string, number>();
-  let previousCash: number | null = null;
+  const derivedStartRankByTeamId = new Map<string, number>();
+  let previousBudget: number | null = null;
   let previousRank = 0;
 
-  cashRankRows.forEach((row, index) => {
-    if (previousCash != null && row.cash === previousCash) {
-      derivedCashRankByTeamId.set(row.teamId, previousRank);
+  startRankRows.forEach((row, index) => {
+    if (previousBudget != null && row.budget === previousBudget) {
+      derivedStartRankByTeamId.set(row.teamId, previousRank);
       return;
     }
 
     const nextRank = index + 1;
-    previousCash = row.cash;
+    previousBudget = row.budget;
     previousRank = nextRank;
-    derivedCashRankByTeamId.set(row.teamId, nextRank);
+    derivedStartRankByTeamId.set(row.teamId, nextRank);
   });
 
   const rowsWithDerivedRanks = baseRows
     .map((row) => {
-      const derivedCashRank = derivedCashRankByTeamId.get(row.teamId) ?? null;
+      const derivedStartRank = derivedStartRankByTeamId.get(row.teamId) ?? null;
       return {
         ...row,
-        rank: row.rank ?? derivedCashRank,
-        startplatz: row.startplatz ?? derivedCashRank,
+        rank: row.rank ?? derivedStartRank,
+        startplatz: row.startplatz ?? derivedStartRank,
       };
     });
 
@@ -571,6 +650,8 @@ export function buildTeamSeasonOverviewRows(input: TeamManagementSnapshotInput):
         upkeep: row.salaryTotal,
         transfers: row.transfersSeasonValue ?? 0,
       })),
+      currentSalaryFactor,
+      gameState.seasonState.adminBalancingConfig,
     ).map((row) => [row.teamId, row] as const),
   );
 

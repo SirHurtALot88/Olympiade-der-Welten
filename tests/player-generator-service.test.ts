@@ -432,40 +432,46 @@ describe("player generator service", () => {
     expect(broken.generated.diagnostics.statSilhouette).toBe("failed");
   });
 
-  it("keeps generator market value and salary blocked until the draft economy engine is actually enabled", () => {
+  it("shows draft economy projections while keeping the real commit path disabled", () => {
     const draft = generatePlayerDraft({
       generatorInput: {
         ...createDefaultPlayerGeneratorInput(),
         preferredArchetype: "mage",
-        seed: "missing-engines",
+        contractMode: "front_loaded",
+        seed: "draft-economy-projection",
       },
       players,
       disciplines: foundationSeedDisciplines,
     });
 
-    expect(draft.generated.marketValue).toBeNull();
-    expect(draft.generated.salary).toBeNull();
-    expect(draft.generated.marketValueStatus).toBe("missing_market_value_engine");
-    expect(draft.generated.salaryStatus).toBe("missing_market_value_input");
+    expect(draft.generated.marketValue).toBeGreaterThan(0);
+    expect(draft.generated.salary).toBeGreaterThan(0);
+    expect(draft.generated.marketValueStatus).toBe("ready");
+    expect(draft.generated.salaryStatus).toBe("ready");
+    expect(draft.generated.economyProjection?.contractMode).toBe("front_loaded");
+    expect(draft.generated.economyProjection?.salarySchedule.length).toBeGreaterThan(0);
+    expect(draft.generated.disciplineOutlook?.length).toBeGreaterThan(0);
+    expect(draft.generated.disciplineOutlook?.[0]?.bestSlotLabel).toBeTruthy();
+    expect(draft.generated.projectedRole).toBeTruthy();
+    expect(draft.generated.captaincyScore).toBeGreaterThan(0);
     expect(draft.generated.formulaStatus.attributeSalaryModifiersStatus).toBe("ready");
     expect(draft.generated.formulaStatus.traitSalaryFactorsStatus).toBe("ready");
     expect(draft.generated.formulaStatus.rankMarketValueStatus).toBe("ready");
     expect(draft.generated.formulaStatus.marketValueEngineStatus).toBe("ready");
     expect(draft.generated.formulaStatus.classEngineStatus).toBe("heuristic");
     expect(draft.generated.formulaStatus.salaryEngineStatus).toBe("ready_if_market_value_input_present");
-    expect(draft.generated.diagnostics.engineStatus.marketValueEngine).toBe("blocked");
-    expect(draft.generated.diagnostics.engineStatus.salaryEngine).toBe("missing_market_value_input");
+    expect(draft.generated.diagnostics.engineStatus.marketValueEngine).toBe("ready");
+    expect(draft.generated.diagnostics.engineStatus.salaryEngine).toBe("ready");
     expect(draft.generated.diagnostics.engineStatus.classEngine).toBe("heuristic");
     expect(draft.generated.diagnostics.engineStatus.potentialEngine).toBe("missing_progression_source");
     expect(draft.generated.diagnostics.draftStatus.ovr).toBe("draft_preview");
     expect(draft.generated.diagnostics.draftStatus.pps).toBe("draft_preview");
     expect(draft.generated.diagnostics.saveStatus.save).toBe("draft_only");
     expect(draft.generated.diagnostics.saveStatus.commit).toBe("disabled");
-    expect(draft.generated.diagnostics.saveStatus.commitReasons).toContain("market_value_engine_blocked");
-    expect(draft.generated.diagnostics.saveStatus.commitReasons).toContain("salary_engine_waits_for_market_value");
+    expect(draft.generated.diagnostics.saveStatus.commitReasons).toContain("commit_path_not_ready");
     expect(draft.warnings.filter((warning) => warning.includes("rank_to_discipline_market_value_source_incomplete"))).toHaveLength(0);
     expect(draft.warnings.filter((warning) => warning.includes("class_factors_source_missing"))).toHaveLength(1);
-    expect(draft.warnings.filter((warning) => warning.includes("salary_engine_waits_for_market_value_input"))).toHaveLength(1);
+    expect(draft.warnings.filter((warning) => warning.includes("salary_engine_waits_for_market_value_input"))).toHaveLength(0);
     expect(draft.generated.diagnostics.qualityWarnings).not.toContain("unknown_trait");
     expect(draft.generated.diagnostics.qualityWarnings).not.toContain("unknown_class");
     expect(draft.generated.diagnostics.qualityWarnings).not.toContain("unknown_race");

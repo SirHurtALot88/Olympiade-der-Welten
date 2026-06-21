@@ -1,5 +1,6 @@
 import { getPlayerPortraitBrowserUrl } from "@/lib/data/mediaAssets";
-import type { GameState, Player, RosterEntry, Team, TeamStrategyProfile } from "@/lib/data/olyDataTypes";
+import { getImportedPlayerDisplayMarketValue } from "@/lib/data/player-economy-display";
+import type { DisciplineCategory, GameState, Player, RosterEntry, Team, TeamStrategyProfile } from "@/lib/data/olyDataTypes";
 import {
   assessPlayerBoardTrust,
   type PlayerBoardTrustMood,
@@ -15,9 +16,23 @@ import {
   type PlayerRatingContractRow,
 } from "@/lib/foundation/player-rating-contract";
 import { buildPlayerSeasonPerformance, buildPlayerSeasonPerformanceMap } from "@/lib/foundation/player-season-performance";
+import { buildSeasonPointsLedger } from "@/lib/foundation/season-points-ledger";
+import { getPlayerBaselineEconomyReference } from "@/lib/players/player-baseline-service";
+import { getFacilityLevel, getTeamFacilityState } from "@/lib/facilities/facility-effects";
 import { getTeamStrategyProfile } from "@/lib/foundation/team-strategy-profiles";
 import type { LegacyLineupLoadedContext } from "@/lib/lineups/legacy-lineup-types";
 import { normalizeTransfermarktToken } from "@/lib/market/transfermarkt-fit";
+import { buildTransfermarktSaleFactorBreakdown } from "@/lib/market/transfermarkt-sale-factor";
+import {
+  buildTransfermarktScoutedAttributeRows,
+  buildScoutedDisciplineTiers,
+  getScoutedTraitView,
+  type TransfermarktAttributeRatings,
+  type TransfermarktAttributeValues,
+  type TransfermarktScoutingDisclosure,
+} from "@/lib/market/transfermarkt-scouting";
+import type { TransfermarktRatingTier } from "@/lib/market/transfermarkt-sheet-stats";
+import { buildPlayerDemands } from "@/lib/morale/player-demands-service";
 import { assessPlayerMorale, type PlayerMoraleAssessment } from "@/lib/morale/player-morale-service";
 import {
   buildPlayerDevelopmentInsight,
@@ -39,6 +54,20 @@ type PlayerDrawerAxisCard = {
   valueRank: number | null;
   seasonPoints: number | null;
   seasonPointsRank: number | null;
+  previousSeasonPointsRank: number | null;
+};
+
+type PlayerDisciplineDrawerDetail = {
+  mutatorPps: number;
+  slotLabels: string[];
+};
+
+type AttributeVisibility = "exact" | "scouted";
+
+type DisciplineGlobalRankMaps = {
+  valueRanksByDiscipline: Map<string, Map<string, number | null>>;
+  seasonPointsRanksByDiscipline: Map<string, Map<string, number | null>>;
+  allTimePointsRanksByDiscipline: Map<string, Map<string, number | null>>;
 };
 
 type PlayerDrawerHistoryRow = {
@@ -61,6 +90,15 @@ type PlayerDrawerHistoryRow = {
   mvs: number | null;
   mvsRank: number | null;
   marketValue: number | null;
+  marketValueBaselineDelta: number | null;
+  transferType: "buy" | "sell" | "contract_exit" | null;
+  transferFee: number | null;
+  transferMarketValue: number | null;
+  transferDeltaToMarketValue: number | null;
+  transferMarketValueFactor: number | null;
+  projectedSellValue: number | null;
+  projectedSellFactor: number | null;
+  projectedSellSourceLabel: string | null;
   salary: number | null;
   contractLength: number | null;
   averageContribution: number | null;
@@ -78,12 +116,18 @@ export type PlayerDetailDrawerData = {
   portraitUrl: string | null;
   teamName: string | null;
   teamCode: string | null;
+  teamHumanControlled: boolean | null;
   transferStatus: string;
   className: string | null;
   race: string | null;
   subclasses: string[];
   traitsPositive: string[];
   traitsNegative: string[];
+  scoutingLevel: number | null;
+  scoutingDisclosure: TransfermarktScoutingDisclosure | null;
+  hiddenPositiveTraitCount: number;
+  hiddenNegativeTraitCount: number;
+  preferredDisciplineIdsVisible: boolean;
   pow: number | null;
   spe: number | null;
   men: number | null;
@@ -146,6 +190,17 @@ export type PlayerDetailDrawerData = {
     warnings: string[];
     source: PlayerMoraleAssessment["source"];
   } | null;
+  demands: Array<{
+    demandId: string;
+    label: string;
+    detail: string;
+    type: string;
+    targetDisciplineName?: string | null;
+    status: "open" | "fulfilled" | "at_risk" | "failed";
+    priority: "low" | "medium" | "high";
+    moraleReward: number;
+    moralePenalty: number;
+  }>;
   fatigue: number | null;
   availability: {
     injuryStatus: "healthy" | "injured" | "recovering";
@@ -180,11 +235,17 @@ export type PlayerDetailDrawerData = {
   potential: number | null;
   scoutPotential: PlayerScoutPotential | null;
   developmentInsight: PlayerDevelopmentInsight | null;
+  organicProgression: Player["lastOrganicProgression"] | null;
+  classHistory: NonNullable<Player["classHistory"]>;
+  attributeVisibility: AttributeVisibility;
   attributeStats: Array<{
     key: string;
     label: string;
+    revealed: boolean;
+    revealLevel: number;
     value: number | null;
     ratingLabel: string | null;
+    rangeLabel: string | null;
   }>;
   baselineAttributeDeltas: Array<{
     key: string;
@@ -198,9 +259,16 @@ export type PlayerDetailDrawerData = {
   disciplineValues: Array<{
     id: string;
     label: string;
+    category: DisciplineCategory;
     value: number | null;
     seasonPoints: number | null;
+    seasonPointsRank: number | null;
     seasonAppearances: number | null;
+    allTimePoints: number | null;
+    allTimePointsRank: number | null;
+    allTimeAppearances: number | null;
+    currentSeasonMutatorPps: number | null;
+    slotLabels: string[];
     lastSeasonPoints: number | null;
     lastSeasonAppearances: number | null;
     lastSeasonId: string | null;
@@ -210,6 +278,7 @@ export type PlayerDetailDrawerData = {
     disciplineDelta: number | null;
     rank: number | null;
     playerCount: number | null;
+    scoutedTier?: TransfermarktRatingTier | null;
   }>;
   progressionForecast: PlayerProgressionForecast | null;
   developmentLevelup: PlayerDevelopmentLevelupModel | null;
@@ -340,6 +409,15 @@ export type PlayerDetailDrawerData = {
     mvs: number | null;
     mvsRank: number | null;
     marketValue: number | null;
+    marketValueBaselineDelta: number | null;
+    transferType: "buy" | "sell" | "contract_exit" | null;
+    transferFee: number | null;
+    transferMarketValue: number | null;
+    transferDeltaToMarketValue: number | null;
+    transferMarketValueFactor: number | null;
+    projectedSellValue: number | null;
+    projectedSellFactor: number | null;
+    projectedSellSourceLabel: string | null;
     salary: number | null;
     contractLength: number | null;
     top10Count: number;
@@ -358,6 +436,20 @@ function isFiniteNumber(value: number | null | undefined): value is number {
 
 function roundValue(value: number, digits = 1) {
   return Number(value.toFixed(digits));
+}
+
+function calculateMoneyDelta(value: number | null | undefined, reference: number | null | undefined, digits = 2) {
+  if (!isFiniteNumber(value) || !isFiniteNumber(reference)) {
+    return null;
+  }
+  return roundValue(value - reference, digits);
+}
+
+function calculateMoneyFactor(value: number | null | undefined, reference: number | null | undefined) {
+  if (!isFiniteNumber(value) || !isFiniteNumber(reference) || reference <= 0) {
+    return null;
+  }
+  return roundValue(value / reference, 3);
 }
 
 function buildSharedRankMap(values: Array<{ playerId: string; value: number | null }>) {
@@ -393,7 +485,184 @@ function buildSharedRankMap(values: Array<{ playerId: string; value: number | nu
   return rankMap;
 }
 
-function buildAttributeStats(
+function addDisciplinePoints(
+  totalsByDiscipline: Map<string, Map<string, number>>,
+  disciplineId: string | null | undefined,
+  playerId: string | null | undefined,
+  value: number | null | undefined,
+) {
+  if (!disciplineId || !playerId || value == null || !Number.isFinite(value)) {
+    return;
+  }
+  const byPlayerId = totalsByDiscipline.get(disciplineId) ?? new Map<string, number>();
+  byPlayerId.set(playerId, roundValue((byPlayerId.get(playerId) ?? 0) + value, 1));
+  totalsByDiscipline.set(disciplineId, byPlayerId);
+}
+
+function mergeDisciplinePointTotals(
+  target: Map<string, Map<string, number>>,
+  source: Map<string, Map<string, number>>,
+) {
+  for (const [disciplineId, byPlayerId] of source.entries()) {
+    const targetByPlayerId = target.get(disciplineId) ?? new Map<string, number>();
+    for (const [playerId, value] of byPlayerId.entries()) {
+      targetByPlayerId.set(playerId, roundValue((targetByPlayerId.get(playerId) ?? 0) + value, 1));
+    }
+    target.set(disciplineId, targetByPlayerId);
+  }
+}
+
+function buildDisciplineGlobalRankMaps(
+  gameState: GameState,
+  disciplines: Array<{ id: string; name: string; category: DisciplineCategory; playerCount?: number | null }>,
+): DisciplineGlobalRankMaps {
+  const valueRanksByDiscipline = new Map<string, Map<string, number | null>>();
+  const seasonPointsRanksByDiscipline = new Map<string, Map<string, number | null>>();
+  const allTimePointsRanksByDiscipline = new Map<string, Map<string, number | null>>();
+  const currentSeasonId = gameState.season.id ?? null;
+  const currentSeasonTotalsByDiscipline = new Map<string, Map<string, number>>();
+  const allTimeTotalsByDiscipline = new Map<string, Map<string, number>>();
+  const currentSeasonLedger = buildSeasonPointsLedger(gameState);
+
+  for (const snapshot of gameState.seasonState.seasonSnapshots ?? []) {
+    for (const playerPerformance of snapshot.playerPerformances ?? []) {
+      for (const entry of playerPerformance.disciplineBreakdown ?? []) {
+        addDisciplinePoints(allTimeTotalsByDiscipline, entry.disciplineId, playerPerformance.playerId, entry.totalContribution ?? null);
+      }
+    }
+  }
+
+  for (const entry of currentSeasonLedger.pointEntries) {
+    const seasonId = entry.seasonId ?? currentSeasonId;
+    if (currentSeasonId && seasonId !== currentSeasonId) {
+      continue;
+    }
+    addDisciplinePoints(currentSeasonTotalsByDiscipline, entry.disciplineId, entry.playerId, entry.points ?? null);
+  }
+
+  const hasCurrentSeasonSnapshot = Boolean(
+    currentSeasonId &&
+      (gameState.seasonState.seasonSnapshots ?? []).some((snapshot) => snapshot.seasonId === currentSeasonId),
+  );
+  if (!hasCurrentSeasonSnapshot) {
+    mergeDisciplinePointTotals(allTimeTotalsByDiscipline, currentSeasonTotalsByDiscipline);
+  }
+
+  for (const discipline of disciplines) {
+    valueRanksByDiscipline.set(
+      discipline.id,
+      buildSharedRankMap(
+        gameState.players.map((player) => ({
+          playerId: player.id,
+          value: player.currentDisciplineValues?.[discipline.id] ?? player.disciplineRatings?.[discipline.id] ?? null,
+        })),
+      ),
+    );
+    seasonPointsRanksByDiscipline.set(
+      discipline.id,
+      buildSharedRankMap(
+        gameState.players.map((player) => ({
+          playerId: player.id,
+          value: currentSeasonTotalsByDiscipline.get(discipline.id)?.get(player.id) ?? null,
+        })),
+      ),
+    );
+    allTimePointsRanksByDiscipline.set(
+      discipline.id,
+      buildSharedRankMap(
+        gameState.players.map((player) => ({
+          playerId: player.id,
+          value: allTimeTotalsByDiscipline.get(discipline.id)?.get(player.id) ?? null,
+        })),
+      ),
+    );
+  }
+
+  return {
+    valueRanksByDiscipline,
+    seasonPointsRanksByDiscipline,
+    allTimePointsRanksByDiscipline,
+  };
+}
+
+function deriveAttributeRatingLabel(value: number | null | undefined): TransfermarktRatingTier | null {
+  if (value == null || !Number.isFinite(value)) return null;
+  if (value >= 90) return "S+";
+  if (value >= 80) return "S";
+  if (value >= 70) return "A";
+  if (value >= 60) return "B";
+  if (value >= 50) return "C";
+  if (value >= 40) return "D";
+  if (value >= 25) return "E";
+  return "F";
+}
+
+function normalizeAttributeRatingTier(value: string | null | undefined): TransfermarktRatingTier | null {
+  if (value === "S+" || value === "S" || value === "A" || value === "B" || value === "C" || value === "D" || value === "E" || value === "F") {
+    return value;
+  }
+  return null;
+}
+
+function buildAttributeValueMap(
+  player: Pick<Player, "attributeSheetStats"> | null,
+): TransfermarktAttributeValues {
+  return {
+    power: player?.attributeSheetStats?.power ?? null,
+    health: player?.attributeSheetStats?.health ?? null,
+    stamina: player?.attributeSheetStats?.stamina ?? null,
+    intelligence: player?.attributeSheetStats?.intelligence ?? null,
+    awareness: player?.attributeSheetStats?.awareness ?? null,
+    determination: player?.attributeSheetStats?.determination ?? null,
+    speed: player?.attributeSheetStats?.speed ?? null,
+    dexterity: player?.attributeSheetStats?.dexterity ?? null,
+    charisma: player?.attributeSheetStats?.charisma ?? null,
+    will: player?.attributeSheetStats?.will ?? null,
+    spirit: player?.attributeSheetStats?.spirit ?? null,
+    torment: player?.attributeSheetStats?.torment ?? null,
+  };
+}
+
+function buildAttributeRatingMap(
+  player: Pick<Player, "attributeSheetRatings" | "attributeSheetStats"> | null,
+): TransfermarktAttributeRatings {
+  return {
+    power: normalizeAttributeRatingTier(player?.attributeSheetRatings?.powerRating) ?? deriveAttributeRatingLabel(player?.attributeSheetStats?.power ?? null),
+    health: normalizeAttributeRatingTier(player?.attributeSheetRatings?.healthRating) ?? deriveAttributeRatingLabel(player?.attributeSheetStats?.health ?? null),
+    stamina: normalizeAttributeRatingTier(player?.attributeSheetRatings?.staminaRating) ?? deriveAttributeRatingLabel(player?.attributeSheetStats?.stamina ?? null),
+    intelligence:
+      normalizeAttributeRatingTier(player?.attributeSheetRatings?.intelligenceRating) ?? deriveAttributeRatingLabel(player?.attributeSheetStats?.intelligence ?? null),
+    awareness:
+      normalizeAttributeRatingTier(player?.attributeSheetRatings?.awarenessRating) ?? deriveAttributeRatingLabel(player?.attributeSheetStats?.awareness ?? null),
+    determination:
+      normalizeAttributeRatingTier(player?.attributeSheetRatings?.determinationRating) ?? deriveAttributeRatingLabel(player?.attributeSheetStats?.determination ?? null),
+    speed: normalizeAttributeRatingTier(player?.attributeSheetRatings?.speedRating) ?? deriveAttributeRatingLabel(player?.attributeSheetStats?.speed ?? null),
+    dexterity:
+      normalizeAttributeRatingTier(player?.attributeSheetRatings?.dexterityRating) ?? deriveAttributeRatingLabel(player?.attributeSheetStats?.dexterity ?? null),
+    charisma:
+      normalizeAttributeRatingTier(player?.attributeSheetRatings?.charismaRating) ?? deriveAttributeRatingLabel(player?.attributeSheetStats?.charisma ?? null),
+    will: normalizeAttributeRatingTier(player?.attributeSheetRatings?.willRating) ?? deriveAttributeRatingLabel(player?.attributeSheetStats?.will ?? null),
+    spirit: normalizeAttributeRatingTier(player?.attributeSheetRatings?.spiritRating) ?? deriveAttributeRatingLabel(player?.attributeSheetStats?.spirit ?? null),
+    torment:
+      normalizeAttributeRatingTier(player?.attributeSheetRatings?.tormentRating) ?? deriveAttributeRatingLabel(player?.attributeSheetStats?.torment ?? null),
+  };
+}
+
+function maskAttributeStatsForVisibility(
+  rows: ReturnType<typeof buildRawAttributeStats>,
+  visibility: AttributeVisibility,
+) {
+  return rows.map((row) => ({
+    ...row,
+    revealed: true,
+    revealLevel: 1,
+    value: visibility === "exact" ? row.value : null,
+    ratingLabel: row.ratingLabel ?? deriveAttributeRatingLabel(row.value),
+    rangeLabel: null,
+  }));
+}
+
+function buildRawAttributeStats(
   player: Pick<Player, "attributeSheetStats" | "attributeSheetRatings"> | null,
 ) {
   const stats = player?.attributeSheetStats;
@@ -412,6 +681,116 @@ function buildAttributeStats(
     { key: "spirit", label: "Spirit", value: stats?.spirit ?? null, ratingLabel: ratings?.spiritRating ?? null },
     { key: "torment", label: "Torment", value: stats?.torment ?? null, ratingLabel: ratings?.tormentRating ?? null },
   ];
+}
+
+function buildAttributeStats(
+  player: Pick<Player, "attributeSheetStats" | "attributeSheetRatings"> | null,
+  visibility: AttributeVisibility = "exact",
+  scoutingLevel?: number | null,
+  scoutingSeed?: { saveId: string; playerId: string } | null,
+) {
+  if (visibility === "scouted") {
+    return buildTransfermarktScoutedAttributeRows({
+      values: buildAttributeValueMap(player),
+      ratings: buildAttributeRatingMap(player),
+      scoutingLevel,
+      saveId: scoutingSeed?.saveId,
+      playerId: scoutingSeed?.playerId,
+    });
+  }
+  return maskAttributeStatsForVisibility(buildRawAttributeStats(player), visibility);
+}
+
+function maskAxisCardsForVisibility(cards: PlayerDrawerAxisCard[], visibility: AttributeVisibility): PlayerDrawerAxisCard[] {
+  if (visibility === "exact") {
+    return cards;
+  }
+  return cards.map((card) => ({
+    ...card,
+    value: null,
+    valueRank: null,
+    seasonPoints: null,
+    seasonPointsRank: null,
+    previousSeasonPointsRank: null,
+  }));
+}
+
+function getGameStateScoutingSeed(gameState: GameState) {
+  return [
+    gameState.scenarioMeta?.sourceSaveId,
+    gameState.scenarioMeta?.createdAt,
+    gameState.mappingReport?.generatedAt,
+    gameState.season.id,
+  ].find((value) => typeof value === "string" && value.trim().length > 0) ?? "player-drawer-scouting";
+}
+
+function buildScoutedDisciplineValuesFromPlayer(input: {
+  gameState: GameState;
+  player: Player;
+  scoutingLevel: number | null;
+  topN?: number;
+}): PlayerDetailDrawerData["disciplineValues"] {
+  const disciplineById = new Map(input.gameState.disciplines.map((discipline) => [discipline.id, discipline] as const));
+  return buildScoutedDisciplineTiers({
+    saveId: getGameStateScoutingSeed(input.gameState),
+    playerId: input.player.id,
+    scoutingLevel: input.scoutingLevel,
+    topN: input.topN ?? 5,
+    disciplines: Object.entries(input.player.disciplineRatings ?? {})
+      .filter(([, score]) => typeof score === "number" && Number.isFinite(score))
+      .map(([disciplineId, score]) => {
+        const discipline = disciplineById.get(disciplineId) ?? null;
+        return {
+          disciplineId,
+          disciplineName: discipline?.name ?? disciplineId,
+          score,
+        };
+      }),
+  }).map((entry, index) => {
+    const discipline = disciplineById.get(entry.disciplineId) ?? null;
+    return {
+      id: entry.disciplineId,
+      label: discipline?.name ?? entry.disciplineName,
+      category: discipline?.category ?? "power",
+      value: entry.displayedScore,
+      seasonPoints: null,
+      seasonPointsRank: null,
+      seasonAppearances: null,
+      allTimePoints: null,
+      allTimePointsRank: null,
+      allTimeAppearances: null,
+      currentSeasonMutatorPps: null,
+      slotLabels: [],
+      lastSeasonPoints: null,
+      lastSeasonAppearances: null,
+      lastSeasonId: null,
+      upgradeDelta: null,
+      lastSeasonDisciplineValues: null,
+      currentDisciplineValues: null,
+      disciplineDelta: null,
+      rank: index + 1,
+      playerCount: discipline?.playerCount ?? null,
+      scoutedTier: entry.scoreTier,
+    };
+  });
+}
+
+function resolveAttributeVisibility(input: {
+  teamId: string | null | undefined;
+  teamHumanControlled: boolean | null | undefined;
+  manageableTeamIds?: string[] | null;
+  scoutingLevel?: number | null;
+}): AttributeVisibility {
+  if (input.manageableTeamIds) {
+    if (input.teamId && input.manageableTeamIds.includes(input.teamId)) {
+      return "exact";
+    }
+    return "scouted";
+  }
+  if (input.teamHumanControlled === false) {
+    return "scouted";
+  }
+  return "exact";
 }
 
 function buildBaselineAttributeDeltas(
@@ -445,8 +824,8 @@ function buildBaselineAttributeDeltas(
 }
 
 function buildDisciplineValuesFromPlayer(
-  player: Pick<Player, "disciplineRatings" | "previousDisciplineRatings" | "lastSeasonDisciplineValues" | "currentDisciplineValues" | "disciplineDelta"> | null,
-  disciplines: Array<{ id: string; name: string; playerCount?: number | null }>,
+  player: Pick<Player, "id" | "disciplineRatings" | "previousDisciplineRatings" | "lastSeasonDisciplineValues" | "currentDisciplineValues" | "disciplineDelta"> | null,
+  disciplines: Array<{ id: string; name: string; category: DisciplineCategory; playerCount?: number | null }>,
   performance?: {
     seasonId: string | null;
     disciplineBreakdown: Array<{
@@ -463,17 +842,63 @@ function buildDisciplineValuesFromPlayer(
       totalContribution?: number | null;
     }>;
   } | null,
+  gameState?: GameState | null,
+  globalRankMaps?: DisciplineGlobalRankMaps | null,
 ) {
   if (!player) {
     return [];
   }
   const seasonByDisciplineId = new Map((performance?.disciplineBreakdown ?? []).map((entry) => [entry.disciplineId, entry] as const));
   const lastSeasonByDisciplineId = new Map((latestArchivedPerformance?.disciplineBreakdown ?? []).map((entry) => [entry.disciplineId, entry] as const));
+  const allTimeByDisciplineId = new Map<string, { points: number; appearances: number }>();
+  const currentDetailsByDisciplineId = new Map<string, PlayerDisciplineDrawerDetail>();
+  const currentSeasonId = gameState?.season.id ?? performance?.seasonId ?? null;
+
+  for (const snapshot of gameState?.seasonState.seasonSnapshots ?? []) {
+    const snapshotPerformance = snapshot.playerPerformances?.find((entry) => entry.playerId === player.id) ?? null;
+    if (!snapshotPerformance) continue;
+    for (const entry of snapshotPerformance.disciplineBreakdown ?? []) {
+      const current = allTimeByDisciplineId.get(entry.disciplineId) ?? { points: 0, appearances: 0 };
+      current.points += entry.totalContribution ?? 0;
+      current.appearances += entry.appearances ?? 0;
+      allTimeByDisciplineId.set(entry.disciplineId, current);
+    }
+  }
+
+  const hasCurrentSeasonSnapshot = Boolean(
+    currentSeasonId &&
+      (gameState?.seasonState.seasonSnapshots ?? []).some((snapshot) => snapshot.seasonId === currentSeasonId),
+  );
+  if (!hasCurrentSeasonSnapshot) {
+    for (const entry of performance?.disciplineBreakdown ?? []) {
+      const current = allTimeByDisciplineId.get(entry.disciplineId) ?? { points: 0, appearances: 0 };
+      current.points += entry.totalContribution ?? 0;
+      current.appearances += entry.appearances ?? 0;
+      allTimeByDisciplineId.set(entry.disciplineId, current);
+    }
+  }
+
+  const resultById = new Map((gameState?.seasonState.matchdayResults ?? []).map((entry) => [entry.id, entry] as const));
+  for (const entry of gameState?.seasonState.playerDisciplinePerformances ?? []) {
+    if (entry.playerId !== player.id) continue;
+    const result = resultById.get(entry.matchdayResultId) ?? null;
+    if (currentSeasonId && (result?.seasonId ?? currentSeasonId) !== currentSeasonId) continue;
+    const detail = currentDetailsByDisciplineId.get(entry.disciplineId) ?? { mutatorPps: 0, slotLabels: [] };
+    detail.mutatorPps += entry.mutatorPpsBonus ?? 0;
+    const matchdayLabel = result?.matchdayId?.match(/matchday-(\d+)/i)?.[1] ?? result?.matchdayId ?? "MD";
+    const slotLabel = `MD ${matchdayLabel} ${entry.disciplineSide.toUpperCase()}-${entry.slotIndex + 1}`;
+    if (!detail.slotLabels.includes(slotLabel)) {
+      detail.slotLabels.push(slotLabel);
+    }
+    currentDetailsByDisciplineId.set(entry.disciplineId, detail);
+  }
 
   return disciplines
     .map((discipline) => {
       const seasonRow = seasonByDisciplineId.get(discipline.id) ?? null;
       const lastSeasonRow = lastSeasonByDisciplineId.get(discipline.id) ?? null;
+      const allTimeRow = allTimeByDisciplineId.get(discipline.id) ?? null;
+      const currentDetail = currentDetailsByDisciplineId.get(discipline.id) ?? null;
       const previous =
         player.lastSeasonDisciplineValues?.[discipline.id] != null && player.currentDisciplineValues?.[discipline.id] != null
           ? player.lastSeasonDisciplineValues[discipline.id]
@@ -493,9 +918,16 @@ function buildDisciplineValuesFromPlayer(
       return {
         id: discipline.id,
         label: discipline.name,
+        category: discipline.category,
         value: current,
         seasonPoints: seasonRow?.totalContribution ?? null,
+        seasonPointsRank: globalRankMaps?.seasonPointsRanksByDiscipline.get(discipline.id)?.get(player.id) ?? null,
         seasonAppearances: seasonRow?.appearances ?? null,
+        allTimePoints: allTimeRow ? roundValue(allTimeRow.points, 1) : null,
+        allTimePointsRank: globalRankMaps?.allTimePointsRanksByDiscipline.get(discipline.id)?.get(player.id) ?? null,
+        allTimeAppearances: allTimeRow?.appearances ?? null,
+        currentSeasonMutatorPps: currentDetail ? roundValue(currentDetail.mutatorPps, 1) : null,
+        slotLabels: currentDetail?.slotLabels.slice(0, 8) ?? [],
         lastSeasonPoints: lastSeasonRow?.totalContribution ?? null,
         lastSeasonAppearances: lastSeasonRow?.appearances ?? null,
         lastSeasonId: latestArchivedPerformance?.seasonId ?? null,
@@ -509,7 +941,7 @@ function buildDisciplineValuesFromPlayer(
     .sort((left, right) => (right.value ?? Number.NEGATIVE_INFINITY) - (left.value ?? Number.NEGATIVE_INFINITY))
     .map((entry, index) => ({
       ...entry,
-      rank: entry.value == null ? null : index + 1,
+      rank: globalRankMaps?.valueRanksByDiscipline.get(entry.id)?.get(player.id) ?? (entry.value == null ? null : index + 1),
     }));
 }
 
@@ -524,10 +956,105 @@ function buildCoreAxisRankMaps(players: Player[], rankPoolPlayerIds?: string[] |
   };
 }
 
+type AxisId = PlayerDrawerAxisCard["id"];
+type AxisRankMap = Partial<Record<AxisId, number | null>>;
+type SeasonSnapshotRecord = NonNullable<GameState["seasonState"]["seasonSnapshots"]>[number];
+
+const AXIS_POINT_FIELDS: Record<AxisId, "powPoints" | "spePoints" | "menPoints" | "socPoints"> = {
+  pow: "powPoints",
+  spe: "spePoints",
+  men: "menPoints",
+  soc: "socPoints",
+};
+
+const AXIS_DISCIPLINE_CATEGORIES: Record<AxisId, DisciplineCategory> = {
+  pow: "power",
+  spe: "speed",
+  men: "mental",
+  soc: "social",
+};
+
+function getSeasonSortValue(seasonId: string) {
+  const numericMatch = seasonId.match(/(\d+)$/);
+  return numericMatch ? Number(numericMatch[1]) : Number.NEGATIVE_INFINITY;
+}
+
+function compareSeasonSnapshotsDesc(left: SeasonSnapshotRecord, right: SeasonSnapshotRecord) {
+  const leftValue = getSeasonSortValue(left.seasonId);
+  const rightValue = getSeasonSortValue(right.seasonId);
+  if (Number.isFinite(leftValue) && Number.isFinite(rightValue) && leftValue !== rightValue) {
+    return rightValue - leftValue;
+  }
+  return right.seasonId.localeCompare(left.seasonId, "de", { numeric: true });
+}
+
+function resolveSnapshotAxisPoints(
+  gameState: GameState,
+  row: SeasonSnapshotRecord["playerPerformances"][number],
+  axisId: AxisId,
+) {
+  const directValue = row[AXIS_POINT_FIELDS[axisId]];
+  if (isFiniteNumber(directValue)) {
+    return directValue;
+  }
+
+  const category = AXIS_DISCIPLINE_CATEGORIES[axisId];
+  const disciplineCategoryById = new Map(gameState.disciplines.map((discipline) => [discipline.id, discipline.category] as const));
+  const values = (row.disciplineBreakdown ?? [])
+    .filter((entry) => disciplineCategoryById.get(entry.disciplineId) === category && isFiniteNumber(entry.totalContribution))
+    .map((entry) => entry.totalContribution ?? 0);
+  if (values.length === 0) {
+    return null;
+  }
+
+  return roundValue(values.reduce((total, value) => total + value, 0), 1);
+}
+
+function buildSnapshotAxisRanks(gameState: GameState, snapshot: SeasonSnapshotRecord, playerId: string): AxisRankMap {
+  return {
+    pow: buildSharedRankMap(
+      snapshot.playerPerformances.map((row) => ({ playerId: row.playerId, value: resolveSnapshotAxisPoints(gameState, row, "pow") })),
+    ).get(playerId) ?? null,
+    spe: buildSharedRankMap(
+      snapshot.playerPerformances.map((row) => ({ playerId: row.playerId, value: resolveSnapshotAxisPoints(gameState, row, "spe") })),
+    ).get(playerId) ?? null,
+    men: buildSharedRankMap(
+      snapshot.playerPerformances.map((row) => ({ playerId: row.playerId, value: resolveSnapshotAxisPoints(gameState, row, "men") })),
+    ).get(playerId) ?? null,
+    soc: buildSharedRankMap(
+      snapshot.playerPerformances.map((row) => ({ playerId: row.playerId, value: resolveSnapshotAxisPoints(gameState, row, "soc") })),
+    ).get(playerId) ?? null,
+  };
+}
+
+function buildAxisRankContext(input: {
+  gameState: GameState;
+  playerId: string;
+  referenceSeasonId: string | null | undefined;
+}) {
+  const snapshots = [...(input.gameState.seasonState.seasonSnapshots ?? [])]
+    .filter((snapshot) => snapshot.playerPerformances.some((row) => row.playerId === input.playerId))
+    .sort(compareSeasonSnapshotsDesc);
+  const currentSnapshot = input.referenceSeasonId
+    ? snapshots.find((snapshot) => snapshot.seasonId === input.referenceSeasonId) ?? null
+    : null;
+  const previousSnapshot =
+    snapshots.find((snapshot) => snapshot.seasonId !== input.referenceSeasonId) ?? null;
+
+  return {
+    current: currentSnapshot ? buildSnapshotAxisRanks(input.gameState, currentSnapshot, input.playerId) : {},
+    previous: previousSnapshot ? buildSnapshotAxisRanks(input.gameState, previousSnapshot, input.playerId) : {},
+  };
+}
+
 function buildAxisCards(input: {
   player: Pick<Player, "id" | "coreStats">;
   playerRating: PlayerRatingContractRow | null;
   coreAxisRankMaps: ReturnType<typeof buildCoreAxisRankMaps>;
+  axisRankContext?: {
+    current?: AxisRankMap;
+    previous?: AxisRankMap;
+  } | null;
 }): PlayerDrawerAxisCard[] {
   return [
     {
@@ -537,7 +1064,8 @@ function buildAxisCards(input: {
       value: input.player.coreStats.pow ?? null,
       valueRank: input.coreAxisRankMaps.pow.get(input.player.id) ?? null,
       seasonPoints: input.playerRating?.ppPow ?? null,
-      seasonPointsRank: input.playerRating?.ppPowRank ?? null,
+      seasonPointsRank: input.playerRating?.ppPowRank ?? input.axisRankContext?.current?.pow ?? null,
+      previousSeasonPointsRank: input.axisRankContext?.previous?.pow ?? null,
     },
     {
       id: "spe",
@@ -546,7 +1074,8 @@ function buildAxisCards(input: {
       value: input.player.coreStats.spe ?? null,
       valueRank: input.coreAxisRankMaps.spe.get(input.player.id) ?? null,
       seasonPoints: input.playerRating?.ppSpe ?? null,
-      seasonPointsRank: input.playerRating?.ppSpeRank ?? null,
+      seasonPointsRank: input.playerRating?.ppSpeRank ?? input.axisRankContext?.current?.spe ?? null,
+      previousSeasonPointsRank: input.axisRankContext?.previous?.spe ?? null,
     },
     {
       id: "men",
@@ -555,7 +1084,8 @@ function buildAxisCards(input: {
       value: input.player.coreStats.men ?? null,
       valueRank: input.coreAxisRankMaps.men.get(input.player.id) ?? null,
       seasonPoints: input.playerRating?.ppMen ?? null,
-      seasonPointsRank: input.playerRating?.ppMenRank ?? null,
+      seasonPointsRank: input.playerRating?.ppMenRank ?? input.axisRankContext?.current?.men ?? null,
+      previousSeasonPointsRank: input.axisRankContext?.previous?.men ?? null,
     },
     {
       id: "soc",
@@ -564,7 +1094,8 @@ function buildAxisCards(input: {
       value: input.player.coreStats.soc ?? null,
       valueRank: input.coreAxisRankMaps.soc.get(input.player.id) ?? null,
       seasonPoints: input.playerRating?.ppSoc ?? null,
-      seasonPointsRank: input.playerRating?.ppSocRank ?? null,
+      seasonPointsRank: input.playerRating?.ppSocRank ?? input.axisRankContext?.current?.soc ?? null,
+      previousSeasonPointsRank: input.axisRankContext?.previous?.soc ?? null,
     },
   ];
 }
@@ -638,8 +1169,15 @@ function getSourceLabel(source: "sqlite" | "prisma") {
   return source === "prisma" ? "Prisma / Referenz read-only" : "SQLite / lokal";
 }
 
+function getSeasonZeroEconomyForPlayer(gameState: GameState, playerId: string) {
+  const baseline = gameState.playerBaselines?.find((entry) => entry.playerId === playerId) ?? null;
+  return getPlayerBaselineEconomyReference(baseline);
+}
+
 function buildSeasonHistory(gameState: GameState, playerId: string) {
   const disciplineCategoryById = new Map(gameState.disciplines.map((discipline) => [discipline.id, discipline.category] as const));
+  const seasonZeroEconomy = getSeasonZeroEconomyForPlayer(gameState, playerId);
+  const baselineMarketValue = seasonZeroEconomy?.marketValue ?? null;
   return [...(gameState.seasonState.seasonSnapshots ?? [])]
     .sort((left, right) => right.seasonId.localeCompare(left.seasonId, "de"))
     .map((snapshot) => {
@@ -647,6 +1185,18 @@ function buildSeasonHistory(gameState: GameState, playerId: string) {
       if (!row) {
         return null;
       }
+      const seasonTransfer = [...(snapshot.transferSnapshots ?? [])]
+        .filter((entry) => entry.playerId === playerId)
+        .sort((left, right) => {
+          const leftTime = Date.parse(left.happenedAt ?? "");
+          const rightTime = Date.parse(right.happenedAt ?? "");
+          if (Number.isFinite(rightTime) && Number.isFinite(leftTime) && rightTime !== leftTime) {
+            return rightTime - leftTime;
+          }
+          return right.transferId.localeCompare(left.transferId, "de", { numeric: true });
+        })[0] ?? null;
+      const transferFee = seasonTransfer?.amount ?? null;
+      const transferMarketValue = row.marketValue ?? seasonTransfer?.marketValue ?? null;
       const ppsRankMap = buildSharedRankMap(
         snapshot.playerPerformances.map((entry) => ({
           playerId: entry.playerId,
@@ -687,6 +1237,17 @@ function buildSeasonHistory(gameState: GameState, playerId: string) {
         mvs: row.mvs ?? null,
         mvsRank: row.mvsRank ?? null,
         marketValue: row.marketValue ?? null,
+        marketValueBaselineDelta: calculateMoneyDelta(row.marketValue, baselineMarketValue),
+        transferType: seasonTransfer?.type ?? null,
+        transferFee,
+        transferMarketValue,
+        transferDeltaToMarketValue: seasonTransfer?.amountDeltaToMarketValue ?? calculateMoneyDelta(transferFee, transferMarketValue),
+        transferMarketValueFactor: seasonTransfer?.amountMarketValueFactor ?? calculateMoneyFactor(transferFee, transferMarketValue),
+        projectedSellValue: seasonTransfer?.type === "sell" ? transferFee : null,
+        projectedSellFactor: seasonTransfer?.type === "sell"
+          ? seasonTransfer?.amountMarketValueFactor ?? calculateMoneyFactor(transferFee, transferMarketValue)
+          : null,
+        projectedSellSourceLabel: seasonTransfer?.type === "sell" ? "Archivierter Verkauf" : null,
         salary: row.salary ?? null,
         contractLength: row.contractLength ?? null,
         bestDisciplineLabel: row.bestDisciplineLabel ?? null,
@@ -717,6 +1278,8 @@ function buildMetricDelta(currentValue: number | null, previousValue: number | n
 
 function buildHistoryRows(input: {
   gameState: GameState;
+  player: Player;
+  rosterEntry: RosterEntry | null;
   teamName: string | null;
   teamCode: string | null;
   seasonPerformance: PlayerDetailDrawerData["seasonPerformance"];
@@ -729,6 +1292,16 @@ function buildHistoryRows(input: {
   const hasActiveSeasonPerformance =
     input.seasonPerformance?.seasonId === input.gameState.season.id &&
     input.seasonPerformance.sourceLabel !== "Season Snapshot";
+  const activeSeasonTransfer = [...input.gameState.transferHistory]
+    .filter((entry) => entry.playerId === input.player.id && entry.seasonId === input.gameState.season.id)
+    .sort((left, right) => right.happenedAt.localeCompare(left.happenedAt, "de"))[0] ?? null;
+  const activeTransferFee = activeSeasonTransfer?.fee ?? null;
+  const activeTransferMarketValue = input.marketValue ?? activeSeasonTransfer?.marketValue ?? null;
+  const seasonZeroEconomy = getSeasonZeroEconomyForPlayer(input.gameState, input.player.id);
+  const baselineMarketValue = seasonZeroEconomy?.marketValue ?? getImportedPlayerDisplayMarketValue(input.player);
+  const activeSaleBreakdown = input.rosterEntry
+    ? buildTransfermarktSaleFactorBreakdown(input.gameState, input.player, input.rosterEntry)
+    : null;
   const activeSeasonRow: PlayerDrawerHistoryRow = {
     seasonId: input.gameState.season.id,
     seasonName: input.gameState.season.name,
@@ -749,6 +1322,15 @@ function buildHistoryRows(input: {
     mvs: input.playerRating?.mvs ?? null,
     mvsRank: input.playerRating?.mvsRank ?? null,
     marketValue: input.marketValue,
+    marketValueBaselineDelta: calculateMoneyDelta(input.marketValue, baselineMarketValue),
+    transferType: activeSeasonTransfer?.transferType ?? null,
+    transferFee: activeTransferFee,
+    transferMarketValue: activeTransferMarketValue,
+    transferDeltaToMarketValue: calculateMoneyDelta(activeTransferFee, activeTransferMarketValue),
+    transferMarketValueFactor: calculateMoneyFactor(activeTransferFee, activeTransferMarketValue),
+    projectedSellValue: activeSaleBreakdown?.salePrice ?? null,
+    projectedSellFactor: activeSaleBreakdown?.saleFactor ?? null,
+    projectedSellSourceLabel: activeSaleBreakdown ? activeSaleBreakdown.factorSource : null,
     salary: input.salary,
     contractLength: input.contractLength,
     averageContribution: hasActiveSeasonPerformance ? input.seasonPerformance?.averageContribution ?? null : null,
@@ -779,6 +1361,15 @@ function buildHistoryRows(input: {
       mvs: entry.mvs,
       mvsRank: entry.mvsRank,
       marketValue: entry.marketValue,
+      marketValueBaselineDelta: entry.marketValueBaselineDelta,
+      transferType: entry.transferType,
+      transferFee: entry.transferFee,
+      transferMarketValue: entry.transferMarketValue,
+      transferDeltaToMarketValue: entry.transferDeltaToMarketValue,
+      transferMarketValueFactor: entry.transferMarketValueFactor,
+      projectedSellValue: entry.projectedSellValue,
+      projectedSellFactor: entry.projectedSellFactor,
+      projectedSellSourceLabel: entry.projectedSellSourceLabel,
       salary: entry.salary,
       contractLength: entry.contractLength,
       averageContribution: entry.averageContribution,
@@ -892,6 +1483,7 @@ function buildBoardTrust(input: {
     salary: number | null;
   };
   coreAxisRankMaps: ReturnType<typeof buildCoreAxisRankMaps>;
+  rankPoolSize: number;
   seasonPerformance: ReturnType<typeof buildPlayerSeasonPerformance> | null;
 }): PlayerDetailDrawerData["boardTrust"] {
   if (!input.team || !input.rosterEntry) {
@@ -956,26 +1548,17 @@ function buildBoardTrust(input: {
     actualMvsRank: input.playerRating?.mvsRank ?? null,
     expectedAxisRank: axisCandidates?.expectedAxisRank ?? null,
     actualAxisPpsRank: axisCandidates?.actualAxisPpsRank ?? null,
+    rankPoolSize: input.rankPoolSize,
     weakTeamFit,
     hardNoGoHit,
   });
-  const reasons = [...assessment.reasons];
-  if (
-    identity?.boardConfidence != null &&
-    identity.boardConfidence < 42 &&
-    (input.rosterEntry.contractLength ?? 99) <= 1 &&
-    !reasons.includes("performance_below_board_expectation")
-  ) {
-    reasons.push("performance_below_board_expectation");
-  }
 
   return {
     ...assessment,
-    reasons,
     sourceLabel:
       identity?.boardConfidence != null
-        ? `Board Confidence ${Math.round(identity.boardConfidence)}`
-        : "Board Confidence neutral",
+        ? `Board Rating ${Math.round(identity.boardConfidence)}`
+        : "Board Rating neutral",
   };
 }
 
@@ -984,6 +1567,7 @@ export function buildPlayerDrawerDataFromGameState(input: {
   playerId: string;
   source: "sqlite" | "prisma";
   activePlayerId?: string | null;
+  manageableTeamIds?: string[] | null;
 }): PlayerDetailDrawerData | null {
   const player = input.gameState.players.find((entry) => entry.id === input.playerId) ?? null;
   if (!player) {
@@ -992,11 +1576,41 @@ export function buildPlayerDrawerDataFromGameState(input: {
 
   const rosterEntry = resolveRosterEntry(input.gameState.rosters, input.playerId, input.activePlayerId);
   const team = resolveTeam(input.gameState.teams, rosterEntry);
+  const scoutingTeamId = input.manageableTeamIds?.[0] ?? null;
+  const scoutingLevel = scoutingTeamId
+    ? getFacilityLevel(getTeamFacilityState(input.gameState, scoutingTeamId), "scouting_office")
+    : 0;
+  const attributeVisibility = resolveAttributeVisibility({
+    teamId: rosterEntry?.teamId ?? team?.teamId ?? null,
+    teamHumanControlled: team ? team.humanControlled !== false : null,
+    manageableTeamIds: input.manageableTeamIds ?? null,
+    scoutingLevel,
+  });
+  const traitView =
+    attributeVisibility === "exact"
+      ? {
+          disclosure: null,
+          visiblePositiveTraits: player.traitsPositive ?? [],
+          visibleNegativeTraits: player.traitsNegative ?? [],
+          hiddenPositiveTraitCount: 0,
+          hiddenNegativeTraitCount: 0,
+        }
+      : getScoutedTraitView({
+          traitsPositive: player.traitsPositive ?? [],
+          traitsNegative: player.traitsNegative ?? [],
+          scoutingLevel,
+        });
   const seasonPerformance = buildPlayerSeasonPerformance(input.gameState, player.id);
   const playerRatingsById = buildPlayerRatingContractMap(input.gameState);
   const playerRating = buildPlayerRatingWithSeasonFallback(input.gameState, playerRatingsById.get(player.id) ?? null, player.id);
   const activePlayerIds = Array.from(new Set((input.gameState.rosters ?? []).map((entry) => entry.playerId).filter(Boolean)));
   const coreAxisRankMaps = buildCoreAxisRankMaps(input.gameState.players, activePlayerIds);
+  const disciplineGlobalRankMaps = buildDisciplineGlobalRankMaps(input.gameState, input.gameState.disciplines);
+  const axisRankContext = buildAxisRankContext({
+    gameState: input.gameState,
+    playerId: player.id,
+    referenceSeasonId: seasonPerformance?.seasonId ?? input.gameState.season.id,
+  });
   const economyCompare = buildPlayerEconomyCompareMap({ gameState: input.gameState }).get(player.id) ?? null;
   const economy = resolvePlayerEconomyContract({
     playerId: player.id,
@@ -1014,6 +1628,7 @@ export function buildPlayerDrawerDataFromGameState(input: {
       salary: economy.salary,
     },
     coreAxisRankMaps,
+    rankPoolSize: playerRatingsById.size,
     seasonPerformance,
   });
   const moraleAssessment = team && rosterEntry
@@ -1024,10 +1639,13 @@ export function buildPlayerDrawerDataFromGameState(input: {
         renewalSalaryPreview: player.economyAfterUpgradePreview?.renewalSalaryPreview ?? null,
       })
     : null;
+  const playerDemands = team && rosterEntry ? buildPlayerDemands(input.gameState, player.id, team.teamId) : [];
   const seasonHistory = buildSeasonHistory(input.gameState, player.id);
   const latestArchivedPerformance = findLatestArchivedPlayerPerformance(input.gameState, player.id);
   const historyRows = buildHistoryRows({
     gameState: input.gameState,
+    player,
+    rosterEntry,
     teamName: team?.name ?? null,
     teamCode: team?.shortCode ?? null,
     seasonPerformance,
@@ -1105,12 +1723,18 @@ export function buildPlayerDrawerDataFromGameState(input: {
     portraitUrl: getPlayerPortraitBrowserUrl(player.id, player.portraitUrl ?? null, player.portraitPath ?? null),
     teamName: team?.name ?? null,
     teamCode: team?.shortCode ?? null,
+    teamHumanControlled: team ? team.humanControlled !== false : null,
     transferStatus: rosterEntry ? "Active Player" : "Free Agent",
     className: player.className ?? null,
     race: player.race ?? null,
     subclasses: player.subclasses ?? [],
-    traitsPositive: player.traitsPositive ?? [],
-    traitsNegative: player.traitsNegative ?? [],
+    traitsPositive: traitView.visiblePositiveTraits,
+    traitsNegative: traitView.visibleNegativeTraits,
+    scoutingLevel,
+    scoutingDisclosure: traitView.disclosure,
+    hiddenPositiveTraitCount: traitView.hiddenPositiveTraitCount,
+    hiddenNegativeTraitCount: traitView.hiddenNegativeTraitCount,
+    preferredDisciplineIdsVisible: attributeVisibility === "exact" || Boolean(traitView.disclosure?.preferredDisciplinesVisible),
     pow: player.coreStats.pow ?? null,
     spe: player.coreStats.spe ?? null,
     men: player.coreStats.men ?? null,
@@ -1140,14 +1764,14 @@ export function buildPlayerDrawerDataFromGameState(input: {
     mvsDeltaSourceLabel: previousHistoryRow?.mvs != null ? `Vergleich zu ${previousHistoryRow.seasonName}` : null,
     mvsSourceLabel:
       playerRating?.sourceStatus.mvs === "ready"
-        ? "MVS aus Season-Platzierungen via Rank→Diszi-MW"
+        ? "MVS aus Retool-Season-Rankpunkten, Clutch, Vielseitigkeit und Einsaetzen"
         : "Keine belegte MVS-Quelle",
     marketValue: economy.marketValue,
     marketValueSource: economy.marketValueSource,
     salary: economy.salary,
     salarySource: economy.salarySource,
-    normalSalary: economy.expectedSalary,
-    normalSalarySource: "calculated_expected",
+    normalSalary: getSeasonZeroEconomyForPlayer(input.gameState, player.id)?.salary ?? economy.expectedSalary,
+    normalSalarySource: getSeasonZeroEconomyForPlayer(input.gameState, player.id)?.salary != null ? "season_0_baseline" : "calculated_expected",
     purchasePrice: economy.purchasePrice,
     purchasePriceSource: economy.purchasePriceSource,
     contractLength: economy.contractLength,
@@ -1172,6 +1796,17 @@ export function buildPlayerDrawerDataFromGameState(input: {
           source: moraleAssessment.source,
         }
       : null,
+    demands: playerDemands.map((demand) => ({
+      demandId: demand.demandId,
+      label: demand.label,
+      detail: demand.detail,
+      type: demand.type,
+      targetDisciplineName: demand.targetDisciplineName ?? null,
+      status: demand.status,
+      priority: demand.priority,
+      moraleReward: demand.moraleReward,
+      moralePenalty: demand.moralePenalty,
+    })),
     progressionEconomyPreview: player.economyAfterUpgradePreview
       ? {
           marketValuePreview: player.economyAfterUpgradePreview.marketValuePreview,
@@ -1216,21 +1851,41 @@ export function buildPlayerDrawerDataFromGameState(input: {
       player,
       currentRating: progressionForecast.currentAbilityRating,
       performanceRating: playerRating?.ratingPps ?? playerRating?.ppsSeason ?? null,
-      scoutPotential: progressionForecast.scoutPotential,
+    scoutPotential: progressionForecast.scoutPotential,
     }),
-    attributeStats: buildAttributeStats(player),
+    organicProgression: player.lastOrganicProgression ?? null,
+    classHistory: player.classHistory ?? [],
+    attributeVisibility,
+    attributeStats: buildAttributeStats(player, attributeVisibility, scoutingLevel, {
+      saveId: getGameStateScoutingSeed(input.gameState),
+      playerId: player.id,
+    }),
     baselineAttributeDeltas: buildBaselineAttributeDeltas(player, input.gameState, progressionEvents),
-    axisCards: buildAxisCards({
-      player,
-      playerRating,
-      coreAxisRankMaps,
-    }),
-    disciplineValues: buildDisciplineValuesFromPlayer(
-      player,
-      input.gameState.disciplines,
-      seasonPerformance,
-      latestArchivedPerformance,
+    axisCards: maskAxisCardsForVisibility(
+      buildAxisCards({
+        player,
+        playerRating,
+        coreAxisRankMaps,
+        axisRankContext,
+      }),
+      attributeVisibility,
     ),
+    disciplineValues:
+      attributeVisibility === "scouted"
+        ? buildScoutedDisciplineValuesFromPlayer({
+            gameState: input.gameState,
+            player,
+            scoutingLevel,
+            topN: 5,
+          })
+        : buildDisciplineValuesFromPlayer(
+            player,
+            input.gameState.disciplines,
+            seasonPerformance,
+            latestArchivedPerformance,
+            input.gameState,
+            disciplineGlobalRankMaps,
+          ),
     progressionForecast,
     developmentLevelup,
     progressionEvents,
@@ -1264,6 +1919,8 @@ export function buildPlayerDrawerDataFromLegacyContext(input: {
   const activePlayer = input.context.activePlayers.find((entry) =>
     input.activePlayerId ? entry.id === input.activePlayerId : entry.playerId === input.playerId,
   ) ?? null;
+  const attributeVisibility: AttributeVisibility =
+    (input.context.team as { humanControlled?: boolean }).humanControlled === false ? "scouted" : "exact";
   const playerCatalog = input.playerCatalogById ? [...input.playerCatalogById.values()] : catalogPlayer ? [catalogPlayer] : [];
   const activePlayerIds = Array.from(new Set(input.context.activePlayers.map((entry) => entry.playerId).filter(Boolean)));
   const coreAxisRankMaps = buildCoreAxisRankMaps(playerCatalog, activePlayerIds);
@@ -1289,24 +1946,31 @@ export function buildPlayerDrawerDataFromLegacyContext(input: {
     ? buildDisciplineValuesFromPlayer(catalogPlayer, input.context.disciplines)
     : input.context.disciplineScores
         .filter((entry) => entry.playerId === input.playerId)
-        .map((entry) => ({
-          id: entry.disciplineId,
-          label:
-            input.context.disciplines.find((discipline) => discipline.id === entry.disciplineId)?.name ?? entry.disciplineId,
-          value: entry.score,
-          seasonPoints: null,
-          seasonAppearances: null,
-          lastSeasonPoints: null,
-          lastSeasonAppearances: null,
-          lastSeasonId: null,
-          upgradeDelta: null,
-          lastSeasonDisciplineValues: null,
-          currentDisciplineValues: entry.score,
-          disciplineDelta: null,
-          playerCount:
-            (input.context.disciplines.find((discipline) => discipline.id === entry.disciplineId) as { playerCount?: number | null } | undefined)
-              ?.playerCount ?? null,
-        }))
+        .map((entry) => {
+          const discipline = input.context.disciplines.find((candidate) => candidate.id === entry.disciplineId) ?? null;
+          return {
+            id: entry.disciplineId,
+            label: discipline?.name ?? entry.disciplineId,
+            category: discipline?.category ?? "power",
+            value: entry.score,
+            seasonPoints: null,
+            seasonPointsRank: null,
+            seasonAppearances: null,
+            allTimePoints: null,
+            allTimePointsRank: null,
+            allTimeAppearances: null,
+            currentSeasonMutatorPps: null,
+            slotLabels: [],
+            lastSeasonPoints: null,
+            lastSeasonAppearances: null,
+            lastSeasonId: null,
+            upgradeDelta: null,
+            lastSeasonDisciplineValues: null,
+            currentDisciplineValues: entry.score,
+            disciplineDelta: null,
+            playerCount: (discipline as { playerCount?: number | null } | null)?.playerCount ?? null,
+          };
+        })
         .sort((left, right) => (right.value ?? Number.NEGATIVE_INFINITY) - (left.value ?? Number.NEGATIVE_INFINITY))
         .map((entry, index) => ({
           ...entry,
@@ -1328,6 +1992,7 @@ export function buildPlayerDrawerDataFromLegacyContext(input: {
             valueRank: null,
             seasonPoints: null,
             seasonPointsRank: null,
+            previousSeasonPointsRank: null,
           },
           {
             id: "spe",
@@ -1337,6 +2002,7 @@ export function buildPlayerDrawerDataFromLegacyContext(input: {
             valueRank: null,
             seasonPoints: null,
             seasonPointsRank: null,
+            previousSeasonPointsRank: null,
           },
           {
             id: "men",
@@ -1346,6 +2012,7 @@ export function buildPlayerDrawerDataFromLegacyContext(input: {
             valueRank: null,
             seasonPoints: null,
             seasonPointsRank: null,
+            previousSeasonPointsRank: null,
           },
           {
             id: "soc",
@@ -1355,6 +2022,7 @@ export function buildPlayerDrawerDataFromLegacyContext(input: {
             valueRank: null,
             seasonPoints: null,
             seasonPointsRank: null,
+            previousSeasonPointsRank: null,
           },
         ] satisfies PlayerDrawerAxisCard[];
   const historyRows: PlayerDrawerHistoryRow[] = [
@@ -1378,6 +2046,15 @@ export function buildPlayerDrawerDataFromLegacyContext(input: {
       mvs: playerRating?.mvs ?? null,
       mvsRank: playerRating?.mvsRank ?? null,
       marketValue: economy.marketValue,
+      marketValueBaselineDelta: calculateMoneyDelta(economy.marketValue, catalogPlayer ? getImportedPlayerDisplayMarketValue(catalogPlayer) : null),
+      transferType: null,
+      transferFee: null,
+      transferMarketValue: null,
+      transferDeltaToMarketValue: null,
+      transferMarketValueFactor: null,
+      projectedSellValue: null,
+      projectedSellFactor: null,
+      projectedSellSourceLabel: null,
       salary: economy.salary,
       contractLength: economy.contractLength,
       averageContribution: null,
@@ -1386,6 +2063,22 @@ export function buildPlayerDrawerDataFromLegacyContext(input: {
       warnings: [],
     },
   ];
+
+  const detailPlayer = catalogPlayer;
+  const legacyTraitView =
+    attributeVisibility === "exact"
+      ? {
+          disclosure: null,
+          visiblePositiveTraits: catalogPlayer?.traitsPositive ?? rosterPlayer?.traitsPositive ?? [],
+          visibleNegativeTraits: catalogPlayer?.traitsNegative ?? rosterPlayer?.traitsNegative ?? [],
+          hiddenPositiveTraitCount: 0,
+          hiddenNegativeTraitCount: 0,
+        }
+      : getScoutedTraitView({
+          traitsPositive: catalogPlayer?.traitsPositive ?? rosterPlayer?.traitsPositive ?? [],
+          traitsNegative: catalogPlayer?.traitsNegative ?? rosterPlayer?.traitsNegative ?? [],
+          scoutingLevel: 0,
+        });
 
   return {
     playerId: input.playerId,
@@ -1402,12 +2095,18 @@ export function buildPlayerDrawerDataFromLegacyContext(input: {
       : getPlayerPortraitBrowserUrl(input.playerId, rosterPlayer?.portraitUrl ?? null, null),
     teamName: input.context.team.name,
     teamCode: input.context.team.shortCode,
+    teamHumanControlled: (input.context.team as { humanControlled?: boolean }).humanControlled === false ? false : true,
     transferStatus: activePlayer ? "Active Player" : "Preview / Kontextspieler",
     className: catalogPlayer?.className ?? rosterPlayer?.className ?? null,
     race: catalogPlayer?.race ?? null,
     subclasses: catalogPlayer?.subclasses ?? [],
-    traitsPositive: catalogPlayer?.traitsPositive ?? rosterPlayer?.traitsPositive ?? [],
-    traitsNegative: catalogPlayer?.traitsNegative ?? rosterPlayer?.traitsNegative ?? [],
+    traitsPositive: legacyTraitView.visiblePositiveTraits,
+    traitsNegative: legacyTraitView.visibleNegativeTraits,
+    scoutingLevel: 0,
+    scoutingDisclosure: legacyTraitView.disclosure,
+    hiddenPositiveTraitCount: legacyTraitView.hiddenPositiveTraitCount,
+    hiddenNegativeTraitCount: legacyTraitView.hiddenNegativeTraitCount,
+    preferredDisciplineIdsVisible: attributeVisibility === "exact",
     pow: catalogPlayer?.coreStats.pow ?? rosterPlayer?.coreStats.pow ?? null,
     spe: catalogPlayer?.coreStats.spe ?? rosterPlayer?.coreStats.spe ?? null,
     men: catalogPlayer?.coreStats.men ?? rosterPlayer?.coreStats.men ?? null,
@@ -1434,7 +2133,7 @@ export function buildPlayerDrawerDataFromLegacyContext(input: {
     mvsDeltaSourceLabel: null,
     mvsSourceLabel:
       playerRating?.sourceStatus.mvs === "ready"
-        ? "MVS aus Season-Platzierungen via Rank→Diszi-MW"
+        ? "MVS aus Retool-Season-Rankpunkten, Clutch, Vielseitigkeit und Einsaetzen"
         : "Keine belegte MVS-Quelle",
     marketValue: economy.marketValue,
     marketValueSource: economy.marketValueSource,
@@ -1451,6 +2150,7 @@ export function buildPlayerDrawerDataFromLegacyContext(input: {
     economyCompare: null,
     boardTrust: null,
     morale: null,
+    demands: [],
     fatigue: rosterPlayer ? rosterPlayer.fatigue ?? catalogPlayer?.fatigue ?? 0 : 0,
     availability: {
       injuryStatus: rosterPlayer?.injuryStatus ?? "healthy",
@@ -1469,14 +2169,17 @@ export function buildPlayerDrawerDataFromLegacyContext(input: {
     potential: catalogPlayer?.potential ?? rosterPlayer?.potential ?? null,
     scoutPotential: null,
     developmentInsight: null,
-    attributeStats: buildAttributeStats(catalogPlayer),
+    organicProgression: detailPlayer?.lastOrganicProgression ?? null,
+    classHistory: detailPlayer?.classHistory ?? [],
+    attributeVisibility,
+    attributeStats: detailPlayer ? buildAttributeStats(detailPlayer, attributeVisibility, 0, { saveId: "legacy-context", playerId: input.playerId }) : [],
     baselineAttributeDeltas: [],
-    axisCards,
+    axisCards: maskAxisCardsForVisibility(axisCards, attributeVisibility),
     disciplineValues,
     progressionForecast: null,
-    developmentLevelup: catalogPlayer
+    developmentLevelup: detailPlayer
       ? buildPlayerDevelopmentLevelupModel({
-          player: catalogPlayer,
+          player: detailPlayer,
           forecast: null,
           teamId: null,
           profile: null,

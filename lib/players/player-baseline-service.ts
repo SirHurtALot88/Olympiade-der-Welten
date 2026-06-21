@@ -5,6 +5,7 @@ import type {
   PlayerBaselineWriteGuardEvent,
   PlayerGeneratorAttributeName,
 } from "@/lib/data/olyDataTypes";
+import { resolvePlayerEconomyContract } from "@/lib/foundation/player-economy-contract";
 
 export const PLAYER_BASELINE_VERSION = "player-baseline-v2";
 const PLAYER_BASELINE_CHECKSUM_ALGORITHM = "sha256" as const;
@@ -24,6 +25,8 @@ const ATTRIBUTE_KEYS: PlayerGeneratorAttributeName[] = [
   "spirit",
   "torment",
 ];
+
+type SeasonZeroEconomyReference = NonNullable<PlayerBaselineRecord["seasonZeroEconomy"]>;
 
 function clone<T>(value: T): T {
   return structuredClone(value);
@@ -143,6 +146,7 @@ function buildChecksumPayload(baseline: Pick<
   | "attributes"
   | "marketValue"
   | "salary"
+  | "seasonZeroEconomy"
   | "bracket"
   | "disciplineRatings"
 >) {
@@ -158,9 +162,181 @@ function buildChecksumPayload(baseline: Pick<
     attributes: Object.fromEntries(ATTRIBUTE_KEYS.map((key) => [key, baseline.attributes[key] ?? null])),
     marketValue: baseline.marketValue ?? null,
     salary: baseline.salary ?? null,
+    seasonZeroEconomy: baseline.seasonZeroEconomy ?? null,
     bracket: baseline.bracket ?? null,
     disciplineRatings: baseline.disciplineRatings ?? {},
   };
+}
+
+function buildBaselineCorePayload(baseline: Pick<
+  PlayerBaselineRecord,
+  | "playerId"
+  | "name"
+  | "race"
+  | "className"
+  | "subclasses"
+  | "traits"
+  | "traitsPositive"
+  | "traitsNegative"
+  | "attributes"
+  | "bracket"
+  | "disciplineRatings"
+>) {
+  return {
+    playerId: baseline.playerId,
+    name: baseline.name,
+    race: baseline.race,
+    className: baseline.className,
+    subclasses: [...baseline.subclasses].sort(),
+    traits: [...baseline.traits].sort(),
+    traitsPositive: [...(baseline.traitsPositive ?? [])].sort(),
+    traitsNegative: [...(baseline.traitsNegative ?? [])].sort(),
+    attributes: Object.fromEntries(ATTRIBUTE_KEYS.map((key) => [key, baseline.attributes[key] ?? null])),
+    bracket: baseline.bracket ?? null,
+    disciplineRatings: baseline.disciplineRatings ?? {},
+  };
+}
+
+function roundBaselineMoney(value: number | null | undefined) {
+  return typeof value === "number" && Number.isFinite(value) ? Number(value.toFixed(2)) : null;
+}
+
+function normalizeLegacyBaselineMoney(value: number | null | undefined, kind: "marketValue" | "salary") {
+  const numericValue = roundBaselineMoney(value);
+  if (numericValue == null) {
+    return null;
+  }
+
+  if (kind === "marketValue") {
+    if (numericValue > 10_000) return roundBaselineMoney(numericValue / 1000);
+    if (numericValue > 1000) return roundBaselineMoney(numericValue / 100);
+    return numericValue;
+  }
+
+  if (numericValue > 1000) return roundBaselineMoney(numericValue / 1000);
+  if (numericValue > 100) return roundBaselineMoney(numericValue / 100);
+  return numericValue;
+}
+
+function createSeasonZeroEconomyReferenceFromPlayer(
+  player: Player,
+  options?: {
+    computedAt?: string;
+    source?: SeasonZeroEconomyReference["source"];
+  },
+): SeasonZeroEconomyReference {
+  const storedMarketValue = roundBaselineMoney(player.marketValue);
+  const displayMarketValue = roundBaselineMoney(player.displayMarketValue);
+  const storedSalary = roundBaselineMoney(player.salaryDemand);
+  const usesLegacyRawMarketValue = storedMarketValue != null && storedMarketValue > 1000 && displayMarketValue != null;
+  const usesLegacyRawSalary = storedSalary != null && storedSalary > 1000;
+  const seasonZeroPlayer = {
+    ...player,
+    marketValue: usesLegacyRawMarketValue ? displayMarketValue : player.marketValue,
+    salaryDemand: usesLegacyRawSalary ? null : player.salaryDemand,
+    displayMarketValue: null,
+    displaySalary: null,
+  };
+  const economy = resolvePlayerEconomyContract({
+    playerId: player.id,
+    player: seasonZeroPlayer,
+    rosterEntry: null,
+  });
+
+  return {
+    source: options?.source ?? "season_0_computed",
+    marketValue: roundBaselineMoney(economy.marketValue),
+    salary: roundBaselineMoney(economy.expectedSalary ?? economy.salary),
+    purchasePrice: roundBaselineMoney(economy.purchasePrice),
+    salaryMarketValue: roundBaselineMoney(economy.salaryMarketValue),
+    baseMarketValue: roundBaselineMoney(economy.baseMarketValue),
+    salaryBase: roundBaselineMoney(economy.salaryBase),
+    traitPercentSum: roundBaselineMoney(economy.traitPercentSum),
+    marketValueSource: economy.marketValueSource,
+    salarySource: economy.expectedSalary != null ? "season_0_expected_salary" : economy.salarySource,
+    computedAt: options?.computedAt ?? new Date().toISOString(),
+  };
+}
+
+function isEconomyReferenceMismatch(
+  left: SeasonZeroEconomyReference | null | undefined,
+  right: SeasonZeroEconomyReference | null | undefined,
+) {
+  if (!left || !right || left.marketValue == null || right.marketValue == null) {
+    return false;
+  }
+  const ratio = Math.max(left.marketValue, right.marketValue) / Math.max(0.01, Math.min(left.marketValue, right.marketValue));
+  return ratio >= 3 || Math.abs((left.salary ?? 0) - (right.salary ?? 0)) >= 50;
+}
+
+function normalizeSeasonZeroEconomyReference(
+  baseline: PlayerBaselineRecord,
+  options?: { computedAt?: string },
+): SeasonZeroEconomyReference {
+  const existing = baseline.seasonZeroEconomy;
+  if (existing) {
+    const isLegacyBackfill =
+      existing.source !== "season_0_computed" &&
+      (existing.marketValueSource.startsWith("baseline_") || existing.salarySource.startsWith("baseline_"));
+    return {
+      source: existing.source,
+      marketValue: isLegacyBackfill
+        ? normalizeLegacyBaselineMoney(existing.marketValue, "marketValue")
+        : roundBaselineMoney(existing.marketValue),
+      salary: isLegacyBackfill ? normalizeLegacyBaselineMoney(existing.salary, "salary") : roundBaselineMoney(existing.salary),
+      purchasePrice: isLegacyBackfill
+        ? normalizeLegacyBaselineMoney(existing.purchasePrice, "marketValue")
+        : roundBaselineMoney(existing.purchasePrice),
+      salaryMarketValue: isLegacyBackfill
+        ? normalizeLegacyBaselineMoney(existing.salaryMarketValue, "marketValue")
+        : roundBaselineMoney(existing.salaryMarketValue),
+      baseMarketValue: roundBaselineMoney(existing.baseMarketValue),
+      salaryBase: roundBaselineMoney(existing.salaryBase),
+      traitPercentSum: roundBaselineMoney(existing.traitPercentSum),
+      marketValueSource: existing.marketValueSource,
+      salarySource: existing.salarySource,
+      computedAt: existing.computedAt ?? baseline.createdAt ?? options?.computedAt ?? new Date().toISOString(),
+    };
+  }
+
+  return {
+    source: baseline.reconstructionWarning ? "season_0_reconstructed" : "season_0_backfilled",
+    marketValue: normalizeLegacyBaselineMoney(baseline.marketValue, "marketValue"),
+    salary: normalizeLegacyBaselineMoney(baseline.salary, "salary"),
+    purchasePrice: normalizeLegacyBaselineMoney(baseline.marketValue, "marketValue"),
+    salaryMarketValue: normalizeLegacyBaselineMoney(baseline.marketValue, "marketValue"),
+    baseMarketValue: null,
+    salaryBase: null,
+    traitPercentSum: null,
+    marketValueSource: "baseline_market_value_backfill",
+    salarySource: "baseline_salary_backfill",
+    computedAt: baseline.createdAt ?? options?.computedAt ?? new Date().toISOString(),
+  };
+}
+
+export function getPlayerBaselineEconomyReference(
+  baseline: PlayerBaselineRecord | null | undefined,
+): SeasonZeroEconomyReference | null {
+  return baseline ? normalizeSeasonZeroEconomyReference(baseline) : null;
+}
+
+function shouldReconstructLegacyEconomyReference(baseline: PlayerBaselineRecord, player: Player) {
+  const economy = getPlayerBaselineEconomyReference(baseline);
+  if (!economy || economy.source === "season_0_computed") {
+    return false;
+  }
+  const currentEconomy = createSeasonZeroEconomyReferenceFromPlayer(player, {
+    computedAt: baseline.createdAt,
+    source: "season_0_reconstructed",
+  });
+  if (economy.marketValue == null || currentEconomy.marketValue == null) {
+    return false;
+  }
+  const baselineLooksPlaceholder =
+    Math.abs((economy.marketValue ?? 0) - 100) < 0.01 && Math.abs((economy.salary ?? 0) - 10) < 0.01;
+  const marketValueRatio =
+    Math.max(economy.marketValue, currentEconomy.marketValue) / Math.max(0.01, Math.min(economy.marketValue, currentEconomy.marketValue));
+  return baselineLooksPlaceholder && marketValueRatio >= 3;
 }
 
 export function calculatePlayerBaselineChecksum(baseline: PlayerBaselineRecord) {
@@ -187,6 +363,7 @@ export function normalizePlayerBaselineRecord(
     createdAt: baseline.createdAt ?? options?.createdAt ?? new Date().toISOString(),
     importedAt: baseline.importedAt ?? options?.importedAt ?? baseline.createdAt ?? options?.createdAt ?? new Date().toISOString(),
   };
+  normalized.seasonZeroEconomy = normalizeSeasonZeroEconomyReference(normalized, { computedAt: normalized.createdAt });
   const checksum = calculatePlayerBaselineChecksum(normalized);
   return {
     ...normalized,
@@ -205,6 +382,11 @@ export function createPlayerBaselineFromPlayer(
     reconstructionWarning?: PlayerBaselineRecord["reconstructionWarning"];
   },
 ): PlayerBaselineRecord {
+  const createdAt = options?.createdAt ?? new Date().toISOString();
+  const seasonZeroEconomy = createSeasonZeroEconomyReferenceFromPlayer(player, {
+    computedAt: createdAt,
+    source: options?.reconstructionWarning ? "season_0_reconstructed" : "season_0_computed",
+  });
   return normalizePlayerBaselineRecord({
     playerId: player.id,
     name: player.name,
@@ -215,15 +397,16 @@ export function createPlayerBaselineFromPlayer(
     traitsPositive: [...player.traitsPositive],
     traitsNegative: [...player.traitsNegative],
     attributes: buildBaselineAttributes(player),
-    marketValue: player.marketValue ?? null,
-    salary: player.salaryDemand ?? null,
+    marketValue: seasonZeroEconomy.marketValue ?? player.marketValue ?? null,
+    salary: seasonZeroEconomy.salary ?? player.salaryDemand ?? null,
+    seasonZeroEconomy,
     bracket: player.bracketLabel ?? null,
     disciplineRatings: { ...(player.disciplineRatings ?? {}) },
     imageRef: player.portraitPath ?? player.portraitUrl ?? player.imageSource ?? null,
     source: options?.source ?? "seed",
     baselineVersion: PLAYER_BASELINE_VERSION,
-    createdAt: options?.createdAt ?? new Date().toISOString(),
-    importedAt: options?.importedAt ?? options?.createdAt ?? new Date().toISOString(),
+    createdAt,
+    importedAt: options?.importedAt ?? createdAt,
     sourceFile: options?.sourceFile ?? DEFAULT_BASELINE_SOURCE_FILE,
     ...(options?.reconstructionWarning ? { reconstructionWarning: options.reconstructionWarning } : {}),
   });
@@ -265,6 +448,10 @@ export function ensurePlayerBaselines(
       const normalizedExisting = normalizePlayerBaselineRecord(existing, { createdAt: options?.createdAt });
       if (sourcePlayer) {
         const sourceAttributes = buildBaselineAttributes(sourcePlayer);
+        const sourceEconomy = createSeasonZeroEconomyReferenceFromPlayer(sourcePlayer, {
+          computedAt: normalizedExisting.createdAt,
+          source: "season_0_computed",
+        });
         const mergedAttributes = { ...normalizedExisting.attributes };
         let backfilled = false;
         for (const key of ATTRIBUTE_KEYS) {
@@ -273,13 +460,38 @@ export function ensurePlayerBaselines(
             backfilled = true;
           }
         }
+        const needsComputedEconomyReference =
+          normalizedExisting.seasonZeroEconomy?.source !== "season_0_computed" ||
+          isEconomyReferenceMismatch(normalizedExisting.seasonZeroEconomy, sourceEconomy);
+        if (needsComputedEconomyReference) {
+          backfilled = true;
+          warnings.push(`baseline_economy_backfilled:${player.id}`);
+        }
         if (backfilled) {
-          warnings.push(`baseline_attribute_backfilled:${player.id}`);
+          if (Object.entries(mergedAttributes).some(([key, value]) => normalizedExisting.attributes[key as PlayerGeneratorAttributeName] !== value)) {
+            warnings.push(`baseline_attribute_backfilled:${player.id}`);
+          }
           return normalizePlayerBaselineRecord({
             ...normalizedExisting,
             attributes: mergedAttributes,
+            seasonZeroEconomy: needsComputedEconomyReference ? sourceEconomy : normalizedExisting.seasonZeroEconomy,
+            marketValue: needsComputedEconomyReference ? sourceEconomy.marketValue : normalizedExisting.marketValue,
+            salary: needsComputedEconomyReference ? sourceEconomy.salary : normalizedExisting.salary,
           });
         }
+      }
+      if (shouldReconstructLegacyEconomyReference(normalizedExisting, player)) {
+        const reconstructedEconomy = createSeasonZeroEconomyReferenceFromPlayer(player, {
+          computedAt: normalizedExisting.createdAt,
+          source: "season_0_reconstructed",
+        });
+        warnings.push(`baseline_economy_reconstructed_from_current:${player.id}`);
+        return normalizePlayerBaselineRecord({
+          ...normalizedExisting,
+          marketValue: reconstructedEconomy.marketValue,
+          salary: reconstructedEconomy.salary,
+          seasonZeroEconomy: reconstructedEconomy,
+        });
       }
       return normalizedExisting;
     }
@@ -338,6 +550,21 @@ export function guardPlayerBaselineWrite(input: {
         baselineVersion: normalizedNext.baselineVersion || previous.baselineVersion,
         checksum: previousChecksum,
       };
+    }
+
+    const previousCoreHash = stableHash(buildBaselineCorePayload(previous));
+    const nextCoreHash = stableHash(buildBaselineCorePayload(normalizedNext));
+    const isEconomyReferenceMigration =
+      previousCoreHash === nextCoreHash &&
+      previous.seasonZeroEconomy?.source !== "season_0_computed" &&
+      normalizedNext.seasonZeroEconomy != null;
+    const isEconomyReferenceCorrection =
+      previousCoreHash === nextCoreHash &&
+      previous.seasonZeroEconomy != null &&
+      normalizedNext.seasonZeroEconomy != null &&
+      isEconomyReferenceMismatch(previous.seasonZeroEconomy, normalizedNext.seasonZeroEconomy);
+    if (isEconomyReferenceMigration || isEconomyReferenceCorrection) {
+      return normalizedNext;
     }
 
     events.push({
@@ -488,6 +715,39 @@ export function buildPlayerBaselineAudit(gameState: GameState) {
     createdAt: baseline.createdAt,
     reconstructionWarning: baseline.reconstructionWarning ?? null,
   }));
+  const economyRows = gameState.players.map((player) => {
+    const baseline = baselineByPlayerId.get(player.id) ?? null;
+    const economy = getPlayerBaselineEconomyReference(baseline);
+    const currentEconomy = resolvePlayerEconomyContract({
+      playerId: player.id,
+      player,
+      rosterEntry: null,
+    });
+    const marketValueDelta =
+      economy?.marketValue != null && currentEconomy.marketValue != null
+        ? roundBaselineMoney(currentEconomy.marketValue - economy.marketValue)
+        : null;
+    const salaryDelta =
+      economy?.salary != null && currentEconomy.expectedSalary != null
+        ? roundBaselineMoney(currentEconomy.expectedSalary - economy.salary)
+        : null;
+    return {
+      playerId: player.id,
+      playerName: player.name,
+      baselineMarketValue: economy?.marketValue ?? null,
+      baselineSalary: economy?.salary ?? null,
+      baselinePurchasePrice: economy?.purchasePrice ?? null,
+      currentMarketValue: currentEconomy.marketValue,
+      currentSalary: currentEconomy.expectedSalary ?? currentEconomy.salary,
+      marketValueDelta,
+      salaryDelta,
+      source: economy?.source ?? null,
+      marketValueSource: economy?.marketValueSource ?? null,
+      salarySource: economy?.salarySource ?? null,
+    };
+  });
+  const computedEconomyReferenceRows = economyRows.filter((row) => row.source === "season_0_computed");
+  const nonComputedEconomyReferenceRows = economyRows.filter((row) => row.source !== "season_0_computed");
 
   return {
     summary: {
@@ -499,11 +759,16 @@ export function buildPlayerBaselineAudit(gameState: GameState) {
       reconstructedBaselineCount: reconstructed.length,
       baselineVersions: versions,
       invalidChecksumCount: invalidChecksumRows.length,
+      seasonZeroEconomyReferenceCount: economyRows.filter((row) => row.source).length,
+      computedSeasonZeroEconomyReferenceCount: computedEconomyReferenceRows.length,
+      nonComputedSeasonZeroEconomyReferenceCount: nonComputedEconomyReferenceRows.length,
+      missingComputedEconomyReferenceCount: nonComputedEconomyReferenceRows.length,
       writeGuardEventCount: gameState.baselineWriteGuardEvents?.length ?? 0,
     },
     missing,
     deltaRows,
     checksumRows,
+    economyRows,
     reconstructed,
     writeGuardEvents: gameState.baselineWriteGuardEvents ?? [],
   };

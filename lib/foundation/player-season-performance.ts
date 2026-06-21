@@ -1,5 +1,6 @@
 import type { GameState, SeasonSnapshotPlayerPerformanceRecord } from "@/lib/data/olyDataTypes";
 import { buildSeasonPointsLedger } from "@/lib/foundation/season-points-ledger";
+import type { SeasonPointsLedger } from "@/lib/foundation/season-points-ledger";
 
 export type PlayerSeasonPerformanceSummary = {
   seasonId: string | null;
@@ -155,11 +156,11 @@ function buildSummaryFromSnapshotRow(
   };
 }
 
-export function buildPlayerSeasonPerformanceMap(gameState: GameState) {
+export function buildPlayerSeasonPerformanceMap(gameState: GameState, seasonPointsLedger?: SeasonPointsLedger) {
   const matchdayResultsById = new Map((gameState.seasonState.matchdayResults ?? []).map((entry) => [entry.id, entry] as const));
   const disciplineNamesById = new Map(gameState.disciplines.map((discipline) => [discipline.id, discipline.name] as const));
   const disciplineCategoryById = new Map(gameState.disciplines.map((discipline) => [discipline.id, discipline.category] as const));
-  const pointsLedger = buildSeasonPointsLedger(gameState);
+  const pointsLedger = seasonPointsLedger ?? buildSeasonPointsLedger(gameState);
   const performanceMap = new Map<
     string,
     {

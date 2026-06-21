@@ -210,7 +210,7 @@ async function main() {
       () => undefined,
     );
     ensureClientStaticManifests(projectDir).catch(() => undefined);
-  }, 10);
+  }, 1000);
 
   const exitCode = await new Promise<number>((resolve, reject) => {
     child.once("error", reject);

@@ -1,0 +1,7 @@
+fromTab,toTab,baselineV2Ms,v3Ms,apiCallsCount,heavyCalls,warnings,status
+START,Home,1500,10765,4,"compact state 2.5s; standings overview 0.74s; management overview 1.38-1.74s","Request-Scope bleibt sauber ohne Markt-, History- oder XP-Feed; frischer Dev-Full-Reload bleibt schwer","mixed"
+Arena,Teams,10357,5150,4,"resolve preview 13.7s serverseitig nachlaufend; standings preview 14.1s serverseitig nachlaufend; portraits ~0.41s","UI wechselt schneller, aber alte Arena-Preview-Arbeit wird serverseitig noch fertiggeloggt","improved"
+Training,Transfermarkt,12430,7568,2,"free-agents 2.2s; version poll 0.23s","Initialer Markt-Feed jetzt limit=48 offset=0; Mehr laden nutzt offset=48","improved"
+Transfermarkt,Transferhistorie,10428,8573,2,"history 0.74s; version poll 0.23s","Recap-Request feuert beim Historienwechsel nicht mehr; Historie startet mit 100 Eintraegen","improved"
+Transferhistorie,Mehr laden,n/a,740,1,"history offset=100 0.74s","200 von 3177 Transfers sichtbar nach Nachladen","verified"
+Transfermarkt,Mehr laden,n/a,1003,1,"free-agents offset=48 1.0s","Geladener Markt-Feed waechst seitenweise statt Voll-Reload","verified"

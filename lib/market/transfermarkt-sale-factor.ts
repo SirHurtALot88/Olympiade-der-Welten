@@ -1,5 +1,5 @@
 import type { GameState, Player, RosterEntry, SeasonSnapshotRecord } from "@/lib/data/olyDataTypes";
-import { getImportedPlayerDisplayMarketValue } from "@/lib/data/player-economy-display";
+import { resolvePlayerEconomyContract } from "@/lib/foundation/player-economy-contract";
 import { buildPlayerRatingContractMap } from "@/lib/foundation/player-rating-contract";
 import { getTransfermarktBracket } from "@/lib/market/transfermarkt-fit";
 
@@ -38,6 +38,15 @@ type RankedCandidate = {
   ppsSeason: number;
   source: "live" | "snapshot";
 };
+
+type SaleFactorRankContext = {
+  playerRatingsById: ReturnType<typeof buildPlayerRatingContractMap>;
+  groupedCandidates: Map<number, RankedCandidate[]>;
+  latestSnapshot: SeasonSnapshotRecord | null;
+  hasLivePerformance: boolean;
+};
+
+const saleFactorRankContextCache = new WeakMap<GameState, SaleFactorRankContext>();
 
 function getLatestCompletedSeasonSnapshot(gameState: GameState): SeasonSnapshotRecord | null {
   return [...(gameState.seasonState.seasonSnapshots ?? [])]
@@ -97,15 +106,33 @@ export function normalizeVisibleRosterMoney(
     return importedDisplayValue;
   }
 
+  if (rosterValue > 1000) {
+    return roundValue(rosterValue / 100, 2);
+  }
+
   return roundValue(rosterValue, 2);
 }
 
-function buildRankedCandidates(gameState: GameState) {
-  const playerRatingsById = buildPlayerRatingContractMap(gameState);
+function buildRankedCandidates(
+  gameState: GameState,
+  playerRatingsById: ReturnType<typeof buildPlayerRatingContractMap>,
+  hasLivePerformance: boolean,
+  latestSnapshot: SeasonSnapshotRecord | null,
+) {
   const playersById = new Map(gameState.players.map((player) => [player.id, player]));
   const groupedCandidates = new Map<number, RankedCandidate[]>();
-  const hasLivePerformance = (gameState.seasonState.playerDisciplinePerformances ?? []).length > 0;
-  const latestSnapshot = hasLivePerformance ? null : getLatestCompletedSeasonSnapshot(gameState);
+  const livePerformancePointsByPlayerId = new Map<string, number>();
+  if (hasLivePerformance) {
+    for (const performance of gameState.seasonState.playerDisciplinePerformances ?? []) {
+      if (!performance.playerId || !Number.isFinite(performance.scoreContribution)) {
+        continue;
+      }
+      livePerformancePointsByPlayerId.set(
+        performance.playerId,
+        roundValue((livePerformancePointsByPlayerId.get(performance.playerId) ?? 0) + performance.scoreContribution, 4),
+      );
+    }
+  }
   const snapshotPerformanceByPlayerId = new Map(
     (latestSnapshot?.playerPerformances ?? []).map((performance) => [performance.playerId, performance] as const),
   );
@@ -116,7 +143,8 @@ function buildRankedCandidates(gameState: GameState) {
       continue;
     }
 
-    const baseMarketValue = getImportedPlayerDisplayMarketValue(player);
+    const economy = resolvePlayerEconomyContract({ player, rosterEntry });
+    const baseMarketValue = normalizeVisibleRosterMoney(rosterEntry.currentValue, economy.marketValue);
     if (baseMarketValue == null || baseMarketValue <= 0) {
       continue;
     }
@@ -125,13 +153,15 @@ function buildRankedCandidates(gameState: GameState) {
     const rating = playerRatingsById.get(player.id);
     const snapshotPerformance = snapshotPerformanceByPlayerId.get(player.id) ?? null;
     const snapshotPoints = snapshotPerformance?.totalPoints ?? snapshotPerformance?.totalContribution ?? null;
-    const rankingValue = hasLivePerformance ? rating?.mvs ?? 0 : snapshotPoints ?? 0;
+    const livePerformancePoints = livePerformancePointsByPlayerId.get(player.id) ?? 0;
+    const liveMvs = rating?.mvs != null && rating.mvs > 0 ? rating.mvs : livePerformancePoints;
+    const rankingValue = hasLivePerformance ? liveMvs : snapshotPoints ?? 0;
     const candidate: RankedCandidate = {
       playerId: player.id,
       bracket,
       baseMarketValue,
       mvs: rankingValue,
-      ppsSeason: hasLivePerformance ? rating?.ppsSeason ?? 0 : snapshotPoints ?? 0,
+      ppsSeason: hasLivePerformance ? rating?.ppsSeason ?? livePerformancePoints : snapshotPoints ?? 0,
       source: hasLivePerformance ? "live" : "snapshot",
     };
 
@@ -143,14 +173,33 @@ function buildRankedCandidates(gameState: GameState) {
   return groupedCandidates;
 }
 
+function getSaleFactorRankContext(gameState: GameState): SaleFactorRankContext {
+  const cached = saleFactorRankContextCache.get(gameState);
+  if (cached) {
+    return cached;
+  }
+
+  const playerRatingsById = buildPlayerRatingContractMap(gameState);
+  const hasLivePerformance = (gameState.seasonState.playerDisciplinePerformances ?? []).length > 0;
+  const latestSnapshot = hasLivePerformance ? null : getLatestCompletedSeasonSnapshot(gameState);
+  const groupedCandidates = buildRankedCandidates(gameState, playerRatingsById, hasLivePerformance, latestSnapshot);
+  const context = {
+    playerRatingsById,
+    groupedCandidates,
+    latestSnapshot,
+    hasLivePerformance,
+  };
+  saleFactorRankContextCache.set(gameState, context);
+  return context;
+}
+
 export function buildTransfermarktSaleFactorBreakdown(
   gameState: GameState,
   player: Player | null | undefined,
   rosterEntry?: RosterEntry | null,
 ): TransfermarktSaleFactorBreakdown {
-  const importedMarketValue = player ? getImportedPlayerDisplayMarketValue(player) : null;
-  const fallbackBaseMarketValue = normalizeVisibleRosterMoney(rosterEntry?.currentValue, importedMarketValue);
-  const baseMarketValue = importedMarketValue ?? fallbackBaseMarketValue ?? null;
+  const economy = resolvePlayerEconomyContract({ player, rosterEntry });
+  const baseMarketValue = normalizeVisibleRosterMoney(rosterEntry?.currentValue, economy.marketValue) ?? economy.marketValue ?? null;
 
   if (baseMarketValue == null || baseMarketValue <= 0) {
     return {
@@ -169,17 +218,14 @@ export function buildTransfermarktSaleFactorBreakdown(
   }
 
   const bracket = getTransfermarktBracket(baseMarketValue);
-  const playerRatingsById = buildPlayerRatingContractMap(gameState);
-  const playerRating = player ? playerRatingsById.get(player.id) ?? null : null;
-  const latestSnapshot = (gameState.seasonState.playerDisciplinePerformances ?? []).length > 0
-    ? null
-    : getLatestCompletedSeasonSnapshot(gameState);
+  const rankContext = getSaleFactorRankContext(gameState);
+  const playerRating = player ? rankContext.playerRatingsById.get(player.id) ?? null : null;
+  const latestSnapshot = rankContext.latestSnapshot;
   const snapshotPerformance = player
     ? latestSnapshot?.playerPerformances.find((performance) => performance.playerId === player.id) ?? null
     : null;
   const snapshotPoints = snapshotPerformance?.totalPoints ?? snapshotPerformance?.totalContribution ?? null;
-  const groupedCandidates = buildRankedCandidates(gameState);
-  const rankedGroup = (groupedCandidates.get(bracket) ?? [])
+  const rankedGroup = (rankContext.groupedCandidates.get(bracket) ?? [])
     .filter((candidate) => candidate.mvs > 0)
     .sort((left, right) => {
       if (right.mvs !== left.mvs) {

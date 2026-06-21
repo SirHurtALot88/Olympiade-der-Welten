@@ -12,14 +12,23 @@ export const TRANSFERMARKT_CONFIRMED_COLOR_RULES: TransfermarktColorRule[] = [
   {
     id: "core_axis_heat_scale",
     certainty: "confirmed",
-    colors: ["#1565C0", "#42A5F5", "#2E7D32", "#66BB6A", "#F9A825", "#FFEB3B", "#FF9800", "#EF5350"],
-    source: "Retool playersTable Pow/Spe/Men/Soc conditionalFormatting",
+    colors: [
+      "var(--heat-blue-dark)",
+      "var(--heat-blue-light)",
+      "var(--heat-green-dark)",
+      "var(--heat-green-light)",
+      "var(--heat-yellow-light)",
+      "var(--heat-orange-light)",
+      "var(--heat-red-light)",
+      "var(--heat-red-dark)",
+    ],
+    source: "Retool playersTable Pow/Spe/Men/Soc conditionalFormatting, mapped to app heat palette",
   },
   {
     id: "gt_count_heat_scale",
     certainty: "confirmed",
-    colors: ["#4CAF50", "#FFEB3B", "#F44336"],
-    source: "Retool playersTable >20/>40/>60/>80 conditionalFormatting",
+    colors: ["var(--heat-strong-bg)", "var(--heat-neutral-bg)", "var(--heat-danger-bg)"],
+    source: "Retool playersTable >20/>40/>60/>80 conditionalFormatting, mapped to app heat palette",
   },
   {
     id: "class_tag_palette",
@@ -44,8 +53,8 @@ export function formatTransfermarktCurrency(value: number | null) {
   }
 
   return `${new Intl.NumberFormat("de-DE", {
-    minimumFractionDigits: Math.abs(value) < 1000 ? 2 : 0,
-    maximumFractionDigits: Math.abs(value) < 1000 ? 2 : 0,
+    minimumFractionDigits: 1,
+    maximumFractionDigits: 1,
   }).format(value)} €`;
 }
 
@@ -76,26 +85,18 @@ export function getConfirmedAxisHeatStyle(value: number | null) {
     return undefined;
   }
 
-  const backgroundColor =
-    value >= 86 ? "#1565C0" :
-    value >= 76 ? "#42A5F5" :
-    value >= 66 ? "#2E7D32" :
-    value >= 56 ? "#66BB6A" :
-    value >= 46 ? "#F9A825" :
-    value >= 36 ? "#FFEB3B" :
-    value >= 21 ? "#FF9800" :
-    "#EF5350";
-
-  const color =
-    backgroundColor === "#1565C0" ||
-    backgroundColor === "#42A5F5" ||
-    backgroundColor === "#2E7D32"
-      ? "#FFFFFF"
-      : "#000000";
+  const heat =
+    value >= 86 ? { backgroundColor: "var(--heat-best-bg)", color: "var(--heat-best-text)" } :
+    value >= 76 ? { backgroundColor: "var(--heat-elite-bg)", color: "var(--heat-elite-text)" } :
+    value >= 66 ? { backgroundColor: "var(--heat-strong-bg)", color: "var(--heat-strong-text)" } :
+    value >= 56 ? { backgroundColor: "var(--heat-good-bg)", color: "var(--heat-good-text)" } :
+    value >= 46 ? { backgroundColor: "var(--heat-neutral-bg)", color: "var(--heat-neutral-text)" } :
+    value >= 36 ? { backgroundColor: "var(--heat-risk-bg)", color: "var(--heat-risk-text)" } :
+    value >= 21 ? { backgroundColor: "var(--heat-danger-light-bg)", color: "var(--heat-danger-light-text)" } :
+    { backgroundColor: "var(--heat-danger-bg)", color: "var(--heat-danger-text)" };
 
   return {
-    backgroundColor,
-    color,
+    ...heat,
   };
 }
 
@@ -108,18 +109,12 @@ export function getConfirmedTierStyle(value: TransfermarktTier | null) {
     return undefined;
   }
 
-  const backgroundColor =
-    value === "S+" ? "#1565C0" :
-    value === "S" ? "#42A5F5" :
-    value === "A" ? "#2E7D32" :
-    value === "B" ? "#66BB6A" :
-    value === "C" ? "#F9A825" :
-    value === "D" ? "#FFEB3B" :
-    value === "E" ? "#FF9800" :
-    "#EF5350";
-
-  return {
-    backgroundColor,
-    color: value === "S+" || value === "S" || value === "A" ? "#FFFFFF" : "#000000",
-  };
+  if (value === "S+") return { backgroundColor: "var(--heat-best-bg)", color: "var(--heat-best-text)" };
+  if (value === "S") return { backgroundColor: "var(--heat-elite-bg)", color: "var(--heat-elite-text)" };
+  if (value === "A") return { backgroundColor: "var(--heat-strong-bg)", color: "var(--heat-strong-text)" };
+  if (value === "B") return { backgroundColor: "var(--heat-good-bg)", color: "var(--heat-good-text)" };
+  if (value === "C") return { backgroundColor: "var(--heat-neutral-bg)", color: "var(--heat-neutral-text)" };
+  if (value === "D") return { backgroundColor: "var(--heat-risk-bg)", color: "var(--heat-risk-text)" };
+  if (value === "E") return { backgroundColor: "var(--heat-danger-light-bg)", color: "var(--heat-danger-light-text)" };
+  return { backgroundColor: "var(--heat-danger-bg)", color: "var(--heat-danger-text)" };
 }

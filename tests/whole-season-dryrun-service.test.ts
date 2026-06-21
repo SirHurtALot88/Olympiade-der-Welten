@@ -152,6 +152,7 @@ describe("runWholeSeasonDryRun", () => {
     expect(result.snapshotReadiness.status).toBe("blocked");
     expect(result.playerPPsReconciliation.status).toBe("missing_source");
     expect(result.teamPPsReconciliation.status).toBe("missing_source");
+    expect(result.aiSeasonAudit.warnings).toContain("ai_lineup_audit_no_source");
   });
 
   it("keeps the real local save untouched because the full season runs on an isolated in-memory copy", async () => {
@@ -177,6 +178,7 @@ describe("runWholeSeasonDryRun", () => {
     expect(result.snapshotReadiness.totalMatchdays).toBe(before.season.matchdayIds.length);
     expect(result.playerPPsReconciliation.status).toBe("missing_source");
     expect(result.teamPPsReconciliation.status).toBe("missing_source");
+    expect(result.aiSeasonAudit.totals.drafts).toBe(0);
     expect(result.skippedDisabledAiTeams).toBe(before.teams.length);
     expect(result.missingAiLineups).toBe(0);
     expect(result.blockingReasons).toContain("ai_lineup_apply_disabled");
@@ -214,6 +216,7 @@ describe("runWholeSeasonDryRun", () => {
     expect(result.snapshotReadiness.status).toMatch(/ready|warning|blocked/);
     expect(result.playerPPsReconciliation.totalPlayerPoints).toBeGreaterThanOrEqual(0);
     expect(result.teamPPsReconciliation.totalTeamPoints).toBeGreaterThanOrEqual(0);
+    expect(result.aiSeasonAudit.totals.drafts).toBeGreaterThanOrEqual(0);
     expect(result.simulatedMatchdays).toBeLessThanOrEqual(1);
   });
 
@@ -274,6 +277,12 @@ describe("runWholeSeasonDryRun", () => {
     expect(result.missingAiLineups).toBe(0);
     expect(result.skippedDisabledAiTeams).toBe(0);
     expect(result.simulatedMatchdays).toBe(2);
+    expect(result.aiSeasonAudit.totals.aiDrafts).toBeGreaterThan(0);
+    expect(result.aiSeasonAudit.totals.formCardUses).toBeGreaterThan(0);
+    expect(result.aiSeasonAudit.totals.mutatorTraits).toBeGreaterThan(0);
+    for (const matchday of result.matchdays) {
+      expect(matchday.steps.filter((step) => step.key === "matchday_advance")).toHaveLength(1);
+    }
     expect(persistence.state.gameState).toEqual(before);
   }, 90_000);
 });

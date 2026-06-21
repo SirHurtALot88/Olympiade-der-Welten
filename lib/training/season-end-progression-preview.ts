@@ -122,6 +122,15 @@ export type SeasonEndProgressionPreview = {
   warnings: string[];
 };
 
+type EconomyPreviewContext = {
+  beforeReport: ReturnType<typeof buildPlayerEconomyCompareReport>;
+  beforeRowsByPlayerId: Map<string, ReturnType<typeof buildPlayerEconomyCompareReport>["players"][number]>;
+  beforeRatings: ReturnType<typeof buildPlayerRatingContractMap>;
+  rosterByPlayerId: Map<string, GameState["rosters"][number]>;
+  salaryMarketValueOverridesByPlayerId: Map<string, number>;
+  baseMarketValueOverridesByPlayerId: Map<string, number>;
+};
+
 const ATTRIBUTE_LABELS: Record<PlayerGeneratorAttributeName, string> = {
   power: "Power",
   health: "Health",
@@ -394,33 +403,28 @@ function buildEconomyAudit(input: {
   gameState: GameState;
   player: Player;
   previewPlayer: Player;
+  context: EconomyPreviewContext;
+  shouldBuildAfterPreview: boolean;
 }) {
-  const rosterEntry = input.gameState.rosters.find((entry) => entry.playerId === input.player.id) ?? null;
+  const rosterEntry = input.context.rosterByPlayerId.get(input.player.id) ?? null;
   const economy = resolvePlayerEconomyContract({ playerId: input.player.id, player: input.player, rosterEntry });
-  const beforeReport = buildPlayerEconomyCompareReport({ gameState: input.gameState });
-  const salaryMarketValueOverridesByPlayerId = new Map(
-    beforeReport.players
-      .filter((row) => row.calculationBreakdown.salaryMarketValue != null)
-      .map((row) => [row.playerId, row.calculationBreakdown.salaryMarketValue as number] as const),
-  );
-  const baseMarketValueOverridesByPlayerId = new Map(
-    beforeReport.players
-      .filter((row) => row.calculationBreakdown.baseMarketValue != null)
-      .map((row) => [row.playerId, row.calculationBreakdown.baseMarketValue as number] as const),
-  );
-  const beforeRow = beforeReport.players.find((entry) => entry.playerId === input.player.id) ?? null;
-  const previewGameState: GameState = {
-    ...input.gameState,
-    players: input.gameState.players.map((entry) => (entry.id === input.player.id ? input.previewPlayer : entry)),
-  };
-  const afterReport = buildPlayerEconomyCompareReport({
-    gameState: previewGameState,
-    salaryMarketValueOverridesByPlayerId,
-    baseMarketValueOverridesByPlayerId,
-  });
-  const afterRow = afterReport.players.find((entry) => entry.playerId === input.player.id) ?? null;
-  const beforeRating = buildPlayerRatingContractMap(input.gameState).get(input.player.id) ?? null;
-  const afterRating = buildPlayerRatingContractMap(previewGameState).get(input.player.id) ?? null;
+  const beforeRow = input.context.beforeRowsByPlayerId.get(input.player.id) ?? null;
+  const previewGameState: GameState | null = input.shouldBuildAfterPreview
+    ? {
+        ...input.gameState,
+        players: input.gameState.players.map((entry) => (entry.id === input.player.id ? input.previewPlayer : entry)),
+      }
+    : null;
+  const afterReport = previewGameState
+    ? buildPlayerEconomyCompareReport({
+        gameState: previewGameState,
+        salaryMarketValueOverridesByPlayerId: input.context.salaryMarketValueOverridesByPlayerId,
+        baseMarketValueOverridesByPlayerId: input.context.baseMarketValueOverridesByPlayerId,
+      })
+    : input.context.beforeReport;
+  const afterRow = previewGameState ? afterReport.players.find((entry) => entry.playerId === input.player.id) ?? null : beforeRow;
+  const beforeRating = input.context.beforeRatings.get(input.player.id) ?? null;
+  const afterRating = previewGameState ? buildPlayerRatingContractMap(previewGameState).get(input.player.id) ?? null : beforeRating;
   const marketValueDeltaAbs =
     beforeRow?.calculatedMarketValue != null && economy.marketValue != null ? roundValue(beforeRow.calculatedMarketValue - economy.marketValue, 2) : null;
   const marketValueDeltaPct =
@@ -487,12 +491,31 @@ export function buildSeasonEndProgressionPreview(input: {
 }) {
   const facilities = input.facilities ?? {};
   const normalizedFacilities = normalizePreviewFacilities(facilities);
+  const playerById = new Map(input.gameState.players.map((player) => [player.id, player] as const));
+  const teamById = new Map(input.gameState.teams.map((team) => [team.teamId, team] as const));
+  const beforeReport = buildPlayerEconomyCompareReport({ gameState: input.gameState });
+  const economyContext: EconomyPreviewContext = {
+    beforeReport,
+    beforeRowsByPlayerId: new Map(beforeReport.players.map((row) => [row.playerId, row] as const)),
+    beforeRatings: buildPlayerRatingContractMap(input.gameState),
+    rosterByPlayerId: new Map(input.gameState.rosters.map((entry) => [entry.playerId, entry] as const)),
+    salaryMarketValueOverridesByPlayerId: new Map(
+      beforeReport.players
+        .filter((row) => row.calculationBreakdown.salaryMarketValue != null)
+        .map((row) => [row.playerId, row.calculationBreakdown.salaryMarketValue as number] as const),
+    ),
+    baseMarketValueOverridesByPlayerId: new Map(
+      beforeReport.players
+        .filter((row) => row.calculationBreakdown.baseMarketValue != null)
+        .map((row) => [row.playerId, row.calculationBreakdown.baseMarketValue as number] as const),
+    ),
+  };
   const rosterRows = input.gameState.rosters
     .filter((entry) => (input.teamId ? entry.teamId === input.teamId : true))
     .map((entry) => ({
       rosterEntry: entry,
-      player: input.gameState.players.find((player) => player.id === entry.playerId) ?? null,
-      team: input.gameState.teams.find((team) => team.teamId === entry.teamId) ?? null,
+      player: playerById.get(entry.playerId) ?? null,
+      team: teamById.get(entry.teamId) ?? null,
     }))
     .filter((entry): entry is { rosterEntry: GameState["rosters"][number]; player: Player; team: GameState["teams"][number] | null } =>
       Boolean(entry.player),
@@ -524,6 +547,7 @@ export function buildSeasonEndProgressionPreview(input: {
             : availableXP < cost.costAfterFacility
               ? "xp_insufficient"
               : null;
+    const shouldBuildAfterPreview = blockReason == null;
     const baselineAttributes = toGeneratorAttributes(player);
     const baselineDisciplineRatings = buildPreviewDisciplineRatingsFromAttributes({
       player,
@@ -551,7 +575,13 @@ export function buildSeasonEndProgressionPreview(input: {
       previousDisciplineRatings: baselineDisciplineRatings,
       disciplineRatings: previewDisciplineRatings,
     };
-    const economyAudit = buildEconomyAudit({ gameState: input.gameState, player, previewPlayer });
+    const economyAudit = buildEconomyAudit({
+      gameState: input.gameState,
+      player,
+      previewPlayer,
+      context: economyContext,
+      shouldBuildAfterPreview,
+    });
 
     return {
       playerId: player.id,

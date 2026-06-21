@@ -6,6 +6,10 @@ import {
   calculateMutatorModifierForSide,
   getFormCardColorForDisciplineCategory,
 } from "@/lib/lineups/legacy-lineup-modifiers";
+import { calculateTeamPowerModifierForSide } from "@/lib/lineups/team-powers";
+import { getTeamRelationship } from "@/lib/rivalries/team-rivalries";
+import { selectTeamCaptain } from "@/lib/morale/player-demands-service";
+import { buildPlayerMoralePerformanceMap } from "@/lib/morale/player-morale-performance";
 import { distributeRankPointsToPlayers, getRankToPointsValue } from "@/lib/resolve/rank-to-points";
 import type {
   DisciplineHighlightCandidate,
@@ -21,6 +25,99 @@ function rankDescending<T>(items: T[], scoreAccessor: (item: T) => number) {
   return [...items]
     .sort((left, right) => scoreAccessor(right) - scoreAccessor(left))
     .map((item, index) => ({ item, rank: index + 1 }));
+}
+
+function roundScore(value: number) {
+  return Math.round(value * 10) / 10;
+}
+
+function selectDebuffTargets(input: {
+  source: DisciplineTeamResolvePreview;
+  teamResults: DisciplineTeamResolvePreview[];
+  preRanksByTeamId: Map<string, number>;
+}) {
+  const eligible = input.teamResults.filter((team) => team.teamId !== input.source.teamId && !team.missingLineup);
+  if (eligible.length === 0 || !input.source.teamPowerEffectType || !input.source.teamPowerTargetMode) {
+    return [];
+  }
+
+  const sourceRank = input.preRanksByTeamId.get(input.source.teamId) ?? input.source.rank;
+  const sortedByScore = [...eligible].sort((left, right) => right.score - left.score);
+  const sortedByRankDistance = [...eligible].sort((left, right) => {
+    const leftDistance = Math.abs((input.preRanksByTeamId.get(left.teamId) ?? left.rank) - sourceRank);
+    const rightDistance = Math.abs((input.preRanksByTeamId.get(right.teamId) ?? right.rank) - sourceRank);
+    if (leftDistance !== rightDistance) return leftDistance - rightDistance;
+    return right.score - left.score;
+  });
+  const rivalTarget = [...eligible].sort((left, right) => {
+    const leftValue = getTeamRelationship(input.source.teamId, left.teamId)?.value ?? 0;
+    const rightValue = getTeamRelationship(input.source.teamId, right.teamId)?.value ?? 0;
+    if (leftValue !== rightValue) return leftValue - rightValue;
+    return right.score - left.score;
+  })[0] ?? null;
+
+  if (input.source.teamPowerTargetMode === "single_rival") {
+    return [rivalTarget ?? sortedByScore[0]].filter((team): team is DisciplineTeamResolvePreview => Boolean(team));
+  }
+
+  if (input.source.teamPowerTargetMode === "single_top") {
+    return [sortedByScore[0]].filter((team): team is DisciplineTeamResolvePreview => Boolean(team));
+  }
+
+  if (input.source.teamPowerTargetMode === "single_rank_neighbor") {
+    return [sortedByRankDistance[0]].filter((team): team is DisciplineTeamResolvePreview => Boolean(team));
+  }
+
+  if (input.source.teamPowerTargetMode === "rank_band") {
+    const limit = Math.max(input.source.teamPowerTargetLimit ?? 2, 1);
+    return sortedByRankDistance.slice(0, limit);
+  }
+
+  return [];
+}
+
+function applyTeamPowerDebuffs(teamResults: DisciplineTeamResolvePreview[]) {
+  const preRanked = rankDescending(teamResults, (team) => team.score);
+  const preRanksByTeamId = new Map(preRanked.map(({ item, rank }) => [item.teamId, rank] as const));
+  const debuffSources = teamResults.filter(
+    (team) =>
+      (team.teamPowerEffectType === "snipe_debuff" ||
+        team.teamPowerEffectType === "field_debuff" ||
+        team.teamPowerEffectType === "rivalry_debuff") &&
+      (team.teamPowerImpact ?? 0) > 0,
+  );
+
+  if (debuffSources.length === 0) {
+    return teamResults;
+  }
+
+  const debuffByTeamId = new Map<string, { amount: number; labels: string[] }>();
+  for (const source of debuffSources) {
+    const targets = selectDebuffTargets({ source, teamResults, preRanksByTeamId });
+    const impactPct = source.teamPowerImpact ?? 0;
+    for (const target of targets) {
+      const rawImpact = roundScore((target.score * impactPct) / 100);
+      const perTargetImpact = source.teamPowerEffectType === "field_debuff" ? roundScore(rawImpact * 0.65) : rawImpact;
+      const current = debuffByTeamId.get(target.teamId) ?? { amount: 0, labels: [] };
+      current.amount = roundScore(current.amount + perTargetImpact);
+      current.labels.push(`${source.teamName}: ${source.teamPowerLabel ?? "Team-Power"} -${perTargetImpact} (${impactPct}%)`);
+      debuffByTeamId.set(target.teamId, current);
+    }
+  }
+
+  return teamResults.map((team) => {
+    const debuff = debuffByTeamId.get(team.teamId);
+    if (!debuff) {
+      return team;
+    }
+    const nextScore = roundScore(Math.max(team.score - debuff.amount, 0));
+    return {
+      ...team,
+      finalPreviewScore: nextScore,
+      score: nextScore,
+      warnings: [...team.warnings, ...debuff.labels.map((label) => `team_power_debuff:${label}`)],
+    };
+  });
 }
 
 function buildPlayerNameResolver(contexts: LegacyLineupLoadedContext[]) {
@@ -119,7 +216,7 @@ export function buildLegacyMatchdayResolvePreview(
 
   const resolveOptions: LegacyResolvePreviewOptions = {
     modifierMode: options?.modifierMode ?? "legacy_selected_traits",
-    captainMode: options?.captainMode ?? "legacy_strongest_selected",
+    captainMode: options?.captainMode ?? "selected_captain",
   };
   const base = contexts[0];
   const resolveWarnings: string[] = [];
@@ -153,6 +250,14 @@ export function buildLegacyMatchdayResolvePreview(
     let d2DisciplineId = context.contextMeta.d2DisciplineId;
     let d1Status: ResolvePreviewStatus = d1DisciplineId ? "ready" : "blocked";
     let d2Status: ResolvePreviewStatus = d2DisciplineId ? "ready" : "blocked";
+    const resolvePlayerIds = new Set((draft?.entries ?? []).map((entry) => entry.playerId));
+    const moraleByPlayerId = buildPlayerMoralePerformanceMap({
+      gameState: context.gameState,
+      teamId: context.teamId,
+      rosterEntries:
+        context.gameState?.rosters.filter((entry) => entry.teamId === context.teamId && resolvePlayerIds.has(entry.playerId)) ??
+        null,
+    });
 
     for (const meta of getDisciplineSideMeta(context)) {
       const score = scoreLegacyLineupDisciplineSide({
@@ -166,9 +271,11 @@ export function buildLegacyMatchdayResolvePreview(
           context.disciplineSidePlayerCounts?.[`${meta.disciplineId}::${meta.disciplineSide}`] ??
           context.disciplinePlayerCounts[meta.disciplineId] ??
           null,
-        fatigueByPlayerId: context.fatigueByPlayerId ?? null,
-        fatigueSourceStatus: context.fatigueSourceStatus ?? "missing_source",
-        ...(() => {
+            fatigueByPlayerId: context.fatigueByPlayerId ?? null,
+            moraleByPlayerId,
+            fatigueSourceStatus: context.fatigueSourceStatus ?? "missing_source",
+            intensity: draft?.modifiers?.[meta.disciplineSide]?.intensity,
+            ...(() => {
           const sideEntries = (draft?.entries ?? []).filter(
             (entry) => entry.disciplineId === meta.disciplineId && entry.disciplineSide === meta.disciplineSide,
           );
@@ -184,11 +291,12 @@ export function buildLegacyMatchdayResolvePreview(
           const mutatorResult =
             resolveOptions.modifierMode === "mvp_forced_mutators"
               ? calculateMvpForcedMutatorModifierForSide({
-                  disciplineId: meta.disciplineId,
-                  disciplineSide: meta.disciplineSide,
-                  entries: sideEntries.map((entry) => ({ playerId: entry.playerId })),
-                  disciplineScores: context.disciplineScores,
-                })
+                disciplineId: meta.disciplineId,
+                disciplineSide: meta.disciplineSide,
+                entries: sideEntries.map((entry) => ({ playerId: entry.playerId })),
+                disciplineScores: context.disciplineScores,
+                rosterPlayers: context.rosterPlayers,
+              })
               : calculateMutatorModifierForSide({
                   modifiers: draft?.modifiers,
                   disciplineSide: meta.disciplineSide,
@@ -200,6 +308,25 @@ export function buildLegacyMatchdayResolvePreview(
           const effectiveMutatorBonuses = context.mutatorSource?.effectStatus === "ready" ? mutatorResult.playerMutatorBonuses : null;
           const effectiveMutatorPpsBonuses =
             context.mutatorSource?.effectStatus === "ready" ? mutatorResult.playerMutatorPpsBonuses : null;
+          const disciplineCategory = context.disciplines.find((discipline) => discipline.id === meta.disciplineId)?.category;
+          const selectedTeamPower = context.teamPowers?.find(
+            (power) => power.id === draft?.modifiers?.[meta.disciplineSide]?.teamPowerId,
+          ) ?? null;
+          const conditionalBonusPct =
+            selectedTeamPower?.conditionalTrigger === "rival_top8_discipline" &&
+            (context.teamPowerWindows?.[meta.disciplineId]?.top8Rivals.length ?? 0) > 0
+              ? selectedTeamPower.conditionalBonusPct
+              : 0;
+          const teamCaptain = context.gameState ? selectTeamCaptain(context.gameState, context.teamId) : null;
+          const teamPowerResult = calculateTeamPowerModifierForSide({
+            modifiers: draft?.modifiers,
+            disciplineSide: meta.disciplineSide,
+            disciplineId: meta.disciplineId,
+            disciplineCategory,
+            teamPowers: context.teamPowers ?? [],
+            teamCaptainPowerModifierPct: teamCaptain?.effects.teamPowerModifierPct ?? null,
+            conditionalBonusPct,
+          });
 
           return {
             formCardsAvailable: formResult.formCardsAvailable,
@@ -213,6 +340,17 @@ export function buildLegacyMatchdayResolvePreview(
             mutatorSlots: context.mutatorSource?.effectStatus === "ready" ? mutatorResult.mutatorSlots : [],
             mutatorBonusByPlayerId: effectiveMutatorBonuses,
             mutatorPpsBonusByPlayerId: effectiveMutatorPpsBonuses,
+            teamPowerSelected: teamPowerResult.teamPowerSelected,
+            teamPowerStatus: context.teamPowerSource?.effectStatus === "ready" ? "ready" : "missing_source",
+            teamPowerLabel: teamPowerResult.teamPowerLabel,
+            teamPowerModifier: context.teamPowerSource?.effectStatus === "ready" ? teamPowerResult.teamPowerModifier : null,
+            teamPowerImpact: teamPowerResult.teamPowerImpact,
+            teamPowerBasePct: teamPowerResult.teamPowerBasePct,
+            teamPowerConditionalPct: teamPowerResult.teamPowerConditionalPct,
+            teamPowerAttributeFitPct: teamPowerResult.teamPowerAttributeFitPct,
+            teamPowerEffectType: selectedTeamPower?.effectType ?? null,
+            teamPowerTargetMode: selectedTeamPower?.targetMode ?? null,
+            teamPowerTargetLimit: selectedTeamPower?.targetLimit ?? null,
             captainMode: resolveOptions.captainMode,
             captainStatus: resolveOptions.captainMode === "missing_source" ? "missing_source" : "mapped",
             teamPpsModifier: context.mutatorSource?.effectStatus === "ready" ? mutatorResult.teamPpsModifier : null,
@@ -290,14 +428,13 @@ export function buildLegacyMatchdayResolvePreview(
     };
   });
 
-  const rankedTeams = rankDescending(teamResultsUnranked, (team) => team.totalScore).map(({ item, rank }) => ({
+  const rankedTeamsBeforePowers = rankDescending(teamResultsUnranked, (team) => team.totalScore).map(({ item, rank }) => ({
     ...item,
     rank,
   }));
 
   const disciplinePreviews: DisciplineResolvePreview[] = Array.from(disciplineBuckets.entries()).map(([disciplineId, bucket]) => {
-    const teamResultsRanked = rankDescending(
-      bucket.map(({ context, side, score }) => ({
+    const rawTeamResults = bucket.map(({ context, side, score }) => ({
         teamId: context.team.id,
         teamName: context.team.name,
         disciplineId,
@@ -312,6 +449,8 @@ export function buildLegacyMatchdayResolvePreview(
         baseScore: score.baseScore ?? 0,
         fatigueModifier: score.fatigueModifier ?? null,
         fatigueStatus: score.fatigueStatus ?? "missing_source",
+        intensity: score.intensity ?? null,
+        intensityModifier: score.intensityModifier ?? null,
         captainStatus: score.captainStatus ?? "missing_source",
         captainBonus: score.captainBonusTotal ?? null,
         formCardStatus: score.formCardStatus ?? "missing_source",
@@ -320,10 +459,21 @@ export function buildLegacyMatchdayResolvePreview(
         mutatorMode: score.mutatorMode ?? "legacy_selected_traits",
         mutatorModifier: score.mutatorModifier ?? null,
         mutatorSlots: score.mutatorSlots ?? [],
+        teamPowerStatus: score.teamPowerStatus ?? "missing_source",
+        teamPowerLabel: score.teamPowerLabel ?? null,
+        teamPowerModifier: score.teamPowerModifier ?? null,
+        teamPowerImpact: score.teamPowerImpact ?? null,
+        teamPowerBasePct: score.teamPowerBasePct ?? null,
+        teamPowerConditionalPct: score.teamPowerConditionalPct ?? null,
+        teamPowerAttributeFitPct: score.teamPowerAttributeFitPct ?? null,
+        teamPowerEffectType: score.teamPowerEffectType ?? null,
+        teamPowerTargetMode: score.teamPowerTargetMode ?? null,
+        teamPowerTargetLimit: score.teamPowerTargetLimit ?? null,
         teamPpsModifier: score.teamPpsModifier ?? null,
         teamPpsStatus: score.teamPpsStatus ?? "missing_source",
         finalPreviewScore: score.finalPreviewScore ?? score.totalScore,
         score: score.finalPreviewScore ?? score.totalScore,
+        rank: 0,
         teamPoints: null,
         pointSource: "rank_to_points_missing",
         warnings: [...score.validationWarnings, ...(context.existingDraft ? [] : ["Missing lineup for this discipline side."])],
@@ -346,7 +496,10 @@ export function buildLegacyMatchdayResolvePreview(
           isCaptain: Boolean(entry.isCaptain),
           warnings: entry.warnings ?? [],
         })),
-      })),
+      }));
+    const teamResultsAfterPowers = applyTeamPowerDebuffs(rawTeamResults);
+    const teamResultsRanked = rankDescending(
+      teamResultsAfterPowers,
       (result) => result.score,
     ).map<DisciplineTeamResolvePreview>(({ item, rank }) => ({
       ...item,
@@ -510,6 +663,37 @@ export function buildLegacyMatchdayResolvePreview(
       highlightCandidates,
     };
   });
+
+  const disciplineScoreSummaryByTeamId = new Map<string, { d1Score: number | null; d2Score: number | null }>();
+  for (const disciplinePreview of disciplinePreviews) {
+    for (const teamResult of disciplinePreview.teamResults) {
+      const current = disciplineScoreSummaryByTeamId.get(teamResult.teamId) ?? { d1Score: null, d2Score: null };
+      if (disciplinePreview.disciplineSide === "d1") {
+        current.d1Score = teamResult.score;
+      } else {
+        current.d2Score = teamResult.score;
+      }
+      disciplineScoreSummaryByTeamId.set(teamResult.teamId, current);
+    }
+  }
+
+  const rankedTeams = rankDescending(
+    rankedTeamsBeforePowers.map((team) => {
+      const scores = disciplineScoreSummaryByTeamId.get(team.teamId);
+      const d1Score = scores?.d1Score ?? team.d1Score;
+      const d2Score = scores?.d2Score ?? team.d2Score;
+      return {
+        ...team,
+        d1Score,
+        d2Score,
+        totalScore: roundScore(d1Score + d2Score),
+      };
+    }),
+    (team) => team.totalScore,
+  ).map(({ item, rank }) => ({
+    ...item,
+    rank,
+  }));
 
   for (const team of rankedTeams) {
     resolveWarnings.push(...team.warnings);

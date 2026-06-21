@@ -206,6 +206,7 @@ function decideTrainingMode(input: {
 }
 
 function applyTrainingModes(gameState: GameState): { gameState: GameState; rows: TrainingAuditRow[] } {
+  const startedAt = Date.now();
   const playerById = new Map(gameState.players.map((player) => [player.id, player]));
   const rows: TrainingAuditRow[] = [];
   const modeByPlayerId = new Map<string, PlayerTrainingMode>();
@@ -252,6 +253,7 @@ function applyTrainingModes(gameState: GameState): { gameState: GameState; rows:
     });
   }
 
+  console.error(`[autoprep] training modes done players=${rows.length} elapsed=${Date.now() - startedAt}ms`);
   return {
     gameState: {
       ...gameState,
@@ -366,6 +368,7 @@ function upsertDraft(gameState: GameState, input: {
 }
 
 function prepLineups(gameState: GameState, saveId: string): { gameState: GameState; rows: LineupAuditRow[] } {
+  const startedAt = Date.now();
   let nextGameState: GameState = {
     ...gameState,
     seasonState: {
@@ -375,8 +378,9 @@ function prepLineups(gameState: GameState, saveId: string): { gameState: GameSta
   };
   const rows: LineupAuditRow[] = [];
 
-  for (const matchdayId of gameState.season.matchdayIds) {
-    for (const team of gameState.teams) {
+  for (const [matchdayIndex, matchdayId] of gameState.season.matchdayIds.entries()) {
+    const matchdayStartedAt = Date.now();
+    for (const [teamIndex, team] of gameState.teams.entries()) {
       const params: LegacyLineupKeyParams = {
         saveId,
         seasonId: gameState.season.id,
@@ -482,9 +486,14 @@ function prepLineups(gameState: GameState, saveId: string): { gameState: GameSta
         warnings: warnings.join(" | "),
         blockers: blockers.join(" | "),
       });
+      if ((teamIndex + 1) % 8 === 0) {
+        console.error(`[autoprep] lineups ${matchdayId}: ${teamIndex + 1}/${gameState.teams.length} elapsed=${Date.now() - matchdayStartedAt}ms`);
+      }
     }
+    console.error(`[autoprep] matchday ${matchdayIndex + 1}/${gameState.season.matchdayIds.length} ${matchdayId} done elapsed=${Date.now() - matchdayStartedAt}ms total=${Date.now() - startedAt}ms`);
   }
 
+  console.error(`[autoprep] lineups done rows=${rows.length} elapsed=${Date.now() - startedAt}ms`);
   return { gameState: nextGameState, rows };
 }
 
@@ -656,6 +665,7 @@ ${trainingLines}
 }
 
 function main() {
+  const startedAt = Date.now();
   fs.mkdirSync(OUTPUT_DIR, { recursive: true });
   const persistence = createPersistenceService();
   const bootstrapped = persistence.bootstrapSingleplayerSave();
@@ -664,6 +674,7 @@ function main() {
     throw new Error("No active local save available.");
   }
   const preflight = buildPreflight(save);
+  console.error(`[autoprep] preflight done ok=${preflight.ok} blockers=${preflight.blockers.length} elapsed=${Date.now() - startedAt}ms`);
   if (!preflight.ok) {
     const jsonPath = writeJson(exportName("autoprep-readiness.json"), { ok: false, preflight });
     writeMarkdown(exportName("autoprep-readiness.md"), `# ${save.gameState.season.name} Auto-Prep Readiness\n\nStatus: **BLOCKED**\n\nBlocker: ${preflight.blockers.join(" | ")}\n\nJSON: ${jsonPath}\n`);
@@ -672,6 +683,7 @@ function main() {
 
   let gameState = save.gameState;
   const generatedCards = buildGeneratedFormCardRecordsForSeason(gameState, save.saveId, gameState.season.id);
+  console.error(`[autoprep] formcards generated cards=${generatedCards.length} elapsed=${Date.now() - startedAt}ms`);
   gameState = {
     ...gameState,
     seasonState: {
@@ -687,6 +699,7 @@ function main() {
   gameState = training.gameState;
   const lineupPrep = prepLineups(gameState, save.saveId);
   gameState = lineupPrep.gameState;
+  console.error(`[autoprep] prep complete elapsed=${Date.now() - startedAt}ms`);
 
   if (WRITE_ENABLED) {
     persistence.saveSingleplayerState(save.saveId, gameState);

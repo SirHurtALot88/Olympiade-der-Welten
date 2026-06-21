@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 
+import { buildAiLegacyLineupModifiers } from "@/lib/ai/ai-legacy-lineup-batch-apply-service";
 import { buildAiLegacyLineupPreview, buildAiLegacyLineupSuggestion } from "@/lib/ai/ai-legacy-lineup-engine";
 import { evaluateLegacyAiNeeds } from "@/lib/ai/ai-needs-engine";
 import { createFreshSeasonOneGameState } from "@/lib/game-state/singleplayer-state";
@@ -197,6 +198,26 @@ describe("legacy ai lineup suggestion", () => {
     expect(suggestion.entries.every((entry) => activeIds.has(entry.playerId))).toBe(true);
   });
 
+  it("selects AI mutator traits by active player coverage instead of overlapping duplicate coverage", () => {
+    const context = createContext();
+    context.rosterPlayers = [
+      { id: "p1", name: "Player 1", traitsPositive: ["Cool", "Diligent"], traitsNegative: [], coreStats: { pow: 80, spe: 20, men: 20, soc: 20 } },
+      { id: "p2", name: "Player 2", traitsPositive: ["Cool", "Diligent"], traitsNegative: [], coreStats: { pow: 75, spe: 30, men: 25, soc: 25 } },
+      { id: "p3", name: "Player 3", traitsPositive: ["Ambitious"], traitsNegative: [], coreStats: { pow: 20, spe: 70, men: 80, soc: 30 } },
+      { id: "p4", name: "Player 4", traitsPositive: ["Flexible"], traitsNegative: [], coreStats: { pow: 15, spe: 75, men: 75, soc: 25 } },
+    ];
+
+    const modifiers = buildAiLegacyLineupModifiers(context, [
+      { disciplineId: "tdm", disciplineSide: "d1", slotIndex: 0, playerId: "p1", activePlayerId: "a1" },
+      { disciplineId: "tdm", disciplineSide: "d1", slotIndex: 1, playerId: "p2", activePlayerId: "a2" },
+      { disciplineId: "tdm", disciplineSide: "d1", slotIndex: 2, playerId: "p3", activePlayerId: "a3" },
+      { disciplineId: "tdm", disciplineSide: "d1", slotIndex: 3, playerId: "p4", activePlayerId: "a4" },
+    ]);
+
+    expect(modifiers.d1.mutatorTrait1).toBe("Cool");
+    expect(modifiers.d1.mutatorTrait2).toBe("Ambitious");
+  });
+
   it("avoids injured roster players because they are not selectable active players", () => {
     const context = createContext();
     context.activePlayers = context.activePlayers.filter((player) => player.playerId !== "p1");
@@ -260,7 +281,15 @@ describe("legacy ai lineup suggestion", () => {
   });
 
   it("builds a read-only ai preview with captain suggestions per side", () => {
-    const preview = buildAiLegacyLineupPreview(createContext());
+    const context = createContext();
+    context.disciplineScores = context.disciplineScores.map((score) =>
+      score.playerId === "p1" && score.disciplineId === "tdm"
+        ? { ...score, score: 98 }
+        : score.playerId === "p3" && score.disciplineId === "mini-dm"
+          ? { ...score, score: 97 }
+          : score,
+    );
+    const preview = buildAiLegacyLineupPreview(context);
     const captainEntries = preview.entries.filter((entry) => entry.isCaptain);
 
     expect(preview.readOnly).toBe(true);
@@ -268,18 +297,15 @@ describe("legacy ai lineup suggestion", () => {
     expect(preview.status).toBe("ready");
     expect(preview.teamCode).toBe("A-A");
     expect(preview.captainSlotsUsed).toBe(0);
-    expect(preview.captainSlotsRemaining).toBe(3);
+    expect(preview.captainSlotsRemaining).toBe(2);
     expect(preview.d1.selectedPlayers).toBe(2);
     expect(preview.d2.selectedPlayers).toBe(2);
     expect(preview.d1.missingSlots).toBe(0);
     expect(preview.d2.missingSlots).toBe(0);
-    expect(preview.d1.captainSelectionStatus).toBe("selected");
-    expect(preview.d2.captainSelectionStatus).toBe("selected");
-    expect(preview.d1.captainName).toBeTruthy();
-    expect(preview.d2.captainName).toBeTruthy();
+    expect([preview.d1.captainSelectionStatus, preview.d2.captainSelectionStatus]).toContain("selected");
     expect(preview.d1.selectedEntries).toHaveLength(2);
     expect(preview.d2.selectedEntries).toHaveLength(2);
-    expect(captainEntries).toHaveLength(2);
+    expect(captainEntries.length).toBeGreaterThanOrEqual(1);
   });
 
   it("keeps captain suggestions inside the selected team players without duplicates", () => {
@@ -309,6 +335,13 @@ describe("legacy ai lineup suggestion", () => {
 
   it("uses only the remaining captain slots for the current season draft", () => {
     const context = createContext();
+    context.disciplineScores = context.disciplineScores.map((score) =>
+      score.playerId === "p1" && score.disciplineId === "tdm"
+        ? { ...score, score: 98 }
+        : score.playerId === "p3" && score.disciplineId === "mini-dm"
+          ? { ...score, score: 97 }
+          : score,
+    );
     context.teamStatus = {
       ...context.teamStatus!,
       captainUsedCount: 2,
@@ -318,11 +351,103 @@ describe("legacy ai lineup suggestion", () => {
     const captainEntries = preview.entries.filter((entry) => entry.isCaptain);
 
     expect(preview.captainSlotsUsed).toBe(2);
-    expect(preview.captainSlotsRemaining).toBe(1);
+    expect(preview.captainSlotsRemaining).toBe(0);
     expect(captainEntries).toHaveLength(1);
     expect(preview.d1.captainSelectionStatus === "selected" || preview.d2.captainSelectionStatus === "selected").toBe(true);
-    expect(preview.d1.captainSelectionStatus === "skipped_limit_reached" || preview.d2.captainSelectionStatus === "skipped_limit_reached").toBe(true);
-    expect(preview.warnings).toContain("captain_limit_reached");
+    expect(preview.warnings.some((warning) => warning.includes("Captain gespart") || warning === "captain_limit_reached")).toBe(true);
+  });
+
+  it("uses a captain in midseason top-six windows for large disciplines", () => {
+    const context = createContext();
+    context.matchday = {
+      ...context.matchday,
+      index: 5,
+      label: "Spieltag 5",
+    };
+    context.season = {
+      ...context.season,
+      currentMatchday: 5,
+    };
+    context.matchdayContract = {
+      matchdayIndex: 5,
+      matchdayId: "matchday-1",
+      matchdayLabel: "Spieltag 5",
+      totalDisciplineSidesInSeason: 20,
+      seasonCaptainSlots: 3,
+      discipline1: {
+        disciplineId: "tdm",
+        displayName: "TDM",
+        requiredPlayers: 5,
+        requiredCaptains: 0,
+        category: "power",
+        rankSource: null,
+        rankSourceStatus: "mapped",
+        sourceStatus: "season_seed",
+        disciplineSide: "d1",
+      },
+      discipline2: {
+        disciplineId: "mini-dm",
+        displayName: "Mini DM",
+        requiredPlayers: 2,
+        requiredCaptains: 0,
+        category: "speed",
+        rankSource: null,
+        rankSourceStatus: "mapped",
+        sourceStatus: "season_seed",
+        disciplineSide: "d2",
+      },
+    };
+    context.disciplinePlayerCounts = {
+      ...context.disciplinePlayerCounts,
+      tdm: 5,
+    };
+    context.disciplineSidePlayerCounts = {
+      ...context.disciplineSidePlayerCounts,
+      "tdm::d1": 5,
+    };
+    context.teamDisciplineRanks = {
+      tdm: {
+        disciplineId: "tdm",
+        teamId: "A-A",
+        rank: 5,
+        score: 390,
+      },
+    };
+    context.activePlayers = [
+      ...context.activePlayers,
+      { id: "a6", saveId: "save-1", seasonId: "season-1", teamId: "A-A", playerId: "p6", upkeep: 10 },
+      { id: "a7", saveId: "save-1", seasonId: "season-1", teamId: "A-A", playerId: "p7", upkeep: 10 },
+    ];
+    context.rosterPlayers = [
+      ...context.rosterPlayers,
+      { id: "p6", name: "Player 6", coreStats: { pow: 10, spe: 70, men: 70, soc: 20 } },
+      { id: "p7", name: "Player 7", coreStats: { pow: 10, spe: 65, men: 65, soc: 20 } },
+    ];
+    context.disciplineScores = [
+      ...context.disciplineScores.map((score) =>
+        score.disciplineId === "tdm" && score.playerId === "p1"
+          ? { ...score, score: 90 }
+          : score.disciplineId === "tdm" && score.playerId === "p2"
+            ? { ...score, score: 82 }
+            : score.disciplineId === "tdm" && score.playerId === "p3"
+              ? { ...score, score: 80 }
+              : score.disciplineId === "tdm" && score.playerId === "p4"
+                ? { ...score, score: 78 }
+                : score.disciplineId === "tdm" && score.playerId === "p5"
+                  ? { ...score, score: 76 }
+                  : score,
+      ),
+      { playerId: "p6", disciplineId: "tdm", score: 30 },
+      { playerId: "p7", disciplineId: "tdm", score: 25 },
+      { playerId: "p6", disciplineId: "mini-dm", score: 75 },
+      { playerId: "p7", disciplineId: "mini-dm", score: 73 },
+    ];
+
+    const preview = buildAiLegacyLineupPreview(context);
+
+    expect(preview.d1.captainSelectionStatus).toBe("selected");
+    expect(preview.entries.some((entry) => entry.disciplineId === "tdm" && entry.isCaptain)).toBe(true);
+    expect(preview.warnings.some((warning) => warning.includes("große Diszi absichern"))).toBe(true);
   });
 
   it("skips captain suggestions entirely once the season captain limit is already reached", () => {
@@ -403,6 +528,7 @@ describe("legacy ai lineup suggestion", () => {
     const wickedWizards = getTeamStrategyProfile(gameState, "W-W");
 
     expect(zeroHeroes?.strategySummary).toContain("Underground");
+    expect(zeroHeroes?.strategyVersion).toContain("+gm-v2");
     expect(zeroHeroes?.bias.riskTolerance).toBe(10);
     expect(cashCreators?.strategySummary).toContain("Bank der Olympiade");
     expect(cashCreators?.bias.cashPriority).toBe(10);

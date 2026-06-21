@@ -29,7 +29,7 @@ import { buildPlayerProgressionForecast } from "@/lib/training/player-progressio
 
 const OUTPUT_DIR =
   process.env.OLY_OUTPUT_DIR ??
-  "/Users/chrisfalk/Documents/Codex/2026-06-11/wir-machen-weiter-mit-dem-olympiade/outputs";
+  path.join(process.cwd(), "outputs");
 
 type Severity = "ok" | "beobachten" | "langsam" | "kritisch" | "blockierend";
 

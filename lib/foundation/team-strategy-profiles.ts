@@ -1,4 +1,10 @@
 import type { GameState, Team, TeamIdentity, TeamStrategyBias, TeamStrategyLevel, TeamStrategyProfile } from "@/lib/data/olyDataTypes";
+import {
+  applyGeneralManagerIdentityEffect,
+  applyGeneralManagerStrategyProfileEffect,
+  getTeamGeneralManager,
+  withNormalizedTeamGeneralManagers,
+} from "@/lib/foundation/team-general-managers";
 import { deriveTeamIdentityAxisBias } from "@/lib/foundation/team-identity-settings";
 
 const neutralBias = (): TeamStrategyBias => ({
@@ -1023,25 +1029,43 @@ export function buildTeamStrategyProfileMap(
 
 export function getTeamStrategyProfile(gameState: GameState, teamId: string) {
   const existing = gameState.seasonState.teamStrategyProfiles?.[teamId];
-  if (existing) {
-    return existing;
-  }
-
   const team = gameState.teams.find((entry) => entry.teamId === teamId);
   const identity = gameState.teamIdentities.find((entry) => entry.teamId === teamId) ?? null;
-  return team ? createDefaultTeamStrategyProfile(team, identity) : null;
+  if (!team) {
+    return null;
+  }
+
+  const gm = getTeamGeneralManager(gameState, teamId);
+  const strategyIdentity =
+    identity && gm ? applyGeneralManagerIdentityEffect(identity, gm.profile, gm.assignment.influencePct) : identity;
+  const profile = existing
+    ? normalizeStrategyProfile(team, strategyIdentity, existing)
+    : createDefaultTeamStrategyProfile(team, strategyIdentity);
+  return applyGeneralManagerStrategyProfileEffect(profile, gm?.profile ?? null, gm?.assignment.influencePct);
 }
 
 export function withNormalizedTeamStrategyProfiles(gameState: GameState): GameState {
+  const gameStateWithManagers = withNormalizedTeamGeneralManagers(gameState);
+  const baseProfiles = buildTeamStrategyProfileMap(
+    gameStateWithManagers.teams,
+    gameStateWithManagers.teamIdentities,
+    gameStateWithManagers.seasonState.teamStrategyProfiles,
+  );
+  const teamStrategyProfiles = Object.fromEntries(
+    gameStateWithManagers.teams.map((team) => {
+      const gm = getTeamGeneralManager(gameStateWithManagers, team.teamId);
+      return [
+        team.teamId,
+        applyGeneralManagerStrategyProfileEffect(baseProfiles[team.teamId], gm?.profile ?? null, gm?.assignment.influencePct),
+      ] as const;
+    }),
+  );
+
   return {
-    ...gameState,
+    ...gameStateWithManagers,
     seasonState: {
-      ...gameState.seasonState,
-      teamStrategyProfiles: buildTeamStrategyProfileMap(
-        gameState.teams,
-        gameState.teamIdentities,
-        gameState.seasonState.teamStrategyProfiles,
-      ),
+      ...gameStateWithManagers.seasonState,
+      teamStrategyProfiles,
     },
   };
 }

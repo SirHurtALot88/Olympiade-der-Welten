@@ -22,7 +22,7 @@ describe("player formula market value engine", () => {
     expect(sources.marketValueEngineStatus).toBe("ready");
   });
 
-  it("calculates ranked discipline market values with the explicit +3.5 base offset from a test fixture", () => {
+  it("calculates ranked discipline market values without a flat base offset", () => {
     const result = calculateMarketValueFromRankTable({
       rankToDisciplineMarketValue: [...rankFixture],
       players: [
@@ -68,7 +68,7 @@ describe("player formula market value engine", () => {
         protectedRaw: 13,
         marketValueBaseOffset: MARKET_VALUE_BASE_OFFSET,
         calcWithoutBaseOffset: 13,
-        marketValueNew: 16.5,
+        marketValueNew: 13,
       },
       {
         playerId: "beta",
@@ -85,7 +85,7 @@ describe("player formula market value engine", () => {
         protectedRaw: 0,
         marketValueBaseOffset: MARKET_VALUE_BASE_OFFSET,
         calcWithoutBaseOffset: 0,
-        marketValueNew: 3.5,
+        marketValueNew: 0,
       },
       {
         playerId: "gamma",
@@ -102,7 +102,7 @@ describe("player formula market value engine", () => {
         protectedRaw: 8.8,
         marketValueBaseOffset: MARKET_VALUE_BASE_OFFSET,
         calcWithoutBaseOffset: 8.8,
-        marketValueNew: 12.3,
+        marketValueNew: 8.8,
       },
     ]);
   });

@@ -15,8 +15,13 @@ import type {
   PlayerGeneratorRoleIntent,
   PlayerGeneratorStrengthTier,
   PlayerGeneratorValidationStatus,
+  Team,
+  TeamGeneralManagerProfile,
+  TeamIdentity,
 } from "@/lib/data/olyDataTypes";
 import { normalizePlayerOvr } from "@/lib/data/player-ovr-scale";
+import { deriveTeamIdentityAxisWeightMap } from "@/lib/foundation/team-identity-settings";
+import { resolveSlotRolesForDiscipline, type MatchdaySlotRoleDefinition } from "@/lib/lineups/matchday-slot-roles";
 import { loadPlayerFormulaSources } from "@/lib/player-formulas/formula-source-loader";
 import { calculateSalaryFromMarketValue } from "@/lib/player-formulas/salary-engine";
 import { officialDisciplineWeightMatrix, playerGeneratorAttributeKeys, type PlayerGeneratorAttributeKey } from "@/lib/player-generator/official-discipline-weights";
@@ -63,6 +68,14 @@ type ValidationResult = {
   qualityScore: number;
 };
 
+export type PlayerGeneratorTeamContext = {
+  team: Team | null;
+  identity: TeamIdentity | null;
+  generalManager: TeamGeneralManagerProfile | null;
+  rosterCount: number;
+  averageSalary: number | null;
+};
+
 const defaultInput: PlayerGeneratorInput = {
   name: "",
   roleIntent: "allround",
@@ -75,6 +88,8 @@ const defaultInput: PlayerGeneratorInput = {
   },
   randomness: "medium",
   preferredArchetype: null,
+  targetTeamId: null,
+  contractMode: "balanced",
   raceHint: null,
   classHint: null,
   traitHint: null,
@@ -727,6 +742,262 @@ function deriveGeneratorOvr(axes: Record<PlayerGeneratorAxisKey, number>) {
   return normalizePlayerOvr(roundValue((axes.pow + axes.spe + axes.men + axes.soc) / 4, 2));
 }
 
+function estimateDraftMarketValue(input: {
+  ovr: number | null;
+  pps: number | null;
+  disciplineRatings: Record<string, number>;
+  strengthTier: PlayerGeneratorStrengthTier;
+}) {
+  const topRatings = Object.values(input.disciplineRatings)
+    .filter((value) => Number.isFinite(value))
+    .sort((left, right) => right - left)
+    .slice(0, 3);
+  const topAverage = topRatings.length ? average(topRatings) : input.pps ?? input.ovr ?? 50;
+  const strengthMultiplier =
+    input.strengthTier === "legendary" ? 1.34
+      : input.strengthTier === "elite" ? 1.18
+        : input.strengthTier === "strong" ? 1.04
+          : input.strengthTier === "weak" ? 0.74
+            : input.strengthTier === "very_weak" ? 0.56
+              : 0.9;
+  const quality = ((input.ovr ?? topAverage) * 0.45 + (input.pps ?? topAverage) * 0.25 + topAverage * 0.3) / 100;
+  return roundValue(clamp(8 + quality * 52 * strengthMultiplier, 4, 90), 2);
+}
+
+function buildSalarySchedule(totalSalary: number | null, mode: NonNullable<PlayerGeneratorInput["contractMode"]>, length: number | null) {
+  if (totalSalary == null || length == null || length <= 0) {
+    return [];
+  }
+  const weights =
+    mode === "front_loaded"
+      ? Array.from({ length }, (_, index) => length - index)
+      : mode === "back_loaded"
+        ? Array.from({ length }, (_, index) => index + 1)
+        : mode === "prove_it"
+          ? [1]
+          : Array.from({ length }, () => 1);
+  const totalWeight = weights.reduce((sum, value) => sum + value, 0);
+  return weights.map((weight, index) => ({
+    yearIndex: index + 1,
+    label: `Y${index + 1}`,
+    salary: roundValue((totalSalary * weight) / totalWeight, 2),
+  }));
+}
+
+function deriveProjectedRole(ovr: number | null, pps: number | null): NonNullable<PlayerGeneratorDraft["generated"]["projectedRole"]> {
+  const value = ((ovr ?? 0) * 0.6) + ((pps ?? 0) * 0.4);
+  if (value >= 82) return "star";
+  if (value >= 68) return "starter";
+  if (value >= 52) return "rotation";
+  if (value >= 35) return "prospect";
+  return "flier";
+}
+
+function buildCaptaincyScore(input: {
+  attributes: PlayerGeneratorAttributes;
+  traitsPositive: string[];
+}) {
+  const traitBonus = input.traitsPositive.reduce((sum, trait) => {
+    const normalized = toSlug(trait);
+    if (["eloquent", "leader", "motivated", "loyal", "disciplined", "team-player"].some((token) => normalized.includes(token))) {
+      return sum + 7;
+    }
+    if (["ambitious", "famous", "clutch"].some((token) => normalized.includes(token))) {
+      return sum + 3;
+    }
+    return sum;
+  }, 0);
+  return roundValue(clamp(
+    input.attributes.charisma * 0.28 +
+      input.attributes.spirit * 0.22 +
+      input.attributes.will * 0.18 +
+      input.attributes.determination * 0.16 +
+      input.attributes.awareness * 0.1 +
+      input.attributes.intelligence * 0.06 +
+      traitBonus,
+    1,
+    99,
+  ), 1);
+}
+
+function buildDisciplineOutlook(
+  disciplines: Discipline[],
+  attributes: PlayerGeneratorAttributes,
+  disciplineRatings: Record<string, number>,
+) {
+  return disciplines
+    .map((discipline) => {
+      const roles = resolveSlotRolesForDiscipline(discipline.id, discipline.name, 6) as MatchdaySlotRoleDefinition[];
+      const scoredSlots = roles.map((role) => {
+        const profile = role.slotWeightProfile ?? role.baseWeightProfile ?? null;
+        const entries = Object.entries(profile ?? {}) as Array<[PlayerGeneratorAttributeKey, number]>;
+        const totalWeight = entries.reduce((sum, [, weight]) => sum + weight, 0);
+        const slotScore =
+          totalWeight > 0
+            ? entries.reduce((sum, [attribute, weight]) => sum + attributes[attribute] * weight, 0) / totalWeight
+            : disciplineRatings[discipline.id] ?? null;
+        return {
+          role,
+          score: slotScore == null ? null : roundValue(slotScore, 1),
+        };
+      }).sort((left, right) => (right.score ?? Number.NEGATIVE_INFINITY) - (left.score ?? Number.NEGATIVE_INFINITY));
+      const bestSlot = scoredSlots[0] ?? null;
+      return {
+        disciplineId: discipline.id,
+        disciplineName: discipline.name,
+        rating: disciplineRatings[discipline.id] ?? 0,
+        category: discipline.category,
+        bestSlotLabel: bestSlot?.role.label ?? null,
+        bestSlotScore: bestSlot?.score ?? null,
+        keyAttributes: (bestSlot?.role.keyAttributes ?? [])
+          .slice(0, 3)
+          .map((entry) => entry.attribute as PlayerGeneratorAttributeName),
+      };
+    })
+    .sort((left, right) => right.rating - left.rating);
+}
+
+function buildTeamFit(input: {
+  teamContext: PlayerGeneratorTeamContext | null | undefined;
+  axes: Record<PlayerGeneratorAxisKey, number>;
+  traitsPositive: string[];
+  projectedRole: NonNullable<PlayerGeneratorDraft["generated"]["projectedRole"]>;
+}) {
+  const context = input.teamContext ?? null;
+  if (!context?.team) {
+    return {
+      teamId: null,
+      teamName: null,
+      score: null,
+      axisFit: null,
+      gmFit: null,
+      traitFit: null,
+      rosterNeed: "unknown" as const,
+      reasons: ["Kein Zielteam gewaehlt."],
+      warnings: [] as string[],
+    };
+  }
+
+  const identityWeights = deriveTeamIdentityAxisWeightMap(context.identity);
+  const axisFit = roundValue(
+    clamp(
+      input.axes.pow * identityWeights.pow +
+        input.axes.spe * identityWeights.spe +
+        input.axes.men * identityWeights.men +
+        input.axes.soc * identityWeights.soc,
+      1,
+      99,
+    ),
+    1,
+  );
+  const gm = context.generalManager;
+  const gmAxisSum = gm ? gm.pow + gm.spe + gm.men + gm.soc : 0;
+  const gmFit = gm && gmAxisSum > 0
+    ? roundValue(clamp((input.axes.pow * gm.pow + input.axes.spe * gm.spe + input.axes.men * gm.men + input.axes.soc * gm.soc) / gmAxisSum, 1, 99), 1)
+    : null;
+  const normalizedTraits = input.traitsPositive.map((trait) => toSlug(trait));
+  const gmTraitHits = gm?.preferredTraits.filter((trait) => normalizedTraits.some((entry) => entry.includes(toSlug(trait)) || toSlug(trait).includes(entry))).length ?? 0;
+  const traitFit = gm ? roundValue(clamp(50 + gmTraitHits * 16, 35, 99), 1) : null;
+  const rosterNeed: NonNullable<PlayerGeneratorDraft["generated"]["teamFit"]>["rosterNeed"] =
+    context.identity?.playerOpt && context.rosterCount < context.identity.playerOpt - 1
+      ? "thin"
+      : context.identity?.playerOpt && context.rosterCount > context.identity.playerOpt + 1
+        ? "crowded"
+        : context.identity
+          ? "healthy"
+          : "unknown";
+  const rosterModifier = rosterNeed === "thin" ? 8 : rosterNeed === "crowded" ? -8 : 0;
+  const roleModifier =
+    input.projectedRole === "star" && gm?.bias.starPriority != null
+      ? (gm.bias.starPriority - 5) * 1.2
+      : input.projectedRole === "rotation" && gm?.bias.rosterDepthPreference != null
+        ? (gm.bias.rosterDepthPreference - 5)
+        : 0;
+  const score = roundValue(clamp(axisFit * 0.52 + (gmFit ?? axisFit) * 0.28 + (traitFit ?? 55) * 0.2 + rosterModifier + roleModifier, 1, 99), 1);
+  const reasons = [
+    `Identity-Achse passt mit ${axisFit}.`,
+    gm ? `${gm.title}: ${gm.marketDoctrine}` : "Kein GM-Profil aktiv.",
+    rosterNeed === "thin" ? "Kader braucht Tiefe." : rosterNeed === "crowded" ? "Kader ist eher voll." : "Kadergroesse wirkt stabil.",
+  ];
+  const warnings = [
+    ...(score < 50 ? ["Teamfit ist schwach, eher Markt-/Trade-Kandidat als Zielspieler."] : []),
+    ...(rosterNeed === "crowded" ? ["Roster ist voll: Draft waere nur sinnvoll, wenn jemand geht."] : []),
+  ];
+
+  return {
+    teamId: context.team.teamId,
+    teamName: context.team.name,
+    score,
+    axisFit,
+    gmFit,
+    traitFit,
+    rosterNeed,
+    reasons,
+    warnings,
+  };
+}
+
+function buildEconomyProjection(input: {
+  generatorInput: PlayerGeneratorInput;
+  marketValueEstimate: number | null;
+  salaryFromFormula: number | null;
+  ovr: number | null;
+  pps: number | null;
+  teamContext: PlayerGeneratorTeamContext | null | undefined;
+  projectedRole: NonNullable<PlayerGeneratorDraft["generated"]["projectedRole"]>;
+}) {
+  const mode = input.generatorInput.contractMode ?? "balanced";
+  const marketValueEstimate = input.marketValueEstimate;
+  const fallbackSalary =
+    marketValueEstimate == null
+      ? null
+      : roundValue(
+          marketValueEstimate *
+            (input.projectedRole === "star" ? 0.24 : input.projectedRole === "starter" ? 0.2 : input.projectedRole === "rotation" ? 0.16 : 0.12),
+          2,
+        );
+  const salaryEstimate = input.salaryFromFormula ?? fallbackSalary;
+  const valueRatio =
+    marketValueEstimate != null && salaryEstimate != null && salaryEstimate > 0
+      ? roundValue(marketValueEstimate / salaryEstimate, 2)
+      : null;
+  const averageSalary = input.teamContext?.averageSalary ?? null;
+  const salaryPressure: NonNullable<PlayerGeneratorDraft["generated"]["economyProjection"]>["salaryPressure"] =
+    salaryEstimate == null || averageSalary == null || averageSalary <= 0
+      ? "unknown"
+      : salaryEstimate > averageSalary * 1.25
+        ? "high"
+        : salaryEstimate > averageSalary * 0.88
+          ? "medium"
+          : "low";
+  const recommendedContractLength =
+    mode === "prove_it"
+      ? 1
+      : input.projectedRole === "star"
+        ? 5
+        : input.projectedRole === "starter"
+          ? mode === "back_loaded" ? 4 : 3
+          : input.projectedRole === "rotation"
+            ? 2
+            : 1;
+  const warnings = [
+    ...(salaryPressure === "high" ? ["Gehalt liegt klar ueber dem Team-Schnitt."] : []),
+    ...(mode === "front_loaded" ? ["Front-loaded entlastet spaetere Seasons, kostet aber jetzt Cashdruck."] : []),
+    ...(mode === "back_loaded" ? ["Back-loaded schont jetzt Cash, kann spaeter teuer werden."] : []),
+  ];
+
+  return {
+    marketValueEstimate,
+    salaryEstimate,
+    valueRatio,
+    salaryPressure,
+    contractMode: mode,
+    recommendedContractLength,
+    salarySchedule: buildSalarySchedule(salaryEstimate, mode, recommendedContractLength),
+    warnings,
+  };
+}
+
 function deriveGeneratedEconomy(input: {
   attributes: PlayerGeneratorAttributes;
   traitsPositive: string[];
@@ -1285,6 +1556,7 @@ function buildCandidate(input: {
   players: Player[];
   disciplines: Discipline[];
   seedVariant: string;
+  teamContext?: PlayerGeneratorTeamContext | null;
 }) {
   const generatorInput = input.generatorInput;
   const rng = createSeededRng(input.seedVariant);
@@ -1308,9 +1580,37 @@ function buildCandidate(input: {
     traitsPositive: traits.traitsPositive,
     traitsNegative: traits.traitsNegative,
   });
+  const disciplineOutlook = buildDisciplineOutlook(input.disciplines, attributes, disciplineRatings);
+  const marketValueEstimate = estimateDraftMarketValue({
+    ovr,
+    pps,
+    disciplineRatings,
+    strengthTier: generatorInput.strengthTier,
+  });
+  const projectedRole = deriveProjectedRole(ovr, pps);
+  const economyProjection = buildEconomyProjection({
+    generatorInput,
+    marketValueEstimate,
+    salaryFromFormula: generatedEconomy.salary,
+    ovr,
+    pps,
+    teamContext: input.teamContext,
+    projectedRole,
+  });
+  const captaincyScore = buildCaptaincyScore({
+    attributes,
+    traitsPositive: traits.traitsPositive,
+  });
+  const teamFit = buildTeamFit({
+    teamContext: input.teamContext,
+    axes,
+    traitsPositive: traits.traitsPositive,
+    projectedRole,
+  });
 
   const generatedBase = {
     name: buildGeneratedName(generatorInput, rng),
+    portraitUrl: null,
     race,
     className: classSuggestion.className,
     classSuggestion,
@@ -1320,13 +1620,18 @@ function buildCandidate(input: {
     attributes,
     axes,
     disciplineRatings,
+    disciplineOutlook,
     ovr,
     pps,
     potential: null,
-    marketValue: generatedEconomy.marketValue,
-    salary: generatedEconomy.salary,
-    marketValueStatus: generatedEconomy.marketValueStatus,
-    salaryStatus: generatedEconomy.salaryStatus,
+    projectedRole,
+    captaincyScore,
+    teamFit,
+    economyProjection,
+    marketValue: economyProjection.marketValueEstimate,
+    salary: economyProjection.salaryEstimate,
+    marketValueStatus: economyProjection.marketValueEstimate != null ? "ready" : generatedEconomy.marketValueStatus,
+    salaryStatus: economyProjection.salaryEstimate != null ? "ready" : generatedEconomy.salaryStatus,
     formulaStatus: generatedEconomy.formulaStatus,
     diagnostics: {
       archetypeMatch: "warning" as PlayerGeneratorMatchState,
@@ -1386,6 +1691,7 @@ function selectBestCandidate(input: {
   players: Player[];
   disciplines: Discipline[];
   strictMode?: boolean;
+  teamContext?: PlayerGeneratorTeamContext | null;
 }) {
   const seed = input.generatorInput.seed?.trim() || `draft-${Date.now()}`;
   const attempts = input.strictMode ? 10 : 6;
@@ -1394,6 +1700,7 @@ function selectBestCandidate(input: {
     players: input.players,
     disciplines: input.disciplines,
     seedVariant: `${seed}::pass-0`,
+    teamContext: input.teamContext,
   });
 
   for (let index = 1; index < attempts; index += 1) {
@@ -1402,6 +1709,7 @@ function selectBestCandidate(input: {
       players: input.players,
       disciplines: input.disciplines,
       seedVariant: `${seed}::pass-${index}`,
+      teamContext: input.teamContext,
     });
     if (candidate.qualityScore > best.qualityScore) {
       best = candidate;
@@ -1427,6 +1735,7 @@ export function generatePlayerDraft(input: {
   generatorInput: PlayerGeneratorInput;
   players: Player[];
   disciplines: Discipline[];
+  teamContext?: PlayerGeneratorTeamContext | null;
   draftId?: string;
   createdAt?: string;
 }): PlayerGeneratorDraft {
@@ -1446,6 +1755,7 @@ export function generatePlayerDraft(input: {
     },
     players: input.players,
     disciplines: input.disciplines,
+    teamContext: input.teamContext,
   });
 
   return {
@@ -1466,12 +1776,14 @@ export function tightenPlayerGeneratorDraft(input: {
   draft: PlayerGeneratorDraft;
   players: Player[];
   disciplines: Discipline[];
+  teamContext?: PlayerGeneratorTeamContext | null;
 }): PlayerGeneratorDraft {
   const best = selectBestCandidate({
     generatorInput: input.draft.input,
     players: input.players,
     disciplines: input.disciplines,
     strictMode: true,
+    teamContext: input.teamContext,
   });
 
   return {
@@ -1490,6 +1802,7 @@ export function recalculatePlayerGeneratorDraft(input: {
   draft: PlayerGeneratorDraft;
   players: Player[];
   disciplines: Discipline[];
+  teamContext?: PlayerGeneratorTeamContext | null;
 }): PlayerGeneratorDraft {
   const disciplineWarnings: string[] = [];
   const attributes = input.draft.generated.attributes;
@@ -1502,6 +1815,32 @@ export function recalculatePlayerGeneratorDraft(input: {
     traitsPositive: input.draft.generated.traitsPositive,
     traitsNegative: input.draft.generated.traitsNegative,
   });
+  const disciplineOutlook = buildDisciplineOutlook(input.disciplines, attributes, disciplineRatings);
+  const projectedRole = deriveProjectedRole(ovr, pps);
+  const economyProjection = buildEconomyProjection({
+    generatorInput: input.draft.input,
+    marketValueEstimate: estimateDraftMarketValue({
+      ovr,
+      pps,
+      disciplineRatings,
+      strengthTier: input.draft.input.strengthTier,
+    }),
+    salaryFromFormula: generatedEconomy.salary,
+    ovr,
+    pps,
+    teamContext: input.teamContext,
+    projectedRole,
+  });
+  const captaincyScore = buildCaptaincyScore({
+    attributes,
+    traitsPositive: input.draft.generated.traitsPositive,
+  });
+  const teamFit = buildTeamFit({
+    teamContext: input.teamContext,
+    axes,
+    traitsPositive: input.draft.generated.traitsPositive,
+    projectedRole,
+  });
   const roleProfile = playerGeneratorRoleProfiles[input.draft.input.roleIntent];
   const archetypeConstraint = input.draft.input.preferredArchetype ? playerGeneratorArchetypes[input.draft.input.preferredArchetype] : null;
   const catalog = buildCatalog(input.players);
@@ -1509,12 +1848,17 @@ export function recalculatePlayerGeneratorDraft(input: {
     ...input.draft.generated,
     axes,
     disciplineRatings,
+    disciplineOutlook,
     ovr,
     pps,
-    marketValue: generatedEconomy.marketValue,
-    salary: generatedEconomy.salary,
-    marketValueStatus: generatedEconomy.marketValueStatus,
-    salaryStatus: generatedEconomy.salaryStatus,
+    projectedRole,
+    captaincyScore,
+    teamFit,
+    economyProjection,
+    marketValue: economyProjection.marketValueEstimate,
+    salary: economyProjection.salaryEstimate,
+    marketValueStatus: economyProjection.marketValueEstimate != null ? "ready" : generatedEconomy.marketValueStatus,
+    salaryStatus: economyProjection.salaryEstimate != null ? "ready" : generatedEconomy.salaryStatus,
     formulaStatus: generatedEconomy.formulaStatus,
   } satisfies PlayerGeneratorDraft["generated"];
   const axisResolution = deriveAxisIntentFromProfile(input.draft.input);

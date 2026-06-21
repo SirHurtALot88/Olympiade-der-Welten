@@ -25,7 +25,7 @@ function buildFallbackIdentity(team: Team): TeamIdentity {
     soc: 0,
     ambition: 0,
     finances: 0,
-    boardConfidence: 0,
+    boardConfidence: 5,
     harmony: 0,
     manners: 0,
     popularity: 0,
@@ -41,9 +41,11 @@ function mergeIdentity(base: TeamIdentity, override?: TeamIdentityOverride | nul
     return base;
   }
 
+  const { playerMin: _ignoredPlayerMin, playerOpt: _ignoredPlayerOpt, ...nonRosterOverride } = override;
+
   return {
     ...base,
-    ...override,
+    ...nonRosterOverride,
     teamId: base.teamId,
     sourceNote: base.sourceNote,
   };

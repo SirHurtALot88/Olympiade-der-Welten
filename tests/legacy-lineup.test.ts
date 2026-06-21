@@ -1,6 +1,9 @@
 import { describe, expect, it } from "vitest";
 
-import { calculateMutatorModifierForSide } from "@/lib/lineups/legacy-lineup-modifiers";
+import {
+  calculateMutatorModifierForSide,
+  calculateMvpForcedMutatorModifierForSide,
+} from "@/lib/lineups/legacy-lineup-modifiers";
 import { scoreLegacyLineupDisciplineSide } from "@/lib/lineups/legacy-score-engine";
 import { validateLegacyLineupContext } from "@/lib/lineups/legacy-lineup-validator";
 import type { LegacyLineupContext } from "@/lib/lineups/legacy-lineup-types";
@@ -60,7 +63,7 @@ function createBaseContext(): LegacyLineupContext {
 }
 
 describe("legacy lineup score engine", () => {
-  it("maps 0, 1 and 2 matching mutators to +0, +6 and +12 score while player PPs use +0.3 per hit", () => {
+  it("maps 0, 1 and 2 matching mutators to +0, +6 and +12 score while player PPs are capped once per active player", () => {
     const baseInput = {
       disciplineSide: "d1" as const,
       entries: [{ playerId: "player-1" }],
@@ -102,7 +105,120 @@ describe("legacy lineup score engine", () => {
     expect(one.mutatorModifier).toBe(6);
     expect(one.playerMutatorPpsBonuses["player-1"]).toBe(0.3);
     expect(two.mutatorModifier).toBe(12);
-    expect(two.playerMutatorPpsBonuses["player-1"]).toBe(0.6);
+    expect(two.playerMutatorPpsBonuses["player-1"]).toBe(0.3);
+    expect(two.mutatorSlots[0]?.playerPpsModifier).toBe(0.3);
+    expect(two.mutatorSlots[1]?.playerPpsModifier).toBe(0);
+  });
+
+  it("counts mutator hits per selected player like Retool", () => {
+    const result = calculateMutatorModifierForSide({
+      disciplineSide: "d1",
+      entries: [{ playerId: "player-1" }, { playerId: "player-2" }],
+      rosterPlayers: [
+        {
+          id: "player-1",
+          name: "Player 1",
+          traitsPositive: ["Cool"],
+          traitsNegative: [],
+          coreStats: { pow: 1, spe: 1, men: 1, soc: 1 },
+        },
+        {
+          id: "player-2",
+          name: "Player 2",
+          traitsPositive: ["Cool"],
+          traitsNegative: [],
+          coreStats: { pow: 1, spe: 1, men: 1, soc: 1 },
+        },
+      ],
+      modifiers: {
+        d1: { primaryFormCardId: null, secondaryFormCardId: null, mutatorTrait1: "Cool", mutatorTrait2: null },
+        d2: { primaryFormCardId: null, secondaryFormCardId: null, mutatorTrait1: null, mutatorTrait2: null },
+      },
+    });
+
+    expect(result.mutatorModifier).toBe(12);
+    expect(result.playerMutatorPpsBonuses["player-1"]).toBe(0.3);
+    expect(result.playerMutatorPpsBonuses["player-2"]).toBe(0.3);
+    expect(result.mutatorSlots[0]?.hitCount).toBe(2);
+    expect(result.mutatorSlots[0]?.scoreModifier).toBe(12);
+  });
+
+  it("only counts active discipline-side entries for mutator bonuses", () => {
+    const result = calculateMutatorModifierForSide({
+      disciplineSide: "d1",
+      entries: [{ playerId: "active-player" }, { playerId: "active-player" }],
+      rosterPlayers: [
+        {
+          id: "active-player",
+          name: "Active Player",
+          traitsPositive: ["Cool"],
+          traitsNegative: [],
+          coreStats: { pow: 1, spe: 1, men: 1, soc: 1 },
+        },
+        {
+          id: "bench-player",
+          name: "Bench Player",
+          traitsPositive: ["Cool", "Diligent"],
+          traitsNegative: [],
+          coreStats: { pow: 1, spe: 1, men: 1, soc: 1 },
+        },
+      ],
+      modifiers: {
+        d1: { primaryFormCardId: null, secondaryFormCardId: null, mutatorTrait1: "Cool", mutatorTrait2: "Diligent" },
+        d2: { primaryFormCardId: null, secondaryFormCardId: null, mutatorTrait1: null, mutatorTrait2: null },
+      },
+    });
+
+    expect(result.mutatorModifier).toBe(6);
+    expect(result.playerMutatorPpsBonuses["active-player"]).toBe(0.3);
+    expect(result.playerMutatorPpsBonuses["bench-player"]).toBeUndefined();
+    expect(result.mutatorSlots[0]?.hitCount).toBe(1);
+    expect(result.mutatorSlots[1]?.hitCount).toBe(0);
+  });
+
+  it("uses real active player traits for forced MVP mutators instead of fake labels", () => {
+    const result = calculateMvpForcedMutatorModifierForSide({
+      disciplineId: "tdm",
+      disciplineSide: "d1",
+      entries: [{ playerId: "player-1" }, { playerId: "player-2" }, { playerId: "player-3" }],
+      disciplineScores: [
+        { playerId: "player-1", disciplineId: "tdm", score: 50 },
+        { playerId: "player-2", disciplineId: "tdm", score: 40 },
+        { playerId: "player-3", disciplineId: "tdm", score: 30 },
+      ],
+      rosterPlayers: [
+        {
+          id: "player-1",
+          name: "Player 1",
+          traitsPositive: ["Motivated"],
+          traitsNegative: ["Diva"],
+          coreStats: { pow: 1, spe: 1, men: 1, soc: 1 },
+        },
+        {
+          id: "player-2",
+          name: "Player 2",
+          traitsPositive: ["Motivated"],
+          traitsNegative: [],
+          coreStats: { pow: 1, spe: 1, men: 1, soc: 1 },
+        },
+        {
+          id: "player-3",
+          name: "Player 3",
+          traitsPositive: [],
+          traitsNegative: ["Diva"],
+          coreStats: { pow: 1, spe: 1, men: 1, soc: 1 },
+        },
+      ],
+    });
+
+    expect(result.mutatorMode).toBe("mvp_forced_mutators");
+    expect(result.mutatorText).toBe("Motivated, Diva");
+    expect(result.mutatorSlots.map((slot) => slot.label)).toEqual(["Motivated", "Diva"]);
+    expect(result.mutatorSlots.map((slot) => slot.scoreModifier)).toEqual([12, 12]);
+    expect(result.playerMutatorPpsBonuses["player-1"]).toBe(0.3);
+    expect(result.playerMutatorPpsBonuses["player-2"]).toBe(0.3);
+    expect(result.playerMutatorPpsBonuses["player-3"]).toBe(0.3);
+    expect(result.mutatorSlots.some((slot) => slot.label.includes("MVP Force"))).toBe(false);
   });
 
   it("sums known discipline scores correctly", () => {
@@ -115,6 +231,7 @@ describe("legacy lineup score engine", () => {
       disciplineScores: context.disciplineScores,
       activePlayers: context.activePlayers,
       requiredPlayers: 2,
+      captainMode: "legacy_strongest_selected",
     });
 
     expect(result.entries.map((entry) => entry.score)).toEqual([10, 20]);
@@ -134,6 +251,7 @@ describe("legacy lineup score engine", () => {
       disciplineScores: context.disciplineScores,
       activePlayers: context.activePlayers,
       requiredPlayers: 2,
+      captainMode: "legacy_strongest_selected",
     });
 
     expect(result.entries.map((entry) => entry.score)).toEqual([10, null]);
@@ -143,7 +261,7 @@ describe("legacy lineup score engine", () => {
     expect(result.modifierWarnings).toContain("Fatigue source is missing for tdm/d1.");
   });
 
-  it("applies captain bonus to the strongest selected player when a captain is enabled", () => {
+  it("applies captain bonus to the strongest selected player when legacy captain mode is enabled", () => {
     const context = createBaseContext();
     context.entries[2] = { ...context.entries[2], isCaptain: true };
 
@@ -154,6 +272,7 @@ describe("legacy lineup score engine", () => {
       disciplineScores: context.disciplineScores,
       activePlayers: context.activePlayers,
       requiredPlayers: 2,
+      captainMode: "legacy_strongest_selected",
     });
 
     expect(result.baseScore).toBe(70);
@@ -174,6 +293,7 @@ describe("legacy lineup score engine", () => {
       disciplineScores: context.disciplineScores,
       activePlayers: context.activePlayers,
       requiredPlayers: 2,
+      captainMode: "legacy_strongest_selected",
       fatigueSourceStatus: "mapped",
       fatigueByPlayerId: {
         "player-3": { count: 1, multiplier: 0.95 },
@@ -186,7 +306,7 @@ describe("legacy lineup score engine", () => {
     expect(result.totalScore).toBe(82.5);
   });
 
-  it("applies mutator score as a team-level bonus after fatigue/current and captain, while PPs stay separate", () => {
+  it("applies mutator score to matching players and keeps mutator PPs as a separate breakdown", () => {
     const context = createBaseContext();
     context.entries[0] = { ...context.entries[0], isCaptain: true };
     context.disciplineScores = [
@@ -203,6 +323,7 @@ describe("legacy lineup score engine", () => {
       disciplineScores: context.disciplineScores,
       activePlayers: context.activePlayers,
       requiredPlayers: 2,
+      captainMode: "legacy_strongest_selected",
       fatigueSourceStatus: "mapped",
       fatigueByPlayerId: {
         "player-1": { count: 2, multiplier: 0.5 },
@@ -212,9 +333,11 @@ describe("legacy lineup score engine", () => {
       formCardsSelected: 1,
       formModifier: 4,
       mutatorModifier: 12,
-      mutatorBonusByPlayerId: {},
+      mutatorBonusByPlayerId: {
+        "player-1": 12,
+      },
       mutatorPpsBonusByPlayerId: {
-        "player-1": 0.6,
+        "player-1": 0.3,
       },
       rosterPlayers: [
         {
@@ -239,9 +362,9 @@ describe("legacy lineup score engine", () => {
     expect(result.captainBonusTotal).toBe(8);
     expect(result.formModifier).toBe(4);
     expect(result.mutatorModifier).toBe(12);
-    expect(result.entries[0]?.mutatorBonus).toBe(0);
-    expect(result.entries[0]?.mutatorPpsBonus).toBe(0.6);
-    expect(result.entries[0]?.finalContribution).toBe(15);
+    expect(result.entries[0]?.mutatorBonus).toBe(12);
+    expect(result.entries[0]?.mutatorPpsBonus).toBe(0.3);
+    expect(result.entries[0]?.finalContribution).toBe(27);
     expect(result.entries[1]?.captainBonus).toBe(8);
     expect(result.entries[1]?.finalContribution).toBe(23.9);
     expect(result.totalScore).toBe(54.9);

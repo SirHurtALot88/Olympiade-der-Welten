@@ -68,6 +68,19 @@ describe("player stats adapter", () => {
     expect(players[0]?.potential).toBeDefined();
   });
 
+  it("repairs Riley Le Rogue instead of keeping the broken Le Rouge placeholder", () => {
+    const players = loadImportedPlayerStats();
+    const riley = players.find((player) => player.id === "player-0154-riley-le-rouge");
+
+    expect(riley?.name).toBe("Riley Le Rogue");
+    expect(riley?.className).not.toBe("#N/A");
+    expect(riley?.attributeSheetStats?.power).toBe(58);
+    expect(riley?.attributeSheetRatings?.spiritRating).toBe("A");
+    expect(riley?.displayMarketValue).toBeGreaterThan(0);
+    expect(riley?.displaySalary).toBeGreaterThanOrEqual(0);
+    expect(riley?.preferredDisciplineIds.length).toBe(3);
+  });
+
   it("does not invent mvs when the imported JSON has no dedicated mvs field", () => {
     const players = loadImportedPlayerStats();
     const first = players[0] as Record<string, unknown> | undefined;
@@ -128,7 +141,7 @@ describe("player stats adapter", () => {
     expect((mid?.ovrNormalized ?? 0) < 100).toBe(true);
   });
 
-  it("derives mvs from stored season placings via the rank-to-mw table", () => {
+  it("derives Retool-style MVS from discipline rank points, clutch, versatility and appearances", () => {
     const players = [
       createPlayer({ id: "weak", rating: 10, disciplineRatings: { a: 20, b: 21 } }),
       createPlayer({ id: "mid", rating: 55, disciplineRatings: { a: 45, b: 44 } }),
@@ -149,7 +162,7 @@ describe("player stats adapter", () => {
           slotIndex: 0,
           baseValue: 0,
           finalPlayerScore: 90,
-          scoreContribution: 1,
+          scoreContribution: 90,
           rankInTeam: 1,
           rankInDiscipline: 1,
           isTop10: true,
@@ -168,7 +181,7 @@ describe("player stats adapter", () => {
           slotIndex: 0,
           baseValue: 0,
           finalPlayerScore: 45,
-          scoreContribution: 1,
+          scoreContribution: 45,
           rankInTeam: 1,
           rankInDiscipline: 50,
           isTop10: false,
@@ -187,7 +200,7 @@ describe("player stats adapter", () => {
           slotIndex: 0,
           baseValue: 0,
           finalPlayerScore: 20,
-          scoreContribution: 1,
+          scoreContribution: 20,
           rankInTeam: 1,
           rankInDiscipline: 100,
           isTop10: false,
@@ -201,9 +214,9 @@ describe("player stats adapter", () => {
     const mid = result.find((entry) => entry.playerId === "mid");
     const top = result.find((entry) => entry.playerId === "top");
 
-    expect(top?.mvs).not.toBeNull();
-    expect(mid?.mvs).not.toBeNull();
-    expect(weak?.mvs).not.toBeNull();
+    expect(top?.mvs).toBe(10.5);
+    expect(mid?.mvs).toBe(8.5);
+    expect(weak?.mvs).toBe(6.5);
     expect((top?.mvs ?? 0) > (mid?.mvs ?? 0)).toBe(true);
     expect((mid?.mvs ?? 0) > (weak?.mvs ?? 0)).toBe(true);
     expect(top?.sourceStatus.mvs).toBe("ready");

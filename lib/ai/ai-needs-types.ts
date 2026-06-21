@@ -35,12 +35,27 @@ export type AiLegacyLineupSuggestion = {
   needsSummary: AiNeedsSummary;
   warnings: string[];
   debugReasoning: string[];
+  d1SelectionReasons: AiSideSelectionReason[];
+  d2SelectionReasons: AiSideSelectionReason[];
+};
+
+export type AiSideSelectionReason = {
+  playerId: string;
+  activePlayerId: string;
+  slotIndex: number;
+  disciplineScore: number | null;
+  selectionScore: number | null;
+  demandBonus: number;
+  identityTieBreak: number;
+  demandReasons: string[];
+  reason: string;
 };
 
 export type AiLegacyLineupPreviewStatus = "ready" | "incomplete_roster" | "missing_scores" | "blocked";
 export type AiCaptainSelectionStatus =
   | "selected"
   | "skipped_limit_reached"
+  | "skipped_reserved"
   | "skipped_not_needed"
   | "blocked_policy";
 
@@ -50,6 +65,11 @@ export type AiLegacyLineupSelectedPlayer = {
   name: string | null;
   isCaptain: boolean;
   baseScore: number | null;
+  selectionScore?: number | null;
+  demandBonus?: number | null;
+  identityTieBreak?: number | null;
+  demandReasons?: string[];
+  selectionReason?: string | null;
   fatigueCount: number | null;
   fatigueMultiplier: number | null;
   fatigueAdjustedScore: number | null;
@@ -82,6 +102,30 @@ export type AiLegacyLineupSuggestionSide = {
   reasoning: string[];
 };
 
+export type AiLegacyLineupModifierSidePlan = {
+  disciplineSide: DisciplineSide;
+  intensity: "conserve" | "normal" | "push";
+  intensityReason: string;
+  primaryFormCardId: string | null;
+  secondaryFormCardId: string | null;
+  formReason: string;
+  mutatorTrait1: string | null;
+  mutatorTrait2: string | null;
+  mutatorReason: string;
+  teamPowerId: string | null;
+  teamPowerReason: string;
+};
+
+export type AiLegacyLineupAuditSummary = {
+  status: "ready" | "warning" | "blocked";
+  ready: boolean;
+  items: Array<{
+    label: string;
+    status: "ok" | "warning" | "blocked";
+    detail: string;
+  }>;
+};
+
 export type AiLegacyLineupPreview = {
   source: "sqlite" | "prisma";
   readOnly: boolean;
@@ -98,6 +142,11 @@ export type AiLegacyLineupPreview = {
   warnings: string[];
   explanation: string;
   debugReasoning: string[];
+  modifierPlan?: {
+    d1: AiLegacyLineupModifierSidePlan;
+    d2: AiLegacyLineupModifierSidePlan;
+  };
+  auditSummary?: AiLegacyLineupAuditSummary;
   d1: AiLegacyLineupSuggestionSide;
   d2: AiLegacyLineupSuggestionSide;
   entries: LegacyLineupEntryInput[];

@@ -12,6 +12,8 @@ import {
 describe("global table layout helpers", () => {
   it("registers the important foundation tables with stable storage keys", () => {
     expect(GLOBAL_TABLE_REGISTRY["season-standings"].storageKey).toBe("seasonTable");
+    expect(GLOBAL_TABLE_REGISTRY["season-standings-v2"].storageKey).toBe("seasonStandingsV2Table");
+    expect(GLOBAL_TABLE_REGISTRY["season-standings-v2-top-players"].storageKey).toBe("seasonStandingsV2TopPlayersTable");
     expect(GLOBAL_TABLE_REGISTRY["prize-money"].storageKey).toBe("prizePreviewTable");
     expect(GLOBAL_TABLE_REGISTRY["transfer-market"].storageKey).toBe("transferMarketTable");
     expect(GLOBAL_TABLE_REGISTRY["transfer-history"].storageKey).toBe("transferHistoryTable");
@@ -24,6 +26,14 @@ describe("global table layout helpers", () => {
     expect(GLOBAL_TABLE_REGISTRY["balance-economy"].storageKey).toBe("multiSeasonEconomyTable");
     expect(GLOBAL_TABLE_REGISTRY["balance-player"].storageKey).toBe("multiSeasonPlayerProgressionTable");
     expect(GLOBAL_TABLE_REGISTRY["balance-gameplay"].storageKey).toBe("multiSeasonGameplayTable");
+  });
+
+  it("documents the global table baseline: connected tables keep resizable persisted widths", () => {
+    const connectedEntries = Object.values(GLOBAL_TABLE_REGISTRY).filter((entry) => entry.status === "connected");
+
+    expect(connectedEntries.length).toBeGreaterThan(0);
+    expect(connectedEntries.every((entry) => entry.requiresResizableColumns)).toBe(true);
+    expect(connectedEntries.every((entry) => entry.requiresPersistentWidths)).toBe(true);
   });
 
   it("clamps widths so resized columns stay usable", () => {

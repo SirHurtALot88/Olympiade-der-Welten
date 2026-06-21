@@ -2,6 +2,8 @@ import { describe, expect, it } from "vitest";
 
 import {
   buildTrainingTraitSignal,
+  CANONICAL_NEGATIVE_TRAITS,
+  CANONICAL_POSITIVE_TRAITS,
   getLegacyTraitTrainingFactorPct,
   LEGACY_TRAIT_TRAINING_FACTOR_PCT,
 } from "@/lib/training/trait-training-signal";
@@ -13,6 +15,13 @@ describe("trait training signal", () => {
     expect(LEGACY_TRAIT_TRAINING_FACTOR_PCT.Lazy).toBe(-20);
     expect(LEGACY_TRAIT_TRAINING_FACTOR_PCT.Fearless).toBe(-5);
     expect(getLegacyTraitTrainingFactorPct("Obsessive")).toBe(5);
+  });
+
+  it("confirms the canonical trait scope is 18 positive and 18 negative traits", () => {
+    expect(CANONICAL_POSITIVE_TRAITS).toHaveLength(18);
+    expect(CANONICAL_NEGATIVE_TRAITS).toHaveLength(18);
+    expect(getLegacyTraitTrainingFactorPct("lazy")).toBe(-20);
+    expect(getLegacyTraitTrainingFactorPct("InjuryProne")).toBeNull();
   });
 
   it("compresses a normal positive raw signal into a moderate bonus", () => {
@@ -73,4 +82,3 @@ describe("trait training signal", () => {
     });
   });
 });
-

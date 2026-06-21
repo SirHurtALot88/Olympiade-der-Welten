@@ -43,6 +43,7 @@ export type SeasonPlayerPointLedgerEntry = {
 export type SeasonTeamPointsSummary = {
   teamId: string;
   totalPoints: number;
+  mutatorPpsBonus: number;
   pointsByArea: Record<DisciplineCategory, number>;
   pointsByDiscipline: Record<string, number>;
   playerDerivedTotal: number;
@@ -334,6 +335,7 @@ export function buildSeasonPointsLedger(
     teamSummariesByTeamId.set(team.teamId, {
       teamId: team.teamId,
       totalPoints: 0,
+      mutatorPpsBonus: 0,
       pointsByArea: { power: 0, speed: 0, mental: 0, social: 0 },
       pointsByDiscipline: Object.fromEntries(disciplineIds.map((disciplineId) => [disciplineId, 0] as const)),
       playerDerivedTotal: 0,
@@ -391,15 +393,16 @@ export function buildSeasonPointsLedger(
 
     const teamSummary = teamSummariesByTeamId.get(entry.teamId);
     if (teamSummary) {
-      teamSummary.totalPoints = roundValue(teamSummary.totalPoints + entry.basePoints, 4);
+      teamSummary.totalPoints = roundValue(teamSummary.totalPoints + entry.points, 4);
       teamSummary.pointsByDiscipline[entry.disciplineId] = roundValue(
-        (teamSummary.pointsByDiscipline[entry.disciplineId] ?? 0) + entry.basePoints,
+        (teamSummary.pointsByDiscipline[entry.disciplineId] ?? 0) + entry.points,
         4,
       );
       if (category) {
-        teamSummary.pointsByArea[category] = roundValue(teamSummary.pointsByArea[category] + entry.basePoints, 4);
+        teamSummary.pointsByArea[category] = roundValue(teamSummary.pointsByArea[category] + entry.points, 4);
       }
-      teamSummary.playerDerivedTotal = roundValue(teamSummary.playerDerivedTotal + entry.basePoints, 4);
+      teamSummary.mutatorPpsBonus = roundValue(teamSummary.mutatorPpsBonus + entry.mutatorPpsBonus, 4);
+      teamSummary.playerDerivedTotal = roundValue(teamSummary.playerDerivedTotal + entry.points, 4);
       teamSummary.warnings = Array.from(new Set([...teamSummary.warnings, ...entry.warnings]));
     }
   }
@@ -424,6 +427,7 @@ export function buildSeasonPointsLedger(
 
   for (const teamSummary of teamSummariesByTeamId.values()) {
     teamSummary.totalPoints = roundValue(teamSummary.totalPoints, 1);
+    teamSummary.mutatorPpsBonus = roundValue(teamSummary.mutatorPpsBonus, 1);
     teamSummary.pointsByArea = {
       power: roundValue(teamSummary.pointsByArea.power, 1),
       speed: roundValue(teamSummary.pointsByArea.speed, 1),
@@ -436,18 +440,20 @@ export function buildSeasonPointsLedger(
 
     const expectedRankPoints = expectedRankPointsByTeamId.get(teamSummary.teamId) ?? 0;
 
-    if (teamSummary.totalPoints === 0 && expectedRankPoints === 0) {
+    const basePlayerDerivedTotal = roundValue(teamSummary.playerDerivedTotal - teamSummary.mutatorPpsBonus, 4);
+
+    if (basePlayerDerivedTotal === 0 && expectedRankPoints === 0) {
       teamSummary.reconciliationStatus = "reconciled";
       continue;
     }
 
-    if (teamSummary.totalPoints === 0 && expectedRankPoints > 0) {
+    if (basePlayerDerivedTotal === 0 && expectedRankPoints > 0) {
       teamSummary.reconciliationStatus = "missing_player_points";
       continue;
     }
 
     teamSummary.reconciliationStatus =
-      expectedRankPoints === 0 || isWithinTolerance(teamSummary.totalPoints, expectedRankPoints)
+      expectedRankPoints === 0 || isWithinTolerance(basePlayerDerivedTotal, expectedRankPoints)
         ? "reconciled"
         : "reconciliation_failed";
 

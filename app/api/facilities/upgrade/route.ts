@@ -1,7 +1,10 @@
+export const dynamic = "force-dynamic";
+
 import { NextResponse } from "next/server";
 
 import { FACILITY_CATALOG_BY_ID, type FacilityId } from "@/lib/facilities/facility-catalog";
 import { applyFacilityUpgrade, previewFacilityUpgrade } from "@/lib/facilities/facility-upgrade-service";
+import { evaluateGamePhaseAction } from "@/lib/foundation/game-phase-action-policy";
 import { createPersistenceService } from "@/lib/persistence/persistence-service";
 import { notifyRoomGameplayWrite } from "@/lib/room/room-gameplay-write-notifier";
 import { authorizeServerRoomWrite } from "@/lib/room/server-authoritative-write-guard";
@@ -11,6 +14,7 @@ type FacilityUpgradeBody = {
   teamId?: string;
   facilityId?: string;
   variant?: string | null;
+  action?: "upgrade" | "downgrade" | null;
   dryRun?: boolean;
   confirmToken?: string | null;
   source?: "sqlite" | "prisma";
@@ -19,6 +23,7 @@ type FacilityUpgradeBody = {
   seatToken?: string | null;
   userId?: string | null;
   activeManagerTeamId?: string | null;
+  activeOwnerId?: string | null;
   controlMode?: "human" | "ai" | "passive" | "manual" | null;
 };
 
@@ -34,6 +39,7 @@ export async function POST(request: Request) {
     const teamId = body.teamId?.trim() ?? "";
     const facilityId = normalizeFacilityId(body.facilityId?.trim());
     const dryRun = body.dryRun !== false;
+    const action = body.action === "downgrade" ? "downgrade" : "upgrade";
 
     if (source === "prisma") {
       return NextResponse.json({ success: false, error: "Prisma/Supabase mode is read-only in this build." }, { status: 409 });
@@ -50,8 +56,31 @@ export async function POST(request: Request) {
     if (!save) {
       return NextResponse.json({ success: false, error: "save_not_found", summary: null }, { status: 404 });
     }
+    const phaseGate = evaluateGamePhaseAction(save.gameState, "facility_apply");
+    if (!phaseGate.allowed && !dryRun) {
+      return NextResponse.json(
+        {
+          success: false,
+          error: phaseGate.reason,
+          summary: null,
+          warnings: phaseGate.warnings,
+          blockingReasons: phaseGate.reason ? [phaseGate.reason] : [],
+        },
+        { status: 409 },
+      );
+    }
 
-    const preview = previewFacilityUpgrade(save, teamId, facilityId, body.variant);
+    const preview = previewFacilityUpgrade(save, teamId, facilityId, body.variant, action);
+    const phaseAwarePreview =
+      dryRun && !phaseGate.allowed && phaseGate.reason
+        ? {
+            ...preview,
+            ok: false,
+            confirmToken: null,
+            warnings: [...preview.warnings, ...phaseGate.warnings],
+            blockingReasons: [...preview.blockingReasons, phaseGate.reason],
+          }
+        : preview;
     const writeAuth = authorizeServerRoomWrite({
       roomCode: body.roomCode,
       participantId: body.participantId,
@@ -65,6 +94,7 @@ export async function POST(request: Request) {
       confirmToken: body.confirmToken,
       expectedConfirmToken: preview.confirmToken,
       activeManagerTeamId: body.activeManagerTeamId,
+      activeOwnerId: body.activeOwnerId,
       controlMode: body.controlMode,
     });
     if (!writeAuth.allowed) {
@@ -81,13 +111,13 @@ export async function POST(request: Request) {
     }
 
     const summary = dryRun
-      ? preview
-      : applyFacilityUpgrade(save, teamId, facilityId, body.confirmToken ?? null, body.variant, persistence);
+      ? phaseAwarePreview
+      : applyFacilityUpgrade(save, teamId, facilityId, body.confirmToken ?? null, body.variant, action, persistence);
     const success = "applied" in summary ? summary.applied : summary.ok;
     notifyRoomGameplayWrite(writeAuth, {
       saveId,
       teamId,
-      action: "facility_upgrade",
+      action: action === "downgrade" ? "facility_downgrade" : "facility_upgrade",
       eventType: "facility_updated",
       affectedViews: ["home", "team", "facilities"],
       dryRun,
@@ -98,7 +128,7 @@ export async function POST(request: Request) {
       {
         success,
         summary,
-        warnings: [...writeAuth.warnings, ...summary.warnings],
+        warnings: [...phaseGate.warnings, ...writeAuth.warnings, ...summary.warnings],
         blockingReasons: summary.blockingReasons,
       },
       { status: success || dryRun ? 200 : 409 },

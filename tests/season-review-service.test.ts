@@ -121,6 +121,15 @@ describe("season review service", () => {
     expect(review.teamHighlights.some((entry) => entry.source === "seasonState.disciplineResults")).toBe(true);
   });
 
+  it("includes board objective settlement in the season review", () => {
+    const review = buildSeasonReview(gameState());
+
+    expect(review.objectiveSettlement.seasonId).toBe("season-1");
+    expect(review.objectiveSettlement.rows.length).toBeGreaterThan(0);
+    expect(review.objectiveSettlement.byTeamId["team-1"]).toBeDefined();
+    expect(review.objectiveSettlement.totals.completed + review.objectiveSettlement.totals.failed).toBeGreaterThan(0);
+  });
+
   it("reports promised-role gaps and XP development rankings from stored snapshots", () => {
     const review = buildSeasonReview(gameState());
 

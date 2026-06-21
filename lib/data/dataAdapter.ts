@@ -8,7 +8,7 @@ import { getTeamPlayerMax } from "@/lib/foundation/roster-limits";
 import { buildTeamStrategyProfileMap } from "@/lib/foundation/team-strategy-profiles";
 import { createPlayerBaselinesForPlayers } from "@/lib/players/player-baseline-service";
 import { loadSeasonManagementReferenceRows, mapSeasonManagementRowsToTeams } from "@/lib/foundation/season-management-sheet";
-import { buildLegacySeedSeasonDisciplineSchedule, buildMatchdaysFromSeasonDisciplineSchedule } from "@/lib/season/season-discipline-schedule";
+import { buildSeasonSeededDisciplineSchedule, buildMatchdaysFromSeasonDisciplineSchedule } from "@/lib/season/season-discipline-schedule";
 import type {
   Contract,
   Discipline,
@@ -73,11 +73,13 @@ export const foundationSeedDisciplines: Discipline[] = [
   { id: "breaking", name: "Breaking", category: "power", weight: 1.0, originalOrder: 5, displayOrder: 12, playerCount: 4, mutator1: null, mutator2: null },
 ];
 
-const foundationSeedDisciplineSchedule = buildLegacySeedSeasonDisciplineSchedule({
+const foundationSeedDisciplineSchedule = buildSeasonSeededDisciplineSchedule({
+  saveId: "foundation-seed",
   seasonId: foundationSeedSeason.id,
   disciplines: foundationSeedDisciplines,
   matchdayIds: foundationSeedSeason.matchdayIds,
-});
+  matchdayCount: foundationSeedSeason.matchdayIds.length,
+}).entries;
 
 export const foundationSeedMatchdays: Matchday[] = buildMatchdaysFromSeasonDisciplineSchedule(
   foundationSeedSeason.id,
@@ -111,15 +113,18 @@ function createSeasonState(
   seasonId: string,
   disciplines: Discipline[],
   matchdayIds: string[],
+  scheduleSeedId: string,
 ): SeasonState {
   return {
     seasonId,
     schedule: fixtures,
-    disciplineSchedule: buildLegacySeedSeasonDisciplineSchedule({
+    disciplineSchedule: buildSeasonSeededDisciplineSchedule({
+      saveId: scheduleSeedId,
       seasonId,
       disciplines,
       matchdayIds,
-    }),
+      matchdayCount: matchdayIds.length,
+    }).entries,
     lineupDrafts: [],
     playerGeneratorDrafts: [],
     contractNegotiationDrafts: [],
@@ -460,8 +465,9 @@ export function loadFreshSeasonOneSeedData(): OlySeedData {
   };
 }
 
-export function createGameStateFromSeed(input: OlySeedData = loadSeedData()): GameState {
+export function createGameStateFromSeed(input: OlySeedData = loadSeedData(), options?: { scheduleSeedId?: string }): GameState {
   const data = structuredClone(input);
+  const scheduleSeedId = options?.scheduleSeedId ?? "local-game-state";
   const hydrated = hydrateGameStateMedia({
     season: data.season,
     seasonState: {
@@ -471,6 +477,7 @@ export function createGameStateFromSeed(input: OlySeedData = loadSeedData()): Ga
         data.season.id,
         data.disciplines,
         data.season.matchdayIds,
+        scheduleSeedId,
       ),
       teamControlSettings: buildTeamControlSettingsMap(data.teams),
       teamStrategyProfiles: buildTeamStrategyProfileMap(data.teams, data.teamIdentities),
@@ -499,6 +506,6 @@ export function createSaveGameState(saveId = "save-dev-1", input?: OlySeedData):
     saveId,
     createdAt: now,
     updatedAt: now,
-    gameState: createGameStateFromSeed(input),
+    gameState: createGameStateFromSeed(input, { scheduleSeedId: saveId }),
   };
 }

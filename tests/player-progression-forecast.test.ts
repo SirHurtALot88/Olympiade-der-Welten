@@ -44,9 +44,9 @@ function createGameState(player: Player): GameState {
     season: {
       id: "season-1",
       name: "Season 1",
+      year: 1,
       currentMatchday: 1,
-      totalMatchdays: 10,
-      isCompleted: false,
+      matchdayIds: ["matchday-1"],
     },
     seasonState: {
       seasonId: "season-1",
@@ -55,9 +55,20 @@ function createGameState(player: Player): GameState {
       matchdayResults: [
         {
           id: "result-1",
+          saveId: "save-1",
           seasonId: "season-1",
           matchdayId: "matchday-1",
           status: "preview_applied",
+          sourceVersion: "test",
+          teamsTotal: 0,
+          teamsReady: 0,
+          teamsUnderfilled: 0,
+          teamsMissingLineup: 0,
+          teamsInvalidLineup: 0,
+          teamsMissingScoreCoverage: 0,
+          warningsCount: 0,
+          createdAt: "2026-06-11T00:00:00.000Z",
+          updatedAt: "2026-06-11T00:00:00.000Z",
         },
       ],
       playerDisciplinePerformances: [],
@@ -85,6 +96,13 @@ function createGameState(player: Player): GameState {
       processedMappingRows: 0,
       importedPlayerCount: 1,
       matchedRosterCount: 0,
+      teamCount: 0,
+      unmappedPlayers: [],
+      teamsWithoutPlayers: [],
+      mappingRowsWithoutPlayerMatch: [],
+      duplicateMappedPlayers: [],
+      unknownTeamCodes: [],
+      duplicateTeamCodes: [],
       warnings: [],
     },
   } satisfies GameState;
@@ -205,6 +223,57 @@ describe("player progression forecast", () => {
     expect(forecast.performanceXP).toBe(0);
   });
 
+  it("gives weaker players more growth credit when they outperform their bracket", () => {
+    const underdog = createPlayer({
+      id: "player-underdog",
+      rating: 42,
+      marketValue: 8,
+      coreStats: { pow: 42, spe: 40, men: 39, soc: 37 },
+    });
+    const favorite = createPlayer({
+      id: "player-favorite",
+      rating: 82,
+      marketValue: 75,
+      coreStats: { pow: 82, spe: 80, men: 79, soc: 78 },
+    });
+
+    const underdogForecast = buildPlayerProgressionForecast({
+      gameState: createGameState(underdog),
+      player: underdog,
+      playerRating: createRating({ playerId: underdog.id, ovrNormalized: 42, mvs: 6, ppsSeason: 10 }),
+      seasonPerformance: createSeasonPerformance({ appearances: 5, totalPoints: 10 }),
+      trainingModeByPlayerId: { [underdog.id]: "mittel" },
+    });
+    const favoriteForecast = buildPlayerProgressionForecast({
+      gameState: createGameState(favorite),
+      player: favorite,
+      playerRating: createRating({ playerId: favorite.id, ovrNormalized: 82, mvs: 6, ppsSeason: 10 }),
+      seasonPerformance: createSeasonPerformance({ appearances: 5, totalPoints: 10 }),
+      trainingModeByPlayerId: { [favorite.id]: "mittel" },
+    });
+
+    expect(underdogForecast.developmentFactors.performanceFactor).toBeGreaterThan(favoriteForecast.developmentFactors.performanceFactor);
+    expect(underdogForecast.netDevelopmentXP).toBeGreaterThan(favoriteForecast.netDevelopmentXP);
+  });
+
+  it("still lets weak players slip backwards after a really bad season", () => {
+    const player = createPlayer({
+      rating: 40,
+      marketValue: 7,
+      coreStats: { pow: 39, spe: 37, men: 36, soc: 35 },
+    });
+    const forecast = buildPlayerProgressionForecast({
+      gameState: createGameState(player),
+      player,
+      playerRating: createRating({ ovrNormalized: 40, mvs: 2.5, ppsSeason: 3 }),
+      seasonPerformance: createSeasonPerformance({ appearances: 5, totalPoints: 3 }),
+      trainingModeByPlayerId: { [player.id]: "leicht" },
+    });
+
+    expect(forecast.regressionBreakdown.poorPerformance).toBeGreaterThan(0);
+    expect(forecast.netDevelopmentXP).toBeLessThan(0);
+  });
+
   it("adds appearance XP and MVS XP, while PPs stay capped as a bonus", () => {
     const player = createPlayer();
     const forecast = buildPlayerProgressionForecast({
@@ -323,7 +392,7 @@ describe("player progression forecast", () => {
   it("pushes underperforming starter-level players into regression", () => {
     const player = createPlayer({ potential: 63, rating: 60 });
     const gameState = createGameState(player);
-    gameState.rosters = [{ teamId: "team-1", playerId: player.id, role: "starter", joinedSeasonId: "season-1" }];
+    gameState.rosters = [{ teamId: "team-1", playerId: player.id, roleTag: "starter", joinedSeasonId: "season-1" } as never];
     const forecast = buildPlayerProgressionForecast({
       gameState,
       player,
@@ -354,7 +423,7 @@ describe("player progression forecast", () => {
   it("warns expensive stars with bad performance through regression pressure", () => {
     const player = createPlayer({ marketValue: 90000, salaryDemand: 20000, potential: 80, rating: 78 });
     const gameState = createGameState(player);
-    gameState.rosters = [{ teamId: "team-1", playerId: player.id, role: "star", joinedSeasonId: "season-1" }];
+    gameState.rosters = [{ teamId: "team-1", playerId: player.id, roleTag: "star", joinedSeasonId: "season-1" } as never];
     const forecast = buildPlayerProgressionForecast({
       gameState,
       player,

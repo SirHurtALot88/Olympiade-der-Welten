@@ -2,6 +2,7 @@ import rawPlayerStats from "@/data/generated/oly-player-stats.json";
 import { attachPlayerPortraitPath } from "@/lib/data/mediaAssets";
 import { normalizePlayerOvr } from "@/lib/data/player-ovr-scale";
 import { hydratePlayerWithAttributeSheet } from "@/lib/data/playerAttributeSheetData";
+import { repairImportedPlayerData } from "@/lib/data/playerImportRepairs";
 import type { Player } from "@/lib/data/olyDataTypes";
 import { getPlayerImportedRatingPps } from "@/lib/foundation/player-rating-contract";
 
@@ -18,8 +19,10 @@ export function enrichPlayerDerivedStats(player: Player): Player {
 }
 
 export function loadImportedPlayerStats(): Player[] {
-  return structuredClone(rawPlayerStats as RawPlayerStat[])
-    .map(hydratePlayerWithAttributeSheet)
+  return repairImportedPlayerData(
+    structuredClone(rawPlayerStats as RawPlayerStat[])
+      .map(hydratePlayerWithAttributeSheet),
+  )
     .map(attachPlayerPortraitPath)
     .map(enrichPlayerDerivedStats);
 }

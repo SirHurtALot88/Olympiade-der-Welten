@@ -2,7 +2,6 @@ import fs from "node:fs";
 import path from "node:path";
 
 import type { GameState, Player, RosterEntry, TeamIdentity, TeamStrategyProfile } from "@/lib/data/olyDataTypes";
-import { getImportedPlayerDisplayMarketValue } from "@/lib/data/player-economy-display";
 import { resolvePlayerEconomyContract } from "@/lib/foundation/player-economy-contract";
 import { deriveRosterTargets } from "@/lib/foundation/roster-limits";
 import { buildTeamStrategyScores } from "@/lib/foundation/team-strategy-score-service";
@@ -16,6 +15,19 @@ import {
   type TeamThemeCompositionScore,
 } from "@/lib/ai/team-theme-composition-service";
 import {
+  buildRetoolAi2BudgetPlan,
+  buildTeamNeedState,
+  scoreFitPenalty,
+  scoreFormColorStackPenalty,
+  scoreInAxisHoleCompletion,
+  scoreMarginalNeedGain,
+  scoreOffAxisDetourPenalty,
+  scoreOverpayPenalty,
+  scoreRoleMismatchPenalty,
+  type RetoolAi2BudgetPlan,
+  type TeamNeedState,
+} from "@/lib/ai/retool-ai2-pick-engine";
+import {
   createLocalTransfermarktRunContext,
   executeLocalTransfermarktBuy,
   flushLocalTransfermarktRunContext,
@@ -27,12 +39,29 @@ import type { PersistedSaveGame, PersistenceService } from "@/lib/persistence/ty
 
 export const CHUNKED_REDRAFT_TOPUP_CONFIRM_TOKEN = "CONFIRM_CHUNKED_REDRAFT_TOPUP_V1";
 
-export type ChunkedRedraftMode = "season1_initial_topup" | "full_clean_redraft";
+export type ChunkedRedraftMode = "season1_initial_topup" | "preseason_roster_repair" | "full_clean_redraft";
 export type ChunkedRedraftTarget = "playerMin" | "playerOpt" | "playerMax";
 export type ChunkedRedraftPhase = "phase_a_minimum" | "phase_b_core_optimum" | "phase_c_depth_luxury";
 
+const REDRAFT_FUTURE_MIN_BASE_PENALTY = 1_200;
+const REDRAFT_FUTURE_MIN_GAP_PENALTY = 80;
+const REDRAFT_FUTURE_MIN_UNKNOWN_PENALTY = 4_000;
+const REDRAFT_PLANNED_DEPTH_BASE_PENALTY = 650;
+const REDRAFT_PLANNED_DEPTH_GAP_PENALTY = 45;
+const REDRAFT_PLANNED_DEPTH_UNKNOWN_PENALTY = 1_200;
+const REDRAFT_USEFUL_MIN_FUTURE_PENALTY = 2_500;
+const REDRAFT_USEFUL_DEPTH_FUTURE_PENALTY = 1_250;
+const REDRAFT_MINIMUM_FALLBACK_PENALTY = 2_500;
+
 function getCalculatedPlayerSalary(player: Player) {
   return resolvePlayerEconomyContract({ player }).salary;
+}
+
+function getEmergencyMinimumSigningFee(input: { teamCash: number; marketValue: number; enabled: boolean }) {
+  if (!input.enabled) return input.marketValue;
+  const positiveCash = Math.max(0, input.teamCash);
+  if (positiveCash <= 1) return input.marketValue;
+  return roundValue(Math.min(input.marketValue, Math.max(1, Math.min(8, positiveCash * 0.12))), 2);
 }
 
 export type ChunkedRedraftState = {
@@ -90,6 +119,7 @@ export type ChunkedRedraftPickRow = {
   themeTier?: string;
   themeTags?: string;
   themeReason?: string;
+  needImpactScore?: number;
   salaryImpact?: number;
   budgetFit?: number;
   topRejectedCandidates?: string;
@@ -146,9 +176,11 @@ export type ChunkedRedraftTopupParams = {
   mode: ChunkedRedraftMode;
   resume?: boolean;
   target?: ChunkedRedraftTarget;
+  minimumRosterTargetOverride?: number;
   roundLimit?: number;
   teamTimeLimitMs?: number;
   maxTeams?: number;
+  targetTeamIds?: string[];
   watchdogMs?: number;
   reportMode?: "full" | "light";
   outputDir?: string;
@@ -167,11 +199,16 @@ type Candidate = {
   pickScore: number;
 };
 
+function getTopupPlayerMarketValue(player: Player) {
+  return resolvePlayerEconomyContract({ player }).marketValue;
+}
+
 type ScoredCandidate = Candidate & {
   selectedScore: number;
   identityFit: number;
   premiumAxisFit: number;
   axisFocusStrength: number;
+  needImpactScore: number;
   valueScore: number;
   themeCompositionScore: number;
   themeTier: TeamThemeCompositionScore["themeTier"];
@@ -426,6 +463,18 @@ type RosterTargetPlan = {
   salaryStart: number;
   spendableBudget: number;
   reserveBudget: number;
+  reservePolicy: RetoolAi2BudgetPlan["reservePolicy"];
+  budgetCaution01: number;
+  budgetAggression01: number;
+  budgetPostureScore: number;
+  salaryBurdenRatio: number;
+  cashRunwayRatio: number;
+  salaryFactorCurrent: number;
+  sponsorSupportForecast5: number[];
+  spendWindowFloor: number;
+  spendWindowBase: number;
+  spendWindowCeiling: number;
+  softSlotBudget: number;
   maxTransferSpend: number;
   maxSalaryIncrease: number;
   qualityFloor: number;
@@ -725,7 +774,7 @@ function buildCandidatePool(gameState: GameState, pickedPlayerIds: Set<string>, 
     .filter((player) => !rosteredPlayerIds.has(player.id) && !pickedPlayerIds.has(player.id))
     .map<Candidate | null>((player) => {
       if (counters) counters.marketValueLookups += 1;
-      const marketValue = getImportedPlayerDisplayMarketValue(player);
+      const marketValue = getTopupPlayerMarketValue(player);
       if (marketValue == null || marketValue <= 0) return null;
       if (counters) counters.salaryLookups += 1;
       const salary = getCalculatedPlayerSalary(player);
@@ -748,7 +797,7 @@ function buildCandidatePool(gameState: GameState, pickedPlayerIds: Set<string>, 
     })
     .filter((entry): entry is Candidate => Boolean(entry))
     .sort((left, right) => {
-      return left.player.name.localeCompare(right.player.name, "de");
+      return compareByDeterministicPlayerTie(left.player.id, right.player.id, "candidate_pool");
     });
 }
 
@@ -791,44 +840,54 @@ function buildPhasePlan(input: {
   const cashBias = toBias(input.strategyProfile?.bias?.cashPriority);
   const riskBias = toBias(input.strategyProfile?.bias?.riskTolerance);
   const depthBias = toBias(input.strategyProfile?.bias?.rosterDepthPreference);
+  const plannedReservePct =
+    input.targetPlan && input.teamCash > 0 ? Math.max(0, Math.min(0.5, input.targetPlan.reserveBudget / input.teamCash)) : null;
+  const plannedSpendableCash = Math.max(0, input.teamCash - (input.targetPlan?.reserveBudget ?? 0));
+  const plannedSoftSlotBudget =
+    input.targetPlan?.softSlotBudget && input.targetPlan.softSlotBudget > 0
+      ? input.targetPlan.softSlotBudget
+      : plannedSpendableCash / remainingSlots;
 
   if (phase === "phase_a_minimum") {
-    const spendableCash = input.teamCash * 0.98;
+    const reservePct = Math.min(0.08, plannedReservePct ?? 0.02);
+    const spendableCash = input.teamCash * (1 - reservePct);
     return {
       phase,
       targetRoster,
-      cashReservePct: 0.02,
+      cashReservePct: roundValue(reservePct, 3),
       shortlistCap: 112,
       maxRecommendedSpend: Math.max(1, (spendableCash / remainingSlots) * 1.05),
       qualityFloor: 0,
-      description: "Pflicht-Minimum: breit, guenstig, brauchbar, niedrige CashReserve.",
+      description: "Pflicht-Minimum: breit, guenstig, brauchbar, Retool-Reserve nur weich.",
     };
   }
 
   if (phase === "phase_b_core_optimum") {
     const activeSpendMultiplier = 1.25 + starBias * 0.08 + riskBias * 0.04 - cashBias * 0.025;
-    const reservePct = Math.max(0.04, Math.min(0.16, 0.14 - starBias * 0.008 + cashBias * 0.006));
+    const fallbackReservePct = Math.max(0.04, Math.min(0.16, 0.14 - starBias * 0.008 + cashBias * 0.006));
+    const reservePct = roundValue(Math.max(0.02, Math.min(0.32, plannedReservePct ?? fallbackReservePct)), 3);
     const shortlistCap = Math.round(56 + starBias * 4 + valueBias * 2);
     return {
       phase,
       targetRoster,
-      cashReservePct: roundValue(reservePct, 3),
+      cashReservePct: reservePct,
       shortlistCap,
-      maxRecommendedSpend: Math.max(1, ((input.teamCash * (1 - reservePct)) / remainingSlots) * activeSpendMultiplier),
+      maxRecommendedSpend: Math.max(1, plannedSoftSlotBudget * activeSpendMultiplier),
       qualityFloor: 0,
-      description: "Core/Optimum: Teamfit, Qualitaet, Diszi-Needs und aktive Cash-Nutzung.",
+      description: `Core/Optimum: Retool-Budget ${input.targetPlan?.reservePolicy ?? "fallback"}; Teamfit, Qualitaet und Needs.`,
     };
   }
 
-  const reservePct = Math.max(0.14, Math.min(0.28, 0.25 + cashBias * 0.006 - depthBias * 0.01));
+  const fallbackReservePct = Math.max(0.14, Math.min(0.28, 0.25 + cashBias * 0.006 - depthBias * 0.01));
+  const reservePct = roundValue(Math.max(0.08, Math.min(0.42, plannedReservePct ?? fallbackReservePct)), 3);
   return {
     phase,
     targetRoster,
-    cashReservePct: roundValue(reservePct, 3),
+    cashReservePct: reservePct,
     shortlistCap: Math.round(32 + depthBias * 3),
-    maxRecommendedSpend: Math.max(1, ((input.teamCash * (1 - reservePct)) / remainingSlots) * 0.9),
+    maxRecommendedSpend: Math.max(1, plannedSoftSlotBudget * 0.9),
     qualityFloor: 0,
-    description: "Depth/Luxus: Rotation, Absicherung und vorsichtigere Budgetnutzung.",
+    description: `Depth/Luxus: Retool-Budget ${input.targetPlan?.reservePolicy ?? "fallback"}; Rotation und Cash-Absicherung.`,
   };
 }
 
@@ -881,6 +940,22 @@ function getClassFit(candidate: Candidate, roster: RosterEntry[], gameState: Gam
   return sameClassCount === 0 ? 8 : sameClassCount === 1 ? 3 : -4;
 }
 
+function buildRosterClassCounts(gameState: GameState, roster: RosterEntry[]) {
+  const playersById = new Map(gameState.players.map((player) => [player.id, player] as const));
+  const counts = new Map<string, number>();
+  for (const entry of roster) {
+    const className = playersById.get(entry.playerId)?.className;
+    if (!className) continue;
+    counts.set(className, (counts.get(className) ?? 0) + 1);
+  }
+  return counts;
+}
+
+function getClassFitFromCounts(candidate: Candidate, classCounts: Map<string, number>) {
+  const sameClassCount = classCounts.get(candidate.player.className) ?? 0;
+  return sameClassCount === 0 ? 8 : sameClassCount === 1 ? 3 : -4;
+}
+
 function getCheapThemePriority(candidate: Candidate, target: TeamThemeCompositionTarget | null) {
   if (!target) return 0;
   const tags = new Set(derivePlayerThemeTags(candidate.player).playerThemeTags);
@@ -915,7 +990,7 @@ function selectScoringPool(input: {
     const leftScore = left.premiumAxisFit * 0.55 + left.identityFit * 0.35 + left.themePriority * 8 - left.salary * 0.4;
     const rightScore = right.premiumAxisFit * 0.55 + right.identityFit * 0.35 + right.themePriority * 8 - right.salary * 0.4;
     if (rightScore !== leftScore) return rightScore - leftScore;
-    return left.candidate.player.name.localeCompare(right.candidate.player.name, "de");
+    return compareByDeterministicPlayerTie(left.candidate.player.id, right.candidate.player.id, "fit_pool");
   });
   for (const row of fitRows.slice(0, baseLimit)) {
     selected.set(row.candidate.player.id, row.candidate);
@@ -939,6 +1014,183 @@ function selectScoringPool(input: {
   return [...selected.values()];
 }
 
+function getRoleMarketCeiling(input: {
+  role: DraftPickRole;
+  phasePlan: PhasePlan;
+  targetPlan: RosterTargetPlan;
+  teamCash: number;
+  rosterCount: number;
+  desiredRosterTarget: number;
+}) {
+  const remainingSlots = Math.max(1, input.desiredRosterTarget - input.rosterCount);
+  const budgetPerSlot = Math.max(1, (input.teamCash - input.targetPlan.reserveBudget) / remainingSlots);
+  const softSlot = Math.max(1, input.targetPlan.softSlotBudget || input.phasePlan.maxRecommendedSpend || budgetPerSlot);
+  const financeCaution = input.targetPlan.budgetCaution01 ?? 0.5;
+  const roleMultiplier =
+    input.role === "star"
+      ? 3.2
+      : input.role === "core"
+        ? 2.35
+        : input.role === "starter"
+          ? 1.7
+          : input.role === "theme"
+            ? 1.55
+            : input.role === "prospect"
+              ? 1.25
+              : input.role === "value"
+                ? 1.15
+                : 1.0;
+  const cashShare =
+    input.role === "star"
+      ? 0.72
+      : input.role === "core"
+        ? 0.48
+        : input.role === "starter"
+          ? 0.34
+          : input.role === "theme"
+            ? 0.3
+            : input.role === "prospect"
+              ? 0.22
+              : input.role === "value"
+                ? 0.2
+                : 0.16;
+  const cautionCut = 1 - Math.max(0, Math.min(0.28, financeCaution * 0.18));
+  const cashAwareCeiling = Math.max(softSlot * roleMultiplier, input.teamCash * cashShare) * cautionCut;
+  return Math.max(1, Math.min(input.teamCash, cashAwareCeiling));
+}
+
+function getCandidateNeedAxisValue(candidate: Candidate, needState: TeamNeedState | null | undefined) {
+  if (!needState) return Math.max(candidate.pow, candidate.spe, candidate.men, candidate.soc);
+  return Math.max(
+    candidate[needState.topAxis] ?? 0,
+    (candidate[needState.secondAxis] ?? 0) * 0.92,
+    (candidate[needState.thirdAxis] ?? 0) * 0.78,
+  );
+}
+
+function getCheapMarketLaneScore(input: {
+  candidate: Candidate;
+  role: DraftPickRole;
+  identity: TeamIdentity | null | undefined;
+  themeTarget: TeamThemeCompositionTarget | null;
+  needState: TeamNeedState | null | undefined;
+}) {
+  const identityFit = getIdentityFit(input.candidate, input.identity);
+  const premiumAxisFit = computePreferredAxisFit(input.candidate, input.identity);
+  const needAxis = getCandidateNeedAxisValue(input.candidate, input.needState);
+  const themePriority = getCheapThemePriority(input.candidate, input.themeTarget);
+  const salary = Math.max(1, input.candidate.salary ?? 1);
+  const marketValueSalaryRatio = input.candidate.marketValue / salary;
+  const roleValue =
+    input.role === "star" || input.role === "core"
+      ? needAxis * 0.62 + premiumAxisFit * 0.82 + identityFit * 0.52 + marketValueSalaryRatio * 2 + themePriority * 9
+      : input.role === "value"
+        ? marketValueSalaryRatio * 8 + needAxis * 0.65 + identityFit * 0.35 + premiumAxisFit * 0.35 + themePriority * 7
+        : input.role === "prospect"
+          ? (input.candidate.player.potential ?? 0) * 0.75 + needAxis * 0.4 + identityFit * 0.35 + themePriority * 8 - salary * 0.4
+          : input.role === "theme"
+            ? themePriority * 22 + identityFit * 0.45 + premiumAxisFit * 0.32 + needAxis * 0.25
+            : needAxis * 0.75 + marketValueSalaryRatio * 4 + identityFit * 0.35 + premiumAxisFit * 0.28 + themePriority * 6 - salary * 0.25;
+  return roundValue(roleValue, 4);
+}
+
+function buildStrategicScoutingPool(input: {
+  planningPool: Candidate[];
+  role: DraftPickRole;
+  phasePlan: PhasePlan;
+  targetPlan: RosterTargetPlan;
+  teamCash: number;
+  rosterCount: number;
+  desiredRosterTarget: number;
+  identity: TeamIdentity | null | undefined;
+  themeTarget: TeamThemeCompositionTarget | null;
+  needState: TeamNeedState | null | undefined;
+}) {
+  if (input.planningPool.length === 0) {
+    return { pool: [] as Candidate[], lane: "empty", scanned: 0, matched: 0, deepLimit: 0 };
+  }
+
+  const ceiling = getRoleMarketCeiling(input);
+  const salaryValueThreshold =
+    input.role === "value" ? 2.15 : input.role === "depth" ? 1.55 : input.role === "prospect" ? 1.25 : 0.9;
+  const needAxisThreshold =
+    input.role === "star" ? 64 : input.role === "core" ? 58 : input.role === "starter" ? 54 : input.role === "theme" ? 48 : 50;
+  const rows = input.planningPool.map((candidate) => {
+    const needAxis = getCandidateNeedAxisValue(candidate, input.needState);
+    const identityFit = getIdentityFit(candidate, input.identity);
+    const premiumAxisFit = computePreferredAxisFit(candidate, input.identity);
+    const themePriority = getCheapThemePriority(candidate, input.themeTarget);
+    const salaryRatio = candidate.marketValue / Math.max(1, candidate.salary ?? 1);
+    const priceOk = candidate.marketValue <= ceiling;
+    const roleOk =
+      input.role === "star" || input.role === "core"
+        ? candidate.quality >= (input.role === "star" ? 64 : 56) || premiumAxisFit >= (input.role === "star" ? 68 : 60)
+        : input.role === "theme"
+          ? themePriority > 0 || identityFit >= 56 || needAxis >= needAxisThreshold
+          : needAxis >= needAxisThreshold || salaryRatio >= salaryValueThreshold || identityFit >= 56 || premiumAxisFit >= 56;
+    return {
+      candidate,
+      priceOk,
+      roleOk,
+      themePriority,
+      needAxis,
+      identityFit,
+      premiumAxisFit,
+      salaryRatio,
+    };
+  });
+
+  const primaryLane = rows.filter((row) => row.priceOk && row.roleOk);
+  const priceOnlyLane = rows.filter((row) => row.priceOk);
+  const roleOnlyLane = rows.filter((row) => row.roleOk);
+  const selectedLane =
+    primaryLane.length > 0
+      ? primaryLane
+      : priceOnlyLane.length > 0
+        ? priceOnlyLane
+        : roleOnlyLane.length > 0
+          ? roleOnlyLane
+          : rows;
+  const lane =
+    primaryLane.length > 0
+      ? "role_budget_need"
+      : priceOnlyLane.length > 0
+        ? "budget_fallback"
+        : roleOnlyLane.length > 0
+          ? "role_fallback"
+          : "full_fallback";
+  const scoredLane = selectedLane.map((row) => ({
+    ...row,
+    score: getCheapMarketLaneScore({
+      candidate: row.candidate,
+      role: input.role,
+      identity: input.identity,
+      themeTarget: input.themeTarget,
+      needState: input.needState,
+    }),
+  }));
+  const sorted = scoredLane.sort((left, right) => {
+    if (right.themePriority !== left.themePriority && input.role === "theme") return right.themePriority - left.themePriority;
+    if (right.score !== left.score) return right.score - left.score;
+    return compareByDeterministicPlayerTie(left.candidate.player.id, right.candidate.player.id, `strategic_scouting:${input.role}`);
+  });
+  const deepLimit =
+    selectedLane.length <= 640
+      ? selectedLane.length
+      : input.role === "star" || input.role === "core"
+        ? 760
+        : input.role === "theme"
+          ? 700
+          : 640;
+  return {
+    pool: sorted.slice(0, deepLimit).map((row) => row.candidate),
+    lane,
+    scanned: input.planningPool.length,
+    matched: selectedLane.length,
+    deepLimit,
+  };
+}
+
 function getRosterPlayers(gameState: GameState, roster: RosterEntry[]) {
   const playersById = new Map(gameState.players.map((player) => [player.id, player] as const));
   return roster.map((entry) => playersById.get(entry.playerId)).filter((player): player is Player => Boolean(player));
@@ -950,7 +1202,19 @@ function getCandidateTeamFit(input: {
   roster: RosterEntry[];
   candidate: Candidate;
 }) {
-  return calculateTransfermarktFit(input.candidate.player, getRosterPlayers(input.gameState, input.roster), {
+  return getCandidateTeamFitFromRosterPlayers({
+    team: input.team,
+    rosterPlayers: getRosterPlayers(input.gameState, input.roster),
+    candidate: input.candidate,
+  });
+}
+
+function getCandidateTeamFitFromRosterPlayers(input: {
+  team: GameState["teams"][number];
+  rosterPlayers: Player[];
+  candidate: Candidate;
+}) {
+  return calculateTransfermarktFit(input.candidate.player, input.rosterPlayers, {
     teamId: input.team.teamId,
   }).teamFit ?? 0;
 }
@@ -970,8 +1234,23 @@ function isAllowedByStandardFit(input: {
   };
 }
 
-function estimateCheapestFutureCost(input: {
-  sortedCandidates: Candidate[];
+function isMercenaryMarketTeam(team: GameState["teams"][number]) {
+  return team.teamId === "W-L" || team.shortCode === "W-L" || /wrecking legionnaires/i.test(team.name ?? "");
+}
+
+function selectFitLegalCandidates(input: {
+  team: GameState["teams"][number];
+  positiveFitCandidates: Candidate[];
+  mercenaryFallbackCandidates: Candidate[];
+}) {
+  if (isMercenaryMarketTeam(input.team)) {
+    return [...input.positiveFitCandidates, ...input.mercenaryFallbackCandidates];
+  }
+  return input.positiveFitCandidates.length > 0 ? input.positiveFitCandidates : input.mercenaryFallbackCandidates;
+}
+
+function estimateCheapestFutureCost<T extends Candidate>(input: {
+  sortedCandidates: T[];
   excludedPlayerId: string;
   neededCount: number;
 }) {
@@ -985,6 +1264,47 @@ function estimateCheapestFutureCost(input: {
     if (count >= input.neededCount) break;
   }
   return count >= input.neededCount ? roundValue(total, 2) : Number.POSITIVE_INFINITY;
+}
+
+function isUsefulFutureCandidate(candidate: ScoredCandidate, phase: ChunkedRedraftPhase) {
+  const usefulAxis =
+    candidate.premiumAxisFit >= (phase === "phase_a_minimum" ? 56 : 60) ||
+    candidate.identityFit >= (phase === "phase_a_minimum" ? 54 : 58);
+  const usefulDisciplineProxy = candidate.quality >= (phase === "phase_a_minimum" ? 54 : 60);
+  const usefulTheme =
+    candidate.themeCompositionScore > 0 ||
+    candidate.themeTier === "core_theme" ||
+    candidate.themeTier === "secondary_theme" ||
+    candidate.themeTier === "soft_theme";
+  const usefulValue = candidate.valueScore >= (phase === "phase_a_minimum" ? 4.5 : 5.2);
+  return usefulAxis || usefulDisciplineProxy || usefulTheme || usefulValue;
+}
+
+function estimateUsefulFutureCost(input: {
+  sortedCandidates: ScoredCandidate[];
+  fallbackSortedCandidates: ScoredCandidate[];
+  excludedPlayerId: string;
+  neededCount: number;
+  phase: ChunkedRedraftPhase;
+}) {
+  if (input.neededCount <= 0) return { cost: 0, usefulCountEnough: true };
+  const usefulCandidates = input.sortedCandidates.filter((candidate) => isUsefulFutureCandidate(candidate, input.phase));
+  const usefulCost = estimateCheapestFutureCost({
+    sortedCandidates: usefulCandidates,
+    excludedPlayerId: input.excludedPlayerId,
+    neededCount: input.neededCount,
+  });
+  if (Number.isFinite(usefulCost)) {
+    return { cost: usefulCost, usefulCountEnough: true };
+  }
+  return {
+    cost: estimateCheapestFutureCost({
+      sortedCandidates: input.fallbackSortedCandidates,
+      excludedPlayerId: input.excludedPlayerId,
+      neededCount: input.neededCount,
+    }),
+    usefulCountEnough: false,
+  };
 }
 
 function buildDraftRoleSequence(input: {
@@ -1211,6 +1531,20 @@ function hashStringToUnitInterval(value: string) {
   return (hash >>> 0) / 0xffffffff;
 }
 
+function compareByDeterministicPlayerTie(leftPlayerId: string, rightPlayerId: string, salt: string) {
+  const leftTie = hashStringToUnitInterval(`${salt}:${leftPlayerId}`);
+  const rightTie = hashStringToUnitInterval(`${salt}:${rightPlayerId}`);
+  if (rightTie !== leftTie) return rightTie - leftTie;
+  return leftPlayerId.localeCompare(rightPlayerId, "en");
+}
+
+function compareScoredCandidateTie(left: ScoredCandidate, right: ScoredCandidate, salt: string) {
+  if (right.premiumAxisFit !== left.premiumAxisFit) return right.premiumAxisFit - left.premiumAxisFit;
+  if (right.identityFit !== left.identityFit) return right.identityFit - left.identityFit;
+  if (right.draftVariance !== left.draftVariance) return right.draftVariance - left.draftVariance;
+  return compareByDeterministicPlayerTie(left.player.id, right.player.id, salt);
+}
+
 export function computeRedraftScoreVariance(input: {
   draftSalt: string;
   teamId: string;
@@ -1239,9 +1573,7 @@ function applyDraftRoleIntent(candidates: ScoredCandidate[], role: DraftPickRole
     .sort((left, right) => {
       if (right.selectedScore !== left.selectedScore) return right.selectedScore - left.selectedScore;
       if (right.roleScore !== left.roleScore) return right.roleScore - left.roleScore;
-      if (right.premiumAxisFit !== left.premiumAxisFit) return right.premiumAxisFit - left.premiumAxisFit;
-      if (right.identityFit !== left.identityFit) return right.identityFit - left.identityFit;
-      return left.player.name.localeCompare(right.player.name, "de");
+      return compareScoredCandidateTie(left, right, `draft_role:${role}`);
     });
 }
 
@@ -1312,7 +1644,7 @@ function buildTeamReadinessScore(input: {
   const rosterCandidateShapes = rosterPlayers
     .map((player) => ({
       player,
-      marketValue: getImportedPlayerDisplayMarketValue(player) ?? 0,
+      marketValue: getTopupPlayerMarketValue(player) ?? 0,
       salary: getCalculatedPlayerSalary(player),
       pow: getPlayerAxisValue(player, "pow"),
       spe: getPlayerAxisValue(player, "spe"),
@@ -1382,24 +1714,51 @@ function buildRosterTargetPlan(input: {
   target: ChunkedRedraftTarget;
   strategyProfile: TeamStrategyProfile | null | undefined;
   candidatePool: Candidate[];
+  requirePlayerOptTarget?: boolean;
+  minimumRosterTargetOverride?: number;
 }): RosterTargetPlan {
   const team = input.gameState.teams.find((entry) => entry.teamId === input.teamId);
   const identity = input.gameState.teamIdentities.find((entry) => entry.teamId === input.teamId) ?? null;
   const rostersByTeam = groupRostersByTeam(input.gameState.rosters);
   const roster = rostersByTeam.get(input.teamId) ?? [];
   const target = getTeamTarget(input.gameState, input.teamId, input.target);
+  const requirePlayerOptTarget = input.requirePlayerOptTarget ?? input.target === "playerOpt";
+  const minimumRosterTargetOverride =
+    input.minimumRosterTargetOverride != null && Number.isFinite(input.minimumRosterTargetOverride)
+      ? Math.max(0, Math.round(input.minimumRosterTargetOverride))
+      : null;
+  const coverageMinTarget = Math.min(
+    target.playerMax,
+    Math.max(target.playerMin, minimumRosterTargetOverride ?? target.playerMin),
+  );
   const seasonLegalMin = getSeasonLegalMin(target.playerMin);
   const salaryStart = getRosterSalary(roster);
   const cashStart = roundValue(team?.cash ?? 0);
+  const playerById = new Map(input.gameState.players.map((player) => [player.id, player]));
+  const rosterPlayers = roster.map((entry) => playerById.get(entry.playerId)).filter((player): player is Player => Boolean(player));
+  const rosterMarketValue = roundValue(rosterPlayers.reduce((sum, player) => sum + (getTopupPlayerMarketValue(player) ?? 0), 0), 2);
+  const standing = input.gameState.seasonState.standings[input.teamId];
   const cashPriority = toBias(input.strategyProfile?.bias?.cashPriority);
   const valuePriority = toBias(input.strategyProfile?.bias?.valuePriority);
   const starPriority = toBias(input.strategyProfile?.bias?.starPriority);
   const riskTolerance = toBias(input.strategyProfile?.bias?.riskTolerance);
   const eliteSmallRosterPreference = toBias(input.strategyProfile?.bias?.eliteSmallRosterPreference);
   const rosterDepthPreference = toBias(input.strategyProfile?.bias?.rosterDepthPreference);
-  const reservePct = Math.max(0.04, Math.min(0.22, 0.14 + cashPriority * 0.006 - starPriority * 0.008));
-  const reserveBudget = roundValue(cashStart * reservePct);
-  const spendableBudget = roundValue(Math.max(0, cashStart - reserveBudget));
+  const budgetPlan = buildRetoolAi2BudgetPlan({
+    team: { teamId: input.teamId, cash: cashStart },
+    teamIdentity: identity,
+    strategyProfile: input.strategyProfile ?? null,
+    rosterSize: roster.length,
+    rosterSalaryKnown: salaryStart,
+    rosterMarketValue,
+    playerMin: target.playerMin,
+    optimum: target.playerOpt,
+    currentRank: standing?.rank ?? standing?.startplatz ?? 32,
+    previousRank: standing?.startplatz ?? standing?.rank ?? 32,
+    sponsorSupport: standing?.sponsorTotal ?? standing?.sponsorSeason ?? standing?.sponsorBasis ?? null,
+  });
+  const reserveBudget = budgetPlan.reserveTarget;
+  const spendableBudget = budgetPlan.allowedBudgetForSearch;
   const strongAffordableCandidates = input.candidatePool.filter(
     (candidate) =>
       candidate.marketValue <= spendableBudget &&
@@ -1458,8 +1817,19 @@ function buildRosterTargetPlan(input: {
     targetReason = "value_or_rebuild_profile_targets_opt_with_value_bias";
   }
 
-  const minTarget = allowedUnderMin ? seasonLegalMin : target.playerMin;
-  const maxTransferSpend = roundValue(spendableBudget / Math.max(1, desiredRosterTarget - roster.length));
+  if (requirePlayerOptTarget && input.target === "playerOpt") {
+    desiredRosterTarget = target.playerOpt;
+    allowedUnderOpt = false;
+    ecoRound = false;
+    targetMode = winNow ? "win_now_push" : targetMode === "small_elite_roster" || targetMode === "eco_round" || targetMode === "cash_recovery"
+      ? "fill_to_optimum"
+      : targetMode;
+    targetReason = `${targetReason}+full_clean_redraft_requires_playerOpt`;
+  }
+
+  desiredRosterTarget = Math.max(desiredRosterTarget, coverageMinTarget);
+  const minTarget = allowedUnderMin ? Math.max(seasonLegalMin, coverageMinTarget) : coverageMinTarget;
+  const maxTransferSpend = roundValue(budgetPlan.softSlotBudget || spendableBudget / Math.max(1, desiredRosterTarget - roster.length));
   const requiredRoles = roster.length < minTarget ? "season_legal_core" : targetMode === "small_elite_roster" ? "elite_core" : "coverage_depth";
   return {
     teamId: input.teamId,
@@ -1472,11 +1842,25 @@ function buildRosterTargetPlan(input: {
     desiredRosterTarget: Math.min(desiredRosterTarget, target.playerMax),
     minTarget,
     targetMode,
-    targetReason,
+    targetReason: minimumRosterTargetOverride != null && coverageMinTarget > target.playerMin
+      ? `${targetReason}+coverage_min_${coverageMinTarget}`
+      : targetReason,
     cashStart,
     salaryStart,
     spendableBudget,
     reserveBudget,
+    reservePolicy: budgetPlan.reservePolicy,
+    budgetCaution01: budgetPlan.caution01,
+    budgetAggression01: budgetPlan.aggression01,
+    budgetPostureScore: budgetPlan.spendPostureScore,
+    salaryBurdenRatio: budgetPlan.salaryBurdenRatio,
+    cashRunwayRatio: budgetPlan.cashRunwayRatio,
+    salaryFactorCurrent: budgetPlan.salaryFactorCurrent,
+    sponsorSupportForecast5: budgetPlan.sponsorSupportForecast5,
+    spendWindowFloor: budgetPlan.spendWindowFloor,
+    spendWindowBase: budgetPlan.spendWindowBase,
+    spendWindowCeiling: budgetPlan.spendWindowCeiling,
+    softSlotBudget: budgetPlan.softSlotBudget,
     maxTransferSpend,
     maxSalaryIncrease: roundValue(spendableBudget * 0.18),
     qualityFloor: 0,
@@ -1503,6 +1887,8 @@ function buildRosterTargetPlans(input: {
   target: ChunkedRedraftTarget;
   strategyProfiles: Record<string, TeamStrategyProfile>;
   candidatePool: Candidate[];
+  requirePlayerOptTarget?: boolean;
+  minimumRosterTargetOverride?: number;
 }) {
   return new Map(
     input.gameState.teams.map((team) => [
@@ -1513,6 +1899,8 @@ function buildRosterTargetPlans(input: {
         target: input.target,
         strategyProfile: input.strategyProfiles[team.teamId],
         candidatePool: input.candidatePool,
+        requirePlayerOptTarget: input.requirePlayerOptTarget,
+        minimumRosterTargetOverride: input.minimumRosterTargetOverride,
       }),
     ]),
   );
@@ -1800,12 +2188,16 @@ function scoreCandidateForTeam(input: {
   phase: ChunkedRedraftPhase;
   maxRecommendedSpend: number;
   draftSalt: string;
+  teamNeedState?: TeamNeedState | null;
+  rosterClassCounts?: Map<string, number>;
   counters?: RedraftCandidateCounters;
 }): ScoredCandidate {
   const identityFit = getIdentityFit(input.candidate, input.teamIdentity);
   const premiumAxisFit = computePreferredAxisFit(input.candidate, input.teamIdentity);
   const axisFocusStrength = getAxisFocusStrength(input.teamIdentity);
-  const classFit = getClassFit(input.candidate, input.roster, input.gameState);
+  const classFit = input.rosterClassCounts
+    ? getClassFitFromCounts(input.candidate, input.rosterClassCounts)
+    : getClassFit(input.candidate, input.roster, input.gameState);
   const salaryImpact = roundValue(input.candidate.salary ?? 0, 2);
   const starBias = toBias(input.strategyProfile?.bias?.starPriority);
   const valueBias = toBias(input.strategyProfile?.bias?.valuePriority);
@@ -1828,6 +2220,12 @@ function scoreCandidateForTeam(input: {
       Math.max(1, salaryImpact + 5),
     4,
   );
+  const marginalNeedGain = input.teamNeedState
+    ? scoreMarginalNeedGain({ needState: input.teamNeedState, candidate: input.candidate.player })
+    : null;
+  const needImpactScore = roundValue(marginalNeedGain?.needScoreApplied ?? 0, 4);
+  const needScoreWeight =
+    input.phase === "phase_a_minimum" ? 0.85 : input.phase === "phase_b_core_optimum" ? 1.22 : 0.72;
   const budgetFit = 0;
   const focusedPremiumAxisPenalty =
     axisFocusStrength >= 0.65 && input.phase === "phase_b_core_optimum" && starBias >= 8
@@ -1838,6 +2236,7 @@ function scoreCandidateForTeam(input: {
       ? identityFit * 0.35 +
         premiumAxisFit * 0.45 +
         valueScore * (18 + valueBias * 0.8) +
+        needImpactScore * needScoreWeight +
         classFit * 0.65 +
         themeScore.themeCompositionScore * themeWeight -
         salaryImpact * 0.45
@@ -1845,6 +2244,7 @@ function scoreCandidateForTeam(input: {
         ? identityFit * 0.95 +
           premiumAxisFit * (starBias >= 8 && axisFocusStrength >= 0.65 ? 0.55 : 0.18) +
           valueScore * (8 + valueBias * 0.7) +
+          needImpactScore * needScoreWeight +
           potentialScore * 0.12 +
           themeScore.themeCompositionScore * themeWeight +
           classFit -
@@ -1853,6 +2253,7 @@ function scoreCandidateForTeam(input: {
         : identityFit * 0.55 +
           premiumAxisFit * (axisFocusStrength >= 0.65 ? 0.28 : 0.1) +
           valueScore * (8 + valueBias * 0.6) +
+          needImpactScore * needScoreWeight +
           potentialScore * 0.08 +
           themeScore.themeCompositionScore * themeWeight +
           classFit * 1.15 +
@@ -1865,18 +2266,23 @@ function scoreCandidateForTeam(input: {
     phase: input.phase,
   });
   const selectedScore = roundValue(phaseScore + draftVariance, 4);
-  const strongestAxis = [
+  const strongestAxis = marginalNeedGain?.bestAxis?.toUpperCase() ?? [
     ["POW", input.candidate.pow],
     ["SPE", input.candidate.spe],
     ["MEN", input.candidate.men],
     ["SOC", input.candidate.soc],
   ].sort((left, right) => Number(right[1]) - Number(left[1]))[0]?.[0] ?? "OVR";
+  const formColorNeedLabel =
+    marginalNeedGain && marginalNeedGain.formColorNeedScore >= 3 && marginalNeedGain.formColor
+      ? `FORM_${marginalNeedGain.formColor.toUpperCase()}`
+      : null;
   return {
     ...input.candidate,
     selectedScore,
     identityFit,
     premiumAxisFit,
     axisFocusStrength,
+    needImpactScore,
     classFit,
     valueScore,
     themeCompositionScore: themeScore.themeCompositionScore,
@@ -1888,7 +2294,7 @@ function scoreCandidateForTeam(input: {
     potentialScore,
     phaseScore: roundValue(phaseScore, 4),
     draftVariance,
-    teamNeed: `${strongestAxis}_coverage`,
+    teamNeed: formColorNeedLabel ?? (marginalNeedGain?.bestDisciplineName ? `${strongestAxis}_${marginalNeedGain.bestDisciplineName}` : `${strongestAxis}_coverage`),
   };
 }
 
@@ -2220,6 +2626,7 @@ function buildManagerStopReasons(input: {
       target: "playerOpt",
       strategyProfile: null,
       candidatePool: [],
+      minimumRosterTargetOverride: input.targetPlans.get(team.teamId)?.minTarget,
     });
     const profile = input.managerProfiles.get(team.teamId);
     const rosterCount = rostersByTeam.get(team.teamId)?.length ?? 0;
@@ -2270,6 +2677,18 @@ function planToCsvRow(plan: RosterTargetPlan) {
     salaryStart: plan.salaryStart,
     spendableBudget: plan.spendableBudget,
     reserveBudget: plan.reserveBudget,
+    reservePolicy: plan.reservePolicy,
+    budgetCaution01: plan.budgetCaution01,
+    budgetAggression01: plan.budgetAggression01,
+    budgetPostureScore: plan.budgetPostureScore,
+    salaryBurdenRatio: plan.salaryBurdenRatio,
+    cashRunwayRatio: plan.cashRunwayRatio,
+    salaryFactorCurrent: plan.salaryFactorCurrent,
+    sponsorSupportForecast5: plan.sponsorSupportForecast5.join("|"),
+    spendWindowFloor: plan.spendWindowFloor,
+    spendWindowBase: plan.spendWindowBase,
+    spendWindowCeiling: plan.spendWindowCeiling,
+    softSlotBudget: plan.softSlotBudget,
     maxTransferSpend: plan.maxTransferSpend,
     maxSalaryIncrease: plan.maxSalaryIncrease,
     qualityFloor: plan.qualityFloor,
@@ -2950,6 +3369,12 @@ export function runChunkedRedraftTopup(params: ChunkedRedraftTopupParams) {
   const resumeState = params.resume ? readResumeState(outputDir, save.saveId) : null;
   const resumeTested = Boolean(resumeState);
   const initialSave = save;
+  const transferSource =
+    params.mode === "full_clean_redraft"
+      ? "full_churn_redraft_buy"
+      : params.mode === "preseason_roster_repair"
+        ? "preseason_roster_repair_buy"
+        : "season1_autoprep_topup";
   const warnings: string[] = [...(resumeState?.warnings ?? [])];
   const pickedPlayerIds = new Set<string>([
     ...(resumeState?.pickedPlayerIds ?? []),
@@ -3000,11 +3425,14 @@ export function runChunkedRedraftTopup(params: ChunkedRedraftTopupParams) {
   });
   profiler.end("build_manager_profiles", managerProfilesStartedAt, { candidateCount: managerProfiles.size });
   const targetPlansStartedAt = profiler.start("build_roster_target_plans", { candidateCount: initialCandidatePool.length });
+  const requirePlayerOptTarget = target === "playerOpt";
   const targetPlans = buildRosterTargetPlans({
     gameState: runContext.save.gameState,
     target,
     strategyProfiles,
     candidatePool: initialCandidatePool,
+    requirePlayerOptTarget,
+    minimumRosterTargetOverride: params.minimumRosterTargetOverride,
   });
   profiler.end("build_roster_target_plans", targetPlansStartedAt, { candidateCount: targetPlans.size });
   const marketBoardsStartedAt = profiler.start("build_market_boards");
@@ -3034,8 +3462,9 @@ export function runChunkedRedraftTopup(params: ChunkedRedraftTopupParams) {
   if (params.mode === "full_clean_redraft") {
     const sequentialStartedAt = Date.now();
     const candidatePool = initialCandidatePool;
-    const teamsForRun = maxTeams
-      ? runContext.save.gameState.teams.slice(0, maxTeams)
+    const targetTeamIdSet = new Set((params.targetTeamIds ?? []).filter(Boolean));
+    const sortedTeamsForRun = targetTeamIdSet.size > 0
+      ? runContext.save.gameState.teams.filter((team) => targetTeamIdSet.has(team.teamId))
       : [...runContext.save.gameState.teams].sort((teamA, teamB) => {
           const targetA = getTeamTarget(runContext.save.gameState, teamA.teamId, target);
           const targetB = getTeamTarget(runContext.save.gameState, teamB.teamId, target);
@@ -3044,6 +3473,7 @@ export function runChunkedRedraftTopup(params: ChunkedRedraftTopupParams) {
           if (pressureA !== pressureB) return pressureA - pressureB;
           return teamA.teamId.localeCompare(teamB.teamId, "de");
         });
+    const teamsForRun = maxTeams ? sortedTeamsForRun.slice(0, maxTeams) : sortedTeamsForRun;
     const sequentialTeamRows: Array<Record<string, unknown>> = [];
     const sequentialPickRows: Array<Record<string, unknown>> = [];
     const sequentialIdentityRows: Array<Record<string, unknown>> = [];
@@ -3062,11 +3492,23 @@ export function runChunkedRedraftTopup(params: ChunkedRedraftTopupParams) {
       let teamPicks = 0;
       let teamErrors = 0;
       const teamWarnings: string[] = [];
-      const teamTimeLimit = Math.max(teamTimeLimitMs, 60_000);
+      const scoredCandidateCache = new Map<string, ScoredCandidate>();
       const teamTarget = getTeamTarget(runContext.save.gameState, team.teamId, target);
+      const teamTimeLimit = Math.max(teamTimeLimitMs, 60_000, teamTarget.targetRoster * 8_500);
+      const minimumRosterTimeLimit = Math.max(teamTimeLimit, 180_000);
       const teamIdentity = runContext.save.gameState.teamIdentities.find((entry) => entry.teamId === team.teamId) ?? null;
       const strategyProfile = strategyProfiles[team.teamId] ?? null;
-      const targetPlan = targetPlans.get(team.teamId) ?? null;
+      const targetPlan =
+        targetPlans.get(team.teamId) ??
+        buildRosterTargetPlan({
+          gameState: runContext.save.gameState,
+          teamId: team.teamId,
+          target,
+          strategyProfile,
+          candidatePool,
+          requirePlayerOptTarget,
+          minimumRosterTargetOverride: params.minimumRosterTargetOverride,
+        });
       const managerProfile = managerProfiles.get(team.teamId) ?? null;
       const seasonStrategy = seasonStrategies.get(team.teamId) ?? null;
       const rosterBlueprint = rosterBlueprints.get(team.teamId) ?? null;
@@ -3088,18 +3530,34 @@ export function runChunkedRedraftTopup(params: ChunkedRedraftTopupParams) {
         freeAgentCount: candidatePool.length - pickedPlayerIds.size,
         candidateCount: candidatePool.length,
       });
+      console.error(`[redraft] team_sequence_start ${team.teamId} target=${desiredRosterTarget} cash=${roundValue(team.cash)}`);
 
       while (true) {
         const latestTeam = runContext.save.gameState.teams.find((entry) => entry.teamId === team.teamId) ?? team;
         const teamRoster = runContext.save.gameState.rosters.filter((entry) => entry.teamId === team.teamId);
+        const teamRosterPlayers = getRosterPlayers(runContext.save.gameState, teamRoster);
+        const teamRosterClassCounts = buildRosterClassCounts(runContext.save.gameState, teamRoster);
         const rosterCount = teamRoster.length;
         if (rosterCount >= desiredRosterTarget || rosterCount >= teamTarget.playerMax || teamPicks >= maxTeamPicks) {
           break;
         }
-        if (Date.now() - teamStartedAt > teamTimeLimit) {
-          teamWarnings.push("team_sequence_time_limit_reached");
-          warningRows.push({ round: teamPicks + 1, teamId: team.teamId, reason: "team_sequence_time_limit_reached", detail: `${teamTimeLimit}ms` });
-          break;
+        const elapsedTeamMs = Date.now() - teamStartedAt;
+        if (elapsedTeamMs > teamTimeLimit) {
+          if (rosterCount < minTarget && elapsedTeamMs <= minimumRosterTimeLimit) {
+            if (!teamWarnings.includes("team_sequence_minimum_time_guard_extended")) {
+              teamWarnings.push("team_sequence_minimum_time_guard_extended");
+              warningRows.push({
+                round: teamPicks + 1,
+                teamId: team.teamId,
+                reason: "team_sequence_minimum_time_guard_extended",
+                detail: `${elapsedTeamMs}ms>${teamTimeLimit}ms;min=${rosterCount}/${minTarget}`,
+              });
+            }
+          } else {
+            teamWarnings.push("team_sequence_time_limit_reached");
+            warningRows.push({ round: teamPicks + 1, teamId: team.teamId, reason: "team_sequence_time_limit_reached", detail: `${teamTimeLimit}ms` });
+            break;
+          }
         }
 
         const pickStartedAt = Date.now();
@@ -3119,25 +3577,41 @@ export function runChunkedRedraftTopup(params: ChunkedRedraftTopupParams) {
           freeAgentCount: candidatePool.length - pickedPlayerIds.size,
         });
         const unpickedCandidates = candidatePool.filter((candidate) => !pickedPlayerIds.has(candidate.player.id));
-        const fitChecked = unpickedCandidates.map((candidate) => ({
-          candidate,
-          fit: isAllowedByStandardFit({
-            gameState: runContext.save.gameState,
+        const cashReachableCandidates = unpickedCandidates.filter((candidate) => candidate.marketValue <= latestTeam.cash);
+        const fitChecked = cashReachableCandidates.map((candidate) => {
+          const teamFit = getCandidateTeamFitFromRosterPlayers({
             team: latestTeam,
-            roster: teamRoster,
+            rosterPlayers: teamRosterPlayers,
             candidate,
-          }),
-        }));
-        const fitLegalCandidates = fitChecked.filter((entry) => entry.fit.allowed).map((entry) => entry.candidate);
-        const cashLegalCandidates = fitLegalCandidates.filter((candidate) => candidate.marketValue <= latestTeam.cash);
-        const negativeFitBlocked = fitChecked.length - fitLegalCandidates.length;
-        const cashBlocked = fitLegalCandidates.length - cashLegalCandidates.length;
+          });
+          const mercenary = hasMercenaryTrait(candidate.player);
+          return {
+            candidate,
+            fit: {
+              allowed: teamFit >= 0 || mercenary,
+              teamFit,
+              mercenary,
+            },
+          };
+        });
+        const fitByPlayerId = new Map(fitChecked.map((entry) => [entry.candidate.player.id, entry.fit] as const));
+        const positiveFitCandidates = fitChecked.filter((entry) => entry.fit.teamFit >= 0).map((entry) => entry.candidate);
+        const mercenaryFallbackCandidates = fitChecked
+          .filter((entry) => entry.fit.teamFit < 0 && entry.fit.mercenary)
+          .map((entry) => entry.candidate);
+        const cashLegalCandidates = selectFitLegalCandidates({
+          team: latestTeam,
+          positiveFitCandidates,
+          mercenaryFallbackCandidates,
+        });
+        const negativeFitBlocked = fitChecked.length - cashLegalCandidates.length;
+        const cashBlocked = unpickedCandidates.length - cashReachableCandidates.length;
         profiler.end("candidate_stage0", stage0StartedAt, {
           round: teamPicks + 1,
           teamId: team.teamId,
           rosterCount,
           candidateCount: cashLegalCandidates.length,
-          warning: `negativeFitBlocked=${negativeFitBlocked};cashBlocked=${cashBlocked}`,
+          warning: `negativeFitBlocked=${negativeFitBlocked};cashBlocked=${cashBlocked};mercenaryFallback=${mercenaryFallbackCandidates.length}`,
         });
 
         profiler.log("team_sequence_need_eval", {
@@ -3146,13 +3620,13 @@ export function runChunkedRedraftTopup(params: ChunkedRedraftTopupParams) {
           rosterCount,
           freeAgentCount: unpickedCandidates.length,
           candidateCount: cashLegalCandidates.length,
-          warning: `negativeFitBlocked=${negativeFitBlocked};cashBlocked=${cashBlocked}`,
+          warning: `negativeFitBlocked=${negativeFitBlocked};cashBlocked=${cashBlocked};mercenaryFallback=${mercenaryFallbackCandidates.length}`,
         });
 
         if (cashLegalCandidates.length === 0) {
           teamErrors += 1;
           teamWarnings.push("no_cash_legal_candidate");
-          warningRows.push({ round: teamPicks + 1, teamId: team.teamId, reason: "no_cash_legal_candidate", detail: `cash=${latestTeam.cash};fitLegal=${fitLegalCandidates.length}` });
+          warningRows.push({ round: teamPicks + 1, teamId: team.teamId, reason: "no_cash_legal_candidate", detail: `cash=${latestTeam.cash};fitLegal=${cashLegalCandidates.length}` });
           break;
         }
 
@@ -3180,9 +3654,33 @@ export function runChunkedRedraftTopup(params: ChunkedRedraftTopupParams) {
               targetPlan,
               themeTarget,
             });
-        const scoredBase = cashLegalCandidates
-          .map((candidate) =>
-            scoreCandidateForTeam({
+        const teamNeedState = buildTeamNeedState({
+          gameState: runContext.save.gameState,
+          team: latestTeam,
+          teamIdentity,
+          rosterPlayers: teamRosterPlayers,
+          targetRosterSize: desiredRosterTarget,
+          plannedPicksRemaining: Math.max(1, desiredRosterTarget - rosterCount),
+        });
+        const strategicPool = buildStrategicScoutingPool({
+          planningPool: cashLegalCandidates,
+          role: desiredDraftRole,
+          phasePlan,
+          targetPlan,
+          teamCash: latestTeam.cash,
+          rosterCount,
+          desiredRosterTarget,
+          identity: teamIdentity,
+          themeTarget,
+          needState: teamNeedState,
+        });
+        const scoredBase = strategicPool.pool
+          .map((candidate) => {
+            const classFit = getClassFitFromCounts(candidate, teamRosterClassCounts);
+            const cacheKey = `${team.teamId}:${candidate.player.id}:${phasePlan.phase}:classFit=${classFit}:needs=${teamRoster.length}`;
+            const cached = scoredCandidateCache.get(cacheKey);
+            if (cached) return cached;
+            const scored = scoreCandidateForTeam({
               candidate,
               roster: teamRoster,
               gameState: runContext.save.gameState,
@@ -3191,79 +3689,270 @@ export function runChunkedRedraftTopup(params: ChunkedRedraftTopupParams) {
               team: latestTeam,
               phase: phasePlan.phase,
               maxRecommendedSpend: phasePlan.maxRecommendedSpend,
-              draftSalt: `${save.saveId}:${params.mode}:team_sequence:${teamPicks}`,
+              draftSalt: `${save.saveId}:${params.mode}:team_sequence:${team.teamId}`,
+              teamNeedState,
+              rosterClassCounts: teamRosterClassCounts,
               counters,
-            }),
-          );
-        const roleRankedCandidates = applyDraftRoleIntent(scoredBase, desiredDraftRole);
-        const futureSortedCandidates = fitLegalCandidates
-          .filter((candidate) => candidate.marketValue <= latestTeam.cash)
+            });
+            scoredCandidateCache.set(cacheKey, scored);
+            return scored;
+          });
+        const strategicPlayerIds = new Set(scoredBase.map((candidate) => candidate.player.id));
+        const emergencyPoolLimit =
+          rosterCount < minTarget
+            ? Math.min(140, Math.max(36, Math.ceil(cashLegalCandidates.length * 0.14)))
+            : Math.min(64, Math.max(18, Math.ceil(cashLegalCandidates.length * 0.06)));
+        const emergencyFallbackBase =
+          rosterCount < desiredRosterTarget
+            ? cashLegalCandidates
+                .filter((candidate) => !strategicPlayerIds.has(candidate.player.id))
+                .sort((left, right) => {
+                  const leftPrice = Number(left["marketValue"]);
+                  const rightPrice = Number(right["marketValue"]);
+                  const leftNeed = getCandidateNeedAxisValue(left, teamNeedState);
+                  const rightNeed = getCandidateNeedAxisValue(right, teamNeedState);
+                  const leftValue = leftPrice / Math.max(1, left.salary ?? 1);
+                  const rightValue = rightPrice / Math.max(1, right.salary ?? 1);
+                  const leftScore = leftNeed * 0.65 + leftValue * 5 - leftPrice / 5.56;
+                  const rightScore = rightNeed * 0.65 + rightValue * 5 - rightPrice / 5.56;
+                  if (rightScore !== leftScore) return rightScore - leftScore;
+                  return leftPrice - rightPrice;
+                })
+                .slice(0, emergencyPoolLimit)
+                .map((candidate) => {
+                  const classFit = getClassFitFromCounts(candidate, teamRosterClassCounts);
+                  const cacheKey = `${team.teamId}:${candidate.player.id}:${phasePlan.phase}:classFit=${classFit}:needs=${teamRoster.length}:emergency`;
+                  const cached = scoredCandidateCache.get(cacheKey);
+                  if (cached) return cached;
+                  const scored = scoreCandidateForTeam({
+                    candidate,
+                    roster: teamRoster,
+                    gameState: runContext.save.gameState,
+                    teamIdentity,
+                    strategyProfile,
+                    team: latestTeam,
+                    phase: phasePlan.phase,
+                    maxRecommendedSpend: phasePlan.maxRecommendedSpend,
+                    draftSalt: `${save.saveId}:${params.mode}:team_sequence_emergency:${team.teamId}`,
+                    teamNeedState,
+                    rosterClassCounts: teamRosterClassCounts,
+                    counters,
+                  });
+                  const softened = {
+                    ...scored,
+                    selectedScore: roundValue(scored.selectedScore - (rosterCount < minTarget ? 45 : 95), 4),
+                    budgetFit: roundValue((scored.budgetFit ?? 0) - (rosterCount < minTarget ? 45 : 95), 2),
+                    teamNeed: `fallback_${scored.teamNeed}`,
+                  };
+                  scoredCandidateCache.set(cacheKey, softened);
+                  return softened;
+                })
+            : [];
+        const roleRankedCandidates = applyDraftRoleIntent([...scoredBase, ...emergencyFallbackBase], desiredDraftRole);
+        const futureSortedCandidates = [...roleRankedCandidates]
           .sort((candidateA, candidateB) => candidateA.marketValue - candidateB.marketValue);
         const remainingMinAfterPick = Math.max(0, minTarget - (rosterCount + 1));
         const remainingPlannedAfterPick = Math.max(0, desiredRosterTarget - (rosterCount + 1));
-        const scoredCandidates = roleRankedCandidates
-          .map((candidate) => {
+        const evaluatedCandidatePool = roleRankedCandidates.map((candidate) => {
             const cashAfter = latestTeam.cash - candidate.marketValue;
-            const cheapestFutureCost = estimateCheapestFutureCost({
+            const minimumFuture = estimateUsefulFutureCost({
               sortedCandidates: futureSortedCandidates,
+              fallbackSortedCandidates: futureSortedCandidates,
               excludedPlayerId: candidate.player.id,
               neededCount: remainingMinAfterPick,
+              phase: phasePlan.phase,
             });
-            const cheapestPlannedCost = estimateCheapestFutureCost({
+            const plannedFuture = estimateUsefulFutureCost({
               sortedCandidates: futureSortedCandidates,
+              fallbackSortedCandidates: futureSortedCandidates,
               excludedPlayerId: candidate.player.id,
               neededCount: remainingPlannedAfterPick,
+              phase: phasePlan.phase,
             });
+            const cheapestFutureCost = minimumFuture.cost;
+            const cheapestPlannedCost = plannedFuture.cost;
             const futureGap = remainingMinAfterPick > 0 ? cheapestFutureCost - cashAfter : 0;
-            const futurePenalty = Number.isFinite(futureGap) && futureGap > 0 ? 100_000 + futureGap * 2_000 : !Number.isFinite(cheapestFutureCost) ? 250_000 : 0;
+            const minimumFutureFeasible =
+              remainingMinAfterPick <= 0 ||
+              (Number.isFinite(cheapestFutureCost) && cheapestFutureCost <= cashAfter + 0.0001);
+            const futurePenalty =
+              Number.isFinite(futureGap) && futureGap > 0
+                ? REDRAFT_FUTURE_MIN_BASE_PENALTY + futureGap * REDRAFT_FUTURE_MIN_GAP_PENALTY
+                : !Number.isFinite(cheapestFutureCost)
+                  ? REDRAFT_FUTURE_MIN_UNKNOWN_PENALTY
+                  : 0;
             const plannedGap = remainingPlannedAfterPick > 0 ? cheapestPlannedCost - cashAfter : 0;
             const plannedDepthPenalty =
               Number.isFinite(plannedGap) && plannedGap > 0
-                ? 1_200 + plannedGap * 120
+                ? REDRAFT_PLANNED_DEPTH_BASE_PENALTY + plannedGap * REDRAFT_PLANNED_DEPTH_GAP_PENALTY
                 : !Number.isFinite(cheapestPlannedCost) && remainingPlannedAfterPick > 0
-                  ? 900
+                  ? REDRAFT_PLANNED_DEPTH_UNKNOWN_PENALTY
                   : 0;
+            const usefulFuturePenalty =
+              (remainingMinAfterPick > 0 && !minimumFuture.usefulCountEnough ? REDRAFT_USEFUL_MIN_FUTURE_PENALTY : 0) +
+              (remainingPlannedAfterPick > 0 && !plannedFuture.usefulCountEnough ? REDRAFT_USEFUL_DEPTH_FUTURE_PENALTY : 0);
             const minRosterUrgency = rosterCount < minTarget ? (minTarget - rosterCount) * 3 : 0;
             const valueSafetyBonus = rosterCount < minTarget ? candidate.valueScore * 18 - (candidate.salary ?? 0) * 0.35 : 0;
-            const teamFit = getCandidateTeamFit({
-              gameState: runContext.save.gameState,
-              team: latestTeam,
-              roster: teamRoster,
-              candidate,
+            const teamFit = fitByPlayerId.get(candidate.player.id)?.teamFit ?? 0;
+            const mercenary = fitByPlayerId.get(candidate.player.id)?.mercenary ?? hasMercenaryTrait(candidate.player);
+            const marginalNeedGain = scoreMarginalNeedGain({ needState: teamNeedState, candidate: candidate.player });
+            const inAxisHoleCompletionBonus = scoreInAxisHoleCompletion({ needState: teamNeedState, marginalGain: marginalNeedGain });
+            const offAxisDetourPenalty = scoreOffAxisDetourPenalty({ needState: teamNeedState, marginalGain: marginalNeedGain });
+            const formColorStackPenalty = scoreFormColorStackPenalty({ needState: teamNeedState, candidate: candidate.player, marginalGain: marginalNeedGain });
+            const plannedBudgetRemaining = Math.max(0, latestTeam.cash - targetPlan.reserveBudget);
+            const budgetForOverpay = Math.max(1, plannedBudgetRemaining || Math.min(latestTeam.cash, targetPlan.spendWindowFloor || latestTeam.cash));
+            const overpayPenalty = scoreOverpayPenalty({
+              candidateMarketValue: candidate.marketValue,
+              candidateSalary: candidate.salary,
+              remainingBudget: budgetForOverpay,
+              plannedPicksRemaining: Math.max(1, desiredRosterTarget - rosterCount),
+              needScoreApplied: marginalNeedGain.needScoreApplied,
+              financePressure01: targetPlan.budgetCaution01,
             });
-            const sequenceFitBonus = candidate.identityFit * 0.55 + candidate.premiumAxisFit * 0.75 + Math.max(0, teamFit) * 1.7;
+            const roleMismatchPenalty = scoreRoleMismatchPenalty({
+              plannedRole: desiredDraftRole,
+              candidateQuality: candidate.quality,
+              needScoreApplied: marginalNeedGain.needScoreApplied,
+              themeTier: candidate.themeTier,
+              classFit: candidate.classFit,
+            });
+            const fitPenalty = scoreFitPenalty({ teamFit, mercenary });
+            const sequenceFitBonus =
+              candidate.identityFit * 0.28 +
+              candidate.premiumAxisFit * 0.36 +
+              Math.max(0, teamFit) * 1.15 +
+              marginalNeedGain.needScoreApplied * 1.8;
             const candidatePrice = candidate.marketValue;
+            const plannedSlotsIncludingPick = Math.max(1, desiredRosterTarget - rosterCount);
+            const budgetPerPlannedSlot = Math.max(1, budgetForOverpay / plannedSlotsIncludingPick);
+            const excellenceScore =
+              candidate.identityFit * 0.36 +
+              candidate.premiumAxisFit * 0.36 +
+              Math.max(0, teamFit) * 0.18 +
+              Math.max(0, candidate.themeCompositionScore) * 0.1;
+            const overspendAllowance =
+              rosterCount === 0
+                ? 1.85
+                : rosterCount < Math.min(3, minTarget)
+                  ? 1.55
+                  : rosterCount < minTarget
+                    ? 1.32
+                    : 1.18;
+            const excellenceRelief = Math.max(0, excellenceScore - 72) * 0.018;
+            const pacingLimit = Math.max(1, budgetPerPlannedSlot * (overspendAllowance + excellenceRelief));
+            const pacingOverspend = Math.max(0, candidatePrice - pacingLimit);
+            const rosterPacingPenalty =
+              remainingPlannedAfterPick > 0
+                ? pacingOverspend * (rosterCount < minTarget ? 180 : 95) * (excellenceScore >= 86 ? 0.35 : excellenceScore >= 78 ? 0.62 : 1)
+                : 0;
             const infeasibleMinimumFallback =
               remainingMinAfterPick > 0 && (!Number.isFinite(cheapestFutureCost) || futureGap > 0)
                 ? -candidatePrice * 70 - (candidate.salary ?? 0) * 18 + candidate.valueScore * 30 + sequenceFitBonus
+                : 0;
+            const starBudgetShockPenalty = 0;
+            const anchorPick = rosterCount < Math.min(4, desiredRosterTarget);
+            const anchorThemePenalty =
+              anchorPick && themeTarget && (candidate.themeTier === "avoid" || candidate.themeTier === "outsider")
+                ? candidate.themeTier === "avoid"
+                  ? 18_000
+                  : 6_500
                 : 0;
             return {
               ...candidate,
               selectedScore: roundValue(
                 candidate.selectedScore +
                   sequenceFitBonus +
+                  inAxisHoleCompletionBonus +
                   valueSafetyBonus +
                   minRosterUrgency +
                   infeasibleMinimumFallback -
                   futurePenalty -
-                  plannedDepthPenalty,
+                  plannedDepthPenalty -
+                  usefulFuturePenalty -
+                  rosterPacingPenalty -
+                  starBudgetShockPenalty -
+                  offAxisDetourPenalty -
+                  formColorStackPenalty -
+                  overpayPenalty -
+                  roleMismatchPenalty -
+                  fitPenalty -
+                  anchorThemePenalty,
                 4,
               ),
-              budgetFit: roundValue(-(futurePenalty + plannedDepthPenalty), 2),
+              needImpactScore: marginalNeedGain.needScoreApplied,
+              teamNeed: marginalNeedGain.formColorNeedScore >= 3 && marginalNeedGain.formColor
+                ? `FORM_${marginalNeedGain.formColor.toUpperCase()}`
+                : marginalNeedGain.bestDisciplineName
+                ? `${marginalNeedGain.bestAxis.toUpperCase()}_${marginalNeedGain.bestDisciplineName}`
+                : candidate.teamNeed,
+              budgetFit: roundValue(
+                -(
+                  futurePenalty +
+                  plannedDepthPenalty +
+                  usefulFuturePenalty +
+                  rosterPacingPenalty +
+                  starBudgetShockPenalty +
+                  offAxisDetourPenalty +
+                  formColorStackPenalty +
+                  overpayPenalty +
+                  roleMismatchPenalty +
+                  fitPenalty +
+                  anchorThemePenalty
+                ),
+                2,
+              ),
+              minimumFutureFeasible,
+              minimumFutureCost: Number.isFinite(cheapestFutureCost) ? roundValue(cheapestFutureCost, 2) : null,
+              minimumFutureCashAfter: roundValue(cashAfter, 2),
             };
-          })
+          });
+        let evaluatedCandidates =
+          remainingMinAfterPick <= 0
+            ? evaluatedCandidatePool
+            : evaluatedCandidatePool.filter((candidate) => Boolean(candidate.minimumFutureFeasible));
+        if (remainingMinAfterPick > 0 && evaluatedCandidates.length === 0 && evaluatedCandidatePool.length > 0) {
+          const fallbackLimit = Math.min(80, Math.max(16, Math.ceil(evaluatedCandidatePool.length * 0.18)));
+          evaluatedCandidates = [...evaluatedCandidatePool]
+            .sort((left, right) => {
+              if (right.selectedScore !== left.selectedScore) return right.selectedScore - left.selectedScore;
+              return compareScoredCandidateTie(left, right, `minimum_guard_fallback:${team.teamId}:${teamPicks}`);
+            })
+            .slice(0, fallbackLimit)
+            .map((candidate) => ({
+              ...candidate,
+              selectedScore: roundValue(candidate.selectedScore - REDRAFT_MINIMUM_FALLBACK_PENALTY, 4),
+              budgetFit: roundValue((candidate.budgetFit ?? 0) - REDRAFT_MINIMUM_FALLBACK_PENALTY, 2),
+              minimumFutureFallbackUsed: true,
+            }));
+          teamWarnings.push(`minimum_feasibility_guard_fallback:${fallbackLimit}/${evaluatedCandidatePool.length}`);
+          warningRows.push({
+            round: teamPicks + 1,
+            teamId: team.teamId,
+            reason: "minimum_feasibility_guard_fallback",
+            detail: `fallback=${fallbackLimit};pool=${evaluatedCandidatePool.length};remainingMinAfterPick=${remainingMinAfterPick};cash=${roundValue(latestTeam.cash)}`,
+          });
+        }
+        if (remainingMinAfterPick > 0 && evaluatedCandidates.length < roleRankedCandidates.length) {
+          const blockedCount = roleRankedCandidates.length - evaluatedCandidates.length;
+          teamWarnings.push(`minimum_feasibility_guard_blocked:${blockedCount}`);
+          warningRows.push({
+            round: teamPicks + 1,
+            teamId: team.teamId,
+            reason: "minimum_feasibility_guard_blocked",
+            detail: `blocked=${blockedCount};remainingMinAfterPick=${remainingMinAfterPick};cash=${roundValue(latestTeam.cash)}`,
+          });
+        }
+        const scoredCandidates = evaluatedCandidates
           .sort((left, right) => {
             if (right.selectedScore !== left.selectedScore) return right.selectedScore - left.selectedScore;
-            if (right.premiumAxisFit !== left.premiumAxisFit) return right.premiumAxisFit - left.premiumAxisFit;
-            if (right.identityFit !== left.identityFit) return right.identityFit - left.identityFit;
-            return left.player.name.localeCompare(right.player.name, "de");
+            return compareScoredCandidateTie(left, right, `team_sequence:${team.teamId}:${teamPicks}`);
           });
         profiler.end("candidate_stage1", stage1StartedAt, {
           round: teamPicks + 1,
           teamId: team.teamId,
           rosterCount,
           candidateCount: scoredCandidates.length,
-          warning: `role=${desiredDraftRole};allPlayersScored=${scoredCandidates.length}`,
+          warning: `role=${desiredDraftRole};lane=${strategicPool.lane};scanned=${strategicPool.scanned};matched=${strategicPool.matched};deep=${strategicPool.pool.length}`,
         });
 
         draftRoleBoardRows.push(
@@ -3298,7 +3987,7 @@ export function runChunkedRedraftTopup(params: ChunkedRedraftTopupParams) {
           cheapFilterCount: cashLegalCandidates.length,
           shortlistCount: scoredCandidates.length,
           hardBlockersCount: negativeFitBlocked + cashBlocked,
-          note: `teamSequence=true;allPlayersScored=${cashLegalCandidates.length};onlyHardFilters=negative_fit_except_mercenary,cash_non_negative;role=${desiredDraftRole};phaseLabel=${phasePlan.phase};minTarget=${minTarget};desiredTarget=${desiredRosterTarget};cash=${roundValue(latestTeam.cash)}`,
+          note: `teamSequence=true;scoutingLane=${strategicPool.lane};scanned=${strategicPool.scanned};matched=${strategicPool.matched};deepScored=${strategicPool.pool.length};hardFilters=positive_fit_first,mercenary_fallback_for_wl,cash_non_negative;role=${desiredDraftRole};phaseLabel=${phasePlan.phase};minTarget=${minTarget};desiredTarget=${desiredRosterTarget};cash=${roundValue(latestTeam.cash)}`,
         });
 
         let picked = false;
@@ -3307,8 +3996,15 @@ export function runChunkedRedraftTopup(params: ChunkedRedraftTopupParams) {
           const contractOffer = recommendContractOfferForPlayer({
             player: candidate.player,
             teamStrategyProfile: strategyProfiles[team.teamId] ?? null,
+            teamIdentity,
             teamCash: latestTeam.cash,
             marketValue: candidate.marketValue,
+            currentTeamSalary: teamRosterPlayers.reduce((sum, player) => sum + (getCalculatedPlayerSalary(player) ?? 0), 0),
+            dealRole: desiredDraftRole,
+            rosterCountBefore: rosterCount,
+            teamRosterMin: minTarget,
+            teamRosterOpt: desiredRosterTarget,
+            isFirstSeason: runContext.save.gameState.season.id === "season-1",
           });
           previewCalls += 1;
           counters.buyPreviewCalls += 1;
@@ -3320,7 +4016,8 @@ export function runChunkedRedraftTopup(params: ChunkedRedraftTopupParams) {
             playerId: candidate.player.id,
             contractLength: contractOffer.contractLength,
             contractShape: contractOffer.contractShape,
-            transferSource: "season1_autoprep_topup",
+            transferSource,
+            fastLocalBatch: true,
             localRunContext: runContext,
             deferPersist: true,
           });
@@ -3355,12 +4052,11 @@ export function runChunkedRedraftTopup(params: ChunkedRedraftTopupParams) {
           const targetProgress = rosterBlueprint
             ? `${result.rosterAfter ?? rosterCount + 1}/${rosterBlueprint.desiredRosterTarget}`
             : `${result.rosterAfter ?? rosterCount + 1}/${desiredRosterTarget}`;
-          const fitInfo = isAllowedByStandardFit({
-            gameState: runContext.save.gameState,
-            team: latestTeam,
-            roster: teamRoster,
-            candidate,
-          });
+          const fitInfo = fitByPlayerId.get(candidate.player.id) ?? {
+            allowed: true,
+            teamFit: 0,
+            mercenary: hasMercenaryTrait(candidate.player),
+          };
           picks.push({
             round: teamPicks,
             teamId: team.teamId,
@@ -3403,13 +4099,14 @@ export function runChunkedRedraftTopup(params: ChunkedRedraftTopupParams) {
             themeTier: candidate.themeTier,
             themeTags: candidate.themeTags.join("|"),
             themeReason: candidate.themeReason,
+            needImpactScore: candidate.needImpactScore,
             salaryImpact: candidate.salaryImpact,
             budgetFit: candidate.budgetFit,
             topRejectedCandidates: getTopRejectedCandidates(scoredCandidates, candidate.player.id),
             ...rejectedFields,
             previewCalls,
             candidateCount: scoredCandidates.length,
-            reasons: `team_sequence;pick=${teamPicks};globalPick=${globalPickIndex};role=${desiredDraftRole};teamNeed=${candidate.teamNeed};quality=${roundValue(candidate.quality, 2)};identityFit=${candidate.identityFit};premiumAxisFit=${candidate.premiumAxisFit};axisFocus=${candidate.axisFocusStrength};theme=${candidate.themeTier}:${candidate.themeCompositionScore};valueScore=${candidate.valueScore};potential=${candidate.potentialScore};marketValue=${candidate.marketValue};fit=${fitInfo.teamFit};mercenary=${fitInfo.mercenary}`,
+            reasons: `team_sequence;pick=${teamPicks};globalPick=${globalPickIndex};role=${desiredDraftRole};teamNeed=${candidate.teamNeed};needImpact=${candidate.needImpactScore};quality=${roundValue(candidate.quality, 2)};identityFit=${candidate.identityFit};premiumAxisFit=${candidate.premiumAxisFit};axisFocus=${candidate.axisFocusStrength};theme=${candidate.themeTier}:${candidate.themeCompositionScore};valueScore=${candidate.valueScore};potential=${candidate.potentialScore};marketValue=${candidate.marketValue};fit=${fitInfo.teamFit};mercenary=${fitInfo.mercenary}`,
             durationMs: Date.now() - pickStartedAt,
           });
           sequentialPickRows.push({
@@ -3452,6 +4149,9 @@ export function runChunkedRedraftTopup(params: ChunkedRedraftTopupParams) {
             candidateCount: scoredCandidates.length,
             previewCount: previewCalls,
           });
+          console.error(
+            `[redraft] pick ${team.teamId} #${teamPicks}/${desiredRosterTarget} ${candidate.player.name} score=${candidate.selectedScore} candidates=${scoredCandidates.length}`,
+          );
           break;
         }
 
@@ -3498,7 +4198,7 @@ export function runChunkedRedraftTopup(params: ChunkedRedraftTopupParams) {
         finalRoster.length < minTarget
           ? "red_under_min"
           : anchorIdentityFit < 48 || anchorPremiumAxisFit < 48
-            ? "red_identity_fit"
+            ? "yellow_identity_watch"
             : coreIdentityFit < 55 || corePremiumAxisFit < 55 || avgIdentityFit < 35 || avgPremiumAxisFit < 35
               ? "yellow_fit_watch"
               : "green_plausible";
@@ -3557,6 +4257,9 @@ export function runChunkedRedraftTopup(params: ChunkedRedraftTopupParams) {
         candidateCount: teamPicks,
         warning: teamWarnings.join("|") || null,
       });
+      console.error(
+        `[redraft] team_sequence_done ${team.teamId} picks=${teamPicks} roster=${finalRoster.length} status=${status} durationMs=${Date.now() - teamStartedAt}`,
+      );
     }
 
     const finalSave = dryRun ? initialSave : persistence.getSaveById(save.saveId) ?? runContext.save;
@@ -3642,7 +4345,9 @@ export function runChunkedRedraftTopup(params: ChunkedRedraftTopupParams) {
     profiler.log("round_start", { round, rosterCount: runContext.save.gameState.rosters.length });
     const setupStartedAt = Date.now();
     const memoryAtRoundStart = memorySnapshot();
-    const candidatePool = buildCandidatePool(runContext.save.gameState, pickedPlayerIds, counters);
+    counters.candidateScans += 1;
+    const candidatePool = initialCandidatePool.filter((candidate) => !pickedPlayerIds.has(candidate.player.id));
+    counters.rejectedByAlreadyPicked += Math.max(0, initialCandidatePool.length - candidatePool.length);
     phaseRows.push({
       round,
       teamId: "ALL",
@@ -3660,7 +4365,12 @@ export function runChunkedRedraftTopup(params: ChunkedRedraftTopupParams) {
       break;
     }
 
-    const teamsForRound = maxTeams ? runContext.save.gameState.teams.slice(0, maxTeams) : runContext.save.gameState.teams;
+    const targetTeamIdSet = new Set((params.targetTeamIds ?? []).filter(Boolean));
+    const roundTeams =
+      targetTeamIdSet.size > 0
+        ? runContext.save.gameState.teams.filter((team) => targetTeamIdSet.has(team.teamId))
+        : runContext.save.gameState.teams;
+    const teamsForRound = maxTeams ? roundTeams.slice(0, maxTeams) : roundTeams;
     for (const team of teamsForRound) {
       const teamStartedAt = Date.now();
       const memoryBefore = memorySnapshot();
@@ -3676,7 +4386,17 @@ export function runChunkedRedraftTopup(params: ChunkedRedraftTopupParams) {
       const teamTarget = getTeamTarget(runContext.save.gameState, team.teamId, target);
       const teamIdentity = runContext.save.gameState.teamIdentities.find((entry) => entry.teamId === team.teamId) ?? null;
       const strategyProfile = strategyProfiles[team.teamId] ?? null;
-      const targetPlan = targetPlans.get(team.teamId) ?? null;
+      const targetPlan =
+        targetPlans.get(team.teamId) ??
+        buildRosterTargetPlan({
+          gameState: runContext.save.gameState,
+          teamId: team.teamId,
+          target,
+          strategyProfile,
+          candidatePool,
+          requirePlayerOptTarget,
+          minimumRosterTargetOverride: params.minimumRosterTargetOverride,
+        });
       const managerProfile = managerProfiles.get(team.teamId) ?? null;
       const seasonStrategy = seasonStrategies.get(team.teamId) ?? null;
       const rosterBlueprint = rosterBlueprints.get(team.teamId) ?? null;
@@ -3726,63 +4446,65 @@ export function runChunkedRedraftTopup(params: ChunkedRedraftTopupParams) {
         rosterCount,
         freeAgentCount: candidatePool.length,
       });
+      const minimumRosterGap = Math.max(0, (targetPlan?.minTarget ?? teamTarget.playerMin) - rosterCount);
+      const phaseAMinimumGuard = phasePlan.phase === "phase_a_minimum" && minimumRosterGap > 0;
+      const getCandidateCashCost = (candidate: Candidate) =>
+        getEmergencyMinimumSigningFee({
+          teamCash: latestTeam.cash,
+          marketValue: candidate.marketValue,
+          enabled: params.mode === "preseason_roster_repair" && phaseAMinimumGuard,
+        });
       const cashAffordableCandidates = candidatePool
         .filter((candidate) => !pickedPlayerIds.has(candidate.player.id))
-        .filter((candidate) => latestTeam.cash * (1 - phasePlan.cashReservePct) >= candidate.marketValue);
+        .filter((candidate) => latestTeam.cash * (1 - phasePlan.cashReservePct) >= getCandidateCashCost(candidate));
       counters.rejectedByCash += Math.max(0, candidatePool.length - cashAffordableCandidates.length);
+      const teamRosterPlayers = getRosterPlayers(runContext.save.gameState, teamRoster);
+      const fitChecked = cashAffordableCandidates.map((candidate) => {
+        const teamFit = getCandidateTeamFitFromRosterPlayers({
+          team: latestTeam,
+          rosterPlayers: teamRosterPlayers,
+          candidate,
+        });
+        const mercenary = hasMercenaryTrait(candidate.player);
+        return {
+          candidate,
+          fit: {
+            allowed: teamFit >= 0 || mercenary,
+            teamFit,
+            mercenary,
+          },
+        };
+      });
+      const positiveFitCandidates = fitChecked.filter((entry) => entry.fit.teamFit >= 0).map((entry) => entry.candidate);
+      const mercenaryFallbackCandidates = fitChecked
+        .filter((entry) => entry.fit.teamFit < 0 && entry.fit.mercenary)
+        .map((entry) => entry.candidate);
+      const fitLegalCandidates = selectFitLegalCandidates({
+        team: latestTeam,
+        positiveFitCandidates,
+        mercenaryFallbackCandidates,
+      });
+      const fitByPlayerId = new Map(fitChecked.map((entry) => [entry.candidate.player.id, entry.fit] as const));
       profiler.end("candidate_stage0", stage0StartedAt, {
         round,
         teamId: team.teamId,
         rosterCount,
         freeAgentCount: candidatePool.length,
-        candidateCount: cashAffordableCandidates.length,
+        candidateCount: fitLegalCandidates.length,
+        warning: `cashAffordable=${cashAffordableCandidates.length};positiveFit=${positiveFitCandidates.length};mercenaryFallback=${mercenaryFallbackCandidates.length}`,
       });
       const stage1StartedAt = profiler.start("candidate_stage1", {
         round,
         teamId: team.teamId,
         rosterCount,
-        candidateCount: cashAffordableCandidates.length,
+        candidateCount: fitLegalCandidates.length,
       });
-      const affordableCandidates = cashAffordableCandidates;
+      const affordableCandidates = fitLegalCandidates;
       const qualitySafeCandidates = affordableCandidates;
-      const budgetSafeCandidates = affordableCandidates.filter((candidate) => candidate.marketValue <= phasePlan.maxRecommendedSpend);
-      const minimumRosterGap = Math.max(0, (targetPlan?.minTarget ?? teamTarget.playerMin) - rosterCount);
-      const phaseAMinimumGuard = phasePlan.phase === "phase_a_minimum" && minimumRosterGap > 0;
+      const budgetSafeCandidates = affordableCandidates.filter((candidate) => getCandidateCashCost(candidate) <= phasePlan.maxRecommendedSpend);
       const usingPhaseAMinimumFallback = phaseAMinimumGuard && budgetSafeCandidates.length > 0;
       const planningPool = usingPhaseAMinimumFallback ? budgetSafeCandidates : affordableCandidates;
       const themeTarget = getTeamThemeCompositionTarget(latestTeam);
-      const scoringPoolCap =
-        phasePlan.phase === "phase_a_minimum"
-          ? Math.max(320, phasePlan.shortlistCap * 3)
-          : Math.max(420, phasePlan.shortlistCap * 4);
-      const scoringPool = selectScoringPool({
-        planningPool,
-        cap: scoringPoolCap,
-        themeTarget,
-        phase: phasePlan.phase,
-        identity: teamIdentity,
-      });
-      const baseScoredCandidates = scoringPool
-        .map((candidate) =>
-          scoreCandidateForTeam({
-            candidate,
-            roster: teamRoster,
-            gameState: runContext.save.gameState,
-            teamIdentity,
-            strategyProfile,
-            team: latestTeam,
-            phase: phasePlan.phase,
-            maxRecommendedSpend: phasePlan.maxRecommendedSpend,
-            draftSalt: `${save.saveId}:${params.mode}`,
-            counters,
-          }),
-        )
-        .sort((left, right) => {
-          if (right.selectedScore !== left.selectedScore) return right.selectedScore - left.selectedScore;
-          if (right.premiumAxisFit !== left.premiumAxisFit) return right.premiumAxisFit - left.premiumAxisFit;
-          if (right.identityFit !== left.identityFit) return right.identityFit - left.identityFit;
-          return left.player.name.localeCompare(right.player.name, "de");
-        });
       const protectThemeMinimum = needsThemePickToProtectMinimum({
         gameState: runContext.save.gameState,
         roster: teamRoster,
@@ -3803,6 +4525,46 @@ export function runChunkedRedraftTopup(params: ChunkedRedraftTopupParams) {
             targetPlan,
             themeTarget,
           });
+      const teamNeedState = buildTeamNeedState({
+        gameState: runContext.save.gameState,
+        team: latestTeam,
+        teamIdentity,
+        rosterPlayers: teamRosterPlayers,
+        targetRosterSize: phasePlan.targetRoster,
+        plannedPicksRemaining: Math.max(1, phasePlan.targetRoster - rosterCount),
+      });
+      const strategicPool = buildStrategicScoutingPool({
+        planningPool,
+        role: desiredDraftRole,
+        phasePlan,
+        targetPlan,
+        teamCash: latestTeam.cash,
+        rosterCount,
+        desiredRosterTarget: phasePlan.targetRoster,
+        identity: teamIdentity,
+        themeTarget,
+        needState: teamNeedState,
+      });
+      const baseScoredCandidates = strategicPool.pool
+        .map((candidate) =>
+          scoreCandidateForTeam({
+            candidate,
+            roster: teamRoster,
+            gameState: runContext.save.gameState,
+            teamIdentity,
+            strategyProfile,
+            team: latestTeam,
+            phase: phasePlan.phase,
+            maxRecommendedSpend: phasePlan.maxRecommendedSpend,
+            draftSalt: `${save.saveId}:${params.mode}`,
+            teamNeedState,
+            counters,
+          }),
+        )
+        .sort((left, right) => {
+          if (right.selectedScore !== left.selectedScore) return right.selectedScore - left.selectedScore;
+          return compareScoredCandidateTie(left, right, `round:${round}:${team.teamId}`);
+        });
       const roleRankedCandidates = applyDraftRoleIntent(baseScoredCandidates, desiredDraftRole);
       const premiumRoleGate = applyPremiumDraftRoleGate(roleRankedCandidates, desiredDraftRole);
       const scoredCandidates = premiumRoleGate.candidates;
@@ -3820,9 +4582,7 @@ export function runChunkedRedraftTopup(params: ChunkedRedraftTopupParams) {
         teamId: team.teamId,
         rosterCount,
         candidateCount: scoredCandidates.length,
-        warning: planningPool.length > scoringPool.length
-          ? `fit_prefilter:${scoringPool.length}/${planningPool.length};role=${desiredDraftRole};fallback=${usingPhaseAMinimumFallback};premiumGateBlocked=${premiumRoleGate.blockedCount};premiumGateFallback=${premiumRoleGate.usedFallback};no_ovr_mvs_market_value_attractiveness`
-          : `role=${desiredDraftRole};fallback=${usingPhaseAMinimumFallback};premiumGateBlocked=${premiumRoleGate.blockedCount};premiumGateFallback=${premiumRoleGate.usedFallback}`,
+        warning: `role=${desiredDraftRole};lane=${strategicPool.lane};scanned=${strategicPool.scanned};matched=${strategicPool.matched};deep=${strategicPool.pool.length};fallback=${usingPhaseAMinimumFallback};premiumGateBlocked=${premiumRoleGate.blockedCount};premiumGateFallback=${premiumRoleGate.usedFallback}`,
       });
       const shortlistStartedAt = profiler.start("candidate_shortlist", {
         round,
@@ -3860,7 +4620,7 @@ export function runChunkedRedraftTopup(params: ChunkedRedraftTopupParams) {
         shortlistCount: shortlist.length,
         hardBlockersCount: candidatePool.length - cashAffordableCandidates.length,
         freeAgentsRemaining: candidatePool.length,
-        note: `phase=${phasePlan.phase};${phasePlan.description};cashAffordable=${cashAffordableCandidates.length};qualitySafe=not_used_for_pick;budgetSafe=${budgetSafeCandidates.length};phaseAMinimumGuard=${phaseAMinimumGuard};scoringPool=${scoringPool.length}/${planningPool.length};premiumGateBlocked=${premiumRoleGate.blockedCount};premiumGateFallback=${premiumRoleGate.usedFallback};allLegalCandidatesConsidered=true;fitPrefilter=no_ovr_mvs_market_value_attractiveness;maxRecommendedSpend=${roundValue(phasePlan.maxRecommendedSpend)};cashReservePct=${phasePlan.cashReservePct};qualityFloor=not_used_for_pick`,
+        note: `phase=${phasePlan.phase};${phasePlan.description};cashAffordable=${cashAffordableCandidates.length};positiveFit=${positiveFitCandidates.length};mercenaryFallback=${mercenaryFallbackCandidates.length};qualitySafe=not_used_for_pick;budgetSafe=${budgetSafeCandidates.length};phaseAMinimumGuard=${phaseAMinimumGuard};scoutingLane=${strategicPool.lane};scanned=${strategicPool.scanned};matched=${strategicPool.matched};deepScored=${strategicPool.pool.length};role=${desiredDraftRole};premiumGateBlocked=${premiumRoleGate.blockedCount};premiumGateFallback=${premiumRoleGate.usedFallback};maxRecommendedSpend=${roundValue(phasePlan.maxRecommendedSpend)};cashReservePct=${phasePlan.cashReservePct};reservePolicy=${targetPlan.reservePolicy};allowedBudget=${targetPlan.spendableBudget};reserveBudget=${targetPlan.reserveBudget};budgetCaution=${targetPlan.budgetCaution01};softSlotBudget=${targetPlan.softSlotBudget};qualityFloor=not_used_for_pick`,
       });
 
       if (shortlist.length === 0) {
@@ -3906,9 +4666,24 @@ export function runChunkedRedraftTopup(params: ChunkedRedraftTopupParams) {
         const contractOffer = recommendContractOfferForPlayer({
           player: candidate.player,
           teamStrategyProfile: strategyProfiles[team.teamId] ?? null,
+          teamIdentity,
           teamCash: latestTeam.cash,
           marketValue: candidate.marketValue,
+          currentTeamSalary: teamRosterPlayers.reduce((sum, player) => sum + (getCalculatedPlayerSalary(player) ?? 0), 0),
+          dealRole: desiredDraftRole,
+          rosterCountBefore: rosterCount,
+          teamRosterMin: teamTarget.playerMin,
+          teamRosterOpt: targetPlan.desiredRosterTarget,
+          isFirstSeason: runContext.save.gameState.season.id === "season-1",
         });
+        const emergencySigningFee =
+          params.mode === "preseason_roster_repair" && phaseAMinimumGuard
+            ? getEmergencyMinimumSigningFee({
+                teamCash: latestTeam.cash,
+                marketValue: candidate.marketValue,
+                enabled: true,
+              })
+            : null;
         const result = executeLocalTransfermarktBuy({
           saveId: runContext.save.saveId,
           seasonId: runContext.save.gameState.season.id,
@@ -3916,7 +4691,10 @@ export function runChunkedRedraftTopup(params: ChunkedRedraftTopupParams) {
           playerId: candidate.player.id,
           contractLength: contractOffer.contractLength,
           contractShape: contractOffer.contractShape,
-          transferSource: "season1_autoprep_topup",
+          transferSource,
+          purchasePriceOverride: emergencySigningFee ?? undefined,
+          purchasePriceOverrideReason: emergencySigningFee != null ? "preseason_minimum_roster_repair_signing_fee" : undefined,
+          fastLocalBatch: true,
           localRunContext: runContext,
           deferPersist: true,
         });
@@ -4124,50 +4902,61 @@ export function runChunkedRedraftTopup(params: ChunkedRedraftTopupParams) {
       roundDurations,
       resumeTested,
     });
-    const reportStartedAt = Date.now();
-    const reportPhaseStartedAt = profiler.start("report_export", {
-      round,
-      teamId: "ALL",
-      rosterCount: runContext.save.gameState.rosters.length,
-      freeAgentCount: candidatePool.length,
-      candidateCount: picks.length,
-    });
-    writeReports({
-      outputDir,
-      summary,
-      state,
-      initialSave,
-      finalSave: runContext.save,
-      picks,
-      rejectedRows,
-      targetPlans,
-      managerProfiles,
-      seasonStrategies,
-      rosterBlueprints,
-      marketBoardRows,
-      draftRoleBoardRows,
-      candidatePool,
-      memoryRows,
-      warningRows,
-      phaseRows,
-      progressRows: profiler.rows,
-      counters,
-      reportMode,
-    });
-    profiler.end("report_export", reportPhaseStartedAt, {
-      round,
-      teamId: "ALL",
-      rosterCount: runContext.save.gameState.rosters.length,
-      freeAgentCount: candidatePool.length,
-      candidateCount: picks.length,
-    });
-    phaseRows.push({
-      round,
-      teamId: "ALL",
-      phase: "report_export",
-      durationMs: Date.now() - reportStartedAt,
-      itemCount: picks.length,
-    });
+    const shouldWriteRoundReport = reportMode === "full";
+    if (shouldWriteRoundReport) {
+      const reportStartedAt = Date.now();
+      const reportPhaseStartedAt = profiler.start("report_export", {
+        round,
+        teamId: "ALL",
+        rosterCount: runContext.save.gameState.rosters.length,
+        freeAgentCount: candidatePool.length,
+        candidateCount: picks.length,
+      });
+      writeReports({
+        outputDir,
+        summary,
+        state,
+        initialSave,
+        finalSave: runContext.save,
+        picks,
+        rejectedRows,
+        targetPlans,
+        managerProfiles,
+        seasonStrategies,
+        rosterBlueprints,
+        marketBoardRows,
+        draftRoleBoardRows,
+        candidatePool,
+        memoryRows,
+        warningRows,
+        phaseRows,
+        progressRows: profiler.rows,
+        counters,
+        reportMode,
+      });
+      profiler.end("report_export", reportPhaseStartedAt, {
+        round,
+        teamId: "ALL",
+        rosterCount: runContext.save.gameState.rosters.length,
+        freeAgentCount: candidatePool.length,
+        candidateCount: picks.length,
+      });
+      phaseRows.push({
+        round,
+        teamId: "ALL",
+        phase: "report_export",
+        durationMs: Date.now() - reportStartedAt,
+        itemCount: picks.length,
+      });
+    } else {
+      phaseRows.push({
+        round,
+        teamId: "ALL",
+        phase: "round_report_skipped_light_mode",
+        durationMs: 0,
+        itemCount: picks.length,
+      });
+    }
 
     const rostersByTeamAfterRound = groupRostersByTeam(runContext.save.gameState.rosters);
     if (

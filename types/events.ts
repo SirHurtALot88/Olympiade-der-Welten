@@ -70,6 +70,28 @@ export type AdvanceRoomFlowRequest = {
   seatToken: string;
 };
 
+export type StartRoomArenaRequest = {
+  roomCode: string;
+  seatToken: string;
+  seasonId?: string | null;
+  matchdayId?: string | null;
+  disciplineSide?: "d1" | "d2" | "overall" | null;
+  maxSlotRevealIndex?: number | null;
+};
+
+export type SetRoomArenaReadyRequest = {
+  roomCode: string;
+  seatToken: string;
+  ready: boolean;
+};
+
+export type AdvanceRoomArenaStepRequest = {
+  roomCode: string;
+  seatToken: string;
+  maxSlotRevealIndex?: number | null;
+  force?: boolean | null;
+};
+
 export type RoomErrorPayload = {
   roomCode?: string;
   message: string;
@@ -115,6 +137,9 @@ export type ClientToServerEvents = {
   startRoom: (payload: StartRoomRequest) => void;
   runRoomAiAutoStep: (payload: RunRoomAiAutoStepRequest) => void;
   advanceRoomFlow: (payload: AdvanceRoomFlowRequest) => void;
+  startRoomArena: (payload: StartRoomArenaRequest) => void;
+  setRoomArenaReady: (payload: SetRoomArenaReadyRequest) => void;
+  advanceRoomArenaStep: (payload: AdvanceRoomArenaStepRequest) => void;
   authorizeRoomWrite: (payload: AuthorizeRoomWriteRequest, callback: (response: AuthorizeRoomWriteResponse) => void) => void;
   moveToken: (payload: MoveTokenRequest) => void;
   endTurn: (payload: EndTurnRequest) => void;

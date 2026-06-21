@@ -167,12 +167,22 @@ async function main() {
             lineupsReady: dryRun.summary.lineupsReady,
             warningTeams: dryRun.summary.warningTeams,
             plannedWrites: dryRun.summary.plannedWrites,
+            steps: dryRun.steps.map((step) => ({
+              key: step.key,
+              status: step.status,
+              metrics: step.metrics,
+            })),
           },
           execute: {
             status: execute.status,
             aiLineupTeamsSaved: execute.appliedAudits.aiLineupTeamsSaved,
             resultApply: execute.appliedAudits.resultApply,
             standingsApply: execute.appliedAudits.standingsApply,
+            steps: execute.steps.map((step) => ({
+              key: step.key,
+              status: step.status,
+              metrics: step.metrics,
+            })),
           },
           nextMatchday: {
             currentMatchday: afterSave.gameState.season.currentMatchday,

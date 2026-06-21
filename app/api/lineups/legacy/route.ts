@@ -1,3 +1,5 @@
+export const dynamic = "force-dynamic";
+
 import { NextResponse } from "next/server";
 
 import {
@@ -5,8 +7,10 @@ import {
   saveLocalLegacyLineupDraft,
 } from "@/lib/lineups/legacy-lineup-local-service";
 import type { LineupDraftModifiers } from "@/lib/data/olyDataTypes";
+import { evaluateGamePhaseAction } from "@/lib/foundation/game-phase-action-policy";
 import { LegacyLineupService } from "@/lib/lineups/legacy-lineup-service";
 import type { LegacyLineupEntryInput, LegacyLineupKeyParams } from "@/lib/lineups/legacy-lineup-types";
+import { createPersistenceService } from "@/lib/persistence/persistence-service";
 import { notifyRoomGameplayWrite } from "@/lib/room/room-gameplay-write-notifier";
 import { authorizeServerRoomWrite } from "@/lib/room/server-authoritative-write-guard";
 
@@ -36,6 +40,7 @@ function parseRoomWriteContext(request: Request) {
     seatToken: searchParams.get("seatToken"),
     userId: searchParams.get("userId"),
     activeManagerTeamId: searchParams.get("activeManagerTeamId"),
+    activeOwnerId: searchParams.get("activeOwnerId"),
     controlMode: searchParams.get("controlMode") as "human" | "ai" | "passive" | "manual" | null,
   };
 }
@@ -68,6 +73,22 @@ export async function PUT(request: Request) {
   }
 
   if (parseSource(request) !== "prisma") {
+    const save = createPersistenceService().getSaveById(params.saveId);
+    if (!save) {
+      return NextResponse.json({ error: "save_not_found", warnings: [], blockingReasons: ["save_not_found"] }, { status: 404 });
+    }
+    const phaseGate = evaluateGamePhaseAction(save.gameState, "set_lineup");
+    if (!phaseGate.allowed) {
+      return NextResponse.json(
+        {
+          error: phaseGate.reason,
+          warnings: phaseGate.warnings,
+          blockingReasons: phaseGate.reason ? [phaseGate.reason] : [],
+        },
+        { status: 409 },
+      );
+    }
+
     const writeAuth = authorizeServerRoomWrite({
       ...parseRoomWriteContext(request),
       saveId: params.saveId,
@@ -95,14 +116,14 @@ export async function PUT(request: Request) {
       teamId: params.teamId,
       action: "lineup_save",
       eventType: "lineup_updated",
-      affectedViews: ["home", "lineup", "matchday"],
+      affectedViews: ["home", "lineup", "matchday", "arena"],
       dryRun: false,
       success: true,
     });
 
     return NextResponse.json({
       draft: result.draft,
-      warnings: [...writeAuth.warnings, ...result.warnings],
+      warnings: [...phaseGate.warnings, ...writeAuth.warnings, ...result.warnings],
       source: "sqlite",
       readOnly: false,
     });

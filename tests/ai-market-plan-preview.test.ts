@@ -711,4 +711,254 @@ describe("ai market plan preview service", () => {
     expect(result.teams[0].planSteps.filter((step) => step.stepType === "sell")).toHaveLength(2);
     expect(result.teams[0].planSteps.some((step) => step.reason.includes("realisierbarer Gewinn"))).toBe(true);
   });
+
+  it("sells enough safe players to clear negative team cash without dropping below the player minimum", async () => {
+    buildAiTransfermarktPreview.mockResolvedValue({
+      readOnly: true,
+      source: "sqlite",
+      scope: { saveId: "save-local", seasonId: "season-2", teamId: null, teamScope: "ai" },
+      totalTeams: 1,
+      aiTeams: 1,
+      skippedManual: 0,
+      skippedPassive: 0,
+      skippedDisabled: 0,
+      readyTeams: 1,
+      warningTeams: 0,
+      blockedTeams: 0,
+      teams: [
+        {
+          teamId: "D-E",
+          teamCode: "D-E",
+          teamName: "Debt Engines",
+          controlMode: "ai",
+          aiTransferPreviewEnabled: true,
+          status: "ready",
+          cash: -30,
+          salary: 44,
+          salaryTotal: 44,
+          rosterSize: 8,
+          rosterCount: 8,
+          targetRosterMin: 3,
+          targetRosterOpt: 6,
+          marketValueTotal: 160,
+          needSummary: "Cash negativ.",
+          budgetStatus: "critical",
+          rosterStatus: "over_opt",
+          topTargets: [],
+          recommendedBuys: [],
+          skippedTargets: [],
+          warnings: [],
+          explanation: "Cash recovery before any buy.",
+        },
+      ],
+    });
+
+    const makeSell = (index: number, value: number) => ({
+      activePlayerId: `ap-debt-${index}`,
+      playerId: `p-debt-${index}`,
+      playerName: `Debt Relief ${index}`,
+      className: "Runner",
+      race: "Human",
+      raceName: "Human",
+      ovr: 52,
+      mvs: 8,
+      salary: 3,
+      marketValue: value,
+      expectedSellValue: value,
+      contractLength: 1,
+      rosterAfter: 8 - index,
+      salaryAfter: 44 - index * 3,
+      cashAfter: -30 + value,
+      sportValueSummary: "Cash relief",
+      performanceSummary: "Cash relief",
+      strategyFitSummary: "Cash relief.",
+      reasonToSell: ["negatives Teamcash zum Seasonstart"],
+      reasonToKeep: [],
+      reasonsToSell: ["negatives Teamcash zum Seasonstart"],
+      reasonsToKeep: [],
+      warnings: [],
+      sellPriority: 40 + index,
+      sellPriorityScore: 40 + index,
+    });
+
+    buildAiTransfermarktSellPreview.mockResolvedValue({
+      readOnly: true,
+      source: "sqlite",
+      scope: { saveId: "save-local", seasonId: "season-2", teamId: null, teamScope: "ai" },
+      totalTeams: 1,
+      aiTeams: 1,
+      skippedManual: 0,
+      skippedPassive: 0,
+      skippedDisabled: 0,
+      readyTeams: 1,
+      warningTeams: 0,
+      blockedTeams: 0,
+      teams: [
+        {
+          teamId: "D-E",
+          teamCode: "D-E",
+          teamName: "Debt Engines",
+          controlMode: "ai",
+          aiSellPreviewEnabled: true,
+          status: "ready",
+          strategySummary: "Cash recovery before any buy.",
+          cash: -30,
+          rosterCount: 8,
+          salaryTotal: 44,
+          marketValueTotal: 160,
+          rosterSize: 8,
+          playerMin: 3,
+          playerOpt: 6,
+          targetRosterMin: 3,
+          targetRosterOpt: 6,
+          budgetPressure: "critical",
+          sellCandidates: [makeSell(1, 8), makeSell(2, 9), makeSell(3, 10), makeSell(4, 12)],
+          keepCore: [],
+          warnings: [],
+          blockingReasons: [],
+          explanation: "Cash recovery before any buy.",
+        },
+      ],
+    });
+
+    const { buildAiMarketPlanPreview } = await import("@/lib/ai/ai-market-plan-preview-service");
+    const result = await buildAiMarketPlanPreview({
+      source: "sqlite",
+      saveId: "save-local",
+      seasonId: "season-2",
+    });
+
+    expect(result.teams[0].status).toBe("sell_only");
+    expect(result.teams[0].sellPlan.candidates.map((candidate) => candidate.playerName)).toEqual([
+      "Debt Relief 1",
+      "Debt Relief 2",
+      "Debt Relief 3",
+      "Debt Relief 4",
+    ]);
+    expect(result.teams[0].projectedState.cashAfterPlan).toBe(9);
+    expect(result.teams[0].projectedState.rosterAfterPlan).toBe(4);
+    expect(result.teams[0].blockingReasons).not.toContain("cash_after_market_plan_not_positive");
+  });
+
+  it("blocks a market plan when safe sells cannot clear negative team cash", async () => {
+    buildAiTransfermarktPreview.mockResolvedValue({
+      readOnly: true,
+      source: "sqlite",
+      scope: { saveId: "save-local", seasonId: "season-2", teamId: null, teamScope: "ai" },
+      totalTeams: 1,
+      aiTeams: 1,
+      skippedManual: 0,
+      skippedPassive: 0,
+      skippedDisabled: 0,
+      readyTeams: 1,
+      warningTeams: 0,
+      blockedTeams: 0,
+      teams: [
+        {
+          teamId: "S-H",
+          teamCode: "S-H",
+          teamName: "Short Hands",
+          controlMode: "ai",
+          aiTransferPreviewEnabled: true,
+          status: "ready",
+          cash: -30,
+          salary: 24,
+          salaryTotal: 24,
+          rosterSize: 4,
+          rosterCount: 4,
+          targetRosterMin: 3,
+          targetRosterOpt: 4,
+          marketValueTotal: 90,
+          needSummary: "Cash negativ.",
+          budgetStatus: "critical",
+          rosterStatus: "at_opt",
+          topTargets: [],
+          recommendedBuys: [],
+          skippedTargets: [],
+          warnings: [],
+          explanation: "Cash recovery before any buy.",
+        },
+      ],
+    });
+    buildAiTransfermarktSellPreview.mockResolvedValue({
+      readOnly: true,
+      source: "sqlite",
+      scope: { saveId: "save-local", seasonId: "season-2", teamId: null, teamScope: "ai" },
+      totalTeams: 1,
+      aiTeams: 1,
+      skippedManual: 0,
+      skippedPassive: 0,
+      skippedDisabled: 0,
+      readyTeams: 1,
+      warningTeams: 0,
+      blockedTeams: 0,
+      teams: [
+        {
+          teamId: "S-H",
+          teamCode: "S-H",
+          teamName: "Short Hands",
+          controlMode: "ai",
+          aiSellPreviewEnabled: true,
+          status: "ready",
+          strategySummary: "Cash recovery before any buy.",
+          cash: -30,
+          rosterCount: 4,
+          salaryTotal: 24,
+          marketValueTotal: 90,
+          rosterSize: 4,
+          playerMin: 3,
+          playerOpt: 4,
+          targetRosterMin: 3,
+          targetRosterOpt: 4,
+          budgetPressure: "critical",
+          sellCandidates: [
+            {
+              activePlayerId: "ap-short-1",
+              playerId: "p-short-1",
+              playerName: "Only Exit",
+              className: "Runner",
+              race: "Human",
+              raceName: "Human",
+              ovr: 50,
+              mvs: 7,
+              salary: 3,
+              marketValue: 10,
+              expectedSellValue: 10,
+              contractLength: 1,
+              rosterAfter: 3,
+              salaryAfter: 21,
+              cashAfter: -20,
+              sportValueSummary: "Cash relief",
+              performanceSummary: "Cash relief",
+              strategyFitSummary: "Cash relief.",
+              reasonToSell: ["negatives Teamcash zum Seasonstart"],
+              reasonToKeep: [],
+              reasonsToSell: ["negatives Teamcash zum Seasonstart"],
+              reasonsToKeep: [],
+              warnings: [],
+              sellPriority: 42,
+              sellPriorityScore: 42,
+            },
+          ],
+          keepCore: [],
+          warnings: [],
+          blockingReasons: [],
+          explanation: "Cash recovery before any buy.",
+        },
+      ],
+    });
+
+    const { buildAiMarketPlanPreview } = await import("@/lib/ai/ai-market-plan-preview-service");
+    const result = await buildAiMarketPlanPreview({
+      source: "sqlite",
+      saveId: "save-local",
+      seasonId: "season-2",
+    });
+
+    expect(result.teams[0].status).toBe("blocked");
+    expect(result.teams[0].projectedState.cashAfterPlan).toBe(-20);
+    expect(result.teams[0].blockingReasons).toContain("negative_cash_unresolved_after_safe_sells");
+    expect(result.teams[0].blockingReasons).toContain("cash_after_market_plan_not_positive");
+    expect(result.summary.blocked).toBe(1);
+  });
 });

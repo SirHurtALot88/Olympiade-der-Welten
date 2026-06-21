@@ -95,10 +95,117 @@ function gameState(partial?: Partial<GameState>): GameState {
 }
 
 describe("game flow controller", () => {
+  it("starts empty new-game rosters with the season briefing before training", () => {
+    const flow = buildGameFlowState({
+      gameState: gameState({
+        players: [],
+        rosters: [],
+        seasonState: {
+          seasonId: "season-1",
+          schedule: [],
+          standings: {},
+          newGameFlow: {
+            active: true,
+            selectedTeamId: "M-M",
+            dismissed: false,
+            steps: [{ stepId: "season_intro", status: "open" }],
+          },
+        },
+        season: { id: "season-1", name: "Season 1", year: 2026, currentMatchday: 1, matchdayIds: ["season-1-md-1"] },
+      }),
+      activeTeamId: "M-M",
+    });
+
+    expect(flow.currentStepId).toBe("season_intro");
+    expect(flow.currentStep.targetView).toBe("home");
+    expect(flow.currentStep.targetPanel).toBe("season-briefing");
+    expect(flow.nextStepId).toBe("scouting_facilities");
+  });
+
+  it("continues to scouting and buildings after the empty-roster season briefing is completed", () => {
+    const flow = buildGameFlowState({
+      gameState: gameState({
+        players: [],
+        rosters: [],
+        seasonState: {
+          seasonId: "season-1",
+          schedule: [],
+          standings: {},
+          newGameFlow: {
+            active: true,
+            selectedTeamId: "M-M",
+            dismissed: false,
+            steps: [{ stepId: "season_intro", status: "completed", completedAt: "2026-06-20T00:00:00.000Z" }],
+          },
+        },
+        season: { id: "season-1", name: "Season 1", year: 2026, currentMatchday: 1, matchdayIds: ["season-1-md-1"] },
+      }),
+      activeTeamId: "M-M",
+    });
+
+    expect(flow.currentStepId).toBe("scouting_facilities");
+    expect(flow.currentStep.targetView).toBe("trainingV2");
+    expect(flow.currentStep.targetPanel).toBe("facilities");
+    expect(flow.currentStep.cta).toContain("Gebäude");
+    expect(flow.nextStepId).toBe("buy_players");
+  });
+
+  it("keeps checked facilities completed while the empty roster still needs players", () => {
+    const flow = buildGameFlowState({
+      gameState: gameState({
+        players: [],
+        rosters: [],
+        seasonState: {
+          seasonId: "season-1",
+          schedule: [],
+          standings: {},
+          newGameFlow: {
+            active: true,
+            selectedTeamId: "M-M",
+            dismissed: false,
+            steps: [
+              { stepId: "season_intro", status: "completed", completedAt: "2026-06-20T00:00:00.000Z" },
+              { stepId: "training_facilities", status: "completed", completedAt: "2026-06-20T00:01:00.000Z" },
+            ],
+          },
+        },
+        season: { id: "season-1", name: "Season 1", year: 2026, currentMatchday: 1, matchdayIds: ["season-1-md-1"] },
+      }),
+      activeTeamId: "M-M",
+    });
+
+    expect(flow.currentStepId).toBe("buy_players");
+    expect(flow.steps.find((step) => step.stepId === "scouting_facilities")?.status).toBe("completed");
+  });
+
+  it("keeps a new-season briefing first even when the roster is already filled", () => {
+    const flow = buildGameFlowState({
+      gameState: gameState({
+        players: [player("p-1", "mittel")],
+        seasonState: {
+          seasonId: "season-2",
+          schedule: [],
+          standings: {},
+          newGameFlow: {
+            active: true,
+            selectedTeamId: "M-M",
+            dismissed: false,
+            steps: [{ stepId: "season_intro", status: "open" }],
+          },
+        },
+      }),
+      activeTeamId: "M-M",
+    });
+
+    expect(flow.currentStepId).toBe("season_intro");
+    expect(flow.currentStep.targetPanel).toBe("season-briefing");
+    expect(flow.steps.find((step) => step.stepId === "check_training")?.status).toBe("completed");
+  });
+
   it("opens training first when active roster players have no training mode", () => {
     const flow = buildGameFlowState({ gameState: gameState(), activeTeamId: "M-M" });
     expect(flow.currentStepId).toBe("check_training");
-    expect(flow.currentStep.targetView).toBe("training");
+    expect(flow.currentStep.targetView).toBe("trainingV2");
     expect(flow.currentStep.cta).toContain("Training");
   });
 
@@ -150,6 +257,28 @@ describe("game flow controller", () => {
     expect(flow.currentStep.targetPanel).toBe("arena-result-summary");
   });
 
+  it("offers the next result-flow step after the current result panel instead of jumping backwards", () => {
+    const flow = buildGameFlowState({
+      gameState: gameState({
+        players: [player("p-1", "mittel")],
+        matchdayState: { matchdayId: "season-2-md-1", status: "resolved", pendingTeamIds: [], resolvedFixtureIds: [] },
+        seasonState: {
+          seasonId: "season-2",
+          schedule: [],
+          standings: {},
+          formCards: [{ id: "card-1", saveId: "save-1", seasonId: "season-2", teamId: "M-M", playerId: "p-1", playerName: "p-1", cardColor: "red", cardValue: 1, createdAt: "2026-06-12T00:00:00.000Z" }],
+          lineupDrafts: [{ lineupId: "lineup-1", saveId: "save-1", seasonId: "season-2", matchdayId: "season-2-md-1", teamId: "M-M", status: "resolved", entries: [{ disciplineId: "d1", disciplineSide: "d1", slotIndex: 0, playerId: "p-1", activePlayerId: "r-1" }], createdAt: "2026-06-12T00:00:00.000Z", updatedAt: "2026-06-12T00:00:00.000Z" }],
+          matchdayResults: [{ id: "result-1", saveId: "save-1", seasonId: "season-2", matchdayId: "season-2-md-1", status: "preview_applied", sourceVersion: "test", teamsTotal: 1, teamsReady: 1, teamsUnderfilled: 0, teamsMissingLineup: 0, teamsInvalidLineup: 0, teamsMissingScoreCoverage: 0, warningsCount: 0, createdAt: "2026-06-12T00:00:00.000Z", updatedAt: "2026-06-12T00:00:00.000Z" }],
+        },
+      }),
+      activeTeamId: "M-M",
+    });
+
+    expect(flow.currentStepId).toBe("review_matchday_results");
+    expect(flow.nextStepId).toBe("open_season_standings");
+    expect(flow.nextStep?.targetView).toBe("season");
+  });
+
   it("uses transfermarkt for preseason buy step", () => {
     const flow = buildGameFlowState({
       gameState: gameState({ gamePhase: "transfer_buy_phase" }),
@@ -157,6 +286,31 @@ describe("game flow controller", () => {
     });
     expect(flow.steps.find((step) => step.stepId === "buy_players")?.targetView).toBe("market");
     expect(flow.steps.find((step) => step.stepId === "buy_players")?.cta).toContain("Spieler kaufen");
+  });
+
+  it("prioritizes season review after the final matchday instead of reopening the season briefing", () => {
+    const flow = buildGameFlowState({
+      gameState: gameState({
+        gamePhase: "season_completed",
+        season: { id: "season-1", name: "Season 1", year: 2026, currentMatchday: 10, matchdayIds: ["season-1-md-10"] },
+        seasonState: {
+          seasonId: "season-1",
+          schedule: [],
+          standings: {},
+          newGameFlow: {
+            active: true,
+            selectedTeamId: "M-M",
+            dismissed: false,
+            steps: [{ stepId: "season_intro", status: "open" }],
+          },
+        },
+      }),
+      activeTeamId: "M-M",
+    });
+
+    expect(flow.phase).toBe("season_review");
+    expect(flow.currentStepId).toBe("review_previous_season");
+    expect(flow.currentStep.targetView).toBe("cockpit");
   });
 
   it("surfaces blockers when no active team exists", () => {

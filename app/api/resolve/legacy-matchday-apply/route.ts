@@ -1,3 +1,5 @@
+export const dynamic = "force-dynamic";
+
 import { NextResponse } from "next/server";
 
 import {
@@ -90,7 +92,7 @@ export async function POST(request: Request) {
     saveId,
     action: "matchday_apply",
     eventType: "matchday_applied",
-    affectedViews: ["home", "season", "matchday", "standings"],
+    affectedViews: ["home", "season", "matchday", "arena", "standings"],
     dryRun,
     success: result.applied === true,
   });

@@ -6,7 +6,7 @@ import {
   getFacilityLevelDefinition,
   type FacilityId,
 } from "@/lib/facilities/facility-catalog";
-import { getFacilityEfficiency, getFacilityLevel, getTeamFacilityState } from "@/lib/facilities/facility-effects";
+import { calculateFacilitySeasonUpkeep, getFacilityEfficiency, getFacilityLevel, getTeamFacilityState } from "@/lib/facilities/facility-effects";
 import { degradeFacilityCondition } from "@/lib/facilities/facility-condition";
 import { createPersistenceService } from "@/lib/persistence/persistence-service";
 import type { PersistedSaveGame, PersistenceService } from "@/lib/persistence/types";
@@ -97,7 +97,7 @@ function buildRows(teamFacilities: TeamFacilityCollection, cashBefore: number | 
       label: facility.label,
       level: rawLevel,
       enabled,
-      upkeep: roundValue(definition?.seasonUpkeep ?? 0),
+      upkeep: calculateFacilitySeasonUpkeep(facility.facilityId, teamFacilities),
       income: roundValue(((definition?.seasonIncome ?? 0) * efficiencyPct) / 100),
       status: rawLevel <= 0 ? "not_built" : enabled ? "enabled" : "disabled",
       warning: !enabled && rawLevel > 0 ? state?.disabledReason ?? "facility_disabled" : null,

@@ -58,6 +58,10 @@ export type ScenarioMeta = {
   scenarioType: ScenarioType;
   label: string;
   description?: string;
+  saveCategory?: "manual" | "autosave" | "pre-deploy" | "pre-season" | "post-season" | "emergency" | "recovery";
+  saveMode?: "solo_1" | "solo_2" | "solo_4" | "online_4v4" | "custom";
+  newGamePresetId?: "solo_1" | "solo_2" | "solo_4" | "online_4v4" | "custom";
+  humanControlledTeamCount?: number;
   createdAt: string;
   sourceSaveId?: string;
   isStableTestPoint?: boolean;
@@ -120,6 +124,22 @@ export type GameInboxItem = {
   source: string;
 };
 
+export type AiPreseasonAutomationRunRecord = {
+  runId: string;
+  seasonId: string;
+  status: "running" | "completed" | "failed" | "skipped";
+  mode: "setup_draft" | "season_market" | "none";
+  startedAt: string;
+  completedAt?: string | null;
+  aiTeamsTotal: number;
+  aiTeamsCompleted: number;
+  managerActionsApplied: number;
+  transferBuysApplied: number;
+  transferSellsApplied: number;
+  warnings: string[];
+  blockingReasons: string[];
+};
+
 export type PlayerMoraleVisibleMood = "angry" | "unhappy" | "neutral" | "happy" | "excellent";
 
 export type PlayerMoraleContractIntent =
@@ -142,8 +162,60 @@ export type PlayerMoraleState = {
   morale: number;
   visibleMood: PlayerMoraleVisibleMood;
   lastUpdatedSeasonId: string;
+  inactiveSeasons?: number;
   reasons: PlayerMoraleReason[];
   contractIntent: PlayerMoraleContractIntent;
+};
+
+export type PlayerRelationshipEventRecord = {
+  eventId: string;
+  seasonId: string;
+  teamId: string;
+  playerId: string;
+  reason: string;
+  delta: number;
+  severity: "positive" | "neutral" | "negative";
+  createdAt: string;
+  source: "promised_role_morale";
+};
+
+export type PlayerDemandStatus = "open" | "fulfilled" | "at_risk" | "failed";
+
+export type PlayerDemandRecord = {
+  demandId: string;
+  seasonId: string;
+  teamId: string;
+  playerId: string;
+  type: "discipline_start" | "captaincy" | "appearances" | "facility" | "role";
+  label: string;
+  detail: string;
+  targetDisciplineId?: string | null;
+  targetDisciplineName?: string | null;
+  targetCategory?: DisciplineCategory | null;
+  targetValue?: number | string | null;
+  currentValue?: number | string | null;
+  status: PlayerDemandStatus;
+  moraleReward: number;
+  moralePenalty: number;
+  priority: "low" | "medium" | "high";
+  source: string;
+};
+
+export type TeamCaptainRecord = {
+  seasonId: string;
+  teamId: string;
+  playerId: string;
+  playerName: string;
+  leadershipScore: number;
+  style: "leader" | "inspirer" | "enforcer" | "operator" | "wildcard";
+  effects: {
+    moraleBuffer: number;
+    rivalryPressureReductionPct: number;
+    teamPowerModifierPct: number;
+    conflictSoftenChancePct: number;
+  };
+  traitSignals: string[];
+  source: string;
 };
 
 export type StandingRecord = {
@@ -215,7 +287,7 @@ export type PlayerProgressionSpendUpgradeRecord = {
   fromValue: number;
   toValue: number;
   cost: number;
-  source: "manual_xp_spend_preview";
+  source: "manual_xp_spend_preview" | "season_end_regression" | "organic_season_progression";
 };
 
 export type PlayerProgressionEconomySnapshot = {
@@ -248,7 +320,7 @@ export type PlayerProgressionSpendEventRecord = {
   };
   economyWarnings?: string[];
   timestamp: string;
-  source: "manual_season_end_xp_spend";
+  source: "manual_season_end_xp_spend" | "organic_season_progression";
 };
 
 export type PlayerBaselineRecord = {
@@ -263,6 +335,19 @@ export type PlayerBaselineRecord = {
   attributes: Partial<Record<PlayerGeneratorAttributeName, number>>;
   marketValue: number | null;
   salary: number | null;
+  seasonZeroEconomy?: {
+    source: "season_0_computed" | "season_0_backfilled" | "season_0_reconstructed";
+    marketValue: number | null;
+    salary: number | null;
+    purchasePrice: number | null;
+    salaryMarketValue: number | null;
+    baseMarketValue: number | null;
+    salaryBase: number | null;
+    traitPercentSum: number | null;
+    marketValueSource: string;
+    salarySource: string;
+    computedAt: string;
+  };
   bracket: string | null;
   disciplineRatings: Record<string, number>;
   imageRef: string | null;
@@ -307,6 +392,53 @@ export type TeamIdentity = {
 };
 
 export type TeamIdentityOverride = Partial<Omit<TeamIdentity, "teamId">>;
+
+export type TeamGeneralManagerArchetype =
+  | "bargain_hunter"
+  | "talent_builder"
+  | "star_chaser"
+  | "depth_spammer"
+  | "elite_curator"
+  | "facility_architect"
+  | "risk_gambler"
+  | "culture_keeper"
+  | "rivalry_hawk"
+  | "systems_tinkerer";
+
+export type TeamGeneralManagerProfile = {
+  gmId: string;
+  name: string;
+  archetype: TeamGeneralManagerArchetype;
+  title: string;
+  description: string;
+  pow: number;
+  spe: number;
+  men: number;
+  soc: number;
+  ambition: number;
+  finances: number;
+  boardConfidence: number;
+  harmony: number;
+  manners: number;
+  popularity: number;
+  cooperation: number;
+  playerOptDelta: -2 | -1 | 0 | 1 | 2;
+  preferredTraits: string[];
+  facilityPriorities: string[];
+  marketDoctrine: string;
+  lineupDoctrine: string;
+  bias: Partial<TeamStrategyBias>;
+};
+
+export type TeamGeneralManagerAssignment = {
+  teamId: string;
+  gmId: string;
+  assignedSeasonId: string;
+  influencePct: number;
+  source: "auto_generated" | "auto_wildcard" | "human_slot" | "board_replacement";
+  previousGmId?: string | null;
+  dismissalReason?: "low_board_confidence" | "high_board_pressure" | null;
+};
 
 export type PlayerAttributeSheetStats = {
   height?: number | null;
@@ -375,6 +507,8 @@ export type PlayerGeneratorInput = {
   axisIntent: PlayerGeneratorAxisIntent;
   randomness: PlayerGeneratorRandomness;
   preferredArchetype?: PlayerGeneratorArchetype | null;
+  targetTeamId?: string | null;
+  contractMode?: "value" | "balanced" | "front_loaded" | "back_loaded" | "prove_it" | null;
   raceHint?: string | null;
   classHint?: string | null;
   traitHint?: string | null;
@@ -470,6 +604,7 @@ export type PlayerGeneratorDraft = {
   input: PlayerGeneratorInput;
   generated: {
     name: string;
+    portraitUrl?: string | null;
     race: string;
     className: string;
     classSuggestion: PlayerGeneratorClassSuggestion;
@@ -484,9 +619,41 @@ export type PlayerGeneratorDraft = {
       soc: number;
     };
     disciplineRatings: Record<string, number>;
+    disciplineOutlook?: Array<{
+      disciplineId: string;
+      disciplineName: string;
+      rating: number;
+      category: DisciplineCategory | string;
+      bestSlotLabel: string | null;
+      bestSlotScore: number | null;
+      keyAttributes: PlayerGeneratorAttributeName[];
+    }>;
     ovr: number | null;
     pps: number | null;
     potential: number | null;
+    projectedRole?: "star" | "starter" | "rotation" | "prospect" | "flier";
+    captaincyScore?: number | null;
+    teamFit?: {
+      teamId: string | null;
+      teamName: string | null;
+      score: number | null;
+      axisFit: number | null;
+      gmFit: number | null;
+      traitFit: number | null;
+      rosterNeed: "thin" | "healthy" | "crowded" | "unknown";
+      reasons: string[];
+      warnings: string[];
+    };
+    economyProjection?: {
+      marketValueEstimate: number | null;
+      salaryEstimate: number | null;
+      valueRatio: number | null;
+      salaryPressure: "low" | "medium" | "high" | "unknown";
+      contractMode: "value" | "balanced" | "front_loaded" | "back_loaded" | "prove_it";
+      recommendedContractLength: number | null;
+      salarySchedule: Array<{ yearIndex: number; label: string; salary: number }>;
+      warnings: string[];
+    };
     marketValue: number | null;
     salary: number | null;
     marketValueStatus: PlayerGeneratorMarketValueStatus;
@@ -576,6 +743,32 @@ export type Player = {
   lastSeasonDisciplineValues?: Record<string, number>;
   currentDisciplineValues?: Record<string, number>;
   disciplineDelta?: Record<string, number>;
+  classHistory?: Array<{
+    seasonId: string;
+    className: string;
+    previousClassName?: string | null;
+    reason: "seed" | "organic_progression" | "manual";
+    createdAt: string;
+  }>;
+  lastOrganicProgression?: {
+    seasonId: string;
+    classBefore: string;
+    classAfter: string;
+    trainingClass: string;
+    secondaryTrainingClass?: string | null;
+    trainingMode: "leicht" | "mittel" | "hart";
+    traitModifierPct: number;
+    facilityModifierPct: number;
+    marketValuePressureTotal: number;
+    trainingSetpoints: number;
+    performanceSetpoints: number;
+    netSetpoints: number;
+    fatigueLoad: number;
+    topGains: Array<{ attribute: PlayerGeneratorAttributeName; delta: number }>;
+    topLosses: Array<{ attribute: PlayerGeneratorAttributeName; delta: number }>;
+    attributeDeltas: Partial<Record<PlayerGeneratorAttributeName, number>>;
+    createdAt: string;
+  } | null;
   economyAfterUpgradePreview?: {
     marketValuePreview: number | null;
     salaryExpectation: number | null;
@@ -740,6 +933,49 @@ export type FormCardRecord = {
   createdAt: string;
 };
 
+export type TeamPowerCategory = "power" | "speed" | "mental" | "social" | "flex";
+export type TeamPowerEffectType = "self_boost" | "support_boost" | "snipe_debuff" | "field_debuff" | "rivalry_debuff";
+export type TeamPowerTargetMode = "self" | "single_top" | "single_rival" | "single_rank_neighbor" | "rank_band";
+export type TeamPowerConditionalTrigger = "rival_top8_discipline" | "target_top8_discipline";
+export type TeamPowerAttributeTag =
+  | "power"
+  | "health"
+  | "determination"
+  | "stamina"
+  | "speed"
+  | "dexterity"
+  | "awareness"
+  | "intelligence"
+  | "will"
+  | "charisma"
+  | "spirit"
+  | "torment";
+
+export type TeamPowerRecord = {
+  id: string;
+  saveId: string;
+  seasonId: string;
+  teamId: string;
+  label: string;
+  description: string;
+  category: TeamPowerCategory;
+  effectType: TeamPowerEffectType;
+  targetMode: TeamPowerTargetMode;
+  targetLimit: number;
+  conditionalBonusPct?: number;
+  conditionalTrigger?: TeamPowerConditionalTrigger;
+  conditionalDescription?: string;
+  source: "team_identity" | "facility";
+  sourceRank?: number;
+  sourceFacilityId?: string;
+  modifier: number;
+  positiveAttributeTags?: TeamPowerAttributeTag[];
+  negativeAttributeTag?: TeamPowerAttributeTag | null;
+  chargesTotal: number;
+  selectedForSeason: boolean;
+  createdAt: string;
+};
+
 export type TeamFacilityRecord = {
   level: number;
   enabled: boolean;
@@ -764,6 +1000,7 @@ export type FacilityEventRecord = {
   timestamp: string;
   source:
     | "manual_facility_upgrade"
+    | "manual_facility_downgrade"
     | "facility_upkeep_paid"
     | "facility_upkeep_unpaid"
     | "facility_income_collected"
@@ -791,6 +1028,8 @@ export type TeamSeasonObjectiveRecord = {
   objectiveId: string;
   category: TeamSeasonObjectiveCategory;
   label: string;
+  detail?: string | null;
+  actionHint?: string | null;
   targetValue: number | string | boolean | null;
   currentValue: number | string | boolean | null;
   status: TeamSeasonObjectiveStatus;
@@ -805,6 +1044,18 @@ export type TeamBoardConfidenceRecord = {
   value: number;
   pressure: number;
   warnings: string[];
+};
+
+export type TeamRelationshipEventRecord = {
+  eventId: string;
+  seasonId: string;
+  matchdayId?: string | null;
+  fromTeamId: string;
+  toTeamId: string;
+  delta: number;
+  reason: "rivalry_win" | "rivalry_loss" | "rivalry_close_finish" | "ally_shared_success" | "manual_adjustment";
+  source: "matchday_result" | "manual" | "system_preview";
+  createdAt: string;
 };
 
 export type ContractEventRecord = {
@@ -952,6 +1203,8 @@ export type RosterEntry = {
   playerId: string;
   contractLength: number;
   contractStatus?: ContractStatus;
+  contractShape?: ContractShape;
+  yearlySalarySchedule?: ContractYearSalary[];
   salary: number;
   upkeep: number;
   purchasePrice?: number | null;
@@ -1016,7 +1269,25 @@ export type TransferWishlistEntry = {
   marketValue: number | null;
   salary: number | null;
   bracket: number | null;
+  pow?: number | null;
+  spe?: number | null;
+  men?: number | null;
+  soc?: number | null;
   teamId?: string | null;
+  createdAt: string;
+};
+
+export type TransferSellMarkerEntry = {
+  id: string;
+  saveId: string;
+  seasonId: string;
+  teamId: string;
+  playerId: string;
+  playerName: string;
+  contractLength: number;
+  buyoutCost: number | null;
+  marketValueAtExit: number | null;
+  morale: number | null;
   createdAt: string;
 };
 
@@ -1091,6 +1362,19 @@ export type SeasonDisciplineScheduleEntry = {
   sourceNote: string | null;
 };
 
+export type FormCardPlanRecord = {
+  id: string;
+  saveId: string;
+  seasonId: string;
+  teamId: string;
+  matchdayId: string;
+  disciplineSide: "d1" | "d2";
+  disciplineId: string | null;
+  primaryFormCardId: string | null;
+  secondaryFormCardId: string | null;
+  updatedAt: string;
+};
+
 export type Fixture = {
   id: string;
   homeTeamId: string;
@@ -1144,6 +1428,7 @@ export type DisciplineResultRecord = {
   rank: number;
   baseScore: number;
   totalScore: number;
+  formModifier?: number | null;
   readinessStatus: LegacyResultReadinessStatus;
   warnings: string[];
   createdAt: string;
@@ -1219,7 +1504,18 @@ export type SeasonSnapshotTeamRecord = {
   transferCount: number;
   transferBuyCount: number;
   transferSellCount: number;
+  transferBuyTotal?: number | null;
+  transferSellTotal?: number | null;
   transferNet: number | null;
+  cashFc?: number | null;
+  startplatz?: number | null;
+  rankDiff?: number | null;
+  sponsorBasis?: number | null;
+  sponsorRank?: number | null;
+  sponsorSeason?: number | null;
+  sponsorTotal?: number | null;
+  guv?: number | null;
+  cashTotal?: number | null;
   isGold?: boolean;
   isSilver?: boolean;
   isBronze?: boolean;
@@ -1296,8 +1592,28 @@ export type SeasonSnapshotTransferRecord = {
   amount: number | null;
   salary: number | null;
   marketValue: number | null;
+  amountDeltaToMarketValue?: number | null;
+  amountMarketValueFactor?: number | null;
   contractLength: number | null;
   source: string;
+  happenedAt?: string | null;
+};
+
+export type SeasonSnapshotGeneralManagerRecord = {
+  teamId: string;
+  teamCode: string;
+  teamName: string;
+  gmId: string;
+  gmName: string;
+  gmTitle: string;
+  gmArchetype: TeamGeneralManagerArchetype;
+  assignedSeasonId: string;
+  source: TeamGeneralManagerAssignment["source"];
+  influencePct: number;
+  boardConfidenceValue?: number | null;
+  boardPressure?: number | null;
+  previousGmId?: string | null;
+  dismissalReason?: TeamGeneralManagerAssignment["dismissalReason"];
 };
 
 export type SeasonSnapshotRecord = {
@@ -1318,6 +1634,7 @@ export type SeasonSnapshotRecord = {
   playerPerformances: SeasonSnapshotPlayerPerformanceRecord[];
   playerPerformanceSnapshots?: SeasonSnapshotPlayerPerformanceRecord[];
   transferSnapshots?: SeasonSnapshotTransferRecord[];
+  gmAssignments?: SeasonSnapshotGeneralManagerRecord[];
   warnings?: string[];
 };
 
@@ -1500,18 +1817,65 @@ export type AiSeasonStrategyStateRecord = {
   updatedAt: string;
 };
 
+export type NewGameFlowStepId =
+  | "season_intro"
+  | "team_confirm"
+  | "roster_review"
+  | "first_transfers"
+  | "fill_roster"
+  | "training_facilities"
+  | "set_lineup";
+
+export type NewGameFlowStepStatus = "open" | "completed" | "skipped";
+
+export type NewGameFlowStepRecord = {
+  stepId: NewGameFlowStepId;
+  status: NewGameFlowStepStatus;
+  completedAt?: string | null;
+  skippedAt?: string | null;
+};
+
+export type NewGameFlowState = {
+  active: boolean;
+  selectedTeamId?: string | null;
+  dismissed?: boolean;
+  completedAt?: string | null;
+  updatedAt?: string | null;
+  steps?: NewGameFlowStepRecord[];
+};
+
+export type AdminBalancingConfigInput = {
+  version?: number;
+  classProgressionWeights?: Record<string, Partial<Record<PlayerGeneratorAttributeName, number>>>;
+  traitTrainingFactorsPct?: Record<string, number>;
+  prizeMoneyPercents?: number[];
+  updatedAt?: string | null;
+};
+
+export type AdminBalancingConfig = {
+  version: number;
+  classProgressionWeights: Record<string, Record<PlayerGeneratorAttributeName, number>>;
+  traitTrainingFactorsPct: Record<string, number>;
+  prizeMoneyPercents: number[];
+  updatedAt?: string | null;
+};
+
 export type SeasonState = {
   seasonId: string;
   schedule: Fixture[];
   disciplineSchedule?: SeasonDisciplineScheduleEntry[];
+  seasonEconomyFactors?: SeasonEconomyFactorRecord[];
   standings: Record<string, StandingRecord>;
   teamIdentityOverrides?: Record<string, TeamIdentityOverride>;
+  teamGeneralManagers?: Record<string, TeamGeneralManagerAssignment>;
   teamControlSettings?: Record<string, TeamControlSettings>;
   teamStrategyProfiles?: Record<string, TeamStrategyProfile>;
+  aiPreseasonAutomationRuns?: Record<string, AiPreseasonAutomationRunRecord>;
   teamFacilities?: Record<string, TeamFacilityCollection>;
   facilityEvents?: FacilityEventRecord[];
   teamSeasonObjectives?: TeamSeasonObjectiveRecord[];
   boardConfidence?: Record<string, TeamBoardConfidenceRecord>;
+  teamRelationshipEvents?: TeamRelationshipEventRecord[];
   contractEvents?: ContractEventRecord[];
   playerAvailabilityState?: PlayerAvailabilityStateRecord[];
   injuryEvents?: InjuryEventRecord[];
@@ -1519,10 +1883,13 @@ export type SeasonState = {
   playerGeneratorDrafts?: PlayerGeneratorDraft[];
   contractNegotiationDrafts?: ContractNegotiationDraft[];
   transferWishlist?: TransferWishlistEntry[];
+  transferSellMarkers?: TransferSellMarkerEntry[];
   standingsApplyLogs?: StandingsApplyAuditLogRecord[];
   cashPrizeApplyLogs?: CashPrizeApplyLogRecord[];
   matchdayAdvanceLogs?: MatchdayAdvanceLogRecord[];
   formCards?: FormCardRecord[];
+  formCardPlans?: FormCardPlanRecord[];
+  teamPowers?: TeamPowerRecord[];
   lineupDrafts?: LineupDraft[];
   matchdayResults?: MatchdayResultRecord[];
   disciplineResults?: DisciplineResultRecord[];
@@ -1539,6 +1906,19 @@ export type SeasonState = {
   teamDoctrines?: Record<string, TeamDoctrineRecord>;
   aiSeasonStrategyState?: Record<string, AiSeasonStrategyStateRecord>;
   aiManagerDecisionJournal?: AiManagerDecisionJournalEntry[];
+  newGameFlow?: NewGameFlowState;
+  adminBalancingConfig?: AdminBalancingConfigInput;
+};
+
+export type SeasonEconomyFactorRecord = {
+  seasonId: string;
+  seasonLabel: string;
+  horizonIndex: number;
+  factor: number;
+  source: "sheet_seed" | "rolled" | "carried";
+  rollSeed?: string | null;
+  carriedFromSeasonId?: string | null;
+  generatedAt?: string;
 };
 
 export type MatchdayState = {
@@ -1564,6 +1944,8 @@ export type LineupDraftModifierSide = {
   secondaryFormCardId?: string | null;
   mutatorTrait1?: string | null;
   mutatorTrait2?: string | null;
+  teamPowerId?: string | null;
+  intensity?: "conserve" | "normal" | "push" | null;
 };
 
 export type LineupDraftModifiers = {
@@ -1648,6 +2030,9 @@ export type GameState = {
   baselineWriteGuardEvents?: PlayerBaselineWriteGuardEvent[];
   playerPotential?: PlayerPotentialRecord[];
   playerMoraleState?: PlayerMoraleState[];
+  playerRelationshipEvents?: PlayerRelationshipEventRecord[];
+  playerDemands?: PlayerDemandRecord[];
+  teamCaptains?: TeamCaptainRecord[];
   playerProgressionEvents?: PlayerProgressionSpendEventRecord[];
   gameInboxItems?: GameInboxItem[];
   logs: GameLogEntry[];

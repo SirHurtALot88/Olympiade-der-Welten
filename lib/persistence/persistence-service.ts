@@ -50,9 +50,10 @@ export function createPersistenceService(): PersistenceService {
       }
       return saveRepository.getSaveById(saveId);
     },
-    saveSingleplayerState(saveId, gameState) {
+    saveSingleplayerState(saveId, gameState, input) {
       return saveRepository.saveGameState({
         saveId,
+        status: input?.status,
         gameState,
       });
     },
@@ -63,14 +64,23 @@ export function createPersistenceService(): PersistenceService {
         status: "active",
         seedData: loadSeedData(),
       });
+      const manualSave = saveRepository.saveGameState({
+        saveId: save.saveId,
+        name: save.name,
+        status: save.status,
+        gameState: withScenarioMeta(save.gameState, {
+          saveCategory: "manual",
+        }),
+      });
 
-      return saveRepository.setActiveSave(save.saveId) ?? save;
+      return saveRepository.setActiveSave(manualSave.saveId) ?? manualSave;
     },
     createFreshSeasonOneSave(input) {
+      const status = input?.status ?? "active";
       const save = saveRepository.createSaveFromSeed({
         saveId: input?.saveId ?? createFreshSeasonOneSaveId(),
         name: input?.name ?? `Season 1 Teststart ${new Date().toLocaleString("de-DE")}`,
-        status: "active",
+        status,
         seedData: loadFreshSeasonOneSeedData(),
       });
       const taggedSave = saveRepository.saveGameState({
@@ -81,19 +91,33 @@ export function createPersistenceService(): PersistenceService {
           scenarioType: "fresh_start",
           label: save.name,
           description: "Fresh Season-1 Startsave aus lokalem Seed.",
+          saveCategory: "pre-season",
           isStableTestPoint: true,
         }),
       });
 
-      return saveRepository.setActiveSave(taggedSave.saveId) ?? taggedSave;
+      if (status === "active" && input?.activate !== false) {
+        return saveRepository.setActiveSave(taggedSave.saveId) ?? taggedSave;
+      }
+
+      return taggedSave;
     },
     cloneSave(sourceSaveId, name) {
-      return saveRepository.cloneSave({
+      const clone = saveRepository.cloneSave({
         sourceSaveId,
         saveId: createSaveId(),
         name,
         status: "active",
       });
+      const manualClone = saveRepository.saveGameState({
+        saveId: clone.saveId,
+        name: clone.name,
+        status: clone.status,
+        gameState: withScenarioMeta(clone.gameState, {
+          saveCategory: "manual",
+        }),
+      });
+      return saveRepository.setActiveSave(manualClone.saveId) ?? manualClone;
     },
     createScenarioSnapshot(input) {
       const source = saveRepository.getSaveById(input.sourceSaveId);
@@ -108,6 +132,7 @@ export function createPersistenceService(): PersistenceService {
         scenarioMeta: {
           ...input.scenarioMeta,
           sourceSaveId: input.scenarioMeta.sourceSaveId ?? input.sourceSaveId,
+          saveCategory: input.scenarioMeta.saveCategory ?? "manual",
         },
       });
     },

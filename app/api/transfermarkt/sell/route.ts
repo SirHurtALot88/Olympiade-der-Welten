@@ -1,6 +1,10 @@
+export const dynamic = "force-dynamic";
+
 import { NextResponse } from "next/server";
 
 import { executeLocalTransfermarktSell, previewLocalTransfermarktSell } from "@/lib/market/transfermarkt-local-service";
+import { evaluateGamePhaseAction } from "@/lib/foundation/game-phase-action-policy";
+import { createPersistenceService } from "@/lib/persistence/persistence-service";
 import { notifyRoomGameplayWrite } from "@/lib/room/room-gameplay-write-notifier";
 import { authorizeServerRoomWrite } from "@/lib/room/server-authoritative-write-guard";
 
@@ -16,6 +20,7 @@ type SellRequestBody = {
   seatToken?: string | null;
   userId?: string | null;
   activeManagerTeamId?: string | null;
+  activeOwnerId?: string | null;
   controlMode?: "human" | "ai" | "passive" | "manual" | null;
   confirmToken?: string | null;
   expectedConfirmToken?: string | null;
@@ -55,6 +60,33 @@ export async function POST(request: Request) {
       );
     }
 
+    const persistence = createPersistenceService();
+    const save = persistence.getSaveById(saveId);
+    if (!save) {
+      return NextResponse.json(
+        {
+          success: false,
+          error: "save_not_found",
+          summary: null,
+          warnings: [],
+        },
+        { status: 404 },
+      );
+    }
+
+    const phaseGate = evaluateGamePhaseAction(save.gameState, "sell_players");
+    if (!phaseGate.allowed) {
+      return NextResponse.json(
+        {
+          success: false,
+          error: phaseGate.reason,
+          summary: null,
+          warnings: phaseGate.warnings,
+        },
+        { status: 409 },
+      );
+    }
+
     const writeAuth = authorizeServerRoomWrite({
       roomCode: body.roomCode,
       participantId: body.participantId,
@@ -68,6 +100,7 @@ export async function POST(request: Request) {
       confirmToken: body.confirmToken,
       expectedConfirmToken: body.expectedConfirmToken,
       activeManagerTeamId: body.activeManagerTeamId,
+      activeOwnerId: body.activeOwnerId,
       controlMode: body.controlMode,
     });
     if (!writeAuth.allowed) {
@@ -98,7 +131,7 @@ export async function POST(request: Request) {
       {
         success: summary.canSell,
         summary,
-        warnings: [...writeAuth.warnings, ...summary.warnings],
+        warnings: [...phaseGate.warnings, ...writeAuth.warnings, ...summary.warnings],
       },
       { status: summary.canSell ? 200 : 409 },
     );

@@ -10,10 +10,12 @@ import { projectFoundationStateFromPrisma } from "@/lib/db/read/foundation-read-
 import { getTeamControlSettings, withNormalizedTeamControlSettings } from "@/lib/foundation/team-control-settings";
 import { deriveTeamIdentityAxisWeightMap } from "@/lib/foundation/team-identity-settings";
 import { getTeamStrategyProfile, withNormalizedTeamStrategyProfiles } from "@/lib/foundation/team-strategy-profiles";
+import { deriveRosterTargets } from "@/lib/foundation/roster-limits";
 import { getPlayerClassColor } from "@/lib/lineups/legacy-lineup-modifiers";
 import {
   MERCENARY_NEGATIVE_FIT_PENALTY_REASON,
   applyMercenaryNegativeFitPenaltyToFinalPickScore,
+  calculateTransfermarktFit,
   getMercenaryNegativeFitPenalty,
   hasMercenaryTrait,
 } from "@/lib/market/transfermarkt-fit";
@@ -28,6 +30,10 @@ export type AiNeedsPickLane = "superstar" | "star" | "core" | "specialist" | "de
 export type AiNeedsPickCostBand = "cheap_fill" | "backup" | "depth" | "core" | "star" | "superstar";
 export type AiNeedsPicksRunMode = "default" | "season1_optimum_execute";
 
+const AI_CHEAP_FILL_MARKET_VALUE_CAP = 15;
+const AI_RESERVE_MARKET_VALUE_CAP = 20;
+const AI_EXPENSIVE_EARLY_SCAN_CAP = 60;
+
 export type AiNeedsPicksCompareParams = {
   source?: AiNeedsPicksCompareSource;
   saveId?: string | null;
@@ -37,8 +43,10 @@ export type AiNeedsPicksCompareParams = {
   teamIds?: string[] | null;
   excludedPlayerIds?: string[] | null;
   limit?: number | null;
+  fullScoringLimit?: number | null;
   steps?: number | null;
   runMode?: AiNeedsPicksRunMode | null;
+  draftSeed?: string | null;
 };
 
 export type AiNeedsPicksOpenNeed = {
@@ -149,6 +157,9 @@ export type AiNeedsPicksCashStrategy = {
     expectedPrizeNextSeason3: number | null;
     expectedPrizeNextSeason4: number | null;
     expectedPrizeFiveSeasonSum: number | null;
+    expectedGuvCurrentSeason: number | null;
+    expectedGuvFiveSeasonSum: number | null;
+    expectedProjectedCashAfterFiveSeasons: number | null;
     expectedPrizeTrend: "up" | "down" | "flat" | "volatile" | "unknown";
     prizeConfidence: "ready" | "partial" | "missing_source";
     prizeSourceStatus: "ready" | "partial" | "missing_source";
@@ -254,6 +265,7 @@ export type AiNeedsPicksCandidateScore = {
   formColorDoubleBoostPotential?: boolean;
   strategicException: boolean;
   strategicExceptionReason: string | null;
+  minimumReachableAfterPick?: boolean;
   mustFeelRightStatus: "strong_fit" | "on_plan" | "warning" | "risky_but_allowed";
   focusTeamStatus?: "ok" | "warning" | "blocked";
   focusTeamReason?: string | null;
@@ -276,6 +288,11 @@ export type AiNeedsPicksCandidateScore = {
   phaseCap: number | null;
   capExceeded: boolean;
   capOverrideReason: string | null;
+  draftSeed?: string | null;
+  baseScore?: number | null;
+  tieBreakJitter?: number | null;
+  scoreWithSeed?: number | null;
+  tieBreakBand?: string | null;
   finalScore: number;
   scoreBreakdown: {
     playerQualityScore: number;
@@ -303,6 +320,8 @@ export type AiNeedsPicksCandidateScore = {
   };
   reasons: string[];
 };
+
+type AiNeedsPickPhase = AiNeedsPicksCandidateScore["pickPhase"];
 
 export type AiNeedsPicksPlannedPick = {
   step: number;
@@ -378,6 +397,11 @@ export type AiNeedsPicksPlannedPick = {
   depthNeedFilled: boolean;
   minimumReachableAfterPick: boolean;
   remainingMinimumReserve: number | null;
+  draftSeed?: string | null;
+  baseScore?: number | null;
+  tieBreakJitter?: number | null;
+  scoreWithSeed?: number | null;
+  tieBreakBand?: string | null;
   finalScore: number;
   scoreBreakdown: AiNeedsPicksCandidateScore["scoreBreakdown"];
   reasons: string[];
@@ -538,7 +562,6 @@ type ResolvedCompareContext = {
 type ComparePrizeSignal = AiNeedsPicksCashStrategy["expectedPrizeSignal"];
 
 const DEFAULT_COMPARE_SET = ["C-C", "W-W", "T-T", "A-A"];
-const LEGAL_MINIMUM_ROSTER_SIZE = 7;
 const RETOOL_REFERENCE_FILES = [
   "references/retool-ai-golden-master/aiTeamNeedsQuery.js",
   "references/retool-ai-golden-master/aiPlannedPicks.txt",
@@ -691,37 +714,48 @@ function buildAiNeedsCostBandCaps(input: {
       ? roundValue(Math.max(input.currentCash / minimumSlotsMissing, expectedMinimumSlotCost), 2)
       : null;
   const cheapFillCap = roundValue(
-    Math.max(
-      expectedMinimumSlotCost,
-      minFinite([
-        input.anchors.q50Price > 0 ? input.anchors.q50Price * 0.86 : null,
-        input.anchors.q25Price > 0 ? input.anchors.q25Price * 1.45 : null,
-        minimumAverageBudget != null ? minimumAverageBudget * 0.95 : null,
-        minimumSlotsMissing > 0 ? 22 : 24,
-      ]) ?? (minimumSlotsMissing > 0 ? 22 : 24),
+    Math.min(
+      AI_CHEAP_FILL_MARKET_VALUE_CAP,
+      Math.max(
+        1,
+        minFinite([
+          expectedMinimumSlotCost,
+          input.anchors.q50Price > 0 ? input.anchors.q50Price * 0.86 : null,
+          input.anchors.q25Price > 0 ? input.anchors.q25Price * 1.45 : null,
+          minimumAverageBudget != null ? minimumAverageBudget * 0.95 : null,
+          AI_CHEAP_FILL_MARKET_VALUE_CAP,
+        ]) ?? AI_CHEAP_FILL_MARKET_VALUE_CAP,
+      ),
     ),
     2,
   );
   const backupCap = roundValue(
-    Math.max(
-      cheapFillCap + 1.5,
-      minFinite([
-        input.anchors.q50Price > 0 ? input.anchors.q50Price * 1.02 : null,
-        input.anchors.q75Price > 0 ? input.anchors.q75Price * 0.8 : null,
-        minimumAverageBudget != null ? minimumAverageBudget * 1.2 : null,
-        minimumSlotsMissing > 0 ? 26 : 28,
-      ]) ?? (minimumSlotsMissing > 0 ? 26 : 28),
+    Math.min(
+      AI_RESERVE_MARKET_VALUE_CAP,
+      Math.max(
+        cheapFillCap + 1.5,
+        minFinite([
+          input.anchors.q50Price > 0 ? input.anchors.q50Price * 1.02 : null,
+          input.anchors.q75Price > 0 ? input.anchors.q75Price * 0.8 : null,
+          minimumAverageBudget != null ? minimumAverageBudget * 1.2 : null,
+          AI_RESERVE_MARKET_VALUE_CAP,
+        ]) ?? AI_RESERVE_MARKET_VALUE_CAP,
+      ),
     ),
     2,
   );
   const depthCap = roundValue(
-    Math.max(
-      backupCap + 2,
-      minFinite([
-        input.anchors.q75Price > 0 ? input.anchors.q75Price : null,
-        input.anchors.q85Price > 0 ? input.anchors.q85Price * 0.88 : null,
-        minimumAverageBudget != null ? minimumAverageBudget * (minimumSlotsMissing > 0 ? 1.45 : 1.75) : null,
-      ]) ?? backupCap + 6,
+    Math.min(
+      AI_RESERVE_MARKET_VALUE_CAP,
+      Math.max(
+        backupCap + 1,
+        minFinite([
+          input.anchors.q75Price > 0 ? input.anchors.q75Price : null,
+          input.anchors.q85Price > 0 ? input.anchors.q85Price * 0.88 : null,
+          minimumAverageBudget != null ? minimumAverageBudget * (minimumSlotsMissing > 0 ? 1.45 : 1.75) : null,
+          AI_RESERVE_MARKET_VALUE_CAP,
+        ]) ?? AI_RESERVE_MARKET_VALUE_CAP,
+      ),
     ),
     2,
   );
@@ -810,7 +844,7 @@ function isCheapFillCandidate(input: {
     currentCash: input.currentCash,
     minimumSlotsMissing: input.minimumSlotsMissing,
   });
-  const cheapPriceCap = caps.cheap_fill;
+  const cheapPriceCap = Math.min(caps.cheap_fill, AI_CHEAP_FILL_MARKET_VALUE_CAP);
   const cheapSalaryCap = roundValue(Math.max(4.5, Math.min(8.5, cheapPriceCap * 0.21)), 2);
   return price > 0 && price <= cheapPriceCap && salary <= cheapSalaryCap;
 }
@@ -1193,16 +1227,33 @@ function tokenizeThemeText(value: string | null | undefined) {
 
 function buildPlayerThemeTokens(player: Player) {
   return [
+    player.name,
     player.className,
     player.referenceClass ?? "",
     player.race,
+    player.gender ?? "",
     ...player.subclasses,
     ...player.traitsPositive,
     ...player.traitsNegative,
   ].filter((entry) => entry.trim().length > 0);
 }
 
-const STRICT_IDENTITY_FOCUS_TEAM_CODES = new Set(["C-C", "W-W", "T-T", "A-A", "N-W", "C-S", "M-M", "G-G", "N-N"]);
+const STRICT_IDENTITY_FOCUS_TEAM_CODES = new Set([
+  "C-C",
+  "W-W",
+  "T-T",
+  "A-A",
+  "N-W",
+  "C-S",
+  "M-M",
+  "G-G",
+  "N-N",
+  "D-P",
+  "H-R",
+  "T-G",
+  "V-D",
+  "P-C",
+]);
 
 type V4FocusTeamProfile = {
   code: string;
@@ -1286,7 +1337,102 @@ const V4_FOCUS_TEAM_PROFILES: Record<string, V4FocusTeamProfile> = {
     avoidTokens: ["demon", "berserker"],
     namedMetricKeys: ["academyFit", "leaderFit"],
   },
+  "D-P": {
+    code: "D-P",
+    preferredAxes: ["soc", "men"],
+    primaryTokens: ["female", "woman", "lady", "queen", "witch", "succubus", "demon", "dark", "shadow", "temptress"],
+    secondaryTokens: ["hell", "infernal", "vampire", "rogue", "bard", "mage"],
+    avoidTokens: ["construct", "robot", "holy", "paladin", "angel"],
+    namedMetricKeys: ["darkFemaleFit", "demonCourtFit"],
+  },
+  "H-R": {
+    code: "H-R",
+    preferredAxes: ["pow", "soc"],
+    primaryTokens: ["demon", "hell", "infernal", "devil", "fiend", "prime", "evil", "succubus", "incubus"],
+    secondaryTokens: ["berserker", "warlord", "dark", "fire", "shadow"],
+    avoidTokens: ["angel", "paladin", "divine", "elf", "construct"],
+    namedMetricKeys: ["hellFit", "demonCoreFit"],
+  },
+  "T-G": {
+    code: "T-G",
+    preferredAxes: ["pow", "soc"],
+    primaryTokens: ["giant", "titan", "colossus", "tall", "huge", "prime"],
+    secondaryTokens: ["tank", "warlord", "guardian", "beast", "ogre"],
+    avoidTokens: ["tiny", "small", "pixie", "goblin", "imp"],
+    namedMetricKeys: ["heightFit", "giantFit"],
+  },
+  "V-D": {
+    code: "V-D",
+    preferredAxes: ["soc", "spe"],
+    primaryTokens: ["female", "woman", "lady", "queen", "princess", "witch", "succubus", "animal", "pet", "beast"],
+    secondaryTokens: ["bard", "hero", "elf", "aqua", "cat", "dog"],
+    avoidTokens: ["male", "man", "lord", "king", "warrior"],
+    namedMetricKeys: ["femalePetFit", "viciousDeliciousFit"],
+  },
+  "P-C": {
+    code: "P-C",
+    preferredAxes: ["spe", "soc"],
+    primaryTokens: ["pirate", "swashbuckler", "wayfarer", "corsair", "sailor", "captain"],
+    secondaryTokens: ["rogue", "bard", "aqua", "ocean", "sea", "water"],
+    avoidTokens: ["paladin", "angel", "teacher", "construct"],
+    namedMetricKeys: ["pirateCrewFit", "seaFit"],
+  },
+  "L-K": {
+    code: "L-K",
+    preferredAxes: ["men", "soc"],
+    primaryTokens: ["undead", "vampire", "skeleton", "ghoul", "lich", "zombie", "ghost", "wraith", "revenant"],
+    secondaryTokens: ["necromancer", "death", "dead", "mummy", "dark", "shadow"],
+    avoidTokens: ["angel", "paladin", "divine", "plant", "elf"],
+    namedMetricKeys: ["undeadKingdomFit", "lostKingdomFit"],
+  },
 };
+
+function buildNormalizedPlayerTokenSet(player: Player) {
+  return new Set(buildPlayerThemeTokens(player).flatMap((entry) => tokenizeThemeText(entry)));
+}
+
+function playerHasAnyThemeToken(player: Player, values: string[]) {
+  const tokens = buildNormalizedPlayerTokenSet(player);
+  return values.some((value) => {
+    const normalizedValue = tokenizeThemeText(value)[0] ?? String(value).toLowerCase();
+    return tokens.has(normalizedValue) || [...tokens].some((token) => token.includes(normalizedValue) || normalizedValue.includes(token));
+  });
+}
+
+function isFemaleThemePlayer(player: Player) {
+  const gender = String(player.gender ?? "").trim().toLowerCase();
+  return gender === "female" || gender === "weiblich" || gender === "w" || playerHasAnyThemeToken(player, ["female", "woman", "girl", "lady", "madame", "queen", "princess", "witch", "succubus"]);
+}
+
+function isPetThemePlayer(player: Player) {
+  return String(player.race ?? "").trim().toLowerCase() === "animal" || playerHasAnyThemeToken(player, ["animal", "pet", "beast", "cat", "dog"]);
+}
+
+function isDemonHellThemePlayer(player: Player) {
+  return playerHasAnyThemeToken(player, ["demon", "hell", "fiend", "prime evil", "succubus", "incubus", "infernal", "devil"]);
+}
+
+function getPlayerHeightValue(player: Player) {
+  const raw = (player as { height?: unknown }).height;
+  if (typeof raw === "number" && Number.isFinite(raw)) return raw;
+  const parsed = Number(String(raw ?? "").replace(",", "."));
+  return Number.isFinite(parsed) ? parsed : 0;
+}
+
+function isTallThemePlayer(player: Player) {
+  return (
+    getPlayerHeightValue(player) >= 5 ||
+    playerHasAnyThemeToken(player, ["giant", "titan", "colossus", "tall", "huge", "ogre", "troll", "behemoth", "goliath", "hulk", "massive"])
+  );
+}
+
+function getHardFocusRuleFailure(code: string, player: Player) {
+  if (code === "H-R" && !isDemonHellThemePlayer(player)) return "hard_focus_h-r_requires_demon_hell";
+  if (code === "D-P" && !isFemaleThemePlayer(player)) return "hard_focus_d-p_requires_female";
+  if (code === "T-G" && !isTallThemePlayer(player)) return "hard_focus_t-g_requires_height_5_or_size_theme";
+  if (code === "V-D" && !isFemaleThemePlayer(player) && !isPetThemePlayer(player)) return "hard_focus_v-d_requires_female_or_pet";
+  return null;
+}
 
 function isStrictIdentityFocusTeam(team: Team) {
   return (
@@ -1753,17 +1899,73 @@ function isIdentityProtectedSeason1Team(team: Team) {
   return code === "B-P" || code === "P-C" || code === "C-S" || code === "M-M";
 }
 
-function isSeason1MinimumIdentityAcceptable(team: Team, candidate: AiNeedsPicksCandidateScore) {
+function isSeason1MinimumIdentityAcceptable(_team: Team, candidate: AiNeedsPicksCandidateScore) {
   if (candidate.focusTeamStatus === "blocked") {
     return false;
   }
-  if (!isIdentityProtectedSeason1Team(team)) {
-    return true;
+  return isRelativeMarketFitLegal(candidate);
+}
+
+function isRelativeMarketFitLegal(candidate: AiNeedsPicksCandidateScore) {
+  if (candidate.focusTeamStatus === "blocked") {
+    return false;
   }
   if (candidate.scoreBreakdown.teamIdentityScore >= 0) {
     return true;
   }
-  return false;
+  return candidate.scoreBreakdown.mercenaryNegativeFitPenalty < 0;
+}
+
+function isSeason1MinimumDepthAcceptable(team: Team, candidate: AiNeedsPicksCandidateScore) {
+  if (candidate.focusTeamStatus === "blocked") {
+    return false;
+  }
+  const breakdown = candidate.scoreBreakdown;
+  const protectedTeam = isIdentityProtectedSeason1Team(team);
+  const relativeFitLegal = isRelativeMarketFitLegal(candidate);
+  const usefulNeedSignal =
+    breakdown.needMatchScore >= 2 ||
+    breakdown.disciplineCoverageScore >= 2 ||
+    breakdown.formColorCoverageScore >= 2 ||
+    breakdown.rosterBalanceScore >= 2 ||
+    candidate.strategicException;
+  if (breakdown.teamIdentityScore < 0 && !relativeFitLegal) {
+    return false;
+  }
+  if (protectedTeam && breakdown.teamIdentityScore < -3 && !usefulNeedSignal && !relativeFitLegal) {
+    return false;
+  }
+  if (breakdown.offThemePenalty <= -10 && !usefulNeedSignal) {
+    return false;
+  }
+  return candidate.finalScore > -35;
+}
+
+function getSeason1OptimumDepthPressureBonus(input: {
+  candidate: AiNeedsPicksCandidateScore;
+  targetSlotsBefore: number;
+  mustContinueTowardOptimum: boolean;
+}) {
+  if (!input.mustContinueTowardOptimum || input.candidate.focusTeamStatus === "blocked") {
+    return 0;
+  }
+  const breakdown = input.candidate.scoreBreakdown;
+  if (!isRelativeMarketFitLegal(input.candidate)) {
+    return 0;
+  }
+  const usefulNeedSignal =
+    breakdown.needMatchScore >= 2 ||
+    breakdown.disciplineCoverageScore >= 2 ||
+    breakdown.formColorCoverageScore >= 2 ||
+    breakdown.rosterBalanceScore >= 2 ||
+    input.candidate.strategicException;
+  if (!usefulNeedSignal && breakdown.teamIdentityScore < -2) {
+    return 0;
+  }
+  const pressure = Math.max(0, input.targetSlotsBefore - 2);
+  const cheapDepthBoost = input.candidate.price != null ? clamp((32 - input.candidate.price) / 4, 0, 8) : 3;
+  const fitPenaltySoftener = Math.max(0, Math.min(6, breakdown.teamIdentityScore < 0 ? Math.abs(breakdown.teamIdentityScore) * 0.6 : 0));
+  return roundValue(8 + pressure * 4 + cheapDepthBoost + fitPenaltySoftener, 2);
 }
 
 function isWithinSeason1SpendCorridor(input: {
@@ -1940,6 +2142,17 @@ function scoreV4FocusTeamFit(input: {
     return { fitScore: 0, status: "ok", reason: null, metrics: {}, reasons: [] };
   }
 
+  const hardRuleFailure = getHardFocusRuleFailure(profile.code, input.player);
+  if (hardRuleFailure) {
+    return {
+      fitScore: -18,
+      status: "blocked",
+      reason: hardRuleFailure,
+      metrics: Object.fromEntries(profile.namedMetricKeys.map((key) => [key, -10])),
+      reasons: ["Harte Team-Identity-Regel blockiert diesen Pick."],
+    };
+  }
+
   const candidateTokens = buildPlayerThemeTokens(input.player);
   const tokenPool = [input.player.race, ...candidateTokens];
   const majorHits = countSemanticMatches(profile.primaryTokens, tokenPool);
@@ -2025,7 +2238,7 @@ function scoreV4FocusTeamFit(input: {
   let status: "ok" | "warning" | "blocked" = "ok";
   let reason: string | null = null;
   if (earlyPhase && fitScore <= -4 && !input.strategicException) {
-    status = "blocked";
+    status = "warning";
     reason = "focus_team_early_phase_off_theme";
   } else if (fitScore <= 1) {
     status = "warning";
@@ -2038,7 +2251,7 @@ function scoreV4FocusTeamFit(input: {
   if (axisHit > 0) reasons.push("Spieler passt zu den priorisierten Teamachsen.");
   if (avoidHits > 0) reasons.push("Spieler wirkt fuer das Fokus-Team off-theme.");
   if (status === "warning" && reason === "early_phase_cap_exceeded") reasons.push("Fruehphase prueft dieses Team besonders streng gegen teure Ausreisser.");
-  if (status === "blocked") reasons.push("Fruehphase blockiert klar off-theme Picks, wenn die Identity noch nicht gebaut ist.");
+  if (status === "warning" && reason === "focus_team_early_phase_off_theme") reasons.push("Fruehphase markiert off-theme Picks, laesst sie aber fuer harte Kader-Needs im Pool.");
 
   return { fitScore, status, reason, metrics, reasons };
 }
@@ -2912,6 +3125,7 @@ function filterIdentityEligibleCandidates(input: {
   team: Team;
   profile: TeamStrategyProfile | null;
   candidates: AiNeedsPicksCandidateScore[];
+  preserveMinimumPool?: boolean;
 }) {
   const evaluated = input.candidates.map((candidate) => ({
       candidate,
@@ -2951,6 +3165,9 @@ function filterIdentityEligibleCandidates(input: {
         return true;
       }
       if (entry.eligibility.status === "eligible") {
+        return true;
+      }
+      if (input.preserveMinimumPool) {
         return true;
       }
       return !hasBetterFocusAlternative({
@@ -3240,6 +3457,110 @@ function buildSlotPlan(input: {
   return slotPlan.slice(0, input.steps);
 }
 
+function stableDraftHash(value: string) {
+  let hash = 2166136261;
+  for (let index = 0; index < value.length; index += 1) {
+    hash ^= value.charCodeAt(index);
+    hash = Math.imul(hash, 16777619);
+  }
+  return hash >>> 0;
+}
+
+function draftUnit(seed: string) {
+  return (stableDraftHash(seed) % 10000) / 9999;
+}
+
+function draftCentered(seed: string) {
+  return draftUnit(seed) * 2 - 1;
+}
+
+function getDraftVarianceConfig(teamCode: string) {
+  const normalized = normalizeTeamCode(teamCode);
+  if (["M-M", "H-R", "R-R", "V-V"].includes(normalized)) {
+    return { laneBias: 0.075, maxJitter: 3.2, nearTieBand: 4.5 };
+  }
+  if (["W-W", "P-C", "T-G", "V-D", "D-P", "C-S", "L-K"].includes(normalized)) {
+    return { laneBias: 0.045, maxJitter: 1.6, nearTieBand: 3.2 };
+  }
+  return { laneBias: 0.06, maxJitter: 2.2, nearTieBand: 3.8 };
+}
+
+function applyDraftSeedLaneVariation(input: {
+  slotPlan: AiNeedsPickLane[];
+  draftSeed: string | null;
+  teamCode: string;
+  missingToMin: number;
+}) {
+  if (!input.draftSeed || input.slotPlan.length < 3) {
+    return input.slotPlan;
+  }
+  const varied = [...input.slotPlan];
+  const safeStart = Math.max(1, Math.min(input.missingToMin, varied.length - 2));
+  for (let index = safeStart; index < varied.length - 1; index += 1) {
+    const current = varied[index];
+    const next = varied[index + 1];
+    if (current === next) {
+      continue;
+    }
+    const currentPremium = current === "superstar" || current === "star";
+    const nextPremium = next === "superstar" || next === "star";
+    if ((currentPremium || nextPremium) && index < safeStart + 2) {
+      continue;
+    }
+    if (draftUnit(`${input.draftSeed}:${input.teamCode}:lane-swap:${index}`) > 0.63) {
+      varied[index] = next;
+      varied[index + 1] = current;
+      index += 1;
+    }
+  }
+  return varied;
+}
+
+function applyDraftSeedCandidateVariation(input: {
+  candidates: AiNeedsPicksCandidateScore[];
+  draftSeed: string | null;
+  teamCode: string;
+  stepIndex: number;
+}) {
+  if (!input.draftSeed || input.candidates.length <= 1) {
+    return input.candidates.sort((left, right) => right.finalScore - left.finalScore);
+  }
+  const config = getDraftVarianceConfig(input.teamCode);
+  const bestBaseScore = Math.max(...input.candidates.map((candidate) => candidate.finalScore));
+  return input.candidates
+    .map((candidate) => {
+      const baseScore = candidate.baseScore ?? candidate.finalScore;
+      const inBand = bestBaseScore - candidate.finalScore <= config.nearTieBand;
+      const hardBlocked = candidate.focusTeamStatus === "blocked" || candidate.capExceeded;
+      if (!inBand || hardBlocked) {
+        return {
+          ...candidate,
+          draftSeed: input.draftSeed,
+          baseScore,
+          tieBreakJitter: 0,
+          scoreWithSeed: candidate.finalScore,
+          tieBreakBand: inBand ? `near_tie_${config.nearTieBand}` : null,
+        };
+      }
+      const jitter = roundValue(
+        draftCentered(`${input.draftSeed}:${input.teamCode}:${input.stepIndex}:${candidate.playerId}`) * config.maxJitter,
+        2,
+      );
+      const scoreWithSeed = roundValue(candidate.finalScore + jitter, 2);
+      return {
+        ...candidate,
+        draftSeed: input.draftSeed,
+        baseScore,
+        tieBreakJitter: jitter,
+        scoreWithSeed,
+        tieBreakBand: `near_tie_${config.nearTieBand}`,
+        finalScore: scoreWithSeed,
+        reasons: jitter !== 0 ? [...candidate.reasons, `draft_seed_near_tie:${jitter}`] : candidate.reasons,
+      };
+    })
+    .sort((left, right) => right.finalScore - left.finalScore);
+}
+
 function buildPickPlanner(input: {
   gameState: GameState;
   team: Team;
@@ -3251,6 +3572,7 @@ function buildPickPlanner(input: {
   compareCandidates: AiTransferPreviewRecommendation[];
   steps: number;
   runMode?: AiNeedsPicksRunMode | null;
+  draftSeed?: string | null;
 }): AiNeedsPicksPlanner {
   const identity = getTeamIdentityRow(input.gameState, input.team.teamId);
   const teamCode = normalizeTeamCode(input.team.shortCode || input.team.teamId);
@@ -3259,6 +3581,13 @@ function buildPickPlanner(input: {
   const rosterGap = input.targetRosterSize != null ? Math.max(input.targetRosterSize - input.rosterCount, 0) : 0;
   const missingToMin = Math.max(input.playerMin - input.rosterCount, 0);
   const lanePhilosophy = getSeason1LanePhilosophy(input.team);
+  const draftSeed = input.draftSeed?.trim() || null;
+  const variance = getDraftVarianceConfig(teamCode);
+  const seededLaneBias = (key: string) => (draftSeed ? draftCentered(`${draftSeed}:${teamCode}:planner:${key}`) * variance.laneBias : 0);
+  const coreBias = clamp(lanePhilosophy.coreBias + seededLaneBias("core"), 0.18, 0.45);
+  const specialistBias = clamp(lanePhilosophy.specialistBias + seededLaneBias("specialist"), 0.04, 0.25);
+  const depthBias = clamp(lanePhilosophy.depthBias + seededLaneBias("depth"), 0.18, 0.48);
+  const backupBias = clamp(lanePhilosophy.backupBias + seededLaneBias("backup"), 0.04, 0.32);
   const existingStars = (input.roleCounts.get("star") ?? 0) + (input.roleCounts.get("superstar") ?? 0);
   const existingCores = input.roleCounts.get("core") ?? 0;
   const existingDepth = (input.roleCounts.get("depth") ?? 0) + (input.roleCounts.get("backup") ?? 0);
@@ -3331,13 +3660,13 @@ function buildPickPlanner(input: {
   const remainingSlotsAfterPremium = Math.max(rosterGap - premiumPlanned, 0);
   const coreNeeded = season1OptimumMode
     ? Math.min(
-        Math.max(existingCores === 0 ? 2 : 1, Math.ceil(remainingSlotsAfterPremium * lanePhilosophy.coreBias)),
+        Math.max(existingCores === 0 ? 2 : 1, Math.ceil(remainingSlotsAfterPremium * coreBias)),
         remainingSlotsAfterPremium,
       )
     : Math.max(existingCores === 0 ? 1 : 0, rosterGap > 0 ? 1 : 0);
   const specialistSlots = season1OptimumMode
     ? Math.min(
-        Math.max(specialistNeeded, Math.ceil(remainingSlotsAfterPremium * lanePhilosophy.specialistBias)),
+        Math.max(specialistNeeded, Math.ceil(remainingSlotsAfterPremium * specialistBias)),
         Math.max(rosterGap - premiumPlanned - coreNeeded, 0),
       )
     : specialistNeeded;
@@ -3347,19 +3676,20 @@ function buildPickPlanner(input: {
       ? Math.max(rosterGap - premiumPlanned - coreNeeded - specialistSlots, 0)
       : Math.max(rosterGap - coreNeeded - cheapFillNeeded, 0);
   const depthNeeded = season1OptimumMode
-    ? Math.min(Math.max(Math.ceil(remainingSlotsAfterPremium * lanePhilosophy.depthBias), 1), remainingAfterPremiumCore)
+    ? Math.min(Math.max(Math.ceil(remainingSlotsAfterPremium * depthBias), 1), remainingAfterPremiumCore)
     : Math.min(
         Math.max(existingDepth < 2 ? 2 - existingDepth : 0, remainingAfterPremiumCore > 0 ? 1 : 0),
         Math.max(remainingAfterPremiumCore, 0),
       );
   const backupNeeded = season1OptimumMode
     ? Math.max(
-        Math.max(Math.ceil(remainingSlotsAfterPremium * lanePhilosophy.backupBias), 0),
+        Math.max(Math.ceil(remainingSlotsAfterPremium * backupBias), 0),
         rosterGap - premiumPlanned - coreNeeded - specialistSlots - depthNeeded,
       )
     : Math.max(Math.min(rosterGap - coreNeeded - cheapFillNeeded - depthNeeded - specialistSlots, 1), 0);
 
-  const slotPlan = buildSlotPlan({
+  const slotPlan = applyDraftSeedLaneVariation({
+    slotPlan: buildSlotPlan({
     steps: input.steps,
     missingToMin,
     targetSlotsMissing: rosterGap,
@@ -3372,6 +3702,10 @@ function buildPickPlanner(input: {
     superstarAllowed: limitedSuperstarAllowed,
     premiumCap: lanePhilosophy.premiumCap,
     season1OptimumMode,
+    }),
+    draftSeed,
+    teamCode,
+    missingToMin,
   });
 
   const blockingReasons: string[] = [];
@@ -3383,6 +3717,9 @@ function buildPickPlanner(input: {
   }
   if (!season1OptimumMode && (limitedSuperstarAllowed > 0 || starAllowed > 0) && (coreNeeded > 0 || depthNeeded > 0 || missingToMin > 0)) {
     warnings.push("High-End-Lanes bleiben gedeckelt, solange Core/Depth oder Mindestkader noch offen sind.");
+  }
+  if (draftSeed) {
+    warnings.push(`draft_seed_planner_variation:${draftSeed}`);
   }
   const firstHighEndIndex = slotPlan.findIndex((lane) => lane === "superstar" || lane === "star");
   if (firstHighEndIndex >= 0) {
@@ -4220,6 +4557,126 @@ function getBudgetStretchEnvelope(input: {
   };
 }
 
+function isAiPlannerCandidateEligible(input: {
+  team: Team;
+  recommendation: AiTransferPreviewRecommendation;
+  player: Player | null;
+  rosterPlayers: Player[];
+  openNeeds: AiNeedsPicksOpenNeed[];
+  budgetLane: AiNeedsPicksBudgetLane;
+  pickPhase: AiNeedsPickPhase;
+  price: number | null;
+  remainingCash: number | null;
+  minimumSlotsBefore: number;
+  minimumReachableAfterPick: boolean;
+  targetSlotsBefore: number;
+  targetReachableAfterPick: boolean;
+  topNeedDisciplineIds: string[];
+  classCounts: Map<string, number>;
+  profile: TeamStrategyProfile | null;
+}) {
+  const price = input.price;
+  const lane = input.budgetLane.lane;
+  if (price != null && input.remainingCash != null && price > input.remainingCash + 0.01) {
+    return false;
+  }
+  if (input.minimumSlotsBefore > 0 && !input.minimumReachableAfterPick) {
+    return false;
+  }
+  if (input.targetSlotsBefore > 1 && !input.targetReachableAfterPick && lane !== "star" && lane !== "superstar") {
+    return false;
+  }
+
+  if (price != null) {
+    const hardLaneCap =
+      lane === "cheap_fill"
+        ? AI_CHEAP_FILL_MARKET_VALUE_CAP
+        : lane === "backup"
+          ? AI_RESERVE_MARKET_VALUE_CAP
+          : lane === "depth"
+            ? Math.min(Math.max(input.budgetLane.priceCap ?? AI_RESERVE_MARKET_VALUE_CAP, AI_RESERVE_MARKET_VALUE_CAP), 40)
+            : lane === "specialist" || lane === "core"
+              ? input.budgetLane.priceCap != null
+                ? input.budgetLane.priceCap * 1.18
+                : null
+              : null;
+    if (hardLaneCap != null && price > hardLaneCap + 0.01) {
+      return false;
+    }
+    if ((lane === "cheap_fill" || lane === "backup" || lane === "depth") && price > AI_EXPENSIVE_EARLY_SCAN_CAP) {
+      return false;
+    }
+  }
+
+  const player = input.player;
+  if (!player) {
+    return true;
+  }
+
+  const candidateAxis = getPlayerAxis(player);
+  const playerRole = getPlayerRoleTag(player, candidateAxis);
+  const sportsQuality = getPlayerSportsQuality(player, candidateAxis);
+  const needAxes = new Set(
+    input.openNeeds
+      .map((entry) => entry.axis)
+      .filter((axis): axis is "pow" | "spe" | "men" | "soc" => axis === "pow" || axis === "spe" || axis === "men" || axis === "soc"),
+  );
+  const axisHitsNeed = candidateAxis != null && needAxes.has(candidateAxis);
+  const bestNeedDisciplineScore =
+    input.topNeedDisciplineIds.length > 0
+      ? Math.max(...input.topNeedDisciplineIds.map((disciplineId) => player.disciplineRatings?.[disciplineId] ?? 0), 0)
+      : 0;
+  const topNeedDisciplineHit = bestNeedDisciplineScore >= (lane === "specialist" ? 54 : 48);
+  const cheapEmergency =
+    input.minimumSlotsBefore > 0 &&
+    (lane === "cheap_fill" || lane === "backup") &&
+    price != null &&
+    price <= (lane === "cheap_fill" ? AI_CHEAP_FILL_MARKET_VALUE_CAP : AI_RESERVE_MARKET_VALUE_CAP);
+  const isMercenary = hasMercenaryTrait({
+    traitsPositive: player.traitsPositive ?? [],
+    traitsNegative: player.traitsNegative ?? [],
+  });
+  const teamFit = calculateTransfermarktFit(player, input.rosterPlayers, { teamId: input.team.teamId }).teamFit ?? 0;
+  const plannerAllowsThemeBreaker =
+    (lane === "star" || lane === "superstar") &&
+    (bestNeedDisciplineScore >= 76 || sportsQuality.topCore >= 76 || sportsQuality.topDiscipline >= 84);
+  if (teamFit < 0 && !isMercenary && !cheapEmergency && !plannerAllowsThemeBreaker) {
+    return false;
+  }
+
+  const laneNeedsAxis =
+    lane === "depth" ||
+    lane === "specialist" ||
+    (lane === "core" && input.pickPhase !== "late_core_investment");
+  if (
+    laneNeedsAxis &&
+    needAxes.size > 0 &&
+    !axisHitsNeed &&
+    !topNeedDisciplineHit &&
+    playerRole !== "star" &&
+    playerRole !== "superstar"
+  ) {
+    return false;
+  }
+
+  const classToken = normalizeToken(player.className ?? input.recommendation.className);
+  const classCount = input.classCounts.get(classToken) ?? 0;
+  const profileWantsClass = Boolean(input.profile?.preferredClasses.some((entry) => normalizeToken(entry) === classToken));
+  const clearlyDifferentOrBetter =
+    profileWantsClass ||
+    axisHitsNeed ||
+    topNeedDisciplineHit ||
+    sportsQuality.strongDisciplineCount >= 2 ||
+    sportsQuality.topDiscipline >= 70 ||
+    playerRole === "star" ||
+    playerRole === "superstar";
+  if (classCount >= 3 && !clearlyDifferentOrBetter) {
+    return false;
+  }
+
+  return true;
+}
+
 function scoreCandidate(input: {
   gameState: GameState;
   team: Team;
@@ -4651,6 +5108,7 @@ function scoreCandidate(input: {
     formColorReason,
     strategicException,
     strategicExceptionReason,
+    minimumReachableAfterPick: input.minimumReachableAfterPick,
     mustFeelRightStatus,
     focusTeamStatus: focusTeamFit.status,
     focusTeamReason: focusTeamFit.reason,
@@ -4813,6 +5271,9 @@ function toComparePrizeSignal(
       expectedPrizeNextSeason3: null,
       expectedPrizeNextSeason4: null,
       expectedPrizeFiveSeasonSum: null,
+      expectedGuvCurrentSeason: null,
+      expectedGuvFiveSeasonSum: null,
+      expectedProjectedCashAfterFiveSeasons: null,
       expectedPrizeTrend: "unknown",
       prizeConfidence: "missing_source",
       prizeSourceStatus: "missing_source",
@@ -4823,6 +5284,14 @@ function toComparePrizeSignal(
 
   const future = item.futureSeasons.slice(0, 4);
   const futureValues = future.map((entry) => entry.prizeMoney);
+  const currentGuv =
+    item.prizeMoney != null && item.salaryTotal != null ? roundValue(item.prizeMoney - item.salaryTotal, 2) : null;
+  const futureGuvValues = future.map((entry) => entry.guv);
+  const guvValues = [currentGuv, ...futureGuvValues].filter((value): value is number => value != null);
+  const expectedProjectedCashAfterFiveSeasons =
+    item.currentCash != null && guvValues.length > 0
+      ? roundValue(item.currentCash + guvValues.reduce((sum, value) => sum + value, 0), 2)
+      : item.projectedCash ?? future.map((entry) => entry.projectedCash).find((value) => value != null) ?? null;
   const firstKnown = futureValues.find((value) => value != null) ?? item.prizeMoney;
   const lastKnown = [...futureValues].reverse().find((value) => value != null) ?? item.prizeMoney;
   const comparableValues = [item.prizeMoney, ...futureValues].filter((value): value is number => value != null);
@@ -4848,6 +5317,7 @@ function toComparePrizeSignal(
 
   const expectedPrizeFiveSeasonSum =
     comparableValues.length > 0 ? roundValue(comparableValues.reduce((sum, value) => sum + value, 0), 2) : null;
+  const expectedGuvFiveSeasonSum = guvValues.length > 0 ? roundValue(guvValues.reduce((sum, value) => sum + value, 0), 2) : null;
   const hasCurrent = item.prizeMoney != null;
   const futureKnown = futureValues.filter((value) => value != null).length;
   const prizeSourceStatus: ComparePrizeSignal["prizeSourceStatus"] =
@@ -4860,6 +5330,9 @@ function toComparePrizeSignal(
     expectedPrizeNextSeason3: future[2]?.prizeMoney ?? null,
     expectedPrizeNextSeason4: future[3]?.prizeMoney ?? null,
     expectedPrizeFiveSeasonSum,
+    expectedGuvCurrentSeason: currentGuv,
+    expectedGuvFiveSeasonSum,
+    expectedProjectedCashAfterFiveSeasons,
     expectedPrizeTrend,
     prizeConfidence: prizeSourceStatus,
     prizeSourceStatus,
@@ -4934,6 +5407,7 @@ function buildTeamEntry(input: {
   prizeSignalByTeamId: Map<string, ComparePrizeSignal>;
   excludedPlayerIds?: string[];
   runMode: AiNeedsPicksRunMode;
+  draftSeed?: string | null;
 }): AiNeedsPicksCompareTeamEntry | null {
   const team = input.context.gameState.teams.find((entry) => entry.teamId === input.previewTeam.teamId) ?? null;
   if (!team) {
@@ -4942,18 +5416,14 @@ function buildTeamEntry(input: {
   const season1OptimumMode = input.runMode === "season1_optimum_execute";
 
   const profile = getTeamStrategyProfile(input.context.gameState, team.teamId);
+  const identity = getTeamIdentityRow(input.context.gameState, team.teamId);
+  const rosterTargets = deriveRosterTargets(team, identity);
   const needs = evaluateAiNeeds(input.context.gameState, team.teamId);
   const rosterComposition = buildRosterComposition(input.context.gameState, team.teamId);
   const rosterEntries = getRosterEntriesForTeam(input.context.gameState, team.teamId);
   const rosterCount = input.previewTeam.rosterCount ?? input.previewTeam.rosterSize ?? rosterEntries.length ?? null;
-  const targetRosterSize =
-    input.previewTeam.targetRosterOpt ?? profile?.rosterOptTarget ?? input.context.gameState.teamIdentities.find((entry) => entry.teamId === team.teamId)?.playerOpt ?? null;
-  const configuredMinimumTarget =
-    input.previewTeam.targetRosterMin ??
-    profile?.rosterMinTarget ??
-    input.context.gameState.teamIdentities.find((entry) => entry.teamId === team.teamId)?.playerMin ??
-    null;
-  const playerMin = LEGAL_MINIMUM_ROSTER_SIZE;
+  const targetRosterSize = rosterTargets.playerOpt;
+  const playerMin = rosterTargets.playerMin;
   const targetRosterGap =
     rosterCount != null && targetRosterSize != null ? Math.max(targetRosterSize - rosterCount, 0) : null;
   const baseAxisDeficits = {
@@ -4963,11 +5433,6 @@ function buildTeamEntry(input: {
     soc: needs.axisDeficits.soc,
   };
   const warnings = [...input.retoolReferenceStatus.warnings];
-  if (configuredMinimumTarget != null && configuredMinimumTarget > LEGAL_MINIMUM_ROSTER_SIZE) {
-    warnings.push(
-      `Teamziel fuer den Kader liegt bei ${configuredMinimumTarget}, aber das harte Gameplay-Minimum bleibt ${LEGAL_MINIMUM_ROSTER_SIZE}.`,
-    );
-  }
   const coveredAxisHits = { pow: 0, spe: 0, men: 0, soc: 0 };
   const simulatedClassCounts = new Map(rosterComposition.classCounts);
   const simulatedRoleCounts = new Map(rosterComposition.roleCounts);
@@ -5026,8 +5491,8 @@ function buildTeamEntry(input: {
     compareCandidates,
     steps: maxSteps,
     runMode: input.runMode,
+    draftSeed: input.draftSeed ?? null,
   });
-  const identity = getTeamIdentityRow(input.context.gameState, team.teamId);
   const expectedPrizeSignal =
     input.prizeSignalByTeamId.get(team.teamId) ??
     toComparePrizeSignal(null, "missing_source");
@@ -5137,6 +5602,7 @@ function buildTeamEntry(input: {
     team,
     profile,
     candidates: initiallyScoredCandidates,
+    preserveMinimumPool: true,
   });
   if (initialIdentityFilter.usedFallback) {
     warnings.push(
@@ -5218,9 +5684,19 @@ function buildTeamEntry(input: {
       season1OptimumMode && targetRosterSize != null && simulatedRosterCount != null
         ? Math.max(targetRosterSize - simulatedRosterCount, 0)
         : 0;
+    const minimumAcceptedRosterTarget =
+      season1OptimumMode && targetRosterSize != null
+        ? Math.max(playerMin, targetRosterSize - 2)
+        : playerMin;
+    const mustContinueTowardOptimum =
+      season1OptimumMode &&
+      minimumSecured &&
+      simulatedRosterCount != null &&
+      simulatedRosterCount < minimumAcceptedRosterTarget;
     const candidateEvaluations = compareCandidates
       .filter((entry) => !pickedPlayerIds.includes(entry.playerId))
       .map((entry) => {
+        const player = getPlayerById(input.context.gameState, entry.playerId);
         const price = entry.price ?? entry.marketValue ?? null;
         const cashAfter = remainingCash != null && price != null ? roundValue(remainingCash - price, 2) : remainingCash;
         const minimumSlotsAfter = Math.max(playerMin - ((simulatedRosterCount ?? 0) + 1), 0);
@@ -5256,6 +5732,7 @@ function buildTeamEntry(input: {
               cashAfter >= targetReserveAfter.reservedCash;
         return {
           entry,
+          player,
           price,
           minimumSlotsAfter,
           reserveAfter,
@@ -5266,9 +5743,12 @@ function buildTeamEntry(input: {
         };
       });
     const minimumSafeCandidateEvaluations =
-      minimumSlotsBefore > 0 && candidateEvaluations.some((entry) => entry.minimumReachableAfterPick)
+      season1OptimumMode && minimumSlotsBefore > 0
         ? candidateEvaluations.filter((entry) => entry.minimumReachableAfterPick)
         : candidateEvaluations;
+    if (season1OptimumMode && minimumSlotsBefore > 0 && candidateEvaluations.length > 0 && minimumSafeCandidateEvaluations.length === 0) {
+      warnings.push(`Schritt ${stepIndex + 1}: minimum_future_cash_guard_no_safe_candidate`);
+    }
     const targetSafeCandidateEvaluations =
       season1OptimumMode && targetSlotsBefore > 1 && minimumSafeCandidateEvaluations.some((entry) => entry.targetReachableAfterPick)
         ? minimumSafeCandidateEvaluations.filter((entry) => entry.targetReachableAfterPick)
@@ -5291,13 +5771,38 @@ function buildTeamEntry(input: {
         : affordableCandidateEvaluations.length > 0
           ? affordableCandidateEvaluations
           : [];
-    const scored = gatedCandidateEvaluations
+    const plannerEligibleCandidateEvaluations = gatedCandidateEvaluations.filter((evaluation) =>
+      isAiPlannerCandidateEligible({
+        team,
+        recommendation: evaluation.entry,
+        player: evaluation.player,
+        rosterPlayers: simulatedRosterPlayers,
+        openNeeds,
+        budgetLane: lane,
+        pickPhase,
+        price: evaluation.price,
+        remainingCash,
+        minimumSlotsBefore,
+        minimumReachableAfterPick: evaluation.minimumReachableAfterPick,
+        targetSlotsBefore,
+        targetReachableAfterPick: evaluation.targetReachableAfterPick,
+        topNeedDisciplineIds: needs.topNeedDisciplineIds,
+        classCounts: simulatedClassCounts,
+        profile,
+      }),
+    );
+    const scoreCandidateEvaluations =
+      plannerEligibleCandidateEvaluations.length > 0
+        ? plannerEligibleCandidateEvaluations
+        : gatedCandidateEvaluations;
+    const scoredBase = scoreCandidateEvaluations
       .map((evaluation) =>
-        scoreCandidate({
+        {
+          const scoredCandidate = scoreCandidate({
           recommendation: evaluation.entry,
           gameState: input.context.gameState,
           team,
-          player: getPlayerById(input.context.gameState, evaluation.entry.playerId),
+          player: evaluation.player,
           openNeeds,
           budgetLane: lane,
           profile,
@@ -5316,14 +5821,34 @@ function buildTeamEntry(input: {
           seasonStrategy: seasonPlanning.seasonStrategy,
           pickPhase,
           teamCashTier,
-        }),
+          });
+          const optimumDepthBonus = getSeason1OptimumDepthPressureBonus({
+            candidate: scoredCandidate,
+            targetSlotsBefore,
+            mustContinueTowardOptimum,
+          });
+          return optimumDepthBonus > 0
+            ? {
+                ...scoredCandidate,
+                finalScore: roundValue(scoredCandidate.finalScore + optimumDepthBonus, 2),
+                reasons: [...scoredCandidate.reasons, `optimum_depth_pressure:+${optimumDepthBonus}`],
+              }
+            : scoredCandidate;
+        },
       )
       .sort((left, right) => right.finalScore - left.finalScore);
+    const scored = applyDraftSeedCandidateVariation({
+      candidates: scoredBase,
+      draftSeed: input.draftSeed ?? null,
+      teamCode: normalizeTeamCode(team.shortCode || team.teamId),
+      stepIndex,
+    });
     const identityFiltered = filterIdentityEligibleCandidates({
       gameState: input.context.gameState,
       team,
       profile,
       candidates: scored,
+      preserveMinimumPool: minimumSlotsBefore > 0,
     });
     const rankedScoredCandidates = identityFiltered.candidates.sort((left, right) => right.finalScore - left.finalScore);
     const earlyPhaseStrict =
@@ -5346,7 +5871,10 @@ function buildTeamEntry(input: {
         : rankedPhaseCandidates;
     const rankedTargetAwareCandidates =
       season1OptimumMode && minimumSlotsBefore > 0
-        ? rankedTargetAwareCandidatesRaw.filter((candidate) => isSeason1MinimumIdentityAcceptable(team, candidate))
+        ? rankedTargetAwareCandidatesRaw.filter((candidate) =>
+            isSeason1MinimumIdentityAcceptable(team, candidate) ||
+            isSeason1MinimumDepthAcceptable(team, candidate),
+          )
         : rankedTargetAwareCandidatesRaw;
     const postMinimumQualityCandidates =
       minimumSecured ? rankedTargetAwareCandidates.filter(isPostMinimumQualityAcceptable) : rankedTargetAwareCandidates;
@@ -5379,6 +5907,16 @@ function buildTeamEntry(input: {
           ? postMinimumCorridorCandidates
           : postMinimumTargetPressureCandidates
         : rankedQualityCandidates;
+    const relaxedRelativeCandidates = rankedTargetAwareCandidates.filter(isRelativeMarketFitLegal);
+    const phaseRelativeCandidates = rankedPhaseCandidates.filter(isRelativeMarketFitLegal);
+    const relativeMarketCandidates =
+      rankedSelectionCandidates.length > 0
+        ? rankedSelectionCandidates
+        : rankedQualityCandidates.length > 0
+          ? rankedQualityCandidates
+          : relaxedRelativeCandidates.length > 0
+            ? relaxedRelativeCandidates
+            : phaseRelativeCandidates;
     if (identityFiltered.usedFallback) {
       warnings.push(
         `Schritt ${stepIndex + 1}: Identity-Fallback aktiv (${identityFiltered.fallbackReason ?? "identity_fallback"}).`,
@@ -5386,8 +5924,14 @@ function buildTeamEntry(input: {
     }
 
     if (season1OptimumMode && minimumSecured && rankedQualityCandidates.length === 0) {
-      warnings.push(`Schritt ${stepIndex + 1}: target_not_reachable_quality_floor`);
-      break;
+      if (relativeMarketCandidates.length > 0) {
+        warnings.push(
+          `Schritt ${stepIndex + 1}: quality_floor_empty_relative_market_pick${mustContinueTowardOptimum ? "_under_optimum_pressure" : ""}`,
+        );
+      } else {
+        warnings.push(`Schritt ${stepIndex + 1}: target_not_reachable_quality_floor`);
+        break;
+      }
     }
 
     if (season1OptimumMode && minimumSecured && rankedQualityCandidates.length > 0 && rankedSelectionCandidates.length === 0) {
@@ -5397,9 +5941,8 @@ function buildTeamEntry(input: {
         remainingCash,
       });
       warnings.push(
-        `Schritt ${stepIndex + 1}: season1_spend_corridor_stop${projectedSpend != null ? `:${projectedSpend}pct` : ""}`,
+        `Schritt ${stepIndex + 1}: spend_corridor_empty_relative_market_pick${projectedSpend != null ? `:${projectedSpend}pct` : ""}`,
       );
-      break;
     }
     if (season1OptimumMode && minimumSecured && postMinimumCorridorCandidates.length === 0 && postMinimumTargetPressureCandidates.length > 0) {
       warnings.push(
@@ -5407,10 +5950,24 @@ function buildTeamEntry(input: {
       );
     }
 
-    let top = rankedSelectionCandidates[0] ?? null;
+    let top = relativeMarketCandidates[0] ?? null;
+    if (mustContinueTowardOptimum && top && rankedSelectionCandidates.length === 0) {
+      warnings.push(`Schritt ${stepIndex + 1}: optimum_minus_2_depth_pick`);
+    }
+    if (!top && minimumSlotsBefore > 0) {
+      const emergencyMinimumCandidate = scored.find(
+        (entry) =>
+          entry.minimumReachableAfterPick &&
+          isSeason1MinimumDepthAcceptable(team, entry) &&
+          canAffordWithoutNegativeCash(entry.price, remainingCash),
+      );
+      if (emergencyMinimumCandidate) {
+        top = emergencyMinimumCandidate;
+        warnings.push(`Schritt ${stepIndex + 1}: minimum_roster_emergency_depth_pick`);
+      }
+    }
     if (minimumSecured && top && !isPostMinimumQualityAcceptable(top)) {
-      warnings.push(`Schritt ${stepIndex + 1}: post_minimum_quality_floor_stop`);
-      break;
+      warnings.push(`Schritt ${stepIndex + 1}: post_minimum_quality_floor_warning_relative_pick`);
     }
     if (top && minimumSlotsBefore > 0 && !season1OptimumMode) {
       const cheaperAlternative = rankedPhaseCandidates.find(
@@ -5460,7 +6017,7 @@ function buildTeamEntry(input: {
         team,
         identity,
         expectedPrizeSignal: cashStrategyWithLanes.expectedPrizeSignal,
-        candidates: minimumSecured ? rankedSelectionCandidates : rankedTargetAwareCandidates,
+        candidates: minimumSecured ? relativeMarketCandidates : rankedTargetAwareCandidates,
         current: top,
         remainingCash,
         startingCash: cashStrategyWithLanes.startingCash,
@@ -5475,7 +6032,7 @@ function buildTeamEntry(input: {
 
       const impactCandidate = findSeason1OptimumImpactCandidate({
         team,
-        candidates: minimumSecured ? rankedSelectionCandidates : rankedTargetAwareCandidates,
+        candidates: minimumSecured ? relativeMarketCandidates : rankedTargetAwareCandidates,
         current: top,
         remainingCash,
         minimumSlotsBefore,
@@ -5537,6 +6094,33 @@ function buildTeamEntry(input: {
           top = premiumReplacement;
           warnings.push(
             `Schritt ${stepIndex + 1}: ${lane.lane}-Lane erzwingt echten Impact-Pick statt billigem Zielspieler.`,
+          );
+        }
+      }
+    }
+    if (
+      season1OptimumMode &&
+      top &&
+      minimumSlotsBefore > 1 &&
+      minimumSlotsBefore <= 3 &&
+      remainingCash != null &&
+      top.price != null
+    ) {
+      const minimumSlotBudget = remainingCash / minimumSlotsBefore;
+      if (top.price > minimumSlotBudget * 1.12) {
+        const minimumSafeAlternative = rankedTargetAwareCandidates.find(
+          (entry) =>
+            entry.playerId !== top?.playerId &&
+            entry.price != null &&
+            entry.price <= minimumSlotBudget * 1.08 &&
+            entry.minimumReachableAfterPick &&
+            canAffordWithoutNegativeCash(entry.price, remainingCash) &&
+            isSeason1MinimumDepthAcceptable(team, entry),
+        );
+        if (minimumSafeAlternative) {
+          top = minimumSafeAlternative;
+          warnings.push(
+            `Schritt ${stepIndex + 1}: Minimum-Sicherung ersetzt zu teuren Pick durch guenstigeren legalen Depth-Pick.`,
           );
         }
       }
@@ -5888,6 +6472,11 @@ function buildTeamEntry(input: {
       depthNeedFilled,
       minimumReachableAfterPick: topEvaluation?.minimumReachableAfterPick ?? true,
       remainingMinimumReserve: topEvaluation?.reserveAfter.reservedCash ?? null,
+      draftSeed: top.draftSeed ?? input.draftSeed ?? null,
+      baseScore: top.baseScore ?? top.finalScore,
+      tieBreakJitter: top.tieBreakJitter ?? 0,
+      scoreWithSeed: top.scoreWithSeed ?? top.finalScore,
+      tieBreakBand: top.tieBreakBand ?? null,
       finalScore: top.finalScore,
       scoreBreakdown: top.scoreBreakdown,
       reasons: top.reasons,
@@ -6076,6 +6665,7 @@ export async function buildAiNeedsPicksCompare(
         teamScope: "all",
         excludedPlayerIds: params.excludedPlayerIds ?? [],
         limit: params.limit ?? fullFreeAgentPoolSize,
+        fullScoringLimit: params.fullScoringLimit ?? null,
       } satisfies AiTransferPreviewParams),
     ),
   );
@@ -6094,6 +6684,7 @@ export async function buildAiNeedsPicksCompare(
         prizeSignalByTeamId,
         excludedPlayerIds: params.excludedPlayerIds ?? undefined,
         runMode: params.runMode ?? "default",
+        draftSeed: params.draftSeed ?? null,
       }),
     );
 

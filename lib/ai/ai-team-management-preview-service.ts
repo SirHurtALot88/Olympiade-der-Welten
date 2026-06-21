@@ -6,6 +6,7 @@ import type {
   Team,
   TeamIdentity,
 } from "@/lib/data/olyDataTypes";
+import { getTeamObjectiveAiBias, type TeamObjectiveAiBias } from "@/lib/board/team-season-objectives-service";
 import { previewFacilitySeasonEndFinance } from "@/lib/facilities/facility-season-end-service";
 import { FACILITY_CATALOG, getFacilityLevelDefinition, type FacilityId } from "@/lib/facilities/facility-catalog";
 import { calculateFacilityMaintenanceCost, FACILITY_CONDITION_FULL } from "@/lib/facilities/facility-condition";
@@ -160,6 +161,7 @@ type TeamContext = {
   lastSeasonRank: number | null;
   lastSeasonPrizeMoney: number;
   upcomingCategoryCounts: Record<DisciplineCategory, number>;
+  objectiveAiBias: TeamObjectiveAiBias | null;
 };
 
 type CalculatedPlayerEconomy = {
@@ -374,6 +376,7 @@ function buildTeamContext(
     lastSeasonRank,
     lastSeasonPrizeMoney,
     upcomingCategoryCounts,
+    objectiveAiBias: getTeamObjectiveAiBias(gameState, teamId),
   };
 }
 
@@ -384,8 +387,11 @@ function deriveStrategicIntent(context: TeamContext) {
   const rosterGap = Math.max(0, context.identity.playerMin - context.rosterCount);
   if (context.team.cash < 0) return "cash_recovery" as const;
   if (rosterGap > 0 || context.rosterCount < context.identity.playerMin) return "roster_repair" as const;
+  if ((context.objectiveAiBias?.rosterUrgency ?? 0) >= 0.78 && context.rosterCount < context.identity.playerOpt) return "roster_repair" as const;
   if (context.injuryCount >= 2 || context.fatigueCriticalCount >= 2) return "injury_recovery" as const;
   if (salaryPressure >= 1.18 && finances <= 45) return "salary_control" as const;
+  if ((context.objectiveAiBias?.budgetConservatism ?? 0) >= 0.7 && context.team.cash <= 25) return "conservative_hold" as const;
+  if ((context.objectiveAiBias?.facilityPriority ?? 0) >= 0.7 && context.team.cash >= 35) return "facility_push" as const;
   if (ratio(context.youthCount, context.rosterCount) >= 0.35) return "youth_development" as const;
   if (context.team.cash >= 80 && ambition >= 70 && finances >= 55) return "facility_push" as const;
   if ((context.lastSeasonRank ?? 99) <= 6 && ambition >= 68) return "win_now" as const;
@@ -414,7 +420,11 @@ function buildProfile(gameState: GameState, context: TeamContext): AiTeamManagem
   const ambition = identitySignal(context.identity.ambition);
   const finances = identitySignal(context.identity.finances);
   const boardConfidence = identitySignal(context.identity.boardConfidence);
-  const rosterPressure = clamp(((context.identity.playerOpt - context.rosterCount) / Math.max(context.identity.playerOpt, 1)) * 100, 0, 100);
+  const objectiveBias = context.objectiveAiBias;
+  const rosterPressure = Math.max(
+    clamp(((context.identity.playerOpt - context.rosterCount) / Math.max(context.identity.playerOpt, 1)) * 100, 0, 100),
+    (objectiveBias?.rosterUrgency ?? 0) * 100,
+  );
   const salaryPressure = clamp((context.expectedSalarySum / Math.max(context.team.cash + context.salarySum, 1)) * 100, 0, 100);
   const warnings: string[] = [];
   if (context.team.cash < 10) warnings.push("cash_low");
@@ -422,6 +432,7 @@ function buildProfile(gameState: GameState, context: TeamContext): AiTeamManagem
   if (context.fatigueCriticalCount > 0) warnings.push("fatigue_critical");
   if (context.lowMoraleCount >= 2) warnings.push("morale_cluster_low");
   if (context.contractExitCount >= 2) warnings.push("contract_exit_wave");
+  warnings.push(...(objectiveBias?.warnings ?? []).map((warning) => `board_objective:${warning}`));
   return {
     teamId: context.team.teamId,
     teamCode: context.team.shortCode,
@@ -429,7 +440,7 @@ function buildProfile(gameState: GameState, context: TeamContext): AiTeamManagem
     controlMode: getControlMode(gameState, context.team.teamId),
     strategicIntent,
     riskProfile,
-    boardPressure: clamp(100 - boardConfidence, 0, 100),
+    boardPressure: Math.max(clamp(100 - boardConfidence, 0, 100), (objectiveBias?.pressure ?? 0) * 10),
     youthShare: round(ratio(context.youthCount, context.rosterCount) * 100, 2),
     injuryPressure: clamp(context.injuryCount * 22 + context.fatigueCriticalCount * 12, 0, 100),
     fatiguePressure: clamp(context.fatigueAvg + context.fatigueHighCount * 5, 0, 100),
@@ -468,13 +479,17 @@ function buildBudgetPlan(gameState: GameState, context: TeamContext): AiTeamBudg
   const cash = context.team.cash ?? 0;
   const ambition = identitySignal(context.identity.ambition);
   const finances = identitySignal(context.identity.finances);
+  const objectiveBias = context.objectiveAiBias;
   const salaryReserve = round(Math.max(context.salarySumBudget * 0.5, context.expectedSalarySum * 0.35), 2);
   const maintenanceBudget = round(Math.max(facilityPreview.facilityUpkeepTotal, facilityMaintenanceCost, 0), 2);
   const emergencyBudget = round(Math.max(5, cash * (context.injuryCount > 0 ? 0.14 : 0.08)), 2);
   const cashReserveRate = clamp(
-    0.13 + Math.max(0, finances - 55) / 450 - Math.max(0, ambition - 65) / 900,
+    0.13 +
+      Math.max(0, finances - 55) / 450 -
+      Math.max(0, ambition - 65) / 900 +
+      (objectiveBias?.budgetConservatism ?? 0) * 0.05,
     0.1,
-    0.24,
+    0.3,
   );
   const cashReserve = round(Math.max(8, cash * cashReserveRate), 2);
   const rawFreeCash = Math.max(0, cash - salaryReserve - maintenanceBudget - emergencyBudget - cashReserve);
@@ -484,12 +499,15 @@ function buildBudgetPlan(gameState: GameState, context: TeamContext): AiTeamBudg
     (ambition >= 65 ? 0.08 : 0) +
     (finances >= 70 ? 0.04 : 0) +
     (context.youthCount >= 2 ? 0.04 : 0) +
-    recoveryBuildingNeed;
+    recoveryBuildingNeed +
+    (objectiveBias?.facilityPriority ?? 0) * 0.09;
   const transferBias =
     0.28 +
     (context.rosterCount < context.identity.playerMin ? 0.24 : context.rosterCount < context.identity.playerOpt ? 0.14 : 0) +
     (ambition >= 70 ? 0.05 : 0) +
-    (finances >= 65 ? 0.03 : 0);
+    (finances >= 65 ? 0.03 : 0) +
+    (objectiveBias?.buyAggression ?? 0) * 0.12 -
+    (objectiveBias?.budgetConservatism ?? 0) * 0.05;
   const investmentRate = clamp(0.6 + ambition / 600 + finances / 900, 0.58, 0.82);
   const investableCash = rawFreeCash * investmentRate;
   const totalBias = Math.max(0.01, buildingBias + transferBias);
@@ -550,19 +568,23 @@ function buildBuildingPlan(gameState: GameState, context: TeamContext, budgetPla
   const cashStart = context.team.cash ?? 0;
   const ambition = identitySignal(context.identity.ambition);
   const finances = identitySignal(context.identity.finances);
+  const objectiveBias = context.objectiveAiBias;
   let spendCursor = 0;
   return FACILITY_CATALOG.map((facility) => {
     const currentLevel = teamFacilities.facilities[facility.facilityId]?.level ?? 0;
     const nextLevel = Math.min(facility.maxLevel, currentLevel + 1);
+    const downgradeLevel = Math.max(0, currentLevel - 1);
+    const currentDefinition = getFacilityLevelDefinition(facility.facilityId, currentLevel);
     const nextDefinition = getFacilityLevelDefinition(facility.facilityId, nextLevel);
-    const maintenanceCost = getFacilityLevelDefinition(facility.facilityId, currentLevel)?.seasonUpkeep ?? 0;
+    const maintenanceCost = currentDefinition?.seasonUpkeep ?? 0;
+    const currentIncome = currentDefinition?.seasonIncome ?? 0;
     const upgradeCost = nextDefinition?.upgradeCost ?? 0;
     const positive: string[] = [];
     const negative: string[] = [];
     let score = 0;
 
     if (facility.facilityId === "training_center") {
-      score += context.youthCount * 10 + (profile.strategicIntent === "youth_development" ? 18 : 0);
+      score += context.youthCount * 10 + (profile.strategicIntent === "youth_development" ? 18 : 0) + (objectiveBias?.developmentPriority ?? 0) * 6;
       if (context.injuryCount > 0) score -= 8;
       positive.push("junge/entwickelbare Spieler profitieren");
       if (context.injuryCount > 0) negative.push("Verletzungen machen XP-Push riskanter");
@@ -572,7 +594,7 @@ function buildBuildingPlan(gameState: GameState, context: TeamContext, budgetPla
       positive.push("Fatigue/Injury-Druck ist hoch");
       if (context.rosterCount >= context.identity.playerOpt + 2) negative.push("große Rotation mildert den Druck");
     } else if (facility.facilityId === "scouting_office" || facility.facilityId === "analytics_room") {
-      score += Math.max(0, context.identity.playerOpt - context.rosterCount) * 10 + context.contractExitCount * 6;
+      score += Math.max(0, context.identity.playerOpt - context.rosterCount) * 10 + context.contractExitCount * 6 + (objectiveBias?.rosterUrgency ?? 0) * 7;
       if (context.team.cash < 15) score -= 10;
       positive.push("Kaderlücken und Vertragswellen erhöhen den Informationswert");
       if (context.team.cash < 15) negative.push("Cash ist für Scouts/Forecasts knapp");
@@ -582,7 +604,7 @@ function buildBuildingPlan(gameState: GameState, context: TeamContext, budgetPla
       positive.push("langfristiger Cashflow hilft Reserven");
       if (profile.strategicIntent === "roster_repair") negative.push("akute Kaderbaustellen sind wichtiger");
     } else if (facility.facilityId === "academy" || facility.facilityId === "specialist_wing") {
-      score += context.youthCount * 7 + ambition * 0.12;
+      score += context.youthCount * 7 + ambition * 0.12 + (objectiveBias?.developmentPriority ?? 0) * 8;
       if (context.team.cash < 18) score -= 8;
       positive.push("Development-/Upgrade-Plan profitiert");
       if (context.team.cash < 18) negative.push("wenig freies Cash für Spezial-Investments");
@@ -590,8 +612,23 @@ function buildBuildingPlan(gameState: GameState, context: TeamContext, budgetPla
 
     score = round(clamp(score, 0, 100), 2);
     const canSpend = spendCursor + upgradeCost <= budgetPlan.bucketsBefore.buildingBudget;
+    const hasCashPressure =
+      budgetPlan.freeCashAfterReserves <= 0 ||
+      budgetPlan.warnings.includes("salary_and_maintenance_pressure") ||
+      budgetPlan.cash < budgetPlan.bucketsBefore.maintenanceBudget + budgetPlan.bucketsBefore.cashReserve;
+    const lowStrategicValue =
+      score < 42 ||
+      ((profile.strategicIntent === "cash_recovery" || profile.strategicIntent === "salary_control") && score < 58);
+    const isNetPositiveIncomeFacility = currentIncome > maintenanceCost;
+    const shouldDowngrade =
+      currentLevel > 0 &&
+      hasCashPressure &&
+      lowStrategicValue &&
+      !isNetPositiveIncomeFacility;
     const action: AiManagementBuildingAction =
-      maintenanceCost > 0 && budgetPlan.bucketsBefore.maintenanceBudget >= maintenanceCost
+      shouldDowngrade
+        ? "downgrade_or_ignore_if_no_cash"
+        : maintenanceCost > 0 && budgetPlan.bucketsBefore.maintenanceBudget >= maintenanceCost
         ? score >= 52 && currentLevel < facility.maxLevel && canSpend
           ? currentLevel > 0
             ? "upgrade_existing"
@@ -608,10 +645,16 @@ function buildBuildingPlan(gameState: GameState, context: TeamContext, budgetPla
       budgetPlan.warnings.includes("maintenance_priority_over_upgrades") && (action === "upgrade_existing" || action === "build_new")
         ? "maintenance_first"
         : null,
+      action === "downgrade_or_ignore_if_no_cash" ? "downgrade_to_cut_upkeep" : null,
     ].filter((entry): entry is string => Boolean(entry));
-    const cost = action === "upgrade_existing" || action === "build_new" ? upgradeCost : 0;
-    const cashBefore = round(cashStart - spendCursor + cost, 2);
+    const refund = action === "downgrade_or_ignore_if_no_cash" && currentDefinition ? round(currentDefinition.upgradeCost * 0.25, 2) : 0;
+    const cost = action === "upgrade_existing" || action === "build_new" ? upgradeCost : action === "downgrade_or_ignore_if_no_cash" ? -refund : 0;
+    const cashBefore = round(cashStart - (action === "upgrade_existing" || action === "build_new" ? spendCursor - cost : spendCursor), 2);
     const cashAfter = round(cashBefore - cost, 2);
+    if (action === "downgrade_or_ignore_if_no_cash") {
+      positive.push("Unterhalt senken und Cash durch 25% Erstattung stabilisieren");
+      negative.push("Gebaeude-Effekt faellt ein Level niedriger aus");
+    }
     return {
       teamId: context.team.teamId,
       teamCode: context.team.shortCode,
@@ -621,7 +664,10 @@ function buildBuildingPlan(gameState: GameState, context: TeamContext, budgetPla
       action,
       cost: round(cost, 2),
       maintenanceCost: round(maintenanceCost, 2),
-      expectedEffect: getFacilityExpectedEffect(facility.facilityId, action === "upgrade_existing" || action === "build_new" ? nextLevel : currentLevel),
+      expectedEffect: getFacilityExpectedEffect(
+        facility.facilityId,
+        action === "upgrade_existing" || action === "build_new" ? nextLevel : action === "downgrade_or_ignore_if_no_cash" ? downgradeLevel : currentLevel,
+      ),
       score,
       reasonsPositive: positive,
       reasonsNegative: negative,
@@ -636,11 +682,24 @@ function buildTrainingPlan(gameState: GameState, context: TeamContext, profile: 
   const ambition = identitySignal(context.identity.ambition);
   const harmony = identitySignal(context.identity.harmony);
   const cooperation = identitySignal(context.identity.cooperation);
+  const objectiveBias = context.objectiveAiBias;
   const axisPriority: Array<{ key: AiManagementTrainingFocus; score: number }> = [
-    { key: "POW", score: identitySignal(context.identity.pow) + context.upcomingCategoryCounts.power * 6 },
-    { key: "SPE", score: identitySignal(context.identity.spe) + context.upcomingCategoryCounts.speed * 6 },
-    { key: "MEN", score: identitySignal(context.identity.men) + context.upcomingCategoryCounts.mental * 6 },
-    { key: "SOC", score: identitySignal(context.identity.soc) + context.upcomingCategoryCounts.social * 6 },
+    {
+      key: "POW",
+      score: identitySignal(context.identity.pow) + context.upcomingCategoryCounts.power * 6 + (objectiveBias?.axisPriorities?.pow ?? 0) * 18,
+    },
+    {
+      key: "SPE",
+      score: identitySignal(context.identity.spe) + context.upcomingCategoryCounts.speed * 6 + (objectiveBias?.axisPriorities?.spe ?? 0) * 18,
+    },
+    {
+      key: "MEN",
+      score: identitySignal(context.identity.men) + context.upcomingCategoryCounts.mental * 6 + (objectiveBias?.axisPriorities?.men ?? 0) * 18,
+    },
+    {
+      key: "SOC",
+      score: identitySignal(context.identity.soc) + context.upcomingCategoryCounts.social * 6 + (objectiveBias?.axisPriorities?.soc ?? 0) * 18,
+    },
   ];
   axisPriority.sort((left, right) => right.score - left.score);
   const topAxis = axisPriority[0]?.key ?? "BALANCED";
@@ -658,7 +717,9 @@ function buildTrainingPlan(gameState: GameState, context: TeamContext, profile: 
       (profile.strategicIntent === "win_now" ? 12 : 0) -
       profile.injuryPressure * 0.65 -
       profile.fatiguePressure * 0.28 -
-      Math.max(0, context.identity.playerMin + 1 - context.rosterCount) * 10,
+      Math.max(0, context.identity.playerMin + 1 - context.rosterCount) * 10 +
+      (objectiveBias?.developmentPriority ?? 0) * 8 -
+      (objectiveBias?.moralePriority ?? 0) * 3,
     0,
     100,
   );
@@ -681,6 +742,19 @@ function buildTrainingPlan(gameState: GameState, context: TeamContext, profile: 
   if (selectedTrainingFocus === "RECOVERY") reasons.push("Verletzungen/Fatigue priorisieren Erholung");
   else if (selectedTrainingFocus === "BALANCED") reasons.push("keine klare Einzelachse, gemischte Needs");
   else reasons.push(`Team-Identity und kommende Disziplinen ziehen Richtung ${selectedTrainingFocus}`);
+  const selectedAxisKey =
+    selectedTrainingFocus === "POW"
+      ? "pow"
+      : selectedTrainingFocus === "SPE"
+        ? "spe"
+        : selectedTrainingFocus === "MEN"
+          ? "men"
+          : selectedTrainingFocus === "SOC"
+            ? "soc"
+            : null;
+  if (selectedAxisKey && (objectiveBias?.axisPriorities?.[selectedAxisKey] ?? 0) >= 0.5) {
+    reasons.push("Board-Achsenziel erhoeht Trainingsprioritaet");
+  }
   if (selectedTrainingIntensity === "hard") reasons.push("großer oder stabiler Kader erlaubt härteres Training");
   if (selectedTrainingIntensity === "light") reasons.push("kleiner Kader oder Injury-Krise braucht Schonung");
   if (identityTrainingDrive >= 54) reasons.push("Team-Identity spricht fuer aktiveres Training");

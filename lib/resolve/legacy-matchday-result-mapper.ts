@@ -54,6 +54,7 @@ export type DisciplineResultWritePayload = {
   rank: number;
   baseScore: number;
   totalScore: number;
+  formModifier: number | null;
   readinessStatus: ResultReadinessStatus;
   warnings: string[];
 };
@@ -198,6 +199,7 @@ export function mapLegacyMatchdayResolvePreviewToResultPayload(
           rank: teamResult.rank,
           baseScore: teamResult.baseScore,
           totalScore: teamResult.finalPreviewScore,
+          formModifier: teamResult.formModifier,
           readinessStatus,
           warnings: teamResult.warnings,
         };
@@ -226,7 +228,7 @@ export function mapLegacyMatchdayResolvePreviewToResultPayload(
         finalPlayerScore: player.finalPlayerScore,
         mutatorScoreBonus: player.mutatorBonus ?? null,
         mutatorPpsBonus: player.mutatorPpsBonus ?? null,
-        scoreContribution: player.scoreContribution,
+        scoreContribution: player.pointsAwarded ?? player.scoreContribution,
         rankInTeam: player.rankInTeam,
         rankInDiscipline: player.rankInDiscipline,
         isTop10: player.isTop10,

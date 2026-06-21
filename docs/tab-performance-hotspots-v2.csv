@@ -1,0 +1,7 @@
+fromTab,toTab,baselineV1Ms,v2Ms,apiCallsCount,heavyCalls,warnings,status
+START,Home,8000,1500,4,"foundation; compact state; standings overview; management overview","Start weiterhin ohne Markt-, History- oder XP-Feed; Version-Polling jetzt 25s und hidden pausiert","improved"
+Einsatzliste,Arena,6619,12286,5,"lab-context 2.7s/4.7s in dev; matchday-mvp-score 1.6s; standings preview 0.77s","Kalter Dev-Wechsel blieb schwer; Arena zeigt Grundlayout, Preview laedt separat","mixed"
+History,Arena,6619,5966,4,"lab-context 1.2s/2.4s in dev; matchday-mvp-score 0.93s; standings preview 2.9s","Warmer Wechsel zeigt entkoppelten Arena-Flow mit Preview-Laedt-Hinweis","improved"
+Arena,Teams,22005,10357,3,"singleplayer-state refresh 5.2s; standings overview 0.57s; management overview 1.39s","Teams rendert zuerst leichten Fokus; Vergleich/History sind pausiert","improved"
+Training,Transfermarkt,13230,12430,2,"season-end-xp-spend 0.53s; free-agents 2.8s","Markt bleibt datenlastig, aber ohne harten Loading-State","slightly-improved"
+Transfermarkt,Transferhistorie,9600,10428,2,"history 1.75s; recap 1.08s","Abbruchpfad ist eingebaut; gemessener normaler Wechsel bleibt wegen 3177 History-Zeilen schwer","needs-follow-up"

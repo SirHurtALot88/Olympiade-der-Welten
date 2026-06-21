@@ -4,6 +4,14 @@ import type {
   TrainingTraitSignalBreakdownEntry,
   TrainingTraitSignalInput,
 } from "@/lib/training/training-plan-types";
+import type { AdminBalancingConfigInput } from "@/lib/data/olyDataTypes";
+import {
+  CANONICAL_NEGATIVE_TRAITS,
+  CANONICAL_POSITIVE_TRAITS,
+  CANONICAL_PROGRESS_TRAITS,
+} from "@/lib/training/class-progression-config";
+
+export { CANONICAL_NEGATIVE_TRAITS, CANONICAL_POSITIVE_TRAITS, CANONICAL_PROGRESS_TRAITS };
 
 export const LEGACY_TRAIT_TRAINING_FACTOR_PCT: LegacyTraitTrainingFactorMap = {
   Altruistic: -5,
@@ -60,11 +68,22 @@ function collectTraits(input: TrainingTraitSignalInput) {
   return [...(input.traitsPositive ?? []), ...(input.traitsNegative ?? [])];
 }
 
-export function buildTrainingTraitSignal(input: TrainingTraitSignalInput): TrainingTraitSignal {
+export function normalizeProgressionTraitName(trait: string | null | undefined) {
+  if (!trait) return null;
+  const normalized = trait.trim().toLowerCase();
+  if (!normalized || normalized === "#n/a") return null;
+  return CANONICAL_PROGRESS_TRAITS.find((entry) => entry.toLowerCase() === normalized) ?? null;
+}
+
+export function buildTrainingTraitSignal(input: TrainingTraitSignalInput & { adminConfig?: AdminBalancingConfigInput | null }): TrainingTraitSignal {
   const traits = collectTraits(input);
+  const traitFactors = input.adminConfig?.traitTrainingFactorsPct
+    ? { ...LEGACY_TRAIT_TRAINING_FACTOR_PCT, ...input.adminConfig.traitTrainingFactorsPct }
+    : LEGACY_TRAIT_TRAINING_FACTOR_PCT;
   const warnings: string[] = [];
   const breakdown: TrainingTraitSignalBreakdownEntry[] = traits.map((trait) => {
-    const legacyTraitTrainingFactorPct = LEGACY_TRAIT_TRAINING_FACTOR_PCT[trait];
+    const canonicalTrait = normalizeProgressionTraitName(trait);
+    const legacyTraitTrainingFactorPct = canonicalTrait ? traitFactors[canonicalTrait] : null;
     if (typeof legacyTraitTrainingFactorPct !== "number" || !Number.isFinite(legacyTraitTrainingFactorPct)) {
       warnings.push(`unknown_trait_training_factor:${trait}`);
       return {
@@ -75,7 +94,7 @@ export function buildTrainingTraitSignal(input: TrainingTraitSignalInput): Train
     }
 
     return {
-      trait,
+      trait: canonicalTrait ?? trait,
       legacyTraitTrainingFactorPct,
       known: true,
     };
@@ -105,6 +124,6 @@ export function buildTrainingTraitSignal(input: TrainingTraitSignalInput): Train
 }
 
 export function getLegacyTraitTrainingFactorPct(trait: string) {
-  return LEGACY_TRAIT_TRAINING_FACTOR_PCT[trait] ?? null;
+  const canonicalTrait = normalizeProgressionTraitName(trait);
+  return canonicalTrait ? LEGACY_TRAIT_TRAINING_FACTOR_PCT[canonicalTrait] ?? null : null;
 }
-

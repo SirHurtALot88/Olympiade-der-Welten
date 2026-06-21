@@ -12,6 +12,7 @@ export type RoomFlowView =
   | "teams"
   | "market"
   | "training"
+  | "trainingV2"
   | "lineup"
   | "matchdayArena"
   | "season"
@@ -29,9 +30,9 @@ export const ROOM_FLOW_STEPS: RoomFlowStepDefinition[] = [
   { stepId: "lobby_ready", label: "Room bereit machen", cta: "Room starten", targetView: "cockpit", aiAutoStep: false },
   { stepId: "sell_players", label: "Verkäufe entscheiden", cta: "Weiter: Team/Kader", targetView: "teams", aiAutoStep: true },
   { stepId: "buy_players", label: "Käufe entscheiden", cta: "Weiter: Transfermarkt", targetView: "market", aiAutoStep: true },
-  { stepId: "facilities", label: "Facilities entscheiden", cta: "Weiter: Training & Gebäude", targetView: "training", aiAutoStep: true },
-  { stepId: "xp_spend", label: "XP verteilen", cta: "Weiter: Entwicklung", targetView: "training", aiAutoStep: true },
-  { stepId: "training", label: "Training prüfen", cta: "Weiter: Training prüfen", targetView: "training", aiAutoStep: true },
+  { stepId: "facilities", label: "Facilities entscheiden", cta: "Weiter: Training & Gebäude", targetView: "trainingV2", aiAutoStep: true },
+  { stepId: "xp_spend", label: "XP verteilen", cta: "Weiter: Entwicklung", targetView: "trainingV2", aiAutoStep: true },
+  { stepId: "training", label: "Training prüfen", cta: "Weiter: Training prüfen", targetView: "trainingV2", aiAutoStep: true },
   { stepId: "lineup", label: "Einsatzliste setzen", cta: "Weiter: Einsatzliste", targetView: "lineup", aiAutoStep: true },
   { stepId: "formcards", label: "Formkarten setzen", cta: "Weiter: Formkarten", targetView: "lineup", aiAutoStep: true },
   { stepId: "arena", label: "Arena starten", cta: "Arena starten", targetView: "matchdayArena", aiAutoStep: false },

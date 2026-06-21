@@ -160,7 +160,7 @@ describe("player economy compare service", () => {
     expect(report.players[0]?.legacySalary).toBe(12);
     expect(report.players[0]?.calculatedMarketValue).not.toBeNull();
     expect(report.players[0]?.calculatedSalary).not.toBeNull();
-    expect(report.players[0]?.calculationBreakdown.marketValueBaseOffset).toBe(3.5);
+    expect(report.players[0]?.calculationBreakdown.marketValueBaseOffset).toBe(0);
     expect(report.players[0]?.calculationBreakdown.calcWithoutBaseOffset).not.toBeNull();
     expect(report.summary.comparedPlayers).toBe(2);
     expect(report.summary.missingSourceCount).toBe(0);

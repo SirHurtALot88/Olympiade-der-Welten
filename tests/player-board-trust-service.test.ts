@@ -79,4 +79,32 @@ describe("player board trust service", () => {
     expect(result.trustScore).toBeGreaterThan(55);
     expect(result.reasons).toContain("outperformed_expected_rank");
   });
+
+  it("does not block renewal for productive league elite players", () => {
+    const result = assessPlayerBoardTrust({
+      boardConfidence: 9,
+      appearances: 10,
+      averageContribution: 3.1,
+      averageFinalScore: 70.4,
+      expectedPerformanceValue: 100,
+      contractLength: 2,
+      roleTag: "starter",
+      salary: 14.15,
+      marketValue: 66.06,
+      purchasePrice: 60,
+      currentValue: 66.06,
+      ovrRank: 1,
+      actualPpsRank: 1,
+      actualMvsRank: 1,
+      expectedAxisRank: 1,
+      actualAxisPpsRank: 2,
+      rankPoolSize: 280,
+      weakTeamFit: false,
+    });
+
+    expect(result.renewalPolicy).not.toBe("do_not_renew");
+    expect(result.renewalPolicy).toBe("salary_cap");
+    expect(result.reasons).not.toContain("performance_below_board_expectation");
+    expect(result.reasons).toContain("elite_player_retention_floor");
+  });
 });

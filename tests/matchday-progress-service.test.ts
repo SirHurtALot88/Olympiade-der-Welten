@@ -169,6 +169,7 @@ describe("matchday progress service", () => {
     expect(result.ok).toBe(true);
     expect(result.applied).toBe(true);
     expect(save.gameState.season.currentMatchday).toBe(2);
+    expect(save.gameState.gamePhase).toBe("season_active");
     expect(save.gameState.matchdayState.matchdayId).toBe("matchday-2");
     expect(save.gameState.matchdayState.pendingTeamIds).toHaveLength(2);
     expect(save.gameState.seasonState.lineupDrafts?.[0]?.status).toBe("resolved");
@@ -185,6 +186,48 @@ describe("matchday progress service", () => {
     expect(result.canApply).toBe(true);
     expect(result.summary.cashApplied).toBe(false);
     expect(result.blockingReasons).not.toContain("cash_apply_missing_for_current_matchday");
+  });
+
+  it("resolves the final matchday as season-end instead of blocking on a missing next matchday", async () => {
+    const { save, persistence } = createPersistenceMock();
+    save.gameState.season.currentMatchday = 2;
+    save.gameState.matchdayState.matchdayId = "matchday-2";
+    save.gameState.seasonState.matchdayResults = [{ id: "result-2", seasonId: "season-1", matchdayId: "matchday-2" } as never];
+    save.gameState.seasonState.standingsApplyLogs = [
+      {
+        id: "standings-audit-2",
+        saveId: "save-local",
+        seasonId: "season-1",
+        matchdayId: "matchday-2",
+        action: "apply",
+        payload: {
+          idempotencyKey: "standings-apply:save-local:season-1:matchday-2",
+          totalTeams: 2,
+          appliedTeams: 2,
+          tieGroupsCount: 0,
+          previewWarningsCount: 0,
+        },
+        createdAt: "2026-06-04T00:00:00.000Z",
+      },
+    ];
+
+    const result = await executeMatchdayAdvance(
+      {
+        saveId: "save-local",
+        seasonId: "season-1",
+        execute: true,
+        confirm: ADVANCE_MATCHDAY_CONFIRM_TOKEN,
+      },
+      persistence as never,
+    );
+
+    expect(result.ok).toBe(true);
+    expect(result.applied).toBe(true);
+    expect(result.scope.nextMatchdayId).toBeNull();
+    expect(save.gameState.matchdayState.matchdayId).toBe("matchday-2");
+    expect(save.gameState.matchdayState.status).toBe("resolved");
+    expect(save.gameState.gamePhase).toBe("season_completed");
+    expect(result.blockingReasons).not.toContain("no_next_matchday_configured");
   });
 
   it("blocks prisma as read-only", async () => {

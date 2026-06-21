@@ -14,6 +14,13 @@ import {
   loadTransfermarktSheetStats,
   type TransfermarktRatingTier,
 } from "@/lib/market/transfermarkt-sheet-stats";
+import {
+  buildScoutedDisciplineTiers,
+  getScoutedTraitView,
+  type TransfermarktAttributeValues,
+  type TransfermarktScoutingDisclosure,
+  normalizeTransfermarktScoutingLevel,
+} from "@/lib/market/transfermarkt-scouting";
 import { buildLegacyMatchdayReadiness, type LegacyMatchdayReadinessStatus } from "@/lib/lineups/legacy-matchday-readiness";
 import { LegacyLineupContextLoader } from "@/lib/lineups/legacy-lineup-context-loader";
 import { LegacyLineupRepository } from "@/lib/lineups/legacy-lineup-repository";
@@ -22,6 +29,7 @@ import { buildTransfermarktPoolAudit, type TransfermarktPoolAudit } from "@/lib/
 import { buildPlayerScoutPotential } from "@/lib/progression/player-potential-service";
 import type { Player } from "@/lib/data/olyDataTypes";
 import type { PlayerPotentialBand, PlayerPotentialSource } from "@/lib/data/olyDataTypes";
+import type { TransfermarktDoubleLoadWarning } from "@/lib/market/transfermarkt-double-load";
 import type {
   PlayerDevelopmentRoute,
   PlayerDevelopmentTrend,
@@ -33,12 +41,16 @@ import { db } from "@/src/server/db";
 
 export type TransfermarktAvailabilityReason = "free_agent" | "no_active_player";
 export type TransfermarktSalaryStatus = "known" | "missing";
+export type TransfermarktNeedMatchTone = "strong" | "good" | "thin" | "none";
+export type TransfermarktNeedMatchAxis = "pow" | "spe" | "men" | "soc";
 
 export type TransfermarktDisciplineScore = {
   disciplineId: string;
   disciplineName: string;
   scoreTier: TransfermarktRatingTier | null;
   ppsLastSeason: number | null;
+  playerCount?: number | null;
+  teamRank?: number | null;
 };
 
 export type TransfermarktFreeAgentItem = {
@@ -52,6 +64,11 @@ export type TransfermarktFreeAgentItem = {
   traitsPositive: string[];
   traitsNegative: string[];
   preferredDisciplineIds: string[];
+  scoutingLevel: number | null;
+  scoutingDisclosure: TransfermarktScoutingDisclosure | null;
+  hiddenPositiveTraitCount: number;
+  hiddenNegativeTraitCount: number;
+  preferredDisciplineIdsVisible: boolean;
   subclass1: string | null;
   subclass2: string | null;
   subclass3: string | null;
@@ -92,6 +109,7 @@ export type TransfermarktFreeAgentItem = {
   willRating: TransfermarktRatingTier | null;
   spiritRating: TransfermarktRatingTier | null;
   tormentRating: TransfermarktRatingTier | null;
+  attributeStatValues?: TransfermarktAttributeValues | null;
   topDisciplineScores: TransfermarktDisciplineScore[];
   currentAbilityTier: PlayerProgressionRatingTier | null;
   potentialTier: PlayerProgressionRatingTier | null;
@@ -100,6 +118,7 @@ export type TransfermarktFreeAgentItem = {
   scoutingConfidence: number | null;
   scoutingSource: PlayerPotentialSource;
   scoutingWarnings: string[];
+  doubleLoadWarnings?: TransfermarktDoubleLoadWarning[];
   marketValuePotentialPremiumPct: number | null;
   trainingFormTier: PlayerTrainingFormTier | null;
   developmentTrend: PlayerDevelopmentTrend | null;
@@ -126,6 +145,20 @@ export type TransfermarktFreeAgentItem = {
   fit: number | null;
   fitDisplay: string;
   fitSource: "select_team_for_fit" | "not_ported_golden_master" | "local_approximation_not_golden_master";
+  needMatchScore?: number | null;
+  needMatchLabel?: string | null;
+  needMatchTone?: TransfermarktNeedMatchTone | null;
+  needMatchAxes?: TransfermarktNeedMatchAxis[];
+  needMatchReasons?: string[];
+  needMatchBreakdown?: {
+    axisScore: number;
+    rosterGapScore: number;
+    depthQualityScore: number;
+    preferredDisciplineScore: number;
+    valueReliefScore: number;
+    premiumOverfillPenalty: number;
+    totalScore: number;
+  } | null;
   missingFields?: string[];
 };
 
@@ -134,14 +167,25 @@ export type TransfermarktReadParams = {
   seasonId?: string | null;
   teamId?: string | null;
   limit?: number | null;
+  offset?: number | null;
   search?: string | null;
   minMarketValue?: number | null;
   maxMarketValue?: number | null;
+  minSalary?: number | null;
+  maxSalary?: number | null;
+  mode?: "full" | "ai_preview" | null;
+  scoutingLevel?: number | null;
+  localRunContext?: unknown;
 };
 
 export type TransfermarktReadResult = {
   items: TransfermarktFreeAgentItem[];
   total: number;
+  teamAvailableTotal?: number | null;
+  offset: number;
+  limit: number;
+  returned: number;
+  hasMore: boolean;
   scope: {
     saveId: string;
     seasonId: string;
@@ -151,12 +195,22 @@ export type TransfermarktReadResult = {
     teamId: string;
     teamCash: number;
     teamSalary: number;
+    marketValueTotal?: number | null;
     rosterCount: number;
     playerMin: number;
     playerOpt: number;
     readinessStatus: LegacyMatchdayReadinessStatus | "unknown";
     affordabilityStatus: TransferAffordabilityStatus;
     rosterPressureStatus: TransferRosterPressureStatus;
+    axisAverages?: {
+      pow: number;
+      spe: number;
+      men: number;
+      soc: number;
+    } | null;
+    wishlistAxes?: TransfermarktNeedMatchAxis[];
+    wishlistDisciplines?: string[];
+    rosterGap?: number | null;
   } | null;
   source: "derived_free_agents";
   notes: string[];
@@ -242,6 +296,12 @@ type DatabaseLike = {
       playerOpt: number;
       rosterLimit: number;
     } | null>;
+  };
+  seasonDisciplineConfig?: {
+    findMany(args: unknown): Promise<Array<{
+      disciplineId: string;
+      playerCount: number | null;
+    }>>;
   };
 };
 
@@ -334,7 +394,7 @@ export async function listTransfermarktFreeAgents(
 
   const activeDatabase = database ?? (db as unknown as DatabaseLike);
   const scope = await resolveTransfermarktScope(activeDatabase, input);
-  const [players, activePlayers, sheetStatsByName] = await Promise.all([
+  const [players, activePlayers, sheetStatsByName, seasonDisciplineConfigs] = await Promise.all([
     activeDatabase.player.findMany({
       select: {
         id: true,
@@ -401,6 +461,13 @@ export async function listTransfermarktFreeAgents(
       },
     }),
     loadTransfermarktSheetStats().catch(() => new Map()),
+    activeDatabase.seasonDisciplineConfig?.findMany({
+      where: { seasonId: scope.seasonId },
+      select: {
+        disciplineId: true,
+        playerCount: true,
+      },
+    }) ?? Promise.resolve([]),
   ]);
 
   const activePlayerIds = new Set(activePlayers.map((entry) => entry.playerId));
@@ -426,11 +493,19 @@ export async function listTransfermarktFreeAgents(
       );
     })
     .filter((player) => {
-      const marketValue = getDisplayedMarketValue(player, sheetStatsByName.get(normalizeSearch(player.name)));
+      const sheetStats = sheetStatsByName.get(normalizeSearch(player.name));
+      const marketValue = getDisplayedMarketValue(player, sheetStats);
       if (input.minMarketValue != null && (marketValue == null || marketValue < input.minMarketValue)) {
         return false;
       }
       if (input.maxMarketValue != null && (marketValue == null || marketValue > input.maxMarketValue)) {
+        return false;
+      }
+      const salary = getDisplayedSalary(player, sheetStats);
+      if (input.minSalary != null && (salary == null || salary < input.minSalary)) {
+        return false;
+      }
+      if (input.maxSalary != null && (salary == null || salary > input.maxSalary)) {
         return false;
       }
       return true;
@@ -451,8 +526,8 @@ export async function listTransfermarktFreeAgents(
       return left.name.localeCompare(right.name, "de", { sensitivity: "base" });
     });
 
-  const total = filtered.length;
   const limit = input.limit != null ? Math.max(1, Math.min(input.limit, 250)) : 100;
+  const offset = input.offset != null ? Math.max(0, Math.floor(input.offset)) : 0;
   const playerRatingById = new Map(
     buildPlayerRatingContractRows({
       players: players.map(
@@ -505,6 +580,10 @@ export async function listTransfermarktFreeAgents(
     }).map((row) => [row.playerId, row] as const),
   );
   let teamContext: TransfermarktReadResult["teamContext"] = null;
+  const teamDisciplineRankById = new Map<string, number | null>();
+  const disciplinePlayerCountById = new Map<string, number | null>(
+    seasonDisciplineConfigs.map((config) => [config.disciplineId, config.playerCount ?? null] as const),
+  );
   let rosterFitPlayers: Array<{
     race: string;
     alignment: string;
@@ -568,6 +647,14 @@ export async function listTransfermarktFreeAgents(
             });
             if (loaded.ok) {
               readinessStatus = buildLegacyMatchdayReadiness(loaded.context).readinessStatus;
+              Object.entries(loaded.context.teamDisciplineRanks ?? {}).forEach(([disciplineId, rankEntry]) => {
+                teamDisciplineRankById.set(disciplineId, rankEntry.rank ?? null);
+              });
+              Object.entries(loaded.context.disciplinePlayerCounts ?? {}).forEach(([disciplineId, playerCount]) => {
+                if (!disciplinePlayerCountById.has(disciplineId)) {
+                  disciplinePlayerCountById.set(disciplineId, playerCount ?? null);
+                }
+              });
             }
           }
         } catch {
@@ -593,7 +680,44 @@ export async function listTransfermarktFreeAgents(
     }
   }
 
-  const items = filtered.slice(0, limit).map<TransfermarktFreeAgentItem>((player) => {
+  const fitBreakdownByPlayerId = new Map<string, ReturnType<typeof calculateTransfermarktFit> | null>();
+  const getFitBreakdownForPlayer = (player: typeof filtered[number]) => {
+    if (!teamContext) {
+      return null;
+    }
+    if (fitBreakdownByPlayerId.has(player.id)) {
+      return fitBreakdownByPlayerId.get(player.id) ?? null;
+    }
+    const fitBreakdown = calculateTransfermarktFit(
+      {
+        race: player.race,
+        alignment: player.alignment,
+        subclasses: toStringArray(player.subclasses),
+        traitsPositive: toStringArray(player.traitsPositive),
+        traitsNegative: toStringArray(player.traitsNegative),
+      },
+      rosterFitPlayers,
+      { teamId: teamContext.teamId },
+    );
+    fitBreakdownByPlayerId.set(player.id, fitBreakdown);
+    return fitBreakdown;
+  };
+  const fitFiltered = teamContext
+    ? filtered.filter((player) => {
+        const traitsPositive = toStringArray(player.traitsPositive);
+        const traitsNegative = toStringArray(player.traitsNegative);
+        if (hasMercenaryTrait({ traitsPositive, traitsNegative })) {
+          return true;
+        }
+        const fitBreakdown = getFitBreakdownForPlayer(player);
+        return (fitBreakdown?.teamFit ?? 0) >= 0;
+      })
+    : filtered;
+
+  const total = fitFiltered.length;
+  const pageItems = fitFiltered.slice(offset, offset + limit);
+  const scoutingLevel = normalizeTransfermarktScoutingLevel(input.scoutingLevel);
+  const items = pageItems.map<TransfermarktFreeAgentItem>((player) => {
     const sheetStats = sheetStatsByName.get(normalizeSearch(player.name));
     const salary = getDisplayedSalary(player, sheetStats);
     const marketValue = getDisplayedMarketValue(player, sheetStats);
@@ -602,24 +726,29 @@ export async function listTransfermarktFreeAgents(
     const traitsNegative = toStringArray(player.traitsNegative);
     const preferredDisciplineIds = toStringArray(player.preferredDisciplineIds);
     const subclassSlots = getArraySlots(subclasses);
-    const positiveTraitSlots = getArraySlots(traitsPositive);
-    const negativeTraitSlots = getArraySlots(traitsNegative);
-    const mercenary = hasMercenaryTrait({ traitsPositive, traitsNegative });
     const playerRating = playerRatingById.get(player.id) ?? null;
-    const scoutPotential = buildPlayerScoutPotential({ player: { potential: player.attributes?.rating ?? 0 }, scoutingLevel: 0 });
-    const fitBreakdown = teamContext
-        ? calculateTransfermarktFit(
-            {
-              race: player.race,
-            alignment: player.alignment,
-            subclasses,
-              traitsPositive,
-              traitsNegative,
-            },
-            rosterFitPlayers,
-            { teamId: teamContext.teamId },
-          )
-      : null;
+    const scoutPotential = buildPlayerScoutPotential({
+      player: { potential: player.attributes?.rating ?? 0 },
+      scoutingLevel,
+    });
+    const traitView = getScoutedTraitView({
+      traitsPositive,
+      traitsNegative,
+      scoutingLevel,
+    });
+    const visiblePreferredDisciplineIds = traitView.disclosure.preferredDisciplinesVisible ? preferredDisciplineIds : [];
+    const scoutedTopDisciplineScores = buildScoutedDisciplineTiers({
+      saveId: scope.saveId,
+      playerId: player.id,
+      scoutingLevel,
+      disciplines: player.disciplineScores.map((entry) => ({
+        disciplineId: entry.discipline.id,
+        disciplineName: entry.discipline.name,
+        score: entry.score,
+      })),
+      topN: 5,
+    });
+    const fitBreakdown = getFitBreakdownForPlayer(player);
     const missingFields: string[] = [];
     if (marketValue == null) {
       missingFields.push("marketValue");
@@ -640,18 +769,23 @@ export async function listTransfermarktFreeAgents(
       alignment: player.alignment,
       gender: player.gender,
       subclasses,
-      traitsPositive,
-      traitsNegative,
-      preferredDisciplineIds,
+      traitsPositive: traitView.visiblePositiveTraits,
+      traitsNegative: traitView.visibleNegativeTraits,
+      preferredDisciplineIds: visiblePreferredDisciplineIds,
+      scoutingLevel,
+      scoutingDisclosure: traitView.disclosure,
+      hiddenPositiveTraitCount: traitView.hiddenPositiveTraitCount,
+      hiddenNegativeTraitCount: traitView.hiddenNegativeTraitCount,
+      preferredDisciplineIdsVisible: traitView.disclosure.preferredDisciplinesVisible,
       subclass1: subclassSlots.first,
       subclass2: subclassSlots.second,
       subclass3: subclassSlots.third,
-      traitPos1: positiveTraitSlots.first,
-      traitPos2: positiveTraitSlots.second,
-      traitPos3: positiveTraitSlots.third,
-      traitNeg1: negativeTraitSlots.first,
-      traitNeg2: negativeTraitSlots.second,
-      traitNeg3: negativeTraitSlots.third,
+      traitPos1: traitView.visiblePositiveTraits[0] ?? null,
+      traitPos2: traitView.visiblePositiveTraits[1] ?? null,
+      traitPos3: traitView.visiblePositiveTraits[2] ?? null,
+      traitNeg1: traitView.visibleNegativeTraits[0] ?? null,
+      traitNeg2: traitView.visibleNegativeTraits[1] ?? null,
+      traitNeg3: traitView.visibleNegativeTraits[2] ?? null,
       marketValue,
       ovr: playerRating?.ovrNormalized ?? null,
       mvs: playerRating?.mvs ?? null,
@@ -683,15 +817,15 @@ export async function listTransfermarktFreeAgents(
       willRating: sheetStats?.willRating ?? null,
       spiritRating: sheetStats?.spiritRating ?? null,
       tormentRating: sheetStats?.tormentRating ?? null,
-      topDisciplineScores: [...player.disciplineScores]
-        .sort((left, right) => right.score - left.score)
-        .slice(0, 3)
-        .map((entry) => ({
-          disciplineId: entry.discipline.id,
-          disciplineName: entry.discipline.name,
-          scoreTier: getTransfermarktTierFromPoints(entry.score),
-          ppsLastSeason: null,
-        })),
+      attributeStatValues: null,
+      topDisciplineScores: scoutedTopDisciplineScores.map((entry) => ({
+        disciplineId: entry.disciplineId,
+        disciplineName: entry.disciplineName,
+        scoreTier: entry.scoreTier,
+        ppsLastSeason: null,
+        playerCount: disciplinePlayerCountById.get(entry.disciplineId) ?? null,
+        teamRank: teamDisciplineRankById.get(entry.disciplineId) ?? null,
+      })),
       currentAbilityTier: null,
       potentialTier: scoutPotential.scoutRating == null ? null : getTransfermarktTierFromPoints(scoutPotential.scoutRating),
       potentialBand: scoutPotential.band,
@@ -721,7 +855,10 @@ export async function listTransfermarktFreeAgents(
       fitSubclasses: fitBreakdown?.fitSubclasses ?? null,
       fitTraits: fitBreakdown?.fitTraits ?? null,
       fitAlignment: fitBreakdown?.fitAlignment ?? null,
-      mercenary,
+      mercenary: hasMercenaryTrait({
+        traitsPositive,
+        traitsNegative,
+      }),
       fit: fitBreakdown?.teamFit ?? null,
       fitDisplay: teamContext ? String(fitBreakdown?.teamFit ?? 0) : "Team waehlen",
       fitSource: teamContext ? "local_approximation_not_golden_master" : "select_team_for_fit",
@@ -739,13 +876,17 @@ export async function listTransfermarktFreeAgents(
     warnings.push(`${unresolvedPortraitCount} free agents are missing_or_unresolved_portrait.`);
   }
   if (input.teamId) {
-    warnings.push("teamId adds real team context, but does not filter the free-agent pool.");
+    warnings.push("teamId filters negative team-fit players before pagination; Mercenary players stay visible as exceptions.");
     warnings.push("Fit is currently a local Retool-style approximation based on roster-derived race/subclass/trait/alignment counts.");
   }
 
   return {
     items,
     total,
+    offset,
+    limit,
+    returned: items.length,
+    hasMore: offset + items.length < total,
     scope: {
       saveId: scope.saveId,
       seasonId: scope.seasonId,

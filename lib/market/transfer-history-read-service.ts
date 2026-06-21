@@ -3,9 +3,11 @@ import { db } from "@/src/server/db";
 export type TransferHistoryReadParams = {
   saveId?: string | null;
   seasonId?: string | null;
+  allSeasons?: boolean | null;
   teamId?: string | null;
   type?: "buy" | "sell" | "contract_exit" | null;
   limit?: number | null;
+  offset?: number | null;
 };
 
 export type TransferHistoryItem = {
@@ -33,6 +35,10 @@ export type TransferHistoryItem = {
 export type TransferHistoryReadResult = {
   items: TransferHistoryItem[];
   total: number;
+  offset: number;
+  limit: number;
+  returned: number;
+  hasMore: boolean;
   scope: {
     saveId: string;
     seasonId: string;
@@ -86,6 +92,7 @@ type DatabaseLike = {
         name: string;
       } | null;
     }>>;
+    count(args: unknown): Promise<number>;
   };
 };
 
@@ -114,6 +121,18 @@ async function resolveScope(database: DatabaseLike, input: TransferHistoryReadPa
 
   if (!save) {
     throw new Error("No save available for transfer history read.");
+  }
+
+  if (input.allSeasons) {
+    return {
+      saveId: save.id,
+      seasonId: null,
+      saveName: save.name ?? null,
+      saveStatus: save.status ?? null,
+      requestedSaveId,
+      requestedSeasonId,
+      scopeWarning: null,
+    };
   }
 
   if (requestedSeasonId) {
@@ -169,10 +188,14 @@ export async function listTransferHistory(
   }
 
   const scope = await resolveScope(database, input);
-  if (!scope.saveId || !scope.seasonId) {
+  if (!scope.saveId || (!scope.seasonId && !input.allSeasons)) {
     return {
       items: [],
       total: 0,
+      offset: 0,
+      limit: 0,
+      returned: 0,
+      hasMore: false,
       scope: {
         saveId: scope.saveId ?? input.saveId ?? "unknown-save",
         seasonId: scope.seasonId ?? input.seasonId ?? "unknown-season",
@@ -191,54 +214,60 @@ export async function listTransferHistory(
       },
     };
   }
-  const limit = input.limit != null ? Math.max(1, Math.min(input.limit, 250)) : 100;
+  const limit = input.limit != null ? Math.max(1, Math.min(input.limit, 5000)) : 100;
+  const offset = input.offset != null ? Math.max(0, Math.floor(input.offset)) : 0;
+  const where = {
+    saveId: scope.saveId,
+    ...(input.allSeasons ? {} : { seasonId: scope.seasonId }),
+    ...(input.teamId
+      ? {
+          OR: [{ fromTeamId: input.teamId }, { toTeamId: input.teamId }],
+        }
+      : {}),
+    ...(input.type ? { type: input.type } : {}),
+  };
 
-  const rows = await database.transfer.findMany({
-    where: {
-      saveId: scope.saveId,
-      seasonId: scope.seasonId,
-      ...(input.teamId
-        ? {
-            OR: [{ fromTeamId: input.teamId }, { toTeamId: input.teamId }],
-          }
-        : {}),
-      ...(input.type ? { type: input.type } : {}),
-    },
-    select: {
-      id: true,
-      saveId: true,
-      seasonId: true,
-      playerId: true,
-      fromTeamId: true,
-      toTeamId: true,
-      type: true,
-      fee: true,
-      salary: true,
-      marketValue: true,
-      remainingContractLength: true,
-      happenedAt: true,
-      player: {
-        select: {
-          id: true,
-          name: true,
+  const [rows, total] = await Promise.all([
+    database.transfer.findMany({
+      where,
+      select: {
+        id: true,
+        saveId: true,
+        seasonId: true,
+        playerId: true,
+        fromTeamId: true,
+        toTeamId: true,
+        type: true,
+        fee: true,
+        salary: true,
+        marketValue: true,
+        remainingContractLength: true,
+        happenedAt: true,
+        player: {
+          select: {
+            id: true,
+            name: true,
+          },
+        },
+        fromTeam: {
+          select: {
+            id: true,
+            name: true,
+          },
+        },
+        toTeam: {
+          select: {
+            id: true,
+            name: true,
+          },
         },
       },
-      fromTeam: {
-        select: {
-          id: true,
-          name: true,
-        },
-      },
-      toTeam: {
-        select: {
-          id: true,
-          name: true,
-        },
-      },
-    },
-    orderBy: [{ happenedAt: "desc" }, { id: "desc" }],
-    take: limit,
-  });
+      orderBy: [{ happenedAt: "desc" }, { id: "desc" }],
+      skip: offset,
+      take: limit,
+    }),
+    database.transfer.count({ where }),
+  ]);
 
   return {
     items: rows.map((row) => ({
@@ -262,10 +291,14 @@ export async function listTransferHistory(
       source: null,
       remainingContractLength: row.remainingContractLength ?? null,
     })),
-    total: rows.length,
+    total,
+    offset,
+    limit,
+    returned: rows.length,
+    hasMore: offset + rows.length < total,
     scope: {
       saveId: scope.saveId,
-      seasonId: scope.seasonId,
+      seasonId: input.allSeasons ? "ALL" : scope.seasonId ?? "unknown-season",
       teamId: input.teamId ?? null,
       type: input.type ?? null,
     },
@@ -274,7 +307,7 @@ export async function listTransferHistory(
       requestedSaveId: scope.requestedSaveId,
       resolvedSaveId: scope.saveId,
       requestedSeasonId: scope.requestedSeasonId,
-      resolvedSeasonId: scope.seasonId,
+      resolvedSeasonId: input.allSeasons ? null : scope.seasonId,
       saveName: scope.saveName,
       saveStatus: scope.saveStatus,
       scopeWarning: scope.scopeWarning,

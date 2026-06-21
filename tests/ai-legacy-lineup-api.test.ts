@@ -2,11 +2,15 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 
 const buildAiLegacyLineupPreview = vi.fn();
 const loadLocalLegacyLineupContext = vi.fn();
+const loadLocalLegacyLineupContextFromGameState = vi.fn();
 const loadLegacyLineupContext = vi.fn();
 const createPersistenceService = vi.fn();
 const saveLocalLegacyLineupDraft = vi.fn();
+const saveLocalLegacyLineupDraftBatch = vi.fn();
 const getLocalLegacyLineupDraft = vi.fn();
 const calculateLocalLegacyLineupPreview = vi.fn();
+const calculateLocalLegacyLineupPreviewFromContext = vi.fn();
+const ensureLocalLegacyFormCardsForSeason = vi.fn();
 
 const db = {
   save: {
@@ -30,9 +34,13 @@ vi.mock("@/lib/ai/ai-legacy-lineup-engine", () => ({
 
 vi.mock("@/lib/lineups/legacy-lineup-local-service", () => ({
   loadLocalLegacyLineupContext,
+  loadLocalLegacyLineupContextFromGameState,
   saveLocalLegacyLineupDraft,
+  saveLocalLegacyLineupDraftBatch,
   getLocalLegacyLineupDraft,
   calculateLocalLegacyLineupPreview,
+  calculateLocalLegacyLineupPreviewFromContext,
+  ensureLocalLegacyFormCardsForSeason,
 }));
 
 vi.mock("@/lib/lineups/legacy-lineup-context-loader", () => ({
@@ -57,11 +65,33 @@ describe("ai legacy lineup preview api", () => {
   beforeEach(() => {
     buildAiLegacyLineupPreview.mockReset();
     loadLocalLegacyLineupContext.mockReset();
+    loadLocalLegacyLineupContextFromGameState.mockReset();
     loadLegacyLineupContext.mockReset();
     createPersistenceService.mockReset();
     saveLocalLegacyLineupDraft.mockReset();
+    saveLocalLegacyLineupDraftBatch.mockReset();
     getLocalLegacyLineupDraft.mockReset();
     calculateLocalLegacyLineupPreview.mockReset();
+    calculateLocalLegacyLineupPreviewFromContext.mockReset();
+    ensureLocalLegacyFormCardsForSeason.mockReset();
+    ensureLocalLegacyFormCardsForSeason.mockReturnValue({
+      ok: true,
+      warnings: [],
+      generatedCardCount: 0,
+      existingCardCount: 0,
+    });
+    loadLocalLegacyLineupContextFromGameState.mockImplementation((gameState, params) =>
+      loadLocalLegacyLineupContext(params),
+    );
+    calculateLocalLegacyLineupPreviewFromContext.mockImplementation((context, entries, modifiers, fatigueByPlayerId) =>
+      calculateLocalLegacyLineupPreview(context, entries, modifiers, fatigueByPlayerId),
+    );
+    saveLocalLegacyLineupDraftBatch.mockImplementation((drafts) => {
+      for (const draft of drafts) {
+        saveLocalLegacyLineupDraft(draft.params, draft.entries, draft.modifiers);
+      }
+      return { ok: true, warnings: [], drafts: [] };
+    });
     db.save.findUnique.mockReset();
     db.save.findFirst.mockReset();
     db.season.findFirst.mockReset();
@@ -361,7 +391,17 @@ describe("ai legacy lineup preview api", () => {
       lineupId: "lineup-1",
       entries: [{ disciplineId: "tdm" }],
     });
-    loadLocalLegacyLineupContext.mockReturnValue({ ok: true, context: { teamId: "A-A", team: { name: "Alpha" } } });
+    loadLocalLegacyLineupContext.mockReturnValue({
+      ok: true,
+      context: {
+        teamId: "A-A",
+        team: { name: "Alpha" },
+        existingDraft: {
+          lineupId: "lineup-1",
+          entries: [{ disciplineId: "tdm" }],
+        },
+      },
+    });
     buildAiLegacyLineupPreview.mockReturnValue({
       teamId: "A-A",
       teamCode: "A-A",
@@ -424,7 +464,17 @@ describe("ai legacy lineup preview api", () => {
       lineupId: "lineup-1",
       entries: [{ disciplineId: "tdm" }],
     });
-    loadLocalLegacyLineupContext.mockReturnValue({ ok: true, context: { teamId: "A-A", team: { name: "Alpha" } } });
+    loadLocalLegacyLineupContext.mockReturnValue({
+      ok: true,
+      context: {
+        teamId: "A-A",
+        team: { name: "Alpha" },
+        existingDraft: {
+          lineupId: "lineup-1",
+          entries: [{ disciplineId: "tdm" }],
+        },
+      },
+    });
     buildAiLegacyLineupPreview.mockReturnValue({
       teamId: "A-A",
       teamCode: "A-A",

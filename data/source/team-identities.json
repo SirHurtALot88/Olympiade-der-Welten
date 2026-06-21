@@ -14,8 +14,8 @@
     "popularity": 1,
     "cooperation": 2,
     "playerMin": 10,
-    "playerOpt": 11,
-    "sourceNote": "season-management-sheet"
+    "playerOpt": 12,
+    "sourceNote": "team-ratings-sheet"
   },
   {
     "teamId": "B-P",
@@ -33,7 +33,7 @@
     "cooperation": 6,
     "playerMin": 8,
     "playerOpt": 10,
-    "sourceNote": "season-management-sheet"
+    "sourceNote": "team-ratings-sheet"
   },
   {
     "teamId": "B-B",
@@ -51,7 +51,7 @@
     "cooperation": 2,
     "playerMin": 9,
     "playerOpt": 11,
-    "sourceNote": "season-management-sheet"
+    "sourceNote": "team-ratings-sheet"
   },
   {
     "teamId": "C-C",
@@ -68,8 +68,8 @@
     "popularity": 7.5,
     "cooperation": 9.5,
     "playerMin": 11,
-    "playerOpt": 12,
-    "sourceNote": "season-management-sheet"
+    "playerOpt": 13,
+    "sourceNote": "team-ratings-sheet"
   },
   {
     "teamId": "C-S",
@@ -86,8 +86,8 @@
     "popularity": 9,
     "cooperation": 10,
     "playerMin": 10,
-    "playerOpt": 10,
-    "sourceNote": "season-management-sheet"
+    "playerOpt": 12,
+    "sourceNote": "team-ratings-sheet"
   },
   {
     "teamId": "D-P",
@@ -104,8 +104,8 @@
     "popularity": 9,
     "cooperation": 7,
     "playerMin": 7,
-    "playerOpt": 10,
-    "sourceNote": "season-management-sheet"
+    "playerOpt": 9,
+    "sourceNote": "team-ratings-sheet"
   },
   {
     "teamId": "D-L",
@@ -123,7 +123,7 @@
     "cooperation": 1,
     "playerMin": 10,
     "playerOpt": 12,
-    "sourceNote": "season-management-sheet"
+    "sourceNote": "team-ratings-sheet"
   },
   {
     "teamId": "G-G",
@@ -141,7 +141,7 @@
     "cooperation": 8.5,
     "playerMin": 9,
     "playerOpt": 11,
-    "sourceNote": "season-management-sheet"
+    "sourceNote": "team-ratings-sheet"
   },
   {
     "teamId": "H-R",
@@ -159,7 +159,7 @@
     "cooperation": 3,
     "playerMin": 9,
     "playerOpt": 11,
-    "sourceNote": "season-management-sheet"
+    "sourceNote": "team-ratings-sheet"
   },
   {
     "teamId": "L-R",
@@ -176,8 +176,8 @@
     "popularity": 2,
     "cooperation": 2.5,
     "playerMin": 9,
-    "playerOpt": 12,
-    "sourceNote": "season-management-sheet"
+    "playerOpt": 11,
+    "sourceNote": "team-ratings-sheet"
   },
   {
     "teamId": "L-K",
@@ -195,7 +195,7 @@
     "cooperation": 8,
     "playerMin": 10,
     "playerOpt": 12,
-    "sourceNote": "season-management-sheet"
+    "sourceNote": "team-ratings-sheet"
   },
   {
     "teamId": "M-M",
@@ -212,8 +212,8 @@
     "popularity": 6.5,
     "cooperation": 1.5,
     "playerMin": 8,
-    "playerOpt": 11,
-    "sourceNote": "season-management-sheet"
+    "playerOpt": 10,
+    "sourceNote": "team-ratings-sheet"
   },
   {
     "teamId": "M-S",
@@ -231,7 +231,7 @@
     "cooperation": 9.5,
     "playerMin": 10,
     "playerOpt": 12,
-    "sourceNote": "season-management-sheet"
+    "sourceNote": "team-ratings-sheet"
   },
   {
     "teamId": "N-W",
@@ -248,8 +248,8 @@
     "popularity": 7,
     "cooperation": 5,
     "playerMin": 9,
-    "playerOpt": 10,
-    "sourceNote": "season-management-sheet"
+    "playerOpt": 11,
+    "sourceNote": "team-ratings-sheet"
   },
   {
     "teamId": "N-N",
@@ -266,8 +266,8 @@
     "popularity": 1,
     "cooperation": 9,
     "playerMin": 7,
-    "playerOpt": 10,
-    "sourceNote": "season-management-sheet"
+    "playerOpt": 9,
+    "sourceNote": "team-ratings-sheet"
   },
   {
     "teamId": "P-C",
@@ -284,8 +284,8 @@
     "popularity": 8.5,
     "cooperation": 7,
     "playerMin": 9,
-    "playerOpt": 10,
-    "sourceNote": "season-management-sheet"
+    "playerOpt": 11,
+    "sourceNote": "team-ratings-sheet"
   },
   {
     "teamId": "P-S",
@@ -303,7 +303,7 @@
     "cooperation": 6,
     "playerMin": 8,
     "playerOpt": 10,
-    "sourceNote": "season-management-sheet"
+    "sourceNote": "team-ratings-sheet"
   },
   {
     "teamId": "R-L",
@@ -321,7 +321,7 @@
     "cooperation": 5.5,
     "playerMin": 8,
     "playerOpt": 10,
-    "sourceNote": "season-management-sheet"
+    "sourceNote": "team-ratings-sheet"
   },
   {
     "teamId": "R-R",
@@ -338,8 +338,8 @@
     "popularity": 8,
     "cooperation": 7,
     "playerMin": 8,
-    "playerOpt": 12,
-    "sourceNote": "season-management-sheet"
+    "playerOpt": 10,
+    "sourceNote": "team-ratings-sheet"
   },
   {
     "teamId": "R-C",
@@ -356,8 +356,8 @@
     "popularity": 7,
     "cooperation": 6,
     "playerMin": 10,
-    "playerOpt": 11,
-    "sourceNote": "season-management-sheet"
+    "playerOpt": 12,
+    "sourceNote": "team-ratings-sheet"
   },
   {
     "teamId": "S-S",
@@ -374,8 +374,8 @@
     "popularity": 6.5,
     "cooperation": 8,
     "playerMin": 7,
-    "playerOpt": 10,
-    "sourceNote": "season-management-sheet"
+    "playerOpt": 9,
+    "sourceNote": "team-ratings-sheet"
   },
   {
     "teamId": "S-C",
@@ -392,8 +392,8 @@
     "popularity": 5.5,
     "cooperation": 8,
     "playerMin": 7,
-    "playerOpt": 10,
-    "sourceNote": "season-management-sheet"
+    "playerOpt": 9,
+    "sourceNote": "team-ratings-sheet"
   },
   {
     "teamId": "T-T",
@@ -410,8 +410,8 @@
     "popularity": 6,
     "cooperation": 8.5,
     "playerMin": 12,
-    "playerOpt": 12,
-    "sourceNote": "season-management-sheet"
+    "playerOpt": 14,
+    "sourceNote": "team-ratings-sheet"
   },
   {
     "teamId": "T-C",
@@ -429,7 +429,7 @@
     "cooperation": 8.5,
     "playerMin": 10,
     "playerOpt": 12,
-    "sourceNote": "season-management-sheet"
+    "sourceNote": "team-ratings-sheet"
   },
   {
     "teamId": "T-G",
@@ -447,7 +447,7 @@
     "cooperation": 3,
     "playerMin": 9,
     "playerOpt": 11,
-    "sourceNote": "season-management-sheet"
+    "sourceNote": "team-ratings-sheet"
   },
   {
     "teamId": "U-A",
@@ -465,7 +465,7 @@
     "cooperation": 3.5,
     "playerMin": 9,
     "playerOpt": 11,
-    "sourceNote": "season-management-sheet"
+    "sourceNote": "team-ratings-sheet"
   },
   {
     "teamId": "V-D",
@@ -482,8 +482,8 @@
     "popularity": 3.5,
     "cooperation": 3.5,
     "playerMin": 8,
-    "playerOpt": 11,
-    "sourceNote": "season-management-sheet"
+    "playerOpt": 10,
+    "sourceNote": "team-ratings-sheet"
   },
   {
     "teamId": "V-W",
@@ -501,7 +501,7 @@
     "cooperation": 5.5,
     "playerMin": 8,
     "playerOpt": 10,
-    "sourceNote": "season-management-sheet"
+    "sourceNote": "team-ratings-sheet"
   },
   {
     "teamId": "V-V",
@@ -518,8 +518,8 @@
     "popularity": 1,
     "cooperation": 1.5,
     "playerMin": 8,
-    "playerOpt": 9,
-    "sourceNote": "season-management-sheet"
+    "playerOpt": 10,
+    "sourceNote": "team-ratings-sheet"
   },
   {
     "teamId": "W-W",
@@ -536,8 +536,8 @@
     "popularity": 1.5,
     "cooperation": 8,
     "playerMin": 9,
-    "playerOpt": 12,
-    "sourceNote": "season-management-sheet"
+    "playerOpt": 11,
+    "sourceNote": "team-ratings-sheet"
   },
   {
     "teamId": "W-L",
@@ -555,7 +555,7 @@
     "cooperation": 7.5,
     "playerMin": 8,
     "playerOpt": 10,
-    "sourceNote": "season-management-sheet"
+    "sourceNote": "team-ratings-sheet"
   },
   {
     "teamId": "Z-H",
@@ -572,7 +572,7 @@
     "popularity": 2.5,
     "cooperation": 1,
     "playerMin": 8,
-    "playerOpt": 11,
-    "sourceNote": "season-management-sheet"
+    "playerOpt": 10,
+    "sourceNote": "team-ratings-sheet"
   }
 ]

@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 
 import {
   applyRoomOwnershipPreset,
+  advanceRoomArenaStep,
   advanceRoomFlow,
   canSeatControlTeam,
   createRoom,
@@ -9,7 +10,9 @@ import {
   recordRoomGameplayWrite,
   rejoinRoom,
   runRoomAiAutoStep,
+  setRoomArenaReadyState,
   setParticipantReadyState,
+  startRoomArenaSync,
   startRoom,
 } from "@/lib/room/room-store";
 import { authorizeTeamWrite } from "@/lib/room/online-room-model";
@@ -129,6 +132,73 @@ describe("room store", () => {
       expect(advanced.room.state.roomFlowState.aiAutoCompletedTeamIds).toHaveLength(0);
       expect(advanced.room.state.teamOwnership.filter((entry) => entry.controllerType === "human")).toHaveLength(8);
       expect(advanced.room.state.teamOwnership.filter((entry) => entry.controllerType === "ai")).toHaveLength(24);
+    }
+  });
+
+  it("keeps arena reveal steps server-authoritative with ready gates", () => {
+    const created = createRoom("socket-arena-a", { displayName: "Chris", preset: "chris_4_rest_ai", saveId: "arena-save" });
+    const joined = joinRoom(created.room.roomCode, "socket-arena-b", { displayName: "Franky" });
+    expect(joined.ok).toBe(true);
+    if (!joined.ok) return;
+
+    const started = startRoomArenaSync(created.room.roomCode, created.seat.seatToken, {
+      seasonId: "season-2",
+      matchdayId: "season-2-matchday-1",
+      disciplineSide: "d1",
+      maxSlotRevealIndex: 5,
+    });
+    expect(started.ok).toBe(true);
+    if (!started.ok) return;
+    expect(started.room.state.arenaSyncState.status).toBe("ready_check");
+    expect(started.room.state.arenaSyncState.requiredParticipantIds).toHaveLength(2);
+    expect(started.room.state.roomEvents.at(-1)?.type).toBe("arena_started");
+
+    expect(advanceRoomArenaStep(created.room.roomCode, created.seat.seatToken).ok).toBe(false);
+    expect(setRoomArenaReadyState(created.room.roomCode, created.seat.seatToken, true).ok).toBe(true);
+    expect(advanceRoomArenaStep(created.room.roomCode, created.seat.seatToken).ok).toBe(false);
+    expect(setRoomArenaReadyState(created.room.roomCode, joined.seat.seatToken, true).ok).toBe(true);
+
+    const firstStep = advanceRoomArenaStep(created.room.roomCode, created.seat.seatToken);
+    expect(firstStep.ok).toBe(true);
+    if (!firstStep.ok) return;
+    expect(firstStep.room.state.arenaSyncState.phaseId).toBe("slots");
+    expect(firstStep.room.state.arenaSyncState.slotRevealIndex).toBe(0);
+    expect(firstStep.room.state.roomEvents.at(-1)?.type).toBe("arena_step_changed");
+
+    const secondStep = advanceRoomArenaStep(created.room.roomCode, created.seat.seatToken);
+    expect(secondStep.ok).toBe(true);
+    if (secondStep.ok) {
+      expect(secondStep.room.state.arenaSyncState.phaseId).toBe("slots");
+      expect(secondStep.room.state.arenaSyncState.slotRevealIndex).toBe(1);
+    }
+  });
+
+  it("marks arena result state when a matchday write is applied", () => {
+    const created = createRoom("socket-arena-result-a", { displayName: "Chris", preset: "chris_4_rest_ai", saveId: "arena-result-save" });
+    const chris = created.room.state.roomParticipants[0];
+    expect(chris).toBeTruthy();
+    if (!chris) return;
+
+    const started = startRoomArenaSync(created.room.roomCode, created.seat.seatToken, {
+      seasonId: "season-2",
+      matchdayId: "season-2-matchday-1",
+      maxSlotRevealIndex: 5,
+    });
+    expect(started.ok).toBe(true);
+
+    const recorded = recordRoomGameplayWrite({
+      roomCode: created.room.roomCode,
+      saveId: "arena-result-save",
+      participantId: chris.participantId,
+      action: "matchday_apply",
+      eventType: "matchday_applied",
+      affectedViews: ["arena", "standings"],
+    });
+    expect(recorded.ok).toBe(true);
+    if (recorded.ok) {
+      expect(recorded.room.state.arenaSyncState.status).toBe("result_applied");
+      expect(recorded.room.state.arenaSyncState.resultStatus).toBe("applied");
+      expect(recorded.room.state.arenaSyncState.phaseId).toBe("result");
     }
   });
 

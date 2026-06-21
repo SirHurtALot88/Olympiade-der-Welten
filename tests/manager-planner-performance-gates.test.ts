@@ -22,13 +22,13 @@ describe("manager planner performance gates", () => {
   it("shrinks AI buy candidate pools before full preview", () => {
     const source = readRepoFile("lib/ai/ai-transfermarkt-preview-service.ts");
 
-    expect(source).toContain("baseFreeAgentsByPrice");
+    expect(source).toContain("marketValueSortedAsc");
     expect(source).toContain("candidateTokenCache");
     expect(source).toContain("candidateScans");
     expect(source).toContain("hardFilterCount");
     expect(source).toContain("fullBuyPreviewCount");
-    expect(source).toContain("if ((item.marketValue ?? Number.POSITIVE_INFINITY) > spendableCash)");
-    expect(source).toContain(".slice(0, Math.max(16, Math.min(24, limit)))");
+    expect(source).toContain("item.marketValue > budget");
+    expect(source).toContain("Performance gate: avoid enriching the full market, but never take the first N rows blindly.");
   });
 
   it("exports the planner performance proof and lineup precompute design", () => {

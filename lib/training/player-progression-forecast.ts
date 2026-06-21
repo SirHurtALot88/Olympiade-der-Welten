@@ -267,10 +267,53 @@ function getMarketValuePressureFactor(player: Player) {
 }
 
 function getPotentialSeasonLevelCap(potentialGap: number) {
-  if (potentialGap <= 0) return 0;
-  if (potentialGap <= 4) return 0.5;
-  if (potentialGap <= 10) return 1;
+  if (potentialGap <= -8) return 1.25;
+  if (potentialGap <= 0) return DEVELOPMENT_TARGET_TOP_SEASON_LEVEL_GAIN;
+  if (potentialGap <= 4) return DEVELOPMENT_TARGET_TOP_SEASON_LEVEL_GAIN;
+  if (potentialGap <= 10) return DEVELOPMENT_TARGET_TOP_SEASON_LEVEL_GAIN;
   return DEVELOPMENT_MAX_LEVEL_UPS_PER_SEASON;
+}
+
+function getEffectivePotentialForDevelopment(input: {
+  currentAbility: number;
+  scoutPotential: number;
+}) {
+  if (input.scoutPotential >= input.currentAbility) return input.scoutPotential;
+  // Potential is a soft scouting signal, not a hard ceiling. A low scout read may
+  // create regression risk, but it must not erase a productive player's whole season.
+  return roundValue(Math.max(input.scoutPotential, input.currentAbility - 8), 1);
+}
+
+function getPerformanceExpectations(input: {
+  currentAbility: number;
+  marketValue: number | null;
+  role: string;
+}) {
+  const abilityBand = clamp((input.currentAbility - 48) / 28, -0.45, 1.25);
+  const valueBand = clamp(((input.marketValue ?? 18) - 18) / 38, -0.35, 1.35);
+  const roleOffset = isStarOrCore(input.role) ? 0.18 : isProspect(input.role) ? -0.08 : 0;
+
+  return {
+    expectedMvs: roundValue(clamp(5.1 + abilityBand * 1.45 + valueBand * 0.85 + roleOffset, 4.2, 9.6), 2),
+    expectedPps: roundValue(clamp(7.4 + abilityBand * 4.3 + valueBand * 3.4 + roleOffset * 5, 6, 18.5), 2),
+  };
+}
+
+function getRelativePerformanceIndex(input: {
+  mvs: number | null;
+  pps: number | null;
+  expectedMvs: number;
+  expectedPps: number;
+}) {
+  const signals: number[] = [];
+  if (isFiniteNumber(input.mvs)) {
+    signals.push((input.mvs + 1.2) / (input.expectedMvs + 1.2));
+  }
+  if (isFiniteNumber(input.pps)) {
+    signals.push((input.pps + 3) / (input.expectedPps + 3));
+  }
+  if (signals.length === 0) return 0.92;
+  return roundValue(signals.reduce((sum, value) => sum + value, 0) / signals.length, 2);
 }
 
 function buildTrainingFormScore(player: Player, mode: PlayerTrainingMode) {
@@ -302,7 +345,7 @@ function buildDevelopmentRoute(input: {
   isFreeAgent: boolean;
 }): PlayerDevelopmentRoute {
   if (input.isFreeAgent) return "free_agent_ambient";
-  if (input.netDevelopmentXP < -30) return "stagnation_watch";
+  if (input.netDevelopmentXP < -90) return "stagnation_watch";
   if (isProspect(input.role) && input.potentialGap > 8) return "prospect_growth";
   if (isStarOrCore(input.role) && input.potentialGap > 5) return input.role.includes("star") ? "star_growth" : "core_growth";
   if (input.potentialGap > 12) return "depth_growth";
@@ -318,9 +361,9 @@ function getTrend(netDevelopmentXP: number): PlayerDevelopmentTrend {
 }
 
 function getRegressionRisk(input: { netDevelopmentXP: number; regressionPressure: number }): PlayerRegressionRisk {
-  if (input.netDevelopmentXP <= -110 || input.regressionPressure >= 95) return "high";
-  if (input.netDevelopmentXP < -30 || input.regressionPressure >= 60) return "medium";
-  if (input.regressionPressure >= 25) return "low";
+  if (input.netDevelopmentXP <= -230 || input.regressionPressure >= 130) return "high";
+  if (input.netDevelopmentXP < -130 || input.regressionPressure >= 90) return "medium";
+  if (input.regressionPressure >= 65) return "low";
   return "none";
 }
 
@@ -341,13 +384,33 @@ function buildNetDevelopment(input: {
   const role = getRosterRole(input.gameState, input.player.id);
   const isFreeAgent = !input.gameState.rosters.some((entry) => entry.playerId === input.player.id);
   const ca = input.currentAbility ?? 50;
-  const po = input.potentialRating ?? Math.max(ca, 55);
+  const rawPo = input.potentialRating ?? Math.max(ca, 55);
+  const po = getEffectivePotentialForDevelopment({ currentAbility: ca, scoutPotential: rawPo });
   const potentialGap = po - ca;
+  const marketValue = getDisplayMarketValue(input.player);
+  const performanceExpectations = getPerformanceExpectations({
+    currentAbility: ca,
+    marketValue,
+    role,
+  });
+  const relativePerformanceIndex = getRelativePerformanceIndex({
+    mvs: input.mvs,
+    pps: input.pps,
+    expectedMvs: performanceExpectations.expectedMvs,
+    expectedPps: performanceExpectations.expectedPps,
+  });
   const playtimeFactor = input.appearances >= 7 ? 1.1 : input.appearances >= 4 ? 1 : input.appearances >= 1 ? 0.9 : isFreeAgent ? 0.82 : 0.74;
-  const performanceFactor =
-    isFiniteNumber(input.mvs) || isFiniteNumber(input.pps)
-      ? clamp(0.8 + ((input.mvs ?? 0) / 40) + ((input.pps ?? 0) / 120), 0.72, 1.28)
-      : 0.92;
+  const bracketMomentum = clamp((58 - ca) / 100 + ((22 - (marketValue ?? 22)) / 140), -0.12, 0.14);
+  const appearanceReliability = input.appearances >= 7 ? 0.03 : input.appearances >= 4 ? 0.01 : 0;
+  const performanceFactor = clamp(
+    0.9 +
+      (relativePerformanceIndex - 1) * 0.55 +
+      (relativePerformanceIndex > 1 ? Math.max(0, bracketMomentum) * 0.45 : 0) -
+      (relativePerformanceIndex < 1 ? Math.max(0, -bracketMomentum) * 0.45 : 0) +
+      appearanceReliability,
+    0.62,
+    1.38,
+  );
   const trainingFormFactor = getTierFactor(input.trainingFormTier);
   const potentialGapFactor = potentialGap >= 28 ? 1.18 : potentialGap >= 14 ? 1.1 : potentialGap >= 5 ? 1.02 : potentialGap >= -2 ? 0.82 : 0.62;
   const traitFactor = clamp(input.traitMultiplier, 0.9, 1.1);
@@ -355,10 +418,12 @@ function buildNetDevelopment(input: {
   const routeFitFactor = routeConflict ? 0.92 : 1;
   const earnedXP = roundValue(input.xpAfterTraits * playtimeFactor * performanceFactor * trainingFormFactor * potentialGapFactor * traitFactor * routeFitFactor, 0);
   const roleMaintenance = isStarOrCore(role) ? (role.includes("star") ? 42 : 28) : isProspect(role) ? 8 : 16;
-  const leagueMedianRegression = isProspect(role) ? 180 : isStarOrCore(role) ? (role.includes("star") ? 340 : 300) : 260;
-  const potentialProximity = potentialGap <= -1 ? 45 + Math.abs(potentialGap) * 4 : potentialGap <= 4 ? 36 : potentialGap <= 10 ? 20 : 8;
-  const currentAbilityMaintenance = ca * 0.65;
-  const overPotential = Math.max(0, ca - po) * 8;
+  const leagueMedianRegression = isProspect(role) ? 170 : isStarOrCore(role) ? (role.includes("star") ? 300 : 260) : 220;
+  const potentialProximity = potentialGap <= -1 ? 28 + Math.abs(potentialGap) * 3 : potentialGap <= 4 ? 24 : potentialGap <= 10 ? 14 : 6;
+  const marketValuePressureFactor = getMarketValuePressureFactor(input.player);
+  const maintenanceRate = clamp(0.38 + marketValuePressureFactor * 0.1 + (isStarOrCore(role) ? 0.02 : 0) - (isProspect(role) ? 0.02 : 0), 0.36, 0.5);
+  const currentAbilityMaintenance = ca * maintenanceRate;
+  const overPotential = Math.max(0, ca - po) * 4;
   const maintenanceBreakdown = {
     leagueMedianRegression,
     currentAbility: roundValue(currentAbilityMaintenance, 0),
@@ -375,16 +440,23 @@ function buildNetDevelopment(input: {
     0,
   );
   const lowPlaytime = input.appearances === 0 ? (isFreeAgent ? 8 : isStarOrCore(role) ? 42 : 24) : input.appearances <= 2 ? 14 : 0;
-  const poorPerformance = input.appearances > 0 && (input.mvs ?? 0) < 4 && (input.pps ?? 0) < 8 ? 28 : input.appearances > 0 && (input.mvs ?? 0) < 8 ? 12 : 0;
+  const poorPerformance =
+    input.appearances > 0 && relativePerformanceIndex < 0.72
+      ? 30
+      : input.appearances > 0 && relativePerformanceIndex < 0.88
+        ? 14
+        : 0;
   const sharpness = isFiniteNumber(input.player.form) && input.player.form > 0 && input.player.form < 38 ? 18 : 0;
   const boardTrust = input.boardTrustScore != null ? (input.boardTrustScore < 30 ? 28 : input.boardTrustScore < 50 ? 13 : 0) : 0;
   const negativeTraits = input.player.traitsNegative.reduce((sum, trait) => sum + Math.abs(TRAINING_FORM_NEGATIVE_TRAITS[trait] ?? 0) * 0.7, 0);
   const routeConflictPressure = routeConflict ? 14 : 0;
-  const starUnderperformance = isStarOrCore(role) && input.appearances >= 4 && ((input.mvs ?? 0) < 8 || (input.pps ?? 0) < 12) ? 24 : 0;
-  const marketValuePressureFactor = getMarketValuePressureFactor(input.player);
+  const starUnderperformance =
+    isStarOrCore(role) && input.appearances >= 4 && relativePerformanceIndex < 0.9
+      ? roundValue(18 + Math.max(0, ca - 58) * 0.18, 0)
+      : 0;
   const highValueUnderperformance =
-    marketValuePressureFactor > 0 && input.appearances >= 3 && ((input.mvs ?? 0) < 8 || (input.pps ?? 0) < 12)
-      ? roundValue((34 + ca * 0.16) * marketValuePressureFactor, 0)
+    marketValuePressureFactor > 0 && input.appearances >= 3 && relativePerformanceIndex < 0.94
+      ? roundValue((20 + ca * 0.14 + Math.max(0, 1 - relativePerformanceIndex) * 70) * marketValuePressureFactor, 0)
       : 0;
   const poorTrainingValuePressure =
     marketValuePressureFactor > 0

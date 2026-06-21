@@ -9,6 +9,7 @@ export type SaveSummary = {
   createdAt: string;
   updatedAt: string;
   scenarioMeta?: ScenarioMeta;
+  saveMode?: "solo_1" | "solo_2" | "solo_4" | "online_4v4" | "custom";
 };
 
 export type PersistedSaveGame = SaveGameState & {
@@ -57,9 +58,9 @@ export type PersistenceService = {
   bootstrapSingleplayerSave(): PersistenceBootstrapResult;
   getActiveSave(): PersistedSaveGame | null;
   getSaveById(saveId: string): PersistedSaveGame | null;
-  saveSingleplayerState(saveId: string, gameState: GameState): PersistedSaveGame;
+  saveSingleplayerState(saveId: string, gameState: GameState, input?: { status?: SaveStatus }): PersistedSaveGame;
   createSave(name: string): PersistedSaveGame;
-  createFreshSeasonOneSave(input?: { saveId?: string; name?: string }): PersistedSaveGame;
+  createFreshSeasonOneSave(input?: { saveId?: string; name?: string; status?: SaveStatus; activate?: boolean }): PersistedSaveGame;
   cloneSave(sourceSaveId: string, name: string): PersistedSaveGame;
   createScenarioSnapshot(input: {
     sourceSaveId: string;

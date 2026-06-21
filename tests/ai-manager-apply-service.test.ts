@@ -294,6 +294,38 @@ describe("ai manager apply service", () => {
     expect(mock.current.gameState.seasonState.facilityEvents?.[0]?.source).toBe("manual_facility_upgrade");
   });
 
+  it("lets AI downgrade low-priority buildings under cash pressure", () => {
+    const source = save(gameState({
+      cash: 2,
+      teamFacilities: {
+        "T-1": {
+          facilities: {
+            analytics_room: { level: 3, enabled: true, conditionPct: 45 },
+          },
+        },
+      },
+    }));
+    const preview = buildAiManagerApplyPreview(source);
+    const plannedDowngrade = preview.actions.find((action) => action.actionType === "downgrade_building");
+    const mock = persistenceMock(source);
+    const result = applyAiManagerPlan({
+      save: source,
+      dryRun: false,
+      actionTypes: ["downgrade_building"],
+      persistence: mock.persistence,
+    });
+
+    const appliedDowngrade = result.actions.find((action) => action.actionType === "downgrade_building" && action.applied);
+    const analyticsRoom = mock.current.gameState.seasonState.teamFacilities?.["T-1"]?.facilities.analytics_room;
+
+    expect(plannedDowngrade).toBeTruthy();
+    expect(appliedDowngrade).toBeTruthy();
+    expect(appliedDowngrade?.cost).toBeLessThan(0);
+    expect(mock.current.gameState.teams.find((team) => team.teamId === "T-1")?.cash).toBeGreaterThan(2);
+    expect(analyticsRoom).toMatchObject({ level: 2, enabled: true, conditionPct: 100 });
+    expect(mock.current.gameState.seasonState.facilityEvents?.[0]?.source).toBe("manual_facility_downgrade");
+  });
+
   it("stores team training settings and player training modes through the training service", () => {
     const source = save();
     const mock = persistenceMock(source);

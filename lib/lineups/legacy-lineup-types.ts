@@ -1,7 +1,16 @@
 import type {
+  DisciplineCategory,
+  FormCardPlanRecord,
   FormCardColor,
+  GameState,
   LineupDraftModifiers,
+  SeasonDisciplineScheduleEntry,
   PlayerAttributeSheetStats,
+  TeamPowerAttributeTag,
+  TeamPowerCategory,
+  TeamPowerConditionalTrigger,
+  TeamPowerEffectType,
+  TeamPowerTargetMode,
   TeamStrategyProfile,
 } from "@/lib/data/olyDataTypes";
 
@@ -79,6 +88,15 @@ export type LegacyLineupContext = {
   activePlayers: LegacyActivePlayerRef[];
   rosterPlayers?: LegacyRosterPlayerRef[];
   disciplineScores: LegacyDisciplineScoreRef[];
+  moraleByPlayerId?: Record<string, LegacyMoralePerformanceRef> | null;
+};
+
+export type LegacyMoralePerformanceRef = {
+  morale: number;
+  multiplier: number;
+  modifierPct: number;
+  label: "boost" | "neutral" | "risk";
+  contractDragPct?: number | null;
 };
 
 export type LegacyLineupEntryScore = {
@@ -94,6 +112,12 @@ export type LegacyLineupEntryScore = {
   fatigueCount?: number | null;
   fatigueMultiplier?: number | null;
   fatigueAdjustedScore?: number | null;
+  moraleStatus?: "mapped" | "missing_source" | "not_applied";
+  morale?: number | null;
+  moraleMultiplier?: number | null;
+  moraleModifierPct?: number | null;
+  moraleModifier?: number | null;
+  moraleAdjustedScore?: number | null;
   isCaptain?: boolean;
   captainMultiplier?: number | null;
   captainBonus?: number | null;
@@ -109,6 +133,7 @@ export type LegacyResolveMutatorMode = "legacy_selected_traits" | "mvp_forced_mu
 export type LegacyMutatorSlotEffect = {
   slotKey: "mutator1" | "mutator2";
   label: string;
+  hitCount?: number;
   scoreModifier: number;
   playerPpsModifier: number;
   teamPpsModifier: number | null;
@@ -128,6 +153,10 @@ export type LegacyLineupScoreResult = {
   baseScore?: number;
   fatigueStatus?: "mapped" | "missing_source";
   fatigueModifier?: number | null;
+  moraleStatus?: "mapped" | "missing_source" | "not_applied";
+  moraleModifier?: number | null;
+  intensity?: "conserve" | "normal" | "push" | null;
+  intensityModifier?: number | null;
   captainStatus?: "mapped" | "missing_source";
   captainBonusTotal?: number | null;
   formCardsAvailable?: number | null;
@@ -138,6 +167,17 @@ export type LegacyLineupScoreResult = {
   mutatorMode?: LegacyResolveMutatorMode;
   mutatorText?: string | null;
   mutatorModifier?: number | null;
+  teamPowerSelected?: number | null;
+  teamPowerStatus?: "ready" | "missing_source";
+  teamPowerLabel?: string | null;
+  teamPowerModifier?: number | null;
+  teamPowerImpact?: number | null;
+  teamPowerBasePct?: number | null;
+  teamPowerConditionalPct?: number | null;
+  teamPowerAttributeFitPct?: number | null;
+  teamPowerEffectType?: TeamPowerEffectType | null;
+  teamPowerTargetMode?: TeamPowerTargetMode | null;
+  teamPowerTargetLimit?: number | null;
   mutatorSlots?: LegacyMutatorSlotEffect[];
   teamPpsModifier?: number | null;
   teamPpsStatus?: "ready" | "missing_source";
@@ -178,6 +218,29 @@ export type LegacyFormCardOption = {
   value: number;
   isUsed: boolean;
   usedByLineupId: string | null;
+};
+
+export type LegacyTeamPowerOption = {
+  id: string;
+  label: string;
+  description: string;
+  category: TeamPowerCategory;
+  effectType: TeamPowerEffectType;
+  targetMode: TeamPowerTargetMode;
+  targetLimit: number;
+  conditionalBonusPct: number;
+  conditionalTrigger: TeamPowerConditionalTrigger | null;
+  conditionalDescription: string | null;
+  source: "team_identity" | "facility";
+  sourceFacilityId: string | null;
+  modifier: number;
+  positiveAttributeTags: TeamPowerAttributeTag[];
+  negativeAttributeTag: TeamPowerAttributeTag | null;
+  chargesTotal: number;
+  chargesUsed: number;
+  chargesRemaining: number;
+  selectedForSeason: boolean;
+  isUsedUp: boolean;
 };
 
 export type LegacyMutatorTraitOption = {
@@ -232,6 +295,7 @@ export type LegacyLineupContextMeta = LegacyLineupKeyParams & {
 };
 
 export type LegacyLineupLoadedContext = LegacyLineupRepositoryContext & {
+  gameState?: GameState;
   save: {
     id: string;
     name: string;
@@ -288,8 +352,9 @@ export type LegacyLineupLoadedContext = LegacyLineupRepositoryContext & {
   disciplines: Array<{
     id: string;
     name: string;
-    category: string;
+    category: DisciplineCategory;
   }>;
+  seasonDisciplineSchedule?: SeasonDisciplineScheduleEntry[];
   disciplineWeights: Array<{
     disciplineId: string;
     attributeKey: string;
@@ -360,6 +425,7 @@ export type LegacyLineupLoadedContext = LegacyLineupRepositoryContext & {
     displayLabel: string;
   };
   fatigueByPlayerId?: Record<string, { count: number; multiplier: number }> | null;
+  moraleByPlayerId?: Record<string, LegacyMoralePerformanceRef> | null;
   fatigueSourceStatus?: "mapped" | "missing_source";
   teamDisciplineRanks?: Record<string, { rank: number | null; score?: number | null; sourceStatus: string; rankSource?: string | null }>;
   captainRule?: {
@@ -369,7 +435,16 @@ export type LegacyLineupLoadedContext = LegacyLineupRepositoryContext & {
   };
   formCardSource?: LegacyModifierSourceSummary;
   mutatorSource?: LegacyModifierSourceSummary;
+  teamPowerSource?: LegacyModifierSourceSummary;
   formCards?: LegacyFormCardOption[];
+  formCardPlans?: FormCardPlanRecord[];
+  teamPowers?: LegacyTeamPowerOption[];
+  teamPowerWindows?: Record<string, {
+    disciplineId: string;
+    rankSource: string;
+    sourceStatus: string;
+    top8Rivals: Array<{ teamId: string; teamName: string; rank: number; relationship: number }>;
+  }>;
   mutatorTraitOptions?: LegacyMutatorTraitOption[];
 };
 
@@ -409,5 +484,5 @@ export type LegacyLineupValidationOptions = {
 
 export type LegacyResolvePreviewOptions = {
   modifierMode?: LegacyResolveMutatorMode;
-  captainMode?: "legacy_strongest_selected" | "missing_source";
+  captainMode?: "selected_captain" | "legacy_strongest_selected" | "missing_source";
 };

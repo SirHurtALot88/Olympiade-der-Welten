@@ -95,7 +95,7 @@ function normalizeStoredEconomyValue(value: number | null | undefined) {
     return null;
   }
   if (numericValue > 1000) {
-    return null;
+    return roundTo2(numericValue / 100);
   }
 
   return numericValue;
@@ -169,8 +169,8 @@ export function resolvePlayerEconomyContract(input: {
 
   const storedCalculatedMarketValue = normalizeStoredEconomyValue(player?.marketValue);
   const storedCalculatedSalary = normalizeStoredEconomyValue(player?.salaryDemand);
-  const legacyDisplayMarketValue = toFiniteNumber(player?.displayMarketValue);
-  const legacyDisplaySalary = toFiniteNumber(player?.displaySalary);
+  const legacyDisplayMarketValue = normalizeStoredEconomyValue(player?.displayMarketValue);
+  const legacyDisplaySalary = normalizeStoredEconomyValue(player?.displaySalary);
   const rosterPurchasePrice = toFiniteNumber(rosterEntry?.purchasePrice);
   const rosterSalary = toFiniteNumber(rosterEntry?.salary);
   const contractLength = toFiniteNumber(rosterEntry?.contractLength);
@@ -178,7 +178,7 @@ export function resolvePlayerEconomyContract(input: {
   const formulaSources = loadPlayerFormulaSources();
   const generatorAttributes = toGeneratorAttributes(playerEntity);
   const salaryMarketValueOverride = toFiniteNumber(input.salaryMarketValueOverride);
-  const visibleFinalMarketValue = storedCalculatedMarketValue ?? legacyDisplayMarketValue ?? null;
+  const visibleFinalMarketValue = legacyDisplayMarketValue ?? storedCalculatedMarketValue ?? null;
   const baseMarketValue =
     input.baseMarketValueOverride ??
     (visibleFinalMarketValue != null
@@ -188,7 +188,7 @@ export function resolvePlayerEconomyContract(input: {
           disciplineRatings: playerEntity?.disciplineRatings,
         })
       : null);
-  const fallbackFinalSalary = storedCalculatedSalary ?? legacyDisplaySalary;
+  const fallbackFinalSalary = legacyDisplaySalary ?? storedCalculatedSalary;
   const salaryMarketValueFromLegacySalary =
     salaryMarketValueOverride == null &&
     baseMarketValue == null &&
@@ -205,7 +205,7 @@ export function resolvePlayerEconomyContract(input: {
           attributeSalaryModifiers: formulaSources.attributeSalaryModifiers,
         })
       : null;
-  const salaryMarketValue = salaryMarketValueOverride ?? baseMarketValue ?? salaryMarketValueFromLegacySalary;
+  const salaryMarketValue = salaryMarketValueOverride ?? visibleFinalMarketValue ?? baseMarketValue ?? salaryMarketValueFromLegacySalary;
   const marketValueBonuses =
     baseMarketValue != null
       ? calculateMarketValueBonuses({
@@ -238,21 +238,20 @@ export function resolvePlayerEconomyContract(input: {
       : null;
 
   const marketValue =
+    visibleFinalMarketValue ??
     calculatedFinalMarketValue ??
-    storedCalculatedMarketValue ??
-    legacyDisplayMarketValue ??
     rosterPurchasePrice ??
     null;
   const marketValueSource =
-    calculatedFinalMarketValue != null
-        ? "calculated_preview"
-        : storedCalculatedMarketValue != null
+    storedCalculatedMarketValue != null
           ? "calculated_stored"
           : legacyDisplayMarketValue != null
             ? resolveImportedMarketValueSource(player)
             : rosterPurchasePrice != null
               ? "active_purchase_price"
-              : "missing_source";
+              : calculatedFinalMarketValue != null
+                ? "calculated_preview"
+                : "missing_source";
 
   const salary =
     rosterSalary ??

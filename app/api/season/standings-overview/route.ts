@@ -1,9 +1,15 @@
+export const dynamic = "force-dynamic";
+
 import { NextResponse } from "next/server";
 
+import type { GameState } from "@/lib/data/olyDataTypes";
 import { resolvePlayerEconomyContract } from "@/lib/foundation/player-economy-contract";
+import { buildSeasonPointsLedger } from "@/lib/foundation/season-points-ledger";
 import { createPersistenceService } from "@/lib/persistence/persistence-service";
 import { buildArchivedSeasonStandingsOverviewItems } from "@/lib/season/archived-standings-overview";
 import { buildTeamPrizeSummary } from "@/lib/season/prize-money";
+import { getSeasonEconomyFactorWindow } from "@/lib/season/season-economy-factors";
+import { normalizeLineupDisciplineFieldName } from "@/lib/lineups/team-discipline-ranks";
 import {
   extractSeasonStandingsDisciplineValues,
   inspectSeasonStandingsSheet,
@@ -13,11 +19,51 @@ import {
 } from "@/lib/standings/season-standings-sheet";
 import { db } from "@/src/server/db";
 
+function roundValue(value: number, digits = 1) {
+  return Number(value.toFixed(digits));
+}
+
+function buildLocalSeasonDisciplineValues(input: {
+  gameState: GameState;
+  seasonId: string;
+}) {
+  const ledger = buildSeasonPointsLedger(input.gameState, input.seasonId);
+
+  return new Map(
+    input.gameState.teams.map((team) => {
+      const summary = ledger.teamSummariesByTeamId.get(team.teamId) ?? null;
+      const disciplineValues: Record<string, number | null> = {};
+
+      for (const discipline of input.gameState.disciplines) {
+        const key = normalizeLineupDisciplineFieldName(discipline.id);
+        if (!key) {
+          continue;
+        }
+        const value = summary?.pointsByDiscipline[discipline.id] ?? null;
+        disciplineValues[key] = typeof value === "number" && Number.isFinite(value) ? roundValue(value, 1) : null;
+      }
+
+      disciplineValues.bonuspunkte =
+        summary?.mutatorPpsBonus != null && Number.isFinite(summary.mutatorPpsBonus)
+          ? roundValue(summary.mutatorPpsBonus, 1)
+          : null;
+
+      return [
+        team.teamId,
+        {
+          disciplineValues,
+          warnings: summary?.warnings ?? [],
+        },
+      ] as const;
+    }),
+  );
+}
+
 export async function GET(request: Request) {
   try {
     const { searchParams } = new URL(request.url);
     const saveId = searchParams.get("saveId")?.trim() || undefined;
-    const seasonId = searchParams.get("seasonId")?.trim() || "season-1";
+    const requestedSeasonId = searchParams.get("seasonId")?.trim() || undefined;
     const source = searchParams.get("source")?.trim() === "prisma" ? "prisma" : "sqlite";
 
     const localSave =
@@ -31,6 +77,7 @@ export async function GET(request: Request) {
             );
           })()
         : null;
+    const seasonId = requestedSeasonId ?? localSave?.gameState.season.id ?? "season-1";
 
     const archivedSnapshot =
       source === "sqlite" && seasonId !== localSave!.gameState.season.id
@@ -46,12 +93,7 @@ export async function GET(request: Request) {
           kind: "season_snapshot",
           access: "local_save",
           detectedColumns: [],
-          disciplineColumns: [
-            { normalizedKey: "pow", sheetColumn: "Archiv Power" },
-            { normalizedKey: "spe", sheetColumn: "Archiv Speed" },
-            { normalizedKey: "men", sheetColumn: "Archiv Mental" },
-            { normalizedKey: "soc", sheetColumn: "Archiv Social" },
-          ],
+          disciplineColumns: SEASON_STANDINGS_DISCIPLINE_COLUMNS,
         },
         scope: {
           saveId: localSave!.saveId,
@@ -109,29 +151,36 @@ export async function GET(request: Request) {
               .map((row) => [row.resolvedTeamId as string, row] as const),
           )
         : null;
+    const localSeasonDisciplineValuesByTeamId =
+      source === "sqlite"
+        ? buildLocalSeasonDisciplineValues({
+            gameState: localSave!.gameState,
+            seasonId,
+          })
+        : null;
 
-    const localCashRankByTeamId =
+    const localStartRankByTeamId =
       source === "sqlite"
         ? (() => {
             const sorted = [...localSave!.gameState.teams].sort((left, right) => {
-              if (right.cash !== left.cash) {
-                return right.cash - left.cash;
+              if (right.budget !== left.budget) {
+                return right.budget - left.budget;
               }
               return left.name.localeCompare(right.name, "de");
             });
 
             const rankByTeamId = new Map<string, number>();
-            let previousCash: number | null = null;
+            let previousBudget: number | null = null;
             let previousRank = 0;
 
             sorted.forEach((team, index) => {
-              if (previousCash != null && team.cash === previousCash) {
+              if (previousBudget != null && team.budget === previousBudget) {
                 rankByTeamId.set(team.teamId, previousRank);
                 return;
               }
 
               const nextRank = index + 1;
-              previousCash = team.cash;
+              previousBudget = team.budget;
               previousRank = nextRank;
               rankByTeamId.set(team.teamId, nextRank);
             });
@@ -159,6 +208,13 @@ export async function GET(request: Request) {
               }
             }
 
+            const currentSalaryFactor =
+              getSeasonEconomyFactorWindow({
+                saveId: localSave!.saveId,
+                seasonId,
+                seasonState: localSave!.gameState.seasonState,
+              }).find((row) => row.seasonLabel === "Aktuell")?.factor ?? 1;
+
             return new Map(
               buildTeamPrizeSummary(
                 localSave!.gameState.teams.map((team) => {
@@ -168,11 +224,14 @@ export async function GET(request: Request) {
                     return sum + (resolvePlayerEconomyContract({ player, rosterEntry: entry }).salary ?? 0);
                   }, 0);
                   const standing = localSave!.gameState.seasonState.standings[team.teamId] ?? null;
-                  const derivedRank = standing?.rank ?? localCashRankByTeamId?.get(team.teamId) ?? 0;
+                  const hasCurrentPoints = standing?.points != null && Number.isFinite(standing.points) && standing.points > 0;
+                  const budgetStartRank = localStartRankByTeamId?.get(team.teamId) ?? 0;
+                  const startRank = hasCurrentPoints ? standing?.startplatz ?? budgetStartRank : budgetStartRank;
+                  const derivedRank = hasCurrentPoints ? standing?.rank ?? startRank : budgetStartRank;
                   const transfers = transferSummaryByTeamId.get(team.teamId) ?? 0;
                   return {
                     rank: derivedRank,
-                    startPlace: standing?.rank ?? derivedRank,
+                    startPlace: startRank,
                     team: {
                       teamId: team.teamId,
                       name: team.name,
@@ -182,6 +241,8 @@ export async function GET(request: Request) {
                     transfers,
                   };
                 }),
+                currentSalaryFactor,
+                localSave!.gameState.seasonState.adminBalancingConfig,
               ).map((row) => [row.teamId, row] as const),
             );
           })()
@@ -193,30 +254,34 @@ export async function GET(request: Request) {
           ? localSave!.gameState.teams.map((team) => {
               const standing = localSave!.gameState.seasonState.standings[team.teamId] ?? null;
               const row = localSheetRowByTeamId?.get(team.teamId) ?? null;
-              const derivedCashRank = localCashRankByTeamId?.get(team.teamId) ?? null;
+              const localDiscipline = localSeasonDisciplineValuesByTeamId?.get(team.teamId) ?? null;
+              const hasCurrentPoints = standing?.points != null && Number.isFinite(standing.points) && standing.points > 0;
+              const budgetStartRank = localStartRankByTeamId?.get(team.teamId) ?? null;
+              const startRank = hasCurrentPoints ? standing?.startplatz ?? budgetStartRank : budgetStartRank;
+              const displayRank = hasCurrentPoints ? standing?.rank ?? startRank : budgetStartRank;
               const prizeSummary = localPrizeSummaryByTeamId?.get(team.teamId) ?? null;
               return {
                 teamId: team.teamId,
                 teamName: team.name,
                 teamCode: team.shortCode,
-                rank: standing?.rank ?? derivedCashRank,
-                points: standing?.points ?? 0,
+                rank: displayRank,
+                points: hasCurrentPoints ? standing?.points ?? null : null,
                 cash: team.cash,
-                cashFc: prizeSummary?.cashForecast ?? null,
-                startplatz: standing?.rank ?? derivedCashRank,
-                rankDiff: prizeSummary?.rankDiff ?? null,
-                sponsorBasis: prizeSummary?.basis ?? null,
-                sponsorRank: prizeSummary?.placementBonus ?? null,
-                sponsorTotal: prizeSummary?.sponsorTotal ?? null,
-                guv: prizeSummary?.profitLoss ?? null,
-                cashTotal: prizeSummary?.cashTotal ?? null,
+                cashFc: standing?.cashFc ?? prizeSummary?.cashForecast ?? null,
+                startplatz: startRank,
+                rankDiff: standing?.rankDiff ?? prizeSummary?.rankDiff ?? null,
+                sponsorBasis: standing?.sponsorBasis ?? prizeSummary?.basis ?? null,
+                sponsorRank: standing?.sponsorRank ?? prizeSummary?.placementBonus ?? null,
+                sponsorTotal: standing?.sponsorTotal ?? prizeSummary?.sponsorTotal ?? null,
+                guv: standing?.guv ?? prizeSummary?.profitLoss ?? null,
+                cashTotal: standing?.cashTotal ?? prizeSummary?.cashTotal ?? null,
                 form: null,
                 transfers: prizeSummary?.transfers ?? null,
                 rosterCount: null,
                 salaryTotal: null,
                 marketValueTotal: null,
-                disciplineValues: row ? extractSeasonStandingsDisciplineValues(row) : {},
-                warnings: row?.warnings ?? [],
+                disciplineValues: localDiscipline?.disciplineValues ?? (row ? extractSeasonStandingsDisciplineValues(row) : {}),
+                warnings: Array.from(new Set([...(row?.warnings ?? []), ...(localDiscipline?.warnings ?? [])])),
               };
             })
           : mapping.rows

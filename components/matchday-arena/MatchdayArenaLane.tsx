@@ -3,6 +3,7 @@
 import { useLayoutEffect, useRef } from "react";
 
 import OptimizedMediaImage from "@/app/foundation/OptimizedMediaImage";
+import { getGameTermTooltip } from "@/components/ui/GameTerm";
 import type { MatchdayArenaPhaseBreakdownItem } from "@/lib/season/matchday-arena-presenter";
 
 type MatchdayArenaLaneProps = {
@@ -72,7 +73,7 @@ export default function MatchdayArenaLane({
       className={`matchday-arena-lane is-${tone}${isLeader ? " is-leader" : ""}${hasPenalty ? " has-penalty" : ""}`.trim()}
     >
       <div className="matchday-arena-lane-meta">
-        <span className="matchday-arena-lane-rank">#{rank}</span>
+        <span className="matchday-arena-lane-rank" title={getGameTermTooltip("Rank") ?? undefined}>#{rank}</span>
         {teamLogoUrl ? (
           <OptimizedMediaImage
             className="matchday-arena-lane-logo"
@@ -92,9 +93,9 @@ export default function MatchdayArenaLane({
         </div>
         {breakdownItems.length ? (
           <div className="matchday-arena-lane-breakdown">
-            {breakdownItems.map((item) => (
+            {breakdownItems.map((item, index) => (
               <span
-                key={`${teamName}-${item.id}`}
+                key={`${teamName}-${item.id}-${item.label}-${index}`}
                 className={`matchday-arena-lane-breakdown-item is-${item.tone}`}
                 title={`${item.label}: ${item.valueLabel}`}
               >
@@ -105,10 +106,10 @@ export default function MatchdayArenaLane({
         ) : null}
       </div>
       <div className="matchday-arena-lane-stats">
-        <span className="matchday-arena-lane-score">{scoreLabel}</span>
+        <span className="matchday-arena-lane-score" title="Score = Spieltagswertung aus Slots, Rollen, Erschoepfung und Einsatzstufe.">{scoreLabel}</span>
         {deltaLabel ? <span className="matchday-arena-lane-delta">{deltaLabel}</span> : <span className="matchday-arena-lane-delta">—</span>}
         {rankShiftLabel ? <span className="matchday-arena-lane-rank-shift">{rankShiftLabel}</span> : null}
-        {pointsLabel ? <span className="matchday-arena-lane-points">{pointsLabel}</span> : null}
+        {pointsLabel ? <span className="matchday-arena-lane-points" title={getGameTermTooltip("PPs") ?? undefined}>{pointsLabel}</span> : null}
       </div>
     </article>
   );

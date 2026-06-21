@@ -77,6 +77,22 @@ function main() {
     createdAt: row.createdAt,
     reconstructionWarning: row.reconstructionWarning,
   }));
+  const economyRows = audit.economyRows
+    .sort((left, right) => Math.abs(right.marketValueDelta ?? 0) - Math.abs(left.marketValueDelta ?? 0))
+    .map((row) => ({
+      playerId: row.playerId,
+      playerName: row.playerName,
+      baselineMarketValue: row.baselineMarketValue,
+      baselineSalary: row.baselineSalary,
+      baselinePurchasePrice: row.baselinePurchasePrice,
+      currentMarketValue: row.currentMarketValue,
+      currentSalary: row.currentSalary,
+      marketValueDelta: row.marketValueDelta,
+      salaryDelta: row.salaryDelta,
+      source: row.source,
+      marketValueSource: row.marketValueSource,
+      salarySource: row.salarySource,
+    }));
   const proofPlayer = save.gameState.players.find((player) => player.attributeSheetStats?.power != null) ?? save.gameState.players[0] ?? null;
   const proofBaseline = proofPlayer
     ? save.gameState.playerBaselines?.find((baseline) => baseline.playerId === proofPlayer.id) ?? null
@@ -127,7 +143,7 @@ function main() {
 
   const jsonPath = writeOutput(
     "player-baseline-audit.json",
-    JSON.stringify({ summary, missingRows, deltaRows, reconstructedRows }, null, 2),
+    JSON.stringify({ summary, missingRows, deltaRows, economyRows, reconstructedRows }, null, 2),
   );
   const missingCsvPath = writeOutput(
     "player-baseline-missing.csv",
@@ -151,6 +167,23 @@ function main() {
       "importedAt",
       "createdAt",
       "reconstructionWarning",
+    ]),
+  );
+  const economyCsvPath = writeOutput(
+    "player-baseline-season0-economy.csv",
+    toCsv(economyRows, [
+      "playerId",
+      "playerName",
+      "baselineMarketValue",
+      "baselineSalary",
+      "baselinePurchasePrice",
+      "currentMarketValue",
+      "currentSalary",
+      "marketValueDelta",
+      "salaryDelta",
+      "source",
+      "marketValueSource",
+      "salarySource",
     ]),
   );
   const resetProofPath = writeOutput(
@@ -189,6 +222,8 @@ function main() {
       `- Spieler mit Attribut-Deltas: ${summary.deltaPlayerCount}`,
       `- Delta-Zeilen: ${summary.deltaRowCount}`,
       `- Rekonstruierte Baselines: ${summary.reconstructedBaselineCount}`,
+      `- Season-0 Economy Referenzen: ${summary.seasonZeroEconomyReferenceCount}`,
+      `- Fehlende berechnete Economy Referenzen: ${summary.missingComputedEconomyReferenceCount}`,
       `- Baseline-Versionen: ${summary.baselineVersions.join(", ") || "—"}`,
       `- Ungültige Checksums: ${summary.invalidChecksumCount}`,
       `- Write-Guard Events: ${summary.writeGuardEventCount}`,
@@ -200,6 +235,7 @@ function main() {
       `- JSON: ${jsonPath}`,
       `- Missing CSV: ${missingCsvPath}`,
       `- Delta CSV: ${deltaCsvPath}`,
+      `- Season-0 Economy CSV: ${economyCsvPath}`,
       `- Checksum CSV: ${checksumCsvPath}`,
       `- Reset Proof: ${resetProofPath}`,
       "",
@@ -214,6 +250,7 @@ function main() {
       `- Baseline-Versionen: ${summary.baselineVersions.join(", ") || "—"}`,
       `- Source Hashes vorhanden: ${checksumRows.filter((row) => row.sourceHash).length}/${checksumRows.length}`,
       `- Checksums gueltig: ${checksumRows.filter((row) => row.checksumValid).length}/${checksumRows.length}`,
+      `- Season-0 Economy Referenzen: ${summary.seasonZeroEconomyReferenceCount}/${summary.baselineCount}`,
       `- Write-Guard Events: ${summary.writeGuardEventCount}`,
       `- Reset Proof OK: ${resetProof?.ok ? "ja" : "nein"}`,
       `- Reset Proof XP leer: ${resetProofPlayer?.currentXP === 0 && resetProofPlayer?.spentXP === 0 ? "ja" : "nein"}`,
@@ -222,6 +259,7 @@ function main() {
       "## Dateien",
       "",
       `- Checksum CSV: ${checksumCsvPath}`,
+      `- Season-0 Economy CSV: ${economyCsvPath}`,
       `- Reset Proof: ${resetProofPath}`,
       `- Legacy Audit: ${markdownPath}`,
       "",
@@ -239,6 +277,7 @@ function main() {
           json: jsonPath,
           missingCsv: missingCsvPath,
           deltaCsv: deltaCsvPath,
+          economyCsv: economyCsvPath,
           checksumCsv: checksumCsvPath,
           resetProof: resetProofPath,
         },

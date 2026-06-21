@@ -16,7 +16,7 @@ describe("matchday slot roles", () => {
       "Aggressor",
       "Defender",
       "Technician",
-      "Flex",
+      "Counter Tempo",
     ]);
   });
 
@@ -32,7 +32,7 @@ describe("matchday slot roles", () => {
 
     expect(role.majorPositiveAttribute).toBe("dexterity");
     expect(role.minorPositiveAttribute).toBe("speed");
-    expect(role.strainAttribute).toBe("stamina");
+    expect(role.strainAttribute).toBe("speed");
   });
 
   it("builds projected range from base, role, intensity and fatigue", () => {
@@ -60,12 +60,12 @@ describe("matchday slot roles", () => {
       revealVariance: 2,
     });
 
-    expect(projected.roleModifier).toBe(4);
+    expect(projected.roleModifier).toBe(5.3);
     expect(projected.intensityModifier).toBe(0);
     expect(projected.fatiguePenaltyPercent).toBe(0.5);
-    expect(projected.totalProjected).toBe(68.7);
-    expect(projected.rangeLow).toBe(64.3);
-    expect(projected.rangeHigh).toBe(73.1);
+    expect(projected.totalProjected).toBe(69.9);
+    expect(projected.rangeLow).toBe(65.4);
+    expect(projected.rangeHigh).toBe(74.4);
   });
 
   it("push raises score and fatigue while conserve lowers both", () => {
@@ -96,7 +96,7 @@ describe("matchday slot roles", () => {
     const normal = calculateMatchdayProjectedPreview({ ...shared, intensity: "normal" });
     const push = calculateMatchdayProjectedPreview({ ...shared, intensity: "push" });
 
-    expect(push.intensityModifier).toBe(2);
+    expect(push.intensityModifier).toBe(3);
     expect(push.totalProjected ?? 0).toBeGreaterThan(normal.totalProjected ?? 0);
     expect(push.rangeHigh ?? 0).toBeGreaterThan(conserve.rangeHigh ?? 0);
     expect(push.additionalFatigue).toBeGreaterThan(conserve.additionalFatigue);
@@ -301,6 +301,68 @@ describe("matchday slot roles", () => {
   it("exposes the three intensity stages", () => {
     expect(getMatchdayIntensityConfig("conserve").scoreModifier).toBe(-2);
     expect(getMatchdayIntensityConfig("normal").scoreModifier).toBe(0);
-    expect(getMatchdayIntensityConfig("push").scoreModifier).toBe(2);
+    expect(getMatchdayIntensityConfig("push").scoreModifier).toBe(3);
+  });
+
+  it("makes push more expensive on large disciplines than on small ones", () => {
+    const role = resolveSlotRolesForDiscipline("mini-dm", "Mini DM", 2)[0];
+    const shared = {
+      baseScore: 66,
+      role,
+      attributeStats: {
+        power: 70,
+        health: 70,
+        stamina: 56,
+        intelligence: 45,
+        awareness: 45,
+        determination: 48,
+        speed: 42,
+        dexterity: 44,
+        charisma: 36,
+        will: 40,
+        spirit: 39,
+        torment: 66,
+      },
+      currentFatigueCount: 4,
+      intensity: "push" as const,
+    };
+
+    const smallDiscipline = calculateMatchdayProjectedPreview({ ...shared, requiredPlayers: 2 });
+    const largeDiscipline = calculateMatchdayProjectedPreview({ ...shared, requiredPlayers: 6 });
+
+    expect(largeDiscipline.additionalFatigue).toBeGreaterThan(smallDiscipline.additionalFatigue);
+    expect(largeDiscipline.totalProjected).toBe(smallDiscipline.totalProjected);
+  });
+
+  it("makes rivalry pressure visible as extra push variance and strain", () => {
+    const role = resolveSlotRolesForDiscipline("mini-dm", "Mini DM", 2)[0];
+    const shared = {
+      baseScore: 65,
+      role,
+      attributeStats: {
+        power: 70,
+        health: 70,
+        stamina: 50,
+        intelligence: 45,
+        awareness: 45,
+        determination: 45,
+        speed: 45,
+        dexterity: 45,
+        charisma: 45,
+        will: 45,
+        spirit: 45,
+        torment: 70,
+      },
+      currentFatigueCount: 5,
+      rivalryPressure: 1.5,
+    };
+
+    const normal = calculateMatchdayProjectedPreview({ ...shared, intensity: "normal" });
+    const push = calculateMatchdayProjectedPreview({ ...shared, intensity: "push" });
+
+    expect(normal.rivalryPressureModifier).toBe(0);
+    expect(push.rivalryPressureModifier).toBe(1.5);
+    expect(push.additionalFatigue).toBeGreaterThan(normal.additionalFatigue);
+    expect(push.warnings).toContain("Rivalitaetsdruck: Push-Streuung +1.5");
   });
 });

@@ -22,6 +22,7 @@ export type AiManagerActionType =
   | "maintain_building"
   | "upgrade_building"
   | "buy_building"
+  | "downgrade_building"
   | "set_training_focus"
   | "set_training_intensity"
   | "reserve_transfer_budget"
@@ -200,9 +201,11 @@ function buildBuildingActions(save: PersistedSaveGame, preview: AiLeagueManageme
     let remainingMaintenanceBudget = buckets.maintenanceBudget;
     let remainingBuildingBudget = buckets.buildingBudget;
     const maintenancePlans = teamPlan.buildingPlan.filter((row) => {
+      if (row.action === "downgrade_or_ignore_if_no_cash") return false;
       const maintenance = previewFacilityMaintenance(save, row.teamId, row.buildingType);
       return maintenance.ok || (!maintenance.blockingReasons.includes("facility_not_built") && !maintenance.blockingReasons.includes("facility_condition_already_full"));
     });
+    const downgradePlans = teamPlan.buildingPlan.filter((row) => row.action === "downgrade_or_ignore_if_no_cash" && row.currentLevel > 0);
     const upgradePlans = teamPlan.buildingPlan.filter((row) => row.action === "upgrade_existing" || row.action === "build_new");
 
     for (const row of maintenancePlans) {
@@ -229,6 +232,31 @@ function buildBuildingActions(save: PersistedSaveGame, preview: AiLeagueManageme
         canApply,
         blockers,
         warnings: [...maintenance.warnings, ...row.warnings],
+        facilityId: row.buildingType,
+      });
+    }
+
+    for (const row of downgradePlans) {
+      const downgrade = previewFacilityUpgrade(save, row.teamId, row.buildingType, null, "downgrade");
+      const refund = downgrade.refundAmount ?? Math.max(0, -row.cost);
+      const blockers = downgrade.blockingReasons;
+      const canApply = blockers.length === 0;
+      actions.push({
+        actionId: actionId([sourcePlanId, row.teamId, "downgrade", row.buildingType]),
+        teamId: row.teamId,
+        teamCode: row.teamCode,
+        teamName: teamPlan.teamName,
+        actionType: "downgrade_building",
+        cost: round(-refund, 2),
+        cashBefore: downgrade.cashBefore ?? row.cashBefore,
+        cashAfter: downgrade.cashAfter ?? row.cashAfter,
+        expectedEffect: `${downgrade.currentEffect} -> ${downgrade.nextEffect ?? row.expectedEffect}; Zustand wird auf 100% gesetzt`,
+        reason: row.reasonsPositive.join(" | ") || "Unterhalt senken und Cash stabilisieren",
+        risk: riskFromWarnings(blockers, [...downgrade.warnings, ...row.warnings]),
+        sourcePlanId,
+        canApply,
+        blockers,
+        warnings: [...downgrade.warnings, ...row.warnings],
         facilityId: row.buildingType,
       });
     }
@@ -377,8 +405,13 @@ function buildContractActions(save: PersistedSaveGame, preview: AiLeagueManageme
   });
 }
 
-export function buildAiManagerApplyPreview(save: PersistedSaveGame): AiManagerApplyPreview {
-  const plan = buildAiLeagueManagementPreview(save.gameState);
+export function buildAiManagerApplyPreview(save: PersistedSaveGame, teamIds?: string[] | null): AiManagerApplyPreview {
+  const teamIdSet = teamIds?.length ? new Set(teamIds) : null;
+  const rawPlan = buildAiLeagueManagementPreview(save.gameState);
+  const plan: AiLeagueManagementPreview = {
+    ...rawPlan,
+    teams: teamIdSet ? rawPlan.teams.filter((team) => teamIdSet.has(team.teamId)) : rawPlan.teams,
+  };
   const sourcePlanId = buildPlanId(save);
   const budgetRows = buildBudgetRows(plan);
   const actions = [
@@ -412,7 +445,12 @@ export function buildAiManagerApplyPreview(save: PersistedSaveGame): AiManagerAp
   };
 }
 
-function writeManagerPlanState(save: PersistedSaveGame, actions: AiManagerAction[], persistence: PersistenceService) {
+function writeManagerPlanState(
+  save: PersistedSaveGame,
+  actions: AiManagerAction[],
+  persistence: PersistenceService,
+  preview: AiLeagueManagementPreview,
+) {
   const now = new Date().toISOString();
   const budgetReservations: Record<string, AiManagerBudgetReservationRecord> = {
     ...(save.gameState.seasonState.aiManagerBudgetReservations ?? {}),
@@ -432,7 +470,7 @@ function writeManagerPlanState(save: PersistedSaveGame, actions: AiManagerAction
   for (const [teamId, teamActions] of grouped) {
     const sourcePlanId = teamActions[0]?.sourcePlanId ?? buildPlanId(save);
     const byType = new Map(teamActions.map((action) => [action.actionType, action] as const));
-    const budgetPreview = buildAiLeagueManagementPreview(save.gameState).teams.find((team) => team.teamId === teamId)?.budgetPlan.bucketsBefore;
+    const budgetPreview = preview.teams.find((team) => team.teamId === teamId)?.budgetPlan.bucketsBefore;
     if (budgetPreview && (byType.has("reserve_transfer_budget") || byType.has("reserve_salary_budget") || byType.has("reserve_maintenance_budget"))) {
       budgetReservations[teamId] = {
         teamId,
@@ -475,27 +513,50 @@ export function applyAiManagerPlan(input: {
   save: PersistedSaveGame;
   dryRun?: boolean;
   actionTypes?: AiManagerActionType[];
+  teamIds?: string[] | null;
   persistence?: PersistenceService;
 }): AiManagerApplyPreview {
   const dryRun = input.dryRun ?? true;
   const persistence = input.persistence ?? createPersistenceService();
-  const preview = buildAiManagerApplyPreview(input.save);
+  const preview = buildAiManagerApplyPreview(input.save, input.teamIds);
   const allowedTypes = input.actionTypes ? new Set(input.actionTypes) : null;
   const selectedActions = allowedTypes ? preview.actions.filter((action) => allowedTypes.has(action.actionType)) : preview.actions;
   if (dryRun) {
     return { ...preview, dryRun: true, actions: selectedActions };
   }
 
-  let currentSave = writeManagerPlanState(input.save, selectedActions, persistence);
+  let currentSave = writeManagerPlanState(input.save, selectedActions, persistence, buildAiLeagueManagementPreview(input.save.gameState));
   const appliedIds = new Set<string>();
   const orderedFacilityActions = selectedActions.filter(
-    (action) => action.canApply && (action.actionType === "maintain_building" || action.actionType === "upgrade_building" || action.actionType === "buy_building"),
+    (action) =>
+      action.canApply &&
+      (action.actionType === "maintain_building" ||
+        action.actionType === "downgrade_building" ||
+        action.actionType === "upgrade_building" ||
+        action.actionType === "buy_building"),
   );
   for (const action of orderedFacilityActions) {
     if (!action.facilityId) continue;
     if (action.actionType === "maintain_building") {
       const maintenancePreview = previewFacilityMaintenance(currentSave, action.teamId, action.facilityId);
       const result = applyFacilityMaintenance(currentSave, action.teamId, action.facilityId, maintenancePreview.confirmToken, persistence);
+      if (result.applied) {
+        appliedIds.add(action.actionId);
+        currentSave = persistence.getSaveById(currentSave.saveId) ?? currentSave;
+      }
+      continue;
+    }
+    if (action.actionType === "downgrade_building") {
+      const downgradePreview = previewFacilityUpgrade(currentSave, action.teamId, action.facilityId, null, "downgrade");
+      const result = applyFacilityUpgrade(
+        currentSave,
+        action.teamId,
+        action.facilityId,
+        downgradePreview.confirmToken,
+        null,
+        "downgrade",
+        persistence,
+      );
       if (result.applied) {
         appliedIds.add(action.actionId);
         currentSave = persistence.getSaveById(currentSave.saveId) ?? currentSave;

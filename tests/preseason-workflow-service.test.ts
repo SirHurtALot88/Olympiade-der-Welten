@@ -2,6 +2,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import type { GameState, Player, TeamFacilityCollection } from "@/lib/data/olyDataTypes";
 import type { PersistedSaveGame, PersistenceService } from "@/lib/persistence/types";
+import { createPlayerBaselineFromPlayer } from "@/lib/players/player-baseline-service";
 
 vi.mock("@/lib/season/prize-money-preview", () => ({
   buildPrizeMoneyPreview: vi.fn(async () => ({
@@ -148,10 +149,17 @@ function createPlayer(partial: Partial<Player> = {}): Player {
     fatigue: partial.fatigue ?? 0,
     form: partial.form ?? 0,
     potential: partial.potential ?? 0,
+    currentXP: partial.currentXP,
+    spentXP: partial.spentXP,
+    lifetimeXP: partial.lifetimeXP,
+    trainingMode: partial.trainingMode,
+    displayMarketValue: partial.displayMarketValue,
+    displaySalary: partial.displaySalary,
   };
 }
 
 function gameState(): GameState {
+  const players = [createPlayer(), createPlayer({ id: "p-ai", name: "AI Player", className: "Mage" })];
   return {
     gamePhase: "season_review",
     season: { id: "season-1", name: "Season 1", year: 1, currentMatchday: 10, matchdayIds: ["md-1", "md-2"] },
@@ -195,7 +203,13 @@ function gameState(): GameState {
       { teamId: "ai-1", shortCode: "A-I", name: "AI Team", budget: 100, cash: 80, identityId: "ai", humanControlled: false, rosterLimit: 12 },
     ],
     teamIdentities: [],
-    players: [createPlayer(), createPlayer({ id: "p-ai", name: "AI Player", className: "Mage" })],
+    players,
+    playerBaselines: players.map((player) =>
+      createPlayerBaselineFromPlayer(player, {
+        source: "seed",
+        createdAt: "2026-06-11T00:00:00.000Z",
+      }),
+    ),
     disciplines: [
       { id: "tdm", name: "TDM", category: "power", weight: 1, playerCount: 2 },
       { id: "fechten", name: "Fechten", category: "speed", weight: 1, playerCount: 2 },
@@ -203,8 +217,8 @@ function gameState(): GameState {
       { id: "showcase", name: "Showcase", category: "social", weight: 1, playerCount: 2 },
     ],
     rosters: [
-      { id: "r-human", teamId: "human-1", playerId: "p-human", salary: 1, marketValue: 10, contractLength: 1, roleTag: "core" },
-      { id: "r-ai", teamId: "ai-1", playerId: "p-ai", salary: 4, marketValue: 20, contractLength: 1, roleTag: "bench" },
+      { id: "r-human", teamId: "human-1", playerId: "p-human", salary: 1, upkeep: 1, contractLength: 1, roleTag: "starter", joinedSeasonId: "season-1" },
+      { id: "r-ai", teamId: "ai-1", playerId: "p-ai", salary: 4, upkeep: 4, contractLength: 1, roleTag: "bench", joinedSeasonId: "season-1" },
     ],
     contracts: [],
     transferListings: [],
@@ -290,15 +304,15 @@ describe("pre-season workflow service", () => {
     expect(facilities.summary.salaryTotal).toBe(5);
   });
 
-  it("keeps player development preview-only while showing XP preview rows", async () => {
+  it("shows player development as a productive season-flow step with XP preview rows", async () => {
     const sourceSave = save();
     const { persistence } = persistenceMock(sourceSave);
 
     const preview = await buildPreSeasonWorkflowPreview(sourceSave, persistence);
     const development = preview.steps.find((step) => step.stepId === "player_development")!;
 
-    expect(development.productive).toBe(false);
-    expect(development.status).toBe("preview_only");
+    expect(development.productive).toBe(true);
+    expect(development.status).toBe("ready");
     expect(development.summary.players).toBe(2);
   });
 
@@ -336,7 +350,7 @@ describe("pre-season workflow service", () => {
     const token = preview.steps.find((step) => step.stepId === "next_season_setup")?.confirmToken;
 
     const result = await applyPreSeasonNextSeasonSetup(sourceSave, token, persistence);
-    const savedState = saveSingleplayerState.mock.calls[0]?.[1];
+    const savedState = saveSingleplayerState.mock.calls.at(-1)?.[1];
 
     expect(result.applied).toBe(true);
     expect(result.auditLogId).toEqual(expect.stringContaining("preseason-workflow"));
@@ -357,15 +371,18 @@ describe("pre-season workflow service", () => {
     expect(savedState.seasonState.matchdayResults).toEqual([]);
     expect(savedState.seasonState.disciplineResults).toEqual([]);
     expect(savedState.seasonState.playerDisciplinePerformances).toEqual([]);
+    expect(savedState.seasonState.cashPrizeApplyLogs?.filter((log) => log.seasonId === "season-1")).toHaveLength(2);
     expect(savedState.seasonState.seasonSnapshots).toHaveLength(1);
     expect(savedState.seasonState.seasonSnapshots?.[0]?.seasonId).toBe("season-1");
     expect(savedState.seasonState.seasonSnapshots?.[0]?.finalStandings).toHaveLength(2);
     expect(savedState.seasonState.seasonSnapshots?.[0]?.playerPerformances).toHaveLength(2);
+    expect(savedState.playerProgressionEvents?.filter((event) => event.seasonId === "season-1").length).toBeGreaterThan(0);
     expect(savedState.seasonState.standings["human-1"]?.points).toBe(0);
     expect(savedState.rosters.length).toBe(2);
     expect(savedState.transferHistory.length).toBe(0);
     expect(savedState.seasonState.preSeasonWorkflowLogs?.[0]?.status).toBe("applied");
     expect(savedState.seasonState.preSeasonWorkflowLogs?.[0]?.affectedEntities).toContain("seasonState.disciplineSchedule");
+    expect(savedState.seasonState.preSeasonWorkflowLogs?.[0]?.affectedEntities).toContain("playerProgressionEvents");
     expect(savedState.seasonState.preSeasonWorkflowLogs?.[0]?.warnings).toContain("season_mutator_state_reset_lineup_modifiers_cleared");
   });
 
@@ -375,7 +392,7 @@ describe("pre-season workflow service", () => {
     const token = buildPreSeasonNextSeasonSetupToken(sourceSave).confirmToken;
 
     const result = applyPreSeasonNextSeasonSetupLightweight(sourceSave, token, persistence);
-    const savedState = saveSingleplayerState.mock.calls[0]?.[1];
+    const savedState = saveSingleplayerState.mock.calls.at(-1)?.[1];
 
     expect(result.applied).toBe(true);
     if (!savedState) throw new Error("Expected lightweight next season setup to persist state.");
@@ -383,8 +400,115 @@ describe("pre-season workflow service", () => {
     expect(savedState.seasonState.disciplineSchedule?.map((entry) => entry.matchdayId)).toEqual(savedState.season.matchdayIds);
     expect(savedState.seasonState.formCards?.every((card) => card.seasonId === "season-2")).toBe(true);
     expect(savedState.seasonState.matchdayResults).toEqual([]);
+    expect(savedState.seasonState.cashPrizeApplyLogs?.filter((log) => log.seasonId === "season-1")).toHaveLength(2);
     expect(savedState.seasonState.seasonSnapshots?.[0]?.seasonId).toBe("season-1");
     expect(savedState.seasonState.seasonSnapshots?.[0]?.finalStandings).toHaveLength(2);
+    expect(savedState.playerProgressionEvents?.filter((event) => event.seasonId === "season-1").length).toBeGreaterThan(0);
+    const activeObjectives = savedState.seasonState.teamSeasonObjectives?.filter(
+      (objective) => objective.seasonId === savedState.season.id,
+    ) ?? [];
+    const teamsWithObjectives = new Set(activeObjectives.map((objective) => objective.teamId));
+    const objectiveKeys = new Set(activeObjectives.map((objective) => `${objective.teamId}:${objective.objectiveId}`));
+    expect(teamsWithObjectives.size).toBe(savedState.teams.length);
+    expect(objectiveKeys.size).toBe(activeObjectives.length);
+    expect(Object.keys(savedState.seasonState.boardConfidence ?? {})).toHaveLength(savedState.teams.length);
+  });
+
+  it("pulls free agents gradually back toward their original baseline next season", () => {
+    const sourceSave = save();
+    const freeAgent = createPlayer({
+      id: "fa-1",
+      name: "Loose Cannon",
+      marketValue: 42,
+      salaryDemand: 5,
+      currentXP: 30,
+      attributeSheetStats: {
+        power: 40,
+        health: 38,
+        stamina: 41,
+        intelligence: 27,
+        awareness: 29,
+        determination: 39,
+        speed: 43,
+        dexterity: 40,
+        charisma: 26,
+        will: 28,
+        spirit: 25,
+        torment: 24,
+      },
+      disciplineRatings: {
+        tdm: 42,
+        fechten: 44,
+        schach: 27,
+        showcase: 25,
+      },
+      coreStats: { pow: 42, spe: 44, men: 27, soc: 25 },
+    });
+    const freeAgentBaseline = createPlayerBaselineFromPlayer({
+      ...freeAgent,
+      marketValue: 20,
+      salaryDemand: 2,
+      attributeSheetStats: {
+        power: 31,
+        health: 31,
+        stamina: 31,
+        intelligence: 31,
+        awareness: 31,
+        determination: 31,
+        speed: 31,
+        dexterity: 31,
+        charisma: 31,
+        will: 31,
+        spirit: 31,
+        torment: 31,
+      },
+      disciplineRatings: {
+        tdm: 31,
+        fechten: 31,
+        schach: 31,
+        showcase: 31,
+      },
+      coreStats: { pow: 31, spe: 31, men: 31, soc: 31 },
+    });
+    freeAgentBaseline.marketValue = 20;
+    freeAgentBaseline.salary = 2;
+    freeAgentBaseline.seasonZeroEconomy = {
+      ...(freeAgentBaseline.seasonZeroEconomy ?? {}),
+      marketValue: 20,
+      salary: 2,
+    };
+    sourceSave.gameState.players.push(freeAgent);
+    sourceSave.gameState.playerBaselines = [...(sourceSave.gameState.playerBaselines ?? []), freeAgentBaseline];
+    sourceSave.gameState.playerMoraleState = [
+      {
+        playerId: "fa-1",
+        teamId: "OLD",
+        morale: 82,
+        visibleMood: "excellent",
+        lastUpdatedSeasonId: "season-1",
+        inactiveSeasons: 0,
+        reasons: [],
+        contractIntent: "willing_to_extend",
+      },
+    ];
+
+    const { persistence, saveSingleplayerState } = persistenceMock(sourceSave);
+    const token = buildPreSeasonNextSeasonSetupToken(sourceSave).confirmToken;
+
+    const result = applyPreSeasonNextSeasonSetupLightweight(sourceSave, token, persistence);
+    const savedState = saveSingleplayerState.mock.calls.at(-1)?.[1];
+    const savedFreeAgent = savedState?.players.find((player) => player.id === "fa-1");
+
+    expect(result.applied).toBe(true);
+    expect(savedFreeAgent).toBeDefined();
+    expect(savedFreeAgent?.attributeSheetStats?.power).toBeLessThan(40);
+    expect(savedFreeAgent?.attributeSheetStats?.intelligence).toBeGreaterThan(27);
+    expect(savedFreeAgent?.marketValue).toBeLessThan(42);
+    expect(savedFreeAgent?.marketValue).toBeGreaterThan(20);
+    expect(savedFreeAgent?.salaryDemand).toBeLessThan(5);
+    expect(savedFreeAgent?.salaryDemand).toBeGreaterThan(2);
+    expect(savedFreeAgent?.currentXP).toBeLessThan(30);
+    expect(savedState?.playerMoraleState?.find((entry) => entry.playerId === "fa-1")?.inactiveSeasons).toBe(1);
   });
 
   it("blocks next-season setup when a completed season snapshot cannot be built", async () => {

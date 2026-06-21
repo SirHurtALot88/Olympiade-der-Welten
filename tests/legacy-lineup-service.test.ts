@@ -164,10 +164,10 @@ describe("legacy lineup draft service", () => {
     await service.saveLegacyLineupDraft(baseParams, entries);
     const preview = await service.calculateLegacyLineupPreview(baseParams);
 
-    expect(preview?.totalScore).toBe(110);
+    expect(preview?.totalScore).toBe(105);
     expect(preview?.disciplineSideScores).toHaveLength(2);
-    expect(preview?.disciplineSideScores.find((entry) => entry.disciplineSide === "d1")?.captainBonusTotal).toBe(10);
-    expect(preview?.disciplineSideScores.find((entry) => entry.disciplineSide === "d1")?.totalScore).toBe(40);
+    expect(preview?.disciplineSideScores.find((entry) => entry.disciplineSide === "d1")?.captainBonusTotal).toBe(5);
+    expect(preview?.disciplineSideScores.find((entry) => entry.disciplineSide === "d1")?.totalScore).toBe(35);
     expect(preview?.disciplineSideScores.find((entry) => entry.disciplineSide === "d2")?.totalScore).toBe(70);
   });
 
@@ -182,10 +182,10 @@ describe("legacy lineup draft service", () => {
 
     expect(preview?.scorePreview.baseScore).toBe(100);
     expect(preview?.scorePreview.fatigueModifier).toBeNull();
-    expect(preview?.scorePreview.captainBonusTotal).toBe(10);
-    expect(preview?.totalScore).toBe(110);
+    expect(preview?.scorePreview.captainBonusTotal).toBe(5);
+    expect(preview?.totalScore).toBe(105);
     expect(preview?.missingScores).toEqual([]);
-    expect(preview?.validationWarnings).toContain(
+    expect(preview?.validationWarnings).not.toContain(
       "Captain bonus for tdm/d1 follows the strongest selected player score, not a separate stored captain player identity.",
     );
     expect(preview?.scorePreview.modifierWarnings).toContain("Fatigue source is missing for tdm/d1.");

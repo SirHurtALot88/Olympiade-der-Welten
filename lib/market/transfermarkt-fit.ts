@@ -19,6 +19,7 @@ export type TransfermarktFitBreakdown = {
 export const NEGATIVE_MERCENARY_FIT_MALUS = 1.5;
 export const MERCENARY_NEGATIVE_FIT_PENALTY = -NEGATIVE_MERCENARY_FIT_MALUS;
 export const MERCENARY_NEGATIVE_FIT_PENALTY_REASON = "negative_fit_mercenary_penalty";
+export const TRANSFERMARKT_BRACKET_STARTS = [0, 12.5, 17.5, 22.5, 30, 37.5, 45, 55, 70] as const;
 
 export function normalizeTransfermarktToken(value: string | null | undefined) {
   if (!value) {
@@ -46,17 +47,23 @@ export function toStringArray(value: unknown) {
 export function getTransfermarktBracket(marketValue: number | null | undefined) {
   const value = Number(marketValue) || 0;
   const bracketValue = value > 1000 ? value / 1000 : value;
-  const starts = [0, 12.5, 17.5, 22.5, 30, 37.5, 45, 55, 70];
 
-  if (bracketValue < starts[1]) return 1;
-  if (bracketValue < starts[2]) return 2;
-  if (bracketValue < starts[3]) return 3;
-  if (bracketValue < starts[4]) return 4;
-  if (bracketValue < starts[5]) return 5;
-  if (bracketValue < starts[6]) return 6;
-  if (bracketValue < starts[7]) return 7;
-  if (bracketValue < starts[8]) return 8;
+  if (bracketValue < TRANSFERMARKT_BRACKET_STARTS[1]) return 1;
+  if (bracketValue < TRANSFERMARKT_BRACKET_STARTS[2]) return 2;
+  if (bracketValue < TRANSFERMARKT_BRACKET_STARTS[3]) return 3;
+  if (bracketValue < TRANSFERMARKT_BRACKET_STARTS[4]) return 4;
+  if (bracketValue < TRANSFERMARKT_BRACKET_STARTS[5]) return 5;
+  if (bracketValue < TRANSFERMARKT_BRACKET_STARTS[6]) return 6;
+  if (bracketValue < TRANSFERMARKT_BRACKET_STARTS[7]) return 7;
+  if (bracketValue < TRANSFERMARKT_BRACKET_STARTS[8]) return 8;
   return 9;
+}
+
+export function getTransfermarktBracketRange(bracket: number) {
+  const normalizedBracket = Math.max(1, Math.min(9, Math.round(bracket)));
+  const min = TRANSFERMARKT_BRACKET_STARTS[normalizedBracket - 1] ?? 0;
+  const max = normalizedBracket < 9 ? TRANSFERMARKT_BRACKET_STARTS[normalizedBracket] ?? null : null;
+  return { min, max };
 }
 
 export function hasMercenaryTrait(input: Pick<TokenizedPlayer, "traitsPositive" | "traitsNegative">) {

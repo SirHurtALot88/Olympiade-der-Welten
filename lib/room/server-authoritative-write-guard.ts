@@ -1,6 +1,8 @@
 import { getActiveRoomBySaveId, getRoom } from "@/lib/room/room-store";
 import { findSeatByToken } from "@/lib/room/rejoin";
 import { authorizeTeamWrite, type TeamWriteAction } from "@/lib/room/online-room-model";
+import { DEFAULT_ACTIVE_OWNER_ID, canLocalUserManageTeam } from "@/lib/foundation/team-control-settings";
+import { createPersistenceService } from "@/lib/persistence/persistence-service";
 import type { RoomParticipant, TeamControllerType, TeamOwnershipRecord } from "@/types/game";
 import type { RuntimeRoom } from "@/types/room";
 
@@ -19,6 +21,7 @@ export type ServerRoomWriteContext = {
   confirmToken?: string | null;
   expectedConfirmToken?: string | null;
   activeManagerTeamId?: string | null;
+  activeOwnerId?: string | null;
   controlMode?: TeamControllerType | "manual" | null;
   allowSandboxHostOverride?: boolean;
 };
@@ -43,6 +46,7 @@ export type ServerRoomWriteAuthorization = ServerRoomWriteAllowed | ServerRoomWr
 const HOST_LEVEL_ACTIONS = new Set<TeamWriteAction>([
   "matchday_resolve",
   "season_transition",
+  "season_completion",
   "cash_prize_apply",
   "standings_apply",
 ]);
@@ -63,6 +67,51 @@ function resolveParticipant(room: RuntimeRoom, input: ServerRoomWriteContext): R
 
 function isSandboxLikeSave(saveId: string) {
   return /sandbox|manager|test|local/i.test(saveId);
+}
+
+function authorizeLocalSingleplayerTeamWrite(input: ServerRoomWriteContext, warnings: string[]): ServerRoomWriteAuthorization {
+  if (HOST_LEVEL_ACTIONS.has(input.action)) {
+    return {
+      allowed: true,
+      room: null,
+      participant: null,
+      ownership: null,
+      warnings,
+    };
+  }
+
+  if (!input.teamId) {
+    return { allowed: false, status: 409, reason: "team_id_required_for_team_write", warnings };
+  }
+
+  const save = createPersistenceService().getSaveById(input.saveId);
+  if (!save) {
+    return {
+      allowed: true,
+      room: null,
+      participant: null,
+      ownership: null,
+      warnings: [...warnings, "local_team_ownership_unverified_save_not_found"],
+    };
+  }
+
+  const activeOwnerId = input.activeOwnerId?.trim() || DEFAULT_ACTIVE_OWNER_ID;
+  if (!canLocalUserManageTeam(save.gameState, input.teamId, activeOwnerId)) {
+    return {
+      allowed: false,
+      status: 403,
+      reason: "local_team_not_owned_or_ai_controlled",
+      warnings,
+    };
+  }
+
+  return {
+    allowed: true,
+    room: null,
+    participant: null,
+    ownership: null,
+    warnings,
+  };
 }
 
 export function isRoomWriteContextPresent(input: Pick<ServerRoomWriteContext, "roomCode" | "participantId" | "seatToken" | "userId">) {
@@ -93,13 +142,7 @@ export function authorizeServerRoomWrite(input: ServerRoomWriteContext): ServerR
         warnings,
       };
     }
-    return {
-      allowed: true,
-      room: null,
-      participant: null,
-      ownership: null,
-      warnings: [],
-    };
+    return authorizeLocalSingleplayerTeamWrite(input, warnings);
   }
 
   const room = getRoom(input.roomCode);

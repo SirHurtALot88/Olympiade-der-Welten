@@ -241,11 +241,11 @@ describe("matchday auto-run manual-team policy", () => {
     expect(result.summary.lineupsReady).toBe(32);
     expect(result.summary.aiReady).toBe(32);
     expect(result.summary.cashApplyAllowed).toBe(false);
-    expect(result.summary.advanceAllowed).toBe(false);
+    expect(result.summary.advanceAllowed).toBe(true);
     expect(result.appliedAudits.cashApply).toBeNull();
-    expect(result.appliedAudits.matchdayAdvance).toBeNull();
+    expect(result.appliedAudits.matchdayAdvance).toBeTruthy();
     expect(prizeStep).toBeUndefined();
     expect(cashStep).toBeUndefined();
-    expect(advanceStep).toBeUndefined();
+    expect(advanceStep?.status).toBe("applied");
   }, 40_000);
 });

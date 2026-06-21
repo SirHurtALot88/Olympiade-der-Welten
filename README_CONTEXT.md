@@ -59,6 +59,7 @@ Dieser Ordner ist der zentrale Bezugspunkt fuer zukuenftige Chats zum Projekt.
 - keine neue Zukunftslogik auf SQLite aufbauen
 - SQLite bleibt nur Uebergang/Fallback
 - Battle Mode und Draft Mode vorerst ignorieren
+- UI-Grundsaetze stehen in `docs/UI_PRINCIPLES.md`: kompakte Screens, stabile/sortierbare Tabellen, konsistente Farben und Erklaertexte als Tooltips statt dauerhaftem Fliesstext.
 
 ## Empfohlene Einstiegsdateien fuer neue Chats
 

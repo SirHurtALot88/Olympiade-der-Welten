@@ -6,7 +6,9 @@ import {
   DEFAULT_ACTIVE_OWNER_ID,
   buildTeamControlSettingsMap,
   buildTeamOwners,
+  canOwnerManageTeam,
   filterTeamsByControlScope,
+  withNormalizedTeamControlSettings,
 } from "@/lib/foundation/team-control-settings";
 
 function makeTeam(teamId: string, shortCode: string, humanControlled: boolean): Team {
@@ -99,5 +101,198 @@ describe("team control ownership", () => {
     expect(filterTeamsByControlScope(teams, settings, "ai", DEFAULT_ACTIVE_OWNER_ID).map((team) => team.teamId)).toEqual(["B-P"]);
     expect(filterTeamsByControlScope(teams, settings, "passive", DEFAULT_ACTIVE_OWNER_ID).map((team) => team.teamId)).toEqual(["P-X"]);
     expect(filterTeamsByControlScope(teams, settings, "all", DEFAULT_ACTIVE_OWNER_ID)).toHaveLength(4);
+  });
+
+  it("allows writes only for teams owned by the active local owner", () => {
+    const settings = buildTeamControlSettingsMap(teams, {
+      "D-P": {
+        teamId: "D-P",
+        controlMode: "manual",
+        ownerId: "ramona_local",
+        aiLineupPreviewEnabled: false,
+        aiLineupAutoApplyEnabled: false,
+        aiTransferPreviewEnabled: false,
+        aiTransferAutoApplyEnabled: false,
+        aiSellPreviewEnabled: false,
+        aiSellAutoApplyEnabled: false,
+      },
+    });
+
+    expect(canOwnerManageTeam(settings["M-M"], DEFAULT_ACTIVE_OWNER_ID)).toBe(true);
+    expect(canOwnerManageTeam(settings["D-P"], DEFAULT_ACTIVE_OWNER_ID)).toBe(false);
+    expect(canOwnerManageTeam(settings["D-P"], "ramona_local")).toBe(true);
+    expect(canOwnerManageTeam(settings["B-P"], DEFAULT_ACTIVE_OWNER_ID)).toBe(false);
+  });
+
+  it("repairs the selected new-game team when an old save still marks it as AI", () => {
+    const gameState = withNormalizedTeamControlSettings({
+      season: {
+        id: "season-1",
+        name: "Season 1",
+        year: 1,
+        matchdayIds: [],
+        currentMatchday: 1,
+      },
+      teams: [
+        makeTeam("H-R", "H-R", false),
+        makeTeam("B-P", "B-P", false),
+      ],
+      teamIdentities: [],
+      players: [],
+      disciplines: [],
+      rosters: [],
+      contracts: [],
+      transferListings: [],
+      transferHistory: [],
+      logs: [],
+      matchdayState: {
+        matchdayId: "matchday-1",
+        status: "planning",
+        pendingTeamIds: [],
+        resolvedFixtureIds: [],
+      },
+      mappingReport: {
+        mappingSource: "test",
+        teamSource: "test",
+        generatedAt: "2026-01-01T00:00:00.000Z",
+        processedMappingRows: 0,
+        importedPlayerCount: 0,
+        matchedRosterCount: 0,
+        teamCount: 2,
+        unmappedPlayers: [],
+        teamsWithoutPlayers: [],
+        mappingRowsWithoutPlayerMatch: [],
+        duplicateMappedPlayers: [],
+        unknownTeamCodes: [],
+        duplicateTeamCodes: [],
+        warnings: [],
+      },
+      seasonState: {
+        seasonId: "season-1",
+        schedule: [],
+        standings: {},
+        newGameFlow: {
+          active: true,
+          selectedTeamId: "H-R",
+          steps: [],
+        },
+        teamControlSettings: {
+          "H-R": {
+            teamId: "H-R",
+            controlMode: "ai",
+            ownerId: AI_OWNER_ID,
+            ownerSlot: "ai",
+            displayLabel: "H-R",
+            aiLineupPreviewEnabled: true,
+            aiLineupApplyEnabled: false,
+            aiLineupAutoApplyEnabled: false,
+            aiTransferPreviewEnabled: true,
+            aiTransferAutoApplyEnabled: false,
+            aiSellPreviewEnabled: true,
+            aiSellAutoApplyEnabled: false,
+          },
+        },
+      },
+      gamePhase: "preseason_management",
+    });
+
+    expect(gameState.teams.find((team) => team.teamId === "H-R")?.humanControlled).toBe(true);
+    expect(gameState.seasonState.teamControlSettings?.["H-R"]?.controlMode).toBe("manual");
+    expect(gameState.seasonState.teamControlSettings?.["H-R"]?.ownerId).toBe(DEFAULT_ACTIVE_OWNER_ID);
+    expect(canOwnerManageTeam(gameState.seasonState.teamControlSettings?.["H-R"], DEFAULT_ACTIVE_OWNER_ID)).toBe(true);
+    expect(gameState.seasonState.teamControlSettings?.["B-P"]?.controlMode).toBe("ai");
+  });
+
+  it("treats saved control settings as the source of truth after reload", () => {
+    const gameState = withNormalizedTeamControlSettings({
+      season: {
+        id: "season-1",
+        name: "Season 1",
+        year: 1,
+        matchdayIds: [],
+        currentMatchday: 1,
+      },
+      teams: [
+        makeTeam("M-M", "M-M", true),
+        makeTeam("H-R", "H-R", false),
+      ],
+      teamIdentities: [],
+      players: [],
+      disciplines: [],
+      rosters: [],
+      contracts: [],
+      transferListings: [],
+      transferHistory: [],
+      logs: [],
+      matchdayState: {
+        matchdayId: "matchday-1",
+        status: "planning",
+        pendingTeamIds: [],
+        resolvedFixtureIds: [],
+      },
+      mappingReport: {
+        mappingSource: "test",
+        teamSource: "test",
+        generatedAt: "2026-01-01T00:00:00.000Z",
+        processedMappingRows: 0,
+        importedPlayerCount: 0,
+        matchedRosterCount: 0,
+        teamCount: 2,
+        unmappedPlayers: [],
+        teamsWithoutPlayers: [],
+        mappingRowsWithoutPlayerMatch: [],
+        duplicateMappedPlayers: [],
+        unknownTeamCodes: [],
+        duplicateTeamCodes: [],
+        warnings: [],
+      },
+      seasonState: {
+        seasonId: "season-1",
+        schedule: [],
+        standings: {},
+        newGameFlow: {
+          active: true,
+          selectedTeamId: "H-R",
+          steps: [],
+        },
+        teamControlSettings: {
+          "M-M": {
+            teamId: "M-M",
+            controlMode: "ai",
+            ownerId: AI_OWNER_ID,
+            ownerSlot: "ai",
+            displayLabel: "M-M",
+            aiLineupPreviewEnabled: true,
+            aiLineupApplyEnabled: false,
+            aiLineupAutoApplyEnabled: false,
+            aiTransferPreviewEnabled: true,
+            aiTransferAutoApplyEnabled: false,
+            aiSellPreviewEnabled: true,
+            aiSellAutoApplyEnabled: false,
+          },
+          "H-R": {
+            teamId: "H-R",
+            controlMode: "manual",
+            ownerId: DEFAULT_ACTIVE_OWNER_ID,
+            ownerSlot: "user",
+            displayLabel: "Chris",
+            aiLineupPreviewEnabled: false,
+            aiLineupApplyEnabled: false,
+            aiLineupAutoApplyEnabled: false,
+            aiTransferPreviewEnabled: false,
+            aiTransferAutoApplyEnabled: false,
+            aiSellPreviewEnabled: false,
+            aiSellAutoApplyEnabled: false,
+          },
+        },
+      },
+      gamePhase: "preseason_management",
+    });
+
+    expect(gameState.seasonState.newGameFlow?.selectedTeamId).toBe("H-R");
+    expect(gameState.teams.find((team) => team.teamId === "H-R")?.humanControlled).toBe(true);
+    expect(gameState.teams.find((team) => team.teamId === "M-M")?.humanControlled).toBe(false);
+    expect(canOwnerManageTeam(gameState.seasonState.teamControlSettings?.["H-R"], DEFAULT_ACTIVE_OWNER_ID)).toBe(true);
+    expect(canOwnerManageTeam(gameState.seasonState.teamControlSettings?.["M-M"], DEFAULT_ACTIVE_OWNER_ID)).toBe(false);
   });
 });

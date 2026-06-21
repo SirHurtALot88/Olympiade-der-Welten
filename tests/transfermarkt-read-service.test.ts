@@ -81,6 +81,7 @@ function createDatabase() {
           traitsNegative: ["ColdBlooded"],
           preferredDisciplineIds: [],
           attributes: {
+            rating: 87,
             marketValue: 100000,
             salaryDemand: 8000,
             pow: 88,
@@ -95,6 +96,7 @@ function createDatabase() {
           disciplineScores: [
             { score: 91, discipline: { id: "mini-dm", name: "Mini DM" } },
             { score: 80, discipline: { id: "fechten", name: "Fechten" } },
+            { score: 74, discipline: { id: "basketball", name: "Basketball" } },
             { score: 65, discipline: { id: "tennis", name: "Tennis" } },
             { score: 55, discipline: { id: "showcase", name: "Showcase" } },
           ],
@@ -113,6 +115,7 @@ function createDatabase() {
           traitsNegative: ["Fragile"],
           preferredDisciplineIds: ["speed-schach"],
           attributes: {
+            rating: 91,
             marketValue: 90000,
             salaryDemand: 7000,
             pow: 20,
@@ -193,20 +196,23 @@ describe("transfermarkt read service", () => {
     expect(result.items[0]?.above20).toBe(18);
     expect(result.items[0]?.powTier).toBe("S+");
     expect(result.items[0]?.speTier).toBe("S");
-    expect(result.items[0]?.topDisciplineScores[0]).toMatchObject({
-      disciplineName: "Mini DM",
-      scoreTier: "S+",
-      ppsLastSeason: null,
-    });
+    expect(result.items[0]?.topDisciplineScores).toHaveLength(5);
+    expect(
+      result.items[0]?.topDisciplineScores.every((entry) =>
+        ["Mini DM", "Fechten", "Basketball", "Tennis", "Showcase"].includes(entry.disciplineName),
+      ),
+    ).toBe(true);
+    expect(result.items[0]?.topDisciplineScores.every((entry) => entry.scoreTier != null && entry.ppsLastSeason == null)).toBe(true);
     expect("score" in (result.items[0]?.topDisciplineScores[0] ?? {})).toBe(false);
     expect(result.items[0]?.mercenary).toBe(true);
     expect(result.items[0]?.subclass1).toBe("Berserker");
     expect(result.items[0]?.subclass2).toBe("Mercenary");
     expect(result.items[0]?.subclass3).toBeNull();
-    expect(result.items[0]?.traitPos1).toBe("Mercenary");
-    expect(result.items[0]?.traitPos2).toBe("Bold");
+    expect(result.items[0]?.mercenary).toBe(true);
+    expect(result.items[0]?.traitPos1).toBeNull();
+    expect(result.items[0]?.traitPos2).toBeNull();
     expect(result.items[0]?.traitPos3).toBeNull();
-    expect(result.items[0]?.traitNeg1).toBe("ColdBlooded");
+    expect(result.items[0]?.traitNeg1).toBeNull();
     expect(result.items[0]?.traitNeg2).toBeNull();
     expect(result.items[0]?.traitNeg3).toBeNull();
     expect(result.items[0]?.preferredDisciplineIds).toEqual([]);
@@ -319,7 +325,7 @@ describe("transfermarkt read service", () => {
     expect(moduleText).not.toContain("deleteMany");
   });
 
-  it("keeps teamId only as context and exposes a warning", async () => {
+  it("uses teamId as context and hides negative-fit non-mercenaries", async () => {
     process.env.DATABASE_URL = "postgres://example";
     const result = await listTransfermarktFreeAgents({ teamId: "A-A" }, createDatabase());
 
@@ -339,8 +345,9 @@ describe("transfermarkt read service", () => {
     expect(result.items[0]?.fitSubclasses).toBe(-2);
     expect(result.items[0]?.fitTraits).toBe(-3);
     expect(result.items[0]?.fitAlignment).toBe(-1);
+    expect(result.items.every((item) => item.mercenary || (item.fit ?? 0) >= 0)).toBe(true);
     expect(result.warnings).toContain(
-      "teamId adds real team context, but does not filter the free-agent pool.",
+      "teamId filters negative team-fit players before pagination; Mercenary players stay visible as exceptions.",
     );
     expect(result.warnings).toContain(
       "Fit is currently a local Retool-style approximation based on roster-derived race/subclass/trait/alignment counts.",

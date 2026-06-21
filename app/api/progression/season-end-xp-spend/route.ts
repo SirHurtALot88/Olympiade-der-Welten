@@ -1,3 +1,5 @@
+export const dynamic = "force-dynamic";
+
 import { NextResponse } from "next/server";
 
 import {
@@ -21,6 +23,7 @@ type SeasonEndXpSpendBody = {
   seatToken?: string | null;
   userId?: string | null;
   activeManagerTeamId?: string | null;
+  activeOwnerId?: string | null;
   controlMode?: "human" | "ai" | "passive" | "manual" | null;
 };
 
@@ -63,6 +66,7 @@ export async function POST(request: Request) {
       confirmToken: body.confirmToken,
       expectedConfirmToken: preview.confirmToken,
       activeManagerTeamId: body.activeManagerTeamId,
+      activeOwnerId: body.activeOwnerId,
       controlMode: body.controlMode,
     });
     if (!writeAuth.allowed) {

@@ -21,6 +21,10 @@ describe("transfermarkt free agents api", () => {
     listLocalTransfermarktFreeAgents.mockReturnValue({
       items: [{ playerId: "player-1", name: "Arkon" }],
       total: 1,
+      offset: 0,
+      limit: 5,
+      returned: 1,
+      hasMore: false,
       source: "derived_free_agents",
       scope: { saveId: "save-singleplayer-dev", seasonId: "season-1", teamId: null },
       teamContext: null,
@@ -53,9 +57,11 @@ describe("transfermarkt free agents api", () => {
       seasonId: null,
       teamId: null,
       limit: 5,
+      offset: null,
       search: "ark",
       minMarketValue: null,
       maxMarketValue: null,
+      scoutingLevel: null,
     });
     expect(listTransfermarktFreeAgents).not.toHaveBeenCalled();
     expect(body.total).toBe(1);
@@ -71,6 +77,10 @@ describe("transfermarkt free agents api", () => {
     listTransfermarktFreeAgents.mockResolvedValue({
       items: [{ playerId: "player-1", name: "Arkon" }],
       total: 1,
+      offset: 0,
+      limit: 100,
+      returned: 1,
+      hasMore: false,
       source: "derived_free_agents",
       scope: { saveId: "save-initial", seasonId: "season-1", teamId: null },
       teamContext: null,
@@ -105,9 +115,11 @@ describe("transfermarkt free agents api", () => {
       seasonId: "season-1",
       teamId: null,
       limit: null,
+      offset: null,
       search: null,
       minMarketValue: null,
       maxMarketValue: null,
+      scoutingLevel: null,
     });
     expect(listLocalTransfermarktFreeAgents).not.toHaveBeenCalled();
     expect(body.scope.saveId).toBe("save-initial");

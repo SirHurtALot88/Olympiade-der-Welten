@@ -43,6 +43,10 @@ describe("transfer history api", () => {
         },
       ],
       total: 1,
+      offset: 0,
+      limit: 5,
+      returned: 1,
+      hasMore: false,
       scope: { saveId: "save-singleplayer-dev", seasonId: "season-1", teamId: null, type: null },
       saveContext: {
         source: "sqlite",
@@ -64,9 +68,11 @@ describe("transfer history api", () => {
     expect(listLocalTransferHistory).toHaveBeenCalledWith({
       saveId: undefined,
       seasonId: undefined,
+      allSeasons: false,
       teamId: null,
       type: null,
       limit: 5,
+      offset: undefined,
     });
     expect(listTransferHistory).not.toHaveBeenCalled();
     expect(body.total).toBe(1);
@@ -81,6 +87,10 @@ describe("transfer history api", () => {
     listTransferHistory.mockResolvedValue({
       items: [],
       total: 0,
+      offset: 0,
+      limit: 5,
+      returned: 0,
+      hasMore: false,
       scope: { saveId: "save-initial", seasonId: "season-1", teamId: null, type: null },
       saveContext: {
         source: "prisma",
@@ -104,9 +114,11 @@ describe("transfer history api", () => {
     expect(listTransferHistory).toHaveBeenCalledWith({
       saveId: "save-initial",
       seasonId: "season-1",
+      allSeasons: false,
       teamId: null,
       type: null,
       limit: 5,
+      offset: undefined,
     });
     expect(listLocalTransferHistory).not.toHaveBeenCalled();
     expect(body.scope.saveId).toBe("save-initial");
@@ -130,6 +142,10 @@ describe("transfer history api", () => {
     listLocalTransferHistory.mockResolvedValue({
       items: [],
       total: 0,
+      offset: 0,
+      limit: 5,
+      returned: 0,
+      hasMore: false,
       scope: { saveId: "missing-save", seasonId: "season-1", teamId: null, type: null },
       saveContext: {
         source: "sqlite",

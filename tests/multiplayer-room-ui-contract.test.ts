@@ -2,10 +2,11 @@ import fs from "node:fs/promises";
 
 import { describe, expect, it } from "vitest";
 
-const lobbyPath = "/Users/chrisfalk/Documents/Codex/Olympiade der Welten/app/page.tsx";
-const roomPagePath = "/Users/chrisfalk/Documents/Codex/Olympiade der Welten/app/room/[roomCode]/page.tsx";
+const lobbyPath = "/Users/chrisfalk/Documents/Codex/Olympiade der Welten/app/HomePageClient.tsx";
+const roomPagePath = "/Users/chrisfalk/Documents/Codex/Olympiade der Welten/app/room/[roomCode]/RoomPageClient.tsx";
 const modelPath = "/Users/chrisfalk/Documents/Codex/Olympiade der Welten/lib/room/online-room-model.ts";
 const flowPath = "/Users/chrisfalk/Documents/Codex/Olympiade der Welten/lib/room/room-flow-controller.ts";
+const arenaSyncPath = "/Users/chrisfalk/Documents/Codex/Olympiade der Welten/lib/room/arena-sync-state.ts";
 
 describe("online multiplayer room UI contract", () => {
   it("exposes online-room setup instead of local-only runtime sessions", async () => {
@@ -31,6 +32,10 @@ describe("online multiplayer room UI contract", () => {
     expect(roomText).toContain("applyRoomPreset");
     expect(roomText).toContain("startRoom");
     expect(roomText).toContain("Season / Room starten");
+    expect(roomText).toContain("room-arena-sync-controller");
+    expect(roomText).toContain("startRoomArena");
+    expect(roomText).toContain("setRoomArenaReady");
+    expect(roomText).toContain("advanceRoomArenaStep");
   });
 
   it("renders a multiplayer-ready room flow controller with AI and participant gates", async () => {
@@ -52,6 +57,7 @@ describe("online multiplayer room UI contract", () => {
 
   it("models server-ready room participants and team ownership", async () => {
     const modelText = await fs.readFile(modelPath, "utf8");
+    const arenaSyncText = await fs.readFile(arenaSyncPath, "utf8");
 
     expect(modelText).toContain("SERVER_AUTHORITATIVE_WRITE_POLICY");
     expect(modelText).toContain("clientMayWriteDirectly: false");
@@ -62,5 +68,9 @@ describe("online multiplayer room UI contract", () => {
     expect(modelText).toContain("canParticipantControlTeam");
     expect(modelText).toContain("buildTurnState");
     expect(modelText).toContain("syncParticipantControlledTeams");
+    expect(arenaSyncText).toContain("ROOM_ARENA_PHASES");
+    expect(arenaSyncText).toContain("startRoomArena");
+    expect(arenaSyncText).toContain("advanceRoomArenaReveal");
+    expect(arenaSyncText).toContain("readyParticipantIds");
   });
 });

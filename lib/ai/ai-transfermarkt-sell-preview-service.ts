@@ -19,6 +19,7 @@ import { normalizeTransfermarktToken } from "@/lib/market/transfermarkt-fit";
 import { buildTransfermarktSaleFactorBreakdown } from "@/lib/market/transfermarkt-sale-factor";
 import { createPersistenceService } from "@/lib/persistence/persistence-service";
 import { assessPlayerBoardTrust, type PlayerBoardTrustRenewalPolicy } from "@/lib/ai/player-board-trust-service";
+import { buildPlayerDemands } from "@/lib/morale/player-demands-service";
 
 export type AiSellPreviewSource = "sqlite" | "prisma";
 export type AiSellPreviewTeamScope = "ai" | "all";
@@ -403,6 +404,8 @@ function buildCandidate(
   }
 
   const budgetPressure = getBudgetPressure(team);
+  const boardPressure = clamp((10 - (identity?.boardConfidence ?? 5)) / 10, 0, 1);
+  const teamSalaryPressure = team.cash > 0 ? clamp(salaryTotal / Math.max(team.cash, 1), 0, 3) / 3 : salaryTotal > 0 ? 1 : 0;
   const salaryShare = salary != null && salaryTotal > 0 ? clamp(salary / salaryTotal, 0, 1) : 0;
   const cashShare = salary != null && team.cash > 0 ? clamp(salary / team.cash, 0, 1) : 0;
   const wagePressureScore = clamp(salaryShare * 0.7 + cashShare * 0.3, 0, 1);
@@ -428,7 +431,28 @@ function buildCandidate(
   const sellAggression = (profile?.bias.sellForProfitAggression ?? 5) / 10;
   const wageSensitivity = (profile?.bias.wageSensitivity ?? 5) / 10;
   const loyaltyBias = (profile?.bias.loyaltyBias ?? 5) / 10;
+  const starProtection =
+    (playerRating?.ovrRank != null && playerRating.ovrRank <= 20) ||
+    (playerRating?.ppsSeasonRank != null && playerRating.ppsSeasonRank <= 20) ||
+    (playerRating?.mvsRank != null && playerRating.mvsRank <= 20);
+  const playerDemands = buildPlayerDemands(context.gameState, player.id, team.teamId);
+  const openDemands = playerDemands.filter((demand) => demand.status === "open" || demand.status === "at_risk");
+  const demandPressureScore = openDemands.reduce((sum, demand) => {
+    const priority = demand.priority === "high" ? 0.18 : demand.priority === "medium" ? 0.1 : 0.04;
+    const risk = demand.status === "at_risk" ? 0.08 : 0;
+    const typePressure = demand.type === "appearances" ? 0.05 : demand.type === "captaincy" ? 0.03 : 0;
+    return sum + priority + risk + typePressure;
+  }, 0);
+  const demandKeepScore = openDemands.reduce((sum, demand) => {
+    const coreDemand = demand.type === "discipline_start" || demand.type === "captaincy" || demand.type === "facility";
+    if (!coreDemand) return sum;
+    const priority = demand.priority === "high" ? 0.12 : demand.priority === "medium" ? 0.07 : 0.03;
+    return sum + priority;
+  }, 0);
   const negativeCashPressure = Number.isFinite(team.cash) && team.cash < 0;
+  const lowCashReservePressure =
+    budgetPressure === "critical" ||
+    (Number.isFinite(team.cash) && team.cash > 0 && salaryTotal > 0 && team.cash < Math.max(8, salaryTotal * 0.18));
   const weakTeamFit = strategy.avoidedHits > strategy.preferredHits || hardNoGoHit;
   const boardTrust = assessPlayerBoardTrust({
     boardConfidence: identity?.boardConfidence ?? null,
@@ -445,6 +469,7 @@ function buildCandidate(
     ovrRank: playerRating?.ovrRank ?? null,
     actualPpsRank: playerRating?.ppsSeasonRank ?? null,
     actualMvsRank: playerRating?.mvsRank ?? null,
+    rankPoolSize: playerRatingsById.size,
     weakTeamFit,
     hardNoGoHit,
   });
@@ -479,6 +504,17 @@ function buildCandidate(
   if (strategy.preferredHits > strategy.avoidedHits) {
     reasonToKeep.push("passt gut zum Teamprofil");
   }
+  if (starProtection) {
+    reasonToKeep.push("Star-/Core-Spieler wird nur bei echtem Finanz- oder Boarddruck bewegt");
+  }
+  if (openDemands.length > 0) {
+    const demandLabels = openDemands.slice(0, 2).map((demand) => demand.label).join(", ");
+    if (demandPressureScore >= 0.18 && !starProtection && !coversNeedAxis) {
+      reasonToSell.push(`offene Spielerforderung erzeugt Kaderdruck: ${demandLabels}`);
+    } else {
+      reasonToKeep.push(`offene Forderung muss eingeplant werden: ${demandLabels}`);
+    }
+  }
   if (hardNoGoHit) {
     reasonToSell.push("faellt in ein Team-Hard-No-Go");
   }
@@ -506,10 +542,20 @@ function buildCandidate(
   } else if (roster.contractLength >= 3) {
     reasonToKeep.push("laengerer Restvertrag");
   }
+  const expiringStrategicPressure = roster.contractLength <= 1 && !coversNeedAxis && keepPerformanceScore < 0.7;
+  const expiringCoreDecisionPressure =
+    roster.contractLength <= 1 &&
+    (boardPressure >= 0.45 || teamSalaryPressure >= 0.3 || lowCashReservePressure || negativeCashPressure);
+  if (expiringCoreDecisionPressure) {
+    reasonToSell.push("auslaufender Vertrag braucht vor Ablauf eine aktive Marktentscheidung");
+  }
 
   const scoreRaw =
     18 +
     (negativeCashPressure ? 24 : 0) +
+    (lowCashReservePressure ? 10 : 0) +
+    teamSalaryPressure * 18 * wageSensitivity +
+    boardPressure * 12 +
     wagePressureScore * 30 * wageSensitivity +
     Math.max(profitScore ?? 0, 0) * 24 * sellAggression +
     lowPerformanceScore * 18 +
@@ -517,6 +563,9 @@ function buildCandidate(
     rosterPressureScore * 16 +
     shortContractScore * 30 * (profile?.bias.shortContractPreference ?? 5) / 10 +
     (roster.contractLength <= 1 && (strategy.avoidedHits >= strategy.preferredHits || underperformed || hardNoGoHit) ? 10 : 0) +
+    (expiringStrategicPressure ? 8 : 0) +
+    (expiringCoreDecisionPressure ? 10 : 0) +
+    demandPressureScore * 18 +
     (boardTrust.renewalPolicy === "salary_cap" ? 5 : 0) +
     (boardTrust.renewalPolicy === "renewal_warning" ? 11 : 0) +
     (boardTrust.renewalPolicy === "do_not_renew" ? 22 : 0) +
@@ -526,12 +575,14 @@ function buildCandidate(
     keepPerformanceScore * 22 -
     strategy.preferredHits * 5 -
     (coversNeedAxis ? 12 : 0) -
+    demandKeepScore * 14 -
+    (starProtection && !negativeCashPressure && !lowCashReservePressure && boardPressure < 0.65 ? 14 : 0) -
     loyaltyBias * (roster.contractLength >= 3 ? 8 : 2);
 
   if (negativeCashPressure) {
     reasonToSell.unshift("negatives Teamcash zum Seasonstart");
-  } else if (budgetPressure === "critical") {
-    reasonToSell.unshift("Teamcash ist kritisch");
+  } else if (lowCashReservePressure) {
+    reasonToSell.unshift("Cash-Reserve ist zu knapp fuer sichere Kaderplanung");
   } else if (budgetPressure === "healthy") {
     reasonToKeep.push("Teamcash ist entspannt");
   }

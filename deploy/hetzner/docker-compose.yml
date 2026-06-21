@@ -1,0 +1,35 @@
+services:
+  oly-app:
+    build:
+      context: ../..
+      dockerfile: Dockerfile
+    restart: unless-stopped
+    environment:
+      NODE_ENV: production
+      PORT: "3000"
+      OLY_APP_SQLITE_PATH: /app/data/persistence/oly-app.sqlite
+    volumes:
+      - oly-data:/app/data/persistence
+    expose:
+      - "3000"
+
+  caddy:
+    image: caddy:2
+    restart: unless-stopped
+    depends_on:
+      - oly-app
+    environment:
+      OLY_DOMAIN: ${OLY_DOMAIN}
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy-data:/data
+      - caddy-config:/config
+
+volumes:
+  oly-data:
+  caddy-data:
+  caddy-config:
+

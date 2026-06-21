@@ -107,6 +107,56 @@ export type SignatureShiftPreview = {
   notification: string | null;
 };
 
+function hashString(value: string) {
+  let hash = 0;
+  for (let index = 0; index < value.length; index += 1) {
+    hash = (hash * 31 + value.charCodeAt(index)) >>> 0;
+  }
+  return hash;
+}
+
+function getSeasonalRouteAttributeCandidates(route?: PlayerDevelopmentRoute | null): PlayerGeneratorAttributeName[] {
+  if (route === "star_growth") {
+    return ["determination", "charisma", "stamina", "awareness", "power"];
+  }
+  if (route === "core_growth") {
+    return ["awareness", "stamina", "will", "dexterity", "health", "intelligence"];
+  }
+  if (route === "prospect_growth") {
+    return ["stamina", "determination", "speed", "health", "awareness"];
+  }
+  if (route === "depth_growth") {
+    return ["spirit", "health", "dexterity", "will", "stamina"];
+  }
+  if (route === "maintenance" || route === "stagnation_watch") {
+    return ["health", "stamina", "spirit", "awareness"];
+  }
+  return [];
+}
+
+function chooseSeasonalRouteAttribute(input: {
+  playerId: string;
+  seasonId?: string | null;
+  route?: PlayerDevelopmentRoute | null;
+  currentProfile: AttributeAffinityProfile;
+}) {
+  const candidates = getSeasonalRouteAttributeCandidates(input.route).filter(
+    (attribute) => attribute !== input.currentProfile.signatureAttributes[0],
+  );
+  if (candidates.length === 0) {
+    return null;
+  }
+  const seed = `${input.playerId}:${input.seasonId ?? "no-season"}:${input.route ?? "no-route"}`;
+  const start = hashString(seed) % candidates.length;
+  for (let offset = 0; offset < candidates.length; offset += 1) {
+    const candidate = candidates[(start + offset) % candidates.length];
+    if (candidate && candidate !== input.currentProfile.signatureAttributes[0]) {
+      return candidate;
+    }
+  }
+  return null;
+}
+
 export type AiTrainingPointAllocation = {
   playerId: string;
   teamId: string | null;
@@ -432,6 +482,7 @@ export function buildSignatureShiftPreview(input: {
   player: Player;
   currentProfile: AttributeAffinityProfile;
   route?: PlayerDevelopmentRoute | null;
+  seasonId?: string | null;
   seasonShiftAlreadyUsed?: boolean;
 }): SignatureShiftPreview {
   if (input.seasonShiftAlreadyUsed) {
@@ -447,16 +498,12 @@ export function buildSignatureShiftPreview(input: {
     };
   }
   const route = input.route ?? null;
-  const routeAttribute: PlayerGeneratorAttributeName | null =
-    route === "star_growth"
-      ? "determination"
-      : route === "core_growth"
-        ? "awareness"
-        : route === "prospect_growth"
-          ? "stamina"
-          : route === "depth_growth"
-            ? "spirit"
-            : null;
+  const routeAttribute = chooseSeasonalRouteAttribute({
+    playerId: input.player.id,
+    seasonId: input.seasonId ?? null,
+    route,
+    currentProfile: input.currentProfile,
+  });
   if (!routeAttribute || input.currentProfile.signatureAttributes.includes(routeAttribute)) {
     return {
       playerId: input.player.id,
@@ -477,21 +524,34 @@ export function buildSignatureShiftPreview(input: {
     newSignatureAttributes,
     oldWeakAttribute: input.currentProfile.weakAttribute,
     newWeakAttribute: input.currentProfile.weakAttribute,
-    reason: `development_route_shift:${route}`,
-    notification: `Development Shift: ${input.player.name} behaelt ${TRAINING_ATTRIBUTE_LABELS[newSignatureAttributes[0]]} als Signature, aber ${TRAINING_ATTRIBUTE_LABELS[input.currentProfile.signatureAttributes[1]]} wurde durch ${TRAINING_ATTRIBUTE_LABELS[routeAttribute]} ersetzt. Grund: ${route}.`,
+    reason: `seasonal_development_route_shift:${route ?? "unknown"}:${input.seasonId ?? "no-season"}`,
+    notification: `Development Shift: ${input.player.name} behaelt ${TRAINING_ATTRIBUTE_LABELS[newSignatureAttributes[0]]} als Signature, aber ${TRAINING_ATTRIBUTE_LABELS[input.currentProfile.signatureAttributes[1]]} wurde durch ${TRAINING_ATTRIBUTE_LABELS[routeAttribute]} ersetzt. Grund: ${route ?? "Season-Fokus"}.`,
   };
 }
 
 function getTeamStrategyAttributeBias(profile?: TeamStrategyProfile | null): PlayerGeneratorAttributeName[] {
   const result: PlayerGeneratorAttributeName[] = [];
-  if ((profile?.powBias ?? 0) > 0) result.push("power", "health", "stamina");
-  if ((profile?.speBias ?? 0) > 0) result.push("speed", "dexterity", "awareness");
-  if ((profile?.menBias ?? 0) > 0) result.push("intelligence", "will", "awareness");
-  if ((profile?.socBias ?? 0) > 0) result.push("charisma", "spirit", "determination");
+  const axisAttributeBiasSource: Array<{
+    axis: "pow" | "spe" | "men" | "soc";
+    value: number;
+    attributes: PlayerGeneratorAttributeName[];
+  }> = [
+    { axis: "pow", value: profile?.powBias ?? 0, attributes: ["power", "health", "stamina"] },
+    { axis: "spe", value: profile?.speBias ?? 0, attributes: ["speed", "dexterity", "awareness"] },
+    { axis: "men", value: profile?.menBias ?? 0, attributes: ["intelligence", "will", "awareness"] },
+    { axis: "soc", value: profile?.socBias ?? 0, attributes: ["charisma", "spirit", "determination"] },
+  ];
+  const axisAttributeBias = axisAttributeBiasSource
+    .filter((entry) => Number.isFinite(entry.value) && entry.value > 0)
+    .sort((left, right) => right.value - left.value);
+  const selectedAxes = axisAttributeBias.filter((entry, index) => index < 2 || entry.value >= 30);
+  for (const entry of selectedAxes) {
+    result.push(...entry.attributes);
+  }
   if (profile?.strategySummary?.toLowerCase().includes("rebuild")) result.push("determination", "stamina");
   if (profile?.teamName?.toLowerCase().includes("wicked wizard")) result.push("intelligence", "will");
   if (profile?.teamName?.toLowerCase().includes("blazing beast")) result.push("power", "speed");
-  return result;
+  return result.filter((attribute, index) => result.indexOf(attribute) === index);
 }
 
 export function buildAiTrainingPointAllocation(input: {
@@ -560,7 +620,7 @@ export function buildPlayerDevelopmentLevelupModel(input: {
   teamId?: string | null;
   profile?: TeamStrategyProfile | null;
 }): PlayerDevelopmentLevelupModel {
-  const affinity = deriveAttributeAffinityProfile(input.player);
+  const baseAffinity = deriveAttributeAffinityProfile(input.player);
   const level = buildDevelopmentLevelSummary({
     player: input.player,
     forecast: input.forecast,
@@ -568,6 +628,20 @@ export function buildPlayerDevelopmentLevelupModel(input: {
     spentXP: input.player.spentXP ?? input.forecast?.spentXP ?? 0,
     lifetimeXP: input.player.lifetimeXP ?? null,
   });
+  const signatureShift = buildSignatureShiftPreview({
+    player: input.player,
+    currentProfile: baseAffinity,
+    route: input.forecast?.developmentRoute ?? null,
+    seasonId: input.gameState?.season.id ?? null,
+  });
+  const affinity: AttributeAffinityProfile = signatureShift.canShift
+    ? {
+        ...baseAffinity,
+        signatureAttributes: signatureShift.newSignatureAttributes,
+        weakAttribute: signatureShift.newWeakAttribute,
+        reasons: [...baseAffinity.reasons, signatureShift.reason],
+      }
+    : baseAffinity;
   const costs = playerGeneratorAttributeKeys.map((attribute) =>
     getAttributeTrainingPointCost({
       value: getPlayerAttributeValue(input.player, attribute as PlayerGeneratorAttributeName),
@@ -582,11 +656,6 @@ export function buildPlayerDevelopmentLevelupModel(input: {
   });
   const upgradePreview = buildUpgradePreview({ player: input.player, level, affinity, economy });
   const regressionEvent = buildRegressionEventPreview({ player: input.player, level, forecast: input.forecast, affinity });
-  const signatureShift = buildSignatureShiftPreview({
-    player: input.player,
-    currentProfile: affinity,
-    route: input.forecast?.developmentRoute ?? null,
-  });
   const aiAllocation = buildAiTrainingPointAllocation({
     player: input.player,
     teamId: input.teamId ?? null,

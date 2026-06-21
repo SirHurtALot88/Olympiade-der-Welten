@@ -11,13 +11,21 @@ import {
   ensureLocalFormCardsForSeason,
   getFormCardColorForDisciplineCategory,
   getTeamFormCardOptions,
-  getLegacyMutatorTraitOptions,
+  buildLegacyMutatorTraitOptionsForRoster,
   normalizeLineupDraftModifiers,
 } from "@/lib/lineups/legacy-lineup-modifiers";
+import {
+  calculateTeamPowerModifierForSide,
+  ensureLocalTeamPowersForSeason,
+  getTeamPowerOptions,
+} from "@/lib/lineups/team-powers";
 import { buildLineupDisciplineContract, buildMatchdayLineupContract, countSeasonCaptains, countSeasonLineupDisciplineSides, createLineupDraftId, formatLineupTeamStatusLabel, getSeasonCaptainDisciplineSideKeys, SEASON_CAPTAIN_SLOTS } from "@/lib/lineups/lineup-discipline-contract";
 import { buildLegacyLineupAggregateScore, scoreLegacyLineupDisciplineSide } from "@/lib/lineups/legacy-score-engine";
-import { computeTeamDisciplineRanks } from "@/lib/lineups/team-discipline-ranks";
-import type { GameState, LineupDraft, Player, RosterEntry } from "@/lib/data/olyDataTypes";
+import { computeTeamDisciplineRankTable, computeTeamDisciplineRanks } from "@/lib/lineups/team-discipline-ranks";
+import { getTeamRelationship } from "@/lib/rivalries/team-rivalries";
+import { selectTeamCaptain } from "@/lib/morale/player-demands-service";
+import { buildPlayerMoralePerformanceMap } from "@/lib/morale/player-morale-performance";
+import type { FormCardPlanRecord, GameState, LineupDraft, Player, RosterEntry } from "@/lib/data/olyDataTypes";
 import type {
   LegacyLineupContextLoadResult,
   LegacyLineupDraft,
@@ -222,6 +230,7 @@ type SharedLineupContextBase = {
   lineupContract: ReturnType<typeof buildLineupDisciplineContract>;
   matchdayContract: ReturnType<typeof buildMatchdayLineupContract>;
   requiredDisciplineIds: string[];
+  rankDisciplineIds: string[];
   playersById: Map<string, Player>;
   rosterEntriesByTeamId: Map<string, RosterEntry[]>;
   teamById: Map<string, GameState["teams"][number]>;
@@ -234,6 +243,8 @@ type SharedLineupContextBase = {
   scoreByPlayerAndDiscipline: Map<string, number>;
   fatigueByTeamId: Map<string, ReturnType<typeof buildLocalFatigueMap>>;
   teamDisciplineRanksByTeamId: Map<string, ReturnType<typeof computeTeamDisciplineRanks>>;
+  disciplineRankTable: ReturnType<typeof computeTeamDisciplineRankTable>;
+  teamNameById: Map<string, string>;
 };
 
 const sharedLineupContextBaseCache = new Map<string, SharedLineupContextBase>();
@@ -255,6 +266,8 @@ function buildSharedLineupContextBaseCacheKey(gameState: GameState, params: Lega
     gameState.disciplines.length,
     gameState.rosters.length,
     gameState.seasonState.formCards?.length ?? 0,
+    gameState.seasonState.teamPowers?.length ?? 0,
+    JSON.stringify(gameState.seasonState.teamFacilities ?? {}),
     rosterSignature,
     lineupDraftSignature,
   ].join("::");
@@ -262,13 +275,19 @@ function buildSharedLineupContextBaseCacheKey(gameState: GameState, params: Lega
 
 function getSharedLineupContextBase(gameState: GameState, params: LegacyLineupKeyParams): SharedLineupContextBase | null {
   const gameStateWithFormCards = ensureLocalFormCardsForSeason(gameState, params.saveId, params.seasonId);
-  const cacheKey = buildSharedLineupContextBaseCacheKey(gameStateWithFormCards, params);
+  const hasCurrentSeasonPowers = (gameStateWithFormCards.seasonState.teamPowers ?? []).some(
+    (power) => power.seasonId === params.seasonId,
+  );
+  const gameStateWithPowers = hasCurrentSeasonPowers
+    ? gameStateWithFormCards
+    : ensureLocalTeamPowersForSeason(gameStateWithFormCards, params.saveId, params.seasonId);
+  const cacheKey = buildSharedLineupContextBaseCacheKey(gameStateWithPowers, params);
   const cached = sharedLineupContextBaseCache.get(cacheKey);
   if (cached) {
     return cached;
   }
 
-  const normalizedGameState = withNormalizedSeasonDisciplineSchedule(gameStateWithFormCards);
+  const normalizedGameState = withNormalizedSeasonDisciplineSchedule(gameStateWithPowers);
   const season = normalizedGameState.season.id === params.seasonId ? normalizedGameState.season : null;
   const matchdayIndex = season ? season.matchdayIds.findIndex((matchdayId) => matchdayId === params.matchdayId) : -1;
   const scheduleEntry =
@@ -311,10 +330,14 @@ function getSharedLineupContextBase(gameState: GameState, params: LegacyLineupKe
   const requiredDisciplineIds = [matchdayContract.discipline1?.disciplineId, matchdayContract.discipline2?.disciplineId].filter(
     (value): value is string => Boolean(value),
   );
+  const rankDisciplineIds = Array.from(
+    new Set(normalizedGameState.disciplines.map((discipline) => discipline.id).filter((value): value is string => Boolean(value))),
+  );
+  const scoreDisciplineIds = Array.from(new Set([...requiredDisciplineIds, ...rankDisciplineIds]));
 
   const scoreByPlayerAndDiscipline = new Map<string, number>();
   for (const player of normalizedGameState.players) {
-    for (const disciplineId of requiredDisciplineIds) {
+    for (const disciplineId of scoreDisciplineIds) {
       scoreByPlayerAndDiscipline.set(`${player.id}::${disciplineId}`, roundScore(player.disciplineRatings[disciplineId] ?? 0));
     }
   }
@@ -329,6 +352,46 @@ function getSharedLineupContextBase(gameState: GameState, params: LegacyLineupKe
       .filter((entry) => entry.weightPct > 0)
       .sort((left, right) => right.weightPct - left.weightPct),
   );
+  const rosterAssignments = normalizedGameState.rosters.map((entry) => ({
+    teamId: entry.teamId,
+    playerId: entry.playerId,
+  }));
+  const disciplineRankTable = computeTeamDisciplineRankTable({
+    teamIds: normalizedGameState.teams.map((entry) => entry.teamId),
+    disciplineIds: rankDisciplineIds.length > 0 ? rankDisciplineIds : requiredDisciplineIds,
+    rosterAssignments,
+    scoreByPlayerAndDiscipline,
+  });
+  const mappedDisciplineRankIds = rankDisciplineIds.length > 0 ? rankDisciplineIds : requiredDisciplineIds;
+  const teamDisciplineRanksByTeamId = new Map<string, ReturnType<typeof computeTeamDisciplineRanks>>();
+  for (const team of normalizedGameState.teams) {
+    teamDisciplineRanksByTeamId.set(
+      team.teamId,
+      Object.fromEntries(
+        mappedDisciplineRankIds.map((disciplineId) => {
+          const row = disciplineRankTable.find(
+            (entry) => entry.teamId === team.teamId && entry.disciplineId === disciplineId,
+          );
+          return [
+            disciplineId,
+            row
+              ? {
+                  rank: row.rank,
+                  score: row.score,
+                  sourceStatus: "mapped_with_transform" as const,
+                  rankSource: "active_roster_top6_sum_discipline_score",
+                }
+              : {
+                  rank: null,
+                  score: null,
+                  sourceStatus: "missing_source" as const,
+                  rankSource: null,
+                },
+          ] as const;
+        }),
+      ),
+    );
+  }
 
   const sharedBase: SharedLineupContextBase = {
     normalizedGameState,
@@ -337,6 +400,7 @@ function getSharedLineupContextBase(gameState: GameState, params: LegacyLineupKe
     lineupContract,
     matchdayContract,
     requiredDisciplineIds,
+    rankDisciplineIds,
     playersById,
     rosterEntriesByTeamId,
     teamById: new Map(normalizedGameState.teams.map((team) => [team.teamId, team] as const)),
@@ -344,7 +408,9 @@ function getSharedLineupContextBase(gameState: GameState, params: LegacyLineupKe
     localDisciplineWeights,
     scoreByPlayerAndDiscipline,
     fatigueByTeamId: new Map(),
-    teamDisciplineRanksByTeamId: new Map(),
+    teamDisciplineRanksByTeamId,
+    disciplineRankTable,
+    teamNameById: new Map(normalizedGameState.teams.map((entry) => [entry.teamId, entry.name] as const)),
   };
 
   sharedLineupContextBaseCache.set(cacheKey, sharedBase);
@@ -390,6 +456,12 @@ function buildContextFromGameState(gameState: GameState, params: LegacyLineupKey
     matchdayContract.discipline1?.disciplineId,
     matchdayContract.discipline2?.disciplineId,
   ].filter((value): value is string => Boolean(value));
+  const rankDisciplineIds =
+    sharedBase?.rankDisciplineIds ??
+    Array.from(
+      new Set(normalizedGameState.disciplines.map((discipline) => discipline.id).filter((value): value is string => Boolean(value))),
+    );
+  const mappedDisciplineRankIds = rankDisciplineIds.length > 0 ? rankDisciplineIds : requiredDisciplineIds;
   const rosterEntries = sharedBase?.rosterEntriesByTeamId.get(params.teamId) ?? normalizedGameState.rosters.filter((entry) => entry.teamId === params.teamId);
   const playersById = sharedBase?.playersById ?? new Map(normalizedGameState.players.map((player) => [player.id, player]));
   const activePlayers = rosterEntries
@@ -411,10 +483,17 @@ function buildContextFromGameState(gameState: GameState, params: LegacyLineupKey
   const scoreByPlayerAndDiscipline = sharedBase?.scoreByPlayerAndDiscipline ?? new Map<string, number>();
   let teamDisciplineRanks = sharedBase?.teamDisciplineRanksByTeamId.get(params.teamId);
   if (!teamDisciplineRanks) {
+    if (scoreByPlayerAndDiscipline.size === 0) {
+      for (const player of normalizedGameState.players) {
+        for (const disciplineId of mappedDisciplineRankIds) {
+          scoreByPlayerAndDiscipline.set(`${player.id}::${disciplineId}`, roundScore(player.disciplineRatings[disciplineId] ?? 0));
+        }
+      }
+    }
     teamDisciplineRanks = computeTeamDisciplineRanks({
       teamId: params.teamId,
       teamIds: normalizedGameState.teams.map((entry) => entry.teamId),
-      disciplineIds: requiredDisciplineIds,
+      disciplineIds: mappedDisciplineRankIds,
       rosterAssignments: normalizedGameState.rosters.map((entry) => ({
         teamId: entry.teamId,
         playerId: entry.playerId,
@@ -423,12 +502,95 @@ function buildContextFromGameState(gameState: GameState, params: LegacyLineupKey
     });
     sharedBase?.teamDisciplineRanksByTeamId.set(params.teamId, teamDisciplineRanks);
   }
+  const disciplineRankTable =
+    sharedBase?.disciplineRankTable ??
+    computeTeamDisciplineRankTable({
+      teamIds: normalizedGameState.teams.map((entry) => entry.teamId),
+      disciplineIds: mappedDisciplineRankIds,
+      rosterAssignments: normalizedGameState.rosters.map((entry) => ({
+        teamId: entry.teamId,
+        playerId: entry.playerId,
+      })),
+      scoreByPlayerAndDiscipline,
+    });
+  const teamNameById = sharedBase?.teamNameById ?? new Map(normalizedGameState.teams.map((entry) => [entry.teamId, entry.name] as const));
+  const teamPowerWindows = Object.fromEntries(
+    requiredDisciplineIds.map((disciplineId) => {
+      const top8Rivals = disciplineRankTable
+        .filter((row) => row.disciplineId === disciplineId && row.teamId !== params.teamId && row.rank != null && row.rank <= 8)
+        .map((row) => ({
+          teamId: row.teamId,
+          teamName: teamNameById.get(row.teamId) ?? row.teamId,
+          rank: row.rank ?? 99,
+          relationship: getTeamRelationship(params.teamId, row.teamId)?.value ?? 0,
+        }))
+        .filter((row) => row.relationship <= -2)
+        .sort((left, right) => left.relationship - right.relationship || left.rank - right.rank);
+      return [
+        disciplineId,
+        {
+          disciplineId,
+          rankSource: "active_roster_top6_sum_discipline_score",
+          sourceStatus: "mapped_with_transform",
+          top8Rivals,
+        },
+      ] as const;
+    }),
+  );
   let fatigueByPlayerId = sharedBase?.fatigueByTeamId.get(params.teamId);
   if (fatigueByPlayerId === undefined) {
     fatigueByPlayerId = buildLocalFatigueMap(normalizedGameState, params);
     sharedBase?.fatigueByTeamId.set(params.teamId, fatigueByPlayerId);
   }
   const localDisciplineWeights = sharedBase?.localDisciplineWeights ?? [];
+  const rosterPlayerRefs: LegacyLineupLoadedContext["rosterPlayers"] = activePlayers.map(({ player }) => {
+    const availability = availabilityByPlayerId.get(player.id) ?? getPlayerAvailabilityView(normalizedGameState, player.id, params.teamId, params.matchdayId);
+    const fatigue = availability.fatigue ?? player.fatigue ?? null;
+    const injuryRiskBand = getInjuryRiskBand(fatigue ?? 0);
+    return {
+      id: player.id,
+      name: player.name,
+      portraitUrl: player.portraitUrl ?? null,
+      className: player.className,
+      race: player.race,
+      displayMarketValue: getImportedPlayerDisplayMarketValue(player),
+      displaySalary: getImportedPlayerDisplaySalary(player),
+      potential: player.potential ?? null,
+      ovr: player.ovr ?? player.rating ?? null,
+      pps: player.pps ?? null,
+      fatigue,
+      injuryStatus: availability.injuryStatus,
+      injuryUntilMatchday: availability.injuryUntilMatchday ?? null,
+      injuryRiskPercent: fatigue != null ? injuryRiskBand.riskPercent : null,
+      injuryRiskBand: fatigue != null ? injuryRiskBand.label : null,
+      injuryRiskLabel: fatigue != null ? injuryRiskBand.uiLabel : null,
+      availabilityBlocker: availability.blocker,
+      form: player.form ?? null,
+      traitsPositive: player.traitsPositive ?? [],
+      traitsNegative: player.traitsNegative ?? [],
+      attributeStats: player.attributeSheetStats ?? null,
+      attributeRatings: {
+        power: player.attributeSheetRatings?.powerRating ?? null,
+        health: player.attributeSheetRatings?.healthRating ?? null,
+        stamina: player.attributeSheetRatings?.staminaRating ?? null,
+        intelligence: player.attributeSheetRatings?.intelligenceRating ?? null,
+        awareness: player.attributeSheetRatings?.awarenessRating ?? null,
+        determination: player.attributeSheetRatings?.determinationRating ?? null,
+        speed: player.attributeSheetRatings?.speedRating ?? null,
+        dexterity: player.attributeSheetRatings?.dexterityRating ?? null,
+        charisma: player.attributeSheetRatings?.charismaRating ?? null,
+        will: player.attributeSheetRatings?.willRating ?? null,
+        spirit: player.attributeSheetRatings?.spiritRating ?? null,
+        torment: player.attributeSheetRatings?.tormentRating ?? null,
+      },
+      coreStats: {
+        pow: player.coreStats.pow,
+        spe: player.coreStats.spe,
+        men: player.coreStats.men,
+        soc: player.coreStats.soc,
+      },
+    };
+  });
 
   return {
     ok: true,
@@ -524,59 +686,15 @@ function buildContextFromGameState(gameState: GameState, params: LegacyLineupKey
           };
         })
         .filter((entry): entry is NonNullable<typeof entry> => Boolean(entry)),
-      rosterPlayers: activePlayers.map(({ player }) => {
-        const availability = availabilityByPlayerId.get(player.id) ?? getPlayerAvailabilityView(normalizedGameState, player.id, params.teamId, params.matchdayId);
-        const fatigue = availability.fatigue ?? player.fatigue ?? null;
-        const injuryRiskBand = getInjuryRiskBand(fatigue ?? 0);
-        return ({
-        id: player.id,
-        name: player.name,
-        portraitUrl: player.portraitUrl ?? null,
-        className: player.className,
-        race: player.race,
-        displayMarketValue: getImportedPlayerDisplayMarketValue(player),
-        displaySalary: getImportedPlayerDisplaySalary(player),
-        potential: player.potential ?? null,
-        ovr: player.ovr ?? player.rating ?? null,
-        pps: player.pps ?? null,
-        fatigue,
-        injuryStatus: availability.injuryStatus,
-        injuryUntilMatchday: availability.injuryUntilMatchday ?? null,
-        injuryRiskPercent: fatigue != null ? injuryRiskBand.riskPercent : null,
-        injuryRiskBand: fatigue != null ? injuryRiskBand.label : null,
-        injuryRiskLabel: fatigue != null ? injuryRiskBand.uiLabel : null,
-        availabilityBlocker: availability.blocker,
-        form: player.form ?? null,
-        traitsPositive: player.traitsPositive ?? [],
-        traitsNegative: player.traitsNegative ?? [],
-        attributeStats: player.attributeSheetStats ?? null,
-        attributeRatings: {
-          power: player.attributeSheetRatings?.powerRating ?? null,
-          health: player.attributeSheetRatings?.healthRating ?? null,
-          stamina: player.attributeSheetRatings?.staminaRating ?? null,
-          intelligence: player.attributeSheetRatings?.intelligenceRating ?? null,
-          awareness: player.attributeSheetRatings?.awarenessRating ?? null,
-          determination: player.attributeSheetRatings?.determinationRating ?? null,
-          speed: player.attributeSheetRatings?.speedRating ?? null,
-          dexterity: player.attributeSheetRatings?.dexterityRating ?? null,
-          charisma: player.attributeSheetRatings?.charismaRating ?? null,
-          will: player.attributeSheetRatings?.willRating ?? null,
-          spirit: player.attributeSheetRatings?.spiritRating ?? null,
-          torment: player.attributeSheetRatings?.tormentRating ?? null,
-        },
-        coreStats: {
-          pow: player.coreStats.pow,
-          spe: player.coreStats.spe,
-          men: player.coreStats.men,
-          soc: player.coreStats.soc,
-        },
-      });
-      }),
+      rosterPlayers: rosterPlayerRefs,
       disciplines: normalizedGameState.disciplines.map((discipline) => ({
         id: discipline.id,
         name: discipline.name,
         category: discipline.category,
       })),
+      seasonDisciplineSchedule: (normalizedGameState.seasonState.disciplineSchedule ?? []).filter(
+        (entry) => entry.seasonId === params.seasonId,
+      ),
       disciplineWeights: localDisciplineWeights,
       seasonDisciplineConfigs: lineupContract.map((entry) => ({
         disciplineId: entry.disciplineId,
@@ -610,8 +728,10 @@ function buildContextFromGameState(gameState: GameState, params: LegacyLineupKey
         }),
       },
       fatigueByPlayerId,
+      moraleByPlayerId: null,
       fatigueSourceStatus: fatigueByPlayerId ? "mapped" : "missing_source",
       teamDisciplineRanks: teamDisciplineRanks,
+      teamPowerWindows,
       captainRule: {
         seasonCaptainSlots: SEASON_CAPTAIN_SLOTS,
         perDisciplineSideMaxCaptains: 1,
@@ -619,13 +739,28 @@ function buildContextFromGameState(gameState: GameState, params: LegacyLineupKey
       },
       formCardSource: getLegacyFormCardSourceSummary(),
       mutatorSource: getLegacyMutatorSourceSummary(),
+      teamPowerSource: {
+        selectionStatus: "ready",
+        effectStatus: "ready",
+        sourceLabel: "Team-Powers: drei Identity-Powers mit 4/3/2 Charges plus Facility-Boni auf Level 2/4.",
+        warnings: [],
+      },
       formCards: getTeamFormCardOptions({
         gameState: normalizedGameState,
         seasonId: params.seasonId,
         teamId: params.teamId,
         lineupId: existingDraftLineupId,
       }),
-      mutatorTraitOptions: getLegacyMutatorTraitOptions(),
+      formCardPlans: (normalizedGameState.seasonState.formCardPlans ?? []).filter(
+        (plan) => plan.seasonId === params.seasonId && plan.teamId === params.teamId,
+      ),
+      teamPowers: getTeamPowerOptions({
+        gameState: normalizedGameState,
+        seasonId: params.seasonId,
+        teamId: params.teamId,
+        lineupId: existingDraftLineupId,
+      }),
+      mutatorTraitOptions: buildLegacyMutatorTraitOptionsForRoster(rosterPlayerRefs),
     },
   };
 }
@@ -776,6 +911,171 @@ export function generateLocalLegacyFormCardsForSeason(
     replacedCardCount,
     scrubbedSelectionCount,
     warnings,
+  };
+}
+
+export function ensureLocalLegacyFormCardsForSeason(
+  params: LegacyLineupKeyParams,
+  persistence?: PersistenceService,
+) {
+  const { persistence: resolvedPersistence, save } = resolveLocalSave(params.saveId, persistence);
+  const effectiveParams = { ...params, saveId: save.saveId };
+  if (save.gameState.season.id !== effectiveParams.seasonId) {
+    return {
+      ok: false as const,
+      errors: ["form_cards_season_is_not_active"],
+      warnings: ["Formkarten lassen sich nur fuer die aktive lokale Season sicherstellen."],
+    };
+  }
+
+  const existingSeasonCards = (save.gameState.seasonState.formCards ?? []).filter(
+    (card) => card.seasonId === effectiveParams.seasonId,
+  );
+  if (existingSeasonCards.length > 0) {
+    return {
+      ok: true as const,
+      source: "sqlite" as const,
+      seasonId: effectiveParams.seasonId,
+      generatedCardCount: 0,
+      existingCardCount: existingSeasonCards.length,
+      warnings: [],
+    };
+  }
+
+  const nextGameState = ensureLocalFormCardsForSeason(save.gameState, effectiveParams.saveId, effectiveParams.seasonId);
+  resolvedPersistence.saveSingleplayerState(save.saveId, nextGameState);
+  const generatedCardCount = (nextGameState.seasonState.formCards ?? []).filter(
+    (card) => card.seasonId === effectiveParams.seasonId,
+  ).length;
+
+  return {
+    ok: true as const,
+    source: "sqlite" as const,
+    seasonId: effectiveParams.seasonId,
+    generatedCardCount,
+    existingCardCount: 0,
+    warnings: generatedCardCount === 0 ? ["In dieser Season wurden keine Formkartenquellen gefunden."] : [],
+  };
+}
+
+export type SaveLocalLegacyFormCardPlanInput = LegacyLineupKeyParams & {
+  disciplineSide: "d1" | "d2";
+  disciplineId?: string | null;
+  primaryFormCardId?: string | null;
+  secondaryFormCardId?: string | null;
+};
+
+export function saveLocalLegacyFormCardPlan(
+  input: SaveLocalLegacyFormCardPlanInput,
+  persistence?: PersistenceService,
+): {
+  ok: boolean;
+  plans: FormCardPlanRecord[];
+  errors: string[];
+  warnings: string[];
+} {
+  const { persistence: resolvedPersistence, save } = resolveLocalSave(input.saveId, persistence);
+  const effectiveSaveId = save.saveId;
+  const gameState = withNormalizedSeasonDisciplineSchedule(save.gameState);
+  const scheduleEntry = (gameState.seasonState.disciplineSchedule ?? []).find(
+    (entry) => entry.seasonId === input.seasonId && entry.matchdayId === input.matchdayId,
+  );
+  if (!scheduleEntry) {
+    return { ok: false, plans: [], errors: ["form_card_plan_matchday_missing"], warnings: [] };
+  }
+
+  const sideSlot = input.disciplineSide === "d1" ? scheduleEntry.discipline1 : scheduleEntry.discipline2;
+  const disciplineId = input.disciplineId ?? sideSlot?.disciplineId ?? null;
+  if (!sideSlot || (disciplineId && sideSlot.disciplineId !== disciplineId)) {
+    return { ok: false, plans: [], errors: ["form_card_plan_discipline_side_missing"], warnings: [] };
+  }
+
+  const requestedCardIds = [input.primaryFormCardId ?? null, input.secondaryFormCardId ?? null].filter(
+    (value): value is string => Boolean(value),
+  );
+  const validCards = new Set(
+    (gameState.seasonState.formCards ?? [])
+      .filter((card) => card.seasonId === input.seasonId && card.teamId === input.teamId)
+      .map((card) => card.id),
+  );
+  const positiveCardIds = new Set(
+    (gameState.seasonState.formCards ?? [])
+      .filter((card) => card.seasonId === input.seasonId && card.teamId === input.teamId && card.cardValue > 0)
+      .map((card) => card.id),
+  );
+  const invalidCardId = requestedCardIds.find((cardId) => !validCards.has(cardId));
+  const teamPlans = (gameState.seasonState.formCardPlans ?? []).filter(
+    (plan) => plan.seasonId === input.seasonId && plan.teamId === input.teamId,
+  );
+  if (invalidCardId) {
+    return {
+      ok: false,
+      plans: teamPlans,
+      errors: [`form_card_plan_card_missing:${invalidCardId}`],
+      warnings: [],
+    };
+  }
+  if (input.secondaryFormCardId && !positiveCardIds.has(input.secondaryFormCardId)) {
+    return {
+      ok: false,
+      plans: teamPlans,
+      errors: [`form_card_plan_secondary_must_be_positive:${input.secondaryFormCardId}`],
+      warnings: [],
+    };
+  }
+
+  const now = new Date().toISOString();
+  const planId = `form-card-plan:${effectiveSaveId}:${input.seasonId}:${input.matchdayId}:${input.teamId}:${input.disciplineSide}`;
+  const allPlans = gameState.seasonState.formCardPlans ?? [];
+  const nextPlan: FormCardPlanRecord | null =
+    requestedCardIds.length > 0
+      ? {
+          id: planId,
+          saveId: effectiveSaveId,
+          seasonId: input.seasonId,
+          teamId: input.teamId,
+          matchdayId: input.matchdayId,
+          disciplineSide: input.disciplineSide,
+          disciplineId,
+          primaryFormCardId: input.primaryFormCardId ?? null,
+          secondaryFormCardId: input.secondaryFormCardId ?? null,
+          updatedAt: now,
+        }
+      : null;
+  const reservedCardIds = new Set(requestedCardIds);
+  const nextPlans = [
+    ...allPlans.filter((plan) => {
+      if (plan.id === planId) {
+        return false;
+      }
+      if (plan.seasonId !== input.seasonId || plan.teamId !== input.teamId) {
+        return true;
+      }
+      return ![plan.primaryFormCardId, plan.secondaryFormCardId].some((cardId) => cardId && reservedCardIds.has(cardId));
+    }),
+    ...(nextPlan ? [nextPlan] : []),
+  ].sort(
+    (left, right) =>
+      left.seasonId.localeCompare(right.seasonId) ||
+      left.teamId.localeCompare(right.teamId) ||
+      left.matchdayId.localeCompare(right.matchdayId) ||
+      left.disciplineSide.localeCompare(right.disciplineSide),
+  );
+
+  const nextGameState: GameState = {
+    ...gameState,
+    seasonState: {
+      ...gameState.seasonState,
+      formCardPlans: nextPlans,
+    },
+  };
+  resolvedPersistence.saveSingleplayerState(effectiveSaveId, nextGameState);
+
+  return {
+    ok: true,
+    plans: nextPlans.filter((plan) => plan.seasonId === input.seasonId && plan.teamId === input.teamId),
+    errors: [],
+    warnings: reservedCardIds.size > 0 ? ["Doppelte Formkartenplaene wurden fuer diese Karte bereinigt."] : [],
   };
 }
 
@@ -996,28 +1296,46 @@ export function calculateLocalLegacyLineupPreview(
     saveId: save.saveId,
   });
 
-  const previewEntries = normalizeEntries(entries ?? contextResult.context.existingDraft?.entries ?? []);
-  const previewModifiers = normalizeLineupDraftModifiers(modifiers ?? contextResult.context.existingDraft?.modifiers);
+  return calculateLocalLegacyLineupPreviewFromContext(contextResult.context, entries, modifiers, fatigueMap);
+}
+
+export function calculateLocalLegacyLineupPreviewFromContext(
+  context: LegacyLineupLoadedContext,
+  entries?: LegacyLineupEntryInput[],
+  modifiers?: LegacyLineupDraft["modifiers"],
+  fatigueMap: ReturnType<typeof buildLocalFatigueMap> = context.fatigueByPlayerId ?? null,
+): LegacyLineupPreviewResult {
+  const previewEntries = normalizeEntries(entries ?? context.existingDraft?.entries ?? []);
+  const previewPlayerIds = new Set(previewEntries.map((entry) => entry.playerId));
+  const moraleByPlayerId = buildPlayerMoralePerformanceMap({
+    gameState: context.gameState,
+    teamId: context.teamId,
+    rosterEntries:
+      context.gameState?.rosters.filter((entry) => entry.teamId === context.teamId && previewPlayerIds.has(entry.playerId)) ??
+      null,
+  });
+  const previewModifiers = normalizeLineupDraftModifiers(modifiers ?? context.existingDraft?.modifiers);
   const validation = validateLegacyLineupContext(
     {
-      ...contextResult.context,
+      ...context,
       entries: previewEntries,
-      disciplineSidePlayerCounts: buildDisciplineSidePlayerCounts(contextResult.context),
-      disciplineSideCaptainCounts: contextResult.context.disciplineSideCaptainCounts,
+      disciplineSidePlayerCounts: buildDisciplineSidePlayerCounts(context),
+      disciplineSideCaptainCounts: context.disciplineSideCaptainCounts,
     },
-    buildValidationOptions(contextResult.context),
+    buildValidationOptions(context),
   );
 
   const previewPairs = [
-    contextResult.context.matchdayContract?.discipline1
-      ? `${contextResult.context.matchdayContract.discipline1.disciplineId}::${contextResult.context.matchdayContract.discipline1.disciplineSide}`
+    context.matchdayContract?.discipline1
+      ? `${context.matchdayContract.discipline1.disciplineId}::${context.matchdayContract.discipline1.disciplineSide}`
       : null,
-    contextResult.context.matchdayContract?.discipline2
-      ? `${contextResult.context.matchdayContract.discipline2.disciplineId}::${contextResult.context.matchdayContract.discipline2.disciplineSide}`
+    context.matchdayContract?.discipline2
+      ? `${context.matchdayContract.discipline2.disciplineId}::${context.matchdayContract.discipline2.disciplineSide}`
       : null,
     ...previewEntries.map((entry) => `${entry.disciplineId}::${entry.disciplineSide}`),
   ].filter((value): value is string => Boolean(value));
   const uniquePairs = Array.from(new Set(previewPairs));
+  const teamCaptain = context.gameState ? selectTeamCaptain(context.gameState, context.teamId) : null;
   const scorePartsWithModifierWarnings = uniquePairs.map((pair) => {
     const [disciplineId, disciplineSide] = pair.split("::") as [string, "d1" | "d2"];
     const sideEntries = previewEntries.filter(
@@ -1025,47 +1343,80 @@ export function calculateLocalLegacyLineupPreview(
     );
     const disciplineMeta =
       disciplineSide === "d1"
-        ? contextResult.context.matchdayContract?.discipline1 ?? null
-        : contextResult.context.matchdayContract?.discipline2 ?? null;
+        ? context.matchdayContract?.discipline1 ?? null
+        : context.matchdayContract?.discipline2 ?? null;
     const formResult = calculateFormModifierForSide({
       modifiers: previewModifiers,
       disciplineSide,
       disciplineColor: getFormCardColorForDisciplineCategory(disciplineMeta?.category),
       playerCount: sideEntries.length,
-      formCards: contextResult.context.formCards ?? [],
+      formCards: context.formCards ?? [],
     });
     const mutatorResult = calculateMutatorModifierForSide({
       modifiers: previewModifiers,
       disciplineSide,
       entries: sideEntries.map((entry) => ({ playerId: entry.playerId })),
-      rosterPlayers: contextResult.context.rosterPlayers,
+      rosterPlayers: context.rosterPlayers,
+    });
+    const teamPowerResult = calculateTeamPowerModifierForSide({
+      modifiers: previewModifiers,
+      disciplineSide,
+      disciplineId,
+      disciplineCategory: disciplineMeta?.category,
+      teamPowers: context.teamPowers ?? [],
+      teamCaptainPowerModifierPct: teamCaptain?.effects.teamPowerModifierPct ?? null,
+      conditionalBonusPct: (() => {
+        const selectedPower = context.teamPowers?.find((power) => power.id === previewModifiers[disciplineSide].teamPowerId) ?? null;
+        if (!selectedPower?.conditionalTrigger || !selectedPower.conditionalBonusPct) {
+          return 0;
+        }
+        if (selectedPower.conditionalTrigger === "rival_top8_discipline") {
+          return (context.teamPowerWindows?.[disciplineId]?.top8Rivals.length ?? 0) > 0 ? selectedPower.conditionalBonusPct : 0;
+        }
+        return 0;
+      })(),
     });
     const effectiveMutatorModifier =
-      contextResult.context.mutatorSource?.effectStatus === "ready" ? mutatorResult.mutatorModifier : null;
+      context.mutatorSource?.effectStatus === "ready" ? mutatorResult.mutatorModifier : null;
     const effectiveMutatorBonuses =
-      contextResult.context.mutatorSource?.effectStatus === "ready" ? mutatorResult.playerMutatorBonuses : null;
+      context.mutatorSource?.effectStatus === "ready" ? mutatorResult.playerMutatorBonuses : null;
+    const effectiveTeamPowerModifier =
+      context.teamPowerSource?.effectStatus === "ready" ? teamPowerResult.teamPowerModifier : null;
     return {
       score: scoreLegacyLineupDisciplineSide({
         disciplineId,
         disciplineSide,
         entries: previewEntries,
-        disciplineScores: contextResult.context.disciplineScores,
-        activePlayers: contextResult.context.activePlayers,
-        rosterPlayers: contextResult.context.rosterPlayers,
+        disciplineScores: context.disciplineScores,
+        activePlayers: context.activePlayers,
+        rosterPlayers: context.rosterPlayers,
         requiredPlayers:
-          contextResult.context.disciplineSidePlayerCounts?.[pair] ??
-          contextResult.context.disciplinePlayerCounts[disciplineId] ??
+          context.disciplineSidePlayerCounts?.[pair] ??
+          context.disciplinePlayerCounts[disciplineId] ??
           null,
         fatigueByPlayerId: fatigueMap,
+        moraleByPlayerId,
         fatigueSourceStatus: fatigueMap ? "mapped" : "missing_source",
+        intensity: previewModifiers[disciplineSide].intensity,
         formCardsAvailable: formResult.formCardsAvailable,
         formCardsSelected: formResult.formCardsSelected,
         formModifier: formResult.formModifier,
         mutatorText: mutatorResult.mutatorText,
         mutatorModifier: effectiveMutatorModifier,
         mutatorBonusByPlayerId: effectiveMutatorBonuses,
+        teamPowerSelected: teamPowerResult.teamPowerSelected,
+        teamPowerStatus: context.teamPowerSource?.effectStatus === "ready" ? "ready" : "missing_source",
+        teamPowerLabel: teamPowerResult.teamPowerLabel,
+        teamPowerModifier: effectiveTeamPowerModifier,
+        teamPowerImpact: teamPowerResult.teamPowerImpact,
+        teamPowerBasePct: teamPowerResult.teamPowerBasePct,
+        teamPowerConditionalPct: teamPowerResult.teamPowerConditionalPct,
+        teamPowerAttributeFitPct: teamPowerResult.teamPowerAttributeFitPct,
+        teamPowerEffectType: context.teamPowers?.find((power) => power.id === previewModifiers[disciplineSide].teamPowerId)?.effectType ?? null,
+        teamPowerTargetMode: context.teamPowers?.find((power) => power.id === previewModifiers[disciplineSide].teamPowerId)?.targetMode ?? null,
+        teamPowerTargetLimit: context.teamPowers?.find((power) => power.id === previewModifiers[disciplineSide].teamPowerId)?.targetLimit ?? null,
       }),
-      modifierWarnings: [...formResult.warnings, ...mutatorResult.warnings],
+      modifierWarnings: [...formResult.warnings, ...mutatorResult.warnings, ...teamPowerResult.warnings],
     };
   });
   const scoreParts = scorePartsWithModifierWarnings.map((entry) => entry.score);
@@ -1076,7 +1427,7 @@ export function calculateLocalLegacyLineupPreview(
 
   return {
     ok: true,
-    contextMeta: contextResult.context.contextMeta,
+    contextMeta: context.contextMeta,
     validation,
     disciplineSideScores: scoreParts,
     scorePreview: {
@@ -1088,6 +1439,6 @@ export function calculateLocalLegacyLineupPreview(
       ],
       modifierWarnings: [...(scorePreview.modifierWarnings ?? []), ...modifierWarnings],
     },
-    warnings: contextResult.warnings,
+    warnings: [],
   };
 }

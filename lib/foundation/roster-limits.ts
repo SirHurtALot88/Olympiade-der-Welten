@@ -14,7 +14,7 @@ export function getTeamPlayerMax(team?: TeamRosterLimitInput, identity?: TeamRos
   const teamLimit = finiteRounded(team?.rosterLimit);
   const playerMin = finiteRounded(identity?.playerMin);
   const playerOpt = finiteRounded(identity?.playerOpt);
-  const requestedLimit = Math.max(teamLimit ?? 0, playerOpt ?? 0, playerMin ?? 0, DEFAULT_ROSTER_MIN_FLOOR);
+  const requestedLimit = Math.max(teamLimit ?? 0, playerOpt ?? 0, playerMin ?? 0, DEFAULT_ROSTER_MAX);
   return Math.min(Math.max(requestedLimit, DEFAULT_ROSTER_MIN_FLOOR), DEFAULT_ROSTER_MAX);
 }
 

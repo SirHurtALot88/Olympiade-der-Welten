@@ -4,6 +4,7 @@ import {
   buildNewGameStateFromBaseline,
   previewNewGameSetup,
 } from "@/lib/game/new-game-setup-service";
+import { resolveFoundationSaveMode } from "@/lib/persistence/foundation-save-mode";
 
 describe("new-game-setup-service", () => {
   it("creates a Solo 1 preview with one Chris team and AI rest", () => {
@@ -18,11 +19,14 @@ describe("new-game-setup-service", () => {
   });
 
   it("creates a Solo 4 preview with four local human teams", () => {
-    const preview = previewNewGameSetup({ presetId: "solo_4", now: "2026-06-13T10:00:00.000Z" });
+    const { gameState, preview } = buildNewGameStateFromBaseline({ presetId: "solo_4", now: "2026-06-13T10:00:00.000Z" });
 
     expect(preview.counts.chris).toBe(4);
     expect(preview.chrisTeamIds).toEqual(["P-S", "D-P", "M-M", "V-W"]);
     expect(preview.frankyTeamIds).toEqual([]);
+    expect(gameState.scenarioMeta?.saveMode).toBe("solo_4");
+    expect(gameState.scenarioMeta?.humanControlledTeamCount).toBe(4);
+    expect(resolveFoundationSaveMode({ gameState })).toBe("solo_4");
   });
 
   it("creates Online 4v4 with Chris, Franky and AI ownership metadata", () => {
@@ -36,11 +40,13 @@ describe("new-game-setup-service", () => {
     expect(preview.chrisTeamIds).toEqual(["P-S", "D-P", "M-M", "V-W"]);
     expect(preview.frankyTeamIds).toEqual(["M-S", "P-C", "C-S", "G-G"]);
     expect(gameState.scenarioMeta?.roomCode).toMatch(/^NEW-/);
+    expect(gameState.scenarioMeta?.saveMode).toBe("online_4v4");
     expect(gameState.scenarioMeta?.roomParticipants?.map((participant) => participant.displayName)).toEqual(["Chris", "Franky"]);
     expect(gameState.scenarioMeta?.teamOwnership?.filter((entry) => entry.controllerType === "human")).toHaveLength(8);
     expect(gameState.seasonState.teamControlSettings?.["M-M"]?.ownerId).toBe("user_local");
     expect(gameState.seasonState.teamControlSettings?.["M-S"]?.ownerId).toBe("franky_remote_placeholder");
     expect(gameState.seasonState.teamControlSettings?.["A-A"]?.controlMode).toBe("ai");
+    expect(resolveFoundationSaveMode({ gameState })).toBe("online_4v4");
   });
 
   it("uses immutable baseline state and clears mutable season history for a new game", () => {

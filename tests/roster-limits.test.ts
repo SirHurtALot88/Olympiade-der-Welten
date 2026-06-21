@@ -8,11 +8,11 @@ describe("roster limits", () => {
     const identity = { playerMin: 8, playerOpt: 11 };
 
     expect(DEFAULT_ROSTER_MAX).toBe(14);
-    expect(getTeamPlayerMax(team, identity)).toBe(12);
+    expect(getTeamPlayerMax(team, identity)).toBe(14);
     expect(deriveRosterTargets(team, identity)).toEqual({
       playerMin: 8,
       playerOpt: 11,
-      playerMax: 12,
+      playerMax: 14,
     });
   });
 

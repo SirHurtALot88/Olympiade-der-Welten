@@ -5,6 +5,7 @@ import type {
   PlayerMoraleReason,
   PlayerMoraleState,
   PlayerMoraleVisibleMood,
+  PlayerDemandRecord,
   RosterEntry,
   Team,
   TeamIdentity,
@@ -13,6 +14,7 @@ import { buildPlayerSeasonPerformance } from "@/lib/foundation/player-season-per
 import { getTeamStrategyProfile } from "@/lib/foundation/team-strategy-profiles";
 import { resolvePlayerEconomyContract } from "@/lib/foundation/player-economy-contract";
 import { calculateTransfermarktFit } from "@/lib/market/transfermarkt-fit";
+import { buildPlayerDemands, selectTeamCaptain } from "@/lib/morale/player-demands-service";
 
 export type PlayerMoraleAssessment = PlayerMoraleState & {
   smiley: string;
@@ -34,6 +36,9 @@ export type PlayerMoraleInput = {
 
 const POSITIVE_TRAINING_TRAITS = new Set(["diligent", "disciplined", "motivated", "ambitious", "flexible", "healthy", "resourceful"]);
 const NEGATIVE_VOLATILE_TRAITS = new Set(["lazy", "diva", "fainthearted", "paranoid", "obsessive", "egomaniac", "gambler", "mercenary", "renegade"]);
+const CORE_AXES = ["pow", "spe", "men", "soc"] as const;
+
+type CoreAxis = (typeof CORE_AXES)[number];
 
 function clamp(value: number, min: number, max: number) {
   return Math.max(min, Math.min(max, value));
@@ -134,11 +139,12 @@ function getMoraleSalaryModifier(input: {
   renewalSalaryPreview: number | null;
 }) {
   let modifier = 1;
-  if (input.morale >= 84) modifier -= 0.05;
-  else if (input.morale >= 68) modifier -= 0.02;
+  if (input.morale >= 84) modifier -= 0.08;
+  else if (input.morale >= 68) modifier -= 0.04;
+  else if (input.morale >= 60) modifier -= 0.02;
   else if (input.morale < 25) modifier += 0.28;
   else if (input.morale < 40) modifier += 0.16;
-  else if (input.morale < 52) modifier += 0.07;
+  else if (input.morale < 48) modifier += 0.07;
 
   const currentSalary = input.currentSalary ?? 0;
   const expected = input.renewalSalaryPreview ?? 0;
@@ -153,7 +159,7 @@ function getMoraleSalaryModifier(input: {
     modifier += 0.06;
   }
 
-  return roundValue(clamp(modifier, 0.82, 1.45), 3);
+  return roundValue(clamp(modifier, 0.78, 1.28), 3);
 }
 
 function getContractLengthLimit(morale: number, player: Player) {
@@ -189,16 +195,319 @@ function getTeamRank(gameState: GameState, teamId: string) {
   return standing?.rank ?? null;
 }
 
+function getLatestSnapshotContext(gameState: GameState, teamId: string, playerId: string) {
+  const snapshots = [...((gameState.seasonState as { seasonSnapshots?: Array<Record<string, unknown>> }).seasonSnapshots ?? [])];
+  for (const snapshot of snapshots.reverse()) {
+    const finalStandings = (snapshot.finalStandings ?? []) as Array<{ teamId?: string; rank?: number | null }>;
+    const playerRows = [
+      ...(((snapshot.playerPerformances ?? []) as Array<Record<string, unknown>>) ?? []),
+      ...(((snapshot.playerPerformanceSnapshots ?? []) as Array<Record<string, unknown>>) ?? []),
+    ];
+    const teamRow = finalStandings.find((entry) => entry.teamId === teamId) ?? null;
+    const playerRow = playerRows.find((entry) => entry.playerId === playerId) ?? null;
+    if (teamRow || playerRow) {
+      return {
+        seasonId: String(snapshot.seasonId ?? ""),
+        teamRank: typeof teamRow?.rank === "number" ? teamRow.rank : null,
+        ppsRank: typeof playerRow?.ppsRank === "number" ? playerRow.ppsRank : null,
+        ovrRank: typeof playerRow?.ovrRank === "number" ? playerRow.ovrRank : null,
+        mvsRank: typeof playerRow?.mvsRank === "number" ? playerRow.mvsRank : null,
+      };
+    }
+  }
+  return null;
+}
+
+function hasCurrentSeasonResults(gameState: GameState) {
+  const seasonId = gameState.season.id;
+  const hasMatchdayResult = (gameState.seasonState.matchdayResults ?? []).some((entry) => entry.seasonId === seasonId);
+  const resultIds = new Set(
+    (gameState.seasonState.matchdayResults ?? [])
+      .filter((entry) => entry.seasonId === seasonId)
+      .map((entry) => entry.id),
+  );
+  const hasPlayerResult = (gameState.seasonState.playerDisciplinePerformances ?? []).some((entry) =>
+    resultIds.has(entry.matchdayResultId),
+  );
+  return hasMatchdayResult || hasPlayerResult;
+}
+
+function getCurrentSeasonMatchdayResultIds(gameState: GameState) {
+  const seasonId = gameState.season.id;
+  return new Set(
+    (gameState.seasonState.matchdayResults ?? [])
+      .filter((entry) => entry.seasonId === seasonId)
+      .map((entry) => entry.id),
+  );
+}
+
+function getResolvedTargetMatchdayResultIds(gameState: GameState, disciplineId: string) {
+  const resultIds = getCurrentSeasonMatchdayResultIds(gameState);
+  const targetResultIds = new Set<string>();
+  for (const result of gameState.seasonState.disciplineResults ?? []) {
+    if (result.disciplineId === disciplineId && resultIds.has(result.matchdayResultId)) {
+      targetResultIds.add(result.matchdayResultId);
+    }
+  }
+  return targetResultIds;
+}
+
+function hasPlayerDisciplineAppearance(input: {
+  gameState: GameState;
+  teamId: string;
+  playerId: string;
+  disciplineId: string;
+}) {
+  const resultIds = getResolvedTargetMatchdayResultIds(input.gameState, input.disciplineId);
+  if (resultIds.size === 0) return false;
+  return (input.gameState.seasonState.playerDisciplinePerformances ?? []).some(
+    (entry) =>
+      resultIds.has(entry.matchdayResultId) &&
+      entry.teamId === input.teamId &&
+      entry.disciplineId === input.disciplineId &&
+      (entry.playerId === input.playerId || entry.activePlayerId === input.playerId),
+  );
+}
+
+function hasPlayerCaptainDraft(input: {
+  gameState: GameState;
+  teamId: string;
+  playerId: string;
+  disciplineId: string;
+}) {
+  const seasonId = input.gameState.season.id;
+  return (input.gameState.seasonState.lineupDrafts ?? []).some(
+    (draft) =>
+      draft.seasonId === seasonId &&
+      draft.teamId === input.teamId &&
+      draft.entries.some(
+        (entry) =>
+          entry.disciplineId === input.disciplineId &&
+          entry.isCaptain &&
+          (entry.playerId === input.playerId || entry.activePlayerId === input.playerId),
+      ),
+  );
+}
+
+function getDemandPriorityMultiplier(demand: PlayerDemandRecord) {
+  if (demand.priority === "high") return 1.15;
+  if (demand.priority === "low") return 0.7;
+  return 1;
+}
+
+function getNumericTargetValue(value: PlayerDemandRecord["targetValue"]) {
+  if (typeof value === "number" && Number.isFinite(value)) return value;
+  if (typeof value === "string") {
+    const parsed = Number(value.replace(",", "."));
+    return Number.isFinite(parsed) ? parsed : null;
+  }
+  return null;
+}
+
+function evaluateDemandDelta(input: {
+  gameState: GameState;
+  teamId: string;
+  playerId: string;
+  demand: PlayerDemandRecord;
+  seasonAppearances: number;
+  currentSeasonHasResults: boolean;
+}) {
+  const { gameState, teamId, playerId, demand } = input;
+  const priorityMultiplier = getDemandPriorityMultiplier(demand);
+  const reward = Math.max(0, demand.moraleReward) * priorityMultiplier;
+  const penalty = Math.min(0, demand.moralePenalty) * priorityMultiplier;
+  const targetDisciplineId = demand.targetDisciplineId ?? null;
+
+  if (demand.type === "discipline_start" && targetDisciplineId) {
+    const targetResolved = getResolvedTargetMatchdayResultIds(gameState, targetDisciplineId).size > 0;
+    const appeared = hasPlayerDisciplineAppearance({ gameState, teamId, playerId, disciplineId: targetDisciplineId });
+    if (appeared) return { delta: reward, outcome: "fulfilled" as const };
+    if (targetResolved) return { delta: penalty, outcome: "failed" as const };
+    if (demand.status === "at_risk") return { delta: penalty * 0.25, outcome: "pressure" as const };
+    return { delta: 0, outcome: "open" as const };
+  }
+
+  if (demand.type === "captaincy" && targetDisciplineId) {
+    const targetResolved = getResolvedTargetMatchdayResultIds(gameState, targetDisciplineId).size > 0;
+    const captained = hasPlayerCaptainDraft({ gameState, teamId, playerId, disciplineId: targetDisciplineId });
+    if (captained) return { delta: reward, outcome: "fulfilled" as const };
+    if (targetResolved) return { delta: penalty, outcome: "failed" as const };
+    return { delta: 0, outcome: "open" as const };
+  }
+
+  if (demand.type === "appearances") {
+    const target = getNumericTargetValue(demand.targetValue);
+    if (target == null || target <= 0) return { delta: 0, outcome: "open" as const };
+    if (input.seasonAppearances >= target) return { delta: reward, outcome: "fulfilled" as const };
+    if (!input.currentSeasonHasResults) return { delta: 0, outcome: "open" as const };
+    const gapShare = clamp((target - input.seasonAppearances) / target, 0.25, 1);
+    return { delta: penalty * gapShare, outcome: demand.status === "at_risk" ? "pressure" as const : "failed" as const };
+  }
+
+  if (demand.type === "facility") {
+    if (demand.status === "fulfilled") return { delta: reward, outcome: "fulfilled" as const };
+    if (input.currentSeasonHasResults) return { delta: penalty * 0.35, outcome: "pressure" as const };
+  }
+
+  if (demand.status === "failed") return { delta: penalty, outcome: "failed" as const };
+  if (demand.status === "fulfilled") return { delta: reward, outcome: "fulfilled" as const };
+  return { delta: 0, outcome: "open" as const };
+}
+
+function applyPlayerDemandMoraleImpact(input: {
+  gameState: GameState;
+  team: Team;
+  player: Player;
+  seasonAppearances: number;
+  currentSeasonHasResults: boolean;
+  reasons: PlayerMoraleReason[];
+  warnings: string[];
+}) {
+  const demands = buildPlayerDemands(input.gameState, input.player.id, input.team.teamId);
+  if (demands.length === 0) return 0;
+
+  let rawDelta = 0;
+  for (const demand of demands) {
+    const result = evaluateDemandDelta({
+      gameState: input.gameState,
+      teamId: input.team.teamId,
+      playerId: input.player.id,
+      demand,
+      seasonAppearances: input.seasonAppearances,
+      currentSeasonHasResults: input.currentSeasonHasResults,
+    });
+    if (result.delta === 0) continue;
+    const roundedDelta = roundValue(result.delta, 1);
+    rawDelta += roundedDelta;
+    const labelPrefix =
+      result.outcome === "fulfilled" ? "Forderung erfuellt" : result.outcome === "failed" ? "Forderung verfehlt" : "Forderung unter Druck";
+    addReason(input.reasons, `player_demand_${result.outcome}_${demand.type}`, `${labelPrefix}: ${demand.label}`, roundedDelta, "player_demands");
+    if (result.outcome === "failed" && demand.priority === "high") {
+      input.warnings.push("high_priority_player_demand_failed");
+    }
+  }
+
+  const cappedDelta = roundValue(clamp(rawDelta, -18, 12), 1);
+  if (cappedDelta < 0) {
+    const teamCaptain = selectTeamCaptain(input.gameState, input.team.teamId);
+    const buffer = teamCaptain ? roundValue(Math.min(Math.abs(cappedDelta), teamCaptain.effects.moraleBuffer ?? 0), 1) : 0;
+    if (buffer > 0) {
+      addReason(input.reasons, "team_captain_morale_buffer", "Teamkapitaen puffert Forderungskonflikt", buffer, "team_captain");
+      return roundValue(cappedDelta + buffer, 1);
+    }
+  }
+
+  return cappedDelta;
+}
+
 function getRosterPlayers(gameState: GameState, teamId: string, excludedPlayerId: string) {
   const ids = new Set(gameState.rosters.filter((entry) => entry.teamId === teamId && entry.playerId !== excludedPlayerId).map((entry) => entry.playerId));
   return gameState.players.filter((player) => ids.has(player.id));
 }
 
+function getPlayerCoreAverage(player: Player) {
+  const values = CORE_AXES.map((axis) => player.coreStats?.[axis] ?? 0);
+  return values.reduce((sum, value) => sum + value, 0) / values.length;
+}
+
+function getPlayerRosterStrength(player: Player, rosterEntry: RosterEntry | null | undefined) {
+  const economy = resolvePlayerEconomyContract({ player, rosterEntry: rosterEntry ?? null });
+  const marketSignal = economy.marketValue ?? player.displayMarketValue ?? player.marketValue ?? 0;
+  return marketSignal * 1.25 + (player.rating ?? 0) * 0.45 + getPlayerCoreAverage(player) * 0.3;
+}
+
+function getStrongestPlayerAxis(player: Player): CoreAxis {
+  return CORE_AXES.reduce((best, axis) => ((player.coreStats?.[axis] ?? 0) > (player.coreStats?.[best] ?? 0) ? axis : best), "pow");
+}
+
+function getStrongestTeamAxis(teamIdentity: TeamIdentity | null): CoreAxis | null {
+  if (!teamIdentity) return null;
+  return CORE_AXES.reduce((best, axis) => ((teamIdentity[axis] ?? 0) > (teamIdentity[best] ?? 0) ? axis : best), "pow");
+}
+
+function buildRelativePlayerContext(input: {
+  gameState: GameState;
+  player: Player;
+  rosterEntry: RosterEntry;
+  teamIdentity: TeamIdentity | null;
+}) {
+  const rosterRows = input.gameState.rosters
+    .filter((entry) => entry.teamId === input.rosterEntry.teamId)
+    .map((entry) => {
+      const player = input.gameState.players.find((candidate) => candidate.id === entry.playerId) ?? null;
+      return player
+        ? {
+            entry,
+            player,
+            strength: getPlayerRosterStrength(player, entry),
+          }
+        : null;
+    })
+    .filter((entry): entry is { entry: RosterEntry; player: Player; strength: number } => Boolean(entry))
+    .sort((left, right) => right.strength - left.strength);
+
+  const rosterCount = rosterRows.length;
+  const rosterRank = Math.max(1, rosterRows.findIndex((row) => row.player.id === input.player.id) + 1 || rosterCount);
+  const relativeStrength = rosterCount <= 1 ? 1 : 1 - (rosterRank - 1) / Math.max(1, rosterCount - 1);
+  const expectationRole = input.rosterEntry.promisedRole ?? input.rosterEntry.roleTag ?? "";
+  const role = expectationRole.toLowerCase();
+  const isPromisedCore = role.includes("starter") || role.includes("star") || role.includes("core");
+  const isExplicitDepth = role.includes("rotation") || role.includes("bench") || role.includes("depth") || role.includes("prospect");
+  const strengthTier =
+    relativeStrength >= 0.72 || isPromisedCore ? "core" : relativeStrength <= 0.34 || isExplicitDepth ? "depth" : "rotation";
+  const expectationWeight = strengthTier === "core" ? 1 : strengthTier === "rotation" ? 0.72 : 0.45;
+  const strongestPlayerAxis = getStrongestPlayerAxis(input.player);
+  const strongestTeamAxis = getStrongestTeamAxis(input.teamIdentity);
+  const strongestTeamAxisValue = strongestTeamAxis ? input.teamIdentity?.[strongestTeamAxis] ?? 0 : 0;
+  const strongestTeamAxisPlayerValue = strongestTeamAxis ? input.player.coreStats?.[strongestTeamAxis] ?? 0 : 0;
+
+  return {
+    rosterCount,
+    rosterRank,
+    relativeStrength,
+    strengthTier,
+    expectationWeight,
+    strongestPlayerAxis,
+    strongestTeamAxis,
+    strongestTeamAxisValue,
+    strongestTeamAxisPlayerValue,
+  };
+}
+
 function getStoredMorale(gameState: GameState, playerId: string, teamId: string | null): PlayerMoraleState | null {
-  return (
-    (gameState.playerMoraleState ?? []).find((entry) => entry.playerId === playerId && (teamId == null || entry.teamId === teamId)) ??
-    null
-  );
+  const storedRows = gameState.playerMoraleState ?? [];
+  const exactMatch =
+    storedRows.find((entry) => entry.playerId === playerId && (teamId == null || entry.teamId === teamId)) ?? null;
+  if (exactMatch) {
+    return exactMatch;
+  }
+
+  return storedRows.find((entry) => entry.playerId === playerId) ?? null;
+}
+
+function normalizeCarryOverMorale(stored: PlayerMoraleState, seasonId: string, currentTeamId: string | null) {
+  if (stored.lastUpdatedSeasonId === seasonId) {
+    return {
+      morale: stored.morale,
+      carryWeight: 0.55,
+    };
+  }
+
+  const sameTeamCarry = currentTeamId != null && stored.teamId === currentTeamId;
+  const inactiveSeasons = Math.max(0, stored.inactiveSeasons ?? 0);
+  if (inactiveSeasons > 0) {
+    const inactiveFactor = Math.max(0.12, 0.22 - (inactiveSeasons - 1) * 0.04);
+    const inactiveCarryWeight = Math.max(0.1, 0.16 - (inactiveSeasons - 1) * 0.02);
+    return {
+      morale: roundValue(clamp(50 + (stored.morale - 50) * inactiveFactor, 0, 100)),
+      carryWeight: inactiveCarryWeight,
+    };
+  }
+
+  return {
+    morale: roundValue(clamp(50 + (stored.morale - 50) * (sameTeamCarry ? 0.7 : 0.3), 0, 100)),
+    carryWeight: sameTeamCarry ? 0.38 : 0.18,
+  };
 }
 
 export function assessPlayerMorale(input: PlayerMoraleInput): PlayerMoraleAssessment | null {
@@ -224,7 +533,10 @@ export function assessPlayerMorale(input: PlayerMoraleInput): PlayerMoraleAssess
     return assessment;
   }
 
-  const blendedMorale = roundValue(clamp(stored.morale * 0.55 + assessment.morale * 0.45, 0, 100));
+  const carryOver = normalizeCarryOverMorale(stored, input.gameState.season.id, rosterEntry.teamId);
+  const blendedMorale = roundValue(
+    clamp(carryOver.morale * carryOver.carryWeight + assessment.morale * (1 - carryOver.carryWeight), 0, 100),
+  );
   const visibleMood = getVisibleMood(blendedMorale);
   const intent = getContractIntent(blendedMorale, player);
   const salaryModifier = getMoraleSalaryModifier({
@@ -261,18 +573,48 @@ function computePlayerMorale(input: {
   const { gameState, player, rosterEntry, team, teamIdentity } = input;
   const reasons: PlayerMoraleReason[] = [];
   const warnings: string[] = [];
-  let morale = 55;
+  let morale = 50;
+  const relativeContext = buildRelativePlayerContext({
+    gameState,
+    player,
+    rosterEntry,
+    teamIdentity,
+  });
 
-  const rank = getTeamRank(gameState, team.teamId);
+  const currentSeasonHasResults = hasCurrentSeasonResults(gameState);
+  const snapshotContext = currentSeasonHasResults
+    ? null
+    : getLatestSnapshotContext(gameState, team.teamId, player.id);
+  const rank = snapshotContext?.teamRank ?? getTeamRank(gameState, team.teamId);
+  const rankSource = snapshotContext?.teamRank != null ? "season_snapshot" : "standings";
   if (rank != null) {
-    if (rank <= 8) {
-      const delta = hasTrait(player, "ambitious") ? 10 : 7;
+    if (rank <= 3) {
+      const weight = clamp(
+        relativeContext.expectationWeight + (hasTrait(player, "ambitious") ? 0.22 : 0) - (hasTrait(player, "loyal") ? 0.12 : 0),
+        0.45,
+        1.25,
+      );
+      const delta = roundValue(12 * weight, 1);
       morale += delta;
-      addReason(reasons, "team_success", "Team ist sportlich stark", delta, "standings");
+      addReason(reasons, "team_title_contender", "Team spielt um Titel/Meisterschaft", delta, rankSource);
+    } else if (rank <= 8) {
+      const weight = clamp(
+        relativeContext.expectationWeight + (hasTrait(player, "ambitious") ? 0.18 : 0) - (hasTrait(player, "loyal") ? 0.08 : 0),
+        0.45,
+        1.2,
+      );
+      const delta = roundValue(7 * weight, 1);
+      morale += delta;
+      addReason(reasons, "team_success", "Team ist sportlich stark", delta, rankSource);
     } else if (rank >= 25) {
-      const delta = hasTrait(player, "loyal") ? -4 : hasTrait(player, "ambitious") ? -13 : -8;
+      const weight = clamp(
+        relativeContext.expectationWeight + (hasTrait(player, "ambitious") ? 0.45 : 0) - (hasTrait(player, "loyal") ? 0.22 : 0),
+        0.3,
+        1.45,
+      );
+      const delta = roundValue(-8 * weight, 1);
       morale += delta;
-      addReason(reasons, "team_underperforming", "Team bleibt hinter Erwartungen", delta, "standings");
+      addReason(reasons, "team_underperforming", "Team bleibt hinter Erwartungen", delta, rankSource);
     }
   }
 
@@ -280,6 +622,8 @@ function computePlayerMorale(input: {
     appearances: 0,
     averageContribution: null,
   };
+  const hasSeasonPerformance =
+    seasonPerformance.appearances > 0 || seasonPerformance.averageContribution != null;
   const expectationRole = rosterEntry.promisedRole ?? rosterEntry.roleTag;
   const expectedAppearances = getRoleExpectedAppearances(expectationRole);
   const appearanceGap = seasonPerformance.appearances - expectedAppearances;
@@ -293,16 +637,36 @@ function computePlayerMorale(input: {
       usageDelta,
       "season_performance",
     );
-  } else if (expectationRole === "starter") {
+    if (relativeContext.strengthTier === "depth" && appearanceGap >= -1) {
+      morale += 3;
+      addReason(reasons, "relative_role_fulfilled", "Rolle passt zur relativen Teamposition", 3, "roster_context");
+    }
+  } else if (expectationRole === "starter" && currentSeasonHasResults && !hasSeasonPerformance) {
     morale -= 12;
     addReason(reasons, "star_not_used", "Versprochener Starter ohne Einsatzzeit", -12, "season_performance");
+  } else if (relativeContext.strengthTier === "depth" && currentSeasonHasResults && !hasSeasonPerformance) {
+    morale -= 2;
+    addReason(reasons, "depth_not_used", "Depth-Spieler ohne Einsatzzeit", -2, "season_performance");
   }
 
   if (seasonPerformance.averageContribution != null) {
-    if (seasonPerformance.averageContribution >= 12) {
+    if (snapshotContext?.ppsRank != null && snapshotContext.ppsRank <= 40) {
+      morale += 8;
+      addReason(reasons, "strong_pps_rank", "Spieler ist in den Season-PPs stark", 8, "season_snapshot");
+    } else if (snapshotContext?.ppsRank != null && snapshotContext.ppsRank <= 80) {
       morale += 5;
-      addReason(reasons, "good_personal_performance", "Spieler liefert sportlich", 5, "season_performance");
-    } else if (seasonPerformance.appearances >= 3 && seasonPerformance.averageContribution < 5) {
+      addReason(reasons, "good_pps_rank", "Spieler ist in den Season-PPs solide", 5, "season_snapshot");
+    } else if (seasonPerformance.averageContribution >= 18) {
+      morale += 9;
+      addReason(reasons, "elite_personal_performance", "Spieler liefert eine starke Season", 9, "season_performance");
+    } else if (seasonPerformance.averageContribution >= 12) {
+      morale += 6;
+      addReason(reasons, "good_personal_performance", "Spieler liefert sportlich", 6, "season_performance");
+    } else if (
+      seasonPerformance.appearances >= 3 &&
+      seasonPerformance.averageContribution < 5 &&
+      (snapshotContext?.ppsRank == null || snapshotContext.ppsRank > 120)
+    ) {
       morale -= 5;
       addReason(reasons, "poor_personal_performance", "Schwache eigene Season", -5, "season_performance");
     }
@@ -322,6 +686,24 @@ function computePlayerMorale(input: {
     if (hasTrait(player, "mercenary") && team.shortCode !== "W-L" && team.teamId !== "W-L") {
       warnings.push("mercenary_negative_fit_morale_risk");
     }
+  }
+
+  if (
+    relativeContext.strongestTeamAxis &&
+    relativeContext.strongestTeamAxis === relativeContext.strongestPlayerAxis &&
+    relativeContext.strongestTeamAxisPlayerValue >= 45
+  ) {
+    const delta = relativeContext.strengthTier === "core" ? 4 : 2;
+    morale += delta;
+    addReason(reasons, "team_axis_fit", "Spielerstaerke passt zur Teamachse", delta, "roster_context");
+  } else if (
+    relativeContext.strengthTier === "core" &&
+    relativeContext.strongestTeamAxis &&
+    relativeContext.strongestTeamAxisValue >= 7 &&
+    relativeContext.strongestTeamAxisPlayerValue < 35
+  ) {
+    morale -= 3;
+    addReason(reasons, "team_axis_mismatch", "Core-Spieler passt schwach zur Teamachse", -3, "roster_context");
   }
 
   const trainingMode = player.trainingMode ?? null;
@@ -352,7 +734,12 @@ function computePlayerMorale(input: {
   const economy = resolvePlayerEconomyContract({ player, rosterEntry });
   const renewalSalary = input.renewalSalaryPreview ?? economy.salary;
   if (rosterEntry.salary > 0 && renewalSalary != null && renewalSalary > rosterEntry.salary * 1.25) {
-    const delta = hasTrait(player, "mercenary") ? -10 : -6;
+    const expectationRelief = relativeContext.strengthTier === "depth" ? 2 : relativeContext.strengthTier === "rotation" ? 1 : 0;
+    const goodContextDiscount =
+      (rank != null && rank <= 3 ? 3 : rank != null && rank <= 8 ? 1 : 0) +
+      (seasonPerformance.averageContribution != null && seasonPerformance.averageContribution >= 12 ? 2 : 0) +
+      expectationRelief;
+    const delta = Math.min(-2, (hasTrait(player, "mercenary") ? -10 : -6) + goodContextDiscount);
     morale += delta;
     addReason(reasons, "underpaid_vs_expectation", "Gehalt liegt unter Erwartung", delta, "contract");
   } else if (rosterEntry.salary > 0 && renewalSalary != null && rosterEntry.salary >= renewalSalary * 1.08) {
@@ -382,7 +769,18 @@ function computePlayerMorale(input: {
     addReason(reasons, "strict_harmony_profile", "Strenge Teamkultur reagiert auf Ego-Traits", -4, "team_strategy");
   }
 
-  morale = roundValue(clamp(morale, 0, 100));
+  const demandDelta = applyPlayerDemandMoraleImpact({
+    gameState,
+    team,
+    player,
+    seasonAppearances: seasonPerformance.appearances,
+    currentSeasonHasResults,
+    reasons,
+    warnings,
+  });
+  morale += demandDelta;
+
+  morale = roundValue(clamp(50 + (morale - 50) * 1.2, 0, 100));
   const visibleMood = getVisibleMood(morale);
   const contractIntent = getContractIntent(morale, player);
   const moraleSalaryModifier = getMoraleSalaryModifier({

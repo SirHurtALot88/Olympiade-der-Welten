@@ -16,13 +16,22 @@ import {
 import { buildSeasonReview } from "@/lib/season/season-review-service";
 import { CASH_PRIZE_APPLY_CONFIRM_TOKEN, executeCashPrizeApply, previewCashPrizeApply, type CashPrizeApplyResult } from "@/lib/season/cash-prize-apply-service";
 import { buildPlayerRatingContractMap } from "@/lib/foundation/player-rating-contract";
+import { deriveRosterTargets } from "@/lib/foundation/roster-limits";
 import { buildPlayerSeasonPerformanceMap } from "@/lib/foundation/player-season-performance";
+import {
+  executeLocalTransfermarktBuy,
+  executeLocalTransfermarktSell,
+  listLocalTransfermarktFreeAgents,
+  previewLocalTransfermarktBuy,
+  previewLocalTransfermarktSell,
+} from "@/lib/market/transfermarkt-local-service";
 import { buildPlayerProgressionForecast } from "@/lib/training/player-progression-forecast";
 import { buildSeasonEndProgressionPreview, type SeasonEndProgressionPreview } from "@/lib/training/season-end-progression-preview";
 
 const PROJECT_ROOT = path.resolve(__dirname, "..");
 const OUTPUT_DIR = "/Users/chrisfalk/Documents/Codex/2026-06-11/wir-machen-weiter-mit-dem-olympiade/outputs";
 const TARGET_SEASON_ID = process.env.OLY_TARGET_SEASON_ID ?? "season-1";
+const TARGET_SAVE_ID = process.env.OLY_TARGET_SAVE_ID ?? null;
 const EXPORT_PREFIX = process.env.OLY_EXPORT_PREFIX ?? "season-transition-s1-s2";
 
 function parseArgs() {
@@ -59,7 +68,7 @@ function round(value: number, digits = 2) {
 
 function getActiveSaveOrThrow() {
   const persistence = createPersistenceService();
-  const save = persistence.getActiveSave() ?? persistence.bootstrapSingleplayerSave().save;
+  const save = (TARGET_SAVE_ID ? persistence.getSaveById(TARGET_SAVE_ID) : null) ?? persistence.getActiveSave() ?? persistence.bootstrapSingleplayerSave().save;
   if (!save) throw new Error("No active local save found.");
   return { persistence, save };
 }
@@ -232,6 +241,240 @@ function transferRows(result: AiMarketPlanApplyResult | null) {
   }));
 }
 
+type EmergencyFinanceRepairAction = {
+  teamId: string;
+  teamCode: string;
+  teamName: string;
+  action: "sell" | "buy";
+  playerId: string;
+  playerName: string;
+  fee: number | null;
+  cashBefore: number | null;
+  cashAfter: number | null;
+  rosterBefore: number | null;
+  rosterAfter: number | null;
+  reason: string;
+};
+
+type EmergencyFinanceRepairResult = {
+  applied: boolean;
+  actions: EmergencyFinanceRepairAction[];
+  blockers: string[];
+  warnings: string[];
+};
+
+function getRosterEntries(gameState: GameState, teamId: string) {
+  return gameState.rosters.filter((entry) => entry.teamId === teamId);
+}
+
+function getPlayerName(gameState: GameState, playerId: string) {
+  return gameState.players.find((player) => player.id === playerId)?.name ?? playerId;
+}
+
+function getTeamTargets(gameState: GameState, teamId: string) {
+  const team = gameState.teams.find((entry) => entry.teamId === teamId);
+  const identity = gameState.teamIdentities.find((entry) => entry.teamId === teamId);
+  return deriveRosterTargets(team, identity);
+}
+
+function getCurrentTeam(gameState: GameState, teamId: string) {
+  return gameState.teams.find((team) => team.teamId === teamId) ?? null;
+}
+
+function sellCandidateScore(entry: GameState["rosters"][number], preview: ReturnType<typeof previewLocalTransfermarktSell>) {
+  const salePrice = preview.salePrice ?? 0;
+  const salary = preview.salaryReduction ?? entry.salary ?? 0;
+  const expiringBoost = entry.contractLength <= 1 ? 1000 : entry.contractLength === 2 ? 400 : 0;
+  return expiringBoost + salary * 20 + salePrice;
+}
+
+function findEmergencyReplacement(input: {
+  saveId: string;
+  seasonId: string;
+  teamId: string;
+  excludedPlayerIds: Set<string>;
+  maxPurchasePrice: number;
+}) {
+  const feed = listLocalTransfermarktFreeAgents({
+    saveId: input.saveId,
+    seasonId: input.seasonId,
+    teamId: input.teamId,
+    mode: "ai_preview",
+    limit: 160,
+  });
+  const cheapCandidates = feed.items
+    .filter((item) => !input.excludedPlayerIds.has(item.playerId))
+    .filter((item) => (item.marketValue ?? 9999) <= input.maxPurchasePrice + 1)
+    .sort((left, right) => {
+      const priceDelta = (left.marketValue ?? 9999) - (right.marketValue ?? 9999);
+      if (priceDelta !== 0) return priceDelta;
+      const leftAxis = ((left.pow ?? 0) + (left.spe ?? 0) + (left.men ?? 0) + (left.soc ?? 0)) / 4;
+      const rightAxis = ((right.pow ?? 0) + (right.spe ?? 0) + (right.men ?? 0) + (right.soc ?? 0)) / 4;
+      return rightAxis - leftAxis || left.name.localeCompare(right.name, "de", { numeric: true, sensitivity: "base" });
+    })
+    .slice(0, 24);
+
+  for (const item of cheapCandidates) {
+      const preview = previewLocalTransfermarktBuy({
+        saveId: input.saveId,
+        seasonId: input.seasonId,
+        teamId: input.teamId,
+        playerId: item.playerId,
+        contractLength: 1,
+        transferSource: "ai_preseason_finance_emergency_buy",
+      });
+    if (preview.canBuy && (preview.purchasePrice ?? Number.POSITIVE_INFINITY) <= input.maxPurchasePrice) {
+      return { item, preview };
+    }
+  }
+  return null;
+}
+
+function runEmergencyFinanceRepair(saveId: string, seasonId: string): EmergencyFinanceRepairResult {
+  const persistence = createPersistenceService();
+  const actions: EmergencyFinanceRepairAction[] = [];
+  const blockers: string[] = [];
+  const warnings: string[] = [];
+  const sourceSell = "ai_preseason_finance_emergency_sell";
+  const sourceBuy = "ai_preseason_finance_emergency_buy";
+
+  for (let teamIndex = 0; teamIndex < 32; teamIndex += 1) {
+    const save = persistence.getSaveById(saveId);
+    if (!save) {
+      blockers.push("save_missing_during_emergency_finance_repair");
+      break;
+    }
+    const team = save.gameState.teams[teamIndex];
+    if (!team || team.humanControlled || team.cash > 0) continue;
+
+    let safety = 0;
+    while (safety < 8) {
+      safety += 1;
+      const latestSave = persistence.getSaveById(saveId);
+      if (!latestSave) {
+        blockers.push("save_missing_during_emergency_finance_repair_loop");
+        break;
+      }
+      const latestTeam = getCurrentTeam(latestSave.gameState, team.teamId);
+      if (!latestTeam || latestTeam.cash > 0) break;
+
+      const targets = getTeamTargets(latestSave.gameState, team.teamId);
+      const rosterEntries = getRosterEntries(latestSave.gameState, team.teamId);
+      const canSellWithoutReplacement = rosterEntries.length - 1 >= targets.playerMin;
+      const sellOptions = rosterEntries
+        .map((entry) => ({ entry, preview: previewLocalTransfermarktSell({ saveId, seasonId, teamId: team.teamId, activePlayerId: entry.id, transferSource: sourceSell }) }))
+        .filter(({ preview }) => preview.canSell && (preview.salePrice ?? 0) > 0)
+        .sort((left, right) => sellCandidateScore(right.entry, right.preview) - sellCandidateScore(left.entry, left.preview));
+
+      let executed = false;
+      for (const option of sellOptions) {
+        const cashAfterSell = option.preview.cashAfter ?? latestTeam.cash;
+        const needsReplacement = !canSellWithoutReplacement;
+        const replacement = needsReplacement
+          ? findEmergencyReplacement({
+              saveId,
+              seasonId,
+              teamId: team.teamId,
+              excludedPlayerIds: new Set([option.entry.playerId]),
+              maxPurchasePrice: Math.max(0, cashAfterSell - 0.25),
+            })
+          : null;
+
+        if (needsReplacement && !replacement) continue;
+
+        const sellResult = executeLocalTransfermarktSell({
+          saveId,
+          seasonId,
+          teamId: team.teamId,
+          activePlayerId: option.entry.id,
+          transferSource: sourceSell,
+        });
+        if (!sellResult.activePlayerRemoved) continue;
+        actions.push({
+          teamId: team.teamId,
+          teamCode: team.shortCode,
+          teamName: team.name,
+          action: "sell",
+          playerId: option.entry.playerId,
+          playerName: sellResult.player?.name ?? getPlayerName(latestSave.gameState, option.entry.playerId),
+          fee: round(sellResult.salePrice ?? 0),
+          cashBefore: sellResult.cashBefore != null ? round(sellResult.cashBefore) : null,
+          cashAfter: sellResult.cashAfter != null ? round(sellResult.cashAfter) : null,
+          rosterBefore: sellResult.rosterBefore,
+          rosterAfter: sellResult.rosterAfter,
+          reason: option.entry.contractLength <= 1 ? "negative_cash_expiring_contract_sale" : "negative_cash_salary_pressure_sale",
+        });
+
+        if (replacement) {
+          const buyResult = executeLocalTransfermarktBuy({
+            saveId,
+            seasonId,
+            teamId: team.teamId,
+            playerId: replacement.item.playerId,
+            contractLength: 1,
+            transferSource: sourceBuy,
+          });
+          if (!buyResult.activePlayerCreated) {
+            blockers.push(`emergency_replacement_buy_failed:${team.shortCode}:${replacement.item.name}:${buyResult.blockingReasons.join("|")}`);
+            break;
+          }
+          actions.push({
+            teamId: team.teamId,
+            teamCode: team.shortCode,
+            teamName: team.name,
+            action: "buy",
+            playerId: replacement.item.playerId,
+            playerName: replacement.item.name,
+            fee: buyResult.purchasePrice != null ? round(buyResult.purchasePrice) : null,
+            cashBefore: buyResult.cashBefore != null ? round(buyResult.cashBefore) : null,
+            cashAfter: buyResult.cashAfter != null ? round(buyResult.cashAfter) : null,
+            rosterBefore: buyResult.rosterBefore,
+            rosterAfter: buyResult.rosterAfter,
+            reason: "minimum_roster_refill_after_emergency_sale",
+          });
+        }
+
+        executed = true;
+        break;
+      }
+
+      if (!executed) {
+        blockers.push(`emergency_finance_repair_no_safe_swap:${team.shortCode}:cash=${round(latestTeam.cash)}:roster=${rosterEntries.length}:min=${targets.playerMin}`);
+        break;
+      }
+    }
+
+    const finalSave = persistence.getSaveById(saveId);
+    const finalTeam = finalSave ? getCurrentTeam(finalSave.gameState, team.teamId) : null;
+    if (finalSave && finalTeam) {
+      const targets = getTeamTargets(finalSave.gameState, team.teamId);
+      const rosterCount = getRosterEntries(finalSave.gameState, team.teamId).length;
+      if (finalTeam.cash <= 0) blockers.push(`emergency_finance_repair_cash_still_negative:${team.shortCode}:${round(finalTeam.cash)}`);
+      if (rosterCount < targets.playerMin) blockers.push(`emergency_finance_repair_roster_below_min:${team.shortCode}:${rosterCount}/${targets.playerMin}`);
+    }
+  }
+
+  if (actions.length === 0) warnings.push("emergency_finance_repair_no_actions_needed_or_possible");
+  return { applied: actions.length > 0, actions, blockers, warnings };
+}
+
+function emergencyFinanceRepairRows(result: EmergencyFinanceRepairResult | null) {
+  return (result?.actions ?? []).map((action) => ({
+    teamId: action.teamId,
+    teamCode: action.teamCode,
+    teamName: action.teamName,
+    action: action.action,
+    playerId: action.playerId,
+    playerName: action.playerName,
+    fee: action.fee,
+    cashBefore: action.cashBefore,
+    cashAfter: action.cashAfter,
+    rosterBefore: action.rosterBefore,
+    rosterAfter: action.rosterAfter,
+    reason: action.reason,
+  }));
+}
+
 function readinessRows(gameState: GameState) {
   const rosterByTeam = new Map<string, number>();
   for (const roster of gameState.rosters) rosterByTeam.set(roster.teamId, (rosterByTeam.get(roster.teamId) ?? 0) + 1);
@@ -265,7 +508,7 @@ async function buildBudgetedAiMarketAudit(saveId: string, gameState: GameState):
       applySellSteps: true,
       applyBuySteps: true,
       maxBuysPerTeam: null,
-      maxSellsPerTeam: 1,
+      maxSellsPerTeam: 4,
       stopOnTeamFailure: true,
     },
   });
@@ -276,7 +519,7 @@ async function buildBudgetedAiMarketAudit(saveId: string, gameState: GameState):
       ...result.saveContext,
       scopeWarning: [
         result.saveContext.scopeWarning,
-        `budgeted_ai_market_scan:elapsed_ms=${Date.now() - startedAt};buy_need_only=true;preview_buy_limit=120;max_buys_per_team=target_gap;max_sells_per_team=1`,
+        `budgeted_ai_market_scan:elapsed_ms=${Date.now() - startedAt};buy_need_only=true;preview_buy_limit=120;max_buys_per_team=target_gap;max_sells_per_team=4`,
       ].filter(Boolean).join(" | "),
     },
   };
@@ -334,11 +577,12 @@ async function main() {
     phase: "season_end",
   }, persistence);
   const facilityPreviews = save.gameState.teams.map((team) => previewFacilitySeasonEndFinance(save, team.teamId));
-  const marketBeforeRewards = await buildBudgetedAiMarketAudit(save.saveId, save.gameState);
+  const marketBeforeRewards = args.write ? null : await buildBudgetedAiMarketAudit(save.saveId, save.gameState);
 
   let cashApply: CashPrizeApplyResult | null = null;
   let facilityApplyResults: FacilitySeasonEndFinanceApplyResult[] = [];
   let marketAfterRewards: AiMarketPlanApplyResult | null = null;
+  let emergencyFinanceRepair: EmergencyFinanceRepairResult | null = null;
   let marketApply: AiMarketPlanApplyResult | null = null;
   let nextSeasonApply: Awaited<ReturnType<typeof applyPreSeasonNextSeasonSetupLightweight>> | null = null;
   const blockers: string[] = [];
@@ -393,9 +637,32 @@ async function main() {
     if (blockers.length === 0) {
       const latestSave = persistence.getSaveById(save.saveId);
       if (!latestSave) throw new Error("Save disappeared before AI market recheck.");
+      if (latestSave.gameState.teams.some((team) => !team.humanControlled && team.cash <= 0)) {
+        emergencyFinanceRepair = runEmergencyFinanceRepair(latestSave.saveId, latestSave.gameState.season.id);
+        if (emergencyFinanceRepair.blockers.length > 0) {
+          blockers.push(...emergencyFinanceRepair.blockers.map((entry) => `emergency_finance:${entry}`));
+        }
+      }
+    }
+
+    if (blockers.length === 0) {
+      const latestSave = persistence.getSaveById(save.saveId);
+      if (!latestSave) throw new Error("Save disappeared before AI market recheck after emergency repair.");
       marketAfterRewards = await buildBudgetedAiMarketAudit(latestSave.saveId, latestSave.gameState);
       if (marketAfterRewards.status === "blocked" || marketAfterRewards.summary.blockedTeams > 0) {
-        blockers.push(...marketAfterRewards.blockingReasons.map((entry) => `ai_market:${entry}`));
+        if (!emergencyFinanceRepair?.applied) {
+          emergencyFinanceRepair = runEmergencyFinanceRepair(latestSave.saveId, latestSave.gameState.season.id);
+        }
+        if (emergencyFinanceRepair.blockers.length > 0) {
+          blockers.push(...emergencyFinanceRepair.blockers.map((entry) => `emergency_finance:${entry}`));
+        } else {
+          const repairedSave = persistence.getSaveById(save.saveId);
+          if (!repairedSave) throw new Error("Save disappeared after emergency finance repair.");
+          marketAfterRewards = await buildBudgetedAiMarketAudit(repairedSave.saveId, repairedSave.gameState);
+          if (marketAfterRewards.status === "blocked" || marketAfterRewards.summary.blockedTeams > 0) {
+            blockers.push(...marketAfterRewards.blockingReasons.map((entry) => `ai_market:${entry}`));
+          }
+        }
       }
     }
 
@@ -415,9 +682,9 @@ async function main() {
           applySellSteps: true,
           applyBuySteps: true,
           maxBuysPerTeam: null,
-          maxSellsPerTeam: 1,
+          maxSellsPerTeam: 4,
           previewBuyLimit: 120,
-          previewSellLimit: 6,
+          previewSellLimit: 10,
           stopOnTeamFailure: true,
         },
       });
@@ -472,6 +739,7 @@ async function main() {
   writeOutput(exportName("finance-audit.csv"), toCsv(financeRows(financeResult), ["teamId", "teamCode", "teamName", "rank", "points", "cashBefore", "prizeMoney", "cashAfter", "status", "warnings"]));
   writeOutput(exportName("facility-audit.csv"), toCsv(facilityRows(facilityResultRows), ["teamId", "teamCode", "teamName", "facilityId", "label", "level", "enabled", "upkeep", "income", "status", "cashBeforeFacilities", "cashAfterFacilities", "warning"]));
   writeOutput(exportName("progression-audit.csv"), toCsv(progressionRows(progressionPreview), ["playerId", "playerName", "teamId", "teamCode", "availableXP", "trainingXP", "performanceXP", "selectedAttribute", "attributeBefore", "attributeAfter", "upgradeCost", "remainingXP", "status", "blockReason", "marketValueWarning", "economyWarnings", "disciplineDeltas"]));
+  writeOutput(exportName("emergency-finance-repair.csv"), toCsv(emergencyFinanceRepairRows(emergencyFinanceRepair), ["teamId", "teamCode", "teamName", "action", "playerId", "playerName", "fee", "cashBefore", "cashAfter", "rosterBefore", "rosterAfter", "reason"]));
   writeOutput(exportName("transfer-audit.csv"), toCsv(transferRows(transferResult), ["teamId", "teamCode", "teamName", "controlMode", "result", "plannedSells", "plannedBuys", "executedSells", "executedBuys", "cashBefore", "cashAfter", "rosterBefore", "rosterAfter", "warnings", "blockers"]));
   writeOutput(exportName("readiness-audit.csv"), toCsv(finalReadinessRows, ["teamId", "teamCode", "teamName", "seasonId", "matchdayId", "gamePhase", "cash", "roster", "standingsPoints", "standingsRank", "lineupDrafts", "formCards"]));
 
@@ -508,16 +776,22 @@ async function main() {
       productiveWrites: false,
     },
     marketBeforeRewards: {
-      status: marketBeforeRewards.status,
-      summary: marketBeforeRewards.summary,
-      blockingReasons: marketBeforeRewards.blockingReasons,
-      phaseAudit: marketBeforeRewards.phaseAudit,
+      status: marketBeforeRewards?.status ?? "skipped",
+      summary: marketBeforeRewards?.summary ?? null,
+      blockingReasons: marketBeforeRewards?.blockingReasons ?? [],
+      phaseAudit: marketBeforeRewards?.phaseAudit ?? [],
     },
     marketAfterRewards: marketAfterRewards ? {
       status: marketAfterRewards.status,
       summary: marketAfterRewards.summary,
       blockingReasons: marketAfterRewards.blockingReasons,
       phaseAudit: marketAfterRewards.phaseAudit,
+    } : null,
+    emergencyFinanceRepair: emergencyFinanceRepair ? {
+      applied: emergencyFinanceRepair.applied,
+      actions: emergencyFinanceRepair.actions.length,
+      blockers: emergencyFinanceRepair.blockers,
+      warnings: emergencyFinanceRepair.warnings,
     } : null,
     marketApply: marketApplyResult ? {
       status: marketApplyResult.status,
@@ -559,6 +833,7 @@ async function main() {
     `- Finance Applied: ${summary.finance.applied ? "ja" : summary.finance.alreadyApplied ? "bereits erledigt" : "nein"} · Prize ${round(summary.finance.totalPrizeMoney, 1)}`,
     `- Facility Applied Teams: ${summary.facilities.appliedTeams}`,
     `- Progression Preview: ${summary.progression.planned} geplant / ${summary.progression.blocked} blockiert`,
+    `- Emergency Finance Repair: ${summary.emergencyFinanceRepair?.applied ? `${summary.emergencyFinanceRepair.actions} Aktionen` : "nicht noetig"}`,
     `- AI Market: ${summary.marketApply?.status ?? summary.marketAfterRewards?.status ?? summary.marketBeforeRewards.status}`,
     `- Final: ${summary.final.seasonId} · ${summary.final.gamePhase} · ${summary.final.matchdayId}`,
     `- Blocker: ${blockers.length ? blockers.join(", ") : "keine"}`,

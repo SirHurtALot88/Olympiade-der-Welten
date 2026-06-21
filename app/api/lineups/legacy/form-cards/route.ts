@@ -1,3 +1,5 @@
+export const dynamic = "force-dynamic";
+
 import { NextResponse } from "next/server";
 
 import { generateLocalLegacyFormCardsForSeason } from "@/lib/lineups/legacy-lineup-local-service";

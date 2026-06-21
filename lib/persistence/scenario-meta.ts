@@ -60,6 +60,7 @@ export function buildScenarioMeta(input: {
   label?: string;
   description?: string;
   sourceSaveId?: string;
+  saveCategory?: ScenarioMeta["saveCategory"];
   isStableTestPoint?: boolean;
   allowTestWrites?: boolean;
   containsFinalStandings?: boolean;
@@ -82,6 +83,9 @@ export function buildScenarioMeta(input: {
     createdAt: input.createdAt ?? input.gameState.scenarioMeta?.createdAt ?? new Date().toISOString(),
     ...(input.sourceSaveId ?? input.gameState.scenarioMeta?.sourceSaveId
       ? { sourceSaveId: input.sourceSaveId ?? input.gameState.scenarioMeta?.sourceSaveId }
+      : {}),
+    ...(input.saveCategory ?? input.gameState.scenarioMeta?.saveCategory
+      ? { saveCategory: input.saveCategory ?? input.gameState.scenarioMeta?.saveCategory }
       : {}),
     isStableTestPoint: input.isStableTestPoint ?? input.gameState.scenarioMeta?.isStableTestPoint ?? false,
     allowTestWrites: input.allowTestWrites ?? input.gameState.scenarioMeta?.allowTestWrites ?? false,
@@ -107,6 +111,7 @@ export function withScenarioMeta(gameState: GameState, meta: Partial<ScenarioMet
       label: meta.label,
       description: meta.description,
       sourceSaveId: meta.sourceSaveId,
+      saveCategory: meta.saveCategory,
       isStableTestPoint: meta.isStableTestPoint,
       allowTestWrites: meta.allowTestWrites,
       containsFinalStandings: meta.containsFinalStandings,

@@ -133,8 +133,6 @@ export default function TransfermarktLabClient({ initialData = null, initialErro
     <main className="app-shell foundation-shell">
       <section className="hero">
         <h1>Transfermarkt Lab</h1>
-        <p>Read-only Transfermarkt MVP.</p>
-        <p className="muted">Keine Kaufbuttons, keine Wishlist, keine DB-Writes. Diese Seite zeigt nur abgeleitete Free Agents.</p>
         <p>
           <Link href="/foundation">Zurueck zur Foundation</Link>
         </p>
@@ -186,32 +184,13 @@ export default function TransfermarktLabClient({ initialData = null, initialErro
               Markt laden
             </button>
           </div>
-          {scope ? (
-            <p className="muted">
-              saveId: {scope.saveId} · seasonId: {scope.seasonId} · teamId: {scope.teamId ?? "none"}
-            </p>
-          ) : null}
         </section>
 
+        {notes.length > 0 || warnings.length > 0 ? (
         <section className="panel">
           <div className="panel-header">
             <h2>Hinweise</h2>
           </div>
-          <div className="legacy-resolve-kpis">
-            <p>API status: {errors.length > 0 ? "error" : busy ? "loading" : "success"}</p>
-            <p>Total: {data?.total ?? 0}</p>
-            <p>Items in response: {items.length}</p>
-            <p>Source: {source ?? "n/a"}</p>
-            <p>Scope: {scope ? `${scope.saveId} / ${scope.seasonId} / ${scope.teamId ?? "no-team"}` : "n/a"}</p>
-            <p>Error message: {errors[0] ?? "none"}</p>
-            <p>Team context: {teamContext ? "available" : "not available"}</p>
-            <p>Team cash: {teamContext ? formatTransfermarktCurrency(teamContext.teamCash) : "n/a"}</p>
-            <p>Team salary: {teamContext ? formatTransfermarktCurrency(teamContext.teamSalary) : "n/a"}</p>
-            <p>Roster count: {teamContext ? teamContext.rosterCount : "n/a"}</p>
-            <p>Player min / opt: {teamContext ? `${teamContext.playerMin} / ${teamContext.playerOpt}` : "n/a"}</p>
-            <p>Readiness: {teamContext?.readinessStatus ?? "n/a"}</p>
-          </div>
-          {notes.length === 0 && warnings.length === 0 ? <p className="muted">Aktuell keine Zusatzhinweise.</p> : null}
           {notes.length > 0 ? (
             <ul className="warning-list">
               {notes.map((note) => (
@@ -227,6 +206,7 @@ export default function TransfermarktLabClient({ initialData = null, initialErro
             </ul>
           ) : null}
         </section>
+        ) : null}
 
         <section className="panel legacy-resolve-table-panel">
           <div className="panel-header">

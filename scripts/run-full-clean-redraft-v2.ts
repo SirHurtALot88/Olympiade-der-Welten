@@ -18,6 +18,10 @@ const MAX_TEAMS = Number(process.env.OLY_FULL_CLEAN_REDRAFT_V2_MAX_TEAMS ?? Numb
 const WATCHDOG_MS = Number(process.env.OLY_FULL_CLEAN_REDRAFT_V2_WATCHDOG_MS ?? 30_000);
 const DRY_RUN = process.env.OLY_FULL_CLEAN_REDRAFT_V2_DRY_RUN === "true";
 const REPORT_MODE = process.env.OLY_FULL_CLEAN_REDRAFT_V2_REPORT_MODE === "light" ? "light" : "full";
+const TARGET_TEAM_IDS = (process.env.OLY_FULL_CLEAN_REDRAFT_V2_TARGET_TEAMS ?? "")
+  .split(",")
+  .map((teamId) => teamId.trim())
+  .filter(Boolean);
 
 function readJson<T>(filePath: string): T {
   return JSON.parse(fs.readFileSync(filePath, "utf8")) as T;
@@ -48,7 +52,7 @@ function main() {
     withScenarioMeta(save.gameState, {
       scenarioType: "ai_redraft_test",
       label: save.name,
-      description: "Full Clean Redraft V2: leerer Season-1 Startsave, chunked AI Picklauf bis mindestens playerMin.",
+      description: "Full Clean Redraft V2: leerer Season-1 Startsave, chunked AI Picklauf bis playerOpt.",
       isStableTestPoint: true,
       allowTestWrites: true,
       gamePhase: "draft",
@@ -67,6 +71,7 @@ function main() {
     roundLimit: Number.isFinite(ROUND_LIMIT) ? ROUND_LIMIT : 18,
     teamTimeLimitMs: Number.isFinite(TEAM_TIME_LIMIT_MS) ? TEAM_TIME_LIMIT_MS : 10_000,
     maxTeams: Number.isFinite(MAX_TEAMS) ? MAX_TEAMS : undefined,
+    targetTeamIds: TARGET_TEAM_IDS.length > 0 ? TARGET_TEAM_IDS : undefined,
     watchdogMs: Number.isFinite(WATCHDOG_MS) ? WATCHDOG_MS : 30_000,
     reportMode: REPORT_MODE,
     outputDir: OUTPUT_DIR,
@@ -100,6 +105,7 @@ function main() {
       "",
       `- Dry run: ${DRY_RUN ? "ja" : "nein"}`,
       `- Max Teams: ${Number.isFinite(MAX_TEAMS) ? MAX_TEAMS : "alle"}`,
+      `- Target Teams: ${TARGET_TEAM_IDS.length > 0 ? TARGET_TEAM_IDS.join(", ") : "alle"}`,
       `- Round Limit: ${Number.isFinite(ROUND_LIMIT) ? ROUND_LIMIT : 18}`,
       `- Watchdog: ${Number.isFinite(WATCHDOG_MS) ? WATCHDOG_MS : 30_000}ms`,
       `- Picks: ${summary.picksTotal}`,
@@ -157,6 +163,7 @@ function main() {
         activeSave: finalSave?.saveId ?? save.saveId,
         dryRun: DRY_RUN,
         maxTeams: Number.isFinite(MAX_TEAMS) ? MAX_TEAMS : null,
+        targetTeamIds: TARGET_TEAM_IDS,
       },
       null,
       2,
@@ -172,8 +179,15 @@ function main() {
     summary.picksTotal <= 32 &&
     summary.duplicatePlayers.length === 0 &&
     summary.negativeCashTeams.length === 0;
+  const targetTeamSet = new Set(TARGET_TEAM_IDS);
+  const targetedProofPassed =
+    TARGET_TEAM_IDS.length > 0 &&
+    summary.picksTotal > 0 &&
+    summary.duplicatePlayers.length === 0 &&
+    summary.teamsBelowMin.filter((row) => targetTeamSet.has(row.teamId)).length === 0 &&
+    summary.negativeCashTeams.filter((row) => targetTeamSet.has(row.teamId)).length === 0;
 
-  if (!summary.draftValid && !firstPickProofPassed && !oneRoundProofPassed) {
+  if (!summary.draftValid && !firstPickProofPassed && !oneRoundProofPassed && !targetedProofPassed) {
     process.exitCode = 1;
   }
 }

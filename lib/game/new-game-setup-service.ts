@@ -383,6 +383,8 @@ export function buildNewGameStateFromBaseline(input: NewGameSetupInput & { saveI
     scenarioMeta: {
       scenarioType,
       label: saveName,
+      saveMode: input.presetId,
+      newGamePresetId: input.presetId,
       description: input.sandbox
         ? "Neues Sandbox-Testspiel aus immutable Player-Baseline."
         : "Neues Spiel aus immutable Player-Baseline und echten Startbudgets.",
@@ -394,6 +396,7 @@ export function buildNewGameStateFromBaseline(input: NewGameSetupInput & { saveI
       activeSeasonId: "season-1",
       activeMatchday: 1,
       gamePhase: "preseason_management",
+      humanControlledTeamCount: humanTeamIds.size,
       roomId: roomMeta.roomId,
       roomCode: roomMeta.roomCode,
       roomParticipants: roomMeta.participants,
@@ -449,6 +452,21 @@ export function buildNewGameStateFromBaseline(input: NewGameSetupInput & { saveI
       disciplineHighlights: [],
       resultAuditLogs: [],
       seasonSnapshots: [],
+      newGameFlow: {
+        active: true,
+        dismissed: false,
+        selectedTeamId: chrisTeamIds[0] ?? frankyTeamIds[0] ?? null,
+        updatedAt: now,
+        steps: [
+          { stepId: "season_intro", status: "open" },
+          { stepId: "team_confirm", status: "open" },
+          { stepId: "roster_review", status: "open" },
+          { stepId: "first_transfers", status: "open" },
+          { stepId: "fill_roster", status: "open" },
+          { stepId: "training_facilities", status: "open" },
+          { stepId: "set_lineup", status: "open" },
+        ],
+      },
     },
     logs: [
       {

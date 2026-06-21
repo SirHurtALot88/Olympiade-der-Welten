@@ -46,6 +46,7 @@ describe("transfer history read service", () => {
             toTeam: { id: "W-W", name: "Wicked Wizards" },
           },
         ],
+        count: async () => 1,
       },
     };
 
@@ -55,6 +56,10 @@ describe("transfer history read service", () => {
     )) as TransferHistoryReadResult;
 
     expect(result.total).toBe(1);
+    expect(result.offset).toBe(0);
+    expect(result.limit).toBe(100);
+    expect(result.returned).toBe(1);
+    expect(result.hasMore).toBe(false);
     expect(result.items[0]?.playerName).toBe("Kloeschen");
     expect(result.items[0]?.toTeamId).toBe("W-W");
     expect(result.items[0]?.fee).toBe(5000);
@@ -85,11 +90,12 @@ describe("transfer history read service", () => {
           calls.push(args);
           return [];
         },
+        count: async () => 0,
       },
     };
 
     await listTransferHistory(
-      { saveId: "save-initial", seasonId: "season-1", teamId: "W-W", limit: 5 },
+      { saveId: "save-initial", seasonId: "season-1", teamId: "W-W", limit: 5, offset: 10 },
       mockDb as never,
     );
 
@@ -100,6 +106,7 @@ describe("transfer history read service", () => {
         seasonId: "season-1",
         OR: [{ fromTeamId: "W-W" }, { toTeamId: "W-W" }],
       },
+      skip: 10,
       take: 5,
     });
   });
@@ -117,6 +124,9 @@ describe("transfer history read service", () => {
         findMany: async () => {
           throw new Error("should not query transfers for an invalid explicit save");
         },
+        count: async () => {
+          throw new Error("should not count transfers for an invalid explicit save");
+        },
       },
     };
 
@@ -124,6 +134,7 @@ describe("transfer history read service", () => {
 
     expect(result.items).toEqual([]);
     expect(result.total).toBe(0);
+    expect(result.hasMore).toBe(false);
     expect(result.saveContext.requestedSaveId).toBe("missing-save");
     expect(result.saveContext.resolvedSaveId).toBeNull();
     expect(result.saveContext.scopeWarning).toContain("missing-save");

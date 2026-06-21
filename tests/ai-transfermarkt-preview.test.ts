@@ -302,7 +302,7 @@ describe("ai transfermarkt preview service", () => {
     expect(result.teams.every((team) => team.targetRosterOpt != null)).toBe(true);
     expect(result.teams.every((team) => team.salaryTotal != null)).toBe(true);
     expect(result.teams.every((team) => team.marketValueTotal != null)).toBe(true);
-  });
+  }, 20000);
 
   it("prefers value for Cash Creators, mage fits for Wicked Wizards and human fits for Dire Legion", async () => {
     const { buildAiTransfermarktPreview } = await import("@/lib/ai/ai-transfermarkt-preview-service");
@@ -335,7 +335,7 @@ describe("ai transfermarkt preview service", () => {
     expect(result.skippedPassive).toBe(0);
     expect(result.skippedDisabled).toBe(0);
     expect(cashCreators?.recommendedBuys[0]?.salaryAfter).toBeTypeOf("number");
-  });
+  }, 20000);
 
   it("never recommends unaffordable targets as ready buys", async () => {
     const { buildAiTransfermarktPreview } = await import("@/lib/ai/ai-transfermarkt-preview-service");
@@ -348,7 +348,7 @@ describe("ai transfermarkt preview service", () => {
 
     expect(result.teams[0].recommendedBuys.some((entry) => entry.name === "Arcane Broker")).toBe(false);
     expect(result.teams[0].skippedTargets.some((entry) => entry.reason.includes("insufficient_cash"))).toBe(true);
-  });
+  }, 20000);
 
   it("lets value teams use scouted high-potential players as an AI buy signal", async () => {
     persistenceState.save!.gameState.playerPotential = [

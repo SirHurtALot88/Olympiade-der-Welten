@@ -1,3 +1,5 @@
+export const dynamic = "force-dynamic";
+
 import { NextResponse } from "next/server";
 
 import { buildStandingsPreview } from "@/lib/standings/standings-preview-engine";

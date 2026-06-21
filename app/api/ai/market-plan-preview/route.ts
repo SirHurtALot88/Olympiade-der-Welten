@@ -1,3 +1,5 @@
+export const dynamic = "force-dynamic";
+
 import { NextResponse } from "next/server";
 
 import { buildAiMarketPlanPreview } from "@/lib/ai/ai-market-plan-preview-service";

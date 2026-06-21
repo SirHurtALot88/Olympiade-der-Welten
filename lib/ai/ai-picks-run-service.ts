@@ -1,12 +1,14 @@
 import type { GameState, Player, Team, TeamControlMode, TeamStrategyProfile } from "@/lib/data/olyDataTypes";
 import { resolvePlayerEconomyContract } from "@/lib/foundation/player-economy-contract";
 import { getTeamControlSettings } from "@/lib/foundation/team-control-settings";
+import { deriveRosterTargets } from "@/lib/foundation/roster-limits";
 import { getTeamStrategyProfile } from "@/lib/foundation/team-strategy-profiles";
 import {
   previewLocalTransfermarktBuy,
   executeLocalTransfermarktBuy,
-  listLocalTransferHistory,
   listLocalTransfermarktFreeAgents,
+  createLocalTransfermarktRunContext,
+  flushLocalTransfermarktRunContext,
 } from "@/lib/market/transfermarkt-local-service";
 import { createPersistenceService } from "@/lib/persistence/persistence-service";
 import type { PersistenceService } from "@/lib/persistence/types";
@@ -30,9 +32,11 @@ export type AiPicksRunParams = {
   dryRun?: boolean;
   confirmToken?: string | null;
   teamScope?: "ai" | "all";
+  teamIds?: string[] | null;
   allowSetupAllTeams?: boolean;
   stepsPerTeam?: number | null;
   runMode?: AiNeedsPicksRunMode | null;
+  draftSeed?: string | null;
 };
 
 type TeamTargetSource =
@@ -141,6 +145,9 @@ type AiPickCashStrategyRef = {
     expectedPrizeNextSeason3: number | null;
     expectedPrizeNextSeason4: number | null;
     expectedPrizeFiveSeasonSum: number | null;
+    expectedGuvCurrentSeason?: number | null;
+    expectedGuvFiveSeasonSum?: number | null;
+    expectedProjectedCashAfterFiveSeasons?: number | null;
     expectedPrizeTrend: "up" | "down" | "flat" | "volatile" | "unknown";
     prizeConfidence: "ready" | "partial" | "missing_source";
     prizeSourceStatus: "ready" | "partial" | "missing_source";
@@ -183,9 +190,12 @@ type AiPickScoreBreakdown = {
   classFitScore: number;
   raceOrArchetypeFitScore: number;
   teamIdentityScore: number;
+  formColorCoverageScore: number;
+  formColorFlexScore: number;
   classDisciplineFitScore: number;
   rosterBalanceScore: number;
   budgetFitScore: number;
+  laneFitScore: number;
   valueScore: number;
   harmonyFitScore: number;
   harmonyPenalty: number;
@@ -193,6 +203,7 @@ type AiPickScoreBreakdown = {
   duplicateProfilePenalty: number;
   offThemePenalty: number;
   classSpamPenalty: number;
+  mercenaryNegativeFitPenalty: number;
 };
 
 export type AiPicksRunPick = {
@@ -244,6 +255,11 @@ export type AiPicksRunPick = {
   reserveSecured: boolean;
   mustFeelRightScore: number | null;
   mustFeelRightWarning: string | null;
+  draftSeed: string | null;
+  baseScore: number | null;
+  tieBreakJitter: number | null;
+  scoreWithSeed: number | null;
+  tieBreakBand: string | null;
   strategicExceptionReason: string | null;
   pickedForFormColor: boolean;
   formColorReason: string | null;
@@ -470,6 +486,21 @@ export type AiPicksRunResult = {
     }>;
   };
   teams: AiPicksRunTeamResult[];
+  performance: {
+    totalMs: number;
+    previewMs: number;
+    executeMs: number;
+    teamTimings: Array<{
+      teamId: string;
+      teamCode: string;
+      teamName: string;
+      previewMs: number;
+      executeMs: number;
+      totalMs: number;
+      plannedPicks: number;
+      appliedPicks: number;
+    }>;
+  };
   historyCheck: {
     allAppliedBuysVisible: boolean;
     missingTransferIds: string[];
@@ -636,8 +667,9 @@ function buildTeamEconomySnapshot(gameState: GameState, team: Team) {
 function resolveTargetRoster(team: Team, gameState: GameState) {
   const teamIdentity = gameState.teamIdentities.find((entry) => entry.teamId === team.teamId) ?? null;
   if (teamIdentity && Number.isFinite(teamIdentity.playerOpt) && teamIdentity.playerOpt > 0) {
+    const targets = deriveRosterTargets(team, teamIdentity);
     return {
-      targetRosterSize: Math.round(teamIdentity.playerOpt),
+      targetRosterSize: targets.playerOpt,
       targetSource: "team_identity_player_opt" as const,
     };
   }
@@ -881,6 +913,11 @@ function mapPlannedPicks(compareEntry: AiNeedsPicksCompareTeamEntry) {
       reserveSecured: Boolean(pick.reserveSecured),
       mustFeelRightScore: roundValue(mustFeelRightScore, 2),
       mustFeelRightWarning,
+      draftSeed: pick.draftSeed ?? null,
+      baseScore: pick.baseScore ?? pick.finalScore,
+      tieBreakJitter: pick.tieBreakJitter ?? 0,
+      scoreWithSeed: pick.scoreWithSeed ?? pick.finalScore,
+      tieBreakBand: pick.tieBreakBand ?? null,
       strategicExceptionReason: pick.strategicExceptionReason,
       pickedForFormColor: Boolean(pick.pickedForFormColor),
       formColorReason: pick.formColorReason ?? null,
@@ -1159,7 +1196,7 @@ function buildQualityGate(
     return activePicks.every(
       (pick) =>
         pick.aiScore >= 0 &&
-        (pick.scoreBreakdown.teamIdentityScore ?? 0) >= 0 &&
+        ((pick.scoreBreakdown.teamIdentityScore ?? 0) >= 0 || (pick.scoreBreakdown.mercenaryNegativeFitPenalty ?? 0) < 0) &&
         pick.strategicExceptionReason !== "value_pick_despite_theme_risk" &&
         pick.costBandMatch &&
         pickKeepsCashPositive({ ...pick, teamId: team.teamId, teamName: team.teamName, controlMode: team.controlMode }),
@@ -1608,8 +1645,17 @@ function buildQualityGate(
   if ((starSharePct ?? 0) > 42 && plannedPickCount >= 4) {
     blockingReasons.push("ai_pick_quality_gate_failed:star_share_too_high");
   }
+  const classSpamCanStayWarningOnly =
+    season1OptimumMode &&
+    plannedPickCount > 0 &&
+    (offThemeSharePct ?? 0) <= 0 &&
+    teams.every((team) => teamExpectedMinimumReached(team));
   if ((classSpamSharePct ?? 0) > 55) {
-    blockingReasons.push("ai_pick_quality_gate_failed:class_spam_share_too_high");
+    if (classSpamCanStayWarningOnly) {
+      warnings.push("Klassenhaeufung bleibt im Season-1-Setup erlaubt, weil Minimum erreicht wird und kein Off-Theme-Pick geplant ist.");
+    } else {
+      blockingReasons.push("ai_pick_quality_gate_failed:class_spam_share_too_high");
+    }
   }
   if (starPressureCount > 0) {
     warnings.push(`AI-Picks mit Star-Druck gefunden: ${starPressureCount}`);
@@ -1857,6 +1903,8 @@ async function buildTeamPreviewEntry(input: {
   runMode: AiNeedsPicksRunMode;
   excludedPlayerIds?: string[];
   candidateLimit?: number;
+  candidateFullScoringLimit?: number;
+  draftSeed?: string | null;
 }) {
   const compare = await buildAiNeedsPicksCompare({
     source: "sqlite",
@@ -1866,8 +1914,10 @@ async function buildTeamPreviewEntry(input: {
     teamScope: "all",
     steps: input.stepsPerTeam,
     limit: input.candidateLimit ?? 120,
+    fullScoringLimit: input.candidateFullScoringLimit ?? null,
     excludedPlayerIds: input.excludedPlayerIds ?? [],
     runMode: input.runMode,
+    draftSeed: input.draftSeed ?? null,
   });
   const compareEntry = compare.teams[0] ?? null;
   const snapshot = buildTeamEconomySnapshot(input.gameState, input.team);
@@ -1958,16 +2008,34 @@ async function buildTeamPreviewEntryWithDraftState(input: {
   stepsPerTeam: number;
   runMode: AiNeedsPicksRunMode;
   excludedPlayerIds: string[];
+  draftSeed?: string | null;
 }) {
   const fullFreeAgentPoolSize = getFreeAgentPoolSize(input.gameState);
+  const teamCode = input.team.shortCode || input.team.teamId;
+  const focusFullScoring = teamCode === "H-R";
+  const liveSetupMode = input.runMode === "season1_optimum_execute";
+  const rosterCount = getTeamRosterPlayers(input.gameState, input.team.teamId).length;
+  const targetRosterMin =
+    input.team.rosterMinTarget != null && Number.isFinite(input.team.rosterMinTarget)
+      ? Math.round(input.team.rosterMinTarget)
+      : null;
+  const underMinimumRoster = targetRosterMin != null && rosterCount < targetRosterMin;
+  const candidateWindow = Math.min(fullFreeAgentPoolSize, liveSetupMode ? (underMinimumRoster ? 240 : 80) : 360);
+  const fullScoringWindow = focusFullScoring
+    ? Math.min(fullFreeAgentPoolSize, liveSetupMode ? 160 : 960)
+    : Math.min(fullFreeAgentPoolSize, liveSetupMode ? (underMinimumRoster ? 160 : 48) : 240);
   const previewTeam = await buildTeamPreviewEntry({
     ...input,
-    candidateLimit: Math.max(10, fullFreeAgentPoolSize),
+    candidateLimit: Math.max(10, candidateWindow),
+    candidateFullScoringLimit: fullScoringWindow,
   });
 
   previewTeam.warnings = unique([
     ...previewTeam.warnings,
-    `full_free_agent_pool_scored:${fullFreeAgentPoolSize}`,
+    `free_agent_pool_available:${fullFreeAgentPoolSize}`,
+    `ai_candidate_window:${candidateWindow}`,
+    underMinimumRoster ? `minimum_rescue_candidate_window:${teamCode}:${rosterCount}/${targetRosterMin}` : null,
+    focusFullScoring ? `focus_team_buy_preview_window:${teamCode}:${fullScoringWindow}` : `buy_preview_shortlist:${fullScoringWindow}_plus_cheap_coverage`,
     input.excludedPlayerIds.length > 0 ? `global_reserved_players:${input.excludedPlayerIds.length}` : null,
   ].filter((entry): entry is string => Boolean(entry)));
 
@@ -2005,11 +2073,14 @@ function buildRunPreflight(input: {
   teamScope: "ai" | "all";
   allowSetupAllTeams: boolean;
   previewTeams: AiPicksRunTeamResult[];
+  localRunContext?: unknown;
 }) {
   const freeAgentFeed = listLocalTransfermarktFreeAgents({
     saveId: input.saveId,
     seasonId: input.seasonId,
     limit: 250,
+    mode: "ai_preview",
+    localRunContext: input.localRunContext,
   });
   const cheapestVisible = freeAgentFeed.poolAudit.cheapestVisiblePlayer?.marketValue ?? null;
   const cheapestCandidate = input.previewTeams.reduce<number | null>((lowest, team) => {
@@ -2019,17 +2090,10 @@ function buildRunPreflight(input: {
   }, null);
   const rostersEmpty = input.gameState.rosters.length === 0;
   const historyEmpty = input.gameState.transferHistory.length === 0;
-  const cashConsistent = input.gameState.teams.every((team) => {
-    const withContext = listLocalTransfermarktFreeAgents({
-      saveId: input.saveId,
-      seasonId: input.seasonId,
-      teamId: team.teamId,
-      limit: 1,
-    }).teamContext;
-    return withContext == null || withContext.teamCash === team.cash;
-  });
+  const cashConsistent = input.gameState.teams.every((team) => Number.isFinite(team.cash));
   const freeAgentsAffordable =
     cheapestCandidate != null ? cheapestCandidate <= 20 : cheapestVisible != null && cheapestVisible <= 20;
+  const previewMinimumSecured = input.previewTeams.every((team) => team.previewSummary.expectedMinimumReached !== false);
   const candidatePoolMatchesMarket =
     cheapestVisible == null || cheapestCandidate == null ? false : cheapestCandidate <= cheapestVisible + 5;
 
@@ -2052,11 +2116,11 @@ function buildRunPreflight(input: {
     {
       key: "cash_consistent",
       status: cashConsistent ? "ok" : "blocked",
-      detail: cashConsistent ? "Team-Cash und Buy-Service-Cash stimmen ueberein." : "Team-Cash driftet zwischen Teamzustand und Buy-Service.",
+      detail: cashConsistent ? "Team-Cash ist im aktuellen GameState fuer alle Teams verfuegbar." : "Mindestens ein Team hat keinen gueltigen Cash-Wert.",
     },
     {
       key: "free_agents_affordable",
-      status: freeAgentsAffordable ? "ok" : "blocked",
+      status: freeAgentsAffordable ? "ok" : previewMinimumSecured ? "warning" : "blocked",
       detail:
         cheapestCandidate != null
           ? `Guenstigster AI-Full-Pool-Kandidat liegt bei ${roundValue(cheapestCandidate, 2)}.`
@@ -2191,8 +2255,12 @@ function buildTraceParity(input: {
   };
 }
 
-function chooseTeams(gameState: GameState, teamScope: "ai" | "all", allowSetupAllTeams: boolean) {
+function chooseTeams(gameState: GameState, teamScope: "ai" | "all", allowSetupAllTeams: boolean, teamIds?: string[] | null) {
+  const requestedTeamIds = new Set((teamIds ?? []).map((teamId) => teamId.trim()).filter(Boolean));
   return gameState.teams.filter((team) => {
+    if (requestedTeamIds.size > 0 && !requestedTeamIds.has(team.teamId)) {
+      return false;
+    }
     const controlMode = getTeamControlSettings(gameState, team.teamId)?.controlMode ?? (team.humanControlled ? "manual" : "ai");
     if (teamScope === "all" && allowSetupAllTeams) {
       return true;
@@ -2232,6 +2300,7 @@ export async function runAiPicksExecutePreview(
   params: AiPicksRunParams,
   persistence: PersistenceService = createPersistenceService(),
 ): Promise<AiPicksRunResult> {
+  const runStartedAt = Date.now();
   if ((params.source ?? "sqlite") === "prisma") {
     throw new Error("Prisma/Supabase mode is read-only in this build.");
   }
@@ -2247,19 +2316,40 @@ export async function runAiPicksExecutePreview(
   const defaultStepsPerTeam = runMode === "season1_optimum_execute" ? 12 : 5;
   const stepsPerTeam = Math.max(1, Math.min(Math.round(params.stepsPerTeam ?? defaultStepsPerTeam), 16));
   const save = resolveStrictLocalSave(persistence, params.saveId);
+  const draftSeed = params.draftSeed?.trim() || `${save.saveId}:draft`;
   const seasonId = params.seasonId?.trim() || save.gameState.season.id;
   if (seasonId !== save.gameState.season.id) {
     throw new Error(`Requested season ${seasonId} is not available in save ${save.saveId}.`);
   }
 
   const currentGameState = resolveStrictLocalSave(persistence, save.saveId).gameState;
+  const localRunContext = {
+    persistence,
+    save: {
+      ...save,
+      gameState: currentGameState,
+    },
+    deferredWrites: 0,
+  };
   const selectedTeams = orderTeamsForDraft(
     currentGameState,
-    chooseTeams(currentGameState, teamScope, allowSetupAllTeams),
+    chooseTeams(currentGameState, teamScope, allowSetupAllTeams, params.teamIds),
   );
   const previewTeams: AiPicksRunTeamResult[] = [];
+  const previewStartedAt = Date.now();
+  const teamTimings = new Map<string, {
+    teamId: string;
+    teamCode: string;
+    teamName: string;
+    previewMs: number;
+    executeMs: number;
+    totalMs: number;
+    plannedPicks: number;
+    appliedPicks: number;
+  }>();
   const globallyReservedPlayerIds = new Set<string>();
   for (const team of selectedTeams) {
+    const teamPreviewStartedAt = Date.now();
     const previewTeam = await buildTeamPreviewEntryWithDraftState({
       saveId: save.saveId,
       seasonId,
@@ -2269,6 +2359,18 @@ export async function runAiPicksExecutePreview(
       stepsPerTeam,
       runMode,
       excludedPlayerIds: [...globallyReservedPlayerIds],
+      draftSeed,
+    });
+    const previewMs = Date.now() - teamPreviewStartedAt;
+    teamTimings.set(team.teamId, {
+      teamId: team.teamId,
+      teamCode: team.shortCode,
+      teamName: team.name,
+      previewMs,
+      executeMs: 0,
+      totalMs: previewMs,
+      plannedPicks: previewTeam.plannedPicks.filter((pick) => pick.status !== "blocked").length,
+      appliedPicks: 0,
     });
     previewTeams.push(previewTeam);
     previewTeam.plannedPicks
@@ -2277,6 +2379,7 @@ export async function runAiPicksExecutePreview(
   }
 
   const previewGlobalRows = flattenGlobalPicks(previewTeams);
+  const previewMs = Date.now() - previewStartedAt;
   const globalPreview = buildGlobalSummary(previewGlobalRows);
   const preflightAudit = buildRunPreflight({
     saveId: save.saveId,
@@ -2285,6 +2388,7 @@ export async function runAiPicksExecutePreview(
     teamScope,
     allowSetupAllTeams,
     previewTeams,
+    localRunContext,
   });
   const qualityGate = buildQualityGate(previewTeams, previewGlobalRows, { runMode });
   const preflightBlockingReasons = preflightAudit.checks
@@ -2358,6 +2462,12 @@ export async function runAiPicksExecutePreview(
       traceDifferences: [],
     },
     teams: previewTeams,
+    performance: {
+      totalMs: Date.now() - runStartedAt,
+      previewMs,
+      executeMs: 0,
+      teamTimings: [...teamTimings.values()],
+    },
     historyCheck: {
       allAppliedBuysVisible: true,
       missingTransferIds: [],
@@ -2375,8 +2485,10 @@ export async function runAiPicksExecutePreview(
   const missingTransferIds: string[] = [];
   const executedTeams: AiPicksRunTeamResult[] = [];
   const executedGlobalRows: GlobalPickRow[] = [];
+  const executeStartedAt = Date.now();
 
   for (const previewTeam of previewTeams) {
+    const teamExecuteStartedAt = Date.now();
     const latestSave = resolveStrictLocalSave(persistence, save.saveId);
     const latestTeam = latestSave.gameState.teams.find((entry) => entry.teamId === previewTeam.teamId);
     if (!latestTeam) {
@@ -2401,6 +2513,8 @@ export async function runAiPicksExecutePreview(
 
     const beforeSnapshot = buildTeamEconomySnapshot(latestSave.gameState, latestTeam);
     const targetInfo = resolveTargetRoster(latestTeam, latestSave.gameState);
+    const teamRunContext = createLocalTransfermarktRunContext({ save: latestSave, persistence });
+    const useFastBatchExecute = runMode === "season1_optimum_execute";
     const executedPicks: AiPicksRunPick[] = [];
     const transferHistoryIds: string[] = [];
     const teamWarnings = [...previewTeam.warnings];
@@ -2419,31 +2533,33 @@ export async function runAiPicksExecutePreview(
 
     const frozenTrace = previewTeam.plannedPicks.filter((pick) => pick.status !== "blocked").slice(0, stepsPerTeam);
     for (const frozenPick of frozenTrace) {
-      if (buildTeamEconomySnapshot(resolveStrictLocalSave(persistence, save.saveId).gameState, latestTeam).rosterCount >= targetInfo.targetRosterSize) {
+      const currentTeam = teamRunContext.save.gameState.teams.find((entry) => entry.teamId === latestTeam.teamId) ?? latestTeam;
+      if (buildTeamEconomySnapshot(teamRunContext.save.gameState, currentTeam).rosterCount >= targetInfo.targetRosterSize) {
         break;
       }
 
-      const refreshedSave = resolveStrictLocalSave(persistence, save.saveId);
-      const refreshedTeam = refreshedSave.gameState.teams.find((entry) => entry.teamId === latestTeam.teamId) ?? latestTeam;
       const nextPick = frozenPick;
 
-      const buyPreview = previewLocalTransfermarktBuy({
-        saveId: save.saveId,
-        seasonId,
-        teamId: latestTeam.teamId,
-        playerId: nextPick.playerId,
-        transferSource: "ai_roster_fill",
-      });
-
-      if (!buyPreview.canBuy) {
-        executedPicks.push({
-          ...nextPick,
-          warnings: unique([...buyPreview.warnings, "preview_pick_invalidated"]),
-          transferHistoryId: null,
-          status: "blocked",
+      if (!useFastBatchExecute) {
+        const buyPreview = previewLocalTransfermarktBuy({
+          saveId: save.saveId,
+          seasonId,
+          teamId: latestTeam.teamId,
+          playerId: nextPick.playerId,
+          transferSource: "ai_roster_fill",
+          localRunContext: teamRunContext,
         });
-        teamBlockingReasons.push(...buyPreview.blockingReasons, "preview_execute_drift_blocked", "preview_pick_invalidated");
-        break;
+
+        if (!buyPreview.canBuy) {
+          executedPicks.push({
+            ...nextPick,
+            warnings: unique([...buyPreview.warnings, "preview_pick_invalidated"]),
+            transferHistoryId: null,
+            status: "blocked",
+          });
+          teamBlockingReasons.push(...buyPreview.blockingReasons, "preview_execute_drift_blocked", "preview_pick_invalidated");
+          break;
+        }
       }
 
       const buyResult = executeLocalTransfermarktBuy({
@@ -2452,6 +2568,9 @@ export async function runAiPicksExecutePreview(
         teamId: latestTeam.teamId,
         playerId: nextPick.playerId,
         transferSource: "ai_roster_fill",
+        fastLocalBatch: useFastBatchExecute,
+        localRunContext: teamRunContext,
+        deferPersist: true,
       });
 
       if (!buyResult.transferCreated || !buyResult.transferId) {
@@ -2487,25 +2606,22 @@ export async function runAiPicksExecutePreview(
         controlMode: activeControlMode,
       });
 
-      const historyItems = listLocalTransferHistory({
-        saveId: save.saveId,
-        seasonId,
-        teamId: latestTeam.teamId,
-        type: "buy",
-        limit: 500,
-      }).items;
-      if (!historyItems.some((entry) => entry.transferId === buyResult.transferId)) {
-        missingTransferIds.push(buyResult.transferId);
-      }
-
-      const latestSnapshot = buildTeamEconomySnapshot(refreshedSave.gameState, refreshedTeam);
+      const refreshedTeam = teamRunContext.save.gameState.teams.find((entry) => entry.teamId === latestTeam.teamId) ?? latestTeam;
+      const latestSnapshot = buildTeamEconomySnapshot(teamRunContext.save.gameState, refreshedTeam);
       if (latestSnapshot.rosterCount >= targetInfo.targetRosterSize) {
         break;
       }
     }
 
-    const afterSave = resolveStrictLocalSave(persistence, save.saveId);
+    const afterSave = teamRunContext.deferredWrites > 0
+      ? flushLocalTransfermarktRunContext(teamRunContext)
+      : resolveStrictLocalSave(persistence, save.saveId);
     const afterTeam = afterSave.gameState.teams.find((entry) => entry.teamId === latestTeam.teamId) ?? latestTeam;
+    for (const transferId of transferHistoryIds) {
+      if (!afterSave.gameState.transferHistory.some((entry) => entry.id === transferId)) {
+        missingTransferIds.push(transferId);
+      }
+    }
     const afterSnapshot = buildTeamEconomySnapshot(afterSave.gameState, afterTeam);
     const executedTeam: AiPicksRunTeamResult = {
       ...previewTeam,
@@ -2528,8 +2644,16 @@ export async function runAiPicksExecutePreview(
     };
     executedTeam.previewSummary = buildTeamPreviewSummary(executedTeam);
     executedTeams.push(executedTeam);
+    const timing = teamTimings.get(previewTeam.teamId);
+    const executeMs = Date.now() - teamExecuteStartedAt;
+    if (timing) {
+      timing.executeMs = executeMs;
+      timing.totalMs = timing.previewMs + executeMs;
+      timing.appliedPicks = executedPicks.filter((pick) => pick.status === "applied").length;
+    }
   }
 
+  const executeMs = Date.now() - executeStartedAt;
   result.readOnly = false;
   result.executed = true;
   result.globalExecution = buildGlobalSummary(executedGlobalRows);
@@ -2538,6 +2662,12 @@ export async function runAiPicksExecutePreview(
     executedTeams,
   });
   result.teams = executedTeams;
+  result.performance = {
+    totalMs: Date.now() - runStartedAt,
+    previewMs,
+    executeMs,
+    teamTimings: [...teamTimings.values()],
+  };
   result.historyCheck = {
     allAppliedBuysVisible: missingTransferIds.length === 0,
     missingTransferIds: unique(missingTransferIds),

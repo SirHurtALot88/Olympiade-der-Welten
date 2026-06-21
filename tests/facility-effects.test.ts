@@ -71,6 +71,7 @@ describe("facility effects", () => {
     expect(applyTrainingXpFacilityModifiers(100, teamFacilities).after).toBe(100);
     expect(calculateFacilityUpkeep(teamFacilities)).toBe(0);
     expect(calculateFacilityIncome(teamFacilities)).toBe(0);
+    expect(teamFacilities.facilities.training_center.conditionPct).toBe(100);
     expect(teamFacilities.facilities.training_center.disabledReason).toBe("not_built");
   });
 
@@ -146,6 +147,15 @@ describe("facility effects", () => {
 
     expect(applyUpgradeCostFacilityModifiers("speed", "B", 100, teamFacilities).costAfterFacility).toBe(88);
     expect(applyUpgradeCostFacilityModifiers("power", "B", 100, teamFacilities).costAfterFacility).toBe(100);
+  });
+
+  it("specialist wing also reduces facility upkeep", () => {
+    const teamFacilities = facilities({
+      training_center: { level: 5, enabled: true },
+      specialist_wing: { level: 5, enabled: true, activeVariant: "agility_track" },
+    });
+
+    expect(calculateFacilityUpkeep(teamFacilities)).toBe(8.54);
   });
 
   it("scouting and analytics expose information quality without performance bonuses", () => {

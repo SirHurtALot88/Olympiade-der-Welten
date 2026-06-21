@@ -10,7 +10,7 @@ function roundTo2(value: number) {
   return Number(value.toFixed(2));
 }
 
-export const MARKET_VALUE_BASE_OFFSET = 3.5;
+export const MARKET_VALUE_BASE_OFFSET = 0;
 
 const ALLROUNDER_THRESHOLDS = [
   { threshold: 90, bonus: 2.2 },

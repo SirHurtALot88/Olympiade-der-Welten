@@ -1,4 +1,5 @@
 import type { LegacyMutatorSlotEffect, LegacyResolveMutatorMode } from "@/lib/lineups/legacy-lineup-types";
+import type { TeamPowerEffectType, TeamPowerTargetMode } from "@/lib/data/olyDataTypes";
 
 export type ResolveHighlightType =
   | "best_player_discipline"
@@ -61,6 +62,8 @@ export type DisciplineTeamResolvePreview = {
   baseScore: number;
   fatigueModifier: number | null;
   fatigueStatus: "mapped" | "missing_source";
+  intensity?: "conserve" | "normal" | "push" | null;
+  intensityModifier?: number | null;
   captainStatus: "mapped" | "missing_source";
   captainBonus: number | null;
   formCardStatus: "ready" | "missing_source";
@@ -69,6 +72,16 @@ export type DisciplineTeamResolvePreview = {
   mutatorMode: LegacyResolveMutatorMode;
   mutatorModifier: number | null;
   mutatorSlots: LegacyMutatorSlotEffect[];
+  teamPowerStatus?: "ready" | "missing_source";
+  teamPowerLabel?: string | null;
+  teamPowerModifier?: number | null;
+  teamPowerImpact?: number | null;
+  teamPowerBasePct?: number | null;
+  teamPowerConditionalPct?: number | null;
+  teamPowerAttributeFitPct?: number | null;
+  teamPowerEffectType?: TeamPowerEffectType | null;
+  teamPowerTargetMode?: TeamPowerTargetMode | null;
+  teamPowerTargetLimit?: number | null;
   teamPpsModifier: number | null;
   teamPpsStatus: "ready" | "missing_source";
   finalPreviewScore: number;

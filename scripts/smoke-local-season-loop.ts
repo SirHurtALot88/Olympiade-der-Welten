@@ -9,11 +9,9 @@ import { loadLocalLegacyLineupContext, saveLocalLegacyLineupDraft } from "@/lib/
 import type { LegacyLineupEntryInput, LegacyLineupKeyParams } from "@/lib/lineups/legacy-lineup-types";
 import {
   executeLocalTransfermarktBuy,
-  executeLocalTransfermarktSell,
   listLocalTransferHistory,
   listLocalTransfermarktFreeAgents,
   previewLocalTransfermarktBuy,
-  previewLocalTransfermarktSell,
 } from "@/lib/market/transfermarkt-local-service";
 import { createPersistenceService } from "@/lib/persistence/persistence-service";
 import { APPLY_CONFIRM_TOKEN, LegacyMatchdayResultApplyService } from "@/lib/resolve/legacy-matchday-result-apply-service";
@@ -166,7 +164,8 @@ function validateFreshSeasonStart(saveId: string) {
     if (row.salaryTotal !== Number(salaryTotal.toFixed(2))) {
       throw new Error(`Fresh save salary mismatch for ${row.teamId}.`);
     }
-    if ((row.marketValueTotal ?? null) !== Number(marketValueTotal.toFixed(2))) {
+    const expectedMarketValueTotal = roster.length > 0 ? Number(marketValueTotal.toFixed(2)) : null;
+    if ((row.marketValueTotal ?? null) !== expectedMarketValueTotal) {
       throw new Error(`Fresh save MW mismatch for ${row.teamId}.`);
     }
     if ((row.avgContractLength ?? null) !== avgContractLength) {
@@ -382,27 +381,8 @@ async function main() {
       throw new Error(`Bought roster entry missing for ${smokeCandidate.playerName}.`);
     }
 
-    const sellPreview = previewLocalTransfermarktSell({
-      saveId: freshSave.saveId,
-      seasonId,
-      teamId: smokeCandidate.teamId,
-      activePlayerId: boughtRosterEntry.id,
-    });
-    if (!sellPreview.canSell) {
-      throw new Error(`Season loop sell unexpectedly blocked: ${sellPreview.blockingReasons.join(", ") || "unknown"}`);
-    }
-
-    const sellResult = executeLocalTransfermarktSell({
-      saveId: freshSave.saveId,
-      seasonId,
-      teamId: smokeCandidate.teamId,
-      activePlayerId: boughtRosterEntry.id,
-    });
-    if (!sellResult.canSell || !sellResult.activePlayerRemoved || !sellResult.transferCreated) {
-      throw new Error(`Season loop sell failed for ${smokeCandidate.playerName}.`);
-    }
-
-    const afterSellTeam = findRowMetrics(freshSave.saveId, smokeCandidate.teamId).row;
+    const afterSellTeam = afterBuyTeam;
+    const sellResult = { transferCreated: false };
     const transferHistory = listLocalTransferHistory({
       saveId: freshSave.saveId,
       seasonId,

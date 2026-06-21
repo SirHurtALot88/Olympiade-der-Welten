@@ -85,7 +85,8 @@ function validateFreshSeasonStart(saveId: string) {
     if (row.salaryTotal !== Number(salaryTotal.toFixed(2))) {
       throw new Error(`Fresh save salary mismatch for ${row.teamId}: row=${row.salaryTotal}, actual=${salaryTotal}`);
     }
-    if ((row.marketValueTotal ?? null) !== Number(marketValueTotal.toFixed(2))) {
+    const expectedMarketValueTotal = roster.length > 0 ? Number(marketValueTotal.toFixed(2)) : null;
+    if ((row.marketValueTotal ?? null) !== expectedMarketValueTotal) {
       throw new Error(`Fresh save MW mismatch for ${row.teamId}: row=${row.marketValueTotal}, actual=${marketValueTotal}`);
     }
     if ((row.avgContractLength ?? null) !== avgContractLength) {

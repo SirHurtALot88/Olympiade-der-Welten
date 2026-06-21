@@ -198,6 +198,14 @@ describe("legacy lineup lab helpers", () => {
     expect(fileText).toContain("legacy-lineup-main-flow");
     expect(fileText).toContain("legacy-lineup-discipline-board");
     expect(fileText).toContain("Teamdeck / Assignment");
+    expect(fileText).toContain('setTeamdeckSortMode("top");');
+    expect(fileText).toContain('teamdeckSortMode === "top" && leftSlotScore !== rightSlotScore');
+    expect(fileText).toContain("leftBlocked !== rightBlocked");
+    expect(fileText).toContain("resolveTeamDisciplineRank");
+    expect(fileText).toContain("normalizeLineupDisciplineFieldName");
+    expect(fileText.indexOf('className="legacy-lineup-draft-footer"')).toBeLessThan(
+      fileText.indexOf('className="legacy-lineup-draft-roadmap"'),
+    );
     expect(fileText).toContain("Matchday Room · Lineup Prep");
     expect(fileText).toContain("Matchday Preview");
     expect(fileText).toContain("D1 Projected Range");

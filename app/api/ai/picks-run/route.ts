@@ -1,3 +1,5 @@
+export const dynamic = "force-dynamic";
+
 import { NextResponse } from "next/server";
 
 import { AI_PICKS_RUN_CONFIRM_TOKEN } from "@/lib/ai/ai-picks-run-contract";
@@ -35,6 +37,7 @@ export async function POST(request: Request) {
     dryRun?: boolean;
     confirmToken?: string | null;
     teamScope?: "ai" | "all";
+    teamIds?: string[] | null;
     allowSetupAllTeams?: boolean;
     stepsPerTeam?: number | null;
     runMode?: "default" | "season1_optimum_execute" | null;
@@ -52,6 +55,7 @@ export async function POST(request: Request) {
   }
 
   try {
+    const teamIds = Array.isArray(body.teamIds) ? body.teamIds : null;
     const result = await runAiPicksExecutePreview({
       source: "sqlite",
       saveId,
@@ -59,6 +63,7 @@ export async function POST(request: Request) {
       dryRun,
       confirmToken: body.confirmToken ?? null,
       teamScope: body.teamScope === "all" ? "all" : "ai",
+      ...(teamIds ? { teamIds } : {}),
       allowSetupAllTeams: body.allowSetupAllTeams ?? false,
       stepsPerTeam: body.stepsPerTeam ?? parseOptionalNumber(searchParams.get("stepsPerTeam")),
       runMode: body.runMode === "season1_optimum_execute" ? "season1_optimum_execute" : "default",

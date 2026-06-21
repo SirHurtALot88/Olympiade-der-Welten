@@ -7,6 +7,15 @@ const previewLocalTransfermarktSell = vi.fn();
 const executeLocalTransfermarktSell = vi.fn();
 const previewLocalTransfermarktBuy = vi.fn();
 const executeLocalTransfermarktBuy = vi.fn();
+const createLocalTransfermarktRunContext = vi.fn(() => ({
+  get save() {
+    return persistenceState.save;
+  },
+  set save(nextSave: typeof persistenceState.save) {
+    persistenceState.save = nextSave;
+  },
+}));
+const flushLocalTransfermarktRunContext = vi.fn();
 
 const persistenceState = {
   save: {
@@ -101,10 +110,12 @@ vi.mock("@/lib/ai/ai-market-plan-preview-service", () => ({
 }));
 
 vi.mock("@/lib/market/transfermarkt-local-service", () => ({
+  createLocalTransfermarktRunContext,
   previewLocalTransfermarktSell,
   executeLocalTransfermarktSell,
   previewLocalTransfermarktBuy,
   executeLocalTransfermarktBuy,
+  flushLocalTransfermarktRunContext,
 }));
 
 vi.mock("@/lib/persistence/persistence-service", () => ({
@@ -797,6 +808,183 @@ describe("ai market plan apply service", () => {
     expect(result.auditLogId).toContain("ai-market-apply__save-local__season-1__");
   });
 
+  it("blocks dry-run plans whose final cash would not stay positive", async () => {
+    persistenceState.save.gameState.teams = [
+      { teamId: "D-E", name: "Debt Engines", shortCode: "D-E", cash: 10, rosterLimit: 4, controlMode: "ai" },
+    ] as GameState["teams"];
+    persistenceState.save.gameState.teamIdentities = [
+      { teamId: "D-E", playerMin: 3, playerOpt: 3 },
+    ] as GameState["teamIdentities"];
+    persistenceState.save.gameState.rosters = [
+      { teamId: "D-E", playerId: "p-1", activePlayerId: "ap-1", salary: 4, currentValue: 18 },
+      { teamId: "D-E", playerId: "p-2", activePlayerId: "ap-2", salary: 4, currentValue: 18 },
+    ] as GameState["rosters"];
+
+    buildAiMarketPlanPreview.mockResolvedValue({
+      readOnly: true,
+      source: "sqlite",
+      scope: { saveId: "save-local", seasonId: "season-1", teamId: null, teamScope: "all" },
+      totalTeams: 1,
+      aiTeams: 1,
+      skippedManual: 0,
+      skippedPassive: 0,
+      skippedDisabled: 0,
+      holdTeams: 0,
+      buyOnlyTeams: 1,
+      sellOnlyTeams: 0,
+      sellThenBuyTeams: 0,
+      warningTeams: 0,
+      blockedTeams: 0,
+      summary: { aiTeams: 1, ready: 1, hold: 0, buyOnly: 1, sellOnly: 0, sellThenBuy: 0, warning: 0, blocked: 0 },
+      teams: [
+        {
+          teamId: "D-E",
+          teamCode: "D-E",
+          teamName: "Debt Engines",
+          controlMode: "ai",
+          aiTransferPreviewEnabled: true,
+          aiSellPreviewEnabled: true,
+          status: "buy_only",
+          strategySummary: "Needs one body, but cannot afford this target.",
+          currentState: { cash: 10, rosterCount: 2, playerMin: 3, playerOpt: 3, salaryTotal: 8, marketValueTotal: 36 },
+          sellPlan: { candidates: [], totalExpectedSellValue: 0, salaryFreed: 0, expectedSellValue: 0, rosterAfterSell: 2, warnings: [] },
+          buyPlan: {
+            candidates: [{ playerId: "fa-1", playerName: "Free One", name: "Free One", className: "Knight", race: "Human", price: 15, marketValue: 15, salary: 3, contractLength: 1, cashAfter: -5, rosterAfter: 3, salaryAfter: 11, fitSummary: "", sportsSummary: "", budgetReason: [], warnings: [], overallRecommendationScore: 70, score: 70, reason: "need", fitNotes: [], riskNotes: [], strategyNotes: [] }],
+            plannedSpend: 15,
+            plannedSalaryAdded: 3,
+            rosterAfterBuy: 3,
+            warnings: [],
+          },
+          projectedState: { cashAfterPlan: -5, rosterAfterPlan: 3, salaryAfterPlan: 11, marketValueAfterPlan: 51 },
+          planSteps: [],
+          reasons: [],
+          warnings: [],
+          blockingReasons: [],
+        },
+      ],
+    });
+
+    const { applyAiMarketPlanLocally } = await import("@/lib/ai/ai-market-plan-apply-service");
+    const result = await applyAiMarketPlanLocally({
+      source: "sqlite",
+      saveId: "save-local",
+      seasonId: "season-1",
+      dryRun: true,
+    });
+
+    expect(result.status).toBe("blocked");
+    expect(result.summary.plannedWrites).toBe(0);
+    expect(result.results[0]?.result).toBe("blocked");
+    expect(result.results[0]?.blockingReasons).toContain("cash_after_market_plan_not_positive");
+    expect(executeLocalTransfermarktBuy).not.toHaveBeenCalled();
+  });
+
+  it("rolls back an executed team plan when the saved cash ends negative", async () => {
+    persistenceState.save.gameState.teams = [
+      { teamId: "A-I", name: "AI Team", shortCode: "A-I", cash: 20, rosterLimit: 4, controlMode: "ai" },
+    ] as GameState["teams"];
+    persistenceState.save.gameState.teamIdentities = [
+      { teamId: "A-I", playerMin: 2, playerOpt: 3 },
+    ] as GameState["teamIdentities"];
+    persistenceState.save.gameState.rosters = [
+      { teamId: "A-I", playerId: "p-1", activePlayerId: "ap-1", salary: 4, currentValue: 18 },
+      { teamId: "A-I", playerId: "p-2", activePlayerId: "ap-2", salary: 4, currentValue: 18 },
+    ] as GameState["rosters"];
+
+    buildAiMarketPlanPreview.mockResolvedValue({
+      readOnly: true,
+      source: "sqlite",
+      scope: { saveId: "save-local", seasonId: "season-1", teamId: null, teamScope: "all" },
+      totalTeams: 1,
+      aiTeams: 1,
+      skippedManual: 0,
+      skippedPassive: 0,
+      skippedDisabled: 0,
+      holdTeams: 0,
+      buyOnlyTeams: 1,
+      sellOnlyTeams: 0,
+      sellThenBuyTeams: 0,
+      warningTeams: 0,
+      blockedTeams: 0,
+      summary: { aiTeams: 1, ready: 1, hold: 0, buyOnly: 1, sellOnly: 0, sellThenBuy: 0, warning: 0, blocked: 0 },
+      teams: [
+        {
+          teamId: "A-I",
+          teamCode: "A-I",
+          teamName: "AI Team",
+          controlMode: "ai",
+          aiTransferPreviewEnabled: true,
+          aiSellPreviewEnabled: true,
+          status: "buy_only",
+          strategySummary: "Need one target.",
+          currentState: { cash: 20, rosterCount: 2, playerMin: 2, playerOpt: 3, salaryTotal: 8, marketValueTotal: 36 },
+          sellPlan: { candidates: [], totalExpectedSellValue: 0, salaryFreed: 0, expectedSellValue: 0, rosterAfterSell: 2, warnings: [] },
+          buyPlan: {
+            candidates: [{ playerId: "fa-1", playerName: "Free One", name: "Free One", className: "Knight", race: "Human", price: 8, marketValue: 8, salary: 3, contractLength: 1, cashAfter: 12, rosterAfter: 3, salaryAfter: 11, fitSummary: "", sportsSummary: "", budgetReason: [], warnings: [], overallRecommendationScore: 70, score: 70, reason: "need", fitNotes: [], riskNotes: [], strategyNotes: [] }],
+            plannedSpend: 8,
+            plannedSalaryAdded: 3,
+            rosterAfterBuy: 3,
+            warnings: [],
+          },
+          projectedState: { cashAfterPlan: 12, rosterAfterPlan: 3, salaryAfterPlan: 11, marketValueAfterPlan: 44 },
+          planSteps: [],
+          reasons: [],
+          warnings: [],
+          blockingReasons: [],
+        },
+      ],
+    });
+    previewLocalTransfermarktBuy.mockReturnValue({
+      canBuy: true,
+      blockingReasons: [],
+      warnings: [],
+      cashBefore: 20,
+      cashAfter: 12,
+      salaryBefore: 8,
+      salaryAfter: 11,
+      rosterBefore: 2,
+      rosterAfter: 3,
+      purchasePrice: 8,
+      salary: 3,
+    });
+    executeLocalTransfermarktBuy.mockImplementation(() => {
+      persistenceState.save = {
+        ...persistenceState.save,
+        gameState: {
+          ...persistenceState.save.gameState,
+          teams: persistenceState.save.gameState.teams.map((team) =>
+            team.teamId === "A-I" ? { ...team, cash: -2 } : team,
+          ),
+        },
+      };
+      return {
+        canBuy: true,
+        blockingReasons: [],
+        warnings: [],
+        purchasePrice: 8,
+        transferCreated: true,
+        activePlayerCreated: true,
+        teamSeasonStateUpdated: true,
+      };
+    });
+
+    const { applyAiMarketPlanLocally } = await import("@/lib/ai/ai-market-plan-apply-service");
+    const result = await applyAiMarketPlanLocally({
+      source: "sqlite",
+      saveId: "save-local",
+      seasonId: "season-1",
+      dryRun: false,
+      transferPhase: "manual_transfer_window",
+    });
+
+    expect(result.status).toBe("blocked");
+    expect(result.results[0]?.result).toBe("blocked");
+    expect(result.results[0]?.blockingReasons).toContain("post_market_cash_not_positive");
+    expect(result.summary.appliedBuys).toBe(0);
+    expect(result.auditLogId).toBeNull();
+    expect(persistenceState.save.gameState.teams.find((team) => team.teamId === "A-I")?.cash).toBe(20);
+  });
+
   it("blocks sell plans without a real expected sell value", async () => {
     buildAiMarketPlanPreview.mockResolvedValue({
       readOnly: true,
@@ -1254,6 +1442,24 @@ describe("ai market plan apply service", () => {
       ...persistenceState.save,
       gameState: {
         ...persistenceState.save.gameState,
+        teams: [
+          { teamId: "A-I", name: "Alpha AI", shortCode: "A-I", cash: 90, rosterLimit: 4, controlMode: "ai" },
+          { teamId: "B-I", name: "Beta AI", shortCode: "B-I", cash: 95, rosterLimit: 4, controlMode: "ai" },
+        ] as GameState["teams"],
+        teamIdentities: [
+          { teamId: "A-I", playerMin: 3, playerOpt: 4 },
+          { teamId: "B-I", playerMin: 3, playerOpt: 4 },
+        ] as GameState["teamIdentities"],
+        rosters: [
+          { teamId: "A-I", playerId: "p-1", activePlayerId: "ap-1", salary: 4, currentValue: 18 },
+          { teamId: "A-I", playerId: "p-a2", activePlayerId: "ap-a2", salary: 4, currentValue: 18 },
+          { teamId: "A-I", playerId: "p-a3", activePlayerId: "ap-a3", salary: 4, currentValue: 18 },
+          { teamId: "A-I", playerId: "p-a4", activePlayerId: "ap-a4", salary: 4, currentValue: 18 },
+          { teamId: "B-I", playerId: "p-2", activePlayerId: "ap-2", salary: 5, currentValue: 16 },
+          { teamId: "B-I", playerId: "p-b2", activePlayerId: "ap-b2", salary: 5, currentValue: 16 },
+          { teamId: "B-I", playerId: "p-b3", activePlayerId: "ap-b3", salary: 5, currentValue: 16 },
+          { teamId: "B-I", playerId: "p-b4", activePlayerId: "ap-b4", salary: 5, currentValue: 16 },
+        ] as GameState["rosters"],
         seasonState: {
           ...persistenceState.save.gameState.seasonState,
           teamStrategyProfiles: {},

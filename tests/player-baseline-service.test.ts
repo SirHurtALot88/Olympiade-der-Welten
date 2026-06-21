@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 
 import { createFreshSeasonOneGameState } from "@/lib/game-state/singleplayer-state";
+import { resolvePlayerEconomyContract } from "@/lib/foundation/player-economy-contract";
 import {
   buildPlayerBaselineAudit,
   calculatePlayerBaselineChecksum,
@@ -14,14 +15,35 @@ describe("player baseline service", () => {
   it("creates a baseline for every imported player", () => {
     const gameState = createFreshSeasonOneGameState();
     const audit = buildPlayerBaselineAudit(gameState);
+    const proofPlayer = gameState.players[0]!;
+    const proofBaseline = gameState.playerBaselines?.find((entry) => entry.playerId === proofPlayer.id)!;
+    const proofEconomy = resolvePlayerEconomyContract({
+      playerId: proofPlayer.id,
+      player: {
+        ...proofPlayer,
+        marketValue: proofPlayer.displayMarketValue ?? proofPlayer.marketValue,
+        salaryDemand: null,
+        displayMarketValue: null,
+        displaySalary: null,
+      },
+      rosterEntry: null,
+    });
 
     expect(audit.summary.playerCount).toBeGreaterThan(0);
     expect(audit.summary.baselineCount).toBe(audit.summary.playerCount);
     expect(audit.summary.missingBaselineCount).toBe(0);
+    expect(audit.summary.seasonZeroEconomyReferenceCount).toBe(audit.summary.playerCount);
+    expect(audit.summary.missingComputedEconomyReferenceCount).toBe(0);
     expect(audit.summary.baselineVersions).toEqual(["player-baseline-v2"]);
     expect(audit.summary.invalidChecksumCount).toBe(0);
     expect(gameState.playerBaselines?.[0]?.checksum).toMatch(/^[a-f0-9]{64}$/);
     expect(gameState.playerBaselines?.[0]?.sourceHash).toMatch(/^[a-f0-9]{64}$/);
+    expect(proofBaseline.seasonZeroEconomy?.source).toBe("season_0_computed");
+    expect(proofBaseline.seasonZeroEconomy?.marketValue).toBe(proofEconomy.marketValue);
+    expect(proofBaseline.seasonZeroEconomy?.salary).toBe(proofEconomy.expectedSalary);
+    expect(audit.economyRows.find((row) => row.playerId === proofPlayer.id)?.baselineMarketValue).toBe(
+      proofBaseline.seasonZeroEconomy?.marketValue,
+    );
   });
 
   it("resets mutable player state back to baseline values without deleting baseline", () => {
@@ -126,6 +148,76 @@ describe("player baseline service", () => {
 
     expect(before?.checksum).toBe(after?.checksum);
     expect(after ? calculatePlayerBaselineChecksum(after) : null).toBe(before?.checksum);
+  });
+
+  it("keeps season zero economy references stable after market and salary mutations", () => {
+    const gameState = createFreshSeasonOneGameState();
+    const before = gameState.playerBaselines?.[0]!;
+    const player = gameState.players[0]!;
+    const ensured = ensurePlayerBaselines({
+      ...gameState,
+      players: gameState.players.map((entry, index) =>
+        index === 0
+          ? {
+              ...entry,
+              marketValue: (entry.marketValue ?? 0) + 999,
+              salaryDemand: (entry.salaryDemand ?? 0) + 999,
+              displayMarketValue: (entry.displayMarketValue ?? 0) + 999,
+              displaySalary: (entry.displaySalary ?? 0) + 999,
+            }
+          : entry,
+      ),
+    });
+    const after = ensured.gameState.playerBaselines?.find((entry) => entry.playerId === player.id)!;
+
+    expect(after.checksum).toBe(before.checksum);
+    expect(after.seasonZeroEconomy).toEqual(before.seasonZeroEconomy);
+    expect(after.marketValue).toBe(before.marketValue);
+    expect(after.salary).toBe(before.salary);
+  });
+
+  it("backfills old economy baselines from source players instead of mutated live players", () => {
+    const gameState = createFreshSeasonOneGameState();
+    const sourcePlayer = gameState.players[0]!;
+    const legacyBaseline = {
+      ...gameState.playerBaselines![0]!,
+      marketValue: 999,
+      salary: 999,
+      seasonZeroEconomy: undefined,
+    };
+    const ensured = ensurePlayerBaselines(
+      {
+        ...gameState,
+        players: gameState.players.map((player, index) =>
+          index === 0
+            ? {
+                ...player,
+                marketValue: 888,
+                salaryDemand: 777,
+              }
+            : player,
+        ),
+        playerBaselines: [legacyBaseline, ...gameState.playerBaselines!.slice(1)],
+      },
+      { sourcePlayers: gameState.players },
+    );
+    const after = ensured.gameState.playerBaselines?.find((entry) => entry.playerId === sourcePlayer.id)!;
+    const sourceEconomy = resolvePlayerEconomyContract({
+      playerId: sourcePlayer.id,
+      player: {
+        ...sourcePlayer,
+        marketValue: sourcePlayer.displayMarketValue ?? sourcePlayer.marketValue,
+        salaryDemand: null,
+        displayMarketValue: null,
+        displaySalary: null,
+      },
+      rosterEntry: null,
+    });
+
+    expect(ensured.warnings).toContain(`baseline_economy_backfilled:${sourcePlayer.id}`);
+    expect(after.seasonZeroEconomy?.source).toBe("season_0_computed");
+    expect(after.seasonZeroEconomy?.marketValue).toBe(sourceEconomy.marketValue);
+    expect(after.seasonZeroEconomy?.salary).toBe(sourceEconomy.expectedSalary);
   });
 
   it("blocks attempts to overwrite an existing baseline payload", () => {

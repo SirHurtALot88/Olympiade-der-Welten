@@ -49,6 +49,12 @@ export type TeamThemeCompositionScore = {
   reason: string;
 };
 
+export type TeamThemeCompositionRuntimeContext = {
+  target: TeamThemeCompositionTarget | null;
+  rosterShare: ReturnType<typeof calculateRosterShareUncached> | null;
+  themedPoolCount: number | null;
+};
+
 export type TeamThemeCompositionAuditRow = {
   teamId: string;
   teamName: string;
@@ -506,6 +512,7 @@ const THEME_TARGETS: Record<string, TeamThemeCompositionTarget> = {
 
 const PLAYER_THEME_TAG_CACHE = new WeakMap<Player, PlayerThemeTagRow>();
 const THEMED_POOL_COUNT_CACHE = new WeakMap<GameState, Map<string, number>>();
+const ROSTER_SHARE_CACHE = new WeakMap<GameState, Map<string, ReturnType<typeof calculateRosterShareUncached>>>();
 
 function normalizeToken(value: string | null | undefined) {
   return (value ?? "")
@@ -824,7 +831,30 @@ function hasAny(tags: Set<string>, candidates: string[]) {
   return candidates.some((tag) => tags.has(tag));
 }
 
-function rosterShare(input: { gameState: GameState; teamId: string; target: TeamThemeCompositionTarget }) {
+function hasHardIdentityOverride(teamId: string, tags: Set<string>) {
+  switch (teamId) {
+    case "H-R":
+      return hasAny(tags, ["Demon", "Hell", "Infernal", "Devil", "Fiend", "PrimeEvil", "Succubus", "Incubus", "SexyDemon"]);
+    case "P-C":
+      return hasAny(tags, ["Pirate", "Swashbuckler", "Wayfarer", "Corsair"]);
+    case "D-P":
+      return hasAny(tags, ["Female"]) && hasAny(tags, ["Demon", "Hell", "Infernal", "Succubus", "SexyDemon", "Dark", "Shadow", "Temptress"]);
+    case "T-G":
+      return hasAny(tags, ["Tall", "Giant", "Colossus", "Titan"]);
+    case "V-D":
+      return hasAny(tags, ["Female", "Pet", "Animal", "Beast"]);
+    case "D-L":
+      return hasAny(tags, ["Human"]);
+    case "S-S":
+      return hasAny(tags, ["Construct", "Robot", "Android", "Machine", "Augmented", "Cyborg", "Steel"]);
+    case "L-K":
+      return hasAny(tags, ["Undead", "Vampire", "Skeleton", "Ghoul", "Lich", "Zombie", "Ghost"]);
+    default:
+      return false;
+  }
+}
+
+function calculateRosterShareUncached(input: { gameState: GameState; teamId: string; target: TeamThemeCompositionTarget }) {
   const playerById = new Map(input.gameState.players.map((player) => [player.id, player] as const));
   const rosterPlayers = input.gameState.rosters
     .filter((entry) => entry.teamId === input.teamId)
@@ -855,6 +885,25 @@ function rosterShare(input: { gameState: GameState; teamId: string; target: Team
   };
 }
 
+function rosterShare(input: { gameState: GameState; teamId: string; target: TeamThemeCompositionTarget }) {
+  let map = ROSTER_SHARE_CACHE.get(input.gameState);
+  if (!map) {
+    map = new Map();
+    ROSTER_SHARE_CACHE.set(input.gameState, map);
+  }
+  const rosterSignature = input.gameState.rosters
+    .filter((entry) => entry.teamId === input.teamId)
+    .map((entry) => entry.playerId)
+    .sort()
+    .join("|");
+  const cacheKey = `${input.teamId}:${rosterSignature}`;
+  const cached = map.get(cacheKey);
+  if (cached) return cached;
+  const computed = calculateRosterShareUncached(input);
+  map.set(cacheKey, computed);
+  return computed;
+}
+
 function getThemedPoolCount(gameState: GameState, target: TeamThemeCompositionTarget) {
   let map = THEMED_POOL_COUNT_CACHE.get(gameState);
   if (!map) {
@@ -870,6 +919,22 @@ function getThemedPoolCount(gameState: GameState, target: TeamThemeCompositionTa
   }).length;
   map.set(target.teamId, count);
   return count;
+}
+
+export function buildTeamThemeCompositionRuntimeContext(
+  gameState: GameState,
+  team: Pick<Team, "teamId" | "name"> | string,
+): TeamThemeCompositionRuntimeContext {
+  const target = getTeamThemeCompositionTarget(team);
+  if (!target) {
+    return { target: null, rosterShare: null, themedPoolCount: null };
+  }
+  const teamId = typeof team === "string" ? team : team.teamId;
+  return {
+    target,
+    rosterShare: rosterShare({ gameState, teamId, target }),
+    themedPoolCount: getThemedPoolCount(gameState, target),
+  };
 }
 
 function getPlayerThemeQuality(player: Player) {
@@ -889,8 +954,9 @@ export function calculateThemeCompositionScore(input: {
   candidateRoleFit?: number | null;
   currentTeamNeeds?: string[] | null;
   phase?: "phase_a_minimum" | "phase_b_core_optimum" | "phase_c_depth_luxury" | null;
+  runtimeContext?: TeamThemeCompositionRuntimeContext | null;
 }): TeamThemeCompositionScore {
-  const target = getTeamThemeCompositionTarget(input.team);
+  const target = input.runtimeContext?.target ?? getTeamThemeCompositionTarget(input.team);
   const tagRow = getCachedPlayerThemeTags(input.player);
   const tags = new Set(tagRow.playerThemeTags);
   if (!target) {
@@ -914,12 +980,13 @@ export function calculateThemeCompositionScore(input: {
     };
   }
 
-  const share = rosterShare({ gameState: input.gameState, teamId: input.team.teamId, target });
+  const share = input.runtimeContext?.rosterShare ?? rosterShare({ gameState: input.gameState, teamId: input.team.teamId, target });
   const primaryMatch = hasAny(tags, target.primaryThemeTags);
   const secondaryMatch = hasAny(tags, target.secondaryThemeTags);
   const softMatch = hasAny(tags, target.softPreferredTags);
   const allowedOutsider = hasAny(tags, target.allowedOutsiderTags);
-  const avoidMatch = hasAny(tags, target.avoidTags);
+  const hardIdentityOverride = hasHardIdentityOverride(input.team.teamId, tags);
+  const avoidMatch = hasAny(tags, target.avoidTags) && !hardIdentityOverride;
   const belowMinimum = share.primaryShare < target.minimumShare;
   const belowTarget = share.primaryShare < target.targetShare;
   const strictnessWeight = target.strictness === "hard" ? 1.4 : target.strictness === "strong" ? 1.15 : target.strictness === "medium" ? 0.9 : 0.65;
@@ -932,10 +999,12 @@ export function calculateThemeCompositionScore(input: {
   const outsider = !primaryMatch && !secondaryMatch && !softMatch;
   const outsiderPenalty = outsider && !allowedOutsider ? -18 * strictnessWeight * phaseWeight : outsider ? -7 * phaseWeight : 0;
   const avoidTagPenalty = avoidMatch ? -26 * strictnessWeight : 0;
+  const hardQuotaRecoveryBonus = target.strictness === "hard" && belowMinimum && hardIdentityOverride ? 35 : 0;
+  const hardQuotaMissPenalty = target.strictness === "hard" && belowMinimum && !hardIdentityOverride ? -80 : 0;
   const roleFit = input.candidateRoleFit ?? 0;
   const qualityOverrideBonus =
     outsider && input.candidateQuality + roleFit >= target.qualityOverrideThreshold ? Math.min(18, (input.candidateQuality + roleFit - target.qualityOverrideThreshold) * 0.45) : 0;
-  const themedPool = getThemedPoolCount(input.gameState, target);
+  const themedPool = input.runtimeContext?.themedPoolCount ?? getThemedPoolCount(input.gameState, target);
   const scarcityAdjustment = themedPool < 12 && (primaryMatch || secondaryMatch) ? 4 : themedPool < 8 && outsider ? 5 : 0;
   const total = Number(
     (
@@ -946,6 +1015,8 @@ export function calculateThemeCompositionScore(input: {
       currentRosterBelowTargetBonus +
       outsiderPenalty +
       avoidTagPenalty +
+      hardQuotaRecoveryBonus +
+      hardQuotaMissPenalty +
       qualityOverrideBonus +
       scarcityAdjustment
     ).toFixed(2),
@@ -993,6 +1064,8 @@ export function calculateThemeCompositionScore(input: {
       belowMinimum ? "roster_below_minimum" : belowTarget ? "roster_below_target" : "target_reached",
       outsider ? "outsider" : null,
       avoidMatch ? "avoid_tag" : null,
+      hardIdentityOverride ? "hard_identity_match" : null,
+      hardQuotaMissPenalty < 0 ? "hard_quota_miss" : null,
       qualityOverrideBonus > 0 ? "quality_override" : null,
     ]
       .filter(Boolean)

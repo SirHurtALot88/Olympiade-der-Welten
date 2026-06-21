@@ -12,6 +12,13 @@ export type TeamDisciplineRankEntry = {
   rankSource: string | null;
 };
 
+export type TeamDisciplineRankTableRow = {
+  teamId: string;
+  disciplineId: string;
+  rank: number | null;
+  score: number | null;
+};
+
 type TeamPlayerAssignment = {
   teamId: string;
   playerId: string;
@@ -124,4 +131,49 @@ export function computeTeamDisciplineRanks(input: {
       ] as const;
     }),
   );
+}
+
+export function computeTeamDisciplineRankTable(input: {
+  teamIds: string[];
+  disciplineIds: string[];
+  rosterAssignments: TeamPlayerAssignment[];
+  scoreByPlayerAndDiscipline: Map<string, number>;
+  topPlayerCount?: number;
+}): TeamDisciplineRankTableRow[] {
+  const disciplineIds = Array.from(new Set(input.disciplineIds.filter(Boolean)));
+  const topPlayerCount = input.topPlayerCount ?? 6;
+  const rosterByTeamId = new Map<string, string[]>();
+
+  for (const assignment of input.rosterAssignments) {
+    const current = rosterByTeamId.get(assignment.teamId) ?? [];
+    current.push(assignment.playerId);
+    rosterByTeamId.set(assignment.teamId, current);
+  }
+
+  const rows: TeamDisciplineRankTableRow[] = [];
+  for (const disciplineId of disciplineIds) {
+    const ordered = input.teamIds
+      .map((teamId) => {
+        const playerIds = rosterByTeamId.get(teamId) ?? [];
+        const values = playerIds.map((playerId) => input.scoreByPlayerAndDiscipline.get(`${playerId}::${disciplineId}`) ?? 0);
+        return {
+          teamId,
+          disciplineId,
+          score: topKSum(values, topPlayerCount),
+        };
+      })
+      .filter((entry): entry is { teamId: string; disciplineId: string; score: number } => entry.score != null)
+      .sort((left, right) => right.score - left.score || left.teamId.localeCompare(right.teamId, "de"));
+
+    ordered.forEach((entry, index) => {
+      rows.push({
+        teamId: entry.teamId,
+        disciplineId,
+        rank: index + 1,
+        score: entry.score,
+      });
+    });
+  }
+
+  return rows;
 }

@@ -12,6 +12,11 @@ import {
 } from "@/lib/season/matchday-auto-run-service";
 import { ADVANCE_MATCHDAY_CONFIRM_TOKEN, executeMatchdayAdvance } from "@/lib/season/matchday-progress-service";
 import { buildSeasonSnapshotDryRun } from "@/lib/season/season-snapshot-service";
+import {
+  buildEmptySeasonAiLineupAudit,
+  buildSeasonAiLineupAudit,
+  type SeasonAiLineupAudit,
+} from "@/lib/season/season-ai-lineup-audit-service";
 
 export type WholeSeasonDryRunParams = {
   source?: "sqlite" | "prisma";
@@ -132,6 +137,7 @@ export type WholeSeasonDryRunResult = {
   snapshotReadiness: WholeSeasonDryRunSnapshotReadiness;
   playerPPsReconciliation: WholeSeasonDryRunPlayerPpsReconciliation;
   teamPPsReconciliation: WholeSeasonDryRunTeamPpsReconciliation;
+  aiSeasonAudit: SeasonAiLineupAudit;
   projectedFinalStandings: WholeSeasonDryRunStandingRow[];
   projectedCash: Array<{
     teamId: string;
@@ -384,6 +390,7 @@ export async function runWholeSeasonDryRun(
       snapshotReadiness: createEmptySnapshotReadiness(params.saveId, params.seasonId ?? "season-1"),
       playerPPsReconciliation: createEmptyPlayerPpsReconciliation(),
       teamPPsReconciliation: createEmptyTeamPpsReconciliation(),
+      aiSeasonAudit: buildEmptySeasonAiLineupAudit(params.seasonId ?? "season-1"),
       projectedFinalStandings: [],
       projectedCash: [],
       projectedCashTable: [],
@@ -431,6 +438,7 @@ export async function runWholeSeasonDryRun(
       snapshotReadiness: createEmptySnapshotReadiness(params.saveId, params.seasonId ?? "season-1"),
       playerPPsReconciliation: createEmptyPlayerPpsReconciliation(),
       teamPPsReconciliation: createEmptyTeamPpsReconciliation(),
+      aiSeasonAudit: buildEmptySeasonAiLineupAudit(params.seasonId ?? "season-1"),
       projectedFinalStandings: [],
       projectedCash: [],
       projectedCashTable: [],
@@ -523,7 +531,7 @@ export async function runWholeSeasonDryRun(
           includeWarningLineups: params.options?.includeWarningLineups ?? false,
           overwriteExistingLineups: params.options?.overwriteExistingLineups ?? false,
           stopOnTie: params.options?.stopOnTie ?? true,
-          advanceAfterCashApply: advanceAfterEachMatchday && !isLastMatchday,
+          advanceAfterCashApply: false,
         },
       },
       inMemoryPersistence,
@@ -619,6 +627,7 @@ export async function runWholeSeasonDryRun(
   }
 
   const projectedGameState = resolveLocalSave(inMemoryPersistence, initializedSave.saveId).gameState;
+  const aiSeasonAudit = buildSeasonAiLineupAudit(projectedGameState, seasonId);
   const projectedRows = buildProjectedRows(projectedGameState);
   const snapshotPreview = buildSeasonSnapshotDryRun(projectedGameState, {
     saveId: realSave.saveId,
@@ -726,6 +735,7 @@ export async function runWholeSeasonDryRun(
     snapshotReadiness,
     playerPPsReconciliation,
     teamPPsReconciliation,
+    aiSeasonAudit,
     projectedFinalStandings: projectedRows.map((row) => ({
       rank: row.rank,
       teamId: row.teamId,

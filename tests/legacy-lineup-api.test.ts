@@ -6,6 +6,7 @@ const calculateLocalLegacyLineupPreview = vi.fn();
 const buildLegacyLineupPreview = vi.fn();
 const getLegacyLineupDraft = vi.fn();
 const calculateLegacyLineupPreview = vi.fn();
+const getSaveById = vi.fn();
 
 vi.mock("@/lib/lineups/legacy-lineup-local-service", () => ({
   getLocalLegacyLineupDraft,
@@ -24,6 +25,12 @@ vi.mock("@/lib/lineups/legacy-lineup-service", () => ({
   },
 }));
 
+vi.mock("@/lib/persistence/persistence-service", () => ({
+  createPersistenceService: () => ({
+    getSaveById,
+  }),
+}));
+
 const legacyLineupRouteModulePromise = import("@/app/api/lineups/legacy/route");
 const legacyLineupPreviewRouteModulePromise = import("@/app/api/lineups/legacy/preview/route");
 
@@ -35,6 +42,7 @@ describe("legacy lineup api routes", () => {
     buildLegacyLineupPreview.mockReset();
     getLegacyLineupDraft.mockReset();
     calculateLegacyLineupPreview.mockReset();
+    getSaveById.mockReset();
   });
 
   it("reads local sqlite draft data by default", async () => {
@@ -80,6 +88,50 @@ describe("legacy lineup api routes", () => {
 
     expect(response.status).toBe(409);
     expect(body.error).toContain("read-only");
+    expect(saveLocalLegacyLineupDraft).not.toHaveBeenCalled();
+  });
+
+  it("blocks local lineup writes outside lineup phases", async () => {
+    getSaveById.mockReturnValue({
+      saveId: "save-local",
+      gameState: {
+        gamePhase: "season_completed",
+        season: {
+          id: "season-1",
+          name: "Season 1",
+          year: 2026,
+          currentMatchday: 10,
+          matchdayIds: ["matchday-1", "matchday-10"],
+        },
+        seasonState: {
+          seasonId: "season-1",
+          schedule: [],
+          standings: {},
+          matchdayResults: [],
+        },
+        matchdayState: {
+          matchdayId: "matchday-10",
+          status: "resolved",
+          pendingTeamIds: [],
+          resolvedFixtureIds: [],
+        },
+      },
+    });
+
+    const { PUT } = await legacyLineupRouteModulePromise;
+    const response = await PUT(
+      new Request(
+        "http://localhost/api/lineups/legacy?saveId=save-local&seasonId=season-1&matchdayId=matchday-10&teamId=A-A",
+        {
+          method: "PUT",
+          body: JSON.stringify({ entries: [] }),
+        },
+      ),
+    );
+    const body = await response.json();
+
+    expect(response.status).toBe(409);
+    expect(body.error).toBe("phase_blocked:set_lineup:season_completed");
     expect(saveLocalLegacyLineupDraft).not.toHaveBeenCalled();
   });
 

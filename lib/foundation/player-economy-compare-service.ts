@@ -420,11 +420,26 @@ export function buildPlayerEconomyCompareReport(input: {
   economyMode?: PlayerEconomyMode;
   salaryMarketValueOverridesByPlayerId?: Map<string, number>;
   baseMarketValueOverridesByPlayerId?: Map<string, number>;
+  playerIds?: Iterable<string>;
+  playerOverridesById?: Map<string, Player>;
+  includeSummary?: boolean;
 }): PlayerEconomyCompareReport {
   const economyMode = input.economyMode ?? "compare";
   const gameState = input.gameState;
-  const ratingByPlayerId = buildPlayerRatingContractMap(gameState);
+  const effectivePlayers =
+    input.playerOverridesById && input.playerOverridesById.size > 0
+      ? gameState.players.map((player) => input.playerOverridesById?.get(player.id) ?? player)
+      : gameState.players;
+  const effectiveGameState =
+    effectivePlayers === gameState.players
+      ? gameState
+      : ({
+          ...gameState,
+          players: effectivePlayers,
+        } satisfies GameState);
+  const ratingByPlayerId = buildPlayerRatingContractMap(effectiveGameState);
   const marketValueInputs = gameState.players
+    .map((player) => input.playerOverridesById?.get(player.id) ?? player)
     .filter((player) =>
       Object.values(player.disciplineRatings ?? {}).some((value) => isFiniteNumber(value)),
     )
@@ -442,7 +457,12 @@ export function buildPlayerEconomyCompareReport(input: {
       ? new Map(marketValueResult.players.map((entry) => [entry.playerId, entry] as const))
       : new Map<string, (typeof marketValueResult.players)[number]>();
 
-  const rows = gameState.players.map((player) => {
+  const selectedPlayerIds = input.playerIds ? new Set(input.playerIds) : null;
+  const rowPlayers = selectedPlayerIds
+    ? effectivePlayers.filter((player) => selectedPlayerIds.has(player.id))
+    : effectivePlayers;
+
+  const rows = rowPlayers.map((player) => {
     const rosterEntry = getRosterEntry(gameState.rosters, player.id);
     const team = getTeam(gameState.teams, rosterEntry);
     const legacyEconomy = resolvePlayerEconomyContract({
@@ -616,13 +636,38 @@ export function buildPlayerEconomyCompareReport(input: {
     ...playerFormulaSources.warnings,
     ...(marketValueResult.status === "ready" ? marketValueResult.warnings : marketValueResult.warnings),
   ])];
+  const summary = input.includeSummary === false
+    ? {
+        comparedPlayers: rows.length,
+        missingMarketValueSources: rows.filter((row) => row.calculatedMarketValue == null).length,
+        missingSalarySources: rows.filter((row) => row.calculatedSalary == null).length,
+        missingSourceCount: rows.filter((row) => row.missingSources.length > 0).length,
+        salaryFloorAppliedCount: rows.filter((row) => row.salaryFloorApplied).length,
+        averageMarketValueDelta: average(rows.map((row) => row.marketValueDelta).filter((value): value is number => isFiniteNumber(value))),
+        medianMarketValueDelta: median(rows.map((row) => row.marketValueDelta).filter((value): value is number => isFiniteNumber(value))),
+        averageSalaryDelta: average(rows.map((row) => row.salaryDelta).filter((value): value is number => isFiniteNumber(value))),
+        medianSalaryDelta: median(rows.map((row) => row.salaryDelta).filter((value): value is number => isFiniteNumber(value))),
+        topLegacyOvervaluedPlayers: [],
+        topLegacyUndervaluedPlayers: [],
+        topSalaryOutliers: [],
+        salaryFloorAppliedPlayers: [],
+        playersWithMissingSources: [],
+        byTeam: [],
+        byClass: [],
+        byRace: [],
+        marketValueOutliersByTeam: [],
+        marketValueOutliersByClass: [],
+        salaryOutliersByTeam: [],
+        salaryOutliersByClass: [],
+      } satisfies PlayerEconomyCompareSummary
+    : buildSummary(rows);
 
   return {
     economyMode,
     activeTransferEconomyMode: "legacy",
     benchmarkSource: "legacy_imported_display",
     players: rows,
-    summary: buildSummary(rows),
+    summary,
     warnings,
     formulaStatus: {
       marketValueEngine: playerFormulaSources.marketValueEngineStatus,

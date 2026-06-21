@@ -1,19 +1,18 @@
 "use client";
 
 import Link from "next/link";
-import { useDeferredValue, useEffect, useMemo, useRef, useState, useTransition } from "react";
+import dynamic from "next/dynamic";
+import { Fragment, useDeferredValue, useEffect, useMemo, useRef, useState, useTransition } from "react";
 import type { CSSProperties, Dispatch, SetStateAction } from "react";
 
-import PlayerDetailDrawer from "@/app/foundation/PlayerDetailDrawer";
-import PlayerGeneratorPanel from "@/app/foundation/PlayerGeneratorPanel";
 import ClassColorChip, { getClassColorClassName } from "@/app/foundation/ClassColorChip";
 import ClassIcon from "@/app/foundation/ClassIcon";
 import DisciplineIcon from "@/app/foundation/DisciplineIcon";
 import RaceIcon from "@/app/foundation/RaceIcon";
-import MatchdayArenaClient from "@/app/foundation/matchday-arena/MatchdayArenaClient";
-import TeamDetailDrawer, { type TeamDetailDrawerData } from "@/app/foundation/TeamDetailDrawer";
-import LegacyLineupLabClient from "@/app/foundation/legacy-lineup-lab/LegacyLineupLabClient";
+import type { TeamDetailDrawerData, TeamDetailDrawerHistoryRow } from "@/app/foundation/TeamDetailDrawer";
 import { TooltipHeading } from "@/components/ui/TooltipHeading";
+import { GameTerm, getGameTermTooltip } from "@/components/ui/GameTerm";
+import { GAME_ENCYCLOPEDIA_ENTRIES, getGameEncyclopediaEntry } from "@/lib/ui/game-encyclopedia";
 import { AUTO_ROSTER_FILL_CONFIRM_TOKEN } from "@/lib/ai/auto-roster-fill-contract";
 import { AI_MARKET_APPLY_CONFIRM_TOKEN } from "@/lib/ai/ai-market-plan-apply-contract";
 import { buildAiTransferIntents } from "@/lib/ai/aiTransferMarket";
@@ -41,7 +40,6 @@ import {
   getScoutingConfidence,
   getTeamFacilityState,
 } from "@/lib/facilities/facility-effects";
-import { createSingleplayerGameState } from "@/lib/game-state/singleplayer-state";
 import {
   buildContractNegotiationDraft,
   buildTeamContractSeasonTable,
@@ -56,16 +54,27 @@ import {
   getConfirmedTierStyle,
   type TransfermarktTier,
 } from "@/lib/market/transfermarkt-formatting-contract";
+import { buildTransfermarktSaleFactorBreakdown, normalizeVisibleRosterMoney } from "@/lib/market/transfermarkt-sale-factor";
 import { LOCAL_TRANSFER_WINDOW_PHASE } from "@/lib/market/transfer-window-policy";
 import { getTransfermarktPortraitModel } from "@/lib/market/transfermarkt-lab";
 import { evaluateTransferListing } from "@/lib/market/transfer-market";
 import type { TransfermarktFreeAgentItem } from "@/lib/market/transfermarkt-read-service";
 import { SEASON_START_RESET_CONFIRM_TOKEN } from "@/lib/persistence/season-start-reset-contract";
+import {
+  FOUNDATION_SAVE_MODE_OPTIONS,
+  formatFoundationSaveModeLabel,
+  normalizeFoundationSaveMode,
+  resolveFoundationSaveMode,
+  type FoundationSaveMode,
+} from "@/lib/persistence/foundation-save-mode";
 import type { SaveSummary } from "@/lib/persistence/types";
 import type {
 	  GameState,
 	  GameInboxItem,
 	  MappingWarning,
+  AdminBalancingConfig,
+  NewGameFlowStepId,
+  NewGameFlowStepStatus,
   Player,
   PlayerGeneratorDraft,
   ContractNegotiationDraft,
@@ -78,8 +87,10 @@ import type {
   TeamIdentity,
   TeamStrategyBias,
   TeamStrategyProfile,
+  TransferSellMarkerEntry,
   TransferWishlistEntry,
 } from "@/lib/data/olyDataTypes";
+import { getDefaultAdminBalancingConfig, resolveAdminBalancingConfig } from "@/lib/admin/balancing-config";
 import { resolvePlayerEconomyContract } from "@/lib/foundation/player-economy-contract";
 import { buildPlayerEconomyCompareReport } from "@/lib/foundation/player-economy-compare-service";
 import {
@@ -92,7 +103,8 @@ import {
   saisonstandColumnContract,
   type SaisonstandColumnContractEntry,
 } from "@/lib/foundation/saisonstand-column-contract";
-import { buildPlayerDrawerDataFromGameState, type PlayerDetailDrawerData } from "@/lib/foundation/player-detail-drawer";
+import type { PlayerDetailDrawerData } from "@/lib/foundation/player-detail-drawer";
+import { getPlayerBaselineEconomyReference } from "@/lib/players/player-baseline-service";
 import { buildPlayerRatingContractMap } from "@/lib/foundation/player-rating-contract";
 import { buildPlayerSeasonPerformanceMap } from "@/lib/foundation/player-season-performance";
 import { buildSeasonPointsLedger } from "@/lib/foundation/season-points-ledger";
@@ -102,11 +114,13 @@ import {
   buildTeamIdentityOverrideMap,
   withNormalizedTeamIdentityOverrides,
 } from "@/lib/foundation/team-identity-settings";
+import { getTeamGeneralManager, getTeamGeneralManagerProfile, withNormalizedTeamGeneralManagers } from "@/lib/foundation/team-general-managers";
 import {
   AI_OWNER_ID,
   DEFAULT_ACTIVE_OWNER_ID,
   buildTeamControlSettingsMap,
   buildTeamOwners,
+  canOwnerManageTeam,
   filterTeamsByControlScope,
   getTeamControlSettings,
   isAiLineupBatchApplyEnabled,
@@ -140,14 +154,24 @@ import { buildGameFlowState, type GameFlowStepStatus, type GameFlowView } from "
 import { buildGameInboxItems, filterGameInboxItems, getPrimaryInboxTask } from "@/lib/foundation/game-inbox-service";
 import { buildMatchdaySummary, getMatchdaySummaryOptions } from "@/lib/foundation/matchday-summary";
 import { normalizeLineupDisciplineFieldName } from "@/lib/lineups/team-discipline-ranks";
-import { getPlayerPortraitBrowserUrl } from "@/lib/data/mediaAssets";
+import { buildTeamPlayerDemandMap, selectTeamCaptain } from "@/lib/morale/player-demands-service";
+import { buildPlayerMoraleAudit } from "@/lib/morale/player-morale-service";
+import { buildTeamRivalryLedger } from "@/lib/rivalries/team-rivalries";
+import { buildTeamRelationshipCards } from "@/lib/rivalries/team-relationship-dynamics";
 import { getTransfermarktBracket } from "@/lib/market/transfermarkt-fit";
-import { getSeasonDisciplineSchedule } from "@/lib/season/season-discipline-schedule";
+import { getTeamPowerOptions } from "@/lib/lineups/team-powers";
+import { getDisciplineColor, getSeasonDisciplineSchedule } from "@/lib/season/season-discipline-schedule";
+import { getSeasonEconomyFactorWindow } from "@/lib/season/season-economy-factors";
 import { getCanonicalSeasonLabel } from "@/lib/season/season-label";
 import {
   buildPlayerProgressionForecast,
   PLAYER_PROGRESSION_XP_CONSTANTS,
 } from "@/lib/training/player-progression-forecast";
+import {
+  CANONICAL_PROGRESS_TRAITS,
+  PROGRESSION_ATTRIBUTE_ORDER,
+  PROGRESSION_CLASS_ORDER,
+} from "@/lib/training/class-progression-config";
 import { buildPlayerDevelopmentLevelupModel, TRAINING_ATTRIBUTE_LABELS } from "@/lib/training/training-levelup-service";
 import { BASE_MATCHDAY_RECOVERY } from "@/lib/fatigue/fatigue-injury-service";
 import { applyTrainingRecoveryImpact, TRAINING_RECOVERY_IMPACT } from "@/lib/training/training-recovery-impact";
@@ -184,6 +208,20 @@ import {
 import type { PlayerEconomyCompareReport } from "@/lib/foundation/player-economy-compare-service";
 import type { RoomRealtimeEvent } from "@/types/game";
 
+const PlayerDetailDrawer = dynamic(() => import("@/app/foundation/PlayerDetailDrawer"), { ssr: false });
+const PlayerGeneratorPanel = dynamic(() => import("@/app/foundation/PlayerGeneratorPanel"), { ssr: false });
+const MatchdayArenaV2Client = dynamic(() => import("@/app/foundation/matchday-arena-v2/MatchdayArenaV2Client"), { ssr: false });
+const TransfermarktV2Client = dynamic(() => import("@/app/foundation/transfermarkt-v2/TransfermarktV2Client"), { ssr: false });
+const TransferHistoryV2Client = dynamic(() => import("@/app/foundation/transfer-history-v2/TransferHistoryV2Client"), { ssr: false });
+const SeasonStandingsV2Client = dynamic(() => import("@/app/foundation/season-v2/SeasonStandingsV2Client"), { ssr: false });
+const TrainingFacilitiesV2Client = dynamic(() => import("@/app/foundation/training-facilities-v2/TrainingFacilitiesV2Client"), {
+  ssr: false,
+});
+const TeamDetailDrawer = dynamic(() => import("@/app/foundation/TeamDetailDrawer"), { ssr: false });
+const LegacyLineupLabClient = dynamic(() => import("@/app/foundation/legacy-lineup-lab/LegacyLineupLabClient"), {
+  ssr: false,
+});
+
 type SortDirection = "asc" | "desc";
 type SortState = {
   key: string;
@@ -192,27 +230,96 @@ type SortState = {
 type PlayerTableScope = "active" | "free_agents" | "all";
 type TrainingModeDraft = PlayerTrainingMode;
 type SeasonEndAttributeDraft = PlayerGeneratorAttributeName;
+type TrainingDevelopmentFilter = "all" | "growth" | "stable" | "regression";
 type FoundationView =
   | "home"
+  | "hq"
   | "season"
+  | "seasonV2"
+  | "historyV2"
 	  | "cockpit"
 	  | "inbox"
-	  | "seasonPreview"
+  | "seasonPreview"
   | "lineup"
   | "matchdayArena"
   | "matchdayResult"
   | "teams"
   | "training"
+  | "trainingV2"
   | "players"
   | "ranks"
   | "diszis"
   | "prize"
   | "market"
+  | "marketV2"
   | "history"
   | "debug"
   | "generator"
   | "teamSettings"
+  | "encyclopedia"
   | "admin";
+
+const SEASON_SETUP_STEP_IDS: NewGameFlowStepId[] = [
+  "season_intro",
+  "team_confirm",
+  "roster_review",
+  "first_transfers",
+  "fill_roster",
+  "training_facilities",
+  "set_lineup",
+];
+
+type SeasonSetupStepTone = "open" | "completed" | "skipped";
+type SeasonSetupStepViewTarget = FoundationView | "manager_team";
+
+type FoundationCommandItem = {
+  id: string;
+  label: string;
+  detail: string;
+  section: "Flow" | "Ansicht" | "Team" | "Spieler" | "Aktion" | "Lexikon";
+  keywords: string;
+  tone?: "ready" | "warning" | "blocked";
+  run: () => void;
+};
+
+type FoundationFlowCoachAction = {
+  label: string;
+  targetView: FoundationView;
+  detail: string;
+  tone?: "primary" | "quiet";
+};
+
+type FoundationFlowCoachModel = {
+  kicker: string;
+  title: string;
+  detail: string;
+  terms: string[];
+  nextLabel: string;
+  nextTitle: string;
+  progressLabel: string;
+  progressPct: number;
+  shortcut: string;
+  actions: FoundationFlowCoachAction[];
+};
+
+type FoundationFlowLoopStage = {
+  id: string;
+  label: string;
+  detail: string;
+  targetView: FoundationView;
+  views: FoundationView[];
+};
+
+type FoundationScreenPrimaryAction = {
+  kicker: string;
+  title: string;
+  detail: string;
+  status: "offen" | "bereit" | "blockiert" | "erledigt" | "optional";
+  buttonLabel: string;
+  onClick: () => void;
+  disabled?: boolean;
+  disabledReason?: string | null;
+};
 
 const EMPTY_MULTI_SEASON_BALANCE_DASHBOARD: MultiSeasonBalanceDashboard = {
   generatedAt: "deferred",
@@ -306,22 +413,36 @@ const EMPTY_SEASON_END_PROGRESSION_PREVIEW: SeasonEndProgressionPreview = {
   warnings: [],
 };
 
+const SEASON_V2_TOP_PLAYER_LIMIT = 32;
+
 type SeasonTableMode = "compact" | "expert";
+type TeamRosterRoleFilter = "all" | "starter" | "rotation" | "prospect" | "bench" | "other";
+type TeamRosterFocusMode = "default" | "salary" | "value" | "contracts" | "training";
 type FoundationReadSource = "sqlite" | "prisma";
 type FoundationReadMeta = {
   source: FoundationReadSource;
   readOnly: boolean;
   generatedAt: string;
+  saveMode?: FoundationSaveMode;
 };
 type FoundationPageClientProps = {
   initialReadSource: FoundationReadSource | null;
   initialSelectedTeamId?: string | null;
   initialSaveId?: string | null;
+  initialPersistenceState?: {
+    save?: { saveId: string; name?: string; gameState: GameState };
+    saves?: SaveSummary[];
+    _meta?: FoundationReadMeta;
+  } | null;
 };
 
 type FoundationTransfermarktResponse = {
   items: TransfermarktFreeAgentItem[];
   total: number;
+  offset: number;
+  limit: number;
+  returned: number;
+  hasMore: boolean;
   source: "derived_free_agents";
   scope: {
     saveId: string;
@@ -473,6 +594,7 @@ type FacilityUpgradeSummary = {
   ok: boolean;
   dryRun: boolean;
   applied?: boolean;
+  action?: "upgrade" | "downgrade";
   confirmToken: string | null;
   facilityEventId?: string | null;
   team: { teamId: string; shortCode: string; name: string } | null;
@@ -482,6 +604,7 @@ type FacilityUpgradeSummary = {
   currentEffect: string;
   nextEffect: string | null;
   upgradeCost: number | null;
+  refundAmount?: number | null;
   currentUpkeep: number;
   newUpkeep: number;
   currentIncome: number;
@@ -685,6 +808,42 @@ type SeasonReviewXpDevelopmentRowResponse = {
   source: string;
 };
 
+type SeasonObjectiveSettlementResponse = {
+  seasonId: string;
+  rows: Array<{
+    teamId: string;
+    teamName: string;
+    objectiveId: string;
+    label: string;
+    category: string;
+    status: "open" | "completed" | "failed" | "at_risk";
+    cashDelta: number;
+    boardConfidenceDelta: number;
+    visibleResult: "plus" | "minus" | "neutral";
+    reason: string;
+  }>;
+  byTeamId: Record<
+    string,
+    {
+      teamId: string;
+      teamName: string;
+      completed: number;
+      failed: number;
+      atRisk: number;
+      open: number;
+      cashDelta: number;
+      boardConfidenceDelta: number;
+      resultLabel: string;
+    }
+  >;
+  totals: {
+    cashDelta: number;
+    boardConfidenceDelta: number;
+    completed: number;
+    failed: number;
+  };
+};
+
 type SeasonReviewResponse = {
   championTeam: SeasonReviewNamedValueResponse | null;
   finalTable: SeasonReviewNamedValueResponse[];
@@ -694,6 +853,7 @@ type SeasonReviewResponse = {
   storylines: Array<{ storylineId: string; text: string; source: string }>;
   transferHighlights: SeasonReviewTransferHighlightResponse[];
   teamHighlights: SeasonReviewNamedValueResponse[];
+  objectiveSettlement?: SeasonObjectiveSettlementResponse;
   promisedRoleSignals?: SeasonReviewPromisedRoleSignalResponse[];
   xpDevelopmentRankings?: {
     topImproved: SeasonReviewXpDevelopmentRowResponse[];
@@ -738,6 +898,80 @@ type SeasonTransitionSummaryResponse = {
 type SeasonTransitionApiResponse = {
   success: boolean;
   summary: SeasonTransitionSummaryResponse | null;
+  warnings?: string[];
+  blockingReasons?: string[];
+  error?: string;
+};
+
+type SeasonCompletionSummaryResponse = {
+  ok: boolean;
+  dryRun: boolean;
+  applied: boolean;
+  status: "ready" | "applied" | "blocked";
+  scope: {
+    saveId: string;
+    seasonId: string;
+    matchdayId: string;
+  };
+  steps: Array<{
+    key: string;
+    label: string;
+    status: "planned" | "applied" | "already_done" | "blocked" | "skipped";
+    warnings: string[];
+    blockingReasons: string[];
+    auditId: string | null;
+  }>;
+  seasonReview?: SeasonReviewResponse;
+  cashApply?: FoundationApplySummary;
+  relationships?: {
+    generatedEvents: Array<unknown>;
+    insertedEvents: number;
+    replacedPreviewEvents: number;
+    totalEvents: number;
+    warnings: string[];
+  };
+  snapshot?: FoundationSeasonSnapshotSummary;
+  transition?: SeasonTransitionSummaryResponse;
+  aiSeasonAudit?: {
+    totals: {
+      aiDrafts: number;
+      captainUses: number;
+      formCardUses: number;
+      teamPowerUses: number;
+      mutatorTraits: number;
+      pushSides: number;
+    };
+    rates: {
+      aiDraftCoveragePct: number;
+      aiCaptainPerDraftPct: number;
+      aiFormCardPerDraftPct: number;
+      aiPushSidePct: number;
+      aiMutatorTraitPerSidePct: number;
+    };
+    teams?: Array<{
+      teamId: string;
+      teamCode: string;
+      teamName: string;
+      controlMode: TeamControlMode;
+      drafts: number;
+      captainUses: number;
+      formCardUses: number;
+      teamPowerUses: number;
+      mutatorTraits: number;
+      pushSides: number;
+      conserveSides: number;
+      normalSides: number;
+      warnings: string[];
+    }>;
+    warnings: string[];
+  };
+  warnings: string[];
+  blockingReasons: string[];
+};
+
+type SeasonCompletionApiResponse = {
+  success: boolean;
+  summary: SeasonCompletionSummaryResponse | null;
   warnings?: string[];
   blockingReasons?: string[];
   error?: string;
@@ -820,8 +1054,8 @@ const SEASON_TRANSITION_STATIC_STEPS: SeasonTransitionStepResponse[] = [
     stepId: "next_season_ready",
     label: "Neue Saison starten",
     status: "open",
-    preview: "Kein Start in V1; nur Struktur und Gates sind sichtbar.",
-    warnings: ["no_new_season_apply_in_transition_v1"],
+    preview: "Start erfolgt ueber den bestaetigten Pre-Season Workflow.",
+    warnings: ["next_season_apply_requires_preseason_confirm"],
     blockingReasons: [],
     canApply: false,
   },
@@ -1549,6 +1783,30 @@ type FoundationAutoRosterFillResponse = {
   error?: string;
 };
 
+type FoundationAiPreseasonAutomationRun = {
+  runId: string;
+  seasonId: string;
+  status: "running" | "completed" | "failed" | "skipped";
+  mode: "setup_draft" | "season_market" | "none";
+  startedAt: string;
+  completedAt?: string | null;
+  aiTeamsTotal: number;
+  aiTeamsCompleted: number;
+  managerActionsApplied: number;
+  transferBuysApplied: number;
+  transferSellsApplied: number;
+  warnings: string[];
+  blockingReasons: string[];
+};
+
+type FoundationAiPreseasonAutomationResponse = {
+  ok: boolean;
+  skipped: boolean;
+  reason?: string;
+  run: FoundationAiPreseasonAutomationRun;
+  error?: string;
+};
+
 type FoundationAiPickAuditResetTeamPickedPlayer = {
   playerId: string;
   playerName: string;
@@ -1776,6 +2034,18 @@ type FoundationAiLineupBatchApplyResponse = {
     wouldOverwrite: number;
     overwrittenExisting: number;
     plannedLineups: number;
+    formCardsSelected?: number;
+    negativeFormCardsSelected?: number;
+    performanceBreakdown?: {
+      formCardPlanningMs: number;
+      aiLineupGenerationMs: number;
+      lineupValidationMs: number;
+      mutatorPlanningMs: number;
+      saveWriteMs: number;
+      contextLoadMs: number;
+      teamPowerPlanningMs: number;
+      totalMs: number;
+    };
     warnings: string[];
     blockingReasons: string[];
   };
@@ -1842,6 +2112,8 @@ type FoundationMatchdayMvpTopPlayerRow = {
   pointsAwarded: number | null;
   mutatorPpsBonus: number | null;
   mutatorScoreBonus: number | null;
+  mutatorSelectedTraitLabels?: string[];
+  mutatorHitTraitLabels?: string[];
   rankInDiscipline: number;
 };
 
@@ -2002,7 +2274,7 @@ const teamIdentityFieldLabels: Array<{
   { key: "soc", label: "Social" },
   { key: "ambition", label: "Ambition" },
   { key: "finances", label: "Finances" },
-  { key: "boardConfidence", label: "Board Confidence" },
+  { key: "boardConfidence", label: "Board Rating" },
   { key: "harmony", label: "Harmony" },
   { key: "manners", label: "Manners" },
   { key: "popularity", label: "Popularity" },
@@ -2010,6 +2282,10 @@ const teamIdentityFieldLabels: Array<{
   { key: "playerMin", label: "Player Min" },
   { key: "playerOpt", label: "Player Opt" },
 ];
+const TEAM_BOARD_RATING_TOOLTIP =
+  "Board Rating ist der interne Team-Vorstandswert von 1 bis 10. Er ist getrennt von der Spieler-Vorstandsbewertung, startet neutral bei 5 und steigt oder faellt mit erledigten, gefaehrdeten oder verfehlten Board-Zielen. Die AI nutzt ihn unter anderem fuer Risiko, Budgetdisziplin und Vertragslaengen.";
+const TEAM_BOARD_PRESSURE_TOOLTIP =
+  "Druck zeigt, wie angespannt das Board gerade ist. Niedriges Board Rating, verfehlte Ziele und Ziele unter Risiko erhoehen den Druck; hoher Druck macht die AI vorsichtiger mit Cash, schneller bei Korrekturen und strenger bei Kader- oder Gehaltsentscheidungen.";
 const teamStrategyBiasFieldLabels: Array<{ key: keyof TeamStrategyBias; label: string }> = [
   { key: "cashPriority", label: "Cash" },
   { key: "valuePriority", label: "Value" },
@@ -2144,6 +2420,10 @@ type FoundationTransferHistoryItem = {
 type FoundationTransferHistoryResponse = {
   items: FoundationTransferHistoryItem[];
   total: number;
+  offset: number;
+  limit: number;
+  returned: number;
+  hasMore: boolean;
   scope: {
     saveId: string;
     seasonId: string;
@@ -2325,7 +2605,10 @@ type FoundationPrizePreviewItem = {
   futureSeasons?: Array<{
     seasonLabel: string;
     factor: number | null;
+    salaryGrowthFactor?: number | null;
     prizeMoney: number | null;
+    salaryTotal?: number | null;
+    guv?: number | null;
     projectedCash: number | null;
   }>;
 };
@@ -2343,6 +2626,7 @@ type FoundationPrizePreviewResponse = {
     futureSeasonCount?: number;
     totalPrizeMoney?: number;
     totalRankChangePrize?: number | null;
+    forecastSalaryFactorPassthrough?: number | null;
   };
   source: {
     mode: "sqlite" | "prisma";
@@ -2567,6 +2851,8 @@ type FoundationMatchdayAutoRunSummary = {
     cashApplyAllowed: boolean;
     advanceAllowed: boolean;
     plannedWrites: number;
+    formCardsSelected?: number;
+    negativeFormCardsSelected?: number;
   };
   steps: Array<{
     key: string;
@@ -2756,6 +3042,45 @@ type FoundationWholeSeasonDryRunSummary = {
   blockingReasons: string[];
 };
 
+type AdminSeasonSimulationRunSummary = {
+  runId: string;
+  saveId: string;
+  requestedSeasons: 1 | 2 | 5;
+  mode: "dry_run" | "apply";
+  fullChurnStress: boolean;
+  injuriesTestMode: boolean;
+  status: "idle" | "running" | "paused" | "completed" | "blocked" | "cancelled";
+  activePhase: string;
+  activeSeasonId: string | null;
+  activeMatchdayId: string | null;
+  activeTeamId: string | null;
+  currentOperation: string;
+  startedAt: string;
+  updatedAt: string;
+  heartbeatAt: string;
+  completedAt: string | null;
+  durationMs: number;
+  progressPct: number;
+  reports: {
+    directory: string;
+    jsonl: string;
+    summary: string;
+  };
+  logs: Array<{
+    at: string;
+    level: "red" | "yellow" | "info";
+    phase: string;
+    message: string;
+  }>;
+  issues: Array<{
+    at: string;
+    level: "red" | "yellow" | "info";
+    phase: string;
+    message: string;
+    code: string;
+  }>;
+};
+
 type FoundationSeasonSnapshotSummary = {
   ok: boolean;
   readOnly: true;
@@ -2833,6 +3158,7 @@ type FoundationSeasonSnapshotSummary = {
 
 type FoundationTableColumn = GlobalTableColumnConfig & {
   visibleByDefault?: boolean;
+  tooltip?: string;
 };
 
 type FoundationTablePresetId = "retool_default" | "compact" | "finance" | "performance" | "custom";
@@ -2877,14 +3203,21 @@ const FOUNDATION_TABLE_PREFERENCES_STORAGE_KEY = "foundation-table-preferences-v
 const FOUNDATION_MANAGER_TEAM_STORAGE_KEY = "foundation-active-manager-team-v1";
 const FOUNDATION_ACTIVE_OWNER_STORAGE_KEY = "foundation-active-owner-v1";
 const FOUNDATION_TEAM_FILTER_STORAGE_KEY = "foundation-team-filter-v1";
+const FOUNDATION_SAVE_MODE_STORAGE_KEY = "foundation-save-mode-v1";
 const RESULT_APPLY_CONFIRM_TOKEN = "APPLY_MATCHDAY_RESULT";
 const STANDINGS_APPLY_CONFIRM_TOKEN = "APPLY_LOCAL_STANDINGS";
 const CASH_APPLY_CONFIRM_TOKEN = "APPLY_LOCAL_CASH_PRIZE";
 const ADVANCE_MATCHDAY_CONFIRM_TOKEN = "ADVANCE_LOCAL_MATCHDAY";
 const MATCHDAY_MVP_SCORING_CONFIRM_TOKEN = "RUN_MATCHDAY_MVP_SCORING";
 const MATCHDAY_AUTO_RUN_CONFIRM_TOKEN = "RUN_LOCAL_MATCHDAY_AUTO";
+const SEASON_COMPLETION_CONFIRM_TOKEN = "COMPLETE_LOCAL_SEASON_PIPELINE";
 const SEASON_SNAPSHOT_CONFIRM_TOKEN = "CREATE_LOCAL_SEASON_SNAPSHOT";
-const TRANSFER_HISTORY_INITIAL_RENDER_LIMIT = 80;
+const PRESEASON_NEXT_SEASON_SETUP_CONFIRM_TOKEN = "APPLY_PRESEASON_NEXT_SEASON_SETUP";
+const TRANSFER_HISTORY_SEASON_LIMIT = 5000;
+const TRANSFER_HISTORY_ALL_SEASONS_PAGE_SIZE = 50;
+const HISTORY_ALL_SEASONS_FILTER = "__ALL_SEASONS__";
+const TRANSFER_MARKET_INITIAL_RENDER_LIMIT = 48;
+const TRANSFER_MARKET_RENDER_STEP = 48;
 
 function loadFoundationTablePreferences(): PersistedFoundationTablePreferences {
   if (typeof window === "undefined") {
@@ -2966,36 +3299,40 @@ function applyStoredColumnOrder(
   return [...leftPinnedColumns, ...middleColumns, ...rightPinnedColumns];
 }
 
-const foundationPrimaryViews: Array<{ id: FoundationView; label: string }> = [
-  { id: "home", label: "Home" },
-  { id: "season", label: "Saisonstand" },
-  { id: "lineup", label: "Einsatzliste" },
-  { id: "matchdayArena", label: "Arena" },
-  { id: "teams", label: "Teams" },
-  { id: "training", label: "Training & Gebäude" },
-  { id: "players", label: "Spieler" },
-  { id: "ranks", label: "Ranks" },
-  { id: "diszis", label: "Diszis" },
-  { id: "prize", label: "Preisgeld" },
-  { id: "market", label: "Transfermarkt" },
-  { id: "history", label: "Transferhistorie" },
+const foundationPrimaryViews: Array<{ id: FoundationView; label: string; tooltip: string }> = [
+  { id: "home", label: "Home", tooltip: "Manager-Zentrale: naechste Schritte, wichtigste Spieler, Liga-Lage und To-dos." },
+  { id: "hq", label: "HQ", tooltip: "Front Office: Board, GM, Rivalen, Team Powers, Captains, Forderungen und Storylines." },
+  { id: "season", label: "Saisonstand", tooltip: "Tabelle, Story-Karten, Teamstaerken und Punkteentwicklung." },
+  { id: "lineup", label: "Einsatzliste", tooltip: "Spieler in Slots setzen, Team-Boost waehlen und Spieltag vorbereiten." },
+  { id: "matchdayArena", label: "Arena", tooltip: "Spieltag als Reveal/Event ansehen und Ergebnis verstehen." },
+  { id: "teams", label: "Teams", tooltip: "Kader, Vertraege, Value, Achsenprofil und Teamdetails pruefen." },
+  { id: "trainingV2", label: "Training & Gebäude", tooltip: "Entwicklungszentrale: Spielertraining links, Gebaeude rechts, Season-End-XP unten." },
+  { id: "players", label: "Spieler", tooltip: "Spieler suchen, vergleichen und Profil/Training/Markt oeffnen." },
+  { id: "ranks", label: "Ranks", tooltip: "Team- und Disziplinranks nach Gesamtstaerke und Achsen." },
+  { id: "diszis", label: "Diszis", tooltip: "Disziplinen, Mutatoren und Gewichtungen pruefen." },
+  { id: "prize", label: "Preisgeld", tooltip: "Preisgeld- und Saisonende-Ausblick nach Tabellenplatz." },
+  { id: "market", label: "Transfermarkt", tooltip: "Kaufen, verkaufen, Value pruefen und Budgets absichern." },
+  { id: "history", label: "Transferhistorie", tooltip: "Vergangene Deals, Gewinne, Risiken und Kaderbewegungen." },
 ];
 
-const foundationAdminViews: Array<{ id: FoundationView; label: string }> = [
-	  { id: "cockpit", label: "Spieltag" },
-	  { id: "inbox", label: "Inbox" },
-	  { id: "generator", label: "Player Generator" },
-  { id: "teamSettings", label: "Team Settings" },
-  { id: "admin", label: "Admin" },
+const foundationAdminViews: Array<{ id: FoundationView; label: string; tooltip: string }> = [
+	  { id: "cockpit", label: "Spieltag", tooltip: "Spieltag steuern, Status pruefen und naechste Phase vorbereiten." },
+	  { id: "inbox", label: "Inbox", tooltip: "Hinweise und Aufgaben als To-do-Liste." },
+	  { id: "generator", label: "Player Generator", tooltip: "Spieler generieren und Draftwerte pruefen." },
+  { id: "teamSettings", label: "Team Settings", tooltip: "Teamnamen, Manager, Identitaet und Steuerung konfigurieren." },
+  { id: "admin", label: "Admin", tooltip: "Technische Steuerung, Import, Simulationen und Debug-Hilfen." },
 ];
 
-const foundationSecondaryViews: Array<{ id: FoundationView; label: string }> = [
-  { id: "seasonPreview", label: "Saisonstand Preview" },
-  { id: "debug", label: "Debug" },
+const foundationSecondaryViews: Array<{ id: FoundationView; label: string; tooltip: string }> = [
+  { id: "seasonPreview", label: "Saisonstand Preview", tooltip: "Preview-Tabelle vor dem finalen Schreiben." },
+  { id: "debug", label: "Debug", tooltip: "Nur technische Analyse und Rohsignale." },
 ];
 
 const foundationInternalViews: Array<{ id: FoundationView; label: string }> = [
   { id: "matchdayResult", label: "Spieltagsergebnis" },
+  { id: "seasonV2", label: "Saisonstand v2" },
+  { id: "historyV2", label: "Transferhistorie v2" },
+  { id: "encyclopedia", label: "Lexikon" },
 ];
 
 const homeTaskLabelContract = [
@@ -3012,7 +3349,82 @@ const homeTaskLabelContract = [
 const foundationViews = [...foundationPrimaryViews, ...foundationAdminViews, ...foundationSecondaryViews, ...foundationInternalViews];
 
 function normalizeInboxTargetView(view: string | null | undefined): FoundationView {
-  return foundationViews.some((entry) => entry.id === view) ? (view as FoundationView) : "home";
+  return foundationViews.some((entry) => entry.id === view) ? getDefaultFoundationViewTarget(view as FoundationView) : "home";
+}
+
+function getFoundationViewScrollTarget(view: FoundationView | GameFlowView | string | null | undefined) {
+  switch (view) {
+    case "home":
+      return "foundation-home";
+    case "hq":
+      return "foundation-hq";
+    case "inbox":
+      return "foundation-inbox";
+    case "encyclopedia":
+      return "foundation-encyclopedia";
+    case "lineup":
+      return "foundation-lineup";
+    case "matchdayArena":
+      return "foundation-matchday-arena";
+    case "matchdayResult":
+      return "foundation-matchday-result";
+    case "season":
+      return "team-table";
+    case "seasonV2":
+      return "foundation-season-v2";
+    case "seasonPreview":
+      return "standings-preview";
+    case "players":
+      return "players-table";
+    case "teams":
+      return "team-focus-roster";
+    case "training":
+      return "foundation-training-facilities-v2";
+    case "trainingV2":
+      return "foundation-training-facilities-v2";
+    case "market":
+      return "transfer-market";
+    case "marketV2":
+      return "transfer-market";
+    case "history":
+      return "transfer-history";
+    case "historyV2":
+      return "transfer-history";
+    case "teamSettings":
+      return "foundation-team-settings";
+    case "admin":
+      return "foundation-admin";
+    case "generator":
+      return "foundation-generator";
+    case "cockpit":
+      return "foundation-cockpit";
+    case "prize":
+      return "prize-money";
+    case "ranks":
+      return "discipline-ranks";
+    case "diszis":
+      return "discipline-config";
+    default:
+      return null;
+  }
+}
+
+function scrollToFoundationTarget(targetId: string | null | undefined) {
+  if (!targetId || typeof window === "undefined") {
+    return;
+  }
+  window.setTimeout(() => {
+    const target = document.getElementById(targetId);
+    if (!target) {
+      return;
+    }
+    target.scrollIntoView({ behavior: "smooth", block: "start" });
+    target.classList.remove("foundation-jump-target");
+    window.requestAnimationFrame(() => {
+      target.classList.add("foundation-jump-target");
+      window.setTimeout(() => target.classList.remove("foundation-jump-target"), 1400);
+    });
+  }, 90);
 }
 
 function parseFoundationViewFromUrl() {
@@ -3028,6 +3440,39 @@ function parseFoundationViewFromUrl() {
   if (view === "matchday-arena") {
     return "matchdayArena";
   }
+  if (view === "matchday-arena-v2") {
+    return "matchdayArena";
+  }
+  if (view === "season-v2") {
+    return "seasonV2";
+  }
+  if (view === "season") {
+    return "seasonV2";
+  }
+  if (view === "prize-v2" || view === "preisgeld-v2") {
+    return "prize";
+  }
+  if (view === "transfermarkt-v2") {
+    return "marketV2";
+  }
+  if (view === "transfermarkt" || view === "market") {
+    return "marketV2";
+  }
+  if (view === "history-v2" || view === "transferhistorie-v2") {
+    return "historyV2";
+  }
+  if (view === "teams-v2") {
+    return "teams";
+  }
+  if (view === "training-v2" || view === "training-facilities-v2" || view === "gebaeude-v2") {
+    return "trainingV2";
+  }
+  if (view === "training" || view === "training-facilities") {
+    return "trainingV2";
+  }
+  if (view === "lexikon" || view === "glossar" || view === "encyclopedia" || view === "buch") {
+    return "encyclopedia";
+  }
 
   return foundationViews.some((entry) => entry.id === view) ? (view as FoundationView) : null;
 }
@@ -3040,6 +3485,13 @@ function syncFoundationViewInUrl(view: FoundationView) {
   const nextUrl = new URL(window.location.href);
   nextUrl.searchParams.set("view", view);
   window.history.replaceState({}, "", nextUrl.toString());
+}
+
+function getDefaultFoundationViewTarget(view: FoundationView): FoundationView {
+  if (view === "market") return "marketV2";
+  if (view === "season") return "seasonV2";
+  if (view === "history") return "historyV2";
+  return view;
 }
 
 function resolveFoundationTeamId(teams: Team[], value: string | null | undefined) {
@@ -3171,6 +3623,52 @@ function persistFoundationTeamFilter(filter: TeamControlFilter) {
       updatedAt: new Date().toISOString(),
     }),
   );
+}
+
+function readStoredFoundationSaveMode(): FoundationSaveMode {
+  if (typeof window === "undefined") {
+    return "all";
+  }
+
+  try {
+    const urlMode = new URL(window.location.href).searchParams.get("saveMode");
+    if (urlMode) {
+      return normalizeFoundationSaveMode(urlMode);
+    }
+
+    const raw = window.localStorage.getItem(FOUNDATION_SAVE_MODE_STORAGE_KEY);
+    if (!raw) {
+      return "all";
+    }
+
+    const parsed = JSON.parse(raw) as { saveMode?: string | null };
+    return normalizeFoundationSaveMode(parsed.saveMode);
+  } catch {
+    return "all";
+  }
+}
+
+function persistFoundationSaveMode(saveMode: FoundationSaveMode) {
+  if (typeof window === "undefined") {
+    return;
+  }
+
+  window.localStorage.setItem(
+    FOUNDATION_SAVE_MODE_STORAGE_KEY,
+    JSON.stringify({
+      version: 1,
+      saveMode,
+      updatedAt: new Date().toISOString(),
+    }),
+  );
+
+  const nextUrl = new URL(window.location.href);
+  if (saveMode === "all") {
+    nextUrl.searchParams.delete("saveMode");
+  } else {
+    nextUrl.searchParams.set("saveMode", saveMode);
+  }
+  window.history.replaceState({}, "", nextUrl.toString());
 }
 
 function resolveDefaultManagerTeamId(teams: Team[], settingsMap?: Record<string, TeamControlSettings> | null) {
@@ -3515,6 +4013,12 @@ function joinClassNames(...classes: Array<string | false | null | undefined>) {
   return classes.filter(Boolean).join(" ");
 }
 
+function isAbortError(error: unknown) {
+  return error instanceof DOMException
+    ? error.name === "AbortError"
+    : error instanceof Error && error.name === "AbortError";
+}
+
 function getOwnerTeamHighlightClass(settings: TeamControlSettings | null | undefined) {
   if (settings?.controlMode !== "manual") {
     return "";
@@ -3526,6 +4030,13 @@ function getOwnerTeamHighlightClass(settings: TeamControlSettings | null | undef
     return "is-owner-franky-team";
   }
   return "";
+}
+
+function formatTeamControlModeLabel(mode: TeamControlMode | null | undefined) {
+  if (mode === "manual") return "geführt";
+  if (mode === "ai") return "automatisch";
+  if (mode === "passive") return "beobachtet";
+  return "offen";
 }
 
 function getRanksMetricToneClass(columnId: string, scope: "head" | "cell") {
@@ -3569,6 +4080,74 @@ function getTeamLogoModel(team: Pick<Team, "teamId" | "name" | "logoPath">) {
   return { src, initials };
 }
 
+const SEASON_TOP_PLAYER_TEAM_TAG_COLORS: Record<string, { bg: string; border: string; text: string; glow: string }> = {
+  "A-A": { bg: "rgba(125, 44, 48, 0.74)", border: "rgba(236, 92, 89, 0.82)", text: "#ffe0dc", glow: "rgba(236, 92, 89, 0.28)" },
+  "B-B": { bg: "rgba(117, 65, 29, 0.76)", border: "rgba(245, 139, 57, 0.82)", text: "#ffe4ca", glow: "rgba(245, 139, 57, 0.25)" },
+  "B-P": { bg: "rgba(44, 42, 62, 0.78)", border: "rgba(143, 130, 201, 0.8)", text: "#ebe7ff", glow: "rgba(143, 130, 201, 0.24)" },
+  "C-C": { bg: "rgba(117, 90, 37, 0.76)", border: "rgba(247, 205, 91, 0.84)", text: "#fff1c8", glow: "rgba(247, 205, 91, 0.26)" },
+  "C-S": { bg: "rgba(55, 78, 92, 0.76)", border: "rgba(159, 205, 225, 0.76)", text: "#e6f7ff", glow: "rgba(159, 205, 225, 0.22)" },
+  "D-L": { bg: "rgba(63, 44, 79, 0.76)", border: "rgba(179, 116, 220, 0.8)", text: "#f1ddff", glow: "rgba(179, 116, 220, 0.24)" },
+  "D-P": { bg: "rgba(111, 68, 89, 0.76)", border: "rgba(245, 154, 189, 0.78)", text: "#ffe1ee", glow: "rgba(245, 154, 189, 0.23)" },
+  "G-G": { bg: "rgba(116, 86, 31, 0.78)", border: "rgba(250, 194, 70, 0.86)", text: "#fff0bd", glow: "rgba(250, 194, 70, 0.27)" },
+  "H-R": { bg: "rgba(105, 34, 34, 0.78)", border: "rgba(241, 76, 68, 0.86)", text: "#ffe0dd", glow: "rgba(241, 76, 68, 0.27)" },
+  "L-K": { bg: "rgba(51, 62, 78, 0.78)", border: "rgba(142, 169, 207, 0.76)", text: "#e8f0ff", glow: "rgba(142, 169, 207, 0.22)" },
+  "L-R": { bg: "rgba(62, 55, 51, 0.78)", border: "rgba(185, 162, 139, 0.72)", text: "#f4e6d8", glow: "rgba(185, 162, 139, 0.2)" },
+  "M-M": { bg: "rgba(101, 60, 35, 0.78)", border: "rgba(238, 145, 75, 0.84)", text: "#ffe5cf", glow: "rgba(238, 145, 75, 0.25)" },
+  "M-S": { bg: "rgba(78, 40, 72, 0.78)", border: "rgba(210, 104, 183, 0.78)", text: "#ffdff7", glow: "rgba(210, 104, 183, 0.22)" },
+  "N-N": { bg: "rgba(64, 54, 82, 0.78)", border: "rgba(176, 148, 227, 0.8)", text: "#eee5ff", glow: "rgba(176, 148, 227, 0.23)" },
+  "N-W": { bg: "rgba(45, 84, 54, 0.78)", border: "rgba(121, 202, 131, 0.78)", text: "#def8df", glow: "rgba(121, 202, 131, 0.24)" },
+  "P-C": { bg: "rgba(51, 75, 93, 0.78)", border: "rgba(101, 185, 225, 0.76)", text: "#dff5ff", glow: "rgba(101, 185, 225, 0.22)" },
+  "P-S": { bg: "rgba(70, 52, 108, 0.78)", border: "rgba(169, 133, 255, 0.86)", text: "#eee5ff", glow: "rgba(169, 133, 255, 0.27)" },
+  "R-C": { bg: "rgba(92, 45, 81, 0.78)", border: "rgba(231, 128, 203, 0.78)", text: "#ffe2f8", glow: "rgba(231, 128, 203, 0.24)" },
+  "R-L": { bg: "rgba(40, 85, 61, 0.78)", border: "rgba(109, 215, 143, 0.82)", text: "#d9ffe5", glow: "rgba(109, 215, 143, 0.25)" },
+  "R-R": { bg: "rgba(34, 87, 98, 0.78)", border: "rgba(83, 205, 225, 0.78)", text: "#d8fbff", glow: "rgba(83, 205, 225, 0.23)" },
+  "S-C": { bg: "rgba(98, 46, 38, 0.78)", border: "rgba(236, 104, 83, 0.82)", text: "#ffe1dc", glow: "rgba(236, 104, 83, 0.25)" },
+  "S-S": { bg: "rgba(75, 84, 96, 0.78)", border: "rgba(190, 205, 224, 0.78)", text: "#edf5ff", glow: "rgba(190, 205, 224, 0.22)" },
+  "T-C": { bg: "rgba(62, 91, 74, 0.78)", border: "rgba(151, 217, 174, 0.76)", text: "#e2ffea", glow: "rgba(151, 217, 174, 0.22)" },
+  "T-G": { bg: "rgba(70, 75, 80, 0.78)", border: "rgba(175, 185, 194, 0.76)", text: "#f0f4f8", glow: "rgba(175, 185, 194, 0.22)" },
+  "T-T": { bg: "rgba(94, 61, 39, 0.78)", border: "rgba(226, 163, 90, 0.8)", text: "#ffe7ca", glow: "rgba(226, 163, 90, 0.23)" },
+  "U-A": { bg: "rgba(44, 75, 91, 0.78)", border: "rgba(112, 185, 223, 0.76)", text: "#e2f6ff", glow: "rgba(112, 185, 223, 0.22)" },
+  "V-D": { bg: "rgba(91, 45, 77, 0.78)", border: "rgba(229, 116, 193, 0.78)", text: "#ffe2f5", glow: "rgba(229, 116, 193, 0.22)" },
+  "V-V": { bg: "rgba(76, 68, 100, 0.78)", border: "rgba(180, 160, 238, 0.78)", text: "#eee7ff", glow: "rgba(180, 160, 238, 0.23)" },
+  "V-W": { bg: "rgba(75, 53, 90, 0.78)", border: "rgba(190, 137, 225, 0.78)", text: "#f5e1ff", glow: "rgba(190, 137, 225, 0.22)" },
+  "W-L": { bg: "rgba(64, 73, 77, 0.78)", border: "rgba(165, 190, 198, 0.76)", text: "#e9f6f9", glow: "rgba(165, 190, 198, 0.2)" },
+  "W-W": { bg: "rgba(42, 72, 111, 0.78)", border: "rgba(104, 168, 244, 0.84)", text: "#ddecff", glow: "rgba(104, 168, 244, 0.25)" },
+  "Z-H": { bg: "rgba(50, 77, 116, 0.78)", border: "rgba(92, 164, 245, 0.84)", text: "#e0efff", glow: "rgba(92, 164, 245, 0.25)" },
+};
+
+function hashTeamColorSeed(value: string) {
+  let hash = 0;
+  for (let index = 0; index < value.length; index += 1) {
+    hash = (hash * 31 + value.charCodeAt(index)) >>> 0;
+  }
+  return hash;
+}
+
+function getSeasonTopPlayerTeamTagStyle(teamCode: string | null | undefined): React.CSSProperties | undefined {
+  const code = String(teamCode ?? "").trim().toUpperCase();
+  if (!code) {
+    return undefined;
+  }
+
+  const mapped = SEASON_TOP_PLAYER_TEAM_TAG_COLORS[code];
+  if (mapped) {
+    return {
+      "--team-tag-bg": mapped.bg,
+      "--team-tag-border": mapped.border,
+      "--team-tag-text": mapped.text,
+      "--team-tag-glow": mapped.glow,
+    } as React.CSSProperties;
+  }
+
+  const hue = hashTeamColorSeed(code) % 360;
+  return {
+    "--team-tag-bg": `hsla(${hue}, 38%, 30%, 0.78)`,
+    "--team-tag-border": `hsla(${hue}, 72%, 68%, 0.78)`,
+    "--team-tag-text": `hsl(${hue}, 80%, 92%)`,
+    "--team-tag-glow": `hsla(${hue}, 72%, 60%, 0.22)`,
+  } as React.CSSProperties;
+}
+
 function sortRows<T>(rows: T[], sortState: SortState | undefined, accessors: Record<string, (row: T) => string | number>) {
   if (!sortState) {
     return rows;
@@ -3591,23 +4170,29 @@ function SortableHeader({
   columnKey,
   sortState,
   onToggle,
+  tooltip,
 }: {
   label: string;
   tableId: string;
   columnKey: string;
   sortState?: SortState;
   onToggle: (tableId: string, columnKey: string) => void;
+  tooltip?: string | null;
 }) {
   const isActive = sortState?.key === columnKey;
   const arrow = !isActive ? "↕" : sortState.direction === "asc" ? "↑" : "↓";
+  const resolvedTooltip = tooltip ?? getGameTermTooltip(label) ?? getGameTermTooltip(columnKey);
 
   return (
     <button
       className={`sortable-header${isActive ? " is-active" : ""}`}
       type="button"
       onClick={() => onToggle(tableId, columnKey)}
+      title={resolvedTooltip ?? `Nach ${label} sortieren`}
+      aria-label={`${label} sortieren${resolvedTooltip ? `: ${resolvedTooltip}` : ""}`}
     >
       <span>{label}</span>
+      {resolvedTooltip ? <span className="sortable-help-dot" aria-hidden="true">?</span> : null}
       <span className="sortable-arrow">{arrow}</span>
     </button>
   );
@@ -3752,7 +4337,8 @@ function ColumnVisibilityManager({
 
 function formatMoney(value: number) {
   return new Intl.NumberFormat("de-DE", {
-    maximumFractionDigits: 0,
+    minimumFractionDigits: 1,
+    maximumFractionDigits: 1,
   }).format(value);
 }
 
@@ -3762,8 +4348,8 @@ function formatNullableMoney(value: number | null | undefined) {
 
 function formatDisplayMoney(value: number) {
   return new Intl.NumberFormat("de-DE", {
-    minimumFractionDigits: 2,
-    maximumFractionDigits: 2,
+    minimumFractionDigits: 1,
+    maximumFractionDigits: 1,
   }).format(value);
 }
 
@@ -3774,7 +4360,7 @@ function formatShortSaveId(saveId: string) {
 function formatScenarioTypeLabel(scenarioType?: string | null) {
   switch (scenarioType) {
     case "fresh_start":
-      return "Fresh Start";
+      return "Neuer Start";
     case "ai_redraft_test":
       return "Redraft Test";
     case "season1_simulation":
@@ -3794,6 +4380,15 @@ function formatScenarioTypeLabel(scenarioType?: string | null) {
     default:
       return "Unmarkiert";
   }
+}
+
+function formatGamePhaseLabel(phase?: string | null) {
+  if (phase === "season_active") return "Saison laeuft";
+  if (phase === "season_review") return "Saisonrueckblick";
+  if (phase === "season_completed") return "Saison abgeschlossen";
+  if (phase === "transfer_window") return "Transferfenster";
+  if (phase === "setup") return "Vorbereitung";
+  return phase ? phase.replaceAll("_", " ") : "Vorbereitung";
 }
 
 function formatFeatureAuditStatus(status: FeatureAuditStatus) {
@@ -3906,12 +4501,12 @@ function buildViewContextWarning(
     return "Redraft-Testsave: enthält Kader-/Pickdaten, aber keine vollständige Season-Historie.";
   }
 
-  if ((view === "season" || view === "prize" || view === "cockpit") && !meta?.containsFinalStandings) {
+  if ((view === "season" || view === "seasonV2" || view === "prize" || view === "cockpit") && !meta?.containsFinalStandings) {
     return "Dieser Save hat keine abgeschlossenen Season-Daten.";
   }
 
   if (
-    view === "training" &&
+    (view === "training" || view === "trainingV2") &&
     (gamePhase ?? "season_active") === "season_active" &&
     !meta?.containsFinalStandings
   ) {
@@ -3923,15 +4518,19 @@ function buildViewContextWarning(
 
 function getViewSourceBadgeLabel(view: FoundationView, meta?: SaveSummary["scenarioMeta"] | null) {
 	  if (view === "home") return "source: manager home snapshot";
+	  if (view === "hq") return "source: front office snapshot";
 	  if (view === "inbox") return "source: derived inbox";
-	  if (view === "season") return meta?.containsFinalStandings ? "source: local season results" : "source: active local save";
-  if (view === "prize") return "source: season-end forecast";
-  if (view === "market") return "source: active local save";
-  if (view === "training") return "source: local roster/progression";
-  if (view === "matchdayArena") return meta?.containsFinalStandings ? "source: resolved matchday" : "source: active matchday";
-  if (view === "matchdayResult") return "source: local matchday results";
-  if (view === "history") return "source: active local save";
-  return "source: active local save";
+  if (view === "season") return meta?.containsFinalStandings ? "Spielstand: Saisonergebnisse" : "Spielstand: aktiv";
+  if (view === "seasonV2") return meta?.containsFinalStandings ? "Spielstand: Saisonergebnisse" : "Spielstand: aktiv";
+  if (view === "prize") return "Vorschau: Saisonende";
+  if (view === "market") return "Spielstand: aktiv";
+  if (view === "marketV2") return "Spielstand: aktiv";
+  if (view === "historyV2") return "Spielstand: aktiv";
+  if (view === "training" || view === "trainingV2") return "Kader: Entwicklung";
+  if (view === "matchdayArena") return meta?.containsFinalStandings ? "Spieltag: entschieden" : "Spieltag: aktiv";
+  if (view === "matchdayResult") return "Spieltag: Ergebnisse";
+  if (view === "history") return "Spielstand: aktiv";
+  return "Spielstand: aktiv";
 }
 
 function formatActiveManagerTeamSource(source: ActiveManagerTeamSource) {
@@ -3941,7 +4540,7 @@ function formatActiveManagerTeamSource(source: ActiveManagerTeamSource) {
     case "saved_preference":
       return "gespeichert";
     case "default_human_team":
-      return "Human Default";
+      return "Startteam";
     case "manual_select":
     default:
       return "manuell";
@@ -3965,6 +4564,22 @@ function formatLocalePoints(value: number | null | undefined, maximumFractionDig
 
 function formatWholeNumber(value: number | null | undefined) {
   return formatLocalePoints(value, 0);
+}
+
+function getTeamAxisRankTooltip(axisLabel: "POW" | "SPE" | "MEN" | "SOC") {
+  return `${axisLabel} Rang: Die Engine nimmt pro Disziplin die Top 6 scorefaehigen Spieler eines Teams, summiert diese Teamstaerke je Bereich und rankt alle Teams ligaweit.`;
+}
+
+function getTeamsViewColumnTitle(columnId: string) {
+  if (columnId === "pow") return getTeamAxisRankTooltip("POW");
+  if (columnId === "spe") return getTeamAxisRankTooltip("SPE");
+  if (columnId === "men") return getTeamAxisRankTooltip("MEN");
+  if (columnId === "soc") return getTeamAxisRankTooltip("SOC");
+  if (columnId === "gold") return "Goldmedaillen aus archivierten Seasons.";
+  if (columnId === "silver") return "Silbermedaillen aus archivierten Seasons.";
+  if (columnId === "bronze") return "Bronzemedaillen aus archivierten Seasons.";
+  if (columnId === "seasonPoints") return "Aufklappen zeigt die Punkte des Teams pro archivierter Season.";
+  return undefined;
 }
 
 function formatSignedDisplayMoney(value: number | null | undefined) {
@@ -4096,6 +4711,93 @@ function formatNullablePps(value: number | null | undefined) {
   return value == null ? "—" : formatPpsValue(value);
 }
 
+type PpAreaKey = "total" | "pow" | "spe" | "men" | "soc";
+type DisciplineCategoryFilter = "all" | "power" | "speed" | "mental" | "social";
+type PpAreaFormBonusTotals = Record<PpAreaKey, number>;
+
+function createEmptyPpAreaFormBonusTotals(): PpAreaFormBonusTotals {
+  return {
+    total: 0,
+    pow: 0,
+    spe: 0,
+    men: 0,
+    soc: 0,
+  };
+}
+
+function getPpAreaKeyForDisciplineCategory(category: string | null | undefined): Exclude<PpAreaKey, "total"> | null {
+  if (category === "power") return "pow";
+  if (category === "speed") return "spe";
+  if (category === "mental") return "men";
+  if (category === "social") return "soc";
+  return null;
+}
+
+function formatDisciplineCategoryLabel(category: string | null | undefined) {
+  if (category === "power") return "rot";
+  if (category === "speed") return "gruen";
+  if (category === "mental") return "blau";
+  if (category === "social") return "gelb";
+  return "neutral";
+}
+
+function buildPpAreaFormBonusByTeamId(gameState: GameState, seasonId: string): Record<string, PpAreaFormBonusTotals> {
+  const selectedSnapshot =
+    (gameState.seasonState.seasonSnapshots ?? []).find((snapshot) => snapshot.seasonId === seasonId) ?? null;
+  const matchdayResults =
+    selectedSnapshot?.matchdayResults ??
+    (gameState.seasonState.matchdayResults ?? []).filter((result) => result.seasonId === seasonId);
+  const resultIds = new Set(
+    matchdayResults
+      .filter((result) => result.status === "preview_applied")
+      .map((result) => result.id),
+  );
+  const disciplineResults = selectedSnapshot?.disciplineResults ?? gameState.seasonState.disciplineResults ?? [];
+  const disciplineCategoryById = new Map(
+    gameState.disciplines.map((discipline) => [discipline.id, discipline.category] as const),
+  );
+  const totalsByTeamId = new Map<string, PpAreaFormBonusTotals>();
+
+  for (const result of disciplineResults) {
+    if (resultIds.size > 0 && !resultIds.has(result.matchdayResultId)) {
+      continue;
+    }
+
+    const formModifier = result.formModifier ?? null;
+    if (formModifier == null || !Number.isFinite(formModifier) || Math.abs(formModifier) < 0.05) {
+      continue;
+    }
+
+    const areaKey = getPpAreaKeyForDisciplineCategory(disciplineCategoryById.get(result.disciplineId));
+    if (!areaKey) {
+      continue;
+    }
+
+    const current = totalsByTeamId.get(result.teamId) ?? createEmptyPpAreaFormBonusTotals();
+    current.total = Number((current.total + formModifier).toFixed(1));
+    current[areaKey] = Number((current[areaKey] + formModifier).toFixed(1));
+    totalsByTeamId.set(result.teamId, current);
+  }
+
+  return Object.fromEntries(totalsByTeamId.entries());
+}
+
+function formatPpFormBonus(value: number | null | undefined) {
+  if (value == null || !Number.isFinite(value) || Math.abs(value) < 0.05) {
+    return null;
+  }
+
+  const digits = Math.abs(value % 1) > 0.05 ? 1 : 0;
+  return `${value > 0 ? "+" : ""}${formatLocalePoints(value, digits)}`;
+}
+
+function formatSignedNumber(value: number | null | undefined, digits = 1) {
+  if (value == null || !Number.isFinite(value)) {
+    return "—";
+  }
+  return `${value > 0 ? "+" : ""}${formatLocalePoints(value, digits)}`;
+}
+
 function formatPlayerRatingValue(value: number | null | undefined) {
   return formatWholeNumber(value);
 }
@@ -4150,6 +4852,19 @@ function getCockpitStepTone(status: "open" | "ready" | "warning" | "blocked" | "
   return "is-open";
 }
 
+function getSeasonFactorToneClass(value: number | null | undefined) {
+  if (typeof value !== "number" || !Number.isFinite(value)) {
+    return "is-neutral";
+  }
+  if (value > 1.1) {
+    return "is-positive";
+  }
+  if (value < 0.9) {
+    return "is-negative";
+  }
+  return "is-neutral";
+}
+
 function getCockpitStatusLabel(status: "open" | "ready" | "warning" | "blocked" | "applied") {
   if (status === "applied") return "angewendet";
   if (status === "ready") return "bereit";
@@ -4180,6 +4895,32 @@ function getGameFlowStatusClass(status: GameFlowStepStatus) {
   return "is-warning";
 }
 
+function getAiPreseasonStatusLabel(status: FoundationAiPreseasonAutomationRun["status"]) {
+  if (status === "running") return "AI pickt gerade";
+  if (status === "completed") return "AI fertig";
+  if (status === "failed") return "AI blockiert";
+  return "AI uebersprungen";
+}
+
+function getAiPreseasonModeLabel(mode: FoundationAiPreseasonAutomationRun["mode"]) {
+  if (mode === "setup_draft") return "Setup-Draft";
+  if (mode === "season_market") return "Preseason-Markt";
+  return "Preseason";
+}
+
+function getAiPreseasonStatusClass(status: FoundationAiPreseasonAutomationRun["status"]) {
+  if (status === "running") return "is-applying";
+  if (status === "completed") return "is-completed";
+  if (status === "failed") return "is-blocked";
+  return "is-optional";
+}
+
+function getAiLineupEnsureStatusClass(feed: FoundationAiLineupBatchApplyResponse | null, busy: boolean) {
+  if (busy) return "is-applying";
+  if (feed?.error || (feed?.summary?.blockedTeams ?? 0) > 0 || (feed?.summary?.skippedBlocked ?? 0) > 0) return "is-blocked";
+  return "is-completed";
+}
+
 function getInboxSeverityLabel(severity: GameInboxItem["severity"]) {
   if (severity === "critical") return "kritisch";
   if (severity === "warning") return "Warnung";
@@ -4190,6 +4931,67 @@ function getInboxSeverityPillClass(severity: GameInboxItem["severity"]) {
   if (severity === "critical") return "transfer-status-pill is-blocked";
   if (severity === "warning") return "transfer-status-pill is-warning";
   return "transfer-status-pill is-info";
+}
+
+function getInboxCategoryLabel(category: GameInboxItem["category"]) {
+  if (category === "task") return "Aufgabe";
+  if (category === "warning") return "Warnung";
+  if (category === "news") return "Story";
+  if (category === "result") return "Reveal";
+  if (category === "finance") return "Finanzen";
+  if (category === "transfer") return "Transfer";
+  if (category === "training") return "Training";
+  if (category === "contract") return "Vertrag";
+  if (category === "facility") return "Gebaeude";
+  return "Hinweis";
+}
+
+function getInboxCategoryIcon(category: GameInboxItem["category"]) {
+  if (category === "task") return "!";
+  if (category === "warning") return "!";
+  if (category === "result") return "#";
+  if (category === "finance") return "$";
+  if (category === "transfer") return "+";
+  if (category === "training") return "^";
+  if (category === "contract") return "%";
+  if (category === "facility") return "*";
+  return "i";
+}
+
+function getInboxStatusLabel(status: GameInboxItem["status"]) {
+  if (status === "done") return "erledigt";
+  if (status === "dismissed") return "ausgeblendet";
+  return "offen";
+}
+
+function getInboxStatusPillClass(status: GameInboxItem["status"]) {
+  if (status === "done") return "transfer-status-pill is-ready";
+  if (status === "dismissed") return "transfer-status-pill";
+  return "transfer-status-pill is-info";
+}
+
+function getTeamHistoryRankToneClass(rank: number | null | undefined) {
+  if (rank == null) return "is-muted";
+  if (rank <= 4) return "is-elite";
+  if (rank <= 10) return "is-strong";
+  if (rank <= 20) return "is-mid";
+  return "is-weak";
+}
+
+function isInboxItemOwnedByTeam(item: GameInboxItem, teamId: string | null | undefined) {
+  if (!teamId) {
+    return false;
+  }
+  if (item.teamId === teamId) {
+    return true;
+  }
+  const targetTeam =
+    typeof item.targetParams.team === "string"
+      ? item.targetParams.team
+      : typeof item.targetParams.teamId === "string"
+        ? item.targetParams.teamId
+        : null;
+  return targetTeam === teamId;
 }
 
 function mapAutoRunStatusToCockpitStatus(
@@ -4277,6 +5079,10 @@ function formatCockpitReason(reason: string) {
     partial_lineup_allowed: "Das Team darf mit Mindestkader auch nur eine Disziplin voll besetzen.",
     lineup_matchday_is_not_active: "Lineups lassen sich nur fuer den aktuell aktiven Matchday aendern.",
     preview_status_not_ready: "Die Vorschau ist noch nicht im Status bereit.",
+    board_objectives_failed: "Mindestens ein Board-Ziel ist verfehlt.",
+    board_objectives_at_risk: "Mindestens ein Board-Ziel steht unter Druck.",
+    sponsor_objective_source_missing: "Sponsor-Ziel kann gerade nicht sauber gelesen werden.",
+    source_missing: "Eine Quelle fuer diese Bewertung fehlt noch.",
     "resolve_status:incomplete_lineups": "Mindestens eine Einsatzliste ist noch unvollstaendig.",
     "resolve_status:missing_lineups": "Mindestens eine Einsatzliste fehlt noch komplett.",
     "resolve_status:missing_scores": "Mindestens ein Team hat noch fehlende Score-Quellen.",
@@ -4292,15 +5098,91 @@ function formatCockpitReason(reason: string) {
     return `Blocker: ${reason.replace("blockedRule:", "")}`;
   }
 
-  if (reason.startsWith("missing_projected_cash:")) {
+    if (reason.startsWith("missing_projected_cash:")) {
     return "Mindestens ein Team hat noch keinen berechenbaren Cash-nachher-Wert.";
   }
+
+  if (reason.startsWith("phase_blocked:facility_apply:")) {
+    return "Bauen ist in dieser Phase noch nicht dran. Du kannst die Kosten trotzdem prüfen; bestätigen geht erst im Management-Fenster.";
+  }
+  if (reason === "insufficient_cash") return "Nicht genug Cash fuer dieses Upgrade.";
+  if (reason === "facility_max_level") return "Dieses Gebaeude ist bereits auf Max-Level.";
+  if (reason === "facility_disabled") return "Dieses Gebaeude ist aktuell deaktiviert und muss erst stabilisiert werden.";
+  if (reason === "specialist_wing_variant_required") return "Bitte zuerst eine Spezialisten-Variante waehlen.";
+  if (reason === "specialist_wing_variant_switch_not_supported") return "Diese Spezialisten-Variante kann nach dem Bau nicht mehr gewechselt werden.";
+  if (reason === "team_not_found") return "Team konnte fuer diese Gebaeude-Aktion nicht gefunden werden.";
+  if (reason === "save_not_active") return "Dieser Spielstand ist nicht aktiv.";
+  if (reason === "save_not_found") return "Spielstand konnte nicht gefunden werden.";
+  if (reason === "local_team_not_owned_or_ai_controlled") return "Nur eigene manuelle Teams duerfen Gebaeude bauen oder warten.";
+  if (reason === "confirm_token_required") return "Bitte Upgrade zuerst pruefen und danach bestaetigen.";
+  if (reason === "facility_upgrade_preview_stale") return "Die Upgrade-Vorschau ist veraltet. Bitte noch einmal pruefen.";
+  if (reason === "facility_maintenance_preview_stale") return "Die Wartungs-Vorschau ist veraltet. Bitte noch einmal pruefen.";
+  if (reason === "early_season_setup_allowed_before_first_result") return "Frueher Saisonstart: Management-Aktion ist bis zum ersten echten Resultat erlaubt.";
 
   if (reason.startsWith("tie_warning")) {
     return "Gleichstand blockiert diesen Schritt aktuell.";
   }
 
   return reason.replaceAll("_", " ");
+}
+
+function formatObjectiveStatusLabel(status: string | null | undefined) {
+  const mapped: Record<string, string> = {
+    open: "offen",
+    at_risk: "unter Druck",
+    failed: "verfehlt",
+    completed: "erfuellt",
+    blocked: "blockiert",
+    optional: "optional",
+    ready: "bereit",
+  };
+  return mapped[String(status ?? "").toLowerCase()] ?? String(status ?? "offen").replaceAll("_", " ");
+}
+
+function formatSeasonCompletionStepStatus(status: string | null | undefined) {
+  const mapped: Record<string, string> = {
+    planned: "geplant",
+    applied: "angewendet",
+    already_done: "schon erledigt",
+    blocked: "blockiert",
+    skipped: "uebersprungen",
+    ready: "bereit",
+  };
+  return mapped[String(status ?? "").toLowerCase()] ?? String(status ?? "offen").replaceAll("_", " ");
+}
+
+function getSeasonCompletionStepTone(status: string | null | undefined) {
+  const normalized = String(status ?? "").toLowerCase();
+  if (normalized === "applied" || normalized === "already_done" || normalized === "ready") return "is-ready";
+  if (normalized === "blocked") return "is-blocked";
+  if (normalized === "skipped") return "is-warning";
+  return "is-open";
+}
+
+function formatAiLineupAuditWarning(warning: string) {
+  const mapped: Record<string, string> = {
+    ai_lineup_audit_no_source: "AI-Audit hat keine lesbare Lineup-Quelle.",
+    ai_lineup_audit_no_lineup_drafts: "Keine gespeicherten Einsatzlisten fuer diese Saison gefunden.",
+    ai_lineup_audit_no_ai_drafts: "AI-Teams haben keine gespeicherten Einsatzlisten.",
+    ai_lineups_missing: "AI-Lineups fehlen.",
+    ai_captain_unused: "Captain wurde nicht genutzt.",
+    ai_form_cards_unused: "Formkarten wurden nicht genutzt.",
+    ai_push_unused: "Push wurde nicht genutzt.",
+    ai_mutators_unused: "Mutatoren wurden nicht genutzt.",
+  };
+  return mapped[warning] ?? formatCockpitReason(warning);
+}
+
+function formatHomeWarningLabel(warning: string) {
+  const mapped: Record<string, string> = {
+    no_active_team: "Kein aktives Team",
+    season_started_no_results: "Saison ohne Ergebnis",
+    no_final_standings: "Tabelle noch offen",
+    missing_lineups: "Einsatzliste offen",
+    formcards_open: "Formkarten offen",
+    room_not_connected: "Room nicht verbunden",
+  };
+  return mapped[warning] ?? formatCockpitReason(warning);
 }
 
 function formatMatchdayMvpWarning(warning: string) {
@@ -4341,6 +5223,18 @@ function getPlayerDisplaySalary(player?: Pick<Player, "id" | "salaryDemand" | "d
   return resolvePlayerEconomyContract({ playerId: player?.id ?? null, player }).salary;
 }
 
+function getRosterEntryDisplayMarketValue(
+  entry?: Pick<RosterEntry, "currentValue" | "purchasePrice"> | null,
+  player?: Player | null,
+) {
+  const economy = resolvePlayerEconomyContract({ playerId: player?.id ?? null, player, rosterEntry: entry ?? null });
+  return (
+    normalizeVisibleRosterMoney(entry?.currentValue ?? entry?.purchasePrice ?? null, economy.marketValue) ??
+    economy.marketValue ??
+    null
+  );
+}
+
 function getPlayerOvr(
   player: Pick<Player, "id" | "ovr" | "rating">,
   playerRatingsById?: Map<string, { ovrNormalized: number | null }> | null,
@@ -4356,9 +5250,111 @@ function getRosterEntryDisplaySalary(
 }
 
 function getRosterEntryNormalSalary(
-  player?: Player | null,
+  player?: Pick<Player, "id" | "salaryDemand" | "displaySalary"> | null,
 ) {
+  const displayNormalSalary = normalizeVisibleRosterMoney(player?.displaySalary ?? null, null);
+  if (displayNormalSalary != null) {
+    return displayNormalSalary;
+  }
+
+  const storedNormalSalary = normalizeVisibleRosterMoney(player?.salaryDemand ?? null, null);
+  if (storedNormalSalary != null) {
+    return storedNormalSalary;
+  }
+
   return resolvePlayerEconomyContract({ playerId: player?.id ?? null, player }).expectedSalary;
+}
+
+function getPlayerBaselineEconomy(gameState: GameState | null | undefined, playerId: string | null | undefined) {
+  if (!gameState || !playerId) {
+    return null;
+  }
+  const baseline = gameState.playerBaselines?.find((entry) => entry.playerId === playerId) ?? null;
+  return getPlayerBaselineEconomyReference(baseline);
+}
+
+function isPlausibleSalaryDeltaReference(
+  salary: number | null | undefined,
+  normalSalary: number | null | undefined,
+) {
+  if (
+    salary == null ||
+    normalSalary == null ||
+    !Number.isFinite(salary) ||
+    !Number.isFinite(normalSalary) ||
+    salary <= 0 ||
+    normalSalary <= 0
+  ) {
+    return false;
+  }
+
+  const largerSalary = Math.max(salary, normalSalary);
+  const smallerSalary = Math.max(0.01, Math.min(salary, normalSalary));
+  return largerSalary / smallerSalary <= 8 && Math.abs(salary - normalSalary) <= 50;
+}
+
+function getPlayerDisplayMarketValueDelta(
+  player?: Player | null,
+  entry?: Pick<RosterEntry, "currentValue" | "purchasePrice"> | null,
+) {
+  const marketValue = getPlayerDisplayMarketValue(player);
+  const previousValue = getRosterEntryDisplayMarketValue(entry, player);
+  if (marketValue == null || previousValue == null) {
+    return null;
+  }
+
+  const delta = marketValue - previousValue;
+  return Math.abs(delta) >= 0.01 ? roundViewNumber(delta, 2) : null;
+}
+
+function getRosterEntrySalaryDelta(
+  entry?: Pick<RosterEntry, "salary"> | null,
+  player?: Player | null,
+  gameState?: GameState | null,
+) {
+  if (!entry) {
+    return null;
+  }
+
+  const salary = getRosterEntryDisplaySalary(entry, player);
+  const normalSalary = getPlayerBaselineEconomy(gameState, player?.id)?.salary ?? getRosterEntryNormalSalary(player);
+  if (!isPlausibleSalaryDeltaReference(salary, normalSalary)) {
+    return null;
+  }
+  if (normalSalary == null) {
+    return null;
+  }
+
+  const delta = salary - normalSalary;
+  return Math.abs(delta) >= 0.01 ? roundViewNumber(delta, 2) : null;
+}
+
+function getEconomyDeltaClass(
+  value: number | null | undefined,
+  positiveDirection: "higher" | "lower",
+) {
+  if (value == null || !Number.isFinite(value) || Math.abs(value) < 0.01) {
+    return "";
+  }
+
+  const isPositive = positiveDirection === "higher" ? value > 0 : value < 0;
+  return isPositive ? " is-positive" : " is-negative";
+}
+
+function renderEconomyDelta(
+  value: number | null | undefined,
+  positiveDirection: "higher" | "lower",
+  className = "player-card-money-delta",
+) {
+  if (value == null || !Number.isFinite(value) || Math.abs(value) < 0.01) {
+    return null;
+  }
+
+  return (
+    <small className={`${className}${getEconomyDeltaClass(value, positiveDirection)}`}>
+      {formatSignedDisplayMoney(value)}
+    </small>
+  );
 }
 
 function roundViewNumber(value: number, digits = 4) {
@@ -4421,6 +5417,56 @@ function getPoolHeatClass(value: number | null | undefined, pool: Array<number |
   return `heat-band-${bucketIndex + 1}`;
 }
 
+function getMetricBarPercent(
+  value: number | null | undefined,
+  pool: Array<number | null | undefined> = [],
+  fallbackMax = 100,
+) {
+  if (value == null || !Number.isFinite(value) || value <= 0) {
+    return 0;
+  }
+
+  const numericPool = pool.filter((entry): entry is number => typeof entry === "number" && Number.isFinite(entry) && entry > 0);
+  const poolMax = numericPool.length > 0 ? Math.max(...numericPool) : null;
+  const max = poolMax != null && poolMax > 0 ? poolMax : fallbackMax;
+  if (!Number.isFinite(max) || max <= 0) {
+    return 0;
+  }
+
+  return Math.max(10, Math.min(100, (value / max) * 100));
+}
+
+function renderMetricBar(
+  value: number | null | undefined,
+  options: {
+    tone: "neutral" | "pps" | "mvs" | "ovr" | "pow" | "spe" | "men" | "soc";
+    pool?: Array<number | null | undefined>;
+    fallbackMax?: number;
+    format?: (value: number) => string;
+    detail?: string | null;
+    detailNegative?: boolean;
+    title?: string;
+  },
+) {
+  if (value == null || !Number.isFinite(value)) {
+    return <span className="table-metric-bar is-empty">—</span>;
+  }
+
+  const percent = getMetricBarPercent(value, options.pool, options.fallbackMax ?? 100);
+  const displayValue = options.format ? options.format(value) : formatLocalePoints(value);
+  return (
+    <span className={`table-metric-bar is-${options.tone}`} title={options.title}>
+      <span className="table-metric-bar-fill" style={{ width: `${percent}%` }} />
+      <span className="table-metric-bar-content">
+        <span className="table-metric-bar-value">{displayValue}</span>
+        {options.detail ? (
+          <small className={`table-metric-bar-detail${options.detailNegative ? " is-negative" : ""}`}>{options.detail}</small>
+        ) : null}
+      </span>
+    </span>
+  );
+}
+
 function getTransferHistoryAxisHeaderClass(columnId: string) {
   if (columnId === "pow") return "transfer-history-axis-header transfer-history-axis-header-pow heat-band-1";
   if (columnId === "spe") return "transfer-history-axis-header transfer-history-axis-header-spe heat-band-6";
@@ -4432,13 +5478,22 @@ function getTransferHistoryAxisHeaderClass(columnId: string) {
 function getSeasonCashHeatClass(value: number, rows: Array<{ cash: number | null }>) {
   const cashValues = rows.map((row) => row.cash).filter((cash): cash is number => cash != null && Number.isFinite(cash));
   if (cashValues.length < 4) {
-    return value >= 0 ? "heat-good" : "heat-weak";
+    return value >= 0 ? "heat-elite" : "heat-weak";
   }
 
   const sorted = [...cashValues].sort((left, right) => left - right);
   const pick = (ratio: number) => sorted[Math.min(sorted.length - 1, Math.max(0, Math.floor((sorted.length - 1) * ratio)))] ?? 0;
 
-  return getHeatClass(value, [pick(0.25), pick(0.5), pick(0.75)]);
+  if (value >= pick(0.75)) {
+    return "heat-elite";
+  }
+  if (value >= pick(0.5)) {
+    return "heat-strong";
+  }
+  if (value >= pick(0.25)) {
+    return "heat-good";
+  }
+  return "heat-weak";
 }
 
 function getRankHeatClass(rank: number, teamCount: number) {
@@ -4446,11 +5501,11 @@ function getRankHeatClass(rank: number, teamCount: number) {
     return "";
   }
 
-  // Rank matrices highlight only the Top 10: front green, chase yellow, edge red; places 11+ stay calm.
+  // Rank matrices highlight only the Top 10: 1-3 green, 4-6 yellow, 7-10 red; places 11+ stay calm.
   if (rank <= 3) {
     return "rank-strong";
   }
-  if (rank <= 7) {
+  if (rank <= 6) {
     return "rank-mid";
   }
   if (rank <= 10) {
@@ -4459,17 +5514,20 @@ function getRankHeatClass(rank: number, teamCount: number) {
   return "rank-muted";
 }
 
-function getPpSummaryRankClass(rank: number) {
-  if (rank <= 3) {
-    return "pp-rank-top";
+function getTop10TrafficRankClass(rank: number | null | undefined) {
+  if (rank == null || !Number.isFinite(rank)) {
+    return "";
   }
-  if (rank <= 7) {
-    return "pp-rank-chase";
+  if (rank <= 3) {
+    return "top10-rank-strong";
+  }
+  if (rank <= 6) {
+    return "top10-rank-mid";
   }
   if (rank <= 10) {
-    return "pp-rank-watch";
+    return "top10-rank-weak";
   }
-  return "pp-rank-muted";
+  return "";
 }
 
 function getSeasonMatrixRankClass(rank: number) {
@@ -4510,6 +5568,41 @@ function buildSharedRankMap(values: Array<{ teamId: string; value: number }>) {
   });
 
   return rankMap;
+}
+
+function buildMetricRankMap(values: Array<{ id: string; value: number | null | undefined }>) {
+  const numericValues = values.filter(
+    (entry): entry is { id: string; value: number } =>
+      typeof entry.value === "number" && Number.isFinite(entry.value),
+  );
+  const sortedValues = [...numericValues].sort((left, right) => {
+    if (Math.abs(right.value - left.value) > 0.0001) {
+      return right.value - left.value;
+    }
+    return left.id.localeCompare(right.id, "de");
+  });
+  const rankMap = new Map<string, number>();
+  let previousValue: number | null = null;
+  let previousRank = 0;
+
+  sortedValues.forEach((entry, index) => {
+    if (previousValue != null && Math.abs(previousValue - entry.value) < 0.0001) {
+      rankMap.set(entry.id, previousRank);
+      return;
+    }
+
+    const nextRank = index + 1;
+    previousValue = entry.value;
+    previousRank = nextRank;
+    rankMap.set(entry.id, nextRank);
+  });
+
+  return rankMap;
+}
+
+function buildMetricRankClassMap(values: Array<{ id: string; value: number | null | undefined }>) {
+  const rankMap = buildMetricRankMap(values);
+  return new Map(values.map((entry) => [entry.id, getTop10TrafficRankClass(rankMap.get(entry.id))] as const));
 }
 
 function buildNullableSharedRankMap(values: Array<{ teamId: string; value: number | null | undefined }>) {
@@ -4567,10 +5660,109 @@ function MappingHighlight({ warning }: { warning: MappingWarning }) {
   );
 }
 
-const initialGameState = createSingleplayerGameState();
+function getPlayerPortraitBrowserUrl(playerId: string, portraitUrl?: string | null, portraitPath?: string | null) {
+  if (portraitUrl?.startsWith("http://") || portraitUrl?.startsWith("https://") || (portraitUrl?.startsWith("/") && !portraitUrl.startsWith("/Users/"))) {
+    return portraitUrl;
+  }
+
+  if (portraitPath?.startsWith("/") && !portraitPath.startsWith("/Users/")) {
+    return portraitPath;
+  }
+
+  if (portraitPath?.startsWith("/Users/")) {
+    return `/api/media/player-portrait/${encodeURIComponent(playerId)}`;
+  }
+
+  return null;
+}
+
+const initialGameState: GameState = {
+  season: {
+    id: "loading",
+    name: "Foundation laedt",
+    year: 0,
+    currentMatchday: 1,
+    matchdayIds: [],
+  },
+  seasonState: {
+    seasonId: "loading",
+    schedule: [],
+    standings: {},
+    teamControlSettings: {},
+    teamStrategyProfiles: {},
+  },
+  matchdayState: {
+    matchdayId: "loading",
+    status: "planning",
+    pendingTeamIds: [],
+    resolvedFixtureIds: [],
+  },
+  teams: [
+    {
+      teamId: "loading-team",
+      shortCode: "LOAD",
+      name: "Foundation laedt",
+      logoPath: null,
+      budget: 0,
+      cash: 0,
+      identityId: "loading-team",
+      humanControlled: true,
+      rosterLimit: 0,
+      rosterMinTarget: 0,
+      rosterOptTarget: 0,
+    },
+  ],
+  teamIdentities: [
+    {
+      teamId: "loading-team",
+      playerType: null,
+      pow: 0,
+      spe: 0,
+      men: 0,
+      soc: 0,
+      ambition: 0,
+      finances: 0,
+      boardConfidence: 0,
+      harmony: 0,
+      manners: 0,
+      popularity: 0,
+      cooperation: 0,
+      playerMin: 0,
+      playerOpt: 0,
+      sourceNote: "loading",
+    },
+  ],
+  players: [],
+  disciplines: [],
+  rosters: [],
+  contracts: [],
+  transferListings: [],
+  transferHistory: [],
+  logs: [],
+  mappingReport: {
+    mappingSource: "loading",
+    teamSource: "loading",
+    generatedAt: new Date(0).toISOString(),
+    processedMappingRows: 0,
+    importedPlayerCount: 0,
+    matchedRosterCount: 0,
+    teamCount: 0,
+    unmappedPlayers: [],
+    teamsWithoutPlayers: [],
+    mappingRowsWithoutPlayerMatch: [],
+    duplicateMappedPlayers: [],
+    unknownTeamCodes: [],
+    duplicateTeamCodes: [],
+    warnings: [],
+  },
+};
 
 function withNormalizedLocalTeamSettings(gameState: GameState): GameState {
-  return withNormalizedTeamStrategyProfiles(withNormalizedTeamControlSettings(withNormalizedTeamIdentityOverrides(gameState)));
+  return withNormalizedTeamStrategyProfiles(
+    withNormalizedTeamControlSettings(
+      withNormalizedTeamGeneralManagers(withNormalizedTeamIdentityOverrides(gameState)),
+    ),
+  );
 }
 
 function buildTeamIdentityDraftMap(teams: Team[], teamIdentities: TeamIdentity[]) {
@@ -4611,6 +5803,23 @@ function formatCsvList(values: string[] | null | undefined) {
   return values?.join(", ") ?? "";
 }
 
+function getTeamRosterRoleBucket(roleTag: string | null | undefined): Exclude<TeamRosterRoleFilter, "all"> {
+  const normalized = (roleTag ?? "").toLowerCase();
+  if (normalized.includes("starter") || normalized.includes("star") || normalized.includes("core")) {
+    return "starter";
+  }
+  if (normalized.includes("rotation")) {
+    return "rotation";
+  }
+  if (normalized.includes("prospect")) {
+    return "prospect";
+  }
+  if (normalized.includes("bench") || normalized.includes("bank")) {
+    return "bench";
+  }
+  return "other";
+}
+
 function clampBiasValue(value: number) {
   if (!Number.isFinite(value)) {
     return 5;
@@ -4644,65 +5853,113 @@ function withSynchronizedStrategyAliases(current: TeamStrategyProfile, patch: Pa
   return next;
 }
 
-export default function FoundationPageClient({ initialReadSource, initialSelectedTeamId, initialSaveId }: FoundationPageClientProps) {
-  const [gameState, setGameState] = useState<GameState>(() => withNormalizedLocalTeamSettings(initialGameState));
+const foundationBootWatchdogScript = `
+(function () {
+  if (window.__foundationBootWatchdogActive) return;
+  window.__foundationBootWatchdogActive = true;
+  window.setTimeout(function () {
+    try {
+      var key = "foundation_boot_reload_once";
+      if (!window.sessionStorage.getItem(key)) {
+        window.sessionStorage.setItem(key, "1");
+        window.location.reload();
+        return;
+      }
+    } catch (error) {}
+  }, 6000);
+})();
+`;
+
+export default function FoundationPageClient({
+  initialReadSource,
+  initialSelectedTeamId,
+  initialSaveId,
+  initialPersistenceState,
+}: FoundationPageClientProps) {
+  const initialPersistedSave = initialPersistenceState?.save?.gameState ? initialPersistenceState.save : null;
+  const initialClientGameState = withNormalizedLocalTeamSettings(initialPersistedSave?.gameState ?? initialGameState);
+  const [gameState, setGameState] = useState<GameState>(() => initialClientGameState);
   const [teamIdentityDraft, setTeamIdentityDraft] = useState<TeamIdentityDraftMap>(() =>
-    buildTeamIdentityDraftMap(initialGameState.teams, initialGameState.teamIdentities),
+    buildTeamIdentityDraftMap(initialClientGameState.teams, initialClientGameState.teamIdentities),
   );
   const [teamControlDraft, setTeamControlDraft] = useState<TeamControlDraftMap>(() =>
-    buildTeamControlSettingsMap(initialGameState.teams, initialGameState.seasonState.teamControlSettings),
+    buildTeamControlSettingsMap(initialClientGameState.teams, initialClientGameState.seasonState.teamControlSettings),
   );
   const [teamStrategyDraft, setTeamStrategyDraft] = useState<TeamStrategyDraftMap>(() =>
-    buildTeamStrategyProfileMap(initialGameState.teams, initialGameState.teamIdentities, initialGameState.seasonState.teamStrategyProfiles),
+    buildTeamStrategyProfileMap(
+      initialClientGameState.teams,
+      initialClientGameState.teamIdentities,
+      initialClientGameState.seasonState.teamStrategyProfiles,
+    ),
   );
   const [teamIdentityMessage, setTeamIdentityMessage] = useState<string | null>(null);
   const [teamControlMessage, setTeamControlMessage] = useState<string | null>(null);
   const [teamStrategyMessage, setTeamStrategyMessage] = useState<string | null>(null);
-  const [saveSummaries, setSaveSummaries] = useState<SaveSummary[]>([]);
-  const [activeSaveId, setActiveSaveId] = useState<string>("save-singleplayer-dev");
+  const [saveSummaries, setSaveSummaries] = useState<SaveSummary[]>(initialPersistenceState?.saves ?? []);
+  const [activeSaveId, setActiveSaveId] = useState<string>(initialPersistedSave?.saveId ?? "save-singleplayer-dev");
+  const [foundationSaveMode, setFoundationSaveMode] = useState<FoundationSaveMode>(() =>
+    normalizeFoundationSaveMode(initialPersistenceState?._meta?.saveMode ?? readStoredFoundationSaveMode()),
+  );
   const [roomContext, setRoomContext] = useState<FoundationRoomContext | null>(null);
-  const [activeSaveName, setActiveSaveName] = useState<string>("Singleplayer Foundation");
+  const [activeSaveName, setActiveSaveName] = useState<string>(initialPersistedSave?.name ?? "Singleplayer Foundation");
   const [isSaveBusy, setIsSaveBusy] = useState<boolean>(false);
   const [readMeta, setReadMeta] = useState<FoundationReadMeta>({
-    source: "sqlite",
-    readOnly: false,
-    generatedAt: new Date().toISOString(),
+    source: initialPersistenceState?._meta?.source ?? "sqlite",
+    readOnly: initialPersistenceState?._meta?.readOnly ?? false,
+    generatedAt: initialPersistenceState?._meta?.generatedAt ?? new Date().toISOString(),
+    saveMode: initialPersistenceState?._meta?.saveMode,
   });
   const [selectedTeamId, setSelectedTeamId] = useState<string>(() =>
-    resolveFoundationTeamId(initialGameState.teams, initialSelectedTeamId) ?? initialGameState.teams[0]?.teamId ?? "",
+    resolveFoundationTeamId(initialClientGameState.teams, initialSelectedTeamId) ?? initialClientGameState.teams[0]?.teamId ?? "",
   );
   const [activeManagerTeamSource, setActiveManagerTeamSource] = useState<ActiveManagerTeamSource>(() =>
-    resolveFoundationTeamId(initialGameState.teams, initialSelectedTeamId) ? "route" : "default_human_team",
+    resolveFoundationTeamId(initialClientGameState.teams, initialSelectedTeamId) ? "route" : "default_human_team",
   );
   // UI preference only: this helps the local manager flow focus views, not authorize team access.
   const [activeOwnerId, setActiveOwnerId] = useState<string>(() => readStoredFoundationActiveOwnerId());
   const [teamContextFilter, setTeamContextFilter] = useState<TeamControlFilter>(() => readStoredFoundationTeamFilter());
   const [activeManagerTeamWarning, setActiveManagerTeamWarning] = useState<string | null>(null);
-	  const [activeView, setActiveView] = useState<FoundationView>(() => parseFoundationViewFromUrl() ?? "home");
+  const [activeView, setActiveView] = useState<FoundationView>(() => parseFoundationViewFromUrl() ?? "home");
+  const [selectedEncyclopediaEntryId, setSelectedEncyclopediaEntryId] = useState(() => getGameEncyclopediaEntry("OVR")?.id ?? "ovr");
+  const [lineupFocusRequestKey, setLineupFocusRequestKey] = useState<string | null>(null);
+  const [transferMarketTab, setTransferMarketTab] = useState<"classic" | "v2">(() => (activeView === "marketV2" ? "v2" : "classic"));
+  const activeTransferMarketTab = activeView === "marketV2" ? "v2" : transferMarketTab;
+  const isTransferMarketViewActive = activeView === "market" || activeView === "marketV2";
+  const [transferHistoryTab, setTransferHistoryTab] = useState<"classic" | "v2">(() => (activeView === "historyV2" ? "v2" : "classic"));
+  const activeTransferHistoryTab = activeView === "historyV2" ? "v2" : transferHistoryTab;
+  const isTransferHistoryViewActive = activeView === "history" || activeView === "historyV2";
+  const [showCommandPalette, setShowCommandPalette] = useState(false);
+  const [commandSearch, setCommandSearch] = useState("");
+  const commandSearchInputRef = useRef<HTMLInputElement | null>(null);
+  const [showTeamsComparison, setShowTeamsComparison] = useState<boolean>(true);
+  const shouldBuildTeamsHeavyComparison = activeView === "teams" && showTeamsComparison;
   const shouldBuildDisciplineRanks =
-    activeView === "teams" ||
+    shouldBuildTeamsHeavyComparison ||
     activeView === "ranks" ||
     activeView === "seasonPreview" ||
     activeView === "season" ||
     activeView === "prize";
-  const shouldBuildTeamHistory = activeView === "teams";
-  const shouldBuildTrainingView = activeView === "training";
+  const shouldBuildTeamHistory = shouldBuildTeamsHeavyComparison;
+  const shouldBuildTrainingView = activeView === "trainingV2";
   const shouldBuildPlayerDirectory = activeView === "players";
-  const shouldBuildMarketView = activeView === "market";
-  const shouldBuildTransferHistoryView = activeView === "history";
+  const shouldBuildMarketView = isTransferMarketViewActive;
+  const shouldBuildTransferHistoryView = isTransferHistoryViewActive;
   const shouldBuildDebugView = activeView === "debug";
-	  const [showGameFlowPanel, setShowGameFlowPanel] = useState<boolean>(false);
-	  const [inboxTeamFilter, setInboxTeamFilter] = useState<string>("ALL");
-	  const [inboxCategoryFilter, setInboxCategoryFilter] = useState<string>("ALL");
-	  const [inboxIncludeDone, setInboxIncludeDone] = useState<boolean>(false);
-	  const [inboxIncludeDismissed, setInboxIncludeDismissed] = useState<boolean>(false);
-	  const [featureAuditFilter, setFeatureAuditFilter] = useState<FeatureAuditFilter>("all");
+  const [showGameFlowPanel, setShowGameFlowPanel] = useState<boolean>(false);
+  const [inboxCategoryFilter, setInboxCategoryFilter] = useState<string>("ALL");
+  const [inboxIncludeDone, setInboxIncludeDone] = useState<boolean>(false);
+  const [inboxIncludeDismissed, setInboxIncludeDismissed] = useState<boolean>(false);
+  const [featureAuditFilter, setFeatureAuditFilter] = useState<FeatureAuditFilter>("all");
   const [matchdaySummaryTab, setMatchdaySummaryTab] = useState<"matchday" | "season">("matchday");
   const [selectedMatchdaySummaryId, setSelectedMatchdaySummaryId] = useState<string | null>(null);
   const [teamSettingsSearch, setTeamSettingsSearch] = useState<string>("");
   const [showTeamDisciplines, setShowTeamDisciplines] = useState<boolean>(false);
   const [selectedTeamDetailTab, setSelectedTeamDetailTab] = useState<"roster" | "contracts">("roster");
+  const [teamRosterRoleFilter, setTeamRosterRoleFilter] = useState<TeamRosterRoleFilter>("all");
+  const [teamRosterFocusMode, setTeamRosterFocusMode] = useState<TeamRosterFocusMode>("default");
+  const [showSelectedRosterPpsBreakdown, setShowSelectedRosterPpsBreakdown] = useState(false);
   const [trainingModeDraft, setTrainingModeDraft] = useState<Record<string, TrainingModeDraft>>({});
+  const [trainingDevelopmentFilter, setTrainingDevelopmentFilter] = useState<TrainingDevelopmentFilter>("all");
   const [trainingFacilityPreviewId, setTrainingFacilityPreviewId] = useState<string | null>(null);
   const [seasonEndAttributeDraft, setSeasonEndAttributeDraft] = useState<Record<string, SeasonEndAttributeDraft>>({});
   const [plannedXpUpgrades, setPlannedXpUpgrades] = useState<SeasonEndXpSpendPlannedUpgradeInput[]>([]);
@@ -4711,16 +5968,23 @@ export default function FoundationPageClient({ initialReadSource, initialSelecte
   const [seasonEndXpSpendError, setSeasonEndXpSpendError] = useState<string | null>(null);
   const [seasonEndXpSpendSuccess, setSeasonEndXpSpendSuccess] = useState<string | null>(null);
   const [seasonTableMode, setSeasonTableMode] = useState<SeasonTableMode>("expert");
-  const [showTeamsComparison, setShowTeamsComparison] = useState<boolean>(true);
   const [showExtendedTeamPanels, setShowExtendedTeamPanels] = useState<boolean>(false);
+  const shouldBuildTeamContracts = activeView === "teams" && selectedTeamDetailTab === "contracts";
+  const shouldBuildExtendedTeamPanels = activeView === "teams" && showExtendedTeamPanels;
+  const shouldLoadTransferHistoryFeed = isTransferHistoryViewActive;
+  const shouldLoadPrizePreviewFeed = activeView === "prize" || activeView === "cockpit";
+  const shouldLoadStandingsPreviewFeed = activeView === "season" || activeView === "cockpit" || activeView === "matchdayArena";
+  const shouldLoadSeasonManagementFeed = activeView === "home" || activeView === "inbox" || activeView === "cockpit";
+  const isFoundationBootstrapState = gameState.season.id === "loading" || selectedTeamId === "loading-team";
   const [showSeasonTopPlayerAreas, setShowSeasonTopPlayerAreas] = useState<boolean>(false);
   const [tableSorts, setTableSorts] = useState<Record<string, SortState>>({
     teamTable: { key: "punkte", direction: "desc" },
     playersTable: { key: "ovr", direction: "desc" },
     teamsView: { key: "overallRank", direction: "asc" },
     disciplineRanks: { key: "totalRank", direction: "asc" },
-    disciplineConfig: { key: "displayOrder", direction: "asc" },
+    disciplineConfig: { key: "originalOrder", direction: "asc" },
     ppArea: { key: "rank", direction: "asc" },
+    seasonTopPlayers: { key: "rank", direction: "asc" },
     prizeMoney: { key: "rank", direction: "asc" },
     sponsorPlacement: { key: "rankDelta", direction: "desc" },
     teamPrize: { key: "place", direction: "asc" },
@@ -4743,8 +6007,100 @@ export default function FoundationPageClient({ initialReadSource, initialSelecte
     setRoomContext(readFoundationRoomContextFromLocation());
   }, []);
 
+  useEffect(() => {
+    setAdminBalancingDraft(resolveAdminBalancingConfig(gameState.seasonState.adminBalancingConfig));
+    setAdminBalancingMessage(null);
+  }, [activeSaveId, gameState.seasonState.adminBalancingConfig]);
+
+  function updateAdminClassWeight(className: string, attribute: PlayerGeneratorAttributeName, value: number) {
+    setAdminBalancingDraft((current) => ({
+      ...current,
+      classProgressionWeights: {
+        ...current.classProgressionWeights,
+        [className]: {
+          ...current.classProgressionWeights[className],
+          [attribute]: Number.isFinite(value) ? value : 0,
+        },
+      },
+    }));
+    setAdminBalancingMessage(null);
+  }
+
+  function updateAdminTraitTrainingFactor(trait: string, value: number) {
+    setAdminBalancingDraft((current) => ({
+      ...current,
+      traitTrainingFactorsPct: {
+        ...current.traitTrainingFactorsPct,
+        [trait]: Number.isFinite(value) ? value : 0,
+      },
+    }));
+    setAdminBalancingMessage(null);
+  }
+
+  function updateAdminPrizePercent(index: number, value: number) {
+    setAdminBalancingDraft((current) => {
+      const prizeMoneyPercents = [...current.prizeMoneyPercents];
+      prizeMoneyPercents[index] = Math.max(0, Number.isFinite(value) ? value : 0);
+      return {
+        ...current,
+        prizeMoneyPercents,
+      };
+    });
+    setAdminBalancingMessage(null);
+  }
+
+  async function saveAdminBalancingConfig(nextDraft = adminBalancingDraft) {
+    if (isReadOnlyMode) {
+      showReadOnlyNotice();
+      return;
+    }
+
+    const nextConfig = resolveAdminBalancingConfig({
+      ...nextDraft,
+      updatedAt: new Date().toISOString(),
+    });
+    const nextGameState: GameState = {
+      ...gameState,
+      seasonState: {
+        ...gameState.seasonState,
+        adminBalancingConfig: nextConfig,
+      },
+    };
+
+    setAdminBalancingBusy(true);
+    setAdminBalancingMessage(null);
+    try {
+      await persistLocalGameStateImmediately(nextGameState);
+      setGameState(nextGameState);
+      setAdminBalancingDraft(nextConfig);
+      setAdminBalancingMessage("Balancing-Matrix gespeichert. Neue Progression/Preisgeld-Previews nutzen diese Werte.");
+    } catch (error) {
+      setAdminBalancingMessage(error instanceof Error ? error.message : "Balancing-Matrix konnte nicht gespeichert werden.");
+    } finally {
+      setAdminBalancingBusy(false);
+    }
+  }
+
+  async function resetAdminBalancingConfig() {
+    const defaults = getDefaultAdminBalancingConfig();
+    setAdminBalancingDraft(defaults);
+    await saveAdminBalancingConfig(defaults);
+  }
+
   function withRoomBody<T extends Record<string, unknown>>(body: T) {
-    return withRoomContextBody(body, roomContext);
+    const targetTeamId = typeof body.teamId === "string" ? body.teamId : selectedTeamId;
+    const targetControl = targetTeamId
+      ? buildTeamControlSettingsMap(gameState.teams, gameState.seasonState.teamControlSettings)[targetTeamId]
+      : null;
+    return withRoomContextBody(
+      {
+        ...body,
+        activeManagerTeamId: selectedTeamId,
+        activeOwnerId: effectiveActiveOwnerId,
+        controlMode: targetControl?.controlMode ?? null,
+      },
+      roomContext,
+    );
   }
   const [marketPositiveTraitFilter, setMarketPositiveTraitFilter] = useState<string>("ALL");
   const [marketNegativeTraitFilter, setMarketNegativeTraitFilter] = useState<string>("ALL");
@@ -4761,11 +6117,17 @@ export default function FoundationPageClient({ initialReadSource, initialSelecte
   const [marketMinMen, setMarketMinMen] = useState<number>(1);
   const [marketMinSoc, setMarketMinSoc] = useState<number>(1);
   const [marketShowAdvancedColumns, setMarketShowAdvancedColumns] = useState<boolean>(false);
+  const [marketShowAutoAnalysis, setMarketShowAutoAnalysis] = useState<boolean>(false);
+  const [marketShowTransferRecap, setMarketShowTransferRecap] = useState<boolean>(false);
+  const shouldLoadTransferRecapFeed = activeView === "market" && marketShowTransferRecap;
+  const [marketRenderLimit, setMarketRenderLimit] = useState<number>(TRANSFER_MARKET_INITIAL_RENDER_LIMIT);
+  const [marketLoadingMore, setMarketLoadingMore] = useState<boolean>(false);
   const [marketReloadToken, setMarketReloadToken] = useState<number>(0);
   const [marketFeed, setMarketFeed] = useState<FoundationTransfermarktResponse | null>(null);
   const [marketBuyBusy, setMarketBuyBusy] = useState<boolean>(false);
   const [marketBuyError, setMarketBuyError] = useState<string | null>(null);
   const [marketBuySuccess, setMarketBuySuccess] = useState<string | null>(null);
+  const [seasonBriefingOpen, setSeasonBriefingOpen] = useState<boolean>(false);
   const [freshSeasonStartMessage, setFreshSeasonStartMessage] = useState<string | null>(null);
   const [newGamePresetId, setNewGamePresetId] = useState<NewGamePresetId>("solo_1");
   const [newGameChrisTeamIds, setNewGameChrisTeamIds] = useState<string[]>(NEW_GAME_PRESET_DEFAULTS.solo_1.chrisTeamIds);
@@ -4819,12 +6181,27 @@ export default function FoundationPageClient({ initialReadSource, initialSelecte
   const [marketAiApplyIncludeWarnings, setMarketAiApplyIncludeWarnings] = useState<boolean>(false);
   const [rosterFillBusy, setRosterFillBusy] = useState<boolean>(false);
   const [rosterFillFeed, setRosterFillFeed] = useState<FoundationAutoRosterFillResponse | null>(null);
+  const [aiPreseasonBusy, setAiPreseasonBusy] = useState<boolean>(false);
+  const [aiPreseasonFeed, setAiPreseasonFeed] = useState<FoundationAiPreseasonAutomationResponse | null>(null);
+  const aiPreseasonRunStartedRef = useRef<Set<string>>(new Set());
+  const [aiLineupEnsureBusy, setAiLineupEnsureBusy] = useState<boolean>(false);
+  const [aiLineupEnsureFeed, setAiLineupEnsureFeed] = useState<FoundationAiLineupBatchApplyResponse | null>(null);
+  const aiLineupEnsureRunStartedRef = useRef<Set<string>>(new Set());
   const [aiPickAuditBusy, setAiPickAuditBusy] = useState<boolean>(false);
   const [aiPickAuditFeed, setAiPickAuditFeed] = useState<FoundationAiPickAuditResetResponse | null>(null);
   const [seasonStartResetBusy, setSeasonStartResetBusy] = useState<boolean>(false);
   const [seasonStartResetFeed, setSeasonStartResetFeed] = useState<FoundationSeasonStartResetResponse | null>(null);
   const [playerDrawerData, setPlayerDrawerData] = useState<PlayerDetailDrawerData | null>(null);
   const [teamDrawerTeamId, setTeamDrawerTeamId] = useState<string | null>(null);
+  const pendingTeamActivationRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  useEffect(() => () => {
+    if (pendingTeamActivationRef.current) {
+      clearTimeout(pendingTeamActivationRef.current);
+      pendingTeamActivationRef.current = null;
+    }
+  }, []);
+  const [drawerLayerOrder, setDrawerLayerOrder] = useState<"player" | "team">("player");
   const [historyFeed, setHistoryFeed] = useState<FoundationTransferHistoryResponse | null>(null);
   const [transferRecapFeed, setTransferRecapFeed] = useState<FoundationTransferRecapResponse | null>(null);
   const [resolvePreviewFeed, setResolvePreviewFeed] = useState<FoundationResolvePreviewResponse | null>(null);
@@ -4836,6 +6213,7 @@ export default function FoundationPageClient({ initialReadSource, initialSelecte
   const [resultApplyFeed, setResultApplyFeed] = useState<FoundationApplySummary | null>(null);
   const [standingsPreviewFeed, setStandingsPreviewFeed] = useState<FoundationStandingsPreviewResponse | null>(null);
   const [standingsApplyFeed, setStandingsApplyFeed] = useState<FoundationApplySummary | null>(null);
+  const [disciplineCategoryFilter, setDisciplineCategoryFilter] = useState<DisciplineCategoryFilter>("all");
   const [seasonManagementFeed, setSeasonManagementFeed] = useState<FoundationSeasonManagementResponse | null>(null);
   const [facilityUpgradeBusy, setFacilityUpgradeBusy] = useState<boolean>(false);
   const [facilityUpgradePreview, setFacilityUpgradePreview] = useState<FacilityUpgradeSummary | null>(null);
@@ -4851,9 +6229,11 @@ export default function FoundationPageClient({ initialReadSource, initialSelecte
   const [preSeasonWorkflowError, setPreSeasonWorkflowError] = useState<string | null>(null);
   const [seasonTransitionBusy, setSeasonTransitionBusy] = useState<boolean>(false);
   const [seasonTransitionFeed, setSeasonTransitionFeed] = useState<SeasonTransitionSummaryResponse | null>(null);
+  const [seasonCompletionFeed, setSeasonCompletionFeed] = useState<SeasonCompletionSummaryResponse | null>(null);
   const [seasonTransitionError, setSeasonTransitionError] = useState<string | null>(null);
   const [seasonStandingsFeed, setSeasonStandingsFeed] = useState<FoundationSeasonStandingsOverviewResponse | null>(null);
-  const [seasonOverviewSeasonId, setSeasonOverviewSeasonId] = useState<string>(initialGameState.season.id);
+  const [seasonOverviewSeasonId, setSeasonOverviewSeasonId] = useState<string>(initialClientGameState.season.id);
+  const seasonOverviewScopeRef = useRef(`${activeSaveId}:${initialClientGameState.season.id}`);
   const [prizePreviewFeed, setPrizePreviewFeed] = useState<FoundationPrizePreviewResponse | null>(null);
   const [prizeForecastRank, setPrizeForecastRank] = useState<number>(1);
   const [cashApplyFeed, setCashApplyFeed] = useState<FoundationApplySummary | null>(null);
@@ -4868,13 +6248,26 @@ export default function FoundationPageClient({ initialReadSource, initialSelecte
   const [wholeSeasonOverwriteExistingLineups, setWholeSeasonOverwriteExistingLineups] = useState<boolean>(false);
   const [wholeSeasonStopOnTie, setWholeSeasonStopOnTie] = useState<boolean>(true);
   const [wholeSeasonMaxMatchdays, setWholeSeasonMaxMatchdays] = useState<number>(2);
+  const [adminSimulationSeasonCount, setAdminSimulationSeasonCount] = useState<1 | 2 | 5>(1);
+  const [adminSimulationMode, setAdminSimulationMode] = useState<"dry_run" | "apply">("dry_run");
+  const [adminSimulationFullChurn, setAdminSimulationFullChurn] = useState<boolean>(false);
+  const [adminSimulationInjuries, setAdminSimulationInjuries] = useState<boolean>(false);
+  const [adminSimulationRun, setAdminSimulationRun] = useState<AdminSeasonSimulationRunSummary | null>(null);
+  const [adminSimulationBusy, setAdminSimulationBusy] = useState<boolean>(false);
+  const [adminSimulationError, setAdminSimulationError] = useState<string | null>(null);
+  const [adminBalancingDraft, setAdminBalancingDraft] = useState<AdminBalancingConfig>(() =>
+    resolveAdminBalancingConfig(initialClientGameState.seasonState.adminBalancingConfig),
+  );
+  const [adminBalancingMessage, setAdminBalancingMessage] = useState<string | null>(null);
+  const [adminBalancingBusy, setAdminBalancingBusy] = useState<boolean>(false);
   const [cockpitBusyKey, setCockpitBusyKey] = useState<string | null>(null);
-  const [historySeasonFilter, setHistorySeasonFilter] = useState<string>("ALL");
+  const [historySeasonFilter, setHistorySeasonFilter] = useState<string>(initialClientGameState.season.id);
   const [historyTeamFilter, setHistoryTeamFilter] = useState<string>("ALL");
   const [historyTypeFilter, setHistoryTypeFilter] = useState<string>("ALL");
   const [historyClassFilter, setHistoryClassFilter] = useState<string>("ALL");
   const [historySourceFilter, setHistorySourceFilter] = useState<string>("ALL");
   const [historySearch, setHistorySearch] = useState<string>("");
+  const [historyPage, setHistoryPage] = useState<number>(1);
   const [tableColumnPreferences, setTableColumnPreferences] = useState<PersistedFoundationTablePreferences>(() =>
     Object.fromEntries(
       Object.entries(loadFoundationTablePreferences()).map(([tableId, entry]) => [
@@ -4891,7 +6284,7 @@ export default function FoundationPageClient({ initialReadSource, initialSelecte
   const deferredPlayerTeamFilter = useDeferredValue(playerTeamFilter);
   const deferredPlayerClassFilter = useDeferredValue(playerClassFilter);
   const hasPersistedInitialState = useRef(false);
-  const hasLoadedPersistentState = useRef(false);
+  const hasLoadedPersistentState = useRef(Boolean(initialPersistedSave));
   const seasonTableShellRef = useRef<HTMLDivElement | null>(null);
   const tableResizeState = useRef<{
     tableId: string;
@@ -4904,11 +6297,22 @@ export default function FoundationPageClient({ initialReadSource, initialSelecte
   const tableDragState = useRef<{ tableId: string; columnId: string } | null>(null);
   const marketBuyPreviewRequestVersion = useRef(0);
   const marketSellPreviewRequestVersion = useRef(0);
+  const marketFeedAbortRef = useRef<AbortController | null>(null);
+  const historyFeedAbortRef = useRef<AbortController | null>(null);
+  const transferRecapAbortRef = useRef<AbortController | null>(null);
+  const resolvePreviewAbortRef = useRef<AbortController | null>(null);
+  const standingsPreviewAbortRef = useRef<AbortController | null>(null);
   const loadSaveRequestVersion = useRef(0);
   const saveActionRequestVersion = useRef(0);
+  const skipNextFullPersistCountRef = useRef(0);
+  const liveSaveVersionSignatureRef = useRef<string | null>(null);
+  const liveSaveRefreshInFlightRef = useRef(false);
+  const fullSeasonArchiveLoadKeyRef = useRef<string | null>(null);
 
   function clearSaveScopedFeeds() {
     setMarketFeed(null);
+    setMarketRenderLimit(TRANSFER_MARKET_INITIAL_RENDER_LIMIT);
+    setMarketLoadingMore(false);
     setMarketBuyPreview(null);
     setMarketBuyPreviewContext(null);
     setMarketBuyError(null);
@@ -4926,9 +6330,13 @@ export default function FoundationPageClient({ initialReadSource, initialSelecte
     setMarketAiCompareFeed(null);
     setMarketAiApplyFeed(null);
     setRosterFillFeed(null);
+    setAiPreseasonFeed(null);
+    setAiPreseasonBusy(false);
     setAiPickAuditFeed(null);
     setSeasonStartResetFeed(null);
     setHistoryFeed(null);
+    setHistorySeasonFilter(gameState.season.id);
+    setHistoryPage(1);
     setTransferRecapFeed(null);
     setResolvePreviewFeed(null);
     setCockpitAiBatchApplyFeed(null);
@@ -4943,6 +6351,7 @@ export default function FoundationPageClient({ initialReadSource, initialSelecte
     setPreSeasonWorkflowFeed(null);
     setPreSeasonWorkflowError(null);
     setSeasonTransitionFeed(null);
+    setSeasonCompletionFeed(null);
     setSeasonTransitionError(null);
     setSeasonStandingsFeed(null);
     setSeasonOverviewSeasonId(gameState.season.id);
@@ -4967,13 +6376,6 @@ export default function FoundationPageClient({ initialReadSource, initialSelecte
       return;
     }
 
-    const controlSettings = buildTeamControlSettingsMap(gameState.teams, gameState.seasonState.teamControlSettings)[resolvedTeamId];
-    const ownerId = controlSettings?.controlMode === "manual" ? controlSettings.ownerId : null;
-    if (ownerId && ownerId !== activeOwnerId) {
-      setActiveOwnerId(ownerId);
-      persistFoundationActiveOwnerId(ownerId);
-    }
-
     setSelectedTeamId(resolvedTeamId);
     setActiveManagerTeamSource(source);
     setActiveManagerTeamWarning(null);
@@ -4982,6 +6384,27 @@ export default function FoundationPageClient({ initialReadSource, initialSelecte
     }
     syncFoundationTeamIdInUrl(resolvedTeamId);
     persistFoundationManagerTeamId(resolvedTeamId, activeSaveId, source);
+    skipNextFullPersistCountRef.current += 1;
+    void persistSelectedManagerTeam(resolvedTeamId).catch((error) => {
+      console.error(error);
+      skipNextFullPersistCountRef.current = Math.max(0, skipNextFullPersistCountRef.current - 1);
+    });
+  }
+
+  function clearPendingTeamActivation() {
+    if (pendingTeamActivationRef.current) {
+      clearTimeout(pendingTeamActivationRef.current);
+      pendingTeamActivationRef.current = null;
+    }
+  }
+
+  function scheduleActiveManagerTeam(teamId: string, source: ActiveManagerTeamSource = "manual_select", afterSelect?: () => void) {
+    clearPendingTeamActivation();
+    pendingTeamActivationRef.current = setTimeout(() => {
+      pendingTeamActivationRef.current = null;
+      setActiveManagerTeam(teamId, source);
+      afterSelect?.();
+    }, 180);
   }
 
   function handleManagerTeamSelect(value: string) {
@@ -5023,13 +6446,23 @@ export default function FoundationPageClient({ initialReadSource, initialSelecte
     return views.includes(activeView) ? "" : " foundation-section-hidden";
   }
 
-  function buildStateApiPath(saveId?: string) {
+  function buildStateApiPath(
+    saveId?: string,
+    saveMode: FoundationSaveMode = foundationSaveMode,
+    options?: { compactInitial?: boolean },
+  ) {
     const params = new URLSearchParams();
     if (saveId) {
       params.set("saveId", saveId);
     }
+    if (saveMode !== "all") {
+      params.set("saveMode", saveMode);
+    }
     if (initialReadSource) {
       params.set("source", initialReadSource);
+    }
+    if (options?.compactInitial) {
+      params.set("compact", "foundation-initial");
     }
 
     const query = params.toString();
@@ -5038,6 +6471,10 @@ export default function FoundationPageClient({ initialReadSource, initialSelecte
 
   function showReadOnlyNotice() {
     window.alert("Prisma/Supabase mode is read-only in this build. Switch to SQLite mode to edit local saves.");
+  }
+
+  function showTeamManagementLockedNotice(teamName = selectedTeam?.name ?? "dieses Team") {
+    window.alert(`${teamName} gehoert nicht zu deinen steuerbaren Teams. Du kannst es ansehen, aber Management-Aktionen sind gesperrt.`);
   }
 
   async function persistLocalGameStateImmediately(nextGameState: GameState) {
@@ -5062,6 +6499,121 @@ export default function FoundationPageClient({ initialReadSource, initialSelecte
     }
     if (payload.saves) {
       setSaveSummaries(payload.saves);
+    }
+  }
+
+  async function persistNewGameFlowStepStatus(stepId: NewGameFlowStepId, status: NewGameFlowStepStatus) {
+    if (readMeta.source === "prisma" || readMeta.readOnly) {
+      return;
+    }
+
+    const response = await fetch(
+      `/api/singleplayer-state?${new URLSearchParams({
+        source: readMeta.source,
+        saveMode: foundationSaveMode,
+      }).toString()}`,
+      {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          action: "new-game-flow-step",
+          saveId: activeSaveId,
+          stepId,
+          status,
+          selectedTeamId: selectedTeamId ?? activeManagerTeamId ?? null,
+        }),
+      },
+    );
+
+    if (!response.ok) {
+      throw new Error("Flow-Schritt konnte nicht gespeichert werden.");
+    }
+
+    const payload = (await response.json()) as {
+      save?: { saveId: string; name?: string };
+      saves?: SaveSummary[];
+    };
+    if (payload.save?.name) {
+      setActiveSaveName(payload.save.name);
+    }
+    if (payload.saves) {
+      setSaveSummaries(payload.saves);
+    }
+  }
+
+  async function persistSelectedManagerTeam(teamId: string) {
+    if (readMeta.source === "prisma" || readMeta.readOnly || !teamId || activeSaveId === "loading-save") {
+      return;
+    }
+
+    const response = await fetch(
+      `/api/singleplayer-state?${new URLSearchParams({
+        source: readMeta.source,
+        saveMode: foundationSaveMode,
+      }).toString()}`,
+      {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          action: "select-manager-team",
+          saveId: activeSaveId,
+          selectedTeamId: teamId,
+        }),
+      },
+    );
+
+    if (!response.ok) {
+      throw new Error("Manager-Team konnte nicht gespeichert werden.");
+    }
+
+    const payload = (await response.json()) as {
+      save?: { saveId: string; name?: string };
+      saves?: SaveSummary[];
+    };
+    if (payload.save?.name) {
+      setActiveSaveName(payload.save.name);
+    }
+    if (payload.saves) {
+      setSaveSummaries(payload.saves);
+    }
+  }
+
+  async function setPlayerTrainingMode(playerId: string, mode: TrainingModeDraft) {
+    if (isReadOnlyMode) {
+      showReadOnlyNotice();
+      return;
+    }
+    if (isSelectedTeamManagementLocked) {
+      showTeamManagementLockedNotice();
+      return;
+    }
+
+    const playerRosterEntry = gameState.rosters.find(
+      (entry) => entry.playerId === playerId && entry.teamId === selectedTeam?.teamId,
+    );
+    if (!playerRosterEntry) {
+      return;
+    }
+
+    setTrainingModeDraft((current) => ({
+      ...current,
+      [playerId]: mode,
+    }));
+
+    const nextGameState: GameState = {
+      ...gameState,
+      players: gameState.players.map((player) => (player.id === playerId ? { ...player, trainingMode: mode } : player)),
+    };
+
+    setGameState(nextGameState);
+    try {
+      await persistLocalGameStateImmediately(nextGameState);
+    } catch (error) {
+      window.alert(error instanceof Error ? error.message : "Training konnte nicht gespeichert werden.");
     }
   }
 
@@ -5117,36 +6669,74 @@ export default function FoundationPageClient({ initialReadSource, initialSelecte
     setActiveManagerTeam(nextTeamId, "manual_select");
   }
 
-  function saveTeamSettings() {
+  async function saveTeamSettings() {
     if (isReadOnlyMode) {
       showReadOnlyNotice();
       return;
     }
 
-    setGameState((current) =>
-      {
-        const identityOverrides = buildTeamIdentityOverrideMap(current.teams, teamIdentityDraft);
-        const resolvedIdentities = buildResolvedTeamIdentities(current.teams, current.teamIdentities, identityOverrides);
-
-        return withNormalizedLocalTeamSettings({
-          ...current,
-          teamIdentities: resolvedIdentities,
-          seasonState: {
-            ...current.seasonState,
-            teamIdentityOverrides: identityOverrides,
-            teamControlSettings: buildTeamControlSettingsMap(current.teams, teamControlDraft),
-            teamStrategyProfiles: buildTeamStrategyProfileMap(
-              current.teams,
-              resolvedIdentities,
-              teamStrategyDraft,
-            ),
-          },
-        });
+    const identityOverrides = buildTeamIdentityOverrideMap(gameState.teams, teamIdentityDraft);
+    const resolvedIdentities = buildResolvedTeamIdentities(gameState.teams, gameState.teamIdentities, identityOverrides);
+    const nextTeamControlSettings = buildTeamControlSettingsMap(gameState.teams, teamControlDraft);
+    const selectedTeamControl = selectedTeam ? nextTeamControlSettings[selectedTeam.teamId] : null;
+    const selectedTeamIsLocalUser =
+      selectedTeamControl?.controlMode === "manual" &&
+      (selectedTeamControl.ownerId === DEFAULT_ACTIVE_OWNER_ID || selectedTeamControl.ownerSlot === "user");
+    const nextSelectedTeamId = selectedTeamIsLocalUser
+      ? selectedTeam?.teamId
+      : gameState.seasonState.newGameFlow?.selectedTeamId ?? null;
+    const nextGameState = withNormalizedLocalTeamSettings({
+      ...gameState,
+      teams: gameState.teams.map((team) => {
+        const control = nextTeamControlSettings[team.teamId];
+        return control ? { ...team, humanControlled: control.controlMode === "manual" } : team;
+      }),
+      teamIdentities: resolvedIdentities,
+      seasonState: {
+        ...gameState.seasonState,
+        newGameFlow: gameState.seasonState.newGameFlow
+          ? {
+              ...gameState.seasonState.newGameFlow,
+              selectedTeamId: nextSelectedTeamId,
+              updatedAt: new Date().toISOString(),
+            }
+          : gameState.seasonState.newGameFlow,
+        teamIdentityOverrides: identityOverrides,
+        teamControlSettings: nextTeamControlSettings,
+        teamStrategyProfiles: buildTeamStrategyProfileMap(
+          gameState.teams,
+          resolvedIdentities,
+          teamStrategyDraft,
+        ),
       },
-    );
-    setTeamIdentityMessage("Team-Identitäten wurden lokal gespeichert.");
-    setTeamControlMessage("Team-Admin-Settings wurden lokal gespeichert.");
-    setTeamStrategyMessage("Strategy Profiles wurden lokal gespeichert.");
+    });
+
+    setIsSaveBusy(true);
+    try {
+      await persistLocalGameStateImmediately(nextGameState);
+      hasPersistedInitialState.current = false;
+      hasLoadedPersistentState.current = true;
+      setGameState(nextGameState);
+      setTeamControlDraft(nextTeamControlSettings);
+
+      const nextSelectedControl = selectedTeam ? nextTeamControlSettings[selectedTeam.teamId] : null;
+      if (nextSelectedControl?.controlMode === "manual" && nextSelectedControl.ownerId && nextSelectedControl.ownerId !== activeOwnerId) {
+        setActiveOwnerId(nextSelectedControl.ownerId);
+        persistFoundationActiveOwnerId(nextSelectedControl.ownerId);
+      }
+
+      setTeamIdentityMessage("Team-Identitäten wurden lokal gespeichert.");
+      setTeamControlMessage("Team-Admin-Settings wurden lokal gespeichert.");
+      setTeamStrategyMessage("Strategy Profiles wurden lokal gespeichert.");
+      await loadSave(activeSaveId, foundationSaveMode, { compactInitial: false });
+    } catch (error) {
+      const message = error instanceof Error ? error.message : "Team-Settings konnten nicht lokal gespeichert werden.";
+      setTeamIdentityMessage(null);
+      setTeamControlMessage(message);
+      setTeamStrategyMessage(null);
+    } finally {
+      setIsSaveBusy(false);
+    }
   }
 
   async function enableAiLineupApplyForAiTeams() {
@@ -5285,6 +6875,10 @@ export default function FoundationPageClient({ initialReadSource, initialSelecte
       showReadOnlyNotice();
       return;
     }
+    if (!selectedTeamCanManage) {
+      showTeamManagementLockedNotice();
+      return;
+    }
 
     setGameState((current) => ({
       ...current,
@@ -5310,6 +6904,25 @@ export default function FoundationPageClient({ initialReadSource, initialSelecte
     }));
   }
 
+  function saveTransferSellMarkers(nextEntries: TransferSellMarkerEntry[]) {
+    if (isReadOnlyMode) {
+      showReadOnlyNotice();
+      return;
+    }
+    if (!selectedTeamCanManage) {
+      showTeamManagementLockedNotice();
+      return;
+    }
+
+    setGameState((current) => ({
+      ...current,
+      seasonState: {
+        ...current.seasonState,
+        transferSellMarkers: nextEntries,
+      },
+    }));
+  }
+
   function buildWishlistEntry(item: TransfermarktFreeAgentItem): TransferWishlistEntry {
     return {
       id:
@@ -5325,6 +6938,10 @@ export default function FoundationPageClient({ initialReadSource, initialSelecte
       marketValue: item.marketValue ?? null,
       salary: item.salary ?? null,
       bracket: item.bracket ?? null,
+      pow: item.pow ?? null,
+      spe: item.spe ?? null,
+      men: item.men ?? null,
+      soc: item.soc ?? null,
       teamId: marketTeamId || null,
       createdAt: new Date().toISOString(),
     };
@@ -5345,6 +6962,44 @@ export default function FoundationPageClient({ initialReadSource, initialSelecte
     saveTransferWishlist((gameState.seasonState.transferWishlist ?? []).filter((entry) => entry.playerId !== playerId));
   }
 
+  function toggleTransferSellMarker(input: {
+    teamId: string;
+    playerId: string;
+    playerName: string;
+    contractLength: number;
+    buyoutCost: number | null;
+    marketValueAtExit: number | null;
+    morale: number | null;
+  }) {
+    const currentEntries = gameState.seasonState.transferSellMarkers ?? [];
+    const existing = currentEntries.find((entry) => entry.teamId === input.teamId && entry.playerId === input.playerId);
+    if (existing) {
+      saveTransferSellMarkers(
+        currentEntries.filter((entry) => !(entry.teamId === input.teamId && entry.playerId === input.playerId)),
+      );
+      return;
+    }
+
+    const nextEntry: TransferSellMarkerEntry = {
+      id:
+        typeof crypto !== "undefined" && "randomUUID" in crypto
+          ? crypto.randomUUID()
+          : `sell-marker-${input.teamId}-${input.playerId}-${Date.now()}`,
+      saveId: activeSaveId,
+      seasonId: gameState.season.id,
+      teamId: input.teamId,
+      playerId: input.playerId,
+      playerName: input.playerName,
+      contractLength: input.contractLength,
+      buyoutCost: input.buyoutCost,
+      marketValueAtExit: input.marketValueAtExit,
+      morale: input.morale,
+      createdAt: new Date().toISOString(),
+    };
+
+    saveTransferSellMarkers([nextEntry, ...currentEntries]);
+  }
+
   function updateTeamStrategyDraft(teamId: string, updater: (current: TeamStrategyProfile) => TeamStrategyProfile) {
     setTeamStrategyDraft((current) => {
       const base =
@@ -5363,12 +7018,14 @@ export default function FoundationPageClient({ initialReadSource, initialSelecte
     setTeamStrategyMessage(null);
   }
 
-  function openPlayerDrawerById(playerId: string, activePlayerId?: string | null) {
+  async function openPlayerDrawerById(playerId: string, activePlayerId?: string | null) {
+    const { buildPlayerDrawerDataFromGameState } = await import("@/lib/foundation/player-detail-drawer");
     const nextData = buildPlayerDrawerDataFromGameState({
       gameState,
       playerId,
       activePlayerId,
       source: readMeta.source,
+      manageableTeamIds: ownerQuickSwitchTeams.map((team) => team.teamId),
     });
 
     if (!nextData) {
@@ -5376,6 +7033,12 @@ export default function FoundationPageClient({ initialReadSource, initialSelecte
     }
 
     setPlayerDrawerData(nextData);
+    setDrawerLayerOrder("player");
+  }
+
+  function openTrainingPlayerTarget(playerId: string, target: "training" | "upgrade" = "training") {
+    setFoundationView("trainingV2", setActiveView);
+    scrollToFoundationTarget(target === "upgrade" ? `training-upgrade-player-${playerId}` : `training-player-${playerId}`);
   }
 
   function closePlayerDrawer() {
@@ -5387,7 +7050,10 @@ export default function FoundationPageClient({ initialReadSource, initialSelecte
       return;
     }
 
+    clearPendingTeamActivation();
+    setPlayerDrawerData(null);
     setTeamDrawerTeamId(teamId);
+    setDrawerLayerOrder("team");
   }
 
   function closeTeamDrawer() {
@@ -5592,6 +7258,12 @@ export default function FoundationPageClient({ initialReadSource, initialSelecte
   }
 
   async function openMarketBuyModal(item: TransfermarktBuyPreviewSubject, teamIdOverride?: string) {
+    const effectiveTeamId = teamIdOverride ?? marketTeamId;
+    if (!canManageTeamId(effectiveTeamId)) {
+      setMarketBuyError(`${getTeamLockedName(effectiveTeamId)} gehoert nicht zu deinen steuerbaren Teams. Kaufen ist gesperrt.`);
+      showTeamManagementLockedNotice(getTeamLockedName(effectiveTeamId));
+      return;
+    }
     setMarketContractLengthDraft(1);
     setMarketContractShapeDraft("balanced");
     setMarketOfferedSalaryDraft(null);
@@ -5627,6 +7299,15 @@ export default function FoundationPageClient({ initialReadSource, initialSelecte
         return;
       }
       setMarketSellError("Prisma-Referenz ist read-only. Fuer Verkaeufe bitte lokalen Testspielstand nutzen.");
+      setMarketSellPreview(null);
+      return;
+    }
+
+    if (!canManageTeamId(effectiveTeamId)) {
+      if (requestVersion !== marketSellPreviewRequestVersion.current) {
+        return;
+      }
+      setMarketSellError(`${getTeamLockedName(effectiveTeamId)} gehoert nicht zu deinen steuerbaren Teams. Verkaufen ist gesperrt.`);
       setMarketSellPreview(null);
       return;
     }
@@ -5689,6 +7370,12 @@ export default function FoundationPageClient({ initialReadSource, initialSelecte
   }
 
   async function openMarketSellModal(subject: TransfermarktSellPreviewSubject, teamIdOverride?: string) {
+    const effectiveTeamId = teamIdOverride ?? selectedTeam?.teamId ?? "";
+    if (!canManageTeamId(effectiveTeamId)) {
+      setMarketSellError(`${getTeamLockedName(effectiveTeamId)} gehoert nicht zu deinen steuerbaren Teams. Verkaufen ist gesperrt.`);
+      showTeamManagementLockedNotice(getTeamLockedName(effectiveTeamId));
+      return;
+    }
     setMarketSellError(null);
     setMarketSellSuccess(null);
     setMarketSellPreview(null);
@@ -5711,6 +7398,11 @@ export default function FoundationPageClient({ initialReadSource, initialSelecte
     }
 
     if (!marketSellPreview?.activePlayer?.id || !marketSellPreview.team?.id) {
+      return;
+    }
+    if (!canManageTeamId(marketSellPreview.team.id)) {
+      setMarketSellError(`${getTeamLockedName(marketSellPreview.team.id)} gehoert nicht zu deinen steuerbaren Teams. Verkaufen ist gesperrt.`);
+      showTeamManagementLockedNotice(getTeamLockedName(marketSellPreview.team.id));
       return;
     }
 
@@ -5773,25 +7465,41 @@ export default function FoundationPageClient({ initialReadSource, initialSelecte
     }), roomContext);
   }
 
-  async function reloadResolvePreview() {
+  async function reloadResolvePreview(signal?: AbortSignal) {
     const response = await fetch(`/api/resolve/legacy-matchday-preview?${buildCockpitScopeParams().toString()}`, {
       cache: "no-store",
+      signal,
     });
     const payload = (await response.json()) as FoundationResolvePreviewResponse;
+    if (signal?.aborted) {
+      return null;
+    }
     setResolvePreviewFeed(payload);
     return payload;
   }
 
-  async function reloadStandingsPreviewFeed() {
+  async function reloadStandingsPreviewFeed(signal?: AbortSignal) {
+    if (gameState.season.id === "loading" || gameState.matchdayState.matchdayId === "loading") {
+      setStandingsPreviewFeed(null);
+      return null;
+    }
     const response = await fetch(`/api/standings/preview?${buildCockpitScopeParams().toString()}`, {
       cache: "no-store",
+      signal,
     });
     const payload = (await response.json()) as FoundationStandingsPreviewResponse;
+    if (signal?.aborted) {
+      return null;
+    }
     setStandingsPreviewFeed(payload);
     return payload;
   }
 
   async function reloadPrizePreviewFeed() {
+    if (gameState.season.id === "loading") {
+      setPrizePreviewFeed(null);
+      return null;
+    }
     const params = new URLSearchParams({
       saveId: activeSaveId,
       seasonId: gameState.season.id,
@@ -5905,6 +7613,72 @@ export default function FoundationPageClient({ initialReadSource, initialSelecte
     }
   }
 
+  async function runAiPreseasonBackground() {
+    if (readMeta.source === "prisma") {
+      return null;
+    }
+
+    setAiPreseasonBusy(true);
+    setAiPreseasonFeed(null);
+    try {
+      const response = await fetch(
+        `/api/ai/preseason-background?${new URLSearchParams({
+          saveId: activeSaveId,
+          seasonId: gameState.season.id,
+          source: readMeta.source,
+        }).toString()}`,
+        {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({}),
+        },
+      );
+      const payload = (await response.json()) as FoundationAiPreseasonAutomationResponse;
+      setAiPreseasonFeed(payload);
+      if (response.ok && payload.run?.status !== "running") {
+        await Promise.all([
+          loadSave(activeSaveId),
+          reloadMarketFeed(),
+          reloadHistoryFeed(),
+          reloadTransferRecapFeed(),
+          reloadAiTransferPreview(),
+          reloadAiSellPreview(),
+          reloadAiMarketPlanPreview(),
+          reloadSeasonStandingsOverview(),
+          reloadSeasonManagementOverview(),
+        ]);
+        setMarketReloadToken((current) => current + 1);
+      }
+      return payload;
+    } catch (error) {
+      const message = error instanceof Error ? error.message : "AI Preseason konnte nicht gestartet werden.";
+      const payload: FoundationAiPreseasonAutomationResponse = {
+        ok: false,
+        skipped: false,
+        error: message,
+        run: {
+          runId: `client-error-${Date.now()}`,
+          seasonId: gameState.season.id,
+          status: "failed",
+          mode: "none",
+          startedAt: new Date().toISOString(),
+          completedAt: new Date().toISOString(),
+          aiTeamsTotal: aiTeams.length,
+          aiTeamsCompleted: 0,
+          managerActionsApplied: 0,
+          transferBuysApplied: 0,
+          transferSellsApplied: 0,
+          warnings: [],
+          blockingReasons: [message],
+        },
+      };
+      setAiPreseasonFeed(payload);
+      return payload;
+    } finally {
+      setAiPreseasonBusy(false);
+    }
+  }
+
   async function runAiPickAuditReset(execute: boolean) {
     if (readMeta.source === "prisma") {
       showReadOnlyNotice();
@@ -6003,9 +7777,15 @@ export default function FoundationPageClient({ initialReadSource, initialSelecte
     }
   }
 
-  async function runFacilityUpgradePreview(facilityId: FacilityId) {
+  async function runFacilityUpgradePreview(facilityId: FacilityId, action: "upgrade" | "downgrade" = "upgrade") {
     if (readMeta.source === "prisma") {
       setFacilityUpgradeError("Prisma-Referenz ist read-only. Facility-Upgrades laufen nur im lokalen Save.");
+      return;
+    }
+    if (!selectedTeamCanManage) {
+      const message = `${selectedTeam?.name ?? "Dieses Team"} gehoert nicht zu deinen steuerbaren Teams. Gebaeude sind read-only.`;
+      setFacilityUpgradeError(message);
+      showTeamManagementLockedNotice();
       return;
     }
 
@@ -6024,13 +7804,21 @@ export default function FoundationPageClient({ initialReadSource, initialSelecte
           teamId: selectedTeam.teamId,
           facilityId,
           variant: facilityId === "specialist_wing" ? specialistWingVariantDraft : null,
+          action,
           dryRun: true,
         })),
       });
       const payload = (await response.json()) as FacilityUpgradeApiResponse;
       setFacilityUpgradePreview(payload.summary ?? null);
-      if (!response.ok || payload.error) {
-        setFacilityUpgradeError(payload.error ?? payload.blockingReasons?.join(" · ") ?? "Facility-Preview blockiert.");
+      if (!response.ok || !payload.success || payload.error) {
+        const reasons = payload.blockingReasons ?? payload.summary?.blockingReasons ?? [];
+        setFacilityUpgradeError(
+          payload.error
+            ? formatCockpitReason(payload.error)
+            : reasons.length > 0
+              ? reasons.map(formatCockpitReason).join(" · ")
+              : "Upgrade-Vorschau ist gerade blockiert.",
+        );
       }
     } catch {
       setFacilityUpgradeError("Facility-Preview konnte nicht geladen werden.");
@@ -6049,6 +7837,11 @@ export default function FoundationPageClient({ initialReadSource, initialSelecte
       setFacilityUpgradeError("facility_upgrade_preview_stale: Save oder Team hat sich geaendert. Bitte Preview neu laden.");
       return;
     }
+    if (!selectedTeamCanManage) {
+      setFacilityUpgradeError(`${selectedTeam.name} gehoert nicht zu deinen steuerbaren Teams. Gebaeude sind read-only.`);
+      showTeamManagementLockedNotice();
+      return;
+    }
 
     setFacilityUpgradeBusy(true);
     setFacilityUpgradeError(null);
@@ -6064,6 +7857,7 @@ export default function FoundationPageClient({ initialReadSource, initialSelecte
           teamId: selectedTeam.teamId,
           facilityId: facilityUpgradePreview.facility.facilityId,
           variant: facilityUpgradePreview.facility.variant,
+          action: facilityUpgradePreview.action ?? "upgrade",
           dryRun: false,
           confirmToken: facilityUpgradePreview.confirmToken,
         })),
@@ -6071,10 +7865,23 @@ export default function FoundationPageClient({ initialReadSource, initialSelecte
       const payload = (await response.json()) as FacilityUpgradeApiResponse;
       setFacilityUpgradePreview(payload.summary ?? null);
       if (!response.ok || !payload.success || !payload.summary) {
-        setFacilityUpgradeError(payload.error ?? payload.blockingReasons?.join(" · ") ?? "Facility-Upgrade blockiert.");
+        const reasons = payload.blockingReasons ?? payload.summary?.blockingReasons ?? [];
+        setFacilityUpgradeError(
+          payload.error
+            ? formatCockpitReason(payload.error)
+            : reasons.length > 0
+              ? reasons.map(formatCockpitReason).join(" · ")
+              : "Facility-Upgrade blockiert.",
+        );
         return;
       }
-      setFacilityUpgradeSuccess(`${payload.summary.facility?.label ?? "Facility"} aktualisiert. Event ${payload.summary.facilityEventId ?? "geschrieben"}.`);
+      setFacilityUpgradeSuccess(
+        `${payload.summary.facility?.label ?? "Facility"} aktualisiert: Level ${payload.summary.currentLevel} → ${
+          payload.summary.nextLevel ?? payload.summary.currentLevel
+        } · Cash ${formatTransfermarktCurrency(payload.summary.cashBefore)} → ${formatTransfermarktCurrency(payload.summary.cashAfter)} · ${
+          payload.summary.nextEffect ?? payload.summary.currentEffect
+        }.`,
+      );
       await Promise.all([loadSave(activeSaveId), reloadPrizePreviewFeed(), reloadStandingsPreviewFeed()]);
       setMarketReloadToken((current) => current + 1);
     } catch {
@@ -6087,6 +7894,11 @@ export default function FoundationPageClient({ initialReadSource, initialSelecte
   async function runFacilityMaintenancePreview(facilityId: FacilityId) {
     if (readMeta.source === "prisma") {
       setFacilityMaintenanceError("Prisma-Referenz ist read-only. Facility-Wartung laeuft nur im lokalen Save.");
+      return;
+    }
+    if (!selectedTeamCanManage) {
+      setFacilityMaintenanceError(`${selectedTeam?.name ?? "Dieses Team"} gehoert nicht zu deinen steuerbaren Teams. Wartung ist read-only.`);
+      showTeamManagementLockedNotice();
       return;
     }
 
@@ -6109,8 +7921,15 @@ export default function FoundationPageClient({ initialReadSource, initialSelecte
       });
       const payload = (await response.json()) as FacilityMaintenanceApiResponse;
       setFacilityMaintenancePreview(payload.summary ?? null);
-      if (!response.ok || payload.error) {
-        setFacilityMaintenanceError(payload.error ?? payload.blockingReasons?.join(" · ") ?? "Facility-Wartung blockiert.");
+      if (!response.ok || !payload.success || payload.error) {
+        const reasons = payload.blockingReasons ?? payload.summary?.blockingReasons ?? [];
+        setFacilityMaintenanceError(
+          payload.error
+            ? formatCockpitReason(payload.error)
+            : reasons.length > 0
+              ? reasons.map(formatCockpitReason).join(" · ")
+              : "Wartungs-Vorschau ist gerade blockiert.",
+        );
       }
     } catch {
       setFacilityMaintenanceError("Facility-Wartung konnte nicht geladen werden.");
@@ -6130,6 +7949,11 @@ export default function FoundationPageClient({ initialReadSource, initialSelecte
       facilityMaintenancePreview.team?.teamId !== selectedTeam.teamId
     ) {
       setFacilityMaintenanceError("facility_maintenance_preview_stale: Save oder Team hat sich geaendert. Bitte Preview neu laden.");
+      return;
+    }
+    if (!selectedTeamCanManage) {
+      setFacilityMaintenanceError(`${selectedTeam.name} gehoert nicht zu deinen steuerbaren Teams. Wartung ist read-only.`);
+      showTeamManagementLockedNotice();
       return;
     }
 
@@ -6153,7 +7977,14 @@ export default function FoundationPageClient({ initialReadSource, initialSelecte
       const payload = (await response.json()) as FacilityMaintenanceApiResponse;
       setFacilityMaintenancePreview(payload.summary ?? null);
       if (!response.ok || !payload.success || !payload.summary) {
-        setFacilityMaintenanceError(payload.error ?? payload.blockingReasons?.join(" · ") ?? "Facility-Wartung blockiert.");
+        const reasons = payload.blockingReasons ?? payload.summary?.blockingReasons ?? [];
+        setFacilityMaintenanceError(
+          payload.error
+            ? formatCockpitReason(payload.error)
+            : reasons.length > 0
+              ? reasons.map(formatCockpitReason).join(" · ")
+              : "Facility-Wartung blockiert.",
+        );
         return;
       }
       setFacilityMaintenanceSuccess(
@@ -6171,7 +8002,13 @@ export default function FoundationPageClient({ initialReadSource, initialSelecte
   }
 
   function addSeasonEndXpUpgrade(playerId: string, attribute: PlayerGeneratorAttributeName) {
-    setSeasonEndXpSpendSuccess(null);
+    if (!selectedTeamCanManage) {
+      setSeasonEndXpSpendError(`${selectedTeam?.name ?? "Dieses Team"} gehoert nicht zu deinen steuerbaren Teams. Training ist read-only.`);
+      showTeamManagementLockedNotice();
+      return;
+    }
+    const plannedPlayer = seasonEndProgressionPreview?.rows.find((row) => row.playerId === playerId)?.playerName ?? "Spieler";
+    setSeasonEndXpSpendSuccess(`Training geplant: ${plannedPlayer} +1 ${SEASON_END_ATTRIBUTE_LABELS[attribute]}. Noch nicht gespeichert.`);
     setSeasonEndXpSpendError(null);
     setPlannedXpUpgrades((current) => [
       ...current,
@@ -6184,7 +8021,12 @@ export default function FoundationPageClient({ initialReadSource, initialSelecte
   }
 
   function removeSeasonEndXpUpgrade(playerId: string, attribute?: PlayerGeneratorAttributeName) {
-    setSeasonEndXpSpendSuccess(null);
+    if (!selectedTeamCanManage) {
+      setSeasonEndXpSpendError(`${selectedTeam?.name ?? "Dieses Team"} gehoert nicht zu deinen steuerbaren Teams. Training ist read-only.`);
+      showTeamManagementLockedNotice();
+      return;
+    }
+    setSeasonEndXpSpendSuccess("Training angepasst: ein geplantes Upgrade entfernt. Noch nicht gespeichert.");
     setSeasonEndXpSpendError(null);
     setPlannedXpUpgrades((current) => {
       const index = [...current]
@@ -6207,6 +8049,11 @@ export default function FoundationPageClient({ initialReadSource, initialSelecte
     }
     if (readMeta.source === "prisma") {
       showReadOnlyNotice();
+      return;
+    }
+    if (!selectedTeamCanManage) {
+      setSeasonEndXpSpendError(`${selectedTeam.name} gehoert nicht zu deinen steuerbaren Teams. Training ist read-only.`);
+      showTeamManagementLockedNotice();
       return;
     }
 
@@ -6236,7 +8083,7 @@ export default function FoundationPageClient({ initialReadSource, initialSelecte
 
       setSeasonEndXpSpendSuccess(
         plannedXpUpgrades.length > 0
-          ? `XP-Upgrades bestaetigt: ${payload.summary.eventIds.length} Progression-Event(s) geschrieben.`
+          ? `XP-Upgrades bestaetigt: ${payload.summary.eventIds.length} Progression-Event(s) · ${plannedXpUpgrades.length} Upgrade(s) geschrieben.`
           : `Season-XP eingesammelt: ${payload.summary.eventIds.length} Progression-Event(s) geschrieben.`,
       );
       setPlannedXpUpgrades([]);
@@ -6411,8 +8258,7 @@ export default function FoundationPageClient({ initialReadSource, initialSelecte
       const payload = (await response.json()) as FoundationApplySummary;
       setStandingsApplyFeed(payload);
       if (execute && response.ok && payload.applied) {
-        await Promise.all([loadSave(activeSaveId), reloadStandingsPreviewFeed(), reloadPrizePreviewFeed()]);
-        setMarketReloadToken((current) => current + 1);
+        await reloadLiveSeasonState("manual_apply");
       }
       return payload;
     } finally {
@@ -6488,6 +8334,54 @@ export default function FoundationPageClient({ initialReadSource, initialSelecte
     }
   }
 
+  async function runPreSeasonNextSeasonSetup() {
+    if (readMeta.source === "prisma") {
+      showReadOnlyNotice();
+      return null;
+    }
+
+    setPreSeasonWorkflowBusy(true);
+    setPreSeasonWorkflowError(null);
+    setCockpitBusyKey("preseason-next-season-setup");
+    try {
+      const response = await fetch("/api/season/preseason-workflow", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(withRoomBody({
+          saveId: activeSaveId,
+          source: readMeta.source,
+          dryRun: false,
+          stepId: "next_season_setup",
+          confirmToken: PRESEASON_NEXT_SEASON_SETUP_CONFIRM_TOKEN,
+        })),
+      });
+      const payload = (await response.json()) as PreSeasonWorkflowApiResponse;
+      setPreSeasonWorkflowFeed(payload.summary ?? null);
+      if (!response.ok || payload.error || !payload.success) {
+        setPreSeasonWorkflowError(payload.error ?? payload.blockingReasons?.join(" · ") ?? "Neue Saison konnte nicht gestartet werden.");
+      }
+      if (response.ok && payload.success) {
+        await Promise.all([
+          loadSave(activeSaveId),
+          reloadSeasonStandingsOverview(),
+          reloadSeasonManagementOverview(),
+          reloadHistoryFeed(),
+          reloadTransferRecapFeed(),
+        ]);
+        setMarketReloadToken((current) => current + 1);
+        setActiveView("home");
+        syncFoundationViewInUrl("home");
+      }
+      return payload;
+    } catch {
+      setPreSeasonWorkflowError("Neue Saison konnte nicht gestartet werden.");
+      return null;
+    } finally {
+      setPreSeasonWorkflowBusy(false);
+      setCockpitBusyKey(null);
+    }
+  }
+
   async function runSeasonTransition(action: "preview" | "start_transition") {
     if (readMeta.source === "prisma") {
       showReadOnlyNotice();
@@ -6521,6 +8415,64 @@ export default function FoundationPageClient({ initialReadSource, initialSelecte
       return payload;
     } catch {
       setSeasonTransitionError("Season Transition konnte nicht geladen werden.");
+      return null;
+    } finally {
+      setSeasonTransitionBusy(false);
+      setCockpitBusyKey(null);
+    }
+  }
+
+  async function runSeasonCompletion(execute: boolean) {
+    if (readMeta.source === "prisma") {
+      showReadOnlyNotice();
+      return null;
+    }
+
+    setSeasonTransitionBusy(true);
+    setSeasonTransitionError(null);
+    setCockpitBusyKey(execute ? "season-completion-execute" : "season-completion-preview");
+    try {
+      const response = await fetch("/api/season/completion", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(withRoomBody({
+          saveId: activeSaveId,
+          seasonId: gameState.season.id,
+          source: readMeta.source,
+          dryRun: !execute,
+          execute,
+          confirmToken: execute ? SEASON_COMPLETION_CONFIRM_TOKEN : undefined,
+        })),
+      });
+      const payload = (await response.json()) as SeasonCompletionApiResponse;
+      setSeasonCompletionFeed(payload.summary ?? null);
+      if (payload.summary?.transition) {
+        setSeasonTransitionFeed(payload.summary.transition);
+      }
+      if (payload.summary?.cashApply) {
+        setCashApplyFeed(payload.summary.cashApply);
+      }
+      if (payload.summary?.snapshot) {
+        setSeasonSnapshotFeed(payload.summary.snapshot);
+      }
+      if (!response.ok || payload.error) {
+        setSeasonTransitionError(payload.error ?? payload.blockingReasons?.join(" · ") ?? "Saisonabschluss blockiert.");
+      }
+      if (execute && response.ok && payload.success) {
+        await Promise.all([
+          loadSave(activeSaveId),
+          reloadPrizePreviewFeed(),
+          reloadSeasonStandingsOverview(),
+          reloadSeasonManagementOverview(),
+          reloadHistoryFeed(),
+          reloadTransferRecapFeed(),
+        ]);
+        setActiveView("cockpit");
+        syncFoundationViewInUrl("cockpit");
+      }
+      return payload;
+    } catch {
+      setSeasonTransitionError("Saisonabschluss konnte nicht geladen werden.");
       return null;
     } finally {
       setSeasonTransitionBusy(false);
@@ -6583,6 +8535,7 @@ export default function FoundationPageClient({ initialReadSource, initialSelecte
             includeWarningLineups: matchdayAutoRunIncludeWarningLineups,
             overwriteExistingLineups: matchdayAutoRunOverwriteExistingLineups,
             stopOnTie: matchdayAutoRunStopOnTie,
+            advanceAfterCashApply: true,
           },
         }),
       });
@@ -6641,6 +8594,58 @@ export default function FoundationPageClient({ initialReadSource, initialSelecte
     } finally {
       setCockpitBusyKey(null);
     }
+  }
+
+  async function postAdminSeasonSimulation(action: "start" | "tick" | "pause" | "resume" | "cancel" | "status") {
+    if (readMeta.source === "prisma") {
+      showReadOnlyNotice();
+      return null;
+    }
+    setAdminSimulationBusy(true);
+    setAdminSimulationError(null);
+    try {
+      const response = await fetch("/api/admin/season-simulation", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          action,
+          runId: adminSimulationRun?.runId,
+          saveId: activeSaveId,
+          seasonCount: adminSimulationSeasonCount,
+          mode: adminSimulationMode,
+          fullChurnStress: adminSimulationFullChurn,
+          injuriesTestMode: adminSimulationInjuries,
+        }),
+      });
+      const payload = (await response.json()) as {
+        ok?: boolean;
+        run?: AdminSeasonSimulationRunSummary | null;
+        error?: string;
+      };
+      if (!response.ok || payload.error) {
+        setAdminSimulationError(payload.error ?? "Season Simulation konnte nicht gestartet werden.");
+      }
+      if (payload.run) {
+        setAdminSimulationRun(payload.run);
+        if (payload.run.status === "completed" || payload.run.status === "blocked" || payload.run.status === "cancelled") {
+          await Promise.all([loadSave(activeSaveId), reloadSeasonStandingsOverview(), reloadPrizePreviewFeed()]);
+        }
+      }
+      return payload.run ?? null;
+    } catch {
+      setAdminSimulationError("Season Simulation API nicht erreichbar.");
+      return null;
+    } finally {
+      setAdminSimulationBusy(false);
+    }
+  }
+
+  async function startAdminSeasonSimulationRun() {
+    const confirmed =
+      adminSimulationMode === "dry_run" ||
+      window.confirm("Diese Simulation schreibt in den aktiv gewaehlten lokalen Save. Fortfahren?");
+    if (!confirmed) return;
+    await postAdminSeasonSimulation("start");
   }
 
   async function runSeasonSnapshotAction(execute: boolean, options?: { forceCreate?: boolean; replaceExisting?: boolean }) {
@@ -6702,6 +8707,18 @@ export default function FoundationPageClient({ initialReadSource, initialSelecte
   }, []);
 
   useEffect(() => {
+    if (adminSimulationRun?.status !== "running" || adminSimulationBusy) {
+      return;
+    }
+
+    const timer = window.setTimeout(() => {
+      void postAdminSeasonSimulation("tick");
+    }, 900);
+
+    return () => window.clearTimeout(timer);
+  }, [adminSimulationBusy, adminSimulationRun?.runId, adminSimulationRun?.status, adminSimulationRun?.updatedAt]);
+
+  useEffect(() => {
     setTeamIdentityDraft(buildTeamIdentityDraftMap(gameState.teams, gameState.teamIdentities));
   }, [gameState.teamIdentities, gameState.teams]);
 
@@ -6721,11 +8738,11 @@ export default function FoundationPageClient({ initialReadSource, initialSelecte
       setActiveView(requestedView);
     }
 
-    const requestedTeamContext = resolvePreferredFoundationTeamContext(initialGameState.teams, {
+    const requestedTeamContext = resolvePreferredFoundationTeamContext(initialClientGameState.teams, {
       currentTeamId: selectedTeamId,
       currentSource: activeManagerTeamSource,
       initialTeamId: initialSelectedTeamId,
-      settingsMap: buildTeamControlSettingsMap(initialGameState.teams, initialGameState.seasonState.teamControlSettings),
+      settingsMap: buildTeamControlSettingsMap(initialClientGameState.teams, initialClientGameState.seasonState.teamControlSettings),
     });
     if (requestedTeamContext.teamId) {
       setSelectedTeamId(requestedTeamContext.teamId);
@@ -6748,7 +8765,7 @@ export default function FoundationPageClient({ initialReadSource, initialSelecte
       return;
     }
 
-    if (selectedTeamId) {
+    if (selectedTeamId && selectedTeamId !== "loading-team" && gameState.season.id !== "loading") {
       syncFoundationTeamIdInUrl(selectedTeamId);
       persistFoundationManagerTeamId(selectedTeamId, activeSaveId, activeManagerTeamSource);
     }
@@ -6762,7 +8779,7 @@ export default function FoundationPageClient({ initialReadSource, initialSelecte
   }, [activeSaveId, selectedTeamId]);
 
   useEffect(() => {
-    if (!activeSaveId || !selectedTeamId) {
+    if (!activeSaveId || !selectedTeamId || isFoundationBootstrapState || !shouldBuildTrainingView) {
       setSeasonEndXpSpendPreview(null);
       setSeasonEndXpSpendError(null);
       setSeasonEndXpSpendBusy(false);
@@ -6809,7 +8826,7 @@ export default function FoundationPageClient({ initialReadSource, initialSelecte
       });
 
     return () => controller.abort();
-  }, [activeSaveId, plannedXpUpgrades, readMeta.source, selectedTeamId]);
+  }, [activeSaveId, isFoundationBootstrapState, plannedXpUpgrades, readMeta.source, selectedTeamId, shouldBuildTrainingView]);
 
   useEffect(() => {
     if (typeof window === "undefined") {
@@ -6822,7 +8839,15 @@ export default function FoundationPageClient({ initialReadSource, initialSelecte
     );
   }, [tableColumnPreferences]);
 
-  async function loadSave(saveId?: string) {
+  useEffect(() => {
+    persistFoundationSaveMode(foundationSaveMode);
+  }, [foundationSaveMode]);
+
+  async function loadSave(
+    saveId?: string,
+    saveMode: FoundationSaveMode = foundationSaveMode,
+    options: { compactInitial?: boolean } = { compactInitial: true },
+  ) {
     const requestVersion = loadSaveRequestVersion.current + 1;
     loadSaveRequestVersion.current = requestVersion;
 
@@ -6830,9 +8855,17 @@ export default function FoundationPageClient({ initialReadSource, initialSelecte
       clearSaveScopedFeeds();
     }
 
-    const response = await fetch(buildStateApiPath(saveId), { cache: "no-store" });
+    let response: Response;
+    try {
+      response = await fetch(buildStateApiPath(saveId, saveMode, { compactInitial: options.compactInitial ?? true }), {
+        cache: "no-store",
+      });
+    } catch (error) {
+      console.warn("Save konnte gerade nicht geladen werden.", error);
+      return null;
+    }
     if (!response.ok) {
-      return;
+      return null;
     }
 
     const payload = (await response.json()) as {
@@ -6842,13 +8875,13 @@ export default function FoundationPageClient({ initialReadSource, initialSelecte
     };
 
     if (!payload.save?.gameState) {
-      return;
+      return null;
     }
 
     const nextGameState = payload._meta?.source === "prisma" ? payload.save.gameState : withNormalizedLocalTeamSettings(payload.save.gameState);
 
     if (requestVersion !== loadSaveRequestVersion.current) {
-      return;
+      return null;
     }
 
     hasPersistedInitialState.current = false;
@@ -6860,15 +8893,21 @@ export default function FoundationPageClient({ initialReadSource, initialSelecte
     setActiveSaveId(payload.save.saveId);
     setActiveSaveName(payload.save.name ?? "Oly Save");
     setSaveSummaries(payload.saves ?? []);
+    if (payload._meta?.saveMode) {
+      setFoundationSaveMode(normalizeFoundationSaveMode(payload._meta.saveMode));
+    }
     if (payload._meta) {
       setReadMeta(payload._meta);
     }
-    const nextTeamContext = resolvePreferredFoundationTeamContext(nextGameState.teams, {
-      currentTeamId: selectedTeamId,
-      currentSource: activeManagerTeamSource,
-      initialTeamId: initialSelectedTeamId,
-      settingsMap: buildTeamControlSettingsMap(nextGameState.teams, nextGameState.seasonState.teamControlSettings),
-    });
+    const saveSelectedTeamId = resolveFoundationTeamId(nextGameState.teams, nextGameState.seasonState.newGameFlow?.selectedTeamId);
+    const nextTeamContext = saveSelectedTeamId
+      ? { teamId: saveSelectedTeamId, source: "saved_preference" as const, warning: null }
+      : resolvePreferredFoundationTeamContext(nextGameState.teams, {
+          currentTeamId: selectedTeamId,
+          currentSource: activeManagerTeamSource,
+          initialTeamId: initialSelectedTeamId,
+          settingsMap: buildTeamControlSettingsMap(nextGameState.teams, nextGameState.seasonState.teamControlSettings),
+        });
     setSelectedTeamId(nextTeamContext.teamId);
     setActiveManagerTeamSource(nextTeamContext.source);
     setActiveManagerTeamWarning(nextTeamContext.warning ?? null);
@@ -6876,13 +8915,54 @@ export default function FoundationPageClient({ initialReadSource, initialSelecte
       setMarketTeamId(nextTeamContext.teamId);
       persistFoundationManagerTeamId(nextTeamContext.teamId, payload.save.saveId, nextTeamContext.source);
     }
+
+    return nextGameState;
   }
+
+  useEffect(() => {
+    if (activeView !== "season" || isFoundationBootstrapState || !activeSaveId || activeSaveId === "loading-save") {
+      return;
+    }
+
+    if (gameState.seasonState.seasonSnapshots !== undefined) {
+      fullSeasonArchiveLoadKeyRef.current = null;
+      return;
+    }
+
+    const archiveLoadKey = `${activeSaveId}:${gameState.season.id}:season-archive-full`;
+    if (fullSeasonArchiveLoadKeyRef.current === archiveLoadKey) {
+      return;
+    }
+
+    fullSeasonArchiveLoadKeyRef.current = archiveLoadKey;
+    void loadSave(activeSaveId, foundationSaveMode, { compactInitial: false }).then((nextGameState) => {
+      if (nextGameState?.seasonState.seasonSnapshots !== undefined) {
+        void reloadSeasonStandingsOverview(seasonOverviewSeasonId || nextGameState.season.id);
+      }
+    });
+  }, [
+    activeSaveId,
+    activeView,
+    foundationSaveMode,
+    gameState.season.id,
+    gameState.seasonState.seasonSnapshots,
+    isFoundationBootstrapState,
+    seasonOverviewSeasonId,
+  ]);
 
   useEffect(() => {
     let cancelled = false;
 
     async function loadPersistentState() {
-      const response = await fetch(buildStateApiPath(initialSaveId ?? undefined), { cache: "no-store" });
+      let response: Response;
+      try {
+        response = await fetch(buildStateApiPath(initialSaveId ?? undefined, foundationSaveMode, { compactInitial: true }), {
+          cache: "no-store",
+        });
+      } catch (error) {
+        console.warn("Initialer Spielstand konnte gerade nicht geladen werden.", error);
+        return;
+      }
       if (!response.ok || cancelled) {
         return;
       }
@@ -6904,15 +8984,21 @@ export default function FoundationPageClient({ initialReadSource, initialSelecte
       setActiveSaveId(payload.save.saveId);
       setActiveSaveName(payload.save.name ?? "Oly Save");
       setSaveSummaries(payload.saves ?? []);
+      if (payload._meta?.saveMode) {
+        setFoundationSaveMode(normalizeFoundationSaveMode(payload._meta.saveMode));
+      }
       if (payload._meta) {
         setReadMeta(payload._meta);
       }
-      const nextTeamContext = resolvePreferredFoundationTeamContext(nextGameState.teams, {
-        currentTeamId: selectedTeamId,
-        currentSource: activeManagerTeamSource,
-        initialTeamId: initialSelectedTeamId,
-        settingsMap: buildTeamControlSettingsMap(nextGameState.teams, nextGameState.seasonState.teamControlSettings),
-      });
+      const saveSelectedTeamId = resolveFoundationTeamId(nextGameState.teams, nextGameState.seasonState.newGameFlow?.selectedTeamId);
+      const nextTeamContext = saveSelectedTeamId
+        ? { teamId: saveSelectedTeamId, source: "saved_preference" as const, warning: null }
+        : resolvePreferredFoundationTeamContext(nextGameState.teams, {
+            currentTeamId: selectedTeamId,
+            currentSource: activeManagerTeamSource,
+            initialTeamId: initialSelectedTeamId,
+            settingsMap: buildTeamControlSettingsMap(nextGameState.teams, nextGameState.seasonState.teamControlSettings),
+          });
       setSelectedTeamId(nextTeamContext.teamId);
       setActiveManagerTeamSource(nextTeamContext.source);
       setActiveManagerTeamWarning(nextTeamContext.warning ?? null);
@@ -6940,6 +9026,11 @@ export default function FoundationPageClient({ initialReadSource, initialSelecte
 
     if (!hasPersistedInitialState.current) {
       hasPersistedInitialState.current = true;
+      return;
+    }
+
+    if (skipNextFullPersistCountRef.current > 0) {
+      skipNextFullPersistCountRef.current -= 1;
       return;
     }
 
@@ -6971,29 +9062,65 @@ export default function FoundationPageClient({ initialReadSource, initialSelecte
         if (payload.saves) {
           setSaveSummaries(payload.saves);
         }
+      })
+      .catch((error) => {
+        console.warn("Auto-Save konnte gerade nicht gespeichert werden.", error);
       });
   }, [activeSaveId, gameState]);
 
-  async function reloadMarketFeed(teamIdOverride?: string) {
+  async function reloadMarketFeed(
+    teamIdOverride?: string,
+    signal?: AbortSignal,
+    options?: { append?: boolean; offset?: number },
+  ) {
     try {
+      const effectiveTeamId = typeof teamIdOverride === "string" ? teamIdOverride : marketTeamId;
+      if (gameState.season.id === "loading" || effectiveTeamId === "loading-team") {
+        setMarketFeed(null);
+        return null;
+      }
+      const offset = options?.offset ?? (options?.append ? marketFeed?.items.length ?? 0 : 0);
       const params = new URLSearchParams({
         saveId: activeSaveId,
         source: readMeta.source,
-        limit: "1000",
+        limit: String(TRANSFER_MARKET_RENDER_STEP),
+        offset: String(offset),
+        maxMarketValue: String(marketMaxValue),
       });
-      const effectiveTeamId = typeof teamIdOverride === "string" ? teamIdOverride : marketTeamId;
       if (effectiveTeamId) {
         params.set("teamId", effectiveTeamId);
       }
-      const response = await fetch(`/api/transfermarkt/free-agents?${params.toString()}`, { cache: "no-store" });
+      const response = await fetch(`/api/transfermarkt/free-agents?${params.toString()}`, { cache: "no-store", signal });
       const payload = (await response.json()) as FoundationTransfermarktResponse;
+      if (signal?.aborted) {
+        return null;
+      }
       if (!response.ok || payload.error) {
         setMarketFeed(null);
         return null;
       }
-      setMarketFeed(payload);
-      return payload;
-    } catch {
+      const nextPayload =
+        options?.append && marketFeed
+          ? {
+              ...payload,
+              items: [
+                ...marketFeed.items,
+                ...payload.items.filter((item) => !marketFeed.items.some((existing) => existing.playerId === item.playerId)),
+              ],
+              returned:
+                marketFeed.items.length +
+                payload.items.filter((item) => !marketFeed.items.some((existing) => existing.playerId === item.playerId)).length,
+            }
+          : payload;
+      if (!options?.append) {
+        setMarketRenderLimit(TRANSFER_MARKET_INITIAL_RENDER_LIMIT);
+      }
+      setMarketFeed(nextPayload);
+      return nextPayload;
+    } catch (error) {
+      if (isAbortError(error) || signal?.aborted) {
+        return null;
+      }
       setMarketFeed(null);
       return null;
     }
@@ -7018,7 +9145,7 @@ export default function FoundationPageClient({ initialReadSource, initialSelecte
       const payload = (await response.json()) as FoundationAiTransferPreviewResponse;
       if (!response.ok || payload.error) {
         setMarketAiPreviewFeed(null);
-        setMarketAiPreviewError(payload.error ?? "AI-Kaufvorschlaege konnten nicht geladen werden.");
+        setMarketAiPreviewError(payload.error ?? "Auto-Kaufideen konnten nicht geladen werden.");
         return null;
       }
       setMarketAiPreviewFeed(payload);
@@ -7029,7 +9156,7 @@ export default function FoundationPageClient({ initialReadSource, initialSelecte
       return payload;
     } catch {
       setMarketAiPreviewFeed(null);
-      setMarketAiPreviewError("AI-Kaufvorschlaege konnten nicht geladen werden.");
+      setMarketAiPreviewError("Auto-Kaufideen konnten nicht geladen werden.");
       return null;
     } finally {
       setMarketAiPreviewBusy(false);
@@ -7055,7 +9182,7 @@ export default function FoundationPageClient({ initialReadSource, initialSelecte
       const payload = (await response.json()) as FoundationAiSellPreviewResponse;
       if (!response.ok || payload.error) {
         setMarketAiSellPreviewFeed(null);
-        setMarketAiSellPreviewError(payload.error ?? "AI-Verkaufsvorschlaege konnten nicht geladen werden.");
+        setMarketAiSellPreviewError(payload.error ?? "Auto-Verkaufsideen konnten nicht geladen werden.");
         return null;
       }
       setMarketAiSellPreviewFeed(payload);
@@ -7066,7 +9193,7 @@ export default function FoundationPageClient({ initialReadSource, initialSelecte
       return payload;
     } catch {
       setMarketAiSellPreviewFeed(null);
-      setMarketAiSellPreviewError("AI-Verkaufsvorschlaege konnten nicht geladen werden.");
+      setMarketAiSellPreviewError("Auto-Verkaufsideen konnten nicht geladen werden.");
       return null;
     } finally {
       setMarketAiSellPreviewBusy(false);
@@ -7093,7 +9220,7 @@ export default function FoundationPageClient({ initialReadSource, initialSelecte
       const payload = (await response.json()) as FoundationAiMarketPlanPreviewResponse;
       if (!response.ok || payload.error) {
         setMarketAiPlanPreviewFeed(null);
-        setMarketAiPlanPreviewError(payload.error ?? "AI-Marktplan konnte nicht geladen werden.");
+        setMarketAiPlanPreviewError(payload.error ?? "Auto-Marktplan konnte nicht geladen werden.");
         return null;
       }
       setMarketAiPlanPreviewFeed(payload);
@@ -7104,7 +9231,7 @@ export default function FoundationPageClient({ initialReadSource, initialSelecte
       return payload;
     } catch {
       setMarketAiPlanPreviewFeed(null);
-      setMarketAiPlanPreviewError("AI-Marktplan konnte nicht geladen werden.");
+      setMarketAiPlanPreviewError("Auto-Marktplan konnte nicht geladen werden.");
       return null;
     } finally {
       setMarketAiPlanPreviewBusy(false);
@@ -7131,7 +9258,7 @@ export default function FoundationPageClient({ initialReadSource, initialSelecte
       const payload = (await response.json()) as FoundationAiNeedsPicksCompareResponse;
       if (!response.ok || payload.error) {
         setMarketAiCompareFeed(null);
-        setMarketAiCompareError(payload.error ?? "AI Needs/Picks Compare konnte nicht geladen werden.");
+        setMarketAiCompareError(payload.error ?? "Needs & Picks konnten nicht geladen werden.");
         return null;
       }
       setMarketAiCompareFeed(payload);
@@ -7142,61 +9269,136 @@ export default function FoundationPageClient({ initialReadSource, initialSelecte
       return payload;
     } catch {
       setMarketAiCompareFeed(null);
-      setMarketAiCompareError("AI Needs/Picks Compare konnte nicht geladen werden.");
+      setMarketAiCompareError("Needs & Picks konnten nicht geladen werden.");
       return null;
     } finally {
       setMarketAiCompareBusy(false);
     }
   }
 
-  async function reloadHistoryFeed() {
+  async function reloadHistoryFeed(signal?: AbortSignal, options?: { append?: boolean; offset?: number }) {
     try {
+      const offset = options?.offset ?? (options?.append ? historyFeed?.items.length ?? 0 : 0);
+      const isAllSeasonsRequest = historySeasonFilter === HISTORY_ALL_SEASONS_FILTER;
+      const requestedSeasonId = isAllSeasonsRequest ? null : historySeasonFilter;
       const params = new URLSearchParams({
         saveId: activeSaveId,
         source: readMeta.source,
-        limit: "1000",
+        limit: String(TRANSFER_HISTORY_SEASON_LIMIT),
+        offset: String(offset),
       });
-      const response = await fetch(`/api/transfermarkt/history?${params.toString()}`, { cache: "no-store" });
+      if (isAllSeasonsRequest) {
+        params.set("allSeasons", "1");
+      } else if (requestedSeasonId) {
+        params.set("seasonId", requestedSeasonId);
+      }
+      const response = await fetch(`/api/transfermarkt/history?${params.toString()}`, { cache: "no-store", signal });
       const payload = (await response.json()) as FoundationTransferHistoryResponse;
+      if (signal?.aborted) {
+        return null;
+      }
       if (!response.ok || payload.error) {
         setHistoryFeed(payload);
         return null;
       }
-      setHistoryFeed(payload);
-      return payload;
-    } catch {
+      const nextPayload =
+        options?.append && historyFeed
+          ? {
+              ...payload,
+              items: [
+                ...historyFeed.items,
+                ...payload.items.filter(
+                  (item) => !historyFeed.items.some((existing) => existing.transferId === item.transferId),
+                ),
+              ],
+              returned:
+                historyFeed.items.length +
+                payload.items.filter(
+                  (item) => !historyFeed.items.some((existing) => existing.transferId === item.transferId),
+                ).length,
+            }
+          : payload;
+      if (!options?.append) {
+        setHistoryPage(1);
+      }
+      setHistoryFeed(nextPayload);
+      return nextPayload;
+    } catch (error) {
+      if (isAbortError(error) || signal?.aborted) {
+        return null;
+      }
       setHistoryFeed(null);
       return null;
     }
   }
 
-  async function reloadTransferRecapFeed() {
+  async function reloadTransferRecapFeed(signal?: AbortSignal) {
     try {
+      const isAllSeasonsRequest = historySeasonFilter === HISTORY_ALL_SEASONS_FILTER;
       const params = new URLSearchParams({
         saveId: activeSaveId,
-        seasonId: gameState.season.id,
         source: readMeta.source,
         limit: "5",
       });
-      const response = await fetch(`/api/transfermarkt/recap?${params.toString()}`, { cache: "no-store" });
+      if (!isAllSeasonsRequest && historySeasonFilter) {
+        params.set("seasonId", historySeasonFilter);
+      }
+      const response = await fetch(`/api/transfermarkt/recap?${params.toString()}`, { cache: "no-store", signal });
       const payload = (await response.json()) as FoundationTransferRecapResponse;
+      if (signal?.aborted) {
+        return null;
+      }
       if (!response.ok || payload.error) {
         setTransferRecapFeed(null);
         return null;
       }
       setTransferRecapFeed(payload);
       return payload;
-    } catch {
+    } catch (error) {
+      if (isAbortError(error) || signal?.aborted) {
+        return null;
+      }
       setTransferRecapFeed(null);
       return null;
     }
   }
 
-  async function reloadSeasonStandingsOverview() {
+  async function loadMoreMarketFeed() {
+    if (marketLoadingMore || !marketFeed?.hasMore) {
+      return;
+    }
+
+    marketFeedAbortRef.current?.abort();
+    const controller = new AbortController();
+    marketFeedAbortRef.current = controller;
+    setMarketLoadingMore(true);
     try {
+      const payload = await reloadMarketFeed(undefined, controller.signal, {
+        append: true,
+        offset: marketFeed.items.length,
+      });
+      if (!payload) {
+        return;
+      }
+      setMarketRenderLimit(payload.items.length);
+    } finally {
+      setMarketLoadingMore(false);
+      if (marketFeedAbortRef.current === controller) {
+        marketFeedAbortRef.current = null;
+      }
+    }
+  }
+
+  async function reloadSeasonStandingsOverview(seasonIdOverride?: string) {
+    try {
+      const targetSeasonId = seasonIdOverride || seasonOverviewSeasonId || gameState.season.id;
+      if (targetSeasonId === "loading") {
+        setSeasonStandingsFeed(null);
+        return null;
+      }
       const params = new URLSearchParams({
         saveId: activeSaveId,
-        seasonId: seasonOverviewSeasonId || gameState.season.id,
+        seasonId: targetSeasonId,
         source: readMeta.source,
       });
       const response = await fetch(`/api/season/standings-overview?${params.toString()}`, { cache: "no-store" });
@@ -7209,8 +9411,53 @@ export default function FoundationPageClient({ initialReadSource, initialSelecte
     }
   }
 
+  async function reloadLiveSeasonState(reason: "manual_apply" | "room_event" | "local_save_version" = "local_save_version") {
+    void reason;
+    const nextGameState = await loadSave(activeSaveId);
+    const nextSeasonId = nextGameState?.season.id ?? gameState.season.id;
+    if (nextSeasonId && seasonOverviewSeasonId !== nextSeasonId) {
+      setSeasonOverviewSeasonId(nextSeasonId);
+    }
+
+    const refreshes: Array<Promise<unknown>> = [];
+    const shouldRefreshSeasonOverview =
+      activeView === "home" ||
+      activeView === "season" ||
+      activeView === "seasonV2" ||
+      activeView === "prize" ||
+      activeView === "teams" ||
+      activeView === "ranks" ||
+      activeView === "diszis";
+
+    if (shouldRefreshSeasonOverview) {
+      refreshes.push(reloadSeasonStandingsOverview(nextSeasonId));
+    }
+    if (shouldLoadStandingsPreviewFeed) {
+      refreshes.push(reloadStandingsPreviewFeed());
+    }
+    if (shouldLoadPrizePreviewFeed) {
+      refreshes.push(reloadPrizePreviewFeed());
+    }
+    if (shouldLoadSeasonManagementFeed) {
+      refreshes.push(reloadSeasonManagementOverview());
+    }
+    if (activeView === "history") {
+      refreshes.push(reloadHistoryFeed(), reloadTransferRecapFeed());
+    }
+    if (activeView === "market") {
+      setMarketReloadToken((current) => current + 1);
+    }
+    if (refreshes.length > 0) {
+      await Promise.all(refreshes);
+    }
+  }
+
   async function reloadSeasonManagementOverview() {
     try {
+      if (gameState.season.id === "loading") {
+        setSeasonManagementFeed(null);
+        return null;
+      }
       const params = new URLSearchParams({
         saveId: activeSaveId,
         seasonId: gameState.season.id,
@@ -7250,8 +9497,8 @@ export default function FoundationPageClient({ initialReadSource, initialSelecte
         if (affectedViews.some((view) => ["market", "team", "contracts"].includes(view))) {
           await Promise.all([reloadMarketFeed(), reloadHistoryFeed(), reloadTransferRecapFeed()]);
         }
-        if (affectedViews.some((view) => ["season", "standings", "matchday"].includes(view))) {
-          await Promise.all([reloadResolvePreview(), reloadStandingsPreviewFeed(), reloadPrizePreviewFeed()]);
+        if (affectedViews.some((view) => ["season", "standings", "matchday", "arena", "lineup"].includes(view))) {
+          await Promise.all([reloadResolvePreview(), reloadLiveSeasonState("room_event")]);
         }
         setMarketReloadToken((current) => current + 1);
       })();
@@ -7264,20 +9511,85 @@ export default function FoundationPageClient({ initialReadSource, initialSelecte
   }, [activeSaveId, roomContext, readMeta.source]);
 
   useEffect(() => {
-    const shouldLoadMarketFeed = activeView === "market";
-    if (!shouldLoadMarketFeed) {
+    if (readMeta.source !== "sqlite" || !activeSaveId || !hasLoadedPersistentState.current) {
       return undefined;
     }
 
     let cancelled = false;
+    liveSaveVersionSignatureRef.current = null;
+
+    async function pollLocalSaveVersion() {
+      if (cancelled || liveSaveRefreshInFlightRef.current) {
+        return;
+      }
+
+      if (typeof document !== "undefined" && document.visibilityState === "hidden") {
+        return;
+      }
+
+      try {
+        const params = new URLSearchParams({ saveId: activeSaveId });
+        const response = await fetch(`/api/singleplayer-state/version?${params.toString()}`, { cache: "no-store" });
+        const payload = (await response.json()) as { ok?: boolean; signature?: string };
+        if (!response.ok || !payload.ok || !payload.signature) {
+          return;
+        }
+
+        const previousSignature = liveSaveVersionSignatureRef.current;
+        liveSaveVersionSignatureRef.current = payload.signature;
+        if (!previousSignature || previousSignature === payload.signature) {
+          return;
+        }
+
+        liveSaveRefreshInFlightRef.current = true;
+        try {
+          await reloadLiveSeasonState("local_save_version");
+        } finally {
+          liveSaveRefreshInFlightRef.current = false;
+        }
+      } catch {
+        liveSaveRefreshInFlightRef.current = false;
+      }
+    }
+
+    void pollLocalSaveVersion();
+    const intervalId = window.setInterval(pollLocalSaveVersion, 25000);
+    const onVisibilityChange = () => {
+      if (document.visibilityState === "visible") {
+        void pollLocalSaveVersion();
+      }
+    };
+    document.addEventListener("visibilitychange", onVisibilityChange);
+    return () => {
+      cancelled = true;
+      document.removeEventListener("visibilitychange", onVisibilityChange);
+      window.clearInterval(intervalId);
+    };
+  }, [activeSaveId, gameState.season.id, readMeta.source, seasonOverviewSeasonId]);
+
+  useEffect(() => {
+    const shouldLoadMarketFeed = activeView === "market";
+    if (!shouldLoadMarketFeed || isFoundationBootstrapState) {
+      marketFeedAbortRef.current?.abort();
+      marketFeedAbortRef.current = null;
+      return undefined;
+    }
+
+    let cancelled = false;
+    marketFeedAbortRef.current?.abort();
+    const controller = new AbortController();
+    marketFeedAbortRef.current = controller;
 
     async function loadMarketFeed() {
       try {
-        const payload = await reloadMarketFeed();
+        const payload = await reloadMarketFeed(undefined, controller.signal);
         if (cancelled || !payload) {
           return;
         }
-      } catch {
+      } catch (error) {
+        if (isAbortError(error) || controller.signal.aborted) {
+          return;
+        }
         if (!cancelled) {
           setMarketFeed(null);
         }
@@ -7288,19 +9600,35 @@ export default function FoundationPageClient({ initialReadSource, initialSelecte
 
     return () => {
       cancelled = true;
+      controller.abort();
+      if (marketFeedAbortRef.current === controller) {
+        marketFeedAbortRef.current = null;
+      }
     };
-  }, [activeSaveId, activeView, gameState.season.id, marketReloadToken, marketTeamId, readMeta.source]);
+  }, [activeSaveId, activeView, gameState.season.id, isFoundationBootstrapState, marketMaxValue, marketReloadToken, marketTeamId, readMeta.source]);
 
   useEffect(() => {
+    if (!shouldLoadTransferHistoryFeed) {
+      historyFeedAbortRef.current?.abort();
+      historyFeedAbortRef.current = null;
+      return undefined;
+    }
+
     let cancelled = false;
+    historyFeedAbortRef.current?.abort();
+    const controller = new AbortController();
+    historyFeedAbortRef.current = controller;
 
     async function loadHistoryFeed() {
       try {
-        const payload = await reloadHistoryFeed();
+        const payload = await reloadHistoryFeed(controller.signal);
         if (cancelled || !payload) {
           return;
         }
-      } catch {
+      } catch (error) {
+        if (isAbortError(error) || controller.signal.aborted) {
+          return;
+        }
         if (!cancelled) {
           setHistoryFeed(null);
         }
@@ -7311,19 +9639,35 @@ export default function FoundationPageClient({ initialReadSource, initialSelecte
 
     return () => {
       cancelled = true;
+      controller.abort();
+      if (historyFeedAbortRef.current === controller) {
+        historyFeedAbortRef.current = null;
+      }
     };
-  }, [activeSaveId, gameState.season.id, marketReloadToken, readMeta.source]);
+  }, [activeSaveId, gameState.season.id, historySeasonFilter, marketReloadToken, readMeta.source, shouldLoadTransferHistoryFeed]);
 
   useEffect(() => {
+    if (!shouldLoadTransferRecapFeed) {
+      transferRecapAbortRef.current?.abort();
+      transferRecapAbortRef.current = null;
+      return undefined;
+    }
+
     let cancelled = false;
+    transferRecapAbortRef.current?.abort();
+    const controller = new AbortController();
+    transferRecapAbortRef.current = controller;
 
     async function loadTransferRecap() {
       try {
-        const payload = await reloadTransferRecapFeed();
+        const payload = await reloadTransferRecapFeed(controller.signal);
         if (cancelled || !payload) {
           return;
         }
-      } catch {
+      } catch (error) {
+        if (isAbortError(error) || controller.signal.aborted) {
+          return;
+        }
         if (!cancelled) {
           setTransferRecapFeed(null);
         }
@@ -7334,10 +9678,18 @@ export default function FoundationPageClient({ initialReadSource, initialSelecte
 
     return () => {
       cancelled = true;
+      controller.abort();
+      if (transferRecapAbortRef.current === controller) {
+        transferRecapAbortRef.current = null;
+      }
     };
-  }, [activeSaveId, gameState.season.id, marketReloadToken, readMeta.source, seasonOverviewSeasonId]);
+  }, [activeSaveId, gameState.season.id, marketReloadToken, readMeta.source, seasonOverviewSeasonId, shouldLoadTransferRecapFeed]);
 
   useEffect(() => {
+    if (!shouldLoadPrizePreviewFeed) {
+      return undefined;
+    }
+
     let cancelled = false;
 
     async function loadPrizePreview() {
@@ -7358,9 +9710,13 @@ export default function FoundationPageClient({ initialReadSource, initialSelecte
     return () => {
       cancelled = true;
     };
-  }, [activeSaveId, gameState.matchdayState.matchdayId, gameState.season.id, marketReloadToken, readMeta.source]);
+  }, [activeSaveId, gameState.matchdayState.matchdayId, gameState.season.id, marketReloadToken, readMeta.source, shouldLoadPrizePreviewFeed]);
 
   useEffect(() => {
+    if (!shouldLoadSeasonManagementFeed || isFoundationBootstrapState) {
+      return undefined;
+    }
+
     let cancelled = false;
 
     async function loadSeasonStandingsOverview() {
@@ -7381,9 +9737,13 @@ export default function FoundationPageClient({ initialReadSource, initialSelecte
     return () => {
       cancelled = true;
     };
-  }, [activeSaveId, gameState.season.id, marketReloadToken, readMeta.source]);
+  }, [activeSaveId, gameState.season.id, isFoundationBootstrapState, marketReloadToken, readMeta.source, shouldLoadSeasonManagementFeed]);
 
   useEffect(() => {
+    if (!shouldLoadSeasonManagementFeed || isFoundationBootstrapState) {
+      return undefined;
+    }
+
     let cancelled = false;
 
     async function loadSeasonManagementOverview() {
@@ -7404,18 +9764,30 @@ export default function FoundationPageClient({ initialReadSource, initialSelecte
     return () => {
       cancelled = true;
     };
-  }, [activeSaveId, gameState.season.id, marketReloadToken, readMeta.source]);
+  }, [activeSaveId, gameState.season.id, isFoundationBootstrapState, marketReloadToken, readMeta.source, shouldLoadSeasonManagementFeed]);
 
   useEffect(() => {
+    if (!shouldLoadStandingsPreviewFeed || isFoundationBootstrapState) {
+      standingsPreviewAbortRef.current?.abort();
+      standingsPreviewAbortRef.current = null;
+      return undefined;
+    }
+
     let cancelled = false;
+    standingsPreviewAbortRef.current?.abort();
+    const controller = new AbortController();
+    standingsPreviewAbortRef.current = controller;
 
     async function loadStandingsPreview() {
       try {
-        const payload = await reloadStandingsPreviewFeed();
+        const payload = await reloadStandingsPreviewFeed(controller.signal);
         if (cancelled) {
           return;
         }
-      } catch {
+      } catch (error) {
+        if (isAbortError(error) || controller.signal.aborted) {
+          return;
+        }
         if (!cancelled) {
           setStandingsPreviewFeed(null);
         }
@@ -7426,8 +9798,12 @@ export default function FoundationPageClient({ initialReadSource, initialSelecte
 
     return () => {
       cancelled = true;
+      controller.abort();
+      if (standingsPreviewAbortRef.current === controller) {
+        standingsPreviewAbortRef.current = null;
+      }
     };
-  }, [activeSaveId, gameState.matchdayState.matchdayId, gameState.season.id, marketReloadToken, readMeta.source]);
+  }, [activeSaveId, gameState.matchdayState.matchdayId, gameState.season.id, marketReloadToken, readMeta.source, shouldLoadStandingsPreviewFeed]);
 
   useEffect(() => {
     setResolvePreviewFeed(null);
@@ -7440,19 +9816,29 @@ export default function FoundationPageClient({ initialReadSource, initialSelecte
 
   useEffect(() => {
     if (activeView !== "cockpit") {
+      resolvePreviewAbortRef.current?.abort();
+      resolvePreviewAbortRef.current = null;
       return;
     }
 
     let cancelled = false;
+    resolvePreviewAbortRef.current?.abort();
+    const controller = new AbortController();
+    resolvePreviewAbortRef.current = controller;
 
     async function loadResolvePreview() {
       try {
-        const payload = await reloadResolvePreview();
+        const payload = await reloadResolvePreview(controller.signal);
         if (cancelled) {
           return;
         }
-        setResolvePreviewFeed(payload);
-      } catch {
+        if (payload) {
+          setResolvePreviewFeed(payload);
+        }
+      } catch (error) {
+        if (isAbortError(error) || controller.signal.aborted) {
+          return;
+        }
         if (!cancelled) {
           setResolvePreviewFeed(null);
         }
@@ -7463,6 +9849,10 @@ export default function FoundationPageClient({ initialReadSource, initialSelecte
 
     return () => {
       cancelled = true;
+      controller.abort();
+      if (resolvePreviewAbortRef.current === controller) {
+        resolvePreviewAbortRef.current = null;
+      }
     };
   }, [activeSaveId, activeView, gameState.matchdayState.matchdayId, gameState.season.id, readMeta.source]);
 
@@ -7500,6 +9890,17 @@ export default function FoundationPageClient({ initialReadSource, initialSelecte
         return;
       }
       setMarketBuyError("Bitte zuerst ein Team waehlen.");
+      setMarketBuyPreview(null);
+      setMarketBuyPreviewContext(null);
+      setMarketPreviewPlayerId(item.playerId);
+      return;
+    }
+
+    if (!canManageTeamId(effectiveTeamId)) {
+      if (requestVersion !== marketBuyPreviewRequestVersion.current) {
+        return;
+      }
+      setMarketBuyError(`${getTeamLockedName(effectiveTeamId)} gehoert nicht zu deinen steuerbaren Teams. Kaufen ist gesperrt.`);
       setMarketBuyPreview(null);
       setMarketBuyPreviewContext(null);
       setMarketPreviewPlayerId(item.playerId);
@@ -7631,6 +10032,11 @@ export default function FoundationPageClient({ initialReadSource, initialSelecte
     if (!marketBuyPreview?.player?.id || !marketBuyPreview?.team?.id) {
       return;
     }
+    if (!canManageTeamId(marketBuyPreview.team.id)) {
+      setMarketBuyError(`${getTeamLockedName(marketBuyPreview.team.id)} gehoert nicht zu deinen steuerbaren Teams. Kaufen ist gesperrt.`);
+      showTeamManagementLockedNotice(getTeamLockedName(marketBuyPreview.team.id));
+      return;
+    }
 
     const buyContext = marketBuyPreviewContext;
     if (!buyContext) {
@@ -7687,7 +10093,13 @@ export default function FoundationPageClient({ initialReadSource, initialSelecte
       }
 
       setMarketBuyPreview(payload.summary);
-      setMarketBuySuccess(`${payload.summary.player?.name ?? "Spieler"} wurde erfolgreich gekauft.`);
+      setMarketBuySuccess(
+        `${payload.summary.player?.name ?? "Spieler"} gekauft: Cash ${formatTransfermarktCurrency(payload.summary.cashBefore)} → ${formatTransfermarktCurrency(
+          payload.summary.cashAfter,
+        )} · Gehalt ${formatTransfermarktCurrency(payload.summary.salaryBefore)} → ${formatTransfermarktCurrency(payload.summary.salaryAfter)} · Kader ${
+          payload.summary.rosterBefore ?? "—"
+        } → ${payload.summary.rosterAfter ?? "—"}.`,
+      );
       setActiveManagerTeam(payload.summary.team?.id ?? marketBuyPreview.team.id, "manual_select");
       setMarketBuyModalOpen(false);
       setMarketBuySubject(null);
@@ -7721,6 +10133,11 @@ export default function FoundationPageClient({ initialReadSource, initialSelecte
   }) {
     if (readMeta.readOnly || readMeta.source === "prisma") {
       showReadOnlyNotice();
+      return;
+    }
+    if (!canManageTeamId(input.teamId)) {
+      setContractRenewalError(`${getTeamLockedName(input.teamId)} gehoert nicht zu deinen steuerbaren Teams. Vertragsaktionen sind gesperrt.`);
+      showTeamManagementLockedNotice(getTeamLockedName(input.teamId));
       return;
     }
 
@@ -7814,7 +10231,7 @@ export default function FoundationPageClient({ initialReadSource, initialSelecte
     }
 
     try {
-      const response = await fetch("/api/singleplayer-state", {
+      const response = await fetch(buildStateApiPath(undefined, foundationSaveMode), {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
@@ -7862,6 +10279,12 @@ export default function FoundationPageClient({ initialReadSource, initialSelecte
     setNewGamePreview(null);
     setNewGameError(null);
     setNewGameSuccess(null);
+  }
+
+  function changeFoundationSaveMode(nextSaveMode: FoundationSaveMode) {
+    setFoundationSaveMode(nextSaveMode);
+    clearSaveScopedFeeds();
+    void loadSave(undefined, nextSaveMode);
   }
 
   function toggleNewGameTeam(owner: "chris" | "franky", teamId: string) {
@@ -7938,7 +10361,9 @@ export default function FoundationPageClient({ initialReadSource, initialSelecte
 
       if (payload.result?.save.saveId) {
         clearSaveScopedFeeds();
-        await loadSave(payload.result.save.saveId);
+        const nextSaveMode = normalizeFoundationSaveMode(payload.result.preview.presetId);
+        setFoundationSaveMode(nextSaveMode);
+        await loadSave(payload.result.save.saveId, nextSaveMode);
         const firstTeamId = payload.result.preview.chrisTeamIds[0] ?? payload.result.preview.frankyTeamIds[0] ?? null;
         if (firstTeamId) {
           setActiveManagerTeam(firstTeamId, "manual_select");
@@ -7947,6 +10372,7 @@ export default function FoundationPageClient({ initialReadSource, initialSelecte
         setNewGameSuccess(`Neuer Spielstand aktiv: ${payload.result.save.name}`);
         setActiveView("home");
         syncFoundationViewInUrl("home");
+        setSeasonBriefingOpen(true);
       }
     } catch {
       setNewGameError("New-Game-Setup konnte nicht geladen werden.");
@@ -7971,6 +10397,7 @@ export default function FoundationPageClient({ initialReadSource, initialSelecte
     () => aiTeams.filter((team) => isAiLineupBatchApplyEnabled(resolvedTeamControlSettings[team.teamId])),
     [aiTeams, resolvedTeamControlSettings],
   );
+  const aiLineupEnsureTeams = useMemo(() => aiTeams, [aiTeams]);
   const aiMarketEnabledTeams = useMemo(
     () =>
       aiTeams.filter((team) => {
@@ -8018,7 +10445,17 @@ export default function FoundationPageClient({ initialReadSource, initialSelecte
   }, [effectiveActiveOwnerId, gameState.teams, manualTeams, resolvedTeamControlSettings, teamContextFilter]);
   const ownerQuickSwitchTeams = useMemo(() => {
     const ownerTeams = filterTeamsByControlScope(gameState.teams, resolvedTeamControlSettings, "my_teams", effectiveActiveOwnerId);
-    return ownerTeams.length ? ownerTeams : manualTeams;
+    const localUserManualTeams = gameState.teams.filter((team) => {
+      const settings = resolvedTeamControlSettings[team.teamId];
+      return (
+        settings?.controlMode === "manual" &&
+        (settings.ownerId === DEFAULT_ACTIVE_OWNER_ID || settings.ownerSlot === "user" || settings.displayLabel === "Chris")
+      );
+    });
+    const merged = [...ownerTeams, ...localUserManualTeams].filter(
+      (team, index, teams) => teams.findIndex((entry) => entry.teamId === team.teamId) === index,
+    );
+    return merged.length ? merged : manualTeams;
   }, [effectiveActiveOwnerId, gameState.teams, manualTeams, resolvedTeamControlSettings]);
 
   useEffect(() => {
@@ -8058,12 +10495,35 @@ export default function FoundationPageClient({ initialReadSource, initialSelecte
     () => (selectedTeam ? getTeamControlSettings(gameState, selectedTeam.teamId) : null),
     [gameState, selectedTeam],
   );
+  const isLocalUserManualTeam = (settings: TeamControlSettings | null | undefined) =>
+    Boolean(
+      settings &&
+        settings.controlMode === "manual" &&
+        (settings.ownerId === DEFAULT_ACTIVE_OWNER_ID || settings.ownerSlot === "user" || settings.displayLabel === "Chris"),
+    );
+  const selectedTeamCanManage = canOwnerManageTeam(selectedTeamControl, effectiveActiveOwnerId) || isLocalUserManualTeam(selectedTeamControl);
+  const isSelectedTeamManagementLocked = Boolean(selectedTeam) && !selectedTeamCanManage;
+  function canManageTeamId(teamId: string | null | undefined) {
+    if (!teamId) {
+      return false;
+    }
+    const settings = getTeamControlSettings(gameState, teamId);
+    return canOwnerManageTeam(settings, effectiveActiveOwnerId) || isLocalUserManualTeam(settings);
+  }
+
+  function getTeamLockedName(teamId: string | null | undefined) {
+    return gameState.teams.find((team) => team.teamId === teamId)?.name ?? selectedTeam?.name ?? "dieses Team";
+  }
   const selectedTeamStrategyProfile = useMemo(
     () => (selectedTeam ? getTeamStrategyProfile(gameState, selectedTeam.teamId) : null),
     [gameState, selectedTeam],
   );
   const activeSaveSummary = useMemo(
     () => saveSummaries.find((save) => save.saveId === activeSaveId) ?? null,
+    [activeSaveId, saveSummaries],
+  );
+  const activeSaveIsInCurrentMode = useMemo(
+    () => saveSummaries.some((save) => save.saveId === activeSaveId),
     [activeSaveId, saveSummaries],
   );
   const activeContextMeta = useMemo(
@@ -8104,7 +10564,7 @@ export default function FoundationPageClient({ initialReadSource, initialSelecte
     }
     return gameState.matchdayState.matchdayId;
   }, [gameState.matchdayState.matchdayId, gameState.season.currentMatchday]);
-  const readSourceLabel = readMeta.source === "prisma" ? "Prisma/Supabase · Read-only" : "SQLite/local";
+  const readSourceLabel = readMeta.source === "prisma" ? "Referenzmodus" : "Lokaler Spielstand";
   const isReadOnlyMode = readMeta.readOnly || readMeta.source === "prisma";
 	  const gameFlowState = useMemo(
 	    () => buildGameFlowState({ gameState, activeTeamId: activeManagerTeamId }),
@@ -8122,74 +10582,1005 @@ export default function FoundationPageClient({ initialReadSource, initialSelecte
 	      }),
 	    [activeManagerTeamId, activeSaveId, effectiveActiveOwnerId, gameFlowState, gameState, teamContextFilter],
 	  );
+  const activeTeamInboxItems = useMemo(
+    () => gameInboxItems.filter((item) => isInboxItemOwnedByTeam(item, activeManagerTeamId)),
+    [activeManagerTeamId, gameInboxItems],
+  );
+  const activeTeamOpenInboxItems = useMemo(
+    () => activeTeamInboxItems.filter((item) => item.status === "open"),
+    [activeTeamInboxItems],
+  );
+  const flowCycleKey = `${gameState.season.id}:${gameState.matchdayState.matchdayId}:${gameFlowState.phase}:${activeManagerTeamId ?? "no-team"}`;
+  const [flowCycleKeyState, setFlowCycleKeyState] = useState(flowCycleKey);
+  const [acknowledgedFlowStepIds, setAcknowledgedFlowStepIds] = useState<Set<string>>(() => new Set());
+  useEffect(() => {
+    if (flowCycleKeyState === flowCycleKey) {
+      return;
+    }
+    setFlowCycleKeyState(flowCycleKey);
+    setAcknowledgedFlowStepIds(new Set());
+  }, [flowCycleKey, flowCycleKeyState]);
+  const activeTeamCriticalInboxItems = useMemo(
+    () => activeTeamOpenInboxItems.filter((item) => item.severity === "critical"),
+    [activeTeamOpenInboxItems],
+  );
+  const activeTeamStoryInboxItems = useMemo(
+    () =>
+      activeTeamOpenInboxItems.filter(
+        (item) => item.category === "news" || item.category === "result" || item.source.startsWith("story:"),
+      ),
+    [activeTeamOpenInboxItems],
+  );
+  const activeTeamDecisionInboxItems = useMemo(
+    () =>
+      activeTeamOpenInboxItems.filter((item) =>
+        ["task", "warning", "transfer", "finance", "contract", "training", "facility"].includes(item.category),
+      ),
+    [activeTeamOpenInboxItems],
+  );
+  const inboxHighlightItems = useMemo(() => {
+    const severityOrder: Record<GameInboxItem["severity"], number> = {
+      critical: 0,
+      warning: 1,
+      info: 2,
+    };
+    return activeTeamOpenInboxItems
+      .filter(
+        (item) =>
+          (item.severity !== "info" ||
+            item.category === "news" ||
+            item.category === "result" ||
+            item.category === "transfer" ||
+            item.category === "finance"),
+      )
+      .sort((left, right) => {
+        const severityDelta = severityOrder[left.severity] - severityOrder[right.severity];
+        if (severityDelta !== 0) {
+          return severityDelta;
+        }
+        return new Date(right.createdAt).getTime() - new Date(left.createdAt).getTime();
+      })
+      .slice(0, 3);
+  }, [activeTeamOpenInboxItems]);
+  const inboxLoreItems = useMemo(
+    () =>
+      activeTeamOpenInboxItems
+        .filter(
+          (item) =>
+            (item.category === "news" ||
+              item.category === "result" ||
+              item.source.startsWith("story:") ||
+              item.source === "season_snapshots"),
+        )
+        .sort((left, right) => new Date(right.createdAt).getTime() - new Date(left.createdAt).getTime())
+        .slice(0, 4),
+    [activeTeamOpenInboxItems],
+  );
+  const inboxPrimaryTeamItem = useMemo(
+    () => getPrimaryInboxTask(filterGameInboxItems(activeTeamInboxItems, { includeDismissed: false, includeDone: false })),
+    [activeTeamInboxItems],
+  );
 	  const visibleInboxItems = useMemo(
 	    () =>
-	      filterGameInboxItems(gameInboxItems, {
-	        teamId: inboxTeamFilter,
+	      filterGameInboxItems(activeTeamInboxItems, {
 	        category: inboxCategoryFilter,
 	        includeDone: inboxIncludeDone,
 	        includeDismissed: inboxIncludeDismissed,
 	      }),
-	    [gameInboxItems, inboxCategoryFilter, inboxIncludeDismissed, inboxIncludeDone, inboxTeamFilter],
+	    [activeTeamInboxItems, inboxCategoryFilter, inboxIncludeDismissed, inboxIncludeDone],
 	  );
+  const gameFlowActionStep = useMemo(() => {
+    const actionableSteps = gameFlowState.steps.filter(
+      (stepEntry) =>
+        stepEntry.status !== "completed" &&
+        !(stepEntry.status !== "blocked" && acknowledgedFlowStepIds.has(stepEntry.stepId)),
+    );
+    return (
+      actionableSteps.find((stepEntry) => stepEntry.status === "ready" || stepEntry.status === "warning" || stepEntry.status === "blocked") ??
+      actionableSteps.find((stepEntry) => stepEntry.status === "optional") ??
+      (gameFlowState.currentStep.status === "completed" ? gameFlowState.nextStep ?? gameFlowState.currentStep : gameFlowState.currentStep)
+    );
+  }, [acknowledgedFlowStepIds, gameFlowState]);
+  const shouldPreferGameFlowAction =
+    gameFlowActionStep.status !== "completed" &&
+    (gameFlowActionStep.stepId === "season_intro" ||
+      gameFlowActionStep.stepId === "team_confirm" ||
+      gameFlowActionStep.stepId === "roster_review" ||
+      gameFlowActionStep.stepId === "first_transfers" ||
+      gameFlowActionStep.stepId === "fill_roster" ||
+      gameFlowActionStep.stepId === "training_facilities" ||
+      gameFlowActionStep.stepId === "set_lineup" ||
+      gameFlowActionStep.stepId === "scouting_facilities" ||
+      gameFlowActionStep.stepId === "buy_players" ||
+      gameFlowActionStep.targetView === "market");
 	  const primaryInboxItem = useMemo(
-	    () => getPrimaryInboxTask(filterGameInboxItems(gameInboxItems, { includeDismissed: false, includeDone: false })),
-	    [gameInboxItems],
+	    () =>
+        shouldPreferGameFlowAction
+          ? null
+          : inboxPrimaryTeamItem ??
+            getPrimaryInboxTask(filterGameInboxItems(gameInboxItems, { includeDismissed: false, includeDone: false })),
+	    [gameInboxItems, inboxPrimaryTeamItem, shouldPreferGameFlowAction],
 	  );
-	  const gameFlowActionStep = gameFlowState.currentStep.status === "completed"
-	    ? gameFlowState.nextStep ?? gameFlowState.currentStep
-	    : gameFlowState.currentStep;
 	  const gameFlowCanAutoFix = Boolean(activeContextMeta?.allowTestWrites && gameFlowActionStep.status === "blocked");
-  const navigateToGameFlowStep = (targetView: GameFlowView, teamId?: string | null, targetPanel?: string | null) => {
-    if (teamId && teamId !== activeManagerTeamId) {
-      setActiveManagerTeam(teamId, "manual_select");
+  const resolveLineupIssueTeamId = (preferredTeamId?: string | null) => {
+    const matchdayLineups = (gameState.seasonState.lineupDrafts ?? []).filter(
+      (draft) => draft.seasonId === gameState.season.id && draft.matchdayId === gameState.matchdayState.matchdayId,
+    );
+    const lineupByTeamId = new Map(matchdayLineups.map((draft) => [draft.teamId, draft] as const));
+    const requiredSlots =
+      (currentMatchdayDisciplineSchedule?.discipline1?.playerCount ?? 0) +
+      (currentMatchdayDisciplineSchedule?.discipline2?.playerCount ?? 0);
+    const readinessByTeamId = new Map((resolvePreviewFeed?.teamRows ?? []).map((row) => [row.teamId, row] as const));
+    const issueStatuses = new Set(["missing_lineup", "underfilled_roster", "invalid_lineup", "missing_score_coverage"]);
+    const isLineupIssueTeam = (teamId: string | null | undefined) => {
+      if (!teamId) return false;
+      const readiness = readinessByTeamId.get(teamId);
+      if (readiness && issueStatuses.has(readiness.readinessStatus)) return true;
+      const draft = lineupByTeamId.get(teamId);
+      if (!draft || draft.entries.length === 0) return true;
+      return requiredSlots > 0 && draft.entries.length < requiredSlots;
+    };
+
+    if (isLineupIssueTeam(preferredTeamId)) {
+      return preferredTeamId ?? null;
     }
-    setFoundationView(targetView as FoundationView, setActiveView);
+
+    const visibleCandidateTeams = managerTeamOptions.length ? managerTeamOptions : gameState.teams;
+    const nonPassiveCandidate = visibleCandidateTeams.find((team) => {
+      const controlMode = resolvedTeamControlSettings[team.teamId]?.controlMode ?? (team.humanControlled ? "manual" : "ai");
+      return controlMode !== "passive" && isLineupIssueTeam(team.teamId);
+    });
+    if (nonPassiveCandidate) {
+      return nonPassiveCandidate.teamId;
+    }
+
+    const anyCandidate = visibleCandidateTeams.find((team) => isLineupIssueTeam(team.teamId));
+    return anyCandidate?.teamId ?? preferredTeamId ?? null;
+  };
+  const navigateToGameFlowStep = (targetView: GameFlowView, teamId?: string | null, targetPanel?: string | null) => {
+    const navigationTeamId = targetView === "lineup" ? resolveLineupIssueTeamId(teamId) : teamId;
+    if (navigationTeamId && navigationTeamId !== activeManagerTeamId) {
+      setActiveManagerTeam(navigationTeamId, "manual_select");
+    }
+    if (targetView === "lineup") {
+      setLineupFocusRequestKey(`lineup-${navigationTeamId ?? activeManagerTeamId ?? "team"}-${Date.now()}`);
+    }
+    if (targetPanel === "season-briefing") {
+      setFoundationView("home", setActiveView);
+      setShowGameFlowPanel(false);
+      setSeasonBriefingOpen(true);
+      scrollToFoundationTarget("foundation-home");
+      return;
+    }
+    if (targetView === "teams") {
+      if (targetPanel === "contracts") {
+        setSelectedTeamDetailTab("contracts");
+      } else {
+        setSelectedTeamDetailTab("roster");
+      }
+    }
+    setFoundationView(getDefaultFoundationViewTarget(targetView as FoundationView), setActiveView);
     setShowGameFlowPanel(false);
-    if (targetPanel) {
-      window.setTimeout(() => {
-        document.getElementById(targetPanel)?.scrollIntoView({ behavior: "smooth", block: "start" });
-	      }, 80);
-	    }
-	  };
-	  const navigateToInboxItem = (item: GameInboxItem) => {
-	    if (item.teamId && item.teamId !== activeManagerTeamId) {
-	      setActiveManagerTeam(item.teamId, "manual_select");
-	    }
-	    setFoundationView(normalizeInboxTargetView(item.targetView), setActiveView);
-	    setShowGameFlowPanel(false);
-	    const panel = typeof item.targetParams.panel === "string" ? item.targetParams.panel : null;
-	    if (panel) {
-	      window.setTimeout(() => {
-	        document.getElementById(panel)?.scrollIntoView({ behavior: "smooth", block: "start" });
-	      }, 80);
-	    }
-	  };
-	  const globalNextDisabled = primaryInboxItem ? false : gameFlowActionStep.status === "blocked" || gameFlowActionStep.status === "applying";
-	  const globalNextLabel = primaryInboxItem?.title ?? gameFlowActionStep.label;
-	  const globalNextTitle = primaryInboxItem
-	    ? `${primaryInboxItem.title}: ${primaryInboxItem.description}`
-	    : globalNextDisabled
-	      ? gameFlowActionStep.blockers.map(formatCockpitReason).join(" · ") || "Aktueller Schritt ist blockiert."
-	      : "Leertaste: Weiter";
-	  const globalNextStatusClass = primaryInboxItem
-	    ? primaryInboxItem.severity === "critical"
-	      ? "is-blocked"
-	      : primaryInboxItem.severity === "warning"
-	        ? "is-warning"
-	        : "is-ready"
-	    : getGameFlowStatusClass(gameFlowActionStep.status);
-	  const triggerGlobalNext = () => {
-	    if (primaryInboxItem) {
-	      navigateToInboxItem(primaryInboxItem);
-	      return;
-	    }
-	    if (globalNextDisabled) {
-	      setShowGameFlowPanel(true);
-	      return;
+    scrollToFoundationTarget(
+      targetView === "teams" && (targetPanel === "roster" || targetPanel === "contracts")
+        ? "team-focus-roster"
+        : targetPanel ?? getFoundationViewScrollTarget(targetView),
+    );
+  };
+  const updateNewGameFlowStepStatus = (stepId: NewGameFlowStepId, status: NewGameFlowStepStatus) => {
+    if (isReadOnlyMode) {
+      showReadOnlyNotice();
+      return;
+    }
+
+    const now = new Date().toISOString();
+    skipNextFullPersistCountRef.current += 1;
+    void persistNewGameFlowStepStatus(stepId, status).catch((error) => {
+      console.error(error);
+      skipNextFullPersistCountRef.current = Math.max(0, skipNextFullPersistCountRef.current - 1);
+    });
+    setGameState((current) => {
+      const previous = current.seasonState.newGameFlow ?? {
+        active: true,
+        selectedTeamId,
+        steps: [],
+      };
+      const nextSteps = SEASON_SETUP_STEP_IDS.map((id) => {
+        const stored = previous.steps?.find((step) => step.stepId === id);
+        if (id !== stepId) {
+          return stored ?? { stepId: id, status: "open" as const };
+        }
+
+        return {
+          stepId: id,
+          status,
+          completedAt: status === "completed" ? now : stored?.completedAt ?? null,
+          skippedAt: status === "skipped" ? now : stored?.skippedAt ?? null,
+        };
+      });
+      const isHandled = nextSteps.every((step) => step.status === "completed" || step.status === "skipped");
+
+      return {
+        ...current,
+        seasonState: {
+          ...current.seasonState,
+          newGameFlow: {
+            ...previous,
+            active: true,
+            dismissed: false,
+            selectedTeamId: selectedTeamId ?? previous.selectedTeamId ?? null,
+            steps: nextSteps,
+            updatedAt: now,
+            completedAt: isHandled ? previous.completedAt ?? now : previous.completedAt ?? null,
+          },
+        },
+      };
+    });
+  };
+  useEffect(() => {
+    const flow = gameState.seasonState.newGameFlow;
+    const selectedFlowTeamId = resolveFoundationTeamId(
+      gameState.teams,
+      flow?.selectedTeamId ?? selectedTeamId ?? activeManagerTeamId,
+    );
+    const teamConfirmStatus = flow?.steps?.find((step) => step.stepId === "team_confirm")?.status ?? "open";
+    if (
+      readMeta.source !== "sqlite" ||
+      isReadOnlyMode ||
+      !flow?.active ||
+      !selectedFlowTeamId ||
+      teamConfirmStatus !== "open"
+    ) {
+      return;
+    }
+
+    updateNewGameFlowStepStatus("team_confirm", "completed");
+  }, [
+    activeManagerTeamId,
+    gameState.seasonState.newGameFlow,
+    gameState.teams,
+    isReadOnlyMode,
+    readMeta.source,
+    selectedTeamId,
+  ]);
+  useEffect(() => {
+    const flow = gameState.seasonState.newGameFlow;
+    const trainingStepStatus = flow?.steps?.find((step) => step.stepId === "training_facilities")?.status ?? "open";
+    if (
+      readMeta.source !== "sqlite" ||
+      isReadOnlyMode ||
+      !flow?.active ||
+      trainingStepStatus !== "open" ||
+      (activeView !== "trainingV2" && activeView !== "training")
+    ) {
+      return;
+    }
+
+    updateNewGameFlowStepStatus("training_facilities", "completed");
+  }, [
+    activeView,
+    gameState.seasonState.newGameFlow,
+    isReadOnlyMode,
+    readMeta.source,
+  ]);
+  const dismissNewGameFlow = () => {
+    if (isReadOnlyMode) {
+      showReadOnlyNotice();
+      return;
+    }
+
+    const now = new Date().toISOString();
+    setGameState((current) => ({
+      ...current,
+      seasonState: {
+        ...current.seasonState,
+        newGameFlow: {
+          ...(current.seasonState.newGameFlow ?? { steps: [] }),
+          active: false,
+          dismissed: true,
+          selectedTeamId: selectedTeamId ?? current.seasonState.newGameFlow?.selectedTeamId ?? null,
+          updatedAt: now,
+        },
+      },
+    }));
+  };
+  const navigateSeasonSetupStep = (stepId: NewGameFlowStepId) => {
+    const targetTeamId =
+      resolveFoundationTeamId(gameState.teams, gameState.seasonState.newGameFlow?.selectedTeamId ?? selectedTeamId ?? activeManagerTeamId) ??
+      activeManagerTeamId;
+    if (targetTeamId && targetTeamId !== activeManagerTeamId) {
+      setActiveManagerTeam(targetTeamId, "manual_select");
+    }
+
+    if (stepId === "season_intro") {
+      setFoundationView("home", setActiveView);
+      setSeasonBriefingOpen(true);
+      scrollToFoundationTarget("foundation-home");
+      return;
+    }
+
+    if (stepId === "team_confirm") {
+      setFoundationView("home", setActiveView);
+      scrollToFoundationTarget("foundation-home");
+      return;
+    }
+
+    if (stepId === "roster_review") {
+      setSelectedTeamDetailTab("roster");
+      setFoundationView("teams", setActiveView);
+      scrollToFoundationTarget("team-focus-roster");
+      return;
+    }
+
+    if (stepId === "first_transfers" || stepId === "fill_roster") {
+      const targetTeam = gameState.teams.find((team) => team.teamId === targetTeamId) ?? selectedTeam;
+      const cashBudget = Math.max(12, Math.min(150, Math.floor(((targetTeam?.cash ?? 40) * 0.65))));
+      setMarketTeamId(targetTeamId);
+      setMarketSearch("");
+      setMarketClassFilter("ALL");
+      setMarketRaceFilter("ALL");
+      setMarketSubclassFilter("ALL");
+      setMarketAlignmentFilter("ALL");
+      setMarketGenderFilter("ALL");
+      setMarketPositiveTraitFilter("ALL");
+      setMarketNegativeTraitFilter("ALL");
+      setMarketBracketFilter("ALL");
+      setMarketMaxValue(cashBudget);
+      marketValueFilterManualRef.current = true;
+      setMarketMaxSalary(40);
+      setMarketMinRatio(stepId === "first_transfers" ? 3 : 2);
+      setMarketMinPow(1);
+      setMarketMinSpe(1);
+      setMarketMinMen(1);
+      setMarketMinSoc(1);
+      setMarketShowAutoAnalysis(true);
+      setFoundationView("marketV2", setActiveView);
+      scrollToFoundationTarget("transfer-market");
+      return;
+    }
+
+    if (stepId === "training_facilities") {
+      setFoundationView("trainingV2", setActiveView);
+      scrollToFoundationTarget("foundation-training-facilities-v2");
+      return;
+    }
+
+    navigateToGameFlowStep("lineup", targetTeamId);
+  };
+  const navigateToInboxItem = (item: GameInboxItem) => {
+    const targetView = normalizeInboxTargetView(item.targetView);
+    const itemTeamId = item.teamId ?? (typeof item.targetParams.team === "string" ? item.targetParams.team : null);
+    const navigationTeamId =
+      targetView === "lineup" && (item.source === "lineup_drafts" || item.title.toLowerCase().includes("lineup"))
+        ? resolveLineupIssueTeamId(itemTeamId)
+        : itemTeamId;
+    if (navigationTeamId && navigationTeamId !== activeManagerTeamId) {
+      setActiveManagerTeam(navigationTeamId, "manual_select");
+    }
+    const panel = typeof item.targetParams.panel === "string" ? item.targetParams.panel : null;
+    if (targetView === "teams") {
+      if (panel === "contracts") {
+        setSelectedTeamDetailTab("contracts");
+      } else {
+        setSelectedTeamDetailTab("roster");
+      }
+    }
+    setFoundationView(getDefaultFoundationViewTarget(targetView), setActiveView);
+    setShowGameFlowPanel(false);
+    scrollToFoundationTarget(
+      targetView === "teams" && (panel === "roster" || panel === "contracts")
+        ? "team-focus-roster"
+        : panel ?? getFoundationViewScrollTarget(targetView),
+    );
+  };
+  const updateInboxItemStatus = (item: GameInboxItem, status: GameInboxItem["status"]) => {
+    if (isReadOnlyMode) {
+      showReadOnlyNotice();
+      return;
+    }
+
+    setGameState((current) => {
+      const existingItems = current.gameInboxItems ?? [];
+      const hasStoredItem = existingItems.some((entry) => entry.itemId === item.itemId);
+      const nextItems = hasStoredItem
+        ? existingItems.map((entry) => (entry.itemId === item.itemId ? { ...entry, status } : entry))
+        : [...existingItems, { ...item, status }];
+
+      return {
+        ...current,
+        gameInboxItems: nextItems,
+      };
+    });
+  };
+  const foundationWarningInboxItems = useMemo(
+    () => {
+      const items: Array<{
+        id: string;
+        title: string;
+        detail: string;
+        severity: "blocked" | "warning" | "info";
+        targetView: FoundationView;
+        targetTeamId?: string | null;
+        targetPanel?: string | null;
+        inboxItem?: GameInboxItem;
+      }> = [];
+
+      if (primaryInboxItem) {
+        items.push({
+          id: `inbox-${primaryInboxItem.itemId}`,
+          title: primaryInboxItem.title,
+          detail: primaryInboxItem.description,
+          severity:
+            primaryInboxItem.severity === "critical"
+              ? "blocked"
+              : primaryInboxItem.severity === "warning"
+                ? "warning"
+                : "info",
+          targetView: normalizeInboxTargetView(primaryInboxItem.targetView),
+          inboxItem: primaryInboxItem,
+        });
+      }
+
+      if (gameFlowActionStep.blockers.length > 0) {
+        items.push({
+          id: `flow-blocker-${gameFlowActionStep.stepId}`,
+          title: "Flow blockiert",
+          detail: gameFlowActionStep.blockers.map(formatCockpitReason).join(" · "),
+          severity: "blocked",
+          targetView: gameFlowActionStep.targetView as FoundationView,
+          targetTeamId: gameFlowActionStep.teamId,
+          targetPanel: gameFlowActionStep.targetPanel,
+        });
+      } else if (gameFlowActionStep.warnings.length > 0) {
+        items.push({
+          id: `flow-warning-${gameFlowActionStep.stepId}`,
+          title: "Flow prüfen",
+          detail: gameFlowActionStep.warnings.map(formatCockpitReason).join(" · "),
+          severity: "warning",
+          targetView: gameFlowActionStep.targetView as FoundationView,
+          targetTeamId: gameFlowActionStep.teamId,
+          targetPanel: gameFlowActionStep.targetPanel,
+        });
+      }
+
+      if (activeManagerTeamWarning) {
+        items.push({
+          id: "manager-team-warning",
+          title: "Team-Kontext",
+          detail: activeManagerTeamWarning,
+          severity: "warning",
+          targetView: "teams",
+        });
+      }
+
+      if (activeViewContextWarning) {
+        items.push({
+          id: `view-warning-${activeView}`,
+          title: "Ansicht prüfen",
+          detail: activeViewContextWarning,
+          severity: "info",
+          targetView: activeView,
+        });
+      }
+
+      return items.slice(0, 4);
+    },
+    [activeManagerTeamWarning, activeView, activeViewContextWarning, gameFlowActionStep, primaryInboxItem],
+  );
+  const globalNextDisabled = primaryInboxItem
+    ? false
+    : gameFlowActionStep.status === "applying" || cockpitBusyKey != null || seasonTransitionBusy;
+  const globalNextLabel = primaryInboxItem?.title ?? gameFlowActionStep.label;
+  const globalNextTitle = primaryInboxItem
+    ? `${primaryInboxItem.title}: ${primaryInboxItem.description}`
+    : gameFlowActionStep.status === "blocked"
+      ? gameFlowActionStep.blockers.map(formatCockpitReason).join(" · ") || "Leertaste: zum blockierten Schritt springen"
+      : globalNextDisabled
+        ? "Aktion laeuft gerade."
+        : "Leertaste: Weiter";
+  const globalNextStatusClass = primaryInboxItem
+    ? primaryInboxItem.severity === "critical"
+      ? "is-blocked"
+      : primaryInboxItem.severity === "warning"
+        ? "is-warning"
+        : "is-ready"
+    : getGameFlowStatusClass(gameFlowActionStep.status);
+  const acknowledgeFlowStep = (stepId: string) => {
+    const acknowledgeableStepIds = new Set([
+      "season_intro",
+      "review_previous_season",
+      "review_last_matchday",
+      "scouting_facilities",
+      "review_matchday_results",
+      "open_season_standings",
+    ]);
+    if (!acknowledgeableStepIds.has(stepId)) {
+      return;
+    }
+    setAcknowledgedFlowStepIds((current) => {
+      if (current.has(stepId)) {
+        return current;
+      }
+      const next = new Set(current);
+      next.add(stepId);
+      return next;
+    });
+  };
+  const triggerGlobalNext = async () => {
+    if (primaryInboxItem) {
+      navigateToInboxItem(primaryInboxItem);
+      return;
+    }
+    if (globalNextDisabled) {
+      setShowGameFlowPanel(true);
+      return;
+    }
+    if (gameFlowActionStep.stepId === "advance_to_next_matchday" && gameFlowActionStep.status === "ready") {
+      const result = await runCockpitMatchdayAdvance(true);
+      if (result?.applied) {
+        setAcknowledgedFlowStepIds(new Set());
+      } else {
+        setShowGameFlowPanel(true);
+      }
+      return;
+    }
+    if (gameFlowActionStep.stepId === "scouting_facilities") {
+      updateNewGameFlowStepStatus("training_facilities", "completed");
     }
     navigateToGameFlowStep(gameFlowActionStep.targetView, gameFlowActionStep.teamId, gameFlowActionStep.targetPanel);
+    acknowledgeFlowStep(gameFlowActionStep.stepId);
   };
+  const closeCommandPalette = () => {
+    setShowCommandPalette(false);
+    setCommandSearch("");
+  };
+
+  const openFoundationViewCommand = (view: FoundationView) => {
+    const targetView = getDefaultFoundationViewTarget(view);
+    setFoundationView(targetView, setActiveView);
+    scrollToFoundationTarget(getFoundationViewScrollTarget(targetView));
+  };
+
+  const openEncyclopediaEntry = (termOrId: string) => {
+    const entry = getGameEncyclopediaEntry(termOrId) ?? GAME_ENCYCLOPEDIA_ENTRIES.find((item) => item.id === termOrId);
+    setSelectedEncyclopediaEntryId(entry?.id ?? "ovr");
+    setFoundationView("encyclopedia", setActiveView);
+    scrollToFoundationTarget("foundation-encyclopedia");
+  };
+
+  const foundationCommandItems = useMemo<FoundationCommandItem[]>(() => {
+    const viewCommands: FoundationCommandItem[] = [
+      ...foundationPrimaryViews,
+      ...foundationAdminViews,
+      ...foundationSecondaryViews,
+    ].map((view) => ({
+      id: `view-${view.id}`,
+      label: view.label,
+      detail: getDefaultFoundationViewTarget(view.id) === activeView ? "aktuelle Ansicht" : "Ansicht öffnen",
+      section: "Ansicht" as const,
+      keywords: `${view.id} ${view.label}`,
+      tone: getDefaultFoundationViewTarget(view.id) === activeView ? "ready" : undefined,
+      run: () => openFoundationViewCommand(view.id),
+    }));
+
+    const teamCommands: FoundationCommandItem[] = gameState.teams.map((team) => ({
+      id: `team-${team.teamId}`,
+      label: team.name,
+      detail: `${team.shortCode} · Team öffnen`,
+      section: "Team" as const,
+      keywords: `${team.name} ${team.shortCode} ${team.teamId} team verein kader roster gm ally rival`,
+      tone: team.teamId === activeManagerTeamId ? "ready" : undefined,
+      run: () => {
+        openTeamDrawerById(team.teamId);
+      },
+    }));
+    const teamById = new Map(gameState.teams.map((team) => [team.teamId, team] as const));
+    const rosterByPlayerId = new Map(gameState.rosters.map((entry) => [entry.playerId, entry] as const));
+    const playerCommands: FoundationCommandItem[] = gameState.players.map((player) => {
+      const roster = rosterByPlayerId.get(player.id) ?? null;
+      const team = roster ? teamById.get(roster.teamId) ?? null : null;
+      const teamLabel = team ? `${team.shortCode} · ${team.name}` : "Free Agent";
+      const classLabel = [player.className, player.race].filter(Boolean).join(" · ");
+      return {
+        id: `player-${player.id}`,
+        label: player.name,
+        detail: `${teamLabel}${classLabel ? ` · ${classLabel}` : ""}`,
+        section: "Spieler" as const,
+        keywords: [
+          player.name,
+          player.id,
+          player.className,
+          player.race,
+          player.alignment,
+          player.gender,
+          ...(player.subclasses ?? []),
+          ...(player.traitsPositive ?? []),
+          ...(player.traitsNegative ?? []),
+          team?.name,
+          team?.shortCode,
+          roster?.teamId,
+          "spieler player profil drawer",
+        ].filter(Boolean).join(" "),
+        run: () => {
+          openPlayerDrawerById(player.id, roster?.id ?? null);
+        },
+      };
+    });
+    const encyclopediaCommands: FoundationCommandItem[] = GAME_ENCYCLOPEDIA_ENTRIES.map((entry) => ({
+      id: `encyclopedia-${entry.id}`,
+      label: entry.term,
+      detail: `${entry.category} · ${entry.short}`,
+      section: "Lexikon" as const,
+      keywords: [entry.term, entry.category, entry.short, entry.meaning, entry.usage, ...entry.aliases, ...entry.factors].join(" "),
+      tone: activeView === "encyclopedia" && selectedEncyclopediaEntryId === entry.id ? "ready" : undefined,
+      run: () => openEncyclopediaEntry(entry.id),
+    }));
+
+    return [
+      {
+        id: "flow-next",
+        label: globalNextLabel,
+        detail: primaryInboxItem ? primaryInboxItem.description : gameFlowActionStep.cta,
+        section: "Flow",
+        keywords: `weiter next flow leertaste ${globalNextLabel}`,
+        tone: globalNextStatusClass === "is-blocked" ? "blocked" : globalNextStatusClass === "is-warning" ? "warning" : "ready",
+        run: triggerGlobalNext,
+      },
+      {
+        id: "lineup-open",
+        label: "Einsatzliste öffnen",
+        detail: "Slots, Captain und Team-Boosts",
+        section: "Aktion",
+        keywords: "lineup einsatzliste slots teamdeck spieler einsetzen",
+        tone: activeView === "lineup" ? "ready" : undefined,
+        run: () => openFoundationViewCommand("lineup"),
+      },
+      {
+        id: "arena-open",
+        label: "Arena öffnen",
+        detail: "Matchday Reveal und Ergebnis",
+        section: "Aktion",
+        keywords: "arena matchday reveal ergebnis",
+        tone: activeView === "matchdayArena" ? "ready" : undefined,
+        run: () => openFoundationViewCommand("matchdayArena"),
+      },
+      {
+        id: "market-open",
+        label: "Transfermarkt öffnen",
+        detail: "V2 · Kaufen, verkaufen, Wishlist",
+        section: "Aktion",
+        keywords: "transfermarkt markt kaufen verkaufen wishlist",
+        tone: isTransferMarketViewActive ? "ready" : undefined,
+        run: () => openFoundationViewCommand("market"),
+      },
+      {
+        id: "home-open",
+        label: "Home öffnen",
+        detail: "Manager-Zentrale",
+        section: "Aktion",
+        keywords: "home dashboard manager zentrale",
+        tone: activeView === "home" ? "ready" : undefined,
+        run: () => openFoundationViewCommand("home"),
+      },
+      ...teamCommands,
+      ...playerCommands,
+      ...encyclopediaCommands,
+      ...viewCommands,
+    ];
+  }, [
+    activeManagerTeamId,
+    activeView,
+    gameFlowActionStep.cta,
+    gameState.players,
+    gameState.rosters,
+    gameState.teams,
+    globalNextLabel,
+    globalNextStatusClass,
+    isTransferMarketViewActive,
+    primaryInboxItem,
+    selectedEncyclopediaEntryId,
+    triggerGlobalNext,
+  ]);
+
+  const visibleFoundationCommandItems = useMemo(() => {
+    const query = commandSearch.trim().toLowerCase();
+    if (!query) {
+      return foundationCommandItems.slice(0, 14);
+    }
+    const tokens = query.split(/\s+/).filter(Boolean);
+    return foundationCommandItems
+      .map((command, index) => {
+        const label = command.label.toLowerCase();
+        const detail = command.detail.toLowerCase();
+        const keywords = command.keywords.toLowerCase();
+        const section = command.section.toLowerCase();
+        const haystack = `${command.label} ${command.detail} ${command.section} ${command.keywords}`.toLowerCase();
+        if (!tokens.every((token) => haystack.includes(token))) {
+          return null;
+        }
+
+        const exactLabelMatch = tokens.some((token) => label === token);
+        const labelStartsWith = tokens.some((token) => label.startsWith(token));
+        const keywordStartsWith = tokens.some((token) =>
+          keywords
+            .split(/\s+/)
+            .filter(Boolean)
+            .some((keyword) => keyword.startsWith(token)),
+        );
+        const score =
+          (command.section === "Lexikon" ? 1000 : 0) +
+          (exactLabelMatch ? 500 : 0) +
+          (labelStartsWith ? 180 : 0) +
+          (keywordStartsWith ? 80 : 0) +
+          (detail.includes("kennzahl") ? 20 : 0) +
+          (section.includes("lexikon") ? 20 : 0) -
+          index / 10000;
+
+        return { command, score };
+      })
+      .filter((entry): entry is { command: FoundationCommandItem; score: number } => Boolean(entry))
+      .sort((left, right) => right.score - left.score)
+      .map((entry) => entry.command)
+      .slice(0, 14);
+  }, [commandSearch, foundationCommandItems]);
+
+  const activeFlowCoach = useMemo<FoundationFlowCoachModel>(() => {
+    const base = {
+      nextLabel: globalNextLabel,
+      nextTitle: globalNextTitle,
+    };
+    switch (activeView) {
+      case "home":
+        return {
+          ...base,
+          kicker: "Briefing-Flow",
+          title: "Kurz lesen, dann direkt in Markt, HQ oder Einsatzliste springen.",
+          detail: "Home zeigt nur die wichtigsten Signale fuer die ersten Minuten: Next Play, Druck, Chancen und Spieltag.",
+          terms: ["PPs", "MVS", "OVR"],
+          progressLabel: "Orientierung",
+          progressPct: 18,
+          shortcut: "Space = Next Play",
+          actions: [
+            { label: "Transfermarkt", targetView: "marketV2", detail: "Deals & Wishlist", tone: "primary" },
+            { label: "HQ", targetView: "hq", detail: "Druck & Prioritaeten" },
+            { label: "Einsatzliste", targetView: "lineup", detail: "Slots fuellen" },
+          ],
+        };
+      case "hq":
+        return {
+          ...base,
+          kicker: "HQ-Flow",
+          title: "Baustellen ordnen, Druck lesen und dann gezielt in Markt oder Einsatzliste gehen.",
+          detail: "HQ ist die Manager-Zentrale: Was brennt sofort, was kippt diese Season und was musst du vor dem Wechsel vorbereiten?",
+          terms: ["Cash", "Moral", "Kader", "Druck"],
+          progressLabel: "Prioritäten",
+          progressPct: 34,
+          shortcut: "Space = naechste Baustelle",
+          actions: [
+            { label: "Transfermarkt", targetView: "marketV2", detail: "Kaderluecken", tone: "primary" },
+            { label: "Training", targetView: "trainingV2", detail: "Entwicklung" },
+            { label: "Einsatzliste", targetView: "lineup", detail: "bereit machen" },
+          ],
+        };
+      case "lineup":
+        return {
+          ...base,
+          kicker: "Einsatz-Flow",
+          title: "Slot waehlen, Kandidat pruefen, Team-Boost setzen, speichern.",
+          detail: "Leertaste springt zum naechsten offenen Schritt. Boosts gelten teamweit, nicht mehr pro Spieler.",
+          terms: ["Slot", "Boost", "D1", "D2"],
+          progressLabel: "Vorbereitung",
+          progressPct: 44,
+          shortcut: "Space = naechster offener Slot",
+          actions: [
+            { label: "Arena oeffnen", targetView: "matchdayArena", detail: "Reveal", tone: "primary" },
+            { label: "HQ", targetView: "hq", detail: "Blocker" },
+            { label: "Training", targetView: "trainingV2", detail: "Erschoepfung" },
+          ],
+        };
+      case "matchdayArena":
+        return {
+          ...base,
+          kicker: "Arena-Flow",
+          title: "Reveal anschauen, Gewinner verstehen, danach Tabelle oder Training pruefen.",
+          detail: "PPs zeigen den echten Spieltagsbeitrag; Arena veraendert nichts mehr, sie macht das Ergebnis lesbar.",
+          terms: ["PPs", "Rank", "D1", "D2"],
+          progressLabel: "Spieltag",
+          progressPct: 68,
+          shortcut: "Space = naechster Flow-Schritt",
+          actions: [
+            { label: "Saisonstand", targetView: "seasonV2", detail: "Ranking", tone: "primary" },
+            { label: "HQ", targetView: "hq", detail: "Folgen" },
+            { label: "Einsatzliste", targetView: "lineup", detail: "Zurueck" },
+          ],
+        };
+      case "teams":
+        return {
+          ...base,
+          kicker: "Kader-Flow",
+          title: "Teamprofil lesen, Fokus setzen, Problemspieler direkt oeffnen.",
+          detail: "Nutze Gehaltsdruck, Value, Vertraege und Training als Arbeitsmodi statt die Tabelle zu durchsuchen.",
+          terms: ["Value", "Gehalt", "LZ", "POW"],
+          progressLabel: "Kaderarbeit",
+          progressPct: 36,
+          shortcut: "Doppelklick = Drawer",
+          actions: [
+            { label: "Training", targetView: "trainingV2", detail: "Upgrades", tone: "primary" },
+            { label: "Transfermarkt", targetView: "marketV2", detail: "Kaufen/Verkaufen" },
+            { label: "Einsatzliste", targetView: "lineup", detail: "Slots" },
+          ],
+        };
+      case "trainingV2":
+      case "training":
+        return {
+          ...base,
+          kicker: "Entwicklungs-Flow",
+          title: "Steigerer zuerst, Rueckschritt-Risiko danach, Upgrades direkt beim Spieler.",
+          detail: "XP kann Upgrades ermoeglichen; schwache Entwicklung und negative Netto-XP koennen Werte auch senken.",
+          terms: ["XP", "OVR", "MVS", "Fatigue"],
+          progressLabel: "Entwicklung",
+          progressPct: 52,
+          shortcut: "Upgrade-Button = Spielerfokus",
+          actions: [
+            { label: "HQ", targetView: "hq", detail: "Prioritaeten", tone: "primary" },
+            { label: "Einsatzliste", targetView: "lineup", detail: "Fit pruefen" },
+            { label: "Transfermarkt", targetView: "marketV2", detail: "Bedarf" },
+          ],
+        };
+      case "market":
+        return {
+          ...base,
+          kicker: "Markt-Alt",
+          title: "Die alte Marktansicht bleibt lesbar, der Hauptflow liegt aber in Transfermarkt v2.",
+          detail: "Wenn du handeln willst, fuehrt dich der Hauptpfad immer in die modernere Deal-Ansicht.",
+          terms: ["MW", "Value", "Gehalt", "OVR"],
+          progressLabel: "Transfers",
+          progressPct: 42,
+          shortcut: "/ oder Ctrl+K = Suchen",
+          actions: [
+            { label: "Transfermarkt v2", targetView: "marketV2", detail: "Hauptansicht", tone: "primary" },
+            { label: "HQ", targetView: "hq", detail: "Prioritaeten" },
+            { label: "Historie", targetView: "historyV2", detail: "Deals" },
+          ],
+        };
+      case "marketV2":
+        return {
+          ...base,
+          kicker: "Markt-Flow",
+          title: "Kandidaten links vergleichen, Profil mittig lesen, Vertrag rechts sauber vorbereiten.",
+          detail: "Transfermarkt v2 ist die Hauptansicht: erst Bedarf und Fit, dann Cash/Gehalt, dann die Entscheidung.",
+          terms: ["MW", "Fit", "Gehalt", "Bedarf"],
+          progressLabel: "Transfers",
+          progressPct: 48,
+          shortcut: "Suche + Teamfilter = Deal-Funnel",
+          actions: [
+            { label: "HQ", targetView: "hq", detail: "Prioritaeten", tone: "primary" },
+            { label: "Einsatzliste", targetView: "lineup", detail: "wenn bereit" },
+            { label: "Historie", targetView: "historyV2", detail: "Deals" },
+          ],
+        };
+      case "season":
+      case "seasonV2":
+        return {
+          ...base,
+          kicker: "Tabellen-Flow",
+          title: "Rang, Punkte und Bereichsstaerken als Story lesen.",
+          detail: "POW/SPE/MEN/SOC zeigen, warum Teams in bestimmten Disziplinen tragen oder wackeln.",
+          terms: ["Rank", "PPs", "POW", "SOC"],
+          progressLabel: "Liga-Lage",
+          progressPct: 78,
+          shortcut: "Tabellenkopf = sortieren",
+          actions: [
+            { label: "Arena", targetView: "matchdayArena", detail: "Spieltag", tone: "primary" },
+            { label: "HQ", targetView: "hq", detail: "Ursachen" },
+            { label: "Preisgeld", targetView: "prize", detail: "Ausblick" },
+          ],
+        };
+      case "players":
+        return {
+          ...base,
+          kicker: "Spieler-Flow",
+          title: "Erst Leistung scannen, dann Profil, Training oder Verkauf oeffnen.",
+          detail: "OVR ist der Schnellvergleich; PPs und MVS sagen mehr ueber echten Nutzen im Spiel.",
+          terms: ["OVR", "PPs", "MVS", "MW"],
+          progressLabel: "Scouting",
+          progressPct: 34,
+          shortcut: "Doppelklick = Profil",
+          actions: [
+            { label: "Training", targetView: "trainingV2", detail: "Entwicklung", tone: "primary" },
+            { label: "HQ", targetView: "hq", detail: "Rollen" },
+            { label: "Transfermarkt", targetView: "marketV2", detail: "Vergleich" },
+          ],
+        };
+      case "encyclopedia":
+        return {
+          ...base,
+          kicker: "Lexikon",
+          title: "Kennzahlen und Systeme transparent nachlesen.",
+          detail: "Suche nach Abkuerzungen, klicke GameTerm-Chips oder springe direkt von OVR, MVS und PPs in die Erklaerung.",
+          terms: ["OVR", "PPs", "MVS", "XP"],
+          progressLabel: "Transparenz",
+          progressPct: 60,
+          shortcut: "Ctrl+K = Begriff suchen",
+          actions: [
+            { label: "Spieler", targetView: "players", detail: "Kennzahlen sehen", tone: "primary" },
+            { label: "Einsatzliste", targetView: "lineup", detail: "Score anwenden" },
+            { label: "Training", targetView: "trainingV2", detail: "XP pruefen" },
+          ],
+        };
+      default:
+        return {
+          ...base,
+          kicker: "Flow",
+          title: "Nutze Next Play und die Schnellnavigation fuer den naechsten sinnvollen Schritt.",
+          detail: "Die Hilfepunkte an Abkuerzungen erklaeren Werte direkt im Kontext.",
+          terms: ["OVR", "PPs", "MVS", "Value"],
+          progressLabel: "Navigation",
+          progressPct: 24,
+          shortcut: "Ctrl+K = Schnellzugriff",
+          actions: [
+            { label: "Home", targetView: "home", detail: "Briefing", tone: "primary" },
+            { label: "Transfermarkt", targetView: "marketV2", detail: "Handeln" },
+            { label: "HQ", targetView: "hq", detail: "Zentrale" },
+          ],
+        };
+    }
+  }, [activeView, globalNextLabel, globalNextTitle]);
+
+  const foundationFlowLoopStages = useMemo<FoundationFlowLoopStage[]>(
+    () => [
+      { id: "briefing", label: "Briefing", detail: "Home & Hinweise", targetView: "home", views: ["home", "inbox", "cockpit"] },
+      { id: "market", label: "Markt", detail: "Deals & Wishlist", targetView: "marketV2", views: ["market", "marketV2", "history", "historyV2"] },
+      { id: "hq", label: "HQ", detail: "Druck & Planung", targetView: "hq", views: ["hq", "teams", "training", "trainingV2", "players", "teamSettings"] },
+      { id: "lineup", label: "Einsatz", detail: "Slots & Captain", targetView: "lineup", views: ["lineup"] },
+      { id: "arena", label: "Arena", detail: "Reveal & Auswertung", targetView: "matchdayArena", views: ["matchdayArena", "matchdayResult", "season", "seasonV2", "ranks", "diszis", "prize", "seasonPreview"] },
+    ],
+    [],
+  );
+  const activeFlowLoopIndex = useMemo(() => {
+    const index = foundationFlowLoopStages.findIndex((stage) => stage.views.includes(activeView));
+    return index >= 0 ? index : 0;
+  }, [activeView, foundationFlowLoopStages]);
+  const selectedEncyclopediaEntry =
+    GAME_ENCYCLOPEDIA_ENTRIES.find((entry) => entry.id === selectedEncyclopediaEntryId) ?? GAME_ENCYCLOPEDIA_ENTRIES[0];
+
+  const readOnlyBannerMessage = useMemo(() => {
+    if (isReadOnlyMode) {
+      return "Nur Ansicht: Dieser Spielstand ist gerade nicht schreibbar. Anschauen ja, steuern nein.";
+    }
+    if (isSelectedTeamManagementLocked && selectedTeam) {
+      return `Nur Ansicht: ${selectedTeam.name} gehoert nicht zu deinen steuerbaren Teams. Anschauen ja, steuern nein.`;
+    }
+    return null;
+  }, [isReadOnlyMode, isSelectedTeamManagementLocked, selectedTeam]);
+
+  function getReadOnlyActionReason(action: string) {
+    return `Im Nur-Ansicht-Modus kannst du ${action} nicht aendern.`;
+  }
+
+  function getBusyActionReason(task: string) {
+    return `${task} laeuft gerade. Bitte kurz warten.`;
+  }
+
+  function getCockpitBusyReason() {
+    return "Gerade laeuft schon ein anderer Saisonabschluss-Schritt. Bitte erst diesen Schritt fertig werden lassen.";
+  }
+
+  const runFoundationCommand = (command: FoundationCommandItem) => {
+    command.run();
+    closeCommandPalette();
+  };
+
+  useEffect(() => {
+    const onOpenGameTerm = (event: Event) => {
+      const termId = event instanceof CustomEvent ? String(event.detail?.termId ?? "") : "";
+      if (!termId) return;
+      openEncyclopediaEntry(termId);
+    };
+
+    window.addEventListener("foundation:open-game-term", onOpenGameTerm);
+    return () => window.removeEventListener("foundation:open-game-term", onOpenGameTerm);
+  }, []);
 
   useEffect(() => {
     const onKeyDown = (event: KeyboardEvent) => {
@@ -8203,13 +11594,64 @@ export default function FoundationPageClient({ initialReadSource, initialSelecte
         target?.isContentEditable ||
         target?.closest("[contenteditable='true']");
       const modalOpen = Boolean(document.querySelector(".foundation-modal-backdrop, .player-drawer-backdrop, [role='dialog']"));
-      if (isTextTarget || modalOpen || globalNextDisabled) return;
+      const activeViewHandlesOwnSpace = activeView === "lineup" || activeView === "matchdayArena";
+      if (isTextTarget || modalOpen || activeViewHandlesOwnSpace || globalNextDisabled) return;
       event.preventDefault();
-      triggerGlobalNext();
+      void triggerGlobalNext();
     };
     window.addEventListener("keydown", onKeyDown);
     return () => window.removeEventListener("keydown", onKeyDown);
-	  }, [activeManagerTeamId, gameFlowActionStep, globalNextDisabled, primaryInboxItem]);
+	  }, [activeManagerTeamId, activeView, gameFlowActionStep, globalNextDisabled, primaryInboxItem, triggerGlobalNext]);
+
+  useEffect(() => {
+    const onKeyDown = (event: KeyboardEvent) => {
+      const target = event.target as HTMLElement | null;
+      const tagName = target?.tagName.toLowerCase();
+      const isTextTarget =
+        tagName === "input" ||
+        tagName === "textarea" ||
+        tagName === "select" ||
+        target?.isContentEditable ||
+        target?.closest("[contenteditable='true']");
+
+      if ((event.metaKey || event.ctrlKey) && event.code === "KeyK") {
+        event.preventDefault();
+        setShowCommandPalette(true);
+        return;
+      }
+
+      if (!isTextTarget && event.altKey && !event.ctrlKey && !event.metaKey && /^Digit[1-5]$/.test(event.code)) {
+        const index = Number(event.code.replace("Digit", "")) - 1;
+        const stage = foundationFlowLoopStages[index];
+        if (stage) {
+          event.preventDefault();
+          openFoundationViewCommand(stage.targetView);
+          return;
+        }
+      }
+
+      if (event.code === "Escape" && showCommandPalette) {
+        event.preventDefault();
+        closeCommandPalette();
+        return;
+      }
+
+      if (!isTextTarget && event.code === "Slash" && !showCommandPalette) {
+        event.preventDefault();
+        setShowCommandPalette(true);
+      }
+    };
+
+    window.addEventListener("keydown", onKeyDown);
+    return () => window.removeEventListener("keydown", onKeyDown);
+  }, [foundationFlowLoopStages, showCommandPalette]);
+
+  useEffect(() => {
+    if (!showCommandPalette) {
+      return;
+    }
+    window.setTimeout(() => commandSearchInputRef.current?.focus(), 30);
+  }, [showCommandPalette]);
 
   const selectedIdentity = useMemo(
     () =>
@@ -8286,18 +11728,114 @@ export default function FoundationPageClient({ initialReadSource, initialSelecte
   const rosterPlayers = useMemo(() => getRosterPlayers(gameState, selectedRoster), [gameState, selectedRoster]);
   const selectedTeamContractTable = useMemo(
     () =>
-      selectedTeam
+      selectedTeam && shouldBuildTeamContracts
         ? buildTeamContractSeasonTable({
             gameState,
             teamId: selectedTeam.teamId,
             seasonLabelBase: canonicalSeasonLabel,
           })
         : null,
-    [canonicalSeasonLabel, gameState, selectedTeam],
+    [canonicalSeasonLabel, gameState, selectedTeam, shouldBuildTeamContracts],
   );
-  const selectedAiTeamId = selectedTeamControl?.controlMode === "ai" ? selectedTeam?.teamId : aiTeams[0]?.teamId;
-  const aiPreview = selectedAiTeamId ? runAiTurn(gameState, selectedAiTeamId) : null;
-  const aiMarketPreview = selectedAiTeamId ? buildAiTransferIntents(gameState, selectedAiTeamId) : [];
+  const selectedTeamContractShapeMix = useMemo(() => {
+    if (!selectedTeamContractTable) {
+      return null;
+    }
+
+    const activeRows = selectedTeamContractTable.rows.filter((row) => row.status === "active");
+    const totalCount = activeRows.length;
+    const buckets: Record<
+      ContractShape,
+      {
+        shape: ContractShape;
+        label: string;
+        count: number;
+        totalSalary: number;
+        currentDelta: number;
+        futureDelta: number;
+      }
+    > = {
+      balanced: { shape: "balanced", label: "Balanced", count: 0, totalSalary: 0, currentDelta: 0, futureDelta: 0 },
+      front_loaded: { shape: "front_loaded", label: "Front-loaded", count: 0, totalSalary: 0, currentDelta: 0, futureDelta: 0 },
+      back_loaded: { shape: "back_loaded", label: "Back-loaded", count: 0, totalSalary: 0, currentDelta: 0, futureDelta: 0 },
+    };
+
+    activeRows.forEach((row) => {
+      const shape = row.contractShape ?? "balanced";
+      const scheduleSalary = row.yearlySalarySchedule.reduce((sum, entry) => sum + (Number.isFinite(entry.salary) ? entry.salary : 0), 0);
+      const totalSalary = row.totalSalary ?? scheduleSalary;
+      if (!Number.isFinite(totalSalary) || totalSalary <= 0) {
+        buckets[shape].count += 1;
+        return;
+      }
+
+      const contractLength = Math.max(1, row.contractLength || row.yearlySalarySchedule.length || 1);
+      const balancedAnnualSalary = totalSalary / contractLength;
+      const currentSalary = row.yearlySalarySchedule[0]?.salary ?? balancedAnnualSalary;
+      const futureSalary = Math.max(0, totalSalary - currentSalary);
+      const balancedFutureSalary = Math.max(0, totalSalary - balancedAnnualSalary);
+
+      buckets[shape].count += 1;
+      buckets[shape].totalSalary += totalSalary;
+      buckets[shape].currentDelta += currentSalary - balancedAnnualSalary;
+      buckets[shape].futureDelta += futureSalary - balancedFutureSalary;
+    });
+
+    const entries = (["balanced", "front_loaded", "back_loaded"] as ContractShape[]).map((shape) => {
+      const bucket = buckets[shape];
+      return {
+        ...bucket,
+        share: totalCount > 0 ? (bucket.count / totalCount) * 100 : 0,
+        totalSalary: roundViewNumber(bucket.totalSalary, 2),
+        currentDelta: roundViewNumber(bucket.currentDelta, 2),
+        futureDelta: roundViewNumber(bucket.futureDelta, 2),
+      };
+    });
+
+    const nonBalancedCurrentDelta = entries
+      .filter((entry) => entry.shape !== "balanced")
+      .reduce((sum, entry) => sum + entry.currentDelta, 0);
+    const nonBalancedFutureDelta = entries
+      .filter((entry) => entry.shape !== "balanced")
+      .reduce((sum, entry) => sum + entry.futureDelta, 0);
+
+    return {
+      totalCount,
+      entries,
+      nonBalancedCount: entries.filter((entry) => entry.shape !== "balanced").reduce((sum, entry) => sum + entry.count, 0),
+      currentDelta: roundViewNumber(nonBalancedCurrentDelta, 2),
+      futureDelta: roundViewNumber(nonBalancedFutureDelta, 2),
+    };
+  }, [selectedTeamContractTable]);
+  const playerGeneratorTeamContexts = useMemo(
+    () =>
+      gameState.teams.map((team) => {
+        const rosterEntries = gameState.rosters.filter((entry) => entry.teamId === team.teamId);
+        const salaryTotal = rosterEntries.reduce((sum, entry) => sum + (Number.isFinite(entry.salary) ? entry.salary : 0), 0);
+        const generalManager = getTeamGeneralManager(gameState, team.teamId);
+        return {
+          team,
+          identity: gameState.teamIdentities.find((identity) => identity.teamId === team.teamId) ?? null,
+          generalManager: generalManager?.profile ?? null,
+          rosterCount: rosterEntries.length,
+          averageSalary: rosterEntries.length > 0 ? roundViewNumber(salaryTotal / rosterEntries.length, 2) : null,
+        };
+      }),
+    [gameState],
+  );
+  const selectedAiTeamId = shouldBuildExtendedTeamPanels
+    ? selectedTeamControl?.controlMode === "ai"
+      ? selectedTeam?.teamId
+      : aiTeams[0]?.teamId
+    : null;
+  const aiPreview = useMemo(
+    () => (selectedAiTeamId && shouldBuildExtendedTeamPanels ? runAiTurn(gameState, selectedAiTeamId) : null),
+    [gameState, selectedAiTeamId, shouldBuildExtendedTeamPanels],
+  );
+  const aiMarketPreview = useMemo(
+    () => (selectedAiTeamId && shouldBuildExtendedTeamPanels ? buildAiTransferIntents(gameState, selectedAiTeamId) : []),
+    [gameState, selectedAiTeamId, shouldBuildExtendedTeamPanels],
+  );
   const marketSelectedTeam = useMemo(
     () => gameState.teams.find((team) => team.teamId === marketTeamId) ?? null,
     [gameState.teams, marketTeamId],
@@ -8330,8 +11868,21 @@ export default function FoundationPageClient({ initialReadSource, initialSelecte
   );
   const transferWishlistEntries = useMemo(
     () =>
-      (gameState.seasonState.transferWishlist ?? []).filter((entry) => entry.saveId === activeSaveId),
-    [activeSaveId, gameState.seasonState.transferWishlist],
+      shouldBuildMarketView
+        ? (gameState.seasonState.transferWishlist ?? []).filter((entry) => entry.saveId === activeSaveId)
+        : [],
+    [activeSaveId, gameState.seasonState.transferWishlist, shouldBuildMarketView],
+  );
+  const transferSellMarkerEntries = useMemo(
+    () =>
+      (gameState.seasonState.transferSellMarkers ?? []).filter(
+        (entry) => entry.saveId === activeSaveId && entry.seasonId === gameState.season.id,
+      ),
+    [activeSaveId, gameState.season.id, gameState.seasonState.transferSellMarkers],
+  );
+  const transferSellMarkerKeySet = useMemo(
+    () => new Set(transferSellMarkerEntries.map((entry) => `${entry.teamId}:${entry.playerId}`)),
+    [transferSellMarkerEntries],
   );
   const transferWishlistByPlayerId = useMemo(
     () => new Map(transferWishlistEntries.map((entry) => [entry.playerId, entry] as const)),
@@ -8349,7 +11900,6 @@ export default function FoundationPageClient({ initialReadSource, initialSelecte
       }),
     [marketFeed?.items, transferWishlistEntries],
   );
-
   useEffect(() => {
     setMarketBuyPreview(null);
     setMarketBuyPreviewContext(null);
@@ -8433,6 +11983,10 @@ export default function FoundationPageClient({ initialReadSource, initialSelecte
         defaultWidth: Math.max(Math.round(column.columnSize ?? 96), 52),
         minWidth: column.normalizedKey === "mannschaft" ? 150 : 52,
         visibleByDefault: column.compactVisible,
+        tooltip:
+          column.normalizedKey === "bonuspunkte"
+            ? `${column.sourceDescription} ${column.transformNote ?? ""}`.trim()
+            : undefined,
       }));
 
       return [
@@ -8478,12 +12032,13 @@ export default function FoundationPageClient({ initialReadSource, initialSelecte
       { id: "soc", label: "SOC", dataKey: "soc", defaultWidth: 86, minWidth: 72 },
       { id: "histPoints", label: "Hist. Punkte", dataKey: "histPoints", defaultWidth: 126, minWidth: 104 },
       { id: "avgPoints", label: "Ø Punkte", dataKey: "avgPoints", defaultWidth: 108, minWidth: 90 },
-      { id: "gold", label: "Gold", dataKey: "gold", defaultWidth: 82, minWidth: 70 },
-      { id: "silver", label: "Silber", dataKey: "silver", defaultWidth: 84, minWidth: 72 },
-      { id: "bronze", label: "Bronze", dataKey: "bronze", defaultWidth: 90, minWidth: 78 },
+      { id: "gold", label: "🥇", dataKey: "gold", defaultWidth: 66, minWidth: 56 },
+      { id: "silver", label: "🥈", dataKey: "silver", defaultWidth: 66, minWidth: 56 },
+      { id: "bronze", label: "🥉", dataKey: "bronze", defaultWidth: 66, minWidth: 56 },
       { id: "top5", label: "Top 5", dataKey: "top5", defaultWidth: 86, minWidth: 72 },
       { id: "top10", label: "Top 10", dataKey: "top10", defaultWidth: 96, minWidth: 78 },
       { id: "avgRank", label: "Avg Rank", dataKey: "avgRank", defaultWidth: 110, minWidth: 90 },
+      { id: "seasonPoints", label: "Seasons", dataKey: "seasonPoints", defaultWidth: 150, minWidth: 120 },
     ],
     [],
   );
@@ -8615,18 +12170,19 @@ export default function FoundationPageClient({ initialReadSource, initialSelecte
   }, [gameState.disciplines]);
   const disciplineRanksColumns = useMemo<FoundationTableColumn[]>(
     () => [
-      { id: "team", label: "Team", dataKey: "team", defaultWidth: 240, minWidth: 180 },
-      { id: "totalRank", label: "TOT", dataKey: "totalRank", defaultWidth: 82, minWidth: 66 },
-      { id: "powRank", label: "POW", dataKey: "powRank", defaultWidth: 82, minWidth: 66 },
-      { id: "speRank", label: "SPE", dataKey: "speRank", defaultWidth: 82, minWidth: 66 },
-      { id: "menRank", label: "MEN", dataKey: "menRank", defaultWidth: 82, minWidth: 66 },
-      { id: "socRank", label: "SOC", dataKey: "socRank", defaultWidth: 82, minWidth: 66 },
+      { id: "team", label: "Team", dataKey: "team", defaultWidth: 178, minWidth: 150, maxWidth: 210 },
+      { id: "totalRank", label: "TOT", dataKey: "totalRank", defaultWidth: 64, minWidth: 58, maxWidth: 76 },
+      { id: "powRank", label: "POW", dataKey: "powRank", defaultWidth: 64, minWidth: 58, maxWidth: 76 },
+      { id: "speRank", label: "SPE", dataKey: "speRank", defaultWidth: 64, minWidth: 58, maxWidth: 76 },
+      { id: "menRank", label: "MEN", dataKey: "menRank", defaultWidth: 64, minWidth: 58, maxWidth: 76 },
+      { id: "socRank", label: "SOC", dataKey: "socRank", defaultWidth: 64, minWidth: 58, maxWidth: 76 },
       ...orderedDisciplines.map((discipline) => ({
         id: discipline.id,
-        label: discipline.name.slice(0, 3).toUpperCase(),
+        label: discipline.name.replace(/\s+/g, "").slice(0, 3).toUpperCase(),
         dataKey: discipline.id,
-        defaultWidth: 78,
-        minWidth: 62,
+        defaultWidth: 44,
+        minWidth: 40,
+        maxWidth: 52,
       })),
     ],
     [orderedDisciplines],
@@ -8649,15 +12205,26 @@ export default function FoundationPageClient({ initialReadSource, initialSelecte
       { id: "class", label: "Klasse", dataKey: "class", defaultWidth: 130, minWidth: 110 },
       { id: "race", label: "Rasse", dataKey: "race", defaultWidth: 120, minWidth: 96 },
       { id: "mw", label: "MW", dataKey: "mw", defaultWidth: 110, minWidth: 90 },
+      { id: "salePrice", label: "VK", dataKey: "salePrice", defaultWidth: 104, minWidth: 86 },
+      { id: "saleFactor", label: "Faktor", dataKey: "saleFactor", defaultWidth: 84, minWidth: 72 },
       { id: "salary", label: "Gehalt", dataKey: "salary", defaultWidth: 110, minWidth: 90 },
+      { id: "value", label: "Value", dataKey: "value", defaultWidth: 96, minWidth: 78 },
       { id: "contract", label: "LZ", dataKey: "contract", defaultWidth: 76, minWidth: 64 },
       { id: "ovr", label: "OVR", dataKey: "ovr", defaultWidth: 90, minWidth: 72 },
       { id: "mvs", label: "MVS", dataKey: "mvs", defaultWidth: 90, minWidth: 72 },
       { id: "pps", label: "PPs", dataKey: "pps", defaultWidth: 90, minWidth: 72 },
-      { id: "pow", label: "POW", dataKey: "pow", defaultWidth: 82, minWidth: 68 },
-      { id: "spe", label: "SPE", dataKey: "spe", defaultWidth: 82, minWidth: 68 },
-      { id: "men", label: "MEN", dataKey: "men", defaultWidth: 82, minWidth: 68 },
-      { id: "soc", label: "SOC", dataKey: "soc", defaultWidth: 82, minWidth: 68 },
+      ...(showSelectedRosterPpsBreakdown
+        ? [
+            { id: "ppPow", label: "PP POW", dataKey: "ppPow", defaultWidth: 78, minWidth: 66 },
+            { id: "ppSpe", label: "PP SPE", dataKey: "ppSpe", defaultWidth: 78, minWidth: 66 },
+            { id: "ppMen", label: "PP MEN", dataKey: "ppMen", defaultWidth: 78, minWidth: 66 },
+            { id: "ppSoc", label: "PP SOC", dataKey: "ppSoc", defaultWidth: 78, minWidth: 66 },
+          ]
+        : []),
+      { id: "pow", label: "POW", dataKey: "pow", defaultWidth: 74, minWidth: 60 },
+      { id: "spe", label: "SPE", dataKey: "spe", defaultWidth: 74, minWidth: 60 },
+      { id: "men", label: "MEN", dataKey: "men", defaultWidth: 74, minWidth: 60 },
+      { id: "soc", label: "SOC", dataKey: "soc", defaultWidth: 74, minWidth: 60 },
       ...(
         showTeamDisciplines
           ? orderedDisciplines.map((discipline) => ({
@@ -8670,7 +12237,7 @@ export default function FoundationPageClient({ initialReadSource, initialSelecte
           : []
       ),
     ],
-    [orderedDisciplines, showTeamDisciplines],
+    [orderedDisciplines, showSelectedRosterPpsBreakdown, showTeamDisciplines],
   );
 
   const seasonCompactPresets = useMemo<FoundationTablePreset[]>(
@@ -8720,130 +12287,6 @@ export default function FoundationPageClient({ initialReadSource, initialSelecte
     },
     [seasonTableColumns],
   );
-  const playersTablePresets = useMemo<FoundationTablePreset[]>(
-    () => {
-      const defaultOrder = playersTableColumns.map((column) => column.id);
-      return [
-        {
-          id: "retool_default",
-          label: "Retool Default",
-          description: "Vollstaendige Arbeitsansicht der aktiven Spieler.",
-          order: defaultOrder,
-          visibleColumnIds: defaultOrder,
-          pinnedLeft: ["image", "name", "team"],
-        },
-        {
-          id: "compact",
-          label: "Compact",
-          description: "Name, Team und Kernwerte fuer schnellen Scan.",
-          order: defaultOrder,
-          visibleColumnIds: ["image", "name", "team", "class", "pps", "ovr", "mw", "appearances"],
-          pinnedLeft: ["image", "name", "team"],
-        },
-        {
-          id: "finance",
-          label: "Finance",
-          description: "Vertrag, Gehalt und Marktwert im Fokus.",
-          order: defaultOrder,
-          visibleColumnIds: ["image", "name", "team", "mw", "salary", "contract", "appearances"],
-          pinnedLeft: ["image", "name", "team"],
-        },
-        {
-          id: "performance",
-          label: "Performance",
-          description: "PPs, OVR und Season Stats fuer Rankings.",
-          order: defaultOrder,
-          visibleColumnIds: ["image", "name", "team", "pps", "ovr", "appearances", "bestDiscipline", "lastPerformance"],
-          pinnedLeft: ["image", "name", "team"],
-        },
-      ];
-    },
-    [playersTableColumns],
-  );
-  const teamsViewPresets = useMemo<FoundationTablePreset[]>(
-    () => {
-      const defaultOrder = teamsViewColumns.map((column) => column.id);
-      return [
-        {
-          id: "retool_default",
-          label: "Retool Default",
-          description: "Kompletter Managementvergleich.",
-          order: defaultOrder,
-          visibleColumnIds: defaultOrder,
-          pinnedLeft: ["team", "overallRank"],
-        },
-        {
-          id: "compact",
-          label: "Compact",
-          description: "Kompakte Teamübersicht fuer den Alltag.",
-          order: defaultOrder,
-          visibleColumnIds: ["team", "overallRank", "cash", "roster", "mw", "salary", "pow", "spe", "men", "soc"],
-          pinnedLeft: ["team", "overallRank"],
-        },
-        {
-          id: "finance",
-          label: "Finance",
-          description: "Cash, GuV und Sponsorwerte im Fokus.",
-          order: defaultOrder,
-          visibleColumnIds: ["team", "overallRank", "cash", "guv", "roster", "mw", "salary", "sponsor", "histPoints", "avgPoints"],
-          pinnedLeft: ["team", "overallRank"],
-        },
-        {
-          id: "performance",
-          label: "Performance",
-          description: "Historische Achsen und Platzierungen.",
-          order: defaultOrder,
-          visibleColumnIds: ["team", "overallRank", "pow", "spe", "men", "soc", "histPoints", "avgPoints", "gold", "silver", "bronze", "top5", "top10"],
-          pinnedLeft: ["team", "overallRank"],
-        },
-      ];
-    },
-    [teamsViewColumns],
-  );
-  const selectedRosterPresets = useMemo<FoundationTablePreset[]>(
-    () => {
-      const defaultOrder = selectedRosterColumns.map((column) => column.id);
-      const disciplineColumnIds = selectedRosterColumns
-        .map((column) => column.id)
-        .filter((columnId) => !["image", "name", "class", "race", "mw", "salary", "contract", "ovr", "pps", "pow", "spe", "men", "soc"].includes(columnId));
-
-      return [
-        {
-          id: "retool_default",
-          label: "Retool Default",
-          description: "Standardansicht des aktuellen Kaders.",
-          order: defaultOrder,
-          visibleColumnIds: defaultOrder,
-          pinnedLeft: ["image", "name"],
-        },
-        {
-          id: "compact",
-          label: "Compact",
-          description: "Kaderliste mit den wichtigsten Kernwerten.",
-          order: defaultOrder,
-          visibleColumnIds: ["image", "name", "class", "race", "mw", "salary", "contract", "ovr", "pps"],
-          pinnedLeft: ["image", "name"],
-        },
-        {
-          id: "finance",
-          label: "Finance",
-          description: "Kosten, Gehalt und Vertragslaengen.",
-          order: defaultOrder,
-          visibleColumnIds: ["image", "name", "mw", "salary", "contract"],
-          pinnedLeft: ["image", "name"],
-        },
-        {
-          id: "performance",
-          label: "Performance",
-          description: "OVR, PPs, Achsen und Diszis.",
-          order: defaultOrder,
-          visibleColumnIds: ["image", "name", "ovr", "pps", "pow", "spe", "men", "soc", ...disciplineColumnIds],
-          pinnedLeft: ["image", "name"],
-        },
-      ];
-    },
-    [selectedRosterColumns],
-  );
   const transferMarketPresets = useMemo<FoundationTablePreset[]>(
     () => {
       const defaultOrder = transfermarktAllColumns.map((column) => column.id);
@@ -8861,7 +12304,7 @@ export default function FoundationPageClient({ initialReadSource, initialSelecte
           label: "Compact",
           description: "Spieler, Preis und Hauptachsen fuer schnelle Kaufpruefung.",
           order: defaultOrder,
-          visibleColumnIds: ["imageUrl", "name", "marketValue", "salary", "pow", "spe", "men", "soc", "fitDisplay"],
+          visibleColumnIds: ["imageUrl", "name", "marketValue", "salary", "marketValueSalaryRatio", "pow", "spe", "men", "soc", "fitDisplay"],
           pinnedLeft: ["imageUrl", "name"],
         },
         {
@@ -8885,13 +12328,11 @@ export default function FoundationPageClient({ initialReadSource, initialSelecte
     [transfermarktAllColumns],
   );
 
-  const getSeasonTableColumnWidth = (column: FoundationTableColumn) => {
-    if (seasonTableMode === "expert") {
-      return clampTableColumnWidth(column, saisonstandExpertPresetWidths[column.id] ?? column.defaultWidth);
-    }
+  const getSeasonTableDefaultColumnWidth = (column: FoundationTableColumn) =>
+    seasonTableMode === "expert" ? (saisonstandExpertPresetWidths[column.id] ?? column.defaultWidth) : column.defaultWidth;
 
-    return clampTableColumnWidth(column, tableColumnPreferences.seasonTable?.widths?.[column.id] ?? column.defaultWidth);
-  };
+  const getSeasonTableColumnWidth = (column: FoundationTableColumn) =>
+    clampTableColumnWidth(column, tableColumnPreferences.seasonTable?.widths?.[column.id] ?? getSeasonTableDefaultColumnWidth(column));
 
   const getTableColumnWidth = (tableId: string, column: FoundationTableColumn) =>
     clampTableColumnWidth(column, tableColumnPreferences[tableId]?.widths?.[column.id] ?? column.defaultWidth);
@@ -8935,10 +12376,6 @@ export default function FoundationPageClient({ initialReadSource, initialSelecte
     column: FoundationTableColumn,
     event: React.MouseEvent<HTMLSpanElement>,
   ) => {
-    if (tableId === "seasonTable" && seasonTableMode === "expert") {
-      return;
-    }
-
     event.preventDefault();
     event.stopPropagation();
     tableResizeState.current = {
@@ -8980,17 +12417,16 @@ export default function FoundationPageClient({ initialReadSource, initialSelecte
   };
 
   const resetTableColumnWidth = (tableId: string, column: FoundationTableColumn) => {
-    if (tableId === "seasonTable" && seasonTableMode === "expert") {
-      return;
-    }
-
     setTableColumnPreferences((current) => ({
       ...current,
       [tableId]: {
         ...markTableAsCustom(current[tableId]),
         widths: {
           ...(current[tableId]?.widths ?? {}),
-          [column.id]: clampTableColumnWidth(column, column.defaultWidth),
+          [column.id]: clampTableColumnWidth(
+            column,
+            tableId === "seasonTable" ? getSeasonTableDefaultColumnWidth(column) : column.defaultWidth,
+          ),
         },
       },
     }));
@@ -9049,10 +12485,6 @@ export default function FoundationPageClient({ initialReadSource, initialSelecte
   };
 
   const adjustTableColumnWidth = (tableId: string, column: FoundationTableColumn, delta: number) => {
-    if (tableId === "seasonTable" && seasonTableMode === "expert") {
-      return;
-    }
-
     setTableColumnPreferences((current) => {
       const currentWidth = tableId === "seasonTable" ? getSeasonTableColumnWidth(column) : getTableColumnWidth(tableId, column);
       return {
@@ -9069,10 +12501,6 @@ export default function FoundationPageClient({ initialReadSource, initialSelecte
   };
 
   const moveTableColumn = (tableId: string, columnId: string, direction: "left" | "right", columns: FoundationTableColumn[]) => {
-    if (tableId === "seasonTable" && seasonTableMode === "expert") {
-      return;
-    }
-
     setTableColumnPreferences((current) => {
       const baseOrder = applyStoredColumnOrder(
         columns,
@@ -9105,9 +12533,6 @@ export default function FoundationPageClient({ initialReadSource, initialSelecte
   };
 
   const moveTableColumnTo = (tableId: string, sourceColumnId: string, targetColumnId: string, columns: FoundationTableColumn[]) => {
-    if (tableId === "seasonTable" && seasonTableMode === "expert") {
-      return;
-    }
     if (sourceColumnId === targetColumnId) {
       return;
     }
@@ -9147,7 +12572,7 @@ export default function FoundationPageClient({ initialReadSource, initialSelecte
   };
 
   const getTableHeaderDragProps = (tableId: string, column: FoundationTableColumn, columns: FoundationTableColumn[]) => {
-    const disabled = column.draggable === false || (tableId === "seasonTable" && seasonTableMode === "expert");
+    const disabled = column.draggable === false;
     return {
       draggable: !disabled,
       onDragStart: (event: React.DragEvent<HTMLTableCellElement>) => {
@@ -9331,6 +12756,9 @@ export default function FoundationPageClient({ initialReadSource, initialSelecte
 
       return buildTeamSeasonOverviewRows({
         gameState,
+        seasonId: seasonOverviewSeasonId,
+        preferStandingDisciplineValues:
+          seasonOverviewSeasonId !== gameState.season.id || seasonStandingsFeed?.source.kind === "season_snapshot",
         standingsByTeamId: {
           ...Object.fromEntries(
             Object.entries(fallbackStandingsByTeamId).map(([teamId, row]) => [
@@ -9358,7 +12786,15 @@ export default function FoundationPageClient({ initialReadSource, initialSelecte
         transferSummaryByTeamId,
       });
     },
-    [gameState, historyFeed, seasonManagementByTeamId, standingsSnapshotByTeamId, transferSummaryByTeamId],
+    [
+      gameState,
+      historyFeed,
+      seasonManagementByTeamId,
+      seasonOverviewSeasonId,
+      seasonStandingsFeed?.source.kind,
+      standingsSnapshotByTeamId,
+      transferSummaryByTeamId,
+    ],
   );
 
   const seasonDisciplineRankMaps = useMemo(() => {
@@ -9374,6 +12810,11 @@ export default function FoundationPageClient({ initialReadSource, initialSelecte
       ]),
     ) as Record<(typeof saisonstandDisciplineColumns)[number], Map<string, number | null>>;
   }, [seasonStandRows]);
+
+  const seasonFormBonusByTeamId = useMemo(
+    () => buildPpAreaFormBonusByTeamId(gameState, seasonOverviewSeasonId),
+    [gameState, seasonOverviewSeasonId],
+  );
 
   const selectedStandingRow = useMemo(
     () => seasonStandRows.find((row) => row.teamId === selectedTeam?.teamId) ?? null,
@@ -9396,15 +12837,271 @@ export default function FoundationPageClient({ initialReadSource, initialSelecte
     () => selectedTeamObjectives.filter((objective) => objective.status === "open" || objective.status === "at_risk"),
     [selectedTeamObjectives],
   );
+  const selectedTransfermarktBoardObjectives = useMemo(
+    () =>
+      selectedTeamObjectives
+        .filter((objective) => objective.status === "open" || objective.status === "at_risk" || objective.status === "failed")
+        .filter((objective) =>
+          objective.category === "transfer" ||
+          objective.category === "player" ||
+          objective.category === "roster" ||
+          objective.objectiveId === "finance-salary-ratio" ||
+          objective.objectiveId === "finance-rebuild-cash-buffer",
+        )
+        .slice(0, 3),
+    [selectedTeamObjectives],
+  );
+  const selectedTeamGeneralManager = useMemo(
+    () => (selectedTeam ? getTeamGeneralManager(gameState, selectedTeam.teamId) : null),
+    [gameState, selectedTeam?.teamId],
+  );
+  const selectedTeamCaptainProfile = useMemo(
+    () => (selectedTeam ? selectTeamCaptain(gameState, selectedTeam.teamId) : null),
+    [gameState, selectedTeam?.teamId],
+  );
+  const selectedTeamPlayerDemands = useMemo(() => {
+    if (!selectedTeam) {
+      return [];
+    }
+    const playersById = new Map(gameState.players.map((player) => [player.id, player] as const));
+    const statusWeight = { failed: 0, at_risk: 1, open: 2, fulfilled: 3 } as const;
+    const priorityWeight = { high: 0, medium: 1, low: 2 } as const;
+    return Array.from(buildTeamPlayerDemandMap(gameState, selectedTeam.teamId).entries())
+      .flatMap(([playerId, demands]) =>
+        demands.map((demand) => ({
+          ...demand,
+          playerName: playersById.get(playerId)?.name ?? playerId,
+        })),
+      )
+      .filter((demand) => demand.status !== "fulfilled")
+      .sort(
+        (left, right) =>
+          statusWeight[left.status] - statusWeight[right.status] ||
+          priorityWeight[left.priority] - priorityWeight[right.priority] ||
+          left.playerName.localeCompare(right.playerName, "de"),
+      );
+  }, [gameState, selectedTeam?.teamId]);
+  const selectedTeamRivalries = useMemo(() => {
+    if (!selectedTeam) {
+      return [];
+    }
+    return buildTeamRivalryLedger(gameState)
+      .filter((entry) => entry.teamAId === selectedTeam.teamId || entry.teamBId === selectedTeam.teamId)
+      .slice(0, 4);
+  }, [gameState, selectedTeam?.teamId]);
+  const selectedTeamPowers = useMemo(
+    () =>
+      selectedTeam
+        ? getTeamPowerOptions({
+            gameState,
+            seasonId: gameState.season.id,
+            teamId: selectedTeam.teamId,
+            lineupId: null,
+          })
+        : [],
+    [gameState, selectedTeam?.teamId],
+  );
+  const selectedHqInboxItems = useMemo(() => {
+    if (!selectedTeam) {
+      return [];
+    }
+    return gameInboxItems
+      .filter(
+        (item) =>
+          item.status !== "done" &&
+          (!item.teamId ||
+            item.teamId === selectedTeam.teamId ||
+            item.targetParams.teamId === selectedTeam.teamId),
+      )
+      .slice(0, 6);
+  }, [gameInboxItems, selectedTeam?.teamId]);
+  const selectedHqFinanceWarnings = useMemo(() => {
+    const warnings: string[] = [];
+    const salaryTotal = selectedStandingRow?.salaryTotal ?? null;
+    const cash = selectedStandingRow?.cash ?? null;
+    const guv = selectedStandingRow?.guv ?? null;
+    if (guv != null && guv < 0) {
+      warnings.push(`GuV negativ: ${formatMoney(guv)} bei aktuellem Rang.`);
+    }
+    if (salaryTotal != null && cash != null && cash + salaryTotal > 0) {
+      const pressurePct = Math.round((salaryTotal / (cash + salaryTotal)) * 100);
+      if (pressurePct >= 55) {
+        warnings.push(`Gehaltsdruck ${pressurePct}%: Gehalt frisst zu viel vom Cash/Gehalt-Pool.`);
+      }
+      if (cash < salaryTotal * 0.35) {
+        warnings.push(`Cash-Puffer niedrig: ${formatMoney(cash)} Cash gegen ${formatMoney(salaryTotal)} Gehalt.`);
+      }
+    }
+    selectedBoardConfidence?.warnings.slice(0, 2).forEach((warning) => warnings.push(warning));
+    return warnings;
+  }, [selectedBoardConfidence?.warnings, selectedStandingRow?.cash, selectedStandingRow?.guv, selectedStandingRow?.salaryTotal]);
+  const playerMoraleAudit = useMemo(() => buildPlayerMoraleAudit(gameState), [gameState]);
+  const selectedHqMoraleSummary = useMemo(() => {
+    if (!selectedTeam) {
+      return null;
+    }
+    const rows = playerMoraleAudit.rows.filter((entry) => entry.teamId === selectedTeam.teamId);
+    if (rows.length === 0) {
+      return null;
+    }
+    const average = rows.reduce((sum, entry) => sum + entry.morale, 0) / rows.length;
+    const criticalCount = rows.filter((entry) => entry.visibleMood === "angry" || entry.visibleMood === "unhappy").length;
+    const exitRiskCount = rows.filter((entry) => entry.contractIntent === "refuses_extension" || entry.contractIntent === "considering_exit").length;
+    return {
+      average: roundViewNumber(average, 1),
+      criticalCount,
+      exitRiskCount,
+    };
+  }, [playerMoraleAudit.rows, selectedTeam]);
+  const selectedHqPriorityCards = useMemo(() => {
+    const cards: Array<{
+      key: string;
+      kicker: string;
+      title: string;
+      detail: string;
+      tone: "board" | "finance" | "lineup" | "story" | "power";
+      targetView: FoundationView;
+    }> = [];
+    const urgentObjective = selectedAtRiskObjectives[0] ?? selectedOpenObjectives[0] ?? null;
+    if (urgentObjective) {
+      cards.push({
+        key: `objective-${urgentObjective.objectiveId}`,
+        kicker: urgentObjective.status === "at_risk" || urgentObjective.status === "failed" ? "Boarddruck" : "Boardziel",
+        title: urgentObjective.label,
+        detail: urgentObjective.actionHint ?? urgentObjective.detail ?? `${String(urgentObjective.currentValue ?? "—")} / ${String(urgentObjective.targetValue ?? "—")}`,
+        tone: "board",
+        targetView: urgentObjective.category === "finance" ? "prize" : urgentObjective.category === "facility" ? "trainingV2" : "season",
+      });
+    }
+    if (selectedHqFinanceWarnings[0]) {
+      cards.push({
+        key: "finance-warning",
+        kicker: "Finanzen",
+        title: "Cash/Gehalt prüfen",
+        detail: selectedHqFinanceWarnings[0],
+        tone: "finance",
+        targetView: "prize",
+      });
+    }
+    if (selectedTeamPlayerDemands[0]) {
+      cards.push({
+        key: `demand-${selectedTeamPlayerDemands[0].demandId}`,
+        kicker: "Forderung",
+        title: selectedTeamPlayerDemands[0].playerName,
+        detail: selectedTeamPlayerDemands[0].label,
+        tone: "lineup",
+        targetView: selectedTeamPlayerDemands[0].type === "facility" ? "trainingV2" : "lineup",
+      });
+    }
+    if (selectedTeamRivalries[0]) {
+      const rivalry = selectedTeamRivalries[0];
+      const rivalId = rivalry.teamAId === selectedTeam?.teamId ? rivalry.teamBId : rivalry.teamAId;
+      const rivalTeam = gameState.teams.find((team) => team.teamId === rivalId) ?? null;
+      cards.push({
+        key: `rivalry-${rivalry.rivalryId}`,
+        kicker: "Rivalität",
+        title: rivalTeam?.name ?? "Rivale aktiv",
+        detail: `${rivalry.theme} · Intensität ${rivalry.intensity}`,
+        tone: "story",
+        targetView: "hq",
+      });
+    }
+    if (selectedTeamPowers.some((power) => power.chargesRemaining > 0)) {
+      const readyPower = selectedTeamPowers.find((power) => power.chargesRemaining > 0) ?? null;
+      cards.push({
+        key: `power-${readyPower?.id ?? "ready"}`,
+        kicker: "Team Power",
+        title: readyPower?.label ?? "Powers bereit",
+        detail: readyPower ? `${readyPower.chargesRemaining}/${readyPower.chargesTotal} Einsätze · in der Einsatzliste spielen` : "In der Einsatzliste einsetzen.",
+        tone: "power",
+        targetView: "lineup",
+      });
+    }
+    if (cards.length === 0) {
+      cards.push({
+        key: "stable",
+        kicker: "Status",
+        title: "Front Office stabil",
+        detail: "Keine akute Board-, Finanz- oder Kaderwarnung. Fokus auf Einsatzliste und Entwicklung.",
+        tone: "story",
+        targetView: "lineup",
+      });
+    }
+    return cards.slice(0, 5);
+  }, [
+    gameState.teams,
+    selectedAtRiskObjectives,
+    selectedHqFinanceWarnings,
+    selectedOpenObjectives,
+    selectedTeam?.teamId,
+    selectedTeamPlayerDemands,
+    selectedTeamPowers,
+    selectedTeamRivalries,
+  ]);
 
   const seasonPointsLedger = useMemo(
     () => buildSeasonPointsLedger(gameState),
     [gameState],
   );
   const playerRatingsById = useMemo(
-    () => buildPlayerRatingContractMap(gameState),
-    [gameState],
+    () => buildPlayerRatingContractMap(gameState, seasonPointsLedger),
+    [gameState, seasonPointsLedger],
   );
+  const transferMarketV2RosterRows = useMemo(() => {
+    const playersById = new Map(gameState.players.map((player) => [player.id, player] as const));
+    return gameState.rosters
+      .map((entry) => {
+        const player = playersById.get(entry.playerId);
+        if (!player) {
+          return null;
+        }
+        const playerRating = playerRatingsById.get(player.id) ?? null;
+        const portrait = getPlayerPortraitModel(player);
+        return {
+          activePlayerId: entry.id,
+          playerId: player.id,
+          teamId: entry.teamId,
+          name: player.name,
+          className: player.className,
+          race: player.race,
+          portraitUrl: portrait.src ?? null,
+          marketValue: getRosterEntryDisplayMarketValue(entry, player),
+          salary: getRosterEntryDisplaySalary(entry, player),
+          contractLength: entry.contractLength ?? null,
+          pps: playerRating?.ppsSeason ?? player.pps ?? null,
+          ovr: playerRating?.ovrNormalized ?? player.ovr ?? null,
+          mvs: playerRating?.mvs ?? null,
+          valueScore:
+            (playerRating?.ppsSeason ?? player.pps ?? null) != null && getRosterEntryDisplaySalary(entry, player) != null && (getRosterEntryDisplaySalary(entry, player) ?? 0) > 0
+              ? (playerRating?.ppsSeason ?? player.pps ?? 0) / (getRosterEntryDisplaySalary(entry, player) ?? 1)
+              : null,
+          pow: playerRating?.ppPow ?? player.coreStats.pow ?? null,
+          spe: playerRating?.ppSpe ?? player.coreStats.spe ?? null,
+          men: playerRating?.ppMen ?? player.coreStats.men ?? null,
+          soc: playerRating?.ppSoc ?? player.coreStats.soc ?? null,
+          disciplineRatings: player.disciplineRatings,
+        };
+      })
+      .filter((row): row is NonNullable<typeof row> => Boolean(row));
+  }, [gameState.players, gameState.rosters, playerRatingsById]);
+  const transferWishlistEntriesForMarketV2 = useMemo(() => {
+    const playersById = new Map(gameState.players.map((player) => [player.id, player] as const));
+    return transferWishlistEntries.map((entry) => {
+      const player = playersById.get(entry.playerId) ?? null;
+      const rating = player ? playerRatingsById.get(player.id) ?? null : null;
+      return {
+        ...entry,
+        className: entry.className || player?.className || "—",
+        race: entry.race || player?.race || "—",
+        marketValue: entry.marketValue ?? (player ? getPlayerDisplayMarketValue(player) : null) ?? null,
+        salary: entry.salary ?? (player ? getPlayerDisplaySalary(player) : null) ?? null,
+        pow: entry.pow ?? rating?.ppPow ?? player?.coreStats.pow ?? null,
+        spe: entry.spe ?? rating?.ppSpe ?? player?.coreStats.spe ?? null,
+        men: entry.men ?? rating?.ppMen ?? player?.coreStats.men ?? null,
+        soc: entry.soc ?? rating?.ppSoc ?? player?.coreStats.soc ?? null,
+      };
+    });
+  }, [gameState.players, playerRatingsById, transferWishlistEntries]);
   const rosterPlayersByOvr = useMemo(
     () =>
       [...rosterPlayers].sort((left, right) => {
@@ -9432,8 +13129,8 @@ export default function FoundationPageClient({ initialReadSource, initialSelecte
   const bench = rosterPlayersByOvr.filter((item) => item.entry.roleTag !== "starter");
 
   const ppAreaRows = useMemo(
-    () =>
-      seasonStandRows
+    () => {
+      return seasonStandRows
         .map((row) => ({
           team: row.team,
           pps: {
@@ -9443,6 +13140,7 @@ export default function FoundationPageClient({ initialReadSource, initialSelecte
             men: row.ppsMen,
             soc: row.ppsSoc,
           },
+          formBonus: seasonFormBonusByTeamId[row.teamId] ?? createEmptyPpAreaFormBonusTotals(),
         }))
         .sort((left, right) => {
           if (right.pps.total !== left.pps.total) {
@@ -9470,8 +13168,9 @@ export default function FoundationPageClient({ initialReadSource, initialSelecte
               soc: buildAreaRank((entry) => entry.pps.soc),
             },
           };
-        }),
-    [seasonStandRows],
+        });
+    },
+    [seasonFormBonusByTeamId, seasonStandRows],
   );
 
   const seasonHistorySnapshots = useMemo(
@@ -9515,11 +13214,24 @@ export default function FoundationPageClient({ initialReadSource, initialSelecte
     : "Aktive Season · lokale Results";
 
   useEffect(() => {
+    if (isFoundationBootstrapState) {
+      return;
+    }
+
+    const scopeKey = `${activeSaveId}:${gameState.season.id}`;
+    if (seasonOverviewScopeRef.current !== scopeKey) {
+      seasonOverviewScopeRef.current = scopeKey;
+      setSeasonOverviewSeasonId(gameState.season.id);
+      void reloadSeasonStandingsOverview(gameState.season.id);
+      return;
+    }
+
     if (seasonOverviewOptions.some((option) => option.seasonId === seasonOverviewSeasonId)) {
       return;
     }
     setSeasonOverviewSeasonId(gameState.season.id);
-  }, [gameState.season.id, seasonOverviewOptions, seasonOverviewSeasonId]);
+    void reloadSeasonStandingsOverview(gameState.season.id);
+  }, [activeSaveId, gameState.season.id, isFoundationBootstrapState, seasonOverviewOptions, seasonOverviewSeasonId]);
 
   const archivedSeasonDisciplineLeaderboards = useMemo(() => {
     if (!selectedSeasonSnapshot) {
@@ -9891,97 +13603,27 @@ export default function FoundationPageClient({ initialReadSource, initialSelecte
       socRank: row.rosterCount > 0 ? (currentAreaRanks?.soc ?? null) : null,
     };
   }, [currentAreaRanksByTeamId, selectedTeam, teamsViewRows]);
-
-  const selectedTeamHistoricalMetrics = useMemo(() => {
-    if (!selectedStandingRow) {
-      return [];
+  const selectedHqAxisSummary = useMemo(() => {
+    if (!teamsViewSummary) {
+      return null;
     }
-
-    if (!selectedStandingRow.historicalHasData) {
-      return [
-        {
-          key: "history-empty",
-          label: "Historie",
-          value: "—",
-          hint: "Keine archivierten Seasons vorhanden",
-        },
-      ];
+    const axes = [
+      { label: "POW", rank: teamsViewSummary.powRank },
+      { label: "SPE", rank: teamsViewSummary.speRank },
+      { label: "MEN", rank: teamsViewSummary.menRank },
+      { label: "SOC", rank: teamsViewSummary.socRank },
+    ]
+      .filter((entry): entry is { label: "POW" | "SPE" | "MEN" | "SOC"; rank: number } => entry.rank != null)
+      .sort((left, right) => left.rank - right.rank);
+    if (axes.length === 0) {
+      return null;
     }
-
-    return [
-      {
-        key: "season-points",
-        label: "Aktuelle Season Punkte",
-        value:
-          selectedStandingRow.points != null ? formatLocalePoints(selectedStandingRow.points, 1) : "—",
-      },
-      {
-        key: "historical-points",
-        label: "Historische Punkte gesamt",
-        value:
-          selectedStandingRow.historicalPointsTotal != null
-            ? formatLocalePoints(selectedStandingRow.historicalPointsTotal, 1)
-            : "—",
-      },
-      {
-        key: "best-rank",
-        label: "Beste Platzierung",
-        value:
-          selectedStandingRow.historicalBestRank != null
-            ? formatWholeNumber(selectedStandingRow.historicalBestRank)
-            : "—",
-      },
-      {
-        key: "avg-rank",
-        label: "Ø Platzierung",
-        value:
-          selectedStandingRow.historicalAvgRank != null
-            ? formatLocalePoints(selectedStandingRow.historicalAvgRank, 1)
-            : "—",
-      },
-      {
-        key: "seasons-played",
-        label: "Seasons gespielt",
-        value: String(selectedStandingRow.historicalSeasonsPlayed ?? 0),
-      },
-      {
-        key: "top5",
-        label: "Top 5",
-        value: String(selectedStandingRow.historicalTop5Count ?? 0),
-      },
-      {
-        key: "gold",
-        label: "Gold",
-        value: String(selectedStandingRow.historicalGoldCount ?? 0),
-      },
-      {
-        key: "silver",
-        label: "Silber",
-        value: String(selectedStandingRow.historicalSilverCount ?? 0),
-      },
-      {
-        key: "bronze",
-        label: "Bronze",
-        value: String(selectedStandingRow.historicalBronzeCount ?? 0),
-      },
-      {
-        key: "last-season-rank",
-        label: "Letzte Season Platz",
-        value:
-          selectedStandingRow.historicalLastSeasonRank != null
-            ? formatWholeNumber(selectedStandingRow.historicalLastSeasonRank)
-            : "—",
-      },
-      {
-        key: "last-season-points",
-        label: "Letzte Season Punkte",
-        value:
-          selectedStandingRow.historicalLastSeasonPoints != null
-            ? formatLocalePoints(selectedStandingRow.historicalLastSeasonPoints, 1)
-            : "—",
-      },
-    ];
-  }, [selectedStandingRow]);
+    return {
+      strongest: axes[0] ?? null,
+      weakest: axes[axes.length - 1] ?? null,
+      weakestTwo: [...axes].sort((left, right) => right.rank - left.rank).slice(0, 2),
+    };
+  }, [teamsViewSummary]);
 
   const selectedRosterTableRows = useMemo(
     () =>
@@ -9994,54 +13636,214 @@ export default function FoundationPageClient({ initialReadSource, initialSelecte
             playerOvr: playerRating?.ovrNormalized ?? null,
             playerMvs: playerRating?.mvs ?? null,
             playerPps: playerRating?.ppsSeason ?? null,
+            ppPow: playerRating?.ppPow ?? null,
+            ppSpe: playerRating?.ppSpe ?? null,
+            ppMen: playerRating?.ppMen ?? null,
+            ppSoc: playerRating?.ppSoc ?? null,
+            saleBreakdown: buildTransfermarktSaleFactorBreakdown(gameState, player, entry),
           };
         })
         .sort((left, right) => (right.playerOvr ?? Number.NEGATIVE_INFINITY) - (left.playerOvr ?? Number.NEGATIVE_INFINITY)),
-    [playerRatingsById, rosterPlayers],
+    [gameState, playerRatingsById, rosterPlayers],
   );
+  const selectedRosterDecisionCards = useMemo(() => {
+    const rows = selectedRosterTableRows.map((row) => {
+      const salary = getRosterEntryDisplaySalary(row.entry, row.player);
+      const salaryDelta = getRosterEntrySalaryDelta(row.entry, row.player);
+      const marketValue = getRosterEntryDisplayMarketValue(row.entry, row.player);
+      const valueScore =
+        row.playerPps != null && row.playerPps > 0 && salary != null && salary > 0
+          ? row.playerPps / salary
+          : null;
+      return {
+        ...row,
+        salary,
+        salaryDelta,
+        marketValue,
+        valueScore,
+        xp: row.player.currentXP ?? 0,
+        fatigue: row.player.fatigue ?? 0,
+      };
+    });
+    const mostExpensive =
+      [...rows].filter((row) => row.salary != null).sort((left, right) => (right.salary ?? 0) - (left.salary ?? 0))[0] ?? null;
+    const salaryOutlier =
+      [...rows]
+        .filter((row) => row.salaryDelta != null && row.salaryDelta > 0)
+        .sort((left, right) => (right.salaryDelta ?? 0) - (left.salaryDelta ?? 0))[0] ?? null;
+    const bestValue =
+      [...rows]
+        .filter((row) => row.valueScore != null)
+        .sort((left, right) => (right.valueScore ?? 0) - (left.valueScore ?? 0))[0] ?? null;
+    const trainingCandidate =
+      [...rows]
+        .filter((row) => row.xp > 0 || row.fatigue > 0)
+        .sort((left, right) => right.xp - left.xp || right.fatigue - left.fatigue)[0] ?? null;
 
-  const disciplineConfigRows = useMemo(
-    () =>
-      [...orderedDisciplines]
-        .map((discipline) => ({
-          ...discipline,
-          originalOrder: discipline.originalOrder ?? 0,
-          displayOrder: discipline.displayOrder ?? 0,
-          playerCount: discipline.playerCount ?? 0,
-          mutator1: discipline.mutator1 ?? "",
-          mutator2: discipline.mutator2 ?? "",
-        })),
-    [orderedDisciplines],
-  );
+    return {
+      mostExpensive,
+      salaryOutlier,
+      bestValue,
+      trainingCandidate,
+    };
+  }, [selectedRosterTableRows]);
   const seasonDisciplineScheduleRows = useMemo(
     () => getSeasonDisciplineSchedule(gameState),
     [gameState],
+  );
+  const seasonDisciplineConfigMap = useMemo(() => {
+    const slotMeta = new Map<string, { displayOrder: number; playerCount: number | null }>();
+    seasonDisciplineScheduleRows.forEach((entry, matchdayIndex) => {
+      [entry.discipline1, entry.discipline2].forEach((slot, slotIndex) => {
+        if (!slot?.disciplineId) {
+          return;
+        }
+        slotMeta.set(slot.disciplineId, {
+          displayOrder: matchdayIndex * 2 + slotIndex + 1,
+          playerCount: slot.playerCount ?? null,
+        });
+      });
+    });
+    return slotMeta;
+  }, [seasonDisciplineScheduleRows]);
+  const disciplineConfigRows = useMemo(
+    () =>
+      [...gameState.disciplines].map((discipline) => {
+        const seasonalMeta = seasonDisciplineConfigMap.get(discipline.id);
+        return {
+          ...discipline,
+          originalOrder: discipline.originalOrder ?? 0,
+          displayOrder: seasonalMeta?.displayOrder ?? discipline.displayOrder ?? 0,
+          playerCount: seasonalMeta?.playerCount ?? discipline.playerCount ?? 0,
+          mutator1: discipline.mutator1 ?? "",
+          mutator2: discipline.mutator2 ?? "",
+        };
+      }),
+    [gameState.disciplines, seasonDisciplineConfigMap],
   );
   const currentMatchdayDisciplineSchedule = useMemo(
     () =>
       seasonDisciplineScheduleRows.find((entry) => entry.matchdayId === gameState.matchdayState.matchdayId) ?? null,
     [gameState.matchdayState.matchdayId, seasonDisciplineScheduleRows],
   );
-  const teamDrawerData = useMemo<TeamDetailDrawerData | null>(() => {
-    if (!teamDrawerTeamId) {
+  const buildTeamDetailDrawerData = (resolvedTeamId: string | null): TeamDetailDrawerData | null => {
+    if (!resolvedTeamId) {
       return null;
     }
 
-    const team = gameState.teams.find((entry) => entry.teamId === teamDrawerTeamId) ?? null;
+    const team = gameState.teams.find((entry) => entry.teamId === resolvedTeamId) ?? null;
     if (!team) {
       return null;
     }
 
     const teamControl = getTeamControlSettings(gameState, team.teamId);
+    const generalManager = getTeamGeneralManager(gameState, team.teamId);
+    const demandMap = buildTeamPlayerDemandMap(gameState, team.teamId);
+    const teamCaptain = selectTeamCaptain(gameState, team.teamId);
+    const drawerObjectives = teamObjectiveOverview.objectives.filter((objective) => objective.teamId === team.teamId);
+    const drawerBoardConfidence = teamObjectiveOverview.boardConfidence[team.teamId] ?? null;
+    const drawerRelationships = buildTeamRelationshipCards(gameState, team.teamId);
     const logo = getTeamLogoModel(team);
     const contractTable = buildTeamContractSeasonTable({
       gameState,
       teamId: team.teamId,
       seasonLabelBase: canonicalSeasonLabel,
     });
-    const overviewRow = teamsViewRows.find((entry) => entry.team.teamId === team.teamId) ?? null;
+    const liveSeasonOverviewRow = seasonStandRows.find((entry) => entry.teamId === team.teamId) ?? null;
     const currentAreaRanks = currentAreaRanksByTeamId.get(team.teamId) ?? null;
+    const currentTeamPointsSummary = seasonPointsLedger.teamSummariesByTeamId.get(team.teamId) ?? null;
+    const hasCurrentTeamPps = (currentTeamPointsSummary?.playerDerivedTotal ?? 0) > 0;
+    const liveAverageSalary =
+      liveSeasonOverviewRow?.rosterCount != null &&
+      liveSeasonOverviewRow.rosterCount > 0 &&
+      liveSeasonOverviewRow.salaryTotal != null
+        ? roundViewNumber(liveSeasonOverviewRow.salaryTotal / liveSeasonOverviewRow.rosterCount, 2)
+        : null;
+    const currentSeasonTransfers = gameState.transferHistory.filter((entry) => entry.seasonId === gameState.season.id);
+    const currentTopBuy =
+      [...currentSeasonTransfers]
+        .filter((entry) => entry.transferType === "buy" && entry.toTeamId === team.teamId)
+        .sort((left, right) => (right.fee ?? 0) - (left.fee ?? 0))[0] ?? null;
+    const currentTopSell =
+      [...currentSeasonTransfers]
+        .filter((entry) => entry.transferType === "sell" && entry.fromTeamId === team.teamId)
+        .sort((left, right) => (right.fee ?? 0) - (left.fee ?? 0))[0] ?? null;
+    const archivedHistoryRows = [...(gameState.seasonState.seasonSnapshots ?? [])]
+      .sort((left, right) => right.seasonId.localeCompare(left.seasonId, "de", { numeric: true }))
+      .map((snapshot) => {
+        const teamSnapshot =
+          (snapshot.teamSnapshots ?? snapshot.finalStandings ?? []).find((entry) => entry.teamId === team.teamId) ??
+          null;
+        if (!teamSnapshot) {
+          return null;
+        }
+
+        const topBuy =
+          [...(snapshot.transferSnapshots ?? [])]
+            .filter((entry) => entry.type === "buy" && entry.toTeamId === team.teamId)
+            .sort((left, right) => (right.amount ?? 0) - (left.amount ?? 0))[0] ?? null;
+        const topSell =
+          [...(snapshot.transferSnapshots ?? [])]
+            .filter((entry) => entry.type === "sell" && entry.fromTeamId === team.teamId)
+            .sort((left, right) => (right.amount ?? 0) - (left.amount ?? 0))[0] ?? null;
+        const areaPoints = teamSnapshot.disciplinePointsByArea ?? {
+          pow: null,
+          spe: null,
+          men: null,
+          soc: null,
+        };
+
+        return {
+          seasonId: snapshot.seasonId,
+          seasonName: snapshot.seasonName,
+          isLive: false,
+          rank: teamSnapshot.rank ?? null,
+          points: teamSnapshot.points ?? null,
+          pps: teamSnapshot.disciplinePoints ?? null,
+          ppPow: areaPoints.pow ?? null,
+          ppSpe: areaPoints.spe ?? null,
+          ppMen: areaPoints.men ?? null,
+          ppSoc: areaPoints.soc ?? null,
+          cash: teamSnapshot.cashTotal ?? teamSnapshot.cashEnd ?? null,
+          salaryTotal: teamSnapshot.salaryTotalEnd ?? teamSnapshot.salaryEnd ?? null,
+          marketValue: teamSnapshot.marketValueTotalEnd ?? teamSnapshot.marketValueEnd ?? null,
+          guv: teamSnapshot.guv ?? null,
+          topBuyPlayer: topBuy?.playerName ?? null,
+          topBuyAmount: topBuy?.amount ?? null,
+          topSellPlayer: topSell?.playerName ?? null,
+          topSellAmount: topSell?.amount ?? null,
+        } satisfies TeamDetailDrawerHistoryRow;
+      })
+      .filter((entry): entry is NonNullable<typeof entry> => Boolean(entry));
+    const currentHistoryRow: TeamDetailDrawerHistoryRow = {
+      seasonId: gameState.season.id,
+      seasonName: gameState.season.name,
+      isLive: true,
+      rank: liveSeasonOverviewRow?.rank ?? null,
+      points: liveSeasonOverviewRow?.points ?? null,
+      pps: hasCurrentTeamPps ? roundViewNumber(currentTeamPointsSummary?.totalPoints ?? 0, 1) : null,
+      ppPow: hasCurrentTeamPps ? roundViewNumber(currentTeamPointsSummary?.pointsByArea.power ?? 0, 1) : null,
+      ppSpe: hasCurrentTeamPps ? roundViewNumber(currentTeamPointsSummary?.pointsByArea.speed ?? 0, 1) : null,
+      ppMen: hasCurrentTeamPps ? roundViewNumber(currentTeamPointsSummary?.pointsByArea.mental ?? 0, 1) : null,
+      ppSoc: hasCurrentTeamPps ? roundViewNumber(currentTeamPointsSummary?.pointsByArea.social ?? 0, 1) : null,
+      cash: liveSeasonOverviewRow?.cash ?? null,
+      salaryTotal: liveSeasonOverviewRow?.salaryTotal ?? null,
+      marketValue: liveSeasonOverviewRow?.marketValueTotal ?? null,
+      guv: liveSeasonOverviewRow?.guv ?? null,
+      topBuyPlayer: currentTopBuy?.playerName ?? null,
+      topBuyAmount: currentTopBuy?.fee ?? null,
+      topSellPlayer: currentTopSell?.playerName ?? null,
+      topSellAmount: currentTopSell?.fee ?? null,
+    };
     const rosterEntries = gameState.rosters.filter((entry) => entry.teamId === team.teamId);
+    const activePlayerIdSet = new Set(gameState.rosters.map((entry) => entry.playerId).filter(Boolean));
+    const activePlayers = gameState.players.filter((player) => activePlayerIdSet.has(player.id));
+    const playerCoreRankMaps = {
+      pow: buildSharedRankMap(activePlayers.map((player) => ({ teamId: player.id, value: player.coreStats.pow ?? 0 }))),
+      spe: buildSharedRankMap(activePlayers.map((player) => ({ teamId: player.id, value: player.coreStats.spe ?? 0 }))),
+      men: buildSharedRankMap(activePlayers.map((player) => ({ teamId: player.id, value: player.coreStats.men ?? 0 }))),
+      soc: buildSharedRankMap(activePlayers.map((player) => ({ teamId: player.id, value: player.coreStats.soc ?? 0 }))),
+    };
     const rosterCards = rosterEntries
       .map((entry) => {
         const player = gameState.players.find((candidate) => candidate.id === entry.playerId) ?? null;
@@ -10067,18 +13869,15 @@ export default function FoundationPageClient({ initialReadSource, initialSelecte
         }
         const economy = resolvePlayerEconomyContract({ playerId: player.id, player, rosterEntry: entry });
         const marketValue = economy.marketValue;
-        const marketValueBenchmark = entry.currentValue ?? entry.purchasePrice ?? null;
+        const baselineEconomy = getPlayerBaselineEconomy(gameState, player.id);
+        const marketValueBenchmark = baselineEconomy?.marketValue ?? entry.currentValue ?? entry.purchasePrice ?? null;
         const marketValueDelta =
           marketValueBenchmark != null && marketValue != null && Math.abs(marketValue - marketValueBenchmark) >= 0.01
             ? roundViewNumber(marketValue - marketValueBenchmark, 2)
             : null;
-        const salary = economy.salary ?? entry.salary;
-        const normalSalary = economy.expectedSalary;
-        const salaryDelta =
-          normalSalary != null && salary != null && Math.abs(salary - normalSalary) >= 0.01
-            ? roundViewNumber(salary - normalSalary, 2)
-            : null;
-        if (overviewRow?.avgSalary != null && salary > overviewRow.avgSalary * 1.35) {
+        const salary = getRosterEntryDisplaySalary(entry, player);
+        const salaryDelta = getRosterEntrySalaryDelta(entry, player, gameState);
+        if (liveAverageSalary != null && salary > liveAverageSalary * 1.35) {
           issueTags.push("teuer");
         }
         if ((player.fatigue ?? 0) > 0) {
@@ -10110,7 +13909,27 @@ export default function FoundationPageClient({ initialReadSource, initialSelecte
           d1Score,
           d2Label: currentMatchdayDisciplineSchedule?.discipline2?.displayName ?? "D2",
           d2Score,
+          coreStats: {
+            pow: player.coreStats.pow ?? null,
+            powRank: playerCoreRankMaps.pow.get(player.id) ?? null,
+            spe: player.coreStats.spe ?? null,
+            speRank: playerCoreRankMaps.spe.get(player.id) ?? null,
+            men: player.coreStats.men ?? null,
+            menRank: playerCoreRankMaps.men.get(player.id) ?? null,
+            soc: player.coreStats.soc ?? null,
+            socRank: playerCoreRankMaps.soc.get(player.id) ?? null,
+          },
           issueTags,
+          demands: (demandMap.get(player.id) ?? []).map((demand) => ({
+            demandId: demand.demandId,
+            label: demand.label,
+            detail: demand.detail,
+            status: demand.status,
+            priority: demand.priority,
+            targetDisciplineId: demand.targetDisciplineId ?? null,
+            moraleReward: demand.moraleReward,
+            moralePenalty: demand.moralePenalty,
+          })),
           topDisciplines,
         };
       })
@@ -10136,114 +13955,98 @@ export default function FoundationPageClient({ initialReadSource, initialSelecte
       logoUrl: logo.src,
       logoInitials: logo.initials,
       controlMode: teamControl?.controlMode ?? "manual",
+      generalManager: generalManager
+        ? {
+            name: generalManager.profile.name,
+            title: generalManager.profile.title,
+            description: generalManager.profile.description,
+            pow: generalManager.profile.pow,
+            spe: generalManager.profile.spe,
+            men: generalManager.profile.men,
+            soc: generalManager.profile.soc,
+            influencePct: generalManager.assignment.influencePct,
+            playerOptDelta: generalManager.profile.playerOptDelta,
+            marketDoctrine: generalManager.profile.marketDoctrine,
+            lineupDoctrine: generalManager.profile.lineupDoctrine,
+            facilityPriorities: generalManager.profile.facilityPriorities,
+            bias: generalManager.profile.bias,
+          }
+        : null,
       rosterSize: rosterCards.length,
-      cash: overviewRow?.cash ?? null,
-      salaryTotal: overviewRow?.salaryTotal ?? null,
-      marketValueTotal: overviewRow?.marketValueTotal ?? null,
+      cash: liveSeasonOverviewRow?.cash ?? team.cash ?? null,
+      salaryTotal: liveSeasonOverviewRow?.salaryTotal ?? null,
+      marketValueTotal: liveSeasonOverviewRow?.marketValueTotal ?? null,
       powRank: currentAreaRanks?.pow ?? null,
       speRank: currentAreaRanks?.spe ?? null,
       menRank: currentAreaRanks?.men ?? null,
       socRank: currentAreaRanks?.soc ?? null,
       contractSummaries: contractTable.totalsCommitted,
+      boardConfidence: drawerBoardConfidence
+        ? {
+            value: drawerBoardConfidence.value,
+            pressure: drawerBoardConfidence.pressure,
+            warnings: drawerBoardConfidence.warnings,
+          }
+        : null,
+      relationships: drawerRelationships,
+      objectives: drawerObjectives.map((objective) => ({
+        objectiveId: objective.objectiveId,
+        label: objective.label,
+        detail: objective.detail ?? null,
+        actionHint: objective.actionHint ?? null,
+        category: objective.category,
+        targetValue: objective.targetValue,
+        currentValue: objective.currentValue,
+        status: objective.status,
+      })),
+      teamCaptain: teamCaptain
+        ? {
+            playerId: teamCaptain.playerId,
+            playerName: teamCaptain.playerName,
+            leadershipScore: teamCaptain.leadershipScore,
+            style: teamCaptain.style,
+            effects: teamCaptain.effects,
+            traitSignals: teamCaptain.traitSignals,
+          }
+        : null,
+      history: [
+        currentHistoryRow,
+        ...archivedHistoryRows.filter((row) => row.seasonId !== gameState.season.id),
+      ],
       players: rosterCards,
     };
+  };
+  const teamDrawerData = useMemo<TeamDetailDrawerData | null>(() => buildTeamDetailDrawerData(teamDrawerTeamId), [
+    canonicalSeasonLabel,
+    currentAreaRanksByTeamId,
+    currentMatchdayDisciplineSchedule,
+    gameState,
+    playerRatingsById,
+    seasonPointsLedger,
+    teamDrawerTeamId,
+    teamObjectiveOverview.boardConfidence,
+    teamObjectiveOverview.objectives,
+    seasonStandRows,
+  ]);
+  const selectedTeamsHistoryData = useMemo<TeamDetailDrawerData | null>(() => {
+    return buildTeamDetailDrawerData(selectedTeam.teamId);
   }, [
     canonicalSeasonLabel,
     currentAreaRanksByTeamId,
     currentMatchdayDisciplineSchedule,
     gameState,
     playerRatingsById,
-    teamDrawerTeamId,
-    teamsViewRows,
+    seasonPointsLedger,
+    selectedTeam.teamId,
+    teamObjectiveOverview.boardConfidence,
+    teamObjectiveOverview.objectives,
+    seasonStandRows,
   ]);
-  const selectedTeamCoreMetrics = useMemo(
-    () => [
-      {
-        key: "rank",
-        label: "Platz",
-        value: selectedStandingRow?.rank != null ? String(selectedStandingRow.rank) : "—",
-      },
-      {
-        key: "points",
-        label: "Punkte",
-        value: selectedStandingRow?.points != null ? String(selectedStandingRow.points) : "—",
-      },
-      {
-        key: "roster",
-        label: "#",
-        value: String(selectedStandingRow?.rosterCount ?? selectedRoster.length),
-      },
-      {
-        key: "budget",
-        label: "Budget",
-        value: selectedStandingRow?.budget != null ? formatMoney(selectedStandingRow.budget) : "—",
-      },
-      {
-        key: "cash",
-        label: "Cash",
-        value: selectedStandingRow?.cash != null ? formatMoney(selectedStandingRow.cash) : "—",
-      },
-      {
-        key: "salary",
-        label: "Gehalt",
-        value: selectedStandingRow != null ? formatMoney(selectedStandingRow.salaryTotal) : "—",
-      },
-      {
-        key: "contract",
-        label: "Ø LZ",
-        value:
-          selectedStandingRow?.avgContractLength != null
-            ? formatLocalePoints(selectedStandingRow.avgContractLength, 1)
-            : "—",
-      },
-      {
-        key: "mw",
-        label: "MW",
-        value:
-          selectedStandingRow?.marketValueTotal != null
-            ? formatLocalePoints(selectedStandingRow.marketValueTotal, 2)
-            : "—",
-      },
-    ],
-    [selectedRoster.length, selectedStandingRow],
-  );
-
-  const selectedTeamOptionalMetrics = useMemo(
-    () => [
-      {
-        key: "transfers",
-        label: "Transfers",
-        value:
-          selectedStandingRow?.transfersSeasonValue != null
-            ? formatLocalePoints(selectedStandingRow.transfersSeasonValue, 2)
-            : "—",
-        className:
-          selectedStandingRow?.transfersSeasonValue == null
-            ? undefined
-            : selectedStandingRow.transfersSeasonValue >= 0
-              ? "text-positive"
-              : "text-negative",
-        visible: selectedStandingRow?.transfersSeasonValue != null,
-      },
-      {
-        key: "transferCount",
-        label: "Anzahl Transfers",
-        value: selectedStandingRow != null ? String(selectedStandingRow.transferCount) : "—",
-        visible: selectedStandingRow != null,
-      },
-      {
-        key: "cashDelta",
-        label: "Cash Delta",
-        value:
-          selectedStandingRow?.cashDelta != null ? formatLocalePoints(selectedStandingRow.cashDelta, 2) : "—",
-        className: (selectedStandingRow?.cashDelta ?? 0) >= 0 ? "text-positive" : "text-negative",
-        visible: selectedStandingRow?.cashDelta != null,
-      },
-    ].filter((item) => item.visible),
-    [selectedStandingRow],
-  );
-
   const freeAgents = useMemo(() => {
+    if (!shouldBuildExtendedTeamPanels) {
+      return [];
+    }
+
     const rosteredIds = new Set(gameState.rosters.map((entry) => entry.playerId));
     return gameState.players
       .filter((player) => !rosteredIds.has(player.id))
@@ -10260,12 +14063,116 @@ export default function FoundationPageClient({ initialReadSource, initialSelecte
         return left.name.localeCompare(right.name, "de");
       })
       .slice(0, 6);
-  }, [gameState.players, gameState.rosters, playerRatingsById]);
+  }, [gameState.players, gameState.rosters, playerRatingsById, shouldBuildExtendedTeamPanels]);
 
   const playerSeasonPerformanceMap = useMemo(
-    () => (shouldBuildTrainingView || shouldBuildPlayerDirectory || shouldBuildMarketView ? buildPlayerSeasonPerformanceMap(gameState) : new Map()),
-    [gameState, shouldBuildMarketView, shouldBuildPlayerDirectory, shouldBuildTrainingView],
+    () =>
+      shouldBuildTrainingView || shouldBuildPlayerDirectory || shouldBuildMarketView || marketSellModalOpen
+        ? buildPlayerSeasonPerformanceMap(gameState, seasonPointsLedger)
+        : new Map(),
+    [gameState, marketSellModalOpen, seasonPointsLedger, shouldBuildMarketView, shouldBuildPlayerDirectory, shouldBuildTrainingView],
   );
+  const marketSellPlayerContext = useMemo(() => {
+    const playerId =
+      marketSellPreview?.player?.id ??
+      marketSellPreview?.activePlayer?.playerId ??
+      marketSellSubject?.playerId ??
+      null;
+    if (!playerId) {
+      return null;
+    }
+
+    const teamId =
+      marketSellPreview?.team?.id ??
+      gameState.rosters.find((entry) => entry.id === marketSellPreview?.activePlayer?.id || entry.id === marketSellSubject?.activePlayerId)?.teamId ??
+      selectedTeam.teamId;
+    const player = gameState.players.find((entry) => entry.id === playerId) ?? null;
+    const rosterEntry =
+      gameState.rosters.find((entry) => entry.id === marketSellPreview?.activePlayer?.id) ??
+      gameState.rosters.find((entry) => entry.id === marketSellSubject?.activePlayerId) ??
+      gameState.rosters.find((entry) => entry.playerId === playerId && entry.teamId === teamId) ??
+      null;
+    const rating = playerRatingsById.get(playerId) ?? null;
+    const performance = playerSeasonPerformanceMap.get(playerId) ?? null;
+    const teamById = new Map(gameState.teams.map((team) => [team.teamId, team]));
+    const transferEvents = gameState.transferHistory
+      .filter((entry) => entry.playerId === playerId)
+      .sort((left, right) => {
+        const rightTime = Date.parse(right.happenedAt);
+        const leftTime = Date.parse(left.happenedAt);
+        if (Number.isFinite(rightTime) && Number.isFinite(leftTime) && rightTime !== leftTime) {
+          return rightTime - leftTime;
+        }
+        return right.seasonId.localeCompare(left.seasonId, "de", { numeric: true });
+      })
+      .slice(0, 5)
+      .map((entry) => ({
+        id: entry.id,
+        type: entry.transferType,
+        label: getTransferTypeLabel(entry.transferType),
+        seasonLabel: entry.seasonLabel ?? entry.seasonId,
+        phase: entry.phase ?? "—",
+        fee: entry.fee,
+        salary: entry.salary,
+        marketValue: entry.marketValue,
+        fromTeam: entry.fromTeamId ? teamById.get(entry.fromTeamId)?.shortCode ?? entry.fromTeamId : "Free",
+        toTeam: entry.toTeamId ? teamById.get(entry.toTeamId)?.shortCode ?? entry.toTeamId : "Free",
+      }));
+    const latestBuyForCurrentTeam =
+      [...gameState.transferHistory]
+        .filter((entry) => entry.playerId === playerId && entry.transferType === "buy" && entry.toTeamId === teamId)
+        .sort((left, right) => Date.parse(right.happenedAt) - Date.parse(left.happenedAt))[0] ?? null;
+    const purchasePrice =
+      latestBuyForCurrentTeam?.fee ??
+      rosterEntry?.purchasePrice ??
+      marketSellPreview?.activePlayer?.purchasePrice ??
+      null;
+    const currentMarketValue = player
+      ? getPlayerDisplayMarketValue(player)
+      : marketSellPreview?.marketValueReference ?? null;
+    const rosterMarketValue = player && rosterEntry ? getRosterEntryDisplayMarketValue(rosterEntry, player) : marketSellPreview?.activePlayer?.currentValue ?? null;
+    const marketValueDelta = player && rosterEntry ? getPlayerDisplayMarketValueDelta(player, rosterEntry) : null;
+    const salary = player && rosterEntry ? getRosterEntryDisplaySalary(rosterEntry, player) : marketSellPreview?.activePlayer?.salary ?? null;
+    const salaryDelta = player && rosterEntry ? getRosterEntrySalaryDelta(rosterEntry, player) : null;
+    const saleProfit =
+      marketSellPreview?.salePrice != null && purchasePrice != null
+        ? roundViewNumber(marketSellPreview.salePrice - purchasePrice, 2)
+        : marketSellPreview?.profit ?? null;
+    const areaRows = [
+      { key: "POW", value: rating?.ppPow ?? performance?.pointsByArea.pow ?? null, tone: "power" },
+      { key: "SPE", value: rating?.ppSpe ?? performance?.pointsByArea.spe ?? null, tone: "speed" },
+      { key: "MEN", value: rating?.ppMen ?? performance?.pointsByArea.men ?? null, tone: "mental" },
+      { key: "SOC", value: rating?.ppSoc ?? performance?.pointsByArea.soc ?? null, tone: "social" },
+    ];
+
+    return {
+      player,
+      rosterEntry,
+      rating,
+      performance,
+      transferEvents,
+      purchasePrice,
+      currentMarketValue,
+      rosterMarketValue,
+      marketValueDelta,
+      salary,
+      salaryDelta,
+      saleProfit,
+      areaRows,
+      recentMatchdays: performance?.matchdayBreakdown.slice(0, 4) ?? [],
+      topDisciplines: performance?.topDisciplineRows.slice(0, 4) ?? [],
+    };
+  }, [
+    gameState.players,
+    gameState.rosters,
+    gameState.teams,
+    gameState.transferHistory,
+    marketSellPreview,
+    marketSellSubject,
+    playerRatingsById,
+    playerSeasonPerformanceMap,
+    selectedTeam.teamId,
+  ]);
   const selectedTeamFacilityState = useMemo(
     () => getTeamFacilityState(gameState, selectedTeam.teamId),
     [gameState, selectedTeam.teamId],
@@ -10281,7 +14188,7 @@ export default function FoundationPageClient({ initialReadSource, initialSelecte
       }
 
       return rosterPlayers.map(({ entry, player }) => {
-        const mode = trainingModeDraft[player.id] ?? "mittel";
+        const mode = trainingModeDraft[player.id] ?? player.trainingMode ?? "mittel";
         const modeConfig = trainingModeConfigs[mode];
         const recoveryForecast = applyTrainingRecoveryImpact(teamBaseRecoveryForecast.after, mode);
         const seasonPerformance = playerSeasonPerformanceMap.get(player.id) ?? null;
@@ -10338,6 +14245,42 @@ export default function FoundationPageClient({ initialReadSource, initialSelecte
       recoveryAfterTraining,
     };
   }, [teamBaseRecoveryForecast.after, trainingPlayerForecastRows]);
+  const trainingDevelopmentSummary = useMemo(() => {
+    const getTone = (row: (typeof trainingPlayerForecastRows)[number]): Exclude<TrainingDevelopmentFilter, "all"> =>
+      row.forecast.netDevelopmentXP < 0 || row.forecast.regressionRisk === "high"
+        ? "regression"
+        : row.forecast.netDevelopmentXP >= 45
+          ? "growth"
+          : "stable";
+
+    return trainingPlayerForecastRows.reduce(
+      (summary, row) => {
+        summary[getTone(row)] += 1;
+        return summary;
+      },
+      {
+        all: trainingPlayerForecastRows.length,
+        growth: 0,
+        stable: 0,
+        regression: 0,
+      } satisfies Record<TrainingDevelopmentFilter, number>,
+    );
+  }, [trainingPlayerForecastRows]);
+  const filteredTrainingPlayerForecastRows = useMemo(() => {
+    if (trainingDevelopmentFilter === "all") {
+      return trainingPlayerForecastRows;
+    }
+
+    return trainingPlayerForecastRows.filter((row) => {
+      const tone =
+        row.forecast.netDevelopmentXP < 0 || row.forecast.regressionRisk === "high"
+          ? "regression"
+          : row.forecast.netDevelopmentXP >= 45
+            ? "growth"
+            : "stable";
+      return tone === trainingDevelopmentFilter;
+    });
+  }, [trainingDevelopmentFilter, trainingPlayerForecastRows]);
   const trainingFacilityRows = useMemo(
     () => {
       if (!shouldBuildTrainingView) {
@@ -10525,6 +14468,143 @@ export default function FoundationPageClient({ initialReadSource, initialSelecte
     });
     return counts;
   }, [plannedXpUpgrades]);
+  const trainingV2ModeOptions = useMemo(
+    () =>
+      Object.entries(trainingModeConfigs).map(([value, config]) => ({
+        value: value as PlayerTrainingMode,
+        label: config.label,
+        note: config.note,
+        fatigueRisk: config.fatigueRisk,
+      })),
+    [],
+  );
+  const trainingV2AttributeOptions = useMemo(
+    () =>
+      Object.entries(SEASON_END_ATTRIBUTE_LABELS).map(([value, label]) => ({
+        value: value as PlayerGeneratorAttributeName,
+        label,
+      })),
+    [],
+  );
+  const trainingV2SeasonEndRows = useMemo(() => {
+    return seasonEndProgressionPreview.rows.map((row) => {
+      const rosterPlayer = rosterPlayers.find((entry) => entry.player.id === row.playerId)?.player ?? null;
+      const xpSpendPlayer = seasonEndXpSpendPlayerMap.get(row.playerId) ?? null;
+      const topDeltas = (xpSpendPlayer?.disciplineDeltas ?? row.disciplineDeltas)
+        .filter((entry) => (entry.disciplineDelta ?? 0) !== 0)
+        .sort((left, right) => Math.abs(right.disciplineDelta ?? 0) - Math.abs(left.disciplineDelta ?? 0))
+        .slice(0, 3);
+      const currentAttributePlan = xpSpendPlayer?.plannedUpgrades.filter((upgrade) => upgrade.attribute === row.selectedAttribute) ?? [];
+      const plannedCost =
+        currentAttributePlan.length > 0
+          ? currentAttributePlan.reduce((sum, upgrade) => sum + upgrade.cost, 0)
+          : row.upgradeCost;
+      const developmentLevelup =
+        rosterPlayer && selectedTeam
+          ? buildPlayerDevelopmentLevelupModel({
+              gameState,
+              player: rosterPlayer,
+              forecast: trainingPlayerForecastRows.find((forecastRow) => forecastRow.player.id === row.playerId)?.forecast ?? null,
+              teamId: selectedTeam.teamId,
+              profile: getTeamStrategyProfile(gameState, selectedTeam.teamId),
+            })
+          : null;
+
+      return {
+        playerId: row.playerId,
+        playerName: row.playerName,
+        className: rosterPlayer?.className ?? null,
+        portraitUrl: rosterPlayer?.portraitUrl ?? null,
+        portraitPath: rosterPlayer?.portraitPath ?? null,
+        availableXP: xpSpendPlayer?.availableXP ?? row.availableXP,
+        plannedXP: xpSpendPlayer?.plannedXP ?? 0,
+        remainingXP: xpSpendPlayer?.remainingXP ?? row.remainingXP,
+        plannedCount: plannedXpUpgradeCountByPlayer.get(row.playerId) ?? 0,
+        status: row.status,
+        blockReason: row.blockReason ?? "offen",
+        selectedAttribute: row.selectedAttribute,
+        attributeBefore: xpSpendPlayer?.attributeValuesBefore[row.selectedAttribute] ?? row.attributeBefore,
+        attributeAfter: xpSpendPlayer?.attributeValuesAfter[row.selectedAttribute] ?? row.attributeAfter,
+        ratingTierBefore: row.ratingTierBefore,
+        ratingTierAfter: row.ratingTierAfter,
+        plannedCost,
+        topDeltas,
+        organicProgression: xpSpendPlayer?.organicProgression
+          ? {
+              classBefore: xpSpendPlayer.organicProgression.classBefore,
+              classAfter: xpSpendPlayer.organicProgression.classAfter,
+              trainingClass: xpSpendPlayer.organicProgression.primaryTrainingClass,
+              secondaryTrainingClass: xpSpendPlayer.organicProgression.secondaryTrainingClass,
+              traitModifierPct: xpSpendPlayer.organicProgression.traitModifierPct,
+              facilityModifierPct: xpSpendPlayer.organicProgression.facilityModifierPct,
+              marketValuePressureTotal: xpSpendPlayer.organicProgression.marketValuePressureTotal,
+              trainingSetpoints: xpSpendPlayer.organicProgression.trainingSetpoints,
+              performanceSetpoints: xpSpendPlayer.organicProgression.performanceSetpoints,
+              netSetpoints: xpSpendPlayer.organicProgression.netSetpoints,
+              fatigueLoad: xpSpendPlayer.organicProgression.fatigueLoad,
+              topGains: xpSpendPlayer.organicProgression.attributeBreakdown
+                .filter((entry) => entry.delta > 0)
+                .sort((left, right) => right.delta - left.delta)
+                .slice(0, 3)
+                .map((entry) => ({ attribute: TRAINING_ATTRIBUTE_LABELS[entry.attribute], delta: entry.delta })),
+              topLosses: xpSpendPlayer.organicProgression.attributeBreakdown
+                .filter((entry) => entry.delta < 0)
+                .sort((left, right) => left.delta - right.delta)
+                .slice(0, 2)
+                .map((entry) => ({ attribute: TRAINING_ATTRIBUTE_LABELS[entry.attribute], delta: entry.delta })),
+            }
+          : null,
+        facilityEffects: row.facilityEffects,
+        developmentSummary: developmentLevelup
+          ? {
+              level: developmentLevelup.level.developmentLevel,
+              progressPct: developmentLevelup.level.progressPct,
+              trainingPointsAvailable: developmentLevelup.level.trainingPointsAvailable,
+              seasonLevelUpCap: developmentLevelup.level.seasonLevelUpCap,
+              signatureAttributes: developmentLevelup.affinity.signatureAttributes.map((attribute) => TRAINING_ATTRIBUTE_LABELS[attribute]),
+              weakAttribute: TRAINING_ATTRIBUTE_LABELS[developmentLevelup.affinity.weakAttribute],
+              lastTrend: developmentLevelup.level.lastTrend,
+            }
+          : null,
+        economyAudit: xpSpendPlayer?.economyAudit ?? row.economyAudit,
+      };
+    });
+  }, [
+    gameState,
+    plannedXpUpgradeCountByPlayer,
+    rosterPlayers,
+    seasonEndProgressionPreview.rows,
+    seasonEndXpSpendPlayerMap,
+    selectedTeam,
+    trainingPlayerForecastRows,
+  ]);
+  const trainingV2SeasonEndStatus = useMemo(() => {
+    if (seasonEndXpSpendPreview) {
+      return {
+        ok: seasonEndXpSpendPreview.ok,
+        confirmToken: seasonEndXpSpendPreview.confirmToken,
+        warnings: seasonEndXpSpendPreview.warnings,
+        blockingReasons: seasonEndXpSpendPreview.blockingReasons,
+        xpAvailable: seasonEndXpSpendPreview.totals.xpAvailable,
+        xpPlanned: seasonEndXpSpendPreview.totals.xpPlanned,
+        xpRemaining: seasonEndXpSpendPreview.totals.xpRemaining,
+        plannedCount: plannedXpUpgrades.length,
+      };
+    }
+
+    const xpAvailable = seasonEndProgressionPreview.rows.reduce((sum, row) => sum + (row.availableXP ?? 0), 0);
+    const xpPlanned = 0;
+    return {
+      ok: plannedXpUpgrades.length === 0,
+      confirmToken: null,
+      warnings: seasonEndProgressionPreview.warnings,
+      blockingReasons: [],
+      xpAvailable,
+      xpPlanned,
+      xpRemaining: xpAvailable - xpPlanned,
+      plannedCount: 0,
+    };
+  }, [plannedXpUpgrades.length, seasonEndProgressionPreview.rows, seasonEndProgressionPreview.warnings, seasonEndXpSpendPreview]);
   const leaguePlayerHeatPools = useMemo(() => {
     const disciplinePools = Object.fromEntries(
       gameState.disciplines.map((discipline) => [discipline.id, [] as number[]]),
@@ -10651,38 +14731,48 @@ export default function FoundationPageClient({ initialReadSource, initialSelecte
   );
   const marketSubclassOptions = useMemo(
     () =>
-      Array.from(
-        new Set((marketFeed?.items ?? []).flatMap((item) => item.subclasses).filter(Boolean)),
-      ).sort((left, right) => left.localeCompare(right)),
-    [marketFeed],
+      shouldBuildMarketView
+        ? Array.from(
+            new Set((marketFeed?.items ?? []).flatMap((item) => item.subclasses).filter(Boolean)),
+          ).sort((left, right) => left.localeCompare(right))
+        : [],
+    [marketFeed, shouldBuildMarketView],
   );
   const marketAlignmentOptions = useMemo(
     () =>
-      Array.from(new Set((marketFeed?.items ?? []).map((item) => item.alignment).filter(Boolean))).sort((left, right) =>
-        left.localeCompare(right),
-      ),
-    [marketFeed],
+      shouldBuildMarketView
+        ? Array.from(new Set((marketFeed?.items ?? []).map((item) => item.alignment).filter(Boolean))).sort((left, right) =>
+            left.localeCompare(right),
+          )
+        : [],
+    [marketFeed, shouldBuildMarketView],
   );
   const marketGenderOptions = useMemo(
     () =>
-      Array.from(new Set((marketFeed?.items ?? []).map((item) => item.gender).filter(Boolean))).sort((left, right) =>
-        left.localeCompare(right),
-      ),
-    [marketFeed],
+      shouldBuildMarketView
+        ? Array.from(new Set((marketFeed?.items ?? []).map((item) => item.gender).filter(Boolean))).sort((left, right) =>
+            left.localeCompare(right),
+          )
+        : [],
+    [marketFeed, shouldBuildMarketView],
   );
   const marketPositiveTraitOptions = useMemo(
     () =>
-      Array.from(
-        new Set((marketFeed?.items ?? []).flatMap((item) => item.traitsPositive).filter(Boolean)),
-      ).sort((left, right) => left.localeCompare(right)),
-    [marketFeed],
+      shouldBuildMarketView
+        ? Array.from(
+            new Set((marketFeed?.items ?? []).flatMap((item) => item.traitsPositive).filter(Boolean)),
+          ).sort((left, right) => left.localeCompare(right))
+        : [],
+    [marketFeed, shouldBuildMarketView],
   );
   const marketNegativeTraitOptions = useMemo(
     () =>
-      Array.from(
-        new Set((marketFeed?.items ?? []).flatMap((item) => item.traitsNegative).filter(Boolean)),
-      ).sort((left, right) => left.localeCompare(right)),
-    [marketFeed],
+      shouldBuildMarketView
+        ? Array.from(
+            new Set((marketFeed?.items ?? []).flatMap((item) => item.traitsNegative).filter(Boolean)),
+          ).sort((left, right) => left.localeCompare(right))
+        : [],
+    [marketFeed, shouldBuildMarketView],
   );
   const seasonModeColumns = useMemo(
     () => {
@@ -10729,15 +14819,31 @@ export default function FoundationPageClient({ initialReadSource, initialSelecte
     [teamsViewColumns, tableColumnPreferences],
   );
   const visibleSelectedRosterColumns = useMemo(
-    () =>
-      applyStoredColumnOrder(
+    () => {
+      const orderedColumns = applyStoredColumnOrder(
         selectedRosterColumns,
         tableColumnPreferences.selectedRosterTable?.columnOrder,
         getTablePinnedLeftIds("selectedRosterTable"),
         getTablePinnedRightIds("selectedRosterTable"),
       ).filter((column) =>
         isTableColumnVisible("selectedRosterTable", column.id, column.visibleByDefault),
-      ),
+      );
+      const breakdownColumnIds = new Set(["ppPow", "ppSpe", "ppMen", "ppSoc"]);
+      const breakdownColumns = orderedColumns.filter((column) => breakdownColumnIds.has(column.id));
+      if (breakdownColumns.length === 0) {
+        return orderedColumns;
+      }
+      const baseColumns = orderedColumns.filter((column) => !breakdownColumnIds.has(column.id));
+      const ppsIndex = baseColumns.findIndex((column) => column.id === "pps");
+      if (ppsIndex === -1) {
+        return orderedColumns;
+      }
+      return [
+        ...baseColumns.slice(0, ppsIndex + 1),
+        ...breakdownColumns,
+        ...baseColumns.slice(ppsIndex + 1),
+      ];
+    },
     [selectedRosterColumns, tableColumnPreferences],
   );
   const visibleTransferHistoryColumns = useMemo(
@@ -11037,6 +15143,25 @@ export default function FoundationPageClient({ initialReadSource, initialSelecte
     });
   };
 
+  const matchdaySummaryOptions = useMemo(() => getMatchdaySummaryOptions(gameState, gameState.season.id), [gameState]);
+  const activeMatchdaySummaryId =
+    selectedMatchdaySummaryId && matchdaySummaryOptions.some((entry) => entry.matchdayId === selectedMatchdaySummaryId)
+      ? selectedMatchdaySummaryId
+      : matchdaySummaryOptions.at(-1)?.matchdayId ?? gameState.matchdayState.matchdayId;
+  const matchdaySummary = useMemo(
+    () => buildMatchdaySummary(gameState, { seasonId: gameState.season.id, matchdayId: activeMatchdaySummaryId }),
+    [activeMatchdaySummaryId, gameState],
+  );
+  const currentSeasonRankDeltaByTeamId = useMemo(
+    () =>
+      new Map(
+        matchdaySummary.teamRows
+          .filter((row) => row.rankDelta != null && Number.isFinite(row.rankDelta))
+          .map((row) => [row.teamId, row.rankDelta ?? 0] as const),
+      ),
+    [matchdaySummary.teamRows],
+  );
+
   function getSeasonContractColumn(columnId: string) {
     return saisonstandColumnContract.columns.find((column) => column.normalizedKey === columnId) ?? null;
   }
@@ -11075,7 +15200,7 @@ export default function FoundationPageClient({ initialReadSource, initialSelecte
       case "cash":
         return row.cash;
       case "form":
-        return row.financeForm;
+        return seasonFormBonusByTeamId[row.teamId]?.total ?? row.financeForm;
       case "rank_diff":
         return row.rankDiff;
       case "transfers":
@@ -11110,9 +15235,9 @@ export default function FoundationPageClient({ initialReadSource, initialSelecte
         <button
           type="button"
           className="table-team-cell table-team-cell-button"
-          onClick={() => {
-            setActiveManagerTeam(row.team.teamId, "manual_select");
-            setFoundationView("teams", setActiveView);
+          onClick={(event) => {
+            event.stopPropagation();
+            openTeamDrawerById(row.team.teamId);
           }}
           onDoubleClick={(event) => {
             event.stopPropagation();
@@ -11144,6 +15269,40 @@ export default function FoundationPageClient({ initialReadSource, initialSelecte
       return row.teamCode;
     }
 
+    if (column.normalizedKey === "platz") {
+      const latestMatchdayRankDelta =
+        seasonOverviewSeasonId === gameState.season.id ? currentSeasonRankDeltaByTeamId.get(row.teamId) ?? null : null;
+      const rankDelta = latestMatchdayRankDelta ?? row.rankDiff ?? null;
+      return (
+        <span className="season-rank-with-delta">
+          <span>{row.rank}</span>
+          {rankDelta != null && Number.isFinite(rankDelta) && rankDelta !== 0 ? (
+            <span className={`season-rank-delta ${rankDelta > 0 ? "text-positive" : "text-negative"}`}>
+              ({rankDelta > 0 ? "+" : ""}{formatLocalePoints(rankDelta, 0)})
+            </span>
+          ) : null}
+        </span>
+      );
+    }
+
+    if (column.normalizedKey === "form") {
+      const formValue = typeof value === "number" && Number.isFinite(value) ? value : null;
+      if (formValue == null) {
+        return "—";
+      }
+      const formattedValue = formatPpFormBonus(formValue) ?? formatSeasonContractNumber(formValue, column);
+      return (
+        <span
+          className={joinClassNames(
+            "season-form-total",
+            formValue > 0 ? "text-positive" : formValue < 0 ? "text-negative" : undefined,
+          )}
+        >
+          {formattedValue}
+        </span>
+      );
+    }
+
     if (typeof value === "number") {
       const formattedValue = formatSeasonContractNumber(value, column);
 
@@ -11160,6 +15319,8 @@ export default function FoundationPageClient({ initialReadSource, initialSelecte
 
     return value ?? "—";
   }
+  const seasonSponsorPartColumnIds = new Set(["basis", "platzierung", "sponsor_season", "sponsor_total"]);
+
   function getSeasonTableCellClass(columnId: string) {
     const classes = ["season-standings-cell"];
     if (columnId === "platz" || columnId === "mannschaft" || columnId === "punkte") {
@@ -11176,6 +15337,24 @@ export default function FoundationPageClient({ initialReadSource, initialSelecte
     }
     if (saisonstandDisciplineColumns.includes(columnId as (typeof saisonstandDisciplineColumns)[number])) {
       classes.push("season-standings-cell-discipline");
+    }
+    if (["tdm", "mini_dm", "gewichtheben", "hockey", "breaking"].includes(columnId)) {
+      classes.push("season-standings-cell-area-power");
+    }
+    if (["staffel", "time_trial", "spurt", "climbing", "fechten"].includes(columnId)) {
+      classes.push("season-standings-cell-area-speed");
+    }
+    if (["schach", "takeshi", "tennis", "i_spy", "wettessen"].includes(columnId)) {
+      classes.push("season-standings-cell-area-mental");
+    }
+    if (["basketball", "football", "battlefield", "eiskunst", "showcase"].includes(columnId)) {
+      classes.push("season-standings-cell-area-social");
+    }
+    if (["tdm", "staffel", "schach", "basketball"].includes(columnId)) {
+      classes.push("season-standings-cell-area-start");
+    }
+    if (["breaking", "fechten", "wettessen", "showcase"].includes(columnId)) {
+      classes.push("season-standings-cell-area-end");
     }
     if (saisonstandFinanceColumns.includes(columnId as (typeof saisonstandFinanceColumns)[number])) {
       classes.push("season-standings-cell-finance");
@@ -11194,6 +15373,15 @@ export default function FoundationPageClient({ initialReadSource, initialSelecte
     }
     if (columnId === "cash" || columnId === "gehalt" || columnId === "guv" || columnId === "cash_total") {
       classes.push("season-standings-cell-finance-focus");
+    }
+    if (seasonSponsorPartColumnIds.has(columnId)) {
+      classes.push("season-standings-cell-sponsor-part");
+    }
+    if (columnId === "basis") {
+      classes.push("season-standings-cell-sponsor-start");
+    }
+    if (columnId === "sponsor_total") {
+      classes.push("season-standings-cell-sponsor-end");
     }
     return classes.join(" ");
   }
@@ -11224,15 +15412,81 @@ export default function FoundationPageClient({ initialReadSource, initialSelecte
       ).filter((column) => isTableColumnVisible("transferMarketTable", column.id, true)),
     [tableColumnPreferences, transfermarktColumns],
   );
+  const historyAllSeasonsSelected = historySeasonFilter === HISTORY_ALL_SEASONS_FILTER;
   const transferSeasonOptions = useMemo(
-    () =>
-      Array.from(new Set((historyFeed?.items ?? []).map((entry) => entry.seasonLabel ?? entry.seasonId)))
-        .filter(Boolean)
-        .sort((left, right) => left.localeCompare(right)),
-    [historyFeed],
+    () => {
+      if (!shouldBuildTransferHistoryView) {
+        return [];
+      }
+
+      const labelBySeasonId = new Map<string, string>();
+      labelBySeasonId.set(
+        gameState.season.id,
+        getCanonicalSeasonLabel({
+          seasonId: gameState.season.id,
+          seasonName: gameState.season.name,
+        }),
+      );
+
+      for (const entry of gameState.transferHistory) {
+        labelBySeasonId.set(
+          entry.seasonId,
+          getCanonicalSeasonLabel({
+            seasonId: entry.seasonId,
+            seasonName: entry.seasonLabel ?? null,
+          }),
+        );
+      }
+
+      for (const snapshot of gameState.seasonState.seasonSnapshots ?? []) {
+        labelBySeasonId.set(
+          snapshot.seasonId,
+          getCanonicalSeasonLabel({
+            seasonId: snapshot.seasonId,
+            seasonName: snapshot.seasonName,
+          }),
+        );
+      }
+
+      return Array.from(labelBySeasonId.entries())
+        .sort(([leftId], [rightId]) => rightId.localeCompare(leftId, "de", { numeric: true }))
+        .map(([seasonId, label]) => ({ seasonId, label }));
+    },
+    [
+      gameState.season.id,
+      gameState.season.name,
+      gameState.seasonState.seasonSnapshots,
+      gameState.transferHistory,
+      shouldBuildTransferHistoryView,
+    ],
   );
+  useEffect(() => {
+    if (
+      historySeasonFilter !== HISTORY_ALL_SEASONS_FILTER &&
+      !transferSeasonOptions.some((option) => option.seasonId === historySeasonFilter)
+    ) {
+      setHistorySeasonFilter(gameState.season.id);
+    }
+  }, [gameState.season.id, historySeasonFilter, transferSeasonOptions]);
+
+  useEffect(() => {
+    setHistoryPage(1);
+  }, [
+    historySeasonFilter,
+    historyTeamFilter,
+    historyTypeFilter,
+    historyClassFilter,
+    historySourceFilter,
+    deferredHistorySearch,
+    tableSorts.transferHistory.direction,
+    tableSorts.transferHistory.key,
+  ]);
 
   const transferMarketRows = useMemo(() => {
+    if (!shouldBuildMarketView) {
+      return [];
+    }
+
     return (marketFeed?.items ?? [])
       .map((item, index) => ({
         id: `derived-free-agent-${index + 1}`,
@@ -11262,8 +15516,6 @@ export default function FoundationPageClient({ initialReadSource, initialSelecte
         const matchesSpe = (entry.item.spe ?? Number.NEGATIVE_INFINITY) >= marketMinSpe;
         const matchesMen = (entry.item.men ?? Number.NEGATIVE_INFINITY) >= marketMinMen;
         const matchesSoc = (entry.item.soc ?? Number.NEGATIVE_INFINITY) >= marketMinSoc;
-        const matchesTeamFit =
-          !marketSelectedTeam || entry.item.mercenary || (entry.item.fit ?? Number.NEGATIVE_INFINITY) > 0;
 
         return (
           matchesSearch &&
@@ -11281,8 +15533,7 @@ export default function FoundationPageClient({ initialReadSource, initialSelecte
           matchesPow &&
           matchesSpe &&
           matchesMen &&
-          matchesSoc &&
-          matchesTeamFit
+          matchesSoc
         );
       });
   }, [
@@ -11303,6 +15554,7 @@ export default function FoundationPageClient({ initialReadSource, initialSelecte
     marketRaceFilter,
     deferredMarketSearch,
     marketSelectedTeam,
+    shouldBuildMarketView,
     marketSubclassFilter,
   ]);
 
@@ -11324,10 +15576,14 @@ export default function FoundationPageClient({ initialReadSource, initialSelecte
   );
 
   const historyPlayerById = useMemo(
-    () => new Map(gameState.players.map((player) => [player.id, player] as const)),
-    [gameState.players],
+    () => (shouldBuildTransferHistoryView ? new Map(gameState.players.map((player) => [player.id, player] as const)) : new Map()),
+    [gameState.players, shouldBuildTransferHistoryView],
   );
   const transferHistoryProfitById = useMemo(() => {
+    if (!shouldBuildTransferHistoryView) {
+      return new Map<string, number | null>();
+    }
+
     const purchaseMap = new Map<string, number>();
     const profitByTransferId = new Map<string, number | null>();
     const sortedEntries = [...(historyFeed?.items ?? [])].sort(
@@ -11349,27 +15605,35 @@ export default function FoundationPageClient({ initialReadSource, initialSelecte
     }
 
     return profitByTransferId;
-  }, [historyFeed]);
+  }, [historyFeed, shouldBuildTransferHistoryView]);
   const transferHistoryClassOptions = useMemo(
     () =>
-      Array.from(
-        new Set(
-          (historyFeed?.items ?? [])
-            .map((entry) => historyPlayerById.get(entry.playerId)?.className ?? null)
-            .filter(Boolean) as string[],
-        ),
-      ).sort((left, right) => left.localeCompare(right)),
-    [historyFeed, historyPlayerById],
+      shouldBuildTransferHistoryView
+        ? Array.from(
+            new Set(
+              (historyFeed?.items ?? [])
+                .map((entry) => historyPlayerById.get(entry.playerId)?.className ?? null)
+                .filter(Boolean) as string[],
+            ),
+          ).sort((left, right) => left.localeCompare(right))
+        : [],
+    [historyFeed, historyPlayerById, shouldBuildTransferHistoryView],
   );
   const transferHistorySourceOptions = useMemo(
     () =>
-      Array.from(new Set((historyFeed?.items ?? []).map((entry) => entry.source ?? "missing_source"))).sort(
-        (left, right) => left.localeCompare(right),
-      ),
-    [historyFeed],
+      shouldBuildTransferHistoryView
+        ? Array.from(new Set((historyFeed?.items ?? []).map((entry) => entry.source ?? "missing_source"))).sort(
+            (left, right) => left.localeCompare(right),
+          )
+        : [],
+    [historyFeed, shouldBuildTransferHistoryView],
   );
 
   const transferHistoryRows = useMemo(() => {
+    if (!shouldBuildTransferHistoryView) {
+      return [];
+    }
+
     return (historyFeed?.items ?? [])
       .map((entry) => {
         const player = historyPlayerById.get(entry.playerId) ?? null;
@@ -11415,7 +15679,10 @@ export default function FoundationPageClient({ initialReadSource, initialSelecte
       })
       .filter((entry) => {
         const normalizedHistorySearch = deferredHistorySearch.trim().toLowerCase();
-        const matchesSeason = historySeasonFilter === "ALL" || entry.seasonLabel === historySeasonFilter;
+        const matchesSeason =
+          historySeasonFilter === HISTORY_ALL_SEASONS_FILTER ||
+          entry.seasonId === historySeasonFilter ||
+          entry.seasonLabel === historySeasonFilter;
         const matchesType = historyTypeFilter === "ALL" || entry.type === historyTypeFilter;
         const matchesTeam =
           historyTeamFilter === "ALL" || entry.fromTeamId === historyTeamFilter || entry.toTeamId === historyTeamFilter;
@@ -11437,6 +15704,7 @@ export default function FoundationPageClient({ initialReadSource, initialSelecte
     historyPlayerById,
     historySourceFilter,
     playerRatingsById,
+    shouldBuildTransferHistoryView,
     transferHistoryProfitById,
   ]);
 
@@ -11459,6 +15727,10 @@ export default function FoundationPageClient({ initialReadSource, initialSelecte
     };
   }, [transferHistoryRows]);
   const transferHistorySeasonBreakdown = useMemo(() => {
+    if (!shouldBuildTransferHistoryView) {
+      return [];
+    }
+
     const counts = new Map<string, number>();
     for (const entry of historyFeed?.items ?? []) {
       const label = entry.seasonLabel ?? entry.seasonId;
@@ -11468,7 +15740,7 @@ export default function FoundationPageClient({ initialReadSource, initialSelecte
     return Array.from(counts.entries()).sort(([left], [right]) =>
       left.localeCompare(right, "de", { numeric: true }),
     );
-  }, [historyFeed]);
+  }, [historyFeed, shouldBuildTransferHistoryView]);
   const transferHistoryRequestedSeasonLabel = historyFeed?.saveContext?.requestedSeasonId ?? "Alle Seasons";
   const transferHistoryResolvedSeasonLabel =
     historyFeed?.saveContext?.requestedSeasonId == null
@@ -11476,15 +15748,6 @@ export default function FoundationPageClient({ initialReadSource, initialSelecte
       : historyFeed?.saveContext?.resolvedSeasonId ?? historyFeed?.scope?.seasonId ?? gameState.season.id;
 
   const standingsPreviewRows = useMemo(() => standingsPreviewFeed?.items ?? [], [standingsPreviewFeed]);
-  const matchdaySummaryOptions = useMemo(() => getMatchdaySummaryOptions(gameState, gameState.season.id), [gameState]);
-  const activeMatchdaySummaryId =
-    selectedMatchdaySummaryId && matchdaySummaryOptions.some((entry) => entry.matchdayId === selectedMatchdaySummaryId)
-      ? selectedMatchdaySummaryId
-      : matchdaySummaryOptions.at(-1)?.matchdayId ?? gameState.matchdayState.matchdayId;
-  const matchdaySummary = useMemo(
-    () => buildMatchdaySummary(gameState, { seasonId: gameState.season.id, matchdayId: activeMatchdaySummaryId }),
-    [activeMatchdaySummaryId, gameState],
-  );
   const activeTeamMatchdaySummaryRow = useMemo(
     () => matchdaySummary.teamRows.find((row) => row.teamId === activeManagerTeamId) ?? null,
     [activeManagerTeamId, matchdaySummary.teamRows],
@@ -11555,12 +15818,12 @@ export default function FoundationPageClient({ initialReadSource, initialSelecte
         const isActiveOwner = owner.ownerId === effectiveActiveOwnerId;
         const readyState =
           owner.ownerId === AI_OWNER_ID
-            ? `${aiTeams.length} AI Teams · auto`
+            ? `${aiTeams.length} Teams werden automatisch gefuehrt`
             : isActiveOwner
               ? gameFlowActionStep.label
               : owner.type === "remote_player"
-                ? "remote human · wartet auf Room"
-                : "human · bereitstellen";
+                ? "Mitspieler wartet auf Freigabe"
+                : "Bereit zur Steuerung";
 
         return {
           owner,
@@ -11582,6 +15845,22 @@ export default function FoundationPageClient({ initialReadSource, initialSelecte
       ) ?? null,
     [activeManagerTeamId, gameState.matchdayState.matchdayId, gameState.season.id, gameState.seasonState.lineupDrafts],
   );
+  const currentMatchdayLineupDrafts = useMemo(
+    () =>
+      (gameState.seasonState.lineupDrafts ?? []).filter(
+        (draft) => draft.seasonId === gameState.season.id && draft.matchdayId === gameState.matchdayState.matchdayId,
+      ),
+    [gameState.matchdayState.matchdayId, gameState.season.id, gameState.seasonState.lineupDrafts],
+  );
+  const aiLineupMissingTeamIds = useMemo(() => {
+    const readyTeamIds = new Set(
+      currentMatchdayLineupDrafts
+        .filter((draft) => draft.entries.length > 0)
+        .map((draft) => draft.teamId),
+    );
+    return aiLineupEnsureTeams.filter((team) => !readyTeamIds.has(team.teamId)).map((team) => team.teamId);
+  }, [aiLineupEnsureTeams, currentMatchdayLineupDrafts]);
+  const activeManagerLineupReady = Boolean(homeCurrentLineupDraft && homeCurrentLineupDraft.entries.length > 0);
   const homeNextMatchdayStatus = useMemo(() => {
     const d1Slots = currentMatchdayDisciplineSchedule?.discipline1?.playerCount ?? 0;
     const d2Slots = currentMatchdayDisciplineSchedule?.discipline2?.playerCount ?? 0;
@@ -11607,8 +15886,8 @@ export default function FoundationPageClient({ initialReadSource, initialSelecte
         : requiredSlots > 0 && filledSlots >= requiredSlots
           ? "Arena bereit"
           : filledSlots > 0
-            ? "Lineup unvollständig"
-            : "Lineup fehlt",
+            ? "Einsatzliste unvollständig"
+            : "Einsatzliste offen",
     };
   }, [
     activeManagerTeamId,
@@ -11619,6 +15898,476 @@ export default function FoundationPageClient({ initialReadSource, initialSelecte
     gameState.seasonState.matchdayResults,
     homeCurrentLineupDraft,
   ]);
+  async function ensureAiLineupsForCurrentMatchday(trigger: "human_lineup_saved" | "arena_open" | "manual" = "manual") {
+    if (
+      readMeta.source !== "sqlite" ||
+      isReadOnlyMode ||
+      !activeSaveId ||
+      activeSaveId === "loading-save" ||
+      !gameState.season.id ||
+      !gameState.matchdayState.matchdayId ||
+      aiLineupEnsureBusy ||
+      aiLineupEnsureTeams.length === 0 ||
+      aiLineupMissingTeamIds.length === 0
+    ) {
+      return null;
+    }
+
+    const runKey = [
+      activeSaveId,
+      gameState.season.id,
+      gameState.matchdayState.matchdayId,
+      aiLineupMissingTeamIds.join(","),
+    ].join(":");
+    if (trigger !== "manual" && aiLineupEnsureRunStartedRef.current.has(runKey)) {
+      return null;
+    }
+
+    aiLineupEnsureRunStartedRef.current.add(runKey);
+    setAiLineupEnsureBusy(true);
+    try {
+      const query = new URLSearchParams({
+        saveId: activeSaveId,
+        seasonId: gameState.season.id,
+        matchdayId: gameState.matchdayState.matchdayId,
+        source: readMeta.source,
+      });
+      const response = await fetch(`/api/lineups/legacy/ai-batch-apply?${query.toString()}`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          dryRun: false,
+          confirm: true,
+          includeWarningTeams: true,
+          overwriteExisting: false,
+          forceAiTeams: true,
+        }),
+      });
+      const payload = (await response.json()) as FoundationAiLineupBatchApplyResponse;
+      setAiLineupEnsureFeed(payload);
+      if (response.ok && !payload.error) {
+        await loadSave(activeSaveId, foundationSaveMode, { compactInitial: true });
+      }
+      return payload;
+    } finally {
+      setAiLineupEnsureBusy(false);
+    }
+  }
+  const handleHumanLineupSaved = (payload: {
+    saveId: string;
+    seasonId: string;
+    matchdayId: string;
+    teamId: string;
+    silent: boolean;
+  }) => {
+    if (
+      payload.saveId !== activeSaveId ||
+      payload.seasonId !== gameState.season.id ||
+      payload.matchdayId !== gameState.matchdayState.matchdayId ||
+      resolvedTeamControlSettings[payload.teamId]?.controlMode !== "manual"
+    ) {
+      return;
+    }
+
+    void ensureAiLineupsForCurrentMatchday("human_lineup_saved");
+  };
+  useEffect(() => {
+    if (activeView !== "matchdayArena" || !activeManagerLineupReady || aiLineupMissingTeamIds.length === 0) {
+      return;
+    }
+
+    void ensureAiLineupsForCurrentMatchday("arena_open");
+  }, [
+    activeManagerLineupReady,
+    activeView,
+    aiLineupMissingTeamIds.length,
+    gameState.matchdayState.matchdayId,
+    gameState.season.id,
+  ]);
+  const seasonSetupFlow = useMemo(() => {
+    if (!selectedTeam) {
+      return null;
+    }
+
+    const storedFlow = gameState.seasonState.newGameFlow ?? null;
+    const currentSeasonText = `${gameState.season.id} ${gameState.season.name}`.toLowerCase();
+    const isFirstSeason = /season[-_\s]*1\b/.test(currentSeasonText) || /\bsaison[-_\s]*1\b/.test(currentSeasonText);
+    const hasSeasonResults = (gameState.seasonState.matchdayResults ?? []).some((result) => result.seasonId === gameState.season.id);
+    const shouldShow =
+      Boolean(storedFlow?.active && !storedFlow.dismissed) ||
+      (isFirstSeason && !hasSeasonResults && !storedFlow?.dismissed && !storedFlow?.completedAt);
+
+    if (!shouldShow) {
+      return null;
+    }
+
+    const storedStatusById = new Map<NewGameFlowStepId, NewGameFlowStepStatus>(
+      (storedFlow?.steps ?? []).map((step) => [step.stepId, step.status]),
+    );
+    const rosterCount = rosterPlayers.length;
+    const targetRosterCount = Math.max(10, Math.min(12, selectedTeam.rosterLimit ?? 12));
+    const activeTransfers = gameState.transferHistory.some(
+      (transfer) =>
+        transfer.seasonId === gameState.season.id &&
+        (transfer.toTeamId === selectedTeam.teamId || transfer.fromTeamId === selectedTeam.teamId),
+    );
+    const facilityUpgradeCount = FACILITY_CATALOG.reduce(
+      (sum, facility) => sum + (getFacilityLevel(selectedTeamFacilityState, facility.facilityId) > 1 ? 1 : 0),
+      0,
+    );
+    const hasTrainingIntent = facilityUpgradeCount > 0;
+    const axisAverages = [
+      { label: "POW", value: rosterPlayers.reduce((sum, row) => sum + row.player.coreStats.pow, 0) / Math.max(rosterCount, 1) },
+      { label: "SPE", value: rosterPlayers.reduce((sum, row) => sum + row.player.coreStats.spe, 0) / Math.max(rosterCount, 1) },
+      { label: "MEN", value: rosterPlayers.reduce((sum, row) => sum + row.player.coreStats.men, 0) / Math.max(rosterCount, 1) },
+      { label: "SOC", value: rosterPlayers.reduce((sum, row) => sum + row.player.coreStats.soc, 0) / Math.max(rosterCount, 1) },
+    ].sort((left, right) => right.value - left.value);
+    const strongestAxis = axisAverages[0] ?? null;
+    const weakestAxis = axisAverages[axisAverages.length - 1] ?? null;
+    const getResolvedStatus = (stepId: NewGameFlowStepId, autoCompleted: boolean): SeasonSetupStepTone => {
+      if (autoCompleted || storedStatusById.get(stepId) === "completed") {
+        return "completed";
+      }
+      if (storedStatusById.get(stepId) === "skipped") {
+        return "skipped";
+      }
+      return "open";
+    };
+    const steps: Array<{
+      stepId: NewGameFlowStepId;
+      title: string;
+      kicker: string;
+      detail: string;
+      targetLabel: string;
+      targetView: SeasonSetupStepViewTarget;
+      status: SeasonSetupStepTone;
+      progress: string;
+    }> = [
+      {
+        stepId: "season_intro",
+        title: "Season-Briefing",
+        kicker: "Startsignal",
+        detail: "Salary Factor, Diszi-Reihenfolge, große Slot-Tage und Farb-Dopplungen einmal lesen.",
+        targetLabel: "Briefing öffnen",
+        targetView: "home",
+        status: getResolvedStatus("season_intro", false),
+        progress: "wichtig",
+      },
+      {
+        stepId: "team_confirm",
+        title: "Team wählen",
+        kicker: "Start",
+        detail: `${selectedTeam.shortCode} ist aktiv. Wechsel, wenn du ein anderes Team starten willst.`,
+        targetLabel: "Team prüfen",
+        targetView: "manager_team",
+        status: getResolvedStatus("team_confirm", Boolean(selectedTeam.teamId)),
+        progress: selectedTeam.shortCode,
+      },
+      {
+        stepId: "roster_review",
+        title: "Kader prüfen",
+        kicker: "Dossier",
+        detail:
+          rosterCount > 0
+            ? `Staerke ${strongestAxis?.label ?? "—"} ${formatWholeNumber(strongestAxis?.value)} · Luecke ${weakestAxis?.label ?? "—"} ${formatWholeNumber(weakestAxis?.value)}.`
+            : "Noch kein aktiver Kader vorhanden.",
+        targetLabel: "Kader öffnen",
+        targetView: "teams",
+        status: getResolvedStatus("roster_review", rosterCount > 0),
+        progress: `${rosterCount} Spieler`,
+      },
+      {
+        stepId: "first_transfers",
+        title: "Erste Transfers",
+        kicker: "Markt",
+        detail: "Oeffnet den Markt mit Team-Fit, Value-Ratio und Kaderluecken im Fokus.",
+        targetLabel: "Deals suchen",
+        targetView: "market",
+        status: getResolvedStatus("first_transfers", activeTransfers),
+        progress: activeTransfers ? "Transfer aktiv" : "Filter bereit",
+      },
+      {
+        stepId: "fill_roster",
+        title: "Kader auffüllen",
+        kicker: "Tiefe",
+        detail: `Ziel: mindestens ${targetRosterCount} aktive Spieler, damit Slots und Rotation nicht sofort brennen.`,
+        targetLabel: "Spieler finden",
+        targetView: "market",
+        status: getResolvedStatus("fill_roster", rosterCount >= targetRosterCount),
+        progress: `${rosterCount}/${targetRosterCount}`,
+      },
+      {
+        stepId: "training_facilities",
+        title: "Scouting & Gebäude prüfen",
+        kicker: "Basis",
+        detail:
+          facilityUpgradeCount > 0
+            ? `${facilityUpgradeCount} Facility-Upgrades aktiv. Scouting und Training kurz gegenchecken.`
+            : "Nach dem Markt kurz prüfen: Scouting verbessern, Training setzen oder bewusst sparen.",
+        targetLabel: "Basis prüfen",
+        targetView: "trainingV2",
+        status: getResolvedStatus("training_facilities", hasTrainingIntent),
+        progress: facilityUpgradeCount > 0 ? `${facilityUpgradeCount} Upgrades` : "offen",
+      },
+      {
+        stepId: "set_lineup",
+        title: "Einsatzliste setzen",
+        kicker: "Matchday",
+        detail: `${currentMatchdayDisciplineSchedule?.discipline1?.displayName ?? "D1"} / ${currentMatchdayDisciplineSchedule?.discipline2?.displayName ?? "D2"}: Slots fuellen, Powers/Captains bewusst setzen.`,
+        targetLabel: "Einsatzliste öffnen",
+        targetView: "lineup",
+        status: getResolvedStatus(
+          "set_lineup",
+          homeNextMatchdayStatus.requiredSlots > 0 && homeNextMatchdayStatus.openSlots === 0,
+        ),
+        progress:
+          homeNextMatchdayStatus.requiredSlots > 0
+            ? `${homeNextMatchdayStatus.filledSlots}/${homeNextMatchdayStatus.requiredSlots}`
+            : "—",
+      },
+    ];
+    const completedCount = steps.filter((step) => step.status === "completed").length;
+    const handledCount = steps.filter((step) => step.status === "completed" || step.status === "skipped").length;
+    const openStep = steps.find((step) => step.status === "open") ?? null;
+
+    return {
+      steps,
+      completedCount,
+      handledCount,
+      isReady: handledCount === steps.length,
+      openStep,
+      rosterCount,
+      targetRosterCount,
+      strongestAxis,
+      weakestAxis,
+    };
+  }, [
+    currentMatchdayDisciplineSchedule?.discipline1?.displayName,
+    currentMatchdayDisciplineSchedule?.discipline2?.displayName,
+    gameState.season.id,
+    gameState.season.name,
+    gameState.seasonState.matchdayResults,
+    gameState.seasonState.newGameFlow,
+    gameState.transferHistory,
+    homeNextMatchdayStatus.filledSlots,
+    homeNextMatchdayStatus.openSlots,
+    homeNextMatchdayStatus.requiredSlots,
+    rosterPlayers,
+    selectedTeam,
+    selectedTeamFacilityState,
+  ]);
+  const seasonBriefingData = useMemo(() => {
+    const factorWindow = getSeasonEconomyFactorWindow({
+      saveId: activeSaveId,
+      seasonId: gameState.season.id,
+      seasonState: gameState.seasonState,
+    });
+    const currentFactor = prizePreviewFeed?.summary.currentFactor ?? factorWindow[0]?.factor ?? null;
+    const futureFactors = factorWindow.slice(1, 5).map((entry) => ({
+      label: entry.seasonLabel,
+      factor: entry.factor,
+    }));
+    const slots = seasonDisciplineScheduleRows.flatMap((entry, matchdayIndex) =>
+      [entry.discipline1, entry.discipline2]
+        .filter((slot): slot is NonNullable<typeof slot> => Boolean(slot))
+        .map((slot, slotIndex) => ({
+          ...slot,
+          matchdayId: entry.matchdayId,
+          matchdayLabel: entry.matchdayLabel || `Spieltag ${matchdayIndex + 1}`,
+          matchdayIndex,
+          slotIndex,
+          color: getDisciplineColor(slot.category) ?? "neutral",
+        })),
+    );
+    const firstMatchdays = seasonDisciplineScheduleRows.slice(0, 5).map((entry, index) => ({
+      matchdayId: entry.matchdayId,
+      label: entry.matchdayLabel || `Spieltag ${index + 1}`,
+      disciplines: [entry.discipline1, entry.discipline2].filter((slot): slot is NonNullable<typeof slot> => Boolean(slot)).map((slot) => ({
+        name: slot.displayName,
+        playerCount: slot.playerCount ?? null,
+        category: slot.category,
+        color: getDisciplineColor(slot.category) ?? "neutral",
+      })),
+      sameColor:
+        Boolean(entry.discipline1 && entry.discipline2 && entry.discipline1.category === entry.discipline2.category),
+    }));
+    const bigDisciplines = [...slots]
+      .sort((left, right) => (right.playerCount ?? 0) - (left.playerCount ?? 0) || left.matchdayIndex - right.matchdayIndex || left.slotIndex - right.slotIndex)
+      .slice(0, 8);
+    const sameColorMatchdays = firstMatchdays.filter((entry) => entry.sameColor);
+    const categoryCounts = slots.reduce(
+      (acc, slot) => {
+        if (slot.category === "power") acc.power += 1;
+        if (slot.category === "speed") acc.speed += 1;
+        if (slot.category === "mental") acc.mental += 1;
+        if (slot.category === "social") acc.social += 1;
+        return acc;
+      },
+      { power: 0, speed: 0, mental: 0, social: 0 },
+    );
+
+    return {
+      currentFactor,
+      futureFactors,
+      firstMatchdays,
+      bigDisciplines,
+      sameColorMatchdays,
+      categoryCounts,
+      scheduleCount: seasonDisciplineScheduleRows.length,
+    };
+  }, [activeSaveId, gameState.season.id, gameState.seasonState, prizePreviewFeed?.summary.currentFactor, seasonDisciplineScheduleRows]);
+  const seasonBriefingTeamAxes = selectedIdentity
+    ? `${formatWholeNumber(selectedIdentity.pow)}/${formatWholeNumber(selectedIdentity.spe)}/${formatWholeNumber(selectedIdentity.men)}/${formatWholeNumber(selectedIdentity.soc)}`
+    : "—";
+  const seasonBriefingTeamCash =
+    selectedTeam && Number.isFinite(selectedTeam.cash)
+      ? selectedTeam.cash
+      : selectedTeam && Number.isFinite(selectedTeam.budget)
+        ? selectedTeam.budget
+        : null;
+  const seasonBriefingStepStatus = seasonSetupFlow?.steps.find((step) => step.stepId === "season_intro")?.status ?? null;
+  const aiPreseasonStoredRun =
+    (gameState.seasonState.aiPreseasonAutomationRuns?.[gameState.season.id] as FoundationAiPreseasonAutomationRun | undefined) ?? null;
+  const aiPreseasonDisplayRun =
+    aiPreseasonStoredRun?.status === "running"
+      ? aiPreseasonStoredRun
+      : aiPreseasonFeed?.run?.status === "running"
+        ? aiPreseasonFeed.run
+        : aiPreseasonStoredRun;
+  const showAiPreseasonBanner = aiPreseasonBusy || aiPreseasonDisplayRun?.status === "running";
+  useEffect(() => {
+    if (seasonBriefingStepStatus === "open") {
+      if (activeView !== "home") {
+        setFoundationView("home", setActiveView);
+        syncFoundationViewInUrl("home");
+      }
+      setSeasonBriefingOpen(true);
+    }
+  }, [activeSaveId, activeView, gameState.season.id, seasonBriefingStepStatus]);
+  useEffect(() => {
+    const isFirstSeason = /season[-_\s]*1\b/i.test(`${gameState.season.id} ${gameState.season.name}`);
+    const storedStatus = aiPreseasonStoredRun?.status ?? null;
+    const alreadyHandled =
+      storedStatus === "running" ||
+      storedStatus === "completed" ||
+      storedStatus === "skipped" ||
+      storedStatus === "failed";
+    const firstSeasonTrigger =
+      isFirstSeason &&
+      seasonBriefingStepStatus === "completed" &&
+      (gameFlowState.currentStepId === "scouting_facilities" || gameFlowState.currentStepId === "buy_players");
+    const followingSeasonTrigger =
+      !isFirstSeason &&
+      gameFlowState.phase === "preseason" &&
+      gameFlowState.currentStepId === "buy_players";
+    const runKey = `${activeSaveId}:${gameState.season.id}`;
+
+    if (
+      readMeta.source !== "sqlite" ||
+      isReadOnlyMode ||
+      aiTeams.length === 0 ||
+      aiPreseasonBusy ||
+      alreadyHandled ||
+      aiPreseasonRunStartedRef.current.has(runKey) ||
+      (!firstSeasonTrigger && !followingSeasonTrigger)
+    ) {
+      return;
+    }
+
+    aiPreseasonRunStartedRef.current.add(runKey);
+    void runAiPreseasonBackground();
+  }, [
+    activeSaveId,
+    aiPreseasonBusy,
+    aiPreseasonStoredRun?.status,
+    aiTeams.length,
+    gameFlowState.currentStepId,
+    gameFlowState.phase,
+    gameState.season.id,
+    gameState.season.name,
+    isReadOnlyMode,
+    readMeta.source,
+    seasonBriefingStepStatus,
+  ]);
+  useEffect(() => {
+    const shouldPollAiPreseason =
+      readMeta.source === "sqlite" &&
+      !isReadOnlyMode &&
+      activeSaveId &&
+      activeSaveId !== "loading-save" &&
+      (aiPreseasonBusy || aiPreseasonDisplayRun?.status === "running");
+
+    if (!shouldPollAiPreseason) {
+      return;
+    }
+
+    let cancelled = false;
+    let inFlight = false;
+    const pollAiPreseasonRun = async () => {
+      if (cancelled || inFlight) {
+        return;
+      }
+      inFlight = true;
+      try {
+        const nextGameState = await loadSave(activeSaveId, foundationSaveMode, { compactInitial: true });
+        const nextRun =
+          (nextGameState?.seasonState.aiPreseasonAutomationRuns?.[nextGameState.season.id] as FoundationAiPreseasonAutomationRun | undefined) ??
+          null;
+        if (!cancelled && nextRun) {
+          setAiPreseasonFeed((current) => ({
+            ok: nextRun.status === "completed",
+            skipped: nextRun.status === "skipped",
+            reason: current?.reason,
+            error: current?.error,
+            run: nextRun,
+          }));
+        }
+      } catch (error) {
+        if (!cancelled) {
+          console.warn("AI-Preseason-Status konnte gerade nicht aktualisiert werden.", error);
+        }
+      } finally {
+        inFlight = false;
+      }
+    };
+
+    void pollAiPreseasonRun();
+    const intervalId = window.setInterval(() => {
+      void pollAiPreseasonRun();
+    }, 2500);
+
+    return () => {
+      cancelled = true;
+      window.clearInterval(intervalId);
+    };
+  }, [
+    activeSaveId,
+    aiPreseasonBusy,
+    aiPreseasonDisplayRun?.status,
+    foundationSaveMode,
+    isReadOnlyMode,
+    readMeta.source,
+  ]);
+  const closeSeasonBriefing = (markCompleted = true) => {
+    setSeasonBriefingOpen(false);
+    if (markCompleted && seasonBriefingStepStatus === "open") {
+      updateNewGameFlowStepStatus("season_intro", "completed");
+    }
+  };
+  const completeSeasonBriefingAndContinue = () => {
+    closeSeasonBriefing(true);
+    const nextRequiredFlowStep = gameFlowState.steps.find(
+      (step) => step.stepId !== "season_intro" && (step.status === "ready" || step.status === "warning" || step.status === "blocked"),
+    );
+    const nextFlowStep = nextRequiredFlowStep ?? gameFlowState.nextStep;
+
+    if (nextFlowStep && nextFlowStep.stepId !== "season_intro") {
+      navigateToGameFlowStep(nextFlowStep.targetView, nextFlowStep.teamId ?? activeManagerTeamId, nextFlowStep.targetPanel);
+      return;
+    }
+
+    setFoundationView((seasonSetupFlow?.rosterCount ?? rosterPlayers.length) === 0 ? "marketV2" : "trainingV2", setActiveView);
+  };
   const homeWarnings = useMemo(() => {
     const warnings: string[] = [];
     if (!selectedTeam) warnings.push("no_active_team");
@@ -11631,19 +16380,23 @@ export default function FoundationPageClient({ initialReadSource, initialSelecte
     }
     return Array.from(new Set(warnings));
   }, [activeContextMeta?.roomId, activeContextMeta?.scenarioType, activeViewContextWarning, gameState.scenarioMeta?.scenarioType, hasSeasonResultsForHome, homeNextMatchdayStatus.hasFormCards, homeNextMatchdayStatus.openSlots, selectedTeam]);
+  const shouldShowArenaBackToLineup = homeNextMatchdayStatus.openSlots > 0 || homeWarnings.includes("missing_lineups");
   const homePlayerCards = useMemo(
     () =>
       selectedRosterTableRows
         .map((row) => {
           const portrait = getPlayerPortraitModel(row.player);
           const salary = getRosterEntryDisplaySalary(row.entry, row.player);
+          const marketValue = getRosterEntryDisplayMarketValue(row.entry, row.player);
           const rating = playerRatingsById.get(row.player.id) ?? null;
           const seasonPerformance = playerSeasonPerformanceMap.get(row.player.id) ?? null;
           return {
             ...row,
             portrait,
             salary,
-            marketValue: getPlayerDisplayMarketValue(row.player),
+            marketValue,
+            marketValueDelta: getPlayerDisplayMarketValueDelta(row.player, row.entry),
+            salaryDelta: getRosterEntrySalaryDelta(row.entry, row.player),
             xp: row.player.currentXP ?? 0,
             fatigue: row.player.fatigue ?? 0,
             ppPow: rating?.ppPow ?? seasonPerformance?.pointsByArea.pow ?? null,
@@ -11676,21 +16429,71 @@ export default function FoundationPageClient({ initialReadSource, initialSelecte
   );
 	  const homeTasks = useMemo(
 	    () =>
-	      filterGameInboxItems(gameInboxItems, { includeDismissed: false, includeDone: false })
+	      filterGameInboxItems(activeTeamInboxItems.length > 0 ? activeTeamInboxItems : gameInboxItems, { includeDismissed: false, includeDone: false })
 	        .filter((item) => item.category === "task" || item.category === "warning" || item.severity === "critical")
+          .sort((left, right) => {
+            const severityOrder: Record<GameInboxItem["severity"], number> = {
+              critical: 0,
+              warning: 1,
+              info: 2,
+            };
+            return severityOrder[left.severity] - severityOrder[right.severity];
+          })
 	        .slice(0, 5),
-	    [gameInboxItems],
+	    [activeTeamInboxItems, gameInboxItems],
 	  );
+  const homeTodayCards = useMemo<Array<{
+    key: string;
+    kicker: string;
+    title: string;
+    detail: string;
+    tone: "ready" | "warning" | "info";
+    view: FoundationView;
+  }>>(
+    () => [
+      {
+        key: "lineup",
+        kicker: "Heute wichtig",
+        title: homeNextMatchdayStatus.openSlots > 0 ? `${homeNextMatchdayStatus.openSlots} Slots offen` : "Einsatz bereit",
+        detail: homeNextMatchdayStatus.openSlots > 0 ? "erst Team setzen" : "direkt Arena spielen",
+        tone: homeNextMatchdayStatus.openSlots > 0 ? "warning" : "ready",
+        view: homeNextMatchdayStatus.openSlots > 0 ? "lineup" : "matchdayArena",
+      },
+      {
+        key: "team",
+        kicker: "Teamzustand",
+        title: selectedStandingRow?.rank != null ? `Rang #${selectedStandingRow.rank}` : "Team pruefen",
+        detail: selectedStandingRow?.points != null ? `${formatLocalePoints(selectedStandingRow.points, 1)} Punkte` : "Roster & Finanzen",
+        tone: "info",
+        view: "teams",
+      },
+      {
+        key: "tasks",
+        kicker: "Aufgaben",
+        title: homeTasks.length > 0 ? `${homeTasks.length} Quest${homeTasks.length === 1 ? "" : "s"}` : "Keine offenen Quests",
+        detail: homeTasks[0]?.title ?? "bereit fuer den naechsten Zug",
+        tone: homeTasks.some((task) => task.severity === "critical")
+          ? "warning"
+          : homeTasks.length > 0
+            ? "info"
+            : "ready",
+        view: homeTasks.length > 0 ? "inbox" : "home",
+      },
+    ],
+    [homeNextMatchdayStatus.openSlots, homeTasks, selectedStandingRow?.points, selectedStandingRow?.rank],
+  );
 	  const homeNewsItems = useMemo(() => {
-	    return gameInboxItems
+	    const sourceItems = activeTeamInboxItems.length > 0 ? activeTeamInboxItems : gameInboxItems;
+	    return sourceItems
 	      .filter((item) => item.status === "open" && ["news", "result", "finance", "transfer", "facility"].includes(item.category))
 	      .slice(0, 5);
-	  }, [gameInboxItems]);
+	  }, [activeTeamInboxItems, gameInboxItems]);
 	  const homeStoryItems = useMemo(() => {
-	    return gameInboxItems
+	    const sourceItems = activeTeamInboxItems.length > 0 ? activeTeamInboxItems : gameInboxItems;
+	    return sourceItems
 	      .filter((item) => item.status === "open" && item.source.startsWith("story:"))
 	      .slice(0, 3);
-	  }, [gameInboxItems]);
+	  }, [activeTeamInboxItems, gameInboxItems]);
 
   const sortedSeasonStandRows = useMemo(
     () =>
@@ -11708,14 +16511,13 @@ export default function FoundationPageClient({ initialReadSource, initialSelecte
         sponsor_total: (row) => row.sponsorTotal ?? Number.NEGATIVE_INFINITY,
         guv: (row) => row.guv ?? Number.NEGATIVE_INFINITY,
         cash_total: (row) => row.cashTotal ?? Number.NEGATIVE_INFINITY,
-        form: (row) => row.financeForm ?? Number.NEGATIVE_INFINITY,
+        form: (row) => seasonFormBonusByTeamId[row.teamId]?.total ?? row.financeForm ?? Number.NEGATIVE_INFINITY,
         gehalt: (row) => row.salaryTotal,
         vertragslange: (row) => row.avgContractLength ?? Number.NEGATIVE_INFINITY,
         transfers: (row) => row.transfersSeasonValue ?? Number.NEGATIVE_INFINITY,
       }),
-    [seasonStandRows, tableSorts.teamTable],
+    [seasonFormBonusByTeamId, seasonStandRows, tableSorts.teamTable],
   );
-
   const sortedStandingsPreviewRows = useMemo(
     () =>
       sortRows(standingsPreviewRows, tableSorts.standingsPreview, {
@@ -11782,10 +16584,10 @@ export default function FoundationPageClient({ initialReadSource, initialSelecte
         top5: (row) => row.top5,
         top10: (row) => row.top10,
         avgRank: (row) => row.avgRank ?? Number.POSITIVE_INFINITY,
+        seasonPoints: (row) => row.historicalPointsBySeason.length,
       }),
     [tableSorts.teamsView, teamsViewRows],
   );
-
   const sortedDisciplineRankRows = useMemo(
     () =>
       sortRows(disciplineRankRows, tableSorts.disciplineRanks, {
@@ -11800,6 +16602,37 @@ export default function FoundationPageClient({ initialReadSource, initialSelecte
     [disciplineRankRows, orderedDisciplines, tableSorts.disciplineRanks],
   );
 
+  const rankLeaderCards = useMemo(() => {
+    const findLeader = (
+      key: "totalRank" | "powRank" | "speRank" | "menRank" | "socRank",
+      scoreKey: "total" | "pow" | "spe" | "men" | "soc",
+    ) =>
+      disciplineRankRows
+        .filter((row) => row.scorePack[scoreKey] > 0)
+        .sort((left, right) => {
+          const rankDelta = left[key] - right[key];
+          if (rankDelta !== 0) {
+            return rankDelta;
+          }
+          return right.scorePack[scoreKey] - left.scorePack[scoreKey];
+        })[0] ?? null;
+
+    const entries: Array<{
+      id: string;
+      label: string;
+      tone: string;
+      scoreKey: "total" | "pow" | "spe" | "men" | "soc";
+      row: (typeof disciplineRankRows)[number] | null;
+    }> = [
+      { id: "total", label: "Gesamt", tone: "total", scoreKey: "total", row: findLeader("totalRank", "total") },
+      { id: "pow", label: "POW", tone: "pow", scoreKey: "pow", row: findLeader("powRank", "pow") },
+      { id: "spe", label: "SPE", tone: "spe", scoreKey: "spe", row: findLeader("speRank", "spe") },
+      { id: "men", label: "MEN", tone: "men", scoreKey: "men", row: findLeader("menRank", "men") },
+      { id: "soc", label: "SOC", tone: "soc", scoreKey: "soc", row: findLeader("socRank", "soc") },
+    ];
+    return entries;
+  }, [disciplineRankRows]);
+
   const sortedDisciplineConfigRows = useMemo(
     () =>
       sortRows(disciplineConfigRows, tableSorts.disciplineConfig, {
@@ -11811,6 +16644,13 @@ export default function FoundationPageClient({ initialReadSource, initialSelecte
         mutator2: (row) => row.mutator2,
       }),
     [disciplineConfigRows, tableSorts.disciplineConfig],
+  );
+  const visibleDisciplineConfigRows = useMemo(
+    () =>
+      disciplineCategoryFilter === "all"
+        ? sortedDisciplineConfigRows
+        : sortedDisciplineConfigRows.filter((discipline) => discipline.category === disciplineCategoryFilter),
+    [disciplineCategoryFilter, sortedDisciplineConfigRows],
   );
 
   const sortedPpAreaRows = useMemo(
@@ -11827,10 +16667,37 @@ export default function FoundationPageClient({ initialReadSource, initialSelecte
     [ppAreaRows, tableSorts.ppArea],
   );
 
+  const ppAreaRankClassMaps = useMemo(
+    () => ({
+      total: buildMetricRankClassMap(ppAreaRows.map((row) => ({ id: row.team.teamId, value: row.pps.total }))),
+      pow: buildMetricRankClassMap(ppAreaRows.map((row) => ({ id: row.team.teamId, value: row.pps.pow }))),
+      spe: buildMetricRankClassMap(ppAreaRows.map((row) => ({ id: row.team.teamId, value: row.pps.spe }))),
+      men: buildMetricRankClassMap(ppAreaRows.map((row) => ({ id: row.team.teamId, value: row.pps.men }))),
+      soc: buildMetricRankClassMap(ppAreaRows.map((row) => ({ id: row.team.teamId, value: row.pps.soc }))),
+    }),
+    [ppAreaRows],
+  );
+  const ppAreaMetricPools = useMemo(
+    () => ({
+      total: ppAreaRows.map((row) => row.pps.total),
+      pow: ppAreaRows.map((row) => row.pps.pow),
+      spe: ppAreaRows.map((row) => row.pps.spe),
+      men: ppAreaRows.map((row) => row.pps.men),
+      soc: ppAreaRows.map((row) => row.pps.soc),
+    }),
+    [ppAreaRows],
+  );
+
   const seasonTopPlayerRows = useMemo(() => {
+    const teamById = new Map(gameState.teams.map((team) => [team.teamId, team] as const));
+    const playerById = new Map(gameState.players.map((player) => [player.id, player] as const));
+
     if (selectedSeasonSnapshot) {
       return [...(selectedSeasonSnapshot.playerPerformances ?? [])]
         .map((player) => {
+          const activePlayer = playerById.get(player.playerId) ?? null;
+          const team = player.teamId ? teamById.get(player.teamId) ?? null : null;
+          const snapshotClassName = (player as { className?: string | null }).className ?? null;
           const totalPoints = player.pps ?? player.totalPoints ?? player.totalContribution ?? null;
           const breakdownAreaPoints = (player.disciplineBreakdown ?? []).reduce(
             (totals, entry) => {
@@ -11849,7 +16716,9 @@ export default function FoundationPageClient({ initialReadSource, initialSelecte
             playerId: player.playerId,
             name: player.playerName,
             teamId: player.teamId ?? null,
-            teamName: player.teamCode ? `${player.teamCode} · ${player.teamName ?? "—"}` : player.teamName ?? "—",
+            teamCode: player.teamCode ?? team?.shortCode ?? null,
+            teamName: player.teamName ?? team?.name ?? "—",
+            className: snapshotClassName ?? activePlayer?.className ?? null,
             pps: totalPoints,
             ppsRank: player.ppsRank ?? null,
             ovr: player.ovr ?? null,
@@ -11869,10 +16738,9 @@ export default function FoundationPageClient({ initialReadSource, initialSelecte
           }
           return left.name.localeCompare(right.name, "de");
         })
-        .slice(0, 32);
+        .map((row, index) => ({ ...row, rank: index + 1 }));
     }
 
-    const teamById = new Map(gameState.teams.map((team) => [team.teamId, team] as const));
     const rosterByPlayerId = new Map(gameState.rosters.map((roster) => [roster.playerId, roster] as const));
 
     return gameState.players
@@ -11891,7 +16759,9 @@ export default function FoundationPageClient({ initialReadSource, initialSelecte
           playerId: player.id,
           name: player.name,
           teamId: team?.teamId ?? null,
+          teamCode: team?.shortCode ?? null,
           teamName: team?.name ?? "—",
+          className: player.className ?? null,
           pps: rating?.ppsSeason ?? null,
           ppsRank: rating?.ppsSeasonRank ?? null,
           ovr: rating?.ovrNormalized ?? null,
@@ -11918,17 +16788,343 @@ export default function FoundationPageClient({ initialReadSource, initialSelecte
 
         return left.name.localeCompare(right.name, "de");
       })
-      .slice(0, 32);
+      .map((row, index) => ({ ...row, rank: index + 1 }));
   }, [gameState.disciplines, gameState.players, gameState.rosters, gameState.teams, playerRatingsById, playerSeasonPerformanceMap, selectedSeasonSnapshot]);
 
+  const sortedSeasonTopPlayerRows = useMemo(
+    () =>
+      sortRows(seasonTopPlayerRows, tableSorts.seasonTopPlayers, {
+        rank: (row) => row.rank,
+        name: (row) => row.name,
+        team: (row) => row.teamCode ?? row.teamName ?? "",
+        pps: (row) => row.pps ?? Number.NEGATIVE_INFINITY,
+        pow: (row) => row.ppPow ?? Number.NEGATIVE_INFINITY,
+        spe: (row) => row.ppSpe ?? Number.NEGATIVE_INFINITY,
+        men: (row) => row.ppMen ?? Number.NEGATIVE_INFINITY,
+        soc: (row) => row.ppSoc ?? Number.NEGATIVE_INFINITY,
+        ovr: (row) => row.ovr ?? Number.NEGATIVE_INFINITY,
+        mvs: (row) => row.mvs ?? Number.NEGATIVE_INFINITY,
+        marketValue: (row) => row.marketValue ?? Number.NEGATIVE_INFINITY,
+        bracket: (row) => row.bracket ?? Number.NEGATIVE_INFINITY,
+      }),
+    [seasonTopPlayerRows, tableSorts.seasonTopPlayers],
+  );
+  const seasonV2StandingsRows = useMemo(
+    () =>
+      sortedSeasonStandRows.map((row) => {
+        const logo = getTeamLogoModel(row.team);
+        const generalManager = getTeamGeneralManager(gameState, row.teamId);
+        return {
+          teamId: row.teamId,
+          teamName: row.teamName,
+          teamCode: row.teamCode,
+          gmName: generalManager?.profile.name ?? null,
+          gmTitle: generalManager?.profile.title ?? null,
+          gmArchetype: generalManager?.profile.archetype ?? null,
+          logoUrl: logo.src,
+          logoInitials: logo.initials,
+          rank: row.rank ?? null,
+          rankDiff: row.rankDiff ?? null,
+          points: row.points ?? null,
+          pps: row.ppsTotal ?? null,
+          pow: row.ppsPow ?? null,
+          spe: row.ppsSpe ?? null,
+          men: row.ppsMen ?? null,
+          soc: row.ppsSoc ?? null,
+          cash: row.cash ?? null,
+          salaryTotal: row.salaryTotal ?? null,
+          guv: row.guv ?? null,
+          sponsorTotal: row.sponsorTotal ?? null,
+          marketValueTotal: row.marketValueTotal ?? null,
+          disciplineValues: {
+            bonuspunkte: row.disciplineValues.bonuspunkte ?? null,
+            tdm: row.disciplineValues.tdm ?? null,
+            mini_dm: row.disciplineValues.mini_dm ?? null,
+            gewichtheben: row.disciplineValues.gewichtheben ?? null,
+            hockey: row.disciplineValues.hockey ?? null,
+            breaking: row.disciplineValues.breaking ?? null,
+            staffel: row.disciplineValues.staffel ?? null,
+            time_trial: row.disciplineValues.time_trial ?? null,
+            spurt: row.disciplineValues.spurt ?? null,
+            climbing: row.disciplineValues.climbing ?? null,
+            fechten: row.disciplineValues.fechten ?? null,
+            schach: row.disciplineValues.schach ?? null,
+            takeshi: row.disciplineValues.takeshi ?? null,
+            tennis: row.disciplineValues.tennis ?? null,
+            i_spy: row.disciplineValues.i_spy ?? null,
+            wettessen: row.disciplineValues.wettessen ?? null,
+            basketball: row.disciplineValues.basketball ?? null,
+            football: row.disciplineValues.football ?? null,
+            battlefield: row.disciplineValues.battlefield ?? null,
+            eiskunst: row.disciplineValues.eiskunst ?? null,
+            showcase: row.disciplineValues.showcase ?? null,
+          },
+          rosterCount: row.rosterCount ?? 0,
+          avgContractLength: row.avgContractLength ?? null,
+          isSelected: selectedTeam?.teamId === row.teamId,
+        };
+      }),
+    [gameState, selectedTeam?.teamId, sortedSeasonStandRows],
+  );
+  const seasonV2PpRows = useMemo(
+    () =>
+      sortedPpAreaRows.map((row) => ({
+        teamId: row.team.teamId,
+        teamName: row.team.name,
+        teamCode: row.team.shortCode,
+        rank: row.rank,
+        total: row.pps.total,
+        pow: row.pps.pow,
+        spe: row.pps.spe,
+        men: row.pps.men,
+        soc: row.pps.soc,
+      })),
+    [sortedPpAreaRows],
+  );
+  const seasonV2TopPlayers = useMemo(() => {
+    const playerById = new Map(gameState.players.map((player) => [player.id, player] as const));
+    return sortedSeasonTopPlayerRows.slice(0, SEASON_V2_TOP_PLAYER_LIMIT).map((row) => {
+      const player = playerById.get(row.playerId) ?? null;
+      const portrait = player ? getPlayerPortraitModel(player) : { src: null, initials: row.name.slice(0, 2).toUpperCase() };
+      return {
+        playerId: row.playerId,
+        name: row.name,
+        teamId: row.teamId ?? null,
+        teamCode: row.teamCode ?? null,
+        teamName: row.teamName ?? null,
+        className: row.className ?? null,
+        portraitUrl: portrait.src,
+        portraitInitials: portrait.initials,
+        rank: row.rank,
+        pps: row.pps ?? null,
+        ovr: row.ovr ?? null,
+        mvs: row.mvs ?? null,
+        ppPow: row.ppPow ?? null,
+        ppSpe: row.ppSpe ?? null,
+        ppMen: row.ppMen ?? null,
+        ppSoc: row.ppSoc ?? null,
+      };
+    });
+  }, [gameState.players, sortedSeasonTopPlayerRows]);
+  const seasonV2PlayerRows = useMemo(() => {
+    const playerById = new Map(gameState.players.map((player) => [player.id, player] as const));
+    return sortedSeasonTopPlayerRows.map((row) => {
+      const player = playerById.get(row.playerId) ?? null;
+      const portrait = player ? getPlayerPortraitModel(player) : { src: null, initials: row.name.slice(0, 2).toUpperCase() };
+      return {
+        playerId: row.playerId,
+        name: row.name,
+        teamId: row.teamId ?? null,
+        teamCode: row.teamCode ?? null,
+        teamName: row.teamName ?? null,
+        className: row.className ?? null,
+        portraitUrl: portrait.src,
+        portraitInitials: portrait.initials,
+        rank: row.rank,
+        pps: row.pps ?? null,
+        ovr: row.ovr ?? null,
+        mvs: row.mvs ?? null,
+        ppPow: row.ppPow ?? null,
+        ppSpe: row.ppSpe ?? null,
+        ppMen: row.ppMen ?? null,
+        ppSoc: row.ppSoc ?? null,
+      };
+    });
+  }, [gameState.players, sortedSeasonTopPlayerRows]);
+  const seasonV2SelectedTeamSummary = useMemo(
+    () =>
+      selectedStandingRow
+        ? {
+            teamId: selectedStandingRow.teamId,
+            teamName: selectedStandingRow.teamName,
+            teamCode: selectedStandingRow.teamCode,
+            rank: selectedStandingRow.rank ?? null,
+            points: selectedStandingRow.points ?? null,
+            pps: selectedStandingRow.ppsTotal ?? null,
+            cash: selectedStandingRow.cash ?? null,
+            salaryTotal: selectedStandingRow.salaryTotal ?? null,
+            guv: selectedStandingRow.guv ?? null,
+            sponsorTotal: selectedStandingRow.sponsorTotal ?? null,
+            marketValueTotal: selectedStandingRow.marketValueTotal ?? null,
+          }
+        : null,
+    [selectedStandingRow],
+  );
+  const seasonV2LeaderTeam = seasonV2StandingsRows[0] ?? null;
+  const seasonV2MomentumTeam = useMemo(
+    () =>
+      [...seasonV2StandingsRows]
+        .filter((row) => (row.rankDiff ?? 0) > 0)
+        .sort(
+          (left, right) =>
+            (right.rankDiff ?? 0) - (left.rankDiff ?? 0) ||
+            (left.rank ?? Number.POSITIVE_INFINITY) - (right.rank ?? Number.POSITIVE_INFINITY),
+        )[0] ??
+      seasonV2StandingsRows[1] ??
+      null,
+    [seasonV2StandingsRows],
+  );
+  const seasonV2PressureTeam = useMemo(
+    () =>
+      [...seasonV2StandingsRows].sort((left, right) => {
+        const leftPressure =
+          (left.salaryTotal ?? 0) / Math.max(1, Math.abs(left.cash ?? 0) + Math.abs(left.salaryTotal ?? 0)) +
+          ((left.guv ?? 0) < 0 ? Math.abs(left.guv ?? 0) / 1000 : 0);
+        const rightPressure =
+          (right.salaryTotal ?? 0) / Math.max(1, Math.abs(right.cash ?? 0) + Math.abs(right.salaryTotal ?? 0)) +
+          ((right.guv ?? 0) < 0 ? Math.abs(right.guv ?? 0) / 1000 : 0);
+        return rightPressure - leftPressure;
+      })[0] ?? null,
+    [seasonV2StandingsRows],
+  );
+  const seasonV2ArchiveRows = useMemo(
+    () =>
+      seasonHistorySnapshots.map((snapshot) => ({
+        seasonId: snapshot.seasonId,
+        seasonName: snapshot.seasonName,
+        archivedAt: snapshot.archivedAt ?? null,
+        teamCount: snapshot.finalStandings.length,
+        playerCount: snapshot.playerPerformances.length,
+      })),
+    [seasonHistorySnapshots],
+  );
+  const seasonV2GmRows = useMemo(
+    () =>
+      gameState.teams
+        .map((team) => {
+          const logo = getTeamLogoModel(team);
+          const generalManager = getTeamGeneralManager(gameState, team.teamId);
+          const boardConfidence = teamObjectiveOverview.boardConfidence[team.teamId] ?? null;
+          const snapshotHistory = seasonHistorySnapshots
+            .map((snapshot) => {
+              const snapshotGm = snapshot.gmAssignments?.find((entry) => entry.teamId === team.teamId) ?? null;
+              if (!snapshotGm) return null;
+              return {
+                seasonId: snapshot.seasonId,
+                seasonName: snapshot.seasonName,
+                gmId: snapshotGm.gmId,
+                gmName: snapshotGm.gmName,
+                gmTitle: snapshotGm.gmTitle,
+                source: snapshotGm.source,
+                boardConfidenceValue: snapshotGm.boardConfidenceValue ?? null,
+                boardPressure: snapshotGm.boardPressure ?? null,
+                previousGmId: snapshotGm.previousGmId ?? null,
+                dismissalReason: snapshotGm.dismissalReason ?? null,
+              };
+            })
+            .filter((entry): entry is NonNullable<typeof entry> => Boolean(entry));
+          const currentHistory = generalManager
+            ? [
+                {
+                  seasonId: gameState.season.id,
+                  seasonName: gameState.season.name,
+                  gmId: generalManager.profile.gmId,
+                  gmName: generalManager.profile.name,
+                  gmTitle: generalManager.profile.title,
+                  source: generalManager.assignment.source,
+                  boardConfidenceValue: boardConfidence?.value ?? null,
+                  boardPressure: boardConfidence?.pressure ?? null,
+                  previousGmId: generalManager.assignment.previousGmId ?? null,
+                  dismissalReason: generalManager.assignment.dismissalReason ?? null,
+                },
+              ]
+            : [];
+          return {
+            teamId: team.teamId,
+            teamName: team.name,
+            teamCode: team.shortCode,
+            logoUrl: logo.src,
+            logoInitials: logo.initials,
+            gmId: generalManager?.profile.gmId ?? null,
+            gmName: generalManager?.profile.name ?? null,
+            gmTitle: generalManager?.profile.title ?? null,
+            gmArchetype: generalManager?.profile.archetype ?? null,
+            description: generalManager?.profile.description ?? null,
+            marketDoctrine: generalManager?.profile.marketDoctrine ?? null,
+            lineupDoctrine: generalManager?.profile.lineupDoctrine ?? null,
+            facilityPriorities: generalManager?.profile.facilityPriorities ?? [],
+            preferredTraits: generalManager?.profile.preferredTraits ?? [],
+            influencePct: generalManager?.assignment.influencePct ?? null,
+            source: generalManager?.assignment.source ?? null,
+            assignedSeasonId: generalManager?.assignment.assignedSeasonId ?? null,
+            boardConfidenceValue: boardConfidence?.value ?? null,
+            boardPressure: boardConfidence?.pressure ?? null,
+            previousGmId: generalManager?.assignment.previousGmId ?? null,
+            dismissalReason: generalManager?.assignment.dismissalReason ?? null,
+            history: [...currentHistory, ...snapshotHistory].map((entry) => {
+              const profile = getTeamGeneralManagerProfile(entry.gmId);
+              return {
+                ...entry,
+                gmTitle: entry.gmTitle || profile?.title || entry.gmId,
+                gmName: entry.gmName || profile?.name || entry.gmId,
+              };
+            }),
+          };
+        })
+        .sort((left, right) => (right.boardPressure ?? 0) - (left.boardPressure ?? 0) || left.teamName.localeCompare(right.teamName, "de")),
+    [gameState, seasonHistorySnapshots, teamObjectiveOverview.boardConfidence],
+  );
+  const seasonV2DisciplineLeaders = useMemo(
+    () =>
+      archivedSeasonDisciplineLeaderboards
+        .map((discipline) => {
+          const leader = discipline.players[0] ?? null;
+          if (!leader) {
+            return null;
+          }
+          return {
+            disciplineId: discipline.disciplineId,
+            disciplineName: discipline.disciplineName,
+            playerId: leader.playerId,
+            playerName: leader.playerName,
+            teamCode: leader.teamCode ?? null,
+            appearances: leader.appearances,
+            totalContribution: leader.totalContribution ?? null,
+          };
+        })
+        .filter((entry): entry is NonNullable<typeof entry> => Boolean(entry))
+        .slice(0, 8),
+    [archivedSeasonDisciplineLeaderboards],
+  );
+
+  const seasonTopPlayerRankClassMaps = useMemo(
+    () => ({
+      pps: buildMetricRankClassMap(seasonTopPlayerRows.map((row) => ({ id: row.playerId, value: row.pps }))),
+      pow: buildMetricRankClassMap(seasonTopPlayerRows.map((row) => ({ id: row.playerId, value: row.ppPow }))),
+      spe: buildMetricRankClassMap(seasonTopPlayerRows.map((row) => ({ id: row.playerId, value: row.ppSpe }))),
+      men: buildMetricRankClassMap(seasonTopPlayerRows.map((row) => ({ id: row.playerId, value: row.ppMen }))),
+      soc: buildMetricRankClassMap(seasonTopPlayerRows.map((row) => ({ id: row.playerId, value: row.ppSoc }))),
+      ovr: buildMetricRankClassMap(seasonTopPlayerRows.map((row) => ({ id: row.playerId, value: row.ovr }))),
+      mvs: buildMetricRankClassMap(seasonTopPlayerRows.map((row) => ({ id: row.playerId, value: row.mvs }))),
+    }),
+    [seasonTopPlayerRows],
+  );
+  const seasonTopPlayerMetricPools = useMemo(
+    () => ({
+      pps: seasonTopPlayerRows.map((row) => row.pps),
+      pow: seasonTopPlayerRows.map((row) => row.ppPow),
+      spe: seasonTopPlayerRows.map((row) => row.ppSpe),
+      men: seasonTopPlayerRows.map((row) => row.ppMen),
+      soc: seasonTopPlayerRows.map((row) => row.ppSoc),
+      ovr: seasonTopPlayerRows.map((row) => row.ovr),
+      mvs: seasonTopPlayerRows.map((row) => row.mvs),
+    }),
+    [seasonTopPlayerRows],
+  );
   const sortedSelectedRosterTableRows = useMemo(
     () =>
       sortRows(selectedRosterTableRows, tableSorts.selectedRoster, {
         name: (row) => row.player.name,
         class: (row) => row.player.className,
         fit: (row) => row.player.form,
-        mw: (row) => getPlayerDisplayMarketValue(row.player) ?? Number.NEGATIVE_INFINITY,
+        mw: (row) => getRosterEntryDisplayMarketValue(row.entry, row.player) ?? Number.NEGATIVE_INFINITY,
+        salePrice: (row) => row.saleBreakdown.salePrice ?? Number.NEGATIVE_INFINITY,
+        saleFactor: (row) => row.saleBreakdown.saleFactor ?? Number.NEGATIVE_INFINITY,
         salary: (row) => getRosterEntryDisplaySalary(row.entry, row.player),
+        value: (row) => {
+          const salary = getRosterEntryDisplaySalary(row.entry, row.player);
+          return row.playerPps != null && salary != null && salary > 0 ? row.playerPps / salary : Number.NEGATIVE_INFINITY;
+        },
         contract: (row) => row.entry.contractLength,
         ovr: (row) => row.playerOvr ?? Number.NEGATIVE_INFINITY,
         mvs: (row) => row.playerMvs ?? Number.NEGATIVE_INFINITY,
@@ -11941,7 +17137,129 @@ export default function FoundationPageClient({ initialReadSource, initialSelecte
       }),
     [gameState.disciplines, selectedRosterTableRows, tableSorts.selectedRoster],
   );
+  const seasonEndRosterActionsActive = useMemo(() => {
+    const phase = gameState.gamePhase ?? "season_active";
+    const sellWindowPhases = new Set([
+      "season_completed",
+      "season_review",
+      "season_rewards",
+      "player_development",
+      "preseason_management",
+      "transfer_sell_phase",
+    ]);
+    return sellWindowPhases.has(phase) || (phase === "season_active" && localSeasonTransitionGate.canCompleteSeason);
+  }, [gameState.gamePhase, localSeasonTransitionGate.canCompleteSeason]);
+  const selectedTeamRosterActionsAvailable = seasonEndRosterActionsActive && selectedTeamCanManage && !isReadOnlyMode;
+  const selectedTeamRosterActionHint = !selectedTeam
+    ? null
+    : isReadOnlyMode
+      ? "Nur Ansicht: In diesem Modus kannst du Kader, Verträge und Verkaufspreise prüfen, aber nichts schreiben."
+      : !selectedTeamCanManage
+        ? `${selectedTeam.name} ist nicht dein steuerbares Team. Anschauen ja, Kaufen/Verkaufen/Verlängern nein.`
+        : seasonEndRosterActionsActive
+          ? "Season-End-Phase aktiv: Verkaufen ist freigegeben, auslaufende Verträge können verlängert werden."
+          : "Verkaufen und Verlängern öffnen erst am Season-End. Während der laufenden Season bleibt der Kader gesperrt.";
+  const teamRosterFocusOptions = useMemo(() => {
+    const salaryCount = selectedRosterTableRows.filter((row) => {
+      const delta = getRosterEntrySalaryDelta(row.entry, row.player);
+      return delta != null && delta > 0;
+    }).length;
+    const valueCount = selectedRosterTableRows.filter((row) => {
+      const salary = getRosterEntryDisplaySalary(row.entry, row.player);
+      return row.playerPps != null && row.playerPps > 0 && salary != null && salary > 0;
+    }).length;
+    const expiringCount = selectedRosterTableRows.filter((row) => row.entry.contractLength <= 1).length;
+    const trainingCount = selectedRosterTableRows.filter((row) => (row.player.currentXP ?? 0) > 0 || (row.player.fatigue ?? 0) > 0).length;
+    return [
+      { id: "default" as const, label: "Standard", count: selectedRosterTableRows.length },
+      { id: "salary" as const, label: "Gehaltsdruck", count: salaryCount },
+      { id: "value" as const, label: "Value", count: valueCount },
+      { id: "contracts" as const, label: "Vertraege", count: expiringCount },
+      { id: "training" as const, label: "Training", count: trainingCount },
+    ].filter((entry) => entry.id === "default" || entry.count > 0);
+  }, [selectedRosterTableRows]);
+  const focusedSelectedRosterTableRows = useMemo(() => {
+    if (teamRosterFocusMode === "default") {
+      return sortedSelectedRosterTableRows;
+    }
 
+    const rows = [...sortedSelectedRosterTableRows];
+    if (teamRosterFocusMode === "salary") {
+      return rows.sort((left, right) => {
+        const rightDelta = getRosterEntrySalaryDelta(right.entry, right.player) ?? Number.NEGATIVE_INFINITY;
+        const leftDelta = getRosterEntrySalaryDelta(left.entry, left.player) ?? Number.NEGATIVE_INFINITY;
+        return rightDelta - leftDelta;
+      });
+    }
+    if (teamRosterFocusMode === "value") {
+      return rows.sort((left, right) => {
+        const leftSalary = getRosterEntryDisplaySalary(left.entry, left.player);
+        const rightSalary = getRosterEntryDisplaySalary(right.entry, right.player);
+        const leftScore = left.playerPps != null && leftSalary != null && leftSalary > 0 ? left.playerPps / leftSalary : Number.NEGATIVE_INFINITY;
+        const rightScore = right.playerPps != null && rightSalary != null && rightSalary > 0 ? right.playerPps / rightSalary : Number.NEGATIVE_INFINITY;
+        return rightScore - leftScore;
+      });
+    }
+    if (teamRosterFocusMode === "contracts") {
+      return rows.sort((left, right) => left.entry.contractLength - right.entry.contractLength);
+    }
+    return rows.sort((left, right) => {
+      const rightScore = (right.player.currentXP ?? 0) * 100 + (right.player.fatigue ?? 0);
+      const leftScore = (left.player.currentXP ?? 0) * 100 + (left.player.fatigue ?? 0);
+      return rightScore - leftScore;
+    });
+  }, [sortedSelectedRosterTableRows, teamRosterFocusMode]);
+  const hqContractExpiringCount = useMemo(
+    () => selectedRosterTableRows.filter((row) => row.entry.contractLength <= 1).length,
+    [selectedRosterTableRows],
+  );
+  const hqTrainingFocusCount = useMemo(
+    () => selectedRosterTableRows.filter((row) => (row.player.currentXP ?? 0) > 0 || (row.player.fatigue ?? 0) > 0).length,
+    [selectedRosterTableRows],
+  );
+  const hqTransferWishlistEntries = useMemo(
+    () =>
+      (gameState.seasonState.transferWishlist ?? [])
+        .filter(
+          (entry) =>
+            entry.saveId === activeSaveId &&
+            (!selectedTeam || entry.teamId == null || entry.teamId === selectedTeam.teamId),
+        )
+        .slice(0, 4),
+    [activeSaveId, gameState.seasonState.transferWishlist, selectedTeam],
+  );
+  const hqTransferSellMarkers = useMemo(
+    () => transferSellMarkerEntries.filter((entry) => entry.teamId === selectedTeam?.teamId).slice(0, 4),
+    [selectedTeam?.teamId, transferSellMarkerEntries],
+  );
+  const teamRosterRoleFilterOptions = useMemo(() => {
+    const counts: Record<TeamRosterRoleFilter, number> = {
+      all: selectedRosterTableRows.length,
+      starter: 0,
+      rotation: 0,
+      prospect: 0,
+      bench: 0,
+      other: 0,
+    };
+    for (const row of selectedRosterTableRows) {
+      counts[getTeamRosterRoleBucket(row.entry.roleTag)] += 1;
+    }
+    return [
+      { id: "all" as const, label: "Alle", count: counts.all },
+      { id: "starter" as const, label: "Starter", count: counts.starter },
+      { id: "rotation" as const, label: "Rotation", count: counts.rotation },
+      { id: "prospect" as const, label: "Prospects", count: counts.prospect },
+      { id: "bench" as const, label: "Bank", count: counts.bench },
+      { id: "other" as const, label: "Sonstige", count: counts.other },
+    ].filter((entry) => entry.id === "all" || entry.count > 0);
+  }, [selectedRosterTableRows]);
+  const filteredSelectedRosterTableRows = useMemo(
+    () =>
+      teamRosterRoleFilter === "all"
+        ? focusedSelectedRosterTableRows
+        : focusedSelectedRosterTableRows.filter((row) => getTeamRosterRoleBucket(row.entry.roleTag) === teamRosterRoleFilter),
+    [focusedSelectedRosterTableRows, teamRosterRoleFilter],
+  );
   const sortedTransferMarketRows = useMemo(
     () =>
       sortRows(transferMarketRows, tableSorts.transferMarket, {
@@ -12003,6 +17321,137 @@ export default function FoundationPageClient({ initialReadSource, initialSelecte
       }),
     [tableSorts.transferMarket, transferMarketRows],
   );
+  useEffect(() => {
+    setMarketRenderLimit(TRANSFER_MARKET_INITIAL_RENDER_LIMIT);
+  }, [
+    activeView,
+    marketAlignmentFilter,
+    marketBracketFilter,
+    marketClassFilter,
+    marketGenderFilter,
+    marketMaxSalary,
+    marketMaxValue,
+    marketMinMen,
+    marketMinPow,
+    marketMinRatio,
+    marketMinSoc,
+    marketMinSpe,
+    marketNegativeTraitFilter,
+    marketPositiveTraitFilter,
+    marketRaceFilter,
+    marketSearch,
+    marketSubclassFilter,
+    marketTeamId,
+    tableSorts.transferMarket.direction,
+    tableSorts.transferMarket.key,
+  ]);
+  const visibleTransferMarketRows = useMemo(
+    () => sortedTransferMarketRows.slice(0, marketRenderLimit),
+    [marketRenderLimit, sortedTransferMarketRows],
+  );
+  const marketLoadedCount = marketFeed?.items.length ?? 0;
+
+  const transferDecisionBoard = useMemo(() => {
+    const buyPick =
+      sortedTransferMarketRows.find((row) => marketSelectedTeam && (row.item.fit ?? 0) > 0 && row.item.teamContextAvailable) ??
+      sortedTransferMarketRows[0] ??
+      null;
+    const watchPick =
+      sortedTransferMarketRows.find((row) => transferWishlistByPlayerId.has(row.item.playerId)) ??
+      sortedTransferMarketRows.find((row) => (row.item.mvs ?? 0) >= 4 || (row.item.ovr ?? 0) >= 65) ??
+      sortedTransferMarketRows[1] ??
+      null;
+    const sellPick =
+      selectedRosterTableRows
+        .map((row) => {
+          const salary = getRosterEntryDisplaySalary(row.entry, row.player) ?? 0;
+          const pps = row.playerPps ?? 0;
+          return {
+            row,
+            salary,
+            score: salary / Math.max(pps, 1),
+          };
+        })
+        .sort((left, right) => right.score - left.score)[0] ?? null;
+
+    const buyReasons = buyPick
+      ? [
+          formatFitDisplay(buyPick.item),
+          buyPick.item.affordabilityStatus ? `Budget ${buyPick.item.affordabilityStatus}` : null,
+          buyPick.item.bracket ? `Rolle ${buyPick.item.bracket}` : null,
+        ].filter((entry): entry is string => Boolean(entry)).slice(0, 3)
+      : ["Filter lockern"];
+    const buyWarnings = buyPick
+      ? [
+          buyPick.item.teamContextAvailable ? null : "Team waehlen",
+          buyPick.item.affordabilityStatus && buyPick.item.affordabilityStatus !== "affordable" ? "Budget pruefen" : null,
+          buyPick.item.rosterPressureStatus === "at_or_above_opt" ? "Kader voll" : null,
+        ].filter((entry): entry is string => Boolean(entry)).slice(0, 3)
+      : [];
+    const watchReasons = watchPick
+      ? [
+          watchPick.item.ovr != null ? `OVR ${formatWholeNumber(watchPick.item.ovr)}` : null,
+          watchPick.item.mvs != null ? `MVS ${formatPpsValue(watchPick.item.mvs)}` : null,
+          watchPick.item.marketValue != null ? formatTransfermarktCurrency(watchPick.item.marketValue) : null,
+        ].filter((entry): entry is string => Boolean(entry)).slice(0, 3)
+      : ["Kandidaten merken"];
+    const sellReasons = sellPick
+      ? [
+          `Gehalt ${formatMoney(sellPick.salary)}`,
+          sellPick.row.playerPps != null ? `PPs ${formatPpsValue(sellPick.row.playerPps)}` : null,
+          sellPick.score > 1 ? "teuer pro PPs" : "Verkaufskandidat",
+        ].filter((entry): entry is string => Boolean(entry)).slice(0, 3)
+      : ["Kader halten"];
+
+    return {
+      buyPick,
+      buyReasons,
+      buyWarnings,
+      watchPick,
+      watchReasons,
+      sellPick,
+      sellReasons,
+    };
+  }, [marketSelectedTeam, selectedRosterTableRows, sortedTransferMarketRows, transferWishlistByPlayerId]);
+
+  const activeMarketFilterChips = useMemo(() => {
+    const chips: string[] = [];
+    if (marketSearch.trim()) chips.push(`Suche: ${marketSearch.trim()}`);
+    if (marketClassFilter !== "ALL") chips.push(`Klasse: ${marketClassFilter}`);
+    if (marketRaceFilter !== "ALL") chips.push(`Volk: ${marketRaceFilter}`);
+    if (marketSubclassFilter !== "ALL") chips.push(`Subklasse: ${marketSubclassFilter}`);
+    if (marketAlignmentFilter !== "ALL") chips.push(`Alignment: ${marketAlignmentFilter}`);
+    if (marketGenderFilter !== "ALL") chips.push(`Gender: ${marketGenderFilter}`);
+    if (marketPositiveTraitFilter !== "ALL") chips.push(`Trait+: ${marketPositiveTraitFilter}`);
+    if (marketNegativeTraitFilter !== "ALL") chips.push(`Trait-: ${marketNegativeTraitFilter}`);
+    if (marketBracketFilter !== "ALL") chips.push(`Rolle: ${marketBracketFilter}`);
+    if (marketMaxValue !== marketCashMaxValue) chips.push(`MW bis ${formatLocalePoints(marketMaxValue, marketMaxValue % 1 === 0 ? 0 : 1)}`);
+    if (marketMaxSalary < 40) chips.push(`Gehalt bis ${marketMaxSalary}`);
+    if (marketMinRatio > 0) chips.push(`Ratio ab ${marketMinRatio}`);
+    if (marketMinPow > 1) chips.push(`POW ab ${marketMinPow}`);
+    if (marketMinSpe > 1) chips.push(`SPE ab ${marketMinSpe}`);
+    if (marketMinMen > 1) chips.push(`MEN ab ${marketMinMen}`);
+    if (marketMinSoc > 1) chips.push(`SOC ab ${marketMinSoc}`);
+    return chips.slice(0, 10);
+  }, [
+    marketAlignmentFilter,
+    marketBracketFilter,
+    marketCashMaxValue,
+    marketClassFilter,
+    marketGenderFilter,
+    marketMaxSalary,
+    marketMaxValue,
+    marketMinMen,
+    marketMinPow,
+    marketMinRatio,
+    marketMinSoc,
+    marketMinSpe,
+    marketNegativeTraitFilter,
+    marketPositiveTraitFilter,
+    marketRaceFilter,
+    marketSearch,
+    marketSubclassFilter,
+  ]);
 
   const sortedTransferHistoryRows = useMemo(
     () =>
@@ -12036,6 +17485,40 @@ export default function FoundationPageClient({ initialReadSource, initialSelecte
     }),
     [sortedTransferHistoryRows],
   );
+  const historyPageCount = useMemo(
+    () =>
+      historyAllSeasonsSelected
+        ? Math.max(1, Math.ceil(sortedTransferHistoryRows.length / TRANSFER_HISTORY_ALL_SEASONS_PAGE_SIZE))
+        : 1,
+    [historyAllSeasonsSelected, sortedTransferHistoryRows.length],
+  );
+  const visibleTransferHistoryRows = useMemo(
+    () =>
+      historyAllSeasonsSelected
+        ? sortedTransferHistoryRows.slice(
+            (historyPage - 1) * TRANSFER_HISTORY_ALL_SEASONS_PAGE_SIZE,
+            historyPage * TRANSFER_HISTORY_ALL_SEASONS_PAGE_SIZE,
+          )
+        : sortedTransferHistoryRows,
+    [historyAllSeasonsSelected, historyPage, sortedTransferHistoryRows],
+  );
+  const historyVisibleRangeLabel = useMemo(() => {
+    if (sortedTransferHistoryRows.length === 0) {
+      return "0–0";
+    }
+    if (!historyAllSeasonsSelected) {
+      return `1–${visibleTransferHistoryRows.length}`;
+    }
+    const start = (historyPage - 1) * TRANSFER_HISTORY_ALL_SEASONS_PAGE_SIZE + 1;
+    const end = start + visibleTransferHistoryRows.length - 1;
+    return `${start}–${end}`;
+  }, [historyAllSeasonsSelected, historyPage, sortedTransferHistoryRows.length, visibleTransferHistoryRows.length]);
+  useEffect(() => {
+    const maxLoadedPage = Math.max(1, historyPageCount);
+    if (historyPage > maxLoadedPage) {
+      setHistoryPage(maxLoadedPage);
+    }
+  }, [historyPage, historyPageCount]);
 
   const prizePreviewRows = useMemo(() => prizePreviewFeed?.items ?? [], [prizePreviewFeed]);
   const prizePreviewGlobalWarnings = useMemo(() => prizePreviewFeed?.globalWarnings ?? [], [prizePreviewFeed]);
@@ -12079,16 +17562,19 @@ export default function FoundationPageClient({ initialReadSource, initialSelecte
     const startCash = selectedPrizePreviewRow?.currentCash ?? selectedTeam?.cash ?? null;
     const salaryTotal = prizeForecastSalaryTotal;
     const rankRow = prizeForecastRankRow;
+    const currentFactor = prizePreviewFeed?.summary.currentFactor ?? null;
 
     if (startCash == null || salaryTotal == null || !rankRow) {
       return [];
     }
 
     const seasonPrizeRows = [
-      { label: "GuV", prizeMoney: rankRow.prizeMoney ?? null },
+      { label: "GuV", factor: currentFactor, prizeMoney: rankRow.prizeMoney ?? null, salaryGrowthFactor: 1 },
       ...(rankRow.futureSeasons ?? []).slice(0, 4).map((entry, index) => ({
         label: `GuV +${index + 1}`,
+        factor: entry.factor ?? null,
         prizeMoney: entry.prizeMoney ?? null,
+        salaryGrowthFactor: entry.salaryGrowthFactor ?? null,
       })),
     ];
 
@@ -12096,13 +17582,16 @@ export default function FoundationPageClient({ initialReadSource, initialSelecte
       ...seasonPrizeRows,
       ...Array.from({ length: Math.max(0, 5 - seasonPrizeRows.length) }, (_, index) => ({
         label: `GuV +${seasonPrizeRows.length + index}`,
+        factor: null,
         prizeMoney: rankRow.prizeMoney ?? null,
+        salaryGrowthFactor: 1,
       })),
     ].slice(0, 5);
 
     let runningCash = startCash;
     return paddedRows.map((row) => {
-      const guv = row.prizeMoney == null ? null : roundViewNumber(row.prizeMoney - salaryTotal, 1);
+      const projectedSalaryTotal = roundViewNumber(salaryTotal, 1);
+      const guv = row.prizeMoney == null ? null : roundViewNumber(row.prizeMoney - projectedSalaryTotal, 1);
       const cashAfter = guv == null ? null : roundViewNumber(runningCash + guv, 1);
       if (cashAfter != null) {
         runningCash = cashAfter;
@@ -12110,12 +17599,12 @@ export default function FoundationPageClient({ initialReadSource, initialSelecte
 
       return {
         ...row,
-        salaryTotal,
+        salaryTotal: projectedSalaryTotal,
         guv,
         cashAfter,
       };
     });
-  }, [prizeForecastRankRow, prizeForecastSalaryTotal, selectedPrizePreviewRow?.currentCash, selectedTeam?.cash]);
+  }, [prizeForecastRankRow, prizeForecastSalaryTotal, prizePreviewFeed?.summary.currentFactor, selectedPrizePreviewRow?.currentCash, selectedTeam?.cash]);
   const seasonEndChampionRow = useMemo(
     () =>
       [...seasonStandRows]
@@ -12175,6 +17664,17 @@ export default function FoundationPageClient({ initialReadSource, initialSelecte
       }),
     [prizePreviewRows, tableSorts.prizePreview],
   );
+  const displayPrizePreviewRows = useMemo(() => {
+    if (!selectedTeam?.teamId) {
+      return sortedPrizePreviewRows;
+    }
+    const selectedRowIndex = sortedPrizePreviewRows.findIndex((row) => row.teamId === selectedTeam.teamId);
+    if (selectedRowIndex <= 0) {
+      return sortedPrizePreviewRows;
+    }
+    const selectedRow = sortedPrizePreviewRows[selectedRowIndex];
+    return [selectedRow, ...sortedPrizePreviewRows.slice(0, selectedRowIndex), ...sortedPrizePreviewRows.slice(selectedRowIndex + 1)];
+  }, [selectedTeam?.teamId, sortedPrizePreviewRows]);
   const prizeFutureSeasonLabels = useMemo(
     () => (prizePreviewFeed?.seasonFactors ?? []).filter((row) => row.seasonLabel !== "Aktuell"),
     [prizePreviewFeed],
@@ -12188,6 +17688,7 @@ export default function FoundationPageClient({ initialReadSource, initialSelecte
       { id: "currentCash", label: "Cash aktuell", dataKey: "currentCash", defaultWidth: 120, minWidth: 96 },
       { id: "basisCash", label: "Basis Cash", dataKey: "basisCash", defaultWidth: 118, minWidth: 96 },
       { id: "seasonCash", label: "Season-Anteil", dataKey: "seasonCash", defaultWidth: 128, minWidth: 100 },
+      { id: "currentFactor", label: "Faktor", dataKey: "currentFactor", defaultWidth: 88, minWidth: 74 },
       { id: "prizeMoney", label: "Preisgeld", dataKey: "prizeMoney", defaultWidth: 116, minWidth: 92 },
       { id: "rankChangePrize", label: "Rank Bonus", dataKey: "rankChangePrize", defaultWidth: 118, minWidth: 96 },
       { id: "payoutIfTenBetter", label: "+10 Plätze", dataKey: "payoutIfTenBetter", defaultWidth: 116, minWidth: 92 },
@@ -12201,7 +17702,7 @@ export default function FoundationPageClient({ initialReadSource, initialSelecte
         minWidth: 90,
         visibleByDefault: false,
       })),
-      { id: "warnings", label: "Warnings", dataKey: "warnings", defaultWidth: 260, minWidth: 170 },
+      { id: "warnings", label: "Hinweise", dataKey: "warnings", defaultWidth: 260, minWidth: 170 },
     ],
     [prizeFutureSeasonLabels],
   );
@@ -12216,6 +17717,105 @@ export default function FoundationPageClient({ initialReadSource, initialSelecte
         isTableColumnVisible("prizePreviewTable", column.id, column.visibleByDefault),
       ),
     [prizePreviewTableColumns, tableColumnPreferences],
+  );
+  const prizeV2Rows = useMemo(
+    () =>
+      sortedPrizePreviewRows.map((row) => {
+        const team = gameState.teams.find((entry) => entry.teamId === row.teamId) ?? null;
+        const logoModel = team
+          ? getTeamLogoModel(team)
+          : {
+              src: null,
+              initials:
+                row.teamCode ||
+                row.teamName
+                  .split(/\s+/)
+                  .filter(Boolean)
+                  .slice(0, 2)
+                  .map((part) => part[0]?.toUpperCase() ?? "")
+                  .join("") ||
+                "?",
+            };
+        return {
+          teamId: row.teamId,
+          teamName: row.teamName,
+          teamCode: row.teamCode,
+          logoUrl: logoModel.src,
+          logoInitials: logoModel.initials,
+          rank: row.rank,
+          points: row.points ?? null,
+          currentCash: row.currentCash ?? null,
+          basisCash: row.basisCash ?? null,
+          seasonCash: row.seasonCash ?? null,
+          currentFactor: prizePreviewFeed?.summary.currentFactor ?? null,
+          prizeMoney: row.prizeMoney ?? null,
+          bonusMalus: row.rankChangePrize?.bonusMalus ?? null,
+          startRank: row.rankChangePrize?.startRank ?? null,
+          rankDelta: row.rankChangePrize?.rankDelta ?? null,
+          projectedCash: row.projectedCash ?? null,
+          salaryTotal: row.salaryTotal ?? null,
+          status: row.status,
+          warnings: row.warnings,
+          isSelected: row.teamId === selectedTeam?.teamId,
+        };
+      }),
+    [gameState.teams, prizePreviewFeed?.summary.currentFactor, selectedTeam?.teamId, sortedPrizePreviewRows],
+  );
+  const prizeV2SelectedTeamSummary = useMemo(() => {
+    if (!selectedPrizePreviewRow) {
+      return null;
+    }
+    return {
+      teamId: selectedPrizePreviewRow.teamId,
+      teamName: selectedPrizePreviewRow.teamName,
+      teamCode: selectedPrizePreviewRow.teamCode,
+      rank: selectedPrizePreviewRow.rank,
+      points: selectedPrizePreviewRow.points ?? null,
+      currentCash: selectedPrizePreviewRow.currentCash ?? null,
+      basisCash: selectedPrizePreviewRow.basisCash ?? null,
+      seasonCash: selectedPrizePreviewRow.seasonCash ?? null,
+      prizeMoney: selectedPrizePreviewRow.prizeMoney ?? null,
+      bonusMalus: selectedPrizePreviewRow.rankChangePrize?.bonusMalus ?? null,
+      projectedCash: selectedPrizePreviewRow.projectedCash ?? null,
+      salaryTotal: selectedPrizePreviewRow.salaryTotal ?? null,
+      payoutIfTenBetter: selectedPrizePreviewRow.payoutIfTenBetter ?? null,
+      payoutIfTenWorse: selectedPrizePreviewRow.payoutIfTenWorse ?? null,
+    };
+  }, [selectedPrizePreviewRow]);
+  const prizeV2LeaderRow = prizeV2Rows[0] ?? null;
+  const prizeV2SwingRow = useMemo(
+    () =>
+      [...prizeV2Rows].sort(
+        (left, right) => Math.abs(right.rankDelta ?? 0) - Math.abs(left.rankDelta ?? 0) || (left.rank ?? 99) - (right.rank ?? 99),
+      )[0] ?? null,
+    [prizeV2Rows],
+  );
+  const prizeV2RiskRow = useMemo(
+    () =>
+      [...prizeV2Rows].sort((left, right) => {
+        const leftWarnings = left.warnings.length;
+        const rightWarnings = right.warnings.length;
+        if (rightWarnings !== leftWarnings) return rightWarnings - leftWarnings;
+        return (left.projectedCash ?? Number.POSITIVE_INFINITY) - (right.projectedCash ?? Number.POSITIVE_INFINITY);
+      })[0] ?? null,
+    [prizeV2Rows],
+  );
+  const prizeV2FactorRows = useMemo(
+    () => (prizePreviewFeed?.seasonFactors ?? []).map((entry) => ({ seasonLabel: entry.seasonLabel, factor: entry.factor ?? null })),
+    [prizePreviewFeed],
+  );
+  const prizeV2Summary = useMemo(
+    () => ({
+      totalTeams: prizePreviewFeed?.summary.totalTeams ?? 0,
+      calculableTeams: prizePreviewFeed?.summary.calculableTeams ?? 0,
+      blockedItemsCount: prizePreviewFeed?.summary.blockedItemsCount ?? 0,
+      currentFactor: prizePreviewFeed?.summary.currentFactor ?? null,
+      futureSeasonCount: prizePreviewFeed?.summary.futureSeasonCount ?? 0,
+      totalPrizeMoney: prizePreviewFeed?.summary.totalPrizeMoney ?? null,
+      totalRankChangePrize: prizePreviewFeed?.summary.totalRankChangePrize ?? null,
+      forecastSalaryFactorPassthrough: prizePreviewFeed?.summary.forecastSalaryFactorPassthrough ?? null,
+    }),
+    [prizePreviewFeed],
   );
 
   const lineupStatusSummary = useMemo(() => {
@@ -12593,7 +18193,12 @@ export default function FoundationPageClient({ initialReadSource, initialSelecte
       return { status: "open" as const, message: "DryRun zeigt zuerst, ob der aktuelle Matchday lokal komplett durchlaufen kann." };
     }
     if (matchdayAutoRunFeed.status === "applied") {
-      return { status: "applied" as const, message: "Der aktuelle Matchday wurde lokal ueber den Auto-Run ausgefuehrt." };
+      const formCards = matchdayAutoRunFeed.summary.formCardsSelected ?? 0;
+      const advanceText = matchdayAutoRunFeed.summary.advanceAllowed ? " Der Spieltag wurde fortgeschrieben." : "";
+      return {
+        status: "applied" as const,
+        message: `Der aktuelle Matchday wurde lokal ausgefuehrt. AI-Lineups und ${formCards} Formkarten wurden vorbereitet.${advanceText}`,
+      };
     }
     if (matchdayAutoRunFeed.status === "blocked") {
       return {
@@ -12605,6 +18210,13 @@ export default function FoundationPageClient({ initialReadSource, initialSelecte
     }
     if (matchdayAutoRunFeed.status === "warning") {
       return { status: "warning" as const, message: "Der Auto-Run meldet Warnungen. Bitte Step-Details pruefen." };
+    }
+    if (matchdayAutoRunFeed.summary.resolveReady) {
+      const formCards = matchdayAutoRunFeed.summary.formCardsSelected ?? 0;
+      return {
+        status: "ready" as const,
+        message: `DryRun ist bereit: Lineups passen, ${formCards} Formkarten sind im Plan. Der Matchday kann lokal simuliert werden.`,
+      };
     }
     return { status: "ready" as const, message: "DryRun ist geladen. Der Matchday kann lokal simuliert werden." };
   }, [matchdayAutoRunFeed]);
@@ -12754,17 +18366,300 @@ export default function FoundationPageClient({ initialReadSource, initialSelecte
       [
         { id: "season", label: "Saisonstand" },
         { id: "lineup", label: "Einsatzliste" },
-        { id: "market", label: "Transfermarkt" },
+        { id: "marketV2", label: "Transfermarkt" },
         { id: "prize", label: "Preisgeld" },
       ] as Array<{ id: FoundationView; label: string }>,
     [],
   );
 
+  const screenPrimaryAction = useMemo<FoundationScreenPrimaryAction | null>(() => {
+    if (activeView === "home") {
+      return {
+        kicker: "Hauptaktion",
+        title: globalNextLabel,
+        detail: primaryInboxItem ? primaryInboxItem.description : gameFlowActionStep.cta,
+        status: globalNextDisabled ? "blockiert" : "bereit",
+        buttonLabel: globalNextDisabled ? "Warum blockiert?" : "Zum nächsten Schritt",
+        onClick: triggerGlobalNext,
+        disabled: false,
+        disabledReason: globalNextDisabled ? globalNextTitle : null,
+      };
+    }
+
+    if (activeView === "hq") {
+      if (homeNextMatchdayStatus.openSlots > 0) {
+        return {
+          kicker: "Hauptaktion",
+          title: "Einsatzliste vorbereiten",
+          detail: `${homeNextMatchdayStatus.openSlots} offene Slots und Spieltag noch nicht bereit.`,
+          status: "offen",
+          buttonLabel: "Einsatzliste öffnen",
+          onClick: () => setFoundationView("lineup", setActiveView),
+        };
+      }
+      if (selectedHqFinanceWarnings.length > 0) {
+        return {
+          kicker: "Hauptaktion",
+          title: "Cash-Druck prüfen",
+          detail: selectedHqFinanceWarnings[0],
+          status: "blockiert",
+          buttonLabel: "Preisgeld öffnen",
+          onClick: () => setFoundationView("prize", setActiveView),
+        };
+      }
+      if (hqTrainingFocusCount > 0) {
+        return {
+          kicker: "Hauptaktion",
+          title: "Training nachschärfen",
+          detail: `${hqTrainingFocusCount} Spieler brauchen gerade Aufmerksamkeit.`,
+          status: "offen",
+          buttonLabel: "Training öffnen",
+          onClick: () => setFoundationView("trainingV2", setActiveView),
+        };
+      }
+      return {
+        kicker: "Hauptaktion",
+        title: "Transfermarkt prüfen",
+        detail: "Wenn nichts brennt, ist jetzt der beste Moment fuer Markt, Wishlist und Kaderfeinschliff.",
+        status: "optional",
+        buttonLabel: "Transfermarkt öffnen",
+        onClick: () => setFoundationView("marketV2", setActiveView),
+      };
+    }
+
+    if (activeView === "lineup") {
+      const blockedReason = globalNextDisabled ? globalNextTitle : null;
+      return {
+        kicker: "Hauptaktion",
+        title: homeNextMatchdayStatus.openSlots > 0 ? "Nächsten offenen Slot setzen" : "Arena vorbereiten",
+        detail:
+          homeNextMatchdayStatus.openSlots > 0
+            ? `${homeNextMatchdayStatus.openSlots} Slots offen, Captain und Form bitte mitdenken.`
+            : "Einsatzliste wirkt komplett. Als Nächstes Arena und Reveal prüfen.",
+        status: homeNextMatchdayStatus.openSlots > 0 ? "offen" : "bereit",
+        buttonLabel: homeNextMatchdayStatus.openSlots > 0 ? "Zum nächsten Slot" : "Arena öffnen",
+        onClick:
+          homeNextMatchdayStatus.openSlots > 0
+            ? triggerGlobalNext
+            : () => setFoundationView("matchdayArena", setActiveView),
+        disabled: false,
+        disabledReason: blockedReason,
+      };
+    }
+
+    if (activeView === "matchdayArena") {
+      if (shouldShowArenaBackToLineup) {
+        return {
+          kicker: "Hauptaktion",
+          title: "Erst Einsatzliste schließen",
+          detail: "Die Arena ist lesbar, aber der Spieltag ist noch nicht sauber vorbereitet.",
+          status: "blockiert",
+          buttonLabel: "Zur Einsatzliste",
+          onClick: () => setFoundationView("lineup", setActiveView),
+        };
+      }
+      return {
+        kicker: "Hauptaktion",
+        title: "Saisonstand lesen",
+        detail: "Nach dem Reveal direkt sehen, wie sich Rang, Punkte und Druck verschoben haben.",
+        status: "bereit",
+        buttonLabel: "Saisonstand öffnen",
+        onClick: () => setFoundationView("seasonV2", setActiveView),
+      };
+    }
+
+    if (activeView === "market" || activeView === "marketV2") {
+      const marketTeamLocked = marketSelectedTeam ? !canManageTeamId(marketSelectedTeam.teamId) : false;
+      const selectedCandidate = marketPreviewPlayer;
+      const disabledReason =
+        !marketTeamId
+          ? "Waehle erst ein Team, damit Budget, Kaderdruck und Verhandlung fuer dieses Team berechnet werden."
+          : marketTeamLocked
+            ? `${marketSelectedTeam?.name ?? "Dieses Team"} ist hier nur Ansicht. Deals gehen nur mit steuerbaren Teams.`
+            : !selectedCandidate
+              ? "Waehle links erst einen Kandidaten aus der Liste aus."
+              : marketBuyBusy
+                ? "Deal wird gerade vorbereitet."
+                : null;
+      return {
+        kicker: "Hauptaktion",
+        title: selectedCandidate ? `${selectedCandidate.name} prüfen` : "Deal vorbereiten",
+        detail: selectedCandidate
+          ? "Kaufmodal mit Forderung, Vertrag und Teamwirkung öffnen."
+          : "Links Kandidat wählen, dann Vertrag und Folgen sauber prüfen.",
+        status: disabledReason ? "blockiert" : "bereit",
+        buttonLabel: selectedCandidate ? "Kaufmodal öffnen" : "Kandidat wählen",
+        onClick: () => {
+          if (selectedCandidate) {
+            void openMarketBuyModal(selectedCandidate);
+          }
+        },
+        disabled: Boolean(disabledReason),
+        disabledReason,
+      };
+    }
+
+    if (activeView === "teams") {
+      return {
+        kicker: "Hauptaktion",
+        title: "Kader aus Einsatzsicht prüfen",
+        detail: "Von hier aus entweder den nächsten Engpass schließen oder direkt Training und Markt nachschärfen.",
+        status: isSelectedTeamManagementLocked ? "optional" : "bereit",
+        buttonLabel: isSelectedTeamManagementLocked ? "Nur ansehen" : "Einsatzliste öffnen",
+        onClick: () => {
+          if (!isSelectedTeamManagementLocked) {
+            setFoundationView("lineup", setActiveView);
+          }
+        },
+        disabled: isSelectedTeamManagementLocked,
+        disabledReason: isSelectedTeamManagementLocked
+          ? `${selectedTeam?.name ?? "Dieses Team"} ist hier nur Ansicht. Du kannst lesen, aber nicht steuern.`
+          : null,
+      };
+    }
+
+    if (activeView === "trainingV2" || activeView === "training") {
+      return {
+        kicker: "Hauptaktion",
+        title: "Entwicklung in Einsatz übersetzen",
+        detail: "Training ist kein Selbstzweck. Danach sofort prüfen, ob Slots, Captain oder Markt jetzt besser aussehen.",
+        status: selectedTeamCanManage ? "bereit" : "optional",
+        buttonLabel: selectedTeamCanManage ? "Zur Einsatzliste" : "Nur ansehen",
+        onClick: () => {
+          if (selectedTeamCanManage) {
+            setFoundationView("lineup", setActiveView);
+          }
+        },
+        disabled: !selectedTeamCanManage,
+        disabledReason: !selectedTeamCanManage
+          ? `${selectedTeam?.name ?? "Dieses Team"} ist hier nur Ansicht. Training lässt sich nur bei steuerbaren Teams ändern.`
+          : null,
+      };
+    }
+
+    if (activeView === "season" || activeView === "seasonV2") {
+      return {
+        kicker: "Hauptaktion",
+        title: "Nächste Ursache aufklären",
+        detail: "Wenn ein Rang oder Faktor auffällt, geh von hier direkt in HQ oder Teamprofil und klär den Treiber.",
+        status: "bereit",
+        buttonLabel: "HQ öffnen",
+        onClick: () => setFoundationView("hq", setActiveView),
+      };
+    }
+
+    if (activeView === "players") {
+      return {
+        kicker: "Hauptaktion",
+        title: "Spieler konkret prüfen",
+        detail: "Von hier aus erst Leistung lesen, dann Training oder Markt öffnen. Nicht jeder hohe OVR hilft dir sofort im Spieltag.",
+        status: "bereit",
+        buttonLabel: "Training öffnen",
+        onClick: () => setFoundationView("trainingV2", setActiveView),
+      };
+    }
+
+    if (activeView === "inbox") {
+      return {
+        kicker: "Hauptaktion",
+        title: inboxPrimaryTeamItem ? inboxPrimaryTeamItem.title : "Zur Manager-Zentrale",
+        detail:
+          inboxPrimaryTeamItem?.description ??
+          "Wenn hier nichts Kritisches liegt, geht es zurück in HQ für Markt, Kaderdruck und die nächsten Saison-Schritte.",
+        status: inboxPrimaryTeamItem ? "offen" : "optional",
+        buttonLabel: inboxPrimaryTeamItem ? "Hinweis öffnen" : "HQ öffnen",
+        onClick: () => {
+          if (inboxPrimaryTeamItem) {
+            navigateToInboxItem(inboxPrimaryTeamItem);
+            return;
+          }
+          setFoundationView("hq", setActiveView);
+        },
+      };
+    }
+
+    if (activeView === "teamSettings") {
+      return {
+        kicker: "Hauptaktion",
+        title: selectedTeamHasUnsavedChanges ? "Teamprofil sichern" : "Danach in die Einsatzliste",
+        detail: selectedTeamHasUnsavedChanges
+          ? "Kontrolle, Identität und Strategie erst speichern, damit Markt, HQ und Einsatzliste mit denselben Annahmen arbeiten."
+          : "Wenn Team-DNA und Steuerung passen, wird sie erst im Matchday-Flow wirklich relevant.",
+        status: selectedTeamHasUnsavedChanges ? "offen" : "bereit",
+        buttonLabel: selectedTeamHasUnsavedChanges ? "Änderungen prüfen" : "Einsatzliste öffnen",
+        onClick: () => {
+          if (!selectedTeamHasUnsavedChanges) {
+            setFoundationView("lineup", setActiveView);
+          }
+        },
+        disabled: selectedTeamHasUnsavedChanges,
+        disabledReason: selectedTeamHasUnsavedChanges
+          ? "Es gibt noch ungespeicherte Team-Änderungen. Erst sichern oder bewusst verwerfen."
+          : null,
+      };
+    }
+
+    if (activeView === "prize") {
+      return {
+        kicker: "Hauptaktion",
+        title: "Eigenes Team zuerst lesen",
+        detail: "Von hier aus erst Forecast und Faktor deines Teams prüfen, dann auf Saisonstand oder HQ zurückspringen.",
+        status: "bereit",
+        buttonLabel: "Saisonstand öffnen",
+        onClick: () => setFoundationView("seasonV2", setActiveView),
+      };
+    }
+
+    return null;
+  }, [
+    activeView,
+    gameFlowActionStep.cta,
+    globalNextDisabled,
+    globalNextLabel,
+    globalNextTitle,
+    homeNextMatchdayStatus.openSlots,
+    hqTrainingFocusCount,
+    isSelectedTeamManagementLocked,
+    marketBuyBusy,
+    marketPreviewPlayer,
+    marketSelectedTeam,
+    marketTeamId,
+    inboxPrimaryTeamItem,
+    navigateToInboxItem,
+    primaryInboxItem,
+    selectedHqFinanceWarnings,
+    selectedTeamHasUnsavedChanges,
+    selectedTeam,
+    selectedTeamCanManage,
+    shouldShowArenaBackToLineup,
+    triggerGlobalNext,
+  ]);
+
+  const showCompactHeader = activeView !== "home";
+  const showFlowCoach = activeView === "home";
+  const showCompactFlowCoach = activeView !== "home" && activeView !== "admin";
+
   if (!isHydrated) {
     return (
       <main className="app-shell foundation-shell">
         <div className="foundation-loading-shell">
-          <span className="pill">Foundation laedt...</span>
+          <div className="foundation-loading-card">
+            <span className="pill">Foundation laedt...</span>
+            <strong>Spielstand wird vorbereitet</strong>
+            <p>
+              Falls dieser Screen haengen bleibt, wird einmal automatisch neu geladen. Danach kannst du den Spielstand
+              direkt erneut oeffnen.
+            </p>
+            <div className="foundation-loading-actions">
+              <a className="primary-button" href="/foundation">
+                Foundation neu laden
+              </a>
+              <a className="secondary-button" href="/">
+                Zu Spielstaenden
+              </a>
+            </div>
+          </div>
+          <script dangerouslySetInnerHTML={{ __html: foundationBootWatchdogScript }} />
         </div>
       </main>
     );
@@ -12779,10 +18674,16 @@ export default function FoundationPageClient({ initialReadSource, initialSelecte
         {foundationPrimaryViews.map((view) => (
           <button
             key={view.id}
-            className={`pill foundation-tab${view.id === "admin" ? " foundation-tab-admin" : ""}${activeView === view.id ? " is-active" : ""}`}
+            className={`pill foundation-tab${view.id === "admin" ? " foundation-tab-admin" : ""}${activeView === view.id || (view.id === "market" && activeView === "marketV2") || (view.id === "season" && activeView === "seasonV2") || (view.id === "history" && activeView === "historyV2") ? " is-active" : ""}`}
             data-testid={`foundation-nav-${view.id}`}
             type="button"
-            onClick={() => setFoundationView(view.id, setActiveView)}
+            title={view.tooltip}
+            onClick={() =>
+              setFoundationView(
+                getDefaultFoundationViewTarget(view.id),
+                setActiveView,
+              )
+            }
           >
             {view.label}
           </button>
@@ -12799,12 +18700,21 @@ export default function FoundationPageClient({ initialReadSource, initialSelecte
 	          <strong>{globalNextLabel}</strong>
 	          <small>Leertaste</small>
 	        </button>
+        <button
+          className="pill foundation-tab foundation-tab-search"
+          type="button"
+          title="Suche öffnen"
+          onClick={() => setShowCommandPalette(true)}
+        >
+          Suchen
+        </button>
         {foundationAdminViews.map((view, index) => (
           <button
             key={view.id}
             className={`pill foundation-tab${index === 0 ? " foundation-tab-admin" : ""}${activeView === view.id ? " is-active" : ""}`}
             data-testid={`foundation-nav-${view.id}`}
             type="button"
+            title={view.tooltip}
             onClick={() => setFoundationView(view.id, setActiveView)}
           >
             {view.label}
@@ -12820,6 +18730,7 @@ export default function FoundationPageClient({ initialReadSource, initialSelecte
               key={view.id}
               className={`pill foundation-tab foundation-tab-secondary${activeView === view.id ? " is-active" : ""}`}
               type="button"
+              title={view.tooltip}
               onClick={() => setFoundationView(view.id, setActiveView)}
             >
               {view.label}
@@ -12831,20 +18742,394 @@ export default function FoundationPageClient({ initialReadSource, initialSelecte
         </div>
       ) : null}
 
-      <section className={`foundation-context-banner${isSaveBusy ? " is-loading" : ""}`} data-testid="foundation-context-banner">
+      {showFlowCoach ? (
+      <section className="foundation-flow-coach" aria-label="Aktueller Gameplay-Flow">
+        <div>
+          <span>{activeFlowCoach.kicker}</span>
+          <strong>{activeFlowCoach.title}</strong>
+          <small>{activeFlowCoach.detail}</small>
+          <div className="foundation-flow-coach-progress" aria-label={`${activeFlowCoach.progressLabel} ${activeFlowCoach.progressPct} Prozent`}>
+            <span>{activeFlowCoach.progressLabel}</span>
+            <div>
+              <i style={{ width: `${activeFlowCoach.progressPct}%` }} />
+            </div>
+          </div>
+        </div>
+        <div className="foundation-flow-coach-right">
+          <div className="foundation-flow-coach-terms" aria-label="Erklaerte Begriffe">
+            {activeFlowCoach.terms.map((term) => (
+              <GameTerm key={`flow-term-${activeView}-${term}`} term={term} />
+            ))}
+          </div>
+          <div className="foundation-flow-coach-actions" aria-label="Direkte Flow-Aktionen">
+            {activeFlowCoach.actions.map((action) => (
+              <button
+                key={`flow-action-${activeView}-${action.targetView}-${action.label}`}
+                className={`foundation-flow-coach-action${action.tone === "primary" ? " is-primary" : ""}`}
+                type="button"
+                onClick={() => openFoundationViewCommand(action.targetView)}
+                title={action.detail}
+              >
+                <span>{action.label}</span>
+                <small>{action.detail}</small>
+                <b aria-hidden="true">›</b>
+              </button>
+            ))}
+          </div>
+        </div>
+        <div className="foundation-flow-coach-cta">
+          <span className="foundation-flow-coach-mode" title="Schwere Tabellen und Zusatzpanels werden erst beim Oeffnen vorbereitet.">
+            Schnellmodus
+          </span>
+          <span className="foundation-flow-coach-shortcut">{activeFlowCoach.shortcut}</span>
+          <button
+            className={`secondary-button inline-button foundation-flow-coach-next ${globalNextStatusClass}`}
+            type="button"
+            onClick={triggerGlobalNext}
+            disabled={globalNextDisabled}
+            title={globalNextDisabled ? globalNextTitle : activeFlowCoach.nextTitle}
+          >
+            {activeFlowCoach.nextLabel}
+          </button>
+        </div>
+        <div className="foundation-flow-loop" aria-label="Gameplay Loop">
+          {foundationFlowLoopStages.map((stage, index) => (
+            <button
+              key={`foundation-flow-loop-${stage.id}`}
+              className={`foundation-flow-loop-step${index === activeFlowLoopIndex ? " is-active" : ""}${index < activeFlowLoopIndex ? " is-done" : ""}`}
+              type="button"
+              onClick={() => openFoundationViewCommand(stage.targetView)}
+              title={stage.detail}
+            >
+              <span>{index + 1}</span>
+              <strong>{stage.label}</strong>
+              <small>{stage.detail} · Alt+{index + 1}</small>
+            </button>
+          ))}
+        </div>
+      </section>
+      ) : null}
+
+      {showCompactFlowCoach ? (
+        <section className="foundation-flow-coach foundation-flow-coach-compact" aria-label="Gameplay-Flow kompakt">
+          <div className="foundation-flow-coach-compact-copy">
+            <span>{activeFlowCoach.kicker}</span>
+            <strong>{activeFlowCoach.title}</strong>
+            <small>{activeFlowCoach.detail}</small>
+          </div>
+          <div className="foundation-flow-coach-right">
+            <div className="foundation-flow-coach-terms" aria-label="Erklärte Begriffe">
+              {activeFlowCoach.terms.map((term) => (
+                <GameTerm key={`compact-flow-term-${activeView}-${term}`} term={term} />
+              ))}
+            </div>
+            <div className="foundation-flow-coach-actions" aria-label="Direkte Flow-Aktionen">
+              {activeFlowCoach.actions.map((action) => (
+                <button
+                  key={`compact-flow-action-${activeView}-${action.targetView}-${action.label}`}
+                  className={`foundation-flow-coach-action${action.tone === "primary" ? " is-primary" : ""}`}
+                  type="button"
+                  onClick={() => openFoundationViewCommand(action.targetView)}
+                  title={action.detail}
+                >
+                  <span>{action.label}</span>
+                  <small>{action.detail}</small>
+                  <b aria-hidden="true">›</b>
+                </button>
+              ))}
+            </div>
+          </div>
+          <div className="foundation-flow-coach-cta">
+            <span className="foundation-flow-coach-shortcut">{activeFlowCoach.shortcut}</span>
+            <button
+              className={`secondary-button inline-button foundation-flow-coach-next ${globalNextStatusClass}`}
+              type="button"
+              onClick={triggerGlobalNext}
+              disabled={globalNextDisabled}
+              title={globalNextDisabled ? globalNextTitle : activeFlowCoach.nextTitle}
+            >
+              {activeFlowCoach.nextLabel}
+            </button>
+          </div>
+          <div className="foundation-flow-loop foundation-flow-loop-compact" aria-label="Gameplay Loop">
+            {foundationFlowLoopStages.map((stage, index) => (
+              <button
+                key={`compact-foundation-flow-loop-${stage.id}`}
+                className={`foundation-flow-loop-step${index === activeFlowLoopIndex ? " is-active" : ""}${index < activeFlowLoopIndex ? " is-done" : ""}`}
+                type="button"
+                onClick={() => openFoundationViewCommand(stage.targetView)}
+                title={stage.detail}
+              >
+                <span>{index + 1}</span>
+                <strong>{stage.label}</strong>
+                <small>{stage.detail}</small>
+              </button>
+            ))}
+          </div>
+        </section>
+      ) : null}
+
+      {showCommandPalette ? (
+        <div
+          className="foundation-command-backdrop"
+          role="presentation"
+          onMouseDown={(event) => {
+            if (event.target === event.currentTarget) {
+              closeCommandPalette();
+            }
+          }}
+        >
+          <section className="foundation-command-palette" role="dialog" aria-modal="true" aria-label="Foundation Schnellzugriff">
+            <div className="foundation-command-search">
+              <span className="foundation-command-kicker">Schnellzugriff</span>
+              <input
+                ref={commandSearchInputRef}
+                className="input"
+                type="search"
+                value={commandSearch}
+                onChange={(event) => setCommandSearch(event.target.value)}
+                onKeyDown={(event) => {
+                  if (event.key === "Enter" && visibleFoundationCommandItems[0]) {
+                    event.preventDefault();
+                    runFoundationCommand(visibleFoundationCommandItems[0]);
+                  }
+                }}
+                placeholder="Ansicht, Team, Spieler, Aktion oder Begriff suchen"
+              />
+            </div>
+            <div className="foundation-command-list">
+              {visibleFoundationCommandItems.map((command) => (
+                <button
+                  key={command.id}
+                  className={`foundation-command-item${command.tone ? ` is-${command.tone}` : ""}`}
+                  type="button"
+                  onClick={() => runFoundationCommand(command)}
+                >
+                  <span className="foundation-command-section">{command.section}</span>
+                  <span className="foundation-command-copy">
+                    <strong>{command.label}</strong>
+                    <small>{command.detail}</small>
+                  </span>
+                </button>
+              ))}
+              {visibleFoundationCommandItems.length === 0 ? (
+                <div className="foundation-command-empty">
+                  <strong>Kein Treffer</strong>
+                  <span>Suchbegriff kuerzen oder direkt einen Tab nutzen.</span>
+                </div>
+              ) : null}
+            </div>
+          </section>
+        </div>
+      ) : null}
+
+      {seasonBriefingOpen ? (
+        <div
+          className="foundation-modal-backdrop season-briefing-backdrop"
+          role="presentation"
+          onMouseDown={(event) => {
+            if (event.target === event.currentTarget) {
+              closeSeasonBriefing(false);
+            }
+          }}
+        >
+          <section className="foundation-modal season-briefing-modal" role="dialog" aria-modal="true" aria-label="Season-Briefing">
+            <div className="foundation-modal-header season-briefing-header">
+              <div className="stack">
+                <span className="eyebrow">Season-Briefing</span>
+                <h2>{gameState.season.name}: Was jetzt wichtig ist</h2>
+                <p className="muted">Factor, Reihenfolge, Slot-Druck und Farb-Dopplungen, bevor du Geld und Lineups festziehst.</p>
+              </div>
+              <button className="secondary-button inline-button" type="button" onClick={() => closeSeasonBriefing(false)}>
+                Schliessen
+              </button>
+            </div>
+            <div className="foundation-modal-body season-briefing-body">
+              <section className="season-briefing-kpis" aria-label="Season-Faktoren">
+                <article>
+                  <span>Salary Factor</span>
+                  <strong>{seasonBriefingData.currentFactor != null ? `${formatLocalePoints(seasonBriefingData.currentFactor, 2)}x` : "—"}</strong>
+                  <small>Basis fuer Gehaelter, Preisgeld und Forecast</small>
+                </article>
+                <article>
+                  <span>Matchdays</span>
+                  <strong>{seasonBriefingData.scheduleCount}</strong>
+                  <small>Diszi-Paare in dieser Season</small>
+                </article>
+                <article>
+                  <span>POW / SPE / MEN / SOC</span>
+                  <strong>{seasonBriefingTeamAxes}</strong>
+                  <small>{selectedTeam ? `${selectedTeam.shortCode} Team-Identity` : "Team waehlen"}</small>
+                </article>
+                <article>
+                  <span>Cash</span>
+                  <strong>{seasonBriefingTeamCash == null ? "—" : formatTransfermarktCurrency(seasonBriefingTeamCash)}</strong>
+                  <small>Startbudget fuer Transfers</small>
+                </article>
+              </section>
+
+              <section className="season-briefing-section">
+                <div className="panel-header compact">
+                  <div className="stack">
+                    <h3>Erste Spieltage</h3>
+                    <p className="muted">Die Reihenfolge entscheidet, ob du sofort Spezialisten brauchst oder breiter einkaufen kannst.</p>
+                  </div>
+                </div>
+                <div className="season-briefing-matchday-grid">
+                  {seasonBriefingData.firstMatchdays.map((entry) => (
+                    <article key={`season-briefing-md-${entry.matchdayId}`} className={joinClassNames("season-briefing-matchday", entry.sameColor && "has-same-color")}>
+                      <span className="eyebrow">{entry.label}</span>
+                      <div className="season-briefing-discipline-row">
+                        {entry.disciplines.map((discipline) => (
+                          <span
+                            key={`season-briefing-md-${entry.matchdayId}-${discipline.name}`}
+                            className={`season-briefing-discipline-chip is-${discipline.color}`}
+                          >
+                            <b>{discipline.name}</b>
+                            <small>{discipline.playerCount ?? "—"} Slots · {formatDisciplineCategoryLabel(discipline.category)}</small>
+                          </span>
+                        ))}
+                      </div>
+                      {entry.sameColor ? <small className="text-warning">gleiche Farbe am selben Spieltag</small> : null}
+                    </article>
+                  ))}
+                </div>
+              </section>
+
+              <section className="season-briefing-two-col">
+                <article className="season-briefing-section">
+                  <h3>Große Diszis</h3>
+                  <p className="muted">Nach Slotgröße sortiert; die Spieltags-Reihenfolge steht oben.</p>
+                  <div className="season-briefing-chip-list">
+                    {seasonBriefingData.bigDisciplines.map((slot) => (
+                      <span key={`season-briefing-big-${slot.matchdayId}-${slot.disciplineId}`} className={`season-briefing-discipline-chip is-${slot.color}`}>
+                        <b>{slot.displayName}</b>
+                        <small>{slot.matchdayLabel} · {slot.playerCount ?? "—"} Slots</small>
+                      </span>
+                    ))}
+                  </div>
+                </article>
+                <article className="season-briefing-section">
+                  <h3>Farb-Dopplungen</h3>
+                  {seasonBriefingData.sameColorMatchdays.length > 0 ? (
+                    <div className="season-briefing-chip-list">
+                      {seasonBriefingData.sameColorMatchdays.map((entry) => (
+                        <span key={`season-briefing-double-${entry.matchdayId}`} className="season-briefing-warning-chip">
+                          <b>{entry.label}</b>
+                          <small>{entry.disciplines.map((discipline) => discipline.name).join(" / ")}</small>
+                        </span>
+                      ))}
+                    </div>
+                  ) : (
+                    <p className="muted">In den ersten Spieltagen keine gleiche Farbe doppelt. Breiter Kader wird etwas entspannter.</p>
+                  )}
+                  <div className="season-briefing-factor-row">
+                    {seasonBriefingData.futureFactors.map((entry) => (
+                      <span key={`season-briefing-factor-${entry.label}`} className="pill">
+                        {entry.label}: {formatLocalePoints(entry.factor, 2)}x
+                      </span>
+                    ))}
+                  </div>
+                </article>
+              </section>
+            </div>
+            <div className="foundation-modal-actions">
+              <button
+                className="secondary-button"
+                type="button"
+                onClick={() => {
+                  closeSeasonBriefing(false);
+                  setFoundationView("diszis", setActiveView);
+                }}
+              >
+                Diszis ansehen
+              </button>
+              <button
+                className="primary-button"
+                type="button"
+                onClick={completeSeasonBriefingAndContinue}
+              >
+                Erledigt
+              </button>
+            </div>
+          </section>
+        </div>
+      ) : null}
+
+      <section className={`foundation-context-banner${isSaveBusy ? " is-loading" : ""}${showCompactHeader ? " is-compact" : ""}`} data-testid="foundation-context-banner">
         <div className="foundation-context-main">
-          <span className="eyebrow">Aktiver Kontext</span>
+          <span className="eyebrow">Spielstand</span>
           <strong>{isSaveBusy ? "Save-Wechsel lädt..." : activeSaveName}</strong>
           <span className="muted">
-            {formatShortSaveId(activeSaveId)} · {activeContextMeta?.activeSeasonId ?? gameState.season.id} · MD{" "}
-            {activeContextMeta?.activeMatchday ?? gameState.season.currentMatchday} ·{" "}
-            {activeContextMeta?.gamePhase ?? gameState.gamePhase ?? "season_active"}
+            {gameState.season.name} · Spieltag {activeContextMeta?.activeMatchday ?? gameState.season.currentMatchday} ·{" "}
+            {formatGamePhaseLabel(activeContextMeta?.gamePhase ?? gameState.gamePhase)}
           </span>
         </div>
+        {showAiPreseasonBanner ? (
+          <div
+            className={`foundation-ai-preseason-banner ${getAiPreseasonStatusClass(
+              aiPreseasonBusy && (!aiPreseasonDisplayRun || aiPreseasonDisplayRun.status === "running")
+                ? "running"
+                : aiPreseasonDisplayRun?.status ?? "running",
+            )}`}
+            data-testid="foundation-ai-preseason-banner"
+          >
+            <div className="foundation-ai-preseason-copy">
+              <span className="eyebrow">{getAiPreseasonModeLabel(aiPreseasonDisplayRun?.mode ?? "setup_draft")}</span>
+              <strong>
+                {getAiPreseasonStatusLabel(
+                  aiPreseasonBusy && (!aiPreseasonDisplayRun || aiPreseasonDisplayRun.status === "running")
+                    ? "running"
+                    : aiPreseasonDisplayRun?.status ?? "running",
+                )}
+              </strong>
+              <span className="muted">
+                {aiPreseasonDisplayRun?.aiTeamsCompleted ?? 0}/{aiPreseasonDisplayRun?.aiTeamsTotal ?? aiTeams.length} Teams fertig
+                {(aiPreseasonDisplayRun?.transferBuysApplied ?? 0) > 0
+                  ? ` · ${aiPreseasonDisplayRun?.transferBuysApplied ?? 0} ${aiPreseasonDisplayRun?.mode === "setup_draft" ? "Picks" : "Kaeufe"}`
+                  : ""}
+                {(aiPreseasonDisplayRun?.transferSellsApplied ?? 0) > 0 ? ` · ${aiPreseasonDisplayRun?.transferSellsApplied ?? 0} Verkaeufe` : ""}
+                {(aiPreseasonDisplayRun?.managerActionsApplied ?? 0) > 0
+                  ? ` · ${aiPreseasonDisplayRun?.managerActionsApplied ?? 0} Setup-Aktionen`
+                  : ""}
+                {aiPreseasonDisplayRun?.blockingReasons[0] ? ` · ${formatCockpitReason(aiPreseasonDisplayRun.blockingReasons[0])}` : ""}
+              </span>
+            </div>
+          </div>
+        ) : null}
+        {aiLineupEnsureBusy || aiLineupEnsureFeed ? (
+          <div
+            className={`foundation-ai-preseason-banner ${getAiLineupEnsureStatusClass(aiLineupEnsureFeed, aiLineupEnsureBusy)}`}
+            data-testid="foundation-ai-lineup-ensure-banner"
+          >
+            <div className="foundation-ai-preseason-copy">
+              <span className="eyebrow">AI-Lineups</span>
+              <strong>
+                {aiLineupEnsureBusy
+                  ? "KI setzt Einsatzlisten"
+                  : aiLineupEnsureFeed?.error || (aiLineupEnsureFeed?.summary?.blockedTeams ?? 0) > 0
+                    ? "Lineups prüfen"
+                    : "KI-Lineups bereit"}
+              </strong>
+              <span className="muted">
+                {aiLineupEnsureBusy
+                  ? `${Math.max(aiLineupEnsureTeams.length - aiLineupMissingTeamIds.length, 0)}/${aiLineupEnsureTeams.length} Teams bereit`
+                  : `${aiLineupEnsureFeed?.summary?.savedTeams ?? 0} gespeichert · ${aiLineupEnsureFeed?.summary?.existingLineups ?? 0} vorhanden`}
+                {aiLineupEnsureFeed?.summary?.blockedTeams
+                  ? ` · ${aiLineupEnsureFeed.summary.blockedTeams} blockiert`
+                  : ""}
+                {aiLineupEnsureFeed?.summary?.performanceBreakdown?.totalMs != null
+                  ? ` · ${formatLocalePoints(aiLineupEnsureFeed.summary.performanceBreakdown.totalMs / 1000, 1)}s`
+                  : ""}
+                {aiLineupEnsureFeed?.error ? ` · ${aiLineupEnsureFeed.error}` : ""}
+              </span>
+            </div>
+          </div>
+        ) : null}
         <div className={`foundation-flow-controller ${getGameFlowStatusClass(gameFlowActionStep.status)}`} data-testid="foundation-flow-controller">
           <div className="foundation-flow-copy">
             <span className="eyebrow">
-              {gameFlowState.activeSeasonId} · {currentMatchdayDisplayLabel} · {gameFlowState.phase.replaceAll("_", " ")}
+              {gameState.season.name} · {currentMatchdayDisplayLabel} · {formatGamePhaseLabel(gameFlowState.phase)}
             </span>
             <strong>{gameFlowActionStep.label}</strong>
             <span className="muted">
@@ -12861,7 +19146,7 @@ export default function FoundationPageClient({ initialReadSource, initialSelecte
                 triggerGlobalNext();
               }}
             >
-              {gameFlowActionStep.status === "blocked" ? "Blocker anzeigen" : gameFlowActionStep.cta}
+              {gameFlowActionStep.status === "blocked" ? "Zum Problem springen" : gameFlowActionStep.cta}
             </button>
             <button
               className="secondary-button inline-button foundation-flow-menu-button"
@@ -12875,16 +19160,16 @@ export default function FoundationPageClient({ initialReadSource, initialSelecte
           {showGameFlowPanel ? (
             <div className="foundation-flow-panel" data-testid="foundation-flow-panel">
               <div className="foundation-flow-panel-header">
-                <strong>Flow Controller</strong>
+                <strong>Spielablauf</strong>
                 <button className="table-link-button" type="button" onClick={() => setShowGameFlowPanel(false)}>
                   schließen
                 </button>
               </div>
               <div className="foundation-flow-summary">
-                <span className="pill">Phase {gameFlowState.phase.replaceAll("_", " ")}</span>
+                <span className="pill">Phase {formatGamePhaseLabel(gameFlowState.phase)}</span>
                 <span className="pill">Erledigt {gameFlowState.completedSteps.length}</span>
                 <span className={`pill${gameFlowState.blockedSteps.length > 0 ? " is-warning" : ""}`}>Blocker {gameFlowState.blockedSteps.length}</span>
-                {activeContextMeta?.allowTestWrites ? <span className="pill is-warning">Sandbox Auto-Fix sichtbar</span> : null}
+                {activeContextMeta?.allowTestWrites ? <span className="pill is-warning">Sandbox-Hilfe sichtbar</span> : null}
               </div>
               {gameFlowActionStep.status === "blocked" ? (
                 <div className="transfer-callout is-blocked foundation-flow-blocker" role="alert">
@@ -12902,9 +19187,9 @@ export default function FoundationPageClient({ initialReadSource, initialSelecte
                       className="secondary-button inline-button"
                       type="button"
                       disabled={!gameFlowCanAutoFix}
-                      title={gameFlowCanAutoFix ? "Auto-Fix wird erst mit sicherem Service-Gate aktiviert." : "Nur im Sandbox-Save sichtbar und nur mit sicherem Service-Gate."}
+                      title={gameFlowCanAutoFix ? "Automatische Hilfe wird erst mit sicherem Service-Gate aktiviert." : "Nur im Sandbox-Save sichtbar und nur mit sicherem Service-Gate."}
                     >
-                      Auto-fix im Sandbox-Modus
+                      Sandbox-Hilfe
                     </button>
                   </div>
                 </div>
@@ -12943,7 +19228,7 @@ export default function FoundationPageClient({ initialReadSource, initialSelecte
               );
             })()}
             <label className="foundation-manager-team-select">
-              <span>UI-Fokus-Team</span>
+              <span>Aktives Team</span>
               <select
                 className="input"
                 value={selectedTeam.teamId}
@@ -12958,16 +19243,20 @@ export default function FoundationPageClient({ initialReadSource, initialSelecte
                 ))}
               </select>
             </label>
+            {!showCompactHeader ? (
             <div className="foundation-manager-team-meta">
               <span className="pill">{selectedTeam.shortCode}</span>
-              <span className="pill">Local Owner {activeOwner?.label ?? activeOwnerId}</span>
-              <span className="pill">Save-Control {selectedTeamControl?.controlMode ?? "manual"}</span>
-              <span className="pill">Quelle {formatActiveManagerTeamSource(activeManagerTeamSource)}</span>
+              <span className="pill">Manager {activeOwner?.label ?? activeOwnerId}</span>
+              <span className="pill">{formatTeamControlModeLabel(selectedTeamControl?.controlMode)}</span>
+              {isSelectedTeamManagementLocked ? <span className="pill foundation-source-pill is-readonly">Nur Ansicht</span> : null}
+              <span className="pill">Auswahl {formatActiveManagerTeamSource(activeManagerTeamSource)}</span>
               {isTeamSwitchPending ? <span className="pill foundation-context-tag">Teamwechsel...</span> : null}
             </div>
+            ) : null}
+            {!showCompactHeader ? (
             <div className="foundation-manager-team-controls" data-testid="active-owner-controls">
               <label className="foundation-mini-select">
-                <span>Local Owner</span>
+                <span>Manager</span>
                 <select
                   className="input"
                   value={activeOwner?.ownerId ?? DEFAULT_ACTIVE_OWNER_ID}
@@ -12999,20 +19288,22 @@ export default function FoundationPageClient({ initialReadSource, initialSelecte
                   onChange={(event) => setTeamContextFilter(event.target.value as TeamControlFilter)}
                 >
                   <option value="my_teams">Meine Teams</option>
-                  <option value="human">Human Teams</option>
-                  <option value="ai">AI Teams</option>
-                  <option value="passive">Passive Teams</option>
+                  <option value="human">Gefuehrte Teams</option>
+                  <option value="ai">Automatische Teams</option>
+                  <option value="passive">Beobachtete Teams</option>
                   <option value="all">Alle Teams</option>
                   {teamOwners
                     .filter((owner) => owner.ownerId !== "ai")
                     .map((owner) => (
                       <option key={`owner-filter-${owner.ownerId}`} value={`owner:${owner.ownerId}`}>
-                        Owner: {owner.label}
+                        Manager: {owner.label}
                       </option>
                     ))}
                 </select>
               </label>
             </div>
+            ) : null}
+            {!showCompactHeader ? (
             <div className="foundation-manager-team-switch" data-testid="human-team-quick-switch">
               {ownerQuickSwitchTeams.slice(0, 8).map((team) => (
                 <button
@@ -13020,15 +19311,16 @@ export default function FoundationPageClient({ initialReadSource, initialSelecte
                   className={`table-link-button${team.teamId === selectedTeam.teamId ? " is-active" : ""}`}
                   type="button"
                   onDoubleClick={() => openTeamDrawerById(team.teamId)}
-                  onClick={() => setActiveManagerTeam(team.teamId, "manual_select")}
+                  onClick={() => scheduleActiveManagerTeam(team.teamId, "manual_select")}
                 >
                   {team.shortCode}
                 </button>
               ))}
             </div>
+            ) : null}
           </div>
         ) : null}
-        <div className="foundation-context-chips" aria-label="Save- und Season-Kontext">
+        <div className="foundation-context-chips" aria-label="Spielstand- und Saisonkontext">
           <span className="pill foundation-context-tag">{resolveScenarioMetaLabel(activeContextMeta)}</span>
           <span className="pill">{formatScenarioTypeLabel(activeContextMeta?.scenarioType)}</span>
           <span className={`pill foundation-source-pill${isReadOnlyMode ? " is-readonly" : ""}`}>{activeViewSourceBadge}</span>
@@ -13041,30 +19333,176 @@ export default function FoundationPageClient({ initialReadSource, initialSelecte
             </span>
           ))}
         </div>
-        {activeManagerTeamWarning ? (
-          <div className="foundation-context-warning" role="status">
-            {activeManagerTeamWarning}
-          </div>
-        ) : null}
-        {activeViewContextWarning ? (
-          <div className="foundation-context-warning" role="status">
-            {activeViewContextWarning}
-          </div>
-        ) : null}
       </section>
 
+      {readOnlyBannerMessage ? (
+        <section className="foundation-access-banner is-readonly" role="status" aria-label="Steuerungsstatus">
+          <div className="foundation-access-banner-copy">
+            <span className="eyebrow">Steuerung</span>
+            <strong>Nur Ansicht</strong>
+            <small>{readOnlyBannerMessage}</small>
+          </div>
+          <span className="transfer-status-pill is-warning">Anschauen ja · Steuern nein</span>
+        </section>
+      ) : null}
+
+      {screenPrimaryAction ? (
+        <section
+          className={joinClassNames(
+            "foundation-screen-action",
+            `is-${screenPrimaryAction.status}`,
+            screenPrimaryAction.disabled && "is-disabled",
+          )}
+          aria-label="Hauptaktion dieser Ansicht"
+        >
+          <div className="foundation-screen-action-copy">
+            <span className="eyebrow">{screenPrimaryAction.kicker}</span>
+            <strong>{screenPrimaryAction.title}</strong>
+            <small>{screenPrimaryAction.detail}</small>
+          </div>
+          <div className="foundation-screen-action-cta">
+            <button
+              className={`primary-button foundation-screen-action-button${screenPrimaryAction.disabled ? " is-disabled" : ""}`}
+              type="button"
+              onClick={screenPrimaryAction.onClick}
+              disabled={screenPrimaryAction.disabled}
+              title={screenPrimaryAction.disabledReason ?? screenPrimaryAction.detail}
+            >
+              {screenPrimaryAction.buttonLabel}
+            </button>
+            {screenPrimaryAction.disabledReason ? (
+              <span className="foundation-screen-action-reason">Warum nicht: {screenPrimaryAction.disabledReason}</span>
+            ) : null}
+          </div>
+        </section>
+      ) : null}
+
+      {activeView === "home" && foundationWarningInboxItems.length > 0 ? (
+        <section className="foundation-warning-inbox" aria-label="Offene Hinweise">
+          <div className="foundation-warning-inbox-summary">
+            <span className="eyebrow">Hinweise</span>
+            <strong>{foundationWarningInboxItems.length} offen</strong>
+          </div>
+          <div className="foundation-warning-inbox-list">
+            {foundationWarningInboxItems.map((item) => (
+              <button
+                key={item.id}
+                className={`foundation-warning-inbox-item is-${item.severity}`}
+                type="button"
+                onClick={() => {
+                  if (item.inboxItem) {
+                    navigateToInboxItem(item.inboxItem);
+                    return;
+                  }
+                  if (item.targetTeamId || item.targetPanel) {
+                    navigateToGameFlowStep(item.targetView as GameFlowView, item.targetTeamId, item.targetPanel);
+                    return;
+                  }
+                  setFoundationView(item.targetView, setActiveView);
+                  scrollToFoundationTarget(getFoundationViewScrollTarget(item.targetView));
+                }}
+              >
+                <span className={`foundation-warning-dot is-${item.severity}`} aria-hidden="true" />
+                <span>
+                  <strong>{item.title}</strong>
+                  <small>{item.detail}</small>
+                </span>
+              </button>
+            ))}
+          </div>
+        </section>
+      ) : null}
+
       <div className="foundation-content">
+          {activeView === "encyclopedia" ? (
+          <section className="panel foundation-encyclopedia-panel" id="foundation-encyclopedia" data-testid="foundation-encyclopedia">
+            <div className="foundation-encyclopedia-hero">
+              <div>
+                <span className="eyebrow">Lexikon</span>
+                <h2>Info-Buch fuer Kennzahlen und Systeme</h2>
+                <p>
+                  Abkuerzungen, Werte und wichtige Formellogik ohne Tabellenballast. Die Eintraege zeigen bewusst Faktoren
+                  und Lesart, nicht jede interne Nachkommastelle.
+                </p>
+              </div>
+              <button className="secondary-button inline-button" type="button" onClick={() => setShowCommandPalette(true)}>
+                Begriff suchen
+              </button>
+            </div>
+
+            <div className="foundation-encyclopedia-layout">
+              <nav className="foundation-encyclopedia-index" aria-label="Lexikon-Themen">
+                {GAME_ENCYCLOPEDIA_ENTRIES.map((entry) => (
+                  <button
+                    key={entry.id}
+                    className={`foundation-encyclopedia-index-item${selectedEncyclopediaEntry?.id === entry.id ? " is-active" : ""}`}
+                    type="button"
+                    onClick={() => setSelectedEncyclopediaEntryId(entry.id)}
+                    title={entry.short}
+                  >
+                    <span>{entry.category}</span>
+                    <strong>{entry.term}</strong>
+                    <small>{entry.short}</small>
+                  </button>
+                ))}
+              </nav>
+
+              {selectedEncyclopediaEntry ? (
+                <article className="foundation-encyclopedia-entry">
+                  <div className="foundation-encyclopedia-entry-head">
+                    <span className="pill">{selectedEncyclopediaEntry.category}</span>
+                    <h3>{selectedEncyclopediaEntry.term}</h3>
+                    <p>{selectedEncyclopediaEntry.meaning}</p>
+                  </div>
+
+                  <div className="foundation-encyclopedia-grid">
+                    <section>
+                      <span className="eyebrow">Faktoren</span>
+                      <ul>
+                        {selectedEncyclopediaEntry.factors.map((factor) => (
+                          <li key={`${selectedEncyclopediaEntry.id}-${factor}`}>{factor}</li>
+                        ))}
+                      </ul>
+                    </section>
+                    <section>
+                      <span className="eyebrow">So liest du es</span>
+                      <p>{selectedEncyclopediaEntry.usage}</p>
+                      {selectedEncyclopediaEntry.caveat ? (
+                        <p className="foundation-encyclopedia-caveat">{selectedEncyclopediaEntry.caveat}</p>
+                      ) : null}
+                    </section>
+                  </div>
+
+                  <div className="foundation-encyclopedia-aliases">
+                    {selectedEncyclopediaEntry.aliases.slice(0, 8).map((alias) => (
+                      <span key={`${selectedEncyclopediaEntry.id}-${alias}`}>{alias}</span>
+                    ))}
+                  </div>
+                </article>
+              ) : null}
+            </div>
+          </section>
+          ) : null}
+
           {activeView === "home" ? (
           <section className={`panel foundation-home-panel${getViewClass("home")}`} data-testid="foundation-home" id="foundation-home">
             <div className="foundation-home-hero">
               <div
                 className="foundation-home-team-card"
+                role="button"
+                tabIndex={0}
+                onClick={() => setFoundationView("teams", setActiveView)}
+                onKeyDown={(event) => {
+                  if (event.key === "Enter") {
+                    setFoundationView("teams", setActiveView);
+                  }
+                }}
                 onDoubleClick={() => {
                   if (selectedTeam?.teamId) {
                     openTeamDrawerById(selectedTeam.teamId);
                   }
                 }}
-                title="Doppelklick öffnet den Team-Drawer"
+                title="Klick öffnet Teams, Doppelklick den Team-Drawer"
               >
                 {homeActiveTeamLogo?.src ? (
                   <img
@@ -13083,8 +19521,8 @@ export default function FoundationPageClient({ initialReadSource, initialSelecte
                   <h1>{selectedTeam?.name ?? "Kein Team ausgewählt"}</h1>
                   <div className="room-meta foundation-admin-meta">
                     <span className="pill">{selectedTeam?.shortCode ?? "—"}</span>
-                    <span className="pill">Owner {activeOwner?.label ?? "—"}</span>
-                    <span className="pill">Control {selectedTeamControl?.controlMode ?? "—"}</span>
+                    <span className="pill">Manager {activeOwner?.label ?? "—"}</span>
+                    <span className="pill">{formatTeamControlModeLabel(selectedTeamControl?.controlMode)}</span>
                     <span className="pill">{gameState.season.name}</span>
                     <span className="pill">{currentMatchdayDisplayLabel}</span>
                   </div>
@@ -13101,11 +19539,11 @@ export default function FoundationPageClient({ initialReadSource, initialSelecte
                   {homeWarnings.length > 0 ? (
                     homeWarnings.map((warning) => (
                       <span key={`home-warning-${warning}`} className="transfer-status-pill is-warning">
-                        {warning}
+                        {formatHomeWarningLabel(warning)}
                       </span>
                     ))
                   ) : (
-                    <span className="transfer-status-pill is-ready">sources_ready</span>
+                    <span className="transfer-status-pill is-ready">Bereit</span>
                   )}
                 </div>
                 <div className="foundation-home-actions">
@@ -13119,20 +19557,171 @@ export default function FoundationPageClient({ initialReadSource, initialSelecte
                   <button className="secondary-button" type="button" onClick={() => setFoundationView("lineup", setActiveView)}>
                     Einsatzliste öffnen
                   </button>
-                  <button className="secondary-button" type="button" onClick={() => setFoundationView("market", setActiveView)}>
+                  <button className="secondary-button" type="button" onClick={() => setFoundationView("marketV2", setActiveView)}>
                     Transfermarkt öffnen
                   </button>
                 </div>
               </div>
             </div>
 
+            {seasonSetupFlow ? (
+              <section
+                className={joinClassNames("foundation-season-setup", seasonSetupFlow.isReady && "is-ready")}
+                aria-label="Manager-Briefing Season Setup"
+                data-testid="season-setup-panel"
+              >
+                <div className="foundation-season-setup-head">
+                  <div className="stack">
+                    <span className="eyebrow">Manager-Briefing</span>
+                    <h2>{seasonSetupFlow.isReady ? "Bereit für Matchday 1" : "Season Setup"}</h2>
+                    <p className="muted">
+                      {seasonSetupFlow.openStep
+                        ? `Naechster Fokus: ${seasonSetupFlow.openStep.title}.`
+                        : "Alle Startsignale sind geklaert. Du kannst das Panel ausblenden oder direkt in den Matchday gehen."}
+                    </p>
+                  </div>
+                  <div className="foundation-season-setup-actions">
+                    <span className="foundation-season-setup-progress">
+                      {seasonSetupFlow.completedCount}/{seasonSetupFlow.steps.length} erledigt
+                    </span>
+                    <button className="ghost-button" type="button" onClick={dismissNewGameFlow}>
+                      Später
+                    </button>
+                    <button
+                      className="primary-button"
+                      type="button"
+                      onClick={() =>
+                        seasonSetupFlow.openStep
+                          ? navigateSeasonSetupStep(seasonSetupFlow.openStep.stepId)
+                          : navigateToGameFlowStep("lineup", selectedTeam?.teamId)
+                      }
+                    >
+                      {seasonSetupFlow.openStep ? seasonSetupFlow.openStep.targetLabel : "Zum Matchday"}
+                    </button>
+                  </div>
+                </div>
+
+                <div className="foundation-season-setup-summary">
+                  <span>
+                    <strong>{selectedTeam?.shortCode ?? "—"}</strong>
+                    Aktives Team
+                  </span>
+                  <span>
+                    <strong>
+                      {seasonSetupFlow.rosterCount}/{seasonSetupFlow.targetRosterCount}
+                    </strong>
+                    Kaderziel
+                  </span>
+                  <span>
+                    <strong>{seasonSetupFlow.strongestAxis?.label ?? "—"}</strong>
+                    Staerke {formatWholeNumber(seasonSetupFlow.strongestAxis?.value)}
+                  </span>
+                  <span>
+                    <strong>{seasonSetupFlow.weakestAxis?.label ?? "—"}</strong>
+                    Luecke {formatWholeNumber(seasonSetupFlow.weakestAxis?.value)}
+                  </span>
+                  <span>
+                    <strong>
+                      {homeNextMatchdayStatus.requiredSlots > 0
+                        ? `${homeNextMatchdayStatus.filledSlots}/${homeNextMatchdayStatus.requiredSlots}`
+                        : "—"}
+                    </strong>
+                    Einsatz-Slots
+                  </span>
+                </div>
+
+                <div className="foundation-season-setup-grid">
+                  {seasonSetupFlow.steps.map((step, index) => (
+                    <article
+                      key={`season-setup-${step.stepId}`}
+                      className={joinClassNames(
+                        "foundation-season-setup-card",
+                        `is-${step.status}`,
+                        seasonSetupFlow.openStep?.stepId === step.stepId && "is-current",
+                      )}
+                    >
+                      <div className="foundation-season-setup-card-head">
+                        <span className="foundation-season-setup-step-index">{index + 1}</span>
+                        <div>
+                          <span className="eyebrow">{step.kicker}</span>
+                          <h3>{step.title}</h3>
+                        </div>
+                        <span className={`transfer-status-pill is-${step.status === "open" ? "warning" : "ready"}`}>
+                          {step.status === "completed" ? "erledigt" : step.status === "skipped" ? "später" : step.progress}
+                        </span>
+                      </div>
+                      <p className="muted">{step.detail}</p>
+                      <div className="foundation-season-setup-card-actions">
+                        <button className="secondary-button" type="button" onClick={() => navigateSeasonSetupStep(step.stepId)}>
+                          {step.targetLabel}
+                        </button>
+                        {step.status === "open" ? (
+                          <>
+                            <button className="ghost-button" type="button" onClick={() => updateNewGameFlowStepStatus(step.stepId, "completed")}>
+                              Als erledigt markieren
+                            </button>
+                            <button className="ghost-button" type="button" onClick={() => updateNewGameFlowStepStatus(step.stepId, "skipped")}>
+                              Später
+                            </button>
+                          </>
+                        ) : null}
+                      </div>
+                    </article>
+                  ))}
+                </div>
+              </section>
+            ) : null}
+
+            <section className="foundation-home-play-lane" aria-label="Spielzug Schnellstart">
+              <button className="foundation-home-play-card is-lineup" type="button" onClick={() => setFoundationView("lineup", setActiveView)} title="Einsatzliste: Slots fuellen, Team-Boost setzen und speichern.">
+                <span>Vorbereiten</span>
+                <strong>{homeNextMatchdayStatus.openSlots > 0 ? `${homeNextMatchdayStatus.openSlots} Slots offen` : "Einsatz bereit"}</strong>
+                <small>{currentMatchdayDisciplineSchedule?.discipline1?.displayName ?? "D1"} / {currentMatchdayDisciplineSchedule?.discipline2?.displayName ?? "D2"}</small>
+              </button>
+              <button className="foundation-home-play-card is-arena" type="button" onClick={() => setFoundationView("matchdayArena", setActiveView)} title="Arena: Spieltag als Reveal ansehen und Score verstehen.">
+                <span>Spielen</span>
+                <strong>{homeNextMatchdayStatus.resultAvailable ? "Ergebnis ansehen" : homeNextMatchdayStatus.openSlots > 0 ? "Einsatzliste offen" : "Arena bereit"}</strong>
+                <small>{currentMatchdayDisplayLabel}</small>
+              </button>
+              <button className="foundation-home-play-card is-season" type="button" onClick={() => setFoundationView("season", setActiveView)} title="Saisonstand: Punkte, Rang und Bereichsstaerken lesen.">
+                <span>Auswerten</span>
+                <strong>{selectedStandingRow?.rank != null ? `Rang #${selectedStandingRow.rank}` : "Tabelle offen"}</strong>
+                <small>{selectedStandingRow?.points != null ? `${formatLocalePoints(selectedStandingRow.points, 1)} Punkte` : "Noch keine Punkte"}</small>
+              </button>
+              <button className="foundation-home-play-card is-training" type="button" onClick={() => setFoundationView("trainingV2", setActiveView)} title="Training: XP, Upgrades, Erschoepfung und Rueckschritt-Risiko pruefen.">
+                <span>Entwickeln</span>
+                <strong>{selectedRosterDecisionCards.trainingCandidate?.player.name ?? "Training prüfen"}</strong>
+                <small>{selectedRosterDecisionCards.trainingCandidate ? "Spieler im Fokus" : "XP und Risiko"}</small>
+              </button>
+              <button className="foundation-home-play-card is-market" type="button" onClick={() => setFoundationView("marketV2", setActiveView)} title="Transfermarkt: Value, Gehalt und Kaderbedarf pruefen.">
+                <span>Handeln</span>
+                <strong>{selectedRosterDecisionCards.salaryOutlier?.player.name ?? "Markt prüfen"}</strong>
+                <small>{selectedRosterDecisionCards.salaryOutlier ? "Gehaltsdruck" : "Kaufen / verkaufen"}</small>
+              </button>
+            </section>
+
+            <section className="foundation-home-today-strip" aria-label="Heute wichtig">
+              {homeTodayCards.map((card) => (
+                <button
+                  key={`home-today-${card.key}`}
+                  className={`foundation-home-today-card is-${card.tone}`}
+                  type="button"
+                  onClick={() => setFoundationView(card.view, setActiveView)}
+                >
+                  <span>{card.kicker}</span>
+                  <strong>{card.title}</strong>
+                  <small>{card.detail}</small>
+                </button>
+              ))}
+            </section>
+
             <article className="foundation-home-card foundation-home-owner-overview" data-testid="home-owner-overview">
               <div className="panel-header compact">
                 <div className="stack">
                   <h2>Meine Teams / Multiplayer</h2>
-                  <p className="muted">Local Owner aus dem Save. Echte Room-Rechte bleiben Team Ownership im Online-Room.</p>
+                  <p className="muted">Schneller Wechsel zwischen deinen Teams, Mitspielern und automatisch gefuehrten Teams.</p>
                 </div>
-                <span className="pill">AI {aiTeams.length}</span>
+                <span className="pill">Auto {aiTeams.length}</span>
               </div>
               <div className="foundation-home-owner-grid">
                 {homeMultiplayerOwnerGroups.map((group) => (
@@ -13165,7 +19754,7 @@ export default function FoundationPageClient({ initialReadSource, initialSelecte
                           onDoubleClick={() => openTeamDrawerById(row.teamId)}
                           onClick={() => {
                             if (row.controlMode !== "ai") {
-                              setActiveManagerTeam(row.teamId, "manual_select");
+                              scheduleActiveManagerTeam(row.teamId, "manual_select");
                             }
                           }}
                         >
@@ -13218,23 +19807,34 @@ export default function FoundationPageClient({ initialReadSource, initialSelecte
                   <p className="muted">Ziele sind Preview-first: Sponsor-Boni/Mali werden angezeigt, aber noch nicht angewendet.</p>
                 </div>
                 <div className="room-meta foundation-admin-meta">
-                  <span className={`transfer-status-pill${(selectedBoardConfidence?.pressure ?? 0) >= 8 ? " is-warning" : " is-ready"}`}>
+                  <span
+                    className={`transfer-status-pill${(selectedBoardConfidence?.pressure ?? 0) >= 8 ? " is-warning" : " is-ready"}`}
+                    title={TEAM_BOARD_PRESSURE_TOOLTIP}
+                  >
                     Druck {selectedBoardConfidence?.pressure ?? "—"}/10
                   </span>
-                  <span className="pill">Trust {selectedBoardConfidence?.value ?? "—"}/10</span>
+                  <span className="pill" title={TEAM_BOARD_RATING_TOOLTIP}>
+                    Board Rating {selectedBoardConfidence?.value ?? "—"}/10
+                  </span>
                 </div>
               </div>
               <div className="foundation-home-owner-grid">
                 {selectedOpenObjectives.slice(0, 4).map((objective) => (
-                  <article key={`home-objective-${objective.objectiveId}`} className="metric-card teams-summary-card">
+                  <article
+                    key={`home-objective-${objective.objectiveId}`}
+                    className="metric-card teams-summary-card"
+                    title={`Grundlage: ${objective.source}`}
+                  >
                     <span>{objective.category.toUpperCase()}</span>
                     <strong>{objective.label}</strong>
                     <small className="muted">
                       {String(objective.currentValue ?? "—")} / {String(objective.targetValue ?? "—")}
                     </small>
+                    {objective.detail ? <small className="muted">{objective.detail}</small> : null}
+                    {objective.actionHint ? <small className="muted">{objective.actionHint}</small> : null}
                     <div className="room-meta foundation-admin-meta">
                       <span className={`transfer-status-pill${objective.status === "completed" ? " is-ready" : objective.status === "failed" || objective.status === "at_risk" ? " is-warning" : ""}`}>
-                        {objective.status}
+                        {formatObjectiveStatusLabel(objective.status)}
                       </span>
                       {objective.rewardCash != null ? <span className="pill">Bonus {formatMoney(objective.rewardCash)}</span> : null}
                       {objective.penaltyCash != null ? <span className="pill">Malus {formatMoney(objective.penaltyCash)}</span> : null}
@@ -13249,7 +19849,7 @@ export default function FoundationPageClient({ initialReadSource, initialSelecte
                 ) : null}
               </div>
               {teamObjectiveOverview.warnings.length > 0 ? (
-                <p className="muted">Warnings: {teamObjectiveOverview.warnings.join(", ")}</p>
+                <p className="muted">Hinweise: {teamObjectiveOverview.warnings.map(formatCockpitReason).join(", ")}</p>
               ) : null}
             </article>
 
@@ -13257,7 +19857,9 @@ export default function FoundationPageClient({ initialReadSource, initialSelecte
               <div className="panel-header compact">
                 <div className="stack">
                   <h2>Meine Spieler</h2>
-                  <p className="muted">Top 6–8 nach Rolle, PPs, MVS und OVR.</p>
+                  <p className="muted">
+                    Top 6–8 nach Rolle, <GameTerm term="PPs" />, <GameTerm term="MVS" /> und <GameTerm term="OVR" />.
+                  </p>
                 </div>
                 <button className="secondary-button inline-button" type="button" onClick={() => setFoundationView("teams", setActiveView)}>
                   Alle Spieler
@@ -13271,51 +19873,120 @@ export default function FoundationPageClient({ initialReadSource, initialSelecte
                     onDoubleClick={() => openPlayerDrawerById(row.player.id, row.entry.id)}
                     title="Doppelklick öffnet den Spieler-Drawer"
                   >
-                    <div className="foundation-home-player-hero">
-                      <PlayerPortrait
-                        src={row.portrait.src}
-                        initials={row.portrait.initials}
-                        alt={row.player.name}
-                        className="foundation-home-player-portrait player-avatar-fallback"
-                      />
-                      <div className="stack">
+                    <div className="foundation-home-player-card-head">
+                      <div className="foundation-home-player-title">
                         <strong>{row.player.name}</strong>
-                        <span className="muted">
-                          {row.entry.roleTag ?? "—"} · <ClassColorChip className={row.player.className} /> · <RaceIcon race={row.player.race} className="race-icon-chip-inline" />
-                        </span>
+                        <span>{row.entry.roleTag ?? "ohne Rolle"}</span>
+                      </div>
+                      <span className="foundation-home-player-rating" title={getGameTermTooltip("OVR") ?? undefined}>
+                        {row.playerOvr != null ? formatLocalePoints(row.playerOvr, 1) : "—"}
+                      </span>
+                    </div>
+                    <div className="foundation-home-player-hero">
+                      <div className="foundation-home-player-portrait-shell">
+                        <PlayerPortrait
+                          src={row.portrait.src}
+                          initials={row.portrait.initials}
+                          alt={row.player.name}
+                          className="foundation-home-player-portrait player-avatar-fallback"
+                        />
+                      </div>
+                      <div className="foundation-home-player-meta">
+                        <div className="foundation-home-player-type">
+                          <ClassColorChip className={row.player.className} />
+                          <RaceIcon race={row.player.race} className="race-icon-chip-inline" />
+                        </div>
+                        <div className="foundation-home-player-core-stats">
+                          <span title={getGameTermTooltip("MVS") ?? undefined}>MVS {row.playerMvs != null ? formatLocalePoints(row.playerMvs, 1) : "—"}</span>
+                          <span title={getGameTermTooltip("PPs") ?? undefined}>PPs {row.playerPps != null ? formatPpsValue(row.playerPps) : "—"}</span>
+                        </div>
                       </div>
                     </div>
-                    <div className="stack">
+                    <div className="foundation-home-player-body">
+                      <div className="foundation-home-player-axis">
+                        <span className="is-power" title={getGameTermTooltip("POW") ?? undefined}>
+                          POW
+                          <b>{formatWholeNumber(row.player.coreStats.pow)}</b>
+                          <small>PP {formatNullablePps(row.ppPow)}</small>
+                        </span>
+                        <span className="is-speed" title={getGameTermTooltip("SPE") ?? undefined}>
+                          SPE
+                          <b>{formatWholeNumber(row.player.coreStats.spe)}</b>
+                          <small>PP {formatNullablePps(row.ppSpe)}</small>
+                        </span>
+                        <span className="is-mental" title={getGameTermTooltip("MEN") ?? undefined}>
+                          MEN
+                          <b>{formatWholeNumber(row.player.coreStats.men)}</b>
+                          <small>PP {formatNullablePps(row.ppMen)}</small>
+                        </span>
+                        <span className="is-social" title={getGameTermTooltip("SOC") ?? undefined}>
+                          SOC
+                          <b>{formatWholeNumber(row.player.coreStats.soc)}</b>
+                          <small>PP {formatNullablePps(row.ppSoc)}</small>
+                        </span>
+                      </div>
                       <div className="foundation-home-player-stats">
-                        <span>OVR {row.playerOvr != null ? formatLocalePoints(row.playerOvr, 1) : "—"}</span>
-                        <span>MVS {row.playerMvs != null ? formatLocalePoints(row.playerMvs, 1) : "—"}</span>
-                        <span>PPs {row.playerPps != null ? formatPpsValue(row.playerPps) : "—"}</span>
-                        <span>POW {formatNullablePps(row.ppPow)}</span>
-                        <span>SPE {formatNullablePps(row.ppSpe)}</span>
-                        <span>MEN {formatNullablePps(row.ppMen)}</span>
-                        <span>SOC {formatNullablePps(row.ppSoc)}</span>
-                        <span>MW {row.marketValue != null ? formatMoney(row.marketValue) : "—"}</span>
-                        <span>Gehalt {row.salary != null ? formatMoney(row.salary) : "—"}</span>
-                        <span>XP {row.xp}</span>
-                        <span>Fatigue {row.fatigue}</span>
+                        <span>
+                          MW {row.marketValue != null ? formatMoney(row.marketValue) : "—"}
+                          {row.marketValueDelta != null ? (
+                            <small className={`foundation-home-player-money-delta${getEconomyDeltaClass(row.marketValueDelta, "higher")}`}>
+                              {formatSignedDisplayMoney(row.marketValueDelta)}
+                            </small>
+                          ) : null}
+                        </span>
+                        <span>
+                          Gehalt {row.salary != null ? formatMoney(row.salary) : "—"}
+                          {row.salaryDelta != null ? (
+                            <small className={`foundation-home-player-money-delta${getEconomyDeltaClass(row.salaryDelta, "lower")}`}>
+                              {formatSignedDisplayMoney(row.salaryDelta)}
+                            </small>
+                          ) : null}
+                        </span>
+                        {row.xp > 0 ? <span>XP {row.xp}</span> : null}
+                        {row.fatigue > 0 ? <span>Erschoepfung {row.fatigue}</span> : null}
                         <span>LZ {row.entry.contractLength ?? "—"}</span>
                       </div>
-                      <div className="foundation-home-actions">
-                        <button className="secondary-button inline-button" type="button" onClick={() => openPlayerDrawerById(row.player.id, row.entry.id)}>
-                          Details
-                        </button>
-                        <button className="secondary-button inline-button" type="button" onClick={() => setFoundationView("training", setActiveView)}>
-                          Training
-                        </button>
-                        <button className="secondary-button inline-button" type="button" onClick={() => setFoundationView("market", setActiveView)}>
-                          Verkaufen
-                        </button>
-                        {row.xp > 0 ? (
-                          <button className="primary-button inline-button" type="button" onClick={() => setFoundationView("training", setActiveView)}>
-                            Upgrade
-                          </button>
+                    </div>
+                    {row.fatigue > 0 || row.xp > 0 || (row.marketValueDelta != null && Math.abs(row.marketValueDelta) >= 1) ? (
+                      <div className="foundation-home-player-hints" aria-label="Spieler Hinweise">
+                        {row.fatigue > 0 ? <span className="is-warning">Erschoepfung {row.fatigue}</span> : null}
+                        {row.xp > 0 ? <span className="is-ready">Upgrade bereit</span> : null}
+                        {row.marketValueDelta != null && Math.abs(row.marketValueDelta) >= 1 ? (
+                          <span className={row.marketValueDelta > 0 ? "is-ready" : "is-warning"}>
+                            MW {formatSignedDisplayMoney(row.marketValueDelta)}
+                          </span>
                         ) : null}
                       </div>
+                    ) : null}
+                    <div className="foundation-home-actions foundation-home-player-actions">
+                      <button className="secondary-button inline-button" type="button" onClick={() => openPlayerDrawerById(row.player.id, row.entry.id)}>
+                        Details
+                      </button>
+                      <button className="secondary-button inline-button" type="button" onClick={() => openTrainingPlayerTarget(row.player.id, "training")}>
+                        Training
+                      </button>
+                      <button
+                        className="secondary-button inline-button"
+                        type="button"
+                        disabled={marketSellBusy}
+                        onClick={() =>
+                          void openMarketSellModal({
+                            activePlayerId: row.entry.id,
+                            playerId: row.player.id,
+                            playerName: row.player.name,
+                            className: row.player.className,
+                            race: row.player.race,
+                            portraitUrl: row.portrait.src,
+                          }, selectedTeam?.teamId)
+                        }
+                      >
+                        Verkaufen
+                      </button>
+                      {row.xp > 0 ? (
+                        <button className="primary-button inline-button" type="button" onClick={() => openTrainingPlayerTarget(row.player.id, "upgrade")}>
+                          Upgrade
+                        </button>
+                      ) : null}
                     </div>
                   </article>
                 ))}
@@ -13365,7 +20036,7 @@ export default function FoundationPageClient({ initialReadSource, initialSelecte
                       )}
                       type="button"
                       onDoubleClick={() => openTeamDrawerById(row.teamId)}
-                      onClick={() => setActiveManagerTeam(row.teamId, "manual_select")}
+                      onClick={() => scheduleActiveManagerTeam(row.teamId, "manual_select")}
                     >
                       <span>{row.rank ?? "—"}</span>
                       <strong>{row.teamCode}</strong>
@@ -13403,6 +20074,20 @@ export default function FoundationPageClient({ initialReadSource, initialSelecte
                     <small>{homeNextMatchdayStatus.d2Slots || "—"} Slots</small>
                   </div>
                 </div>
+                <div className="foundation-home-matchday-progress" aria-label="Einsatz-Fortschritt">
+                  <span
+                    style={{
+                      width: `${
+                        homeNextMatchdayStatus.requiredSlots > 0
+                          ? Math.min(100, Math.round((homeNextMatchdayStatus.filledSlots / homeNextMatchdayStatus.requiredSlots) * 100))
+                          : 0
+                      }%`,
+                    }}
+                  />
+                  <small>
+                    {homeNextMatchdayStatus.filledSlots}/{homeNextMatchdayStatus.requiredSlots || "—"} Slots gesetzt
+                  </small>
+                </div>
                 <div className="room-meta foundation-admin-meta">
                   <span className="pill">Offen {homeNextMatchdayStatus.openSlots}</span>
                   <span className={`pill${homeNextMatchdayStatus.hasFormCards ? " is-ready" : " is-warning"}`}>
@@ -13439,13 +20124,14 @@ export default function FoundationPageClient({ initialReadSource, initialSelecte
 	                    Alle anzeigen
 	                  </button>
 	                </div>
-	                {homeTasks.map((task) => (
+	                {homeTasks.map((task, index) => (
 	                  <button
 	                    key={`home-task-${task.itemId}`}
 	                    className={`foundation-home-task${task.itemId === primaryInboxItem?.itemId ? " is-primary" : ""}`}
 	                    type="button"
 	                    onClick={() => navigateToInboxItem(task)}
 	                  >
+                      <span className="foundation-home-task-index">Q{index + 1}</span>
 	                    <span>
 	                      <strong>{task.title}</strong>
 	                      <small>{task.description}</small>
@@ -13465,8 +20151,11 @@ export default function FoundationPageClient({ initialReadSource, initialSelecte
                     {homeStoryItems.map((item) => (
                       <li key={`home-story-${item.itemId}`}>
                         <button className="foundation-text-button" type="button" onClick={() => navigateToInboxItem(item)}>
-                          <strong>{item.title.replace("Story Card: ", "")}</strong>
-                          <span>{item.description}</span>
+                          <span className="foundation-home-news-icon">{getInboxCategoryIcon(item.category)}</span>
+                          <span>
+                            <strong>{item.title.replace("Story Card: ", "")}</strong>
+                            <small>{item.description}</small>
+                          </span>
                         </button>
                       </li>
                     ))}
@@ -13485,8 +20174,11 @@ export default function FoundationPageClient({ initialReadSource, initialSelecte
 	                    {homeNewsItems.map((item) => (
 	                      <li key={`home-news-${item.itemId}`}>
 	                        <button className="foundation-text-button" type="button" onClick={() => navigateToInboxItem(item)}>
-	                          <strong>{item.title}</strong>
-	                          <span>{item.description}</span>
+                            <span className="foundation-home-news-icon">{getInboxCategoryIcon(item.category)}</span>
+                            <span>
+	                            <strong>{item.title}</strong>
+	                            <small>{item.description}</small>
+                            </span>
 	                        </button>
 	                      </li>
 	                    ))}
@@ -13524,7 +20216,7 @@ export default function FoundationPageClient({ initialReadSource, initialSelecte
                       )}
                       type="button"
                       onDoubleClick={() => openTeamDrawerById(row.teamId)}
-                      onClick={() => setActiveManagerTeam(row.teamId, "manual_select")}
+                      onClick={() => scheduleActiveManagerTeam(row.teamId, "manual_select")}
                     >
                       <span>{row.rank ?? "—"}</span>
                       <strong>{row.teamCode}</strong>
@@ -13534,7 +20226,7 @@ export default function FoundationPageClient({ initialReadSource, initialSelecte
                       <span>{row.salaryTotal != null ? formatMoney(row.salaryTotal) : "—"}</span>
                       <span>{gameFlowActionStep.label}</span>
                       <span>{homeNextMatchdayStatus.openSlots > 0 ? "offen" : "bereit"}</span>
-                      <span>{resolvedTeamControlSettings[row.teamId]?.controlMode ?? "manual"}</span>
+                      <span>{formatTeamControlModeLabel(resolvedTeamControlSettings[row.teamId]?.controlMode)}</span>
                     </button>
                   ))}
                 </div>
@@ -13543,30 +20235,701 @@ export default function FoundationPageClient({ initialReadSource, initialSelecte
 	          </section>
           ) : null}
 
+	          {activeView === "hq" ? (() => {
+              function sortManagerCards<T extends { priority: number; title: string }>(cards: T[]) {
+                return [...cards].sort((left, right) => right.priority - left.priority || left.title.localeCompare(right.title, "de"));
+              }
+	            const immediateCards = sortManagerCards([
+	              {
+	                key: "lineup",
+	                eyebrow: "Sofort",
+	                title: homeNextMatchdayStatus.openSlots > 0 ? "Einsatzliste fertig machen" : homeNextMatchdayStatus.resultAvailable ? "Ergebnis ansehen" : "Arena bereit",
+	                detail:
+	                  homeNextMatchdayStatus.requiredSlots > 0
+	                    ? `${homeNextMatchdayStatus.filledSlots}/${homeNextMatchdayStatus.requiredSlots} Slots · ${homeNextMatchdayStatus.openSlots} offen`
+	                    : "Noch kein Spieltag aktiv.",
+	                meta: homeNextMatchdayStatus.hasFormCards ? "Nutzen: direkt revealbar" : "Blocker: Form noch offen",
+                  priority: homeNextMatchdayStatus.openSlots > 0 ? 100 : homeNextMatchdayStatus.hasFormCards ? 72 : 84,
+	                tone: homeNextMatchdayStatus.openSlots > 0 ? "warning" : "ready",
+	                onClick: () => setFoundationView(homeNextMatchdayStatus.openSlots > 0 ? "lineup" : "matchdayArena", setActiveView),
+	              },
+	              {
+	                key: "demands",
+	                eyebrow: "Sofort",
+	                title: selectedTeamPlayerDemands.length > 0 ? "Forderungen prüfen" : "Kader ruhig",
+	                detail: selectedTeamPlayerDemands[0]?.detail ?? "Gerade kein Spieler mit akutem Wunsch.",
+	                meta: selectedTeamPlayerDemands.length > 0 ? `Schaden: Moral kippt bei ${selectedTeamPlayerDemands.length}` : "keine Reibung",
+                  priority: selectedTeamPlayerDemands.length > 0 ? 88 : 44,
+	                tone: selectedTeamPlayerDemands.length > 0 ? "warning" : "ready",
+	                onClick: () =>
+	                  setFoundationView(
+	                    selectedTeamPlayerDemands[0]?.type === "facility" ? "trainingV2" : "lineup",
+	                    setActiveView,
+	                  ),
+	              },
+	              {
+	                key: "finance",
+	                eyebrow: "Sofort",
+	                title: selectedHqFinanceWarnings.length > 0 ? "Cash-Druck sichtbar" : "Finanzen stabil",
+	                detail:
+	                  selectedHqFinanceWarnings[0] ??
+	                  `Cash ${selectedStandingRow?.cash != null ? formatMoney(selectedStandingRow.cash) : "—"} · Gehalt ${selectedStandingRow?.salaryTotal != null ? formatMoney(selectedStandingRow.salaryTotal) : "—"}`,
+	                meta: selectedHqFinanceWarnings.length > 0 ? "Schaden: Cash/Gehaltsdruck" : "Puffer stabil",
+                  priority: selectedHqFinanceWarnings.length > 0 ? 92 : 48,
+	                tone: selectedHqFinanceWarnings.length > 0 ? "danger" : "ready",
+	                onClick: () => setFoundationView("prize", setActiveView),
+	              },
+	              {
+	                key: "inbox",
+	                eyebrow: "Sofort",
+	                title: activeTeamOpenInboxItems.length > 0 ? "Inbox öffnen" : "Keine harten To-dos",
+	                detail:
+	                  activeTeamOpenInboxItems[0]?.title ??
+	                  "Story, Hinweise und Aufgaben bleiben hier gesammelt und teamfokussiert.",
+	                meta: activeTeamCriticalInboxItems.length > 0 ? `Kritisch: ${activeTeamCriticalInboxItems.length}` : `${activeTeamOpenInboxItems.length} offen`,
+                  priority: activeTeamCriticalInboxItems.length > 0 ? 86 : activeTeamOpenInboxItems.length > 0 ? 68 : 36,
+	                tone: activeTeamOpenInboxItems.length > 0 ? "warning" : "ready",
+	                onClick: () => setFoundationView("inbox", setActiveView),
+	              },
+	            ]);
+	            const seasonCards = sortManagerCards([
+	              {
+	                key: "board",
+	                eyebrow: "Diese Season",
+	                title: selectedOpenObjectives[0]?.label ?? "Board sauber halten",
+	                detail: selectedOpenObjectives[0]?.detail ?? selectedOpenObjectives[0]?.actionHint ?? "Aktive Ziele, Druck und Richtung für diese Season.",
+	                meta: `Druck ${selectedBoardConfidence?.pressure ?? "—"}/10 · Rating ${selectedBoardConfidence?.value ?? "—"}/10`,
+                  priority: (selectedBoardConfidence?.pressure ?? 0) >= 8 ? 84 : selectedOpenObjectives.length > 0 ? 70 : 42,
+	                tone: (selectedBoardConfidence?.pressure ?? 0) >= 8 ? "danger" : selectedOpenObjectives.length > 0 ? "warning" : "ready",
+	                onClick: () => setFoundationView("season", setActiveView),
+	              },
+	              {
+	                key: "training",
+	                eyebrow: "Diese Season",
+	                title: hqTrainingFocusCount > 0 ? "Training nachschärfen" : "Training ruhig",
+	                detail:
+	                  hqTrainingFocusCount > 0
+	                    ? `${hqTrainingFocusCount} Spieler haben XP oder Fatigue-Signale.`
+	                    : "Gerade kein akuter Trainingsstau.",
+	                meta: hqTrainingFocusCount > 0 ? "Nutzen: XP sichern, Fatigue beruhigen" : selectedTeamGeneralManager?.profile.facilityPriorities.slice(0, 2).join(" · ") ?? "Facility-Fokus offen",
+                  priority: hqTrainingFocusCount > 0 ? 74 : 40,
+	                tone: hqTrainingFocusCount > 0 ? "warning" : "ready",
+	                onClick: () => setFoundationView("trainingV2", setActiveView),
+	              },
+	              {
+	                key: "market",
+	                eyebrow: "Diese Season",
+	                title: hqTransferWishlistEntries[0]?.playerName ?? "Marktwatch aufbauen",
+	                detail:
+	                  hqTransferWishlistEntries[0]
+	                    ? `${hqTransferWishlistEntries[0].className} · MW ${hqTransferWishlistEntries[0].marketValue != null ? formatTransfermarktCurrency(hqTransferWishlistEntries[0].marketValue) : "—"}`
+	                    : "Merke interessante Free Agents und beobachte Fits direkt von hier.",
+	                meta: hqTransferWishlistEntries.length > 0 ? `Nutzen: ${hqTransferWishlistEntries.length} konkrete Targets` : "Chance: Watchlist aufbauen",
+                  priority: hqTransferWishlistEntries.length > 0 ? 66 : 38,
+	                tone: hqTransferWishlistEntries.length > 0 ? "ready" : "warning",
+	                onClick: () => setFoundationView("marketV2", setActiveView),
+	              },
+	              {
+	                key: "powers",
+	                eyebrow: "Diese Season",
+	                title: selectedTeamCaptainProfile?.playerName ?? "Captain & Team Powers",
+	                detail:
+	                  selectedTeamCaptainProfile
+	                    ? `${selectedTeamCaptainProfile.style} · Buffer +${formatLocalePoints(selectedTeamCaptainProfile.effects.moraleBuffer, 1)}`
+	                    : "Noch kein klares Captain-Signal sichtbar.",
+	                meta: selectedTeamPowers.length > 0 ? `${selectedTeamPowers.length} Powers aktiv` : "Captain-Synergien offen",
+                  priority: selectedTeamPowers.length > 0 ? 54 : 46,
+	                tone: selectedTeamPowers.length > 0 ? "ready" : "warning",
+	                onClick: () => setFoundationView("lineup", setActiveView),
+	              },
+	            ]);
+	            const preseasonCards = sortManagerCards([
+	              {
+	                key: "expiring",
+	                eyebrow: "Vor Saisonwechsel",
+	                title: hqContractExpiringCount > 0 ? "Ausläufer absichern" : "Verträge wirken stabil",
+	                detail:
+	                  hqContractExpiringCount > 0
+	                    ? `${hqContractExpiringCount} Verträge laufen bald aus.`
+	                    : "Keine akute Verlängerungswelle sichtbar.",
+	                meta: hqContractExpiringCount > 0 ? "Schaden: Verliere Binder ohne Plan" : `${selectedRosterTableRows.length} Spieler im Kader`,
+                  priority: hqContractExpiringCount > 0 ? 82 : 34,
+	                tone: hqContractExpiringCount > 0 ? "warning" : "ready",
+	                onClick: () => setFoundationView("teams", setActiveView),
+	              },
+	              {
+	                key: "sell",
+	                eyebrow: "Vor Saisonwechsel",
+	                title: hqTransferSellMarkers.length > 0 ? "VK-Vormerkung prüfen" : "Keine Abgänge markiert",
+	                detail:
+	                  hqTransferSellMarkers[0]
+	                    ? `${hqTransferSellMarkers[0].playerName} · Buyout ${hqTransferSellMarkers[0].buyoutCost != null ? formatDisplayMoney(hqTransferSellMarkers[0].buyoutCost) : "—"}`
+	                    : "Wenn ein Spieler nicht mehr passt, hier vorbereitet in den Abgang gehen.",
+	                meta: hqTransferSellMarkers.length > 0 ? `${hqTransferSellMarkers.length} markiert` : "Kein geplanter Exit",
+                  priority: hqTransferSellMarkers.length > 0 ? 62 : 28,
+	                tone: hqTransferSellMarkers.length > 0 ? "warning" : "ready",
+	                onClick: () => setFoundationView("teams", setActiveView),
+	              },
+	              {
+	                key: "morale",
+	                eyebrow: "Vor Saisonwechsel",
+	                title: selectedHqMoraleSummary ? `Moral ${formatLocalePoints(selectedHqMoraleSummary.average, 1)}` : "Moral prüfen",
+	                detail:
+	                  selectedHqMoraleSummary
+	                    ? `${selectedHqMoraleSummary.criticalCount} kritisch · ${selectedHqMoraleSummary.exitRiskCount} Exit-Risiken`
+	                    : "Noch keine belastbare Moral-Lage für dieses Team.",
+	                meta: selectedTeamCaptainProfile?.playerName ? `Captain ${selectedTeamCaptainProfile.playerName}` : "kein Captain",
+                  priority:
+                    (selectedHqMoraleSummary?.criticalCount ?? 0) > 0 || (selectedHqMoraleSummary?.exitRiskCount ?? 0) > 0
+                      ? 90
+                      : 44,
+	                tone:
+	                  (selectedHqMoraleSummary?.criticalCount ?? 0) > 0 || (selectedHqMoraleSummary?.exitRiskCount ?? 0) > 0
+	                    ? "danger"
+	                    : "ready",
+	                onClick: () => setFoundationView("teams", setActiveView),
+	              },
+	              {
+	                key: "forecast",
+	                eyebrow: "Vor Saisonwechsel",
+	                title: "Preisgeld & Forecast",
+	                detail:
+	                  selectedStandingRow?.rank != null
+	                    ? `Rang #${selectedStandingRow.rank} · ${selectedStandingRow.points != null ? formatLocalePoints(selectedStandingRow.points, 1) : "—"} Punkte`
+	                    : "Rang und Kassenlauf im Blick behalten.",
+	                meta: selectedStandingRow?.guv != null ? `GuV ${formatMoney(selectedStandingRow.guv)}` : "GuV —",
+                  priority: selectedStandingRow?.guv != null && selectedStandingRow.guv < 0 ? 58 : 30,
+	                tone: selectedStandingRow?.guv != null && selectedStandingRow.guv < 0 ? "warning" : "ready",
+	                onClick: () => setFoundationView("prize", setActiveView),
+	              },
+	            ]);
+              const managerPriorityCards = sortManagerCards([
+                {
+                  key: "priority-lineup",
+                  title: homeNextMatchdayStatus.openSlots > 0 ? "Einsatzliste offen" : homeNextMatchdayStatus.resultAvailable ? "Reveal lesen" : "Arena starten",
+                  detail:
+                    homeNextMatchdayStatus.requiredSlots > 0
+                      ? `${homeNextMatchdayStatus.filledSlots}/${homeNextMatchdayStatus.requiredSlots} Slots · ${homeNextMatchdayStatus.openSlots} offen`
+                      : "Kein aktiver Spieltag im Fokus.",
+                  meta: homeNextMatchdayStatus.openSlots > 0 ? "Schaden: Matchday blockiert" : "Nutzen: Spieltag direkt spielbar",
+                  tone: homeNextMatchdayStatus.openSlots > 0 ? "warning" : "ready",
+                  priority: homeNextMatchdayStatus.openSlots > 0 ? 100 : 70,
+                  accent: "lineup",
+                  onClick: () => setFoundationView(homeNextMatchdayStatus.openSlots > 0 ? "lineup" : "matchdayArena", setActiveView),
+                },
+                {
+                  key: "priority-finance",
+                  title: selectedHqFinanceWarnings.length > 0 ? "Cash-Druck" : "Finanzlage stabil",
+                  detail:
+                    selectedHqFinanceWarnings[0] ??
+                    `Cash ${selectedStandingRow?.cash != null ? formatMoney(selectedStandingRow.cash) : "—"} · Gehalt ${selectedStandingRow?.salaryTotal != null ? formatMoney(selectedStandingRow.salaryTotal) : "—"}`,
+                  meta: selectedHqFinanceWarnings.length > 0 ? "Schaden: Markt und Verlaengerungen enger" : "Nutzen: Flex fuer Deals",
+                  tone: selectedHqFinanceWarnings.length > 0 ? "danger" : "ready",
+                  priority: selectedHqFinanceWarnings.length > 0 ? 92 : 54,
+                  accent: "finance",
+                  onClick: () => setFoundationView("prize", setActiveView),
+                },
+                {
+                  key: "priority-morale",
+                  title:
+                    (selectedHqMoraleSummary?.criticalCount ?? 0) > 0 || (selectedHqMoraleSummary?.exitRiskCount ?? 0) > 0
+                      ? "Moral kippt"
+                      : "Moral ruhig",
+                  detail:
+                    selectedHqMoraleSummary
+                      ? `${selectedHqMoraleSummary.criticalCount} kritisch · ${selectedHqMoraleSummary.exitRiskCount} Exit-Risiken`
+                      : "Noch keine belastbare Moral-Lage.",
+                  meta:
+                    (selectedHqMoraleSummary?.criticalCount ?? 0) > 0 || (selectedHqMoraleSummary?.exitRiskCount ?? 0) > 0
+                      ? "Schaden: Forderungen und Abgangsrisiko"
+                      : "Nutzen: stabiler Kern",
+                  tone:
+                    (selectedHqMoraleSummary?.criticalCount ?? 0) > 0 || (selectedHqMoraleSummary?.exitRiskCount ?? 0) > 0
+                      ? "danger"
+                      : "ready",
+                  priority:
+                    (selectedHqMoraleSummary?.criticalCount ?? 0) > 0 || (selectedHqMoraleSummary?.exitRiskCount ?? 0) > 0
+                      ? 90
+                      : 48,
+                  accent: "board",
+                  onClick: () => setFoundationView("teams", setActiveView),
+                },
+                {
+                  key: "priority-market",
+                  title: hqTransferWishlistEntries.length > 0 ? "Marktchance da" : "Marktwatch fehlt",
+                  detail:
+                    hqTransferWishlistEntries[0]
+                      ? `${hqTransferWishlistEntries[0].playerName} · ${hqTransferWishlistEntries[0].className} · MW ${hqTransferWishlistEntries[0].marketValue != null ? formatTransfermarktCurrency(hqTransferWishlistEntries[0].marketValue) : "—"}`
+                      : "Wishlist und Fits geben dir wieder schnellere Kaufentscheidungen.",
+                  meta: hqTransferWishlistEntries.length > 0 ? "Nutzen: vorbereitete Targets" : "Chance: Watchlist aufbauen",
+                  tone: hqTransferWishlistEntries.length > 0 ? "ready" : "warning",
+                  priority: hqTransferWishlistEntries.length > 0 ? 72 : 46,
+                  accent: "power",
+                  onClick: () => setFoundationView("marketV2", setActiveView),
+                },
+                {
+                  key: "priority-training",
+                  title: hqTrainingFocusCount > 0 ? "Training braucht Fokus" : "Training ruhig",
+                  detail:
+                    hqTrainingFocusCount > 0
+                      ? `${hqTrainingFocusCount} Spieler mit XP-/Fatigue-Signal.`
+                      : "Gerade kein akuter Trainingsstau.",
+                  meta: hqTrainingFocusCount > 0 ? "Nutzen: Entwicklung sichern" : "Kein Sofortschaden",
+                  tone: hqTrainingFocusCount > 0 ? "warning" : "ready",
+                  priority: hqTrainingFocusCount > 0 ? 68 : 40,
+                  accent: "lineup",
+                  onClick: () => setFoundationView("trainingV2", setActiveView),
+                },
+              ]);
+              const marketWatchRows = hqTransferWishlistEntries.slice(0, 3);
+              const hqGlanceRows = [
+                {
+                  key: "cash",
+                  label: "Cash",
+                  value: selectedStandingRow?.cash != null ? formatMoney(selectedStandingRow.cash) : "—",
+                  detail: selectedHqFinanceWarnings[0] ?? "sofort verfuegbar",
+                },
+                {
+                  key: "salary",
+                  label: "Gehalt",
+                  value: selectedStandingRow?.salaryTotal != null ? formatMoney(selectedStandingRow.salaryTotal) : "—",
+                  detail: "laufender Saisondruck",
+                },
+                {
+                  key: "roster",
+                  label: "Kader",
+                  value: `${selectedStandingRow?.rosterCount ?? rosterPlayers.length}`,
+                  detail: `${hqContractExpiringCount} kurz gebunden`,
+                },
+                {
+                  key: "morale",
+                  label: "Moral",
+                  value: selectedHqMoraleSummary?.average != null ? formatLocalePoints(selectedHqMoraleSummary.average, 1) : "—",
+                  detail: `${selectedHqMoraleSummary?.criticalCount ?? 0} kritisch`,
+                },
+                {
+                  key: "axes",
+                  label: "Achsen",
+                  value:
+                    selectedHqAxisSummary?.weakestTwo.length
+                      ? selectedHqAxisSummary.weakestTwo.map((entry) => `${entry.label} #${entry.rank}`).join(" · ")
+                      : "—",
+                  detail:
+                    selectedHqAxisSummary?.strongest
+                      ? `stark: ${selectedHqAxisSummary.strongest.label} #${selectedHqAxisSummary.strongest.rank}`
+                      : "keine Rangdaten",
+                },
+                {
+                  key: "board",
+                  label: "Board",
+                  value: `${selectedBoardConfidence?.value ?? "—"}/10`,
+                  detail: `Druck ${selectedBoardConfidence?.pressure ?? "—"}/10`,
+                },
+              ];
+              const immediatePrimaryAction = immediateCards[0] ?? null;
+              const seasonPrimaryAction = seasonCards[0] ?? null;
+              const preseasonPrimaryAction = preseasonCards[0] ?? null;
+	            return (
+	              <section className={`panel foundation-hq-panel${getViewClass("hq")}`} data-testid="foundation-hq" id="foundation-hq">
+	                <div className="foundation-hq-hero">
+	                  <button
+	                    className="foundation-home-team-card foundation-hq-team-card"
+	                    type="button"
+	                    onClick={() => selectedTeam?.teamId && openTeamDrawerById(selectedTeam.teamId)}
+	                    title="Team-Dossier öffnen"
+	                  >
+	                    {homeActiveTeamLogo?.src ? (
+	                      <img
+	                        className="foundation-home-logo"
+	                        src={homeActiveTeamLogo.src}
+	                        alt={`${selectedTeam?.name ?? "Team"} Logo`}
+	                        loading="eager"
+	                        decoding="async"
+	                      />
+	                    ) : (
+	                      <span className="foundation-home-logo team-logo-placeholder">{homeActiveTeamLogo?.initials ?? selectedTeam?.shortCode ?? "?"}</span>
+	                    )}
+	                    <div className="stack">
+	                      <span className="eyebrow">HQ / Manager-Zentrale</span>
+	                      <h1>{selectedTeam?.name ?? "Kein Team ausgewählt"}</h1>
+	                      <div className="room-meta foundation-admin-meta">
+	                        <span className="pill">{selectedTeam?.shortCode ?? "—"}</span>
+	                        <span className="pill">{formatTeamControlModeLabel(selectedTeamControl?.controlMode)}</span>
+	                        <span className="pill">{gameState.season.name}</span>
+	                        <span className="pill">{currentMatchdayDisplayLabel}</span>
+	                      </div>
+	                    </div>
+	                  </button>
+	                  <article className="foundation-home-next-card foundation-hq-command">
+	                    <span className="eyebrow">Front-Office Fokus</span>
+	                    <strong>{managerPriorityCards[0]?.title ?? selectedOpenObjectives[0]?.label ?? selectedHqFinanceWarnings[0] ?? "Systeme stabil halten"}</strong>
+	                    <p className="muted">
+	                      {managerPriorityCards[0]?.detail ??
+                          "Erst die akuten Baustellen schliessen, dann Season-Druck sauber managen und den Wechsel rechtzeitig vorbereiten."}
+	                    </p>
+                      <div className="foundation-hq-finance-strip">
+                        <span>
+                          Sofort
+                          <strong>{managerPriorityCards[0]?.meta ?? "naechster Zug"}</strong>
+                        </span>
+                        <span>
+                          Diese Season
+                          <strong>{seasonCards[0]?.title ?? "ruhig"}</strong>
+                        </span>
+                        <span>
+                          Wechsel
+                          <strong>{preseasonCards[0]?.title ?? "vorbereiten"}</strong>
+                        </span>
+                      </div>
+	                    <div className="foundation-home-actions">
+	                      <button className="primary-button inline-button" type="button" onClick={() => setFoundationView("lineup", setActiveView)}>
+	                        Einsatz planen
+	                      </button>
+	                      <button className="secondary-button inline-button" type="button" onClick={() => setFoundationView("marketV2", setActiveView)}>
+	                        Markt prüfen
+	                      </button>
+	                      <button className="secondary-button inline-button" type="button" onClick={() => setFoundationView("inbox", setActiveView)}>
+	                        Inbox öffnen
+	                      </button>
+	                    </div>
+	                  </article>
+	                </div>
+
+                  <section className="foundation-hq-priority-rail" aria-label="Manager-Fokus">
+                    <div className="foundation-hq-focus-head">
+                      <div className="foundation-hq-focus-copy">
+                        <span>Manager-Fokus</span>
+                        <strong>Was du jetzt tun solltest</strong>
+                        <small>Nach Dringlichkeit sortiert. Jede Karte springt direkt in die richtige Ansicht.</small>
+                      </div>
+                      <span className="pill">{managerPriorityCards.filter((card) => card.tone !== "ready").length} aktiv</span>
+                    </div>
+                    <div className="foundation-hq-priority-grid">
+                      {managerPriorityCards.map((card) => (
+                        <button
+                          key={`hq-priority-${card.key}`}
+                          className={`foundation-hq-priority-card is-${card.accent}`}
+                          type="button"
+                          onClick={card.onClick}
+                        >
+                          <span>{card.tone === "danger" ? "Druck" : card.tone === "warning" ? "Jetzt" : "Chance"}</span>
+                          <strong>{card.title}</strong>
+                          <small>{card.detail}</small>
+                          <b>{card.meta}</b>
+                        </button>
+                      ))}
+                    </div>
+                  </section>
+
+	                <div className="foundation-hq-state-strip">
+	                  <article className="foundation-hq-state-card">
+	                    <span>Nächster Zug</span>
+	                    <strong>{managerPriorityCards[0]?.title ?? "—"}</strong>
+	                    <small>{managerPriorityCards[0]?.meta ?? "keine akute Baustelle"}</small>
+	                  </article>
+	                  <article className="foundation-hq-state-card">
+	                    <span>Cash</span>
+	                    <strong>{selectedStandingRow?.cash != null ? formatMoney(selectedStandingRow.cash) : "—"}</strong>
+	                    <small>sofort verfügbar</small>
+	                  </article>
+	                  <article className="foundation-hq-state-card">
+	                    <span>Gehalt</span>
+	                    <strong>{selectedStandingRow?.salaryTotal != null ? formatMoney(selectedStandingRow.salaryTotal) : "—"}</strong>
+	                    <small>laufender Druck</small>
+	                  </article>
+	                  <article className="foundation-hq-state-card">
+	                    <span>Kadergröße</span>
+	                    <strong>{selectedStandingRow?.rosterCount ?? rosterPlayers.length}</strong>
+	                    <small>aktive Spieler</small>
+	                  </article>
+	                  <article className="foundation-hq-state-card">
+	                    <span>Moral-Schnitt</span>
+	                    <strong>{selectedHqMoraleSummary?.average != null ? formatLocalePoints(selectedHqMoraleSummary.average, 1) : "—"}</strong>
+	                    <small>{selectedHqMoraleSummary?.criticalCount ?? 0} kritisch</small>
+	                  </article>
+	                  <article className="foundation-hq-state-card">
+	                    <span>Schwächste Achsen</span>
+	                    <strong>
+	                      {selectedHqAxisSummary?.weakestTwo.length
+	                        ? selectedHqAxisSummary.weakestTwo.map((entry) => `${entry.label} #${entry.rank}`).join(" · ")
+	                        : "—"}
+	                    </strong>
+	                    <small>
+	                      {selectedHqAxisSummary?.strongest ? `stark in ${selectedHqAxisSummary.strongest.label} #${selectedHqAxisSummary.strongest.rank}` : "keine Rangdaten"}
+	                    </small>
+	                  </article>
+	                </div>
+
+	                <div className="foundation-hq-zones">
+	                  <article className="foundation-home-card foundation-hq-zone">
+	                    <div className="panel-header compact">
+	                      <div className="stack">
+	                        <h2>Sofort</h2>
+	                        <p className="muted">Die nächsten direkten Züge für diesen Spieltag.</p>
+	                      </div>
+                        <div className="foundation-hq-zone-head-actions">
+	                      <span className={`transfer-status-pill${homeNextMatchdayStatus.openSlots > 0 ? " is-warning" : " is-ready"}`}>
+	                        {homeNextMatchdayStatus.statusLabel}
+	                      </span>
+                          {immediatePrimaryAction ? (
+                            <button className="secondary-button inline-button" type="button" onClick={immediatePrimaryAction.onClick} title={immediatePrimaryAction.detail}>
+                              Jetzt öffnen
+                            </button>
+                          ) : null}
+                        </div>
+	                    </div>
+	                    <div className="foundation-hq-action-grid">
+	                      {immediateCards.map((card) => (
+	                        <button key={`hq-immediate-${card.key}`} className={`foundation-hq-action-card is-${card.tone}`} type="button" onClick={card.onClick} title={`${card.detail} · ${card.meta}`}>
+	                          <span>{card.eyebrow}</span>
+	                          <strong>{card.title}</strong>
+	                          <small>{card.detail}</small>
+	                          <b>{card.meta}</b>
+	                        </button>
+	                      ))}
+	                    </div>
+	                  </article>
+
+	                  <article className="foundation-home-card foundation-hq-zone">
+	                    <div className="panel-header compact">
+	                      <div className="stack">
+	                        <h2>Diese Season</h2>
+	                        <p className="muted">Board, Markt, Training und Team-DNA im laufenden Rennen.</p>
+	                      </div>
+                        <div className="foundation-hq-zone-head-actions">
+	                      <span className="pill">{selectedOpenObjectives.length} Ziele offen</span>
+                          {seasonPrimaryAction ? (
+                            <button className="secondary-button inline-button" type="button" onClick={seasonPrimaryAction.onClick} title={seasonPrimaryAction.detail}>
+                              Direkt rein
+                            </button>
+                          ) : null}
+                        </div>
+	                    </div>
+	                    <div className="foundation-hq-action-grid">
+	                      {seasonCards.map((card) => (
+	                        <button key={`hq-season-${card.key}`} className={`foundation-hq-action-card is-${card.tone}`} type="button" onClick={card.onClick} title={`${card.detail} · ${card.meta}`}>
+	                          <span>{card.eyebrow}</span>
+	                          <strong>{card.title}</strong>
+	                          <small>{card.detail}</small>
+	                          <b>{card.meta}</b>
+	                        </button>
+	                      ))}
+	                    </div>
+	                    <div className="foundation-hq-mini-grid">
+	                      <div className="foundation-hq-mini-card is-glance">
+	                        <span>Teamzustand kompakt</span>
+                          <div className="foundation-hq-glance-grid">
+                            {hqGlanceRows.map((row) => (
+                              <div key={`hq-glance-${row.key}`} className="foundation-hq-glance-card">
+                                <span>{row.label}</span>
+                                <strong>{row.value}</strong>
+                                <small>{row.detail}</small>
+                              </div>
+                            ))}
+                          </div>
+	                      </div>
+	                      <div className="foundation-hq-mini-card is-watch">
+	                        <span>Wishlist</span>
+	                        {marketWatchRows.length > 0 ? (
+	                          <div className="foundation-hq-mini-list">
+	                            {marketWatchRows.map((entry) => (
+	                              <button key={`hq-wishlist-${entry.id}`} className="foundation-hq-mini-row" type="button" onClick={() => setFoundationView("marketV2", setActiveView)}>
+	                                <strong>{entry.playerName}</strong>
+	                                <small>{entry.className} · {entry.marketValue != null ? formatTransfermarktCurrency(entry.marketValue) : "—"} · Watch</small>
+	                              </button>
+	                            ))}
+	                          </div>
+	                        ) : (
+	                          <p className="muted">Noch leer. Gute Targets hier merken und spaeter schneller ziehen.</p>
+	                        )}
+	                      </div>
+	                      <div className="foundation-hq-mini-card">
+	                        <span>Marktchance</span>
+	                        {selectedHqAxisSummary?.weakestTwo[0] ? (
+	                          <button className="foundation-hq-mini-row" type="button" onClick={() => setFoundationView("marketV2", setActiveView)}>
+	                            <strong>{selectedHqAxisSummary?.weakestTwo[0] ? `${selectedHqAxisSummary.weakestTwo[0].label} reparieren` : "Fits pruefen"}</strong>
+	                            <small>
+                                {selectedHqAxisSummary?.weakestTwo[0]
+                                  ? `Schwachpunkt #${selectedHqAxisSummary.weakestTwo[0].rank} · Markt direkt auf diese Achse drehen`
+                                  : "Kaderbedarf und Wishlist im Markt kombinieren"}
+                              </small>
+	                          </button>
+	                        ) : (
+	                          <p className="muted">Gerade kein klarer Marktbedarf sichtbar.</p>
+	                        )}
+	                      </div>
+	                    </div>
+	                  </article>
+
+	                  <article className="foundation-home-card foundation-hq-zone">
+	                    <div className="panel-header compact">
+	                      <div className="stack">
+	                        <h2>Vor Saisonwechsel</h2>
+	                        <p className="muted">Was du früh vorbereitest, damit der Übergang nicht chaotisch wird.</p>
+	                      </div>
+                        <div className="foundation-hq-zone-head-actions">
+	                      <span className="pill">{hqContractExpiringCount} Ausläufer</span>
+                          {preseasonPrimaryAction ? (
+                            <button className="secondary-button inline-button" type="button" onClick={preseasonPrimaryAction.onClick} title={preseasonPrimaryAction.detail}>
+                              Vorbereiten
+                            </button>
+                          ) : null}
+                        </div>
+	                    </div>
+	                    <div className="foundation-hq-action-grid">
+	                      {preseasonCards.map((card) => (
+	                        <button key={`hq-preseason-${card.key}`} className={`foundation-hq-action-card is-${card.tone}`} type="button" onClick={card.onClick} title={`${card.detail} · ${card.meta}`}>
+	                          <span>{card.eyebrow}</span>
+	                          <strong>{card.title}</strong>
+	                          <small>{card.detail}</small>
+	                          <b>{card.meta}</b>
+	                        </button>
+	                      ))}
+	                    </div>
+	                    <div className="foundation-hq-mini-grid">
+	                      <div className="foundation-hq-mini-card">
+	                        <span>VK vorgemerkt</span>
+	                        {hqTransferSellMarkers.length > 0 ? (
+	                          <div className="foundation-hq-mini-list">
+	                            {hqTransferSellMarkers.map((entry) => (
+	                              <button key={`hq-sell-marker-${entry.id}`} className="foundation-hq-mini-row" type="button" onClick={() => setFoundationView("teams", setActiveView)}>
+	                                <strong>{entry.playerName}</strong>
+	                                <small>Buyout {entry.buyoutCost != null ? formatDisplayMoney(entry.buyoutCost) : "—"} · Moral {entry.morale != null ? formatWholeNumber(entry.morale) : "—"}</small>
+	                              </button>
+	                            ))}
+	                          </div>
+	                        ) : (
+	                          <p className="muted">Noch kein Spieler für den Abgang vorgemerkt.</p>
+	                        )}
+	                      </div>
+	                      <div className="foundation-hq-mini-card">
+	                        <span>Inbox & Lore</span>
+	                        {selectedHqInboxItems.length > 0 ? (
+	                          <div className="foundation-hq-mini-list">
+	                            {selectedHqInboxItems.slice(0, 3).map((item) => (
+	                              <button key={`hq-story-${item.itemId}`} className="foundation-hq-mini-row" type="button" onClick={() => navigateToInboxItem(item)}>
+	                                <strong>{item.title}</strong>
+	                                <small>{item.description}</small>
+	                              </button>
+	                            ))}
+	                          </div>
+	                        ) : (
+	                          <p className="muted">Gerade keine neuen Team-Highlights.</p>
+	                        )}
+	                      </div>
+	                    </div>
+	                  </article>
+	                </div>
+	              </section>
+	            );
+	          })() : null}
+
 	          <section className={`panel foundation-inbox-panel${getViewClass("inbox")}`} data-testid="foundation-inbox" id="foundation-inbox">
 	            <div className="panel-header">
 	              <div>
 	                <h2>Inbox</h2>
-	                <p className="muted">Aufgaben, Warnungen und News aus echten Save-Quellen. Keine automatisch erzeugten Fantasie-Meldungen.</p>
+	                <p className="muted">Nur dein aktives Team. Highlights, Storylines und klare To-dos statt einer globalen Sammelbox.</p>
 	              </div>
 	              <div className="room-meta foundation-admin-meta">
 	                <span className="pill foundation-source-pill">{getViewSourceBadgeLabel("inbox", activeContextMeta)}</span>
-	                <span className="pill">{gameInboxItems.filter((item) => item.status === "open").length} offen</span>
-	                <span className="pill">{gameInboxItems.filter((item) => item.severity === "critical" && item.status === "open").length} kritisch</span>
+	                <span className="pill">{activeTeamOpenInboxItems.length} offen</span>
+	                <span className="pill">{activeTeamCriticalInboxItems.length} kritisch</span>
 	              </div>
 	            </div>
+              <div className="foundation-inbox-hero">
+                <article className="foundation-inbox-team-card">
+                  <span>Aktives Team</span>
+                  <strong>{selectedTeam ? `${selectedTeam.shortCode} · ${selectedTeam.name}` : "Kein Team aktiv"}</strong>
+                  <small>
+                    {selectedTeam
+                      ? "Die Inbox zeigt nur Signale, Storys und Aufgaben fuer dieses Team."
+                      : "Waehle ein steuerbares Team, damit die Inbox wieder Signale zeigen kann."}
+                  </small>
+                </article>
+                <article className="foundation-inbox-team-card foundation-inbox-primary-card">
+                  <span>Nächster Fokus</span>
+                  <strong>{inboxPrimaryTeamItem?.title ?? "Gerade ruhig"}</strong>
+                  <small>
+                    {inboxPrimaryTeamItem?.description ??
+                      "Für dein aktives Team gibt es gerade keinen blockierenden Team-To-do-Moment."}
+                  </small>
+                  {inboxPrimaryTeamItem ? (
+                    <div className="foundation-inbox-primary-actions">
+                      <span className={getInboxSeverityPillClass(inboxPrimaryTeamItem.severity)}>
+                        {getInboxSeverityLabel(inboxPrimaryTeamItem.severity)}
+                      </span>
+                      <button className="primary-button inline-button" type="button" onClick={() => navigateToInboxItem(inboxPrimaryTeamItem)}>
+                        Öffnen
+                      </button>
+                    </div>
+                  ) : null}
+                </article>
+                <div className="foundation-inbox-stat-grid">
+                  <article>
+                    <span>Offen</span>
+                    <strong>{activeTeamOpenInboxItems.length}</strong>
+                  </article>
+                  <article>
+                    <span>Kritisch</span>
+                    <strong>{activeTeamCriticalInboxItems.length}</strong>
+                  </article>
+                  <article>
+                    <span>Storys</span>
+                    <strong>{activeTeamStoryInboxItems.length}</strong>
+                  </article>
+                  <article>
+                    <span>Entscheidungen</span>
+                    <strong>{activeTeamDecisionInboxItems.length}</strong>
+                  </article>
+                </div>
+              </div>
+              <div className="foundation-inbox-quick-grid">
+                <article className="foundation-inbox-story-strip">
+                  <div className="panel-header">
+                    <h3>Sofort jetzt</h3>
+                    <span className="pill">{Math.min(activeTeamDecisionInboxItems.length, 3)}</span>
+                  </div>
+                  <div className="foundation-inbox-quick-list">
+                    {activeTeamDecisionInboxItems.slice(0, 3).map((item) => (
+                      <button
+                        key={`inbox-quick-${item.itemId}`}
+                        className={`foundation-inbox-quick-card is-${item.severity}`}
+                        type="button"
+                        onClick={() => navigateToInboxItem(item)}
+                      >
+                        <span className={getInboxSeverityPillClass(item.severity)}>{getInboxSeverityLabel(item.severity)}</span>
+                        <strong>{item.title}</strong>
+                        <small>{item.description}</small>
+                      </button>
+                    ))}
+                    {activeTeamDecisionInboxItems.length === 0 ? (
+                      <p className="muted">Kein akuter Team-Fix offen.</p>
+                    ) : null}
+                  </div>
+                </article>
+                <article className="foundation-inbox-story-strip">
+                  <div className="panel-header">
+                    <h3>Letzte Storyline</h3>
+                    <span className="pill">{inboxLoreItems.length > 0 ? "live" : "ruhig"}</span>
+                  </div>
+                  {inboxLoreItems[0] ? (
+                    <button
+                      className={`foundation-inbox-lore-lead is-${inboxLoreItems[0].severity}`}
+                      type="button"
+                      onClick={() => navigateToInboxItem(inboxLoreItems[0])}
+                    >
+                      <span className="foundation-inbox-story-icon">{getInboxCategoryIcon(inboxLoreItems[0].category)}</span>
+                      <span>
+                        <strong>{inboxLoreItems[0].title}</strong>
+                        <small>{inboxLoreItems[0].description}</small>
+                      </span>
+                    </button>
+                  ) : (
+                    <p className="muted">Noch keine frische Team-Story für diesen Moment.</p>
+                  )}
+                </article>
+              </div>
 	            <div className="foundation-filter-grid">
-	              <label className="filter-field">
-	                <span>Team</span>
-	                <select className="input" value={inboxTeamFilter} onChange={(event) => setInboxTeamFilter(event.target.value)}>
-	                  <option value="ALL">Alle sichtbaren Teams</option>
-	                  {managerTeamOptions.map((team) => (
-	                    <option key={`inbox-team-${team.teamId}`} value={team.teamId}>
-	                      {team.shortCode} · {team.name}
-	                    </option>
-	                  ))}
-	                </select>
-	              </label>
 	              <label className="filter-field">
 	                <span>Kategorie</span>
 	                <select className="input" value={inboxCategoryFilter} onChange={(event) => setInboxCategoryFilter(event.target.value)}>
@@ -13591,18 +20954,72 @@ export default function FoundationPageClient({ initialReadSource, initialSelecte
 	                <span>Ausgeblendete anzeigen</span>
 	              </label>
 	            </div>
+              <div className="foundation-inbox-highlight-grid">
+                {inboxHighlightItems.length > 0 ? (
+                  inboxHighlightItems.map((item) => (
+                    <button
+                      key={`inbox-highlight-${item.itemId}`}
+                      className={`foundation-inbox-highlight-card is-${item.severity}`}
+                      type="button"
+                      onClick={() => navigateToInboxItem(item)}
+                    >
+                      <div className="room-meta foundation-admin-meta">
+                        <span className={getInboxSeverityPillClass(item.severity)}>{getInboxSeverityLabel(item.severity)}</span>
+                        <span className="pill">{getInboxCategoryLabel(item.category)}</span>
+                      </div>
+                      <strong>{item.title}</strong>
+                      <p>{item.description}</p>
+                      <small>{item.matchday ?? item.seasonId}</small>
+                    </button>
+                  ))
+                ) : (
+                  <div className="transfer-callout">
+                    <strong>Keine Team-Highlights</strong>
+                    <span>Aktuell gibt es fuer dieses Team weder kritische Signale noch frische Story-Momente.</span>
+                  </div>
+                )}
+              </div>
+              <div className="foundation-inbox-story-strip">
+                <div className="panel-header">
+                  <h3>Highlights & Lore</h3>
+                  <span className="pill">{inboxLoreItems.length}</span>
+                </div>
+                <div className="foundation-inbox-story-list">
+                  {inboxLoreItems.length > 0 ? (
+                    inboxLoreItems.map((item) => (
+                      <button
+                        key={`inbox-story-${item.itemId}`}
+                        className={`foundation-inbox-story-card is-${item.severity}`}
+                        type="button"
+                        onClick={() => navigateToInboxItem(item)}
+                      >
+                        <span className="foundation-inbox-story-icon">{getInboxCategoryIcon(item.category)}</span>
+                        <span>
+                          <strong>{item.title}</strong>
+                          <small>{item.description}</small>
+                        </span>
+                      </button>
+                    ))
+                  ) : (
+                    <p className="muted">Noch keine Story-Karten oder Reveal-Highlights fuer dieses Team.</p>
+                  )}
+                </div>
+              </div>
+              <div className="panel-header">
+                <h3>Team-Aufgaben</h3>
+                <span className="pill">{visibleInboxItems.length}</span>
+              </div>
 	            <div className="foundation-inbox-list">
 	              {visibleInboxItems.length > 0 ? (
 	                visibleInboxItems.map((item) => {
-	                  const team = item.teamId ? gameState.teams.find((candidate) => candidate.teamId === item.teamId) : null;
 	                  return (
 	                    <article key={`inbox-item-${item.itemId}`} className={`foundation-inbox-item is-${item.severity}`}>
 	                      <div>
 	                        <div className="room-meta foundation-admin-meta">
 	                          <span className={getInboxSeverityPillClass(item.severity)}>{getInboxSeverityLabel(item.severity)}</span>
-	                          <span className="pill">{item.category}</span>
-	                          <span className="pill">{item.status}</span>
-	                          {team ? <span className="pill">{team.shortCode}</span> : <span className="pill">global</span>}
+	                          <span className="pill">{getInboxCategoryLabel(item.category)}</span>
+	                          <span className={getInboxStatusPillClass(item.status)}>{getInboxStatusLabel(item.status)}</span>
+                            <span className="pill">{item.matchday ?? item.seasonId}</span>
 	                        </div>
 	                        <h3>{item.title}</h3>
 	                        <p>{item.description}</p>
@@ -13610,16 +21027,44 @@ export default function FoundationPageClient({ initialReadSource, initialSelecte
 	                          {item.source} · {item.matchday ?? item.seasonId}
 	                        </small>
 	                      </div>
+                        <div className="foundation-inbox-item-actions">
 	                      <button className="primary-button inline-button" type="button" onClick={() => navigateToInboxItem(item)}>
 	                        Öffnen
 	                      </button>
+                          {item.status === "open" ? (
+                            <>
+                              <button
+                                className="secondary-button inline-button"
+                                type="button"
+                                onClick={() => updateInboxItemStatus(item, "done")}
+                              >
+                                Erledigt
+                              </button>
+                              <button
+                                className="secondary-button inline-button"
+                                type="button"
+                                onClick={() => updateInboxItemStatus(item, "dismissed")}
+                              >
+                                Ausblenden
+                              </button>
+                            </>
+                          ) : (
+                            <button
+                              className="secondary-button inline-button"
+                              type="button"
+                              onClick={() => updateInboxItemStatus(item, "open")}
+                            >
+                              Wieder öffnen
+                            </button>
+                          )}
+                        </div>
 	                    </article>
 	                  );
 	                })
 	              ) : (
 	                <div className="transfer-callout">
 	                  <strong>Keine Inbox-Einträge</strong>
-	                  <span>Für die aktuellen Filter gibt es keine offenen echten Aufgaben oder News.</span>
+	                  <span>Fuer dieses Team gibt es in den aktuellen Filtern gerade keine offenen Signale.</span>
 	                </div>
 	              )}
 	            </div>
@@ -13633,14 +21078,83 @@ export default function FoundationPageClient({ initialReadSource, initialSelecte
               <span className="pill">{canonicalSeasonLabel}</span>
               <span className="pill">Save {activeSaveName}</span>
               <span className="pill">Scenario {formatScenarioTypeLabel(activeSaveSummary?.scenarioMeta?.scenarioType ?? gameState.scenarioMeta?.scenarioType)}</span>
-              <span className={`pill foundation-source-pill${isReadOnlyMode ? " is-readonly" : ""}`}>Read source: {readSourceLabel}</span>
+              <span className={`pill foundation-source-pill${isReadOnlyMode ? " is-readonly" : ""}`}>Spielstand: {readSourceLabel}</span>
               <span className="pill">Matchday {gameState.season.currentMatchday}</span>
               <span className="pill">Teams {gameState.teams.length}</span>
               <span className="pill">Spieler {gameState.players.length}</span>
               <span className="pill">Roster {gameState.rosters.length}</span>
             </div>
+            <div className="foundation-team-settings-hero">
+              <article className="foundation-team-settings-lead">
+                <span className="foundation-kicker">Control Room</span>
+                <strong>Spielstaende, Ownership und Team-KI an einer Stelle.</strong>
+                <p className="muted">
+                  Hier steuerst du, welches Team wem gehoert, wie AI-Teams laufen und welcher lokale Save gerade die Grundlage ist.
+                </p>
+                <div className="room-meta foundation-admin-meta">
+                  <span className={`pill${selectedTeamHasUnsavedChanges ? " warning-pill" : " success-pill"}`}>
+                    {selectedTeamHasUnsavedChanges ? "Aenderungen offen" : "Alles synchron"}
+                  </span>
+                  <span className="pill">Aktiv {selectedTeam?.shortCode ?? "—"}</span>
+                  <span className="pill">GM {selectedTeamGeneralManager?.profile.name ?? "—"}</span>
+                  <span className="pill">Steuerung {formatTeamControlModeLabel(selectedTeamControl?.controlMode)}</span>
+                </div>
+                <div className="foundation-save-actions">
+                  <button
+                    className="secondary-button"
+                    type="button"
+                    onClick={() => document.getElementById("foundation-team-settings-saves")?.scrollIntoView({ behavior: "smooth", block: "start" })}
+                  >
+                    Saves & Start
+                  </button>
+                  <button
+                    className="secondary-button"
+                    type="button"
+                    onClick={() => document.getElementById("foundation-team-settings-team-selection")?.scrollIntoView({ behavior: "smooth", block: "start" })}
+                  >
+                    Team-Fokus
+                  </button>
+                  <button
+                    className="secondary-button"
+                    type="button"
+                    onClick={() => document.getElementById("foundation-team-settings-controls")?.scrollIntoView({ behavior: "smooth", block: "start" })}
+                  >
+                    Team-KI
+                  </button>
+                  <button
+                    className="secondary-button"
+                    type="button"
+                    onClick={() => document.getElementById("foundation-admin")?.scrollIntoView({ behavior: "smooth", block: "start" })}
+                  >
+                    Admin
+                  </button>
+                </div>
+              </article>
+              <div className="foundation-team-settings-overview">
+                <article className="metric-card">
+                  <span>Aktiver Save</span>
+                  <strong>{activeSaveName}</strong>
+                  <small>{formatFoundationSaveModeLabel(foundationSaveMode)}</small>
+                </article>
+                <article className="metric-card">
+                  <span>Saves im Bereich</span>
+                  <strong>{saveSummaries.length}</strong>
+                  <small>{activeSaveIsInCurrentMode ? "aktiver Save sichtbar" : "aktiver Save ausserhalb"}</small>
+                </article>
+                <article className="metric-card">
+                  <span>Steuerung</span>
+                  <strong>{manualTeams.length}/{aiTeams.length}/{passiveTeams.length}</strong>
+                  <small>Manual · AI · Passive</small>
+                </article>
+                <article className="metric-card">
+                  <span>Fokus-Team</span>
+                  <strong>{selectedTeam?.shortCode ?? "—"}</strong>
+                  <small>{selectedStandingRow?.rank != null ? `Rang #${selectedStandingRow.rank}` : "noch ohne Rang"}</small>
+                </article>
+              </div>
+            </div>
             <div className="foundation-main-grid">
-              <section className="panel">
+              <section className="panel" id="foundation-team-settings-saves">
                 <div className="panel-header">
                   <h2>Spielstaende</h2>
                 </div>
@@ -13660,7 +21174,7 @@ export default function FoundationPageClient({ initialReadSource, initialSelecte
                       MD {activeSaveSummary?.scenarioMeta?.activeMatchday ?? gameState.scenarioMeta?.activeMatchday ?? gameState.season.currentMatchday}
                     </small>
                     <small className={`foundation-read-status${isReadOnlyMode ? " is-readonly" : ""}`}>
-                      Read source: {readSourceLabel}
+                      Spielstand: {readSourceLabel}
                     </small>
                   </article>
                   {activeScenarioWarning ? (
@@ -13671,20 +21185,61 @@ export default function FoundationPageClient({ initialReadSource, initialSelecte
                   ) : null}
 
                   <label className="filter-field">
+                    <span>Save-Bereich</span>
+                    <select
+                      className="input"
+                      data-testid="foundation-save-mode-select"
+                      value={foundationSaveMode}
+                      disabled={isSaveBusy || isReadOnlyMode}
+                      title={
+                        isReadOnlyMode
+                          ? getReadOnlyActionReason("den Save-Bereich")
+                          : isSaveBusy
+                            ? getBusyActionReason("Der Save-Wechsel")
+                            : "Waehlt, in welchem Bereich lokale Spielstaende angezeigt und gesteuert werden."
+                      }
+                      onChange={(event) => changeFoundationSaveMode(normalizeFoundationSaveMode(event.target.value))}
+                    >
+                      {FOUNDATION_SAVE_MODE_OPTIONS.map((option) => (
+                        <option key={option.value} value={option.value}>
+                          {option.label}
+                        </option>
+                      ))}
+                    </select>
+                  </label>
+
+                  <label className="filter-field">
                     <span>Aktiven Save wechseln</span>
                     <select
                       className="input"
                       data-testid="foundation-save-switch-select"
-                      value={activeSaveId}
-                      disabled={isSaveBusy || isReadOnlyMode}
+                      value={activeSaveIsInCurrentMode ? activeSaveId : ""}
+                      disabled={isSaveBusy || isReadOnlyMode || saveSummaries.length === 0}
+                      title={
+                        saveSummaries.length === 0
+                          ? "In diesem Save-Bereich gibt es gerade keine Spielstaende."
+                          : isReadOnlyMode
+                            ? getReadOnlyActionReason("den aktiven Spielstand")
+                            : isSaveBusy
+                              ? getBusyActionReason("Der Save-Wechsel")
+                              : "Waehlt den lokalen Spielstand, mit dem du weiterarbeitest."
+                      }
                       onChange={(event) => {
                         const nextSaveId = event.target.value;
+                        if (!nextSaveId) {
+                          return;
+                        }
                         void runSaveAction({ action: "activate", saveId: nextSaveId });
                       }}
                     >
+                      {!activeSaveIsInCurrentMode ? (
+                        <option value="" disabled>
+                          Kein Save in diesem Bereich
+                        </option>
+                      ) : null}
                       {saveSummaries.map((save) => (
                         <option key={save.saveId} value={save.saveId}>
-                          {save.name} ({save.status})
+                          {save.name} · {formatFoundationSaveModeLabel(save.saveMode ?? resolveFoundationSaveMode(save))} ({save.status})
                         </option>
                       ))}
                     </select>
@@ -13705,6 +21260,13 @@ export default function FoundationPageClient({ initialReadSource, initialSelecte
                           className="input"
                           value={newGamePresetId}
                           disabled={newGameBusy || isReadOnlyMode}
+                          title={
+                            isReadOnlyMode
+                              ? getReadOnlyActionReason("den Spielmodus")
+                              : newGameBusy
+                                ? getBusyActionReason("Das New-Game-Setup")
+                                : "Waehlt das Basissetup fuer das neue Spiel."
+                          }
                           onChange={(event) => applyNewGamePreset(event.target.value as NewGamePresetId)}
                         >
                           {Object.entries(NEW_GAME_PRESET_DEFAULTS).map(([presetId, preset]) => (
@@ -13720,6 +21282,13 @@ export default function FoundationPageClient({ initialReadSource, initialSelecte
                           className="input"
                           value={newGameSaveName}
                           disabled={newGameBusy || isReadOnlyMode}
+                          title={
+                            isReadOnlyMode
+                              ? getReadOnlyActionReason("den Save-Namen")
+                              : newGameBusy
+                                ? getBusyActionReason("Das New-Game-Setup")
+                                : "Optionaler Name fuer den neuen lokalen Spielstand."
+                          }
                           placeholder="Optional, sonst automatisch"
                           onChange={(event) => {
                             setNewGameSaveName(event.target.value);
@@ -13732,6 +21301,13 @@ export default function FoundationPageClient({ initialReadSource, initialSelecte
                           type="checkbox"
                           checked={newGameSandbox}
                           disabled={newGameBusy || isReadOnlyMode}
+                          title={
+                            isReadOnlyMode
+                              ? getReadOnlyActionReason("die Sandbox-Markierung")
+                              : newGameBusy
+                                ? getBusyActionReason("Das New-Game-Setup")
+                                : "Markiert den neuen Save klar als Test- oder Sandbox-Stand."
+                          }
                           onChange={(event) => {
                             setNewGameSandbox(event.target.checked);
                             setNewGamePreview(null);
@@ -13755,7 +21331,7 @@ export default function FoundationPageClient({ initialReadSource, initialSelecte
                       <article className="metric-card">
                         <span>Rest</span>
                         <strong>{Math.max(0, gameState.teams.length - newGameChrisTeamIds.length - newGameFrankyTeamIds.length)}</strong>
-                        <small>AI-Teams</small>
+                        <small>Auto-Teams</small>
                       </article>
                     </div>
 
@@ -13780,6 +21356,15 @@ export default function FoundationPageClient({ initialReadSource, initialSelecte
                                   className={isChris ? "primary-button inline-button" : "secondary-button inline-button"}
                                   type="button"
                                   disabled={newGameBusy || isReadOnlyMode || isFranky}
+                                  title={
+                                    isFranky
+                                      ? "Dieses Team ist bereits Franky zugeordnet."
+                                      : isReadOnlyMode
+                                        ? getReadOnlyActionReason("die Team-Zuordnung")
+                                        : newGameBusy
+                                          ? getBusyActionReason("Das New-Game-Setup")
+                                          : "Ordnet dieses Team Chris/User fuer den neuen Spielstand zu."
+                                  }
                                   onClick={() => toggleNewGameTeam("chris", team.teamId)}
                                 >
                                   Chris
@@ -13788,6 +21373,15 @@ export default function FoundationPageClient({ initialReadSource, initialSelecte
                                   className={isFranky ? "primary-button inline-button" : "secondary-button inline-button"}
                                   type="button"
                                   disabled={newGameBusy || isReadOnlyMode || isChris}
+                                  title={
+                                    isChris
+                                      ? "Dieses Team ist bereits Chris/User zugeordnet."
+                                      : isReadOnlyMode
+                                        ? getReadOnlyActionReason("die Team-Zuordnung")
+                                        : newGameBusy
+                                          ? getBusyActionReason("Das New-Game-Setup")
+                                          : "Ordnet dieses Team Franky fuer den neuen Spielstand zu."
+                                  }
                                   onClick={() => toggleNewGameTeam("franky", team.teamId)}
                                 >
                                   Franky
@@ -13803,6 +21397,13 @@ export default function FoundationPageClient({ initialReadSource, initialSelecte
                         className="secondary-button"
                         type="button"
                         disabled={newGameBusy || isReadOnlyMode}
+                        title={
+                          isReadOnlyMode
+                            ? getReadOnlyActionReason("das New-Game-Setup")
+                            : newGameBusy
+                              ? getBusyActionReason("Das New-Game-Setup")
+                              : "Prueft Baseline, Ownership und Season-Setup, bevor der neue Spielstand gebaut wird."
+                        }
                         onClick={() => void runNewGameSetup(true)}
                       >
                         {newGameBusy ? "Prueft..." : "Setup pruefen"}
@@ -13815,6 +21416,17 @@ export default function FoundationPageClient({ initialReadSource, initialSelecte
                           isReadOnlyMode ||
                           !newGamePreview ||
                           newGamePreview.blockers.length > 0
+                        }
+                        title={
+                          isReadOnlyMode
+                            ? getReadOnlyActionReason("ein neues Spiel")
+                            : newGameBusy
+                              ? getBusyActionReason("Das New-Game-Setup")
+                              : !newGamePreview
+                                ? "Bitte zuerst das Setup pruefen."
+                                : newGamePreview.blockers.length > 0
+                                  ? `Noch offen: ${newGamePreview.blockers.map((reason) => formatCockpitReason(reason)).join(" · ")}`
+                                  : "Erstellt den neuen lokalen Spielstand mit dem geprueften Setup."
                         }
                         onClick={() => void runNewGameSetup(false)}
                       >
@@ -13875,14 +21487,14 @@ export default function FoundationPageClient({ initialReadSource, initialSelecte
                                     <td>{team.shortCode} · {team.name}</td>
                                     <td>{formatMoney(team.budget)}</td>
                                     <td>{team.ownerLabel}</td>
-                                    <td>{team.controlMode}</td>
+                                    <td>{formatTeamControlModeLabel(team.controlMode)}</td>
                                   </tr>
                                 ))}
                             </tbody>
                           </table>
                         </div>
                         {newGamePreview.warnings.length > 0 ? (
-                          <p className="muted">Warnings: {newGamePreview.warnings.join(" · ")}</p>
+                          <p className="muted">Hinweise: {newGamePreview.warnings.join(" · ")}</p>
                         ) : null}
                         {newGamePreview.blockers.length > 0 ? (
                           <p className="text-negative">Blocker: {newGamePreview.blockers.join(" · ")}</p>
@@ -13896,6 +21508,13 @@ export default function FoundationPageClient({ initialReadSource, initialSelecte
                       className="secondary-button"
                       type="button"
                       disabled={isSaveBusy || isReadOnlyMode}
+                      title={
+                        isReadOnlyMode
+                          ? getReadOnlyActionReason("einen neuen Save")
+                          : isSaveBusy
+                            ? getBusyActionReason("Die Save-Aktion")
+                            : "Erstellt einen neuen lokalen Spielstand auf Basis des aktuellen Zustands."
+                      }
                       onClick={() => {
                         const name = `Save ${new Date().toLocaleString("de-DE", {
                           day: "2-digit",
@@ -13912,6 +21531,13 @@ export default function FoundationPageClient({ initialReadSource, initialSelecte
                       className="primary-button"
                       type="button"
                       disabled={isSaveBusy || isReadOnlyMode}
+                      title={
+                        isReadOnlyMode
+                          ? getReadOnlyActionReason("ein neues Spiel")
+                          : isSaveBusy
+                            ? getBusyActionReason("Die Save-Aktion")
+                            : "Startet einen frischen Season-1-Spielstand, ohne bestehende Saves zu loeschen."
+                      }
                       onClick={() => {
                         const confirmed = window.confirm(
                           "Erstellt einen neuen lokalen Testspielstand fuer Season 1. Bestehende Saves bleiben erhalten.",
@@ -13938,6 +21564,13 @@ export default function FoundationPageClient({ initialReadSource, initialSelecte
                       className="secondary-button"
                       type="button"
                       disabled={isSaveBusy || isReadOnlyMode}
+                      title={
+                        isReadOnlyMode
+                          ? getReadOnlyActionReason("den aktiven Save")
+                          : isSaveBusy
+                            ? getBusyActionReason("Die Save-Aktion")
+                            : "Dupliziert den aktuellen Spielstand als sichere Arbeitskopie."
+                      }
                       onClick={() => {
                         void runSaveAction({ action: "clone", sourceSaveId: activeSaveId, name: `${activeSaveName} Kopie` });
                       }}
@@ -13948,6 +21581,13 @@ export default function FoundationPageClient({ initialReadSource, initialSelecte
                       className="secondary-button"
                       type="button"
                       disabled={seasonStartResetBusy || isReadOnlyMode}
+                      title={
+                        isReadOnlyMode
+                          ? getReadOnlyActionReason("den Season-Start-Reset")
+                          : seasonStartResetBusy
+                            ? getBusyActionReason("Der Season-Start-Reset")
+                            : "Prueft, wie der aktuelle Save auf den Season-Start zurueckgesetzt wuerde."
+                      }
                       onClick={() => {
                         void runSeasonStartReset(false);
                       }}
@@ -13958,6 +21598,15 @@ export default function FoundationPageClient({ initialReadSource, initialSelecte
                       className="danger-button"
                       type="button"
                       disabled={seasonStartResetBusy || isReadOnlyMode || !seasonStartResetFeed || !seasonStartResetFeed.dryRun}
+                      title={
+                        isReadOnlyMode
+                          ? getReadOnlyActionReason("den Season-Start-Reset")
+                          : seasonStartResetBusy
+                            ? getBusyActionReason("Der Season-Start-Reset")
+                            : !seasonStartResetFeed || !seasonStartResetFeed.dryRun
+                              ? "Bitte zuerst den Reset trocken pruefen."
+                              : "Setzt den aktuellen lokalen Save hart auf den Season-Start zurueck."
+                      }
                       onClick={() => {
                         if (!seasonStartResetFeed) {
                           return;
@@ -14053,9 +21702,16 @@ export default function FoundationPageClient({ initialReadSource, initialSelecte
                   ) : null}
 
                   <div className="save-summary-list">
+                    {saveSummaries.length === 0 ? (
+                      <div className="transfer-callout">
+                        <strong>Keine Spielstaende in diesem Bereich</strong>
+                        <span>Wechsle den Save-Bereich oder starte ein neues Spiel in diesem Modus.</span>
+                      </div>
+                    ) : null}
                     {saveSummaries.map((save) => {
                       const meta = save.scenarioMeta;
                       const warning = buildScenarioWarning(meta);
+                      const resolvedSaveMode = save.saveMode ?? resolveFoundationSaveMode(save);
                       return (
                         <article
                           key={save.saveId}
@@ -14065,7 +21721,9 @@ export default function FoundationPageClient({ initialReadSource, initialSelecte
                             <strong>{save.name}</strong>
                             <span className="pill">{formatScenarioTypeLabel(meta?.scenarioType)}</span>
                           </div>
-                          <span className="muted">{formatShortSaveId(save.saveId)} · {save.status}</span>
+                          <span className="muted">
+                            {formatShortSaveId(save.saveId)} · {formatFoundationSaveModeLabel(resolvedSaveMode)} · {save.status}
+                          </span>
                           <span className="muted">
                             {meta?.activeSeasonId ?? "—"} · {meta?.gamePhase ?? "—"} · MD {meta?.activeMatchday ?? "—"}
                           </span>
@@ -14091,6 +21749,15 @@ export default function FoundationPageClient({ initialReadSource, initialSelecte
                               className="secondary-button inline-button"
                               type="button"
                               disabled={isSaveBusy || isReadOnlyMode || save.saveId === activeSaveId}
+                              title={
+                                save.saveId === activeSaveId
+                                  ? "Dieser Save ist bereits aktiv."
+                                  : isReadOnlyMode
+                                    ? getReadOnlyActionReason("den aktiven Save")
+                                    : isSaveBusy
+                                      ? getBusyActionReason("Die Save-Aktion")
+                                      : "Macht diesen lokalen Save zum aktiven Arbeitsstand."
+                              }
                               onClick={() => void runSaveAction({ action: "activate", saveId: save.saveId })}
                             >
                               Als aktiv setzen
@@ -14099,6 +21766,13 @@ export default function FoundationPageClient({ initialReadSource, initialSelecte
                               className="secondary-button inline-button"
                               type="button"
                               disabled={isSaveBusy || isReadOnlyMode}
+                              title={
+                                isReadOnlyMode
+                                  ? getReadOnlyActionReason("diesen Save")
+                                  : isSaveBusy
+                                    ? getBusyActionReason("Die Save-Aktion")
+                                    : "Erstellt eine Kopie dieses Spielstands."
+                              }
                               onClick={() => void runSaveAction({ action: "clone", sourceSaveId: save.saveId, name: `${save.name} Kopie` })}
                             >
                               Klonen
@@ -14107,6 +21781,13 @@ export default function FoundationPageClient({ initialReadSource, initialSelecte
                               className="secondary-button inline-button"
                               type="button"
                               disabled={isSaveBusy || isReadOnlyMode}
+                              title={
+                                isReadOnlyMode
+                                  ? getReadOnlyActionReason("einen Snapshot")
+                                  : isSaveBusy
+                                    ? getBusyActionReason("Die Save-Aktion")
+                                    : "Erstellt einen fest eingefrorenen Snapshot dieses Spielstands."
+                              }
                               onClick={() => void runSaveAction({ action: "snapshot", sourceSaveId: save.saveId, name: `${save.name} Snapshot` })}
                             >
                               Snapshot erstellen
@@ -14143,7 +21824,89 @@ export default function FoundationPageClient({ initialReadSource, initialSelecte
                 </div>
               </section>
 
-              <section className="panel foundation-wide">
+              <section className="panel foundation-wide foundation-team-settings-focus-panel">
+                <div className="panel-header">
+                  <div className="stack">
+                    <h2>Fokus-Team</h2>
+                    <p className="muted">Das aktuell ausgewaehlte Team steht hier im Zentrum. Von hier springst du direkt in Kader, Markt oder Team-Drawer.</p>
+                  </div>
+                  <div className="room-meta foundation-admin-meta">
+                    <span className="pill">{selectedTeam?.name ?? "Kein Team"}</span>
+                    <span className="pill">Roster {selectedRoster.length}</span>
+                    <span className="pill">GM {selectedTeamGeneralManager?.profile.archetype ?? "—"}</span>
+                  </div>
+                </div>
+                <div className="foundation-team-settings-focus-grid">
+                  <article className="foundation-team-settings-focus-card is-primary">
+                    <span>Team</span>
+                    <strong>{selectedTeam ? `${selectedTeam.shortCode} · ${selectedTeam.name}` : "Kein Team aktiv"}</strong>
+                    <small>
+                      {selectedTeam
+                        ? `${formatTeamControlModeLabel(selectedTeamControl?.controlMode)} · ${selectedStandingRow?.rank != null ? `Rang #${selectedStandingRow.rank}` : "noch ohne Rang"}`
+                        : "Waehle oben ein Team fuer Identity, Strategy und Control."}
+                    </small>
+                  </article>
+                  <article className="metric-card">
+                    <span>Punkte</span>
+                    <strong>{selectedStandingRow?.points != null ? formatLocalePoints(selectedStandingRow.points, 1) : "—"}</strong>
+                    <small>Live-Stand</small>
+                  </article>
+                  <article className="metric-card">
+                    <span>Cash</span>
+                    <strong>{selectedStandingRow?.cash != null ? formatMoney(selectedStandingRow.cash) : "—"}</strong>
+                    <small>liquide Mittel</small>
+                  </article>
+                  <article className="metric-card">
+                    <span>Gehalt</span>
+                    <strong>{selectedStandingRow?.salaryTotal != null ? formatMoney(selectedStandingRow.salaryTotal) : "—"}</strong>
+                    <small>aktueller Kader</small>
+                  </article>
+                  <article className="metric-card">
+                    <span>MW</span>
+                    <strong>{selectedStandingRow?.marketValueTotal != null ? formatMoney(selectedStandingRow.marketValueTotal) : "—"}</strong>
+                    <small>gesamter Kader</small>
+                  </article>
+                  <article className="metric-card">
+                    <span>Sponsor</span>
+                    <strong>{selectedStandingRow?.sponsorTotal != null ? formatMoney(selectedStandingRow.sponsorTotal) : "—"}</strong>
+                    <small>pro Season</small>
+                  </article>
+                </div>
+                <div className="foundation-save-actions">
+                  <button
+                    className="secondary-button"
+                    type="button"
+                    disabled={!selectedTeam}
+                    title={selectedTeam ? "Oeffnet das aktive Team direkt im Drawer." : "Waehle zuerst ein Team aus."}
+                    onClick={() => selectedTeam && openTeamDrawerById(selectedTeam.teamId)}
+                  >
+                    Team-Drawer
+                  </button>
+                  <button
+                    className="secondary-button"
+                    type="button"
+                    onClick={() => setFoundationView("teams", setActiveView)}
+                  >
+                    Kader öffnen
+                  </button>
+                  <button
+                    className="secondary-button"
+                    type="button"
+                    onClick={() => setFoundationView("marketV2", setActiveView)}
+                  >
+                    Markt öffnen
+                  </button>
+                  <button
+                    className="secondary-button"
+                    type="button"
+                    onClick={() => setFoundationView("lineup", setActiveView)}
+                  >
+                    Einsatzliste
+                  </button>
+                </div>
+              </section>
+
+              <section className="panel foundation-wide" id="foundation-team-settings-team-selection">
                 <div className="panel-header">
                   <div className="stack">
                     <h2>Team-Auswahl</h2>
@@ -14186,6 +21949,11 @@ export default function FoundationPageClient({ initialReadSource, initialSelecte
                     className="secondary-button"
                     type="button"
                     disabled={selectedTeamSettingsIndex <= 0}
+                    title={
+                      selectedTeamSettingsIndex <= 0
+                        ? "Du bist bereits beim ersten Team der Liste."
+                        : "Springt zum vorherigen Team in der aktuellen Liste."
+                    }
                     onClick={() => {
                       const previousTeam = gameState.teams[selectedTeamSettingsIndex - 1];
                       if (previousTeam) {
@@ -14199,6 +21967,11 @@ export default function FoundationPageClient({ initialReadSource, initialSelecte
                     className="secondary-button"
                     type="button"
                     disabled={selectedTeamSettingsIndex < 0 || selectedTeamSettingsIndex >= gameState.teams.length - 1}
+                    title={
+                      selectedTeamSettingsIndex < 0 || selectedTeamSettingsIndex >= gameState.teams.length - 1
+                        ? "Du bist bereits beim letzten Team der Liste."
+                        : "Springt zum naechsten Team in der aktuellen Liste."
+                    }
                     onClick={() => {
                       const nextTeam = gameState.teams[selectedTeamSettingsIndex + 1];
                       if (nextTeam) {
@@ -14235,7 +22008,7 @@ export default function FoundationPageClient({ initialReadSource, initialSelecte
                         <span className="team-selector-code">{team.shortCode}</span>
                         <strong>{team.name}</strong>
                         <span className="muted">
-                          Roster {rosterCount} · {controlMode}
+                          Roster {rosterCount} · {formatTeamControlModeLabel(controlMode)}
                         </span>
                       </button>
                     );
@@ -14243,19 +22016,57 @@ export default function FoundationPageClient({ initialReadSource, initialSelecte
                 </div>
               </section>
 
-              <section className="panel foundation-wide">
+              <section className="panel foundation-wide" id="foundation-team-settings-controls">
                 <div className="panel-header">
-                  <h2>Team Control Settings</h2>
+                  <div className="stack">
+                    <h2>Team Control Settings</h2>
+                    <p className="muted">
+                      Manual, AI und passive Teams werden lokal im Save gespeichert und steuern AI-Flows. Multiplayer-Rechte kommen separat aus
+                      Team Ownership im Online-Room.
+                    </p>
+                  </div>
+                  <div className="foundation-save-actions">
+                    <button
+                      className="primary-button"
+                      type="button"
+                      disabled={isReadOnlyMode}
+                      title={isReadOnlyMode ? getReadOnlyActionReason("die Team-Control-Settings") : "Speichert Control, Owner und lokale Team-Profile in diesem Save."}
+                      onClick={saveTeamSettings}
+                    >
+                      Lokal speichern
+                    </button>
+                    <button
+                      className="secondary-button"
+                      type="button"
+                      disabled={isReadOnlyMode}
+                      title={isReadOnlyMode ? getReadOnlyActionReason("den Team-Control-Draft") : "Setzt alle lokalen Entwurfs-Aenderungen auf den gespeicherten Stand zurueck."}
+                      onClick={() => {
+                        setTeamIdentityDraft(buildTeamIdentityDraftMap(gameState.teams, gameState.teamIdentities));
+                        setTeamControlDraft(buildTeamControlSettingsMap(gameState.teams, gameState.seasonState.teamControlSettings));
+                        setTeamStrategyDraft(
+                          buildTeamStrategyProfileMap(
+                            gameState.teams,
+                            gameState.teamIdentities,
+                            gameState.seasonState.teamStrategyProfiles,
+                          ),
+                        );
+                        setTeamIdentityMessage("Nicht gespeicherte Team-Identity-Änderungen wurden verworfen.");
+                        setTeamControlMessage("Nicht gespeicherte Änderungen wurden verworfen.");
+                        setTeamStrategyMessage("Nicht gespeicherte Strategy-Profile wurden verworfen.");
+                      }}
+                    >
+                      Draft verwerfen
+                    </button>
+                  </div>
+                  {isReadOnlyMode ? (
+                    <p className="foundation-screen-action-reason">Warum nicht: {getReadOnlyActionReason("die Team-Control-Settings")}</p>
+                  ) : null}
                 </div>
-                <p className="muted">
-                  Manual, AI und passive Teams werden lokal im Save gespeichert und steuern AI-Flows. Multiplayer-Rechte kommen separat aus
-                  Team Ownership im Online-Room.
-                </p>
                 <div className="room-meta foundation-admin-meta" style={{ marginTop: 12 }}>
                   <span className="pill">Manual {manualTeams.length}</span>
                   <span className="pill">AI {aiTeams.length}</span>
                   <span className="pill">Passive {passiveTeams.length}</span>
-                  <span className={`pill foundation-source-pill${isReadOnlyMode ? " is-readonly" : ""}`}>Write source: {readSourceLabel}</span>
+                  <span className={`pill foundation-source-pill${isReadOnlyMode ? " is-readonly" : ""}`}>Speichern: {readSourceLabel}</span>
                 </div>
                 <div className="table-shell" style={{ marginTop: 12 }}>
                   <table className="data-table compact-table">
@@ -14293,6 +22104,7 @@ export default function FoundationPageClient({ initialReadSource, initialSelecte
                                 className="input"
                                 value={settings.controlMode}
                                 disabled={isReadOnlyMode}
+                                title={isReadOnlyMode ? getReadOnlyActionReason("die Team-Steuerung") : "Legt fest, ob dieses Team manuell, per AI oder nur passiv laeuft."}
                                 onChange={(event) => {
                                   const nextMode = event.target.value as TeamControlMode;
                                   updateTeamControlDraft(team.teamId, (current) => ({
@@ -14331,6 +22143,13 @@ export default function FoundationPageClient({ initialReadSource, initialSelecte
                                 className="input"
                                 value={settings.ownerId ?? (settings.controlMode === "manual" ? DEFAULT_ACTIVE_OWNER_ID : "ai")}
                                 disabled={isReadOnlyMode || settings.controlMode === "ai"}
+                                title={
+                                  isReadOnlyMode
+                                    ? getReadOnlyActionReason("den Local Owner")
+                                    : settings.controlMode === "ai"
+                                      ? "AI-Teams haben keinen manuell waehlbaren Local Owner."
+                                      : "Waehlt, wer dieses Team lokal steuern darf."
+                                }
                                 onChange={(event) => {
                                   const ownerId = event.target.value;
                                   updateTeamControlDraft(team.teamId, (current) => ({
@@ -14352,6 +22171,7 @@ export default function FoundationPageClient({ initialReadSource, initialSelecte
                                 type="checkbox"
                                 checked={settings.aiLineupPreviewEnabled}
                                 disabled={isReadOnlyMode}
+                                title={isReadOnlyMode ? getReadOnlyActionReason("AI-Lineup-Preview") : "Schaltet die lokale AI-Vorschau fuer Einsatzlisten an oder aus."}
                                 onChange={(event) => {
                                   const checked = event.target.checked;
                                   updateTeamControlDraft(team.teamId, (current) => ({
@@ -14366,6 +22186,7 @@ export default function FoundationPageClient({ initialReadSource, initialSelecte
                                 type="checkbox"
                                 checked={settings.aiLineupApplyEnabled ?? settings.aiLineupAutoApplyEnabled}
                                 disabled={isReadOnlyMode}
+                                title={isReadOnlyMode ? getReadOnlyActionReason("AI-Lineup-Apply") : "Erlaubt lokales automatisches Anwenden von AI-Lineups."}
                                 onChange={(event) => {
                                   const checked = event.target.checked;
                                   updateTeamControlDraft(team.teamId, (current) => ({
@@ -14380,6 +22201,7 @@ export default function FoundationPageClient({ initialReadSource, initialSelecte
                                 type="checkbox"
                                 checked={settings.aiTransferPreviewEnabled}
                                 disabled={isReadOnlyMode}
+                                title={isReadOnlyMode ? getReadOnlyActionReason("AI-Transfer-Preview") : "Zeigt und berechnet Transferideen fuer dieses Team."}
                                 onChange={(event) => {
                                   const checked = event.target.checked;
                                   updateTeamControlDraft(team.teamId, (current) => ({
@@ -14390,13 +22212,14 @@ export default function FoundationPageClient({ initialReadSource, initialSelecte
                               />
                             </td>
                             <td>
-                              <input type="checkbox" checked={settings.aiTransferAutoApplyEnabled} disabled />
+                              <input type="checkbox" checked={settings.aiTransferAutoApplyEnabled} disabled title="Auto-Apply fuer Transfers bleibt derzeit technisch gesperrt." />
                             </td>
                             <td>
                               <input
                                 type="checkbox"
                                 checked={settings.aiSellPreviewEnabled}
                                 disabled={isReadOnlyMode}
+                                title={isReadOnlyMode ? getReadOnlyActionReason("AI-Sell-Preview") : "Zeigt Verkaufsentscheidungen und Exit-Ideen fuer dieses Team."}
                                 onChange={(event) => {
                                   const checked = event.target.checked;
                                   updateTeamControlDraft(team.teamId, (current) => ({
@@ -14407,7 +22230,7 @@ export default function FoundationPageClient({ initialReadSource, initialSelecte
                               />
                             </td>
                             <td>
-                              <input type="checkbox" checked={settings.aiSellAutoApplyEnabled} disabled />
+                              <input type="checkbox" checked={settings.aiSellAutoApplyEnabled} disabled title="Auto-Apply fuer Verkaeufe bleibt derzeit technisch gesperrt." />
                             </td>
                             <td>
                               <input
@@ -14416,6 +22239,7 @@ export default function FoundationPageClient({ initialReadSource, initialSelecte
                                 value={settings.notes ?? ""}
                                 placeholder="Strategie / Hinweis"
                                 disabled={isReadOnlyMode}
+                                title={isReadOnlyMode ? getReadOnlyActionReason("die Team-Notiz") : "Kurzer lokaler Hinweis fuer Steuerung, AI oder Rollenbild."}
                                 onChange={(event) => {
                                   const value = event.target.value;
                                   updateTeamControlDraft(team.teamId, (current) => ({
@@ -14432,39 +22256,27 @@ export default function FoundationPageClient({ initialReadSource, initialSelecte
                   </table>
                 </div>
                 <div className="foundation-save-actions" style={{ marginTop: 12 }}>
-                  <button className="primary-button" type="button" disabled={isReadOnlyMode} onClick={saveTeamSettings}>
-                    Team Settings lokal speichern
-                  </button>
-                  <button
-                    className="secondary-button"
-                    type="button"
-                    disabled={isReadOnlyMode}
-                    onClick={() => {
-                      setTeamIdentityDraft(buildTeamIdentityDraftMap(gameState.teams, gameState.teamIdentities));
-                      setTeamControlDraft(buildTeamControlSettingsMap(gameState.teams, gameState.seasonState.teamControlSettings));
-                      setTeamStrategyDraft(
-                        buildTeamStrategyProfileMap(
-                          gameState.teams,
-                          gameState.teamIdentities,
-                          gameState.seasonState.teamStrategyProfiles,
-                        ),
-                      );
-                      setTeamIdentityMessage("Nicht gespeicherte Team-Identity-Änderungen wurden verworfen.");
-                      setTeamControlMessage("Nicht gespeicherte Änderungen wurden verworfen.");
-                      setTeamStrategyMessage("Nicht gespeicherte Strategy-Profile wurden verworfen.");
-                    }}
-                  >
-                    Aenderungen verwerfen
-                  </button>
                   <button
                     className="secondary-button"
                     type="button"
                     disabled={!selectedTeam || !selectedIdentityDraft || !selectedTeamStrategyDraft}
+                    title={
+                      !selectedTeam
+                        ? "Waehle zuerst ein Team aus."
+                        : !selectedIdentityDraft || !selectedTeamStrategyDraft
+                          ? "Fuer dieses Team fehlen noch lokale Identity- oder Strategy-Daten."
+                          : "Exportiert die aktuellen lokalen Team-Settings als JSON."
+                    }
                     onClick={exportSelectedTeamSettingsJson}
                   >
                     Export JSON
                   </button>
                 </div>
+                {!selectedTeam || !selectedIdentityDraft || !selectedTeamStrategyDraft ? (
+                  <p className="foundation-screen-action-reason">
+                    Warum nicht: {!selectedTeam ? "Waehle zuerst ein Team aus." : "Fuer dieses Team fehlen noch lokale Identity- oder Strategy-Daten."}
+                  </p>
+                ) : null}
                 {teamIdentityMessage ? <p className="text-positive">{teamIdentityMessage}</p> : null}
                 {teamControlMessage ? <p className="text-positive">{teamControlMessage}</p> : null}
                 {teamStrategyMessage ? <p className="text-positive">{teamStrategyMessage}</p> : null}
@@ -14481,7 +22293,7 @@ export default function FoundationPageClient({ initialReadSource, initialSelecte
                       <div className="room-meta foundation-admin-meta">
                         <span className="pill">{selectedTeam.name}</span>
                         <span className="pill">{selectedTeam.shortCode}</span>
-                        <span className="pill">Control {selectedTeamControl?.controlMode ?? "manual"}</span>
+                        <span className="pill">Steuerung {formatTeamControlModeLabel(selectedTeamControl?.controlMode)}</span>
                       </div>
                     </div>
 
@@ -14630,13 +22442,20 @@ export default function FoundationPageClient({ initialReadSource, initialSelecte
                         </p>
 
                         <div className="foundation-save-actions" style={{ marginTop: 16 }}>
-                          <button className="primary-button" type="button" disabled={isReadOnlyMode} onClick={saveTeamSettings}>
+                          <button
+                            className="primary-button"
+                            type="button"
+                            disabled={isReadOnlyMode}
+                            title={isReadOnlyMode ? getReadOnlyActionReason("die Team-Identity") : "Speichert die lokalen Rohwerte und Biases dieses Teams."}
+                            onClick={saveTeamSettings}
+                          >
                             Identity lokal speichern
                           </button>
                           <button
                             className="secondary-button"
                             type="button"
                             disabled={isReadOnlyMode}
+                            title={isReadOnlyMode ? getReadOnlyActionReason("die Team-Identity") : "Setzt die Team-Identity fuer dieses Team auf den Default zurueck."}
                             onClick={() => {
                               const resetIdentities = buildResolvedTeamIdentities(gameState.teams, gameState.teamIdentities, {});
                               const resetIdentity = resetIdentities.find((identity) => identity.teamId === selectedTeam.teamId);
@@ -15045,13 +22864,20 @@ export default function FoundationPageClient({ initialReadSource, initialSelecte
                     </div>
 
                     <div className="foundation-save-actions" style={{ marginTop: 16 }}>
-                      <button className="primary-button" type="button" disabled={isReadOnlyMode} onClick={saveTeamSettings}>
+                      <button
+                        className="primary-button"
+                        type="button"
+                        disabled={isReadOnlyMode}
+                        title={isReadOnlyMode ? getReadOnlyActionReason("das Strategy-Profil") : "Speichert das lokale Strategy-Profil dieses Teams im aktiven Save."}
+                        onClick={saveTeamSettings}
+                      >
                         Strategy Profile lokal speichern
                       </button>
                       <button
                         className="secondary-button"
                         type="button"
                         disabled={isReadOnlyMode}
+                        title={isReadOnlyMode ? getReadOnlyActionReason("das Strategy-Profil") : "Verwirft ungespeicherte Strategy-Aenderungen und springt auf den aktuellen Save-Stand zurueck."}
                         onClick={() => {
                           setTeamStrategyDraft(
                             buildTeamStrategyProfileMap(
@@ -15069,6 +22895,7 @@ export default function FoundationPageClient({ initialReadSource, initialSelecte
                         className="secondary-button"
                         type="button"
                         disabled={isReadOnlyMode}
+                        title={isReadOnlyMode ? getReadOnlyActionReason("das Strategy-Profil") : "Setzt das Strategy-Profil dieses Teams auf die Default-Werte zurueck."}
                         onClick={() => {
                           const defaults = buildTeamStrategyProfileMap(gameState.teams, gameState.teamIdentities);
                           const resetProfile = defaults[selectedTeam.teamId];
@@ -15106,7 +22933,7 @@ export default function FoundationPageClient({ initialReadSource, initialSelecte
               </div>
             </div>
             <div className="room-meta foundation-admin-meta">
-              <span className="pill">Read source: {readSourceLabel}</span>
+              <span className="pill">Spielstand: {readSourceLabel}</span>
               <span className="pill">Save {activeSaveName}</span>
               <span className="pill">Teams {gameState.teams.length}</span>
             </div>
@@ -15115,6 +22942,192 @@ export default function FoundationPageClient({ initialReadSource, initialSelecte
                 Team Settings öffnen
               </button>
             </div>
+            <section className="panel inset-panel admin-season-sim-panel" style={{ marginTop: 16 }}>
+              <div className="panel-header compact">
+                <div className="stack">
+                  <h3>Season Simulation Control</h3>
+                  <p className="muted">
+                    Kontrollierter lokaler Runner mit Heartbeat, echten Phasen-Writes und append-only Reports. Keine Prisma-/Supabase-Writes.
+                  </p>
+                </div>
+                <span className={`transfer-status-pill${adminSimulationRun?.status === "blocked" ? " is-warning" : adminSimulationRun?.status === "running" ? " is-ready" : ""}`}>
+                  {adminSimulationRun?.status ?? "idle"}
+                </span>
+              </div>
+
+              <div className="admin-season-sim-controls">
+                <label>
+                  Seasons
+                  <select
+                    value={adminSimulationSeasonCount}
+                    onChange={(event) => setAdminSimulationSeasonCount(Number(event.target.value) === 5 ? 5 : Number(event.target.value) === 2 ? 2 : 1)}
+                    disabled={adminSimulationRun?.status === "running"}
+                  >
+                    <option value={1}>1 Season</option>
+                    <option value={2}>2 Seasons</option>
+                    <option value={5}>5 Seasons</option>
+                  </select>
+                </label>
+                <label>
+                  Modus
+                  <select
+                    value={adminSimulationMode}
+                    onChange={(event) => setAdminSimulationMode(event.target.value === "apply" ? "apply" : "dry_run")}
+                    disabled={adminSimulationRun?.status === "running"}
+                  >
+                    <option value="dry_run">Dry Run</option>
+                    <option value="apply">Apply</option>
+                  </select>
+                </label>
+                <label className="checkbox-row">
+                  <input
+                    type="checkbox"
+                    checked={adminSimulationFullChurn}
+                    onChange={(event) => setAdminSimulationFullChurn(event.target.checked)}
+                    disabled={adminSimulationRun?.status === "running"}
+                  />
+                  Full-Churn Stressmodus
+                </label>
+                <label className="checkbox-row">
+                  <input
+                    type="checkbox"
+                    checked={adminSimulationInjuries}
+                    onChange={(event) => setAdminSimulationInjuries(event.target.checked)}
+                    disabled={adminSimulationRun?.status === "running"}
+                  />
+                  Injuries Testmode
+                </label>
+              </div>
+
+              <div className="cockpit-actions admin-season-sim-actions">
+                <button
+                  className="primary-button"
+                  type="button"
+                  disabled={isReadOnlyMode || adminSimulationBusy || adminSimulationRun?.status === "running"}
+                  onClick={() => {
+                    void startAdminSeasonSimulationRun();
+                  }}
+                >
+                  Simulation starten
+                </button>
+                <button
+                  className="secondary-button"
+                  type="button"
+                  disabled={adminSimulationBusy || adminSimulationRun?.status !== "running"}
+                  onClick={() => {
+                    void postAdminSeasonSimulation("pause");
+                  }}
+                >
+                  Pause
+                </button>
+                <button
+                  className="secondary-button"
+                  type="button"
+                  disabled={adminSimulationBusy || adminSimulationRun?.status !== "paused"}
+                  onClick={() => {
+                    void postAdminSeasonSimulation("resume");
+                  }}
+                >
+                  Resume
+                </button>
+                <button
+                  className="secondary-button"
+                  type="button"
+                  disabled={adminSimulationBusy || !adminSimulationRun || ["completed", "blocked", "cancelled"].includes(adminSimulationRun.status)}
+                  onClick={() => {
+                    void postAdminSeasonSimulation("cancel");
+                  }}
+                >
+                  Abbrechen
+                </button>
+                <button
+                  className="secondary-button"
+                  type="button"
+                  disabled={adminSimulationBusy || !adminSimulationRun}
+                  onClick={() => {
+                    void postAdminSeasonSimulation("tick");
+                  }}
+                >
+                  Nächsten Schritt ausführen
+                </button>
+              </div>
+
+              {adminSimulationError ? <p className="text-negative">{adminSimulationError}</p> : null}
+
+              <div className="admin-season-sim-progress">
+                <div className="player-drawer-progress-track">
+                  <span style={{ width: `${adminSimulationRun?.progressPct ?? 0}%` }} />
+                </div>
+                <strong>{adminSimulationRun?.progressPct ?? 0}%</strong>
+              </div>
+
+              <div className="teams-summary-grid history-summary-grid admin-season-sim-grid">
+                <article className="metric-card">
+                  <span>Aktive Phase</span>
+                  <strong>{adminSimulationRun?.activePhase ?? "—"}</strong>
+                </article>
+                <article className="metric-card">
+                  <span>Season</span>
+                  <strong>{adminSimulationRun?.activeSeasonId ?? gameState.season.id}</strong>
+                </article>
+                <article className="metric-card">
+                  <span>Matchday</span>
+                  <strong>{adminSimulationRun?.activeMatchdayId ?? gameState.matchdayState.matchdayId}</strong>
+                </article>
+                <article className="metric-card">
+                  <span>Team</span>
+                  <strong>{adminSimulationRun?.activeTeamId ?? "—"}</strong>
+                </article>
+                <article className="metric-card">
+                  <span>Operation</span>
+                  <strong>{adminSimulationRun?.currentOperation ?? "bereit"}</strong>
+                </article>
+                <article className="metric-card">
+                  <span>Dauer</span>
+                  <strong>{adminSimulationRun ? `${Math.round(adminSimulationRun.durationMs / 1000)}s` : "—"}</strong>
+                </article>
+                <article className="metric-card">
+                  <span>Heartbeat</span>
+                  <strong>{adminSimulationRun?.heartbeatAt ? new Date(adminSimulationRun.heartbeatAt).toLocaleTimeString("de-DE") : "—"}</strong>
+                </article>
+                <article className="metric-card">
+                  <span>Reports</span>
+                  <strong>{adminSimulationRun?.reports.summary ? adminSimulationRun.reports.summary.split("/").at(-1) : "—"}</strong>
+                </article>
+              </div>
+
+              {adminSimulationRun ? (
+                <div className="admin-season-sim-report-links">
+                  <span className="pill">JSONL: {adminSimulationRun.reports.jsonl}</span>
+                  <span className="pill">Summary: {adminSimulationRun.reports.summary}</span>
+                </div>
+              ) : null}
+
+              <div className="admin-season-sim-issues">
+                <div>
+                  <strong>Issues</strong>
+                  <ul className="warning-list compact-list cockpit-detail-list">
+                    {adminSimulationRun?.issues.slice(-8).map((issue) => (
+                      <li key={`${issue.at}-${issue.code}-${issue.message}`} className={issue.level === "red" ? "text-negative" : issue.level === "yellow" ? "text-warning" : undefined}>
+                        [{issue.level.toUpperCase()}] {issue.phase}: {issue.message}
+                      </li>
+                    ))}
+                    {(adminSimulationRun?.issues.length ?? 0) === 0 ? <li>Keine RED/YELLOW Issues.</li> : null}
+                  </ul>
+                </div>
+                <div>
+                  <strong>Letzte Logs</strong>
+                  <ul className="warning-list compact-list cockpit-detail-list">
+                    {adminSimulationRun?.logs.slice(-20).map((entry) => (
+                      <li key={`${entry.at}-${entry.phase}-${entry.message}`}>
+                        {new Date(entry.at).toLocaleTimeString("de-DE")} · {entry.phase} · {entry.message}
+                      </li>
+                    ))}
+                    {(adminSimulationRun?.logs.length ?? 0) === 0 ? <li>Noch keine Logs.</li> : null}
+                  </ul>
+                </div>
+              </div>
+            </section>
             <details className="panel inset-panel" style={{ marginTop: 16 }}>
               <summary>Technische Übersicht</summary>
               <div className="stats-grid" style={{ marginTop: 12 }}>
@@ -15150,6 +23163,8 @@ export default function FoundationPageClient({ initialReadSource, initialSelecte
               players={gameState.players}
               disciplines={gameState.disciplines}
               drafts={gameState.seasonState.playerGeneratorDrafts ?? []}
+              teamContexts={playerGeneratorTeamContexts}
+              activeTeamId={selectedTeam?.teamId ?? null}
               readOnly={isReadOnlyMode}
               readSourceLabel={readSourceLabel}
               onSaveDrafts={savePlayerGeneratorDrafts}
@@ -15179,16 +23194,16 @@ export default function FoundationPageClient({ initialReadSource, initialSelecte
               <span className="pill">Save {activeSaveName}</span>
               <span className="pill">{canonicalSeasonLabel}</span>
               <span className="pill">{currentMatchdayDisplayLabel}</span>
-              <span className={`pill foundation-source-pill${isReadOnlyMode ? " is-readonly" : ""}`}>Source {readSourceLabel}</span>
+              <span className={`pill foundation-source-pill${isReadOnlyMode ? " is-readonly" : ""}`}>Spielstand {readSourceLabel}</span>
               <span className="pill">Manuell {manualTeams.length}</span>
-              <span className="pill">AI {aiTeams.length}</span>
+              <span className="pill">Auto {aiTeams.length}</span>
               <span className="pill">Passiv {passiveTeams.length}</span>
             </div>
 
             <div className="cockpit-live-banner">
               <strong>{currentMatchdayDisplayLabel} aktiv</strong>
               <span>
-                SQLite/local bleibt die Schreibquelle. Preview, DryRun und Confirm Apply bleiben sichtbar getrennt.
+                Lokaler Spielstand bleibt die Schreibquelle. Pruefen, Testlauf und Anwenden bleiben sichtbar getrennt.
               </span>
             </div>
 
@@ -15197,7 +23212,7 @@ export default function FoundationPageClient({ initialReadSource, initialSelecte
                 <div className="stack season-panel-head">
                   <h3>Multi-Season Balance</h3>
                   <p className="muted">
-                    Read-only Auswertung aus Season-Snapshots, aktivem Save, Transferhistorie, Facilities und Progression-Events.
+                    Auswertung aus Saison-Snapshots, aktivem Save, Transferhistorie, Gebaeuden und Entwicklung.
                   </p>
                 </div>
                 <span className="pill">Source local save</span>
@@ -15602,7 +23617,7 @@ export default function FoundationPageClient({ initialReadSource, initialSelecte
                     <strong>{getCockpitStatusLabel(cockpitLineupStatus.status)}</strong>
                   </article>
                   <article className="metric-card">
-                    <span>AI-Teams</span>
+                    <span>Auto-Teams</span>
                     <strong>{aiTeams.length}</strong>
                   </article>
                   <article className="metric-card">
@@ -15640,8 +23655,9 @@ export default function FoundationPageClient({ initialReadSource, initialSelecte
                       className="secondary-button"
                       type="button"
                       onClick={() => {
-                        setActiveView(link.id);
-                        syncFoundationViewInUrl(link.id);
+                        const targetView = link.id === "season" ? "seasonV2" : link.id;
+                        setActiveView(targetView);
+                        syncFoundationViewInUrl(targetView);
                       }}
                     >
                       {link.label}
@@ -15651,6 +23667,11 @@ export default function FoundationPageClient({ initialReadSource, initialSelecte
                     className="secondary-button"
                     type="button"
                     disabled={cockpitBusyKey != null}
+                    title={
+                      cockpitBusyKey != null
+                        ? getCockpitBusyReason()
+                        : "Laedt die Season-End-Preview fuer Preisgeld, Rangbewegung und Cash."
+                    }
                     onClick={() => {
                       setCockpitBusyKey("resolve-preview");
                       void reloadResolvePreview().finally(() => setCockpitBusyKey(null));
@@ -15753,8 +23774,8 @@ export default function FoundationPageClient({ initialReadSource, initialSelecte
                   className="secondary-button"
                   type="button"
                   onClick={() => {
-                    setActiveView("market");
-                    syncFoundationViewInUrl("market");
+                    setActiveView("marketV2");
+                    syncFoundationViewInUrl("marketV2");
                   }}
                 >
                   Transfermarkt oeffnen
@@ -15815,7 +23836,7 @@ export default function FoundationPageClient({ initialReadSource, initialSelecte
                   <div className="panel-header">
                     <div className="stack">
                       <h4>Matchday Auto-Run</h4>
-                      <p className="muted">Fuehrt nur den aktuellen lokalen Spieltag Schritt fuer Schritt aus. Kein Prisma-Write, keine Transfers.</p>
+                      <p className="muted">Fuehrt den lokalen Spieltag bis Ergebnis, Tabelle und naechstem Spieltag aus. Kein Prisma-Write, keine Transfers.</p>
                     </div>
                     <span className={getCockpitStatusPillClass(cockpitAutoRunStatus.status)}>{getCockpitStatusLabel(cockpitAutoRunStatus.status)}</span>
                   </div>
@@ -15853,26 +23874,20 @@ export default function FoundationPageClient({ initialReadSource, initialSelecte
                       <span>Tie Blocker</span>
                       <strong>{matchdayAutoRunFeed?.summary.tieBlockers ?? "—"}</strong>
                     </article>
+                    <article className="metric-card">
+                      <span>Weiter</span>
+                      <strong>{matchdayAutoRunFeed ? (matchdayAutoRunFeed.summary.advanceAllowed ? "ja" : "nein") : "—"}</strong>
+                    </article>
+                    <article className="metric-card">
+                      <span>Formkarten</span>
+                      <strong>{matchdayAutoRunFeed?.summary.formCardsSelected ?? "—"}</strong>
+                    </article>
+                    <article className="metric-card">
+                      <span>Negative Karten</span>
+                      <strong>{matchdayAutoRunFeed?.summary.negativeFormCardsSelected ?? "—"}</strong>
+                    </article>
                   </div>
                   <div className="inline-toggle-row" style={{ marginTop: 12 }}>
-                    <label className="inline-field">
-                      <span>Max Matchdays</span>
-                      <input
-                        type="number"
-                        min={1}
-                        max={gameState.season.matchdayIds.length}
-                        value={wholeSeasonMaxMatchdays}
-                        disabled={isReadOnlyMode || cockpitBusyKey != null}
-                        onChange={(event) => {
-                          const nextValue = Number.parseInt(event.target.value, 10);
-                          setWholeSeasonMaxMatchdays(
-                            Number.isFinite(nextValue)
-                              ? Math.max(1, Math.min(nextValue, gameState.season.matchdayIds.length))
-                              : gameState.season.matchdayIds.length,
-                          );
-                        }}
-                      />
-                    </label>
                     <label className="inline-checkbox">
                       <input
                         type="checkbox"
@@ -15924,13 +23939,13 @@ export default function FoundationPageClient({ initialReadSource, initialSelecte
                       }
                       onClick={() => {
                         const confirmed = window.confirm(
-                          "Jetzt den aktuellen Matchday lokal ausführen? Der Auto-Run speichert AI-Lineups, Results und Standings. Preisgeld, Cash und Transferfenster bleiben beim Saisonende.",
+                          "Jetzt den aktuellen Matchday lokal ausführen? Der Auto-Run speichert AI-Lineups, Ergebnis, Tabelle und springt danach zum nächsten Schritt. Preisgeld, Cash und Transferfenster bleiben beim Saisonende.",
                         );
                         if (!confirmed) return;
                         void runCockpitMatchdayAutoRun(true);
                       }}
                     >
-                      Matchday lokal simulieren
+                      Spieltag komplett ausführen
                     </button>
                   </div>
                   {matchdayAutoRunFeed ? (
@@ -15939,6 +23954,9 @@ export default function FoundationPageClient({ initialReadSource, initialSelecte
                         <li>Resolve ready: {String(matchdayAutoRunFeed.summary.resolveReady)}</li>
                         <li>Result Apply erlaubt: {String(matchdayAutoRunFeed.summary.resultApplyAllowed)}</li>
                         <li>Standings Apply erlaubt: {String(matchdayAutoRunFeed.summary.standingsApplyAllowed)}</li>
+                        <li>Matchday Advance: {String(matchdayAutoRunFeed.summary.advanceAllowed)}</li>
+                        <li>Formkarten im Plan: {matchdayAutoRunFeed.summary.formCardsSelected ?? "—"}</li>
+                        <li>Negative Formkarten in Slot 1: {matchdayAutoRunFeed.summary.negativeFormCardsSelected ?? "—"}</li>
                         <li>Preisgeld/Cash: season_end_only</li>
                         <li>Geplante Writes: {matchdayAutoRunFeed.summary.plannedWrites}</li>
                       </ul>
@@ -16433,35 +24451,35 @@ export default function FoundationPageClient({ initialReadSource, initialSelecte
               <article className={`panel cockpit-step ${getCockpitStepTone(cockpitAiLineupStatus.status)}`}>
                 <div className="panel-header">
                   <div className="stack">
-                    <h3>6. AI-Teams aufstellen</h3>
-                    <p className="muted">Nur Teams mit controlMode=ai und aktiver Freigabe werden lokal als Einsatzliste gespeichert.</p>
+                    <h3>6. Auto-Teams aufstellen</h3>
+                    <p className="muted">Nur automatisch gefuehrte Teams mit aktiver Freigabe werden lokal als Einsatzliste gespeichert.</p>
                   </div>
                   <span className={getCockpitStatusPillClass(cockpitAiLineupStatus.status)}>{getCockpitStatusLabel(cockpitAiLineupStatus.status)}</span>
                 </div>
                 <p>{cockpitAiLineupStatus.message}</p>
                 <div className="metric-grid cockpit-mini-grid">
                   <article className="metric-card">
-                    <span>AI Eligible</span>
+                    <span>Auto bereit</span>
                     <strong>{cockpitAiBatchApplyFeed?.summary.aiEligibleTeams ?? aiLineupApplyTeams.length}</strong>
                   </article>
                   <article className="metric-card">
-                    <span>Manual uebersprungen</span>
+                    <span>Gefuehrte uebersprungen</span>
                     <strong>{cockpitAiBatchApplyFeed?.summary.skippedManual ?? manualTeams.length}</strong>
                   </article>
                   <article className="metric-card">
-                    <span>Passive uebersprungen</span>
+                    <span>Beobachtete uebersprungen</span>
                     <strong>{cockpitAiBatchApplyFeed?.summary.skippedPassive ?? passiveTeams.length}</strong>
                   </article>
                   <article className="metric-card">
-                    <span>Disabled uebersprungen</span>
+                    <span>Auto aus</span>
                     <strong>{cockpitAiBatchApplyFeed?.summary.skippedDisabled ?? Math.max(aiTeams.length - aiLineupApplyTeams.length, 0)}</strong>
                   </article>
                   <article className="metric-card">
-                    <span>Ready to Save</span>
+                    <span>Speicherbereit</span>
                     <strong>{cockpitAiBatchApplyFeed?.summary.readyToSave ?? "—"}</strong>
                   </article>
                   <article className="metric-card">
-                    <span>Warnings</span>
+                    <span>Hinweise</span>
                     <strong>{cockpitAiBatchApplyFeed?.summary.warningTeams ?? "—"}</strong>
                   </article>
                   <article className="metric-card">
@@ -16517,7 +24535,7 @@ export default function FoundationPageClient({ initialReadSource, initialSelecte
                     disabled={isReadOnlyMode || cockpitBusyKey != null || Math.max(aiTeams.length - aiLineupApplyTeams.length, 0) === 0}
                     onClick={enableAiLineupApplyForAiTeams}
                   >
-                    AI-Lineup Apply fuer AI-Teams aktivieren
+                    Auto-Aufstellungen aktivieren
                   </button>
                   <button
                     className="secondary-button"
@@ -16851,6 +24869,7 @@ export default function FoundationPageClient({ initialReadSource, initialSelecte
                             <th>Final</th>
                             <th>Punkte</th>
                             <th>Mutator PP</th>
+                            <th>Mutator</th>
                           </tr>
                         </thead>
                         <tbody>
@@ -16862,6 +24881,7 @@ export default function FoundationPageClient({ initialReadSource, initialSelecte
                               <td>{formatLocalePoints(entry.finalPlayerScore, 1)}</td>
                               <td>{entry.pointsAwarded != null ? formatLocalePoints(entry.pointsAwarded, 1) : "—"}</td>
                               <td>{entry.mutatorPpsBonus != null && entry.mutatorPpsBonus > 0 ? formatLocalePoints(entry.mutatorPpsBonus, 1) : "—"}</td>
+                              <td>{entry.mutatorSelectedTraitLabels?.length ? entry.mutatorSelectedTraitLabels.join(" + ") : "—"}</td>
                             </tr>
                           ))}
                         </tbody>
@@ -16880,6 +24900,7 @@ export default function FoundationPageClient({ initialReadSource, initialSelecte
                             <th>Final</th>
                             <th>Punkte</th>
                             <th>Mutator PP</th>
+                            <th>Mutator</th>
                           </tr>
                         </thead>
                         <tbody>
@@ -16891,6 +24912,7 @@ export default function FoundationPageClient({ initialReadSource, initialSelecte
                               <td>{formatLocalePoints(entry.finalPlayerScore, 1)}</td>
                               <td>{entry.pointsAwarded != null ? formatLocalePoints(entry.pointsAwarded, 1) : "—"}</td>
                               <td>{entry.mutatorPpsBonus != null && entry.mutatorPpsBonus > 0 ? formatLocalePoints(entry.mutatorPpsBonus, 1) : "—"}</td>
+                              <td>{entry.mutatorSelectedTraitLabels?.length ? entry.mutatorSelectedTraitLabels.join(" + ") : "—"}</td>
                             </tr>
                           ))}
                         </tbody>
@@ -16907,6 +24929,7 @@ export default function FoundationPageClient({ initialReadSource, initialSelecte
                             <th>Spieler</th>
                             <th>Team</th>
                             <th>Mutator PP</th>
+                            <th>Mutator</th>
                             <th>Punkte</th>
                           </tr>
                         </thead>
@@ -16917,6 +24940,7 @@ export default function FoundationPageClient({ initialReadSource, initialSelecte
                               <td>{entry.playerName}</td>
                               <td>{entry.teamName}</td>
                               <td>{entry.mutatorPpsBonus != null ? formatLocalePoints(entry.mutatorPpsBonus, 1) : "—"}</td>
+                              <td>{entry.mutatorSelectedTraitLabels?.length ? entry.mutatorSelectedTraitLabels.join(" + ") : "—"}</td>
                               <td>{entry.pointsAwarded != null ? formatLocalePoints(entry.pointsAwarded, 1) : "—"}</td>
                             </tr>
                           ))}
@@ -17223,6 +25247,15 @@ export default function FoundationPageClient({ initialReadSource, initialSelecte
                     className="secondary-button"
                     type="button"
                     disabled={isReadOnlyMode || cockpitBusyKey != null || !prizePreviewFeed}
+                    title={
+                      isReadOnlyMode
+                        ? getReadOnlyActionReason("den Cash-DryRun")
+                        : cockpitBusyKey != null
+                          ? getCockpitBusyReason()
+                          : !prizePreviewFeed
+                            ? "Bitte zuerst die Preisgeld-Preview laden."
+                            : "Prueft den lokalen Cash-Apply einmal trocken."
+                    }
                     onClick={() => {
                       void runCockpitCashApply(false);
                     }}
@@ -17233,6 +25266,15 @@ export default function FoundationPageClient({ initialReadSource, initialSelecte
                     className="primary-button"
                     type="button"
                     disabled={isReadOnlyMode || cockpitBusyKey != null || cockpitCashApplyStatus.status !== "ready"}
+                    title={
+                      isReadOnlyMode
+                        ? getReadOnlyActionReason("den Cash-Apply")
+                        : cockpitBusyKey != null
+                          ? getCockpitBusyReason()
+                          : cockpitCashApplyStatus.status !== "ready"
+                            ? cockpitCashApplyStatus.message
+                            : "Schreibt die lokalen Cash-Werte fuer den Saisonabschluss."
+                    }
                     onClick={() => {
                       const confirmed = window.confirm("Cash Apply schreibt nur lokale Cash-Werte. Fortfahren?");
                       if (!confirmed) return;
@@ -17242,6 +25284,17 @@ export default function FoundationPageClient({ initialReadSource, initialSelecte
                     2. Cash lokal anwenden
                   </button>
                 </div>
+                {isReadOnlyMode || cockpitBusyKey != null || !prizePreviewFeed || cockpitCashApplyStatus.status !== "ready" ? (
+                  <p className="foundation-screen-action-reason">
+                    Warum nicht: {isReadOnlyMode
+                      ? getReadOnlyActionReason("den Cash-Apply")
+                      : cockpitBusyKey != null
+                        ? getCockpitBusyReason()
+                        : !prizePreviewFeed
+                          ? "Bitte zuerst die Preisgeld-Preview laden."
+                          : cockpitCashApplyStatus.message}
+                  </p>
+                ) : null}
                 <ul className="warning-list compact-list cockpit-detail-list">
                   <li>Duplicate Schutz: {String(cashApplyFeed?.summary?.duplicateDetected ?? cashApplyFeed?.duplicateDetected ?? false)}</li>
                   <li>Audit: {cashApplyFeed?.summary?.auditLogId ?? cashApplyFeed?.auditLogId ?? "—"}</li>
@@ -17258,13 +25311,20 @@ export default function FoundationPageClient({ initialReadSource, initialSelecte
                 </div>
                 <p>Wizard fuer Finanzen, Facilities, Entwicklung, Sell-before-Buy und Season-2-Setup. Nicht alles heimlich in einem Klick.</p>
                 <p className="muted cockpit-step-hint">
-                  Manual Teams: warten auf deine Entscheidung · AI Teams: Auto-Sell/Buy bereit · Passive Teams: uebersprungen
+                  Gefuehrte Teams: warten auf deine Entscheidung · Auto-Teams: Verkauf/Kauf bereit · Beobachtete Teams: uebersprungen
                 </p>
                 <div className="cockpit-actions">
                   <button
                     className="secondary-button"
                     type="button"
                     disabled={isReadOnlyMode || preSeasonWorkflowBusy}
+                    title={
+                      isReadOnlyMode
+                        ? getReadOnlyActionReason("die Pre-Season-Preview")
+                        : preSeasonWorkflowBusy
+                          ? getBusyActionReason("Die Pre-Season-Preview")
+                          : "Laedt die komplette Pre-Season-Vorschau fuer Finanzen, Facilities, Entwicklung und Markt."
+                    }
                     onClick={() => {
                       void runPreSeasonWorkflowPreview();
                     }}
@@ -17275,13 +25335,50 @@ export default function FoundationPageClient({ initialReadSource, initialSelecte
                     className="secondary-button"
                     type="button"
                     disabled={isReadOnlyMode || preSeasonWorkflowBusy}
+                    title={
+                      isReadOnlyMode
+                        ? getReadOnlyActionReason("den Saisonwechsel-Assistenten")
+                        : preSeasonWorkflowBusy
+                          ? getBusyActionReason("Die Pre-Season-Preview")
+                          : "Prueft den Saisonwechsel als gefuehrten Assistenten."
+                    }
                     onClick={() => {
                       void runSeasonTransition("preview");
                     }}
                   >
                     Saisonwechsel-Assistent prüfen
                   </button>
+                  <button
+                    className="primary-button"
+                    type="button"
+                    disabled={isReadOnlyMode || preSeasonWorkflowBusy || !preSeasonWorkflowFeed?.ok}
+                    title={
+                      isReadOnlyMode
+                        ? getReadOnlyActionReason("die neue Saison")
+                        : preSeasonWorkflowBusy
+                          ? getBusyActionReason("Der Pre-Season-Workflow")
+                          : preSeasonWorkflowFeed?.ok
+                            ? "Schreibt Snapshot, Progression, neue Schedule/Formkarten und startet die naechste Season."
+                            : "Erst Pre-Season Preview laden und Blocker pruefen."
+                    }
+                    onClick={() => {
+                      const confirmed = window.confirm("Neue Saison starten? Das schreibt Snapshot, Progression, neue Schedule, Formkarten und setzt den Flow auf Seasonstart.");
+                      if (!confirmed) return;
+                      void runPreSeasonNextSeasonSetup();
+                    }}
+                  >
+                    Neue Saison starten
+                  </button>
                 </div>
+                {isReadOnlyMode || preSeasonWorkflowBusy || !preSeasonWorkflowFeed?.ok ? (
+                  <p className="foundation-screen-action-reason">
+                    Warum nicht: {isReadOnlyMode
+                      ? getReadOnlyActionReason("die neue Saison")
+                      : preSeasonWorkflowBusy
+                        ? getBusyActionReason("Der Pre-Season-Workflow")
+                        : "Erst Pre-Season Preview laden und Blocker pruefen."}
+                  </p>
+                ) : null}
                 {preSeasonWorkflowFeed ? (
                   <>
                     <div className="training-cash-grid">
@@ -17289,11 +25386,11 @@ export default function FoundationPageClient({ initialReadSource, initialSelecte
                       <strong>{preSeasonWorkflowFeed.saveContext.seasonId}</strong>
                       <span>Nächste Season</span>
                       <strong>{preSeasonWorkflowFeed.saveContext.nextSeasonLabel}</strong>
-                      <span>Manual Teams</span>
+                      <span>Gefuehrte Teams</span>
                       <strong>{preSeasonWorkflowFeed.controlSummary.manualTeams}</strong>
-                      <span>AI Teams</span>
+                      <span>Auto-Teams</span>
                       <strong>{preSeasonWorkflowFeed.controlSummary.aiTeams}</strong>
-                      <span>Passive Teams</span>
+                      <span>Beobachtete Teams</span>
                       <strong>{preSeasonWorkflowFeed.controlSummary.passiveTeams}</strong>
                       <span>Game Phase nach Apply</span>
                       <strong>season_active</strong>
@@ -17313,7 +25410,7 @@ export default function FoundationPageClient({ initialReadSource, initialSelecte
                               <span key={`${step.stepId}-${key}`}>{key}: {String(value)}</span>
                             ))}
                           </div>
-                          {step.warnings.length > 0 ? <p className="muted">Warnings: {step.warnings.slice(0, 3).join(" · ")}</p> : null}
+                          {step.warnings.length > 0 ? <p className="muted">Hinweise: {step.warnings.slice(0, 3).join(" · ")}</p> : null}
                           {step.blockingReasons.length > 0 ? <p className="text-negative">Blocker: {step.blockingReasons.join(" · ")}</p> : null}
                         </div>
                       ))}
@@ -17325,23 +25422,41 @@ export default function FoundationPageClient({ initialReadSource, initialSelecte
 
               <article className={`panel cockpit-step ${getCockpitStepTone(seasonTransitionFeed?.ok ? "ready" : seasonTransitionFeed ? "warning" : "open")}`}>
                 <div className="panel-header">
-                  <h3>Season Transition Assistent</h3>
+                  <h3>Saisonabschluss & Review</h3>
                   <span className={getCockpitStatusPillClass(seasonTransitionFeed?.ok ? "ready" : seasonTransitionFeed ? "warning" : "open")}>
-                    {seasonTransitionFeed?.transition.status ?? "idle"}
+                    {seasonCompletionFeed?.status ?? seasonTransitionFeed?.transition.status ?? "idle"}
                   </span>
                 </div>
-                <p>Game-State-gesteuerter Saisonwechsel: erst prüfen, dann Rückblick, Finanzen, Entwicklung, Pre-Season, Transfers und erst später neue Saison.</p>
-                <p className="muted cockpit-step-hint">V1 ist Preview-/State-Struktur: keine Cash-, Roster-, Transfer- oder Season-Advance-Writes.</p>
+                <p>Saison sauber schließen: Board-Ziele, Preisgeld, Beziehungen, Snapshot, neue Saison und AI-Einsatz werden zusammen geprüft.</p>
+                <p className="muted cockpit-step-hint">Erst Abschluss pruefen, dann ausfuehren. Der echte Write laeuft atomar mit Recovery, damit der Save nicht halb im Saisonwechsel haengen bleibt.</p>
                 <div className="cockpit-actions">
                   <button
                     className="secondary-button"
                     type="button"
                     disabled={isReadOnlyMode || seasonTransitionBusy}
+                    title={
+                      isReadOnlyMode
+                        ? getReadOnlyActionReason("den Saisonwechsel-Assistenten")
+                        : seasonTransitionBusy
+                          ? getBusyActionReason("Der Saisonwechsel-Assistent")
+                          : "Zeigt die naechsten Saisonwechsel-Schritte erst einmal nur als Preview."
+                    }
                     onClick={() => {
                       void runSeasonTransition("preview");
                     }}
                   >
                     Assistent previewen
+                  </button>
+                  <button
+                    className="secondary-button"
+                    type="button"
+                    disabled={isReadOnlyMode || seasonTransitionBusy || !localSeasonTransitionGate.canCompleteSeason}
+                    title={localSeasonTransitionGate.disabledReason ?? "Prueft Board-Ziele, Preisgeld, Beziehungen, Snapshot, naechste Saison und AI-Audit ohne zu schreiben"}
+                    onClick={() => {
+                      void runSeasonCompletion(false);
+                    }}
+                  >
+                    Abschluss pruefen
                   </button>
                   <button
                     className="primary-button"
@@ -17354,7 +25469,131 @@ export default function FoundationPageClient({ initialReadSource, initialSelecte
                   >
                     Saison abschließen
                   </button>
+                  <button
+                    className="primary-button"
+                    type="button"
+                    disabled={isReadOnlyMode || seasonTransitionBusy || !localSeasonTransitionGate.canCompleteSeason}
+                    title={localSeasonTransitionGate.disabledReason ?? "Preisgeld, Snapshot, Review und AI-Audit ausführen"}
+                    onClick={() => {
+                      void runSeasonCompletion(true);
+                    }}
+                  >
+                    Abschluss-Run
+                  </button>
                 </div>
+                {isReadOnlyMode || seasonTransitionBusy || !localSeasonTransitionGate.canCompleteSeason ? (
+                  <p className="foundation-screen-action-reason">
+                    Warum nicht: {isReadOnlyMode
+                      ? getReadOnlyActionReason("den Saisonabschluss")
+                      : seasonTransitionBusy
+                        ? getBusyActionReason("Der Saisonwechsel-Assistent")
+                        : localSeasonTransitionGate.disabledReason ?? "Der Saisonabschluss hat noch offene Blocker."}
+                  </p>
+                ) : null}
+                {seasonCompletionFeed ? (
+                  <>
+                    <div className="season-completion-board" data-testid="season-completion-board">
+                      <div className={`season-completion-hero is-${seasonCompletionFeed.status}`}>
+                        <span className="eyebrow">{seasonCompletionFeed.dryRun ? "Preview" : "Saisonabschluss"}</span>
+                        <strong>
+                          {seasonCompletionFeed.status === "applied"
+                            ? "Saison sauber abgeschlossen"
+                            : seasonCompletionFeed.status === "blocked"
+                              ? "Abschluss blockiert"
+                              : "Bereit zum Abschluss"}
+                        </strong>
+                        <small>
+                          {seasonCompletionFeed.status === "blocked"
+                            ? seasonCompletionFeed.blockingReasons.map(formatCockpitReason).slice(0, 2).join(" · ") || "Offene Blocker pruefen."
+                            : "Board, Geld, Beziehungen, Snapshot, Transition und AI-Audit sind im gleichen Lauf sichtbar."}
+                        </small>
+                      </div>
+                      <div className="season-completion-step-row">
+                        {seasonCompletionFeed.steps.map((step, index) => (
+                          <div className={`season-completion-step ${getSeasonCompletionStepTone(step.status)}`} key={`completion-step-${step.key}`}>
+                            <span>{index + 1}</span>
+                            <strong>{step.label}</strong>
+                            <small>{formatSeasonCompletionStepStatus(step.status)}</small>
+                          </div>
+                        ))}
+                      </div>
+                      <div className="season-completion-card-grid">
+                        <div className="season-completion-card">
+                          <span>Board-Ziele</span>
+                          <strong>
+                            {seasonCompletionFeed.seasonReview?.objectiveSettlement
+                              ? `${seasonCompletionFeed.seasonReview.objectiveSettlement.totals.completed} / ${seasonCompletionFeed.seasonReview.objectiveSettlement.totals.completed + seasonCompletionFeed.seasonReview.objectiveSettlement.totals.failed} erreicht`
+                              : "offen"}
+                          </strong>
+                          <small>
+                            Board {formatSignedNumber(seasonCompletionFeed.seasonReview?.objectiveSettlement?.totals.boardConfidenceDelta, 2)} · Cash{" "}
+                            {formatSignedNumber(seasonCompletionFeed.seasonReview?.objectiveSettlement?.totals.cashDelta, 1)}
+                          </small>
+                        </div>
+                        <div className="season-completion-card">
+                          <span>Preisgeld</span>
+                          <strong>{formatSeasonCompletionStepStatus(seasonCompletionFeed.steps.find((step) => step.key === "cash_apply")?.status)}</strong>
+                          <small>{seasonCompletionFeed.cashApply?.applied ? "Cash wurde geschrieben." : "Noch Preview oder bereits vorhanden."}</small>
+                        </div>
+                        <div className="season-completion-card">
+                          <span>Beziehungen</span>
+                          <strong>{seasonCompletionFeed.relationships?.insertedEvents ?? 0} Events</strong>
+                          <small>{seasonCompletionFeed.relationships?.generatedEvents.length ?? 0} berechnet · Rival/Ally Verlauf bleibt nachvollziehbar</small>
+                        </div>
+                        <div className="season-completion-card">
+                          <span>Snapshot</span>
+                          <strong>{formatSeasonCompletionStepStatus(seasonCompletionFeed.steps.find((step) => step.key === "snapshot")?.status)}</strong>
+                          <small>Finaltabelle, Spielerleistungen und Transferhistorie werden eingefroren.</small>
+                        </div>
+                      </div>
+                      <div className="season-completion-ai-card">
+                        <div>
+                          <span className="eyebrow">AI Einsatz-Audit</span>
+                          <strong>
+                            {seasonCompletionFeed.aiSeasonAudit?.totals.aiDrafts ?? 0} Lineups · Cap{" "}
+                            {seasonCompletionFeed.aiSeasonAudit?.rates.aiCaptainPerDraftPct ?? 0}% · Form{" "}
+                            {seasonCompletionFeed.aiSeasonAudit?.rates.aiFormCardPerDraftPct ?? 0}% · Push{" "}
+                            {seasonCompletionFeed.aiSeasonAudit?.rates.aiPushSidePct ?? 0}%
+                          </strong>
+                          <small>
+                            Powers {seasonCompletionFeed.aiSeasonAudit?.totals.teamPowerUses ?? 0} · Mutatoren{" "}
+                            {seasonCompletionFeed.aiSeasonAudit?.totals.mutatorTraits ?? 0}
+                          </small>
+                        </div>
+                        {(seasonCompletionFeed.aiSeasonAudit?.teams ?? []).filter((team) => team.controlMode === "ai" && team.warnings.length > 0).slice(0, 5).map((team) => (
+                          <div className="season-completion-ai-team" key={`completion-ai-${team.teamId}`}>
+                            <strong>{team.teamCode} · {team.teamName}</strong>
+                            <span>
+                              {team.warnings.map(formatAiLineupAuditWarning).join(" · ")}
+                            </span>
+                          </div>
+                        ))}
+                        {(seasonCompletionFeed.aiSeasonAudit?.teams ?? []).filter((team) => team.controlMode === "ai" && team.warnings.length > 0).length === 0 ? (
+                          <div className="season-completion-ai-team is-clean">
+                            <strong>Keine AI-Blocker</strong>
+                            <span>Captain, Form, Push und Mutatoren werden im Save genutzt oder sind bewusst nicht auffaellig.</span>
+                          </div>
+                        ) : null}
+                      </div>
+                    </div>
+                    {seasonCompletionFeed.aiSeasonAudit?.warnings.length ? (
+                      <div className="training-warning-strip">
+                        <span className="transfer-status-pill is-warning">AI-Audit</span>
+                        <span>{seasonCompletionFeed.aiSeasonAudit.warnings.slice(0, 5).map(formatAiLineupAuditWarning).join(" · ")}</span>
+                      </div>
+                    ) : null}
+                    {seasonCompletionFeed.seasonReview?.objectiveSettlement ? (
+                      <div className="training-warning-strip">
+                        <span className="transfer-status-pill is-ready">Konsequenzen</span>
+                        <span>
+                          Board-Ziele: {seasonCompletionFeed.seasonReview.objectiveSettlement.totals.completed} erfuellt ·{" "}
+                          {seasonCompletionFeed.seasonReview.objectiveSettlement.totals.failed} verfehlt · Board{" "}
+                          {formatSignedNumber(seasonCompletionFeed.seasonReview.objectiveSettlement.totals.boardConfidenceDelta, 2)}
+                        </span>
+                      </div>
+                    ) : null}
+                  </>
+                ) : null}
                 {seasonTransitionFeed ? (
                   <>
                     <div className="training-cash-grid">
@@ -17452,6 +25691,38 @@ export default function FoundationPageClient({ initialReadSource, initialSelecte
                             ))}
                             {seasonTransitionFeed.seasonReview.awards.length === 0 ? <p className="muted">Keine Awards ohne belastbare Quellen.</p> : null}
                           </div>
+                          {seasonTransitionFeed.seasonReview.objectiveSettlement ? (
+                            <div className="season-review-objective-settlement">
+                              <div className="season-review-objective-summary">
+                                <strong>Board-Ziele</strong>
+                                <span>
+                                  {seasonTransitionFeed.seasonReview.objectiveSettlement.totals.completed} erfuellt ·{" "}
+                                  {seasonTransitionFeed.seasonReview.objectiveSettlement.totals.failed} verfehlt · Cash{" "}
+                                  {formatSignedNumber(seasonTransitionFeed.seasonReview.objectiveSettlement.totals.cashDelta, 1)} · Board{" "}
+                                  {formatSignedNumber(seasonTransitionFeed.seasonReview.objectiveSettlement.totals.boardConfidenceDelta, 2)}
+                                </span>
+                              </div>
+                              <div className="season-review-awards">
+                                {Object.values(seasonTransitionFeed.seasonReview.objectiveSettlement.byTeamId)
+                                  .sort((left, right) => (right.completed - left.completed) || (left.failed - right.failed) || left.teamName.localeCompare(right.teamName, "de"))
+                                  .slice(0, 8)
+                                  .map((entry) => (
+                                    <div
+                                      className={`season-review-award-card is-${entry.resultLabel}`}
+                                      key={`objective-settlement-${entry.teamId}`}
+                                    >
+                                      <span>{entry.teamName}</span>
+                                      <strong>
+                                        {entry.completed}/{entry.completed + entry.failed + entry.atRisk + entry.open} Ziele
+                                      </strong>
+                                      <small>
+                                        Cash {formatSignedNumber(entry.cashDelta, 1)} · Board {formatSignedNumber(entry.boardConfidenceDelta, 2)}
+                                      </small>
+                                    </div>
+                                  ))}
+                              </div>
+                            </div>
+                          ) : null}
                           <div className="season-review-highlight-grid">
                             <div>
                               <strong>Diszi-Highlights</strong>
@@ -17634,6 +25905,7 @@ export default function FoundationPageClient({ initialReadSource, initialSelecte
               </div>
             </div>
             <LegacyLineupLabClient
+              key={`lineup-${activeSaveId}-${gameState.season.id}-${gameState.matchdayState.matchdayId}-${activeManagerTeamId}-${effectiveActiveOwnerId}`}
               embedded
               initialSource="sqlite"
               defaultSaveId={activeSaveId}
@@ -17641,9 +25913,14 @@ export default function FoundationPageClient({ initialReadSource, initialSelecte
               defaultSeasonId={gameState.season.id}
               defaultMatchdayId={gameState.matchdayState.matchdayId}
               defaultTeamId={activeManagerTeamId}
+              highlightMissingSlots={Boolean(lineupFocusRequestKey)}
+              focusMissingRequestKey={lineupFocusRequestKey}
+              activeOwnerId={effectiveActiveOwnerId}
+              manageableTeamIds={ownerQuickSwitchTeams.map((team) => team.teamId)}
               onTeamChange={(teamId) => setActiveManagerTeam(teamId, "manual_select")}
               playerCatalog={gameState.players}
               onOpenPlayerDetails={(payload) => openPlayerDrawerById(payload.playerId, payload.activePlayerId)}
+              onLineupSaved={handleHumanLineupSaved}
             />
           </section>
           ) : null}
@@ -17657,7 +25934,7 @@ export default function FoundationPageClient({ initialReadSource, initialSelecte
                     {activeSaveName} · {gameState.season.id} · {gameState.matchdayState.matchdayId}
                   </span>
                 </div>
-                <MatchdayArenaClient
+                <MatchdayArenaV2Client
                   key={`${activeSaveId}-${gameState.season.id}-${gameState.matchdayState.matchdayId}-${activeManagerTeamId}`}
                   initialSource="sqlite"
                   defaultSaveId={activeSaveId}
@@ -17668,7 +25945,7 @@ export default function FoundationPageClient({ initialReadSource, initialSelecte
                   teams={gameState.teams}
                   teamControlSettingsMap={teamControlDraft}
                   onOpenPlayerDetails={(payload) => openPlayerDrawerById(payload.playerId, payload.activePlayerId)}
-                  onBackToLineup={() => setFoundationView("lineup", setActiveView)}
+                  onBackToLineup={shouldShowArenaBackToLineup ? () => setFoundationView("lineup", setActiveView) : null}
                   onOpenMatchdayResult={() => {
                     setSelectedMatchdaySummaryId(gameState.matchdayState.matchdayId);
                     window.setTimeout(() => {
@@ -17736,91 +26013,6 @@ export default function FoundationPageClient({ initialReadSource, initialSelecte
                           <small>{matchdaySummary.d2.disciplineId ?? "missing_source"}</small>
                         </article>
                       </div>
-                      <div className="matchday-result-layout">
-                        <section className="panel matchday-result-card-panel">
-                          <div className="panel-header">
-                            <h3>Top 5 Teams</h3>
-                          </div>
-                          <div className="matchday-result-team-cards">
-                            {matchdaySummary.topTeams.map((row) => (
-                              <article
-                                key={`arena-result-top-${row.teamId}`}
-                                className={joinClassNames(
-                                  "matchday-result-team-card",
-                                  row.teamId === activeManagerTeamId && "is-active-team",
-                                  getOwnerTeamHighlightClass(resolvedTeamControlSettings[row.teamId]),
-                                )}
-                                onDoubleClick={() => openTeamDrawerById(row.teamId)}
-                                title="Doppelklick öffnet den Team-Drawer"
-                              >
-                                <span>#{row.matchdayRank ?? "—"} · {row.teamShortCode}</span>
-                                <strong>{row.teamName}</strong>
-                                <small>{row.matchdayPoints ?? "—"} Tagespunkte · Score {row.matchdayScore != null ? formatLocalePoints(row.matchdayScore, 1) : "—"}</small>
-                              </article>
-                            ))}
-                          </div>
-                        </section>
-                        <section className="panel matchday-result-card-panel">
-                          <div className="panel-header">
-                            <h3>Bottom 5 Teams</h3>
-                          </div>
-                          <div className="matchday-result-team-cards">
-                            {matchdaySummary.bottomTeams.map((row) => (
-                              <article
-                                key={`arena-result-bottom-${row.teamId}`}
-                                className={joinClassNames(
-                                  "matchday-result-team-card",
-                                  "is-bottom",
-                                  row.teamId === activeManagerTeamId && "is-active-team",
-                                  getOwnerTeamHighlightClass(resolvedTeamControlSettings[row.teamId]),
-                                )}
-                                onDoubleClick={() => openTeamDrawerById(row.teamId)}
-                                title="Doppelklick öffnet den Team-Drawer"
-                              >
-                                <span>#{row.matchdayRank ?? "—"} · {row.teamShortCode}</span>
-                                <strong>{row.teamName}</strong>
-                                <small>{row.matchdayPoints ?? "—"} Tagespunkte · Score {row.matchdayScore != null ? formatLocalePoints(row.matchdayScore, 1) : "—"}</small>
-                              </article>
-                            ))}
-                          </div>
-                        </section>
-                      </div>
-                      <section className="panel matchday-result-top-players">
-                        <div className="panel-header">
-                          <h3>Top Player</h3>
-                          <span className="muted">Score, PPs und Bonusquellen.</span>
-                        </div>
-                        <div className="matchday-result-player-grid">
-                          {matchdaySummary.topPlayers.slice(0, 8).map((entry) => {
-                            const player = gameState.players.find((candidate) => candidate.id === entry.playerId) ?? null;
-                            const portrait = player ? getPlayerPortraitModel(player) : null;
-                            return (
-                              <button
-                                key={`arena-result-player-${entry.playerId}-${entry.disciplineId}-${entry.disciplineSide}`}
-                                className="matchday-result-player-card"
-                                type="button"
-                                onClick={() => openPlayerDrawerById(entry.playerId, entry.activePlayerId)}
-                              >
-                                {portrait?.src ? (
-                                  <PlayerPortrait
-                                    src={portrait.src}
-                                    initials={portrait.initials}
-                                    alt={`${entry.playerName} Portrait`}
-                                    className=""
-                                  />
-                                ) : (
-                                  <span className="transfermarkt-portrait transfermarkt-portrait-placeholder">{portrait?.initials ?? "?"}</span>
-                                )}
-                                <strong>{entry.playerName}</strong>
-                                <span>{entry.teamShortCode} · {entry.disciplineName} {entry.disciplineSide.toUpperCase()}</span>
-                                <small>Score {formatLocalePoints(entry.finalPlayerScore, 1)} · PPs {entry.points != null ? formatLocalePoints(entry.points, 2) : "—"}</small>
-                                <small>Mutator {entry.mutatorScoreBonus ?? "—"} / {entry.mutatorPpsBonus ?? "—"} · Form {entry.formCardBonus ?? "—"} · Captain {entry.captainBonus ?? "—"}</small>
-                              </button>
-                            );
-                          })}
-                          {matchdaySummary.topPlayers.length === 0 ? <p className="muted">Keine Top-Player-Quelle für diesen Spieltag.</p> : null}
-                        </div>
-                      </section>
                     </>
                   )}
                 </section>
@@ -17938,60 +26130,6 @@ export default function FoundationPageClient({ initialReadSource, initialSelecte
               </button>
             </div>
 
-            {matchdaySummaryTab === "matchday" ? (
-              <div className="matchday-result-layout">
-                <section className="panel matchday-result-card-panel">
-                  <div className="panel-header">
-                    <h3>Top 5 Teams des Spieltags</h3>
-                  </div>
-                  <div className="matchday-result-team-cards">
-                    {matchdaySummary.topTeams.map((row) => (
-                      <article
-                        key={`matchday-top-${row.teamId}`}
-                        className={joinClassNames(
-                          "matchday-result-team-card",
-                          row.teamId === activeManagerTeamId && "is-active-team",
-                          getOwnerTeamHighlightClass(resolvedTeamControlSettings[row.teamId]),
-                        )}
-                        onDoubleClick={() => openTeamDrawerById(row.teamId)}
-                        title="Doppelklick öffnet den Team-Drawer"
-                      >
-                        <span>#{row.matchdayRank ?? "—"} · {row.teamShortCode}</span>
-                        <strong>{row.teamName}</strong>
-                        <small>{row.matchdayPoints ?? "—"} Tagespunkte · Score {row.matchdayScore != null ? formatLocalePoints(row.matchdayScore, 1) : "—"}</small>
-                      </article>
-                    ))}
-                    {matchdaySummary.topTeams.length === 0 ? <p className="muted">Keine Tageswertung ohne gespeichertes Matchday Result.</p> : null}
-                  </div>
-                </section>
-                <section className="panel matchday-result-card-panel">
-                  <div className="panel-header">
-                    <h3>Bottom 5 Teams des Spieltags</h3>
-                  </div>
-                  <div className="matchday-result-team-cards">
-                    {matchdaySummary.bottomTeams.map((row) => (
-                      <article
-                        key={`matchday-bottom-${row.teamId}`}
-                        className={joinClassNames(
-                          "matchday-result-team-card",
-                          "is-bottom",
-                          row.teamId === activeManagerTeamId && "is-active-team",
-                          getOwnerTeamHighlightClass(resolvedTeamControlSettings[row.teamId]),
-                        )}
-                        onDoubleClick={() => openTeamDrawerById(row.teamId)}
-                        title="Doppelklick öffnet den Team-Drawer"
-                      >
-                        <span>#{row.matchdayRank ?? "—"} · {row.teamShortCode}</span>
-                        <strong>{row.teamName}</strong>
-                        <small>{row.matchdayPoints ?? "—"} Tagespunkte · Score {row.matchdayScore != null ? formatLocalePoints(row.matchdayScore, 1) : "—"}</small>
-                      </article>
-                    ))}
-                    {matchdaySummary.bottomTeams.length === 0 ? <p className="muted">Keine Bottom-5 ohne gespeichertes Matchday Result.</p> : null}
-                  </div>
-                </section>
-              </div>
-            ) : null}
-
             {matchdaySummaryTab === "season" ? (
               <div className="table-shell matchday-result-table-shell">
                 <table className="team-table matchday-result-table">
@@ -18036,45 +26174,6 @@ export default function FoundationPageClient({ initialReadSource, initialSelecte
               </div>
             ) : null}
 
-            <section className="panel matchday-result-top-players">
-              <div className="panel-header">
-                <h3>Beste Einzelspieler</h3>
-                <span className="muted">Score, PPs und bekannte Bonusquellen aus gespeicherten Performances.</span>
-              </div>
-              <div className="matchday-result-player-grid">
-                {matchdaySummary.topPlayers.map((entry) => {
-                  const player = gameState.players.find((candidate) => candidate.id === entry.playerId) ?? null;
-                  const portrait = player ? getPlayerPortraitModel(player) : null;
-                  return (
-                    <button
-                      key={`matchday-top-player-${entry.playerId}-${entry.disciplineId}-${entry.disciplineSide}`}
-                      className="matchday-result-player-card"
-                      type="button"
-                      onClick={() => openPlayerDrawerById(entry.playerId, entry.activePlayerId)}
-                    >
-                      {portrait?.src ? (
-                        <PlayerPortrait
-                          src={portrait.src}
-                          initials={portrait.initials}
-                          alt={`${entry.playerName} Portrait`}
-                          className=""
-                        />
-                      ) : (
-                        <span className="transfermarkt-portrait transfermarkt-portrait-placeholder">{portrait?.initials ?? "?"}</span>
-                      )}
-                      <strong>{entry.playerName}</strong>
-                      <span>{entry.teamShortCode} · {entry.disciplineName} {entry.disciplineSide.toUpperCase()}</span>
-                      <small>Score {formatLocalePoints(entry.finalPlayerScore, 1)} · PPs {entry.points != null ? formatLocalePoints(entry.points, 2) : "—"}</small>
-                      <small>
-                        Mutator {entry.mutatorScoreBonus ?? "—"} / {entry.mutatorPpsBonus ?? "—"} · Form {entry.formCardBonus ?? "—"} · Captain {entry.captainBonus ?? "—"}
-                      </small>
-                    </button>
-                  );
-                })}
-                {matchdaySummary.topPlayers.length === 0 ? <p className="muted">Keine Top-Player-Quelle für diesen Spieltag.</p> : null}
-              </div>
-            </section>
-
             <section className="panel">
               <div className="panel-header">
                 <h3>Highlights</h3>
@@ -18113,12 +26212,29 @@ export default function FoundationPageClient({ initialReadSource, initialSelecte
                 </p>
               </div>
               <div className="season-toolbar">
+                <div className="season-view-switch" role="tablist" aria-label="Saisonstand Ansicht">
+                  <button className="secondary-button inline-button is-active" type="button" aria-pressed="true">
+                    Classic
+                  </button>
+                  <button
+                    className="secondary-button inline-button"
+                    type="button"
+                    aria-pressed="false"
+                    onClick={() => setFoundationView("seasonV2", setActiveView)}
+                  >
+                    V2
+                  </button>
+                </div>
                 <label className="filter-field season-history-select">
                   <span>Saison anzeigen</span>
                   <select
                     className="input"
                     value={seasonOverviewSeasonId}
-                    onChange={(event) => setSeasonOverviewSeasonId(event.target.value)}
+                    onChange={(event) => {
+                      const nextSeasonId = event.target.value;
+                      setSeasonOverviewSeasonId(nextSeasonId);
+                      void reloadSeasonStandingsOverview(nextSeasonId);
+                    }}
                   >
                     {seasonOverviewOptions.map((option) => (
                       <option key={option.seasonId} value={option.seasonId}>
@@ -18158,7 +26274,7 @@ export default function FoundationPageClient({ initialReadSource, initialSelecte
                 <>
                   <span className="transfer-status-pill is-info">Archivmodus</span>
                   <span>
-                    Read-only Snapshot: Standings, PPs, Topspieler und Disziplin-Bestenlisten werden aus {selectedSeasonOverviewLabel} geladen.
+                    Archiv-Snapshot: Standings, PPs, Topspieler und Disziplin-Bestenlisten werden aus {selectedSeasonOverviewLabel} geladen.
                   </span>
                 </>
               ) : (
@@ -18259,10 +26375,11 @@ export default function FoundationPageClient({ initialReadSource, initialSelecte
                               columnKey={column.dataKey}
                               sortState={tableSorts.teamTable}
                               onToggle={toggleTableSort}
+                              tooltip={column.tooltip}
                             />
                           )}
                           <span
-                            className={`column-resizer${seasonTableMode === "expert" ? " is-disabled" : ""}`}
+                            className="column-resizer"
                             draggable={false}
                             role="separator"
                             aria-orientation="vertical"
@@ -18280,7 +26397,10 @@ export default function FoundationPageClient({ initialReadSource, initialSelecte
                     <tr
                       key={row.team.teamId}
                       className={joinClassNames(
+                        "season-standings-row",
                         selectedTeam?.teamId === row.team.teamId && "is-selected",
+                        row.team.teamId === activeManagerTeamId && "is-active-team",
+                        row.rank != null && row.rank <= 3 && `is-podium-${row.rank}`,
                         getOwnerTeamHighlightClass(resolvedTeamControlSettings[row.team.teamId]),
                       )}
                       onDoubleClick={() => openTeamDrawerById(row.team.teamId)}
@@ -18295,8 +26415,17 @@ export default function FoundationPageClient({ initialReadSource, initialSelecte
                             <td
                               key={column.id}
                               className={(() => {
+                                const baseClass = getSeasonTableCellClass(column.id);
+                                if (column.id === "platzierung" && row.sponsorRank != null && row.sponsorRank !== 0) {
+                                  return joinClassNames(
+                                    baseClass,
+                                    row.sponsorRank > 0
+                                      ? "season-standings-cell-placement-positive"
+                                      : "season-standings-cell-placement-negative",
+                                  );
+                                }
                                 if (column.id === "punkte" && (row.points ?? 0) > 0) {
-                                  return `${getSeasonTableCellClass(column.id)} ${getSeasonMatrixRankClass(rowIndex + 1)}`.trim();
+                                  return `${baseClass} ${getSeasonMatrixRankClass(rowIndex + 1)}`.trim();
                                 }
                                 if (
                                   saisonstandDisciplineColumns.includes(column.id as (typeof saisonstandDisciplineColumns)[number]) &&
@@ -18305,10 +26434,10 @@ export default function FoundationPageClient({ initialReadSource, initialSelecte
                                   const disciplineRank =
                                     seasonDisciplineRankMaps[column.id as (typeof saisonstandDisciplineColumns)[number]]?.get(row.teamId) ?? null;
                                   return disciplineRank
-                                    ? `${getSeasonTableCellClass(column.id)} ${getSeasonMatrixRankClass(disciplineRank)}`.trim()
-                                    : getSeasonTableCellClass(column.id);
+                                    ? `${baseClass} ${getSeasonMatrixRankClass(disciplineRank)}`.trim()
+                                    : baseClass;
                                 }
-                                return getSeasonTableCellClass(column.id);
+                                return baseClass;
                               })()}
                               style={{
                                 ...(seasonTablePinnedOffsets.has(column.id)
@@ -18322,6 +26451,10 @@ export default function FoundationPageClient({ initialReadSource, initialSelecte
                                   contractColumn.normalizedKey as (typeof saisonstandDisciplineColumns)[number],
                                 )
                                   ? "center"
+                                  : saisonstandFinanceColumns.includes(
+                                      contractColumn.normalizedKey as (typeof saisonstandFinanceColumns)[number],
+                                    )
+                                    ? "center"
                                   : contractColumn.alignment === "right"
                                     ? "right"
                                     : contractColumn.normalizedKey === "mannschaft"
@@ -18352,7 +26485,7 @@ export default function FoundationPageClient({ initialReadSource, initialSelecte
                   <div className="stack">
                     <TooltipHeading
                       as="h3"
-                      tooltip="Summe aus POW, SPE, MEN und SOC je Team. Top 3 sind stark markiert, Rang 4-10 markiert, ab Rang 11 neutral."
+                      tooltip="Summe aus POW, SPE, MEN und SOC je Team. Werte in Klammern, z.B. (+8), zeigen den reinen Formkartenbonus, der in diese Punkte eingeflossen ist. Top 3 sind stark markiert, Rang 4-10 markiert, ab Rang 11 neutral."
                     >
                       PPs pro Bereich
                     </TooltipHeading>
@@ -18364,7 +26497,7 @@ export default function FoundationPageClient({ initialReadSource, initialSelecte
                       <tr>
                         <th><SortableHeader label="Rank" tableId="ppArea" columnKey="rank" sortState={tableSorts.ppArea} onToggle={toggleTableSort} /></th>
                         <th><SortableHeader label="Team" tableId="ppArea" columnKey="team" sortState={tableSorts.ppArea} onToggle={toggleTableSort} /></th>
-                        <th><SortableHeader label="PPs" tableId="ppArea" columnKey="pps" sortState={tableSorts.ppArea} onToggle={toggleTableSort} /></th>
+                        <th className="pp-head-pps"><SortableHeader label="PPs" tableId="ppArea" columnKey="pps" sortState={tableSorts.ppArea} onToggle={toggleTableSort} /></th>
                         <th className="pp-head-pow"><SortableHeader label="PP Pow" tableId="ppArea" columnKey="pow" sortState={tableSorts.ppArea} onToggle={toggleTableSort} /></th>
                         <th className="pp-head-spe"><SortableHeader label="PP Spe" tableId="ppArea" columnKey="spe" sortState={tableSorts.ppArea} onToggle={toggleTableSort} /></th>
                         <th className="pp-head-men"><SortableHeader label="PP Men" tableId="ppArea" columnKey="men" sortState={tableSorts.ppArea} onToggle={toggleTableSort} /></th>
@@ -18373,20 +26506,61 @@ export default function FoundationPageClient({ initialReadSource, initialSelecte
                     </thead>
                     <tbody>
                       {sortedPpAreaRows.map((row) => {
-                        const rankClass = row.pps.total > 0 ? getPpSummaryRankClass(row.rank) : "";
-                        const powRankClass = row.pps.pow > 0 ? getPpSummaryRankClass(row.areaRanks.pow) : "";
-                        const speRankClass = row.pps.spe > 0 ? getPpSummaryRankClass(row.areaRanks.spe) : "";
-                        const menRankClass = row.pps.men > 0 ? getPpSummaryRankClass(row.areaRanks.men) : "";
-                        const socRankClass = row.pps.soc > 0 ? getPpSummaryRankClass(row.areaRanks.soc) : "";
+                        const teamId = row.team.teamId;
                         return (
                           <tr key={`season-pp-${row.team.teamId}`} onDoubleClick={() => openTeamDrawerById(row.team.teamId)}>
                             <td>{row.rank}</td>
                             <td>{row.team.name}</td>
-                            <td className={rankClass || undefined}>{formatPpsValue(row.pps.total)}</td>
-                            <td className={`pp-cell ${powRankClass}`.trim() || undefined}>{formatPpsValue(row.pps.pow)}</td>
-                            <td className={`pp-cell ${speRankClass}`.trim() || undefined}>{formatPpsValue(row.pps.spe)}</td>
-                            <td className={`pp-cell ${menRankClass}`.trim() || undefined}>{formatPpsValue(row.pps.men)}</td>
-                            <td className={`pp-cell ${socRankClass}`.trim() || undefined}>{formatPpsValue(row.pps.soc)}</td>
+                            <td className={ppAreaRankClassMaps.total.get(teamId) || undefined}>
+                              {renderMetricBar(row.pps.total, {
+                                tone: "pps",
+                                pool: ppAreaMetricPools.total,
+                                fallbackMax: 300,
+                                format: (value) => formatPpsValue(value),
+                                detail: formatPpFormBonus(row.formBonus.total),
+                                detailNegative: (row.formBonus.total ?? 0) < 0,
+                              })}
+                            </td>
+                            <td className={ppAreaRankClassMaps.pow.get(teamId) || undefined}>
+                              {renderMetricBar(row.pps.pow, {
+                                tone: "pow",
+                                pool: ppAreaMetricPools.pow,
+                                fallbackMax: 120,
+                                format: (value) => formatPpsValue(value),
+                                detail: formatPpFormBonus(row.formBonus.pow),
+                                detailNegative: (row.formBonus.pow ?? 0) < 0,
+                              })}
+                            </td>
+                            <td className={ppAreaRankClassMaps.spe.get(teamId) || undefined}>
+                              {renderMetricBar(row.pps.spe, {
+                                tone: "spe",
+                                pool: ppAreaMetricPools.spe,
+                                fallbackMax: 120,
+                                format: (value) => formatPpsValue(value),
+                                detail: formatPpFormBonus(row.formBonus.spe),
+                                detailNegative: (row.formBonus.spe ?? 0) < 0,
+                              })}
+                            </td>
+                            <td className={ppAreaRankClassMaps.men.get(teamId) || undefined}>
+                              {renderMetricBar(row.pps.men, {
+                                tone: "men",
+                                pool: ppAreaMetricPools.men,
+                                fallbackMax: 120,
+                                format: (value) => formatPpsValue(value),
+                                detail: formatPpFormBonus(row.formBonus.men),
+                                detailNegative: (row.formBonus.men ?? 0) < 0,
+                              })}
+                            </td>
+                            <td className={ppAreaRankClassMaps.soc.get(teamId) || undefined}>
+                              {renderMetricBar(row.pps.soc, {
+                                tone: "soc",
+                                pool: ppAreaMetricPools.soc,
+                                fallbackMax: 120,
+                                format: (value) => formatPpsValue(value),
+                                detail: formatPpFormBonus(row.formBonus.soc),
+                                detailNegative: (row.formBonus.soc ?? 0) < 0,
+                              })}
+                            </td>
                           </tr>
                         );
                       })}
@@ -18399,7 +26573,7 @@ export default function FoundationPageClient({ initialReadSource, initialSelecte
                   <div className="stack">
                     <TooltipHeading
                       as="h3"
-                      tooltip="32 beste Spieler der gewählten Season nach gespeicherten Season-PPs. Im Archivmodus kommen die Werte aus dem Season-Snapshot."
+                      tooltip="Top 20 Spieler der gewählten Season nach gespeicherten Season-PPs. Im Archivmodus kommen die Werte aus dem Season-Snapshot."
                     >
                       Top Player {selectedSeasonOverviewLabel}
                     </TooltipHeading>
@@ -18417,64 +26591,146 @@ export default function FoundationPageClient({ initialReadSource, initialSelecte
                   <table className="team-table compact-table season-top-players-table">
                     <thead>
                       <tr>
-                        <th>#</th>
-                        <th>Spieler</th>
-                        <th>Team</th>
-                        <th>PPs</th>
+                        <th><SortableHeader label="#" tableId="seasonTopPlayers" columnKey="rank" sortState={tableSorts.seasonTopPlayers} onToggle={toggleTableSort} /></th>
+                        <th><SortableHeader label="Spieler" tableId="seasonTopPlayers" columnKey="name" sortState={tableSorts.seasonTopPlayers} onToggle={toggleTableSort} /></th>
+                        <th><SortableHeader label="Team" tableId="seasonTopPlayers" columnKey="team" sortState={tableSorts.seasonTopPlayers} onToggle={toggleTableSort} /></th>
+                        <th className="pp-head-pps"><SortableHeader label="PPs" tableId="seasonTopPlayers" columnKey="pps" sortState={tableSorts.seasonTopPlayers} onToggle={toggleTableSort} /></th>
                         {showSeasonTopPlayerAreas ? (
                           <>
-                            <th className="pp-head-pow">POW</th>
-                            <th className="pp-head-spe">SPE</th>
-                            <th className="pp-head-men">MEN</th>
-                            <th className="pp-head-soc">SOC</th>
+                            <th className="pp-head-pow"><SortableHeader label="POW" tableId="seasonTopPlayers" columnKey="pow" sortState={tableSorts.seasonTopPlayers} onToggle={toggleTableSort} /></th>
+                            <th className="pp-head-spe"><SortableHeader label="SPE" tableId="seasonTopPlayers" columnKey="spe" sortState={tableSorts.seasonTopPlayers} onToggle={toggleTableSort} /></th>
+                            <th className="pp-head-men"><SortableHeader label="MEN" tableId="seasonTopPlayers" columnKey="men" sortState={tableSorts.seasonTopPlayers} onToggle={toggleTableSort} /></th>
+                            <th className="pp-head-soc"><SortableHeader label="SOC" tableId="seasonTopPlayers" columnKey="soc" sortState={tableSorts.seasonTopPlayers} onToggle={toggleTableSort} /></th>
                           </>
                         ) : null}
-                        <th>OVR</th>
-                        <th>MVS</th>
-                        <th>MW</th>
-                        <th>Bracket</th>
+                        <th><SortableHeader label="OVR" tableId="seasonTopPlayers" columnKey="ovr" sortState={tableSorts.seasonTopPlayers} onToggle={toggleTableSort} /></th>
+                        <th><SortableHeader label="MVS" tableId="seasonTopPlayers" columnKey="mvs" sortState={tableSorts.seasonTopPlayers} onToggle={toggleTableSort} /></th>
+                        <th><SortableHeader label="MW" tableId="seasonTopPlayers" columnKey="marketValue" sortState={tableSorts.seasonTopPlayers} onToggle={toggleTableSort} /></th>
+                        <th><SortableHeader label="Bracket" tableId="seasonTopPlayers" columnKey="bracket" sortState={tableSorts.seasonTopPlayers} onToggle={toggleTableSort} /></th>
                       </tr>
                     </thead>
                     <tbody>
-                      {seasonTopPlayerRows.map((row, index) => (
-                        <tr key={`season-top-player-${row.playerId}`} onDoubleClick={() => openPlayerDrawerById(row.playerId)}>
-                          <td>{index + 1}</td>
-                          <td>
-                            <div className="table-player-cell">
-                              <strong>{row.name}</strong>
-                              <span>{row.ppsRank != null ? `PP Rank ${row.ppsRank}` : "Aktive Season"}</span>
-                            </div>
-                          </td>
-                          <td>{row.teamName}</td>
-                          <td className={row.pps != null ? getPoolHeatClass(row.pps, leaguePlayerHeatPools.pps) : ""}>
-                            {row.pps != null ? formatPpsValue(row.pps) : "—"}
-                          </td>
-                          {showSeasonTopPlayerAreas ? (
-                            <>
-                              <td className={row.ppPow != null ? getPoolHeatClass(row.ppPow, leaguePlayerHeatPools.pps) : ""}>
-                                {row.ppPow != null ? formatPpsValue(row.ppPow) : "—"}
-                              </td>
-                              <td className={row.ppSpe != null ? getPoolHeatClass(row.ppSpe, leaguePlayerHeatPools.pps) : ""}>
-                                {row.ppSpe != null ? formatPpsValue(row.ppSpe) : "—"}
-                              </td>
-                              <td className={row.ppMen != null ? getPoolHeatClass(row.ppMen, leaguePlayerHeatPools.pps) : ""}>
-                                {row.ppMen != null ? formatPpsValue(row.ppMen) : "—"}
-                              </td>
-                              <td className={row.ppSoc != null ? getPoolHeatClass(row.ppSoc, leaguePlayerHeatPools.pps) : ""}>
-                                {row.ppSoc != null ? formatPpsValue(row.ppSoc) : "—"}
-                              </td>
-                            </>
-                          ) : null}
-                          <td className={row.ovr != null ? getPoolHeatClass(row.ovr, leaguePlayerHeatPools.ovr) : ""}>
-                            {formatWholeNumber(row.ovr)}
-                          </td>
-                          <td className={row.mvs != null ? getPoolHeatClass(row.mvs, leaguePlayerHeatPools.mvs) : ""}>
-                            {row.mvs != null ? formatPpsValue(row.mvs) : "—"}
-                          </td>
-                          <td>{formatLocalePoints(row.marketValue, 2)}</td>
-                          <td>{row.bracket ?? "—"}</td>
-                        </tr>
-                      ))}
+                      {sortedSeasonTopPlayerRows.map((row) => {
+                        return (
+                          <tr
+                            key={`season-top-player-${row.playerId}`}
+                            className={joinClassNames(
+                              "season-top-player-row",
+                              row.rank <= 3 && `is-top-${row.rank}`,
+                            )}
+                            onDoubleClick={() => openPlayerDrawerById(row.playerId)}
+                          >
+                            <td>{row.rank}</td>
+                            <td>
+                              <button
+                                className="season-top-player-name-button"
+                                type="button"
+                                onClick={(event) => {
+                                  event.stopPropagation();
+                                  openPlayerDrawerById(row.playerId);
+                                }}
+                                title={`${row.name} öffnen`}
+                              >
+                                <span className="table-player-cell">
+                                  <strong>{row.name}</strong>
+                                  <span className="season-top-player-class-line">
+                                    <ClassIcon
+                                      classNameValue={row.className}
+                                      className="season-top-player-class-chip"
+                                      iconClassName="season-top-player-class-icon"
+                                    />
+                                  </span>
+                                </span>
+                              </button>
+                            </td>
+                            <td>
+                              {row.teamId ? (
+                                <button
+                                  className="table-link-button season-top-player-team-link season-top-player-team-tag"
+                                  style={getSeasonTopPlayerTeamTagStyle(row.teamCode)}
+                                  type="button"
+                                  onClick={(event) => {
+                                    event.stopPropagation();
+                                    openTeamDrawerById(row.teamId!);
+                                  }}
+                                  title={`${row.teamName} öffnen`}
+                                >
+                                  {row.teamCode ?? row.teamName ?? "—"}
+                                </button>
+                              ) : (
+                                <span
+                                  className="season-top-player-team-link season-top-player-team-tag is-empty"
+                                  style={getSeasonTopPlayerTeamTagStyle(row.teamCode)}
+                                >
+                                  {row.teamCode ?? "—"}
+                                </span>
+                              )}
+                            </td>
+                            <td className={seasonTopPlayerRankClassMaps.pps.get(row.playerId) || undefined}>
+                              {renderMetricBar(row.pps, {
+                                tone: "pps",
+                                pool: seasonTopPlayerMetricPools.pps,
+                                fallbackMax: 120,
+                                format: (value) => formatPpsValue(value),
+                              })}
+                            </td>
+                            {showSeasonTopPlayerAreas ? (
+                              <>
+                                <td className={seasonTopPlayerRankClassMaps.pow.get(row.playerId) || undefined}>
+                                  {renderMetricBar(row.ppPow, {
+                                    tone: "pow",
+                                    pool: seasonTopPlayerMetricPools.pow,
+                                    fallbackMax: 60,
+                                    format: (value) => formatPpsValue(value),
+                                  })}
+                                </td>
+                                <td className={seasonTopPlayerRankClassMaps.spe.get(row.playerId) || undefined}>
+                                  {renderMetricBar(row.ppSpe, {
+                                    tone: "spe",
+                                    pool: seasonTopPlayerMetricPools.spe,
+                                    fallbackMax: 60,
+                                    format: (value) => formatPpsValue(value),
+                                  })}
+                                </td>
+                                <td className={seasonTopPlayerRankClassMaps.men.get(row.playerId) || undefined}>
+                                  {renderMetricBar(row.ppMen, {
+                                    tone: "men",
+                                    pool: seasonTopPlayerMetricPools.men,
+                                    fallbackMax: 60,
+                                    format: (value) => formatPpsValue(value),
+                                  })}
+                                </td>
+                                <td className={seasonTopPlayerRankClassMaps.soc.get(row.playerId) || undefined}>
+                                  {renderMetricBar(row.ppSoc, {
+                                    tone: "soc",
+                                    pool: seasonTopPlayerMetricPools.soc,
+                                    fallbackMax: 60,
+                                    format: (value) => formatPpsValue(value),
+                                  })}
+                                </td>
+                              </>
+                            ) : null}
+                            <td className={seasonTopPlayerRankClassMaps.ovr.get(row.playerId) || undefined}>
+                              {renderMetricBar(row.ovr, {
+                                tone: "ovr",
+                                pool: seasonTopPlayerMetricPools.ovr,
+                                fallbackMax: 100,
+                                format: (value) => formatWholeNumber(value),
+                              })}
+                            </td>
+                            <td className={seasonTopPlayerRankClassMaps.mvs.get(row.playerId) || undefined}>
+                              {renderMetricBar(row.mvs, {
+                                tone: "mvs",
+                                pool: seasonTopPlayerMetricPools.mvs,
+                                fallbackMax: 40,
+                                format: (value) => formatPpsValue(value),
+                              })}
+                            </td>
+                            <td>{formatLocalePoints(row.marketValue, 2)}</td>
+                            <td>{row.bracket ?? "—"}</td>
+                          </tr>
+                        );
+                      })}
                     </tbody>
                   </table>
                 </div>
@@ -18490,7 +26746,7 @@ export default function FoundationPageClient({ initialReadSource, initialSelecte
                     >
                       Disziplin-Ergebnisse {selectedSeasonOverviewLabel}
                     </TooltipHeading>
-                    <span className="muted">Read-only · keine aktiven S2-Werte gemischt.</span>
+                    <span className="muted">Archivansicht · keine aktiven S2-Werte gemischt.</span>
                   </div>
                 </div>
                 <div className="season-archive-discipline-grid">
@@ -18634,6 +26890,40 @@ export default function FoundationPageClient({ initialReadSource, initialSelecte
           </section>
           ) : null}
 
+          <section className={`panel${getViewClass("seasonV2")}`} id="foundation-season-v2">
+            {activeView === "seasonV2" ? (
+              <SeasonStandingsV2Client
+                selectedSeasonId={seasonOverviewSeasonId}
+                selectedSeasonLabel={selectedSeasonOverviewLabel}
+                sourceLabel={seasonOverviewSourceLabel}
+                sourceBadgeLabel={getViewSourceBadgeLabel("seasonV2", activeContextMeta)}
+                isArchived={isViewingArchivedSeason}
+                seasonOptions={seasonOverviewOptions}
+                selectedTeamSummary={seasonV2SelectedTeamSummary}
+                leaderTeam={seasonV2LeaderTeam}
+                momentumTeam={seasonV2MomentumTeam}
+                pressureTeam={seasonV2PressureTeam}
+                topPlayer={seasonV2TopPlayers[0] ?? null}
+                standingsRows={seasonV2StandingsRows}
+                ppRows={seasonV2PpRows}
+                topPlayers={seasonV2TopPlayers}
+                playerRows={seasonV2PlayerRows}
+                gmRows={seasonV2GmRows}
+                archiveRows={seasonV2ArchiveRows}
+                disciplineLeaders={seasonV2DisciplineLeaders}
+                onChangeSeason={(seasonId) => {
+                  setSeasonOverviewSeasonId(seasonId);
+                  void reloadSeasonStandingsOverview(seasonId);
+                }}
+                onOpenTeam={(teamId) => openTeamDrawerById(teamId)}
+                onOpenPlayer={(playerId) => openPlayerDrawerById(playerId)}
+                onOpenClassic={() => setFoundationView("season", setActiveView)}
+                onOpenRanks={() => setFoundationView("ranks", setActiveView)}
+                onOpenPrize={() => setFoundationView("prize", setActiveView)}
+              />
+            ) : null}
+          </section>
+
           <section className={`panel${getViewClass("seasonPreview")}`} id="standings-preview">
             <div className="panel-header">
               <h2>Preview aus gespeicherten Results</h2>
@@ -18768,34 +27058,8 @@ export default function FoundationPageClient({ initialReadSource, initialSelecte
           <section className={`panel${getViewClass("players")}`} id="players-table">
             <div className="panel-header">
               <h2>Players</h2>
-              <ColumnVisibilityManager
-                title="Spalten"
-                columns={playersTableColumns}
-                presets={playersTablePresets}
-                activePreset={getTableActivePreset("playersTable")}
-                isVisible={(columnId, visibleByDefault) =>
-                  isTableColumnVisible("playersTable", columnId, visibleByDefault)
-                }
-                onToggle={(columnId, nextVisible) => setTableColumnVisible("playersTable", columnId, nextVisible)}
-                onMove={(columnId, direction) => moveTableColumn("playersTable", columnId, direction, playersTableColumns)}
-                getWidth={(column) => getTableColumnWidth("playersTable", column)}
-                onStepWidth={(column, delta) => adjustTableColumnWidth("playersTable", column, delta)}
-                onResetWidth={(column) => resetTableColumnWidth("playersTable", column)}
-                onApplyPreset={(presetId) => {
-                  const preset = playersTablePresets.find((entry) => entry.id === presetId);
-                  if (preset) {
-                    applyTablePreset("playersTable", preset, playersTableColumns);
-                  }
-                }}
-                onResetToDefault={() => {
-                  const preset = playersTablePresets.find((entry) => entry.id === "retool_default");
-                  if (preset) {
-                    applyTablePreset("playersTable", preset, playersTableColumns);
-                  }
-                }}
-              />
             </div>
-            <div className="players-toolbar">
+            <div className="players-toolbar players-toolbar-compact">
               <label className="filter-field">
                 <span>Umfang</span>
                 <select
@@ -18838,38 +27102,9 @@ export default function FoundationPageClient({ initialReadSource, initialSelecte
                   ))}
                 </select>
               </label>
-              <article className="metric-card players-count-card">
-                <span>Ergebnisse</span>
+              <article className="metric-card players-count-card players-count-card-compact">
+                <span>Anzahl</span>
                 <strong>{playersTableRows.length}</strong>
-              </article>
-            </div>
-            <div className="stats-grid" style={{ marginBottom: 16 }}>
-              <article className="metric-card">
-                <span>Economy Mode</span>
-                <strong>{playerEconomyCompareReport.economyMode}</strong>
-                <small>Kaeufe bleiben auf Legacy.</small>
-              </article>
-              <article className="metric-card">
-                <span>Verglichene Spieler</span>
-                <strong>{playerEconomyCompareReport.summary.comparedPlayers}</strong>
-              </article>
-              <article className="metric-card">
-                <span>MW Delta Ø</span>
-                <strong>{formatSignedDisplayMoney(playerEconomyCompareReport.summary.averageMarketValueDelta)}</strong>
-                <small>Median {formatSignedDisplayMoney(playerEconomyCompareReport.summary.medianMarketValueDelta)}</small>
-              </article>
-              <article className="metric-card">
-                <span>Gehalt Delta Ø</span>
-                <strong>{formatSignedDisplayMoney(playerEconomyCompareReport.summary.averageSalaryDelta)}</strong>
-                <small>Median {formatSignedDisplayMoney(playerEconomyCompareReport.summary.medianSalaryDelta)}</small>
-              </article>
-              <article className="metric-card">
-                <span>MW Quellen fehlen</span>
-                <strong>{playerEconomyCompareReport.summary.missingMarketValueSources}</strong>
-              </article>
-              <article className="metric-card">
-                <span>Gehalt Quellen fehlen</span>
-                <strong>{playerEconomyCompareReport.summary.missingSalarySources}</strong>
               </article>
             </div>
             <div className="table-shell">
@@ -18933,7 +27168,19 @@ export default function FoundationPageClient({ initialReadSource, initialSelecte
                           const teamLogo = row.team ? getTeamLogoModel(row.team) : null;
                           return (
                             <td key={column.id}>
-                              <div className="players-table-team-cell">
+                              <button
+                                className="players-table-team-cell players-table-team-button"
+                                type="button"
+                                onClick={(event) => {
+                                  event.stopPropagation();
+                                  if (row.team) {
+                                    openTeamDrawerById(row.team.teamId);
+                                  }
+                                }}
+                                onDoubleClick={(event) => {
+                                  event.stopPropagation();
+                                }}
+                              >
                                 {teamLogo?.src ? (
                                   <img
                                     className="players-table-team-logo"
@@ -18949,7 +27196,7 @@ export default function FoundationPageClient({ initialReadSource, initialSelecte
                                   </span>
                                 )}
                                 <span>{row.team?.name ?? "Free Agent"}</span>
-                              </div>
+                              </button>
                             </td>
                           );
                         }
@@ -18970,8 +27217,34 @@ export default function FoundationPageClient({ initialReadSource, initialSelecte
                         if (column.id === "pps") return <td key={column.id} className={row.playerPps != null ? getPoolHeatClass(row.playerPps, leaguePlayerHeatPools.pps) : ""}>{row.playerPps != null ? formatPpsValue(row.playerPps) : "—"}</td>;
                         if (column.id === "ovr") return <td key={column.id} className={row.playerOvr != null ? getPoolHeatClass(row.playerOvr, leaguePlayerHeatPools.ovr) : ""}>{formatWholeNumber(row.playerOvr)}</td>;
                         if (column.id === "mvs") return <td key={column.id} className={row.playerMvs != null ? getPoolHeatClass(row.playerMvs, leaguePlayerHeatPools.mvs) : ""}>{row.playerMvs != null ? formatPpsValue(row.playerMvs) : "—"}</td>;
-                        if (column.id === "mw") return <td key={column.id}>{formatLocalePoints(getPlayerDisplayMarketValue(row.player), 2)}</td>;
-                        if (column.id === "salary") return <td key={column.id}>{formatLocalePoints(row.roster ? getRosterEntryDisplaySalary(row.roster, row.player) : getPlayerDisplaySalary(row.player), 2)}</td>;
+                        if (column.id === "mw") {
+                          const marketValue = getPlayerDisplayMarketValue(row.player);
+                          const purchaseReference = normalizeVisibleRosterMoney(row.roster?.purchasePrice ?? null, marketValue);
+                          const marketValueDelta =
+                            marketValue != null && purchaseReference != null && Math.abs(marketValue - purchaseReference) >= 0.01
+                              ? roundViewNumber(marketValue - purchaseReference, 2)
+                              : null;
+                          return (
+                            <td key={column.id}>
+                              <span className="players-table-money-cell">
+                                <span>{formatLocalePoints(marketValue, 2)}</span>
+                                {renderEconomyDelta(marketValueDelta, "higher", "players-table-money-delta")}
+                              </span>
+                            </td>
+                          );
+                        }
+                        if (column.id === "salary") {
+                          const salary = row.roster ? getRosterEntryDisplaySalary(row.roster, row.player) : getPlayerDisplaySalary(row.player);
+                          const salaryDelta = getRosterEntrySalaryDelta(row.roster, row.player);
+                          return (
+                            <td key={column.id}>
+                              <span className="players-table-money-cell">
+                                <span>{formatLocalePoints(salary, 2)}</span>
+                                {renderEconomyDelta(salaryDelta, "lower", "players-table-money-delta")}
+                              </span>
+                            </td>
+                          );
+                        }
                         if (column.id === "contract") return <td key={column.id}>{row.roster ? row.roster.contractLength : "—"}</td>;
                         if (column.id === "appearances") return <td key={column.id}>{row.seasonPerformance ? row.seasonPerformance.appearances : "—"}</td>;
                         if (column.id === "bestDiscipline") {
@@ -19212,99 +27485,6 @@ export default function FoundationPageClient({ initialReadSource, initialSelecte
 
           {activeView === "teams" ? (
           <section className={`panel teams-view-panel${getViewClass("teams")}`} id="teams-view">
-            <div className="panel-header">
-              <div className="stack">
-                <TooltipHeading
-                  as="h2"
-                  tooltip="Vergleich zuerst, Drilldown darunter, überall dieselben Managementwerte wie im Saisonstand."
-                >
-                  Teamvergleich
-                </TooltipHeading>
-              </div>
-              <div className="season-toolbar teams-toolbar-compact">
-                <button
-                  className="secondary-button inline-button"
-                  type="button"
-                  onClick={() => setShowTeamsComparison((current) => !current)}
-                >
-                  {showTeamsComparison ? "Vergleich ausblenden" : "Vergleich einblenden"}
-                </button>
-                <ColumnVisibilityManager
-                  title="Spalten"
-                  columns={teamsViewColumns}
-                  presets={teamsViewPresets}
-                  activePreset={getTableActivePreset("teamsView")}
-                  isVisible={(columnId, visibleByDefault) =>
-                    isTableColumnVisible("teamsView", columnId, visibleByDefault)
-                  }
-                  onToggle={(columnId, nextVisible) => setTableColumnVisible("teamsView", columnId, nextVisible)}
-                  onMove={(columnId, direction) => moveTableColumn("teamsView", columnId, direction, teamsViewColumns)}
-                  getWidth={(column) => getTableColumnWidth("teamsView", column)}
-                  onStepWidth={(column, delta) => adjustTableColumnWidth("teamsView", column, delta)}
-                  onResetWidth={(column) => resetTableColumnWidth("teamsView", column)}
-                  onApplyPreset={(presetId) => {
-                    const preset = teamsViewPresets.find((entry) => entry.id === presetId);
-                    if (preset) {
-                      applyTablePreset("teamsView", preset, teamsViewColumns);
-                    }
-                  }}
-                  onResetToDefault={() => {
-                    const preset = teamsViewPresets.find((entry) => entry.id === "retool_default");
-                    if (preset) {
-                      applyTablePreset("teamsView", preset, teamsViewColumns);
-                    }
-                  }}
-                />
-              </div>
-            </div>
-            {showTeamsComparison && teamsViewSummary ? (
-              <div className="teams-summary-grid teams-summary-grid-retool">
-                <article className="metric-card teams-summary-card">
-                  <span>POW Rang</span>
-                  <strong>{teamsViewSummary.powRank != null ? formatWholeNumber(teamsViewSummary.powRank) : "—"}</strong>
-                </article>
-                <article className="metric-card teams-summary-card">
-                  <span>SPE Rang</span>
-                  <strong>{teamsViewSummary.speRank != null ? formatWholeNumber(teamsViewSummary.speRank) : "—"}</strong>
-                </article>
-                <article className="metric-card teams-summary-card">
-                  <span>MEN Rang</span>
-                  <strong>{teamsViewSummary.menRank != null ? formatWholeNumber(teamsViewSummary.menRank) : "—"}</strong>
-                </article>
-                <article className="metric-card teams-summary-card">
-                  <span>SOC Rang</span>
-                  <strong>{teamsViewSummary.socRank != null ? formatWholeNumber(teamsViewSummary.socRank) : "—"}</strong>
-                </article>
-                <article className="metric-card teams-summary-card">
-                  <span>Ø Marktwert (Season)</span>
-                  <strong>{teamsViewSummary.avgMarketValue != null ? `${formatDisplayMoney(teamsViewSummary.avgMarketValue)}€` : "—"}</strong>
-                </article>
-                <article className="metric-card teams-summary-card">
-                  <span>Ø Gehalt (Season)</span>
-                  <strong>{teamsViewSummary.avgSalary != null ? formatDisplayMoney(teamsViewSummary.avgSalary) : "—"}</strong>
-                </article>
-                <article className="metric-card teams-summary-card">
-                  <span>Gold</span>
-                  <strong>{teamsViewSummary.goldCount}</strong>
-                </article>
-                <article className="metric-card teams-summary-card">
-                  <span>Silber</span>
-                  <strong>{teamsViewSummary.silverCount}</strong>
-                </article>
-                <article className="metric-card teams-summary-card">
-                  <span>Bronze</span>
-                  <strong>{teamsViewSummary.bronzeCount}</strong>
-                </article>
-                <article className="metric-card teams-summary-card">
-                  <span>Ø Punkte</span>
-                  <strong>{teamsViewSummary.avgPoints != null ? formatLocalePoints(teamsViewSummary.avgPoints, 1) : "—"}</strong>
-                </article>
-                <article className="metric-card teams-summary-card">
-                  <span>Hist. Punkte</span>
-                  <strong>{teamsViewSummary.historicalPointsTotal != null ? formatLocalePoints(teamsViewSummary.historicalPointsTotal, 1) : "—"}</strong>
-                </article>
-              </div>
-            ) : null}
             {showTeamsComparison ? (
             <>
             <div className="table-shell teams-overview-shell">
@@ -19332,6 +27512,7 @@ export default function FoundationPageClient({ initialReadSource, initialSelecte
                                   : ""
                         }
                         style={{ width: `${getTableColumnWidth("teamsView", column)}px`, minWidth: `${column.minWidth}px` }}
+                        title={getTeamsViewColumnTitle(column.id)}
                       >
                         <div className="resizable-header-cell">
                           <SortableHeader label={column.label} tableId="teamsView" columnKey={column.dataKey} sortState={tableSorts.teamsView} onToggle={toggleTableSort} />
@@ -19350,26 +27531,25 @@ export default function FoundationPageClient({ initialReadSource, initialSelecte
                         getOwnerTeamHighlightClass(resolvedTeamControlSettings[row.team.teamId]),
                       )}
                       onClick={() => {
-                        setActiveManagerTeam(row.team.teamId, "manual_select");
-                        setActiveView("teams");
+                        scheduleActiveManagerTeam(row.team.teamId, "manual_select");
                       }}
                       onDoubleClick={() => openTeamDrawerById(row.team.teamId)}
                     >
                       {visibleTeamsViewColumns.map((column) => {
                         if (column.id === "team") {
-                          return <td key={column.id} className="teams-view-team-cell"><button className="table-link-button" type="button" onClick={(event) => { event.stopPropagation(); setActiveManagerTeam(row.team.teamId, "manual_select"); setActiveView("teams"); }} onDoubleClick={(event) => { event.stopPropagation(); openTeamDrawerById(row.team.teamId); }}>{row.team.name}</button></td>;
+                          return <td key={column.id} className="teams-view-team-cell"><button className="table-link-button" type="button" onClick={(event) => { event.stopPropagation(); scheduleActiveManagerTeam(row.team.teamId, "manual_select"); }} onDoubleClick={(event) => { event.stopPropagation(); openTeamDrawerById(row.team.teamId); }}>{row.team.name}</button></td>;
                         }
                         if (column.id === "overallRank") return <td key={column.id} className="teams-view-rank-cell">{row.overallRank ?? "—"}</td>;
-                        if (column.id === "cash") return <td key={column.id} className={`teams-view-finance-cell teams-view-cash-cell ${getHeatClass(row.cash ?? 0, [50, 120, 200])}`}>{row.cash != null ? formatMoney(row.cash) : "—"}</td>;
+                        if (column.id === "cash") return <td key={column.id} className={`teams-view-finance-cell teams-view-cash-cell ${row.cash != null ? getSeasonCashHeatClass(row.cash, sortedTeamsViewRows) : ""}`}>{row.cash != null ? formatMoney(row.cash) : "—"}</td>;
                         if (column.id === "guv") return <td key={column.id} className={`teams-view-finance-cell ${row.guv == null ? "" : row.guv >= 0 ? "text-positive" : "text-negative"}`}>{row.guv != null ? formatLocalePoints(row.guv, 1) : "—"}</td>;
                         if (column.id === "roster") return <td key={column.id} className="teams-view-meta-cell">{row.rosterCount}</td>;
                         if (column.id === "mw") return <td key={column.id} className="teams-view-finance-cell">{row.marketValueTotal != null ? formatLocalePoints(row.marketValueTotal, 2) : "—"}</td>;
                         if (column.id === "salary") return <td key={column.id} className="teams-view-finance-cell">{formatLocalePoints(row.salaryTotal, 2)}</td>;
                         if (column.id === "sponsor") return <td key={column.id} className="teams-view-finance-cell">{row.sponsorTotal != null ? formatLocalePoints(row.sponsorTotal, 1) : "—"}</td>;
-                        if (column.id === "pow") return <td key={column.id} title={row.rosterCount === 0 ? "Kein aktiver Kader vorhanden" : undefined} className={`teams-view-axis-cell teams-view-axis-cell-pow ${row.currentPowRank != null ? getRankHeatClass(row.currentPowRank, gameState.teams.length) : ""}`}>{row.currentPowRank != null ? formatWholeNumber(row.currentPowRank) : "—"}</td>;
-                        if (column.id === "spe") return <td key={column.id} title={row.rosterCount === 0 ? "Kein aktiver Kader vorhanden" : undefined} className={`teams-view-axis-cell teams-view-axis-cell-spe ${row.currentSpeRank != null ? getRankHeatClass(row.currentSpeRank, gameState.teams.length) : ""}`}>{row.currentSpeRank != null ? formatWholeNumber(row.currentSpeRank) : "—"}</td>;
-                        if (column.id === "men") return <td key={column.id} title={row.rosterCount === 0 ? "Kein aktiver Kader vorhanden" : undefined} className={`teams-view-axis-cell teams-view-axis-cell-men ${row.currentMenRank != null ? getRankHeatClass(row.currentMenRank, gameState.teams.length) : ""}`}>{row.currentMenRank != null ? formatWholeNumber(row.currentMenRank) : "—"}</td>;
-                        if (column.id === "soc") return <td key={column.id} title={row.rosterCount === 0 ? "Kein aktiver Kader vorhanden" : undefined} className={`teams-view-axis-cell teams-view-axis-cell-soc ${row.currentSocRank != null ? getRankHeatClass(row.currentSocRank, gameState.teams.length) : ""}`}>{row.currentSocRank != null ? formatWholeNumber(row.currentSocRank) : "—"}</td>;
+                        if (column.id === "pow") return <td key={column.id} title={row.rosterCount === 0 ? "Kein aktiver Kader vorhanden" : getTeamAxisRankTooltip("POW")} className={`teams-view-axis-cell teams-view-axis-cell-pow ${row.currentPowRank != null ? getRankHeatClass(row.currentPowRank, gameState.teams.length) : ""}`}>{row.currentPowRank != null ? formatWholeNumber(row.currentPowRank) : "—"}</td>;
+                        if (column.id === "spe") return <td key={column.id} title={row.rosterCount === 0 ? "Kein aktiver Kader vorhanden" : getTeamAxisRankTooltip("SPE")} className={`teams-view-axis-cell teams-view-axis-cell-spe ${row.currentSpeRank != null ? getRankHeatClass(row.currentSpeRank, gameState.teams.length) : ""}`}>{row.currentSpeRank != null ? formatWholeNumber(row.currentSpeRank) : "—"}</td>;
+                        if (column.id === "men") return <td key={column.id} title={row.rosterCount === 0 ? "Kein aktiver Kader vorhanden" : getTeamAxisRankTooltip("MEN")} className={`teams-view-axis-cell teams-view-axis-cell-men ${row.currentMenRank != null ? getRankHeatClass(row.currentMenRank, gameState.teams.length) : ""}`}>{row.currentMenRank != null ? formatWholeNumber(row.currentMenRank) : "—"}</td>;
+                        if (column.id === "soc") return <td key={column.id} title={row.rosterCount === 0 ? "Kein aktiver Kader vorhanden" : getTeamAxisRankTooltip("SOC")} className={`teams-view-axis-cell teams-view-axis-cell-soc ${row.currentSocRank != null ? getRankHeatClass(row.currentSocRank, gameState.teams.length) : ""}`}>{row.currentSocRank != null ? formatWholeNumber(row.currentSocRank) : "—"}</td>;
                         if (column.id === "histPoints") {
                           const rank = teamHistoryPointRankMaps.total.get(row.team.teamId);
                           return <td key={column.id} className={`teams-view-history-points-cell ${rank != null ? getRankHeatClass(rank, gameState.teams.length) : ""}`}>{row.historicalPointsTotal != null ? formatLocalePoints(row.historicalPointsTotal, 1) : "—"}</td>;
@@ -19378,12 +27558,37 @@ export default function FoundationPageClient({ initialReadSource, initialSelecte
                           const rank = teamHistoryPointRankMaps.average.get(row.team.teamId);
                           return <td key={column.id} className={`teams-view-history-points-cell ${rank != null ? getRankHeatClass(rank, gameState.teams.length) : ""}`}>{row.avgPoints != null ? formatLocalePoints(row.avgPoints, 1) : "—"}</td>;
                         }
-                        if (column.id === "gold") return <td key={column.id} className="teams-view-medal-cell">{row.goldCount}</td>;
-                        if (column.id === "silver") return <td key={column.id} className="teams-view-medal-cell">{row.silverCount}</td>;
-                        if (column.id === "bronze") return <td key={column.id} className="teams-view-medal-cell">{row.bronzeCount}</td>;
+                        if (column.id === "gold") return <td key={column.id} className="teams-view-medal-cell" title="Goldmedaillen">🥇 {row.goldCount}</td>;
+                        if (column.id === "silver") return <td key={column.id} className="teams-view-medal-cell" title="Silbermedaillen">🥈 {row.silverCount}</td>;
+                        if (column.id === "bronze") return <td key={column.id} className="teams-view-medal-cell" title="Bronzemedaillen">🥉 {row.bronzeCount}</td>;
                         if (column.id === "top5") return <td key={column.id} className="teams-view-meta-cell">{row.top5}</td>;
                         if (column.id === "top10") return <td key={column.id} className="teams-view-meta-cell">{row.top10}</td>;
                         if (column.id === "avgRank") return <td key={column.id} className="teams-view-meta-cell">{row.avgRank != null ? formatWholeNumber(row.avgRank) : "—"}</td>;
+                        if (column.id === "seasonPoints") {
+                          const historyEntries = [...row.historicalPointsBySeason].sort((left, right) =>
+                            left.seasonId.localeCompare(right.seasonId, "de", { numeric: true }),
+                          );
+                          return (
+                            <td key={column.id} className="teams-view-season-points-cell">
+                              {historyEntries.length > 0 ? (
+                                <details>
+                                  <summary>{historyEntries.length} Seasons</summary>
+                                  <div className="teams-view-season-points-list">
+                                    {historyEntries.map((entry) => (
+                                      <span key={`${row.team.teamId}-${entry.seasonId}`}>
+                                        <b>{entry.seasonName.replace("Season ", "S")}</b>
+                                        {formatLocalePoints(entry.points, 1)}
+                                        {entry.rank != null ? <small>#{entry.rank}</small> : null}
+                                      </span>
+                                    ))}
+                                  </div>
+                                </details>
+                              ) : (
+                                "—"
+                              )}
+                            </td>
+                          );
+                        }
                         return <td key={column.id}>—</td>;
                       })}
                     </tr>
@@ -19391,107 +27596,70 @@ export default function FoundationPageClient({ initialReadSource, initialSelecte
                 </tbody>
               </table>
             </div>
-            <details className="teams-history-panel" open={false}>
-              <summary className="teams-history-summary">
-                Ewige Tabelle / Historische Punkte
-                <span className="muted">Nur echte archivierte Seasons aus dem lokalen Save.</span>
-              </summary>
-              <div className="table-shell teams-history-shell">
-                <table className="team-table teams-history-table">
-                  <thead>
-                    <tr>
-                      <th>Team</th>
-                      <th>Hist. Punkte</th>
-                      <th>Ø Punkte</th>
-                      {teamHistorySeasonPointColumns.map((seasonColumn) => (
-                        <th key={`history-head-${seasonColumn.seasonId}`}>
-                          {seasonColumn.seasonName.replace("Season ", "S")}
-                        </th>
-                      ))}
-                      <th className="teams-view-head-pow">POW</th>
-                      <th className="teams-view-head-spe">SPE</th>
-                      <th className="teams-view-head-men">MEN</th>
-                      <th className="teams-view-head-soc">SOC</th>
-                      <th>Gold</th>
-                      <th>Silber</th>
-                      <th>Bronze</th>
-                      <th>Top 5</th>
-                      <th>Top 10</th>
-                      <th>Avg Rank</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {sortedTeamsViewRows.map((row) => (
-                      <tr key={`history-${row.team.teamId}`} onDoubleClick={() => openTeamDrawerById(row.team.teamId)}>
-                        <td className="teams-view-team-cell">
-                          <button
-                            className="table-link-button"
-                            type="button"
-                            onClick={() => {
-                              setActiveManagerTeam(row.team.teamId, "manual_select");
-                              setActiveView("teams");
-                            }}
-                          >
-                            {row.team.name}
-                          </button>
-                        </td>
-                        <td
-                          className={`teams-view-history-points-cell ${
-                            teamHistoryPointRankMaps.total.get(row.team.teamId) != null
-                              ? getRankHeatClass(teamHistoryPointRankMaps.total.get(row.team.teamId)!, gameState.teams.length)
-                              : ""
-                          }`}
-                        >
-                          {row.historicalPointsTotal != null ? formatWholeNumber(row.historicalPointsTotal) : "—"}
-                        </td>
-                        <td
-                          className={`teams-view-history-points-cell ${
-                            teamHistoryPointRankMaps.average.get(row.team.teamId) != null
-                              ? getRankHeatClass(teamHistoryPointRankMaps.average.get(row.team.teamId)!, gameState.teams.length)
-                              : ""
-                          }`}
-                        >
-                          {row.avgPoints != null ? formatLocalePoints(row.avgPoints, 1) : "—"}
-                        </td>
-                        {teamHistorySeasonPointColumns.map((seasonColumn) => {
-                          const seasonEntry = row.historicalPointsBySeason.find(
-                            (entry) => entry.seasonId === seasonColumn.seasonId,
-                          );
-                          const rank = teamHistoryPointRankMaps.bySeason.get(seasonColumn.seasonId)?.get(row.team.teamId);
-                          return (
-                            <td
-                              key={`history-cell-${row.team.teamId}-${seasonColumn.seasonId}`}
-                              className={`teams-view-history-points-cell ${rank != null ? getRankHeatClass(rank, gameState.teams.length) : ""}`}
-                              title={seasonEntry?.rank != null ? `Rang ${seasonEntry.rank}` : undefined}
-                            >
-                              {seasonEntry?.points != null ? formatLocalePoints(seasonEntry.points, 1) : "—"}
-                            </td>
-                          );
-                        })}
-                        <td className={`teams-view-axis-cell teams-view-axis-cell-pow ${row.historicalPow != null ? getHeatClass(row.historicalPow, [120, 220, 320]) : ""}`}>
-                          {row.historicalPow != null ? formatWholeNumber(row.historicalPow) : "—"}
-                        </td>
-                        <td className={`teams-view-axis-cell teams-view-axis-cell-spe ${row.historicalSpe != null ? getHeatClass(row.historicalSpe, [120, 220, 320]) : ""}`}>
-                          {row.historicalSpe != null ? formatWholeNumber(row.historicalSpe) : "—"}
-                        </td>
-                        <td className={`teams-view-axis-cell teams-view-axis-cell-men ${row.historicalMen != null ? getHeatClass(row.historicalMen, [120, 220, 320]) : ""}`}>
-                          {row.historicalMen != null ? formatWholeNumber(row.historicalMen) : "—"}
-                        </td>
-                        <td className={`teams-view-axis-cell teams-view-axis-cell-soc ${row.historicalSoc != null ? getHeatClass(row.historicalSoc, [120, 220, 320]) : ""}`}>
-                          {row.historicalSoc != null ? formatWholeNumber(row.historicalSoc) : "—"}
-                        </td>
-                        <td className="teams-view-medal-cell">{row.goldCount}</td>
-                        <td className="teams-view-medal-cell">{row.silverCount}</td>
-                        <td className="teams-view-medal-cell">{row.bronzeCount}</td>
-                        <td className="teams-view-meta-cell">{row.top5}</td>
-                        <td className="teams-view-meta-cell">{row.top10}</td>
-                        <td className="teams-view-meta-cell">{row.avgRank != null ? formatWholeNumber(row.avgRank) : "—"}</td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
+            <section className="teams-v2-history-panel teams-history-panel" aria-label="Team-Historie">
+              <div className="teams-v2-section-head">
+                <div>
+                  <TooltipHeading
+                    as="h3"
+                    tooltip="Live-Season zuerst, darunter die echten Team-Snapshots. So sieht man schnell Rang, Punkte, PPs, Bereichswerte, Cash, Gehalt, MW und die größten Deals."
+                  >
+                    {selectedTeam ? `${selectedTeam.name} - Historie` : "Team-Historie"}
+                  </TooltipHeading>
+                  <p className="muted">Die alte Ewige-Tabelle fliegt raus. Unten bleibt nur noch die lesbare Verlaufs-Historie des ausgewählten Teams.</p>
+                </div>
               </div>
-            </details>
+              {selectedTeamsHistoryData?.history?.length ? (
+                <div className="table-shell teams-history-shell">
+                  <table className="team-table teams-v2-history-table">
+                    <thead>
+                      <tr>
+                        <th>Saison</th>
+                        <th>Rang</th>
+                        <th>Punkte</th>
+                        <th>PPs</th>
+                        <th>POW</th>
+                        <th>SPE</th>
+                        <th>MEN</th>
+                        <th>SOC</th>
+                        <th>Cash</th>
+                        <th>Gehalt</th>
+                        <th>MW</th>
+                        <th>GuV</th>
+                        <th>Top Einkauf</th>
+                        <th>Top Verkauf</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {selectedTeamsHistoryData.history.map((row) => (
+                        <tr key={`team-history-${row.seasonId}`} className={row.isLive ? "is-live" : ""}>
+                          <td className="teams-v2-season-cell">
+                            <strong>{row.seasonName}</strong>
+                            {row.isLive ? <span className="pill">Live</span> : null}
+                          </td>
+                          <td className={`teams-v2-rank-cell ${getTeamHistoryRankToneClass(row.rank)}`}>{row.rank != null ? `#${row.rank}` : "—"}</td>
+                          <td>{formatLocalePoints(row.points, 1)}</td>
+                          <td>{formatLocalePoints(row.pps, 1)}</td>
+                          <td className="teams-v2-area-cell is-pow">{formatLocalePoints(row.ppPow, 1)}</td>
+                          <td className="teams-v2-area-cell is-spe">{formatLocalePoints(row.ppSpe, 1)}</td>
+                          <td className="teams-v2-area-cell is-men">{formatLocalePoints(row.ppMen, 1)}</td>
+                          <td className="teams-v2-area-cell is-soc">{formatLocalePoints(row.ppSoc, 1)}</td>
+                          <td>{formatNullableMoney(row.cash)}</td>
+                          <td>{formatNullableMoney(row.salaryTotal)}</td>
+                          <td>{formatNullableMoney(row.marketValue)}</td>
+                          <td className={row.guv != null && row.guv < 0 ? "text-negative" : "text-positive"}>
+                            {formatSignedDisplayMoney(row.guv)}
+                          </td>
+                          <td>{row.topBuyPlayer ? `${row.topBuyPlayer} · ${formatNullableMoney(row.topBuyAmount)}` : "—"}</td>
+                          <td>{row.topSellPlayer ? `${row.topSellPlayer} · ${formatNullableMoney(row.topSellAmount)}` : "—"}</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              ) : (
+                <p className="muted">Für dieses Team ist noch keine Historie verfügbar.</p>
+              )}
+            </section>
             </>
             ) : (
               <p className="muted teams-view-note">Vergleich aktuell ausgeblendet.</p>
@@ -19522,6 +27690,17 @@ export default function FoundationPageClient({ initialReadSource, initialSelecte
                 onResetToDefault={() => resetTableLayout("disciplineRanksTable", disciplineRanksColumns)}
               />
             </div>
+            <section className="ranks-leader-grid" aria-label="Aktuelle Teamstaerke Leader">
+              {rankLeaderCards.map((entry) => (
+                <article key={`rank-leader-${entry.id}`} className={`ranks-leader-card is-${entry.tone}`}>
+                  <span>{entry.label}</span>
+                  <strong>{entry.row?.team.name ?? "—"}</strong>
+                  <small>
+                    {entry.row ? `#1 · ${formatLocalePoints(entry.row.scorePack[entry.scoreKey], 1)} Punkte` : "keine Werte"}
+                  </small>
+                </article>
+              ))}
+            </section>
             <div className="table-shell">
               <table className="team-table ranks-table">
                 <colgroup>
@@ -19629,6 +27808,25 @@ export default function FoundationPageClient({ initialReadSource, initialSelecte
                 onResetToDefault={() => resetTableLayout("disciplineConfigTable", disciplineConfigTableColumns)}
               />
             </div>
+            <div className="discipline-category-filterbar" aria-label="Disziplin-Kategorien">
+              {([
+                { id: "all", label: "Alle" },
+                { id: "power", label: "POW" },
+                { id: "speed", label: "SPE" },
+                { id: "mental", label: "MEN" },
+                { id: "social", label: "SOC" },
+              ] as Array<{ id: DisciplineCategoryFilter; label: string }>).map((filter) => (
+                <button
+                  key={`discipline-category-filter-${filter.id}`}
+                  className={`secondary-button inline-button${disciplineCategoryFilter === filter.id ? " is-selected" : ""}`}
+                  type="button"
+                  onClick={() => setDisciplineCategoryFilter(filter.id)}
+                >
+                  {filter.label}
+                </button>
+              ))}
+              <span>{visibleDisciplineConfigRows.length} Diszis</span>
+            </div>
             <div className="table-shell">
               <table className="team-table discipline-config-table">
                 <colgroup>
@@ -19653,10 +27851,10 @@ export default function FoundationPageClient({ initialReadSource, initialSelecte
                   </tr>
                 </thead>
                 <tbody>
-                  {sortedDisciplineConfigRows.map((discipline) => (
+                  {visibleDisciplineConfigRows.map((discipline) => (
                     <tr key={discipline.id}>
                       {visibleDisciplineConfigColumns.map((column) => {
-                        if (column.id === "originalOrder") return <td key={column.id} className={getRankHeatClass(discipline.originalOrder, disciplineConfigRows.length)}>{discipline.originalOrder}</td>;
+                        if (column.id === "originalOrder") return <td key={column.id} className={`discipline-order-cell is-${discipline.category}`}>{discipline.originalOrder}</td>;
                         if (column.id === "displayOrder") return <td key={column.id}>{discipline.displayOrder}</td>;
                         if (column.id === "name") {
                           return (
@@ -19729,12 +27927,12 @@ export default function FoundationPageClient({ initialReadSource, initialSelecte
 
           <section className={`panel${getViewClass("ranks")}`}>
             <div className="panel-header">
-              <TooltipHeading
-                as="h2"
-                tooltip="Summe aus POW, SPE, MEN und SOC je Team. Top 3 sind stark markiert, Rang 4-10 markiert, ab Rang 11 neutral."
-              >
-                PPs pro Bereich
-              </TooltipHeading>
+            <TooltipHeading
+              as="h2"
+              tooltip="Summe aus POW, SPE, MEN und SOC je Team. Werte in Klammern, z.B. (+8), zeigen den reinen Formkartenbonus, der in diese Punkte eingeflossen ist. Top 3 sind stark markiert, Rang 4-10 markiert, ab Rang 11 neutral."
+            >
+              PPs pro Bereich
+            </TooltipHeading>
             </div>
             <div className="table-shell narrow-table-shell season-pp-summary-shell">
               <table className="team-table pp-table season-pp-table">
@@ -19751,20 +27949,61 @@ export default function FoundationPageClient({ initialReadSource, initialSelecte
                 </thead>
                 <tbody>
                   {sortedPpAreaRows.map((row) => {
-                    const rankClass = row.pps.total > 0 ? getPpSummaryRankClass(row.rank) : "";
-                    const powRankClass = row.pps.pow > 0 ? getPpSummaryRankClass(row.areaRanks.pow) : "";
-                    const speRankClass = row.pps.spe > 0 ? getPpSummaryRankClass(row.areaRanks.spe) : "";
-                    const menRankClass = row.pps.men > 0 ? getPpSummaryRankClass(row.areaRanks.men) : "";
-                    const socRankClass = row.pps.soc > 0 ? getPpSummaryRankClass(row.areaRanks.soc) : "";
+                    const teamId = row.team.teamId;
                     return (
                       <tr key={row.team.teamId} onDoubleClick={() => openTeamDrawerById(row.team.teamId)}>
                         <td>{row.rank}</td>
                         <td>{row.team.name}</td>
-                        <td className={rankClass || undefined}>{formatPpsValue(row.pps.total)}</td>
-                        <td className={`pp-cell ${powRankClass}`.trim() || undefined}>{formatPpsValue(row.pps.pow)}</td>
-                        <td className={`pp-cell ${speRankClass}`.trim() || undefined}>{formatPpsValue(row.pps.spe)}</td>
-                        <td className={`pp-cell ${menRankClass}`.trim() || undefined}>{formatPpsValue(row.pps.men)}</td>
-                        <td className={`pp-cell ${socRankClass}`.trim() || undefined}>{formatPpsValue(row.pps.soc)}</td>
+                            <td className={ppAreaRankClassMaps.total.get(teamId) || undefined}>
+                              {renderMetricBar(row.pps.total, {
+                                tone: "pps",
+                                pool: ppAreaMetricPools.total,
+                                fallbackMax: 300,
+                                format: (value) => formatPpsValue(value),
+                                detail: formatPpFormBonus(row.formBonus.total),
+                                detailNegative: (row.formBonus.total ?? 0) < 0,
+                              })}
+                            </td>
+                            <td className={ppAreaRankClassMaps.pow.get(teamId) || undefined}>
+                              {renderMetricBar(row.pps.pow, {
+                                tone: "pow",
+                                pool: ppAreaMetricPools.pow,
+                                fallbackMax: 120,
+                                format: (value) => formatPpsValue(value),
+                                detail: formatPpFormBonus(row.formBonus.pow),
+                                detailNegative: (row.formBonus.pow ?? 0) < 0,
+                              })}
+                            </td>
+                            <td className={ppAreaRankClassMaps.spe.get(teamId) || undefined}>
+                              {renderMetricBar(row.pps.spe, {
+                                tone: "spe",
+                                pool: ppAreaMetricPools.spe,
+                                fallbackMax: 120,
+                                format: (value) => formatPpsValue(value),
+                                detail: formatPpFormBonus(row.formBonus.spe),
+                                detailNegative: (row.formBonus.spe ?? 0) < 0,
+                              })}
+                            </td>
+                            <td className={ppAreaRankClassMaps.men.get(teamId) || undefined}>
+                              {renderMetricBar(row.pps.men, {
+                                tone: "men",
+                                pool: ppAreaMetricPools.men,
+                                fallbackMax: 120,
+                                format: (value) => formatPpsValue(value),
+                                detail: formatPpFormBonus(row.formBonus.men),
+                                detailNegative: (row.formBonus.men ?? 0) < 0,
+                              })}
+                            </td>
+                            <td className={ppAreaRankClassMaps.soc.get(teamId) || undefined}>
+                              {renderMetricBar(row.pps.soc, {
+                                tone: "soc",
+                                pool: ppAreaMetricPools.soc,
+                                fallbackMax: 120,
+                                format: (value) => formatPpsValue(value),
+                                detail: formatPpFormBonus(row.formBonus.soc),
+                                detailNegative: (row.formBonus.soc ?? 0) < 0,
+                              })}
+                            </td>
                       </tr>
                     );
                   })}
@@ -19774,196 +28013,188 @@ export default function FoundationPageClient({ initialReadSource, initialSelecte
           </section>
 
           <section className={`panel${getViewClass("prize")}`} id="prize-money">
-            <div className="panel-header">
-              <h2>Preisgeld</h2>
-              <span className="pill foundation-source-pill">source: season-end forecast</span>
-              <ColumnVisibilityManager
-                title="Spalten"
-                columns={prizePreviewTableColumns}
-                activePreset={getTableActivePreset("prizePreviewTable")}
-                isVisible={(columnId, visibleByDefault) =>
-                  isTableColumnVisible("prizePreviewTable", columnId, visibleByDefault)
-                }
-                onToggle={(columnId, nextVisible) => setTableColumnVisible("prizePreviewTable", columnId, nextVisible)}
-                onMove={(columnId, direction) => moveTableColumn("prizePreviewTable", columnId, direction, prizePreviewTableColumns)}
-                getWidth={(column) => getTableColumnWidth("prizePreviewTable", column)}
-                onStepWidth={(column, delta) => adjustTableColumnWidth("prizePreviewTable", column, delta)}
-                onResetWidth={(column) => resetTableColumnWidth("prizePreviewTable", column)}
-                onResetToDefault={() => resetTableLayout("prizePreviewTable", prizePreviewTableColumns)}
-              />
-            </div>
-            <p className="muted">
-              Dieses Panel gehoert zum Saisonende. Es zeigt die echte Preisgeldtabelle mit
-              Basis-Anteil, Season-Anteil, Platzierungs-Szenarien und den Folge-Seasons aus dem
-              Sheet. Die Reihenfolge bleibt: Endstand, Preisgeld/Cash, Verkaufsphase, Kaufphase.
-            </p>
-            <div className="panel" style={{ marginTop: 16, marginBottom: 16 }}>
-              <strong>Season-End Vorschau ist read-only; sie zeigt nur Economy-Auswirkungen und keine versteckten Writes.</strong>
-              {prizePreviewGlobalWarnings.length ? (
-                <ul className="warning-list" style={{ marginTop: 8 }}>
-                  {prizePreviewGlobalWarnings.map((warning) => (
-                    <li key={warning}>{warning}</li>
-                  ))}
-                </ul>
-              ) : null}
-            </div>
-            {prizePreviewHardBlocked.length ? (
-              <div className="panel" style={{ marginTop: 16, marginBottom: 16 }}>
-                <strong>Preisgeldtabelle ungültig oder nicht eindeutig</strong>
-                <ul className="warning-list" style={{ marginTop: 8 }}>
-                  {prizePreviewHardBlocked.map((rule) => (
-                    <li key={rule}>{rule}</li>
-                  ))}
-                </ul>
-              </div>
-            ) : null}
-            <div className={`panel cockpit-step ${getCockpitStepTone(prizeApplyState.status)}`} style={{ marginTop: 16, marginBottom: 16 }}>
-              <div className="panel-header">
-                <h3>Season-End Review: {selectedTeam?.name ?? "Aktives Team"}</h3>
-                <span className={getCockpitStatusPillClass(prizeApplyState.status)}>{prizeApplyState.label}</span>
-              </div>
-              <div className="teams-summary-grid history-summary-grid">
-                <article className="metric-card">
-                  <span>Champion</span>
-                  <strong>{seasonEndChampionRow?.team.name ?? "—"}</strong>
-                </article>
-                <article className="metric-card">
-                  <span>Finaler Rang</span>
-                  <strong>{selectedPrizePreviewRow?.rank ?? selectedStandingRow?.rank ?? "—"}</strong>
-                </article>
-                <article className="metric-card">
-                  <span>Basispreisgeld</span>
-                  <strong>{selectedPrizePreviewRow?.prizeMoney != null ? formatLocalePoints(selectedPrizePreviewRow.prizeMoney, 1) : "—"}</strong>
-                </article>
-                <article className="metric-card">
-                  <span>Rank Bonus/Malus</span>
-                  <strong>{selectedPrizePreviewRow?.rankChangePrize?.bonusMalus != null ? formatLocalePoints(selectedPrizePreviewRow.rankChangePrize.bonusMalus, 1) : "—"}</strong>
-                </article>
-                <article className="metric-card">
-                  <span>Sponsor/Board</span>
-                  <strong>{selectedPrizePreviewRow?.seasonCash != null ? formatLocalePoints(selectedPrizePreviewRow.seasonCash, 1) : "—"}</strong>
-                </article>
-                <article className="metric-card">
-                  <span>Cash vorher/nachher</span>
-                  <strong>
-                    {selectedPrizePreviewRow?.currentCash != null ? formatLocalePoints(selectedPrizePreviewRow.currentCash, 1) : "—"} → {selectedPrizePreviewRow?.projectedCash != null ? formatLocalePoints(selectedPrizePreviewRow.projectedCash, 1) : "—"}
-                  </strong>
-                </article>
-              </div>
-              <p className="muted cockpit-step-hint">
-                RankChange: Season 1 nutzt Startbudget als StartRank; spätere Seasons nutzen den Vorjahresrang, falls als Quelle vorhanden. Fehlende Quelle bleibt Warning, kein Fake-Bonus.
-              </p>
-            </div>
-            <div className="panel prize-forecast-panel" style={{ marginTop: 16, marginBottom: 16 }}>
-              <div className="panel-header">
-                <div>
-                  <h3>5-Seasons GuV Forecast</h3>
-                  <p className="muted">
-                    Simple Rechnung: simuliertes Preisgeld nach Platz minus aktuelle Gehaltssumme. Keine Transfers, Facilities oder Bonus-Fakes.
+            <div className="prize-v2-shell">
+              <section className="prize-v2-hero">
+                <div className="prize-v2-hero-copy">
+                  <span className="prize-v2-kicker">Preisgeld</span>
+                  <h2>{gameState.season.name} · Saisonende</h2>
+                  <p>
+                    Echte Preisgeldtabelle mit Basis-Anteil, Season-Anteil, Bonus/Malus und 5-Seasons-Forecast.
+                    Der Ablauf bleibt gleich: Endstand, Preisgeld/Cash, dann erst Verkaufs- und Kaufphase.
                   </p>
+                  <div className="prize-v2-pill-row">
+                    <span className="pill foundation-source-pill">{getViewSourceBadgeLabel("prize", activeContextMeta)}</span>
+                    <span className={`pill ${prizePreviewHardBlocked.length > 0 ? "is-warning" : "is-ready"}`}>
+                      {prizePreviewHardBlocked.length > 0 ? `${prizePreviewHardBlocked.length} Blocker` : "ohne Blocker"}
+                    </span>
+                    <span className="pill">{prizeV2Summary.calculableTeams}/{prizeV2Summary.totalTeams} Teams berechenbar</span>
+                  </div>
                 </div>
-                <label className="filter-field prize-forecast-rank-select">
-                  <span>Platz simulieren</span>
-                  <select
-                    className="input"
-                    value={prizeForecastRank}
-                    onChange={(event) => setPrizeForecastRank(clampValue(Number(event.target.value), 1, 32))}
-                  >
-                    {Array.from({ length: Math.max(32, prizePreviewFeed?.summary.prizeRowsCount ?? 0) }, (_, index) => index + 1).map((rank) => (
-                      <option key={rank} value={rank}>
-                        Platz {rank}
-                      </option>
-                    ))}
-                  </select>
-                </label>
-              </div>
-              <div className="teams-summary-grid history-summary-grid">
-                <article className="metric-card">
-                  <span>Start Cash</span>
-                  <strong>{formatLocalePoints(selectedPrizePreviewRow?.currentCash ?? selectedTeam?.cash ?? null, 1)}</strong>
-                </article>
-                <article className="metric-card">
-                  <span>Aktuelles Gehalt</span>
-                  <strong>{formatLocalePoints(prizeForecastSalaryTotal, 1)}</strong>
-                </article>
-                <article className="metric-card">
-                  <span>Simulierter Platz</span>
-                  <strong>{prizeForecastRankRow ? `${prizeForecastRank}.` : "—"}</strong>
-                </article>
-                <article className="metric-card">
-                  <span>Preisgeld aktuell</span>
-                  <strong>{formatLocalePoints(prizeForecastRankRow?.prizeMoney ?? null, 1)}</strong>
-                </article>
-              </div>
-              {prizeForecastRows.length === 0 ? (
-                <p className="muted cockpit-step-hint">
-                  Forecast wartet auf Preisgeld-Preview, Team-Cash und Gehaltssumme.
-                </p>
-              ) : (
-                <div className="table-shell prize-forecast-table-shell">
-                  <table className="team-table prize-forecast-table">
-                    <thead>
-                      <tr>
-                        <th>Season</th>
-                        <th>Preisgeld</th>
-                        <th>Gehalt</th>
-                        <th>GuV</th>
-                        <th>Cash nachher</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {prizeForecastRows.map((row) => (
-                        <tr key={row.label}>
-                          <td>{row.label}</td>
-                          <td>{formatLocalePoints(row.prizeMoney, 1)}</td>
-                          <td>{formatLocalePoints(row.salaryTotal, 1)}</td>
-                          <td className={row.guv == null ? undefined : row.guv >= 0 ? "text-positive" : "text-negative"}>
-                            {formatSignedDisplayMoney(row.guv)}
-                          </td>
-                          <td className={row.cashAfter == null ? undefined : row.cashAfter >= 0 ? "text-positive" : "text-negative"}>
-                            {formatLocalePoints(row.cashAfter, 1)}
-                          </td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
+                <div className="prize-v2-hero-actions">
+                  <button className="secondary-button inline-button" type="button" onClick={() => setFoundationView("seasonV2", setActiveView)}>
+                    Saison v2
+                  </button>
+                  <button className="secondary-button inline-button" type="button" onClick={() => setFoundationView("teams", setActiveView)}>
+                    Teams
+                  </button>
                 </div>
-              )}
-            </div>
-            <div className="teams-summary-grid history-summary-grid">
-              <article className="metric-card">
-                <span>Preisgeld-Zeilen</span>
-                <strong>{prizePreviewFeed?.summary.prizeRowsCount ?? 0}</strong>
-              </article>
-              <article className="metric-card">
-                <span>Berechenbar</span>
-                <strong>{prizePreviewFeed?.summary.calculableTeams ?? 0}</strong>
-              </article>
-              <article className="metric-card">
-                <span>Faktor aktuell</span>
-                <strong>{formatLocalePoints(prizePreviewFeed?.summary.currentFactor ?? null, 2)}</strong>
-              </article>
-              <article className="metric-card">
-                <span>Folge-Seasons</span>
-                <strong>{prizePreviewFeed?.summary.futureSeasonCount ?? 0}</strong>
-              </article>
-              <article className="metric-card">
-                <span>Rank Bonus/Malus</span>
-                <strong>{prizePreviewFeed?.summary.totalRankChangePrize != null ? formatLocalePoints(prizePreviewFeed.summary.totalRankChangePrize, 1) : "—"}</strong>
-              </article>
-            </div>
-            {prizePreviewFeed?.seasonFactors?.length ? (
-              <div className="teams-summary-grid history-summary-grid" style={{ marginTop: 16 }}>
-                {prizePreviewFeed.seasonFactors.map((entry) => (
-                  <article className="metric-card" key={entry.seasonLabel}>
-                    <span>{entry.seasonLabel}</span>
-                    <strong>{formatLocalePoints(entry.factor, 2)}</strong>
+              </section>
+
+              <section className="prize-v2-story-grid" aria-label="Preisgeld-Fokus">
+                <article className="prize-v2-story-card is-leader">
+                  <span>Top Auszahlung</span>
+                  <strong>{prizeV2LeaderRow ? prizeV2LeaderRow.teamName : "—"}</strong>
+                  <small>{prizeV2LeaderRow ? `#${prizeV2LeaderRow.rank ?? "—"} · ${formatNullableMoney(prizeV2LeaderRow.prizeMoney)}` : "kein Leader"}</small>
+                </article>
+                <article className="prize-v2-story-card is-selected">
+                  <span>Dein Outlook</span>
+                  <strong>{prizeV2SelectedTeamSummary ? prizeV2SelectedTeamSummary.teamName : "—"}</strong>
+                  <small>
+                    {prizeV2SelectedTeamSummary
+                      ? `#${prizeV2SelectedTeamSummary.rank ?? "—"} · ${formatLocalePoints(prizeV2SelectedTeamSummary.currentCash, 1)} → ${formatLocalePoints(prizeV2SelectedTeamSummary.projectedCash, 1)}`
+                      : "kein Team aktiv"}
+                  </small>
+                </article>
+                <article className="prize-v2-story-card is-swing">
+                  <span>Größter Swing</span>
+                  <strong>{prizeV2SwingRow ? prizeV2SwingRow.teamName : "—"}</strong>
+                  <small>
+                    {prizeV2SwingRow
+                      ? `${formatSignedDisplayMoney(prizeV2SwingRow.rankDelta)} Plätze · ${formatSignedDisplayMoney(prizeV2SwingRow.bonusMalus)}`
+                      : "kein Ausschlag"}
+                  </small>
+                </article>
+                <article className="prize-v2-story-card is-risk">
+                  <span>Finanzrisiko</span>
+                  <strong>{prizeV2RiskRow ? prizeV2RiskRow.teamName : "—"}</strong>
+                  <small>
+                    {prizeV2RiskRow
+                      ? `Cash danach ${formatLocalePoints(prizeV2RiskRow.projectedCash, 1)} · ${prizeV2RiskRow.warnings.length} Hinweise`
+                      : "kein Drucksignal"}
+                  </small>
+                </article>
+              </section>
+
+              <section className="prize-v2-factor-strip" aria-label="Saisonfaktoren">
+                {prizeV2FactorRows.length > 0 ? (
+                  prizeV2FactorRows.map((entry) => (
+                    <article key={entry.seasonLabel} className={`prize-v2-factor-card ${entry.factor == null ? "is-neutral" : entry.factor >= 1.18 ? "is-strong" : entry.factor >= 1 ? "is-good" : entry.factor >= 0.9 ? "is-mid" : "is-low"}`}>
+                      <span>{entry.seasonLabel}</span>
+                      <strong>{formatLocalePoints(entry.factor, 2)}</strong>
+                    </article>
+                  ))
+                ) : (
+                  <article className="prize-v2-factor-card is-neutral">
+                    <span>Faktoren</span>
+                    <strong>—</strong>
                   </article>
-                ))}
-              </div>
-            ) : null}
-            <div className="table-shell">
-              <table className="team-table prize-team-table">
+                )}
+              </section>
+
+              <section className="prize-v2-main-grid">
+                <div className="prize-v2-table-panel">
+                  <div className="panel-header prize-v2-panel-header">
+                    <div className="stack">
+                      <h3>Preisgeld-Tabelle</h3>
+                      <p className="muted">Die klassische Haupttabelle bleibt vorne. Spalten, Sortierung und Forecast bleiben erhalten.</p>
+                    </div>
+                    <ColumnVisibilityManager
+                      title="Spalten"
+                      columns={prizePreviewTableColumns}
+                      activePreset={getTableActivePreset("prizePreviewTable")}
+                      isVisible={(columnId, visibleByDefault) =>
+                        isTableColumnVisible("prizePreviewTable", columnId, visibleByDefault)
+                      }
+                      onToggle={(columnId, nextVisible) => setTableColumnVisible("prizePreviewTable", columnId, nextVisible)}
+                      onMove={(columnId, direction) => moveTableColumn("prizePreviewTable", columnId, direction, prizePreviewTableColumns)}
+                      getWidth={(column) => getTableColumnWidth("prizePreviewTable", column)}
+                      onStepWidth={(column, delta) => adjustTableColumnWidth("prizePreviewTable", column, delta)}
+                      onResetWidth={(column) => resetTableColumnWidth("prizePreviewTable", column)}
+                      onResetToDefault={() => resetTableLayout("prizePreviewTable", prizePreviewTableColumns)}
+                    />
+                  </div>
+                  <section className="prize-v2-primary-forecast">
+                    <div className="panel-header prize-v2-panel-header">
+                      <div className="stack">
+                        <h3>Eigenes Team Forecast</h3>
+                        <p className="muted">Das eigene Team steht oben: Cash, Faktor, Preisgeld und 5-Seasons-Folge direkt an der Haupttabelle.</p>
+                      </div>
+                      <label className="filter-field prize-forecast-rank-select">
+                        <span>Platz simulieren</span>
+                        <select
+                          className="input"
+                          value={prizeForecastRank}
+                          onChange={(event) => setPrizeForecastRank(clampValue(Number(event.target.value), 1, 32))}
+                        >
+                          {Array.from({ length: Math.max(32, prizePreviewFeed?.summary.prizeRowsCount ?? 0) }, (_, index) => index + 1).map((rank) => (
+                            <option key={rank} value={rank}>
+                              Platz {rank}
+                            </option>
+                          ))}
+                        </select>
+                      </label>
+                    </div>
+                    <div className="prize-v2-team-strip">
+                      <article>
+                        <span>Cash vorher</span>
+                        <strong>{prizeV2SelectedTeamSummary?.currentCash != null ? formatLocalePoints(prizeV2SelectedTeamSummary.currentCash, 1) : "—"}</strong>
+                      </article>
+                      <article>
+                        <span>Season Faktor</span>
+                        <strong>{formatLocalePoints(prizePreviewFeed?.summary.currentFactor ?? null, 2)}</strong>
+                      </article>
+                      <article>
+                        <span>Preisgeld</span>
+                        <strong>{prizeV2SelectedTeamSummary?.prizeMoney != null ? formatLocalePoints(prizeV2SelectedTeamSummary.prizeMoney, 1) : "—"}</strong>
+                      </article>
+                      <article>
+                        <span>Bonus / Malus</span>
+                        <strong className={prizeV2SelectedTeamSummary?.bonusMalus != null && prizeV2SelectedTeamSummary.bonusMalus < 0 ? "text-negative" : "text-positive"}>
+                          {formatSignedDisplayMoney(prizeV2SelectedTeamSummary?.bonusMalus)}
+                        </strong>
+                      </article>
+                      <article>
+                        <span>Cash nachher</span>
+                        <strong>{prizeV2SelectedTeamSummary?.projectedCash != null ? formatLocalePoints(prizeV2SelectedTeamSummary.projectedCash, 1) : "—"}</strong>
+                      </article>
+                      <article>
+                        <span>Simulierter Platz</span>
+                        <strong>{prizeForecastRankRow ? `${prizeForecastRank}.` : "—"}</strong>
+                      </article>
+                    </div>
+                    {prizeForecastRows.length === 0 ? (
+                      <p className="muted">Forecast wartet auf Preisgeld-Preview, Team-Cash und Gehaltssumme.</p>
+                    ) : (
+                      <div className="table-shell prize-v2-forecast-shell">
+                        <table className="team-table prize-v2-forecast-table">
+                          <thead>
+                            <tr>
+                              <th>Season</th>
+                              <th>Faktor</th>
+                              <th>Preisgeld</th>
+                              <th>Gehalt</th>
+                              <th>GuV</th>
+                              <th>Cash</th>
+                            </tr>
+                          </thead>
+                          <tbody>
+                            {prizeForecastRows.map((row) => (
+                              <tr key={row.label}>
+                                <td>{row.label}</td>
+                                <td>{formatLocalePoints(row.factor ?? null, 2)}</td>
+                                <td>{row.prizeMoney != null ? formatLocalePoints(row.prizeMoney, 1) : "—"}</td>
+                                <td>{row.salaryTotal != null ? formatLocalePoints(row.salaryTotal, 1) : "—"}</td>
+                                <td className={row.guv != null && row.guv < 0 ? "text-negative" : "text-positive"}>{formatSignedDisplayMoney(row.guv)}</td>
+                                <td>{row.cashAfter != null ? formatLocalePoints(row.cashAfter, 1) : "—"}</td>
+                              </tr>
+                            ))}
+                          </tbody>
+                        </table>
+                      </div>
+                    )}
+                  </section>
+                  <div className="table-shell">
+                    <table className="team-table prize-team-table">
                 <colgroup>
                   {visiblePrizePreviewColumns.map((column) => (
                     <col key={column.id} style={{ width: `${getTableColumnWidth("prizePreviewTable", column)}px` }} />
@@ -19986,8 +28217,12 @@ export default function FoundationPageClient({ initialReadSource, initialSelecte
                   </tr>
                 </thead>
                 <tbody>
-                  {sortedPrizePreviewRows.map((row) => (
-                    <tr key={row.teamId} onDoubleClick={() => openTeamDrawerById(row.teamId)}>
+                  {displayPrizePreviewRows.map((row) => (
+                    <tr
+                      key={row.teamId}
+                      className={`prize-team-table-row${row.teamId === selectedTeam?.teamId ? " is-selected" : ""}`}
+                      onDoubleClick={() => openTeamDrawerById(row.teamId)}
+                    >
                       {visiblePrizePreviewColumns.map((column) => {
                         if (column.id === "team") return <td key={column.id}>{row.teamName}</td>;
                         if (column.id === "projectedRank") return <td key={column.id}>{row.rank ?? "—"}</td>;
@@ -19996,6 +28231,9 @@ export default function FoundationPageClient({ initialReadSource, initialSelecte
                         if (column.id === "currentCash") return <td key={column.id}>{row.currentCash != null ? formatLocalePoints(row.currentCash, 1) : "—"}</td>;
                         if (column.id === "basisCash") return <td key={column.id}>{row.basisCash != null ? formatLocalePoints(row.basisCash, 1) : "—"}</td>;
                         if (column.id === "seasonCash") return <td key={column.id}>{row.seasonCash != null ? formatLocalePoints(row.seasonCash, 1) : "—"}</td>;
+                        if (column.id === "currentFactor") {
+                          return <td key={column.id}>{formatLocalePoints(prizePreviewFeed?.summary.currentFactor ?? null, 2)}</td>;
+                        }
                         if (column.id === "prizeMoney") return <td key={column.id}>{row.prizeMoney != null ? formatLocalePoints(row.prizeMoney, 1) : "—"}</td>;
                         if (column.id === "rankChangePrize") return <td key={column.id}>{row.rankChangePrize?.bonusMalus != null ? formatLocalePoints(row.rankChangePrize.bonusMalus, 1) : "—"}</td>;
                         if (column.id === "payoutIfTenBetter") return <td key={column.id}>{row.payoutIfTenBetter != null ? formatLocalePoints(row.payoutIfTenBetter, 1) : "—"}</td>;
@@ -20010,95 +28248,112 @@ export default function FoundationPageClient({ initialReadSource, initialSelecte
                   ))}
                 </tbody>
               </table>
+                  </div>
+                </div>
+
+                <aside className="prize-v2-side-rail">
+                  <section className="prize-v2-side-panel">
+                    <div className="panel-header prize-v2-panel-header">
+                      <div className="stack">
+                        <h3>Season-End Review</h3>
+                        <p className="muted">Die Funktion von v1 bleibt: lesen, prüfen, dann erst Season-End-Schritte auslösen.</p>
+                      </div>
+                      <span className={getCockpitStatusPillClass(prizeApplyState.status)}>{prizeApplyState.label}</span>
+                    </div>
+                    <div className="prize-v2-review-grid">
+                      <article>
+                        <span>Preisgeld-Zeilen</span>
+                        <strong>{prizePreviewFeed?.summary.prizeRowsCount ?? 0}</strong>
+                      </article>
+                      <article>
+                        <span>Berechenbar</span>
+                        <strong>{prizePreviewFeed?.summary.calculableTeams ?? 0}</strong>
+                      </article>
+                      <article>
+                        <span>Faktor aktuell</span>
+                        <strong>{formatLocalePoints(prizePreviewFeed?.summary.currentFactor ?? null, 2)}</strong>
+                      </article>
+                      <article>
+                        <span>Folge-Seasons</span>
+                        <strong>{prizePreviewFeed?.summary.futureSeasonCount ?? 0}</strong>
+                      </article>
+                      <article>
+                        <span>Rank Bonus/Malus</span>
+                        <strong className={prizePreviewFeed?.summary.totalRankChangePrize != null && prizePreviewFeed.summary.totalRankChangePrize < 0 ? "text-negative" : "text-positive"}>
+                          {prizePreviewFeed?.summary.totalRankChangePrize != null ? formatSignedDisplayMoney(prizePreviewFeed.summary.totalRankChangePrize) : "—"}
+                        </strong>
+                      </article>
+                      <article>
+                        <span>Champion</span>
+                        <strong>{seasonEndChampionRow?.team.name ?? "—"}</strong>
+                      </article>
+                    </div>
+                    {prizeV2SelectedTeamSummary ? (
+                      <div className="prize-v2-scenario-box">
+                        <strong>{prizeV2SelectedTeamSummary.teamName}</strong>
+                        <small>
+                          {prizePreviewFeed?.scenarioWindow
+                            ? `+${prizePreviewFeed.scenarioWindow.betterBy}: ${formatNullableMoney(prizeV2SelectedTeamSummary.payoutIfTenBetter)} · -${prizePreviewFeed.scenarioWindow.worseBy}: ${formatNullableMoney(prizeV2SelectedTeamSummary.payoutIfTenWorse)}`
+                            : "Kein Szenariofenster gefunden."}
+                        </small>
+                      </div>
+                    ) : null}
+                    {prizePreviewHardBlocked.length > 0 ? (
+                      <div className="prize-v2-warning-box is-blocked">
+                        <strong>Blocker</strong>
+                        <ul>
+                          {prizePreviewHardBlocked.slice(0, 4).map((rule) => (
+                            <li key={rule}>{rule}</li>
+                          ))}
+                        </ul>
+                      </div>
+                    ) : null}
+                    {prizePreviewGlobalWarnings.length > 0 ? (
+                      <div className="prize-v2-warning-box">
+                        <strong>Hinweise</strong>
+                        <ul>
+                          {prizePreviewGlobalWarnings.slice(0, 4).map((warning) => (
+                            <li key={warning}>{warning}</li>
+                          ))}
+                        </ul>
+                      </div>
+                    ) : null}
+                    <p className="muted cockpit-step-hint">
+                      RankChange: Season 1 nutzt Startbudget als StartRank; spätere Seasons nutzen den Vorjahresrang, falls als Quelle vorhanden.
+                    </p>
+                  </section>
+                </aside>
+              </section>
             </div>
           </section>
 
           {activeView === "teams" && selectedTeam ? (
             <>
-              <section className={`panel team-hero-panel${getViewClass("teams")}`} id="team-view">
-                <div className="team-hero">
-                  <div className="stack">
-                    <p className="eyebrow">{selectedTeam.shortCode}</p>
-                    <h2>{selectedTeam.name}</h2>
-                    <p className="muted team-detail-note">
-                      {selectedTeamControl?.controlMode === "ai"
-                        ? "AI-gesteuert"
-                        : selectedTeamControl?.controlMode === "passive"
-                          ? "Passives Team"
-                          : "Manuell gesteuert"}{" "}
-                      · derselbe Werte-Stand wie im Saisonstand.
-                    </p>
-                    <div className="team-detail-toolbar">
-                      <label className="filter-field team-inline-select">
-                        <span>Team wechseln</span>
-                        <select
-                          className="input"
-                          value={selectedTeam.teamId}
-                          onChange={(event) => setActiveManagerTeam(event.target.value, "manual_select")}
-                        >
-                          {gameState.teams.map((team) => (
-                            <option key={team.teamId} value={team.teamId}>
-                              {team.shortCode} · {team.name}
-                            </option>
-                          ))}
-                        </select>
-                      </label>
-                      <div className="team-detail-actions">
-                        <button
-                          className="secondary-button inline-button"
-                          type="button"
-                          onClick={() => setShowExtendedTeamPanels((current) => !current)}
-                        >
-                          {showExtendedTeamPanels ? "Mehr Teamdetails ausblenden" : "Mehr Teamdetails einblenden"}
-                        </button>
-                        <button
-                          className="secondary-button inline-button"
-                          type="button"
-                          onClick={() => setShowTeamsComparison((current) => !current)}
-                        >
-                          {showTeamsComparison ? "Vergleich ausblenden" : "Vergleich einblenden"}
-                        </button>
-                      </div>
-                    </div>
-                  </div>
-                  <div className="team-hero-stats">
-                    {selectedTeamCoreMetrics.map((metric) => (
-                      <article key={metric.key}>
-                        <span>{metric.label}</span>
-                        <strong>{metric.value}</strong>
-                      </article>
-                    ))}
-                  </div>
-                  <div className="teams-summary-grid history-summary-grid" style={{ marginTop: 16 }}>
-                    {selectedTeamHistoricalMetrics.map((metric) => (
-                      <article key={metric.key} className="metric-card teams-summary-card">
-                        <span>{metric.label}</span>
-                        <strong>{metric.value}</strong>
-                        {"hint" in metric && metric.hint ? (
-                          <small className="muted">{metric.hint}</small>
-                        ) : null}
-                      </article>
-                    ))}
-                  </div>
-                </div>
-              </section>
-
-              <section className={`panel team-objectives-panel${getViewClass("teams")}`} data-testid="team-board-objectives">
+              <section className={`panel team-objectives-panel teams-secondary-objectives-panel${getViewClass("teams")}`} data-testid="team-board-objectives" id="team-board-objectives">
                 <div className="panel-header compact">
                   <div className="stack">
                     <h2>Board-Ziele</h2>
                     <p className="muted">Saisonziele fuer Sport, Finanzen, Transfers, Kader, Facilities und Entwicklung.</p>
                   </div>
                   <div className="room-meta foundation-admin-meta">
-                    <span className="pill">Confidence {selectedBoardConfidence?.value ?? "—"}/10</span>
-                    <span className={`transfer-status-pill${(selectedBoardConfidence?.pressure ?? 0) >= 8 ? " is-warning" : " is-ready"}`}>
+                    <span className="pill" title={TEAM_BOARD_RATING_TOOLTIP}>
+                      Board Rating {selectedBoardConfidence?.value ?? "—"}/10
+                    </span>
+                    <span
+                      className={`transfer-status-pill${(selectedBoardConfidence?.pressure ?? 0) >= 8 ? " is-warning" : " is-ready"}`}
+                      title={TEAM_BOARD_PRESSURE_TOOLTIP}
+                    >
                       Druck {selectedBoardConfidence?.pressure ?? "—"}/10
                     </span>
                   </div>
                 </div>
                 <div className="teams-summary-grid history-summary-grid">
                   {selectedTeamObjectives.map((objective) => (
-                    <article key={`team-objective-${objective.objectiveId}`} className="metric-card teams-summary-card">
+                    <article
+                      key={`team-objective-${objective.objectiveId}`}
+                      className="metric-card teams-summary-card"
+                      title={`Grundlage: ${objective.source}`}
+                    >
                       <span>{objective.category.toUpperCase()}</span>
                       <strong>{objective.label}</strong>
                       <small className="muted">
@@ -20106,7 +28361,7 @@ export default function FoundationPageClient({ initialReadSource, initialSelecte
                       </small>
                       <div className="room-meta foundation-admin-meta">
                         <span className={`transfer-status-pill${objective.status === "completed" ? " is-ready" : objective.status === "failed" || objective.status === "at_risk" ? " is-warning" : ""}`}>
-                          {objective.status}
+                          {formatObjectiveStatusLabel(objective.status)}
                         </span>
                         {objective.rewardCash != null ? <span className="pill">Bonus {formatMoney(objective.rewardCash)}</span> : null}
                         {objective.penaltyCash != null ? <span className="pill">Malus {formatMoney(objective.penaltyCash)}</span> : null}
@@ -20115,11 +28370,11 @@ export default function FoundationPageClient({ initialReadSource, initialSelecte
                   ))}
                 </div>
                 {selectedBoardConfidence?.warnings.length ? (
-                  <p className="muted">Board-Warnings: {selectedBoardConfidence.warnings.join(", ")}</p>
+                  <p className="muted">Board-Hinweise: {selectedBoardConfidence.warnings.map(formatCockpitReason).join(", ")}</p>
                 ) : null}
               </section>
 
-              <section className={`panel team-focus-panel${getViewClass("teams")}`}>
+              <section className={`panel team-focus-panel teams-primary-roster-panel${getViewClass("teams")}`} id="team-focus-roster">
                 <div className="panel-header team-focus-header">
                   <div className="team-focus-title-wrap">
                     {(() => {
@@ -20172,46 +28427,37 @@ export default function FoundationPageClient({ initialReadSource, initialSelecte
 
                 {selectedTeamDetailTab === "roster" ? (
                   <>
-                    <ColumnVisibilityManager
-                      title="Spalten"
-                      columns={selectedRosterColumns}
-                      presets={selectedRosterPresets}
-                      activePreset={getTableActivePreset("selectedRosterTable")}
-                      isVisible={(columnId, visibleByDefault) =>
-                        isTableColumnVisible("selectedRosterTable", columnId, visibleByDefault)
-                      }
-                      onToggle={(columnId, nextVisible) =>
-                        setTableColumnVisible("selectedRosterTable", columnId, nextVisible)
-                      }
-                      onMove={(columnId, direction) =>
-                        moveTableColumn("selectedRosterTable", columnId, direction, selectedRosterColumns)
-                      }
-                      getWidth={(column) => getTableColumnWidth("selectedRosterTable", column)}
-                      onStepWidth={(column, delta) => adjustTableColumnWidth("selectedRosterTable", column, delta)}
-                      onResetWidth={(column) => resetTableColumnWidth("selectedRosterTable", column)}
-                      onApplyPreset={(presetId) => {
-                        const preset = selectedRosterPresets.find((entry) => entry.id === presetId);
-                        if (preset) {
-                          applyTablePreset("selectedRosterTable", preset, selectedRosterColumns);
-                        }
-                      }}
-                      onResetToDefault={() => {
-                        const preset = selectedRosterPresets.find((entry) => entry.id === "retool_default");
-                        if (preset) {
-                          applyTablePreset("selectedRosterTable", preset, selectedRosterColumns);
-                        }
-                      }}
-                    />
-
-                    <div className="team-focus-summary">
-                      {selectedTeamOptionalMetrics.map((metric) => (
-                        <article className="metric-card" key={metric.key}>
-                          <span>{metric.label}</span>
-                          <strong className={metric.className}>{metric.value}</strong>
-                        </article>
+                    <div className="team-roster-role-filterbar" aria-label="Kaderrollen filtern">
+                      {teamRosterRoleFilterOptions.map((option) => (
+                        <button
+                          key={`team-roster-role-filter-${option.id}`}
+                          className={`secondary-button inline-button${teamRosterRoleFilter === option.id ? " is-active" : ""}`}
+                          type="button"
+                          onClick={() => setTeamRosterRoleFilter(option.id)}
+                        >
+                          {option.label} <span>{option.count}</span>
+                        </button>
                       ))}
                     </div>
 
+                    <div className="team-roster-focusbar" aria-label="Kaderfokus waehlen">
+                      {teamRosterFocusOptions.map((option) => (
+                        <button
+                          key={`team-roster-focus-${option.id}`}
+                          className={`secondary-button inline-button${teamRosterFocusMode === option.id ? " is-active" : ""}`}
+                          type="button"
+                          onClick={() => setTeamRosterFocusMode(option.id)}
+                        >
+                          {option.label} <span>{option.count}</span>
+                        </button>
+                      ))}
+                    </div>
+                    {selectedTeamRosterActionHint ? (
+                      <div className={`team-roster-action-status${selectedTeamRosterActionsAvailable ? " is-ready" : " is-locked"}`}>
+                        <strong>{selectedTeamRosterActionsAvailable ? "Aktionen aktiv" : "Nur Ansicht"}</strong>
+                        <span>{selectedTeamRosterActionHint}</span>
+                      </div>
+                    ) : null}
                     <div className="team-focus-layout">
                       <div className="table-shell team-focus-table-shell">
                         <table
@@ -20243,8 +28489,15 @@ export default function FoundationPageClient({ initialReadSource, initialSelecte
                             </tr>
                           </thead>
                           <tbody>
-                            {sortedSelectedRosterTableRows.map(({ entry, player, playerOvr, playerMvs, playerPps }) => (
-                              <tr key={entry.id} onDoubleClick={() => openPlayerDrawerById(player.id, entry.id)}>
+                            {filteredSelectedRosterTableRows.map(({ entry, player, playerOvr, playerMvs, playerPps, ppPow, ppSpe, ppMen, ppSoc, saleBreakdown }) => {
+                              const hasPpsBreakdown = [ppPow, ppSpe, ppMen, ppSoc].some((value) => value != null && Number.isFinite(value));
+                              const isContractExpiring = entry.contractLength <= 1;
+                              return (
+                              <Fragment key={entry.id}>
+                              <tr
+                                className={entry.contractLength <= 1 ? "is-contract-expiring" : undefined}
+                                onDoubleClick={() => openPlayerDrawerById(player.id, entry.id)}
+                              >
                                 {visibleSelectedRosterColumns.map((column) => {
                                   if (column.id === "image") {
                                     const portrait = getPlayerPortraitModel(player);
@@ -20269,25 +28522,45 @@ export default function FoundationPageClient({ initialReadSource, initialSelecte
                                         <div className="table-player-cell">
                                           <strong>{player.name}</strong>
                                           <span>{entry.roleTag}</span>
-                                          <div className="transfermarkt-inline-actions">
-                                            <button
-                                              className="secondary-button inline-button"
-                                              type="button"
-                                              disabled={marketSellBusy}
-                                              onClick={() =>
-                                                void openMarketSellModal({
-                                                  activePlayerId: entry.id,
-                                                  playerId: player.id,
-                                                  playerName: player.name,
-                                                  className: player.className,
-                                                  race: player.race,
-                                                  portraitUrl: getPlayerPortraitModel(player).src,
-                                                }, selectedTeam?.teamId)
-                                              }
-                                            >
-                                              Verkaufen
-                                            </button>
-                                          </div>
+                                          {selectedTeamRosterActionsAvailable ? (
+                                            <div className="transfermarkt-inline-actions">
+                                              <button
+                                                className="secondary-button inline-button"
+                                                type="button"
+                                                disabled={marketSellBusy}
+                                                onClick={() =>
+                                                  void openMarketSellModal({
+                                                    activePlayerId: entry.id,
+                                                    playerId: player.id,
+                                                    playerName: player.name,
+                                                    className: player.className,
+                                                    race: player.race,
+                                                    portraitUrl: getPlayerPortraitModel(player).src,
+                                                  }, selectedTeam?.teamId)
+                                                }
+                                              >
+                                                Verkaufen
+                                              </button>
+                                              {isContractExpiring && selectedTeam ? (
+                                                <button
+                                                  className="secondary-button inline-button"
+                                                  type="button"
+                                                  disabled={contractRenewalBusy != null}
+                                                  onClick={() =>
+                                                    void runContractRenewalAction({
+                                                      teamId: selectedTeam.teamId,
+                                                      playerId: player.id,
+                                                      playerName: player.name,
+                                                      action: "renew",
+                                                      contractLength: 2,
+                                                    })
+                                                  }
+                                                >
+                                                  Verlängern
+                                                </button>
+                                              ) : null}
+                                            </div>
+                                          ) : null}
                                         </div>
                                       </td>
                                     );
@@ -20306,33 +28579,109 @@ export default function FoundationPageClient({ initialReadSource, initialSelecte
                                       </td>
                                     );
                                   }
-                                  if (column.id === "mw") return <td key={column.id}>{formatLocalePoints(getPlayerDisplayMarketValue(player), 2)}</td>;
+                                  if (column.id === "mw") return <td key={column.id}>{formatLocalePoints(getRosterEntryDisplayMarketValue(entry, player), 1)}</td>;
+                                  if (column.id === "salePrice") {
+                                    const saleMarketValueDelta =
+                                      saleBreakdown.salePrice != null && saleBreakdown.baseMarketValue != null
+                                        ? saleBreakdown.salePrice - saleBreakdown.baseMarketValue
+                                        : null;
+                                    return (
+                                      <td key={column.id}>
+                                        <div className="selected-roster-sale-cell">
+                                          <strong>{saleBreakdown.salePrice != null ? formatTransfermarktCurrency(saleBreakdown.salePrice) : "—"}</strong>
+                                          {saleMarketValueDelta != null ? (
+                                            <small className={saleMarketValueDelta >= 0 ? "text-positive" : "text-negative"}>
+                                              {formatSignedTransfermarktCurrency(saleMarketValueDelta)}
+                                            </small>
+                                          ) : null}
+                                          <small className="muted">
+                                            {saleBreakdown.bracket != null ? `Bracket ${saleBreakdown.bracket}` : "kein Bracket"}
+                                          </small>
+                                        </div>
+                                      </td>
+                                    );
+                                  }
+                                  if (column.id === "saleFactor") {
+                                    return (
+                                      <td key={column.id}>
+                                        <div className="selected-roster-sale-cell">
+                                          <strong>{saleBreakdown.saleFactor != null ? `${formatLocalePoints(saleBreakdown.saleFactor, 2)}x` : "—"}</strong>
+                                          <small className="muted">
+                                            {saleBreakdown.rankInBracket != null && saleBreakdown.bracketGroupSize > 0
+                                              ? `${saleBreakdown.rankInBracket}/${saleBreakdown.bracketGroupSize} MVS`
+                                              : "MVS offen"}
+                                          </small>
+                                        </div>
+                                      </td>
+                                    );
+                                  }
                                   if (column.id === "salary") {
                                     const currentSalary = getRosterEntryDisplaySalary(entry, player);
-                                    const normalSalary = getRosterEntryNormalSalary(player);
+                                    const salaryDelta = getRosterEntrySalaryDelta(entry, player);
                                     return (
                                       <td key={column.id}>
                                         <span>{formatDisplayMoney(currentSalary)}</span>
-                                        {normalSalary != null && currentSalary != null && Math.abs(normalSalary - currentSalary) >= 0.01 ? (
-                                          <small className={currentSalary < normalSalary ? "text-positive" : "text-negative"}>
-                                            {" "}({formatDisplayMoney(normalSalary)})
+                                        {salaryDelta != null && Math.abs(salaryDelta) >= 0.01 ? (
+                                          <small className={salaryDelta <= 0 ? "text-positive" : "text-negative"}>
+                                            {" "}({formatSignedDisplayMoney(salaryDelta)})
                                           </small>
                                         ) : null}
                                       </td>
                                     );
                                   }
+                                  if (column.id === "value") {
+                                    const currentSalary = getRosterEntryDisplaySalary(entry, player);
+                                    const valueScore =
+                                      playerPps != null && currentSalary != null && currentSalary > 0
+                                        ? playerPps / currentSalary
+                                        : null;
+                                    return <td key={column.id}>{valueScore != null ? formatLocalePoints(valueScore, 2) : "—"}</td>;
+                                  }
                                   if (column.id === "contract") return <td key={column.id}>{entry.contractLength}</td>;
-                                  if (column.id === "ovr") return <td key={column.id} className={playerOvr != null ? getPoolHeatClass(playerOvr, leaguePlayerHeatPools.ovr) : ""}>{formatWholeNumber(playerOvr)}</td>;
-                                  if (column.id === "mvs") return <td key={column.id} className={playerMvs != null ? getPoolHeatClass(playerMvs, leaguePlayerHeatPools.mvs) : ""}>{playerMvs != null ? formatPpsValue(playerMvs) : "—"}</td>;
-                                  if (column.id === "pps") return <td key={column.id} className={playerPps != null && playerPps > 0 ? getPoolHeatClass(playerPps, leaguePlayerHeatPools.pps) : ""}>{playerPps != null ? formatPpsValue(playerPps) : "—"}</td>;
-                                  if (column.id === "pow") return <td key={column.id} className={getPoolHeatClass(player.coreStats.pow, leaguePlayerHeatPools.pow)}>{formatLocalePoints(player.coreStats.pow)}</td>;
-                                  if (column.id === "spe") return <td key={column.id} className={getPoolHeatClass(player.coreStats.spe, leaguePlayerHeatPools.spe)}>{formatLocalePoints(player.coreStats.spe)}</td>;
-                                  if (column.id === "men") return <td key={column.id} className={getPoolHeatClass(player.coreStats.men, leaguePlayerHeatPools.men)}>{formatLocalePoints(player.coreStats.men)}</td>;
-                                  if (column.id === "soc") return <td key={column.id} className={getPoolHeatClass(player.coreStats.soc, leaguePlayerHeatPools.soc)}>{formatLocalePoints(player.coreStats.soc)}</td>;
+                                  if (column.id === "ovr") return <td key={column.id}>{renderMetricBar(playerOvr, { tone: "ovr", pool: leaguePlayerHeatPools.ovr, fallbackMax: 100, format: (value) => formatWholeNumber(value) })}</td>;
+                                  if (column.id === "mvs") return <td key={column.id}>{renderMetricBar(playerMvs, { tone: "mvs", pool: leaguePlayerHeatPools.mvs, fallbackMax: 40, format: (value) => formatPpsValue(value) })}</td>;
+                                  if (column.id === "pps") {
+                                    return (
+                                      <td key={column.id}>
+                                        <div className="selected-roster-pps-cell">
+                                          <button
+                                            className={`selected-roster-pps-trigger${showSelectedRosterPpsBreakdown ? " is-open" : ""}`}
+                                            type="button"
+                                            aria-expanded={showSelectedRosterPpsBreakdown}
+                                            disabled={!hasPpsBreakdown}
+                                            onClick={() => setShowSelectedRosterPpsBreakdown((current) => !current)}
+                                          >
+                                            {renderMetricBar(playerPps, {
+                                              tone: "pps",
+                                              pool: leaguePlayerHeatPools.pps,
+                                              fallbackMax: 120,
+                                              format: (value) => formatPpsValue(value),
+                                            })}
+                                            <span className="selected-roster-pps-trigger-label">
+                                              {hasPpsBreakdown
+                                                ? showSelectedRosterPpsBreakdown
+                                                  ? "Bereiche ausblenden"
+                                                  : "Bereiche anzeigen"
+                                                : "Keine Bereichs-PPs"}
+                                            </span>
+                                          </button>
+                                        </div>
+                                      </td>
+                                    );
+                                  }
+                                  if (column.id === "ppPow") return <td key={column.id}>{renderMetricBar(ppPow, { tone: "pow", pool: leaguePlayerHeatPools.pps, fallbackMax: 40, format: (value) => formatPpsValue(value) })}</td>;
+                                  if (column.id === "ppSpe") return <td key={column.id}>{renderMetricBar(ppSpe, { tone: "spe", pool: leaguePlayerHeatPools.pps, fallbackMax: 40, format: (value) => formatPpsValue(value) })}</td>;
+                                  if (column.id === "ppMen") return <td key={column.id}>{renderMetricBar(ppMen, { tone: "men", pool: leaguePlayerHeatPools.pps, fallbackMax: 40, format: (value) => formatPpsValue(value) })}</td>;
+                                  if (column.id === "ppSoc") return <td key={column.id}>{renderMetricBar(ppSoc, { tone: "soc", pool: leaguePlayerHeatPools.pps, fallbackMax: 40, format: (value) => formatPpsValue(value) })}</td>;
+                                  if (column.id === "pow") return <td key={column.id}>{renderMetricBar(player.coreStats.pow, { tone: "pow", pool: leaguePlayerHeatPools.pow, fallbackMax: 100, format: (value) => formatWholeNumber(value) })}</td>;
+                                  if (column.id === "spe") return <td key={column.id}>{renderMetricBar(player.coreStats.spe, { tone: "spe", pool: leaguePlayerHeatPools.spe, fallbackMax: 100, format: (value) => formatWholeNumber(value) })}</td>;
+                                  if (column.id === "men") return <td key={column.id}>{renderMetricBar(player.coreStats.men, { tone: "men", pool: leaguePlayerHeatPools.men, fallbackMax: 100, format: (value) => formatWholeNumber(value) })}</td>;
+                                  if (column.id === "soc") return <td key={column.id}>{renderMetricBar(player.coreStats.soc, { tone: "soc", pool: leaguePlayerHeatPools.soc, fallbackMax: 100, format: (value) => formatWholeNumber(value) })}</td>;
                                   return <td key={column.id} className={getPoolHeatClass(player.disciplineRatings[column.id] ?? null, leaguePlayerHeatPools.disciplines[column.id] ?? [])}>{(player.disciplineRatings[column.id] ?? 0).toFixed(0)}</td>;
                                 })}
                               </tr>
-                            ))}
+                              </Fragment>
+                            )})}
                           </tbody>
                         </table>
                       </div>
@@ -20341,7 +28690,7 @@ export default function FoundationPageClient({ initialReadSource, initialSelecte
                           <article>
                             <span>Kaderstatus</span>
                             <strong>
-                              {selectedStandingRow?.rosterCount ?? selectedRoster.length} Spieler · Ø LZ{" "}
+                              {filteredSelectedRosterTableRows.length} / {selectedStandingRow?.rosterCount ?? selectedRoster.length} Spieler · Ø LZ{" "}
                               {selectedStandingRow?.avgContractLength != null
                                 ? formatLocalePoints(selectedStandingRow.avgContractLength, 1)
                                 : "—"}
@@ -20408,10 +28757,66 @@ export default function FoundationPageClient({ initialReadSource, initialSelecte
 	                    {contractRenewalError ? (
 	                      <div className="status-banner is-warning">{contractRenewalError}</div>
 	                    ) : null}
+                    {selectedTeamRosterActionHint ? (
+                      <div className={`team-roster-action-status${selectedTeamRosterActionsAvailable ? " is-ready" : " is-locked"}`}>
+                        <strong>{selectedTeamRosterActionsAvailable ? "Aktionen aktiv" : "Nur Ansicht"}</strong>
+                        <span>{selectedTeamRosterActionHint}</span>
+                      </div>
+                    ) : null}
 	                    <div className="transfer-callout">
 	                      <strong>Contract Exit Value</strong>
 	                      <span>Wenn ein Vertrag ausläuft oder ein Spieler freigegeben wird, erhält das Team den aktuellen VK-Wert.</span>
 	                    </div>
+                    {selectedTeamContractShapeMix ? (
+                      <div className="team-contract-mix-panel">
+                        <div className="team-contract-mix-head">
+                          <div>
+                            <strong>Vertragsmix</strong>
+                            <span className="muted">Anteil und Cashflow-Verschiebung gegen gleiche Gesamtgehälter als Balanced.</span>
+                          </div>
+                          <div className="team-contract-mix-summary">
+                            <span>
+                              {selectedTeamContractShapeMix.totalCount > 0
+                                ? `${selectedTeamContractShapeMix.nonBalancedCount}/${selectedTeamContractShapeMix.totalCount} strukturiert`
+                                : "keine aktiven Verträge"}
+                            </span>
+                            <strong className={selectedTeamContractShapeMix.currentDelta > 0 ? "negative-value" : selectedTeamContractShapeMix.currentDelta < 0 ? "positive-value" : undefined}>
+                              Jetzt {formatSignedDisplayMoney(selectedTeamContractShapeMix.currentDelta)}
+                            </strong>
+                            <small className={selectedTeamContractShapeMix.futureDelta > 0 ? "negative-value" : selectedTeamContractShapeMix.futureDelta < 0 ? "positive-value" : "muted"}>
+                              Später {formatSignedDisplayMoney(selectedTeamContractShapeMix.futureDelta)}
+                            </small>
+                          </div>
+                        </div>
+                        <div className="team-contract-mix-grid">
+                          {selectedTeamContractShapeMix.entries.map((entry) => (
+                            <article className={`team-contract-mix-card is-${entry.shape.replace("_", "-")}`} key={entry.shape}>
+                              <div className="team-contract-mix-card-head">
+                                <span>{entry.label}</span>
+                                <strong>{formatLocalePoints(entry.share, 0)}%</strong>
+                              </div>
+                              <div className="team-contract-mix-bar" aria-hidden="true">
+                                <span style={{ width: entry.share > 0 ? `${Math.max(3, entry.share)}%` : "0%" }} />
+                              </div>
+                              <div className="team-contract-mix-metrics">
+                                <span>
+                                  <strong>{entry.count}</strong> Verträge
+                                </span>
+                                <span>
+                                  <strong>{formatDisplayMoney(entry.totalSalary)}</strong> gebunden
+                                </span>
+                                <span className={entry.currentDelta > 0 ? "negative-value" : entry.currentDelta < 0 ? "positive-value" : undefined}>
+                                  Jetzt {formatSignedDisplayMoney(entry.currentDelta)}
+                                </span>
+                                <span className={entry.futureDelta > 0 ? "negative-value" : entry.futureDelta < 0 ? "positive-value" : "muted"}>
+                                  Später {formatSignedDisplayMoney(entry.futureDelta)}
+                                </span>
+                              </div>
+                            </article>
+                          ))}
+                        </div>
+                      </div>
+                    ) : null}
                     {selectedTeamContractTable ? (
                       <div className="contract-forecast-panel">
                         <div className="transfer-callout-title">
@@ -20444,12 +28849,10 @@ export default function FoundationPageClient({ initialReadSource, initialSelecte
 	                            <th>LZ</th>
 	                            <th>Moral</th>
 	                            <th>Intent</th>
-	                            <th>Gesamt</th>
 	                            <th>Buyout</th>
 	                            <th>MW</th>
 	                            <th>Faktor</th>
 	                            <th>VK bei Abgang</th>
-	                            <th>GuV</th>
 	                            {selectedTeamContractTable?.seasonLabels.map((label) => (
 	                              <th key={label}>{label}</th>
 	                            ))}
@@ -20457,14 +28860,39 @@ export default function FoundationPageClient({ initialReadSource, initialSelecte
                         </thead>
                         <tbody>
                           {selectedTeamContractTable?.rows.length ? (
-                            selectedTeamContractTable.rows.map((row) => (
+                            selectedTeamContractTable.rows.map((row) => {
+                              const isSellMarked =
+                                row.status === "active" &&
+                                selectedTeam != null &&
+                                transferSellMarkerKeySet.has(`${selectedTeam.teamId}:${row.playerId}`);
+                              return (
                               <tr key={row.rowId} onDoubleClick={() => openPlayerDrawerById(row.playerId)}>
                                 <td>
                                   <div className="table-player-cell">
                                     <strong>{row.playerName}</strong>
                                     <span>{row.roleTag ?? "—"}</span>
-                                    {row.status === "active" ? (
+                                    {isSellMarked ? <span className="pill pill-warning">VK vorgemerkt</span> : null}
+                                    {row.status === "active" && selectedTeamRosterActionsAvailable ? (
                                       <div className="transfermarkt-inline-actions">
+                                        {selectedTeam ? (
+                                          <button
+                                            className="secondary-button inline-button"
+                                            type="button"
+                                            onClick={() =>
+                                              toggleTransferSellMarker({
+                                                teamId: selectedTeam.teamId,
+                                                playerId: row.playerId,
+                                                playerName: row.playerName,
+                                                contractLength: row.contractLength,
+                                                buyoutCost: row.buyoutCost,
+                                                marketValueAtExit: row.marketValueAtExit,
+                                                morale: row.morale,
+                                              })
+                                            }
+                                          >
+                                            {isSellMarked ? "VK gemerkt" : "VK vormerken"}
+                                          </button>
+                                        ) : null}
                                         <button
                                           className="secondary-button inline-button"
                                           type="button"
@@ -20489,39 +28917,22 @@ export default function FoundationPageClient({ initialReadSource, initialSelecte
                                           Verkaufen
                                         </button>
                                         {row.contractLength <= 1 && selectedTeam ? (
-                                          <>
-                                            <button
-                                              className="secondary-button inline-button"
-                                              type="button"
-                                              disabled={contractRenewalBusy != null}
-                                              onClick={() =>
-                                                void runContractRenewalAction({
-                                                  teamId: selectedTeam.teamId,
-                                                  playerId: row.playerId,
-                                                  playerName: row.playerName,
-                                                  action: "renew",
-                                                  contractLength: 2,
-                                                })
-                                              }
-                                            >
-                                              Verlängern
-                                            </button>
-                                            <button
-                                              className="secondary-button inline-button"
-                                              type="button"
-                                              disabled={contractRenewalBusy != null}
-                                              onClick={() =>
-                                                void runContractRenewalAction({
-                                                  teamId: selectedTeam.teamId,
-                                                  playerId: row.playerId,
-                                                  playerName: row.playerName,
-                                                  action: "release",
-                                                })
-                                              }
-                                            >
-                                              Freigeben
-                                            </button>
-                                          </>
+                                          <button
+                                            className="secondary-button inline-button"
+                                            type="button"
+                                            disabled={contractRenewalBusy != null}
+                                            onClick={() =>
+                                              void runContractRenewalAction({
+                                                teamId: selectedTeam.teamId,
+                                                playerId: row.playerId,
+                                                playerName: row.playerName,
+                                                action: "renew",
+                                                contractLength: 2,
+                                              })
+                                            }
+                                          >
+                                            Verlängern
+                                          </button>
                                         ) : null}
                                       </div>
                                     ) : null}
@@ -20549,16 +28960,10 @@ export default function FoundationPageClient({ initialReadSource, initialSelecte
 	                                    "—"
 	                                  )}
 	                                </td>
-	                                <td>{row.totalSalary != null ? formatDisplayMoney(row.totalSalary) : "—"}</td>
 	                                <td>{row.buyoutCost != null ? formatDisplayMoney(row.buyoutCost) : "—"}</td>
 	                                <td>{row.marketValueAtExit != null ? formatDisplayMoney(row.marketValueAtExit) : "—"}</td>
 	                                <td>{row.saleFactor != null ? `${formatLocalePoints(row.saleFactor, 2)}x` : "—"}</td>
 	                                <td>{row.exitValue != null ? formatDisplayMoney(row.exitValue) : "—"}</td>
-	                                <td>
-	                                  <span className={row.profitLoss != null && row.profitLoss < 0 ? "negative-value" : row.profitLoss != null && row.profitLoss > 0 ? "positive-value" : undefined}>
-	                                    {row.profitLoss != null ? formatDisplayMoney(row.profitLoss) : "—"}
-	                                  </span>
-	                                </td>
 	                                {selectedTeamContractTable.seasonLabels.map((label, index) => (
 	                                  <td key={`${row.rowId}-${label}`}>
                                     {row.yearlySalarySchedule[index]?.salary != null
@@ -20567,10 +28972,10 @@ export default function FoundationPageClient({ initialReadSource, initialSelecte
                                   </td>
                                 ))}
                               </tr>
-                            ))
+                            )})
 	                          ) : (
 	                            <tr>
-	                              <td colSpan={12 + (selectedTeamContractTable?.seasonLabels.length ?? 0)} className="muted">
+	                              <td colSpan={10 + (selectedTeamContractTable?.seasonLabels.length ?? 0)} className="muted">
 	                                Noch keine Vertragsdaten im aktuellen Scope.
 	                              </td>
 	                            </tr>
@@ -20579,13 +28984,13 @@ export default function FoundationPageClient({ initialReadSource, initialSelecte
 	                        {selectedTeamContractTable ? (
 	                          <tfoot>
 	                            <tr>
-	                              <td colSpan={12}><strong>Summe aktiv</strong></td>
+	                              <td colSpan={10}><strong>Summe aktiv</strong></td>
                               {selectedTeamContractTable.totalsCommitted.map((entry) => (
                                 <td key={`committed-${entry.label}`}><strong>{formatDisplayMoney(entry.salary)}</strong></td>
                               ))}
                             </tr>
                             <tr>
-                              <td colSpan={12}><strong>Summe mit Preview</strong></td>
+                              <td colSpan={10}><strong>Summe mit Preview</strong></td>
                               {selectedTeamContractTable.totalsWithPreview.map((entry) => (
                                 <td key={`preview-${entry.label}`}><strong>{formatDisplayMoney(entry.salary)}</strong></td>
                               ))}
@@ -20647,19 +29052,21 @@ export default function FoundationPageClient({ initialReadSource, initialSelecte
                           </div>
                         </div>
                         <div className="axis-row">
-                          <span>POW {formatLocalePoints(player.coreStats.pow)}</span>
-                          <span>SPE {formatLocalePoints(player.coreStats.spe)}</span>
-                          <span>MEN {formatLocalePoints(player.coreStats.men)}</span>
-                          <span>SOC {formatLocalePoints(player.coreStats.soc)}</span>
+                          <span>POW {formatWholeNumber(player.coreStats.pow)}</span>
+                          <span>SPE {formatWholeNumber(player.coreStats.spe)}</span>
+                          <span>MEN {formatWholeNumber(player.coreStats.men)}</span>
+                          <span>SOC {formatWholeNumber(player.coreStats.soc)}</span>
                         </div>
                         <p className="muted">
                           OVR {formatWholeNumber(playerRatingsById.get(player.id)?.ovrNormalized ?? null)} · MVS{" "}
                           {playerRatingsById.get(player.id)?.mvs != null ? formatPpsValue(playerRatingsById.get(player.id)?.mvs ?? null) : "—"} · PPs{" "}
                           {playerRatingsById.get(player.id)?.ppsSeason != null ? formatPpsValue(playerRatingsById.get(player.id)?.ppsSeason ?? null) : "—"} · MW{" "}
-                          {formatLocalePoints(getPlayerDisplayMarketValue(player), 2)}
+                          {formatLocalePoints(getRosterEntryDisplayMarketValue(entry, player), 2)}
+                          {renderEconomyDelta(getPlayerDisplayMarketValueDelta(player, entry), "higher")}
                         </p>
                         <p className="muted">
                           Kosten {formatMoney(player.cost ?? player.marketValue)} · Gehalt {formatDisplayMoney(getRosterEntryDisplaySalary(entry, player))}
+                          {renderEconomyDelta(getRosterEntrySalaryDelta(entry, player), "lower")}
                         </p>
                         <p className="muted">
                           Traits {player.traitsPositive.slice(0, 2).join(", ") || "-"} · Alignment{" "}
@@ -20701,18 +29108,22 @@ export default function FoundationPageClient({ initialReadSource, initialSelecte
                           </div>
                         </div>
                         <div className="axis-row">
-                          <span>POW {formatLocalePoints(player.coreStats.pow)}</span>
-                          <span>SPE {formatLocalePoints(player.coreStats.spe)}</span>
-                          <span>MEN {formatLocalePoints(player.coreStats.men)}</span>
-                          <span>SOC {formatLocalePoints(player.coreStats.soc)}</span>
+                          <span>POW {formatWholeNumber(player.coreStats.pow)}</span>
+                          <span>SPE {formatWholeNumber(player.coreStats.spe)}</span>
+                          <span>MEN {formatWholeNumber(player.coreStats.men)}</span>
+                          <span>SOC {formatWholeNumber(player.coreStats.soc)}</span>
                         </div>
                         <p className="muted">
                           OVR {formatWholeNumber(playerRatingsById.get(player.id)?.ovrNormalized ?? null)} · MVS{" "}
                           {playerRatingsById.get(player.id)?.mvs != null ? formatPpsValue(playerRatingsById.get(player.id)?.mvs ?? null) : "—"} · PPs{" "}
                           {playerRatingsById.get(player.id)?.ppsSeason != null ? formatPpsValue(playerRatingsById.get(player.id)?.ppsSeason ?? null) : "—"} · MW{" "}
-                          {formatLocalePoints(getPlayerDisplayMarketValue(player), 2)}
+                          {formatLocalePoints(getRosterEntryDisplayMarketValue(entry, player), 2)}
+                          {renderEconomyDelta(getPlayerDisplayMarketValueDelta(player, entry), "higher")}
                         </p>
-                        <p className="muted">Gehalt {formatDisplayMoney(getRosterEntryDisplaySalary(entry, player))} · LZ {entry.contractLength}</p>
+                        <p className="muted">
+                          Gehalt {formatDisplayMoney(getRosterEntryDisplaySalary(entry, player))}
+                          {renderEconomyDelta(getRosterEntrySalaryDelta(entry, player), "lower")} · LZ {entry.contractLength}
+                        </p>
                       </article>
                     ))}
                     {bench.length === 0 ? <p className="muted">Keine Bench-Spieler im Moment.</p> : null}
@@ -20888,7 +29299,7 @@ export default function FoundationPageClient({ initialReadSource, initialSelecte
             </>
           ) : null}
 
-          {activeView === "training" ? (
+          {false ? (
           <section className={`panel training-facilities-panel${getViewClass("training")}`} data-testid="foundation-training-facilities" id="foundation-training-facilities">
             <div className="panel-header">
               <div className="stack">
@@ -20908,10 +29319,11 @@ export default function FoundationPageClient({ initialReadSource, initialSelecte
                   <div className="training-hero-team">
                     {(() => {
                       const logo = getTeamLogoModel(selectedTeam);
-                      return logo.src ? (
+                      const logoSrc = logo.src ?? undefined;
+                      return logoSrc ? (
                         <img
                           className="training-team-logo"
-                          src={logo.src}
+                          src={logoSrc}
                           alt={`${selectedTeam.name} Logo`}
                           loading="eager"
                           decoding="async"
@@ -20954,8 +29366,15 @@ export default function FoundationPageClient({ initialReadSource, initialSelecte
                   </article>
                   <article className="metric-card">
                     <span>Sponsor-/Cash-Zufluss</span>
-                    <strong>{selectedStandingRow?.sponsorTotal != null ? formatTransfermarktCurrency(selectedStandingRow.sponsorTotal) : "—"}</strong>
-                    <small className="muted">{selectedStandingRow?.sponsorTotal != null ? "aus Saisonstand" : "cash_forecast_source_missing"}</small>
+                    {(() => {
+                      const sponsorTotal = selectedStandingRow?.sponsorTotal ?? null;
+                      return (
+                        <>
+                          <strong>{sponsorTotal != null ? formatTransfermarktCurrency(sponsorTotal) : "—"}</strong>
+                          <small className="muted">{sponsorTotal != null ? "aus Saisonstand" : "kein Saisonwert"}</small>
+                        </>
+                      );
+                    })()}
                   </article>
                   <article className="metric-card">
                     <span>Gebäude-Unterhalt</span>
@@ -21008,6 +29427,26 @@ export default function FoundationPageClient({ initialReadSource, initialSelecte
                   </span>
                 </div>
 
+                <div className="training-development-board" aria-label="Trainingsfokus">
+                  {([
+                    { id: "all" as const, label: "Alle", detail: "ganzer Kader" },
+                    { id: "growth" as const, label: "Steigt", detail: "lohnt sich jetzt" },
+                    { id: "stable" as const, label: "Stabil", detail: "Modus pruefen" },
+                    { id: "regression" as const, label: "Kann fallen", detail: "Risiko zuerst" },
+                  ]).map((filter) => (
+                    <button
+                      key={`training-development-filter-${filter.id}`}
+                      className={`training-development-filter is-${filter.id}${trainingDevelopmentFilter === filter.id ? " is-active" : ""}`}
+                      type="button"
+                      onClick={() => setTrainingDevelopmentFilter(filter.id)}
+                    >
+                      <span>{filter.label}</span>
+                      <strong>{trainingDevelopmentSummary[filter.id]}</strong>
+                      <small>{filter.detail}</small>
+                    </button>
+                  ))}
+                </div>
+
                 <div className="training-management-layout">
                   <section className="training-player-section">
                     <div className="panel-header training-subheader">
@@ -21017,14 +29456,27 @@ export default function FoundationPageClient({ initialReadSource, initialSelecte
                       >
                         Spielertraining
                       </TooltipHeading>
-                      <span className="pill">{trainingPlayerForecastRows.length} Spieler</span>
+                      <span className="pill">{filteredTrainingPlayerForecastRows.length}/{trainingPlayerForecastRows.length} Spieler</span>
                     </div>
                     <div className="training-player-grid">
-                      {trainingPlayerForecastRows.map((row) => {
+                      {filteredTrainingPlayerForecastRows.map((row) => {
                         const portrait = getPlayerPortraitModel(row.player);
+                        const developmentTone =
+                          row.forecast.netDevelopmentXP < 0 || row.forecast.regressionRisk === "high"
+                            ? "is-regression"
+                            : row.forecast.netDevelopmentXP >= 45
+                              ? "is-growth"
+                              : "is-stable";
+                        const developmentLabel =
+                          developmentTone === "is-regression"
+                            ? "kann fallen"
+                            : developmentTone === "is-growth"
+                              ? "steigt"
+                              : "stabil";
                         return (
                           <article
                             className="training-player-card"
+                            id={`training-player-${row.player.id}`}
                             key={row.entry.id}
                             onDoubleClick={() => openPlayerDrawerById(row.player.id, row.entry.id)}
                             title="Doppelklick öffnet den Spieler-Drawer"
@@ -21048,13 +29500,16 @@ export default function FoundationPageClient({ initialReadSource, initialSelecte
                                   <ClassColorChip className={row.player.className} /> · {row.entry.roleTag ?? "—"}
                                 </p>
                               </div>
-                              <button
-                                className="secondary-button inline-button training-card-open"
-                                type="button"
-                                onClick={() => openPlayerDrawerById(row.player.id, row.entry.id)}
-                              >
-                                Profil
-                              </button>
+                              <div className="training-player-card-actions">
+                                <span className={`training-development-badge ${developmentTone}`}>{developmentLabel}</span>
+                                <button
+                                  className="secondary-button inline-button training-card-open"
+                                  type="button"
+                                  onClick={() => openPlayerDrawerById(row.player.id, row.entry.id)}
+                                >
+                                  Profil
+                                </button>
+                              </div>
                             </div>
                             <div className="training-player-stats">
                               <span>Einsätze {row.appearances}</span>
@@ -21066,12 +29521,9 @@ export default function FoundationPageClient({ initialReadSource, initialSelecte
                               <select
                                 className="input"
                                 value={row.mode}
-                                onChange={(event) =>
-                                  setTrainingModeDraft((current) => ({
-                                    ...current,
-                                    [row.player.id]: event.target.value as TrainingModeDraft,
-                                  }))
-                                }
+                                onChange={(event) => {
+                                  void setPlayerTrainingMode(row.player.id, event.target.value as TrainingModeDraft);
+                                }}
                               >
                                 {Object.entries(trainingModeConfigs).map(([mode, config]) => (
                                   <option key={mode} value={mode}>
@@ -21080,13 +29532,27 @@ export default function FoundationPageClient({ initialReadSource, initialSelecte
                                 ))}
                               </select>
                             </label>
+                            <div className="training-mode-switch" aria-label={`${row.player.name} Trainingsmodus`}>
+                              {Object.entries(trainingModeConfigs).map(([mode, config]) => (
+                                <button
+                                  key={`training-mode-${row.player.id}-${mode}`}
+                                  className={`training-mode-chip${row.mode === mode ? " is-active" : ""}`}
+                                  type="button"
+                                  onClick={() => {
+                                    void setPlayerTrainingMode(row.player.id, mode as TrainingModeDraft);
+                                  }}
+                                >
+                                  <span>{config.label}</span>
+                                </button>
+                              ))}
+                            </div>
                             <div className="training-impact-grid">
                               <div className="training-impact-card is-xp">
-                                <span>XP Forecast</span>
+                                <span>XP Vorschau</span>
                                 <strong>{formatWholeNumber(row.totalXp)}</strong>
                                 <small>
                                   +{row.trainingXp} Training ·{" "}
-                                  {row.performanceXp > 0 ? `+${row.performanceXp} Performance` : "keine Performance-XP"}
+                                  {row.performanceXp > 0 ? `+${row.performanceXp} Leistung` : "keine Leistungs-XP"}
                                 </small>
                               </div>
                               <div className="training-impact-card is-recovery">
@@ -21098,6 +29564,16 @@ export default function FoundationPageClient({ initialReadSource, initialSelecte
                                   {row.recoveryForecast.modifierPct === 0
                                     ? "normale Erholung"
                                     : `${formatSignedPercent(row.recoveryForecast.modifierPct)} durch ${row.modeConfig.label}`}
+                                </small>
+                              </div>
+                              <div className={`training-impact-card is-regression${row.forecast.netDevelopmentXP < 0 || row.forecast.regressionRisk === "high" ? " is-warning" : ""}`}>
+                                <span>Entwicklung</span>
+                                <strong className={row.forecast.netDevelopmentXP >= 0 ? "text-positive" : "text-negative"}>
+                                  {row.forecast.netDevelopmentXP > 0 ? "+" : ""}
+                                  {formatWholeNumber(row.forecast.netDevelopmentXP)}
+                                </strong>
+                                <small>
+                                  Rueckschritt {formatWholeNumber(row.forecast.regressionPressure)} · Risiko {formatMarketRisk(row.forecast.regressionRisk)}
                                 </small>
                               </div>
                             </div>
@@ -21121,8 +29597,12 @@ export default function FoundationPageClient({ initialReadSource, initialSelecte
                           </article>
                         );
                       })}
-                      {trainingPlayerForecastRows.length === 0 ? (
-                        <p className="muted">Kein aktiver Kader fuer dieses Team. Training-Forecast bleibt leer.</p>
+                      {filteredTrainingPlayerForecastRows.length === 0 ? (
+                        <p className="muted">
+                          {trainingPlayerForecastRows.length === 0
+                            ? "Kein aktiver Kader fuer dieses Team. Training-Forecast bleibt leer."
+                            : "Keine Spieler in diesem Trainingsfilter."}
+                        </p>
                       ) : null}
                     </div>
                   </section>
@@ -21131,14 +29611,27 @@ export default function FoundationPageClient({ initialReadSource, initialSelecte
                     <div className="panel-header training-subheader">
                       <TooltipHeading
                         as="h3"
-                        tooltip="Facility-Karten sind V1-Preview. Katalog und Effekt-Engine sind echte Design-Konstanten; bestehende Saves ohne Facility-State lesen Level 0 / not_built."
+                        tooltip="Facility-Karten pruefen zuerst Kosten, Cash und Effekt. Wenn die Preview bereit ist, bestaetigt derselbe Button das Upgrade oder die Wartung im lokalen Save."
                       >
                         Gebäude / Facilities
                       </TooltipHeading>
                     </div>
                     <div className="training-facility-grid">
-                      {trainingFacilityRows.map((facility) => (
-                        <article className="training-facility-card" key={facility.id}>
+                      {trainingFacilityRows.map((facility) => {
+                        const upgradePreviewForFacility = facilityUpgradePreview?.facility?.facilityId === facility.id;
+                        const maintenancePreviewForFacility = facilityMaintenancePreview?.facility?.facilityId === facility.id;
+                        const canConfirmUpgrade =
+                          upgradePreviewForFacility &&
+                          Boolean(facilityUpgradePreview?.ok) &&
+                          Boolean(facilityUpgradePreview?.confirmToken) &&
+                          readMeta.source !== "prisma";
+                        const canConfirmMaintenance =
+                          maintenancePreviewForFacility &&
+                          Boolean(facilityMaintenancePreview?.ok) &&
+                          Boolean(facilityMaintenancePreview?.confirmToken) &&
+                          readMeta.source !== "prisma";
+                        return (
+                          <article className={`training-facility-card${upgradePreviewForFacility || maintenancePreviewForFacility ? " is-selected" : ""}`} key={facility.id}>
                           <div className="training-facility-card-head">
                             <strong>{facility.name}</strong>
                             <span
@@ -21197,33 +29690,61 @@ export default function FoundationPageClient({ initialReadSource, initialSelecte
                             </label>
                           ) : null}
                           <button
-                            className="secondary-button inline-button"
+                            className={`${canConfirmUpgrade ? "primary-button" : "secondary-button"} inline-button`}
                             type="button"
                             disabled={facilityUpgradeBusy || facilityMaintenanceBusy}
+                            title={
+                              facilityUpgradeBusy || facilityMaintenanceBusy
+                                ? getBusyActionReason("Die Gebaeude-Aktion")
+                                : canConfirmUpgrade
+                                  ? "Bestaetigt das bereits gepruefte Upgrade fuer dieses Gebaeude."
+                                  : "Prueft Kosten, Wirkung und Cash-Folge fuer dieses Upgrade."
+                            }
                             onClick={() => {
-                              void runFacilityUpgradePreview(facility.id);
+                              void (canConfirmUpgrade ? confirmFacilityUpgrade() : runFacilityUpgradePreview(facility.id));
                             }}
                           >
-                            {facilityUpgradeBusy && selectedTrainingFacilityPreview?.id === facility.id ? "Prueft..." : "Upgrade prüfen"}
+                            {facilityUpgradeBusy && selectedTrainingFacilityPreview?.id === facility.id
+                              ? "Laeuft..."
+                              : canConfirmUpgrade
+                                ? "Upgrade bestätigen"
+                                : "Upgrade prüfen"}
                           </button>
                           <button
-                            className="secondary-button inline-button"
+                            className={`${canConfirmMaintenance ? "primary-button" : "secondary-button"} inline-button`}
                             type="button"
                             disabled={
                               facilityUpgradeBusy ||
                               facilityMaintenanceBusy ||
-                              facility.level <= 0 ||
-                              facility.conditionPct >= 100 ||
+                              (!canConfirmMaintenance && (facility.level <= 0 || facility.conditionPct >= 100)) ||
                               readMeta.source === "prisma"
                             }
+                            title={
+                              readMeta.source === "prisma"
+                                ? getReadOnlyActionReason("die Gebaeude-Wartung")
+                                : facilityUpgradeBusy || facilityMaintenanceBusy
+                                  ? getBusyActionReason("Die Gebaeude-Aktion")
+                                  : !canConfirmMaintenance && facility.level <= 0
+                                    ? "Dieses Gebaeude ist noch nicht gebaut."
+                                    : !canConfirmMaintenance && facility.conditionPct >= 100
+                                      ? "Dieses Gebaeude ist bereits voll gewartet."
+                                      : canConfirmMaintenance
+                                        ? "Bestaetigt die bereits gepruefte Wartung."
+                                        : "Prueft Kosten und Effekt der Wartung."
+                            }
                             onClick={() => {
-                              void runFacilityMaintenancePreview(facility.id);
+                              void (canConfirmMaintenance ? confirmFacilityMaintenance() : runFacilityMaintenancePreview(facility.id));
                             }}
                           >
-                            {facilityMaintenanceBusy && selectedTrainingFacilityPreview?.id === facility.id ? "Wartung prueft..." : "Wartung prüfen"}
+                            {facilityMaintenanceBusy && selectedTrainingFacilityPreview?.id === facility.id
+                              ? "Laeuft..."
+                              : canConfirmMaintenance
+                                ? "Wartung bestätigen"
+                                : "Wartung prüfen"}
                           </button>
-                        </article>
-                      ))}
+                          </article>
+                        );
+                      })}
                     </div>
                     <div className="training-cash-forecast">
                       <h4>Facility Finance Forecast</h4>
@@ -21234,11 +29755,11 @@ export default function FoundationPageClient({ initialReadSource, initialSelecte
                         <strong>{formatTransfermarktCurrency(trainingFacilitySeasonEndFinance.fanShopIncome)}</strong>
                         <span>Arena Income</span>
                         <strong>{formatTransfermarktCurrency(trainingFacilitySeasonEndFinance.arenaIncome)}</strong>
-                        <span>Facility Income total</span>
+                        <span>Gebaeude-Einnahmen gesamt</span>
                         <strong>{formatTransfermarktCurrency(trainingFacilitySeasonEndFinance.incomeTotal)}</strong>
-                        <span>Facility-Upkeep total</span>
+                        <span>Gebaeude-Unterhalt gesamt</span>
                         <strong>{formatTransfermarktCurrency(trainingFacilitySeasonEndFinance.upkeepTotal)}</strong>
-                        <span>Net Facility Result</span>
+                        <span>Gebaeude-Saldo</span>
                         <strong className={trainingFacilitySeasonEndFinance.netFacilityResult >= 0 ? "text-positive" : "text-negative"}>
                           {formatTransfermarktCurrency(trainingFacilitySeasonEndFinance.netFacilityResult)}
                         </strong>
@@ -21261,16 +29782,16 @@ export default function FoundationPageClient({ initialReadSource, initialSelecte
                       </p>
                     </div>
                     <div className="training-cash-forecast">
-                      <h4>Facility Effects Forecast</h4>
+                      <h4>Gebaeude-Wirkung</h4>
                       <div className="training-cash-grid">
-                        <span>Base Training-XP</span>
+                        <span>Training-XP Basis</span>
                         <strong>
                           {formatWholeNumber(trainingFacilityEffectPreview.trainingXp.before)} →{" "}
                           {formatWholeNumber(trainingFacilityEffectPreview.trainingXp.after)}
                         </strong>
                         <span>Training-Center Bonus</span>
                         <strong>{formatSignedPercent(trainingFacilityEffectPreview.trainingXp.modifierPct)}</strong>
-                        <span>Recovery-Forecast</span>
+                        <span>Regeneration</span>
                         <strong>
                           {formatWholeNumber(trainingFacilityEffectPreview.recovery.before)} →{" "}
                           {formatWholeNumber(trainingFacilityEffectPreview.recovery.after)}
@@ -21279,12 +29800,12 @@ export default function FoundationPageClient({ initialReadSource, initialSelecte
                         <strong>{formatSignedPercent(trainingFacilityEffectPreview.recovery.modifierPct)}</strong>
                         <span>Ø Recovery nach Training</span>
                         <strong>{formatPpsValue(trainingFacilityEffectPreview.recoveryAfterTraining)}</strong>
-                        <span>Academy Low-Tier Cost</span>
+                        <span>Akademie Kostenbonus</span>
                         <strong>
                           {trainingFacilityEffectPreview.academyLowTier.costBeforeFacility} →{" "}
                           {trainingFacilityEffectPreview.academyLowTier.costAfterFacility}
                         </strong>
-                        <span>Specialist Power / Speed</span>
+                        <span>Spezialist POW / SPE</span>
                         <strong>
                           {trainingFacilityEffectPreview.specialistPower.costAfterFacility} /{" "}
                           {trainingFacilityEffectPreview.specialistSpeed.costAfterFacility}
@@ -21302,29 +29823,29 @@ export default function FoundationPageClient({ initialReadSource, initialSelecte
                     </div>
                     {selectedTrainingFacilityPreview ? (
                       <div className="training-upgrade-preview">
-                        <strong>{selectedTrainingFacilityPreview.name} · Upgrade Preview</strong>
+                        <strong>{selectedTrainingFacilityPreview!.name} · Upgrade-Vorschau</strong>
                         <div className="training-cash-grid">
                           <span>Status</span>
-                          <strong>{facilityUpgradePreview?.ok ? "confirm-ready" : "preview-only"}</strong>
-                          <span>Save-Quelle</span>
-                          <strong>{selectedTrainingFacilityPreview.sourceStatus}</strong>
+                          <strong>{facilityUpgradePreview?.ok ? "bereit" : "erst pruefen"}</strong>
+                          <span>Gebaeudestatus</span>
+                          <strong>{selectedTrainingFacilityPreview!.level > 0 ? "gebaut" : "noch nicht gebaut"}</strong>
                           <span>Level</span>
                           <strong>
                             {facilityUpgradePreview
-                              ? `${facilityUpgradePreview.currentLevel} → ${facilityUpgradePreview.nextLevel ?? "—"}`
-                              : `${selectedTrainingFacilityPreview.level} → ${selectedTrainingFacilityPreview.nextLevel}`}
+                              ? `${facilityUpgradePreview!.currentLevel} → ${facilityUpgradePreview!.nextLevel ?? "—"}`
+                              : `${selectedTrainingFacilityPreview!.level} → ${selectedTrainingFacilityPreview!.nextLevel}`}
                           </strong>
                           <span>Zustand</span>
                           <strong>
-                            {formatWholeNumber(selectedTrainingFacilityPreview.conditionPct)}% · Effizienz{" "}
-                            {formatWholeNumber(selectedTrainingFacilityPreview.efficiencyPct)}%
+                            {formatWholeNumber(selectedTrainingFacilityPreview!.conditionPct)}% · Effizienz{" "}
+                            {formatWholeNumber(selectedTrainingFacilityPreview!.efficiencyPct)}%
                           </strong>
                           <span>Effekt</span>
-                          <strong>{facilityUpgradePreview?.currentEffect ?? selectedTrainingFacilityPreview.currentEffect}</strong>
+                          <strong>{facilityUpgradePreview?.currentEffect ?? selectedTrainingFacilityPreview!.currentEffect}</strong>
                           <span>Nächster Effekt</span>
-                          <strong>{facilityUpgradePreview?.nextEffect ?? selectedTrainingFacilityPreview.nextLevelEffect}</strong>
+                          <strong>{facilityUpgradePreview?.nextEffect ?? selectedTrainingFacilityPreview!.nextLevelEffect}</strong>
                           <span>Upgrade-Kosten</span>
-                          <strong>{formatTransfermarktCurrency(facilityUpgradePreview?.upgradeCost ?? selectedTrainingFacilityPreview.upgradeCost)}</strong>
+                          <strong>{formatTransfermarktCurrency(facilityUpgradePreview?.upgradeCost ?? selectedTrainingFacilityPreview!.upgradeCost)}</strong>
                           <span>Unterhalt</span>
                           <strong>
                             {formatTransfermarktCurrency(facilityUpgradePreview?.currentUpkeep ?? trainingFacilityForecast.currentUpkeep)} →{" "}
@@ -21339,10 +29860,10 @@ export default function FoundationPageClient({ initialReadSource, initialSelecte
                           <strong>{formatTransfermarktCurrency(facilityUpgradePreview?.cashAfter ?? trainingFacilityForecast.projectedCash)}</strong>
                         </div>
                         {facilityUpgradePreview?.warnings.length ? (
-                          <p className="muted text-negative">Warnungen: {facilityUpgradePreview.warnings.join(" · ")}</p>
+                          <p className="muted text-negative">Hinweise: {facilityUpgradePreview!.warnings.map(formatCockpitReason).join(" · ")}</p>
                         ) : null}
                         {facilityUpgradePreview?.blockingReasons.length ? (
-                          <p className="muted text-negative">Blocker: {facilityUpgradePreview.blockingReasons.join(" · ")}</p>
+                          <p className="muted text-negative">Noch offen: {facilityUpgradePreview!.blockingReasons.map(formatCockpitReason).join(" · ")}</p>
                         ) : null}
                         {facilityUpgradeError ? <p className="muted text-negative">{facilityUpgradeError}</p> : null}
                         {facilityUpgradeSuccess ? <p className="text-positive">{facilityUpgradeSuccess}</p> : null}
@@ -21354,7 +29875,19 @@ export default function FoundationPageClient({ initialReadSource, initialSelecte
                               facilityUpgradeBusy ||
                               readMeta.source === "prisma" ||
                               !facilityUpgradePreview?.ok ||
-                              !facilityUpgradePreview.confirmToken
+                              !facilityUpgradePreview!.confirmToken
+                            }
+                            title={
+                              readMeta.source === "prisma"
+                                ? getReadOnlyActionReason("das Facility-Upgrade")
+                                : facilityUpgradeBusy
+                                  ? getBusyActionReason("Das Facility-Upgrade")
+                                  : !facilityUpgradePreview?.ok || !facilityUpgradePreview!.confirmToken
+                                    ? `Noch offen: ${
+                                        facilityUpgradePreview?.blockingReasons?.map(formatCockpitReason).join(" · ") ??
+                                        "Bitte zuerst die Upgrade-Preview erfolgreich laden."
+                                      }`
+                                    : "Bestaetigt dieses Upgrade lokal."
                             }
                             onClick={() => {
                               void confirmFacilityUpgrade();
@@ -21368,11 +29901,22 @@ export default function FoundationPageClient({ initialReadSource, initialSelecte
                             disabled={
                               facilityMaintenanceBusy ||
                               readMeta.source === "prisma" ||
-                              selectedTrainingFacilityPreview.level <= 0 ||
-                              selectedTrainingFacilityPreview.conditionPct >= 100
+                              selectedTrainingFacilityPreview!.level <= 0 ||
+                              selectedTrainingFacilityPreview!.conditionPct >= 100
+                            }
+                            title={
+                              readMeta.source === "prisma"
+                                ? getReadOnlyActionReason("die Facility-Wartung")
+                                : facilityMaintenanceBusy
+                                  ? getBusyActionReason("Die Facility-Wartung")
+                                  : selectedTrainingFacilityPreview!.level <= 0
+                                    ? "Dieses Gebaeude ist noch nicht gebaut."
+                                    : selectedTrainingFacilityPreview!.conditionPct >= 100
+                                      ? "Dieses Gebaeude ist bereits bei 100% Zustand."
+                                      : "Prueft die Wartung fuer das aktuell ausgewaehlte Gebaeude."
                             }
                             onClick={() => {
-                              void runFacilityMaintenancePreview(selectedTrainingFacilityPreview.id);
+                              void runFacilityMaintenancePreview(selectedTrainingFacilityPreview!.id);
                             }}
                           >
                             {facilityMaintenanceBusy ? "Wartung prueft..." : "Wartung pruefen"}
@@ -21382,30 +29926,30 @@ export default function FoundationPageClient({ initialReadSource, initialSelecte
                     ) : null}
                     {facilityMaintenancePreview ? (
                       <div className="training-upgrade-preview">
-                        <strong>{facilityMaintenancePreview.facility?.label ?? "Facility"} · Wartung Preview</strong>
+                        <strong>{facilityMaintenancePreview!.facility?.label ?? "Gebaeude"} · Wartungs-Vorschau</strong>
                         <div className="training-cash-grid">
                           <span>Status</span>
-                          <strong>{facilityMaintenancePreview.ok ? "confirm-ready" : "preview-only"}</strong>
+                          <strong>{facilityMaintenancePreview!.ok ? "bereit" : "erst pruefen"}</strong>
                           <span>Zustand</span>
                           <strong>
-                            {formatWholeNumber(facilityMaintenancePreview.conditionPct)}% →{" "}
-                            {formatWholeNumber(facilityMaintenancePreview.nextConditionPct)}%
+                            {formatWholeNumber(facilityMaintenancePreview!.conditionPct)}% →{" "}
+                            {formatWholeNumber(facilityMaintenancePreview!.nextConditionPct)}%
                           </strong>
                           <span>Effizienz</span>
                           <strong>
-                            {formatWholeNumber(facilityMaintenancePreview.efficiencyPct)}% →{" "}
-                            {formatWholeNumber(facilityMaintenancePreview.nextEfficiencyPct)}%
+                            {formatWholeNumber(facilityMaintenancePreview!.efficiencyPct)}% →{" "}
+                            {formatWholeNumber(facilityMaintenancePreview!.nextEfficiencyPct)}%
                           </strong>
                           <span>Wartungskosten</span>
-                          <strong>{formatTransfermarktCurrency(facilityMaintenancePreview.maintenanceCost)}</strong>
+                          <strong>{formatTransfermarktCurrency(facilityMaintenancePreview!.maintenanceCost)}</strong>
                           <span>Cash nach Wartung</span>
-                          <strong>{formatTransfermarktCurrency(facilityMaintenancePreview.cashAfter)}</strong>
+                          <strong>{formatTransfermarktCurrency(facilityMaintenancePreview!.cashAfter)}</strong>
                         </div>
-                        {facilityMaintenancePreview.warnings.length ? (
-                          <p className="muted text-negative">Warnungen: {facilityMaintenancePreview.warnings.join(" · ")}</p>
+                        {facilityMaintenancePreview!.warnings.length ? (
+                          <p className="muted text-negative">Hinweise: {facilityMaintenancePreview!.warnings.map(formatCockpitReason).join(" · ")}</p>
                         ) : null}
-                        {facilityMaintenancePreview.blockingReasons.length ? (
-                          <p className="muted text-negative">Blocker: {facilityMaintenancePreview.blockingReasons.join(" · ")}</p>
+                        {facilityMaintenancePreview!.blockingReasons.length ? (
+                          <p className="muted text-negative">Noch offen: {facilityMaintenancePreview!.blockingReasons.map(formatCockpitReason).join(" · ")}</p>
                         ) : null}
                         {facilityMaintenanceError ? <p className="muted text-negative">{facilityMaintenanceError}</p> : null}
                         {facilityMaintenanceSuccess ? <p className="text-positive">{facilityMaintenanceSuccess}</p> : null}
@@ -21416,8 +29960,20 @@ export default function FoundationPageClient({ initialReadSource, initialSelecte
                             disabled={
                               facilityMaintenanceBusy ||
                               readMeta.source === "prisma" ||
-                              !facilityMaintenancePreview.ok ||
-                              !facilityMaintenancePreview.confirmToken
+                              !facilityMaintenancePreview!.ok ||
+                              !facilityMaintenancePreview!.confirmToken
+                            }
+                            title={
+                              readMeta.source === "prisma"
+                                ? getReadOnlyActionReason("die Facility-Wartung")
+                                : facilityMaintenanceBusy
+                                  ? getBusyActionReason("Die Facility-Wartung")
+                                  : !facilityMaintenancePreview!.ok || !facilityMaintenancePreview!.confirmToken
+                                    ? `Noch offen: ${
+                                        facilityMaintenancePreview!.blockingReasons.map(formatCockpitReason).join(" · ") ||
+                                        "Bitte zuerst die Wartungs-Preview erfolgreich laden."
+                                      }`
+                                    : "Bestaetigt die Wartung lokal."
                             }
                             onClick={() => {
                               void confirmFacilityMaintenance();
@@ -21435,16 +29991,16 @@ export default function FoundationPageClient({ initialReadSource, initialSelecte
                   <div className="panel-header training-subheader">
                     <TooltipHeading
                       as="h3"
-                      tooltip="Season-End Entwicklung nutzt Preview/Confirm: Klicks legen Upgrades nur in einen Warenkorb; geschrieben wird erst nach gueltigem Confirm-Token im lokalen Save."
+                      tooltip="Hier planst du echte Spielerentwicklung am Saisonende: XP einsammeln, Upgrades waehlen, dann gesammelt bestaetigen."
                     >
                       Season-End Entwicklung
                     </TooltipHeading>
-                    <span className="pill">Preview/Confirm · lokale Writes erst nach Token</span>
+                    <span className="pill">Planen · dann bestaetigen</span>
                   </div>
                   <div className="training-warning-strip">
                     <span className="transfer-status-pill is-ready">Warenkorb aktiv</span>
                     <span>
-                      +1 plant nur. Confirm sammelt Season-XP ein, zieht geplante Upgrades ab und laesst den XP-Rest seasonuebergreifend liegen.
+                      +1 legt ein Upgrade in den Warenkorb. Beim Bestaetigen werden XP eingesammelt, Upgrades bezahlt und Rest-XP bleibt erhalten.
                     </span>
                   </div>
                   <div className="training-warning-strip">
@@ -21454,13 +30010,19 @@ export default function FoundationPageClient({ initialReadSource, initialSelecte
                     <span>
                       Verfuegbar {formatWholeNumber(seasonEndXpSpendPreview?.totals.xpAvailable ?? 0)} XP · Geplant{" "}
                       {formatWholeNumber(seasonEndXpSpendPreview?.totals.xpPlanned ?? 0)} XP · Rest{" "}
-                      {seasonEndXpSpendPreview ? formatWholeNumber(seasonEndXpSpendPreview.totals.xpRemaining) : "—"} · Phase{" "}
-                      {seasonEndXpSpendPreview?.saveContext.gamePhase ?? gameState.gamePhase ?? "season_active"}
+                      {seasonEndXpSpendPreview ? formatWholeNumber(seasonEndXpSpendPreview!.totals.xpRemaining) : "—"}
                     </span>
                     <button
                       className="secondary-button inline-button"
                       type="button"
                       disabled={plannedXpUpgrades.length === 0 || seasonEndXpSpendBusy}
+                      title={
+                        seasonEndXpSpendBusy
+                          ? getBusyActionReason("Der XP-Warenkorb")
+                          : plannedXpUpgrades.length === 0
+                            ? "Im Warenkorb liegt gerade kein geplantes Upgrade."
+                            : "Entfernt alle geplanten XP-Upgrades aus dem Warenkorb."
+                      }
                       onClick={() => {
                         setPlannedXpUpgrades([]);
                         setSeasonEndXpSpendPreview(null);
@@ -21476,9 +30038,24 @@ export default function FoundationPageClient({ initialReadSource, initialSelecte
                         seasonEndXpSpendBusy ||
                         readMeta.source === "prisma" ||
                         !seasonEndXpSpendPreview?.ok ||
-                        !seasonEndXpSpendPreview.confirmToken ||
-                        seasonEndXpSpendPreview.warnings.some((warning) => warning.includes("ai_xp_spend_apply_not_enabled_v1")) ||
-                        seasonEndXpSpendPreview.warnings.some((warning) => warning.includes("xp_spend_apply_phase_blocked"))
+                        !seasonEndXpSpendPreview!.confirmToken ||
+                        seasonEndXpSpendPreview!.warnings.some((warning) => warning.includes("ai_xp_spend_apply_not_enabled_v1")) ||
+                        seasonEndXpSpendPreview!.warnings.some((warning) => warning.includes("xp_spend_apply_phase_blocked"))
+                      }
+                      title={
+                        seasonEndXpSpendBusy
+                          ? getBusyActionReason("Der Season-End-XP-Schritt")
+                          : readMeta.source === "prisma"
+                            ? getReadOnlyActionReason("Season-End-XP")
+                            : !seasonEndXpSpendPreview?.ok || !seasonEndXpSpendPreview!.confirmToken
+                              ? `Noch offen: ${seasonEndXpSpendPreview?.blockingReasons?.join(" · ") ?? "Bitte zuerst eine gueltige XP-Preview laden."}`
+                              : seasonEndXpSpendPreview!.warnings.some((warning) => warning.includes("ai_xp_spend_apply_not_enabled_v1"))
+                                ? "AI-Teams duerfen in diesem Schritt noch keine XP automatisch anwenden."
+                                : seasonEndXpSpendPreview!.warnings.some((warning) => warning.includes("xp_spend_apply_phase_blocked"))
+                                  ? "Season-End-XP ist in der aktuellen Phase noch blockiert."
+                                  : plannedXpUpgrades.length > 0
+                                    ? "Bestaetigt alle geplanten XP-Upgrades gesammelt."
+                                    : "Sammelt die Season-XP fuer das aktive Team ein."
                       }
                       onClick={() => {
                         void confirmSeasonEndXpSpend();
@@ -21488,10 +30065,10 @@ export default function FoundationPageClient({ initialReadSource, initialSelecte
                     </button>
                   </div>
                   {seasonEndXpSpendPreview?.blockingReasons.length ? (
-                    <p className="muted">Blocker: {seasonEndXpSpendPreview.blockingReasons.join(" · ")}</p>
+                    <p className="muted">Noch offen: {seasonEndXpSpendPreview!.blockingReasons.join(" · ")}</p>
                   ) : null}
                   {seasonEndXpSpendPreview?.warnings.length ? (
-                    <p className="muted">Hinweise: {seasonEndXpSpendPreview.warnings.slice(0, 4).join(" · ")}</p>
+                    <p className="muted">Hinweise: {seasonEndXpSpendPreview!.warnings.slice(0, 4).join(" · ")}</p>
                   ) : null}
                   {seasonEndXpSpendError ? <p className="text-negative">{seasonEndXpSpendError}</p> : null}
                   {seasonEndXpSpendSuccess ? <p className="text-positive">{seasonEndXpSpendSuccess}</p> : null}
@@ -21500,7 +30077,8 @@ export default function FoundationPageClient({ initialReadSource, initialSelecte
                       const rosterPlayer = rosterPlayers.find((entry) => entry.player.id === row.playerId)?.player ?? null;
                       const xpSpendPlayer = seasonEndXpSpendPlayerMap.get(row.playerId) ?? null;
                       const topDeltas = (xpSpendPlayer?.disciplineDeltas ?? row.disciplineDeltas)
-                        .filter((entry) => (entry.disciplineDelta ?? 0) > 0)
+                        .filter((entry) => (entry.disciplineDelta ?? 0) !== 0)
+                        .sort((left, right) => Math.abs(right.disciplineDelta ?? 0) - Math.abs(left.disciplineDelta ?? 0))
                         .slice(0, 3);
                       const economyAudit = xpSpendPlayer?.economyAudit ?? row.economyAudit;
                       const economyTone = economyAudit.warningLevel === "none" ? "is-ready" : "is-warning";
@@ -21526,6 +30104,7 @@ export default function FoundationPageClient({ initialReadSource, initialSelecte
                       return (
                         <article
                           className="training-player-card"
+                          id={`training-upgrade-player-${row.playerId}`}
                           key={`season-end-${row.playerId}`}
                           onDoubleClick={() => openPlayerDrawerById(row.playerId)}
                           title="Doppelklick öffnet den Spieler-Drawer"
@@ -21566,7 +30145,16 @@ export default function FoundationPageClient({ initialReadSource, initialSelecte
                             <button
                               className="secondary-button inline-button"
                               type="button"
-                              disabled={readMeta.source === "prisma" || seasonEndXpSpendBusy}
+                              disabled={readMeta.source === "prisma" || !selectedTeamCanManage || seasonEndXpSpendBusy}
+                              title={
+                                readMeta.source === "prisma"
+                                  ? getReadOnlyActionReason("dieses Spieler-Upgrade")
+                                  : !selectedTeamCanManage
+                                    ? `${row.playerName} gehoert gerade nicht zu einem steuerbaren Team.`
+                                    : seasonEndXpSpendBusy
+                                      ? getBusyActionReason("Der Season-End-XP-Schritt")
+                                      : `Plant +1 ${SEASON_END_ATTRIBUTE_LABELS[row.selectedAttribute]} fuer ${row.playerName}.`
+                              }
                               onClick={() => addSeasonEndXpUpgrade(row.playerId, row.selectedAttribute)}
                             >
                               +1 planen
@@ -21574,7 +30162,16 @@ export default function FoundationPageClient({ initialReadSource, initialSelecte
                             <button
                               className="secondary-button inline-button"
                               type="button"
-                              disabled={plannedForPlayer === 0 || seasonEndXpSpendBusy}
+                              disabled={!selectedTeamCanManage || plannedForPlayer === 0 || seasonEndXpSpendBusy}
+                              title={
+                                !selectedTeamCanManage
+                                  ? `${row.playerName} gehoert gerade nicht zu einem steuerbaren Team.`
+                                  : seasonEndXpSpendBusy
+                                    ? getBusyActionReason("Der Season-End-XP-Schritt")
+                                    : plannedForPlayer === 0
+                                      ? `Fuer ${row.playerName} ist auf diesem Attribut noch kein Upgrade geplant.`
+                                      : `Entfernt das geplante Upgrade fuer ${row.playerName} wieder aus dem Warenkorb.`
+                              }
                               onClick={() => removeSeasonEndXpUpgrade(row.playerId, row.selectedAttribute)}
                             >
                               Upgrade entfernen
@@ -21624,8 +30221,10 @@ export default function FoundationPageClient({ initialReadSource, initialSelecte
                             <span>
                               Diszi-Deltas:{" "}
                               {topDeltas.length > 0
-                                ? topDeltas.map((entry) => `${entry.label} +${entry.disciplineDelta}`).join(", ")
-                                : "keine Verbesserung"}
+                                ? topDeltas
+                                    .map((entry) => `${entry.label} ${(entry.disciplineDelta ?? 0) > 0 ? "+" : ""}${entry.disciplineDelta}`)
+                                    .join(", ")
+                                : "keine Veraenderung"}
                             </span>
                             <span>
                               Effekte: {row.facilityEffects.appliedEffects.join(", ") || "keine Facility-Effekte"}
@@ -21659,7 +30258,7 @@ export default function FoundationPageClient({ initialReadSource, initialSelecte
                             </strong>
                           </div>
                           <div className="training-risk-line">
-                            <span className={`transfer-status-pill ${economyTone}`}>Audit {economyAudit.warningLevel}</span>
+                            <span className={`transfer-status-pill ${economyTone}`}>Check {economyAudit.warningLevel === "none" ? "ok" : economyAudit.warningLevel}</span>
                             <span>
                               Δ MW {formatSignedPercent(economyAudit.marketValueDeltaPct)} · Δ Gehalt{" "}
                               {formatSignedPercent(economyAudit.salaryDeltaPct)}
@@ -21667,12 +30266,9 @@ export default function FoundationPageClient({ initialReadSource, initialSelecte
                           </div>
                           {economyAudit.marketValueWarnings.length || economyAudit.salaryWarnings.length ? (
                             <p className="muted">
-                              Warnings: {[...economyAudit.marketValueWarnings, ...economyAudit.salaryWarnings].slice(0, 4).join(" · ")}
+                              Hinweise: {[...economyAudit.marketValueWarnings, ...economyAudit.salaryWarnings].slice(0, 4).join(" · ")}
                             </p>
                           ) : null}
-                          <p className="muted">
-                            Confirm-Token: {seasonEndXpSpendPreview?.confirmToken ? "bereit" : "noch nicht bereit"} · Prisma-Writes blockiert
-                          </p>
                         </article>
                       );
                     })}
@@ -21688,8 +30284,151 @@ export default function FoundationPageClient({ initialReadSource, initialSelecte
           </section>
           ) : null}
 
-          {activeView === "market" ? (
-          <section className={`panel transfer-market-panel${getViewClass("market")}`} data-testid="transfer-market" id="transfer-market">
+          <section className={`panel${getViewClass("trainingV2")}`} id="foundation-training-facilities-v2">
+            {activeView === "trainingV2" && selectedTeam ? (
+              <TrainingFacilitiesV2Client
+                source={readMeta.source}
+                managementLocked={isSelectedTeamManagementLocked}
+                managementLockedReason={
+                  isSelectedTeamManagementLocked
+                    ? `${selectedTeam.name} gehoert nicht zu deinen steuerbaren Teams. Training und Gebaeude sind nur zur Ansicht offen.`
+                    : null
+                }
+                teams={gameState.teams}
+                selectedTeam={selectedTeam}
+                selectedTeamControlMode={formatTeamControlModeLabel(selectedTeamControl?.controlMode)}
+                seasonLabel={canonicalSeasonLabel}
+                sponsorTotal={selectedStandingRow?.sponsorTotal ?? null}
+                onSelectTeam={(teamId) => setActiveManagerTeam(teamId, "manual_select")}
+                onOpenTeams={() => setFoundationView("teams", setActiveView)}
+                onOpenPlayerDetails={(payload) => openPlayerDrawerById(payload.playerId, payload.activePlayerId)}
+                summary={{
+                  cashCurrent: selectedTeam.cash,
+                  upkeepTotal: trainingFacilitySeasonEndFinance.upkeepTotal,
+                  incomeTotal: trainingFacilitySeasonEndFinance.incomeTotal,
+                  netFacilityResult: trainingFacilitySeasonEndFinance.netFacilityResult,
+                  trainingXpBefore: trainingFacilityEffectPreview.trainingXp.before,
+                  trainingXpAfter: trainingFacilityEffectPreview.trainingXp.after,
+                  trainingXpModifierPct: trainingFacilityEffectPreview.trainingXp.modifierPct,
+                  recoveryBeforeTraining: trainingForecastSummary.recoveryBeforeTraining,
+                  recoveryAfterTraining: trainingForecastSummary.recoveryAfterTraining,
+                  performanceXp: trainingForecastSummary.performanceXp,
+                  totalXp: trainingForecastSummary.totalXp,
+                  lightModeCount: trainingForecastSummary.lightModeCount,
+                  hardModeCount: trainingForecastSummary.hardModeCount,
+                }}
+                developmentFilter={trainingDevelopmentFilter}
+                developmentSummary={trainingDevelopmentSummary}
+                onSetDevelopmentFilter={setTrainingDevelopmentFilter}
+                trainingModeOptions={trainingV2ModeOptions}
+                playerRows={filteredTrainingPlayerForecastRows.map((row) => ({
+                  entryId: row.entry.id,
+                  roleTag: row.entry.roleTag ?? null,
+                  player: {
+                    id: row.player.id,
+                    name: row.player.name,
+                    className: row.player.className,
+                    portraitUrl: row.player.portraitUrl ?? null,
+                    portraitPath: row.player.portraitPath ?? null,
+                    coreStats: row.player.coreStats,
+                  },
+                  mode: row.mode,
+                  modeConfig: row.modeConfig,
+                  appearances: row.appearances,
+                  playerMvs: row.playerMvs,
+                  playerPps: row.playerPps,
+                  trainingXp: row.trainingXp,
+                  performanceXp: row.performanceXp,
+                  totalXp: row.totalXp,
+                  upgradeEstimate: row.upgradeEstimate,
+                  fatigueWarning: row.fatigueWarning,
+                  recoveryForecast: row.recoveryForecast,
+                  forecast: {
+                    netDevelopmentXP: row.forecast.netDevelopmentXP,
+                    regressionRisk: row.forecast.regressionRisk,
+                    regressionPressure: row.forecast.regressionPressure,
+                    appearanceXP: row.forecast.appearanceXP,
+                    mvsXP: row.forecast.mvsXP,
+                    ppsBonusXP: row.forecast.ppsBonusXP,
+                    topPlayerXP: row.forecast.topPlayerXP,
+                    highlightXP: row.forecast.highlightXP,
+                    traitModifierPct: row.forecast.traitModifierPct,
+                    fatigueStrain: {
+                      label: row.forecast.fatigueStrain.label,
+                    },
+                  },
+                }))}
+                allPlayerCount={trainingPlayerForecastRows.length}
+                onSetTrainingMode={(playerId, mode) => {
+                  void setPlayerTrainingMode(playerId, mode);
+                }}
+                facilityRows={trainingFacilityRows}
+                selectedFacilityPreviewId={trainingFacilityPreviewId}
+                specialistWingVariant={specialistWingVariantDraft}
+                specialistWingOptions={Object.entries(SPECIALIST_WING_VARIANTS).map(([value, variant]) => ({
+                  value: value as SpecialistWingVariant,
+                  label: variant.label,
+                }))}
+                onSetSpecialistWingVariant={setSpecialistWingVariantDraft}
+                facilityUpgradeBusy={facilityUpgradeBusy}
+                facilityUpgradePreview={facilityUpgradePreview}
+                facilityUpgradeError={facilityUpgradeError}
+                facilityUpgradeSuccess={facilityUpgradeSuccess}
+                facilityMaintenanceBusy={facilityMaintenanceBusy}
+                facilityMaintenancePreview={facilityMaintenancePreview}
+                facilityMaintenanceError={facilityMaintenanceError}
+                facilityMaintenanceSuccess={facilityMaintenanceSuccess}
+                facilityFinance={trainingFacilitySeasonEndFinance}
+                facilityForecast={trainingFacilityForecast}
+                facilityEffectPreview={{
+                  recoveryAfterTraining: trainingFacilityEffectPreview.recoveryAfterTraining,
+                  academyLowTier: trainingFacilityEffectPreview.academyLowTier,
+                  specialistPower: trainingFacilityEffectPreview.specialistPower,
+                  specialistSpeed: trainingFacilityEffectPreview.specialistSpeed,
+                  scouting: { label: trainingFacilityEffectPreview.scouting.label },
+                  analytics: { label: trainingFacilityEffectPreview.analytics.label },
+                  warnings: trainingFacilityEffectPreview.warnings,
+                }}
+                onRunFacilityUpgradePreview={(facilityId) => {
+                  void runFacilityUpgradePreview(facilityId);
+                }}
+                onConfirmFacilityUpgrade={() => {
+                  void confirmFacilityUpgrade();
+                }}
+                onRunFacilityMaintenancePreview={(facilityId) => {
+                  void runFacilityMaintenancePreview(facilityId);
+                }}
+                onConfirmFacilityMaintenance={() => {
+                  void confirmFacilityMaintenance();
+                }}
+                attributeOptions={trainingV2AttributeOptions}
+                seasonEndRows={trainingV2SeasonEndRows}
+                seasonEndBusy={seasonEndXpSpendBusy}
+                seasonEndError={seasonEndXpSpendError}
+                seasonEndSuccess={seasonEndXpSpendSuccess}
+                seasonEndStatus={trainingV2SeasonEndStatus}
+                onSetSeasonEndAttribute={(playerId, attribute) =>
+                  setSeasonEndAttributeDraft((current) => ({
+                    ...current,
+                    [playerId]: attribute,
+                  }))
+                }
+                onAddSeasonEndUpgrade={addSeasonEndXpUpgrade}
+                onRemoveSeasonEndUpgrade={removeSeasonEndXpUpgrade}
+                onClearUpgradeCart={() => {
+                  setPlannedXpUpgrades([]);
+                  setSeasonEndXpSpendPreview(null);
+                  setSeasonEndXpSpendError(null);
+                }}
+                onConfirmSeasonEndXpSpend={() => {
+                  void confirmSeasonEndXpSpend();
+                }}
+              />
+            ) : null}
+          </section>
+
+          {isTransferMarketViewActive ? (
+          <section className={`panel transfer-market-panel${getViewClass("market", "marketV2")}`} data-testid="transfer-market" id="transfer-market">
             <div className="panel-header">
               <TooltipHeading
                 as="h2"
@@ -21699,8 +30438,187 @@ export default function FoundationPageClient({ initialReadSource, initialSelecte
               </TooltipHeading>
               <span className="pill foundation-source-pill">source: active local save</span>
             </div>
+            <div className="transfer-market-view-tabs" role="tablist" aria-label="Transfermarkt Ansicht">
+              <button
+                className={`transfer-market-view-tab${activeTransferMarketTab === "classic" ? " is-active" : ""}`}
+                type="button"
+                role="tab"
+                aria-selected={activeTransferMarketTab === "classic"}
+                onClick={() => {
+                  setTransferMarketTab("classic");
+                  if (activeView === "marketV2") {
+                    setFoundationView("market", setActiveView);
+                  }
+                }}
+              >
+                Klassisch
+              </button>
+              <button
+                className={`transfer-market-view-tab${activeTransferMarketTab === "v2" ? " is-active" : ""}`}
+                type="button"
+                role="tab"
+                aria-selected={activeTransferMarketTab === "v2"}
+                onClick={() => {
+                  setTransferMarketTab("v2");
+                  if (activeView !== "marketV2") {
+                    setFoundationView("marketV2", setActiveView);
+                  }
+                }}
+              >
+                V2
+              </button>
+            </div>
+            {activeTransferMarketTab === "v2" ? (
+              <>
+                <div className="foundation-view-source-row">
+                  <span className="pill foundation-source-pill">{getViewSourceBadgeLabel("marketV2", activeContextMeta)}</span>
+                  <span className="muted">
+                    {activeSaveName} · {gameState.season.id} · Fokus {selectedTeam ? `${selectedTeam.shortCode} · ${selectedTeam.name}` : "—"}
+                  </span>
+                </div>
+                <TransfermarktV2Client
+                  key={`market-v2-${activeSaveId}-${gameState.season.id}-${activeManagerTeamId ?? "overview"}`}
+                  defaultSaveId={activeSaveId}
+                  defaultSeasonId={gameState.season.id}
+                  defaultTeamId={activeManagerTeamId}
+                  source={readMeta.source}
+                  activeOwnerId={effectiveActiveOwnerId}
+                  manageableTeamIds={ownerQuickSwitchTeams.map((team) => team.teamId)}
+                  teamControlModesByTeamId={Object.fromEntries(
+                    Object.entries(resolvedTeamControlSettings).map(([teamId, settings]) => [teamId, settings.controlMode]),
+                  )}
+                  teams={gameState.teams}
+                  disciplines={gameState.disciplines}
+                  rosterRows={transferMarketV2RosterRows}
+                  wishlistEntries={transferWishlistEntriesForMarketV2}
+                  wishlistPlayerIds={transferWishlistEntriesForMarketV2.map((entry) => entry.playerId)}
+                  boardObjectiveHighlights={selectedTransfermarktBoardObjectives}
+                  onOpenPlayerDetails={(payload) => openPlayerDrawerById(payload.playerId, payload.activePlayerId)}
+                  onOpenHistory={() => setFoundationView("historyV2", setActiveView)}
+                  onOpenClassicMarket={() => {
+                    setTransferMarketTab("classic");
+                    setFoundationView("market", setActiveView);
+                  }}
+                  onToggleWishlist={(item) => {
+                    toggleTransferWishlist(item);
+                  }}
+                  onRemoveWishlist={(playerId) => {
+                    removeTransferWishlistEntry(playerId);
+                  }}
+                  onBuyCompleted={async (teamId) => {
+                    setActiveManagerTeam(teamId, "manual_select");
+                    await loadSave(activeSaveId);
+                  }}
+                />
+              </>
+            ) : (
+            <>
+            <section className="transfer-decision-board" aria-label="Transfermarkt Entscheidungen">
+              <article className="transfer-decision-card is-buy">
+                <span>Kaufen</span>
+                <strong>{transferDecisionBoard.buyPick?.item.name ?? "Kein Kandidat"}</strong>
+                <small>
+                  {transferDecisionBoard.buyPick
+                    ? `${formatFitDisplay(transferDecisionBoard.buyPick.item)} · ${formatTransfermarktCurrency(transferDecisionBoard.buyPick.item.marketValue)}`
+                    : "Filter anpassen oder Team waehlen"}
+                </small>
+                <div className="transfer-decision-chip-row" aria-label="Kaufgruende">
+                  {transferDecisionBoard.buyReasons.map((reason) => (
+                    <span key={`buy-reason-${reason}`} className="transfer-decision-chip is-good">{reason}</span>
+                  ))}
+                  {transferDecisionBoard.buyWarnings.map((warning) => (
+                    <span key={`buy-warning-${warning}`} className="transfer-decision-chip is-warn">{warning}</span>
+                  ))}
+                </div>
+                <button
+                  className="primary-button inline-button"
+                  type="button"
+                  disabled={!transferDecisionBoard.buyPick || !marketTeamId}
+                  title={
+                    !marketTeamId
+                      ? "Waehle erst ein Team, damit Budget und Kaderlage fuer den Kauf geprueft werden."
+                      : !transferDecisionBoard.buyPick
+                        ? "Gerade gibt es keinen klaren Kaufkandidaten. Filter anpassen oder Team wechseln."
+                        : "Kaufmodal mit Vertrag und Forderung öffnen."
+                  }
+                  onClick={() => {
+                    if (transferDecisionBoard.buyPick) {
+                      void openMarketBuyModal(transferDecisionBoard.buyPick.item);
+                    }
+                  }}
+                >
+                  Kaufen pruefen
+                </button>
+              </article>
+              <article className="transfer-decision-card is-watch">
+                <span>Watch</span>
+                <strong>{transferDecisionBoard.watchPick?.item.name ?? "Watchlist leer"}</strong>
+                <small>
+                  {transferDecisionBoard.watchPick
+                    ? `OVR ${formatWholeNumber(transferDecisionBoard.watchPick.item.ovr)} · MVS ${transferDecisionBoard.watchPick.item.mvs != null ? formatPpsValue(transferDecisionBoard.watchPick.item.mvs) : "—"}`
+                    : "Kandidaten merken"}
+                </small>
+                <div className="transfer-decision-chip-row" aria-label="Watchgruende">
+                  {transferDecisionBoard.watchReasons.map((reason) => (
+                    <span key={`watch-reason-${reason}`} className="transfer-decision-chip is-watch">{reason}</span>
+                  ))}
+                </div>
+                <button
+                  className="secondary-button inline-button"
+                  type="button"
+                  disabled={!transferDecisionBoard.watchPick}
+                  onClick={() => {
+                    if (transferDecisionBoard.watchPick) {
+                      toggleTransferWishlist(transferDecisionBoard.watchPick.item);
+                    }
+                  }}
+                >
+                  {transferDecisionBoard.watchPick && transferWishlistByPlayerId.has(transferDecisionBoard.watchPick.item.playerId) ? "Gemerkt" : "Merken"}
+                </button>
+              </article>
+              <article className="transfer-decision-card is-sell">
+                <span>Sell</span>
+                <strong>{transferDecisionBoard.sellPick?.row.player.name ?? "Kader stabil"}</strong>
+                <small>
+                  {transferDecisionBoard.sellPick
+                    ? `Gehalt ${formatMoney(transferDecisionBoard.sellPick.salary)} · PPs ${transferDecisionBoard.sellPick.row.playerPps != null ? formatPpsValue(transferDecisionBoard.sellPick.row.playerPps) : "—"}`
+                    : "kein aktiver Kader"}
+                </small>
+                <div className="transfer-decision-chip-row" aria-label="Verkaufsgruende">
+                  {transferDecisionBoard.sellReasons.map((reason) => (
+                    <span key={`sell-reason-${reason}`} className="transfer-decision-chip is-sell">{reason}</span>
+                  ))}
+                </div>
+                <button
+                  className="secondary-button inline-button"
+                  type="button"
+                  disabled={!transferDecisionBoard.sellPick || !marketTeamId}
+                  onClick={() => {
+                    const pick = transferDecisionBoard.sellPick;
+                    if (!pick) return;
+                    void openMarketSellModal({
+                      activePlayerId: pick.row.entry.id,
+                      playerId: pick.row.player.id,
+                      playerName: pick.row.player.name,
+                      className: pick.row.player.className,
+                      race: pick.row.player.race,
+                      portraitUrl: pick.row.player.portraitUrl ?? null,
+                    });
+                  }}
+                >
+                  Verkaufen
+                </button>
+              </article>
+            </section>
             <div className="transfer-market-layout">
               <div className="table-shell transfer-market-table-shell">
+                <div className={`transfer-active-filter-chips${activeMarketFilterChips.length === 0 ? " is-empty" : ""}`} aria-label="Aktive Marktfilter">
+                  {activeMarketFilterChips.length === 0 ? (
+                    <span>Keine Extra-Filter aktiv</span>
+                  ) : (
+                    activeMarketFilterChips.map((chip) => <span key={`market-filter-chip-${chip}`}>{chip}</span>)
+                  )}
+                </div>
                 <table className="team-table transfer-table">
                   <colgroup>
                     {visibleTransfermarktColumns.map((column) => (
@@ -21743,7 +30661,7 @@ export default function FoundationPageClient({ initialReadSource, initialSelecte
                     </tr>
                   </thead>
                   <tbody>
-                    {sortedTransferMarketRows.slice(0, 80).map((row) => (
+                    {visibleTransferMarketRows.map((row) => (
                       <tr key={row.id} onDoubleClick={() => openPlayerDrawerById(row.item.playerId)}>
                         {visibleTransfermarktColumns.map((column) => {
                           if (column.id === "imageUrl") {
@@ -21840,28 +30758,28 @@ export default function FoundationPageClient({ initialReadSource, initialSelecte
                           if (column.id === "pow") {
                             return (
                               <td key={column.id} className={row.item.pow != null ? getPoolHeatClass(row.item.pow, leaguePlayerHeatPools.pow) : ""}>
-                                {row.item.pow == null ? "—" : formatLocalePoints(row.item.pow, 1)}
+                                {row.item.pow == null ? "—" : formatWholeNumber(row.item.pow)}
                               </td>
                             );
                           }
                           if (column.id === "spe") {
                             return (
                               <td key={column.id} className={row.item.spe != null ? getPoolHeatClass(row.item.spe, leaguePlayerHeatPools.spe) : ""}>
-                                {row.item.spe == null ? "—" : formatLocalePoints(row.item.spe, 1)}
+                                {row.item.spe == null ? "—" : formatWholeNumber(row.item.spe)}
                               </td>
                             );
                           }
                           if (column.id === "men") {
                             return (
                               <td key={column.id} className={row.item.men != null ? getPoolHeatClass(row.item.men, leaguePlayerHeatPools.men) : ""}>
-                                {row.item.men == null ? "—" : formatLocalePoints(row.item.men, 1)}
+                                {row.item.men == null ? "—" : formatWholeNumber(row.item.men)}
                               </td>
                             );
                           }
                           if (column.id === "soc") {
                             return (
                               <td key={column.id} className={row.item.soc != null ? getPoolHeatClass(row.item.soc, leaguePlayerHeatPools.soc) : ""}>
-                                {row.item.soc == null ? "—" : formatLocalePoints(row.item.soc, 1)}
+                                {row.item.soc == null ? "—" : formatWholeNumber(row.item.soc)}
                               </td>
                             );
                           }
@@ -21926,6 +30844,13 @@ export default function FoundationPageClient({ initialReadSource, initialSelecte
                               data-testid="transfer-buy-open-button"
                               type="button"
                               disabled={!marketTeamId || (marketBuyBusy && marketPreviewPlayerId === row.item.playerId)}
+                              title={
+                                !marketTeamId
+                                  ? "Waehle erst ein Team, damit der Kauf sauber geprüft werden kann."
+                                  : marketBuyBusy && marketPreviewPlayerId === row.item.playerId
+                                    ? "Dieser Spieler wird gerade für dein Team vorbereitet."
+                                    : "Kaufmodal mit Vertrag, Forderung und Folgen öffnen."
+                              }
                               onClick={() => {
                                 void openMarketBuyModal(row.item);
                               }}
@@ -21934,7 +30859,7 @@ export default function FoundationPageClient({ initialReadSource, initialSelecte
                                 ? "Team waehlen"
                                 : marketBuyBusy && marketPreviewPlayerId === row.item.playerId
                                   ? "Pruefe..."
-                                  : "Buy"}
+                                  : "Kaufen"}
                             </button>
                             <button
                               className={`secondary-button inline-button${transferWishlistByPlayerId.has(row.item.playerId) ? " is-active" : ""}`}
@@ -21958,12 +30883,12 @@ export default function FoundationPageClient({ initialReadSource, initialSelecte
                       <div className="transfer-panel-title">
                         <h3>Team & Status</h3>
                         <p className="muted transfer-panel-note">
-                          Quelle: {readMeta.source === "prisma" ? "Prisma read-only" : "SQLite / lokal"}
+                          Budget, Kaderdruck und Teamwirkung fuer deine naechste Entscheidung.
                         </p>
                       </div>
                       {readMeta.source === "prisma" ? (
                         <div className="transfer-readonly-banner">
-                          <strong>Prisma-Referenz ist read-only</strong>
+                          <strong>Referenzmodus aktiv</strong>
                           <span>Kauefe und Verkaeufe bleiben im normalen Testmodus lokal.</span>
                         </div>
                       ) : null}
@@ -21998,27 +30923,27 @@ export default function FoundationPageClient({ initialReadSource, initialSelecte
                         </article>
                         <article className="metric-card">
                           <span>Finanzspielraum</span>
-                          <strong>{marketFeed?.teamContext?.affordabilityStatus ?? "Team waehlen"}</strong>
+                          <strong>{marketFeed?.teamContext?.affordabilityStatus === "affordable" ? "passt" : marketFeed?.teamContext?.affordabilityStatus ?? "Team waehlen"}</strong>
                         </article>
                         <article className="metric-card">
-                          <span>Roster-Druck</span>
-                          <strong>{marketFeed?.teamContext?.rosterPressureStatus ?? "Team waehlen"}</strong>
+                          <span>Kaderdruck</span>
+                          <strong>{marketFeed?.teamContext?.rosterPressureStatus === "under_min" ? "zu klein" : marketFeed?.teamContext?.rosterPressureStatus === "under_opt" ? "Tiefe fehlt" : marketFeed?.teamContext?.rosterPressureStatus === "at_or_above_opt" ? "gut besetzt" : "Team waehlen"}</strong>
                         </article>
                         <article className="metric-card transfer-filter-span-2">
-                          <span>Readiness</span>
-                          <strong>{marketFeed?.teamContext?.readinessStatus ?? "Team waehlen"}</strong>
+                          <span>Marktstatus</span>
+                          <strong>{marketFeed?.teamContext?.readinessStatus === "ready" ? "bereit" : marketFeed?.teamContext?.readinessStatus ?? "Team waehlen"}</strong>
                         </article>
                       </div>
                     </div>
 
                     <div className="transfer-panel-section transfer-panel-section--pool">
                       <div className="transfer-panel-title">
-                        <h3>Pool Audit</h3>
-                        <p className="muted transfer-panel-note">Feed, KI-Pool und Buy-Preview lesen denselben lokalen Free-Agent-Scope.</p>
+                        <h3>Marktueberblick</h3>
+                        <p className="muted transfer-panel-note">Freie Spieler, Kaufkandidaten und Budgetwirkung im gleichen Marktfenster.</p>
                       </div>
                       <div className="transfer-status-grid">
                         <article className="metric-card">
-                          <span>Aktive FAs</span>
+                          <span>Freie Spieler</span>
                           <strong>{marketFeed?.poolAudit.activeFreeAgentCount ?? "—"}</strong>
                         </article>
                         <article className="metric-card">
@@ -22042,7 +30967,7 @@ export default function FoundationPageClient({ initialReadSource, initialSelecte
                           </strong>
                         </article>
                         <article className="metric-card transfer-filter-span-2">
-                          <span>Guenstigster AI-Kandidat</span>
+                          <span>Guenstigster Auto-Kandidat</span>
                           <strong>
                             {marketFeed?.poolAudit.cheapestCandidatePoolPlayer
                               ? `${marketFeed.poolAudit.cheapestCandidatePoolPlayer.name} · ${formatTransfermarktCurrency(marketFeed.poolAudit.cheapestCandidatePoolPlayer.marketValue)}`
@@ -22063,28 +30988,62 @@ export default function FoundationPageClient({ initialReadSource, initialSelecte
                               <tr key={`market-pool-${bucket.label}`}>
                                 <td>{bucket.label}</td>
                                 <td>{bucket.count}</td>
-                              </tr>
-                            ))}
-                          </tbody>
-                        </table>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+                {marketFeed ? (
+                  <div className="transfer-render-limit-note" role="status">
+                    <span>
+                      Schnellansicht: {visibleTransferMarketRows.length} von {marketFeed.total} Treffern sichtbar.
+                      {marketFeed.total > marketLoadedCount ? ` ${marketLoadedCount} Spieler sind aktuell geladen.` : ""}
+                    </span>
+                    {marketFeed.hasMore ? (
+                      <button
+                        className="secondary-button inline-button"
+                        type="button"
+                        disabled={marketLoadingMore}
+                        onClick={() => {
+                          void loadMoreMarketFeed();
+                        }}
+                      >
+                        {marketLoadingMore ? "Laedt mehr..." : "Mehr laden"}
+                      </button>
+                    ) : null}
+                  </div>
+                ) : null}
+              </div>
+            </div>
+
+                    <div className="transfer-auto-analysis-toggle panel">
+                      <div>
+                        <strong>Auto-Analyse</strong>
+                        <span>Planungsbereiche fuer automatische Teams nur einblenden, wenn du sie wirklich brauchst.</span>
                       </div>
+                      <button
+                        className={`secondary-button inline-button${marketShowAutoAnalysis ? " is-selected" : ""}`}
+                        type="button"
+                        onClick={() => setMarketShowAutoAnalysis((current) => !current)}
+                      >
+                        {marketShowAutoAnalysis ? "Auto-Analyse ausblenden" : "Auto-Analyse anzeigen"}
+                      </button>
                     </div>
 
-                    <div className="transfer-panel-section transfer-panel-section--ai">
+                    <div className={joinClassNames("transfer-panel-section transfer-panel-section--ai", !marketShowAutoAnalysis && "is-collapsed")}>
                       <div className="transfer-panel-title">
-                        <h3>AI Kaufvorschlaege</h3>
-                        <p className="muted transfer-panel-note">Read-only Vorschlaege auf Basis von Cash, Kaderdruck und Teamprofil.</p>
+                        <h3>Auto-Kaufideen</h3>
+                        <p className="muted transfer-panel-note">Kaufideen auf Basis von Cash, Kaderdruck und Teamprofil.</p>
                       </div>
                       <section className="panel transfer-ai-panel">
                         <div className="transfer-ai-controls">
                           <label className="filter-field">
-                            <span>Scope</span>
+                            <span>Teams</span>
                             <select
                               className="input"
                               value={marketAiTeamScope}
                               onChange={(event) => setMarketAiTeamScope(event.target.value as "ai" | "all")}
                             >
-                              <option value="ai">Nur AI-Teams</option>
+                              <option value="ai">Nur Auto-Teams</option>
                               <option value="all">Alle Teams</option>
                             </select>
                           </label>
@@ -22097,7 +31056,7 @@ export default function FoundationPageClient({ initialReadSource, initialSelecte
                                 void reloadAiTransferPreview();
                               }}
                             >
-                              {marketAiPreviewBusy ? "Laedt..." : "AI Kaufvorschlaege anzeigen"}
+                              {marketAiPreviewBusy ? "Laedt..." : "Auto-Kaufideen anzeigen"}
                             </button>
                           </div>
                         </div>
@@ -22115,7 +31074,7 @@ export default function FoundationPageClient({ initialReadSource, initialSelecte
                                 <strong>{marketAiPreviewFeed.totalTeams}</strong>
                               </article>
                               <article className="metric-card">
-                                <span>AI Teams</span>
+                                <span>Auto-Teams</span>
                                 <strong>{marketAiPreviewFeed.aiTeams}</strong>
                               </article>
                               <article className="metric-card">
@@ -22123,7 +31082,7 @@ export default function FoundationPageClient({ initialReadSource, initialSelecte
                                 <strong>{marketAiPreviewFeed.readyTeams}</strong>
                               </article>
                               <article className="metric-card">
-                                <span>Warning</span>
+                                <span>Hinweise</span>
                                 <strong>{marketAiPreviewFeed.warningTeams}</strong>
                               </article>
                               <article className="metric-card">
@@ -22131,15 +31090,15 @@ export default function FoundationPageClient({ initialReadSource, initialSelecte
                                 <strong>{marketAiPreviewFeed.blockedTeams}</strong>
                               </article>
                               <article className="metric-card">
-                                <span>Manual uebersprungen</span>
+                                <span>Gefuehrte uebersprungen</span>
                                 <strong>{marketAiPreviewFeed.skippedManual}</strong>
                               </article>
                               <article className="metric-card">
-                                <span>Passive uebersprungen</span>
+                                <span>Beobachtete uebersprungen</span>
                                 <strong>{marketAiPreviewFeed.skippedPassive}</strong>
                               </article>
                               <article className="metric-card">
-                                <span>Preview aus</span>
+                                <span>Auto aus</span>
                                 <strong>{marketAiPreviewFeed.skippedDisabled}</strong>
                               </article>
                             </div>
@@ -22173,8 +31132,11 @@ export default function FoundationPageClient({ initialReadSource, initialSelecte
                                             type="button"
                                             onClick={(event) => {
                                               event.stopPropagation();
-                                              setActiveManagerTeam(entry.teamId, "manual_select");
-                                              setFoundationView("teams", setActiveView);
+                                              scheduleActiveManagerTeam(entry.teamId, "manual_select", () => setFoundationView("teams", setActiveView));
+                                            }}
+                                            onDoubleClick={(event) => {
+                                              event.stopPropagation();
+                                              openTeamDrawerById(entry.teamId);
                                             }}
                                           >
                                             {entry.teamName}
@@ -22203,8 +31165,8 @@ export default function FoundationPageClient({ initialReadSource, initialSelecte
                                     <p className="muted">{marketAiSelectedTeam.needSummary}</p>
                                   </div>
                                   <div className="room-meta">
-                                    <span className="pill">Control {marketAiSelectedTeam.controlMode}</span>
-                                    <span className="pill">Preview {marketAiSelectedTeam.aiTransferPreviewEnabled ? "an" : "aus"}</span>
+                                    <span className="pill">Steuerung {formatTeamControlModeLabel(marketAiSelectedTeam.controlMode)}</span>
+                                    <span className="pill">Auto {marketAiSelectedTeam.aiTransferPreviewEnabled ? "an" : "aus"}</span>
                                   </div>
                                 </div>
                                 <div className="metric-grid compact" style={{ marginBottom: 12 }}>
@@ -22310,7 +31272,7 @@ export default function FoundationPageClient({ initialReadSource, initialSelecte
                                               {entry.fitNotes.length ? <p className="muted">Fit: {entry.fitNotes.join(" · ")}</p> : null}
                                               {entry.strategyNotes.length ? <p className="muted">Strategie: {entry.strategyNotes.join(" · ")}</p> : null}
                                               {entry.riskNotes.length ? <p className="muted text-negative">Risiko: {entry.riskNotes.join(" · ")}</p> : null}
-                                              {entry.warnings.length ? <p className="muted text-negative">Warnings: {entry.warnings.join(" · ")}</p> : null}
+                                              {entry.warnings.length ? <p className="muted text-negative">Hinweise: {entry.warnings.join(" · ")}</p> : null}
                                               <div className="transfer-inline-actions">
                                                 <button
                                                   className="secondary-button inline-button"
@@ -22344,7 +31306,7 @@ export default function FoundationPageClient({ initialReadSource, initialSelecte
                                       <h4>Bewusst uebersprungen</h4>
                                     </div>
                                     {marketAiSelectedTeam.skippedTargets.length === 0 ? (
-                                      <p className="muted">Keine uebersprungenen Targets im aktuellen Scope.</p>
+                                      <p className="muted">Keine uebersprungenen Kandidaten im aktuellen Marktfenster.</p>
                                     ) : (
                                       <ul className="warning-list compact-list">
                                         {marketAiSelectedTeam.skippedTargets.map((entry) => (
@@ -22361,28 +31323,28 @@ export default function FoundationPageClient({ initialReadSource, initialSelecte
                             ) : null}
                           </>
                         ) : (
-                          <p className="muted">Noch keine AI-Kaufvorschlaege geladen.</p>
+                          <p className="muted">Noch keine Auto-Kaufideen geladen.</p>
                         )}
                       </section>
                     </div>
 
-                    <div className="transfer-panel-section transfer-panel-section--ai">
+                    <div className={joinClassNames("transfer-panel-section transfer-panel-section--ai", !marketShowAutoAnalysis && "is-collapsed")}>
                       <div className="transfer-panel-title">
-                        <h3>AI Marktplan</h3>
+                        <h3>Auto-Marktplan</h3>
                         <p className="muted transfer-panel-note">
-                          Read-only Kombination aus Kauf- und Verkaufsvorschau fuer AI-Teams. Kein Kauf, kein Verkauf, nur Plan.
+                          Strategischer Plan aus Kauf- und Verkaufsvorschau. Erst pruefen, dann handeln.
                         </p>
                       </div>
                       <section className="panel transfer-ai-panel">
                         <div className="transfer-ai-controls">
                           <label className="filter-field">
-                            <span>Scope</span>
+                            <span>Teams</span>
                             <select
                               className="input"
                               value={marketAiPlanTeamScope}
                               onChange={(event) => setMarketAiPlanTeamScope(event.target.value as "ai" | "all")}
                             >
-                              <option value="ai">Nur AI-Teams</option>
+                              <option value="ai">Nur Auto-Teams</option>
                               <option value="all">Alle Teams</option>
                             </select>
                           </label>
@@ -22395,17 +31357,17 @@ export default function FoundationPageClient({ initialReadSource, initialSelecte
                                 void reloadAiMarketPlanPreview();
                               }}
                             >
-                              {marketAiPlanPreviewBusy ? "Laedt..." : "AI-Marktplan laden"}
+                              {marketAiPlanPreviewBusy ? "Laedt..." : "Auto-Marktplan laden"}
                             </button>
                           </div>
                         </div>
                         <div className="transfer-context-banner">
-                          <strong>Read-only</strong>
-                          <span>Dieser Bereich kombiniert nur Kauf- und Verkaufsvorschlaege. Es gibt hier bewusst keinen Apply-Button.</span>
+                          <strong>Planungsansicht</strong>
+                          <span>Dieser Bereich kombiniert Kauf- und Verkaufsideen. Handeln passiert danach bewusst einzeln.</span>
                         </div>
                         {marketAiPlanPreviewError ? (
                           <div className="transfer-feedback-banner is-error">
-                            <strong>AI-Marktplan blockiert</strong>
+                            <strong>Auto-Marktplan blockiert</strong>
                             <span>{marketAiPlanPreviewError}</span>
                           </div>
                         ) : null}
@@ -22413,7 +31375,7 @@ export default function FoundationPageClient({ initialReadSource, initialSelecte
                           <>
                             <div className="metric-grid compact transfer-ai-summary-grid">
                               <article className="metric-card">
-                                <span>AI Teams</span>
+                                <span>Auto-Teams</span>
                                 <strong>{marketAiPlanPreviewFeed.aiTeams}</strong>
                               </article>
                               <article className="metric-card">
@@ -22429,19 +31391,19 @@ export default function FoundationPageClient({ initialReadSource, initialSelecte
                                 <strong>{marketAiPlanPreviewFeed.sellOnlyTeams}</strong>
                               </article>
                               <article className="metric-card">
-                                <span>Sell then buy</span>
+                                <span>Erst verkaufen</span>
                                 <strong>{marketAiPlanPreviewFeed.sellThenBuyTeams}</strong>
                               </article>
                               <article className="metric-card">
-                                <span>Manual uebersprungen</span>
+                                <span>Gefuehrte uebersprungen</span>
                                 <strong>{marketAiPlanPreviewFeed.skippedManual}</strong>
                               </article>
                               <article className="metric-card">
-                                <span>Passive uebersprungen</span>
+                                <span>Beobachtete uebersprungen</span>
                                 <strong>{marketAiPlanPreviewFeed.skippedPassive}</strong>
                               </article>
                               <article className="metric-card">
-                                <span>Disabled</span>
+                                <span>Auto aus</span>
                                 <strong>{marketAiPlanPreviewFeed.skippedDisabled}</strong>
                               </article>
                             </div>
@@ -22472,8 +31434,11 @@ export default function FoundationPageClient({ initialReadSource, initialSelecte
                                           type="button"
                                           onClick={(event) => {
                                             event.stopPropagation();
-                                            setActiveManagerTeam(entry.teamId, "manual_select");
-                                            setFoundationView("teams", setActiveView);
+                                            scheduleActiveManagerTeam(entry.teamId, "manual_select", () => setFoundationView("teams", setActiveView));
+                                          }}
+                                          onDoubleClick={(event) => {
+                                            event.stopPropagation();
+                                            openTeamDrawerById(entry.teamId);
                                           }}
                                         >
                                           {entry.teamName}
@@ -22505,7 +31470,7 @@ export default function FoundationPageClient({ initialReadSource, initialSelecte
                                     <p className="muted">{marketAiPlanSelectedTeam.strategySummary}</p>
                                   </div>
                                   <div className="room-meta">
-                                    <span className="pill">Control {marketAiPlanSelectedTeam.controlMode}</span>
+                                    <span className="pill">Steuerung {formatTeamControlModeLabel(marketAiPlanSelectedTeam.controlMode)}</span>
                                     <span className="pill">{getAiMarketPlanStatusLabel(marketAiPlanSelectedTeam.status)}</span>
                                   </div>
                                 </div>
@@ -22576,7 +31541,7 @@ export default function FoundationPageClient({ initialReadSource, initialSelecte
                                     </div>
                                     <div className="metric-grid compact">
                                       <article className="metric-card">
-                                        <span>Spend</span>
+                                        <span>Ausgabe</span>
                                         <strong>{formatTransfermarktCurrency(marketAiPlanSelectedTeam.buyPlan.plannedSpend)}</strong>
                                       </article>
                                       <article className="metric-card">
@@ -22589,7 +31554,7 @@ export default function FoundationPageClient({ initialReadSource, initialSelecte
                                       </article>
                                     </div>
                                     {marketAiPlanSelectedTeam.buyPlan.warnings.length ? (
-                                      <p className="muted text-negative">Warnings: {marketAiPlanSelectedTeam.buyPlan.warnings.join(" · ")}</p>
+                                      <p className="muted text-negative">Hinweise: {marketAiPlanSelectedTeam.buyPlan.warnings.join(" · ")}</p>
                                     ) : null}
                                     {marketAiPlanSelectedTeam.buyPlan.candidates.length === 0 ? (
                                       <p className="muted">Kein sauberer Buy-Plan.</p>
@@ -22635,12 +31600,12 @@ export default function FoundationPageClient({ initialReadSource, initialSelecte
                                         <strong>{formatTransfermarktCurrency(marketAiPlanSelectedTeam.sellPlan.totalExpectedSellValue)}</strong>
                                       </article>
                                       <article className="metric-card">
-                                        <span>Kader nach Sell</span>
+                                        <span>Kader nach Verkauf</span>
                                         <strong>{marketAiPlanSelectedTeam.sellPlan.rosterAfterSell ?? "—"}</strong>
                                       </article>
                                     </div>
                                     {marketAiPlanSelectedTeam.sellPlan.warnings.length ? (
-                                      <p className="muted text-negative">Warnings: {marketAiPlanSelectedTeam.sellPlan.warnings.join(" · ")}</p>
+                                      <p className="muted text-negative">Hinweise: {marketAiPlanSelectedTeam.sellPlan.warnings.join(" · ")}</p>
                                     ) : null}
                                     {marketAiPlanSelectedTeam.sellPlan.candidates.length === 0 ? (
                                       <p className="muted">Kein sauberer Sell-Plan.</p>
@@ -22700,28 +31665,28 @@ export default function FoundationPageClient({ initialReadSource, initialSelecte
                             ) : null}
                           </>
                         ) : (
-                          <p className="muted">Noch kein AI-Marktplan geladen.</p>
+                          <p className="muted">Noch kein Auto-Marktplan geladen.</p>
                         )}
                       </section>
                     </div>
 
-                    <div className="transfer-panel-section transfer-panel-section--ai">
+                    <div className={joinClassNames("transfer-panel-section transfer-panel-section--ai", !marketShowAutoAnalysis && "is-collapsed")}>
                       <div className="transfer-panel-title">
-                        <h3>AI Needs/Picks Compare</h3>
+                        <h3>Needs & Picks</h3>
                         <p className="muted transfer-panel-note">
-                          Read-only Vergleich fuer Pick-Reihenfolge, Needs und Budget-Lanes. Kein Kauf, kein Write, nur Qualitaetsabgleich.
+                          Vergleich fuer Pick-Reihenfolge, Teamneeds und Budget-Lanes.
                         </p>
                       </div>
                       <section className="panel transfer-ai-panel">
                         <div className="transfer-ai-controls">
                           <label className="filter-field">
-                            <span>Scope</span>
+                            <span>Teams</span>
                             <select
                               className="input"
                               value={marketAiCompareTeamScope}
                               onChange={(event) => setMarketAiCompareTeamScope(event.target.value as "ai" | "all")}
                             >
-                              <option value="ai">Nur AI-Teams</option>
+                              <option value="ai">Nur Auto-Teams</option>
                               <option value="all">Alle Teams</option>
                             </select>
                           </label>
@@ -22734,17 +31699,17 @@ export default function FoundationPageClient({ initialReadSource, initialSelecte
                                 void reloadAiNeedsPicksCompare();
                               }}
                             >
-                              {marketAiCompareBusy ? "Laedt..." : "AI Needs/Picks Compare laden"}
+                              {marketAiCompareBusy ? "Laedt..." : "Needs & Picks laden"}
                             </button>
                           </div>
                         </div>
                         <div className="transfer-context-banner">
-                          <strong>Compare</strong>
+                          <strong>Abgleich</strong>
                           <span>Retool-Logikdateien werden gelesen. Wenn keine eingefrorenen Pick-Zeilen vorliegen, bleibt der Vergleich bewusst logisch statt gefaelscht.</span>
                         </div>
                         {marketAiCompareError ? (
                           <div className="transfer-feedback-banner is-error">
-                            <strong>AI Compare blockiert</strong>
+                            <strong>Needs & Picks blockiert</strong>
                             <span>{marketAiCompareError}</span>
                           </div>
                         ) : null}
@@ -22825,8 +31790,11 @@ export default function FoundationPageClient({ initialReadSource, initialSelecte
                                           type="button"
                                           onClick={(event) => {
                                             event.stopPropagation();
-                                            setActiveManagerTeam(entry.teamId, "manual_select");
-                                            setFoundationView("teams", setActiveView);
+                                            scheduleActiveManagerTeam(entry.teamId, "manual_select", () => setFoundationView("teams", setActiveView));
+                                          }}
+                                          onDoubleClick={(event) => {
+                                            event.stopPropagation();
+                                            openTeamDrawerById(entry.teamId);
                                           }}
                                         >
                                           {entry.teamName}
@@ -22860,7 +31828,7 @@ export default function FoundationPageClient({ initialReadSource, initialSelecte
                                     </p>
                                   </div>
                                   <div className="room-meta">
-                                    <span className="pill">Control {marketAiCompareSelectedTeam.controlMode}</span>
+                                    <span className="pill">Steuerung {formatTeamControlModeLabel(marketAiCompareSelectedTeam.controlMode)}</span>
                                     <span className={getAiNeedsCompareStatusPillClass(marketAiCompareSelectedTeam.compareStatus)}>
                                       {getAiNeedsCompareStatusLabel(marketAiCompareSelectedTeam.compareStatus)}
                                     </span>
@@ -23046,7 +32014,7 @@ export default function FoundationPageClient({ initialReadSource, initialSelecte
                                       <h4>Geplante Picks</h4>
                                     </div>
                                     {marketAiCompareSelectedTeam.plannedPicks.length === 0 ? (
-                                      <p className="muted">Noch keine sequentielle Pick-Folge im aktuellen Scope.</p>
+                                      <p className="muted">Noch keine Pick-Folge im aktuellen Marktfenster.</p>
                                     ) : (
                                       <div className="transfer-ai-candidate-list">
                                         {marketAiCompareSelectedTeam.plannedPicks.map((entry) => (
@@ -23145,7 +32113,7 @@ export default function FoundationPageClient({ initialReadSource, initialSelecte
                                       </ul>
                                     ) : null}
                                     {marketAiCompareSelectedTeam.warnings.length ? (
-                                      <p className="muted text-negative">Warnings: {marketAiCompareSelectedTeam.warnings.join(" · ")}</p>
+                                      <p className="muted text-negative">Hinweise: {marketAiCompareSelectedTeam.warnings.join(" · ")}</p>
                                     ) : null}
                                   </section>
                                 </div>
@@ -23153,28 +32121,28 @@ export default function FoundationPageClient({ initialReadSource, initialSelecte
                             ) : null}
                           </>
                         ) : (
-                          <p className="muted">Noch kein AI Needs/Picks Compare geladen.</p>
+                                      <p className="muted">Needs & Picks wurden noch nicht geladen.</p>
                         )}
                       </section>
                     </div>
 
-                    <div className="transfer-panel-section transfer-panel-section--ai">
+                    <div className={joinClassNames("transfer-panel-section transfer-panel-section--ai", !marketShowAutoAnalysis && "is-collapsed")}>
                       <div className="transfer-panel-title">
-                        <h3>AI Verkaufsvorschlaege</h3>
+                        <h3>Auto-Verkaufsideen</h3>
                         <p className="muted transfer-panel-note">
-                          Read-only Vorschlaege auf Basis von Gehalt, Kaderdruck, lokalen Leistungen und Teamprofil.
+                          Verkaufsideen auf Basis von Gehalt, Kaderdruck, Leistung und Teamprofil.
                         </p>
                       </div>
                       <section className="panel transfer-ai-panel">
                         <div className="transfer-ai-controls">
                           <label className="filter-field">
-                            <span>Scope</span>
+                            <span>Teams</span>
                             <select
                               className="input"
                               value={marketAiSellTeamScope}
                               onChange={(event) => setMarketAiSellTeamScope(event.target.value as "ai" | "all")}
                             >
-                              <option value="ai">Nur AI-Teams</option>
+                              <option value="ai">Nur Auto-Teams</option>
                               <option value="all">Alle Teams</option>
                             </select>
                           </label>
@@ -23187,13 +32155,13 @@ export default function FoundationPageClient({ initialReadSource, initialSelecte
                                 void reloadAiSellPreview();
                               }}
                             >
-                              {marketAiSellPreviewBusy ? "Laedt..." : "AI-Verkaufsvorschau laden"}
+                              {marketAiSellPreviewBusy ? "Laedt..." : "Auto-Verkaufsideen laden"}
                             </button>
                           </div>
                         </div>
                         {marketAiSellPreviewError ? (
                           <div className="transfer-feedback-banner is-error">
-                            <strong>AI-Sell-Preview blockiert</strong>
+                            <strong>Auto-Verkauf blockiert</strong>
                             <span>{marketAiSellPreviewError}</span>
                           </div>
                         ) : null}
@@ -23205,19 +32173,19 @@ export default function FoundationPageClient({ initialReadSource, initialSelecte
                                 <strong>{marketAiSellPreviewFeed.totalTeams}</strong>
                               </article>
                               <article className="metric-card">
-                                <span>AI-Teams</span>
+                                <span>Auto-Teams</span>
                                 <strong>{marketAiSellPreviewFeed.aiTeams}</strong>
                               </article>
                               <article className="metric-card">
-                                <span>Manual uebersprungen</span>
+                                <span>Gefuehrte uebersprungen</span>
                                 <strong>{marketAiSellPreviewFeed.skippedManual}</strong>
                               </article>
                               <article className="metric-card">
-                                <span>Passive uebersprungen</span>
+                                <span>Beobachtete uebersprungen</span>
                                 <strong>{marketAiSellPreviewFeed.skippedPassive}</strong>
                               </article>
                               <article className="metric-card">
-                                <span>Disabled</span>
+                                <span>Auto aus</span>
                                 <strong>{marketAiSellPreviewFeed.skippedDisabled}</strong>
                               </article>
                               <article className="metric-card">
@@ -23225,7 +32193,7 @@ export default function FoundationPageClient({ initialReadSource, initialSelecte
                                 <strong>{marketAiSellPreviewFeed.readyTeams}</strong>
                               </article>
                               <article className="metric-card">
-                                <span>Warning</span>
+                                <span>Hinweise</span>
                                 <strong>{marketAiSellPreviewFeed.warningTeams}</strong>
                               </article>
                               <article className="metric-card">
@@ -23263,8 +32231,11 @@ export default function FoundationPageClient({ initialReadSource, initialSelecte
                                             type="button"
                                             onClick={(event) => {
                                               event.stopPropagation();
-                                              setActiveManagerTeam(entry.teamId, "manual_select");
-                                              setFoundationView("teams", setActiveView);
+                                              scheduleActiveManagerTeam(entry.teamId, "manual_select", () => setFoundationView("teams", setActiveView));
+                                            }}
+                                            onDoubleClick={(event) => {
+                                              event.stopPropagation();
+                                              openTeamDrawerById(entry.teamId);
                                             }}
                                           >
                                             {entry.teamName}
@@ -23299,8 +32270,8 @@ export default function FoundationPageClient({ initialReadSource, initialSelecte
                                     <p className="muted">{marketAiSellSelectedTeam.explanation}</p>
                                   </div>
                                   <div className="room-meta">
-                                    <span className="pill">Control {marketAiSellSelectedTeam.controlMode}</span>
-                                    <span className="pill">Preview {marketAiSellSelectedTeam.aiSellPreviewEnabled ? "an" : "aus"}</span>
+                                    <span className="pill">Steuerung {formatTeamControlModeLabel(marketAiSellSelectedTeam.controlMode)}</span>
+                                    <span className="pill">Auto {marketAiSellSelectedTeam.aiSellPreviewEnabled ? "an" : "aus"}</span>
                                   </div>
                                 </div>
                                 <div className="metric-grid compact" style={{ marginBottom: 12 }}>
@@ -23453,7 +32424,7 @@ export default function FoundationPageClient({ initialReadSource, initialSelecte
                                           </div>
                                           {entry.reasonsToSell.length ? <p>Sell: {entry.reasonsToSell.join(" · ")}</p> : null}
                                           {entry.reasonsToKeep.length ? <p className="muted">Keep: {entry.reasonsToKeep.join(" · ")}</p> : null}
-                                          {entry.warnings.length ? <p className="muted text-negative">Warnings: {entry.warnings.join(" · ")}</p> : null}
+                                          {entry.warnings.length ? <p className="muted text-negative">Hinweise: {entry.warnings.join(" · ")}</p> : null}
                                         </article>
                                       ))}
                                     </div>
@@ -23463,7 +32434,7 @@ export default function FoundationPageClient({ initialReadSource, initialSelecte
                             ) : null}
                           </>
                         ) : (
-                          <p className="muted">Noch keine AI-Verkaufsvorschau geladen.</p>
+                          <p className="muted">Noch keine Auto-Verkaufsideen geladen.</p>
                         )}
                       </section>
                     </div>
@@ -23875,16 +32846,16 @@ export default function FoundationPageClient({ initialReadSource, initialSelecte
                             <td>{formatTransfermarktCurrency(liveItem?.marketValue ?? entry.marketValue)}</td>
                             <td>{formatTransfermarktCurrency(liveItem?.salary ?? entry.salary)}</td>
                             <td className={liveItem?.pow != null ? getPoolHeatClass(liveItem.pow, leaguePlayerHeatPools.pow) : ""}>
-                              {liveItem?.pow == null ? "—" : formatLocalePoints(liveItem.pow, 1)}
+                              {liveItem?.pow == null ? "—" : formatWholeNumber(liveItem.pow)}
                             </td>
                             <td className={liveItem?.spe != null ? getPoolHeatClass(liveItem.spe, leaguePlayerHeatPools.spe) : ""}>
-                              {liveItem?.spe == null ? "—" : formatLocalePoints(liveItem.spe, 1)}
+                              {liveItem?.spe == null ? "—" : formatWholeNumber(liveItem.spe)}
                             </td>
                             <td className={liveItem?.men != null ? getPoolHeatClass(liveItem.men, leaguePlayerHeatPools.men) : ""}>
-                              {liveItem?.men == null ? "—" : formatLocalePoints(liveItem.men, 1)}
+                              {liveItem?.men == null ? "—" : formatWholeNumber(liveItem.men)}
                             </td>
                             <td className={liveItem?.soc != null ? getPoolHeatClass(liveItem.soc, leaguePlayerHeatPools.soc) : ""}>
-                              {liveItem?.soc == null ? "—" : formatLocalePoints(liveItem.soc, 1)}
+                              {liveItem?.soc == null ? "—" : formatWholeNumber(liveItem.soc)}
                             </td>
                             <td><ClassColorChip className={liveItem?.className ?? entry.className} /></td>
                             <td>{liveItem ? formatFitDisplay(liveItem) : "—"}</td>
@@ -23901,7 +32872,7 @@ export default function FoundationPageClient({ initialReadSource, initialSelecte
                                     }
                                   }}
                                 >
-                                  Buy
+                                  Kaufen
                                 </button>
                                 <button
                                   className="secondary-button inline-button"
@@ -23920,48 +32891,93 @@ export default function FoundationPageClient({ initialReadSource, initialSelecte
                 </div>
               )}
             </section>
-          {transferMarketRows.length === 0 ? (
-              <p className="muted">Mit den aktuellen Filtern wurden keine verfuegbaren Spieler gefunden.</p>
+            {transferMarketRows.length === 0 ? (
+              <div className="transfer-market-empty-card">
+                <strong>Keine Treffer mit diesen Filtern</strong>
+                <span>Lockere zuerst Budget, Klasse oder Bereichswerte. Danach kannst du wieder nach Fit sortieren.</span>
+                <button
+                  className="secondary-button inline-button"
+                  type="button"
+                  onClick={() => {
+                    setMarketClassFilter("ALL");
+                    setMarketRaceFilter("ALL");
+                    setMarketSubclassFilter("ALL");
+                    setMarketAlignmentFilter("ALL");
+                    setMarketGenderFilter("ALL");
+                    setMarketPositiveTraitFilter("ALL");
+                    setMarketNegativeTraitFilter("ALL");
+                    setMarketBracketFilter("ALL");
+                    setMarketSearch("");
+                    marketValueFilterManualRef.current = false;
+                    setMarketMaxValue(marketCashMaxValue);
+                    setMarketMaxSalary(40);
+                    setMarketMinRatio(0);
+                    setMarketMinPow(1);
+                    setMarketMinSpe(1);
+                    setMarketMinMen(1);
+                    setMarketMinSoc(1);
+                  }}
+                >
+                  Filter lockern
+                </button>
+              </div>
             ) : null}
+            </>
+            )}
           </section>
           ) : null}
 
-          {activeView === "market" ? (
+          {activeView === "market" && activeTransferMarketTab === "classic" ? (
           <section className={`panel transfer-market-panel${getViewClass("market")}`} id="transfer-recap">
             <div className="panel-header">
               <h2>Transfer Recap</h2>
-              <button
-                className="secondary-button"
-                type="button"
-                onClick={() => {
-                  void reloadTransferRecapFeed();
-                }}
-              >
-                Recap neu laden
-              </button>
+              <div className="table-actions">
+                <button
+                  className={`secondary-button inline-button${marketShowTransferRecap ? " is-selected" : ""}`}
+                  type="button"
+                  onClick={() => {
+                    const next = !marketShowTransferRecap;
+                    setMarketShowTransferRecap(next);
+                    if (next && !transferRecapFeed) {
+                      void reloadTransferRecapFeed();
+                    }
+                  }}
+                >
+                  {marketShowTransferRecap ? "Recap einklappen" : "Recap anzeigen"}
+                </button>
+                {marketShowTransferRecap ? (
+                  <button
+                    className="secondary-button"
+                    type="button"
+                    onClick={() => {
+                      void reloadTransferRecapFeed();
+                    }}
+                  >
+                    Recap neu laden
+                  </button>
+                ) : null}
+              </div>
             </div>
             <p className="muted">
-              Read-only Zusammenfassung aus echter Transferhistorie mit Top Transfers In/Out und Team Summary.
+              Zusammenfassung aus echter Transferhistorie mit Top-Zugaengen, Abgaengen und Teamuebersicht.
             </p>
-            {transferRecapFeed ? (
+            {!marketShowTransferRecap ? (
+              <p className="muted">Recap bleibt kompakt, bis du ihn oeffnest.</p>
+            ) : transferRecapFeed ? (
               <>
                 <div className="transfer-context-banner" style={{ marginBottom: 12 }}>
                   <strong>
-                    Save {transferRecapFeed.saveContext?.saveName ?? activeSaveName} ·{" "}
+                    Spielstand {transferRecapFeed.saveContext?.saveName ?? activeSaveName} ·{" "}
                     {inferSaveTypeLabel(transferRecapFeed.saveContext ?? activeSaveSummary)}
                   </strong>
                   <span>
-                    Angefragt: {transferRecapFeed.saveContext?.requestedSaveId ?? activeSaveId} /{" "}
-                    {transferRecapFeed.saveContext?.requestedSeasonId ?? gameState.season.id}
-                    {" · "}
-                    Aufgeloest: {transferRecapFeed.saveContext?.resolvedSaveId ?? transferRecapFeed.scope.saveId ?? activeSaveId} /{" "}
-                    {transferRecapFeed.saveContext?.resolvedSeasonId ?? transferRecapFeed.scope.seasonId ?? gameState.season.id}
+                    Saison {transferRecapFeed.saveContext?.resolvedSeasonId ?? transferRecapFeed.scope.seasonId ?? gameState.season.id}
                   </span>
                 </div>
 
                 {transferRecapFeed.saveContext?.scopeWarning ? (
                   <div className="transfer-callout is-warning" style={{ marginBottom: 12 }}>
-                    <strong>Scope-Warnung</strong>
+                    <strong>Hinweis zum Spielstand</strong>
                     <span>{transferRecapFeed.saveContext.scopeWarning}</span>
                   </div>
                 ) : null}
@@ -23991,15 +33007,54 @@ export default function FoundationPageClient({ initialReadSource, initialSelecte
 
                 {transferRecapFeed.warnings.length ? (
                   <div className="transfer-feedback-banner is-warning">
-                    <strong>Warnings</strong>
+                    <strong>Hinweise</strong>
                     <span>{transferRecapFeed.warnings.join(" · ")}</span>
                   </div>
                 ) : null}
 
+                <div className="transfer-recap-story-grid">
+                  <article className="transfer-recap-story-card is-buy">
+                    <span>Groesster Kauf</span>
+                    <strong>{transferRecapFeed.biggestSpend[0]?.playerName ?? "—"}</strong>
+                    <small>
+                      {transferRecapFeed.biggestSpend[0]
+                        ? `${transferRecapFeed.biggestSpend[0].toTeam ?? "—"} · ${formatTransfermarktCurrency(transferRecapFeed.biggestSpend[0].amount)}`
+                        : "Keine Kaufbewegung"}
+                    </small>
+                  </article>
+                  <article className="transfer-recap-story-card is-profit">
+                    <span>Bester Verkauf</span>
+                    <strong>{transferRecapFeed.biggestProfit[0]?.playerName ?? "—"}</strong>
+                    <small>
+                      {transferRecapFeed.biggestProfit[0]
+                        ? `${transferRecapFeed.biggestProfit[0].fromTeam ?? "—"} · ${transferRecapFeed.biggestProfit[0].realizedProfit != null ? formatTransfermarktCurrency(transferRecapFeed.biggestProfit[0].realizedProfit) : "—"}`
+                        : "Kein Gewinnwert"}
+                    </small>
+                  </article>
+                  <article className="transfer-recap-story-card is-value">
+                    <span>Value Deal</span>
+                    <strong>{transferRecapFeed.bestValueDeals[0]?.playerName ?? "—"}</strong>
+                    <small>
+                      {transferRecapFeed.bestValueDeals[0]
+                        ? `OVR ${transferRecapFeed.bestValueDeals[0].ovr ?? "—"} · ${formatTransfermarktCurrency(transferRecapFeed.bestValueDeals[0].amount)}`
+                        : "Noch kein Value-Signal"}
+                    </small>
+                  </article>
+                  <article className="transfer-recap-story-card is-risk">
+                    <span>Riskanter Move</span>
+                    <strong>{transferRecapFeed.riskyMoves[0]?.playerName ?? "—"}</strong>
+                    <small>
+                      {transferRecapFeed.riskyMoves[0]
+                        ? (transferRecapFeed.riskyMoves[0].warnings[0] ?? transferRecapFeed.riskyMoves[0].strategyFitReason ?? "auffaellig")
+                        : "Keine Auffaelligkeit"}
+                    </small>
+                  </article>
+                </div>
+
                 <div className="transfer-ai-candidate-grid">
                   <section className="panel transfer-ai-candidate-panel">
                     <div className="panel-header">
-                      <h3>Top Transfers In</h3>
+                      <h3>Top-Zugaenge</h3>
                     </div>
                     <div className="table-shell transfer-ai-table-shell">
                       <table className="data-table compact-table transfer-ai-table">
@@ -24036,7 +33091,7 @@ export default function FoundationPageClient({ initialReadSource, initialSelecte
 
                   <section className="panel transfer-ai-candidate-panel">
                     <div className="panel-header">
-                      <h3>Top Transfers Out</h3>
+                      <h3>Top-Abgaenge</h3>
                     </div>
                     <div className="table-shell transfer-ai-table-shell">
                       <table className="data-table compact-table transfer-ai-table">
@@ -24073,7 +33128,7 @@ export default function FoundationPageClient({ initialReadSource, initialSelecte
 
                   <section className="panel transfer-ai-candidate-panel">
                     <div className="panel-header">
-                      <h3>Biggest Spend</h3>
+                      <h3>Groesste Ausgaben</h3>
                     </div>
                     {transferRecapFeed.biggestSpend.length ? (
                       <ul className="warning-list compact-list">
@@ -24090,7 +33145,7 @@ export default function FoundationPageClient({ initialReadSource, initialSelecte
 
                   <section className="panel transfer-ai-candidate-panel">
                     <div className="panel-header">
-                      <h3>Biggest Profit</h3>
+                      <h3>Groesste Gewinne</h3>
                     </div>
                     {transferRecapFeed.biggestProfit.length ? (
                       <ul className="warning-list compact-list">
@@ -24107,7 +33162,7 @@ export default function FoundationPageClient({ initialReadSource, initialSelecte
 
                   <section className="panel transfer-ai-candidate-panel">
                     <div className="panel-header">
-                      <h3>Best Value Deals</h3>
+                      <h3>Beste Value-Deals</h3>
                     </div>
                     {transferRecapFeed.bestValueDeals.length ? (
                       <ul className="warning-list compact-list">
@@ -24124,7 +33179,7 @@ export default function FoundationPageClient({ initialReadSource, initialSelecte
 
                   <section className="panel transfer-ai-candidate-panel">
                     <div className="panel-header">
-                      <h3>Risky Moves</h3>
+                      <h3>Riskante Moves</h3>
                     </div>
                     {transferRecapFeed.riskyMoves.length ? (
                       <ul className="warning-list compact-list">
@@ -24149,7 +33204,7 @@ export default function FoundationPageClient({ initialReadSource, initialSelecte
                       <thead>
                         <tr>
                           <th>Team</th>
-                          <th>Control</th>
+                          <th>Steuerung</th>
                           <th>Käufe</th>
                           <th>Verkäufe</th>
                           <th>Spend</th>
@@ -24165,8 +33220,7 @@ export default function FoundationPageClient({ initialReadSource, initialSelecte
                           <tr
                             key={`recap-team-${entry.teamId}`}
                             onClick={() => {
-                              setActiveManagerTeam(entry.teamId, "manual_select");
-                              setFoundationView("teams", setActiveView);
+                              scheduleActiveManagerTeam(entry.teamId, "manual_select", () => setFoundationView("teams", setActiveView));
                             }}
                             onDoubleClick={() => openTeamDrawerById(entry.teamId)}
                           >
@@ -24176,8 +33230,7 @@ export default function FoundationPageClient({ initialReadSource, initialSelecte
                                 type="button"
                                 onClick={(event) => {
                                   event.stopPropagation();
-                                  setActiveManagerTeam(entry.teamId, "manual_select");
-                                  setFoundationView("teams", setActiveView);
+                                  scheduleActiveManagerTeam(entry.teamId, "manual_select", () => setFoundationView("teams", setActiveView));
                                 }}
                                 onDoubleClick={(event) => {
                                   event.stopPropagation();
@@ -24187,7 +33240,7 @@ export default function FoundationPageClient({ initialReadSource, initialSelecte
                                 {entry.teamName}
                               </button>
                             </td>
-                            <td>{entry.controlMode}</td>
+                            <td>{formatTeamControlModeLabel(entry.controlMode)}</td>
                             <td>{entry.buyCount}</td>
                             <td>{entry.sellCount}</td>
                             <td>{formatTransfermarktCurrency(entry.spend)}</td>
@@ -24220,9 +33273,9 @@ export default function FoundationPageClient({ initialReadSource, initialSelecte
               >
                 <div className="foundation-modal-header">
                   <div className="stack">
-                    <h3>Buy</h3>
+                    <h3>Kaufen</h3>
                     <p className="muted">
-                      Quelle: {readMeta.source === "prisma" ? "Prisma / Referenz read-only" : "SQLite / lokal"}
+                      Spielstand: {readMeta.source === "prisma" ? "Referenz" : "lokal"}
                     </p>
                   </div>
                   <button className="secondary-button inline-button" type="button" onClick={closeMarketBuyModal}>
@@ -24306,7 +33359,7 @@ export default function FoundationPageClient({ initialReadSource, initialSelecte
                       </div>
                     </div>
                     <span className={`transfer-status-pill${marketBuyPreview?.canBuy ? " is-ready" : " is-blocked"}`}>
-                      {readMeta.source === "prisma" ? "read-only" : marketBuyPreview?.canBuy ? "bereit" : "geblockt"}
+                      {readMeta.source === "prisma" ? "Referenz" : marketBuyPreview?.canBuy ? "bereit" : "geblockt"}
                     </span>
                   </div>
                     );
@@ -24314,8 +33367,8 @@ export default function FoundationPageClient({ initialReadSource, initialSelecte
 
                   {readMeta.source === "prisma" ? (
                     <div className="transfer-feedback-banner is-error">
-                      <strong>Read-only</strong>
-                      <span>Prisma-Referenz ist read-only. Fuer Kaeufe bitte lokalen Testspielstand nutzen.</span>
+                      <strong>Referenzmodus</strong>
+                      <span>Fuer Kaeufe bitte lokalen Testspielstand nutzen.</span>
                     </div>
                   ) : null}
                   <div className="transfer-feedback-banner is-info">
@@ -24731,6 +33784,17 @@ export default function FoundationPageClient({ initialReadSource, initialSelecte
                     data-testid="transfer-buy-negotiate"
                     type="button"
                     disabled={readMeta.source === "prisma" || !marketBuyPreview?.canBuy || marketBuyBusy || marketNegotiationOutcome?.status === "rejected"}
+                    title={
+                      readMeta.source === "prisma"
+                        ? "Im Referenzmodus bleibt die Verhandlung gesperrt."
+                        : !marketBuyPreview?.canBuy
+                          ? marketBuyPreview?.blockingReasons?.[0] ?? "Der Deal ist in diesem Zustand noch blockiert."
+                          : marketBuyBusy
+                            ? "Die aktuelle Verhandlung wird gerade vorbereitet."
+                            : marketNegotiationOutcome?.status === "rejected"
+                              ? "Nach einer klaren Absage musst du erst das Angebot oder den Vertrag anpassen."
+                              : "Verhandlung starten und Zustimmung testen."
+                    }
                     onClick={() => {
                       void negotiateTransfermarktBuy();
                     }}
@@ -24742,6 +33806,17 @@ export default function FoundationPageClient({ initialReadSource, initialSelecte
                     data-testid="transfer-buy-confirm"
                     type="button"
                     disabled={readMeta.source === "prisma" || !marketBuyPreview?.canBuy || marketBuyBusy || marketNegotiationOutcome?.status !== "accepted"}
+                    title={
+                      readMeta.source === "prisma"
+                        ? "Im Referenzmodus bleibt der Kauf gesperrt."
+                        : !marketBuyPreview?.canBuy
+                          ? marketBuyPreview?.blockingReasons?.[0] ?? "Der Deal ist noch nicht kaufbar."
+                          : marketBuyBusy
+                            ? "Der Kauf wird gerade vorbereitet."
+                            : marketNegotiationOutcome?.status !== "accepted"
+                              ? "Erst verhandeln, bis eine Annahme vorliegt."
+                              : "Kauf jetzt final bestätigen."
+                    }
                     onClick={() => {
                       void confirmTransfermarktBuy();
                     }}
@@ -24755,7 +33830,7 @@ export default function FoundationPageClient({ initialReadSource, initialSelecte
           {marketSellModalOpen ? (
             <div className="foundation-modal-backdrop" role="presentation" onClick={closeMarketSellModal}>
               <section
-                className="foundation-modal transfer-buy-modal"
+                className="foundation-modal transfer-buy-modal transfer-sell-modal"
                 role="dialog"
                 aria-modal="true"
                 aria-label="Verkaufsdialog"
@@ -24765,7 +33840,7 @@ export default function FoundationPageClient({ initialReadSource, initialSelecte
                   <div className="stack">
                     <h3>Verkaufen</h3>
                     <p className="muted">
-                      Quelle: {readMeta.source === "prisma" ? "Prisma / Referenz read-only" : "SQLite / lokal"}
+                      Spielstand: {readMeta.source === "prisma" ? "Referenz" : "lokal"}
                     </p>
                   </div>
                   <button className="secondary-button inline-button" type="button" onClick={closeMarketSellModal}>
@@ -24775,61 +33850,73 @@ export default function FoundationPageClient({ initialReadSource, initialSelecte
 
                 <div className="foundation-modal-body transfer-buy-modal-body">
                   {(() => {
+                    const context = marketSellPlayerContext;
                     const portraitSrc = marketSellSubject?.portraitUrl ?? null;
                     const playerName = marketSellPreview?.player?.name ?? marketSellSubject?.playerName ?? "Unbekannt";
                     const className = marketSellPreview?.player?.className ?? marketSellSubject?.className ?? "—";
                     const race = marketSellPreview?.player?.race ?? marketSellSubject?.race ?? "—";
+                    const saleVsMarketValue =
+                      marketSellPreview?.salePrice != null && marketSellPreview.marketValueReference != null
+                        ? marketSellPreview.salePrice - marketSellPreview.marketValueReference
+                        : null;
 
                     return (
-                  <div className="transfer-buy-player-line">
-                    <div className="transfer-modal-player-hero">
-                      {portraitSrc ? (
-                        <img
-                          className="transfermarkt-portrait"
-                          src={portraitSrc}
-                          alt={playerName}
-                          width={56}
-                          height={56}
-                          loading="lazy"
-                          decoding="async"
-                          fetchPriority="low"
-                        />
-                      ) : (
-                        <div className="transfermarkt-portrait transfermarkt-portrait-placeholder" aria-label={`${playerName} placeholder`}>
-                          {playerName.slice(0, 2).toUpperCase()}
-                        </div>
-                      )}
-                      <div className="transfer-modal-player-summary">
-                        <div className="transfer-modal-player-head">
-                          <strong>{playerName}</strong>
-                          <div className="transfer-modal-player-meta">
-                            <ClassColorChip className={className} />
-                            <span className="muted">{race}</span>
-                            <span className="pill">
-                              {marketSellPreview?.team?.shortCode ?? selectedTeam?.shortCode ?? "—"} · {marketSellPreview?.team?.name ?? selectedTeam?.name ?? "Kein Team gewaehlt"}
-                            </span>
+                      <div className="transfer-buy-player-line transfer-sell-hero-line">
+                        <div className="transfer-modal-player-hero transfer-sell-hero">
+                          {portraitSrc ? (
+                            <img
+                              className="transfermarkt-portrait transfer-sell-portrait"
+                              src={portraitSrc}
+                              alt={playerName}
+                              width={72}
+                              height={72}
+                              loading="lazy"
+                              decoding="async"
+                              fetchPriority="low"
+                            />
+                          ) : (
+                            <div className="transfermarkt-portrait transfermarkt-portrait-placeholder transfer-sell-portrait" aria-label={`${playerName} placeholder`}>
+                              {playerName.slice(0, 2).toUpperCase()}
+                            </div>
+                          )}
+                          <div className="transfer-modal-player-summary">
+                            <div className="transfer-modal-player-head">
+                              <strong>{playerName}</strong>
+                              <div className="transfer-modal-player-meta">
+                                <ClassColorChip className={className} />
+                                <span className="muted">{race}</span>
+                                <span className="pill">
+                                  {marketSellPreview?.team?.shortCode ?? selectedTeam?.shortCode ?? "—"} · {marketSellPreview?.team?.name ?? selectedTeam?.name ?? "Kein Team gewaehlt"}
+                                </span>
+                              </div>
+                            </div>
+                            <div className="transfer-modal-player-kpis transfer-sell-kpis">
+                              <article className="transfer-modal-kpi is-money">
+                                <span>Verkaufspreis</span>
+                                <strong>{formatTransfermarktCurrency(marketSellPreview?.salePrice ?? null)}</strong>
+                                <small className={saleVsMarketValue != null ? (saleVsMarketValue >= 0 ? "text-positive" : "text-negative") : undefined}>
+                                  vs. MW {saleVsMarketValue != null ? formatSignedTransfermarktCurrency(saleVsMarketValue) : "—"}
+                                </small>
+                              </article>
+                              <article className="transfer-modal-kpi">
+                                <span>Faktor</span>
+                                <strong>{marketSellPreview?.saleFactor != null ? `${formatLocalePoints(marketSellPreview.saleFactor, 2)}x` : "—"}</strong>
+                              </article>
+                              <article className="transfer-modal-kpi">
+                                <span>PPs</span>
+                                <strong>{formatPpsValue(context?.rating?.ppsSeason ?? context?.performance?.totalPoints ?? null)}</strong>
+                              </article>
+                              <article className="transfer-modal-kpi">
+                                <span>OVR</span>
+                                <strong>{formatWholeNumber(context?.rating?.ovrNormalized ?? context?.player?.ovr ?? null)}</strong>
+                              </article>
+                            </div>
                           </div>
                         </div>
-                        <div className="transfer-modal-player-kpis">
-                          <article className="transfer-modal-kpi">
-                            <span>Marktwert</span>
-                            <strong>{formatTransfermarktCurrency(marketSellPreview?.marketValueReference ?? null)}</strong>
-                          </article>
-                          <article className="transfer-modal-kpi">
-                            <span>Verkaufspreis</span>
-                            <strong>{formatTransfermarktCurrency(marketSellPreview?.salePrice ?? null)}</strong>
-                          </article>
-                          <article className="transfer-modal-kpi">
-                            <span>Gehaltsentlastung</span>
-                            <strong>{formatTransfermarktCurrency(marketSellPreview?.salaryReduction ?? null)}</strong>
-                          </article>
-                        </div>
+                        <span className={`transfer-status-pill${marketSellPreview?.canSell ? " is-ready" : " is-blocked"}`}>
+                          {readMeta.source === "prisma" ? "read-only" : marketSellPreview?.canSell ? "bereit" : "geblockt"}
+                        </span>
                       </div>
-                    </div>
-                    <span className={`transfer-status-pill${marketSellPreview?.canSell ? " is-ready" : " is-blocked"}`}>
-                      {readMeta.source === "prisma" ? "read-only" : marketSellPreview?.canSell ? "bereit" : "geblockt"}
-                    </span>
-                  </div>
                     );
                   })()}
 
@@ -24848,80 +33935,241 @@ export default function FoundationPageClient({ initialReadSource, initialSelecte
 
                   {marketSellPreview ? (
                     <>
-                      <div className="transfer-modal-section">
+                      <div className="transfer-sell-layout">
                         <div className="transfer-callout-title">
-                          <strong>Spieler</strong>
+                          <strong>Performance</strong>
                           <span className="muted">{marketSellPreview.team?.shortCode ?? "—"} · {marketSellPreview.team?.name ?? "—"}</span>
                         </div>
-                        <div className="metric-grid compact">
+                        <div className="metric-grid compact transfer-sell-metric-grid">
                           <article className="metric-card">
-                            <span>Name</span>
-                            <strong>{marketSellPreview.player?.name ?? "—"}</strong>
+                            <span>OVR</span>
+                            <strong>{formatWholeNumber(marketSellPlayerContext?.rating?.ovrNormalized ?? marketSellPlayerContext?.player?.ovr ?? null)}</strong>
+                            <small>Rang {marketSellPlayerContext?.rating?.ovrRank ?? "—"}</small>
                           </article>
                           <article className="metric-card">
-                            <span>Klasse / Rasse</span>
-                            <strong>
-                              {marketSellPreview.player?.className ?? marketSellSubject?.className ?? "—"} /{" "}
-                              {marketSellPreview.player?.race ?? marketSellSubject?.race ?? "—"}
-                            </strong>
+                            <span>MVS</span>
+                            <strong>{formatPpsValue(marketSellPlayerContext?.rating?.mvs ?? null)}</strong>
+                            <small>Rang {marketSellPlayerContext?.rating?.mvsRank ?? "—"}</small>
                           </article>
                           <article className="metric-card">
-                            <span>MW</span>
-                            <strong>{formatTransfermarktCurrency(marketSellPreview.marketValueReference)}</strong>
+                            <span>Season PPs</span>
+                            <strong>{formatPpsValue(marketSellPlayerContext?.rating?.ppsSeason ?? marketSellPlayerContext?.performance?.totalPoints ?? null)}</strong>
+                            <small>Rang {marketSellPlayerContext?.rating?.ppsSeasonRank ?? "—"}</small>
                           </article>
                           <article className="metric-card">
-                            <span>Verkaufspreis</span>
-                            <strong>{formatTransfermarktCurrency(marketSellPreview.salePrice)}</strong>
+                            <span>Einsaetze</span>
+                            <strong>{marketSellPlayerContext?.performance?.appearances ?? "—"}</strong>
+                            <small>Top 10 {marketSellPlayerContext?.performance?.top10Count ?? "—"} · MVP {marketSellPlayerContext?.performance?.mvpCount ?? "—"}</small>
                           </article>
                           <article className="metric-card">
-                            <span>LZ</span>
-                            <strong>{marketSellPreview.activePlayer?.contractLength ?? "—"}</strong>
+                            <span>Letzter Einsatz</span>
+                            <strong>{marketSellPlayerContext?.performance?.latestDisciplineLabel ?? "—"}</strong>
+                            <small>
+                              Score {formatPpsValue(marketSellPlayerContext?.performance?.latestFinalScore ?? null)} · Rang{" "}
+                              {marketSellPlayerContext?.performance?.latestRankInDiscipline ?? "—"}
+                            </small>
                           </article>
                           <article className="metric-card">
-                            <span>Faktor</span>
-                            <strong>
-                              {marketSellPreview.saleFactor != null ? `${formatLocalePoints(marketSellPreview.saleFactor, 2)}x` : "—"}
-                            </strong>
+                            <span>Beste Diszi</span>
+                            <strong>{marketSellPlayerContext?.performance?.bestDisciplineLabel ?? "—"}</strong>
+                            <small>{formatPpsValue(marketSellPlayerContext?.performance?.bestDisciplineScore ?? null)} Score</small>
                           </article>
                         </div>
                       </div>
 
                       <div className="transfer-modal-section">
                         <div className="transfer-callout-title">
-                          <strong>Team-Auswirkung</strong>
+                          <strong>PP-Profil</strong>
+                          <span className="muted">aktive Season</span>
+                        </div>
+                        <div className="transfer-sell-area-grid">
+                          {(marketSellPlayerContext?.areaRows ?? []).map((area) => (
+                            <article className={`transfer-sell-area-card is-${area.tone}`} key={area.key}>
+                              <span>{area.key}</span>
+                              <strong>{formatPpsValue(area.value)}</strong>
+                            </article>
+                          ))}
+                        </div>
+                      </div>
+
+                      <div className="transfer-modal-section">
+                        <div className="transfer-callout-title">
+                          <strong>Entwicklung & Vertrag</strong>
                           <span className="muted">{marketSellPreview.transferCreated ? "geschrieben" : "Preview"}</span>
                         </div>
-                        <div className="metric-grid compact">
+                        <div className="metric-grid compact transfer-sell-metric-grid">
                           <article className="metric-card">
-                            <span>Gewinn</span>
-                            <strong className={marketSellPreview.profit != null ? (marketSellPreview.profit >= 0 ? "text-positive" : "text-negative") : undefined}>
-                              {marketSellPreview.profit != null ? formatSignedDisplayMoney(marketSellPreview.profit) : "—"}
+                            <span>MW aktuell</span>
+                            <strong>{formatTransfermarktCurrency(marketSellPlayerContext?.currentMarketValue ?? marketSellPreview.marketValueReference)}</strong>
+                            <small>
+                              Kaderwert {formatTransfermarktCurrency(marketSellPlayerContext?.rosterMarketValue ?? marketSellPreview.activePlayer?.currentValue ?? null)}
+                            </small>
+                          </article>
+                          <article className="metric-card">
+                            <span>MW Delta</span>
+                            <strong className={marketSellPlayerContext?.marketValueDelta != null ? (marketSellPlayerContext.marketValueDelta >= 0 ? "text-positive" : "text-negative") : undefined}>
+                              {marketSellPlayerContext?.marketValueDelta != null ? formatSignedDisplayMoney(marketSellPlayerContext.marketValueDelta) : "—"}
                             </strong>
+                            <small>aktuell vs. Kaderwert</small>
+                          </article>
+                          <article className="metric-card">
+                            <span>Kaufpreis</span>
+                            <strong>{formatTransfermarktCurrency(marketSellPlayerContext?.purchasePrice ?? marketSellPreview.activePlayer?.purchasePrice ?? null)}</strong>
+                            <small>letzter Einstieg</small>
+                          </article>
+                          <article className="metric-card">
+                            <span>GuV Verkauf</span>
+                            <strong className={marketSellPlayerContext?.saleProfit != null ? (marketSellPlayerContext.saleProfit >= 0 ? "text-positive" : "text-negative") : undefined}>
+                              {marketSellPlayerContext?.saleProfit != null ? formatSignedDisplayMoney(marketSellPlayerContext.saleProfit) : "—"}
+                            </strong>
+                            <small>Preis minus Einstieg</small>
+                          </article>
+                          <article className="metric-card">
+                            <span>Gehalt</span>
+                            <strong>{formatTransfermarktCurrency(marketSellPlayerContext?.salary ?? marketSellPreview.activePlayer?.salary ?? null)}</strong>
+                            <small className={marketSellPlayerContext?.salaryDelta != null ? (marketSellPlayerContext.salaryDelta <= 0 ? "text-positive" : "text-negative") : undefined}>
+                              vs. normal {marketSellPlayerContext?.salaryDelta != null ? formatSignedDisplayMoney(marketSellPlayerContext.salaryDelta) : "—"}
+                            </small>
+                          </article>
+                          <article className="metric-card">
+                            <span>Laufzeit</span>
+                            <strong>{marketSellPreview.activePlayer?.contractLength ?? "—"}</strong>
+                            <small>Rolle {marketSellPreview.activePlayer?.roleTag ?? "—"}</small>
+                          </article>
+                        </div>
+                      </div>
+
+                      <div className="transfer-sell-history-grid">
+                        <div className="transfer-modal-section">
+                          <div className="transfer-callout-title">
+                            <strong>Letzte Einsaetze</strong>
+                            <span className="muted">{marketSellPlayerContext?.recentMatchdays.length ?? 0}</span>
+                          </div>
+                          {marketSellPlayerContext?.recentMatchdays.length ? (
+                            <div className="transfer-sell-mini-table">
+                              {marketSellPlayerContext.recentMatchdays.map((entry: {
+                                matchdayId: string;
+                                totalContribution: number | null;
+                                averageFinalScore: number | null;
+                                bestDisciplineLabel: string | null;
+                              }) => (
+                                <div className="transfer-sell-mini-row" key={entry.matchdayId}>
+                                  <span>{entry.matchdayId}</span>
+                                  <strong>{formatPpsValue(entry.totalContribution)}</strong>
+                                  <small>{entry.bestDisciplineLabel ?? "—"} · Score {formatPpsValue(entry.averageFinalScore)}</small>
+                                </div>
+                              ))}
+                            </div>
+                          ) : (
+                            <p className="muted transfer-empty-hint">Noch keine Matchday-Historie fuer diesen Spieler.</p>
+                          )}
+                        </div>
+
+                        <div className="transfer-modal-section">
+                          <div className="transfer-callout-title">
+                            <strong>Top-Diszis</strong>
+                            <span className="muted">{marketSellPlayerContext?.topDisciplines.length ?? 0}</span>
+                          </div>
+                          {marketSellPlayerContext?.topDisciplines.length ? (
+                            <div className="transfer-sell-mini-table">
+                              {marketSellPlayerContext.topDisciplines.map((entry: {
+                                disciplineId: string;
+                                disciplineName: string;
+                                totalContribution: number | null;
+                                averageContribution: number | null;
+                                averageFinalScore: number | null;
+                              }) => (
+                                <div className="transfer-sell-mini-row" key={entry.disciplineId}>
+                                  <span>{entry.disciplineName}</span>
+                                  <strong>{formatPpsValue(entry.totalContribution)}</strong>
+                                  <small>Ø Beitrag {formatPpsValue(entry.averageContribution)} · Ø Score {formatPpsValue(entry.averageFinalScore)}</small>
+                                </div>
+                              ))}
+                            </div>
+                          ) : (
+                            <p className="muted transfer-empty-hint">Noch keine Disziplin-Historie verfuegbar.</p>
+                          )}
+                        </div>
+
+                        <div className="transfer-modal-section">
+                          <div className="transfer-callout-title">
+                            <strong>Transferhistorie</strong>
+                            <span className="muted">{marketSellPlayerContext?.transferEvents.length ?? 0}</span>
+                          </div>
+                          {marketSellPlayerContext?.transferEvents.length ? (
+                            <div className="transfer-sell-mini-table">
+                              {marketSellPlayerContext.transferEvents.map((entry: {
+                                id: string;
+                                type: "buy" | "sell" | "contract_exit";
+                                label: string;
+                                seasonLabel: string;
+                                fee: number;
+                                salary: number;
+                                fromTeam: string;
+                                toTeam: string;
+                              }) => (
+                                <div className="transfer-sell-mini-row" key={entry.id}>
+                                  <span className={getTransferTypePillClass(entry.type)}>{entry.label}</span>
+                                  <strong>{formatTransfermarktCurrency(entry.fee)}</strong>
+                                  <small>
+                                    {entry.seasonLabel} · {entry.fromTeam} → {entry.toTeam} · Gehalt {formatTransfermarktCurrency(entry.salary)}
+                                  </small>
+                                </div>
+                              ))}
+                            </div>
+                          ) : (
+                            <p className="muted transfer-empty-hint">Keine Transfers im Save gefunden.</p>
+                          )}
+                        </div>
+                      </div>
+
+                      <div className="transfer-modal-section">
+                        <div className="transfer-callout-title">
+                          <strong>Team-Auswirkung</strong>
+                          <span className="muted">Preview</span>
+                        </div>
+                        <div className="metric-grid compact transfer-sell-metric-grid">
+                          <article className="metric-card">
+                            <span>Verkaufspreis</span>
+                            <strong>{formatTransfermarktCurrency(marketSellPreview.salePrice)}</strong>
+                            {(() => {
+                              const saleVsMarketValue =
+                                marketSellPreview.salePrice != null && marketSellPreview.marketValueReference != null
+                                  ? marketSellPreview.salePrice - marketSellPreview.marketValueReference
+                                  : null;
+                              return (
+                                <small className={saleVsMarketValue != null ? (saleVsMarketValue >= 0 ? "text-positive" : "text-negative") : undefined}>
+                                  Faktor {marketSellPreview.saleFactor != null ? `${formatLocalePoints(marketSellPreview.saleFactor, 2)}x` : "—"} · vs. MW{" "}
+                                  {saleVsMarketValue != null ? formatSignedTransfermarktCurrency(saleVsMarketValue) : "—"}
+                                </small>
+                              );
+                            })()}
                           </article>
                           <article className="metric-card">
                             <span>Gehaltsentlastung</span>
                             <strong>{formatTransfermarktCurrency(marketSellPreview.salaryReduction)}</strong>
+                            <small>Sofort aus Teamgehalt raus</small>
                           </article>
                           <article className="metric-card">
-                            <span>Cash vorher / nachher</span>
+                            <span>Cash</span>
                             <strong>
-                              {formatTransfermarktCurrency(marketSellPreview.cashBefore)} / {formatTransfermarktCurrency(marketSellPreview.cashAfter)}
+                              {formatTransfermarktCurrency(marketSellPreview.cashBefore)} → {formatTransfermarktCurrency(marketSellPreview.cashAfter)}
                             </strong>
                           </article>
                           <article className="metric-card">
-                            <span>Kader vorher / nachher</span>
+                            <span>Kader</span>
                             <strong>
-                              {marketSellPreview.rosterBefore ?? "—"} / {marketSellPreview.rosterAfter ?? "—"}
+                              {marketSellPreview.rosterBefore ?? "—"} → {marketSellPreview.rosterAfter ?? "—"}
                             </strong>
                           </article>
                           <article className="metric-card">
-                            <span>Gehalt vorher / nachher</span>
+                            <span>Teamgehalt</span>
                             <strong>
-                              {formatTransfermarktCurrency(marketSellPreview.teamSalaryBefore)} / {formatTransfermarktCurrency(marketSellPreview.teamSalaryAfter)}
+                              {formatTransfermarktCurrency(marketSellPreview.teamSalaryBefore)} → {formatTransfermarktCurrency(marketSellPreview.teamSalaryAfter)}
                             </strong>
                           </article>
                           <article className="metric-card">
-                            <span>Readiness nach Sell</span>
+                            <span>Readiness</span>
                             <strong>{marketSellPreview.projectedReadinessAfterSell ?? "—"}</strong>
                           </article>
                         </div>
@@ -24971,21 +34219,18 @@ export default function FoundationPageClient({ initialReadSource, initialSelecte
                     Abbrechen
                   </button>
                   <button
-                    className="secondary-button"
-                    type="button"
-                    disabled={!marketSellSubject || marketSellBusy}
-                    onClick={() => {
-                      if (marketSellSubject) {
-                        void requestTransfermarktSellPreview(marketSellSubject, marketSellPreview?.team?.id ?? selectedTeam?.teamId ?? "");
-                      }
-                    }}
-                  >
-                    Verkauf pruefen
-                  </button>
-                  <button
                     className="primary-button"
                     type="button"
                     disabled={readMeta.source === "prisma" || !marketSellPreview?.canSell || marketSellBusy}
+                    title={
+                      readMeta.source === "prisma"
+                        ? "Im Referenzmodus bleibt der Verkauf gesperrt."
+                        : !marketSellPreview?.canSell
+                          ? marketSellPreview?.blockingReasons?.[0] ?? "Dieser Verkauf ist gerade noch blockiert."
+                          : marketSellBusy
+                            ? "Der Verkauf wird gerade vorbereitet."
+                            : "Verkauf jetzt final bestätigen."
+                    }
                     onClick={() => {
                       void confirmTransfermarktSell();
                     }}
@@ -24997,7 +34242,7 @@ export default function FoundationPageClient({ initialReadSource, initialSelecte
             </div>
           ) : null}
 
-          {activeView === "history" ? (
+          {isTransferHistoryViewActive ? (
           <section className={`panel${getViewClass("history")}`} id="transfer-history">
             <div className="panel-header">
               <TooltipHeading
@@ -25007,32 +34252,122 @@ export default function FoundationPageClient({ initialReadSource, initialSelecte
                 Transferhistorie
               </TooltipHeading>
               <span className="pill foundation-source-pill">source: active local save</span>
-              <ColumnVisibilityManager
-                title="Spalten"
-                columns={transferHistoryColumns}
-                isVisible={(columnId, visibleByDefault) =>
-                  isTableColumnVisible("transferHistoryTable", columnId, visibleByDefault)
-                }
-                onToggle={(columnId, nextVisible) =>
-                  setTableColumnVisible("transferHistoryTable", columnId, nextVisible)
-                }
-              />
+              {activeTransferHistoryTab === "classic" ? (
+                <ColumnVisibilityManager
+                  title="Spalten"
+                  columns={transferHistoryColumns}
+                  isVisible={(columnId, visibleByDefault) =>
+                    isTableColumnVisible("transferHistoryTable", columnId, visibleByDefault)
+                  }
+                  onToggle={(columnId, nextVisible) =>
+                    setTableColumnVisible("transferHistoryTable", columnId, nextVisible)
+                  }
+                />
+              ) : null}
             </div>
+            <div className="transfer-market-view-tabs" role="tablist" aria-label="Transferhistorie Ansicht">
+              <button
+                className={`transfer-market-view-tab${activeTransferHistoryTab === "classic" ? " is-active" : ""}`}
+                type="button"
+                role="tab"
+                aria-selected={activeTransferHistoryTab === "classic"}
+                onClick={() => {
+                  setTransferHistoryTab("classic");
+                  if (activeView === "historyV2") {
+                    setFoundationView("history", setActiveView);
+                  }
+                }}
+              >
+                Klassisch
+              </button>
+              <button
+                className={`transfer-market-view-tab${activeTransferHistoryTab === "v2" ? " is-active" : ""}`}
+                type="button"
+                role="tab"
+                aria-selected={activeTransferHistoryTab === "v2"}
+                onClick={() => {
+                  setTransferHistoryTab("v2");
+                  if (activeView !== "historyV2") {
+                    setFoundationView("historyV2", setActiveView);
+                  }
+                }}
+              >
+                V2
+              </button>
+            </div>
+            {activeTransferHistoryTab === "v2" ? (
+              <TransferHistoryV2Client
+                sourceBadgeLabel={getViewSourceBadgeLabel("historyV2", activeContextMeta)}
+                saveName={historyFeed?.saveContext?.saveName ?? activeSaveName}
+                requestedScopeLabel={`${historyFeed?.saveContext?.requestedSaveId ?? activeSaveId} / ${transferHistoryRequestedSeasonLabel}`}
+                resolvedScopeLabel={`${historyFeed?.saveContext?.resolvedSaveId ?? historyFeed?.scope?.saveId ?? activeSaveId} / ${transferHistoryResolvedSeasonLabel}`}
+                totalLoaded={historyFeed?.items.length ?? 0}
+                totalAvailable={historyFeed?.total ?? 0}
+                seasonBreakdown={transferHistorySeasonBreakdown}
+                summary={transferHistorySummary}
+                filteredRows={sortedTransferHistoryRows}
+                visibleRows={visibleTransferHistoryRows}
+                historyVisibleRangeLabel={historyVisibleRangeLabel}
+                isAllSeasons={historyAllSeasonsSelected}
+                historyPage={historyPage}
+                historyPageCount={historyPageCount}
+                onPrevPage={() => setHistoryPage((current) => Math.max(1, current - 1))}
+                onNextPage={() => setHistoryPage((current) => Math.min(historyPageCount, current + 1))}
+                scopeWarning={historyFeed?.saveContext?.scopeWarning ?? null}
+                error={historyFeed?.error ?? null}
+                seasonFilter={historySeasonFilter}
+                allSeasonsValue={HISTORY_ALL_SEASONS_FILTER}
+                seasonOptions={transferSeasonOptions}
+                teamFilter={historyTeamFilter}
+                teamOptions={gameState.teams.map((team) => ({ teamId: team.teamId, name: team.name, shortCode: team.shortCode }))}
+                typeFilter={historyTypeFilter}
+                classFilter={historyClassFilter}
+                sourceFilter={historySourceFilter}
+                classOptions={transferHistoryClassOptions}
+                sourceOptions={transferHistorySourceOptions.map((sourceKey) => ({
+                  key: sourceKey,
+                  label: getTransferSourceLabel(sourceKey === "missing_source" ? null : sourceKey),
+                }))}
+                search={historySearch}
+                onSeasonFilterChange={setHistorySeasonFilter}
+                onTeamFilterChange={setHistoryTeamFilter}
+                onTypeFilterChange={setHistoryTypeFilter}
+                onClassFilterChange={setHistoryClassFilter}
+                onSourceFilterChange={setHistorySourceFilter}
+                onSearchChange={setHistorySearch}
+                onResetFilters={() => {
+                  setHistorySeasonFilter(gameState.season.id);
+                  setHistoryPage(1);
+                  setHistoryTeamFilter("ALL");
+                  setHistoryTypeFilter("ALL");
+                  setHistoryClassFilter("ALL");
+                  setHistorySourceFilter("ALL");
+                  setHistorySearch("");
+                }}
+                onOpenPlayer={(playerId) => openPlayerDrawerById(playerId)}
+                onOpenTeam={(teamId) => openTeamDrawerById(teamId)}
+                onOpenClassic={() => {
+                  setTransferHistoryTab("classic");
+                  setFoundationView("history", setActiveView);
+                }}
+              />
+            ) : (
+            <>
             <div className="transfer-context-banner" style={{ marginBottom: 12 }}>
               <strong>
                 Save {historyFeed?.saveContext?.saveName ?? activeSaveName} ·{" "}
                 {inferSaveTypeLabel(historyFeed?.saveContext ?? activeSaveSummary)}
               </strong>
-              <span>
-                Angefragt: {historyFeed?.saveContext?.requestedSaveId ?? activeSaveId} /{" "}
-                {transferHistoryRequestedSeasonLabel}
-                {" · "}
-                Aufgeloest: {historyFeed?.saveContext?.resolvedSaveId ?? historyFeed?.scope?.saveId ?? activeSaveId} /{" "}
-                {transferHistoryResolvedSeasonLabel}
-                {" · "}
-                Transfers: {historyFeed?.total ?? 0}
-              </span>
-            </div>
+                <span>
+                  Angefragt: {historyFeed?.saveContext?.requestedSaveId ?? activeSaveId} /{" "}
+                  {transferHistoryRequestedSeasonLabel}
+                  {" · "}
+                  Aufgeloest: {historyFeed?.saveContext?.resolvedSaveId ?? historyFeed?.scope?.saveId ?? activeSaveId} /{" "}
+                  {transferHistoryResolvedSeasonLabel}
+                  {" · "}
+                  Zeigt {historyFeed?.items.length ?? 0} von {historyFeed?.total ?? 0} Transfers
+                </span>
+              </div>
             {transferHistorySeasonBreakdown.length > 0 ? (
               <div className="metric-grid compact" style={{ marginBottom: 12 }}>
                 {transferHistorySeasonBreakdown.map(([seasonLabel, count]) => (
@@ -25319,7 +34654,7 @@ export default function FoundationPageClient({ initialReadSource, initialSelecte
             </section>
             <div className="teams-summary-grid history-summary-grid">
               <article className="metric-card transfer-history-summary-card">
-                <span>Transfers</span>
+                <span>Transfers im Fenster</span>
                 <strong>{transferHistorySummary.count}</strong>
               </article>
               <article className="metric-card transfer-history-summary-card">
@@ -25343,11 +34678,39 @@ export default function FoundationPageClient({ initialReadSource, initialSelecte
                 <strong>{formatTransfermarktCurrency(transferHistorySummary.netTransferBalance)}</strong>
               </article>
             </div>
-            {sortedTransferHistoryRows.length > TRANSFER_HISTORY_INITIAL_RENDER_LIMIT ? (
-              <p className="muted" style={{ margin: "8px 0 12px" }}>
-                Performance-Modus: zeigt die ersten {TRANSFER_HISTORY_INITIAL_RENDER_LIMIT} Treffer. Nutze Filter/Suche fuer engere Historie.
-              </p>
-            ) : null}
+            <div className="transfer-render-limit-note" role="status" style={{ margin: "8px 0 12px" }}>
+              <span>
+                Zeigt {historyVisibleRangeLabel} von {sortedTransferHistoryRows.length} Treffern.
+                {historyAllSeasonsSelected
+                  ? ` Alle Seasons laufen seitenweise mit ${TRANSFER_HISTORY_ALL_SEASONS_PAGE_SIZE} Transfers pro Seite.`
+                  : " Aktuelle Auswahl zeigt direkt die komplette Season-Ansicht."}
+              </span>
+              {historyAllSeasonsSelected && historyPageCount > 1 ? (
+                <div className="room-meta foundation-admin-meta">
+                  <span className="pill">
+                    Seite {historyPage} / {historyPageCount}
+                  </span>
+                  <button
+                    className="secondary-button inline-button"
+                    type="button"
+                    disabled={historyPage <= 1}
+                    onClick={() => setHistoryPage((current) => Math.max(1, current - 1))}
+                  >
+                    Zurueck
+                  </button>
+                  <button
+                    className="secondary-button inline-button"
+                    type="button"
+                    disabled={historyPage >= historyPageCount}
+                    onClick={() => {
+                      setHistoryPage((current) => Math.min(historyPageCount, current + 1));
+                    }}
+                  >
+                    Weiter
+                  </button>
+                </div>
+              ) : null}
+            </div>
 
             <div className="transfer-market-layout">
               <div className="table-shell transfer-market-table-shell">
@@ -25382,7 +34745,7 @@ export default function FoundationPageClient({ initialReadSource, initialSelecte
                     </tr>
                   </thead>
                   <tbody>
-                    {sortedTransferHistoryRows.slice(0, TRANSFER_HISTORY_INITIAL_RENDER_LIMIT).map((row) => (
+                    {visibleTransferHistoryRows.map((row) => (
                       <tr key={row.transferId} onDoubleClick={() => openPlayerDrawerById(row.playerId)}>
                         {visibleTransferHistoryColumns.map((column) => {
                           const stickyStyle = getTransferHistoryStickyStyle(column.id, "body");
@@ -25523,12 +34886,12 @@ export default function FoundationPageClient({ initialReadSource, initialSelecte
                         value={historySeasonFilter}
                         onChange={(event) => setHistorySeasonFilter(event.target.value)}
                       >
-                        <option value="ALL">Alle Seasons</option>
-                        {transferSeasonOptions.map((seasonLabel) => (
-                          <option key={seasonLabel} value={seasonLabel}>
-                            {seasonLabel}
+                        {transferSeasonOptions.map((season) => (
+                          <option key={season.seasonId} value={season.seasonId}>
+                            {season.label}
                           </option>
                         ))}
+                        <option value={HISTORY_ALL_SEASONS_FILTER}>Alle Seasons</option>
                       </select>
                     </label>
 
@@ -25607,7 +34970,8 @@ export default function FoundationPageClient({ initialReadSource, initialSelecte
                       className="secondary-button"
                       type="button"
                       onClick={() => {
-                        setHistorySeasonFilter("ALL");
+                        setHistorySeasonFilter(gameState.season.id);
+                        setHistoryPage(1);
                         setHistoryTeamFilter("ALL");
                         setHistoryTypeFilter("ALL");
                         setHistoryClassFilter("ALL");
@@ -25621,6 +34985,8 @@ export default function FoundationPageClient({ initialReadSource, initialSelecte
                 </section>
               </aside>
             </div>
+            </>
+            )}
           </section>
           ) : null}
 
@@ -25670,11 +35036,13 @@ export default function FoundationPageClient({ initialReadSource, initialSelecte
             data={playerDrawerData}
             onClose={closePlayerDrawer}
             onOpenBuyPreview={openPlayerDrawerBuyPreview}
+            layerClassName={drawerLayerOrder === "player" ? "drawer-layer-front" : "drawer-layer-back"}
           />
           <TeamDetailDrawer
             data={teamDrawerData}
             onClose={closeTeamDrawer}
             onOpenPlayer={(playerId, activePlayerId) => openPlayerDrawerById(playerId, activePlayerId)}
+            layerClassName={drawerLayerOrder === "team" ? "drawer-layer-front" : "drawer-layer-back"}
           />
       </div>
     </main>

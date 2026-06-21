@@ -27,6 +27,8 @@ export type TransfermarktSellParams = {
   teamId: string;
   activePlayerId: string;
   transferSource?: string;
+  localRunContext?: unknown;
+  deferPersist?: boolean;
 };
 
 export type TransfermarktSellPreview = {

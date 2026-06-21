@@ -5,12 +5,17 @@ import {
   readNormalizedPrizeMoneyRows,
   readPrizeMoneySourceBundle,
 } from "@/lib/season/prize-money-sheet";
+import { buildPrizeMoneyTable } from "@/lib/season/prize-money";
+import { getSeasonEconomyFactorWindow } from "@/lib/season/season-economy-factors";
 import type { StandingsPreviewSource } from "@/lib/standings/standings-preview-engine";
 
 export type PrizeMoneyPreviewFutureSeason = {
   seasonLabel: string;
   factor: number | null;
+  salaryGrowthFactor: number | null;
   prizeMoney: number | null;
+  salaryTotal: number | null;
+  guv: number | null;
   projectedCash: number | null;
 };
 
@@ -65,6 +70,7 @@ export type PrizeMoneyPreviewResult = {
     futureSeasonCount: number;
     totalPrizeMoney: number;
     totalRankChangePrize: number | null;
+    forecastSalaryFactorPassthrough: number;
   };
   source: {
     mode: "sqlite" | "prisma";
@@ -98,6 +104,10 @@ function round1(value: number) {
   return Math.round(value * 10) / 10;
 }
 
+function round3(value: number) {
+  return Math.round(value * 1000) / 1000;
+}
+
 function projectSeasonEndCash(input: {
   currentCash: number | null;
   prizeMoney: number | null;
@@ -109,6 +119,20 @@ function projectSeasonEndCash(input: {
   }
 
   return round1(input.currentCash - input.salaryTotal + input.prizeMoney + (input.rankChangePrize ?? 0));
+}
+
+const FORECAST_SALARY_FACTOR_PASSTHROUGH = 0.5;
+
+function buildForecastSalaryGrowthFactor(input: {
+  currentFactor: number | null;
+  futureFactor: number | null;
+}) {
+  if (input.currentFactor == null || input.futureFactor == null || input.currentFactor <= 0) {
+    return null;
+  }
+
+  const relativeFactor = input.futureFactor / input.currentFactor;
+  return round3(1 + (relativeFactor - 1) * FORECAST_SALARY_FACTOR_PASSTHROUGH);
 }
 
 function toFiniteNumber(value: number | null | undefined) {
@@ -314,6 +338,7 @@ export async function buildPrizeMoneyPreview(
         futureSeasonCount: 0,
         totalPrizeMoney: 0,
         totalRankChangePrize: null,
+        forecastSalaryFactorPassthrough: FORECAST_SALARY_FACTOR_PASSTHROUGH,
       },
       source: {
         mode: "prisma",
@@ -333,24 +358,28 @@ export async function buildPrizeMoneyPreview(
 
   const save = resolveLocalSave(persistence, input.saveId);
   const saveId = save.saveId;
-  const prizeRows = await readNormalizedPrizeMoneyRows();
+  const normalizedPrizeRows = await readNormalizedPrizeMoneyRows();
   const sourceBundle = await readPrizeMoneySourceBundle();
-  const prizeRowByRank = new Map(
-    prizeRows
-      .filter((row) => row.rank != null)
-      .map((row) => [row.rank as number, row] as const),
-  );
   const placementByRankDelta = new Map(
     sourceBundle.placementRows
       .filter((row) => row.placementAmount != null)
       .map((row) => [row.rankDelta, row.placementAmount as number] as const),
   );
-  const seasonFactors = sourceBundle.seasonFactors
+  const sheetSeasonFactors = sourceBundle.seasonFactors
     .filter((row) => row.factor != null)
     .map((row) => ({
       seasonLabel: row.seasonLabel,
       factor: row.factor,
     }));
+  const seasonFactors = getSeasonEconomyFactorWindow({
+    saveId,
+    seasonId,
+    seasonState: save.gameState.seasonState,
+    sheetFactors: sheetSeasonFactors,
+  }).map((row) => ({
+    seasonLabel: row.seasonLabel,
+    factor: row.factor,
+  }));
   const currentFactor =
     seasonFactors.find((row) => row.seasonLabel === "Aktuell")?.factor ??
     seasonFactors[0]?.factor ??
@@ -364,9 +393,9 @@ export async function buildPrizeMoneyPreview(
     globalWarnings.add("season_end_only");
   }
 
-  if (prizeRows.length === 0) {
+  if (normalizedPrizeRows.length === 0) {
     blockedRules.push("prize_money_table_missing");
-  } else if (prizeRows.length < 32) {
+  } else if (normalizedPrizeRows.length < 32) {
     blockedRules.push("prize_money_table_incomplete");
   }
 
@@ -385,6 +414,51 @@ export async function buildPrizeMoneyPreview(
     existing.push(rosterEntry);
     rosterByTeamId.set(rosterEntry.teamId, existing);
   }
+  const salaryTotalByTeamId = new Map(
+    save.gameState.teams.map((team) => {
+      const salaryTotal = round1(
+        (rosterByTeamId.get(team.teamId) ?? []).reduce((sum, rosterEntry) => {
+          const player = playerById.get(rosterEntry.playerId) ?? null;
+          return sum + (resolvePlayerEconomyContract({ player, rosterEntry }).salary ?? 0);
+        }, 0),
+      );
+      return [team.teamId, salaryTotal] as const;
+    }),
+  );
+  const hasDynamicSalaryBasis = [...salaryTotalByTeamId.values()].filter((salary) => salary > 0).length >= 4;
+  const currentLeagueSalaries = [...salaryTotalByTeamId.values()];
+  const adminBalancingConfig = save.gameState.seasonState.adminBalancingConfig;
+  const prizeRows =
+    currentFactor != null && hasDynamicSalaryBasis
+      ? buildPrizeMoneyTable(currentLeagueSalaries, currentFactor, adminBalancingConfig).map((row) => ({
+          rank: row.rank,
+          basis: row.basis,
+          percent: row.percent,
+          season: String(row.seasonShare),
+          prizeMoney: row.totalPrizeMoney,
+        }))
+      : normalizedPrizeRows;
+  const prizeRowByRank = new Map(
+    prizeRows
+      .filter((row) => row.rank != null)
+      .map((row) => [row.rank as number, row] as const),
+  );
+  const futurePrizeRowsBySeasonLabel = new Map<string, Map<number, { prizeMoney: number | null }>>();
+  if (currentFactor != null && hasDynamicSalaryBasis) {
+    for (const seasonFactor of seasonFactors.filter((row) => row.seasonLabel !== "Aktuell")) {
+      const salaryGrowthFactor = buildForecastSalaryGrowthFactor({
+        currentFactor,
+        futureFactor: seasonFactor.factor,
+      });
+      if (salaryGrowthFactor == null || seasonFactor.factor == null) continue;
+      const projectedLeagueSalaries = currentLeagueSalaries.map((salary) => round1(salary * salaryGrowthFactor));
+      const table = buildPrizeMoneyTable(projectedLeagueSalaries, seasonFactor.factor, adminBalancingConfig);
+      futurePrizeRowsBySeasonLabel.set(
+        seasonFactor.seasonLabel,
+        new Map(table.map((row) => [row.rank, { prizeMoney: row.totalPrizeMoney }] as const)),
+      );
+    }
+  }
 
   const transferBalanceByTeamId = buildTransferBalanceByTeamId(save.gameState.transferHistory);
   const seasonOneStartRankByTeamId = isSeasonOne(seasonId)
@@ -402,12 +476,7 @@ export async function buildPrizeMoneyPreview(
     const seasonCash = prizeRow ? parseSeasonCash(prizeRow.season) : null;
     const prizeMoney = prizeRow ? toFiniteNumber(prizeRow.prizeMoney) : null;
     const transferBalance = transferBalanceByTeamId.get(team.teamId) ?? 0;
-    const salaryTotal = round1(
-      (rosterByTeamId.get(team.teamId) ?? []).reduce((sum, rosterEntry) => {
-        const player = playerById.get(rosterEntry.playerId) ?? null;
-        return sum + (resolvePlayerEconomyContract({ player, rosterEntry }).salary ?? 0);
-      }, 0),
-    );
+    const salaryTotal = salaryTotalByTeamId.get(team.teamId) ?? 0;
 
     const warnings = new Set<string>();
     let status: PrizeMoneyPreviewItem["status"] = "ready";
@@ -483,25 +552,42 @@ export async function buildPrizeMoneyPreview(
     const futureSeasons: PrizeMoneyPreviewFutureSeason[] = seasonFactors
       .filter((row) => row.seasonLabel !== "Aktuell")
       .map((row) => {
-        if (basisCash == null || seasonCash == null || currentCash == null || salaryTotal == null || currentFactor == null || row.factor == null) {
+        const salaryGrowthFactor = buildForecastSalaryGrowthFactor({
+          currentFactor,
+          futureFactor: row.factor,
+        });
+        if (currentCash == null || salaryTotal == null || currentFactor == null || row.factor == null || salaryGrowthFactor == null) {
           return {
             seasonLabel: row.seasonLabel,
             factor: row.factor,
+            salaryGrowthFactor,
             prizeMoney: null,
+            salaryTotal: null,
+            guv: null,
             projectedCash: null,
           };
         }
 
-        const seasonScaled = round1(seasonCash * (row.factor / currentFactor));
-        const futurePrize = round1(basisCash + seasonScaled);
+        const futurePrizeFromLeagueTable =
+          rank != null
+            ? futurePrizeRowsBySeasonLabel.get(row.seasonLabel)?.get(rank)?.prizeMoney ?? null
+            : null;
+        const fallbackSeasonScaled = seasonCash != null ? round1(seasonCash * (row.factor / currentFactor)) : null;
+        const fallbackPrize = basisCash != null && fallbackSeasonScaled != null ? round1(basisCash + fallbackSeasonScaled) : null;
+        const futurePrize = futurePrizeFromLeagueTable ?? fallbackPrize;
+        const futureSalaryTotal = round1(salaryTotal);
+        const guv = futurePrize == null ? null : round1(futurePrize - futureSalaryTotal);
         return {
           seasonLabel: row.seasonLabel,
           factor: row.factor,
+          salaryGrowthFactor,
           prizeMoney: futurePrize,
+          salaryTotal: futureSalaryTotal,
+          guv,
           projectedCash: projectSeasonEndCash({
             currentCash,
             prizeMoney: futurePrize,
-            salaryTotal,
+            salaryTotal: futureSalaryTotal,
           }),
         };
       });
@@ -557,6 +643,7 @@ export async function buildPrizeMoneyPreview(
       futureSeasonCount: seasonFactors.filter((row) => row.seasonLabel !== "Aktuell").length,
       totalPrizeMoney,
       totalRankChangePrize,
+      forecastSalaryFactorPassthrough: FORECAST_SALARY_FACTOR_PASSTHROUGH,
     },
     source: {
       mode: "sqlite",

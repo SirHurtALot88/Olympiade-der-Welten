@@ -126,6 +126,7 @@ describe("saisonstand column contract", () => {
       "battlefield",
       "mini_dm",
       "platz",
+      "bonuspunkte",
       "climbing",
       "sponsor_total",
       "basketball",
@@ -233,6 +234,7 @@ describe("saisonstand column contract", () => {
     expect(byKey.get("transfers")?.sourceStatus).toBe("mapped_with_transform");
     expect(byKey.get("sponsor_season")?.sourceStatus).toBe("mapped_with_transform");
     expect(byKey.get("sponsor_season")?.currentAppField).toBe("sponsorSeason");
-    expect(byKey.get("bonuspunkte")?.sourceStatus).toBe("legacy_not_ported");
+    expect(byKey.get("bonuspunkte")?.sourceStatus).toBe("mapped_with_transform");
+    expect(byKey.get("bonuspunkte")?.currentAppField).toBe("disciplineValues.bonuspunkte");
   });
 });

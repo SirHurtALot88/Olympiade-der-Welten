@@ -170,7 +170,7 @@ describe("facility upgrade service", () => {
       nextLevel: 1,
       cost: 8,
       source: "manual_facility_upgrade",
-      previousConditionPct: 0,
+      previousConditionPct: 100,
       nextConditionPct: 100,
     });
   });
@@ -197,6 +197,55 @@ describe("facility upgrade service", () => {
     });
     expect(savedState.seasonState.facilityEvents?.[0]).toMatchObject({
       previousConditionPct: 42,
+      nextConditionPct: 100,
+    });
+  });
+
+  it("downgrades a facility, repairs it and refunds 25 percent of the removed level cost", () => {
+    const sourceSave = save({
+      teamFacilities: {
+        "team-1": facilities({
+          training_center: { level: 2, enabled: true, conditionPct: 35 },
+        }),
+      },
+    });
+    const preview = previewFacilityUpgrade(sourceSave, "team-1", "training_center", null, "downgrade");
+    const { persistence, saveSingleplayerState } = persistenceMock(sourceSave);
+
+    expect(preview.ok).toBe(true);
+    expect(preview.action).toBe("downgrade");
+    expect(preview.currentLevel).toBe(2);
+    expect(preview.nextLevel).toBe(1);
+    expect(preview.refundAmount).toBe(3.75);
+    expect(preview.cashAfter).toBe(103.75);
+    expect(preview.newUpkeep).toBeLessThan(preview.currentUpkeep);
+
+    const result = applyFacilityUpgrade(
+      sourceSave,
+      "team-1",
+      "training_center",
+      preview.confirmToken,
+      null,
+      "downgrade",
+      persistence,
+    );
+    const savedState = saveSingleplayerState.mock.calls[0]?.[1];
+
+    expect(result.applied).toBe(true);
+    if (!savedState) throw new Error("Expected facility downgrade to persist the next game state.");
+    expect(savedState.teams.find((team) => team.teamId === "team-1")?.cash).toBe(103.75);
+    expect(savedState.seasonState.teamFacilities?.["team-1"].facilities.training_center).toMatchObject({
+      level: 1,
+      enabled: true,
+      conditionPct: 100,
+    });
+    expect(savedState.seasonState.facilityEvents?.[0]).toMatchObject({
+      facilityId: "training_center",
+      previousLevel: 2,
+      nextLevel: 1,
+      cost: -3.75,
+      source: "manual_facility_downgrade",
+      previousConditionPct: 35,
       nextConditionPct: 100,
     });
   });

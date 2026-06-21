@@ -1,8 +1,12 @@
+export const dynamic = "force-dynamic";
+
 import { NextResponse } from "next/server";
 
 import {
   runMatchdayMvpScoring,
 } from "@/lib/season/matchday-mvp-scoring-service";
+import { notifyRoomGameplayWrite } from "@/lib/room/room-gameplay-write-notifier";
+import { authorizeServerRoomWrite } from "@/lib/room/server-authoritative-write-guard";
 
 type MatchdayMvpScoreBody = {
   saveId?: string;
@@ -13,6 +17,10 @@ type MatchdayMvpScoreBody = {
   execute?: boolean;
   confirmToken?: string | null;
   forceReplace?: boolean;
+  roomCode?: string | null;
+  participantId?: string | null;
+  seatToken?: string | null;
+  userId?: string | null;
 };
 
 export async function POST(request: Request) {
@@ -39,6 +47,24 @@ export async function POST(request: Request) {
   }
 
   try {
+    const writeAuth = authorizeServerRoomWrite({
+      roomCode: body.roomCode,
+      participantId: body.participantId,
+      seatToken: body.seatToken,
+      userId: body.userId,
+      saveId,
+      action: "matchday_resolve",
+      source,
+      dryRun,
+      confirmToken: body.confirmToken,
+    });
+    if (!writeAuth.allowed) {
+      return NextResponse.json(
+        { success: false, error: writeAuth.reason, warnings: writeAuth.warnings },
+        { status: writeAuth.status },
+      );
+    }
+
     const result = await runMatchdayMvpScoring({
       saveId,
       seasonId,
@@ -48,6 +74,14 @@ export async function POST(request: Request) {
       execute,
       confirmToken: execute ? body.confirmToken ?? null : undefined,
       forceReplace: body.forceReplace ?? false,
+    });
+    notifyRoomGameplayWrite(writeAuth, {
+      saveId,
+      action: "matchday_mvp_score",
+      eventType: "matchday_applied",
+      affectedViews: ["home", "season", "matchday", "arena", "standings"],
+      dryRun,
+      success: result.executed === true && result.status !== "blocked",
     });
 
     return NextResponse.json({

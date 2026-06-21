@@ -2,6 +2,7 @@ import { relayArena } from "@/data/relayArena";
 import { createSeedTokens } from "@/data/seedRoom";
 import { createActionLogEntry } from "@/lib/game/action-log";
 import { INITIAL_ACTIVE_ROLE, INITIAL_TURN_NUMBER } from "@/lib/game/constants";
+import { createRoomArenaState } from "@/lib/room/arena-sync-state";
 import {
   SERVER_AUTHORITATIVE_WRITE_POLICY,
   buildOwnershipForPreset,
@@ -58,6 +59,12 @@ export function createInitialRoomState(
     systemControlledTeamIds: ownership.filter((entry) => entry.controllerType === "ai").map((entry) => entry.teamId),
     turnState,
     roomFlowState: buildRoomFlowState({ state: flowStateBase }),
+    arenaSyncState: createRoomArenaState({
+      saveId: multiplayerRoom.saveId,
+      seasonId: multiplayerRoom.activeSeasonId,
+      matchdayId: String(multiplayerRoom.activeMatchday),
+      requiredParticipantIds: participants.map((participant) => participant.participantId),
+    }),
     roomEvents: [
       createRoomEvent({
         type: "room_state_updated",

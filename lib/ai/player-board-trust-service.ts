@@ -20,6 +20,7 @@ export type PlayerBoardTrustInput = {
   actualMvsRank?: number | null;
   expectedAxisRank?: number | null;
   actualAxisPpsRank?: number | null;
+  rankPoolSize?: number | null;
 };
 
 export type PlayerBoardTrustAssessment = {
@@ -131,24 +132,50 @@ export function assessPlayerBoardTrust(input: PlayerBoardTrustInput): PlayerBoar
   const expected = input.expectedPerformanceValue != null && Number.isFinite(input.expectedPerformanceValue)
     ? Math.max(input.expectedPerformanceValue, 1)
     : null;
-  const actual = input.averageContribution ?? input.averageFinalScore ?? null;
-  const hasSample = input.appearances >= 3 && actual != null && expected != null;
-  const performanceRatio = hasSample ? clamp(actual / expected, 0, 1.4) : 1;
-  const missesExpectation = hasSample && performanceRatio < 0.72;
-  const badlyMissesExpectation = hasSample && performanceRatio < 0.52;
+  const actualScore = input.averageFinalScore ?? null;
   const expiring = (input.contractLength ?? 99) <= 1;
   const lowBoardConfidence = boardConfidence < 42;
   const veryLowBoardConfidence = boardConfidence < 28;
+  const expectedRank = getExpectedCompositeRank(input);
+  const actualRank = getActualCompositeRank(input);
+  const rankGap = expectedRank != null && actualRank != null ? actualRank - expectedRank : null;
+  const hasScoreSample = input.appearances >= 3 && actualScore != null && expected != null;
+  const hasRankSample = input.appearances >= 3 && rankGap != null;
+  const hasSample = hasScoreSample || hasRankSample;
+  const hasBroadRankContext = isFiniteNumber(input.rankPoolSize) && input.rankPoolSize >= 20;
+  const rankMeetsExpectation = hasBroadRankContext && rankGap != null && rankGap <= 6;
+  const scoreRatio = actualScore != null && expected != null ? clamp(actualScore / expected, 0, 1.4) : null;
+  const performanceRatio = hasScoreSample && scoreRatio != null ? scoreRatio : 1;
+  const earlyMissesExpectation =
+    !hasScoreSample &&
+    lowBoardConfidence &&
+    expiring &&
+    input.appearances > 0 &&
+    scoreRatio != null &&
+    scoreRatio < 0.62;
+  const missesExpectation =
+    (hasScoreSample && performanceRatio < 0.72 && !rankMeetsExpectation) || earlyMissesExpectation;
+  const badlyMissesExpectation =
+    (hasScoreSample && performanceRatio < 0.52 && !rankMeetsExpectation) || earlyMissesExpectation && (scoreRatio ?? 1) < 0.42;
   const softMissesExpectation =
     !missesExpectation &&
     lowBoardConfidence &&
     expiring &&
-    ((hasSample && performanceRatio < 0.9) || (!hasSample && input.appearances > 0));
+    ((hasScoreSample && performanceRatio < 0.9 && !rankMeetsExpectation) ||
+      (!hasScoreSample && input.appearances > 0 && !hasBroadRankContext) ||
+      input.appearances > 0);
   const roleExpectationWeight = getRoleExpectationWeight(input.roleTag);
-  const expectedRank = getExpectedCompositeRank(input);
-  const actualRank = getActualCompositeRank(input);
-  const rankGap = expectedRank != null && actualRank != null ? actualRank - expectedRank : null;
-  const meaningfulRankGap = hasSample && rankGap != null;
+  const meaningfulRankGap = hasRankSample && rankGap != null;
+  const eliteCurrentProduction = [input.actualPpsRank, input.actualMvsRank, input.actualAxisPpsRank].some(
+    (rank) => isFiniteNumber(rank) && rank <= 3,
+  );
+  const eliteExpectedProfile = [input.ovrRank, input.expectedAxisRank].some((rank) => isFiniteNumber(rank) && rank <= 3);
+  const credibleEliteScore = scoreRatio == null || scoreRatio >= 0.6;
+  const productiveElite =
+    !input.hardNoGoHit &&
+    hasBroadRankContext &&
+    credibleEliteScore &&
+    (eliteCurrentProduction || (eliteExpectedProfile && rankMeetsExpectation));
   const costPressure = getCostPressure(input);
   const expensivePlayer = costPressure >= 0.72;
   const valueLoss =
@@ -209,6 +236,13 @@ export function assessPlayerBoardTrust(input: PlayerBoardTrustInput): PlayerBoar
   if (expiring && (missesExpectation || softMissesExpectation || input.weakTeamFit || input.hardNoGoHit)) {
     trustScore -= 10;
     reasons.push("expiring_contract_trust_review");
+  }
+  if (productiveElite) {
+    const retentionFloor = input.weakTeamFit ? 32 : lowBoardConfidence ? 38 : 52;
+    if (trustScore < retentionFloor) {
+      trustScore = retentionFloor;
+      reasons.push("elite_player_retention_floor");
+    }
   }
 
   trustScore = roundValue(clamp(trustScore, 0, 100));

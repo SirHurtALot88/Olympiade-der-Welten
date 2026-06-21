@@ -15,13 +15,15 @@ const rows: MatchdayMvpScoreboardRow[] = [
     formCardStatus: "ready",
     formCardLabel: "Form",
     formCardModifier: 3,
-    mutatorMode: "mvp_forced_mutators",
+    mutatorMode: "legacy_selected_traits",
     mutator1Label: "Mut 1",
     mutator1Modifier: 6,
     mutator2Label: "Mut 2",
     mutator2Modifier: 6,
     captainStatus: "mapped",
     captainModifier: 2,
+    intensity: "push",
+    intensityModifier: 6,
     fatigueStatus: "mapped",
     fatigueModifier: -4,
     teamPpsStatus: "ready",
@@ -40,13 +42,15 @@ const rows: MatchdayMvpScoreboardRow[] = [
     formCardStatus: "missing_source",
     formCardLabel: null,
     formCardModifier: null,
-    mutatorMode: "mvp_forced_mutators",
+    mutatorMode: "legacy_selected_traits",
     mutator1Label: null,
     mutator1Modifier: null,
     mutator2Label: null,
     mutator2Modifier: null,
     captainStatus: "missing_source",
     captainModifier: null,
+    intensity: "conserve",
+    intensityModifier: -4,
     fatigueStatus: "mapped",
     fatigueModifier: -2,
     teamPpsStatus: "missing_source",
@@ -68,7 +72,8 @@ describe("matchday arena presenter", () => {
 
     expect(alpha?.baseRank).toBe(1);
     expect(alpha?.rankDelta).toBe(-1);
-    expect(alpha?.currentScore).toBe(96);
+    expect(alpha?.currentScore).toBe(106);
+    expect(alpha?.pushScore).toBe(6);
     expect(alpha?.formScore).toBe(3);
     expect(alpha?.totalMutatorScore).toBe(12);
     expect(beta?.baseRank).toBe(2);
@@ -78,15 +83,15 @@ describe("matchday arena presenter", () => {
   it("computes reveal phase scores from existing score components without fake extras", () => {
     const [alpha, beta] = buildMatchdayArenaScoreboardView(rows);
 
-    expect(getMatchdayArenaPhaseScore(alpha, "base")).toBe(100);
     expect(getMatchdayArenaPhaseScore(alpha, "slots")).toBe(100);
-    expect(getMatchdayArenaPhaseScore(alpha, "fatigue")).toBe(96);
-    expect(getMatchdayArenaPhaseScore(alpha, "form")).toBe(99);
-    expect(getMatchdayArenaPhaseScore(alpha, "mutator")).toBe(111);
-    expect(getMatchdayArenaPhaseScore(alpha, "captain")).toBe(113);
+    expect(getMatchdayArenaPhaseScore(alpha, "push")).toBe(106);
+    expect(getMatchdayArenaPhaseDelta(alpha, "push")).toBe(6);
+    expect(getMatchdayArenaPhaseScore(alpha, "form")).toBe(109);
+    expect(getMatchdayArenaPhaseScore(alpha, "mutator")).toBe(121);
+    expect(getMatchdayArenaPhaseScore(alpha, "captain")).toBe(123);
     expect(getMatchdayArenaPhaseScore(alpha, "final")).toBe(113);
 
-    expect(getMatchdayArenaPhaseScore(beta, "form")).toBe(94);
+    expect(getMatchdayArenaPhaseScore(beta, "form")).toBe(92);
     expect(getMatchdayArenaPhaseDelta(beta, "form")).toBeNull();
     expect(getMatchdayArenaPhaseDelta(beta, "mutator")).toBeNull();
     expect(getMatchdayArenaPhaseDelta(beta, "captain")).toBeNull();

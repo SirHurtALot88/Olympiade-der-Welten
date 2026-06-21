@@ -99,6 +99,30 @@ export type RoomFlowState = {
   warnings: string[];
 };
 
+export type RoomArenaPhaseId = "slots" | "push" | "form" | "mutator" | "captain" | "final" | "result";
+export type RoomArenaStatus = "idle" | "ready_check" | "revealing" | "result" | "result_applied";
+
+export type RoomArenaState = {
+  status: RoomArenaStatus;
+  version: number;
+  saveId: string;
+  seasonId: string | null;
+  matchdayId: string | null;
+  disciplineSide: "d1" | "d2" | "overall";
+  phaseId: RoomArenaPhaseId | null;
+  phaseIndex: number;
+  slotRevealIndex: number;
+  maxSlotRevealIndex: number;
+  stepIndex: number;
+  requiredParticipantIds: string[];
+  readyParticipantIds: string[];
+  autoReadyControllerTypes: TeamControllerType[];
+  resultStatus: "preview" | "scored" | "applied";
+  lastActionByParticipantId: string | null;
+  updatedAt: string;
+  callout: "arena_started" | "arena_step_ready" | null;
+};
+
 export type RoomRealtimeEventType =
   | "room_state_updated"
   | "participant_joined"
@@ -115,6 +139,10 @@ export type RoomRealtimeEventType =
   | "season_advanced"
   | "ready_invalidated"
   | "flow_step_changed"
+  | "arena_started"
+  | "arena_ready_changed"
+  | "arena_step_changed"
+  | "arena_result_applied"
   | "matchday_resolved";
 
 export type RoomRealtimeEvent = {
@@ -176,6 +204,7 @@ export type OlyRoomState = {
   systemControlledTeamIds: string[];
   turnState: MultiplayerTurnState;
   roomFlowState: RoomFlowState;
+  arenaSyncState: RoomArenaState;
   roomEvents: RoomRealtimeEvent[];
   serverWritePolicy: ServerAuthoritativeWritePolicy;
   activeRole: CoachRole;

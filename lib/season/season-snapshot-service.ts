@@ -10,6 +10,8 @@ import { getImportedPlayerDisplayMarketValue } from "@/lib/data/player-economy-d
 import { resolvePlayerEconomyContract } from "@/lib/foundation/player-economy-contract";
 import { buildPlayerRatingContractMap } from "@/lib/foundation/player-rating-contract";
 import { buildSeasonPointsLedger } from "@/lib/foundation/season-points-ledger";
+import { buildTeamObjectiveOverview } from "@/lib/board/team-season-objectives-service";
+import { getTeamGeneralManager } from "@/lib/foundation/team-general-managers";
 import { createPersistenceService } from "@/lib/persistence/persistence-service";
 import type { PersistenceService } from "@/lib/persistence/types";
 import {
@@ -94,6 +96,7 @@ function getRosterMarketValue(
   playerId: string,
   currentValue?: number | null,
   purchasePrice?: number | null,
+  playerById = new Map(gameState.players.map((entry) => [entry.id, entry] as const)),
 ) {
   if (currentValue != null && Number.isFinite(currentValue)) {
     return currentValue;
@@ -101,7 +104,7 @@ function getRosterMarketValue(
   if (purchasePrice != null && Number.isFinite(purchasePrice)) {
     return purchasePrice;
   }
-  const player = gameState.players.find((entry) => entry.id === playerId) ?? null;
+  const player = playerById.get(playerId) ?? null;
   if (!player) {
     return null;
   }
@@ -164,7 +167,11 @@ function buildSnapshotId(seasonId: string) {
 
 function buildSeasonSnapshotRecord(gameState: GameState, seasonId: string = gameState.season.id): SeasonSnapshotRecord {
   const disciplineCategoryById = buildDisciplineCategoryMap(gameState);
+  const disciplineById = new Map(gameState.disciplines.map((discipline) => [discipline.id, discipline] as const));
+  const playerById = new Map(gameState.players.map((player) => [player.id, player] as const));
+  const teamById = new Map(gameState.teams.map((team) => [team.teamId, team] as const));
   const seasonPointsLedger = buildSeasonPointsLedger(gameState, seasonId);
+  const teamObjectiveOverview = buildTeamObjectiveOverview(gameState);
   const playerRatingsById = buildPlayerRatingContractMap(gameState);
   const seasonResultIds = buildSeasonResultIdSet(gameState, seasonId);
   const coverage = buildSeasonCoverage(gameState, seasonId);
@@ -245,7 +252,7 @@ function buildSeasonSnapshotRecord(gameState: GameState, seasonId: string = game
           ? roundValue(
               roster.reduce(
                 (sum, entry) =>
-                  sum + (getRosterMarketValue(gameState, entry.playerId, entry.currentValue, entry.purchasePrice) ?? 0),
+                  sum + (getRosterMarketValue(gameState, entry.playerId, entry.currentValue, entry.purchasePrice, playerById) ?? 0),
                 0,
               ),
               2,
@@ -258,6 +265,7 @@ function buildSeasonSnapshotRecord(gameState: GameState, seasonId: string = game
         .filter((entry) => entry.transferType === "sell" && entry.fromTeamId === team.teamId)
         .reduce((sum, entry) => sum + entry.fee, 0);
       const rank = standing?.rank ?? null;
+      const transferNet = roundValue(transferSellTotal - transferBuyTotal, 2);
 
       return {
         teamId: team.teamId,
@@ -282,7 +290,22 @@ function buildSeasonSnapshotRecord(gameState: GameState, seasonId: string = game
         transferCount: teamTransfers.length,
         transferBuyCount,
         transferSellCount,
-        transferNet: roundValue(transferSellTotal - transferBuyTotal, 2),
+        transferBuyTotal: roundValue(transferBuyTotal, 2),
+        transferSellTotal: roundValue(transferSellTotal, 2),
+        transferNet,
+        cashFc: standing?.cashFc ?? null,
+        startplatz: standing?.startplatz ?? null,
+        rankDiff: standing?.rankDiff ?? null,
+        sponsorBasis: standing?.sponsorBasis ?? null,
+        sponsorRank: standing?.sponsorRank ?? null,
+        sponsorSeason: standing?.sponsorSeason ?? null,
+        sponsorTotal: standing?.sponsorTotal ?? null,
+        guv:
+          standing?.guv ??
+          (standing?.sponsorTotal != null && salaryEnd != null
+            ? roundValue(standing.sponsorTotal - salaryEnd, 2)
+            : null),
+        cashTotal: standing?.cashTotal ?? team.cash ?? null,
         isGold: rank === 1,
         isSilver: rank === 2,
         isBronze: rank === 3,
@@ -303,10 +326,10 @@ function buildSeasonSnapshotRecord(gameState: GameState, seasonId: string = game
   const rosterByPlayerId = new Map(gameState.rosters.map((entry) => [entry.playerId, entry] as const));
   const playerPerformances: SeasonSnapshotPlayerPerformanceRecord[] = Array.from(
     seasonPlayerPerformances.reduce((map, entry) => {
-      const player = gameState.players.find((candidate) => candidate.id === entry.playerId) ?? null;
-      const team = gameState.teams.find((candidate) => candidate.teamId === entry.teamId) ?? null;
+      const player = playerById.get(entry.playerId) ?? null;
+      const team = teamById.get(entry.teamId) ?? null;
       const disciplineLabel =
-        gameState.disciplines.find((discipline) => discipline.id === entry.disciplineId)?.name ?? entry.disciplineId;
+        disciplineById.get(entry.disciplineId)?.name ?? entry.disciplineId;
       const current = map.get(entry.playerId) ?? {
         playerId: entry.playerId,
         playerName: player?.name ?? entry.playerId,
@@ -388,7 +411,7 @@ function buildSeasonSnapshotRecord(gameState: GameState, seasonId: string = game
     }>()).values(),
   )
     .map((entry) => {
-      const player = gameState.players.find((candidate) => candidate.id === entry.playerId) ?? null;
+      const player = playerById.get(entry.playerId) ?? null;
       const rosterEntry = rosterByPlayerId.get(entry.playerId) ?? null;
       const rating = playerRatingsById.get(entry.playerId) ?? null;
       const economy = player
@@ -456,25 +479,63 @@ function buildSeasonSnapshotRecord(gameState: GameState, seasonId: string = game
     });
 
   const transferSnapshots: SeasonSnapshotTransferRecord[] = seasonTransfers
-    .map((entry) => ({
-      transferId: entry.id,
-      seasonId: entry.seasonId,
-      matchdayId: entry.matchdayId ?? null,
-      phase: entry.phase ?? null,
-      playerId: entry.playerId,
-      playerName: gameState.players.find((player) => player.id === entry.playerId)?.name ?? entry.playerId,
-      fromTeamId: entry.fromTeamId,
-      fromTeamName: gameState.teams.find((team) => team.teamId === entry.fromTeamId)?.name ?? null,
-      toTeamId: entry.toTeamId,
-      toTeamName: gameState.teams.find((team) => team.teamId === entry.toTeamId)?.name ?? null,
-      type: entry.transferType,
-      amount: entry.fee,
-      salary: entry.salary,
-      marketValue: entry.marketValue,
-      contractLength: entry.remainingContractLength,
-      source: "local_transfer_history",
-    }))
+    .map((entry) => {
+      const amountDeltaToMarketValue =
+        entry.marketValue != null && Number.isFinite(entry.marketValue) && entry.fee != null && Number.isFinite(entry.fee)
+          ? roundValue(entry.fee - entry.marketValue, 2)
+          : null;
+      const amountMarketValueFactor =
+        entry.marketValue != null && Number.isFinite(entry.marketValue) && entry.marketValue > 0 && entry.fee != null && Number.isFinite(entry.fee)
+          ? roundValue(entry.fee / entry.marketValue, 3)
+          : null;
+
+      return {
+        transferId: entry.id,
+        seasonId: entry.seasonId,
+        matchdayId: entry.matchdayId ?? null,
+        phase: entry.phase ?? null,
+        playerId: entry.playerId,
+        playerName: playerById.get(entry.playerId)?.name ?? entry.playerId,
+        fromTeamId: entry.fromTeamId,
+        fromTeamName: entry.fromTeamId ? teamById.get(entry.fromTeamId)?.name ?? null : null,
+        toTeamId: entry.toTeamId,
+        toTeamName: entry.toTeamId ? teamById.get(entry.toTeamId)?.name ?? null : null,
+        type: entry.transferType,
+        amount: entry.fee,
+        salary: entry.salary,
+        marketValue: entry.marketValue,
+        amountDeltaToMarketValue,
+        amountMarketValueFactor,
+        contractLength: entry.remainingContractLength,
+        source: "local_transfer_history",
+        happenedAt: entry.happenedAt,
+      };
+    })
     .sort((left, right) => left.transferId.localeCompare(right.transferId, "de"));
+  const gmAssignments = gameState.teams
+    .map((team) => {
+      const generalManager = getTeamGeneralManager(gameState, team.teamId);
+      if (!generalManager) return null;
+      const boardConfidence = teamObjectiveOverview.boardConfidence[team.teamId] ?? null;
+      return {
+        teamId: team.teamId,
+        teamCode: team.shortCode,
+        teamName: team.name,
+        gmId: generalManager.profile.gmId,
+        gmName: generalManager.profile.name,
+        gmTitle: generalManager.profile.title,
+        gmArchetype: generalManager.profile.archetype,
+        assignedSeasonId: generalManager.assignment.assignedSeasonId,
+        source: generalManager.assignment.source,
+        influencePct: generalManager.assignment.influencePct,
+        boardConfidenceValue: boardConfidence?.value ?? null,
+        boardPressure: boardConfidence?.pressure ?? null,
+        previousGmId: generalManager.assignment.previousGmId ?? null,
+        dismissalReason: generalManager.assignment.dismissalReason ?? null,
+      };
+    })
+    .filter((entry): entry is NonNullable<typeof entry> => Boolean(entry))
+    .sort((left, right) => left.teamName.localeCompare(right.teamName, "de"));
 
   const seasonCompleted =
     coverage.totalMatchdays > 0 &&
@@ -505,6 +566,7 @@ function buildSeasonSnapshotRecord(gameState: GameState, seasonId: string = game
     playerPerformances,
     playerPerformanceSnapshots: playerPerformances,
     transferSnapshots,
+    gmAssignments,
     warnings,
   };
 }

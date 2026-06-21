@@ -103,11 +103,11 @@ export const FACILITY_CATALOG: FacilityCatalogEntry[] = [
     effectType: "scouting",
     effectDescription: "Scouting Confidence",
     levels: [
-      { level: 1, effectDescription: "grobe Potential-Range", upgradeCost: 6, seasonUpkeep: 0.6 },
-      { level: 2, effectDescription: "kleinere Potential-Range", upgradeCost: 12, seasonUpkeep: 1.1 },
-      { level: 3, effectDescription: "bessere Wishlist-Infos", upgradeCost: 20, seasonUpkeep: 1.8 },
-      { level: 4, effectDescription: "bessere MW-/Gehalt-Prognose", upgradeCost: 32, seasonUpkeep: 2.8 },
-      { level: 5, effectDescription: "sehr genaue Potential-/Fit-Prognose", upgradeCost: 50, seasonUpkeep: 4.2 },
+      { level: 1, effectDescription: "grobe Diszi-/Potential-Spannen", upgradeCost: 6, seasonUpkeep: 0.6 },
+      { level: 2, effectDescription: "kleinere Scouting-Spannen", upgradeCost: 12, seasonUpkeep: 1.1 },
+      { level: 3, effectDescription: "bessere Wishlist-Infos + leichter Signing-Boost", upgradeCost: 20, seasonUpkeep: 1.8 },
+      { level: 4, effectDescription: "bessere MW-/Gehalt-/Diszi-Reads", upgradeCost: 32, seasonUpkeep: 2.8 },
+      { level: 5, effectDescription: "reale Diszi-Werte + sehr genaue Prognosen", upgradeCost: 50, seasonUpkeep: 4.2 },
     ],
   },
   {

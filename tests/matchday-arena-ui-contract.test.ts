@@ -10,7 +10,7 @@ describe("matchday arena ui contract", () => {
         "utf8",
       ),
       fs.readFile(
-        "/Users/chrisfalk/Documents/Codex/Olympiade der Welten/app/foundation/matchday-arena/MatchdayArenaClient.tsx",
+        "/Users/chrisfalk/Documents/Codex/Olympiade der Welten/app/foundation/matchday-arena-v2/MatchdayArenaV2Client.tsx",
         "utf8",
       ),
       fs.readFile(
@@ -25,7 +25,10 @@ describe("matchday arena ui contract", () => {
 
     expect(foundationText).toContain('"matchdayArena"');
     expect(foundationText).toContain('"matchdayResult"');
-    expect(foundationText).toContain('{ id: "matchdayArena", label: "Arena" }');
+    expect(foundationText).toContain('{ id: "matchdayArena", label: "Arena"');
+    expect(foundationText).not.toContain('{ id: "matchdayArenaV2", label: "Arena v2"');
+    expect(foundationText).toContain('if (view === "matchday-arena-v2")');
+    expect(foundationText).toContain('return "matchdayArena";');
     expect(foundationText).not.toContain('{ id: "matchdayResult", label: "Result" }');
     const secondaryViewsBlock = foundationText.slice(
       foundationText.indexOf("const foundationSecondaryViews"),
@@ -34,7 +37,7 @@ describe("matchday arena ui contract", () => {
     expect(secondaryViewsBlock).not.toContain('{ id: "matchdayResult"');
     expect(foundationText).toContain("const foundationInternalViews");
     expect(foundationText).toContain('{ id: "matchdayResult", label: "Spieltagsergebnis" }');
-    expect(foundationText).toContain("<MatchdayArenaClient");
+    expect(foundationText).toContain("<MatchdayArenaV2Client");
     expect(foundationText).toContain("buildMatchdaySummary");
     expect(foundationText).toContain('id="foundation-matchday-result"');
     expect(foundationText).toContain('id="arena-result-summary"');
@@ -52,31 +55,37 @@ describe("matchday arena ui contract", () => {
     expect(foundationText).toContain("tagName === \"textarea\"");
     expect(foundationText).toContain("tagName === \"select\"");
     expect(foundationText).toContain("targetPanel");
-    expect(arenaText).toContain("Matchday Arena");
+    expect(arenaText).toContain("Arena v2");
     expect(arenaText).toContain("resolveArenaTeamId");
     expect(arenaText).toContain("teamId: resolveArenaTeamId(props.teams, props.defaultTeamId)");
-    expect(arenaText).toContain("Score-Race");
-    expect(arenaText).toContain("Live Top Players");
-    expect(arenaText).toContain("Slot Spotlight");
-    expect(arenaText).toContain("Result Board");
-    expect(arenaText).toContain("Spieltagsergebnis anzeigen");
+    expect(arenaText).toContain("Arena v2 braucht noch Input");
+    expect(arenaText).toContain("32 Teams");
+    expect(arenaText).toContain("Reveal-Fortschritt");
+    expect(arenaText).toContain("onClick={props.onOpenMatchdayResult}");
+    expect(arenaText).toContain("Top Player");
+    expect(arenaText).toContain("Fokus-Team");
+    expect(arenaText).toContain("Was Arena v2 gerade zeigt");
     expect(arenaText).toContain("onOpenMatchdayResult");
     expect(arenaText).toContain("Play");
     expect(arenaText).toContain("Pause");
     expect(arenaText).toContain("Step");
-    expect(arenaText).toContain("Skip to Result");
+    expect(arenaText).toContain("Ergebnis");
     expect(arenaText).toContain("slotRevealIndex");
-    expect(arenaText).toContain("Aktiver Slot");
     expect(arenaText).toContain("MatchdayArenaTimeline");
-    expect(arenaText).toContain("MatchdayArenaLane");
     expect(arenaText).toContain("MatchdayArenaPlayerCard");
     expect(arenaText).toContain("advanceArenaStep");
     expect(arenaText).toContain('fetch("/api/season/matchday-mvp-score"');
-    expect(arenaText).toContain('fetch(`/api/resolve/legacy-matchday-preview?${contextQuery.toString()}`');
+    expect(arenaText).toContain("const canonicalParams = contextPayload.params");
+    expect(arenaText).toContain("const canonicalContextQuery = new URLSearchParams");
+    expect(arenaText).toContain("seasonId: canonicalParams.seasonId");
+    expect(arenaText).toContain('fetch(`/api/resolve/legacy-matchday-preview?${canonicalContextQuery.toString()}`');
     expect(arenaText).toContain('fetch(`/api/lineups/legacy/lab-context?${contextQuery.toString()}`');
     expect(arenaText).toContain('props.onOpenPlayerDetails?.({');
     expect(presenterText).toContain("MATCHDAY_ARENA_PHASES");
     expect(presenterText).toContain('"slots"');
+    expect(presenterText).toContain('"push"');
+    expect(presenterText).not.toContain('id: "base"');
+    expect(presenterText).not.toContain('id: "fatigue"');
     expect(presenterText).toContain('"result"');
     expect(presenterText).toContain("getMatchdayArenaPhaseScore");
     expect(cssText).toContain(".matchday-arena-shell");

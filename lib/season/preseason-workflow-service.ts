@@ -6,11 +6,19 @@ import type { Fixture, GameState, PreSeasonWorkflowLogRecord, SeasonState, Stand
 import { previewFacilitySeasonEndFinance } from "@/lib/facilities/facility-season-end-service";
 import { createPersistenceService } from "@/lib/persistence/persistence-service";
 import type { PersistedSaveGame, PersistenceService } from "@/lib/persistence/types";
+import { normalizePlayerBaselineRecord } from "@/lib/players/player-baseline-service";
+import { applyAiSeasonEndXpSpend, previewAiSeasonEndXpSpend } from "@/lib/progression/ai-xp-spend-planner";
+import { applySeasonEndXpSpend, previewSeasonEndXpSpend } from "@/lib/progression/season-end-xp-apply-service";
 import { buildSeasonSeededDisciplineSchedule } from "@/lib/season/season-discipline-schedule";
 import { buildPlayerProgressionForecast } from "@/lib/training/player-progression-forecast";
+import { buildCoreStatsFromDisciplineRatings, buildPreviewDisciplineRatingsFromAttributes } from "@/lib/training/season-end-progression-preview";
 import { buildSeasonEndProgressionPreview } from "@/lib/training/season-end-progression-preview";
 import { buildPrizeMoneyPreview } from "@/lib/season/prize-money-preview";
 import { buildSeasonSnapshotDryRun, upsertSeasonSnapshotRecord } from "@/lib/season/season-snapshot-service";
+import { advanceSeasonEconomyFactorWindow } from "@/lib/season/season-economy-factors";
+import { refreshTeamObjectiveState } from "@/lib/board/team-season-objectives-service";
+import type { PlayerGeneratorAttributeName, PlayerGeneratorAttributes } from "@/lib/data/olyDataTypes";
+import { resolvePlayerEconomyContract } from "@/lib/foundation/player-economy-contract";
 
 export const PRESEASON_NEXT_SEASON_SETUP_CONFIRM_TOKEN = "APPLY_PRESEASON_NEXT_SEASON_SETUP";
 
@@ -66,12 +74,378 @@ export type PreSeasonWorkflowApplyResult = Omit<PreSeasonWorkflowPreview, "dryRu
   auditLogId: string | null;
 };
 
+export type PreSeasonProgressionMaterializationResult = {
+  save: PersistedSaveGame;
+  teamsProcessed: number;
+  teamsApplied: number;
+  humanOrganicTeams: number;
+  aiPlannedTeams: number;
+  aiOrganicFallbackTeams: number;
+  playerEventsCreated: number;
+  warnings: string[];
+  blockingReasons: string[];
+};
+
 function roundValue(value: number, digits = 2) {
   return Number(value.toFixed(digits));
 }
 
 function toFiniteNumber(value: number | null | undefined) {
   return typeof value === "number" && Number.isFinite(value) ? value : null;
+}
+
+function clamp(value: number, min: number, max: number) {
+  return Math.min(Math.max(value, min), max);
+}
+
+const ATTRIBUTE_KEYS: PlayerGeneratorAttributeName[] = [
+  "power",
+  "health",
+  "stamina",
+  "intelligence",
+  "awareness",
+  "determination",
+  "speed",
+  "dexterity",
+  "charisma",
+  "will",
+  "spirit",
+  "torment",
+];
+
+function normalizePlayerAttributes(
+  attributes: Partial<Record<PlayerGeneratorAttributeName, number | null>> | undefined,
+): PlayerGeneratorAttributes | null {
+  if (!attributes) return null;
+  const values = Object.fromEntries(ATTRIBUTE_KEYS.map((key) => [key, attributes[key]])) as Partial<
+    Record<PlayerGeneratorAttributeName, number | null>
+  >;
+  if (!ATTRIBUTE_KEYS.every((key) => toFiniteNumber(values[key]) != null)) {
+    return null;
+  }
+  return values as PlayerGeneratorAttributes;
+}
+
+function driftTowardBaseline(input: {
+  current: number | null | undefined;
+  baseline: number | null | undefined;
+  fraction: number;
+  minStep: number;
+  digits?: number;
+}) {
+  const current = toFiniteNumber(input.current);
+  const baseline = toFiniteNumber(input.baseline);
+  if (current == null) return baseline;
+  if (baseline == null) return current;
+  const delta = baseline - current;
+  if (Math.abs(delta) < 0.001) return roundValue(baseline, input.digits ?? 0);
+  const step = Math.min(Math.abs(delta), Math.max(input.minStep, Math.abs(delta) * input.fraction));
+  return roundValue(current + Math.sign(delta) * step, input.digits ?? 0);
+}
+
+function getStableEconomyTarget(input: {
+  currentVisible: number | null | undefined;
+  currentRaw: number | null | undefined;
+  baselineRaw: number | null | undefined;
+  rawScaleDivisor: number;
+  maxVisible: number;
+}) {
+  const baselineRaw = toFiniteNumber(input.baselineRaw);
+  if (baselineRaw != null) {
+    return baselineRaw > input.maxVisible ? roundValue(baselineRaw / input.rawScaleDivisor, 2) : baselineRaw;
+  }
+
+  const currentVisible = toFiniteNumber(input.currentVisible);
+  if (currentVisible != null && currentVisible > 0 && currentVisible <= input.maxVisible) {
+    return currentVisible;
+  }
+
+  const currentRaw = toFiniteNumber(input.currentRaw);
+  if (currentRaw != null && currentRaw > 0 && currentRaw <= input.maxVisible) {
+    return currentRaw;
+  }
+
+  return currentVisible ?? currentRaw ?? null;
+}
+
+function coolOffFreeAgentXp(value: number | null | undefined) {
+  const current = toFiniteNumber(value);
+  if (current == null || current <= 0) return 0;
+  return Math.max(0, Math.round(current * 0.72) - 2);
+}
+
+function advancePlayerMoraleCarryState(gameState: GameState) {
+  const rosterByPlayerId = new Map(gameState.rosters.map((entry) => [entry.playerId, entry] as const));
+  return (gameState.playerMoraleState ?? []).map((entry) => {
+    const activeRoster = rosterByPlayerId.get(entry.playerId) ?? null;
+    if (activeRoster) {
+      return {
+        ...entry,
+        teamId: activeRoster.teamId,
+        inactiveSeasons: 0,
+      };
+    }
+
+    return {
+      ...entry,
+      inactiveSeasons: (entry.inactiveSeasons ?? 0) + 1,
+    };
+  });
+}
+
+export function applySeasonBaselineProgression(gameState: GameState, options: { completedSeasonId?: string } = {}) {
+  const rosterPlayerIds = new Set(gameState.rosters.map((entry) => entry.playerId));
+  const completedSeasonId = options.completedSeasonId ?? gameState.season.id;
+  const progressedThisSeasonPlayerIds = new Set(
+    (gameState.playerProgressionEvents ?? [])
+      .filter((event) => event.seasonId === completedSeasonId)
+      .map((event) => event.playerId),
+  );
+  const baselineByPlayerId = new Map(
+    (gameState.playerBaselines ?? []).map((baseline) => {
+      const normalized = normalizePlayerBaselineRecord(baseline);
+      return [normalized.playerId, normalized] as const;
+    }),
+  );
+  const nextMarketValueByPlayerId = new Map<string, number | null>();
+
+  const players = gameState.players.map((player) => {
+    const baseline = baselineByPlayerId.get(player.id);
+    if (!baseline) {
+      return player;
+    }
+
+    const isRostered = rosterPlayerIds.has(player.id);
+    const hasSeasonEndProgression = progressedThisSeasonPlayerIds.has(player.id);
+    const attributeFraction = isRostered ? 0.18 : 0.22;
+    const economyFraction = isRostered ? 0.18 : 0.24;
+    const nextAttributePatch = Object.fromEntries(
+      ATTRIBUTE_KEYS.map((attribute) => [
+        attribute,
+        hasSeasonEndProgression
+          ? (toFiniteNumber(player.attributeSheetStats?.[attribute]) ?? baseline.attributes[attribute])
+          : driftTowardBaseline({
+              current: player.attributeSheetStats?.[attribute],
+              baseline: baseline.attributes[attribute],
+              fraction: attributeFraction,
+              minStep: 1,
+            }),
+      ]),
+    ) as PlayerGeneratorAttributes;
+    const attributesAfter = normalizePlayerAttributes({
+      ...(player.attributeSheetStats ?? {}),
+      ...nextAttributePatch,
+    });
+    const nextDisciplineRatings = buildPreviewDisciplineRatingsFromAttributes({
+      player,
+      attributesAfter,
+    });
+    const currentEconomy = resolvePlayerEconomyContract({ player });
+    const baselineMarketValue = getStableEconomyTarget({
+      currentVisible: player.displayMarketValue,
+      currentRaw: currentEconomy.marketValue ?? player.marketValue,
+      baselineRaw: baseline.marketValue,
+      rawScaleDivisor: 1000,
+      maxVisible: 500,
+    });
+    const baselineSalary = getStableEconomyTarget({
+      currentVisible: player.displaySalary,
+      currentRaw: currentEconomy.salary ?? player.salaryDemand,
+      baselineRaw: baseline.salary,
+      rawScaleDivisor: 1000,
+      maxVisible: 80,
+    });
+    const nextMarketValue =
+      driftTowardBaseline({
+        current: player.marketValue ?? currentEconomy.marketValue,
+        baseline: baselineMarketValue,
+        fraction: economyFraction,
+        minStep: 0.6,
+        digits: 2,
+      }) ?? currentEconomy.marketValue ?? player.marketValue;
+    const nextDisplayMarketValue =
+      driftTowardBaseline({
+        current: player.displayMarketValue ?? player.marketValue ?? currentEconomy.marketValue,
+        baseline: baselineMarketValue,
+        fraction: economyFraction,
+        minStep: 0.6,
+        digits: 2,
+      }) ?? nextMarketValue;
+    const nextSalaryDemand =
+      driftTowardBaseline({
+        current: player.salaryDemand ?? currentEconomy.salary,
+        baseline: baselineSalary,
+        fraction: economyFraction,
+        minStep: 0.08,
+        digits: 2,
+      }) ?? currentEconomy.salary ?? player.salaryDemand;
+    const nextDisplaySalary =
+      driftTowardBaseline({
+        current: player.displaySalary ?? player.salaryDemand ?? currentEconomy.salary,
+        baseline: baselineSalary,
+        fraction: economyFraction,
+        minStep: 0.08,
+        digits: 2,
+      }) ?? nextSalaryDemand;
+
+    nextMarketValueByPlayerId.set(player.id, nextDisplayMarketValue ?? nextMarketValue ?? null);
+
+    return {
+      ...player,
+      attributeSheetStats: {
+        ...(player.attributeSheetStats ?? {}),
+        ...nextAttributePatch,
+      },
+      disciplineRatings: nextDisciplineRatings,
+      previousDisciplineRatings: player.disciplineRatings,
+      currentDisciplineValues: nextDisciplineRatings,
+      disciplineDelta: undefined,
+      coreStats: buildCoreStatsFromDisciplineRatings({
+        disciplines: gameState.disciplines,
+        disciplineRatings: nextDisciplineRatings,
+        fallback: player.coreStats,
+      }),
+      marketValue: nextMarketValue,
+      displayMarketValue: nextDisplayMarketValue,
+      salaryDemand: nextSalaryDemand,
+      displaySalary: nextDisplaySalary,
+      bracketLabel: baseline.bracket ?? player.bracketLabel,
+      currentXP: isRostered ? player.currentXP : coolOffFreeAgentXp(player.currentXP),
+      trainingMode: null,
+      fatigue: clamp(player.fatigue ?? 0, 0, 100),
+    };
+  });
+
+  return {
+    ...gameState,
+    players,
+    playerMoraleState: advancePlayerMoraleCarryState(gameState),
+    rosters: gameState.rosters.map((entry) => {
+      const nextMarketValue = nextMarketValueByPlayerId.get(entry.playerId);
+      if (nextMarketValue == null) return entry;
+      return {
+        ...entry,
+        currentValue: nextMarketValue,
+      };
+    }),
+  };
+}
+
+function createProgressionCapturePersistence(input: {
+  save: PersistedSaveGame;
+  delegate: PersistenceService;
+}): { persistence: PersistenceService; getSave: () => PersistedSaveGame } {
+  let currentSave = structuredClone(input.save);
+  const persistence: PersistenceService = {
+    ...input.delegate,
+    bootstrapSingleplayerSave() {
+      return { save: structuredClone(currentSave), createdFromSeed: false };
+    },
+    getActiveSave() {
+      return structuredClone(currentSave);
+    },
+    getSaveById(saveId) {
+      return saveId === currentSave.saveId ? structuredClone(currentSave) : input.delegate.getSaveById(saveId);
+    },
+    saveSingleplayerState(saveId, nextGameState) {
+      const saved = input.delegate.saveSingleplayerState(saveId, nextGameState);
+      if (saveId === currentSave.saveId) {
+        currentSave = {
+          ...currentSave,
+          updatedAt: saved.updatedAt ?? new Date().toISOString(),
+          gameState: structuredClone(nextGameState),
+        };
+      }
+      return structuredClone(currentSave);
+    },
+  };
+  return {
+    persistence,
+    getSave: () => structuredClone(currentSave),
+  };
+}
+
+function materializeSeasonEndProgressionBeforeNextSeason(
+  save: PersistedSaveGame,
+  persistence: PersistenceService,
+): PreSeasonProgressionMaterializationResult {
+  const materializationSave: PersistedSaveGame = { ...save, status: "active" };
+  const capture = createProgressionCapturePersistence({ save: materializationSave, delegate: persistence });
+  const completedSeasonId = save.gameState.season.id;
+  const teamControlSettings = materializationSave.gameState.seasonState.teamControlSettings ?? {};
+  const warnings: string[] = [];
+  const blockingReasons: string[] = [];
+  let teamsProcessed = 0;
+  let teamsApplied = 0;
+  let humanOrganicTeams = 0;
+  let aiPlannedTeams = 0;
+  let aiOrganicFallbackTeams = 0;
+  let playerEventsCreated = 0;
+
+  for (const team of materializationSave.gameState.teams) {
+    const currentSave = capture.getSave();
+    const rosterCount = currentSave.gameState.rosters.filter((entry) => entry.teamId === team.teamId).length;
+    if (rosterCount === 0) continue;
+    teamsProcessed += 1;
+    const controlMode = teamControlSettings[team.teamId]?.controlMode ?? (team.humanControlled === false ? "ai" : "manual");
+
+    if (controlMode === "ai") {
+      const plan = previewAiSeasonEndXpSpend(currentSave, team.teamId);
+      if (plan.confirmToken && plan.blockers.length === 0 && plan.plannedUpgrades.length > 0) {
+        const result = applyAiSeasonEndXpSpend(currentSave, team.teamId, plan.confirmToken, capture.persistence);
+        warnings.push(...result.warnings.map((warning) => `${team.shortCode}:${warning}`));
+        if (result.applied) {
+          teamsApplied += 1;
+          aiPlannedTeams += 1;
+          playerEventsCreated += result.eventIds.length;
+          continue;
+        }
+        blockingReasons.push(...result.blockingReasons.map((reason) => `${team.shortCode}:${reason}`));
+      } else {
+        warnings.push(...plan.warnings.map((warning) => `${team.shortCode}:${warning}`));
+      }
+    }
+
+    const fallbackSave = capture.getSave();
+    const preview = previewSeasonEndXpSpend(fallbackSave, team.teamId, []);
+    if (!preview.confirmToken || !preview.ok) {
+      const softReasons = preview.blockingReasons.filter((reason) => reason !== "season_xp_no_unmaterialized_xp");
+      warnings.push(...preview.warnings.map((warning) => `${team.shortCode}:${warning}`));
+      warnings.push(...softReasons.map((reason) => `${team.shortCode}:${reason}`));
+      continue;
+    }
+    const result = applySeasonEndXpSpend(fallbackSave, team.teamId, [], preview.confirmToken, capture.persistence, {
+      allowAiTeams: controlMode !== "manual",
+    });
+    warnings.push(...result.warnings.map((warning) => `${team.shortCode}:${warning}`));
+    if (result.applied) {
+      teamsApplied += 1;
+      playerEventsCreated += result.eventIds.length;
+      if (controlMode === "ai") aiOrganicFallbackTeams += 1;
+      else humanOrganicTeams += 1;
+    } else {
+      blockingReasons.push(...result.blockingReasons.map((reason) => `${team.shortCode}:${reason}`));
+    }
+  }
+
+  const finalSeasonEventCount = (capture.getSave().gameState.playerProgressionEvents ?? []).filter(
+    (event) => event.seasonId === completedSeasonId,
+  ).length;
+  if (teamsProcessed > 0 && finalSeasonEventCount === 0) {
+    blockingReasons.push("season_end_progression_no_player_events");
+  }
+
+  return {
+    save: capture.getSave(),
+    teamsProcessed,
+    teamsApplied,
+    humanOrganicTeams,
+    aiPlannedTeams,
+    aiOrganicFallbackTeams,
+    playerEventsCreated,
+    warnings: [...new Set(warnings)],
+    blockingReasons: [...new Set(blockingReasons)],
+  };
 }
 
 function parseSeasonNumber(season: GameState["season"]) {
@@ -140,20 +514,43 @@ function signatureSchedule(entries: NonNullable<SeasonState["disciplineSchedule"
 
 function buildNextSeasonGameState(save: PersistedSaveGame): { gameState: GameState; auditLog: PreSeasonWorkflowLogRecord } {
   const { nextSeasonId, nextSeasonLabel, nextSeasonNumber } = buildNextSeasonContext(save.gameState);
-  const schedulePlan = buildSeasonSeededDisciplineSchedule({
+  const previousSchedule = save.gameState.seasonState.disciplineSchedule ?? [];
+  let schedulePlan = buildSeasonSeededDisciplineSchedule({
     saveId: save.saveId,
     seasonId: nextSeasonId,
     disciplines: save.gameState.disciplines,
     matchdayCount: save.gameState.season.matchdayIds.length || 10,
   });
+  let scheduleRerollCount = 0;
+  while (
+    previousSchedule.length > 0 &&
+    signatureSchedule(previousSchedule) === signatureSchedule(schedulePlan.entries) &&
+    scheduleRerollCount < 8
+  ) {
+    scheduleRerollCount += 1;
+    schedulePlan = buildSeasonSeededDisciplineSchedule({
+      saveId: save.saveId,
+      seasonId: nextSeasonId,
+      disciplines: save.gameState.disciplines,
+      matchdayCount: save.gameState.season.matchdayIds.length || 10,
+      scheduleVersion: `season-setup-v2-reroll-${scheduleRerollCount}`,
+    });
+  }
   const matchdayIds = schedulePlan.matchdayIds;
-  const previousSchedule = save.gameState.seasonState.disciplineSchedule ?? [];
+  const firstMatchdayId = matchdayIds[0] ?? `${nextSeasonId}-matchday-1`;
   const scheduleSameAsPrevious =
     previousSchedule.length > 0 &&
     signatureSchedule(previousSchedule) === signatureSchedule(schedulePlan.entries);
+  const economyFactors = advanceSeasonEconomyFactorWindow({
+    saveId: save.saveId,
+    fromSeasonId: save.gameState.season.id,
+    toSeasonId: nextSeasonId,
+    seasonState: save.gameState.seasonState,
+  });
   const scheduleWarnings = [
     ...schedulePlan.warnings,
-    scheduleSameAsPrevious ? "season_schedule_same_as_previous_warning" : null,
+    scheduleRerollCount > 0 ? `season_schedule_rerolled:${scheduleRerollCount}` : null,
+    scheduleSameAsPrevious ? "season_schedule_same_as_previous_after_reroll_warning" : null,
   ].filter((entry): entry is string => Boolean(entry));
   const nextFormCards = buildGeneratedFormCardRecordsForSeason(
     {
@@ -179,6 +576,7 @@ function buildNextSeasonGameState(save: PersistedSaveGame): { gameState: GameSta
       teamIds: save.gameState.teams.map((team) => team.teamId),
     }),
     disciplineSchedule: schedulePlan.entries,
+    seasonEconomyFactors: economyFactors.nextWindow,
     standings: buildZeroStandings(save.gameState),
     formCards: nextFormCards,
     lineupDrafts: [],
@@ -189,7 +587,22 @@ function buildNextSeasonGameState(save: PersistedSaveGame): { gameState: GameSta
     resultAuditLogs: [],
     standingsApplyLogs: [],
     matchdayAdvanceLogs: [],
-    cashPrizeApplyLogs: [],
+    cashPrizeApplyLogs: save.gameState.seasonState.cashPrizeApplyLogs ?? [],
+    newGameFlow: {
+      active: true,
+      dismissed: false,
+      selectedTeamId: save.gameState.seasonState.newGameFlow?.selectedTeamId ?? null,
+      updatedAt: new Date().toISOString(),
+      steps: [
+        { stepId: "season_intro", status: "open" },
+        { stepId: "team_confirm", status: "open" },
+        { stepId: "roster_review", status: "open" },
+        { stepId: "first_transfers", status: "open" },
+        { stepId: "fill_roster", status: "open" },
+        { stepId: "training_facilities", status: "open" },
+        { stepId: "set_lineup", status: "open" },
+      ],
+    },
   };
   const auditLog: PreSeasonWorkflowLogRecord = {
     logId: `preseason-workflow__${save.saveId}__${save.gameState.season.id}__${nextSeasonId}__${randomUUID()}`,
@@ -201,6 +614,7 @@ function buildNextSeasonGameState(save: PersistedSaveGame): { gameState: GameSta
     errors: [],
     warnings: [
       ...scheduleWarnings,
+      `season_economy_factors_advanced:s_plus_4=${economyFactors.rerolledSeasonPlus4.factor}`,
       nextFormCards.length === 0 ? "season_formcards_generation_empty" : null,
       "season_mutator_state_reset_lineup_modifiers_cleared",
     ].filter((entry): entry is string => Boolean(entry)),
@@ -209,20 +623,23 @@ function buildNextSeasonGameState(save: PersistedSaveGame): { gameState: GameSta
       "matchdayState",
       "seasonState.schedule",
       "seasonState.disciplineSchedule",
+      "seasonState.seasonEconomyFactors",
       "seasonState.standings",
       "seasonState.formCards",
+      "seasonState.newGameFlow",
       "seasonState.lineupDrafts",
       "seasonState.matchdayResults",
       "seasonState.disciplineResults",
       "seasonState.playerDisciplinePerformances",
+      "playerProgressionEvents",
+      "players.season_baseline_progression",
+      "rosters.currentValue",
       "arena_state_reset",
     ],
     timestamp: new Date().toISOString(),
   };
 
-  return {
-    auditLog,
-    gameState: {
+  const nextGameState = refreshTeamObjectiveState(applySeasonBaselineProgression({
       ...save.gameState,
       gamePhase: "season_active",
       season: {
@@ -238,7 +655,7 @@ function buildNextSeasonGameState(save: PersistedSaveGame): { gameState: GameSta
         preSeasonWorkflowLogs: [auditLog, ...(save.gameState.seasonState.preSeasonWorkflowLogs ?? [])],
       },
       matchdayState: {
-        matchdayId: matchdayIds[0],
+        matchdayId: firstMatchdayId,
         status: "planning",
         pendingTeamIds: save.gameState.teams.map((team) => team.teamId),
         resolvedFixtureIds: [],
@@ -252,7 +669,11 @@ function buildNextSeasonGameState(save: PersistedSaveGame): { gameState: GameSta
         },
         ...save.gameState.logs,
       ],
-    },
+    }, { completedSeasonId: save.gameState.season.id }));
+
+  return {
+    auditLog,
+    gameState: nextGameState,
   };
 }
 
@@ -398,7 +819,21 @@ export function applyPreSeasonNextSeasonSetupLightweight(
     };
   }
 
-  const { gameState, auditLog } = buildNextSeasonGameState(snapshotResult.save);
+  const progressionResult = materializeSeasonEndProgressionBeforeNextSeason(snapshotResult.save, persistence);
+  if (progressionResult.blockingReasons.length > 0) {
+    return {
+      ...basePreview,
+      dryRun: false,
+      productiveWrites: true,
+      applied: false,
+      appliedStepId: null,
+      auditLogId: null,
+      warnings: [...basePreview.warnings, ...snapshotResult.warnings, ...progressionResult.warnings],
+      blockingReasons: progressionResult.blockingReasons,
+    };
+  }
+
+  const { gameState, auditLog } = buildNextSeasonGameState(progressionResult.save);
   persistence.saveSingleplayerState(save.saveId, gameState);
   return {
     ...basePreview,
@@ -412,7 +847,12 @@ export function applyPreSeasonNextSeasonSetupLightweight(
       seasonId: gameState.season.id,
       gamePhase: gameState.gamePhase ?? "season_active",
     },
-    warnings: [...basePreview.warnings, ...snapshotResult.warnings],
+    warnings: [
+      ...basePreview.warnings,
+      ...snapshotResult.warnings,
+      ...progressionResult.warnings,
+      `season_end_progression_applied:teams=${progressionResult.teamsApplied}:events=${progressionResult.playerEventsCreated}`,
+    ],
     steps: basePreview.steps.map((step) => ({ ...step, status: "applied" as const })),
   };
 }
@@ -533,12 +973,12 @@ export async function buildPreSeasonWorkflowPreview(
     {
       stepId: "player_development",
       label: "XP / Spielerentwicklung",
-      status: "preview_only",
-      productive: false,
-      summary: { players: progressionPreview.rows.length, planned: progressionPreview.rows.filter((row) => row.status === "planned").length, blocked: progressionPreview.rows.filter((row) => row.status === "blocked").length, productiveWrites: false },
-      warnings: progressionPreview.warnings,
+      status: "ready",
+      productive: true,
+      summary: { players: progressionPreview.rows.length, planned: progressionPreview.rows.filter((row) => row.status === "planned").length, blocked: progressionPreview.rows.filter((row) => row.status === "blocked").length, productiveWrites: true },
+      warnings: [...progressionPreview.warnings, "applied_with_next_season_setup"],
       blockingReasons: [],
-      confirmToken: null,
+      confirmToken: "APPLIED_WITH_NEXT_SEASON_SETUP",
     },
     {
       stepId: "preseason_management",
@@ -662,9 +1102,23 @@ export async function applyPreSeasonNextSeasonSetup(
     };
   }
 
-  const { gameState, auditLog } = buildNextSeasonGameState(snapshotResult.save);
+  const progressionResult = materializeSeasonEndProgressionBeforeNextSeason(snapshotResult.save, persistence);
+  if (progressionResult.blockingReasons.length > 0) {
+    return {
+      ...preview,
+      dryRun: false,
+      productiveWrites: true,
+      applied: false,
+      appliedStepId: null,
+      auditLogId: null,
+      warnings: [...preview.warnings, ...snapshotResult.warnings, ...progressionResult.warnings],
+      blockingReasons: progressionResult.blockingReasons,
+    };
+  }
+
+  const { gameState, auditLog } = buildNextSeasonGameState(progressionResult.save);
   persistence.saveSingleplayerState(save.saveId, gameState);
-  const nextPreview = await buildPreSeasonWorkflowPreview({ ...snapshotResult.save, gameState }, persistence);
+  const nextPreview = await buildPreSeasonWorkflowPreview({ ...progressionResult.save, gameState }, persistence);
 
   return {
     ...nextPreview,
@@ -673,7 +1127,12 @@ export async function applyPreSeasonNextSeasonSetup(
     applied: true,
     appliedStepId: "next_season_setup",
     auditLogId: auditLog.logId,
-    warnings: [...nextPreview.warnings, ...snapshotResult.warnings],
+    warnings: [
+      ...nextPreview.warnings,
+      ...snapshotResult.warnings,
+      ...progressionResult.warnings,
+      `season_end_progression_applied:teams=${progressionResult.teamsApplied}:events=${progressionResult.playerEventsCreated}`,
+    ],
     steps: nextPreview.steps.map((step) =>
       step.stepId === "next_season_setup" || step.stepId === "next_season_ready"
         ? { ...step, status: "applied" as const }

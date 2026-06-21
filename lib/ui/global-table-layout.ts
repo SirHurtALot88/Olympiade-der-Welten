@@ -2,6 +2,8 @@ export const GLOBAL_TABLE_LAYOUT_VERSION = 1;
 
 export type GlobalTableId =
   | "season-standings"
+  | "season-standings-v2"
+  | "season-standings-v2-top-players"
   | "prize-money"
   | "transfer-market"
   | "transfer-history"
@@ -42,6 +44,8 @@ export type GlobalTableRegistryEntry = {
   label: string;
   layoutVersion: number;
   status: "connected" | "legacy";
+  requiresResizableColumns: boolean;
+  requiresPersistentWidths: boolean;
   defaultPinnedLeft?: string[];
   defaultPinnedRight?: string[];
 };
@@ -64,7 +68,29 @@ export const GLOBAL_TABLE_REGISTRY: Record<GlobalTableId, GlobalTableRegistryEnt
     label: "Saisonstand",
     layoutVersion: GLOBAL_TABLE_LAYOUT_VERSION,
     status: "connected",
+    requiresResizableColumns: true,
+    requiresPersistentWidths: true,
     defaultPinnedLeft: ["platz", "mannschaft", "punkte"],
+  },
+  "season-standings-v2": {
+    tableId: "season-standings-v2",
+    storageKey: "seasonStandingsV2Table",
+    label: "Saisonstand v2",
+    layoutVersion: GLOBAL_TABLE_LAYOUT_VERSION,
+    status: "connected",
+    requiresResizableColumns: true,
+    requiresPersistentWidths: true,
+    defaultPinnedLeft: ["rank", "team"],
+  },
+  "season-standings-v2-top-players": {
+    tableId: "season-standings-v2-top-players",
+    storageKey: "seasonStandingsV2TopPlayersTable",
+    label: "Saisonstand v2 Top Player",
+    layoutVersion: GLOBAL_TABLE_LAYOUT_VERSION,
+    status: "connected",
+    requiresResizableColumns: true,
+    requiresPersistentWidths: true,
+    defaultPinnedLeft: ["rank", "player"],
   },
   "prize-money": {
     tableId: "prize-money",
@@ -72,6 +98,8 @@ export const GLOBAL_TABLE_REGISTRY: Record<GlobalTableId, GlobalTableRegistryEnt
     label: "Preisgeld",
     layoutVersion: GLOBAL_TABLE_LAYOUT_VERSION,
     status: "connected",
+    requiresResizableColumns: true,
+    requiresPersistentWidths: true,
     defaultPinnedLeft: ["team"],
   },
   "transfer-market": {
@@ -80,6 +108,8 @@ export const GLOBAL_TABLE_REGISTRY: Record<GlobalTableId, GlobalTableRegistryEnt
     label: "Transfermarkt",
     layoutVersion: GLOBAL_TABLE_LAYOUT_VERSION,
     status: "connected",
+    requiresResizableColumns: true,
+    requiresPersistentWidths: true,
     defaultPinnedLeft: ["imageUrl", "name"],
   },
   "transfer-history": {
@@ -88,6 +118,8 @@ export const GLOBAL_TABLE_REGISTRY: Record<GlobalTableId, GlobalTableRegistryEnt
     label: "Transferhistorie",
     layoutVersion: GLOBAL_TABLE_LAYOUT_VERSION,
     status: "connected",
+    requiresResizableColumns: true,
+    requiresPersistentWidths: true,
     defaultPinnedLeft: ["image", "name"],
   },
   teams: {
@@ -96,6 +128,8 @@ export const GLOBAL_TABLE_REGISTRY: Record<GlobalTableId, GlobalTableRegistryEnt
     label: "Teams",
     layoutVersion: GLOBAL_TABLE_LAYOUT_VERSION,
     status: "connected",
+    requiresResizableColumns: true,
+    requiresPersistentWidths: true,
     defaultPinnedLeft: ["team", "overallRank"],
   },
   players: {
@@ -104,6 +138,8 @@ export const GLOBAL_TABLE_REGISTRY: Record<GlobalTableId, GlobalTableRegistryEnt
     label: "Spieler",
     layoutVersion: GLOBAL_TABLE_LAYOUT_VERSION,
     status: "connected",
+    requiresResizableColumns: true,
+    requiresPersistentWidths: true,
     defaultPinnedLeft: ["image", "name", "team"],
   },
   ranks: {
@@ -112,6 +148,8 @@ export const GLOBAL_TABLE_REGISTRY: Record<GlobalTableId, GlobalTableRegistryEnt
     label: "Ranks",
     layoutVersion: GLOBAL_TABLE_LAYOUT_VERSION,
     status: "connected",
+    requiresResizableColumns: true,
+    requiresPersistentWidths: true,
     defaultPinnedLeft: ["team"],
   },
   disciplines: {
@@ -120,6 +158,8 @@ export const GLOBAL_TABLE_REGISTRY: Record<GlobalTableId, GlobalTableRegistryEnt
     label: "Diszis",
     layoutVersion: GLOBAL_TABLE_LAYOUT_VERSION,
     status: "connected",
+    requiresResizableColumns: true,
+    requiresPersistentWidths: true,
   },
   "lineup-expert": {
     tableId: "lineup-expert",
@@ -127,6 +167,8 @@ export const GLOBAL_TABLE_REGISTRY: Record<GlobalTableId, GlobalTableRegistryEnt
     label: "Einsatzliste / Expert",
     layoutVersion: GLOBAL_TABLE_LAYOUT_VERSION,
     status: "connected",
+    requiresResizableColumns: true,
+    requiresPersistentWidths: true,
     defaultPinnedLeft: ["image", "name"],
   },
   "training-facilities": {
@@ -135,6 +177,8 @@ export const GLOBAL_TABLE_REGISTRY: Record<GlobalTableId, GlobalTableRegistryEnt
     label: "Training & Gebaeude",
     layoutVersion: GLOBAL_TABLE_LAYOUT_VERSION,
     status: "legacy",
+    requiresResizableColumns: true,
+    requiresPersistentWidths: true,
   },
   "ai-audit": {
     tableId: "ai-audit",
@@ -142,6 +186,8 @@ export const GLOBAL_TABLE_REGISTRY: Record<GlobalTableId, GlobalTableRegistryEnt
     label: "Redraft-/AI-Audit",
     layoutVersion: GLOBAL_TABLE_LAYOUT_VERSION,
     status: "legacy",
+    requiresResizableColumns: true,
+    requiresPersistentWidths: true,
   },
   "balance-team": {
     tableId: "balance-team",
@@ -149,6 +195,8 @@ export const GLOBAL_TABLE_REGISTRY: Record<GlobalTableId, GlobalTableRegistryEnt
     label: "Multi-Season Team Balance",
     layoutVersion: GLOBAL_TABLE_LAYOUT_VERSION,
     status: "connected",
+    requiresResizableColumns: true,
+    requiresPersistentWidths: true,
     defaultPinnedLeft: ["team"],
   },
   "balance-economy": {
@@ -157,6 +205,8 @@ export const GLOBAL_TABLE_REGISTRY: Record<GlobalTableId, GlobalTableRegistryEnt
     label: "Multi-Season Economy Balance",
     layoutVersion: GLOBAL_TABLE_LAYOUT_VERSION,
     status: "connected",
+    requiresResizableColumns: true,
+    requiresPersistentWidths: true,
     defaultPinnedLeft: ["team"],
   },
   "balance-player": {
@@ -165,6 +215,8 @@ export const GLOBAL_TABLE_REGISTRY: Record<GlobalTableId, GlobalTableRegistryEnt
     label: "Multi-Season Player Progression",
     layoutVersion: GLOBAL_TABLE_LAYOUT_VERSION,
     status: "connected",
+    requiresResizableColumns: true,
+    requiresPersistentWidths: true,
     defaultPinnedLeft: ["player", "team"],
   },
   "balance-gameplay": {
@@ -173,6 +225,8 @@ export const GLOBAL_TABLE_REGISTRY: Record<GlobalTableId, GlobalTableRegistryEnt
     label: "Multi-Season Gameplay Balance",
     layoutVersion: GLOBAL_TABLE_LAYOUT_VERSION,
     status: "connected",
+    requiresResizableColumns: true,
+    requiresPersistentWidths: true,
     defaultPinnedLeft: ["metric"],
   },
 };

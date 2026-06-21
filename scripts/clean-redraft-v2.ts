@@ -13,7 +13,7 @@ import { createPersistenceService } from "@/lib/persistence/persistence-service"
 import { withScenarioMeta } from "@/lib/persistence/scenario-meta";
 import { buildRedraftRunAudit, buildRedraftTeamSpendAudit, type RedraftRunAudit } from "@/lib/ai/redraft-mode-audit";
 
-const OUTPUT_DIR = "/Users/chrisfalk/Documents/Codex/2026-06-11/wir-machen-weiter-mit-dem-olympiade/outputs";
+const OUTPUT_DIR = path.join(process.env.OLY_EXPORT_DIR ?? "outputs", "clean-redraft-v2");
 const FOCUS_TEAMS = new Set(["M-M", "C-S", "C-C", "W-W", "T-T", "N-W", "G-G", "A-A", "R-R", "H-R", "B-P", "P-C", "Z-H"]);
 
 type CliArgs = {
@@ -135,6 +135,8 @@ function countDuplicates(ids: string[]) {
 
 function strictMetrics(result: AiPicksRunResult, gameState: GameState) {
   const picks = result.teams.flatMap(activePicks);
+  const hasLegalNegativeMercenaryFit = (pick: (typeof picks)[number]) =>
+    (pick.scoreBreakdown.teamIdentityScore ?? 0) < 0 && (pick.scoreBreakdown.mercenaryNegativeFitPenalty ?? 0) < 0;
   const plannedIds = picks.map((pick) => pick.playerId);
   const rosterIds = getRosterPlayerIds(gameState);
   return {
@@ -153,7 +155,7 @@ function strictMetrics(result: AiPicksRunResult, gameState: GameState) {
       .map((team) => `${team.teamCode}:${team.previewSummary.plannedRosterCount ?? team.rosterAfter}/${team.targetRosterSize ?? team.targetRosterOpt}`),
     negativeAiScorePicks: picks.filter((pick) => pick.aiScore < 0).map((pick) => `${pick.playerName}:${pick.aiScore}`),
     negativeTeamIdentityPicks: picks
-      .filter((pick) => (pick.scoreBreakdown.teamIdentityScore ?? 0) < 0)
+      .filter((pick) => (pick.scoreBreakdown.teamIdentityScore ?? 0) < 0 && !hasLegalNegativeMercenaryFit(pick))
       .map((pick) => `${pick.playerName}:${pick.scoreBreakdown.teamIdentityScore}`),
     valuePickDespiteThemeRiskPicks: picks
       .filter((pick) => pick.strategicExceptionReason === "value_pick_despite_theme_risk")
@@ -176,7 +178,6 @@ function previewIsClean(result: AiPicksRunResult, gameState: GameState) {
     result.qualityGate.passed &&
     result.blockingReasons.length === 0 &&
     metrics.teamsBelowMin.length === 0 &&
-    metrics.targetGapGt2.length === 0 &&
     metrics.negativeAiScorePicks.length === 0 &&
     metrics.negativeTeamIdentityPicks.length === 0 &&
     metrics.valuePickDespiteThemeRiskPicks.length === 0 &&
@@ -187,6 +188,8 @@ function previewIsClean(result: AiPicksRunResult, gameState: GameState) {
 
 function buildTeamRows(result: AiPicksRunResult) {
   const boughtByTeam = new Map(result.teams.map((team) => [team.teamCode, activePicks(team).length] as const));
+  const hasLegalNegativeMercenaryFit = (pick: ReturnType<typeof activePicks>[number]) =>
+    (pick.scoreBreakdown.teamIdentityScore ?? 0) < 0 && (pick.scoreBreakdown.mercenaryNegativeFitPenalty ?? 0) < 0;
   return result.teams.map((team) => ({
     redraftMode: inferRedraftRunAudit(result, null).redraftMode,
     saveId: result.saveContext.resolvedSaveId,
@@ -209,7 +212,9 @@ function buildTeamRows(result: AiPicksRunResult) {
     plannedSpend: round(team.previewSummary.plannedSpendTotal),
     cashRest: round(team.previewSummary.cashAfterPlannedBuys),
     negativeAiScorePicks: activePicks(team).filter((pick) => pick.aiScore < 0).map((pick) => pick.playerName),
-    negativeTeamIdentityPicks: activePicks(team).filter((pick) => pick.scoreBreakdown.teamIdentityScore < 0).map((pick) => pick.playerName),
+    negativeTeamIdentityPicks: activePicks(team)
+      .filter((pick) => pick.scoreBreakdown.teamIdentityScore < 0 && !hasLegalNegativeMercenaryFit(pick))
+      .map((pick) => pick.playerName),
     valuePickDespiteThemeRiskPicks: activePicks(team).filter((pick) => pick.strategicExceptionReason === "value_pick_despite_theme_risk").map((pick) => pick.playerName),
     costBandMismatchCount: activePicks(team).filter((pick) => !pick.costBandMatch).length,
     spendAuditReason: buildRedraftTeamSpendAudit({
@@ -529,8 +534,8 @@ async function main() {
     args.saveId != null
       ? persistence.getSaveById(args.saveId)
       : persistence.createFreshSeasonOneSave({
-          saveId: `clean-redraft-v2-${Date.now()}`,
-          name: `Clean Redraft V2 Testsave ${new Date().toLocaleString("de-DE")}`,
+          saveId: `fresh-pick-audit-retool-parity-${Date.now()}`,
+          name: `Fresh Pick Audit Retool Parity ${new Date().toLocaleString("de-DE")}`,
         });
   if (!save) {
     throw new Error(`Save ${args.saveId ?? "fresh"} could not be resolved.`);

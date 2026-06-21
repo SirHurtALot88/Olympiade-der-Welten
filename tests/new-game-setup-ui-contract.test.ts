@@ -23,4 +23,12 @@ describe("new game setup UI contract", () => {
     expect(source).toContain('["P-S", "D-P", "M-M", "V-W"]');
     expect(source).toContain('["M-S", "P-C", "C-S", "G-G"]');
   });
+
+  it("lets the season briefing complete and continue the setup flow", () => {
+    const source = fs.readFileSync(foundationClientPath, "utf8");
+
+    expect(source).toContain("completeSeasonBriefingAndContinue");
+    expect(source).toMatch(/onClick=\{completeSeasonBriefingAndContinue\}[\s\S]*?>\s*Erledigt\s*<\/button>/);
+    expect(source).toContain('closeSeasonBriefing(false)');
+  });
 });

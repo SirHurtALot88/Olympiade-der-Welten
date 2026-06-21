@@ -2,7 +2,7 @@ const ATTRIBUTE_SHEET_URL =
   "https://docs.google.com/spreadsheets/d/1Y4DJWoLBcEAWuS4dXTqnZK_6UXZe7NJtRD-rNjYc8Fk/export?format=csv&gid=589766543";
 
 export const ATTRIBUTE_SHEET_ALIASES: Record<string, string> = {
-  "Riley Le Rogue": "Riley Le Rouge",
+  "Riley Le Rouge": "Riley Le Rogue",
 };
 
 export type PlayerAttributeSheetRow = {

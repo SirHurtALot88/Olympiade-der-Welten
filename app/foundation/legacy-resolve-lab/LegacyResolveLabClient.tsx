@@ -4,6 +4,7 @@ import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
 
 import PlayerDetailDrawer from "@/app/foundation/PlayerDetailDrawer";
+import type { DisciplineCategory } from "@/lib/data/olyDataTypes";
 import type { LegacyMatchdayReadinessStatus } from "@/lib/lineups/legacy-matchday-readiness";
 import type { PlayerDetailDrawerData } from "@/lib/foundation/player-detail-drawer";
 import type { DisciplineHighlightCandidate, LegacyMatchdayResolvePreview, ResolvePreviewStatus } from "@/lib/resolve/legacy-matchday-resolve-types";
@@ -121,6 +122,7 @@ type ResolveLabResponse = {
     disciplineValues: Array<{
       id: string;
       label: string;
+      category?: DisciplineCategory;
       value: number | null;
     }>;
   }>;
@@ -305,12 +307,18 @@ export default function LegacyResolveLabClient({
       portraitUrl: player.portraitUrl,
       teamName: player.teamName,
       teamCode: player.teamCode,
+      teamHumanControlled: null,
       transferStatus: player.activePlayerId ? "Active Player" : "Preview / Kontextspieler",
       className: player.className,
       race: null,
       subclasses: [],
       traitsPositive: player.traitsPositive,
       traitsNegative: player.traitsNegative,
+      scoutingLevel: null,
+      scoutingDisclosure: null,
+      hiddenPositiveTraitCount: 0,
+      hiddenNegativeTraitCount: 0,
+      preferredDisciplineIdsVisible: false,
       pow: player.pow,
       spe: player.spe,
       men: player.men,
@@ -348,6 +356,7 @@ export default function LegacyResolveLabClient({
           : player.salary == null
             ? "missing_salary"
             : "imported_ready",
+      demands: [],
       fatigue: null,
       availability: {
         injuryStatus: "healthy",
@@ -366,18 +375,28 @@ export default function LegacyResolveLabClient({
       potential: player.potential,
       scoutPotential: null,
       developmentInsight: null,
+      organicProgression: null,
+      classHistory: [],
+      attributeVisibility: "scouted",
       attributeStats: [],
       baselineAttributeDeltas: [],
       axisCards: [
-        { id: "pow", label: "POW", tone: "power", value: player.pow, valueRank: null, seasonPoints: null, seasonPointsRank: null },
-        { id: "spe", label: "SPE", tone: "speed", value: player.spe, valueRank: null, seasonPoints: null, seasonPointsRank: null },
-        { id: "men", label: "MEN", tone: "mental", value: player.men, valueRank: null, seasonPoints: null, seasonPointsRank: null },
-        { id: "soc", label: "SOC", tone: "social", value: player.soc, valueRank: null, seasonPoints: null, seasonPointsRank: null },
+        { id: "pow", label: "POW", tone: "power", value: player.pow, valueRank: null, seasonPoints: null, seasonPointsRank: null, previousSeasonPointsRank: null },
+        { id: "spe", label: "SPE", tone: "speed", value: player.spe, valueRank: null, seasonPoints: null, seasonPointsRank: null, previousSeasonPointsRank: null },
+        { id: "men", label: "MEN", tone: "mental", value: player.men, valueRank: null, seasonPoints: null, seasonPointsRank: null, previousSeasonPointsRank: null },
+        { id: "soc", label: "SOC", tone: "social", value: player.soc, valueRank: null, seasonPoints: null, seasonPointsRank: null, previousSeasonPointsRank: null },
       ],
       disciplineValues: player.disciplineValues.map((entry, index) => ({
         ...entry,
+        category: entry.category ?? "power",
         seasonPoints: null,
+        seasonPointsRank: null,
         seasonAppearances: null,
+        allTimePoints: null,
+        allTimePointsRank: null,
+        allTimeAppearances: null,
+        currentSeasonMutatorPps: null,
+        slotLabels: [],
         lastSeasonPoints: null,
         lastSeasonAppearances: null,
         lastSeasonId: null,
@@ -427,6 +446,15 @@ export default function LegacyResolveLabClient({
           mvs: null,
           mvsRank: null,
           marketValue: player.marketValue,
+          marketValueBaselineDelta: null,
+          transferType: null,
+          transferFee: null,
+          transferMarketValue: null,
+          transferDeltaToMarketValue: null,
+          transferMarketValueFactor: null,
+          projectedSellValue: null,
+          projectedSellFactor: null,
+          projectedSellSourceLabel: null,
           salary: player.salary,
           contractLength: player.contractLength,
           averageContribution: null,
@@ -474,8 +502,6 @@ export default function LegacyResolveLabClient({
     <main className="app-shell foundation-shell">
       <section className="hero">
         <h1>Legacy Resolve Lab</h1>
-        <p>Read-only · gespeicherte Einsatzlisten werden hier nur ausgewertet, nicht geschrieben.</p>
-        <p className="muted">Keine DB-Writes, kein Result Apply, kein Standings Apply. Diese Seite ist nur Preview und Audit.</p>
         <p>
           <Link href="/foundation">Zurueck zur Foundation</Link>
         </p>
@@ -531,31 +557,17 @@ export default function LegacyResolveLabClient({
           </div>
         </section>
 
+        {data?.summary.warningsCount || data?.preview.incompleteLineups.length ? (
         <section className="panel">
           <div className="panel-header">
-            <h2>Summary</h2>
+            <h2>Hinweise</h2>
           </div>
-          {data ? (
-            <div className="legacy-resolve-kpis">
-              <p>Source: {data.source === "prisma" ? "Prisma read-only" : "Local SQLite"}</p>
-              <p>Preview Status: {getResolveStatusLabel(data.preview.status)}</p>
-              <p>Teams total: {data.summary.teamsTotal}</p>
-              <p>Teams mit Lineup: {data.summary.teamsWithLineup}</p>
-              <p>Teams ready: {data.summary.teamsReady}</p>
-              <p>Teams underfilled: {data.summary.teamsUnderfilled}</p>
-              <p>Missing Lineups: {data.summary.missingLineups}</p>
-              <p>Missing Drafts: {data.summary.teamsMissingLineup}</p>
-              <p>Invalid Lineups: {data.summary.teamsInvalidLineup}</p>
-              <p>Missing Score Coverage: {data.summary.teamsMissingScoreCoverage}</p>
-              <p>Warnings Count: {data.summary.warningsCount}</p>
-              <p>Incomplete Sides: {data.preview.incompleteLineups.length}</p>
-              <p>D1: {data.summary.d1DisciplineName ?? data.summary.d1DisciplineId ?? "n/a"}</p>
-              <p>D2: {data.summary.d2DisciplineName ?? data.summary.d2DisciplineId ?? "n/a"}</p>
-            </div>
-          ) : (
-            <p className="muted">Noch keine Daten geladen.</p>
-          )}
+          <ul className="warning-list compact-list">
+            {data.summary.warningsCount > 0 ? <li>{data.summary.warningsCount} Resolve-Warnungen vorhanden.</li> : null}
+            {data.preview.incompleteLineups.length > 0 ? <li>{data.preview.incompleteLineups.length} unvollständige Lineups.</li> : null}
+          </ul>
         </section>
+        ) : null}
 
         <section className="panel">
           <div className="panel-header">

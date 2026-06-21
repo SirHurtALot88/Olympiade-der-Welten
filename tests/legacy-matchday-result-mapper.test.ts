@@ -78,6 +78,7 @@ function createPreview(): LegacyMatchdayResolvePreview {
             baseValue: 22,
             finalPlayerScore: 22,
             scoreContribution: 0.55,
+            pointsAwarded: 4.4,
             rankInTeam: 1,
             rankInDiscipline: 1,
             isTop10: true,
@@ -136,6 +137,7 @@ function createPreview(): LegacyMatchdayResolvePreview {
             baseValue: 30,
             finalPlayerScore: 30,
             scoreContribution: 0.43,
+            pointsAwarded: 5.1,
             rankInTeam: 1,
             rankInDiscipline: 1,
             isTop10: true,
@@ -174,6 +176,8 @@ describe("legacy matchday result mapper", () => {
     expect(payload.matchdayResultPayload.teamsTotal).toBe(2);
     expect(payload.disciplineResultPayloads).toHaveLength(4);
     expect(payload.playerPerformancePayloads).toHaveLength(2);
+    expect(payload.playerPerformancePayloads[0]?.scoreContribution).toBe(4.4);
+    expect(payload.playerPerformancePayloads[1]?.scoreContribution).toBe(5.1);
     expect(payload.highlightPayloads).toHaveLength(2);
     expect(payload.auditPayload.action).toBe("prepare_apply_payload");
   });

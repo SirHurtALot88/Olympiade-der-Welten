@@ -5,6 +5,7 @@ import { endTurn } from "@/lib/game/apply-end-turn";
 import { applyMoveToken } from "@/lib/game/apply-move-token";
 import {
   applyRoomOwnershipPreset,
+  advanceRoomArenaStep,
   advanceRoomFlow,
   createRoom,
   getRoom,
@@ -12,7 +13,9 @@ import {
   markDisconnected,
   rejoinRoom,
   runRoomAiAutoStep,
+  setRoomArenaReadyState,
   setParticipantReadyState,
+  startRoomArenaSync,
   startRoom,
 } from "@/lib/room/room-store";
 import { authorizeServerRoomWrite } from "@/lib/room/server-authoritative-write-guard";
@@ -174,6 +177,44 @@ export function ensureSocketServer(httpServer: HttpServer) {
         return;
       }
 
+      io.to(result.room.roomCode).emit("roomState", result.room.state);
+    });
+
+    socket.on("startRoomArena", ({ roomCode, seatToken, seasonId, matchdayId, disciplineSide, maxSlotRevealIndex }) => {
+      const result = startRoomArenaSync(roomCode, seatToken, {
+        seasonId,
+        matchdayId,
+        disciplineSide,
+        maxSlotRevealIndex,
+      });
+      if (!result.ok) {
+        emitRoomError(io, socket.id, result.error, roomCode);
+        return;
+      }
+      const latestEvent = result.room.state.roomEvents.at(-1) ?? null;
+      if (latestEvent) io.to(result.room.roomCode).emit("roomGameplayEvent", latestEvent);
+      io.to(result.room.roomCode).emit("roomState", result.room.state);
+    });
+
+    socket.on("setRoomArenaReady", ({ roomCode, seatToken, ready }) => {
+      const result = setRoomArenaReadyState(roomCode, seatToken, ready);
+      if (!result.ok) {
+        emitRoomError(io, socket.id, result.error, roomCode);
+        return;
+      }
+      const latestEvent = result.room.state.roomEvents.at(-1) ?? null;
+      if (latestEvent) io.to(result.room.roomCode).emit("roomGameplayEvent", latestEvent);
+      io.to(result.room.roomCode).emit("roomState", result.room.state);
+    });
+
+    socket.on("advanceRoomArenaStep", ({ roomCode, seatToken, maxSlotRevealIndex, force }) => {
+      const result = advanceRoomArenaStep(roomCode, seatToken, { maxSlotRevealIndex, force });
+      if (!result.ok) {
+        emitRoomError(io, socket.id, result.error, roomCode);
+        return;
+      }
+      const latestEvent = result.room.state.roomEvents.at(-1) ?? null;
+      if (latestEvent) io.to(result.room.roomCode).emit("roomGameplayEvent", latestEvent);
       io.to(result.room.roomCode).emit("roomState", result.room.state);
     });
 

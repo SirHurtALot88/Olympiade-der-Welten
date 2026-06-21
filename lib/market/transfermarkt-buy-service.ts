@@ -21,7 +21,10 @@ export type TransfermarktBuyParams = {
   offeredSalary?: number;
   promisedRole?: RosterPromisedRole;
   transferSource?: string;
+  purchasePriceOverride?: number;
+  purchasePriceOverrideReason?: string;
   allowRecentlySoldRebuyOverride?: boolean;
+  fastLocalBatch?: boolean;
   localRunContext?: unknown;
   deferPersist?: boolean;
 };
@@ -76,6 +79,12 @@ export type TransfermarktBuyPreview = {
   negotiationReasons?: string[];
   negotiationWarnings?: string[];
   negotiationBlockingReasons?: string[];
+  dealPressure?: {
+    happinessPressure: number | null;
+    trustRisk: number | null;
+    pushPressure: number | null;
+    signals: string[];
+  } | null;
 };
 
 export type TransfermarktBuyExecuteResult = TransfermarktBuyPreview & {

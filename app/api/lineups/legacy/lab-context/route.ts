@@ -1,9 +1,11 @@
+export const dynamic = "force-dynamic";
+
 import { NextResponse } from "next/server";
 
 import { LegacyLineupContextLoader } from "@/lib/lineups/legacy-lineup-context-loader";
 import { loadLocalLegacyLineupContext } from "@/lib/lineups/legacy-lineup-local-service";
 import { LegacyLineupRepository } from "@/lib/lineups/legacy-lineup-repository";
-import { buildTeamControlSettingsMap } from "@/lib/foundation/team-control-settings";
+import { DEFAULT_ACTIVE_OWNER_ID, buildTeamControlSettingsMap, canLocalUserManageTeam } from "@/lib/foundation/team-control-settings";
 import { buildLineupDisciplineContract, buildMatchdayLineupContract, countSeasonCaptains, countSeasonLineupDisciplineSides, formatLineupTeamStatusLabel, SEASON_CAPTAIN_SLOTS } from "@/lib/lineups/lineup-discipline-contract";
 import type { LegacyLineupKeyParams } from "@/lib/lineups/legacy-lineup-types";
 import { createPersistenceService } from "@/lib/persistence/persistence-service";
@@ -41,6 +43,7 @@ function parseOptionalParams(request: Request) {
     seasonId: searchParams.get("seasonId")?.trim() ?? null,
     matchdayId: searchParams.get("matchdayId")?.trim() ?? null,
     teamId: searchParams.get("teamId")?.trim() ?? null,
+    activeOwnerId: searchParams.get("activeOwnerId")?.trim() || DEFAULT_ACTIVE_OWNER_ID,
   };
 }
 
@@ -190,6 +193,13 @@ async function loadPrismaOptions(params: LegacyLineupKeyParams) {
     where: { seasonId: params.seasonId },
     orderBy: [{ displayOrder: "asc" }],
   });
+  const matchdayResults = await db.matchdayResult.findMany({
+    where: {
+      saveId: params.saveId,
+      seasonId: params.seasonId,
+      status: "preview_applied",
+    },
+  });
 
   const contract = buildLineupDisciplineContract(
     disciplineConfigs.map((config) => ({
@@ -216,6 +226,7 @@ async function loadPrismaOptions(params: LegacyLineupKeyParams) {
     })),
   }));
   const totalTeams = teamStates.length;
+  const resultByMatchdayId = new Map(matchdayResults.map((result) => [result.matchdayId, result] as const));
 
   return {
     saves: saves.map((save) => ({ id: save.id, name: save.name, status: save.status })),
@@ -230,11 +241,14 @@ async function loadPrismaOptions(params: LegacyLineupKeyParams) {
             matchdayId: matchday.id,
           }) >= 2,
       ).length;
+      const result = resultByMatchdayId.get(matchday.id) ?? null;
       return {
         id: matchday.id,
         label: matchday.label,
         index: matchday.index,
-        status: matchday.status,
+        status: result ? "resolved" : matchday.status,
+        resultApplied: Boolean(result),
+        resultId: result?.id ?? null,
         discipline1Label: null,
         discipline1RequiredPlayers: null,
         discipline2Label: null,
@@ -301,6 +315,11 @@ function loadSqliteOptions(params: LegacyLineupKeyParams) {
   const disciplineScheduleByMatchdayId = new Map(disciplineSchedule.map((entry) => [entry.matchdayId, entry] as const));
   const controlSettingsMap = buildTeamControlSettingsMap(save.gameState.teams, save.gameState.seasonState.teamControlSettings);
   const totalTeams = save.gameState.teams.length;
+  const resultByMatchdayId = new Map(
+    (save.gameState.seasonState.matchdayResults ?? [])
+      .filter((result) => result.seasonId === save.gameState.season.id && result.status === "preview_applied")
+      .map((result) => [result.matchdayId, result] as const),
+  );
 
   return {
     saves: persistence.listSaves().map((saveItem) => ({ id: saveItem.saveId, name: saveItem.name, status: saveItem.status })),
@@ -322,11 +341,14 @@ function loadSqliteOptions(params: LegacyLineupKeyParams) {
             matchdayId,
           }) >= 2,
       ).length;
+      const result = resultByMatchdayId.get(matchdayId) ?? null;
       return {
         id: matchdayId,
         label: disciplineScheduleByMatchdayId.get(matchdayId)?.matchdayLabel ?? `Spieltag ${index + 1}`,
         index: disciplineScheduleByMatchdayId.get(matchdayId)?.matchdayIndex ?? index + 1,
-        status: save.gameState.matchdayState.matchdayId === matchdayId ? save.gameState.matchdayState.status : "planning",
+        status: result ? "resolved" : save.gameState.matchdayState.matchdayId === matchdayId ? save.gameState.matchdayState.status : "planning",
+        resultApplied: Boolean(result),
+        resultId: result?.id ?? null,
         discipline1Label: disciplineScheduleByMatchdayId.get(matchdayId)?.discipline1?.displayName ?? null,
         discipline1RequiredPlayers: disciplineScheduleByMatchdayId.get(matchdayId)?.discipline1?.playerCount ?? null,
         discipline2Label: disciplineScheduleByMatchdayId.get(matchdayId)?.discipline2?.displayName ?? null,
@@ -376,6 +398,17 @@ function loadSqliteOptions(params: LegacyLineupKeyParams) {
       };
     }),
   };
+}
+
+function isSqliteLineupReadOnly(params: LegacyLineupKeyParams, activeOwnerId: string) {
+  const persistence = createPersistenceService();
+  const bootstrapped = persistence.bootstrapSingleplayerSave();
+  const save =
+    persistence.getSaveById(params.saveId) ??
+    persistence.getActiveSave() ??
+    bootstrapped.save;
+
+  return !canLocalUserManageTeam(save.gameState, params.teamId, activeOwnerId);
 }
 
 export async function GET(request: Request) {
@@ -475,7 +508,7 @@ export async function GET(request: Request) {
     return NextResponse.json({
       params,
       source: "sqlite",
-      readOnly: false,
+      readOnly: isSqliteLineupReadOnly(params, parsed.activeOwnerId),
       context: contextResult.ok ? contextResult.context : null,
       contextWarnings: contextResult.ok ? contextResult.warnings : contextResult.warnings,
       contextErrors: contextResult.ok ? [] : contextResult.errors,

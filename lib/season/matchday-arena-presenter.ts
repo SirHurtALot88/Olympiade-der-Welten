@@ -2,8 +2,7 @@ import type { MatchdayMvpScoreboardRow } from "@/lib/season/matchday-mvp-scoring
 
 export const MATCHDAY_ARENA_PHASES = [
   { id: "slots", label: "Slots" },
-  { id: "base", label: "Base" },
-  { id: "fatigue", label: "Fatigue" },
+  { id: "push", label: "Push" },
   { id: "form", label: "Form" },
   { id: "mutator", label: "Mutator" },
   { id: "captain", label: "Captain" },
@@ -17,13 +16,14 @@ export type MatchdayArenaScoreboardRowView = MatchdayMvpScoreboardRow & {
   baseRank: number;
   rankDelta: number;
   currentScore: number;
+  pushScore: number | null;
   formScore: number | null;
   captainScore: number | null;
   totalMutatorScore: number | null;
 };
 
 export type MatchdayArenaPhaseBreakdownItem = {
-  id: "slots" | "base" | "fatigue" | "form" | "mutator" | "captain";
+  id: "slots" | "push" | "form" | "mutator" | "captain";
   label: string;
   valueLabel: string;
   tone: "neutral" | "positive" | "negative";
@@ -54,8 +54,7 @@ export function buildMatchdayArenaScoreboardView(
   const baseRankByTeamId = new Map(rankedByBase.map((entry) => [entry.teamId, entry.rank]));
 
   return rows.map((row) => {
-    const fatigueModifier =
-      row.fatigueStatus === "mapped" ? roundArenaScore(row.fatigueModifier ?? 0) ?? 0 : 0;
+    const pushScore = roundArenaScore(row.intensityModifier ?? 0);
     const captainScore =
       row.captainStatus === "mapped" ? roundArenaScore(row.captainModifier ?? 0) : null;
     const formScore =
@@ -70,7 +69,8 @@ export function buildMatchdayArenaScoreboardView(
       ...row,
       baseRank,
       rankDelta: baseRank - row.rank,
-      currentScore: roundArenaScore(row.baseScore + fatigueModifier) ?? row.baseScore,
+      currentScore: roundArenaScore(row.baseScore + (pushScore ?? 0)) ?? row.baseScore,
+      pushScore,
       formScore,
       captainScore,
       totalMutatorScore,
@@ -82,12 +82,11 @@ export function getMatchdayArenaPhaseScore(
   row: MatchdayArenaScoreboardRowView,
   phaseId: MatchdayArenaPhaseId,
 ) {
-  const fatiguePhaseScore =
-    row.fatigueStatus === "mapped" ? row.currentScore : row.baseScore;
+  const pushPhaseScore = row.currentScore;
   const formPhaseScore =
     row.formCardStatus === "ready"
-      ? fatiguePhaseScore + (row.formScore ?? 0)
-      : fatiguePhaseScore;
+      ? pushPhaseScore + (row.formScore ?? 0)
+      : pushPhaseScore;
   const mutatorPhaseScore =
     row.totalMutatorScore != null ? formPhaseScore + row.totalMutatorScore : formPhaseScore;
   const captainPhaseScore =
@@ -98,10 +97,8 @@ export function getMatchdayArenaPhaseScore(
   switch (phaseId) {
     case "slots":
       return roundArenaScore(row.baseScore);
-    case "base":
-      return roundArenaScore(row.baseScore);
-    case "fatigue":
-      return roundArenaScore(fatiguePhaseScore);
+    case "push":
+      return roundArenaScore(pushPhaseScore);
     case "form":
       return roundArenaScore(formPhaseScore);
     case "mutator":
@@ -123,10 +120,8 @@ export function getMatchdayArenaPhaseDelta(
   switch (phaseId) {
     case "slots":
       return null;
-    case "base":
-      return null;
-    case "fatigue":
-      return row.fatigueStatus === "mapped" ? roundArenaScore(row.currentScore - row.baseScore) : null;
+    case "push":
+      return row.intensity ? roundArenaScore(row.pushScore ?? 0) : null;
     case "form":
       return row.formCardStatus === "ready" ? roundArenaScore(row.formScore ?? 0) : null;
     case "mutator":
@@ -151,8 +146,8 @@ export function getMatchdayArenaPhaseSourceStatus(
   switch (phaseId) {
     case "slots":
       return "source_missing";
-    case "fatigue":
-      return row.fatigueStatus;
+    case "push":
+      return row.intensity ? "mapped" : "missing_source";
     case "form":
       return row.formCardStatus;
     case "mutator":
@@ -187,8 +182,7 @@ export function getMatchdayArenaPhaseBreakdown(
 ): MatchdayArenaPhaseBreakdownItem[] {
   const phaseOrder: MatchdayArenaPhaseBreakdownItem["id"][] = [
     "slots",
-    "base",
-    "fatigue",
+    "push",
     "form",
     "mutator",
     "captain",
@@ -207,19 +201,11 @@ export function getMatchdayArenaPhaseBreakdown(
       tone: "neutral",
     },
     {
-      id: "base",
-      label: "Base",
-      valueLabel: formatBreakdownValue(row.baseScore),
-      tone: "neutral",
-    },
-    {
-      id: "fatigue",
-      label: "Fatigue",
+      id: "push",
+      label: "Push",
       valueLabel:
-        row.fatigueStatus === "mapped"
-          ? formatBreakdownValue(row.currentScore - row.baseScore, true)
-          : "—",
-      tone: (row.currentScore - row.baseScore) < 0 ? "negative" : "neutral",
+        row.intensity ? formatBreakdownValue(row.pushScore ?? 0, true) : "—",
+      tone: (row.pushScore ?? 0) < 0 ? "negative" : (row.pushScore ?? 0) > 0 ? "positive" : "neutral",
     },
     {
       id: "form",

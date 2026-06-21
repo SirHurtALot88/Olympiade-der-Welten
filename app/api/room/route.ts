@@ -1,13 +1,18 @@
+export const dynamic = "force-dynamic";
+
 import { NextResponse } from "next/server";
 
 import {
   advanceRoomFlow,
+  advanceRoomArenaStep,
   createRoom,
   getRoom,
   joinRoom,
   rejoinRoom,
   runRoomAiAutoStep,
+  setRoomArenaReadyState,
   setParticipantReadyState,
+  startRoomArenaSync,
   startRoom,
 } from "@/lib/room/room-store";
 import { authorizeServerRoomWrite } from "@/lib/room/server-authoritative-write-guard";
@@ -15,7 +20,7 @@ import type { RoomOwnershipPreset } from "@/types/events";
 import type { TeamWriteAction } from "@/lib/room/online-room-model";
 
 type RoomPostBody = {
-  action?: "create" | "join" | "rejoin" | "ready" | "start" | "aiAutoStep" | "advance" | "authorizeWrite";
+  action?: "create" | "join" | "rejoin" | "ready" | "start" | "aiAutoStep" | "advance" | "arenaStart" | "arenaReady" | "arenaNextStep" | "authorizeWrite";
   roomCode?: string | null;
   displayName?: string | null;
   saveId?: string | null;
@@ -29,6 +34,11 @@ type RoomPostBody = {
   dryRun?: boolean | null;
   confirmToken?: string | null;
   expectedConfirmToken?: string | null;
+  seasonId?: string | null;
+  matchdayId?: string | null;
+  disciplineSide?: "d1" | "d2" | "overall" | null;
+  maxSlotRevealIndex?: number | null;
+  force?: boolean | null;
 };
 
 function publicRoomPayload(roomCode: string) {
@@ -179,6 +189,38 @@ export async function POST(request: Request) {
 
   if (action === "advance") {
     const result = advanceRoomFlow(body.roomCode?.trim() ?? "", body.seatToken?.trim() ?? "");
+    if (!result.ok) {
+      return NextResponse.json({ success: false, error: result.error }, { status: 403 });
+    }
+    return NextResponse.json({ success: true, room: publicRoomPayload(result.room.roomCode) });
+  }
+
+  if (action === "arenaStart") {
+    const result = startRoomArenaSync(body.roomCode?.trim() ?? "", body.seatToken?.trim() ?? "", {
+      seasonId: body.seasonId,
+      matchdayId: body.matchdayId,
+      disciplineSide: body.disciplineSide,
+      maxSlotRevealIndex: body.maxSlotRevealIndex,
+    });
+    if (!result.ok) {
+      return NextResponse.json({ success: false, error: result.error }, { status: 403 });
+    }
+    return NextResponse.json({ success: true, room: publicRoomPayload(result.room.roomCode) });
+  }
+
+  if (action === "arenaReady") {
+    const result = setRoomArenaReadyState(body.roomCode?.trim() ?? "", body.seatToken?.trim() ?? "", body.ready ?? true);
+    if (!result.ok) {
+      return NextResponse.json({ success: false, error: result.error }, { status: 403 });
+    }
+    return NextResponse.json({ success: true, room: publicRoomPayload(result.room.roomCode) });
+  }
+
+  if (action === "arenaNextStep") {
+    const result = advanceRoomArenaStep(body.roomCode?.trim() ?? "", body.seatToken?.trim() ?? "", {
+      maxSlotRevealIndex: body.maxSlotRevealIndex,
+      force: body.force,
+    });
     if (!result.ok) {
       return NextResponse.json({ success: false, error: result.error }, { status: 403 });
     }

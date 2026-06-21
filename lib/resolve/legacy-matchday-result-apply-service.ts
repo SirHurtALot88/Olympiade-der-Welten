@@ -43,6 +43,8 @@ export type ApplyLegacyMatchdayResultParams = LegacyMatchdayScopeParams & {
   forceReplace?: boolean;
   allowIncompleteOverride?: boolean;
   resolveOptions?: LegacyResolvePreviewOptions;
+  preloadedContexts?: LegacyLineupLoadedContext[];
+  preloadedPreview?: ReturnType<typeof buildLegacyMatchdayResolvePreview>;
 };
 
 export type PrepareLegacyMatchdayResultApplyResult = {
@@ -60,6 +62,14 @@ export type PrepareLegacyMatchdayResultApplyResult = {
   existingResultId: string | null;
   canApply: boolean;
   blockingReasons: string[];
+  performanceBreakdown?: {
+    contextLoadMs: number;
+    resolvePreviewMs: number;
+    lineupValidationMs: number;
+    playerPerformanceAggregationMs: number;
+    existingLookupMs: number;
+    totalMs: number;
+  };
 };
 
 type ApplyCounts = {
@@ -100,6 +110,17 @@ export type ApplyLegacyMatchdayResultSuccess = {
     }>;
     warnings: string[];
   };
+  performanceBreakdown?: {
+    contextLoadMs: number;
+    resolvePreviewMs: number;
+    lineupValidationMs: number;
+    playerPerformanceAggregationMs: number;
+    existingLookupMs: number;
+    recordMapMs: number;
+    standingsObjectiveRefreshMs: number;
+    saveWriteMs: number;
+    totalMs: number;
+  };
 };
 
 export type ApplyLegacyMatchdayResultFailure = {
@@ -120,6 +141,10 @@ type LocalContextLoaderLike = (params: LegacyMatchdayScopeParams & { teamId: str
 
 const APPLY_CONFIRM_TOKEN = "APPLY_MATCHDAY_RESULT";
 const FATIGUE_INJURY_ENABLED = process.env.OLY_ENABLE_INJURIES === "1";
+
+function elapsedSince(startedAt: number) {
+  return Math.max(0, Math.round(performance.now() - startedAt));
+}
 
 function buildResultId(saveId: string, seasonId: string, matchdayId: string) {
   return `matchday-result__${saveId}__${seasonId}__${matchdayId}`;
@@ -332,8 +357,11 @@ export async function prepareLegacyMatchdayResultApply(
     sourceVersion?: string;
     persistence?: PersistenceService;
     resolveOptions?: LegacyResolvePreviewOptions;
+    preloadedContexts?: LegacyLineupLoadedContext[];
+    preloadedPreview?: ReturnType<typeof buildLegacyMatchdayResolvePreview>;
   },
 ): Promise<PrepareLegacyMatchdayResultApplyResult> {
+  const totalStartedAt = performance.now();
   const source = normalizeSource(params.source);
   const client = options?.client ?? db;
   const loader =
@@ -344,16 +372,23 @@ export async function prepareLegacyMatchdayResultApply(
   const localLoader = options?.localLoader ?? loadLocalLegacyLineupContext;
   const persistence = options?.persistence ?? createPersistenceService();
 
+  const contextStartedAt = performance.now();
   const contexts =
-    source === "prisma"
+    options?.preloadedContexts ??
+    (source === "prisma"
       ? await loadAllContextsForPrisma(client, params, loader)
-      : loadAllContextsForSqlite(params, persistence, localLoader);
-  const preview = buildLegacyMatchdayResolvePreview(contexts, options?.resolveOptions);
+      : loadAllContextsForSqlite(params, persistence, localLoader));
+  const contextLoadMs = elapsedSince(contextStartedAt);
+  const resolveStartedAt = performance.now();
+  const preview = options?.preloadedPreview ?? buildLegacyMatchdayResolvePreview(contexts, options?.resolveOptions);
+  const resolvePreviewMs = elapsedSince(resolveStartedAt);
 
+  const readinessStartedAt = performance.now();
   const readinessEntries = contexts.map((context) => {
     const readiness = buildLegacyMatchdayReadiness(context);
     return [context.team.id, readiness] as const;
   });
+  const lineupValidationMs = elapsedSince(readinessStartedAt);
 
   const readinessByTeamId = Object.fromEntries(
     readinessEntries.map(([teamId, readiness]) => [
@@ -366,12 +401,15 @@ export async function prepareLegacyMatchdayResultApply(
     ]),
   );
 
+  const payloadStartedAt = performance.now();
   const writePayload = mapLegacyMatchdayResolvePreviewToResultPayload({
     preview,
     sourceVersion: options?.sourceVersion ?? "legacy-resolve-preview-v1",
     readinessByTeamId,
   });
+  const playerPerformanceAggregationMs = elapsedSince(payloadStartedAt);
 
+  const existingStartedAt = performance.now();
   const existingResultId =
     source === "sqlite"
       ? (
@@ -394,6 +432,7 @@ export async function prepareLegacyMatchdayResultApply(
             select: { id: true },
           })
         )?.id ?? null;
+  const existingLookupMs = elapsedSince(existingStartedAt);
 
   const blockingReasons = buildBlockingReasons({
     previewStatus: preview.status,
@@ -411,6 +450,14 @@ export async function prepareLegacyMatchdayResultApply(
     existingResultId,
     canApply: blockingReasons.length === 0,
     blockingReasons,
+    performanceBreakdown: {
+      contextLoadMs,
+      resolvePreviewMs,
+      lineupValidationMs,
+      playerPerformanceAggregationMs,
+      existingLookupMs,
+      totalMs: elapsedSince(totalStartedAt),
+    },
   };
 }
 
@@ -425,6 +472,7 @@ export class LegacyMatchdayResultApplyService {
   async applyLegacyMatchdayResult(
     params: ApplyLegacyMatchdayResultParams,
   ): Promise<ApplyLegacyMatchdayResultResult> {
+    const totalStartedAt = performance.now();
     const source = normalizeSource(params.source);
     const dryRun = params.execute ? false : params.dryRun ?? true;
 
@@ -453,6 +501,8 @@ export class LegacyMatchdayResultApplyService {
         persistence: this.persistence,
         localLoader: this.localLoader,
         resolveOptions: params.resolveOptions,
+        preloadedContexts: params.preloadedContexts,
+        preloadedPreview: params.preloadedPreview,
       },
     );
 
@@ -519,9 +569,21 @@ export class LegacyMatchdayResultApplyService {
         replacedExisting: Boolean(prepared.existingResultId),
         counts,
         dryRunSummary,
+        performanceBreakdown: {
+          contextLoadMs: prepared.performanceBreakdown?.contextLoadMs ?? 0,
+          resolvePreviewMs: prepared.performanceBreakdown?.resolvePreviewMs ?? 0,
+          lineupValidationMs: prepared.performanceBreakdown?.lineupValidationMs ?? 0,
+          playerPerformanceAggregationMs: prepared.performanceBreakdown?.playerPerformanceAggregationMs ?? 0,
+          existingLookupMs: prepared.performanceBreakdown?.existingLookupMs ?? 0,
+          recordMapMs: 0,
+          standingsObjectiveRefreshMs: 0,
+          saveWriteMs: 0,
+          totalMs: elapsedSince(totalStartedAt),
+        },
       };
     }
 
+    const recordMapStartedAt = performance.now();
     const save = resolveLocalSave(this.persistence, params.saveId);
     const now = new Date().toISOString();
     const existingResult =
@@ -616,6 +678,7 @@ export class LegacyMatchdayResultApplyService {
         resultAuditLogs: [...(seasonState.resultAuditLogs ?? []), nextAuditLog],
       },
     };
+    const recordMapMs = elapsedSince(recordMapStartedAt);
 
     const injuryResult = FATIGUE_INJURY_ENABLED
       ? applyFatigueAndInjuryAfterMatchday({
@@ -628,7 +691,12 @@ export class LegacyMatchdayResultApplyService {
         })
       : { gameState: nextGameState, injuryEvents: [] };
 
-    this.persistence.saveSingleplayerState(save.saveId, refreshTeamObjectiveState(injuryResult.gameState));
+    const objectiveStartedAt = performance.now();
+    const refreshedGameState = refreshTeamObjectiveState(injuryResult.gameState);
+    const standingsObjectiveRefreshMs = elapsedSince(objectiveStartedAt);
+    const saveStartedAt = performance.now();
+    this.persistence.saveSingleplayerState(save.saveId, refreshedGameState);
+    const saveWriteMs = elapsedSince(saveStartedAt);
 
     return {
       ok: true,
@@ -647,6 +715,17 @@ export class LegacyMatchdayResultApplyService {
       replacedExisting: Boolean(existingResult),
       counts,
       dryRunSummary,
+      performanceBreakdown: {
+        contextLoadMs: prepared.performanceBreakdown?.contextLoadMs ?? 0,
+        resolvePreviewMs: prepared.performanceBreakdown?.resolvePreviewMs ?? 0,
+        lineupValidationMs: prepared.performanceBreakdown?.lineupValidationMs ?? 0,
+        playerPerformanceAggregationMs: prepared.performanceBreakdown?.playerPerformanceAggregationMs ?? 0,
+        existingLookupMs: prepared.performanceBreakdown?.existingLookupMs ?? 0,
+        recordMapMs,
+        standingsObjectiveRefreshMs,
+        saveWriteMs,
+        totalMs: elapsedSince(totalStartedAt),
+      },
     };
   }
 }

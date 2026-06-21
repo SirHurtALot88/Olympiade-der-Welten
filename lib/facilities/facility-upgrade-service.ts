@@ -22,6 +22,7 @@ import type { PersistedSaveGame, PersistenceService } from "@/lib/persistence/ty
 export type FacilityUpgradePreview = {
   ok: boolean;
   dryRun: true;
+  action: FacilityUpgradeAction;
   confirmToken: string | null;
   team: { teamId: string; shortCode: string; name: string } | null;
   facility: { facilityId: FacilityId; label: string; variant: string | null } | null;
@@ -30,6 +31,7 @@ export type FacilityUpgradePreview = {
   currentEffect: string;
   nextEffect: string | null;
   upgradeCost: number | null;
+  refundAmount: number | null;
   currentUpkeep: number;
   newUpkeep: number;
   currentIncome: number;
@@ -51,6 +53,8 @@ export type FacilityUpgradeApplyResult = Omit<FacilityUpgradePreview, "dryRun"> 
   facilityEventId: string | null;
 };
 
+export type FacilityUpgradeAction = "upgrade" | "downgrade";
+
 function roundValue(value: number, digits = 2) {
   return Number(value.toFixed(digits));
 }
@@ -62,7 +66,9 @@ function buildConfirmToken(input: {
   currentLevel: number;
   nextLevel: number;
   upgradeCost: number;
+  refundAmount: number;
   cashBefore: number;
+  action: FacilityUpgradeAction;
   variant?: string | null;
 }) {
   return createHash("sha256")
@@ -74,7 +80,9 @@ function buildConfirmToken(input: {
         input.currentLevel,
         input.nextLevel,
         input.upgradeCost,
+        input.refundAmount,
         input.cashBefore,
+        input.action,
         input.variant ?? "none",
       ].join(":"),
     )
@@ -102,11 +110,11 @@ function buildNextFacilityState(input: {
       [input.facilityId]: {
         ...existing,
         level: input.nextLevel,
-        enabled: true,
+        enabled: input.nextLevel > 0,
         conditionPct: FACILITY_CONDITION_FULL,
         activeVariant: input.variant ?? existing?.activeVariant,
         lastPaidSeasonId: input.seasonId,
-        disabledReason: undefined,
+        disabledReason: input.nextLevel > 0 ? undefined : "not_built",
       },
     },
   } satisfies TeamFacilityCollection;
@@ -145,15 +153,22 @@ export function previewFacilityUpgrade(
   teamId: string,
   facilityId: FacilityId,
   variant?: string | null,
+  action: FacilityUpgradeAction = "upgrade",
 ): FacilityUpgradePreview {
   const gameState = save.gameState;
   const team = gameState.teams.find((entry) => entry.teamId === teamId) ?? null;
   const facility = FACILITY_CATALOG_BY_ID[facilityId] ?? null;
   const teamFacilities = getTeamFacilityState(gameState, teamId);
-  const currentLevel = facility ? getFacilityLevel(teamFacilities, facilityId) : 0;
-  const nextLevel = facility ? Math.min(currentLevel + 1, facility.maxLevel) : null;
+  const storedLevel = Math.max(0, Math.min(5, Math.round(teamFacilities.facilities[facilityId]?.level ?? 0)));
+  const currentLevel = facility ? (action === "downgrade" ? storedLevel : getFacilityLevel(teamFacilities, facilityId)) : 0;
+  const nextLevel = facility
+    ? action === "downgrade"
+      ? Math.max(currentLevel - 1, 0)
+      : Math.min(currentLevel + 1, facility.maxLevel)
+    : null;
   const currentDefinition = facility ? getFacilityLevelDefinition(facilityId, currentLevel) : null;
   const nextDefinition = facility && nextLevel != null ? getFacilityLevelDefinition(facilityId, nextLevel) : null;
+  const downgradeRefundSourceDefinition = action === "downgrade" && facility ? getFacilityLevelDefinition(facilityId, currentLevel) : null;
   const existingVariant = teamFacilities.facilities.specialist_wing?.activeVariant ?? null;
   const normalizedVariant =
     facilityId === "specialist_wing"
@@ -175,22 +190,30 @@ export function previewFacilityUpgrade(
   const newUpkeep = calculateFacilityUpkeep(nextTeamFacilities);
   const currentIncome = calculateFacilityIncome(teamFacilities);
   const newIncome = calculateFacilityIncome(nextTeamFacilities);
-  const upgradeCost = nextDefinition?.upgradeCost ?? null;
+  const upgradeCost = action === "upgrade" ? nextDefinition?.upgradeCost ?? null : 0;
+  const refundAmount =
+    action === "downgrade" && downgradeRefundSourceDefinition
+      ? roundValue(downgradeRefundSourceDefinition.upgradeCost * 0.25)
+      : null;
   const cashBefore = team?.cash ?? null;
-  const cashAfter = cashBefore != null && upgradeCost != null ? roundValue(cashBefore - upgradeCost) : cashBefore;
+  const cashAfter =
+    cashBefore != null && upgradeCost != null
+      ? roundValue(cashBefore - upgradeCost + (refundAmount ?? 0))
+      : cashBefore;
   const blockingReasons: string[] = [];
 
   if (save.status !== "active") blockingReasons.push("save_not_active");
   if (!team) blockingReasons.push("team_not_found");
   if (!facility) blockingReasons.push("facility_not_found");
-  if (facility && currentLevel >= facility.maxLevel) blockingReasons.push("facility_max_level");
-  if (teamFacilities.facilities[facilityId]?.disabledReason && currentLevel > 0) {
+  if (facility && action === "upgrade" && currentLevel >= facility.maxLevel) blockingReasons.push("facility_max_level");
+  if (facility && action === "downgrade" && currentLevel <= 0) blockingReasons.push("facility_min_level");
+  if (action === "upgrade" && teamFacilities.facilities[facilityId]?.disabledReason && currentLevel > 0) {
     blockingReasons.push("facility_disabled");
   }
-  if (facilityId === "specialist_wing" && currentLevel === 0 && !normalizedVariant) {
+  if (facilityId === "specialist_wing" && action === "upgrade" && currentLevel === 0 && !normalizedVariant) {
     blockingReasons.push("specialist_wing_variant_required");
   }
-  if (facilityId === "specialist_wing" && currentLevel > 0 && variant && variant !== existingVariant) {
+  if (facilityId === "specialist_wing" && action === "upgrade" && currentLevel > 0 && variant && variant !== existingVariant) {
     blockingReasons.push("specialist_wing_variant_switch_not_supported");
   }
   if (cashAfter != null && cashAfter < 0) blockingReasons.push("insufficient_cash");
@@ -204,7 +227,9 @@ export function previewFacilityUpgrade(
           currentLevel,
           nextLevel,
           upgradeCost,
+          refundAmount: refundAmount ?? 0,
           cashBefore,
+          action,
           variant: normalizedVariant,
         })
       : null;
@@ -212,14 +237,16 @@ export function previewFacilityUpgrade(
   return {
     ok: blockingReasons.length === 0,
     dryRun: true,
+    action,
     confirmToken,
     team: team ? { teamId: team.teamId, shortCode: team.shortCode, name: team.name } : null,
     facility: facility ? { facilityId, label: facility.label, variant: normalizedVariant } : null,
     currentLevel,
     nextLevel,
     currentEffect: currentDefinition?.effectDescription ?? "Level 0: kein Effekt",
-    nextEffect: nextDefinition?.effectDescription ?? null,
+    nextEffect: nextDefinition?.effectDescription ?? (action === "downgrade" && nextLevel === 0 ? "Level 0: kein Effekt" : null),
     upgradeCost,
+    refundAmount,
     currentUpkeep,
     newUpkeep,
     currentIncome,
@@ -242,9 +269,12 @@ export function applyFacilityUpgrade(
   facilityId: FacilityId,
   confirmToken: string | null | undefined,
   variant?: string | null,
-  persistence: PersistenceService = createPersistenceService(),
+  actionOrPersistence: FacilityUpgradeAction | PersistenceService = "upgrade",
+  persistenceOverride?: PersistenceService,
 ): FacilityUpgradeApplyResult {
-  const preview = previewFacilityUpgrade(save, teamId, facilityId, variant);
+  const action = typeof actionOrPersistence === "string" ? actionOrPersistence : "upgrade";
+  const persistence = typeof actionOrPersistence === "string" ? persistenceOverride ?? createPersistenceService() : actionOrPersistence;
+  const preview = previewFacilityUpgrade(save, teamId, facilityId, variant, action);
   if (!preview.ok || !preview.confirmToken || confirmToken !== preview.confirmToken) {
     return {
       ...preview,
@@ -280,7 +310,7 @@ export function applyFacilityUpgrade(
       team.teamId === teamId
         ? {
             ...team,
-            cash: roundValue(team.cash - preview.upgradeCost!),
+            cash: roundValue(team.cash - preview.upgradeCost! + (preview.refundAmount ?? 0)),
           }
         : team,
     ),
@@ -298,9 +328,9 @@ export function applyFacilityUpgrade(
           facilityId,
           previousLevel: preview.currentLevel,
           nextLevel: preview.nextLevel,
-          cost: preview.upgradeCost,
+          cost: action === "downgrade" ? -(preview.refundAmount ?? 0) : preview.upgradeCost,
           timestamp: new Date().toISOString(),
-          source: "manual_facility_upgrade",
+          source: action === "downgrade" ? "manual_facility_downgrade" : "manual_facility_upgrade",
           previousConditionPct: getFacilityEfficiency(currentFacilities, facilityId).conditionPct,
           nextConditionPct: FACILITY_CONDITION_FULL,
         },
@@ -312,7 +342,7 @@ export function applyFacilityUpgrade(
   persistence.saveSingleplayerState(save.saveId, nextGameState);
 
   return {
-    ...previewFacilityUpgrade({ ...save, gameState: nextGameState }, teamId, facilityId, preview.facility.variant),
+    ...preview,
     dryRun: false,
     applied: true,
     facilityEventId: eventId,

@@ -1,6 +1,8 @@
 import type { GameState, LineupDraft, Team, TeamControlMode } from "@/lib/data/olyDataTypes";
 import { buildAiLegacyLineupPreview } from "@/lib/ai/ai-legacy-lineup-engine";
-import { createDefaultLineupDraftModifiers } from "@/lib/lineups/legacy-lineup-modifiers";
+import { buildAiLegacyLineupModifiers } from "@/lib/ai/ai-legacy-lineup-batch-apply-service";
+import { ensureLocalFormCardsForSeason, normalizeLineupDraftModifiers } from "@/lib/lineups/legacy-lineup-modifiers";
+import { ensureLocalTeamPowersForSeason } from "@/lib/lineups/team-powers";
 import { createLineupDraftId } from "@/lib/lineups/lineup-discipline-contract";
 import { loadLocalLegacyLineupContextFromGameState } from "@/lib/lineups/legacy-lineup-local-service";
 import type { LegacyLineupEntryInput, LegacyLineupKeyParams, LegacyLineupLoadedContext } from "@/lib/lineups/legacy-lineup-types";
@@ -57,6 +59,8 @@ export type MatchdayMvpScoreboardRow = {
   mutator2Modifier: number | null;
   captainStatus: "mapped" | "missing_source";
   captainModifier: number | null;
+  intensity: "conserve" | "normal" | "push" | null;
+  intensityModifier: number | null;
   fatigueStatus: "mapped" | "missing_source";
   fatigueModifier: number | null;
   teamPpsStatus: "ready" | "missing_source";
@@ -77,10 +81,15 @@ export type MatchdayMvpTopPlayerRow = {
   playerName: string;
   teamId: string;
   teamName: string;
+  slotIndex: number;
+  baseValue: number;
   finalPlayerScore: number;
   pointsAwarded: number | null;
+  finalPointsAwarded: number | null;
   mutatorPpsBonus: number | null;
   mutatorScoreBonus: number | null;
+  mutatorSelectedTraitLabels?: string[];
+  mutatorHitTraitLabels?: string[];
   rankInDiscipline: number;
 };
 
@@ -125,7 +134,7 @@ export type MatchdayMvpScoringResult = {
   };
   lineupTeams: MatchdayMvpLineupTeam[];
   resolveStatus: string;
-  mutatorMode: "mvp_forced_mutators";
+  mutatorMode: "legacy_selected_traits" | "mvp_forced_mutators";
   d1Scoreboard: MatchdayMvpScoreboardRow[];
   d2Scoreboard: MatchdayMvpScoreboardRow[];
   d1TopPlayers: MatchdayMvpTopPlayerRow[];
@@ -215,6 +224,7 @@ function upsertDraftInGameState(
   gameState: GameState,
   params: LegacyLineupKeyParams,
   entries: LegacyLineupEntryInput[],
+  modifiers?: LineupDraft["modifiers"],
 ) {
   const now = new Date().toISOString();
   const lineupId = createLineupDraftId(params);
@@ -228,7 +238,7 @@ function upsertDraftInGameState(
     teamId: params.teamId,
     status: "draft",
     entries: entries.map((entry) => ({ ...entry })),
-    modifiers: existing?.modifiers ?? createDefaultLineupDraftModifiers(),
+    modifiers: normalizeLineupDraftModifiers(modifiers ?? existing?.modifiers),
     createdAt: existing?.createdAt ?? now,
     updatedAt: now,
   };
@@ -278,6 +288,8 @@ function buildScoreboardRow(
     mutator2Modifier: mutator2?.scoreModifier ?? null,
     captainStatus: teamResult.captainStatus,
     captainModifier: teamResult.captainBonus,
+    intensity: teamResult.intensity ?? null,
+    intensityModifier: teamResult.intensityModifier ?? null,
     fatigueStatus: teamResult.fatigueStatus,
     fatigueModifier: teamResult.fatigueModifier,
     teamPpsStatus: teamResult.teamPpsStatus,
@@ -296,6 +308,18 @@ function buildTopPlayerRow(
   player: NonNullable<Awaited<ReturnType<typeof prepareLegacyMatchdayResultApply>>["preview"]["disciplinePreviews"]>[number]["topPlayers"][number],
 ): MatchdayMvpTopPlayerRow {
   const teamResult = disciplinePreview.teamResults.find((entry) => entry.teamId === player.teamId) ?? null;
+  const mutatorSlots = teamResult?.mutatorSlots ?? [];
+  const mutatorSelectedTraitLabels = mutatorSlots
+    .map((slot) => slot.label)
+    .filter((label): label is string => Boolean(label));
+  const mutatorHitTraitLabels = mutatorSlots
+    .filter((slot) => slot.affectedPlayerIds?.includes(player.playerId))
+    .map((slot) => slot.label)
+    .filter((label): label is string => Boolean(label));
+  const finalPointsAwarded =
+    player.pointsAwarded == null && player.mutatorPpsBonus == null
+      ? null
+      : Number(((player.pointsAwarded ?? 0) + (player.mutatorPpsBonus ?? 0)).toFixed(2));
   return {
     disciplineSide: disciplinePreview.disciplineSide,
     disciplineId: disciplinePreview.disciplineId,
@@ -304,12 +328,25 @@ function buildTopPlayerRow(
     playerName: player.playerName,
     teamId: player.teamId,
     teamName: teamResult?.teamName ?? player.teamId,
+    slotIndex: player.slotIndex,
+    baseValue: player.baseValue,
     finalPlayerScore: player.finalPlayerScore,
     pointsAwarded: player.pointsAwarded,
+    finalPointsAwarded,
     mutatorPpsBonus: player.mutatorPpsBonus ?? null,
     mutatorScoreBonus: player.mutatorBonus ?? null,
+    mutatorSelectedTraitLabels,
+    mutatorHitTraitLabels,
     rankInDiscipline: player.rankInDiscipline,
   };
+}
+
+function getFinalTopPlayerPoints(player: MatchdayMvpTopPlayerRow) {
+  return player.finalPointsAwarded ?? (
+    player.pointsAwarded == null && player.mutatorPpsBonus == null
+      ? Number.NEGATIVE_INFINITY
+      : (player.pointsAwarded ?? 0) + (player.mutatorPpsBonus ?? 0)
+  );
 }
 
 function buildResolveSources(
@@ -377,7 +414,8 @@ export async function runMatchdayMvpScoring(
 
   const rosterWarnings: string[] = [];
   const lineupTeams: MatchdayMvpLineupTeam[] = [];
-  let nextGameState = structuredClone(save.gameState);
+  let nextGameState = ensureLocalFormCardsForSeason(structuredClone(save.gameState), scope.saveId, scope.seasonId);
+  nextGameState = ensureLocalTeamPowersForSeason(nextGameState, scope.saveId, scope.seasonId);
   const autoLineupTeamIds = new Set<string>();
 
   for (const team of [...save.gameState.teams].sort((left, right) => left.teamId.localeCompare(right.teamId))) {
@@ -461,6 +499,7 @@ export async function runMatchdayMvpScoring(
     }
 
     const preview = buildAiLegacyLineupPreview(contextResult.context, "sqlite");
+    const modifiers = buildAiLegacyLineupModifiers(contextResult.context, preview.entries);
     if (preview.status === "blocked" || preview.status === "missing_scores") {
       lineupTeams.push({
         teamId: team.teamId,
@@ -520,6 +559,7 @@ export async function runMatchdayMvpScoring(
         teamId: team.teamId,
       },
       preview.entries,
+      modifiers,
     );
     autoLineupTeamIds.add(team.teamId);
 
@@ -578,7 +618,7 @@ export async function runMatchdayMvpScoring(
       },
       lineupTeams,
       resolveStatus: "blocked",
-      mutatorMode: "mvp_forced_mutators",
+      mutatorMode: "legacy_selected_traits",
       d1Scoreboard: [],
       d2Scoreboard: [],
       d1TopPlayers: [],
@@ -616,8 +656,8 @@ export async function runMatchdayMvpScoring(
       localLoader: (loaderParams) =>
         loadLocalLegacyLineupContextFromGameState(nextGameState, loaderParams),
       resolveOptions: {
-        modifierMode: "mvp_forced_mutators",
-        captainMode: "missing_source",
+        modifierMode: "legacy_selected_traits",
+        captainMode: "selected_captain",
       },
       sourceVersion: "matchday-mvp-resolve-v2",
     },
@@ -638,14 +678,28 @@ export async function runMatchdayMvpScoring(
   const d1TopPlayers =
     prepared.preview.disciplinePreviews
       .filter((preview) => preview.disciplineSide === "d1")
-      .flatMap((preview) => preview.topPlayers.slice(0, 10).map((player) => buildTopPlayerRow(preview, player)));
+      .flatMap((preview) => preview.topPlayers.map((player) => buildTopPlayerRow(preview, player)))
+      .sort(
+        (left, right) =>
+          getFinalTopPlayerPoints(right) - getFinalTopPlayerPoints(left) ||
+          right.finalPlayerScore - left.finalPlayerScore ||
+          left.playerName.localeCompare(right.playerName, "de"),
+      )
+      .slice(0, 10);
   const d2TopPlayers =
     prepared.preview.disciplinePreviews
       .filter((preview) => preview.disciplineSide === "d2")
-      .flatMap((preview) => preview.topPlayers.slice(0, 10).map((player) => buildTopPlayerRow(preview, player)));
+      .flatMap((preview) => preview.topPlayers.map((player) => buildTopPlayerRow(preview, player)))
+      .sort(
+        (left, right) =>
+          getFinalTopPlayerPoints(right) - getFinalTopPlayerPoints(left) ||
+          right.finalPlayerScore - left.finalPlayerScore ||
+          left.playerName.localeCompare(right.playerName, "de"),
+      )
+      .slice(0, 10);
   const ppWinners = [...d1TopPlayers, ...d2TopPlayers]
-    .filter((player) => (player.mutatorPpsBonus ?? 0) > 0 || (player.pointsAwarded ?? 0) > 0)
-    .sort((left, right) => (right.mutatorPpsBonus ?? 0) - (left.mutatorPpsBonus ?? 0) || (right.pointsAwarded ?? 0) - (left.pointsAwarded ?? 0))
+    .filter((player) => getFinalTopPlayerPoints(player) > 0)
+    .sort((left, right) => getFinalTopPlayerPoints(right) - getFinalTopPlayerPoints(left) || (right.mutatorPpsBonus ?? 0) - (left.mutatorPpsBonus ?? 0))
     .slice(0, 10);
   const resolveSources = buildResolveSources(firstContext, d1Scoreboard, d2Scoreboard);
   const mutatorSlotWarnings = [
@@ -697,7 +751,7 @@ export async function runMatchdayMvpScoring(
       resolveSources,
       lineupTeams,
       resolveStatus: prepared.preview.status,
-      mutatorMode: "mvp_forced_mutators",
+      mutatorMode: "legacy_selected_traits",
       d1Scoreboard,
       d2Scoreboard,
       d1TopPlayers,
@@ -732,8 +786,8 @@ export async function runMatchdayMvpScoring(
     forceReplace: Boolean(params.forceReplace),
     allowIncompleteOverride: true,
     resolveOptions: {
-      modifierMode: "mvp_forced_mutators",
-      captainMode: "missing_source",
+      modifierMode: "legacy_selected_traits",
+      captainMode: "selected_captain",
     },
   });
 
@@ -755,7 +809,7 @@ export async function runMatchdayMvpScoring(
       resolveSources,
       lineupTeams,
       resolveStatus: prepared.preview.status,
-      mutatorMode: "mvp_forced_mutators",
+      mutatorMode: "legacy_selected_traits",
       d1Scoreboard,
       d2Scoreboard,
       d1TopPlayers,
@@ -809,7 +863,7 @@ export async function runMatchdayMvpScoring(
       resolveSources,
       lineupTeams,
       resolveStatus: prepared.preview.status,
-      mutatorMode: "mvp_forced_mutators",
+      mutatorMode: "legacy_selected_traits",
       d1Scoreboard,
       d2Scoreboard,
       d1TopPlayers,
@@ -847,7 +901,7 @@ export async function runMatchdayMvpScoring(
     resolveSources,
     lineupTeams,
     resolveStatus: prepared.preview.status,
-    mutatorMode: "mvp_forced_mutators",
+    mutatorMode: "legacy_selected_traits",
     d1Scoreboard,
     d2Scoreboard,
     d1TopPlayers,

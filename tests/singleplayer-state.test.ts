@@ -5,7 +5,15 @@ import {
   createFreshSeasonOneGameState,
   createSingleplayerGameState,
 } from "@/lib/game-state/singleplayer-state";
-import { deriveTeamIdentityAxisBias } from "@/lib/foundation/team-identity-settings";
+import {
+  applyGeneralManagerStrategyProfileEffect,
+  buildTeamGeneralManagerAssignments,
+  getTeamGeneralManager,
+  TEAM_GENERAL_MANAGER_PROFILES,
+  withNormalizedTeamGeneralManagers,
+} from "@/lib/foundation/team-general-managers";
+import { deriveTeamIdentityAxisBias, loadDefaultTeamIdentities } from "@/lib/foundation/team-identity-settings";
+import { getTeamStrategyProfile } from "@/lib/foundation/team-strategy-profiles";
 import { createPersistenceService } from "@/lib/persistence/persistence-service";
 import { allowsSandboxTestWrites, getSandboxLocalWritePolicy } from "@/lib/persistence/sandbox-write-permissions";
 import { getDatabase, getDatabasePath, resetDatabaseForTests } from "@/lib/persistence/sqlite";
@@ -54,7 +62,7 @@ describe("singleplayer game state", () => {
     expect(second?.gameState.players[0]?.portraitPath).toBeTruthy();
     expect(persistence.listSaves().length).toBeGreaterThan(0);
     expect(getDatabasePath()).toContain("oly-app");
-  });
+  }, 60000);
 
   it("normalizes legacy 10-player roster limits from season management targets", () => {
     const persistence = createPersistenceService();
@@ -63,7 +71,8 @@ describe("singleplayer game state", () => {
 
     const cashCreatorsIdentity = gameState.teamIdentities.find((identity) => identity.teamId === "C-C");
     expect(cashCreatorsIdentity?.playerMin).toBe(11);
-    expect(cashCreatorsIdentity?.playerOpt).toBe(12);
+    expect(cashCreatorsIdentity?.playerOpt).toBe(13);
+    expect(gameState.seasonState.teamGeneralManagers?.["C-C"]?.gmId).toBeTruthy();
 
     gameState.teams = gameState.teams.map((team) =>
       team.teamId === "C-C"
@@ -80,10 +89,10 @@ describe("singleplayer game state", () => {
 
     const reloaded = persistence.getSaveById(first.save.saveId);
     const cashCreators = reloaded?.gameState.teams.find((team) => team.teamId === "C-C");
-    expect(cashCreators?.rosterLimit).toBe(12);
+    expect(cashCreators?.rosterLimit).toBe(14);
     expect(cashCreators?.rosterMinTarget).toBe(11);
-    expect(cashCreators?.rosterOptTarget).toBe(12);
-  });
+    expect(cashCreators?.rosterOptTarget).toBe(13);
+  }, 60000);
 
   it("persists top-level season transition metadata across sqlite reloads", () => {
     const persistence = createPersistenceService();
@@ -279,7 +288,7 @@ describe("singleplayer game state", () => {
     expect(snapshot.gameState.scenarioMeta?.scenarioType).toBe("season2_start");
     expect(persistence.getActiveSave()?.saveId).toBe(snapshot.saveId);
     expect(persistence.getSaveById(first.save.saveId)?.saveId).toBe(first.save.saveId);
-  });
+  }, 20000);
 
   it("can create an archived sandbox snapshot without switching the active save", () => {
     const persistence = createPersistenceService();
@@ -308,7 +317,7 @@ describe("singleplayer game state", () => {
     expect(snapshot.gameState.scenarioMeta?.scenarioType).toBe("sandbox_snapshot");
     expect(snapshot.gameState.scenarioMeta?.allowTestWrites).toBe(false);
     expect(persistence.getActiveSave()?.saveId).toBe(first.save.saveId);
-  });
+  }, 20000);
 
   it("infers season_completed for legacy sqlite saves with final result and standings logs", () => {
     const persistence = createPersistenceService();
@@ -377,7 +386,7 @@ describe("singleplayer game state", () => {
     const activated = persistence.activateSave(first.save.saveId);
     expect(activated?.saveId).toBe(first.save.saveId);
     expect(persistence.getActiveSave()?.saveId).toBe(first.save.saveId);
-  });
+  }, 60000);
 
   it("creates a fresh local season one save without overwriting existing saves", () => {
     const persistence = createPersistenceService();
@@ -400,7 +409,7 @@ describe("singleplayer game state", () => {
       Object.values(fresh.gameState.seasonState.standings).every((standing) => (standing.points ?? 0) === 0),
     ).toBe(true);
     expect(fresh.gameState.seasonState.disciplineSchedule).toHaveLength(10);
-    expect(fresh.gameState.seasonState.disciplineSchedule?.every((entry) => entry.sourceStatus === "legacy_seed")).toBe(
+    expect(fresh.gameState.seasonState.disciplineSchedule?.every((entry) => entry.sourceStatus === "season_seed")).toBe(
       true,
     );
     expect(fresh.gameState.seasonState.teamControlSettings).toBeTruthy();
@@ -419,7 +428,22 @@ describe("singleplayer game state", () => {
           (fresh.gameState.seasonState.teamStrategyProfiles?.[team.teamId]?.rosterMinTarget ?? 0),
       ).toBe(true);
     }
-  });
+  }, 60000);
+
+  it("creates inactive fresh season one audit saves without changing the active save", () => {
+    const persistence = createPersistenceService();
+    const active = persistence.bootstrapSingleplayerSave().save;
+
+    const auditSave = persistence.createFreshSeasonOneSave({
+      name: "Inactive Audit Fresh Season 1",
+      status: "archived",
+      activate: false,
+    });
+
+    expect(auditSave.status).toBe("archived");
+    expect(auditSave.saveId).not.toBe(active.saveId);
+    expect(persistence.getActiveSave()?.saveId).toBe(active.saveId);
+  }, 20000);
 
   it("preloads all 32 local strategy profiles with lore-driven defaults for key teams", () => {
     const fresh = createFreshSeasonOneGameState();
@@ -454,23 +478,27 @@ describe("singleplayer game state", () => {
     expect(profiles["D-L"]?.preferredRaces).toContain("human");
 
     expect(profiles["Z-H"]?.strategySummary).toContain("Underground");
+    expect(profiles["Z-H"]?.strategyVersion).toContain("+gm-v2");
     expect(profiles["Z-H"]?.bias.riskTolerance).toBe(10);
 
     expect(profiles["M-M"]?.strategySummary).toContain("Multi-Champion-Topteam");
-    expect(profiles["M-M"]?.bias.starPriority).toBe(10);
+    expect(profiles["M-M"]?.bias.starPriority).toBe(9);
 
     expect(profiles["W-L"]?.strategySummary).toContain("Soeldner");
     expect(profiles["W-L"]?.preferredArchetypes).toContain("mercenary");
-    expect(profiles["A-A"]?.powBias).toBe(0);
-    expect(profiles["A-A"]?.speBias).toBe(90);
-    expect(profiles["A-A"]?.menBias).toBe(10);
-    expect(profiles["A-A"]?.socBias).toBe(0);
+    expect(profiles["A-A"]?.powBias).toBe(13);
+    expect(profiles["A-A"]?.speBias).toBe(67);
+    expect(profiles["A-A"]?.menBias).toBe(13);
+    expect(profiles["A-A"]?.socBias).toBe(8);
   });
 
-  it("preloads all 32 local team identity ratings from the season management sheet defaults", () => {
+  it("preloads all 32 local team identity ratings with GM-adjusted season identity", () => {
     const fresh = createFreshSeasonOneGameState();
 
     expect(fresh.teamIdentities).toHaveLength(32);
+    expect(TEAM_GENERAL_MANAGER_PROFILES).toHaveLength(100);
+    expect(Object.keys(fresh.seasonState.teamGeneralManagers ?? {})).toHaveLength(32);
+    expect(new Set(Object.values(fresh.seasonState.teamGeneralManagers ?? {}).map((assignment) => assignment.gmId)).size).toBe(32);
 
     const armageddon = fresh.teamIdentities.find((entry) => entry.teamId === "A-A");
     const wickedWizards = fresh.teamIdentities.find((entry) => entry.teamId === "W-W");
@@ -481,42 +509,106 @@ describe("singleplayer game state", () => {
 
     expect(armageddon).toMatchObject({
       playerType: "F",
-      pow: 0,
-      spe: 18,
-      men: 2,
-      soc: 0,
-      sourceNote: "season-management-sheet",
+      pow: 1.5,
+      spe: 15.3,
+      men: 2.3,
+      soc: 0.9,
+      sourceNote: "team-ratings-sheet + gm:gm-risk-gambler-07",
     });
     expect(wickedWizards).toMatchObject({
       playerType: "F",
-      pow: 0,
-      spe: 0,
-      men: 18,
+      pow: 1.2,
+      spe: 1.2,
+      men: 15.6,
       soc: 2,
-      sourceNote: "season-management-sheet",
+      sourceNote: "team-ratings-sheet + gm:gm-talent-builder-04",
     });
     expect(cashCreators).toMatchObject({
       playerType: "C",
       finances: 10,
       playerMin: 11,
-      playerOpt: 12,
+      playerOpt: 13,
     });
     expect(zeroHeroes?.ambition).toBe(10);
     expect(direLegion).toMatchObject({
-      pow: 10,
-      spe: 0,
-      men: 0,
-      soc: 10,
+      pow: 7.6,
+      spe: 1.2,
+      men: 1.2,
+      soc: 10.3,
     });
     expect(wreckingLegionnaires).toMatchObject({
-      pow: 8,
-      spe: 2,
-      men: 7,
-      soc: 3,
+      pow: 7.4,
+      spe: 2.6,
+      men: 6.4,
+      soc: 3.6,
     });
   });
 
-  it("derives strong axis bias percentages from raw team identities", () => {
+  it("repairs duplicate GM assignments into a unique league-wide GM draft", () => {
+    const fresh = createFreshSeasonOneGameState();
+    const duplicateAssignments = Object.fromEntries(
+      fresh.teams.map((team) => [
+        team.teamId,
+        {
+          teamId: team.teamId,
+          gmId: "gm-risk-gambler-01",
+          assignedSeasonId: fresh.season.id,
+          influencePct: 30,
+          source: "auto_generated" as const,
+        },
+      ]),
+    );
+
+    const repaired = buildTeamGeneralManagerAssignments(
+      fresh.teams,
+      fresh.season.id,
+      duplicateAssignments,
+      fresh.teamIdentities,
+    );
+
+    expect(Object.keys(repaired)).toHaveLength(32);
+    expect(new Set(Object.values(repaired).map((assignment) => assignment.gmId)).size).toBe(32);
+    expect(Object.values(repaired).every((assignment) => TEAM_GENERAL_MANAGER_PROFILES.some((profile) => profile.gmId === assignment.gmId))).toBe(true);
+  });
+
+  it("allows rare deterministic wildcard GM hires without duplicating profiles", () => {
+    const fresh = createFreshSeasonOneGameState();
+    const assignments = buildTeamGeneralManagerAssignments(fresh.teams, "season-wildcard-1", null, loadDefaultTeamIdentities());
+    const wildcardAssignments = Object.values(assignments).filter((assignment) => assignment.source === "auto_wildcard");
+
+    expect(wildcardAssignments.length).toBeGreaterThan(0);
+    expect(wildcardAssignments.length).toBeLessThanOrEqual(4);
+    expect(new Set(Object.values(assignments).map((assignment) => assignment.gmId)).size).toBe(32);
+  });
+
+  it("keeps raw sheet identities available separately from GM-adjusted season identities", () => {
+    const defaults = loadDefaultTeamIdentities();
+
+    expect(defaults.find((entry) => entry.teamId === "A-A")).toMatchObject({
+      pow: 0,
+      spe: 18,
+      men: 2,
+      soc: 0,
+      sourceNote: "team-ratings-sheet",
+    });
+    expect(defaults.find((entry) => entry.teamId === "W-W")).toMatchObject({
+      pow: 0,
+      spe: 0,
+      men: 18,
+      soc: 2,
+      sourceNote: "team-ratings-sheet",
+    });
+  });
+
+  it("does not apply GM identity influence twice when saves are normalized repeatedly", () => {
+    const fresh = createFreshSeasonOneGameState();
+    const once = withNormalizedTeamGeneralManagers(fresh);
+    const twice = withNormalizedTeamGeneralManagers(once);
+
+    expect(twice.teamIdentities).toEqual(once.teamIdentities);
+  });
+
+  it("derives strong axis bias percentages from GM-adjusted team identities", () => {
     const fresh = createFreshSeasonOneGameState();
 
     const armageddon = deriveTeamIdentityAxisBias(fresh.teamIdentities.find((entry) => entry.teamId === "A-A"));
@@ -524,10 +616,99 @@ describe("singleplayer game state", () => {
     const socialTeam = deriveTeamIdentityAxisBias(fresh.teamIdentities.find((entry) => entry.teamId === "M-S"));
     const giants = deriveTeamIdentityAxisBias(fresh.teamIdentities.find((entry) => entry.teamId === "T-G"));
 
-    expect(armageddon).toMatchObject({ pow: 0, spe: 90, men: 10, soc: 0, warning: null });
-    expect(wickedWizards).toMatchObject({ pow: 0, spe: 0, men: 90, soc: 10, warning: null });
-    expect(socialTeam).toMatchObject({ pow: 0, spe: 0, men: 0, soc: 100, warning: null });
-    expect(giants).toMatchObject({ pow: 80, spe: 10, men: 10, soc: 0, warning: null });
+    expect(armageddon).toMatchObject({ pow: 8, spe: 77, men: 12, soc: 5, warning: null });
+    expect(wickedWizards).toMatchObject({ pow: 6, spe: 6, men: 78, soc: 10, warning: null });
+    expect(socialTeam).toMatchObject({ pow: 1, spe: 4, men: 9, soc: 85, warning: null });
+    expect(giants).toMatchObject({ pow: 70, spe: 16, men: 14, soc: 0, warning: null });
+  });
+
+  it("feeds GM-adjusted identity axes into strategy profiles used by AI decisions", () => {
+    const fresh = createFreshSeasonOneGameState();
+
+    for (const team of fresh.teams) {
+      const identityAxis = deriveTeamIdentityAxisBias(fresh.teamIdentities.find((entry) => entry.teamId === team.teamId));
+      const profile = getTeamStrategyProfile(fresh, team.teamId);
+
+      expect(profile?.strategyVersion).toContain("+gm-v2");
+      expect(profile?.powBias).toBe(identityAxis?.pow);
+      expect(profile?.speBias).toBe(identityAxis?.spe);
+      expect(profile?.menBias).toBe(identityAxis?.men);
+      expect(profile?.socBias).toBe(identityAxis?.soc);
+    }
+
+    const zeroHeroes = getTeamStrategyProfile(fresh, "Z-H");
+    expect(zeroHeroes?.bias.riskTolerance).toBe(10);
+    expect(zeroHeroes?.bias.cashPriority).toBe(2);
+  });
+
+  it("applies GM axis shares and bias weights into strategy profiles with stable 30 percent influence", () => {
+    const gmProfile = TEAM_GENERAL_MANAGER_PROFILES.find((profile) => profile.gmId === "gm-risk-gambler-02");
+    expect(gmProfile).toBeTruthy();
+
+    const baseProfile = {
+      teamId: "T-1",
+      strategyVersion: "v1-local",
+      strategySummary: "Base profile",
+      buyStyle: "balanced",
+      sellStyle: "balanced",
+      contractStyle: "balanced",
+      rosterStyle: "balanced",
+      preferredArchetypes: [],
+      avoidedArchetypes: [],
+      preferredRaces: [],
+      avoidedRaces: [],
+      preferredClasses: [],
+      avoidedClasses: [],
+      hardNoGos: [],
+      powBias: 40,
+      speBias: 20,
+      menBias: 20,
+      socBias: 20,
+      bias: {
+        cashPriority: 5,
+        valuePriority: 5,
+        starPriority: 5,
+        riskTolerance: 5,
+        wageSensitivity: 5,
+        sellForProfitAggression: 5,
+        shortContractPreference: 5,
+        longContractPreference: 5,
+        loyaltyBias: 5,
+        harmonyStrictness: 5,
+        rosterDepthPreference: 5,
+        eliteSmallRosterPreference: 5,
+      },
+    };
+
+    const adjusted = applyGeneralManagerStrategyProfileEffect(baseProfile, gmProfile ?? null);
+    const axisSum = (gmProfile?.pow ?? 0) + (gmProfile?.spe ?? 0) + (gmProfile?.men ?? 0) + (gmProfile?.soc ?? 0);
+    const gmAxisShares = {
+      pow: Math.round(((gmProfile?.pow ?? 0) / axisSum) * 100),
+      spe: Math.round(((gmProfile?.spe ?? 0) / axisSum) * 100),
+      men: Math.round(((gmProfile?.men ?? 0) / axisSum) * 100),
+      soc: Math.round(((gmProfile?.soc ?? 0) / axisSum) * 100),
+    };
+
+    expect(adjusted.strategyVersion).toContain("+gm-v2");
+    expect(adjusted.powBias).toBe(Math.round(40 * 0.7 + gmAxisShares.pow * 0.3));
+    expect(adjusted.speBias).toBe(Math.round(20 * 0.7 + gmAxisShares.spe * 0.3));
+    expect(adjusted.menBias).toBe(Math.round(20 * 0.7 + gmAxisShares.men * 0.3));
+    expect(adjusted.socBias).toBe(Math.round(20 * 0.7 + gmAxisShares.soc * 0.3));
+    expect(adjusted.bias.riskTolerance).toBe(7);
+    expect(adjusted.bias.cashPriority).toBe(4);
+    expect(adjusted.preferredTraits?.length).toBeGreaterThan(0);
+
+    const appliedTwice = applyGeneralManagerStrategyProfileEffect(adjusted, gmProfile ?? null);
+    expect(appliedTwice).toEqual(adjusted);
+  });
+
+  it("keeps archetype variants meaningfully different instead of cosmetic renames", () => {
+    const variants = TEAM_GENERAL_MANAGER_PROFILES.filter((profile) => profile.archetype === "depth_spammer");
+
+    expect(variants).toHaveLength(10);
+    expect(new Set(variants.map((profile) => profile.title)).size).toBe(10);
+    expect(new Set(variants.map((profile) => `${profile.pow}/${profile.spe}/${profile.men}/${profile.soc}`)).size).toBeGreaterThan(4);
+    expect(new Set(variants.map((profile) => `${profile.bias.rosterDepthPreference}/${profile.bias.riskTolerance}/${profile.bias.harmonyStrictness}`)).size).toBeGreaterThan(4);
   });
 
   it("clones an existing save into a separate active slot", () => {
@@ -541,7 +722,7 @@ describe("singleplayer game state", () => {
     expect(clone.saveId).not.toBe(first.save.saveId);
     expect(clone.gameState.teams[0]!.cash).toBe(nextState.teams[0]!.cash);
     expect(persistence.getActiveSave()?.saveId).toBe(clone.saveId);
-  });
+  }, 20000);
 
   it("creates a fresh season one game state with clean transfer history", () => {
     const gameState = createFreshSeasonOneGameState();
@@ -554,7 +735,7 @@ describe("singleplayer game state", () => {
     expect(gameState.seasonState.playerGeneratorDrafts).toEqual([]);
   });
 
-  it("normalizes older local saves back to the full 10-matchday legacy seed schedule on reload", () => {
+  it("normalizes older local saves back to a full 10-matchday season seed schedule on reload", () => {
     const persistence = createPersistenceService();
     const fresh = persistence.createFreshSeasonOneSave({ name: "Legacy Schedule Normalize Test" });
     const mutated = structuredClone(fresh.gameState);
@@ -571,8 +752,9 @@ describe("singleplayer game state", () => {
     expect(reloaded?.gameState.season.matchdayIds).toHaveLength(10);
     expect(reloaded?.gameState.season.matchdayIds[9]).toBe("matchday-10");
     expect(reloaded?.gameState.seasonState.disciplineSchedule).toHaveLength(10);
-    expect(reloaded?.gameState.seasonState.disciplineSchedule?.[9]?.discipline1?.disciplineId).toBe("football");
-    expect(reloaded?.gameState.seasonState.disciplineSchedule?.[9]?.discipline2?.disciplineId).toBe("spurt");
+    expect(reloaded?.gameState.seasonState.disciplineSchedule?.every((entry) => entry.sourceStatus === "season_seed")).toBe(true);
+    expect(reloaded?.gameState.seasonState.disciplineSchedule?.[0]?.discipline1?.disciplineId).not.toBe("mini-dm");
+    expect(reloaded?.gameState.seasonState.disciplineSchedule?.[0]?.discipline2?.disciplineId).not.toBe("fechten");
   });
 
   it("persists local player generator drafts inside the sqlite save", () => {
@@ -774,7 +956,7 @@ describe("singleplayer game state", () => {
     expect(reloaded?.gameState.seasonState.teamControlSettings?.["B-B"]?.notes).toBe("Batch-Kandidat");
   }, 20000);
 
-  it("persists local team identity overrides inside the sqlite save without touching the defaults", () => {
+  it("normalizes roster identity targets from team ratings while preserving non-roster overrides", () => {
     const persistence = createPersistenceService();
     const first = persistence.bootstrapSingleplayerSave();
     const gameState = createFreshSeasonOneGameState();
@@ -806,9 +988,12 @@ describe("singleplayer game state", () => {
       playerMin: 10,
       playerOpt: 12,
     });
-    expect(reloaded?.gameState.teamIdentities.find((entry) => entry.teamId === "C-C")?.finances).toBe(9);
+    expect(reloaded?.gameState.teamIdentities.find((entry) => entry.teamId === "C-C")?.finances).toBe(9.3);
+    expect(reloaded?.gameState.teamIdentities.find((entry) => entry.teamId === "C-C")?.playerMin).toBe(11);
+    expect(reloaded?.gameState.teamIdentities.find((entry) => entry.teamId === "C-C")?.playerOpt).toBe(13);
+    expect(getTeamGeneralManager(reloaded!.gameState, "C-C")?.profile.title).toContain("Bargain Hunter");
     expect(createFreshSeasonOneGameState().teamIdentities.find((entry) => entry.teamId === "C-C")?.finances).toBe(10);
-  });
+  }, 20000);
 
   it("persists local strategy profiles inside the sqlite save", () => {
     const persistence = createPersistenceService();

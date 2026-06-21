@@ -1,13 +1,27 @@
+export const dynamic = "force-dynamic";
+
 import { NextResponse } from "next/server";
 
 import { projectFoundationStateFromPrisma } from "@/lib/db/read/foundation-read-projection";
 import { loadFoundationSnapshotFromPrisma } from "@/lib/db/read/foundation-read-repository";
-import type { GameState } from "@/lib/data/olyDataTypes";
+import type { GameState, NewGameFlowStepId, NewGameFlowStepStatus } from "@/lib/data/olyDataTypes";
 import { withNormalizedTeamIdentityOverrides } from "@/lib/foundation/team-identity-settings";
-import { withNormalizedTeamControlSettings } from "@/lib/foundation/team-control-settings";
+import { withNormalizedTeamGeneralManagers } from "@/lib/foundation/team-general-managers";
+import {
+  DEFAULT_ACTIVE_OWNER_ID,
+  buildTeamControlSettingsMap,
+  withNormalizedTeamControlSettings,
+} from "@/lib/foundation/team-control-settings";
 import { withNormalizedTeamStrategyProfiles } from "@/lib/foundation/team-strategy-profiles";
 import { createPersistenceService } from "@/lib/persistence/persistence-service";
+import {
+  matchesFoundationSaveMode,
+  normalizeFoundationSaveMode,
+  resolveFoundationSaveMode,
+  type FoundationSaveMode,
+} from "@/lib/persistence/foundation-save-mode";
 import { buildScenarioMeta } from "@/lib/persistence/scenario-meta";
+import type { PersistenceService, SaveSummary } from "@/lib/persistence/types";
 import { getActiveRoomBySaveId } from "@/lib/room/room-store";
 
 type SaveActionBody =
@@ -15,7 +29,31 @@ type SaveActionBody =
   | { action: "clone"; sourceSaveId: string; name: string }
   | { action: "snapshot"; sourceSaveId: string; name?: string }
   | { action: "activate"; saveId: string }
-  | { action: "fresh-season-1"; name?: string };
+  | { action: "fresh-season-1"; name?: string }
+  | {
+      action: "new-game-flow-step";
+      saveId: string;
+      stepId: NewGameFlowStepId;
+      status: NewGameFlowStepStatus;
+      selectedTeamId?: string | null;
+    }
+  | {
+      action: "select-manager-team";
+      saveId: string;
+      selectedTeamId: string;
+    };
+
+const NEW_GAME_FLOW_STEP_IDS: NewGameFlowStepId[] = [
+  "season_intro",
+  "team_confirm",
+  "roster_review",
+  "first_transfers",
+  "fill_roster",
+  "training_facilities",
+  "set_lineup",
+];
+
+const NEW_GAME_FLOW_STEP_STATUSES: NewGameFlowStepStatus[] = ["open", "completed", "skipped"];
 
 function serializeSave(save: {
   saveId: string;
@@ -42,6 +80,7 @@ function serializeSaveSummary(save: {
   createdAt: string;
   updatedAt: string;
   scenarioMeta?: unknown;
+  saveMode?: unknown;
 }) {
   return {
     saveId: save.saveId,
@@ -50,6 +89,42 @@ function serializeSaveSummary(save: {
     createdAt: save.createdAt,
     updatedAt: save.updatedAt,
     scenarioMeta: save.scenarioMeta,
+    saveMode: save.saveMode,
+  };
+}
+
+function enrichSaveSummary(save: SaveSummary): SaveSummary {
+  return {
+    ...save,
+    saveMode: resolveFoundationSaveMode(save),
+  };
+}
+
+function listSavesForMode(persistence: PersistenceService, saveMode: FoundationSaveMode) {
+  const summaries = persistence.listSaves().map(enrichSaveSummary);
+  return saveMode === "all" ? summaries : summaries.filter((save) => matchesFoundationSaveMode(saveMode, save));
+}
+
+function compactFoundationInitialGameState(gameState: GameState): GameState {
+  return {
+    ...gameState,
+    playerBaselines: undefined,
+    baselineWriteGuardEvents: undefined,
+    players: gameState.players.map((player) => ({
+      ...player,
+      attributeSheetStats: undefined,
+      attributeSheetRatings: undefined,
+      flavorEn: "",
+      flavorDe: "",
+      previousDisciplineRatings: undefined,
+      lastSeasonDisciplineValues: undefined,
+      currentDisciplineValues: undefined,
+      disciplineDelta: undefined,
+    })),
+    seasonState: {
+      ...gameState.seasonState,
+      seasonSnapshots: undefined,
+    },
   };
 }
 
@@ -83,10 +158,38 @@ async function loadPrismaResponse(saveId?: string) {
   });
 }
 
-function loadSqliteResponse(saveId?: string) {
+function loadSqliteResponse(saveId?: string, requestedSaveMode: FoundationSaveMode = "all", compactInitial = false) {
   const persistence = createPersistenceService();
-  const bootstrap = persistence.bootstrapSingleplayerSave();
-  const save = saveId ? persistence.getSaveById(saveId) : persistence.getActiveSave() ?? bootstrap.save;
+  let allSaves = persistence.listSaves().map(enrichSaveSummary);
+  if (allSaves.length === 0) {
+    persistence.bootstrapSingleplayerSave();
+    allSaves = persistence.listSaves().map(enrichSaveSummary);
+  }
+
+  const modeSaves =
+    requestedSaveMode === "all"
+      ? allSaves
+      : allSaves.filter((summary) => matchesFoundationSaveMode(requestedSaveMode, summary));
+  const activeSave = persistence.getActiveSave();
+  const activeSaveSummary =
+    activeSave && (requestedSaveMode === "all" || matchesFoundationSaveMode(requestedSaveMode, activeSave))
+      ? activeSave
+      : null;
+  const fallbackSummary = modeSaves[0] ?? allSaves[0] ?? null;
+  const save = saveId
+    ? persistence.getSaveById(saveId)
+    : activeSaveSummary
+      ? activeSaveSummary
+      : fallbackSummary
+      ? persistence.activateSave(fallbackSummary.saveId) ?? persistence.getSaveById(fallbackSummary.saveId)
+      : null;
+  if (!saveId && fallbackSummary) {
+    allSaves = persistence.listSaves().map(enrichSaveSummary);
+  }
+  const responseModeSaves =
+    requestedSaveMode === "all"
+      ? allSaves
+      : allSaves.filter((summary) => matchesFoundationSaveMode(requestedSaveMode, summary));
 
   if (!save) {
     return NextResponse.json(
@@ -97,6 +200,7 @@ function loadSqliteResponse(saveId?: string) {
           source: "sqlite",
           readOnly: false,
           generatedAt: new Date().toISOString(),
+          saveMode: requestedSaveMode,
         },
         error: "SQLite save could not be loaded.",
       },
@@ -104,16 +208,19 @@ function loadSqliteResponse(saveId?: string) {
     );
   }
 
+  const gameState = withNormalizedLocalTeamSettings(save.gameState);
+
   return NextResponse.json({
     save: serializeSave({
       ...save,
-      gameState: withNormalizedLocalTeamSettings(save.gameState),
+      gameState: compactInitial ? compactFoundationInitialGameState(gameState) : gameState,
     }),
-    saves: persistence.listSaves().map(serializeSaveSummary),
+    saves: responseModeSaves.map(serializeSaveSummary),
     _meta: {
       source: "sqlite",
       readOnly: false,
       generatedAt: new Date().toISOString(),
+      saveMode: requestedSaveMode,
     },
   });
 }
@@ -122,17 +229,20 @@ export async function GET(request: Request) {
   const { searchParams } = new URL(request.url);
   const saveId = searchParams.get("saveId")?.trim() || undefined;
   const source = searchParams.get("source")?.trim();
+  const saveMode = normalizeFoundationSaveMode(searchParams.get("saveMode")?.trim());
+  const compactInitial = searchParams.get("compact") === "foundation-initial";
 
   if (source === "prisma") {
     return loadPrismaResponse(saveId);
   }
 
-  return loadSqliteResponse(saveId);
+  return loadSqliteResponse(saveId, saveMode, compactInitial);
 }
 
 export async function PUT(request: Request) {
   const { searchParams } = new URL(request.url);
   const source = searchParams.get("source")?.trim();
+  const saveMode = normalizeFoundationSaveMode(searchParams.get("saveMode")?.trim());
   if (source === "prisma") {
     return NextResponse.json(
       {
@@ -167,13 +277,14 @@ export async function PUT(request: Request) {
       saveId: save.saveId,
       name: save.name,
     },
-    saves: persistence.listSaves().map(serializeSaveSummary),
+    saves: listSavesForMode(persistence, saveMode).map(serializeSaveSummary),
   });
 }
 
 export async function POST(request: Request) {
   const { searchParams } = new URL(request.url);
   const source = searchParams.get("source")?.trim();
+  const saveMode = normalizeFoundationSaveMode(searchParams.get("saveMode")?.trim());
   if (source === "prisma") {
     return NextResponse.json(
       {
@@ -218,13 +329,127 @@ export async function POST(request: Request) {
     save = persistence.createFreshSeasonOneSave({
       name: body.name,
     });
+  } else if (body.action === "new-game-flow-step") {
+    if (!body.saveId || !NEW_GAME_FLOW_STEP_IDS.includes(body.stepId) || !NEW_GAME_FLOW_STEP_STATUSES.includes(body.status)) {
+      return NextResponse.json({ error: "saveId, stepId and status are required." }, { status: 400 });
+    }
+
+    const sourceSave = persistence.getSaveById(body.saveId);
+    if (!sourceSave) {
+      return NextResponse.json({ error: "saveId could not be resolved." }, { status: 404 });
+    }
+
+    const now = new Date().toISOString();
+    const previousFlow = sourceSave.gameState.seasonState.newGameFlow ?? {
+      active: true,
+      selectedTeamId: body.selectedTeamId ?? null,
+      steps: [],
+    };
+    const nextSteps = NEW_GAME_FLOW_STEP_IDS.map((stepId) => {
+      const stored = previousFlow.steps?.find((step) => step.stepId === stepId);
+      if (stepId !== body.stepId) {
+        return stored ?? { stepId, status: "open" as const };
+      }
+
+      return {
+        stepId,
+        status: body.status,
+        completedAt: body.status === "completed" ? now : stored?.completedAt ?? null,
+        skippedAt: body.status === "skipped" ? now : stored?.skippedAt ?? null,
+      };
+    });
+    const isHandled = nextSteps.every((step) => step.status === "completed" || step.status === "skipped");
+    const nextGameState = withNormalizedLocalTeamSettings({
+      ...sourceSave.gameState,
+      seasonState: {
+        ...sourceSave.gameState.seasonState,
+        newGameFlow: {
+          ...previousFlow,
+          active: true,
+          dismissed: false,
+          selectedTeamId: body.selectedTeamId ?? previousFlow.selectedTeamId ?? null,
+          steps: nextSteps,
+          updatedAt: now,
+          completedAt: isHandled ? previousFlow.completedAt ?? now : previousFlow.completedAt ?? null,
+        },
+      },
+    });
+
+    save = persistence.saveSingleplayerState(body.saveId, nextGameState);
+  } else if (body.action === "select-manager-team") {
+    if (!body.saveId || !body.selectedTeamId) {
+      return NextResponse.json({ error: "saveId and selectedTeamId are required." }, { status: 400 });
+    }
+
+    const sourceSave = persistence.getSaveById(body.saveId);
+    if (!sourceSave) {
+      return NextResponse.json({ error: "saveId could not be resolved." }, { status: 404 });
+    }
+    if (!sourceSave.gameState.teams.some((team) => team.teamId === body.selectedTeamId)) {
+      return NextResponse.json({ error: "selectedTeamId could not be resolved." }, { status: 404 });
+    }
+
+    const now = new Date().toISOString();
+    const previousFlow = sourceSave.gameState.seasonState.newGameFlow ?? {
+      active: true,
+      selectedTeamId: body.selectedTeamId,
+      steps: [],
+    };
+    const baseSettings = buildTeamControlSettingsMap(
+      sourceSave.gameState.teams,
+      sourceSave.gameState.seasonState.teamControlSettings,
+    );
+    const selectedTeam = sourceSave.gameState.teams.find((team) => team.teamId === body.selectedTeamId);
+    const selectedSettings = baseSettings[body.selectedTeamId];
+    const nextTeamControlSettings = {
+      ...baseSettings,
+      [body.selectedTeamId]: {
+        ...selectedSettings,
+        teamId: body.selectedTeamId,
+        controlMode: "manual" as const,
+        ownerId: DEFAULT_ACTIVE_OWNER_ID,
+        ownerSlot: "user",
+        displayLabel: selectedSettings?.displayLabel ?? selectedTeam?.shortCode ?? body.selectedTeamId,
+        aiLineupPreviewEnabled: false,
+        aiLineupApplyEnabled: false,
+        aiLineupAutoApplyEnabled: false,
+        aiTransferPreviewEnabled: false,
+        aiTransferAutoApplyEnabled: false,
+        aiSellPreviewEnabled: false,
+        aiSellAutoApplyEnabled: false,
+      },
+    };
+    const nextGameState = withNormalizedLocalTeamSettings({
+      ...sourceSave.gameState,
+      teams: sourceSave.gameState.teams.map((team) =>
+        team.teamId === body.selectedTeamId ? { ...team, humanControlled: true } : team,
+      ),
+      seasonState: {
+        ...sourceSave.gameState.seasonState,
+        newGameFlow: {
+          ...previousFlow,
+          active: previousFlow.active ?? true,
+          dismissed: previousFlow.dismissed ?? false,
+          selectedTeamId: body.selectedTeamId,
+          steps: previousFlow.steps ?? [],
+          updatedAt: now,
+        },
+        teamControlSettings: nextTeamControlSettings,
+      },
+    });
+
+    save = persistence.saveSingleplayerState(body.saveId, nextGameState);
   }
 
   return NextResponse.json({
     save: save ? { saveId: save.saveId } : null,
-    saves: persistence.listSaves().map(serializeSaveSummary),
+    saves: listSavesForMode(persistence, saveMode).map(serializeSaveSummary),
   });
 }
 function withNormalizedLocalTeamSettings(gameState: GameState): GameState {
-  return withNormalizedTeamStrategyProfiles(withNormalizedTeamControlSettings(withNormalizedTeamIdentityOverrides(gameState)));
+  return withNormalizedTeamStrategyProfiles(
+    withNormalizedTeamControlSettings(
+      withNormalizedTeamGeneralManagers(withNormalizedTeamIdentityOverrides(gameState)),
+    ),
+  );
 }

@@ -124,6 +124,7 @@ export type TeamWriteAction =
   | "formcards"
   | "matchday_resolve"
   | "season_transition"
+  | "season_completion"
   | "cash_prize_apply"
   | "standings_apply";
 

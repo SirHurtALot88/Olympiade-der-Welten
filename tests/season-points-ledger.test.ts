@@ -8,13 +8,14 @@ describe("season points ledger", () => {
     const gameState = createFreshSeasonOneGameState();
     const teamA = gameState.teams[0];
     const teamB = gameState.teams[1];
-    const rosterA = gameState.rosters.filter((entry) => entry.teamId === teamA?.teamId).slice(0, 2);
-    const rosterB = gameState.rosters.filter((entry) => entry.teamId === teamB?.teamId).slice(0, 2);
+    const [playerA1, playerA2, playerB1, playerB2] = gameState.players.slice(0, 4);
 
     expect(teamA).toBeTruthy();
     expect(teamB).toBeTruthy();
-    expect(rosterA).toHaveLength(2);
-    expect(rosterB).toHaveLength(2);
+    expect(playerA1).toBeTruthy();
+    expect(playerA2).toBeTruthy();
+    expect(playerB1).toBeTruthy();
+    expect(playerB2).toBeTruthy();
 
     gameState.seasonState.matchdayResults = [
       {
@@ -68,8 +69,8 @@ describe("season points ledger", () => {
         id: "perf-a-1",
         matchdayResultId: "result-1",
         teamId: teamA!.teamId,
-        playerId: rosterA[0]!.playerId,
-        activePlayerId: rosterA[0]!.id,
+        playerId: playerA1!.id,
+        activePlayerId: playerA1!.id,
         disciplineId: "mini-dm",
         disciplineSide: "d1",
         slotIndex: 0,
@@ -88,8 +89,8 @@ describe("season points ledger", () => {
         id: "perf-a-2",
         matchdayResultId: "result-1",
         teamId: teamA!.teamId,
-        playerId: rosterA[1]!.playerId,
-        activePlayerId: rosterA[1]!.id,
+        playerId: playerA2!.id,
+        activePlayerId: playerA2!.id,
         disciplineId: "mini-dm",
         disciplineSide: "d1",
         slotIndex: 1,
@@ -107,8 +108,8 @@ describe("season points ledger", () => {
         id: "perf-b-1",
         matchdayResultId: "result-1",
         teamId: teamB!.teamId,
-        playerId: rosterB[0]!.playerId,
-        activePlayerId: rosterB[0]!.id,
+        playerId: playerB1!.id,
+        activePlayerId: playerB1!.id,
         disciplineId: "mini-dm",
         disciplineSide: "d1",
         slotIndex: 0,
@@ -126,8 +127,8 @@ describe("season points ledger", () => {
         id: "perf-b-2",
         matchdayResultId: "result-1",
         teamId: teamB!.teamId,
-        playerId: rosterB[1]!.playerId,
-        activePlayerId: rosterB[1]!.id,
+        playerId: playerB2!.id,
+        activePlayerId: playerB2!.id,
         disciplineId: "mini-dm",
         disciplineSide: "d1",
         slotIndex: 1,
@@ -151,11 +152,12 @@ describe("season points ledger", () => {
     const perfB1 = ledger.pointEntriesByPerformanceId.get("perf-b-1");
     const perfB2 = ledger.pointEntriesByPerformanceId.get("perf-b-2");
 
-    expect(teamASummary?.totalPoints).toBe(6.6);
+    expect(teamASummary?.totalPoints).toBe(6.9);
     expect(teamBSummary?.totalPoints).toBe(6.2);
     expect(teamASummary?.reconciliationStatus).toBe("reconciled");
     expect(teamBSummary?.reconciliationStatus).toBe("reconciled");
-    expect(teamASummary?.playerDerivedTotal).toBe(6.6);
+    expect(teamASummary?.playerDerivedTotal).toBe(6.9);
+    expect(teamASummary?.mutatorPpsBonus).toBe(0.3);
     expect(perfA1?.basePoints).toBe(4.95);
     expect(perfA1?.mutatorPpsBonus).toBe(0.3);
     expect(perfA1?.points).toBe(5.25);

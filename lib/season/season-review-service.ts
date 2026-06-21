@@ -8,6 +8,10 @@ import type {
   Team,
   TransferHistoryEntry,
 } from "@/lib/data/olyDataTypes";
+import {
+  buildTeamSeasonObjectiveSettlement,
+  type TeamSeasonObjectiveSettlement,
+} from "@/lib/board/team-season-objectives-service";
 import { buildPlayerRatingContractMap } from "@/lib/foundation/player-rating-contract";
 import { buildPlayerSeasonPerformanceMap } from "@/lib/foundation/player-season-performance";
 
@@ -89,6 +93,7 @@ export type SeasonReview = {
   storylines: Array<{ storylineId: string; text: string; source: string }>;
   transferHighlights: SeasonReviewTransferHighlight[];
   teamHighlights: SeasonReviewNamedValue[];
+  objectiveSettlement: TeamSeasonObjectiveSettlement;
   promisedRoleSignals: SeasonReviewPromisedRoleSignal[];
   xpDevelopmentRankings: SeasonReviewXpDevelopmentReport;
   warnings: string[];
@@ -283,7 +288,7 @@ function buildXpDevelopmentRow(
 ): SeasonReviewXpDevelopmentRow {
   const player = gameState.players.find((entry) => entry.id === event.playerId) ?? null;
   const team = gameState.teams.find((entry) => entry.teamId === event.teamId) ?? null;
-  const attributeDelta = event.upgrades.reduce((sum, upgrade) => sum + Math.max(0, upgrade.toValue - upgrade.fromValue), 0);
+  const attributeDelta = event.upgrades.reduce((sum, upgrade) => sum + (upgrade.toValue - upgrade.fromValue), 0);
   const beforeMarket = event.progressionSnapshotBefore?.marketValue;
   const afterMarket = event.progressionSnapshotAfter?.marketValuePreview ?? event.progressionSnapshotAfter?.marketValue;
   const beforeSalary = event.progressionSnapshotBefore?.salary;
@@ -410,8 +415,10 @@ export function buildSeasonReview(gameState: GameState): SeasonReview {
   const transferHighlights = buildTransferHighlights(gameState);
   const promisedRoleSignals = buildPromisedRoleSignals(gameState);
   const xpDevelopmentRankings = buildXpDevelopmentRankings(gameState);
+  const objectiveSettlement = buildTeamSeasonObjectiveSettlement(gameState);
   if (promisedRoleSignals.length > 0) warnings.push("promised_role_usage_gap");
   if (xpDevelopmentRankings.missingFairSnapshot.length > 0) warnings.push("xp_development_before_after_snapshot_missing");
+  if (objectiveSettlement.rows.length === 0) warnings.push("board_objective_settlement_missing");
   const teamHighlights = [
     ...buildTeamAxisHighlights(gameState),
     ...(dominantDisciplineWin ? [dominantDisciplineWin] : []),
@@ -517,6 +524,7 @@ export function buildSeasonReview(gameState: GameState): SeasonReview {
     storylines,
     transferHighlights,
     teamHighlights,
+    objectiveSettlement,
     promisedRoleSignals,
     xpDevelopmentRankings,
     warnings,

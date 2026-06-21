@@ -1,11 +1,12 @@
 import { buildAiLegacyLineupPreview } from "@/lib/ai/ai-legacy-lineup-engine";
-import { applyAiLegacyLineupBatchLocally } from "@/lib/ai/ai-legacy-lineup-batch-apply-service";
-import { type GameState, type TeamControlMode } from "@/lib/data/olyDataTypes";
+import { applyAiLegacyLineupBatchLocally, buildAiLegacyLineupModifiers } from "@/lib/ai/ai-legacy-lineup-batch-apply-service";
+import { type GameState, type LineupDraftModifiers, type TeamControlMode } from "@/lib/data/olyDataTypes";
 import { buildTeamControlSettingsMap, isAiLineupBatchApplyEnabled } from "@/lib/foundation/team-control-settings";
 import { buildLegacyMatchdayReadiness } from "@/lib/lineups/legacy-matchday-readiness";
 import { createLineupDraftId } from "@/lib/lineups/lineup-discipline-contract";
 import { loadLocalLegacyLineupContext, loadLocalLegacyLineupContextFromGameState } from "@/lib/lineups/legacy-lineup-local-service";
 import type { LegacyLineupEntryInput, LegacyLineupKeyParams, LegacyLineupLoadedContext } from "@/lib/lineups/legacy-lineup-types";
+import { ensureLocalFormCardsForSeason, normalizeLineupDraftModifiers } from "@/lib/lineups/legacy-lineup-modifiers";
 import { validateLegacyLineupContext } from "@/lib/lineups/legacy-lineup-validator";
 import { createPersistenceService } from "@/lib/persistence/persistence-service";
 import type { PersistenceService } from "@/lib/persistence/types";
@@ -18,6 +19,7 @@ import { buildLegacyMatchdayResolvePreview } from "@/lib/resolve/legacy-matchday
 import { type ResolvePreviewStatus } from "@/lib/resolve/legacy-matchday-resolve-types";
 import { buildStandingsPreview } from "@/lib/standings/standings-preview-engine";
 import { executeStandingsApply, STANDINGS_APPLY_CONFIRM_TOKEN } from "@/lib/standings/standings-apply-service";
+import { ADVANCE_MATCHDAY_CONFIRM_TOKEN, executeMatchdayAdvance } from "@/lib/season/matchday-progress-service";
 
 export const MATCHDAY_AUTO_RUN_CONFIRM_TOKEN = "RUN_LOCAL_MATCHDAY_AUTO";
 
@@ -174,6 +176,7 @@ function upsertDraftInGameState(
   gameState: GameState,
   params: LegacyLineupKeyParams,
   entries: LegacyLineupEntryInput[],
+  modifiers?: LineupDraftModifiers,
 ): GameState {
   const now = new Date().toISOString();
   const lineupId = createLineupDraftId(params);
@@ -194,6 +197,7 @@ function upsertDraftInGameState(
           teamId: params.teamId,
           status: "draft",
           entries: entries.map((entry) => ({ ...entry })),
+          modifiers: normalizeLineupDraftModifiers(modifiers),
           createdAt: existing?.createdAt ?? now,
           updatedAt: now,
         },
@@ -215,6 +219,7 @@ function simulateAiLineupState(
     save.gameState.seasonState.teamControlSettings,
   );
   let nextGameState = structuredClone(save.gameState);
+  nextGameState = ensureLocalFormCardsForSeason(nextGameState, scope.saveId, scope.seasonId);
   const readyTeamsAfterSimulation = new Set<string>();
 
   for (const team of save.gameState.teams) {
@@ -236,6 +241,7 @@ function simulateAiLineupState(
     }
 
     const preview = buildAiLegacyLineupPreview(contextResult.context, "sqlite");
+    const modifiers = buildAiLegacyLineupModifiers(contextResult.context, preview.entries);
     const hasExistingDraft = Boolean(contextResult.context.existingDraft?.entries?.length);
     if (preview.status === "blocked") {
       continue;
@@ -261,7 +267,7 @@ function simulateAiLineupState(
       continue;
     }
 
-    nextGameState = upsertDraftInGameState(nextGameState, params, preview.entries);
+    nextGameState = upsertDraftInGameState(nextGameState, params, preview.entries, modifiers);
     if (preview.status === "ready") {
       readyTeamsAfterSimulation.add(team.teamId);
     }
@@ -419,6 +425,7 @@ export async function runLocalMatchdayAutoRun(
   const includeWarningLineups = params.options?.includeWarningLineups ?? false;
   const overwriteExistingLineups = params.options?.overwriteExistingLineups ?? false;
   const stopOnTie = params.options?.stopOnTie ?? true;
+  const advanceAfterCashApply = params.options?.advanceAfterCashApply ?? true;
   const result = createBaseResult({
     source,
     dryRun,
@@ -447,6 +454,182 @@ export async function runLocalMatchdayAutoRun(
     seasonId: params.seasonId,
     matchdayId: params.matchdayId,
   };
+  const existingMatchdayResult =
+    (save.gameState.seasonState.matchdayResults ?? []).find(
+      (entry) => entry.saveId === scope.saveId && entry.seasonId === scope.seasonId && entry.matchdayId === scope.matchdayId,
+    ) ?? null;
+
+  if (existingMatchdayResult) {
+    addStep(result, {
+      key: "ai_lineups",
+      label: "AI Lineups",
+      status: "skipped",
+      dryRun,
+      canContinue: true,
+      warnings: ["existing_matchday_result_resume_skips_lineup_write"],
+      blockingReasons: [],
+      metrics: {
+        existingResult: true,
+      },
+      plannedWrites: 0,
+      appliedWrites: 0,
+      auditId: null,
+    });
+    addStep(result, {
+      key: "resolve_preview",
+      label: "Resolve Preview",
+      status: "skipped",
+      dryRun,
+      canContinue: true,
+      warnings: ["existing_matchday_result_resume_skips_resolve_preview"],
+      blockingReasons: [],
+      metrics: {
+        existingResult: true,
+      },
+      plannedWrites: 0,
+      appliedWrites: 0,
+      auditId: null,
+    });
+    addStep(result, {
+      key: "result_apply",
+      label: "Result Apply",
+      status: "applied",
+      dryRun,
+      canContinue: true,
+      warnings: ["existing_matchday_result_reused_for_resume"],
+      blockingReasons: [],
+      metrics: {
+        resultsWritten: 0,
+      },
+      plannedWrites: 0,
+      appliedWrites: 0,
+      auditId: existingMatchdayResult.id,
+    });
+    result.summary.resultApplyAllowed = true;
+    result.appliedAudits.resultApply = existingMatchdayResult.id;
+
+    if (dryRun) {
+      result.summary.standingsApplyAllowed = true;
+      result.summary.plannedWrites = result.plannedWrites.reduce((sum, item) => sum + item.count, 0);
+      result.warnings = Array.from(new Set(result.warnings));
+      result.blockingReasons = Array.from(new Set(result.blockingReasons));
+      result.status = result.warnings.length > 0 ? "warning" : "ready";
+      return result;
+    }
+
+    const standingsPreview = await buildStandingsPreview({ ...scope, source }, undefined, persistence);
+    const standingsPreviewBlockers =
+      stopOnTie && (standingsPreview.tieGroups?.length ?? 0) > 0
+        ? [...standingsPreview.blockedRules, "tie_groups_require_confirmed_policy"]
+        : standingsPreview.blockedRules.filter((rule) => rule !== "global_score_tie_breaker_missing");
+    addStep(result, {
+      key: "standings_preview",
+      label: "Standings Preview",
+      status: getStatusFromBooleans({
+        blockingReasons: standingsPreviewBlockers,
+        warnings: standingsPreview.items.flatMap((item) => item.warnings),
+      }),
+      dryRun: false,
+      canContinue: standingsPreviewBlockers.length === 0,
+      warnings: standingsPreview.items.flatMap((item) => item.warnings),
+      blockingReasons: standingsPreviewBlockers,
+      metrics: {
+        readyTeams: standingsPreview.summary.readyTeams,
+        blockedTeams: standingsPreview.summary.blockedTeamCount,
+        tieGroups: standingsPreview.tieGroups.length,
+      },
+      plannedWrites: 0,
+      appliedWrites: 0,
+      auditId: null,
+    });
+    result.summary.tieBlockers = standingsPreview.tieGroups.length;
+    if (standingsPreviewBlockers.length > 0) {
+      result.summary.standingsApplyAllowed = false;
+      result.summary.plannedWrites = result.plannedWrites.reduce((sum, item) => sum + item.count, 0);
+      result.warnings = Array.from(new Set(result.warnings));
+      result.blockingReasons = Array.from(new Set(result.blockingReasons));
+      return result;
+    }
+
+    const standingsApply = await executeStandingsApply(
+      {
+        ...scope,
+        source,
+        execute: true,
+        dryRun: false,
+        confirm: STANDINGS_APPLY_CONFIRM_TOKEN,
+        forceReplace: !stopOnTie,
+      },
+      persistence,
+    );
+    addStep(result, {
+      key: "standings_apply",
+      label: "Standings Apply",
+      status: standingsApply.ok && standingsApply.applied ? "applied" : "blocked",
+      dryRun: false,
+      canContinue: standingsApply.ok && standingsApply.applied,
+      warnings: standingsApply.warnings,
+      blockingReasons: standingsApply.ok ? [] : standingsApply.blockingReasons,
+      metrics: {
+        duplicateDetected: standingsApply.duplicateDetected,
+        plannedChanges: standingsApply.plannedChanges.length,
+      },
+      plannedWrites: 0,
+      appliedWrites: standingsApply.applied ? standingsApply.plannedChanges.length : 0,
+      auditId: standingsApply.auditLogId,
+    });
+    result.summary.standingsApplyAllowed = standingsApply.ok && standingsApply.applied;
+    if (!standingsApply.ok || !standingsApply.applied) {
+      result.summary.plannedWrites = result.plannedWrites.reduce((sum, item) => sum + item.count, 0);
+      result.warnings = Array.from(new Set(result.warnings));
+      result.blockingReasons = Array.from(new Set(result.blockingReasons));
+      return result;
+    }
+    result.appliedAudits.standingsApply = standingsApply.auditLogId;
+    result.summary.cashApplyAllowed = false;
+    if (advanceAfterCashApply) {
+      const matchdayAdvance = await executeMatchdayAdvance(
+        {
+          saveId: scope.saveId,
+          seasonId: scope.seasonId,
+          source,
+          execute: true,
+          dryRun: false,
+          confirm: ADVANCE_MATCHDAY_CONFIRM_TOKEN,
+        },
+        persistence,
+      );
+      addStep(result, {
+        key: "matchday_advance",
+        label: "Matchday Advance",
+        status: matchdayAdvance.ok && matchdayAdvance.applied ? "applied" : "blocked",
+        dryRun: false,
+        canContinue: matchdayAdvance.ok && matchdayAdvance.applied,
+        warnings: matchdayAdvance.warnings,
+        blockingReasons: matchdayAdvance.ok ? [] : matchdayAdvance.blockingReasons,
+        metrics: {
+          currentMatchday: matchdayAdvance.summary.currentMatchdayLabel,
+          nextMatchday: matchdayAdvance.summary.nextMatchdayLabel ?? "season_review",
+          resultApplied: matchdayAdvance.summary.resultApplied,
+          standingsApplied: matchdayAdvance.summary.standingsApplied,
+          seasonEnd: matchdayAdvance.scope.nextMatchdayId == null,
+        },
+        plannedWrites: 0,
+        appliedWrites: matchdayAdvance.applied ? 1 : 0,
+        auditId: matchdayAdvance.auditLogId,
+      });
+      result.summary.advanceAllowed = matchdayAdvance.ok && matchdayAdvance.applied;
+      result.appliedAudits.matchdayAdvance = matchdayAdvance.auditLogId;
+    } else {
+      result.summary.advanceAllowed = false;
+    }
+    result.summary.plannedWrites = result.plannedWrites.reduce((sum, item) => sum + item.count, 0);
+    result.warnings = Array.from(new Set(result.warnings));
+    result.blockingReasons = Array.from(new Set(result.blockingReasons));
+    result.ok = result.blockingReasons.length === 0;
+    result.status = result.ok ? "applied" : "blocked";
+    return result;
+  }
 
   const aiBatchResult = applyAiLegacyLineupBatchLocally({
     ...scope,
@@ -474,6 +657,15 @@ export async function runLocalMatchdayAutoRun(
       skippedDisabled: aiBatchResult.summary.skippedDisabled,
       warningTeams: aiBatchResult.summary.warningTeams,
       existingLineups: aiBatchResult.summary.existingLineups,
+      formCardsSelected: aiBatchResult.summary.formCardsSelected,
+      negativeFormCardsSelected: aiBatchResult.summary.negativeFormCardsSelected,
+      formCardPlanningMs: aiBatchResult.summary.performanceBreakdown?.formCardPlanningMs ?? null,
+      aiLineupGenerationMs: aiBatchResult.summary.performanceBreakdown?.aiLineupGenerationMs ?? null,
+      lineupValidationMs: aiBatchResult.summary.performanceBreakdown?.lineupValidationMs ?? null,
+      mutatorPlanningMs: aiBatchResult.summary.performanceBreakdown?.mutatorPlanningMs ?? null,
+      aiContextLoadMs: aiBatchResult.summary.performanceBreakdown?.contextLoadMs ?? null,
+      aiSaveWriteMs: aiBatchResult.summary.performanceBreakdown?.saveWriteMs ?? null,
+      aiBatchTotalMs: aiBatchResult.summary.performanceBreakdown?.totalMs ?? null,
     },
     plannedWrites: dryRun ? aiBatchResult.summary.plannedLineups : 0,
     appliedWrites: dryRun ? 0 : aiBatchResult.summary.savedTeams,
@@ -601,6 +793,8 @@ export async function runLocalMatchdayAutoRun(
     execute: true,
     dryRun: false,
     confirm: APPLY_CONFIRM_TOKEN,
+    preloadedContexts: currentContexts,
+    preloadedPreview: activeResolve.preview,
   });
   addStep(result, {
     key: "result_apply",
@@ -614,6 +808,15 @@ export async function runLocalMatchdayAutoRun(
       previewStatus: resultApply.previewStatus ?? "—",
       teamsTotal: resultApply.ok ? resultApply.teamsTotal : null,
       resultsWritten: resultApply.ok ? resultApply.resultsWritten : null,
+      contextLoadMs: resultApply.ok ? resultApply.performanceBreakdown?.contextLoadMs ?? null : null,
+      resolvePreviewMs: resultApply.ok ? resultApply.performanceBreakdown?.resolvePreviewMs ?? null : null,
+      lineupValidationMs: resultApply.ok ? resultApply.performanceBreakdown?.lineupValidationMs ?? null : null,
+      playerPerformanceAggregationMs: resultApply.ok ? resultApply.performanceBreakdown?.playerPerformanceAggregationMs ?? null : null,
+      existingLookupMs: resultApply.ok ? resultApply.performanceBreakdown?.existingLookupMs ?? null : null,
+      recordMapMs: resultApply.ok ? resultApply.performanceBreakdown?.recordMapMs ?? null : null,
+      standingsObjectiveRefreshMs: resultApply.ok ? resultApply.performanceBreakdown?.standingsObjectiveRefreshMs ?? null : null,
+      resultApplyTotalMs: resultApply.ok ? resultApply.performanceBreakdown?.totalMs ?? null : null,
+      saveWriteMs: resultApply.ok ? resultApply.performanceBreakdown?.saveWriteMs ?? null : null,
     },
     plannedWrites: 0,
     appliedWrites: resultApply.ok ? resultApply.resultsWritten : 0,
@@ -662,6 +865,7 @@ export async function runLocalMatchdayAutoRun(
     return result;
   }
 
+  const standingsApplyStartedAt = performance.now();
   const standingsApply = await executeStandingsApply(
     {
       ...scope,
@@ -673,6 +877,7 @@ export async function runLocalMatchdayAutoRun(
     },
     persistence,
   );
+  const standingsApplyDurationMs = Math.round(performance.now() - standingsApplyStartedAt);
   addStep(result, {
     key: "standings_apply",
     label: "Standings Apply",
@@ -684,6 +889,7 @@ export async function runLocalMatchdayAutoRun(
     metrics: {
       duplicateDetected: standingsApply.duplicateDetected,
       plannedChanges: standingsApply.plannedChanges.length,
+      durationMs: standingsApplyDurationMs,
     },
     plannedWrites: 0,
     appliedWrites: standingsApply.applied ? standingsApply.plannedChanges.length : 0,
@@ -698,7 +904,42 @@ export async function runLocalMatchdayAutoRun(
   }
   result.appliedAudits.standingsApply = standingsApply.auditLogId;
   result.summary.cashApplyAllowed = false;
-  result.summary.advanceAllowed = false;
+  if (advanceAfterCashApply) {
+    const matchdayAdvance = await executeMatchdayAdvance(
+      {
+        saveId: scope.saveId,
+        seasonId: scope.seasonId,
+        source,
+        execute: true,
+        dryRun: false,
+        confirm: ADVANCE_MATCHDAY_CONFIRM_TOKEN,
+      },
+      persistence,
+    );
+    addStep(result, {
+      key: "matchday_advance",
+      label: "Matchday Advance",
+      status: matchdayAdvance.ok && matchdayAdvance.applied ? "applied" : "blocked",
+      dryRun: false,
+      canContinue: matchdayAdvance.ok && matchdayAdvance.applied,
+      warnings: matchdayAdvance.warnings,
+      blockingReasons: matchdayAdvance.ok ? [] : matchdayAdvance.blockingReasons,
+      metrics: {
+        currentMatchday: matchdayAdvance.summary.currentMatchdayLabel,
+        nextMatchday: matchdayAdvance.summary.nextMatchdayLabel ?? "season_review",
+        resultApplied: matchdayAdvance.summary.resultApplied,
+        standingsApplied: matchdayAdvance.summary.standingsApplied,
+        seasonEnd: matchdayAdvance.scope.nextMatchdayId == null,
+      },
+      plannedWrites: 0,
+      appliedWrites: matchdayAdvance.applied ? 1 : 0,
+      auditId: matchdayAdvance.auditLogId,
+    });
+    result.summary.advanceAllowed = matchdayAdvance.ok && matchdayAdvance.applied;
+    result.appliedAudits.matchdayAdvance = matchdayAdvance.auditLogId;
+  } else {
+    result.summary.advanceAllowed = false;
+  }
 
   result.summary.plannedWrites = result.plannedWrites.reduce((sum, item) => sum + item.count, 0);
   result.warnings = Array.from(new Set(result.warnings));

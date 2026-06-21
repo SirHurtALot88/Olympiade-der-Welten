@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 
-import type { Player, PlayerGeneratorAttributeName, PlayerGeneratorAttributes } from "@/lib/data/olyDataTypes";
+import type { GameState, Player, PlayerGeneratorAttributeName, PlayerGeneratorAttributes } from "@/lib/data/olyDataTypes";
+import type { PlayerProgressionForecast } from "@/lib/training/training-plan-types";
 import {
   DEVELOPMENT_MAX_ATTRIBUTE_VALUE,
   DEVELOPMENT_POINTS_PER_LEVEL,
@@ -58,6 +59,105 @@ function player(overrides: Partial<Player> = {}): Player {
     potential: 70,
     ...overrides,
   };
+}
+
+function forecast(overrides: Partial<PlayerProgressionForecast> = {}): PlayerProgressionForecast {
+  return {
+    playerId: "player-test",
+    trainingMode: "mittel",
+    currentXP: 360,
+    spentXP: 0,
+    lifetimeXP: 360,
+    seasonProjectedXP: 120,
+    earnedXP: 160,
+    maintenanceXP: 40,
+    regressionPressure: 0,
+    netDevelopmentXP: 120,
+    trainingFormTier: "B",
+    xpTrend: "positive",
+    regressionRisk: "low",
+    developmentRoute: "core_growth",
+    currentAbilityRating: 55,
+    currentAbilityTier: "C",
+    currentAbilityStars: null,
+    potentialRating: 70,
+    potentialTier: "B",
+    potentialStars: null,
+    developmentFactors: {
+      playtimeFactor: 1,
+      performanceFactor: 1,
+      trainingFormFactor: 1,
+      potentialGapFactor: 1,
+      traitFactor: 1,
+      routeFitFactor: 1,
+    },
+    maintenanceBreakdown: {
+      leagueMedianRegression: 0,
+      currentAbility: 0,
+      role: 0,
+      potentialProximity: 0,
+      overPotential: 0,
+    },
+    regressionBreakdown: {
+      lowPlaytime: 0,
+      poorPerformance: 0,
+      sharpness: 0,
+      boardTrust: 0,
+      negativeTraits: 0,
+      routeConflict: 0,
+      starUnderperformance: 0,
+      highValueUnderperformance: 0,
+      poorTrainingValuePressure: 0,
+      potentialCeiling: 0,
+      seasonGainSoftCeiling: 0,
+      seasonGainHardCap: 0,
+    },
+    baseTrainingXP: 0,
+    appearanceXP: 0,
+    mvsXP: 0,
+    ppsBonusXP: 0,
+    topPlayerXP: 0,
+    highlightXP: 0,
+    performanceXP: 0,
+    traitModifierPct: 0,
+    traitMultiplier: 1,
+    potentialTrainingMultiplier: 1,
+    scoutPotential: null,
+    xpBeforeTraits: 0,
+    xpAfterTraits: 0,
+    xpEvents: [],
+    possibleUpgradeSummary: "test",
+    ratingTierCosts: { F: 1, E: 1, D: 1, C: 1, B: 1, A: 1, S: 1, "S+": 1, "99": null },
+    fatigueStrain: { label: "niedrig", score: 0, warning: "" },
+    sourceStatus: {
+      appearances: "missing_source",
+      mvs: "missing_source",
+      pps: "missing_source",
+      highlights: "missing_source",
+      facilities: "future_source",
+      writes: "preview_only",
+    },
+    audit: {
+      mvsPpsCoupling: "test",
+      seasonEndOnly: true,
+      productiveWrites: false,
+      warnings: [],
+    },
+    ...overrides,
+  };
+}
+
+function gameState(seasonId: string): GameState {
+  return {
+    season: {
+      id: seasonId,
+      name: seasonId,
+      currentMatchday: 1,
+      totalMatchdays: 10,
+      isCompleted: false,
+    },
+    rosters: [],
+  } as unknown as GameState;
 }
 
 describe("training-levelup-service", () => {
@@ -140,6 +240,34 @@ describe("training-levelup-service", () => {
     expect(shift.notification).toContain("Development Shift");
   });
 
+  it("rotiert den zweiten Signature-Fokus deterministisch ueber Seasons", () => {
+    const testPlayer = player();
+    const affinity = deriveAttributeAffinityProfile(testPlayer);
+    const signaturesBySeason = ["season-1", "season-2", "season-3"].map((seasonId) =>
+      buildSignatureShiftPreview({
+        player: testPlayer,
+        currentProfile: affinity,
+        route: "core_growth",
+        seasonId,
+      }).newSignatureAttributes.join("|"),
+    );
+
+    expect(new Set(signaturesBySeason).size).toBeGreaterThan(1);
+  });
+
+  it("nutzt den saisonal rotierten Signature-Fokus fuer echte Kosten und Badges", () => {
+    const testPlayer = player();
+    const model = buildPlayerDevelopmentLevelupModel({
+      gameState: gameState("season-2"),
+      player: testPlayer,
+      forecast: forecast({ developmentRoute: "core_growth" }),
+    });
+
+    expect(model.signatureShift.canShift).toBe(true);
+    expect(model.affinity.signatureAttributes).toEqual(model.signatureShift.newSignatureAttributes);
+    expect(model.costs.find((row) => row.attribute === model.signatureShift.newSignatureAttributes[1])?.affinity).toBe("signature");
+  });
+
   it("AI verteilt Trainingspunkte nach Route, Strategy und Affinity und meidet Weak ohne Need", () => {
     const testPlayer = player({ currentXP: 360, spentXP: 0, lifetimeXP: 360 });
     const model = buildPlayerDevelopmentLevelupModel({ player: testPlayer });
@@ -188,6 +316,55 @@ describe("training-levelup-service", () => {
     expect(allocation.pointsSpent).toBeGreaterThan(0);
     expect(allocation.recommendedAttributes).toContain("intelligence");
     expect(allocation.spendPlan[0]?.attribute).not.toBe(model.affinity.weakAttribute);
+  });
+
+  it("AI fokussiert GM- und Teamachsen statt alle kleinen Bias-Werte gleich zu behandeln", () => {
+    const testPlayer = player({ currentXP: 360, spentXP: 0, lifetimeXP: 360 });
+    const model = buildPlayerDevelopmentLevelupModel({ player: testPlayer });
+    const allocation = buildAiTrainingPointAllocation({
+      player: testPlayer,
+      teamId: "S-C",
+      profile: {
+        teamId: "S-C",
+        teamName: "Social Climbers",
+        strategySummary: "Social closer development",
+        buyStyle: "",
+        sellStyle: "",
+        contractStyle: "",
+        rosterStyle: "",
+        preferredArchetypes: [],
+        avoidedArchetypes: [],
+        preferredRaces: [],
+        avoidedRaces: [],
+        preferredClasses: [],
+        avoidedClasses: [],
+        hardNoGos: [],
+        powBias: 18,
+        speBias: 17,
+        menBias: 16,
+        socBias: 50,
+        bias: {
+          cashPriority: 5,
+          valuePriority: 5,
+          starPriority: 5,
+          riskTolerance: 5,
+          wageSensitivity: 5,
+          sellForProfitAggression: 5,
+          shortContractPreference: 5,
+          longContractPreference: 5,
+          loyaltyBias: 5,
+          harmonyStrictness: 5,
+          rosterDepthPreference: 5,
+          eliteSmallRosterPreference: 5,
+        },
+      },
+      level: model.level,
+      affinity: model.affinity,
+      preview: model.upgradePreview,
+    });
+
+    expect(allocation.recommendedAttributes.slice(0, 3)).toEqual(["charisma", "spirit", "determination"]);
+    expect(allocation.recommendedAttributes).not.toContain("intelligence");
   });
 
   it("Preview laesst contractSalary stabil, aber MW/expectedSalary koennen sich bewegen", () => {
