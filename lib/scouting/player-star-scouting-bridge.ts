@@ -1,0 +1,90 @@
+import type { GameState, Player } from "@/lib/data/olyDataTypes";
+import {
+  buildPlayerAxisStarProfile,
+  revealAxisStarProfile,
+  type PlayerAxisStarProfile,
+  type RevealedAxisStarProfile,
+} from "@/lib/scouting/player-axis-star-rating";
+import {
+  buildPlayerPotentialCeilingProfile,
+  buildPotentialGap,
+  revealPotentialStars,
+  type PlayerPotentialCeilingProfile,
+  type RevealedPotentialStars,
+} from "@/lib/scouting/player-potential-ceiling-service";
+import {
+  buildPlayerPotentialRecord,
+} from "@/lib/progression/player-potential-service";
+
+export type PlayerStarScoutingSnapshot = {
+  currentStars: PlayerAxisStarProfile;
+  revealedCurrentStars: RevealedAxisStarProfile;
+  potentialCeiling: PlayerPotentialCeilingProfile;
+  revealedPotentialStars: RevealedPotentialStars;
+  potentialGap: number;
+  fairValueRatio: number | null;
+};
+
+function isFiniteNumber(value: number | null | undefined): value is number {
+  return typeof value === "number" && Number.isFinite(value);
+}
+
+export function estimateFairValueFromStars(overallStars: number, marketValue: number | null | undefined) {
+  if (!isFiniteNumber(marketValue) || marketValue <= 0) return null;
+  const baselineStars = 2.5;
+  return marketValue * (overallStars / baselineStars);
+}
+
+export function buildPlayerStarScoutingSnapshot(input: {
+  gameState: GameState;
+  player: Player;
+  saveId: string;
+  scoutingLevel: number;
+}): PlayerStarScoutingSnapshot {
+  const currentStars = buildPlayerAxisStarProfile({
+    gameState: input.gameState,
+    player: input.player,
+    disciplines: input.gameState.disciplines,
+  });
+  const existingRecord =
+    input.gameState.playerPotential?.find((entry) => entry.playerId === input.player.id) ?? null;
+  const baseRecord = buildPlayerPotentialRecord({
+    saveId: input.saveId,
+    player: input.player,
+    existing: existingRecord,
+  });
+  const potentialCeiling = buildPlayerPotentialCeilingProfile({
+    saveId: input.saveId,
+    player: input.player,
+    currentStars,
+    existing: existingRecord,
+  });
+
+  const revealedCurrentStars = revealAxisStarProfile({
+    profile: currentStars,
+    scoutingLevel: input.scoutingLevel,
+  });
+  const revealedPotentialStars = revealPotentialStars({
+    ceiling: potentialCeiling,
+    currentStars,
+    scoutingLevel: input.scoutingLevel,
+  });
+  const potentialGap = buildPotentialGap({ currentStars, ceiling: potentialCeiling });
+  const fairValue = estimateFairValueFromStars(
+    currentStars.overall,
+    input.player.marketValue ?? null,
+  );
+  const fairValueRatio =
+    fairValue != null && isFiniteNumber(input.player.marketValue) && input.player.marketValue > 0
+      ? input.player.marketValue / fairValue
+      : null;
+
+  return {
+    currentStars,
+    revealedCurrentStars,
+    potentialCeiling,
+    revealedPotentialStars,
+    potentialGap,
+    fairValueRatio,
+  };
+}

@@ -12,6 +12,7 @@
     "start": "NODE_ENV=production tsx server.ts",
     "lint": "eslint .",
     "test": "vitest run",
+    "ci:balance-smoke": "npm test && npm run season:smoke-block-3 && npm run app:smoke-gameplay-write",
     "db:generate": "tsx scripts/run-prisma-with-env.ts generate",
     "db:migrate": "tsx scripts/run-prisma-with-env.ts migrate deploy",
     "db:seed": "prisma db seed",
