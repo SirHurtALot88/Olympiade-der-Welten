@@ -659,6 +659,42 @@ function getBoardReplacementReason(board: TeamBoardConfidenceRecord | null | und
   return null;
 }
 
+// Returns a probability (0–1) that the board will replace the GM this season rollover.
+// Hard floor: confidence <= 2.0 or pressure >= 9.5 → always fires (p=1).
+// Safe zone: confidence >= 6.5 and pressure <= 4 → never fires (p=0).
+// Between those zones: gradual curve modified by team identity traits.
+export function getBoardReplacementProbability(
+  board: TeamBoardConfidenceRecord | null | undefined,
+  identity: TeamIdentity | null | undefined,
+): number {
+  if (!board) return 0;
+  const confidence = Number(board.value ?? 5);
+  const pressure = Number(board.pressure ?? 0);
+
+  // Always safe
+  if (confidence >= 6.5 && pressure <= 4) return 0;
+  // Hard floor — always fire
+  if (confidence <= 2.0 || pressure >= 9.5) return 1.0;
+
+  // Gradual curves for the zone between safe and hard floor
+  const confidenceProb = confidence <= 4.5 ? Math.max(0, Math.min(0.9, (4.5 - confidence) / 2.5)) : 0;
+  const pressureProb = pressure >= 7.0 ? Math.max(0, Math.min(0.9, (pressure - 7.0) / 2.5)) : 0;
+  let prob = Math.max(confidenceProb, pressureProb);
+
+  // Identity modifiers — team personality shapes board patience
+  const ambition = identity?.ambition ?? 5;
+  const harmony = identity?.harmony ?? 5;
+  const boardSeed = identity?.boardConfidence ?? 5;
+
+  if (ambition >= 8) prob += 0.15;       // impatient board, fires sooner
+  else if (ambition <= 3) prob -= 0.10;  // gives trainer more time
+  if (harmony >= 8) prob -= 0.15;        // loyal culture, waits longer
+  else if (harmony <= 3) prob += 0.10;   // volatile board
+  if (boardSeed <= 4) prob += 0.10;      // structurally unstable board relationship
+
+  return Math.max(0, Math.min(1, prob));
+}
+
 function pickBestUnusedGeneralManager(input: {
   team: Team;
   teamIndex: number;
@@ -735,14 +771,17 @@ export function buildTeamGeneralManagerAssignments(
   teams.forEach((team) => {
     const current = existing?.[team.teamId] ?? null;
     const currentProfile = getTeamGeneralManagerProfile(current?.gmId);
-    const boardReplacementReason =
-      current?.assignedSeasonId && current.assignedSeasonId !== seasonId
-        ? getBoardReplacementReason(boardConfidenceByTeamId?.[team.teamId])
-        : null;
+    const identity = identityByTeamId.get(team.teamId) ?? null;
+    const shouldEvaluateReplacement = Boolean(current?.assignedSeasonId && current.assignedSeasonId !== seasonId);
+    const boardReplacementProbability = shouldEvaluateReplacement
+      ? getBoardReplacementProbability(boardConfidenceByTeamId?.[team.teamId], identity)
+      : 0;
+    const hotSeatRoll = (hashString(`${seasonId}:${team.teamId}:gm-hotseat-v2`) % 1000) / 1000;
+    const isFired = boardReplacementProbability > 0 && hotSeatRoll < boardReplacementProbability && !team.humanControlled;
     if (!current || !currentProfile || usedGmIds.has(currentProfile.gmId)) {
       return;
     }
-    if (boardReplacementReason && !team.humanControlled) {
+    if (isFired) {
       usedGmIds.add(currentProfile.gmId);
       return;
     }
@@ -764,15 +803,22 @@ export function buildTeamGeneralManagerAssignments(
 
     const current = existing?.[team.teamId] ?? null;
     const currentProfile = getTeamGeneralManagerProfile(current?.gmId);
-    const boardReplacementReason =
-      current?.assignedSeasonId && current.assignedSeasonId !== seasonId
-        ? getBoardReplacementReason(boardConfidenceByTeamId?.[team.teamId])
-        : null;
+    const identity = identityByTeamId.get(team.teamId) ?? null;
+    const shouldEvaluateReplacement = Boolean(current?.assignedSeasonId && current.assignedSeasonId !== seasonId);
+    const boardReplacementProbability = shouldEvaluateReplacement
+      ? getBoardReplacementProbability(boardConfidenceByTeamId?.[team.teamId], identity)
+      : 0;
+    const hotSeatRoll = (hashString(`${seasonId}:${team.teamId}:gm-hotseat-v2`) % 1000) / 1000;
+    const isFired = boardReplacementProbability > 0 && hotSeatRoll < boardReplacementProbability && !team.humanControlled;
+    // Determine dismissal reason only if the team is actually being replaced
+    const boardReplacementReason = isFired
+      ? getBoardReplacementReason(boardConfidenceByTeamId?.[team.teamId])
+      : null;
     const picked = pickBestUnusedGeneralManager({
       team,
       teamIndex: index,
       seasonId,
-      identity: identityByTeamId.get(team.teamId) ?? null,
+      identity,
       usedGmIds,
     });
     const profile = picked.profile;
@@ -782,9 +828,9 @@ export function buildTeamGeneralManagerAssignments(
       gmId: profile.gmId,
       assignedSeasonId: seasonId,
       influencePct: existing?.[team.teamId]?.influencePct ?? GM_INFLUENCE_PCT,
-      source: boardReplacementReason && currentProfile && !team.humanControlled ? "board_replacement" : (existing?.[team.teamId]?.source ?? picked.source),
-      previousGmId: boardReplacementReason && currentProfile && !team.humanControlled ? currentProfile.gmId : undefined,
-      dismissalReason: boardReplacementReason && currentProfile && !team.humanControlled ? boardReplacementReason : undefined,
+      source: isFired && currentProfile ? "board_replacement" : (existing?.[team.teamId]?.source ?? picked.source),
+      previousGmId: isFired && currentProfile ? currentProfile.gmId : undefined,
+      dismissalReason: boardReplacementReason ?? undefined,
     };
   });
 
