@@ -222,13 +222,35 @@ function getRelativeMetricRank(input: {
   };
 }
 
+function getSeasonNumber(seasonId: string | null | undefined): number {
+  if (!seasonId) return 1;
+  const match = seasonId.match(/season[-_](\d+)/i);
+  return match ? parseInt(match[1], 10) : 1;
+}
+
 function buildSalaryPressureObjective(input: {
   row: TeamManagementSnapshotRow;
   rowsByTeamId: Map<string, TeamManagementSnapshotRow>;
   seasonId?: string;
 }): ObjectiveDraft {
-  const isSeasonOne = input.seasonId != null && /season[-_\s]*1\b/i.test(input.seasonId);
-  const targetRatio = isSeasonOne ? 0.55 : 0.5;
+  const seasonNumber = getSeasonNumber(input.seasonId);
+  // S1: teams can legitimately spend 90%+ building their roster from scratch.
+  // Target loosens gradually as the league economy (salary factors) grows.
+  const targetRatio =
+    seasonNumber <= 1 ? 0.90 :
+    seasonNumber === 2 ? 0.78 :
+    seasonNumber === 3 ? 0.68 :
+    0.62;
+  const penaltyThreshold =
+    seasonNumber <= 1 ? 0.97 :
+    seasonNumber === 2 ? 0.88 :
+    seasonNumber === 3 ? 0.80 :
+    0.75;
+  const confidencePenalty =
+    seasonNumber <= 1 ? -0.1 :
+    seasonNumber === 2 ? -0.25 :
+    -0.4;
+
   const salaryTotal = input.row.salaryTotal ?? 0;
   const cash = input.row.cash ?? null;
   const salaryRatio = salaryTotal > 0 && cash != null ? salaryTotal / Math.max(1, cash + salaryTotal) : null;
@@ -252,14 +274,14 @@ function buildSalaryPressureObjective(input: {
   return {
     objectiveId: "finance-salary-ratio",
     category: "finance",
-    label: "Gehaltsdruck auf 50% senken",
+    label: `Gehaltsdruck auf ${targetPercent}% senken`,
     detail,
     actionHint,
     targetValue: `<= ${targetPercent}%`,
     currentValue: salaryRatio == null ? null : `${currentPercent}%`,
     status: statusForMax(salaryRatio, targetRatio),
-    penaltyCash: salaryRatio != null && salaryRatio > 0.62 ? 4 : undefined,
-    boardConfidenceDelta: salaryRatio != null && salaryRatio <= targetRatio ? 0.3 : -0.4,
+    penaltyCash: salaryRatio != null && salaryRatio > penaltyThreshold ? 4 : undefined,
+    boardConfidenceDelta: salaryRatio != null && salaryRatio <= targetRatio ? 0.3 : confidencePenalty,
     source: "roster_salary_active_cash",
   };
 }
