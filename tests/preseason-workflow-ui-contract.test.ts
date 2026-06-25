@@ -12,13 +12,14 @@ describe("pre-season workflow ui contract", () => {
     expect(fileText).toContain("/api/season/preseason-workflow");
     expect(fileText).toContain("Pre-Season Preview laden");
     expect(fileText).toContain("Saisonwechsel-Assistent prüfen");
-    expect(fileText).toContain("Manual Teams: warten auf deine Entscheidung");
-    expect(fileText).toContain("AI Teams: Auto-Sell/Buy bereit");
-    expect(fileText).toContain("Passive Teams: uebersprungen");
+    expect(fileText).toContain("Gefuehrte Teams: warten auf deine Entscheidung");
+    expect(fileText).toContain("Auto-Teams: Verkauf/Kauf bereit");
+    expect(fileText).toContain("Beobachtete Teams: uebersprungen");
     expect(fileText).toContain("Preisgeld & Finanzen");
+    expect(fileText).toContain("Sponsor");
     expect(fileText).toContain("Facilities");
     expect(fileText).toContain("Verlängern");
-    expect(fileText).toContain("Season-End Review:");
+    expect(fileText).toContain("Season-End Review");
     expect(fileText).toContain("RankChange: Season 1 nutzt Startbudget als StartRank");
     expect(fileText).toContain("already_applied");
     expect(fileText).not.toContain("confirmToken: setupStep.confirmToken");

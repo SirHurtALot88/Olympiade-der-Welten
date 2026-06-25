@@ -42,6 +42,7 @@ import {
 } from "@/lib/room/foundation-room-context-client";
 import { DEFAULT_ACTIVE_OWNER_ID } from "@/lib/foundation/team-control-settings";
 import { getClassTrainingSignals } from "@/lib/training/class-progression-config";
+import { VeloAttributeFocusTags, VeloStatOrbitRow } from "@/components/foundation/velo-ui";
 
 type TransfermarktV2ClientProps = {
   defaultSaveId: string;
@@ -63,6 +64,10 @@ type TransfermarktV2ClientProps = {
   onOpenClassicMarket?: (() => void) | null;
   onToggleWishlist?: ((item: TransfermarktFreeAgentItem) => void) | null;
   onRemoveWishlist?: ((playerId: string) => void) | null;
+  scoutingWatchPlayerIds?: string[];
+  scoutingIntelByPlayerId?: Record<string, number>;
+  scoutingPipelineCapacity?: { occupied: number; max: number } | null;
+  onToggleScoutingWatch?: ((item: TransfermarktFreeAgentItem) => void) | null;
   onBuyCompleted?: ((teamId: string) => Promise<void> | void) | null;
   onSell?: ((payload: { activePlayerId: string; playerId: string; playerName: string; className: string; race: string | null; portraitUrl: string | null }) => void) | null;
 };
@@ -886,7 +891,7 @@ function formatNegotiationSignalLabel(value: string) {
     negotiation_rejected_bad_experience: "Die letzte Absage macht die naechste Runde haerter.",
     offer_below_expected_salary: "Angebot liegt unter der aktuellen Forderung.",
     previous_rejected_offer_reduces_trust: "Spieler ist nach der letzten Runde noch angefressen und verhandelt haerter.",
-    preview_only_contract_negotiation: "Nur Vorschau, noch kein finaler Abschluss.",
+    preview_only_contract_negotiation: "Verhandlungssimulation — finaler Kauf über „Kauf bestätigen“.",
     trait_salary_factor_source_missing: "Ein Teil der Trait-Effekte ist noch unscharf.",
     team_not_found: "Team wurde nicht gefunden.",
     player_not_found: "Spieler wurde nicht gefunden.",
@@ -1058,6 +1063,10 @@ export default function TransfermarktV2Client({
   onOpenClassicMarket,
   onToggleWishlist,
   onRemoveWishlist,
+  scoutingWatchPlayerIds = [],
+  scoutingIntelByPlayerId = {},
+  scoutingPipelineCapacity = null,
+  onToggleScoutingWatch,
   onBuyCompleted,
   onSell,
 }: TransfermarktV2ClientProps) {
@@ -1092,6 +1101,7 @@ export default function TransfermarktV2Client({
     return ids;
   }, [effectiveOwnerId, manageableTeamIds, teamControlModesByTeamId, teamControlOwnersByTeamId]);
   const wishlistPlayerIdSet = useMemo(() => new Set(wishlistPlayerIds), [wishlistPlayerIds]);
+  const scoutingWatchPlayerIdSet = useMemo(() => new Set(scoutingWatchPlayerIds), [scoutingWatchPlayerIds]);
   const selectedTeamId = defaultTeamId ?? "";
   const [search, setSearch] = useState("");
   const deferredSearch = useDeferredValue(search);
@@ -1363,6 +1373,23 @@ export default function TransfermarktV2Client({
     [effectiveRenderedCandidateCount, visibleItems],
   );
   const selectedPlayerWishlisted = Boolean(selectedPlayer && wishlistPlayerIdSet.has(selectedPlayer.playerId));
+  const selectedPlayerScoutingWatched = Boolean(selectedPlayer && scoutingWatchPlayerIdSet.has(selectedPlayer.playerId));
+  const selectedPlayerScoutCertainty =
+    selectedPlayer && scoutingIntelByPlayerId[selectedPlayer.playerId] != null
+      ? scoutingIntelByPlayerId[selectedPlayer.playerId]!
+      : null;
+  const scoutingPipelineFull = Boolean(
+    scoutingPipelineCapacity &&
+      scoutingPipelineCapacity.max > 0 &&
+      scoutingPipelineCapacity.occupied >= scoutingPipelineCapacity.max &&
+      !selectedPlayerScoutingWatched,
+  );
+  const scoutingWatchDisabledReason =
+    scoutingPipelineCapacity?.max === 0
+      ? "Scouting Office L0 — Facility upgraden, um Beobachtung zu aktivieren."
+      : scoutingPipelineFull
+        ? `Scouting Office voll (${scoutingPipelineCapacity?.occupied}/${scoutingPipelineCapacity?.max}) — Ziel entfernen oder Facility upgraden.`
+        : null;
   const activeBoardObjectiveHighlights = useMemo(
     () => boardObjectiveHighlights.filter((objective) => objective.status === "open" || objective.status === "at_risk" || objective.status === "failed").slice(0, 3),
     [boardObjectiveHighlights],
@@ -2850,7 +2877,45 @@ export default function TransfermarktV2Client({
                         </span>
                       </div>
                     ) : null}
-                    <div className="market-v2-candidate-axis-row">
+                    <VeloStatOrbitRow
+                      ariaLabel={`${item.name} Achsenwerte`}
+                      className="market-v2-candidate-orbit"
+                      stats={{
+                        pow: item.pow ?? 0,
+                        spe: item.spe ?? 0,
+                        men: item.men ?? 0,
+                        soc: item.soc ?? 0,
+                      }}
+                    />
+                    {(() => {
+                      const classFocus = getClassTrainingImpact(item.className);
+                      return (
+                        <VeloAttributeFocusTags
+                          primary={classFocus.positive.map((entry) => ({
+                            attribute: TRAINING_ATTRIBUTE_LABELS[entry.attribute as PlayerGeneratorAttributeKey],
+                            weight: entry.weight,
+                          }))}
+                          risks={classFocus.negative.map((entry) => ({
+                            attribute: TRAINING_ATTRIBUTE_LABELS[entry.attribute as PlayerGeneratorAttributeKey],
+                            weight: entry.weight,
+                          }))}
+                          className="market-v2-candidate-class-focus"
+                        />
+                      );
+                    })()}
+                    <div className="market-v2-scouting-disclosure velo-scouting-disclosure" aria-label="Scouting Transparenz">
+                      {(() => {
+                        const buckets = getTransfermarktScoutingVisibilityBuckets(item.scoutingLevel ?? 0);
+                        return (
+                          <>
+                            <span className="velo-scouting-segment is-visible has-data">Sichtbar {buckets.scouted.length}</span>
+                            <span className={`velo-scouting-segment is-hidden${buckets.hidden.length > 0 ? " has-data" : ""}`}>Versteckt {buckets.hidden.length}</span>
+                            <span className="velo-scouting-segment is-base has-data">Basis {buckets.knowledge.length}</span>
+                          </>
+                        );
+                      })()}
+                    </div>
+                    <div className="market-v2-candidate-axis-row is-legacy">
                       {focusAxes.map((entry) => (
                         <span className={`market-v2-axis-chip ${AXIS_META[entry.axis].className}`} key={`${item.playerId}-${entry.axis}`}>
                           {AXIS_META[entry.axis].label} {formatCompactNumber(entry.value, 0)}
@@ -2918,6 +2983,17 @@ export default function TransfermarktV2Client({
                       </span>
                     ) : null}
                   </div>
+                  {selectedPlayer.axisStarsDisplay ? (
+                    <p className="market-v2-star-row muted" title="Achsen-Sterne (aktuell) — je nach Scouting-Level unscharf bis exakt.">
+                      Aktuell: {selectedPlayer.axisStarsDisplay}
+                    </p>
+                  ) : null}
+                  {selectedPlayer.potentialStarsDisplay ? (
+                    <p className="market-v2-star-row muted" title="Potential-Decke — baut sich über Beobachtung/Spieltage enger auf.">
+                      {selectedPlayer.potentialStarsDisplay}
+                      {selectedPlayer.potentialGapStars != null ? ` · Gap ${selectedPlayer.potentialGapStars}★` : ""}
+                    </p>
+                  ) : null}
                   <div className="market-v2-link-row">
                     <button
                       className="secondary-button inline-button"
@@ -3110,11 +3186,39 @@ export default function TransfermarktV2Client({
                       onToggleWishlist?.(selectedPlayer);
                     }
                   }}
-                  title={selectedPlayerWishlisted ? "Spieler wieder aus der Wishlist nehmen." : "Spieler auf die Wishlist setzen."}
+                  title={selectedPlayerWishlisted ? "Kaufabsicht — kein Scouting-Slot. Wishlist spiegelt optional passiv ins Scouting (ab Scouting Office L1)." : "Spieler auf die Transfer-Wishlist setzen (Kaufabsicht, nicht Scouting)."}
                 >
                   {selectedPlayerWishlisted ? "Von Wishlist nehmen" : "Auf Wishlist"}
                 </button>
+                <button
+                  className={`secondary-button${selectedPlayerScoutingWatched ? " is-active" : ""}`}
+                  type="button"
+                  disabled={!selectedPlayer || Boolean(scoutingWatchDisabledReason && !selectedPlayerScoutingWatched)}
+                  onClick={() => {
+                    if (selectedPlayer) {
+                      onToggleScoutingWatch?.(selectedPlayer);
+                    }
+                  }}
+                  title={
+                    selectedPlayerScoutingWatched
+                      ? "Spieler aus der aktiven Beobachtung nehmen."
+                      : scoutingWatchDisabledReason ?? "Spieler aktiv beobachten — Intel baut sich über Spieltage auf."
+                  }
+                >
+                  {selectedPlayerScoutingWatched ? "Nicht mehr beobachten" : "Beobachten"}
+                </button>
               </div>
+              {selectedPlayerScoutCertainty != null ? (
+                <div className="market-v2-scout-certainty" title="Fortschritt der aktiven Beobachtung — höhere Certainty verbessert die Scouting-Disclosure.">
+                  <span>Scouting {selectedPlayerScoutCertainty}%</span>
+                  <div className="market-v2-scout-certainty-bar" aria-hidden="true">
+                    <span style={{ width: `${Math.max(0, Math.min(100, selectedPlayerScoutCertainty))}%` }} />
+                  </div>
+                </div>
+              ) : null}
+              {scoutingWatchDisabledReason && !selectedPlayerScoutingWatched ? (
+                <p className="foundation-screen-action-reason market-v2-focus-action-reason">{scoutingWatchDisabledReason}</p>
+              ) : null}
               {dealOpenDisabledReason ? (
                 <p className="foundation-screen-action-reason market-v2-focus-action-reason">Warum nicht: {dealOpenDisabledReason}</p>
               ) : null}

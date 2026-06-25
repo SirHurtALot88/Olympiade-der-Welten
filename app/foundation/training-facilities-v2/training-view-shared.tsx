@@ -1,9 +1,24 @@
 "use client";
 
+import { useState } from "react";
+
 import ClassColorChip from "@/app/foundation/ClassColorChip";
 import OptimizedMediaImage from "@/app/foundation/OptimizedMediaImage";
+import {
+  buildTrainingImpactItems,
+  buildTrainingModeSegments,
+  formatVeloNumber,
+  formatVeloSignedNumber,
+  VeloAttributeFocusTags,
+  VeloImpactStrip,
+  VeloIntensityRail,
+  VeloStarRating,
+  VeloStatOrbitRow,
+} from "@/components/foundation/velo-ui";
+import { getTrainingModePresentation } from "@/lib/training/training-mode-presentation";
 import { getPlayerPortraitBrowserUrl } from "@/lib/data/mediaAssets";
 import type { PlayerTrainingMode } from "@/lib/training/training-plan-types";
+import type { PlayerDemandStatus } from "@/lib/data/olyDataTypes";
 
 import type {
   TrainingClassOption,
@@ -12,29 +27,14 @@ import type {
   TrainingPlayerRowView,
 } from "@/app/foundation/training-facilities-v2/training-view-types";
 
-const AXIS_META = {
-  pow: { label: "POW", tone: "is-pow" },
-  spe: { label: "SPE", tone: "is-spe" },
-  men: { label: "MEN", tone: "is-men" },
-  soc: { label: "SOC", tone: "is-soc" },
-} as const;
-
 export function formatLocaleNumber(value: number | null | undefined, digits = 0) {
-  if (value == null || !Number.isFinite(value)) {
-    return "—";
-  }
-  return new Intl.NumberFormat("de-DE", {
-    minimumFractionDigits: 0,
-    maximumFractionDigits: digits,
-  }).format(value);
+  return formatVeloNumber(value, digits);
 }
 
 export function formatSignedPercent(value: number | null | undefined) {
-  if (value == null || !Number.isFinite(value)) {
-    return "—";
-  }
+  if (value == null || !Number.isFinite(value)) return "—";
   const prefix = value > 0 ? "+" : "";
-  return `${prefix}${formatLocaleNumber(value, 0)}%`;
+  return `${prefix}${formatVeloNumber(value, 0)}%`;
 }
 
 export function getDevelopmentTone(row: TrainingPlayerRowView) {
@@ -59,13 +59,138 @@ function getPortraitModel(player: TrainingPlayerRowView["player"]) {
   return { src, initials };
 }
 
-function TrainingAxisPill({ axis, value }: { axis: keyof typeof AXIS_META; value: number }) {
-  const meta = AXIS_META[axis];
+function getDevelopmentBadgeLabel(tone: ReturnType<typeof getDevelopmentTone>) {
+  if (tone === "growth") return "steigt";
+  if (tone === "regression") return "kann fallen";
+  return "stabil";
+}
+
+function getDemandStatusLabel(status: PlayerDemandStatus) {
+  switch (status) {
+    case "fulfilled":
+      return "erfuellt";
+    case "at_risk":
+      return "unter Druck";
+    case "failed":
+      return "ignoriert";
+    default:
+      return "offen";
+  }
+}
+
+function TrainingTraitBoostRow({ row }: { row: TrainingPlayerRowView }) {
+  if (row.traitBoosts.length === 0 && row.modifiers.traitModifierPct === 0) {
+    return null;
+  }
+
   return (
-    <span className={`training-v2-axis-pill ${meta.tone}`}>
-      <small>{meta.label}</small>
-      <strong>{formatLocaleNumber(value, 0)}</strong>
-    </span>
+    <div className="training-v2-trait-boost-row" aria-label="Trait Training Boosts">
+      <div className="training-v2-trait-boost-summary">
+        <span>Trait Boost</span>
+        <strong className={row.modifiers.traitModifierPct >= 0 ? "text-positive" : "text-negative"}>
+          {formatSignedPercent(row.modifiers.traitModifierPct)}
+        </strong>
+      </div>
+      <div className="training-v2-trait-boost-chips">
+        {row.traitBoosts.slice(0, 4).map((entry) => (
+          <span
+            key={`${row.player.id}-${entry.trait}`}
+            className={`training-v2-trait-chip is-${entry.tone}`}
+            title={`${entry.trait}: ${entry.pct >= 0 ? "+" : ""}${formatVeloNumber(entry.pct, 1)}% Legacy Training Signal`}
+          >
+            {entry.tone === "positive" ? "★" : entry.tone === "negative" ? "▼" : "•"} {entry.trait} {entry.pct >= 0 ? "+" : ""}
+            {formatVeloNumber(entry.pct, 1)}%
+          </span>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+function TrainingModeDemandBanner({ row }: { row: TrainingPlayerRowView }) {
+  const demand = row.trainingDemand;
+  if (!demand || demand.status === "fulfilled") {
+    return null;
+  }
+
+  const preferred = getTrainingModePresentation(demand.preferredMode);
+  return (
+    <div className={`training-v2-mode-demand is-${demand.status}`} aria-label="Trainingswunsch">
+      <div className="training-v2-mode-demand-copy">
+        <strong>{demand.label}</strong>
+        <span>
+          {getDemandStatusLabel(demand.status)} · will {preferred.label} · Moral {demand.moraleReward >= 0 ? "+" : ""}
+          {demand.moraleReward}/{demand.moralePenalty}
+        </span>
+      </div>
+      <small>{demand.detail}</small>
+    </div>
+  );
+}
+
+function TrainingAttributeForecastGrid({ row }: { row: TrainingPlayerRowView }) {
+  const [expanded, setExpanded] = useState(false);
+  const sorted = [...row.attributeForecast].sort((left, right) => Math.abs(right.delta) - Math.abs(left.delta));
+  const visible = expanded ? sorted : sorted.slice(0, 5);
+
+  if (visible.length === 0) {
+    return null;
+  }
+
+  return (
+    <div className="training-v2-attribute-forecast">
+      <div className="training-v2-attribute-forecast-head">
+        <strong>Stat Forecast</strong>
+        {sorted.length > 5 ? (
+          <button className="secondary-button inline-button" type="button" onClick={() => setExpanded((current) => !current)}>
+            {expanded ? "Weniger" : `Alle ${sorted.length} Stats`}
+          </button>
+        ) : null}
+      </div>
+      <div className="training-v2-attribute-forecast-grid">
+        {visible.map((entry) => (
+          <article
+            className={`training-v2-attribute-forecast-card${entry.delta < 0 ? " is-risk" : entry.delta > 0 ? " is-gain" : ""}${entry.affinity === "signature" ? " is-signature" : entry.affinity === "weak" ? " is-weak" : ""}`}
+            key={`${row.player.id}-${entry.attribute}`}
+          >
+            <div className="training-v2-attribute-forecast-title">
+              <small>{entry.attribute}</small>
+              {entry.affinity === "signature" ? <span className="training-v2-affinity-mark is-signature">★</span> : null}
+              {entry.affinity === "weak" ? <span className="training-v2-affinity-mark is-weak">◆</span> : null}
+            </div>
+            <strong>
+              {formatVeloNumber(entry.before, 1)} → {formatVeloNumber(entry.after, 1)}
+            </strong>
+            <em>{formatVeloSignedNumber(entry.delta, 1)}</em>
+            <div className="training-v2-attribute-forecast-split">
+              <span>T {formatVeloSignedNumber(entry.training, 1)}</span>
+              <span>P {formatVeloSignedNumber(entry.performance, 1)}</span>
+              <span>R {formatVeloSignedNumber(entry.regression, 1)}</span>
+            </div>
+          </article>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+type TrainingModeGuideProps = {
+  trainingModeOptions: TrainingModeOption[];
+};
+
+export function TrainingModeGuide({ trainingModeOptions }: TrainingModeGuideProps) {
+  return (
+    <div className="training-v2-mode-guide velo-mode-guide" aria-label="Trainingslast Erklaerung">
+      {trainingModeOptions.map((option) => (
+        <article className={`training-v2-mode-guide-card velo-mode-guide-card is-${option.fatigueRisk === "niedrig" ? "growth" : option.fatigueRisk === "hoch" ? "regression" : "stable"}`} key={`mode-guide-${option.value}`}>
+          <span>{option.label}</span>
+          <strong>+{formatVeloNumber(option.baseXp, 0)} XP · Fatigue {formatVeloNumber(option.fatigueLoad, 0)}</strong>
+          <small>
+            {option.recoveryDeltaPct > 0 ? `+${option.recoveryDeltaPct}% Reg` : option.recoveryDeltaPct < 0 ? `${option.recoveryDeltaPct}% Reg` : "±0 Reg"} · {option.note}
+          </small>
+        </article>
+      ))}
+    </div>
   );
 }
 
@@ -96,6 +221,17 @@ export function TrainingPlayerLane({
   onOpenPlayerDetails,
   trainingModeReadOnly = false,
 }: TrainingPlayerLaneProps) {
+  const modeSegments = buildTrainingModeSegments(
+    trainingModeOptions.map((option) => ({
+      value: option.value,
+      label: option.label,
+      baseXp: option.baseXp,
+      recoveryDeltaPct: option.recoveryDeltaPct,
+      fatigueLoad: option.fatigueLoad,
+      note: option.note,
+    })),
+  );
+
   return (
     <>
       <div className="training-v2-section-head">
@@ -128,87 +264,118 @@ export function TrainingPlayerLane({
         ))}
       </div>
 
-      <div className="training-v2-player-list">
+      <div className="training-v2-player-list training-v2-rider-grid">
         {playerRows.map((row) => {
           const portrait = getPortraitModel(row.player);
           const tone = getDevelopmentTone(row);
           return (
-            <article className={`training-v2-player-card is-${tone}`} id={`training-player-${row.player.id}`} key={row.entryId}>
-              <button
-                className="training-v2-player-head"
-                type="button"
-                onClick={() => onOpenPlayerDetails?.({ playerId: row.player.id, activePlayerId: row.entryId })}
-              >
-                <div className="training-v2-player-media">
-                  {portrait.src ? (
-                    <OptimizedMediaImage
-                      src={portrait.src}
-                      alt={row.player.name}
-                      width={78}
-                      height={78}
-                      className="training-v2-player-image"
-                    />
-                  ) : (
-                    <div className="training-v2-player-image training-v2-player-image-fallback">{portrait.initials}</div>
-                  )}
-                </div>
-                <div className="training-v2-player-copy">
-                  <strong className="training-v2-clickable">{row.player.name}</strong>
-                  <p>
+            <article className={`training-v2-rider-card velo-rider-card is-${tone}`} id={`training-player-${row.player.id}`} key={row.entryId}>
+              <VeloStatOrbitRow stats={row.player.coreStats} ariaLabel={`${row.player.name} Achsenwerte`} />
+
+              <div className="training-v2-rider-hero">
+                <button
+                  className="training-v2-rider-portrait-button"
+                  type="button"
+                  onClick={() => onOpenPlayerDetails?.({ playerId: row.player.id, activePlayerId: row.entryId })}
+                >
+                  <div className="training-v2-rider-portrait-wrap">
+                    {portrait.src ? (
+                      <OptimizedMediaImage
+                        src={portrait.src}
+                        alt={row.player.name}
+                        width={112}
+                        height={112}
+                        className="training-v2-rider-portrait"
+                      />
+                    ) : (
+                      <div className="training-v2-rider-portrait training-v2-rider-portrait-fallback">{portrait.initials}</div>
+                    )}
+                  </div>
+                </button>
+
+                <div className="training-v2-rider-copy">
+                  <div className="training-v2-rider-title-row">
+                    <strong className="training-v2-clickable">{row.player.name}</strong>
+                    <span className={`training-v2-badge is-${tone}`}>{getDevelopmentBadgeLabel(tone)}</span>
+                  </div>
+                  <p className="training-v2-rider-meta">
                     <ClassColorChip className={row.player.className} /> · {row.roleTag ?? "ohne Rolle"}
                   </p>
-                  <div className="training-v2-axis-row">
-                    <TrainingAxisPill axis="pow" value={row.player.coreStats.pow} />
-                    <TrainingAxisPill axis="spe" value={row.player.coreStats.spe} />
-                    <TrainingAxisPill axis="men" value={row.player.coreStats.men} />
-                    <TrainingAxisPill axis="soc" value={row.player.coreStats.soc} />
+                  <div className="training-v2-rider-star-stack velo-star-stack">
+                    <VeloStarRating compact label="CA" value={row.developmentStars.currentAbilityStars ?? row.developmentStars.currentAbilityRating} />
+                    <VeloStarRating compact label="PO" tone="gold" value={row.developmentStars.potentialStars ?? row.developmentStars.potentialRating} />
                   </div>
+                  <p className="training-v2-rider-class-line">
+                    Klasse {row.organicForecast.classBefore} → {row.organicForecast.classAfter}
+                  </p>
                 </div>
-                <div className="training-v2-player-badge-row">
-                  <span className={`training-v2-badge is-${tone}`}>
-                    {tone === "growth" ? "steigt" : tone === "regression" ? "kann fallen" : "stabil"}
-                  </span>
-                </div>
-              </button>
 
-              <div className="training-v2-player-metrics">
+                <div className="training-v2-rider-ability-stack">
+                  <div className={`training-v2-rider-ability velo-value-flash-target is-${tone}`}>
+                    <span>DEV</span>
+                    <strong>{formatVeloNumber(row.forecast.netDevelopmentXP, 0)}</strong>
+                    <small>Entwicklung</small>
+                  </div>
+                  {row.playerPps != null ? (
+                    <div className="training-v2-rider-ability is-pps">
+                      <span>PPs</span>
+                      <strong>{formatVeloNumber(row.playerPps, 1)}</strong>
+                      <small>Leistung</small>
+                    </div>
+                  ) : null}
+                </div>
+              </div>
+
+              <div className="training-v2-rider-forecast-row">
                 <div>
                   <span>Stat Forecast</span>
                   <strong className={row.organicForecast.netSetpoints >= 0 ? "text-positive" : "text-negative"}>
                     {row.organicForecast.netSetpoints > 0 ? "+" : ""}
-                    {formatLocaleNumber(row.organicForecast.netSetpoints, 1)}
+                    {formatVeloNumber(row.organicForecast.netSetpoints, 1)}
                   </strong>
                 </div>
                 <div>
                   <span>Training</span>
-                  <strong>+{formatLocaleNumber(row.organicForecast.trainingSetpoints, 1)}</strong>
+                  <strong>+{formatVeloNumber(row.organicForecast.trainingSetpoints, 1)}</strong>
                 </div>
                 <div>
-                  <span>Potential</span>
-                  <strong>
-                    {row.organicForecast.potentialRating ?? "—"} · x{formatLocaleNumber(row.organicForecast.potentialTrainingMultiplier, 2)}
-                  </strong>
+                  <span>Performance</span>
+                  <strong>+{formatVeloNumber(row.organicForecast.performanceSetpoints, 1)}</strong>
                 </div>
                 <div>
                   <span>Fatigue</span>
-                  <strong>+{formatLocaleNumber(row.organicForecast.fatigueLoad, 1)}</strong>
+                  <strong>+{formatVeloNumber(row.organicForecast.fatigueLoad, 1)}</strong>
                 </div>
               </div>
 
+              <VeloImpactStrip
+                flashKey={row.mode}
+                items={buildTrainingImpactItems({
+                  trainingXp: row.trainingXp,
+                  performanceXp: row.performanceXp,
+                  recoveryBefore: row.recoveryForecast.before,
+                  recoveryAfter: row.recoveryForecast.after,
+                  recoveryDeltaPct: row.recoveryForecast.modifierPct,
+                  netDevelopmentXp: row.forecast.netDevelopmentXP,
+                  regressionPressure: row.forecast.regressionPressure,
+                  regressionRisk: row.forecast.regressionRisk,
+                })}
+              />
+
+              <TrainingTraitBoostRow row={row} />
+
+              <TrainingModeDemandBanner row={row} />
+
+              <VeloIntensityRail
+                ariaLabel={`${row.player.name} Trainingsmodus`}
+                segments={modeSegments}
+                activeValue={row.mode}
+                demandValue={row.trainingDemand && row.trainingDemand.status !== "fulfilled" ? row.trainingDemand.preferredMode : null}
+                disabled={trainingModeReadOnly}
+                onSelect={(value) => onSetTrainingMode(row.player.id, value as PlayerTrainingMode)}
+              />
+
               <div className="training-v2-plan-controls">
-                <div className="training-v2-mode-strip" aria-label={`${row.player.name} Trainingsmodus`}>
-                  {trainingModeOptions.map((option) => (
-                    <button
-                      key={`${row.player.id}-${option.value}`}
-                      className={`training-v2-mode-chip${row.mode === option.value ? " is-active" : ""}`}
-                      type="button"
-                      disabled={trainingModeReadOnly}
-                      onClick={() => onSetTrainingMode(row.player.id, option.value)}
-                    >
-                      {option.label}
-                    </button>
-                  ))}
-                </div>
                 <label className="filter-field training-v2-class-select">
                   <span>Trainingsklasse</span>
                   <select
@@ -226,35 +393,26 @@ export function TrainingPlayerLane({
                 </label>
               </div>
 
-              <div className="training-v2-stat-forecast">
-                {row.organicForecast.topGains.map((entry) => (
-                  <span key={`${row.player.id}-gain-${entry.attribute}`}>
-                    <small>{entry.attribute}</small>
-                    <strong>
-                      {formatLocaleNumber(entry.before, 1)} → {formatLocaleNumber(entry.after, 1)}
-                    </strong>
-                    <em>+{formatLocaleNumber(entry.delta, 1)}</em>
-                  </span>
-                ))}
-                {row.organicForecast.topLosses.map((entry) => (
-                  <span className="is-risk" key={`${row.player.id}-loss-${entry.attribute}`}>
-                    <small>{entry.attribute}</small>
-                    <strong>
-                      {formatLocaleNumber(entry.before, 1)} → {formatLocaleNumber(entry.after, 1)}
-                    </strong>
-                    <em>{formatLocaleNumber(entry.delta, 1)}</em>
-                  </span>
-                ))}
-              </div>
+              <VeloAttributeFocusTags primary={row.classTrainingFocus.primary} risks={row.classTrainingFocus.risks} />
 
-              <div className="training-v2-player-foot">
+              <TrainingAttributeForecastGrid row={row} />
+
+              <div className="training-v2-player-foot training-v2-modifier-row">
+                <small>
+                  Traits {formatSignedPercent(row.modifiers.traitModifierPct)} · Facility {formatSignedPercent(row.modifiers.facilityModifierPct)} · Potential x
+                  {formatVeloNumber(row.modifiers.potentialTrainingMultiplier, 2)}
+                </small>
+                {row.trainingDemand && row.trainingDemand.status !== "fulfilled" ? (
+                  <small className={`training-v2-mode-demand-foot is-${row.trainingDemand.status}`}>
+                    Wunsch {getTrainingModePresentation(row.trainingDemand.preferredMode).label} · aktuell{" "}
+                    {getTrainingModePresentation(row.mode).label}
+                  </small>
+                ) : null}
+                <small>
+                  {row.modifiers.signatureAttributes.length > 0 ? `★ ${row.modifiers.signatureAttributes.join(" / ")}` : "★ —"}
+                  {row.modifiers.weakAttribute ? ` · ◆ Weak ${row.modifiers.weakAttribute}` : ""}
+                </small>
                 <small>{row.modeConfig.note}</small>
-                <small>
-                  Klasse {row.organicForecast.classBefore} → {row.organicForecast.classAfter} · Training {row.trainingClass}
-                </small>
-                <small>
-                  Performance +{formatLocaleNumber(row.organicForecast.performanceSetpoints, 1)} · Steigerungsstufe {row.forecast.trainingFormTier}
-                </small>
                 <small>
                   Risiko {row.forecast.fatigueStrain.label} · {row.fatigueWarning}
                 </small>

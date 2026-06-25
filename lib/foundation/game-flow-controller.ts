@@ -246,6 +246,14 @@ function buildMatchdaySteps(gameState: GameState, activeTeamId: string | null): 
   const hasFormCardPool = activeTeamHasFormCardPool(gameState, activeTeamId);
   const hasResults = hasCurrentMatchdayResult(gameState) || gameState.matchdayState.status === "resolved";
   const formCardsRequired = hasLineup && !hasResults;
+  const matchdayArenaReady = hasLineup && (!formCardsRequired || hasFormCards);
+  const openArenaBlockers = matchdayArenaReady
+    ? []
+    : !hasLineup
+      ? ["missing_lineup"]
+      : formCardsRequired && !hasFormCards
+        ? ["missing_formcard_selections"]
+        : ["missing_lineup"];
   const trainingComplete = activeTeamTrainingComplete(gameState, activeTeamId);
   const storedNewGameFlow = gameState.seasonState.newGameFlow ?? null;
   const seasonIntroStep = storedNewGameFlow?.steps?.find((entry) => entry.stepId === "season_intro");
@@ -298,7 +306,7 @@ function buildMatchdaySteps(gameState: GameState, activeTeamId: string | null): 
       label: "Training prüfen",
       cta: "Weiter: Training prüfen",
       status: !hasActiveTeam ? "blocked" : activeRosterCount === 0 ? "blocked" : trainingComplete ? "completed" : "ready",
-      targetView: "trainingCompact",
+      targetView: "trainingV2",
       targetPanel: "training-plan",
       teamId: activeTeamId,
       blockers: !hasActiveTeam ? ["no_active_team"] : activeRosterCount === 0 ? ["empty_roster"] : [],
@@ -365,19 +373,20 @@ function buildMatchdaySteps(gameState: GameState, activeTeamId: string | null): 
       stepId: "open_arena",
       label: "Arena starten",
       cta: "Weiter: Arena starten",
-      status: hasResults ? "completed" : lineupConfirmed || hasLineup ? "ready" : "blocked",
+      status: hasResults ? "completed" : matchdayArenaReady ? "ready" : "blocked",
       targetView: "matchdayArena",
       teamId: activeTeamId,
-      blockers: lineupConfirmed || hasLineup ? [] : ["missing_lineup"],
+      blockers: openArenaBlockers,
+      warnings: matchdayArenaReady && !lineupConfirmed ? ["lineup_not_submitted"] : [],
     }),
     step({
       stepId: "run_reveal",
       label: "Reveal laufen lassen",
       cta: "Weiter: Reveal prüfen",
-      status: hasResults ? "completed" : lineupConfirmed || hasLineup ? "ready" : "blocked",
+      status: hasResults ? "completed" : matchdayArenaReady ? "ready" : "blocked",
       targetView: "matchdayArena",
       teamId: activeTeamId,
-      blockers: lineupConfirmed || hasLineup ? [] : ["missing_lineup"],
+      blockers: openArenaBlockers,
     }),
     step({
       stepId: "review_matchday_results",

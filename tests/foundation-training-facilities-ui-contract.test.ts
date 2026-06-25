@@ -75,6 +75,11 @@ describe("foundation training and facilities ui contract", () => {
     expect(cssText).toContain(".training-v2-shell");
     expect(cssText).toContain(".training-compact-shell");
     expect(cssText).toContain(".training-v2-lane");
+    expect(cssText).toContain(".training-v2-rider-card");
+    expect(cssText).toContain(".training-v2-rider-grid");
+    expect(cssText).toContain(".training-v2-intensity-rail");
+    expect(cssText).toContain(".training-v2-impact-strip");
+    expect(cssText).toContain(".training-v2-class-focus");
     expect(cssText).toContain(".training-v2-player-card");
     expect(cssText).toContain(".training-v2-facility-card");
     expect(cssText).toContain(".training-v2-preview-card");

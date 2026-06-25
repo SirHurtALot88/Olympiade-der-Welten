@@ -12,6 +12,7 @@ import { buildSeasonAiLineupAudit, type SeasonAiLineupAudit } from "@/lib/season
 import {
   applyTeamSeasonObjectiveRewards,
 } from "@/lib/board/team-season-objectives-service";
+import { applySponsorSettlement, previewSponsorSettlement } from "@/lib/sponsor/sponsor-settlement-service";
 import { buildSeasonReview, type SeasonReview } from "@/lib/season/season-review-service";
 import {
   createSeasonSnapshot,
@@ -246,23 +247,64 @@ async function runLocalSeasonCompletionUnsafe(
   );
 
   const afterCashSave = resolveLocalSave(persistence, initialSave.saveId);
-  const objectiveRewardPreview = applyTeamSeasonObjectiveRewards(afterCashSave.gameState, {
+  const sponsorSettlementPreview = previewSponsorSettlement(afterCashSave.gameState, "season_end");
+  const existingSponsorEndPayout =
+    (afterCashSave.gameState.seasonState.sponsorPayoutLogs ?? []).some(
+      (log) => log.seasonId === seasonId && log.phase === "season_end",
+    ) ?? false;
+  const shouldApplySponsorSettlement =
+    !dryRun && blockingReasons.size === 0 && sponsorSettlementPreview.canApply && !existingSponsorEndPayout;
+  const sponsorSettlementApply = shouldApplySponsorSettlement
+    ? applySponsorSettlement({
+        gameState: afterCashSave.gameState,
+        saveId: afterCashSave.saveId,
+        phase: "season_end",
+        execute: true,
+      })
+    : { gameState: afterCashSave.gameState, preview: sponsorSettlementPreview, applied: false };
+  if (shouldApplySponsorSettlement && sponsorSettlementApply.applied) {
+    persistence.saveSingleplayerState(afterCashSave.saveId, sponsorSettlementApply.gameState);
+  }
+  addStep(
+    steps,
+    {
+      key: "sponsor_settlement",
+      label: "Sponsor-Abrechnung",
+      status: existingSponsorEndPayout
+        ? "already_done"
+        : sponsorSettlementApply.applied
+          ? "applied"
+          : sponsorSettlementPreview.canApply
+            ? "planned"
+            : "skipped",
+      warnings: sponsorSettlementPreview.warnings,
+      blockingReasons: sponsorSettlementPreview.blockingReasons,
+      auditId: null,
+    },
+    warnings,
+    blockingReasons,
+  );
+
+  const afterSponsorSave = sponsorSettlementApply.applied
+    ? resolveLocalSave(persistence, initialSave.saveId)
+    : afterCashSave;
+  const objectiveRewardPreview = applyTeamSeasonObjectiveRewards(afterSponsorSave.gameState, {
     saveId: afterCashSave.saveId,
     seasonId,
     execute: false,
   });
   const existingObjectiveRewardLog =
-    (afterCashSave.gameState.seasonState.objectiveRewardApplyLogs ?? []).find((log) => log.seasonId === seasonId) ?? null;
+    (afterSponsorSave.gameState.seasonState.objectiveRewardApplyLogs ?? []).find((log) => log.seasonId === seasonId) ?? null;
   const shouldApplyObjectiveRewards = !dryRun && blockingReasons.size === 0 && !existingObjectiveRewardLog;
   const objectiveRewardApply = shouldApplyObjectiveRewards
-    ? applyTeamSeasonObjectiveRewards(afterCashSave.gameState, {
-        saveId: afterCashSave.saveId,
+    ? applyTeamSeasonObjectiveRewards(afterSponsorSave.gameState, {
+        saveId: afterSponsorSave.saveId,
         seasonId,
         execute: true,
       })
     : objectiveRewardPreview;
   if (shouldApplyObjectiveRewards && objectiveRewardApply.applied) {
-    persistence.saveSingleplayerState(afterCashSave.saveId, objectiveRewardApply.gameState);
+    persistence.saveSingleplayerState(afterSponsorSave.saveId, objectiveRewardApply.gameState);
   }
   addStep(
     steps,
@@ -284,7 +326,7 @@ async function runLocalSeasonCompletionUnsafe(
     blockingReasons,
   );
 
-  const afterObjectiveSave = objectiveRewardApply.applied ? resolveLocalSave(persistence, initialSave.saveId) : afterCashSave;
+  const afterObjectiveSave = objectiveRewardApply.applied ? resolveLocalSave(persistence, initialSave.saveId) : afterSponsorSave;
   const relationshipApply = upsertTeamRelationshipEvents(afterObjectiveSave.gameState);
   const existingRelationshipEvents = afterCashSave.gameState.seasonState.teamRelationshipEvents ?? [];
   const existingRelationshipIds = new Set(existingRelationshipEvents.map((event) => event.eventId));

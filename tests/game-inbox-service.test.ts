@@ -365,4 +365,36 @@ describe("game inbox service", () => {
 	    expect(items.some((item) => item.teamId === "M-M")).toBe(true);
 	    expect(items.some((item) => item.teamId === "P-C")).toBe(true);
 	  });
-	});
+
+  it("creates sponsor choice task for manual teams without sponsor contract", () => {
+    const gameState = makeGameState();
+    const items = buildGameInboxItems({ gameState, saveId: "save-1", activeTeamId: "M-M", activeOwnerId: "user_local" });
+    const sponsorTask = items.find((item) => item.itemId.startsWith("sponsor_choice_missing:"));
+    expect(sponsorTask?.title).toBe("Sponsor wählen");
+    expect(sponsorTask?.targetParams).toEqual({ team: "M-M", panel: "sponsor-choice" });
+  });
+
+  it("skips sponsor choice task when a sponsor contract exists", () => {
+    const gameState = makeGameState({
+      seasonState: {
+        seasonId: "season-3",
+        schedule: [],
+        standings: {},
+        sponsorContractsByTeamId: {
+          "M-M": {
+            seasonId: "season-3",
+            teamId: "M-M",
+            offerId: "offer-1",
+            archetype: "security",
+            name: "Sicherheitspartner AG",
+            chosenAt: "2026-06-25T00:00:00.000Z",
+            components: [],
+            payouts: { baseFirstPaid: true },
+          },
+        },
+      },
+    });
+    const items = buildGameInboxItems({ gameState, saveId: "save-1", activeTeamId: "M-M", activeOwnerId: "user_local" });
+    expect(items.some((item) => item.itemId.startsWith("sponsor_choice_missing:"))).toBe(false);
+  });
+});

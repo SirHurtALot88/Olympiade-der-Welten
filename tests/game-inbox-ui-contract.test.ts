@@ -49,11 +49,11 @@ describe("game inbox UI contract", () => {
     expect(foundationSource).toContain("openEncyclopediaEntry");
   });
 
-  it("keeps the inbox read-only in V1", () => {
+  it("persists inbox done and dismissed status into the local save", () => {
     const source = readFileSync(join(root, "app/foundation/FoundationPageClient.tsx"), "utf8");
 
-    expect(source).not.toContain("dismissInboxItem");
-    expect(source).not.toContain("completeInboxItem");
-    expect(source).not.toContain("/api/inbox");
+    expect(source).toContain("updateInboxItemStatus");
+    expect(source).toContain("persistLocalGameStateImmediately(nextGameState)");
+    expect(source).toContain('gameInboxItems: nextItems');
   });
 });

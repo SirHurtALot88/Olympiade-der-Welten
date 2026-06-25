@@ -186,7 +186,7 @@ export type PlayerDemandRecord = {
   seasonId: string;
   teamId: string;
   playerId: string;
-  type: "discipline_start" | "captaincy" | "appearances" | "facility" | "role";
+  type: "discipline_start" | "captaincy" | "appearances" | "facility" | "role" | "training_mode";
   label: string;
   detail: string;
   targetDisciplineId?: string | null;
@@ -816,6 +816,13 @@ export type PlayerPotentialRecord = {
   playerId: string;
   potentialBand: PlayerPotentialBand;
   hiddenPotentialScore?: number;
+  hiddenPotentialCeilingByAxis?: {
+    pow: number;
+    spe: number;
+    men: number;
+    soc: number;
+  };
+  hiddenPotentialOverallStars?: number;
   revealedPotentialRange?: {
     min: number;
     max: number;
@@ -1032,7 +1039,117 @@ export type TeamSeasonObjectiveCategory =
   | "facility"
   | "development"
   | "morale"
-  | "player";
+  | "player"
+  | "sponsor";
+
+export type SponsorArchetype = "security" | "performance" | "identity";
+
+export type SponsorOfferComponentKind = "base" | "rank" | "improvement" | "special";
+
+export type SponsorOfferComponent = {
+  componentId: string;
+  kind: SponsorOfferComponentKind;
+  label: string;
+  targetValue: number | string;
+  rewardCash: number;
+  penaltyCash?: number;
+  specialKey?: string | null;
+};
+
+export type SponsorDemandProfile = "safe" | "balanced" | "ambitious" | "elite";
+
+export type SponsorStarTier = 1 | 2 | 3 | 4 | 5;
+
+export type SponsorOffer = {
+  offerId: string;
+  seasonId: string;
+  teamId: string;
+  archetype: SponsorArchetype;
+  name: string;
+  flavor: string;
+  components: SponsorOfferComponent[];
+  totalUpsideEstimate: number;
+  starTier?: SponsorStarTier;
+  commercialRating?: number;
+  sponsorBrandId?: string;
+  demandProfile?: SponsorDemandProfile;
+};
+
+export type SponsorCommercialRating = {
+  score: number;
+  tierHint: SponsorStarTier;
+  breakdown: {
+    recentPerformance: number;
+    rosterPotential: number;
+    prestige: number;
+  };
+  inputs: {
+    lastSeasonRank: number | null;
+    avgWeightedRank: number | null;
+    marketValuePercentile: number;
+    axisPercentile: number;
+    depthScore: number;
+    prestigeMedalScore: number;
+  };
+};
+
+export type TeamSponsorContractPayouts = {
+  baseFirstPaid?: boolean;
+  baseSecondPaid?: boolean;
+  rankPaid?: boolean;
+  improvementPaid?: boolean;
+  specialPaid?: boolean;
+};
+
+export type TeamSponsorContract = {
+  seasonId: string;
+  teamId: string;
+  offerId: string;
+  archetype: SponsorArchetype;
+  name: string;
+  chosenAt: string;
+  startRank: number | null;
+  components: SponsorOfferComponent[];
+  payouts: TeamSponsorContractPayouts;
+  starTier?: SponsorStarTier;
+  commercialRating?: number;
+  sponsorBrandId?: string;
+  demandProfile?: SponsorDemandProfile;
+};
+
+export type ScoutIntelSource = "watchlist" | "wishlist_mirror" | "passive_need" | "roster";
+
+export type PlayerScoutIntelRecord = {
+  playerId: string;
+  teamId: string;
+  seasonId: string;
+  source: ScoutIntelSource;
+  certainty: number;
+  startedAt: string;
+  lastTickAt: string | null;
+  ticksCompleted: number;
+};
+
+export type SponsorPayoutLogRecord = {
+  id: string;
+  saveId: string;
+  seasonId: string;
+  teamId: string;
+  phase: "base_first" | "base_second" | "season_end";
+  componentId: string | null;
+  cashDelta: number;
+  action: "apply";
+  createdAt: string;
+};
+
+export type ScoutingWatchlistEntry = {
+  playerId: string;
+  teamId: string;
+  seasonId: string;
+  addedAt: string;
+  source: "manual_scouting_hub" | "transfer_wishlist_mirror";
+  note?: string | null;
+};
 
 export type TeamSeasonObjectiveStatus = "open" | "completed" | "failed" | "at_risk";
 
@@ -1902,6 +2019,11 @@ export type SeasonState = {
   cashPrizeApplyLogs?: CashPrizeApplyLogRecord[];
   matchdayAdvanceLogs?: MatchdayAdvanceLogRecord[];
   objectiveRewardApplyLogs?: ObjectiveRewardApplyLogRecord[];
+  sponsorOffersByTeamId?: Record<string, SponsorOffer[]>;
+  sponsorContractsByTeamId?: Record<string, TeamSponsorContract>;
+  sponsorPayoutLogs?: SponsorPayoutLogRecord[];
+  scoutingWatchlist?: ScoutingWatchlistEntry[];
+  scoutIntelByTeamId?: Record<string, PlayerScoutIntelRecord[]>;
   formCards?: FormCardRecord[];
   formCardPlans?: FormCardPlanRecord[];
   teamPowers?: TeamPowerRecord[];

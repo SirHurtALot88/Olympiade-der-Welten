@@ -5,6 +5,11 @@ import type {
   PlayerPotentialRecord,
   PlayerPotentialSource,
 } from "@/lib/data/olyDataTypes";
+import { buildPlayerAxisStarProfile } from "@/lib/scouting/player-axis-star-rating";
+import {
+  attachPotentialCeilingToRecord,
+  buildPlayerPotentialCeilingProfile,
+} from "@/lib/scouting/player-potential-ceiling-service";
 
 export type PlayerPotentialCertainty = "missing_source" | "low" | "medium" | "high";
 
@@ -242,8 +247,31 @@ export function buildPlayerPotentialRecord(input: {
   };
 }
 
-export function buildPlayerPotentialRecordsForSave(input: { saveId: string; players: Player[] }) {
-  return input.players.map((player) => buildPlayerPotentialRecord({ saveId: input.saveId, player }));
+export function buildPlayerPotentialRecordsForSave(input: {
+  saveId: string;
+  players: Player[];
+  gameState?: GameState | null;
+}) {
+  return input.players.map((player) => {
+    const record = buildPlayerPotentialRecord({
+      saveId: input.saveId,
+      player,
+    });
+    if (!input.gameState) {
+      return record;
+    }
+    const currentStars = buildPlayerAxisStarProfile({
+      gameState: input.gameState,
+      player,
+      disciplines: input.gameState.disciplines,
+    });
+    const ceiling = buildPlayerPotentialCeilingProfile({
+      saveId: input.saveId,
+      player,
+      currentStars,
+    });
+    return attachPotentialCeilingToRecord({ record, ceiling });
+  });
 }
 
 function resolvePlayerPotentialRecord(input: {

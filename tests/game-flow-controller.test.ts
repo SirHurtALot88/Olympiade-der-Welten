@@ -205,7 +205,7 @@ describe("game flow controller", () => {
   it("opens training first when active roster players have no training mode", () => {
     const flow = buildGameFlowState({ gameState: gameState(), activeTeamId: "M-M" });
     expect(flow.currentStepId).toBe("check_training");
-    expect(flow.currentStep.targetView).toBe("trainingCompact");
+    expect(flow.currentStep.targetView).toBe("trainingV2");
     expect(flow.currentStep.cta).toContain("Training");
   });
 
@@ -238,7 +238,29 @@ describe("game flow controller", () => {
     expect(flow.currentStep.blockers).toContain("missing_formcard_selections");
   });
 
-  it("opens arena once a lineup exists", () => {
+  it("blocks arena when lineup is complete but form cards are missing", () => {
+    const flow = buildGameFlowState({
+      gameState: gameState({
+        players: [player("p-1", "mittel")],
+        seasonState: {
+          seasonId: "season-2",
+          schedule: [],
+          standings: {},
+          disciplineSchedule: [{ seasonId: "season-2", matchdayId: "season-2-md-1", discipline1: { disciplineId: "d1", playerCount: 1 }, discipline2: null }],
+          formCards: [{ id: "card-1", saveId: "save-1", seasonId: "season-2", teamId: "M-M", playerId: "p-1", playerName: "p-1", cardColor: "red", cardValue: 4, createdAt: "2026-06-12T00:00:00.000Z" }],
+          lineupDrafts: [{ lineupId: "lineup-1", saveId: "save-1", seasonId: "season-2", matchdayId: "season-2-md-1", teamId: "M-M", status: "draft", entries: [{ disciplineId: "d1", disciplineSide: "d1", slotIndex: 0, playerId: "p-1", activePlayerId: "r-1" }], createdAt: "2026-06-12T00:00:00.000Z", updatedAt: "2026-06-12T00:00:00.000Z" }],
+        },
+      }),
+      activeTeamId: "M-M",
+    });
+
+    expect(flow.currentStepId).toBe("assign_formcards");
+    const arenaStep = flow.steps.find((step) => step.stepId === "open_arena");
+    expect(arenaStep?.status).toBe("blocked");
+    expect(arenaStep?.blockers).toContain("missing_formcard_selections");
+  });
+
+  it("opens arena once lineup and form cards are ready", () => {
     const flow = buildGameFlowState({
       gameState: gameState({
         players: [player("p-1", "mittel")],

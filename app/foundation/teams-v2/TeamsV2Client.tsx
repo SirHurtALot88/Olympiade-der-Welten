@@ -1,7 +1,10 @@
 "use client";
 
+import OptimizedMediaImage from "@/app/foundation/OptimizedMediaImage";
+import ClassColorChip from "@/app/foundation/ClassColorChip";
 import type { Team } from "@/lib/data/olyDataTypes";
-import type { TeamDetailDrawerData } from "@/app/foundation/TeamDetailDrawer";
+import type { TeamDetailDrawerData, TeamDetailDrawerPlayerCard } from "@/app/foundation/TeamDetailDrawer";
+import { VeloStatOrbitRow, formatVeloNumber } from "@/components/foundation/velo-ui";
 
 type TeamsV2FocusCard = {
   label: string;
@@ -24,17 +27,8 @@ type TeamsV2ClientProps = {
   onOpenMarket?: (() => void) | null;
 };
 
-function formatNumber(value: number | null | undefined, digits = 0) {
-  if (value == null || !Number.isFinite(value)) return "-";
-  return new Intl.NumberFormat("de-DE", {
-    minimumFractionDigits: 0,
-    maximumFractionDigits: digits,
-  }).format(value);
-}
-
 function formatMoney(value: number | null | undefined) {
-  if (value == null || !Number.isFinite(value)) return "-";
-  return formatNumber(value, 2);
+  return formatVeloNumber(value, 2);
 }
 
 function getFocusToneClass(tone: TeamsV2FocusCard["tone"]) {
@@ -52,6 +46,49 @@ function formatRelationshipReason(reason: string) {
   return reason.replaceAll("_", " ");
 }
 
+function TeamsV2PlayerCard({
+  player,
+  onOpenPlayerDetails,
+}: {
+  player: TeamDetailDrawerPlayerCard;
+  onOpenPlayerDetails?: (payload: { playerId: string; activePlayerId?: string | null }) => void;
+}) {
+  return (
+    <button
+      className="teams-v2-player-card velo-rider-mini-card"
+      type="button"
+      onClick={() => onOpenPlayerDetails?.({ playerId: player.playerId, activePlayerId: player.activePlayerId })}
+      title={`${player.name} · PPS ${formatVeloNumber(player.pps, 1)}`}
+    >
+      <VeloStatOrbitRow
+        ariaLabel={`${player.name} Achsenwerte`}
+        stats={{
+          pow: player.coreStats.pow ?? 0,
+          spe: player.coreStats.spe ?? 0,
+          men: player.coreStats.men ?? 0,
+          soc: player.coreStats.soc ?? 0,
+        }}
+      />
+      <div className="teams-v2-player-card-body">
+        {player.portraitUrl ? (
+          <OptimizedMediaImage src={player.portraitUrl} alt={player.name} width={72} height={72} className="teams-v2-player-portrait" />
+        ) : (
+          <span className="teams-v2-player-portrait is-placeholder">{player.portraitInitials}</span>
+        )}
+        <div className="teams-v2-player-copy">
+          <strong>{player.name}</strong>
+          <small>
+            {player.className ? <ClassColorChip className={player.className} /> : "—"} · PPS {formatVeloNumber(player.pps, 1)}
+          </small>
+          <small>
+            OVR {formatVeloNumber(player.ovr, 1)} · MVS {formatVeloNumber(player.mvs, 1)}
+          </small>
+        </div>
+      </div>
+    </button>
+  );
+}
+
 export default function TeamsV2Client({
   teams,
   selectedTeam,
@@ -65,19 +102,33 @@ export default function TeamsV2Client({
   onOpenMarket,
 }: TeamsV2ClientProps) {
   return (
-    <div className="teams-v2-shell">
+    <div className="teams-v2-shell" data-testid="foundation-teams-v2">
       <header className="teams-v2-header">
         <div className="teams-v2-title">
           {teamData.logoUrl ? <img src={teamData.logoUrl} alt={teamData.teamName} /> : <span>{teamData.logoInitials}</span>}
           <div>
-            <small>{teamData.shortCode} · {selectedTeamControlMode ?? teamData.controlMode}</small>
+            <small>
+              {teamData.shortCode} · {selectedTeamControlMode ?? teamData.controlMode}
+            </small>
             <h2>{teamData.teamName}</h2>
           </div>
         </div>
         <div className="teams-v2-actions">
-          {onOpenClassicTeams ? <button type="button" className="secondary-button" onClick={onOpenClassicTeams}>Teams</button> : null}
-          {onOpenTraining ? <button type="button" className="secondary-button" onClick={onOpenTraining}>Training</button> : null}
-          {onOpenMarket ? <button type="button" className="secondary-button" onClick={onOpenMarket}>Markt</button> : null}
+          {onOpenClassicTeams ? (
+            <button type="button" className="secondary-button" onClick={onOpenClassicTeams}>
+              Vergleichstabelle
+            </button>
+          ) : null}
+          {onOpenTraining ? (
+            <button type="button" className="secondary-button" onClick={onOpenTraining}>
+              Training
+            </button>
+          ) : null}
+          {onOpenMarket ? (
+            <button type="button" className="secondary-button" onClick={onOpenMarket}>
+              Markt
+            </button>
+          ) : null}
         </div>
       </header>
 
@@ -109,7 +160,9 @@ export default function TeamsV2Client({
         <article>
           <span>Kader</span>
           <strong>{teamData.rosterSize}</strong>
-          <small>MW {formatMoney(teamData.marketValueTotal)} · Gehalt {formatMoney(teamData.salaryTotal)}</small>
+          <small>
+            MW {formatMoney(teamData.marketValueTotal)} · Gehalt {formatMoney(teamData.salaryTotal)}
+          </small>
         </article>
         <article>
           <span>Board</span>
@@ -124,7 +177,7 @@ export default function TeamsV2Client({
         <article>
           <span>Captain</span>
           <strong>{teamData.teamCaptain?.playerName ?? "-"}</strong>
-          <small>{teamData.teamCaptain ? `${formatNumber(teamData.teamCaptain.leadershipScore)} Leadership` : "offen"}</small>
+          <small>{teamData.teamCaptain ? `${formatVeloNumber(teamData.teamCaptain.leadershipScore)} Leadership` : "offen"}</small>
         </article>
       </section>
 
@@ -134,7 +187,9 @@ export default function TeamsV2Client({
           {teamData.relationships.allies.length > 0 ? (
             teamData.relationships.allies.map((team) => (
               <span key={team.teamId} className={team.changed ? "has-change" : ""} title={team.reasons.map(formatRelationshipReason).join(" · ")}>
-                <strong>{team.shortCode} {formatNumber(team.value, 1)}</strong>
+                <strong>
+                  {team.shortCode} {formatVeloNumber(team.value, 1)}
+                </strong>
                 {team.changed ? <em>{team.changeLabel ?? "neu"}</em> : null}
                 {team.changed && team.reasons[0] ? <small>{formatRelationshipReason(team.reasons[0])}</small> : null}
               </span>
@@ -148,7 +203,9 @@ export default function TeamsV2Client({
           {teamData.relationships.rivals.length > 0 ? (
             teamData.relationships.rivals.map((team) => (
               <span key={team.teamId} className={team.changed ? "has-change" : ""} title={team.reasons.map(formatRelationshipReason).join(" · ")}>
-                <strong>{team.shortCode} {formatNumber(team.value, 1)}</strong>
+                <strong>
+                  {team.shortCode} {formatVeloNumber(team.value, 1)}
+                </strong>
                 {team.changed ? <em>{team.changeLabel ?? "neu"}</em> : null}
                 {team.changed && team.reasons[0] ? <small>{formatRelationshipReason(team.reasons[0])}</small> : null}
               </span>
@@ -159,17 +216,9 @@ export default function TeamsV2Client({
         </article>
       </section>
 
-      <section className="teams-v2-player-grid">
+      <section className="teams-v2-roster-grid">
         {teamData.players.map((player) => (
-          <button
-            key={player.activePlayerId}
-            type="button"
-            onClick={() => onOpenPlayerDetails?.({ playerId: player.playerId, activePlayerId: player.activePlayerId })}
-            title={`${player.name} · PPS ${formatNumber(player.pps, 1)}`}
-          >
-            <strong>{player.name}</strong>
-            <span>{player.className ?? "-"} · PPS {formatNumber(player.pps, 1)}</span>
-          </button>
+          <TeamsV2PlayerCard key={player.activePlayerId} player={player} onOpenPlayerDetails={onOpenPlayerDetails} />
         ))}
       </section>
     </div>

@@ -45,6 +45,14 @@ export type HomeV2TodayCard = {
   tone: "ready" | "warning" | "info";
 };
 
+export type HomeV2BoardObjective = {
+  objectiveId: string;
+  label: string;
+  status: string;
+  currentValue: string | number | null;
+  targetValue: string | number | null;
+};
+
 export type HomeV2ClientProps = {
   teamName: string;
   teamCode: string;
@@ -74,6 +82,7 @@ export type HomeV2ClientProps = {
   scheduleItems: HomeV2ScheduleItem[];
   inboxItems: HomeV2InboxItem[];
   todayCards: HomeV2TodayCard[];
+  boardObjectives: HomeV2BoardObjective[];
   onContinue: () => void;
   onOpenClassicHome: () => void;
   onOpenTeams: () => void;

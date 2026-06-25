@@ -2,7 +2,23 @@
 
 import { useMemo } from "react";
 
+import OptimizedMediaImage from "@/app/foundation/OptimizedMediaImage";
+import { VeloStatOrbitRow } from "@/components/foundation/velo-ui";
+
 import type { InboxV2ClientProps } from "@/app/foundation/inbox-v2/inbox-v2-types";
+
+const INBOX_CATEGORY_FILTERS = [
+  { value: "ALL", label: "Alle" },
+  { value: "task", label: "Aufgaben" },
+  { value: "warning", label: "Warnungen" },
+  { value: "news", label: "News" },
+  { value: "result", label: "Results" },
+  { value: "finance", label: "Finanzen" },
+  { value: "transfer", label: "Transfers" },
+  { value: "training", label: "Training" },
+  { value: "contract", label: "Vertraege" },
+  { value: "facility", label: "Facilities" },
+] as const;
 
 export default function InboxV2Client({
   items,
@@ -47,22 +63,20 @@ export default function InboxV2Client({
       </header>
 
       {onCategoryFilterChange ? (
-        <div className="inbox-v2-filters foundation-filter-grid">
-          <label className="filter-field">
-            <span>Kategorie</span>
-            <select className="input" value={categoryFilter} onChange={(event) => onCategoryFilterChange(event.target.value)}>
-              <option value="ALL">Alle Kategorien</option>
-              <option value="task">Aufgaben</option>
-              <option value="warning">Warnungen</option>
-              <option value="news">News</option>
-              <option value="result">Results</option>
-              <option value="finance">Finanzen</option>
-              <option value="transfer">Transfers</option>
-              <option value="training">Training</option>
-              <option value="contract">Verträge</option>
-              <option value="facility">Facilities</option>
-            </select>
-          </label>
+        <div className="inbox-v2-filters">
+          <div className="velo-intensity-rail inbox-v2-category-rail" aria-label="Inbox Kategorien">
+            {INBOX_CATEGORY_FILTERS.map((filter) => (
+              <button
+                key={filter.value}
+                className={`velo-intensity-segment inbox-v2-category-segment${categoryFilter === filter.value ? " is-active" : ""}`}
+                type="button"
+                onClick={() => onCategoryFilterChange(filter.value)}
+              >
+                <span className="velo-intensity-segment-label">{filter.label}</span>
+              </button>
+            ))}
+          </div>
+          <div className="inbox-v2-toggle-row foundation-filter-grid">
           {onIncludeDoneChange ? (
             <label className="filter-field checkbox-field">
               <input type="checkbox" checked={includeDone} onChange={(event) => onIncludeDoneChange(event.target.checked)} />
@@ -75,6 +89,7 @@ export default function InboxV2Client({
               <span>Ausgeblendete anzeigen</span>
             </label>
           ) : null}
+          </div>
         </div>
       ) : null}
 

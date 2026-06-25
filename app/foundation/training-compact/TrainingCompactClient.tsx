@@ -6,7 +6,7 @@ import { getTeamLogoBrowserUrl } from "@/lib/data/mediaAssets";
 import type { Team } from "@/lib/data/olyDataTypes";
 import type { PlayerTrainingMode } from "@/lib/training/training-plan-types";
 
-import { TrainingPlayerLane, formatLocaleNumber, formatSignedPercent } from "@/app/foundation/training-facilities-v2/training-view-shared";
+import { TrainingModeGuide, TrainingPlayerLane, formatLocaleNumber, formatSignedPercent } from "@/app/foundation/training-facilities-v2/training-view-shared";
 import type {
   TrainingClassOption,
   TrainingDevelopmentFilter,
@@ -179,6 +179,7 @@ export default function TrainingCompactClient({
         </div>
 
         {managementLockedReason ? <p className="muted">{managementLockedReason}</p> : null}
+        <TrainingModeGuide trainingModeOptions={trainingModeOptions} />
       </header>
 
       <section className="training-compact-workspace training-v2-lane training-v2-lane-training">

@@ -89,14 +89,20 @@ export function calculateFacilityIncome(teamFacilities: TeamFacilityCollection |
   );
 }
 
-export function applyTrainingXpFacilityModifiers(baseTrainingXp: number, facilities: TeamFacilityCollection | null | undefined) {
+export function applyTrainingXpFacilityModifiers(
+  baseTrainingXp: number,
+  facilities: TeamFacilityCollection | null | undefined,
+  options?: { developmentTrainingBonusPct?: number },
+) {
   const level = getFacilityLevel(facilities, "training_center");
   const efficiencyPct = getFacilityEfficiency(facilities, "training_center").efficiencyPct;
   const modifierPct = roundValue(((getFacilityLevelDefinition("training_center", level)?.modifierPct ?? 0) * efficiencyPct) / 100);
+  const developmentBonusPct = options?.developmentTrainingBonusPct ?? 0;
+  const totalModifierPct = modifierPct + developmentBonusPct;
   return {
     before: baseTrainingXp,
-    modifierPct,
-    after: roundValue(baseTrainingXp * (1 + modifierPct / 100), 0),
+    modifierPct: totalModifierPct,
+    after: roundValue(baseTrainingXp * (1 + totalModifierPct / 100), 0),
   };
 }
 

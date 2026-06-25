@@ -18,6 +18,7 @@ import { formatTransfermarktCurrency } from "@/lib/market/transfermarkt-formatti
 import type { PlayerTrainingMode } from "@/lib/training/training-plan-types";
 import { TrainingPlayerLane } from "@/app/foundation/training-facilities-v2/training-view-shared";
 import type { TrainingModeOption, TrainingPlayerRowView } from "@/app/foundation/training-facilities-v2/training-view-types";
+import { VeloImpactStrip } from "@/components/foundation/velo-ui";
 
 type AttributeOption = {
   value: PlayerGeneratorAttributeName;
@@ -1007,30 +1008,35 @@ export default function TrainingFacilitiesV2Client({
 
             <article className="training-v2-preview-card">
               <span>Gebaeude-Wirkung</span>
-              <div className="training-v2-mini-grid">
-                <div>
-                  <small>Training-XP</small>
-                  <strong>
-                    {formatLocaleNumber(summary.trainingXpBefore, 0)} → {formatLocaleNumber(summary.trainingXpAfter, 0)}
-                  </strong>
-                </div>
-                <div>
-                  <small>Recovery nach Training</small>
-                  <strong>{formatPps(facilityEffectPreview.recoveryAfterTraining)}</strong>
-                </div>
-                <div>
-                  <small>Akademie Rabatt</small>
-                  <strong>
-                    {formatLocaleNumber(facilityEffectPreview.academyLowTier.costBeforeFacility, 0)} → {formatLocaleNumber(facilityEffectPreview.academyLowTier.costAfterFacility, 0)}
-                  </strong>
-                </div>
-                <div>
-                  <small>Spezialist POW / SPE</small>
-                  <strong>
-                    {formatLocaleNumber(facilityEffectPreview.specialistPower.costAfterFacility, 0)} / {formatLocaleNumber(facilityEffectPreview.specialistSpeed.costAfterFacility, 0)}
-                  </strong>
-                </div>
-              </div>
+              <VeloImpactStrip
+                className="training-v2-facility-impact-strip"
+                items={[
+                  {
+                    key: "xp",
+                    label: "Training-XP",
+                    value: `${formatLocaleNumber(summary.trainingXpBefore, 0)} → ${formatLocaleNumber(summary.trainingXpAfter, 0)}`,
+                    tone: summary.trainingXpAfter >= summary.trainingXpBefore ? "positive" : "neutral",
+                  },
+                  {
+                    key: "recovery",
+                    label: "Recovery",
+                    value: formatPps(facilityEffectPreview.recoveryAfterTraining),
+                    tone: "positive",
+                  },
+                  {
+                    key: "academy",
+                    label: "Akademie",
+                    value: `${formatLocaleNumber(facilityEffectPreview.academyLowTier.costBeforeFacility, 0)} → ${formatLocaleNumber(facilityEffectPreview.academyLowTier.costAfterFacility, 0)}`,
+                    tone: "positive",
+                  },
+                  {
+                    key: "specialist",
+                    label: "Spezialist",
+                    value: `${formatLocaleNumber(facilityEffectPreview.specialistPower.costAfterFacility, 0)} / ${formatLocaleNumber(facilityEffectPreview.specialistSpeed.costAfterFacility, 0)}`,
+                    tone: "neutral",
+                  },
+                ]}
+              />
               <p className="muted">
                 Scouting {facilityEffectPreview.scouting.label} · Analytics {facilityEffectPreview.analytics.label}
                 {facilityEffectPreview.warnings.length > 0 ? ` · ${facilityEffectPreview.warnings.join(" · ")}` : ""}
@@ -1041,40 +1047,42 @@ export default function TrainingFacilitiesV2Client({
               <article className="training-v2-preview-card is-upgrade">
                 <span>{facilityUpgradePreview.action === "downgrade" ? "Downgrade-Vorschau" : "Upgrade-Vorschau"}</span>
                 <strong>{facilityUpgradePreview.facility?.label ?? "Gebaeude"}</strong>
-                <div className="training-v2-mini-grid">
-                  <div>
-                    <small>Level</small>
-                    <strong>
-                      {facilityUpgradePreview.currentLevel} → {facilityUpgradePreview.nextLevel ?? "—"}
-                    </strong>
-                  </div>
-                  <div>
-                    <small>Cash danach</small>
-                    <strong>{formatTransfermarktCurrency(facilityUpgradePreview.cashAfter)}</strong>
-                  </div>
-                  <div>
-                    <small>{facilityUpgradePreview.action === "downgrade" ? "Erstattung" : "Kosten"}</small>
-                    <strong>
-                      {facilityUpgradePreview.action === "downgrade"
-                        ? formatTransfermarktCurrency(facilityUpgradePreview.refundAmount ?? null)
-                        : formatTransfermarktCurrency(facilityUpgradePreview.upgradeCost)}
-                    </strong>
-                  </div>
-                  <div>
-                    <small>Unterhalt</small>
-                    <strong>
-                      {formatTransfermarktCurrency(facilityUpgradePreview.currentUpkeep)} → {formatTransfermarktCurrency(facilityUpgradePreview.newUpkeep)}
-                    </strong>
-                  </div>
-                  <div>
-                    <small>Income</small>
-                    <strong>
-                      {formatTransfermarktCurrency(facilityUpgradePreview.currentIncome)} → {formatTransfermarktCurrency(facilityUpgradePreview.newIncome)}
-                    </strong>
-                  </div>
-                </div>
+                <VeloImpactStrip
+                  className="training-v2-facility-upgrade-strip"
+                  items={[
+                    {
+                      key: "level",
+                      label: "Level",
+                      value: `${facilityUpgradePreview.currentLevel} → ${facilityUpgradePreview.nextLevel ?? "—"}`,
+                      tone: "neutral",
+                    },
+                    {
+                      key: "cost",
+                      label: facilityUpgradePreview.action === "downgrade" ? "Erstattung" : "Kosten",
+                      value:
+                        facilityUpgradePreview.action === "downgrade"
+                          ? formatTransfermarktCurrency(facilityUpgradePreview.refundAmount ?? null)
+                          : formatTransfermarktCurrency(facilityUpgradePreview.upgradeCost),
+                      tone: facilityUpgradePreview.action === "downgrade" ? "positive" : "warning",
+                    },
+                    {
+                      key: "effect",
+                      label: "Wirkung",
+                      value: `${facilityUpgradePreview.currentEffect} → ${facilityUpgradePreview.nextEffect ?? "Max"}`,
+                      tone: "positive",
+                    },
+                    {
+                      key: "cash",
+                      label: "Cash danach",
+                      value: formatTransfermarktCurrency(facilityUpgradePreview.cashAfter),
+                      tone: "neutral",
+                    },
+                  ]}
+                />
                 <p className="muted">
-                  {facilityUpgradePreview.currentEffect} → {facilityUpgradePreview.nextEffect ?? "Max"}
+                  Unterhalt {formatTransfermarktCurrency(facilityUpgradePreview.currentUpkeep)} → {formatTransfermarktCurrency(facilityUpgradePreview.newUpkeep)}
+                  {" · "}
+                  Income {formatTransfermarktCurrency(facilityUpgradePreview.currentIncome)} → {formatTransfermarktCurrency(facilityUpgradePreview.newIncome)}
                 </p>
                 {facilityUpgradePreview.blockingReasons.length > 0 ? (
                   <p className="text-negative">Noch offen: {facilityUpgradePreview.blockingReasons.map(formatFacilityActionReason).join(" · ")}</p>

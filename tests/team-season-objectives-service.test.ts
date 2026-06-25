@@ -235,13 +235,14 @@ describe("team season objectives service", () => {
   it("generates a compact four-objective board slate per team", () => {
     const overview = buildTeamObjectiveOverview(createGameState());
     const teamObjectives = overview.objectives.filter((objective) => objective.teamId === "M-M");
-    const categories = new Set(teamObjectives.map((objective) => objective.category));
+    const coreObjectives = teamObjectives.filter((objective) => objective.category !== "sponsor");
+    const categories = new Set(coreObjectives.map((objective) => objective.category));
 
-    expect(teamObjectives).toHaveLength(4);
+    expect(coreObjectives).toHaveLength(4);
     expect(categories.has("sport")).toBe(true);
     expect(categories.has("finance")).toBe(true);
     expect(categories.has("roster")).toBe(true);
-    expect(overview.warnings).toContain("sponsor_objective_source_missing");
+    expect(overview.warnings).not.toContain("sponsor_objective_source_missing");
   });
 
   it("does not assign transfer-balance objectives during the Season 1 setup churn", () => {
@@ -256,7 +257,7 @@ describe("team season objectives service", () => {
     const overview = buildTeamObjectiveOverview(gameState);
 
     expect(overview.objectives.some((objective) => objective.objectiveId === "transfer-profit")).toBe(false);
-    expect(overview.objectives).toHaveLength(4);
+    expect(overview.objectives.filter((objective) => objective.category !== "sponsor")).toHaveLength(4);
   });
 
   it("uses team identity for profile-like goals such as M-M top target and C-C value transfer target", () => {
@@ -626,7 +627,7 @@ describe("team season objectives service", () => {
     const formColor = overview.objectives.find((objective) => objective.objectiveId === "roster-form-color-cover");
     const matchdayTop10 = overview.objectives.find((objective) => objective.objectiveId === "sport-next-matchday-top10");
 
-    expect(overview.objectives.filter((objective) => objective.teamId === "M-M")).toHaveLength(4);
+    expect(overview.objectives.filter((objective) => objective.teamId === "M-M" && objective.category !== "sponsor")).toHaveLength(4);
     expect(formColor?.status).toBe("completed");
     if (matchdayTop10) {
       expect(matchdayTop10.label).toContain("Climbing/Football");

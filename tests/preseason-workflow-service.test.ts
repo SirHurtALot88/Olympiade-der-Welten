@@ -286,6 +286,7 @@ describe("pre-season workflow service", () => {
       "transfer_sell_phase",
       "contract_renewal",
       "transfer_buy_phase",
+      "sponsor_choice",
       "next_season_setup",
       "next_season_ready",
     ]);

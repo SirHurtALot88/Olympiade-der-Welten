@@ -77,7 +77,8 @@ describe("foundation ui v2 roadmap contract", () => {
     expect(fileText).toContain("Base Infos (immer)");
     expect(fileText).toContain("Draft & Rekrutierung");
     expect(fileText).not.toContain("Recent Reports");
-    expect(fileText).toContain('data-testid="foundation-scouting-hub-v2"');
+    expect(fileText).toContain("Nächster Meilenstein");
+    expect(fileText).toContain("Aktive Beobachtung");
   });
 
   it("keeps inbox v2 as the canonical compact inbox", async () => {

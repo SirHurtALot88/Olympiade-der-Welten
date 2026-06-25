@@ -33,7 +33,10 @@ describe("foundation transfermarkt ui contract", () => {
   });
 
   it("keeps Transfermarkt V2 centered on scouting, deal preview and own roster context", async () => {
-    const fileText = await fs.readFile(transfermarktV2Path, "utf8");
+    const [fileText, cssText] = await Promise.all([
+      fs.readFile(transfermarktV2Path, "utf8"),
+      fs.readFile(globalsPath, "utf8"),
+    ]);
 
     expect(fileText).toContain("Markt-Pool");
     expect(fileText).toContain("Scouting-Profil");
@@ -43,6 +46,12 @@ describe("foundation transfermarkt ui contract", () => {
     expect(fileText).toContain("Wishlist & Bedarf");
     expect(fileText).toContain("Deal prüfen");
     expect(fileText).toContain("Auf Wishlist");
+    expect(fileText).toContain("Beobachten");
+    expect(fileText).toContain("market-v2-star-row");
+    expect(fileText).toContain("axisStarsDisplay");
+    expect(fileText).toContain("onToggleScoutingWatch");
+    expect(fileText).toContain("market-v2-scout-certainty");
+    expect(cssText).toContain(".market-v2-scout-certainty-bar");
     expect(fileText).toContain("scoutingProfileTooltip");
     expect(fileText).toContain("title={scoutingProfileTooltip}");
     expect(fileText).toContain("Scouting L");
@@ -192,7 +201,8 @@ describe("foundation transfermarkt ui contract", () => {
     expect(fileText).toContain("Spieler ist noch angefressen");
     expect(fileText).toContain('buyNegotiationOutcome?.status !== "accepted"');
     expect(fileText).toContain('persistNegotiationOutcome(buyPreview, "countered")');
-    expect(foundationText).toContain('marketNegotiationOutcome?.status !== "accepted"');
+    expect(foundationText).toContain("toggleScoutingWatch");
+    expect(foundationText).toContain("onToggleScoutingWatch");
     expect(foundationText).toContain("clearNegotiationOutcome: false");
   });
 

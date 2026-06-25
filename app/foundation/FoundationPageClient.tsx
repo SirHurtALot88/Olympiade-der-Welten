@@ -18,6 +18,7 @@ import { AI_MARKET_APPLY_CONFIRM_TOKEN } from "@/lib/ai/ai-market-plan-apply-con
 import { buildAiTransferIntents } from "@/lib/ai/aiTransferMarket";
 import { runAiTurn } from "@/lib/ai/aiTurnEngine";
 import { buildTeamObjectiveOverview } from "@/lib/board/team-season-objectives-service";
+import { getTeamDevelopmentTrainingBonusPct } from "@/lib/foundation/team-development-tendency";
 import {
   FACILITY_CATALOG,
   getFacilityLevelDefinition,
@@ -181,6 +182,14 @@ import { buildTeamPlayerDemandMap, selectTeamCaptain } from "@/lib/morale/player
 import { buildPlayerMoraleAudit } from "@/lib/morale/player-morale-service";
 import { buildTeamRivalryLedger } from "@/lib/rivalries/team-rivalries";
 import { buildTeamRelationshipCards } from "@/lib/rivalries/team-relationship-dynamics";
+import {
+  addScoutingWatchlistEntry,
+  getScoutingWatchlistForTeam,
+  removeScoutingWatchlistEntry,
+  syncWishlistToScoutingWatchlist,
+} from "@/lib/scouting/scouting-watchlist-service";
+import { buildSponsorCommercialRating, getTeamSponsorContract, getTeamSponsorOffers } from "@/lib/sponsor/sponsor-offer-service";
+import { buildScoutPipelineSummary } from "@/lib/scouting/facility-scout-pipeline-service";
 import { getTransfermarktBracket } from "@/lib/market/transfermarkt-fit";
 import { getTeamPowerOptions } from "@/lib/lineups/team-powers";
 import { getDisciplineColor, getSeasonDisciplineSchedule } from "@/lib/season/season-discipline-schedule";
@@ -200,6 +209,8 @@ import { buildPlayerDevelopmentLevelupModel, TRAINING_ATTRIBUTE_LABELS } from "@
 import { BASE_MATCHDAY_RECOVERY } from "@/lib/fatigue/fatigue-injury-service";
 import { applyTrainingRecoveryImpact, TRAINING_RECOVERY_IMPACT } from "@/lib/training/training-recovery-impact";
 import { buildOrganicSeasonProgression } from "@/lib/training/organic-season-progression";
+import { getAllTrainingModePresentations } from "@/lib/training/training-mode-presentation";
+import { buildTrainingModeDemand } from "@/lib/training/training-mode-demand-service";
 import {
   buildSeasonEndProgressionPreview,
   SEASON_END_ATTRIBUTE_LABELS,
@@ -232,12 +243,14 @@ import {
 } from "@/lib/ui/global-table-layout";
 import type { PlayerEconomyCompareReport } from "@/lib/foundation/player-economy-compare-service";
 import type { RoomRealtimeEvent } from "@/types/game";
+import { VeloStatOrbitRow } from "@/components/foundation/velo-ui";
 
 const PlayerDetailDrawer = dynamic(() => import("@/app/foundation/PlayerDetailDrawer"), { ssr: false });
 const PlayerGeneratorPanel = dynamic(() => import("@/app/foundation/PlayerGeneratorPanel"), { ssr: false });
 const MatchdayArenaV2Client = dynamic(() => import("@/app/foundation/matchday-arena-v2/MatchdayArenaV2Client"), { ssr: false });
 const TransfermarktV2Client = dynamic(() => import("@/app/foundation/transfermarkt-v2/TransfermarktV2Client"), { ssr: false });
 const TransferHistoryV2Client = dynamic(() => import("@/app/foundation/transfer-history-v2/TransferHistoryV2Client"), { ssr: false });
+const TeamsV2Client = dynamic(() => import("@/app/foundation/teams-v2/TeamsV2Client"), { ssr: false });
 const SeasonStandingsV2Client = dynamic(() => import("@/app/foundation/season-v2/SeasonStandingsV2Client"), { ssr: false });
 const TrainingFacilitiesV2Client = dynamic(() => import("@/app/foundation/training-facilities-v2/TrainingFacilitiesV2Client"), {
   ssr: false,
@@ -727,6 +740,7 @@ type PreSeasonWorkflowStepSummaryResponse = {
     | "preseason_management"
     | "transfer_sell_phase"
     | "contract_renewal"
+    | "sponsor_choice"
     | "transfer_buy_phase"
     | "next_season_setup"
     | "next_season_ready";
@@ -4772,7 +4786,7 @@ function formatNegotiationSignalLabel(value: string) {
     negotiation_cancelled_after_contact: "Abgebrochene Verhandlung bleibt als schlechte Erfahrung gespeichert.",
     negotiation_rejected_bad_experience: "Abgelehntes Angebot bleibt als schlechte Erfahrung gespeichert.",
     offer_below_expected_salary: "Angebot liegt unter der Gehaltserwartung.",
-    preview_only_contract_negotiation: "Verhandlungsvorschau: noch kein Abschluss.",
+    preview_only_contract_negotiation: "Verhandlungssimulation — finaler Kauf über „Kauf bestätigen“.",
     previous_rejected_offer_reduces_trust: "Spieler ist nach der letzten Runde noch angefressen und verhandelt haerter.",
     salary_source_missing: "Gehaltserwartung fehlt.",
     trait_salary_factor_source_missing: "Trait-Gehaltseffekt noch nicht final aus Quelle belegt.",
@@ -6042,7 +6056,7 @@ export default function FoundationPageClient({
   const [showCommandPalette, setShowCommandPalette] = useState(false);
   const [commandSearch, setCommandSearch] = useState("");
   const commandSearchInputRef = useRef<HTMLInputElement | null>(null);
-  const [showTeamsComparison, setShowTeamsComparison] = useState<boolean>(true);
+  const [showTeamsComparison, setShowTeamsComparison] = useState<boolean>(false);
   const shouldBuildTeamsHeavyComparison = activeView === "teams" && showTeamsComparison;
   const shouldBuildDisciplineRanks =
     shouldBuildTeamsHeavyComparison ||
@@ -6274,6 +6288,17 @@ export default function FoundationPageClient({
   const [contractRenewalBusy, setContractRenewalBusy] = useState<string | null>(null);
   const [contractRenewalMessage, setContractRenewalMessage] = useState<string | null>(null);
   const [contractRenewalError, setContractRenewalError] = useState<string | null>(null);
+  const [contractRenewalNegotiation, setContractRenewalNegotiation] = useState<{
+    teamId: string;
+    playerId: string;
+    playerName: string;
+    contractLength: number;
+    offeredSalary: number | null;
+    expectedSalary: number | null;
+    confirmToken: string;
+  } | null>(null);
+  const [sponsorChoiceBusy, setSponsorChoiceBusy] = useState<string | null>(null);
+  const [sponsorChoiceMessage, setSponsorChoiceMessage] = useState<string | null>(null);
   const [marketSellModalOpen, setMarketSellModalOpen] = useState<boolean>(false);
   const [marketSellSubject, setMarketSellSubject] = useState<TransfermarktSellPreviewSubject | null>(null);
   const [marketContractLengthDraft, setMarketContractLengthDraft] = useState<number | null>(null);
@@ -7194,6 +7219,25 @@ export default function FoundationPageClient({
 
   function removeTransferWishlistEntry(playerId: string) {
     saveTransferWishlist((gameState.seasonState.transferWishlist ?? []).filter((entry) => entry.playerId !== playerId));
+  }
+
+  function toggleScoutingWatch(item: TransfermarktFreeAgentItem) {
+    if (isReadOnlyMode) {
+      showReadOnlyNotice();
+      return;
+    }
+    if (!selectedTeamCanManage || !activeManagerTeamId) {
+      showTeamManagementLockedNotice();
+      return;
+    }
+
+    const teamId = activeManagerTeamId;
+    const watched = getScoutingWatchlistForTeam(gameState, teamId).some((entry) => entry.playerId === item.playerId);
+    setGameState((current) =>
+      watched
+        ? removeScoutingWatchlistEntry({ gameState: current, teamId, playerId: item.playerId })
+        : addScoutingWatchlistEntry({ gameState: current, teamId, playerId: item.playerId }),
+    );
   }
 
   function toggleTransferSellMarker(input: {
@@ -10472,6 +10516,117 @@ export default function FoundationPageClient({
     }
   }
 
+  async function openContractRenewalNegotiation(input: {
+    teamId: string;
+    playerId: string;
+    playerName: string;
+    contractLength?: number | null;
+  }) {
+    if (readMeta.readOnly || readMeta.source === "prisma") {
+      showReadOnlyNotice();
+      return;
+    }
+    if (!canManageTeamId(input.teamId)) {
+      setContractRenewalError(`${getTeamLockedName(input.teamId)} gehoert nicht zu deinen steuerbaren Teams. Vertragsaktionen sind gesperrt.`);
+      showTeamManagementLockedNotice(getTeamLockedName(input.teamId));
+      return;
+    }
+
+    setContractRenewalBusy(`preview:${input.teamId}:${input.playerId}`);
+    setContractRenewalError(null);
+    try {
+      const previewResponse = await fetch("/api/contracts/renewal", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(withRoomBody({
+          saveId: activeSaveId,
+          teamId: input.teamId,
+          playerId: input.playerId,
+          action: "renew",
+          contractLength: input.contractLength ?? 2,
+          dryRun: true,
+          source: readMeta.source,
+        })),
+      });
+      const previewPayload = (await previewResponse.json()) as ContractRenewalApiResponse;
+      if (!previewResponse.ok || previewPayload.error || !previewPayload.summary?.confirmToken) {
+        setContractRenewalError(
+          previewPayload.error ??
+            previewPayload.summary?.blockingReasons?.[0] ??
+            `${input.playerName}: Verhandlungsvorschau blockiert.`,
+        );
+        return;
+      }
+      const expectedSalary = previewPayload.summary.negotiationPreview?.expectedSalary ?? null;
+      setContractRenewalNegotiation({
+        teamId: input.teamId,
+        playerId: input.playerId,
+        playerName: input.playerName,
+        contractLength: input.contractLength ?? 2,
+        offeredSalary: expectedSalary,
+        expectedSalary,
+        confirmToken: previewPayload.summary.confirmToken,
+      });
+    } catch {
+      setContractRenewalError(`${input.playerName}: Verhandlungsvorschau konnte nicht geladen werden.`);
+    } finally {
+      setContractRenewalBusy(null);
+    }
+  }
+
+  async function confirmContractRenewalNegotiation() {
+    if (!contractRenewalNegotiation) {
+      return;
+    }
+    await runContractRenewalAction({
+      teamId: contractRenewalNegotiation.teamId,
+      playerId: contractRenewalNegotiation.playerId,
+      playerName: contractRenewalNegotiation.playerName,
+      action: "renew",
+      contractLength: contractRenewalNegotiation.contractLength,
+      offeredSalary: contractRenewalNegotiation.offeredSalary,
+    });
+    setContractRenewalNegotiation(null);
+  }
+
+  async function chooseTeamSponsor(offerId: string) {
+    if (!selectedTeam || readMeta.readOnly || readMeta.source === "prisma") {
+      showReadOnlyNotice();
+      return;
+    }
+    if (!canManageTeamId(selectedTeam.teamId)) {
+      showTeamManagementLockedNotice(selectedTeam.name);
+      return;
+    }
+    setSponsorChoiceBusy(offerId);
+    setSponsorChoiceMessage(null);
+    try {
+      const response = await fetch("/api/sponsor/choose", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(withRoomBody({
+          saveId: activeSaveId,
+          teamId: selectedTeam.teamId,
+          offerId,
+          dryRun: false,
+          source: readMeta.source,
+        })),
+      });
+      const payload = (await response.json()) as { success?: boolean; error?: string; summary?: { contract?: { name?: string } } };
+      if (!response.ok || payload.error) {
+        setSponsorChoiceMessage(payload.error ?? "Sponsor konnte nicht gewählt werden.");
+        return;
+      }
+      setSponsorChoiceMessage(`${payload.summary?.contract?.name ?? "Sponsor"} für ${selectedTeam.shortCode} unterzeichnet.`);
+      await loadSave(activeSaveId);
+      await reloadSeasonManagementOverview();
+    } catch {
+      setSponsorChoiceMessage("Sponsor konnte nicht gewählt werden.");
+    } finally {
+      setSponsorChoiceBusy(null);
+    }
+  }
+
   async function runContractRenewalAction(input: {
     teamId: string;
     playerId: string;
@@ -11095,6 +11250,12 @@ export default function FoundationPageClient({
       gameFlowActionStep.stepId === "fill_roster" ||
       gameFlowActionStep.stepId === "training_facilities" ||
       gameFlowActionStep.stepId === "set_lineup" ||
+      gameFlowActionStep.stepId === "assign_formcards" ||
+      gameFlowActionStep.stepId === "confirm_lineup" ||
+      gameFlowActionStep.stepId === "open_arena" ||
+      gameFlowActionStep.stepId === "run_reveal" ||
+      gameFlowActionStep.stepId === "check_training" ||
+      gameFlowActionStep.stepId === "advance_to_next_matchday" ||
       gameFlowActionStep.stepId === "scouting_facilities" ||
       gameFlowActionStep.stepId === "buy_players" ||
       gameFlowActionStep.targetView === "market");
@@ -11402,18 +11563,22 @@ export default function FoundationPageClient({
       return;
     }
 
-    setGameState((current) => {
-      const existingItems = current.gameInboxItems ?? [];
-      const hasStoredItem = existingItems.some((entry) => entry.itemId === item.itemId);
-      const nextItems = hasStoredItem
-        ? existingItems.map((entry) => (entry.itemId === item.itemId ? { ...entry, status } : entry))
-        : [...existingItems, { ...item, status }];
+    const existingItems = gameState.gameInboxItems ?? [];
+    const hasStoredItem = existingItems.some((entry) => entry.itemId === item.itemId);
+    const nextItems = hasStoredItem
+      ? existingItems.map((entry) => (entry.itemId === item.itemId ? { ...entry, status } : entry))
+      : [...existingItems, { ...item, status }];
+    const nextGameState = {
+      ...gameState,
+      gameInboxItems: nextItems,
+    };
 
-      return {
-        ...current,
-        gameInboxItems: nextItems,
-      };
-    });
+    setGameState(nextGameState);
+    if (readMeta.source !== "prisma" && !readMeta.readOnly && activeSaveId !== "loading-save") {
+      void persistLocalGameStateImmediately(nextGameState).catch((error) => {
+        console.error(error);
+      });
+    }
   };
   const foundationWarningInboxItems = useMemo(
     () => {
@@ -11530,7 +11695,7 @@ export default function FoundationPageClient({
     });
   };
   const triggerGlobalNext = async () => {
-    if (activeView === "matchdayArena" && !activeManagerLineupReady) {
+    if (activeView === "matchdayArena" && !activeManagerMatchdayReady) {
       const lineupInboxItem =
         primaryInboxItem?.itemId.startsWith("lineup_missing:") ? primaryInboxItem : null;
       if (lineupInboxItem) {
@@ -11542,7 +11707,7 @@ export default function FoundationPageClient({
     }
     if (
       activeView === "lineup" &&
-      activeManagerLineupReady &&
+      activeManagerMatchdayReady &&
       !homeNextMatchdayStatus.resultAvailable &&
       primaryInboxItem?.itemId.startsWith("lineup_missing:")
     ) {
@@ -13291,6 +13456,37 @@ export default function FoundationPageClient({
     () => buildTeamObjectiveOverview(gameState),
     [gameState],
   );
+  const selectedTeamSponsorOffers = useMemo(
+    () => (selectedTeam ? getTeamSponsorOffers(gameState, selectedTeam.teamId) : []),
+    [gameState, selectedTeam],
+  );
+  const selectedTeamSponsorContract = useMemo(
+    () => (selectedTeam ? getTeamSponsorContract(gameState, selectedTeam.teamId) : null),
+    [gameState, selectedTeam],
+  );
+  const selectedTeamCommercialRating = useMemo(
+    () => (selectedTeam ? buildSponsorCommercialRating({ gameState, teamId: selectedTeam.teamId }) : null),
+    [gameState, selectedTeam],
+  );
+  const selectedTeamScoutPipeline = useMemo(
+    () => (selectedTeam ? buildScoutPipelineSummary(gameState, selectedTeam.teamId) : null),
+    [gameState, selectedTeam],
+  );
+  const transferMarketScoutingWatchPlayerIds = useMemo(
+    () =>
+      activeManagerTeamId
+        ? getScoutingWatchlistForTeam(gameState, activeManagerTeamId).map((entry) => entry.playerId)
+        : [],
+    [activeManagerTeamId, gameState],
+  );
+  const transferMarketScoutingIntelByPlayerId = useMemo(() => {
+    if (!activeManagerTeamId || !selectedTeamScoutPipeline) {
+      return {};
+    }
+    return Object.fromEntries(
+      selectedTeamScoutPipeline.records.map((record) => [record.playerId, record.certainty]),
+    );
+  }, [activeManagerTeamId, selectedTeamScoutPipeline]);
   const selectedTeamObjectives = useMemo(
     () => teamObjectiveOverview.objectives.filter((objective) => objective.teamId === selectedTeam?.teamId),
     [selectedTeam?.teamId, teamObjectiveOverview.objectives],
@@ -14136,6 +14332,28 @@ export default function FoundationPageClient({
     };
   }, [teamsViewSummary]);
 
+  const selectedTeamAverageAxisStats = useMemo(() => {
+    if (rosterPlayers.length === 0) {
+      return null;
+    }
+    const totals = rosterPlayers.reduce(
+      (sum, { player }) => ({
+        pow: sum.pow + (player.coreStats.pow ?? 0),
+        spe: sum.spe + (player.coreStats.spe ?? 0),
+        men: sum.men + (player.coreStats.men ?? 0),
+        soc: sum.soc + (player.coreStats.soc ?? 0),
+      }),
+      { pow: 0, spe: 0, men: 0, soc: 0 },
+    );
+    const count = rosterPlayers.length;
+    return {
+      pow: totals.pow / count,
+      spe: totals.spe / count,
+      men: totals.men / count,
+      soc: totals.soc / count,
+    };
+  }, [rosterPlayers]);
+
   const selectedRosterTableRows = useMemo(
     () =>
       [...rosterPlayers]
@@ -14553,6 +14771,43 @@ export default function FoundationPageClient({
     teamObjectiveOverview.objectives,
     seasonStandRows,
   ]);
+  const teamsV2FocusCards = useMemo(() => {
+    const data = selectedTeamsHistoryData;
+    if (!data) {
+      return [];
+    }
+    const expiringContracts = data.players.filter((player) => (player.contractLength ?? 99) <= 1).length;
+    return [
+      {
+        label: "Gehalt",
+        value: data.salaryTotal != null ? formatMoney(data.salaryTotal) : "—",
+        note: `${data.rosterSize} Spieler`,
+        detail: "Gesamtgehaltsblock des aktiven Kaders",
+        tone: "salary" as const,
+      },
+      {
+        label: "Marktwert",
+        value: data.marketValueTotal != null ? formatMoney(data.marketValueTotal) : "—",
+        note: data.cash != null ? `Cash ${formatMoney(data.cash)}` : "—",
+        detail: "Team-Marktwert und Liquiditaet",
+        tone: "value" as const,
+      },
+      {
+        label: "Achsen",
+        value: data.powRank != null ? `POW #${data.powRank}` : "—",
+        note: [data.speRank, data.menRank, data.socRank].filter(Boolean).length ? `SPE/MEN/SOC gerankt` : "keine Ranks",
+        detail: "Aggregierte Team-Achsenstaerke",
+        tone: "training" as const,
+      },
+      {
+        label: "Vertraege",
+        value: String(expiringContracts),
+        note: "laufen <= 1 Saison aus",
+        detail: "Vertragsdruck im Kader",
+        tone: "contract" as const,
+      },
+    ];
+  }, [selectedTeamsHistoryData]);
   const freeAgents = useMemo(() => {
     if (!shouldBuildExtendedTeamPanels) {
       return [];
@@ -14725,6 +14980,19 @@ export default function FoundationPageClient({
           player: trainingPlayer,
           facilities: selectedTeamFacilityState,
         });
+        const currentSchedule =
+          gameState.seasonState.disciplineSchedule?.find((entry) => entry.matchdayId === gameState.matchdayState.matchdayId) ?? null;
+        const trainingDemand = buildTrainingModeDemand({
+          context: {
+            seasonId: gameState.season.id,
+            teamId: selectedTeam.teamId,
+            matchdayIndex: currentSchedule?.matchdayIndex ?? null,
+          },
+          player: {
+            ...trainingPlayer,
+            trainingMode: mode,
+          },
+        });
         const appearances = seasonPerformance?.appearances ?? 0;
         const seasonPoints = seasonPerformance?.totalPoints ?? rating?.ppsSeason ?? null;
 
@@ -14746,6 +15014,13 @@ export default function FoundationPageClient({
           recoveryForecast,
           playerMvs: rating?.mvs ?? null,
           playerPps: rating?.ppsSeason ?? seasonPerformance?.totalPoints ?? null,
+          developmentStars: {
+            currentAbilityStars: forecast.currentAbilityStars,
+            potentialStars: forecast.potentialStars,
+            currentAbilityRating: forecast.currentAbilityRating,
+            potentialRating: forecast.potentialRating,
+          },
+          trainingDemand,
         };
       });
     },
@@ -14854,7 +15129,10 @@ export default function FoundationPageClient({
             level,
             conditionPct: efficiency.conditionPct,
           }),
-          status: "preview_only" as const,
+          status:
+            readMeta.source === "sqlite" && !readMeta.readOnly
+              ? ("ready" as const)
+              : ("preview_only" as const),
           sourceStatus: state?.disabledReason ?? (level > 0 ? "save_state" : "not_built"),
           currentEffect: currentLevel?.effectDescription ?? "Level 0: kein Effekt",
           nextLevelEffect: nextLevelDefinition?.effectDescription ?? "Max Level erreicht",
@@ -14932,7 +15210,12 @@ export default function FoundationPageClient({
     };
   }, [selectedTeam.cash, selectedTeamFacilityState, shouldBuildTrainingView, trainingFacilityRows]);
   const trainingFacilityEffectPreview = useMemo(() => {
-    const trainingXp = applyTrainingXpFacilityModifiers(trainingForecastSummary.trainingXp, selectedTeamFacilityState);
+    const developmentTrainingBonusPct = selectedTeam
+      ? getTeamDevelopmentTrainingBonusPct(gameState, selectedTeam.teamId)
+      : 0;
+    const trainingXp = applyTrainingXpFacilityModifiers(trainingForecastSummary.trainingXp, selectedTeamFacilityState, {
+      developmentTrainingBonusPct,
+    });
     const recovery = applyRecoveryFacilityModifiers(BASE_MATCHDAY_RECOVERY, selectedTeamFacilityState);
     const academyLowTier = applyUpgradeCostFacilityModifiers("power", "D", PLAYER_PROGRESSION_XP_CONSTANTS.ratingTierUpgradeCost.D, selectedTeamFacilityState);
     const specialistPower = applyUpgradeCostFacilityModifiers("power", "B", PLAYER_PROGRESSION_XP_CONSTANTS.ratingTierUpgradeCost.B, selectedTeamFacilityState);
@@ -15008,11 +15291,15 @@ export default function FoundationPageClient({
   }, [plannedXpUpgrades]);
   const trainingV2ModeOptions = useMemo(
     () =>
-      Object.entries(trainingModeConfigs).map(([value, config]) => ({
-        value: value as PlayerTrainingMode,
-        label: config.label,
-        note: config.note,
-        fatigueRisk: config.fatigueRisk,
+      getAllTrainingModePresentations().map((presentation) => ({
+        value: presentation.value,
+        label: presentation.label,
+        note: presentation.note,
+        fatigueRisk: presentation.fatigueRisk,
+        baseXp: presentation.baseXp,
+        recoveryDeltaPct: presentation.recoveryDeltaPct,
+        trainingSetpoints: presentation.trainingSetpoints,
+        fatigueLoad: presentation.fatigueLoad,
       })),
     [],
   );
@@ -16442,6 +16729,9 @@ export default function FoundationPageClient({
     gameState.seasonState.matchdayResults,
     homeCurrentLineupDraft,
   ]);
+  const activeManagerMatchdayReady =
+    activeManagerLineupReady &&
+    (homeNextMatchdayStatus.hasFormCards || !homeNextMatchdayStatus.formCardBlocker);
   async function ensureAiLineupsForCurrentMatchday(trigger: "human_lineup_saved" | "arena_open" | "manual" = "manual") {
     if (
       readMeta.source !== "sqlite" ||
@@ -16963,7 +17253,7 @@ export default function FoundationPageClient({
     }
     return Array.from(new Set(warnings));
   }, [activeContextMeta?.roomId, activeContextMeta?.scenarioType, activeViewContextWarning, gameState.scenarioMeta?.scenarioType, hasSeasonResultsForHome, homeNextMatchdayStatus.hasFormCards, homeNextMatchdayStatus.openSlots, selectedTeam]);
-  const shouldShowArenaBackToLineup = !activeManagerLineupReady;
+  const shouldShowArenaBackToLineup = !activeManagerMatchdayReady;
   const homePlayerCards = useMemo(
     () =>
       selectedRosterTableRows
@@ -17129,6 +17419,22 @@ export default function FoundationPageClient({
       isPast: currentIndex >= 0 && gameState.season.matchdayIds.indexOf(matchdayId) < currentIndex,
     }));
   }, [gameState.matchdayState.matchdayId, gameState.season.matchdayIds]);
+  const homeV2BoardObjectives = useMemo(
+    () =>
+      activeManagerTeamId
+        ? teamObjectiveOverview.objectives
+            .filter((objective) => objective.teamId === activeManagerTeamId && objective.status !== "completed")
+            .slice(0, 4)
+            .map((objective) => ({
+              objectiveId: objective.objectiveId,
+              label: objective.label,
+              status: objective.status,
+              currentValue: objective.currentValue ?? null,
+              targetValue: objective.targetValue ?? null,
+            }))
+        : [],
+    [activeManagerTeamId, teamObjectiveOverview.objectives],
+  );
   const homeV2InboxItems = useMemo(
     () =>
       homeTasks.map((item) => ({
@@ -17156,25 +17462,48 @@ export default function FoundationPageClient({
       }),
     [selectedTeamFacilityState],
   );
-  const scoutingHubV2WatchTargets = useMemo(
-    () =>
-      transferWishlistEntriesForMarketV2.slice(0, 6).map((entry) => ({
+  const scoutingHubV2WatchTargets = useMemo(() => {
+    if (!selectedTeam) {
+      return [];
+    }
+    const syncedState = syncWishlistToScoutingWatchlist(gameState, selectedTeam.teamId);
+    const watchlistEntries = getScoutingWatchlistForTeam(syncedState, selectedTeam.teamId);
+    const playerById = new Map(gameState.players.map((player) => [player.id, player] as const));
+    const fromWatchlist = watchlistEntries.map((entry) => {
+      const player = playerById.get(entry.playerId);
+      const marketEntry = transferWishlistEntriesForMarketV2.find((candidate) => candidate.playerId === entry.playerId);
+      return {
         playerId: entry.playerId,
-        playerName: entry.playerName,
-        className: entry.className,
-        marketValue: entry.marketValue != null ? formatTransfermarktCurrency(entry.marketValue) : "—",
-        baseInfoSummary: [
-          entry.pow != null ? `POW ${formatLocalePoints(entry.pow, 0)}` : null,
-          entry.spe != null ? `SPE ${formatLocalePoints(entry.spe, 0)}` : null,
-          entry.men != null ? `MEN ${formatLocalePoints(entry.men, 0)}` : null,
-          entry.soc != null ? `SOC ${formatLocalePoints(entry.soc, 0)}` : null,
-          entry.salary != null ? `Gehalt ${formatTransfermarktCurrency(entry.salary)}` : null,
-        ]
-          .filter(Boolean)
-          .join(" · "),
-      })),
-    [transferWishlistEntriesForMarketV2],
-  );
+        playerName: player?.name ?? marketEntry?.playerName ?? entry.playerId,
+        className: player?.className ?? marketEntry?.className ?? "—",
+        marketValue:
+          marketEntry?.marketValue != null
+            ? formatTransfermarktCurrency(marketEntry.marketValue)
+            : player?.marketValue != null
+              ? formatTransfermarktCurrency(player.marketValue)
+              : "—",
+        baseInfoSummary: entry.note ?? "Scouting Watchlist",
+      };
+    });
+    if (fromWatchlist.length > 0) {
+      return fromWatchlist.slice(0, 6);
+    }
+    return transferWishlistEntriesForMarketV2.slice(0, 6).map((entry) => ({
+      playerId: entry.playerId,
+      playerName: entry.playerName,
+      className: entry.className,
+      marketValue: entry.marketValue != null ? formatTransfermarktCurrency(entry.marketValue) : "—",
+      baseInfoSummary: [
+        entry.pow != null ? `POW ${formatLocalePoints(entry.pow, 0)}` : null,
+        entry.spe != null ? `SPE ${formatLocalePoints(entry.spe, 0)}` : null,
+        entry.men != null ? `MEN ${formatLocalePoints(entry.men, 0)}` : null,
+        entry.soc != null ? `SOC ${formatLocalePoints(entry.soc, 0)}` : null,
+        entry.salary != null ? `Gehalt ${formatTransfermarktCurrency(entry.salary)}` : null,
+      ]
+        .filter(Boolean)
+        .join(" · "),
+    }));
+  }, [gameState, selectedTeam, transferWishlistEntriesForMarketV2]);
   const scoutingHubV2Visibility = useMemo(() => {
     const scoutingLevel = getFacilityLevel(selectedTeamFacilityState, "scouting_office");
     const buckets = getTransfermarktScoutingVisibilityBuckets(scoutingLevel);
@@ -20491,7 +20820,7 @@ export default function FoundationPageClient({
               <div className="panel-header compact">
                 <div className="stack">
                   <h2>Board & Saisonziele</h2>
-                  <p className="muted">Ziele sind Preview-first: Sponsor-Boni/Mali werden angezeigt, aber noch nicht angewendet.</p>
+                  <p className="muted">Board-Ziele werden live getrackt. Sponsor-Boni/Mali werden am Saisonende über die Settlement-Logik angewendet.</p>
                 </div>
                 <div className="room-meta foundation-admin-meta">
                   <span
@@ -20944,6 +21273,7 @@ export default function FoundationPageClient({
                 gmStoryTone={selectedHqGmStory?.tone ?? null}
                 boardPressure={selectedBoardConfidence?.pressure ?? null}
                 boardRating={selectedBoardConfidence?.value ?? null}
+                boardObjectives={homeV2BoardObjectives}
                 nextStepLabel={globalNextLabel}
                 nextStepStatus={getGameFlowStatusLabel(gameFlowActionStep.status)}
                 nextStepDetail={
@@ -21102,6 +21432,25 @@ export default function FoundationPageClient({
                 hiddenAtTier={scoutingHubV2Visibility.hiddenAtTier}
                 baseInfoAlwaysVisible={scoutingHubV2Visibility.baseInfoAlwaysVisible}
                 watchTargets={scoutingHubV2WatchTargets}
+                scoutPipeline={
+                  selectedTeamScoutPipeline
+                    ? {
+                        occupiedSlots: selectedTeamScoutPipeline.occupiedSlots,
+                        maxSlots: selectedTeamScoutPipeline.config.maxSlots,
+                        tickGain: selectedTeamScoutPipeline.config.tickGain,
+                        passiveActive: selectedTeamScoutPipeline.passiveActive,
+                        records: selectedTeamScoutPipeline.records.map((record) => {
+                          const player = gameState.players.find((entry) => entry.id === record.playerId);
+                          return {
+                            playerId: record.playerId,
+                            playerName: player?.name ?? record.playerId,
+                            source: record.source,
+                            certainty: record.certainty,
+                          };
+                        }),
+                      }
+                    : null
+                }
                 onOpenMarket={() => setFoundationView("marketV2", setActiveView)}
                 onOpenHomeV2={() => setFoundationView("homeV2", setActiveView)}
                 onOpenPlayer={(playerId) => openPlayerDrawerById(playerId)}
@@ -21519,6 +21868,18 @@ export default function FoundationPageClient({
                           <strong>{preseasonCards[0]?.title ?? "vorbereiten"}</strong>
                         </span>
                       </div>
+                      {selectedTeamAverageAxisStats ? (
+                        <VeloStatOrbitRow
+                          ariaLabel="Team Achsen Durchschnitt"
+                          className="foundation-hq-axis-orbit"
+                          stats={{
+                            pow: selectedTeamAverageAxisStats.pow,
+                            spe: selectedTeamAverageAxisStats.spe,
+                            men: selectedTeamAverageAxisStats.men,
+                            soc: selectedTeamAverageAxisStats.soc,
+                          }}
+                        />
+                      ) : null}
 	                    <div className="foundation-home-actions">
 	                      <button className="primary-button inline-button" type="button" onClick={() => setFoundationView("lineup", setActiveView)}>
 	                        Einsatz planen
@@ -28582,6 +28943,20 @@ export default function FoundationPageClient({
 
           {activeView === "teams" ? (
           <section className={`panel teams-view-panel${getViewClass("teams")}`} id="teams-view">
+            {!showTeamsComparison && selectedTeamsHistoryData && selectedTeam ? (
+              <TeamsV2Client
+                teams={gameState.teams}
+                selectedTeam={selectedTeam}
+                selectedTeamControlMode={formatTeamControlModeLabel(selectedTeamControl?.controlMode)}
+                teamData={selectedTeamsHistoryData}
+                focusCards={teamsV2FocusCards}
+                onSelectTeam={(teamId) => scheduleActiveManagerTeam(teamId, "manual_select")}
+                onOpenPlayerDetails={({ playerId, activePlayerId }) => openPlayerDrawerById(playerId, activePlayerId ?? null)}
+                onOpenClassicTeams={() => setShowTeamsComparison(true)}
+                onOpenTraining={() => setActiveView("trainingCompact")}
+                onOpenMarket={() => setActiveView("marketV2")}
+              />
+            ) : null}
             {showTeamsComparison ? (
             <>
             <div className="table-shell teams-overview-shell">
@@ -28759,7 +29134,7 @@ export default function FoundationPageClient({
             </section>
             </>
             ) : (
-              <p className="muted teams-view-note">Vergleich aktuell ausgeblendet.</p>
+              <p className="muted teams-view-note">Vergleichstabelle ausgeblendet. Nutze „Vergleichstabelle“ im Teams-v2-Header.</p>
             )}
           </section>
           ) : null}
@@ -29471,6 +29846,62 @@ export default function FoundationPageClient({
                 ) : null}
               </section>
 
+              <section className={`panel team-sponsor-panel teams-secondary-objectives-panel${getViewClass("teams")}`} data-testid="team-sponsor-choice" id="team-sponsor-choice">
+                <div className="panel-header compact">
+                  <div className="stack">
+                    <h2>Sponsor-Vertrag</h2>
+                    <p className="muted">Drei Angebote pro Saison — Sterne-Tier, Basis, Platzierung, Verbesserung und Sonderziel.</p>
+                    {selectedTeamCommercialRating ? (
+                      <p className="muted">
+                        Commercial Rating {selectedTeamCommercialRating.score}/100 · Erwartung ★{selectedTeamCommercialRating.tierHint}
+                        {" · "}Historie {selectedTeamCommercialRating.breakdown.recentPerformance.toFixed(0)} · Kader{" "}
+                        {selectedTeamCommercialRating.breakdown.rosterPotential.toFixed(0)} · Prestige{" "}
+                        {selectedTeamCommercialRating.breakdown.prestige.toFixed(0)}
+                      </p>
+                    ) : null}
+                  </div>
+                </div>
+                {sponsorChoiceMessage ? <div className="status-banner is-success">{sponsorChoiceMessage}</div> : null}
+                {selectedTeamSponsorContract ? (
+                  <div className="teams-summary-grid history-summary-grid">
+                    <article className="metric-card teams-summary-card">
+                      <span>AKTIV{selectedTeamSponsorContract.starTier ? ` · ★${selectedTeamSponsorContract.starTier}` : ""}</span>
+                      <strong>{selectedTeamSponsorContract.name}</strong>
+                      <small className="muted">{selectedTeamSponsorContract.components.length} Vertragskomponenten</small>
+                    </article>
+                  </div>
+                ) : (
+                  <div className="teams-summary-grid history-summary-grid">
+                    {selectedTeamSponsorOffers.map((offer) => (
+                      <article key={offer.offerId} className="metric-card teams-summary-card">
+                        <span>
+                          {offer.archetype.toUpperCase()}
+                          {offer.starTier ? ` · ★${offer.starTier}` : ""}
+                          {offer.demandProfile ? ` · ${offer.demandProfile}` : ""}
+                        </span>
+                        <strong>{offer.name}</strong>
+                        <small className="muted">{offer.flavor}</small>
+                        <ul className="muted">
+                          {offer.components.map((component) => (
+                            <li key={component.componentId}>
+                              {component.label}: {typeof component.rewardCash === "number" ? formatMoney(component.rewardCash) : component.rewardCash}
+                            </li>
+                          ))}
+                        </ul>
+                        <button
+                          type="button"
+                          className="primary-button inline-button"
+                          disabled={sponsorChoiceBusy != null || !selectedTeamCanManage}
+                          onClick={() => void chooseTeamSponsor(offer.offerId)}
+                        >
+                          {sponsorChoiceBusy === offer.offerId ? "Speichert…" : "Wählen"}
+                        </button>
+                      </article>
+                    ))}
+                  </div>
+                )}
+              </section>
+
               <section className={`panel team-focus-panel teams-primary-roster-panel${getViewClass("teams")}`} id="team-focus-roster">
                 <div className="panel-header team-focus-header">
                   <div className="team-focus-title-wrap">
@@ -29644,11 +30075,10 @@ export default function FoundationPageClient({
                                                   type="button"
                                                   disabled={contractRenewalBusy != null}
                                                   onClick={() =>
-                                                    void runContractRenewalAction({
+                                                    void openContractRenewalNegotiation({
                                                       teamId: selectedTeam.teamId,
                                                       playerId: player.id,
                                                       playerName: player.name,
-                                                      action: "renew",
                                                       contractLength: 2,
                                                     })
                                                   }
@@ -29851,9 +30281,42 @@ export default function FoundationPageClient({
                     {contractRenewalMessage ? (
                       <div className="status-banner is-success">{contractRenewalMessage}</div>
                     ) : null}
-	                    {contractRenewalError ? (
-	                      <div className="status-banner is-warning">{contractRenewalError}</div>
-	                    ) : null}
+                    {contractRenewalError ? (
+                      <div className="status-banner is-warning">{contractRenewalError}</div>
+                    ) : null}
+                    {contractRenewalNegotiation ? (
+                      <div className="status-banner is-info">
+                        <strong>Verhandlung: {contractRenewalNegotiation.playerName}</strong>
+                        <p className="muted">
+                          Erwartung {contractRenewalNegotiation.expectedSalary != null ? formatTransfermarktCurrency(contractRenewalNegotiation.expectedSalary) : "—"}
+                        </p>
+                        <label className="stack gap-xs">
+                          <span>Angebot p.a.</span>
+                          <input
+                            type="number"
+                            value={contractRenewalNegotiation.offeredSalary ?? ""}
+                            onChange={(event) =>
+                              setContractRenewalNegotiation((current) =>
+                                current
+                                  ? {
+                                      ...current,
+                                      offeredSalary: event.target.value === "" ? null : Number(event.target.value),
+                                    }
+                                  : current,
+                              )
+                            }
+                          />
+                        </label>
+                        <div className="transfermarkt-inline-actions">
+                          <button type="button" className="primary-button inline-button" onClick={() => void confirmContractRenewalNegotiation()}>
+                            Vertrag bestätigen
+                          </button>
+                          <button type="button" className="secondary-button inline-button" onClick={() => setContractRenewalNegotiation(null)}>
+                            Abbrechen
+                          </button>
+                        </div>
+                      </div>
+                    ) : null}
                     {selectedTeamRosterActionHint ? (
                       <div className={`team-roster-action-status${selectedTeamRosterActionsAvailable ? " is-ready" : " is-locked"}`}>
                         <strong>{selectedTeamRosterActionsAvailable ? "Aktionen aktiv" : "Nur Ansicht"}</strong>
@@ -30031,12 +30494,10 @@ export default function FoundationPageClient({
                                             type="button"
                                             disabled={contractRenewalBusy != null}
                                             onClick={() =>
-                                              void runContractRenewalAction({
+                                              void openContractRenewalNegotiation({
                                                 teamId: selectedTeam.teamId,
                                                 playerId: row.playerId,
                                                 playerName: row.playerName,
-                                                action: "renew",
-                                                contractLength: 2,
                                               })
                                             }
                                           >
@@ -31659,6 +32120,19 @@ export default function FoundationPageClient({
                   }}
                   onRemoveWishlist={(playerId) => {
                     removeTransferWishlistEntry(playerId);
+                  }}
+                  scoutingWatchPlayerIds={transferMarketScoutingWatchPlayerIds}
+                  scoutingIntelByPlayerId={transferMarketScoutingIntelByPlayerId}
+                  scoutingPipelineCapacity={
+                    selectedTeamScoutPipeline
+                      ? {
+                          occupied: selectedTeamScoutPipeline.occupiedSlots,
+                          max: selectedTeamScoutPipeline.config.maxSlots,
+                        }
+                      : null
+                  }
+                  onToggleScoutingWatch={(item) => {
+                    toggleScoutingWatch(item);
                   }}
                   onBuyCompleted={async (teamId) => {
                     setActiveManagerTeam(teamId, "manual_select");
@@ -34035,7 +34509,12 @@ export default function FoundationPageClient({
                                 <button
                                   className="secondary-button inline-button"
                                   type="button"
-                                  disabled={!available || !liveItem || !marketTeamId}
+                                  disabled={!available || !liveItem || !marketTeamId || !canManageTeamId(marketTeamId)}
+                                  title={
+                                    marketTeamId && !canManageTeamId(marketTeamId)
+                                      ? `${getTeamLockedName(marketTeamId)} — Kaufen ist für dieses Team gesperrt.`
+                                      : undefined
+                                  }
                                   onClick={() => {
                                     if (liveItem) {
                                       void openMarketBuyModal(liveItem);

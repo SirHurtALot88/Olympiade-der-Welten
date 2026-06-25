@@ -10,7 +10,11 @@ import { buildTeamControlSettingsMap, DEFAULT_ACTIVE_OWNER_ID, getTeamOwner } fr
 import { FACILITY_CATALOG } from "@/lib/facilities/facility-catalog";
 import { calculateFacilityIncome, calculateFacilityUpkeep, getTeamFacilityState } from "@/lib/facilities/facility-effects";
 import { FACILITY_CONDITION_WARNING, getFacilityConditionStatus } from "@/lib/facilities/facility-condition";
+import { buildTeamObjectiveOverview } from "@/lib/board/team-season-objectives-service";
 import { buildMatchdaySummary } from "@/lib/foundation/matchday-summary";
+import { activeTeamHasFormCardSelections } from "@/lib/foundation/form-card-flow";
+import { isTeamMatchdayLineupComplete, isTeamMatchdayLineupSubmitted } from "@/lib/foundation/matchday-lineup-readiness";
+import { getTeamSponsorContract } from "@/lib/sponsor/sponsor-offer-service";
 
 export type GameInboxTargetView =
   | "home"
@@ -119,15 +123,6 @@ function getVisibleTeamIds(input: BuildGameInboxInput, settingsMap: Record<strin
   );
 }
 
-import {
-  isTeamMatchdayLineupComplete,
-  isTeamMatchdayLineupSubmitted,
-} from "@/lib/foundation/matchday-lineup-readiness";
-
-function hasTeamFormCards(gameState: GameState, teamId: string) {
-  return (gameState.seasonState.formCards ?? []).some((card) => card.seasonId === gameState.season.id && card.teamId === teamId);
-}
-
 function getTeamRosterPlayerIds(gameState: GameState, teamId: string) {
   return gameState.rosters.filter((entry) => entry.teamId === teamId).map((entry) => entry.playerId);
 }
@@ -212,7 +207,20 @@ function buildTeamTasks(input: BuildGameInboxInput, visibleTeamIds: Set<string>,
       );
     }
 
-    if (rosterCount > 0 && !hasTeamFormCards(input.gameState, team.teamId) && controlMode === "manual") {
+    const lineupDraft =
+      (input.gameState.seasonState.lineupDrafts ?? []).find(
+        (draft) =>
+          draft.seasonId === input.gameState.season.id &&
+          draft.matchdayId === input.gameState.matchdayState.matchdayId &&
+          draft.teamId === team.teamId,
+      ) ?? null;
+    const lineupComplete = isTeamMatchdayLineupComplete(input.gameState, team.teamId, lineupDraft);
+    if (
+      rosterCount > 0 &&
+      lineupComplete &&
+      !activeTeamHasFormCardSelections(input.gameState, team.teamId) &&
+      controlMode === "manual"
+    ) {
       items.push(
         createItem({
           itemId: `formcards_open:${input.saveId}:${input.gameState.season.id}:${team.teamId}`,
@@ -223,10 +231,30 @@ function buildTeamTasks(input: BuildGameInboxInput, visibleTeamIds: Set<string>,
           category: "task",
           severity: "warning",
           title: "Formkarten offen",
-          description: `${team.shortCode}: Für die aktive Season sind noch keine Formkarten sichtbar.`,
+          description: `${team.shortCode}: Einsatzliste steht, Formkarten fehlen noch.`,
           targetView: "lineup",
           targetParams: { team: team.teamId, panel: "formcards" },
           source: "season_formcards",
+          createdAt,
+        }),
+      );
+    }
+
+    if (controlMode === "manual" && !getTeamSponsorContract(input.gameState, team.teamId)) {
+      items.push(
+        createItem({
+          itemId: `sponsor_choice_missing:${input.saveId}:${input.gameState.season.id}:${team.teamId}`,
+          saveId: input.saveId,
+          seasonId: input.gameState.season.id,
+          teamId: team.teamId,
+          category: "sponsor",
+          severity: "warning",
+          title: "Sponsor wählen",
+          description: `${team.shortCode}: Wähle einen von drei Sponsor-Verträgen für die Saison.`,
+          targetView: "teams",
+          targetParams: { team: team.teamId, panel: "sponsor-choice" },
+          ctaLabel: "Sponsor wählen",
+          source: "sponsor_v2_choice_pending",
           createdAt,
         }),
       );
@@ -398,6 +426,55 @@ function buildTeamTasks(input: BuildGameInboxInput, visibleTeamIds: Set<string>,
           targetView: "trainingV2",
           targetParams: { team: team.teamId, panel: "facilities" },
           source: "facility_catalog_cash_check",
+          createdAt,
+        }),
+      );
+    }
+  }
+
+  const objectiveOverview = buildTeamObjectiveOverview(input.gameState);
+  for (const objective of objectiveOverview.objectives) {
+    if (!visibleTeamIds.has(objective.teamId)) continue;
+    if (objective.status !== "at_risk" && objective.status !== "failed") continue;
+    items.push(
+      createItem({
+        itemId: `board_objective_${objective.status}:${input.saveId}:${objective.seasonId}:${objective.teamId}:${objective.objectiveId}`,
+        saveId: input.saveId,
+        seasonId: objective.seasonId,
+        teamId: objective.teamId,
+        category: "task",
+        severity: objective.status === "failed" ? "critical" : "warning",
+        title: objective.status === "failed" ? "Board-Ziel verfehlt" : "Board-Ziel gefährdet",
+        description: `${objective.label}: ${objective.currentValue ?? "—"} / Ziel ${objective.targetValue ?? "—"}`,
+        targetView: "teams",
+        targetParams: { team: objective.teamId, panel: "board-objectives" },
+        source: "team_season_objectives",
+        createdAt,
+      }),
+    );
+  }
+
+  for (const teamId of visibleTeamIds) {
+    const intelEntries = (input.gameState.seasonState.scoutIntelByTeamId?.[teamId] ?? []).filter(
+      (entry) => entry.seasonId === input.gameState.season.id,
+    );
+    for (const entry of intelEntries) {
+      const milestone = entry.certainty >= 75 ? 75 : entry.certainty >= 50 ? 50 : entry.certainty >= 25 ? 25 : null;
+      if (milestone == null) continue;
+      items.push(
+        createItem({
+          itemId: `scout_milestone:${input.saveId}:${input.gameState.season.id}:${teamId}:${entry.playerId}:${milestone}`,
+          saveId: input.saveId,
+          seasonId: input.gameState.season.id,
+          teamId,
+          playerId: entry.playerId,
+          category: "transfer",
+          severity: "info",
+          title: "Scouting-Fortschritt",
+          description: `${entry.playerName ?? entry.playerId}: Certainty ${entry.certainty}% — Intel wird schärfer.`,
+          targetView: "market",
+          targetParams: { team: teamId, player: entry.playerId },
+          source: "scout_intel_pipeline",
           createdAt,
         }),
       );
@@ -794,7 +871,17 @@ export function filterGameInboxItems(items: GameInboxItem[], filter: GameInboxFi
 }
 
 export function getPrimaryInboxTask(items: GameInboxItem[]) {
-  return items.find((item) => item.status === "open" && (item.category === "task" || item.category === "warning" || item.severity === "critical")) ?? null;
+  return (
+    items.find(
+      (item) =>
+        item.status === "open" &&
+        (item.category === "task" ||
+          item.category === "warning" ||
+          item.category === "sponsor" ||
+          item.category === "contract" ||
+          item.severity === "critical"),
+    ) ?? null
+  );
 }
 
 export function mapInboxItemToFlowStep(item: GameInboxItem): Pick<GameFlowStep, "label" | "cta" | "status" | "targetView" | "targetPanel" | "teamId" | "blockers" | "warnings"> {

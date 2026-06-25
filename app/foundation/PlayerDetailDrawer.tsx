@@ -11,6 +11,7 @@ import OptimizedMediaImage from "./OptimizedMediaImage";
 import RaceIcon from "./RaceIcon";
 import { getCanonicalSeasonLabel } from "@/lib/season/season-label";
 import { GameTerm, getGameTermTooltip } from "@/components/ui/GameTerm";
+import { VeloImpactStrip, VeloStatOrbitRow } from "@/components/foundation/velo-ui";
 
 function formatValue(value: number | null | undefined, digits = 0) {
   if (value == null || !Number.isFinite(value)) {
@@ -524,6 +525,31 @@ function parseStarValue(value: string | number | null | undefined) {
   return Number.isFinite(parsed) ? parsed : null;
 }
 
+function ScoutStarDisplay({
+  axisDisplay,
+  starRating,
+  label,
+  compact = false,
+}: {
+  axisDisplay?: string | null;
+  starRating?: string | number | null;
+  label?: string;
+  compact?: boolean;
+}) {
+  if (axisDisplay) {
+    return (
+      <span className={`player-drawer-star-text${compact ? " is-compact" : ""}`}>
+        {label ? `${label} ` : ""}
+        {axisDisplay}
+      </span>
+    );
+  }
+  if (starRating) {
+    return <StarRating value={starRating} label={label} compact={compact} />;
+  }
+  return null;
+}
+
 function StarRating({
   value,
   label,
@@ -780,6 +806,20 @@ export default function PlayerDetailDrawer({
   const showScoutedDevelopmentSection = !isScoutedProfile || scoutingLevel >= 3;
   const showScoutedDeepDevelopmentDetails = !isScoutedProfile || scoutingLevel >= 5;
   const visibleScoutedAttributeChips = isScoutedProfile ? data.attributeStats.filter((entry) => entry.revealed).slice(0, 8) : [];
+  const scoutedAttributeBuckets = isScoutedProfile
+    ? {
+        visible: data.attributeStats.filter((entry) => entry.revealed),
+        hidden: data.attributeStats.filter((entry) => !entry.revealed),
+      }
+    : null;
+  const axisOrbitStats = !isScoutedProfile
+    ? {
+        pow: data.axisCards.find((card) => card.id === "pow")?.value ?? 0,
+        spe: data.axisCards.find((card) => card.id === "spe")?.value ?? 0,
+        men: data.axisCards.find((card) => card.id === "men")?.value ?? 0,
+        soc: data.axisCards.find((card) => card.id === "soc")?.value ?? 0,
+      }
+    : null;
   const noSeasonPerformanceMessage = isFreeAgent
     ? "Keine gespeicherte Season-Performance."
     : "Aktiver Spieler, aber noch kein gespeicherter Season-Einsatz.";
@@ -993,10 +1033,12 @@ export default function PlayerDetailDrawer({
                       <span>Scout-Wert {formatDevelopmentRange(data.developmentInsight)}</span>
                     ) : null}
                     <span>Scouting L{data.scoutingLevel ?? 0}</span>
-                    {showScoutedPotentialStars && (data.developmentInsight?.potentialLabel ?? data.scoutPotential?.starRating) ? (
-                      <span>
-                        <StarRating value={data.developmentInsight?.potentialLabel ?? data.scoutPotential?.starRating} compact />
-                      </span>
+                    {showScoutedPotentialStars ? (
+                      <ScoutStarDisplay
+                        axisDisplay={data.potentialStarsDisplay}
+                        starRating={data.scoutPotential?.starRating}
+                        compact
+                      />
                     ) : null}
                     <span title={getGameTermTooltip("Erschoepfung") ?? undefined}>Erschoepfung {formatValue(data.fatigue, 0)}</span>
                     <span>Form {formatValue(data.form, 0)}</span>
@@ -1052,6 +1094,13 @@ export default function PlayerDetailDrawer({
                   </span>
                 ))}
               </div>
+            ) : null}
+            {axisOrbitStats ? (
+              <VeloStatOrbitRow
+                ariaLabel={`${data.name} Kernachsen`}
+                className="player-drawer-axis-orbit"
+                stats={axisOrbitStats}
+              />
             ) : null}
             {!isScoutedProfile ? (
               <div className="player-drawer-axis-strip" aria-label="Kernwerte mit Liga-Rang">
@@ -1356,6 +1405,19 @@ export default function PlayerDetailDrawer({
 
           <section className="player-drawer-section player-drawer-panel">
             <h3>Attribute</h3>
+            {scoutedAttributeBuckets ? (
+              <div className="player-drawer-scouting-disclosure velo-scouting-disclosure" aria-label="Scouting Transparenz">
+                <span className={`velo-scouting-segment is-visible${scoutedAttributeBuckets.visible.length > 0 ? " has-data" : ""}`}>
+                  Sichtbar {scoutedAttributeBuckets.visible.length}
+                </span>
+                <span className={`velo-scouting-segment is-hidden${scoutedAttributeBuckets.hidden.length > 0 ? " has-data" : ""}`}>
+                  Versteckt {scoutedAttributeBuckets.hidden.length}
+                </span>
+                <span className="velo-scouting-segment is-rumor">
+                  Unlock bis L5
+                </span>
+              </div>
+            ) : null}
             <div className="player-drawer-attribute-grid">
               {data.attributeStats.map((entry) => {
                 const preview = data.attributeVisibility === "exact" ? developmentPreviewByAttribute.get(entry.key) : null;
@@ -1381,7 +1443,7 @@ export default function PlayerDetailDrawer({
                 return (
                   <article
                     key={entry.key}
-                    className={`metric-card player-drawer-attribute-card is-affinity-${preview?.affinity ?? "neutral"} ${getAttributeTierClass(entry.ratingLabel)}`}
+                    className={`metric-card player-drawer-attribute-card is-affinity-${preview?.affinity ?? "neutral"} ${getAttributeTierClass(entry.ratingLabel)}${!entry.revealed && isScoutedProfile ? " is-scouting-locked" : ""}`}
                     title={
                       showExactAttribute
                         ? data.attributeVisibility === "exact"
@@ -1420,8 +1482,8 @@ export default function PlayerDetailDrawer({
                           Range {entry.rangeLabel}
                         </span>
                       ) : !entry.revealed ? (
-                        <span className="player-drawer-chip">
-                          ab L{entry.revealLevel}
+                        <span className="player-drawer-chip velo-scouting-segment is-hidden has-data">
+                          🔒 ab L{entry.revealLevel}
                         </span>
                       ) : null}
                       {showCostChip && preview ? (
@@ -1602,7 +1664,11 @@ export default function PlayerDetailDrawer({
                     <strong>
                       {formatDevelopmentRange(data.developmentInsight)}{" "}
                       {showScoutedPotentialStars ? (
-                        <StarRating value={data.developmentInsight?.potentialLabel ?? data.scoutPotential.starRating} compact />
+                        <ScoutStarDisplay
+                          axisDisplay={data.potentialStarsDisplay}
+                          starRating={data.scoutPotential?.starRating}
+                          compact
+                        />
                       ) : null}
                     </strong>
                     <small>
@@ -1666,8 +1732,16 @@ export default function PlayerDetailDrawer({
                         <article className="metric-card">
                           <HelpLabel title="CA = aktueller Stand. PO = geschaetztes Potential. Je groesser der Abstand, desto mehr Upside.">CA / PO</HelpLabel>
                           <strong className="player-drawer-star-stack">
-                            <StarRating value={data.progressionForecast.currentAbilityStars} label="CA" />
-                            <StarRating value={data.progressionForecast.potentialStars} label="PO" />
+                            <ScoutStarDisplay
+                              axisDisplay={data.axisStarsDisplay}
+                              starRating={data.progressionForecast.currentAbilityStars}
+                              label="CAS"
+                            />
+                            <ScoutStarDisplay
+                              axisDisplay={data.potentialStarsDisplay}
+                              starRating={data.progressionForecast.potentialStars}
+                              label="PAS"
+                            />
                           </strong>
                           <small>
                             {data.progressionForecast.currentAbilityTier ?? "—"} → {data.progressionForecast.potentialTier ?? "—"}

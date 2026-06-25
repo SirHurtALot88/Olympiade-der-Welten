@@ -230,8 +230,8 @@ describe("season-end progression preview", () => {
     const row = previewFor(createPlayer(), createForecast({ baseTrainingXP: 100, performanceXP: 50, seasonProjectedXP: 150 }), "power", { trainingCenterLevel: 2 });
 
     expect(row.facilityEffects.xpBeforeFacility).toBe(100);
-    expect(row.facilityEffects.xpAfterFacility).toBe(110);
-    expect(row.availableXP).toBe(160);
+    expect(row.facilityEffects.xpAfterFacility).toBe(106);
+    expect(row.availableXP).toBe(156);
   });
 
   it("shows scouting and analytics quality without faking missing potential values", () => {

@@ -12,6 +12,7 @@ import type {
   TeamFacilityCollection,
 } from "@/lib/data/olyDataTypes";
 import { getTeamFacilityState, applyTrainingXpFacilityModifiers } from "@/lib/facilities/facility-effects";
+import { getTeamDevelopmentTrainingBonusPct } from "@/lib/foundation/team-development-tendency";
 import { buildPlayerEconomyCompareReport } from "@/lib/foundation/player-economy-compare-service";
 import { buildPlayerRatingContractMap } from "@/lib/foundation/player-rating-contract";
 import { buildPlayerSeasonPerformance } from "@/lib/foundation/player-season-performance";
@@ -244,7 +245,9 @@ function getSeasonXp(input: {
     spentXP: input.player.spentXP ?? 0,
     lifetimeXP: input.player.lifetimeXP ?? null,
   });
-  const trainingFacilityXp = applyTrainingXpFacilityModifiers(forecast.baseTrainingXP, input.facilities);
+  const trainingFacilityXp = applyTrainingXpFacilityModifiers(forecast.baseTrainingXP, input.facilities, {
+    developmentTrainingBonusPct: getTeamDevelopmentTrainingBonusPct(gameState, input.teamId),
+  });
   const facilityTrainingDelta = trainingFacilityXp.after - trainingFacilityXp.before;
   const earnedSeasonXP = Math.max(0, forecast.netDevelopmentXP + facilityTrainingDelta);
   const development = buildPlayerDevelopmentLevelupModel({

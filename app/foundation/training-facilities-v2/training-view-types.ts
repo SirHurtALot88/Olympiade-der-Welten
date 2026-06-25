@@ -1,12 +1,28 @@
 import type { PlayerGeneratorAttributeName } from "@/lib/data/olyDataTypes";
 import type { ProgressionClassName } from "@/lib/training/class-progression-config";
 import type { PlayerTrainingMode } from "@/lib/training/training-plan-types";
+import type { TrainingModeDemandView } from "@/lib/training/training-mode-demand-service";
 
 export type TrainingModeOption = {
   value: PlayerTrainingMode;
   label: string;
   note: string;
   fatigueRisk: "niedrig" | "mittel" | "hoch";
+  baseXp: number;
+  recoveryDeltaPct: number;
+  trainingSetpoints: number;
+  fatigueLoad: number;
+};
+
+export type TrainingAttributeForecastEntry = {
+  attribute: string;
+  before: number;
+  after: number;
+  delta: number;
+  training: number;
+  performance: number;
+  regression: number;
+  affinity: "signature" | "weak" | "neutral";
 };
 
 export type TrainingPlayerRowView = {
@@ -45,6 +61,30 @@ export type TrainingPlayerRowView = {
     after: number;
     modifierPct: number;
   };
+  classTrainingFocus: {
+    primary: Array<{ attribute: string; weight: number }>;
+    risks: Array<{ attribute: string; weight: number }>;
+  };
+  attributeForecast: TrainingAttributeForecastEntry[];
+  modifiers: {
+    traitModifierPct: number;
+    facilityModifierPct: number;
+    potentialTrainingMultiplier: number;
+    signatureAttributes: string[];
+    weakAttribute: string | null;
+  };
+  developmentStars: {
+    currentAbilityStars: string | null;
+    potentialStars: string | null;
+    currentAbilityRating: number | null;
+    potentialRating: number | null;
+  };
+  traitBoosts: Array<{
+    trait: string;
+    pct: number;
+    tone: "positive" | "negative" | "neutral";
+  }>;
+  trainingDemand: TrainingModeDemandView | null;
   organicForecast: {
     classBefore: string;
     classAfter: string;

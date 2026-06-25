@@ -24,6 +24,7 @@ export default function ScoutingCenterV2Client({
   hiddenAtTier,
   baseInfoAlwaysVisible,
   watchTargets,
+  scoutPipeline = null,
   onOpenMarket,
   onOpenHomeV2,
   onOpenPlayer,
@@ -38,7 +39,7 @@ export default function ScoutingCenterV2Client({
           <span className="eyebrow">Scouting & Transfermarkt</span>
           <h2>{teamName}</h2>
           <p className="muted">
-            {scoutingFacilityLabel} · Scouting L{scoutingFacilityLevel} · Hub-Preview — kein separates Scouting Center
+            {scoutingFacilityLabel} · Scouting L{scoutingFacilityLevel} · Markt-Hub (kein separates Scouting Center — Potenzial aus Kader/Facilities)
           </p>
         </div>
         <div className="scouting-center-v2-actions">
@@ -113,6 +114,46 @@ export default function ScoutingCenterV2Client({
             </ul>
           </article>
         </div>
+      </section>
+
+      <section className="scouting-hub-v2-watchlist">
+        <div className="home-v2-panel-head">
+          <span className="eyebrow">Facility Pipeline</span>
+          <h3>Aktive Beobachtung</h3>
+          {scoutPipeline ? (
+            <p className="muted">
+              {scoutPipeline.occupiedSlots}/{scoutPipeline.maxSlots} Slots · +{scoutPipeline.tickGain} Intel/Spieltag
+              {scoutPipeline.passiveActive > 0 ? ` · ${scoutPipeline.passiveActive} passive Scouts` : ""}
+            </p>
+          ) : null}
+        </div>
+        {scoutPipeline && scoutPipeline.records.length > 0 ? (
+          <div className="scouting-hub-v2-target-grid">
+            {scoutPipeline.records.map((record) => (
+              <button
+                key={`scout-pipeline-${record.playerId}`}
+                type="button"
+                className="scouting-hub-v2-target-card"
+                onClick={() => onOpenPlayer(record.playerId)}
+              >
+                <strong>{record.playerName}</strong>
+                <span>{record.source}</span>
+                <span>Scouting {record.certainty}%</span>
+                <small>
+                  {record.certainty < 25
+                    ? "Nächster Meilenstein: Achsen-Band"
+                    : record.certainty < 50
+                      ? "Nächster Meilenstein: Achsen-Sterne"
+                      : record.certainty < 75
+                        ? "Nächster Meilenstein: Potential-Band"
+                        : "Nächster Meilenstein: enge Potential-Range"}
+                </small>
+              </button>
+            ))}
+          </div>
+        ) : (
+          <p className="muted">Scouting Office beobachtet noch keine Spieler — Watchlist im Transfermarkt setzen oder Facility upgraden.</p>
+        )}
       </section>
 
       <section className="scouting-hub-v2-watchlist">

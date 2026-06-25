@@ -17,6 +17,14 @@ import { buildPrizeMoneyPreview } from "@/lib/season/prize-money-preview";
 import { buildSeasonSnapshotDryRun, upsertSeasonSnapshotRecord } from "@/lib/season/season-snapshot-service";
 import { advanceSeasonEconomyFactorWindow } from "@/lib/season/season-economy-factors";
 import { refreshTeamObjectiveState } from "@/lib/board/team-season-objectives-service";
+import { advanceScoutIntelTick } from "@/lib/scouting/facility-scout-pipeline-service";
+import {
+  buildSponsorChoiceSummary,
+  chooseSponsorOfferForAiTeams,
+  ensureSeasonSponsorOffers,
+  regenerateSponsorOffersForSeason,
+} from "@/lib/sponsor/sponsor-offer-service";
+import { getSeasonSponsorCashTotal, previewSponsorSettlement } from "@/lib/sponsor/sponsor-settlement-service";
 import type { PlayerGeneratorAttributeName, PlayerGeneratorAttributes } from "@/lib/data/olyDataTypes";
 import { resolvePlayerEconomyContract } from "@/lib/foundation/player-economy-contract";
 
@@ -25,6 +33,7 @@ export const PRESEASON_NEXT_SEASON_SETUP_CONFIRM_TOKEN = "APPLY_PRESEASON_NEXT_S
 export type PreSeasonWorkflowStepId =
   | "season_review"
   | "season_rewards"
+  | "sponsor_choice"
   | "facilities"
   | "player_development"
   | "preseason_management"
@@ -639,37 +648,49 @@ function buildNextSeasonGameState(save: PersistedSaveGame): { gameState: GameSta
     timestamp: new Date().toISOString(),
   };
 
-  const nextGameState = refreshTeamObjectiveState(applySeasonBaselineProgression({
-      ...save.gameState,
-      gamePhase: "season_active",
-      season: {
-        ...save.gameState.season,
-        id: nextSeasonId,
-        name: nextSeasonLabel,
-        year: Math.max(save.gameState.season.year + 1, nextSeasonNumber),
-        currentMatchday: 1,
-        matchdayIds,
-      },
-      seasonState: {
-        ...nextSeasonState,
-        preSeasonWorkflowLogs: [auditLog, ...(save.gameState.seasonState.preSeasonWorkflowLogs ?? [])],
-      },
-      matchdayState: {
-        matchdayId: firstMatchdayId,
-        status: "planning",
-        pendingTeamIds: save.gameState.teams.map((team) => team.teamId),
-        resolvedFixtureIds: [],
-      },
-      logs: [
-        {
-          id: auditLog.logId,
-          type: "season",
-          message: `${nextSeasonLabel} aktiviert. Pre-Season Workflow abgeschlossen.`,
-          createdAt: auditLog.timestamp,
-        },
-        ...save.gameState.logs,
-      ],
-    }, { completedSeasonId: save.gameState.season.id }));
+  const nextGameState = refreshTeamObjectiveState(
+    advanceScoutIntelTick({
+      gameState: chooseSponsorOfferForAiTeams(
+        regenerateSponsorOffersForSeason(
+          applySeasonBaselineProgression(
+          {
+            ...save.gameState,
+            gamePhase: "season_active",
+            season: {
+              ...save.gameState.season,
+              id: nextSeasonId,
+              name: nextSeasonLabel,
+              year: Math.max(save.gameState.season.year + 1, nextSeasonNumber),
+              currentMatchday: 1,
+              matchdayIds,
+            },
+            seasonState: {
+              ...nextSeasonState,
+              preSeasonWorkflowLogs: [auditLog, ...(save.gameState.seasonState.preSeasonWorkflowLogs ?? [])],
+            },
+            matchdayState: {
+              matchdayId: firstMatchdayId,
+              status: "planning",
+              pendingTeamIds: save.gameState.teams.map((team) => team.teamId),
+              resolvedFixtureIds: [],
+            },
+            logs: [
+              {
+                id: auditLog.logId,
+                type: "season",
+                message: `${nextSeasonLabel} aktiviert. Pre-Season Workflow abgeschlossen.`,
+                createdAt: auditLog.timestamp,
+              },
+              ...save.gameState.logs,
+            ],
+          },
+          { completedSeasonId: save.gameState.season.id },
+        ),
+      ),
+    ),
+      phase: "preseason",
+    }),
+  );
 
   return {
     auditLog,
@@ -911,7 +932,19 @@ export async function buildPreSeasonWorkflowPreview(
   const facilityPreviews = save.gameState.teams.map((team) => previewFacilitySeasonEndFinance(save, team.teamId));
   const totalPrizeMoney = roundValue(prizePreview.items.reduce((sum, item) => sum + (item.prizeMoney ?? 0), 0));
   const totalRankChangePrize = prizePreview.summary.totalRankChangePrize == null ? null : roundValue(prizePreview.summary.totalRankChangePrize);
-  const totalSponsor = roundValue(prizePreview.items.reduce((sum, item) => sum + (item.seasonCash ?? 0), 0));
+  const totalSponsorLegacy = roundValue(prizePreview.items.reduce((sum, item) => sum + (item.seasonCash ?? 0), 0));
+  const sponsorSettlementPreview = previewSponsorSettlement(save.gameState, "season_end");
+  const sponsorPaidToDate = roundValue(
+    (save.gameState.seasonState.sponsorPayoutLogs ?? [])
+      .filter((log) => log.seasonId === save.gameState.season.id)
+      .reduce((sum, log) => sum + log.cashDelta, 0),
+  );
+  const totalSponsor = roundValue(
+    Math.max(totalSponsorLegacy, sponsorPaidToDate + sponsorSettlementPreview.totalCashDelta),
+  );
+  const sponsorPreviewState = regenerateSponsorOffersForSeason(ensureSeasonSponsorOffers(save.gameState));
+  const sponsorChoiceSummary = buildSponsorChoiceSummary(sponsorPreviewState);
+  const manualSponsorChoicesPending = sponsorChoiceSummary.filter((entry) => entry.requiresManualChoice).length;
   const totalUpkeep = roundValue(facilityPreviews.reduce((sum, item) => sum + item.facilityUpkeepTotal, 0));
   const totalFacilityIncome = roundValue(facilityPreviews.reduce((sum, item) => sum + item.facilityIncomeTotal, 0));
   const totalSalary = roundValue(save.gameState.teams.reduce((sum, team) => sum + getSalaryTotal(save.gameState, team.teamId), 0));
@@ -959,7 +992,7 @@ export async function buildPreSeasonWorkflowPreview(
     ...prizePreview.globalWarnings,
     ...facilityPreviews.flatMap((preview) => preview.warnings.map((warning) => `${preview.team?.shortCode ?? preview.team?.teamId}:${warning}`)),
     prizePreview.source.prizeTable === "missing" ? "prize_money_source_missing" : null,
-    totalSponsor <= 0 ? "sponsor_source_missing" : null,
+    totalSponsor <= 0 && manualSponsorChoicesPending === 0 ? "sponsor_source_missing" : null,
   ].filter((entry): entry is string => Boolean(entry));
   const steps: PreSeasonWorkflowStep[] = [
     {
@@ -1063,6 +1096,33 @@ export async function buildPreSeasonWorkflowPreview(
       warnings: ["human_teams_no_auto_buy", "buy_after_sell", "uses executeLocalTransfermarktBuy via ai-market-plan-apply-service", "transfer_history_required", marketPreviewWarning],
       blockingReasons: [],
       confirmToken: "USE_AI_MARKET_APPLY_CONFIRM_TOKEN_BUY_AFTER_SELL",
+    },
+    {
+      stepId: "sponsor_choice",
+      label: "Sponsor wählen",
+      status:
+        manualSponsorChoicesPending > 0
+          ? "blocked"
+          : sponsorChoiceSummary.some((entry) => entry.hasContract)
+            ? "ready"
+            : "warning",
+      productive: true,
+      summary: {
+        offersReady: sponsorChoiceSummary.reduce((sum, entry) => sum + entry.offers.length, 0),
+        contractsSigned: sponsorChoiceSummary.filter((entry) => entry.hasContract).length,
+        manualPending: manualSponsorChoicesPending,
+        projectedSponsorCash: getSeasonSponsorCashTotal(sponsorPreviewState),
+        avgCommercialRating: Math.round(
+          sponsorChoiceSummary.reduce((sum, entry) => sum + entry.commercialRating.score, 0) /
+            Math.max(1, sponsorChoiceSummary.length),
+        ),
+      },
+      warnings:
+        manualSponsorChoicesPending > 0
+          ? [`manual_sponsor_choice_pending:${manualSponsorChoicesPending}`]
+          : ["sponsor_offers_regenerated_after_transfer_window"],
+      blockingReasons: manualSponsorChoicesPending > 0 ? ["manual_sponsor_choice_pending"] : [],
+      confirmToken: manualSponsorChoicesPending > 0 ? null : "SPONSOR_CHOICE_READY",
     },
     {
       stepId: "next_season_setup",

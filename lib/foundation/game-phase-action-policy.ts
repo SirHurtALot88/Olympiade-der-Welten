@@ -12,6 +12,7 @@ export type GamePhaseAction =
   | "renew_contract"
   | "set_training"
   | "facility_apply"
+  | "sponsor_choice"
   | "set_lineup"
   | "resolve_matchday"
   | "complete_season"
@@ -85,9 +86,10 @@ export function evaluateGamePhaseAction(gameState: GameState, action: GamePhaseA
   } else if (
     action === "renew_contract" ||
     action === "set_training" ||
-    action === "facility_apply"
+    action === "facility_apply" ||
+    action === "sponsor_choice"
   ) {
-    allowed = isPreseasonManagementOpen(gameState);
+    allowed = isPreseasonManagementOpen(gameState) || isEarlySeasonSetup(gameState);
     reason = allowed ? null : `phase_blocked:${action}:${phase}`;
   } else if (action === "set_lineup") {
     allowed = phase === "season_active" || phase === "lineup_setup" || phase === "next_season_ready";
@@ -105,7 +107,7 @@ export function evaluateGamePhaseAction(gameState: GameState, action: GamePhaseA
 
   if (
     isEarlySeasonSetup(gameState) &&
-    ["buy_players", "sell_players", "renew_contract", "set_training", "facility_apply"].includes(action)
+    ["buy_players", "sell_players", "renew_contract", "set_training", "facility_apply", "sponsor_choice"].includes(action)
   ) {
     warnings.push("early_season_setup_allowed_before_first_result");
   }

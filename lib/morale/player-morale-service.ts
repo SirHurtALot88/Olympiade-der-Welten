@@ -15,6 +15,7 @@ import { getTeamStrategyProfile } from "@/lib/foundation/team-strategy-profiles"
 import { resolvePlayerEconomyContract } from "@/lib/foundation/player-economy-contract";
 import { calculateTransfermarktFit } from "@/lib/market/transfermarkt-fit";
 import { buildPlayerDemands, selectTeamCaptain } from "@/lib/morale/player-demands-service";
+import { buildTrainingModeDemandRecord, evaluateTrainingModeDemandDelta } from "@/lib/training/training-mode-demand-service";
 
 export type PlayerMoraleAssessment = PlayerMoraleState & {
   smiley: string;
@@ -347,6 +348,31 @@ function evaluateDemandDelta(input: {
   if (demand.type === "facility") {
     if (demand.status === "fulfilled") return { delta: reward, outcome: "fulfilled" as const };
     if (input.currentSeasonHasResults) return { delta: penalty * 0.35, outcome: "pressure" as const };
+  }
+
+  if (demand.type === "training_mode") {
+    const player = input.gameState.players.find((entry) => entry.id === playerId) ?? null;
+    const activeMode = player?.trainingMode ?? "mittel";
+    const preferredMode =
+      demand.targetValue === "leicht" || demand.targetValue === "mittel" || demand.targetValue === "hart"
+        ? demand.targetValue
+        : "mittel";
+    return evaluateTrainingModeDemandDelta({
+      demand: {
+        preferredMode,
+        currentMode: activeMode,
+        status: demand.status,
+        moraleReward: demand.moraleReward,
+        moralePenalty: demand.moralePenalty,
+        mismatchSeverity:
+          activeMode === preferredMode
+            ? 0
+            : (activeMode === "leicht" && preferredMode === "hart") || (activeMode === "hart" && preferredMode === "leicht")
+              ? 2
+              : 1,
+      },
+      activeMode,
+    });
   }
 
   if (demand.status === "failed") return { delta: penalty, outcome: "failed" as const };

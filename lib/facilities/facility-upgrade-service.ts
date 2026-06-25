@@ -15,6 +15,8 @@ import {
   getFacilityLevel,
   getTeamFacilityState,
 } from "@/lib/facilities/facility-effects";
+import { getDevelopmentWeightedFacilityUpgradeDiscount, getTeamDevelopmentTendency } from "@/lib/foundation/team-development-tendency";
+import { getTeamStrategyProfile } from "@/lib/foundation/team-strategy-profiles";
 import { FACILITY_CONDITION_FULL } from "@/lib/facilities/facility-condition";
 import { createPersistenceService } from "@/lib/persistence/persistence-service";
 import type { PersistedSaveGame, PersistenceService } from "@/lib/persistence/types";
@@ -190,7 +192,19 @@ export function previewFacilityUpgrade(
   const newUpkeep = calculateFacilityUpkeep(nextTeamFacilities);
   const currentIncome = calculateFacilityIncome(teamFacilities);
   const newIncome = calculateFacilityIncome(nextTeamFacilities);
-  const upgradeCost = action === "upgrade" ? nextDefinition?.upgradeCost ?? null : 0;
+  const rawUpgradeCost = action === "upgrade" ? nextDefinition?.upgradeCost ?? null : 0;
+  const identity = gameState.teamIdentities.find((entry) => entry.teamId === teamId) ?? null;
+  const profile = getTeamStrategyProfile(gameState, teamId);
+  const developmentTendency =
+    team != null ? getTeamDevelopmentTendency({ team, identity, profile }) : null;
+  const upgradeCost =
+    rawUpgradeCost != null && developmentTendency
+      ? getDevelopmentWeightedFacilityUpgradeDiscount({
+          baseUpgradeCost: rawUpgradeCost,
+          facilityId,
+          tendency: developmentTendency,
+        })
+      : rawUpgradeCost;
   const refundAmount =
     action === "downgrade" && downgradeRefundSourceDefinition
       ? roundValue(downgradeRefundSourceDefinition.upgradeCost * 0.25)

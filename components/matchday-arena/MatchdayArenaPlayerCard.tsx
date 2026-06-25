@@ -2,6 +2,7 @@
 
 import type { KeyboardEvent } from "react";
 
+import OptimizedMediaImage from "@/app/foundation/OptimizedMediaImage";
 import { getArenaAxisValueTier } from "@/lib/matchday-arena/arena-stat-visuals";
 import { getGameTermTooltip } from "@/components/ui/GameTerm";
 

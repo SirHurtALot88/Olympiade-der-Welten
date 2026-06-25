@@ -12,6 +12,7 @@ import {
 } from "react";
 
 import OptimizedMediaImage from "@/app/foundation/OptimizedMediaImage";
+import { VeloStatOrbitRow } from "@/components/foundation/velo-ui";
 import { TooltipHeading } from "@/components/ui/TooltipHeading";
 import {
   formatGmDismissalReason,
@@ -599,6 +600,7 @@ export default function SeasonStandingsV2Client({
   });
   const [showTopPlayerAxes, setShowTopPlayerAxes] = useState(true);
   const [showFinanceColumns, setShowFinanceColumns] = useState(true);
+  const [showTeamCards, setShowTeamCards] = useState(true);
   const [seasonV2Mode, setSeasonV2Mode] = useState<"table" | "gms">("table");
   const [focusedTeamId, setFocusedTeamId] = useState<string | null>(selectedTeamSummary?.teamId ?? null);
   const seasonV2ResizeState = useRef<{
@@ -1038,6 +1040,43 @@ export default function SeasonStandingsV2Client({
           "player",
         )}
       </section>
+
+      <div className="season-v2-view-toolbar">
+        <button className={`secondary-button inline-button${showTeamCards ? " is-active" : ""}`} type="button" onClick={() => setShowTeamCards((current) => !current)}>
+          {showTeamCards ? "Team-Cards aus" : "Team-Cards an"}
+        </button>
+      </div>
+
+      {showTeamCards ? (
+        <section className="season-v2-team-card-grid velo-team-card-grid" aria-label="Team Mini Cards">
+          {sortedStandingsRows.slice(0, 8).map((row) => (
+            <article className={`season-v2-team-card velo-team-card${row.isSelected ? " is-selected" : ""}`} key={`team-card-${row.teamId}`}>
+              <div className="season-v2-team-card-head">
+                {row.logoUrl ? (
+                  <OptimizedMediaImage src={row.logoUrl} alt={row.teamName} width={40} height={40} className="season-v2-team-card-logo" />
+                ) : (
+                  <span className="season-v2-team-card-logo is-placeholder">{row.logoInitials}</span>
+                )}
+                <div>
+                  <strong>{row.teamName}</strong>
+                  <small>
+                    #{row.rank ?? "—"} · {formatNumber(row.points, 1)} Pkt
+                  </small>
+                </div>
+              </div>
+              <VeloStatOrbitRow
+                ariaLabel={`${row.teamName} Bereichswerte`}
+                stats={{
+                  pow: row.pow ?? 0,
+                  spe: row.spe ?? 0,
+                  men: row.men ?? 0,
+                  soc: row.soc ?? 0,
+                }}
+              />
+            </article>
+          ))}
+        </section>
+      ) : null}
 
       {selectedTeamSummary && showFinanceColumns ? (
         <section className="season-v2-team-strip">

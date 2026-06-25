@@ -11152,6 +11152,16 @@ a {
   gap: 4px;
 }
 
+.player-drawer-star-text {
+  color: rgba(235, 239, 247, 0.88);
+  font-size: 0.82rem;
+  font-weight: 700;
+}
+
+.player-drawer-star-text.is-compact {
+  font-size: 0.74rem;
+}
+
 .player-drawer-star-label {
   min-width: 2.1ch;
   color: rgba(235, 239, 247, 0.66);
@@ -25522,6 +25532,36 @@ a {
   margin-top: 8px;
 }
 
+.market-v2-star-row {
+  margin: 8px 0 0;
+  font-size: 0.86rem;
+}
+
+.market-v2-scout-certainty {
+  display: grid;
+  gap: 6px;
+  margin-top: 10px;
+}
+
+.market-v2-scout-certainty > span {
+  font-size: 0.82rem;
+  color: var(--muted-foreground, #94a3b8);
+}
+
+.market-v2-scout-certainty-bar {
+  height: 6px;
+  border-radius: 999px;
+  background: rgba(148, 163, 184, 0.18);
+  overflow: hidden;
+}
+
+.market-v2-scout-certainty-bar > span {
+  display: block;
+  height: 100%;
+  border-radius: inherit;
+  background: linear-gradient(90deg, #38bdf8, #22c55e);
+}
+
 .market-v2-development-grid {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
@@ -26921,6 +26961,918 @@ a {
     linear-gradient(180deg, rgba(31, 23, 34, 0.98), rgba(17, 18, 28, 0.96));
 }
 
+.training-v2-rider-grid {
+  grid-template-columns: repeat(auto-fit, minmax(340px, 1fr));
+}
+
+.training-v2-rider-card {
+  display: grid;
+  gap: 12px;
+  padding: 0;
+  overflow: hidden;
+  border: 1px solid rgba(112, 145, 210, 0.18);
+  border-radius: 20px;
+  background: linear-gradient(180deg, rgba(19, 27, 42, 0.98), rgba(12, 18, 29, 0.96));
+  color: rgba(238, 243, 252, 0.94);
+  box-shadow: 0 18px 36px rgba(6, 10, 18, 0.28);
+}
+
+.training-v2-rider-card.is-growth {
+  border-color: rgba(101, 182, 114, 0.28);
+}
+
+.training-v2-rider-card.is-regression {
+  border-color: rgba(214, 93, 86, 0.28);
+}
+
+.training-v2-rider-card.is-stable {
+  border-color: rgba(113, 143, 209, 0.22);
+}
+
+.training-v2-rider-orbit {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 8px;
+  padding: 12px 14px 0;
+}
+
+.training-v2-rider-orbit-chip {
+  display: grid;
+  gap: 2px;
+  justify-items: center;
+  min-width: 0;
+  padding: 8px 6px;
+  border-radius: 999px;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  background: rgba(255, 255, 255, 0.04);
+  text-align: center;
+}
+
+.training-v2-rider-orbit-chip small {
+  color: rgba(218, 229, 245, 0.72);
+  font-size: 0.66rem;
+  font-weight: 850;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+.training-v2-rider-orbit-chip strong {
+  color: rgba(248, 251, 255, 0.96);
+  font-size: 0.92rem;
+  line-height: 1;
+}
+
+.training-v2-rider-orbit-chip.is-pow {
+  border-color: rgba(214, 93, 86, 0.24);
+  background: rgba(214, 93, 86, 0.1);
+}
+
+.training-v2-rider-orbit-chip.is-spe {
+  border-color: rgba(98, 179, 110, 0.24);
+  background: rgba(98, 179, 110, 0.1);
+}
+
+.training-v2-rider-orbit-chip.is-men {
+  border-color: rgba(113, 153, 235, 0.24);
+  background: rgba(113, 153, 235, 0.1);
+}
+
+.training-v2-rider-orbit-chip.is-soc {
+  border-color: rgba(225, 184, 92, 0.24);
+  background: rgba(225, 184, 92, 0.1);
+}
+
+.training-v2-rider-orbit-chip.is-tier-high strong {
+  color: rgba(255, 244, 214, 0.98);
+  text-shadow: 0 0 14px rgba(255, 214, 120, 0.28);
+}
+
+.training-v2-rider-orbit-chip.is-tier-good strong {
+  color: rgba(232, 244, 255, 0.98);
+}
+
+.training-v2-rider-orbit-chip.is-tier-mid strong {
+  color: rgba(214, 223, 238, 0.92);
+}
+
+.training-v2-rider-orbit-chip.is-tier-low strong,
+.training-v2-rider-orbit-chip.is-tier-muted strong {
+  color: rgba(176, 188, 208, 0.82);
+}
+
+.training-v2-rider-hero {
+  position: relative;
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  gap: 14px;
+  align-items: center;
+  padding: 10px 16px 16px;
+  background:
+    linear-gradient(135deg, rgba(255, 255, 255, 0.04), transparent 42%),
+    linear-gradient(180deg, rgba(255, 255, 255, 0.03), transparent 72%);
+}
+
+.training-v2-rider-card.is-growth .training-v2-rider-hero {
+  background:
+    linear-gradient(135deg, rgba(92, 178, 115, 0.16), transparent 48%),
+    linear-gradient(180deg, rgba(92, 178, 115, 0.08), transparent 72%);
+}
+
+.training-v2-rider-card.is-regression .training-v2-rider-hero {
+  background:
+    linear-gradient(135deg, rgba(218, 95, 88, 0.16), transparent 48%),
+    linear-gradient(180deg, rgba(218, 95, 88, 0.08), transparent 72%);
+}
+
+.training-v2-rider-card.is-stable .training-v2-rider-hero {
+  background:
+    linear-gradient(135deg, rgba(113, 153, 235, 0.14), transparent 48%),
+    linear-gradient(180deg, rgba(113, 153, 235, 0.06), transparent 72%);
+}
+
+.training-v2-rider-portrait-button {
+  border: 0;
+  padding: 0;
+  background: transparent;
+  cursor: pointer;
+}
+
+.training-v2-rider-portrait-wrap {
+  position: relative;
+  width: 112px;
+  height: 112px;
+  border-radius: 22px;
+  overflow: hidden;
+  border: 2px solid rgba(255, 255, 255, 0.12);
+  box-shadow: 0 14px 28px rgba(6, 10, 18, 0.34);
+}
+
+.training-v2-rider-portrait {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.training-v2-rider-portrait-fallback {
+  display: grid;
+  place-items: center;
+  width: 100%;
+  height: 100%;
+  background: linear-gradient(180deg, rgba(44, 58, 88, 0.92), rgba(24, 32, 52, 0.96));
+  color: rgba(248, 251, 255, 0.96);
+  font-size: 1.35rem;
+  font-weight: 900;
+}
+
+.training-v2-rider-copy {
+  min-width: 0;
+}
+
+.training-v2-rider-title-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  align-items: center;
+}
+
+.training-v2-rider-title-row strong {
+  font-size: 1.08rem;
+  line-height: 1.15;
+}
+
+.training-v2-rider-meta {
+  margin: 6px 0 0;
+  color: rgba(216, 225, 241, 0.78);
+  font-size: 0.84rem;
+}
+
+.training-v2-rider-class-line {
+  margin: 6px 0 0;
+  color: rgba(198, 210, 232, 0.82);
+  font-size: 0.8rem;
+}
+
+.training-v2-rider-stars {
+  display: inline-flex;
+  gap: 3px;
+  align-items: center;
+  margin-top: 8px;
+}
+
+.training-v2-rider-stars span {
+  width: 12px;
+  height: 12px;
+  clip-path: polygon(50% 0%, 61% 35%, 98% 35%, 68% 57%, 79% 91%, 50% 70%, 21% 91%, 32% 57%, 2% 35%, 39% 35%);
+  background: rgba(255, 255, 255, 0.12);
+}
+
+.training-v2-rider-stars span.is-filled {
+  background: linear-gradient(180deg, rgba(255, 224, 132, 0.98), rgba(214, 162, 44, 0.96));
+  box-shadow: 0 0 10px rgba(255, 208, 96, 0.24);
+}
+
+.training-v2-rider-stars small {
+  margin-left: 6px;
+  color: rgba(214, 223, 238, 0.76);
+  font-size: 0.74rem;
+  font-weight: 800;
+}
+
+.training-v2-rider-stars.is-muted {
+  color: rgba(176, 188, 208, 0.72);
+  font-size: 0.76rem;
+}
+
+.training-v2-rider-ability-stack {
+  display: grid;
+  gap: 8px;
+  flex: 0 0 auto;
+}
+
+.training-v2-rider-ability {
+  display: grid;
+  gap: 2px;
+  min-width: 88px;
+  padding: 10px 12px;
+  border-radius: 14px;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  background: rgba(8, 12, 20, 0.34);
+  text-align: center;
+}
+
+.training-v2-rider-ability > span {
+  color: rgba(214, 223, 238, 0.72);
+  font-size: 0.68rem;
+  font-weight: 900;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.training-v2-rider-ability strong {
+  color: rgba(248, 251, 255, 0.98);
+  font-size: 1.35rem;
+  line-height: 1;
+}
+
+.training-v2-rider-ability small {
+  color: rgba(198, 210, 232, 0.72);
+  font-size: 0.68rem;
+}
+
+.training-v2-rider-ability.is-growth {
+  border-color: rgba(98, 179, 110, 0.34);
+  background: linear-gradient(180deg, rgba(58, 128, 78, 0.28), rgba(24, 44, 34, 0.42));
+}
+
+.training-v2-rider-ability.is-regression {
+  border-color: rgba(214, 93, 86, 0.34);
+  background: linear-gradient(180deg, rgba(138, 54, 50, 0.28), rgba(44, 24, 28, 0.42));
+}
+
+.training-v2-rider-ability.is-stable {
+  border-color: rgba(113, 153, 235, 0.3);
+  background: linear-gradient(180deg, rgba(64, 92, 158, 0.24), rgba(24, 32, 52, 0.42));
+}
+
+.training-v2-rider-ability.is-pps {
+  border-color: rgba(225, 184, 92, 0.32);
+  background: linear-gradient(180deg, rgba(164, 126, 42, 0.24), rgba(44, 36, 20, 0.42));
+}
+
+.training-v2-rider-forecast-row {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 8px;
+  padding: 0 16px;
+}
+
+.training-v2-rider-forecast-row > div {
+  display: grid;
+  gap: 4px;
+  min-width: 0;
+  padding: 10px 12px;
+  border-radius: 12px;
+  border: 1px solid rgba(255, 255, 255, 0.06);
+  background: rgba(255, 255, 255, 0.03);
+}
+
+.training-v2-rider-forecast-row span {
+  color: rgba(214, 223, 238, 0.72);
+  font-size: 0.72rem;
+  font-weight: 850;
+  text-transform: uppercase;
+}
+
+.training-v2-rider-forecast-row strong {
+  color: rgba(248, 251, 255, 0.96);
+  font-size: 0.92rem;
+}
+
+.training-v2-rider-card .training-v2-plan-controls,
+.training-v2-rider-card .training-v2-stat-forecast,
+.training-v2-rider-card .training-v2-player-foot {
+  padding: 0 16px 16px;
+}
+
+.training-v2-rider-card .class-color-chip-with-icon {
+  color: inherit;
+  text-shadow: none;
+}
+
+.velo-intensity-rail,
+.training-v2-intensity-rail {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 8px;
+  padding: 0 16px;
+}
+
+.velo-intensity-segment,
+.training-v2-intensity-segment {
+  display: grid;
+  gap: 4px;
+  min-width: 0;
+  padding: 10px 8px;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 14px;
+  background: rgba(255, 255, 255, 0.03);
+  color: rgba(232, 239, 251, 0.88);
+  text-align: center;
+  cursor: pointer;
+}
+
+.velo-intensity-segment-label,
+.training-v2-intensity-segment .velo-intensity-segment-label {
+  font-size: 0.82rem;
+  font-weight: 900;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+.velo-intensity-segment small,
+.training-v2-intensity-segment small {
+  color: rgba(214, 223, 238, 0.76);
+  font-size: 0.68rem;
+  line-height: 1.2;
+}
+
+.velo-intensity-segment.is-leicht.is-active,
+.training-v2-intensity-segment.is-leicht.is-active {
+  border-color: rgba(98, 179, 110, 0.38);
+  background: linear-gradient(180deg, rgba(58, 128, 78, 0.28), rgba(24, 44, 34, 0.42));
+  box-shadow: 0 10px 24px rgba(20, 39, 73, 0.18);
+}
+
+.velo-intensity-segment.is-mittel.is-active,
+.training-v2-intensity-segment.is-mittel.is-active {
+  border-color: rgba(113, 153, 235, 0.34);
+  background: linear-gradient(180deg, rgba(64, 92, 158, 0.24), rgba(24, 32, 52, 0.42));
+}
+
+.velo-intensity-segment.is-hart.is-active,
+.training-v2-intensity-segment.is-hart.is-active {
+  border-color: rgba(214, 93, 86, 0.38);
+  background: linear-gradient(180deg, rgba(138, 54, 50, 0.28), rgba(44, 24, 28, 0.42));
+}
+
+.velo-impact-strip,
+.training-v2-impact-strip {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 8px;
+  padding: 0 16px;
+}
+
+.velo-impact-card,
+.training-v2-impact-card {
+  display: grid;
+  gap: 4px;
+  min-width: 0;
+  padding: 10px 12px;
+  border-radius: 12px;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  background: rgba(255, 255, 255, 0.03);
+}
+
+.velo-impact-card span,
+.training-v2-impact-card span {
+  color: rgba(214, 223, 238, 0.72);
+  font-size: 0.72rem;
+  font-weight: 850;
+  text-transform: uppercase;
+}
+
+.velo-impact-card strong,
+.training-v2-impact-card strong {
+  color: rgba(248, 251, 255, 0.96);
+  font-size: 0.98rem;
+}
+
+.velo-impact-card small,
+.training-v2-impact-card small {
+  color: rgba(198, 210, 232, 0.76);
+  font-size: 0.72rem;
+  line-height: 1.25;
+}
+
+.velo-impact-card.is-positive strong,
+.training-v2-impact-card.is-positive strong {
+  color: rgba(140, 224, 153, 0.96);
+}
+
+.velo-impact-card.is-negative strong,
+.training-v2-impact-card.is-negative strong {
+  color: rgba(238, 126, 118, 0.96);
+}
+
+.velo-impact-card.is-warning,
+.training-v2-impact-card.is-warning {
+  border-color: rgba(225, 184, 92, 0.24);
+}
+
+.velo-impact-card.is-flash,
+.training-v2-impact-card.is-flash,
+.velo-value-flash-target.is-flash {
+  animation: training-v2-value-flash 0.55s ease;
+}
+
+@keyframes training-v2-value-flash {
+  0% { box-shadow: 0 0 0 rgba(124, 174, 255, 0); transform: scale(1); }
+  35% { box-shadow: 0 0 0 3px rgba(124, 174, 255, 0.24); transform: scale(1.02); }
+  100% { box-shadow: 0 0 0 rgba(124, 174, 255, 0); transform: scale(1); }
+}
+
+.velo-class-focus,
+.training-v2-class-focus {
+  display: grid;
+  gap: 8px;
+  padding: 0 16px;
+}
+
+.velo-class-focus-row,
+.training-v2-class-focus-row {
+  display: grid;
+  gap: 6px;
+}
+
+.velo-class-focus-row > span,
+.training-v2-class-focus-row > span {
+  color: rgba(214, 223, 238, 0.72);
+  font-size: 0.72rem;
+  font-weight: 850;
+  text-transform: uppercase;
+}
+
+.velo-class-focus-tags,
+.training-v2-class-focus-tags {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.velo-class-focus-tag,
+.training-v2-class-focus-tag {
+  display: inline-flex;
+  align-items: center;
+  min-height: 28px;
+  padding: 0 10px;
+  border-radius: 999px;
+  font-size: 0.76rem;
+  font-weight: 800;
+}
+
+.velo-class-focus-tag.is-gain,
+.training-v2-class-focus-tag.is-gain {
+  border: 1px solid rgba(98, 179, 110, 0.24);
+  background: rgba(58, 128, 78, 0.14);
+  color: rgba(198, 236, 204, 0.96);
+}
+
+.velo-class-focus-tag.is-loss,
+.training-v2-class-focus-tag.is-loss {
+  border: 1px solid rgba(214, 93, 86, 0.24);
+  background: rgba(138, 54, 50, 0.14);
+  color: rgba(244, 196, 190, 0.96);
+}
+
+.training-v2-attribute-forecast,
+.velo-attribute-forecast {
+  display: grid;
+  gap: 8px;
+  padding: 0 16px;
+}
+
+.training-v2-attribute-forecast-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.training-v2-attribute-forecast-head strong {
+  font-size: 0.84rem;
+}
+
+.training-v2-attribute-forecast-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+  gap: 8px;
+}
+
+.training-v2-attribute-forecast-card {
+  display: grid;
+  gap: 4px;
+  padding: 10px;
+  border-radius: 12px;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  background: rgba(255, 255, 255, 0.03);
+}
+
+.training-v2-attribute-forecast-card.is-gain {
+  border-color: rgba(98, 179, 110, 0.22);
+}
+
+.training-v2-attribute-forecast-card.is-risk {
+  border-color: rgba(214, 93, 86, 0.22);
+}
+
+.training-v2-attribute-forecast-card.is-signature {
+  box-shadow: inset 0 0 0 1px rgba(255, 214, 120, 0.12);
+}
+
+.training-v2-attribute-forecast-title {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.training-v2-attribute-forecast-title small {
+  color: rgba(218, 229, 245, 0.72);
+  font-size: 0.72rem;
+  font-weight: 850;
+  text-transform: uppercase;
+}
+
+.training-v2-attribute-forecast-card strong {
+  color: rgba(248, 251, 255, 0.96);
+  font-size: 0.84rem;
+}
+
+.training-v2-attribute-forecast-card em {
+  color: rgba(140, 224, 153, 0.95);
+  font-style: normal;
+  font-weight: 900;
+}
+
+.training-v2-attribute-forecast-card.is-risk em {
+  color: rgba(238, 126, 118, 0.95);
+}
+
+.training-v2-attribute-forecast-split {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.training-v2-attribute-forecast-split span {
+  color: rgba(198, 210, 232, 0.72);
+  font-size: 0.68rem;
+  font-weight: 800;
+}
+
+.training-v2-modifier-row {
+  display: grid;
+  gap: 6px;
+}
+
+.market-v2-candidate-axis-row.is-legacy {
+  display: none;
+}
+
+.velo-scouting-disclosure {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 6px;
+}
+
+.velo-scouting-segment {
+  display: grid;
+  place-items: center;
+  min-height: 28px;
+  padding: 4px 6px;
+  border-radius: 999px;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  background: rgba(255, 255, 255, 0.03);
+  color: rgba(198, 210, 232, 0.72);
+  font-size: 0.68rem;
+  font-weight: 800;
+}
+
+.velo-scouting-segment.has-data {
+  color: rgba(232, 239, 251, 0.9);
+}
+
+.velo-scouting-segment.is-visible.has-data {
+  border-color: rgba(98, 179, 110, 0.24);
+  background: rgba(58, 128, 78, 0.12);
+}
+
+.velo-scouting-segment.is-hidden.has-data {
+  border-color: rgba(214, 93, 86, 0.24);
+  background: rgba(138, 54, 50, 0.12);
+}
+
+.velo-scouting-segment.is-hidden.has-data {
+  border-color: rgba(214, 93, 86, 0.24);
+  background: rgba(138, 54, 50, 0.12);
+}
+
+.velo-star-rating {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  vertical-align: middle;
+}
+
+.velo-star-rating.is-empty {
+  color: rgba(235, 239, 247, 0.62);
+}
+
+.velo-star-rating.is-compact {
+  gap: 4px;
+}
+
+.velo-star-label {
+  min-width: 2.1ch;
+  color: rgba(235, 239, 247, 0.66);
+  font-size: 0.72rem;
+  font-weight: 900;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.velo-stars {
+  display: inline-flex;
+  gap: 1px;
+  line-height: 1;
+  filter: drop-shadow(0 0 9px rgba(255, 198, 64, 0.45));
+}
+
+.velo-star-rating.is-danger .velo-stars {
+  filter: drop-shadow(0 0 9px rgba(255, 96, 86, 0.35));
+}
+
+.velo-star {
+  position: relative;
+  display: inline-block;
+  width: 0.86em;
+  color: rgba(111, 91, 48, 0.72);
+  font-size: 0.96rem;
+}
+
+.velo-star-fill {
+  position: absolute;
+  inset: 0 auto 0 0;
+  width: 0;
+  overflow: hidden;
+  color: #ffd76a;
+  text-shadow:
+    0 0 3px rgba(255, 245, 181, 0.95),
+    0 0 9px rgba(255, 191, 49, 0.8),
+    0 1px 0 rgba(85, 47, 7, 0.65);
+}
+
+.velo-star-rating.is-danger .velo-star-fill {
+  color: #ff8d84;
+  text-shadow:
+    0 0 3px rgba(255, 214, 210, 0.95),
+    0 0 9px rgba(255, 96, 86, 0.75);
+}
+
+.velo-star-empty {
+  color: rgba(103, 89, 61, 0.58);
+}
+
+.velo-star-stack,
+.training-v2-rider-star-stack {
+  display: grid;
+  gap: 5px;
+  margin-top: 8px;
+}
+
+.training-v2-trait-boost-row {
+  display: grid;
+  gap: 8px;
+  padding: 10px 12px;
+  border: 1px solid rgba(112, 138, 187, 0.18);
+  border-radius: 14px;
+  background: rgba(8, 14, 26, 0.72);
+}
+
+.training-v2-trait-boost-summary {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 10px;
+}
+
+.training-v2-trait-boost-summary span {
+  color: rgba(198, 210, 232, 0.78);
+  font-size: 0.76rem;
+  font-weight: 800;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+
+.training-v2-trait-boost-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.training-v2-trait-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 4px 8px;
+  border-radius: 999px;
+  font-size: 0.74rem;
+  font-weight: 800;
+}
+
+.training-v2-trait-chip.is-positive {
+  border: 1px solid rgba(255, 208, 96, 0.34);
+  background: rgba(255, 198, 64, 0.12);
+  color: #ffd76a;
+}
+
+.training-v2-trait-chip.is-negative {
+  border: 1px solid rgba(255, 96, 86, 0.28);
+  background: rgba(138, 54, 50, 0.16);
+  color: #ff8d84;
+}
+
+.training-v2-trait-chip.is-neutral {
+  border: 1px solid rgba(112, 138, 187, 0.22);
+  background: rgba(112, 138, 187, 0.08);
+  color: rgba(214, 223, 238, 0.86);
+}
+
+.training-v2-mode-demand {
+  display: grid;
+  gap: 4px;
+  padding: 10px 12px;
+  border-radius: 14px;
+  border: 1px solid rgba(255, 198, 64, 0.24);
+  background: rgba(255, 198, 64, 0.08);
+}
+
+.training-v2-mode-demand.is-at_risk {
+  border-color: rgba(255, 168, 72, 0.34);
+  background: rgba(255, 168, 72, 0.1);
+}
+
+.training-v2-mode-demand.is-failed {
+  border-color: rgba(255, 96, 86, 0.34);
+  background: rgba(138, 54, 50, 0.14);
+}
+
+.training-v2-mode-demand-copy {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 10px;
+}
+
+.training-v2-mode-demand-copy strong {
+  color: #ffd76a;
+}
+
+.training-v2-mode-demand.is-failed .training-v2-mode-demand-copy strong {
+  color: #ff8d84;
+}
+
+.training-v2-mode-demand-copy span,
+.training-v2-mode-demand small {
+  color: rgba(214, 223, 238, 0.82);
+  font-size: 0.76rem;
+}
+
+.training-v2-mode-demand-foot.is-at_risk {
+  color: #ffb347;
+}
+
+.training-v2-mode-demand-foot.is-failed {
+  color: #ff8d84;
+}
+
+.velo-intensity-segment.is-demanded:not(.is-active) {
+  box-shadow: inset 0 0 0 1px rgba(255, 208, 96, 0.55);
+}
+
+.velo-intensity-segment.is-demanded.is-active {
+  box-shadow:
+    inset 0 0 0 1px rgba(255, 224, 132, 0.85),
+    0 0 16px rgba(255, 198, 64, 0.22);
+}
+
+.player-drawer-axis-orbit,
+.arena-v2-slot-impact-strip,
+.training-v2-facility-impact-strip,
+.training-v2-facility-upgrade-strip {
+  margin-top: 8px;
+}
+
+.player-drawer-scouting-disclosure {
+  margin-bottom: 10px;
+}
+
+.player-drawer-attribute-card.is-scouting-locked {
+  opacity: 0.72;
+}
+
+.arena-v2-slot-impact-strip .velo-impact-card {
+  min-width: 0;
+}
+
+.teams-v2-player-card {
+  display: grid;
+  gap: 10px;
+  padding: 12px;
+  border: 1px solid rgba(112, 138, 187, 0.2);
+  border-radius: 16px;
+  background: rgba(11, 18, 32, 0.72);
+  text-align: left;
+  color: inherit;
+}
+
+.teams-v2-player-card-body {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  gap: 10px;
+  align-items: center;
+}
+
+.teams-v2-player-portrait {
+  width: 72px;
+  height: 72px;
+  border-radius: 14px;
+  object-fit: cover;
+}
+
+.teams-v2-player-portrait.is-placeholder {
+  display: grid;
+  place-items: center;
+  background: rgba(255, 255, 255, 0.06);
+}
+
+.season-v2-team-card-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+  gap: 12px;
+}
+
+.season-v2-team-card {
+  display: grid;
+  gap: 10px;
+  padding: 12px;
+  border: 1px solid rgba(112, 138, 187, 0.2);
+  border-radius: 16px;
+  background: rgba(11, 18, 32, 0.72);
+}
+
+.season-v2-team-card.is-selected {
+  border-color: rgba(124, 174, 255, 0.34);
+  box-shadow: 0 10px 24px rgba(20, 39, 73, 0.18);
+}
+
+.season-v2-team-card-head {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  gap: 10px;
+  align-items: center;
+}
+
+.inbox-v2-category-rail {
+  grid-template-columns: repeat(auto-fit, minmax(88px, 1fr));
+  padding: 0;
+}
+
+.legacy-lineup-fit-strip {
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+
+.training-v2-rider-card .velo-intensity-rail,
+.training-v2-rider-card .velo-impact-strip,
+.training-v2-rider-card .velo-class-focus,
+.training-v2-rider-card .training-v2-attribute-forecast {
+  padding-bottom: 0;
+}
+
+.training-v2-rider-card .training-v2-plan-controls {
+  grid-template-columns: 1fr;
+}
+
 .training-v2-plan-controls {
   display: grid;
   grid-template-columns: minmax(0, 1.2fr) minmax(180px, 0.8fr);
@@ -28012,9 +28964,24 @@ a {
   .training-v2-team,
   .training-v2-player-head,
   .training-v2-upgrade-head,
-  .training-v2-seasonend-bar {
+  .training-v2-seasonend-bar,
+  .training-v2-rider-hero {
     flex-direction: column;
     align-items: stretch;
+  }
+
+  .training-v2-rider-hero {
+    display: flex;
+    flex-direction: column;
+  }
+
+  .training-v2-rider-forecast-row {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .training-v2-rider-ability-stack {
+    width: 100%;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 
   .training-v2-player-image,
@@ -29442,10 +30409,27 @@ a {
 .home-v2-axis-row,
 .home-v2-warning-row,
 .home-v2-board-meta,
-.home-v2-facility-grid {
+.home-v2-facility-grid,
+.home-v2-objective-list {
   display: flex;
   flex-wrap: wrap;
   gap: 8px;
+}
+
+.home-v2-objective-list {
+  flex-direction: column;
+  margin-top: 12px;
+}
+
+.home-v2-objective-card {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  padding: 10px 12px;
+  border-radius: 10px;
+  background: rgba(255, 255, 255, 0.04);
+  border: 1px solid rgba(255, 255, 255, 0.08);
 }
 
 .home-v2-axis-row .is-pow { color: #ff7a7a; }

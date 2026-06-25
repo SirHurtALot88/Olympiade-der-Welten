@@ -133,15 +133,15 @@ describe("organic season progression", () => {
     expect(diligentResult.performanceSetpoints).toBe(lazyResult.performanceSetpoints);
   });
 
-  it("uses player potential as a training growth multiplier", () => {
+  it("uses player potential and star gap as training growth multipliers", () => {
     const lowPotential = player({ potential: 50 });
     const elitePotential = player({ potential: 94 });
 
     const lowResult = buildOrganicSeasonProgression({ gameState: gameState(lowPotential), player: lowPotential });
     const eliteResult = buildOrganicSeasonProgression({ gameState: gameState(elitePotential), player: elitePotential });
 
-    expect(lowResult.potentialTrainingMultiplier).toBe(0.94);
-    expect(eliteResult.potentialTrainingMultiplier).toBe(1.18);
+    expect(lowResult.potentialTrainingMultiplier).toBeLessThan(0.94);
+    expect(eliteResult.potentialTrainingMultiplier).toBeGreaterThan(1.18);
     expect(eliteResult.trainingSetpoints).toBeGreaterThan(lowResult.trainingSetpoints);
   });
 
@@ -218,5 +218,37 @@ describe("organic season progression", () => {
     expect(neutralPower.affinity).toBe("neutral");
     expect(weakPower.growthMultiplier).toBeLessThan(1);
     expect(weakPower.performance).toBeLessThan(neutralPower.performance);
+  });
+
+  it("boosts prospects with star gap and penalizes overpriced veterans", () => {
+    const youth = player({
+      id: "youth",
+      rating: 58,
+      potential: 85,
+      marketValue: 12,
+      coreStats: { pow: 58, spe: 60, men: 57, soc: 56 },
+      attributeSheetStats: attrs,
+      traitsPositive: ["Diligent", "Motivated"],
+      trainingMode: "hart",
+    });
+    const overpaid = player({
+      id: "vet",
+      rating: 82,
+      potential: 84,
+      marketValue: 80,
+      coreStats: { pow: 82, spe: 80, men: 78, soc: 76 },
+      attributeSheetStats: {
+        ...attrs,
+        power: 82,
+        speed: 80,
+        intelligence: 78,
+        charisma: 76,
+      },
+      trainingMode: "leicht",
+    });
+    const youthResult = buildOrganicSeasonProgression({ gameState: gameState(youth), player: youth });
+    const vetResult = buildOrganicSeasonProgression({ gameState: gameState(overpaid), player: overpaid });
+    expect(youthResult.netSetpoints).toBeGreaterThan(0);
+    expect(vetResult.netSetpoints).toBeLessThan(youthResult.netSetpoints);
   });
 });

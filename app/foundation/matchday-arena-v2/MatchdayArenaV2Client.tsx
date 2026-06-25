@@ -5,6 +5,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import OptimizedMediaImage from "@/app/foundation/OptimizedMediaImage";
 import MatchdayArenaPlayerCard from "@/components/matchday-arena/MatchdayArenaPlayerCard";
 import MatchdayArenaTimeline from "@/components/matchday-arena/MatchdayArenaTimeline";
+import { VeloImpactStrip } from "@/components/foundation/velo-ui";
 import { TooltipHeading } from "@/components/ui/TooltipHeading";
 import { getPlayerPortraitBrowserUrl, getTeamLogoBrowserUrl } from "@/lib/data/mediaAssets";
 import type { Player, Team, TeamControlSettings } from "@/lib/data/olyDataTypes";
@@ -243,6 +244,7 @@ type ArenaFocusTeamEntryCard = {
   roleHint: string;
   baseScore: number | null;
   fatigueAdjustedScore: number | null;
+  mutatorBonus: number | null;
   finalPlayerScore: number | null;
   pointsAwarded: number | null;
   mutatorPpsBonus?: number | null;
@@ -1527,6 +1529,7 @@ export default function MatchdayArenaV2Client(props: MatchdayArenaV2ClientProps)
           roleHint: role?.description ?? "Spielerbeitrag in dieser Rolle.",
           baseScore: entry.baseScore,
           fatigueAdjustedScore: entry.fatigueAdjustedScore,
+          mutatorBonus: entry.mutatorBonus,
           finalPlayerScore: entry.finalPlayerScore,
           pointsAwarded: entry.pointsAwarded,
           mutatorPpsBonus: entry.mutatorPpsBonus,
@@ -2225,18 +2228,36 @@ export default function MatchdayArenaV2Client(props: MatchdayArenaV2ClientProps)
                 </div>
                 <div className="arena-v2-slot-meta-row">
                   <span>{entry.className ?? "—"}</span>
-                  <span className={`arena-v2-slot-score-pill is-tier-${getArenaAxisValueTier(entry.baseScore)}`}>
-                    Base {formatDecimalScore(entry.baseScore, 1)}
-                  </span>
-                  {canShowFinalLayer ? (
-                    <span className={`arena-v2-slot-score-pill is-tier-${getArenaAxisValueTier(entry.finalPlayerScore)}`}>
-                      Final {formatDecimalScore(entry.finalPlayerScore, 1)}
-                    </span>
-                  ) : null}
                   {canShowResultLayer ? <span>PPs {formatDecimalScore(entry.pointsAwarded, 1)}</span> : null}
                 </div>
               </div>
             </div>
+            <VeloImpactStrip
+              className="arena-v2-slot-impact-strip"
+              items={[
+                {
+                  key: "base",
+                  label: "Base",
+                  value: formatDecimalScore(entry.baseScore, 1),
+                  tone: "neutral",
+                },
+                {
+                  key: "mutator",
+                  label: "Mutator",
+                  value:
+                    entry.mutatorBonus != null
+                      ? `${entry.mutatorBonus >= 0 ? "+" : ""}${formatDecimalScore(entry.mutatorBonus, 1)}`
+                      : "—",
+                  tone: (entry.mutatorBonus ?? 0) >= 0 ? "positive" : "negative",
+                },
+                {
+                  key: "final",
+                  label: "Final",
+                  value: canShowFinalLayer ? formatDecimalScore(entry.finalPlayerScore, 1) : "—",
+                  tone: "positive",
+                },
+              ]}
+            />
             <div className="arena-v2-rank-tag-row">
               {renderArenaRankTag("S#", entry.rankInSlotBase, "base", ARENA_PLAYER_RANK_TOOLTIPS.slotBase, entryRankPools.slotPoolSize)}
               {renderArenaRankTag("G#", entry.rankTotalBase, "base", ARENA_PLAYER_RANK_TOOLTIPS.totalBase, entryRankPools.totalPoolSize)}

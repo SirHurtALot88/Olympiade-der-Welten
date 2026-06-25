@@ -115,6 +115,16 @@ export type TransfermarktFreeAgentItem = {
   potentialTier: PlayerProgressionRatingTier | null;
   potentialBand: PlayerPotentialBand;
   potentialRange: { min: number; max: number } | null;
+  axisStarsDisplay: string | null;
+  axisStarsOverall: number | null;
+  axisStarsPow: number | null;
+  axisStarsSpe: number | null;
+  axisStarsMen: number | null;
+  axisStarsSoc: number | null;
+  potentialStarsDisplay: string | null;
+  potentialStarsMin: number | null;
+  potentialStarsMax: number | null;
+  potentialGapStars: number | null;
   scoutingConfidence: number | null;
   scoutingSource: PlayerPotentialSource;
   scoutingWarnings: string[];

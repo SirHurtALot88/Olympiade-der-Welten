@@ -7,6 +7,8 @@ import { getTeamPlayerMax } from "@/lib/foundation/roster-limits";
 import { getTeamStrategyProfile } from "@/lib/foundation/team-strategy-profiles";
 import { buildPlayerProgressionForecast } from "@/lib/training/player-progression-forecast";
 import { getFacilityLevel, getTeamFacilityState } from "@/lib/facilities/facility-effects";
+import { getEffectiveScoutingLevel } from "@/lib/scouting/facility-scout-pipeline-service";
+import { buildPlayerStarScoutingSnapshot, type PlayerStarScoutingSnapshot } from "@/lib/scouting/player-star-scouting-bridge";
 import { buildPlayerScoutPotentialFromGameState } from "@/lib/progression/player-potential-service";
 import { createPersistenceService } from "@/lib/persistence/persistence-service";
 import type { PersistenceService, PersistedSaveGame } from "@/lib/persistence/types";
@@ -232,6 +234,51 @@ function getQuickPotentialBand(score: number | null | undefined) {
   if (value >= 72) return "high" as const;
   if (value >= 50) return "medium" as const;
   return "low" as const;
+}
+
+function mapStarScoutingFields(snapshot: PlayerStarScoutingSnapshot) {
+  return {
+    axisStarsDisplay: snapshot.revealedCurrentStars.displayLabel,
+    axisStarsOverall: snapshot.revealedCurrentStars.overall,
+    axisStarsPow: snapshot.revealedCurrentStars.pow,
+    axisStarsSpe: snapshot.revealedCurrentStars.spe,
+    axisStarsMen: snapshot.revealedCurrentStars.men,
+    axisStarsSoc: snapshot.revealedCurrentStars.soc,
+    potentialStarsDisplay: snapshot.revealedPotentialStars.displayLabel,
+    potentialStarsMin: snapshot.revealedPotentialStars.overallMin,
+    potentialStarsMax: snapshot.revealedPotentialStars.overallMax,
+    potentialGapStars: snapshot.potentialGap,
+  };
+}
+
+function buildStarFieldsForPlayer(input: {
+  gameState: GameState;
+  player: Player;
+  saveId: string;
+  scoutingLevel: number;
+}) {
+  if (input.scoutingLevel <= 0) {
+    return {
+      axisStarsDisplay: "Scouting nötig",
+      axisStarsOverall: null,
+      axisStarsPow: null,
+      axisStarsSpe: null,
+      axisStarsMen: null,
+      axisStarsSoc: null,
+      potentialStarsDisplay: "Potenzial unbekannt",
+      potentialStarsMin: null,
+      potentialStarsMax: null,
+      potentialGapStars: null,
+    };
+  }
+  return mapStarScoutingFields(
+    buildPlayerStarScoutingSnapshot({
+      gameState: input.gameState,
+      player: input.player,
+      saveId: input.saveId,
+      scoutingLevel: input.scoutingLevel,
+    }),
+  );
 }
 
 function getQuickProgressionTier(score: number | null | undefined): TransfermarktFreeAgentItem["currentAbilityTier"] {
@@ -1169,6 +1216,12 @@ export function listLocalTransfermarktFreeAgents(input: TransfermarktReadParams 
             : getTransfermarktTierFromPoints(scoutPotential.scoutRating),
         potentialBand: scoutPotential?.band ?? potentialRecord?.potentialBand ?? getQuickPotentialBand(quickPotentialScore),
         potentialRange: scoutPotential?.potentialRange ?? potentialRecord?.revealedPotentialRange ?? null,
+        ...buildStarFieldsForPlayer({
+          gameState,
+          player,
+          saveId: save.saveId,
+          scoutingLevel: 0,
+        }),
         scoutingConfidence: scoutPotential?.confidence ?? potentialRecord?.confidence ?? null,
         scoutingSource: scoutPotential?.source ?? potentialRecord?.source ?? "generated",
         scoutingWarnings: scoutPotential?.warnings ?? [],
@@ -1250,25 +1303,29 @@ export function listLocalTransfermarktFreeAgents(input: TransfermarktReadParams 
   let items = localFreeAgentTeamCache.get(teamCacheKey) ?? null;
   if (!items) {
     items = baseItems.map<TransfermarktFreeAgentItem>((baseItem) => {
+      const playerScoutingLevel =
+        selectedTeam != null
+          ? getEffectiveScoutingLevel(gameState, selectedTeam.teamId, baseItem.playerId)
+          : selectedScoutingLevel;
       const player = playersById.get(baseItem.playerId) ?? null;
       const scoutPotential = player
         ? buildPlayerScoutPotentialFromGameState({
             gameState,
             player,
             saveId: save.saveId,
-            scoutingLevel: selectedScoutingLevel,
+            scoutingLevel: playerScoutingLevel,
           })
         : null;
       const traitView = player
         ? getScoutedTraitView({
             traitsPositive: player.traitsPositive,
             traitsNegative: player.traitsNegative,
-            scoutingLevel: selectedScoutingLevel,
+            scoutingLevel: playerScoutingLevel,
           })
         : getScoutedTraitView({
             traitsPositive: baseItem.traitsPositive,
             traitsNegative: baseItem.traitsNegative,
-            scoutingLevel: selectedScoutingLevel,
+            scoutingLevel: playerScoutingLevel,
           });
       const visiblePreferredDisciplineIds =
         player && traitView.disclosure.preferredDisciplinesVisible ? player.preferredDisciplineIds : [];
@@ -1297,7 +1354,7 @@ export function listLocalTransfermarktFreeAgents(input: TransfermarktReadParams 
             playerId: player.id,
             field: "pow",
             value: player.coreStats.pow,
-            scoutingLevel: selectedScoutingLevel,
+            scoutingLevel: playerScoutingLevel,
           })
         : baseItem.pow;
       const scoutedSpe = player
@@ -1306,7 +1363,7 @@ export function listLocalTransfermarktFreeAgents(input: TransfermarktReadParams 
             playerId: player.id,
             field: "spe",
             value: player.coreStats.spe,
-            scoutingLevel: selectedScoutingLevel,
+            scoutingLevel: playerScoutingLevel,
           })
         : baseItem.spe;
       const scoutedMen = player
@@ -1315,7 +1372,7 @@ export function listLocalTransfermarktFreeAgents(input: TransfermarktReadParams 
             playerId: player.id,
             field: "men",
             value: player.coreStats.men,
-            scoutingLevel: selectedScoutingLevel,
+            scoutingLevel: playerScoutingLevel,
           })
         : baseItem.men;
       const scoutedSoc = player
@@ -1324,7 +1381,7 @@ export function listLocalTransfermarktFreeAgents(input: TransfermarktReadParams 
             playerId: player.id,
             field: "soc",
             value: player.coreStats.soc,
-            scoutingLevel: selectedScoutingLevel,
+            scoutingLevel: playerScoutingLevel,
           })
         : baseItem.soc;
       const needMatch = buildNeedMatchSignal({
@@ -1349,13 +1406,13 @@ export function listLocalTransfermarktFreeAgents(input: TransfermarktReadParams 
             disciplinePlayerCountById,
             teamDisciplineRankById,
             player,
-            scoutingLevel: selectedScoutingLevel,
+            scoutingLevel: playerScoutingLevel,
           })
         : baseItem.topDisciplineScores;
       const doubleLoadWarnings = player
         ? buildTransfermarktDoubleLoadWarnings({
             gameState,
-            scoutingLevel: selectedScoutingLevel,
+            scoutingLevel: playerScoutingLevel,
             topDisciplines: topDisciplineScores,
           })
         : [];
@@ -1399,6 +1456,25 @@ export function listLocalTransfermarktFreeAgents(input: TransfermarktReadParams 
             : getTransfermarktTierFromPoints(scoutPotential.scoutRating),
         potentialBand: scoutPotential?.band ?? baseItem.potentialBand,
         potentialRange: scoutPotential?.potentialRange ?? baseItem.potentialRange,
+        ...(player
+          ? buildStarFieldsForPlayer({
+              gameState,
+              player,
+              saveId: save.saveId,
+              scoutingLevel: playerScoutingLevel,
+            })
+          : {
+              axisStarsDisplay: baseItem.axisStarsDisplay,
+              axisStarsOverall: baseItem.axisStarsOverall,
+              axisStarsPow: baseItem.axisStarsPow,
+              axisStarsSpe: baseItem.axisStarsSpe,
+              axisStarsMen: baseItem.axisStarsMen,
+              axisStarsSoc: baseItem.axisStarsSoc,
+              potentialStarsDisplay: baseItem.potentialStarsDisplay,
+              potentialStarsMin: baseItem.potentialStarsMin,
+              potentialStarsMax: baseItem.potentialStarsMax,
+              potentialGapStars: baseItem.potentialGapStars,
+            }),
         scoutingConfidence: scoutPotential?.confidence ?? baseItem.scoutingConfidence,
         scoutingSource: scoutPotential?.source ?? baseItem.scoutingSource,
         scoutingWarnings,

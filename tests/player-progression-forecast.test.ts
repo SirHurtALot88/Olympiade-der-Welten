@@ -189,7 +189,7 @@ describe("player progression forecast", () => {
     expect(forecast.baseTrainingXP).toBe(80);
     expect(forecast.potentialTrainingMultiplier).toBe(1.14);
     expect(forecast.scoutPotential?.starRating).toBe("4.0 Sterne");
-    expect(forecast.performanceXP).toBe(85);
+    expect(forecast.performanceXP).toBe(95);
   });
 
   it("keeps lower-to-mid match performance visible beside hard training", () => {
@@ -284,7 +284,7 @@ describe("player progression forecast", () => {
       trainingModeByPlayerId: { [player.id]: "leicht" },
     });
 
-    expect(forecast.appearanceXP).toBe(45);
+    expect(forecast.appearanceXP).toBe(60);
     expect(forecast.mvsXP).toBe(40);
     expect(forecast.ppsBonusXP).toBe(35);
     expect(forecast.ppsBonusXP).toBeLessThan(forecast.mvsXP);
@@ -370,6 +370,35 @@ describe("player progression forecast", () => {
     expect(forecast.audit.seasonEndOnly).toBe(true);
     expect(forecast.audit.productiveWrites).toBe(false);
     expect(forecast.sourceStatus.writes).toBe("preview_only");
+    expect(forecast.sourceStatus.facilities).toBe("missing_source");
+  });
+
+  it("reads training center facility bonus from the player roster team", () => {
+    const player = createPlayer();
+    const gameState = createGameState(player);
+    gameState.teams = [{ teamId: "team-1", name: "Team One", shortCode: "T-1", cash: 100, rosterLimit: 14 } as never];
+    gameState.rosters = [{ teamId: "team-1", playerId: player.id, roleTag: "starter", joinedSeasonId: "season-1" } as never];
+    gameState.seasonState.teamFacilities = {
+      "team-1": {
+        facilities: {
+          training_center: { level: 2, enabled: true, conditionPct: 100, activeVariant: null },
+        },
+      },
+    };
+
+    const forecast = buildPlayerProgressionForecast({
+      gameState,
+      player,
+      playerRating: null,
+      seasonPerformance: null,
+      trainingModeByPlayerId: { [player.id]: "mittel" },
+    });
+    const facilityEvent = forecast.xpEvents.find((event) => event.type === "facility_modifier");
+
+    expect(forecast.sourceStatus.facilities).toBe("ready");
+    expect(facilityEvent?.sourceStatus).toBe("ready");
+    expect(facilityEvent?.label).toContain("Training Center");
+    expect(facilityEvent?.xpBeforeTraits).toBeGreaterThan(0);
   });
 
   it("moves top performers into positive net development", () => {

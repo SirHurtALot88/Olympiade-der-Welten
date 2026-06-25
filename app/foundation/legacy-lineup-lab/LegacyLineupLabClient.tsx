@@ -5,6 +5,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
 import DisciplineIcon from "@/app/foundation/DisciplineIcon";
 import OptimizedMediaImage from "@/app/foundation/OptimizedMediaImage";
+import { VeloImpactStrip, VeloStatOrbitRow } from "@/components/foundation/velo-ui";
 import { getGameTermTooltip } from "@/components/ui/GameTerm";
 import { TooltipHeading } from "@/components/ui/TooltipHeading";
 import { getPlayerPortraitBrowserUrl, getTeamLogoBrowserUrl } from "@/lib/data/mediaAssets";
@@ -2988,6 +2989,7 @@ export default function LegacyLineupLabClient(props: LegacyLineupLabClientProps)
       return new Map<
         string,
         {
+          baseScore: number | null;
           projectedScore: number | null;
           scoreDelta: number | null;
           blockReason: ReturnType<typeof resolveLegacyLineupDragBlockReason>;
@@ -3020,6 +3022,7 @@ export default function LegacyLineupLabClient(props: LegacyLineupLabClientProps)
         return [
           option.activePlayerId,
           {
+            baseScore: option.disciplineScores[activeSlot.disciplineId] ?? null,
             projectedScore: projected.totalProjected,
             scoreDelta,
             blockReason,
@@ -7586,6 +7589,44 @@ export default function LegacyLineupLabClient(props: LegacyLineupLabClientProps)
                               Slot {formatNullableScore(activeSlotCandidate?.projectedScore ?? focusedSideScore)}
                             </span>
                           </div>
+                          <VeloStatOrbitRow
+                            ariaLabel={`${player.name} Slot-Fit`}
+                            className="legacy-lineup-draft-orbit"
+                            stats={{
+                              pow: player.discipline1Score ?? 0,
+                              spe: player.discipline2Score ?? 0,
+                              men: activeSlotCandidate?.projectedScore ?? focusedSideScore ?? 0,
+                              soc: Math.max(player.discipline1Score ?? 0, player.discipline2Score ?? 0),
+                            }}
+                          />
+                          {activeSlotCandidate ? (
+                            <VeloImpactStrip
+                              className="legacy-lineup-fit-strip"
+                              items={[
+                                {
+                                  key: "base",
+                                  label: "Base",
+                                  value: formatNullableScore(activeSlotCandidate.baseScore ?? null),
+                                  tone: "neutral",
+                                },
+                                {
+                                  key: "final",
+                                  label: "Final",
+                                  value: formatNullableScore(activeSlotCandidate.projectedScore ?? null),
+                                  tone: "positive",
+                                },
+                                {
+                                  key: "delta",
+                                  label: "Delta",
+                                  value:
+                                    activeSlotCandidate.scoreDelta != null
+                                      ? `${activeSlotCandidate.scoreDelta >= 0 ? "+" : ""}${formatDecimalScore(activeSlotCandidate.scoreDelta, 1)}`
+                                      : "—",
+                                  tone: (activeSlotCandidate.scoreDelta ?? 0) >= 0 ? "positive" : "negative",
+                                },
+                              ]}
+                            />
+                          ) : null}
 	                          <div className="legacy-lineup-draft-player-tags">
 	                            <span>{groupMeta.label}</span>
 	                            <span>{activeSlotCandidate?.fitSummary ?? shortReason}</span>

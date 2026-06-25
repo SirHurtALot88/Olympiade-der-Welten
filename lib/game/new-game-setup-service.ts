@@ -362,6 +362,7 @@ export function buildNewGameStateFromBaseline(input: NewGameSetupInput & { saveI
     playerPotential: buildPlayerPotentialRecordsForSave({
       saveId: input.saveId ?? "season-1-new-game-preview",
       players: resetGameState.players,
+      gameState: resetGameState,
     }),
     playerProgressionEvents: [],
     seasonState: {

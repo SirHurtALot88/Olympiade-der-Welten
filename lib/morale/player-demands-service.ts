@@ -9,10 +9,23 @@ import type {
 import { getTeamFacilityState } from "@/lib/facilities/facility-effects";
 import { buildPlayerSeasonPerformance } from "@/lib/foundation/player-season-performance";
 import { buildPlayerRatingContractMap } from "@/lib/foundation/player-rating-contract";
+import { buildTrainingModeDemandRecord } from "@/lib/training/training-mode-demand-service";
 
 type DemandPlayerLike = Pick<
   Player,
-  "id" | "name" | "traitsPositive" | "traitsNegative" | "disciplineRatings" | "coreStats" | "attributeSheetStats" | "pps" | "ovr"
+  | "id"
+  | "name"
+  | "traitsPositive"
+  | "traitsNegative"
+  | "disciplineRatings"
+  | "coreStats"
+  | "attributeSheetStats"
+  | "pps"
+  | "ovr"
+  | "trainingMode"
+  | "fatigue"
+  | "potential"
+  | "age"
 >;
 
 type DemandDisciplineLike = Pick<Discipline, "id" | "name" | "category"> & { playerCount?: number | null };
@@ -296,6 +309,22 @@ function buildAppearanceDemand(input: {
   };
 }
 
+function buildTrainingModePlayerDemand(input: {
+  context: DemandContext;
+  player: DemandPlayerLike & Pick<Player, "trainingMode" | "fatigue">;
+  rosterRank: number;
+}): PlayerDemandRecord | null {
+  return buildTrainingModeDemandRecord({
+    context: {
+      seasonId: input.context.seasonId,
+      teamId: input.context.teamId,
+      matchdayIndex: input.context.matchdayIndex ?? null,
+    },
+    player: input.player,
+    rosterRank: input.rosterRank,
+  });
+}
+
 function buildFacilityDemand(input: {
   context: DemandContext;
   player: DemandPlayerLike;
@@ -361,6 +390,7 @@ export function buildPlayerDemandsForContext(
     buildDisciplineDemand({ context, player, rosterRank }),
     buildCaptainDemand({ context, player, rosterRank, captainDemandAllowedPlayerIds }),
     buildAppearanceDemand({ context, player, rosterRank }),
+    buildTrainingModePlayerDemand({ context, player, rosterRank }),
     buildFacilityDemand({ context, player }),
   ].filter((entry): entry is PlayerDemandRecord => Boolean(entry));
 

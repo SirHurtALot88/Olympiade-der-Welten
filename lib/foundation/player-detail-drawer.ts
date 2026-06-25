@@ -37,6 +37,8 @@ import {
   type PlayerDevelopmentInsight,
   type PlayerScoutPotential,
 } from "@/lib/progression/player-potential-service";
+import { getEffectiveScoutingLevel } from "@/lib/scouting/facility-scout-pipeline-service";
+import { buildPlayerStarScoutingSnapshot } from "@/lib/scouting/player-star-scouting-bridge";
 import { buildPlayerProgressionForecast } from "@/lib/training/player-progression-forecast";
 import {
   buildPlayerDevelopmentLevelupModel,
@@ -122,6 +124,10 @@ export type PlayerDetailDrawerData = {
   traitsPositive: string[];
   traitsNegative: string[];
   scoutingLevel: number | null;
+  effectiveScoutingLevel: number | null;
+  axisStarsDisplay: string | null;
+  potentialStarsDisplay: string | null;
+  potentialGapStars: number | null;
   scoutingDisclosure: TransfermarktScoutingDisclosure | null;
   hiddenPositiveTraitCount: number;
   hiddenNegativeTraitCount: number;
@@ -1531,9 +1537,23 @@ export function buildPlayerDrawerDataFromGameState(input: {
   const rosterEntry = resolveRosterEntry(input.gameState.rosters, input.playerId, input.activePlayerId);
   const team = resolveTeam(input.gameState.teams, rosterEntry);
   const scoutingTeamId = input.manageableTeamIds?.[0] ?? null;
-  const scoutingLevel = scoutingTeamId
+  const facilityScoutingLevel = scoutingTeamId
     ? getFacilityLevel(getTeamFacilityState(input.gameState, scoutingTeamId), "scouting_office")
     : 0;
+  const effectiveScoutingLevel =
+    scoutingTeamId != null
+      ? getEffectiveScoutingLevel(input.gameState, scoutingTeamId, player.id)
+      : facilityScoutingLevel;
+  const scoutingLevel = effectiveScoutingLevel;
+  const starSnapshot =
+    scoutingLevel > 0
+      ? buildPlayerStarScoutingSnapshot({
+          gameState: input.gameState,
+          player,
+          saveId: input.gameState.season.id,
+          scoutingLevel,
+        })
+      : null;
   const attributeVisibility = resolveAttributeVisibility({
     teamId: rosterEntry?.teamId ?? team?.teamId ?? null,
     teamHumanControlled: team ? team.humanControlled !== false : null,
@@ -1685,6 +1705,10 @@ export function buildPlayerDrawerDataFromGameState(input: {
     traitsPositive: traitView.visiblePositiveTraits,
     traitsNegative: traitView.visibleNegativeTraits,
     scoutingLevel,
+    effectiveScoutingLevel,
+    axisStarsDisplay: starSnapshot?.revealedCurrentStars.displayLabel ?? null,
+    potentialStarsDisplay: starSnapshot?.revealedPotentialStars.displayLabel ?? null,
+    potentialGapStars: starSnapshot?.potentialGap ?? null,
     scoutingDisclosure: traitView.disclosure,
     hiddenPositiveTraitCount: traitView.hiddenPositiveTraitCount,
     hiddenNegativeTraitCount: traitView.hiddenNegativeTraitCount,

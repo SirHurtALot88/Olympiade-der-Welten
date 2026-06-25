@@ -20,6 +20,8 @@ import type {
 import { getTeamControlSettings } from "@/lib/foundation/team-control-settings";
 import { deriveRosterTargets } from "@/lib/foundation/roster-limits";
 import { getTeamStrategyProfile } from "@/lib/foundation/team-strategy-profiles";
+import { getScoutingWatchlistForTeam } from "@/lib/scouting/scouting-watchlist-service";
+import { getPlayerScoutCertainty } from "@/lib/scouting/facility-scout-pipeline-service";
 import { previewSeasonEndContracts } from "@/lib/contracts/contract-renewal-service";
 import { buildTransfermarktSaleFactorBreakdown } from "@/lib/market/transfermarkt-sale-factor";
 import { recommendContractOfferForPlayer } from "@/lib/market/contract-negotiation-preview";
@@ -525,6 +527,7 @@ function buildFinalBuyGate(input: {
     playersById: input.playersById,
     field: "race",
   });
+  const watchPlayerIds = buildScoutingWatchPlayerIds(input.gameState, input.team.teamId);
   const blockedCandidateIds = new Set<string>();
 
   while (picked.length < input.allowedBuyCount) {
@@ -537,6 +540,7 @@ function buildFinalBuyGate(input: {
       raceCounts,
       coverageFallback,
       pickedCount: picked.length,
+      watchPlayerIds,
     });
     const candidate = sorted[0];
     if (!candidate) break;
@@ -573,6 +577,7 @@ function buildFinalBuyGate(input: {
         classCounts,
         raceCounts,
         coverageFallback,
+        watchPlayerIds,
       }),
       cashBefore: cashRemaining,
       price,
@@ -690,6 +695,14 @@ function buildRosterTokenCounts(input: {
   return counts;
 }
 
+function buildScoutingWatchPlayerIds(gameState: GameState, teamId: string) {
+  const watchlistIds = getScoutingWatchlistForTeam(gameState, teamId).map((entry) => entry.playerId);
+  const wishlistIds = (gameState.seasonState.transferWishlist ?? [])
+    .filter((entry) => entry.teamId === teamId)
+    .map((entry) => entry.playerId);
+  return new Set([...watchlistIds, ...wishlistIds]);
+}
+
 function getDiversityAdjustedBuyScore(input: {
   candidate: AiMarketPlanBuyPlan["candidates"][number];
   gameState: GameState;
@@ -698,6 +711,7 @@ function getDiversityAdjustedBuyScore(input: {
   classCounts: Map<string, number>;
   raceCounts: Map<string, number>;
   coverageFallback: boolean;
+  watchPlayerIds: Set<string>;
 }) {
   const baseScore = input.candidate.overallRecommendationScore ?? input.candidate.score ?? 0;
   const classToken = getCandidateToken(input.candidate, input.playersById, "className");
@@ -711,7 +725,9 @@ function getDiversityAdjustedBuyScore(input: {
     (classCount >= 3 ? 2.2 : 0);
   const stableJitter = (getStableUnitHash(`${input.gameState.season.id}:${input.teamId}:${input.candidate.playerId}:buy-window-v2`) - 0.5) * 1.6;
   const coverageValueNudge = input.coverageFallback ? Math.min(1.5, Math.max(0, 6 - (input.candidate.salary ?? 6)) * 0.18) : 0;
-  return baseScore + noveltyBonus + stableJitter + coverageValueNudge - repeatPenalty;
+  const scoutingWatchBonus = input.watchPlayerIds.has(input.candidate.playerId) ? 5 : 0;
+  const intelBonus = getPlayerScoutCertainty(input.gameState, input.teamId, input.candidate.playerId) / 20;
+  return baseScore + noveltyBonus + stableJitter + coverageValueNudge + scoutingWatchBonus + intelBonus - repeatPenalty;
 }
 
 function rankFinalBuyCandidates(input: {
@@ -723,6 +739,7 @@ function rankFinalBuyCandidates(input: {
   raceCounts: Map<string, number>;
   coverageFallback: boolean;
   pickedCount: number;
+  watchPlayerIds: Set<string>;
 }) {
   return [...input.candidates].sort((left, right) => {
     const leftBase = left.overallRecommendationScore ?? left.score ?? 0;

@@ -1,6 +1,7 @@
 "use client";
 
 import OptimizedMediaImage from "@/app/foundation/OptimizedMediaImage";
+import { VeloStatOrbitRow } from "@/components/foundation/velo-ui";
 import type { HomeV2ClientProps, HomeV2TopPlayerCard } from "@/app/foundation/home-v2/home-v2-types";
 
 function formatNumber(value: number | null | undefined, digits = 1) {
@@ -57,6 +58,7 @@ export default function HomeV2Client({
   gmStoryTone,
   boardPressure,
   boardRating,
+  boardObjectives,
   nextStepLabel,
   nextStepStatus,
   nextStepDetail,
@@ -182,6 +184,18 @@ export default function HomeV2Client({
           <button type="button" className="secondary-button inline-button" onClick={onOpenHq}>
             HQ öffnen
           </button>
+          {boardObjectives.length > 0 ? (
+            <div className="home-v2-objective-list">
+              {boardObjectives.slice(0, 4).map((objective) => (
+                <article key={objective.objectiveId} className="home-v2-objective-card">
+                  <strong>{objective.label}</strong>
+                  <span className={`transfer-status-pill${objective.status === "at_risk" || objective.status === "failed" ? " is-warning" : ""}`}>
+                    {objective.currentValue ?? "—"} / {objective.targetValue ?? "—"}
+                  </span>
+                </article>
+              ))}
+            </div>
+          ) : null}
         </section>
 
         <section className="home-v2-top-players" aria-label="Top Spieler">
@@ -220,12 +234,16 @@ export default function HomeV2Client({
                       <span>PPs {formatNumber(player.playerPps, 1)}</span>
                       <span>MVS {formatNumber(player.playerMvs, 1)}</span>
                     </div>
-                    <div className="home-v2-axis-row">
-                      <span className="is-pow">P {formatNumber(player.ppPow, 1)}</span>
-                      <span className="is-spe">S {formatNumber(player.ppSpe, 1)}</span>
-                      <span className="is-men">M {formatNumber(player.ppMen, 1)}</span>
-                      <span className="is-soc">O {formatNumber(player.ppSoc, 1)}</span>
-                    </div>
+                    <VeloStatOrbitRow
+                      ariaLabel={`${player.name} Bereichswerte`}
+                      className="home-v2-player-orbit"
+                      stats={{
+                        pow: player.ppPow ?? 0,
+                        spe: player.ppSpe ?? 0,
+                        men: player.ppMen ?? 0,
+                        soc: player.ppSoc ?? 0,
+                      }}
+                    />
                     <small className="muted">
                       MW {formatMoney(player.marketValue)} · LZ {player.contractLength ?? "—"}
                     </small>

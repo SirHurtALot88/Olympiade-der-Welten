@@ -6,6 +6,7 @@ import {
   getFacilityLevel,
   getScoutingConfidence,
 } from "@/lib/facilities/facility-effects";
+import { getTeamDevelopmentTrainingBonusPct } from "@/lib/foundation/team-development-tendency";
 import { resolvePlayerEconomyContract } from "@/lib/foundation/player-economy-contract";
 import { buildPlayerEconomyCompareReport } from "@/lib/foundation/player-economy-compare-service";
 import { buildPlayerRatingContractMap } from "@/lib/foundation/player-rating-contract";
@@ -532,7 +533,9 @@ export function buildSeasonEndProgressionPreview(input: {
     const tierAfter = getProgressionRatingTier(attributeAfter);
     const baseTrainingXP = forecast?.baseTrainingXP ?? 0;
     const performanceXP = forecast?.performanceXP ?? 0;
-    const trainingFacilityXp = applyTrainingXpFacilityModifiers(baseTrainingXP, normalizedFacilities);
+    const trainingFacilityXp = applyTrainingXpFacilityModifiers(baseTrainingXP, normalizedFacilities, {
+      developmentTrainingBonusPct: team ? getTeamDevelopmentTrainingBonusPct(input.gameState, team.teamId) : 0,
+    });
     const facilityTrainingDelta = trainingFacilityXp.after - trainingFacilityXp.before;
     const spendableDevelopmentXP = Math.max(0, (forecast?.netDevelopmentXP ?? 0) + facilityTrainingDelta);
     const cost = getSeasonEndUpgradeCost({ tier: tierBefore, attribute: selectedAttribute, facilities });
