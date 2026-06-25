@@ -121,9 +121,9 @@ Checkliste-Punkt 5 für SP vorerst depriorisieren / Ziel-Schwellen anpassen (Gam
 
 ## Re-Test nach Merge
 
-**Wann:** Nach Merge von PR [#2](https://github.com/SirHurtALot88/Olympiade-der-Welten/pull/2) (TM/Verhandlung), [#3](https://github.com/SirHurtALot88/Olympiade-der-Welten/pull/3) / [#4](https://github.com/SirHurtALot88/Olympiade-der-Welten/pull/4) (Arena/Gameplay) auf `main`, lokal `main` pullen + Hard Reload.
+**Wann:** `git pull origin main` + Hard Reload. Stand 2026-06-25: **#3/#4 MERGED** (Arena/Gameplay auf `main`); **#2 OPEN** (TM/Verhandlung noch auf Branch).
 
-**Branch-Stand vor Merge:** Fixes nur auf Feature-Branches — dieser Block ist für den User nach Integration.
+**User-Aktion:** Re-Test **4** und **6** jetzt auf `main`; **2–3** nach Merge von **#2**.
 
 ### 2. Ownership / Rechte (Re-Test)
 
