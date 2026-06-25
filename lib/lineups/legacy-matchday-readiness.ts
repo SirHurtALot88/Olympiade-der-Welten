@@ -39,6 +39,46 @@ export type LegacyMatchdayReadiness = {
 
 const LEGACY_MATCHDAY_MINIMUM_PLAYERS = 7;
 
+export function getLegacyLineupDraftSideCounts(context: LegacyLineupLoadedContext) {
+  const entries = context.existingDraft?.entries ?? [];
+  const counts = {
+    d1: 0,
+    d2: 0,
+  };
+
+  for (const entry of entries) {
+    if (entry.disciplineSide === "d1") {
+      counts.d1 += 1;
+    } else if (entry.disciplineSide === "d2") {
+      counts.d2 += 1;
+    }
+  }
+
+  return counts;
+}
+
+export function isLegacyLineupDraftComplete(context: LegacyLineupLoadedContext): boolean {
+  const draft = context.existingDraft;
+  if (!draft?.entries.length) {
+    return false;
+  }
+
+  const d1DisciplineId = context.contextMeta.d1DisciplineId;
+  const d2DisciplineId = context.contextMeta.d2DisciplineId;
+  const sideCounts = getLegacyLineupDraftSideCounts(context);
+  const d1Required = d1DisciplineId ? (context.disciplinePlayerCounts[d1DisciplineId] ?? 0) : 0;
+  const d2Required = d2DisciplineId ? (context.disciplinePlayerCounts[d2DisciplineId] ?? 0) : 0;
+
+  if (d1Required > 0 && sideCounts.d1 < d1Required) {
+    return false;
+  }
+  if (d2Required > 0 && sideCounts.d2 < d2Required) {
+    return false;
+  }
+
+  return true;
+}
+
 function buildDisciplineSidePlayerCounts(entries: LegacyLineupEntryInput[], context: LegacyLineupLoadedContext) {
   const uniquePairs = Array.from(new Set(entries.map((entry) => `${entry.disciplineId}::${entry.disciplineSide}`)));
   return Object.fromEntries(

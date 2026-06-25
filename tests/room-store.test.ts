@@ -162,14 +162,16 @@ describe("room store", () => {
     expect(firstStep.ok).toBe(true);
     if (!firstStep.ok) return;
     expect(firstStep.room.state.arenaSyncState.phaseId).toBe("slots");
-    expect(firstStep.room.state.arenaSyncState.slotRevealIndex).toBe(0);
+    expect(firstStep.room.state.arenaSyncState.slotRevealIndex).toBe(1);
+    expect(firstStep.room.state.arenaSyncState.revealedSlotCountByDiscipline.d1).toBe(1);
     expect(firstStep.room.state.roomEvents.at(-1)?.type).toBe("arena_step_changed");
 
     const secondStep = advanceRoomArenaStep(created.room.roomCode, created.seat.seatToken);
     expect(secondStep.ok).toBe(true);
     if (secondStep.ok) {
       expect(secondStep.room.state.arenaSyncState.phaseId).toBe("slots");
-      expect(secondStep.room.state.arenaSyncState.slotRevealIndex).toBe(1);
+      expect(secondStep.room.state.arenaSyncState.slotRevealIndex).toBe(2);
+      expect(secondStep.room.state.arenaSyncState.revealedSlotCountByDiscipline.d1).toBe(2);
     }
   });
 

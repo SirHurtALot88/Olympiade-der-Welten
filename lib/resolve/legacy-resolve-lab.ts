@@ -22,6 +22,8 @@ export type ResolveLabTeamEntryRow = {
   baseScore: number | null;
   fatigueAdjustedScore: number | null;
   captainBonus: number | null;
+  mutatorBonus: number | null;
+  mutatorPpsBonus: number | null;
   finalPlayerScore: number | null;
   pointsAwarded: number | null;
   isCaptain: boolean;
@@ -190,6 +192,8 @@ export function buildResolveLabTeamDetails(
             baseScore: entry.baseValue,
             fatigueAdjustedScore: entry.fatigueAdjustedValue,
             captainBonus: entry.captainBonus,
+            mutatorBonus: entry.mutatorBonus ?? null,
+            mutatorPpsBonus: entry.mutatorPpsBonus ?? null,
             finalPlayerScore: entry.finalPlayerScore,
             pointsAwarded: entry.pointsAwarded ?? null,
             isCaptain: entry.isCaptain,

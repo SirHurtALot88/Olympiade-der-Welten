@@ -341,6 +341,7 @@ export function startRoomArenaSync(
     matchdayId?: string | null;
     disciplineSide?: "d1" | "d2" | "overall" | null;
     maxSlotRevealIndex?: number | null;
+    maxSlotRevealCountByDiscipline?: { d1: number; d2: number } | null;
   },
 ) {
   const room = getRoom(roomCode);
@@ -368,6 +369,7 @@ export function startRoomArenaSync(
       matchdayId: input?.matchdayId,
       disciplineSide: input?.disciplineSide,
       maxSlotRevealIndex: input?.maxSlotRevealIndex,
+      maxSlotRevealCountByDiscipline: input?.maxSlotRevealCountByDiscipline,
     }),
   };
   room.state = appendRoomEvent(room.state, "arena_started", {
@@ -419,6 +421,7 @@ export function advanceRoomArenaStep(
   seatToken: string,
   input?: {
     maxSlotRevealIndex?: number | null;
+    maxSlotRevealCountByDiscipline?: { d1: number; d2: number } | null;
     force?: boolean | null;
   },
 ) {
@@ -443,6 +446,7 @@ export function advanceRoomArenaStep(
       arenaState: room.state.arenaSyncState,
       participantId,
       maxSlotRevealIndex: input?.maxSlotRevealIndex,
+      maxSlotRevealCountByDiscipline: input?.maxSlotRevealCountByDiscipline,
     }),
   };
   room.state = appendRoomEvent(room.state, "arena_step_changed", {

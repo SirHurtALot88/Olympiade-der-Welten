@@ -1,0 +1,121 @@
+import type { GameState, LineupDraft, LineupDraftEntry } from "@/lib/data/olyDataTypes";
+
+export type MatchdayLineupSideRequirements = {
+  d1Required: number;
+  d2Required: number;
+  totalRequired: number;
+};
+
+export type MatchdayLineupSideCounts = {
+  d1: number;
+  d2: number;
+  total: number;
+};
+
+export function getCurrentMatchdayDisciplineSchedule(gameState: GameState) {
+  return (
+    (gameState.seasonState.disciplineSchedule ?? []).find(
+      (entry) => entry.seasonId === gameState.season.id && entry.matchdayId === gameState.matchdayState.matchdayId,
+    ) ?? null
+  );
+}
+
+export function getMatchdayLineupSideRequirements(gameState: GameState): MatchdayLineupSideRequirements {
+  const schedule = getCurrentMatchdayDisciplineSchedule(gameState);
+  const d1Required = schedule?.discipline1?.playerCount ?? 0;
+  const d2Required = schedule?.discipline2?.playerCount ?? 0;
+  return {
+    d1Required,
+    d2Required,
+    totalRequired: d1Required + d2Required,
+  };
+}
+
+export function getTeamMatchdayLineupDraft(gameState: GameState, teamId: string): LineupDraft | null {
+  return (
+    (gameState.seasonState.lineupDrafts ?? []).find(
+      (draft) =>
+        draft.seasonId === gameState.season.id &&
+        draft.matchdayId === gameState.matchdayState.matchdayId &&
+        draft.teamId === teamId,
+    ) ?? null
+  );
+}
+
+export function getLineupDraftSideCounts(entries: LineupDraftEntry[]): MatchdayLineupSideCounts {
+  let d1 = 0;
+  let d2 = 0;
+  for (const entry of entries) {
+    if (entry.disciplineSide === "d1") {
+      d1 += 1;
+    } else if (entry.disciplineSide === "d2") {
+      d2 += 1;
+    }
+  }
+  return { d1, d2, total: d1 + d2 };
+}
+
+export function isTeamMatchdayLineupComplete(
+  gameState: GameState,
+  teamId: string,
+  draft: LineupDraft | null = getTeamMatchdayLineupDraft(gameState, teamId),
+): boolean {
+  if (!draft?.entries.length) {
+    return false;
+  }
+
+  const { d1Required, d2Required, totalRequired } = getMatchdayLineupSideRequirements(gameState);
+  const counts = getLineupDraftSideCounts(draft.entries);
+
+  if (d1Required > 0 && counts.d1 < d1Required) {
+    return false;
+  }
+  if (d2Required > 0 && counts.d2 < d2Required) {
+    return false;
+  }
+  if (totalRequired > 0) {
+    return true;
+  }
+
+  return draft.entries.length > 0;
+}
+
+export function getTeamMatchdayLineupOpenSlots(
+  gameState: GameState,
+  teamId: string,
+  draft: LineupDraft | null = getTeamMatchdayLineupDraft(gameState, teamId),
+): number {
+  const { d1Required, d2Required, totalRequired } = getMatchdayLineupSideRequirements(gameState);
+  if (totalRequired <= 0) {
+    return draft?.entries.length ? 0 : 1;
+  }
+
+  const counts = getLineupDraftSideCounts(draft?.entries ?? []);
+  return Math.max(d1Required - counts.d1, 0) + Math.max(d2Required - counts.d2, 0);
+}
+
+export function isTeamMatchdayLineupSubmitted(draft: LineupDraft | null | undefined) {
+  return draft?.status === "submitted" || draft?.status === "locked" || draft?.status === "resolved";
+}
+
+export function mergeTeamLineupDraftIntoGameState(
+  gameState: GameState,
+  draft: LineupDraft,
+): GameState {
+  const lineupDrafts = [...(gameState.seasonState.lineupDrafts ?? [])];
+  const draftIndex = lineupDrafts.findIndex(
+    (entry) => entry.seasonId === draft.seasonId && entry.matchdayId === draft.matchdayId && entry.teamId === draft.teamId,
+  );
+  if (draftIndex >= 0) {
+    lineupDrafts[draftIndex] = draft;
+  } else {
+    lineupDrafts.push(draft);
+  }
+  return {
+    ...gameState,
+    seasonState: {
+      ...gameState.seasonState,
+      lineupDrafts,
+    },
+  };
+}

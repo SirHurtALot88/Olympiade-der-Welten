@@ -8,9 +8,19 @@ export default function InboxV2Client({
   items,
   selectedItemId,
   onSelectItem,
-  onOpenClassicInbox,
+  teamLabel,
+  openCount = 0,
+  criticalCount = 0,
+  categoryFilter = "ALL",
+  onCategoryFilterChange,
+  includeDone = false,
+  onIncludeDoneChange,
+  includeDismissed = false,
+  onIncludeDismissedChange,
   onOpenHomeV2,
   onRunChoice,
+  onMarkDone,
+  onDismiss,
 }: InboxV2ClientProps) {
   const selectedItem = useMemo(
     () => items.find((item) => item.id === selectedItemId) ?? items[0] ?? null,
@@ -21,18 +31,52 @@ export default function InboxV2Client({
     <div className="inbox-v2-shell" data-testid="foundation-inbox-v2" id="foundation-inbox-v2">
       <header className="inbox-v2-header">
         <div>
-          <span className="eyebrow">Inbox V2</span>
+          <span className="eyebrow">Inbox</span>
           <h2>Entscheidungen & Hinweise</h2>
+          {teamLabel ? <p className="muted">{teamLabel}</p> : null}
         </div>
         <div className="inbox-v2-actions">
-          <button type="button" className="secondary-button" onClick={onOpenHomeV2}>
-            Home V2
-          </button>
-          <button type="button" className="secondary-button" onClick={onOpenClassicInbox}>
-            Inbox Classic
-          </button>
+          <span className="pill">{openCount} offen</span>
+          {criticalCount > 0 ? <span className="pill is-warning">{criticalCount} kritisch</span> : null}
+          {onOpenHomeV2 ? (
+            <button type="button" className="secondary-button" onClick={onOpenHomeV2}>
+              Home V2
+            </button>
+          ) : null}
         </div>
       </header>
+
+      {onCategoryFilterChange ? (
+        <div className="inbox-v2-filters foundation-filter-grid">
+          <label className="filter-field">
+            <span>Kategorie</span>
+            <select className="input" value={categoryFilter} onChange={(event) => onCategoryFilterChange(event.target.value)}>
+              <option value="ALL">Alle Kategorien</option>
+              <option value="task">Aufgaben</option>
+              <option value="warning">Warnungen</option>
+              <option value="news">News</option>
+              <option value="result">Results</option>
+              <option value="finance">Finanzen</option>
+              <option value="transfer">Transfers</option>
+              <option value="training">Training</option>
+              <option value="contract">Verträge</option>
+              <option value="facility">Facilities</option>
+            </select>
+          </label>
+          {onIncludeDoneChange ? (
+            <label className="filter-field checkbox-field">
+              <input type="checkbox" checked={includeDone} onChange={(event) => onIncludeDoneChange(event.target.checked)} />
+              <span>Erledigte anzeigen</span>
+            </label>
+          ) : null}
+          {onIncludeDismissedChange ? (
+            <label className="filter-field checkbox-field">
+              <input type="checkbox" checked={includeDismissed} onChange={(event) => onIncludeDismissedChange(event.target.checked)} />
+              <span>Ausgeblendete anzeigen</span>
+            </label>
+          ) : null}
+        </div>
+      ) : null}
 
       <div className="inbox-v2-layout">
         <aside className="inbox-v2-list" aria-label="Inbox Liste">
@@ -73,6 +117,20 @@ export default function InboxV2Client({
                       <small>{choice.detail}</small>
                     </button>
                   ))}
+                </div>
+              ) : null}
+              {selectedItem.status === "open" && (onMarkDone || onDismiss) ? (
+                <div className="inbox-v2-detail-actions">
+                  {onMarkDone ? (
+                    <button type="button" className="secondary-button inline-button" onClick={() => onMarkDone(selectedItem.id)}>
+                      Erledigt
+                    </button>
+                  ) : null}
+                  {onDismiss ? (
+                    <button type="button" className="secondary-button inline-button" onClick={() => onDismiss(selectedItem.id)}>
+                      Ausblenden
+                    </button>
+                  ) : null}
                 </div>
               ) : null}
             </>

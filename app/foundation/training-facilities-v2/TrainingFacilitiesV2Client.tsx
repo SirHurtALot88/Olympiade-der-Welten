@@ -16,82 +16,12 @@ import {
 import type { ProgressionClassName } from "@/lib/training/class-progression-config";
 import { formatTransfermarktCurrency } from "@/lib/market/transfermarkt-formatting-contract";
 import type { PlayerTrainingMode } from "@/lib/training/training-plan-types";
-
-type TrainingModeOption = {
-  value: PlayerTrainingMode;
-  label: string;
-  note: string;
-  fatigueRisk: "niedrig" | "mittel" | "hoch";
-};
+import { TrainingPlayerLane } from "@/app/foundation/training-facilities-v2/training-view-shared";
+import type { TrainingModeOption, TrainingPlayerRowView } from "@/app/foundation/training-facilities-v2/training-view-types";
 
 type AttributeOption = {
   value: PlayerGeneratorAttributeName;
   label: string;
-};
-
-type TrainingPlayerRowView = {
-  entryId: string;
-  roleTag: string | null;
-  player: {
-    id: string;
-    name: string;
-    className: string;
-    portraitUrl?: string | null;
-    portraitPath?: string | null;
-    coreStats: {
-      pow: number;
-      spe: number;
-      men: number;
-      soc: number;
-    };
-  };
-  mode: PlayerTrainingMode;
-  trainingClass: string;
-  modeConfig: {
-    label: string;
-    note: string;
-    fatigueRisk: "niedrig" | "mittel" | "hoch";
-  };
-  appearances: number;
-  playerMvs: number | null;
-  playerPps: number | null;
-  trainingXp: number;
-  performanceXp: number;
-  totalXp: number;
-  upgradeEstimate: string;
-  fatigueWarning: string;
-  recoveryForecast: {
-    before: number;
-    after: number;
-    modifierPct: number;
-  };
-  organicForecast: {
-    classBefore: string;
-    classAfter: string;
-    potentialRating: number | null;
-    potentialTrainingMultiplier: number;
-    trainingSetpoints: number;
-    performanceSetpoints: number;
-    netSetpoints: number;
-    fatigueLoad: number;
-    topGains: Array<{ attribute: string; before: number; after: number; delta: number }>;
-    topLosses: Array<{ attribute: string; before: number; after: number; delta: number }>;
-  };
-  forecast: {
-    netDevelopmentXP: number;
-    trainingFormTier: string;
-    regressionRisk: string | null;
-    regressionPressure: number;
-    appearanceXP: number;
-    mvsXP: number;
-    ppsBonusXP: number;
-    topPlayerXP: number;
-    highlightXP: number;
-    traitModifierPct: number;
-    fatigueStrain: {
-      label: "niedrig" | "mittel" | "hoch";
-    };
-  };
 };
 
 type TrainingFacilityRowView = {
@@ -217,14 +147,14 @@ type TrainingFacilitiesV2ClientProps = {
   source: "sqlite" | "prisma";
   managementLocked?: boolean;
   managementLockedReason?: string | null;
-  teams: Team[];
   selectedTeam: Team;
   selectedTeamControlMode?: string | null;
   seasonLabel: string;
   sponsorTotal: number | null;
-  onSelectTeam: (teamId: string) => void;
   onOpenTeams?: (() => void) | null;
+  onOpenTraining?: (() => void) | null;
   onOpenPlayerDetails?: (payload: { playerId: string; activePlayerId?: string | null }) => void;
+  layoutMode?: "facilities" | "combined";
   summary: {
     cashCurrent: number;
     upkeepTotal: number;
@@ -583,14 +513,14 @@ export default function TrainingFacilitiesV2Client({
   source,
   managementLocked = false,
   managementLockedReason = null,
-  teams,
   selectedTeam,
   selectedTeamControlMode,
   seasonLabel,
   sponsorTotal,
-  onSelectTeam,
   onOpenTeams,
+  onOpenTraining,
   onOpenPlayerDetails,
+  layoutMode = "facilities",
   summary,
   developmentFilter,
   developmentSummary,
@@ -638,6 +568,8 @@ export default function TrainingFacilitiesV2Client({
   const readOnly = source === "prisma" || managementLocked;
   const trainingModeReadOnly = false;
   const showLegacySeasonEndXpPanel = false;
+  const showPlayerLane = layoutMode === "combined";
+  const showFacilitiesLane = layoutMode === "facilities" || layoutMode === "combined";
   const facilityLaneActionReason =
     readOnly
       ? "Nur eigene Teams duerfen Gebaeude bauen oder warten."
@@ -753,7 +685,11 @@ export default function TrainingFacilitiesV2Client({
     : null;
 
   return (
-    <section className="training-v2-shell">
+    <section
+      className={`training-v2-shell${layoutMode === "facilities" ? " is-facilities-only" : ""}`}
+      data-testid="foundation-training-facilities-v2"
+      id="foundation-training-facilities-v2"
+    >
       <header className="training-v2-hero">
         <div className="training-v2-hero-main">
           <div className="training-v2-team">
@@ -769,12 +705,18 @@ export default function TrainingFacilitiesV2Client({
               <div className="training-v2-team-logo training-v2-team-logo-fallback">{teamLogo.initials}</div>
             )}
             <div className="training-v2-team-copy">
-              <span className="training-v2-kicker">Training & Gebaeude</span>
+              <span className="training-v2-kicker">{showPlayerLane ? "Training & Gebaeude" : "Gebaeude & Infrastruktur"}</span>
               <TooltipHeading
                 as="h2"
-                tooltip="V2 baut den Trainingsscreen als Steuerzentrale: Spielerentwicklung zuerst, Gebaeude rechts im Blick und organisches Wachstum sichtbar."
+                tooltip={
+                  showPlayerLane
+                    ? "V2 baut den Trainingsscreen als Steuerzentrale: Spielerentwicklung zuerst, Gebaeude rechts im Blick und organisches Wachstum sichtbar."
+                    : "Facilities V2: Upgrade, Wartung, Unterhalt und Wirkung direkt am aktiven Spielstand."
+                }
               >
-                Entwicklung steuern, Gebaeude lesen, Wachstum sauber planen.
+                {showPlayerLane
+                  ? "Entwicklung steuern, Gebaeude lesen, Wachstum sauber planen."
+                  : "Gebaeude ausbauen, warten und ihre Wirkung auf Training und Recovery lesen."}
               </TooltipHeading>
               <p>
                 {selectedTeam.shortCode} · {selectedTeamControlMode ?? "manual"} · {seasonLabel}
@@ -782,17 +724,17 @@ export default function TrainingFacilitiesV2Client({
             </div>
           </div>
           <div className="training-v2-hero-actions">
-            <label className="filter-field training-v2-team-select">
-              <span>Fokus-Team</span>
-              <select className="input" value={selectedTeam.teamId} onChange={(event) => onSelectTeam(event.target.value)}>
-                {teams.map((team) => (
-                  <option key={team.teamId} value={team.teamId}>
-                    {team.shortCode} · {team.name}
-                  </option>
-                ))}
-              </select>
-            </label>
+            <div className="filter-field training-v2-team-select">
+              <span>Aktives Team</span>
+              <strong>{selectedTeam.shortCode} · {selectedTeam.name}</strong>
+              <small className="muted">Wechsel oben in der Foundation-Leiste.</small>
+            </div>
             <div className="training-v2-hero-button-row">
+              {!showPlayerLane && onOpenTraining ? (
+                <button className="secondary-button inline-button" type="button" onClick={() => onOpenTraining?.()}>
+                  Training oeffnen
+                </button>
+              ) : null}
               <button className="secondary-button inline-button" type="button" onClick={() => onOpenTeams?.()}>
                 Team ansehen
               </button>
@@ -871,179 +813,26 @@ export default function TrainingFacilitiesV2Client({
         </div>
       </header>
 
-      <section className="training-v2-workspace">
-        <div className="training-v2-lane training-v2-lane-training">
-          <div className="training-v2-section-head">
-            <div>
-              <span className="training-v2-kicker">Spielertraining</span>
-              <strong>Wer steigt jetzt, wer kippt spaeter?</strong>
-            </div>
-            <span className="pill">
-              {playerRows.length}/{allPlayerCount}
-            </span>
+      <section className={`training-v2-workspace${showFacilitiesLane && !showPlayerLane ? " is-facilities-only" : ""}`}>
+        {showPlayerLane ? (
+          <div className="training-v2-lane training-v2-lane-training">
+            <TrainingPlayerLane
+              playerRows={playerRows}
+              allPlayerCount={allPlayerCount}
+              developmentFilter={developmentFilter}
+              developmentSummary={developmentSummary}
+              onSetDevelopmentFilter={onSetDevelopmentFilter}
+              trainingModeOptions={trainingModeOptions}
+              trainingClassOptions={trainingClassOptions}
+              onSetTrainingMode={onSetTrainingMode}
+              onSetTrainingClass={onSetTrainingClass}
+              onOpenPlayerDetails={onOpenPlayerDetails}
+              trainingModeReadOnly={trainingModeReadOnly}
+            />
           </div>
+        ) : null}
 
-          <div className="training-v2-filter-row">
-            {([
-              { id: "all" as const, label: "Alle", detail: "ganzer Kader" },
-              { id: "growth" as const, label: "Steigt", detail: "lohnt sich jetzt" },
-              { id: "stable" as const, label: "Stabil", detail: "Modus pruefen" },
-              { id: "regression" as const, label: "Risiko", detail: "zuerst sichern" },
-            ]).map((filter) => (
-              <button
-                key={filter.id}
-                className={`training-v2-filter-card${developmentFilter === filter.id ? " is-active" : ""}`}
-                type="button"
-                onClick={() => onSetDevelopmentFilter(filter.id)}
-              >
-                <span>{filter.label}</span>
-                <strong>{developmentSummary[filter.id]}</strong>
-                <small>{filter.detail}</small>
-              </button>
-            ))}
-          </div>
-
-          <div className="training-v2-player-list">
-            {playerRows.map((row) => {
-              const portrait = getPortraitModel(row.player);
-              const tone = getDevelopmentTone(row);
-              return (
-                <article className={`training-v2-player-card is-${tone}`} id={`training-player-${row.player.id}`} key={row.entryId}>
-                  <button
-                    className="training-v2-player-head"
-                    type="button"
-                    onClick={() => onOpenPlayerDetails?.({ playerId: row.player.id, activePlayerId: row.entryId })}
-                  >
-                    <div className="training-v2-player-media">
-                      {portrait.src ? (
-                        <OptimizedMediaImage
-                          src={portrait.src}
-                          alt={row.player.name}
-                          width={78}
-                          height={78}
-                          className="training-v2-player-image"
-                        />
-                      ) : (
-                        <div className="training-v2-player-image training-v2-player-image-fallback">{portrait.initials}</div>
-                      )}
-                    </div>
-                    <div className="training-v2-player-copy">
-                      <strong className="training-v2-clickable">{row.player.name}</strong>
-                      <p>
-                        <ClassColorChip className={row.player.className} /> · {row.roleTag ?? "ohne Rolle"}
-                      </p>
-                      <div className="training-v2-axis-row">
-                        <TrainingAxisPill axis="pow" value={row.player.coreStats.pow} />
-                        <TrainingAxisPill axis="spe" value={row.player.coreStats.spe} />
-                        <TrainingAxisPill axis="men" value={row.player.coreStats.men} />
-                        <TrainingAxisPill axis="soc" value={row.player.coreStats.soc} />
-                      </div>
-                    </div>
-                    <div className="training-v2-player-badge-row">
-                      <span className={`training-v2-badge is-${tone}`}>
-                        {tone === "growth" ? "steigt" : tone === "regression" ? "kann fallen" : "stabil"}
-                      </span>
-                    </div>
-                  </button>
-
-	                  <div className="training-v2-player-metrics">
-	                    <div>
-	                      <span>Stat Forecast</span>
-	                      <strong className={row.organicForecast.netSetpoints >= 0 ? "text-positive" : "text-negative"}>
-	                        {row.organicForecast.netSetpoints > 0 ? "+" : ""}
-	                        {formatLocaleNumber(row.organicForecast.netSetpoints, 1)}
-	                      </strong>
-	                    </div>
-	                    <div>
-	                      <span>Training</span>
-	                      <strong>+{formatLocaleNumber(row.organicForecast.trainingSetpoints, 1)}</strong>
-	                    </div>
-	                    <div>
-	                      <span>Potential</span>
-	                      <strong>{row.organicForecast.potentialRating ?? "—"} · x{formatLocaleNumber(row.organicForecast.potentialTrainingMultiplier, 2)}</strong>
-	                    </div>
-	                    <div>
-	                      <span>Fatigue</span>
-	                      <strong>+{formatLocaleNumber(row.organicForecast.fatigueLoad, 1)}</strong>
-	                    </div>
-	                  </div>
-
-	                  <div className="training-v2-plan-controls">
-	                  <div className="training-v2-mode-strip" aria-label={`${row.player.name} Trainingsmodus`}>
-	                    {trainingModeOptions.map((option) => (
-	                      <button
-                        key={`${row.player.id}-${option.value}`}
-                        className={`training-v2-mode-chip${row.mode === option.value ? " is-active" : ""}`}
-                        type="button"
-                        disabled={trainingModeReadOnly}
-                        onClick={() => onSetTrainingMode(row.player.id, option.value)}
-                      >
-                        {option.label}
-	                      </button>
-	                    ))}
-	                  </div>
-	                    <label className="filter-field training-v2-class-select">
-	                      <span>Trainingsklasse</span>
-	                      <select
-	                        className="input"
-	                        value={row.trainingClass}
-	                        disabled={trainingModeReadOnly}
-	                        onChange={(event) => onSetTrainingClass(row.player.id, event.target.value)}
-	                      >
-	                        {trainingClassOptions.map((option) => (
-	                          <option key={option.value} value={option.value}>
-	                            {option.label}
-	                          </option>
-	                        ))}
-	                      </select>
-	                    </label>
-	                  </div>
-
-	                  <div className="training-v2-stat-forecast">
-	                    {row.organicForecast.topGains.map((entry) => (
-	                      <span key={`${row.player.id}-gain-${entry.attribute}`}>
-	                        <small>{entry.attribute}</small>
-	                        <strong>
-	                          {formatLocaleNumber(entry.before, 1)} → {formatLocaleNumber(entry.after, 1)}
-	                        </strong>
-	                        <em>+{formatLocaleNumber(entry.delta, 1)}</em>
-	                      </span>
-	                    ))}
-	                    {row.organicForecast.topLosses.map((entry) => (
-	                      <span className="is-risk" key={`${row.player.id}-loss-${entry.attribute}`}>
-	                        <small>{entry.attribute}</small>
-	                        <strong>
-	                          {formatLocaleNumber(entry.before, 1)} → {formatLocaleNumber(entry.after, 1)}
-	                        </strong>
-	                        <em>{formatLocaleNumber(entry.delta, 1)}</em>
-	                      </span>
-	                    ))}
-	                  </div>
-
-	                  <div className="training-v2-player-foot">
-	                    <small>{row.modeConfig.note}</small>
-	                    <small>
-	                      Klasse {row.organicForecast.classBefore} → {row.organicForecast.classAfter} · Training {row.trainingClass}
-	                    </small>
-	                    <small>
-	                      Performance +{formatLocaleNumber(row.organicForecast.performanceSetpoints, 1)} · Steigerungsstufe {row.forecast.trainingFormTier}
-	                    </small>
-	                    <small>
-	                      Risiko {row.forecast.fatigueStrain.label} · {row.fatigueWarning}
-	                    </small>
-	                  </div>
-                </article>
-              );
-            })}
-            {playerRows.length === 0 ? (
-              <div className="training-v2-empty">
-                <strong>Keine Spieler im aktuellen Filter.</strong>
-                <p>Wechsle den Entwicklungsfokus oder waehle ein anderes Team.</p>
-              </div>
-            ) : null}
-          </div>
-        </div>
-
+        {showFacilitiesLane ? (
         <aside className="training-v2-lane training-v2-lane-facilities">
           <div className="training-v2-section-head">
             <div>
@@ -1360,6 +1149,7 @@ export default function TrainingFacilitiesV2Client({
             ) : null}
           </div>
         </aside>
+        ) : null}
       </section>
 
       {facilityDialog && selectedDialogFacility ? (

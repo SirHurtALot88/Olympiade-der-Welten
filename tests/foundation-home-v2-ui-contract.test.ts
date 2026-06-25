@@ -52,9 +52,9 @@ describe("foundation ui v2 roadmap contract", () => {
     expect(fileText).toContain('| "facilitiesOverviewV2"');
     expect(fileText).toContain('| "scoutingCenterV2"');
     expect(fileText).toContain('| "inboxV2"');
-    expect(fileText).toContain("<FacilitiesOverviewV2Client");
     expect(fileText).toContain("<ScoutingCenterV2Client");
     expect(fileText).toContain("<InboxV2Client");
+    expect(fileText).toContain('label: "Inbox"');
     expect(fileText).toContain('label: "Scouting Hub"');
     expect(fileText).toContain("getTransfermarktScoutingVisibilityBuckets");
   });
@@ -80,12 +80,12 @@ describe("foundation ui v2 roadmap contract", () => {
     expect(fileText).toContain('data-testid="foundation-scouting-hub-v2"');
   });
 
-  it("keeps inbox v2 as master-detail with classic fallback", async () => {
+  it("keeps inbox v2 as the canonical compact inbox", async () => {
     const fileText = await fs.readFile(inboxV2Path, "utf8");
 
-    expect(fileText).toContain("Inbox V2");
-    expect(fileText).toContain("inbox-v2-layout");
-    expect(fileText).toContain("Inbox Classic");
     expect(fileText).toContain('data-testid="foundation-inbox-v2"');
+    expect(fileText).toContain("inbox-v2-layout");
+    expect(fileText).toContain("Entscheidungen & Hinweise");
+    expect(fileText).not.toContain("Inbox Classic");
   });
 });

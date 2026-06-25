@@ -180,12 +180,13 @@ export function ensureSocketServer(httpServer: HttpServer) {
       io.to(result.room.roomCode).emit("roomState", result.room.state);
     });
 
-    socket.on("startRoomArena", ({ roomCode, seatToken, seasonId, matchdayId, disciplineSide, maxSlotRevealIndex }) => {
+    socket.on("startRoomArena", ({ roomCode, seatToken, seasonId, matchdayId, disciplineSide, maxSlotRevealIndex, maxSlotRevealCountByDiscipline }) => {
       const result = startRoomArenaSync(roomCode, seatToken, {
         seasonId,
         matchdayId,
         disciplineSide,
         maxSlotRevealIndex,
+        maxSlotRevealCountByDiscipline,
       });
       if (!result.ok) {
         emitRoomError(io, socket.id, result.error, roomCode);
@@ -207,8 +208,8 @@ export function ensureSocketServer(httpServer: HttpServer) {
       io.to(result.room.roomCode).emit("roomState", result.room.state);
     });
 
-    socket.on("advanceRoomArenaStep", ({ roomCode, seatToken, maxSlotRevealIndex, force }) => {
-      const result = advanceRoomArenaStep(roomCode, seatToken, { maxSlotRevealIndex, force });
+    socket.on("advanceRoomArenaStep", ({ roomCode, seatToken, maxSlotRevealIndex, maxSlotRevealCountByDiscipline, force }) => {
+      const result = advanceRoomArenaStep(roomCode, seatToken, { maxSlotRevealIndex, maxSlotRevealCountByDiscipline, force });
       if (!result.ok) {
         emitRoomError(io, socket.id, result.error, roomCode);
         return;

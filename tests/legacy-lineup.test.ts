@@ -5,6 +5,9 @@ import {
   calculateMutatorModifierForSide,
   calculateMvpForcedMutatorModifierForSide,
   calculatePerPlayerFormModifier,
+  buildMatchdayMutatorTraitsBySide,
+  formatCompactFormCardLabel,
+  rollMatchdayMutatorTraitsForSide,
 } from "@/lib/lineups/legacy-lineup-modifiers";
 import { scoreLegacyLineupDisciplineSide } from "@/lib/lineups/legacy-score-engine";
 import { validateLegacyLineupContext } from "@/lib/lineups/legacy-lineup-validator";
@@ -102,6 +105,7 @@ describe("legacy lineup form-card modifiers", () => {
     });
 
     expect(result.formModifier).toBe(80);
+    expect(result.formCardLabel).toBe("Y+8×2");
     expect(
       calculatePerPlayerFormModifier({
         formModifier: result.formModifier,
@@ -119,6 +123,57 @@ describe("legacy lineup form-card modifiers", () => {
         requiredPlayers: 5,
       }),
     ).toBe(16);
+  });
+
+  it("formats selected form cards as compact color codes without player names", () => {
+    expect(formatCompactFormCardLabel({ color: "yellow", value: -4 })).toBe("Y-4");
+    expect(formatCompactFormCardLabel({ color: "green", value: 8 }, true)).toBe("G+8×2");
+
+    const result = calculateFormModifierForSide({
+      modifiers: {
+        d1: {
+          primaryFormCardId: "card-neg",
+          secondaryFormCardId: "card-pos",
+          mutatorTrait1: null,
+          mutatorTrait2: null,
+          teamPowerId: null,
+          intensity: "normal",
+        },
+        d2: {
+          primaryFormCardId: null,
+          secondaryFormCardId: null,
+          mutatorTrait1: null,
+          mutatorTrait2: null,
+          teamPowerId: null,
+          intensity: "normal",
+        },
+      },
+      disciplineSide: "d1",
+      disciplineColor: "green",
+      playerCount: 4,
+      formCards: [
+        {
+          id: "card-neg",
+          playerId: "player-1",
+          playerName: "Hidden Name",
+          color: "yellow",
+          value: -4,
+          isUsed: false,
+          usedByLineupId: null,
+        },
+        {
+          id: "card-pos",
+          playerId: "player-2",
+          playerName: "Also Hidden",
+          color: "red",
+          value: 8,
+          isUsed: false,
+          usedByLineupId: null,
+        },
+      ],
+    });
+
+    expect(result.formCardLabel).toBe("Y-4 · R+8");
   });
 });
 
@@ -234,6 +289,64 @@ describe("legacy lineup score engine", () => {
     expect(result.playerMutatorPpsBonuses["bench-player"]).toBeUndefined();
     expect(result.mutatorSlots[0]?.hitCount).toBe(1);
     expect(result.mutatorSlots[1]?.hitCount).toBe(0);
+  });
+
+  it("rolls the same matchday mutator traits for every team on a discipline side", () => {
+    const scope = {
+      saveId: "save-1",
+      seasonId: "season-1",
+      matchdayId: "md-1",
+      disciplineSide: "d1" as const,
+      disciplineId: "football",
+    };
+    const sharedTraits = rollMatchdayMutatorTraitsForSide(scope);
+    const rosterPlayers = [
+      {
+        id: "player-1",
+        name: "Player 1",
+        traitsPositive: [sharedTraits[0]],
+        traitsNegative: [],
+        coreStats: { pow: 1, spe: 1, men: 1, soc: 1 },
+      },
+      {
+        id: "player-2",
+        name: "Player 2",
+        traitsPositive: [sharedTraits[1]],
+        traitsNegative: [],
+        coreStats: { pow: 1, spe: 1, men: 1, soc: 1 },
+      },
+    ];
+    const modifiers = {
+      d1: { primaryFormCardId: null, secondaryFormCardId: null, mutatorTrait1: null, mutatorTrait2: null },
+      d2: { primaryFormCardId: null, secondaryFormCardId: null, mutatorTrait1: null, mutatorTrait2: null },
+    };
+
+    const teamA = calculateMutatorModifierForSide({
+      disciplineSide: "d1",
+      entries: [{ playerId: "player-1" }],
+      rosterPlayers,
+      modifiers,
+      matchdayMutatorTraits: sharedTraits,
+    });
+    const teamB = calculateMutatorModifierForSide({
+      disciplineSide: "d1",
+      entries: [{ playerId: "player-2" }],
+      rosterPlayers,
+      modifiers,
+      matchdayMutatorTraits: sharedTraits,
+    });
+
+    expect(teamA.mutatorText).toBe(teamB.mutatorText);
+    expect(teamA.mutatorSlots.map((slot) => slot.label)).toEqual(teamB.mutatorSlots.map((slot) => slot.label));
+    expect(teamA.mutatorModifier).toBe(6);
+    expect(teamB.mutatorModifier).toBe(6);
+    expect(buildMatchdayMutatorTraitsBySide({
+      saveId: scope.saveId,
+      seasonId: scope.seasonId,
+      matchdayId: scope.matchdayId,
+      d1DisciplineId: scope.disciplineId,
+      d2DisciplineId: "other",
+    }).d1).toEqual(sharedTraits);
   });
 
   it("uses real active player traits for forced MVP mutators instead of fake labels", () => {

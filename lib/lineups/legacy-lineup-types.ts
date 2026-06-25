@@ -157,6 +157,7 @@ export type LegacyLineupScoreResult = {
   moraleModifier?: number | null;
   intensity?: "conserve" | "normal" | "push" | null;
   intensityModifier?: number | null;
+  slotRoleModifier?: number | null;
   captainStatus?: "mapped" | "missing_source";
   captainBonusTotal?: number | null;
   formCardsAvailable?: number | null;
@@ -433,6 +434,7 @@ export type LegacyLineupLoadedContext = LegacyLineupRepositoryContext & {
     perDisciplineSideMaxCaptains: number;
     sourceStatus: string;
   };
+  contextLoadMode?: "sqlite_local" | "prisma_reference";
   formCardSource?: LegacyModifierSourceSummary;
   mutatorSource?: LegacyModifierSourceSummary;
   teamPowerSource?: LegacyModifierSourceSummary;

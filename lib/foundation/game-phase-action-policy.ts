@@ -1,5 +1,10 @@
 import type { GamePhase, GameState } from "@/lib/data/olyDataTypes";
-import { isTransferMarketPhaseOpen, getTransferWindowStatus } from "@/lib/market/transfer-window-policy";
+import {
+  getTransferWindowStatus,
+  isTransferBuyPhaseOpen,
+  isTransferMarketPhaseOpen,
+  isTransferSellPhaseOpen,
+} from "@/lib/market/transfer-window-policy";
 
 export type GamePhaseAction =
   | "buy_players"
@@ -71,9 +76,13 @@ export function evaluateGamePhaseAction(gameState: GameState, action: GamePhaseA
   let allowed = false;
   let reason: string | null = null;
 
-  if (
-    action === "buy_players" ||
-    action === "sell_players" ||
+  if (action === "buy_players") {
+    allowed = isTransferBuyPhaseOpen(gameState);
+    reason = allowed ? null : `phase_blocked:${action}:${phase}`;
+  } else if (action === "sell_players") {
+    allowed = isTransferSellPhaseOpen(gameState);
+    reason = allowed ? null : `phase_blocked:${action}:${phase}`;
+  } else if (
     action === "renew_contract" ||
     action === "set_training" ||
     action === "facility_apply"

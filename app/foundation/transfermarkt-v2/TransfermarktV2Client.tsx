@@ -64,6 +64,7 @@ type TransfermarktV2ClientProps = {
   onToggleWishlist?: ((item: TransfermarktFreeAgentItem) => void) | null;
   onRemoveWishlist?: ((playerId: string) => void) | null;
   onBuyCompleted?: ((teamId: string) => Promise<void> | void) | null;
+  onSell?: ((payload: { activePlayerId: string; playerId: string; playerName: string; className: string; race: string | null; portraitUrl: string | null }) => void) | null;
 };
 
 type MarketFeedResponse = TransfermarktReadResult & {
@@ -1058,6 +1059,7 @@ export default function TransfermarktV2Client({
   onToggleWishlist,
   onRemoveWishlist,
   onBuyCompleted,
+  onSell,
 }: TransfermarktV2ClientProps) {
   const roomContextRef = useRef(readFoundationRoomContextFromLocation());
   const marketAbortRef = useRef<AbortController | null>(null);
@@ -1090,7 +1092,7 @@ export default function TransfermarktV2Client({
     return ids;
   }, [effectiveOwnerId, manageableTeamIds, teamControlModesByTeamId, teamControlOwnersByTeamId]);
   const wishlistPlayerIdSet = useMemo(() => new Set(wishlistPlayerIds), [wishlistPlayerIds]);
-  const [selectedTeamId, setSelectedTeamId] = useState<string>(defaultTeamId ?? "");
+  const selectedTeamId = defaultTeamId ?? "";
   const [search, setSearch] = useState("");
   const deferredSearch = useDeferredValue(search);
   const [sortMode, setSortMode] = useState<MarketSortMode>("potential");
@@ -2434,17 +2436,11 @@ export default function TransfermarktV2Client({
   return (
     <section className="market-v2-shell">
       <section className="market-v2-topbar">
-        <label className="filter-field">
-          <span>Fokus-Team</span>
-          <select className="input" value={selectedTeamId} onChange={(event) => setSelectedTeamId(event.target.value)}>
-            <option value="">Markt-Überblick</option>
-            {teamOptions.map((team) => (
-              <option key={team.teamId} value={team.teamId}>
-                {team.shortCode} · {team.name}
-              </option>
-            ))}
-          </select>
-        </label>
+        <div className="filter-field">
+          <span>Aktives Team</span>
+          <strong>{selectedTeam ? `${selectedTeam.shortCode} · ${selectedTeam.name}` : "Markt-Überblick"}</strong>
+          <small className="muted">Wechsel oben in der Foundation-Leiste.</small>
+        </div>
         <label className="filter-field">
           <span>Suchen</span>
           <input
@@ -3525,6 +3521,7 @@ export default function TransfermarktV2Client({
                         </th>
                       ))
                     : null}
+                  {onSell && manageableTeamIdSet.has(selectedTeamId) ? <th /> : null}
                 </tr>
               </thead>
               <tbody>
@@ -3583,6 +3580,27 @@ export default function TransfermarktV2Client({
                           </td>
                         ))
                       : null}
+                    {onSell && manageableTeamIdSet.has(selectedTeamId) ? (
+                      <td>
+                        <button
+                          className="secondary-button inline-button"
+                          type="button"
+                          title={`${row.name} verkaufen`}
+                          onClick={() =>
+                            onSell({
+                              activePlayerId: row.activePlayerId,
+                              playerId: row.playerId,
+                              playerName: row.name,
+                              className: row.className,
+                              race: row.race ?? null,
+                              portraitUrl: row.portraitUrl ?? null,
+                            })
+                          }
+                        >
+                          Verkaufen
+                        </button>
+                      </td>
+                    ) : null}
                   </tr>
                 ))}
               </tbody>

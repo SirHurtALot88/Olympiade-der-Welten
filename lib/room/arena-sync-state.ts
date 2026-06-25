@@ -1,3 +1,11 @@
+import {
+  advanceFoundationArenaReveal,
+  getFoundationArenaActiveSide,
+  getFoundationArenaDisplayPhase,
+  mapFoundationPhaseToRoomDisciplineSide,
+  mapRoomDisciplineSideToFoundationPhase,
+  type FoundationArenaRevealState,
+} from "@/lib/foundation/matchday-arena-reveal-sync";
 import type { OlyRoomState, RoomArenaPhaseId, RoomArenaState } from "@/types/game";
 
 export const ROOM_ARENA_PHASES: RoomArenaPhaseId[] = [
@@ -16,6 +24,44 @@ export function getRoomArenaRequiredParticipantIds(state: Pick<OlyRoomState, "ro
     .map((participant) => participant.participantId);
 }
 
+function defaultMaxSlotRevealCounts(maxSlotRevealIndex = 0) {
+  const normalized = Math.max(0, maxSlotRevealIndex);
+  return { d1: normalized, d2: normalized } as const;
+}
+
+export function normalizeRoomArenaState(state: RoomArenaState): RoomArenaState {
+  const maxCounts = state.maxSlotRevealCountByDiscipline ?? defaultMaxSlotRevealCounts(state.maxSlotRevealIndex);
+  const activeDisciplinePhase =
+    state.activeDisciplinePhase ?? mapRoomDisciplineSideToFoundationPhase(state.disciplineSide);
+  const activeSide = activeDisciplinePhase === "d2" ? "d2" : "d1";
+  const revealedSlotCountByDiscipline = state.revealedSlotCountByDiscipline ?? {
+    d1:
+      activeDisciplinePhase === "d1" || activeDisciplinePhase === "total"
+        ? Math.min(state.slotRevealIndex, maxCounts.d1)
+        : maxCounts.d1,
+    d2:
+      activeDisciplinePhase === "d2" || activeDisciplinePhase === "total"
+        ? Math.min(state.slotRevealIndex, maxCounts.d2)
+        : 0,
+  };
+  const completedDisciplinePhases = state.completedDisciplinePhases ?? {
+    d1: activeDisciplinePhase === "total" || (activeDisciplinePhase === "d2" && revealedSlotCountByDiscipline.d1 >= maxCounts.d1),
+    d2: activeDisciplinePhase === "total",
+  };
+
+  return {
+    ...state,
+    activeDisciplinePhase,
+    revealedSlotCountByDiscipline,
+    completedDisciplinePhases,
+    maxSlotRevealCountByDiscipline: maxCounts,
+    phaseIndex: state.phaseIndex < 0 ? 0 : state.phaseIndex,
+    phaseId: state.phaseId ?? getFoundationArenaDisplayPhase(state.phaseIndex < 0 ? 0 : state.phaseIndex),
+    slotRevealIndex: revealedSlotCountByDiscipline[activeSide],
+    maxSlotRevealIndex: Math.max(maxCounts.d1, maxCounts.d2),
+  };
+}
+
 export function createRoomArenaState(input: {
   saveId: string;
   seasonId?: string | null;
@@ -24,17 +70,21 @@ export function createRoomArenaState(input: {
   now?: string;
 }): RoomArenaState {
   const now = input.now ?? new Date().toISOString();
-  return {
+  return normalizeRoomArenaState({
     status: "idle",
     version: 0,
     saveId: input.saveId,
     seasonId: input.seasonId ?? null,
     matchdayId: input.matchdayId ?? null,
     disciplineSide: "d1",
+    activeDisciplinePhase: "d1",
     phaseId: null,
-    phaseIndex: -1,
+    phaseIndex: 0,
     slotRevealIndex: 0,
     maxSlotRevealIndex: 0,
+    revealedSlotCountByDiscipline: { d1: 0, d2: 0 },
+    completedDisciplinePhases: { d1: false, d2: false },
+    maxSlotRevealCountByDiscipline: { d1: 0, d2: 0 },
     stepIndex: 0,
     requiredParticipantIds: input.requiredParticipantIds ?? [],
     readyParticipantIds: [],
@@ -43,13 +93,13 @@ export function createRoomArenaState(input: {
     lastActionByParticipantId: null,
     updatedAt: now,
     callout: null,
-  };
+  });
 }
 
 export function syncRoomArenaParticipants(state: OlyRoomState): RoomArenaState {
   const requiredParticipantIds = getRoomArenaRequiredParticipantIds(state);
   const requiredSet = new Set(requiredParticipantIds);
-  return {
+  return normalizeRoomArenaState({
     ...(state.arenaSyncState ?? createRoomArenaState({ saveId: state.multiplayerRoom.saveId })),
     saveId: state.multiplayerRoom.saveId,
     seasonId: state.arenaSyncState?.seasonId ?? state.multiplayerRoom.activeSeasonId,
@@ -58,7 +108,7 @@ export function syncRoomArenaParticipants(state: OlyRoomState): RoomArenaState {
     readyParticipantIds: (state.arenaSyncState?.readyParticipantIds ?? []).filter((participantId) =>
       requiredSet.has(participantId),
     ),
-  };
+  });
 }
 
 export function isRoomArenaReady(arenaState: RoomArenaState) {
@@ -72,18 +122,19 @@ export function setRoomArenaParticipantReady(input: {
   ready: boolean;
   now?: string;
 }) {
-  const readySet = new Set(input.arenaState.readyParticipantIds);
+  const arenaState = normalizeRoomArenaState(input.arenaState);
+  const readySet = new Set(arenaState.readyParticipantIds);
   if (input.ready) {
     readySet.add(input.participantId);
   } else {
     readySet.delete(input.participantId);
   }
-  const nextReadyIds = input.arenaState.requiredParticipantIds.filter((participantId) => readySet.has(participantId));
+  const nextReadyIds = arenaState.requiredParticipantIds.filter((participantId) => readySet.has(participantId));
   return {
-    ...input.arenaState,
-    status: isRoomArenaReady({ ...input.arenaState, readyParticipantIds: nextReadyIds }) ? "revealing" : "ready_check",
+    ...arenaState,
+    status: isRoomArenaReady({ ...arenaState, readyParticipantIds: nextReadyIds }) ? "revealing" : "ready_check",
     readyParticipantIds: nextReadyIds,
-    version: input.arenaState.version + 1,
+    version: arenaState.version + 1,
     lastActionByParticipantId: input.participantId,
     updatedAt: input.now ?? new Date().toISOString(),
   } satisfies RoomArenaState;
@@ -96,21 +147,28 @@ export function startRoomArena(input: {
   matchdayId?: string | null;
   disciplineSide?: "d1" | "d2" | "overall" | null;
   maxSlotRevealIndex?: number | null;
+  maxSlotRevealCountByDiscipline?: { d1: number; d2: number } | null;
   now?: string;
 }) {
   const now = input.now ?? new Date().toISOString();
   const requiredParticipantIds = getRoomArenaRequiredParticipantIds(input.state);
-  return {
+  const maxCounts = input.maxSlotRevealCountByDiscipline ?? defaultMaxSlotRevealCounts(input.maxSlotRevealIndex ?? 0);
+
+  return normalizeRoomArenaState({
     status: "ready_check",
     version: (input.state.arenaSyncState?.version ?? 0) + 1,
     saveId: input.state.multiplayerRoom.saveId,
     seasonId: input.seasonId ?? input.state.multiplayerRoom.activeSeasonId,
     matchdayId: input.matchdayId ?? String(input.state.multiplayerRoom.activeMatchday),
     disciplineSide: input.disciplineSide ?? "d1",
-    phaseId: null,
-    phaseIndex: -1,
+    activeDisciplinePhase: mapRoomDisciplineSideToFoundationPhase(input.disciplineSide ?? "d1"),
+    phaseId: "slots",
+    phaseIndex: 0,
     slotRevealIndex: 0,
-    maxSlotRevealIndex: Math.max(0, input.maxSlotRevealIndex ?? 0),
+    maxSlotRevealIndex: Math.max(maxCounts.d1, maxCounts.d2),
+    revealedSlotCountByDiscipline: { d1: 0, d2: 0 },
+    completedDisciplinePhases: { d1: false, d2: false },
+    maxSlotRevealCountByDiscipline: maxCounts,
     stepIndex: 0,
     requiredParticipantIds,
     readyParticipantIds: [],
@@ -119,44 +177,91 @@ export function startRoomArena(input: {
     lastActionByParticipantId: input.participantId,
     updatedAt: now,
     callout: "arena_started",
-  } satisfies RoomArenaState;
+  });
+}
+
+export function roomArenaStateToFoundationReveal(state: RoomArenaState): FoundationArenaRevealState {
+  const normalized = normalizeRoomArenaState(state);
+  return {
+    activeDisciplinePhase: normalized.activeDisciplinePhase,
+    phaseIndex: normalized.phaseIndex,
+    revealedSlotCountByDiscipline: { ...normalized.revealedSlotCountByDiscipline },
+    completedDisciplinePhases: { ...normalized.completedDisciplinePhases },
+  };
 }
 
 export function advanceRoomArenaReveal(input: {
   arenaState: RoomArenaState;
   participantId: string;
   maxSlotRevealIndex?: number | null;
+  maxSlotRevealCountByDiscipline?: { d1: number; d2: number } | null;
   now?: string;
 }) {
-  const maxSlotRevealIndex = Math.max(0, input.maxSlotRevealIndex ?? input.arenaState.maxSlotRevealIndex ?? 0);
-  let nextPhaseIndex = input.arenaState.phaseIndex;
-  let nextSlotRevealIndex = input.arenaState.slotRevealIndex;
-
-  if (nextPhaseIndex < 0) {
-    nextPhaseIndex = 0;
-    nextSlotRevealIndex = 0;
-  } else if (ROOM_ARENA_PHASES[nextPhaseIndex] === "slots" && nextSlotRevealIndex < maxSlotRevealIndex) {
-    nextSlotRevealIndex += 1;
-  } else {
-    nextPhaseIndex = Math.min(nextPhaseIndex + 1, ROOM_ARENA_PHASES.length - 1);
-    if (ROOM_ARENA_PHASES[nextPhaseIndex] !== "slots") {
-      nextSlotRevealIndex = maxSlotRevealIndex;
-    }
+  const arenaState = normalizeRoomArenaState(input.arenaState);
+  const maxCounts = input.maxSlotRevealCountByDiscipline ?? arenaState.maxSlotRevealCountByDiscipline;
+  const limits = {
+    maxD1SlotRevealCount: Math.max(0, maxCounts.d1),
+    maxD2SlotRevealCount: Math.max(0, maxCounts.d2),
+  };
+  if (input.maxSlotRevealCountByDiscipline) {
+    limits.maxD1SlotRevealCount = Math.max(0, input.maxSlotRevealCountByDiscipline.d1);
+    limits.maxD2SlotRevealCount = Math.max(0, input.maxSlotRevealCountByDiscipline.d2);
   }
 
-  const phaseId = ROOM_ARENA_PHASES[nextPhaseIndex] ?? "result";
-  return {
-    ...input.arenaState,
-    status: phaseId === "result" ? "result" : "revealing",
-    phaseIndex: nextPhaseIndex,
+  const nextFoundationState = advanceFoundationArenaReveal(roomArenaStateToFoundationReveal(arenaState), limits);
+  if (!nextFoundationState) {
+    return arenaState;
+  }
+
+  const phaseId = getFoundationArenaDisplayPhase(nextFoundationState.phaseIndex);
+  const activeSide = getFoundationArenaActiveSide(nextFoundationState);
+
+  return normalizeRoomArenaState({
+    ...arenaState,
+    status:
+      phaseId === "result" && nextFoundationState.activeDisciplinePhase === "total" ? "result" : "revealing",
+    activeDisciplinePhase: nextFoundationState.activeDisciplinePhase,
+    disciplineSide: mapFoundationPhaseToRoomDisciplineSide(nextFoundationState.activeDisciplinePhase),
+    phaseIndex: nextFoundationState.phaseIndex,
     phaseId,
-    slotRevealIndex: nextSlotRevealIndex,
-    maxSlotRevealIndex,
-    stepIndex: input.arenaState.stepIndex + 1,
-    readyParticipantIds: phaseId === "result" ? input.arenaState.readyParticipantIds : [],
-    version: input.arenaState.version + 1,
+    slotRevealIndex: nextFoundationState.revealedSlotCountByDiscipline[activeSide],
+    revealedSlotCountByDiscipline: nextFoundationState.revealedSlotCountByDiscipline,
+    completedDisciplinePhases: nextFoundationState.completedDisciplinePhases,
+    maxSlotRevealCountByDiscipline: {
+      d1: limits.maxD1SlotRevealCount,
+      d2: limits.maxD2SlotRevealCount,
+    },
+    maxSlotRevealIndex: Math.max(limits.maxD1SlotRevealCount, limits.maxD2SlotRevealCount),
+    stepIndex: arenaState.stepIndex + 1,
+    readyParticipantIds: phaseId === "result" ? arenaState.readyParticipantIds : [],
+    version: arenaState.version + 1,
     lastActionByParticipantId: input.participantId,
     updatedAt: input.now ?? new Date().toISOString(),
     callout: null,
-  } satisfies RoomArenaState;
+  });
+}
+
+export function applyFoundationRevealToRoomArenaState(
+  arenaState: RoomArenaState,
+  reveal: FoundationArenaRevealState,
+  limits: { maxD1SlotRevealCount: number; maxD2SlotRevealCount: number },
+): RoomArenaState {
+  const phaseId = getFoundationArenaDisplayPhase(reveal.phaseIndex);
+  const activeSide = getFoundationArenaActiveSide(reveal);
+
+  return normalizeRoomArenaState({
+    ...arenaState,
+    activeDisciplinePhase: reveal.activeDisciplinePhase,
+    disciplineSide: mapFoundationPhaseToRoomDisciplineSide(reveal.activeDisciplinePhase),
+    phaseIndex: reveal.phaseIndex,
+    phaseId,
+    slotRevealIndex: reveal.revealedSlotCountByDiscipline[activeSide],
+    revealedSlotCountByDiscipline: reveal.revealedSlotCountByDiscipline,
+    completedDisciplinePhases: reveal.completedDisciplinePhases,
+    maxSlotRevealCountByDiscipline: {
+      d1: limits.maxD1SlotRevealCount,
+      d2: limits.maxD2SlotRevealCount,
+    },
+    maxSlotRevealIndex: Math.max(limits.maxD1SlotRevealCount, limits.maxD2SlotRevealCount),
+  });
 }

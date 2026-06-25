@@ -4,12 +4,14 @@ export const LOCAL_TRANSFER_WINDOW_PHASE = "manual_transfer_window";
 
 export type LocalTransferWindowPhase = typeof LOCAL_TRANSFER_WINDOW_PHASE;
 
-const TRANSFER_MARKET_OPEN_PHASES = new Set<GamePhase>([
+const TRANSFER_SELL_PHASES = new Set<GamePhase>([
   "preseason_management",
   "transfer_sell_phase",
+]);
+
+const TRANSFER_BUY_PHASES = new Set<GamePhase>([
+  "preseason_management",
   "transfer_buy_phase",
-  "lineup_setup",
-  "next_season_ready",
 ]);
 
 export function isExplicitLocalTransferWindowPhase(value: string | null | undefined): value is LocalTransferWindowPhase {
@@ -31,12 +33,24 @@ function isEarlySeasonTransferSetup(gameState: GameState) {
 
 export function isTransferMarketPhaseOpen(gameState: GameState) {
   const phase = gameState.gamePhase ?? "season_active";
-  return TRANSFER_MARKET_OPEN_PHASES.has(phase) || isEarlySeasonTransferSetup(gameState);
+  return TRANSFER_SELL_PHASES.has(phase) || TRANSFER_BUY_PHASES.has(phase) || isEarlySeasonTransferSetup(gameState);
+}
+
+export function isTransferSellPhaseOpen(gameState: GameState) {
+  const phase = gameState.gamePhase ?? "season_active";
+  return TRANSFER_SELL_PHASES.has(phase) || isEarlySeasonTransferSetup(gameState);
+}
+
+export function isTransferBuyPhaseOpen(gameState: GameState) {
+  const phase = gameState.gamePhase ?? "season_active";
+  return TRANSFER_BUY_PHASES.has(phase) || isEarlySeasonTransferSetup(gameState);
 }
 
 export function getTransferWindowStatus(gameState: GameState) {
   const phase = gameState.gamePhase ?? "season_active";
-  const open = isTransferMarketPhaseOpen(gameState);
+  const canSell = isTransferSellPhaseOpen(gameState);
+  const canBuy = isTransferBuyPhaseOpen(gameState);
+  const open = canSell || canBuy;
   const label = open
     ? phase === "transfer_sell_phase"
       ? "Verkaufsfenster"
@@ -51,6 +65,8 @@ export function getTransferWindowStatus(gameState: GameState) {
     open,
     phase,
     label,
+    canSell,
+    canBuy,
     explicitWindowPhase: LOCAL_TRANSFER_WINDOW_PHASE,
     reason: open ? null : `phase_blocked:${phase}`,
   };
