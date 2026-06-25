@@ -14830,6 +14830,11 @@ a {
   box-shadow: 0 0 0 1px rgba(247, 188, 67, 0.22), 0 16px 32px rgba(93, 66, 9, 0.16);
 }
 
+.legacy-lineup-arena-slot.is-next-target {
+  outline: 2px solid rgba(132, 188, 255, 0.72);
+  outline-offset: 2px;
+}
+
 .legacy-lineup-slot-empty-card strong {
   color: #f7fbff;
   font-size: 1rem;

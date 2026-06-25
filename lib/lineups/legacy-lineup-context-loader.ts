@@ -9,6 +9,7 @@ import type {
   LegacyLineupLoadedContext,
   LegacyLineupPreviewResult,
 } from "@/lib/lineups/legacy-lineup-types";
+import { getPrismaReferenceModifierSourceBundle } from "@/lib/lineups/legacy-modifier-source-contract";
 import { validateLegacyLineupContext } from "@/lib/lineups/legacy-lineup-validator";
 import { db } from "@/src/server/db";
 
@@ -328,10 +329,16 @@ export class LegacyLineupContextLoader {
       entries,
     });
 
+    const referenceModifierSources = getPrismaReferenceModifierSourceBundle();
+
     return {
       ok: true,
-      warnings,
+      warnings: [...warnings, "Prisma reference context: modifier sources are read-only and resolve apply is blocked."],
       context: {
+        contextLoadMode: referenceModifierSources.contextLoadMode,
+        formCardSource: referenceModifierSources.formCardSource,
+        mutatorSource: referenceModifierSources.mutatorSource,
+        teamPowerSource: referenceModifierSources.teamPowerSource,
         saveId: params.saveId,
         seasonId: params.seasonId,
         matchdayId: params.matchdayId,

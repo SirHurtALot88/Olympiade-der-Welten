@@ -186,6 +186,24 @@ export function getLegacyMutatorSourceSummary(): LegacyModifierSourceSummary {
   };
 }
 
+export function getDisciplineTextMutatorSourceSummary(mutator1: string | null, mutator2: string | null): LegacyModifierSourceSummary {
+  if (!mutator1?.trim() && !mutator2?.trim()) {
+    return {
+      selectionStatus: "missing_source",
+      effectStatus: "missing_source",
+      sourceLabel: "Disziplin-Text-Mutatoren sind noch nicht an eine kanonische Quelle angebunden.",
+      warnings: ["discipline_text_mutator_source_missing"],
+    };
+  }
+
+  return {
+    selectionStatus: "ready",
+    effectStatus: "ready",
+    sourceLabel: `Disziplin-Text-Mutatoren: ${[mutator1, mutator2].filter(Boolean).join(" / ")}`,
+    warnings: [],
+  };
+}
+
 export function buildGeneratedFormCardRecordsForTeam(
   gameState: GameState,
   saveId: string,

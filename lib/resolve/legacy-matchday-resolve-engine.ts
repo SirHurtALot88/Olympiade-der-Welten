@@ -1,3 +1,5 @@
+import { hasResolveReadyModifierSources } from "@/lib/lineups/legacy-modifier-source-contract";
+import { calculateSideSlotRoleModifierTotal } from "@/lib/lineups/matchday-slot-roles";
 import { scoreLegacyLineupDisciplineSide } from "@/lib/lineups/legacy-score-engine";
 import type { LegacyLineupLoadedContext, LegacyResolvePreviewOptions } from "@/lib/lineups/legacy-lineup-types";
 import {
@@ -177,9 +179,13 @@ function getWorseStatus(left: ResolvePreviewStatus, right: ResolvePreviewStatus)
 function shouldFlagMissingSources(
   score: ReturnType<typeof scoreLegacyLineupDisciplineSide>,
   resolveOptions: LegacyResolvePreviewOptions,
+  context: LegacyLineupLoadedContext,
 ) {
   if (resolveOptions.modifierMode === "mvp_forced_mutators") {
     return false;
+  }
+  if (!hasResolveReadyModifierSources(context)) {
+    return true;
   }
   return score.fatigueStatus !== "mapped";
 }
@@ -260,6 +266,22 @@ export function buildLegacyMatchdayResolvePreview(
     });
 
     for (const meta of getDisciplineSideMeta(context)) {
+      const sideEntries = (draft?.entries ?? []).filter(
+        (entry) => entry.disciplineId === meta.disciplineId && entry.disciplineSide === meta.disciplineSide,
+      );
+      const slotRoleModifier = calculateSideSlotRoleModifierTotal({
+        disciplineId: meta.disciplineId,
+        disciplineSide: meta.disciplineSide,
+        entries: sideEntries.map((entry) => ({ playerId: entry.playerId, slotIndex: entry.slotIndex })),
+        rosterPlayers: context.rosterPlayers,
+        disciplineScores: context.disciplineScores,
+        intensity: draft?.modifiers?.[meta.disciplineSide]?.intensity ?? "normal",
+        fatigueByPlayerId: context.fatigueByPlayerId ?? null,
+        requiredPlayers:
+          context.disciplineSidePlayerCounts?.[`${meta.disciplineId}::${meta.disciplineSide}`] ??
+          context.disciplinePlayerCounts[meta.disciplineId] ??
+          null,
+      });
       const score = scoreLegacyLineupDisciplineSide({
         disciplineId: meta.disciplineId,
         disciplineSide: meta.disciplineSide,
@@ -275,10 +297,8 @@ export function buildLegacyMatchdayResolvePreview(
             moraleByPlayerId,
             fatigueSourceStatus: context.fatigueSourceStatus ?? "missing_source",
             intensity: draft?.modifiers?.[meta.disciplineSide]?.intensity,
+            slotRoleModifier,
             ...(() => {
-          const sideEntries = (draft?.entries ?? []).filter(
-            (entry) => entry.disciplineId === meta.disciplineId && entry.disciplineSide === meta.disciplineSide,
-          );
           const formResult = calculateFormModifierForSide({
             modifiers: draft?.modifiers,
             disciplineSide: meta.disciplineSide,
@@ -382,7 +402,7 @@ export function buildLegacyMatchdayResolvePreview(
           missingLineup,
           missingScores: score.missingScores,
           isComplete: score.isComplete !== false || allowPartialLineup,
-          missingSources: shouldFlagMissingSources(score, resolveOptions),
+          missingSources: shouldFlagMissingSources(score, resolveOptions, context),
         });
       } else {
         d2Score = score.totalScore;
@@ -392,7 +412,7 @@ export function buildLegacyMatchdayResolvePreview(
           missingLineup,
           missingScores: score.missingScores,
           isComplete: score.isComplete !== false || allowPartialLineup,
-          missingSources: shouldFlagMissingSources(score, resolveOptions),
+          missingSources: shouldFlagMissingSources(score, resolveOptions, context),
         });
       }
 
@@ -444,7 +464,7 @@ export function buildLegacyMatchdayResolvePreview(
           missingLineup: !context.existingDraft,
           missingScores: score.missingScores,
           isComplete: score.isComplete !== false,
-          missingSources: shouldFlagMissingSources(score, resolveOptions),
+          missingSources: shouldFlagMissingSources(score, resolveOptions, context),
         }),
         baseScore: score.baseScore ?? 0,
         fatigueModifier: score.fatigueModifier ?? null,

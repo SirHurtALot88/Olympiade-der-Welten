@@ -127,6 +127,7 @@ import {
   withNormalizedTeamGeneralManagers,
 } from "@/lib/foundation/team-general-managers";
 import { buildGmStoryView } from "@/lib/foundation/gm-story";
+import { getFormCardFlowStatus } from "@/lib/foundation/form-card-flow";
 import {
   AI_OWNER_ID,
   DEFAULT_ACTIVE_OWNER_ID,
@@ -10965,10 +10966,33 @@ export default function FoundationPageClient({
         .slice(0, 4),
     [activeTeamOpenInboxItems],
   );
-  const inboxPrimaryTeamItem = useMemo(
-    () => getPrimaryInboxTask(filterGameInboxItems(activeTeamInboxItems, { includeDismissed: false, includeDone: false })),
-    [activeTeamInboxItems],
-  );
+  const inboxPrimaryTeamItem = useMemo(() => {
+    const scheduleEntry = (gameState.seasonState.disciplineSchedule ?? []).find(
+      (entry) => entry.seasonId === gameState.season.id && entry.matchdayId === gameState.matchdayState.matchdayId,
+    );
+    const requiredLineupSlots =
+      (scheduleEntry?.discipline1?.playerCount ?? 0) + (scheduleEntry?.discipline2?.playerCount ?? 0);
+    const openItems = filterGameInboxItems(activeTeamInboxItems, { includeDismissed: false, includeDone: false }).filter(
+      (item) => {
+        if (!item.itemId.startsWith("lineup_missing:")) {
+          return true;
+        }
+        const teamId = item.teamId ?? (typeof item.targetParams.team === "string" ? item.targetParams.team : null);
+        if (!teamId) {
+          return true;
+        }
+        const draft = (gameState.seasonState.lineupDrafts ?? []).find(
+          (entry) =>
+            entry.seasonId === gameState.season.id &&
+            entry.matchdayId === gameState.matchdayState.matchdayId &&
+            entry.teamId === teamId,
+        );
+        const filledSlots = draft?.entries.length ?? 0;
+        return !(requiredLineupSlots > 0 ? filledSlots >= requiredLineupSlots : filledSlots > 0);
+      },
+    );
+    return getPrimaryInboxTask(openItems);
+  }, [activeTeamInboxItems, gameState.matchdayState.matchdayId, gameState.season.id, gameState.seasonState.disciplineSchedule, gameState.seasonState.lineupDrafts]);
 	  const visibleInboxItems = useMemo(
 	    () =>
 	      filterGameInboxItems(activeTeamInboxItems, {
@@ -11416,6 +11440,15 @@ export default function FoundationPageClient({
     });
   };
   const triggerGlobalNext = async () => {
+    if (
+      activeView === "lineup" &&
+      homeNextMatchdayStatus.openSlots === 0 &&
+      !homeNextMatchdayStatus.resultAvailable &&
+      primaryInboxItem?.itemId.startsWith("lineup_missing:")
+    ) {
+      setFoundationView("matchdayArena", setActiveView);
+      return;
+    }
     if (primaryInboxItem) {
       navigateToInboxItem(primaryInboxItem);
       return;
@@ -16262,9 +16295,7 @@ export default function FoundationPageClient({
     const resultAvailable = (gameState.seasonState.matchdayResults ?? []).some(
       (result) => result.seasonId === gameState.season.id && result.matchdayId === gameState.matchdayState.matchdayId,
     );
-    const hasFormCards = (gameState.seasonState.formCards ?? []).some(
-      (card) => card.seasonId === gameState.season.id && card.teamId === activeManagerTeamId,
-    );
+    const formCardFlow = getFormCardFlowStatus(gameState, activeManagerTeamId);
 
     return {
       d1Slots,
@@ -16273,7 +16304,9 @@ export default function FoundationPageClient({
       filledSlots,
       openSlots: Math.max(requiredSlots - filledSlots, 0),
       resultAvailable,
-      hasFormCards,
+      hasFormCards: formCardFlow.isReady,
+      hasFormCardPool: formCardFlow.hasPool,
+      formCardBlocker: formCardFlow.blocker,
       statusLabel: resultAvailable
         ? "Result verfügbar"
         : requiredSlots > 0 && filledSlots >= requiredSlots
@@ -16353,6 +16386,13 @@ export default function FoundationPageClient({
     matchdayId: string;
     teamId: string;
     silent: boolean;
+    draft?: {
+      seasonId: string;
+      matchdayId: string;
+      teamId: string;
+      entries: unknown[];
+      status?: string;
+    } | null;
   }) => {
     if (
       payload.saveId !== activeSaveId ||
@@ -16363,11 +16403,38 @@ export default function FoundationPageClient({
       return;
     }
 
-    setFoundationActionFeedback({
-      tone: "success",
-      title: "Lineup gespeichert",
-      detail: `${getTeamLockedName(payload.teamId)} ist fuer ${currentMatchdayDisplayLabel} aktualisiert. KI-Lineups werden bei Bedarf nachgezogen.`,
-    });
+    if (payload.draft) {
+      setGameState((current) => {
+        const lineupDrafts = [...(current.seasonState.lineupDrafts ?? [])];
+        const draftIndex = lineupDrafts.findIndex(
+          (entry) =>
+            entry.seasonId === payload.draft!.seasonId &&
+            entry.matchdayId === payload.draft!.matchdayId &&
+            entry.teamId === payload.draft!.teamId,
+        );
+        if (draftIndex >= 0) {
+          lineupDrafts[draftIndex] = payload.draft as (typeof lineupDrafts)[number];
+        } else {
+          lineupDrafts.push(payload.draft as (typeof lineupDrafts)[number]);
+        }
+        return {
+          ...current,
+          seasonState: {
+            ...current.seasonState,
+            lineupDrafts,
+          },
+        };
+      });
+    }
+
+    if (!payload.silent) {
+      setFoundationActionFeedback({
+        tone: "success",
+        title: "Lineup gespeichert",
+        detail: `${getTeamLockedName(payload.teamId)} ist fuer ${currentMatchdayDisplayLabel} aktualisiert. KI-Lineups werden bei Bedarf nachgezogen.`,
+      });
+    }
+    void reloadLiveSeasonState("manual_apply");
     void ensureAiLineupsForCurrentMatchday("human_lineup_saved");
   };
   useEffect(() => {
@@ -20597,8 +20664,8 @@ export default function FoundationPageClient({
                 </div>
                 <div className="room-meta foundation-admin-meta">
                   <span className="pill">Offen {homeNextMatchdayStatus.openSlots}</span>
-                  <span className={`pill${homeNextMatchdayStatus.hasFormCards ? " is-ready" : " is-warning"}`}>
-                    Formkarten {homeNextMatchdayStatus.hasFormCards ? "bereit" : "offen"}
+                  <span className={`pill${homeNextMatchdayStatus.hasFormCards ? " is-ready" : homeNextMatchdayStatus.hasFormCardPool ? " is-warning" : " is-blocked"}`}>
+                    Formkarten {homeNextMatchdayStatus.hasFormCards ? "gesetzt" : homeNextMatchdayStatus.hasFormCardPool ? "offen" : "Pool fehlt"}
                   </span>
                   <span className="pill">Fatigue {homePlayerCards.filter((row) => row.fatigue > 0).length}</span>
                 </div>

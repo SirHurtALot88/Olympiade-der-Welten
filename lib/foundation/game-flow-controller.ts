@@ -1,5 +1,9 @@
 import type { GameState } from "@/lib/data/olyDataTypes";
 import { GAME_LANGUAGE } from "@/lib/ui/game-language";
+import {
+  activeTeamHasFormCardPool,
+  activeTeamHasFormCardSelections,
+} from "@/lib/foundation/form-card-flow";
 
 export type GameFlowPhase =
   | "preseason"
@@ -123,10 +127,7 @@ function isCurrentMatchdayLineupComplete(gameState: GameState, lineup: ReturnTyp
 }
 
 function activeTeamHasFormCards(gameState: GameState, activeTeamId: string | null) {
-  if (!activeTeamId) return false;
-  return (gameState.seasonState.formCards ?? []).some(
-    (card) => card.seasonId === gameState.season.id && card.teamId === activeTeamId,
-  );
+  return activeTeamHasFormCardSelections(gameState, activeTeamId);
 }
 
 function activeTeamTrainingComplete(gameState: GameState, activeTeamId: string | null) {
@@ -253,8 +254,10 @@ function buildMatchdaySteps(gameState: GameState, activeTeamId: string | null): 
   const hasLineup = isCurrentMatchdayLineupComplete(gameState, activeLineup);
   const lineupConfirmed = activeLineup?.status === "submitted" || activeLineup?.status === "locked" || activeLineup?.status === "resolved";
   const hasFormCards = activeTeamHasFormCards(gameState, activeTeamId);
-  const trainingComplete = activeTeamTrainingComplete(gameState, activeTeamId);
+  const hasFormCardPool = activeTeamHasFormCardPool(gameState, activeTeamId);
   const hasResults = hasCurrentMatchdayResult(gameState) || gameState.matchdayState.status === "resolved";
+  const formCardsRequired = hasLineup && !hasResults;
+  const trainingComplete = activeTeamTrainingComplete(gameState, activeTeamId);
   const storedNewGameFlow = gameState.seasonState.newGameFlow ?? null;
   const seasonIntroStep = storedNewGameFlow?.steps?.find((entry) => entry.stepId === "season_intro");
   const trainingFacilitiesStep = storedNewGameFlow?.steps?.find((entry) => entry.stepId === "training_facilities");
@@ -338,11 +341,27 @@ function buildMatchdaySteps(gameState: GameState, activeTeamId: string | null): 
       stepId: "assign_formcards",
       label: "Formkarten zuweisen",
       cta: "Weiter: Formkarten prüfen",
-      status: !hasActiveTeam ? "blocked" : hasFormCards ? "completed" : "warning",
+      status: !hasActiveTeam
+        ? "blocked"
+        : !formCardsRequired
+          ? "completed"
+          : hasFormCards
+            ? "completed"
+            : !hasFormCardPool
+              ? "blocked"
+              : hasLineup
+                ? "ready"
+                : "warning",
       targetView: "lineup",
       teamId: activeTeamId,
-      blockers: hasActiveTeam ? [] : ["no_active_team"],
-      warnings: hasFormCards ? [] : ["missing_formcards"],
+      blockers: !hasActiveTeam
+        ? ["no_active_team"]
+        : formCardsRequired && !hasFormCardPool
+          ? ["missing_formcard_pool"]
+          : formCardsRequired && hasLineup && !hasFormCards
+            ? ["missing_formcard_selections"]
+            : [],
+      warnings: formCardsRequired && hasLineup && !hasFormCards && hasFormCardPool ? ["missing_formcards"] : [],
     }),
     step({
       stepId: "confirm_lineup",

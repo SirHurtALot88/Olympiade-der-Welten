@@ -2561,6 +2561,10 @@ export default function LegacyLineupLabClient(props: LegacyLineupLabClientProps)
       null
     );
   }, [activeSlotKey, selections, slots]);
+  const nextOpenSlotKey = useMemo(
+    () => slots.find((slot) => !selections[slot.key])?.key ?? null,
+    [selections, slots],
+  );
   const activeSlotRole = activeSlot ? slotRoleByKey.get(activeSlot.key) ?? null : null;
 
   useEffect(() => {
@@ -8254,7 +8258,7 @@ export default function LegacyLineupLabClient(props: LegacyLineupLabClientProps)
                       <label
                         key={slot.key}
                         id={`lineup-slot-${slot.key}`}
-                        className={`legacy-lineup-lab-slot-row legacy-lineup-slot-dropzone legacy-lineup-arena-slot ${disciplineColorClass} ${draggedActivePlayerId ? "is-drop-ready" : ""} ${activeSlot?.key === slot.key ? "is-active-slot" : ""} ${activeMissingHighlightKey && !selections[slot.key] ? "is-missing-highlight" : ""} ${recentlyAssignedSlotKey === slot.key ? "is-recently-assigned" : ""} ${selections[slot.key] && activeSlot?.key !== slot.key && !slotDragPreviewByKey.get(slot.key) ? "is-compact" : ""} ${getDragFitTierClass(slotDragPreviewByKey.get(slot.key)?.fitTier ?? null)}`.trim()}
+                        className={`legacy-lineup-lab-slot-row legacy-lineup-slot-dropzone legacy-lineup-arena-slot ${disciplineColorClass} ${draggedActivePlayerId ? "is-drop-ready" : ""} ${activeSlot?.key === slot.key ? "is-active-slot" : ""} ${nextOpenSlotKey === slot.key ? "is-next-target" : ""} ${activeMissingHighlightKey && !selections[slot.key] ? "is-missing-highlight" : ""} ${recentlyAssignedSlotKey === slot.key ? "is-recently-assigned" : ""} ${selections[slot.key] && activeSlot?.key !== slot.key && !slotDragPreviewByKey.get(slot.key) ? "is-compact" : ""} ${getDragFitTierClass(slotDragPreviewByKey.get(slot.key)?.fitTier ?? null)}`.trim()}
                         onClick={() => {
                           setActiveSlotKey(slot.key);
                           setFocusedDisciplineSide(slot.disciplineSide);

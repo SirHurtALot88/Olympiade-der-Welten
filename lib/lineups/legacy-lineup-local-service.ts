@@ -4,8 +4,6 @@ import { getTeamStrategyProfile } from "@/lib/foundation/team-strategy-profiles"
 import {
   buildGeneratedFormCardRecordsForSeason,
   calculateFormModifierForSide,
-  getLegacyFormCardSourceSummary,
-  getLegacyMutatorSourceSummary,
   calculateMutatorModifierForSide,
   createDefaultLineupDraftModifiers,
   ensureLocalFormCardsForSeason,
@@ -14,6 +12,7 @@ import {
   buildLegacyMutatorTraitOptionsForRoster,
   normalizeLineupDraftModifiers,
 } from "@/lib/lineups/legacy-lineup-modifiers";
+import { getLocalModifierSourceBundle } from "@/lib/lineups/legacy-modifier-source-contract";
 import {
   calculateTeamPowerModifierForSide,
   ensureLocalTeamPowersForSeason,
@@ -737,14 +736,15 @@ function buildContextFromGameState(gameState: GameState, params: LegacyLineupKey
         perDisciplineSideMaxCaptains: 1,
         sourceStatus: "mapped_with_transform",
       },
-      formCardSource: getLegacyFormCardSourceSummary(),
-      mutatorSource: getLegacyMutatorSourceSummary(),
-      teamPowerSource: {
-        selectionStatus: "ready",
-        effectStatus: "ready",
-        sourceLabel: "Team-Powers: drei Identity-Powers mit 4/3/2 Charges plus Facility-Boni auf Level 2/4.",
-        warnings: [],
-      },
+      ...(() => {
+        const modifierSources = getLocalModifierSourceBundle();
+        return {
+          contextLoadMode: modifierSources.contextLoadMode,
+          formCardSource: modifierSources.formCardSource,
+          mutatorSource: modifierSources.mutatorSource,
+          teamPowerSource: modifierSources.teamPowerSource,
+        };
+      })(),
       formCards: getTeamFormCardOptions({
         gameState: normalizedGameState,
         seasonId: params.seasonId,

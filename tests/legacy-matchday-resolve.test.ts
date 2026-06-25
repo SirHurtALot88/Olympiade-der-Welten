@@ -127,6 +127,7 @@ function createContext(input: {
     },
     fatigueByPlayerId: input.fatigueByPlayerId ?? null,
     fatigueSourceStatus: input.fatigueSourceStatus ?? "missing_source",
+    contextLoadMode: "sqlite_local",
     formCardSource: {
       selectionStatus: "ready",
       effectStatus: "ready",
@@ -134,6 +135,12 @@ function createContext(input: {
       warnings: [],
     },
     mutatorSource: {
+      selectionStatus: "ready",
+      effectStatus: "ready",
+      sourceLabel: "test",
+      warnings: [],
+    },
+    teamPowerSource: {
       selectionStatus: "ready",
       effectStatus: "ready",
       sourceLabel: "test",
