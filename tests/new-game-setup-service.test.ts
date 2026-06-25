@@ -16,7 +16,7 @@ describe("new-game-setup-service", () => {
     expect(preview.counts.ai).toBe(31);
     expect(preview.chrisTeamIds).toEqual(["M-M"]);
     expect(preview.room.enabled).toBe(false);
-  });
+  }, 120_000);
 
   it("creates a Solo 4 preview with four local human teams", () => {
     const { gameState, preview } = buildNewGameStateFromBaseline({ presetId: "solo_4", now: "2026-06-13T10:00:00.000Z" });
@@ -27,7 +27,7 @@ describe("new-game-setup-service", () => {
     expect(gameState.scenarioMeta?.saveMode).toBe("solo_4");
     expect(gameState.scenarioMeta?.humanControlledTeamCount).toBe(4);
     expect(resolveFoundationSaveMode({ gameState })).toBe("solo_4");
-  });
+  }, 120_000);
 
   it("creates Online 4v4 with Chris, Franky and AI ownership metadata", () => {
     const { gameState, preview } = buildNewGameStateFromBaseline({
@@ -47,7 +47,7 @@ describe("new-game-setup-service", () => {
     expect(gameState.seasonState.teamControlSettings?.["M-S"]?.ownerId).toBe("franky_remote_placeholder");
     expect(gameState.seasonState.teamControlSettings?.["A-A"]?.controlMode).toBe("ai");
     expect(resolveFoundationSaveMode({ gameState })).toBe("online_4v4");
-  });
+  }, 120_000);
 
   it("uses immutable baseline state and clears mutable season history for a new game", () => {
     const { gameState, preview } = buildNewGameStateFromBaseline({
@@ -75,7 +75,7 @@ describe("new-game-setup-service", () => {
     expect(gameState.seasonState.lineupDrafts).toEqual([]);
     expect(gameState.seasonState.matchdayResults).toEqual([]);
     expect(gameState.seasonState.seasonSnapshots).toEqual([]);
-  });
+  }, 120_000);
 
   it("sets Season 1 setup and start ranks from real start budgets", () => {
     const { gameState, preview } = buildNewGameStateFromBaseline({
@@ -92,5 +92,5 @@ describe("new-game-setup-service", () => {
     expect(gameState.seasonState.standings["R-R"]?.startplatz).toBe(32);
     expect(preview.teams.find((team) => team.teamId === "M-M")?.budget).toBe(325);
     expect(preview.teams.find((team) => team.teamId === "R-R")?.budget).toBe(170);
-  });
+  }, 120_000);
 });

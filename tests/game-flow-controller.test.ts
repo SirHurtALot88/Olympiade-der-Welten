@@ -236,6 +236,7 @@ describe("game flow controller", () => {
 
     expect(flow.currentStepId).toBe("assign_formcards");
     expect(flow.currentStep.blockers).toContain("missing_formcard_selections");
+    expect(flow.steps.find((step) => step.stepId === "assign_formcards")?.targetPanel).toBe("form-board");
   });
 
   it("blocks arena when lineup is complete but form cards are missing", () => {
@@ -258,6 +259,27 @@ describe("game flow controller", () => {
     const arenaStep = flow.steps.find((step) => step.stepId === "open_arena");
     expect(arenaStep?.status).toBe("blocked");
     expect(arenaStep?.blockers).toContain("missing_formcard_selections");
+  });
+
+  it("blocks arena when lineup is complete but not submitted", () => {
+    const flow = buildGameFlowState({
+      gameState: gameState({
+        players: [player("p-1", "mittel")],
+        seasonState: {
+          seasonId: "season-2",
+          schedule: [],
+          standings: {},
+          formCards: [{ id: "card-1", saveId: "save-1", seasonId: "season-2", teamId: "M-M", playerId: "p-1", playerName: "p-1", cardColor: "red", cardValue: 1, createdAt: "2026-06-12T00:00:00.000Z" }],
+          lineupDrafts: [{ lineupId: "lineup-1", saveId: "save-1", seasonId: "season-2", matchdayId: "season-2-md-1", teamId: "M-M", status: "draft", entries: [{ disciplineId: "d1", disciplineSide: "d1", slotIndex: 0, playerId: "p-1", activePlayerId: "r-1" }], modifiers: { d1: { primaryFormCardId: "card-1", secondaryFormCardId: null, mutatorTrait1: null, mutatorTrait2: null, intensity: "normal", teamPowerId: null }, d2: { primaryFormCardId: null, secondaryFormCardId: null, mutatorTrait1: null, mutatorTrait2: null, intensity: "normal", teamPowerId: null } }, createdAt: "2026-06-12T00:00:00.000Z", updatedAt: "2026-06-12T00:00:00.000Z" }],
+        },
+      }),
+      activeTeamId: "M-M",
+    });
+
+    expect(flow.currentStepId).toBe("confirm_lineup");
+    const arenaStep = flow.steps.find((step) => step.stepId === "open_arena");
+    expect(arenaStep?.status).toBe("blocked");
+    expect(arenaStep?.blockers).toContain("lineup_not_submitted");
   });
 
   it("opens arena once lineup and form cards are ready", () => {
@@ -359,5 +381,102 @@ describe("game flow controller", () => {
     const flow = buildGameFlowState({ gameState: gameState(), activeTeamId: null });
     expect(flow.currentStep.status).toBe("blocked");
     expect(flow.currentStep.blockers).toContain("no_active_team");
+  });
+
+  it("requires sponsor choice in season 1 onboarding after training facilities", () => {
+    const flow = buildGameFlowState({
+      gameState: gameState({
+        season: { id: "season-1", name: "Season 1", year: 1, currentMatchday: 1, matchdayIds: ["md-1"] },
+        seasonState: {
+          seasonId: "season-1",
+          schedule: [],
+          standings: {},
+          newGameFlow: {
+            active: true,
+            dismissed: false,
+            selectedTeamId: "M-M",
+            steps: [
+              { stepId: "team_confirm", status: "completed" },
+              { stepId: "roster_review", status: "completed" },
+              { stepId: "first_transfers", status: "completed" },
+              { stepId: "fill_roster", status: "completed" },
+              { stepId: "training_facilities", status: "completed" },
+              { stepId: "choose_sponsor", status: "open" },
+              { stepId: "set_lineup", status: "open" },
+            ],
+          },
+        },
+        players: [player("p-1", "mittel")],
+        rosters: [
+          {
+            id: "r-1",
+            teamId: "M-M",
+            playerId: "p-1",
+            contractLength: 1,
+            salary: 2,
+            upkeep: 2,
+            purchasePrice: 10,
+            currentValue: 10,
+            roleTag: "starter",
+            joinedSeasonId: "season-1",
+          },
+        ],
+      }),
+      activeTeamId: "M-M",
+    });
+
+    const sponsorStep = flow.steps.find((entry) => entry.stepId === "choose_sponsor");
+    expect(sponsorStep?.status).toBe("ready");
+    expect(sponsorStep?.targetPanel).toBe("sponsor-choice");
+    expect(flow.currentStep.stepId).toBe("choose_sponsor");
+  });
+
+  it("keeps sponsor choice optional in later seasons without onboarding", () => {
+    const flow = buildGameFlowState({
+      gameState: gameState({
+        players: [player("p-1", "mittel")],
+        rosters: [
+          {
+            id: "r-1",
+            teamId: "M-M",
+            playerId: "p-1",
+            contractLength: 1,
+            salary: 2,
+            upkeep: 2,
+            purchasePrice: 10,
+            currentValue: 10,
+            roleTag: "starter",
+            joinedSeasonId: "season-2",
+          },
+        ],
+      }),
+      activeTeamId: "M-M",
+    });
+
+    const sponsorStep = flow.steps.find((entry) => entry.stepId === "choose_sponsor");
+    expect(sponsorStep?.status).toBe("optional");
+    expect(sponsorStep?.targetPanel).toBe("sponsor-choice");
+  });
+
+  it("merges active newGameFlow onboarding steps ahead of matchday flow", () => {
+    const flow = buildGameFlowState({
+      gameState: gameState({
+        seasonState: {
+          seasonId: "season-2",
+          schedule: [],
+          standings: {},
+          newGameFlow: {
+            active: true,
+            selectedTeamId: "M-M",
+            dismissed: false,
+            steps: [{ stepId: "team_confirm", status: "open" }],
+          },
+        },
+      }),
+      activeTeamId: "M-M",
+    });
+
+    expect(flow.steps[0]?.stepId).toBe("team_confirm");
+    expect(flow.steps.some((entry) => entry.stepId === "roster_review")).toBe(true);
   });
 });

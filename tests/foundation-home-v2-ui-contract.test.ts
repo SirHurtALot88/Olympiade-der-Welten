@@ -4,6 +4,8 @@ import { describe, expect, it } from "vitest";
 
 const foundationClientPath = "/Users/chrisfalk/Documents/Codex/Olympiade der Welten/app/foundation/FoundationPageClient.tsx";
 const homeV2Path = "/Users/chrisfalk/Documents/Codex/Olympiade der Welten/app/foundation/home-v2/HomeV2Client.tsx";
+const navConfigPath = "/Users/chrisfalk/Documents/Codex/Olympiade der Welten/lib/foundation/foundation-nav-config.ts";
+const viewRoutingPath = "/Users/chrisfalk/Documents/Codex/Olympiade der Welten/lib/foundation/foundation-view-routing.ts";
 const facilitiesOverviewV2Path =
   "/Users/chrisfalk/Documents/Codex/Olympiade der Welten/app/foundation/facilities-overview-v2/FacilitiesOverviewV2Client.tsx";
 const scoutingHubV2Path =
@@ -12,15 +14,27 @@ const inboxV2Path = "/Users/chrisfalk/Documents/Codex/Olympiade der Welten/app/f
 const globalsPath = "/Users/chrisfalk/Documents/Codex/Olympiade der Welten/app/globals.css";
 
 describe("foundation home v2 ui contract", () => {
-  it("routes the preview navigation into Home V2 without replacing classic home", async () => {
+  it("merges home and office into one home v2 view with sub navigation", async () => {
     const fileText = await fs.readFile(foundationClientPath, "utf8");
+    const navText = await fs.readFile(navConfigPath, "utf8");
+    const routingText = await fs.readFile(viewRoutingPath, "utf8");
 
-    expect(fileText).toContain('| "homeV2"');
-    expect(fileText).toContain('{ id: "homeV2", label: "Home v2"');
-    expect(fileText).toContain('return "foundation-home-v2"');
+    expect(fileText).toContain("FoundationSubNav");
+    expect(fileText).toContain('homeV2Tab === "overview"');
+    expect(fileText).toContain('homeV2Tab === "office"');
+    expect(fileText).toContain('navigateHomeTab("office")');
+    expect(fileText).toContain("ManagerOfficeClient");
+    const officeText = await fs.readFile(
+      "/Users/chrisfalk/Documents/Codex/Olympiade der Welten/app/foundation/home-v2/ManagerOfficeClient.tsx",
+      "utf8",
+    );
+    expect(officeText).toContain('data-testid="foundation-hq"');
+    expect(fileText).not.toContain('getViewClass("hq")');
+    expect(navText).not.toContain('id: "hq"');
+    expect(routingText).toContain('if (view === "hq") return "homeV2"');
     expect(fileText).toContain("<HomeV2Client");
+    expect(fileText).toContain("onOpenOffice");
     expect(fileText).toContain('onOpenClassicHome={() => setFoundationView("home", setActiveView)}');
-    expect(fileText).toContain('activeView === "home" ? (');
   });
 
   it("keeps the Velo-inspired dashboard focused on top players, KPIs and flow actions", async () => {
@@ -30,7 +44,12 @@ describe("foundation home v2 ui contract", () => {
     expect(fileText).toContain("home-v2-player-grid");
     expect(fileText).toContain("home-v2-kpi-grid");
     expect(fileText).toContain("onContinue");
-    expect(fileText).toContain("Classic Home");
+    expect(fileText).toContain("onOpenBoardObjectives");
+    expect(fileText).toContain("home-v2-objective-card");
+    expect(fileText).toContain("onOpenOffice");
+    expect(fileText).toContain("Office");
+    expect(fileText).not.toContain("Manager Overview V2");
+    expect(fileText).not.toContain("HQ öffnen");
     expect(fileText).toContain("Facilities");
     expect(fileText).toContain("Inbox");
     expect(fileText).toContain('data-testid="foundation-home-v2"');
@@ -42,6 +61,7 @@ describe("foundation home v2 ui contract", () => {
     expect(cssText).toContain(".home-v2-shell");
     expect(cssText).toContain(".home-v2-player-card");
     expect(cssText).toContain(".home-v2-kpi-grid");
+    expect(cssText).toContain(".foundation-home-v2-panel .home-v2-subnav");
   });
 });
 

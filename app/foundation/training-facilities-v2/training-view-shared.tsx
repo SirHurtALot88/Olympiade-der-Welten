@@ -1,9 +1,10 @@
 "use client";
 
-import { useState } from "react";
+import { useMemo, useState } from "react";
 
 import ClassColorChip from "@/app/foundation/ClassColorChip";
 import OptimizedMediaImage from "@/app/foundation/OptimizedMediaImage";
+import { TooltipHeading } from "@/components/ui/TooltipHeading";
 import {
   buildTrainingImpactItems,
   buildTrainingModeSegments,
@@ -206,6 +207,7 @@ type TrainingPlayerLaneProps = {
   onSetTrainingClass: (playerId: string, trainingClass: string) => void;
   onOpenPlayerDetails?: (payload: { playerId: string; activePlayerId?: string | null }) => void;
   trainingModeReadOnly?: boolean;
+  showIntensityRail?: boolean;
 };
 
 export function TrainingPlayerLane({
@@ -220,6 +222,7 @@ export function TrainingPlayerLane({
   onSetTrainingClass,
   onOpenPlayerDetails,
   trainingModeReadOnly = false,
+  showIntensityRail = true,
 }: TrainingPlayerLaneProps) {
   const modeSegments = buildTrainingModeSegments(
     trainingModeOptions.map((option) => ({
@@ -232,24 +235,44 @@ export function TrainingPlayerLane({
     })),
   );
 
+  const teamModeCounts = useMemo(
+    () =>
+      playerRows.reduce(
+        (counts, row) => {
+          counts[row.mode] += 1;
+          return counts;
+        },
+        { leicht: 0, mittel: 0, hart: 0 },
+      ),
+    [playerRows],
+  );
+
   return (
     <>
       <div className="training-v2-section-head">
         <div>
-          <span className="training-v2-kicker">Spielertraining</span>
-          <strong>Wer steigt jetzt, wer kippt spaeter?</strong>
+          <TooltipHeading as="h3" tooltip="Modus und Klasse pro Spieler. Filter nach Entwicklung und Risiko.">
+            Kader
+          </TooltipHeading>
         </div>
         <span className="pill">
           {playerRows.length}/{allPlayerCount}
         </span>
       </div>
 
+      <div className="training-v2-team-mode-strip" aria-label="Team-Trainingsmodus">
+        <span>Team-Modus</span>
+        <strong>
+          Leicht {teamModeCounts.leicht} · Mittel {teamModeCounts.mittel} · Hart {teamModeCounts.hart}
+        </strong>
+      </div>
+
       <div className="training-v2-filter-row">
         {([
-          { id: "all" as const, label: "Alle", detail: "ganzer Kader" },
-          { id: "growth" as const, label: "Steigt", detail: "lohnt sich jetzt" },
-          { id: "stable" as const, label: "Stabil", detail: "Modus pruefen" },
-          { id: "regression" as const, label: "Risiko", detail: "zuerst sichern" },
+          { id: "all" as const, label: "Alle" },
+          { id: "growth" as const, label: "Steigt" },
+          { id: "stable" as const, label: "Stabil" },
+          { id: "regression" as const, label: "Risiko" },
         ]).map((filter) => (
           <button
             key={filter.id}
@@ -259,7 +282,6 @@ export function TrainingPlayerLane({
           >
             <span>{filter.label}</span>
             <strong>{developmentSummary[filter.id]}</strong>
-            <small>{filter.detail}</small>
           </button>
         ))}
       </div>
@@ -268,8 +290,9 @@ export function TrainingPlayerLane({
         {playerRows.map((row) => {
           const portrait = getPortraitModel(row.player);
           const tone = getDevelopmentTone(row);
+          const isHighRisk = row.forecast.regressionRisk === "high";
           return (
-            <article className={`training-v2-rider-card velo-rider-card is-${tone}`} id={`training-player-${row.player.id}`} key={row.entryId}>
+            <article className={`training-v2-rider-card velo-rider-card is-${tone}${isHighRisk ? " is-high-risk" : ""}`} id={`training-player-${row.player.id}`} key={row.entryId}>
               <VeloStatOrbitRow stats={row.player.coreStats} ariaLabel={`${row.player.name} Achsenwerte`} />
 
               <div className="training-v2-rider-hero">
@@ -297,6 +320,7 @@ export function TrainingPlayerLane({
                   <div className="training-v2-rider-title-row">
                     <strong className="training-v2-clickable">{row.player.name}</strong>
                     <span className={`training-v2-badge is-${tone}`}>{getDevelopmentBadgeLabel(tone)}</span>
+                    {isHighRisk ? <span className="training-v2-badge is-risk-urgent">10/10 Risiko</span> : null}
                   </div>
                   <p className="training-v2-rider-meta">
                     <ClassColorChip className={row.player.className} /> · {row.roleTag ?? "ohne Rolle"}
@@ -325,6 +349,9 @@ export function TrainingPlayerLane({
                   ) : null}
                 </div>
               </div>
+
+              <TrainingTraitBoostRow row={row} />
+              <TrainingModeDemandBanner row={row} />
 
               <div className="training-v2-rider-forecast-row">
                 <div>
@@ -362,10 +389,7 @@ export function TrainingPlayerLane({
                 })}
               />
 
-              <TrainingTraitBoostRow row={row} />
-
-              <TrainingModeDemandBanner row={row} />
-
+              {showIntensityRail ? (
               <VeloIntensityRail
                 ariaLabel={`${row.player.name} Trainingsmodus`}
                 segments={modeSegments}
@@ -374,6 +398,7 @@ export function TrainingPlayerLane({
                 disabled={trainingModeReadOnly}
                 onSelect={(value) => onSetTrainingMode(row.player.id, value as PlayerTrainingMode)}
               />
+              ) : null}
 
               <div className="training-v2-plan-controls">
                 <label className="filter-field training-v2-class-select">

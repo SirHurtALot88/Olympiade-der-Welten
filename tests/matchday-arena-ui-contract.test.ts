@@ -4,13 +4,21 @@ import { describe, expect, it } from "vitest";
 
 describe("matchday arena ui contract", () => {
   it("wires a dedicated foundation arena view with reveal controls and score lanes", async () => {
-    const [foundationText, arenaText, legacyLineupText, presenterText, cssText] = await Promise.all([
+    const [foundationText, routingText, arenaText, arenaRevealPanelText, legacyLineupText, presenterText, cssText] = await Promise.all([
       fs.readFile(
         "/Users/chrisfalk/Documents/Codex/Olympiade der Welten/app/foundation/FoundationPageClient.tsx",
         "utf8",
       ),
       fs.readFile(
+        "/Users/chrisfalk/Documents/Codex/Olympiade der Welten/lib/foundation/foundation-view-routing.ts",
+        "utf8",
+      ),
+      fs.readFile(
         "/Users/chrisfalk/Documents/Codex/Olympiade der Welten/app/foundation/matchday-arena-v2/MatchdayArenaV2Client.tsx",
+        "utf8",
+      ),
+      fs.readFile(
+        "/Users/chrisfalk/Documents/Codex/Olympiade der Welten/app/foundation/matchday-arena-v2/ArenaRevealPlaybackPanel.tsx",
         "utf8",
       ),
       fs.readFile(
@@ -31,8 +39,8 @@ describe("matchday arena ui contract", () => {
     expect(foundationText).toContain('"matchdayResult"');
     expect(foundationText).toContain('{ id: "matchdayArena", label: "Arena"');
     expect(foundationText).not.toContain('{ id: "matchdayArenaV2", label: "Arena v2"');
-    expect(foundationText).toContain('if (view === "matchday-arena-v2")');
-    expect(foundationText).toContain('return "matchdayArena";');
+    expect(routingText).toContain('view === "matchday-arena-v2"');
+    expect(routingText).toContain('return "matchdayArena"');
     expect(foundationText).not.toContain('{ id: "matchdayResult", label: "Result" }');
     const secondaryViewsBlock = foundationText.slice(
       foundationText.indexOf("const foundationSecondaryViews"),
@@ -55,6 +63,9 @@ describe("matchday arena ui contract", () => {
     expect(foundationText).toContain("foundation-global-next-button");
     expect(foundationText).toContain("triggerGlobalNext");
     expect(foundationText).toContain('activeView === "matchdayArena"');
+    expect(foundationText).toContain('data-testid="arena-lineup-blocker"');
+    expect(foundationText).toContain("lineup_not_submitted");
+    expect(foundationText).toContain("isTeamMatchdayLineupSubmitted");
     expect(foundationText).toContain("homeNextMatchdayStatus.openSlots > 0");
     expect(foundationText).toContain("Leertaste");
     expect(foundationText).toContain("event.code !== \"Space\"");
@@ -84,7 +95,8 @@ describe("matchday arena ui contract", () => {
     expect(arenaText).toContain("activeDisciplinePhase");
     expect(arenaText).toContain("revealedSlotCountByDiscipline");
     expect(arenaText).toContain("completedDisciplinePhases");
-    expect(arenaText).toContain("MatchdayArenaTimeline");
+    expect(arenaRevealPanelText).toContain("MatchdayArenaTimeline");
+    expect(arenaText).toContain("ArenaRevealPlaybackPanel");
     expect(arenaText).toContain("MatchdayArenaPlayerCard");
     expect(arenaText).toContain("handleAdvanceArenaStep");
     expect(arenaText).toContain("scrollArenaTeamIntoView");
@@ -173,9 +185,30 @@ describe("matchday arena ui contract", () => {
     expect(cssText).toContain(".matchday-result-table");
     expect(cssText).toContain(".arena-v2-board-step-nav");
     expect(arenaText).toContain("arena-v2-main-grid is-full-stage");
+    expect(arenaText).toContain('data-virtualized="true"');
+    expect(arenaText).toContain("ArenaBoardRow");
+    expect(arenaText).toContain("arena-v2-board-row-velo-strip");
+    expect(arenaText).toContain("handleBoardScroll");
+    expect(arenaText).toContain("matchdayWinnerByTeamId");
+    expect(arenaText).toContain("VeloStatOrbitRow");
+    expect(arenaText).toContain("arena-v2-breakdown-velo-strip");
     expect(arenaText).toContain("Teams links, Fokus-Spieler rechts");
     expect(cssText).toContain(".arena-v2-main-grid.is-full-stage");
     expect(cssText).toContain(".arena-v2-main-grid.is-single-discipline");
     expect(cssText).toContain("transition: width 920ms");
+  });
+
+  it("wires Spieltag-abschliessen button and lineup blocker in arena view", async () => {
+    const foundationText = await fs.readFile(
+      "/Users/chrisfalk/Documents/Codex/Olympiade der Welten/app/foundation/FoundationPageClient.tsx",
+      "utf8",
+    );
+
+    expect(foundationText).toContain('data-testid="arena-finish-matchday-button"');
+    expect(foundationText).toContain("runFinishMatchdaySimple");
+    expect(foundationText).toContain("Spieltag abschliessen");
+    expect(foundationText).toContain("matchday-auto-run-execute");
+    expect(foundationText).toContain('data-testid="arena-lineup-blocker"');
+    expect(foundationText).toContain("lineup_not_submitted");
   });
 });

@@ -14,6 +14,10 @@ export type HomeV2TopPlayerCard = {
   contractLength: number | null;
   marketValue: number | null;
   highlight?: "top" | "prospect" | null;
+  topDisciplineId?: string | null;
+  topDisciplineLabel?: string | null;
+  topDisciplineTier?: string | null;
+  topDisciplineScore?: number | null;
 };
 
 export type HomeV2FacilitySnapshot = {
@@ -89,8 +93,9 @@ export type HomeV2ClientProps = {
   onOpenLineup: () => void;
   onOpenMarket: () => void;
   onOpenTraining: () => void;
-  onOpenHq: () => void;
+  onOpenOffice: () => void;
   onOpenSeason: () => void;
   onOpenInbox: () => void;
+  onOpenBoardObjectives?: () => void;
   onOpenPlayer: (playerId: string) => void;
 };

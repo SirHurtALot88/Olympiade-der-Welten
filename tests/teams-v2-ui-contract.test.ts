@@ -10,6 +10,10 @@ describe("teams v2 ui contract", () => {
   it("uses velo rider mini cards in roster grid", async () => {
     const fileText = await fs.readFile(teamsV2Path, "utf8");
     expect(fileText).toContain("VeloStatOrbitRow");
+    expect(fileText).toContain("VeloScoutMetric");
+    expect(fileText).toContain("DisciplineIcon");
+    expect(fileText).toContain("FoundationSubNav");
+    expect(fileText).toContain('data-testid="teams-v2-contracts-panel"');
     expect(fileText).toContain("teams-v2-roster-grid");
     expect(fileText).toContain('data-testid="foundation-teams-v2"');
   });
@@ -34,5 +38,12 @@ describe("teams v2 ui contract", () => {
     expect(fileText).toContain("openContractRenewalNegotiation");
     expect(fileText).toContain("confirmContractRenewalNegotiation");
     expect(fileText).toContain("contractRenewalNegotiation");
+  });
+
+  it("offers an exit from classic teams comparison back to rider cards", async () => {
+    const fileText = await fs.readFile(foundationClientPath, "utf8");
+    expect(fileText).toContain("Zurück zu Teams");
+    expect(fileText).toContain("setShowTeamsComparison(false)");
+    expect(fileText).toContain("teams-comparison-header");
   });
 });

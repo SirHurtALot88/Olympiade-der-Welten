@@ -1,6 +1,10 @@
 "use client";
 
 import type { ScoutingHubV2ClientProps } from "@/app/foundation/scouting-center-v2/scouting-center-v2-types";
+import FoundationSubNav from "@/app/foundation/shell/FoundationSubNav";
+import DisciplineIcon from "@/app/foundation/DisciplineIcon";
+import { VeloScoutMetric } from "@/components/foundation/velo-ui";
+import { useState } from "react";
 
 function renderStars(level: number) {
   return Array.from({ length: 5 }, (_, index) => (
@@ -29,6 +33,7 @@ export default function ScoutingCenterV2Client({
   onOpenHomeV2,
   onOpenPlayer,
 }: ScoutingHubV2ClientProps) {
+  const [activeTab, setActiveTab] = useState<"overview" | "reports" | "recommended">("overview");
   const rosterGap =
     rosterMinimum != null && rosterCount < rosterMinimum ? rosterMinimum - rosterCount : 0;
 
@@ -52,6 +57,18 @@ export default function ScoutingCenterV2Client({
         </div>
       </header>
 
+      <FoundationSubNav
+        className="scouting-center-v2-subnav"
+        activeId={activeTab}
+        onSelect={(id) => setActiveTab(id as typeof activeTab)}
+        items={[
+          { id: "overview", label: "Overview" },
+          { id: "reports", label: "Reports" },
+          { id: "recommended", label: "Recommended" },
+        ]}
+      />
+
+      {(activeTab === "overview" || activeTab === "recommended") ? (
       <section className="scouting-hub-v2-recruitment">
         <article className="scouting-hub-v2-card">
           <span className="eyebrow">Draft & Rekrutierung</span>
@@ -86,7 +103,10 @@ export default function ScoutingCenterV2Client({
           </p>
         </article>
       </section>
+      ) : null}
 
+      {activeTab === "overview" ? (
+      <>
       <section className="scouting-hub-v2-disclosure">
         <div className="home-v2-panel-head">
           <span className="eyebrow">Sichtbarkeit</span>
@@ -155,7 +175,28 @@ export default function ScoutingCenterV2Client({
           <p className="muted">Scouting Office beobachtet noch keine Spieler — Watchlist im Transfermarkt setzen oder Facility upgraden.</p>
         )}
       </section>
+      </>
+      ) : null}
 
+      {activeTab === "recommended" || activeTab === "reports" ? (
+      <section className="scouting-hub-v2-watchlist">
+        <div className="home-v2-panel-head">
+          <span className="eyebrow">Top Stärken</span>
+          <h3>Top 3 Disziplinen (Scouting)</h3>
+        </div>
+        <div className="scouting-hub-v2-target-grid" data-testid="scouting-top-disciplines">
+          {watchTargets.slice(0, 3).map((target) => (
+            <article key={`disc-${target.playerId}`} className="scouting-hub-v2-target-card">
+              <DisciplineIcon disciplineId={target.className?.toLowerCase()} label={target.className ?? "Flex"} showLabel />
+              <VeloScoutMetric rangeLabel={target.marketValue} tier={target.className?.slice(0, 1) ?? "?"} scoutingLevel={disclosureLevel} />
+              <strong>{target.playerName}</strong>
+            </article>
+          ))}
+        </div>
+      </section>
+      ) : null}
+
+      {(activeTab === "overview" || activeTab === "recommended") ? (
       <section className="scouting-hub-v2-watchlist">
         <div className="home-v2-panel-head">
           <span className="eyebrow">Watchlist / Beobachtet</span>
@@ -186,6 +227,7 @@ export default function ScoutingCenterV2Client({
           Transfermarkt öffnen
         </button>
       </section>
+      ) : null}
     </div>
   );
 }

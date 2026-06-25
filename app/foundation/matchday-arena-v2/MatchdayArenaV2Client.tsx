@@ -1,11 +1,11 @@
 "use client";
 
-import { useEffect, useMemo, useRef, useState } from "react";
+import { memo, useCallback, useEffect, useMemo, useRef, useState, type UIEvent } from "react";
 
 import OptimizedMediaImage from "@/app/foundation/OptimizedMediaImage";
+import ArenaRevealPlaybackPanel from "@/app/foundation/matchday-arena-v2/ArenaRevealPlaybackPanel";
 import MatchdayArenaPlayerCard from "@/components/matchday-arena/MatchdayArenaPlayerCard";
-import MatchdayArenaTimeline from "@/components/matchday-arena/MatchdayArenaTimeline";
-import { VeloImpactStrip } from "@/components/foundation/velo-ui";
+import { VeloImpactStrip, VeloStatOrbitRow, type VeloAxisKey } from "@/components/foundation/velo-ui";
 import { TooltipHeading } from "@/components/ui/TooltipHeading";
 import { getPlayerPortraitBrowserUrl, getTeamLogoBrowserUrl } from "@/lib/data/mediaAssets";
 import type { Player, Team, TeamControlSettings } from "@/lib/data/olyDataTypes";
@@ -229,6 +229,17 @@ type ArenaPlayerAxisStat = {
   axis: "POW" | "SPE" | "MEN" | "SOC";
   value: number | null;
 };
+
+function axisStatsToOrbitStats(axisStats: ArenaPlayerAxisStat[]) {
+  const stats = { pow: 0, spe: 0, men: 0, soc: 0 };
+  for (const stat of axisStats) {
+    const key = stat.axis.toLowerCase() as VeloAxisKey;
+    if (key in stats && stat.value != null && Number.isFinite(stat.value)) {
+      stats[key] = stat.value;
+    }
+  }
+  return stats;
+}
 
 type ArenaFocusTeamEntryCard = {
   disciplineSide: "d1" | "d2";
@@ -554,6 +565,143 @@ function clampPct(value: number) {
   return Math.max(6, Math.min(100, value));
 }
 
+const ARENA_BOARD_ROW_STRIDE = 66;
+const ARENA_BOARD_VIRTUAL_OVERSCAN = 4;
+
+type ArenaBoardRowModel = {
+  teamId: string;
+  teamName: string;
+  teamLogoUrl: string | null;
+  rank: number;
+  stepRankDelta: number | null;
+  score: number;
+  points: number | null;
+  tone: string;
+  detailChips: string[];
+  trackSegments?: Array<{ id: string; value: number; tone: string; label: string }>;
+  breakdown?: Array<{ id: string; label: string; value: number | null; tone?: string }>;
+};
+
+type ArenaBoardRowProps = {
+  row: ArenaBoardRowModel;
+  maxBoardScore: number;
+  widthPct: number;
+  isSelected: boolean;
+  isActiveTeam: boolean;
+  effectiveBoardMode: string;
+  isSlotsPhase: boolean;
+  slotDelta: number | null;
+  stepRankDeltaLabel: string | null;
+  statSecondaryLabel: string | null;
+  teamResult: { seasonRank?: number | null; seasonRankDelta?: number | null } | null;
+  paramsTeamId: string;
+  onTeamRowClick: (teamId: string) => void;
+  onTeamRowDoubleClick: (teamId: string) => void;
+  registerRowRef: (teamId: string, node: HTMLElement | null) => void;
+};
+
+const ArenaBoardRow = memo(function ArenaBoardRow({
+  row,
+  maxBoardScore,
+  widthPct,
+  isSelected,
+  isActiveTeam,
+  effectiveBoardMode,
+  isSlotsPhase,
+  slotDelta,
+  stepRankDeltaLabel,
+  statSecondaryLabel,
+  teamResult,
+  paramsTeamId,
+  onTeamRowClick,
+  onTeamRowDoubleClick,
+  registerRowRef,
+}: ArenaBoardRowProps) {
+  return (
+    <article
+      ref={(node) => registerRowRef(row.teamId, node)}
+      className={`arena-v2-board-row is-${row.tone}${isSelected ? " is-selected" : ""}${isActiveTeam ? " is-active-team" : ""}`}
+      role="listitem"
+      tabIndex={0}
+      aria-current={isSelected ? "true" : undefined}
+      title={isSelected ? "Team-Fokus aufheben" : `${row.teamName} fokussieren · Doppelklick für Team-Drawer`}
+      onClick={() => onTeamRowClick(row.teamId)}
+      onDoubleClick={() => onTeamRowDoubleClick(row.teamId)}
+      onKeyDown={(event) => {
+        if (event.key === "Enter" || event.key === " ") {
+          event.preventDefault();
+          onTeamRowClick(row.teamId);
+        }
+      }}
+    >
+      <div className="arena-v2-board-row-main">
+        <span className="arena-v2-board-rank">
+          #{row.rank}
+          {stepRankDeltaLabel ? (
+            <span
+              className={`arena-v2-board-rank-delta${(row.stepRankDelta ?? 0) > 0 ? " is-up" : " is-down"}`}
+              title="Rangänderung seit dem letzten Reveal-Schritt"
+            >
+              {stepRankDeltaLabel}
+            </span>
+          ) : null}
+        </span>
+        {row.teamLogoUrl ? (
+          <OptimizedMediaImage className="arena-v2-board-logo" src={row.teamLogoUrl} alt={`${row.teamName} Logo`} width={32} height={32} />
+        ) : (
+          <span className="arena-v2-board-logo arena-v2-board-logo-fallback">—</span>
+        )}
+        <div className="arena-v2-board-copy">
+          <strong>{row.teamName}</strong>
+          {row.detailChips.length > 0 ? (
+            <div className="arena-v2-board-chips">
+              {row.detailChips.slice(0, effectiveBoardMode === "total" ? 2 : 4).map((chip) => (
+                <span key={`${row.teamId}-${chip}`} className="pill arena-v2-board-chip">
+                  {chip}
+                </span>
+              ))}
+            </div>
+          ) : null}
+        </div>
+      </div>
+      <div className="arena-v2-board-track-wrap">
+        <div className="arena-v2-board-track">
+          {(row.trackSegments?.length ?? 0) > 0 ? (
+            <div className="arena-v2-board-track-stack" style={{ width: `${widthPct}%` }}>
+              {row.trackSegments!.map((segment) => (
+                <span
+                  key={`${row.teamId}-${segment.id}`}
+                  className={`arena-v2-board-track-segment is-${segment.id} is-${segment.tone}`}
+                  style={{ flexGrow: Math.max(Math.abs(segment.value), 0.01) }}
+                  title={`${segment.label}: ${formatSignedDelta(segment.value)}`}
+                />
+              ))}
+            </div>
+          ) : (
+            <div className="arena-v2-board-track-fill" style={{ width: `${widthPct}%` }} />
+          )}
+        </div>
+        <span className="arena-v2-board-track-rank">Rang {row.rank}</span>
+      </div>
+      <div className="arena-v2-board-stats">
+        <strong>{formatDecimalScore(row.score, 1)}</strong>
+        {statSecondaryLabel ? <span>{statSecondaryLabel}</span> : null}
+      </div>
+      {isSelected && (row.breakdown?.length ?? 0) > 0 ? (
+        <VeloImpactStrip
+          className="arena-v2-board-row-velo-strip"
+          items={row.breakdown!.slice(0, 5).map((entry) => ({
+            key: entry.id,
+            label: entry.label,
+            value: entry.value == null ? "—" : formatDecimalScore(entry.value, 1),
+            tone: entry.tone === "negative" ? "negative" : entry.tone === "positive" ? "positive" : "neutral",
+          }))}
+        />
+      ) : null}
+    </article>
+  );
+});
+
 export default function MatchdayArenaV2Client(props: MatchdayArenaV2ClientProps) {
   const [params, setParams] = useState(() => defaultArenaParams(props));
   const [source, setSource] = useState<"sqlite" | "prisma">(props.initialSource ?? "sqlite");
@@ -588,6 +736,20 @@ export default function MatchdayArenaV2Client(props: MatchdayArenaV2ClientProps)
   const detailRequestAbortRef = useRef<AbortController | null>(null);
   const boardListRef = useRef<HTMLDivElement | null>(null);
   const boardRowRefs = useRef<Map<string, HTMLElement>>(new Map());
+  const scoreFeedCacheRef = useRef<Map<string, MatchdayMvpScoringResult>>(new Map());
+  const [boardScrollTop, setBoardScrollTop] = useState(0);
+  const [boardViewportHeight, setBoardViewportHeight] = useState(560);
+  const boardScrollRafRef = useRef<number | null>(null);
+  const handleBoardScroll = useCallback((event: UIEvent<HTMLDivElement>) => {
+    const scrollTop = event.currentTarget.scrollTop;
+    if (boardScrollRafRef.current != null) {
+      return;
+    }
+    boardScrollRafRef.current = window.requestAnimationFrame(() => {
+      setBoardScrollTop(scrollTop);
+      boardScrollRafRef.current = null;
+    });
+  }, []);
   const teamRowClickTimerRef = useRef<number | null>(null);
   const hasAutoScrolledToFocusRef = useRef(false);
   const shouldScrollToActiveTeamAfterStepRef = useRef(false);
@@ -705,6 +867,8 @@ export default function MatchdayArenaV2Client(props: MatchdayArenaV2ClientProps)
         teamId: resolvedParams.teamId,
         source: nextSource,
       });
+      const scoreCacheKey = `${resolvedParams.saveId}:${resolvedParams.seasonId}:${resolvedParams.matchdayId}:${nextSource}`;
+      const cachedScoreFeed = scoreFeedCacheRef.current.get(scoreCacheKey) ?? null;
 
       const [contextResult, scoreResult] = await Promise.allSettled([
         fetch(`/api/lineups/legacy/lab-context?${contextQuery.toString()}`, {
@@ -717,7 +881,12 @@ export default function MatchdayArenaV2Client(props: MatchdayArenaV2ClientProps)
             "Der Arena-v2-Kontext hat keine lesbare Antwort geliefert.",
           ),
         })),
-        fetch("/api/season/matchday-mvp-score", {
+        cachedScoreFeed
+          ? Promise.resolve({
+              ok: true,
+              payload: { summary: cachedScoreFeed },
+            })
+          : fetch("/api/season/matchday-mvp-score", {
           method: "POST",
           signal: baseController.signal,
           headers: {
@@ -818,6 +987,7 @@ export default function MatchdayArenaV2Client(props: MatchdayArenaV2ClientProps)
       setContext(contextPayload.context);
       setTeamOptions(contextPayload.options.teams);
       setScoreFeed(scorePayload.summary);
+      scoreFeedCacheRef.current.set(scoreCacheKey, scorePayload.summary);
       setStandingsPreviewFeed(null);
       setFocusTeamId(canonicalParams.teamId);
       setWarnings(
@@ -1091,6 +1261,11 @@ export default function MatchdayArenaV2Client(props: MatchdayArenaV2ClientProps)
       }));
   }, [props.teams, scoreboardByTeamId, standingsRankChangeByTeamId]);
 
+  const matchdayWinnerByTeamId = useMemo(
+    () => new Map(matchdayWinnerRows.map((row) => [row.teamId, row] as const)),
+    [matchdayWinnerRows],
+  );
+
   const resolvePlayerCatalogById = useMemo(
     () => new Map((resolveFeed?.playerCatalog ?? []).map((player) => [player.playerId, player] as const)),
     [resolveFeed?.playerCatalog],
@@ -1141,8 +1316,8 @@ export default function MatchdayArenaV2Client(props: MatchdayArenaV2ClientProps)
     if (!focusTeamId) {
       return null;
     }
-    return matchdayWinnerRows.find((entry) => entry.teamId === focusTeamId) ?? null;
-  }, [focusTeamId, matchdayWinnerRows]);
+    return matchdayWinnerByTeamId.get(focusTeamId) ?? null;
+  }, [focusTeamId, matchdayWinnerByTeamId]);
 
   const focusTeam = useMemo(
     () => (focusTeamId ? props.teams.find((team) => team.teamId === focusTeamId) ?? null : null),
@@ -1689,6 +1864,25 @@ export default function MatchdayArenaV2Client(props: MatchdayArenaV2ClientProps)
 
   const leaderRow = boardRows[0] ?? null;
   const boardLeaderLabel = leaderRow?.teamName ?? "—";
+  const boardVirtualWindow = useMemo(() => {
+    const start = Math.max(0, Math.floor(boardScrollTop / ARENA_BOARD_ROW_STRIDE) - ARENA_BOARD_VIRTUAL_OVERSCAN);
+    const end = Math.min(
+      boardRows.length,
+      Math.ceil((boardScrollTop + boardViewportHeight) / ARENA_BOARD_ROW_STRIDE) + ARENA_BOARD_VIRTUAL_OVERSCAN,
+    );
+    return { start, end, offsetY: start * ARENA_BOARD_ROW_STRIDE };
+  }, [boardRows.length, boardScrollTop, boardViewportHeight]);
+  useEffect(() => {
+    const node = boardListRef.current;
+    if (!node) {
+      return;
+    }
+    const syncViewport = () => setBoardViewportHeight(node.clientHeight || 560);
+    syncViewport();
+    const observer = new ResizeObserver(syncViewport);
+    observer.observe(node);
+    return () => observer.disconnect();
+  }, [loadStage, boardRows.length]);
   const boardLabel =
     effectiveBoardMode === "total" ? "Gesamtwertung" : effectiveBoardMode === "d1" ? `${d1Label} Reveal` : `${d2Label} Reveal`;
   const canGoBackArenaStep =
@@ -2265,17 +2459,11 @@ export default function MatchdayArenaV2Client(props: MatchdayArenaV2ClientProps)
               {renderArenaRankTag("G+#", entry.rankTotalBoosted, "boosted", ARENA_PLAYER_RANK_TOOLTIPS.totalBoosted, entryRankPools.totalPoolSize)}
             </div>
             {entry.axisStats.length ? (
-              <div className="arena-v2-axis-strip">
-                {entry.axisStats.map((stat) => (
-                  <span
-                    key={`${entry.playerId}-${stat.axis}`}
-                    className={`arena-v2-axis-chip is-${stat.axis.toLowerCase()} is-tier-${getArenaAxisValueTier(stat.value)}`}
-                  >
-                    <small>{stat.axis}</small>
-                    <strong>{stat.value == null || !Number.isFinite(stat.value) ? "—" : Math.round(stat.value)}</strong>
-                  </span>
-                ))}
-              </div>
+              <VeloStatOrbitRow
+                className="arena-v2-slot-orbit-row"
+                ariaLabel={`${entry.playerName} Attribute`}
+                stats={axisStatsToOrbitStats(entry.axisStats)}
+              />
             ) : null}
             {entry.warnings.length ? <p className="arena-v2-slot-warning">{entry.warnings[0]}</p> : null}
           </article>
@@ -2427,74 +2615,83 @@ export default function MatchdayArenaV2Client(props: MatchdayArenaV2ClientProps)
             <span className="pill">Slots {revealedSlotCount}/{maxSlotRevealCount}</span>
             <span className="pill">{canShowResultLayer ? `PPs ${scoreFeed?.ppWinners.length ?? 0} sichtbar` : "PPs im Result"}</span>
           </div>
-          <div className="arena-v2-control-row arena-v2-timeline-controls">
-            <button
-              className={`secondary-button inline-button${effectiveBoardMode === "total" ? " is-selected" : ""}`}
-              type="button"
-              disabled={!canShowTotalResults || isRoomRevealSyncActive}
-              onClick={showTotalResults}
-              title={canShowTotalResults ? "Gesamtwertung anzeigen" : "Gesamtwertung wird erst nach D1 und D2 freigeschaltet"}
-            >
-              Gesamt
-            </button>
-            <button
-              className={`secondary-button inline-button${effectiveBoardMode === "d1" ? " is-selected" : ""}`}
-              type="button"
-              disabled={isRoomRevealSyncActive}
-              onClick={() => switchToDiscipline("d1")}
-            >
-              {d1Label}
-            </button>
-            <button
-              className={`secondary-button inline-button${effectiveBoardMode === "d2" ? " is-selected" : ""}`}
-              type="button"
-              disabled={!canSwitchToD2 || isRoomRevealSyncActive}
-              onClick={() => switchToDiscipline("d2")}
-              title={canSwitchToD2 ? `${d2Label} Reveal anzeigen` : `${d2Label} wird nach Abschluss von ${d1Label} freigeschaltet`}
-            >
-              {d2Label}
-            </button>
-            <button className="primary-button inline-button" type="button" disabled={!canControlArenaReveal} onClick={() => (isPlaying ? setIsPlaying(false) : startRevealPlayback())}>
-              {isPlaying ? "Pause" : "Play"}
-            </button>
-            <button className="secondary-button inline-button" type="button" disabled={!canControlArenaReveal} onClick={resetArenaReveal}>
-              Reset
-            </button>
-            {[1, 2, 4].map((entry) => (
-              <button
-                key={`speed-${entry}`}
-                className={`secondary-button inline-button${speed === entry ? " is-selected" : ""}`}
-                type="button"
-                onClick={() => setSpeed(entry as ArenaPhaseControlSpeed)}
-              >
-                x{entry}
-              </button>
-            ))}
-          </div>
-          {effectiveBoardMode !== "total" ? (
-            <div className="arena-v2-score-legend" aria-label="Score-Balken Legende">
-              {(["slots", "push", "form", "mutator", "captain", "power"] as const).map((segmentId) => (
-                <span key={segmentId} className={`arena-v2-score-legend-item is-${segmentId}`}>
-                  {ARENA_SCORE_TRACK_SEGMENT_LABELS[segmentId]}
-                </span>
-              ))}
-            </div>
-          ) : null}
-          {restoredRevealSessionLabel ? (
-            <p className="arena-v2-control-hint">
-              {restoredRevealSessionLabel}. Leertaste = nächster Schritt, Pfeiltasten ebenfalls.
-              {isRoomRevealSyncActive ? (isRoomHost ? " Du steuerst den Reveal für alle." : " Der Host steuert den Reveal.") : ""}
-            </p>
-          ) : (
-            <p className="arena-v2-control-hint">
-              Leertaste = nächster Reveal-Schritt. Play startet Auto-Reveal.
-              {roomRevealWaitingForHost ? " Warte auf Host-Start." : ""}
-              {isRoomRevealSyncActive && !isRoomHost ? " Der Host steuert den gemeinsamen Reveal." : ""}
-              {isRoomRevealSyncActive && isRoomHost ? " Dein Schritt gilt für alle Spieler." : ""}
-            </p>
-          )}
         </div>
-        <MatchdayArenaTimeline activePhase={displayPhase} onSelectPhase={canControlArenaReveal ? jumpToArenaPhase : undefined} />
+        <ArenaRevealPlaybackPanel
+          activePhase={displayPhase}
+          onSelectPhase={canControlArenaReveal ? jumpToArenaPhase : undefined}
+          controls={
+            <>
+              <div className="arena-v2-control-row arena-v2-timeline-controls">
+                <button
+                  className={`secondary-button inline-button${effectiveBoardMode === "total" ? " is-selected" : ""}`}
+                  type="button"
+                  disabled={!canShowTotalResults || isRoomRevealSyncActive}
+                  onClick={showTotalResults}
+                  title={canShowTotalResults ? "Gesamtwertung anzeigen" : "Gesamtwertung wird erst nach D1 und D2 freigeschaltet"}
+                >
+                  Gesamt
+                </button>
+                <button
+                  className={`secondary-button inline-button${effectiveBoardMode === "d1" ? " is-selected" : ""}`}
+                  type="button"
+                  disabled={isRoomRevealSyncActive}
+                  onClick={() => switchToDiscipline("d1")}
+                >
+                  {d1Label}
+                </button>
+                <button
+                  className={`secondary-button inline-button${effectiveBoardMode === "d2" ? " is-selected" : ""}`}
+                  type="button"
+                  disabled={!canSwitchToD2 || isRoomRevealSyncActive}
+                  onClick={() => switchToDiscipline("d2")}
+                  title={canSwitchToD2 ? `${d2Label} Reveal anzeigen` : `${d2Label} wird nach Abschluss von ${d1Label} freigeschaltet`}
+                >
+                  {d2Label}
+                </button>
+                <button className="primary-button inline-button" type="button" disabled={!canControlArenaReveal} onClick={() => (isPlaying ? setIsPlaying(false) : startRevealPlayback())}>
+                  {isPlaying ? "Pause" : "Play"}
+                </button>
+                <button className="secondary-button inline-button" type="button" disabled={!canControlArenaReveal} onClick={resetArenaReveal}>
+                  Reset
+                </button>
+                {[1, 2, 4].map((entry) => (
+                  <button
+                    key={`speed-${entry}`}
+                    className={`secondary-button inline-button${speed === entry ? " is-selected" : ""}`}
+                    type="button"
+                    onClick={() => setSpeed(entry as ArenaPhaseControlSpeed)}
+                  >
+                    x{entry}
+                  </button>
+                ))}
+              </div>
+              {effectiveBoardMode !== "total" ? (
+                <div className="arena-v2-score-legend" aria-label="Score-Balken Legende">
+                  {(["slots", "push", "form", "mutator", "captain", "power"] as const).map((segmentId) => (
+                    <span key={segmentId} className={`arena-v2-score-legend-item is-${segmentId}`}>
+                      {ARENA_SCORE_TRACK_SEGMENT_LABELS[segmentId]}
+                    </span>
+                  ))}
+                </div>
+              ) : null}
+            </>
+          }
+          hint={
+            restoredRevealSessionLabel ? (
+              <p className="arena-v2-control-hint">
+                {restoredRevealSessionLabel}. Leertaste = nächster Schritt, Pfeiltasten ebenfalls.
+                {isRoomRevealSyncActive ? (isRoomHost ? " Du steuerst den Reveal für alle." : " Der Host steuert den Reveal.") : ""}
+              </p>
+            ) : (
+              <p className="arena-v2-control-hint">
+                Leertaste = nächster Reveal-Schritt. Play startet Auto-Reveal.
+                {roomRevealWaitingForHost ? " Warte auf Host-Start." : ""}
+                {isRoomRevealSyncActive && !isRoomHost ? " Der Host steuert den gemeinsamen Reveal." : ""}
+                {isRoomRevealSyncActive && isRoomHost ? " Dein Schritt gilt für alle Spieler." : ""}
+              </p>
+            )
+          }
+        />
       </section>
 
       <section className={`arena-v2-main-grid is-full-stage${canShowResultLayer ? "" : " is-single-discipline"}`}>
@@ -2538,17 +2735,30 @@ export default function MatchdayArenaV2Client(props: MatchdayArenaV2ClientProps)
               <span>
                 {MATCHDAY_ARENA_PHASES.find((phase) => phase.id === displayPhase)?.label ?? "Result"} · {boardLabel}
               </span>
-              <button
-                className="primary-button inline-button"
-                type="button"
-                disabled={!canGoForwardArenaStep || !canControlArenaReveal}
-                onClick={() => {
-                  setIsPlaying(false);
-                  handleAdvanceArenaStep();
-                }}
-              >
-                Weiter
-              </button>
+              {canShowResultLayer && props.onOpenMatchdayResult ? (
+                <button
+                  className="primary-button inline-button"
+                  type="button"
+                  onClick={() => {
+                    setIsPlaying(false);
+                    props.onOpenMatchdayResult?.();
+                  }}
+                >
+                  Zu den Ergebnissen →
+                </button>
+              ) : (
+                <button
+                  className="primary-button inline-button"
+                  type="button"
+                  disabled={!canGoForwardArenaStep || !canControlArenaReveal}
+                  onClick={() => {
+                    setIsPlaying(false);
+                    handleAdvanceArenaStep();
+                  }}
+                >
+                  Weiter
+                </button>
+              )}
             </div>
           </div>
           {loadStage === "scoreboard" ? (
@@ -2557,108 +2767,69 @@ export default function MatchdayArenaV2Client(props: MatchdayArenaV2ClientProps)
               <span>Auto-Lineups, Formkarten und Resolve laufen serverseitig. Das dauert meist ein paar Sekunden.</span>
             </div>
           ) : (
-          <div className="arena-v2-board-list" ref={boardListRef} role="list" aria-label="Arena v2 Teamboard">
-            {boardRows.map((row) => {
-              const widthPct = maxBoardScore > 0 && row.score > 0 ? clampPct((row.score / maxBoardScore) * 100) : 0;
-              const isSelected = focusTeamId === row.teamId;
-              const isActiveTeam = params.teamId === row.teamId;
-              const teamResult = matchdayWinnerRows.find((entry) => entry.teamId === row.teamId) ?? null;
-              const slotDelta = isSlotsPhase ? slotScoreByTeamId.deltaByTeamId.get(row.teamId) ?? null : null;
-              const stepRankDeltaLabel = formatArenaRankDelta(row.stepRankDelta);
-              const statSecondaryLabel =
-                row.points != null
-                  ? `${formatDecimalScore(row.points, 1)} PPs`
-                  : effectiveBoardMode === "total"
-                    ? `Saison ${formatSeasonRankChange(teamResult?.seasonRank ?? null, teamResult?.seasonRankDelta ?? null)}`
-                    : slotDelta != null
-                      ? `+${formatDecimalScore(slotDelta, 1)}`
-                      : null;
-              return (
-                <article
-                  key={`arena-v2-row-${row.teamId}`}
-                  ref={(node) => {
-                    if (node) {
-                      boardRowRefs.current.set(row.teamId, node);
-                    } else {
-                      boardRowRefs.current.delete(row.teamId);
-                    }
-                  }}
-                  className={`arena-v2-board-row is-${row.tone}${isSelected ? " is-selected" : ""}${isActiveTeam ? " is-active-team" : ""}`}
-                  role="listitem"
-                  tabIndex={0}
-                  aria-current={isSelected ? "true" : undefined}
-                  title={isSelected ? "Team-Fokus aufheben" : `${row.teamName} fokussieren · Doppelklick für Team-Drawer`}
-                  onClick={() => handleTeamRowClick(row.teamId)}
-                  onDoubleClick={() => handleTeamRowDoubleClick(row.teamId)}
-                  onKeyDown={(event) => {
-                    if (event.key === "Enter" || event.key === " ") {
-                      event.preventDefault();
-                      handleTeamRowClick(row.teamId);
-                    }
-                  }}
-                >
-                  <div className="arena-v2-board-row-main">
-                    <span className="arena-v2-board-rank">
-                      #{row.rank}
-                      {stepRankDeltaLabel ? (
-                        <span
-                          className={`arena-v2-board-rank-delta${(row.stepRankDelta ?? 0) > 0 ? " is-up" : " is-down"}`}
-                          title="Rangänderung seit dem letzten Reveal-Schritt"
-                        >
-                          {stepRankDeltaLabel}
-                        </span>
-                      ) : null}
-                    </span>
-                    {row.teamLogoUrl ? (
-                      <OptimizedMediaImage
-                        className="arena-v2-board-logo"
-                        src={row.teamLogoUrl}
-                        alt={`${row.teamName} Logo`}
-                        width={32}
-                        height={32}
-                      />
-                    ) : (
-                      <span className="arena-v2-board-logo arena-v2-board-logo-fallback">—</span>
-                    )}
-                    <div className="arena-v2-board-copy">
-                      <strong>{row.teamName}</strong>
-                      {row.detailChips.length > 0 ? (
-                        <div className="arena-v2-board-chips">
-                          {row.detailChips.slice(0, effectiveBoardMode === "total" ? 2 : 4).map((chip) => (
-                            <span key={`${row.teamId}-${chip}`} className="pill arena-v2-board-chip">
-                              {chip}
-                            </span>
-                          ))}
-                        </div>
-                      ) : null}
-                    </div>
-                  </div>
-                  <div className="arena-v2-board-track-wrap">
-                    <div className="arena-v2-board-track">
-                      {(row.trackSegments?.length ?? 0) > 0 ? (
-                        <div className="arena-v2-board-track-stack" style={{ width: `${widthPct}%` }}>
-                          {row.trackSegments!.map((segment) => (
-                            <span
-                              key={`${row.teamId}-${segment.id}`}
-                              className={`arena-v2-board-track-segment is-${segment.id} is-${segment.tone}`}
-                              style={{ flexGrow: Math.max(Math.abs(segment.value), 0.01) }}
-                              title={`${segment.label}: ${formatSignedDelta(segment.value)}`}
-                            />
-                          ))}
-                        </div>
-                      ) : (
-                        <div className="arena-v2-board-track-fill" style={{ width: `${widthPct}%` }} />
-                      )}
-                    </div>
-                    <span className="arena-v2-board-track-rank">Rang {row.rank}</span>
-                  </div>
-                  <div className="arena-v2-board-stats">
-                    <strong>{formatDecimalScore(row.score, 1)}</strong>
-                    {statSecondaryLabel ? <span>{statSecondaryLabel}</span> : null}
-                  </div>
-                </article>
-              );
-            })}
+          <div
+            className="arena-v2-board-list is-virtualized"
+            data-virtualized="true"
+            ref={boardListRef}
+            role="list"
+            aria-label="Arena v2 Teamboard"
+            onScroll={handleBoardScroll}
+          >
+            <div style={{ height: boardRows.length * ARENA_BOARD_ROW_STRIDE, position: "relative" }}>
+              <div
+                style={{
+                  position: "absolute",
+                  top: boardVirtualWindow.offsetY,
+                  left: 0,
+                  right: 0,
+                  display: "grid",
+                  gap: "var(--arena-v2-board-list-gap, 8px)",
+                }}
+              >
+                {boardRows.slice(boardVirtualWindow.start, boardVirtualWindow.end).map((row) => {
+                  const widthPct = maxBoardScore > 0 && row.score > 0 ? clampPct((row.score / maxBoardScore) * 100) : 0;
+                  const isSelected = focusTeamId === row.teamId;
+                  const isActiveTeam = params.teamId === row.teamId;
+                  const teamResult = matchdayWinnerByTeamId.get(row.teamId) ?? null;
+                  const slotDelta = isSlotsPhase ? slotScoreByTeamId.deltaByTeamId.get(row.teamId) ?? null : null;
+                  const stepRankDeltaLabel = formatArenaRankDelta(row.stepRankDelta);
+                  const statSecondaryLabel =
+                    row.points != null
+                      ? `${formatDecimalScore(row.points, 1)} PPs`
+                      : effectiveBoardMode === "total"
+                        ? `Saison ${formatSeasonRankChange(teamResult?.seasonRank ?? null, teamResult?.seasonRankDelta ?? null)}`
+                        : slotDelta != null
+                          ? `+${formatDecimalScore(slotDelta, 1)}`
+                          : null;
+                  return (
+                    <ArenaBoardRow
+                      key={`arena-v2-row-${row.teamId}`}
+                      row={row}
+                      maxBoardScore={maxBoardScore}
+                      widthPct={widthPct}
+                      isSelected={isSelected}
+                      isActiveTeam={isActiveTeam}
+                      effectiveBoardMode={effectiveBoardMode}
+                      isSlotsPhase={isSlotsPhase}
+                      slotDelta={slotDelta}
+                      stepRankDeltaLabel={stepRankDeltaLabel}
+                      statSecondaryLabel={statSecondaryLabel}
+                      teamResult={teamResult}
+                      paramsTeamId={params.teamId}
+                      onTeamRowClick={handleTeamRowClick}
+                      onTeamRowDoubleClick={handleTeamRowDoubleClick}
+                      registerRowRef={(teamId, node) => {
+                        if (node) {
+                          boardRowRefs.current.set(teamId, node);
+                        } else {
+                          boardRowRefs.current.delete(teamId);
+                        }
+                      }}
+                    />
+                  );
+                })}
+              </div>
+            </div>
           </div>
           )}
         </section>
@@ -2864,14 +3035,15 @@ export default function MatchdayArenaV2Client(props: MatchdayArenaV2ClientProps)
               {boardRows.slice(0, 3).map((row) => (
                 <article key={`arena-v2-breakdown-${row.teamId}`} className="arena-v2-breakdown-card">
                   <strong>{row.teamName}</strong>
-                  <div className="arena-v2-breakdown-list">
-                    {(row.breakdown ?? []).map((item) => (
-                      <span key={`${row.teamId}-${item.id}`} className={`arena-v2-breakdown-item is-${item.tone}`}>
-                        <small>{item.label}</small>
-                        <strong>{item.valueLabel}</strong>
-                      </span>
-                    ))}
-                  </div>
+                  <VeloImpactStrip
+                    className="arena-v2-breakdown-velo-strip"
+                    items={(row.breakdown ?? []).map((item) => ({
+                      key: item.id,
+                      label: item.label,
+                      value: item.valueLabel,
+                      tone: item.tone === "negative" ? "negative" : item.tone === "positive" ? "positive" : "neutral",
+                    }))}
+                  />
                 </article>
               ))}
             </div>

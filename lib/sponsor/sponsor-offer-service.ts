@@ -1,11 +1,13 @@
-import { randomUUID } from "node:crypto";
+import { randomUUID } from "@/lib/utils/random-id";
 
 import type {
   GameState,
   SponsorArchetype,
+  SponsorNegotiationProfile,
   SponsorOffer,
   SponsorOfferComponent,
   SponsorStarTier,
+  SponsorTermSeasons,
   Team,
   TeamIdentity,
   TeamSponsorContract,
@@ -14,8 +16,14 @@ import type {
 import { buildTeamSeasonOverviewRows } from "@/lib/foundation/team-management-overview";
 import { getTeamStrategyProfile } from "@/lib/foundation/team-strategy-profiles";
 import { buildTeamControlSettingsMap, type TeamControlSettings } from "@/lib/foundation/team-control-settings";
-import { pickSponsorBrandForOffer } from "@/lib/sponsor/sponsor-brand-catalog";
+import { pickSponsorBrandForOffer, buildGlobalParentUsageFromOffers } from "@/lib/sponsor/sponsor-brand-catalog";
+import { appendSponsorBrandHistory, getRecentSponsorParentIds } from "@/lib/sponsor/sponsor-contract-lifecycle";
+import { getTeamSponsorContract, getTeamSponsorOffers } from "@/lib/sponsor/sponsor-offer-read";
 import { buildSponsorCommercialRating } from "@/lib/sponsor/sponsor-commercial-rating-service";
+import {
+  applySponsorNegotiationToContract,
+  defaultAiSponsorNegotiation,
+} from "@/lib/sponsor/sponsor-negotiation";
 import {
   getDemandMultiplier,
   getDemandProfile,
@@ -29,6 +37,31 @@ function roundCash(value: number) {
 
 function clamp(value: number, min: number, max: number) {
   return Math.min(Math.max(value, min), max);
+}
+
+const REFERENCE_BLUEPRINT_TOTAL = 20;
+const SPONSOR_PAYROLL_SHARE = 0.5;
+
+function getCurrentSalaryFactor(gameState: GameState): number {
+  const factor = gameState.seasonState.seasonEconomyFactors?.[0]?.factor;
+  return typeof factor === "number" && Number.isFinite(factor) && factor > 0 ? factor : 1;
+}
+
+function getTeamSponsorEconomyMultiplier(input: {
+  teamSalaryTotal: number | null;
+  salaryFactor: number;
+  rewardMult: number;
+}): number {
+  const salary = input.teamSalaryTotal ?? 0;
+  if (salary <= 0) {
+    return input.salaryFactor;
+  }
+  const targetBestOffer = salary * input.salaryFactor * SPONSOR_PAYROLL_SHARE;
+  const baselineOffer = REFERENCE_BLUEPRINT_TOTAL * input.rewardMult;
+  if (baselineOffer <= 0) {
+    return input.salaryFactor;
+  }
+  return Math.max(input.salaryFactor * 0.5, Math.min(12, targetBestOffer / baselineOffer));
 }
 
 function getSportTargetRank(
@@ -67,14 +100,19 @@ function buildOffer(input: {
   starTier: SponsorStarTier;
   commercialRating: number;
   slotIndex: number;
-  usedBrandIds?: string[];
+  salaryFactor: number;
+  teamSalaryTotal: number | null;
+  usedParentBrandIds?: string[];
+  recentParentBrandIds?: string[];
+  globalParentUsage?: Record<string, number>;
 }): SponsorOffer {
-  const { team, identity, profile, archetype, rankTarget, startRank, gameState, starTier, commercialRating, slotIndex } = input;
+  const { team, identity, profile, archetype, rankTarget, startRank, gameState, starTier, commercialRating, slotIndex, salaryFactor, teamSalaryTotal } = input;
   const demandMult = getDemandMultiplier(starTier);
   const rewardMult = getRewardMultiplier(starTier);
+  const economyMult = getTeamSponsorEconomyMultiplier({ teamSalaryTotal, salaryFactor, rewardMult });
   const improvementBase = startRank != null ? Math.min(4, Math.max(2, Math.round((startRank - rankTarget) / 2) || 2)) : 2;
   const improvementTarget = improvementBase + (starTier >= 4 ? 1 : 0) + (starTier >= 5 ? 1 : 0);
-  const { brand, special } = pickSponsorBrandForOffer({
+  const { brand, parent, special } = pickSponsorBrandForOffer({
     seasonId: gameState.season.id,
     teamId: team.teamId,
     team,
@@ -83,10 +121,12 @@ function buildOffer(input: {
     archetype,
     starTier,
     slotIndex,
-    usedBrandIds: input.usedBrandIds,
+    usedParentBrandIds: input.usedParentBrandIds,
+    recentParentBrandIds: input.recentParentBrandIds,
+    globalParentUsage: input.globalParentUsage,
   });
 
-  const scale = (value: number) => roundCash(value * rewardMult);
+  const scale = (value: number) => roundCash(value * rewardMult * economyMult);
   const components: SponsorOfferComponent[] = [
     {
       componentId: "base-cash",
@@ -122,13 +162,15 @@ function buildOffer(input: {
     seasonId: gameState.season.id,
     teamId: team.teamId,
     archetype,
-    name: brand.name,
+    name: parent.name,
     flavor: brand.flavor,
     components,
     totalUpsideEstimate: roundCash(components.reduce((sum, component) => sum + component.rewardCash, 0)),
     starTier,
     commercialRating,
     sponsorBrandId: brand.id,
+    sponsorParentBrandId: brand.parentBrandId,
+    variantKey: brand.variantKey,
     demandProfile: getDemandProfile(starTier),
   };
 }
@@ -153,7 +195,11 @@ export function buildSponsorOffersForTeam(input: {
     commercialRating: commercialRating.score,
   });
   const archetypes: SponsorArchetype[] = ["security", "performance", "identity"];
-  const usedBrandIds: string[] = [];
+  const usedParentBrandIds: string[] = [];
+  const recentParentBrandIds = getRecentSponsorParentIds(input.gameState, input.teamId);
+  const globalParentUsage = buildGlobalParentUsageFromOffers(input.gameState.seasonState.sponsorOffersByTeamId);
+  const salaryFactor = getCurrentSalaryFactor(input.gameState);
+  const teamSalaryTotal = row?.salaryTotal ?? null;
 
   return archetypes.map((archetype, slotIndex) => {
     const starTier = starTiers[slotIndex] ?? 2;
@@ -169,10 +215,14 @@ export function buildSponsorOffersForTeam(input: {
       starTier,
       commercialRating: commercialRating.score,
       slotIndex,
-      usedBrandIds,
+      salaryFactor,
+      teamSalaryTotal,
+      usedParentBrandIds,
+      recentParentBrandIds,
+      globalParentUsage,
     });
-    if (offer.sponsorBrandId) {
-      usedBrandIds.push(offer.sponsorBrandId);
+    if (offer.sponsorParentBrandId) {
+      usedParentBrandIds.push(offer.sponsorParentBrandId);
     }
     return offer;
   });
@@ -206,6 +256,10 @@ export function ensureSeasonSponsorOffers(gameState: GameState): GameState {
   let changed = false;
 
   for (const team of gameState.teams) {
+    if (getTeamSponsorContract(gameState, team.teamId)) {
+      nextOffers[team.teamId] = existingOffers[team.teamId] ?? [];
+      continue;
+    }
     const currentOffers = existingOffers[team.teamId] ?? [];
     const hasCurrentSeasonOffers =
       currentOffers.length === 3 && currentOffers.every((offer) => offer.seasonId === seasonId);
@@ -230,18 +284,7 @@ export function ensureSeasonSponsorOffers(gameState: GameState): GameState {
   };
 }
 
-export function getTeamSponsorContract(gameState: GameState, teamId: string): TeamSponsorContract | null {
-  const contract = gameState.seasonState.sponsorContractsByTeamId?.[teamId] ?? null;
-  if (!contract || contract.seasonId !== gameState.season.id) {
-    return null;
-  }
-  return contract;
-}
-
-export function getTeamSponsorOffers(gameState: GameState, teamId: string): SponsorOffer[] {
-  const offers = gameState.seasonState.sponsorOffersByTeamId?.[teamId] ?? [];
-  return offers.filter((offer) => offer.seasonId === gameState.season.id);
-}
+export { getTeamSponsorContract, getTeamSponsorOffers } from "@/lib/sponsor/sponsor-offer-read";
 
 function payBaseFirstInstallment(gameState: GameState, contract: TeamSponsorContract, saveId?: string): GameState {
   if (contract.payouts.baseFirstPaid) {
@@ -289,6 +332,8 @@ export function chooseSponsorOffer(input: {
   teamId: string;
   offerId: string;
   saveId?: string;
+  termSeasons?: SponsorTermSeasons;
+  negotiationProfile?: SponsorNegotiationProfile;
 }): { gameState: GameState; contract: TeamSponsorContract | null; error?: string } {
   const offers = getTeamSponsorOffers(input.gameState, input.teamId);
   const offer = offers.find((entry) => entry.offerId === input.offerId) ?? null;
@@ -296,9 +341,12 @@ export function chooseSponsorOffer(input: {
     return { gameState: input.gameState, contract: null, error: "sponsor_offer_not_found" };
   }
 
+  const termSeasons: SponsorTermSeasons = 1;
+  const negotiationProfile = input.negotiationProfile ?? "balanced";
+
   const rows = buildTeamSeasonOverviewRows({ gameState: input.gameState });
   const row = rows.find((entry) => entry.teamId === input.teamId) ?? null;
-  const contract: TeamSponsorContract = {
+  let contract: TeamSponsorContract = {
     seasonId: input.gameState.season.id,
     teamId: input.teamId,
     offerId: offer.offerId,
@@ -311,8 +359,14 @@ export function chooseSponsorOffer(input: {
     starTier: offer.starTier,
     commercialRating: offer.commercialRating,
     sponsorBrandId: offer.sponsorBrandId,
+    sponsorParentBrandId: offer.sponsorParentBrandId,
+    variantKey: offer.variantKey,
+    termSeasons,
+    seasonsRemaining: termSeasons,
+    negotiationProfile,
     demandProfile: offer.demandProfile,
   };
+  contract = applySponsorNegotiationToContract(contract, { termSeasons, negotiationProfile });
 
   let nextGameState: GameState = {
     ...input.gameState,
@@ -324,6 +378,7 @@ export function chooseSponsorOffer(input: {
       },
     },
   };
+  nextGameState = appendSponsorBrandHistory(nextGameState, input.teamId, offer.sponsorParentBrandId);
   nextGameState = payBaseFirstInstallment(nextGameState, contract, input.saveId);
   const updatedContract = getTeamSponsorContract(nextGameState, input.teamId);
   return { gameState: nextGameState, contract: updatedContract };
@@ -374,6 +429,8 @@ export function chooseSponsorOfferForAiTeams(gameState: GameState, settingsMap?:
     const rows = buildTeamSeasonOverviewRows({ gameState: nextGameState });
     const row = rows.find((entry) => entry.teamId === team.teamId) ?? null;
     const cashPressure = row?.cash != null && row.cash < 0 ? 10 : row?.cash != null && row.cash < 20 ? 7 : 3;
+    const ambition = identity?.ambition ?? profile?.bias.starPriority ?? 5;
+    const negotiation = defaultAiSponsorNegotiation({ cashPressure, ambition });
     const bestOffer = [...offers].sort(
       (left, right) =>
         scoreOfferForAi({ offer: right, profile, identity, cashPressure }) -
@@ -382,7 +439,13 @@ export function chooseSponsorOfferForAiTeams(gameState: GameState, settingsMap?:
     if (!bestOffer) {
       continue;
     }
-    const result = chooseSponsorOffer({ gameState: nextGameState, teamId: team.teamId, offerId: bestOffer.offerId });
+    const result = chooseSponsorOffer({
+      gameState: nextGameState,
+      teamId: team.teamId,
+      offerId: bestOffer.offerId,
+      termSeasons: negotiation.termSeasons,
+      negotiationProfile: negotiation.negotiationProfile,
+    });
     nextGameState = result.gameState;
   }
 

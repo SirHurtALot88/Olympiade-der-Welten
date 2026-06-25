@@ -97,6 +97,48 @@ describe("form card flow", () => {
     expect(activeTeamHasFormCardSelections(state, "M-M")).toBe(true);
     expect(getFormCardFlowStatus(state, "M-M")).toEqual({
       hasPool: true,
+      hasModifierSelections: true,
+      hasPlanSelections: false,
+      hasSelections: true,
+      isReady: true,
+      blocker: null,
+    });
+  });
+
+  it("treats current-matchday form plans as ready selections", () => {
+    const state = gameState({
+      seasonState: {
+        seasonId: "season-2",
+        schedule: [],
+        standings: {},
+        formCards: [
+          {
+            id: "card-1",
+            saveId: "save-1",
+            seasonId: "season-2",
+            teamId: "M-M",
+            playerId: "p-1",
+            playerName: "p-1",
+            cardColor: "red",
+            cardValue: 4,
+            createdAt: "2026-06-12T00:00:00.000Z",
+          },
+        ],
+        formCardPlans: [
+          {
+            matchdayId: "season-2-md-1",
+            teamId: "M-M",
+            disciplineSide: "d1",
+            disciplineId: "d1-id",
+            primaryFormCardId: "card-1",
+            secondaryFormCardId: null,
+          },
+        ],
+      },
+    });
+
+    expect(getFormCardFlowStatus(state, "M-M")).toMatchObject({
+      hasPlanSelections: true,
       hasSelections: true,
       isReady: true,
       blocker: null,

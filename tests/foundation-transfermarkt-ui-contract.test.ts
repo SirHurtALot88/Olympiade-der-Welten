@@ -3,6 +3,7 @@ import fs from "node:fs/promises";
 import { describe, expect, it } from "vitest";
 
 const foundationClientPath = "/Users/chrisfalk/Documents/Codex/Olympiade der Welten/app/foundation/FoundationPageClient.tsx";
+const foundationViewRoutingPath = "/Users/chrisfalk/Documents/Codex/Olympiade der Welten/lib/foundation/foundation-view-routing.ts";
 const transfermarktV2Path = "/Users/chrisfalk/Documents/Codex/Olympiade der Welten/app/foundation/transfermarkt-v2/TransfermarktV2Client.tsx";
 const lineupPath = "/Users/chrisfalk/Documents/Codex/Olympiade der Welten/app/foundation/legacy-lineup-lab/LegacyLineupLabClient.tsx";
 const teamDrawerPath = "/Users/chrisfalk/Documents/Codex/Olympiade der Welten/app/foundation/TeamDetailDrawer.tsx";
@@ -24,11 +25,15 @@ describe("foundation transfermarkt ui contract", () => {
   });
 
   it("opens Transfermarkt V2 as the primary market flow", async () => {
-    const fileText = await fs.readFile(foundationClientPath, "utf8");
+    const [fileText, routingText] = await Promise.all([
+      fs.readFile(foundationClientPath, "utf8"),
+      fs.readFile(foundationViewRoutingPath, "utf8"),
+    ]);
 
-    expect(fileText).toContain('if (view === "market") return "marketV2";');
-    expect(fileText).toContain('if (view === "transfermarkt" || view === "market")');
-    expect(fileText).toContain("getDefaultFoundationViewTarget(view.id)");
+    expect(routingText).toContain('view === "transfermarkt-v2" || view === "transfermarkt" || view === "market"');
+    expect(routingText).toContain('return "marketV2"');
+    expect(fileText).toContain("normalizeFoundationViewParam");
+    expect(fileText).toContain("getDefaultFoundationViewTarget(view as FoundationViewId)");
     expect(fileText).toContain('setFoundationView("marketV2", setActiveView)');
   });
 
@@ -196,7 +201,7 @@ describe("foundation transfermarkt ui contract", () => {
     ]);
 
     expect(fileText).toContain("Kaufdialog");
-    expect(fileText).toContain("Auto-Angebot");
+    expect(foundationText).toContain("Auto-Angebot"); // classic TM in FoundationPageClient
     expect(fileText).toContain("resetBuyDemandFrame");
     expect(fileText).toContain("Spieler ist noch angefressen");
     expect(fileText).toContain('buyNegotiationOutcome?.status !== "accepted"');
@@ -223,5 +228,33 @@ describe("foundation transfermarkt ui contract", () => {
     expect(cssText).toContain(".legacy-lineup-slot-conflict-chip");
     expect(cssText).toContain(".legacy-lineup-side-issue-chip");
     expect(cssText).toContain(".legacy-matchday-player-score-chip.is-quality-instant");
+  });
+
+  it("separates market loading from empty filter state", async () => {
+    const fileText = await fs.readFile(transfermarktV2Path, "utf8");
+
+    expect(fileText).toContain("bootstrapReady");
+    expect(fileText).toContain("marketBusy && visibleItems.length === 0");
+    expect(fileText).toContain("market-v2-candidate-skeleton");
+    expect(fileText).toContain("!marketBusy && visibleItems.length === 0");
+    expect(fileText).toContain('defaultSeasonId === "loading"');
+  });
+
+  it("blocks classic market buy for teams the active owner cannot manage", async () => {
+    const fileText = await fs.readFile(foundationClientPath, "utf8");
+
+    expect(fileText).toContain('data-testid="transfer-buy-open-button"');
+    expect(fileText).toContain("!canManageTeamId(marketTeamId)");
+    expect(fileText).toContain("Nicht dein Team");
+  });
+
+  it("shows negotiation abort feedback when closing buy modals", async () => {
+    const [foundationText, v2Text] = await Promise.all([
+      fs.readFile(foundationClientPath, "utf8"),
+      fs.readFile(transfermarktV2Path, "utf8"),
+    ]);
+
+    expect(foundationText).toContain("Kauf von ${abortPlayerName} abgebrochen");
+    expect(v2Text).toContain("Kauf von ${playerName} abgebrochen");
   });
 });

@@ -6,7 +6,7 @@ import { setTimeout as delay } from "node:timers/promises";
 import { chromium, type Browser, type Page } from "@playwright/test";
 
 const DEFAULT_BASE_URL = "http://localhost:3000";
-const OUTPUT_DIR = "/Users/chrisfalk/Documents/Codex/2026-06-11/wir-machen-weiter-mit-dem-olympiade/outputs";
+const OUTPUT_DIR = path.join(process.cwd(), "outputs", "gameplay-smoke");
 const SCREENSHOT_NAMES = {
   foundation: "smoke-foundation.png",
   transfermarkt: "smoke-transfermarkt.png",
@@ -482,6 +482,21 @@ async function main() {
         assertStep(step, bannerText.toLowerCase().includes("aktiver kontext"), "Foundation zeigt aktiven Kontext-Banner.");
         assertStep(step, hasAny(text, ["season-", "Season 2", "Season 1"]), "Season ist sichtbar.");
         assertStep(step, hasAny(text, ["GamePhase", "season_active", "Phase"]), "GamePhase ist sichtbar.");
+      },
+    }));
+
+    steps.push(await runStep({
+      id: "home-v2",
+      label: "Home v2",
+      page,
+      screenshots: args.screenshots,
+      run: async (step) => {
+        await gotoFoundation(page, args.baseUrl, "homeV2", expectedTeamId, expectedSaveId);
+        await page.locator("#foundation-home-v2, [data-testid='foundation-home-v2']").first().waitFor({ state: "visible", timeout: args.timeoutMs }).catch(async () => {
+          await page.locator(".foundation-home-play-card, .foundation-home-dashboard").first().waitFor({ state: "visible", timeout: args.timeoutMs });
+        });
+        const text = await pageText(page);
+        assertStep(step, hasAny(text, ["Home", "Manager", "Weiter", "Spieltag", "Nächster Schritt"]), "Home v2 lädt mit Spieltag-Orientierung.");
       },
     }));
 

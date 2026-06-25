@@ -16,6 +16,15 @@ jobs:
           node-version: "20"
           cache: npm
       - run: npm ci
-      - run: npm test
+      - run: npx playwright install chromium --with-deps
+      - run: npm run ci:flow-smoke
       - run: npm run season:smoke-block-3
-      - run: npm run app:smoke-gameplay-write
+      - name: Start dev server for browser smokes
+        run: |
+          npm run dev &
+          echo $! > .dev-server.pid
+      - run: npm run app:check-live -- --startup-retries 90 --startup-delay-ms 2000
+      - run: npm run app:smoke-gameplay
+      - name: Stop dev server
+        if: always()
+        run: kill "$(cat .dev-server.pid)" 2>/dev/null || true

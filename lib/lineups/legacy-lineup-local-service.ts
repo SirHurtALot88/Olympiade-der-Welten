@@ -793,7 +793,7 @@ function normalizeEntries(entries: LegacyLineupEntryInput[]) {
     });
 }
 
-function buildValidationOptions(context: LegacyLineupLoadedContext): LegacyLineupValidationOptions {
+function buildValidationOptions(context: LegacyLineupLoadedContext, forSubmit = false): LegacyLineupValidationOptions {
   const previousCaptainKeys = new Set(
     (context.existingDraft?.entries ?? [])
       .filter((entry) => entry.isCaptain)
@@ -805,7 +805,7 @@ function buildValidationOptions(context: LegacyLineupLoadedContext): LegacyLineu
   }
 
   return {
-    enforceCompleteness: false,
+    enforceCompleteness: forSubmit,
     seasonCaptainLimit: SEASON_CAPTAIN_SLOTS,
     captainUsedBeforeCurrentDraft: Math.max(0, (context.teamStatus?.captainUsedCount ?? 0) - previousCaptainKeys.size),
     captainUsedBeforeCurrentDraftSides: Array.from(captainUsedBeforeCurrentDraftSides),
@@ -1108,7 +1108,7 @@ export function saveLocalLegacyLineupDraft(
       disciplineSidePlayerCounts: buildDisciplineSidePlayerCounts(contextResult.context),
       disciplineSideCaptainCounts: contextResult.context.disciplineSideCaptainCounts,
     },
-    buildValidationOptions(contextResult.context),
+    buildValidationOptions(contextResult.context, true),
   );
 
   if (!validation.isValid) {
@@ -1218,7 +1218,7 @@ export function saveLocalLegacyLineupDraftBatch(
         disciplineSidePlayerCounts: buildDisciplineSidePlayerCounts(contextResult.context),
         disciplineSideCaptainCounts: contextResult.context.disciplineSideCaptainCounts,
       },
-      buildValidationOptions(contextResult.context),
+      buildValidationOptions(contextResult.context, true),
     );
 
     warnings.push(...validation.warnings);
@@ -1242,7 +1242,7 @@ export function saveLocalLegacyLineupDraftBatch(
       seasonId: draftInput.params.seasonId,
       matchdayId: draftInput.params.matchdayId,
       teamId: draftInput.params.teamId,
-      status: "draft",
+      status: "submitted",
       entries: normalizedEntries,
       modifiers: draftInput.modifiers,
       createdAt: existing?.createdAt ?? now,

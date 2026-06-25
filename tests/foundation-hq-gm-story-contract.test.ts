@@ -9,13 +9,14 @@ const root = process.cwd();
 
 describe("foundation hq gm story contract", () => {
   it("surfaces gm change, hot seat and board pressure in HQ", () => {
-    const source = readFileSync(join(root, "app/foundation/FoundationPageClient.tsx"), "utf8");
+    const foundationSource = readFileSync(join(root, "app/foundation/FoundationPageClient.tsx"), "utf8");
+    const officeSource = readFileSync(join(root, "app/foundation/home-v2/ManagerOfficeClient.tsx"), "utf8");
 
-    expect(source).toContain('from "@/lib/foundation/gm-story"');
-    expect(source).toContain('data-testid="foundation-hq-gm-story"');
-    expect(source).toContain("selectedHqGmStory");
-    expect(source).toContain("Hot Seat");
-    expect(source).toContain("Board-Wechsel");
+    expect(foundationSource).toContain("ManagerOfficeClient");
+    expect(officeSource).toContain('data-testid="foundation-hq-gm-story"');
+    expect(officeSource).toContain("selectedHqGmStory");
+    expect(officeSource).toContain("Hot Seat");
+    expect(officeSource).toContain("Board-Wechsel");
   });
 
   it("derives gm story tone from board pressure and replacement signals", () => {

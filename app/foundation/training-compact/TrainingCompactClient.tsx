@@ -102,12 +102,11 @@ export default function TrainingCompactClient({
               <div className="training-v2-team-logo training-v2-team-logo-fallback">{teamLogo.initials}</div>
             )}
             <div className="training-v2-team-copy">
-              <span className="training-v2-kicker">Training</span>
               <TooltipHeading
                 as="h2"
-                tooltip="Kompakte Trainingssteuerung: Modus und Klasse pro Spieler, Forecast und Risiko auf einen Blick."
+                tooltip="Trainingsmodus und Klasse pro Spieler. Forecast und Risiko in der Liste."
               >
-                Kader entwickeln, ohne den Screen zu ueberladen.
+                Training
               </TooltipHeading>
               <p>
                 {selectedTeam.shortCode} · {selectedTeamControlMode ?? "manual"} · {seasonLabel}

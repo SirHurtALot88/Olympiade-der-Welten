@@ -537,7 +537,9 @@ export function buildPlayerDevelopmentInsight(input: {
               trainingForm === "D" ? 0.88 :
                 trainingForm === "E" ? 0.78 :
                   0.64;
-  const routeFitFactor = route === "RECOVERY" ? 0.9 : highRiskTraits ? 0.92 : 1;
+  const routeFitFactor =
+    (route === "RECOVERY" ? 0.9 : highRiskTraits ? 0.92 : 1) *
+    (route !== "BALANCED" && route !== "RECOVERY" ? 1.08 : 1);
   const regressionPressure = roundValue(
     (gap != null && gap < 0 ? Math.abs(gap) * 8 : 0) +
       (highRiskTraits ? 24 : 0) +

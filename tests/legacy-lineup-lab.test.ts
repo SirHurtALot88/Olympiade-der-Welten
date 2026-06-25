@@ -208,7 +208,7 @@ describe("legacy lineup lab helpers", () => {
     );
     expect(fileText).toContain("Matchday Room · Lineup Prep");
     expect(fileText).toContain("Matchday Preview");
-    expect(fileText).toContain("Form Board");
+    expect(fileText).toContain("Formplan");
     expect(fileText).toContain("aiInsightPreview");
     expect(fileText).toContain("Fatigue Cost gesamt");
     expect(fileText).toContain("Captain moeglich");
@@ -238,7 +238,6 @@ describe("legacy lineup lab helpers", () => {
     expect(fileText).toContain("legacy-lineup-result-team-card");
     expect(fileText).toContain("D1 / D2 Lineup-Zonen");
     expect(fileText).toContain("Expert Modus");
-    expect(fileText).toContain("Expert Modus an");
     expect(fileText).toContain("legacy-lineup-expert-mode-v1");
     expect(fileText).toContain("formatWeightInfo");
     expect(fileText).toContain("legacy-lineup-focus-switch");

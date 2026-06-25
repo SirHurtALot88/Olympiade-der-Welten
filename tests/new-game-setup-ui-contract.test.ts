@@ -14,6 +14,20 @@ describe("new game setup UI contract", () => {
     expect(source).toContain("Neues Spiel erstellen");
     expect(source).toContain("Online 4v4");
     expect(source).toContain("/api/new-game");
+    expect(source).toContain("NEW_GAME_VISIBLE_PRESET_IDS");
+    expect(source).toContain('data-testid="new-game-solo-team-select"');
+    expect(source).toContain('data-testid="new-game-ownership-picker"');
+  });
+
+  it("uses game mode as the single ownership UI in team settings", () => {
+    const source = fs.readFileSync(foundationClientPath, "utf8");
+
+    expect(source).not.toContain('data-testid="current-save-ownership-cards"');
+    expect(source).toContain('data-testid="foundation-active-game-mode"');
+    expect(source).toContain('data-testid="game-mode-ownership-panel"');
+    expect(source).toContain('data-testid="solo-player-team-select"');
+    expect(source).toContain('data-testid="game-mode-ownership-picker"');
+    expect(source).toContain("applyGameModeOwnership");
   });
 
   it("keeps Online 4v4 ownership preset visible in the client", () => {

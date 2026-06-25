@@ -17,6 +17,7 @@ import type { ProgressionClassName } from "@/lib/training/class-progression-conf
 import { formatTransfermarktCurrency } from "@/lib/market/transfermarkt-formatting-contract";
 import type { PlayerTrainingMode } from "@/lib/training/training-plan-types";
 import { TrainingPlayerLane } from "@/app/foundation/training-facilities-v2/training-view-shared";
+import FoundationSubNav from "@/app/foundation/shell/FoundationSubNav";
 import type { TrainingModeOption, TrainingPlayerRowView } from "@/app/foundation/training-facilities-v2/training-view-types";
 import { VeloImpactStrip } from "@/components/foundation/velo-ui";
 
@@ -424,10 +425,10 @@ function formatFacilityActionReason(reason: string) {
 
 function describeFacilityCondition(facility: TrainingFacilityRowView) {
   if (facility.level <= 0) {
-    return "Noch nicht gebaut. Erst mit dem Bau startet Wirkung und Unterhalt.";
+    return "Geplant · noch nicht gebaut. Erst mit dem Bau startet Wirkung und Unterhalt.";
   }
   if (facility.conditionPct >= 100) {
-    return "Zustand 100%: volle Effizienz, keine Wartung noetig.";
+    return "Betriebsbereit · 100% Zustand, volle Effizienz, keine Wartung noetig.";
   }
   if (facility.conditionPct >= 80) {
     return `Zustand ${formatLocaleNumber(facility.conditionPct, 0)}%: noch stabil, aber Wirkung ist bereits leicht gedrueckt.`;
@@ -436,6 +437,16 @@ function describeFacilityCondition(facility: TrainingFacilityRowView) {
     return `Zustand ${formatLocaleNumber(facility.conditionPct, 0)}%: Wirkung ist spuerbar reduziert, Wartung lohnt sich bald.`;
   }
   return `Zustand ${formatLocaleNumber(facility.conditionPct, 0)}%: deutlicher Leistungsverlust, hier versickert gerade viel Wirkung.`;
+}
+
+function formatFacilityStatusLabel(facility: TrainingFacilityRowView) {
+  if (facility.level <= 0) {
+    return "Geplant · nicht gebaut";
+  }
+  if (facility.conditionPct >= 100) {
+    return "Betriebsbereit · 100%";
+  }
+  return `Betrieb · ${formatLocaleNumber(facility.conditionPct, 0)}% Zustand`;
 }
 
 function describeFacilityUpkeep(facility: TrainingFacilityRowView) {
@@ -564,13 +575,17 @@ export default function TrainingFacilitiesV2Client({
   onClearUpgradeCart,
   onConfirmSeasonEndXpSpend,
 }: TrainingFacilitiesV2ClientProps) {
+  const [facilityTab, setFacilityTab] = useState<"overview" | "scouting" | "training" | "medical" | "finance">("overview");
   const [facilityDialog, setFacilityDialog] = useState<FacilityDialogState>(null);
   const teamLogo = getTeamLogoModel(selectedTeam);
   const readOnly = source === "prisma" || managementLocked;
   const trainingModeReadOnly = readOnly;
-  const showLegacySeasonEndXpPanel = false;
   const showPlayerLane = layoutMode === "combined";
   const showFacilitiesLane = layoutMode === "facilities" || layoutMode === "combined";
+  const showPlayerLaneForTab = showPlayerLane && (facilityTab === "overview" || facilityTab === "training");
+  const showFacilitiesLaneForTab =
+    showFacilitiesLane && (facilityTab === "overview" || facilityTab === "scouting" || facilityTab === "medical" || facilityTab === "finance");
+  const showHeroForTab = facilityTab === "overview";
   const facilityLaneActionReason =
     readOnly
       ? "Nur eigene Teams duerfen Gebaeude bauen oder warten."
@@ -691,6 +706,19 @@ export default function TrainingFacilitiesV2Client({
       data-testid="foundation-training-facilities-v2"
       id="foundation-training-facilities-v2"
     >
+      <FoundationSubNav
+        className="training-v2-subnav"
+        activeId={facilityTab}
+        onSelect={(id) => setFacilityTab(id as typeof facilityTab)}
+        items={[
+          { id: "overview", label: "Overview" },
+          { id: "scouting", label: "Scouting" },
+          { id: "training", label: "Training" },
+          { id: "medical", label: "Medical" },
+          { id: "finance", label: "Finanzen" },
+        ]}
+      />
+      {showHeroForTab ? (
       <header className="training-v2-hero">
         <div className="training-v2-hero-main">
           <div className="training-v2-team">
@@ -813,9 +841,10 @@ export default function TrainingFacilitiesV2Client({
           </article>
         </div>
       </header>
+      ) : null}
 
       <section className={`training-v2-workspace${showFacilitiesLane && !showPlayerLane ? " is-facilities-only" : ""}`}>
-        {showPlayerLane ? (
+        {showPlayerLaneForTab ? (
           <div className="training-v2-lane training-v2-lane-training">
             <TrainingPlayerLane
               playerRows={playerRows}
@@ -833,7 +862,7 @@ export default function TrainingFacilitiesV2Client({
           </div>
         ) : null}
 
-        {showFacilitiesLane ? (
+        {showFacilitiesLaneForTab ? (
         <aside className="training-v2-lane training-v2-lane-facilities">
           <div className="training-v2-section-head">
             <div>
@@ -853,6 +882,7 @@ export default function TrainingFacilitiesV2Client({
           ) : null}
           {facilityLaneActionReason ? <p className="foundation-screen-action-reason">Warum nicht: {facilityLaneActionReason}</p> : null}
 
+          {showPlayerLane ? (
           <div className="training-v2-mode-guide" aria-label="Trainingslast Erklaerung">
             {trainingModeOptions.map((option) => (
               <article className={`training-v2-mode-guide-card is-${getTrainingModeTone(option.fatigueRisk)}`} key={`mode-guide-${option.value}`}>
@@ -862,6 +892,7 @@ export default function TrainingFacilitiesV2Client({
               </article>
             ))}
           </div>
+          ) : null}
 
           <div className="training-v2-facility-list">
             {facilityRows.map((facility) => {
@@ -882,12 +913,11 @@ export default function TrainingFacilitiesV2Client({
                   </div>
                   <FacilityLevelRail level={facility.level} nextLevel={facility.nextLevel} />
                   <div className="training-v2-facility-metrics">
-                    <span>Zustand {formatLocaleNumber(facility.conditionPct, 0)}%</span>
+                    <span>{formatFacilityStatusLabel(facility)}</span>
                     <span>Effizienz {formatLocaleNumber(facility.efficiencyPct, 0)}%</span>
                     <span>Kosten {facility.upgradeCost != null ? formatTransfermarktCurrency(facility.upgradeCost) : "Max"}</span>
                     <span>Wartung {facility.maintenanceCost > 0 ? formatTransfermarktCurrency(facility.maintenanceCost) : "voll"}</span>
                     <span>Netto {formatTransfermarktCurrency(facility.currentIncome - facility.currentUpkeep)}</span>
-                    <span>Status {facility.sourceStatus.replaceAll("_", " ")}</span>
                   </div>
                   <div className="training-v2-facility-effects">
                     <div>
@@ -1471,253 +1501,51 @@ export default function TrainingFacilitiesV2Client({
         </div>
       ) : null}
 
-      {showLegacySeasonEndXpPanel ? (
-      <section className="training-v2-seasonend">
-        <div className="training-v2-section-head">
-          <div>
-            <span className="training-v2-kicker">Season-End Entwicklung</span>
-            <strong>XP einsammeln, Upgrades planen, dann gesammelt bestaetigen</strong>
+      {(facilityTab === "overview" || facilityTab === "training") && seasonEndRows.length > 0 ? (
+        <section className="training-v2-season-end-panel" data-testid="training-v2-season-end-panel">
+          <div className="training-v2-season-end-head">
+            <h3>Season-End XP</h3>
+            <p className="muted">{seasonEndStatus.plannedCount} Upgrades geplant · {seasonEndStatus.xpRemaining} XP frei</p>
           </div>
-          <span className={`transfer-status-pill ${seasonEndStatus.ok ? "is-ready" : seasonEndStatus.plannedCount > 0 ? "is-warning" : "is-info"}`}>
-            {seasonEndStatus.plannedCount > 0 ? `${seasonEndStatus.plannedCount} geplant` : "leer"}
-          </span>
-        </div>
-
-        <div className="training-v2-seasonend-bar">
-          <div className="training-v2-seasonend-totals">
-            <div>
-              <span>Verfuegbar</span>
-              <strong>{formatLocaleNumber(seasonEndStatus.xpAvailable, 0)} XP</strong>
-            </div>
-            <div>
-              <span>Geplant</span>
-              <strong>{formatLocaleNumber(seasonEndStatus.xpPlanned, 0)} XP</strong>
-            </div>
-            <div>
-              <span>Rest</span>
-              <strong>{formatLocaleNumber(seasonEndStatus.xpRemaining, 0)} XP</strong>
-            </div>
+          {seasonEndError ? <p className="text-negative">{seasonEndError}</p> : null}
+          {seasonEndSuccess ? <p className="text-positive">{seasonEndSuccess}</p> : null}
+          <div className="training-v2-season-end-grid">
+            {seasonEndRows.slice(0, 8).map((row) => (
+              <article key={row.playerId} className="training-v2-season-end-card">
+                <strong>{row.playerName}</strong>
+                <small>
+                  {row.className ? <ClassColorChip className={row.className} /> : "—"} · {row.organicProgression.classBefore} →{" "}
+                  {row.organicProgression.classAfter}
+                </small>
+                <span>
+                  XP {row.plannedXP}/{row.availableXP}
+                </span>
+              </article>
+            ))}
           </div>
-          <div className="training-v2-seasonend-actions">
+          <div className="training-v2-season-end-actions">
             <button
-              className="secondary-button inline-button"
               type="button"
-              disabled={readOnly || seasonEndStatus.plannedCount === 0 || seasonEndBusy}
+              className="secondary-button inline-button"
+              disabled={Boolean(seasonEndResetReason)}
+              title={seasonEndResetReason ?? undefined}
               onClick={() => onClearUpgradeCart()}
             >
               Warenkorb leeren
             </button>
             <button
-              className="primary-button inline-button"
               type="button"
-              disabled={
-                readOnly ||
-                seasonEndBusy ||
-                !seasonEndStatus.ok ||
-                !seasonEndStatus.confirmToken
-              }
+              className="primary-button inline-button"
+              disabled={Boolean(seasonEndConfirmReason) || seasonEndBusy}
+              title={seasonEndConfirmReason ?? undefined}
               onClick={() => onConfirmSeasonEndXpSpend()}
             >
-              {seasonEndBusy ? "Pruefe..." : seasonEndStatus.plannedCount > 0 ? "XP-Upgrades bestaetigen" : "Season-XP einsammeln"}
+              {seasonEndBusy ? "XP wird gebucht…" : "Season-End XP bestätigen"}
             </button>
           </div>
-        </div>
-        {seasonEndResetReason || seasonEndConfirmReason ? (
-          <p className="foundation-screen-action-reason">
-            Warum nicht: {seasonEndConfirmReason ?? seasonEndResetReason}
-          </p>
-        ) : null}
-
-        {seasonEndStatus.blockingReasons.length > 0 ? (
-          <p className="muted">Noch offen: {seasonEndStatus.blockingReasons.join(" · ")}</p>
-        ) : null}
-        {seasonEndStatus.warnings.length > 0 ? (
-          <p className="muted">Hinweise: {seasonEndStatus.warnings.slice(0, 4).join(" · ")}</p>
-        ) : null}
-        {seasonEndError ? <p className="text-negative">{seasonEndError}</p> : null}
-        {seasonEndSuccess ? <p className="text-positive">{seasonEndSuccess}</p> : null}
-
-        <div className="training-v2-seasonend-grid">
-          {seasonEndRows.map((row) => {
-            const portrait = getPortraitModel({
-              id: row.playerId,
-              name: row.playerName,
-              portraitUrl: row.portraitUrl ?? null,
-              portraitPath: row.portraitPath ?? null,
-            });
-            return (
-              <article className="training-v2-upgrade-card" id={`training-upgrade-player-${row.playerId}`} key={row.playerId}>
-                <button
-                  className="training-v2-upgrade-head"
-                  type="button"
-                  onClick={() => onOpenPlayerDetails?.({ playerId: row.playerId })}
-                >
-                  <div className="training-v2-upgrade-media">
-                    {portrait.src ? (
-                      <OptimizedMediaImage
-                        src={portrait.src}
-                        alt={row.playerName}
-                        width={64}
-                        height={64}
-                        className="training-v2-upgrade-image"
-                      />
-                    ) : (
-                      <div className="training-v2-upgrade-image training-v2-player-image-fallback">{portrait.initials}</div>
-                    )}
-                  </div>
-                  <div className="training-v2-upgrade-copy">
-                    <strong className="training-v2-clickable">{row.playerName}</strong>
-                    <p>
-                      {row.organicProgression
-                        ? `${row.organicProgression.classBefore} → ${row.organicProgression.classAfter}`
-                        : row.className ?? "ohne Klasse"}
-                    </p>
-                    <small>
-                      {row.organicProgression
-                        ? `Setpoints ${row.organicProgression.netSetpoints > 0 ? "+" : ""}${formatLocaleNumber(row.organicProgression.netSetpoints, 1)} · Training ${row.organicProgression.trainingClass}`
-                        : `XP ${formatLocaleNumber(row.availableXP, 0)} · geplant ${formatLocaleNumber(row.plannedXP, 0)} · Rest ${formatLocaleNumber(row.remainingXP, 0)}`}
-                    </small>
-                  </div>
-                  <span className={`training-v2-badge ${row.plannedCount > 0 ? "is-growth" : row.status === "planned" ? "is-stable" : "is-info"}`}>
-                    {row.plannedCount > 0 ? `${row.plannedCount}x geplant` : row.status === "planned" ? "preview ok" : row.blockReason}
-                  </span>
-                </button>
-
-                <div className="training-v2-upgrade-controls">
-                  <label className="filter-field">
-                    <span>Attribut</span>
-                    <select
-                      className="input"
-                      value={row.selectedAttribute}
-                      disabled={readOnly}
-                      onChange={(event) => onSetSeasonEndAttribute(row.playerId, event.target.value as PlayerGeneratorAttributeName)}
-                    >
-                      {attributeOptions.map((option) => (
-                        <option key={option.value} value={option.value}>
-                          {option.label}
-                        </option>
-                      ))}
-                    </select>
-                  </label>
-                  <div className="training-v2-upgrade-buttons">
-                    <button
-                      className="secondary-button inline-button"
-                      type="button"
-                      disabled={readOnly || seasonEndBusy}
-                      onClick={() => onAddSeasonEndUpgrade(row.playerId, row.selectedAttribute)}
-                    >
-                      +1 planen
-                    </button>
-                    <button
-                      className="secondary-button inline-button"
-                      type="button"
-                      disabled={readOnly || row.plannedCount === 0 || seasonEndBusy}
-                      onClick={() => onRemoveSeasonEndUpgrade(row.playerId, row.selectedAttribute)}
-                    >
-                      Entfernen
-                    </button>
-                  </div>
-                </div>
-
-                <div className="training-v2-upgrade-grid">
-                  <div>
-                    <span>Attribut</span>
-                    <strong>
-                      {row.attributeBefore ?? "—"} → {row.attributeAfter ?? "—"}
-                    </strong>
-                  </div>
-                  <div>
-                    <span>Tier</span>
-                    <strong>
-                      {row.ratingTierBefore ?? "—"} → {row.ratingTierAfter ?? "—"}
-                    </strong>
-                  </div>
-                  <div>
-                    <span>Kosten</span>
-                    <strong>{row.plannedCost != null ? `${formatLocaleNumber(row.plannedCost, 0)} XP` : "—"}</strong>
-                  </div>
-                  <div>
-                    <span>MW / Gehalt Delta</span>
-                    <strong>
-                      {formatSignedPercent(row.economyAudit.marketValueDeltaPct)} / {formatSignedPercent(row.economyAudit.salaryDeltaPct)}
-                    </strong>
-                  </div>
-                </div>
-
-                {row.organicProgression ? (
-                  <div className="training-v2-upgrade-meta is-organic">
-                    <span title="Positive Traits beschleunigen, negative Traits bremsen das organische Wachstum. Signature-Attribute wachsen leichter, Weak-Attribute schwerer.">
-                      Bonus/Malus aktiv · Signature {row.developmentSummary?.signatureAttributes.join(" / ") || "Profil"} · Weak{" "}
-                      {row.developmentSummary?.weakAttribute ?? "offen"}
-                    </span>
-                    <span>
-                      Training +{formatLocaleNumber(row.organicProgression.trainingSetpoints, 1)} · Performance +
-                      {formatLocaleNumber(row.organicProgression.performanceSetpoints, 1)}
-                    </span>
-                    <span>MW-Druck -{formatLocaleNumber(row.organicProgression.marketValuePressureTotal, 1)} gesamt</span>
-                    <span>
-                      Traits {formatSignedPercent(row.organicProgression.traitModifierPct)} · Facility{" "}
-                      {formatSignedPercent(row.organicProgression.facilityModifierPct)}
-                    </span>
-                    <span>Fatigue +{formatLocaleNumber(row.organicProgression.fatigueLoad, 1)}</span>
-                    <span>
-                      Staerkt{" "}
-                      {row.organicProgression.topGains.length > 0
-                        ? row.organicProgression.topGains.map((entry) => `${entry.attribute} +${formatLocaleNumber(entry.delta, 1)}`).join(", ")
-                        : "keine klare Achse"}
-                    </span>
-                    <span>
-                      Risiko{" "}
-                      {row.organicProgression.topLosses.length > 0
-                        ? row.organicProgression.topLosses.map((entry) => `${entry.attribute} ${formatLocaleNumber(entry.delta, 1)}`).join(", ")
-                        : "keine starken Verluste"}
-                    </span>
-                  </div>
-                ) : null}
-
-                {row.developmentSummary ? (
-                  <div className="training-v2-upgrade-meta">
-                    <span>
-                      Lv {row.developmentSummary.level} · {row.developmentSummary.progressPct}% · {row.developmentSummary.trainingPointsAvailable} TP
-                    </span>
-                    <span>Cap {row.developmentSummary.seasonLevelUpCap} / Saison</span>
-                    <span>Staerke {row.developmentSummary.signatureAttributes.join(" / ")}</span>
-                    <span>Weak {row.developmentSummary.weakAttribute}</span>
-                    <span>Trend {row.developmentSummary.lastTrend}</span>
-                  </div>
-                ) : null}
-
-                <div className="training-v2-upgrade-meta">
-                  <span>
-                    XP vor Facility {formatLocaleNumber(row.facilityEffects.xpBeforeFacility, 0)} · Modifier {formatSignedPercent(row.facilityEffects.facilityModifierPct)}
-                  </span>
-                  <span>
-                    Kosten vor Facility {row.facilityEffects.costBeforeFacility ?? "—"} · Discount {formatSignedPercent(-row.facilityEffects.facilityDiscountPct)}
-                  </span>
-                  <span>
-                    Deltas{" "}
-                    {row.topDeltas.length > 0
-                      ? row.topDeltas
-                          .map((entry) => `${entry.label} ${(entry.disciplineDelta ?? 0) > 0 ? "+" : ""}${formatLocaleNumber(entry.disciplineDelta, 0)}`)
-                          .join(", ")
-                      : "keine"}
-                  </span>
-                  <span>
-                    Effekte {row.facilityEffects.appliedEffects.length > 0 ? row.facilityEffects.appliedEffects.join(", ") : "keine"}
-                  </span>
-                </div>
-
-                {(row.economyAudit.marketValueWarnings.length > 0 || row.economyAudit.salaryWarnings.length > 0) ? (
-                  <p className="muted">
-                    Hinweise: {[...row.economyAudit.marketValueWarnings, ...row.economyAudit.salaryWarnings].slice(0, 4).join(" · ")}
-                  </p>
-                ) : null}
-              </article>
-            );
-          })}
-        </div>
-      </section>
+        </section>
       ) : null}
+
     </section>
   );
 }

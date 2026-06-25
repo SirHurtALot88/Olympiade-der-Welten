@@ -402,6 +402,7 @@ export function buildNewGameStateFromBaseline(input: NewGameSetupInput & { saveI
           { stepId: "first_transfers", status: "open" },
           { stepId: "fill_roster", status: "open" },
           { stepId: "training_facilities", status: "open" },
+          { stepId: "choose_sponsor", status: "open" },
           { stepId: "set_lineup", status: "open" },
         ],
       },

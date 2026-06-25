@@ -1,4 +1,8 @@
 import type { GameState, Team, TeamControlMode, TeamControlSettings } from "@/lib/data/olyDataTypes";
+import {
+  resolveFoundationSaveMode,
+  type FoundationSaveModePreset,
+} from "@/lib/persistence/foundation-save-mode";
 
 export const DEFAULT_ACTIVE_OWNER_ID = "user_local";
 export const FRANKY_OWNER_ID = "franky_remote_placeholder";
@@ -131,10 +135,6 @@ export function isFrankyOwnedTeamSettings(settings: TeamControlSettings | null |
   return ownerId === FRANKY_OWNER_ID || settings.displayLabel === "Franky";
 }
 
-function isLocalUserManualSettings(settings: TeamControlSettings | null | undefined) {
-  return isChrisOwnedTeamSettings(settings);
-}
-
 export function deriveChrisFrankyTeamIdsFromSettings(teams: Team[], settingsMap: Record<string, TeamControlSettings>) {
   const chrisTeamIds: string[] = [];
   const frankyTeamIds: string[] = [];
@@ -151,6 +151,24 @@ export function deriveChrisFrankyTeamIdsFromSettings(teams: Team[], settingsMap:
   }
 
   return { chrisTeamIds, frankyTeamIds };
+}
+
+export function getGameModeOwnershipLimits(saveMode: FoundationSaveModePreset): {
+  chrisMax: number;
+  frankyMax: number;
+} {
+  switch (saveMode) {
+    case "online_4v4":
+      return { chrisMax: 4, frankyMax: 4 };
+    case "solo_4":
+      return { chrisMax: 4, frankyMax: 0 };
+    case "solo_2":
+      return { chrisMax: 2, frankyMax: 0 };
+    case "solo_1":
+      return { chrisMax: 1, frankyMax: 0 };
+    default:
+      return { chrisMax: 1, frankyMax: 0 };
+  }
 }
 
 export function createChrisFrankyTeamControlSetting(
@@ -243,74 +261,108 @@ export function applyChrisFrankyOwnershipToTeamControlSettings(
   );
 }
 
-export function withNormalizedTeamControlSettings(gameState: GameState): GameState {
-  const initialSettingsMap = buildTeamControlSettingsMap(gameState.teams, gameState.seasonState.teamControlSettings);
-  const selectedTeamId =
-    gameState.seasonState.newGameFlow?.selectedTeamId ??
-    gameState.teams.find((team) => isLocalUserManualSettings(initialSettingsMap[team.teamId]))?.teamId ??
-    gameState.teams.find((team) => team.humanControlled)?.teamId ??
-    null;
+export function resolveGameModeFromState(gameState: GameState): FoundationSaveModePreset {
+  return resolveFoundationSaveMode({ gameState, scenarioMeta: gameState.scenarioMeta });
+}
 
-  if (selectedTeamId && initialSettingsMap[selectedTeamId]) {
-    const selectedTeam = gameState.teams.find((team) => team.teamId === selectedTeamId);
-    const current = initialSettingsMap[selectedTeamId];
-    initialSettingsMap[selectedTeamId] = {
-      ...current,
-      teamId: selectedTeamId,
-      controlMode: "manual",
-      ownerId: DEFAULT_ACTIVE_OWNER_ID,
-      ownerSlot: "user",
-      displayLabel: LOCAL_USER_DISPLAY_LABEL,
-      aiLineupPreviewEnabled: false,
-      aiLineupApplyEnabled: false,
-      aiLineupAutoApplyEnabled: false,
-      aiTransferPreviewEnabled: false,
-      aiTransferAutoApplyEnabled: false,
-      aiSellPreviewEnabled: false,
-      aiSellAutoApplyEnabled: false,
-    };
-  }
-
+export function applyGameModeOwnership(
+  gameState: GameState,
+  input: {
+    saveMode: FoundationSaveModePreset;
+    chrisTeamIds: string[];
+    frankyTeamIds: string[];
+  },
+): GameState {
+  const validTeamIds = new Set(gameState.teams.map((team) => team.teamId));
+  const chrisTeamIds = input.chrisTeamIds.filter((teamId) => validTeamIds.has(teamId));
+  const frankyTeamIds = input.frankyTeamIds.filter(
+    (teamId) => validTeamIds.has(teamId) && !chrisTeamIds.includes(teamId),
+  );
+  const teamControlSettings = applyChrisFrankyOwnershipToTeamControlSettings(
+    gameState.teams,
+    chrisTeamIds,
+    frankyTeamIds,
+    gameState.seasonState.teamControlSettings,
+  );
   const teams = gameState.teams.map((team) => ({
     ...team,
-    humanControlled: initialSettingsMap[team.teamId]?.controlMode === "manual",
+    humanControlled: teamControlSettings[team.teamId]?.controlMode === "manual",
   }));
-  const settingsMap = buildTeamControlSettingsMap(teams, initialSettingsMap);
+  const primaryChrisTeamId = chrisTeamIds[0] ?? null;
+  const humanControlledTeamCount = chrisTeamIds.length + frankyTeamIds.length;
 
-  if (selectedTeamId && settingsMap[selectedTeamId]) {
-    const selectedTeam = teams.find((team) => team.teamId === selectedTeamId);
-    const current = settingsMap[selectedTeamId];
-    settingsMap[selectedTeamId] = {
-      ...current,
-      teamId: selectedTeamId,
-      controlMode: "manual",
-      ownerId: DEFAULT_ACTIVE_OWNER_ID,
-      ownerSlot: "user",
-      displayLabel: LOCAL_USER_DISPLAY_LABEL,
-      aiLineupPreviewEnabled: false,
-      aiLineupApplyEnabled: false,
-      aiLineupAutoApplyEnabled: false,
-      aiTransferPreviewEnabled: false,
-      aiTransferAutoApplyEnabled: false,
-      aiSellPreviewEnabled: false,
-      aiSellAutoApplyEnabled: false,
-    };
-  }
+  return {
+    ...gameState,
+    teams,
+    scenarioMeta: gameState.scenarioMeta
+      ? {
+          ...gameState.scenarioMeta,
+          saveMode: input.saveMode,
+          newGamePresetId: input.saveMode,
+          humanControlledTeamCount,
+        }
+      : gameState.scenarioMeta,
+    seasonState: {
+      ...gameState.seasonState,
+      teamControlSettings,
+      newGameFlow: gameState.seasonState.newGameFlow
+        ? {
+            ...gameState.seasonState.newGameFlow,
+            selectedTeamId:
+              input.saveMode === "solo_1"
+                ? primaryChrisTeamId
+                : (gameState.seasonState.newGameFlow.selectedTeamId ?? primaryChrisTeamId),
+          }
+        : gameState.seasonState.newGameFlow,
+    },
+  };
+}
+
+/** Sync derived fields from teamControlSettings without mutating ownership. */
+export function withNormalizedTeamControlSettings(gameState: GameState): GameState {
+  const settingsMap = buildTeamControlSettingsMap(gameState.teams, gameState.seasonState.teamControlSettings);
+  const teams = gameState.teams.map((team) => ({
+    ...team,
+    humanControlled: settingsMap[team.teamId]?.controlMode === "manual",
+  }));
 
   return {
     ...gameState,
     teams,
     seasonState: {
       ...gameState.seasonState,
-      newGameFlow: gameState.seasonState.newGameFlow
-        ? {
-            ...gameState.seasonState.newGameFlow,
-            selectedTeamId,
-          }
-        : gameState.seasonState.newGameFlow,
-      teamControlSettings: settingsMap,
+      teamControlSettings: buildTeamControlSettingsMap(teams, settingsMap),
     },
   };
+}
+
+export function mergeAiAutomationFromDraft(
+  ownershipSettings: Record<string, TeamControlSettings>,
+  draft: Record<string, TeamControlSettings>,
+): Record<string, TeamControlSettings> {
+  return Object.fromEntries(
+    Object.entries(ownershipSettings).map(([teamId, settings]) => {
+      const draftSettings = draft[teamId];
+      if (settings.controlMode !== "ai" || !draftSettings) {
+        return [teamId, settings];
+      }
+
+      return [
+        teamId,
+        {
+          ...settings,
+          aiLineupPreviewEnabled: draftSettings.aiLineupPreviewEnabled,
+          aiLineupApplyEnabled: draftSettings.aiLineupApplyEnabled,
+          aiLineupAutoApplyEnabled: draftSettings.aiLineupAutoApplyEnabled,
+          aiTransferPreviewEnabled: draftSettings.aiTransferPreviewEnabled,
+          aiTransferAutoApplyEnabled: draftSettings.aiTransferAutoApplyEnabled,
+          aiSellPreviewEnabled: draftSettings.aiSellPreviewEnabled,
+          aiSellAutoApplyEnabled: draftSettings.aiSellAutoApplyEnabled,
+          notes: draftSettings.notes ?? settings.notes,
+        },
+      ];
+    }),
+  );
 }
 
 export function isAiLineupBatchApplyEnabled(settings: TeamControlSettings | null | undefined) {

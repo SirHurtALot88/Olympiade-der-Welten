@@ -1,4 +1,4 @@
-import { randomUUID } from "node:crypto";
+import { randomUUID } from "@/lib/utils/random-id";
 
 import type { GameState, SponsorOfferComponent, TeamSponsorContract } from "@/lib/data/olyDataTypes";
 import { buildTeamSeasonOverviewRows } from "@/lib/foundation/team-management-overview";

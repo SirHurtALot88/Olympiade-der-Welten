@@ -4,6 +4,7 @@ import { useDeferredValue, useEffect, useMemo, useRef, useState, type CSSPropert
 
 import { getClassColorClassName, getClassColorToken } from "@/app/foundation/ClassColorChip";
 import ClassIcon from "@/app/foundation/ClassIcon";
+import ContractOfferClient from "@/app/foundation/contract-offer/ContractOfferClient";
 import OptimizedMediaImage from "@/app/foundation/OptimizedMediaImage";
 import RaceIcon from "@/app/foundation/RaceIcon";
 import { getPlayerPortraitBrowserUrl } from "@/lib/data/mediaAssets";
@@ -47,6 +48,7 @@ import { VeloAttributeFocusTags, VeloStatOrbitRow } from "@/components/foundatio
 type TransfermarktV2ClientProps = {
   defaultSaveId: string;
   defaultSeasonId: string;
+  bootstrapReady?: boolean;
   defaultTeamId?: string | null;
   source?: "sqlite" | "prisma";
   activeOwnerId?: string | null;
@@ -69,6 +71,8 @@ type TransfermarktV2ClientProps = {
   scoutingPipelineCapacity?: { occupied: number; max: number } | null;
   onToggleScoutingWatch?: ((item: TransfermarktFreeAgentItem) => void) | null;
   onBuyCompleted?: ((teamId: string) => Promise<void> | void) | null;
+  initialPlayerId?: string | null;
+  onInitialPlayerFocusConsumed?: (() => void) | null;
   onSell?: ((payload: { activePlayerId: string; playerId: string; playerName: string; className: string; race: string | null; portraitUrl: string | null }) => void) | null;
 };
 
@@ -1046,6 +1050,7 @@ function MarketAxisBar({
 export default function TransfermarktV2Client({
   defaultSaveId,
   defaultSeasonId,
+  bootstrapReady = true,
   defaultTeamId = null,
   source = "sqlite",
   activeOwnerId = null,
@@ -1068,9 +1073,22 @@ export default function TransfermarktV2Client({
   scoutingPipelineCapacity = null,
   onToggleScoutingWatch,
   onBuyCompleted,
+  initialPlayerId = null,
+  onInitialPlayerFocusConsumed = null,
   onSell,
 }: TransfermarktV2ClientProps) {
   const roomContextRef = useRef(readFoundationRoomContextFromLocation());
+  const marketCacheRef = useRef(
+    new Map<
+      string,
+      {
+        items: TransfermarktFreeAgentItem[];
+        feed: MarketFeedResponse | null;
+        total: number;
+        hasMore: boolean;
+      }
+    >(),
+  );
   const marketAbortRef = useRef<AbortController | null>(null);
   const historyAbortRef = useRef<AbortController | null>(null);
   const previewAbortRef = useRef<AbortController | null>(null);
@@ -1857,6 +1875,19 @@ export default function TransfermarktV2Client({
   }, [selectedPlayerId, selectedTeamId]);
 
   useEffect(() => {
+    if (!initialPlayerId || marketBusy) {
+      return;
+    }
+    const hasCandidate = marketItems.some((item) => item.playerId === initialPlayerId);
+    if (!hasCandidate && marketItems.length === 0) {
+      return;
+    }
+    setSelectedPlayerId(initialPlayerId);
+    shouldFocusSelectedCandidateRef.current = true;
+    onInitialPlayerFocusConsumed?.();
+  }, [initialPlayerId, marketBusy, marketItems, onInitialPlayerFocusConsumed]);
+
+  useEffect(() => {
     if (!buyModalOpen) {
       return;
     }
@@ -1869,10 +1900,28 @@ export default function TransfermarktV2Client({
   }, [buyModalOpen, buyNegotiationOutcome?.status]);
 
   useEffect(() => {
+    if (!bootstrapReady || defaultSeasonId === "loading" || !defaultSaveId) {
+      return;
+    }
+
     let cancelled = false;
     const controller = new AbortController();
     marketAbortRef.current?.abort();
     marketAbortRef.current = controller;
+    const marketCacheKey = `${defaultSaveId}:${defaultSeasonId}:${deferredSearch.trim()}`;
+    const cachedMarket = marketCacheRef.current.get(marketCacheKey);
+    if (cachedMarket) {
+      setMarketFeed(cachedMarket.feed);
+      setMarketItems(cachedMarket.items);
+      setMarketTotal(cachedMarket.total);
+      setMarketHasMore(cachedMarket.hasMore);
+      setMarketBusy(false);
+      setMarketError(null);
+      return () => {
+        cancelled = true;
+        controller.abort();
+      };
+    }
 
     async function loadFullMarketInPages() {
       setMarketBusy(true);
@@ -1954,6 +2003,19 @@ export default function TransfermarktV2Client({
           setMarketItems([]);
           setMarketTotal(0);
           setMarketHasMore(false);
+        } else {
+          marketCacheRef.current.set(marketCacheKey, {
+            items: [...mergedItems],
+            feed: {
+              ...latestPayload,
+              items: mergedItems,
+              offset: 0,
+              returned: mergedItems.length,
+              hasMore: false,
+            },
+            total: latestPayload.total,
+            hasMore: false,
+          });
         }
       } catch (error) {
         if (cancelled || controller.signal.aborted || isAbortError(error)) {
@@ -1980,7 +2042,7 @@ export default function TransfermarktV2Client({
         marketAbortRef.current = null;
       }
     };
-  }, [defaultSaveId, defaultSeasonId, deferredSearch, reloadToken, selectedTeamId, source]);
+  }, [bootstrapReady, defaultSaveId, defaultSeasonId, deferredSearch, reloadToken, source]);
 
   useEffect(() => {
     let cancelled = false;
@@ -2272,23 +2334,30 @@ export default function TransfermarktV2Client({
     if (buyBusy) {
       return;
     }
+    const hadPreview = Boolean(buyPreview?.player?.id);
+    const negotiationAccepted = buyNegotiationOutcome?.status === "accepted";
     const shouldApplyAbortMalus =
       source === "sqlite" &&
       selectedTeamCanManage &&
-      Boolean(buyPreview?.player?.id && buyNegotiationOutcome) &&
-      buyNegotiationOutcome?.status !== "accepted";
+      hadPreview &&
+      !negotiationAccepted &&
+      Boolean(buyNegotiationOutcome);
     setBuyModalOpen(false);
     setBuyModalWishlistEntry(null);
     setBuyNegotiationOutcome(null);
-    if (shouldApplyAbortMalus && buyPreview) {
-      const playerName = buyPreview.player?.name ?? "dem Spieler";
-      void persistNegotiationOutcome(
-        buyPreview,
-        "rejected_bad_experience",
-        ["negotiation_cancelled_after_contact"],
-      );
+    if (hadPreview && !negotiationAccepted && selectedTeamCanManage) {
+      const playerName = buyPreview?.player?.name ?? "dem Spieler";
+      if (shouldApplyAbortMalus && buyPreview) {
+        void persistNegotiationOutcome(
+          buyPreview,
+          "rejected_bad_experience",
+          ["negotiation_cancelled_after_contact"],
+        );
+      }
       setPreviewError(
-        `Verhandlung mit ${playerName} abgebrochen. Das gibt einen Malus fuer die naechste Runde.`,
+        shouldApplyAbortMalus
+          ? `Verhandlung mit ${playerName} abgebrochen. Das gibt einen Malus fuer die naechste Runde.`
+          : `Kauf von ${playerName} abgebrochen.`,
       );
       window.requestAnimationFrame(() => {
         window.scrollTo({ top: 0, behavior: "smooth" });
@@ -2926,7 +2995,14 @@ export default function TransfermarktV2Client({
                 </button>
               );
             })}
-            {visibleItems.length === 0 ? (
+            {marketBusy && visibleItems.length === 0 ? (
+              <div className="market-v2-candidate-skeleton" aria-busy="true" aria-live="polite">
+                {Array.from({ length: 6 }, (_, index) => (
+                  <div className="market-v2-candidate-skeleton__card" key={`market-skeleton-${index}`} />
+                ))}
+              </div>
+            ) : null}
+            {!marketBusy && visibleItems.length === 0 ? (
               <div className="market-v2-empty">
                 <strong>Keine Kandidaten im aktuellen Filter.</strong>
                 <p>Suchbegriff, MW-Limit oder Fit etwas weiter stellen.</p>
@@ -3068,7 +3144,7 @@ export default function TransfermarktV2Client({
                     </span>
                   ) : null}
                   <div className="market-v2-inline-training" title={`Scouting L${selectedScoutingLevel}: Trainingsprofil wird schrittweise klarer.`}>
-                    <div className="market-v2-card-eyebrow">Training</div>
+                    <div className="market-v2-card-eyebrow">Attribut-Wirkung</div>
                     <div className="market-v2-training-affinity-grid">
                       {visibleTrainingPositive.map((entry) => (
                         <span
@@ -3896,97 +3972,51 @@ export default function TransfermarktV2Client({
                 </div>
               ) : null}
 
-              <div className="transfer-modal-section">
-                <div className="transfer-callout-title">
-                  <strong>Vertrag</strong>
-                  <span className="muted">Die Forderung reagiert live auf Laufzeit, Form und Gehalt.</span>
-                </div>
-                <div className="transfer-negotiation-grid">
-                  <label className="filter-field">
-                    <span>Vertragslaenge</span>
-                    <select className="input" value={activeContractLength} onChange={(event) => {
-                      setBuyNegotiationOutcome(null);
-                      setContractLength(Number(event.target.value));
-                    }}>
-                      {[1, 2, 3, 4, 5].map((value) => (
-                        <option key={`modal-contract-${value}`} value={value}>
-                          {value} Saison{value > 1 ? "en" : ""}
-                        </option>
-                      ))}
-                    </select>
-                  </label>
-                  <label className="filter-field">
-                    <span>Vertragsform</span>
-                    <select className="input" value={activeContractShape} onChange={(event) => {
-                      setBuyNegotiationOutcome(null);
-                      setContractShape(event.target.value as ContractShape);
-                    }}>
-                      <option value="balanced">Ausgeglichen</option>
-                      <option value="front_loaded">Vorne schwer</option>
-                      <option value="back_loaded">Hinten schwer</option>
-                    </select>
-                  </label>
-                  <label className="filter-field">
-                    <span>Gehaltsangebot</span>
-                    <input
-                      className="input"
-                      type="number"
-                      min={0}
-                      step={0.1}
-                      value={salaryEditedManually ? offeredSalary ?? "" : buyPreview?.offeredSalary ?? ""}
-                      placeholder="auto"
-                      onChange={(event) => {
-                        setBuyNegotiationOutcome(null);
-                        if (event.target.value === "") {
-                          setOfferedSalary(null);
-                          setSalaryEditedManually(false);
-                          return;
-                        }
-                        const next = Number(event.target.value);
-                        setOfferedSalary(Number.isFinite(next) ? next : null);
-                        setSalaryEditedManually(true);
-                      }}
-                    />
-                  </label>
-                  <label className="filter-field transfer-slider-field">
-                    <span>Gehaltsregler</span>
-                    <input
-                      type="range"
-                      min={modalSalarySliderMin}
-                      max={modalSalarySliderMax}
-                      step={0.1}
-                      value={Math.min(Math.max(modalOfferValue ?? modalSalarySliderMin, modalSalarySliderMin), modalSalarySliderMax)}
-                      onChange={(event) => {
-                        setBuyNegotiationOutcome(null);
-                        const next = Number(event.target.value);
-                        setOfferedSalary(Number.isFinite(next) && next >= 0 ? next : null);
-                        setSalaryEditedManually(true);
-                      }}
-                    />
-                    <small className="muted">
-                      Forderung {formatTransfermarktCurrency(buyPreview?.expectedSalary ?? null)} · Angebot {formatTransfermarktCurrency(modalOfferValue)}
-                    </small>
-                  </label>
-                </div>
-                <div className="transfer-negotiation-actions">
-                  <button className="secondary-button inline-button" type="button" onClick={resetBuyDemandFrame}>
-                    Auto-Angebot
-                  </button>
-                  <span className="muted">Auto-Angebot setzt Laufzeit, Form und Gehalt auf die aktuelle Spielerforderung zurueck.</span>
-                </div>
-                {buyNegotiationOutcome ? (
-                  <div className={`transfer-feedback-banner ${getNegotiationOutcomeToneClass(buyNegotiationOutcome.tone)}`} style={{ marginTop: 12 }}>
-                    <strong>{buyNegotiationOutcome.title}</strong>
-                    <span>{buyNegotiationOutcome.message}</span>
-                  </div>
-                ) : null}
+              <ContractOfferClient
+                playerName={modalPlayerName}
+                roleLabel={modalPlayerClass}
+                expectedSalary={buyPreview?.expectedSalary ?? null}
+                offeredSalary={modalOfferValue}
+                contractLength={activeContractLength}
+                contractShape={activeContractShape}
+                budgetAvailable={buyPreview?.cashBefore ?? null}
+                acceptChance={buyPreview?.acceptChance ?? null}
+                counterChance={buyPreview?.counterChance ?? null}
+                rejectChance={buyPreview?.rejectChance ?? null}
+                negotiationOutcome={
+                  buyNegotiationOutcome
+                    ? {
+                        title: buyNegotiationOutcome.title,
+                        message: buyNegotiationOutcome.message,
+                        tone: buyNegotiationOutcome.tone,
+                      }
+                    : null
+                }
+                busy={buyBusy}
+                onContractLengthChange={(value) => {
+                  setBuyNegotiationOutcome(null);
+                  setContractLength(value);
+                }}
+                onContractShapeChange={(value) => {
+                  setBuyNegotiationOutcome(null);
+                  setContractShape(value);
+                }}
+                onSalaryChange={(value) => {
+                  setBuyNegotiationOutcome(null);
+                  setOfferedSalary(value);
+                  setSalaryEditedManually(value != null);
+                }}
+                onResetSuggestion={resetBuyDemandFrame}
+                onSendOffer={() => void negotiateBuy()}
+                onCancel={closeBuyModal}
+              />
 
-                <div className="transfer-callout is-info transfer-compact-feedback-callout">
-                  <div className="transfer-callout-title">
-                    <strong>Kompakt: Was er am Vertrag mag</strong>
-                    <span className="muted">schneller Check ohne Scrollen</span>
-                  </div>
-                  <div className="transfer-compact-feedback-grid">
+              <div className="transfer-modal-section transfer-callout is-info transfer-compact-feedback-callout">
+                <div className="transfer-callout-title">
+                  <strong>Kompakt: Was er am Vertrag mag</strong>
+                  <span className="muted">schneller Check ohne Scrollen</span>
+                </div>
+                <div className="transfer-compact-feedback-grid">
                     <div className="transfer-compact-feedback-column">
                       <span className="muted">Passt gut</span>
                       <div className="negotiation-factor-list">
@@ -4021,7 +4051,7 @@ export default function TransfermarktV2Client({
                       </div>
                     </div>
                   </div>
-                </div>
+              </div>
 
                 {contractPreference ? (
                   <div className={`contract-preference-card is-${contractPreference.matchQuality}`}>
@@ -4065,14 +4095,6 @@ export default function TransfermarktV2Client({
                     <strong>{buyPreview?.demandMultiplier != null ? `${formatCompactNumber(buyPreview.demandMultiplier * 100, 0)}%` : "—"}</strong>
                   </article>
                   <article className="metric-card">
-                    <span>Angebotsquote</span>
-                    <strong>{buyPreview?.offerRatio != null ? formatCompactNumber(buyPreview.offerRatio, 2) : "—"}</strong>
-                  </article>
-                  <article className="metric-card">
-                    <span>Zusage-Score</span>
-                    <strong>{buyPreview?.acceptanceScore != null ? formatCompactNumber(buyPreview.acceptanceScore, 0) : "—"}</strong>
-                  </article>
-                  <article className="metric-card">
                     <span>Zusage / Nachf. / Absage</span>
                     <strong className="negotiation-chance-row">
                       <span className="is-positive">{formatPercentLabel(buyPreview?.acceptChance)}</span>
@@ -4083,13 +4105,6 @@ export default function TransfermarktV2Client({
                   <article className="metric-card">
                     <span>Buyout</span>
                     <strong>{formatTransfermarktCurrency(buyPreview?.buyoutCost ?? null)}</strong>
-                  </article>
-                  <article className={`metric-card${fitSalaryDiscountActive ? " is-fit-discount" : ""}`}>
-                    <span>Fit</span>
-                    <strong>
-                      {buyPreview?.teamFit != null ? formatCompactNumber(buyPreview.teamFit, 1) : "—"}
-                      {fitSalaryDiscountActive ? <small>-10% Gehalt am Ende</small> : null}
-                    </strong>
                   </article>
                 </div>
                 {buyPreview?.demandBreakdown?.length ? (
@@ -4110,7 +4125,6 @@ export default function TransfermarktV2Client({
                     </ul>
                   </div>
                 ) : null}
-              </div>
 
               {buyPreview ? (
                 <>

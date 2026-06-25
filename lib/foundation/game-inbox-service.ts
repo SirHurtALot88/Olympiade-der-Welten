@@ -14,7 +14,8 @@ import { buildTeamObjectiveOverview } from "@/lib/board/team-season-objectives-s
 import { buildMatchdaySummary } from "@/lib/foundation/matchday-summary";
 import { activeTeamHasFormCardSelections } from "@/lib/foundation/form-card-flow";
 import { isTeamMatchdayLineupComplete, isTeamMatchdayLineupSubmitted } from "@/lib/foundation/matchday-lineup-readiness";
-import { getTeamSponsorContract } from "@/lib/sponsor/sponsor-offer-service";
+import { getTeamSponsorContract } from "@/lib/sponsor/sponsor-offer-read";
+import { listOpenSponsorEvents } from "@/lib/sponsor/sponsor-event-service";
 
 export type GameInboxTargetView =
   | "home"
@@ -201,6 +202,7 @@ function buildTeamTasks(input: BuildGameInboxInput, visibleTeamIds: Set<string>,
           description: `${team.shortCode}: Einsatzliste für ${input.gameState.matchdayState.matchdayId} ist noch leer.`,
           targetView: "lineup",
           targetParams: { team: team.teamId },
+          ctaLabel: "Lineup öffnen",
           source: "lineup_drafts",
           createdAt,
         }),
@@ -234,6 +236,7 @@ function buildTeamTasks(input: BuildGameInboxInput, visibleTeamIds: Set<string>,
           description: `${team.shortCode}: Einsatzliste steht, Formkarten fehlen noch.`,
           targetView: "lineup",
           targetParams: { team: team.teamId, panel: "formcards" },
+          ctaLabel: "Formkarten zuweisen",
           source: "season_formcards",
           createdAt,
         }),
@@ -260,6 +263,29 @@ function buildTeamTasks(input: BuildGameInboxInput, visibleTeamIds: Set<string>,
       );
     }
 
+    for (const event of listOpenSponsorEvents(input.gameState, team.teamId)) {
+      if (controlMode !== "manual") {
+        continue;
+      }
+      items.push(
+        createItem({
+          itemId: event.eventId,
+          saveId: input.saveId,
+          seasonId: input.gameState.season.id,
+          teamId: team.teamId,
+          category: "sponsor",
+          severity: event.cashDelta >= 0 ? "info" : "warning",
+          title: event.eventType === "activation_bonus" ? "Sponsor-Aktion" : "Sponsor-Ereignis",
+          description: event.message,
+          targetView: "teams",
+          targetParams: { team: team.teamId, panel: "sponsor-choice", sponsorEventId: event.eventId },
+          ctaLabel: event.cashDelta >= 0 ? "Bonus annehmen" : "Ereignis prüfen",
+          source: `sponsor_event:${event.eventType}`,
+          createdAt: event.createdAt,
+        }),
+      );
+    }
+
     const missingTraining = teamTrainingMissingCount(input.gameState, team.teamId);
     if (missingTraining > 0 && controlMode === "manual") {
       items.push(
@@ -274,6 +300,7 @@ function buildTeamTasks(input: BuildGameInboxInput, visibleTeamIds: Set<string>,
           description: `${team.shortCode}: ${missingTraining} Spieler ohne Trainingsmodus.`,
           targetView: "trainingV2",
           targetParams: { team: team.teamId, panel: "training-plan" },
+          ctaLabel: "Training öffnen",
           source: "player_training_mode",
           createdAt,
         }),
@@ -296,6 +323,7 @@ function buildTeamTasks(input: BuildGameInboxInput, visibleTeamIds: Set<string>,
           description: `${team.shortCode}: ${xpPlayers.length} Spieler können entwickelt werden.`,
           targetView: "trainingV2",
           targetParams: { team: team.teamId, panel: "season-end-development" },
+          ctaLabel: "XP ausgeben",
           source: "player_current_xp",
           createdAt,
         }),
@@ -318,6 +346,7 @@ function buildTeamTasks(input: BuildGameInboxInput, visibleTeamIds: Set<string>,
           description: `${team.shortCode}: ${expiring.length} Vertrag(e) brauchen Entscheidung.`,
           targetView: "teams",
           targetParams: { team: team.teamId, panel: "contracts" },
+          ctaLabel: "Kader verwalten",
           source: "roster_contracts",
           createdAt,
         }),
@@ -352,6 +381,7 @@ function buildTeamTasks(input: BuildGameInboxInput, visibleTeamIds: Set<string>,
           description: `${sellCandidate.player.name}: ${sellCandidate.profit >= 0 ? "+" : ""}${sellCandidate.profit.toFixed(1)} MW-Puffer${sellCandidate.isExpiring ? ", Vertrag läuft aus" : ""}.`,
           targetView: "teams",
           targetParams: { team: team.teamId, player: sellCandidate.entry.playerId, panel: "roster" },
+          ctaLabel: "Spieler prüfen",
           source: "roster_value_contract_cash",
           createdAt,
         }),
@@ -381,6 +411,7 @@ function buildTeamTasks(input: BuildGameInboxInput, visibleTeamIds: Set<string>,
           description: `${team.shortCode}: ${wornFacility.facility.label} ist bei ${wornFacility.conditionPct}% und verliert Leistung.`,
           targetView: "trainingV2",
           targetParams: { team: team.teamId, panel: "facilities" },
+          ctaLabel: "Gebäude prüfen",
           source: "facility_condition_forecast",
           createdAt,
         }),
@@ -401,6 +432,7 @@ function buildTeamTasks(input: BuildGameInboxInput, visibleTeamIds: Set<string>,
           description: `${team.shortCode}: Cash reicht nach Facility-Netto voraussichtlich nicht.`,
           targetView: "trainingV2",
           targetParams: { team: team.teamId, panel: "facilities" },
+          ctaLabel: "Gebäude prüfen",
           source: "facility_finance_forecast",
           createdAt,
         }),
@@ -425,6 +457,7 @@ function buildTeamTasks(input: BuildGameInboxInput, visibleTeamIds: Set<string>,
           description: `${team.shortCode}: Mindestens ein Gebäude kann geprüft werden.`,
           targetView: "trainingV2",
           targetParams: { team: team.teamId, panel: "facilities" },
+          ctaLabel: "Gebäude upgraden",
           source: "facility_catalog_cash_check",
           createdAt,
         }),

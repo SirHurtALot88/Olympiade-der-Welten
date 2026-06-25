@@ -1,7 +1,8 @@
 "use client";
 
 import OptimizedMediaImage from "@/app/foundation/OptimizedMediaImage";
-import { VeloStatOrbitRow } from "@/components/foundation/velo-ui";
+import DisciplineIcon from "@/app/foundation/DisciplineIcon";
+import { VeloScoutMetric, VeloStatOrbitRow } from "@/components/foundation/velo-ui";
 import type { HomeV2ClientProps, HomeV2TopPlayerCard } from "@/app/foundation/home-v2/home-v2-types";
 
 function formatNumber(value: number | null | undefined, digits = 1) {
@@ -74,9 +75,10 @@ export default function HomeV2Client({
   onOpenLineup,
   onOpenMarket,
   onOpenTraining,
-  onOpenHq,
+  onOpenOffice,
   onOpenSeason,
   onOpenInbox,
+  onOpenBoardObjectives,
   onOpenPlayer,
 }: HomeV2ClientProps) {
   return (
@@ -89,7 +91,6 @@ export default function HomeV2Client({
             <span className="home-v2-logo team-logo-placeholder">{teamLogoInitials}</span>
           )}
           <div>
-            <span className="eyebrow">Manager Overview V2</span>
             <h2>{teamName}</h2>
             <div className="home-v2-meta">
               <span className="pill">{teamCode}</span>
@@ -141,9 +142,8 @@ export default function HomeV2Client({
         <section className="home-v2-panel home-v2-next-panel">
           <div className="home-v2-panel-head">
             <span className="eyebrow">Nächster Schritt</span>
-            <h3>{nextStepLabel}</h3>
+            <h3 title={nextStepStatus}>{nextStepLabel}</h3>
           </div>
-          <p className="muted">{nextStepStatus}</p>
           <p>{nextStepDetail}</p>
           {warnings.length > 0 ? (
             <div className="home-v2-warning-row">
@@ -175,24 +175,29 @@ export default function HomeV2Client({
             <h3>{gmStoryLabel ?? "Board & GM"}</h3>
           </div>
           <div className="home-v2-board-meta">
-            <span className={`transfer-status-pill ${getGmToneClass(gmStoryTone)}`}>
+            <span className={`transfer-status-pill ${getGmToneClass(gmStoryTone)}`} title={gmStoryDetail ?? undefined}>
               Druck {boardPressure ?? "—"}/10
             </span>
-            <span className="pill">Board {boardRating ?? "—"}/10</span>
+            <span className="pill" title={gmStoryDetail ?? undefined}>Board {boardRating ?? "—"}/10</span>
           </div>
-          <p className="muted">{gmStoryDetail ?? "Kein GM-Signal sichtbar."}</p>
-          <button type="button" className="secondary-button inline-button" onClick={onOpenHq}>
-            HQ öffnen
+          <button type="button" className="secondary-button inline-button" onClick={onOpenOffice}>
+            Office
           </button>
           {boardObjectives.length > 0 ? (
             <div className="home-v2-objective-list">
               {boardObjectives.slice(0, 4).map((objective) => (
-                <article key={objective.objectiveId} className="home-v2-objective-card">
+                <button
+                  key={objective.objectiveId}
+                  type="button"
+                  className="home-v2-objective-card"
+                  onClick={() => onOpenBoardObjectives?.()}
+                  title="Board-Ziele im Team-Fokus öffnen"
+                >
                   <strong>{objective.label}</strong>
                   <span className={`transfer-status-pill${objective.status === "at_risk" || objective.status === "failed" ? " is-warning" : ""}`}>
                     {objective.currentValue ?? "—"} / {objective.targetValue ?? "—"}
                   </span>
-                </article>
+                </button>
               ))}
             </div>
           ) : null}
@@ -244,6 +249,17 @@ export default function HomeV2Client({
                         soc: player.ppSoc ?? 0,
                       }}
                     />
+                    {player.topDisciplineLabel ? (
+                      <div className="home-v2-player-discipline-row">
+                        <DisciplineIcon disciplineId={player.topDisciplineId} label={player.topDisciplineLabel} showLabel />
+                        <VeloScoutMetric
+                          rangeLabel={
+                            player.topDisciplineScore != null ? formatNumber(player.topDisciplineScore, 0) : "?"
+                          }
+                          tier={player.topDisciplineTier ?? player.roleTag ?? "?"}
+                        />
+                      </div>
+                    ) : null}
                     <small className="muted">
                       MW {formatMoney(player.marketValue)} · LZ {player.contractLength ?? "—"}
                     </small>
@@ -296,10 +312,10 @@ export default function HomeV2Client({
           </button>
         </section>
 
-        <section className="home-v2-panel home-v2-inbox-panel">
+        <section className="home-v2-panel home-v2-today-panel">
           <div className="home-v2-panel-head">
-            <span className="eyebrow">Inbox</span>
-            <h3>Heute wichtig</h3>
+            <span className="eyebrow">Heute</span>
+            <h3>Wichtige Schritte</h3>
           </div>
           <div className="home-v2-today-grid">
             {todayCards.map((card) => (
@@ -310,24 +326,6 @@ export default function HomeV2Client({
               </article>
             ))}
           </div>
-          <ul className="home-v2-inbox-list">
-            {inboxItems.length > 0 ? (
-              inboxItems.map((item) => (
-                <li key={item.id} className={`is-${item.severity}`}>
-                  <strong>{item.title}</strong>
-                  <span>{item.detail}</span>
-                </li>
-              ))
-            ) : (
-              <li className="is-info">
-                <strong>Keine harten To-dos</strong>
-                <span>Inbox ist ruhig — Flow weiterfahren.</span>
-              </li>
-            )}
-          </ul>
-          <button type="button" className="secondary-button inline-button" onClick={onOpenInbox}>
-            Inbox öffnen
-          </button>
         </section>
       </div>
     </div>

@@ -17,7 +17,7 @@ import { AUTO_ROSTER_FILL_CONFIRM_TOKEN } from "@/lib/ai/auto-roster-fill-contra
 import { AI_MARKET_APPLY_CONFIRM_TOKEN } from "@/lib/ai/ai-market-plan-apply-contract";
 import { buildAiTransferIntents } from "@/lib/ai/aiTransferMarket";
 import { runAiTurn } from "@/lib/ai/aiTurnEngine";
-import { buildTeamObjectiveOverview } from "@/lib/board/team-season-objectives-service";
+import { buildTeamObjectiveOverview, refreshTeamObjectiveState } from "@/lib/board/team-season-objectives-service";
 import { getTeamDevelopmentTrainingBonusPct } from "@/lib/foundation/team-development-tendency";
 import {
   FACILITY_CATALOG,
@@ -96,6 +96,7 @@ import type {
   TeamStrategyProfile,
   TransferSellMarkerEntry,
   TransferWishlistEntry,
+  FormCardPlanRecord,
 } from "@/lib/data/olyDataTypes";
 import { getDefaultAdminBalancingConfig, resolveAdminBalancingConfig } from "@/lib/admin/balancing-config";
 import { resolvePlayerEconomyContract } from "@/lib/foundation/player-economy-contract";
@@ -129,25 +130,31 @@ import {
 } from "@/lib/foundation/team-general-managers";
 import { buildGmStoryView } from "@/lib/foundation/gm-story";
 import { getFormCardFlowStatus } from "@/lib/foundation/form-card-flow";
+import { getMatchdayArenaReadiness, mergeFormCardPlansIntoGameState } from "@/lib/foundation/matchday-arena-readiness";
 import {
   getLineupDraftSideCounts,
   getMatchdayLineupSideRequirements,
   getTeamMatchdayLineupDraft,
   getTeamMatchdayLineupOpenSlots,
   isTeamMatchdayLineupComplete,
+  isTeamMatchdayLineupSubmitted,
   mergeTeamLineupDraftIntoGameState,
 } from "@/lib/foundation/matchday-lineup-readiness";
 import {
   AI_OWNER_ID,
   DEFAULT_ACTIVE_OWNER_ID,
   applyChrisFrankyOwnershipToTeamControlSettings,
+  applyGameModeOwnership,
   buildTeamControlSettingsMap,
   buildTeamOwners,
   canOwnerManageTeam,
   deriveChrisFrankyTeamIdsFromSettings,
   filterTeamsByControlScope,
+  getGameModeOwnershipLimits,
   getTeamControlSettings,
   isAiLineupBatchApplyEnabled,
+  mergeAiAutomationFromDraft,
+  resolveGameModeFromState,
   type TeamControlFilter,
   withNormalizedTeamControlSettings,
 } from "@/lib/foundation/team-control-settings";
@@ -188,7 +195,10 @@ import {
   removeScoutingWatchlistEntry,
   syncWishlistToScoutingWatchlist,
 } from "@/lib/scouting/scouting-watchlist-service";
-import { buildSponsorCommercialRating, getTeamSponsorContract, getTeamSponsorOffers } from "@/lib/sponsor/sponsor-offer-service";
+import { buildSponsorCommercialRating } from "@/lib/sponsor/sponsor-commercial-rating-service";
+import { getTeamSponsorContract, getTeamSponsorOffers } from "@/lib/sponsor/sponsor-offer-read";
+import { applySponsorNegotiationToComponents, getSponsorNegotiationMultiplier } from "@/lib/sponsor/sponsor-negotiation";
+import type { SponsorNegotiationProfile } from "@/lib/data/olyDataTypes";
 import { buildScoutPipelineSummary } from "@/lib/scouting/facility-scout-pipeline-service";
 import { getTransfermarktBracket } from "@/lib/market/transfermarkt-fit";
 import { getTeamPowerOptions } from "@/lib/lineups/team-powers";
@@ -243,22 +253,44 @@ import {
 } from "@/lib/ui/global-table-layout";
 import type { PlayerEconomyCompareReport } from "@/lib/foundation/player-economy-compare-service";
 import type { RoomRealtimeEvent } from "@/types/game";
-import { VeloStatOrbitRow } from "@/components/foundation/velo-ui";
+import { VeloImpactStrip, VeloStatOrbitRow } from "@/components/foundation/velo-ui";
+import FoundationPanelSkeleton from "@/components/foundation/FoundationPanelSkeleton";
+import { normalizeFoundationViewParam, getDefaultFoundationViewTarget, type FoundationViewId } from "@/lib/foundation/foundation-view-routing";
+import { parseFoundationPlayerIdFromUrl, parseFoundationTabFromUrl, syncFoundationUrlState } from "@/lib/foundation/foundation-url-state";
+import FoundationShell from "@/app/foundation/shell/FoundationShell";
+import FoundationSubNav from "@/app/foundation/shell/FoundationSubNav";
+import type { PlayerProfileTabId } from "@/lib/foundation/player-profile-service";
 
 const PlayerDetailDrawer = dynamic(() => import("@/app/foundation/PlayerDetailDrawer"), { ssr: false });
 const PlayerGeneratorPanel = dynamic(() => import("@/app/foundation/PlayerGeneratorPanel"), { ssr: false });
 const MatchdayArenaV2Client = dynamic(() => import("@/app/foundation/matchday-arena-v2/MatchdayArenaV2Client"), { ssr: false });
-const TransfermarktV2Client = dynamic(() => import("@/app/foundation/transfermarkt-v2/TransfermarktV2Client"), { ssr: false });
-const TransferHistoryV2Client = dynamic(() => import("@/app/foundation/transfer-history-v2/TransferHistoryV2Client"), { ssr: false });
-const TeamsV2Client = dynamic(() => import("@/app/foundation/teams-v2/TeamsV2Client"), { ssr: false });
-const SeasonStandingsV2Client = dynamic(() => import("@/app/foundation/season-v2/SeasonStandingsV2Client"), { ssr: false });
-const TrainingFacilitiesV2Client = dynamic(() => import("@/app/foundation/training-facilities-v2/TrainingFacilitiesV2Client"), {
+const TransfermarktV2Client = dynamic(() => import("@/app/foundation/transfermarkt-v2/TransfermarktV2Client"), {
   ssr: false,
+  loading: () => <FoundationPanelSkeleton variant="marketV2" label="Transfermarkt wird geladen…" />,
 });
+const TransferHistoryV2Client = dynamic(() => import("@/app/foundation/transfer-history-v2/TransferHistoryV2Client"), { ssr: false });
+const TeamsV2Client = dynamic(() => import("@/app/foundation/teams-v2/TeamsV2Client"), {
+  ssr: false,
+  loading: () => <FoundationPanelSkeleton variant="teams" label="Teams werden geladen…" />,
+});
+const SeasonStandingsV2Client = dynamic(() => import("@/app/foundation/season-v2/SeasonStandingsV2Client"), { ssr: false });
 const TrainingCompactClient = dynamic(() => import("@/app/foundation/training-compact/TrainingCompactClient"), {
   ssr: false,
 });
-const HomeV2Client = dynamic(() => import("@/app/foundation/home-v2/HomeV2Client"), { ssr: false });
+const FacilitiesV2Client = dynamic(() => import("@/app/foundation/facilities-v2/FacilitiesV2Client"), {
+  ssr: false,
+});
+const HomeV2Client = dynamic(() => import("@/app/foundation/home-v2/HomeV2Client"), {
+  ssr: false,
+  loading: () => <FoundationPanelSkeleton variant="homeV2" label="Home wird geladen…" />,
+});
+const ManagerOfficeClient = dynamic(
+  () => import("@/app/foundation/home-v2/ManagerOfficeClient").then((mod) => mod.ManagerOfficeClient),
+  { ssr: false, loading: () => null },
+);
+const PlayerProfileClient = dynamic(() => import("@/app/foundation/player-profile/PlayerProfileClient"), {
+  ssr: false,
+});
 const FacilitiesOverviewV2Client = dynamic(
   () => import("@/app/foundation/facilities-overview-v2/FacilitiesOverviewV2Client"),
   { ssr: false },
@@ -270,6 +302,7 @@ const InboxV2Client = dynamic(() => import("@/app/foundation/inbox-v2/InboxV2Cli
 const TeamDetailDrawer = dynamic(() => import("@/app/foundation/TeamDetailDrawer"), { ssr: false });
 const LegacyLineupLabClient = dynamic(() => import("@/app/foundation/legacy-lineup-lab/LegacyLineupLabClient"), {
   ssr: false,
+  loading: () => <FoundationPanelSkeleton variant="lineup" label="Einsatzliste wird geladen…" />,
 });
 
 type SortDirection = "asc" | "desc";
@@ -303,6 +336,7 @@ type FoundationView =
   | "trainingCompact"
   | "trainingV2"
   | "players"
+  | "playerProfile"
   | "ranks"
   | "diszis"
   | "prize"
@@ -322,6 +356,7 @@ const SEASON_SETUP_STEP_IDS: NewGameFlowStepId[] = [
   "first_transfers",
   "fill_roster",
   "training_facilities",
+  "choose_sponsor",
   "set_lineup",
 ];
 
@@ -485,6 +520,7 @@ type FoundationPageClientProps = {
   initialReadSource: FoundationReadSource | null;
   initialSelectedTeamId?: string | null;
   initialSaveId?: string | null;
+  initialView?: FoundationView | null;
   initialPersistenceState?: {
     save?: { saveId: string; name?: string; gameState: GameState };
     saves?: SaveSummary[];
@@ -2297,6 +2333,8 @@ type NewGameSetupApiResponse = {
   error?: string;
 };
 
+const NEW_GAME_VISIBLE_PRESET_IDS: NewGamePresetId[] = ["solo_1", "online_4v4"];
+
 const NEW_GAME_PRESET_DEFAULTS: Record<NewGamePresetId, { label: string; chrisTeamIds: string[]; frankyTeamIds: string[]; online: boolean }> = {
   solo_1: { label: "Solo 1 Team", chrisTeamIds: ["M-M"], frankyTeamIds: [], online: false },
   solo_2: { label: "Solo 2 Teams", chrisTeamIds: ["M-M", "D-P"], frankyTeamIds: [], online: false },
@@ -3363,7 +3401,6 @@ function applyStoredColumnOrder(
 
 const foundationPrimaryViews: Array<{ id: FoundationView; label: string; tooltip: string }> = [
   { id: "home", label: "Home", tooltip: "Manager-Zentrale: naechste Schritte, wichtigste Spieler, Liga-Lage und To-dos." },
-  { id: "hq", label: "HQ", tooltip: "Front Office: Board, GM, Rivalen, Team Powers, Captains, Forderungen und Storylines." },
   { id: "season", label: "Saisonstand", tooltip: "Tabelle, Story-Karten, Teamstaerken und Punkteentwicklung." },
   { id: "lineup", label: "Einsatzliste", tooltip: "Spieler in Slots setzen, Team-Boost waehlen und Spieltag vorbereiten." },
   { id: "matchdayArena", label: "Arena", tooltip: "Spieltag als Reveal/Event ansehen und Ergebnis verstehen." },
@@ -3418,7 +3455,7 @@ const homeTaskLabelContract = [
 const foundationViews = [...foundationPrimaryViews, ...foundationAdminViews, ...foundationSecondaryViews, ...foundationInternalViews];
 
 function normalizeInboxTargetView(view: string | null | undefined): FoundationView {
-  return foundationViews.some((entry) => entry.id === view) ? getDefaultFoundationViewTarget(view as FoundationView) : "home";
+  return foundationViews.some((entry) => entry.id === view) ? resolveFoundationViewTarget(view as FoundationView) : "home";
 }
 
 function getFoundationViewScrollTarget(view: FoundationView | GameFlowView | string | null | undefined) {
@@ -3428,7 +3465,7 @@ function getFoundationViewScrollTarget(view: FoundationView | GameFlowView | str
     case "homeV2":
       return "foundation-home-v2";
     case "facilitiesOverviewV2":
-      return "foundation-training-facilities-v2";
+      return "foundation-facilities-v2";
     case "scoutingCenterV2":
       return "foundation-scouting-hub-v2";
     case "inboxV2":
@@ -3460,7 +3497,7 @@ function getFoundationViewScrollTarget(view: FoundationView | GameFlowView | str
     case "trainingCompact":
       return "foundation-training-compact";
     case "trainingV2":
-      return "foundation-training-facilities-v2";
+      return "foundation-facilities-v2";
     case "market":
       return "transfer-market";
     case "marketV2":
@@ -3488,6 +3525,34 @@ function getFoundationViewScrollTarget(view: FoundationView | GameFlowView | str
   }
 }
 
+function resolveFoundationPanelScrollTarget(input: {
+  targetView: FoundationView | GameFlowView | string;
+  panel?: string | null;
+}) {
+  if (input.panel === "sponsor-choice") {
+    return "team-sponsor-choice";
+  }
+  if (input.panel === "board-objectives") {
+    return "team-board-objectives";
+  }
+  if (input.panel === "contracts" || input.panel === "roster") {
+    return "team-focus-roster";
+  }
+  if (input.panel === "formcards") {
+    return "foundation-lineup";
+  }
+  if (input.panel === "training-plan") {
+    return "foundation-facilities-v2";
+  }
+  if (input.panel === "season-end-development") {
+    return "foundation-training-compact";
+  }
+  if (input.panel === "arena-result-summary") {
+    return "foundation-matchday-arena";
+  }
+  return input.panel ?? getFoundationViewScrollTarget(input.targetView) ?? "foundation-home";
+}
+
 function scrollToFoundationTarget(targetId: string | null | undefined) {
   if (!targetId || typeof window === "undefined") {
     return;
@@ -3511,80 +3576,23 @@ function parseFoundationViewFromUrl() {
     return null;
   }
 
-  const view = new URL(window.location.href).searchParams.get("view");
-  if (!view) {
-    return null;
-  }
-
-  if (view === "matchday-arena") {
-    return "matchdayArena";
-  }
-  if (view === "matchday-arena-v2") {
-    return "matchdayArena";
-  }
-  if (view === "season-v2") {
-    return "seasonV2";
-  }
-  if (view === "season") {
-    return "seasonV2";
-  }
-  if (view === "prize-v2" || view === "preisgeld-v2") {
-    return "prize";
-  }
-  if (view === "transfermarkt-v2") {
-    return "marketV2";
-  }
-  if (view === "transfermarkt" || view === "market") {
-    return "marketV2";
-  }
-  if (view === "history-v2" || view === "transferhistorie-v2") {
-    return "historyV2";
-  }
-  if (view === "teams-v2") {
-    return "teams";
-  }
-  if (view === "training-v2" || view === "training-facilities-v2" || view === "gebaeude-v2" || view === "facilities-v2") {
-    return "trainingV2";
-  }
-  if (view === "training-compact" || view === "training" || view === "training-facilities") {
-    return "trainingCompact";
-  }
-  if (view === "lexikon" || view === "glossar" || view === "encyclopedia" || view === "buch") {
-    return "encyclopedia";
-  }
-  if (view === "home-v2" || view === "homev2") {
-    return "homeV2";
-  }
-  if (view === "facilities-overview-v2" || view === "facilities-v2-overview") {
-    return "facilitiesOverviewV2";
-  }
-  if (view === "scouting-center-v2" || view === "scouting-v2") {
-    return "scoutingCenterV2";
-  }
-  if (view === "inbox-v2" || view === "inbox") {
-    return "inboxV2";
-  }
-
-  return foundationViews.some((entry) => entry.id === view) ? (view as FoundationView) : null;
+  return normalizeFoundationViewParam(new URL(window.location.href).searchParams.get("view"));
 }
 
-function syncFoundationViewInUrl(view: FoundationView) {
+function syncFoundationViewInUrl(view: FoundationView, tab?: string | null, playerId?: string | null) {
   if (typeof window === "undefined") {
     return;
   }
 
-  const nextUrl = new URL(window.location.href);
-  nextUrl.searchParams.set("view", view);
-  window.history.replaceState({}, "", nextUrl.toString());
+  syncFoundationUrlState({
+    view: view as FoundationViewId,
+    tab: tab ?? null,
+    playerId: playerId ?? null,
+  });
 }
 
-function getDefaultFoundationViewTarget(view: FoundationView): FoundationView {
-  if (view === "market") return "marketV2";
-  if (view === "season") return "seasonV2";
-  if (view === "training") return "trainingCompact";
-  if (view === "facilitiesOverviewV2") return "trainingV2";
-  if (view === "inbox") return "inboxV2";
-  return view;
+function resolveFoundationViewTarget(view: FoundationView): FoundationView {
+  return getDefaultFoundationViewTarget(view as FoundationViewId) as FoundationView;
 }
 
 function resolveFoundationTeamId(teams: Team[], value: string | null | undefined) {
@@ -3838,9 +3846,21 @@ function setFoundationView(
   view: FoundationView,
   setActiveView: Dispatch<SetStateAction<FoundationView>>,
 ) {
-  const targetView = getDefaultFoundationViewTarget(view);
-  setActiveView(targetView);
-  syncFoundationViewInUrl(targetView);
+  const applyViewChange = () => {
+    const targetView = resolveFoundationViewTarget(view);
+    setActiveView(targetView);
+    syncFoundationViewInUrl(targetView);
+  };
+  runFoundationNavigationTransition(applyViewChange);
+}
+
+type FoundationNavigationTransition = (callback: () => void) => void;
+let runFoundationNavigationTransition: FoundationNavigationTransition = (callback) => {
+  callback();
+};
+
+function bindFoundationNavigationTransition(transition: FoundationNavigationTransition) {
+  runFoundationNavigationTransition = transition;
 }
 
 function compareSortValues(left: string | number, right: string | number) {
@@ -5212,6 +5232,14 @@ function formatCockpitReason(reason: string) {
     "resolve_status:missing_scores": "Mindestens ein Team hat noch fehlende Score-Quellen.",
     "resolve_status:missing_sources": "Mindestens eine Resolve-Quelle ist noch unvollstaendig.",
     "resolve_status:blocked": "Resolve Preview ist aktuell blockiert.",
+    lineup_not_submitted: "Einsatzliste noch nicht bestaetigt — bitte in der Einsatzliste abschliessen.",
+    missing_formcard_selections: "Formkarten fehlen noch fuer den aktuellen Spieltag.",
+    missing_formcard_pool: "Formkarten fuer diese Saison fehlen noch — bitte in der Einsatzliste erzeugen.",
+    missing_lineup: "Einsatzliste ist noch nicht vollstaendig.",
+    incomplete_lineup: "Einsatzliste ist noch nicht vollstaendig — offene Slots in D1/D2 fuellen.",
+    training_missing: "Training fuer alle Kaderspieler muss zuerst gesetzt werden.",
+    no_active_team: "Kein aktives Team ausgewaehlt.",
+    empty_roster: "Kader ist leer — erst Spieler hinzufuegen.",
   };
 
   if (mapped[reason]) {
@@ -5303,6 +5331,7 @@ function formatHomeWarningLabel(warning: string) {
     season_started_no_results: "Saison ohne Ergebnis",
     no_final_standings: "Tabelle noch offen",
     missing_lineups: "Einsatzliste offen",
+    lineup_not_submitted: "Einsatzliste noch nicht bestaetigt — bitte in der Einsatzliste abschliessen.",
     formcards_open: "Formkarten offen",
     room_not_connected: "Room nicht verbunden",
   };
@@ -5977,27 +6006,11 @@ function withSynchronizedStrategyAliases(current: TeamStrategyProfile, patch: Pa
   return next;
 }
 
-const foundationBootWatchdogScript = `
-(function () {
-  if (window.__foundationBootWatchdogActive) return;
-  window.__foundationBootWatchdogActive = true;
-  window.setTimeout(function () {
-    try {
-      var key = "foundation_boot_reload_once";
-      if (!window.sessionStorage.getItem(key)) {
-        window.sessionStorage.setItem(key, "1");
-        window.location.reload();
-        return;
-      }
-    } catch (error) {}
-  }, 6000);
-})();
-`;
-
 export default function FoundationPageClient({
   initialReadSource,
   initialSelectedTeamId,
   initialSaveId,
+  initialView,
   initialPersistenceState,
 }: FoundationPageClientProps) {
   const initialPersistedSave = initialPersistenceState?.save?.gameState ? initialPersistenceState.save : null;
@@ -6008,6 +6021,16 @@ export default function FoundationPageClient({
   );
   const [teamControlDraft, setTeamControlDraft] = useState<TeamControlDraftMap>(() =>
     buildTeamControlSettingsMap(initialClientGameState.teams, initialClientGameState.seasonState.teamControlSettings),
+  );
+  const initialOwnershipDraft = deriveChrisFrankyTeamIdsFromSettings(
+    initialClientGameState.teams,
+    buildTeamControlSettingsMap(initialClientGameState.teams, initialClientGameState.seasonState.teamControlSettings),
+  );
+  const [gameModeOwnershipChrisIds, setGameModeOwnershipChrisIds] = useState<string[]>(
+    () => initialOwnershipDraft.chrisTeamIds,
+  );
+  const [gameModeOwnershipFrankyIds, setGameModeOwnershipFrankyIds] = useState<string[]>(
+    () => initialOwnershipDraft.frankyTeamIds,
   );
   const [teamStrategyDraft, setTeamStrategyDraft] = useState<TeamStrategyDraftMap>(() =>
     buildTeamStrategyProfileMap(
@@ -6043,10 +6066,22 @@ export default function FoundationPageClient({
   const [activeOwnerId, setActiveOwnerId] = useState<string>(() => readStoredFoundationActiveOwnerId());
   const [teamContextFilter, setTeamContextFilter] = useState<TeamControlFilter>(() => readStoredFoundationTeamFilter());
   const [activeManagerTeamWarning, setActiveManagerTeamWarning] = useState<string | null>(null);
-  const [activeView, setActiveView] = useState<FoundationView>(() => parseFoundationViewFromUrl() ?? "home");
+  const [activeView, setActiveView] = useState<FoundationView>(
+    () => resolveFoundationViewTarget((initialView ?? parseFoundationViewFromUrl() ?? "homeV2") as FoundationView),
+  );
+  const [homeV2Tab, setHomeV2Tab] = useState<"overview" | "office">(() => {
+    if (typeof window === "undefined") return "overview";
+    const view = normalizeFoundationViewParam(new URL(window.location.href).searchParams.get("view"));
+    const tab = parseFoundationTabFromUrl();
+    if (tab === "office" || view === "hq") return "office";
+    return "overview";
+  });
+  const [playerProfileTab, setPlayerProfileTab] = useState<PlayerProfileTabId>("overview");
+  const [playerProfileData, setPlayerProfileData] = useState<PlayerDetailDrawerData | null>(null);
   const [inboxV2SelectedItemId, setInboxV2SelectedItemId] = useState<string | null>(null);
   const [selectedEncyclopediaEntryId, setSelectedEncyclopediaEntryId] = useState(() => getGameEncyclopediaEntry("OVR")?.id ?? "ovr");
   const [lineupFocusRequestKey, setLineupFocusRequestKey] = useState<string | null>(null);
+  const [lineupDraftBoardViewRequest, setLineupDraftBoardViewRequest] = useState<"lineup" | "formBoard" | null>(null);
   const [transferMarketTab, setTransferMarketTab] = useState<"classic" | "v2">(() => (activeView === "marketV2" ? "v2" : "classic"));
   const activeTransferMarketTab = activeView === "marketV2" ? "v2" : transferMarketTab;
   const isTransferMarketViewActive = activeView === "market" || activeView === "marketV2";
@@ -6058,6 +6093,12 @@ export default function FoundationPageClient({
   const commandSearchInputRef = useRef<HTMLInputElement | null>(null);
   const [showTeamsComparison, setShowTeamsComparison] = useState<boolean>(false);
   const shouldBuildTeamsHeavyComparison = activeView === "teams" && showTeamsComparison;
+
+  useEffect(() => {
+    if (activeView !== "teams") {
+      setShowTeamsComparison(false);
+    }
+  }, [activeView]);
   const shouldBuildDisciplineRanks =
     shouldBuildTeamsHeavyComparison ||
     activeView === "ranks" ||
@@ -6238,6 +6279,7 @@ export default function FoundationPageClient({
   const [marketNegativeTraitFilter, setMarketNegativeTraitFilter] = useState<string>("ALL");
   const [marketBracketFilter, setMarketBracketFilter] = useState<string>("ALL");
   const [marketTeamId, setMarketTeamId] = useState<string>("");
+  const [marketFocusPlayerId, setMarketFocusPlayerId] = useState<string | null>(null);
   const [marketSearch, setMarketSearch] = useState<string>("");
   const [marketMaxValue, setMarketMaxValue] = useState<number>(150);
   const marketValueFilterManualRef = useRef(false);
@@ -6299,6 +6341,7 @@ export default function FoundationPageClient({
   } | null>(null);
   const [sponsorChoiceBusy, setSponsorChoiceBusy] = useState<string | null>(null);
   const [sponsorChoiceMessage, setSponsorChoiceMessage] = useState<string | null>(null);
+  const [sponsorChoiceProfiles, setSponsorChoiceProfiles] = useState<Record<string, SponsorNegotiationProfile>>({});
   const [marketSellModalOpen, setMarketSellModalOpen] = useState<boolean>(false);
   const [marketSellSubject, setMarketSellSubject] = useState<TransfermarktSellPreviewSubject | null>(null);
   const [marketContractLengthDraft, setMarketContractLengthDraft] = useState<number | null>(null);
@@ -6424,8 +6467,17 @@ export default function FoundationPageClient({
       ]),
     ),
   );
-  const [isHydrated, setIsHydrated] = useState<boolean>(false);
   const [isPending, startTransition] = useTransition();
+  const deferredGameState = useDeferredValue(gameState);
+  const inboxGameState = deferredGameState;
+  useEffect(() => {
+    bindFoundationNavigationTransition(startTransition);
+    return () => {
+      bindFoundationNavigationTransition((callback) => {
+        callback();
+      });
+    };
+  }, []);
   const [isTeamSwitchPending, startTeamSwitchTransition] = useTransition();
   const deferredMarketSearch = useDeferredValue(marketSearch);
   const deferredHistorySearch = useDeferredValue(historySearch);
@@ -6527,19 +6579,8 @@ export default function FoundationPageClient({
       return;
     }
 
-    const resolvedTeam = gameState.teams.find((team) => team.teamId === resolvedTeamId) ?? null;
-    const resolvedSettingsMap = buildTeamControlSettingsMap(gameState.teams, gameState.seasonState.teamControlSettings);
-    const resolvedSettings = resolvedSettingsMap[resolvedTeamId] ?? null;
-    const shouldPersistAsOwnedTeam =
-      !isReadOnlyMode &&
-      activeSaveId !== "loading-save" &&
-      Boolean(
-        !resolvedSettings ||
-        resolvedSettings.controlMode !== "manual" ||
-        (resolvedSettings.ownerId !== DEFAULT_ACTIVE_OWNER_ID && resolvedSettings.ownerSlot !== "user") ||
-        gameState.seasonState.newGameFlow?.selectedTeamId !== resolvedTeamId,
-      );
-
+    // Viewing/switching the active team must not change teamControlSettings.
+    // Ownership (manual vs ai) is edited explicitly in Team Settings and persisted via saveTeamSettings().
     setSelectedTeamId(resolvedTeamId);
     setActiveManagerTeamSource(source);
     setActiveManagerTeamWarning(null);
@@ -6548,64 +6589,6 @@ export default function FoundationPageClient({
     }
     syncFoundationTeamIdInUrl(resolvedTeamId);
     persistFoundationManagerTeamId(resolvedTeamId, activeSaveId, source);
-
-    if (shouldPersistAsOwnedTeam) {
-      const nextTeamControlSettings = {
-        ...resolvedSettingsMap,
-        [resolvedTeamId]: {
-          ...(resolvedSettings ?? {}),
-          teamId: resolvedTeamId,
-          controlMode: "manual" as const,
-          ownerId: DEFAULT_ACTIVE_OWNER_ID,
-          ownerSlot: "user",
-          displayLabel: resolvedSettings?.displayLabel ?? resolvedTeam?.shortCode ?? resolvedTeamId,
-          aiLineupPreviewEnabled: false,
-          aiLineupApplyEnabled: false,
-          aiLineupAutoApplyEnabled: false,
-          aiTransferPreviewEnabled: false,
-          aiTransferAutoApplyEnabled: false,
-          aiSellPreviewEnabled: false,
-          aiSellAutoApplyEnabled: false,
-        },
-      };
-
-      const nextGameState = withNormalizedLocalTeamSettings({
-        ...gameState,
-        teams: gameState.teams.map((team) =>
-          team.teamId === resolvedTeamId
-            ? { ...team, humanControlled: true }
-            : team
-        ),
-        seasonState: {
-          ...gameState.seasonState,
-          newGameFlow: gameState.seasonState.newGameFlow
-            ? {
-                ...gameState.seasonState.newGameFlow,
-                selectedTeamId: resolvedTeamId,
-                updatedAt: new Date().toISOString(),
-              }
-            : gameState.seasonState.newGameFlow,
-          teamControlSettings: nextTeamControlSettings,
-        },
-      });
-
-      setGameState(nextGameState);
-      setTeamControlDraft(buildTeamControlSettingsMap(nextGameState.teams, nextGameState.seasonState.teamControlSettings));
-      setActiveOwnerId(DEFAULT_ACTIVE_OWNER_ID);
-      persistFoundationActiveOwnerId(DEFAULT_ACTIVE_OWNER_ID);
-      skipNextFullPersistCountRef.current += 1;
-      void persistLocalGameStateImmediately(nextGameState).catch((error) => {
-        console.error(error);
-        skipNextFullPersistCountRef.current = Math.max(0, skipNextFullPersistCountRef.current - 1);
-      });
-      return;
-    }
-
-    skipNextFullPersistCountRef.current += 1;
-    void persistSelectedManagerTeam(resolvedTeamId).catch((error) => {
-      console.error(error);
-      skipNextFullPersistCountRef.current = Math.max(0, skipNextFullPersistCountRef.current - 1);
-    });
   }
 
   function clearPendingTeamActivation() {
@@ -6760,45 +6743,6 @@ export default function FoundationPageClient({
     }
   }
 
-  async function persistSelectedManagerTeam(teamId: string) {
-    if (readMeta.source === "prisma" || readMeta.readOnly || !teamId || activeSaveId === "loading-save") {
-      return;
-    }
-
-    const response = await fetch(
-      `/api/singleplayer-state?${new URLSearchParams({
-        source: readMeta.source,
-        saveMode: foundationSaveMode,
-      }).toString()}`,
-      {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({
-          action: "select-manager-team",
-          saveId: activeSaveId,
-          selectedTeamId: teamId,
-        }),
-      },
-    );
-
-    if (!response.ok) {
-      throw new Error("Manager-Team konnte nicht gespeichert werden.");
-    }
-
-    const payload = (await response.json()) as {
-      save?: { saveId: string; name?: string };
-      saves?: SaveSummary[];
-    };
-    if (payload.save?.name) {
-      setActiveSaveName(payload.save.name);
-    }
-    if (payload.saves) {
-      setSaveSummaries(payload.saves);
-    }
-  }
-
   async function setPlayerTrainingMode(playerId: string, mode: TrainingModeDraft) {
     if (isReadOnlyMode) {
       showReadOnlyNotice();
@@ -6865,31 +6809,44 @@ export default function FoundationPageClient({
     setTeamControlMessage(null);
   }
 
-  function applyCurrentSaveOwnershipDraft(chrisTeamIds: string[], frankyTeamIds: string[]) {
+  function applyGameModeOwnershipDraft(chrisTeamIds: string[], frankyTeamIds: string[]) {
+    setGameModeOwnershipChrisIds(chrisTeamIds);
+    setGameModeOwnershipFrankyIds(frankyTeamIds);
     setTeamControlDraft(
       applyChrisFrankyOwnershipToTeamControlSettings(gameState.teams, chrisTeamIds, frankyTeamIds, teamControlDraft),
     );
-    setTeamControlMessage("Ownership im Draft angepasst. Bitte 'Lokal speichern' klicken.");
+    setTeamControlMessage("Team-Zuordnung im Draft angepasst. Bitte 'Lokal speichern' klicken.");
   }
 
-  function toggleCurrentSaveTeamOwnership(owner: "chris" | "franky", teamId: string) {
-    const { chrisTeamIds, frankyTeamIds } = deriveChrisFrankyTeamIdsFromSettings(gameState.teams, teamControlDraft);
+  function setSoloPlayerTeam(teamId: string) {
+    applyGameModeOwnershipDraft([teamId], []);
+  }
+
+  function toggleGameModeOwnershipTeam(owner: "chris" | "franky", teamId: string) {
+    const limits = getGameModeOwnershipLimits(resolveGameModeFromState(gameState));
     if (owner === "chris") {
-      const nextChrisTeamIds = chrisTeamIds.includes(teamId)
-        ? chrisTeamIds.filter((entry) => entry !== teamId)
-        : [...chrisTeamIds.filter((entry) => entry !== teamId), teamId].filter((entry) => !frankyTeamIds.includes(entry));
-      applyCurrentSaveOwnershipDraft(
-        nextChrisTeamIds,
-        frankyTeamIds.filter((entry) => entry !== teamId),
-      );
+      const nextChrisTeamIds = gameModeOwnershipChrisIds.includes(teamId)
+        ? gameModeOwnershipChrisIds.filter((entry) => entry !== teamId)
+        : gameModeOwnershipChrisIds.length >= limits.chrisMax && limits.chrisMax === 1
+          ? [teamId]
+          : gameModeOwnershipChrisIds.length >= limits.chrisMax
+            ? gameModeOwnershipChrisIds
+            : [...gameModeOwnershipChrisIds.filter((entry) => entry !== teamId), teamId].filter(
+                (entry) => !gameModeOwnershipFrankyIds.includes(entry),
+              );
+      applyGameModeOwnershipDraft(nextChrisTeamIds, gameModeOwnershipFrankyIds.filter((entry) => entry !== teamId));
       return;
     }
 
-    const nextFrankyTeamIds = frankyTeamIds.includes(teamId)
-      ? frankyTeamIds.filter((entry) => entry !== teamId)
-      : [...frankyTeamIds.filter((entry) => entry !== teamId), teamId].filter((entry) => !chrisTeamIds.includes(entry));
-    applyCurrentSaveOwnershipDraft(
-      chrisTeamIds.filter((entry) => entry !== teamId),
+    const nextFrankyTeamIds = gameModeOwnershipFrankyIds.includes(teamId)
+      ? gameModeOwnershipFrankyIds.filter((entry) => entry !== teamId)
+      : gameModeOwnershipFrankyIds.length >= limits.frankyMax
+        ? gameModeOwnershipFrankyIds
+        : [...gameModeOwnershipFrankyIds.filter((entry) => entry !== teamId), teamId].filter(
+            (entry) => !gameModeOwnershipChrisIds.includes(entry),
+          );
+    applyGameModeOwnershipDraft(
+      gameModeOwnershipChrisIds.filter((entry) => entry !== teamId),
       nextFrankyTeamIds,
     );
   }
@@ -6936,30 +6893,35 @@ export default function FoundationPageClient({
 
     const identityOverrides = buildTeamIdentityOverrideMap(gameState.teams, teamIdentityDraft);
     const resolvedIdentities = buildResolvedTeamIdentities(gameState.teams, gameState.teamIdentities, identityOverrides);
-    const nextTeamControlSettings = buildTeamControlSettingsMap(gameState.teams, teamControlDraft);
-    const selectedTeamControl = selectedTeam ? nextTeamControlSettings[selectedTeam.teamId] : null;
-    const selectedTeamIsLocalUser =
-      selectedTeamControl?.controlMode === "manual" &&
-      (selectedTeamControl.ownerId === DEFAULT_ACTIVE_OWNER_ID || selectedTeamControl.ownerSlot === "user");
-    const nextSelectedTeamId = selectedTeamIsLocalUser
-      ? selectedTeam?.teamId
-      : gameState.seasonState.newGameFlow?.selectedTeamId ?? null;
+    const saveMode = resolveGameModeFromState(gameState);
+    const limits = getGameModeOwnershipLimits(saveMode);
+    if (saveMode === "online_4v4" && (gameModeOwnershipChrisIds.length !== 4 || gameModeOwnershipFrankyIds.length !== 4)) {
+      setTeamControlMessage("Online 4v4 braucht genau 4 Chris-Teams und 4 Franky-Teams.");
+      return;
+    }
+    if (saveMode === "solo_1" && gameModeOwnershipChrisIds.length !== 1) {
+      setTeamControlMessage("Solo braucht genau 1 menschliches Team.");
+      return;
+    }
+    if (gameModeOwnershipChrisIds.length > limits.chrisMax || gameModeOwnershipFrankyIds.length > limits.frankyMax) {
+      setTeamControlMessage("Zu viele Teams fuer den aktiven Spielmodus zugeordnet.");
+      return;
+    }
+
+    const ownershipGameState = applyGameModeOwnership(gameState, {
+      saveMode,
+      chrisTeamIds: gameModeOwnershipChrisIds,
+      frankyTeamIds: gameModeOwnershipFrankyIds,
+    });
+    const nextTeamControlSettings = mergeAiAutomationFromDraft(
+      ownershipGameState.seasonState.teamControlSettings ?? {},
+      teamControlDraft,
+    );
     const nextGameState = withNormalizedLocalTeamSettings({
-      ...gameState,
-      teams: gameState.teams.map((team) => {
-        const control = nextTeamControlSettings[team.teamId];
-        return control ? { ...team, humanControlled: control.controlMode === "manual" } : team;
-      }),
+      ...ownershipGameState,
       teamIdentities: resolvedIdentities,
       seasonState: {
-        ...gameState.seasonState,
-        newGameFlow: gameState.seasonState.newGameFlow
-          ? {
-              ...gameState.seasonState.newGameFlow,
-              selectedTeamId: nextSelectedTeamId,
-              updatedAt: new Date().toISOString(),
-            }
-          : gameState.seasonState.newGameFlow,
+        ...ownershipGameState.seasonState,
         teamIdentityOverrides: identityOverrides,
         teamControlSettings: nextTeamControlSettings,
         teamStrategyProfiles: buildTeamStrategyProfileMap(
@@ -6977,6 +6939,9 @@ export default function FoundationPageClient({
       hasLoadedPersistentState.current = true;
       setGameState(nextGameState);
       setTeamControlDraft(nextTeamControlSettings);
+      const savedOwnership = deriveChrisFrankyTeamIdsFromSettings(nextGameState.teams, nextTeamControlSettings);
+      setGameModeOwnershipChrisIds(savedOwnership.chrisTeamIds);
+      setGameModeOwnershipFrankyIds(savedOwnership.frankyTeamIds);
 
       const nextSelectedControl = selectedTeam ? nextTeamControlSettings[selectedTeam.teamId] : null;
       if (nextSelectedControl?.controlMode === "manual" && nextSelectedControl.ownerId && nextSelectedControl.ownerId !== activeOwnerId) {
@@ -7009,17 +6974,9 @@ export default function FoundationPageClient({
       return;
     }
 
-    if (
-      typeof window !== "undefined" &&
-      !window.confirm("AI-Lineup Apply fuer alle AI-Teams lokal aktivieren? Es werden nur Team-Settings gesetzt, keine Einsatzlisten gespeichert.")
-    ) {
-      return;
-    }
-
-    const nextTeamControlSettings = buildTeamControlSettingsMap(
-      gameState.teams,
+    setTeamControlDraft((current) =>
       Object.fromEntries(
-        Object.entries(teamControlDraft).map(([teamId, settings]) => [
+        Object.entries(current).map(([teamId, settings]) => [
           teamId,
           settings.controlMode === "ai"
             ? {
@@ -7031,28 +6988,7 @@ export default function FoundationPageClient({
         ]),
       ),
     );
-    const nextGameState = withNormalizedLocalTeamSettings({
-      ...gameState,
-      seasonState: {
-        ...gameState.seasonState,
-        teamControlSettings: nextTeamControlSettings,
-      },
-    });
-
-    setCockpitBusyKey("enable-ai-lineup-apply");
-    try {
-      await persistLocalGameStateImmediately(nextGameState);
-      hasPersistedInitialState.current = false;
-      hasLoadedPersistentState.current = true;
-      setGameState(nextGameState);
-      setTeamControlDraft(nextTeamControlSettings);
-      setTeamControlMessage("AI-Lineup Apply wurde lokal fuer alle AI-Teams aktiviert.");
-      await loadSave(activeSaveId);
-    } catch (error) {
-      setTeamControlMessage(error instanceof Error ? error.message : "AI-Lineup Apply konnte lokal nicht aktiviert werden.");
-    } finally {
-      setCockpitBusyKey(null);
-    }
+    setTeamControlMessage("AI-Lineup Apply im Draft gesetzt. Bitte in Team Settings 'Lokal speichern'.");
   }
 
   async function enableAiMarketPreviewForAiTeams() {
@@ -7066,19 +7002,9 @@ export default function FoundationPageClient({
       return;
     }
 
-    if (
-      typeof window !== "undefined" &&
-      !window.confirm(
-        "AI-Markt-Vorschau und AI-Sell-Vorschau fuer alle AI-Teams in diesem lokalen Save aktivieren? Es werden nur Team-Settings gespeichert, keine Transfers ausgefuehrt.",
-      )
-    ) {
-      return;
-    }
-
-    const nextTeamControlSettings = buildTeamControlSettingsMap(
-      gameState.teams,
+    setTeamControlDraft((current) =>
       Object.fromEntries(
-        Object.entries(teamControlDraft).map(([teamId, settings]) => [
+        Object.entries(current).map(([teamId, settings]) => [
           teamId,
           settings.controlMode === "ai"
             ? {
@@ -7090,28 +7016,7 @@ export default function FoundationPageClient({
         ]),
       ),
     );
-    const nextGameState = withNormalizedLocalTeamSettings({
-      ...gameState,
-      seasonState: {
-        ...gameState.seasonState,
-        teamControlSettings: nextTeamControlSettings,
-      },
-    });
-
-    setCockpitBusyKey("enable-ai-market-preview");
-    try {
-      await persistLocalGameStateImmediately(nextGameState);
-      hasPersistedInitialState.current = false;
-      hasLoadedPersistentState.current = true;
-      setGameState(nextGameState);
-      setTeamControlDraft(nextTeamControlSettings);
-      setTeamControlMessage("AI-Marktfreigaben wurden lokal fuer alle AI-Teams aktiviert.");
-      await loadSave(activeSaveId);
-    } catch (error) {
-      setTeamControlMessage(error instanceof Error ? error.message : "AI-Marktfreigaben konnten lokal nicht gespeichert werden.");
-    } finally {
-      setCockpitBusyKey(null);
-    }
+    setTeamControlMessage("AI-Marktfreigaben im Draft gesetzt. Bitte in Team Settings 'Lokal speichern'.");
   }
 
   function savePlayerGeneratorDrafts(nextDrafts: PlayerGeneratorDraft[]) {
@@ -7296,7 +7201,11 @@ export default function FoundationPageClient({
     setTeamStrategyMessage(null);
   }
 
-  async function openPlayerDrawerById(playerId: string, activePlayerId?: string | null) {
+  async function openPlayerProfileById(
+    playerId: string,
+    activePlayerId?: string | null,
+    options?: { quickPeek?: boolean; tab?: PlayerProfileTabId },
+  ) {
     const { buildPlayerDrawerDataFromGameState } = await import("@/lib/foundation/player-detail-drawer");
     const nextData = buildPlayerDrawerDataFromGameState({
       gameState,
@@ -7310,8 +7219,27 @@ export default function FoundationPageClient({
       return;
     }
 
-    setPlayerDrawerData(nextData);
-    setDrawerLayerOrder("player");
+    if (options?.quickPeek) {
+      setPlayerDrawerData(nextData);
+      setDrawerLayerOrder("player");
+      return;
+    }
+
+    setPlayerProfileData(nextData);
+    setPlayerProfileTab(options?.tab ?? "overview");
+    setFoundationView("playerProfile", setActiveView);
+    syncFoundationViewInUrl("playerProfile", options?.tab ?? "overview", playerId);
+  }
+
+  async function openPlayerDrawerById(playerId: string, activePlayerId?: string | null) {
+    await openPlayerProfileById(playerId, activePlayerId);
+  }
+
+  function navigateHomeTab(tab: "overview" | "office") {
+    setHomeV2Tab(tab);
+    setFoundationView("homeV2", setActiveView);
+    syncFoundationViewInUrl("homeV2", tab === "office" ? "office" : null);
+    scrollToFoundationTarget(tab === "office" ? "foundation-hq" : "foundation-home-v2");
   }
 
   function openTrainingPlayerTarget(playerId: string, target: "training" | "upgrade" = "training") {
@@ -7552,6 +7480,27 @@ export default function FoundationPageClient({
 
   async function openMarketBuyModal(item: TransfermarktBuyPreviewSubject, teamIdOverride?: string) {
     const effectiveTeamId = resolveMarketBuyTeamId(teamIdOverride);
+    // #region agent log
+    fetch("http://127.0.0.1:7744/ingest/8fee0963-e343-46df-a0b4-6cfa69e52b00", {
+      method: "POST",
+      headers: { "Content-Type": "application/json", "X-Debug-Session-Id": "03cfb2" },
+      body: JSON.stringify({
+        sessionId: "03cfb2",
+        runId: "tm-buy-open",
+        hypothesisId: "C-tm-ownership",
+        location: "FoundationPageClient.tsx:openMarketBuyModal",
+        message: "Transfer buy modal open attempt",
+        data: {
+          effectiveTeamId,
+          canManage: canManageTeamId(effectiveTeamId),
+          marketTeamId,
+          selectedTeamId,
+          activeManagerTeamId,
+        },
+        timestamp: Date.now(),
+      }),
+    }).catch(() => {});
+    // #endregion
     if (!canManageTeamId(effectiveTeamId)) {
       setMarketBuyError(`${getTeamLockedName(effectiveTeamId)} gehoert nicht zu deinen steuerbaren Teams. Kaufen ist gesperrt.`);
       showTeamManagementLockedNotice(getTeamLockedName(effectiveTeamId));
@@ -7582,21 +7531,30 @@ export default function FoundationPageClient({
 
   function closeMarketBuyModal() {
     marketBuyPreviewRequestVersion.current += 1;
+    const hadPreview = Boolean(marketBuyPreview?.player?.id && marketBuyPreview?.team?.id);
+    const negotiationAccepted = marketNegotiationOutcome?.status === "accepted";
     const shouldApplyAbortMalus =
       readMeta.source === "sqlite" &&
       !isReadOnlyMode &&
-      Boolean(marketBuyPreview?.player?.id && marketBuyPreview?.team?.id && marketNegotiationOutcome) &&
-      marketNegotiationOutcome?.status !== "accepted";
+      hadPreview &&
+      !negotiationAccepted &&
+      Boolean(marketNegotiationOutcome);
     const abortPreview = shouldApplyAbortMalus ? marketBuyPreview : null;
-    const abortPlayerName = abortPreview?.player?.name ?? "dem Spieler";
+    const abortPlayerName = marketBuyPreview?.player?.name ?? "dem Spieler";
     setMarketBuyModalOpen(false);
     setMarketBuySubject(null);
     setMarketBuyPreview(null);
     setMarketBuyPreviewContext(null);
     setMarketNegotiationOutcome(null);
-    if (shouldApplyAbortMalus && abortPreview) {
-      persistContractNegotiationOutcome(abortPreview, "rejected_bad_experience", ["negotiation_cancelled_after_contact"]);
-      setMarketBuyError(`Verhandlung mit ${abortPlayerName} abgebrochen. Das gibt einen Malus fuer die naechste Runde.`);
+    if (hadPreview && !negotiationAccepted) {
+      if (shouldApplyAbortMalus && abortPreview) {
+        persistContractNegotiationOutcome(abortPreview, "rejected_bad_experience", ["negotiation_cancelled_after_contact"]);
+      }
+      setMarketBuyError(
+        shouldApplyAbortMalus
+          ? `Verhandlung mit ${abortPlayerName} abgebrochen. Das gibt einen Malus fuer die naechste Runde.`
+          : `Kauf von ${abortPlayerName} abgebrochen.`,
+      );
     }
   }
 
@@ -8705,7 +8663,9 @@ export default function FoundationPageClient({
           source: readMeta.source,
           dryRun: false,
           stepId: "next_season_setup",
-          confirmToken: PRESEASON_NEXT_SEASON_SETUP_CONFIRM_TOKEN,
+          confirmToken:
+            preSeasonWorkflowFeed?.steps?.find((s) => s.stepId === "next_season_setup")?.confirmToken ??
+            PRESEASON_NEXT_SEASON_SETUP_CONFIRM_TOKEN,
         })),
       });
       const payload = (await response.json()) as PreSeasonWorkflowApiResponse;
@@ -8932,6 +8892,42 @@ export default function FoundationPageClient({
     }
   }
 
+  async function runFinishMatchdaySimple() {
+    if (isReadOnlyMode) {
+      showReadOnlyNotice();
+      return;
+    }
+    // Force solo-safe options: keep existing lineups, no tie-stop, advance after cash
+    const savedInclude = matchdayAutoRunIncludeWarningLineups;
+    const savedOverwrite = matchdayAutoRunOverwriteExistingLineups;
+    const savedStop = matchdayAutoRunStopOnTie;
+    setMatchdayAutoRunIncludeWarningLineups(false);
+    setMatchdayAutoRunOverwriteExistingLineups(false);
+    setMatchdayAutoRunStopOnTie(false);
+    try {
+      const result = await runCockpitMatchdayAutoRun(true);
+      const advanced = result?.summary?.advanceAllowed ?? false;
+      if (advanced) {
+        setFoundationView("homeV2", setActiveView);
+        setFoundationActionFeedback({
+          tone: "success",
+          title: "Spieltag abgeschlossen",
+          detail: "Ergebnisse gesichert. Der naechste Spieltag ist bereit.",
+        });
+      } else {
+        setFoundationActionFeedback({
+          tone: "warning",
+          title: "Spieltag nicht vollstaendig abgeschlossen",
+          detail: "Bitte Cockpit pruefen — ein Schritt ist moeglicherweise blockiert.",
+        });
+      }
+    } finally {
+      setMatchdayAutoRunIncludeWarningLineups(savedInclude);
+      setMatchdayAutoRunOverwriteExistingLineups(savedOverwrite);
+      setMatchdayAutoRunStopOnTie(savedStop);
+    }
+  }
+
   async function runCockpitWholeSeasonDryRun() {
     if (readMeta.source === "prisma") {
       showReadOnlyNotice();
@@ -9079,10 +9075,6 @@ export default function FoundationPageClient({
   }
 
   useEffect(() => {
-    setIsHydrated(true);
-  }, []);
-
-  useEffect(() => {
     if (adminSimulationRun?.status !== "running" || adminSimulationBusy) {
       return;
     }
@@ -9100,6 +9092,12 @@ export default function FoundationPageClient({
 
   useEffect(() => {
     setTeamControlDraft(buildTeamControlSettingsMap(gameState.teams, gameState.seasonState.teamControlSettings));
+    const savedOwnership = deriveChrisFrankyTeamIdsFromSettings(
+      gameState.teams,
+      buildTeamControlSettingsMap(gameState.teams, gameState.seasonState.teamControlSettings),
+    );
+    setGameModeOwnershipChrisIds(savedOwnership.chrisTeamIds);
+    setGameModeOwnershipFrankyIds(savedOwnership.frankyTeamIds);
   }, [gameState.seasonState.teamControlSettings, gameState.teams]);
 
   useEffect(() => {
@@ -9112,6 +9110,18 @@ export default function FoundationPageClient({
     const requestedView = parseFoundationViewFromUrl();
     if (requestedView) {
       setActiveView(requestedView);
+    }
+
+    const requestedPlayerId = parseFoundationPlayerIdFromUrl();
+    const requestedTab = parseFoundationTabFromUrl();
+    if (requestedView === "playerProfile" && requestedPlayerId) {
+      void openPlayerProfileById(requestedPlayerId, null, {
+        tab: (requestedTab as PlayerProfileTabId | null) ?? "overview",
+      });
+    }
+
+    if (requestedTab === "office" || requestedView === "hq") {
+      setHomeV2Tab("office");
     }
 
     const requestedTeamContext = resolvePreferredFoundationTeamContext(initialClientGameState.teams, {
@@ -9254,7 +9264,11 @@ export default function FoundationPageClient({
       return null;
     }
 
-    const nextGameState = payload._meta?.source === "prisma" ? payload.save.gameState : withNormalizedLocalTeamSettings(payload.save.gameState);
+    const normalizedGameState =
+      payload._meta?.source === "prisma" ? payload.save.gameState : withNormalizedLocalTeamSettings(payload.save.gameState);
+    const sponsorOffersBefore = JSON.stringify(normalizedGameState.seasonState.sponsorOffersByTeamId ?? {});
+    const nextGameState = refreshTeamObjectiveState(normalizedGameState);
+    const sponsorOffersHydrated = sponsorOffersBefore !== JSON.stringify(nextGameState.seasonState.sponsorOffersByTeamId ?? {});
 
     if (requestVersion !== loadSaveRequestVersion.current) {
       return null;
@@ -9263,6 +9277,16 @@ export default function FoundationPageClient({
     hasPersistedInitialState.current = false;
     hasLoadedPersistentState.current = true;
     setGameState(nextGameState);
+    if (
+      sponsorOffersHydrated &&
+      payload._meta?.source !== "prisma" &&
+      !payload._meta?.readOnly &&
+      payload.save.saveId
+    ) {
+      void persistLocalGameStateImmediately(nextGameState).catch((error) => {
+        console.warn("Sponsor-Hydration konnte nicht persistiert werden.", error);
+      });
+    }
     if (payload.save.saveId !== activeSaveId) {
       setSeasonOverviewSeasonId(nextGameState.season.id);
     }
@@ -9789,10 +9813,12 @@ export default function FoundationPageClient({
 
   async function reloadLiveSeasonState(
     reason: "manual_apply" | "room_event" | "local_save_version" = "local_save_version",
-    options: { skipGameStateReload?: boolean } = {},
+    options: { skipGameStateReload?: boolean; reloadFullGameState?: boolean } = {},
   ) {
     void reason;
-    const nextGameState = options.skipGameStateReload ? null : await loadSave(activeSaveId);
+    const nextGameState = options.skipGameStateReload
+      ? null
+      : await loadSave(activeSaveId, foundationSaveMode, { compactInitial: options.reloadFullGameState ? false : true });
     const nextSeasonId = nextGameState?.season.id ?? gameState.season.id;
     if (nextSeasonId && seasonOverviewSeasonId !== nextSeasonId) {
       setSeasonOverviewSeasonId(nextSeasonId);
@@ -10598,6 +10624,7 @@ export default function FoundationPageClient({
       showTeamManagementLockedNotice(selectedTeam.name);
       return;
     }
+    const negotiationProfile = sponsorChoiceProfiles[offerId] ?? "balanced";
     setSponsorChoiceBusy(offerId);
     setSponsorChoiceMessage(null);
     try {
@@ -10608,6 +10635,7 @@ export default function FoundationPageClient({
           saveId: activeSaveId,
           teamId: selectedTeam.teamId,
           offerId,
+          negotiationProfile,
           dryRun: false,
           source: readMeta.source,
         })),
@@ -10618,6 +10646,7 @@ export default function FoundationPageClient({
         return;
       }
       setSponsorChoiceMessage(`${payload.summary?.contract?.name ?? "Sponsor"} für ${selectedTeam.shortCode} unterzeichnet.`);
+      updateNewGameFlowStepStatus("choose_sponsor", "completed");
       await loadSave(activeSaveId);
       await reloadSeasonManagementOverview();
     } catch {
@@ -10799,8 +10828,16 @@ export default function FoundationPageClient({
     void loadSave(undefined, nextSaveMode);
   }
 
+  function setNewGameSoloTeam(teamId: string) {
+    setNewGameChrisTeamIds([teamId]);
+    setNewGameFrankyTeamIds([]);
+    setNewGamePreview(null);
+    setNewGameError(null);
+    setNewGameSuccess(null);
+  }
+
   function toggleNewGameTeam(owner: "chris" | "franky", teamId: string) {
-    setNewGamePresetId("custom");
+    const limits = getGameModeOwnershipLimits(newGamePresetId);
     setNewGamePreview(null);
     setNewGameError(null);
     setNewGameSuccess(null);
@@ -10808,7 +10845,13 @@ export default function FoundationPageClient({
       setNewGameChrisTeamIds((current) =>
         current.includes(teamId)
           ? current.filter((entry) => entry !== teamId)
-          : [...current, teamId].filter((entry) => !newGameFrankyTeamIds.includes(entry)),
+          : limits.chrisMax === 1
+            ? [teamId]
+            : current.length >= limits.chrisMax
+              ? current
+              : [...current.filter((entry) => entry !== teamId), teamId].filter(
+                  (entry) => !newGameFrankyTeamIds.includes(entry),
+                ),
       );
       return;
     }
@@ -10816,7 +10859,9 @@ export default function FoundationPageClient({
     setNewGameFrankyTeamIds((current) =>
       current.includes(teamId)
         ? current.filter((entry) => entry !== teamId)
-        : [...current, teamId].filter((entry) => !newGameChrisTeamIds.includes(entry)),
+        : current.length >= limits.frankyMax
+          ? current
+          : [...current.filter((entry) => entry !== teamId), teamId].filter((entry) => !newGameChrisTeamIds.includes(entry)),
     );
   }
 
@@ -10930,9 +10975,31 @@ export default function FoundationPageClient({
     () => gameState.teams.filter((team) => resolvedTeamControlSettings[team.teamId]?.controlMode === "passive"),
     [gameState.teams, resolvedTeamControlSettings],
   );
+  const activeSaveGameMode = useMemo(() => resolveGameModeFromState(gameState), [gameState]);
+  const gameModeOwnershipLimits = useMemo(
+    () => getGameModeOwnershipLimits(activeSaveGameMode),
+    [activeSaveGameMode],
+  );
+  const savedGameModeOwnership = useMemo(
+    () => deriveChrisFrankyTeamIdsFromSettings(gameState.teams, resolvedTeamControlSettings),
+    [gameState.teams, resolvedTeamControlSettings],
+  );
+  const gameModeOwnershipDraftChanged = useMemo(
+    () =>
+      JSON.stringify([...gameModeOwnershipChrisIds].sort()) !==
+        JSON.stringify([...savedGameModeOwnership.chrisTeamIds].sort()) ||
+      JSON.stringify([...gameModeOwnershipFrankyIds].sort()) !==
+        JSON.stringify([...savedGameModeOwnership.frankyTeamIds].sort()),
+    [
+      gameModeOwnershipChrisIds,
+      gameModeOwnershipFrankyIds,
+      savedGameModeOwnership.chrisTeamIds,
+      savedGameModeOwnership.frankyTeamIds,
+    ],
+  );
   const currentSaveOwnership = useMemo(
-    () => deriveChrisFrankyTeamIdsFromSettings(gameState.teams, teamControlDraft),
-    [gameState.teams, teamControlDraft],
+    () => ({ chrisTeamIds: gameModeOwnershipChrisIds, frankyTeamIds: gameModeOwnershipFrankyIds }),
+    [gameModeOwnershipChrisIds, gameModeOwnershipFrankyIds],
   );
   const teamOwners = useMemo(
     () => buildTeamOwners(gameState.teams, resolvedTeamControlSettings),
@@ -11105,21 +11172,21 @@ export default function FoundationPageClient({
     return gameState.matchdayState.matchdayId;
   }, [gameState.matchdayState.matchdayId, gameState.season.currentMatchday]);
 	  const gameFlowState = useMemo(
-	    () => buildGameFlowState({ gameState, activeTeamId: activeManagerTeamId }),
-	    [activeManagerTeamId, gameState],
+	    () => buildGameFlowState({ gameState: inboxGameState, activeTeamId: activeManagerTeamId }),
+	    [activeManagerTeamId, inboxGameState],
 	  );
-  const transferWindowStatus = useMemo(() => getTransferWindowStatus(gameState), [gameState]);
+  const transferWindowStatus = useMemo(() => getTransferWindowStatus(inboxGameState), [inboxGameState]);
 	  const gameInboxItems = useMemo(
 	    () =>
 	      buildGameInboxItems({
-	        gameState,
+	        gameState: inboxGameState,
 	        saveId: activeSaveId,
 	        activeTeamId: activeManagerTeamId,
 	        activeOwnerId: effectiveActiveOwnerId,
 	        hostMode: teamContextFilter === "all",
 	        gameFlowState,
 	      }),
-	    [activeManagerTeamId, activeSaveId, effectiveActiveOwnerId, gameFlowState, gameState, teamContextFilter],
+	    [activeManagerTeamId, activeSaveId, effectiveActiveOwnerId, gameFlowState, inboxGameState, teamContextFilter],
 	  );
   const activeTeamInboxItems = useMemo(
     () => gameInboxItems.filter((item) => isInboxItemOwnedByTeam(item, activeManagerTeamId)),
@@ -11257,10 +11324,26 @@ export default function FoundationPageClient({
       gameFlowActionStep.stepId === "check_training" ||
       gameFlowActionStep.stepId === "advance_to_next_matchday" ||
       gameFlowActionStep.stepId === "scouting_facilities" ||
+      gameFlowActionStep.stepId === "choose_sponsor" ||
       gameFlowActionStep.stepId === "buy_players" ||
       gameFlowActionStep.targetView === "market");
+  const flowOverrideInboxItem = useMemo(
+    () =>
+      shouldPreferGameFlowAction
+        ? (activeTeamOpenInboxItems.find(
+            (item) =>
+              item.category === "sponsor" ||
+              item.category === "contract" ||
+              item.severity === "critical",
+          ) ?? null)
+        : null,
+    [activeTeamOpenInboxItems, shouldPreferGameFlowAction],
+  );
 	  const primaryInboxItem = useMemo(
 	    () => {
+        if (flowOverrideInboxItem) {
+          return flowOverrideInboxItem;
+        }
         if (shouldPreferGameFlowAction) {
           return null;
         }
@@ -11272,7 +11355,7 @@ export default function FoundationPageClient({
         );
         return getPrimaryInboxTask(globalTasks);
       },
-	    [activeManagerTeamId, gameInboxItems, inboxPrimaryTeamItem, shouldPreferGameFlowAction],
+	    [activeManagerTeamId, flowOverrideInboxItem, gameInboxItems, inboxPrimaryTeamItem, shouldPreferGameFlowAction],
 	  );
 	  const gameFlowCanAutoFix = Boolean(activeContextMeta?.allowTestWrites && gameFlowActionStep.status === "blocked");
   const resolveLineupIssueTeamId = (preferredTeamId?: string | null) => {
@@ -11309,12 +11392,20 @@ export default function FoundationPageClient({
     return anyCandidate?.teamId ?? preferredTeamId ?? null;
   };
   const navigateToGameFlowStep = (targetView: GameFlowView, teamId?: string | null, targetPanel?: string | null) => {
+    if (targetView === "hq") {
+      navigateHomeTab("office");
+      setShowGameFlowPanel(false);
+      return;
+    }
     const navigationTeamId = targetView === "lineup" ? resolveLineupIssueTeamId(teamId) : teamId;
     if (navigationTeamId && navigationTeamId !== activeManagerTeamId) {
       setActiveManagerTeam(navigationTeamId, "manual_select");
     }
     if (targetView === "lineup") {
       setLineupFocusRequestKey(`lineup-${navigationTeamId ?? activeManagerTeamId ?? "team"}-${Date.now()}`);
+      if (targetPanel === "form-board") {
+        setLineupDraftBoardViewRequest("formBoard");
+      }
     }
     if (targetPanel === "season-briefing") {
       setFoundationView("home", setActiveView);
@@ -11330,12 +11421,17 @@ export default function FoundationPageClient({
         setSelectedTeamDetailTab("roster");
       }
     }
-    setFoundationView(getDefaultFoundationViewTarget(targetView as FoundationView), setActiveView);
+    const resolvedView = resolveFoundationViewTarget(targetView as FoundationView);
+    if (resolvedView === "marketV2") {
+      setMarketFocusPlayerId(null);
+    }
+    setFoundationView(resolvedView, setActiveView);
     setShowGameFlowPanel(false);
     scrollToFoundationTarget(
-      targetView === "teams" && (targetPanel === "roster" || targetPanel === "contracts")
-        ? "team-focus-roster"
-        : targetPanel ?? getFoundationViewScrollTarget(targetView),
+      resolveFoundationPanelScrollTarget({
+        targetView: resolvedView,
+        panel: targetPanel,
+      }),
     );
   };
   const updateNewGameFlowStepStatus = (stepId: NewGameFlowStepId, status: NewGameFlowStepStatus) => {
@@ -11522,7 +11618,13 @@ export default function FoundationPageClient({
 
     if (stepId === "training_facilities") {
       setFoundationView("trainingV2", setActiveView);
-      scrollToFoundationTarget("foundation-training-facilities-v2");
+      scrollToFoundationTarget("foundation-facilities-v2");
+      return;
+    }
+
+    if (stepId === "choose_sponsor") {
+      setFoundationView("teams", setActiveView);
+      scrollToFoundationTarget("team-sponsor-choice");
       return;
     }
 
@@ -11542,6 +11644,9 @@ export default function FoundationPageClient({
       setLineupFocusRequestKey(`lineup-${navigationTeamId ?? activeManagerTeamId ?? "team"}-${Date.now()}`);
     }
     const panel = typeof item.targetParams.panel === "string" ? item.targetParams.panel : null;
+    const focusPlayerId =
+      item.playerId ??
+      (typeof item.targetParams.player === "string" ? item.targetParams.player : null);
     if (targetView === "teams") {
       if (panel === "contracts") {
         setSelectedTeamDetailTab("contracts");
@@ -11549,12 +11654,19 @@ export default function FoundationPageClient({
         setSelectedTeamDetailTab("roster");
       }
     }
-    setFoundationView(getDefaultFoundationViewTarget(targetView), setActiveView);
+    const resolvedView = resolveFoundationViewTarget(targetView);
+    if (resolvedView === "marketV2" && focusPlayerId) {
+      setMarketFocusPlayerId(focusPlayerId);
+    } else if (resolvedView === "marketV2") {
+      setMarketFocusPlayerId(null);
+    }
+    setFoundationView(resolvedView, setActiveView);
     setShowGameFlowPanel(false);
     scrollToFoundationTarget(
-      targetView === "teams" && (panel === "roster" || panel === "contracts")
-        ? "team-focus-roster"
-        : panel ?? getFoundationViewScrollTarget(targetView),
+      resolveFoundationPanelScrollTarget({
+        targetView: resolvedView,
+        panel,
+      }),
     );
   };
   const updateInboxItemStatus = (item: GameInboxItem, status: GameInboxItem["status"]) => {
@@ -11743,7 +11855,15 @@ export default function FoundationPageClient({
   };
 
   const openFoundationViewCommand = (view: FoundationView) => {
-    const targetView = getDefaultFoundationViewTarget(view);
+    if (view === "hq") {
+      navigateHomeTab("office");
+      return;
+    }
+    const targetView = resolveFoundationViewTarget(view);
+    if (targetView === "homeV2") {
+      setHomeV2Tab("overview");
+      syncFoundationViewInUrl("homeV2");
+    }
     setFoundationView(targetView, setActiveView);
     scrollToFoundationTarget(getFoundationViewScrollTarget(targetView));
   };
@@ -11763,10 +11883,10 @@ export default function FoundationPageClient({
     ].map((view) => ({
       id: `view-${view.id}`,
       label: view.label,
-      detail: getDefaultFoundationViewTarget(view.id) === activeView ? "aktuelle Ansicht" : "Ansicht öffnen",
+      detail: resolveFoundationViewTarget(view.id) === activeView ? "aktuelle Ansicht" : "Ansicht öffnen",
       section: "Ansicht" as const,
       keywords: `${view.id} ${view.label}`,
-      tone: getDefaultFoundationViewTarget(view.id) === activeView ? "ready" : undefined,
+      tone: resolveFoundationViewTarget(view.id) === activeView ? "ready" : undefined,
       run: () => openFoundationViewCommand(view.id),
     }));
 
@@ -11949,16 +12069,49 @@ export default function FoundationPageClient({
           shortcut: "Space = Next Play",
           actions: [
             { label: "Transfermarkt", targetView: "marketV2", detail: "Deals & Wishlist", tone: "primary" },
-            { label: "HQ", targetView: "hq", detail: "Druck & Prioritaeten" },
+            { label: "Office", targetView: "hq", detail: "Druck & Prioritaeten" },
+            { label: "Einsatzliste", targetView: "lineup", detail: "Slots fuellen" },
+          ],
+        };
+      case "homeV2":
+        if (homeV2Tab === "office") {
+          return {
+            ...base,
+            kicker: "Office-Flow",
+            title: "Baustellen ordnen, Druck lesen und dann gezielt in Markt oder Einsatzliste gehen.",
+            detail: "Office ist die Manager-Zentrale: Was brennt sofort, was kippt diese Season und was musst du vor dem Wechsel vorbereiten?",
+            terms: ["Cash", "Moral", "Kader", "Druck"],
+            progressLabel: "Prioritäten",
+            progressPct: 34,
+            shortcut: "Space = naechste Baustelle",
+            actions: [
+              { label: "Transfermarkt", targetView: "marketV2", detail: "Kaderluecken", tone: "primary" },
+              { label: "Training", targetView: "trainingCompact", detail: "Entwicklung" },
+              { label: "Einsatzliste", targetView: "lineup", detail: "bereit machen" },
+            ],
+          };
+        }
+        return {
+          ...base,
+          kicker: "Briefing-Flow",
+          title: "Kurz lesen, dann direkt in Markt, Office oder Einsatzliste springen.",
+          detail: "Home zeigt die wichtigsten Signale: Next Play, Druck, Chancen und Spieltag.",
+          terms: ["PPs", "MVS", "OVR"],
+          progressLabel: "Orientierung",
+          progressPct: 18,
+          shortcut: "Space = Next Play",
+          actions: [
+            { label: "Transfermarkt", targetView: "marketV2", detail: "Deals & Wishlist", tone: "primary" },
+            { label: "Office", targetView: "hq", detail: "Druck & Prioritaeten" },
             { label: "Einsatzliste", targetView: "lineup", detail: "Slots fuellen" },
           ],
         };
       case "hq":
         return {
           ...base,
-          kicker: "HQ-Flow",
+          kicker: "Office-Flow",
           title: "Baustellen ordnen, Druck lesen und dann gezielt in Markt oder Einsatzliste gehen.",
-          detail: "HQ ist die Manager-Zentrale: Was brennt sofort, was kippt diese Season und was musst du vor dem Wechsel vorbereiten?",
+          detail: "Office ist die Manager-Zentrale: Was brennt sofort, was kippt diese Season und was musst du vor dem Wechsel vorbereiten?",
           terms: ["Cash", "Moral", "Kader", "Druck"],
           progressLabel: "Prioritäten",
           progressPct: 34,
@@ -11981,7 +12134,7 @@ export default function FoundationPageClient({
           shortcut: "Space = naechster offener Slot",
           actions: [
             { label: "Arena oeffnen", targetView: "matchdayArena", detail: "Reveal", tone: "primary" },
-            { label: "HQ", targetView: "hq", detail: "Blocker" },
+            { label: "Office", targetView: "hq", detail: "Blocker" },
             { label: "Training", targetView: "trainingCompact", detail: "Erschoepfung" },
           ],
         };
@@ -11997,7 +12150,7 @@ export default function FoundationPageClient({
           shortcut: "Space = naechster Flow-Schritt",
           actions: [
             { label: "Saisonstand", targetView: "seasonV2", detail: "Ranking", tone: "primary" },
-            { label: "HQ", targetView: "hq", detail: "Folgen" },
+            { label: "Office", targetView: "hq", detail: "Folgen" },
             { label: "Einsatzliste", targetView: "lineup", detail: "Zurueck" },
           ],
         };
@@ -12029,7 +12182,7 @@ export default function FoundationPageClient({
           shortcut: "Upgrade pruefen = Vorschau laden",
           actions: [
             { label: "Training", targetView: "trainingCompact", detail: "Kader", tone: "primary" },
-            { label: "HQ", targetView: "hq", detail: "Prioritaeten" },
+            { label: "Office", targetView: "hq", detail: "Prioritaeten" },
             { label: "Transfermarkt", targetView: "marketV2", detail: "Budget" },
           ],
         };
@@ -12045,7 +12198,7 @@ export default function FoundationPageClient({
           progressPct: 52,
           shortcut: "Upgrade-Button = Spielerfokus",
           actions: [
-            { label: "HQ", targetView: "hq", detail: "Prioritaeten", tone: "primary" },
+            { label: "Office", targetView: "hq", detail: "Prioritaeten", tone: "primary" },
             { label: "Einsatzliste", targetView: "lineup", detail: "Fit pruefen" },
             { label: "Transfermarkt", targetView: "marketV2", detail: "Bedarf" },
           ],
@@ -12062,7 +12215,7 @@ export default function FoundationPageClient({
           shortcut: "/ oder Ctrl+K = Suchen",
           actions: [
             { label: "Transfermarkt v2", targetView: "marketV2", detail: "Hauptansicht", tone: "primary" },
-            { label: "HQ", targetView: "hq", detail: "Prioritaeten" },
+            { label: "Office", targetView: "hq", detail: "Prioritaeten" },
             { label: "Historie", targetView: "history", detail: "Deals" },
           ],
         };
@@ -12077,7 +12230,7 @@ export default function FoundationPageClient({
           progressPct: 48,
           shortcut: "Suche + Teamfilter = Deal-Funnel",
           actions: [
-            { label: "HQ", targetView: "hq", detail: "Prioritaeten", tone: "primary" },
+            { label: "Office", targetView: "hq", detail: "Prioritaeten", tone: "primary" },
             { label: "Einsatzliste", targetView: "lineup", detail: "wenn bereit" },
             { label: "Historie", targetView: "history", detail: "Deals" },
           ],
@@ -12095,7 +12248,7 @@ export default function FoundationPageClient({
           shortcut: "Tabellenkopf = sortieren",
           actions: [
             { label: "Arena", targetView: "matchdayArena", detail: "Spieltag", tone: "primary" },
-            { label: "HQ", targetView: "hq", detail: "Ursachen" },
+            { label: "Office", targetView: "hq", detail: "Ursachen" },
             { label: "Preisgeld", targetView: "prize", detail: "Ausblick" },
           ],
         };
@@ -12111,7 +12264,7 @@ export default function FoundationPageClient({
           shortcut: "Doppelklick = Profil",
           actions: [
             { label: "Training", targetView: "trainingCompact", detail: "Entwicklung", tone: "primary" },
-            { label: "HQ", targetView: "hq", detail: "Rollen" },
+            { label: "Office", targetView: "hq", detail: "Rollen" },
             { label: "Transfermarkt", targetView: "marketV2", detail: "Vergleich" },
           ],
         };
@@ -12144,26 +12297,32 @@ export default function FoundationPageClient({
           actions: [
             { label: "Home", targetView: "home", detail: "Briefing", tone: "primary" },
             { label: "Transfermarkt", targetView: "marketV2", detail: "Handeln" },
-            { label: "HQ", targetView: "hq", detail: "Zentrale" },
+            { label: "Office", targetView: "hq", detail: "Zentrale" },
           ],
         };
     }
-  }, [activeView, globalNextLabel, globalNextTitle]);
+  }, [activeView, homeV2Tab, globalNextLabel, globalNextTitle]);
 
   const foundationFlowLoopStages = useMemo<FoundationFlowLoopStage[]>(
     () => [
-      { id: "briefing", label: "Briefing", detail: "Home & Hinweise", targetView: "home", views: ["home", "inbox", "cockpit"] },
+      { id: "briefing", label: "Briefing", detail: "Home & Hinweise", targetView: "homeV2", views: ["home", "homeV2", "inbox", "inboxV2", "cockpit"] },
       { id: "market", label: "Markt", detail: "Deals & Wishlist", targetView: "marketV2", views: ["market", "marketV2", "history", "historyV2"] },
-      { id: "hq", label: "HQ", detail: "Druck & Planung", targetView: "hq", views: ["hq", "teams", "training", "trainingCompact", "trainingV2", "players", "teamSettings"] },
+      { id: "hq", label: "Office", detail: "Druck & Planung", targetView: "hq", views: ["teams", "training", "trainingCompact", "trainingV2", "players", "teamSettings"] },
       { id: "lineup", label: "Einsatz", detail: "Slots & Captain", targetView: "lineup", views: ["lineup"] },
       { id: "arena", label: "Arena", detail: "Reveal & Auswertung", targetView: "matchdayArena", views: ["matchdayArena", "matchdayResult", "season", "seasonV2", "ranks", "diszis", "prize", "seasonPreview"] },
     ],
     [],
   );
   const activeFlowLoopIndex = useMemo(() => {
+    if (activeView === "homeV2" && homeV2Tab === "office") {
+      const officeIndex = foundationFlowLoopStages.findIndex((stage) => stage.id === "hq");
+      if (officeIndex >= 0) {
+        return officeIndex;
+      }
+    }
     const index = foundationFlowLoopStages.findIndex((stage) => stage.views.includes(activeView));
     return index >= 0 ? index : 0;
-  }, [activeView, foundationFlowLoopStages]);
+  }, [activeView, homeV2Tab, foundationFlowLoopStages]);
   const selectedEncyclopediaEntry =
     GAME_ENCYCLOPEDIA_ENTRIES.find((entry) => entry.id === selectedEncyclopediaEntryId) ?? GAME_ENCYCLOPEDIA_ENTRIES[0];
 
@@ -12304,7 +12463,7 @@ export default function FoundationPageClient({
       JSON.stringify(teamIdentityDraft[selectedTeam.teamId] ?? null) !== JSON.stringify(selectedIdentity ?? null);
     const controlChanged =
       JSON.stringify(teamControlDraft[selectedTeam.teamId] ?? null) !==
-      JSON.stringify(resolvedTeamControlSettings[selectedTeam.teamId] ?? null);
+        JSON.stringify(resolvedTeamControlSettings[selectedTeam.teamId] ?? null) || gameModeOwnershipDraftChanged;
     const strategyChanged =
       JSON.stringify(teamStrategyDraft[selectedTeam.teamId] ?? null) !==
       JSON.stringify(resolvedTeamStrategyProfiles[selectedTeam.teamId] ?? null);
@@ -13453,8 +13612,8 @@ export default function FoundationPageClient({
     [seasonStandRows, selectedTeam],
   );
   const teamObjectiveOverview = useMemo(
-    () => buildTeamObjectiveOverview(gameState),
-    [gameState],
+    () => buildTeamObjectiveOverview(inboxGameState),
+    [inboxGameState],
   );
   const selectedTeamSponsorOffers = useMemo(
     () => (selectedTeam ? getTeamSponsorOffers(gameState, selectedTeam.teamId) : []),
@@ -16686,6 +16845,7 @@ export default function FoundationPageClient({
     return aiLineupEnsureTeams.filter((team) => !readyTeamIds.has(team.teamId)).map((team) => team.teamId);
   }, [aiLineupEnsureTeams, currentMatchdayLineupDrafts, isCurrentMatchdayLineupComplete]);
   const activeManagerLineupReady = isCurrentMatchdayLineupComplete(homeCurrentLineupDraft);
+  const activeManagerLineupSubmitted = isTeamMatchdayLineupSubmitted(homeCurrentLineupDraft);
   const homeNextMatchdayStatus = useMemo(() => {
     const d1Slots = currentMatchdayDisciplineSchedule?.discipline1?.playerCount ?? 0;
     const d2Slots = currentMatchdayDisciplineSchedule?.discipline2?.playerCount ?? 0;
@@ -16712,11 +16872,13 @@ export default function FoundationPageClient({
       formCardBlocker: formCardFlow.blocker,
       statusLabel: resultAvailable
         ? "Result verfügbar"
-        : requiredSlots > 0 && filledSlots >= requiredSlots
-          ? "Arena bereit"
-          : filledSlots > 0
-            ? "Einsatzliste unvollständig"
-            : "Einsatzliste offen",
+        : requiredSlots > 0 && filledSlots >= requiredSlots && !activeManagerLineupSubmitted
+          ? "Lineup bestätigen"
+          : requiredSlots > 0 && filledSlots >= requiredSlots
+            ? "Arena bereit"
+            : filledSlots > 0
+              ? "Einsatzliste unvollständig"
+              : "Einsatzliste offen",
     };
   }, [
     activeManagerTeamId,
@@ -16728,10 +16890,40 @@ export default function FoundationPageClient({
     gameState.seasonState.formCards,
     gameState.seasonState.matchdayResults,
     homeCurrentLineupDraft,
+    activeManagerLineupSubmitted,
   ]);
-  const activeManagerMatchdayReady =
-    activeManagerLineupReady &&
-    (homeNextMatchdayStatus.hasFormCards || !homeNextMatchdayStatus.formCardBlocker);
+  const matchdayArenaReadiness = useMemo(
+    () => getMatchdayArenaReadiness(gameState, activeManagerTeamId),
+    [activeManagerTeamId, gameState],
+  );
+  const activeManagerMatchdayReady = matchdayArenaReadiness.isReady;
+  const activeManagerArenaBlockerReason = matchdayArenaReadiness.blocker;
+  useEffect(() => {
+    // #region agent log
+    fetch("http://127.0.0.1:7744/ingest/8fee0963-e343-46df-a0b4-6cfa69e52b00", {
+      method: "POST",
+      headers: { "Content-Type": "application/json", "X-Debug-Session-Id": "03cfb2" },
+      body: JSON.stringify({
+        sessionId: "03cfb2",
+        runId: "arena-readiness",
+        hypothesisId: "A-formcard-sync",
+        location: "FoundationPageClient.tsx:matchdayArenaReadiness",
+        message: "Arena readiness snapshot",
+        data: {
+          teamId: activeManagerTeamId,
+          isReady: matchdayArenaReadiness.isReady,
+          blocker: matchdayArenaReadiness.blocker,
+          lineupSubmitted: matchdayArenaReadiness.lineupSubmitted,
+          formCardsRequired: matchdayArenaReadiness.formCardsRequired,
+          formCardBlocker: matchdayArenaReadiness.formCardFlow.blocker,
+          openLineupSlots: matchdayArenaReadiness.openLineupSlots,
+          sideRequirements: matchdayArenaReadiness.sideRequirements,
+        },
+        timestamp: Date.now(),
+      }),
+    }).catch(() => {});
+    // #endregion
+  }, [activeManagerTeamId, gameState.seasonState.formCardPlans, matchdayArenaReadiness]);
   async function ensureAiLineupsForCurrentMatchday(trigger: "human_lineup_saved" | "arena_open" | "manual" = "manual") {
     if (
       readMeta.source !== "sqlite" ||
@@ -16787,6 +16979,44 @@ export default function FoundationPageClient({
       setAiLineupEnsureBusy(false);
     }
   }
+  const handleFormCardPlanSaved = (payload: {
+    saveId: string;
+    seasonId: string;
+    matchdayId: string;
+    teamId: string;
+    plans: FormCardPlanRecord[];
+  }) => {
+    if (payload.saveId !== activeSaveId) {
+      return;
+    }
+
+    setGameState((current) =>
+      mergeFormCardPlansIntoGameState(current, payload.plans, {
+        seasonId: payload.seasonId,
+        teamId: payload.teamId,
+      }),
+    );
+
+    // #region agent log
+    fetch("http://127.0.0.1:7744/ingest/8fee0963-e343-46df-a0b4-6cfa69e52b00", {
+      method: "POST",
+      headers: { "Content-Type": "application/json", "X-Debug-Session-Id": "03cfb2" },
+      body: JSON.stringify({
+        sessionId: "03cfb2",
+        runId: "formcard-plan-sync",
+        hypothesisId: "A-formcard-sync",
+        location: "FoundationPageClient.tsx:handleFormCardPlanSaved",
+        message: "Form card plans merged into foundation gameState",
+        data: {
+          teamId: payload.teamId,
+          matchdayId: payload.matchdayId,
+          planCount: payload.plans.length,
+        },
+        timestamp: Date.now(),
+      }),
+    }).catch(() => {});
+    // #endregion
+  };
   const handleHumanLineupSaved = (payload: {
     saveId: string;
     seasonId: string;
@@ -16801,12 +17031,31 @@ export default function FoundationPageClient({
       status?: string;
     } | null;
   }) => {
-    if (
-      payload.saveId !== activeSaveId ||
-      payload.seasonId !== gameState.season.id ||
-      payload.matchdayId !== gameState.matchdayState.matchdayId ||
-      resolvedTeamControlSettings[payload.teamId]?.controlMode !== "manual"
-    ) {
+    const lineupSyncAllowed =
+      payload.saveId === activeSaveId &&
+      payload.seasonId === gameState.season.id &&
+      payload.matchdayId === gameState.matchdayState.matchdayId &&
+      canManageTeamId(payload.teamId);
+    // #region agent log
+    fetch("http://127.0.0.1:7744/ingest/8fee0963-e343-46df-a0b4-6cfa69e52b00", {
+      method: "POST",
+      headers: { "Content-Type": "application/json", "X-Debug-Session-Id": "03cfb2" },
+      body: JSON.stringify({
+        sessionId: "03cfb2",
+        runId: "lineup-save-sync",
+        hypothesisId: "B-lineup-sync",
+        location: "FoundationPageClient.tsx:handleHumanLineupSaved",
+        message: lineupSyncAllowed ? "Lineup save accepted for foundation sync" : "Lineup save ignored by foundation sync guard",
+        data: {
+          teamId: payload.teamId,
+          draftStatus: payload.draft?.status ?? null,
+          lineupSyncAllowed,
+        },
+        timestamp: Date.now(),
+      }),
+    }).catch(() => {});
+    // #endregion
+    if (!lineupSyncAllowed) {
       return;
     }
 
@@ -16841,7 +17090,7 @@ export default function FoundationPageClient({
         detail: `${getTeamLockedName(payload.teamId)} ist fuer ${currentMatchdayDisplayLabel} aktualisiert. KI-Lineups werden bei Bedarf nachgezogen.`,
       });
     }
-    void reloadLiveSeasonState("manual_apply");
+    void reloadLiveSeasonState("manual_apply", { reloadFullGameState: true });
     void ensureAiLineupsForCurrentMatchday("human_lineup_saved");
   };
   useEffect(() => {
@@ -16981,6 +17230,18 @@ export default function FoundationPageClient({
         targetView: "trainingV2",
         status: getResolvedStatus("training_facilities", hasTrainingIntent),
         progress: facilityUpgradeCount > 0 ? `${facilityUpgradeCount} Upgrades` : "offen",
+      },
+      {
+        stepId: "choose_sponsor",
+        title: "Sponsor wählen",
+        kicker: "Budget",
+        detail: selectedTeamSponsorContract
+          ? `Aktiver Sponsor: ${selectedTeamSponsorContract.brandLabel ?? selectedTeamSponsorContract.brandId}.`
+          : "Wähle einen von drei Sponsor-Verträgen — beeinflusst Saisoneinkommen und Objectives.",
+        targetLabel: "Sponsor prüfen",
+        targetView: "teams",
+        status: getResolvedStatus("choose_sponsor", Boolean(selectedTeamSponsorContract)),
+        progress: selectedTeamSponsorContract ? "aktiv" : "offen",
       },
       {
         stepId: "set_lineup",
@@ -17407,6 +17668,10 @@ export default function FoundationPageClient({
         contractLength: row.entry.contractLength ?? null,
         marketValue: row.marketValue,
         highlight: index === 0 ? ("top" as const) : index === 2 ? ("prospect" as const) : null,
+        topDisciplineId: row.player.className?.toLowerCase() ?? null,
+        topDisciplineLabel: row.player.className ?? row.entry.roleTag ?? "Flex",
+        topDisciplineTier: row.playerOvr != null && row.playerOvr >= 82 ? "S" : row.playerOvr != null && row.playerOvr >= 76 ? "A" : "B",
+        topDisciplineScore: row.playerOvr,
       })),
     [homePlayerCards],
   );
@@ -19423,7 +19688,7 @@ export default function FoundationPageClient({
       };
     }
 
-    if (activeView === "hq") {
+    if (activeView === "homeV2" && homeV2Tab === "office") {
       if (homeNextMatchdayStatus.openSlots > 0) {
         return {
           kicker: "Hauptaktion",
@@ -19472,10 +19737,13 @@ export default function FoundationPageClient({
       if (shouldShowArenaBackToLineup) {
         return {
           kicker: "Hauptaktion",
-          title: "Erst Einsatzliste schließen",
-          detail: "Die Arena ist lesbar, aber der Spieltag ist noch nicht sauber vorbereitet.",
+          title: activeManagerArenaBlockerReason === "lineup_not_submitted" ? "Einsatzliste bestätigen" : "Erst Einsatzliste schließen",
+          detail:
+            activeManagerArenaBlockerReason != null
+              ? formatCockpitReason(activeManagerArenaBlockerReason)
+              : "Die Arena ist lesbar, aber der Spieltag ist noch nicht sauber vorbereitet.",
           status: "blockiert",
-          buttonLabel: "Zur Einsatzliste",
+          buttonLabel: activeManagerArenaBlockerReason === "lineup_not_submitted" ? "Lineup bestätigen" : "Zur Einsatzliste",
           onClick: () => setFoundationView("lineup", setActiveView),
         };
       }
@@ -19564,8 +19832,8 @@ export default function FoundationPageClient({
         title: "Nächste Ursache aufklären",
         detail: "Wenn ein Rang oder Faktor auffällt, geh von hier direkt in HQ oder Teamprofil und klär den Treiber.",
         status: "bereit",
-        buttonLabel: "HQ öffnen",
-        onClick: () => setFoundationView("hq", setActiveView),
+        buttonLabel: "Office öffnen",
+        onClick: () => navigateHomeTab("office"),
       };
     }
 
@@ -19588,13 +19856,13 @@ export default function FoundationPageClient({
           inboxPrimaryTeamItem?.description ??
           "Wenn hier nichts Kritisches liegt, geht es zurück in HQ für Markt, Kaderdruck und die nächsten Saison-Schritte.",
         status: inboxPrimaryTeamItem ? "offen" : "optional",
-        buttonLabel: inboxPrimaryTeamItem ? "Hinweis öffnen" : "HQ öffnen",
+        buttonLabel: inboxPrimaryTeamItem ? "Hinweis öffnen" : "Office öffnen",
         onClick: () => {
           if (inboxPrimaryTeamItem) {
             navigateToInboxItem(inboxPrimaryTeamItem);
             return;
           }
-          setFoundationView("hq", setActiveView);
+          navigateHomeTab("office");
         },
       };
     }
@@ -19656,92 +19924,40 @@ export default function FoundationPageClient({
     triggerGlobalNext,
   ]);
 
-  const showCompactHeader = activeView !== "home";
-  const showFlowCoach = activeView === "home";
+  const showCompactHeader = activeView !== "home" && activeView !== "homeV2";
+  const showFlowCoach = activeView === "home" || activeView === "homeV2";
   const showCompactFlowCoach = activeView !== "home" && activeView !== "admin";
-
-  if (!isHydrated) {
-    return (
-      <main className="app-shell foundation-shell">
-        <div className="foundation-loading-shell">
-          <div className="foundation-loading-card">
-            <span className="pill">Foundation laedt...</span>
-            <strong>Spielstand wird vorbereitet</strong>
-            <p>
-              Falls dieser Screen haengen bleibt, wird einmal automatisch neu geladen. Danach kannst du den Spielstand
-              direkt erneut oeffnen.
-            </p>
-            <div className="foundation-loading-actions">
-              <a className="primary-button" href="/foundation">
-                Foundation neu laden
-              </a>
-              <a className="secondary-button" href="/">
-                Zu Spielstaenden
-              </a>
-            </div>
-          </div>
-          <script dangerouslySetInnerHTML={{ __html: foundationBootWatchdogScript }} />
-        </div>
-      </main>
-    );
-  }
 
   return (
     <main className="app-shell foundation-shell">
-      <div className="room-meta foundation-topnav">
-        <Link className="pill" href="/">
-          Spielstände
-        </Link>
-        {foundationPrimaryViews.map((view) => (
-          <button
-            key={view.id}
-            className={`pill foundation-tab${view.id === "admin" ? " foundation-tab-admin" : ""}${activeView === view.id || (view.id === "market" && activeView === "marketV2") || (view.id === "season" && activeView === "seasonV2") || (view.id === "history" && activeView === "historyV2") ? " is-active" : ""}`}
-            data-testid={`foundation-nav-${view.id}`}
-            type="button"
-            title={view.tooltip}
-            onClick={() =>
-              setFoundationView(
-                getDefaultFoundationViewTarget(view.id),
-                setActiveView,
-              )
-            }
-          >
-            {view.label}
-          </button>
-        ))}
-        <div className="foundation-topnav-spacer" />
-        <button
-	          className={`primary-button foundation-global-next-button ${globalNextStatusClass}`}
-	          data-testid="foundation-global-next-button"
-	          type="button"
-	          onClick={triggerGlobalNext}
-	          title={globalNextTitle}
-	        >
-	          <span>Weiter</span>
-	          <strong>{globalNextLabel}</strong>
-	          <small>Leertaste</small>
-	        </button>
-        <button
-          className="pill foundation-tab foundation-tab-search"
-          type="button"
-          title="Suche öffnen"
-          onClick={() => setShowCommandPalette(true)}
-        >
-          Suchen
-        </button>
-        {foundationAdminViews.map((view, index) => (
-          <button
-            key={view.id}
-            className={`pill foundation-tab${index === 0 ? " foundation-tab-admin" : ""}${activeView === view.id ? " is-active" : ""}`}
-            data-testid={`foundation-nav-${view.id}`}
-            type="button"
-            title={view.tooltip}
-            onClick={() => setFoundationView(view.id, setActiveView)}
-          >
-            {view.label}
-          </button>
-        ))}
-      </div>
+      <FoundationShell
+        activeView={activeView as FoundationViewId}
+        onNavigate={(view) => setFoundationView(view as FoundationView, setActiveView)}
+        isPending={isPending}
+        headerActions={
+          <>
+            <button
+              className={`primary-button foundation-global-next-button ${globalNextStatusClass}`}
+              data-testid="foundation-global-next-button"
+              type="button"
+              onClick={triggerGlobalNext}
+              title={globalNextTitle}
+            >
+              <span>Weiter</span>
+              <strong>{globalNextLabel}</strong>
+              <small>Leertaste</small>
+            </button>
+            <button
+              className="pill foundation-tab foundation-tab-search"
+              type="button"
+              title="Suche öffnen"
+              onClick={() => setShowCommandPalette(true)}
+            >
+              Suchen
+            </button>
+          </>
+        }
+      >
 
       {foundationSecondaryViews.some((view) => view.id === activeView) ? (
         <div className="foundation-utility-strip">
@@ -20151,7 +20367,7 @@ export default function FoundationPageClient({
             </button>
           </div>
         ) : null}
-        {(activeView === "home" || activeView === "hq") ? (
+        {(activeView === "home" || activeView === "homeV2") ? (
         <div className={`foundation-flow-controller ${getGameFlowStatusClass(gameFlowActionStep.status)}`} data-testid="foundation-flow-controller">
           <div className="foundation-flow-copy">
             <span className="eyebrow">
@@ -21251,8 +21467,19 @@ export default function FoundationPageClient({
 	          </section>
           ) : null}
 
-          <section className={`panel foundation-home-v2-panel${getViewClass("homeV2")}`}>
+          <section className={`panel foundation-home-v2-panel${getViewClass("homeV2")}`} id="foundation-home-v2">
             {activeView === "homeV2" ? (
+              <>
+                <FoundationSubNav
+                  className="home-v2-subnav"
+                  activeId={homeV2Tab}
+                  onSelect={(id) => navigateHomeTab(id as "overview" | "office")}
+                  items={[
+                    { id: "overview", label: "Übersicht" },
+                    { id: "office", label: "Office" },
+                  ]}
+                />
+                {homeV2Tab === "overview" ? (
               <HomeV2Client
                 teamName={selectedTeam?.name ?? "Kein Team"}
                 teamCode={selectedTeam?.shortCode ?? "—"}
@@ -21295,17 +21522,84 @@ export default function FoundationPageClient({
                 onOpenLineup={() => setFoundationView("lineup", setActiveView)}
                 onOpenMarket={() => setFoundationView("marketV2", setActiveView)}
                 onOpenTraining={() => setFoundationView("trainingCompact", setActiveView)}
-                onOpenHq={() => setFoundationView("hq", setActiveView)}
+                onOpenOffice={() => navigateHomeTab("office")}
                 onOpenSeason={() => setFoundationView("seasonV2", setActiveView)}
                 onOpenInbox={() => setFoundationView("inboxV2", setActiveView)}
+                onOpenBoardObjectives={() => {
+                  setFoundationView("teams", setActiveView);
+                  scrollToFoundationTarget("team-board-objectives");
+                }}
                 onOpenPlayer={(playerId) => openPlayerDrawerById(playerId)}
+              />
+            ) : null}
+
+            {homeV2Tab === "office" ? (
+              <ManagerOfficeClient
+                homeNextMatchdayStatus={homeNextMatchdayStatus}
+                selectedTeamPlayerDemands={selectedTeamPlayerDemands}
+                selectedHqFinanceWarnings={selectedHqFinanceWarnings}
+                selectedStandingRow={selectedStandingRow}
+                activeTeamOpenInboxItems={activeTeamOpenInboxItems}
+                activeTeamCriticalInboxItems={activeTeamCriticalInboxItems}
+                selectedOpenObjectives={selectedOpenObjectives}
+                selectedBoardConfidence={selectedBoardConfidence}
+                hqTrainingFocusCount={hqTrainingFocusCount}
+                selectedTeamGeneralManager={selectedTeamGeneralManager}
+                hqTransferWishlistEntries={hqTransferWishlistEntries}
+                selectedTeamCaptainProfile={selectedTeamCaptainProfile}
+                selectedTeamPowers={selectedTeamPowers}
+                hqContractExpiringCount={hqContractExpiringCount}
+                hqTransferSellMarkers={hqTransferSellMarkers}
+                selectedHqMoraleSummary={selectedHqMoraleSummary}
+                selectedRosterTableRows={selectedRosterTableRows}
+                selectedHqAxisSummary={selectedHqAxisSummary}
+                selectedHqInboxItems={selectedHqInboxItems}
+                selectedHqGmStory={selectedHqGmStory}
+                selectedTeam={selectedTeam}
+                selectedTeamControl={selectedTeamControl}
+                homeActiveTeamLogo={homeActiveTeamLogo}
+                gameState={gameState}
+                currentMatchdayDisplayLabel={currentMatchdayDisplayLabel}
+                selectedTeamCanManage={selectedTeamCanManage}
+                isReadOnlyMode={isReadOnlyMode}
+                selectedTeamAverageAxisStats={selectedTeamAverageAxisStats}
+                rosterPlayers={rosterPlayers}
+                onNavigate={(view) => setFoundationView(view, setActiveView)}
+                onOpenTeam={(teamId) => openTeamDrawerById(teamId)}
+                onNavigateInboxItem={navigateToInboxItem}
+              />
+            ) : null}
+
+              </>
+            ) : null}
+          </section>
+
+          <section className={`panel foundation-player-profile-panel${getViewClass("playerProfile")}`}>
+            {activeView === "playerProfile" && playerProfileData ? (
+              <PlayerProfileClient
+                data={playerProfileData}
+                activeTab={playerProfileTab}
+                onTabChange={(tab) => {
+                  setPlayerProfileTab(tab);
+                  syncFoundationViewInUrl("playerProfile", tab, playerProfileData.playerId);
+                }}
+                onClose={() => {
+                  setPlayerProfileData(null);
+                  setFoundationView("homeV2", setActiveView);
+                  syncFoundationViewInUrl("homeV2");
+                }}
+                onOpenQuickPeek={() => {
+                  void openPlayerProfileById(playerProfileData.playerId, playerProfileData.activePlayerId, { quickPeek: true });
+                }}
+                onOpenTraining={() => openTrainingPlayerTarget(playerProfileData.playerId)}
+                onOpenContractOffer={() => setFoundationView("marketV2", setActiveView)}
               />
             ) : null}
           </section>
 
           <section className={`panel foundation-facilities-overview-v2-panel${getViewClass("facilitiesOverviewV2")}`}>
             {activeView === "facilitiesOverviewV2" && selectedTeam ? (
-              <TrainingFacilitiesV2Client
+              <FacilitiesV2Client
                 source={readMeta.source}
                 managementLocked={isSelectedTeamManagementLocked}
                 managementLockedReason={
@@ -21316,41 +21610,14 @@ export default function FoundationPageClient({
                 selectedTeam={selectedTeam}
                 selectedTeamControlMode={formatTeamControlModeLabel(selectedTeamControl?.controlMode)}
                 seasonLabel={canonicalSeasonLabel}
-                sponsorTotal={selectedStandingRow?.sponsorTotal ?? null}
                 onOpenTraining={() => setFoundationView("trainingCompact", setActiveView)}
                 onOpenTeams={() => setFoundationView("teams", setActiveView)}
-                onOpenPlayerDetails={(payload) => openPlayerDrawerById(payload.playerId, payload.activePlayerId)}
-                layoutMode="facilities"
                 summary={{
                   cashCurrent: selectedTeam.cash,
-                  upkeepTotal: trainingFacilitySeasonEndFinance.upkeepTotal,
-                  incomeTotal: trainingFacilitySeasonEndFinance.incomeTotal,
                   netFacilityResult: trainingFacilitySeasonEndFinance.netFacilityResult,
-                  trainingXpBefore: trainingFacilityEffectPreview.trainingXp.before,
-                  trainingXpAfter: trainingFacilityEffectPreview.trainingXp.after,
-                  trainingXpModifierPct: trainingFacilityEffectPreview.trainingXp.modifierPct,
-                  recoveryBeforeTraining: trainingForecastSummary.recoveryBeforeTraining,
                   recoveryAfterTraining: trainingForecastSummary.recoveryAfterTraining,
-                  performanceXp: trainingForecastSummary.performanceXp,
-                  totalXp: trainingForecastSummary.totalXp,
-                  lightModeCount: trainingForecastSummary.lightModeCount,
-                  hardModeCount: trainingForecastSummary.hardModeCount,
-                }}
-                developmentFilter={trainingDevelopmentFilter}
-                developmentSummary={trainingDevelopmentSummary}
-                onSetDevelopmentFilter={setTrainingDevelopmentFilter}
-                trainingModeOptions={trainingV2ModeOptions}
-                trainingClassOptions={PROGRESSION_CLASS_ORDER.map((className) => ({ value: className, label: className }))}
-                playerRows={trainingPlayerRowViews}
-                allPlayerCount={trainingPlayerForecastRows.length}
-                onSetTrainingMode={(playerId, mode) => {
-                  void setPlayerTrainingMode(playerId, mode);
-                }}
-                onSetTrainingClass={(playerId, trainingClass) => {
-                  void setPlayerTrainingClass(playerId, trainingClass);
                 }}
                 facilityRows={trainingFacilityRows}
-                selectedFacilityPreviewId={trainingFacilityPreviewId}
                 specialistWingVariant={specialistWingVariantDraft}
                 specialistWingOptions={Object.entries(SPECIALIST_WING_VARIANTS).map(([value, variant]) => ({
                   value: value as SpecialistWingVariant,
@@ -21365,19 +21632,8 @@ export default function FoundationPageClient({
                 facilityMaintenancePreview={facilityMaintenancePreview}
                 facilityMaintenanceError={facilityMaintenanceError}
                 facilityMaintenanceSuccess={facilityMaintenanceSuccess}
-                facilityFinance={trainingFacilitySeasonEndFinance}
-                facilityForecast={trainingFacilityForecast}
-                facilityEffectPreview={{
-                  recoveryAfterTraining: trainingFacilityEffectPreview.recoveryAfterTraining,
-                  academyLowTier: trainingFacilityEffectPreview.academyLowTier,
-                  specialistPower: trainingFacilityEffectPreview.specialistPower,
-                  specialistSpeed: trainingFacilityEffectPreview.specialistSpeed,
-                  scouting: { label: trainingFacilityEffectPreview.scouting.label },
-                  analytics: { label: trainingFacilityEffectPreview.analytics.label },
-                  warnings: trainingFacilityEffectPreview.warnings,
-                }}
-                onRunFacilityUpgradePreview={(facilityId) => {
-                  void runFacilityUpgradePreview(facilityId);
+                onRunFacilityUpgradePreview={(facilityId, action) => {
+                  void runFacilityUpgradePreview(facilityId, action);
                 }}
                 onConfirmFacilityUpgrade={() => {
                   void confirmFacilityUpgrade();
@@ -21387,28 +21643,6 @@ export default function FoundationPageClient({
                 }}
                 onConfirmFacilityMaintenance={() => {
                   void confirmFacilityMaintenance();
-                }}
-                attributeOptions={trainingV2AttributeOptions}
-                seasonEndRows={trainingV2SeasonEndRows}
-                seasonEndBusy={seasonEndXpSpendBusy}
-                seasonEndError={seasonEndXpSpendError}
-                seasonEndSuccess={seasonEndXpSpendSuccess}
-                seasonEndStatus={trainingV2SeasonEndStatus}
-                onSetSeasonEndAttribute={(playerId, attribute) =>
-                  setSeasonEndAttributeDraft((current) => ({
-                    ...current,
-                    [playerId]: attribute,
-                  }))
-                }
-                onAddSeasonEndUpgrade={addSeasonEndXpUpgrade}
-                onRemoveSeasonEndUpgrade={removeSeasonEndXpUpgrade}
-                onClearUpgradeCart={() => {
-                  setPlannedXpUpgrades([]);
-                  setSeasonEndXpSpendPreview(null);
-                  setSeasonEndXpSpendError(null);
-                }}
-                onConfirmSeasonEndXpSpend={() => {
-                  void confirmSeasonEndXpSpend();
                 }}
               />
             ) : null}
@@ -21500,642 +21734,6 @@ export default function FoundationPageClient({
             ) : null}
           </section>
 
-	          {activeView === "hq" ? (() => {
-              function sortManagerCards<T extends { priority: number; title: string }>(cards: T[]) {
-                return [...cards].sort((left, right) => right.priority - left.priority || left.title.localeCompare(right.title, "de"));
-              }
-	            const immediateCards = sortManagerCards([
-	              {
-	                key: "lineup",
-	                eyebrow: "Sofort",
-	                title: homeNextMatchdayStatus.openSlots > 0 ? "Einsatzliste fertig machen" : homeNextMatchdayStatus.resultAvailable ? "Ergebnis ansehen" : "Arena bereit",
-	                detail:
-	                  homeNextMatchdayStatus.requiredSlots > 0
-	                    ? `${homeNextMatchdayStatus.filledSlots}/${homeNextMatchdayStatus.requiredSlots} Slots · ${homeNextMatchdayStatus.openSlots} offen`
-	                    : "Noch kein Spieltag aktiv.",
-	                meta:
-                    homeNextMatchdayStatus.openSlots > 0
-                      ? "erst Einsatz fertig machen"
-                      : homeNextMatchdayStatus.hasFormCards
-                        ? "Nutzen: direkt revealbar"
-                        : "Formkarten optional · Arena trotzdem spielbar",
-                  priority: homeNextMatchdayStatus.openSlots > 0 ? 100 : 72,
-	                tone: homeNextMatchdayStatus.openSlots > 0 ? "warning" : "ready",
-	                onClick: () => setFoundationView(homeNextMatchdayStatus.openSlots > 0 ? "lineup" : "matchdayArena", setActiveView),
-	              },
-	              {
-	                key: "demands",
-	                eyebrow: "Sofort",
-	                title: selectedTeamPlayerDemands.length > 0 ? "Forderungen prüfen" : "Kader ruhig",
-	                detail: selectedTeamPlayerDemands[0]?.detail ?? "Gerade kein Spieler mit akutem Wunsch.",
-	                meta: selectedTeamPlayerDemands.length > 0 ? `Schaden: Moral kippt bei ${selectedTeamPlayerDemands.length}` : "keine Reibung",
-                  priority: selectedTeamPlayerDemands.length > 0 ? 88 : 44,
-	                tone: selectedTeamPlayerDemands.length > 0 ? "warning" : "ready",
-	                onClick: () =>
-	                  setFoundationView(
-	                    selectedTeamPlayerDemands[0]?.type === "facility" ? "trainingV2" : "lineup",
-	                    setActiveView,
-	                  ),
-	              },
-	              {
-	                key: "finance",
-	                eyebrow: "Sofort",
-	                title: selectedHqFinanceWarnings.length > 0 ? "Cash-Druck sichtbar" : "Finanzen stabil",
-	                detail:
-	                  selectedHqFinanceWarnings[0] ??
-	                  `Cash ${selectedStandingRow?.cash != null ? formatMoney(selectedStandingRow.cash) : "—"} · Gehalt ${selectedStandingRow?.salaryTotal != null ? formatMoney(selectedStandingRow.salaryTotal) : "—"}`,
-	                meta: selectedHqFinanceWarnings.length > 0 ? "Schaden: Cash/Gehaltsdruck" : "Puffer stabil",
-                  priority: selectedHqFinanceWarnings.length > 0 ? 92 : 48,
-	                tone: selectedHqFinanceWarnings.length > 0 ? "danger" : "ready",
-	                onClick: () => setFoundationView("prize", setActiveView),
-	              },
-	              {
-	                key: "inbox",
-	                eyebrow: "Sofort",
-	                title: activeTeamOpenInboxItems.length > 0 ? "Inbox öffnen" : "Keine harten To-dos",
-	                detail:
-	                  activeTeamOpenInboxItems[0]?.title ??
-	                  "Story, Hinweise und Aufgaben bleiben hier gesammelt und teamfokussiert.",
-	                meta: activeTeamCriticalInboxItems.length > 0 ? `Kritisch: ${activeTeamCriticalInboxItems.length}` : `${activeTeamOpenInboxItems.length} offen`,
-                  priority: activeTeamCriticalInboxItems.length > 0 ? 86 : activeTeamOpenInboxItems.length > 0 ? 68 : 36,
-	                tone: activeTeamOpenInboxItems.length > 0 ? "warning" : "ready",
-	                onClick: () => setFoundationView("inbox", setActiveView),
-	              },
-	            ]);
-	            const seasonCards = sortManagerCards([
-	              {
-	                key: "board",
-	                eyebrow: "Diese Season",
-	                title: selectedOpenObjectives[0]?.label ?? "Board sauber halten",
-	                detail: selectedOpenObjectives[0]?.detail ?? selectedOpenObjectives[0]?.actionHint ?? "Aktive Ziele, Druck und Richtung für diese Season.",
-	                meta: `Druck ${selectedBoardConfidence?.pressure ?? "—"}/10 · Rating ${selectedBoardConfidence?.value ?? "—"}/10`,
-                  priority: (selectedBoardConfidence?.pressure ?? 0) >= 8 ? 84 : selectedOpenObjectives.length > 0 ? 70 : 42,
-	                tone: (selectedBoardConfidence?.pressure ?? 0) >= 8 ? "danger" : selectedOpenObjectives.length > 0 ? "warning" : "ready",
-	                onClick: () => setFoundationView("season", setActiveView),
-	              },
-	              {
-	                key: "training",
-	                eyebrow: "Diese Season",
-	                title: hqTrainingFocusCount > 0 ? "Training nachschärfen" : "Training ruhig",
-	                detail:
-	                  hqTrainingFocusCount > 0
-	                    ? `${hqTrainingFocusCount} Spieler haben XP oder Fatigue-Signale.`
-	                    : "Gerade kein akuter Trainingsstau.",
-	                meta: hqTrainingFocusCount > 0 ? "Nutzen: XP sichern, Fatigue beruhigen" : selectedTeamGeneralManager?.profile.facilityPriorities.slice(0, 2).join(" · ") ?? "Facility-Fokus offen",
-                  priority: hqTrainingFocusCount > 0 ? 74 : 40,
-	                tone: hqTrainingFocusCount > 0 ? "warning" : "ready",
-	                onClick: () => setFoundationView("trainingCompact", setActiveView),
-	              },
-	              {
-	                key: "market",
-	                eyebrow: "Diese Season",
-	                title: hqTransferWishlistEntries[0]?.playerName ?? "Marktwatch aufbauen",
-	                detail:
-	                  hqTransferWishlistEntries[0]
-	                    ? `${hqTransferWishlistEntries[0].className} · MW ${hqTransferWishlistEntries[0].marketValue != null ? formatTransfermarktCurrency(hqTransferWishlistEntries[0].marketValue) : "—"}`
-	                    : "Merke interessante Free Agents und beobachte Fits direkt von hier.",
-	                meta: hqTransferWishlistEntries.length > 0 ? `Nutzen: ${hqTransferWishlistEntries.length} konkrete Targets` : "Chance: Watchlist aufbauen",
-                  priority: hqTransferWishlistEntries.length > 0 ? 66 : 38,
-	                tone: hqTransferWishlistEntries.length > 0 ? "ready" : "warning",
-	                onClick: () => setFoundationView("marketV2", setActiveView),
-	              },
-	              {
-	                key: "powers",
-	                eyebrow: "Diese Season",
-	                title: selectedTeamCaptainProfile?.playerName ?? "Captain & Team Powers",
-	                detail:
-	                  selectedTeamCaptainProfile
-	                    ? `${selectedTeamCaptainProfile.style} · Buffer +${formatLocalePoints(selectedTeamCaptainProfile.effects.moraleBuffer, 1)}`
-	                    : "Noch kein klares Captain-Signal sichtbar.",
-	                meta: selectedTeamPowers.length > 0 ? `${selectedTeamPowers.length} Powers aktiv` : "Captain-Synergien offen",
-                  priority: selectedTeamPowers.length > 0 ? 54 : 46,
-	                tone: selectedTeamPowers.length > 0 ? "ready" : "warning",
-	                onClick: () => setFoundationView("lineup", setActiveView),
-	              },
-	            ]);
-	            const preseasonCards = sortManagerCards([
-	              {
-	                key: "expiring",
-	                eyebrow: "Vor Saisonwechsel",
-	                title: hqContractExpiringCount > 0 ? "Ausläufer absichern" : "Verträge wirken stabil",
-	                detail:
-	                  hqContractExpiringCount > 0
-	                    ? `${hqContractExpiringCount} Verträge laufen bald aus.`
-	                    : "Keine akute Verlängerungswelle sichtbar.",
-	                meta: hqContractExpiringCount > 0 ? "Schaden: Verliere Binder ohne Plan" : `${selectedRosterTableRows.length} Spieler im Kader`,
-                  priority: hqContractExpiringCount > 0 ? 82 : 34,
-	                tone: hqContractExpiringCount > 0 ? "warning" : "ready",
-	                onClick: () => setFoundationView("teams", setActiveView),
-	              },
-	              {
-	                key: "sell",
-	                eyebrow: "Vor Saisonwechsel",
-	                title: hqTransferSellMarkers.length > 0 ? "VK-Vormerkung prüfen" : "Keine Abgänge markiert",
-	                detail:
-	                  hqTransferSellMarkers[0]
-	                    ? `${hqTransferSellMarkers[0].playerName} · Buyout ${hqTransferSellMarkers[0].buyoutCost != null ? formatDisplayMoney(hqTransferSellMarkers[0].buyoutCost) : "—"}`
-	                    : "Wenn ein Spieler nicht mehr passt, hier vorbereitet in den Abgang gehen.",
-	                meta: hqTransferSellMarkers.length > 0 ? `${hqTransferSellMarkers.length} markiert` : "Kein geplanter Exit",
-                  priority: hqTransferSellMarkers.length > 0 ? 62 : 28,
-	                tone: hqTransferSellMarkers.length > 0 ? "warning" : "ready",
-	                onClick: () => setFoundationView("teams", setActiveView),
-	              },
-	              {
-	                key: "morale",
-	                eyebrow: "Vor Saisonwechsel",
-	                title: selectedHqMoraleSummary ? `Moral ${formatLocalePoints(selectedHqMoraleSummary.average, 1)}` : "Moral prüfen",
-	                detail:
-	                  selectedHqMoraleSummary
-	                    ? `${selectedHqMoraleSummary.criticalCount} kritisch · ${selectedHqMoraleSummary.exitRiskCount} Exit-Risiken`
-	                    : "Noch keine belastbare Moral-Lage für dieses Team.",
-	                meta: selectedTeamCaptainProfile?.playerName ? `Captain ${selectedTeamCaptainProfile.playerName}` : "kein Captain",
-                  priority:
-                    (selectedHqMoraleSummary?.criticalCount ?? 0) > 0 || (selectedHqMoraleSummary?.exitRiskCount ?? 0) > 0
-                      ? 90
-                      : 44,
-	                tone:
-	                  (selectedHqMoraleSummary?.criticalCount ?? 0) > 0 || (selectedHqMoraleSummary?.exitRiskCount ?? 0) > 0
-	                    ? "danger"
-	                    : "ready",
-	                onClick: () => setFoundationView("teams", setActiveView),
-	              },
-	              {
-	                key: "forecast",
-	                eyebrow: "Vor Saisonwechsel",
-	                title: "Preisgeld & Forecast",
-	                detail:
-	                  selectedStandingRow?.rank != null
-	                    ? `Rang #${selectedStandingRow.rank} · ${selectedStandingRow.points != null ? formatLocalePoints(selectedStandingRow.points, 1) : "—"} Punkte`
-	                    : "Rang und Kassenlauf im Blick behalten.",
-	                meta: selectedStandingRow?.guv != null ? `GuV ${formatMoney(selectedStandingRow.guv)}` : "GuV —",
-                  priority: selectedStandingRow?.guv != null && selectedStandingRow.guv < 0 ? 58 : 30,
-	                tone: selectedStandingRow?.guv != null && selectedStandingRow.guv < 0 ? "warning" : "ready",
-	                onClick: () => setFoundationView("prize", setActiveView),
-	              },
-	            ]);
-              const managerPriorityCards = sortManagerCards([
-                {
-                  key: "priority-lineup",
-                  title: homeNextMatchdayStatus.openSlots > 0 ? "Einsatzliste offen" : homeNextMatchdayStatus.resultAvailable ? "Reveal lesen" : "Arena starten",
-                  detail:
-                    homeNextMatchdayStatus.requiredSlots > 0
-                      ? `${homeNextMatchdayStatus.filledSlots}/${homeNextMatchdayStatus.requiredSlots} Slots · ${homeNextMatchdayStatus.openSlots} offen`
-                      : "Kein aktiver Spieltag im Fokus.",
-                  meta: homeNextMatchdayStatus.openSlots > 0 ? "Schaden: Matchday blockiert" : "Nutzen: Spieltag direkt spielbar",
-                  tone: homeNextMatchdayStatus.openSlots > 0 ? "warning" : "ready",
-                  priority: homeNextMatchdayStatus.openSlots > 0 ? 100 : 70,
-                  accent: "lineup",
-                  onClick: () => setFoundationView(homeNextMatchdayStatus.openSlots > 0 ? "lineup" : "matchdayArena", setActiveView),
-                },
-                {
-                  key: "priority-finance",
-                  title: selectedHqFinanceWarnings.length > 0 ? "Cash-Druck" : "Finanzlage stabil",
-                  detail:
-                    selectedHqFinanceWarnings[0] ??
-                    `Cash ${selectedStandingRow?.cash != null ? formatMoney(selectedStandingRow.cash) : "—"} · Gehalt ${selectedStandingRow?.salaryTotal != null ? formatMoney(selectedStandingRow.salaryTotal) : "—"}`,
-                  meta: selectedHqFinanceWarnings.length > 0 ? "Schaden: Markt und Verlaengerungen enger" : "Nutzen: Flex fuer Deals",
-                  tone: selectedHqFinanceWarnings.length > 0 ? "danger" : "ready",
-                  priority: selectedHqFinanceWarnings.length > 0 ? 92 : 54,
-                  accent: "finance",
-                  onClick: () => setFoundationView("prize", setActiveView),
-                },
-                {
-                  key: "priority-morale",
-                  title:
-                    (selectedHqMoraleSummary?.criticalCount ?? 0) > 0 || (selectedHqMoraleSummary?.exitRiskCount ?? 0) > 0
-                      ? "Moral kippt"
-                      : "Moral ruhig",
-                  detail:
-                    selectedHqMoraleSummary
-                      ? `${selectedHqMoraleSummary.criticalCount} kritisch · ${selectedHqMoraleSummary.exitRiskCount} Exit-Risiken`
-                      : "Noch keine belastbare Moral-Lage.",
-                  meta:
-                    (selectedHqMoraleSummary?.criticalCount ?? 0) > 0 || (selectedHqMoraleSummary?.exitRiskCount ?? 0) > 0
-                      ? "Schaden: Forderungen und Abgangsrisiko"
-                      : "Nutzen: stabiler Kern",
-                  tone:
-                    (selectedHqMoraleSummary?.criticalCount ?? 0) > 0 || (selectedHqMoraleSummary?.exitRiskCount ?? 0) > 0
-                      ? "danger"
-                      : "ready",
-                  priority:
-                    (selectedHqMoraleSummary?.criticalCount ?? 0) > 0 || (selectedHqMoraleSummary?.exitRiskCount ?? 0) > 0
-                      ? 90
-                      : 48,
-                  accent: "board",
-                  onClick: () => setFoundationView("teams", setActiveView),
-                },
-                {
-                  key: "priority-market",
-                  title: hqTransferWishlistEntries.length > 0 ? "Marktchance da" : "Marktwatch fehlt",
-                  detail:
-                    hqTransferWishlistEntries[0]
-                      ? `${hqTransferWishlistEntries[0].playerName} · ${hqTransferWishlistEntries[0].className} · MW ${hqTransferWishlistEntries[0].marketValue != null ? formatTransfermarktCurrency(hqTransferWishlistEntries[0].marketValue) : "—"}`
-                      : "Wishlist und Fits geben dir wieder schnellere Kaufentscheidungen.",
-                  meta: hqTransferWishlistEntries.length > 0 ? "Nutzen: vorbereitete Targets" : "Chance: Watchlist aufbauen",
-                  tone: hqTransferWishlistEntries.length > 0 ? "ready" : "warning",
-                  priority: hqTransferWishlistEntries.length > 0 ? 72 : 46,
-                  accent: "power",
-                  onClick: () => setFoundationView("marketV2", setActiveView),
-                },
-                {
-                  key: "priority-training",
-                  title: hqTrainingFocusCount > 0 ? "Training braucht Fokus" : "Training ruhig",
-                  detail:
-                    hqTrainingFocusCount > 0
-                      ? `${hqTrainingFocusCount} Spieler mit XP-/Fatigue-Signal.`
-                      : "Gerade kein akuter Trainingsstau.",
-                  meta: hqTrainingFocusCount > 0 ? "Nutzen: Entwicklung sichern" : "Kein Sofortschaden",
-                  tone: hqTrainingFocusCount > 0 ? "warning" : "ready",
-                  priority: hqTrainingFocusCount > 0 ? 68 : 40,
-                  accent: "lineup",
-                  onClick: () => setFoundationView("trainingCompact", setActiveView),
-                },
-              ]);
-              const marketWatchRows = hqTransferWishlistEntries.slice(0, 3);
-              const hqGlanceRows = [
-                {
-                  key: "cash",
-                  label: "Cash",
-                  value: selectedStandingRow?.cash != null ? formatMoney(selectedStandingRow.cash) : "—",
-                  detail: selectedHqFinanceWarnings[0] ?? "sofort verfuegbar",
-                },
-                {
-                  key: "salary",
-                  label: "Gehalt",
-                  value: selectedStandingRow?.salaryTotal != null ? formatMoney(selectedStandingRow.salaryTotal) : "—",
-                  detail: "laufender Saisondruck",
-                },
-                {
-                  key: "roster",
-                  label: "Kader",
-                  value: `${selectedStandingRow?.rosterCount ?? rosterPlayers.length}`,
-                  detail: `${hqContractExpiringCount} kurz gebunden`,
-                },
-                {
-                  key: "morale",
-                  label: "Moral",
-                  value: selectedHqMoraleSummary?.average != null ? formatLocalePoints(selectedHqMoraleSummary.average, 1) : "—",
-                  detail: `${selectedHqMoraleSummary?.criticalCount ?? 0} kritisch`,
-                },
-                {
-                  key: "axes",
-                  label: "Achsen",
-                  value:
-                    selectedHqAxisSummary?.weakestTwo.length
-                      ? selectedHqAxisSummary.weakestTwo.map((entry) => `${entry.label} #${entry.rank}`).join(" · ")
-                      : "—",
-                  detail:
-                    selectedHqAxisSummary?.strongest
-                      ? `stark: ${selectedHqAxisSummary.strongest.label} #${selectedHqAxisSummary.strongest.rank}`
-                      : "keine Rangdaten",
-                },
-                {
-                  key: "board",
-                  label: "Board",
-                  value: `${selectedBoardConfidence?.value ?? "—"}/10`,
-                  detail: `Druck ${selectedBoardConfidence?.pressure ?? "—"}/10`,
-                },
-                {
-                  key: "gm",
-                  label: "GM",
-                  value: selectedTeamGeneralManager?.profile.name ?? "—",
-                  detail:
-                    selectedTeamGeneralManager?.assignment.source === "board_replacement" ||
-                    selectedTeamGeneralManager?.assignment.dismissalReason
-                      ? "Board-Wechsel · neuer GM"
-                      : (selectedBoardConfidence?.pressure ?? 0) >= 8
-                        ? `Hot Seat · Druck ${selectedBoardConfidence?.pressure ?? "—"}/10`
-                        : (selectedBoardConfidence?.pressure ?? 0) >= 6
-                          ? `Board schaut hin · Druck ${selectedBoardConfidence?.pressure ?? "—"}/10`
-                          : selectedTeamGeneralManager?.profile.title ?? "Front Office",
-                },
-              ];
-              const immediatePrimaryAction = immediateCards[0] ?? null;
-              const seasonPrimaryAction = seasonCards[0] ?? null;
-              const preseasonPrimaryAction = preseasonCards[0] ?? null;
-	            return (
-	              <section className={`panel foundation-hq-panel${getViewClass("hq")}`} data-testid="foundation-hq" id="foundation-hq">
-	                <div className="foundation-hq-hero">
-	                  <button
-	                    className="foundation-home-team-card foundation-hq-team-card"
-	                    type="button"
-	                    onClick={() => selectedTeam?.teamId && openTeamDrawerById(selectedTeam.teamId)}
-	                    title="Team-Dossier öffnen"
-	                  >
-	                    {homeActiveTeamLogo?.src ? (
-	                      <img
-	                        className="foundation-home-logo"
-	                        src={homeActiveTeamLogo.src}
-	                        alt={`${selectedTeam?.name ?? "Team"} Logo`}
-	                        loading="eager"
-	                        decoding="async"
-	                      />
-	                    ) : (
-	                      <span className="foundation-home-logo team-logo-placeholder">{homeActiveTeamLogo?.initials ?? selectedTeam?.shortCode ?? "?"}</span>
-	                    )}
-	                    <div className="stack">
-	                      <span className="eyebrow">HQ / Manager-Zentrale</span>
-	                      <h1>{selectedTeam?.name ?? "Kein Team ausgewählt"}</h1>
-	                      <div className="room-meta foundation-admin-meta">
-	                        <span className="pill">{selectedTeam?.shortCode ?? "—"}</span>
-	                        <span className="pill">{formatTeamControlModeLabel(selectedTeamControl?.controlMode)}</span>
-	                        {selectedTeam && (!selectedTeamCanManage || isReadOnlyMode) ? (
-	                          <span className="transfer-status-pill is-warning">Nur Ansicht</span>
-	                        ) : null}
-	                        <span className="pill">{gameState.season.name}</span>
-	                        <span className="pill">{currentMatchdayDisplayLabel}</span>
-	                      </div>
-	                    </div>
-	                  </button>
-	                  <article className="foundation-home-next-card foundation-hq-command">
-	                    <span className="eyebrow">Front-Office Fokus</span>
-	                    <strong>{managerPriorityCards[0]?.title ?? selectedOpenObjectives[0]?.label ?? selectedHqFinanceWarnings[0] ?? "Systeme stabil halten"}</strong>
-	                    <p className="muted">
-	                      {managerPriorityCards[0]?.detail ??
-                          "Erst die akuten Baustellen schliessen, dann Season-Druck sauber managen und den Wechsel rechtzeitig vorbereiten."}
-	                    </p>
-                      <div className="foundation-hq-finance-strip">
-                        <span>
-                          Sofort
-                          <strong>{managerPriorityCards[0]?.meta ?? "naechster Zug"}</strong>
-                        </span>
-                        <span>
-                          Diese Season
-                          <strong>{seasonCards[0]?.title ?? "ruhig"}</strong>
-                        </span>
-                        <span>
-                          Wechsel
-                          <strong>{preseasonCards[0]?.title ?? "vorbereiten"}</strong>
-                        </span>
-                      </div>
-                      {selectedTeamAverageAxisStats ? (
-                        <VeloStatOrbitRow
-                          ariaLabel="Team Achsen Durchschnitt"
-                          className="foundation-hq-axis-orbit"
-                          stats={{
-                            pow: selectedTeamAverageAxisStats.pow,
-                            spe: selectedTeamAverageAxisStats.spe,
-                            men: selectedTeamAverageAxisStats.men,
-                            soc: selectedTeamAverageAxisStats.soc,
-                          }}
-                        />
-                      ) : null}
-	                    <div className="foundation-home-actions">
-	                      <button className="primary-button inline-button" type="button" onClick={() => setFoundationView("lineup", setActiveView)}>
-	                        Einsatz planen
-	                      </button>
-	                      <button className="secondary-button inline-button" type="button" onClick={() => setFoundationView("marketV2", setActiveView)}>
-	                        Markt prüfen
-	                      </button>
-	                      <button className="secondary-button inline-button" type="button" onClick={() => setFoundationView("inbox", setActiveView)}>
-	                        Inbox öffnen
-	                      </button>
-	                    </div>
-	                  </article>
-	                </div>
-                  {selectedTeamGeneralManager && selectedHqGmStory ? (
-                    <div
-                      className={`season-v2-gm-story is-${selectedHqGmStory.tone}`}
-                      data-testid="foundation-hq-gm-story"
-                      title="GM-Mandat aus Board Confidence, Druck und moeglichen Wechselgruenden."
-                    >
-                      <strong>{selectedHqGmStory.label}</strong>
-                      <span>
-                        {selectedTeamGeneralManager.profile.name} · {selectedTeamGeneralManager.profile.title} · Druck{" "}
-                        {selectedBoardConfidence?.pressure ?? "—"}/10 · Confidence {selectedBoardConfidence?.value ?? "—"}/10 ·{" "}
-                        {selectedHqGmStory.detail}
-                      </span>
-                    </div>
-                  ) : null}
-
-                  <section className="foundation-hq-priority-rail" aria-label="Manager-Fokus">
-                    <div className="foundation-hq-focus-head">
-                      <div className="foundation-hq-focus-copy">
-                        <span>Manager-Fokus</span>
-                        <strong>Was du jetzt tun solltest</strong>
-                        <small>Nach Dringlichkeit sortiert. Jede Karte springt direkt in die richtige Ansicht.</small>
-                      </div>
-                      <span className="pill">{managerPriorityCards.filter((card) => card.tone !== "ready").length} aktiv</span>
-                    </div>
-                    <div className="foundation-hq-priority-grid">
-                      {managerPriorityCards.map((card) => (
-                        <button
-                          key={`hq-priority-${card.key}`}
-                          className={`foundation-hq-priority-card is-${card.accent}`}
-                          type="button"
-                          onClick={card.onClick}
-                        >
-                          <span>{card.tone === "danger" ? "Druck" : card.tone === "warning" ? "Jetzt" : "Chance"}</span>
-                          <strong>{card.title}</strong>
-                          <small>{card.detail}</small>
-                          <b>{card.meta}</b>
-                        </button>
-                      ))}
-                    </div>
-                  </section>
-
-	                <div className="foundation-hq-state-strip">
-	                  <article className="foundation-hq-state-card">
-	                    <span>Nächster Zug</span>
-	                    <strong>{managerPriorityCards[0]?.title ?? "—"}</strong>
-	                    <small>{managerPriorityCards[0]?.meta ?? "keine akute Baustelle"}</small>
-	                  </article>
-	                  <article className="foundation-hq-state-card">
-	                    <span>Cash</span>
-	                    <strong>{selectedStandingRow?.cash != null ? formatMoney(selectedStandingRow.cash) : "—"}</strong>
-	                    <small>sofort verfügbar</small>
-	                  </article>
-	                  <article className="foundation-hq-state-card">
-	                    <span>Gehalt</span>
-	                    <strong>{selectedStandingRow?.salaryTotal != null ? formatMoney(selectedStandingRow.salaryTotal) : "—"}</strong>
-	                    <small>laufender Druck</small>
-	                  </article>
-	                  <article className="foundation-hq-state-card">
-	                    <span>Kadergröße</span>
-	                    <strong>{selectedStandingRow?.rosterCount ?? rosterPlayers.length}</strong>
-	                    <small>aktive Spieler</small>
-	                  </article>
-	                  <article className="foundation-hq-state-card">
-	                    <span>Moral-Schnitt</span>
-	                    <strong>{selectedHqMoraleSummary?.average != null ? formatLocalePoints(selectedHqMoraleSummary.average, 1) : "—"}</strong>
-	                    <small>{selectedHqMoraleSummary?.criticalCount ?? 0} kritisch</small>
-	                  </article>
-	                  <article className="foundation-hq-state-card">
-	                    <span>Schwächste Achsen</span>
-	                    <strong>
-	                      {selectedHqAxisSummary?.weakestTwo.length
-	                        ? selectedHqAxisSummary.weakestTwo.map((entry) => `${entry.label} #${entry.rank}`).join(" · ")
-	                        : "—"}
-	                    </strong>
-	                    <small>
-	                      {selectedHqAxisSummary?.strongest ? `stark in ${selectedHqAxisSummary.strongest.label} #${selectedHqAxisSummary.strongest.rank}` : "keine Rangdaten"}
-	                    </small>
-	                  </article>
-	                </div>
-
-	                <div className="foundation-hq-zones">
-	                  <article className="foundation-home-card foundation-hq-zone">
-	                    <div className="panel-header compact">
-	                      <div className="stack">
-	                        <h2>Sofort</h2>
-	                        <p className="muted">Die nächsten direkten Züge für diesen Spieltag.</p>
-	                      </div>
-                        <div className="foundation-hq-zone-head-actions">
-	                      <span className={`transfer-status-pill${homeNextMatchdayStatus.openSlots > 0 ? " is-warning" : " is-ready"}`}>
-	                        {homeNextMatchdayStatus.statusLabel}
-	                      </span>
-                          {immediatePrimaryAction ? (
-                            <button className="secondary-button inline-button" type="button" onClick={immediatePrimaryAction.onClick} title={immediatePrimaryAction.detail}>
-                              Jetzt öffnen
-                            </button>
-                          ) : null}
-                        </div>
-	                    </div>
-	                    <div className="foundation-hq-action-grid">
-	                      {immediateCards.map((card) => (
-	                        <button key={`hq-immediate-${card.key}`} className={`foundation-hq-action-card is-${card.tone}`} type="button" onClick={card.onClick} title={`${card.detail} · ${card.meta}`}>
-	                          <span>{card.eyebrow}</span>
-	                          <strong>{card.title}</strong>
-	                          <small>{card.detail}</small>
-	                          <b>{card.meta}</b>
-	                        </button>
-	                      ))}
-	                    </div>
-	                  </article>
-
-	                  <article className="foundation-home-card foundation-hq-zone">
-	                    <div className="panel-header compact">
-	                      <div className="stack">
-	                        <h2>Diese Season</h2>
-	                        <p className="muted">Board, Markt, Training und Team-DNA im laufenden Rennen.</p>
-	                      </div>
-                        <div className="foundation-hq-zone-head-actions">
-	                      <span className="pill">{selectedOpenObjectives.length} Ziele offen</span>
-                          {seasonPrimaryAction ? (
-                            <button className="secondary-button inline-button" type="button" onClick={seasonPrimaryAction.onClick} title={seasonPrimaryAction.detail}>
-                              Direkt rein
-                            </button>
-                          ) : null}
-                        </div>
-	                    </div>
-	                    <div className="foundation-hq-action-grid">
-	                      {seasonCards.map((card) => (
-	                        <button key={`hq-season-${card.key}`} className={`foundation-hq-action-card is-${card.tone}`} type="button" onClick={card.onClick} title={`${card.detail} · ${card.meta}`}>
-	                          <span>{card.eyebrow}</span>
-	                          <strong>{card.title}</strong>
-	                          <small>{card.detail}</small>
-	                          <b>{card.meta}</b>
-	                        </button>
-	                      ))}
-	                    </div>
-	                    <div className="foundation-hq-mini-grid">
-	                      <div className="foundation-hq-mini-card is-glance">
-	                        <span>Teamzustand kompakt</span>
-                          <div className="foundation-hq-glance-grid">
-                            {hqGlanceRows.map((row) => (
-                              <div key={`hq-glance-${row.key}`} className="foundation-hq-glance-card">
-                                <span>{row.label}</span>
-                                <strong>{row.value}</strong>
-                                <small>{row.detail}</small>
-                              </div>
-                            ))}
-                          </div>
-	                      </div>
-	                      <div className="foundation-hq-mini-card is-watch">
-	                        <span>Wishlist</span>
-	                        {marketWatchRows.length > 0 ? (
-	                          <div className="foundation-hq-mini-list">
-	                            {marketWatchRows.map((entry) => (
-	                              <button key={`hq-wishlist-${entry.id}`} className="foundation-hq-mini-row" type="button" onClick={() => setFoundationView("marketV2", setActiveView)}>
-	                                <strong>{entry.playerName}</strong>
-	                                <small>{entry.className} · {entry.marketValue != null ? formatTransfermarktCurrency(entry.marketValue) : "—"} · Watch</small>
-	                              </button>
-	                            ))}
-	                          </div>
-	                        ) : (
-	                          <p className="muted">Noch leer. Gute Targets hier merken und spaeter schneller ziehen.</p>
-	                        )}
-	                      </div>
-	                      <div className="foundation-hq-mini-card">
-	                        <span>Marktchance</span>
-	                        {selectedHqAxisSummary?.weakestTwo[0] ? (
-	                          <button className="foundation-hq-mini-row" type="button" onClick={() => setFoundationView("marketV2", setActiveView)}>
-	                            <strong>{selectedHqAxisSummary?.weakestTwo[0] ? `${selectedHqAxisSummary.weakestTwo[0].label} reparieren` : "Fits pruefen"}</strong>
-	                            <small>
-                                {selectedHqAxisSummary?.weakestTwo[0]
-                                  ? `Schwachpunkt #${selectedHqAxisSummary.weakestTwo[0].rank} · Markt direkt auf diese Achse drehen`
-                                  : "Kaderbedarf und Wishlist im Markt kombinieren"}
-                              </small>
-	                          </button>
-	                        ) : (
-	                          <p className="muted">Gerade kein klarer Marktbedarf sichtbar.</p>
-	                        )}
-	                      </div>
-	                    </div>
-	                  </article>
-
-	                  <article className="foundation-home-card foundation-hq-zone">
-	                    <div className="panel-header compact">
-	                      <div className="stack">
-	                        <h2>Vor Saisonwechsel</h2>
-	                        <p className="muted">Was du früh vorbereitest, damit der Übergang nicht chaotisch wird.</p>
-	                      </div>
-                        <div className="foundation-hq-zone-head-actions">
-	                      <span className="pill">{hqContractExpiringCount} Ausläufer</span>
-                          {preseasonPrimaryAction ? (
-                            <button className="secondary-button inline-button" type="button" onClick={preseasonPrimaryAction.onClick} title={preseasonPrimaryAction.detail}>
-                              Vorbereiten
-                            </button>
-                          ) : null}
-                        </div>
-	                    </div>
-	                    <div className="foundation-hq-action-grid">
-	                      {preseasonCards.map((card) => (
-	                        <button key={`hq-preseason-${card.key}`} className={`foundation-hq-action-card is-${card.tone}`} type="button" onClick={card.onClick} title={`${card.detail} · ${card.meta}`}>
-	                          <span>{card.eyebrow}</span>
-	                          <strong>{card.title}</strong>
-	                          <small>{card.detail}</small>
-	                          <b>{card.meta}</b>
-	                        </button>
-	                      ))}
-	                    </div>
-	                    <div className="foundation-hq-mini-grid">
-	                      <div className="foundation-hq-mini-card">
-	                        <span>VK vorgemerkt</span>
-	                        {hqTransferSellMarkers.length > 0 ? (
-	                          <div className="foundation-hq-mini-list">
-	                            {hqTransferSellMarkers.map((entry) => (
-	                              <button key={`hq-sell-marker-${entry.id}`} className="foundation-hq-mini-row" type="button" onClick={() => setFoundationView("teams", setActiveView)}>
-	                                <strong>{entry.playerName}</strong>
-	                                <small>Buyout {entry.buyoutCost != null ? formatDisplayMoney(entry.buyoutCost) : "—"} · Moral {entry.morale != null ? formatWholeNumber(entry.morale) : "—"}</small>
-	                              </button>
-	                            ))}
-	                          </div>
-	                        ) : (
-	                          <p className="muted">Noch kein Spieler für den Abgang vorgemerkt.</p>
-	                        )}
-	                      </div>
-	                      <div className="foundation-hq-mini-card">
-	                        <span>Inbox & Lore</span>
-	                        {selectedHqInboxItems.length > 0 ? (
-	                          <div className="foundation-hq-mini-list">
-	                            {selectedHqInboxItems.slice(0, 3).map((item) => (
-	                              <button key={`hq-story-${item.itemId}`} className="foundation-hq-mini-row" type="button" onClick={() => navigateToInboxItem(item)}>
-	                                <strong>{item.title}</strong>
-	                                <small>{item.description}</small>
-	                              </button>
-	                            ))}
-	                          </div>
-	                        ) : (
-	                          <p className="muted">Gerade keine neuen Team-Highlights.</p>
-	                        )}
-	                      </div>
-	                    </div>
-	                  </article>
-	                </div>
-	              </section>
-	            );
-	          })() : null}
 
 	          {false ? (
 	          <section className={`panel foundation-inbox-panel${getViewClass("inbox")}`} data-testid="foundation-inbox-legacy" id="foundation-inbox">
@@ -22402,9 +22000,9 @@ export default function FoundationPageClient({
             <div className="foundation-team-settings-hero">
               <article className="foundation-team-settings-lead">
                 <span className="foundation-kicker">Control Room</span>
-                <strong>Spielstaende, Ownership und Team-KI an einer Stelle.</strong>
+                <strong>Spielmodus, Team-Zuordnung und AI-Automation.</strong>
                 <p className="muted">
-                  Hier steuerst du, welches Team wem gehoert, wie AI-Teams laufen und welcher lokale Save gerade die Grundlage ist.
+                  Der Spielmodus ist die einzige Wahrheit fuer Ownership. Solo = 1 Team, Online 4v4 = 4+4 Teams, Rest AI.
                 </p>
                 <div className="room-meta foundation-admin-meta">
                   <span className={`pill${selectedTeamHasUnsavedChanges ? " warning-pill" : " success-pill"}`}>
@@ -22584,9 +22182,9 @@ export default function FoundationPageClient({
                           }
                           onChange={(event) => applyNewGamePreset(event.target.value as NewGamePresetId)}
                         >
-                          {Object.entries(NEW_GAME_PRESET_DEFAULTS).map(([presetId, preset]) => (
+                          {NEW_GAME_VISIBLE_PRESET_IDS.map((presetId) => (
                             <option key={presetId} value={presetId}>
-                              {preset.label}
+                              {NEW_GAME_PRESET_DEFAULTS[presetId].label}
                             </option>
                           ))}
                         </select>
@@ -22632,80 +22230,116 @@ export default function FoundationPageClient({
                       </label>
                     </div>
 
-                    <div className="metric-grid compact">
-                      <article className="metric-card">
-                        <span>Chris</span>
-                        <strong>{newGameChrisTeamIds.length}</strong>
-                        <small>{newGameChrisTeamIds.join(" · ") || "kein Team"}</small>
-                      </article>
-                      <article className="metric-card">
-                        <span>Franky</span>
-                        <strong>{newGameFrankyTeamIds.length}</strong>
-                        <small>{newGameFrankyTeamIds.join(" · ") || "kein Team"}</small>
-                      </article>
-                      <article className="metric-card">
-                        <span>Rest</span>
-                        <strong>{Math.max(0, gameState.teams.length - newGameChrisTeamIds.length - newGameFrankyTeamIds.length)}</strong>
-                        <small>Auto-Teams</small>
-                      </article>
-                    </div>
+                    {newGamePresetId === "solo_1" ? (
+                      <label className="filter-field" data-testid="new-game-solo-team-select">
+                        <span>Dein Team</span>
+                        <select
+                          className="input"
+                          disabled={newGameBusy || isReadOnlyMode}
+                          value={newGameChrisTeamIds[0] ?? ""}
+                          title={
+                            isReadOnlyMode
+                              ? getReadOnlyActionReason("die Team-Zuordnung")
+                              : newGameBusy
+                                ? getBusyActionReason("Das New-Game-Setup")
+                                : "Waehle genau 1 Team fuer den Solo-Spielstand."
+                          }
+                          onChange={(event) => {
+                            if (event.target.value) {
+                              setNewGameSoloTeam(event.target.value);
+                            }
+                          }}
+                        >
+                          <option value="" disabled>
+                            Team waehlen
+                          </option>
+                          {[...gameState.teams]
+                            .sort((a, b) => (b.budget ?? 0) - (a.budget ?? 0) || a.shortCode.localeCompare(b.shortCode))
+                            .map((team) => (
+                              <option key={`new-game-solo-${team.teamId}`} value={team.teamId}>
+                                {team.name} ({team.shortCode}) · Budget {formatMoney(team.budget)}
+                              </option>
+                            ))}
+                        </select>
+                      </label>
+                    ) : (
+                      <>
+                        <div className="metric-grid compact">
+                          <article className="metric-card">
+                            <span>Chris</span>
+                            <strong>{newGameChrisTeamIds.length}/4</strong>
+                            <small>{newGameChrisTeamIds.join(" · ") || "kein Team"}</small>
+                          </article>
+                          <article className="metric-card">
+                            <span>Franky</span>
+                            <strong>{newGameFrankyTeamIds.length}/4</strong>
+                            <small>{newGameFrankyTeamIds.join(" · ") || "kein Team"}</small>
+                          </article>
+                          <article className="metric-card">
+                            <span>Rest</span>
+                            <strong>{Math.max(0, gameState.teams.length - newGameChrisTeamIds.length - newGameFrankyTeamIds.length)}</strong>
+                            <small>Auto-Teams</small>
+                          </article>
+                        </div>
 
-                    <div className="team-chip-grid">
-                      {[...gameState.teams]
-                        .sort((a, b) => (b.budget ?? 0) - (a.budget ?? 0) || a.shortCode.localeCompare(b.shortCode))
-                        .map((team) => {
-                          const isChris = newGameChrisTeamIds.includes(team.teamId);
-                          const isFranky = newGameFrankyTeamIds.includes(team.teamId);
-                          return (
-                            <div
-                              key={`new-game-team-${team.teamId}`}
-                              className={`team-settings-team-card${isChris ? " is-owned-by-user" : ""}${isFranky ? " is-owned-by-remote" : ""}`}
-                              onDoubleClick={() => openTeamDrawerById(team.teamId)}
-                              title="Doppelklick öffnet den Team-Drawer"
-                            >
-                              <strong>{team.shortCode}</strong>
-                              <span>{team.name}</span>
-                              <small>Budget {formatMoney(team.budget)}</small>
-                              <div className="foundation-save-actions save-summary-actions">
-                                <button
-                                  className={isChris ? "primary-button inline-button" : "secondary-button inline-button"}
-                                  type="button"
-                                  disabled={newGameBusy || isReadOnlyMode || isFranky}
-                                  title={
-                                    isFranky
-                                      ? "Dieses Team ist bereits Franky zugeordnet."
-                                      : isReadOnlyMode
-                                        ? getReadOnlyActionReason("die Team-Zuordnung")
-                                        : newGameBusy
-                                          ? getBusyActionReason("Das New-Game-Setup")
-                                          : "Ordnet dieses Team Chris/User fuer den neuen Spielstand zu."
-                                  }
-                                  onClick={() => toggleNewGameTeam("chris", team.teamId)}
+                        <div className="team-chip-grid" data-testid="new-game-ownership-picker">
+                          {[...gameState.teams]
+                            .sort((a, b) => (b.budget ?? 0) - (a.budget ?? 0) || a.shortCode.localeCompare(b.shortCode))
+                            .map((team) => {
+                              const isChris = newGameChrisTeamIds.includes(team.teamId);
+                              const isFranky = newGameFrankyTeamIds.includes(team.teamId);
+                              return (
+                                <div
+                                  key={`new-game-team-${team.teamId}`}
+                                  className={`team-settings-team-card${isChris ? " is-owned-by-user" : ""}${isFranky ? " is-owned-by-remote" : ""}`}
+                                  onDoubleClick={() => openTeamDrawerById(team.teamId)}
+                                  title="Doppelklick öffnet den Team-Drawer"
                                 >
-                                  Chris
-                                </button>
-                                <button
-                                  className={isFranky ? "primary-button inline-button" : "secondary-button inline-button"}
-                                  type="button"
-                                  disabled={newGameBusy || isReadOnlyMode || isChris}
-                                  title={
-                                    isChris
-                                      ? "Dieses Team ist bereits Chris/User zugeordnet."
-                                      : isReadOnlyMode
-                                        ? getReadOnlyActionReason("die Team-Zuordnung")
-                                        : newGameBusy
-                                          ? getBusyActionReason("Das New-Game-Setup")
-                                          : "Ordnet dieses Team Franky fuer den neuen Spielstand zu."
-                                  }
-                                  onClick={() => toggleNewGameTeam("franky", team.teamId)}
-                                >
-                                  Franky
-                                </button>
-                              </div>
-                            </div>
-                          );
-                        })}
-                    </div>
+                                  <strong>{team.shortCode}</strong>
+                                  <span>{team.name}</span>
+                                  <small>Budget {formatMoney(team.budget)}</small>
+                                  <div className="foundation-save-actions save-summary-actions">
+                                    <button
+                                      className={isChris ? "primary-button inline-button" : "secondary-button inline-button"}
+                                      type="button"
+                                      disabled={newGameBusy || isReadOnlyMode || isFranky}
+                                      title={
+                                        isFranky
+                                          ? "Dieses Team ist bereits Franky zugeordnet."
+                                          : isReadOnlyMode
+                                            ? getReadOnlyActionReason("die Team-Zuordnung")
+                                            : newGameBusy
+                                              ? getBusyActionReason("Das New-Game-Setup")
+                                              : "Ordnet dieses Team Chris/User fuer den neuen Spielstand zu."
+                                      }
+                                      onClick={() => toggleNewGameTeam("chris", team.teamId)}
+                                    >
+                                      Chris
+                                    </button>
+                                    <button
+                                      className={isFranky ? "primary-button inline-button" : "secondary-button inline-button"}
+                                      type="button"
+                                      disabled={newGameBusy || isReadOnlyMode || isChris}
+                                      title={
+                                        isChris
+                                          ? "Dieses Team ist bereits Chris/User zugeordnet."
+                                          : isReadOnlyMode
+                                            ? getReadOnlyActionReason("die Team-Zuordnung")
+                                            : newGameBusy
+                                              ? getBusyActionReason("Das New-Game-Setup")
+                                              : "Ordnet dieses Team Franky fuer den neuen Spielstand zu."
+                                      }
+                                      onClick={() => toggleNewGameTeam("franky", team.teamId)}
+                                    >
+                                      Franky
+                                    </button>
+                                  </div>
+                                </div>
+                              );
+                            })}
+                        </div>
+                      </>
+                    )}
 
                     <div className="foundation-save-actions">
                       <button
@@ -23387,10 +23021,10 @@ export default function FoundationPageClient({
               <section className="panel foundation-wide" id="foundation-team-settings-controls">
                 <div className="panel-header">
                   <div className="stack">
-                    <h2>Team Control Settings</h2>
+                    <h2>Spielmodus &amp; Team-Zuordnung</h2>
                     <p className="muted">
-                      Manual, AI und passive Teams werden lokal im Save gespeichert und steuern AI-Flows. Multiplayer-Rechte kommen separat aus
-                      Team Ownership im Online-Room.
+                      Eine Wahrheit pro Save: Der Spielmodus legt fest, wie viele Teams menschlich sind. Alles andere laeuft als AI.
+                      Aenderungen erst mit &quot;Lokal speichern&quot; dauerhaft schreiben.
                     </p>
                   </div>
                   <div className="foundation-save-actions">
@@ -23398,7 +23032,7 @@ export default function FoundationPageClient({
                       className="primary-button"
                       type="button"
                       disabled={isReadOnlyMode}
-                      title={isReadOnlyMode ? getReadOnlyActionReason("die Team-Control-Settings") : "Speichert Control, Owner und lokale Team-Profile in diesem Save."}
+                      title={isReadOnlyMode ? getReadOnlyActionReason("die Team-Control-Settings") : "Speichert Spielmodus-Zuordnung und AI-Automation in diesem Save."}
                       onClick={saveTeamSettings}
                     >
                       Lokal speichern
@@ -23409,8 +23043,12 @@ export default function FoundationPageClient({
                       disabled={isReadOnlyMode}
                       title={isReadOnlyMode ? getReadOnlyActionReason("den Team-Control-Draft") : "Setzt alle lokalen Entwurfs-Aenderungen auf den gespeicherten Stand zurueck."}
                       onClick={() => {
+                        const savedSettings = buildTeamControlSettingsMap(gameState.teams, gameState.seasonState.teamControlSettings);
+                        const savedOwnership = deriveChrisFrankyTeamIdsFromSettings(gameState.teams, savedSettings);
                         setTeamIdentityDraft(buildTeamIdentityDraftMap(gameState.teams, gameState.teamIdentities));
-                        setTeamControlDraft(buildTeamControlSettingsMap(gameState.teams, gameState.seasonState.teamControlSettings));
+                        setTeamControlDraft(savedSettings);
+                        setGameModeOwnershipChrisIds(savedOwnership.chrisTeamIds);
+                        setGameModeOwnershipFrankyIds(savedOwnership.frankyTeamIds);
                         setTeamStrategyDraft(
                           buildTeamStrategyProfileMap(
                             gameState.teams,
@@ -23431,285 +23069,209 @@ export default function FoundationPageClient({
                   ) : null}
                 </div>
                 <div className="room-meta foundation-admin-meta" style={{ marginTop: 12 }}>
-                  <span className="pill">Manual {manualTeams.length}</span>
+                  <span className="pill" data-testid="foundation-active-game-mode">
+                    Modus {formatFoundationSaveModeLabel(activeSaveGameMode)}
+                  </span>
+                  <span className="pill">Chris {currentSaveOwnership.chrisTeamIds.length}/{gameModeOwnershipLimits.chrisMax}</span>
+                  {gameModeOwnershipLimits.frankyMax > 0 ? (
+                    <span className="pill">Franky {currentSaveOwnership.frankyTeamIds.length}/{gameModeOwnershipLimits.frankyMax}</span>
+                  ) : null}
                   <span className="pill">AI {aiTeams.length}</span>
-                  <span className="pill">Passive {passiveTeams.length}</span>
                   <span className={`pill foundation-source-pill${isReadOnlyMode ? " is-readonly" : ""}`}>Speichern: {readSourceLabel}</span>
                 </div>
-                <section className="panel" data-testid="current-save-ownership-cards" style={{ marginTop: 12 }}>
+
+                <section className="panel" data-testid="game-mode-ownership-panel" style={{ marginTop: 12 }}>
                   <div className="panel-header">
                     <div className="stack">
-                      <h3>Ownership-Karten</h3>
+                      <h3>Team-Zuordnung</h3>
                       <p className="muted">
-                        Chris- und Franky-Zuordnung steuert direkt die Team-Control-Tabelle unten. Nur zugeordnete Teams sind
-                        manual, der Rest wird AI.
+                        {activeSaveGameMode === "online_4v4"
+                          ? "Waehle genau 4 Teams fuer Chris und 4 fuer Franky. Alle anderen Teams bleiben AI."
+                          : activeSaveGameMode === "solo_1"
+                            ? "Waehle genau 1 Team fuer dich. Alle anderen Teams bleiben AI."
+                            : `Maximal ${gameModeOwnershipLimits.chrisMax} Chris-Team(s)${gameModeOwnershipLimits.frankyMax ? ` und ${gameModeOwnershipLimits.frankyMax} Franky-Team(s)` : ""}.`}
                       </p>
                     </div>
                   </div>
-                  <div className="metric-grid compact">
-                    <article className="metric-card">
-                      <span>Chris</span>
-                      <strong>{currentSaveOwnership.chrisTeamIds.length}</strong>
-                      <small>{currentSaveOwnership.chrisTeamIds.join(" · ") || "kein Team"}</small>
-                    </article>
-                    <article className="metric-card">
-                      <span>Franky</span>
-                      <strong>{currentSaveOwnership.frankyTeamIds.length}</strong>
-                      <small>{currentSaveOwnership.frankyTeamIds.join(" · ") || "kein Team"}</small>
-                    </article>
-                    <article className="metric-card">
-                      <span>Rest</span>
-                      <strong>
-                        {Math.max(
-                          0,
-                          gameState.teams.length -
-                            currentSaveOwnership.chrisTeamIds.length -
-                            currentSaveOwnership.frankyTeamIds.length,
-                        )}
-                      </strong>
-                      <small>Auto-Teams</small>
-                    </article>
+
+                  {activeSaveGameMode === "solo_1" || (gameModeOwnershipLimits.chrisMax === 1 && gameModeOwnershipLimits.frankyMax === 0) ? (
+                    <label className="filter-field" style={{ marginTop: 12 }}>
+                      <span>Dein Team</span>
+                      <select
+                        className="input"
+                        data-testid="solo-player-team-select"
+                        disabled={isReadOnlyMode}
+                        value={gameModeOwnershipChrisIds[0] ?? ""}
+                        onChange={(event) => {
+                          if (event.target.value) {
+                            setSoloPlayerTeam(event.target.value);
+                          }
+                        }}
+                      >
+                        <option value="" disabled>
+                          Team waehlen
+                        </option>
+                        {gameState.teams.map((team) => (
+                          <option key={`solo-team-${team.teamId}`} value={team.teamId}>
+                            {team.name} ({team.shortCode})
+                          </option>
+                        ))}
+                      </select>
+                    </label>
+                  ) : (
+                    <>
+                      <div className="metric-grid compact" style={{ marginTop: 12 }}>
+                        <article className="metric-card">
+                          <span>Chris</span>
+                          <strong>{currentSaveOwnership.chrisTeamIds.length}/{gameModeOwnershipLimits.chrisMax}</strong>
+                          <small>{currentSaveOwnership.chrisTeamIds.join(" · ") || "kein Team"}</small>
+                        </article>
+                        <article className="metric-card">
+                          <span>Franky</span>
+                          <strong>{currentSaveOwnership.frankyTeamIds.length}/{gameModeOwnershipLimits.frankyMax}</strong>
+                          <small>{currentSaveOwnership.frankyTeamIds.join(" · ") || "kein Team"}</small>
+                        </article>
+                        <article className="metric-card">
+                          <span>AI</span>
+                          <strong>
+                            {Math.max(
+                              0,
+                              gameState.teams.length -
+                                currentSaveOwnership.chrisTeamIds.length -
+                                currentSaveOwnership.frankyTeamIds.length,
+                            )}
+                          </strong>
+                          <small>automatisch</small>
+                        </article>
+                      </div>
+                      <div className="team-chip-grid" data-testid="game-mode-ownership-picker">
+                        {[...gameState.teams]
+                          .sort((a, b) => (b.budget ?? 0) - (a.budget ?? 0) || a.shortCode.localeCompare(b.shortCode))
+                          .map((team) => {
+                            const isChris = currentSaveOwnership.chrisTeamIds.includes(team.teamId);
+                            const isFranky = currentSaveOwnership.frankyTeamIds.includes(team.teamId);
+                            return (
+                              <div
+                                key={`game-mode-team-${team.teamId}`}
+                                className={`team-settings-team-card${isChris ? " is-owned-by-user" : ""}${isFranky ? " is-owned-by-remote" : ""}`}
+                              >
+                                <strong>{team.shortCode}</strong>
+                                <span>{team.name}</span>
+                                <div className="foundation-save-actions save-summary-actions">
+                                  <button
+                                    className={isChris ? "primary-button inline-button" : "secondary-button inline-button"}
+                                    type="button"
+                                    disabled={isReadOnlyMode || isFranky}
+                                    onClick={() => toggleGameModeOwnershipTeam("chris", team.teamId)}
+                                  >
+                                    Chris
+                                  </button>
+                                  <button
+                                    className={isFranky ? "primary-button inline-button" : "secondary-button inline-button"}
+                                    type="button"
+                                    disabled={isReadOnlyMode || isChris || gameModeOwnershipLimits.frankyMax === 0}
+                                    onClick={() => toggleGameModeOwnershipTeam("franky", team.teamId)}
+                                  >
+                                    Franky
+                                  </button>
+                                </div>
+                              </div>
+                            );
+                          })}
+                      </div>
+                    </>
+                  )}
+                </section>
+
+                <section className="panel" data-testid="ai-automation-panel" style={{ marginTop: 12 }}>
+                  <div className="panel-header">
+                    <div className="stack">
+                      <h3>AI-Automation (nur AI-Teams)</h3>
+                      <p className="muted">Preview- und Apply-Flags fuer automatisierte AI-Teams. Ownership bleibt unveraendert.</p>
+                    </div>
                   </div>
-                  <div className="team-chip-grid">
-                    {[...gameState.teams]
-                      .sort((a, b) => (b.budget ?? 0) - (a.budget ?? 0) || a.shortCode.localeCompare(b.shortCode))
-                      .map((team) => {
-                        const isChris = currentSaveOwnership.chrisTeamIds.includes(team.teamId);
-                        const isFranky = currentSaveOwnership.frankyTeamIds.includes(team.teamId);
-                        return (
-                          <div
-                            key={`current-save-team-${team.teamId}`}
-                            className={`team-settings-team-card${isChris ? " is-owned-by-user" : ""}${isFranky ? " is-owned-by-remote" : ""}`}
-                            onDoubleClick={() => openTeamDrawerById(team.teamId)}
-                            title="Doppelklick öffnet den Team-Drawer"
-                          >
-                            <strong>{team.shortCode}</strong>
-                            <span>{team.name}</span>
-                            <small>Budget {formatMoney(team.budget)}</small>
-                            <div className="foundation-save-actions save-summary-actions">
-                              <button
-                                className={isChris ? "primary-button inline-button" : "secondary-button inline-button"}
-                                type="button"
-                                disabled={isReadOnlyMode || isFranky}
-                                title={
-                                  isFranky
-                                    ? "Dieses Team ist bereits Franky zugeordnet."
-                                    : isReadOnlyMode
-                                      ? getReadOnlyActionReason("die Team-Zuordnung")
-                                      : "Ordnet dieses Team Chris zu und setzt den Rest der Tabelle passend."
-                                }
-                                onClick={() => toggleCurrentSaveTeamOwnership("chris", team.teamId)}
-                              >
-                                Chris
-                              </button>
-                              <button
-                                className={isFranky ? "primary-button inline-button" : "secondary-button inline-button"}
-                                type="button"
-                                disabled={isReadOnlyMode || isChris}
-                                title={
-                                  isChris
-                                    ? "Dieses Team ist bereits Chris zugeordnet."
-                                    : isReadOnlyMode
-                                      ? getReadOnlyActionReason("die Team-Zuordnung")
-                                      : "Ordnet dieses Team Franky zu und setzt den Rest der Tabelle passend."
-                                }
-                                onClick={() => toggleCurrentSaveTeamOwnership("franky", team.teamId)}
-                              >
-                                Franky
-                              </button>
-                            </div>
-                          </div>
-                        );
-                      })}
+                  <div className="table-shell" style={{ marginTop: 12 }}>
+                    <table className="data-table compact-table">
+                      <thead>
+                        <tr>
+                          <th>Team</th>
+                          <th>Lineup Preview</th>
+                          <th>Lineup Apply</th>
+                          <th>Transfer Preview</th>
+                          <th>Sell Preview</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {gameState.teams
+                          .filter((team) => (teamControlDraft[team.teamId] ?? resolvedTeamControlSettings[team.teamId])?.controlMode === "ai")
+                          .map((team) => {
+                            const settings = teamControlDraft[team.teamId] ?? resolvedTeamControlSettings[team.teamId];
+                            if (!settings) return null;
+                            return (
+                              <tr key={`ai-auto-${team.teamId}`}>
+                                <td>
+                                  <strong>{team.shortCode}</strong>
+                                  <span className="muted"> {team.name}</span>
+                                </td>
+                                <td>
+                                  <input
+                                    type="checkbox"
+                                    checked={settings.aiLineupPreviewEnabled}
+                                    disabled={isReadOnlyMode}
+                                    onChange={(event) => {
+                                      updateTeamControlDraft(team.teamId, (current) => ({
+                                        ...current,
+                                        aiLineupPreviewEnabled: event.target.checked,
+                                      }));
+                                    }}
+                                  />
+                                </td>
+                                <td>
+                                  <input
+                                    type="checkbox"
+                                    checked={settings.aiLineupApplyEnabled ?? settings.aiLineupAutoApplyEnabled}
+                                    disabled={isReadOnlyMode}
+                                    onChange={(event) => {
+                                      updateTeamControlDraft(team.teamId, (current) => ({
+                                        ...current,
+                                        aiLineupApplyEnabled: event.target.checked,
+                                      }));
+                                    }}
+                                  />
+                                </td>
+                                <td>
+                                  <input
+                                    type="checkbox"
+                                    checked={settings.aiTransferPreviewEnabled}
+                                    disabled={isReadOnlyMode}
+                                    onChange={(event) => {
+                                      updateTeamControlDraft(team.teamId, (current) => ({
+                                        ...current,
+                                        aiTransferPreviewEnabled: event.target.checked,
+                                      }));
+                                    }}
+                                  />
+                                </td>
+                                <td>
+                                  <input
+                                    type="checkbox"
+                                    checked={settings.aiSellPreviewEnabled}
+                                    disabled={isReadOnlyMode}
+                                    onChange={(event) => {
+                                      updateTeamControlDraft(team.teamId, (current) => ({
+                                        ...current,
+                                        aiSellPreviewEnabled: event.target.checked,
+                                      }));
+                                    }}
+                                  />
+                                </td>
+                              </tr>
+                            );
+                          })}
+                      </tbody>
+                    </table>
                   </div>
                 </section>
-                <div className="table-shell" style={{ marginTop: 12 }}>
-                  <table className="data-table compact-table">
-                    <thead>
-                      <tr>
-                        <th>Team</th>
-                        <th>Steuerung</th>
-                        <th>Local Owner</th>
-                        <th>AI Lineup Preview</th>
-                        <th>AI Lineup Apply</th>
-                        <th>AI Transfer Preview</th>
-                        <th>AI Transfer Apply</th>
-                        <th>AI Sell Preview</th>
-                        <th>AI Sell Apply</th>
-                        <th>Notiz</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {gameState.teams.map((team) => {
-                        const settings = teamControlDraft[team.teamId] ?? resolvedTeamControlSettings[team.teamId];
-                        if (!settings) {
-                          return null;
-                        }
-
-                        return (
-                          <tr key={team.teamId} onDoubleClick={() => openTeamDrawerById(team.teamId)}>
-                            <td>
-                              <div className="table-team-cell">
-                                <strong>{team.name}</strong>
-                                <span className="muted">{team.shortCode}</span>
-                              </div>
-                            </td>
-                            <td>
-                              <select
-                                className="input"
-                                value={settings.controlMode}
-                                disabled={isReadOnlyMode}
-                                title={isReadOnlyMode ? getReadOnlyActionReason("die Team-Steuerung") : "Legt fest, ob dieses Team manuell, per AI oder nur passiv laeuft."}
-                                onChange={(event) => {
-                                  const nextMode = event.target.value as TeamControlMode;
-                                  updateTeamControlDraft(team.teamId, (current) => ({
-                                    ...current,
-                                    controlMode: nextMode,
-                                    ownerId:
-                                      nextMode === "manual"
-                                        ? current.ownerId && current.ownerId !== "ai"
-                                          ? current.ownerId
-                                          : DEFAULT_ACTIVE_OWNER_ID
-                                        : nextMode === "ai"
-                                          ? "ai"
-                                          : current.ownerId ?? "ai",
-                                    ownerSlot:
-                                      nextMode === "manual"
-                                        ? current.ownerSlot && current.ownerSlot !== "ai"
-                                          ? current.ownerSlot
-                                          : "user"
-                                        : nextMode,
-                                    aiLineupPreviewEnabled:
-                                      nextMode === "manual" ? current.aiLineupPreviewEnabled : nextMode !== "passive",
-                                    aiTransferPreviewEnabled:
-                                      nextMode === "manual" ? current.aiTransferPreviewEnabled : nextMode !== "passive",
-                                    aiSellPreviewEnabled:
-                                      nextMode === "manual" ? current.aiSellPreviewEnabled : nextMode !== "passive",
-                                  }));
-                                }}
-                              >
-                                <option value="manual">manual</option>
-                                <option value="ai">ai</option>
-                                <option value="passive">passive</option>
-                              </select>
-                            </td>
-                            <td>
-                              <select
-                                className="input"
-                                value={settings.ownerId ?? (settings.controlMode === "manual" ? DEFAULT_ACTIVE_OWNER_ID : "ai")}
-                                disabled={isReadOnlyMode || settings.controlMode === "ai"}
-                                title={
-                                  isReadOnlyMode
-                                    ? getReadOnlyActionReason("den Local Owner")
-                                    : settings.controlMode === "ai"
-                                      ? "AI-Teams haben keinen manuell waehlbaren Local Owner."
-                                      : "Waehlt, wer dieses Team lokal steuern darf."
-                                }
-                                onChange={(event) => {
-                                  const ownerId = event.target.value;
-                                  updateTeamControlDraft(team.teamId, (current) => ({
-                                    ...current,
-                                    ownerId,
-                                    ownerSlot: ownerId === DEFAULT_ACTIVE_OWNER_ID ? "user" : ownerId,
-                                  }));
-                                }}
-                              >
-                                {teamOwners.map((owner) => (
-                                  <option key={`team-owner-${team.teamId}-${owner.ownerId}`} value={owner.ownerId}>
-                                    {owner.label}
-                                  </option>
-                                ))}
-                              </select>
-                            </td>
-                            <td>
-                              <input
-                                type="checkbox"
-                                checked={settings.aiLineupPreviewEnabled}
-                                disabled={isReadOnlyMode}
-                                title={isReadOnlyMode ? getReadOnlyActionReason("AI-Lineup-Preview") : "Schaltet die lokale AI-Vorschau fuer Einsatzlisten an oder aus."}
-                                onChange={(event) => {
-                                  const checked = event.target.checked;
-                                  updateTeamControlDraft(team.teamId, (current) => ({
-                                    ...current,
-                                    aiLineupPreviewEnabled: checked,
-                                  }));
-                                }}
-                              />
-                            </td>
-                            <td>
-                              <input
-                                type="checkbox"
-                                checked={settings.aiLineupApplyEnabled ?? settings.aiLineupAutoApplyEnabled}
-                                disabled={isReadOnlyMode}
-                                title={isReadOnlyMode ? getReadOnlyActionReason("AI-Lineup-Apply") : "Erlaubt lokales automatisches Anwenden von AI-Lineups."}
-                                onChange={(event) => {
-                                  const checked = event.target.checked;
-                                  updateTeamControlDraft(team.teamId, (current) => ({
-                                    ...current,
-                                    aiLineupApplyEnabled: checked,
-                                  }));
-                                }}
-                              />
-                            </td>
-                            <td>
-                              <input
-                                type="checkbox"
-                                checked={settings.aiTransferPreviewEnabled}
-                                disabled={isReadOnlyMode}
-                                title={isReadOnlyMode ? getReadOnlyActionReason("AI-Transfer-Preview") : "Zeigt und berechnet Transferideen fuer dieses Team."}
-                                onChange={(event) => {
-                                  const checked = event.target.checked;
-                                  updateTeamControlDraft(team.teamId, (current) => ({
-                                    ...current,
-                                    aiTransferPreviewEnabled: checked,
-                                  }));
-                                }}
-                              />
-                            </td>
-                            <td>
-                              <input type="checkbox" checked={settings.aiTransferAutoApplyEnabled} disabled title="Auto-Apply fuer Transfers bleibt derzeit technisch gesperrt." />
-                            </td>
-                            <td>
-                              <input
-                                type="checkbox"
-                                checked={settings.aiSellPreviewEnabled}
-                                disabled={isReadOnlyMode}
-                                title={isReadOnlyMode ? getReadOnlyActionReason("AI-Sell-Preview") : "Zeigt Verkaufsentscheidungen und Exit-Ideen fuer dieses Team."}
-                                onChange={(event) => {
-                                  const checked = event.target.checked;
-                                  updateTeamControlDraft(team.teamId, (current) => ({
-                                    ...current,
-                                    aiSellPreviewEnabled: checked,
-                                  }));
-                                }}
-                              />
-                            </td>
-                            <td>
-                              <input type="checkbox" checked={settings.aiSellAutoApplyEnabled} disabled title="Auto-Apply fuer Verkaeufe bleibt derzeit technisch gesperrt." />
-                            </td>
-                            <td>
-                              <input
-                                className="input"
-                                type="text"
-                                value={settings.notes ?? ""}
-                                placeholder="Strategie / Hinweis"
-                                disabled={isReadOnlyMode}
-                                title={isReadOnlyMode ? getReadOnlyActionReason("die Team-Notiz") : "Kurzer lokaler Hinweis fuer Steuerung, AI oder Rollenbild."}
-                                onChange={(event) => {
-                                  const value = event.target.value;
-                                  updateTeamControlDraft(team.teamId, (current) => ({
-                                    ...current,
-                                    notes: value || null,
-                                  }));
-                                }}
-                              />
-                            </td>
-                          </tr>
-                        );
-                      })}
-                    </tbody>
-                  </table>
-                </div>
                 <div className="foundation-save-actions" style={{ marginTop: 12 }}>
                   <button
                     className="secondary-button"
@@ -27338,7 +26900,7 @@ export default function FoundationPageClient({
           </section>
 
           {activeView === "lineup" ? (
-          <section className={`panel${getViewClass("lineup")}`} data-testid="foundation-lineup" id="foundation-lineup">
+          <section className="panel" data-testid="foundation-lineup" id="foundation-lineup">
             <div className="panel-header">
               <div className="stack season-panel-head">
                 <TooltipHeading
@@ -27370,19 +26932,23 @@ export default function FoundationPageClient({
               defaultTeamId={activeManagerTeamId}
               highlightMissingSlots={Boolean(lineupFocusRequestKey)}
               focusMissingRequestKey={lineupFocusRequestKey}
+              initialDraftBoardView={lineupDraftBoardViewRequest ?? undefined}
+              onDraftBoardViewApplied={() => setLineupDraftBoardViewRequest(null)}
               activeOwnerId={effectiveActiveOwnerId}
               manageableTeamIds={ownerQuickSwitchTeams.map((team) => team.teamId)}
               onTeamChange={(teamId) => setActiveManagerTeam(teamId, "manual_select")}
               playerCatalog={gameState.players}
               onOpenPlayerDetails={(payload) => openPlayerDrawerById(payload.playerId, payload.activePlayerId)}
               onLineupSaved={handleHumanLineupSaved}
+              onFormCardPlanSaved={handleFormCardPlanSaved}
               onOpenArena={() => setFoundationView("matchdayArena", setActiveView)}
             />
           </section>
           ) : null}
 
-          <section className={`panel${getViewClass("matchdayArena")}`} id="foundation-matchday-arena">
-            {activeView === "matchdayArena" && saveSummaries.length > 0 && selectedTeamId ? (
+          {activeView === "matchdayArena" ? (
+          <section className="panel" id="foundation-matchday-arena">
+            {saveSummaries.length > 0 && selectedTeamId ? (
               <>
                 <div className="foundation-view-source-row">
                   <span className="pill foundation-source-pill">{getViewSourceBadgeLabel("matchdayArena", activeContextMeta)}</span>
@@ -27390,6 +26956,22 @@ export default function FoundationPageClient({
                     {activeSaveName} · {gameState.season.id} · {gameState.matchdayState.matchdayId}
                   </span>
                 </div>
+                {activeManagerArenaBlockerReason ? (
+                  <div className="transfer-callout is-warning" data-testid="arena-lineup-blocker" style={{ marginTop: 12 }}>
+                    <strong>Arena noch nicht bereit</strong>
+                    <span>
+                      {formatCockpitReason(activeManagerArenaBlockerReason)}
+                      {matchdayArenaReadiness.openLineupSlots > 0
+                        ? ` (${matchdayArenaReadiness.openLineupSlots} offene Slot${matchdayArenaReadiness.openLineupSlots === 1 ? "" : "s"})`
+                        : ""}
+                    </span>
+                    <div className="foundation-save-actions save-summary-actions" style={{ marginTop: 8 }}>
+                      <button className="primary-button inline-button" type="button" onClick={() => setFoundationView("lineup", setActiveView)}>
+                        {activeManagerArenaBlockerReason === "lineup_not_submitted" ? "Lineup bestätigen" : "Zur Einsatzliste"}
+                      </button>
+                    </div>
+                  </div>
+                ) : null}
                 <MatchdayArenaV2Client
                   key={`${activeSaveId}-${gameState.season.id}-${gameState.matchdayState.matchdayId}-${activeManagerTeamId}`}
                   initialSource="sqlite"
@@ -27424,12 +27006,25 @@ export default function FoundationPageClient({
                       <button className="secondary-button inline-button" type="button" onClick={() => setFoundationView("matchdayArena", setActiveView)}>
                         Zur Arena
                       </button>
-                      <button className="primary-button inline-button" type="button" onClick={() => setFoundationView("season", setActiveView)}>
+                      <button className="secondary-button inline-button" type="button" onClick={() => setFoundationView("season", setActiveView)}>
                         Saisonstand ansehen
                       </button>
-                      <button className="primary-button inline-button" type="button" onClick={triggerGlobalNext}>
-                        Weiter
-                      </button>
+                      {matchdaySummary.hasResult ? (
+                        <button className="primary-button inline-button" type="button" onClick={triggerGlobalNext}>
+                          Weiter
+                        </button>
+                      ) : (
+                        <button
+                          className="primary-button inline-button"
+                          type="button"
+                          data-testid="arena-finish-matchday-button"
+                          disabled={isReadOnlyMode || cockpitBusyKey != null}
+                          onClick={() => void runFinishMatchdaySimple()}
+                          title="Berechnet alle Ergebnisse, schreibt Wertung und wechselt zum naechsten Spieltag."
+                        >
+                          {cockpitBusyKey === "matchday-auto-run-execute" ? "Laeuft..." : "Spieltag abschliessen"}
+                        </button>
+                      )}
                     </div>
                   </div>
                   {matchdaySummary.topTeams.length === 0 && matchdaySummary.bottomTeams.length === 0 ? (
@@ -27475,7 +27070,7 @@ export default function FoundationPageClient({
                   )}
                 </section>
               </>
-            ) : activeView === "matchdayArena" ? (
+            ) : (
               <div className="stack">
                 <TooltipHeading
                   as="h2"
@@ -27484,8 +27079,9 @@ export default function FoundationPageClient({
                   Matchday Arena
                 </TooltipHeading>
               </div>
-            ) : null}
+            )}
           </section>
+          ) : null}
 
           <section className={`panel${getViewClass("matchdayResult")}`} id="foundation-matchday-result" data-testid="foundation-matchday-result">
             <div className="panel-header">
@@ -28348,7 +27944,8 @@ export default function FoundationPageClient({
           </section>
           ) : null}
 
-          <section className={`panel${getViewClass("seasonV2")}`} id="foundation-season-v2">
+          {(activeView === "seasonV2" || activeView === "season") ? (
+          <section className="panel" id="foundation-season-v2">
             {activeView === "seasonV2" ? (
               <SeasonStandingsV2Client
                 selectedSeasonId={seasonOverviewSeasonId}
@@ -28363,7 +27960,6 @@ export default function FoundationPageClient({
                 pressureTeam={seasonV2PressureTeam}
                 topPlayer={seasonV2TopPlayers[0] ?? null}
                 standingsRows={seasonV2StandingsRows}
-                ppRows={seasonV2PpRows}
                 topPlayers={seasonV2TopPlayers}
                 playerRows={seasonV2PlayerRows}
                 gmRows={seasonV2GmRows}
@@ -28381,6 +27977,7 @@ export default function FoundationPageClient({
               />
             ) : null}
           </section>
+          ) : null}
 
           <section className={`panel${getViewClass("seasonPreview")}`} id="standings-preview">
             <div className="panel-header">
@@ -28942,23 +28539,18 @@ export default function FoundationPageClient({
           ) : null}
 
           {activeView === "teams" ? (
-          <section className={`panel teams-view-panel${getViewClass("teams")}`} id="teams-view">
-            {!showTeamsComparison && selectedTeamsHistoryData && selectedTeam ? (
-              <TeamsV2Client
-                teams={gameState.teams}
-                selectedTeam={selectedTeam}
-                selectedTeamControlMode={formatTeamControlModeLabel(selectedTeamControl?.controlMode)}
-                teamData={selectedTeamsHistoryData}
-                focusCards={teamsV2FocusCards}
-                onSelectTeam={(teamId) => scheduleActiveManagerTeam(teamId, "manual_select")}
-                onOpenPlayerDetails={({ playerId, activePlayerId }) => openPlayerDrawerById(playerId, activePlayerId ?? null)}
-                onOpenClassicTeams={() => setShowTeamsComparison(true)}
-                onOpenTraining={() => setActiveView("trainingCompact")}
-                onOpenMarket={() => setActiveView("marketV2")}
-              />
-            ) : null}
+          <section className="panel teams-view-panel" id="teams-view">
             {showTeamsComparison ? (
             <>
+            <div className="teams-comparison-header">
+              <div>
+                <span className="eyebrow">Teams · Vergleich</span>
+                <strong>Klassische Teamtabelle</strong>
+              </div>
+              <button className="secondary-button inline-button" type="button" onClick={() => setShowTeamsComparison(false)}>
+                Zurück zu Teams
+              </button>
+            </div>
             <div className="table-shell teams-overview-shell">
               <table className="team-table teams-overview-table">
                 <colgroup>
@@ -29133,8 +28725,21 @@ export default function FoundationPageClient({
               )}
             </section>
             </>
+            ) : selectedTeamsHistoryData && selectedTeam ? (
+              <TeamsV2Client
+                teams={gameState.teams}
+                selectedTeam={selectedTeam}
+                selectedTeamControlMode={formatTeamControlModeLabel(selectedTeamControl?.controlMode)}
+                teamData={selectedTeamsHistoryData}
+                focusCards={teamsV2FocusCards}
+                onSelectTeam={(teamId) => scheduleActiveManagerTeam(teamId, "manual_select")}
+                onOpenPlayerDetails={({ playerId, activePlayerId }) => openPlayerDrawerById(playerId, activePlayerId ?? null)}
+                onOpenClassicTeams={() => setShowTeamsComparison(true)}
+                onOpenTraining={() => setActiveView("trainingCompact")}
+                onOpenMarket={() => setActiveView("marketV2")}
+              />
             ) : (
-              <p className="muted teams-view-note">Vergleichstabelle ausgeblendet. Nutze „Vergleichstabelle“ im Teams-v2-Header.</p>
+              <p className="muted teams-view-note">Kein Team ausgewählt oder Teamdaten noch nicht geladen.</p>
             )}
           </section>
           ) : null}
@@ -29865,24 +29470,60 @@ export default function FoundationPageClient({
                 {selectedTeamSponsorContract ? (
                   <div className="teams-summary-grid history-summary-grid">
                     <article className="metric-card teams-summary-card">
-                      <span>AKTIV{selectedTeamSponsorContract.starTier ? ` · ★${selectedTeamSponsorContract.starTier}` : ""}</span>
+                      <span>
+                        AKTIV{selectedTeamSponsorContract.starTier ? ` · ★${selectedTeamSponsorContract.starTier}` : ""}
+                        {selectedTeamSponsorContract.termSeasons ? ` · ${selectedTeamSponsorContract.termSeasons} Saison` : ""}
+                      </span>
                       <strong>{selectedTeamSponsorContract.name}</strong>
-                      <small className="muted">{selectedTeamSponsorContract.components.length} Vertragskomponenten</small>
+                      <small className="muted">
+                        {selectedTeamSponsorContract.variantKey ? `${selectedTeamSponsorContract.variantKey.replace(/_/g, " ")} · ` : ""}
+                        {selectedTeamSponsorContract.components.length} Vertragskomponenten
+                        {selectedTeamSponsorContract.negotiationProfile ? ` · Profil ${selectedTeamSponsorContract.negotiationProfile}` : ""}
+                      </small>
                     </article>
                   </div>
                 ) : (
                   <div className="teams-summary-grid history-summary-grid">
-                    {selectedTeamSponsorOffers.map((offer) => (
+                    {selectedTeamSponsorOffers.map((offer) => {
+                      const negotiationProfile = sponsorChoiceProfiles[offer.offerId] ?? "balanced";
+                      const adjustedComponents = applySponsorNegotiationToComponents({
+                        components: offer.components,
+                        termSeasons: 1,
+                        negotiationProfile,
+                        starTier: offer.starTier,
+                      });
+                      const multiplier = getSponsorNegotiationMultiplier({ termSeasons: 1, negotiationProfile });
+                      return (
                       <article key={offer.offerId} className="metric-card teams-summary-card">
                         <span>
                           {offer.archetype.toUpperCase()}
                           {offer.starTier ? ` · ★${offer.starTier}` : ""}
                           {offer.demandProfile ? ` · ${offer.demandProfile}` : ""}
+                          {offer.variantKey ? ` · ${offer.variantKey.replace(/_/g, " ")}` : ""}
                         </span>
                         <strong>{offer.name}</strong>
                         <small className="muted">{offer.flavor}</small>
+                        <div className="stack compact sponsor-choice-controls">
+                          <label className="muted">
+                            Profil
+                            <select
+                              value={negotiationProfile}
+                              onChange={(event) =>
+                                setSponsorChoiceProfiles((current) => ({
+                                  ...current,
+                                  [offer.offerId]: event.target.value as SponsorNegotiationProfile,
+                                }))
+                              }
+                            >
+                              <option value="safe">Sicher (−5 %)</option>
+                              <option value="balanced">Ausgewogen</option>
+                              <option value="ambitious">Ambitioniert (+8 %)</option>
+                            </select>
+                          </label>
+                          <small className="muted">Cash-Faktor ×{multiplier.toFixed(2)} · 1 Saison</small>
+                        </div>
                         <ul className="muted">
-                          {offer.components.map((component) => (
+                          {adjustedComponents.map((component) => (
                             <li key={component.componentId}>
                               {component.label}: {typeof component.rewardCash === "number" ? formatMoney(component.rewardCash) : component.rewardCash}
                             </li>
@@ -29897,7 +29538,8 @@ export default function FoundationPageClient({
                           {sponsorChoiceBusy === offer.offerId ? "Speichert…" : "Wählen"}
                         </button>
                       </article>
-                    ))}
+                    );
+                    })}
                   </div>
                 )}
               </section>
@@ -31856,8 +31498,9 @@ export default function FoundationPageClient({
           </section>
           ) : null}
 
-          <section className={`panel${getViewClass("trainingCompact")}`} id="foundation-training-compact">
-            {activeView === "trainingCompact" && selectedTeam ? (
+          {activeView === "trainingCompact" ? (
+          <section className="panel" id="foundation-training-compact">
+            {selectedTeam ? (
               <TrainingCompactClient
                 selectedTeam={selectedTeam}
                 selectedTeamControlMode={formatTeamControlModeLabel(selectedTeamControl?.controlMode)}
@@ -31897,55 +31540,30 @@ export default function FoundationPageClient({
               />
             ) : null}
           </section>
+          ) : null}
 
-          <section className={`panel${getViewClass("trainingV2")}`} id="foundation-training-facilities-v2">
-            {activeView === "trainingV2" && selectedTeam ? (
-              <TrainingFacilitiesV2Client
+          {activeView === "trainingV2" ? (
+          <section className="panel" id="foundation-facilities-v2">
+            {selectedTeam ? (
+              <FacilitiesV2Client
                 source={readMeta.source}
                 managementLocked={isSelectedTeamManagementLocked}
                 managementLockedReason={
                   isSelectedTeamManagementLocked
-                    ? `${selectedTeam.name} gehoert nicht zu deinen steuerbaren Teams. Training und Gebaeude sind nur zur Ansicht offen.`
+                    ? `${selectedTeam.name} gehoert nicht zu deinen steuerbaren Teams. Gebaeude sind nur zur Ansicht offen.`
                     : null
                 }
                 selectedTeam={selectedTeam}
                 selectedTeamControlMode={formatTeamControlModeLabel(selectedTeamControl?.controlMode)}
                 seasonLabel={canonicalSeasonLabel}
-                sponsorTotal={selectedStandingRow?.sponsorTotal ?? null}
                 onOpenTraining={() => setFoundationView("trainingCompact", setActiveView)}
                 onOpenTeams={() => setFoundationView("teams", setActiveView)}
-                onOpenPlayerDetails={(payload) => openPlayerDrawerById(payload.playerId, payload.activePlayerId)}
-                layoutMode="facilities"
                 summary={{
                   cashCurrent: selectedTeam.cash,
-                  upkeepTotal: trainingFacilitySeasonEndFinance.upkeepTotal,
-                  incomeTotal: trainingFacilitySeasonEndFinance.incomeTotal,
                   netFacilityResult: trainingFacilitySeasonEndFinance.netFacilityResult,
-                  trainingXpBefore: trainingFacilityEffectPreview.trainingXp.before,
-                  trainingXpAfter: trainingFacilityEffectPreview.trainingXp.after,
-                  trainingXpModifierPct: trainingFacilityEffectPreview.trainingXp.modifierPct,
-                  recoveryBeforeTraining: trainingForecastSummary.recoveryBeforeTraining,
                   recoveryAfterTraining: trainingForecastSummary.recoveryAfterTraining,
-                  performanceXp: trainingForecastSummary.performanceXp,
-                  totalXp: trainingForecastSummary.totalXp,
-                  lightModeCount: trainingForecastSummary.lightModeCount,
-                  hardModeCount: trainingForecastSummary.hardModeCount,
-                }}
-                developmentFilter={trainingDevelopmentFilter}
-                developmentSummary={trainingDevelopmentSummary}
-                onSetDevelopmentFilter={setTrainingDevelopmentFilter}
-                trainingModeOptions={trainingV2ModeOptions}
-                trainingClassOptions={PROGRESSION_CLASS_ORDER.map((className) => ({ value: className, label: className }))}
-                playerRows={trainingPlayerRowViews}
-                allPlayerCount={trainingPlayerForecastRows.length}
-                onSetTrainingMode={(playerId, mode) => {
-                  void setPlayerTrainingMode(playerId, mode);
-                }}
-                onSetTrainingClass={(playerId, trainingClass) => {
-                  void setPlayerTrainingClass(playerId, trainingClass);
                 }}
                 facilityRows={trainingFacilityRows}
-                selectedFacilityPreviewId={trainingFacilityPreviewId}
                 specialistWingVariant={specialistWingVariantDraft}
                 specialistWingOptions={Object.entries(SPECIALIST_WING_VARIANTS).map(([value, variant]) => ({
                   value: value as SpecialistWingVariant,
@@ -31960,19 +31578,8 @@ export default function FoundationPageClient({
                 facilityMaintenancePreview={facilityMaintenancePreview}
                 facilityMaintenanceError={facilityMaintenanceError}
                 facilityMaintenanceSuccess={facilityMaintenanceSuccess}
-                facilityFinance={trainingFacilitySeasonEndFinance}
-                facilityForecast={trainingFacilityForecast}
-                facilityEffectPreview={{
-                  recoveryAfterTraining: trainingFacilityEffectPreview.recoveryAfterTraining,
-                  academyLowTier: trainingFacilityEffectPreview.academyLowTier,
-                  specialistPower: trainingFacilityEffectPreview.specialistPower,
-                  specialistSpeed: trainingFacilityEffectPreview.specialistSpeed,
-                  scouting: { label: trainingFacilityEffectPreview.scouting.label },
-                  analytics: { label: trainingFacilityEffectPreview.analytics.label },
-                  warnings: trainingFacilityEffectPreview.warnings,
-                }}
-                onRunFacilityUpgradePreview={(facilityId) => {
-                  void runFacilityUpgradePreview(facilityId);
+                onRunFacilityUpgradePreview={(facilityId, action) => {
+                  void runFacilityUpgradePreview(facilityId, action);
                 }}
                 onConfirmFacilityUpgrade={() => {
                   void confirmFacilityUpgrade();
@@ -31983,34 +31590,13 @@ export default function FoundationPageClient({
                 onConfirmFacilityMaintenance={() => {
                   void confirmFacilityMaintenance();
                 }}
-                attributeOptions={trainingV2AttributeOptions}
-                seasonEndRows={trainingV2SeasonEndRows}
-                seasonEndBusy={seasonEndXpSpendBusy}
-                seasonEndError={seasonEndXpSpendError}
-                seasonEndSuccess={seasonEndXpSpendSuccess}
-                seasonEndStatus={trainingV2SeasonEndStatus}
-                onSetSeasonEndAttribute={(playerId, attribute) =>
-                  setSeasonEndAttributeDraft((current) => ({
-                    ...current,
-                    [playerId]: attribute,
-                  }))
-                }
-                onAddSeasonEndUpgrade={addSeasonEndXpUpgrade}
-                onRemoveSeasonEndUpgrade={removeSeasonEndXpUpgrade}
-                onClearUpgradeCart={() => {
-                  setPlannedXpUpgrades([]);
-                  setSeasonEndXpSpendPreview(null);
-                  setSeasonEndXpSpendError(null);
-                }}
-                onConfirmSeasonEndXpSpend={() => {
-                  void confirmSeasonEndXpSpend();
-                }}
               />
             ) : null}
           </section>
+          ) : null}
 
           {isTransferMarketViewActive ? (
-          <section className={`panel transfer-market-panel${getViewClass("market", "marketV2")}`} data-testid="transfer-market" id="transfer-market">
+          <section className="panel transfer-market-panel" data-testid="transfer-market" id="transfer-market">
             <div className="panel-header">
               <TooltipHeading
                 as="h2"
@@ -32084,9 +31670,10 @@ export default function FoundationPageClient({
                   </span>
                 </div>
                 <TransfermarktV2Client
-                  key={`market-v2-${activeSaveId}-${gameState.season.id}-${activeManagerTeamId ?? "overview"}`}
+                  key={`market-v2-${activeSaveId}-${gameState.season.id}`}
                   defaultSaveId={activeSaveId}
                   defaultSeasonId={gameState.season.id}
+                  bootstrapReady={!isFoundationBootstrapState}
                   defaultTeamId={activeManagerTeamId}
                   source={readMeta.source}
                   activeOwnerId={effectiveActiveOwnerId}
@@ -32134,6 +31721,8 @@ export default function FoundationPageClient({
                   onToggleScoutingWatch={(item) => {
                     toggleScoutingWatch(item);
                   }}
+                  initialPlayerId={marketFocusPlayerId}
+                  onInitialPlayerFocusConsumed={() => setMarketFocusPlayerId(null)}
                   onBuyCompleted={async (teamId) => {
                     setActiveManagerTeam(teamId, "manual_select");
                     setFoundationActionFeedback({
@@ -32487,13 +32076,19 @@ export default function FoundationPageClient({
                               className="secondary-button inline-button"
                               data-testid="transfer-buy-open-button"
                               type="button"
-                              disabled={!marketTeamId || (marketBuyBusy && marketPreviewPlayerId === row.item.playerId)}
+                              disabled={
+                                !marketTeamId ||
+                                !canManageTeamId(marketTeamId) ||
+                                (marketBuyBusy && marketPreviewPlayerId === row.item.playerId)
+                              }
                               title={
                                 !marketTeamId
                                   ? "Waehle erst ein Team, damit der Kauf sauber geprüft werden kann."
-                                  : marketBuyBusy && marketPreviewPlayerId === row.item.playerId
-                                    ? "Dieser Spieler wird gerade für dein Team vorbereitet."
-                                    : "Kaufmodal mit Vertrag, Forderung und Folgen öffnen."
+                                  : !canManageTeamId(marketTeamId)
+                                    ? `${getTeamLockedName(marketTeamId)} gehoert nicht zu deinen steuerbaren Teams.`
+                                    : marketBuyBusy && marketPreviewPlayerId === row.item.playerId
+                                      ? "Dieser Spieler wird gerade für dein Team vorbereitet."
+                                      : "Kaufmodal mit Vertrag, Forderung und Folgen öffnen."
                               }
                               onClick={() => {
                                 void openMarketBuyModal(row.item);
@@ -32501,9 +32096,11 @@ export default function FoundationPageClient({
                             >
                               {!marketTeamId
                                 ? "Team waehlen"
-                                : marketBuyBusy && marketPreviewPlayerId === row.item.playerId
-                                  ? "Pruefe..."
-                                  : "Kaufen"}
+                                : !canManageTeamId(marketTeamId)
+                                  ? "Nicht dein Team"
+                                  : marketBuyBusy && marketPreviewPlayerId === row.item.playerId
+                                    ? "Pruefe..."
+                                    : "Kaufen"}
                             </button>
                             <button
                               className={`secondary-button inline-button${transferWishlistByPlayerId.has(row.item.playerId) ? " is-active" : ""}`}
@@ -32922,7 +32519,12 @@ export default function FoundationPageClient({
                                                   className="secondary-button inline-button"
                                                   data-testid="transfer-buy-open-button"
                                                   type="button"
-                                                  disabled={readMeta.source === "prisma"}
+                                                  disabled={readMeta.source === "prisma" || !canManageTeamId(marketAiSelectedTeam.teamId)}
+                                                  title={
+                                                    !canManageTeamId(marketAiSelectedTeam.teamId)
+                                                      ? `${getTeamLockedName(marketAiSelectedTeam.teamId)} gehoert nicht zu deinen steuerbaren Teams.`
+                                                      : undefined
+                                                  }
                                                   onClick={() => {
                                                     setMarketTeamId(marketAiSelectedTeam.teamId);
                                                     void openMarketBuyModal(
@@ -36479,10 +36081,11 @@ export default function FoundationPageClient({
           <TeamDetailDrawer
             data={teamDrawerData}
             onClose={closeTeamDrawer}
-            onOpenPlayer={(playerId, activePlayerId) => openPlayerDrawerById(playerId, activePlayerId)}
+            onOpenPlayer={(playerId, activePlayerId) => openPlayerProfileById(playerId, activePlayerId)}
             layerClassName={drawerLayerOrder === "team" ? "drawer-layer-front" : "drawer-layer-back"}
           />
       </div>
+      </FoundationShell>
     </main>
   );
 }

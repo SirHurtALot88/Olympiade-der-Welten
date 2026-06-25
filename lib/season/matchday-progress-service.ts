@@ -2,6 +2,7 @@ import type { Fixture, GameLogEntry, GameState, LineupDraft, MatchdayAdvanceLogR
 import { assessPlayerMorale } from "@/lib/morale/player-morale-service";
 import { createPersistenceService } from "@/lib/persistence/persistence-service";
 import { advanceScoutIntelTick } from "@/lib/scouting/facility-scout-pipeline-service";
+import { maybeGenerateSponsorEvents } from "@/lib/sponsor/sponsor-event-service";
 
 export const ADVANCE_MATCHDAY_CONFIRM_TOKEN = "ADVANCE_LOCAL_MATCHDAY";
 
@@ -288,33 +289,36 @@ function writeLocalMatchdayAdvance(prepared: PreparedMatchdayProgress, persisten
     ],
   };
 
-  const nextGameState: GameState = advanceScoutIntelTick({
-    gameState: {
-      ...save.gameState,
-      gamePhase: prepared.nextMatchdayId ? "season_active" : "season_completed",
-      season: {
-        ...save.gameState.season,
-        currentMatchday: prepared.nextMatchdayIndex ?? save.gameState.season.currentMatchday,
+  const nextGameState: GameState = maybeGenerateSponsorEvents(
+    advanceScoutIntelTick({
+      gameState: {
+        ...save.gameState,
+        gamePhase: prepared.nextMatchdayId ? "season_active" : "season_completed",
+        season: {
+          ...save.gameState.season,
+          currentMatchday: prepared.nextMatchdayIndex ?? save.gameState.season.currentMatchday,
+        },
+        seasonState: nextSeasonState,
+        playerMoraleState: buildCurrentMoraleState(save.gameState),
+        matchdayState: {
+          matchdayId: prepared.nextMatchdayId ?? prepared.currentMatchdayId,
+          status: prepared.nextMatchdayId ? "planning" : "resolved",
+          pendingTeamIds: prepared.nextMatchdayId ? save.gameState.teams.map((team) => team.teamId) : [],
+          resolvedFixtureIds: [],
+        },
+        logs: [
+          ...save.gameState.logs,
+          createSeasonLog(
+            prepared.nextMatchdayId
+              ? `${prepared.currentMatchdayLabel} abgeschlossen. Weiter zu ${prepared.nextMatchdayLabel}.`
+              : `${prepared.currentMatchdayLabel} abgeschlossen. Kein weiterer Matchday konfiguriert.`,
+          ),
+        ],
       },
-      seasonState: nextSeasonState,
-      playerMoraleState: buildCurrentMoraleState(save.gameState),
-      matchdayState: {
-        matchdayId: prepared.nextMatchdayId ?? prepared.currentMatchdayId,
-        status: prepared.nextMatchdayId ? "planning" : "resolved",
-        pendingTeamIds: prepared.nextMatchdayId ? save.gameState.teams.map((team) => team.teamId) : [],
-        resolvedFixtureIds: [],
-      },
-      logs: [
-        ...save.gameState.logs,
-        createSeasonLog(
-          prepared.nextMatchdayId
-            ? `${prepared.currentMatchdayLabel} abgeschlossen. Weiter zu ${prepared.nextMatchdayLabel}.`
-            : `${prepared.currentMatchdayLabel} abgeschlossen. Kein weiterer Matchday konfiguriert.`,
-        ),
-      ],
-    },
-    phase: "matchday",
-  });
+      phase: "matchday",
+    }),
+    prepared.saveId,
+  );
 
   persistence.saveSingleplayerState(save.saveId, nextGameState);
   return nextSeasonState.matchdayAdvanceLogs?.[nextSeasonState.matchdayAdvanceLogs.length - 1] ?? null;

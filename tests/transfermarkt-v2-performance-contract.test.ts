@@ -25,11 +25,10 @@ describe("transfermarkt v2 performance contract", () => {
     const source = fs.readFileSync(transfermarktV2ClientPath, "utf8");
 
     expect(source).not.toContain("VISIBLE_CANDIDATE_RENDER_LIMIT");
-    expect(source).not.toContain("renderedVisibleItems.map");
     expect(source).not.toContain("Mehr laden");
     expect(source).not.toContain("loadNextMarketPage");
-    expect(source).toContain("visibleItems.map");
-    expect(source).toContain("marketItems.length} geladen");
+    expect(source).toContain("renderedVisibleItems.map");
+    expect(source).toContain("visibleItems.length} sichtbar");
   });
 
   it("supports keyboard navigation through the visible candidate list", () => {

@@ -51,4 +51,15 @@ describe("velo ui rollout contract", () => {
     expect(cssText).toContain(".player-drawer-axis-orbit");
     expect(cssText).toContain(".arena-v2-slot-impact-strip");
   });
+
+  it("uses impact strip for draft lineup intensity preview", async () => {
+    const lineupText = await fs.readFile(
+      "/Users/chrisfalk/Documents/Codex/Olympiade der Welten/app/foundation/legacy-lineup-lab/LegacyLineupLabClient.tsx",
+      "utf8",
+    );
+    expect(lineupText).toContain("draftIntensityPreview");
+    expect(lineupText).toContain("legacy-lineup-draft-intensity-preview");
+    expect(lineupText).toContain('label: "Taktik"');
+    expect(lineupText).toContain('label: "Final"');
+  });
 });

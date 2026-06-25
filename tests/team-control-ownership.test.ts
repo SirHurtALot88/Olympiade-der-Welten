@@ -126,7 +126,7 @@ describe("team control ownership", () => {
     expect(canOwnerManageTeam(settings["B-P"], DEFAULT_ACTIVE_OWNER_ID)).toBe(false);
   });
 
-  it("repairs the selected new-game team when an old save still marks it as AI", () => {
+  it("does not override saved AI ownership on load when selectedTeamId differs", () => {
     const gameState = withNormalizedTeamControlSettings({
       season: {
         id: "season-1",
@@ -198,10 +198,10 @@ describe("team control ownership", () => {
       gamePhase: "preseason_management",
     });
 
-    expect(gameState.teams.find((team) => team.teamId === "H-R")?.humanControlled).toBe(true);
-    expect(gameState.seasonState.teamControlSettings?.["H-R"]?.controlMode).toBe("manual");
-    expect(gameState.seasonState.teamControlSettings?.["H-R"]?.ownerId).toBe(DEFAULT_ACTIVE_OWNER_ID);
-    expect(canOwnerManageTeam(gameState.seasonState.teamControlSettings?.["H-R"], DEFAULT_ACTIVE_OWNER_ID)).toBe(true);
+    expect(gameState.teams.find((team) => team.teamId === "H-R")?.humanControlled).toBe(false);
+    expect(gameState.seasonState.teamControlSettings?.["H-R"]?.controlMode).toBe("ai");
+    expect(gameState.seasonState.teamControlSettings?.["H-R"]?.ownerId).toBe(AI_OWNER_ID);
+    expect(canOwnerManageTeam(gameState.seasonState.teamControlSettings?.["H-R"], DEFAULT_ACTIVE_OWNER_ID)).toBe(false);
     expect(gameState.seasonState.teamControlSettings?.["B-P"]?.controlMode).toBe("ai");
   });
 
