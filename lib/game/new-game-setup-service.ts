@@ -11,7 +11,7 @@ import { createNewGameFromPlayerBaseline } from "@/lib/players/player-baseline-s
 import { buildPlayerPotentialRecordsForSave } from "@/lib/progression/player-potential-service";
 import { createPersistenceService } from "@/lib/persistence/persistence-service";
 import type { PersistenceService, PersistedSaveGame } from "@/lib/persistence/types";
-import { DEFAULT_ACTIVE_OWNER_ID, AI_OWNER_ID } from "@/lib/foundation/team-control-settings";
+import { DEFAULT_ACTIVE_OWNER_ID, AI_OWNER_ID, applyChrisFrankyOwnershipToTeamControlSettings } from "@/lib/foundation/team-control-settings";
 import {
   buildOwnershipForPreset,
   buildParticipant,
@@ -138,32 +138,6 @@ function buildStartRankByTeamId(teams: Team[]) {
       .sort((a, b) => (b.budget ?? 0) - (a.budget ?? 0) || a.teamId.localeCompare(b.teamId))
       .map((team, index) => [team.teamId, index + 1] as const),
   );
-}
-
-function createControlSetting(input: {
-  team: Team;
-  controlMode: TeamControlMode;
-  ownerId: string;
-  ownerSlot: string;
-  displayLabel: string;
-}): TeamControlSettings {
-  const isAi = input.controlMode === "ai";
-  return {
-    teamId: input.team.teamId,
-    controlMode: input.controlMode,
-    ownerId: input.ownerId,
-    ownerSlot: input.ownerSlot,
-    displayLabel: input.displayLabel,
-    aiLineupPreviewEnabled: isAi,
-    aiLineupApplyEnabled: false,
-    aiLineupAutoApplyEnabled: false,
-    aiTransferPreviewEnabled: isAi,
-    aiTransferAutoApplyEnabled: false,
-    aiSellPreviewEnabled: isAi,
-    aiSellAutoApplyEnabled: false,
-    notes: null,
-    strategyLock: null,
-  };
 }
 
 function createScenarioRoomMeta(input: {
@@ -315,44 +289,7 @@ export function buildNewGameStateFromBaseline(input: NewGameSetupInput & { saveI
     frankyTeamIds,
   });
 
-  const teamControlSettings = Object.fromEntries(
-    baseGameState.teams.map((team) => {
-      if (chrisTeamIds.includes(team.teamId)) {
-        return [
-          team.teamId,
-          createControlSetting({
-            team,
-            controlMode: "manual",
-            ownerId: DEFAULT_ACTIVE_OWNER_ID,
-            ownerSlot: "user",
-            displayLabel: "Chris",
-          }),
-        ];
-      }
-      if (frankyTeamIds.includes(team.teamId)) {
-        return [
-          team.teamId,
-          createControlSetting({
-            team,
-            controlMode: "manual",
-            ownerId: "franky_remote_placeholder",
-            ownerSlot: "franky_remote_placeholder",
-            displayLabel: "Franky",
-          }),
-        ];
-      }
-      return [
-        team.teamId,
-        createControlSetting({
-          team,
-          controlMode: "ai",
-          ownerId: AI_OWNER_ID,
-          ownerSlot: "ai",
-          displayLabel: "AI",
-        }),
-      ];
-    }),
-  );
+  const teamControlSettings = applyChrisFrankyOwnershipToTeamControlSettings(baseGameState.teams, chrisTeamIds, frankyTeamIds);
 
   const resetGameState = baselineReset.ok ? baselineReset.gameState : baseGameState;
   const standings: SeasonState["standings"] = Object.fromEntries(

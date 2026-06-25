@@ -158,6 +158,11 @@ describe("legacy lineup context loader", () => {
     expect(result.context.teamDisciplineRanks?.tdm?.sourceStatus).toBe("mapped_with_transform");
     expect(result.context.teamDisciplineRanks?.tdm?.rank).toBe(1);
     expect(result.context.teamDisciplineRanks?.["mini-dm"]?.sourceStatus).toBe("mapped_with_transform");
+    expect(result.context.contextLoadMode).toBe("prisma_reference");
+    expect(result.context.formCardSource?.effectStatus).toBe("missing_source");
+    expect(result.context.mutatorSource?.effectStatus).toBe("missing_source");
+    expect(result.context.teamPowerSource?.effectStatus).toBe("missing_source");
+    expect(result.warnings.some((warning) => warning.includes("Prisma reference context"))).toBe(true);
   });
 
   it("does not fail when no lineup exists", async () => {

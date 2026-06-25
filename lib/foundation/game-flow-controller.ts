@@ -1,5 +1,14 @@
 import type { GameState } from "@/lib/data/olyDataTypes";
 import { GAME_LANGUAGE } from "@/lib/ui/game-language";
+import {
+  activeTeamHasFormCardPool,
+  activeTeamHasFormCardSelections,
+} from "@/lib/foundation/form-card-flow";
+import {
+  getTeamMatchdayLineupDraft,
+  isTeamMatchdayLineupComplete,
+  isTeamMatchdayLineupSubmitted,
+} from "@/lib/foundation/matchday-lineup-readiness";
 
 export type GameFlowPhase =
   | "preseason"
@@ -23,6 +32,7 @@ export type GameFlowView =
   | "matchdayArena"
   | "teams"
   | "training"
+  | "trainingCompact"
   | "trainingV2"
   | "prize"
   | "market"
@@ -97,36 +107,16 @@ function getActiveTeamRosterPlayerIds(gameState: GameState, activeTeamId: string
 
 function getActiveTeamLineup(gameState: GameState, activeTeamId: string | null) {
   if (!activeTeamId) return null;
-  return (
-    (gameState.seasonState.lineupDrafts ?? []).find(
-      (draft) =>
-        draft.seasonId === gameState.season.id &&
-        draft.matchdayId === gameState.matchdayState.matchdayId &&
-        draft.teamId === activeTeamId,
-    ) ?? null
-  );
-}
-
-function getCurrentMatchdayRequiredLineupSlots(gameState: GameState) {
-  const scheduleEntry = (gameState.seasonState.disciplineSchedule ?? []).find(
-    (entry) => entry.seasonId === gameState.season.id && entry.matchdayId === gameState.matchdayState.matchdayId,
-  );
-  return (scheduleEntry?.discipline1?.playerCount ?? 0) + (scheduleEntry?.discipline2?.playerCount ?? 0);
+  return getTeamMatchdayLineupDraft(gameState, activeTeamId);
 }
 
 function isCurrentMatchdayLineupComplete(gameState: GameState, lineup: ReturnType<typeof getActiveTeamLineup>) {
-  const requiredSlots = getCurrentMatchdayRequiredLineupSlots(gameState);
-  if (requiredSlots <= 0) {
-    return Boolean(lineup && lineup.entries.length > 0);
-  }
-  return Boolean(lineup && lineup.entries.length >= requiredSlots);
+  if (!lineup) return false;
+  return isTeamMatchdayLineupComplete(gameState, lineup.teamId, lineup);
 }
 
 function activeTeamHasFormCards(gameState: GameState, activeTeamId: string | null) {
-  if (!activeTeamId) return false;
-  return (gameState.seasonState.formCards ?? []).some(
-    (card) => card.seasonId === gameState.season.id && card.teamId === activeTeamId,
-  );
+  return activeTeamHasFormCardSelections(gameState, activeTeamId);
 }
 
 function activeTeamTrainingComplete(gameState: GameState, activeTeamId: string | null) {
@@ -195,7 +185,7 @@ function buildPreseasonSteps(gameState: GameState, activeTeamId: string | null):
       label: "Spieler entwickeln",
       cta: "Weiter: Spielerentwicklung",
       status: !hasSeasonHistory && isFirstSeason ? "completed" : completedTransitionSteps.has("player_development") ? "completed" : "ready",
-      targetView: "trainingV2",
+      targetView: "trainingCompact",
       targetPanel: "season-end-development",
       teamId: activeTeamId,
     }),
@@ -223,7 +213,7 @@ function buildPreseasonSteps(gameState: GameState, activeTeamId: string | null):
       label: "Training setzen",
       cta: "Weiter: Training prüfen",
       status: activeTeamTrainingComplete(gameState, activeTeamId) ? "completed" : "ready",
-      targetView: "trainingV2",
+      targetView: "trainingCompact",
       targetPanel: "training-plan",
       teamId: activeTeamId,
     }),
@@ -251,10 +241,12 @@ function buildMatchdaySteps(gameState: GameState, activeTeamId: string | null): 
   const activeRosterCount = getActiveTeamRosterPlayerIds(gameState, activeTeamId).length;
   const activeLineup = getActiveTeamLineup(gameState, activeTeamId);
   const hasLineup = isCurrentMatchdayLineupComplete(gameState, activeLineup);
-  const lineupConfirmed = activeLineup?.status === "submitted" || activeLineup?.status === "locked" || activeLineup?.status === "resolved";
+  const lineupConfirmed = isTeamMatchdayLineupSubmitted(activeLineup);
   const hasFormCards = activeTeamHasFormCards(gameState, activeTeamId);
-  const trainingComplete = activeTeamTrainingComplete(gameState, activeTeamId);
+  const hasFormCardPool = activeTeamHasFormCardPool(gameState, activeTeamId);
   const hasResults = hasCurrentMatchdayResult(gameState) || gameState.matchdayState.status === "resolved";
+  const formCardsRequired = hasLineup && !hasResults;
+  const trainingComplete = activeTeamTrainingComplete(gameState, activeTeamId);
   const storedNewGameFlow = gameState.seasonState.newGameFlow ?? null;
   const seasonIntroStep = storedNewGameFlow?.steps?.find((entry) => entry.stepId === "season_intro");
   const trainingFacilitiesStep = storedNewGameFlow?.steps?.find((entry) => entry.stepId === "training_facilities");
@@ -306,7 +298,7 @@ function buildMatchdaySteps(gameState: GameState, activeTeamId: string | null): 
       label: "Training prüfen",
       cta: "Weiter: Training prüfen",
       status: !hasActiveTeam ? "blocked" : activeRosterCount === 0 ? "blocked" : trainingComplete ? "completed" : "ready",
-      targetView: "trainingV2",
+      targetView: "trainingCompact",
       targetPanel: "training-plan",
       teamId: activeTeamId,
       blockers: !hasActiveTeam ? ["no_active_team"] : activeRosterCount === 0 ? ["empty_roster"] : [],
@@ -338,11 +330,27 @@ function buildMatchdaySteps(gameState: GameState, activeTeamId: string | null): 
       stepId: "assign_formcards",
       label: "Formkarten zuweisen",
       cta: "Weiter: Formkarten prüfen",
-      status: !hasActiveTeam ? "blocked" : hasFormCards ? "completed" : "warning",
+      status: !hasActiveTeam
+        ? "blocked"
+        : !formCardsRequired
+          ? "completed"
+          : hasFormCards
+            ? "completed"
+            : !hasFormCardPool
+              ? "blocked"
+              : hasLineup
+                ? "ready"
+                : "warning",
       targetView: "lineup",
       teamId: activeTeamId,
-      blockers: hasActiveTeam ? [] : ["no_active_team"],
-      warnings: hasFormCards ? [] : ["missing_formcards"],
+      blockers: !hasActiveTeam
+        ? ["no_active_team"]
+        : formCardsRequired && !hasFormCardPool
+          ? ["missing_formcard_pool"]
+          : formCardsRequired && hasLineup && !hasFormCards
+            ? ["missing_formcard_selections"]
+            : [],
+      warnings: formCardsRequired && hasLineup && !hasFormCards && hasFormCardPool ? ["missing_formcards"] : [],
     }),
     step({
       stepId: "confirm_lineup",
@@ -414,7 +422,7 @@ function derivePhase(gameState: GameState, activeTeamId: string | null): GameFlo
   if (preseasonPhase) return preseasonPhase;
   if (hasCurrentMatchdayResult(gameState) || gameState.matchdayState.status === "resolved") return "matchday_result";
   const activeLineup = getActiveTeamLineup(gameState, activeTeamId);
-  if (activeLineup?.status === "submitted" || activeLineup?.status === "locked" || activeLineup?.status === "resolved") {
+  if (isTeamMatchdayLineupSubmitted(activeLineup)) {
     return "matchday_ready";
   }
   if (activeLineup && activeLineup.entries.length > 0) return "matchday_prep";

@@ -1,4 +1,10 @@
 import type { GamePhase, GameState } from "@/lib/data/olyDataTypes";
+import {
+  getTransferWindowStatus,
+  isTransferBuyPhaseOpen,
+  isTransferMarketPhaseOpen,
+  isTransferSellPhaseOpen,
+} from "@/lib/market/transfer-window-policy";
 
 export type GamePhaseAction =
   | "buy_players"
@@ -53,8 +59,7 @@ function isEarlySeasonSetup(gameState: GameState) {
 }
 
 function isPreseasonManagementOpen(gameState: GameState) {
-  const phase = gameState.gamePhase ?? "season_active";
-  return PRESEASON_MANAGEMENT_PHASES.has(phase) || isEarlySeasonSetup(gameState);
+  return isTransferMarketPhaseOpen(gameState);
 }
 
 function isSeasonComplete(gameState: GameState) {
@@ -71,9 +76,13 @@ export function evaluateGamePhaseAction(gameState: GameState, action: GamePhaseA
   let allowed = false;
   let reason: string | null = null;
 
-  if (
-    action === "buy_players" ||
-    action === "sell_players" ||
+  if (action === "buy_players") {
+    allowed = isTransferBuyPhaseOpen(gameState);
+    reason = allowed ? null : `phase_blocked:${action}:${phase}`;
+  } else if (action === "sell_players") {
+    allowed = isTransferSellPhaseOpen(gameState);
+    reason = allowed ? null : `phase_blocked:${action}:${phase}`;
+  } else if (
     action === "renew_contract" ||
     action === "set_training" ||
     action === "facility_apply"
@@ -99,6 +108,10 @@ export function evaluateGamePhaseAction(gameState: GameState, action: GamePhaseA
     ["buy_players", "sell_players", "renew_contract", "set_training", "facility_apply"].includes(action)
   ) {
     warnings.push("early_season_setup_allowed_before_first_result");
+  }
+
+  if ((action === "buy_players" || action === "sell_players") && !allowed) {
+    warnings.push(getTransferWindowStatus(gameState).reason ?? "transfer_window_closed");
   }
 
   return {

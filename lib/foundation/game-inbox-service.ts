@@ -119,24 +119,10 @@ function getVisibleTeamIds(input: BuildGameInboxInput, settingsMap: Record<strin
   );
 }
 
-function getTeamLineupStatus(gameState: GameState, teamId: string) {
-  const lineup = (gameState.seasonState.lineupDrafts ?? []).find(
-    (draft) =>
-      draft.seasonId === gameState.season.id &&
-      draft.matchdayId === gameState.matchdayState.matchdayId &&
-      draft.teamId === teamId,
-  );
-  const scheduleEntry = (gameState.seasonState.disciplineSchedule ?? []).find(
-    (entry) => entry.seasonId === gameState.season.id && entry.matchdayId === gameState.matchdayState.matchdayId,
-  );
-  const requiredSlots = (scheduleEntry?.discipline1?.playerCount ?? 0) + (scheduleEntry?.discipline2?.playerCount ?? 0);
-  const filledSlots = lineup?.entries.length ?? 0;
-  return {
-    lineup,
-    hasLineup: requiredSlots > 0 ? filledSlots >= requiredSlots : filledSlots > 0,
-    isSubmitted: lineup?.status === "submitted" || lineup?.status === "locked" || lineup?.status === "resolved",
-  };
-}
+import {
+  isTeamMatchdayLineupComplete,
+  isTeamMatchdayLineupSubmitted,
+} from "@/lib/foundation/matchday-lineup-readiness";
 
 function hasTeamFormCards(gameState: GameState, teamId: string) {
   return (gameState.seasonState.formCards ?? []).some((card) => card.seasonId === gameState.season.id && card.teamId === teamId);
@@ -195,8 +181,18 @@ function buildTeamTasks(input: BuildGameInboxInput, visibleTeamIds: Set<string>,
     const controlMode = settingsMap[team.teamId]?.controlMode ?? (team.humanControlled ? "manual" : "ai");
     const roster = input.gameState.rosters.filter((entry) => entry.teamId === team.teamId);
     const rosterCount = roster.length;
-    const lineupStatus = getTeamLineupStatus(input.gameState, team.teamId);
-    if (rosterCount > 0 && !lineupStatus.hasLineup && controlMode !== "passive") {
+    const lineupStatus = {
+      hasLineup: isTeamMatchdayLineupComplete(input.gameState, team.teamId),
+      isSubmitted: isTeamMatchdayLineupSubmitted(
+        (input.gameState.seasonState.lineupDrafts ?? []).find(
+          (draft) =>
+            draft.seasonId === input.gameState.season.id &&
+            draft.matchdayId === input.gameState.matchdayState.matchdayId &&
+            draft.teamId === team.teamId,
+        ) ?? null,
+      ),
+    };
+    if (rosterCount > 0 && !lineupStatus.hasLineup && controlMode === "manual") {
       items.push(
         createItem({
           itemId: `lineup_missing:${input.saveId}:${input.gameState.season.id}:${input.gameState.matchdayState.matchdayId}:${team.teamId}`,
@@ -216,7 +212,7 @@ function buildTeamTasks(input: BuildGameInboxInput, visibleTeamIds: Set<string>,
       );
     }
 
-    if (rosterCount > 0 && !hasTeamFormCards(input.gameState, team.teamId) && controlMode !== "passive") {
+    if (rosterCount > 0 && !hasTeamFormCards(input.gameState, team.teamId) && controlMode === "manual") {
       items.push(
         createItem({
           itemId: `formcards_open:${input.saveId}:${input.gameState.season.id}:${team.teamId}`,

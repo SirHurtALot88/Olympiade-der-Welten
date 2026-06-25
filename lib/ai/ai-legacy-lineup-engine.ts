@@ -13,6 +13,7 @@ import { evaluateLegacyAiNeeds } from "@/lib/ai/ai-needs-engine";
 import { deriveTeamIdentityAxisWeightMap } from "@/lib/foundation/team-identity-settings";
 import { buildLegacyLineupAggregateScore } from "@/lib/lineups/legacy-score-engine";
 import { scoreLegacyLineupDisciplineSide } from "@/lib/lineups/legacy-score-engine";
+import { calculateMatchdayProjectedPreview, resolveSlotRolesForDiscipline } from "@/lib/lineups/matchday-slot-roles";
 import type { DisciplineSide, LegacyLineupEntryInput, LegacyLineupLoadedContext } from "@/lib/lineups/legacy-lineup-types";
 import { validateLegacyLineupContext } from "@/lib/lineups/legacy-lineup-validator";
 import { buildLineupPlayerDemandMap } from "@/lib/morale/player-demands-service";
@@ -169,49 +170,84 @@ function buildEntriesForDisciplineSide(
 
   const demandMap = buildAiLineupDemandMap(context);
   const playerCount = context.disciplinePlayerCounts[disciplineId] ?? 0;
-  const candidates = context.activePlayers
-    .filter((player) => !usedPlayerIds.has(player.playerId))
-    .map((player) => {
-      const disciplineScore = context.disciplineScores.find(
-        (entry) => entry.playerId === player.playerId && entry.disciplineId === disciplineId,
-      );
-      const score = disciplineScore?.score ?? Number.NEGATIVE_INFINITY;
-      const tieBreak = getIdentityTieBreakScore(context, player.playerId, focusAxes);
-      const demand = getLineupDemandScore({ context, demandMap, playerId: player.playerId, disciplineId });
+  const slotRoles = resolveSlotRolesForDiscipline(disciplineId, disciplineId, playerCount);
+  const rosterById = new Map((context.rosterPlayers ?? []).map((player) => [player.id, player]));
+  const picked: Array<{
+    activePlayerId: string;
+    playerId: string;
+    score: number;
+    demandBonus: number;
+    demandReasons: string[];
+    hasScore: boolean;
+    tieBreak: number;
+    slotFitBonus: number;
+    slotIndex: number;
+  }> = [];
 
-      return {
-        activePlayerId: player.id,
-        playerId: player.playerId,
-        score,
-        demandBonus: demand.bonus,
-        demandReasons: demand.reasons,
-        hasScore: disciplineScore != null,
-        tieBreak,
-      };
-    })
-    .sort((left, right) => {
-      if (left.hasScore !== right.hasScore) {
-        return left.hasScore ? -1 : 1;
-      }
-      const leftEffectiveScore = left.score + left.demandBonus;
-      const rightEffectiveScore = right.score + right.demandBonus;
-      if (rightEffectiveScore !== leftEffectiveScore) {
-        return rightEffectiveScore - leftEffectiveScore;
-      }
-      if (right.tieBreak !== left.tieBreak) {
-        return right.tieBreak - left.tieBreak;
-      }
-      return left.playerId.localeCompare(right.playerId);
-    });
+  for (let slotIndex = 0; slotIndex < playerCount; slotIndex += 1) {
+    const role = slotRoles[slotIndex] ?? null;
+    const candidates = context.activePlayers
+      .filter((player) => !usedPlayerIds.has(player.playerId))
+      .map((player) => {
+        const disciplineScore = context.disciplineScores.find(
+          (entry) => entry.playerId === player.playerId && entry.disciplineId === disciplineId,
+        );
+        const score = disciplineScore?.score ?? Number.NEGATIVE_INFINITY;
+        const tieBreak = getIdentityTieBreakScore(context, player.playerId, focusAxes);
+        const demand = getLineupDemandScore({ context, demandMap, playerId: player.playerId, disciplineId });
+        const rosterPlayer = rosterById.get(player.playerId) ?? null;
+        const slotFitBonus =
+          disciplineScore?.score != null
+            ? calculateMatchdayProjectedPreview({
+                baseScore: disciplineScore.score,
+                role,
+                attributeStats: rosterPlayer?.attributeStats ?? null,
+                currentFatigueCount: context.fatigueByPlayerId?.[player.playerId]?.count ?? 0,
+                requiredPlayers: playerCount,
+                intensity: "normal",
+              }).roleModifier
+            : 0;
 
-  const picked = candidates.slice(0, playerCount);
-  picked.forEach((player) => usedPlayerIds.add(player.playerId));
+        return {
+          activePlayerId: player.id,
+          playerId: player.playerId,
+          score,
+          demandBonus: demand.bonus,
+          demandReasons: demand.reasons,
+          hasScore: disciplineScore != null,
+          tieBreak,
+          slotFitBonus,
+          slotIndex,
+        };
+      })
+      .sort((left, right) => {
+        if (left.hasScore !== right.hasScore) {
+          return left.hasScore ? -1 : 1;
+        }
+        const leftEffectiveScore = left.score + left.demandBonus + left.slotFitBonus;
+        const rightEffectiveScore = right.score + right.demandBonus + right.slotFitBonus;
+        if (rightEffectiveScore !== leftEffectiveScore) {
+          return rightEffectiveScore - leftEffectiveScore;
+        }
+        if (right.tieBreak !== left.tieBreak) {
+          return right.tieBreak - left.tieBreak;
+        }
+        return left.playerId.localeCompare(right.playerId);
+      });
+
+    const selected = candidates[0];
+    if (!selected) {
+      break;
+    }
+    picked.push(selected);
+    usedPlayerIds.add(selected.playerId);
+  }
 
   return {
-    entries: picked.map((player, index) => ({
+    entries: picked.map((player) => ({
       disciplineId,
       disciplineSide,
-      slotIndex: index,
+      slotIndex: player.slotIndex,
       playerId: player.playerId,
       activePlayerId: player.activePlayerId,
     })),
@@ -221,26 +257,25 @@ function buildEntriesForDisciplineSide(
         .filter((player) => !player.hasScore)
         .map((player) => `Missing discipline score for player ${player.playerId} in ${disciplineId} (${disciplineSide}).`),
     ],
-    reasoning: picked.map((player, index) => {
-      const selectionScore = player.hasScore ? player.score + player.demandBonus : null;
-      return `${disciplineSide.toUpperCase()} Slot ${index + 1}: Score ${formatAiReasonScore(player.hasScore ? player.score : null)} + Bedarf ${formatAiReasonScore(player.demandBonus)} + Teamfit ${formatAiReasonScore(player.tieBreak)}${player.demandReasons.length ? ` (${player.demandReasons.join(", ")})` : ""}`;
+    reasoning: picked.map((player) => {
+      return `${disciplineSide.toUpperCase()} Slot ${player.slotIndex + 1}: Score ${formatAiReasonScore(player.hasScore ? player.score : null)} + Bedarf ${formatAiReasonScore(player.demandBonus)} + Slot-Fit ${formatAiReasonScore(player.slotFitBonus)} + Teamfit ${formatAiReasonScore(player.tieBreak)}${player.demandReasons.length ? ` (${player.demandReasons.join(", ")})` : ""}`;
     }),
-    selectionReasons: picked.map((player, index) => {
+    selectionReasons: picked.map((player) => {
       const disciplineScore = player.hasScore ? player.score : null;
-      const selectionScore = disciplineScore == null ? null : disciplineScore + player.demandBonus;
+      const selectionScore = disciplineScore == null ? null : disciplineScore + player.demandBonus + player.slotFitBonus;
       const demandText = player.demandReasons.length > 0
         ? `, dazu ${player.demandReasons.join(", ")}`
         : "";
       return {
         playerId: player.playerId,
         activePlayerId: player.activePlayerId,
-        slotIndex: index,
+        slotIndex: player.slotIndex,
         disciplineScore,
         selectionScore,
         demandBonus: player.demandBonus,
         identityTieBreak: player.tieBreak,
         demandReasons: player.demandReasons,
-        reason: `Eingesetzt wegen ${formatAiReasonScore(disciplineScore)} Diszi-Score${demandText}. Teamfit/Tiebreak ${formatAiReasonScore(player.tieBreak)}.`,
+        reason: `Eingesetzt wegen ${formatAiReasonScore(disciplineScore)} Diszi-Score, Slot-Fit ${formatAiReasonScore(player.slotFitBonus)}${demandText}. Teamfit/Tiebreak ${formatAiReasonScore(player.tieBreak)}.`,
       };
     }),
   };

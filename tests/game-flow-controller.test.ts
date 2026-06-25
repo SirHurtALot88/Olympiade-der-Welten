@@ -205,7 +205,7 @@ describe("game flow controller", () => {
   it("opens training first when active roster players have no training mode", () => {
     const flow = buildGameFlowState({ gameState: gameState(), activeTeamId: "M-M" });
     expect(flow.currentStepId).toBe("check_training");
-    expect(flow.currentStep.targetView).toBe("trainingV2");
+    expect(flow.currentStep.targetView).toBe("trainingCompact");
     expect(flow.currentStep.cta).toContain("Training");
   });
 
@@ -218,6 +218,26 @@ describe("game flow controller", () => {
     expect(flow.currentStep.targetView).toBe("lineup");
   });
 
+  it("requires form card selections before arena when lineup is complete", () => {
+    const flow = buildGameFlowState({
+      gameState: gameState({
+        players: [player("p-1", "mittel")],
+        seasonState: {
+          seasonId: "season-2",
+          schedule: [],
+          standings: {},
+          disciplineSchedule: [{ seasonId: "season-2", matchdayId: "season-2-md-1", discipline1: { disciplineId: "d1", playerCount: 1 }, discipline2: null }],
+          formCards: [{ id: "card-1", saveId: "save-1", seasonId: "season-2", teamId: "M-M", playerId: "p-1", playerName: "p-1", cardColor: "red", cardValue: 4, createdAt: "2026-06-12T00:00:00.000Z" }],
+          lineupDrafts: [{ lineupId: "lineup-1", saveId: "save-1", seasonId: "season-2", matchdayId: "season-2-md-1", teamId: "M-M", status: "draft", entries: [{ disciplineId: "d1", disciplineSide: "d1", slotIndex: 0, playerId: "p-1", activePlayerId: "r-1" }], createdAt: "2026-06-12T00:00:00.000Z", updatedAt: "2026-06-12T00:00:00.000Z" }],
+        },
+      }),
+      activeTeamId: "M-M",
+    });
+
+    expect(flow.currentStepId).toBe("assign_formcards");
+    expect(flow.currentStep.blockers).toContain("missing_formcard_selections");
+  });
+
   it("opens arena once a lineup exists", () => {
     const flow = buildGameFlowState({
       gameState: gameState({
@@ -227,7 +247,7 @@ describe("game flow controller", () => {
           schedule: [],
           standings: {},
           formCards: [{ id: "card-1", saveId: "save-1", seasonId: "season-2", teamId: "M-M", playerId: "p-1", playerName: "p-1", cardColor: "red", cardValue: 1, createdAt: "2026-06-12T00:00:00.000Z" }],
-          lineupDrafts: [{ lineupId: "lineup-1", saveId: "save-1", seasonId: "season-2", matchdayId: "season-2-md-1", teamId: "M-M", status: "submitted", entries: [{ disciplineId: "d1", disciplineSide: "d1", slotIndex: 0, playerId: "p-1", activePlayerId: "r-1" }], createdAt: "2026-06-12T00:00:00.000Z", updatedAt: "2026-06-12T00:00:00.000Z" }],
+          lineupDrafts: [{ lineupId: "lineup-1", saveId: "save-1", seasonId: "season-2", matchdayId: "season-2-md-1", teamId: "M-M", status: "submitted", entries: [{ disciplineId: "d1", disciplineSide: "d1", slotIndex: 0, playerId: "p-1", activePlayerId: "r-1" }], modifiers: { d1: { primaryFormCardId: "card-1", secondaryFormCardId: null, mutatorTrait1: null, mutatorTrait2: null, intensity: "normal", teamPowerId: null }, d2: { primaryFormCardId: null, secondaryFormCardId: null, mutatorTrait1: null, mutatorTrait2: null, intensity: "normal", teamPowerId: null } }, createdAt: "2026-06-12T00:00:00.000Z", updatedAt: "2026-06-12T00:00:00.000Z" }],
         },
       }),
       activeTeamId: "M-M",

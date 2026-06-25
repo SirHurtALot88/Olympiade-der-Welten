@@ -1367,6 +1367,112 @@ export function buildTeamSeasonObjectiveSettlement(gameState: GameState): TeamSe
   };
 }
 
+export type ObjectiveRewardApplyResult = {
+  ok: boolean;
+  applied: boolean;
+  duplicateDetected: boolean;
+  auditLogId: string | null;
+  settlement: TeamSeasonObjectiveSettlement;
+  gameState: GameState;
+  warnings: string[];
+};
+
+export function applyTeamSeasonObjectiveRewards(
+  gameState: GameState,
+  input?: { saveId?: string; seasonId?: string; execute?: boolean },
+): ObjectiveRewardApplyResult {
+  const seasonId = input?.seasonId ?? gameState.season.id;
+  const settlement = buildTeamSeasonObjectiveSettlement(gameState);
+  const existingLog = (gameState.seasonState.objectiveRewardApplyLogs ?? []).find((log) => log.seasonId === seasonId) ?? null;
+  const warnings: string[] = [];
+
+  if (existingLog) {
+    return {
+      ok: true,
+      applied: false,
+      duplicateDetected: true,
+      auditLogId: existingLog.id,
+      settlement,
+      gameState,
+      warnings,
+    };
+  }
+
+  if (!input?.execute) {
+    return {
+      ok: true,
+      applied: false,
+      duplicateDetected: false,
+      auditLogId: null,
+      settlement,
+      gameState,
+      warnings,
+    };
+  }
+
+  const teamById = new Map(gameState.teams.map((team) => [team.teamId, team] as const));
+  const nextTeams = gameState.teams.map((team) => {
+    const summary = settlement.byTeamId[team.teamId];
+    if (!summary || summary.cashDelta === 0) {
+      return team;
+    }
+    return {
+      ...team,
+      cash: roundValue(Math.max(0, (team.cash ?? 0) + summary.cashDelta), 1),
+    };
+  });
+
+  const nextBoardConfidence = { ...(gameState.seasonState.boardConfidence ?? {}) };
+  for (const [teamId, summary] of Object.entries(settlement.byTeamId)) {
+    if (!summary || summary.boardConfidenceDelta === 0) {
+      continue;
+    }
+    const current = nextBoardConfidence[teamId];
+    const nextValue = roundValue(clamp((current?.value ?? 5) + summary.boardConfidenceDelta, 1, 10), 1);
+    nextBoardConfidence[teamId] = {
+      teamId,
+      value: nextValue,
+      pressure: roundValue(clamp(11 - nextValue, 1, 10), 1),
+      warnings: current?.warnings ?? [],
+    };
+  }
+
+  const auditLogId = `objective-reward:${seasonId}:${Date.now()}`;
+  const nextGameState: GameState = {
+    ...gameState,
+    teams: nextTeams,
+    seasonState: {
+      ...gameState.seasonState,
+      boardConfidence: nextBoardConfidence,
+      objectiveRewardApplyLogs: [
+        ...(gameState.seasonState.objectiveRewardApplyLogs ?? []),
+        {
+          id: auditLogId,
+          saveId: input.saveId ?? gameState.season.id,
+          seasonId,
+          action: "apply",
+          payload: {
+            totalCashDelta: settlement.totals.cashDelta,
+            totalBoardConfidenceDelta: settlement.totals.boardConfidenceDelta,
+            appliedTeams: Object.keys(settlement.byTeamId).length,
+          },
+          createdAt: new Date().toISOString(),
+        },
+      ],
+    },
+  };
+
+  return {
+    ok: true,
+    applied: true,
+    duplicateDetected: false,
+    auditLogId,
+    settlement,
+    gameState: refreshTeamObjectiveState(nextGameState),
+    warnings,
+  };
+}
+
 export function getTeamObjectives(gameState: GameState, teamId: string) {
   return buildTeamObjectiveOverview(gameState).objectives.filter((objective) => objective.teamId === teamId);
 }

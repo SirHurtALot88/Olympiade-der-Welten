@@ -6,15 +6,14 @@ import {
   createDefaultLineupDraftModifiers,
   ensureLocalFormCardsForSeason,
   getFormCardColorForDisciplineCategory,
-  getLegacyMutatorTraitOptions,
-  getPlayerMutatorTraitSlots,
 } from "@/lib/lineups/legacy-lineup-modifiers";
-import type { LegacyFormCardOption, LegacyLineupEntryInput, LegacyLineupKeyParams, LegacyLineupLoadedContext, LegacyMutatorTraitOption, LegacyRosterPlayerRef } from "@/lib/lineups/legacy-lineup-types";
+import type { LegacyFormCardOption, LegacyLineupEntryInput, LegacyLineupKeyParams, LegacyLineupLoadedContext, LegacyMutatorTraitOption, LegacyRosterPlayerRef, LegacyTeamPowerOption } from "@/lib/lineups/legacy-lineup-types";
 import {
   calculateLocalLegacyLineupPreviewFromContext,
   loadLocalLegacyLineupContextFromGameState,
   saveLocalLegacyLineupDraftBatch,
 } from "@/lib/lineups/legacy-lineup-local-service";
+import { isLegacyLineupDraftComplete } from "@/lib/lineups/legacy-matchday-readiness";
 import { calculateTeamPowerModifierForSide, ensureLocalTeamPowersForSeason } from "@/lib/lineups/team-powers";
 import { selectTeamCaptain } from "@/lib/morale/player-demands-service";
 import { createPersistenceService } from "@/lib/persistence/persistence-service";
@@ -249,85 +248,192 @@ function takeBestFormCard(input: {
   return picked;
 }
 
-function selectBestMutatorTraitsForEntries(
-  entries: LegacyLineupEntryInput[],
-  rosterPlayers: LegacyRosterPlayerRef[],
-  traitOptions: LegacyMutatorTraitOption[] = getLegacyMutatorTraitOptions(),
-): [string | null, string | null] {
-  const rosterPlayerById = new Map((rosterPlayers ?? []).map((player) => [player.id, player]));
-  const traitCounts = new Map<string, { label: string; hits: number; players: Set<string> }>();
+function findBestMatchingPositiveFormCard(input: {
+  cards: LegacyFormCardOption[];
+  usedIds: Set<string>;
+  color: FormCardColor | null;
+  fallbackAnyColor?: boolean;
+}) {
+  const candidates = input.cards.filter((card) => !input.usedIds.has(card.id) && card.value > 0);
+  if (candidates.length === 0) return null;
 
-  for (const entry of entries) {
-    const player = rosterPlayerById.get(entry.playerId) ?? null;
-    const hitKeysForPlayer = new Set<string>();
-    for (const trait of getPlayerMutatorTraitSlots(player)) {
-      const key = trait.toLowerCase();
-      const current = traitCounts.get(key) ?? { label: trait, hits: 0, players: new Set<string>() };
-      current.hits += 1;
-      if (!hitKeysForPlayer.has(key)) {
-        current.players.add(entry.playerId);
-        hitKeysForPlayer.add(key);
-      }
-      traitCounts.set(key, current);
-    }
+  const colorMatchCandidates = input.color ? candidates.filter((card) => card.color === input.color) : [];
+  if (colorMatchCandidates.length > 0) {
+    return sortFormCardsForSlot(colorMatchCandidates, input.color, "positive")[0] ?? null;
   }
 
-  const candidates = [...traitCounts.values()]
-    .filter((entry) => entry.hits > 0)
-    .sort((left, right) => {
-      if (left.players.size !== right.players.size) return right.players.size - left.players.size;
-      if (left.hits !== right.hits) return right.hits - left.hits;
-      return left.label.localeCompare(right.label);
-    });
-
-  const first = candidates[0] ?? null;
-  const coveredPlayers = new Set(first?.players ?? []);
-  const second =
-    candidates
-      .filter((entry) => entry !== first)
-      .sort((left, right) => {
-        const leftNewPlayers = [...left.players].filter((playerId) => !coveredPlayers.has(playerId)).length;
-        const rightNewPlayers = [...right.players].filter((playerId) => !coveredPlayers.has(playerId)).length;
-        if (leftNewPlayers !== rightNewPlayers) return rightNewPlayers - leftNewPlayers;
-        if (left.players.size !== right.players.size) return right.players.size - left.players.size;
-        if (left.hits !== right.hits) return right.hits - left.hits;
-        return left.label.localeCompare(right.label);
-      })[0] ?? null;
-
-  const selectedLabels = [first?.label ?? null, second?.label ?? null];
-  if (selectedLabels.every(Boolean)) {
-    return selectedLabels as [string, string];
+  if (input.fallbackAnyColor) {
+    return sortFormCardsForSlot(candidates, null, "positive")[0] ?? null;
   }
-
-  const usedKeys = new Set(selectedLabels.filter(Boolean).map((label) => label!.toLowerCase()));
-  for (const option of traitOptions.length > 0 ? traitOptions : getLegacyMutatorTraitOptions()) {
-    const label = String(option.label || option.value || "").trim();
-    if (!label) continue;
-    const key = label.toLowerCase();
-    if (usedKeys.has(key)) continue;
-    const emptyIndex = selectedLabels.findIndex((entry) => !entry);
-    if (emptyIndex === -1) break;
-    selectedLabels[emptyIndex] = label;
-    usedKeys.add(key);
-  }
-
-  return [selectedLabels[0] ?? null, selectedLabels[1] ?? null];
+  return null;
 }
 
-function applyAiMutatorsForSide(
-  modifiers: LineupDraftModifiers,
-  side: "d1" | "d2",
-  entries: LegacyLineupEntryInput[],
-  rosterPlayers: LegacyRosterPlayerRef[],
-  traitOptions?: LegacyMutatorTraitOption[],
-) {
-  const [trait1, trait2] = selectBestMutatorTraitsForEntries(
-    entries.filter((entry) => entry.disciplineSide === side),
-    rosterPlayers,
-    traitOptions,
+function competitivenessRank(value: DisciplineSideCompetitiveness) {
+  switch (value) {
+    case "weak":
+      return 0;
+    case "neutral":
+      return 1;
+    case "strong":
+      return 2;
+  }
+}
+
+function planNegativeDumpSidesForMatchday(input: {
+  sides: Array<{ side: "d1" | "d2"; competitiveness: DisciplineSideCompetitiveness }>;
+  dumpsRequiredThisMatchday: number;
+  unusedNegativeCount: number;
+}) {
+  const dumpSides = new Set<"d1" | "d2">();
+  if (input.unusedNegativeCount <= 0 || input.dumpsRequiredThisMatchday <= 0) {
+    return dumpSides;
+  }
+
+  const target = Math.min(input.dumpsRequiredThisMatchday, input.unusedNegativeCount, 2);
+  const orderedSides = [...input.sides].sort(
+    (left, right) => competitivenessRank(left.competitiveness) - competitivenessRank(right.competitiveness),
   );
-  modifiers[side].mutatorTrait1 = trait1;
-  modifiers[side].mutatorTrait2 = trait2;
+
+  for (const side of orderedSides) {
+    if (dumpSides.size >= target) {
+      break;
+    }
+    dumpSides.add(side.side);
+  }
+
+  return dumpSides;
+}
+
+function parseIdentityPowerSlotIndex(powerId: string) {
+  const match = powerId.match(/:identity:(\d+)$/);
+  if (!match) {
+    return null;
+  }
+  return Number(match[1]) - 1;
+}
+
+function countRemainingSelectableCharges(teamPowers: LegacyTeamPowerOption[]) {
+  return teamPowers
+    .filter((power) => power.selectedForSeason && power.chargesRemaining > 0)
+    .reduce((sum, power) => sum + power.chargesRemaining, 0);
+}
+
+function isDebuffTeamPower(power: LegacyTeamPowerOption) {
+  return (
+    power.effectType === "snipe_debuff" ||
+    power.effectType === "field_debuff" ||
+    power.effectType === "rivalry_debuff"
+  );
+}
+
+function powerMatchesDisciplineCategory(power: LegacyTeamPowerOption, disciplineCategory: string | null | undefined) {
+  return power.category === "flex" || power.category === disciplineCategory;
+}
+
+function sideTeamPowerPriority(input: {
+  competitiveness: DisciplineSideCompetitiveness;
+  rivalryCount: number;
+}) {
+  const competitivenessRank = input.competitiveness === "strong" ? 2 : input.competitiveness === "neutral" ? 1 : 0;
+  return competitivenessRank * 3 + Math.min(input.rivalryCount, 2);
+}
+
+function planTeamPowerSidesForMatchday(input: {
+  sidePlans: Array<{
+    side: "d1" | "d2";
+    competitiveness: DisciplineSideCompetitiveness;
+    rivalryCount: number;
+  }>;
+  remainingCharges: number;
+  remainingMatchdaysIncludingCurrent: number;
+  matchdayIndex: number;
+}) {
+  const plannedSides = new Set<"d1" | "d2">();
+  if (input.remainingCharges <= 0 || input.sidePlans.length === 0) {
+    return plannedSides;
+  }
+
+  const remainingSlots = input.remainingMatchdaysIncludingCurrent * 2;
+  const slack = remainingSlots - input.remainingCharges;
+  const totalMatchdays = Math.max(1, Math.ceil(remainingSlots / 2));
+  const lateSeason = input.matchdayIndex >= Math.ceil(totalMatchdays * 0.7);
+
+  let targetUses = 0;
+  if (slack < 0) {
+    targetUses = Math.min(2, Math.max(1, input.remainingCharges - Math.max(0, remainingSlots - 2)));
+  } else if (slack <= 1) {
+    targetUses = 1;
+  } else if (lateSeason && slack <= 3) {
+    targetUses = 1;
+  }
+
+  const orderedSides = [...input.sidePlans].sort(
+    (left, right) =>
+      sideTeamPowerPriority(right) - sideTeamPowerPriority(left) || left.side.localeCompare(right.side),
+  );
+
+  if (targetUses === 0) {
+    const bestSide =
+      orderedSides.find((side) => side.rivalryCount > 0) ??
+      orderedSides.find((side) => side.competitiveness === "strong") ??
+      null;
+    if (
+      bestSide &&
+      (bestSide.rivalryCount > 0 || (bestSide.competitiveness === "strong" && input.matchdayIndex >= 4))
+    ) {
+      plannedSides.add(bestSide.side);
+    }
+    return plannedSides;
+  }
+
+  for (const side of orderedSides) {
+    if (plannedSides.size >= targetUses) {
+      break;
+    }
+    if (side.competitiveness === "weak" && !lateSeason && slack > 0) {
+      continue;
+    }
+    plannedSides.add(side.side);
+  }
+
+  return plannedSides;
+}
+
+function powerAllowedForSide(input: {
+  power: LegacyTeamPowerOption;
+  competitiveness: DisciplineSideCompetitiveness;
+  disciplineCategory: string | null | undefined;
+  rivalryCount: number;
+  lateSeason: boolean;
+}) {
+  if (isDebuffTeamPower(input.power)) {
+    return input.rivalryCount > 0 || input.power.conditionalTrigger === "rival_top8_discipline";
+  }
+
+  const identitySlot = parseIdentityPowerSlotIndex(input.power.id);
+  if (identitySlot == null) {
+    if (input.power.source === "facility") {
+      return (
+        (input.competitiveness === "strong" || input.lateSeason) &&
+        powerMatchesDisciplineCategory(input.power, input.disciplineCategory)
+      );
+    }
+    return (
+      input.rivalryCount > 0 ||
+      categoryMatch ||
+      input.competitiveness === "strong" ||
+      input.power.conditionalTrigger === "rival_top8_discipline"
+    );
+  }
+
+  const categoryMatch = powerMatchesDisciplineCategory(input.power, input.disciplineCategory);
+  if (input.competitiveness === "strong") {
+    return identitySlot <= 1 || categoryMatch;
+  }
+  if (input.competitiveness === "neutral") {
+    return identitySlot >= 1 || categoryMatch;
+  }
+  return identitySlot >= 2;
 }
 
 function selectBestTeamPowerForSide(input: {
@@ -337,11 +443,20 @@ function selectBestTeamPowerForSide(input: {
   disciplineId: string | null | undefined;
   disciplineCategory: string | null | undefined;
   usedPowerIds: Set<string>;
+  competitiveness: DisciplineSideCompetitiveness;
+  rivalryCount: number;
+  lateSeason: boolean;
 }) {
   const candidates = (input.context.teamPowers ?? []).filter((power) => {
     if (input.usedPowerIds.has(power.id)) return false;
     if (power.isUsedUp || power.chargesRemaining <= 0) return false;
-    return true;
+    return powerAllowedForSide({
+      power,
+      competitiveness: input.competitiveness,
+      disciplineCategory: input.disciplineCategory,
+      rivalryCount: input.rivalryCount,
+      lateSeason: input.lateSeason,
+    });
   });
   if (candidates.length === 0 || !input.disciplineId) return null;
   const contextGameState = (input.context as LegacyLineupLoadedContext & { gameState?: GameState }).gameState ?? null;
@@ -350,8 +465,7 @@ function selectBestTeamPowerForSide(input: {
   const ranked = candidates
     .map((power) => {
       const conditionalBonusPct =
-        power.conditionalTrigger === "rival_top8_discipline" &&
-        (input.context.teamPowerWindows?.[input.disciplineId ?? ""]?.top8Rivals.length ?? 0) > 0
+        power.conditionalTrigger === "rival_top8_discipline" && input.rivalryCount > 0
           ? power.conditionalBonusPct
           : 0;
       const result = calculateTeamPowerModifierForSide({
@@ -369,43 +483,121 @@ function selectBestTeamPowerForSide(input: {
         teamCaptainPowerModifierPct: teamCaptain?.effects.teamPowerModifierPct ?? null,
         conditionalBonusPct,
       });
-      const categoryFit = power.category === "flex" || power.category === input.disciplineCategory ? 0.45 : 0;
-      const rivalryFit = conditionalBonusPct > 0 || power.effectType === "rivalry_debuff" ? 0.35 : 0;
-      const targetFit = power.targetMode === "rank_band" || power.targetMode === "single_rival" ? 0.15 : 0;
+      const categoryMatch = powerMatchesDisciplineCategory(power, input.disciplineCategory);
+      const identitySlot = parseIdentityPowerSlotIndex(power.id);
+      const slotFit =
+        identitySlot == null
+          ? power.source === "facility"
+            ? 0.15
+            : 0
+          : input.competitiveness === "strong"
+            ? identitySlot === 0
+              ? 0.55
+              : identitySlot === 1
+                ? 0.35
+                : 0.1
+            : input.competitiveness === "neutral"
+              ? identitySlot === 1
+                ? 0.35
+                : identitySlot === 2
+                  ? 0.25
+                  : 0.05
+              : identitySlot === 2
+                ? 0.2
+                : 0;
+      const categoryFit = categoryMatch ? 0.5 : power.category === "flex" ? 0.2 : -0.35;
+      const rivalryFit = conditionalBonusPct > 0 || (isDebuffTeamPower(power) && input.rivalryCount > 0) ? 0.45 : 0;
+      const chargeFit = (power.chargesTotal - power.chargesRemaining) / Math.max(1, power.chargesTotal);
+      const conserveBonus = power.chargesTotal >= 4 && input.competitiveness !== "strong" ? -0.25 : 0;
       return {
         power,
-        score: result.teamPowerImpact + categoryFit + rivalryFit + targetFit,
+        score:
+          result.teamPowerImpact +
+          categoryFit +
+          rivalryFit +
+          slotFit +
+          conserveBonus -
+          chargeFit * 0.15,
       };
     })
     .sort((left, right) => {
       if (right.score !== left.score) return right.score - left.score;
-      if (right.power.chargesRemaining !== left.power.chargesRemaining) return right.power.chargesRemaining - left.power.chargesRemaining;
+      const leftSlot = parseIdentityPowerSlotIndex(left.power.id) ?? 99;
+      const rightSlot = parseIdentityPowerSlotIndex(right.power.id) ?? 99;
+      if (leftSlot !== rightSlot) return leftSlot - rightSlot;
+      if (right.power.chargesRemaining !== left.power.chargesRemaining) {
+        return right.power.chargesRemaining - left.power.chargesRemaining;
+      }
       return left.power.label.localeCompare(right.power.label);
     });
 
-  return ranked[0]?.power ?? null;
+  const best = ranked[0] ?? null;
+  if (!best || best.score < 5.5) {
+    return null;
+  }
+  return best.power;
 }
 
-function applyAiTeamPowers(context: LegacyLineupLoadedContext, modifiers: LineupDraftModifiers) {
-  const usedPowerIds = new Set<string>();
-  const sides = [
+function applyAiTeamPowers(
+  context: LegacyLineupLoadedContext,
+  modifiers: LineupDraftModifiers,
+  plannedEntries: LegacyLineupEntryInput[],
+) {
+  const teamPowers = context.teamPowers ?? [];
+  const remainingCharges = countRemainingSelectableCharges(teamPowers);
+  if (remainingCharges <= 0) {
+    return;
+  }
+
+  const totalSeasonSides = context.matchdayContract?.totalDisciplineSidesInSeason ?? 20;
+  const totalMatchdays = Math.max(1, Math.ceil(totalSeasonSides / 2));
+  const matchdayIndex = Math.max(1, context.matchday?.index || context.season?.currentMatchday || 1);
+  const remainingMatchdaysIncludingCurrent = Math.max(1, totalMatchdays - matchdayIndex + 1);
+  const lateSeason = matchdayIndex >= Math.ceil(totalMatchdays * 0.7);
+
+  const sidePlans = [
     {
       side: "d1" as const,
       disciplineId: context.matchdayContract?.discipline1?.disciplineId ?? null,
       category: context.matchdayContract?.discipline1?.category ?? null,
+      competitiveness: estimateDisciplineSideCompetitiveness({
+        context,
+        side: "d1",
+        disciplineId: context.matchdayContract?.discipline1?.disciplineId ?? null,
+        plannedEntries,
+      }),
+      rivalryCount: context.teamPowerWindows?.[context.matchdayContract?.discipline1?.disciplineId ?? ""]?.top8Rivals.length ?? 0,
     },
     {
       side: "d2" as const,
       disciplineId: context.matchdayContract?.discipline2?.disciplineId ?? null,
       category: context.matchdayContract?.discipline2?.category ?? null,
+      competitiveness: estimateDisciplineSideCompetitiveness({
+        context,
+        side: "d2",
+        disciplineId: context.matchdayContract?.discipline2?.disciplineId ?? null,
+        plannedEntries,
+      }),
+      rivalryCount: context.teamPowerWindows?.[context.matchdayContract?.discipline2?.disciplineId ?? ""]?.top8Rivals.length ?? 0,
     },
-  ].sort((left, right) => {
-    const leftWindow = left.disciplineId ? (context.teamPowerWindows?.[left.disciplineId]?.top8Rivals.length ?? 0) : 0;
-    const rightWindow = right.disciplineId ? (context.teamPowerWindows?.[right.disciplineId]?.top8Rivals.length ?? 0) : 0;
-    return rightWindow - leftWindow;
+  ];
+
+  const plannedSides = planTeamPowerSidesForMatchday({
+    sidePlans: sidePlans.map((side) => ({
+      side: side.side,
+      competitiveness: side.competitiveness,
+      rivalryCount: side.rivalryCount,
+    })),
+    remainingCharges,
+    remainingMatchdaysIncludingCurrent,
+    matchdayIndex,
   });
 
-  for (const side of sides) {
+  const usedPowerIds = new Set<string>();
+  for (const side of sidePlans) {
+    if (!plannedSides.has(side.side)) {
+      continue;
+    }
     const selected = selectBestTeamPowerForSide({
       context,
       modifiers,
@@ -413,11 +605,192 @@ function applyAiTeamPowers(context: LegacyLineupLoadedContext, modifiers: Lineup
       disciplineId: side.disciplineId,
       disciplineCategory: side.category,
       usedPowerIds,
+      competitiveness: side.competitiveness,
+      rivalryCount: side.rivalryCount,
+      lateSeason,
     });
     if (!selected) continue;
     modifiers[side.side].teamPowerId = selected.id;
     usedPowerIds.add(selected.id);
   }
+}
+
+function takeDumpNegativeFormCard(input: {
+  cards: LegacyFormCardOption[];
+  usedIds: Set<string>;
+  color: FormCardColor | null;
+}) {
+  const candidates = input.cards.filter((card) => !input.usedIds.has(card.id));
+  if (candidates.length === 0) {
+    return null;
+  }
+
+  const nonMatching = candidates.filter((card) => !(input.color && card.color === input.color));
+  const pool = nonMatching.length > 0 ? nonMatching : candidates;
+  const picked =
+    [...pool].sort((left, right) => {
+      if (left.value !== right.value) {
+        return left.value - right.value;
+      }
+      return left.id.localeCompare(right.id);
+    })[0] ?? null;
+
+  if (picked) {
+    input.usedIds.add(picked.id);
+  }
+  return picked;
+}
+
+function getSideStrongestScore(input: {
+  context: LegacyLineupLoadedContext;
+  side: "d1" | "d2";
+  disciplineId: string | null | undefined;
+  plannedEntries: LegacyLineupEntryInput[];
+}) {
+  if (!input.disciplineId) {
+    return 0;
+  }
+
+  const sideEntries = input.plannedEntries.filter((entry) => entry.disciplineSide === input.side);
+  return Math.max(
+    0,
+    ...sideEntries.map((entry) =>
+      input.context.disciplineScores.find(
+        (score) => score.playerId === entry.playerId && score.disciplineId === input.disciplineId,
+      )?.score ?? 0,
+    ),
+  );
+}
+
+type DisciplineSideCompetitiveness = "weak" | "neutral" | "strong";
+
+function estimateDisciplineSideCompetitiveness(input: {
+  context: LegacyLineupLoadedContext;
+  side: "d1" | "d2";
+  disciplineId: string | null | undefined;
+  plannedEntries: LegacyLineupEntryInput[];
+}): DisciplineSideCompetitiveness {
+  if (!input.disciplineId) {
+    return "neutral";
+  }
+
+  const sideEntries = input.plannedEntries.filter((entry) => entry.disciplineSide === input.side);
+  if (sideEntries.length === 0) {
+    return "neutral";
+  }
+
+  const rank = input.context.teamDisciplineRanks?.[input.disciplineId]?.rank ?? null;
+  const strongestScore = getSideStrongestScore(input);
+
+  if ((rank != null && rank >= 24) || strongestScore < 68) {
+    return "weak";
+  }
+  if (rank != null && rank >= 20 && strongestScore < 74) {
+    return "weak";
+  }
+  if (rank != null && rank <= 12 && strongestScore >= 76) {
+    return "strong";
+  }
+  if (rank != null && rank <= 16 && strongestScore >= 80) {
+    return "strong";
+  }
+
+  return "neutral";
+}
+
+function pickPrimaryFormCardForSide(input: {
+  competitiveness: DisciplineSideCompetitiveness;
+  preferNegativeDump: boolean;
+  negativeCards: LegacyFormCardOption[];
+  positiveCards: LegacyFormCardOption[];
+  usedIds: Set<string>;
+  color: FormCardColor | null;
+  positiveSelected: number;
+  desiredPositiveThisMatchday: number;
+  positiveUrgency: boolean;
+}) {
+  if (input.competitiveness === "weak") {
+    return takeDumpNegativeFormCard({
+      cards: input.negativeCards,
+      usedIds: input.usedIds,
+      color: input.color,
+    });
+  }
+
+  if (input.preferNegativeDump) {
+    // For both strong and neutral dump sides: prefer non-color-matched but always fall back
+    // to any negative (including color-matched) so forced dumps never silently skip.
+    const nonMatching = takeBestFormCard({
+      cards: input.negativeCards,
+      usedIds: input.usedIds,
+      color: input.color,
+      polarity: "negative",
+    });
+    if (nonMatching) return nonMatching;
+    return takeDumpNegativeFormCard({
+      cards: input.negativeCards,
+      usedIds: input.usedIds,
+      color: input.color,
+    });
+  }
+
+  if (input.competitiveness === "strong" && input.positiveSelected < input.desiredPositiveThisMatchday) {
+    const positive = findBestMatchingPositiveFormCard({
+      cards: input.positiveCards,
+      usedIds: input.usedIds,
+      color: input.color,
+      fallbackAnyColor: input.positiveUrgency,
+    });
+    if (positive) {
+      input.usedIds.add(positive.id);
+      return positive;
+    }
+  }
+
+  if (input.competitiveness === "neutral" && input.positiveUrgency && input.positiveSelected < input.desiredPositiveThisMatchday) {
+    const positive = findBestMatchingPositiveFormCard({
+      cards: input.positiveCards,
+      usedIds: input.usedIds,
+      color: input.color,
+      fallbackAnyColor: true,
+    });
+    if (positive) {
+      input.usedIds.add(positive.id);
+      return positive;
+    }
+  }
+
+  return null;
+}
+
+function pickSecondaryFormCardForSide(input: {
+  competitiveness: DisciplineSideCompetitiveness;
+  primaryCard: LegacyFormCardOption | null;
+  positiveCards: LegacyFormCardOption[];
+  usedIds: Set<string>;
+  color: FormCardColor | null;
+  positiveSelected: number;
+  desiredPositiveThisMatchday: number;
+  positiveUrgency: boolean;
+}) {
+  // Weak sides never get secondary cards.
+  if (input.competitiveness === "weak") return null;
+  // Neutral sides only get a secondary when positives are piling up.
+  if (input.competitiveness === "neutral" && !input.positiveUrgency) return null;
+  // Never put a negative in the secondary slot.
+  if (input.primaryCard && input.primaryCard.value < 0) return null;
+  if (input.positiveSelected >= input.desiredPositiveThisMatchday) return null;
+
+  const positive = findBestMatchingPositiveFormCard({
+    cards: input.positiveCards,
+    usedIds: input.usedIds,
+    color: input.color,
+    fallbackAnyColor: input.positiveUrgency,
+  });
+  if (positive) {
+    input.usedIds.add(positive.id);
+  }
+  return positive;
 }
 
 function getAiIntensityForSide(input: {
@@ -431,14 +804,12 @@ function getAiIntensityForSide(input: {
   }
   const rank = input.context.teamDisciplineRanks?.[input.disciplineId]?.rank ?? null;
   const sideEntries = input.plannedEntries.filter((entry) => entry.disciplineSide === input.side);
-  const strongestScore = Math.max(
-    0,
-    ...sideEntries.map((entry) =>
-      input.context.disciplineScores.find(
-        (score) => score.playerId === entry.playerId && score.disciplineId === input.disciplineId,
-      )?.score ?? 0,
-    ),
-  );
+  const strongestScore = getSideStrongestScore({
+    context: input.context,
+    side: input.side,
+    disciplineId: input.disciplineId,
+    plannedEntries: input.plannedEntries,
+  });
   const hasCaptain = sideEntries.some((entry) => entry.isCaptain);
   const matchdayIndex = Math.max(1, input.context.matchdayContract?.matchdayIndex ?? input.context.matchday.index ?? 1);
   const totalSeasonSides = input.context.matchdayContract?.totalDisciplineSidesInSeason ?? 20;
@@ -449,6 +820,15 @@ function getAiIntensityForSide(input: {
     input.context.disciplineSidePlayerCounts?.[`${input.disciplineId}::${input.side}`] ??
     input.context.disciplinePlayerCounts[input.disciplineId] ??
     sideEntries.length;
+
+  const isWeakDisciplineWindow =
+    (rank != null && rank >= 28) ||
+    (rank != null && rank >= 22 && strongestScore < 74) ||
+    strongestScore < 66;
+
+  if (isWeakDisciplineWindow) {
+    return matchdayIndex <= 2 ? "conserve" as const : "normal" as const;
+  }
 
   const hasHighLeverageRank = rank != null && rank <= 8 && strongestScore >= 76;
   const hasEliteSpecialistWindow = strongestScore >= (isLateSeason ? 84 : 88);
@@ -498,74 +878,100 @@ export function buildAiLegacyLineupModifiers(
   const totalMatchdays = Math.max(1, Math.ceil(totalSeasonSides / 2));
   const currentMatchdayIndex = Math.max(1, context.matchday?.index || context.season?.currentMatchday || 1);
   const remainingMatchdaysIncludingCurrent = Math.max(1, totalMatchdays - currentMatchdayIndex + 1);
+  const remainingPrimarySlots = remainingMatchdaysIncludingCurrent * 2;
   const negativeCards = formCards.filter((card) => card.value < 0);
   const positiveCards = formCards.filter((card) => card.value > 0);
-  const desiredNegativeThisMatchday = Math.min(
+  const dumpsRequiredThisMatchday = Math.min(
     2,
-    Math.ceil(negativeCards.length / remainingMatchdaysIncludingCurrent),
+    Math.max(0, negativeCards.length - Math.max(0, remainingPrimarySlots - 2)),
   );
   const desiredPositiveThisMatchday = Math.min(
-    4 - desiredNegativeThisMatchday,
+    4,
     Math.ceil(positiveCards.length / remainingMatchdaysIncludingCurrent),
   );
+  // Urgency flags: true when cards are accumulating faster than available slots can absorb them.
+  // Negative urgency: more negatives than remaining primary slots (can't all be used without color-override).
+  // Positive urgency: more than 2 positives needed per matchday to exhaust the pool.
+  const negativeUrgency = negativeCards.length > remainingPrimarySlots;
+  const positiveUrgency = positiveCards.length > remainingMatchdaysIncludingCurrent * 2;
   const usedIds = new Set<string>();
-  let negativeSelected = 0;
   let positiveSelected = 0;
   const sides = [
     {
       side: "d1" as const,
+      disciplineId: context.matchdayContract?.discipline1?.disciplineId ?? null,
       color: getFormCardColorForDisciplineCategory(context.matchdayContract?.discipline1?.category),
     },
     {
       side: "d2" as const,
+      disciplineId: context.matchdayContract?.discipline2?.disciplineId ?? null,
       color: getFormCardColorForDisciplineCategory(context.matchdayContract?.discipline2?.category),
     },
   ];
+  const sidePlans = sides.map((side) => ({
+    ...side,
+    competitiveness: estimateDisciplineSideCompetitiveness({
+      context,
+      side: side.side,
+      disciplineId: side.disciplineId,
+      plannedEntries,
+    }),
+  }));
+  // When negative urgency is active, also flag the weaker sides for forced dumps so all
+  // negatives get assigned rather than waiting until the very last matchday.
+  const effectiveDumpsRequired = negativeUrgency
+    ? Math.min(2, negativeCards.length)
+    : dumpsRequiredThisMatchday;
+  const negativeDumpSides = planNegativeDumpSidesForMatchday({
+    sides: sidePlans,
+    dumpsRequiredThisMatchday: effectiveDumpsRequired,
+    unusedNegativeCount: negativeCards.length,
+  });
 
-  for (const side of sides) {
-    if (formCards.length > 0 && negativeSelected < desiredNegativeThisMatchday) {
-      const negative = takeBestFormCard({
-        cards: negativeCards,
-        usedIds,
-        color: side.color,
-        polarity: "negative",
-      });
-      if (negative) {
-        modifiers[side.side].primaryFormCardId = negative.id;
-        negativeSelected += 1;
-      }
-    }
+  for (const side of sidePlans) {
+    const primary =
+      formCards.length > 0
+        ? pickPrimaryFormCardForSide({
+            competitiveness: side.competitiveness,
+            preferNegativeDump: negativeDumpSides.has(side.side),
+            negativeCards,
+            positiveCards,
+            usedIds,
+            color: side.color,
+            positiveSelected,
+            desiredPositiveThisMatchday,
+            positiveUrgency,
+          })
+        : null;
 
-    if (formCards.length > 0 && !modifiers[side.side].primaryFormCardId && positiveSelected < desiredPositiveThisMatchday) {
-      const positive = takeBestFormCard({
-        cards: positiveCards,
-        usedIds,
-        color: side.color,
-        polarity: "positive",
-      });
-      if (positive) {
-        modifiers[side.side].primaryFormCardId = positive.id;
+    if (primary) {
+      modifiers[side.side].primaryFormCardId = primary.id;
+      if (primary.value > 0) {
         positiveSelected += 1;
       }
     }
 
-    if (formCards.length > 0) {
-      const secondaryPositive = takeBestFormCard({
-        cards: positiveCards,
-        usedIds,
-        color: side.color,
-        polarity: "positive",
-      });
-      if (secondaryPositive) {
-        modifiers[side.side].secondaryFormCardId = secondaryPositive.id;
-        positiveSelected += 1;
-      }
+    const secondary =
+      formCards.length > 0
+        ? pickSecondaryFormCardForSide({
+            competitiveness: side.competitiveness,
+            primaryCard: primary,
+            positiveCards,
+            usedIds,
+            color: side.color,
+            positiveSelected,
+            desiredPositiveThisMatchday,
+            positiveUrgency,
+          })
+        : null;
+
+    if (secondary) {
+      modifiers[side.side].secondaryFormCardId = secondary.id;
+      positiveSelected += 1;
     }
   }
 
-  applyAiMutatorsForSide(modifiers, "d1", plannedEntries, context.rosterPlayers ?? [], context.mutatorTraitOptions);
-  applyAiMutatorsForSide(modifiers, "d2", plannedEntries, context.rosterPlayers ?? [], context.mutatorTraitOptions);
-  applyAiTeamPowers(context, modifiers);
+  applyAiTeamPowers(context, modifiers, plannedEntries);
   applyAiIntensity(context, modifiers, plannedEntries);
 
   return modifiers;
@@ -627,69 +1033,6 @@ export function applyAiLegacyLineupBatchLocally(
 	  }
 
   for (const team of scope.teams) {
-    if (team.controlMode === "manual") {
-      results.push({
-        teamId: team.teamId,
-        teamCode: team.teamCode,
-        teamName: team.teamName,
-        controlMode: team.controlMode,
-        aiEligible: false,
-        previewStatus: "blocked",
-        captainSlotsUsed: null,
-        captainSlotsRemaining: null,
-        d1CaptainSelectionStatus: null,
-        d2CaptainSelectionStatus: null,
-        result: "skipped_manual",
-        overwriteExisting: false,
-        warnings: [],
-        blockingReasons: ["team_control_mode_manual"],
-        saved: false,
-      });
-      continue;
-    }
-
-    if (team.controlMode === "passive") {
-      results.push({
-        teamId: team.teamId,
-        teamCode: team.teamCode,
-        teamName: team.teamName,
-        controlMode: team.controlMode,
-        aiEligible: false,
-        previewStatus: "blocked",
-        captainSlotsUsed: null,
-        captainSlotsRemaining: null,
-        d1CaptainSelectionStatus: null,
-        d2CaptainSelectionStatus: null,
-        result: "skipped_passive",
-        overwriteExisting: false,
-        warnings: [],
-        blockingReasons: ["team_control_mode_passive"],
-        saved: false,
-      });
-      continue;
-    }
-
-    if (!team.aiEligible) {
-      results.push({
-        teamId: team.teamId,
-        teamCode: team.teamCode,
-        teamName: team.teamName,
-        controlMode: team.controlMode,
-        aiEligible: false,
-        previewStatus: "blocked",
-        captainSlotsUsed: null,
-        captainSlotsRemaining: null,
-        d1CaptainSelectionStatus: null,
-        d2CaptainSelectionStatus: null,
-        result: "skipped_disabled",
-        overwriteExisting: false,
-        warnings: [],
-        blockingReasons: ["ai_lineup_apply_disabled"],
-        saved: false,
-      });
-      continue;
-    }
-
     const params: LegacyLineupKeyParams = {
       saveId: scope.saveId,
       seasonId: scope.seasonId,
@@ -721,6 +1064,73 @@ export function applyAiLegacyLineupBatchLocally(
       continue;
     }
 
+    const hasCompleteExistingDraft = isLegacyLineupDraftComplete(contextResult.context);
+    const canAutoFillIncompleteLineup = !hasCompleteExistingDraft;
+
+    if (team.controlMode === "manual" && !canAutoFillIncompleteLineup) {
+      results.push({
+        teamId: team.teamId,
+        teamCode: team.teamCode,
+        teamName: team.teamName,
+        controlMode: team.controlMode,
+        aiEligible: false,
+        previewStatus: "blocked",
+        captainSlotsUsed: null,
+        captainSlotsRemaining: null,
+        d1CaptainSelectionStatus: null,
+        d2CaptainSelectionStatus: null,
+        result: "skipped_manual",
+        overwriteExisting: false,
+        warnings: [],
+        blockingReasons: ["team_control_mode_manual"],
+        saved: false,
+      });
+      continue;
+    }
+
+    if (team.controlMode === "passive" && !canAutoFillIncompleteLineup) {
+      results.push({
+        teamId: team.teamId,
+        teamCode: team.teamCode,
+        teamName: team.teamName,
+        controlMode: team.controlMode,
+        aiEligible: false,
+        previewStatus: "blocked",
+        captainSlotsUsed: null,
+        captainSlotsRemaining: null,
+        d1CaptainSelectionStatus: null,
+        d2CaptainSelectionStatus: null,
+        result: "skipped_passive",
+        overwriteExisting: false,
+        warnings: [],
+        blockingReasons: ["team_control_mode_passive"],
+        saved: false,
+      });
+      continue;
+    }
+
+    if (!team.aiEligible && team.controlMode === "ai" && !canAutoFillIncompleteLineup) {
+      results.push({
+        teamId: team.teamId,
+        teamCode: team.teamCode,
+        teamName: team.teamName,
+        controlMode: team.controlMode,
+        aiEligible: false,
+        previewStatus: "blocked",
+        captainSlotsUsed: null,
+        captainSlotsRemaining: null,
+        d1CaptainSelectionStatus: null,
+        d2CaptainSelectionStatus: null,
+        result: "skipped_disabled",
+        overwriteExisting: false,
+        warnings: [],
+        blockingReasons: ["ai_lineup_apply_disabled"],
+        saved: false,
+      });
+      continue;
+    }
+
+    const effectiveAiEligible = team.aiEligible || canAutoFillIncompleteLineup;
     const previewStartedAt = performance.now();
     const preview = buildAiLegacyLineupPreview(contextResult.context, "sqlite");
     performanceBreakdown.aiLineupGenerationMs += elapsedSince(previewStartedAt);
@@ -742,6 +1152,7 @@ export function applyAiLegacyLineupBatchLocally(
       ...(preview.warnings ?? []),
       ...(validationPreview.ok ? validationPreview.validation.warnings : validationPreview.warnings),
       ...(!formCardEnsure.ok ? formCardEnsure.warnings : formCardEnsure.warnings),
+      ...(canAutoFillIncompleteLineup && team.controlMode === "manual" ? ["manual_incomplete_lineup_autofilled"] : []),
     ]);
     const formCardsSelected = countSelectedFormCards(modifiers);
     const negativeFormCardsSelected = countSelectedNegativeFormCards(modifiers, contextResult.context.formCards ?? []);
@@ -809,7 +1220,7 @@ export function applyAiLegacyLineupBatchLocally(
       continue;
     }
 
-    if (hasExistingDraft && !overwriteExisting) {
+    if (hasCompleteExistingDraft && !overwriteExisting) {
       const captainMeta = buildCaptainPreviewMeta(preview);
       results.push({
         teamId: preview.teamId,

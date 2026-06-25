@@ -102,6 +102,9 @@ export type RoomFlowState = {
 export type RoomArenaPhaseId = "slots" | "push" | "form" | "mutator" | "captain" | "final" | "result";
 export type RoomArenaStatus = "idle" | "ready_check" | "revealing" | "result" | "result_applied";
 
+export type RoomArenaDisciplineSide = "d1" | "d2";
+export type RoomArenaDisciplinePhase = "d1" | "d2" | "total";
+
 export type RoomArenaState = {
   status: RoomArenaStatus;
   version: number;
@@ -109,10 +112,14 @@ export type RoomArenaState = {
   seasonId: string | null;
   matchdayId: string | null;
   disciplineSide: "d1" | "d2" | "overall";
+  activeDisciplinePhase: RoomArenaDisciplinePhase;
   phaseId: RoomArenaPhaseId | null;
   phaseIndex: number;
   slotRevealIndex: number;
   maxSlotRevealIndex: number;
+  revealedSlotCountByDiscipline: Record<RoomArenaDisciplineSide, number>;
+  completedDisciplinePhases: Record<RoomArenaDisciplineSide, boolean>;
+  maxSlotRevealCountByDiscipline: Record<RoomArenaDisciplineSide, number>;
   stepIndex: number;
   requiredParticipantIds: string[];
   readyParticipantIds: string[];

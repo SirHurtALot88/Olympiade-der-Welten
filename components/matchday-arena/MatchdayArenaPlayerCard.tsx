@@ -2,7 +2,7 @@
 
 import type { KeyboardEvent } from "react";
 
-import OptimizedMediaImage from "@/app/foundation/OptimizedMediaImage";
+import { getArenaAxisValueTier } from "@/lib/matchday-arena/arena-stat-visuals";
 import { getGameTermTooltip } from "@/components/ui/GameTerm";
 
 type MatchdayArenaPlayerCardProps = {
@@ -82,7 +82,11 @@ export default function MatchdayArenaPlayerCard({
       {axisStats.length ? (
         <div className="matchday-arena-player-axis-strip" aria-label="Player Achsenwerte">
           {axisStats.map((stat) => (
-            <span key={`${playerName}-${stat.axis}`} className={`matchday-arena-player-axis is-${stat.axis.toLowerCase()}`} title={getGameTermTooltip(stat.axis) ?? undefined}>
+            <span
+              key={`${playerName}-${stat.axis}`}
+              className={`matchday-arena-player-axis is-${stat.axis.toLowerCase()} is-tier-${getArenaAxisValueTier(stat.value)}`}
+              title={getGameTermTooltip(stat.axis) ?? undefined}
+            >
               <small>{stat.axis}</small>
               <strong>{stat.value == null || !Number.isFinite(stat.value) ? "—" : Math.round(stat.value)}</strong>
             </span>

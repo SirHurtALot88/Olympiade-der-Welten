@@ -115,6 +115,29 @@ describe("game phase action policy", () => {
     expect(gate.reason).toBe("phase_blocked:buy_players:season_completed");
   });
 
+  it("keeps sell and buy timing separate after the preseason hub", () => {
+    const sellPhaseBuyGate = evaluateGamePhaseAction(gameState("transfer_sell_phase"), "buy_players");
+    const sellPhaseSellGate = evaluateGamePhaseAction(gameState("transfer_sell_phase"), "sell_players");
+    const buyPhaseBuyGate = evaluateGamePhaseAction(gameState("transfer_buy_phase"), "buy_players");
+    const buyPhaseSellGate = evaluateGamePhaseAction(gameState("transfer_buy_phase"), "sell_players");
+
+    expect(sellPhaseBuyGate.allowed).toBe(false);
+    expect(sellPhaseBuyGate.reason).toBe("phase_blocked:buy_players:transfer_sell_phase");
+    expect(sellPhaseSellGate.allowed).toBe(true);
+    expect(buyPhaseBuyGate.allowed).toBe(true);
+    expect(buyPhaseSellGate.allowed).toBe(false);
+    expect(buyPhaseSellGate.reason).toBe("phase_blocked:sell_players:transfer_buy_phase");
+  });
+
+  it("closes transfer writes once lineup setup starts", () => {
+    const buyGate = evaluateGamePhaseAction(gameState("lineup_setup"), "buy_players");
+    const sellGate = evaluateGamePhaseAction(gameState("lineup_setup"), "sell_players");
+
+    expect(buyGate.allowed).toBe(false);
+    expect(sellGate.allowed).toBe(false);
+    expect(buyGate.warnings).toContain("phase_blocked:lineup_setup");
+  });
+
   it("treats facility writes like preseason management actions", () => {
     expect(evaluateGamePhaseAction(gameState("preseason_management"), "facility_apply").allowed).toBe(true);
 

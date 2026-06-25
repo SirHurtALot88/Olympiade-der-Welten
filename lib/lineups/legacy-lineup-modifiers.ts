@@ -139,6 +139,95 @@ export function getPlayerMutatorTraitSlots(player: Pick<LegacyRosterPlayerRef, "
     .filter(Boolean);
 }
 
+export function selectBestMutatorTraitsForEntries(
+  entries: Array<{ playerId: string }>,
+  rosterPlayers: LegacyRosterPlayerRef[],
+  traitOptions: LegacyMutatorTraitOption[] = getLegacyMutatorTraitOptions(),
+): [string | null, string | null] {
+  const rosterPlayerById = new Map((rosterPlayers ?? []).map((player) => [player.id, player]));
+  const traitCounts = new Map<string, { label: string; hits: number; players: Set<string> }>();
+
+  for (const entry of entries) {
+    const player = rosterPlayerById.get(entry.playerId) ?? null;
+    const hitKeysForPlayer = new Set<string>();
+    for (const trait of getPlayerMutatorTraitSlots(player)) {
+      const key = normalizeTraitKey(trait);
+      const current = traitCounts.get(key) ?? { label: trait, hits: 0, players: new Set<string>() };
+      current.hits += 1;
+      if (!hitKeysForPlayer.has(key)) {
+        current.players.add(entry.playerId);
+        hitKeysForPlayer.add(key);
+      }
+      traitCounts.set(key, current);
+    }
+  }
+
+  const candidates = [...traitCounts.values()]
+    .filter((entry) => entry.hits > 0)
+    .sort((left, right) => {
+      if (left.players.size !== right.players.size) return right.players.size - left.players.size;
+      if (left.hits !== right.hits) return right.hits - left.hits;
+      return left.label.localeCompare(right.label);
+    });
+
+  const first = candidates[0] ?? null;
+  const coveredPlayers = new Set(first?.players ?? []);
+  const second =
+    candidates
+      .filter((entry) => entry !== first)
+      .sort((left, right) => {
+        const leftNewPlayers = [...left.players].filter((playerId) => !coveredPlayers.has(playerId)).length;
+        const rightNewPlayers = [...right.players].filter((playerId) => !coveredPlayers.has(playerId)).length;
+        if (leftNewPlayers !== rightNewPlayers) return rightNewPlayers - leftNewPlayers;
+        if (left.players.size !== right.players.size) return right.players.size - left.players.size;
+        if (left.hits !== right.hits) return right.hits - left.hits;
+        return left.label.localeCompare(right.label);
+      })[0] ?? null;
+
+  const selectedLabels = [first?.label ?? null, second?.label ?? null];
+  if (selectedLabels.every(Boolean)) {
+    return selectedLabels as [string, string];
+  }
+
+  const usedKeys = new Set(selectedLabels.filter(Boolean).map((label) => normalizeTraitKey(label!)));
+  for (const option of traitOptions.length > 0 ? traitOptions : getLegacyMutatorTraitOptions()) {
+    const label = String(option.label || option.value || "").trim();
+    if (!label) continue;
+    const key = normalizeTraitKey(label);
+    if (usedKeys.has(key)) continue;
+    const emptyIndex = selectedLabels.findIndex((entry) => !entry);
+    if (emptyIndex === -1) break;
+    selectedLabels[emptyIndex] = label;
+    usedKeys.add(key);
+  }
+
+  return [selectedLabels[0] ?? null, selectedLabels[1] ?? null];
+}
+
+export function applyMutatorTraitsToLineupModifiers(input: {
+  modifiers: LineupDraftModifiers;
+  entries: Array<{ playerId: string; disciplineSide: "d1" | "d2" }>;
+  rosterPlayers: LegacyRosterPlayerRef[];
+  traitOptions?: LegacyMutatorTraitOption[];
+  onlyFillMissing?: boolean;
+}): LineupDraftModifiers {
+  const modifiers = normalizeLineupDraftModifiers(input.modifiers);
+  const traitOptions = input.traitOptions ?? getLegacyMutatorTraitOptions();
+
+  for (const side of ["d1", "d2"] as const) {
+    const sideEntries = input.entries.filter((entry) => entry.disciplineSide === side);
+    const [trait1, trait2] = selectBestMutatorTraitsForEntries(sideEntries, input.rosterPlayers, traitOptions);
+    if (!input.onlyFillMissing || !modifiers[side].mutatorTrait1?.trim()) {
+      modifiers[side].mutatorTrait1 = trait1;
+    }
+    if (!input.onlyFillMissing || !modifiers[side].mutatorTrait2?.trim()) {
+      modifiers[side].mutatorTrait2 = trait2;
+    }
+  }
+
+  return modifiers;
+}
+
 export function buildLegacyMutatorTraitOptionsForRoster(rosterPlayers: LegacyRosterPlayerRef[]): LegacyMutatorTraitOption[] {
   const byKey = new Map<string, LegacyMutatorTraitOption>();
   for (const option of getLegacyMutatorTraitOptions()) {
@@ -181,7 +270,83 @@ export function getLegacyMutatorSourceSummary(): LegacyModifierSourceSummary {
     selectionStatus: "ready",
     effectStatus: "ready",
     sourceLabel:
-      "Mutator-Auswahl aus Legacy mutator_trait_1/_2; Effekt: +6 Score pro passendem Mutator und +0.3 Player-PPs pro betroffenem aktivem Spieler, maximal einmal je Diszi-Seite.",
+      "Matchday-Mutatoren: 2 Traits werden einmal pro Spieltag und Disziplin-Seite für alle Teams ausgewürfelt; +6 Score pro passendem Trait je eingesetztem Spieler und +0,3 Player-PPs pro betroffenem Spieler.",
+    warnings: [],
+  };
+}
+
+export type MatchdayMutatorTraitsBySide = Record<LineupDisciplineSide, [string, string]>;
+
+export function rollMatchdayMutatorTraitsForSide(input: {
+  saveId: string;
+  seasonId: string;
+  matchdayId: string;
+  disciplineSide: LineupDisciplineSide;
+  disciplineId?: string | null;
+}): [string, string] {
+  const pool = getLegacyMutatorTraitOptions()
+    .map((option) => option.value)
+    .sort((left, right) => left.localeCompare(right, "de"));
+  if (pool.length === 0) {
+    return ["", ""];
+  }
+
+  const seedBase = [
+    input.saveId,
+    input.seasonId,
+    input.matchdayId,
+    input.disciplineSide,
+    input.disciplineId ?? "discipline",
+  ].join("::");
+  const firstIndex = hashSeed(`${seedBase}::mutator1`) % pool.length;
+  const first = pool[firstIndex] ?? pool[0]!;
+  const remaining = pool.filter((_, index) => index !== firstIndex);
+  const secondPool = remaining.length > 0 ? remaining : pool;
+  const secondIndex = hashSeed(`${seedBase}::mutator2`) % secondPool.length;
+  const second = secondPool[secondIndex] ?? secondPool[0] ?? first;
+
+  return [first, second];
+}
+
+export function buildMatchdayMutatorTraitsBySide(input: {
+  saveId: string;
+  seasonId: string;
+  matchdayId: string;
+  d1DisciplineId?: string | null;
+  d2DisciplineId?: string | null;
+}): MatchdayMutatorTraitsBySide {
+  return {
+    d1: rollMatchdayMutatorTraitsForSide({
+      saveId: input.saveId,
+      seasonId: input.seasonId,
+      matchdayId: input.matchdayId,
+      disciplineSide: "d1",
+      disciplineId: input.d1DisciplineId,
+    }),
+    d2: rollMatchdayMutatorTraitsForSide({
+      saveId: input.saveId,
+      seasonId: input.seasonId,
+      matchdayId: input.matchdayId,
+      disciplineSide: "d2",
+      disciplineId: input.d2DisciplineId,
+    }),
+  };
+}
+
+export function getDisciplineTextMutatorSourceSummary(mutator1: string | null, mutator2: string | null): LegacyModifierSourceSummary {
+  if (!mutator1?.trim() && !mutator2?.trim()) {
+    return {
+      selectionStatus: "missing_source",
+      effectStatus: "missing_source",
+      sourceLabel: "Disziplin-Text-Mutatoren sind noch nicht an eine kanonische Quelle angebunden.",
+      warnings: ["discipline_text_mutator_source_missing"],
+    };
+  }
+
+  return {
+    selectionStatus: "ready",
+    effectStatus: "ready",
+    sourceLabel: `Disziplin-Text-Mutatoren: ${[mutator1, mutator2].filter(Boolean).join(" / ")}`,
     warnings: [],
   };
 }
@@ -332,8 +497,12 @@ export function buildFormCardSeasonUsageAudit(gameState: GameState, seasonId: st
       );
       const usedCards = cards.filter((card) => usage.has(card.id));
       const unusedCards = cards.filter((card) => !usage.has(card.id));
-      const unusedNegativeCards = unusedCards.filter((card) => card.cardValue < 0).length;
+      const unusedNegativeCardList = unusedCards.filter((card) => card.cardValue < 0);
+      const unusedNegativeCards = unusedNegativeCardList.length;
       const unusedPositiveCards = unusedCards.filter((card) => card.cardValue > 0).length;
+      const negativePenaltyPoints = Math.round(
+        unusedNegativeCardList.reduce((sum, card) => sum + Math.abs(card.cardValue) * 0.5, 0),
+      );
 
       return {
         teamId: team.teamId,
@@ -342,7 +511,7 @@ export function buildFormCardSeasonUsageAudit(gameState: GameState, seasonId: st
         unusedCards: unusedCards.length,
         unusedPositiveCards,
         unusedNegativeCards,
-        negativePenaltyPoints: unusedNegativeCards,
+        negativePenaltyPoints,
       };
     });
 
@@ -366,6 +535,39 @@ function normalizeColor(value: string | null | undefined): FormCardColor | null 
   return null;
 }
 
+const FORM_CARD_COLOR_CODES: Record<FormCardColor, string> = {
+  red: "R",
+  green: "G",
+  blue: "B",
+  yellow: "Y",
+};
+
+export function formatCompactFormCardLabel(
+  card: Pick<LegacyFormCardOption, "color" | "value">,
+  doubled = false,
+): string {
+  const code = FORM_CARD_COLOR_CODES[normalizeColor(card.color) ?? "red"] ?? "C";
+  const sign = card.value > 0 ? "+" : "";
+  return `${code}${sign}${card.value}${doubled ? "×2" : ""}`;
+}
+
+export function formatSelectedFormCardLabels(input: {
+  selectedCards: LegacyFormCardOption[];
+  disciplineColor?: string | null;
+}): string | null {
+  if (input.selectedCards.length === 0) {
+    return null;
+  }
+
+  const normalizedColor = normalizeColor(input.disciplineColor);
+  return input.selectedCards
+    .map((card) => {
+      const doubled = normalizedColor != null && card.color === normalizedColor;
+      return formatCompactFormCardLabel(card, doubled);
+    })
+    .join(" · ");
+}
+
 export function getModifierSelectionForSide(
   modifiers: LineupDraftModifiers | undefined | null,
   disciplineSide: LineupDisciplineSide,
@@ -382,6 +584,7 @@ export function calculateFormModifierForSide(input: {
 }): {
   formCardsAvailable: number;
   formCardsSelected: number;
+  formCardLabel: string | null;
   formModifier: number;
   warnings: string[];
 } {
@@ -407,6 +610,10 @@ export function calculateFormModifierForSide(input: {
   return {
     formCardsAvailable: input.formCards.filter((card) => !card.isUsed || selectedIds.includes(card.id)).length,
     formCardsSelected: selectedCards.length,
+    formCardLabel: formatSelectedFormCardLabels({
+      selectedCards,
+      disciplineColor: input.disciplineColor,
+    }),
     formModifier: Number((effectiveSum * input.playerCount).toFixed(1)),
     warnings,
   };
@@ -442,6 +649,7 @@ export function calculateMutatorModifierForSide(input: {
   disciplineSide: LineupDisciplineSide;
   entries: Array<{ playerId: string }>;
   rosterPlayers: LegacyRosterPlayerRef[];
+  matchdayMutatorTraits?: Array<string | null | undefined>;
 }): {
   mutatorMode: LegacyResolveMutatorMode;
   mutatorText: string | null;
@@ -454,12 +662,22 @@ export function calculateMutatorModifierForSide(input: {
   warnings: string[];
 } {
   const selection = getModifierSelectionForSide(input.modifiers, input.disciplineSide);
-  const selectedTraits = Array.from(
+  const matchdayTraits = (input.matchdayMutatorTraits ?? [])
+    .map(normalizeTraitValue)
+    .filter(Boolean);
+  const storedTraits = Array.from(
     new Map(
       [selection.mutatorTrait1, selection.mutatorTrait2]
         .map(normalizeTraitValue)
         .filter(Boolean)
         .map((trait) => [normalizeTraitKey(trait), trait] as const),
+    ).values(),
+  );
+  const selectedTraits = Array.from(
+    new Map(
+      (matchdayTraits.length > 0 ? matchdayTraits : storedTraits).map(
+        (trait) => [normalizeTraitKey(trait), trait] as const,
+      ),
     ).values(),
   );
   const warnings: string[] = [];
