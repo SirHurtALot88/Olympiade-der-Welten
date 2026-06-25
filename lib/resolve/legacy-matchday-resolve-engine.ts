@@ -6,6 +6,7 @@ import {
   calculateMvpForcedMutatorModifierForSide,
   calculateFormModifierForSide,
   calculateMutatorModifierForSide,
+  buildMatchdayMutatorTraitsBySide,
   getFormCardColorForDisciplineCategory,
 } from "@/lib/lineups/legacy-lineup-modifiers";
 import { calculateTeamPowerModifierForSide } from "@/lib/lineups/team-powers";
@@ -225,6 +226,13 @@ export function buildLegacyMatchdayResolvePreview(
     captainMode: options?.captainMode ?? "selected_captain",
   };
   const base = contexts[0];
+  const matchdayMutatorTraitsBySide = buildMatchdayMutatorTraitsBySide({
+    saveId: base.saveId,
+    seasonId: base.seasonId,
+    matchdayId: base.matchdayId,
+    d1DisciplineId: base.contextMeta.d1DisciplineId,
+    d2DisciplineId: base.contextMeta.d2DisciplineId,
+  });
   const resolveWarnings: string[] = [];
   const missingLineups: Array<{ teamId: string; teamName: string }> = [];
   const incompleteLineups: Array<{ teamId: string; teamName: string; disciplineSide: "d1" | "d2" }> = [];
@@ -322,6 +330,7 @@ export function buildLegacyMatchdayResolvePreview(
                   disciplineSide: meta.disciplineSide,
                   entries: sideEntries.map((entry) => ({ playerId: entry.playerId })),
                   rosterPlayers: context.rosterPlayers,
+                  matchdayMutatorTraits: matchdayMutatorTraitsBySide[meta.disciplineSide],
                 });
           const effectiveMutatorModifier =
             context.mutatorSource?.effectStatus === "ready" ? mutatorResult.mutatorModifier : null;
@@ -352,7 +361,7 @@ export function buildLegacyMatchdayResolvePreview(
             formCardsAvailable: formResult.formCardsAvailable,
             formCardsSelected: formResult.formCardsSelected,
             formCardStatus: context.formCardSource?.effectStatus === "ready" ? "ready" : "missing_source",
-            formCardLabel: formResult.formCardsSelected > 0 ? `Formkarten (${formResult.formCardsSelected})` : null,
+            formCardLabel: formResult.formCardLabel,
             formModifier: formResult.formModifier,
             mutatorMode: mutatorResult.mutatorMode,
             mutatorText: mutatorResult.mutatorText,

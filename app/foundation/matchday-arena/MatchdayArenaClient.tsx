@@ -1761,28 +1761,9 @@ export default function MatchdayArenaClient(props: MatchdayArenaClientProps) {
             ) : null}
           </div>
           <div className="matchday-arena-focus-select">
-            <label htmlFor="matchday-arena-focus-team">Fokus-Team</label>
-            <select
-              id="matchday-arena-focus-team"
-              value={params.teamId}
-              onChange={(event) => {
-                const nextTeamId = event.currentTarget.value;
-                const nextParams = {
-                  ...params,
-                  teamId: nextTeamId,
-                };
-                setParams(nextParams);
-                setWinnerBoardTeamId(nextTeamId);
-                void loadArena(nextParams, source, { reuseScoreFeed: true });
-              }}
-              disabled={isBusy || !teamOptions.length}
-            >
-              {teamOptions.map((team) => (
-                <option key={`arena-focus-team-${team.id}`} value={team.id}>
-                  {team.id} · {team.name}
-                </option>
-              ))}
-            </select>
+            <label>Aktives Team</label>
+            <strong>{context?.team.name ?? params.teamId}</strong>
+            <small className="muted">Wechsel oben in der Foundation-Leiste.</small>
           </div>
           <div className="matchday-arena-side-switch">
             <button
@@ -2188,7 +2169,7 @@ export default function MatchdayArenaClient(props: MatchdayArenaClientProps) {
               </article>
               {focusedSlotSpotlight.selectedEntry ? (
                 <div className="matchday-arena-spotlight-block">
-                  <strong>Fokus-Team · Reveal bis Slot {Math.max(revealedSlotLimit + 1, 0)}</strong>
+                  <strong>Aktives Team · Reveal bis Slot {Math.max(revealedSlotLimit + 1, 0)}</strong>
                   <div className="matchday-arena-player-stack">
                     {focusTeamEntries.length ? (
                       focusTeamEntries.map((entry) => (
@@ -2217,7 +2198,7 @@ export default function MatchdayArenaClient(props: MatchdayArenaClientProps) {
                     ) : (
                       <div className="matchday-arena-empty-card">
                         <strong>Noch keine Reveal-Slots</strong>
-                        <span className="muted">Sobald die Slot-Phase startet, baut sich dein Fokus-Team hier Schritt für Schritt auf.</span>
+                        <span className="muted">Sobald die Slot-Phase startet, baut sich dein aktives Team hier Schritt für Schritt auf.</span>
                       </div>
                     )}
                   </div>

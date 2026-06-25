@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { buildLegacyMatchdayReadiness as buildLineupReadiness } from "@/lib/lineups/legacy-matchday-readiness";
+import { buildLegacyMatchdayReadiness as buildLineupReadiness, isLegacyLineupDraftComplete } from "@/lib/lineups/legacy-matchday-readiness";
 import { buildLegacyMatchdayReadiness as buildResolveReadiness } from "@/lib/resolve/legacy-matchday-readiness";
 import type { LegacyLineupLoadedContext } from "@/lib/lineups/legacy-lineup-types";
 
@@ -181,5 +181,41 @@ describe("legacy matchday readiness", () => {
     expect(lineupReadiness.reasonCodes).toContain("partial_lineup_allowed");
     expect(resolveReadiness.readinessStatus).toBe("ready");
     expect(resolveReadiness.reasonCodes).toContain("partial_lineup_allowed");
+  });
+
+  it("treats missing discipline-side slots as incomplete even when matchdayReady", () => {
+    const context = createContext({
+      activePlayersCount: 7,
+      d1Required: 4,
+      d2Required: 5,
+      d1Selected: 4,
+      d2Selected: 3,
+    });
+
+    expect(buildLineupReadiness(context).matchdayReady).toBe(true);
+    expect(isLegacyLineupDraftComplete(context)).toBe(false);
+  });
+
+  it("flags a one-sided draft as incomplete", () => {
+    const context = createContext({
+      activePlayersCount: 12,
+      d1Required: 4,
+      d2Required: 8,
+      d1Selected: 0,
+      d2Selected: 10,
+    });
+
+    expect(isLegacyLineupDraftComplete(context)).toBe(false);
+  });
+  it("accepts a draft once both discipline sides meet their slot counts", () => {
+    const context = createContext({
+      activePlayersCount: 12,
+      d1Required: 4,
+      d2Required: 8,
+      d1Selected: 4,
+      d2Selected: 8,
+    });
+
+    expect(isLegacyLineupDraftComplete(context)).toBe(true);
   });
 });

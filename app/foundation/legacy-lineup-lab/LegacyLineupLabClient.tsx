@@ -313,6 +313,7 @@ type LegacyLineupLabClientProps = {
     matchdayId: string;
     teamId: string;
     silent: boolean;
+    draft?: LegacyLineupDraft | null;
   }) => void;
   onOpenArena?: (payload: {
     saveId: string;
@@ -2020,6 +2021,8 @@ export default function LegacyLineupLabClient(props: LegacyLineupLabClientProps)
     }
 
     const rows = visibleScoreboardSide === "d1" ? matchdayScorePreview.d1Scoreboard : matchdayScorePreview.d2Scoreboard;
+    const revealState = scoreboardReveal[visibleScoreboardSide];
+    const showResultLayer = Boolean(revealState.form && revealState.mutators);
     const rankedByBase = [...rows]
       .sort((left, right) => {
         if (right.baseScore !== left.baseScore) {
@@ -2044,8 +2047,16 @@ export default function LegacyLineupLabClient(props: LegacyLineupLabClientProps)
         formScore: row.formCardStatus === "ready" ? Number((row.formCardModifier ?? 0).toFixed(1)) : null,
         bonusScore: row.teamPpsStatus === "ready" ? Number((row.teamPpsModifier ?? 0).toFixed(1)) : 0,
       };
+    }).sort((left, right) => {
+      if (showResultLayer) {
+        return left.rank - right.rank;
+      }
+      if (left.baseRank !== right.baseRank) {
+        return left.baseRank - right.baseRank;
+      }
+      return left.teamName.localeCompare(right.teamName, "de");
     });
-  }, [matchdayScorePreview, visibleScoreboardSide]);
+  }, [matchdayScorePreview, scoreboardReveal, visibleScoreboardSide]);
   const visibleTopPlayers = useMemo<MatchdayMvpTopPlayerRow[]>(() => {
     if (!matchdayScorePreview || !visibleScoreboardSide) {
       return [];
@@ -2055,6 +2066,8 @@ export default function LegacyLineupLabClient(props: LegacyLineupLabClientProps)
       ? matchdayScorePreview.d1TopPlayers ?? []
       : matchdayScorePreview.d2TopPlayers ?? [];
   }, [matchdayScorePreview, visibleScoreboardSide]);
+  const visibleScoreboardReveal = visibleScoreboardSide ? scoreboardReveal[visibleScoreboardSide] : null;
+  const isScoreboardResultRevealed = Boolean(visibleScoreboardReveal?.form && visibleScoreboardReveal?.mutators);
   const playerRows = useMemo<LineupPlayerTableRow[]>(() => {
     if (!context) {
       return [];
@@ -4587,6 +4600,7 @@ export default function LegacyLineupLabClient(props: LegacyLineupLabClientProps)
         matchdayId: params.matchdayId,
         teamId: params.teamId,
         silent: Boolean(options?.silent),
+        draft: payload.draft ?? null,
       });
       return true;
     } finally {
@@ -4700,15 +4714,15 @@ export default function LegacyLineupLabClient(props: LegacyLineupLabClientProps)
 
       setMatchdayScorePreview(nextFeed);
       setVisibleScoreboardSide(side);
-      if (nextReveal) {
-        setScoreboardReveal((current) => ({
-          ...current,
-          [side]: {
-            form: nextReveal.form ?? current[side].form,
-            mutators: nextReveal.mutators ?? current[side].mutators,
-          },
-        }));
-      }
+      setScoreboardReveal((current) => ({
+        ...current,
+        [side]: nextReveal
+          ? {
+              form: nextReveal.form ?? current[side].form,
+              mutators: nextReveal.mutators ?? current[side].mutators,
+            }
+          : { form: false, mutators: false },
+      }));
       setWarnings([...nextFeed.warnings, ...nextFeed.blockingReasons]);
       setMessage(
         `${side === "d1" ? nextFeed.targetMatchday.d1DisciplineName : nextFeed.targetMatchday.d2DisciplineName}: ${nextFeed.totalTeamsScored ?? (side === "d1" ? nextFeed.d1Scoreboard.length : nextFeed.d2Scoreboard.length)} Teams geladen.`,
@@ -7207,9 +7221,9 @@ export default function LegacyLineupLabClient(props: LegacyLineupLabClientProps)
                             </div>
                             {(slotIssuesByKey.get(slot.key) ?? []).length > 0 ? (
                               <div className="legacy-lineup-slot-issue-row" aria-label="Slot Status">
-                                {(slotIssuesByKey.get(slot.key) ?? []).slice(0, 2).map((issue) => (
+                                {(slotIssuesByKey.get(slot.key) ?? []).slice(0, 2).map((issue, issueIndex) => (
                                   <span
-                                    key={`${slot.key}-${issue.label}`}
+                                    key={`${slot.key}-${issue.label}-${issue.detail}-${issueIndex}`}
                                     className={`legacy-lineup-slot-issue-chip is-${issue.tone}`}
                                     title={issue.detail}
                                   >
@@ -8850,7 +8864,7 @@ export default function LegacyLineupLabClient(props: LegacyLineupLabClientProps)
                 <span>Fatigue: {matchdayScorePreview.resolveSources.fatigueSourceStatus}</span>
               </div>
             </div>
-            {visibleResultBoardSummary ? (
+            {isScoreboardResultRevealed && visibleResultBoardSummary ? (
               <section className="legacy-lineup-result-board-shell">
                 <div className="legacy-lineup-result-board-main">
                   <article className="legacy-lineup-result-hero-card">
@@ -8939,48 +8953,49 @@ export default function LegacyLineupLabClient(props: LegacyLineupLabClientProps)
               <table className="team-table legacy-lineup-scoreboard-table">
                 <thead>
                   <tr>
-                    <th>Rang</th>
+                    <th>{isScoreboardResultRevealed ? "Rang" : "Base-Rang"}</th>
                     <th>Δ</th>
                     <th>Team</th>
                     <th>Base</th>
                     <th>Loss</th>
                     <th>Current</th>
                     <th>Captain</th>
-                    <th>Form</th>
+                    {scoreboardReveal[visibleScoreboardSide].form ? <th>Form</th> : null}
                     {scoreboardReveal[visibleScoreboardSide].mutators ? <th>Mutator 1</th> : null}
                     {scoreboardReveal[visibleScoreboardSide].mutators ? <th>Mutator 2</th> : null}
-                    <th>Bonus</th>
-                    <th>Gesamt</th>
-                    <th>Finale Punkte</th>
+                    {isScoreboardResultRevealed ? <th>Bonus</th> : null}
+                    {isScoreboardResultRevealed ? <th>Gesamt</th> : null}
+                    {isScoreboardResultRevealed ? <th>Finale Punkte</th> : null}
                   </tr>
                 </thead>
                 <tbody>
                   {visibleMatchdayScoreboard.map((entry) => (
                     <tr key={`legacy-lineup-scoreboard-${visibleScoreboardSide}-${entry.teamId}`}>
-                      <td>{entry.rank}</td>
+                      <td>{isScoreboardResultRevealed ? entry.rank : entry.baseRank}</td>
                       <td className={entry.rankDelta > 0 ? "is-positive-number" : entry.rankDelta < 0 ? "is-negative-number" : undefined}>
-                        {formatSignedDelta(entry.rankDelta)}
+                        {isScoreboardResultRevealed ? formatSignedDelta(entry.rankDelta) : "—"}
                       </td>
                       <td>{entry.teamName}</td>
                       <td>{formatDecimalScore(entry.baseScore, 1)}</td>
                       <td>{formatDecimalScore(entry.lossScore, 1)}</td>
                       <td>{formatDecimalScore(entry.currentScore, 1)}</td>
                       <td>{entry.captainScore != null ? formatDecimalScore(entry.captainScore, 1) : "—"}</td>
-                      <td>{entry.formScore != null ? formatDecimalScore(entry.formScore, 1) : "—"}</td>
+                      {scoreboardReveal[visibleScoreboardSide].form ? <td>{entry.formScore != null ? formatDecimalScore(entry.formScore, 1) : "—"}</td> : null}
                       {scoreboardReveal[visibleScoreboardSide].mutators ? (
                         <td>{entry.mutator1Label ? `${entry.mutator1Label} · ${formatDecimalScore(entry.mutator1Modifier, 1)}` : "—"}</td>
                       ) : null}
                       {scoreboardReveal[visibleScoreboardSide].mutators ? (
                         <td>{entry.mutator2Label ? `${entry.mutator2Label} · ${formatDecimalScore(entry.mutator2Modifier, 1)}` : "—"}</td>
                       ) : null}
-                      <td>{entry.teamPpsStatus === "ready" ? formatDecimalScore(entry.bonusScore, 1) : "—"}</td>
-                      <td>{formatDecimalScore(entry.score, 1)}</td>
-                      <td>{entry.points != null ? formatDecimalScore(entry.points, 1) : "—"}</td>
+                      {isScoreboardResultRevealed ? <td>{entry.teamPpsStatus === "ready" ? formatDecimalScore(entry.bonusScore, 1) : "—"}</td> : null}
+                      {isScoreboardResultRevealed ? <td>{formatDecimalScore(entry.score, 1)}</td> : null}
+                      {isScoreboardResultRevealed ? <td>{entry.points != null ? formatDecimalScore(entry.points, 1) : "—"}</td> : null}
                     </tr>
                   ))}
                 </tbody>
               </table>
             </div>
+            {isScoreboardResultRevealed ? (
             <div className="table-shell legacy-lineup-scoreboard-table-shell" style={{ marginTop: 12 }}>
               <table className="team-table legacy-lineup-scoreboard-table">
                 <thead>
@@ -9011,6 +9026,7 @@ export default function LegacyLineupLabClient(props: LegacyLineupLabClientProps)
                 </tbody>
               </table>
             </div>
+            ) : null}
           </section>
         ) : null}
 

@@ -198,7 +198,7 @@ describe("legacy ai lineup suggestion", () => {
     expect(suggestion.entries.every((entry) => activeIds.has(entry.playerId))).toBe(true);
   });
 
-  it("selects AI mutator traits by active player coverage instead of overlapping duplicate coverage", () => {
+  it("does not persist per-team mutator traits in AI lineup modifiers anymore", () => {
     const context = createContext();
     context.rosterPlayers = [
       { id: "p1", name: "Player 1", traitsPositive: ["Cool", "Diligent"], traitsNegative: [], coreStats: { pow: 80, spe: 20, men: 20, soc: 20 } },
@@ -214,8 +214,8 @@ describe("legacy ai lineup suggestion", () => {
       { disciplineId: "tdm", disciplineSide: "d1", slotIndex: 3, playerId: "p4", activePlayerId: "a4" },
     ]);
 
-    expect(modifiers.d1.mutatorTrait1).toBe("Cool");
-    expect(modifiers.d1.mutatorTrait2).toBe("Ambitious");
+    expect(modifiers.d1.mutatorTrait1).toBeNull();
+    expect(modifiers.d1.mutatorTrait2).toBeNull();
   });
 
   it("avoids injured roster players because they are not selectable active players", () => {

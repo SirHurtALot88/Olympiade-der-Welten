@@ -47,30 +47,80 @@ function createContext(
         disciplineSide: "d2",
       },
       seasonCaptainSlots: 0,
-      totalDisciplineSidesInSeason: 2,
+      totalDisciplineSidesInSeason: 20,
     },
   } as unknown as LegacyLineupLoadedContext;
 }
 
 describe("AI legacy lineup form-card planning", () => {
-  it("does not place a negative form card on a matching-color discipline", () => {
-    const modifiers = buildAiLegacyLineupModifiers(
-      createContext([
+  it("does not place a negative form card on a matching-color discipline when the side is competitive", () => {
+    const context = createContext([
+      {
+        id: "negative-red",
+        playerId: "p-red",
+        playerName: "Red Player",
+        color: "red",
+        value: -8,
+        isUsed: false,
+        usedByLineupId: null,
+      },
+      {
+        id: "negative-green",
+        playerId: "p-green",
+        playerName: "Green Player",
+        color: "green",
+        value: -8,
+        isUsed: false,
+        usedByLineupId: null,
+      },
+      {
+        id: "positive-red",
+        playerId: "p-red-positive",
+        playerName: "Red Positive",
+        color: "red",
+        value: 8,
+        isUsed: false,
+        usedByLineupId: null,
+      },
+    ]);
+    context.teamDisciplineRanks = {
+      tdm: { disciplineId: "tdm", teamId: "A-A", rank: 10, score: 420 },
+      spurt: { disciplineId: "spurt", teamId: "A-A", rank: 11, score: 410 },
+    };
+    context.disciplineScores = [
+      { playerId: "p-red", disciplineId: "tdm", score: 78 },
+      { playerId: "p-green", disciplineId: "spurt", score: 77 },
+    ];
+
+    const modifiers = buildAiLegacyLineupModifiers(context, [
+      { disciplineId: "tdm", disciplineSide: "d1", slotIndex: 0, playerId: "p-red", activePlayerId: "a1" },
+      { disciplineId: "spurt", disciplineSide: "d2", slotIndex: 0, playerId: "p-green", activePlayerId: "a2" },
+    ]);
+
+    expect(modifiers.d1.primaryFormCardId).toBe("positive-red");
+    expect(modifiers.d1.secondaryFormCardId).toBeNull();
+    expect(modifiers.d2.primaryFormCardId).toBeNull();
+    expect(modifiers.d2.secondaryFormCardId).toBeNull();
+  });
+
+  it("dumps matching-color negative form cards on weak discipline sides", () => {
+    const context = createContext(
+      [
         {
-          id: "negative-red",
-          playerId: "p-red",
-          playerName: "Red Player",
+          id: "negative-red-a",
+          playerId: "p-red-a",
+          playerName: "Red Player A",
           color: "red",
           value: -8,
           isUsed: false,
           usedByLineupId: null,
         },
         {
-          id: "negative-green",
-          playerId: "p-green",
-          playerName: "Green Player",
-          color: "green",
-          value: -8,
+          id: "negative-red-b",
+          playerId: "p-red-b",
+          playerName: "Red Player B",
+          color: "red",
+          value: -4,
           isUsed: false,
           usedByLineupId: null,
         },
@@ -83,43 +133,167 @@ describe("AI legacy lineup form-card planning", () => {
           isUsed: false,
           usedByLineupId: null,
         },
-      ]),
+      ],
+      { d2Category: "power" },
     );
+    context.teamDisciplineRanks = {
+      tdm: { disciplineId: "tdm", teamId: "A-A", rank: 29, score: 180 },
+    };
+    context.disciplineScores = [
+      { playerId: "p-red-a", disciplineId: "tdm", score: 62 },
+      { playerId: "p-red-b", disciplineId: "tdm", score: 60 },
+    ];
 
-    expect(modifiers.d1.primaryFormCardId).not.toBe("negative-red");
-    expect(modifiers.d1.primaryFormCardId).toBe("negative-green");
-    expect(modifiers.d2.primaryFormCardId).not.toBe("negative-green");
+    const modifiers = buildAiLegacyLineupModifiers(context, [
+      { disciplineId: "tdm", disciplineSide: "d1", slotIndex: 0, playerId: "p-red-a", activePlayerId: "a1" },
+      { disciplineId: "tdm", disciplineSide: "d1", slotIndex: 1, playerId: "p-red-b", activePlayerId: "a2" },
+    ]);
+
+    expect(modifiers.d1.primaryFormCardId).toBe("negative-red-a");
+    expect(modifiers.d1.primaryFormCardId).not.toBe("positive-red");
+    expect(modifiers.d1.secondaryFormCardId).toBeNull();
+    expect(modifiers.d2.secondaryFormCardId).toBeNull();
   });
 
-  it("skips negative form cards when every available negative card would double its malus", () => {
-    const modifiers = buildAiLegacyLineupModifiers(
-      createContext(
-        [
-          {
-            id: "negative-red-a",
-            playerId: "p-red-a",
-            playerName: "Red Player A",
-            color: "red",
-            value: -8,
-            isUsed: false,
-            usedByLineupId: null,
-          },
-          {
-            id: "negative-red-b",
-            playerId: "p-red-b",
-            playerName: "Red Player B",
-            color: "red",
-            value: -4,
-            isUsed: false,
-            usedByLineupId: null,
-          },
-        ],
-        { d2Category: "power" },
-      ),
+  it("skips negative form cards when every available negative card would double its malus on a neutral side", () => {
+    const context = createContext(
+      [
+        {
+          id: "negative-red-a",
+          playerId: "p-red-a",
+          playerName: "Red Player A",
+          color: "red",
+          value: -8,
+          isUsed: false,
+          usedByLineupId: null,
+        },
+        {
+          id: "negative-red-b",
+          playerId: "p-red-b",
+          playerName: "Red Player B",
+          color: "red",
+          value: -4,
+          isUsed: false,
+          usedByLineupId: null,
+        },
+      ],
+      { d2Category: "power" },
     );
+    context.teamDisciplineRanks = {
+      tdm: { disciplineId: "tdm", teamId: "A-A", rank: 14, score: 360 },
+      "mini-dm": { disciplineId: "mini-dm", teamId: "A-A", rank: 15, score: 350 },
+    };
+    context.matchdayContract = {
+      ...context.matchdayContract!,
+      discipline2: {
+        ...context.matchdayContract!.discipline2,
+        disciplineId: "mini-dm",
+        category: "power",
+      },
+    };
+    context.disciplineScores = [
+      { playerId: "p-red-a", disciplineId: "tdm", score: 72 },
+      { playerId: "p-red-b", disciplineId: "mini-dm", score: 71 },
+    ];
+
+    const modifiers = buildAiLegacyLineupModifiers(context, [
+      { disciplineId: "tdm", disciplineSide: "d1", slotIndex: 0, playerId: "p-red-a", activePlayerId: "a1" },
+      { disciplineId: "mini-dm", disciplineSide: "d2", slotIndex: 0, playerId: "p-red-b", activePlayerId: "a2" },
+    ]);
 
     expect(modifiers.d1.primaryFormCardId).toBeNull();
     expect(modifiers.d2.primaryFormCardId).toBeNull();
+    expect(modifiers.d1.secondaryFormCardId).toBeNull();
+    expect(modifiers.d2.secondaryFormCardId).toBeNull();
+  });
+
+  it("skips all form-card slots when only non-matching positives are available on competitive sides", () => {
+    const context = createContext([
+      {
+        id: "positive-blue",
+        playerId: "p-blue",
+        playerName: "Blue Player",
+        color: "blue",
+        value: 8,
+        isUsed: false,
+        usedByLineupId: null,
+      },
+      {
+        id: "positive-yellow",
+        playerId: "p-yellow",
+        playerName: "Yellow Player",
+        color: "yellow",
+        value: 8,
+        isUsed: false,
+        usedByLineupId: null,
+      },
+    ]);
+    context.teamDisciplineRanks = {
+      tdm: { disciplineId: "tdm", teamId: "A-A", rank: 10, score: 420 },
+      spurt: { disciplineId: "spurt", teamId: "A-A", rank: 11, score: 410 },
+    };
+    context.disciplineScores = [
+      { playerId: "p-blue", disciplineId: "tdm", score: 78 },
+      { playerId: "p-yellow", disciplineId: "spurt", score: 77 },
+    ];
+
+    const modifiers = buildAiLegacyLineupModifiers(context, [
+      { disciplineId: "tdm", disciplineSide: "d1", slotIndex: 0, playerId: "p-blue", activePlayerId: "a1" },
+      { disciplineId: "spurt", disciplineSide: "d2", slotIndex: 0, playerId: "p-yellow", activePlayerId: "a2" },
+    ]);
+
+    expect(modifiers.d1.primaryFormCardId).toBeNull();
+    expect(modifiers.d1.secondaryFormCardId).toBeNull();
+    expect(modifiers.d2.primaryFormCardId).toBeNull();
+    expect(modifiers.d2.secondaryFormCardId).toBeNull();
+  });
+
+  it("burns remaining negative cards on strong sides near season end", () => {
+    const context = createContext([
+      {
+        id: "negative-red-a",
+        playerId: "p-red-a",
+        playerName: "Red Player A",
+        color: "red",
+        value: -8,
+        isUsed: false,
+        usedByLineupId: null,
+      },
+      {
+        id: "negative-red-b",
+        playerId: "p-red-b",
+        playerName: "Red Player B",
+        color: "red",
+        value: -4,
+        isUsed: false,
+        usedByLineupId: null,
+      },
+    ]);
+    context.matchday = { index: 10 };
+    context.season = { currentMatchday: 10 };
+    context.matchdayContract = {
+      ...context.matchdayContract!,
+      matchdayIndex: 10,
+      totalDisciplineSidesInSeason: 20,
+    };
+    context.teamDisciplineRanks = {
+      tdm: { disciplineId: "tdm", teamId: "A-A", rank: 10, score: 420 },
+      spurt: { disciplineId: "spurt", teamId: "A-A", rank: 11, score: 410 },
+    };
+    context.disciplineScores = [
+      { playerId: "p-red-a", disciplineId: "tdm", score: 78 },
+      { playerId: "p-red-b", disciplineId: "spurt", score: 77 },
+    ];
+
+    const modifiers = buildAiLegacyLineupModifiers(context, [
+      { disciplineId: "tdm", disciplineSide: "d1", slotIndex: 0, playerId: "p-red-a", activePlayerId: "a1" },
+      { disciplineId: "spurt", disciplineSide: "d2", slotIndex: 0, playerId: "p-red-b", activePlayerId: "a2" },
+    ]);
+
+    expect(modifiers.d1.primaryFormCardId).toBe("negative-red-a");
+    expect(modifiers.d2.primaryFormCardId).toBe("negative-red-b");
+    expect(modifiers.d1.secondaryFormCardId).toBeNull();
+    expect(modifiers.d2.secondaryFormCardId).toBeNull();
   });
 
   it("prioritizes team powers by discipline fit and active rivalry windows", () => {

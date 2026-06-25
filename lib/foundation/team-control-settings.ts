@@ -1,6 +1,8 @@
 import type { GameState, Team, TeamControlMode, TeamControlSettings } from "@/lib/data/olyDataTypes";
 
 export const DEFAULT_ACTIVE_OWNER_ID = "user_local";
+export const FRANKY_OWNER_ID = "franky_remote_placeholder";
+export const LOCAL_USER_DISPLAY_LABEL = "Chris";
 export const AI_OWNER_ID = "ai";
 
 export type TeamOwnerType = "local_user" | "local_friend" | "remote_player" | "ai";
@@ -21,9 +23,9 @@ export type TeamControlFilter =
   | `owner:${string}`;
 
 export const DEFAULT_TEAM_OWNERS: Array<Omit<TeamOwner, "controlledTeamIds">> = [
-  { ownerId: DEFAULT_ACTIVE_OWNER_ID, label: "User", type: "local_user" },
+  { ownerId: DEFAULT_ACTIVE_OWNER_ID, label: LOCAL_USER_DISPLAY_LABEL, type: "local_user" },
   { ownerId: "ramona_local", label: "Ramona", type: "local_friend" },
-  { ownerId: "franky_remote_placeholder", label: "Franky", type: "remote_player" },
+  { ownerId: FRANKY_OWNER_ID, label: "Franky", type: "remote_player" },
   { ownerId: AI_OWNER_ID, label: "AI", type: "ai" },
 ];
 
@@ -107,12 +109,138 @@ export function getTeamControlSettings(gameState: GameState, teamId: string) {
   return team ? createDefaultTeamControlSettings(team) : null;
 }
 
-function isLocalUserManualSettings(settings: TeamControlSettings | null | undefined) {
+export function isChrisOwnedTeamSettings(settings: TeamControlSettings | null | undefined) {
   if (!settings || settings.controlMode !== "manual") {
     return false;
   }
 
-  return normalizeOwnerIdForMode(settings.controlMode, settings.ownerId) === DEFAULT_ACTIVE_OWNER_ID || settings.ownerSlot === "user";
+  const ownerId = normalizeOwnerIdForMode(settings.controlMode, settings.ownerId);
+  return (
+    ownerId === DEFAULT_ACTIVE_OWNER_ID ||
+    settings.ownerSlot === "user" ||
+    settings.displayLabel === LOCAL_USER_DISPLAY_LABEL
+  );
+}
+
+export function isFrankyOwnedTeamSettings(settings: TeamControlSettings | null | undefined) {
+  if (!settings || settings.controlMode !== "manual") {
+    return false;
+  }
+
+  const ownerId = normalizeOwnerIdForMode(settings.controlMode, settings.ownerId);
+  return ownerId === FRANKY_OWNER_ID || settings.displayLabel === "Franky";
+}
+
+function isLocalUserManualSettings(settings: TeamControlSettings | null | undefined) {
+  return isChrisOwnedTeamSettings(settings);
+}
+
+export function deriveChrisFrankyTeamIdsFromSettings(teams: Team[], settingsMap: Record<string, TeamControlSettings>) {
+  const chrisTeamIds: string[] = [];
+  const frankyTeamIds: string[] = [];
+
+  for (const team of teams) {
+    const settings = settingsMap[team.teamId];
+    if (isChrisOwnedTeamSettings(settings)) {
+      chrisTeamIds.push(team.teamId);
+      continue;
+    }
+    if (isFrankyOwnedTeamSettings(settings)) {
+      frankyTeamIds.push(team.teamId);
+    }
+  }
+
+  return { chrisTeamIds, frankyTeamIds };
+}
+
+export function createChrisFrankyTeamControlSetting(
+  team: Team,
+  ownership: "chris" | "franky" | "ai",
+): TeamControlSettings {
+  if (ownership === "chris") {
+    return {
+      teamId: team.teamId,
+      controlMode: "manual",
+      ownerId: DEFAULT_ACTIVE_OWNER_ID,
+      ownerSlot: "user",
+      displayLabel: LOCAL_USER_DISPLAY_LABEL,
+      aiLineupPreviewEnabled: false,
+      aiLineupApplyEnabled: false,
+      aiLineupAutoApplyEnabled: false,
+      aiTransferPreviewEnabled: false,
+      aiTransferAutoApplyEnabled: false,
+      aiSellPreviewEnabled: false,
+      aiSellAutoApplyEnabled: false,
+      notes: null,
+      strategyLock: null,
+    };
+  }
+
+  if (ownership === "franky") {
+    return {
+      teamId: team.teamId,
+      controlMode: "manual",
+      ownerId: FRANKY_OWNER_ID,
+      ownerSlot: FRANKY_OWNER_ID,
+      displayLabel: "Franky",
+      aiLineupPreviewEnabled: false,
+      aiLineupApplyEnabled: false,
+      aiLineupAutoApplyEnabled: false,
+      aiTransferPreviewEnabled: false,
+      aiTransferAutoApplyEnabled: false,
+      aiSellPreviewEnabled: false,
+      aiSellAutoApplyEnabled: false,
+      notes: null,
+      strategyLock: null,
+    };
+  }
+
+  return {
+    teamId: team.teamId,
+    controlMode: "ai",
+    ownerId: AI_OWNER_ID,
+    ownerSlot: "ai",
+    displayLabel: "AI",
+    aiLineupPreviewEnabled: true,
+    aiLineupApplyEnabled: false,
+    aiLineupAutoApplyEnabled: false,
+    aiTransferPreviewEnabled: true,
+    aiTransferAutoApplyEnabled: false,
+    aiSellPreviewEnabled: true,
+    aiSellAutoApplyEnabled: false,
+    notes: null,
+    strategyLock: null,
+  };
+}
+
+export function applyChrisFrankyOwnershipToTeamControlSettings(
+  teams: Team[],
+  chrisTeamIds: string[],
+  frankyTeamIds: string[],
+  existing?: Record<string, TeamControlSettings> | null,
+) {
+  const chrisSet = new Set(chrisTeamIds);
+  const frankySet = new Set(frankyTeamIds.filter((teamId) => !chrisSet.has(teamId)));
+
+  return Object.fromEntries(
+    teams.map((team) => {
+      const existingSettings = existing?.[team.teamId];
+      const ownership = chrisSet.has(team.teamId) ? "chris" : frankySet.has(team.teamId) ? "franky" : "ai";
+      const nextSettings = createChrisFrankyTeamControlSetting(team, ownership);
+      return [
+        team.teamId,
+        existingSettings
+          ? {
+              ...existingSettings,
+              ...nextSettings,
+              teamId: team.teamId,
+              notes: existingSettings.notes ?? nextSettings.notes,
+              strategyLock: existingSettings.strategyLock ?? nextSettings.strategyLock,
+            }
+          : nextSettings,
+      ];
+    }),
+  );
 }
 
 export function withNormalizedTeamControlSettings(gameState: GameState): GameState {
@@ -132,7 +260,7 @@ export function withNormalizedTeamControlSettings(gameState: GameState): GameSta
       controlMode: "manual",
       ownerId: DEFAULT_ACTIVE_OWNER_ID,
       ownerSlot: "user",
-      displayLabel: current.displayLabel ?? selectedTeam?.shortCode ?? selectedTeamId,
+      displayLabel: LOCAL_USER_DISPLAY_LABEL,
       aiLineupPreviewEnabled: false,
       aiLineupApplyEnabled: false,
       aiLineupAutoApplyEnabled: false,
@@ -158,7 +286,7 @@ export function withNormalizedTeamControlSettings(gameState: GameState): GameSta
       controlMode: "manual",
       ownerId: DEFAULT_ACTIVE_OWNER_ID,
       ownerSlot: "user",
-      displayLabel: current.displayLabel ?? selectedTeam?.shortCode ?? selectedTeamId,
+      displayLabel: LOCAL_USER_DISPLAY_LABEL,
       aiLineupPreviewEnabled: false,
       aiLineupApplyEnabled: false,
       aiLineupAutoApplyEnabled: false,

@@ -4,9 +4,11 @@ import type { Team } from "@/lib/data/olyDataTypes";
 import {
   AI_OWNER_ID,
   DEFAULT_ACTIVE_OWNER_ID,
+  applyChrisFrankyOwnershipToTeamControlSettings,
   buildTeamControlSettingsMap,
   buildTeamOwners,
   canOwnerManageTeam,
+  deriveChrisFrankyTeamIdsFromSettings,
   filterTeamsByControlScope,
   withNormalizedTeamControlSettings,
 } from "@/lib/foundation/team-control-settings";
@@ -201,6 +203,26 @@ describe("team control ownership", () => {
     expect(gameState.seasonState.teamControlSettings?.["H-R"]?.ownerId).toBe(DEFAULT_ACTIVE_OWNER_ID);
     expect(canOwnerManageTeam(gameState.seasonState.teamControlSettings?.["H-R"], DEFAULT_ACTIVE_OWNER_ID)).toBe(true);
     expect(gameState.seasonState.teamControlSettings?.["B-P"]?.controlMode).toBe("ai");
+  });
+
+  it("maps chris and franky ownership cards to manual/ai team control settings", () => {
+    const next = applyChrisFrankyOwnershipToTeamControlSettings(teams, ["M-M"], ["D-P"]);
+
+    expect(next["M-M"]?.controlMode).toBe("manual");
+    expect(next["M-M"]?.ownerId).toBe(DEFAULT_ACTIVE_OWNER_ID);
+    expect(next["M-M"]?.displayLabel).toBe("Chris");
+    expect(next["D-P"]?.controlMode).toBe("manual");
+    expect(next["D-P"]?.ownerId).toBe("franky_remote_placeholder");
+    expect(next["B-P"]?.controlMode).toBe("ai");
+    expect(next["P-X"]?.controlMode).toBe("ai");
+  });
+
+  it("derives chris and franky team ids from saved control settings", () => {
+    const settings = applyChrisFrankyOwnershipToTeamControlSettings(teams, ["M-M"], []);
+    expect(deriveChrisFrankyTeamIdsFromSettings(teams, settings)).toEqual({
+      chrisTeamIds: ["M-M"],
+      frankyTeamIds: [],
+    });
   });
 
   it("treats saved control settings as the source of truth after reload", () => {

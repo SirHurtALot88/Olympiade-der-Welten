@@ -147,6 +147,36 @@ describe("game inbox service", () => {
     expect(titles(items)).toContain("Training nicht gesetzt");
   });
 
+  it("does not create lineup tasks for ai-controlled teams", () => {
+    const gameState = makeGameState({
+      teams: [makeTeam({ teamId: "M-M", humanControlled: false })],
+      seasonState: {
+        seasonId: "season-3",
+        schedule: [],
+        standings: {},
+        teamControlSettings: {
+          "M-M": {
+            teamId: "M-M",
+            controlMode: "ai",
+            ownerId: "ai",
+            ownerSlot: "ai",
+            displayLabel: "AI",
+            aiLineupPreviewEnabled: true,
+            aiLineupApplyEnabled: true,
+            aiLineupAutoApplyEnabled: true,
+            aiTransferPreviewEnabled: true,
+            aiTransferAutoApplyEnabled: true,
+            aiSellPreviewEnabled: true,
+            aiSellAutoApplyEnabled: true,
+          },
+        },
+      },
+    });
+
+    const items = buildGameInboxItems({ gameState, saveId: "save-1", activeTeamId: "M-M", activeOwnerId: "user_local" });
+    expect(items.some((item) => item.itemId.startsWith("lineup_missing:"))).toBe(false);
+  });
+
   it("creates a transfer candidate task from real roster value, contract and cash pressure", () => {
     const gameState = makeGameState({
       teams: [makeTeam({ cash: -5 })],

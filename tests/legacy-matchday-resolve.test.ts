@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 
 import type { LegacyLineupLoadedContext } from "@/lib/lineups/legacy-lineup-types";
+import { buildMatchdayMutatorTraitsBySide } from "@/lib/lineups/legacy-lineup-modifiers";
 import { buildLegacyMatchdayResolvePreview } from "@/lib/resolve/legacy-matchday-resolve-engine";
 
 function createContext(input: {
@@ -315,10 +316,6 @@ describe("legacy matchday resolve preview", () => {
       fatigueSourceStatus: "mapped",
     });
 
-    alpha.rosterPlayers[0] = {
-      ...alpha.rosterPlayers[0]!,
-      traitsPositive: ["Cool", "Diligent"],
-    };
     alpha.formCards = [
       {
         id: "form-1",
@@ -339,11 +336,21 @@ describe("legacy matchday resolve preview", () => {
         usedByLineupId: null,
       },
     ];
+    const matchdayMutators = buildMatchdayMutatorTraitsBySide({
+      saveId: alpha.saveId,
+      seasonId: alpha.seasonId,
+      matchdayId: alpha.matchdayId,
+      d1DisciplineId: alpha.contextMeta.d1DisciplineId,
+      d2DisciplineId: alpha.contextMeta.d2DisciplineId,
+    }).d1;
+    alpha.rosterPlayers[0] = {
+      ...alpha.rosterPlayers[0]!,
+      traitsPositive: matchdayMutators,
+      traitsNegative: [],
+    };
     if (alpha.existingDraft) {
       alpha.existingDraft.modifiers.d1.primaryFormCardId = "form-1";
       alpha.existingDraft.modifiers.d1.secondaryFormCardId = "form-2";
-      alpha.existingDraft.modifiers.d1.mutatorTrait1 = "Cool";
-      alpha.existingDraft.modifiers.d1.mutatorTrait2 = "Diligent";
     }
 
     const preview = buildLegacyMatchdayResolvePreview([alpha, beta]);

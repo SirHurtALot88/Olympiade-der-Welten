@@ -11,6 +11,7 @@ import {
   getTeamFormCardOptions,
   buildLegacyMutatorTraitOptionsForRoster,
   normalizeLineupDraftModifiers,
+  buildMatchdayMutatorTraitsBySide,
 } from "@/lib/lineups/legacy-lineup-modifiers";
 import { getLocalModifierSourceBundle } from "@/lib/lineups/legacy-modifier-source-contract";
 import {
@@ -1135,7 +1136,7 @@ export function saveLocalLegacyLineupDraft(
     seasonId: effectiveParams.seasonId,
     matchdayId: effectiveParams.matchdayId,
     teamId: effectiveParams.teamId,
-    status: "draft",
+    status: "submitted",
     entries: normalizedEntries,
     modifiers: normalizeLineupDraftModifiers(modifiers),
     createdAt: existing?.createdAt ?? now,
@@ -1315,6 +1316,13 @@ export function calculateLocalLegacyLineupPreviewFromContext(
       null,
   });
   const previewModifiers = normalizeLineupDraftModifiers(modifiers ?? context.existingDraft?.modifiers);
+  const matchdayMutatorTraitsBySide = buildMatchdayMutatorTraitsBySide({
+    saveId: context.saveId,
+    seasonId: context.seasonId,
+    matchdayId: context.matchdayId,
+    d1DisciplineId: context.contextMeta.d1DisciplineId,
+    d2DisciplineId: context.contextMeta.d2DisciplineId,
+  });
   const validation = validateLegacyLineupContext(
     {
       ...context,
@@ -1357,6 +1365,7 @@ export function calculateLocalLegacyLineupPreviewFromContext(
       disciplineSide,
       entries: sideEntries.map((entry) => ({ playerId: entry.playerId })),
       rosterPlayers: context.rosterPlayers,
+      matchdayMutatorTraits: matchdayMutatorTraitsBySide[disciplineSide],
     });
     const teamPowerResult = calculateTeamPowerModifierForSide({
       modifiers: previewModifiers,
@@ -1400,6 +1409,7 @@ export function calculateLocalLegacyLineupPreviewFromContext(
         intensity: previewModifiers[disciplineSide].intensity,
         formCardsAvailable: formResult.formCardsAvailable,
         formCardsSelected: formResult.formCardsSelected,
+        formCardLabel: formResult.formCardLabel,
         formModifier: formResult.formModifier,
         mutatorText: mutatorResult.mutatorText,
         mutatorModifier: effectiveMutatorModifier,

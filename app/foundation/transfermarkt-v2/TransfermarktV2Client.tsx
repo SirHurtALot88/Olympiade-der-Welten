@@ -1090,7 +1090,7 @@ export default function TransfermarktV2Client({
     return ids;
   }, [effectiveOwnerId, manageableTeamIds, teamControlModesByTeamId, teamControlOwnersByTeamId]);
   const wishlistPlayerIdSet = useMemo(() => new Set(wishlistPlayerIds), [wishlistPlayerIds]);
-  const [selectedTeamId, setSelectedTeamId] = useState<string>(defaultTeamId ?? "");
+  const selectedTeamId = defaultTeamId ?? "";
   const [search, setSearch] = useState("");
   const deferredSearch = useDeferredValue(search);
   const [sortMode, setSortMode] = useState<MarketSortMode>("potential");
@@ -2434,17 +2434,11 @@ export default function TransfermarktV2Client({
   return (
     <section className="market-v2-shell">
       <section className="market-v2-topbar">
-        <label className="filter-field">
-          <span>Fokus-Team</span>
-          <select className="input" value={selectedTeamId} onChange={(event) => setSelectedTeamId(event.target.value)}>
-            <option value="">Markt-Überblick</option>
-            {teamOptions.map((team) => (
-              <option key={team.teamId} value={team.teamId}>
-                {team.shortCode} · {team.name}
-              </option>
-            ))}
-          </select>
-        </label>
+        <div className="filter-field">
+          <span>Aktives Team</span>
+          <strong>{selectedTeam ? `${selectedTeam.shortCode} · ${selectedTeam.name}` : "Markt-Überblick"}</strong>
+          <small className="muted">Wechsel oben in der Foundation-Leiste.</small>
+        </div>
         <label className="filter-field">
           <span>Suchen</span>
           <input

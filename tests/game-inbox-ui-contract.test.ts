@@ -9,9 +9,10 @@ describe("game inbox UI contract", () => {
     const source = readFileSync(join(root, "app/foundation/FoundationPageClient.tsx"), "utf8");
 
     expect(source).toContain('import { buildGameInboxItems, filterGameInboxItems, getPrimaryInboxTask }');
-    expect(source).toContain('| "inbox"');
-    expect(source).toContain('{ id: "inbox", label: "Inbox"');
-    expect(source).toContain('data-testid="foundation-inbox"');
+    expect(source).toContain('| "inboxV2"');
+    expect(source).toContain('{ id: "inboxV2", label: "Inbox"');
+    expect(source).toContain("<InboxV2Client");
+    expect(source).toContain('if (view === "inbox") return "inboxV2"');
     expect(source).toContain('data-testid="home-task-list"');
     expect(source).toContain('data-testid="home-story-cards"');
     expect(source).toContain("primaryInboxItem");
