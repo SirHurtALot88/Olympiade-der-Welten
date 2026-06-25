@@ -280,7 +280,7 @@ describe("team season objectives service", () => {
           transferType: "sell",
           fromTeamId: "C-C",
           toTeamId: null,
-          fee: 14,
+          fee: 16,
           salary: 0,
           marketValue: 10,
           remainingContractLength: 1,
@@ -295,7 +295,8 @@ describe("team season objectives service", () => {
 
     expect(mmSport?.label).toContain("Top 3");
     expect(mmSport?.status).toBe("completed");
-    expect(ccTransfer?.targetValue).toBe(10);
+    // Season 3 → C-C transfer target is 15 (seasonal scaling)
+    expect(ccTransfer?.targetValue).toBe(15);
     expect(ccTransfer?.status).toBe("completed");
   });
 
@@ -689,7 +690,8 @@ describe("team season objectives service", () => {
 
     expect(categories.has("player")).toBe(true);
     expect(topPlayer?.status).toBe("completed");
-    expect(transferGoal?.targetValue).toBe(10);
+    // Season 3 → C-C transfer target is 15 (seasonal scaling)
+    expect(transferGoal?.targetValue).toBe(15);
   });
 
   it("counts matchday medals from summed team scores across discipline results", () => {
@@ -771,6 +773,17 @@ describe("team season objectives service", () => {
     expect(bias?.warnings).toContain("objective_bias_player_peak_needed");
   });
 
+  it("hydrates missing season sponsor offers on refresh", () => {
+    const gameState = createGameState();
+    expect(gameState.seasonState.sponsorOffersByTeamId).toBeUndefined();
+
+    const refreshed = refreshTeamObjectiveState(gameState);
+    const offers = refreshed.seasonState.sponsorOffersByTeamId?.["M-M"] ?? [];
+
+    expect(offers).toHaveLength(3);
+    expect(offers.every((offer) => offer.seasonId === "season-3")).toBe(true);
+  });
+
   it("refreshes board confidence into season state without compounding saved confidence", () => {
     const gameState = createGameState({
       teams: [createTeam({ cash: -8 })],
@@ -815,5 +828,131 @@ describe("team season objectives service", () => {
     expect(Math.abs((minusRow?.cashDelta ?? 0) + (minusRow?.boardConfidenceDelta ?? 0))).toBeGreaterThan(0);
     expect(settlement.byTeamId["M-M"]?.completed).toBeGreaterThan(0);
     expect(settlement.byTeamId["A-A"]?.failed).toBeGreaterThan(0);
+  });
+});
+
+describe("team season objectives build stability", () => {
+  it("uses resolveSeasonNumberFromState without duplicate getSeasonNumber exports", async () => {
+    const fs = await import("node:fs/promises");
+    const servicePath = "/Users/chrisfalk/Documents/Codex/Olympiade der Welten/lib/board/team-season-objectives-service.ts";
+    const serviceText = await fs.readFile(servicePath, "utf8");
+
+    expect(serviceText).toContain("function resolveSeasonNumberFromState(gameState: GameState)");
+    expect(serviceText).toContain("resolveSeasonNumberFromState(gameState)");
+    expect(serviceText.match(/function getSeasonNumber\(/g)?.length ?? 0).toBe(1);
+  });
+});
+
+describe("human board pressure + C-C eco rules", () => {
+  it("adds board-confidence-budget-cut objective for human team with low confidence", () => {
+    const team = createTeam({ teamId: "H-T", shortCode: "H-T", humanControlled: true });
+    const gameState = createGameState({
+      teams: [team],
+      identities: [createIdentity("H-T", { boardConfidence: 5 })],
+      players: [createPlayer("h1")],
+      rosters: [createRoster("h1", { teamId: "H-T" })],
+      boardConfidence: {
+        "H-T": { teamId: "H-T", value: 3.5, pressure: 7.5, warnings: [] },
+      },
+    });
+
+    const overview = buildTeamObjectiveOverview(gameState);
+    const penalty = overview.objectives.find((o) => o.teamId === "H-T" && o.objectiveId === "board-confidence-budget-cut");
+
+    expect(penalty).toBeDefined();
+    expect(penalty?.status).toBe("failed");
+    // confidence=3.5 → (5.0 - 3.5) * 3.3 = 4.95 → rounds to 5
+    expect(penalty?.penaltyCash).toBe(5);
+    expect(penalty?.category).toBe("finance");
+  });
+
+  it("does NOT add board-confidence-budget-cut for non-human team", () => {
+    const team = createTeam({ teamId: "A-I", shortCode: "A-I", humanControlled: false });
+    const gameState = createGameState({
+      teams: [team],
+      identities: [createIdentity("A-I", { boardConfidence: 5 })],
+      players: [createPlayer("a1")],
+      rosters: [createRoster("a1", { teamId: "A-I" })],
+      boardConfidence: {
+        "A-I": { teamId: "A-I", value: 2.5, pressure: 9.0, warnings: [] },
+      },
+    });
+
+    const overview = buildTeamObjectiveOverview(gameState);
+    const penalty = overview.objectives.find((o) => o.teamId === "A-I" && o.objectiveId === "board-confidence-budget-cut");
+
+    expect(penalty).toBeUndefined();
+  });
+
+  it("does NOT add board-confidence-budget-cut when confidence is >= 5.0", () => {
+    const team = createTeam({ teamId: "H-T", shortCode: "H-T", humanControlled: true });
+    const gameState = createGameState({
+      teams: [team],
+      identities: [createIdentity("H-T", { boardConfidence: 7 })],
+      players: [createPlayer("h1")],
+      rosters: [createRoster("h1", { teamId: "H-T" })],
+      boardConfidence: {
+        "H-T": { teamId: "H-T", value: 5.5, pressure: 4.5, warnings: [] },
+      },
+    });
+
+    const overview = buildTeamObjectiveOverview(gameState);
+    const penalty = overview.objectives.find((o) => o.teamId === "H-T" && o.objectiveId === "board-confidence-budget-cut");
+
+    expect(penalty).toBeUndefined();
+  });
+
+  it("caps board-confidence-budget-cut penaltyCash at 10 (confidence=2.0)", () => {
+    const team = createTeam({ teamId: "H-T", shortCode: "H-T", humanControlled: true });
+    const gameState = createGameState({
+      teams: [team],
+      identities: [createIdentity("H-T", { boardConfidence: 5 })],
+      players: [createPlayer("h1")],
+      rosters: [createRoster("h1", { teamId: "H-T" })],
+      boardConfidence: {
+        "H-T": { teamId: "H-T", value: 2.0, pressure: 9.0, warnings: [] },
+      },
+    });
+
+    const overview = buildTeamObjectiveOverview(gameState);
+    const penalty = overview.objectives.find((o) => o.teamId === "H-T" && o.objectiveId === "board-confidence-budget-cut");
+
+    expect(penalty?.penaltyCash).toBe(10);
+  });
+
+  it("C-C gets transfer target 15 in season 3", () => {
+    const team = createTeam({ teamId: "C-C", shortCode: "C-C", name: "Cash Creators" });
+    const gameState = createGameState({
+      teams: [team],
+      identities: [createIdentity("C-C", { finances: 10, ambition: 2 })],
+      players: [createPlayer("c1")],
+      rosters: [createRoster("c1", { teamId: "C-C" })],
+    });
+    // default gameState uses season-3
+    const objective = buildTeamObjectiveOverview(gameState).objectives.find(
+      (o) => o.teamId === "C-C" && o.objectiveId === "transfer-profit",
+    );
+
+    expect(objective?.targetValue).toBe(15);
+    expect(objective?.penaltyCash).toBe(3);
+  });
+
+  it("C-C gets transfer target 20 in season 4+", () => {
+    const team = createTeam({ teamId: "C-C", shortCode: "C-C", name: "Cash Creators" });
+    const gameState = createGameState({
+      teams: [team],
+      identities: [createIdentity("C-C", { finances: 10, ambition: 2 })],
+      players: [createPlayer("c1")],
+      rosters: [createRoster("c1", { teamId: "C-C" })],
+    });
+    gameState.season = { ...gameState.season, id: "season-5", name: "Season 5" };
+    gameState.seasonState = { ...gameState.seasonState, seasonId: "season-5" };
+
+    const objective = buildTeamObjectiveOverview(gameState).objectives.find(
+      (o) => o.teamId === "C-C" && o.objectiveId === "transfer-profit",
+    );
+
+    expect(objective?.targetValue).toBe(20);
+    expect(objective?.penaltyCash).toBe(3);
   });
 });

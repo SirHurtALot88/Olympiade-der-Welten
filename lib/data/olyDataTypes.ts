@@ -1060,6 +1060,26 @@ export type SponsorDemandProfile = "safe" | "balanced" | "ambitious" | "elite";
 
 export type SponsorStarTier = 1 | 2 | 3 | 4 | 5;
 
+export type SponsorTermSeasons = 1 | 2 | 3;
+
+export type SponsorNegotiationProfile = "safe" | "balanced" | "ambitious";
+
+export type SponsorEventType = "activation_bonus" | "clause_trigger" | "partner_conflict";
+
+export type SponsorEventRecord = {
+  eventId: string;
+  saveId: string;
+  seasonId: string;
+  teamId: string;
+  matchday: number;
+  eventType: SponsorEventType;
+  sponsorName: string;
+  cashDelta: number;
+  status: "open" | "resolved" | "dismissed";
+  createdAt: string;
+  message: string;
+};
+
 export type SponsorOffer = {
   offerId: string;
   seasonId: string;
@@ -1072,6 +1092,10 @@ export type SponsorOffer = {
   starTier?: SponsorStarTier;
   commercialRating?: number;
   sponsorBrandId?: string;
+  sponsorParentBrandId?: string;
+  variantKey?: string;
+  termSeasons?: SponsorTermSeasons;
+  negotiationProfile?: SponsorNegotiationProfile;
   demandProfile?: SponsorDemandProfile;
 };
 
@@ -1114,6 +1138,11 @@ export type TeamSponsorContract = {
   starTier?: SponsorStarTier;
   commercialRating?: number;
   sponsorBrandId?: string;
+  sponsorParentBrandId?: string;
+  variantKey?: string;
+  termSeasons?: SponsorTermSeasons;
+  seasonsRemaining?: number;
+  negotiationProfile?: SponsorNegotiationProfile;
   demandProfile?: SponsorDemandProfile;
 };
 
@@ -1955,6 +1984,7 @@ export type NewGameFlowStepId =
   | "first_transfers"
   | "fill_roster"
   | "training_facilities"
+  | "choose_sponsor"
   | "set_lineup";
 
 export type NewGameFlowStepStatus = "open" | "completed" | "skipped";
@@ -2006,6 +2036,7 @@ export type SeasonState = {
   facilityEvents?: FacilityEventRecord[];
   teamSeasonObjectives?: TeamSeasonObjectiveRecord[];
   boardConfidence?: Record<string, TeamBoardConfidenceRecord>;
+  previousSeasonBoardConfidence?: Record<string, TeamBoardConfidenceRecord>;
   teamRelationshipEvents?: TeamRelationshipEventRecord[];
   contractEvents?: ContractEventRecord[];
   playerAvailabilityState?: PlayerAvailabilityStateRecord[];
@@ -2021,6 +2052,8 @@ export type SeasonState = {
   objectiveRewardApplyLogs?: ObjectiveRewardApplyLogRecord[];
   sponsorOffersByTeamId?: Record<string, SponsorOffer[]>;
   sponsorContractsByTeamId?: Record<string, TeamSponsorContract>;
+  sponsorBrandHistoryByTeamId?: Record<string, string[]>;
+  sponsorEvents?: SponsorEventRecord[];
   sponsorPayoutLogs?: SponsorPayoutLogRecord[];
   scoutingWatchlist?: ScoutingWatchlistEntry[];
   scoutIntelByTeamId?: Record<string, PlayerScoutIntelRecord[]>;

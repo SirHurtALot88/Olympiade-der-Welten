@@ -18,6 +18,7 @@ import { buildSeasonSnapshotDryRun, upsertSeasonSnapshotRecord } from "@/lib/sea
 import { advanceSeasonEconomyFactorWindow } from "@/lib/season/season-economy-factors";
 import { refreshTeamObjectiveState } from "@/lib/board/team-season-objectives-service";
 import { advanceScoutIntelTick } from "@/lib/scouting/facility-scout-pipeline-service";
+import { advanceSponsorContractsForNewSeason } from "@/lib/sponsor/sponsor-contract-lifecycle";
 import {
   buildSponsorChoiceSummary,
   chooseSponsorOfferForAiTeams,
@@ -587,6 +588,8 @@ function buildNextSeasonGameState(save: PersistedSaveGame): { gameState: GameSta
     disciplineSchedule: schedulePlan.entries,
     seasonEconomyFactors: economyFactors.nextWindow,
     standings: buildZeroStandings(save.gameState),
+    // Snapshot the outgoing season's final confidence for carry-over into the next season.
+    previousSeasonBoardConfidence: save.gameState.seasonState.boardConfidence ?? {},
     formCards: nextFormCards,
     lineupDrafts: [],
     matchdayResults: [],
@@ -609,6 +612,7 @@ function buildNextSeasonGameState(save: PersistedSaveGame): { gameState: GameSta
         { stepId: "first_transfers", status: "open" },
         { stepId: "fill_roster", status: "open" },
         { stepId: "training_facilities", status: "open" },
+        { stepId: "choose_sponsor", status: "open" },
         { stepId: "set_lineup", status: "open" },
       ],
     },
@@ -652,6 +656,7 @@ function buildNextSeasonGameState(save: PersistedSaveGame): { gameState: GameSta
     advanceScoutIntelTick({
       gameState: chooseSponsorOfferForAiTeams(
         regenerateSponsorOffersForSeason(
+          advanceSponsorContractsForNewSeason(
           applySeasonBaselineProgression(
           {
             ...save.gameState,
@@ -685,6 +690,8 @@ function buildNextSeasonGameState(save: PersistedSaveGame): { gameState: GameSta
             ],
           },
           { completedSeasonId: save.gameState.season.id },
+        ),
+          nextSeasonId,
         ),
       ),
     ),

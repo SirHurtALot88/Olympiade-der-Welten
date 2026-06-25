@@ -12,7 +12,8 @@ import { buildTeamSeasonOverviewRows, type TeamManagementSnapshotRow } from "@/l
 import { getTeamDevelopmentTendency } from "@/lib/foundation/team-development-tendency";
 import { getTeamStrategyProfile } from "@/lib/foundation/team-strategy-profiles";
 import { getPrimaryTeamRivalry } from "@/lib/rivalries/team-rivalries";
-import { ensureSeasonSponsorOffers, getTeamSponsorContract } from "@/lib/sponsor/sponsor-offer-service";
+import { ensureSeasonSponsorOffers } from "@/lib/sponsor/sponsor-offer-service";
+import { getTeamSponsorContract } from "@/lib/sponsor/sponsor-offer-read";
 import {
   evaluateSpecialComponentForObjective,
   evaluateSponsorImprovementObjective,
@@ -222,9 +223,10 @@ function getRelativeMetricRank(input: {
   };
 }
 
-function getSeasonNumber(seasonId: string | null | undefined): number {
-  if (!seasonId) return 1;
-  const match = seasonId.match(/season[-_](\d+)/i);
+function getSeasonNumber(seasonId: string | number | null | undefined): number {
+  if (seasonId == null) return 1;
+  const normalized = typeof seasonId === "string" ? seasonId : String(seasonId);
+  const match = normalized.match(/season[-_](\d+)/i);
   return match ? parseInt(match[1], 10) : 1;
 }
 
@@ -994,7 +996,7 @@ function getRivalryObjective(input: {
   };
 }
 
-function getSeasonNumber(gameState: GameState) {
+function resolveSeasonNumberFromState(gameState: GameState) {
   const fromId = /season-(\d+)/i.exec(gameState.season.id)?.[1];
   const fromName = /season\s+(\d+)/i.exec(gameState.season.name)?.[1];
   const parsed = Number(fromId ?? fromName);
@@ -1174,19 +1176,25 @@ function buildTeamObjectives(input: {
 }): TeamSeasonObjectiveRecord[] {
   const { gameState, team, row, rowsByTeamId, identity, profile } = input;
   const sportTarget = getSportTarget({ team, identity, profile, row, rowsByTeamId });
-  const transferProfitTarget = team.shortCode === "C-C" || (profile?.bias.sellForProfitAggression ?? 0) >= 8 ? 10 : 0;
-  const isInitialSeason = getSeasonNumber(gameState) === 1;
+  const seasonNum = resolveSeasonNumberFromState(gameState) ?? 1;
+  const isInitialSeason = seasonNum === 1;
+  // C-C and high-profit teams have a transfer target that scales up over seasons.
+  const isHighProfitTeam = team.shortCode === "C-C" || (profile?.bias.sellForProfitAggression ?? 0) >= 8;
+  const transferProfitTarget = isHighProfitTeam
+    ? (seasonNum <= 2 ? 10 : seasonNum === 3 ? 15 : 20)
+    : 0;
   const transferObjective: ObjectiveDraft | null = isInitialSeason
     ? null
     : {
         objectiveId: "transfer-profit",
         category: "transfer",
-        label: transferProfitTarget > 0 ? "Transfergewinn erzielen" : "Transferbilanz stabil halten",
+        label: transferProfitTarget > 0 ? `Transfergewinn von ${transferProfitTarget}M erzielen` : "Transferbilanz stabil halten",
         targetValue: transferProfitTarget,
         currentValue: row.transferNet,
         status: statusForMin(row.transferNet, transferProfitTarget),
         rewardCash: transferProfitTarget > 0 ? 5 : undefined,
-        boardConfidenceDelta: (row.transferNet ?? 0) >= transferProfitTarget ? 0.25 : -0.25,
+        penaltyCash: transferProfitTarget > 0 ? 3 : undefined,
+        boardConfidenceDelta: (row.transferNet ?? 0) >= transferProfitTarget ? 0.35 : -0.35,
         source: "local_transfer_history",
       };
   const objectiveDrafts = selectBoardObjectiveDrafts({
@@ -1237,7 +1245,30 @@ function buildTeamObjectives(input: {
   });
   const sponsorDrafts = buildSponsorObjectiveDrafts({ gameState, team, row });
 
-  return [...objectiveDrafts, ...sponsorDrafts].map((objective) => ({
+  // For human-controlled teams: if board confidence fell below 5.0 last season,
+  // the board cuts the budget at season end. This prevents riskless eco rounds.
+  const boardConfidencePenaltyDraft = ((): ObjectiveDraft | null => {
+    if (!team.humanControlled || isInitialSeason) return null;
+    const storedConfidence = gameState.seasonState.boardConfidence?.[team.teamId]?.value ?? null;
+    if (storedConfidence == null || storedConfidence >= 5.0) return null;
+    const penaltyCash = Math.round(Math.max(2, Math.min(10, (5.0 - storedConfidence) * 3.3)));
+    const currentPct = roundValue(storedConfidence * 10, 0);
+    return {
+      objectiveId: "board-confidence-budget-cut",
+      category: "finance",
+      label: "Vorstandsvertrauen wiederherstellen",
+      detail: `Board Confidence ${currentPct}% — Ziel ≥ 50%. Fehlgeschlagene Saisonziele haben das Vertrauen des Vorstands geschwächt.`,
+      actionHint: `Der Vorstand kürzt das Budget um ${penaltyCash}M. Erfülle deine Saisonziele, um den Druck zu reduzieren.`,
+      targetValue: 5.0,
+      currentValue: storedConfidence,
+      status: "failed",
+      penaltyCash,
+      boardConfidenceDelta: 0,
+      source: "human_board_confidence_penalty",
+    };
+  })();
+
+  return [...objectiveDrafts, ...(boardConfidencePenaltyDraft ? [boardConfidencePenaltyDraft] : []), ...sponsorDrafts].map((objective) => ({
     seasonId: gameState.season.id,
     teamId: team.teamId,
     source: objective.source ?? "board_objective_generator_v1",
@@ -1290,8 +1321,22 @@ function calculateBoardConfidence(input: {
   identity: TeamIdentity | null;
   objectives: TeamSeasonObjectiveRecord[];
   storedBoard?: TeamBoardConfidenceRecord | null;
+  previousSeasonBoard?: TeamBoardConfidenceRecord | null;
+  gmChangedThisSeason?: boolean;
 }): TeamBoardConfidenceRecord {
-  const base = normalizeBoardConfidence(input.identity?.boardConfidence ?? input.storedBoard?.value ?? null);
+  const identitySeed = normalizeBoardConfidence(input.identity?.boardConfidence ?? input.storedBoard?.value ?? null);
+  const prev = input.previousSeasonBoard?.value ?? null;
+  let base: number;
+  if (prev != null && !input.gmChangedThisSeason) {
+    // Same GM: carry over last season's final confidence, blended slightly toward the
+    // identity seed to prevent permanent drift away from the team's natural level.
+    base = roundValue(prev * 0.8 + identitySeed * 0.2, 1);
+  } else if (prev != null && input.gmChangedThisSeason) {
+    // New GM: reset toward identity seed with a small honeymoon boost (+0.5, capped at 10).
+    base = Math.min(identitySeed + 0.5, 10);
+  } else {
+    base = identitySeed;
+  }
   const delta = input.objectives.reduce((sum, objective) => sum + (objective.boardConfidenceDelta ?? 0), 0);
   const failed = input.objectives.filter((objective) => objective.status === "failed").length;
   const atRisk = input.objectives.filter((objective) => objective.status === "at_risk").length;
@@ -1408,7 +1453,17 @@ export function buildTeamObjectiveOverview(gameState: GameState): TeamObjectiveO
     const teamObjectives = mergeStoredTeamObjectives({ gameState, teamId: team.teamId, generated: generatedObjectives });
     objectives.push(...teamObjectives);
     const storedBoard = gameState.seasonState.boardConfidence?.[team.teamId] ?? null;
-    const board = calculateBoardConfidence({ teamId: team.teamId, identity, objectives: teamObjectives, storedBoard });
+    const previousSeasonBoard = gameState.seasonState.previousSeasonBoardConfidence?.[team.teamId] ?? null;
+    const gmAssignment = gameState.seasonState.teamGeneralManagers?.[team.teamId];
+    const gmChangedThisSeason = gmAssignment?.assignedSeasonId === gameState.season.id;
+    const board = calculateBoardConfidence({
+      teamId: team.teamId,
+      identity,
+      objectives: teamObjectives,
+      storedBoard,
+      previousSeasonBoard,
+      gmChangedThisSeason,
+    });
     boardConfidence[team.teamId] = board;
     aiBiasByTeamId[team.teamId] = buildAiBias({ teamId: team.teamId, objectives: teamObjectives, board });
   }
