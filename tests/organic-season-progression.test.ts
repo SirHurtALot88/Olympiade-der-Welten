@@ -43,6 +43,7 @@ function player(partial: Partial<Player> = {}): Player {
     form: partial.form ?? 0,
     potential: partial.potential ?? 70,
     trainingMode: partial.trainingMode ?? "mittel",
+    trainingClass: partial.trainingClass ?? null,
   };
 }
 
@@ -130,6 +131,25 @@ describe("organic season progression", () => {
     expect(lazyResult.traitModifierPct).toBeLessThan(0);
     expect(diligentResult.trainingSetpoints).toBeGreaterThan(lazyResult.trainingSetpoints);
     expect(diligentResult.performanceSetpoints).toBe(lazyResult.performanceSetpoints);
+  });
+
+  it("uses player potential as a training growth multiplier", () => {
+    const lowPotential = player({ potential: 50 });
+    const elitePotential = player({ potential: 94 });
+
+    const lowResult = buildOrganicSeasonProgression({ gameState: gameState(lowPotential), player: lowPotential });
+    const eliteResult = buildOrganicSeasonProgression({ gameState: gameState(elitePotential), player: elitePotential });
+
+    expect(lowResult.potentialTrainingMultiplier).toBe(0.94);
+    expect(eliteResult.potentialTrainingMultiplier).toBe(1.18);
+    expect(eliteResult.trainingSetpoints).toBeGreaterThan(lowResult.trainingSetpoints);
+  });
+
+  it("uses an explicit training class when the player plan sets one", () => {
+    const sourcePlayer = player({ trainingClass: "Mage" });
+    const result = buildOrganicSeasonProgression({ gameState: gameState(sourcePlayer), player: sourcePlayer });
+
+    expect(result.primaryTrainingClass).toBe("Mage");
   });
 
   it("adds discipline-weighted performance points for strong discipline results", () => {

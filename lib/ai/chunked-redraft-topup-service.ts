@@ -221,6 +221,12 @@ type ScoredCandidate = Candidate & {
   classFit: number;
   teamNeed: string;
   draftVariance: number;
+  areaDiversityScore: number;
+  traitAlignmentScore: number;
+  minimumFutureFeasible?: boolean;
+  minimumFutureCost?: number | null;
+  minimumFutureCashAfter?: number;
+  minimumFutureFallbackUsed?: boolean;
 };
 
 type TeamStatusRow = {
@@ -578,6 +584,14 @@ type ManagerStopReasonRow = {
 
 function roundValue(value: number, digits = 2) {
   return Number(value.toFixed(digits));
+}
+
+function normalizeProfileToken(value: string | null | undefined) {
+  return String(value ?? "")
+    .trim()
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, "_")
+    .replace(/^_+|_+$/g, "");
 }
 
 function avg(values: number[]) {
@@ -1066,6 +1080,69 @@ function getCandidateNeedAxisValue(candidate: Candidate, needState: TeamNeedStat
     (candidate[needState.secondAxis] ?? 0) * 0.92,
     (candidate[needState.thirdAxis] ?? 0) * 0.78,
   );
+}
+
+function getCandidateDominantAxis(candidate: Pick<Candidate, "pow" | "spe" | "men" | "soc">): "pow" | "spe" | "men" | "soc" {
+  return ([
+    ["pow", candidate.pow],
+    ["spe", candidate.spe],
+    ["men", candidate.men],
+    ["soc", candidate.soc],
+  ] as Array<["pow" | "spe" | "men" | "soc", number]>).sort((left, right) => right[1] - left[1])[0]?.[0] ?? "pow";
+}
+
+function scoreRosterAreaDiversity(input: {
+  candidate: Candidate;
+  roster: RosterEntry[];
+  gameState: GameState;
+  phase: ChunkedRedraftPhase;
+  targetRosterSize: number;
+}) {
+  const rosterPlayerById = new Map(input.gameState.players.map((player) => [player.id, player]));
+  const counts: Record<"pow" | "spe" | "men" | "soc", number> = { pow: 0, spe: 0, men: 0, soc: 0 };
+  for (const rosterEntry of input.roster) {
+    const player = rosterPlayerById.get(rosterEntry.playerId);
+    if (!player) continue;
+    const axis = getCandidateDominantAxis({
+      pow: getPlayerAxisValue(player, "pow"),
+      spe: getPlayerAxisValue(player, "spe"),
+      men: getPlayerAxisValue(player, "men"),
+      soc: getPlayerAxisValue(player, "soc"),
+    });
+    counts[axis] += 1;
+  }
+  const candidateAxis = getCandidateDominantAxis(input.candidate);
+  const coveredAxes = Object.values(counts).filter((count) => count > 0).length;
+  const candidateAxisCount = counts[candidateAxis];
+  const plannedRosterAfterPick = input.roster.length + 1;
+  const phaseMultiplier = input.phase === "phase_a_minimum" ? 0.65 : input.phase === "phase_b_core_optimum" ? 1 : 0.75;
+  const missingAxisBonus =
+    candidateAxisCount === 0 && plannedRosterAfterPick >= 4
+      ? (42 + Math.max(0, 4 - coveredAxes) * 8) * phaseMultiplier
+      : 0;
+  const overloadLimit = Math.max(3, Math.ceil(Math.min(input.targetRosterSize, 12) * 0.45));
+  const monoAxisPenalty =
+    coveredAxes <= 1 && candidateAxisCount > 0 && plannedRosterAfterPick >= 5
+      ? Math.min(150, 55 + candidateAxisCount * 18) * phaseMultiplier
+      : 0;
+  const overloadPenalty =
+    candidateAxisCount >= overloadLimit && coveredAxes <= 2
+      ? Math.min(70, (candidateAxisCount - overloadLimit + 1) * 14) * phaseMultiplier
+      : 0;
+  return roundValue(missingAxisBonus - monoAxisPenalty - overloadPenalty, 4);
+}
+
+function scoreStrategyTraitAlignment(player: Player, profile: TeamStrategyProfile | null | undefined) {
+  if (!profile) return 0;
+  const positiveTraits = new Set((player.traitsPositive ?? []).map(normalizeProfileToken));
+  const negativeTraits = new Set((player.traitsNegative ?? []).map(normalizeProfileToken));
+  const allTraits = new Set([...positiveTraits, ...negativeTraits]);
+  const preferredHits = (profile.preferredTraits ?? []).filter((trait) => allTraits.has(normalizeProfileToken(trait))).length;
+  const dislikedHits = (profile.dislikedTraits ?? []).filter((trait) => allTraits.has(normalizeProfileToken(trait))).length;
+  const positivePreferredHits = (profile.preferredTraits ?? []).filter((trait) => positiveTraits.has(normalizeProfileToken(trait))).length;
+  const negativeDislikedHits = (profile.dislikedTraits ?? []).filter((trait) => negativeTraits.has(normalizeProfileToken(trait))).length;
+  const genericRiskPenalty = Math.max(0, negativeTraits.size - 1) * 2.2;
+  return roundValue(preferredHits * 14 + positivePreferredHits * 8 - dislikedHits * 12 - negativeDislikedHits * 5 - genericRiskPenalty, 4);
 }
 
 function getCheapMarketLaneScore(input: {
@@ -2224,6 +2301,14 @@ function scoreCandidateForTeam(input: {
     ? scoreMarginalNeedGain({ needState: input.teamNeedState, candidate: input.candidate.player })
     : null;
   const needImpactScore = roundValue(marginalNeedGain?.needScoreApplied ?? 0, 4);
+  const areaDiversityScore = scoreRosterAreaDiversity({
+    candidate: input.candidate,
+    roster: input.roster,
+    gameState: input.gameState,
+    phase: input.phase,
+    targetRosterSize: input.teamNeedState?.targetRosterSize ?? Math.max(input.roster.length + 1, 10),
+  });
+  const traitAlignmentScore = scoreStrategyTraitAlignment(input.candidate.player, input.strategyProfile);
   const needScoreWeight =
     input.phase === "phase_a_minimum" ? 0.85 : input.phase === "phase_b_core_optimum" ? 1.22 : 0.72;
   const budgetFit = 0;
@@ -2237,6 +2322,8 @@ function scoreCandidateForTeam(input: {
         premiumAxisFit * 0.45 +
         valueScore * (18 + valueBias * 0.8) +
         needImpactScore * needScoreWeight +
+        areaDiversityScore +
+        traitAlignmentScore +
         classFit * 0.65 +
         themeScore.themeCompositionScore * themeWeight -
         salaryImpact * 0.45
@@ -2245,6 +2332,8 @@ function scoreCandidateForTeam(input: {
           premiumAxisFit * (starBias >= 8 && axisFocusStrength >= 0.65 ? 0.55 : 0.18) +
           valueScore * (8 + valueBias * 0.7) +
           needImpactScore * needScoreWeight +
+          areaDiversityScore +
+          traitAlignmentScore +
           potentialScore * 0.12 +
           themeScore.themeCompositionScore * themeWeight +
           classFit -
@@ -2254,6 +2343,8 @@ function scoreCandidateForTeam(input: {
           premiumAxisFit * (axisFocusStrength >= 0.65 ? 0.28 : 0.1) +
           valueScore * (8 + valueBias * 0.6) +
           needImpactScore * needScoreWeight +
+          areaDiversityScore +
+          traitAlignmentScore +
           potentialScore * 0.08 +
           themeScore.themeCompositionScore * themeWeight +
           classFit * 1.15 +
@@ -2295,6 +2386,8 @@ function scoreCandidateForTeam(input: {
     phaseScore: roundValue(phaseScore, 4),
     draftVariance,
     teamNeed: formColorNeedLabel ?? (marginalNeedGain?.bestDisciplineName ? `${strongestAxis}_${marginalNeedGain.bestDisciplineName}` : `${strongestAxis}_coverage`),
+    areaDiversityScore,
+    traitAlignmentScore,
   };
 }
 
@@ -3854,8 +3947,8 @@ export function runChunkedRedraftTopup(params: ChunkedRedraftTopupParams) {
             const anchorThemePenalty =
               anchorPick && themeTarget && (candidate.themeTier === "avoid" || candidate.themeTier === "outsider")
                 ? candidate.themeTier === "avoid"
-                  ? 18_000
-                  : 6_500
+                  ? 140
+                  : 55
                 : 0;
             return {
               ...candidate,
@@ -3910,26 +4003,130 @@ export function runChunkedRedraftTopup(params: ChunkedRedraftTopupParams) {
           remainingMinAfterPick <= 0
             ? evaluatedCandidatePool
             : evaluatedCandidatePool.filter((candidate) => Boolean(candidate.minimumFutureFeasible));
-        if (remainingMinAfterPick > 0 && evaluatedCandidates.length === 0 && evaluatedCandidatePool.length > 0) {
-          const fallbackLimit = Math.min(80, Math.max(16, Math.ceil(evaluatedCandidatePool.length * 0.18)));
-          evaluatedCandidates = [...evaluatedCandidatePool]
+        const bestMinimumCandidateScore = evaluatedCandidates.reduce(
+          (best, candidate) => Math.max(best, candidate.selectedScore),
+          Number.NEGATIVE_INFINITY,
+        );
+        const shouldUseSurvivalBudgetFallback =
+          evaluatedCandidatePool.length > 0 &&
+          (
+            (remainingMinAfterPick > 0 && (evaluatedCandidates.length === 0 || bestMinimumCandidateScore < 0)) ||
+            (remainingMinAfterPick <= 0 && remainingPlannedAfterPick > 0 && bestMinimumCandidateScore < 0)
+          );
+        if (
+          shouldUseSurvivalBudgetFallback
+        ) {
+          const survivalCandidatePool = fitChecked
+            .filter((entry) => entry.fit.teamFit >= -12 || entry.fit.mercenary)
+            .map((entry) => entry.candidate);
+          const cheapestLegalFuture = [...survivalCandidatePool].sort((left, right) => {
+            if (left.marketValue !== right.marketValue) return left.marketValue - right.marketValue;
+            return (left.salary ?? 0) - (right.salary ?? 0);
+          });
+          const survivalBudgetRows = survivalCandidatePool.map((candidate) => {
+            const cashAfter = latestTeam.cash - candidate.marketValue;
+            const futureCost = estimateCheapestFutureCost({
+              sortedCandidates: cheapestLegalFuture,
+              excludedPlayerId: candidate.player.id,
+              neededCount: remainingMinAfterPick,
+            });
+            const futureFeasible = Number.isFinite(futureCost) && futureCost <= cashAfter + 0.0001;
+            const needAxis = getCandidateNeedAxisValue(candidate, teamNeedState);
+            const classFit = getClassFitFromCounts(candidate, teamRosterClassCounts);
+            const valueRatio = candidate.marketValue / Math.max(1, candidate.salary ?? 1);
+            const teamFit = fitByPlayerId.get(candidate.player.id)?.teamFit ?? 0;
+            const survivalScore =
+              needAxis * 0.72 +
+              candidate.quality * 0.18 +
+              classFit * 1.4 +
+              Math.max(0, teamFit) * 0.75 +
+              valueRatio * 4.5 -
+              candidate.marketValue * 1.65 -
+              (candidate.salary ?? 0) * 2.4;
+            return { candidate, futureCost, futureFeasible, survivalScore };
+          });
+          const futureSafeRows = survivalBudgetRows.filter((row) => row.futureFeasible);
+          const fallbackSource = futureSafeRows.length > 0 ? futureSafeRows : survivalBudgetRows;
+          const fallbackLimit = Math.min(96, Math.max(24, Math.ceil(fallbackSource.length * 0.22)));
+          const survivalFallbackCandidates = fallbackSource
             .sort((left, right) => {
-              if (right.selectedScore !== left.selectedScore) return right.selectedScore - left.selectedScore;
-              return compareScoredCandidateTie(left, right, `minimum_guard_fallback:${team.teamId}:${teamPicks}`);
+              if (right.survivalScore !== left.survivalScore) return right.survivalScore - left.survivalScore;
+              if (left.candidate.marketValue !== right.candidate.marketValue) return left.candidate.marketValue - right.candidate.marketValue;
+              return compareByDeterministicPlayerTie(left.candidate.player.id, right.candidate.player.id, `minimum_survival:${team.teamId}:${teamPicks}`);
             })
             .slice(0, fallbackLimit)
-            .map((candidate) => ({
-              ...candidate,
-              selectedScore: roundValue(candidate.selectedScore - REDRAFT_MINIMUM_FALLBACK_PENALTY, 4),
-              budgetFit: roundValue((candidate.budgetFit ?? 0) - REDRAFT_MINIMUM_FALLBACK_PENALTY, 2),
-              minimumFutureFallbackUsed: true,
-            }));
-          teamWarnings.push(`minimum_feasibility_guard_fallback:${fallbackLimit}/${evaluatedCandidatePool.length}`);
+            .map((row) => {
+              const candidate = row.candidate;
+              const classFit = getClassFitFromCounts(candidate, teamRosterClassCounts);
+              const cacheKey = `${team.teamId}:${candidate.player.id}:${phasePlan.phase}:classFit=${classFit}:needs=${teamRoster.length}:survival`;
+              const cached = scoredCandidateCache.get(cacheKey);
+              const scored =
+                cached ??
+                scoreCandidateForTeam({
+                  candidate,
+                  roster: teamRoster,
+                  gameState: runContext.save.gameState,
+                  teamIdentity,
+                  strategyProfile,
+                  team: latestTeam,
+                  phase: phasePlan.phase,
+                  maxRecommendedSpend: phasePlan.maxRecommendedSpend,
+                  draftSalt: `${save.saveId}:${params.mode}:team_sequence_survival:${team.teamId}`,
+                  teamNeedState,
+                  rosterClassCounts: teamRosterClassCounts,
+                  counters,
+                });
+              const teamFit = fitByPlayerId.get(candidate.player.id)?.teamFit ?? 0;
+              const needAxis = getCandidateNeedAxisValue(candidate, teamNeedState);
+              const valueRatio = candidate.marketValue / Math.max(1, candidate.salary ?? 1);
+              const futureGap = Number.isFinite(row.futureCost)
+                ? Math.max(0, row.futureCost - (latestTeam.cash - candidate.marketValue))
+                : 0;
+              const survivalScore =
+                needAxis * 1.1 +
+                scored.valueScore * 20 +
+                Math.max(0, teamFit) * 1.2 +
+                classFit * 2.2 +
+                valueRatio * 5 -
+                candidate.marketValue * 0.75 -
+                (candidate.salary ?? 0) * 1.4 -
+                futureGap * 35;
+              const roleScore = scoreCandidateForDraftRole(scored, desiredDraftRole);
+              const softened = {
+                ...scored,
+                selectedScore: roundValue(survivalScore, 4),
+                roleScore,
+                desiredDraftRole,
+                budgetFit: roundValue(row.futureFeasible ? 120 - candidate.marketValue : -futureGap * 35, 2),
+                teamNeed: `survival_${scored.teamNeed}`,
+                minimumFutureFeasible: row.futureFeasible,
+                minimumFutureCost: Number.isFinite(row.futureCost) ? roundValue(row.futureCost, 2) : null,
+                minimumFutureCashAfter: roundValue(latestTeam.cash - candidate.marketValue, 2),
+                minimumFutureFallbackUsed: true,
+              };
+              scoredCandidateCache.set(cacheKey, softened);
+              return softened;
+            });
+          evaluatedCandidates = survivalFallbackCandidates.length > 0
+            ? survivalFallbackCandidates
+            : [...evaluatedCandidatePool]
+                .sort((left, right) => {
+                  if (left.marketValue !== right.marketValue) return left.marketValue - right.marketValue;
+                  return compareScoredCandidateTie(left, right, `minimum_guard_fallback:${team.teamId}:${teamPicks}`);
+                })
+                .slice(0, Math.min(24, evaluatedCandidatePool.length))
+                .map((candidate) => ({
+                  ...candidate,
+                  selectedScore: roundValue(candidate.selectedScore - REDRAFT_MINIMUM_FALLBACK_PENALTY, 4),
+                  budgetFit: roundValue((candidate.budgetFit ?? 0) - REDRAFT_MINIMUM_FALLBACK_PENALTY, 2),
+                  minimumFutureFallbackUsed: true,
+                }));
+          teamWarnings.push(`minimum_survival_budget_fallback:${evaluatedCandidates.length}/${survivalCandidatePool.length}`);
           warningRows.push({
             round: teamPicks + 1,
             teamId: team.teamId,
-            reason: "minimum_feasibility_guard_fallback",
-            detail: `fallback=${fallbackLimit};pool=${evaluatedCandidatePool.length};remainingMinAfterPick=${remainingMinAfterPick};cash=${roundValue(latestTeam.cash)}`,
+            reason: "minimum_survival_budget_fallback",
+            detail: `fallback=${evaluatedCandidates.length};futureSafe=${futureSafeRows.length};pool=${survivalCandidatePool.length};remainingMinAfterPick=${remainingMinAfterPick};remainingPlannedAfterPick=${remainingPlannedAfterPick};bestScore=${roundValue(bestMinimumCandidateScore)};cash=${roundValue(latestTeam.cash)}`,
           });
         }
         if (remainingMinAfterPick > 0 && evaluatedCandidates.length < roleRankedCandidates.length) {
@@ -3999,6 +4196,7 @@ export function runChunkedRedraftTopup(params: ChunkedRedraftTopupParams) {
             teamIdentity,
             teamCash: latestTeam.cash,
             marketValue: candidate.marketValue,
+            teamFit: fitByPlayerId.get(candidate.player.id)?.teamFit ?? null,
             currentTeamSalary: teamRosterPlayers.reduce((sum, player) => sum + (getCalculatedPlayerSalary(player) ?? 0), 0),
             dealRole: desiredDraftRole,
             rosterCountBefore: rosterCount,
@@ -4669,6 +4867,7 @@ export function runChunkedRedraftTopup(params: ChunkedRedraftTopupParams) {
           teamIdentity,
           teamCash: latestTeam.cash,
           marketValue: candidate.marketValue,
+          teamFit: fitByPlayerId.get(candidate.player.id)?.teamFit ?? null,
           currentTeamSalary: teamRosterPlayers.reduce((sum, player) => sum + (getCalculatedPlayerSalary(player) ?? 0), 0),
           dealRole: desiredDraftRole,
           rosterCountBefore: rosterCount,

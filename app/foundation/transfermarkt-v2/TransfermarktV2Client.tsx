@@ -20,6 +20,8 @@ import type { TransfermarktBuyPreview } from "@/lib/market/transfermarkt-buy-ser
 import type { TransfermarktFreeAgentItem, TransfermarktReadResult } from "@/lib/market/transfermarkt-read-service";
 import {
   buildTransfermarktScoutedAttributeRows,
+  getTransfermarktScoutingDisclosure,
+  getTransfermarktScoutingVisibilityBuckets,
   normalizeTransfermarktScoutingLevel,
   getTransfermarktTrainingAffinityVisibility,
   type TransfermarktAttributeRatings,
@@ -38,6 +40,7 @@ import {
   readFoundationRoomContextFromLocation,
   withRoomContextBody,
 } from "@/lib/room/foundation-room-context-client";
+import { DEFAULT_ACTIVE_OWNER_ID } from "@/lib/foundation/team-control-settings";
 import { getClassTrainingSignals } from "@/lib/training/class-progression-config";
 
 type TransfermarktV2ClientProps = {
@@ -48,6 +51,7 @@ type TransfermarktV2ClientProps = {
   activeOwnerId?: string | null;
   manageableTeamIds?: string[];
   teamControlModesByTeamId?: Record<string, TeamControlMode>;
+  teamControlOwnersByTeamId?: Record<string, { ownerId?: string | null; ownerSlot?: string | null }>;
   teams: Team[];
   disciplines?: Discipline[];
   rosterRows?: TransfermarktV2RosterRow[];
@@ -136,6 +140,9 @@ type TransfermarktV2RosterRow = {
 };
 
 const MARKET_PAGE_LIMIT = 250;
+const MARKET_INITIAL_RENDER_COUNT = 32;
+const MARKET_RENDER_STEP = 24;
+const MARKET_BATCH_PUBLISH_SIZE = 500;
 const DEFAULT_MAX_MARKET_VALUE = 0;
 const DEFAULT_MAX_SALARY = 0;
 const DEFAULT_MAX_RATIO = 0;
@@ -484,6 +491,14 @@ function formatSignedPoints(value: number | null | undefined) {
   return `${value > 0 ? "+" : ""}${Math.round(value)}`;
 }
 
+function formatDemandPercent(value: number | null | undefined) {
+  if (value == null || !Number.isFinite(value)) {
+    return "—";
+  }
+  const rounded = Math.round(value);
+  return `${rounded > 0 ? "+" : ""}${rounded}%`;
+}
+
 function formatToneLabel(value: string | null | undefined) {
   if (!value) {
     return "—";
@@ -535,6 +550,34 @@ function formatContractShapeLabel(value: ContractShape | null | undefined) {
   if (value === "back_loaded") return "hinten schwer";
   if (value === "balanced") return "ausgeglichen";
   return "offen";
+}
+
+function formatContractPreferenceCurrentStatus(
+  contractPreference: {
+    preferredMinLength: number;
+    preferredMaxLength: number;
+    shapePreference: ContractShape;
+  },
+  contractLength: number | null | undefined,
+  contractShape: ContractShape | null | undefined,
+) {
+  const safeLength = typeof contractLength === "number" && Number.isFinite(contractLength) ? contractLength : null;
+  const lengthMatches =
+    safeLength != null &&
+    safeLength >= contractPreference.preferredMinLength &&
+    safeLength <= contractPreference.preferredMaxLength;
+  const shapeMatches = contractShape === contractPreference.shapePreference;
+
+  if (lengthMatches && shapeMatches) {
+    return "Aktuell: Laufzeit und Form passen gut";
+  }
+  if (lengthMatches) {
+    return `Aktuell: Laufzeit passt, Form stoert (${formatContractShapeLabel(contractShape)})`;
+  }
+  if (shapeMatches) {
+    return `Aktuell: Form passt, Laufzeit stoert (${safeLength ?? "?"} Saisons)`;
+  }
+  return `Aktuell: Laufzeit (${safeLength ?? "?"}) und Form (${formatContractShapeLabel(contractShape)}) weichen ab`;
 }
 
 function getAxisBarWidth(value: number | null | undefined) {
@@ -812,13 +855,13 @@ function getNeedSignal(item: TransfermarktFreeAgentItem) {
   if (score == null) {
     return { label: "Team wählen", tone: "neutral" as const };
   }
-  if (score >= 62) {
+  if (score >= 72) {
     return { label: "Top-Bedarf", tone: "positive" as const };
   }
-  if (score >= 42) {
+  if (score >= 48) {
     return { label: "guter Bedarf", tone: "positive" as const };
   }
-  if (score >= 22) {
+  if (score >= 26) {
     return { label: "situativ", tone: "warning" as const };
   }
   return { label: "kaum Bedarf", tone: "neutral" as const };
@@ -836,9 +879,12 @@ function formatNegotiationSignalLabel(value: string) {
     contract_length_override_in_effect: "Laufzeit weicht vom Standarddeal ab.",
     insufficient_cash: "Cash reicht fuer Kauf oder Gesamtpaket noch nicht.",
     low_team_fit_reduces_acceptance: "Schwacher Teamfit drueckt die Zusage.",
+    local_team_not_owned_or_ai_controlled: "Dieses Team ist hier nur Ansicht und kann keine Deals schreiben.",
     market_bracket_factor_preview_pending: "Marktklasse ist nur grob eingeschaetzt.",
+    negotiation_cancelled_after_contact: "Abbruch nach Kontakt bleibt als Vertrauensmalus haengen.",
+    negotiation_rejected_bad_experience: "Die letzte Absage macht die naechste Runde haerter.",
     offer_below_expected_salary: "Angebot liegt unter der aktuellen Forderung.",
-    previous_rejected_offer_reduces_trust: "Fruehere Absage macht die Verhandlung haerter.",
+    previous_rejected_offer_reduces_trust: "Spieler ist nach der letzten Runde noch angefressen und verhandelt haerter.",
     preview_only_contract_negotiation: "Nur Vorschau, noch kein finaler Abschluss.",
     trait_salary_factor_source_missing: "Ein Teil der Trait-Effekte ist noch unscharf.",
     team_not_found: "Team wurde nicht gefunden.",
@@ -999,6 +1045,7 @@ export default function TransfermarktV2Client({
   activeOwnerId = null,
   manageableTeamIds = [],
   teamControlModesByTeamId = {},
+  teamControlOwnersByTeamId = {},
   teams,
   disciplines = [],
   rosterRows = [],
@@ -1019,11 +1066,29 @@ export default function TransfermarktV2Client({
   const previewVersionRef = useRef(0);
   const candidateButtonRefs = useRef<Map<string, HTMLButtonElement>>(new Map());
   const shouldFocusSelectedCandidateRef = useRef(false);
+  const wishlistClickTimerRef = useRef<number | null>(null);
   const buyModalRef = useRef<HTMLDivElement | null>(null);
   const buyModalBodyRef = useRef<HTMLDivElement | null>(null);
 
   const teamOptions = useMemo(() => buildTeamSelectOptions(teams), [teams]);
-  const manageableTeamIdSet = useMemo(() => new Set(manageableTeamIds), [manageableTeamIds]);
+  const effectiveOwnerId = activeOwnerId || DEFAULT_ACTIVE_OWNER_ID;
+  const manageableTeamIdSet = useMemo(() => {
+    const ids = new Set(manageableTeamIds);
+    Object.entries(teamControlModesByTeamId).forEach(([teamId, mode]) => {
+      if (mode !== "manual") {
+        return;
+      }
+      const owner = teamControlOwnersByTeamId[teamId] ?? null;
+      const resolvedOwnerId =
+        owner?.ownerSlot === "user"
+          ? DEFAULT_ACTIVE_OWNER_ID
+          : owner?.ownerId?.trim() || null;
+      if (owner?.ownerSlot === "user" || resolvedOwnerId === effectiveOwnerId) {
+        ids.add(teamId);
+      }
+    });
+    return ids;
+  }, [effectiveOwnerId, manageableTeamIds, teamControlModesByTeamId, teamControlOwnersByTeamId]);
   const wishlistPlayerIdSet = useMemo(() => new Set(wishlistPlayerIds), [wishlistPlayerIds]);
   const [selectedTeamId, setSelectedTeamId] = useState<string>(defaultTeamId ?? "");
   const [search, setSearch] = useState("");
@@ -1050,9 +1115,10 @@ export default function TransfermarktV2Client({
   const [marketHasMore, setMarketHasMore] = useState(false);
   const [marketTotal, setMarketTotal] = useState(0);
   const [selectedPlayerId, setSelectedPlayerId] = useState<string | null>(null);
+  const [renderedCandidateCount, setRenderedCandidateCount] = useState(MARKET_INITIAL_RENDER_COUNT);
   const [historyFeed, setHistoryFeed] = useState<MarketHistoryResponse | null>(null);
-  const [contractLength, setContractLength] = useState(2);
-  const [contractShape, setContractShape] = useState<ContractShape>("balanced");
+  const [contractLength, setContractLength] = useState<number | null>(null);
+  const [contractShape, setContractShape] = useState<ContractShape | null>(null);
   const [offeredSalary, setOfferedSalary] = useState<number | null>(null);
   const [salaryEditedManually, setSalaryEditedManually] = useState(false);
   const [previewBusy, setPreviewBusy] = useState(false);
@@ -1060,9 +1126,10 @@ export default function TransfermarktV2Client({
   const [buyBusy, setBuyBusy] = useState(false);
   const [buySuccess, setBuySuccess] = useState<string | null>(null);
   const [buyPreview, setBuyPreview] = useState<TransfermarktBuyPreview | null>(null);
+  const [buyPreviewRefreshNonce, setBuyPreviewRefreshNonce] = useState(0);
   const [buyNegotiationOutcome, setBuyNegotiationOutcome] = useState<MarketNegotiationOutcome | null>(null);
   const [buyModalOpen, setBuyModalOpen] = useState(false);
-  const [pendingWishlistBuyPlayerId, setPendingWishlistBuyPlayerId] = useState<string | null>(null);
+  const [buyModalWishlistEntry, setBuyModalWishlistEntry] = useState<TransferWishlistEntry | null>(null);
   const [reloadToken, setReloadToken] = useState(0);
   const [filterStorageReady, setFilterStorageReady] = useState(false);
   const [filterPresets, setFilterPresets] = useState<MarketFilterPreset[]>([]);
@@ -1071,6 +1138,12 @@ export default function TransfermarktV2Client({
   const [selectedDisciplineLens, setSelectedDisciplineLens] = useState<OfficialDisciplineWeightId | "">("");
   const [showRosterDisciplines, setShowRosterDisciplines] = useState(false);
   const [wishlistSort, setWishlistSort] = useState<WishlistSortState>({ key: "createdAt", direction: "desc" });
+
+  useEffect(() => () => {
+    if (wishlistClickTimerRef.current != null) {
+      window.clearTimeout(wishlistClickTimerRef.current);
+    }
+  }, []);
 
   function applyMarketFilterSnapshot(snapshot: MarketFilterSnapshot) {
     setSearch(snapshot.search);
@@ -1273,6 +1346,20 @@ export default function TransfermarktV2Client({
       null,
     [marketItems, selectedPlayerId, visibleItems],
   );
+  const selectedVisibleIndex = useMemo(
+    () => (selectedPlayerId ? visibleItems.findIndex((item) => item.playerId === selectedPlayerId) : -1),
+    [selectedPlayerId, visibleItems],
+  );
+  const effectiveRenderedCandidateCount = useMemo(() => {
+    if (selectedVisibleIndex < 0) {
+      return renderedCandidateCount;
+    }
+    return Math.max(renderedCandidateCount, selectedVisibleIndex + 8);
+  }, [renderedCandidateCount, selectedVisibleIndex]);
+  const renderedVisibleItems = useMemo(
+    () => visibleItems.slice(0, Math.min(visibleItems.length, effectiveRenderedCandidateCount)),
+    [effectiveRenderedCandidateCount, visibleItems],
+  );
   const selectedPlayerWishlisted = Boolean(selectedPlayer && wishlistPlayerIdSet.has(selectedPlayer.playerId));
   const activeBoardObjectiveHighlights = useMemo(
     () => boardObjectiveHighlights.filter((objective) => objective.status === "open" || objective.status === "at_risk" || objective.status === "failed").slice(0, 3),
@@ -1284,13 +1371,23 @@ export default function TransfermarktV2Client({
     [selectedTeamId, teamOptions],
   );
   const orderedDisciplines = useMemo(
-    () =>
-      [...disciplines].sort((left, right) => {
+    () => {
+      const categoryOrder: Record<string, number> = {
+        power: 0,
+        speed: 1,
+        mental: 2,
+        social: 3,
+      };
+      return [...disciplines].sort((left, right) => {
+        const leftCategoryOrder = categoryOrder[left.category] ?? 99;
+        const rightCategoryOrder = categoryOrder[right.category] ?? 99;
+        if (leftCategoryOrder !== rightCategoryOrder) return leftCategoryOrder - rightCategoryOrder;
         const leftOrder = left.displayOrder ?? left.originalOrder ?? 0;
         const rightOrder = right.displayOrder ?? right.originalOrder ?? 0;
         if (leftOrder !== rightOrder) return leftOrder - rightOrder;
         return left.name.localeCompare(right.name, "de", { numeric: true, sensitivity: "base" });
-      }),
+      });
+    },
     [disciplines],
   );
   const selectedRosterRows = useMemo(
@@ -1367,13 +1464,61 @@ export default function TransfermarktV2Client({
   const selectedTeamReadOnlyReason =
     selectedTeamLockedReason ??
     (source !== "sqlite" ? "Referenzmodus: Du kannst scouten und simulieren, aber keinen Deal final schreiben." : null);
+
+  function scrollBuyModalToTop() {
+    window.scrollTo({ top: 0, behavior: "auto" });
+    document.documentElement.scrollTop = 0;
+    document.body.scrollTop = 0;
+    buyModalRef.current?.scrollIntoView({ block: "start", behavior: "auto" });
+    buyModalRef.current?.scrollTo({ top: 0, behavior: "auto" });
+    buyModalBodyRef.current?.scrollTo({ top: 0, behavior: "auto" });
+  }
+
+  async function persistNegotiationOutcome(
+    summary: TransfermarktBuyPreview | null,
+    status: "ready_for_review" | "countered" | "accepted_pending_confirm" | "rejected_bad_experience",
+    extraWarnings: string[] = [],
+  ) {
+    if (source !== "sqlite" || !defaultSaveId || !summary?.player?.id || !summary.team?.id) {
+      return;
+    }
+
+    try {
+      await fetch(
+        `/api/singleplayer-state?${new URLSearchParams({
+          source,
+        }).toString()}`,
+        {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({
+            action: "contract-negotiation-outcome",
+            saveId: defaultSaveId,
+            summary,
+            status,
+            extraWarnings,
+          }),
+        },
+      );
+    } catch {
+      // Keep the UI responsive even if the persistence note fails.
+    }
+  }
+
   function withWriteContext<T extends Record<string, unknown>>(body: T) {
     const teamId = typeof body.teamId === "string" ? body.teamId : selectedTeamId;
+    const teamOwner = teamId ? teamControlOwnersByTeamId[teamId] ?? null : null;
+    const resolvedOwnerId =
+      teamOwner?.ownerSlot === "user"
+        ? DEFAULT_ACTIVE_OWNER_ID
+        : teamOwner?.ownerId?.trim() || effectiveOwnerId || DEFAULT_ACTIVE_OWNER_ID;
     return withRoomContextBody(
       {
         ...body,
-        activeManagerTeamId: selectedTeamId,
-        activeOwnerId,
+        activeManagerTeamId: teamId ?? selectedTeamId,
+        activeOwnerId: resolvedOwnerId,
         controlMode: teamControlModesByTeamId[teamId] ?? null,
       },
       roomContextRef.current,
@@ -1435,23 +1580,37 @@ export default function TransfermarktV2Client({
     return MARKET_ATTRIBUTE_GRID_ORDER.map((key) => rowsByKey.get(key)).filter((entry): entry is TransfermarktScoutedAttributeRow => Boolean(entry));
   }, [selectedAttributeRows]);
   const selectedTrainingImpact = selectedPlayer ? getClassTrainingImpact(selectedPlayer.className) : null;
+  const scoutingDisclosure = getTransfermarktScoutingDisclosure(selectedScoutingLevel);
+  const scoutingVisibility = getTransfermarktScoutingVisibilityBuckets(selectedScoutingLevel);
   const trainingVisibility = getTransfermarktTrainingAffinityVisibility(selectedScoutingLevel);
+  const scoutingProfileTooltip = [
+    `Grundwissen: ${scoutingVisibility.knowledge.join(" · ")}`,
+    `Scouting L${selectedScoutingLevel}: ${scoutingDisclosure.positiveTraitsVisible} positive Traits sichtbar${
+      scoutingDisclosure.negativeTraitsVisible ? " · negative Traits sichtbar" : " · negative Traits noch verdeckt"
+    }${scoutingVisibility.scouted.length > 0 ? ` · ${scoutingVisibility.scouted.join(" · ")}` : ""}`,
+    scoutingVisibility.hidden.length > 0 ? `Noch verdeckt: ${scoutingVisibility.hidden.join(" · ")}` : null,
+  ]
+    .filter((entry): entry is string => Boolean(entry))
+    .join("\n");
   const visibleTrainingPositive = selectedTrainingImpact?.positive.slice(0, trainingVisibility.positiveVisible) ?? [];
   const hiddenTrainingPositive = Math.max(0, (selectedTrainingImpact?.positive.length ?? 0) - visibleTrainingPositive.length);
   const visibleTrainingNegative = selectedTrainingImpact?.negative.slice(0, trainingVisibility.negativeVisible) ?? [];
   const hiddenTrainingNegative = Math.max(0, (selectedTrainingImpact?.negative.length ?? 0) - visibleTrainingNegative.length);
   const effectiveOfferedSalary = salaryEditedManually ? offeredSalary : null;
+  const previewPlayerId = selectedPlayer?.playerId ?? (buyModalOpen ? buyModalWishlistEntry?.playerId ?? null : null);
   const contractPreference = buyPreview?.contractPreference ?? null;
+  const activeContractLength = contractLength ?? buyPreview?.contractLength ?? contractPreference?.idealLength ?? 1;
+  const activeContractShape = contractShape ?? buyPreview?.contractShape ?? contractPreference?.shapePreference ?? "balanced";
   const contractSalaryAdjustmentPct = contractPreference?.salaryAdjustmentPct ?? null;
   const contractScoreAdjustment = contractPreference?.scoreAdjustment ?? null;
   const fitSalaryDiscountActive = (buyPreview?.teamFit ?? selectedPlayer?.fit ?? null) != null
     ? Number(buyPreview?.teamFit ?? selectedPlayer?.fit) >= 25
     : false;
   const contractLengthOutsidePreference = contractPreference
-    ? contractLength < contractPreference.preferredMinLength || contractLength > contractPreference.preferredMaxLength
+    ? activeContractLength < contractPreference.preferredMinLength || activeContractLength > contractPreference.preferredMaxLength
     : false;
   const contractShapeMismatch = contractPreference
-    ? contractShape !== contractPreference.shapePreference
+    ? activeContractShape !== contractPreference.shapePreference
     : false;
   const contractPressureTone =
     (contractSalaryAdjustmentPct ?? 0) > 0 || (contractScoreAdjustment ?? 0) < 0
@@ -1479,7 +1638,7 @@ export default function TransfermarktV2Client({
 
   async function ensureWishlistCandidateVisible(playerId: string, playerName: string) {
     if (marketItems.some((item) => item.playerId === playerId)) {
-      return;
+      return true;
     }
 
     try {
@@ -1497,11 +1656,11 @@ export default function TransfermarktV2Client({
       });
       const payload = (await response.json()) as MarketFeedResponse;
       if (!response.ok || payload.error) {
-        return;
+        return false;
       }
       const focusedItem = payload.items.find((item) => item.playerId === playerId);
       if (!focusedItem) {
-        return;
+        return false;
       }
       setMarketItems((current) => {
         if (current.some((item) => item.playerId === playerId)) {
@@ -1509,13 +1668,41 @@ export default function TransfermarktV2Client({
         }
         return [focusedItem, ...current];
       });
+      return true;
     } catch {
       // ignore focused preload miss and keep normal search-driven reload path
+      return false;
     }
   }
 
-  function focusWishlistEntry(entry: TransferWishlistEntry, options?: { openDeal?: boolean }) {
+  async function focusWishlistEntry(entry: TransferWishlistEntry, options?: { openDeal?: boolean }) {
+    setSelectedPlayerId(entry.playerId);
+    if (options?.openDeal) {
+      if (!selectedTeamId) {
+        setPreviewError("Bitte erst ein Team wählen.");
+        return;
+      }
+      if (!selectedTeamCanManage) {
+        setPreviewError(selectedTeamLockedReason ?? "Dieses Team ist nur zum Ansehen freigegeben.");
+        return;
+      }
+      setBuySuccess(null);
+      setPreviewError(null);
+      setBuyPreview(null);
+      setBuyNegotiationOutcome(null);
+      setContractLength(null);
+      setContractShape(null);
+      setOfferedSalary(null);
+      setSalaryEditedManually(false);
+      setBuyModalWishlistEntry(entry);
+      setBuyModalOpen(true);
+      setBuyPreviewRefreshNonce((current) => current + 1);
+      void ensureWishlistCandidateVisible(entry.playerId, entry.playerName);
+      return;
+    }
+
     shouldFocusSelectedCandidateRef.current = true;
+    setBuyModalWishlistEntry(null);
     setSearch(entry.playerName);
     setSelectedAxes([]);
     setAxisMinimums({ pow: 0, spe: 0, men: 0, soc: 0 });
@@ -1526,11 +1713,28 @@ export default function TransfermarktV2Client({
     setMaxSalary(0);
     setMaxRatio(0);
     setMinFit(0);
-    setSelectedPlayerId(entry.playerId);
-    void ensureWishlistCandidateVisible(entry.playerId, entry.playerName);
-    if (options?.openDeal) {
-      setPendingWishlistBuyPlayerId(entry.playerId);
+    await ensureWishlistCandidateVisible(entry.playerId, entry.playerName);
+  }
+
+  function clearWishlistClickTimer() {
+    if (wishlistClickTimerRef.current == null) {
+      return;
     }
+    window.clearTimeout(wishlistClickTimerRef.current);
+    wishlistClickTimerRef.current = null;
+  }
+
+  function queueWishlistFocus(entry: TransferWishlistEntry) {
+    clearWishlistClickTimer();
+    wishlistClickTimerRef.current = window.setTimeout(() => {
+      wishlistClickTimerRef.current = null;
+      void focusWishlistEntry(entry);
+    }, 180);
+  }
+
+  function openWishlistDeal(entry: TransferWishlistEntry) {
+    clearWishlistClickTimer();
+    void focusWishlistEntry(entry, { openDeal: true });
   }
 
   function handleCandidateKeyDown(event: KeyboardEvent<HTMLButtonElement>, playerId: string) {
@@ -1557,19 +1761,51 @@ export default function TransfermarktV2Client({
   }
 
   useEffect(() => {
+    setRenderedCandidateCount(MARKET_INITIAL_RENDER_COUNT);
+  }, [selectedTeamId, deferredSearch, sortMode, minFit, maxValue, maxSalary, maxRatio, selectedDisciplineLens, selectedClassNames, selectedClassAxes, selectedRaceNames, selectedAxes, axisMinimums]);
+
+  useEffect(() => {
+    if (visibleItems.length <= renderedCandidateCount) {
+      return;
+    }
+    const handle = window.setTimeout(() => {
+      setRenderedCandidateCount((current) => Math.min(visibleItems.length, current + MARKET_RENDER_STEP));
+    }, 90);
+    return () => window.clearTimeout(handle);
+  }, [renderedCandidateCount, visibleItems.length]);
+
+  useEffect(() => {
+    if (selectedVisibleIndex < 0) {
+      return;
+    }
+    if (selectedVisibleIndex < renderedCandidateCount) {
+      return;
+    }
+    setRenderedCandidateCount(Math.min(visibleItems.length, selectedVisibleIndex + MARKET_RENDER_STEP));
+  }, [renderedCandidateCount, selectedVisibleIndex, visibleItems.length]);
+
+  useEffect(() => {
     if (!visibleItems.length) {
-      if (!selectedPlayerId || !marketItems.some((item) => item.playerId === selectedPlayerId)) {
+      if (
+        !selectedPlayerId ||
+        (!marketItems.some((item) => item.playerId === selectedPlayerId) &&
+          !selectedWishlistEntries.some((entry) => entry.playerId === selectedPlayerId))
+      ) {
         setSelectedPlayerId(null);
       }
       return;
     }
     if (
       !selectedPlayerId ||
-      (!visibleItems.some((item) => item.playerId === selectedPlayerId) && !marketItems.some((item) => item.playerId === selectedPlayerId))
+      (
+        !visibleItems.some((item) => item.playerId === selectedPlayerId) &&
+        !marketItems.some((item) => item.playerId === selectedPlayerId) &&
+        !selectedWishlistEntries.some((entry) => entry.playerId === selectedPlayerId)
+      )
     ) {
       setSelectedPlayerId(visibleItems[0]?.playerId ?? null);
     }
-  }, [marketItems, selectedPlayerId, visibleItems]);
+  }, [marketItems, selectedPlayerId, selectedWishlistEntries, visibleItems]);
 
   useEffect(() => {
     if (!selectedPlayerId || !shouldFocusSelectedCandidateRef.current) {
@@ -1585,6 +1821,8 @@ export default function TransfermarktV2Client({
   }, [selectedPlayerId, visibleItems]);
 
   useEffect(() => {
+    setContractLength(null);
+    setContractShape(null);
     setOfferedSalary(null);
     setSalaryEditedManually(false);
   }, [selectedPlayerId, selectedTeamId]);
@@ -1593,14 +1831,13 @@ export default function TransfermarktV2Client({
     if (!buyModalOpen) {
       return;
     }
-    const resetScroll = () => {
-      buyModalRef.current?.scrollTo({ top: 0, behavior: "auto" });
-      buyModalBodyRef.current?.scrollTo({ top: 0, behavior: "auto" });
-    };
-    resetScroll();
-    const frame = window.requestAnimationFrame(resetScroll);
+    scrollBuyModalToTop();
+    const frame = window.requestAnimationFrame(() => {
+      scrollBuyModalToTop();
+      window.requestAnimationFrame(scrollBuyModalToTop);
+    });
     return () => window.cancelAnimationFrame(frame);
-  }, [buyModalOpen]);
+  }, [buyModalOpen, buyNegotiationOutcome?.status]);
 
   useEffect(() => {
     let cancelled = false;
@@ -1618,6 +1855,7 @@ export default function TransfermarktV2Client({
         const mergedItems: TransfermarktFreeAgentItem[] = [];
         const seen = new Set<string>();
         let latestPayload: MarketFeedResponse | null = null;
+        let publishedCount = 0;
         let nextOffset = 0;
         let hasMore = true;
 
@@ -1658,16 +1896,24 @@ export default function TransfermarktV2Client({
           nextOffset += payload.returned;
           hasMore = Boolean(payload.hasMore && payload.returned > 0);
 
-          setMarketFeed({
-            ...payload,
-            items: mergedItems,
-            offset: 0,
-            returned: mergedItems.length,
-            hasMore,
-          });
-          setMarketItems([...mergedItems]);
-          setMarketTotal(payload.total);
-          setMarketHasMore(hasMore);
+          const shouldPublish =
+            mergedItems.length <= MARKET_PAGE_LIMIT ||
+            !hasMore ||
+            mergedItems.length - publishedCount >= MARKET_BATCH_PUBLISH_SIZE;
+
+          if (shouldPublish) {
+            setMarketFeed({
+              ...payload,
+              items: mergedItems,
+              offset: 0,
+              returned: mergedItems.length,
+              hasMore,
+            });
+            setMarketItems([...mergedItems]);
+            setMarketTotal(payload.total);
+            setMarketHasMore(hasMore);
+            publishedCount = mergedItems.length;
+          }
 
           if (hasMore) {
             await new Promise((resolve) => window.setTimeout(resolve, 0));
@@ -1750,14 +1996,16 @@ export default function TransfermarktV2Client({
   }, [defaultSaveId, defaultSeasonId, reloadToken, selectedTeamId, source]);
 
   useEffect(() => {
-    if (!selectedPlayer || !selectedTeamId) {
+    if (!previewPlayerId || !selectedTeamId) {
       setBuyPreview(null);
       setPreviewError(null);
+      setPreviewBusy(false);
       return;
     }
     if (!selectedTeamCanManage) {
       setBuyPreview(null);
       setPreviewError(selectedTeamLockedReason ?? "Dieses Team ist nur zum Ansehen freigegeben.");
+      setPreviewBusy(false);
       return;
     }
 
@@ -1766,10 +2014,10 @@ export default function TransfermarktV2Client({
     const controller = new AbortController();
     previewAbortRef.current?.abort();
     previewAbortRef.current = controller;
+    setPreviewBusy(true);
+    setPreviewError(null);
 
     const timer = window.setTimeout(async () => {
-      setPreviewBusy(true);
-      setPreviewError(null);
       try {
         const response = await fetch("/api/transfermarkt/buy", {
           method: "POST",
@@ -1778,10 +2026,10 @@ export default function TransfermarktV2Client({
             saveId: defaultSaveId,
             seasonId: defaultSeasonId,
             teamId: selectedTeamId,
-            playerId: selectedPlayer.playerId,
-            contractLength,
-            contractShape,
-            offeredSalary: effectiveOfferedSalary,
+            playerId: previewPlayerId,
+            ...(contractLength != null ? { contractLength } : {}),
+            ...(contractShape != null ? { contractShape } : {}),
+            ...(effectiveOfferedSalary != null ? { offeredSalary: effectiveOfferedSalary } : {}),
             dryRun: true,
             source,
           })),
@@ -1811,7 +2059,7 @@ export default function TransfermarktV2Client({
           setPreviewBusy(false);
         }
       }
-    }, 160);
+    }, salaryEditedManually ? 90 : 40);
 
     return () => {
       cancelled = true;
@@ -1821,7 +2069,22 @@ export default function TransfermarktV2Client({
         previewAbortRef.current = null;
       }
     };
-  }, [contractLength, contractShape, defaultSaveId, defaultSeasonId, effectiveOfferedSalary, salaryEditedManually, selectedPlayer, selectedTeamCanManage, selectedTeamId, selectedTeamLockedReason, source]);
+  }, [
+    buyPreviewRefreshNonce,
+    buyModalWishlistEntry,
+    previewPlayerId,
+    contractLength,
+    contractShape,
+    defaultSaveId,
+    defaultSeasonId,
+    effectiveOfferedSalary,
+    salaryEditedManually,
+    selectedPlayer,
+    selectedTeamCanManage,
+    selectedTeamId,
+    selectedTeamLockedReason,
+    source,
+  ]);
 
   async function confirmBuy() {
     if (!selectedPlayer || !selectedTeamId) {
@@ -1847,9 +2110,9 @@ export default function TransfermarktV2Client({
           seasonId: defaultSeasonId,
           teamId: selectedTeamId,
           playerId: selectedPlayer.playerId,
-          contractLength,
-          contractShape,
-          offeredSalary: effectiveOfferedSalary,
+          ...(contractLength != null ? { contractLength } : {}),
+          ...(contractShape != null ? { contractShape } : {}),
+          ...(effectiveOfferedSalary != null ? { offeredSalary: effectiveOfferedSalary } : {}),
           dryRun: false,
           source,
         })),
@@ -1861,7 +2124,7 @@ export default function TransfermarktV2Client({
       }
       setBuyPreview(payload.summary);
       setBuySuccess(
-        `${payload.summary.player?.name ?? "Spieler"} fix fuer ${selectedTeam?.shortCode ?? "dein Team"}: ${formatTransfermarktCurrency(payload.summary.purchasePrice)} Abloese, ${formatTransfermarktCurrency(payload.summary.salary)} Gehalt p.a., ${payload.summary.contractLength} Season(s).`,
+        `${payload.summary.player?.name ?? "Spieler"} fix fuer ${selectedTeam?.shortCode ?? "dein Team"}: ${formatTransfermarktCurrency(payload.summary.purchasePrice)} Abloese, ${formatTransfermarktCurrency(payload.summary.salary)} Gehalt p.a., ${payload.summary.contractLength} Saison${payload.summary.contractLength === 1 ? "" : "en"}.`,
       );
       setBuyModalOpen(false);
       setBuyNegotiationOutcome(null);
@@ -1893,11 +2156,19 @@ export default function TransfermarktV2Client({
     const activeSalaryOffer = effectiveOfferedSalary ?? buyPreview.offeredSalary ?? expectedSalary;
 
     if (rejectChance >= acceptChance && rejectChance >= counterChance) {
+      void persistNegotiationOutcome(
+        buyPreview,
+        "rejected_bad_experience",
+        ["negotiation_rejected_bad_experience"],
+      );
       setBuyNegotiationOutcome({
         status: "rejected",
         tone: "error",
         title: "Angebot abgelehnt",
         message: `${buyPreview.player.name} lehnt dieses Angebot aktuell ab. Heb das Gehalt an oder passe den Vertrag an, dann kannst du neu verhandeln.`,
+      });
+      window.requestAnimationFrame(() => {
+        scrollBuyModalToTop();
       });
       return;
     }
@@ -1920,14 +2191,21 @@ export default function TransfermarktV2Client({
         message: `${buyPreview.player.name} will weitermachen, aber eher ${formatTransfermarktCurrency(counterSalary)} pro Season${counterDelta != null ? ` (${counterDelta > 0 ? "+" : ""}${formatTransfermarktCurrency(counterDelta)} gegenueber deinem Angebot)` : ""}. Das Angebot wurde direkt auf den neuen Rahmen gesetzt.`,
         counterSalary,
       });
+      window.requestAnimationFrame(() => {
+        scrollBuyModalToTop();
+      });
       return;
     }
 
+    void persistNegotiationOutcome(buyPreview, "accepted_pending_confirm");
     setBuyNegotiationOutcome({
       status: "accepted",
       tone: "success",
       title: "Angebot angenommen",
       message: `${buyPreview.player.name} akzeptiert den Rahmen. Du kannst den Kauf jetzt final abschließen.`,
+    });
+    window.requestAnimationFrame(() => {
+      scrollBuyModalToTop();
     });
   }
 
@@ -1941,41 +2219,51 @@ export default function TransfermarktV2Client({
     }
     setBuySuccess(null);
     setBuyNegotiationOutcome(null);
+    setBuyPreview(null);
+    setContractLength(null);
+    setContractShape(null);
+    setOfferedSalary(null);
+    setSalaryEditedManually(false);
+    setBuyModalWishlistEntry(null);
     setBuyModalOpen(true);
+    setBuyPreviewRefreshNonce((current) => current + 1);
+  }
+
+  function resetBuyDemandFrame() {
+    setBuyNegotiationOutcome(null);
+    setContractLength(null);
+    setContractShape(null);
+    setOfferedSalary(null);
+    setSalaryEditedManually(false);
+    setBuyPreviewRefreshNonce((current) => current + 1);
   }
 
   function closeBuyModal() {
     if (buyBusy) {
       return;
     }
+    const shouldApplyAbortMalus =
+      source === "sqlite" &&
+      selectedTeamCanManage &&
+      Boolean(buyPreview?.player?.id && buyNegotiationOutcome);
     setBuyModalOpen(false);
+    setBuyModalWishlistEntry(null);
     setBuyNegotiationOutcome(null);
+    if (shouldApplyAbortMalus && buyPreview) {
+      const playerName = buyPreview.player?.name ?? "dem Spieler";
+      void persistNegotiationOutcome(
+        buyPreview,
+        "rejected_bad_experience",
+        ["negotiation_cancelled_after_contact"],
+      );
+      setPreviewError(
+        `Verhandlung mit ${playerName} abgebrochen. Das gibt einen Malus fuer die naechste Runde.`,
+      );
+      window.requestAnimationFrame(() => {
+        window.scrollTo({ top: 0, behavior: "smooth" });
+      });
+    }
   }
-
-  useEffect(() => {
-    if (!pendingWishlistBuyPlayerId) {
-      return;
-    }
-    if (!selectedTeamId) {
-      return;
-    }
-    if (!selectedTeamCanManage) {
-      setPreviewError(selectedTeamLockedReason ?? "Dieses Team ist nur zum Ansehen freigegeben.");
-      setPendingWishlistBuyPlayerId(null);
-      return;
-    }
-    if (!selectedPlayer || selectedPlayer.playerId !== pendingWishlistBuyPlayerId) {
-      if (!marketBusy && marketItems.length > 0 && !marketItems.some((item) => item.playerId === pendingWishlistBuyPlayerId)) {
-        setPreviewError("Wishlist-Spieler ist im aktuellen Markt nicht mehr verfügbar.");
-        setPendingWishlistBuyPlayerId(null);
-      }
-      return;
-    }
-    setBuySuccess(null);
-    setPreviewError(null);
-    setBuyModalOpen(true);
-    setPendingWishlistBuyPlayerId(null);
-  }, [marketBusy, marketItems, pendingWishlistBuyPlayerId, selectedPlayer, selectedTeamCanManage, selectedTeamId, selectedTeamLockedReason]);
 
   const historyItems = historyFeed?.items ?? [];
   const previewNeedSignal = selectedPlayer ? getNeedSignal(selectedPlayer) : null;
@@ -2025,12 +2313,12 @@ export default function TransfermarktV2Client({
                 : buyNegotiationOutcome?.status !== "accepted"
                   ? "Erst verhandeln, dann final bestätigen."
                 : null;
-  const modalPlayerName = buyPreview?.player?.name ?? selectedPlayer?.name ?? "Unbekannt";
-  const modalPlayerClass = buyPreview?.player?.className ?? selectedPlayer?.className ?? "—";
-  const modalPlayerRace = buyPreview?.player?.race ?? selectedPlayer?.race ?? "—";
-  const modalPlayerBracket = buyPreview?.bracket ?? selectedPlayer?.bracket ?? null;
-  const modalPlayerMarketValue = buyPreview?.currentValue ?? selectedPlayer?.marketValue ?? null;
-  const modalPlayerSalary = buyPreview?.salary ?? selectedPlayer?.salary ?? null;
+  const modalPlayerName = buyPreview?.player?.name ?? selectedPlayer?.name ?? buyModalWishlistEntry?.playerName ?? "Unbekannt";
+  const modalPlayerClass = buyPreview?.player?.className ?? selectedPlayer?.className ?? buyModalWishlistEntry?.className ?? "—";
+  const modalPlayerRace = buyPreview?.player?.race ?? selectedPlayer?.race ?? buyModalWishlistEntry?.race ?? "—";
+  const modalPlayerBracket = buyPreview?.bracket ?? selectedPlayer?.bracket ?? buyModalWishlistEntry?.bracket ?? null;
+  const modalPlayerMarketValue = buyPreview?.currentValue ?? selectedPlayer?.marketValue ?? buyModalWishlistEntry?.marketValue ?? null;
+  const modalPlayerSalary = buyPreview?.salary ?? selectedPlayer?.salary ?? buyModalWishlistEntry?.salary ?? null;
   const modalOfferValue = salaryEditedManually
     ? offeredSalary
     : buyPreview?.offeredSalary ?? selectedPlayer?.salary ?? null;
@@ -2049,9 +2337,9 @@ export default function TransfermarktV2Client({
     if (contractPreference) {
       if (contractLengthOutsidePreference) {
         concerns.push(
-          contractLength < contractPreference.preferredMinLength
-            ? `Laufzeit zu kurz fuer den Wunsch (${contractPreference.preferredMinLength}-${contractPreference.preferredMaxLength} Seasons okay)`
-            : `Laufzeit zu lang fuer den Wunsch (${contractPreference.preferredMinLength}-${contractPreference.preferredMaxLength} Seasons okay)`,
+          activeContractLength < contractPreference.preferredMinLength
+            ? `Laufzeit zu kurz fuer den Wunsch (${contractPreference.preferredMinLength}-${contractPreference.preferredMaxLength} Saisons okay)`
+            : `Laufzeit zu lang fuer den Wunsch (${contractPreference.preferredMinLength}-${contractPreference.preferredMaxLength} Saisons okay)`,
         );
       } else {
         likes.push(`Laufzeit passt in sein Wunschfenster (${contractPreference.preferredMinLength}-${contractPreference.preferredMaxLength})`);
@@ -2059,10 +2347,10 @@ export default function TransfermarktV2Client({
 
       if (contractShapeMismatch) {
         concerns.push(
-          `Vertragsform mag er weniger (${formatContractShapeLabel(contractShape)} statt ${formatContractShapeLabel(contractPreference.shapePreference)})`,
+          `Vertragsform mag er weniger (${formatContractShapeLabel(activeContractShape)} statt ${formatContractShapeLabel(contractPreference.shapePreference)})`,
         );
       } else {
-        likes.push(`Vertragsform passt (${formatContractShapeLabel(contractShape)})`);
+        likes.push(`Vertragsform passt (${formatContractShapeLabel(activeContractShape)})`);
       }
     }
 
@@ -2097,28 +2385,50 @@ export default function TransfermarktV2Client({
       concerns: concerns.slice(0, 3),
     };
   }, [
+    activeContractLength,
+    activeContractShape,
     buyPreview?.expectedSalary,
     buyPreview?.negotiationScoreBreakdown,
-    contractLength,
     contractLengthOutsidePreference,
     contractPreference,
-    contractShape,
     contractShapeMismatch,
     modalOfferValue,
   ]);
-  const needBreakdownRows = useMemo(() => {
+  const priorBadExperienceDemandEntry = useMemo(
+    () => buyPreview?.demandBreakdown?.find((entry) => entry.key === "prior_bad_experience") ?? null,
+    [buyPreview?.demandBreakdown],
+  );
+  const priorBadExperienceScoreEntry = useMemo(
+    () => buyPreview?.negotiationScoreBreakdown?.find((entry) => entry.key === "bad_experience") ?? null,
+    [buyPreview?.negotiationScoreBreakdown],
+  );
+  const priorBadExperienceActive = Boolean(
+    buyPreview?.warnings?.includes("previous_rejected_offer_reduces_trust") ||
+    priorBadExperienceDemandEntry ||
+    priorBadExperienceScoreEntry,
+  );
+  const needBreakdownSummary = useMemo(() => {
     const breakdown = selectedPlayer?.needMatchBreakdown;
     if (!breakdown) {
-      return [];
+      return null;
     }
-    return [
-      { key: "axis", label: "Achsenbedarf", value: breakdown.axisScore },
-      { key: "roster", label: "Kaderluecke", value: breakdown.rosterGapScore },
-      { key: "depth", label: "Tiefe/Qualitaet", value: breakdown.depthQualityScore },
-      { key: "discipline", label: "Top-Diszi", value: breakdown.preferredDisciplineScore },
-      { key: "value", label: "MW/Gehalt", value: breakdown.valueReliefScore },
-      { key: "penalty", label: "Premium-Malus", value: breakdown.premiumOverfillPenalty * -1 },
-    ].filter((entry) => Math.abs(entry.value) >= 0.5);
+    const parts = [
+      { label: "Identity", value: breakdown.identityFitScore },
+      { label: "Achse", value: breakdown.axisScore },
+      { label: "Luecke", value: breakdown.rosterGapScore },
+      { label: "Tiefe", value: breakdown.depthQualityScore },
+      { label: "Diszi", value: breakdown.preferredDisciplineScore },
+      { label: "Value", value: breakdown.valueReliefScore },
+      { label: "Malus", value: breakdown.premiumOverfillPenalty * -1 },
+    ]
+      .filter((entry) => Math.abs(entry.value) >= 0.5)
+      .map((entry) => `${entry.label} ${entry.value > 0 ? "+" : ""}${formatCompactNumber(entry.value, 0)}`);
+
+    if (parts.length === 0) {
+      return `Kaum direkter Need-Treiber = ${formatCompactNumber(breakdown.totalScore, 0)}`;
+    }
+
+    return `${parts.join(" · ")} = ${formatCompactNumber(breakdown.totalScore, 0)}`;
   }, [selectedPlayer]);
 
   return (
@@ -2465,7 +2775,7 @@ export default function TransfermarktV2Client({
             </span>
           </div>
           <div className="market-v2-candidate-list">
-            {visibleItems.map((item) => {
+            {renderedVisibleItems.map((item, index) => {
               const portrait = getTransfermarktPortraitModel(item);
               const isSelected = selectedPlayer?.playerId === item.playerId;
               const fitInfo = getFitSignal(item);
@@ -2491,7 +2801,15 @@ export default function TransfermarktV2Client({
                 >
                   <div className="market-v2-candidate-media" style={getCandidateFrameStyle(item.className)}>
                     {portrait.src ? (
-                      <OptimizedMediaImage src={portrait.src} alt={item.name} width={68} height={68} className="market-v2-candidate-image" />
+                      <OptimizedMediaImage
+                        src={portrait.src}
+                        alt={item.name}
+                        width={68}
+                        height={68}
+                        className="market-v2-candidate-image"
+                        loading={isSelected || index < 6 ? "eager" : "lazy"}
+                        fetchPriority={isSelected || index < 3 ? "high" : "low"}
+                      />
                     ) : (
                       <span className="market-v2-candidate-placeholder">{portrait.initials}</span>
                     )}
@@ -2552,6 +2870,11 @@ export default function TransfermarktV2Client({
               </div>
             ) : null}
           </div>
+          {renderedVisibleItems.length < visibleItems.length ? (
+            <p className="muted">
+              {renderedVisibleItems.length} von {visibleItems.length} Kandidaten eingeblendet, der Rest kommt automatisch nach.
+            </p>
+          ) : null}
           {marketHasMore ? (
             <p className="muted">Weitere Kandidaten werden automatisch geladen.</p>
           ) : null}
@@ -2569,7 +2892,9 @@ export default function TransfermarktV2Client({
                   )}
                 </div>
                 <div className="market-v2-player-copy">
-                  <span className="market-v2-kicker">Scouting-Profil</span>
+                  <span className="market-v2-kicker" title={scoutingProfileTooltip}>
+                    Scouting-Profil
+                  </span>
                   <h3>{selectedPlayer.name}</h3>
                   <p>{selectedPlayer.className} · {selectedPlayer.race} · {selectedPlayer.alignment}</p>
                   <div className="market-v2-pill-row">
@@ -2668,67 +2993,63 @@ export default function TransfermarktV2Client({
                       Doppelbelastung
                     </span>
                   ) : null}
-                </article>
-
-                <article
-                  className="market-v2-info-card"
-                  title={`Scouting L${selectedScoutingLevel}: Trainingsprofil wird schrittweise klarer.`}
-                >
-                  <div className="market-v2-card-eyebrow">Training</div>
-                  <div className="market-v2-training-affinity-grid">
-                    {visibleTrainingPositive.map((entry) => (
-                      <span
-                        className="market-v2-training-affinity-chip is-signature"
-                        title={getTrainingAttributeTitle(
-                          { attribute: entry.attribute as PlayerGeneratorAttributeKey, weight: entry.weight },
-                          "signature",
-                        )}
-                        key={`train-pos-${selectedPlayer.playerId}-${entry.attribute}`}
-                      >
-                        <b>+</b>
-                        <span>
-                          <strong>{TRAINING_ATTRIBUTE_LABELS[entry.attribute as PlayerGeneratorAttributeKey]}</strong>
-                          <small>{formatTrainingAttributeWeight(entry.weight)}</small>
+                  <div className="market-v2-inline-training" title={`Scouting L${selectedScoutingLevel}: Trainingsprofil wird schrittweise klarer.`}>
+                    <div className="market-v2-card-eyebrow">Training</div>
+                    <div className="market-v2-training-affinity-grid">
+                      {visibleTrainingPositive.map((entry) => (
+                        <span
+                          className="market-v2-training-affinity-chip is-signature"
+                          title={getTrainingAttributeTitle(
+                            { attribute: entry.attribute as PlayerGeneratorAttributeKey, weight: entry.weight },
+                            "signature",
+                          )}
+                          key={`train-pos-${selectedPlayer.playerId}-${entry.attribute}`}
+                        >
+                          <b>+</b>
+                          <span>
+                            <strong>{TRAINING_ATTRIBUTE_LABELS[entry.attribute as PlayerGeneratorAttributeKey]}</strong>
+                            <small>{formatTrainingAttributeWeight(entry.weight)}</small>
+                          </span>
                         </span>
-                      </span>
-                    ))}
-                    {visibleTrainingNegative.map((entry) => (
-                      <span
-                        className="market-v2-training-affinity-chip is-weak"
-                        title={getTrainingAttributeTitle(
-                          { attribute: entry.attribute as PlayerGeneratorAttributeKey, weight: entry.weight },
-                          "weak",
-                        )}
-                        key={`train-neg-${selectedPlayer.playerId}-${entry.attribute}`}
-                      >
-                        <b>-</b>
-                        <span>
-                          <strong>{TRAINING_ATTRIBUTE_LABELS[entry.attribute as PlayerGeneratorAttributeKey]}</strong>
-                          <small>{formatTrainingAttributeWeight(entry.weight)}</small>
+                      ))}
+                      {visibleTrainingNegative.map((entry) => (
+                        <span
+                          className="market-v2-training-affinity-chip is-weak"
+                          title={getTrainingAttributeTitle(
+                            { attribute: entry.attribute as PlayerGeneratorAttributeKey, weight: entry.weight },
+                            "weak",
+                          )}
+                          key={`train-neg-${selectedPlayer.playerId}-${entry.attribute}`}
+                        >
+                          <b>-</b>
+                          <span>
+                            <strong>{TRAINING_ATTRIBUTE_LABELS[entry.attribute as PlayerGeneratorAttributeKey]}</strong>
+                            <small>{formatTrainingAttributeWeight(entry.weight)}</small>
+                          </span>
                         </span>
-                      </span>
-                    ))}
-                    {hiddenTrainingPositive > 0 ? (
-                      <span className="market-v2-training-affinity-chip is-locked" title="Mehr Scouting deckt weitere Trainingsstaerken auf.">
-                        <b>?</b>
-                        <span>
-                          <strong>+{hiddenTrainingPositive} Staerken</strong>
-                          <small>mehr Scouting</small>
+                      ))}
+                      {hiddenTrainingPositive > 0 ? (
+                        <span className="market-v2-training-affinity-chip is-locked" title="Mehr Scouting deckt weitere Trainingsstaerken auf.">
+                          <b>?</b>
+                          <span>
+                            <strong>+{hiddenTrainingPositive} Staerken</strong>
+                            <small>mehr Scouting</small>
+                          </span>
                         </span>
-                      </span>
-                    ) : null}
-                    {hiddenTrainingNegative > 0 ? (
-                      <span className="market-v2-training-affinity-chip is-locked" title="Mehr Scouting deckt Trainingsrisiken auf.">
-                        <b>?</b>
-                        <span>
-                          <strong>{hiddenTrainingNegative} Malus</strong>
-                          <small>mehr Scouting</small>
+                      ) : null}
+                      {hiddenTrainingNegative > 0 ? (
+                        <span className="market-v2-training-affinity-chip is-locked" title="Mehr Scouting deckt Trainingsrisiken auf.">
+                          <b>?</b>
+                          <span>
+                            <strong>{hiddenTrainingNegative} Malus</strong>
+                            <small>mehr Scouting</small>
+                          </span>
                         </span>
-                      </span>
-                    ) : null}
-                    {!visibleTrainingNegative.length && hiddenTrainingNegative === 0 ? (
-                      <span className="market-v2-signal-badge is-neutral">kein klarer Malus</span>
-                    ) : null}
+                      ) : null}
+                      {!visibleTrainingNegative.length && hiddenTrainingNegative === 0 ? (
+                        <span className="market-v2-signal-badge is-neutral">kein klarer Malus</span>
+                      ) : null}
+                    </div>
                   </div>
                 </article>
 
@@ -2753,18 +3074,10 @@ export default function TransfermarktV2Client({
                         {AXIS_META[axis].label}
                       </span>
                     ))}
-                    {selectedPlayer.needMatchAxes?.length ? null : <span className="pill">keine klare Achse</span>}
                   </div>
-                  {needBreakdownRows.length ? (
-                    <div className="market-v2-need-breakdown" aria-label="Bedarfs-Logik">
-                      {needBreakdownRows.map((entry) => (
-                        <span
-                          className={`market-v2-signal-badge ${entry.value >= 0 ? "is-positive" : "is-negative"}`}
-                          key={`need-breakdown-${entry.key}`}
-                        >
-                          {entry.label} {entry.value > 0 ? "+" : ""}{formatCompactNumber(entry.value, 0)}
-                        </span>
-                      ))}
+                  {needBreakdownSummary ? (
+                    <div className="market-v2-need-breakdown-line muted" aria-label="Bedarfs-Logik">
+                      {needBreakdownSummary}
                     </div>
                   ) : null}
                   <div className="market-v2-axis-compare-mini" aria-label="Achsenvergleich mit dem aktuellen Kader">
@@ -2772,7 +3085,7 @@ export default function TransfermarktV2Client({
                       <span className={`market-v2-axis-compare-pill ${AXIS_META[row.axis].className} ${row.toneClass}`} key={`team-match-axis-${row.axis}`}>
                         <b>{AXIS_META[row.axis].label}</b>
                         <small>
-                          {row.candidateValue != null ? formatCompactNumber(row.candidateValue, 0) : "—"} · Delta {formatAxisComparisonDelta(row.delta)}
+                          {row.candidateValue != null ? formatCompactNumber(row.candidateValue, 0) : "—"} · Δ {formatAxisComparisonDelta(row.delta)}
                         </small>
                       </span>
                     ))}
@@ -2824,6 +3137,16 @@ export default function TransfermarktV2Client({
                   {selectedPlayer.traitsNegative.slice(0, 3).map((trait) => (
                     <span className="pill market-v2-trait-pill is-negative" key={`neg-${trait}`}>- {trait}</span>
                   ))}
+                  {selectedPlayer.hiddenPositiveTraitCount > 0 ? (
+                    <span className="pill market-v2-trait-pill is-neutral">
+                      +{selectedPlayer.hiddenPositiveTraitCount} verdeckt
+                    </span>
+                  ) : null}
+                  {selectedPlayer.hiddenNegativeTraitCount > 0 ? (
+                    <span className="pill market-v2-trait-pill is-neutral">
+                      {selectedPlayer.hiddenNegativeTraitCount} Risiko verdeckt
+                    </span>
+                  ) : null}
                   {selectedPlayer.traitsPositive.length === 0 && selectedPlayer.traitsNegative.length === 0 ? (
                     <span className="pill">keine markanten Traits</span>
                   ) : null}
@@ -2965,62 +3288,65 @@ export default function TransfermarktV2Client({
 
       <section className="market-v2-context-grid" aria-label="Team- und Wishlist-Kontext">
         <article className="market-v2-context-panel">
-          <div className="market-v2-section-head">
-            <div>
-              <strong>Wishlist & Bedarf</strong>
-              <small>{selectedWishlistEntries.length} gemerkt · konkrete Orientierung fürs Kaufen</small>
-            </div>
-          </div>
-          <div className="market-v2-need-summary">
-            <span>
-              {rosterGapOpenCount != null && rosterGapOpenCount > 0
-                ? `${rosterGapOpenCount} Kaderplatz${rosterGapOpenCount === 1 ? "" : "e"} offen`
-                : "Kadergröße okay"}
-            </span>
-            <span>Budget {formatToneLabel(marketContext?.affordabilityStatus)}</span>
-            <span>Status {formatReadinessLabel(marketContext?.readinessStatus)}</span>
-          </div>
-          <div className="market-v2-axis-compare-grid" aria-label="Kader gegen Kandidat vergleichen">
-            {axisComparisonRows.map((row) => (
-              <div className={`market-v2-axis-compare-card ${AXIS_META[row.axis].className} ${row.toneClass}`} key={`context-axis-compare-${row.axis}`}>
-                <div className="market-v2-axis-compare-head">
-                  <strong>{AXIS_META[row.axis].label}</strong>
-                  <span>{row.isNeedAxis ? "Bedarf" : "Kader"}</span>
-                </div>
-                <div className="market-v2-axis-compare-values">
-                  <span>
-                    <small>Kader</small>
-                    <b>{row.rosterValue != null ? formatCompactNumber(row.rosterValue, 0) : "—"}</b>
-                  </span>
-                  <span>
-                    <small>Kandidat</small>
-                    <b>{row.candidateValue != null ? formatCompactNumber(row.candidateValue, 0) : "—"}</b>
-                  </span>
-                  <span>
-                    <small>Delta</small>
-                    <b>{formatAxisComparisonDelta(row.delta)}</b>
-                  </span>
-                </div>
-              </div>
-            ))}
-          </div>
-          <div className="market-v2-chip-row">
-            {wishlistAxes.length > 0 ? (
-              wishlistAxes.map((axis) => (
-                <span key={`context-axis-${axis}`} className={`market-v2-axis-chip ${AXIS_META[axis].className}`}>
-                  Bedarf {AXIS_META[axis].label}
-                </span>
-              ))
-            ) : (
-              <span className="market-v2-signal-badge is-neutral">kein akuter Achsenbedarf</span>
-            )}
-            {wishlistDisciplines.slice(0, 8).map((disciplineName) => (
-              <span key={`context-discipline-${disciplineName}`} className="market-v2-signal-badge is-warning">
-                {disciplineName}
+          <details className="market-v2-context-details" open>
+            <summary className="market-v2-context-summary">
+              <span>
+                <strong>Wishlist & Bedarf</strong>
+                <small>{selectedWishlistEntries.length} gemerkt · konkrete Orientierung fürs Kaufen</small>
               </span>
-            ))}
-          </div>
-          <div className="market-v2-context-table-shell">
+              <b>{selectedWishlistEntries.length} Spieler</b>
+            </summary>
+            <div className="market-v2-context-details-body">
+              <div className="market-v2-need-summary">
+                <span>
+                  {rosterGapOpenCount != null && rosterGapOpenCount > 0
+                    ? `${rosterGapOpenCount} Kaderplatz${rosterGapOpenCount === 1 ? "" : "e"} offen`
+                    : "Kadergröße okay"}
+                </span>
+                <span>Budget {formatToneLabel(marketContext?.affordabilityStatus)}</span>
+                <span>Status {formatReadinessLabel(marketContext?.readinessStatus)}</span>
+              </div>
+              <div className="market-v2-axis-compare-grid" aria-label="Kader gegen Kandidat vergleichen">
+                {axisComparisonRows.map((row) => (
+                  <div className={`market-v2-axis-compare-card ${AXIS_META[row.axis].className} ${row.toneClass}`} key={`context-axis-compare-${row.axis}`}>
+                    <div className="market-v2-axis-compare-head">
+                      <strong>{AXIS_META[row.axis].label}</strong>
+                      <span>{row.isNeedAxis ? "Bedarf" : "Kader"}</span>
+                    </div>
+                    <div className="market-v2-axis-compare-values">
+                      <span>
+                        <small>Kader</small>
+                        <b>{row.rosterValue != null ? formatCompactNumber(row.rosterValue, 0) : "—"}</b>
+                      </span>
+                      <span>
+                        <small>Kandidat</small>
+                        <b>{row.candidateValue != null ? formatCompactNumber(row.candidateValue, 0) : "—"}</b>
+                      </span>
+                      <span>
+                        <small>Δ</small>
+                        <b>{formatAxisComparisonDelta(row.delta)}</b>
+                      </span>
+                    </div>
+                  </div>
+                ))}
+              </div>
+              <div className="market-v2-chip-row">
+                {wishlistAxes.length > 0 ? (
+                  wishlistAxes.map((axis) => (
+                    <span key={`context-axis-${axis}`} className={`market-v2-axis-chip ${AXIS_META[axis].className}`}>
+                      Bedarf {AXIS_META[axis].label}
+                    </span>
+                  ))
+                ) : (
+                  <span className="market-v2-signal-badge is-neutral">kein akuter Achsenbedarf</span>
+                )}
+                {wishlistDisciplines.slice(0, 8).map((disciplineName) => (
+                  <span key={`context-discipline-${disciplineName}`} className="market-v2-signal-badge is-warning">
+                    {disciplineName}
+                  </span>
+                ))}
+              </div>
+              <div className="market-v2-context-table-shell">
             <table className="team-table market-v2-context-table">
               <thead>
                 <tr>
@@ -3076,7 +3402,7 @@ export default function TransfermarktV2Client({
                       key={entry.id}
                       className="market-v2-wishlist-row"
                       title="Einmal klicken: Kandidat fokussieren. Doppelklick: Kaufdialog öffnen."
-                      onDoubleClick={() => focusWishlistEntry(entry, { openDeal: true })}
+                      onDoubleClick={() => openWishlistDeal(entry)}
                     >
                       <td>
                         {wishlistPortraitSrc ? (
@@ -3097,11 +3423,11 @@ export default function TransfermarktV2Client({
                         <button
                           className="table-link-button market-v2-context-player"
                           type="button"
-                          onClick={() => focusWishlistEntry(entry)}
+                          onClick={() => queueWishlistFocus(entry)}
                           onDoubleClick={(event) => {
                             event.preventDefault();
                             event.stopPropagation();
-                            focusWishlistEntry(entry, { openDeal: true });
+                            openWishlistDeal(entry);
                           }}
                           title="Einmal klicken: Kandidat fokussieren. Doppelklick: Kaufdialog öffnen."
                         >
@@ -3148,25 +3474,32 @@ export default function TransfermarktV2Client({
                 <p>Nutze die Bedarfssignale oben als Einkaufsliste und merke Kandidaten im Markt, wenn du später vergleichen willst.</p>
               </div>
             ) : null}
-          </div>
+              </div>
+            </div>
+          </details>
         </article>
 
         <article className="market-v2-context-panel">
-          <div className="market-v2-section-head">
-            <div>
-              <strong>Aktueller Kader</strong>
-              <small>{selectedTeam ? `${selectedTeam.shortCode} · ${selectedTeam.name}` : "Team wählen"} · {selectedRosterRows.length} Spieler</small>
-            </div>
-            <button
-              className={`secondary-button inline-button${showRosterDisciplines ? " is-selected" : ""}`}
-              type="button"
-              onClick={() => setShowRosterDisciplines((current) => !current)}
-              title={showRosterDisciplines ? "Diszi-Spalten im Kader ausblenden." : "Diszi-Spalten wie in der Teamansicht einblenden."}
-            >
-              {showRosterDisciplines ? "Diszis ausblenden" : "Diszis anzeigen"}
-            </button>
-          </div>
-          <div className="market-v2-context-table-shell">
+          <details className="market-v2-context-details" open>
+            <summary className="market-v2-context-summary">
+              <span>
+                <strong>Aktueller Kader</strong>
+                <small>{selectedTeam ? `${selectedTeam.shortCode} · ${selectedTeam.name}` : "Team wählen"} · {selectedRosterRows.length} Spieler</small>
+              </span>
+              <b>{showRosterDisciplines ? "Diszis an" : "Kompakt"}</b>
+            </summary>
+            <div className="market-v2-context-details-body">
+              <div className="market-v2-context-toolbar">
+                <button
+                  className={`secondary-button inline-button${showRosterDisciplines ? " is-selected" : ""}`}
+                  type="button"
+                  onClick={() => setShowRosterDisciplines((current) => !current)}
+                  title={showRosterDisciplines ? "Diszi-Spalten im Kader ausblenden." : "Diszi-Spalten wie in der Teamansicht einblenden."}
+                >
+                  {showRosterDisciplines ? "Diszis ausblenden" : "Diszis anzeigen"}
+                </button>
+              </div>
+              <div className="market-v2-context-table-shell">
             <table className={`team-table market-v2-context-table market-v2-roster-context-table${showRosterDisciplines ? " is-expanded" : ""}`}>
               <thead>
                 <tr>
@@ -3260,7 +3593,9 @@ export default function TransfermarktV2Client({
                 <p>Wähle ein Team, dann siehst du hier direkt, woran du deine Käufe ausrichten kannst.</p>
               </div>
             ) : null}
-          </div>
+              </div>
+            </div>
+          </details>
         </article>
       </section>
 
@@ -3332,7 +3667,9 @@ export default function TransfermarktV2Client({
                 <p className="muted">
                   {selectedPlayer
                     ? `${selectedPlayer.className} · ${selectedPlayer.race} · ${selectedPlayer.alignment || "ohne Fraktion"}`
-                    : "Bitte zuerst einen Kandidaten wählen."}
+                    : buyModalWishlistEntry
+                      ? `${buyModalWishlistEntry.className} · ${buyModalWishlistEntry.race}`
+                      : "Bitte zuerst einen Kandidaten wählen."}
                 </p>
               </div>
               <button className="secondary-button" type="button" onClick={closeBuyModal} disabled={buyBusy}>
@@ -3346,6 +3683,14 @@ export default function TransfermarktV2Client({
                   {selectedPortrait?.src ? (
                     <OptimizedMediaImage
                       src={selectedPortrait.src}
+                      alt={modalPlayerName}
+                      width={72}
+                      height={72}
+                      className="transfermarkt-portrait"
+                    />
+                  ) : buyModalWishlistEntry ? (
+                    <OptimizedMediaImage
+                      src={getPlayerPortraitBrowserUrl(buyModalWishlistEntry.playerId)}
                       alt={modalPlayerName}
                       width={72}
                       height={72}
@@ -3388,7 +3733,7 @@ export default function TransfermarktV2Client({
                   </div>
                 </div>
                 <span className={`transfer-status-pill${buyPreview?.canBuy ? " is-ready" : " is-blocked"}`}>
-                  {source !== "sqlite" ? "read only" : buyPreview?.canBuy ? "bereit" : "pruefen"}
+                  {source !== "sqlite" ? "nur Ansicht" : buyPreview?.canBuy ? "bereit" : "pruefen"}
                 </span>
               </div>
 
@@ -3416,6 +3761,16 @@ export default function TransfermarktV2Client({
                   <span>Hier kannst du alles prüfen, aber in diesem Modus keinen Kauf final schreiben.</span>
                 </div>
               ) : null}
+              {priorBadExperienceActive ? (
+                <div className="transfer-feedback-banner is-warning">
+                  <strong>Spieler ist noch angefressen</strong>
+                  <span>
+                    {priorBadExperienceDemandEntry
+                      ? `Die letzte Verhandlung mit diesem Team wirkt noch nach. Seine Forderung liegt dadurch aktuell bei ${formatDemandPercent(priorBadExperienceDemandEntry.percent)} und die Zusage ist spuerbar schlechter.`
+                      : "Die letzte Verhandlung mit diesem Team wirkt noch nach. Dadurch fordert der Spieler mehr und verhandelt misstrauischer."}
+                  </span>
+                </div>
+              ) : null}
 
               <div className="transfer-modal-section">
                 <div className="transfer-callout-title">
@@ -3425,26 +3780,26 @@ export default function TransfermarktV2Client({
                 <div className="transfer-negotiation-grid">
                   <label className="filter-field">
                     <span>Vertragslaenge</span>
-                    <select className="input" value={contractLength} onChange={(event) => {
+                    <select className="input" value={activeContractLength} onChange={(event) => {
                       setBuyNegotiationOutcome(null);
                       setContractLength(Number(event.target.value));
                     }}>
                       {[1, 2, 3, 4, 5].map((value) => (
                         <option key={`modal-contract-${value}`} value={value}>
-                          {value} Season{value > 1 ? "s" : ""}
+                          {value} Saison{value > 1 ? "en" : ""}
                         </option>
                       ))}
                     </select>
                   </label>
                   <label className="filter-field">
                     <span>Vertragsform</span>
-                    <select className="input" value={contractShape} onChange={(event) => {
+                    <select className="input" value={activeContractShape} onChange={(event) => {
                       setBuyNegotiationOutcome(null);
                       setContractShape(event.target.value as ContractShape);
                     }}>
-                      <option value="balanced">Balanced</option>
-                      <option value="front_loaded">Front-loaded</option>
-                      <option value="back_loaded">Back-loaded</option>
+                      <option value="balanced">Ausgeglichen</option>
+                      <option value="front_loaded">Vorne schwer</option>
+                      <option value="back_loaded">Hinten schwer</option>
                     </select>
                   </label>
                   <label className="filter-field">
@@ -3490,18 +3845,10 @@ export default function TransfermarktV2Client({
                   </label>
                 </div>
                 <div className="transfer-negotiation-actions">
-                  <button
-                    className="secondary-button inline-button"
-                    type="button"
-                    onClick={() => {
-                      setBuyNegotiationOutcome(null);
-                      setOfferedSalary(null);
-                      setSalaryEditedManually(false);
-                    }}
-                  >
+                  <button className="secondary-button inline-button" type="button" onClick={resetBuyDemandFrame}>
                     Auto-Angebot
                   </button>
-                  <span className="muted">Auto nimmt den empfohlenen Rahmen. Manuell siehst du sofort, wie Forderung und Zusage kippen.</span>
+                  <span className="muted">Auto-Angebot setzt Laufzeit, Form und Gehalt auf die aktuelle Spielerforderung zurueck.</span>
                 </div>
                 {buyNegotiationOutcome ? (
                   <div className={`transfer-feedback-banner ${getNegotiationOutcomeToneClass(buyNegotiationOutcome.tone)}`} style={{ marginTop: 12 }}>
@@ -3542,6 +3889,11 @@ export default function TransfermarktV2Client({
                         ) : (
                           <span className="negotiation-factor is-positive">Aktuell kein klarer Vertrags-Nachteil</span>
                         )}
+                        {priorBadExperienceScoreEntry ? (
+                          <span className="negotiation-factor is-negative">
+                            {priorBadExperienceScoreEntry.label}: {priorBadExperienceScoreEntry.reason}
+                          </span>
+                        ) : null}
                       </div>
                     </div>
                   </div>
@@ -3553,8 +3905,15 @@ export default function TransfermarktV2Client({
                       <span className="eyebrow">Spielerwunsch</span>
                       <strong>{formatContractLengthPreference(contractPreference.lengthPreference)}</strong>
                       <p className="muted">
-                        Ideal {contractPreference.idealLength} Seasons · okay {contractPreference.preferredMinLength}-{contractPreference.preferredMaxLength} ·{" "}
-                        {formatContractShapeLabel(contractPreference.shapePreference)}
+                        Wunschfenster {contractPreference.preferredMinLength}-{contractPreference.preferredMaxLength} Saisons · am liebsten{" "}
+                        {contractPreference.idealLength} · Form {formatContractShapeLabel(contractPreference.shapePreference)}
+                      </p>
+                      <p className="muted">
+                        {formatContractPreferenceCurrentStatus(
+                          contractPreference,
+                          activeContractLength,
+                          activeContractShape,
+                        )}
                       </p>
                     </div>
                     <div className="contract-preference-impact">
@@ -3609,6 +3968,24 @@ export default function TransfermarktV2Client({
                     </strong>
                   </article>
                 </div>
+                {buyPreview?.demandBreakdown?.length ? (
+                  <div className="transfer-demand-breakdown">
+                    <div className="transfer-callout-title">
+                      <strong>So entsteht die Forderung</strong>
+                      <span className="muted">
+                        {formatTransfermarktCurrency(buyPreview.baseExpectedSalary ?? null)} → {formatTransfermarktCurrency(buyPreview.expectedSalary ?? null)}
+                      </span>
+                    </div>
+                    <ul className="warning-list negotiation-factor-list">
+                      {buyPreview.demandBreakdown.map((entry) => (
+                        <li className={`negotiation-factor is-${entry.tone}`} key={entry.key}>
+                          <strong>{formatDemandPercent(entry.percent)}</strong>
+                          <span>{entry.label}: {entry.reason}</span>
+                        </li>
+                      ))}
+                    </ul>
+                  </div>
+                ) : null}
               </div>
 
               {buyPreview ? (
@@ -3617,7 +3994,7 @@ export default function TransfermarktV2Client({
                     <div className="transfer-callout-title">
                       <strong>Jahresplan</strong>
                       <span className="muted">
-                        {formatContractShapeLabel(buyPreview.contractShape ?? contractShape)} · {buyPreview.contractLength} Season(s)
+                        {formatContractShapeLabel(buyPreview.contractShape ?? activeContractShape)} · {buyPreview.contractLength} Saison{buyPreview.contractLength === 1 ? "" : "en"}
                       </span>
                     </div>
                     {buyPreview.yearlySalarySchedule?.length ? (

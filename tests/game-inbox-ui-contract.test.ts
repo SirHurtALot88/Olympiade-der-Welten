@@ -24,6 +24,7 @@ describe("game inbox UI contract", () => {
     expect(source).toContain('data-testid="foundation-encyclopedia"');
     expect(source).toContain('window.addEventListener("foundation:open-game-term"');
     expect(source).toContain('command.section === "Lexikon" ? 1000 : 0');
+    expect(source).toContain('data-testid="foundation-hq-gm-story"');
     expect(source).toContain("exactLabelMatch");
     expect(source).toContain("acknowledgedFlowStepIds");
     expect(source).toContain("activeViewHandlesOwnSpace");

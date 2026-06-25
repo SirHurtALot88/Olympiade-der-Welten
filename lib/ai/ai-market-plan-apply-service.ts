@@ -1591,9 +1591,16 @@ export async function applyAiMarketPlanLocally(input: AiMarketPlanApplyParams): 
       const contractOffer = recommendContractOfferForPlayer({
         player: candidatePlayer,
         teamStrategyProfile: getTeamStrategyProfile(preflightGameState, team.teamId),
+        teamIdentity: preflightIdentityByTeamId.get(team.teamId) ?? null,
         teamCash: nextResult.cashAfter ?? nextResult.cashBefore ?? team.currentState.cash,
         marketValue: candidate.price ?? candidate.marketValue,
+        teamFit: candidate.teamFit ?? null,
         currentTeamSalary: nextResult.salaryAfter ?? nextResult.salaryBefore ?? team.currentState.salaryTotal,
+        dealRole: candidate.reason ?? candidate.needMatchLabel ?? null,
+        rosterCountBefore: nextResult.rosterAfter ?? nextResult.rosterBefore ?? team.currentState.rosterCount,
+        teamRosterMin: team.currentState.playerMin,
+        teamRosterOpt: team.currentState.playerOpt,
+        isFirstSeason: preview.scope.seasonId === "season-1",
       });
       const buyPreview = previewLocalTransfermarktBuy({
         saveId: preview.scope.saveId,

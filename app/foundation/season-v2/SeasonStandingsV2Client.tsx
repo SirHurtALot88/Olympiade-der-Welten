@@ -13,6 +13,12 @@ import {
 
 import OptimizedMediaImage from "@/app/foundation/OptimizedMediaImage";
 import { TooltipHeading } from "@/components/ui/TooltipHeading";
+import {
+  formatGmDismissalReason,
+  getGmStoryDetail,
+  getGmStoryLabel,
+  getGmStoryTone,
+} from "@/lib/foundation/gm-story";
 import { clampTableColumnWidth } from "@/lib/ui/global-table-layout";
 
 type SeasonV2AreaId = "pow" | "spe" | "men" | "soc";
@@ -192,31 +198,31 @@ const seasonV2TableWidthStorageKeys: Record<SeasonV2TableStorageId, string> = {
 };
 
 const seasonV2StandingsColumnConfigs: Record<string, SeasonV2ColumnConfig> = {
-  rank: { id: "rank", label: "Rang", defaultWidth: 76, minWidth: 58, maxWidth: 120 },
-  team: { id: "team", label: "Team", defaultWidth: 250, minWidth: 190, maxWidth: 420 },
-  points: { id: "points", label: "Punkte", defaultWidth: 118, minWidth: 94, maxWidth: 180 },
+  rank: { id: "rank", label: "Rang", defaultWidth: 70, minWidth: 54, maxWidth: 110 },
+  team: { id: "team", label: "Team", defaultWidth: 220, minWidth: 170, maxWidth: 360 },
+  points: { id: "points", label: "Punkte", defaultWidth: 106, minWidth: 86, maxWidth: 160 },
   ...Object.fromEntries(
     (Object.keys(seasonV2DisciplineLabels) as SeasonV2DisciplineKey[]).map((key) => [
       key,
       {
         id: key,
         label: seasonV2DisciplineLabels[key],
-        defaultWidth: key === "bonuspunkte" ? 94 : 86,
-        minWidth: 70,
-        maxWidth: 130,
+        defaultWidth: key === "bonuspunkte" ? 86 : 78,
+        minWidth: 62,
+        maxWidth: 116,
       },
     ]),
   ),
-  pow: { id: "pow", label: "POW", defaultWidth: 132, minWidth: 104, maxWidth: 190 },
-  spe: { id: "spe", label: "SPE", defaultWidth: 132, minWidth: 104, maxWidth: 190 },
-  men: { id: "men", label: "MEN", defaultWidth: 132, minWidth: 104, maxWidth: 190 },
-  soc: { id: "soc", label: "SOC", defaultWidth: 132, minWidth: 104, maxWidth: 190 },
-  cash: { id: "cash", label: "Cash", defaultWidth: 112, minWidth: 86, maxWidth: 170 },
-  salary: { id: "salary", label: "Gehalt", defaultWidth: 112, minWidth: 86, maxWidth: 170 },
-  contractLength: { id: "contractLength", label: "Ø LZ", defaultWidth: 96, minWidth: 76, maxWidth: 140 },
-  guv: { id: "guv", label: "GuV", defaultWidth: 112, minWidth: 86, maxWidth: 170 },
-  sponsor: { id: "sponsor", label: "Sponsor", defaultWidth: 112, minWidth: 86, maxWidth: 170 },
-  marketValue: { id: "marketValue", label: "MW", defaultWidth: 112, minWidth: 86, maxWidth: 170 },
+  pow: { id: "pow", label: "POW", defaultWidth: 122, minWidth: 92, maxWidth: 170 },
+  spe: { id: "spe", label: "SPE", defaultWidth: 122, minWidth: 92, maxWidth: 170 },
+  men: { id: "men", label: "MEN", defaultWidth: 122, minWidth: 92, maxWidth: 170 },
+  soc: { id: "soc", label: "SOC", defaultWidth: 122, minWidth: 92, maxWidth: 170 },
+  cash: { id: "cash", label: "Cash", defaultWidth: 102, minWidth: 82, maxWidth: 150 },
+  salary: { id: "salary", label: "Gehalt", defaultWidth: 102, minWidth: 82, maxWidth: 150 },
+  contractLength: { id: "contractLength", label: "Ø LZ", defaultWidth: 88, minWidth: 70, maxWidth: 128 },
+  guv: { id: "guv", label: "GuV", defaultWidth: 102, minWidth: 82, maxWidth: 150 },
+  sponsor: { id: "sponsor", label: "Sponsor", defaultWidth: 102, minWidth: 82, maxWidth: 150 },
+  marketValue: { id: "marketValue", label: "MW", defaultWidth: 102, minWidth: 82, maxWidth: 150 },
 };
 
 const seasonV2TopPlayerColumnConfigs: Record<string, SeasonV2ColumnConfig> = {
@@ -1083,6 +1089,13 @@ export default function SeasonStandingsV2Client({
             {highlightedGmRows.map((row) => {
               const gmTitle = formatGmTitle(row.gmTitle, row.gmArchetype);
               const isHotSeat = (row.boardPressure ?? 0) >= 8;
+              const gmStoryTone = getGmStoryTone({
+                source: row.source,
+                previousGmId: row.previousGmId,
+                dismissalReason: row.dismissalReason,
+                boardPressure: row.boardPressure,
+                boardConfidenceValue: row.boardConfidenceValue,
+              });
               return (
                 <article key={row.teamId} className={`season-v2-gm-card${isHotSeat ? " is-hot" : ""}${row.source === "board_replacement" ? " is-new" : ""}`}>
                   <button className="season-v2-gm-team" type="button" onClick={() => onOpenTeam(row.teamId)}>
@@ -1105,6 +1118,26 @@ export default function SeasonStandingsV2Client({
                     <h4>{gmTitle}</h4>
                     <p>{row.description ?? row.lineupDoctrine ?? "Kein GM-Profil aktiv."}</p>
                   </div>
+                  <div className={`season-v2-gm-story is-${gmStoryTone}`} title="GM-Story aus Board Confidence, Board-Druck und moeglichen Wechselgruenden.">
+                    <strong>
+                      {getGmStoryLabel({
+                        source: row.source,
+                        previousGmId: row.previousGmId,
+                        dismissalReason: row.dismissalReason,
+                        boardPressure: row.boardPressure,
+                        boardConfidenceValue: row.boardConfidenceValue,
+                      })}
+                    </strong>
+                    <span>
+                      {getGmStoryDetail({
+                        source: row.source,
+                        previousGmId: row.previousGmId,
+                        dismissalReason: row.dismissalReason,
+                        boardPressure: row.boardPressure,
+                        boardConfidenceValue: row.boardConfidenceValue,
+                      })}
+                    </span>
+                  </div>
                   <div className="season-v2-gm-meters">
                     <span>Board <b>{formatNumber(row.boardConfidenceValue, 1)}</b></span>
                     <span>Druck <b>{formatNumber(row.boardPressure, 1)}</b></span>
@@ -1124,6 +1157,7 @@ export default function SeasonStandingsV2Client({
                       row.history.slice(0, 4).map((entry) => (
                         <span key={`${row.teamId}-${entry.seasonId}-${entry.gmId}`}>
                           {entry.seasonName}: {formatGmTitle(entry.gmTitle)}
+                          {entry.dismissalReason ? <small>{formatGmDismissalReason(entry.dismissalReason)}</small> : null}
                         </span>
                       ))
                     ) : (
@@ -1291,7 +1325,7 @@ export default function SeasonStandingsV2Client({
                       return (
                         <Fragment key={`${row.teamId}-${group.id}`}>
                           <td className={areaRankClassByTeamId[group.id].get(row.teamId) ?? undefined}>
-                            {renderBar(areaValue, group.id, areaPool, 60, 1)}
+                            {renderBar(areaValue, group.id, areaPool, 60, 0)}
                           </td>
                           {expandedColumns[group.id]
                             ? group.keys.map((key) => (

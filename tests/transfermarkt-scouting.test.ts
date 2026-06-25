@@ -9,6 +9,7 @@ import {
   getTransfermarktScoutingDisclosure,
   getTransfermarktTrainingAffinityVisibility,
   getTransfermarktScoutingRecruitmentBonus,
+  getTransfermarktScoutingVisibilityBuckets,
 } from "@/lib/market/transfermarkt-scouting";
 
 describe("transfermarkt scouting", () => {
@@ -117,6 +118,16 @@ describe("transfermarkt scouting", () => {
       scoutingLevel: 4,
     });
     expect(level4.visibleNegativeTraits).toEqual(["Lazy"]);
+  });
+
+  it("splits transfermarkt knowledge into grundwissen, scouted and hidden buckets", () => {
+    const level1 = getTransfermarktScoutingVisibilityBuckets(1);
+    const level4 = getTransfermarktScoutingVisibilityBuckets(4);
+
+    expect(level1.knowledge).toContain("MW, Gehalt, Ratio und Potenzialband");
+    expect(level1.hidden).toContain("negative Traits");
+    expect(level4.scouted).toContain("negative Traits sichtbar");
+    expect(level4.hidden).toContain("exakte Attributwerte");
   });
 
   it("adds deterministic numeric scouting noise until level 4 reveals exact values", () => {

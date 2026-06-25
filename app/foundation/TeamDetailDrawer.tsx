@@ -253,6 +253,14 @@ function formatObjectiveStatus(status: "open" | "completed" | "failed" | "at_ris
   return "offen";
 }
 
+function formatRelationshipReason(reason: string) {
+  if (reason === "rivalry_win") return "Rivalen geschlagen";
+  if (reason === "rivalry_loss") return "Rivalenduell verloren";
+  if (reason === "rivalry_close_finish") return "knappes Rivalenfenster";
+  if (reason === "ally_shared_success") return "gemeinsamer Erfolg";
+  return reason.replaceAll("_", " ");
+}
+
 function formatRelationshipList(
   rows: TeamDetailDrawerData["relationships"]["allies"],
   emptyLabel: string,
@@ -267,10 +275,11 @@ function formatRelationshipList(
         <span
           key={row.teamId}
           className={`team-drawer-relationship-chip${row.changed ? " has-change" : ""}`}
-          title={row.reasons.length ? row.reasons.join(" · ") : undefined}
+          title={row.reasons.length ? row.reasons.map(formatRelationshipReason).join(" · ") : undefined}
         >
-          {row.shortCode} {formatNumber(row.value, 1)}
+          <strong>{row.shortCode} {formatNumber(row.value, 1)}</strong>
           {row.changeLabel ? <em>{row.changeLabel}</em> : null}
+          {row.changed && row.reasons[0] ? <small>{formatRelationshipReason(row.reasons[0])}</small> : null}
         </span>
       ))}
     </div>
@@ -476,7 +485,7 @@ export default function TeamDetailDrawer({
                 </article>
               ) : null}
               {data.generalManager ? (
-                <article className="metric-card team-drawer-objective-card is-info">
+                <article className="metric-card team-drawer-objective-card team-drawer-objective-card-gm is-info">
                   <span>General Manager</span>
                   <strong>{data.generalManager.name}</strong>
                   <small>{data.generalManager.title} · Einfluss {formatNumber(data.generalManager.influencePct)}%</small>
@@ -513,16 +522,18 @@ export default function TeamDetailDrawer({
                   </small>
                 </article>
               ) : null}
-              <article className="metric-card team-drawer-objective-card is-ready">
-                <span>Ally</span>
-                <strong>{data.relationships.allies.length}</strong>
-                {formatRelationshipList(data.relationships.allies, "Keine Ally-Beziehung ab 4+")}
-              </article>
-              <article className="metric-card team-drawer-objective-card is-blocked">
-                <span>Rival</span>
-                <strong>{data.relationships.rivals.length}</strong>
-                {formatRelationshipList(data.relationships.rivals, "Keine Rivalität ab -4")}
-              </article>
+              <div className="team-drawer-relationship-stack">
+                <article className="metric-card team-drawer-objective-card is-ready">
+                  <span>Ally</span>
+                  <strong>{data.relationships.allies.length}</strong>
+                  {formatRelationshipList(data.relationships.allies, "Keine Ally-Beziehung ab 4+")}
+                </article>
+                <article className="metric-card team-drawer-objective-card is-blocked">
+                  <span>Rival</span>
+                  <strong>{data.relationships.rivals.length}</strong>
+                  {formatRelationshipList(data.relationships.rivals, "Keine Rivalität ab -4")}
+                </article>
+              </div>
               {data.objectives.map((objective) => (
                 <article key={objective.objectiveId} className={`metric-card team-drawer-objective-card${getObjectiveTone(objective.status)}`}>
                   <span>{objective.category}</span>

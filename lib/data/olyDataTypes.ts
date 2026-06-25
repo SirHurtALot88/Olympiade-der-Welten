@@ -704,6 +704,7 @@ export type Player = {
   spentXP?: number | null;
   lifetimeXP?: number | null;
   trainingMode?: "leicht" | "mittel" | "hart" | null;
+  trainingClass?: string | null;
   cost?: number;
   upkeepBase?: number;
   className: string;

@@ -51,6 +51,8 @@ export type OrganicSeasonProgressionResult = {
   secondaryTrainingClass: ProgressionClassName | null;
   trainingMode: PlayerTrainingMode;
   fatigueLoad: number;
+  potentialRating: number | null;
+  potentialTrainingMultiplier: number;
   traitTrainingMultiplier: number;
   traitModifierPct: number;
   facilityModifierPct: number;
@@ -117,6 +119,19 @@ function getDisplayMarketValue(player: Player) {
       : player.marketValue;
   if (!isFiniteNumber(value)) return 0;
   return value > 1000 ? value / 1000 : value;
+}
+
+function getPotentialTrainingMultiplier(player: Player) {
+  const potential = isFiniteNumber(player.potential) && player.potential > 0 ? player.potential : null;
+  if (potential == null) {
+    return 1;
+  }
+  if (potential >= 94) return 1.18;
+  if (potential >= 88) return 1.14;
+  if (potential >= 80) return 1.09;
+  if (potential >= 72) return 1.04;
+  if (potential >= 58) return 1;
+  return 0.94;
 }
 
 export function normalizePlayerAttributes(player: Player): PlayerGeneratorAttributes | null {
@@ -261,6 +276,8 @@ export function buildOrganicSeasonProgression(input: {
       secondaryTrainingClass: null,
       trainingMode: normalizeTrainingMode(input.player.trainingMode),
       fatigueLoad: 0,
+      potentialRating: isFiniteNumber(input.player.potential) && input.player.potential > 0 ? input.player.potential : null,
+      potentialTrainingMultiplier: getPotentialTrainingMultiplier(input.player),
       traitTrainingMultiplier: 1,
       traitModifierPct: 0,
       facilityModifierPct: 0,
@@ -293,10 +310,17 @@ export function buildOrganicSeasonProgression(input: {
     adminConfig: input.gameState.seasonState.adminBalancingConfig,
   });
   const facilityModifierPct = getFacilityTrainingModifierPct(input.facilities);
-  const primaryTrainingClass = calculateDynamicClassName(attributesBefore, input.gameState.seasonState.adminBalancingConfig);
+  const primaryTrainingClass =
+    normalizeProgressionClassName(input.player.trainingClass) ??
+    calculateDynamicClassName(attributesBefore, input.gameState.seasonState.adminBalancingConfig);
   const secondaryTrainingClass = getSecondaryTrainingClass(input.player, input.facilities);
+  const potentialRating = isFiniteNumber(input.player.potential) && input.player.potential > 0 ? input.player.potential : null;
+  const potentialTrainingMultiplier = getPotentialTrainingMultiplier(input.player);
   const baseTrainingBudget = TRAINING_SETPOINTS_BY_MODE[trainingMode];
-  const trainingSetpoints = roundValue(baseTrainingBudget * traitSignal.trainingTraitMultiplier * (1 + facilityModifierPct / 100), 2);
+  const trainingSetpoints = roundValue(
+    baseTrainingBudget * traitSignal.trainingTraitMultiplier * potentialTrainingMultiplier * (1 + facilityModifierPct / 100),
+    2,
+  );
   const primaryShare = secondaryTrainingClass ? 0.7 : 1;
   const secondaryShare = secondaryTrainingClass ? 0.3 : 0;
   const primaryTrainingDeltas = distributeByClassProfile({
@@ -353,6 +377,8 @@ export function buildOrganicSeasonProgression(input: {
     secondaryTrainingClass,
     trainingMode,
     fatigueLoad: roundValue(FATIGUE_LOAD_BY_MODE[trainingMode] * (1 - Math.min(getFacilityLevel(input.facilities, "recovery_center") * 0.04, 0.2)), 1),
+    potentialRating,
+    potentialTrainingMultiplier,
     traitTrainingMultiplier: traitSignal.trainingTraitMultiplier,
     traitModifierPct: roundValue((traitSignal.trainingTraitMultiplier - 1) * 100, 1),
     facilityModifierPct,

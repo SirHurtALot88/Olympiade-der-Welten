@@ -126,9 +126,14 @@ function getTeamLineupStatus(gameState: GameState, teamId: string) {
       draft.matchdayId === gameState.matchdayState.matchdayId &&
       draft.teamId === teamId,
   );
+  const scheduleEntry = (gameState.seasonState.disciplineSchedule ?? []).find(
+    (entry) => entry.seasonId === gameState.season.id && entry.matchdayId === gameState.matchdayState.matchdayId,
+  );
+  const requiredSlots = (scheduleEntry?.discipline1?.playerCount ?? 0) + (scheduleEntry?.discipline2?.playerCount ?? 0);
+  const filledSlots = lineup?.entries.length ?? 0;
   return {
     lineup,
-    hasLineup: Boolean(lineup && lineup.entries.length > 0),
+    hasLineup: requiredSlots > 0 ? filledSlots >= requiredSlots : filledSlots > 0,
     isSubmitted: lineup?.status === "submitted" || lineup?.status === "locked" || lineup?.status === "resolved",
   };
 }

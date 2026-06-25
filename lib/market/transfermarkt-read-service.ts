@@ -151,6 +151,7 @@ export type TransfermarktFreeAgentItem = {
   needMatchAxes?: TransfermarktNeedMatchAxis[];
   needMatchReasons?: string[];
   needMatchBreakdown?: {
+    identityFitScore: number;
     axisScore: number;
     rosterGapScore: number;
     depthQualityScore: number;

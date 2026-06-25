@@ -8,6 +8,7 @@ import {
   buildContractNegotiationPreview,
   recommendContractOfferForPlayer,
 } from "@/lib/market/contract-negotiation-preview";
+import { calculateTransfermarktFit } from "@/lib/market/transfermarkt-fit";
 import { buildPlayerMoralePerformanceMap } from "@/lib/morale/player-morale-performance";
 import { assessPlayerMorale } from "@/lib/morale/player-morale-service";
 import { createPersistenceService } from "@/lib/persistence/persistence-service";
@@ -55,10 +56,9 @@ function isManualTeam(gameState: GameState, teamId: string) {
 
 function inferDealRole(roster: RosterEntry, marketValue: number | null) {
   const role = roster.roleTag ?? roster.promisedRole ?? "";
-  if ((marketValue ?? 0) >= 60) return "premium";
-  if ((roster.contractLength ?? 1) >= 4) return "core";
-  if ((roster.contractLength ?? 1) >= 3 && (marketValue ?? 0) >= 12) return "core";
-  if (role === "starter") return "core";
+  if ((marketValue ?? 0) >= 70) return "premium";
+  if ((marketValue ?? 0) >= 45) return "core";
+  if (role === "starter" && (marketValue ?? 0) >= 25) return "core";
   if (role === "prospect") return "prospect";
   if (role === "bench") return "depth";
   return (marketValue ?? 0) >= 35 ? "core" : "depth";
@@ -116,11 +116,15 @@ function main() {
   fs.mkdirSync(outputDir, { recursive: true });
 
   const gameState = save.gameState;
+  const includeManualTeams = hasArg("--include-manual");
   const manualTeamIds = new Set(gameState.teams.filter((team) => isManualTeam(gameState, team.teamId) || team.humanControlled).map((team) => team.teamId));
-  const aiTeamIds = new Set(gameState.teams.filter((team) => !manualTeamIds.has(team.teamId)).map((team) => team.teamId));
+  const aiTeamIds = new Set(gameState.teams.filter((team) => includeManualTeams || !manualTeamIds.has(team.teamId)).map((team) => team.teamId));
   const beforeRosters = gameState.rosters.filter((entry) => aiTeamIds.has(entry.teamId));
   const beforeDistribution = contractLengthDistribution(beforeRosters);
-  const teamRosterCountBefore = new Map<string, number>();
+  const currentRosterCountByTeam = new Map<string, number>();
+  for (const roster of gameState.rosters) {
+    currentRosterCountByTeam.set(roster.teamId, (currentRosterCountByTeam.get(roster.teamId) ?? 0) + 1);
+  }
   const changes: Array<Record<string, unknown>> = [];
 
   const nextGameState: GameState = {
@@ -139,16 +143,21 @@ function main() {
 
       const economy = resolvePlayerEconomyContract({ player, rosterEntry: roster });
       const marketValue = roster.currentValue ?? roster.purchasePrice ?? economy.marketValue ?? null;
-      const rosterBefore = teamRosterCountBefore.get(roster.teamId) ?? 0;
-      teamRosterCountBefore.set(roster.teamId, rosterBefore + 1);
+      const rosterBefore = currentRosterCountByTeam.get(roster.teamId) ?? 0;
       const currentTeamSalary = teamSalary(gameState, roster.teamId);
       const reconstructedDecisionCash = Math.max(team.cash ?? 0, team.budget ?? 0);
+      const rosterPlayersWithoutCurrent = gameState.rosters
+        .filter((entry) => entry.teamId === roster.teamId && entry.playerId !== roster.playerId)
+        .map((entry) => gameState.players.find((candidate) => candidate.id === entry.playerId))
+        .filter((entry): entry is NonNullable<typeof entry> => Boolean(entry));
+      const teamFit = calculateTransfermarktFit(player, rosterPlayersWithoutCurrent, { teamId: roster.teamId }).teamFit;
       const recommended = recommendContractOfferForPlayer({
         player,
         teamStrategyProfile: getTeamStrategyProfile(gameState, roster.teamId),
         teamIdentity: identity,
         teamCash: reconstructedDecisionCash,
         marketValue,
+        teamFit,
         currentTeamSalary,
         dealRole: inferDealRole(roster, marketValue),
         rosterCountBefore: rosterBefore,
@@ -165,10 +174,7 @@ function main() {
         teamStrategyProfile: getTeamStrategyProfile(gameState, roster.teamId),
         player,
         rosterEntry: roster,
-        rosterPlayers: gameState.rosters
-          .filter((entry) => entry.teamId === roster.teamId && entry.playerId !== roster.playerId)
-          .map((entry) => gameState.players.find((candidate) => candidate.id === entry.playerId))
-          .filter((entry): entry is NonNullable<typeof entry> => Boolean(entry)),
+        rosterPlayers: rosterPlayersWithoutCurrent,
         contractLength: recommended.contractLength,
         contractShape: recommended.contractShape,
         offeredSalary: null,
@@ -226,9 +232,12 @@ function main() {
     saveId: save.saveId,
     saveName: save.name,
     outputDir,
-    manualTeamsSkipped: gameState.teams
-      .filter((team) => manualTeamIds.has(team.teamId))
-      .map((team) => ({ teamId: team.teamId, teamCode: team.shortCode, teamName: team.name })),
+    manualTeamsSkipped: includeManualTeams
+      ? []
+      : gameState.teams
+          .filter((team) => manualTeamIds.has(team.teamId))
+          .map((team) => ({ teamId: team.teamId, teamCode: team.shortCode, teamName: team.name })),
+    includeManualTeams,
     aiTeams: aiTeamIds.size,
     aiRosterEntries: beforeRosters.length,
     changedEntries: changes.length,

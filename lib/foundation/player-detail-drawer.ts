@@ -17,6 +17,7 @@ import {
 } from "@/lib/foundation/player-rating-contract";
 import { buildPlayerSeasonPerformance, buildPlayerSeasonPerformanceMap } from "@/lib/foundation/player-season-performance";
 import { buildSeasonPointsLedger } from "@/lib/foundation/season-points-ledger";
+import { buildSeasonDisciplinePlayerCountMap } from "@/lib/season/season-discipline-schedule";
 import { getPlayerBaselineEconomyReference } from "@/lib/players/player-baseline-service";
 import { getFacilityLevel, getTeamFacilityState } from "@/lib/facilities/facility-effects";
 import { getTeamStrategyProfile } from "@/lib/foundation/team-strategy-profiles";
@@ -24,11 +25,8 @@ import type { LegacyLineupLoadedContext } from "@/lib/lineups/legacy-lineup-type
 import { normalizeTransfermarktToken } from "@/lib/market/transfermarkt-fit";
 import { buildTransfermarktSaleFactorBreakdown } from "@/lib/market/transfermarkt-sale-factor";
 import {
-  buildTransfermarktScoutedAttributeRows,
   buildScoutedDisciplineTiers,
   getScoutedTraitView,
-  type TransfermarktAttributeRatings,
-  type TransfermarktAttributeValues,
   type TransfermarktScoutingDisclosure,
 } from "@/lib/market/transfermarkt-scouting";
 import type { TransfermarktRatingTier } from "@/lib/market/transfermarkt-sheet-stats";
@@ -597,57 +595,6 @@ function deriveAttributeRatingLabel(value: number | null | undefined): Transferm
   return "F";
 }
 
-function normalizeAttributeRatingTier(value: string | null | undefined): TransfermarktRatingTier | null {
-  if (value === "S+" || value === "S" || value === "A" || value === "B" || value === "C" || value === "D" || value === "E" || value === "F") {
-    return value;
-  }
-  return null;
-}
-
-function buildAttributeValueMap(
-  player: Pick<Player, "attributeSheetStats"> | null,
-): TransfermarktAttributeValues {
-  return {
-    power: player?.attributeSheetStats?.power ?? null,
-    health: player?.attributeSheetStats?.health ?? null,
-    stamina: player?.attributeSheetStats?.stamina ?? null,
-    intelligence: player?.attributeSheetStats?.intelligence ?? null,
-    awareness: player?.attributeSheetStats?.awareness ?? null,
-    determination: player?.attributeSheetStats?.determination ?? null,
-    speed: player?.attributeSheetStats?.speed ?? null,
-    dexterity: player?.attributeSheetStats?.dexterity ?? null,
-    charisma: player?.attributeSheetStats?.charisma ?? null,
-    will: player?.attributeSheetStats?.will ?? null,
-    spirit: player?.attributeSheetStats?.spirit ?? null,
-    torment: player?.attributeSheetStats?.torment ?? null,
-  };
-}
-
-function buildAttributeRatingMap(
-  player: Pick<Player, "attributeSheetRatings" | "attributeSheetStats"> | null,
-): TransfermarktAttributeRatings {
-  return {
-    power: normalizeAttributeRatingTier(player?.attributeSheetRatings?.powerRating) ?? deriveAttributeRatingLabel(player?.attributeSheetStats?.power ?? null),
-    health: normalizeAttributeRatingTier(player?.attributeSheetRatings?.healthRating) ?? deriveAttributeRatingLabel(player?.attributeSheetStats?.health ?? null),
-    stamina: normalizeAttributeRatingTier(player?.attributeSheetRatings?.staminaRating) ?? deriveAttributeRatingLabel(player?.attributeSheetStats?.stamina ?? null),
-    intelligence:
-      normalizeAttributeRatingTier(player?.attributeSheetRatings?.intelligenceRating) ?? deriveAttributeRatingLabel(player?.attributeSheetStats?.intelligence ?? null),
-    awareness:
-      normalizeAttributeRatingTier(player?.attributeSheetRatings?.awarenessRating) ?? deriveAttributeRatingLabel(player?.attributeSheetStats?.awareness ?? null),
-    determination:
-      normalizeAttributeRatingTier(player?.attributeSheetRatings?.determinationRating) ?? deriveAttributeRatingLabel(player?.attributeSheetStats?.determination ?? null),
-    speed: normalizeAttributeRatingTier(player?.attributeSheetRatings?.speedRating) ?? deriveAttributeRatingLabel(player?.attributeSheetStats?.speed ?? null),
-    dexterity:
-      normalizeAttributeRatingTier(player?.attributeSheetRatings?.dexterityRating) ?? deriveAttributeRatingLabel(player?.attributeSheetStats?.dexterity ?? null),
-    charisma:
-      normalizeAttributeRatingTier(player?.attributeSheetRatings?.charismaRating) ?? deriveAttributeRatingLabel(player?.attributeSheetStats?.charisma ?? null),
-    will: normalizeAttributeRatingTier(player?.attributeSheetRatings?.willRating) ?? deriveAttributeRatingLabel(player?.attributeSheetStats?.will ?? null),
-    spirit: normalizeAttributeRatingTier(player?.attributeSheetRatings?.spiritRating) ?? deriveAttributeRatingLabel(player?.attributeSheetStats?.spirit ?? null),
-    torment:
-      normalizeAttributeRatingTier(player?.attributeSheetRatings?.tormentRating) ?? deriveAttributeRatingLabel(player?.attributeSheetStats?.torment ?? null),
-  };
-}
-
 function maskAttributeStatsForVisibility(
   rows: ReturnType<typeof buildRawAttributeStats>,
   visibility: AttributeVisibility,
@@ -658,6 +605,17 @@ function maskAttributeStatsForVisibility(
     revealLevel: 1,
     value: visibility === "exact" ? row.value : null,
     ratingLabel: row.ratingLabel ?? deriveAttributeRatingLabel(row.value),
+    rangeLabel: null,
+  }));
+}
+
+function maskForeignAttributeStats(rows: ReturnType<typeof buildRawAttributeStats>) {
+  return rows.map((row) => ({
+    ...row,
+    revealed: false,
+    revealLevel: 99,
+    value: null,
+    ratingLabel: null,
     rangeLabel: null,
   }));
 }
@@ -690,13 +648,7 @@ function buildAttributeStats(
   scoutingSeed?: { saveId: string; playerId: string } | null,
 ) {
   if (visibility === "scouted") {
-    return buildTransfermarktScoutedAttributeRows({
-      values: buildAttributeValueMap(player),
-      ratings: buildAttributeRatingMap(player),
-      scoutingLevel,
-      saveId: scoutingSeed?.saveId,
-      playerId: scoutingSeed?.playerId,
-    });
+    return maskForeignAttributeStats(buildRawAttributeStats(player));
   }
   return maskAttributeStatsForVisibility(buildRawAttributeStats(player), visibility);
 }
@@ -731,6 +683,7 @@ function buildScoutedDisciplineValuesFromPlayer(input: {
   topN?: number;
 }): PlayerDetailDrawerData["disciplineValues"] {
   const disciplineById = new Map(input.gameState.disciplines.map((discipline) => [discipline.id, discipline] as const));
+  const seasonPlayerCountByDisciplineId = buildSeasonDisciplinePlayerCountMap(input.gameState);
   return buildScoutedDisciplineTiers({
     saveId: getGameStateScoutingSeed(input.gameState),
     playerId: input.player.id,
@@ -769,7 +722,7 @@ function buildScoutedDisciplineValuesFromPlayer(input: {
       currentDisciplineValues: null,
       disciplineDelta: null,
       rank: index + 1,
-      playerCount: discipline?.playerCount ?? null,
+      playerCount: seasonPlayerCountByDisciplineId.get(entry.disciplineId) ?? discipline?.playerCount ?? null,
       scoutedTier: entry.scoreTier,
     };
   });
@@ -853,6 +806,7 @@ function buildDisciplineValuesFromPlayer(
   const allTimeByDisciplineId = new Map<string, { points: number; appearances: number }>();
   const currentDetailsByDisciplineId = new Map<string, PlayerDisciplineDrawerDetail>();
   const currentSeasonId = gameState?.season.id ?? performance?.seasonId ?? null;
+  const seasonPlayerCountByDisciplineId = gameState ? buildSeasonDisciplinePlayerCountMap(gameState) : null;
 
   for (const snapshot of gameState?.seasonState.seasonSnapshots ?? []) {
     const snapshotPerformance = snapshot.playerPerformances?.find((entry) => entry.playerId === player.id) ?? null;
@@ -935,7 +889,7 @@ function buildDisciplineValuesFromPlayer(
         lastSeasonDisciplineValues: previous,
         currentDisciplineValues: current,
         disciplineDelta: delta,
-        playerCount: discipline.playerCount ?? null,
+        playerCount: seasonPlayerCountByDisciplineId?.get(discipline.id) ?? discipline.playerCount ?? null,
       };
     })
     .sort((left, right) => (right.value ?? Number.NEGATIVE_INFINITY) - (left.value ?? Number.NEGATIVE_INFINITY))

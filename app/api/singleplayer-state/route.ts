@@ -4,7 +4,12 @@ import { NextResponse } from "next/server";
 
 import { projectFoundationStateFromPrisma } from "@/lib/db/read/foundation-read-projection";
 import { loadFoundationSnapshotFromPrisma } from "@/lib/db/read/foundation-read-repository";
-import type { GameState, NewGameFlowStepId, NewGameFlowStepStatus } from "@/lib/data/olyDataTypes";
+import type {
+  ContractNegotiationDraftStatus,
+  GameState,
+  NewGameFlowStepId,
+  NewGameFlowStepStatus,
+} from "@/lib/data/olyDataTypes";
 import { withNormalizedTeamIdentityOverrides } from "@/lib/foundation/team-identity-settings";
 import { withNormalizedTeamGeneralManagers } from "@/lib/foundation/team-general-managers";
 import {
@@ -22,6 +27,8 @@ import {
 } from "@/lib/persistence/foundation-save-mode";
 import { buildScenarioMeta } from "@/lib/persistence/scenario-meta";
 import type { PersistenceService, SaveSummary } from "@/lib/persistence/types";
+import { buildContractNegotiationDraft } from "@/lib/market/contract-negotiation-preview";
+import type { TransfermarktBuyPreview } from "@/lib/market/transfermarkt-buy-service";
 import { getActiveRoomBySaveId } from "@/lib/room/room-store";
 
 type SaveActionBody =
@@ -41,6 +48,13 @@ type SaveActionBody =
       action: "select-manager-team";
       saveId: string;
       selectedTeamId: string;
+    }
+  | {
+      action: "contract-negotiation-outcome";
+      saveId: string;
+      summary: TransfermarktBuyPreview;
+      status: ContractNegotiationDraftStatus;
+      extraWarnings?: string[];
     };
 
 const NEW_GAME_FLOW_STEP_IDS: NewGameFlowStepId[] = [
@@ -435,6 +449,69 @@ export async function POST(request: Request) {
           updatedAt: now,
         },
         teamControlSettings: nextTeamControlSettings,
+      },
+    });
+
+    save = persistence.saveSingleplayerState(body.saveId, nextGameState);
+  } else if (body.action === "contract-negotiation-outcome") {
+    if (!body.saveId || !body.summary?.player?.id || !body.summary?.team?.id) {
+      return NextResponse.json({ error: "saveId und summary mit Team/Spieler sind erforderlich." }, { status: 400 });
+    }
+
+    const sourceSave = persistence.getSaveById(body.saveId);
+    if (!sourceSave) {
+      return NextResponse.json({ error: "saveId could not be resolved." }, { status: 404 });
+    }
+
+    const summary = body.summary;
+    const summaryTeam = summary.team;
+    const summaryPlayer = summary.player;
+    if (!summaryTeam || !summaryPlayer) {
+      return NextResponse.json({ error: "summary team/player missing." }, { status: 400 });
+    }
+    const draft = buildContractNegotiationDraft({
+      saveId: body.saveId,
+      seasonId: sourceSave.gameState.season.id,
+      teamId: summaryTeam.id,
+      playerId: summaryPlayer.id,
+      playerName: summaryPlayer.name,
+      preview: {
+        expectedSalary: summary.expectedSalary ?? null,
+        baseExpectedSalary: summary.baseExpectedSalary ?? null,
+        demandMultiplier: summary.demandMultiplier ?? null,
+        offeredSalary: summary.offeredSalary ?? null,
+        offerRatio: summary.offerRatio ?? null,
+        contractLength: summary.contractLength,
+        contractShape: summary.contractShape ?? "balanced",
+        yearlySalarySchedule: summary.yearlySalarySchedule ?? [],
+        totalSalary: summary.totalSalary ?? null,
+        roundingAdjustment: summary.roundingAdjustment ?? null,
+        buyoutCost: summary.buyoutCost ?? null,
+        bracket: summary.bracket ?? null,
+        teamFit: summary.teamFit ?? null,
+        acceptanceScore: summary.acceptanceScore ?? null,
+        acceptChance: summary.acceptChance ?? null,
+        counterChance: summary.counterChance ?? null,
+        rejectChance: summary.rejectChance ?? null,
+        contractPreference: summary.contractPreference ?? null,
+        demandBreakdown: summary.demandBreakdown ?? [],
+        scoreBreakdown: summary.negotiationScoreBreakdown ?? [],
+        reasons: summary.negotiationReasons ?? [],
+        warnings: [...(summary.negotiationWarnings ?? []), ...(body.extraWarnings ?? [])],
+        blockingReasons: summary.negotiationBlockingReasons ?? [],
+        status: body.status,
+      },
+    });
+
+    const currentDrafts = sourceSave.gameState.seasonState.contractNegotiationDrafts ?? [];
+    const nextGameState = withNormalizedLocalTeamSettings({
+      ...sourceSave.gameState,
+      seasonState: {
+        ...sourceSave.gameState.seasonState,
+        contractNegotiationDrafts: [
+          draft,
+          ...currentDrafts.filter((entry) => entry.draftId !== draft.draftId),
+        ],
       },
     });
 

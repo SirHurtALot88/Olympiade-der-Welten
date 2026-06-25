@@ -11,8 +11,8 @@ export const TRAINING_RECOVERY_IMPACT: Record<
 > = {
   leicht: {
     label: "Leicht",
-    recoveryMultiplier: 1.1,
-    recoveryDeltaPct: 10,
+    recoveryMultiplier: 1.25,
+    recoveryDeltaPct: 25,
     strainLabel: "schonend",
   },
   mittel: {
@@ -23,8 +23,8 @@ export const TRAINING_RECOVERY_IMPACT: Record<
   },
   hart: {
     label: "Hart",
-    recoveryMultiplier: 0.75,
-    recoveryDeltaPct: -25,
+    recoveryMultiplier: 0.68,
+    recoveryDeltaPct: -32,
     strainLabel: "belastend",
   },
 };

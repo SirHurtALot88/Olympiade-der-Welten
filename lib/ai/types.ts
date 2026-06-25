@@ -4,6 +4,12 @@ export type AiNeedSummary = {
   rosterGap: number;
   budgetPressure: number;
   upkeepPressure: number;
+  identityAxisWeights: {
+    pow: number;
+    spe: number;
+    men: number;
+    soc: number;
+  };
   axisDeficits: {
     pow: number;
     spe: number;

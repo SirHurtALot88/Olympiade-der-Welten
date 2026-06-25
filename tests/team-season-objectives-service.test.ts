@@ -359,6 +359,77 @@ describe("team season objectives service", () => {
     expect(sportGoal?.label).toBe("Kader stabilisieren");
   });
 
+  it("keeps weak lower-mid teams on rebuild style sport goals instead of fantasy jumps", () => {
+    const focusTeam = createTeam({ teamId: "V-W", shortCode: "V-W", name: "Vigilante Wranglers", rosterOptTarget: 12 });
+    const supportTeams = Array.from({ length: 31 }, (_, index) =>
+      createTeam({
+        teamId: `S-${index + 1}`,
+        shortCode: `S${index + 1}`,
+        name: `Support ${index + 1}`,
+        rosterOptTarget: 12,
+      }),
+    );
+    const allTeams = [focusTeam, ...supportTeams];
+    const players = Array.from({ length: 10 }, (_, index) =>
+      createPlayer(`vw-mid-${index + 1}`, {
+        rating: 42,
+        marketValue: 11,
+        displayMarketValue: 11,
+        coreStats: { pow: 23, spe: 24, men: 26, soc: 21 },
+      }),
+    );
+    const supportPlayers = supportTeams.flatMap((team, teamIndex) =>
+      Array.from({ length: 10 }, (_, index) =>
+        createPlayer(`${team.teamId}-${index + 1}`, {
+          rating: 62 - (teamIndex % 6),
+          marketValue: 22 - (teamIndex % 5),
+          displayMarketValue: 22 - (teamIndex % 5),
+          coreStats: { pow: 40, spe: 41, men: 42, soc: 39 },
+        }),
+      ),
+    );
+    const gameState = createGameState({
+      teams: allTeams,
+      identities: [
+        createIdentity("V-W", { ambition: 7, playerMin: 8, playerOpt: 12 }),
+        ...supportTeams.map((team, index) => createIdentity(team.teamId, { ambition: index < 12 ? 7 : 5, playerMin: 8, playerOpt: 12 })),
+      ],
+      players: [...players, ...supportPlayers],
+      rosters: [
+        ...players.map((player) => createRoster(player.id, { teamId: "V-W", salary: 2.5, currentValue: 11 })),
+        ...supportTeams.flatMap((team, teamIndex) =>
+          Array.from({ length: 10 }, (_, index) =>
+            createRoster(`${team.teamId}-${index + 1}`, {
+              teamId: team.teamId,
+              salary: 4.5 + (teamIndex % 3),
+              currentValue: 19 + (teamIndex % 4),
+            }),
+          ),
+        ),
+      ],
+      standings: Object.fromEntries(
+        allTeams.map((team, index) => [
+          team.teamId,
+          {
+            points:
+              team.teamId === "V-W"
+                ? 80
+                : index <= 20
+                  ? 140 - index
+                  : 78 - (index - 21),
+            rank: team.teamId === "V-W" ? 21 : index < 20 ? index + 1 : index + 2,
+          },
+        ]),
+      ),
+    });
+
+    const overview = buildTeamObjectiveOverview(gameState);
+    const sportGoal = overview.objectives.find((objective) => objective.teamId === "V-W" && objective.category === "sport");
+
+    expect((sportGoal?.targetValue ?? 0)).toBeGreaterThanOrEqual(24);
+    expect(["Rebuild ohne Absturz", "Survival: nicht Bottom 5", "Bottom 8 vermeiden"]).toContain(sportGoal?.label);
+  });
+
   it("updates objective status and board pressure when cash is negative", () => {
     const team = createTeam({ cash: -8 });
     const gameState = createGameState({ teams: [team], identities: [createIdentity(team.teamId, { boardConfidence: 4 })] });

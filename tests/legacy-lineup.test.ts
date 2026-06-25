@@ -1,8 +1,10 @@
 import { describe, expect, it } from "vitest";
 
 import {
+  calculateFormModifierForSide,
   calculateMutatorModifierForSide,
   calculateMvpForcedMutatorModifierForSide,
+  calculatePerPlayerFormModifier,
 } from "@/lib/lineups/legacy-lineup-modifiers";
 import { scoreLegacyLineupDisciplineSide } from "@/lib/lineups/legacy-score-engine";
 import { validateLegacyLineupContext } from "@/lib/lineups/legacy-lineup-validator";
@@ -61,6 +63,64 @@ function createBaseContext(): LegacyLineupContext {
     ],
   };
 }
+
+describe("legacy lineup form-card modifiers", () => {
+  it("keeps matching form cards as a side total but exposes the per-player value for slot previews", () => {
+    const result = calculateFormModifierForSide({
+      modifiers: {
+        d1: {
+          primaryFormCardId: "card-8",
+          secondaryFormCardId: null,
+          mutatorTrait1: null,
+          mutatorTrait2: null,
+          teamPowerId: null,
+          intensity: "normal",
+        },
+        d2: {
+          primaryFormCardId: null,
+          secondaryFormCardId: null,
+          mutatorTrait1: null,
+          mutatorTrait2: null,
+          teamPowerId: null,
+          intensity: "normal",
+        },
+      },
+      disciplineSide: "d1",
+      disciplineColor: "yellow",
+      playerCount: 5,
+      formCards: [
+        {
+          id: "card-8",
+          playerId: "player-1",
+          playerName: "Form Player",
+          color: "yellow",
+          value: 8,
+          isUsed: false,
+          usedByLineupId: null,
+        },
+      ],
+    });
+
+    expect(result.formModifier).toBe(80);
+    expect(
+      calculatePerPlayerFormModifier({
+        formModifier: result.formModifier,
+        selectedPlayers: 5,
+        requiredPlayers: 5,
+      }),
+    ).toBe(16);
+  });
+
+  it("uses required player count as fallback when a slot preview has no selected count yet", () => {
+    expect(
+      calculatePerPlayerFormModifier({
+        formModifier: 80,
+        selectedPlayers: 0,
+        requiredPlayers: 5,
+      }),
+    ).toBe(16);
+  });
+});
 
 describe("legacy lineup score engine", () => {
   it("maps 0, 1 and 2 matching mutators to +0, +6 and +12 score while player PPs are capped once per active player", () => {

@@ -232,7 +232,7 @@ describe("matchday slot roles", () => {
         spirit: 30,
         torment: 74,
       },
-      currentFatigueCount: 10,
+      currentFatigueCount: 0,
       intensity: "normal",
     });
     const highStrain = calculateMatchdayProjectedPreview({
@@ -252,7 +252,7 @@ describe("matchday slot roles", () => {
         spirit: 30,
         torment: 74,
       },
-      currentFatigueCount: 10,
+      currentFatigueCount: 0,
       intensity: "normal",
     });
 
@@ -332,6 +332,35 @@ describe("matchday slot roles", () => {
 
     expect(largeDiscipline.additionalFatigue).toBeGreaterThan(smallDiscipline.additionalFatigue);
     expect(largeDiscipline.totalProjected).toBe(smallDiscipline.totalProjected);
+  });
+
+  it("caps per-player fatigue gain so push remains usable on large disciplines", () => {
+    const role = resolveSlotRolesForDiscipline("mini-dm", "Mini DM", 2)[0];
+    const projected = calculateMatchdayProjectedPreview({
+      baseScore: 66,
+      role,
+      attributeStats: {
+        power: 70,
+        health: 70,
+        stamina: 20,
+        intelligence: 45,
+        awareness: 45,
+        determination: 48,
+        speed: 42,
+        dexterity: 44,
+        charisma: 36,
+        will: 40,
+        spirit: 39,
+        torment: 66,
+      },
+      currentFatigueCount: 30,
+      intensity: "push",
+      requiredPlayers: 6,
+      rivalryPressure: 2,
+    });
+
+    expect(projected.additionalFatigue).toBeLessThanOrEqual(11);
+    expect(projected.fatigueRisk).toBe("hoch");
   });
 
   it("makes rivalry pressure visible as extra push variance and strain", () => {

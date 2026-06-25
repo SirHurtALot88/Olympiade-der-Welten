@@ -494,7 +494,7 @@ describe("player detail drawer", () => {
     expect(data?.salary).toBe(12.75);
     expect(data?.normalSalary).not.toBeNull();
     expect(data?.normalSalary).not.toBe(data?.salary);
-    expect(data?.marketValueSource).toBe("calculated_preview");
+    expect(data?.marketValueSource).toBe("calculated_stored");
     expect(data?.salarySource).toBe("active_contract");
     expect(data?.contractLength).toBe(3);
     expect(data?.contractLengthSource).toBe("active_contract");

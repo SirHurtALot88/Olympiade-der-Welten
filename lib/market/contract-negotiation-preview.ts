@@ -317,6 +317,7 @@ export function buildPlayerContractPreference(
 
   const tokens = getPlayerTraitTokens(player);
   const seed = hashToUnitInterval(`${player.id}:${player.name}:contract-preference`);
+  const shapeSeed = hashToUnitInterval(`${player.id}:${player.name}:contract-shape-preference`);
   let longScore = 0;
   let shortScore = 0;
   const reasons: string[] = [];
@@ -366,14 +367,27 @@ export function buildPlayerContractPreference(
   const preferredMaxLength = lengthPreference === "long" ? 5 : lengthPreference === "short" ? 2 : 4;
 
   let shapePreference: ContractShape = "balanced";
-  if ((profile?.bias.cashPriority ?? 0) >= 8 || (profile?.bias.wageSensitivity ?? 0) >= 8) {
-    shapePreference = "back_loaded";
-    reasons.push("Teamprofil schont kurzfristig Cash und bevorzugt back-loaded Deals.");
-  } else if ((profile?.bias.starPriority ?? 0) >= 8 || (profile?.bias.riskTolerance ?? 0) >= 8) {
+  const likesEarlyMoney = hasToken(tokens, ["mercenary", "opportunist", "manipulative", "devious", "egomaniac"]);
+  const likesStability = hasToken(tokens, ["loyal", "disciplined", "diligent", "humble", "teamplayer", "stable"]);
+  const likesDelayedUpside = hasToken(tokens, ["ambitious", "motivated", "leader", "royalty", "lord"]);
+  if (likesEarlyMoney) {
+    shapePreference = shapeSeed < 0.72 ? "front_loaded" : "balanced";
+    reasons.push("Spielertyp nimmt lieber frueh Geld mit als spaeter auf bessere Struktur zu warten.");
+  } else if (likesStability) {
+    shapePreference = shapeSeed < 0.84 ? "balanced" : "back_loaded";
+    reasons.push("Spielertyp mag stabile Verteilung und nicht jede Form von Cash-Spielchen.");
+  } else if (likesDelayedUpside) {
+    shapePreference = shapeSeed < 0.25 ? "front_loaded" : shapeSeed > 0.7 ? "back_loaded" : "balanced";
+    reasons.push("Spielertyp ist offen fuer unterschiedliche Vertragsformen, solange die Rolle stimmt.");
+  } else if (shapeSeed < 0.22) {
     shapePreference = "front_loaded";
-    reasons.push("Ambitioniertes Team kann frueh mehr zahlen, um Stars zu sichern.");
-  } else if (lengthPreference === "long") {
+    reasons.push("Persoenliche Vertragsform tendiert eher zu fruehem Geld.");
+  } else if (shapeSeed > 0.78) {
+    shapePreference = "back_loaded";
+    reasons.push("Persoenliche Vertragsform tendiert eher zu spaeterem Geld.");
+  } else {
     shapePreference = "balanced";
+    reasons.push("Persoenliche Vertragsform bleibt eher ausgeglichen.");
   }
 
   const contractLength = normalizeContractLength(input?.contractLength ?? idealLength);
@@ -407,7 +421,7 @@ export function buildPlayerContractPreference(
   }
 
   const label = lengthPreference === "long" ? "lange Vertraege" : lengthPreference === "short" ? "kurze Vertraege" : "mittlere Vertraege";
-  reasons.unshift(`Praeferenz: ${label}, ideal ${idealLength} Season(s), Form ${shapePreference}.`);
+  reasons.unshift(`Wunschprofil: ${label}, am liebsten ${idealLength} Saisons, Form ${shapePreference}.`);
 
   return {
     lengthPreference,
@@ -429,6 +443,7 @@ export function recommendContractOfferForPlayer(input: {
   teamIdentity?: TeamIdentity | null;
   teamCash?: number | null;
   marketValue?: number | null;
+  teamFit?: number | null;
   currentTeamSalary?: number | null;
   dealRole?: string | null;
   rosterCountBefore?: number | null;
@@ -447,6 +462,7 @@ export function recommendContractOfferForPlayer(input: {
   let contractShape = basePreference.shapePreference;
   const cash = input.teamCash ?? null;
   const marketValue = input.marketValue ?? null;
+  const teamFit = input.teamFit ?? null;
   const currentTeamSalary = input.currentTeamSalary ?? null;
   const cashTight = cash != null && marketValue != null && cash < marketValue * 1.35;
   const cashComfortable =
@@ -581,15 +597,119 @@ export function recommendContractOfferForPlayer(input: {
     reasons.push("Hoher Kostenblock mit Risiko: Star-Vertrag wird nicht automatisch maximal lang.");
   }
   if (firstSeason) {
-    const seasonOneCap = stableValueContract && commitmentScore >= 7.6
-      ? 4
-      : isPremiumRole || (marketValue ?? 0) >= 65
-      ? 4
-      : (marketValue ?? 0) >= 35 || isCoreRole
-        ? 3
-        : 2;
+    const rosterBefore = input.rosterCountBefore ?? null;
+    const rosterMin = input.teamRosterMin ?? null;
+    const rosterOpt = input.teamRosterOpt ?? rosterMin;
+    const market = marketValue ?? 0;
+    const fit = teamFit ?? 0;
+    const salary = salaryReference ?? 0;
+    const valueRatio = salary > 0 ? market / salary : 0;
+    const rosterStillBuilding = rosterBefore == null || rosterMin == null || rosterBefore < rosterMin;
+    const rosterNotSettled = rosterBefore == null || rosterOpt == null || rosterBefore < rosterOpt;
+    const roleFlexPenalty = isReserveRole ? 0.65 : isCoreRole ? 0.15 : isPremiumRole ? 0.25 : 0.3;
+    const capitalLockRisk =
+      market >= 85
+        ? 2.4
+        : market >= 70
+          ? 1.75
+          : market >= 55
+            ? 1.05
+            : market >= 38
+              ? 0.55
+              : market >= 22
+                ? 0.25
+                : 0;
+    const resaleOpportunityRisk =
+      market >= 55
+        ? 0.45 + Math.max(0, (input.teamStrategyProfile?.bias.sellForProfitAggression ?? 5) - 5) * 0.12
+        : market >= 28
+          ? 0.2
+          : 0;
+    const rosterFlexRisk =
+      rosterStillBuilding
+        ? 0.95
+        : rosterNotSettled
+          ? 0.45
+          : 0;
+    const flexibilityNeed =
+      capitalLockRisk +
+      resaleOpportunityRisk +
+      rosterFlexRisk +
+      roleFlexPenalty +
+      (cashTight ? 1.05 : 0) +
+      Math.max(0, 5.8 - commitmentScore) * 0.28 +
+      Math.max(0, (wageSensitivity - 6) * 0.18) +
+      Math.max(0, (cashPriority - 6) * 0.12);
+    const fitCommitment =
+      fit >= 28
+        ? 1.35
+        : fit >= 20
+          ? 1.0
+          : fit >= 12
+            ? 0.62
+            : fit >= 4
+              ? 0.28
+              : fit < 0
+                ? -1.1
+                : 0;
+    const valueCommitment =
+      valueRatio >= 4.2
+        ? 1.05
+        : valueRatio >= 3.2
+          ? 0.74
+          : valueRatio >= 2.4
+            ? 0.38
+            : valueRatio > 0 && valueRatio < 1.8
+              ? -0.35
+              : 0;
+    const lowCapitalUpside =
+      market > 0 && market <= 22 && fit >= 10
+        ? 0.48
+        : market <= 38 && fit >= 18
+          ? 0.34
+          : 0;
+    const identityCommitment =
+      Math.max(0, commitmentScore - 5.5) * 0.42 +
+      Math.max(0, longContractPreference - 5) * 0.18 +
+      Math.max(0, valuePriority - 5) * 0.1 +
+      Math.max(0, (input.teamStrategyProfile?.bias.loyaltyBias ?? 5) - 5) * 0.13;
+    const contractMixRoll = input.player
+      ? hashToUnitInterval(
+          `${input.player.id}:${identity?.teamId ?? "team"}:${market}:${fit}:season-one-contract-mix:${rosterBefore ?? "na"}`,
+        )
+      : 0.5;
+    const mixCommitment = (contractMixRoll - 0.5) * 0.9;
+    const commitmentAppeal = fitCommitment + valueCommitment + lowCapitalUpside + identityCommitment + mixCommitment;
+    const netCommitment = commitmentAppeal - flexibilityNeed;
+
+    let seasonOneCap = 1;
+    if (fit < 0 && netCommitment < 1.4) {
+      seasonOneCap = 1;
+      reasons.push("Season 1: negativer Fit braucht fast immer Exit-Flexibilitaet.");
+    } else if (market >= 70) {
+      seasonOneCap = netCommitment >= 1.1 && !rosterStillBuilding ? 3 : netCommitment >= -0.2 ? 2 : 1;
+      reasons.push("Season 1 Kapitalbindung: teure Spieler bekommen nur bei starkem Gesamtpaket lange Bindung.");
+    } else if (netCommitment >= 1.45 && !cashTight && !rosterStillBuilding) {
+      seasonOneCap = 3;
+      reasons.push("Season 1 Value-Bindung: Fit, Preis/Gehalt und Team-Identity rechtfertigen laengeren Deal.");
+    } else if (netCommitment >= 0.05 || (valueRatio >= 3.4 && fit >= 14 && !cashTight)) {
+      seasonOneCap = 2;
+      reasons.push("Season 1 Mix-Deal: gutes Value/Fit-Paket bekommt zwei Seasons, aber keinen langen Lock.");
+    } else {
+      seasonOneCap = 1;
+      reasons.push("Season 1 Flex-Deal: Team haelt Exit und Verkaufsoption offen.");
+    }
+
+    if (rosterStillBuilding && market < 55 && netCommitment < 1.2) {
+      seasonOneCap = Math.min(seasonOneCap, 1);
+      reasons.push("Season 1 Kaderaufbau: vor stabilem Kern keine breite Mehrjahresbindung.");
+    }
+    if ((input.teamStrategyProfile?.bias.shortContractPreference ?? 0) >= 8 && netCommitment < 1.5) {
+      seasonOneCap = Math.min(seasonOneCap, 1);
+      reasons.push("Vorsichtiger GM: Einjahresvertrag bleibt Default, ausser das Gesamtpaket ist klar stark.");
+    }
+
     contractLength = Math.min(contractLength, seasonOneCap);
-    reasons.push("Season 1: Teams bleiben bei langen Vertraegen vorsichtiger.");
   }
 
   return {
@@ -684,7 +804,7 @@ function deriveTraitCultureSignals(player: Player, identity: TeamIdentity | null
       label: "Status-Erwartung",
       category: "personality",
       multiplier: 1.1,
-      reason: "Diva/Egomaniac erwartet bei populärem oder ambitioniertem Umfeld ein Statussignal.",
+      reason: "Diva/Egomaniac erwartet bei populaerem oder ambitioniertem Umfeld ein Statussignal.",
     });
   }
 
@@ -711,7 +831,7 @@ function deriveTraitCultureSignals(player: Player, identity: TeamIdentity | null
       label: "Loyal + Harmony",
       category: "culture",
       multiplier: 0.95,
-      reason: "Loyaler Spieler akzeptiert stabile Teamharmonie günstiger.",
+      reason: "Loyaler Spieler akzeptiert stabile Teamharmonie guenstiger.",
     });
   }
 
@@ -728,7 +848,38 @@ function deriveFitDemandMultiplier(teamFit: number) {
   return 1 + clamp(Math.abs(teamFit) / 80, 0.04, 0.2);
 }
 
-const LONG_CONTRACT_DISCOUNT_PER_EXTRA_YEAR = 0.07;
+type RetoolContractSalaryRange = { min: number; max: number };
+
+const RETOOL_STANDARD_CONTRACT_SALARY_RANGES: Record<number, RetoolContractSalaryRange> = {
+  1: { min: 0.92, max: 1.08 },
+  2: { min: 0.86, max: 1.02 },
+  3: { min: 0.78, max: 0.94 },
+  4: { min: 0.7, max: 0.86 },
+  5: { min: 0.62, max: 0.78 },
+};
+
+const RETOOL_MERCENARY_CONTRACT_SALARY_RANGES: Record<number, RetoolContractSalaryRange> = {
+  1: { min: 0.92, max: 1.08 },
+  2: { min: 0.9, max: 1.06 },
+  3: { min: 0.86, max: 1.02 },
+  4: { min: 0.82, max: 0.98 },
+  5: { min: 0.78, max: 0.94 },
+};
+
+function formatContractRangePercent(range: RetoolContractSalaryRange) {
+  return `${Math.round(range.min * 100)}-${Math.round(range.max * 100)}%`;
+}
+
+function sampleRetoolContractSalaryFactor(player: Player, years: number, isMercenary: boolean) {
+  const ranges = isMercenary ? RETOOL_MERCENARY_CONTRACT_SALARY_RANGES : RETOOL_STANDARD_CONTRACT_SALARY_RANGES;
+  const range = ranges[years] ?? ranges[1];
+  const sample = hashToUnitInterval(`${player.id}:${player.name}:retool-contract-salary:${years}:${isMercenary ? "merc" : "std"}`);
+  return {
+    range,
+    sample,
+    factor: roundMoney(range.min + (range.max - range.min) * sample, 4),
+  };
+}
 
 function deriveRetoolContractSalarySignal(
   contractLength: number,
@@ -745,6 +896,7 @@ function deriveRetoolContractSalarySignal(
       longFitMultiplier: 1,
       grossDiscount: 0,
       playerDiscount: 0,
+      rangeFactor: 1,
       preferenceAdjustment: 0,
       netDiscount: 0,
       score: 0,
@@ -755,43 +907,49 @@ function deriveRetoolContractSalarySignal(
 
   const years = clamp(normalizeContractLength(contractLength), 1, 5);
   const isMercenary = hasTrait(player, "mercenary");
-  const extraYears = Math.max(0, years - 1);
-  const grossDiscount = roundMoney(extraYears * LONG_CONTRACT_DISCOUNT_PER_EXTRA_YEAR, 4);
-  const playerDiscount = roundMoney(isMercenary ? grossDiscount * 0.5 : grossDiscount, 4);
+  const retoolSalary = sampleRetoolContractSalaryFactor(player, years, isMercenary);
+  const rangeFactor = retoolSalary.factor;
+  const grossDiscount = roundMoney(Math.max(0, 1 - rangeFactor), 4);
+  const playerDiscount = grossDiscount;
   const preferenceAdjustment =
     typeof salaryPreferenceAdjustmentPct === "number" && Number.isFinite(salaryPreferenceAdjustmentPct)
       ? salaryPreferenceAdjustmentPct
       : 0;
-  const netDiscount = clamp(playerDiscount - preferenceAdjustment, -0.12, isMercenary ? 0.2 : 0.38);
-  const contractFactor = clamp(1 - netDiscount, 0.55, 1.2);
-  const shortTermMultiplier = years === 1 ? 1.03 : 1;
+  const effectivePreferenceAdjustment = clamp(preferenceAdjustment, -0.06, isMercenary ? 0.04 : 0.08);
+  const pureLengthFactor = clamp(rangeFactor, 0.55, 1.2);
+  const contractFactor = clamp(pureLengthFactor + effectivePreferenceAdjustment, 0.55, 1.2);
+  const netDiscount = roundMoney(1 - contractFactor, 4);
+  const preferenceFactor = pureLengthFactor > 0 ? contractFactor / pureLengthFactor : 1;
   const fit25Multiplier = teamFit >= 25 ? 0.9 : 1;
   const longFitPressure =
     years >= 4 && teamFit < 18
       ? clamp(((18 - teamFit) / 18) * (years === 5 ? 0.06 : 0.04), 0, years === 5 ? 0.06 : 0.04)
       : 0;
   const longFitMultiplier = 1;
-  const salaryMultiplier = contractFactor * shortTermMultiplier * longFitMultiplier * fit25Multiplier;
+  const salaryMultiplier = contractFactor * longFitMultiplier * fit25Multiplier;
   const demandEntries: NegotiationDemandBreakdownEntry[] = [];
-  if (years === 1) {
-    pushDemandBreakdown(demandEntries, {
-      key: "contract_one_year_no_discount",
-      label: "1 Jahr",
-      category: "contract",
-      multiplier: shortTermMultiplier,
-      reason: "Kurze Laufzeit gibt keinen Sicherheitsrabatt und verlangt leicht mehr Jahresgehalt.",
-    });
-  } else {
-    pushDemandBreakdown(demandEntries, {
-      key: "contract_length_discount",
-      label: `${years} Jahre`,
-      category: "contract",
-      multiplier: contractFactor,
-      reason: isMercenary
-        ? `Längerer Vertrag gibt Rabatt, Mercenary nimmt davon nur etwa die Hälfte mit.`
-        : "Längere Sicherheit senkt die Jahresforderung.",
-    });
-  }
+  pushDemandBreakdown(demandEntries, {
+    key: years === 1 ? "contract_retool_range" : "contract_length_discount",
+    label: `${years} Jahr${years === 1 ? "" : "e"}`,
+    category: "contract",
+    multiplier: pureLengthFactor,
+    reason:
+      years === 1
+        ? `Retool-Spanne ${formatContractRangePercent(retoolSalary.range)} setzt den Startwert der Verhandlung.`
+        : isMercenary
+          ? `Retool-Mercenary-Spanne ${formatContractRangePercent(retoolSalary.range)} setzt den Startwert statt einem festen Rabatt.`
+          : `Retool-Spanne ${formatContractRangePercent(retoolSalary.range)} setzt den Startwert statt einem festen Rabatt.`,
+  });
+  pushDemandBreakdown(demandEntries, {
+    key: "player_contract_wish_salary",
+    label: "Spielerwunsch",
+    category: "contract",
+    multiplier: preferenceFactor,
+    reason:
+      effectivePreferenceAdjustment > 0
+        ? "Laufzeit/Form liegen nicht ideal und reduzieren den Vertragsrabatt."
+        : "Laufzeit/Form treffen den Wunsch und verbessern die Forderung.",
+  });
   pushDemandBreakdown(demandEntries, {
     key: "fit25_salary_discount",
     label: "Fit 25+",
@@ -806,9 +964,10 @@ function deriveRetoolContractSalarySignal(
     multiplier: longFitMultiplier,
     reason: `Bei ${years} Jahren verlangt niedriger Fit Sicherheitsaufschlag.`,
   });
-  const grossDiscountPercent = Math.round(grossDiscount * 100);
+  const rangeLabel = formatContractRangePercent(retoolSalary.range);
+  const rangeFactorPercent = Math.round(rangeFactor * 100);
   const playerDiscountPercent = Math.round(playerDiscount * 100);
-  const preferencePercent = Math.round(preferenceAdjustment * 100);
+  const preferencePercent = Math.round(effectivePreferenceAdjustment * 100);
   const netDiscountPercent = Math.round(netDiscount * 100);
   const fitReason = fit25Multiplier < 1 ? " Teamfit 25+: 10% Fit-Rabatt wird ganz am Ende abgezogen." : "";
   const pressureReason =
@@ -823,20 +982,21 @@ function deriveRetoolContractSalarySignal(
         : "";
   const reason =
     years === 1
-      ? `Retool-Vertragslogik: 1 Jahr bleibt beim Basisgehalt.${fitReason}`
+      ? `Retool-Vertragslogik: 1 Jahr startet aus Spanne ${rangeLabel}, hier ${rangeFactorPercent}% vom Basisgehalt.${preferenceReason}${fitReason}`
       : isMercenary
-        ? `Retool-Vertragslogik: ${years} Jahre geben ${grossDiscountPercent}% Grundrabatt, Mercenary halbiert auf ${playerDiscountPercent}%.${preferenceReason} Netto ${netDiscountPercent}% Jahresrabatt.${fitReason}${pressureReason}`
-        : `Retool-Vertragslogik: ${years} Jahre geben ${grossDiscountPercent}% Grundrabatt.${preferenceReason} Netto ${netDiscountPercent}% Jahresrabatt.${fitReason}${pressureReason}`;
+        ? `Retool-Vertragslogik: ${years} Jahre nutzen Mercenary-Spanne ${rangeLabel}, hier ${rangeFactorPercent}% vom Basisgehalt (${playerDiscountPercent}% Start-Rabatt).${preferenceReason} Netto ${netDiscountPercent}% Jahresrabatt.${fitReason}${pressureReason}`
+        : `Retool-Vertragslogik: ${years} Jahre nutzen Spanne ${rangeLabel}, hier ${rangeFactorPercent}% vom Basisgehalt (${playerDiscountPercent}% Start-Rabatt).${preferenceReason} Netto ${netDiscountPercent}% Jahresrabatt.${fitReason}${pressureReason}`;
 
   return {
     salaryMultiplier,
     contractFactor,
-    shortTermMultiplier,
+    shortTermMultiplier: 1,
     fit25Multiplier,
     longFitMultiplier,
     grossDiscount,
     playerDiscount,
-    preferenceAdjustment,
+    rangeFactor,
+    preferenceAdjustment: effectivePreferenceAdjustment,
     netDiscount,
     score: clamp((1 - contractFactor * longFitMultiplier) * 34 + (fit25Multiplier < 1 ? 4 : 0) - longFitPressure * 75, -14, 12),
     reason,
@@ -844,7 +1004,7 @@ function deriveRetoolContractSalarySignal(
   };
 }
 
-function deriveContractShapeDemandSignal(contractShape: ContractShape, preference: PlayerContractPreference | null) {
+function deriveContractShapeDemandSignal(contractShape: ContractShape) {
   const entries: NegotiationDemandBreakdownEntry[] = [];
 
   if (contractShape === "front_loaded") {
@@ -853,7 +1013,7 @@ function deriveContractShapeDemandSignal(contractShape: ContractShape, preferenc
       label: "Front-loaded",
       category: "contract",
       multiplier: 0.98,
-      reason: "Frühes Geld reduziert die Jahresforderung leicht.",
+      reason: "Fruehes Geld reduziert die Jahresforderung leicht.",
     });
   } else if (contractShape === "back_loaded") {
     pushDemandBreakdown(entries, {
@@ -861,25 +1021,7 @@ function deriveContractShapeDemandSignal(contractShape: ContractShape, preferenc
       label: "Back-loaded",
       category: "contract",
       multiplier: 1.02,
-      reason: "Späteres Geld verlangt leichte Kompensation.",
-    });
-  }
-
-  if (preference && contractShape !== preference.shapePreference) {
-    pushDemandBreakdown(entries, {
-      key: "shape_preference_mismatch",
-      label: "Form gegen Wunsch",
-      category: "contract",
-      multiplier: 1.02,
-      reason: `Spieler bevorzugt ${preference.shapePreference}.`,
-    });
-  } else if (preference && contractShape === preference.shapePreference) {
-    pushDemandBreakdown(entries, {
-      key: "shape_preference_match",
-      label: "Form passt",
-      category: "contract",
-      multiplier: 0.99,
-      reason: "Vertragsform trifft die Spielerpräferenz.",
+      reason: "Spaeteres Geld verlangt leichte Kompensation.",
     });
   }
 
@@ -968,10 +1110,10 @@ function deriveTeamDemandSignals(input: NegotiationPreviewInput, player: Player,
   if ((profile?.bias.starPriority ?? 5) >= 8 && (profile?.bias.riskTolerance ?? 5) >= 7 && (input.team?.cash ?? 0) > 60) {
     pushDemandBreakdown(entries, {
       key: "aggressive_cash_signal",
-      label: "Star-Projekt",
+      label: "Premium-Test",
       category: "team",
       multiplier: 1.03,
-      reason: "Aggressives Team mit Cash wird eher auf Premium geprüft.",
+      reason: "Cashreiches, risikofreudiges Team signalisiert Spielraum. Spieler und Berater testen daher einen kleinen Premium-Aufschlag.",
     });
   }
 
@@ -1111,7 +1253,7 @@ export function buildContractNegotiationPreview(input: NegotiationPreviewInput):
     const fitDemandMultiplier = deriveFitDemandMultiplier(teamFit);
     const trustMultiplier = input.priorBadExperience ? 1.12 : 1;
     const moodMultiplier = 1 + moodDemand;
-    const contractShapeSignal = deriveContractShapeDemandSignal(contractShape, contractPreference);
+    const contractShapeSignal = deriveContractShapeDemandSignal(contractShape);
     const teamDemandSignals = deriveTeamDemandSignals(input, input.player, teamFit);
 
     demandBreakdown.push(buildDemandEntry({
@@ -1134,10 +1276,10 @@ export function buildContractNegotiationPreview(input: NegotiationPreviewInput):
     demandBreakdown.push(...teamDemandSignals.entries);
     pushDemandBreakdown(demandBreakdown, {
       key: "prior_bad_experience",
-      label: "Trust",
+      label: "Vertrauensbruch",
       category: "history",
       multiplier: trustMultiplier,
-      reason: "Fruehere Ablehnung belastet die Forderung.",
+      reason: "Spieler ist nach der letzten geplatzten Runde noch angefressen und zieht die Forderung hoch.",
     });
     pushDemandBreakdown(demandBreakdown, {
       key: "negotiation_mood_demand",
@@ -1309,12 +1451,13 @@ export function buildContractNegotiationPreview(input: NegotiationPreviewInput):
     if (input.priorBadExperience) {
       pushScoreBreakdown(scoreBreakdown, {
         key: "bad_experience",
-        label: "Schlechte Erfahrung",
+        label: "Spieler angefressen",
         category: "history",
         points: -14,
-        reason: "Fruehere Ablehnung belastet neue Verhandlungen mit diesem Team.",
+        reason: "Letzte Verhandlung mit diesem Team lief schlecht. Vertrauen ist unten und die Zusage sinkt merklich.",
       });
       warnings.push("previous_rejected_offer_reduces_trust");
+      reasons.push("Spieler ist nach der letzten Verhandlung mit diesem Team noch angefressen.");
     }
 
     const cultureSignals = deriveTraitCultureSignals(input.player, input.teamIdentity);

@@ -107,6 +107,21 @@ function getActiveTeamLineup(gameState: GameState, activeTeamId: string | null) 
   );
 }
 
+function getCurrentMatchdayRequiredLineupSlots(gameState: GameState) {
+  const scheduleEntry = (gameState.seasonState.disciplineSchedule ?? []).find(
+    (entry) => entry.seasonId === gameState.season.id && entry.matchdayId === gameState.matchdayState.matchdayId,
+  );
+  return (scheduleEntry?.discipline1?.playerCount ?? 0) + (scheduleEntry?.discipline2?.playerCount ?? 0);
+}
+
+function isCurrentMatchdayLineupComplete(gameState: GameState, lineup: ReturnType<typeof getActiveTeamLineup>) {
+  const requiredSlots = getCurrentMatchdayRequiredLineupSlots(gameState);
+  if (requiredSlots <= 0) {
+    return Boolean(lineup && lineup.entries.length > 0);
+  }
+  return Boolean(lineup && lineup.entries.length >= requiredSlots);
+}
+
 function activeTeamHasFormCards(gameState: GameState, activeTeamId: string | null) {
   if (!activeTeamId) return false;
   return (gameState.seasonState.formCards ?? []).some(
@@ -235,7 +250,7 @@ function buildMatchdaySteps(gameState: GameState, activeTeamId: string | null): 
   const hasActiveTeam = activeTeamId != null && gameState.teams.some((team) => team.teamId === activeTeamId);
   const activeRosterCount = getActiveTeamRosterPlayerIds(gameState, activeTeamId).length;
   const activeLineup = getActiveTeamLineup(gameState, activeTeamId);
-  const hasLineup = Boolean(activeLineup && activeLineup.entries.length > 0);
+  const hasLineup = isCurrentMatchdayLineupComplete(gameState, activeLineup);
   const lineupConfirmed = activeLineup?.status === "submitted" || activeLineup?.status === "locked" || activeLineup?.status === "resolved";
   const hasFormCards = activeTeamHasFormCards(gameState, activeTeamId);
   const trainingComplete = activeTeamTrainingComplete(gameState, activeTeamId);

@@ -1032,15 +1032,18 @@ function buildManagerAiDraftPickReasoningAuditRows(input: {
     const budgetFit = pick.budgetFit ?? 0;
     const classFit = pick.classFit ?? 0;
     const selectedScore = pick.selectedScore ?? pick.pickScore ?? 0;
+    const severeBudgetRisk = budgetFit < -120 && selectedScore < 40;
+    const budgetWatch = budgetFit < -25 && !severeBudgetRisk;
     const diagnosis = [
       selectedScore < 0 ? "negative_selected_score" : null,
-      budgetFit < -25 ? "budget_fit_bad" : null,
+      severeBudgetRisk ? "budget_fit_bad" : null,
+      budgetWatch ? "budget_watch" : null,
       identityFit < -35 ? "identity_lore_mismatch_review" : null,
       classFit < -35 ? "class_lore_mismatch_review" : null,
       (pick.candidateCount ?? 0) <= 2 ? "candidate_pool_too_thin" : null,
       !pick.whySelected ? "missing_why_selected" : null,
     ].filter(Boolean).join("|") || "ok";
-    const status = selectedScore < 0 || budgetFit < -35 || (pick.candidateCount ?? 0) <= 1
+    const status = selectedScore < 0 || severeBudgetRisk || (pick.candidateCount ?? 0) <= 1
       ? "red"
       : diagnosis === "ok"
         ? "ok"
@@ -1199,20 +1202,20 @@ function buildManagerAiFormTraitBonusAuditRows(input: {
       const traits = [...(player.traitsPositive ?? []), ...(player.traitsNegative ?? [])].map(normalizeToken);
       const hasPreferred = traits.some((trait) => gmPreferred.has(trait) || strategyPreferred.has(trait));
       if (hasPreferred) preferredTraitPlayers += 1;
+      let playerHasRiskyTrait = false;
       for (const trait of traits) {
         if (gmPreferred.has(trait) || strategyPreferred.has(trait)) covered.add(trait);
-        if (riskyTraits.has(trait)) riskyTraitPlayers += 1;
+        if (riskyTraits.has(trait)) playerHasRiskyTrait = true;
       }
-      negativeTraitPlayers += player.traitsNegative?.length ?? 0;
+      if (playerHasRiskyTrait) riskyTraitPlayers += 1;
+      if ((player.traitsNegative?.length ?? 0) > 0) negativeTraitPlayers += 1;
     }
     const diagnosis = [
       preferredTraitPlayers === 0 ? "no_preferred_trait_carriers" : null,
       riskyTraitPlayers >= Math.max(4, players.length / 2) ? "many_risky_trait_carriers" : null,
-      negativeTraitPlayers >= players.length ? "negative_traits_high" : null,
+      negativeTraitPlayers >= Math.max(5, players.length * 0.75) ? "negative_traits_high" : null,
     ].filter(Boolean).join("|") || "ok";
-    const readinessStatus = preferredTraitPlayers === 0
-      ? "red"
-      : diagnosis === "ok"
+    const readinessStatus = diagnosis === "ok"
         ? "ok"
         : "watch";
     return {
@@ -1333,14 +1336,14 @@ function buildDraftDiversityAuditRows(input: {
     const dominantAreaSharePct = rosterCount > 0 ? round((dominant[1] / rosterCount) * 100, 1) : 0;
     const areaCount = [...areaCounts.values()].filter((count) => count > 0).length;
     const diversityStatus =
-      rosterCount < (row?.playerMin ?? 7) || dominantAreaSharePct >= 75 || classCount <= 2 || areaCount <= 1
+      rosterCount < (row?.playerMin ?? 7) || classCount <= 2 || areaCount <= 1
         ? "red"
-        : dominantAreaSharePct >= 60 || classCount <= 4 || raceCount <= 3
+        : dominantAreaSharePct >= 70 || classCount <= 4 || raceCount <= 3
           ? "watch"
           : "ok";
     const diagnosis = [
       rosterCount < (row?.playerMin ?? 7) ? "below_min_roster" : null,
-      dominantAreaSharePct >= 75 ? "one_area_overloaded" : null,
+      dominantAreaSharePct >= 70 ? "one_area_overloaded" : null,
       classCount <= 2 ? "class_variety_too_low" : null,
       raceCount <= 3 ? "race_variety_low" : null,
       areaCount <= 1 ? "missing_area_mix" : null,
@@ -1389,15 +1392,16 @@ function buildMwSalaryGuardRows(input: {
       const marketValue = round(economy.marketValue ?? 0, 2);
       const salary = round(economy.salary ?? entry.salary ?? 0, 2);
       const salaryToMarketValuePct = marketValue > 0 ? round((salary / marketValue) * 100, 1) : 0;
+      const highRatioOnMeaningfulContract = salaryToMarketValuePct > 42 && (salary >= 10 || marketValue >= 30);
       const diagnosis = [
         marketValue > 120 ? "market_value_gt_120" : null,
         salary > 35 ? "salary_gt_35" : null,
-        salaryToMarketValuePct > 42 ? "salary_to_mw_extreme" : null,
+        highRatioOnMeaningfulContract ? "salary_to_mw_extreme" : null,
         salaryToMarketValuePct > 32 ? "salary_to_mw_high" : null,
         salary < 0 ? "salary_negative" : null,
         marketValue < 0 ? "market_value_negative" : null,
       ].filter(Boolean).join("|") || "ok";
-      const guardStatus = diagnosis.includes("extreme") || diagnosis.includes("gt_120") || diagnosis.includes("negative")
+      const guardStatus = diagnosis.includes("gt_120") || diagnosis.includes("gt_35") || diagnosis.includes("negative")
         ? "red"
         : diagnosis === "ok"
           ? "ok"
@@ -1443,7 +1447,7 @@ function buildContractRenewalExitAuditRows(input: {
       const guardStatus =
         row.statusAfterTick === "out_of_contract" && row.controlMode === "ai" && row.recommendedAction === "no_action"
           ? "red"
-          : renewalSalaryIncreasePct != null && renewalSalaryIncreasePct > 80
+          : row.recommendedAction !== "release" && renewalSalaryIncreasePct != null && renewalSalaryIncreasePct > 80
             ? "red"
             : renewalSalaryIncreasePct != null && renewalSalaryIncreasePct > 35
               ? "watch"

@@ -7,7 +7,13 @@ import OptimizedMediaImage from "@/app/foundation/OptimizedMediaImage";
 import { TooltipHeading } from "@/components/ui/TooltipHeading";
 import { getPlayerPortraitBrowserUrl, getTeamLogoBrowserUrl } from "@/lib/data/mediaAssets";
 import type { PlayerGeneratorAttributeName, Team } from "@/lib/data/olyDataTypes";
-import { getFacilityLevelDefinition, type FacilityId, type SpecialistWingVariant } from "@/lib/facilities/facility-catalog";
+import {
+  SPECIALIST_WING_VARIANTS,
+  getFacilityLevelDefinition,
+  type FacilityId,
+  type SpecialistWingVariant,
+} from "@/lib/facilities/facility-catalog";
+import type { ProgressionClassName } from "@/lib/training/class-progression-config";
 import { formatTransfermarktCurrency } from "@/lib/market/transfermarkt-formatting-contract";
 import type { PlayerTrainingMode } from "@/lib/training/training-plan-types";
 
@@ -40,6 +46,7 @@ type TrainingPlayerRowView = {
     };
   };
   mode: PlayerTrainingMode;
+  trainingClass: string;
   modeConfig: {
     label: string;
     note: string;
@@ -58,8 +65,21 @@ type TrainingPlayerRowView = {
     after: number;
     modifierPct: number;
   };
+  organicForecast: {
+    classBefore: string;
+    classAfter: string;
+    potentialRating: number | null;
+    potentialTrainingMultiplier: number;
+    trainingSetpoints: number;
+    performanceSetpoints: number;
+    netSetpoints: number;
+    fatigueLoad: number;
+    topGains: Array<{ attribute: string; before: number; after: number; delta: number }>;
+    topLosses: Array<{ attribute: string; before: number; after: number; delta: number }>;
+  };
   forecast: {
     netDevelopmentXP: number;
+    trainingFormTier: string;
     regressionRisk: string | null;
     regressionPressure: number;
     appearanceXP: number;
@@ -224,9 +244,11 @@ type TrainingFacilitiesV2ClientProps = {
   developmentSummary: Record<"all" | "growth" | "stable" | "regression", number>;
   onSetDevelopmentFilter: (filter: "all" | "growth" | "stable" | "regression") => void;
   trainingModeOptions: TrainingModeOption[];
+  trainingClassOptions: Array<{ value: ProgressionClassName; label: string }>;
   playerRows: TrainingPlayerRowView[];
   allPlayerCount: number;
   onSetTrainingMode: (playerId: string, mode: PlayerTrainingMode) => void;
+  onSetTrainingClass: (playerId: string, trainingClass: string) => void;
   facilityRows: TrainingFacilityRowView[];
   selectedFacilityPreviewId: string | null;
   specialistWingVariant: SpecialistWingVariant;
@@ -299,6 +321,21 @@ const AXIS_META = {
   men: { label: "MEN", tone: "is-men" },
   soc: { label: "SOC", tone: "is-soc" },
 } as const;
+
+const ATTRIBUTE_SHORT_LABELS: Record<PlayerGeneratorAttributeName, string> = {
+  power: "POW",
+  health: "HEA",
+  stamina: "STA",
+  torment: "TOR",
+  speed: "SPE",
+  dexterity: "DEX",
+  awareness: "AWA",
+  intelligence: "INT",
+  will: "WIL",
+  determination: "DET",
+  charisma: "CHA",
+  spirit: "SPI",
+};
 
 function formatLocaleNumber(value: number | null | undefined, digits = 0) {
   if (value == null || !Number.isFinite(value)) {
@@ -454,6 +491,94 @@ function formatFacilityActionReason(reason: string) {
   return reason.replaceAll("_", " ");
 }
 
+function describeFacilityCondition(facility: TrainingFacilityRowView) {
+  if (facility.level <= 0) {
+    return "Noch nicht gebaut. Erst mit dem Bau startet Wirkung und Unterhalt.";
+  }
+  if (facility.conditionPct >= 100) {
+    return "Zustand 100%: volle Effizienz, keine Wartung noetig.";
+  }
+  if (facility.conditionPct >= 80) {
+    return `Zustand ${formatLocaleNumber(facility.conditionPct, 0)}%: noch stabil, aber Wirkung ist bereits leicht gedrueckt.`;
+  }
+  if (facility.conditionPct >= 60) {
+    return `Zustand ${formatLocaleNumber(facility.conditionPct, 0)}%: Wirkung ist spuerbar reduziert, Wartung lohnt sich bald.`;
+  }
+  return `Zustand ${formatLocaleNumber(facility.conditionPct, 0)}%: deutlicher Leistungsverlust, hier versickert gerade viel Wirkung.`;
+}
+
+function describeFacilityUpkeep(facility: TrainingFacilityRowView) {
+  if (facility.level <= 0) {
+    return "Kein laufender Unterhalt, solange das Gebaeude nicht gebaut ist.";
+  }
+  const income = facility.currentIncome;
+  const upkeep = facility.currentUpkeep;
+  if (income <= 0) {
+    return `Unterhalt kostet jede Saison ${formatTransfermarktCurrency(upkeep)}. Wartung aendert diese Last nicht, ein Downgrade schon.`;
+  }
+  const net = income - upkeep;
+  return `Pro Saison: ${formatTransfermarktCurrency(income)} Income minus ${formatTransfermarktCurrency(upkeep)} Unterhalt = ${formatTransfermarktCurrency(net)} netto.`;
+}
+
+function describeSpecialistWingVariant(variant: SpecialistWingVariant, level: number, efficiencyPct: number) {
+  const entry = SPECIALIST_WING_VARIANTS[variant];
+  const labels = entry.attributes.map((attribute) => ATTRIBUTE_SHORT_LABELS[attribute]).join(" · ");
+  const discountPct = ((getFacilityLevelDefinition("specialist_wing", level)?.discountPct ?? 0) * efficiencyPct) / 100;
+  if (level <= 0) {
+    return `${entry.label}: wirkt spaeter auf ${labels}. Erst nach dem Bau greift der Rabatt.`;
+  }
+  return `${entry.label}: passende Upgrades fuer ${labels} aktuell ${formatLocaleNumber(discountPct, 0)}% guenstiger.`;
+}
+
+function getFacilityActionExplainer(
+  facility: TrainingFacilityRowView,
+  action: "upgrade" | "downgrade" | "maintenance",
+  variant: SpecialistWingVariant,
+) {
+  if (action === "maintenance") {
+    return {
+      title: "Wartung bringt das Gebaeude wieder hoch",
+      body: "Wartung hebt den Zustand zurueck Richtung 100%. Mehr Zustand bedeutet direkt mehr Effizienz und damit mehr echte Wirkung.",
+      bullets: [
+        "Level bleibt gleich",
+        "Unterhalt bleibt gleich",
+        "Ziel ist volle Effizienz statt neues Level",
+      ],
+    };
+  }
+  if (action === "downgrade") {
+    return {
+      title: "Downgrade nimmt Wirkung raus, entlastet aber die Saisonkosten",
+      body: "Beim Downgrade faellt ein Level weg. Dafuer bekommst du Geld zurueck, der kuenftige Unterhalt sinkt und das Gebaeude startet wieder sauber bei 100% Zustand.",
+      bullets: [
+        "25% Rueckerstattung des entfernten Levels",
+        "kuenftiger Unterhalt sinkt",
+        "Zustand wird auf 100% gesetzt",
+      ],
+    };
+  }
+  if (facility.id === "specialist_wing") {
+    return {
+      title: "Specialist Wing macht nur passende Upgrades billiger",
+      body: describeSpecialistWingVariant(variant, Math.max(1, facility.nextLevel), Math.max(facility.efficiencyPct, 100)),
+      bullets: [
+        "wirkt nicht auf alle Attribute",
+        "Rabatt haengt an Variante und Zustand",
+        "mehr Level = groesserer Rabatt",
+      ],
+    };
+  }
+  return {
+    title: "Upgrade hebt Level, Wirkung und Folgekosten",
+    body: "Ein Upgrade schiebt das Gebaeude auf das naechste Level. Dadurch steigt die Wirkung, oft auch Income oder Rabatt, aber ebenso der laufende Unterhalt.",
+    bullets: [
+      "sofort staerkere Gebaeude-Wirkung",
+      "kuenftiger Unterhalt steigt mit",
+      "Cash wird jetzt belastet, Nutzen kommt ueber die Saison",
+    ],
+  };
+}
+
 export default function TrainingFacilitiesV2Client({
   source,
   managementLocked = false,
@@ -471,9 +596,11 @@ export default function TrainingFacilitiesV2Client({
   developmentSummary,
   onSetDevelopmentFilter,
   trainingModeOptions,
+  trainingClassOptions,
   playerRows,
   allPlayerCount,
   onSetTrainingMode,
+  onSetTrainingClass,
   facilityRows,
   selectedFacilityPreviewId,
   specialistWingVariant,
@@ -509,6 +636,8 @@ export default function TrainingFacilitiesV2Client({
   const [facilityDialog, setFacilityDialog] = useState<FacilityDialogState>(null);
   const teamLogo = getTeamLogoModel(selectedTeam);
   const readOnly = source === "prisma" || managementLocked;
+  const trainingModeReadOnly = false;
+  const showLegacySeasonEndXpPanel = false;
   const facilityLaneActionReason =
     readOnly
       ? "Nur eigene Teams duerfen Gebaeude bauen oder warten."
@@ -619,6 +748,9 @@ export default function TrainingFacilitiesV2Client({
     facilityDialog?.action === "maintenance" ? facilityMaintenanceConfirmReason : facilityUpgradeConfirmReason;
   const activeFacilityBusy =
     facilityDialog?.action === "maintenance" ? facilityMaintenanceBusy : facilityUpgradeBusy;
+  const activeFacilityExplainer = selectedDialogFacility && facilityDialog
+    ? getFacilityActionExplainer(selectedDialogFacility, facilityDialog.action, specialistWingVariant)
+    : null;
 
   return (
     <section className="training-v2-shell">
@@ -640,9 +772,9 @@ export default function TrainingFacilitiesV2Client({
               <span className="training-v2-kicker">Training & Gebaeude</span>
               <TooltipHeading
                 as="h2"
-                tooltip="V2 baut den Trainingsscreen als Steuerzentrale: Spielerentwicklung zuerst, Gebaeude rechts im Blick und der Saison-End-XP-Flow gesammelt unten."
+                tooltip="V2 baut den Trainingsscreen als Steuerzentrale: Spielerentwicklung zuerst, Gebaeude rechts im Blick und organisches Wachstum sichtbar."
               >
-                Entwicklung steuern, Gebaeude lesen, Saison-XP sauber verplanen.
+                Entwicklung steuern, Gebaeude lesen, Wachstum sauber planen.
               </TooltipHeading>
               <p>
                 {selectedTeam.shortCode} · {selectedTeamControlMode ?? "manual"} · {seasonLabel}
@@ -684,7 +816,7 @@ export default function TrainingFacilitiesV2Client({
             </small>
           </article>
           <article className="training-v2-summary-card">
-            <span>Trainings-XP</span>
+            <span>Trainingsertrag</span>
             <strong>{formatLocaleNumber(summary.trainingXpAfter, 0)}</strong>
             <small>
               {formatLocaleNumber(summary.trainingXpBefore, 0)} vor Facility · {formatSignedPercent(summary.trainingXpModifierPct)}
@@ -707,7 +839,7 @@ export default function TrainingFacilitiesV2Client({
             <strong>{topGrowth?.player.name ?? "—"}</strong>
             <small>
               {topGrowth
-                ? `+${formatLocaleNumber(topGrowth.forecast.netDevelopmentXP, 0)} Netto-XP · ${topGrowth.modeConfig.label}`
+                ? `+${formatLocaleNumber(topGrowth.forecast.netDevelopmentXP, 0)} Wachstum · ${topGrowth.modeConfig.label}`
                 : "Kein aktiver Kader"}
             </small>
           </article>
@@ -730,10 +862,10 @@ export default function TrainingFacilitiesV2Client({
             </small>
           </article>
           <article className="training-v2-story-card is-seasonend">
-            <span>Season-End Warenkorb</span>
-            <strong>{seasonEndStatus.plannedCount}</strong>
+            <span>Kaderentwicklung</span>
+            <strong>{developmentSummary.growth}</strong>
             <small>
-              {formatLocaleNumber(seasonEndStatus.xpPlanned, 0)} XP geplant · {formatLocaleNumber(seasonEndStatus.xpRemaining, 0)} Rest
+              {developmentSummary.regression} Risiko · {developmentSummary.stable} stabil
             </small>
           </article>
         </div>
@@ -814,61 +946,92 @@ export default function TrainingFacilitiesV2Client({
                     </div>
                   </button>
 
-                  <div className="training-v2-player-metrics">
-                    <div>
-                      <span>XP Forecast</span>
-                      <strong>{formatLocaleNumber(row.totalXp, 0)}</strong>
-                    </div>
-                    <div>
-                      <span>Netto</span>
-                      <strong className={row.forecast.netDevelopmentXP >= 0 ? "text-positive" : "text-negative"}>
-                        {row.forecast.netDevelopmentXP > 0 ? "+" : ""}
-                        {formatLocaleNumber(row.forecast.netDevelopmentXP, 0)}
-                      </strong>
-                    </div>
-                    <div>
-                      <span>Regeneration</span>
-                      <strong>
-                        {formatPps(row.recoveryForecast.before)} → {formatPps(row.recoveryForecast.after)}
-                      </strong>
-                    </div>
-                    <div>
-                      <span>MVS / PPs</span>
-                      <strong>
-                        {formatPps(row.playerMvs)} / {formatPps(row.playerPps)}
-                      </strong>
-                    </div>
-                  </div>
+	                  <div className="training-v2-player-metrics">
+	                    <div>
+	                      <span>Stat Forecast</span>
+	                      <strong className={row.organicForecast.netSetpoints >= 0 ? "text-positive" : "text-negative"}>
+	                        {row.organicForecast.netSetpoints > 0 ? "+" : ""}
+	                        {formatLocaleNumber(row.organicForecast.netSetpoints, 1)}
+	                      </strong>
+	                    </div>
+	                    <div>
+	                      <span>Training</span>
+	                      <strong>+{formatLocaleNumber(row.organicForecast.trainingSetpoints, 1)}</strong>
+	                    </div>
+	                    <div>
+	                      <span>Potential</span>
+	                      <strong>{row.organicForecast.potentialRating ?? "—"} · x{formatLocaleNumber(row.organicForecast.potentialTrainingMultiplier, 2)}</strong>
+	                    </div>
+	                    <div>
+	                      <span>Fatigue</span>
+	                      <strong>+{formatLocaleNumber(row.organicForecast.fatigueLoad, 1)}</strong>
+	                    </div>
+	                  </div>
 
-                  <div className="training-v2-mode-strip" aria-label={`${row.player.name} Trainingsmodus`}>
-                    {trainingModeOptions.map((option) => (
-                      <button
+	                  <div className="training-v2-plan-controls">
+	                  <div className="training-v2-mode-strip" aria-label={`${row.player.name} Trainingsmodus`}>
+	                    {trainingModeOptions.map((option) => (
+	                      <button
                         key={`${row.player.id}-${option.value}`}
                         className={`training-v2-mode-chip${row.mode === option.value ? " is-active" : ""}`}
                         type="button"
-                        disabled={readOnly}
+                        disabled={trainingModeReadOnly}
                         onClick={() => onSetTrainingMode(row.player.id, option.value)}
                       >
                         {option.label}
-                      </button>
-                    ))}
-                  </div>
+	                      </button>
+	                    ))}
+	                  </div>
+	                    <label className="filter-field training-v2-class-select">
+	                      <span>Trainingsklasse</span>
+	                      <select
+	                        className="input"
+	                        value={row.trainingClass}
+	                        disabled={trainingModeReadOnly}
+	                        onChange={(event) => onSetTrainingClass(row.player.id, event.target.value)}
+	                      >
+	                        {trainingClassOptions.map((option) => (
+	                          <option key={option.value} value={option.value}>
+	                            {option.label}
+	                          </option>
+	                        ))}
+	                      </select>
+	                    </label>
+	                  </div>
 
-                  <div className="training-v2-player-foot">
-                    <small>{row.modeConfig.note}</small>
-                    <small>
-                      Einsatz {formatLocaleNumber(row.forecast.appearanceXP, 0)} · MVS {formatLocaleNumber(row.forecast.mvsXP, 0)} ·
-                      PPs {formatLocaleNumber(row.forecast.ppsBonusXP, 0)}
-                    </small>
-                    <small>
-                      Top/HL {formatLocaleNumber(row.forecast.topPlayerXP + row.forecast.highlightXP, 0)} · Traits{" "}
-                      {formatSignedPercent(row.forecast.traitModifierPct)}
-                    </small>
-                    <small>
-                      Risiko {row.forecast.fatigueStrain.label} · {row.fatigueWarning}
-                    </small>
-                    <strong>{row.upgradeEstimate}</strong>
-                  </div>
+	                  <div className="training-v2-stat-forecast">
+	                    {row.organicForecast.topGains.map((entry) => (
+	                      <span key={`${row.player.id}-gain-${entry.attribute}`}>
+	                        <small>{entry.attribute}</small>
+	                        <strong>
+	                          {formatLocaleNumber(entry.before, 1)} → {formatLocaleNumber(entry.after, 1)}
+	                        </strong>
+	                        <em>+{formatLocaleNumber(entry.delta, 1)}</em>
+	                      </span>
+	                    ))}
+	                    {row.organicForecast.topLosses.map((entry) => (
+	                      <span className="is-risk" key={`${row.player.id}-loss-${entry.attribute}`}>
+	                        <small>{entry.attribute}</small>
+	                        <strong>
+	                          {formatLocaleNumber(entry.before, 1)} → {formatLocaleNumber(entry.after, 1)}
+	                        </strong>
+	                        <em>{formatLocaleNumber(entry.delta, 1)}</em>
+	                      </span>
+	                    ))}
+	                  </div>
+
+	                  <div className="training-v2-player-foot">
+	                    <small>{row.modeConfig.note}</small>
+	                    <small>
+	                      Klasse {row.organicForecast.classBefore} → {row.organicForecast.classAfter} · Training {row.trainingClass}
+	                    </small>
+	                    <small>
+	                      Performance +{formatLocaleNumber(row.organicForecast.performanceSetpoints, 1)} · Steigerungsstufe {row.forecast.trainingFormTier}
+	                    </small>
+	                    <small>
+	                      Risiko {row.forecast.fatigueStrain.label} · {row.fatigueWarning}
+	                    </small>
+	                  </div>
                 </article>
               );
             })}
@@ -945,6 +1108,13 @@ export default function TrainingFacilitiesV2Client({
                       <span>Naechstes Level</span>
                       <strong>{facility.nextLevelEffect}</strong>
                     </div>
+                  </div>
+                  <div className="training-v2-facility-callout">
+                    <strong>{describeFacilityCondition(facility)}</strong>
+                    <small>{describeFacilityUpkeep(facility)}</small>
+                    {facility.id === "specialist_wing" ? (
+                      <small>{describeSpecialistWingVariant(specialistWingVariant, Math.max(facility.level, 1), Math.max(facility.efficiencyPct, 100))}</small>
+                    ) : null}
                   </div>
                   <FacilityLevelEffectGrid facilityId={facility.id} level={facility.level} />
                   {facility.id === "specialist_wing" && facility.level === 0 ? (
@@ -1258,11 +1428,13 @@ export default function TrainingFacilitiesV2Client({
                       <strong>{selectedDialogFacility.sourceStatus.replaceAll("_", " ")}</strong>
                     </div>
                   </div>
+                  <p className="muted">{describeFacilityCondition(selectedDialogFacility)}</p>
                 </article>
 
                 <article className="training-v2-preview-card">
                   <span>Level-Wirkung</span>
                   <FacilityLevelEffectGrid facilityId={selectedDialogFacility.id} level={selectedDialogFacility.level} />
+                  <p className="muted">{describeFacilityUpkeep(selectedDialogFacility)}</p>
                   {selectedDialogFacility.id === "specialist_wing" && selectedDialogFacility.level === 0 ? (
                     <label className="filter-field">
                       <span>Variante vor Bau</span>
@@ -1280,8 +1452,46 @@ export default function TrainingFacilitiesV2Client({
                       </select>
                     </label>
                   ) : null}
+                  {selectedDialogFacility.id === "specialist_wing" ? (
+                    <div className="training-v2-specialist-note">
+                      <strong>Aktive Variante</strong>
+                      <small>{describeSpecialistWingVariant(specialistWingVariant, Math.max(selectedDialogFacility.level, 1), Math.max(selectedDialogFacility.efficiencyPct, 100))}</small>
+                    </div>
+                  ) : null}
                 </article>
               </section>
+
+              {activeFacilityExplainer ? (
+                <section className="training-v2-facility-logic-grid">
+                  <article className="training-v2-preview-card">
+                    <span>Was passiert jetzt?</span>
+                    <strong>{activeFacilityExplainer.title}</strong>
+                    <p className="muted">{activeFacilityExplainer.body}</p>
+                    <div className="training-v2-logic-pill-row">
+                      {activeFacilityExplainer.bullets.map((bullet) => (
+                        <span className="training-v2-logic-pill" key={bullet}>
+                          {bullet}
+                        </span>
+                      ))}
+                    </div>
+                  </article>
+                  <article className="training-v2-preview-card">
+                    <span>System-Regeln</span>
+                    <strong>Zustand 100% = volle Wirkung</strong>
+                    <p className="muted">
+                      Sinkt der Zustand, faellt auch die Effizienz. Wartung stellt die Wirkung wieder her. Unterhalt ist die laufende Saisonlast und wird
+                      durch Wartung nicht billiger.
+                    </p>
+                    {selectedDialogFacility.id === "specialist_wing" ? (
+                      <div className="training-v2-logic-pill-row">
+                        <span className="training-v2-logic-pill">nur passende Attribute</span>
+                        <span className="training-v2-logic-pill">Variante entscheidet den Rabatt</span>
+                        <span className="training-v2-logic-pill">bester Wert bei starkem Zustand</span>
+                      </div>
+                    ) : null}
+                  </article>
+                </section>
+              ) : null}
 
               <section className="training-v2-facility-action-tabs" aria-label="Gebaeude-Aktion waehlen">
                 <button
@@ -1463,6 +1673,7 @@ export default function TrainingFacilitiesV2Client({
         </div>
       ) : null}
 
+      {showLegacySeasonEndXpPanel ? (
       <section className="training-v2-seasonend">
         <div className="training-v2-section-head">
           <div>
@@ -1637,6 +1848,10 @@ export default function TrainingFacilitiesV2Client({
 
                 {row.organicProgression ? (
                   <div className="training-v2-upgrade-meta is-organic">
+                    <span title="Positive Traits beschleunigen, negative Traits bremsen das organische Wachstum. Signature-Attribute wachsen leichter, Weak-Attribute schwerer.">
+                      Bonus/Malus aktiv · Signature {row.developmentSummary?.signatureAttributes.join(" / ") || "Profil"} · Weak{" "}
+                      {row.developmentSummary?.weakAttribute ?? "offen"}
+                    </span>
                     <span>
                       Training +{formatLocaleNumber(row.organicProgression.trainingSetpoints, 1)} · Performance +
                       {formatLocaleNumber(row.organicProgression.performanceSetpoints, 1)}
@@ -1704,6 +1919,7 @@ export default function TrainingFacilitiesV2Client({
           })}
         </div>
       </section>
+      ) : null}
     </section>
   );
 }

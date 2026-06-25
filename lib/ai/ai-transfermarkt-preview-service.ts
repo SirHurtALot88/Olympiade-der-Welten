@@ -64,6 +64,8 @@ export type AiTransferPreviewRecommendation = {
   cashAfter: number | null;
   rosterAfter: number | null;
   salaryAfter: number | null;
+  teamFit: number | null;
+  needMatchLabel?: string | null;
   fitSummary: string;
   sportsSummary: string;
   budgetReason: string[];
@@ -1013,12 +1015,20 @@ function buildCandidatePreview(
     const player = context.gameState.players.find((candidate) => candidate.id === item.playerId) ?? null;
     const teamRoster = context.gameState.rosters.filter((entry) => entry.teamId === team.teamId);
     const teamSalary = teamRoster.reduce((sum, entry) => sum + (entry.salary ?? entry.upkeep ?? 0), 0);
+    const identity = context.gameState.teamIdentities.find((entry) => entry.teamId === team.teamId) ?? null;
     const contractOffer = recommendContractOfferForPlayer({
       player,
       teamStrategyProfile: getTeamStrategyProfile(context.gameState, team.teamId),
       teamCash: cashBefore,
       marketValue: purchasePrice,
+      teamFit: item.fit,
       currentTeamSalary: teamSalary,
+      teamIdentity: identity,
+      dealRole: item.needMatchLabel ?? null,
+      rosterCountBefore: rosterBefore,
+      teamRosterMin: item.playerMin,
+      teamRosterOpt: item.playerOpt,
+      isFirstSeason: context.seasonId === "season-1",
     });
     const blockingReasons: string[] = [];
 
@@ -1409,6 +1419,8 @@ function toPreviewRecommendation(entry: {
     cashAfter: entry.scored.preview.cashAfter,
     rosterAfter: entry.scored.preview.rosterAfter,
     salaryAfter: entry.scored.preview.salaryAfter,
+    teamFit: entry.item.fit ?? null,
+    needMatchLabel: entry.item.needMatchLabel ?? null,
     fitSummary: entry.scored.fitSummary,
     sportsSummary: entry.scored.sportsSummary,
     budgetReason: entry.scored.budgetReason,

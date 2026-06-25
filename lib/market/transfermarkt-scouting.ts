@@ -51,6 +51,12 @@ export type TransfermarktScoutingDisclosure = {
   exactAttributeValuesVisible: boolean;
 };
 
+export type TransfermarktScoutingVisibilityBuckets = {
+  knowledge: string[];
+  scouted: string[];
+  hidden: string[];
+};
+
 const ATTRIBUTE_SCOUTING_META: Array<{
   key: TransfermarktAttributeKey;
   label: string;
@@ -100,11 +106,11 @@ function getAccuracyFactor(level: number) {
 }
 
 function getSharedBiasAmplitude(level: number) {
-  return [8, 6, 4.5, 3, 1.5, 0][level] ?? 8;
+  return [3.5, 2.5, 1.75, 1, 0.5, 0][level] ?? 3.5;
 }
 
 function getDisciplineNoiseAmplitude(level: number) {
-  return [14, 11, 8, 5.5, 3, 0][level] ?? 14;
+  return [8, 6, 4.5, 3, 1.5, 0][level] ?? 8;
 }
 
 function getNumericNoiseAmplitude(level: number) {
@@ -143,6 +149,56 @@ export function getTransfermarktScoutingDisclosure(level: number | null | undefi
     preferredDisciplinesVisible: normalizedLevel >= 4,
     exactAttributeValuesVisible: normalizedLevel >= 5,
   };
+}
+
+export function getTransfermarktScoutingVisibilityBuckets(
+  level: number | null | undefined,
+): TransfermarktScoutingVisibilityBuckets {
+  const disclosure = getTransfermarktScoutingDisclosure(level);
+  const knowledge = [
+    "MW, Gehalt, Ratio und Potenzialband",
+    "4 Attribute als grobe Bereiche",
+    "Top-Diszis als grobe Slot-Fits",
+    "Deal-Vorschau fuer Cash, Kader und Bedarf",
+  ];
+
+  const scouted: string[] = [];
+  if (disclosure.positiveTraitsVisible > 0) {
+    scouted.push(
+      disclosure.positiveTraitsVisible === 1
+        ? "1 positiver Trait sichtbar"
+        : `${disclosure.positiveTraitsVisible} positive Traits sichtbar`,
+    );
+  }
+  if (disclosure.negativeTraitsVisible) {
+    scouted.push("negative Traits sichtbar");
+  }
+  if (disclosure.preferredDisciplinesVisible) {
+    scouted.push("Trainings-/Diszi-Profil sichtbar");
+  } else if (disclosure.level >= 2) {
+    scouted.push("Trainingsprofil teilweise sichtbar");
+  }
+  if (disclosure.exactAttributeValuesVisible) {
+    scouted.push("alle Attribute exakt sichtbar");
+  } else {
+    scouted.push(disclosure.level >= 4 ? "Attribute als exakte Tier-Bereiche" : "Attribute nur als grobe Range");
+  }
+
+  const hidden: string[] = [];
+  if (disclosure.positiveTraitsVisible < 2) {
+    hidden.push("weitere positive Traits");
+  }
+  if (!disclosure.negativeTraitsVisible) {
+    hidden.push("negative Traits");
+  }
+  if (!disclosure.preferredDisciplinesVisible) {
+    hidden.push("vollstaendiges Trainings-/Diszi-Profil");
+  }
+  if (!disclosure.exactAttributeValuesVisible) {
+    hidden.push("exakte Attributwerte");
+  }
+
+  return { knowledge, scouted, hidden };
 }
 
 export function getScoutedNumericEstimate(input: {
@@ -200,6 +256,10 @@ export function buildScoutedDisciplineTiers(input: {
   const sharedBiasAmplitude = getSharedBiasAmplitude(normalizedLevel);
   const disciplineNoiseAmplitude = getDisciplineNoiseAmplitude(normalizedLevel);
   const meanScore = input.disciplines.reduce((sum, entry) => sum + entry.score, 0) / input.disciplines.length;
+  const sortedRawScores = [...input.disciplines].map((entry) => entry.score).sort((left, right) => right - left);
+  const topScore = sortedRawScores[0] ?? meanScore;
+  const secondScore = sortedRawScores[1] ?? topScore;
+  const thirdScore = sortedRawScores[2] ?? secondScore;
   const sharedBias =
     normalizedLevel >= 5
       ? 0
@@ -217,7 +277,36 @@ export function buildScoutedDisciplineTiers(input: {
         normalizedLevel >= 5
           ? entry.score
           : meanScore + (entry.score - meanScore) * accuracyFactor + sharedBias + disciplineNoise;
-      const displayedScore = roundValue(clamp(displayedScoreRaw, 20, 99), 0);
+      const strengthSignal = clamp((entry.score - meanScore) / 20, -1, 1);
+      const topBandFloor =
+        entry.score >= thirdScore
+          ? topScore >= 78
+            ? 50
+            : topScore >= 70
+              ? 46
+              : topScore >= 60
+                ? 42
+                : 36
+          : entry.score >= secondScore
+            ? topScore >= 78
+              ? 46
+              : topScore >= 70
+                ? 43
+                : topScore >= 60
+                  ? 39
+                  : 34
+            : topScore >= 78
+              ? 42
+              : topScore >= 70
+                ? 39
+                : topScore >= 60
+                  ? 36
+                  : 32;
+      const protectedScoreRaw =
+        normalizedLevel >= 4
+          ? displayedScoreRaw
+          : Math.max(displayedScoreRaw, topBandFloor + Math.max(0, strengthSignal) * (normalizedLevel <= 1 ? 4 : 2));
+      const displayedScore = roundValue(clamp(protectedScoreRaw, 20, 99), 0);
       return {
         disciplineId: entry.disciplineId,
         disciplineName: entry.disciplineName,

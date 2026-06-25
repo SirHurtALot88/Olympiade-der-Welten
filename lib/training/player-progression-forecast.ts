@@ -144,7 +144,7 @@ function buildFatigueStrain(input: {
   traitMultiplier: number;
   hasDisciplinedTrait: boolean;
 }) {
-  const modeBase = input.mode === "hart" ? 62 : input.mode === "mittel" ? 38 : 18;
+  const modeBase = input.mode === "hart" ? 68 : input.mode === "mittel" ? 36 : 10;
   const appearanceLoad = Math.min(input.appearances * 5, 30);
   const traitRelief = input.hasDisciplinedTrait ? 8 : 0;
   const traitPressure = input.traitMultiplier > 1.08 ? 4 : 0;

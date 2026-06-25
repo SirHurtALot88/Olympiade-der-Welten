@@ -774,6 +774,12 @@ export default function PlayerDetailDrawer({
   const transferContext = data.transferContext;
   const isFreeAgent = data.transferStatus.toLowerCase().includes("free");
   const isScoutedProfile = data.attributeVisibility === "scouted";
+  const scoutingLevel = data.scoutingLevel ?? 0;
+  const showScoutedPotentialSummary = !isScoutedProfile || scoutingLevel >= 2;
+  const showScoutedPotentialStars = !isScoutedProfile || scoutingLevel >= 4;
+  const showScoutedDevelopmentSection = !isScoutedProfile || scoutingLevel >= 3;
+  const showScoutedDeepDevelopmentDetails = !isScoutedProfile || scoutingLevel >= 5;
+  const visibleScoutedAttributeChips = isScoutedProfile ? data.attributeStats.filter((entry) => entry.revealed).slice(0, 8) : [];
   const noSeasonPerformanceMessage = isFreeAgent
     ? "Keine gespeicherte Season-Performance."
     : "Aktiver Spieler, aber noch kein gespeicherter Season-Einsatz.";
@@ -983,11 +989,15 @@ export default function PlayerDetailDrawer({
                   </div>
                   <div className="player-drawer-mini-facts">
                     {!isFreeAgent ? <span title={getGameTermTooltip("PPs") ?? undefined}>PPs Rating {formatValue(data.ppsRating, 1)}</span> : null}
-                    <span>Scout-Wert {formatDevelopmentRange(data.developmentInsight)}</span>
+                    {showScoutedPotentialSummary && data.developmentInsight ? (
+                      <span>Scout-Wert {formatDevelopmentRange(data.developmentInsight)}</span>
+                    ) : null}
                     <span>Scouting L{data.scoutingLevel ?? 0}</span>
-                    <span>
-                      <StarRating value={data.developmentInsight?.potentialLabel ?? data.scoutPotential?.starRating} compact />
-                    </span>
+                    {showScoutedPotentialStars && (data.developmentInsight?.potentialLabel ?? data.scoutPotential?.starRating) ? (
+                      <span>
+                        <StarRating value={data.developmentInsight?.potentialLabel ?? data.scoutPotential?.starRating} compact />
+                      </span>
+                    ) : null}
                     <span title={getGameTermTooltip("Erschoepfung") ?? undefined}>Erschoepfung {formatValue(data.fatigue, 0)}</span>
                     <span>Form {formatValue(data.form, 0)}</span>
                   </div>
@@ -1022,6 +1032,27 @@ export default function PlayerDetailDrawer({
                 </div>
               )}
             </div>
+            {isScoutedProfile && visibleScoutedAttributeChips.length ? (
+              <div className="player-drawer-chip-row player-drawer-scout-attribute-row">
+                {visibleScoutedAttributeChips.map((entry) => (
+                  <span
+                    key={`scouted-attribute-${entry.key}`}
+                    className={`player-drawer-chip ${getAttributeTierClass(entry.ratingLabel ?? entry.rangeLabel ?? null)}`}
+                    title={
+                      entry.value != null
+                        ? `${entry.label}: ${formatValue(entry.value, 0)}`
+                        : entry.ratingLabel
+                          ? `${entry.label}: Klasse ${entry.ratingLabel}`
+                          : entry.rangeLabel
+                            ? `${entry.label}: Bereich ${entry.rangeLabel}`
+                            : `${entry.label}: noch verdeckt`
+                    }
+                  >
+                    {entry.label.toUpperCase()} {entry.value != null ? formatValue(entry.value, 0) : entry.ratingLabel ?? entry.rangeLabel ?? "?"}
+                  </span>
+                ))}
+              </div>
+            ) : null}
             {!isScoutedProfile ? (
               <div className="player-drawer-axis-strip" aria-label="Kernwerte mit Liga-Rang">
                 {data.axisCards.map((card) => (
@@ -1147,7 +1178,9 @@ export default function PlayerDetailDrawer({
             <a href="#player-drawer-profile">Profil</a>
             {!isScoutedProfile ? <a href="#player-drawer-axis">Achsen</a> : null}
             <a href="#player-drawer-disciplines">Diszis</a>
-            {developmentLevelup || data.scoutPotential || data.progressionForecast ? <a href="#player-drawer-development">Entwicklung</a> : null}
+            {developmentLevelup || (showScoutedDevelopmentSection && (data.scoutPotential || data.progressionForecast)) ? (
+              <a href="#player-drawer-development">Entwicklung</a>
+            ) : null}
             {isFreeAgent && onOpenBuyPreview ? <a href="#player-drawer-market">Transfer</a> : null}
             <a href="#player-drawer-history">Historie</a>
           </nav>
@@ -1523,6 +1556,27 @@ export default function PlayerDetailDrawer({
                       </span>
                     ))}
                   </div>
+                  <div className="player-drawer-progression-reason-grid" aria-label="Progressionsgruende">
+                    <span title="Positive Traits erhoehen das Trainingsbudget, negative Traits bremsen es.">
+                      <strong>
+                        Traits {data.organicProgression.traitModifierPct > 0 ? "+" : ""}
+                        {formatValue(data.organicProgression.traitModifierPct, 1)}%
+                      </strong>
+                      <small>Bonus/Malus wirkt auf organisches Wachstum</small>
+                    </span>
+                    <span title="Signature-Attribute bekommen positive Entwicklung etwas schneller gutgeschrieben.">
+                      <strong>Signature</strong>
+                      <small>{developmentLevelup?.affinity.signatureAttributes.join(" / ") || "Spielerprofil"}</small>
+                    </span>
+                    <span title="Das schwache Attribut entwickelt sich langsamer und kostet dadurch mehr Geduld.">
+                      <strong>Weak</strong>
+                      <small>{developmentLevelup?.affinity.weakAttribute ?? "Profil offen"}</small>
+                    </span>
+                    <span title="Einsatz und gute Disziplin-Performance zahlen zusaetzliche Setpoints in die Entwicklung ein.">
+                      <strong>Performance +{formatValue(data.organicProgression.performanceSetpoints, 1)}</strong>
+                      <small>Matchday-Anteil nach dieser Season</small>
+                    </span>
+                  </div>
                 </>
               ) : null}
               {data.classHistory.length > 0 ? (
@@ -1538,7 +1592,7 @@ export default function PlayerDetailDrawer({
             </section>
           ) : null}
 
-          {(data.scoutPotential || data.progressionForecast) ? (
+          {showScoutedDevelopmentSection && (data.scoutPotential || data.progressionForecast) ? (
             <section className="player-drawer-section player-drawer-panel" id={developmentLevelup ? undefined : "player-drawer-development"}>
               <h3 title="Kurzfassung: Potential, XP-Bilanz und Upgrade-Status. Details koennen aufgeklappt werden.">Potential & XP</h3>
               <div className="player-drawer-list-grid player-drawer-list-grid-wide">
@@ -1546,7 +1600,10 @@ export default function PlayerDetailDrawer({
                   <article className="metric-card player-drawer-scout-potential-card" title="Potential ist eine gescoutete Spanne, nicht garantiert. Current ist der aktuelle Leistungswert, Gap ist der Abstand zum geschaetzten Potential. Je niedriger Confidence, desto unsicherer die Spanne.">
                     <HelpLabel title="Potential-Spanne = geschaetzter Zielbereich. Current = aktueller Stand. Gap = moegliche Entwicklung. Confidence zeigt, wie sicher das Scouting ist.">Potential</HelpLabel>
                     <strong>
-                      {formatDevelopmentRange(data.developmentInsight)} <StarRating value={data.developmentInsight?.potentialLabel ?? data.scoutPotential.starRating} compact />
+                      {formatDevelopmentRange(data.developmentInsight)}{" "}
+                      {showScoutedPotentialStars ? (
+                        <StarRating value={data.developmentInsight?.potentialLabel ?? data.scoutPotential.starRating} compact />
+                      ) : null}
                     </strong>
                     <small>
                       Current {formatValue(data.developmentInsight?.currentRating, 1)} · Gap{" "}
@@ -1559,7 +1616,7 @@ export default function PlayerDetailDrawer({
                     </small>
                   </article>
                 ) : null}
-                {data.progressionForecast ? (
+                {data.progressionForecast && (!isScoutedProfile || scoutingLevel >= 4) ? (
                   <>
                     <article className="metric-card player-drawer-xp-balance-card" title="Netto-XP = verdiente XP minus Erhaltung und Regression. Positive Netto-XP werden zu freien XP, negative Werte zeigen Rueckschritt-Risiko.">
                       <HelpLabel title="Netto-XP = verdiente XP minus Erhaltung und Rueckschritt. Das ist die wichtigste Entwicklungszahl.">XP-Bilanz</HelpLabel>
@@ -1600,49 +1657,53 @@ export default function PlayerDetailDrawer({
                   </>
                 ) : null}
               </div>
-              <details className="player-drawer-compact-details">
-                <summary>Mehr Entwicklungsdetails</summary>
-                <div className="player-drawer-compact-details-grid">
-                  {data.progressionForecast ? (
-                    <>
+              {showScoutedDeepDevelopmentDetails ? (
+                <details className="player-drawer-compact-details">
+                  <summary>Mehr Entwicklungsdetails</summary>
+                  <div className="player-drawer-compact-details-grid">
+                    {data.progressionForecast ? (
+                      <>
+                        <article className="metric-card">
+                          <HelpLabel title="CA = aktueller Stand. PO = geschaetztes Potential. Je groesser der Abstand, desto mehr Upside.">CA / PO</HelpLabel>
+                          <strong className="player-drawer-star-stack">
+                            <StarRating value={data.progressionForecast.currentAbilityStars} label="CA" />
+                            <StarRating value={data.progressionForecast.potentialStars} label="PO" />
+                          </strong>
+                          <small>
+                            {data.progressionForecast.currentAbilityTier ?? "—"} → {data.progressionForecast.potentialTier ?? "—"}
+                          </small>
+                        </article>
+                        <article className="metric-card">
+                          <span>Spendbare XP</span>
+                          <strong>{formatValue(data.progressionForecast.seasonProjectedXP, 0)}</strong>
+                          <small>negative Netto-XP schreiben keine XP weg</small>
+                        </article>
+                        <article className="metric-card">
+                          <span>Faktoren</span>
+                          <strong>
+                            {data.progressionForecast.trainingFormTier} · {formatSourceFreeDetail(data.progressionForecast.developmentRoute)}
+                          </strong>
+                          <small>
+                            TF x{formatValue(data.progressionForecast.developmentFactors.trainingFormFactor, 2)} · PO x
+                            {formatValue(data.progressionForecast.developmentFactors.potentialGapFactor, 2)}
+                          </small>
+                        </article>
+                      </>
+                    ) : null}
+                    {data.scoutPotential ? (
                       <article className="metric-card">
-                        <HelpLabel title="CA = aktueller Stand. PO = geschaetztes Potential. Je groesser der Abstand, desto mehr Upside.">CA / PO</HelpLabel>
-                        <strong className="player-drawer-star-stack">
-                          <StarRating value={data.progressionForecast.currentAbilityStars} label="CA" />
-                          <StarRating value={data.progressionForecast.potentialStars} label="PO" />
-                        </strong>
-                        <small>
-                          {data.progressionForecast.currentAbilityTier ?? "—"} → {data.progressionForecast.potentialTier ?? "—"}
-                        </small>
-                      </article>
-                      <article className="metric-card">
-                        <span>Spendbare XP</span>
-                        <strong>{formatValue(data.progressionForecast.seasonProjectedXP, 0)}</strong>
-                        <small>negative Netto-XP schreiben keine XP weg</small>
-                      </article>
-                      <article className="metric-card">
-                        <span>Faktoren</span>
+                        <span>Scouting-Faktoren</span>
                         <strong>
-                          {data.progressionForecast.trainingFormTier} · {formatSourceFreeDetail(data.progressionForecast.developmentRoute)}
+                          Route {data.developmentInsight?.developmentRoute ?? "—"} · Growth x{data.scoutPotential.trainingSpeedMultiplier.toFixed(2)}
                         </strong>
                         <small>
-                          TF x{formatValue(data.progressionForecast.developmentFactors.trainingFormFactor, 2)} · PO x
-                          {formatValue(data.progressionForecast.developmentFactors.potentialGapFactor, 2)}
+                          MW Preview {data.scoutPotential.marketValuePotentialPremiumPct > 0 ? "+" : ""}
+                          {formatValue(data.scoutPotential.marketValuePotentialPremiumPct, 1)}%
                         </small>
                       </article>
-                    </>
-                  ) : null}
-                  {data.scoutPotential ? (
-                    <article className="metric-card">
-                      <span>Scouting-Faktoren</span>
-                      <strong>
-                        Route {data.developmentInsight?.developmentRoute ?? "—"} · Growth x{data.scoutPotential.trainingSpeedMultiplier.toFixed(2)}
-                      </strong>
-                      <small>
-                        MW Preview {data.scoutPotential.marketValuePotentialPremiumPct > 0 ? "+" : ""}
-                        {formatValue(data.scoutPotential.marketValuePotentialPremiumPct, 1)}%
-                      </small>
-                </article>
+                    ) : null}
+                  </div>
+                </details>
               ) : null}
               {data.demands.length ? (
                 <article className={`metric-card player-drawer-board-trust-card${getDemandCardTone(data.demands[0].status)}`}>
@@ -1658,8 +1719,7 @@ export default function PlayerDetailDrawer({
                   </div>
                 </article>
               ) : null}
-            </div>
-                {data.developmentInsight?.reasonChips?.length ? (
+                {(!isScoutedProfile || scoutingLevel >= 4) && data.developmentInsight?.reasonChips?.length ? (
                   <div className="player-drawer-chip-row">
                     {data.developmentInsight.reasonChips.slice(0, 6).map((chip) => (
                       <span key={`potential-chip-${chip}`} className="player-drawer-chip">
@@ -1668,8 +1728,10 @@ export default function PlayerDetailDrawer({
                     ))}
                   </div>
                 ) : null}
-                {data.developmentInsight?.recommendation ? <p className="muted">{data.developmentInsight.recommendation}</p> : null}
-                {data.progressionEvents.length > 0 ? (
+                {(!isScoutedProfile || scoutingLevel >= 4) && data.developmentInsight?.recommendation ? (
+                  <p className="muted">{data.developmentInsight.recommendation}</p>
+                ) : null}
+                {(!isScoutedProfile || scoutingLevel >= 4) && data.progressionEvents.length > 0 ? (
                   <div className="player-drawer-callout">
                     <strong>Progression-Events</strong>
                     <ul className="foundation-inline-list">
@@ -1682,7 +1744,6 @@ export default function PlayerDetailDrawer({
                     </ul>
                   </div>
                 ) : null}
-              </details>
             </section>
           ) : null}
 

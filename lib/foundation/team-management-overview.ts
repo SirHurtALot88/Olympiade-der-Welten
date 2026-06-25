@@ -537,10 +537,10 @@ export function buildTeamSeasonOverviewRows(input: TeamManagementSnapshotInput):
       generalManagerInfluencePct: generalManager?.assignment.influencePct ?? null,
       rank: activeRank,
       points: currentVisiblePoints,
-      rosterCount: usesArchivedSnapshotValues ? standing?.rosterCount ?? roster.length : roster.length,
-      salaryTotal: usesArchivedSnapshotValues ? standing?.salaryTotal ?? salaryTotal : salaryTotal,
+      rosterCount: roster.length > 0 ? roster.length : usesArchivedSnapshotValues ? standing?.rosterCount ?? roster.length : roster.length,
+      salaryTotal: roster.length > 0 ? salaryTotal : usesArchivedSnapshotValues ? standing?.salaryTotal ?? salaryTotal : salaryTotal,
       avgContractLength,
-      marketValueTotal: usesArchivedSnapshotValues ? standing?.marketValueTotal ?? marketValueTotal : marketValueTotal,
+      marketValueTotal: roster.length > 0 ? marketValueTotal : usesArchivedSnapshotValues ? standing?.marketValueTotal ?? marketValueTotal : marketValueTotal,
       cash,
       cashFc,
       budget,
@@ -660,13 +660,13 @@ export function buildTeamSeasonOverviewRows(input: TeamManagementSnapshotInput):
       const prizeSummary = prizeSummaryByTeamId.get(row.teamId) ?? null;
       return {
         ...row,
-        cashFc: row.cashFc ?? prizeSummary?.cashForecast ?? null,
-        sponsorBasis: row.sponsorBasis ?? prizeSummary?.basis ?? null,
-        sponsorRank: row.sponsorRank ?? prizeSummary?.placementBonus ?? null,
-        sponsorSeason: row.sponsorSeason ?? prizeSummary?.sponsorSeason ?? null,
-        sponsorTotal: row.sponsorTotal ?? prizeSummary?.sponsorTotal ?? null,
-        guv: row.guv ?? prizeSummary?.profitLoss ?? null,
-        cashTotal: row.cashTotal ?? prizeSummary?.cashTotal ?? null,
+        cashFc: prizeSummary?.cashForecast ?? row.cashFc ?? null,
+        sponsorBasis: prizeSummary?.basis ?? row.sponsorBasis ?? null,
+        sponsorRank: prizeSummary?.placementBonus ?? row.sponsorRank ?? null,
+        sponsorSeason: prizeSummary?.sponsorSeason ?? row.sponsorSeason ?? null,
+        sponsorTotal: prizeSummary?.sponsorTotal ?? row.sponsorTotal ?? null,
+        guv: prizeSummary?.profitLoss ?? row.guv ?? null,
+        cashTotal: prizeSummary?.cashTotal ?? row.cashTotal ?? null,
       };
     })
     .sort((left, right) => {

@@ -412,6 +412,23 @@ export function calculateFormModifierForSide(input: {
   };
 }
 
+export function calculatePerPlayerFormModifier(input: {
+  formModifier?: number | null;
+  selectedPlayers?: number | null;
+  requiredPlayers?: number | null;
+}) {
+  const total = input.formModifier ?? 0;
+  if (!Number.isFinite(total) || total === 0) {
+    return 0;
+  }
+
+  const selectedPlayers = input.selectedPlayers ?? 0;
+  const requiredPlayers = input.requiredPlayers ?? 0;
+  const divisor = selectedPlayers > 0 ? selectedPlayers : requiredPlayers > 0 ? requiredPlayers : 1;
+
+  return Number((total / divisor).toFixed(1));
+}
+
 function countTraitHits(player: LegacyRosterPlayerRef | null, traitSet: Set<string>) {
   if (!player || traitSet.size === 0) {
     return 0;

@@ -1,4 +1,4 @@
-import type { Player, PlayerGeneratorAttributes, RosterEntry } from "@/lib/data/olyDataTypes";
+import type { ContractYearSalary, Player, PlayerGeneratorAttributes, RosterEntry } from "@/lib/data/olyDataTypes";
 import { loadPlayerFormulaSources } from "@/lib/player-formulas/formula-source-loader";
 import {
   calculateMarketValueBonuses,
@@ -22,6 +22,7 @@ type EconomyRosterEntry = {
   purchasePrice?: number | null;
   currentValue?: number | null;
   contractLength?: number | null;
+  yearlySalarySchedule?: ContractYearSalary[] | null;
 };
 
 export type PlayerEconomyMarketValueSource =
@@ -172,7 +173,8 @@ export function resolvePlayerEconomyContract(input: {
   const legacyDisplayMarketValue = normalizeStoredEconomyValue(player?.displayMarketValue);
   const legacyDisplaySalary = normalizeStoredEconomyValue(player?.displaySalary);
   const rosterPurchasePrice = toFiniteNumber(rosterEntry?.purchasePrice);
-  const rosterSalary = toFiniteNumber(rosterEntry?.salary);
+  const rosterScheduledSalary = toFiniteNumber(rosterEntry?.yearlySalarySchedule?.[0]?.salary);
+  const rosterSalary = rosterScheduledSalary ?? toFiniteNumber(rosterEntry?.salary);
   const contractLength = toFiniteNumber(rosterEntry?.contractLength);
   const playerEntity = player as Player | null;
   const formulaSources = loadPlayerFormulaSources();

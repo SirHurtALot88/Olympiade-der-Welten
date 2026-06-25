@@ -3,6 +3,7 @@
 const DISCIPLINE_ICON_BY_KEY: Record<string, string> = {
   basketball: "/discipline-icons/Basketball.png",
   battlefield: "/discipline-icons/Battlefield.png",
+  breaking: "/discipline-icons/Breaking Point.png",
   breakingpoint: "/discipline-icons/Breaking Point.png",
   climbing: "/discipline-icons/Climbing.png",
   eiskunst: "/discipline-icons/Eiskunst.png",

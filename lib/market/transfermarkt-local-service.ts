@@ -289,9 +289,9 @@ function getNeedMatchLabel(score: number | null) {
   if (score == null) {
     return null;
   }
-  if (score >= 62) return "Top-Bedarf";
-  if (score >= 42) return "guter Bedarf";
-  if (score >= 22) return "situativ";
+  if (score >= 72) return "Top-Bedarf";
+  if (score >= 48) return "guter Bedarf";
+  if (score >= 26) return "situativ";
   return "kaum Bedarf";
 }
 
@@ -299,9 +299,9 @@ function getNeedMatchTone(score: number | null): TransfermarktFreeAgentItem["nee
   if (score == null) {
     return null;
   }
-  if (score >= 62) return "strong";
-  if (score >= 42) return "good";
-  if (score >= 22) return "thin";
+  if (score >= 72) return "strong";
+  if (score >= 48) return "good";
+  if (score >= 26) return "thin";
   return "none";
 }
 
@@ -329,39 +329,63 @@ function buildNeedMatchSignal(input: {
     men: input.item.men ?? 0,
     soc: input.item.soc ?? 0,
   };
+  const identityAxisEntries = (Object.entries(input.needs.identityAxisWeights) as Array<[NeedAxis, number]>)
+    .sort((left, right) => right[1] - left[1]);
   const axisNeedEntries = (Object.entries(input.needs.axisDeficits) as Array<[NeedAxis, number]>)
     .filter(([, deficit]) => deficit > 0.04)
     .sort((left, right) => right[1] - left[1]);
+  const identityFitScore = identityAxisEntries.reduce((sum, [axis, weight], index) => {
+    const axisValue = axisValues[axis];
+    const normalized = Math.max(0, Math.min(1, (axisValue - 35) / 30));
+    const priorityMultiplier = index === 0 ? 1.18 : index === 1 ? 1.02 : 0.76;
+    return sum + weight * normalized * 38 * priorityMultiplier;
+  }, 0);
   const weightedAxisScore = axisNeedEntries.reduce((sum, [axis, deficit], index) => {
     const axisValue = axisValues[axis];
-    const specialistLift = Math.max(0, axisValue - 52) / 48;
-    const priorityMultiplier = index === 0 ? 1.25 : index === 1 ? 1.08 : 0.9;
-    return sum + deficit * (axisValue / 100) * 64 * priorityMultiplier + specialistLift * deficit * 12;
+    const normalized = Math.max(0, Math.min(1, (axisValue - 38) / 34));
+    const specialistLift = Math.max(0, axisValue - 58) / 26;
+    const priorityMultiplier = index === 0 ? 1.24 : index === 1 ? 1.08 : 0.92;
+    return sum + deficit * normalized * 34 * priorityMultiplier + specialistLift * deficit * 10;
   }, 0);
   const bestAxisValue = Math.max(axisValues.pow, axisValues.spe, axisValues.men, axisValues.soc);
   const averageAxisValue = (axisValues.pow + axisValues.spe + axisValues.men + axisValues.soc) / 4;
-  const rosterGapScore = input.needs.rosterGap * Math.max(0, Math.min(8, (averageAxisValue - 35) / 8));
+  const rosterGapScore = input.needs.rosterGap * Math.max(0, Math.min(15, (averageAxisValue - 34) / 4.5));
   const belowMinimumPressure =
     input.playerMin != null && input.rosterCount < input.playerMin
       ? Math.max(0, Math.min(1, (input.playerMin - input.rosterCount) / Math.max(input.playerMin, 1)))
       : 0;
   const depthQualityScore =
     belowMinimumPressure > 0
-      ? (4 + Math.max(0, Math.min(6, (bestAxisValue - 42) / 8)) + Math.max(0, Math.min(4, (input.item.marketValueSalaryRatio ?? 0) * 0.8))) *
+      ? (3 + Math.max(0, Math.min(5, (bestAxisValue - 42) / 8)) + Math.max(0, Math.min(4, (input.item.marketValueSalaryRatio ?? 0) * 0.8))) *
         belowMinimumPressure
       : 0;
   const preferredDisciplineScore = input.item.preferredDisciplineIds.some((disciplineId) => input.needs?.topNeedDisciplineIds.includes(disciplineId))
-    ? 12
+    ? 10
     : 0;
-  const valueReliefScore = input.item.marketValueSalaryRatio != null ? Math.min(6, input.item.marketValueSalaryRatio * 0.9) : 0;
+  const valueReliefScore = input.item.marketValueSalaryRatio != null ? Math.min(8, input.item.marketValueSalaryRatio * 1.1) : 0;
   const premiumOverfillPenalty =
     input.playerOpt != null &&
     input.rosterCount >= input.playerOpt &&
     input.item.bracket != null &&
     input.item.bracket <= 2
-      ? 8
+      ? 10
       : 0;
-  const score = roundValue(Math.max(0, Math.min(100, weightedAxisScore + rosterGapScore + depthQualityScore + preferredDisciplineScore + valueReliefScore - premiumOverfillPenalty)), 1);
+  const score = roundValue(
+    Math.max(
+      0,
+      Math.min(
+        100,
+        identityFitScore +
+          weightedAxisScore +
+          rosterGapScore +
+          depthQualityScore +
+          preferredDisciplineScore +
+          valueReliefScore -
+          premiumOverfillPenalty,
+      ),
+    ),
+    1,
+  );
   const axes = input.needs.uncoveredNeedAxes
     .filter((axis) => axisValues[axis] >= 45)
     .sort((left, right) => (input.needs?.axisDeficits[right] ?? 0) * axisValues[right] - (input.needs?.axisDeficits[left] ?? 0) * axisValues[left])
@@ -390,6 +414,7 @@ function buildNeedMatchSignal(input: {
     needMatchAxes: axes,
     needMatchReasons: reasons,
     needMatchBreakdown: {
+      identityFitScore: roundValue(identityFitScore, 1),
       axisScore: roundValue(weightedAxisScore, 1),
       rosterGapScore: roundValue(rosterGapScore, 1),
       depthQualityScore: roundValue(depthQualityScore, 1),
@@ -802,6 +827,7 @@ function buildLocalTransfermarktBuyPreviewFromContext(
     counterChance: negotiationPreview.counterChance,
     rejectChance: negotiationPreview.rejectChance,
     contractPreference: negotiationPreview.contractPreference,
+    demandBreakdown: negotiationPreview.demandBreakdown,
     negotiationScoreBreakdown: negotiationPreview.scoreBreakdown,
     negotiationReasons: negotiationPreview.reasons,
     negotiationWarnings: negotiationPreview.warnings,
@@ -849,12 +875,33 @@ function resolveLocalTransfermarktBuyContext(params: TransfermarktBuyParams): Lo
   const salaryBefore = teamContext?.salaryTotal ?? 0;
   const marketValueBefore = teamContext?.marketValueTotal ?? 0;
   const rosterBefore = teamContext?.rosterCount ?? 0;
+  const recommendedTeamFit =
+    team && player
+      ? calculateTransfermarktFit(player, teamContext?.visiblePlayers ?? [], { teamId: team.teamId }).teamFit
+      : null;
+  const recommendedDealRole =
+    rosterBefore < (teamContext?.playerMin ?? 0)
+      ? "fill"
+      : (marketValueReference ?? 0) >= 70
+        ? "star"
+        : (marketValueReference ?? 0) >= 45
+          ? "core"
+          : (marketValueReference ?? 0) <= 25
+            ? "depth"
+            : "rotation";
   const recommendedContract = recommendContractOfferForPlayer({
     player,
     teamStrategyProfile,
+    teamIdentity,
     teamCash: cashBefore,
     marketValue: marketValueReference,
+    teamFit: recommendedTeamFit,
     currentTeamSalary: salaryBefore,
+    dealRole: recommendedDealRole,
+    rosterCountBefore: rosterBefore,
+    teamRosterMin: teamContext?.playerMin ?? null,
+    teamRosterOpt: teamContext?.playerOpt ?? null,
+    isFirstSeason: gameState.season.id === "season-1",
   });
   const contractLength =
     typeof params.contractLength === "number" && Number.isFinite(params.contractLength)
@@ -1628,6 +1675,7 @@ function executeFastLocalTransfermarktBatchBuy(params: TransfermarktBuyParams, r
     counterChance: 0,
     rejectChance: 0,
     contractPreference: null,
+    demandBreakdown: [],
     negotiationScoreBreakdown: [],
     negotiationReasons: ["fast_local_batch_buy"],
     negotiationWarnings: warnings,

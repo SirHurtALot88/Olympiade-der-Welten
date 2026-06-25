@@ -73,14 +73,15 @@ const INTENSITY_CONFIG: Record<
     label: string;
     scoreModifier: number;
     fatigueBase: number;
+    additionalFatigueCap: number;
     rangeLowPercent: number;
     rangeHighPercent: number;
     strainLoadModifier: number;
   }
 > = {
-  conserve: { label: "Schonen", scoreModifier: -2, fatigueBase: 1, rangeLowPercent: -0.02, rangeHighPercent: 0.01, strainLoadModifier: -1 },
-  normal: { label: "Normal", scoreModifier: 0, fatigueBase: 3, rangeLowPercent: -0.05, rangeHighPercent: 0.05, strainLoadModifier: 0 },
-  push: { label: "Push", scoreModifier: 3, fatigueBase: 4, rangeLowPercent: -0.03, rangeHighPercent: 0.07, strainLoadModifier: 2 },
+  conserve: { label: "Schonen", scoreModifier: -2, fatigueBase: 1, additionalFatigueCap: 5, rangeLowPercent: -0.02, rangeHighPercent: 0.01, strainLoadModifier: -1 },
+  normal: { label: "Normal", scoreModifier: 0, fatigueBase: 3, additionalFatigueCap: 8, rangeLowPercent: -0.05, rangeHighPercent: 0.05, strainLoadModifier: 0 },
+  push: { label: "Push", scoreModifier: 3, fatigueBase: 4, additionalFatigueCap: 11, rangeLowPercent: -0.03, rangeHighPercent: 0.07, strainLoadModifier: 2 },
 };
 
 const DISCIPLINE_ROLE_THEMES: Record<OfficialDisciplineWeightId, SlotRoleTheme[]> = {
@@ -651,14 +652,15 @@ function resolveAdditionalFatigueFromRisk(
     resolveCurrentFatigueFactor(currentFatigueCount) -
     resolvePlayerStrainResistance(strainValue);
   const riskCarry = strainRiskScore >= 4 ? 4 : strainRiskScore >= 2 ? 2 : strainRiskScore >= 1 ? 1 : 0;
+  const uncappedAdditionalFatigue = Math.max(
+    config.fatigueBase + loadScore + disciplineLoad + rivalryLoad + resolveCurrentFatigueFactor(currentFatigueCount) + riskCarry,
+    1,
+  );
 
   return {
     slotStrainLoad,
     strainRiskScore,
-    additionalFatigue: Math.max(
-      config.fatigueBase + loadScore + disciplineLoad + rivalryLoad + resolveCurrentFatigueFactor(currentFatigueCount) + riskCarry,
-      1,
-    ),
+    additionalFatigue: Number(Math.min(uncappedAdditionalFatigue, config.additionalFatigueCap).toFixed(1)),
   };
 }
 

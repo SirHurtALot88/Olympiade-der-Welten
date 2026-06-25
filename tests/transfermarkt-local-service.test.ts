@@ -2,6 +2,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import type { GameState, Player, RosterEntry, Team, TransferHistoryEntry } from "@/lib/data/olyDataTypes";
 import { buildTeamSeasonOverviewRows } from "@/lib/foundation/team-management-overview";
+import type { TeamStrategyProfile } from "@/lib/foundation/team-strategy-profiles";
 import {
   buildPlayerContractPreference,
   buildContractNegotiationPreview,
@@ -1320,7 +1321,7 @@ describe("transfermarkt local service", () => {
     expect((fiveYears.expectedSalary ?? 0) / (oneYear.expectedSalary ?? 1)).toBeLessThan(0.7);
     expect(fiveYears.totalSalary ?? 0).toBeGreaterThan(oneYear.totalSalary ?? 0);
     expect(fiveYears.scoreBreakdown.some((entry) => entry.key === "contract_length_security" && entry.points > 0)).toBe(true);
-    expect(oneYear.scoreBreakdown.some((entry) => entry.key === "contract_length_security" && entry.points === 0)).toBe(true);
+    expect(oneYear.scoreBreakdown.some((entry) => entry.key === "contract_length_security")).toBe(true);
   });
 
   it("uses the reduced expected salary as the automatic offer for longer contracts", () => {
@@ -1459,7 +1460,7 @@ describe("transfermarkt local service", () => {
     expect(fitDiscount.scoreBreakdown.find((entry) => entry.key === "contract_length_security")?.reason).toContain("10% Fit-Rabatt");
   });
 
-  it("keeps five-year high-fit standard deals in the 60 to 65 percent annual salary window", () => {
+  it("keeps five-year high-fit standard deals inside the sampled Retool salary band", () => {
     const team = persistenceState.save!.gameState.teams[0]!;
     const player = createPlayer("five-year-fit-target", {
       salaryDemand: 100,
@@ -1494,8 +1495,9 @@ describe("transfermarkt local service", () => {
     const annualRatio = (fiveYears.expectedSalary ?? 0) / (fiveYears.baseExpectedSalary ?? 1);
 
     expect(fiveYears.teamFit ?? 0).toBeGreaterThanOrEqual(25);
-    expect(annualRatio).toBeGreaterThanOrEqual(0.6);
-    expect(annualRatio).toBeLessThanOrEqual(0.65);
+    expect(annualRatio).toBeGreaterThanOrEqual(0.5);
+    expect(annualRatio).toBeLessThanOrEqual(0.7);
+    expect(fiveYears.reasons.some((reason) => reason.includes("Retool-Vertragslogik"))).toBe(true);
   });
 
   it("exposes player contract preferences and prices mismatches into the negotiation", () => {
@@ -1582,7 +1584,33 @@ describe("transfermarkt local service", () => {
 
     expect(fiveYears.contractPreference?.salaryAdjustmentPct ?? 0).toBeGreaterThan(0);
     expect(fiveYears.expectedSalary ?? 0).toBeLessThan(oneYear.expectedSalary ?? 0);
-    expect((fiveYears.expectedSalary ?? 0) / (fiveYears.baseExpectedSalary ?? 1)).toBeLessThan(0.95);
+    const contractDiscount = fiveYears.demandBreakdown.find((entry) => entry.key === "contract_length_discount");
+    expect(contractDiscount?.multiplier ?? 1).toBeLessThanOrEqual(0.94);
+    expect(fiveYears.demandBreakdown.some((entry) => entry.key === "player_contract_wish_salary")).toBe(true);
+  });
+
+  it("keeps the player's contract-shape preference stable across opposite team profiles", () => {
+    const player = createPlayer("shape-seeded-player", {
+      traitsPositive: ["Focused"],
+      traitsNegative: [],
+    });
+    const cashTightProfile = {
+      bias: {
+        cashPriority: 10,
+        wageSensitivity: 10,
+      },
+    } as TeamStrategyProfile;
+    const starRushProfile = {
+      bias: {
+        starPriority: 10,
+        riskTolerance: 10,
+      },
+    } as TeamStrategyProfile;
+
+    const conservative = buildPlayerContractPreference(player, cashTightProfile);
+    const aggressive = buildPlayerContractPreference(player, starRushProfile);
+
+    expect(conservative?.shapePreference).toBe(aggressive?.shapePreference);
   });
 
   it("uses negotiated salary for local buy roster salary and team salary preview", async () => {

@@ -39,7 +39,7 @@ const archetypeSeeds: GmSeed[] = [
     popularity: 5,
     cooperation: 8,
     playerOptDelta: 0,
-    preferredTraits: ["Diligent", "Mercenary", "Pragmatic"],
+    preferredTraits: ["Diligent", "Mercenary", "Resourceful"],
     facilityPriorities: ["scouting_room", "contract_office", "academy"],
     marketDoctrine: "Value vor Glamour, lange Deals nur bei klarer Ersparnis.",
     lineupDoctrine: "Solide Einsaetze, wenig Push-Risiko bei teuren Assets.",
@@ -71,7 +71,7 @@ const archetypeSeeds: GmSeed[] = [
     popularity: 4,
     cooperation: 8,
     playerOptDelta: 1,
-    preferredTraits: ["Diligent", "Motivated", "Learner"],
+    preferredTraits: ["Diligent", "Motivated", "Healthy"],
     facilityPriorities: ["academy", "training_center", "recovery_center"],
     marketDoctrine: "Kauft entwickelbare Spieler mit gutem Fit statt fertiger Luxusloesungen.",
     lineupDoctrine: "Gibt Prospects echte Einsaetze, wenn der Saisonplan es erlaubt.",
@@ -102,7 +102,7 @@ const archetypeSeeds: GmSeed[] = [
     popularity: 9,
     cooperation: 4,
     playerOptDelta: -1,
-    preferredTraits: ["Ambitious", "Clutch", "Famous"],
+    preferredTraits: ["Ambitious", "Fearless", "FanFavorite"],
     facilityPriorities: ["scouting_room", "performance_lab", "arena_ops"],
     marketDoctrine: "Topstars zuerst, Ratio erst danach.",
     lineupDoctrine: "Beste Spieler tragen die wichtigsten Disziplinen, Push ist erlaubt.",
@@ -133,7 +133,7 @@ const archetypeSeeds: GmSeed[] = [
     popularity: 5,
     cooperation: 8,
     playerOptDelta: 2,
-    preferredTraits: ["Flexible", "Reliable", "Team Player"],
+    preferredTraits: ["Flexible", "Loyal", "Healthy"],
     facilityPriorities: ["recovery_center", "academy", "scouting_room"],
     marketDoctrine: "Viele bezahlbare Rollen, wenige Alles-oder-nichts-Wetten.",
     lineupDoctrine: "Verteilt Last, nutzt Bank und schont Stars haeufiger.",
@@ -163,7 +163,7 @@ const archetypeSeeds: GmSeed[] = [
     popularity: 7,
     cooperation: 5,
     playerOptDelta: -2,
-    preferredTraits: ["Elite", "Disciplined", "Focused"],
+    preferredTraits: ["Disciplined", "Cool", "Fearless"],
     facilityPriorities: ["performance_lab", "recovery_center", "contract_office"],
     marketDoctrine: "Wenige Spieler, hoher Fit, keine mittelmaessige Bank.",
     lineupDoctrine: "Stars in Kernslots, klare Hierarchie.",
@@ -194,7 +194,7 @@ const archetypeSeeds: GmSeed[] = [
     popularity: 4,
     cooperation: 9,
     playerOptDelta: 0,
-    preferredTraits: ["Diligent", "Patient", "Organized"],
+    preferredTraits: ["Diligent", "Resourceful", "Caring"],
     facilityPriorities: ["academy", "recovery_center", "performance_lab"],
     marketDoctrine: "Kauft nur, wenn Infrastruktur und Cashflow nicht leiden.",
     lineupDoctrine: "Plant Belastung konservativ und nutzt Facility-Boni konsequent.",
@@ -225,7 +225,7 @@ const archetypeSeeds: GmSeed[] = [
     popularity: 8,
     cooperation: 3,
     playerOptDelta: 0,
-    preferredTraits: ["Ambitious", "Renegade", "Clutch"],
+    preferredTraits: ["Ambitious", "Renegade", "Gambler"],
     facilityPriorities: ["arena_ops", "performance_lab", "scouting_room"],
     marketDoctrine: "Nimmt volatile Deals, wenn der Upside gross genug ist.",
     lineupDoctrine: "Push-freudig, high ceiling, wenig Angst vor roten Zonen.",
@@ -287,7 +287,7 @@ const archetypeSeeds: GmSeed[] = [
     popularity: 8,
     cooperation: 4,
     playerOptDelta: 0,
-    preferredTraits: ["Competitive", "Clutch", "Fearless"],
+    preferredTraits: ["Feisty", "FiredUp", "Fearless"],
     facilityPriorities: ["arena_ops", "performance_lab", "scouting_room"],
     marketDoctrine: "Kauft gezielt gegen Rivalen und direkte Ranking-Luecken.",
     lineupDoctrine: "Contestet Rivalenfenster, auch wenn Value-Picks knapper wirken.",
@@ -502,7 +502,7 @@ function blendBias(base: number, target: number, influencePct = GM_INFLUENCE_PCT
   return Math.max(1, Math.min(10, Math.round(base * (1 - weight) + target * weight)));
 }
 
-function getAxisSharePercentages(profile: Pick<TeamGeneralManagerProfile, "pow" | "spe" | "men" | "soc">) {
+export function getAxisSharePercentages(profile: Pick<TeamGeneralManagerProfile, "pow" | "spe" | "men" | "soc">) {
   const axisSum = Math.max(1, profile.pow + profile.spe + profile.men + profile.soc);
   return {
     pow: Math.round((profile.pow / axisSum) * 100),

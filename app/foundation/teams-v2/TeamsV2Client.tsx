@@ -44,6 +44,14 @@ function getFocusToneClass(tone: TeamsV2FocusCard["tone"]) {
   return "is-ready";
 }
 
+function formatRelationshipReason(reason: string) {
+  if (reason === "rivalry_win") return "Rivalen geschlagen";
+  if (reason === "rivalry_loss") return "Rivalenduell verloren";
+  if (reason === "rivalry_close_finish") return "knappes Rivalenfenster";
+  if (reason === "ally_shared_success") return "gemeinsamer Erfolg";
+  return reason.replaceAll("_", " ");
+}
+
 export default function TeamsV2Client({
   teams,
   selectedTeam,
@@ -125,8 +133,10 @@ export default function TeamsV2Client({
           <h3>Ally</h3>
           {teamData.relationships.allies.length > 0 ? (
             teamData.relationships.allies.map((team) => (
-              <span key={team.teamId} title={team.reasons.join(" · ")}>
-                {team.shortCode} {team.value}{team.changed ? ` (${team.changeLabel ?? "neu"})` : ""}
+              <span key={team.teamId} className={team.changed ? "has-change" : ""} title={team.reasons.map(formatRelationshipReason).join(" · ")}>
+                <strong>{team.shortCode} {formatNumber(team.value, 1)}</strong>
+                {team.changed ? <em>{team.changeLabel ?? "neu"}</em> : null}
+                {team.changed && team.reasons[0] ? <small>{formatRelationshipReason(team.reasons[0])}</small> : null}
               </span>
             ))
           ) : (
@@ -137,8 +147,10 @@ export default function TeamsV2Client({
           <h3>Rival</h3>
           {teamData.relationships.rivals.length > 0 ? (
             teamData.relationships.rivals.map((team) => (
-              <span key={team.teamId} title={team.reasons.join(" · ")}>
-                {team.shortCode} {team.value}{team.changed ? ` (${team.changeLabel ?? "neu"})` : ""}
+              <span key={team.teamId} className={team.changed ? "has-change" : ""} title={team.reasons.map(formatRelationshipReason).join(" · ")}>
+                <strong>{team.shortCode} {formatNumber(team.value, 1)}</strong>
+                {team.changed ? <em>{team.changeLabel ?? "neu"}</em> : null}
+                {team.changed && team.reasons[0] ? <small>{formatRelationshipReason(team.reasons[0])}</small> : null}
               </span>
             ))
           ) : (

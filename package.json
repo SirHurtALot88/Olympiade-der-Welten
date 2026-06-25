@@ -47,6 +47,7 @@
     "ai:audit-full-repick": "tsx scripts/export-ai-full-repick-audit.ts",
     "ai:audit-clean-redraft-mode": "tsx scripts/audit-clean-redraft-v2-existing.ts",
     "ai:audit-anti-rebuy": "tsx scripts/export-ai-market-anti-rebuy-audit.ts",
+    "ai:audit-pick-scorer-static": "tsx scripts/export-pick-scorer-static-audit.ts",
     "ai:preview-season1": "tsx scripts/export-ai-season1-preview.ts",
     "player:audit-economy-source": "tsx scripts/audit-player-economy-source.ts",
     "player:baseline-audit": "tsx scripts/export-player-baseline-audit.ts",

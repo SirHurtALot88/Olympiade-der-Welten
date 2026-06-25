@@ -43,6 +43,9 @@ describe("foundation transfermarkt ui contract", () => {
     expect(fileText).toContain("Wishlist & Bedarf");
     expect(fileText).toContain("Deal prüfen");
     expect(fileText).toContain("Auf Wishlist");
+    expect(fileText).toContain("scoutingProfileTooltip");
+    expect(fileText).toContain("title={scoutingProfileTooltip}");
+    expect(fileText).toContain("Scouting L");
     expect(fileText).toContain("marketValueBrackets");
     expect(fileText).toContain("Board-Fokus");
     expect(fileText).toContain("Kaufdialog");
@@ -97,6 +100,7 @@ describe("foundation transfermarkt ui contract", () => {
     expect(cssText).toContain(".market-v2-diszi-row.is-speed");
     expect(cssText).toContain(".market-v2-diszi-row.is-mental");
     expect(cssText).toContain(".market-v2-diszi-row.is-social");
+    expect(cssText).toContain(".market-v2-disclosure-grid");
   });
 
   it("shows Transfermarkt V2 training affinities with drawer-style markers", async () => {
@@ -105,11 +109,10 @@ describe("foundation transfermarkt ui contract", () => {
       fs.readFile(globalsPath, "utf8"),
     ]);
 
-    expect(fileText).toContain("Trainings-Affinität");
+    expect(fileText).toContain("market-v2-inline-training");
+    expect(fileText).toContain("market-v2-training-affinity-grid");
     expect(fileText).toContain("market-v2-training-affinity-chip is-signature");
     expect(fileText).toContain("market-v2-training-affinity-chip is-weak");
-    expect(fileText).toContain("★");
-    expect(fileText).toContain("◆");
     expect(cssText).toContain(".market-v2-training-affinity-chip.is-signature");
     expect(cssText).toContain(".market-v2-training-affinity-chip.is-weak");
   });
@@ -141,6 +144,8 @@ describe("foundation transfermarkt ui contract", () => {
     expect(fileText).toContain("settings.ownerSlot === \"user\"");
     expect(fileText).toContain("settings.displayLabel === \"Chris\"");
     expect(fileText).toContain("manageableTeamIds={ownerQuickSwitchTeams.map((team) => team.teamId)}");
+    expect(fileText).toContain("targetControl?.ownerSlot === \"user\"");
+    expect(fileText).toContain("activeOwnerId: resolvedOwnerId");
   });
 
   it("keeps scouting values intentionally fuzzy instead of exposing exact hidden truths", async () => {
@@ -173,6 +178,15 @@ describe("foundation transfermarkt ui contract", () => {
     expect(drawerText).toContain("relationships:");
     expect(drawerText).toContain("formatRelationshipList");
     expect(cssText).toContain(".team-drawer-relationship-chip");
+  });
+
+  it("keeps Transfermarkt V2 buy dialog negotiation affordances", async () => {
+    const fileText = await fs.readFile(transfermarktV2Path, "utf8");
+
+    expect(fileText).toContain("Kaufdialog");
+    expect(fileText).toContain("Auto-Angebot");
+    expect(fileText).toContain("resetBuyDemandFrame");
+    expect(fileText).toContain("Spieler ist noch angefressen");
   });
 
   it("keeps the lineup coach wording tied to the new candidate quality flow", async () => {

@@ -398,10 +398,26 @@ function getSportTarget(input: {
 
   if (currentRank != null) {
     if (currentRank >= 29) return { rank: 27, label: "Survival: nicht Bottom 5" };
-    if (currentRank >= 25) return { rank: 24, label: "Bottom 8 vermeiden" };
-    if (currentRank >= 21) return { rank: 20, label: "Top-20-Anschluss finden" };
-    if (currentRank >= 17) return { rank: 16, label: "Mittelfeld erreichen" };
-    if (currentRank >= 13) return { rank: 12, label: "Breite Playoff-Zone erreichen" };
+    if (currentRank >= 25) {
+      return weakMiddle || !strengthReady
+        ? { rank: 24, label: "Bottom 8 vermeiden" }
+        : { rank: 20, label: "Top-20-Anschluss finden" };
+    }
+    if (currentRank >= 21) {
+      return weakMiddle || !strengthReady
+        ? { rank: 24, label: "Rebuild ohne Absturz" }
+        : { rank: 20, label: "Top-20-Anschluss finden" };
+    }
+    if (currentRank >= 17) {
+      return weakMiddle && !strengthReady
+        ? { rank: 18, label: "Mittelfeldkontakt herstellen" }
+        : { rank: 16, label: "Mittelfeld erreichen" };
+    }
+    if (currentRank >= 13) {
+      return topThird && strengthReady
+        ? { rank: 12, label: "Breite Playoff-Zone erreichen" }
+        : { rank: 16, label: "Mittelfeld erreichen" };
+    }
   }
 
   if (code === "M-M") {
