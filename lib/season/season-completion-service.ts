@@ -9,6 +9,9 @@ import { runWithSaveRecovery } from "@/lib/persistence/atomic-save-write";
 import type { PersistenceService } from "@/lib/persistence/types";
 import { upsertTeamRelationshipEvents, type TeamRelationshipEventApplyResult } from "@/lib/rivalries/team-relationship-dynamics";
 import { buildSeasonAiLineupAudit, type SeasonAiLineupAudit } from "@/lib/season/season-ai-lineup-audit-service";
+import {
+  applyTeamSeasonObjectiveRewards,
+} from "@/lib/board/team-season-objectives-service";
 import { buildSeasonReview, type SeasonReview } from "@/lib/season/season-review-service";
 import {
   createSeasonSnapshot,
@@ -27,7 +30,7 @@ export const SEASON_COMPLETION_CONFIRM_TOKEN = "COMPLETE_LOCAL_SEASON_PIPELINE";
 export type SeasonCompletionStepStatus = "planned" | "applied" | "already_done" | "blocked" | "skipped";
 
 export type SeasonCompletionStep = {
-  key: "season_check" | "season_review" | "cash_apply" | "relationships" | "snapshot" | "transition" | "ai_audit";
+  key: "season_check" | "season_review" | "objective_rewards" | "cash_apply" | "relationships" | "snapshot" | "transition" | "ai_audit";
   label: string;
   status: SeasonCompletionStepStatus;
   warnings: string[];
@@ -243,7 +246,46 @@ async function runLocalSeasonCompletionUnsafe(
   );
 
   const afterCashSave = resolveLocalSave(persistence, initialSave.saveId);
-  const relationshipApply = upsertTeamRelationshipEvents(afterCashSave.gameState);
+  const objectiveRewardPreview = applyTeamSeasonObjectiveRewards(afterCashSave.gameState, {
+    saveId: afterCashSave.saveId,
+    seasonId,
+    execute: false,
+  });
+  const existingObjectiveRewardLog =
+    (afterCashSave.gameState.seasonState.objectiveRewardApplyLogs ?? []).find((log) => log.seasonId === seasonId) ?? null;
+  const shouldApplyObjectiveRewards = !dryRun && blockingReasons.size === 0 && !existingObjectiveRewardLog;
+  const objectiveRewardApply = shouldApplyObjectiveRewards
+    ? applyTeamSeasonObjectiveRewards(afterCashSave.gameState, {
+        saveId: afterCashSave.saveId,
+        seasonId,
+        execute: true,
+      })
+    : objectiveRewardPreview;
+  if (shouldApplyObjectiveRewards && objectiveRewardApply.applied) {
+    persistence.saveSingleplayerState(afterCashSave.saveId, objectiveRewardApply.gameState);
+  }
+  addStep(
+    steps,
+    {
+      key: "objective_rewards",
+      label: "Board Objectives",
+      status: existingObjectiveRewardLog
+        ? "already_done"
+        : objectiveRewardApply.applied
+          ? "applied"
+          : completed
+            ? "planned"
+            : "skipped",
+      warnings: objectiveRewardPreview.warnings,
+      blockingReasons: [],
+      auditId: existingObjectiveRewardLog?.id ?? objectiveRewardApply.auditLogId,
+    },
+    warnings,
+    blockingReasons,
+  );
+
+  const afterObjectiveSave = objectiveRewardApply.applied ? resolveLocalSave(persistence, initialSave.saveId) : afterCashSave;
+  const relationshipApply = upsertTeamRelationshipEvents(afterObjectiveSave.gameState);
   const existingRelationshipEvents = afterCashSave.gameState.seasonState.teamRelationshipEvents ?? [];
   const existingRelationshipIds = new Set(existingRelationshipEvents.map((event) => event.eventId));
   const newRelationshipEventCount = relationshipApply.generatedEvents.filter((event) => !existingRelationshipIds.has(event.eventId)).length;
@@ -273,7 +315,7 @@ async function runLocalSeasonCompletionUnsafe(
     blockingReasons,
   );
 
-  const afterRelationshipsSave = shouldApplyRelationships ? resolveLocalSave(persistence, initialSave.saveId) : afterCashSave;
+  const afterRelationshipsSave = shouldApplyRelationships ? resolveLocalSave(persistence, initialSave.saveId) : afterObjectiveSave;
   const existingSnapshot =
     (afterRelationshipsSave.gameState.seasonState.seasonSnapshots ?? []).find((snapshot) => snapshot.seasonId === seasonId) ?? null;
   const snapshot =

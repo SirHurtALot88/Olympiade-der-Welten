@@ -672,7 +672,7 @@ export function resolveSlotRolesForDiscipline(
   disciplineId: string | null | undefined,
   disciplineName: string | null | undefined,
   requiredPlayers: number | null | undefined,
-) {
+): MatchdaySlotRoleDefinition[] {
   const slotCount = Math.max(Math.round(requiredPlayers ?? 0), 0);
   const officialDisciplineId = resolveOfficialDisciplineId(disciplineId, disciplineName);
   if (officialDisciplineId) {
@@ -683,15 +683,15 @@ export function resolveSlotRolesForDiscipline(
     roleId: `generic-${index + 1}`,
     label: `Starter ${index + 1}`,
     description: "Fallback-Rolle bis eine echte Diszi-Rollenmatrix hinterlegt ist.",
-    majorPositiveAttribute: "power",
-    minorPositiveAttribute: "speed",
-    strainAttribute: "stamina",
+    majorPositiveAttribute: "power" as const,
+    minorPositiveAttribute: "speed" as const,
+    strainAttribute: "stamina" as const,
     fatigueProfile: "medium" as const,
     riskLabel: "Fallback-Rolle",
     keyAttributes: [
-      { attribute: "power", weightPct: 40, baseWeightPct: 40, deltaPct: 0, emphasis: "primary" as const },
-      { attribute: "speed", weightPct: 30, baseWeightPct: 30, deltaPct: 0, emphasis: "secondary" as const },
-      { attribute: "stamina", weightPct: 30, baseWeightPct: 30, deltaPct: 0, emphasis: "support" as const },
+      { attribute: "power" as const, weightPct: 40, baseWeightPct: 40, deltaPct: 0, emphasis: "primary" as const },
+      { attribute: "speed" as const, weightPct: 30, baseWeightPct: 30, deltaPct: 0, emphasis: "secondary" as const },
+      { attribute: "stamina" as const, weightPct: 30, baseWeightPct: 30, deltaPct: 0, emphasis: "support" as const },
     ],
   }));
 }
@@ -826,4 +826,49 @@ export function calculateMatchdayProjectedPreview(input: {
     strainRiskScore,
     warnings,
   };
+}
+
+export const SLOT_ROLE_RESOLVE_SCORING_ENABLED = true;
+
+export function calculateSideSlotRoleModifierTotal(input: {
+  disciplineId: string;
+  disciplineSide: "d1" | "d2";
+  entries: Array<{ playerId: string; slotIndex: number }>;
+  rosterPlayers: Array<{ id: string; attributeStats?: PlayerAttributeSheetStats | null }>;
+  disciplineScores: Array<{ playerId: string; disciplineId: string; score: number }>;
+  intensity?: MatchdayIntensityStage;
+  fatigueByPlayerId?: Record<string, { count: number; multiplier: number }> | null;
+  requiredPlayers?: number | null;
+}): number {
+  if (!SLOT_ROLE_RESOLVE_SCORING_ENABLED || input.entries.length === 0) {
+    return 0;
+  }
+
+  const roles = resolveSlotRolesForDiscipline(
+    input.disciplineId,
+    input.disciplineId,
+    input.requiredPlayers ?? input.entries.length,
+  );
+  const scoreByPlayer = new Map(input.disciplineScores.map((entry) => [`${entry.playerId}::${entry.disciplineId}`, entry.score]));
+  const rosterById = new Map(input.rosterPlayers.map((player) => [player.id, player]));
+  const intensity = input.intensity ?? "normal";
+
+  return Number(
+    input.entries
+      .reduce((sum, entry) => {
+        const role = roles[entry.slotIndex] ?? null;
+        const rosterPlayer = rosterById.get(entry.playerId) ?? null;
+        const baseScore = scoreByPlayer.get(`${entry.playerId}::${input.disciplineId}`) ?? null;
+        const preview = calculateMatchdayProjectedPreview({
+          baseScore,
+          role,
+          attributeStats: rosterPlayer?.attributeStats ?? null,
+          currentFatigueCount: input.fatigueByPlayerId?.[entry.playerId]?.count ?? 0,
+          requiredPlayers: input.requiredPlayers ?? input.entries.length,
+          intensity,
+        });
+        return sum + preview.roleModifier;
+      }, 0)
+      .toFixed(1),
+  );
 }
