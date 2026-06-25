@@ -707,6 +707,158 @@ function buildSlotFitExplanation(
   };
 }
 
+type CandidateAxisKey = "pow" | "spe" | "men" | "soc";
+
+type CandidateAxisReasonChip = {
+  axis: CandidateAxisKey;
+  label: string;
+  rating: string | null;
+  tone: string;
+  weightPct: number;
+  detail: string;
+};
+
+type SlotMicroStepState = "done" | "current" | "open";
+
+const attributeAxisKeys: Partial<Record<keyof PlayerAttributeSheetStats, CandidateAxisKey>> = {
+  power: "pow",
+  health: "pow",
+  stamina: "pow",
+  determination: "pow",
+  speed: "spe",
+  dexterity: "spe",
+  awareness: "spe",
+  intelligence: "men",
+  will: "men",
+  spirit: "men",
+  charisma: "soc",
+  torment: "soc",
+};
+
+const axisReasonLabels: Record<CandidateAxisKey, string> = {
+  pow: "POW",
+  spe: "SPE",
+  men: "MEN",
+  soc: "SOC",
+};
+
+const axisReasonToneClasses: Record<CandidateAxisKey, string> = {
+  pow: "is-pow",
+  spe: "is-spe",
+  men: "is-men",
+  soc: "is-soc",
+};
+
+function buildCandidateAxisReasonChips(
+  role: MatchdaySlotRoleDefinition | null,
+  rosterCard: Pick<LineupPlayerTableRow, "attributeStats" | "attributeRatings"> | null,
+): CandidateAxisReasonChip[] {
+  if (!role || !rosterCard) {
+    return [];
+  }
+
+  const roleAttributes = role.keyAttributes?.length
+    ? role.keyAttributes.slice(0, 4)
+    : [
+        { attribute: role.majorPositiveAttribute, weightPct: 100, deltaPct: 0, emphasis: "primary" as const },
+        { attribute: role.minorPositiveAttribute, weightPct: 70, deltaPct: 0, emphasis: "secondary" as const },
+        { attribute: role.strainAttribute, weightPct: 40, deltaPct: 0, emphasis: "support" as const },
+      ];
+  const axisMap = new Map<CandidateAxisKey, CandidateAxisReasonChip>();
+
+  for (const attribute of roleAttributes) {
+    if (attribute.emphasis === "support") {
+      continue;
+    }
+    const axis = attributeAxisKeys[attribute.attribute];
+    if (!axis) {
+      continue;
+    }
+    const rating = rosterCard.attributeRatings?.[attribute.attribute] ?? null;
+    const value = rosterCard.attributeStats?.[attribute.attribute] ?? null;
+    const detail = `${axisReasonLabels[axis]} ${rating ?? (value != null ? Math.round(value) : "—")} · Slot ${formatDecimalScore(attribute.weightPct, 0)}%`;
+    const existing = axisMap.get(axis);
+    if (!existing || attribute.weightPct > existing.weightPct) {
+      axisMap.set(axis, {
+        axis,
+        label: axisReasonLabels[axis],
+        rating,
+        tone: axisReasonToneClasses[axis],
+        weightPct: attribute.weightPct,
+        detail,
+      });
+    }
+  }
+
+  return (["pow", "spe", "men", "soc"] as const)
+    .map((axis) => axisMap.get(axis))
+    .filter((chip): chip is CandidateAxisReasonChip => chip != null)
+    .slice(0, 3);
+}
+
+function resolveSlotMicroStepStates(input: {
+  hasSelection: boolean;
+  isActiveSlot: boolean;
+  isHoveredAssign: boolean;
+  isRecentlyAssigned: boolean;
+}): Record<"choose" | "assign" | "next", SlotMicroStepState> {
+  if (input.hasSelection) {
+    return {
+      choose: "done",
+      assign: "done",
+      next: input.isRecentlyAssigned ? "current" : "done",
+    };
+  }
+  if (!input.isActiveSlot) {
+    return { choose: "open", assign: "open", next: "open" };
+  }
+  if (input.isHoveredAssign) {
+    return { choose: "done", assign: "current", next: "open" };
+  }
+  return { choose: "current", assign: "open", next: "open" };
+}
+
+function LegacyLineupCandidateReasonChips({ chips }: { chips: CandidateAxisReasonChip[] }) {
+  if (!chips.length) {
+    return null;
+  }
+
+  return (
+    <div className="legacy-lineup-candidate-reason-chips" aria-label="Achsen-Begruendung">
+      {chips.map((chip) => (
+        <span key={`${chip.axis}-${chip.label}`} className={`legacy-lineup-candidate-reason-chip ${chip.tone}`} title={chip.detail}>
+          {chip.label} {chip.rating ?? "—"}
+        </span>
+      ))}
+    </div>
+  );
+}
+
+function LegacyLineupSlotMicroSteps({
+  stepStates,
+}: {
+  stepStates: Record<"choose" | "assign" | "next", SlotMicroStepState>;
+}) {
+  const steps = [
+    { key: "choose" as const, label: "Waehlen" },
+    { key: "assign" as const, label: "Einsetzen" },
+    { key: "next" as const, label: "Naechster Slot" },
+  ];
+
+  return (
+    <div className="legacy-lineup-slot-micro-steps" aria-label="Slot Mikro-Schritte">
+      {steps.map((step, index) => (
+        <span
+          key={step.key}
+          className={`legacy-lineup-slot-micro-step is-${stepStates[step.key]}${index < steps.length - 1 ? " has-arrow" : ""}`}
+        >
+          <strong>{step.label}</strong>
+        </span>
+      ))}
+    </div>
+  );
+}
+
 function getDragFitTierClass(fitTier: LegacyLineupDragFitTier | null) {
   switch (fitTier) {
     case "best":
@@ -2777,6 +2929,7 @@ export default function LegacyLineupLabClient(props: LegacyLineupLabClientProps)
               scoreDelta,
               fitSummary: fitExplanation.summary,
               fitDetail: fitExplanation.detail,
+              reasonChips: buildCandidateAxisReasonChips(role, rosterCard),
             };
           });
 
@@ -6194,6 +6347,14 @@ export default function LegacyLineupLabClient(props: LegacyLineupLabClientProps)
                 ? `${activeSlotSpotlightCandidates[0].groupMeta.label} · ${formatNullableScore(activeSlotSpotlightCandidates[0].activeSlotCandidate?.projectedScore)}`
                 : "Slot waehlen"}
             </small>
+            {activeSlot && activeSlotSpotlightCandidates[0] ? (
+              <LegacyLineupCandidateReasonChips
+                chips={buildCandidateAxisReasonChips(
+                  slotRoleByKey.get(activeSlot.key) ?? null,
+                  activeSlotSpotlightCandidates[0].player,
+                )}
+              />
+            ) : null}
           </button>
           <div className={`legacy-lineup-flow-card is-${getDisciplineIntensity(focusedDisciplineSide)}`}>
             <span>Einsatz</span>
@@ -7651,6 +7812,9 @@ export default function LegacyLineupLabClient(props: LegacyLineupLabClientProps)
                         ? ` · ${candidate.activeSlotCandidate.scoreDelta >= 0 ? "+" : ""}${formatDecimalScore(candidate.activeSlotCandidate.scoreDelta, 1)}`
                         : ""}
                     </small>
+                    <LegacyLineupCandidateReasonChips
+                      chips={buildCandidateAxisReasonChips(slotRoleByKey.get(activeSlot.key) ?? null, candidate.player)}
+                    />
                     <em>{candidate.activeSlotCandidate?.fitSummary ?? candidate.detail}</em>
                   </button>
                 ))}
@@ -8392,6 +8556,12 @@ export default function LegacyLineupLabClient(props: LegacyLineupLabClientProps)
                           const rivalryPressure = getRivalryPressureForDiscipline(slot.disciplineId);
                           const selectedDemandCount =
                             selectedRosterCard?.demands.filter((demand) => !demand.targetDisciplineId || demand.targetDisciplineId === slot.disciplineId).length ?? 0;
+                          const slotMicroStepStates = resolveSlotMicroStepStates({
+                            hasSelection: Boolean(selections[slot.key]),
+                            isActiveSlot,
+                            isHoveredAssign: hoveredCandidate?.slotKey === slot.key,
+                            isRecentlyAssigned: recentlyAssignedSlotKey === slot.key,
+                          });
                           return (
                             <>
                               <div className="legacy-lineup-arena-slot-head">
@@ -8433,6 +8603,7 @@ export default function LegacyLineupLabClient(props: LegacyLineupLabClientProps)
                                   </span>
                                 </div>
                               </div>
+                              {!isCompactSlot ? <LegacyLineupSlotMicroSteps stepStates={slotMicroStepStates} /> : null}
                               {!isCompactSlot ? (
                                 <div className="legacy-lineup-slot-summary-grid">
                                   <div className="legacy-lineup-slot-summary-card">
@@ -8548,6 +8719,7 @@ export default function LegacyLineupLabClient(props: LegacyLineupLabClientProps)
                                       {candidate.scoreDelta != null ? (
                                         <small>{candidate.scoreDelta >= 0 ? "+" : ""}{formatDecimalScore(candidate.scoreDelta, 1)}</small>
                                       ) : null}
+                                      <LegacyLineupCandidateReasonChips chips={candidate.reasonChips} />
                                       <small>{candidate.fitSummary}</small>
                                     </button>
                                   ))}

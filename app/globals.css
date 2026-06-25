@@ -13162,6 +13162,113 @@ a {
   opacity: 0.62;
 }
 
+.legacy-lineup-flow-card .legacy-lineup-candidate-reason-chips {
+  grid-column: 1 / -1;
+}
+
+.legacy-lineup-slot-micro-steps {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 6px;
+  margin: 0 0 8px;
+}
+
+.legacy-lineup-slot-micro-step {
+  position: relative;
+  display: grid;
+  place-items: center;
+  min-height: 34px;
+  padding: 6px 8px;
+  border-radius: 10px;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  background: rgba(255, 255, 255, 0.03);
+  text-align: center;
+}
+
+.legacy-lineup-slot-micro-step strong {
+  color: rgba(214, 227, 246, 0.72);
+  font-size: 0.68rem;
+  font-weight: 900;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+.legacy-lineup-slot-micro-step.has-arrow::after {
+  content: "→";
+  position: absolute;
+  right: -8px;
+  top: 50%;
+  transform: translateY(-50%);
+  color: rgba(214, 227, 246, 0.34);
+  font-size: 0.72rem;
+  font-weight: 900;
+  pointer-events: none;
+}
+
+.legacy-lineup-slot-micro-step.is-current {
+  border-color: rgba(132, 188, 255, 0.38);
+  background:
+    radial-gradient(circle at 12% 0%, rgba(132, 188, 255, 0.16), transparent 42%),
+    rgba(16, 24, 35, 0.72);
+  box-shadow: 0 0 0 1px rgba(132, 188, 255, 0.08);
+}
+
+.legacy-lineup-slot-micro-step.is-current strong {
+  color: #f7fbff;
+}
+
+.legacy-lineup-slot-micro-step.is-done {
+  border-color: rgba(142, 228, 155, 0.3);
+  background: rgba(142, 228, 155, 0.08);
+}
+
+.legacy-lineup-slot-micro-step.is-done strong {
+  color: #eaffef;
+}
+
+.legacy-lineup-candidate-reason-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+  grid-column: 1 / -1;
+}
+
+.legacy-lineup-candidate-reason-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 2px 7px;
+  border-radius: 999px;
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  background: rgba(255, 255, 255, 0.05);
+  color: #eef6ff;
+  font-size: 0.64rem;
+  font-weight: 900;
+  letter-spacing: 0.04em;
+  line-height: 1.2;
+}
+
+.legacy-lineup-candidate-reason-chip.is-pow {
+  border-color: rgba(239, 68, 68, 0.28);
+  background: rgba(185, 61, 55, 0.18);
+}
+
+.legacy-lineup-candidate-reason-chip.is-spe {
+  border-color: rgba(74, 222, 128, 0.28);
+  background: rgba(70, 136, 65, 0.18);
+}
+
+.legacy-lineup-candidate-reason-chip.is-men {
+  border-color: rgba(96, 165, 250, 0.28);
+  background: rgba(63, 111, 190, 0.18);
+}
+
+.legacy-lineup-candidate-reason-chip.is-soc {
+  border-color: rgba(250, 204, 21, 0.28);
+  background: rgba(240, 178, 71, 0.16);
+  color: #fff7e6;
+}
+
 .legacy-lineup-flow-card:not(:disabled):hover,
 .legacy-lineup-flow-card:not(:disabled):focus-visible {
   transform: translateY(-1px);

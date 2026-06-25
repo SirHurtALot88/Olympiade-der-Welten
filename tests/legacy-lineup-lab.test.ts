@@ -246,6 +246,13 @@ describe("legacy lineup lab helpers", () => {
     expect(fileText).toContain("legacy-lineup-arena-slot");
     expect(fileText).toContain("legacy-lineup-slot-drag-callout");
     expect(fileText).toContain("legacy-lineup-slot-fit-pill");
+    expect(fileText).toContain("legacy-lineup-slot-micro-steps");
+    expect(fileText).toContain("LegacyLineupSlotMicroSteps");
+    expect(fileText).toContain("Waehlen");
+    expect(fileText).toContain("Naechster Slot");
+    expect(fileText).toContain("legacy-lineup-candidate-reason-chip");
+    expect(fileText).toContain("LegacyLineupCandidateReasonChips");
+    expect(fileText).toContain("buildCandidateAxisReasonChips");
     expect(fileText).toContain("getDragFitTierClass");
     expect(fileText).toContain("resolveLegacyLineupDragBlockReason");
     expect(fileText).toContain("handleDropOnSlot");
