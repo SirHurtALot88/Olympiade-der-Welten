@@ -26,7 +26,9 @@ describe("game inbox UI contract", () => {
     expect(source).toContain('command.section === "Lexikon" ? 1000 : 0');
     expect(source).toContain('data-testid="foundation-hq-gm-story"');
     expect(source).toContain("exactLabelMatch");
-    expect(source).toContain("acknowledgedFlowStepIds");
+    expect(source).toContain("handleHumanLineupSaved");
+    expect(source).toContain("reloadLiveSeasonState");
+    expect(source).toContain('item.itemId.startsWith("lineup_missing:")');
     expect(source).toContain("activeViewHandlesOwnSpace");
     expect(source).toContain('gameFlowActionStep.stepId === "advance_to_next_matchday"');
     expect(source).toContain("runCockpitMatchdayAdvance(true)");

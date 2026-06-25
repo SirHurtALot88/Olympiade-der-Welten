@@ -1091,6 +1091,13 @@ export default function TransfermarktV2Client({
   }, [effectiveOwnerId, manageableTeamIds, teamControlModesByTeamId, teamControlOwnersByTeamId]);
   const wishlistPlayerIdSet = useMemo(() => new Set(wishlistPlayerIds), [wishlistPlayerIds]);
   const [selectedTeamId, setSelectedTeamId] = useState<string>(defaultTeamId ?? "");
+  const selectedTeamIdManuallyChangedRef = useRef(false);
+  useEffect(() => {
+    if (!defaultTeamId || selectedTeamIdManuallyChangedRef.current) {
+      return;
+    }
+    setSelectedTeamId((current) => (current === defaultTeamId ? current : defaultTeamId));
+  }, [defaultTeamId]);
   const [search, setSearch] = useState("");
   const deferredSearch = useDeferredValue(search);
   const [sortMode, setSortMode] = useState<MarketSortMode>("potential");
@@ -2182,6 +2189,7 @@ export default function TransfermarktV2Client({
         counterSalary != null && activeSalaryOffer != null
           ? Number((counterSalary - activeSalaryOffer).toFixed(2))
           : null;
+      void persistNegotiationOutcome(buyPreview, "countered");
       setOfferedSalary(counterSalary);
       setSalaryEditedManually(true);
       setBuyNegotiationOutcome({
@@ -2245,7 +2253,8 @@ export default function TransfermarktV2Client({
     const shouldApplyAbortMalus =
       source === "sqlite" &&
       selectedTeamCanManage &&
-      Boolean(buyPreview?.player?.id && buyNegotiationOutcome);
+      Boolean(buyPreview?.player?.id && buyNegotiationOutcome) &&
+      buyNegotiationOutcome?.status !== "accepted";
     setBuyModalOpen(false);
     setBuyModalWishlistEntry(null);
     setBuyNegotiationOutcome(null);
@@ -2436,7 +2445,14 @@ export default function TransfermarktV2Client({
       <section className="market-v2-topbar">
         <label className="filter-field">
           <span>Fokus-Team</span>
-          <select className="input" value={selectedTeamId} onChange={(event) => setSelectedTeamId(event.target.value)}>
+          <select
+            className="input"
+            value={selectedTeamId}
+            onChange={(event) => {
+              selectedTeamIdManuallyChangedRef.current = true;
+              setSelectedTeamId(event.target.value);
+            }}
+          >
             <option value="">Markt-Überblick</option>
             {teamOptions.map((team) => (
               <option key={team.teamId} value={team.teamId}>

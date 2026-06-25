@@ -636,7 +636,7 @@ export default function TrainingFacilitiesV2Client({
   const [facilityDialog, setFacilityDialog] = useState<FacilityDialogState>(null);
   const teamLogo = getTeamLogoModel(selectedTeam);
   const readOnly = source === "prisma" || managementLocked;
-  const trainingModeReadOnly = false;
+  const trainingModeReadOnly = readOnly;
   const showLegacySeasonEndXpPanel = false;
   const facilityLaneActionReason =
     readOnly
