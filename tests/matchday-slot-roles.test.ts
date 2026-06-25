@@ -2,9 +2,11 @@ import { describe, expect, it } from "vitest";
 
 import {
   calculateMatchdayProjectedPreview,
+  calculateSideSlotRoleModifierTotal,
   getMatchdayIntensityConfig,
   resolveSlotRolesForDiscipline,
 } from "@/lib/lineups/matchday-slot-roles";
+import { scoreLegacyLineupDisciplineSide } from "@/lib/lineups/legacy-score-engine";
 
 describe("matchday slot roles", () => {
   it("loads the expected roles for Fechten", () => {
@@ -393,5 +395,60 @@ describe("matchday slot roles", () => {
     expect(push.rivalryPressureModifier).toBe(1.5);
     expect(push.additionalFatigue).toBeGreaterThan(normal.additionalFatigue);
     expect(push.warnings).toContain("Rivalitaetsdruck: Push-Streuung +1.5");
+  });
+
+  it("feeds resolve scoring with the same slot role modifier total used in preview", () => {
+    const entries = [{ playerId: "p-1", slotIndex: 0 }];
+    const rosterPlayers = [
+      {
+        id: "p-1",
+        attributeStats: {
+          power: 80,
+          health: 70,
+          stamina: 55,
+          intelligence: 45,
+          awareness: 45,
+          determination: 45,
+          speed: 45,
+          dexterity: 45,
+          charisma: 45,
+          will: 45,
+          spirit: 45,
+          torment: 70,
+        },
+      },
+    ];
+    const disciplineScores = [{ playerId: "p-1", disciplineId: "mini-dm", score: 65 }];
+    const slotRoleModifier = calculateSideSlotRoleModifierTotal({
+      disciplineId: "fechten",
+      disciplineSide: "d1",
+      entries,
+      rosterPlayers,
+      disciplineScores: [{ playerId: "p-1", disciplineId: "fechten", score: 65 }],
+      intensity: "normal",
+      requiredPlayers: 1,
+    });
+    const score = scoreLegacyLineupDisciplineSide({
+      disciplineId: "fechten",
+      disciplineSide: "d1",
+      entries: entries.map((entry) => ({ ...entry, disciplineId: "fechten", disciplineSide: "d1", activePlayerId: "a-1" })),
+      disciplineScores: [{ playerId: "p-1", disciplineId: "fechten", score: 65 }],
+      rosterPlayers,
+      requiredPlayers: 1,
+      fatigueSourceStatus: "mapped",
+      fatigueByPlayerId: { "p-1": { count: 0, multiplier: 1 } },
+      slotRoleModifier,
+      formCardStatus: "ready",
+      formCardsAvailable: 0,
+      formCardsSelected: 0,
+      formModifier: 0,
+      mutatorModifier: 0,
+      mutatorBonusByPlayerId: {},
+      teamPowerStatus: "ready",
+      teamPowerModifier: 0,
+      captainStatus: "mapped",
+    });
+
+    expect(score.slotRoleModifier).toBe(slotRoleModifier);
   });
 });

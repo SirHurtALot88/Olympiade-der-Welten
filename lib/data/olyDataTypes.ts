@@ -263,6 +263,19 @@ export type CashPrizeApplyLogRecord = {
   createdAt: string;
 };
 
+export type ObjectiveRewardApplyLogRecord = {
+  id: string;
+  saveId: string;
+  seasonId: string;
+  action: "apply";
+  payload: {
+    totalCashDelta: number;
+    totalBoardConfidenceDelta: number;
+    appliedTeams: number;
+  };
+  createdAt: string;
+};
+
 export type MatchdayAdvanceLogRecord = {
   id: string;
   saveId: string;
@@ -1888,6 +1901,7 @@ export type SeasonState = {
   standingsApplyLogs?: StandingsApplyAuditLogRecord[];
   cashPrizeApplyLogs?: CashPrizeApplyLogRecord[];
   matchdayAdvanceLogs?: MatchdayAdvanceLogRecord[];
+  objectiveRewardApplyLogs?: ObjectiveRewardApplyLogRecord[];
   formCards?: FormCardRecord[];
   formCardPlans?: FormCardPlanRecord[];
   teamPowers?: TeamPowerRecord[];
