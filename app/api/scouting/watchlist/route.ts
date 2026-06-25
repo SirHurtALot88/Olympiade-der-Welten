@@ -75,7 +75,15 @@ export async function POST(request: Request) {
 
     if (!dryRun) {
       persistence.saveSingleplayerState(saveId, nextGameState);
-      notifyRoomGameplayWrite(writeAuth, { saveId, teamId, action: "buy" });
+      notifyRoomGameplayWrite(writeAuth, {
+        saveId,
+        teamId,
+        action: "scouting_watchlist",
+        eventType: "save_updated",
+        affectedViews: ["home", "scouting"],
+        dryRun: false,
+        success: true,
+      });
     }
 
     return NextResponse.json({

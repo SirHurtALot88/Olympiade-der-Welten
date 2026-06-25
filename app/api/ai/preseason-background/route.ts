@@ -10,7 +10,7 @@ import { runAiPicksExecutePreview } from "@/lib/ai/ai-picks-run-service";
 import type { AiPreseasonAutomationRunRecord, GameState } from "@/lib/data/olyDataTypes";
 import {
   buildTeamControlSettingsMap,
-  DEFAULT_ACTIVE_OWNER_ID,
+  withNormalizedTeamControlSettings,
 } from "@/lib/foundation/team-control-settings";
 import { LOCAL_TRANSFER_WINDOW_PHASE } from "@/lib/market/transfer-window-policy";
 import { createPersistenceService } from "@/lib/persistence/persistence-service";
@@ -29,63 +29,19 @@ function getAiTeamIds(gameState: GameState) {
 
 function getProtectedHumanTeamIds(gameState: GameState) {
   return new Set(
-    [
-      gameState.seasonState.newGameFlow?.selectedTeamId ?? null,
-      ...gameState.teams
-        .filter((team) => team.humanControlled !== false)
-        .map((team) => team.teamId),
-      ...Object.values(gameState.seasonState.teamControlSettings ?? {})
-        .filter((settings) => settings.controlMode === "manual")
-        .map((settings) => settings.teamId),
-    ].filter((teamId): teamId is string => Boolean(teamId)),
+    Object.values(gameState.seasonState.teamControlSettings ?? {})
+      .filter((settings) => settings.controlMode === "manual")
+      .map((settings) => settings.teamId),
   );
 }
 
 function protectSelectedHumanTeams(gameState: GameState): GameState {
-  const protectedHumanTeamIds = getProtectedHumanTeamIds(gameState);
-  if (protectedHumanTeamIds.size === 0) return gameState;
-
-  const existingControl = buildTeamControlSettingsMap(gameState.teams, gameState.seasonState.teamControlSettings);
-  return {
-    ...gameState,
-    teams: gameState.teams.map((team) =>
-      protectedHumanTeamIds.has(team.teamId)
-        ? { ...team, humanControlled: true }
-        : team,
-    ),
-    seasonState: {
-      ...gameState.seasonState,
-      teamControlSettings: {
-        ...existingControl,
-        ...Object.fromEntries(
-          [...protectedHumanTeamIds].map((teamId) => {
-            const team = gameState.teams.find((entry) => entry.teamId === teamId);
-            const current = existingControl[teamId];
-            return [
-              teamId,
-              {
-                ...current,
-                teamId,
-                controlMode: "manual" as const,
-                ownerId: current?.ownerId && current.ownerId !== "ai" ? current.ownerId : DEFAULT_ACTIVE_OWNER_ID,
-                ownerSlot: current?.ownerSlot && current.ownerSlot !== "ai" ? current.ownerSlot : "user",
-                displayLabel: current?.displayLabel ?? team?.shortCode ?? teamId,
-                aiLineupPreviewEnabled: false,
-                aiLineupApplyEnabled: false,
-                aiLineupAutoApplyEnabled: false,
-                aiTransferPreviewEnabled: false,
-                aiTransferAutoApplyEnabled: false,
-                aiSellPreviewEnabled: false,
-                aiSellAutoApplyEnabled: false,
-                notes: current?.notes ?? null,
-                strategyLock: current?.strategyLock ?? null,
-              },
-            ];
-          }),
-        ),
-      },
-    },
-  };
+  const normalized = withNormalizedTeamControlSettings(gameState);
+  const humanTeamIds = getProtectedHumanTeamIds(gameState);
+  if (humanTeamIds.size === 0) return gameState;
+  const control = buildTeamControlSettingsMap(normalized.teams, normalized.seasonState.teamControlSettings);
+  const anyChanged = [...humanTeamIds].some((id) => control[id]?.controlMode !== "manual");
+  return anyChanged ? normalized : gameState;
 }
 
 function isStaleRunningRun(run: AiPreseasonAutomationRunRecord | null) {

@@ -17,6 +17,8 @@ type SponsorChooseBody = {
   saveId?: string;
   teamId?: string;
   offerId?: string;
+  termSeasons?: 1 | 2 | 3;
+  negotiationProfile?: "safe" | "balanced" | "ambitious";
   dryRun?: boolean;
   source?: "sqlite" | "prisma";
   roomCode?: string | null;
@@ -104,7 +106,14 @@ export async function POST(request: Request) {
     }
 
     const preparedState = ensureSeasonSponsorOffers(save.gameState);
-    const result = chooseSponsorOffer({ gameState: preparedState, teamId, offerId, saveId });
+    const result = chooseSponsorOffer({
+      gameState: preparedState,
+      teamId,
+      offerId,
+      saveId,
+      termSeasons: 1,
+      negotiationProfile: body.negotiationProfile ?? "balanced",
+    });
     if (result.error) {
       return NextResponse.json({ success: false, error: result.error, summary: null }, { status: 400 });
     }
@@ -115,6 +124,10 @@ export async function POST(request: Request) {
         saveId,
         teamId,
         action: "sponsor_choice",
+        eventType: "save_updated",
+        affectedViews: ["home", "sponsor"],
+        dryRun: false,
+        success: true,
       });
     }
 

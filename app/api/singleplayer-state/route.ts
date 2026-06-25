@@ -27,6 +27,7 @@ import {
 } from "@/lib/persistence/foundation-save-mode";
 import { buildScenarioMeta } from "@/lib/persistence/scenario-meta";
 import type { PersistenceService, SaveSummary } from "@/lib/persistence/types";
+import { refreshTeamObjectiveState } from "@/lib/board/team-season-objectives-service";
 import { buildContractNegotiationDraft } from "@/lib/market/contract-negotiation-preview";
 import type { TransfermarktBuyPreview } from "@/lib/market/transfermarkt-buy-service";
 import { getActiveRoomBySaveId } from "@/lib/room/room-store";
@@ -43,11 +44,6 @@ type SaveActionBody =
       stepId: NewGameFlowStepId;
       status: NewGameFlowStepStatus;
       selectedTeamId?: string | null;
-    }
-  | {
-      action: "select-manager-team";
-      saveId: string;
-      selectedTeamId: string;
     }
   | {
       action: "contract-negotiation-outcome";
@@ -222,7 +218,7 @@ function loadSqliteResponse(saveId?: string, requestedSaveMode: FoundationSaveMo
     );
   }
 
-  const gameState = withNormalizedLocalTeamSettings(save.gameState);
+  const gameState = refreshTeamObjectiveState(withNormalizedLocalTeamSettings(save.gameState));
 
   return NextResponse.json({
     save: serializeSave({
@@ -386,69 +382,6 @@ export async function POST(request: Request) {
           updatedAt: now,
           completedAt: isHandled ? previousFlow.completedAt ?? now : previousFlow.completedAt ?? null,
         },
-      },
-    });
-
-    save = persistence.saveSingleplayerState(body.saveId, nextGameState);
-  } else if (body.action === "select-manager-team") {
-    if (!body.saveId || !body.selectedTeamId) {
-      return NextResponse.json({ error: "saveId and selectedTeamId are required." }, { status: 400 });
-    }
-
-    const sourceSave = persistence.getSaveById(body.saveId);
-    if (!sourceSave) {
-      return NextResponse.json({ error: "saveId could not be resolved." }, { status: 404 });
-    }
-    if (!sourceSave.gameState.teams.some((team) => team.teamId === body.selectedTeamId)) {
-      return NextResponse.json({ error: "selectedTeamId could not be resolved." }, { status: 404 });
-    }
-
-    const now = new Date().toISOString();
-    const previousFlow = sourceSave.gameState.seasonState.newGameFlow ?? {
-      active: true,
-      selectedTeamId: body.selectedTeamId,
-      steps: [],
-    };
-    const baseSettings = buildTeamControlSettingsMap(
-      sourceSave.gameState.teams,
-      sourceSave.gameState.seasonState.teamControlSettings,
-    );
-    const selectedTeam = sourceSave.gameState.teams.find((team) => team.teamId === body.selectedTeamId);
-    const selectedSettings = baseSettings[body.selectedTeamId];
-    const nextTeamControlSettings = {
-      ...baseSettings,
-      [body.selectedTeamId]: {
-        ...selectedSettings,
-        teamId: body.selectedTeamId,
-        controlMode: "manual" as const,
-        ownerId: DEFAULT_ACTIVE_OWNER_ID,
-        ownerSlot: "user",
-        displayLabel: selectedSettings?.displayLabel ?? selectedTeam?.shortCode ?? body.selectedTeamId,
-        aiLineupPreviewEnabled: false,
-        aiLineupApplyEnabled: false,
-        aiLineupAutoApplyEnabled: false,
-        aiTransferPreviewEnabled: false,
-        aiTransferAutoApplyEnabled: false,
-        aiSellPreviewEnabled: false,
-        aiSellAutoApplyEnabled: false,
-      },
-    };
-    const nextGameState = withNormalizedLocalTeamSettings({
-      ...sourceSave.gameState,
-      teams: sourceSave.gameState.teams.map((team) =>
-        team.teamId === body.selectedTeamId ? { ...team, humanControlled: true } : team,
-      ),
-      seasonState: {
-        ...sourceSave.gameState.seasonState,
-        newGameFlow: {
-          ...previousFlow,
-          active: previousFlow.active ?? true,
-          dismissed: previousFlow.dismissed ?? false,
-          selectedTeamId: body.selectedTeamId,
-          steps: previousFlow.steps ?? [],
-          updatedAt: now,
-        },
-        teamControlSettings: nextTeamControlSettings,
       },
     });
 
