@@ -116,3 +116,34 @@ Checkliste-Punkt 5 für SP vorerst depriorisieren / Ziel-Schwellen anpassen (Gam
 1. **P0** Kaufdialog bei fremden Teams öffnet sich (Ownership-Gate fehlt in Classic UI)
 2. **P0** Verhandlung: kein Malus/Banner, TM-Reload beim Schließen, langsames Gehalts-Preview
 3. **P0** Arena nicht erreichbar trotz voller Einsatzliste + Formkarten
+
+---
+
+## Re-Test nach Merge
+
+**Wann:** Nach Merge von PR [#2](https://github.com/SirHurtALot88/Olympiade-der-Welten/pull/2) (TM/Verhandlung), [#3](https://github.com/SirHurtALot88/Olympiade-der-Welten/pull/3) / [#4](https://github.com/SirHurtALot88/Olympiade-der-Welten/pull/4) (Arena/Gameplay) auf `main`, lokal `main` pullen + Hard Reload.
+
+**Branch-Stand vor Merge:** Fixes nur auf Feature-Branches — dieser Block ist für den User nach Integration.
+
+### 2. Ownership / Rechte (Re-Test)
+
+- [ ] Buy/Sell nur für eigenes Team — Fremdteam: kein Modal, Meldung sichtbar
+- [ ] `selectedTeamId` / Team-Wechsel ohne leeres Modal
+
+### 3. Verhandlung (Re-Test)
+
+- [ ] Abbrechen → Malus-/Fehlermeldung sichtbar (nicht nur nach Reopen)
+- [ ] Modal schließen → **kein** Full-Page TM-Reload
+- [ ] Reopen nach gescheiterter Verhandlung → „angefressen" / Vertrauensbruch-Banner
+
+### 4. Einsatzliste → Arena (Re-Test)
+
+- [ ] 9/9 + Formkarten → Arena startet (oder klarer Blocker-Grund im UI)
+- [ ] Kein stiller Dead-End nach Lineup-Confirm
+
+### 6. Saisonende + V2 Previews (Re-Test)
+
+- [ ] Saisonwechsel-Assistent / Dry-Run erreichbar
+- [ ] Home v2, Scouting Hub, Inbox v2 — Smoke ohne Crash
+
+**Sync:** 2026-06-25 — offen bis User nach Merge durchspielt.
