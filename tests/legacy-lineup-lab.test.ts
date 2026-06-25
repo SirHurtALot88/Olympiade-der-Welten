@@ -208,8 +208,8 @@ describe("legacy lineup lab helpers", () => {
     );
     expect(fileText).toContain("Matchday Room · Lineup Prep");
     expect(fileText).toContain("Matchday Preview");
-    expect(fileText).toContain("D1 Projected Range");
-    expect(fileText).toContain("D2 Projected Range");
+    expect(fileText).toContain("Form Board");
+    expect(fileText).toContain("aiInsightPreview");
     expect(fileText).toContain("Fatigue Cost gesamt");
     expect(fileText).toContain("Captain moeglich");
     expect(fileText).toContain("Aktiv in");

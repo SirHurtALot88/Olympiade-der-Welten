@@ -44,6 +44,7 @@ type ScoreSideInput = {
   moraleByPlayerId?: Record<string, LegacyMoralePerformanceRef> | null;
   fatigueSourceStatus?: "mapped" | "missing_source";
   intensity?: "conserve" | "normal" | "push" | null;
+  slotRoleModifier?: number | null;
   formCardsAvailable?: number | null;
   formCardsSelected?: number | null;
   formModifier?: number | null;
@@ -234,9 +235,11 @@ export function scoreLegacyLineupDisciplineSide(input: ScoreSideInput): LegacyLi
   );
   const mutatorTeamOnlyAdjustment =
     mutatorModifier == null ? 0 : roundPreviewScore(Math.max(0, (mutatorModifier ?? 0) - mutatorScoreAlreadyApplied));
+  const slotRoleModifier = input.slotRoleModifier ?? 0;
   const prePowerScore = roundPreviewScore(
     scoredEntries.reduce((sum, entry) => sum + (entry.finalContribution ?? 0), 0) +
       intensityModifier +
+      slotRoleModifier +
       (formModifier ?? 0) +
       mutatorTeamOnlyAdjustment,
   );
@@ -264,6 +267,7 @@ export function scoreLegacyLineupDisciplineSide(input: ScoreSideInput): LegacyLi
     moraleModifier: moraleStatus === "mapped" ? moraleModifier : null,
     intensity,
     intensityModifier,
+    slotRoleModifier: input.slotRoleModifier ?? null,
     captainStatus,
     captainBonusTotal: captainStatus === "mapped" ? captainBonusTotal : null,
     formCardsAvailable: input.formCardsAvailable ?? null,
