@@ -9,8 +9,15 @@ import type {
   TeamStrategyProfile,
 } from "@/lib/data/olyDataTypes";
 import { buildTeamSeasonOverviewRows, type TeamManagementSnapshotRow } from "@/lib/foundation/team-management-overview";
+import { getTeamDevelopmentTendency } from "@/lib/foundation/team-development-tendency";
 import { getTeamStrategyProfile } from "@/lib/foundation/team-strategy-profiles";
 import { getPrimaryTeamRivalry } from "@/lib/rivalries/team-rivalries";
+import { ensureSeasonSponsorOffers, getTeamSponsorContract } from "@/lib/sponsor/sponsor-offer-service";
+import {
+  evaluateSpecialComponentForObjective,
+  evaluateSponsorImprovementObjective,
+  evaluateSponsorRankObjective,
+} from "@/lib/sponsor/sponsor-objective-evaluator";
 
 export type TeamObjectiveAiBias = {
   teamId: string;
@@ -218,8 +225,10 @@ function getRelativeMetricRank(input: {
 function buildSalaryPressureObjective(input: {
   row: TeamManagementSnapshotRow;
   rowsByTeamId: Map<string, TeamManagementSnapshotRow>;
+  seasonId?: string;
 }): ObjectiveDraft {
-  const targetRatio = 0.45;
+  const isSeasonOne = input.seasonId != null && /season[-_\s]*1\b/i.test(input.seasonId);
+  const targetRatio = isSeasonOne ? 0.55 : 0.5;
   const salaryTotal = input.row.salaryTotal ?? 0;
   const cash = input.row.cash ?? null;
   const salaryRatio = salaryTotal > 0 && cash != null ? salaryTotal / Math.max(1, cash + salaryTotal) : null;
@@ -243,13 +252,13 @@ function buildSalaryPressureObjective(input: {
   return {
     objectiveId: "finance-salary-ratio",
     category: "finance",
-    label: "Gehaltsdruck auf 45% senken",
+    label: "Gehaltsdruck auf 50% senken",
     detail,
     actionHint,
     targetValue: `<= ${targetPercent}%`,
     currentValue: salaryRatio == null ? null : `${currentPercent}%`,
     status: statusForMax(salaryRatio, targetRatio),
-    penaltyCash: salaryRatio != null && salaryRatio > 0.55 ? 4 : undefined,
+    penaltyCash: salaryRatio != null && salaryRatio > 0.62 ? 4 : undefined,
     boardConfidenceDelta: salaryRatio != null && salaryRatio <= targetRatio ? 0.3 : -0.4,
     source: "roster_salary_active_cash",
   };
@@ -582,19 +591,31 @@ function getRosterTarget(row: TeamManagementSnapshotRow) {
 
 function getFacilityObjective(gameState: GameState, team: Team, profile: TeamStrategyProfile | null): ObjectiveDraft {
   const facilities = gameState.seasonState.teamFacilities?.[team.teamId]?.facilities ?? {};
-  const wantsRecovery = (profile?.strategySummary ?? "").toLowerCase().includes("risk") || team.shortCode === "C-S";
+  const identity = gameState.teamIdentities.find((entry) => entry.teamId === team.teamId) ?? null;
+  const developmentTendency = getTeamDevelopmentTendency({ team, identity, profile });
+  const wantsRecovery =
+    (profile?.strategySummary ?? "").toLowerCase().includes("risk") ||
+    (profile?.bias?.riskTolerance ?? 5) >= 8;
   const facilityId = wantsRecovery ? "recovery_center" : "training_center";
   const level = facilities[facilityId]?.level ?? 0;
+  const targetLevel = wantsRecovery
+    ? 1
+    : Math.max(1, Math.round(developmentTendency.trainingFacilityTargetLevel));
+  const developmentFocused = !wantsRecovery && developmentTendency.score >= 0.35;
   return {
     objectiveId: `facility-${facilityId}`,
     category: "facility",
-    label: wantsRecovery ? "Recovery Center aufbauen" : "Trainingszentrum aufbauen",
-    targetValue: "Level >= 1",
+    label: developmentFocused
+      ? `Trainingszentrum L${targetLevel} (Entwicklung)`
+      : wantsRecovery
+        ? "Recovery Center aufbauen"
+        : "Trainingszentrum aufbauen",
+    targetValue: `Level >= ${targetLevel}`,
     currentValue: level,
-    status: level >= 1 ? "completed" : "open",
-    rewardCash: 3,
-    boardConfidenceDelta: level >= 1 ? 0.3 : 0,
-    source: "facility_strategy_profile",
+    status: level >= targetLevel ? "completed" : level >= targetLevel - 1 ? "at_risk" : "open",
+    rewardCash: roundValue(3 + developmentTendency.score * 2, 0),
+    boardConfidenceDelta: level >= targetLevel ? 0.3 : 0,
+    source: developmentFocused ? "team_development_tendency" : "facility_strategy_profile",
   };
 }
 
@@ -1038,6 +1059,89 @@ function selectBoardObjectiveDrafts(input: {
   return picked;
 }
 
+function buildSponsorObjectiveDrafts(input: {
+  gameState: GameState;
+  team: Team;
+  row: TeamManagementSnapshotRow;
+}): ObjectiveDraft[] {
+  const contract = getTeamSponsorContract(input.gameState, input.team.teamId);
+  if (!contract) {
+    return [
+      {
+        objectiveId: "sponsor-choice-pending",
+        category: "sponsor",
+        label: "Sponsor-Vertrag wählen",
+        targetValue: "1 von 3 Angeboten",
+        currentValue: "offen",
+        status: "open",
+        actionHint: "Pre-Season oder Team-Board: einen von drei Sponsoren auswählen.",
+        source: "sponsor_v2_choice_pending",
+      },
+    ];
+  }
+
+  return contract.components.map((component) => {
+    if (component.kind === "base") {
+      return {
+        objectiveId: `sponsor-${component.componentId}`,
+        category: "sponsor",
+        label: component.label,
+        targetValue: component.targetValue,
+        currentValue: contract.payouts.baseFirstPaid ? "1. Rate gezahlt" : "ausstehend",
+        status: contract.payouts.baseSecondPaid ? "completed" : contract.payouts.baseFirstPaid ? "open" : "open",
+        rewardCash: component.rewardCash,
+        boardConfidenceDelta: 0.2,
+        source: "sponsor_v2_contract",
+      };
+    }
+    if (component.kind === "rank") {
+      const target = typeof component.targetValue === "number" ? component.targetValue : 16;
+      const status = evaluateSponsorRankObjective(input.row.rank ?? null, target);
+      return {
+        objectiveId: `sponsor-${component.componentId}`,
+        category: "sponsor",
+        label: component.label,
+        targetValue: `Top ${target}`,
+        currentValue: input.row.rank ?? "—",
+        status,
+        rewardCash: component.rewardCash,
+        penaltyCash: component.penaltyCash,
+        boardConfidenceDelta: status === "completed" ? 0.35 : status === "failed" ? -0.35 : 0,
+        source: "sponsor_v2_contract",
+      };
+    }
+    if (component.kind === "improvement") {
+      const target = typeof component.targetValue === "number" ? component.targetValue : 2;
+      const improvement =
+        contract.startRank != null && input.row.rank != null ? contract.startRank - input.row.rank : null;
+      const status = evaluateSponsorImprovementObjective(contract.startRank, input.row.rank ?? null, target);
+      return {
+        objectiveId: `sponsor-${component.componentId}`,
+        category: "sponsor",
+        label: component.label,
+        targetValue: `+${target}`,
+        currentValue: improvement == null ? "—" : `+${improvement}`,
+        status,
+        rewardCash: component.rewardCash,
+        boardConfidenceDelta: status === "completed" ? 0.3 : 0,
+        source: "sponsor_v2_contract",
+      };
+    }
+    const status = evaluateSpecialComponentForObjective(input.gameState, input.team.teamId, component);
+    return {
+      objectiveId: `sponsor-${component.componentId}`,
+      category: "sponsor",
+      label: component.label,
+      targetValue: component.targetValue,
+      currentValue: status === "completed" ? "erfüllt" : "offen",
+      status,
+      rewardCash: component.rewardCash,
+      boardConfidenceDelta: status === "completed" ? 0.4 : 0,
+      source: "sponsor_v2_contract",
+    };
+  });
+}
+
 function buildTeamObjectives(input: {
   gameState: GameState;
   team: Team;
@@ -1093,7 +1197,7 @@ function buildTeamObjectives(input: {
         boardConfidenceDelta: (row.cash ?? 0) >= 0 ? 0.4 : -1,
         source: "active_local_team_cash",
       },
-      buildSalaryPressureObjective({ row, rowsByTeamId }),
+      buildSalaryPressureObjective({ row, rowsByTeamId, seasonId: gameState.season.id }),
       transferObjective,
       getRosterTarget(row),
       getFormColorObjective(gameState, team),
@@ -1109,8 +1213,9 @@ function buildTeamObjectives(input: {
       getRivalryObjective({ gameState, team, row, rowsByTeamId }),
     ].filter((objective): objective is ObjectiveDraft => Boolean(objective)),
   });
+  const sponsorDrafts = buildSponsorObjectiveDrafts({ gameState, team, row });
 
-  return objectiveDrafts.map((objective) => ({
+  return [...objectiveDrafts, ...sponsorDrafts].map((objective) => ({
     seasonId: gameState.season.id,
     teamId: team.teamId,
     source: objective.source ?? "board_objective_generator_v1",
@@ -1266,7 +1371,7 @@ export function buildTeamObjectiveOverview(gameState: GameState): TeamObjectiveO
   const objectives: TeamSeasonObjectiveRecord[] = [];
   const boardConfidence: Record<string, TeamBoardConfidenceRecord> = {};
   const aiBiasByTeamId: Record<string, TeamObjectiveAiBias> = {};
-  const warnings = ["sponsor_objective_source_missing"];
+  const warnings: string[] = [];
 
   for (const team of gameState.teams) {
     const row = rowsByTeamId.get(team.teamId);
@@ -1522,16 +1627,17 @@ export function getTeamObjectiveAiBias(gameState: GameState, teamId: string) {
 }
 
 export function refreshTeamObjectiveState(gameState: GameState): GameState {
-  const overview = buildTeamObjectiveOverview(gameState);
+  const withSponsors = ensureSeasonSponsorOffers(gameState);
+  const overview = buildTeamObjectiveOverview(withSponsors);
   const currentSeasonId = gameState.season.id;
   const otherSeasonObjectives = (gameState.seasonState.teamSeasonObjectives ?? []).filter(
     (objective) => objective.seasonId !== currentSeasonId,
   );
 
   return {
-    ...gameState,
+    ...withSponsors,
     seasonState: {
-      ...gameState.seasonState,
+      ...withSponsors.seasonState,
       teamSeasonObjectives: [...otherSeasonObjectives, ...overview.objectives],
       boardConfidence: {
         ...(gameState.seasonState.boardConfidence ?? {}),

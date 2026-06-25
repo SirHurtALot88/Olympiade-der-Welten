@@ -4956,7 +4956,7 @@ function scoreCandidate(input: {
     ),
     1,
   );
-  const duplicateProfilePenalty = roundValue(-clamp(axisCount * 2 + classCount * 1.5, 0, 12), 1);
+  const duplicateProfilePenalty = roundValue(-clamp(axisCount * 2.8 + classCount * 1.5, 0, 17), 1);
   const offThemePenalty = roundValue(
     -clamp(
       strategyFitResult.reasons.filter((entry) => entry.includes("vermeidete") || entry.includes("unerwuenschte") || entry.includes("Hard-No-Go")).length * 4 +

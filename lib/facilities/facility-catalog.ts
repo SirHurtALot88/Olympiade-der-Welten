@@ -73,11 +73,11 @@ export const FACILITY_CATALOG: FacilityCatalogEntry[] = [
     effectType: "training_xp",
     effectDescription: "Base Training XP Modifier",
     levels: [
-      { level: 1, effectDescription: "+5% Base Training XP", upgradeCost: 8, seasonUpkeep: 0.8, modifierPct: 5 },
-      { level: 2, effectDescription: "+10% Base Training XP", upgradeCost: 15, seasonUpkeep: 1.4, modifierPct: 10 },
-      { level: 3, effectDescription: "+15% Base Training XP", upgradeCost: 25, seasonUpkeep: 2.4, modifierPct: 15 },
-      { level: 4, effectDescription: "+20% Base Training XP", upgradeCost: 40, seasonUpkeep: 3.8, modifierPct: 20 },
-      { level: 5, effectDescription: "+25% Base Training XP", upgradeCost: 62, seasonUpkeep: 5.5, modifierPct: 25 },
+      { level: 1, effectDescription: "+3% Base Training XP", upgradeCost: 8, seasonUpkeep: 0.8, modifierPct: 3 },
+      { level: 2, effectDescription: "+6% Base Training XP", upgradeCost: 15, seasonUpkeep: 1.4, modifierPct: 6 },
+      { level: 3, effectDescription: "+10% Base Training XP", upgradeCost: 25, seasonUpkeep: 2.4, modifierPct: 10 },
+      { level: 4, effectDescription: "+13% Base Training XP", upgradeCost: 40, seasonUpkeep: 3.8, modifierPct: 13 },
+      { level: 5, effectDescription: "+15% Base Training XP", upgradeCost: 62, seasonUpkeep: 5.5, modifierPct: 15 },
     ],
   },
   {

@@ -742,12 +742,13 @@ export function scoreFormColorStackPenalty(input: { needState: TeamNeedState; ca
   const identityRelief = formAxis === input.needState.topAxis ? 0.78 : formAxis === input.needState.secondAxis ? 0.88 : 1;
   const realHoleRelief = clamp(Number(input.marginalGain?.bestDisciplineGain01 ?? 0) / 0.86, 0, 0.55);
   const diversityPressure = clamp(
-    input.needState.formColorDiversityNeed01 + missingTargetColors.length * 0.18 + Math.max(0, afterShare - 0.42) * 1.4,
+    input.needState.formColorDiversityNeed01 + missingTargetColors.length * 0.23 + Math.max(0, afterShare - 0.42) * 1.82,
     0,
     1,
   );
-  const penalty = (overTarget * 8.5 + afterShare * 24) * diversityPressure * identityRelief * (1 - realHoleRelief * 0.35);
-  return round(clamp(penalty, 0, 56), 4);
+  const overloadMultiplier = afterShare >= 0.65 ? 1.5 : 1.0;
+  const penalty = (overTarget * 8.5 + afterShare * 24) * diversityPressure * identityRelief * (1 - realHoleRelief * 0.35) * overloadMultiplier;
+  return round(clamp(penalty, 0, 72), 4);
 }
 
 export function scoreInAxisHoleCompletion(input: { needState: TeamNeedState; marginalGain: MarginalNeedGain }) {

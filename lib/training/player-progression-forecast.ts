@@ -1,6 +1,10 @@
-import type { GameState, Player, PlayerDisciplinePerformanceRecord } from "@/lib/data/olyDataTypes";
+import type { GameState, Player, PlayerDisciplinePerformanceRecord, TeamFacilityCollection } from "@/lib/data/olyDataTypes";
 import type { PlayerRatingContractRow } from "@/lib/foundation/player-rating-contract";
 import type { PlayerSeasonPerformanceSummary } from "@/lib/foundation/player-season-performance";
+import { applyTrainingXpFacilityModifiers, getFacilityLevel, getTeamFacilityState } from "@/lib/facilities/facility-effects";
+import { getTeamDevelopmentTrainingBonusPct } from "@/lib/foundation/team-development-tendency";
+import { buildPlayerStarScoutingSnapshot } from "@/lib/scouting/player-star-scouting-bridge";
+import { getEffectiveScoutingLevel } from "@/lib/scouting/facility-scout-pipeline-service";
 import { buildPlayerScoutPotentialFromGameState } from "@/lib/progression/player-potential-service";
 import {
   DEVELOPMENT_MAX_LEVEL_UPS_PER_SEASON,
@@ -26,17 +30,17 @@ export const PLAYER_PROGRESSION_XP_CONSTANTS = {
     mittel: 70,
     hart: 110,
   } satisfies Record<PlayerTrainingMode, number>,
-  appearanceXp: 15,
+  appearanceXp: 20,
   mvsMultiplier: 4,
   ppsBonusMultiplier: 4,
   ppsBonusCapPctOfMvsXp: 0.35,
   ppsBonusNoMvsCap: 35,
-  top10BonusMin: 8,
+  top10BonusMin: 10,
   top10BonusMax: 35,
-  rank1BonusMin: 35,
+  rank1BonusMin: 42,
   rank1BonusMax: 70,
   highlightBonusMin: 10,
-  highlightBonusMax: 35,
+  highlightBonusMax: 42,
   ratingTierUpgradeCost: {
     F: 45,
     E: 55,
@@ -546,8 +550,14 @@ export function buildPlayerProgressionForecast(input: {
   spentXP?: number | null;
   lifetimeXP?: number | null;
   boardTrustScore?: number | null;
+  facilities?: TeamFacilityCollection | null;
 }) {
   const mode = getTrainingMode(input.player, input.trainingModeByPlayerId);
+  const rosterEntry = input.gameState.rosters.find((entry) => entry.playerId === input.player.id);
+  const facilities =
+    input.facilities ??
+    (rosterEntry ? getTeamFacilityState(input.gameState, rosterEntry.teamId) : null);
+  const trainingCenterLevel = getFacilityLevel(facilities, "training_center");
   const traitSignal = buildTrainingTraitSignal({
     traitsPositive: input.player.traitsPositive,
     traitsNegative: input.player.traitsNegative,
@@ -576,6 +586,13 @@ export function buildPlayerProgressionForecast(input: {
 
   const baseTrainingXPBeforePotential = PLAYER_PROGRESSION_XP_CONSTANTS.trainingByMode[mode];
   const baseTrainingXP = roundValue(baseTrainingXPBeforePotential * potentialTrainingMultiplier, 0);
+  const developmentTrainingBonusPct = rosterEntry
+    ? getTeamDevelopmentTrainingBonusPct(input.gameState, rosterEntry.teamId)
+    : 0;
+  const facilityTrainingXp = applyTrainingXpFacilityModifiers(baseTrainingXP, facilities, {
+    developmentTrainingBonusPct,
+  });
+  const facilityTrainingDelta = facilityTrainingXp.after - facilityTrainingXp.before;
   const appearanceXP = appearances * PLAYER_PROGRESSION_XP_CONSTANTS.appearanceXp;
   const mvsXP = isFiniteNumber(mvs) ? roundValue(mvs * PLAYER_PROGRESSION_XP_CONSTANTS.mvsMultiplier, 0) : 0;
   const ppsBonusXP = calculatePpsBonusXp(pps, mvsXP);
@@ -644,11 +661,14 @@ export function buildPlayerProgressionForecast(input: {
     }),
     buildEvent({
       type: "facility_modifier",
-      label: "Facility-Modifikatoren",
-      xpBeforeTraits: 0,
-      traitModifierPct: 0,
-      traitMultiplier: 1,
-      sourceStatus: "future_source",
+      label:
+        facilityTrainingXp.modifierPct > 0
+          ? `Training Center +${facilityTrainingXp.modifierPct}%`
+          : "Kein Training-Center-Bonus",
+      xpBeforeTraits: facilityTrainingDelta,
+      traitModifierPct,
+      traitMultiplier,
+      sourceStatus: trainingCenterLevel > 0 ? "ready" : "missing_source",
     }),
   ];
 
@@ -657,6 +677,16 @@ export function buildPlayerProgressionForecast(input: {
   const performanceXP = withTraits(appearanceXP + mvsXP + ppsBonusXP + topPlayerXP + highlightXP, traitMultiplier);
   const currentAbilityRating = getCurrentAbility({ player: input.player, playerRating: input.playerRating });
   const potentialRating = scoutPotential.scoutRating ?? (input.player.potential > 0 ? input.player.potential : currentAbilityRating);
+  const scoutingTeamId = rosterEntry?.teamId ?? null;
+  const axisStarSnapshot =
+    scoutingTeamId != null && getEffectiveScoutingLevel(input.gameState, scoutingTeamId, input.player.id) > 0
+      ? buildPlayerStarScoutingSnapshot({
+          gameState: input.gameState,
+          player: input.player,
+          saveId: input.gameState.season.id,
+          scoutingLevel: getEffectiveScoutingLevel(input.gameState, scoutingTeamId, input.player.id),
+        })
+      : null;
   const trainingFormTier = getTrainingFormTier(buildTrainingFormScore(input.player, mode));
   const developmentLevelProgress = getDevelopmentLevelProgress(
     input.lifetimeXP ?? input.player.lifetimeXP ?? (input.currentXP ?? input.player.currentXP ?? 0) + (input.spentXP ?? input.player.spentXP ?? 0),
@@ -706,10 +736,10 @@ export function buildPlayerProgressionForecast(input: {
     developmentRoute,
     currentAbilityRating,
     currentAbilityTier: getRatingTier(currentAbilityRating),
-    currentAbilityStars: getStarLabel(currentAbilityRating),
+    currentAbilityStars: axisStarSnapshot?.revealedCurrentStars.displayLabel ?? getStarLabel(currentAbilityRating),
     potentialRating,
     potentialTier: getRatingTier(potentialRating),
-    potentialStars: getStarLabel(potentialRating),
+    potentialStars: axisStarSnapshot?.revealedPotentialStars.displayLabel ?? getStarLabel(potentialRating),
     developmentFactors: netDevelopment.developmentFactors,
     maintenanceBreakdown: netDevelopment.maintenanceBreakdown,
     regressionBreakdown: netDevelopment.regressionBreakdown,
@@ -740,7 +770,7 @@ export function buildPlayerProgressionForecast(input: {
       mvs: isFiniteNumber(mvs) ? "ready" : "missing_source",
       pps: isFiniteNumber(pps) ? "ready" : "missing_source",
       highlights: mvpCount > 0 || highlightCount > 0 ? "ready" : "missing_source",
-      facilities: "future_source",
+      facilities: trainingCenterLevel > 0 ? "ready" : "missing_source",
       writes: "preview_only",
     },
 	    audit: {

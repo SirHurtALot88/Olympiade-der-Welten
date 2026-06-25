@@ -1001,8 +1001,8 @@ function selectScoringPool(input: {
   const baseLimit = Math.max(80, Math.floor(input.cap * baseShare));
   const selected = new Map<string, Candidate>();
   const fitRows = [...indexed].sort((left, right) => {
-    const leftScore = left.premiumAxisFit * 0.55 + left.identityFit * 0.35 + left.themePriority * 8 - left.salary * 0.4;
-    const rightScore = right.premiumAxisFit * 0.55 + right.identityFit * 0.35 + right.themePriority * 8 - right.salary * 0.4;
+    const leftScore = left.premiumAxisFit * 0.50 + left.identityFit * 0.45 + left.themePriority * 8 - left.salary * 0.4;
+    const rightScore = right.premiumAxisFit * 0.50 + right.identityFit * 0.45 + right.themePriority * 8 - right.salary * 0.4;
     if (rightScore !== leftScore) return rightScore - leftScore;
     return compareByDeterministicPlayerTie(left.candidate.player.id, right.candidate.player.id, "fit_pool");
   });
