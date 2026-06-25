@@ -3359,14 +3359,21 @@ export default function LegacyLineupLabClient(props: LegacyLineupLabClientProps)
     slots,
   ]);
 
+  const allAvailablePlayersDeployed = useMemo(() => {
+    const totalActive = context?.activePlayers?.length ?? 0;
+    if (totalActive === 0) return false;
+    const assignedIds = new Set(entries.map((e) => e.activePlayerId).filter(Boolean));
+    return assignedIds.size >= totalActive;
+  }, [context?.activePlayers?.length, entries]);
+
   const lineupReadyToSave = useMemo(() => {
     return (
-      matchdayPreviewCards.openSlots === 0 &&
+      (matchdayPreviewCards.openSlots === 0 || allAvailablePlayersDeployed) &&
       duplicateSelections.length === 0 &&
       !captainBudgetExceeded &&
       entries.length > 0
     );
-  }, [captainBudgetExceeded, duplicateSelections.length, entries.length, matchdayPreviewCards.openSlots]);
+  }, [allAvailablePlayersDeployed, captainBudgetExceeded, duplicateSelections.length, entries.length, matchdayPreviewCards.openSlots]);
 
   const lineupFlowSummary = useMemo(() => {
     const d1Required = context?.matchdayContract?.discipline1?.requiredPlayers ?? 0;
@@ -3630,21 +3637,23 @@ export default function LegacyLineupLabClient(props: LegacyLineupLabClientProps)
 	      detail: string;
 	      tone: "ready" | "warning" | "blocked";
 	    }> = [];
-	    if (matchdayPreviewCards.openSlots > 0) {
-	      items.push({
-	        key: "open-slots",
-	        label: "Slots",
-	        detail: `${matchdayPreviewCards.openSlots} offen`,
-	        tone: "blocked",
-	      });
-	    } else {
-	      items.push({
-	        key: "open-slots",
-	        label: "Slots",
-	        detail: `${lineupFlowSummary.selectedCount}/${lineupFlowSummary.totalRequired || "—"} voll`,
-	        tone: "ready",
-	      });
-	    }
+    if (matchdayPreviewCards.openSlots > 0) {
+      items.push({
+        key: "open-slots",
+        label: "Slots",
+        detail: allAvailablePlayersDeployed
+          ? `${matchdayPreviewCards.openSlots} offen · alle Spieler eingesetzt`
+          : `${matchdayPreviewCards.openSlots} offen`,
+        tone: allAvailablePlayersDeployed ? "warning" : "blocked",
+      });
+    } else {
+      items.push({
+        key: "open-slots",
+        label: "Slots",
+        detail: `${lineupFlowSummary.selectedCount}/${lineupFlowSummary.totalRequired || "—"} voll`,
+        tone: "ready",
+      });
+    }
 	    if (duplicateSelections.length > 0) {
 	      items.push({
 	        key: "duplicates",
@@ -3703,6 +3712,7 @@ export default function LegacyLineupLabClient(props: LegacyLineupLabClientProps)
 	      warningItems: items.filter((item) => item.tone === "warning"),
 	    };
 	  }, [
+	    allAvailablePlayersDeployed,
 	    captainBudgetExceeded,
 	    captainDraftUsedCount,
 	    captainSeasonLimit,
@@ -3866,7 +3876,7 @@ export default function LegacyLineupLabClient(props: LegacyLineupLabClientProps)
   ]);
   const lineupSaveCta = useMemo(() => {
     const blockers: string[] = [];
-    if (matchdayPreviewCards.openSlots > 0) {
+    if (matchdayPreviewCards.openSlots > 0 && !allAvailablePlayersDeployed) {
       blockers.push(`${matchdayPreviewCards.openSlots} Slot${matchdayPreviewCards.openSlots === 1 ? "" : "s"} offen`);
     }
     if (captainBudgetExceeded) {
@@ -3886,13 +3896,15 @@ export default function LegacyLineupLabClient(props: LegacyLineupLabClientProps)
     }
 
     if (lineupReadyToSave) {
+      const allDeployedHint = allAvailablePlayersDeployed && matchdayPreviewCards.openSlots > 0
+        ? "Alle Spieler eingesetzt · Formkarte & Captain optional."
+        : !captains.d1 && !captains.d2
+          ? "Slots voll, keine Konflikte. Captains sind optional und können gespart werden."
+          : "Slots voll, Captain-Plan passt, keine Konflikte mehr.";
       return {
         tone: "ready" as const,
         label: "Lineup bereit speichern",
-        detail:
-          !captains.d1 && !captains.d2
-            ? "Slots voll, keine Konflikte. Captains sind optional und können gespart werden."
-            : "Slots voll, Captain-Plan passt, keine Konflikte mehr.",
+        detail: allDeployedHint,
         buttonLabel: "Lineup bereit speichern",
       };
     }
@@ -3904,7 +3916,7 @@ export default function LegacyLineupLabClient(props: LegacyLineupLabClientProps)
       detail: blockers.slice(0, 3).join(" · ") || "Bitte offene Punkte zuerst aufraeumen.",
       buttonLabel: blockerCount > 0 ? `Noch ${blockerCount} offen` : "Noch nicht bereit",
     };
-  }, [captainBudgetExceeded, captainDraftUsedCount, captainSeasonLimit, captainUsedBeforeCurrentDraft, captains.d1, captains.d2, draft, duplicateSelections.length, lineupReadyToSave, matchdayPreviewCards.openSlots]);
+  }, [allAvailablePlayersDeployed, captainBudgetExceeded, captainDraftUsedCount, captainSeasonLimit, captainUsedBeforeCurrentDraft, captains.d1, captains.d2, draft, duplicateSelections.length, lineupReadyToSave, matchdayPreviewCards.openSlots]);
   const lineupFinishItems = useMemo(() => lineupMiniAudit.items.slice(0, 6), [lineupMiniAudit]);
   const activeSlotIssues = activeSlot ? slotIssuesByKey.get(activeSlot.key) ?? [] : [];
   const teamdeckSortInsight = useMemo(() => {

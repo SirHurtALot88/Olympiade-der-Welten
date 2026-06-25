@@ -6,6 +6,7 @@ export const MATCHDAY_ARENA_PHASES = [
   { id: "form", label: "Form" },
   { id: "mutator", label: "Mutator" },
   { id: "captain", label: "Captain" },
+  { id: "power", label: "Power" },
   { id: "final", label: "Final" },
   { id: "result", label: "Result" },
 ] as const;
@@ -19,11 +20,12 @@ export type MatchdayArenaScoreboardRowView = MatchdayMvpScoreboardRow & {
   pushScore: number | null;
   formScore: number | null;
   captainScore: number | null;
+  teamPowerScore: number | null;
   totalMutatorScore: number | null;
 };
 
 export type MatchdayArenaPhaseBreakdownItem = {
-  id: "slots" | "push" | "form" | "mutator" | "captain";
+  id: "slots" | "push" | "form" | "mutator" | "captain" | "power";
   label: string;
   valueLabel: string;
   tone: "neutral" | "positive" | "negative";
@@ -44,6 +46,7 @@ export const ARENA_SCORE_TRACK_SEGMENT_LABELS: Record<ArenaScoreTrackSegmentId, 
   form: "Form",
   mutator: "Mutator",
   captain: "Captain",
+  power: "Power",
 };
 
 function roundArenaScore(value: number | null | undefined) {
@@ -80,6 +83,8 @@ export function buildMatchdayArenaScoreboardView(
       row.mutator1Modifier != null || row.mutator2Modifier != null
         ? roundArenaScore((row.mutator1Modifier ?? 0) + (row.mutator2Modifier ?? 0))
         : null;
+    const teamPowerScore =
+      row.teamPowerStatus === "ready" ? roundArenaScore(row.teamPowerModifier ?? 0) : null;
     const baseRank = baseRankByTeamId.get(row.teamId) ?? row.rank;
 
     return {
@@ -90,6 +95,7 @@ export function buildMatchdayArenaScoreboardView(
       pushScore,
       formScore,
       captainScore,
+      teamPowerScore,
       totalMutatorScore,
     };
   });
@@ -110,6 +116,10 @@ export function getMatchdayArenaPhaseScore(
     row.captainStatus === "mapped"
       ? mutatorPhaseScore + (row.captainScore ?? 0)
       : mutatorPhaseScore;
+  const powerPhaseScore =
+    row.teamPowerStatus === "ready"
+      ? captainPhaseScore + (row.teamPowerScore ?? 0)
+      : captainPhaseScore;
 
   switch (phaseId) {
     case "slots":
@@ -122,6 +132,8 @@ export function getMatchdayArenaPhaseScore(
       return roundArenaScore(mutatorPhaseScore);
     case "captain":
       return roundArenaScore(captainPhaseScore);
+    case "power":
+      return roundArenaScore(powerPhaseScore);
     case "final":
     case "result":
       return roundArenaScore(row.score);
@@ -145,8 +157,10 @@ export function getMatchdayArenaPhaseDelta(
       return row.totalMutatorScore != null ? roundArenaScore(row.totalMutatorScore) : null;
     case "captain":
       return row.captainStatus === "mapped" ? roundArenaScore(row.captainScore ?? 0) : null;
+    case "power":
+      return row.teamPowerStatus === "ready" ? roundArenaScore(row.teamPowerScore ?? 0) : null;
     case "final": {
-      const finalDelta = roundArenaScore(row.score - getMatchdayArenaPhaseScore(row, "captain")!);
+      const finalDelta = roundArenaScore(row.score - getMatchdayArenaPhaseScore(row, "power")!);
       return finalDelta != null && Math.abs(finalDelta) >= 0.05 ? finalDelta : null;
     }
     case "result":
@@ -171,6 +185,8 @@ export function getMatchdayArenaPhaseSourceStatus(
       return row.mutator1Label || row.mutator2Label ? "ready" : "missing_source";
     case "captain":
       return row.captainStatus;
+    case "power":
+      return row.teamPowerStatus;
     default:
       return "ready";
   }
@@ -211,7 +227,7 @@ function getArenaScoreSegmentTone(value: number): "neutral" | "positive" | "nega
 }
 
 function getArenaPhaseRevealIndex(phaseId: MatchdayArenaPhaseId) {
-  const phaseOrder: ArenaScoreTrackSegmentId[] = ["slots", "push", "form", "mutator", "captain"];
+  const phaseOrder: ArenaScoreTrackSegmentId[] = ["slots", "push", "form", "mutator", "captain", "power"];
   if (phaseId === "result" || phaseId === "final") {
     return phaseOrder.length - 1;
   }
@@ -281,6 +297,14 @@ export function buildArenaScoreTrackSegments(
       tone: getArenaScoreSegmentTone(row.captainScore ?? 0),
     });
   }
+  if (maxPhaseIndex >= 5 && row.teamPowerStatus === "ready") {
+    segments.push({
+      id: "power",
+      label: ARENA_SCORE_TRACK_SEGMENT_LABELS.power,
+      value: row.teamPowerScore ?? 0,
+      tone: getArenaScoreSegmentTone(row.teamPowerScore ?? 0),
+    });
+  }
 
   return segments.filter((segment) => Math.abs(segment.value) >= 0.01 || segment.id === "slots");
 }
@@ -325,6 +349,7 @@ export function getMatchdayArenaPhaseBreakdown(
     "form",
     "mutator",
     "captain",
+    "power",
   ];
 
   const maxPhaseIndex =
@@ -386,6 +411,31 @@ export function getMatchdayArenaPhaseBreakdown(
           : (row.captainScore ?? 0) < 0
             ? "negative"
             : "neutral",
+    },
+    {
+      id: "power",
+      label: "Pow",
+      valueLabel:
+        row.teamPowerStatus === "ready"
+          ? [
+              row.teamPowerModifier != null && row.teamPowerModifier !== 0
+                ? formatBreakdownValue(row.teamPowerScore ?? 0, true)
+                : row.teamPowerImpact != null && row.teamPowerImpact > 0
+                  ? `${row.teamPowerImpact.toFixed(1)}%`
+                  : formatBreakdownValue(row.teamPowerScore ?? 0, true),
+              row.teamPowerLabel,
+            ]
+              .filter(Boolean)
+              .join(" · ")
+          : "—",
+      tone:
+        (row.teamPowerScore ?? 0) > 0
+          ? "positive"
+          : (row.teamPowerScore ?? 0) < 0
+            ? "negative"
+            : row.teamPowerImpact != null && row.teamPowerImpact > 0
+              ? "positive"
+              : "neutral",
     },
   ];
 

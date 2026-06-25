@@ -64,6 +64,7 @@ type TransfermarktV2ClientProps = {
   onToggleWishlist?: ((item: TransfermarktFreeAgentItem) => void) | null;
   onRemoveWishlist?: ((playerId: string) => void) | null;
   onBuyCompleted?: ((teamId: string) => Promise<void> | void) | null;
+  onSell?: ((payload: { activePlayerId: string; playerId: string; playerName: string; className: string; race: string | null; portraitUrl: string | null }) => void) | null;
 };
 
 type MarketFeedResponse = TransfermarktReadResult & {
@@ -1058,6 +1059,7 @@ export default function TransfermarktV2Client({
   onToggleWishlist,
   onRemoveWishlist,
   onBuyCompleted,
+  onSell,
 }: TransfermarktV2ClientProps) {
   const roomContextRef = useRef(readFoundationRoomContextFromLocation());
   const marketAbortRef = useRef<AbortController | null>(null);
@@ -3519,6 +3521,7 @@ export default function TransfermarktV2Client({
                         </th>
                       ))
                     : null}
+                  {onSell && manageableTeamIdSet.has(selectedTeamId) ? <th /> : null}
                 </tr>
               </thead>
               <tbody>
@@ -3577,6 +3580,27 @@ export default function TransfermarktV2Client({
                           </td>
                         ))
                       : null}
+                    {onSell && manageableTeamIdSet.has(selectedTeamId) ? (
+                      <td>
+                        <button
+                          className="secondary-button inline-button"
+                          type="button"
+                          title={`${row.name} verkaufen`}
+                          onClick={() =>
+                            onSell({
+                              activePlayerId: row.activePlayerId,
+                              playerId: row.playerId,
+                              playerName: row.name,
+                              className: row.className,
+                              race: row.race ?? null,
+                              portraitUrl: row.portraitUrl ?? null,
+                            })
+                          }
+                        >
+                          Verkaufen
+                        </button>
+                      </td>
+                    ) : null}
                   </tr>
                 ))}
               </tbody>

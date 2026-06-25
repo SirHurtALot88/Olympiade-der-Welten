@@ -68,6 +68,10 @@ export type MatchdayMvpScoreboardRow = {
   fatigueModifier: number | null;
   teamPpsStatus: "ready" | "missing_source";
   teamPpsModifier: number | null;
+  teamPowerStatus: "ready" | "missing_source";
+  teamPowerLabel: string | null;
+  teamPowerModifier: number | null;
+  teamPowerImpact: number | null;
   score: number;
   rank: number;
   points: number | null;
@@ -134,6 +138,8 @@ export type MatchdayMvpScoringResult = {
     captainSourceStatus: "mapped" | "missing_source";
     fatigueSourceStatus: "mapped" | "missing_source";
     teamPpsSourceStatus: "ready" | "missing_source";
+    teamPowerSourceStatus: "ready" | "missing_source";
+    teamPowerSourceLabel: string | null;
   };
   lineupTeams: MatchdayMvpLineupTeam[];
   resolveStatus: string;
@@ -297,6 +303,10 @@ function buildScoreboardRow(
     fatigueModifier: teamResult.fatigueModifier,
     teamPpsStatus: teamResult.teamPpsStatus,
     teamPpsModifier: teamResult.teamPpsModifier,
+    teamPowerStatus: teamResult.teamPowerStatus ?? "missing_source",
+    teamPowerLabel: teamResult.teamPowerLabel ?? null,
+    teamPowerModifier: teamResult.teamPowerModifier ?? null,
+    teamPowerImpact: teamResult.teamPowerImpact ?? null,
     score: teamResult.finalPreviewScore,
     rank: teamResult.rank,
     points: teamResult.teamPoints,
@@ -366,6 +376,8 @@ function buildResolveSources(
     captainSourceStatus: representativeRow?.captainStatus ?? "missing_source",
     fatigueSourceStatus: representativeRow?.fatigueStatus ?? "missing_source",
     teamPpsSourceStatus: representativeRow?.teamPpsStatus ?? "missing_source",
+    teamPowerSourceStatus: context.teamPowerSource?.effectStatus === "ready" ? "ready" as const : "missing_source" as const,
+    teamPowerSourceLabel: context.teamPowerSource?.sourceLabel ?? null,
   };
 }
 

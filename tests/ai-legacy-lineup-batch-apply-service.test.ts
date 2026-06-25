@@ -355,6 +355,168 @@ describe("AI legacy lineup form-card planning", () => {
     const modifiers = buildAiLegacyLineupModifiers(context);
 
     expect(modifiers.d2.teamPowerId).toBe("redline");
+    expect(modifiers.d1.teamPowerId).toBeNull();
+  });
+
+  it("does not burn two team powers on an early matchday without rivalry pressure", () => {
+    const context = createContext([], { d2Category: "speed", d2DisciplineId: "spurt" });
+    context.teamPowers = [
+      {
+        id: "power-4",
+        label: "Signature Power",
+        description: "4 charges",
+        category: "power",
+        effectType: "self_boost",
+        targetMode: "self",
+        targetLimit: 0,
+        conditionalBonusPct: 0,
+        conditionalTrigger: null,
+        conditionalDescription: null,
+        source: "team_identity",
+        sourceFacilityId: null,
+        modifier: 8,
+        positiveAttributeTags: ["power", "health"],
+        negativeAttributeTag: "speed",
+        chargesTotal: 4,
+        chargesUsed: 0,
+        chargesRemaining: 4,
+        selectedForSeason: true,
+        isUsedUp: false,
+      },
+      {
+        id: "power-3",
+        label: "Secondary Power",
+        description: "3 charges",
+        category: "speed",
+        effectType: "self_boost",
+        targetMode: "self",
+        targetLimit: 0,
+        conditionalBonusPct: 0,
+        conditionalTrigger: null,
+        conditionalDescription: null,
+        source: "team_identity",
+        sourceFacilityId: null,
+        modifier: 6,
+        positiveAttributeTags: ["speed", "dexterity"],
+        negativeAttributeTag: "health",
+        chargesTotal: 3,
+        chargesUsed: 0,
+        chargesRemaining: 3,
+        selectedForSeason: true,
+        isUsedUp: false,
+      },
+      {
+        id: "power-2",
+        label: "Reserve Power",
+        description: "2 charges",
+        category: "mental",
+        effectType: "self_boost",
+        targetMode: "self",
+        targetLimit: 0,
+        conditionalBonusPct: 0,
+        conditionalTrigger: null,
+        conditionalDescription: null,
+        source: "team_identity",
+        sourceFacilityId: null,
+        modifier: 5,
+        positiveAttributeTags: ["intelligence", "awareness"],
+        negativeAttributeTag: "torment",
+        chargesTotal: 2,
+        chargesUsed: 0,
+        chargesRemaining: 2,
+        selectedForSeason: true,
+        isUsedUp: false,
+      },
+    ];
+    context.teamDisciplineRanks = {
+      tdm: { disciplineId: "tdm", teamId: "A-A", rank: 14, score: 360 },
+      spurt: { disciplineId: "spurt", teamId: "A-A", rank: 15, score: 350 },
+    };
+    context.disciplineScores = [
+      { playerId: "p1", disciplineId: "tdm", score: 72 },
+      { playerId: "p2", disciplineId: "spurt", score: 71 },
+    ];
+
+    const modifiers = buildAiLegacyLineupModifiers(context, [
+      { disciplineId: "tdm", disciplineSide: "d1", slotIndex: 0, playerId: "p1", activePlayerId: "a1" },
+      { disciplineId: "spurt", disciplineSide: "d2", slotIndex: 0, playerId: "p2", activePlayerId: "a2" },
+    ]);
+
+    const selected = [modifiers.d1.teamPowerId, modifiers.d2.teamPowerId].filter(Boolean);
+    expect(selected.length).toBeLessThanOrEqual(1);
+  });
+
+  it("uses the 4-charge signature power on a strong matching discipline side", () => {
+    const context = createContext([], { d2Category: "speed", d2DisciplineId: "spurt" });
+    context.matchday = { index: 5 };
+    context.season = { currentMatchday: 5 };
+    context.matchdayContract = {
+      ...context.matchdayContract!,
+      matchdayIndex: 5,
+      totalDisciplineSidesInSeason: 20,
+    };
+    context.teamPowers = [
+      {
+        id: "teampower:season-1:A-A:identity:1",
+        label: "Signature Power",
+        description: "4 charges",
+        category: "power",
+        effectType: "self_boost",
+        targetMode: "self",
+        targetLimit: 0,
+        conditionalBonusPct: 0,
+        conditionalTrigger: null,
+        conditionalDescription: null,
+        source: "team_identity",
+        sourceFacilityId: null,
+        modifier: 8,
+        positiveAttributeTags: ["power", "health"],
+        negativeAttributeTag: "speed",
+        chargesTotal: 4,
+        chargesUsed: 0,
+        chargesRemaining: 4,
+        selectedForSeason: true,
+        isUsedUp: false,
+      },
+      {
+        id: "teampower:season-1:A-A:identity:3",
+        label: "Reserve Power",
+        description: "2 charges",
+        category: "mental",
+        effectType: "self_boost",
+        targetMode: "self",
+        targetLimit: 0,
+        conditionalBonusPct: 0,
+        conditionalTrigger: null,
+        conditionalDescription: null,
+        source: "team_identity",
+        sourceFacilityId: null,
+        modifier: 5,
+        positiveAttributeTags: ["intelligence", "awareness"],
+        negativeAttributeTag: "torment",
+        chargesTotal: 2,
+        chargesUsed: 0,
+        chargesRemaining: 2,
+        selectedForSeason: true,
+        isUsedUp: false,
+      },
+    ];
+    context.teamDisciplineRanks = {
+      tdm: { disciplineId: "tdm", teamId: "A-A", rank: 8, score: 430 },
+      spurt: { disciplineId: "spurt", teamId: "A-A", rank: 22, score: 300 },
+    };
+    context.disciplineScores = [
+      { playerId: "p1", disciplineId: "tdm", score: 80 },
+      { playerId: "p2", disciplineId: "spurt", score: 64 },
+    ];
+
+    const modifiers = buildAiLegacyLineupModifiers(context, [
+      { disciplineId: "tdm", disciplineSide: "d1", slotIndex: 0, playerId: "p1", activePlayerId: "a1" },
+      { disciplineId: "spurt", disciplineSide: "d2", slotIndex: 0, playerId: "p2", activePlayerId: "a2" },
+    ]);
+
+    expect(modifiers.d1.teamPowerId).toBe("teampower:season-1:A-A:identity:1");
+    expect(modifiers.d2.teamPowerId).toBeNull();
   });
 
   it("pushes large midseason discipline windows for competitive AI teams", () => {
@@ -432,5 +594,128 @@ describe("AI legacy lineup form-card planning", () => {
     ]);
 
     expect(modifiers.d1.intensity).toBe("conserve");
+  });
+
+  it("burns color-matched negatives as forced dump on the last matchday even when they would double the malus", () => {
+    // Same all-red negatives, all-power disciplines — but now it is the last matchday.
+    // negativeUrgency kicks in (2 cards > 2 remaining primary slots), so both sides
+    // get a forced dump including the color-matched ones.
+    const context = createContext(
+      [
+        { id: "neg-red-a", playerId: "p-a", playerName: "A", color: "red", value: -8, isUsed: false, usedByLineupId: null },
+        { id: "neg-red-b", playerId: "p-b", playerName: "B", color: "red", value: -4, isUsed: false, usedByLineupId: null },
+      ],
+      { d2Category: "power", d2DisciplineId: "mini-dm" },
+    );
+    context.matchday = { index: 10 };
+    context.season = { currentMatchday: 10 };
+    context.matchdayContract = {
+      ...context.matchdayContract!,
+      matchdayIndex: 10,
+      discipline2: { ...context.matchdayContract!.discipline2, disciplineId: "mini-dm", category: "power" },
+      totalDisciplineSidesInSeason: 20,
+    };
+    context.teamDisciplineRanks = {
+      tdm: { disciplineId: "tdm", teamId: "A-A", rank: 14, score: 360 },
+      "mini-dm": { disciplineId: "mini-dm", teamId: "A-A", rank: 15, score: 350 },
+    };
+    context.disciplineScores = [
+      { playerId: "p-a", disciplineId: "tdm", score: 72 },
+      { playerId: "p-b", disciplineId: "mini-dm", score: 71 },
+    ];
+
+    const modifiers = buildAiLegacyLineupModifiers(context, [
+      { disciplineId: "tdm", disciplineSide: "d1", slotIndex: 0, playerId: "p-a", activePlayerId: "a1" },
+      { disciplineId: "mini-dm", disciplineSide: "d2", slotIndex: 0, playerId: "p-b", activePlayerId: "a2" },
+    ]);
+
+    expect(modifiers.d1.primaryFormCardId).not.toBeNull();
+    expect(modifiers.d2.primaryFormCardId).not.toBeNull();
+    expect(new Set([modifiers.d1.primaryFormCardId, modifiers.d2.primaryFormCardId])).toEqual(
+      new Set(["neg-red-a", "neg-red-b"]),
+    );
+  });
+
+  it("falls back to any-color positive when the pool has only non-matching positives and urgency is high", () => {
+    // Blue/yellow positive cards on a power(red)/speed(green) season.
+    // Last matchday (MD 10) with 3 positives remaining → positiveUrgency = 3 > 1*2=2 → true.
+    const positives = [
+      { id: "pos-blue-a", playerId: "p1", playerName: "P1", color: "blue" as const, value: 8, isUsed: false, usedByLineupId: null },
+      { id: "pos-blue-b", playerId: "p2", playerName: "P2", color: "blue" as const, value: 4, isUsed: false, usedByLineupId: null },
+      { id: "pos-yellow-a", playerId: "p3", playerName: "P3", color: "yellow" as const, value: 8, isUsed: false, usedByLineupId: null },
+    ];
+    const context = createContext(positives);
+    context.matchday = { index: 10 };
+    context.season = { currentMatchday: 10 };
+    context.matchdayContract = {
+      ...context.matchdayContract!,
+      matchdayIndex: 10,
+      totalDisciplineSidesInSeason: 20,
+    };
+    context.teamDisciplineRanks = {
+      tdm: { disciplineId: "tdm", teamId: "A-A", rank: 8, score: 450 },
+      spurt: { disciplineId: "spurt", teamId: "A-A", rank: 9, score: 440 },
+    };
+    context.disciplineScores = [
+      { playerId: "p1", disciplineId: "tdm", score: 82 },
+      { playerId: "p2", disciplineId: "spurt", score: 81 },
+    ];
+
+    const modifiers = buildAiLegacyLineupModifiers(context, [
+      { disciplineId: "tdm", disciplineSide: "d1", slotIndex: 0, playerId: "p1", activePlayerId: "a1" },
+      { disciplineId: "spurt", disciplineSide: "d2", slotIndex: 0, playerId: "p2", activePlayerId: "a2" },
+    ]);
+
+    // Both strong sides should receive a positive even though none match the discipline color.
+    expect(modifiers.d1.primaryFormCardId).not.toBeNull();
+    expect(modifiers.d2.primaryFormCardId).not.toBeNull();
+    const usedIds = new Set([modifiers.d1.primaryFormCardId, modifiers.d2.primaryFormCardId]);
+    for (const id of usedIds) {
+      expect(positives.map((p) => p.id)).toContain(id);
+    }
+  });
+
+  it("assigns positives to neutral sides via secondary slot when urgency is high", () => {
+    // 5 positives (all blue), 2 remaining matchdays → positiveUrgency = 5 > 2*2=4 → true.
+    // Both sides are neutral (rank ~15, score ~73). Secondary slot should activate on neutral sides.
+    const positives = [
+      { id: "pos-blue-a", playerId: "p1", playerName: "P1", color: "blue" as const, value: 8, isUsed: false, usedByLineupId: null },
+      { id: "pos-blue-b", playerId: "p2", playerName: "P2", color: "blue" as const, value: 4, isUsed: false, usedByLineupId: null },
+      { id: "pos-blue-c", playerId: "p3", playerName: "P3", color: "blue" as const, value: 2, isUsed: false, usedByLineupId: null },
+      { id: "pos-blue-d", playerId: "p4", playerName: "P4", color: "blue" as const, value: 8, isUsed: false, usedByLineupId: null },
+      { id: "pos-blue-e", playerId: "p5", playerName: "P5", color: "blue" as const, value: 4, isUsed: false, usedByLineupId: null },
+    ];
+    const context = createContext(positives, { d2Category: "mental", d2DisciplineId: "puzzle" });
+    context.matchday = { index: 9 };
+    context.season = { currentMatchday: 9 };
+    context.matchdayContract = {
+      ...context.matchdayContract!,
+      matchdayIndex: 9,
+      discipline1: { ...context.matchdayContract!.discipline1, category: "mental" },
+      discipline2: { ...context.matchdayContract!.discipline2, disciplineId: "puzzle", category: "mental" },
+      totalDisciplineSidesInSeason: 20,
+    };
+    context.teamDisciplineRanks = {
+      tdm: { disciplineId: "tdm", teamId: "A-A", rank: 15, score: 360 },
+      puzzle: { disciplineId: "puzzle", teamId: "A-A", rank: 15, score: 350 },
+    };
+    context.disciplineScores = [
+      { playerId: "p1", disciplineId: "tdm", score: 73 },
+      { playerId: "p2", disciplineId: "puzzle", score: 72 },
+    ];
+
+    const modifiers = buildAiLegacyLineupModifiers(context, [
+      { disciplineId: "tdm", disciplineSide: "d1", slotIndex: 0, playerId: "p1", activePlayerId: "a1" },
+      { disciplineId: "puzzle", disciplineSide: "d2", slotIndex: 0, playerId: "p2", activePlayerId: "a2" },
+    ]);
+
+    // Both neutral sides should use positives (primary at least, secondary if budget allows).
+    const usedCount = [
+      modifiers.d1.primaryFormCardId,
+      modifiers.d2.primaryFormCardId,
+      modifiers.d1.secondaryFormCardId,
+      modifiers.d2.secondaryFormCardId,
+    ].filter(Boolean).length;
+    expect(usedCount).toBeGreaterThanOrEqual(2);
   });
 });

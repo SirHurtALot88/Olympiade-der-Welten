@@ -18,6 +18,7 @@ import {
   type ArenaRankPoolState,
 } from "@/lib/matchday-arena/arena-stat-visuals";
 import { buildMatchdayMutatorTraitsBySide } from "@/lib/lineups/legacy-lineup-modifiers";
+import { resolveSlotRolesForDiscipline } from "@/lib/lineups/matchday-slot-roles";
 import type { LegacyLineupLoadedContext } from "@/lib/lineups/legacy-lineup-types";
 import {
   MATCHDAY_ARENA_PHASES,
@@ -1636,6 +1637,17 @@ export default function MatchdayArenaV2Client(props: MatchdayArenaV2ClientProps)
                 ? `Captain ${formatSignedDelta(row.captainModifier)}`
                 : "Captain —"
               : null,
+            isPhaseRevealed("power")
+              ? row.teamPowerStatus === "ready"
+                ? row.teamPowerLabel
+                  ? row.teamPowerModifier != null && row.teamPowerModifier !== 0
+                    ? `Power ${formatSignedDelta(row.teamPowerModifier)} · ${row.teamPowerLabel}`
+                    : row.teamPowerImpact != null && row.teamPowerImpact > 0
+                      ? `Power ${row.teamPowerImpact.toFixed(1)}% · ${row.teamPowerLabel}`
+                      : `Power · ${row.teamPowerLabel}`
+                  : `Power ${formatSignedDelta(row.teamPowerModifier)}`
+                : "Power —"
+              : null,
             canShowFinalLayer ? `Final ${formatDecimalScore(row.score, 1)}` : null,
           ].filter((chip): chip is string => Boolean(chip)),
           breakdown: getMatchdayArenaPhaseBreakdown(row, displayPhase, { mutatorHitCount: mutatorHits }),
@@ -2440,7 +2452,7 @@ export default function MatchdayArenaV2Client(props: MatchdayArenaV2ClientProps)
           </div>
           {effectiveBoardMode !== "total" ? (
             <div className="arena-v2-score-legend" aria-label="Score-Balken Legende">
-              {(["slots", "push", "form", "mutator", "captain"] as const).map((segmentId) => (
+              {(["slots", "push", "form", "mutator", "captain", "power"] as const).map((segmentId) => (
                 <span key={segmentId} className={`arena-v2-score-legend-item is-${segmentId}`}>
                   {ARENA_SCORE_TRACK_SEGMENT_LABELS[segmentId]}
                 </span>

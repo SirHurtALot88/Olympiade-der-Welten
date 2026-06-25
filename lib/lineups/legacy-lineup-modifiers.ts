@@ -497,8 +497,12 @@ export function buildFormCardSeasonUsageAudit(gameState: GameState, seasonId: st
       );
       const usedCards = cards.filter((card) => usage.has(card.id));
       const unusedCards = cards.filter((card) => !usage.has(card.id));
-      const unusedNegativeCards = unusedCards.filter((card) => card.cardValue < 0).length;
+      const unusedNegativeCardList = unusedCards.filter((card) => card.cardValue < 0);
+      const unusedNegativeCards = unusedNegativeCardList.length;
       const unusedPositiveCards = unusedCards.filter((card) => card.cardValue > 0).length;
+      const negativePenaltyPoints = Math.round(
+        unusedNegativeCardList.reduce((sum, card) => sum + Math.abs(card.cardValue) * 0.5, 0),
+      );
 
       return {
         teamId: team.teamId,
@@ -507,7 +511,7 @@ export function buildFormCardSeasonUsageAudit(gameState: GameState, seasonId: st
         unusedCards: unusedCards.length,
         unusedPositiveCards,
         unusedNegativeCards,
-        negativePenaltyPoints: unusedNegativeCards,
+        negativePenaltyPoints,
       };
     });
 

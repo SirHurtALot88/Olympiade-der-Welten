@@ -2136,6 +2136,10 @@ type FoundationMatchdayMvpScoreboardRow = {
   fatigueModifier: number | null;
   teamPpsStatus: "ready" | "missing_source";
   teamPpsModifier: number | null;
+  teamPowerStatus?: "ready" | "missing_source";
+  teamPowerLabel?: string | null;
+  teamPowerModifier?: number | null;
+  teamPowerImpact?: number | null;
   score: number;
   rank: number;
   points: number | null;
@@ -11245,19 +11249,29 @@ export default function FoundationPageClient({
   useEffect(() => {
     const flow = gameState.seasonState.newGameFlow;
     const trainingStepStatus = flow?.steps?.find((step) => step.stepId === "training_facilities")?.status ?? "open";
+    const selectedTeamRosterIds = new Set(
+      gameState.rosters.filter((entry) => entry.teamId === activeManagerTeamId).map((entry) => entry.playerId),
+    );
+    const anyPlayerHasTrainingMode = gameState.players.some(
+      (player) => selectedTeamRosterIds.has(player.id) && player.trainingMode != null,
+    );
     if (
       readMeta.source !== "sqlite" ||
       isReadOnlyMode ||
       !flow?.active ||
       trainingStepStatus !== "open" ||
-      (activeView !== "trainingV2" && activeView !== "trainingCompact" && activeView !== "training")
+      (activeView !== "trainingV2" && activeView !== "trainingCompact" && activeView !== "training") ||
+      !anyPlayerHasTrainingMode
     ) {
       return;
     }
 
     updateNewGameFlowStepStatus("training_facilities", "completed");
   }, [
+    activeManagerTeamId,
     activeView,
+    gameState.players,
+    gameState.rosters,
     gameState.seasonState.newGameFlow,
     isReadOnlyMode,
     readMeta.source,
@@ -31647,6 +31661,16 @@ export default function FoundationPageClient({
                       detail: `${getTeamLockedName(teamId)} wurde aktualisiert. Cash, Gehalt, Kader und Marktfeed sind neu geladen.`,
                     });
                     await loadSave(activeSaveId);
+                  }}
+                  onSell={(payload) => {
+                    void openMarketSellModal({
+                      activePlayerId: payload.activePlayerId,
+                      playerId: payload.playerId,
+                      playerName: payload.playerName,
+                      className: payload.className,
+                      race: payload.race ?? "",
+                      portraitUrl: payload.portraitUrl ?? null,
+                    });
                   }}
                 />
               </>

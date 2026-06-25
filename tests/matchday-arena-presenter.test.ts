@@ -37,6 +37,10 @@ const rows: MatchdayMvpScoreboardRow[] = [
     fatigueModifier: -4,
     teamPpsStatus: "ready",
     teamPpsModifier: 0.3,
+    teamPowerStatus: "ready",
+    teamPowerLabel: "Rally Cry (+8%)",
+    teamPowerModifier: 8.5,
+    teamPowerImpact: 8,
     score: 113,
     rank: 2,
     points: 4.4,
@@ -64,6 +68,10 @@ const rows: MatchdayMvpScoreboardRow[] = [
     fatigueModifier: -2,
     teamPpsStatus: "missing_source",
     teamPpsModifier: null,
+    teamPowerStatus: "missing_source",
+    teamPowerLabel: null,
+    teamPowerModifier: null,
+    teamPowerImpact: null,
     score: 94,
     rank: 1,
     points: 5.0,
@@ -98,6 +106,7 @@ describe("matchday arena presenter", () => {
     expect(getMatchdayArenaPhaseScore(alpha, "form")).toBe(109);
     expect(getMatchdayArenaPhaseScore(alpha, "mutator")).toBe(121);
     expect(getMatchdayArenaPhaseScore(alpha, "captain")).toBe(123);
+    expect(getMatchdayArenaPhaseScore(alpha, "power")).toBe(131.5);
     expect(getMatchdayArenaPhaseScore(alpha, "final")).toBe(113);
 
     expect(getMatchdayArenaPhaseScore(beta, "form")).toBe(92);
@@ -177,9 +186,14 @@ describe("matchday arena presenter", () => {
     expect(mutatorSegments.map((segment) => segment.id)).toEqual(["slots", "push", "form", "mutator"]);
     expect(mutatorSegments.find((segment) => segment.id === "mutator")?.value).toBe(12);
 
+    const powerSegments = buildArenaScoreTrackSegments(alpha, "power", { slotsScore: 100 });
+    expect(powerSegments.map((segment) => segment.id)).toEqual(["slots", "push", "form", "mutator", "captain", "power"]);
+    expect(powerSegments.find((segment) => segment.id === "power")?.value).toBe(8.5);
+
     const breakdown = getMatchdayArenaPhaseBreakdown(alpha, "mutator", { mutatorHitCount: 3 });
     expect(breakdown.find((item) => item.id === "mutator")?.valueLabel).toContain("Mut 1 · Mut 2");
     expect(breakdown.find((item) => item.id === "mutator")?.valueLabel).toContain("3 Treffer");
+    expect(getMatchdayArenaPhaseBreakdown(alpha, "power")[5]?.id).toBe("power");
   });
 
   it("counts mutator hits per team for the active discipline side", () => {

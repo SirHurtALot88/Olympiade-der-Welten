@@ -1,7 +1,7 @@
 import { createHash, randomUUID } from "node:crypto";
 
 import { previewSeasonEndContracts } from "@/lib/contracts/contract-renewal-service";
-import { buildGeneratedFormCardRecordsForSeason } from "@/lib/lineups/legacy-lineup-modifiers";
+import { buildFormCardSeasonUsageAudit, buildGeneratedFormCardRecordsForSeason } from "@/lib/lineups/legacy-lineup-modifiers";
 import type { Fixture, GameState, PreSeasonWorkflowLogRecord, SeasonState, StandingRecord } from "@/lib/data/olyDataTypes";
 import { previewFacilitySeasonEndFinance } from "@/lib/facilities/facility-season-end-service";
 import { createPersistenceService } from "@/lib/persistence/persistence-service";
@@ -677,6 +677,41 @@ function buildNextSeasonGameState(save: PersistedSaveGame): { gameState: GameSta
   };
 }
 
+function applyFormCardPenaltyToStandings(save: PersistedSaveGame): { save: PersistedSaveGame; warnings: string[] } {
+  const audit = buildFormCardSeasonUsageAudit(save.gameState, save.gameState.season.id);
+  const penaltyRows = audit.rows.filter((row) => row.negativePenaltyPoints > 0);
+  if (penaltyRows.length === 0) {
+    return { save, warnings: [] };
+  }
+
+  const nextStandings = { ...save.gameState.seasonState.standings };
+  for (const row of penaltyRows) {
+    const current = nextStandings[row.teamId] ?? { points: 0 };
+    nextStandings[row.teamId] = {
+      ...current,
+      points: Math.max(0, current.points - row.negativePenaltyPoints),
+    };
+  }
+
+  const warnings = penaltyRows.map(
+    (row) => `formcard_penalty_applied:${row.teamId}:${row.negativePenaltyPoints}pts`,
+  );
+
+  return {
+    save: {
+      ...save,
+      gameState: {
+        ...save.gameState,
+        seasonState: {
+          ...save.gameState.seasonState,
+          standings: nextStandings,
+        },
+      },
+    },
+    warnings,
+  };
+}
+
 function buildSaveWithRequiredSeasonSnapshot(save: PersistedSaveGame): {
   save: PersistedSaveGame;
   snapshotId: string | null;
@@ -805,7 +840,8 @@ export function applyPreSeasonNextSeasonSetupLightweight(
     };
   }
 
-  const snapshotResult = buildSaveWithRequiredSeasonSnapshot(save);
+  const penaltyResult = applyFormCardPenaltyToStandings(save);
+  const snapshotResult = buildSaveWithRequiredSeasonSnapshot(penaltyResult.save);
   if (snapshotResult.blockingReasons.length > 0) {
     return {
       ...basePreview,
@@ -814,7 +850,7 @@ export function applyPreSeasonNextSeasonSetupLightweight(
       applied: false,
       appliedStepId: null,
       auditLogId: null,
-      warnings: [...basePreview.warnings, ...snapshotResult.warnings],
+      warnings: [...basePreview.warnings, ...penaltyResult.warnings, ...snapshotResult.warnings],
       blockingReasons: snapshotResult.blockingReasons,
     };
   }
@@ -1088,7 +1124,8 @@ export async function applyPreSeasonNextSeasonSetup(
       blockingReasons: [...preview.blockingReasons, confirmToken ? "preseason_preview_stale" : "confirm_token_required"],
     };
   }
-  const snapshotResult = buildSaveWithRequiredSeasonSnapshot(save);
+  const penaltyResult = applyFormCardPenaltyToStandings(save);
+  const snapshotResult = buildSaveWithRequiredSeasonSnapshot(penaltyResult.save);
   if (snapshotResult.blockingReasons.length > 0) {
     return {
       ...preview,
@@ -1097,7 +1134,7 @@ export async function applyPreSeasonNextSeasonSetup(
       applied: false,
       appliedStepId: null,
       auditLogId: null,
-      warnings: [...preview.warnings, ...snapshotResult.warnings],
+      warnings: [...preview.warnings, ...penaltyResult.warnings, ...snapshotResult.warnings],
       blockingReasons: snapshotResult.blockingReasons,
     };
   }
@@ -1129,6 +1166,7 @@ export async function applyPreSeasonNextSeasonSetup(
     auditLogId: auditLog.logId,
     warnings: [
       ...nextPreview.warnings,
+      ...penaltyResult.warnings,
       ...snapshotResult.warnings,
       ...progressionResult.warnings,
       `season_end_progression_applied:teams=${progressionResult.teamsApplied}:events=${progressionResult.playerEventsCreated}`,
