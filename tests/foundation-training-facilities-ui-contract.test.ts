@@ -28,6 +28,8 @@ describe("foundation training and facilities ui contract", () => {
 
     expect(fileText).toContain("Gebaeude & Infrastruktur");
     expect(fileText).toContain("layoutMode");
+    expect(fileText).toContain("Training & Gebaeude");
+    expect(fileText).toContain("Entwicklung steuern, Gebaeude lesen, Wachstum sauber planen.");
     expect(fileText).toContain("Unterhalt, Zustand und naechster Hebel");
     expect(fileText).toContain("Gebaeude-Wirkung");
     expect(fileText).toContain("Upgrade pruefen");
@@ -46,11 +48,15 @@ describe("foundation training and facilities ui contract", () => {
   });
 
   it("still builds training and facilities around local preview services", async () => {
-    const fileText = await fs.readFile(foundationClientPath, "utf8");
+    const [fileText, trainingText] = await Promise.all([
+      fs.readFile(foundationClientPath, "utf8"),
+      fs.readFile(trainingV2Path, "utf8"),
+    ]);
 
     expect(fileText).toContain("buildPlayerProgressionForecast");
     expect(fileText).toContain("buildTrainingPlayerRowView");
     expect(fileText).toContain("trainingModeDraft");
+    expect(trainingText).toContain("trainingModeReadOnly = readOnly");
     expect(fileText).toContain("async function setPlayerTrainingMode");
     expect(fileText).toContain("player.trainingMode ?? \"mittel\"");
     expect(fileText).toContain("persistLocalGameStateImmediately(nextGameState)");

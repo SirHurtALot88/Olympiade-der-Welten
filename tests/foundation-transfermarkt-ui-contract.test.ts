@@ -181,12 +181,19 @@ describe("foundation transfermarkt ui contract", () => {
   });
 
   it("keeps Transfermarkt V2 buy dialog negotiation affordances", async () => {
-    const fileText = await fs.readFile(transfermarktV2Path, "utf8");
+    const [fileText, foundationText] = await Promise.all([
+      fs.readFile(transfermarktV2Path, "utf8"),
+      fs.readFile(foundationClientPath, "utf8"),
+    ]);
 
     expect(fileText).toContain("Kaufdialog");
     expect(fileText).toContain("Auto-Angebot");
     expect(fileText).toContain("resetBuyDemandFrame");
     expect(fileText).toContain("Spieler ist noch angefressen");
+    expect(fileText).toContain('buyNegotiationOutcome?.status !== "accepted"');
+    expect(fileText).toContain('persistNegotiationOutcome(buyPreview, "countered")');
+    expect(foundationText).toContain('marketNegotiationOutcome?.status !== "accepted"');
+    expect(foundationText).toContain("clearNegotiationOutcome: false");
   });
 
   it("keeps the lineup coach wording tied to the new candidate quality flow", async () => {

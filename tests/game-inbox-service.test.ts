@@ -200,9 +200,9 @@ describe("game inbox service", () => {
     const items = buildGameInboxItems({ gameState, saveId: "save-1", activeTeamId: "M-M", activeOwnerId: "user_local" });
     const task = items.find((item) => item.itemId.startsWith("transfer_candidate:"));
 
-    expect(task?.title).toBe("Transferkandidat prüfen");
+    expect(task?.title).toBe("Spieler verkaufen");
     expect(task?.severity).toBe("critical");
-    expect(task?.targetView).toBe("market");
+    expect(task?.targetView).toBe("teams");
   });
 
   it("creates facility warning when upkeep is unaffordable and upgrade task when cash allows", () => {

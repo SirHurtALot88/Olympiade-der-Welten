@@ -6518,7 +6518,7 @@ export default function FoundationPageClient({
     setSelectedTeamId(resolvedTeamId);
     setActiveManagerTeamSource(source);
     setActiveManagerTeamWarning(null);
-    if (activeView === "market") {
+    if (isTransferMarketViewActive) {
       setMarketTeamId(resolvedTeamId);
     }
     syncFoundationTeamIdInUrl(resolvedTeamId);
@@ -7541,7 +7541,8 @@ export default function FoundationPageClient({
     const shouldApplyAbortMalus =
       readMeta.source === "sqlite" &&
       !isReadOnlyMode &&
-      Boolean(marketBuyPreview?.player?.id && marketBuyPreview?.team?.id && marketNegotiationOutcome);
+      Boolean(marketBuyPreview?.player?.id && marketBuyPreview?.team?.id && marketNegotiationOutcome) &&
+      marketNegotiationOutcome?.status !== "accepted";
     const abortPreview = shouldApplyAbortMalus ? marketBuyPreview : null;
     const abortPlayerName = abortPreview?.player?.name ?? "dem Spieler";
     setMarketBuyModalOpen(false);
@@ -10197,6 +10198,7 @@ export default function FoundationPageClient({
       contractLength?: number | null;
       contractShape?: ContractShape | null;
       offeredSalary?: number | null;
+      clearNegotiationOutcome?: boolean;
     },
   ) {
     const requestVersion = ++marketBuyPreviewRequestVersion.current;
@@ -10265,10 +10267,14 @@ export default function FoundationPageClient({
       view: activeView,
     };
 
+    const shouldClearNegotiationOutcome = previewOverrides?.clearNegotiationOutcome !== false;
+
     setMarketBuyBusy(true);
     setMarketBuyError(null);
     setMarketBuySuccess(null);
-    setMarketNegotiationOutcome(null);
+    if (shouldClearNegotiationOutcome) {
+      setMarketNegotiationOutcome(null);
+    }
     setMarketBuyPreviewContext(null);
     setMarketPreviewPlayerId(item.playerId);
 
@@ -10347,6 +10353,7 @@ export default function FoundationPageClient({
         contractLength: marketContractLengthDraft,
         contractShape: marketContractShapeDraft,
         offeredSalary: marketOfferedSalaryDraft,
+        clearNegotiationOutcome: false,
       });
     }, 120);
 

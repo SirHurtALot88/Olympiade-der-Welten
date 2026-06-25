@@ -2184,6 +2184,7 @@ export default function TransfermarktV2Client({
         counterSalary != null && activeSalaryOffer != null
           ? Number((counterSalary - activeSalaryOffer).toFixed(2))
           : null;
+      void persistNegotiationOutcome(buyPreview, "countered");
       setOfferedSalary(counterSalary);
       setSalaryEditedManually(true);
       setBuyNegotiationOutcome({
@@ -2247,7 +2248,8 @@ export default function TransfermarktV2Client({
     const shouldApplyAbortMalus =
       source === "sqlite" &&
       selectedTeamCanManage &&
-      Boolean(buyPreview?.player?.id && buyNegotiationOutcome);
+      Boolean(buyPreview?.player?.id && buyNegotiationOutcome) &&
+      buyNegotiationOutcome?.status !== "accepted";
     setBuyModalOpen(false);
     setBuyModalWishlistEntry(null);
     setBuyNegotiationOutcome(null);

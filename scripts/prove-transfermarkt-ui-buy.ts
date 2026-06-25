@@ -17,6 +17,12 @@ type BuyApiCapture = {
   responseBody: unknown;
 };
 
+type BuyDialogProof = {
+  playerName: string;
+  dialogText: string;
+  previewLoaded: boolean;
+};
+
 function getSaveSnapshot(saveId: string, targetTeamId: string) {
   const persistence = createPersistenceService();
   const save = persistence.getSaveById(saveId);
@@ -56,7 +62,127 @@ function getSaveSnapshot(saveId: string, targetTeamId: string) {
   };
 }
 
-async function pickTeam(page: Page, targetTeamId: string) {
+async function pickTeamV2(page: Page, targetTeamId: string) {
+  const focusTeamSelect = page.locator("label.filter-field").filter({ hasText: "Fokus-Team" }).locator("select");
+  await focusTeamSelect.waitFor({ state: "visible", timeout: 60_000 });
+  await focusTeamSelect.selectOption(targetTeamId);
+  await page.waitForTimeout(900);
+}
+
+async function waitForMarketV2Candidates(page: Page) {
+  await page.locator(".market-v2-shell").waitFor({ state: "visible", timeout: 60_000 });
+  await page.locator(".market-v2-candidate-card").first().waitFor({ state: "visible", timeout: 60_000 });
+}
+
+function assertBuyPreviewLoaded(dialogText: string) {
+  const loadingHint = "Kaufvorschau wird geladen oder ist fuer diesen Kontext noch nicht verfuegbar.";
+  if (dialogText.includes(loadingHint)) {
+    return false;
+  }
+  const hasNumericPreview =
+    /\d/.test(dialogText) &&
+    (dialogText.includes("Marktwert") ||
+      dialogText.includes("Annahme") ||
+      dialogText.includes("Verhandeln") ||
+      dialogText.includes("Gehalt") ||
+      dialogText.includes("Kaufpreis"));
+  return hasNumericPreview;
+}
+
+async function waitForBuyDialog(page: Page) {
+  const dialog = page.locator(".foundation-modal.transfer-buy-modal");
+  await dialog.waitFor({ state: "visible", timeout: 20_000 });
+  await page.waitForTimeout(600);
+  return dialog;
+}
+
+async function negotiateUntilAccepted(page: Page, dialog: ReturnType<Page["locator"]>) {
+  const negotiateButton = dialog.getByRole("button", { name: /Verhandeln|Annahme liegt vor/ });
+  const confirmButton = dialog.getByRole("button", { name: "Kauf final abschließen" });
+
+  for (let attempt = 0; attempt < 6; attempt += 1) {
+    if (await confirmButton.isEnabled()) {
+      return;
+    }
+    if (await negotiateButton.isDisabled()) {
+      break;
+    }
+    await negotiateButton.click();
+    await page.waitForTimeout(900);
+  }
+
+  if (!(await confirmButton.isEnabled())) {
+    const dialogText = await dialog.innerText();
+    throw new Error(`Buy confirm stayed disabled after negotiation attempts.\n${dialogText}`);
+  }
+}
+
+async function confirmBuyDialog(page: Page, dialog: ReturnType<Page["locator"]>) {
+  const dialogTextBeforeConfirm = await dialog.innerText();
+  await negotiateUntilAccepted(page, dialog);
+  const confirm = dialog.getByRole("button", { name: "Kauf final abschließen" });
+  await confirm.click();
+  await dialog.waitFor({ state: "hidden", timeout: 20_000 }).catch(() => undefined);
+  await page.waitForLoadState("networkidle").catch(() => undefined);
+  await page.waitForTimeout(1_200);
+  return dialogTextBeforeConfirm;
+}
+
+async function openDealFromPoolV2(page: Page) {
+  await waitForMarketV2Candidates(page);
+  const candidate = page.locator(".market-v2-candidate-card").first();
+  const playerName =
+    (await candidate.locator(".market-v2-candidate-name strong").first().textContent())?.trim() ??
+    (await candidate.locator("strong").first().textContent())?.trim() ??
+    "unknown";
+  await candidate.click();
+  await page.getByRole("button", { name: "Deal prüfen" }).click();
+  const dialog = await waitForBuyDialog(page);
+  const dialogText = await dialog.innerText();
+  return {
+    playerName,
+    dialogText,
+    previewLoaded: assertBuyPreviewLoaded(dialogText),
+  } satisfies BuyDialogProof;
+}
+
+async function buyFromPoolV2(page: Page) {
+  const opened = await openDealFromPoolV2(page);
+  const dialog = page.locator(".foundation-modal.transfer-buy-modal");
+  const confirmedDialogText = await confirmBuyDialog(page, dialog);
+  return {
+    ...opened,
+    confirmedDialogText,
+  };
+}
+
+async function buyFromWishlistV2(page: Page) {
+  await waitForMarketV2Candidates(page);
+  const candidate = page.locator(".market-v2-candidate-card").first();
+  const playerName =
+    (await candidate.locator(".market-v2-candidate-name strong").first().textContent())?.trim() ??
+    (await candidate.locator("strong").first().textContent())?.trim() ??
+    "unknown";
+  await candidate.click();
+  await page.getByRole("button", { name: "Auf Wishlist" }).click();
+  await page.waitForTimeout(700);
+
+  const wishlistRow = page.locator(".market-v2-wishlist-row").filter({ hasText: playerName }).first();
+  await wishlistRow.waitFor({ state: "visible", timeout: 15_000 });
+  await wishlistRow.dblclick();
+  const dialog = await waitForBuyDialog(page);
+  const dialogText = await dialog.innerText();
+  const previewLoaded = assertBuyPreviewLoaded(dialogText);
+  const confirmedDialogText = await confirmBuyDialog(page, dialog);
+  return {
+    playerName,
+    dialogText,
+    previewLoaded,
+    confirmedDialogText,
+  };
+}
+
+async function pickTeamClassic(page: Page, targetTeamId: string) {
   const selected = await page.evaluate((teamId) => {
     const selects = Array.from(document.querySelectorAll("select"));
     const candidates = selects.filter((select) => Array.from(select.options).some((option) => option.value === teamId));
@@ -95,7 +221,7 @@ async function pickTeam(page: Page, targetTeamId: string) {
   );
 }
 
-async function buyFromVisibleModal(page: Page) {
+async function buyFromVisibleClassicModal(page: Page) {
   const dialog = page.getByRole("dialog", { name: "Kaufdialog" });
   await dialog.waitFor({ state: "visible", timeout: 15_000 });
   const dialogTextBeforeConfirm = await dialog.innerText();
@@ -110,7 +236,7 @@ async function buyFromVisibleModal(page: Page) {
   return dialogTextBeforeConfirm;
 }
 
-async function buyFirstVisibleRow(page: Page) {
+async function buyFirstVisibleClassicRow(page: Page) {
   const buyButton = page
     .locator(".transfer-market-table-shell tbody tr .transfermarkt-inline-actions button")
     .filter({ hasText: /^Buy$/ })
@@ -119,25 +245,7 @@ async function buyFirstVisibleRow(page: Page) {
   const row = buyButton.locator("xpath=ancestor::tr[1]");
   const playerName = (await row.locator(".table-player-cell strong").first().textContent())?.trim() ?? "unknown";
   await buyButton.click();
-  const dialogText = await buyFromVisibleModal(page);
-  return { playerName, dialogText };
-}
-
-async function buyFirstVisibleWishlistEntry(page: Page) {
-  const wishlistButton = page
-    .locator(".transfer-market-table-shell tbody tr .transfermarkt-inline-actions button")
-    .filter({ hasText: /^Merken$/ })
-    .first();
-  await wishlistButton.waitFor({ state: "visible", timeout: 60_000 });
-  const row = wishlistButton.locator("xpath=ancestor::tr[1]");
-  const playerName = (await row.locator(".table-player-cell strong").first().textContent())?.trim() ?? "unknown";
-  await wishlistButton.click();
-  await page.waitForTimeout(700);
-
-  const wishlistCard = page.locator(".transfer-wishlist-card").filter({ hasText: playerName }).first();
-  await wishlistCard.waitFor({ state: "visible", timeout: 15_000 });
-  await wishlistCard.getByRole("button", { name: "Buy" }).click();
-  const dialogText = await buyFromVisibleModal(page);
+  const dialogText = await buyFromVisibleClassicModal(page);
   return { playerName, dialogText };
 }
 
@@ -198,26 +306,39 @@ async function main() {
     }
   });
 
-  let tableBuy: Awaited<ReturnType<typeof buyFirstVisibleRow>> | null = null;
-  let wishlistBuy: Awaited<ReturnType<typeof buyFirstVisibleWishlistEntry>> | null = null;
+  let poolPreview: BuyDialogProof | null = null;
+  let poolBuy: Awaited<ReturnType<typeof buyFromPoolV2>> | null = null;
+  let wishlistBuy: Awaited<ReturnType<typeof buyFromWishlistV2>> | null = null;
+  let classicBuy: Awaited<ReturnType<typeof buyFirstVisibleClassicRow>> | null = null;
   let after = before;
 
   try {
-    await page.goto(`${baseUrl}/foundation?view=market&team=${encodeURIComponent(teamId)}`, {
+    await page.goto(`${baseUrl}/foundation?view=marketV2&team=${encodeURIComponent(teamId)}`, {
       waitUntil: "domcontentloaded",
       timeout: 90_000,
     });
-    await page.getByRole("heading", { name: "Transfermarkt" }).waitFor({ state: "visible", timeout: 60_000 });
-    await pickTeam(page, teamId);
-    tableBuy = await buyFirstVisibleRow(page);
+    await page.locator(".market-v2-shell").waitFor({ state: "visible", timeout: 60_000 });
+    await pickTeamV2(page, teamId);
+    poolPreview = await openDealFromPoolV2(page);
+    await page.locator(".foundation-modal.transfer-buy-modal").getByRole("button", { name: "Schließen" }).click();
+    await page.waitForTimeout(400);
+
+    poolBuy = await buyFromPoolV2(page);
+
+    await page.goto(`${baseUrl}/foundation?view=marketV2&team=${encodeURIComponent(teamId)}`, {
+      waitUntil: "domcontentloaded",
+      timeout: 90_000,
+    });
+    await pickTeamV2(page, teamId);
+    wishlistBuy = await buyFromWishlistV2(page);
 
     await page.goto(`${baseUrl}/foundation?view=market&team=${encodeURIComponent(teamId)}`, {
       waitUntil: "domcontentloaded",
       timeout: 90_000,
     });
     await page.getByRole("heading", { name: "Transfermarkt" }).waitFor({ state: "visible", timeout: 60_000 });
-    await pickTeam(page, teamId);
-    wishlistBuy = await buyFirstVisibleWishlistEntry(page);
+    await pickTeamClassic(page, teamId);
+    classicBuy = await buyFirstVisibleClassicRow(page);
 
     await page.screenshot({ path: proofScreenshotPath, fullPage: true });
     after = getSaveSnapshot(saveId, teamId);
@@ -227,6 +348,7 @@ async function main() {
       createPersistenceService().activateSave(previousActiveSaveId);
     }
   }
+
   const executeResponses = buyApiCaptures
     .map((capture) => {
       const body = capture.responseBody as { summary?: { transferCreated?: boolean; transferId?: string | null } } | null;
@@ -240,11 +362,19 @@ async function main() {
     })
     .filter((capture) => !capture.dryRun);
 
+  const dryRunResponses = buyApiCaptures.filter((capture) => {
+    const requestBody = capture.requestBody as { dryRun?: boolean } | null;
+    return requestBody?.dryRun !== false;
+  });
+
   const result = {
     saveId,
     teamId,
-    tableBuy,
+    flow: "marketV2-primary",
+    poolPreview,
+    poolBuy,
     wishlistBuy,
+    classicBuy,
     before,
     after,
     buyApiCaptures,
@@ -256,9 +386,12 @@ async function main() {
       saveProof: summarizePurchase(after, capture.transferId),
     })),
     checks: {
+      v2PreviewLoaded: poolPreview?.previewLoaded === true,
+      v2WishlistPreviewLoaded: wishlistBuy?.previewLoaded === true,
+      dryRunPreviewResponses: dryRunResponses.length >= 2,
       transferCreatedResponses: executeResponses.every((capture) => capture.transferCreated),
-      rosterPlusTwo: after.rosterCount === before.rosterCount + executeResponses.length,
-      historyPlusTwo: after.transferHistoryCount === before.transferHistoryCount + executeResponses.length,
+      rosterPlusThree: after.rosterCount === before.rosterCount + executeResponses.length,
+      historyPlusThree: after.transferHistoryCount === before.transferHistoryCount + executeResponses.length,
       cashDecreased: after.cash != null && before.cash != null ? after.cash < before.cash : false,
       salaryIncreased: after.teamSalary > before.teamSalary,
       allTransfersInRoster: executeResponses.every((capture) => summarizePurchase(after, capture.transferId).playerInRoster),
