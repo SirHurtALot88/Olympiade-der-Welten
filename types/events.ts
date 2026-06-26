@@ -77,6 +77,7 @@ export type StartRoomArenaRequest = {
   matchdayId?: string | null;
   disciplineSide?: "d1" | "d2" | "overall" | null;
   maxSlotRevealIndex?: number | null;
+  maxSlotRevealCountByDiscipline?: { d1: number; d2: number } | null;
 };
 
 export type SetRoomArenaReadyRequest = {
@@ -89,6 +90,7 @@ export type AdvanceRoomArenaStepRequest = {
   roomCode: string;
   seatToken: string;
   maxSlotRevealIndex?: number | null;
+  maxSlotRevealCountByDiscipline?: { d1: number; d2: number } | null;
   force?: boolean | null;
 };
 

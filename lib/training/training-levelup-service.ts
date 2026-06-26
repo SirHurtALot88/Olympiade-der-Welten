@@ -1,5 +1,10 @@
-import type { GameState, Player, PlayerGeneratorAttributeName, TeamStrategyProfile } from "@/lib/data/olyDataTypes";
+import type { GameState, Player, PlayerGeneratorAttributeName, PlayerPotentialRecord, TeamStrategyProfile } from "@/lib/data/olyDataTypes";
 import { resolvePlayerEconomyContract } from "@/lib/foundation/player-economy-contract";
+import {
+  getAttributeGrowthMultiplier,
+  getAttributeHeadroom,
+  type AttributeHeadroomState,
+} from "@/lib/scouting/player-attribute-ceiling-service";
 import {
   officialDisciplineWeightLabels,
   officialDisciplineWeightOrder,
@@ -74,6 +79,9 @@ export type DevelopmentAttributePreview = TrainingPointCost & {
   marketValuePreviewDelta: number | null;
   expectedSalaryPreviewDelta: number | null;
   contractSalaryStable: true;
+  ceilingState?: AttributeHeadroomState;
+  headroomPoints?: number | null;
+  growthMultiplier?: number;
 };
 
 export type DevelopmentLevelSummary = {
@@ -317,11 +325,29 @@ export function getAttributeTrainingPointCost(input: {
   value: number | null | undefined;
   attribute: PlayerGeneratorAttributeName;
   affinity: AttributeAffinityProfile;
+  player?: Player;
+  potentialRecord?: PlayerPotentialRecord | null;
 }): TrainingPointCost {
   const baseCost = getAttributeTrainingPointBaseCost(input.value);
   const affinity = getAttributeAffinityKind(input.attribute, input.affinity);
   const modifier = affinity === "signature" ? -1 : affinity === "weak" ? 1 : 0;
-  const blocked = !isFiniteNumber(input.value) || input.value >= DEVELOPMENT_MAX_ATTRIBUTE_VALUE;
+  let blocked = !isFiniteNumber(input.value) || input.value >= DEVELOPMENT_MAX_ATTRIBUTE_VALUE;
+  let blockReason: string | null = blocked
+    ? isFiniteNumber(input.value) && input.value >= DEVELOPMENT_MAX_ATTRIBUTE_VALUE
+      ? "attribute_at_99"
+      : "attribute_value_missing"
+    : null;
+  if (input.player) {
+    const headroom = getAttributeHeadroom({
+      player: input.player,
+      attribute: input.attribute,
+      record: input.potentialRecord,
+    });
+    if (headroom.state === "capped") {
+      blocked = true;
+      blockReason = "potential_ceiling_reached";
+    }
+  }
   const finalCost = baseCost == null || blocked ? null : Math.max(1, baseCost + modifier);
   return {
     attribute: input.attribute,
@@ -331,13 +357,15 @@ export function getAttributeTrainingPointCost(input: {
     finalCost,
     affinity,
     reason:
-      affinity === "signature"
-        ? "Signature: Dieses Attribut entwickelt sich bei diesem Spieler guenstiger."
-        : affinity === "weak"
-          ? "Weak Development: Dieses Attribut ist fuer diesen Spieler schwerer zu steigern."
-          : "Neutral: normale Attributkosten.",
+      blockReason === "potential_ceiling_reached"
+        ? "Route-/Attribut-Decke erreicht — kaum noch Entwicklung moeglich."
+        : affinity === "signature"
+          ? "Signature: Dieses Attribut entwickelt sich bei diesem Spieler guenstiger."
+          : affinity === "weak"
+            ? "Weak Development: Dieses Attribut ist fuer diesen Spieler schwerer zu steigern."
+            : "Neutral: normale Attributkosten.",
     blocked,
-    blockReason: blocked ? (isFiniteNumber(input.value) && input.value >= DEVELOPMENT_MAX_ATTRIBUTE_VALUE ? "attribute_at_99" : "attribute_value_missing") : null,
+    blockReason,
   };
 }
 
@@ -422,12 +450,24 @@ export function buildUpgradePreview(input: {
   level: DevelopmentLevelSummary;
   affinity: AttributeAffinityProfile;
   economy?: ReturnType<typeof resolvePlayerEconomyContract> | null;
+  potentialRecord?: PlayerPotentialRecord | null;
 }): DevelopmentAttributePreview[] {
   const economy = input.economy ?? resolvePlayerEconomyContract({ playerId: input.player.id, player: input.player, rosterEntry: null });
   return playerGeneratorAttributeKeys.map((attributeKey) => {
     const attribute = attributeKey as PlayerGeneratorAttributeName;
     const currentValue = getPlayerAttributeValue(input.player, attribute);
-    const cost = getAttributeTrainingPointCost({ value: currentValue, attribute, affinity: input.affinity });
+    const headroom = getAttributeHeadroom({
+      player: input.player,
+      attribute,
+      record: input.potentialRecord,
+    });
+    const cost = getAttributeTrainingPointCost({
+      value: currentValue,
+      attribute,
+      affinity: input.affinity,
+      player: input.player,
+      potentialRecord: input.potentialRecord,
+    });
     const canAfford = cost.finalCost != null && input.level.trainingPointsAvailable >= cost.finalCost;
     const nextValue = isFiniteNumber(currentValue) && !cost.blocked && canAfford ? Math.min(DEVELOPMENT_MAX_ATTRIBUTE_VALUE, currentValue + 1) : currentValue;
     const currentRatingDelta = cost.finalCost != null && canAfford ? estimateRatingDelta(attribute, 1) : 0;
@@ -446,6 +486,9 @@ export function buildUpgradePreview(input: {
       marketValuePreviewDelta,
       expectedSalaryPreviewDelta,
       contractSalaryStable: true,
+      ceilingState: headroom.state,
+      headroomPoints: headroom.headroom,
+      growthMultiplier: getAttributeGrowthMultiplier(headroom.state),
     };
   });
 }
@@ -619,6 +662,7 @@ export function buildPlayerDevelopmentLevelupModel(input: {
   forecast?: PlayerProgressionForecast | null;
   teamId?: string | null;
   profile?: TeamStrategyProfile | null;
+  potentialRecord?: PlayerPotentialRecord | null;
 }): PlayerDevelopmentLevelupModel {
   const baseAffinity = deriveAttributeAffinityProfile(input.player);
   const level = buildDevelopmentLevelSummary({
@@ -647,6 +691,8 @@ export function buildPlayerDevelopmentLevelupModel(input: {
       value: getPlayerAttributeValue(input.player, attribute as PlayerGeneratorAttributeName),
       attribute: attribute as PlayerGeneratorAttributeName,
       affinity,
+      player: input.player,
+      potentialRecord: input.potentialRecord,
     }),
   );
   const economy = resolvePlayerEconomyContract({
@@ -654,7 +700,13 @@ export function buildPlayerDevelopmentLevelupModel(input: {
     player: input.player,
     rosterEntry: input.gameState?.rosters.find((entry) => entry.playerId === input.player.id) ?? null,
   });
-  const upgradePreview = buildUpgradePreview({ player: input.player, level, affinity, economy });
+  const upgradePreview = buildUpgradePreview({
+    player: input.player,
+    level,
+    affinity,
+    economy,
+    potentialRecord: input.potentialRecord,
+  });
   const regressionEvent = buildRegressionEventPreview({ player: input.player, level, forecast: input.forecast, affinity });
   const aiAllocation = buildAiTrainingPointAllocation({
     player: input.player,

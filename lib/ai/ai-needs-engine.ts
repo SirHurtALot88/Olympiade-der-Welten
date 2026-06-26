@@ -73,7 +73,10 @@ function buildDisciplineNeedSummary(
     disciplineSide,
     averageDisciplineScore,
     needScore: clamp(100 - averageDisciplineScore + preferredBonus, 0, 200),
-    playerCount: context.disciplinePlayerCounts[disciplineId] ?? 0,
+    playerCount:
+      context.disciplineSidePlayerCounts?.[`${disciplineId}::${disciplineSide}`] ??
+      context.disciplinePlayerCounts[disciplineId] ??
+      0,
     keyAttributes,
     focusAxes,
   };

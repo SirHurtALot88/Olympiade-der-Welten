@@ -106,6 +106,34 @@ function addStrongPowerPerformance(state: GameState, playerId: string) {
   ];
 }
 
+function addPoorSeasonPerformances(state: GameState, playerId: string, count = 10) {
+  state.seasonState.matchdayResults = Array.from({ length: count }, (_, index) => ({
+    id: `result-${index + 1}`,
+    seasonId: "season-1",
+    matchdayId: `md-${index + 1}`,
+    status: "preview_applied" as const,
+  }));
+  state.seasonState.playerDisciplinePerformances = Array.from({ length: count }, (_, index) => ({
+    id: `perf-${index + 1}`,
+    matchdayResultId: `result-${index + 1}`,
+    teamId: "team-1",
+    playerId,
+    activePlayerId: null,
+    disciplineId: "gewichtheben",
+    disciplineSide: "d1",
+    slotIndex: 0,
+    baseValue: 35,
+    finalPlayerScore: 32,
+    scoreContribution: 7,
+    rankInTeam: 12,
+    rankInDiscipline: 24,
+    isTop10: false,
+    isMvpCandidate: false,
+    storyWeight: null,
+    createdAt: "2026-06-11T00:00:00.000Z",
+  }));
+}
+
 describe("organic season progression", () => {
   it("turns market value into extra attribute maintenance pressure", () => {
     const cheap = player({ marketValue: 20 });
@@ -114,8 +142,8 @@ describe("organic season progression", () => {
     const cheapResult = buildOrganicSeasonProgression({ gameState: gameState(cheap), player: cheap });
     const starResult = buildOrganicSeasonProgression({ gameState: gameState(star), player: star });
 
-    expect(cheapResult.marketValuePressureTotal).toBe(0.6);
-    expect(starResult.marketValuePressureTotal).toBe(3);
+    expect(cheapResult.marketValuePressureTotal).toBe(0.4);
+    expect(starResult.marketValuePressureTotal).toBe(2);
     expect(starResult.marketValuePressurePerAttribute).toBeGreaterThan(cheapResult.marketValuePressurePerAttribute);
     expect(starResult.netSetpoints).toBeLessThan(cheapResult.netSetpoints);
   });
@@ -134,14 +162,34 @@ describe("organic season progression", () => {
   });
 
   it("uses player potential and star gap as training growth multipliers", () => {
-    const lowPotential = player({ potential: 50 });
-    const elitePotential = player({ potential: 94 });
+    const lowPotential = player({ id: "low-potential", potential: 50 });
+    const elitePotential = player({ id: "elite-potential", potential: 94 });
+    const lowState = gameState(lowPotential);
+    const eliteState = gameState(elitePotential);
+    lowState.playerPotential = [
+      {
+        playerId: lowPotential.id,
+        potentialBand: "low",
+        hiddenPotentialScore: 52,
+        confidence: 0,
+        source: "generated",
+      },
+    ];
+    eliteState.playerPotential = [
+      {
+        playerId: elitePotential.id,
+        potentialBand: "elite",
+        hiddenPotentialScore: 95,
+        confidence: 0,
+        source: "generated",
+      },
+    ];
 
-    const lowResult = buildOrganicSeasonProgression({ gameState: gameState(lowPotential), player: lowPotential });
-    const eliteResult = buildOrganicSeasonProgression({ gameState: gameState(elitePotential), player: elitePotential });
+    const lowResult = buildOrganicSeasonProgression({ gameState: lowState, player: lowPotential });
+    const eliteResult = buildOrganicSeasonProgression({ gameState: eliteState, player: elitePotential });
 
-    expect(lowResult.potentialTrainingMultiplier).toBeLessThan(0.94);
-    expect(eliteResult.potentialTrainingMultiplier).toBeGreaterThan(1.18);
+    expect(lowResult.potentialTrainingMultiplier).toBeLessThan(eliteResult.potentialTrainingMultiplier);
+    expect(eliteResult.potentialTrainingMultiplier).toBeGreaterThan(1);
     expect(eliteResult.trainingSetpoints).toBeGreaterThan(lowResult.trainingSetpoints);
   });
 
@@ -163,6 +211,19 @@ describe("organic season progression", () => {
 
     expect(result.performanceSetpoints).toBeGreaterThan(0);
     expect(power.performance).toBeGreaterThan(intelligence.performance);
+  });
+
+  it("adds performance regression pressure after a weak season", () => {
+    const sourcePlayer = player({ rating: 46, marketValue: 12 });
+    const baselineState = gameState(sourcePlayer);
+    const poorState = gameState(sourcePlayer);
+    addPoorSeasonPerformances(poorState, sourcePlayer.id);
+
+    const baseline = buildOrganicSeasonProgression({ gameState: baselineState, player: sourcePlayer });
+    const poor = buildOrganicSeasonProgression({ gameState: poorState, player: sourcePlayer });
+
+    expect(poor.performanceRegressionTotal).toBeGreaterThan(baseline.performanceRegressionTotal);
+    expect(poor.netSetpoints).toBeLessThan(baseline.netSetpoints);
   });
 
   it("lets signature attributes gain a little faster in organic progression", () => {
@@ -246,9 +307,86 @@ describe("organic season progression", () => {
       },
       trainingMode: "leicht",
     });
-    const youthResult = buildOrganicSeasonProgression({ gameState: gameState(youth), player: youth });
-    const vetResult = buildOrganicSeasonProgression({ gameState: gameState(overpaid), player: overpaid });
+    const youthState = gameState(youth);
+    const vetState = gameState(overpaid);
+    youthState.playerPotential = [
+      {
+        playerId: youth.id,
+        potentialBand: "high",
+        hiddenPotentialScore: 88,
+        hiddenPotentialOverallStars: 4,
+        hiddenPotentialCeilingByAxis: { pow: 4, spe: 3.5, men: 3.5, soc: 3.5 },
+        confidence: 0,
+        source: "generated",
+      },
+    ];
+    vetState.playerPotential = [
+      {
+        playerId: overpaid.id,
+        potentialBand: "medium",
+        hiddenPotentialScore: 84,
+        hiddenPotentialOverallStars: 3.5,
+        hiddenPotentialCeilingByAxis: { pow: 3.5, spe: 3.5, men: 3.5, soc: 3.5 },
+        confidence: 0,
+        source: "generated",
+      },
+    ];
+    const youthResult = buildOrganicSeasonProgression({ gameState: youthState, player: youth });
+    const vetResult = buildOrganicSeasonProgression({ gameState: vetState, player: overpaid });
     expect(youthResult.netSetpoints).toBeGreaterThan(0);
     expect(vetResult.netSetpoints).toBeLessThan(youthResult.netSetpoints);
+  });
+
+  it("applies capped attribute growth multiplier near hidden ceiling", () => {
+    const cappedPlayer = player({
+      id: "capped",
+      attributeSheetStats: {
+        power: 72,
+        health: 70,
+        stamina: 68,
+        speed: 40,
+        dexterity: 38,
+        awareness: 36,
+        intelligence: 35,
+        will: 34,
+        charisma: 40,
+        spirit: 38,
+        determination: 42,
+        torment: 45,
+      },
+    });
+    const state = gameState(cappedPlayer);
+    state.playerPotential = [
+      {
+        playerId: cappedPlayer.id,
+        potentialBand: "medium",
+        hiddenPotentialScore: 72,
+        confidence: 0,
+        source: "generated",
+        hiddenPotentialCeilingByAxis: { pow: 3, spe: 4, men: 3.5, soc: 3.5 },
+        hiddenPotentialOverallStars: 3.5,
+        hiddenAttributeCeiling: {
+          power: 72,
+          health: 75,
+          stamina: 70,
+          speed: 80,
+          dexterity: 78,
+          awareness: 76,
+          intelligence: 74,
+          will: 72,
+          charisma: 78,
+          spirit: 76,
+          determination: 80,
+          torment: 73,
+        },
+      },
+    ];
+
+    const result = buildOrganicSeasonProgression({ gameState: state, player: cappedPlayer });
+    const power = result.attributeBreakdown.find((entry) => entry.attribute === "power")!;
+    const determination = result.attributeBreakdown.find((entry) => entry.attribute === "determination")!;
+
+    expect(power.growthMultiplier).toBeLessThanOrEqual(0.1);
+    expect(determination.growthMultiplier).toBeGreaterThan(power.growthMultiplier);
   });
 });

@@ -2,6 +2,11 @@ import type { GameState, Player, PlayerDemandRecord, PlayerDemandStatus } from "
 import type { PlayerTrainingMode } from "@/lib/training/training-plan-types";
 import { getTrainingModePresentation } from "@/lib/training/training-mode-presentation";
 
+type TrainingModeDemandPlayer = Pick<
+  Player,
+  "id" | "name" | "trainingMode" | "traitsPositive" | "traitsNegative" | "fatigue" | "potential"
+> & { age?: number | null };
+
 const LEICHT_BIAS_TRAITS = new Set(["lazy", "relaxed", "fainthearted", "timid", "caring", "paranoid"]);
 const HART_BIAS_TRAITS = new Set(["ambitious", "motivated", "diligent", "disciplined", "firedup", "egomaniac", "obsessive", "feisty"]);
 const LOW_MAINTENANCE_TRAITS = new Set(["loyal", "flexible", "fair"]);
@@ -36,7 +41,7 @@ export type TrainingModeDemandView = {
 };
 
 export function getTrainingModeBiasScores(input: {
-  player: Pick<Player, "traitsPositive" | "traitsNegative" | "fatigue" | "potential" | "age">;
+  player: TrainingModeDemandPlayer;
   rosterRank?: number;
 }) {
   let leicht = 0;
@@ -69,7 +74,7 @@ export function getTrainingModeBiasScores(input: {
 }
 
 export function resolvePreferredTrainingMode(input: {
-  player: Pick<Player, "traitsPositive" | "traitsNegative" | "fatigue" | "potential" | "age">;
+  player: TrainingModeDemandPlayer;
   rosterRank?: number;
 }): PlayerTrainingMode | null {
   const { leicht, hart } = getTrainingModeBiasScores(input);
@@ -110,10 +115,7 @@ export function buildTrainingModeDemand(input: {
     teamId: string;
     matchdayIndex?: number | null;
   };
-  player: Pick<
-    Player,
-    "id" | "name" | "trainingMode" | "traitsPositive" | "traitsNegative" | "fatigue" | "potential" | "age"
-  >;
+  player: TrainingModeDemandPlayer;
   rosterRank?: number;
 }): TrainingModeDemandView | null {
   const preferredMode = resolvePreferredTrainingMode({

@@ -639,6 +639,8 @@ export async function runMatchdayMvpScoring(
         captainSourceStatus: "missing_source",
         fatigueSourceStatus: "missing_source",
         teamPpsSourceStatus: "missing_source",
+        teamPowerSourceStatus: "missing_source",
+        teamPowerSourceLabel: null,
       },
       lineupTeams,
       resolveStatus: "blocked",

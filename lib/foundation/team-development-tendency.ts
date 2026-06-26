@@ -85,13 +85,13 @@ export function getTeamDevelopmentTendency(input: {
       score += 0.08;
       reasons.push("mentor_culture_bias");
     }
-    if (bias.cashPriority >= 6 && bias.saveDiscipline != null && bias.saveDiscipline >= 6) {
+    if (bias.cashPriority >= 6) {
       score += 0.06;
       reasons.push("fiscal_development_patience");
     }
   }
 
-  if (profile?.prefersDepth === true) {
+  if (profile?.prefersDepth === "high") {
     score += 0.06;
     reasons.push("prefers_depth_flag");
   }

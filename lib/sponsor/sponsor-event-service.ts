@@ -1,7 +1,7 @@
 import { randomUUID } from "@/lib/utils/random-id";
 
 import type { GameState, SponsorEventRecord } from "@/lib/data/olyDataTypes";
-import { getTeamSponsorContract } from "@/lib/sponsor/sponsor-offer-service";
+import { getTeamSponsorContract } from "@/lib/sponsor/sponsor-offer-read";
 
 function getStableUnitHash(seed: string) {
   let hash = 2166136261;

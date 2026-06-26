@@ -2,6 +2,7 @@ import { randomUUID } from "@/lib/utils/random-id";
 
 import type { GameState, SponsorOfferComponent, TeamSponsorContract } from "@/lib/data/olyDataTypes";
 import { buildTeamSeasonOverviewRows } from "@/lib/foundation/team-management-overview";
+import { getTieredRankPayoutFraction } from "@/lib/sponsor/sponsor-economy-calibration";
 import { getTeamSponsorContract } from "@/lib/sponsor/sponsor-offer-service";
 import { evaluateSpecialComponentForObjective } from "@/lib/sponsor/sponsor-objective-evaluator";
 
@@ -77,7 +78,9 @@ function buildSeasonEndRows(gameState: GameState, contract: TeamSponsorContract)
 
     if (component.kind === "rank") {
       const target = typeof component.targetValue === "number" ? component.targetValue : 16;
-      const completed = currentRank != null && currentRank <= target;
+      const payoutFraction =
+        currentRank != null ? getTieredRankPayoutFraction(currentRank, target) : 0;
+      const completed = payoutFraction > 0;
       rows.push({
         teamId: contract.teamId,
         teamName: team?.name ?? contract.teamId,
@@ -85,9 +88,11 @@ function buildSeasonEndRows(gameState: GameState, contract: TeamSponsorContract)
         kind: component.kind,
         label: component.label,
         status: completed ? "paid" : component.penaltyCash ? "failed_penalty" : "skipped",
-        cashDelta: completed ? component.rewardCash : -(component.penaltyCash ?? 0),
+        cashDelta: completed
+          ? roundCash(component.rewardCash * payoutFraction)
+          : -(component.penaltyCash ?? 0),
         reason: completed
-          ? `Rang ${currentRank} erreicht Ziel Top ${target}`
+          ? `Rang ${currentRank} → ${Math.round(payoutFraction * 100)}% von Top ${target}`
           : `Rang ${currentRank ?? "—"} verfehlt Top ${target}`,
       });
       continue;
@@ -239,10 +244,17 @@ export function applySponsorSettlement(input: {
 }
 
 export function getSeasonSponsorCashTotal(gameState: GameState): number {
-  const preview = previewSponsorSettlement(gameState, "season_end");
-  const paidBaseFirst = (gameState.seasonState.sponsorPayoutLogs ?? [])
-    .filter((log) => log.seasonId === gameState.season.id && log.phase === "base_first")
+  const seasonId = gameState.season.id;
+  const allLogs = gameState.seasonState.sponsorPayoutLogs ?? [];
+
+  // Sum every sponsor payout log already applied this season (base_first + any season_end partials).
+  const alreadyPaid = allLogs
+    .filter((log) => log.seasonId === seasonId && log.cashDelta > 0)
     .reduce((sum, log) => sum + log.cashDelta, 0);
-  const projectedEnd = preview.rows.reduce((sum, row) => sum + Math.max(0, row.cashDelta), 0);
-  return roundCash(paidBaseFirst + projectedEnd);
+
+  // Add the projected remaining payouts that have not yet been applied (season_end preview).
+  const preview = previewSponsorSettlement(gameState, "season_end");
+  const projectedRemaining = preview.rows.reduce((sum, row) => sum + Math.max(0, row.cashDelta), 0);
+
+  return roundCash(alreadyPaid + projectedRemaining);
 }

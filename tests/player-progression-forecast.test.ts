@@ -166,10 +166,23 @@ function createSeasonPerformance(partial: Partial<PlayerSeasonPerformanceSummary
   };
 }
 
+function pinNeutralPotential(gameState: GameState, playerId: string) {
+  gameState.playerPotential = [
+    {
+      playerId,
+      potentialBand: "medium",
+      hiddenPotentialScore: 58,
+      confidence: 0,
+      source: "generated",
+    },
+  ];
+}
+
 describe("player progression forecast", () => {
   it("uses the configured leicht/mittel/hart training XP", () => {
     const player = createPlayer();
     const gameState = createGameState(player);
+    pinNeutralPotential(gameState, player.id);
 
     expect(buildPlayerProgressionForecast({ gameState, player, playerRating: null, seasonPerformance: null, trainingModeByPlayerId: { [player.id]: "leicht" } }).baseTrainingXP).toBe(40);
     expect(buildPlayerProgressionForecast({ gameState, player, playerRating: null, seasonPerformance: null, trainingModeByPlayerId: { [player.id]: "mittel" } }).baseTrainingXP).toBe(70);
@@ -178,8 +191,18 @@ describe("player progression forecast", () => {
 
   it("uses scout potential as a training-speed modifier without changing performance XP", () => {
     const player = createPlayer({ potential: 90 });
+    const gameState = createGameState(player);
+    gameState.playerPotential = [
+      {
+        playerId: player.id,
+        potentialBand: "high",
+        hiddenPotentialScore: 90,
+        confidence: 0,
+        source: "generated",
+      },
+    ];
     const forecast = buildPlayerProgressionForecast({
-      gameState: createGameState(player),
+      gameState,
       player,
       playerRating: createRating({ mvs: 5, ppsSeason: 20 }),
       seasonPerformance: createSeasonPerformance({ appearances: 2, totalPoints: 20 }),
@@ -194,8 +217,10 @@ describe("player progression forecast", () => {
 
   it("keeps lower-to-mid match performance visible beside hard training", () => {
     const player = createPlayer();
+    const gameState = createGameState(player);
+    pinNeutralPotential(gameState, player.id);
     const forecast = buildPlayerProgressionForecast({
-      gameState: createGameState(player),
+      gameState,
       player,
       playerRating: createRating({ mvs: 4, ppsSeason: 8 }),
       seasonPerformance: createSeasonPerformance({ appearances: 2, totalPoints: 8, top10Count: 1 }),
@@ -488,5 +513,235 @@ describe("player progression forecast", () => {
 
     expect(forecast.developmentRoute).toBe("free_agent_ambient");
     expect(forecast.netDevelopmentXP).not.toBe(0);
+  });
+
+  it("reduces training multiplier when primary route axis is capped", () => {
+    const player = createPlayer({
+      attributeSheetStats: {
+        power: 72,
+        health: 70,
+        stamina: 68,
+        speed: 40,
+        dexterity: 38,
+        awareness: 36,
+        intelligence: 35,
+        will: 34,
+        charisma: 40,
+        spirit: 38,
+        determination: 42,
+        torment: 45,
+      },
+    });
+    const openState = createGameState(player);
+    openState.playerPotential = [
+      {
+        playerId: player.id,
+        potentialBand: "high",
+        hiddenPotentialScore: 84,
+        confidence: 0,
+        source: "generated",
+        hiddenPotentialCeilingByAxis: { pow: 4.5, spe: 4, men: 3.5, soc: 3.5 },
+        hiddenPotentialOverallStars: 4,
+        hiddenAttributeCeiling: {
+          power: 80,
+          health: 82,
+          stamina: 78,
+          speed: 80,
+          dexterity: 78,
+          awareness: 76,
+          intelligence: 74,
+          will: 72,
+          charisma: 78,
+          spirit: 76,
+          determination: 80,
+          torment: 73,
+        },
+      },
+    ];
+    const cappedState = createGameState(player);
+    cappedState.playerPotential = [
+      {
+        playerId: player.id,
+        potentialBand: "medium",
+        hiddenPotentialScore: 72,
+        confidence: 0,
+        source: "generated",
+        hiddenPotentialCeilingByAxis: { pow: 2.5, spe: 4, men: 3.5, soc: 3.5 },
+        hiddenPotentialOverallStars: 3,
+        hiddenAttributeCeiling: {
+          power: 72,
+          health: 75,
+          stamina: 70,
+          speed: 80,
+          dexterity: 78,
+          awareness: 76,
+          intelligence: 74,
+          will: 72,
+          charisma: 78,
+          spirit: 76,
+          determination: 80,
+          torment: 73,
+        },
+      },
+    ];
+
+    const openForecast = buildPlayerProgressionForecast({
+      gameState: openState,
+      player,
+      playerRating: createRating({ ovrNormalized: 60 }),
+      seasonPerformance: null,
+    });
+    const cappedForecast = buildPlayerProgressionForecast({
+      gameState: cappedState,
+      player,
+      playerRating: createRating({ ovrNormalized: 60 }),
+      seasonPerformance: null,
+    });
+
+    expect(cappedForecast.potentialTrainingMultiplier).toBeLessThan(openForecast.potentialTrainingMultiplier);
+    expect(cappedForecast.baseTrainingXP).toBeLessThan(openForecast.baseTrainingXP);
+  });
+
+  it("keeps discipline performance XP independent of potential but scales net XP with PO gap", () => {
+    const player = createPlayer({
+      rating: 55,
+      coreStats: { pow: 50, spe: 50, men: 50, soc: 50 },
+    });
+    const seasonPerformance = createSeasonPerformance({ appearances: 5, totalPoints: 40, top10Count: 1 });
+    const playerRating = createRating({ ovrNormalized: 55, mvs: 8, ppsSeason: 40 });
+
+    const lowPoState = createGameState(player);
+    lowPoState.playerPotential = [
+      {
+        playerId: player.id,
+        potentialBand: "low",
+        hiddenPotentialScore: 52,
+        confidence: 0,
+        source: "generated",
+        hiddenPotentialOverallStars: 2,
+        hiddenPotentialCeilingByAxis: { pow: 2, spe: 2, men: 2, soc: 2 },
+      },
+    ];
+    const highPoState = createGameState(player);
+    highPoState.playerPotential = [
+      {
+        playerId: player.id,
+        potentialBand: "high",
+        hiddenPotentialScore: 88,
+        confidence: 0,
+        source: "generated",
+        hiddenPotentialOverallStars: 4.5,
+        hiddenPotentialCeilingByAxis: { pow: 4.5, spe: 4, men: 3.5, soc: 3.5 },
+      },
+    ];
+
+    const lowForecast = buildPlayerProgressionForecast({
+      gameState: lowPoState,
+      player,
+      playerRating,
+      seasonPerformance,
+    });
+    const highForecast = buildPlayerProgressionForecast({
+      gameState: highPoState,
+      player,
+      playerRating,
+      seasonPerformance,
+    });
+
+    expect(highForecast.performanceXP).toBe(lowForecast.performanceXP);
+    expect(highForecast.performanceXP).toBeGreaterThan(0);
+    expect(highForecast.netDevelopmentXP).toBeGreaterThan(lowForecast.netDevelopmentXP);
+    expect(highForecast.baseTrainingXP).toBeGreaterThan(lowForecast.baseTrainingXP);
+  });
+
+  it("lowers net XP from capped routes without changing discipline performance XP", () => {
+    const player = createPlayer({
+      attributeSheetStats: {
+        power: 72,
+        health: 70,
+        stamina: 68,
+        speed: 40,
+        dexterity: 38,
+        awareness: 36,
+        intelligence: 35,
+        will: 34,
+        charisma: 40,
+        spirit: 38,
+        determination: 42,
+        torment: 45,
+      },
+    });
+    const seasonPerformance = createSeasonPerformance({ appearances: 4, totalPoints: 32, top10Count: 1 });
+    const playerRating = createRating({ ovrNormalized: 60, mvs: 6, ppsSeason: 32 });
+
+    const openState = createGameState(player);
+    openState.playerPotential = [
+      {
+        playerId: player.id,
+        potentialBand: "high",
+        hiddenPotentialScore: 84,
+        confidence: 0,
+        source: "generated",
+        hiddenPotentialCeilingByAxis: { pow: 4.5, spe: 4, men: 3.5, soc: 3.5 },
+        hiddenPotentialOverallStars: 4,
+        hiddenAttributeCeiling: {
+          power: 80,
+          health: 82,
+          stamina: 78,
+          speed: 80,
+          dexterity: 78,
+          awareness: 76,
+          intelligence: 74,
+          will: 72,
+          charisma: 78,
+          spirit: 76,
+          determination: 80,
+          torment: 73,
+        },
+      },
+    ];
+    const cappedState = createGameState(player);
+    cappedState.playerPotential = [
+      {
+        playerId: player.id,
+        potentialBand: "medium",
+        hiddenPotentialScore: 72,
+        confidence: 0,
+        source: "generated",
+        hiddenPotentialCeilingByAxis: { pow: 2.5, spe: 4, men: 3.5, soc: 3.5 },
+        hiddenPotentialOverallStars: 3,
+        hiddenAttributeCeiling: {
+          power: 72,
+          health: 75,
+          stamina: 70,
+          speed: 80,
+          dexterity: 78,
+          awareness: 76,
+          intelligence: 74,
+          will: 72,
+          charisma: 78,
+          spirit: 76,
+          determination: 80,
+          torment: 73,
+        },
+      },
+    ];
+
+    const openForecast = buildPlayerProgressionForecast({
+      gameState: openState,
+      player,
+      playerRating,
+      seasonPerformance,
+    });
+    const cappedForecast = buildPlayerProgressionForecast({
+      gameState: cappedState,
+      player,
+      playerRating,
+      seasonPerformance,
+    });
+
+    expect(cappedForecast.performanceXP).toBe(openForecast.performanceXP);
+    expect(cappedForecast.baseTrainingXP).toBeLessThan(openForecast.baseTrainingXP);
+    expect(cappedForecast.netDevelopmentXP).toBeLessThan(openForecast.netDevelopmentXP);
   });
 });

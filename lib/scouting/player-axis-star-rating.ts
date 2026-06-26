@@ -66,13 +66,29 @@ function percentileOf(value: number, sortedValues: number[]) {
   return (below / sortedValues.length) * 100;
 }
 
+/**
+ * Maps league percentile → half-star CA rating.
+ * Bands are intentionally slightly asymmetric so bucket counts don't look
+ * mathematically perfect. Bottom ~3 % → 0.5★ (Ersatzspieler).
+ */
 export function percentileToCurrentAbilityStars(percentile: number) {
-  if (percentile >= 90) return roundHalfStar(4.5 + (percentile - 90) / 20);
-  if (percentile >= 70) return roundHalfStar(3.5 + (percentile - 70) / 20);
-  if (percentile >= 45) return roundHalfStar(3 + (percentile - 45) / 50);
-  if (percentile >= 20) return roundHalfStar(2.5 + (percentile - 20) / 50);
-  if (percentile >= 5) return roundHalfStar(1.5 + (percentile - 5) / 30);
-  return roundHalfStar(1 + percentile / 10);
+  if (percentile >= 92) return roundHalfStar(4.5 + (percentile - 92) / 16);
+  if (percentile >= 73) return roundHalfStar(3.5 + (percentile - 73) / 19);
+  if (percentile >= 47) return roundHalfStar(3 + (percentile - 47) / 52);
+  if (percentile >= 21) return roundHalfStar(2.5 + (percentile - 21) / 52);
+  if (percentile >= 8) return roundHalfStar(1.5 + (percentile - 8) / 26);
+  if (percentile >= 3) return roundHalfStar(1 + (percentile - 3) / 10);
+  return 0.5;
+}
+
+/** Stable 0..1 hash from player id — used for deterministic score fingerprinting. */
+function hashPlayerId(playerId: string): number {
+  let h = 2166136261;
+  for (let i = 0; i < playerId.length; i++) {
+    h ^= playerId.charCodeAt(i);
+    h = Math.imul(h, 16777619);
+  }
+  return (h >>> 0) / 4294967295;
 }
 
 function buildLeagueAxisValues(gameState: GameState) {
@@ -179,6 +195,61 @@ function buildDisciplineTags(input: {
     .slice(0, 5);
 }
 
+/**
+ * Computes a "specialist score" from raw axis values — the same formula used
+ * for overall ranking, applied to raw numbers (not star-converted).
+ * Best axis dominates; depth bonus rewards all-rounders.
+ */
+function computeSpecialistScore(values: number[]): number {
+  const sorted = [...values].filter(isFiniteNumber).sort((a, b) => b - a);
+  while (sorted.length < 4) sorted.push(0);
+  return (
+    (sorted[0] ?? 0) * 0.45 +
+    (sorted[1] ?? 0) * 0.30 +
+    (sorted[2] ?? 0) * 0.15 +
+    (sorted[3] ?? 0) * 0.10 +
+    (sorted[3] ?? 0) * 0.10 // depth bonus
+  );
+}
+
+/**
+ * Tiny deterministic offset per player so identical raw scores don't produce
+ * perfectly uniform percentile buckets (breaks the "too clean" look).
+ */
+function specialistScoreFingerprint(playerId: string, scoreSpread: number): number {
+  if (scoreSpread <= 0) return 0;
+  return (hashPlayerId(playerId) - 0.5) * scoreSpread * 0.012;
+}
+
+/** Builds a sorted array of specialist scores for all players in the league. */
+function buildLeagueSpecialistScores(gameState: GameState, scoreSpread: number): number[] {
+  return gameState.players
+    .map((player) => {
+      const base = computeSpecialistScore(Object.values(player.coreStats ?? {}));
+      return base + specialistScoreFingerprint(player.id, scoreSpread);
+    })
+    .filter(isFiniteNumber)
+    .sort((a, b) => a - b);
+}
+
+/** Drag overall down when a player is genuinely awful in at least one axis. */
+function applyWeakAxisOverallPenalty(input: {
+  overall: number;
+  player: Player;
+  leagueAxisValues: Record<PlayerAxisKey, number[]>;
+}): number {
+  const axisPercentiles = AXIS_KEYS.map((axis) => {
+    const value = getAxisValue(input.player, axis);
+    if (value == null) return 100;
+    return percentileOf(value, input.leagueAxisValues[axis]);
+  });
+  const weakestPct = Math.min(...axisPercentiles);
+  let penalty = 0;
+  if (weakestPct < 4) penalty = 1.0;
+  else if (weakestPct < 10) penalty = 0.5;
+  return roundHalfStar(clamp(input.overall - penalty, 0.5, 5));
+}
+
 export function buildPlayerAxisStarProfile(input: {
   gameState: GameState;
   player: Player;
@@ -206,10 +277,29 @@ export function buildPlayerAxisStarProfile(input: {
     axisStars[axis] = roundHalfStar(baseStars + bonus);
   }
 
-  const weights = getClassAxisWeights(input.player.className);
-  const overall = roundHalfStar(
-    AXIS_KEYS.reduce((sum, axis) => sum + axisStars[axis] * weights[axis], 0),
-  );
+  // Overall = percentile of this player's specialist score in the full league.
+  // Fingerprint jitter + weak-axis penalty break the overly uniform percentile look.
+  const rawSpecialistScores = input.gameState.players
+    .map((p) => computeSpecialistScore(Object.values(p.coreStats ?? {})))
+    .filter(isFiniteNumber)
+    .sort((a, b) => a - b);
+  const scoreSpread =
+    rawSpecialistScores.length > 0
+      ? rawSpecialistScores[rawSpecialistScores.length - 1]! - rawSpecialistScores[0]!
+      : 0;
+  const leagueSpecialistScores = buildLeagueSpecialistScores(input.gameState, scoreSpread);
+  const playerSpecialistScore =
+    computeSpecialistScore(Object.values(input.player.coreStats ?? {})) +
+    specialistScoreFingerprint(input.player.id, scoreSpread);
+  const overallPercentile =
+    leagueSpecialistScores.length > 0
+      ? percentileOf(playerSpecialistScore, leagueSpecialistScores)
+      : 50;
+  const overall = applyWeakAxisOverallPenalty({
+    overall: roundHalfStar(percentileToCurrentAbilityStars(overallPercentile)),
+    player: input.player,
+    leagueAxisValues,
+  });
 
   return {
     pow: axisStars.pow,

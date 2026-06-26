@@ -22,11 +22,12 @@ type DemandPlayerLike = Pick<
   | "attributeSheetStats"
   | "pps"
   | "ovr"
-  | "trainingMode"
-  | "fatigue"
-  | "potential"
-  | "age"
->;
+> & {
+  trainingMode?: Player["trainingMode"];
+  fatigue?: number;
+  potential?: number;
+  age?: number | null;
+};
 
 type DemandDisciplineLike = Pick<Discipline, "id" | "name" | "category"> & { playerCount?: number | null };
 
@@ -311,7 +312,7 @@ function buildAppearanceDemand(input: {
 
 function buildTrainingModePlayerDemand(input: {
   context: DemandContext;
-  player: DemandPlayerLike & Pick<Player, "trainingMode" | "fatigue">;
+  player: DemandPlayerLike;
   rosterRank: number;
 }): PlayerDemandRecord | null {
   return buildTrainingModeDemandRecord({
@@ -320,7 +321,16 @@ function buildTrainingModePlayerDemand(input: {
       teamId: input.context.teamId,
       matchdayIndex: input.context.matchdayIndex ?? null,
     },
-    player: input.player,
+    player: {
+      id: input.player.id,
+      name: input.player.name,
+      traitsPositive: input.player.traitsPositive,
+      traitsNegative: input.player.traitsNegative,
+      trainingMode: input.player.trainingMode ?? "mittel",
+      fatigue: input.player.fatigue ?? 0,
+      potential: input.player.potential ?? 0,
+      age: input.player.age,
+    },
     rosterRank: input.rosterRank,
   });
 }

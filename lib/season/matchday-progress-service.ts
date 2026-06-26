@@ -1,5 +1,6 @@
 import type { Fixture, GameLogEntry, GameState, LineupDraft, MatchdayAdvanceLogRecord, PlayerMoraleState } from "@/lib/data/olyDataTypes";
 import { assessPlayerMorale } from "@/lib/morale/player-morale-service";
+import type { PersistenceService } from "@/lib/persistence/types";
 import { createPersistenceService } from "@/lib/persistence/persistence-service";
 import { advanceScoutIntelTick } from "@/lib/scouting/facility-scout-pipeline-service";
 import { maybeGenerateSponsorEvents } from "@/lib/sponsor/sponsor-event-service";

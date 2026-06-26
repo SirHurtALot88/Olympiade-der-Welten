@@ -377,4 +377,39 @@ describe("training-levelup-service", () => {
     expect(firstImprovement?.marketValuePreviewDelta).not.toBeNull();
     expect(firstImprovement?.expectedSalaryPreviewDelta).not.toBeNull();
   });
+
+  it("blocks attribute upgrades when hidden ceiling is reached", () => {
+    const testPlayer = player({
+      attributeSheetStats: attributes({ power: 72 }),
+    });
+    const model = buildPlayerDevelopmentLevelupModel({
+      player: testPlayer,
+      potentialRecord: {
+        playerId: testPlayer.id,
+        potentialBand: "medium",
+        hiddenPotentialScore: 72,
+        confidence: 0,
+        source: "generated",
+        hiddenAttributeCeiling: {
+          power: 72,
+          health: 75,
+          stamina: 70,
+          speed: 80,
+          dexterity: 78,
+          awareness: 76,
+          intelligence: 74,
+          will: 72,
+          charisma: 78,
+          spirit: 76,
+          determination: 80,
+          torment: 73,
+        },
+      },
+    });
+    const powerPreview = model.upgradePreview.find((row) => row.attribute === "power");
+
+    expect(powerPreview?.blocked).toBe(true);
+    expect(powerPreview?.blockReason).toBe("potential_ceiling_reached");
+    expect(powerPreview?.ceilingState).toBe("capped");
+  });
 });

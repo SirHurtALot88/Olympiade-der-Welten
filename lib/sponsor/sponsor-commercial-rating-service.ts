@@ -1,5 +1,5 @@
-import type { GameState, SponsorCommercialRating, SponsorStarTier, TeamManagementSnapshotRow } from "@/lib/data/olyDataTypes";
-import { buildTeamSeasonOverviewRows } from "@/lib/foundation/team-management-overview";
+import type { GameState, SponsorCommercialRating, SponsorStarTier } from "@/lib/data/olyDataTypes";
+import { buildTeamSeasonOverviewRows, type TeamManagementSnapshotRow } from "@/lib/foundation/team-management-overview";
 
 function clamp(value: number, min: number, max: number) {
   return Math.min(Math.max(value, min), max);
@@ -71,15 +71,22 @@ export function buildSponsorCommercialRating(input: {
   const row = rows.find((entry) => entry.teamId === input.teamId) ?? null;
   const identity = input.gameState.teamIdentities.find((entry) => entry.teamId === input.teamId) ?? null;
 
-  const avgWeightedRank = row ? computeWeightedHistoricalRank(row) : null;
-  const recentPerformance = rankToScore(avgWeightedRank) * 0.45;
+  const standingRank =
+    row?.startplatz ??
+    row?.rank ??
+    (row ? computeWeightedHistoricalRank(row) : null);
+  const recentPerformance = rankToScore(standingRank) * 0.55;
 
   const marketValues = rows.map((entry) => entry.marketValueTotal ?? 0);
+  const budgetValues = rows.map((entry) => entry.budget ?? entry.cash ?? 0);
   const axisValues = rows.map((entry) => {
     const values = [entry.ppsPow, entry.ppsSpe, entry.ppsMen, entry.ppsSoc].filter((value) => value != null && value > 0);
     return values.length > 0 ? values.reduce((sum, value) => sum + value, 0) / values.length : 0;
   });
-  const mvPct = percentileRank(marketValues, row?.marketValueTotal ?? null);
+  const mvPct = percentileRank(
+    marketValues.some((value) => value > 0) ? marketValues : budgetValues,
+    (row?.marketValueTotal ?? 0) > 0 ? row?.marketValueTotal ?? null : row?.budget ?? row?.cash ?? null,
+  );
   const axisPct = percentileRank(
     axisValues,
     row
@@ -103,7 +110,7 @@ export function buildSponsorCommercialRating(input: {
     },
     inputs: {
       lastSeasonRank: row?.historicalLastSeasonRank ?? row?.rank ?? null,
-      avgWeightedRank,
+      avgWeightedRank: standingRank,
       marketValuePercentile: mvPct,
       axisPercentile: axisPct,
       depthScore,

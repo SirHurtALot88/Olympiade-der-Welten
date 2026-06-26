@@ -57,6 +57,7 @@ export function buildPlayerStarScoutingSnapshot(input: {
     saveId: input.saveId,
     player: input.player,
     currentStars,
+    hiddenPotentialScore: baseRecord.hiddenPotentialScore,
     existing: existingRecord,
   });
 
@@ -86,5 +87,41 @@ export function buildPlayerStarScoutingSnapshot(input: {
     revealedPotentialStars,
     potentialGap,
     fairValueRatio,
+  };
+}
+
+/** Compact CA/PO fields for scouting hub watchlist cards. */
+export function buildScoutingWatchTargetStarFields(input: {
+  gameState: GameState;
+  player: Player;
+  saveId: string;
+  scoutingLevel: number;
+}) {
+  const snapshot = buildPlayerStarScoutingSnapshot(input);
+  const record =
+    input.gameState.playerPotential?.find((entry) => entry.playerId === input.player.id) ?? null;
+  const potentialRecord = buildPlayerPotentialRecord({
+    saveId: input.saveId,
+    player: input.player,
+    existing: record,
+  });
+
+  return {
+    caOverall: snapshot.currentStars.overall,
+    caPow: snapshot.currentStars.pow,
+    caSpe: snapshot.currentStars.spe,
+    caMen: snapshot.currentStars.men,
+    caSoc: snapshot.currentStars.soc,
+    caDisplay: snapshot.revealedCurrentStars.displayLabel,
+    poDisplay: snapshot.revealedPotentialStars.displayLabel,
+    poMin: snapshot.revealedPotentialStars.overallMin,
+    poMax: snapshot.revealedPotentialStars.overallMax,
+    poPow: snapshot.potentialCeiling.pow,
+    poSpe: snapshot.potentialCeiling.spe,
+    poMen: snapshot.potentialCeiling.men,
+    poSoc: snapshot.potentialCeiling.soc,
+    potentialGap: snapshot.potentialGap,
+    potentialScore: potentialRecord.hiddenPotentialScore ?? null,
+    potentialBand: potentialRecord.potentialBand ?? null,
   };
 }

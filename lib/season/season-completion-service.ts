@@ -31,7 +31,7 @@ export const SEASON_COMPLETION_CONFIRM_TOKEN = "COMPLETE_LOCAL_SEASON_PIPELINE";
 export type SeasonCompletionStepStatus = "planned" | "applied" | "already_done" | "blocked" | "skipped";
 
 export type SeasonCompletionStep = {
-  key: "season_check" | "season_review" | "objective_rewards" | "cash_apply" | "relationships" | "snapshot" | "transition" | "ai_audit";
+  key: "season_check" | "season_review" | "objective_rewards" | "cash_apply" | "sponsor_settlement" | "relationships" | "snapshot" | "transition" | "ai_audit";
   label: string;
   status: SeasonCompletionStepStatus;
   warnings: string[];

@@ -12,7 +12,6 @@ import { buildTeamSeasonOverviewRows, type TeamManagementSnapshotRow } from "@/l
 import { getTeamDevelopmentTendency } from "@/lib/foundation/team-development-tendency";
 import { getTeamStrategyProfile } from "@/lib/foundation/team-strategy-profiles";
 import { getPrimaryTeamRivalry } from "@/lib/rivalries/team-rivalries";
-import { ensureSeasonSponsorOffers } from "@/lib/sponsor/sponsor-offer-service";
 import { getTeamSponsorContract } from "@/lib/sponsor/sponsor-offer-read";
 import {
   evaluateSpecialComponentForObjective,
@@ -1704,17 +1703,16 @@ export function getTeamObjectiveAiBias(gameState: GameState, teamId: string) {
 }
 
 export function refreshTeamObjectiveState(gameState: GameState): GameState {
-  const withSponsors = ensureSeasonSponsorOffers(gameState);
-  const overview = buildTeamObjectiveOverview(withSponsors);
+  const overview = buildTeamObjectiveOverview(gameState);
   const currentSeasonId = gameState.season.id;
   const otherSeasonObjectives = (gameState.seasonState.teamSeasonObjectives ?? []).filter(
     (objective) => objective.seasonId !== currentSeasonId,
   );
 
   return {
-    ...withSponsors,
+    ...gameState,
     seasonState: {
-      ...withSponsors.seasonState,
+      ...gameState.seasonState,
       teamSeasonObjectives: [...otherSeasonObjectives, ...overview.objectives],
       boardConfidence: {
         ...(gameState.seasonState.boardConfidence ?? {}),

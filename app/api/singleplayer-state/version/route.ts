@@ -64,13 +64,23 @@ export async function GET(request: Request) {
     disciplineResultsSignature,
   ].join("|");
 
-  return NextResponse.json({
-    ok: true,
-    saveId: save.saveId,
-    updatedAt: save.updatedAt,
-    seasonId: save.gameState.season.id,
-    matchdayId: save.gameState.matchdayState.matchdayId,
-    signature,
+    const contentSignature = [
+      save.gameState.season.id,
+      save.gameState.matchdayState.matchdayId,
+      matchdayResultsSignature,
+      standingsApplySignature,
+      seasonSnapshotsSignature,
+      disciplineResultsSignature,
+    ].join("|");
+
+    return NextResponse.json({
+      ok: true,
+      saveId: save.saveId,
+      updatedAt: save.updatedAt,
+      seasonId: save.gameState.season.id,
+      matchdayId: save.gameState.matchdayState.matchdayId,
+      signature,
+      contentSignature,
     matchdayResultsSignature,
     standingsApplySignature,
     seasonSnapshotsSignature,

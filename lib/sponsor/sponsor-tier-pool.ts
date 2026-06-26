@@ -38,21 +38,69 @@ function pickTierFromWeights(weights: [number, number, number, number, number], 
   return 1;
 }
 
-function adjustTiers(tiers: SponsorStarTier[]): SponsorStarTier[] {
-  const adjusted = [...tiers];
-  const unique = new Set(adjusted);
-  if (unique.size === 1 && adjusted.length === 3) {
-    adjusted[1] = clampTier((adjusted[1]! + 1) as SponsorStarTier);
-    adjusted[2] = clampTier((adjusted[2]! - 1) as SponsorStarTier);
+export function getMaxStarTierForStandingRank(rank: number | null | undefined): SponsorStarTier {
+  if (rank == null || !Number.isFinite(rank)) {
+    return 3;
   }
-  return adjusted;
+  if (rank >= 28) {
+    return 1;
+  }
+  if (rank >= 22) {
+    return 2;
+  }
+  if (rank >= 16) {
+    return 3;
+  }
+  if (rank >= 9) {
+    return 4;
+  }
+  return 5;
+}
+
+export function getMaxStarTierForCommercialRating(commercialRating: number): SponsorStarTier {
+  if (commercialRating >= 86) {
+    return 5;
+  }
+  if (commercialRating >= 66) {
+    return 4;
+  }
+  if (commercialRating >= 46) {
+    return 3;
+  }
+  if (commercialRating >= 26) {
+    return 2;
+  }
+  return 1;
+}
+
+function clampTierToCap(tier: SponsorStarTier, maxTier: SponsorStarTier): SponsorStarTier {
+  return Math.min(Math.max(1, tier), maxTier) as SponsorStarTier;
+}
+
+function adjustTiers(tiers: SponsorStarTier[], maxTier: SponsorStarTier): SponsorStarTier[] {
+  const adjusted = tiers.map((tier) => clampTierToCap(tier, maxTier));
+  if (new Set(adjusted).size === 1 && adjusted.length === 3 && maxTier >= 2) {
+    const base = adjusted[0]!;
+    if (base === maxTier) {
+      adjusted[1] = clampTierToCap((base - 1) as SponsorStarTier, maxTier);
+      adjusted[2] = clampTierToCap((base - 2) as SponsorStarTier, maxTier);
+    } else if (base === 1) {
+      adjusted[1] = clampTierToCap(2, maxTier);
+      adjusted[2] = clampTierToCap(Math.min(3, maxTier) as SponsorStarTier, maxTier);
+    } else {
+      adjusted[1] = clampTierToCap((base + 1) as SponsorStarTier, maxTier);
+      adjusted[2] = clampTierToCap((base - 1) as SponsorStarTier, maxTier);
+    }
+  }
+  return adjusted.map((tier) => clampTierToCap(tier, maxTier));
 }
 
 function applyChampionLuckRoll(
   tiers: SponsorStarTier[],
   input: { seasonId: string; teamId: string; commercialRating: number },
+  maxTier: SponsorStarTier,
 ): SponsorStarTier[] {
-  if (input.commercialRating < 80) {
+  if (input.commercialRating < 80 || maxTier < 5) {
     return tiers;
   }
   const luckRoll = getStableUnitHash(`${input.seasonId}:${input.teamId}:sponsor-luck`);
@@ -62,7 +110,7 @@ function applyChampionLuckRoll(
   const adjusted = [...tiers];
   const luckySlot = Math.floor(getStableUnitHash(`${input.seasonId}:${input.teamId}:sponsor-lucky-slot`) * adjusted.length);
   adjusted[luckySlot] = 5;
-  return adjusted;
+  return adjusted.map((tier) => clampTierToCap(tier, maxTier));
 }
 
 function clampTier(tier: SponsorStarTier): SponsorStarTier {
@@ -73,18 +121,26 @@ export function rollSponsorStarTiers(input: {
   seasonId: string;
   teamId: string;
   commercialRating: number;
+  standingRank?: number | null;
   slotCount?: number;
 }): SponsorStarTier[] {
   const slotCount = input.slotCount ?? 3;
+  const maxTier = Math.min(
+    getMaxStarTierForCommercialRating(input.commercialRating),
+    getMaxStarTierForStandingRank(input.standingRank),
+  ) as SponsorStarTier;
   const weights = TIER_WEIGHTS[getWeightBucket(input.commercialRating)]!;
   const tiers = Array.from({ length: slotCount }, (_, slotIndex) =>
-    pickTierFromWeights(weights, `${input.seasonId}:${input.teamId}:sponsor-tier:${slotIndex}`),
+    clampTierToCap(
+      pickTierFromWeights(weights, `${input.seasonId}:${input.teamId}:sponsor-tier:${slotIndex}`),
+      maxTier,
+    ),
   );
-  return applyChampionLuckRoll(adjustTiers(tiers), input);
+  return applyChampionLuckRoll(adjustTiers(tiers, maxTier), input, maxTier);
 }
 
 export function getRewardMultiplier(starTier: SponsorStarTier) {
-  return 0.75 + starTier * 0.25;
+  return 0.95 + starTier * 0.05;
 }
 
 export function getDemandMultiplier(starTier: SponsorStarTier) {

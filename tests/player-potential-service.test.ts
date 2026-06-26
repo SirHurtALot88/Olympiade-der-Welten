@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 
 import {
+  applySeasonEndPotentialUpdate,
   buildPotentialAiUsagePreview,
   buildPlayerDevelopmentInsight,
   buildPlayerPotentialRecord,
@@ -8,6 +9,7 @@ import {
   buildPlayerScoutPotentialFromGameState,
   revealPlayerPotentialRecord,
 } from "@/lib/progression/player-potential-service";
+import { buildPlayerAxisStarProfile } from "@/lib/scouting/player-axis-star-rating";
 
 function makePlayer(overrides = {}) {
   return {
@@ -237,5 +239,66 @@ describe("player potential service", () => {
 
     expect(highExpectedPremium).toBeGreaterThan(lowExpectedPremium);
     expect(rosterContractSalary).toBe(12.5);
+  });
+
+  it("always applies season-end score drift and stores axis snapshot", () => {
+    const target = makePlayer();
+    const record = buildPlayerPotentialRecord({ saveId: "save-a", player: target });
+    const gameState = {
+      season: { id: "season-1" },
+      players: [target],
+      disciplines: [
+        { id: "d_pow", name: "Pow", category: "power", displayOrder: 1, originalOrder: 1, playerCount: 1 },
+        { id: "d_spe", name: "Spe", category: "speed", displayOrder: 2, originalOrder: 2, playerCount: 1 },
+        { id: "d_men", name: "Men", category: "mental", displayOrder: 3, originalOrder: 3, playerCount: 1 },
+        { id: "d_soc", name: "Soc", category: "social", displayOrder: 4, originalOrder: 4, playerCount: 1 },
+      ],
+    } as never;
+
+    const updated = applySeasonEndPotentialUpdate({
+      saveId: "save-a",
+      seasonId: "season-1",
+      player: target,
+      record,
+      growthOutlook: "stable",
+      gameState,
+    });
+
+    expect(updated.hiddenPotentialScore).not.toBe(record.hiddenPotentialScore);
+    expect(updated.lastSeasonSnapshot?.seasonId).toBe("season-1");
+    expect(updated.lastSeasonSnapshot?.hiddenPotentialScore).toBe(record.hiddenPotentialScore);
+    expect(updated.hiddenPotentialCeilingByAxis).toBeDefined();
+    expect(updated.hiddenAttributeCeiling).toBeDefined();
+  });
+
+  it("drifts axis ceilings by at most 1 star per season", () => {
+    const target = makePlayer();
+    const record = buildPlayerPotentialRecord({ saveId: "save-a", player: target });
+    const gameState = {
+      season: { id: "season-1" },
+      players: [target],
+      disciplines: [
+        { id: "d_pow", name: "Pow", category: "power", displayOrder: 1, originalOrder: 1, playerCount: 1 },
+        { id: "d_spe", name: "Spe", category: "speed", displayOrder: 2, originalOrder: 2, playerCount: 1 },
+        { id: "d_men", name: "Men", category: "mental", displayOrder: 3, originalOrder: 3, playerCount: 1 },
+        { id: "d_soc", name: "Soc", category: "social", displayOrder: 4, originalOrder: 4, playerCount: 1 },
+      ],
+    } as never;
+    const before = buildPlayerAxisStarProfile({ gameState, player: target });
+    const beforeRecord = applySeasonEndPotentialUpdate({
+      saveId: "save-a",
+      seasonId: "season-1",
+      player: target,
+      record,
+      growthOutlook: "stable",
+      gameState,
+    });
+    const snapshot = beforeRecord.lastSeasonSnapshot!;
+
+    for (const axis of ["pow", "spe", "men", "soc"] as const) {
+      const delta = Math.abs((beforeRecord.hiddenPotentialCeilingByAxis?.[axis] ?? 0) - snapshot.byAxis[axis]);
+      expect(delta).toBeLessThanOrEqual(1);
+    }
+    expect(before.overall).toBeGreaterThan(0);
   });
 });

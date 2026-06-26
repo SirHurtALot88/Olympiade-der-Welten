@@ -31,7 +31,10 @@ export function isActiveSponsorContract(contract: TeamSponsorContract | null | u
   if ((contract.seasonsRemaining ?? 1) <= 0) {
     return false;
   }
-  return contract.seasonId === seasonId || (contract.seasonsRemaining ?? 0) > 0;
+  // Contract is active when it belongs to the current season or still has remaining terms.
+  // The seasonsRemaining > 0 guard above already covers the multi-season case;
+  // require seasonId match here to avoid carrying a stale single-season contract forward.
+  return contract.seasonId === seasonId || (contract.seasonsRemaining ?? 0) > 1;
 }
 
 export function advanceSponsorContractsForNewSeason(gameState: GameState, nextSeasonId: string): GameState {

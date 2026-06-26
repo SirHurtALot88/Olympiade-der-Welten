@@ -129,19 +129,29 @@ export async function GET(request: Request) {
             },
           });
 
-    const sheet = await inspectSeasonStandingsSheet();
+    const sheet =
+      source === "sqlite"
+        ? null
+        : await inspectSeasonStandingsSheet();
     const sheetRows =
-      sheet.sourceKind === "season_standings"
+      sheet?.sourceKind === "season_standings"
         ? (sheet.mappedRows as SeasonStandingsSheetRow[])
         : [];
-    const mapping = mapSeasonStandingsRowsToTeams(
-      sheetRows,
-      teamStates.map((state) => ({
-        teamId: state.teamId,
-        shortCode: state.team.shortCode,
-        teamName: state.team.name,
-      })),
-    );
+    const mapping =
+      source === "sqlite"
+        ? {
+            rows: [],
+            missingInDb: [],
+            mappingWarnings: [],
+          }
+        : mapSeasonStandingsRowsToTeams(
+            sheetRows,
+            teamStates.map((state) => ({
+              teamId: state.teamId,
+              shortCode: state.team.shortCode,
+              teamName: state.team.name,
+            })),
+          );
     const teamStateById = new Map(teamStates.map((state) => [state.teamId, state] as const));
     const localSheetRowByTeamId =
       source === "sqlite"
@@ -312,9 +322,9 @@ export async function GET(request: Request) {
       missingMappings: mapping.missingInDb,
       mappingWarnings: mapping.mappingWarnings,
       source: {
-        kind: "season_standings_sheet",
-        access: sheet.access,
-        detectedColumns: sheet.detectedColumns,
+        kind: source === "sqlite" ? "local_save" : "season_standings_sheet",
+        access: sheet?.access ?? "local_save",
+        detectedColumns: sheet?.detectedColumns ?? [],
         disciplineColumns: SEASON_STANDINGS_DISCIPLINE_COLUMNS,
       },
       scope: {

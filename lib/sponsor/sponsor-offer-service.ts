@@ -15,7 +15,8 @@ import type {
 } from "@/lib/data/olyDataTypes";
 import { buildTeamSeasonOverviewRows } from "@/lib/foundation/team-management-overview";
 import { getTeamStrategyProfile } from "@/lib/foundation/team-strategy-profiles";
-import { buildTeamControlSettingsMap, type TeamControlSettings } from "@/lib/foundation/team-control-settings";
+import { buildTeamControlSettingsMap } from "@/lib/foundation/team-control-settings";
+import type { TeamControlSettings } from "@/lib/data/olyDataTypes";
 import { pickSponsorBrandForOffer, buildGlobalParentUsageFromOffers } from "@/lib/sponsor/sponsor-brand-catalog";
 import { appendSponsorBrandHistory, getRecentSponsorParentIds } from "@/lib/sponsor/sponsor-contract-lifecycle";
 import { getTeamSponsorContract, getTeamSponsorOffers } from "@/lib/sponsor/sponsor-offer-read";
@@ -24,6 +25,13 @@ import {
   applySponsorNegotiationToContract,
   defaultAiSponsorNegotiation,
 } from "@/lib/sponsor/sponsor-negotiation";
+import {
+  estimateExpectedPayout,
+  getEconomyMultiplier,
+  getPrizeMoneyReference,
+  scaleSponsorComponentValue,
+  sumWeightedBlueprintComponentValue,
+} from "@/lib/sponsor/sponsor-economy-calibration";
 import {
   getDemandMultiplier,
   getDemandProfile,
@@ -35,33 +43,9 @@ function roundCash(value: number) {
   return Number(value.toFixed(1));
 }
 
-function clamp(value: number, min: number, max: number) {
-  return Math.min(Math.max(value, min), max);
-}
-
-const REFERENCE_BLUEPRINT_TOTAL = 20;
-const SPONSOR_PAYROLL_SHARE = 0.5;
-
 function getCurrentSalaryFactor(gameState: GameState): number {
   const factor = gameState.seasonState.seasonEconomyFactors?.[0]?.factor;
   return typeof factor === "number" && Number.isFinite(factor) && factor > 0 ? factor : 1;
-}
-
-function getTeamSponsorEconomyMultiplier(input: {
-  teamSalaryTotal: number | null;
-  salaryFactor: number;
-  rewardMult: number;
-}): number {
-  const salary = input.teamSalaryTotal ?? 0;
-  if (salary <= 0) {
-    return input.salaryFactor;
-  }
-  const targetBestOffer = salary * input.salaryFactor * SPONSOR_PAYROLL_SHARE;
-  const baselineOffer = REFERENCE_BLUEPRINT_TOTAL * input.rewardMult;
-  if (baselineOffer <= 0) {
-    return input.salaryFactor;
-  }
-  return Math.max(input.salaryFactor * 0.5, Math.min(12, targetBestOffer / baselineOffer));
 }
 
 function getSportTargetRank(
@@ -101,15 +85,14 @@ function buildOffer(input: {
   commercialRating: number;
   slotIndex: number;
   salaryFactor: number;
-  teamSalaryTotal: number | null;
+  referenceRank: number;
   usedParentBrandIds?: string[];
   recentParentBrandIds?: string[];
   globalParentUsage?: Record<string, number>;
 }): SponsorOffer {
-  const { team, identity, profile, archetype, rankTarget, startRank, gameState, starTier, commercialRating, slotIndex, salaryFactor, teamSalaryTotal } = input;
+  const { team, identity, profile, archetype, rankTarget, startRank, gameState, starTier, commercialRating, slotIndex, salaryFactor, referenceRank } = input;
   const demandMult = getDemandMultiplier(starTier);
   const rewardMult = getRewardMultiplier(starTier);
-  const economyMult = getTeamSponsorEconomyMultiplier({ teamSalaryTotal, salaryFactor, rewardMult });
   const improvementBase = startRank != null ? Math.min(4, Math.max(2, Math.round((startRank - rankTarget) / 2) || 2)) : 2;
   const improvementTarget = improvementBase + (starTier >= 4 ? 1 : 0) + (starTier >= 5 ? 1 : 0);
   const { brand, parent, special } = pickSponsorBrandForOffer({
@@ -125,35 +108,43 @@ function buildOffer(input: {
     recentParentBrandIds: input.recentParentBrandIds,
     globalParentUsage: input.globalParentUsage,
   });
+  const economyMult = getEconomyMultiplier({
+    rank: referenceRank,
+    salaryFactor,
+    starTier,
+    blueprintComponentSum: sumWeightedBlueprintComponentValue(brand),
+    rewardMult,
+  });
 
-  const scale = (value: number) => roundCash(value * rewardMult * economyMult);
+  const scale = (kind: SponsorOfferComponent["kind"], value: number) =>
+    scaleSponsorComponentValue(kind, value, rewardMult, economyMult);
   const components: SponsorOfferComponent[] = [
     {
       componentId: "base-cash",
       kind: "base",
       label: "Basis-Saisonzahlung",
-      targetValue: scale(brand.baseCash),
-      rewardCash: scale(brand.baseCash),
+      targetValue: scale("base", brand.baseCash),
+      rewardCash: scale("base", brand.baseCash),
     },
     {
       componentId: "rank-target",
       kind: "rank",
       label: `Platzierung Top ${rankTarget}`,
       targetValue: rankTarget,
-      rewardCash: scale(brand.rankCash),
-      penaltyCash: Math.max(1, roundCash(scale(brand.rankCash) / 3 * demandMult)),
+      rewardCash: scale("rank", brand.rankCash),
+      penaltyCash: Math.max(1, roundCash(scale("rank", brand.rankCash) / 3 * demandMult)),
     },
     {
       componentId: "improvement-target",
       kind: "improvement",
       label: `≥ ${improvementTarget} Plätze verbessern`,
       targetValue: improvementTarget,
-      rewardCash: scale(brand.improvementCash),
+      rewardCash: scale("improvement", brand.improvementCash),
     },
     {
       ...special,
-      rewardCash: scale(special.rewardCash),
-      penaltyCash: special.penaltyCash != null ? roundCash(special.penaltyCash * demandMult) : undefined,
+      rewardCash: scale("special", special.rewardCash),
+      penaltyCash: special.penaltyCash != null ? roundCash(scale("special", special.penaltyCash) / demandMult) : undefined,
     },
   ];
 
@@ -189,17 +180,19 @@ export function buildSponsorOffersForTeam(input: {
   const profile = getTeamStrategyProfile(input.gameState, input.teamId);
   const startRank = row?.startplatz ?? row?.rank ?? null;
   const commercialRating = buildSponsorCommercialRating({ gameState: input.gameState, teamId: input.teamId });
+  const standingRank = row?.startplatz ?? row?.rank ?? null;
   const starTiers = rollSponsorStarTiers({
     seasonId: input.gameState.season.id,
     teamId: input.teamId,
     commercialRating: commercialRating.score,
+    standingRank,
   });
   const archetypes: SponsorArchetype[] = ["security", "performance", "identity"];
   const usedParentBrandIds: string[] = [];
   const recentParentBrandIds = getRecentSponsorParentIds(input.gameState, input.teamId);
   const globalParentUsage = buildGlobalParentUsageFromOffers(input.gameState.seasonState.sponsorOffersByTeamId);
   const salaryFactor = getCurrentSalaryFactor(input.gameState);
-  const teamSalaryTotal = row?.salaryTotal ?? null;
+  const referenceRank = row?.rank ?? row?.startplatz ?? 16;
 
   return archetypes.map((archetype, slotIndex) => {
     const starTier = starTiers[slotIndex] ?? 2;
@@ -216,7 +209,7 @@ export function buildSponsorOffersForTeam(input: {
       commercialRating: commercialRating.score,
       slotIndex,
       salaryFactor,
-      teamSalaryTotal,
+      referenceRank,
       usedParentBrandIds,
       recentParentBrandIds,
       globalParentUsage,
@@ -226,6 +219,60 @@ export function buildSponsorOffersForTeam(input: {
     }
     return offer;
   });
+}
+
+function scaleOfferComponents(offer: SponsorOffer, scale: number): SponsorOffer {
+  if (scale === 1) {
+    return offer;
+  }
+  const components = offer.components.map((component) => ({
+    ...component,
+    targetValue:
+      typeof component.targetValue === "number" ? roundCash(component.targetValue * scale) : component.targetValue,
+    rewardCash: roundCash(component.rewardCash * scale),
+    penaltyCash: component.penaltyCash != null ? roundCash(component.penaltyCash * scale) : undefined,
+  }));
+  return {
+    ...offer,
+    components,
+    totalUpsideEstimate: roundCash(components.reduce((sum, component) => sum + component.rewardCash, 0)),
+  };
+}
+
+function normalizeLeagueSponsorOffers(gameState: GameState, offersByTeamId: Record<string, SponsorOffer[]>) {
+  const salaryFactor = getCurrentSalaryFactor(gameState);
+  const rows = buildTeamSeasonOverviewRows({ gameState });
+  const prizeTotal = gameState.teams.reduce((sum, team) => {
+    const row = rows.find((entry) => entry.teamId === team.teamId) ?? null;
+    const rank = row?.rank ?? row?.startplatz ?? 16;
+    return sum + getPrizeMoneyReference(rank, salaryFactor);
+  }, 0);
+  const expectedTotal = gameState.teams.reduce((sum, team) => {
+    const row = rows.find((entry) => entry.teamId === team.teamId) ?? null;
+    const rank = row?.rank ?? row?.startplatz ?? 16;
+    const offers = offersByTeamId[team.teamId] ?? [];
+    const best = offers.reduce(
+      (max, offer) => Math.max(max, estimateExpectedPayout(offer, rank)),
+      0,
+    );
+    return sum + best;
+  }, 0);
+
+  if (prizeTotal <= 0 || expectedTotal <= 0) {
+    return offersByTeamId;
+  }
+
+  const ratio = expectedTotal / prizeTotal;
+  if (ratio >= 0.92 && ratio <= 1.08) {
+    return offersByTeamId;
+  }
+
+  const scale = prizeTotal / expectedTotal;
+  const nextOffers: Record<string, SponsorOffer[]> = {};
+  for (const team of gameState.teams) {
+    nextOffers[team.teamId] = (offersByTeamId[team.teamId] ?? []).map((offer) => scaleOfferComponents(offer, scale));
+  }
+  return nextOffers;
 }
 
 export function regenerateSponsorOffersForSeason(gameState: GameState, teamIds?: string[]): GameState {
@@ -240,11 +287,13 @@ export function regenerateSponsorOffersForSeason(gameState: GameState, teamIds?:
     nextOffers[teamId] = buildSponsorOffersForTeam({ gameState, teamId });
   }
 
+  const normalizedOffers = normalizeLeagueSponsorOffers(gameState, nextOffers);
+
   return {
     ...gameState,
     seasonState: {
       ...gameState.seasonState,
-      sponsorOffersByTeamId: nextOffers,
+      sponsorOffersByTeamId: normalizedOffers,
     },
   };
 }
@@ -271,7 +320,19 @@ export function ensureSeasonSponsorOffers(gameState: GameState): GameState {
     }
   }
 
-  if (!changed) {
+  const normalizedOffers = normalizeLeagueSponsorOffers(gameState, nextOffers);
+
+  if (!changed && normalizedOffers === nextOffers) {
+    return gameState;
+  }
+
+  const offersChanged =
+    changed ||
+    Object.keys(normalizedOffers).some(
+      (teamId) => normalizedOffers[teamId] !== (gameState.seasonState.sponsorOffersByTeamId ?? {})[teamId],
+    );
+
+  if (!offersChanged) {
     return gameState;
   }
 
@@ -279,7 +340,7 @@ export function ensureSeasonSponsorOffers(gameState: GameState): GameState {
     ...gameState,
     seasonState: {
       ...gameState.seasonState,
-      sponsorOffersByTeamId: nextOffers,
+      sponsorOffersByTeamId: normalizedOffers,
     },
   };
 }
@@ -384,33 +445,89 @@ export function chooseSponsorOffer(input: {
   return { gameState: nextGameState, contract: updatedContract };
 }
 
+function resolveAiSponsorArchetypePreference(input: {
+  teamId: string;
+  profile: TeamStrategyProfile | null;
+  identity: TeamIdentity | null;
+  cashPressure: number;
+  powerRank: number | null;
+}): SponsorArchetype | "balanced" {
+  const cashPriority = input.profile?.bias.cashPriority ?? input.identity?.finances ?? 5;
+  const starPriority = input.profile?.bias.starPriority ?? input.identity?.ambition ?? 5;
+  const valuePriority = input.profile?.bias.valuePriority ?? 5;
+  const rank = input.powerRank;
+
+  if (input.cashPressure >= 7 || cashPriority >= 8 || input.teamId === "R-R" || input.teamId === "C-C") {
+    return "security";
+  }
+  if (starPriority >= 9 && rank != null && rank <= 6) {
+    return "performance";
+  }
+  if (starPriority >= 8 && rank != null && rank <= 10) {
+    return "performance";
+  }
+  if (valuePriority >= 8 && (rank ?? 20) >= 14) {
+    return "security";
+  }
+  if ((input.profile?.preferredArchetypes.length ?? 0) >= 4 || input.profile?.fantasyTheme) {
+    return "identity";
+  }
+  if ((input.identity?.ambition ?? 5) <= 4 && (rank ?? 20) >= 18) {
+    return "security";
+  }
+  return "balanced";
+}
+
 function scoreOfferForAi(input: {
   offer: SponsorOffer;
   profile: TeamStrategyProfile | null;
   identity: TeamIdentity | null;
   cashPressure: number;
+  powerRank?: number | null;
+  teamId: string;
 }): number {
-  const { offer, profile, identity, cashPressure } = input;
-  const ambition = identity?.ambition ?? profile?.bias.starPriority ?? 5;
-  const cashPriority = profile?.bias.cashPriority ?? identity?.finances ?? 5;
-  const tier = offer.starTier ?? 2;
-  const upsidePerTier = (offer.totalUpsideEstimate ?? 0) / Math.max(1, tier);
-  let score = upsidePerTier;
-  if (cashPressure >= 7 || cashPriority >= 8) {
-    score += offer.archetype === "security" ? 40 : offer.archetype === "identity" ? 10 : 0;
-    score -= tier >= 4 ? 15 : 0;
-  } else if (ambition >= 8) {
-    score += offer.archetype === "performance" ? 25 : offer.archetype === "identity" ? 15 : 0;
-    score += tier >= 4 ? 10 : 0;
-  } else {
-    score += offer.archetype === "identity" ? 20 : offer.archetype === "security" ? 15 : 5;
+  const { offer, profile, identity, cashPressure, powerRank, teamId } = input;
+  const rank = powerRank ?? null;
+  const preferredArchetype = resolveAiSponsorArchetypePreference({
+    teamId,
+    profile,
+    identity,
+    cashPressure,
+    powerRank: rank,
+  });
+
+  let score = estimateExpectedPayout(offer, rank) * 3;
+  score += (offer.starTier ?? 2) * 4;
+
+  if (preferredArchetype === offer.archetype) {
+    score += 22;
+  } else if (preferredArchetype === "balanced") {
+    if (offer.archetype === "identity") score += 12;
+    if (offer.archetype === "security") score += 10;
+    if (offer.archetype === "performance" && rank != null && rank <= 14) score += 8;
+  } else if (preferredArchetype === "security" && offer.archetype === "performance") {
+    score -= 18;
+  } else if (preferredArchetype === "performance" && offer.archetype === "security") {
+    score -= 8;
   }
+
+  if (rank != null && rank >= 22 && offer.archetype === "performance") {
+    score -= 25;
+  }
+  if (rank != null && rank <= 5 && offer.archetype === "security" && (profile?.bias.starPriority ?? 0) >= 8) {
+    score -= 6;
+  }
+
   return score;
 }
 
 export function chooseSponsorOfferForAiTeams(gameState: GameState, settingsMap?: Record<string, TeamControlSettings>): GameState {
   const controlSettings = settingsMap ?? buildTeamControlSettingsMap(gameState.teams, gameState.seasonState.teamControlSettings);
   let nextGameState = ensureSeasonSponsorOffers(gameState);
+
+  // Build overview rows once — reused for all teams instead of O(n²) per-team calls.
+  const overviewRows = buildTeamSeasonOverviewRows({ gameState: nextGameState });
+  const rowByTeamId = new Map(overviewRows.map((row) => [row.teamId, row]));
 
   for (const team of nextGameState.teams) {
     if (getTeamSponsorContract(nextGameState, team.teamId)) {
@@ -426,15 +543,15 @@ export function chooseSponsorOfferForAiTeams(gameState: GameState, settingsMap?:
     }
     const identity = nextGameState.teamIdentities.find((entry) => entry.teamId === team.teamId) ?? null;
     const profile = getTeamStrategyProfile(nextGameState, team.teamId);
-    const rows = buildTeamSeasonOverviewRows({ gameState: nextGameState });
-    const row = rows.find((entry) => entry.teamId === team.teamId) ?? null;
+    const row = rowByTeamId.get(team.teamId) ?? null;
     const cashPressure = row?.cash != null && row.cash < 0 ? 10 : row?.cash != null && row.cash < 20 ? 7 : 3;
+    const powerRank = row?.rank ?? null;
     const ambition = identity?.ambition ?? profile?.bias.starPriority ?? 5;
     const negotiation = defaultAiSponsorNegotiation({ cashPressure, ambition });
     const bestOffer = [...offers].sort(
       (left, right) =>
-        scoreOfferForAi({ offer: right, profile, identity, cashPressure }) -
-        scoreOfferForAi({ offer: left, profile, identity, cashPressure }),
+        scoreOfferForAi({ offer: right, profile, identity, cashPressure, powerRank, teamId: team.teamId }) -
+        scoreOfferForAi({ offer: left, profile, identity, cashPressure, powerRank, teamId: team.teamId }),
     )[0];
     if (!bestOffer) {
       continue;

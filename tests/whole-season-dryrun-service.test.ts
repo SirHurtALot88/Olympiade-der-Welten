@@ -100,7 +100,9 @@ function topUpRostersForSeasonMaximum(
       throw new Error(`Expected mapped disciplines for ${matchdayId}.`);
     }
 
-    const requiredUniquePlayers = (discipline1.playerCount ?? 0) + (discipline2.playerCount ?? 0);
+    const d1Count = scheduleEntry.discipline1?.playerCount ?? discipline1.playerCount ?? 0;
+    const d2Count = scheduleEntry.discipline2?.playerCount ?? discipline2.playerCount ?? 0;
+    const requiredUniquePlayers = d1Count + d2Count;
     maxRequiredUniquePlayers = Math.max(maxRequiredUniquePlayers, requiredUniquePlayers);
   }
 

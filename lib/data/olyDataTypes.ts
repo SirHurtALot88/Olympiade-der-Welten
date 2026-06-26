@@ -101,7 +101,8 @@ export type GameInboxCategory =
   | "transfer"
   | "training"
   | "contract"
-  | "facility";
+  | "facility"
+  | "sponsor";
 
 export type GameInboxSeverity = "info" | "warning" | "critical";
 export type GameInboxStatus = "open" | "done" | "dismissed";
@@ -117,6 +118,7 @@ export type GameInboxItem = {
   severity: GameInboxSeverity;
   title: string;
   description: string;
+  ctaLabel?: string | null;
   targetView: string;
   targetParams: Record<string, string | number | boolean | null>;
   status: GameInboxStatus;
@@ -812,6 +814,18 @@ export type Player = {
 export type PlayerPotentialBand = "low" | "medium" | "high" | "elite" | "unknown";
 export type PlayerPotentialSource = "generated" | "imported" | "scouted" | "missing";
 
+export type PlayerPotentialSeasonSnapshot = {
+  seasonId: string;
+  hiddenPotentialScore: number;
+  overallStars: number;
+  byAxis: {
+    pow: number;
+    spe: number;
+    men: number;
+    soc: number;
+  };
+};
+
 export type PlayerPotentialRecord = {
   playerId: string;
   potentialBand: PlayerPotentialBand;
@@ -823,6 +837,8 @@ export type PlayerPotentialRecord = {
     soc: number;
   };
   hiddenPotentialOverallStars?: number;
+  hiddenAttributeCeiling?: Partial<Record<PlayerGeneratorAttributeName, number>>;
+  lastSeasonSnapshot?: PlayerPotentialSeasonSnapshot;
   revealedPotentialRange?: {
     min: number;
     max: number;

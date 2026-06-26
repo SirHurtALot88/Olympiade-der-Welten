@@ -70,7 +70,15 @@ export async function POST(request: Request) {
     const nextGameState = resolveSponsorEvent(save.gameState, eventId, action);
     if (!dryRun) {
       persistence.saveSingleplayerState(saveId, nextGameState);
-      notifyRoomGameplayWrite(writeAuth, { saveId, teamId: event.teamId, action: "sponsor_choice" });
+      notifyRoomGameplayWrite(writeAuth, {
+        saveId,
+        teamId: event.teamId,
+        action: "sponsor_choice",
+        eventType: "save_updated",
+        affectedViews: ["home", "sponsor"],
+        dryRun: false,
+        success: true,
+      });
     }
 
     return NextResponse.json({ success: true, applied: !dryRun, cashDelta: action === "accept" ? event.cashDelta : 0 });

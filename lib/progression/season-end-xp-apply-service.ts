@@ -254,6 +254,7 @@ function getSeasonXp(input: {
     gameState,
     player: input.player,
     forecast,
+    potentialRecord: gameState.playerPotential?.find((entry) => entry.playerId === input.player.id) ?? null,
   });
   return {
     earnedSeasonXP,

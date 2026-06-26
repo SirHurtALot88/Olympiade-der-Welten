@@ -560,6 +560,10 @@ export async function runWholeSeasonDryRun(
     skippedDisabledAiTeams += disabledAiTeams;
     missingAiLineups += Math.max(0, eligibleAiTeams - autoRun.summary.aiReady);
 
+    if (eligibleAiTeams === 0 && disabledAiTeams > 0) {
+      blockingReasons.add("ai_lineup_apply_disabled");
+    }
+
     if (stopOnMissingManualLineups && autoRun.summary.manualMissing > 0) {
       blockingReasons.add("missing_manual_lineup");
       blockedAtMatchday = {

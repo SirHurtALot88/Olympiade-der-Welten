@@ -8,6 +8,7 @@ import {
   buildPotentialGap,
   revealPotentialStars,
 } from "@/lib/scouting/player-potential-ceiling-service";
+import { buildPlayerPotentialRecord } from "@/lib/progression/player-potential-service";
 
 function player(partial: Partial<Player> & { id: string }): Player {
   return {
@@ -57,6 +58,7 @@ describe("player potential ceiling service", () => {
       saveId: "save-1",
       player: target,
       currentStars: current,
+      hiddenPotentialScore: 82,
     });
     expect(ceiling.pow).toBeGreaterThanOrEqual(current.pow);
     expect(buildPotentialGap({ currentStars: current, ceiling })).toBeGreaterThan(0);
@@ -76,7 +78,12 @@ describe("player potential ceiling service", () => {
       } as never,
       player: target,
     });
-    const ceiling = buildPlayerPotentialCeilingProfile({ saveId: "save-1", player: target, currentStars: current });
+    const ceiling = buildPlayerPotentialCeilingProfile({
+      saveId: "save-1",
+      player: target,
+      currentStars: current,
+      hiddenPotentialScore: 78,
+    });
     const record = attachPotentialCeilingToRecord({
       record: { playerId: "p1", potentialBand: "medium", confidence: 0, source: "generated" },
       ceiling,
@@ -84,5 +91,49 @@ describe("player potential ceiling service", () => {
     expect(record.hiddenPotentialCeilingByAxis?.pow).toBe(ceiling.pow);
     expect(revealPotentialStars({ ceiling, currentStars: current, scoutingLevel: 1 }).overallMin).toBeNull();
     expect(revealPotentialStars({ ceiling, currentStars: current, scoutingLevel: 3 }).overallMin).not.toBeNull();
+  });
+
+  it("allows weak overall players to carry high single-axis potential ceilings", () => {
+    const kohanLike = player({
+      id: "kohan-like",
+      className: "Berserker",
+      rating: 30,
+      potential: 32,
+      coreStats: { pow: 46, spe: 17, men: 19, soc: 29 },
+      disciplineRatings: { d_pow: 46, d_spe: 17, d_men: 19, d_soc: 29 },
+    });
+    const peers = Array.from({ length: 40 }, (_, index) =>
+      player({
+        id: `peer-${index}`,
+        coreStats: {
+          pow: 35 + index,
+          spe: 30 + (index % 7),
+          men: 28 + (index % 5),
+          soc: 27 + (index % 6),
+        },
+      }),
+    );
+    const gameState = {
+      players: [kohanLike, ...peers],
+      disciplines: [
+        { id: "d_pow", name: "Pow", category: "power", displayOrder: 1, originalOrder: 1, playerCount: 41 },
+        { id: "d_spe", name: "Spe", category: "speed", displayOrder: 2, originalOrder: 2, playerCount: 41 },
+        { id: "d_men", name: "Men", category: "mental", displayOrder: 3, originalOrder: 3, playerCount: 41 },
+        { id: "d_soc", name: "Soc", category: "social", displayOrder: 4, originalOrder: 4, playerCount: 41 },
+      ],
+    } as never;
+    const current = buildPlayerAxisStarProfile({ gameState, player: kohanLike });
+    const record = buildPlayerPotentialRecord({ saveId: "save-kohan", player: kohanLike });
+    const ceiling = buildPlayerPotentialCeilingProfile({
+      saveId: "save-kohan",
+      player: kohanLike,
+      currentStars: current,
+      hiddenPotentialScore: record.hiddenPotentialScore,
+    });
+
+    expect(current.overall).toBeLessThanOrEqual(1.5);
+    expect(ceiling.pow).toBeGreaterThan(current.pow);
+    expect(ceiling.pow - current.pow).toBeGreaterThanOrEqual(1);
+    expect(buildPotentialGap({ currentStars: current, ceiling })).toBeGreaterThan(0.5);
   });
 });

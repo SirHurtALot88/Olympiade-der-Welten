@@ -99,7 +99,7 @@ export type RoomFlowState = {
   warnings: string[];
 };
 
-export type RoomArenaPhaseId = "slots" | "push" | "form" | "mutator" | "captain" | "final" | "result";
+export type RoomArenaPhaseId = "slots" | "push" | "form" | "mutator" | "captain" | "power" | "final" | "result";
 export type RoomArenaStatus = "idle" | "ready_check" | "revealing" | "result" | "result_applied";
 
 export type RoomArenaDisciplineSide = "d1" | "d2";

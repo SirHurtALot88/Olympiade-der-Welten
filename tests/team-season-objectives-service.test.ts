@@ -773,15 +773,14 @@ describe("team season objectives service", () => {
     expect(bias?.warnings).toContain("objective_bias_player_peak_needed");
   });
 
-  it("hydrates missing season sponsor offers on refresh", () => {
+  it("keeps sponsor offer hydration out of client-safe objective refresh", () => {
     const gameState = createGameState();
     expect(gameState.seasonState.sponsorOffersByTeamId).toBeUndefined();
 
     const refreshed = refreshTeamObjectiveState(gameState);
-    const offers = refreshed.seasonState.sponsorOffersByTeamId?.["M-M"] ?? [];
 
-    expect(offers).toHaveLength(3);
-    expect(offers.every((offer) => offer.seasonId === "season-3")).toBe(true);
+    expect(refreshed.seasonState.sponsorOffersByTeamId).toBeUndefined();
+    expect(refreshed.seasonState.teamSeasonObjectives?.length ?? 0).toBeGreaterThan(0);
   });
 
   it("refreshes board confidence into season state without compounding saved confidence", () => {

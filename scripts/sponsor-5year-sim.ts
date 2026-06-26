@@ -1,0 +1,367 @@
+/**
+ * 5-Jahres-Sponsor-Simulation mit echten Ingame-Daten.
+ *
+ * Nutzt createSingleplayerGameState() für echte Teams und Roster.
+ * Cash-Veränderungen kommen ausschließlich aus Sponsor-Auszahlungen
+ * (im echten Spiel kommen außerdem Preisgeld, Transfers und Facility-Kosten dazu).
+ *
+ * Pro Jahr:
+ *   1. Salary Factor (echtes advanceSeasonEconomyFactorWindow)
+ *   2. Rank-Simulation via team.budget + Gauß-Noise → Standings injizieren
+ *   3. Sponsor-Angebote generieren (ensureSeasonSponsorOffers)
+ *   4. KI wählt Sponsoren (chooseSponsorOfferForAiTeams)
+ *   5. Sponsor-Abrechnung (applySponsorSettlement, execute: true)
+ *   6. Ergebnis protokollieren (Cash-Delta ausschließlich aus Sponsor)
+ *
+ * Usage:
+ *   npm run sponsor:5year-sim
+ *   npm run sponsor:5year-sim-verbose
+ *   npx tsx scripts/sponsor-5year-sim.ts --years=3
+ */
+import path from "node:path";
+import { loadEnvConfig } from "@next/env";
+
+loadEnvConfig(path.resolve(__dirname, ".."));
+
+import type { GameState, StandingRecord } from "@/lib/data/olyDataTypes";
+import { createSingleplayerGameState } from "@/lib/game-state/singleplayer-state";
+import {
+  chooseSponsorOfferForAiTeams,
+  ensureSeasonSponsorOffers,
+} from "@/lib/sponsor/sponsor-offer-service";
+import { applySponsorSettlement } from "@/lib/sponsor/sponsor-settlement-service";
+import { advanceSponsorContractsForNewSeason } from "@/lib/sponsor/sponsor-contract-lifecycle";
+import {
+  advanceSeasonEconomyFactorWindow,
+  getSeasonEconomyFactorWindow,
+} from "@/lib/season/season-economy-factors";
+import { getPrizeMoneyReference } from "@/lib/sponsor/sponsor-economy-calibration";
+
+// ─── CLI args ──────────────────────────────────────────────────────────────────
+
+const args = process.argv.slice(2);
+const SIM_YEARS = Number(args.find((a) => a.startsWith("--years="))?.split("=")[1] ?? 5);
+const VERBOSE = args.includes("--verbose");
+const SAVE_ID = "sponsor-sim-5yr";
+
+// ─── Helpers ──────────────────────────────────────────────────────────────────
+
+function lcg(seed: number) {
+  let s = seed >>> 0;
+  return () => {
+    s = (Math.imul(1664525, s) + 1013904223) >>> 0;
+    return s / 0x100000000;
+  };
+}
+
+/** Box-Muller Gaussian noise */
+function gaussian(rng: () => number): number {
+  const u1 = Math.max(1e-10, rng());
+  const u2 = rng();
+  return Math.sqrt(-2 * Math.log(u1)) * Math.cos(2 * Math.PI * u2);
+}
+
+function round1(v: number) {
+  return Math.round(v * 10) / 10;
+}
+
+function sign(v: number) {
+  return v >= 0 ? `+${v.toFixed(1)}` : v.toFixed(1);
+}
+
+function pad(s: string | number, n: number) {
+  return String(s).padStart(n);
+}
+
+// ─── Rank simulation ──────────────────────────────────────────────────────────
+
+/**
+ * Simulate season ranks based on team.budget (real invest capacity) + Gaussian noise.
+ * Budget is already in display C units (same as cash), range ~170-325.
+ * σ = 20 simulates form variance, injuries, lucky/unlucky runs.
+ */
+function simulateRankMap(gs: GameState, rng: () => number): Record<string, number> {
+  const scored = gs.teams.map((team) => ({
+    teamId: team.teamId,
+    score: (team.budget ?? 0) + gaussian(rng) * 20,
+  }));
+  scored.sort((a, b) => b.score - a.score);
+  const result: Record<string, number> = {};
+  scored.forEach((entry, i) => {
+    result[entry.teamId] = i + 1;
+  });
+  return result;
+}
+
+/** Inject simulated ranks as StandingRecord entries the sponsor settlement reads */
+function injectStandings(gs: GameState, rankMap: Record<string, number>): GameState {
+  const standings: Record<string, StandingRecord> = {};
+  for (const team of gs.teams) {
+    const rank = rankMap[team.teamId] ?? 32;
+    standings[team.teamId] = {
+      points: Math.max(1, 33 - rank) * 3,
+      rank,
+      startplatz: rank,
+    };
+  }
+  return { ...gs, seasonState: { ...gs.seasonState, standings } };
+}
+
+// ─── Result types ─────────────────────────────────────────────────────────────
+
+type TeamYearRow = {
+  teamId: string;
+  name: string;
+  budget: number;
+  rank: number;
+  sponsorPayout: number;
+  prizeMoneyRef: number;   // what the old prize money would have been
+  delta: number;           // sponsorPayout - prizeMoneyRef (positive = better than old system)
+  cashBefore: number;
+  cashAfter: number;
+};
+
+type YearSummary = {
+  year: number;
+  seasonId: string;
+  factor: number;
+  teams: TeamYearRow[];
+};
+
+// ─── Main ─────────────────────────────────────────────────────────────────────
+
+async function main() {
+  console.log("╔══════════════════════════════════════════════════════════════╗");
+  console.log("║         Sponsor-System · 5-Jahres-Simulation (Ingame)        ║");
+  console.log("╚══════════════════════════════════════════════════════════════╝\n");
+
+  console.log("Lade Spiel-Daten …");
+  let gs = createSingleplayerGameState();
+
+  console.log(`  ${gs.teams.length} Teams | ${gs.rosters.length} Roster-Einträge | Season: ${gs.season.id}`);
+  console.log(`  Budget-Spanne: ${Math.min(...gs.teams.map((t) => t.budget)).toFixed(0)} – ${Math.max(...gs.teams.map((t) => t.budget)).toFixed(0)} C`);
+  console.log(`  Starting Cash: ${Math.min(...gs.teams.map((t) => t.cash)).toFixed(1)} – ${Math.max(...gs.teams.map((t) => t.cash)).toFixed(1)} C`);
+  console.log(`  (Note: Cash-Änderungen nur aus Sponsor-Zahlungen. Preisgeld/Transfers/Facility nicht simuliert.)\n`);
+
+  const results: YearSummary[] = [];
+
+  for (let year = 1; year <= SIM_YEARS; year++) {
+    const seasonId = `season-${year}`;
+    gs = { ...gs, season: { ...gs.season, id: seasonId } };
+
+    // 1. Economy Factor
+    const economyWindow = getSeasonEconomyFactorWindow({
+      saveId: SAVE_ID,
+      seasonId,
+      seasonState: gs.seasonState,
+    });
+    const factor = economyWindow[0]?.factor ?? 1;
+    gs = { ...gs, seasonState: { ...gs.seasonState, seasonEconomyFactors: economyWindow } };
+
+    // 2. Simulate ranks via team.budget + Gaussian noise, inject standings
+    const rng = lcg(year * 1013 + 997);
+    const rankMap = simulateRankMap(gs, rng);
+    gs = injectStandings(gs, rankMap);
+
+    // 3. Record cash before sponsor settlement
+    const cashBefore = new Map(gs.teams.map((t) => [t.teamId, t.cash]));
+
+    // 4. Generate sponsor offers (3 per team)
+    gs = ensureSeasonSponsorOffers(gs);
+
+    // 5. AI picks sponsors
+    gs = chooseSponsorOfferForAiTeams(gs);
+
+    // 6. Apply sponsor settlement (adds sponsor income to team.cash)
+    const settlementResult = applySponsorSettlement({
+      gameState: gs,
+      saveId: SAVE_ID,
+      phase: "season_end",
+      execute: true,
+    });
+    gs = settlementResult.gameState;
+
+    if (!settlementResult.applied && VERBOSE) {
+      console.warn(`  [J${year}] Warnung: Settlement nicht angewendet. Warnings: ${settlementResult.preview.warnings.join(", ")}`);
+    }
+
+    // 7. Build per-team result rows
+    const teamRows: TeamYearRow[] = gs.teams.map((team) => {
+      const rank = rankMap[team.teamId] ?? 32;
+      const sponsorLogs = (gs.seasonState.sponsorPayoutLogs ?? []).filter(
+        (log) => log.teamId === team.teamId && log.seasonId === seasonId,
+      );
+      const sponsorPayout = round1(sponsorLogs.reduce((s, log) => s + log.cashDelta, 0));
+      const prizeMoneyRef = round1(getPrizeMoneyReference(rank, factor));
+
+      return {
+        teamId: team.teamId,
+        name: team.name,
+        budget: team.budget ?? 0,
+        rank,
+        sponsorPayout,
+        prizeMoneyRef,
+        delta: round1(sponsorPayout - prizeMoneyRef),
+        cashBefore: cashBefore.get(team.teamId) ?? 0,
+        cashAfter: team.cash,
+      };
+    });
+
+    results.push({ year, seasonId, factor, teams: teamRows });
+
+    // Summary
+    const sorted = [...teamRows].sort((a, b) => a.rank - b.rank);
+    const totalSponsor = round1(sorted.reduce((s, t) => s + t.sponsorPayout, 0));
+    const totalPrize = round1(sorted.reduce((s, t) => s + t.prizeMoneyRef, 0));
+    const aboveRef = sorted.filter((t) => t.delta >= 0).length;
+
+    console.log(`── Jahr ${year} (${seasonId}) | Faktor ×${factor} ──────────────────────────`);
+    console.log(`   Sponsor-Total: ${totalSponsor.toFixed(1)} C  |  Preisgeld-Ref: ${totalPrize.toFixed(1)} C  |  Ratio: ×${(totalSponsor / Math.max(1, totalPrize)).toFixed(2)}`);
+    console.log(`   Besser als Preisgeld: ${aboveRef}/32 Teams`);
+
+    if (VERBOSE) {
+      console.log(`\n   Rang  ${"Team".padEnd(26)} ${"Budget".padStart(7)} ${"Sponsor".padStart(8)} ${"PGeld".padStart(7)} ${"Delta".padStart(7)} ${"CashNach".padStart(9)}`);
+      console.log(`   ${"─".repeat(75)}`);
+      for (const t of sorted) {
+        const dStr = sign(t.delta);
+        const flag = t.delta >= 0 ? " ✓" : "  ";
+        console.log(
+          `   ${pad(t.rank, 3)}  ${t.name.substring(0, 25).padEnd(26)} ${pad(t.budget, 7)} ${pad(t.sponsorPayout.toFixed(1), 8)} ${pad(t.prizeMoneyRef.toFixed(1), 7)} ${pad(dStr, 7)} ${pad(t.cashAfter.toFixed(1), 9)}${flag}`,
+        );
+      }
+      console.log();
+    }
+
+    // Advance to next season
+    if (year < SIM_YEARS) {
+      const nextSeasonId = `season-${year + 1}`;
+      const { nextWindow } = advanceSeasonEconomyFactorWindow({
+        saveId: SAVE_ID,
+        fromSeasonId: seasonId,
+        toSeasonId: nextSeasonId,
+        seasonState: gs.seasonState,
+      });
+      gs = advanceSponsorContractsForNewSeason(gs, nextSeasonId);
+      gs = {
+        ...gs,
+        season: { ...gs.season, id: nextSeasonId },
+        seasonState: {
+          ...gs.seasonState,
+          seasonEconomyFactors: nextWindow,
+          sponsorPayoutLogs: [],
+          sponsorOffersByTeamId: {},
+        },
+      };
+    }
+  }
+
+  // ─── Final Output ──────────────────────────────────────────────────────────
+
+  console.log("\n\n╔══════════════════════════════════════════════════════════════════════════╗");
+  console.log("║  CASH-ENTWICKLUNG ÜBER 5 JAHRE · sortiert nach Budget (aufsteigend)      ║");
+  console.log("╚══════════════════════════════════════════════════════════════════════════╝\n");
+
+  const teamOrder = [...gs.teams].sort((a, b) => (a.budget ?? 0) - (b.budget ?? 0)).map((t) => t.teamId);
+
+  const colW = 9;
+  const header = [
+    "Team".padEnd(26),
+    " Bud",
+    ...results.map((yr) => `  J${yr.year}Spon`.padStart(colW)),
+    ...results.map((yr) => ` J${yr.year}Cash`.padStart(colW)),
+    ...results.map((yr) => `J${yr.year}Δref`.padStart(colW)),
+  ].join("");
+  console.log(header);
+  console.log("─".repeat(header.length));
+
+  for (const teamId of teamOrder) {
+    const baseTeam = gs.teams.find((t) => t.teamId === teamId)!;
+    const cols = [
+      baseTeam.name.substring(0, 25).padEnd(26),
+      pad(baseTeam.budget, 4),
+      ...results.map((yr) => {
+        const t = yr.teams.find((x) => x.teamId === teamId)!;
+        return pad(t.sponsorPayout.toFixed(1), colW);
+      }),
+      ...results.map((yr) => {
+        const t = yr.teams.find((x) => x.teamId === teamId)!;
+        return pad(t.cashAfter.toFixed(1), colW);
+      }),
+      ...results.map((yr) => {
+        const t = yr.teams.find((x) => x.teamId === teamId)!;
+        return pad(sign(t.delta), colW);
+      }),
+    ];
+    console.log(cols.join(""));
+  }
+
+  // Salary factors
+  console.log(`\n${"─".repeat(55)}`);
+  console.log("Salary Factors:");
+  results.forEach((yr) => process.stdout.write(`  J${yr.year}: ×${yr.factor}`));
+  console.log();
+
+  // Per-year summary
+  console.log(`\n${"─".repeat(55)}`);
+  console.log("Zusammenfassung pro Jahr:\n");
+  console.log(
+    `  ${"Jahr".padEnd(6)} ${"×F".padEnd(5)} ${"SponTotal".padStart(10)} ${"PGeldRef".padStart(9)} ${"Ratio".padStart(7)} ${"BessAls".padStart(8)} ${"AvgSpon".padStart(8)} ${"AvgCash".padStart(8)}`,
+  );
+  console.log(`  ${"─".repeat(70)}`);
+  for (const yr of results) {
+    const totalSponsor = round1(yr.teams.reduce((s, t) => s + t.sponsorPayout, 0));
+    const totalPrize = round1(yr.teams.reduce((s, t) => s + t.prizeMoneyRef, 0));
+    const aboveRef = yr.teams.filter((t) => t.delta >= 0).length;
+    const avgSpon = round1(totalSponsor / yr.teams.length);
+    const avgCash = round1(yr.teams.reduce((s, t) => s + t.cashAfter, 0) / yr.teams.length);
+    console.log(
+      `  ${`J${yr.year}`.padEnd(6)} ${"×" + yr.factor.toFixed(2)} ${pad(totalSponsor.toFixed(1), 10)} ${pad(totalPrize.toFixed(1), 9)} ${pad("×" + (totalSponsor / Math.max(1, totalPrize)).toFixed(2), 7)} ${pad(`${aboveRef}/32`, 8)} ${pad(avgSpon.toFixed(1), 8)} ${pad(avgCash.toFixed(1), 8)}`,
+    );
+  }
+
+  // Bottom teams spotlight
+  console.log(`\n${"─".repeat(55)}`);
+  console.log("Bottom Teams (5 niedrigste Budgets) — Sponsor-Verlauf:\n");
+  const bottomIds = [...gs.teams].sort((a, b) => (a.budget ?? 0) - (b.budget ?? 0)).slice(0, 5).map((t) => t.teamId);
+  console.log(
+    `  ${"Team".padEnd(26)} ${"Bud".padStart(4)} ${results.map((yr) => `J${yr.year}Spon`.padStart(8)).join(" ")} ${results.map((yr) => `J${yr.year}Cash`.padStart(9)).join(" ")}`,
+  );
+  for (const tid of bottomIds) {
+    const team = gs.teams.find((t) => t.teamId === tid)!;
+    process.stdout.write(`  ${team.name.substring(0, 25).padEnd(26)} ${pad(team.budget, 4)}`);
+    for (const yr of results) {
+      const t = yr.teams.find((x) => x.teamId === tid)!;
+      process.stdout.write(` ${pad(t.sponsorPayout.toFixed(1), 8)}`);
+    }
+    for (const yr of results) {
+      const t = yr.teams.find((x) => x.teamId === tid)!;
+      process.stdout.write(` ${pad(t.cashAfter.toFixed(1), 9)}`);
+    }
+    console.log();
+  }
+
+  console.log("\nFertig.\n");
+
+  // Gate: exit 1 if any year's league ratio is outside 0.85–1.15
+  const ratioFailures = results.filter((yr) => {
+    const totalSponsor = yr.teams.reduce((s, t) => s + t.sponsorPayout, 0);
+    const totalPrize = yr.teams.reduce((s, t) => s + t.prizeMoneyRef, 0);
+    const ratio = totalSponsor / Math.max(1, totalPrize);
+    return ratio < 0.85 || ratio > 1.15;
+  });
+  if (ratioFailures.length > 0) {
+    console.error(`\n✗ Ratio-Gate fehlgeschlagen für Jahr(e): ${ratioFailures.map((yr) => yr.year).join(", ")}`);
+    for (const yr of ratioFailures) {
+      const totalSponsor = yr.teams.reduce((s, t) => s + t.sponsorPayout, 0);
+      const totalPrize = yr.teams.reduce((s, t) => s + t.prizeMoneyRef, 0);
+      console.error(`  J${yr.year}: Ratio ×${(totalSponsor / Math.max(1, totalPrize)).toFixed(3)} (Ziel 0.85–1.15)`);
+    }
+    process.exit(1);
+  }
+  console.log("✓ Ratio-Gate bestanden (alle Jahre 0.85–1.15)\n");
+}
+
+main().catch((err) => {
+  console.error("Simulation fehlgeschlagen:", err);
+  process.exit(1);
+});

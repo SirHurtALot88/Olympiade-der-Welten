@@ -27,6 +27,33 @@ describe("scouting display contract", () => {
     expect(metricText).toContain('data-testid="velo-scout-metric"');
   });
 
+  it("shows per-axis orbit chips with grade letters in scouting watchlist cards", async () => {
+    const scoutingText = await fs.readFile(
+      "/Users/chrisfalk/Documents/Codex/Olympiade der Welten/app/foundation/scouting-center-v2/ScoutingCenterV2Client.tsx",
+      "utf8",
+    );
+    expect(scoutingText).toContain("VeloStatOrbitRow");
+    expect(scoutingText).toContain("showGrade");
+    expect(scoutingText).toContain('data-testid="scouting-watchlist-card"');
+    expect(scoutingText).toContain('data-testid="scouting-potential-band"');
+    expect(scoutingText).toContain('data-testid="scouting-ca-po-row"');
+    expect(scoutingText).toContain('data-testid="scouting-potential-stars"');
+    expect(scoutingText).toContain('data-testid="scouting-po-axis-stars"');
+    expect(scoutingText).toContain("VeloStarRating");
+  });
+
+  it("scouting-center-v2-types extends watch target with CA/PO star fields", async () => {
+    const typesText = await fs.readFile(
+      "/Users/chrisfalk/Documents/Codex/Olympiade der Welten/app/foundation/scouting-center-v2/scouting-center-v2-types.ts",
+      "utf8",
+    );
+    expect(typesText).toContain("pow?");
+    expect(typesText).toContain("caOverall?");
+    expect(typesText).toContain("poDisplay?");
+    expect(typesText).toContain("potentialScore?");
+    expect(typesText).toContain("potentialBand?");
+  });
+
   it("keeps scouting noise wide enough at low levels", () => {
     const tiers = buildScoutedDisciplineTiers({
       saveId: "test-save",
