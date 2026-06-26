@@ -50,6 +50,9 @@ export function createPersistenceService(): PersistenceService {
       }
       return saveRepository.getSaveById(saveId);
     },
+    getSaveVersionMetadata(saveId) {
+      return saveRepository.getSaveVersionMetadata(saveId);
+    },
     saveSingleplayerState(saveId, gameState, input) {
       return saveRepository.saveGameState({
         saveId,

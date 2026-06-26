@@ -84,6 +84,9 @@ type TransferHistoryV2ClientProps = {
   onResetFilters: () => void;
   onOpenPlayer: (playerId: string) => void;
   onOpenTeam: (teamId: string) => void;
+  hasMore?: boolean;
+  loadingMore?: boolean;
+  onLoadMore?: () => void;
 };
 
 type ActivityCard = {
@@ -219,6 +222,9 @@ export default function TransferHistoryV2Client({
   onResetFilters,
   onOpenPlayer,
   onOpenTeam,
+  hasMore = false,
+  loadingMore = false,
+  onLoadMore,
 }: TransferHistoryV2ClientProps) {
   const [selectedTransferId, setSelectedTransferId] = useState<string | null>(visibleRows[0]?.transferId ?? null);
 
@@ -258,9 +264,9 @@ export default function TransferHistoryV2Client({
         <div className="transfer-history-v2-title">
           <TooltipHeading
             as="h2"
-            tooltip="V2 liest die Historie als Deal-Flow: Scope, Story, Teambewegung und konkrete Transfers in einer ruhigeren Reihenfolge."
+            tooltip="Deal-Flow: Scope, Story, Teambewegung und konkrete Transfers."
           >
-            Transferhistorie v2
+            Transferhistorie
           </TooltipHeading>
           <div className="foundation-view-source-row">
             <span className="pill foundation-source-pill">{sourceBadgeLabel}</span>
@@ -342,6 +348,11 @@ export default function TransferHistoryV2Client({
           <button className="secondary-button inline-button" type="button" onClick={onResetFilters}>
             Filter reset
           </button>
+          {!isAllSeasons && hasMore && onLoadMore ? (
+            <button className="secondary-button inline-button" type="button" onClick={onLoadMore} disabled={loadingMore}>
+              {loadingMore ? "Lädt…" : "Mehr laden"}
+            </button>
+          ) : null}
         </div>
       </section>
 
@@ -571,7 +582,9 @@ export default function TransferHistoryV2Client({
               </div>
             </>
           ) : (
-            <p className="muted">Wähle links einen Deal, dann bekommst du hier Profil, Zahlen und Teamweg auf einen Blick.</p>
+            <p className="muted" title="Wähle links einen Deal für Profil, Zahlen und Teamweg.">
+              Deal wählen
+            </p>
           )}
         </section>
 

@@ -3,12 +3,14 @@ export const dynamic = "force-dynamic";
 import { NextResponse } from "next/server";
 
 import { LegacyLineupContextLoader } from "@/lib/lineups/legacy-lineup-context-loader";
-import { loadLocalLegacyLineupContext } from "@/lib/lineups/legacy-lineup-local-service";
+import { loadLocalLegacyLineupContext, loadLocalLegacyLineupContextFromGameState } from "@/lib/lineups/legacy-lineup-local-service";
 import { LegacyLineupRepository } from "@/lib/lineups/legacy-lineup-repository";
 import { DEFAULT_ACTIVE_OWNER_ID, buildTeamControlSettingsMap, canLocalUserManageTeam } from "@/lib/foundation/team-control-settings";
 import { buildLineupDisciplineContract, buildMatchdayLineupContract, countSeasonCaptains, countSeasonLineupDisciplineSides, formatLineupTeamStatusLabel, SEASON_CAPTAIN_SLOTS } from "@/lib/lineups/lineup-discipline-contract";
 import type { LegacyLineupKeyParams } from "@/lib/lineups/legacy-lineup-types";
 import { createPersistenceService } from "@/lib/persistence/persistence-service";
+import { resolveLocalPersistedSave } from "@/lib/persistence/resolve-local-save";
+import type { PersistedSaveGame } from "@/lib/persistence/types";
 import { getSeasonDisciplineSchedule } from "@/lib/season/season-discipline-schedule";
 import { db } from "@/src/server/db";
 
@@ -128,23 +130,15 @@ async function resolveDefaultPrismaParams(input: {
   };
 }
 
-function resolveDefaultSqliteParams(input: {
-  saveId: string | null;
-  seasonId: string | null;
-  matchdayId: string | null;
-  teamId: string | null;
-}): LegacyLineupKeyParams {
-  const persistence = createPersistenceService();
-  const bootstrapped = persistence.bootstrapSingleplayerSave();
-  const save =
-    (input.saveId ? persistence.getSaveById(input.saveId) : null) ??
-    persistence.getActiveSave() ??
-    bootstrapped.save;
-
-  if (!save) {
-    throw new Error("No local save available for the lineup lab.");
-  }
-
+function resolveDefaultSqliteParamsFromSave(
+  save: PersistedSaveGame,
+  input: {
+    saveId: string | null;
+    seasonId: string | null;
+    matchdayId: string | null;
+    teamId: string | null;
+  },
+): LegacyLineupKeyParams {
   const season = save.gameState.season;
   const seasonId = input.seasonId && input.seasonId === season.id ? input.seasonId : season.id;
   const matchdayId =
@@ -166,6 +160,17 @@ function resolveDefaultSqliteParams(input: {
     matchdayId,
     teamId,
   };
+}
+
+function resolveDefaultSqliteParams(input: {
+  saveId: string | null;
+  seasonId: string | null;
+  matchdayId: string | null;
+  teamId: string | null;
+}): LegacyLineupKeyParams {
+  const persistence = createPersistenceService();
+  const { save } = resolveLocalPersistedSave(persistence, input.saveId);
+  return resolveDefaultSqliteParamsFromSave(save, input);
 }
 
 async function loadPrismaOptions(params: LegacyLineupKeyParams) {
@@ -300,14 +305,7 @@ async function loadPrismaOptions(params: LegacyLineupKeyParams) {
   };
 }
 
-function loadSqliteOptions(params: LegacyLineupKeyParams) {
-  const persistence = createPersistenceService();
-  const bootstrapped = persistence.bootstrapSingleplayerSave();
-  const save =
-    persistence.getSaveById(params.saveId) ??
-    persistence.getActiveSave() ??
-    bootstrapped.save;
-
+function loadSqliteOptions(save: PersistedSaveGame, persistence: ReturnType<typeof createPersistenceService>, params: LegacyLineupKeyParams) {
   const contract = buildLineupDisciplineContract(save.gameState.disciplines);
   const lineups = save.gameState.seasonState.lineupDrafts ?? [];
   const totalLineupSides = contract.length;
@@ -400,26 +398,16 @@ function loadSqliteOptions(params: LegacyLineupKeyParams) {
   };
 }
 
-function isSqliteLineupReadOnly(params: LegacyLineupKeyParams, activeOwnerId: string) {
-  const persistence = createPersistenceService();
-  const bootstrapped = persistence.bootstrapSingleplayerSave();
-  const save =
-    persistence.getSaveById(params.saveId) ??
-    persistence.getActiveSave() ??
-    bootstrapped.save;
-
+function isSqliteLineupReadOnly(save: PersistedSaveGame, params: LegacyLineupKeyParams, activeOwnerId: string) {
   return !canLocalUserManageTeam(save.gameState, params.teamId, activeOwnerId);
 }
 
 export async function GET(request: Request) {
   try {
     const parsed = parseOptionalParams(request);
-    const params =
-      parsed.source === "prisma"
-        ? await resolveDefaultPrismaParams(parsed)
-        : resolveDefaultSqliteParams(parsed);
 
     if (parsed.source === "prisma") {
+      const params = await resolveDefaultPrismaParams(parsed);
       const loader = new LegacyLineupContextLoader(db, new LegacyLineupRepository(db));
       const contextResult = await loader.loadLegacyLineupContext(params);
       const options = await loadPrismaOptions(params);
@@ -503,12 +491,15 @@ export async function GET(request: Request) {
       });
     }
 
-    const contextResult = loadLocalLegacyLineupContext(params);
-    const options = loadSqliteOptions(params);
+    const persistence = createPersistenceService();
+    const { save } = resolveLocalPersistedSave(persistence, parsed.saveId);
+    const params = resolveDefaultSqliteParamsFromSave(save, parsed);
+    const contextResult = loadLocalLegacyLineupContextFromGameState(save.gameState, params);
+    const options = loadSqliteOptions(save, persistence, params);
     return NextResponse.json({
       params,
       source: "sqlite",
-      readOnly: isSqliteLineupReadOnly(params, parsed.activeOwnerId),
+      readOnly: isSqliteLineupReadOnly(save, params, parsed.activeOwnerId),
       context: contextResult.ok ? contextResult.context : null,
       contextWarnings: contextResult.ok ? contextResult.warnings : contextResult.warnings,
       contextErrors: contextResult.ok ? [] : contextResult.errors,

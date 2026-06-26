@@ -1,0 +1,27 @@
+name: CI Nightly
+
+on:
+  schedule:
+    - cron: "0 3 * * *"
+  workflow_dispatch:
+
+jobs:
+  season-block-smokes:
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    env:
+      OLY_APP_SQLITE_PATH: ${{ runner.temp }}/ci-oly-nightly.sqlite
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+          cache: npm
+      - run: npm ci
+      - name: Run season block smokes
+        run: |
+          npm run season:smoke-block-1 2>&1 | tee block1.log
+          BLOCK2_SAVE_ID=$(node -e "const fs=require('fs');const lines=fs.readFileSync('block1.log','utf8').trim().split(/\n/).filter((line)=>line.startsWith('{'));const payload=JSON.parse(lines[lines.length-1]);process.stdout.write(payload.saveId);")
+          test -n "$BLOCK2_SAVE_ID"
+          BLOCK2_SAVE_ID="$BLOCK2_SAVE_ID" npm run season:smoke-block-2
+          BLOCK3_SAVE_ID="$BLOCK2_SAVE_ID" npm run season:smoke-block-3

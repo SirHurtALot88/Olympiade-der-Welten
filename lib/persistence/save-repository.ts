@@ -28,9 +28,17 @@ import { withNormalizedTeamGeneralManagers } from "@/lib/foundation/team-general
 import { buildScenarioMeta, withScenarioMeta } from "@/lib/persistence/scenario-meta";
 import { resolveFoundationSaveMode } from "@/lib/persistence/foundation-save-mode";
 import { enforceRollingSaveRetention } from "@/lib/persistence/save-retention";
+import { invalidateStandingsOverviewCache } from "@/lib/season/standings-overview-cache";
+import { invalidateArenaPreviewCache } from "@/lib/foundation/arena-preview-cache";
 import { ensurePlayerBaselines, guardPlayerBaselineWrite } from "@/lib/players/player-baseline-service";
 import { withNormalizedSeasonDisciplineSchedule } from "@/lib/season/season-discipline-schedule";
-import type { PersistedSaveGame, SaveRepository, SaveStatus, SaveSummary } from "@/lib/persistence/types";
+import type {
+  PersistedSaveGame,
+  SaveRepository,
+  SaveStatus,
+  SaveSummary,
+  SaveVersionMetadata,
+} from "@/lib/persistence/types";
 
 export { enforceRollingSaveRetention } from "@/lib/persistence/save-retention";
 
@@ -405,6 +413,40 @@ function loadSaveRow(saveId: string) {
   return database
     .prepare("SELECT save_id, name, status, created_at, updated_at FROM saves WHERE save_id = ?")
     .get(saveId) as SaveRow | undefined;
+}
+
+function loadSaveVersionMetadata(saveId: string): SaveVersionMetadata | null {
+  const row = loadSaveRow(saveId);
+  if (!row) {
+    return null;
+  }
+
+  const season = loadSingleton<Season>("seasons", saveId);
+  const seasonState = loadSingleton<SeasonState>("season_states", saveId);
+  const matchdayState = loadSingleton<MatchdayState>("matchday_states", saveId);
+  const gameMetadata = loadSingleton<GameMetadata>("game_metadata", saveId);
+  if (!season || !seasonState || !matchdayState) {
+    return null;
+  }
+
+  const database = getDatabase();
+  const transferHistoryRow = database
+    .prepare("SELECT COUNT(*) AS count FROM transfer_history WHERE save_id = ?")
+    .get(saveId) as { count: number };
+
+  return {
+    saveId: row.save_id,
+    updatedAt: row.updated_at,
+    seasonId: season.id,
+    matchdayId: matchdayState.matchdayId,
+    saveVersion: Number.isFinite(gameMetadata?.saveVersion) ? gameMetadata!.saveVersion : 0,
+    matchdayResults: seasonState.matchdayResults ?? [],
+    standingsApplyLogs: seasonState.standingsApplyLogs ?? [],
+    seasonSnapshots: seasonState.seasonSnapshots ?? [],
+    disciplineResults: seasonState.disciplineResults ?? [],
+    lineupDraftCount: (seasonState.lineupDrafts ?? []).length,
+    transferHistoryCount: transferHistoryRow.count,
+  };
 }
 
 let baselineSourcePlayersCache: Player[] | null = null;
@@ -789,6 +831,8 @@ function createPersistedSaveRecord(input: {
   });
 
   transaction();
+  invalidateStandingsOverviewCache(input.saveId);
+  invalidateArenaPreviewCache(input.saveId);
 
   const gameStateWithScenarioMeta = guardedGameState.scenarioMeta
     ? guardedGameState
@@ -819,6 +863,16 @@ export function createSaveRepository(): SaveRepository {
     getSaveById(saveId: string) {
       const row = loadSaveRow(saveId);
       return row ? materializePersistedSave(row) : null;
+    },
+    getSaveVersionMetadata(saveId: string) {
+      if (saveId === "active" || saveId === "current") {
+        const database = getDatabase();
+        const row = database
+          .prepare("SELECT save_id, name, status, created_at, updated_at FROM saves WHERE status = 'active' ORDER BY updated_at DESC LIMIT 1")
+          .get() as SaveRow | undefined;
+        return row ? loadSaveVersionMetadata(row.save_id) : null;
+      }
+      return loadSaveVersionMetadata(saveId);
     },
     listSaves() {
       const database = getDatabase();

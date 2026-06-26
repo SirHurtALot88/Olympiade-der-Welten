@@ -24,7 +24,7 @@ Status: laufende Arbeitsliste fuer die naechsten UI-/Gameplay-/Performance-Patch
 - Teams-Tab startet als leichter Kader-/Board-Fokus; Vergleich, History und grosse Tabellen bauen erst nach Klick. Status: erledigt, siehe `docs/tab-performance-hotspots-v2.md`.
 - Arena-Preview ist entkoppelt: Basis/Score zuerst, Resolve/Standings im Hintergrund. Status: erledigt.
 - Markt-, Historie-, Recap-, Resolve- und Standings-Fetches sind abortable. Status: erledigt.
-- Version-Polling ist von 4s auf 25s plus Visibility-Pause entschaerft. Status: erledigt.
+- Version-Polling ist von 4s auf 25s plus Visibility-Pause entschaerft. Status: erledigt; aktuell 45s plus leichter Metadata-Pfad (<50ms).
 
 ## Einsatzliste
 15. Slot-Status mit klaren Labels: offen, gefuellt, Konflikt, speichern.

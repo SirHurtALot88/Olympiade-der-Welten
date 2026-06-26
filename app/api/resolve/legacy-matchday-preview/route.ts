@@ -8,6 +8,7 @@ import { loadLocalLegacyLineupContext } from "@/lib/lineups/legacy-lineup-local-
 import { LegacyLineupRepository } from "@/lib/lineups/legacy-lineup-repository";
 import type { LegacyLineupContextLoadResult, LegacyLineupKeyParams } from "@/lib/lineups/legacy-lineup-types";
 import { createPersistenceService } from "@/lib/persistence/persistence-service";
+import { readArenaPreviewCache, writeArenaPreviewCache } from "@/lib/foundation/arena-preview-cache";
 import {
   buildResolveLabPlayerCatalog,
   buildResolveLabSummary,
@@ -117,6 +118,20 @@ export async function GET(request: Request) {
       ...params,
       teamId,
     }));
+
+    if (parsed.source === "sqlite") {
+      const persistence = createPersistenceService();
+      const versionMeta = persistence.getSaveVersionMetadata(params.saveId);
+      const cacheKey = `${params.saveId}:${params.seasonId}:${params.matchdayId}`;
+      const cacheSignature = versionMeta
+        ? `${versionMeta.saveVersion}|${versionMeta.lineupDraftCount}|${versionMeta.transferHistoryCount}|${versionMeta.updatedAt}`
+        : "0";
+      const cached = readArenaPreviewCache(cacheKey, cacheSignature);
+      if (cached) {
+        return NextResponse.json(cached);
+      }
+    }
+
     const contextResults =
       parsed.source === "prisma"
         ? await loadPrismaContexts(teamParams)
@@ -138,7 +153,7 @@ export async function GET(request: Request) {
     const topPlayers = buildResolveLabTopPlayersBySide(preview, contexts);
     const playerCatalog = buildResolveLabPlayerCatalog(contexts);
 
-    return NextResponse.json({
+    const responsePayload = {
       source: parsed.source,
       params,
       summary,
@@ -158,7 +173,19 @@ export async function GET(request: Request) {
         missingPlayersToRequirement: readinessByTeamId.get(team.teamId)?.missingPlayersToRequirement ?? 0,
         shortReason: readinessByTeamId.get(team.teamId)?.shortReason ?? "No readiness explanation available.",
       })),
-    });
+    };
+
+    if (parsed.source === "sqlite") {
+      const persistence = createPersistenceService();
+      const versionMeta = persistence.getSaveVersionMetadata(params.saveId);
+      const cacheKey = `${params.saveId}:${params.seasonId}:${params.matchdayId}`;
+      const cacheSignature = versionMeta
+        ? `${versionMeta.saveVersion}|${versionMeta.lineupDraftCount}|${versionMeta.transferHistoryCount}|${versionMeta.updatedAt}`
+        : "0";
+      writeArenaPreviewCache(cacheKey, cacheSignature, responsePayload);
+    }
+
+    return NextResponse.json(responsePayload);
   } catch (error) {
     return NextResponse.json(
       { error: error instanceof Error ? error.message : "Legacy resolve preview could not be loaded." },

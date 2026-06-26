@@ -17,6 +17,19 @@ export type PersistedSaveGame = SaveGameState & {
   status: SaveStatus;
 };
 
+export type SaveVersionMetadata = {
+  saveId: string;
+  updatedAt: string;
+  seasonId: string;
+  matchdayId: string;
+  matchdayResults: unknown[];
+  standingsApplyLogs: unknown[];
+  seasonSnapshots: unknown[];
+  saveVersion?: number;
+  lineupDraftCount: number;
+  transferHistoryCount: number;
+};
+
 export type PersistenceBootstrapResult = {
   save: PersistedSaveGame;
   createdFromSeed: boolean;
@@ -25,6 +38,7 @@ export type PersistenceBootstrapResult = {
 export type SaveRepository = {
   getActiveSave(): PersistedSaveGame | null;
   getSaveById(saveId: string): PersistedSaveGame | null;
+  getSaveVersionMetadata(saveId: string): SaveVersionMetadata | null;
   listSaves(): SaveSummary[];
   setActiveSave(saveId: string): PersistedSaveGame | null;
   createSaveFromSeed(input: {
@@ -58,6 +72,7 @@ export type PersistenceService = {
   bootstrapSingleplayerSave(): PersistenceBootstrapResult;
   getActiveSave(): PersistedSaveGame | null;
   getSaveById(saveId: string): PersistedSaveGame | null;
+  getSaveVersionMetadata(saveId: string): SaveVersionMetadata | null;
   saveSingleplayerState(saveId: string, gameState: GameState, input?: { status?: SaveStatus }): PersistedSaveGame;
   createSave(name: string): PersistedSaveGame;
   createFreshSeasonOneSave(input?: { saveId?: string; name?: string; status?: SaveStatus; activate?: boolean }): PersistedSaveGame;

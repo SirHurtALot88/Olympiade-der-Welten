@@ -666,6 +666,7 @@ export default function SeasonStandingsV2Client({
     men: false,
     soc: false,
   });
+  const [showFullStandingsTable, setShowFullStandingsTable] = useState(false);
   const [standingsSort, setStandingsSort] = useState<{ key: SeasonV2StandingsSortKey; direction: SortDirection }>({
     key: "rank",
     direction: "asc",
@@ -826,15 +827,28 @@ export default function SeasonStandingsV2Client({
     });
   }, [standingsRows, standingsSort]);
 
+  const displayStandingsRows = useMemo(() => {
+    if (showFullStandingsTable || sortedStandingsRows.length <= 6) {
+      return sortedStandingsRows;
+    }
+    const topRows = sortedStandingsRows.slice(0, 5);
+    const focusTeamId = focusedTeamId ?? selectedTeamSummary?.teamId ?? null;
+    if (!focusTeamId || topRows.some((row) => row.teamId === focusTeamId)) {
+      return topRows;
+    }
+    const ownRow = sortedStandingsRows.find((row) => row.teamId === focusTeamId);
+    return ownRow ? [...topRows, ownRow] : topRows;
+  }, [focusedTeamId, selectedTeamSummary?.teamId, showFullStandingsTable, sortedStandingsRows]);
+
   const standingsTableVirtualWindow = useRowVirtualWindow({
-    count: sortedStandingsRows.length,
+    count: displayStandingsRows.length,
     scrollTop: standingsTableScrollTop,
     viewportHeight: standingsTableViewportHeight,
     rowHeight: 44,
   });
   const visibleStandingsTableRows = useMemo(
-    () => sortedStandingsRows.slice(standingsTableVirtualWindow.start, standingsTableVirtualWindow.end),
-    [sortedStandingsRows, standingsTableVirtualWindow.end, standingsTableVirtualWindow.start],
+    () => displayStandingsRows.slice(standingsTableVirtualWindow.start, standingsTableVirtualWindow.end),
+    [displayStandingsRows, standingsTableVirtualWindow.end, standingsTableVirtualWindow.start],
   );
 
   useEffect(() => {
@@ -1428,6 +1442,11 @@ export default function SeasonStandingsV2Client({
                 >
                   Finanzen
                 </button>
+                {!showFullStandingsTable && sortedStandingsRows.length > 6 ? (
+                  <button className="secondary-button inline-button" type="button" onClick={() => setShowFullStandingsTable(true)}>
+                    Alle {sortedStandingsRows.length} Teams
+                  </button>
+                ) : null}
                 <button
                   className={`secondary-button inline-button${standingsSort.key === "points" ? " is-active" : ""}`}
                   type="button"

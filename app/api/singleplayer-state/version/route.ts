@@ -42,45 +42,47 @@ export async function GET(request: Request) {
   const { searchParams } = new URL(request.url);
   const saveId = searchParams.get("saveId")?.trim() || "active";
   const persistence = createPersistenceService();
-  const save = persistence.getSaveById(saveId);
+  const save = persistence.getSaveVersionMetadata(saveId);
 
   if (!save) {
     return NextResponse.json({ ok: false, error: `Save ${saveId} not found.` }, { status: 404 });
   }
 
-  const seasonState = save.gameState.seasonState;
-  const matchdayResultsSignature = latestRecordSignature(seasonState.matchdayResults);
-  const standingsApplySignature = latestRecordSignature(seasonState.standingsApplyLogs);
-  const seasonSnapshotsSignature = latestRecordSignature(seasonState.seasonSnapshots);
-  const disciplineResultsSignature = latestRecordSignature(seasonState.disciplineResults);
+  const matchdayResultsSignature = latestRecordSignature(save.matchdayResults);
+  const standingsApplySignature = latestRecordSignature(save.standingsApplyLogs);
+  const seasonSnapshotsSignature = latestRecordSignature(save.seasonSnapshots);
+  const disciplineResultsSignature = latestRecordSignature(save.disciplineResults);
   const signature = [
     save.saveId,
     save.updatedAt,
-    save.gameState.season.id,
-    save.gameState.matchdayState.matchdayId,
+    save.seasonId,
+    save.matchdayId,
     matchdayResultsSignature,
     standingsApplySignature,
     seasonSnapshotsSignature,
     disciplineResultsSignature,
   ].join("|");
 
-    const contentSignature = [
-      save.gameState.season.id,
-      save.gameState.matchdayState.matchdayId,
-      matchdayResultsSignature,
-      standingsApplySignature,
-      seasonSnapshotsSignature,
-      disciplineResultsSignature,
-    ].join("|");
+  const contentSignature = [
+    save.seasonId,
+    save.matchdayId,
+    String(save.saveVersion),
+    String(save.lineupDraftCount),
+    String(save.transferHistoryCount),
+    matchdayResultsSignature,
+    standingsApplySignature,
+    seasonSnapshotsSignature,
+    disciplineResultsSignature,
+  ].join("|");
 
-    return NextResponse.json({
-      ok: true,
-      saveId: save.saveId,
-      updatedAt: save.updatedAt,
-      seasonId: save.gameState.season.id,
-      matchdayId: save.gameState.matchdayState.matchdayId,
-      signature,
-      contentSignature,
+  return NextResponse.json({
+    ok: true,
+    saveId: save.saveId,
+    updatedAt: save.updatedAt,
+    seasonId: save.seasonId,
+    matchdayId: save.matchdayId,
+    signature,
+    contentSignature,
     matchdayResultsSignature,
     standingsApplySignature,
     seasonSnapshotsSignature,

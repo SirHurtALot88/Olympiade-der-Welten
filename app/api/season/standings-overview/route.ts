@@ -6,6 +6,7 @@ import type { GameState } from "@/lib/data/olyDataTypes";
 import { resolvePlayerEconomyContract } from "@/lib/foundation/player-economy-contract";
 import { buildSeasonPointsLedger } from "@/lib/foundation/season-points-ledger";
 import { createPersistenceService } from "@/lib/persistence/persistence-service";
+import { readStandingsOverviewCache, writeStandingsOverviewCache } from "@/lib/season/standings-overview-cache";
 import { buildArchivedSeasonStandingsOverviewItems } from "@/lib/season/archived-standings-overview";
 import { buildTeamPrizeSummary } from "@/lib/season/prize-money";
 import { getSeasonEconomyFactorWindow } from "@/lib/season/season-economy-factors";
@@ -78,6 +79,26 @@ export async function GET(request: Request) {
           })()
         : null;
     const seasonId = requestedSeasonId ?? localSave?.gameState.season.id ?? "season-1";
+
+    if (source === "sqlite" && localSave) {
+      const versionMeta = createPersistenceService().getSaveVersionMetadata(localSave.saveId);
+      const cacheSignature = versionMeta
+        ? [
+            versionMeta.seasonId,
+            versionMeta.matchdayId,
+            String(versionMeta.saveVersion),
+            String(versionMeta.lineupDraftCount),
+            String(versionMeta.transferHistoryCount),
+            versionMeta.updatedAt,
+            seasonId,
+          ].join("|")
+        : `${localSave.updatedAt}|${seasonId}`;
+      const cacheKey = `${localSave.saveId}:${seasonId}`;
+      const cached = readStandingsOverviewCache(cacheKey, cacheSignature);
+      if (cached) {
+        return NextResponse.json(cached);
+      }
+    }
 
     const archivedSnapshot =
       source === "sqlite" && seasonId !== localSave!.gameState.season.id
@@ -258,7 +279,7 @@ export async function GET(request: Request) {
           })()
         : null;
 
-    return NextResponse.json({
+    const responsePayload = {
       items:
         source === "sqlite"
           ? localSave!.gameState.teams.map((team) => {
@@ -331,7 +352,25 @@ export async function GET(request: Request) {
         saveId,
         seasonId,
       },
-    });
+    };
+
+    if (source === "sqlite" && localSave) {
+      const versionMeta = createPersistenceService().getSaveVersionMetadata(localSave.saveId);
+      const cacheSignature = versionMeta
+        ? [
+            versionMeta.seasonId,
+            versionMeta.matchdayId,
+            String(versionMeta.saveVersion),
+            String(versionMeta.lineupDraftCount),
+            String(versionMeta.transferHistoryCount),
+            versionMeta.updatedAt,
+            seasonId,
+          ].join("|")
+        : `${localSave.updatedAt}|${seasonId}`;
+      writeStandingsOverviewCache(`${localSave.saveId}:${seasonId}`, cacheSignature, responsePayload);
+    }
+
+    return NextResponse.json(responsePayload);
   } catch (error) {
     const message = error instanceof Error ? error.message : "Season standings overview could not be loaded.";
     return NextResponse.json(

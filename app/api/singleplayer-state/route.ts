@@ -262,9 +262,42 @@ export async function PUT(request: Request) {
     );
   }
 
-  const body = (await request.json()) as { saveId?: string; gameState?: GameState };
+  const body = (await request.json()) as {
+    saveId?: string;
+    gameState?: GameState;
+    expectedSaveVersion?: number;
+    expectedUpdatedAt?: string;
+  };
   if (!body.saveId || !body.gameState) {
     return NextResponse.json({ error: "saveId and gameState are required." }, { status: 400 });
+  }
+
+  const persistence = createPersistenceService();
+  const existing = persistence.getSaveById(body.saveId);
+  if (!existing) {
+    return NextResponse.json({ error: `Save ${body.saveId} not found.` }, { status: 404 });
+  }
+
+  const currentSaveVersion = existing.gameState.saveVersion ?? 0;
+  if (body.expectedSaveVersion !== undefined && body.expectedSaveVersion !== currentSaveVersion) {
+    return NextResponse.json(
+      {
+        error: "save_version_conflict",
+        currentSaveVersion,
+        message: `Expected saveVersion ${body.expectedSaveVersion}, current is ${currentSaveVersion}.`,
+      },
+      { status: 409 },
+    );
+  }
+  if (body.expectedUpdatedAt !== undefined && body.expectedUpdatedAt !== existing.updatedAt) {
+    return NextResponse.json(
+      {
+        error: "save_version_conflict",
+        currentUpdatedAt: existing.updatedAt,
+        message: "Save was updated elsewhere before this write could be applied.",
+      },
+      { status: 409 },
+    );
   }
 
   const activeRoom = getActiveRoomBySaveId(body.saveId);
@@ -280,12 +313,17 @@ export async function PUT(request: Request) {
   }
 
   const persistence = createPersistenceService();
-  const save = persistence.saveSingleplayerState(body.saveId, withNormalizedLocalTeamSettings(body.gameState));
+  const nextGameState = withNormalizedLocalTeamSettings({
+    ...body.gameState,
+    saveVersion: currentSaveVersion + 1,
+  });
+  const save = persistence.saveSingleplayerState(body.saveId, nextGameState);
 
   return NextResponse.json({
     save: {
       saveId: save.saveId,
       name: save.name,
+      saveVersion: save.gameState.saveVersion,
     },
     saves: listSavesForMode(persistence, saveMode).map(serializeSaveSummary),
   });

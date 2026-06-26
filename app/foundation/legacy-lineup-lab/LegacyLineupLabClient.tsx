@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { memo, useCallback, useEffect, useMemo, useRef, useState } from "react";
 
-import FormBoardPanel from "@/app/foundation/legacy-lineup-lab/FormBoardPanel";
+import { calculateLocalLegacyLineupPreviewFromContext } from "@/lib/lineups/legacy-lineup-preview-from-context";
 import DraftWorkspace from "@/app/foundation/legacy-lineup-lab/DraftWorkspace";
 import LineupExpertPanels from "@/app/foundation/legacy-lineup-lab/LineupExpertPanels";
 import { LegacyLineupVirtualCardGrid } from "@/app/foundation/legacy-lineup-lab/LegacyLineupVirtualTableBody";
@@ -1831,6 +1831,8 @@ export default function LegacyLineupLabClient(props: LegacyLineupLabClientProps)
   const loadContextRequestKeyRef = useRef<string>("");
   const loadContextAbortRef = useRef<AbortController | null>(null);
   const previewRequestKeyRef = useRef<string>("");
+  const previewAbortRef = useRef<AbortController | null>(null);
+  const previewSequenceRef = useRef(0);
   const [errors, setErrors] = useState<string[]>([]);
   const [warnings, setWarnings] = useState<string[]>([]);
   const [message, setMessage] = useState<string>("");
@@ -4648,48 +4650,26 @@ export default function LegacyLineupLabClient(props: LegacyLineupLabClientProps)
 	  }, [context, params.matchdayId, params.saveId, params.seasonId, params.teamId, selectedTeamOption?.controlMode, source]);
 
   useEffect(() => {
-    if (!context || !autoFlowReadyRef.current || isBusy) {
+    if (!context || !autoFlowReadyRef.current || duplicateSelections.length > 0) {
       return;
     }
     if (lastAutoPreviewKeyRef.current === draftStateKey) {
       return;
     }
-
-    const timer = window.setTimeout(() => {
-      lastAutoPreviewKeyRef.current = draftStateKey;
-      void requestPreview(entries, modifiers, { silent: true });
-    }, 180);
-
-    return () => window.clearTimeout(timer);
-  }, [context, draftStateKey, entries, isBusy, modifiers]);
-
-	  useEffect(() => {
-	    if (!context || !autoFlowReadyRef.current || isBusy || duplicateSelections.length > 0) {
-	      return;
-	    }
-    if (lastAutoPersistKeyRef.current === draftStateKey) {
-      return;
-    }
     if (skipNextAutoPersistRef.current) {
       skipNextAutoPersistRef.current = false;
-      lastAutoPersistKeyRef.current = draftStateKey;
       lastAutoPreviewKeyRef.current = draftStateKey;
       void requestPreview(entries, modifiers, { silent: true });
       return;
     }
 
     const timer = window.setTimeout(() => {
-      lastAutoPersistKeyRef.current = draftStateKey;
       lastAutoPreviewKeyRef.current = draftStateKey;
-	      if (source === "prisma" || isReadOnly) {
-	        void requestPreview(entries, modifiers, { silent: true });
-	        return;
-	      }
-	      void autoPersistDraftAndPreview(entries);
-	    }, 500);
+      void requestPreview(entries, modifiers, { silent: true });
+    }, 700);
 
-	    return () => window.clearTimeout(timer);
-	  }, [context, draftStateKey, duplicateSelections.length, entries, isBusy, isReadOnly, modifiers, source]);
+    return () => window.clearTimeout(timer);
+  }, [context, draftStateKey, duplicateSelections.length, entries, modifiers]);
 
   async function handleLoadDraft() {
     setPreview(null);
@@ -4880,58 +4860,90 @@ export default function LegacyLineupLabClient(props: LegacyLineupLabClientProps)
     query.set("source", source);
     const previewBody = JSON.stringify({ entries: entriesToPreview, modifiers: previewModifiers });
     const previewRequestKey = `${query.toString()}:${previewBody}`;
-    if (previewRequestKeyRef.current === previewRequestKey) {
+    if (!options?.silent && previewRequestKeyRef.current === previewRequestKey) {
       return;
     }
     previewRequestKeyRef.current = previewRequestKey;
 
-    setIsBusy(true);
-    setErrors([]);
-    setWarnings([]);
-    if (!options?.silent) {
+    const previewSequence = options?.silent ? ++previewSequenceRef.current : previewSequenceRef.current;
+    let abortController: AbortController | null = null;
+    if (options?.silent) {
+      previewAbortRef.current?.abort();
+      abortController = new AbortController();
+      previewAbortRef.current = abortController;
+    } else {
+      setIsBusy(true);
+      setErrors([]);
+      setWarnings([]);
       setMessage("");
     }
 
     try {
+      if (options?.silent && source === "sqlite" && context) {
+        const localResult = calculateLocalLegacyLineupPreviewFromContext(context, entriesToPreview, previewModifiers);
+        if (options?.silent && previewSequence !== previewSequenceRef.current) {
+          return;
+        }
+        if (!localResult.ok) {
+          if (!options?.silent) {
+            setErrors(localResult.errors ?? ["Preview konnte nicht berechnet werden."]);
+          }
+          return;
+        }
+        setPreview(localResult);
+        setWarnings(localResult.scorePreview.validationWarnings ?? []);
+        return;
+      }
+
       const response = await fetch(`/api/lineups/legacy/preview?${query.toString()}`, {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
         },
         body: previewBody,
+        signal: abortController?.signal,
       });
       const payload = (await response.json()) as PreviewResponse;
 
+      if (options?.silent && previewSequence !== previewSequenceRef.current) {
+        return;
+      }
+
       if (!response.ok || !payload.preview || !payload.preview.ok) {
-        setErrors(payload.errors ?? ["Preview konnte nicht berechnet werden."]);
-        setWarnings(payload.warnings ?? []);
+        if (!options?.silent) {
+          setErrors(payload.errors ?? ["Preview konnte nicht berechnet werden."]);
+          setWarnings(payload.warnings ?? []);
+        }
         return;
       }
 
       setPreview(payload.preview);
-      setIsPreviewPanelOpen(true);
+      if (!options?.silent) {
+        setIsPreviewPanelOpen(true);
+      }
       setWarnings(payload.preview.scorePreview.validationWarnings ?? []);
       if (!options?.silent) {
         setMessage("Preview berechnet.");
+      }
+    } catch (error) {
+      if (error instanceof DOMException && error.name === "AbortError") {
+        return;
+      }
+      if (!options?.silent) {
+        setErrors(["Preview konnte nicht berechnet werden."]);
       }
     } finally {
       if (previewRequestKeyRef.current === previewRequestKey) {
         previewRequestKeyRef.current = "";
       }
-      setIsBusy(false);
+      if (!options?.silent) {
+        setIsBusy(false);
+      }
     }
   }
 
   async function handlePreview() {
     await requestPreview(entries, modifiers);
-  }
-
-  async function autoPersistDraftAndPreview(entriesToSave: LegacyLineupEntryInput[]) {
-    await saveEntries(entriesToSave, "Draft gespeichert.", {
-      silent: true,
-      resetTransientAfterReload: false,
-    });
-    await requestPreview(entriesToSave, modifiers, { silent: true });
   }
 
   async function loadMatchdayScoreboard(side: "d1" | "d2", nextReveal?: Partial<{ form: boolean; mutators: boolean }>) {

@@ -170,6 +170,8 @@ export function getDatabase() {
 
   ensureDataDirectory();
   databaseInstance = new Database(resolveDatabasePath());
+  databaseInstance.pragma("journal_mode = WAL");
+  databaseInstance.pragma("busy_timeout = 5000");
   databaseInstance.pragma("foreign_keys = ON");
   runMigrations(databaseInstance);
   return databaseInstance;

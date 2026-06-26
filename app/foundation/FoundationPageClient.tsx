@@ -3331,7 +3331,7 @@ const MATCHDAY_AUTO_RUN_CONFIRM_TOKEN = "RUN_LOCAL_MATCHDAY_AUTO";
 const SEASON_COMPLETION_CONFIRM_TOKEN = "COMPLETE_LOCAL_SEASON_PIPELINE";
 const SEASON_SNAPSHOT_CONFIRM_TOKEN = "CREATE_LOCAL_SEASON_SNAPSHOT";
 const PRESEASON_NEXT_SEASON_SETUP_CONFIRM_TOKEN = "APPLY_PRESEASON_NEXT_SEASON_SETUP";
-const TRANSFER_HISTORY_SEASON_LIMIT = 5000;
+const TRANSFER_HISTORY_SEASON_LIMIT = 100;
 const TRANSFER_HISTORY_ALL_SEASONS_PAGE_SIZE = 50;
 const HISTORY_ALL_SEASONS_FILTER = "__ALL_SEASONS__";
 const TRANSFER_MARKET_INITIAL_RENDER_LIMIT = 48;
@@ -6138,7 +6138,8 @@ export default function FoundationPageClient({
   const [showCommandPalette, setShowCommandPalette] = useState(false);
   const [commandSearch, setCommandSearch] = useState("");
   const commandSearchInputRef = useRef<HTMLInputElement | null>(null);
-  const shouldBuildTeamsHeavyComparison = activeView === "teams";
+  const [showExtendedTeamPanels, setShowExtendedTeamPanels] = useState<boolean>(false);
+  const shouldBuildTeamsHeavyComparison = activeView === "teams" && showExtendedTeamPanels;
   const shouldBuildDisciplineRanks =
     shouldBuildTeamsHeavyComparison ||
     activeView === "ranks" ||
@@ -6177,7 +6178,6 @@ export default function FoundationPageClient({
   const [seasonEndXpSpendError, setSeasonEndXpSpendError] = useState<string | null>(null);
   const [seasonEndXpSpendSuccess, setSeasonEndXpSpendSuccess] = useState<string | null>(null);
   const [seasonTableMode, setSeasonTableMode] = useState<SeasonTableMode>("expert");
-  const [showExtendedTeamPanels, setShowExtendedTeamPanels] = useState<boolean>(false);
   const shouldBuildTeamContracts = activeView === "teams" && selectedTeamDetailTab === "contracts";
   const shouldBuildExtendedTeamPanels = activeView === "teams" && showExtendedTeamPanels;
   const shouldLoadTransferHistoryFeed = isTransferHistoryViewActive;
@@ -6338,6 +6338,10 @@ export default function FoundationPageClient({
   const shouldLoadTransferRecapFeed = false;
   const [marketRenderLimit, setMarketRenderLimit] = useState<number>(TRANSFER_MARKET_INITIAL_RENDER_LIMIT);
   const [marketLoadingMore, setMarketLoadingMore] = useState<boolean>(false);
+  const [historyLoadingMore, setHistoryLoadingMore] = useState<boolean>(false);
+  const [bootstrapError, setBootstrapError] = useState<string | null>(null);
+  const [persistenceError, setPersistenceError] = useState<string | null>(null);
+  const [saveSyncError, setSaveSyncError] = useState<string | null>(null);
   const [marketReloadToken, setMarketReloadToken] = useState<number>(0);
   const [marketFeed, setMarketFeed] = useState<FoundationTransfermarktResponse | null>(null);
   const [marketBuyBusy, setMarketBuyBusy] = useState<boolean>(false);
@@ -6547,6 +6551,8 @@ export default function FoundationPageClient({
   const skipNextFullPersistCountRef = useRef(0);
   const liveSaveVersionSignatureRef = useRef<string | null>(null);
   const liveSaveRefreshInFlightRef = useRef(false);
+  const autoPersistPausedRef = useRef(false);
+  const autoPersistTimerRef = useRef<number | null>(null);
   const fullSeasonArchiveLoadKeyRef = useRef<string | null>(null);
 
   function clearSaveScopedFeeds() {
@@ -9565,9 +9571,15 @@ export default function FoundationPageClient({
         });
       } catch (error) {
         console.warn("Initialer Spielstand konnte gerade nicht geladen werden.", error);
+        if (!cancelled) {
+          setBootstrapError("Der Spielstand konnte nicht geladen werden.");
+        }
         return;
       }
       if (!response.ok || cancelled) {
+        if (!cancelled) {
+          setBootstrapError("Der Spielstand konnte nicht geladen werden.");
+        }
         return;
       }
 
@@ -9577,8 +9589,13 @@ export default function FoundationPageClient({
         _meta?: FoundationReadMeta;
       };
       if (!payload.save?.gameState || cancelled) {
+        if (!cancelled) {
+          setBootstrapError("Der Spielstand konnte nicht geladen werden.");
+        }
         return;
       }
+
+      setBootstrapError(null);
 
       const nextGameState = payload._meta?.source === "prisma" ? payload.save.gameState : withNormalizedLocalTeamSettings(payload.save.gameState);
 
@@ -9638,39 +9655,90 @@ export default function FoundationPageClient({
       return;
     }
 
-    void fetch("/api/singleplayer-state", {
-      method: "PUT",
-      headers: {
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify({ saveId: activeSaveId, gameState }),
-    })
-      .then(async (response) => {
-        if (!response.ok) {
-          return null;
-        }
+    if (autoPersistPausedRef.current || liveSaveRefreshInFlightRef.current) {
+      return;
+    }
 
-        return (await response.json()) as {
-          save?: { saveId: string; name?: string };
-          saves?: SaveSummary[];
-        };
-      })
-      .then((payload) => {
-        if (!payload) {
-          return;
-        }
+    if (autoPersistTimerRef.current != null) {
+      window.clearTimeout(autoPersistTimerRef.current);
+    }
 
-        if (payload.save?.name) {
-          setActiveSaveName(payload.save.name);
-        }
-        if (payload.saves) {
-          setSaveSummaries(payload.saves);
-        }
+    autoPersistTimerRef.current = window.setTimeout(() => {
+      autoPersistTimerRef.current = null;
+      if (autoPersistPausedRef.current || liveSaveRefreshInFlightRef.current) {
+        return;
+      }
+
+      void fetch("/api/singleplayer-state", {
+        method: "PUT",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          saveId: activeSaveId,
+          gameState,
+          expectedSaveVersion: gameState.saveVersion ?? 0,
+        }),
       })
-      .catch((error) => {
-        console.warn("Auto-Save konnte gerade nicht gespeichert werden.", error);
-      });
-  }, [activeSaveId, gameState]);
+        .then(async (response) => {
+          if (response.status === 409) {
+            setPersistenceError("Save-Konflikt erkannt. Stand wird neu geladen.");
+            const reloaded = await loadSave(activeSaveId, foundationSaveMode, { compactInitial: true });
+            if (reloaded) {
+              autoPersistPausedRef.current = true;
+              setGameState(reloaded);
+              window.setTimeout(() => {
+                autoPersistPausedRef.current = false;
+              }, 0);
+            }
+            return null;
+          }
+          if (!response.ok) {
+            setPersistenceError("Auto-Save fehlgeschlagen.");
+            return null;
+          }
+
+          setPersistenceError(null);
+          return (await response.json()) as {
+            save?: { saveId: string; name?: string; saveVersion?: number };
+            saves?: SaveSummary[];
+          };
+        })
+        .then((payload) => {
+          if (!payload) {
+            return;
+          }
+
+          if (payload.save?.name) {
+            setActiveSaveName(payload.save.name);
+          }
+          if (payload.saves) {
+            setSaveSummaries(payload.saves);
+          }
+          if (payload.save?.saveVersion != null) {
+            setGameState((current) =>
+              current.saveVersion === payload.save?.saveVersion
+                ? current
+                : {
+                    ...current,
+                    saveVersion: payload.save?.saveVersion,
+                  },
+            );
+          }
+        })
+        .catch((error) => {
+          console.warn("Auto-Save konnte gerade nicht gespeichert werden.", error);
+          setPersistenceError("Auto-Save fehlgeschlagen.");
+        });
+    }, 1500);
+
+    return () => {
+      if (autoPersistTimerRef.current != null) {
+        window.clearTimeout(autoPersistTimerRef.current);
+        autoPersistTimerRef.current = null;
+      }
+    };
+  }, [activeSaveId, foundationSaveMode, gameState, readMeta.readOnly]);
 
   async function reloadMarketFeed(
     teamIdOverride?: string,
@@ -9936,6 +10004,28 @@ export default function FoundationPageClient({
     }
   }
 
+  async function loadMoreHistoryFeed() {
+    if (historyLoadingMore || !historyFeed || (historyFeed.total ?? 0) <= (historyFeed.items.length ?? 0)) {
+      return;
+    }
+
+    historyFeedAbortRef.current?.abort();
+    const controller = new AbortController();
+    historyFeedAbortRef.current = controller;
+    setHistoryLoadingMore(true);
+    try {
+      await reloadHistoryFeed(controller.signal, {
+        append: true,
+        offset: historyFeed.items.length,
+      });
+    } finally {
+      setHistoryLoadingMore(false);
+      if (historyFeedAbortRef.current === controller) {
+        historyFeedAbortRef.current = null;
+      }
+    }
+  }
+
   async function reloadTransferRecapFeed(signal?: AbortSignal) {
     try {
       const isAllSeasonsRequest = historySeasonFilter === HISTORY_ALL_SEASONS_FILTER;
@@ -10017,15 +10107,25 @@ export default function FoundationPageClient({
 
   async function reloadLiveSeasonState(
     reason: "manual_apply" | "room_event" | "local_save_version" = "local_save_version",
-    options: { skipGameStateReload?: boolean; reloadFullGameState?: boolean } = {},
+    options: { skipGameStateReload?: boolean; reloadFullGameState?: boolean; compactReload?: boolean } = {},
   ) {
     void reason;
-    const skipGameStateReload =
-      options.skipGameStateReload ??
-      (reason === "local_save_version" && !options.reloadFullGameState);
-    const nextGameState = skipGameStateReload
-      ? null
-      : await loadSave(activeSaveId, foundationSaveMode, { compactInitial: options.reloadFullGameState ? false : true });
+    const shouldReloadGameState =
+      options.compactReload ||
+      options.reloadFullGameState ||
+      (options.skipGameStateReload !== true && reason !== "local_save_version");
+    const nextGameState = shouldReloadGameState
+      ? await loadSave(activeSaveId, foundationSaveMode, {
+          compactInitial: options.reloadFullGameState ? false : true,
+        })
+      : null;
+    if (nextGameState) {
+      autoPersistPausedRef.current = true;
+      setGameState(nextGameState);
+      window.setTimeout(() => {
+        autoPersistPausedRef.current = false;
+      }, 0);
+    }
     const nextSeasonId = nextGameState?.season.id ?? gameState.season.id;
     if (nextSeasonId && seasonOverviewSeasonId !== nextSeasonId) {
       setSeasonOverviewSeasonId(nextSeasonId);
@@ -10151,17 +10251,19 @@ export default function FoundationPageClient({
 
         liveSaveRefreshInFlightRef.current = true;
         try {
-          await reloadLiveSeasonState("local_save_version", { skipGameStateReload: true });
+          await reloadLiveSeasonState("local_save_version", { compactReload: true });
+          setSaveSyncError(null);
         } finally {
           liveSaveRefreshInFlightRef.current = false;
         }
       } catch {
         liveSaveRefreshInFlightRef.current = false;
+        setSaveSyncError("Save-Sync fehlgeschlagen. Bitte Seite neu laden oder kurz warten.");
       }
     }
 
     void pollLocalSaveVersion();
-    const intervalId = window.setInterval(pollLocalSaveVersion, 25000);
+    const intervalId = window.setInterval(pollLocalSaveVersion, 45000);
     const onVisibilityChange = () => {
       if (document.visibilityState === "visible") {
         void pollLocalSaveVersion();
@@ -19800,45 +19902,8 @@ export default function FoundationPageClient({
   );
 
   const screenPrimaryAction = useMemo<FoundationScreenPrimaryAction | null>(() => {
-    if (activeView === "homeV2" && homeV2Tab === "office") {
-      if (homeNextMatchdayStatus.openSlots > 0) {
-        return {
-          kicker: "Hauptaktion",
-          title: "Einsatzliste vorbereiten",
-          detail: `${homeNextMatchdayStatus.openSlots} offene Slots und Spieltag noch nicht bereit.`,
-          status: "offen",
-          buttonLabel: "Einsatzliste öffnen",
-          onClick: () => setFoundationView("lineup", setActiveView),
-        };
-      }
-      if (selectedHqFinanceWarnings.length > 0) {
-        return {
-          kicker: "Hauptaktion",
-          title: "Cash-Druck prüfen",
-          detail: selectedHqFinanceWarnings[0],
-          status: "blockiert",
-          buttonLabel: "Preisgeld öffnen",
-          onClick: () => setFoundationView("prize", setActiveView),
-        };
-      }
-      if (hqTrainingFocusCount > 0) {
-        return {
-          kicker: "Hauptaktion",
-          title: "Training nachschärfen",
-          detail: `${hqTrainingFocusCount} Spieler brauchen gerade Aufmerksamkeit.`,
-          status: "offen",
-          buttonLabel: "Training öffnen",
-          onClick: () => setFoundationView("trainingCompact", setActiveView),
-        };
-      }
-      return {
-        kicker: "Hauptaktion",
-        title: "Transfermarkt prüfen",
-        detail: "Wenn nichts brennt, ist jetzt der beste Moment fuer Markt, Wishlist und Kaderfeinschliff.",
-        status: "optional",
-        buttonLabel: "Transfermarkt öffnen",
-        onClick: () => setFoundationView("marketV2", setActiveView),
-      };
+    if (activeView === "homeV2") {
+      return null;
     }
 
     if (activeView === "lineup") {
@@ -20039,12 +20104,22 @@ export default function FoundationPageClient({
     triggerGlobalNext,
   ]);
 
-  const showCompactHeader = activeView !== "home" && activeView !== "homeV2";
-  const showFlowCoach = activeView === "homeV2";
-  const showCompactFlowCoach = activeView !== "home" && activeView !== "admin";
+  const showCompactHeader = activeView !== "home";
+  const showFlowCoach = false;
+  const showCompactFlowCoach = false;
 
   return (
     <main className="app-shell foundation-shell foundation-app">
+      {bootstrapError || persistenceError || saveSyncError ? (
+        <div className="foundation-persistence-banner transfer-callout is-warning" role="status">
+          <strong>{bootstrapError ?? persistenceError ?? saveSyncError}</strong>
+          {bootstrapError ? (
+            <button className="secondary-button inline-button" type="button" onClick={() => window.location.reload()}>
+              Neu laden
+            </button>
+          ) : null}
+        </div>
+      ) : null}
       <FoundationShell
         activeView={activeView as FoundationViewId}
         onNavigate={(view) => setFoundationView(view as FoundationView, setActiveView, { push: true })}
@@ -20533,12 +20608,24 @@ export default function FoundationPageClient({
 
       <section className={`foundation-context-banner${isSaveBusy ? " is-loading" : ""}${showCompactHeader ? " is-compact" : ""}`} data-testid="foundation-context-banner">
         <div className="foundation-context-main">
+          {activeView !== "homeV2" ? (
+            <>
           <span className="eyebrow">Spielstand</span>
           <strong>{isSaveBusy ? "Save-Wechsel lädt..." : activeSaveName}</strong>
           <span className="muted">
             {gameState.season.name} · Spieltag {activeContextMeta?.activeMatchday ?? gameState.season.currentMatchday} ·{" "}
             {formatGamePhaseLabel(activeContextMeta?.gamePhase ?? gameState.gamePhase)}
           </span>
+            </>
+          ) : (
+            <>
+              <span className="eyebrow">Team</span>
+              <strong>{selectedTeam?.name ?? "Kein Team"}</strong>
+              <span className="muted">
+                {gameState.season.name} · {currentMatchdayDisplayLabel}
+              </span>
+            </>
+          )}
         </div>
         {showAiPreseasonBanner ? (
           <div
@@ -20617,7 +20704,7 @@ export default function FoundationPageClient({
             </button>
           </div>
         ) : null}
-        {activeView === "homeV2" ? (
+        {false ? (
         <div className={`foundation-flow-controller ${getGameFlowStatusClass(gameFlowActionStep.status)}`} data-testid="foundation-flow-controller">
           <div className="foundation-flow-copy">
             <span className="eyebrow">
@@ -20817,13 +20904,13 @@ export default function FoundationPageClient({
       </section>
 
       {readOnlyBannerMessage ? (
-        <section className="foundation-access-banner is-readonly" role="status" aria-label="Steuerungsstatus">
-          <div className="foundation-access-banner-copy">
-            <span className="eyebrow">Steuerung</span>
-            <strong>Nur Ansicht</strong>
-            <small>{readOnlyBannerMessage}</small>
-          </div>
-          <span className="transfer-status-pill is-warning">Anschauen ja · Steuern nein</span>
+        <section
+          className="foundation-access-banner is-readonly is-compact"
+          role="status"
+          aria-label="Steuerungsstatus"
+          title={readOnlyBannerMessage}
+        >
+          <span className="transfer-status-pill is-warning">Nur Ansicht</span>
         </section>
       ) : null}
 
@@ -20831,29 +20918,26 @@ export default function FoundationPageClient({
         <section
           className={joinClassNames(
             "foundation-screen-action",
+            "is-compact",
             `is-${screenPrimaryAction.status}`,
             screenPrimaryAction.disabled && "is-disabled",
           )}
           aria-label="Hauptaktion dieser Ansicht"
         >
-          <div className="foundation-screen-action-copy">
-            <span className="eyebrow">{screenPrimaryAction.kicker}</span>
-            <strong>{screenPrimaryAction.title}</strong>
-            <small>{screenPrimaryAction.detail}</small>
-          </div>
           <div className="foundation-screen-action-cta">
             <button
               className={`primary-button foundation-screen-action-button${screenPrimaryAction.disabled ? " is-disabled" : ""}`}
               type="button"
               onClick={screenPrimaryAction.onClick}
               disabled={screenPrimaryAction.disabled}
-              title={screenPrimaryAction.disabledReason ?? screenPrimaryAction.detail}
+              title={
+                [screenPrimaryAction.title, screenPrimaryAction.detail, screenPrimaryAction.disabledReason]
+                  .filter(Boolean)
+                  .join(" · ") || screenPrimaryAction.buttonLabel
+              }
             >
               {screenPrimaryAction.buttonLabel}
             </button>
-            {screenPrimaryAction.disabledReason ? (
-              <span className="foundation-screen-action-reason">Warum nicht: {screenPrimaryAction.disabledReason}</span>
-            ) : null}
           </div>
         </section>
       ) : null}
@@ -20870,6 +20954,7 @@ export default function FoundationPageClient({
                 key={item.id}
                 className={`foundation-warning-inbox-item is-${item.severity}`}
                 type="button"
+                title={item.detail}
                 onClick={() => {
                   if (item.inboxItem) {
                     navigateToInboxItem(item.inboxItem);
@@ -20886,7 +20971,6 @@ export default function FoundationPageClient({
                 <span className={`foundation-warning-dot is-${item.severity}`} aria-hidden="true" />
                 <span>
                   <strong>{item.title}</strong>
-                  <small>{item.detail}</small>
                 </span>
               </button>
             ))}
@@ -30767,6 +30851,9 @@ export default function FoundationPageClient({
                 }}
                 onOpenPlayer={(playerId) => openPlayerProfileById(playerId)}
                 onOpenTeam={(teamId) => openTeamProfileById(teamId)}
+                hasMore={(historyFeed?.total ?? 0) > (historyFeed?.items.length ?? 0)}
+                loadingMore={historyLoadingMore}
+                onLoadMore={() => void loadMoreHistoryFeed()}
               />
           </section>
           ) : null}

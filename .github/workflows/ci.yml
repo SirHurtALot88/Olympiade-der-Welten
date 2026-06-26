@@ -9,6 +9,8 @@ jobs:
   test-and-smoke:
     runs-on: ubuntu-latest
     timeout-minutes: 30
+    env:
+      OLY_APP_SQLITE_PATH: ${{ runner.temp }}/ci-oly.sqlite
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
@@ -18,7 +20,7 @@ jobs:
       - run: npm ci
       - run: npx playwright install chromium --with-deps
       - run: npm run ci:flow-smoke
-      - run: npm run season:smoke-block-3
+      - run: npm run perf:regression-smoke
       - name: Start dev server for browser smokes
         run: |
           npm run dev &
