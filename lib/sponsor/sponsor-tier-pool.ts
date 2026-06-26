@@ -1,11 +1,11 @@
 import type { SponsorStarTier } from "@/lib/data/olyDataTypes";
+import { getStarTierMilestoneMultiplier } from "@/lib/sponsor/sponsor-economy-calibration";
+import type { SponsorTeamQualityRank } from "@/lib/sponsor/sponsor-team-quality-rank";
 
-const TIER_WEIGHTS: Record<string, [number, number, number, number, number]> = {
-  low: [35, 40, 20, 5, 0],
-  midLow: [15, 35, 35, 13, 2],
-  mid: [5, 20, 40, 28, 7],
-  midHigh: [2, 10, 28, 40, 20],
-  high: [0, 5, 20, 35, 40],
+export type SponsorTierRollResult = {
+  tiers: SponsorStarTier[];
+  /** Bottom-table luck: one slot may use premium_elite / golden-card flavor at low tier. */
+  goldenCardSlots: number[];
 };
 
 function getStableUnitHash(seed: string) {
@@ -17,130 +17,123 @@ function getStableUnitHash(seed: string) {
   return (hash >>> 0) / 4294967295;
 }
 
-function getWeightBucket(commercialRating: number): keyof typeof TIER_WEIGHTS {
-  if (commercialRating >= 86) return "high";
-  if (commercialRating >= 71) return "midHigh";
-  if (commercialRating >= 51) return "mid";
-  if (commercialRating >= 26) return "midLow";
-  return "low";
+function clampTier(tier: number, maxTier: SponsorStarTier): SponsorStarTier {
+  return Math.min(maxTier, Math.max(1, Math.round(tier))) as SponsorStarTier;
 }
 
-function pickTierFromWeights(weights: [number, number, number, number, number], seed: string): SponsorStarTier {
-  const roll = getStableUnitHash(seed);
-  const total = weights.reduce((sum, weight) => sum + weight, 0);
-  let cursor = roll * total;
-  for (let index = 0; index < weights.length; index += 1) {
-    cursor -= weights[index]!;
-    if (cursor <= 0) {
-      return (index + 1) as SponsorStarTier;
-    }
+function rollClusteredTier(input: {
+  seasonId: string;
+  teamId: string;
+  slotIndex: number;
+  targetTier: SponsorStarTier;
+  maxTier: SponsorStarTier;
+}): SponsorStarTier {
+  const roll = getStableUnitHash(`${input.seasonId}:${input.teamId}:sponsor-tier:${input.slotIndex}`);
+  let tier = input.targetTier;
+  if (roll < 0.12 && tier < input.maxTier) {
+    tier = clampTier(tier + 1, input.maxTier);
+  } else if (roll < 0.32 && tier > 1) {
+    tier = clampTier(tier - 1, input.maxTier);
+  } else if (roll < 0.42 && tier > 2) {
+    tier = clampTier(tier - 1, input.maxTier);
   }
-  return 1;
+  return clampTier(tier, input.maxTier);
 }
 
-export function getMaxStarTierForStandingRank(rank: number | null | undefined): SponsorStarTier {
-  if (rank == null || !Number.isFinite(rank)) {
-    return 3;
-  }
-  if (rank >= 28) {
-    return 1;
-  }
-  if (rank >= 22) {
-    return 2;
-  }
-  if (rank >= 16) {
-    return 3;
-  }
-  if (rank >= 9) {
-    return 4;
-  }
-  return 5;
-}
-
-export function getMaxStarTierForCommercialRating(commercialRating: number): SponsorStarTier {
-  if (commercialRating >= 86) {
-    return 5;
-  }
-  if (commercialRating >= 66) {
-    return 4;
-  }
-  if (commercialRating >= 46) {
-    return 3;
-  }
-  if (commercialRating >= 26) {
-    return 2;
-  }
-  return 1;
-}
-
-function clampTierToCap(tier: SponsorStarTier, maxTier: SponsorStarTier): SponsorStarTier {
-  return Math.min(Math.max(1, tier), maxTier) as SponsorStarTier;
-}
-
-function adjustTiers(tiers: SponsorStarTier[], maxTier: SponsorStarTier): SponsorStarTier[] {
-  const adjusted = tiers.map((tier) => clampTierToCap(tier, maxTier));
-  if (new Set(adjusted).size === 1 && adjusted.length === 3 && maxTier >= 2) {
-    const base = adjusted[0]!;
-    if (base === maxTier) {
-      adjusted[1] = clampTierToCap((base - 1) as SponsorStarTier, maxTier);
-      adjusted[2] = clampTierToCap((base - 2) as SponsorStarTier, maxTier);
-    } else if (base === 1) {
-      adjusted[1] = clampTierToCap(2, maxTier);
-      adjusted[2] = clampTierToCap(Math.min(3, maxTier) as SponsorStarTier, maxTier);
-    } else {
-      adjusted[1] = clampTierToCap((base + 1) as SponsorStarTier, maxTier);
-      adjusted[2] = clampTierToCap((base - 1) as SponsorStarTier, maxTier);
-    }
-  }
-  return adjusted.map((tier) => clampTierToCap(tier, maxTier));
-}
-
-function applyChampionLuckRoll(
+function applyTopChampionCluster(
   tiers: SponsorStarTier[],
-  input: { seasonId: string; teamId: string; commercialRating: number },
-  maxTier: SponsorStarTier,
+  input: { seasonId: string; teamId: string; targetTier: SponsorStarTier; maxTier: SponsorStarTier },
 ): SponsorStarTier[] {
-  if (input.commercialRating < 80 || maxTier < 5) {
-    return tiers;
-  }
-  const luckRoll = getStableUnitHash(`${input.seasonId}:${input.teamId}:sponsor-luck`);
-  if (luckRoll < 0.88) {
+  if (input.maxTier < 5 || input.targetTier < 4) {
     return tiers;
   }
   const adjusted = [...tiers];
-  const luckySlot = Math.floor(getStableUnitHash(`${input.seasonId}:${input.teamId}:sponsor-lucky-slot`) * adjusted.length);
-  adjusted[luckySlot] = 5;
-  return adjusted.map((tier) => clampTierToCap(tier, maxTier));
+  for (let slotIndex = 0; slotIndex < adjusted.length; slotIndex += 1) {
+    const roll = getStableUnitHash(`${input.seasonId}:${input.teamId}:sponsor-elite:${slotIndex}`);
+    if (roll < 0.72) {
+      adjusted[slotIndex] = 5;
+    } else if (roll < 0.94) {
+      adjusted[slotIndex] = clampTier(4, input.maxTier);
+    }
+  }
+  return adjusted.map((tier) => clampTier(tier, input.maxTier));
 }
 
-function clampTier(tier: SponsorStarTier): SponsorStarTier {
-  return Math.min(5, Math.max(1, tier)) as SponsorStarTier;
+function applyBottomGoldenLuck(
+  tiers: SponsorStarTier[],
+  goldenCardSlots: number[],
+  input: {
+    seasonId: string;
+    teamId: string;
+    maxTier: SponsorStarTier;
+    targetTier: SponsorStarTier;
+  },
+): { tiers: SponsorStarTier[]; goldenCardSlots: number[] } {
+  if (input.maxTier > 2 || input.targetTier > 2) {
+    return { tiers, goldenCardSlots };
+  }
+  const luckRoll = getStableUnitHash(`${input.seasonId}:${input.teamId}:sponsor-golden-card`);
+  if (luckRoll >= 0.18) {
+    return { tiers, goldenCardSlots };
+  }
+  const slotIndex = Math.floor(
+    getStableUnitHash(`${input.seasonId}:${input.teamId}:sponsor-golden-slot`) * tiers.length,
+  );
+  const nextGolden = [...goldenCardSlots];
+  if (!nextGolden.includes(slotIndex)) {
+    nextGolden.push(slotIndex);
+  }
+  const adjusted = [...tiers];
+  if (luckRoll < 0.08 && input.maxTier >= 2) {
+    adjusted[slotIndex] = 2;
+  }
+  return { tiers: adjusted.map((tier) => clampTier(tier, input.maxTier)), goldenCardSlots: nextGolden };
 }
 
 export function rollSponsorStarTiers(input: {
   seasonId: string;
   teamId: string;
-  commercialRating: number;
-  standingRank?: number | null;
+  qualityRank: SponsorTeamQualityRank;
   slotCount?: number;
-}): SponsorStarTier[] {
+}): SponsorTierRollResult {
   const slotCount = input.slotCount ?? 3;
-  const maxTier = Math.min(
-    getMaxStarTierForCommercialRating(input.commercialRating),
-    getMaxStarTierForStandingRank(input.standingRank),
-  ) as SponsorStarTier;
-  const weights = TIER_WEIGHTS[getWeightBucket(input.commercialRating)]!;
-  const tiers = Array.from({ length: slotCount }, (_, slotIndex) =>
-    clampTierToCap(
-      pickTierFromWeights(weights, `${input.seasonId}:${input.teamId}:sponsor-tier:${slotIndex}`),
+  const maxTier = input.qualityRank.maxStarTier;
+  const targetTier = clampTier(input.qualityRank.targetStarTier, maxTier);
+
+  let tiers = Array.from({ length: slotCount }, (_, slotIndex) =>
+    rollClusteredTier({
+      seasonId: input.seasonId,
+      teamId: input.teamId,
+      slotIndex,
+      targetTier,
       maxTier,
-    ),
+    }),
   );
-  return applyChampionLuckRoll(adjustTiers(tiers, maxTier), input, maxTier);
+
+  if (input.qualityRank.qualityRank <= 4 && targetTier >= 4 && maxTier >= 4) {
+    tiers = applyTopChampionCluster(tiers, {
+      seasonId: input.seasonId,
+      teamId: input.teamId,
+      targetTier,
+      maxTier,
+    });
+  }
+
+  return applyBottomGoldenLuck(tiers, [], {
+    seasonId: input.seasonId,
+    teamId: input.teamId,
+    maxTier,
+    targetTier,
+  });
+}
+
+/** @deprecated Use rollSponsorStarTiers().tiers */
+export function rollSponsorStarTierList(input: Parameters<typeof rollSponsorStarTiers>[0]): SponsorStarTier[] {
+  return rollSponsorStarTiers(input).tiers;
 }
 
 export function getRewardMultiplier(starTier: SponsorStarTier) {
-  return 0.95 + starTier * 0.05;
+  return getStarTierMilestoneMultiplier(starTier);
 }
 
 export function getDemandMultiplier(starTier: SponsorStarTier) {

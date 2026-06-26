@@ -5,6 +5,7 @@ import { memo, useCallback, useEffect, useMemo, useRef, useState } from "react";
 
 import { calculateLocalLegacyLineupPreviewFromContext } from "@/lib/lineups/legacy-lineup-preview-from-context";
 import DraftWorkspace from "@/app/foundation/legacy-lineup-lab/DraftWorkspace";
+import FormBoardPanel from "@/app/foundation/legacy-lineup-lab/FormBoardPanel";
 import LineupExpertPanels from "@/app/foundation/legacy-lineup-lab/LineupExpertPanels";
 import { LegacyLineupVirtualCardGrid } from "@/app/foundation/legacy-lineup-lab/LegacyLineupVirtualTableBody";
 import { useRowVirtualWindow } from "@/lib/foundation/use-row-virtual-window";

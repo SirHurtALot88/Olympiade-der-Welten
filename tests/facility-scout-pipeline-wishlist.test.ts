@@ -34,8 +34,9 @@ function baseGameState(): GameState {
 }
 
 describe("facility scout pipeline wishlist mirror", () => {
-  it("does not mirror transfer wishlist when scouting office is L0", () => {
+  it("mirrors transfer wishlist at scouting office L0 with four slots", () => {
     const next = refreshScoutPipeline(baseGameState(), "T-T");
-    expect(next.seasonState.scoutIntelByTeamId?.["T-T"] ?? []).toHaveLength(0);
+    expect(next.seasonState.scoutIntelByTeamId?.["T-T"] ?? []).toHaveLength(1);
+    expect(next.seasonState.scoutIntelByTeamId?.["T-T"]?.[0]?.source).toBe("wishlist_mirror");
   });
 });

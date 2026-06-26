@@ -22,8 +22,8 @@ describe("scouting display contract", () => {
     expect(scoutingText).toContain("VeloScoutMetric");
     expect(scoutingText).toContain("scouting-top-disciplines");
     expect(scoutingText).toContain("FoundationSubNav");
-    expect(homeText).toContain("VeloScoutMetric");
-    expect(homeText).toContain("home-v2-today-panel");
+    expect(homeText).toContain("VeloStatOrbitRow");
+    expect(homeText).toContain("home-v2-signal-strip");
     expect(metricText).toContain('data-testid="velo-scout-metric"');
   });
 
@@ -34,7 +34,10 @@ describe("scouting display contract", () => {
     );
     expect(scoutingText).toContain("VeloStatOrbitRow");
     expect(scoutingText).toContain("showGrade");
-    expect(scoutingText).toContain('data-testid="scouting-watchlist-card"');
+    expect(scoutingText).toContain('testId: "scouting-watchlist-card"');
+    expect(scoutingText).toContain('testId: "scouting-bookmarked-target-card"');
+    expect(scoutingText).toContain("Aktiv gescoutet");
+    expect(scoutingText).toContain("Nur gemerkt");
     expect(scoutingText).toContain('data-testid="scouting-potential-band"');
     expect(scoutingText).toContain('data-testid="scouting-ca-po-row"');
     expect(scoutingText).toContain('data-testid="scouting-potential-stars"');

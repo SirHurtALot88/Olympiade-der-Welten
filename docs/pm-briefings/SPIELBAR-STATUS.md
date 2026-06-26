@@ -2,15 +2,18 @@
 
 **Ziel:** Ein Solo-Spielstand, ein manuelles Team, voller Spieltag-Loop ohne Dead-End.
 
-**Letzter Smoke:** 2026-06-25 (Next Steps: Build grün, Resolve-Lab Nav-Polish; manueller Browser-Loop empfohlen)
+**Letzter Smoke:** 2026-06-26 (Browser: Home Top-6 CA/PO, Training→Lineup→Arena→Spieltag, Escape-Back Profil; CI 114/114)
 
 | Check | Status | Notiz |
 |-------|--------|-------|
-| Production Build | 🟢 | `npm run build` grün (Sponsor TS-Fixes) |
-| Save laden | 🟡 | `npm run play` · ggf. `npm run save:repair-team-control -- --team H-R` |
+| Production Build | 🟢 | `npm run build` grün |
+| CI flow-smoke | 🟢 | 114/114 Tests (`npm run ci:flow-smoke`) |
+| Save laden | 🟢 | Dev-Server lädt Long Run Sandbox mit A-A · Armageddon Aftermath |
+| Home Top-6 Karten | 🟢 | POW/SPE/MEN/SOC ohne Noten; CA absolut + PO-Range (kein „Gering“/„F“) |
 | Home/Inbox: nächster Schritt | 🟢 | Flow-Controller zeigt korrekten Schritt mit `globalNextLabel` |
 | Sidebar-Reihenfolge | 🟢 | Drag pro Gruppe, localStorage persistiert nach Reload |
 | Entity-Navigation (Klick) | 🟢 | Spieler-/Teamnamen öffnen Profil per Single-Click; Escape/Backspace navigiert zurück |
+| Escape-Back Profil | 🟢 | Teams → Spieler → Escape kehrt zu Teams zurück (kein URL-Sync-Dead-End) |
 | Training setzen | 🟢 | "Weiter" navigiert korrekt zu `trainingCompact` (Trainingsmodus) statt Gebäude |
 | Transfermarkt: nur eigenes Team | 🟢 | Buy disabled + Modal-Guard |
 | Verhandlung: Feedback bei Abbruch | 🟢 | Meldung beim Schliessen |
@@ -21,13 +24,15 @@
 | Spieltag abschliessen | 🟢 | Button "Spieltag abschliessen" in arena-result-summary — ruft auto-run mit advance |
 | Nächster Spieltag | 🟢 | Nach auto-run → homeV2 mit Training/Lineup für neuen Spieltag |
 | Gehalt/MW-Delta-Stack | 🟢 | Deltas unter Wert in Kader-Tabelle, Roster-Grids und Home-Karten |
+| Ranira Bold Italic | 🟢 | `font-style: italic; font-weight: 700` auf Body/Foundation-Shell |
 
 Legende: 🟢 OK · 🟡 teilweise / Re-Test nötig · 🔴 blockiert
 
 ## Was noch 🟡 ist
 
-- **Save laden** — der repair-script braucht lokale Rechte (kein Sandbox-Problem). Im Terminal laufen lassen: `npm run save:repair-team-control -- --team H-R`. Wenn Save schon korrekt konfiguriert ist, entfällt das.
-- **Manueller 15-Min-Loop** — `npm run app:smoke-gameplay` benötigt lokal `npx playwright install`; bis dahin Checkliste unten manuell in `npm run play`.
+- **Spieltag abschliessen (Apply)** — Arena-Play und Cockpit erreichbar; voller Auto-Run-Apply in diesem Smoke nicht ausgeführt.
+- **Save/Team-Control Solo** — für Chris-gesteuertes H-R: `npm run save:repair-team-control -- --team H-R` falls nötig.
+- **Automatisierter Smoke** — `npm run app:smoke-gameplay` benötigt lokal `npx playwright install`.
 
 ## Fix Loop 3 — Foundation Nav-UX (2026-06-25)
 

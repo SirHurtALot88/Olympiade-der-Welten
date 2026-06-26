@@ -16,6 +16,13 @@ function createGameState(partial?: Partial<GameState>): GameState {
       schedule: [],
       standings: {},
       transferWishlist: [{ teamId: "M-M", playerId: "p-wish", createdAt: "2026-06-25T00:00:00.000Z" }],
+      teamFacilities: {
+        "M-M": {
+          facilities: {
+            scouting_office: { level: 3, enabled: true },
+          },
+        },
+      },
       ...partial?.seasonState,
     },
     matchdayState: { matchdayId: "md-1", status: "planning", pendingTeamIds: [], resolvedFixtureIds: [] },

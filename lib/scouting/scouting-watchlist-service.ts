@@ -1,5 +1,10 @@
 import type { GameState, ScoutingWatchlistEntry } from "@/lib/data/olyDataTypes";
 import { refreshScoutPipeline } from "@/lib/scouting/facility-scout-pipeline-service";
+import {
+  canAddManualScoutingWatchEntry,
+  getActiveScoutingWishlistEntries,
+  getScoutingWishlistSlotMessage,
+} from "@/lib/scouting/scouting-wishlist-slots";
 
 export function getScoutingWatchlistForTeam(gameState: GameState, teamId: string) {
   const seasonId = gameState.season.id;
@@ -17,6 +22,10 @@ export function addScoutingWatchlistEntry(input: {
   const seasonId = input.gameState.season.id;
   const existing = getScoutingWatchlistForTeam(input.gameState, input.teamId);
   if (existing.some((entry) => entry.playerId === input.playerId)) {
+    return input.gameState;
+  }
+  const slotCheck = canAddManualScoutingWatchEntry(input.gameState, input.teamId);
+  if (!slotCheck.ok) {
     return input.gameState;
   }
   const entry: ScoutingWatchlistEntry = {
@@ -63,26 +72,36 @@ export function removeScoutingWatchlistEntry(input: {
 
 export function syncWishlistToScoutingWatchlist(gameState: GameState, teamId: string): GameState {
   const seasonId = gameState.season.id;
-  const wishlist = (gameState.seasonState.transferWishlist ?? []).filter((entry) => entry.teamId === teamId);
-  let next = gameState;
-  for (const entry of wishlist) {
-    next = addScoutingWatchlistEntry({
-      gameState: next,
-      teamId,
-      playerId: entry.playerId,
-      note: "Wishlist",
-    });
-  }
-  const mirrored = (next.seasonState.scoutingWatchlist ?? []).map((entry) =>
-    entry.teamId === teamId && wishlist.some((wish) => wish.playerId === entry.playerId)
-      ? { ...entry, source: "transfer_wishlist_mirror" as const }
-      : entry,
+  const activeWishlist = getActiveScoutingWishlistEntries(gameState, teamId);
+  const activeWishlistIds = new Set(activeWishlist.map((entry) => entry.playerId));
+  const existing = (gameState.seasonState.scoutingWatchlist ?? []).filter(
+    (entry) => !(entry.teamId === teamId && entry.seasonId === seasonId && entry.source === "transfer_wishlist_mirror"),
   );
-  return {
-    ...next,
-    seasonState: {
-      ...next.seasonState,
-      scoutingWatchlist: mirrored,
+  const mirrored: ScoutingWatchlistEntry[] = activeWishlist.map((entry) => ({
+    playerId: entry.playerId,
+    teamId,
+    seasonId,
+    addedAt: entry.createdAt,
+    source: "transfer_wishlist_mirror",
+    note: "Wishlist",
+  }));
+  const manualEntries = existing.filter(
+    (entry) => entry.teamId === teamId && entry.seasonId === seasonId && entry.source !== "transfer_wishlist_mirror",
+  );
+  const otherEntries = existing.filter((entry) => entry.teamId !== teamId || entry.seasonId !== seasonId);
+  const dedupedManual = manualEntries.filter((entry) => !activeWishlistIds.has(entry.playerId));
+  return refreshScoutPipeline(
+    {
+      ...gameState,
+      seasonState: {
+        ...gameState.seasonState,
+        scoutingWatchlist: [...mirrored, ...dedupedManual, ...otherEntries],
+      },
     },
-  };
+    teamId,
+  );
+}
+
+export function getScoutingWatchSlotLimitMessage(gameState: GameState, teamId: string) {
+  return getScoutingWishlistSlotMessage(canAddManualScoutingWatchEntry(gameState, teamId));
 }

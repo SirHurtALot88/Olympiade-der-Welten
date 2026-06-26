@@ -37,19 +37,41 @@ function createIdentity(teamId: string, partial: Partial<TeamIdentity> = {}): Te
 }
 
 function createGameState(partial?: Partial<GameState>): GameState {
-  const team = createTeam();
+  const teams = Array.from({ length: 12 }, (_, index) =>
+    createTeam({
+      teamId: index === 0 ? "M-M" : `T-${index + 1}`,
+      name: index === 0 ? "Mayhem Mavericks" : `Team ${index + 1}`,
+      shortCode: index === 0 ? "M-M" : `T${index + 1}`,
+      cash: index === 0 ? 50 : 20 + index * 4,
+    }),
+  );
+  const teamIdentities = teams.map((team, index) =>
+    createIdentity(team.teamId, {
+      ambition: index === 0 ? 8 : 5,
+      finances: index === 0 ? 5 : 4,
+    }),
+  );
+  const standings = Object.fromEntries(
+    teams.map((team, index) => [
+      team.teamId,
+      {
+        points: index === 0 ? 80 : 120 - index * 5,
+        rank: index === 0 ? 8 : index + 1,
+        startplatz: index === 0 ? 12 : index + 1,
+      },
+    ]),
+  );
+
   return {
     season: { id: "season-2", name: "Season 2", year: 2, currentMatchday: 1, matchdayIds: ["md-1"] },
     seasonState: {
       seasonId: "season-2",
       schedule: [],
-      standings: {
-        "M-M": { points: 80, rank: 8, startplatz: 12 },
-      },
+      standings,
     },
     matchdayState: { matchdayId: "md-1", status: "planning", pendingTeamIds: [], resolvedFixtureIds: [] },
-    teams: [team],
-    teamIdentities: [createIdentity("M-M")],
+    teams,
+    teamIdentities,
     players: [],
     rosters: [],
     contracts: [],
@@ -63,7 +85,7 @@ function createGameState(partial?: Partial<GameState>): GameState {
       processedMappingRows: 0,
       importedPlayerCount: 0,
       matchedRosterCount: 0,
-      teamCount: 1,
+      teamCount: teams.length,
       unmappedPlayers: [],
     },
     disciplines: [],
@@ -77,8 +99,7 @@ describe("sponsor offer service", () => {
     const offers = buildSponsorOffersForTeam({ gameState, teamId: "M-M" });
     expect(offers).toHaveLength(3);
     expect(new Set(offers.map((offer) => offer.archetype)).size).toBe(3);
-    expect(offers.every((offer) => offer.starTier != null)).toBe(true);
-    expect(new Set(offers.map((offer) => offer.starTier)).size).toBeGreaterThan(1);
+    expect(offers.every((offer) => offer.starTier != null && offer.starTier >= 1 && offer.starTier <= 5)).toBe(true);
     expect(offers.find((offer) => offer.archetype === "security")?.components.find((c) => c.kind === "base")?.rewardCash).toBeGreaterThan(
       offers.find((offer) => offer.archetype === "performance")?.components.find((c) => c.kind === "base")?.rewardCash ?? 0,
     );

@@ -1,5 +1,6 @@
 import type { GameState, SponsorCommercialRating, SponsorStarTier } from "@/lib/data/olyDataTypes";
 import { buildTeamSeasonOverviewRows, type TeamManagementSnapshotRow } from "@/lib/foundation/team-management-overview";
+import { computeSponsorTeamQualityRank } from "@/lib/sponsor/sponsor-team-quality-rank";
 
 function clamp(value: number, min: number, max: number) {
   return Math.min(Math.max(value, min), max);
@@ -111,6 +112,7 @@ export function buildSponsorCommercialRating(input: {
     inputs: {
       lastSeasonRank: row?.historicalLastSeasonRank ?? row?.rank ?? null,
       avgWeightedRank: standingRank,
+      qualityRank: computeSponsorTeamQualityRank({ rows, teamId: input.teamId })?.qualityRank ?? standingRank,
       marketValuePercentile: mvPct,
       axisPercentile: axisPct,
       depthScore,

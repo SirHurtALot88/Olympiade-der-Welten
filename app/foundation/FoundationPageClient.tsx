@@ -204,15 +204,17 @@ import { buildSponsorCommercialRating } from "@/lib/sponsor/sponsor-commercial-r
 import { getTeamSponsorContract, getTeamSponsorOffers } from "@/lib/sponsor/sponsor-offer-read";
 import { applySponsorNegotiationToComponents, getSponsorNegotiationMultiplier } from "@/lib/sponsor/sponsor-negotiation";
 import type { SponsorNegotiationProfile } from "@/lib/data/olyDataTypes";
-import { buildScoutPipelineSummary, getEffectiveScoutingLevel, refreshScoutPipeline } from "@/lib/scouting/facility-scout-pipeline-service";
+import { buildScoutPipelineSummary } from "@/lib/scouting/facility-scout-pipeline-service";
 import {
   canAddPlayerToTransferWishlist,
+  getActiveScoutingWishlistEntries,
   getScoutingWishlistSlotLimit,
   getScoutingWishlistSlotMessage,
   getTeamTransferWishlistEntries,
   isTeamSetupDraftWishlistPhase,
 } from "@/lib/scouting/scouting-wishlist-slots";
 import { buildScoutingWatchTargetStarFields } from "@/lib/scouting/player-star-scouting-bridge";
+import { buildScoutingHubTargetSections } from "@/lib/scouting/scouting-hub-targets-service";
 import { getTransfermarktBracket } from "@/lib/market/transfermarkt-fit";
 import { getTeamPowerOptions } from "@/lib/lineups/team-powers";
 import { getDisciplineColor, getSeasonDisciplineSchedule } from "@/lib/season/season-discipline-schedule";
@@ -7409,7 +7411,7 @@ export default function FoundationPageClient({
     } else if (state.view === "playerProfile") {
       setPlayerProfileData(null);
       setActiveView(state.team ? "teams" : "homeV2");
-    } else if (state.view !== "playerProfile") {
+    } else {
       setPlayerProfileData(null);
     }
     if (state.view !== "teamProfile") {
@@ -10500,16 +10502,23 @@ export default function FoundationPageClient({
       void loadSeasonManagementOverview();
     };
 
-    const idleHandle =
-      typeof window !== "undefined" && "requestIdleCallback" in window
-        ? window.requestIdleCallback(scheduleLoad, { timeout: 1500 })
-        : window.setTimeout(scheduleLoad, 150);
+    let idleHandle: ReturnType<typeof setTimeout> | number | null = null;
+    if (typeof window !== "undefined") {
+      if ("requestIdleCallback" in window) {
+        idleHandle = window.requestIdleCallback(scheduleLoad, { timeout: 1500 });
+      } else {
+        idleHandle = setTimeout(scheduleLoad, 150);
+      }
+    }
 
     return () => {
       cancelled = true;
+      if (idleHandle == null) {
+        return;
+      }
       if (typeof window !== "undefined" && "requestIdleCallback" in window && typeof idleHandle === "number") {
         window.cancelIdleCallback(idleHandle);
-      } else {
+      } else if (typeof window !== "undefined") {
         window.clearTimeout(idleHandle as number);
       }
     };
@@ -13953,6 +13962,13 @@ export default function FoundationPageClient({
       selectedTeamScoutPipeline.records.map((record) => [record.playerId, record.certainty]),
     );
   }, [activeManagerTeamId, selectedTeamScoutPipeline]);
+  const transferMarketActiveWishlistPlayerIds = useMemo(
+    () =>
+      activeManagerTeamId
+        ? getActiveScoutingWishlistEntries(gameState, activeManagerTeamId).map((entry) => entry.playerId)
+        : [],
+    [activeManagerTeamId, gameState],
+  );
   const selectedTeamObjectives = useMemo(
     () => teamObjectiveOverview.objectives.filter((objective) => objective.teamId === selectedTeam?.teamId),
     [selectedTeam?.teamId, teamObjectiveOverview.objectives],
@@ -17989,91 +18005,53 @@ export default function FoundationPageClient({
       }),
     [selectedTeamFacilityState],
   );
-  const scoutingHubV2WatchTargets = useMemo(() => {
+  const scoutingHubV2TargetSections = useMemo(() => {
     if (!selectedTeam) {
-      return [];
+      return { activeTargets: [], bookmarkedTargets: [] };
     }
-    const syncedState = syncWishlistToScoutingWatchlist(gameState, selectedTeam.teamId);
-    const watchlistEntries = getScoutingWatchlistForTeam(syncedState, selectedTeam.teamId);
-    const playerById = new Map(gameState.players.map((player) => [player.id, player] as const));
     const facilityLevel = getFacilityLevel(selectedTeamFacilityState, "scouting_office");
-
-    const enrichWatchTarget = (entry: {
-      playerId: string;
-      playerName: string;
-      className: string;
-      marketValue: string;
-      baseInfoSummary: string;
-      pow?: number | null;
-      spe?: number | null;
-      men?: number | null;
-      soc?: number | null;
-    }) => {
-      const player = playerById.get(entry.playerId);
-      const scoutingLevel = Math.max(
-        facilityLevel,
-        getEffectiveScoutingLevel(syncedState, selectedTeam.teamId, entry.playerId),
-      );
+    const sections = buildScoutingHubTargetSections({
+      gameState,
+      teamId: selectedTeam.teamId,
+      resolveMarketEntry: (playerId) => {
+        const entry = transferWishlistEntriesForMarketV2.find((candidate) => candidate.playerId === playerId);
+        if (!entry) {
+          return null;
+        }
+        return {
+          playerName: entry.playerName,
+          className: entry.className,
+          marketValue: entry.marketValue != null ? formatTransfermarktCurrency(entry.marketValue) : "—",
+          pow: entry.pow ?? null,
+          spe: entry.spe ?? null,
+          men: entry.men ?? null,
+          soc: entry.soc ?? null,
+          salary: entry.salary ?? null,
+        };
+      },
+    });
+    const playerById = new Map(gameState.players.map((player) => [player.id, player] as const));
+    const enrichTarget = (draft: (typeof sections.activeTargets)[number]) => {
+      const player = playerById.get(draft.playerId);
+      const scoutingLevel = sections.getScoutingLevelForPlayer(draft.playerId, facilityLevel);
       const starFields =
         player != null
           ? buildScoutingWatchTargetStarFields({
-              gameState: syncedState,
+              gameState: sections.syncedState,
               player,
               saveId: activeSaveId,
               scoutingLevel,
             })
           : null;
       return {
-        ...entry,
+        ...draft,
         ...starFields,
       };
     };
-
-    const fromWatchlist = watchlistEntries.map((entry) => {
-      const player = playerById.get(entry.playerId);
-      const marketEntry = transferWishlistEntriesForMarketV2.find((candidate) => candidate.playerId === entry.playerId);
-      return enrichWatchTarget({
-        playerId: entry.playerId,
-        playerName: player?.name ?? marketEntry?.playerName ?? entry.playerId,
-        className: player?.className ?? marketEntry?.className ?? "—",
-        marketValue:
-          marketEntry?.marketValue != null
-            ? formatTransfermarktCurrency(marketEntry.marketValue)
-            : player?.marketValue != null
-              ? formatTransfermarktCurrency(player.marketValue)
-              : "—",
-        baseInfoSummary: entry.note ?? "Scouting Watchlist",
-        pow: player?.coreStats.pow ?? marketEntry?.pow ?? null,
-        spe: player?.coreStats.spe ?? marketEntry?.spe ?? null,
-        men: player?.coreStats.men ?? marketEntry?.men ?? null,
-        soc: player?.coreStats.soc ?? marketEntry?.soc ?? null,
-      });
-    });
-    if (fromWatchlist.length > 0) {
-      return fromWatchlist.slice(0, 6);
-    }
-    return transferWishlistEntriesForMarketV2.slice(0, 6).map((entry) => {
-      const player = playerById.get(entry.playerId);
-      return enrichWatchTarget({
-        playerId: entry.playerId,
-        playerName: entry.playerName,
-        className: entry.className,
-        marketValue: entry.marketValue != null ? formatTransfermarktCurrency(entry.marketValue) : "—",
-        baseInfoSummary: [
-          entry.pow != null ? `POW ${formatLocalePoints(entry.pow, 0)}` : null,
-          entry.spe != null ? `SPE ${formatLocalePoints(entry.spe, 0)}` : null,
-          entry.men != null ? `MEN ${formatLocalePoints(entry.men, 0)}` : null,
-          entry.soc != null ? `SOC ${formatLocalePoints(entry.soc, 0)}` : null,
-          entry.salary != null ? `Gehalt ${formatTransfermarktCurrency(entry.salary)}` : null,
-        ]
-          .filter(Boolean)
-          .join(" · "),
-        pow: entry.pow ?? null,
-        spe: entry.spe ?? null,
-        men: entry.men ?? null,
-        soc: entry.soc ?? null,
-      });
-    });
+    return {
+      activeTargets: sections.activeTargets.map(enrichTarget),
+      bookmarkedTargets: sections.bookmarkedTargets.map(enrichTarget),
+    };
   }, [activeSaveId, gameState, selectedTeam, selectedTeamFacilityState, transferWishlistEntriesForMarketV2]);
   const scoutingHubV2Visibility = useMemo(() => {
     const scoutingLevel = getFacilityLevel(selectedTeamFacilityState, "scouting_office");
@@ -21337,7 +21315,9 @@ export default function FoundationPageClient({
                 visibleAtTier={scoutingHubV2Visibility.visibleAtTier}
                 hiddenAtTier={scoutingHubV2Visibility.hiddenAtTier}
                 baseInfoAlwaysVisible={scoutingHubV2Visibility.baseInfoAlwaysVisible}
-                watchTargets={scoutingHubV2WatchTargets}
+                activeScoutTargets={scoutingHubV2TargetSections.activeTargets}
+                bookmarkedTargets={scoutingHubV2TargetSections.bookmarkedTargets}
+                watchTargets={scoutingHubV2TargetSections.activeTargets}
                 scoutPipeline={
                   selectedTeamScoutPipeline
                     ? {
@@ -30423,6 +30403,7 @@ export default function FoundationPageClient({
                   }}
                   scoutingWatchPlayerIds={transferMarketScoutingWatchPlayerIds}
                   scoutingIntelByPlayerId={transferMarketScoutingIntelByPlayerId}
+                  scoutingActiveWishlistPlayerIds={transferMarketActiveWishlistPlayerIds}
                   scoutingPipelineCapacity={
                     activeManagerTeamId
                       ? {

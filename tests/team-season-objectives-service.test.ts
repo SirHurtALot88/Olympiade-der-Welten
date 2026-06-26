@@ -6,6 +6,7 @@ import type { GameState, Player, RosterEntry, Team, TeamIdentity, TeamSeasonObje
 import {
   buildTeamObjectiveOverview,
   buildTeamSeasonObjectiveSettlement,
+  getRosterObjectiveStatus,
   getTeamObjectiveAiBias,
   refreshTeamObjectiveState,
 } from "@/lib/board/team-season-objectives-service";
@@ -260,6 +261,26 @@ describe("team season objectives service", () => {
 
     expect(overview.objectives.some((objective) => objective.objectiveId === "transfer-profit")).toBe(false);
     expect(overview.objectives.filter((objective) => objective.category !== "sponsor")).toHaveLength(4);
+  });
+
+  it("treats roster optimum +/- 1 as completed, not at risk", () => {
+    for (const rosterCount of [9, 10, 11]) {
+      expect(getRosterObjectiveStatus({ current: rosterCount, playerMin: 7, playerOpt: 10 })).toBe("completed");
+    }
+
+    expect(getRosterObjectiveStatus({ current: 8, playerMin: 7, playerOpt: 10 })).toBe("open");
+    expect(getRosterObjectiveStatus({ current: 12, playerMin: 7, playerOpt: 10 })).toBe("at_risk");
+
+    const twelvePlayers = Array.from({ length: 12 }, (_, index) => createPlayer(`p${index + 1}`));
+    const overTargetState = createGameState({
+      identities: [createIdentity("M-M", { playerMin: 7, playerOpt: 10 })],
+      players: twelvePlayers,
+      rosters: twelvePlayers.map((player) => createRoster(player.id)),
+    });
+    const overTargetObjective = buildTeamObjectiveOverview(overTargetState).objectives.find(
+      (objective) => objective.teamId === "M-M" && objective.objectiveId === "roster-optimum",
+    );
+    expect(overTargetObjective?.status).toBe("at_risk");
   });
 
   it("uses team identity for profile-like goals such as M-M top target and C-C value transfer target", () => {
@@ -569,7 +590,7 @@ describe("team season objectives service", () => {
   });
 
   it("keeps playable mini objectives as candidates without expanding the compact board", () => {
-    const players = Array.from({ length: 7 }, (_, index) => createPlayer(`p${index + 1}`));
+    const players = Array.from({ length: 9 }, (_, index) => createPlayer(`p${index + 1}`));
     const gameState = createGameState({
       players,
       rosters: players.map((player) => createRoster(player.id)),

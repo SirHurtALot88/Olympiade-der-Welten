@@ -597,17 +597,30 @@ function getAllRoundAxisObjective(input: {
   };
 }
 
+export function getRosterObjectiveStatus(input: { current: number; playerMin: number; playerOpt: number }) {
+  const tolerance = 1;
+  const lowerBound = Math.max(input.playerMin, input.playerOpt - tolerance);
+  const upperBound = input.playerOpt + tolerance;
+
+  if (input.current < input.playerMin) return "failed" satisfies TeamSeasonObjectiveStatus;
+  if (input.current >= lowerBound && input.current <= upperBound) return "completed" satisfies TeamSeasonObjectiveStatus;
+  if (input.current > upperBound) return "at_risk" satisfies TeamSeasonObjectiveStatus;
+  return "open" satisfies TeamSeasonObjectiveStatus;
+}
+
 function getRosterTarget(row: TeamManagementSnapshotRow) {
+  const playerMin = row.playerMin ?? 7;
   const target = row.playerOpt ?? row.playerMin ?? 10;
   const current = row.rosterCount;
+  const status = getRosterObjectiveStatus({ current, playerMin, playerOpt: target });
   return {
     objectiveId: "roster-optimum",
     category: "roster" as const,
     label: "Kaderziel erreichen",
     targetValue: target,
     currentValue: current,
-    status: current >= (row.playerMin ?? 7) && current <= target ? "completed" as const : current >= (row.playerMin ?? 7) ? "at_risk" as const : "failed" as const,
-    boardConfidenceDelta: current >= (row.playerMin ?? 7) ? 0.2 : -0.8,
+    status,
+    boardConfidenceDelta: status === "failed" ? -0.8 : status === "completed" ? 0.2 : status === "at_risk" ? -0.1 : 0,
     source: "team_identity_player_min_opt",
   };
 }
@@ -1356,13 +1369,32 @@ function calculateBoardConfidence(input: {
   };
 }
 
+function inferRosterSizeOnTarget(objectives: TeamSeasonObjectiveRecord[]) {
+  const rosterOptimum = objectives.find((objective) => objective.objectiveId === "roster-optimum");
+  if (rosterOptimum) {
+    return rosterOptimum.status === "completed";
+  }
+  return objectives.some(
+    (objective) => objective.category === "roster" && objective.objectiveId !== "roster-optimum",
+  );
+}
+
+function hasRosterObjectiveRisk(objectives: TeamSeasonObjectiveRecord[]) {
+  const rosterSizeOnTarget = inferRosterSizeOnTarget(objectives);
+  return objectives.some((objective) => {
+    if (objective.category !== "roster" || objective.status === "completed") return false;
+    if (rosterSizeOnTarget && objective.objectiveId !== "roster-optimum") return false;
+    return true;
+  });
+}
+
 function buildAiBias(input: {
   teamId: string;
   objectives: TeamSeasonObjectiveRecord[];
   board: TeamBoardConfidenceRecord;
 }): TeamObjectiveAiBias {
   const hasFinanceRisk = input.objectives.some((objective) => objective.category === "finance" && objective.status !== "completed");
-  const hasRosterRisk = input.objectives.some((objective) => objective.category === "roster" && objective.status !== "completed");
+  const hasRosterRisk = hasRosterObjectiveRisk(input.objectives);
   const hasFacilityOpen = input.objectives.some((objective) => objective.category === "facility" && objective.status === "open");
   const hasDevelopmentOpen = input.objectives.some((objective) => objective.category === "development" && objective.status !== "completed");
   const hasMoraleRisk = input.objectives.some((objective) => objective.category === "morale" && objective.status !== "completed");

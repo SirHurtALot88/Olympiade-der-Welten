@@ -8,6 +8,7 @@ import {
   type SponsorBrandParent,
 } from "@/lib/sponsor/sponsor-brand-parents";
 import {
+  listVariantsForParent,
   parentSupportsArchetype,
   pickVariantForParent,
   type SponsorBrandTemplate,
@@ -128,9 +129,10 @@ function pickBrandForSlot(input: {
   usedParentBrandIds?: string[];
   recentParentBrandIds?: string[];
   globalParentUsage?: Record<string, number>;
+  forcePremiumElite?: boolean;
 }): { parent: SponsorBrandParent; brand: SponsorBrandTemplate } {
   const parent = pickParentForSlot(input);
-  const brand =
+  let brand =
     pickVariantForParent({
       parentId: parent.id,
       archetype: input.archetype,
@@ -147,6 +149,15 @@ function pickBrandForSlot(input: {
       teamId: input.teamId,
       slotIndex: input.slotIndex,
     });
+
+  if (input.forcePremiumElite) {
+    const premium = listVariantsForParent(parent.id).find(
+      (variant) => variant.variantKey === "premium_elite" && variant.archetype === input.archetype,
+    );
+    if (premium) {
+      brand = premium;
+    }
+  }
 
   if (!brand) {
     throw new Error(`missing_sponsor_variant:${parent.id}:${input.archetype}`);
@@ -237,6 +248,7 @@ export function pickSponsorBrandForOffer(input: {
   usedParentBrandIds?: string[];
   recentParentBrandIds?: string[];
   globalParentUsage?: Record<string, number>;
+  forcePremiumElite?: boolean;
 }) {
   const { parent, brand } = pickBrandForSlot(input);
   const display = resolveSponsorBrandDisplay(parent, brand);

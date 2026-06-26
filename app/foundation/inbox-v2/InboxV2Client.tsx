@@ -48,8 +48,8 @@ export default function InboxV2Client({
       <header className="inbox-v2-header">
         <div>
           <span className="eyebrow">Inbox</span>
-          <h2>Entscheidungen & Hinweise</h2>
-          {teamLabel ? <p className="muted">{teamLabel}</p> : null}
+          <h2 title={teamLabel ?? undefined}>Entscheidungen</h2>
+          {teamLabel ? <p className="home-v2-hero-meta-line">{teamLabel}</p> : null}
         </div>
         <div className="inbox-v2-actions">
           <span className="pill">{openCount} offen</span>

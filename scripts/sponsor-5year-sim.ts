@@ -17,6 +17,7 @@
  *   npm run sponsor:5year-sim
  *   npm run sponsor:5year-sim-verbose
  *   npx tsx scripts/sponsor-5year-sim.ts --years=3
+ *   npx tsx scripts/sponsor-5year-sim.ts --showcase
  */
 import path from "node:path";
 import { loadEnvConfig } from "@next/env";
@@ -35,14 +36,22 @@ import {
   advanceSeasonEconomyFactorWindow,
   getSeasonEconomyFactorWindow,
 } from "@/lib/season/season-economy-factors";
-import { getPrizeMoneyReference } from "@/lib/sponsor/sponsor-economy-calibration";
+import {
+  getPrizeMoneyReference,
+  getRankMilestoneBonus,
+  getUnlockedMilestones,
+} from "@/lib/sponsor/sponsor-economy-calibration";
+import { getTeamSponsorContract } from "@/lib/sponsor/sponsor-offer-read";
 
 // ─── CLI args ──────────────────────────────────────────────────────────────────
 
 const args = process.argv.slice(2);
 const SIM_YEARS = Number(args.find((a) => a.startsWith("--years="))?.split("=")[1] ?? 5);
 const VERBOSE = args.includes("--verbose");
+const SHOWCASE = args.includes("--showcase");
 const SAVE_ID = "sponsor-sim-5yr";
+
+const SHOWCASE_RANKS = [1, 5, 9, 13, 17, 21, 25, 32] as const;
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
@@ -128,9 +137,108 @@ type YearSummary = {
   teams: TeamYearRow[];
 };
 
+// ─── Showcase (8 teams, fixed ranks) ─────────────────────────────────────────
+
+function runShowcase() {
+  let gs = createSingleplayerGameState();
+  const factor = getSeasonEconomyFactorWindow({
+    saveId: SAVE_ID,
+    seasonId: gs.season.id,
+    seasonState: gs.seasonState,
+  })[0]?.factor ?? 1.09;
+  gs = { ...gs, seasonState: { ...gs.seasonState, seasonEconomyFactors: getSeasonEconomyFactorWindow({
+    saveId: SAVE_ID,
+    seasonId: gs.season.id,
+    seasonState: gs.seasonState,
+  }) } };
+
+  const sortedByBudget = [...gs.teams].sort((a, b) => (b.budget ?? 0) - (a.budget ?? 0));
+  const showcaseTeams = SHOWCASE_RANKS.map((rank, index) => ({
+    team: sortedByBudget[index] ?? sortedByBudget[sortedByBudget.length - 1]!,
+    rank,
+  }));
+
+  const rankByTeamId = new Map<string, number>();
+  showcaseTeams.forEach(({ team, rank }) => rankByTeamId.set(team.teamId, rank));
+  let fillerRank = 2;
+  for (const team of gs.teams) {
+    if (!rankByTeamId.has(team.teamId)) {
+      while (SHOWCASE_RANKS.includes(fillerRank as (typeof SHOWCASE_RANKS)[number])) fillerRank++;
+      rankByTeamId.set(team.teamId, fillerRank);
+      fillerRank++;
+    }
+  }
+
+  const standings: Record<string, StandingRecord> = {};
+  for (const team of gs.teams) {
+    const rank = rankByTeamId.get(team.teamId) ?? 32;
+    standings[team.teamId] = { points: Math.max(1, 33 - rank) * 3, rank, startplatz: rank };
+  }
+  gs = { ...gs, seasonState: { ...gs.seasonState, standings } };
+
+  gs = ensureSeasonSponsorOffers(gs);
+  gs = chooseSponsorOfferForAiTeams(gs);
+  const settlement = applySponsorSettlement({
+    gameState: gs,
+    saveId: SAVE_ID,
+    phase: "season_end",
+    execute: true,
+  });
+  gs = settlement.gameState;
+
+  console.log("╔══════════════════════════════════════════════════════════════════════════╗");
+  console.log("║  Sponsor Gewinnstufen · Showcase (8 Teams)                               ║");
+  console.log("╚══════════════════════════════════════════════════════════════════════════╝\n");
+  console.log(`Salary Factor: ×${factor}\n`);
+  console.log(
+    `${"Team".padEnd(22)} ${"Pl".padStart(3)} ${"Basis".padStart(7)} ${"Stufen".padStart(7)} ${"Total".padStart(7)} ${"PG-Ref".padStart(7)} ${"Stufen frei".padStart(28)}`,
+  );
+  console.log("─".repeat(90));
+
+  for (const { team, rank } of showcaseTeams.sort((a, b) => a.rank - b.rank)) {
+    const contract = getTeamSponsorContract(gs, team.teamId);
+    const logs = (gs.seasonState.sponsorPayoutLogs ?? []).filter(
+      (log) => log.teamId === team.teamId && log.seasonId === gs.season.id,
+    );
+    const basePaid = round1(
+      logs
+        .filter((log) => log.componentId === "base-cash")
+        .reduce((sum, log) => sum + log.cashDelta, 0),
+    );
+    const rankPaid = round1(
+      logs
+        .filter((log) => log.componentId === "rank-target")
+        .reduce((sum, log) => sum + log.cashDelta, 0),
+    );
+    const extraPaid = round1(
+      logs
+        .filter((log) => log.componentId !== "base-cash" && log.componentId !== "rank-target")
+        .reduce((sum, log) => sum + Math.max(0, log.cashDelta), 0),
+    );
+    const total = round1(logs.reduce((sum, log) => sum + log.cashDelta, 0));
+    const basis = round1(basePaid + extraPaid * 0.5);
+    const stufen = round1(rankPaid + extraPaid * 0.5);
+    const prizeRef = getPrizeMoneyReference(rank, factor);
+    const unlocked = getUnlockedMilestones(rank).map((m) => m.label).join(", ") || "—";
+    const archetype = contract?.archetype ?? "?";
+    const stars = contract?.starTier ?? "?";
+
+    console.log(
+      `${team.shortCode.padEnd(6)} ${archetype.slice(0, 4).padEnd(4)} ${String(stars).padStart(1)}★ ${team.name.substring(0, 10).padEnd(10)} ${pad(rank, 3)} ${pad(basis.toFixed(1), 7)} ${pad(stufen.toFixed(1), 7)} ${pad(total.toFixed(1), 7)} ${pad(prizeRef.toFixed(1), 7)} ${unlocked.substring(0, 28).padEnd(28)}`,
+    );
+  }
+
+  console.log("\nFertig.\n");
+}
+
 // ─── Main ─────────────────────────────────────────────────────────────────────
 
 async function main() {
+  if (SHOWCASE) {
+    runShowcase();
+    return;
+  }
+
   console.log("╔══════════════════════════════════════════════════════════════╗");
   console.log("║         Sponsor-System · 5-Jahres-Simulation (Ingame)        ║");
   console.log("╚══════════════════════════════════════════════════════════════╝\n");

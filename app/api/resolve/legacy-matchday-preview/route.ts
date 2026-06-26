@@ -11,7 +11,12 @@ import { readArenaPreviewCache, writeArenaPreviewCache } from "@/lib/foundation/
 import { buildLegacyMatchdayResolvePreviewPayload } from "@/lib/foundation/legacy-matchday-resolve-preview-service";
 import { db } from "@/src/server/db";
 
-function parseOptionalParams(request: Request) {
+function parseOptionalParams(request: Request): {
+  source: "prisma" | "sqlite";
+  saveId: string | null;
+  seasonId: string | null;
+  matchdayId: string | null;
+} {
   const { searchParams } = new URL(request.url);
   return {
     source: searchParams.get("source")?.trim() === "prisma" ? "prisma" : "sqlite",

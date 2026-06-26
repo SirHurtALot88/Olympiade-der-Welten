@@ -739,15 +739,13 @@ export default function TrainingFacilitiesV2Client({
                 as="h2"
                 tooltip={
                   showPlayerLane
-                    ? "V2 baut den Trainingsscreen als Steuerzentrale: Spielerentwicklung zuerst, Gebaeude rechts im Blick und organisches Wachstum sichtbar."
-                    : "Facilities V2: Upgrade, Wartung, Unterhalt und Wirkung direkt am aktiven Spielstand."
+                    ? "Trainingsmodus und Klasse pro Spieler. Gebaeude rechts im Blick."
+                    : "Upgrade, Wartung, Unterhalt und Wirkung am aktiven Spielstand."
                 }
               >
-                {showPlayerLane
-                  ? "Entwicklung steuern, Gebaeude lesen, Wachstum sauber planen."
-                  : "Gebaeude ausbauen, warten und ihre Wirkung auf Training und Recovery lesen."}
+                {showPlayerLane ? "Training" : "Gebäude"}
               </TooltipHeading>
-              <p>
+              <p className="home-v2-hero-meta-line">
                 {selectedTeam.shortCode} · {selectedTeamControlMode ?? "manual"} · {seasonLabel}
               </p>
             </div>
@@ -755,8 +753,7 @@ export default function TrainingFacilitiesV2Client({
           <div className="training-v2-hero-actions">
             <div className="filter-field training-v2-team-select">
               <span>Aktives Team</span>
-              <strong>{selectedTeam.shortCode} · {selectedTeam.name}</strong>
-              <small className="muted">Wechsel oben in der Foundation-Leiste.</small>
+              <strong title="Teamwechsel in der Foundation-Leiste oben.">{selectedTeam.shortCode} · {selectedTeam.name}</strong>
             </div>
           </div>
         </div>
@@ -876,21 +873,28 @@ export default function TrainingFacilitiesV2Client({
         <aside className="training-v2-lane training-v2-lane-facilities">
           <div className="training-v2-section-head">
             <div>
-              <span className="training-v2-kicker">Gebaeude</span>
-              <strong>Unterhalt, Zustand und naechster Hebel</strong>
+              <span className="training-v2-kicker">Gebäude</span>
+              <strong title="Unterhalt, Zustand und naechster Hebel.">Infrastruktur</strong>
             </div>
             <span className={`transfer-status-pill ${readOnly ? "is-warning" : "is-ready"}`}>
               {managementLocked ? "nur ansehen" : readOnly ? "read only" : "lokal aktiv"}
             </span>
           </div>
-          {managementLockedReason ? <p className="muted">{managementLockedReason}</p> : null}
+          {managementLockedReason ? (
+            <p className="transfer-status-pill is-warning" title={managementLockedReason}>
+              Gesperrt
+            </p>
+          ) : null}
           {readOnly ? (
-            <div className="training-v2-lock-note">
+            <div className="training-v2-lock-note" title="Du kannst Wirkung, Kosten und Risiken lesen. Aenderungen sind nur fuer eigene Teams aktiv.">
               <strong>Nur Ansicht</strong>
-              <span>Du kannst Wirkung, Kosten und Risiken lesen. Aenderungen sind nur fuer eigene Teams aktiv.</span>
             </div>
           ) : null}
-          {facilityLaneActionReason ? <p className="foundation-screen-action-reason">Warum nicht: {facilityLaneActionReason}</p> : null}
+          {facilityLaneActionReason ? (
+            <span className="transfer-status-pill is-warning" title={facilityLaneActionReason}>
+              Blockiert
+            </span>
+          ) : null}
 
           {showPlayerLane ? (
           <div className="training-v2-mode-guide" aria-label="Trainingslast Erklaerung">

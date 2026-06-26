@@ -10,7 +10,15 @@ import {
 } from "@/lib/sponsor/sponsor-offer-service";
 import { advanceSponsorContractsForNewSeason } from "@/lib/sponsor/sponsor-contract-lifecycle";
 import { getTeamSponsorContract } from "@/lib/sponsor/sponsor-offer-read";
-import { getPrizeMoneyReference } from "@/lib/sponsor/sponsor-economy-calibration";
+import {
+  getLeagueMinimumSalaryTotal,
+  getPrizeMoneyReference,
+  getRankMilestoneBonus,
+  getSponsorPayoutForFinalRank,
+  getSponsorPayoutForFinalRankAndTier,
+  resolveSponsorEconomyAnchors,
+  SPONSOR_BASE_FLOOR_C,
+} from "@/lib/sponsor/sponsor-economy-calibration";
 import { applySponsorSettlement } from "@/lib/sponsor/sponsor-settlement-service";
 
 function createTeam(index: number): Team {
@@ -27,14 +35,14 @@ function createTeam(index: number): Team {
   };
 }
 
-function createRoster(teamId: string, playerId: string): RosterEntry {
+function createRoster(teamId: string, playerId: string, salary = 5): RosterEntry {
   return {
     id: `roster:${teamId}:${playerId}`,
     teamId,
     playerId,
     contractLength: 2,
-    salary: 55,
-    upkeep: 55,
+    salary,
+    upkeep: salary,
     purchasePrice: 20,
     currentValue: 20,
     roleTag: "starter",
@@ -160,11 +168,24 @@ function teamSeasonSponsorPayout(gameState: GameState, seasonId: string, teamId:
     .reduce((sum, log) => sum + log.cashDelta, 0);
 }
 
-function runLeagueSettlement(gameState: GameState) {
-  let next = ensureSeasonSponsorOffers(gameState);
-  next = chooseSponsorOfferForAiTeams(next);
+function runSingleTeamSettlement(gameState: GameState, teamId: string) {
+  const offers = buildSponsorOffersForTeam({ gameState, teamId });
+  const securityOffer = offers.find((offer) => offer.archetype === "security") ?? offers[0]!;
+  const signed = chooseSponsorOffer({
+    gameState: {
+      ...gameState,
+      seasonState: {
+        ...gameState.seasonState,
+        sponsorOffersByTeamId: { [teamId]: offers },
+      },
+    },
+    teamId,
+    offerId: securityOffer.offerId,
+    negotiationProfile: "balanced",
+  }).gameState;
+
   return applySponsorSettlement({
-    gameState: next,
+    gameState: signed,
     saveId: "sponsor-balance-test",
     phase: "season_end",
     execute: true,
@@ -172,38 +193,37 @@ function runLeagueSettlement(gameState: GameState) {
 }
 
 describe("sponsor economy balance", () => {
-  it("scales sponsor settlement proportionally with salary factor", () => {
-    const lowFactorState = runLeagueSettlement(buildLeagueGameState(0.9));
-    const highFactorState = runLeagueSettlement(buildLeagueGameState(1.21));
-    const lowTotal = totalSeasonSponsorPayout(lowFactorState, "season-2");
-    const highTotal = totalSeasonSponsorPayout(highFactorState, "season-2");
+  it("scales sponsor economy anchors with salary factor", () => {
+    const leagueMin = 38;
+    const low = resolveSponsorEconomyAnchors(0.9, leagueMin);
+    const high = resolveSponsorEconomyAnchors(1.21, leagueMin);
 
-    expect(lowTotal).toBeGreaterThan(0);
-    expect(highTotal / lowTotal).toBeGreaterThan(1.15);
-    expect(highTotal / lowTotal).toBeLessThan(1.55);
-  }, 60000);
+    expect(high.effectiveBaseFloor / low.effectiveBaseFloor).toBeGreaterThan(1.15);
+    expect(high.effectiveBaseFloor / low.effectiveBaseFloor).toBeLessThan(1.55);
+    expect(high.milestonePool).toBeGreaterThanOrEqual(low.milestonePool);
+  });
 
-  it("keeps league sponsor settlement near normalized prize money reference", () => {
+  it("guarantees weakest-salary teams receive at least scaled league minimum base", () => {
     for (const salaryFactor of [0.9, 1.0, 1.21]) {
-      const gameState = runLeagueSettlement(buildLeagueGameState(salaryFactor));
-      const sponsorTotal = totalSeasonSponsorPayout(gameState, "season-2");
-      const prizeReference = totalNormalizedPrizeReference(gameState, salaryFactor);
-      const ratio = sponsorTotal / prizeReference;
+      const leagueMin = 38;
+      const anchors = resolveSponsorEconomyAnchors(salaryFactor, leagueMin);
+      const rank32Payout = getSponsorPayoutForFinalRankAndTier(32, salaryFactor, 5, leagueMin, "security");
 
-      expect(ratio).toBeGreaterThan(0.82);
-      expect(ratio).toBeLessThan(1.18);
+      expect(anchors.effectiveBaseFloor).toBeGreaterThanOrEqual(Math.max(SPONSOR_BASE_FLOOR_C, leagueMin) * salaryFactor * 0.98);
+      expect(rank32Payout).toBeGreaterThanOrEqual(anchors.effectiveBaseFloor * 0.98);
     }
-  }, 120000);
+  });
 
-  it("limits payout volatility across teams in a simulated season", () => {
-    const gameState = runLeagueSettlement(buildLeagueGameState(1.0));
-    const payouts = gameState.teams.map((team) => teamSeasonSponsorPayout(gameState, "season-2", team.teamId));
-    const positive = payouts.filter((value) => value > 0);
-    const min = Math.min(...positive);
-    const max = Math.max(...positive);
+  it("preserves payout spread between bottom and championship security offers", () => {
+    const leagueMin = 38;
+    const factor = 1.09;
+    const bottom = getSponsorPayoutForFinalRankAndTier(32, factor, 3, leagueMin, "security");
+    const top = getSponsorPayoutForFinalRankAndTier(1, factor, 5, leagueMin, "security");
 
-    expect(max / min).toBeLessThan(5);
-  }, 60000);
+    expect(top).toBeGreaterThan(bottom);
+    expect(top / bottom).toBeGreaterThan(1.8);
+    expect(top / bottom).toBeLessThan(3.5);
+  });
 
   it("supports bottom-budget teams with meaningful sponsor income in singleplayer seed", () => {
     let gameState = createSingleplayerGameState();
@@ -229,11 +249,11 @@ describe("sponsor economy balance", () => {
       },
     };
 
-    const settled = runLeagueSettlement(gameState);
+    const settled = runSingleTeamSettlement(gameState, bottomTeam.teamId);
     const payout = teamSeasonSponsorPayout(settled, gameState.season.id, bottomTeam.teamId);
-    const prizeReference = getPrizeMoneyReference(rank, 1);
+    const leagueMin = getLeagueMinimumSalaryTotal(gameState);
 
-    expect(payout).toBeGreaterThanOrEqual(prizeReference * 0.6);
+    expect(payout).toBeGreaterThanOrEqual(leagueMin * 0.95);
   }, 60000);
 
   it("always signs single-season contracts even when a longer term is requested", () => {
@@ -259,6 +279,155 @@ describe("sponsor economy balance", () => {
     expect(result.contract?.termSeasons).toBe(1);
     expect(result.contract?.seasonsRemaining).toBe(1);
   }, 15000);
+
+  it("applies Gewinnstufen milestone bonuses cumulatively", () => {
+    expect(getRankMilestoneBonus(32, 1)).toBe(0);
+    expect(getRankMilestoneBonus(28, 1)).toBe(7);
+    expect(getRankMilestoneBonus(24, 1)).toBe(12);
+    expect(getRankMilestoneBonus(1, 1)).toBe(63);
+    expect(getSponsorPayoutForFinalRank(32, 1)).toBe(SPONSOR_BASE_FLOOR_C);
+    expect(getSponsorPayoutForFinalRank(28, 1)).toBe(SPONSOR_BASE_FLOOR_C + 7);
+    expect(getSponsorPayoutForFinalRank(1, 1)).toBe(SPONSOR_BASE_FLOOR_C + 63);
+  });
+
+  it("scales championship payout sharply by sponsor star tier", () => {
+    const factor = 1.09;
+    const leagueMin = 38;
+    const fiveStar = getSponsorPayoutForFinalRankAndTier(1, factor, 5, leagueMin);
+    const twoStar = getSponsorPayoutForFinalRankAndTier(1, factor, 2, leagueMin);
+    const oneStar = getSponsorPayoutForFinalRankAndTier(1, factor, 1, leagueMin);
+
+    expect(fiveStar).toBeGreaterThan(95);
+    expect(twoStar).toBeLessThan(fiveStar * 0.92);
+    expect(oneStar).toBeLessThan(twoStar);
+    expect(fiveStar / oneStar).toBeGreaterThan(1.12);
+  });
+
+  it("never pays security base below league minimum salary", () => {
+    let gameState = createSingleplayerGameState();
+    const leagueMin = getLeagueMinimumSalaryTotal(gameState);
+    const offers = buildSponsorOffersForTeam({ gameState, teamId: gameState.teams[0]!.teamId });
+    const security = offers.find((offer) => offer.archetype === "security");
+    const base = security?.components.find((component) => component.kind === "base")?.rewardCash ?? 0;
+
+    expect(base).toBeGreaterThanOrEqual(leagueMin * 0.98);
+  }, 180000);
+
+  it("pays bottom teams at least league minimum salary without rank milestones", () => {
+    let gameState = createSingleplayerGameState();
+    const rrTeam = gameState.teams.find((team) => team.shortCode === "R-R") ?? gameState.teams.at(-1)!;
+    const leagueMin = getLeagueMinimumSalaryTotal(gameState);
+    const salaryFactor = 1.09;
+    gameState = {
+      ...gameState,
+      seasonState: {
+        ...gameState.seasonState,
+        standings: Object.fromEntries(
+          gameState.teams.map((team) => [
+            team.teamId,
+            {
+              points: team.teamId === rrTeam.teamId ? 3 : 90,
+              rank: team.teamId === rrTeam.teamId ? 32 : 1,
+              startplatz: team.teamId === rrTeam.teamId ? 32 : 1,
+            },
+          ]),
+        ),
+        seasonEconomyFactors: [
+          {
+            seasonId: gameState.season.id,
+            seasonLabel: "Aktuell",
+            horizonIndex: 0,
+            factor: salaryFactor,
+            source: "sheet_seed",
+          },
+        ],
+      },
+    };
+
+    const settled = runSingleTeamSettlement(gameState, rrTeam.teamId);
+    const payout = teamSeasonSponsorPayout(settled, gameState.season.id, rrTeam.teamId);
+
+    expect(payout).toBeGreaterThanOrEqual(leagueMin * salaryFactor * 0.98);
+    expect(payout).toBeLessThanOrEqual(leagueMin * salaryFactor * 1.08);
+  }, 60000);
+
+  it("rewards rank-28 milestone for bottom teams", () => {
+    let gameState = createSingleplayerGameState();
+    const rrTeam = gameState.teams.find((team) => team.shortCode === "R-R") ?? gameState.teams.at(-1)!;
+    const leagueMin = getLeagueMinimumSalaryTotal(gameState);
+    const salaryFactor = 1.09;
+    gameState = {
+      ...gameState,
+      seasonState: {
+        ...gameState.seasonState,
+        standings: Object.fromEntries(
+          gameState.teams.map((team) => [
+            team.teamId,
+            {
+              points: team.teamId === rrTeam.teamId ? 20 : 90,
+              rank: team.teamId === rrTeam.teamId ? 28 : 1,
+              startplatz: team.teamId === rrTeam.teamId ? 32 : 1,
+            },
+          ]),
+        ),
+        seasonEconomyFactors: [
+          {
+            seasonId: gameState.season.id,
+            seasonLabel: "Aktuell",
+            horizonIndex: 0,
+            factor: salaryFactor,
+            source: "sheet_seed",
+          },
+        ],
+      },
+    };
+
+    const settled = runSingleTeamSettlement(gameState, rrTeam.teamId);
+    const payout = teamSeasonSponsorPayout(settled, gameState.season.id, rrTeam.teamId);
+    const baseOnlyTarget = getSponsorPayoutForFinalRankAndTier(32, salaryFactor, 5, leagueMin, "security");
+
+    expect(payout).toBeGreaterThan(baseOnlyTarget);
+    expect(payout).toBeGreaterThanOrEqual(leagueMin * salaryFactor * 0.98);
+  }, 60000);
+
+  it("pays top teams above base floor with milestone upside", () => {
+    let gameState = createSingleplayerGameState();
+    const mmTeam = gameState.teams.find((team) => team.shortCode === "M-M") ?? gameState.teams[0]!;
+    const leagueMin = getLeagueMinimumSalaryTotal(gameState);
+    const salaryFactor = 1.09;
+    gameState = {
+      ...gameState,
+      seasonState: {
+        ...gameState.seasonState,
+        standings: Object.fromEntries(
+          gameState.teams.map((team) => [
+            team.teamId,
+            {
+              points: team.teamId === mmTeam.teamId ? 90 : 3,
+              rank: team.teamId === mmTeam.teamId ? 1 : 32,
+              startplatz: team.teamId === mmTeam.teamId ? 1 : 32,
+            },
+          ]),
+        ),
+        seasonEconomyFactors: [
+          {
+            seasonId: gameState.season.id,
+            seasonLabel: "Aktuell",
+            horizonIndex: 0,
+            factor: salaryFactor,
+            source: "sheet_seed",
+          },
+        ],
+      },
+    };
+
+    const settled = runSingleTeamSettlement(gameState, mmTeam.teamId);
+    const payout = teamSeasonSponsorPayout(settled, gameState.season.id, mmTeam.teamId);
+    const baseFloor = leagueMin * salaryFactor;
+
+    expect(payout).toBeGreaterThan(baseFloor * 1.5);
+    expect(payout).toBeLessThan(115);
+  }, 60000);
 
   it("expires sponsor contracts after one season", () => {
     const gameState = buildLeagueGameState(1.0);

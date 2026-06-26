@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 
 import { buildSponsorOffersForTeam, chooseSponsorOffer, getTeamSponsorContract } from "@/lib/sponsor/sponsor-offer-service";
 import { rollSponsorStarTiers } from "@/lib/sponsor/sponsor-tier-pool";
+import type { SponsorTeamQualityRank } from "@/lib/sponsor/sponsor-team-quality-rank";
 import { SPONSOR_BRAND_PARENTS } from "@/lib/sponsor/sponsor-brand-parents";
 import { SPONSOR_BRAND_VARIANTS, listSponsorBrandTemplates } from "@/lib/sponsor/sponsor-brand-variants";
 import { advanceSponsorContractsForNewSeason } from "@/lib/sponsor/sponsor-contract-lifecycle";
@@ -86,10 +87,23 @@ describe("sponsor catalog v2.6", () => {
 
 describe("sponsor tier pool v2.6", () => {
   it("allows five-star offers for elite commercial ratings via luck roll", () => {
+    const eliteQuality: SponsorTeamQualityRank = {
+      teamId: "M-M",
+      qualityRank: 1.2,
+      components: [],
+      maxStarTier: 5,
+      targetStarTier: 5,
+      leaguePosition: 1,
+      leaguePercentile: 99,
+    };
     const samples = Array.from({ length: 24 }, (_, index) =>
-      rollSponsorStarTiers({ seasonId: `season-luck-${index}`, teamId: "M-M", commercialRating: 95, standingRank: 1 }),
+      rollSponsorStarTiers({
+        seasonId: `season-luck-${index}`,
+        teamId: "M-M",
+        qualityRank: eliteQuality,
+      }),
     );
-    expect(samples.some((tiers) => tiers.includes(5))).toBe(true);
+    expect(samples.some((roll) => roll.tiers.includes(5))).toBe(true);
   });
 
   it("deduplicates sponsor parent brands across the three offer slots", () => {

@@ -2,7 +2,12 @@ import { randomUUID } from "@/lib/utils/random-id";
 
 import type { GameState, SponsorOfferComponent, TeamSponsorContract } from "@/lib/data/olyDataTypes";
 import { buildTeamSeasonOverviewRows } from "@/lib/foundation/team-management-overview";
-import { getTieredRankPayoutFraction } from "@/lib/sponsor/sponsor-economy-calibration";
+import {
+  getLeagueMinimumSalaryTotal,
+  getRankMilestoneBonus,
+  getSponsorPayoutForFinalRankAndTier,
+  getUnlockedMilestones,
+} from "@/lib/sponsor/sponsor-economy-calibration";
 import { getTeamSponsorContract } from "@/lib/sponsor/sponsor-offer-service";
 import { evaluateSpecialComponentForObjective } from "@/lib/sponsor/sponsor-objective-evaluator";
 
@@ -40,11 +45,18 @@ function hasSeasonEndPayoutLog(gameState: GameState, seasonId: string, teamId: s
   );
 }
 
+function getCurrentSalaryFactor(gameState: GameState): number {
+  const factor = gameState.seasonState.seasonEconomyFactors?.[0]?.factor;
+  return typeof factor === "number" && Number.isFinite(factor) && factor > 0 ? factor : 1;
+}
+
 function buildSeasonEndRows(gameState: GameState, contract: TeamSponsorContract): SponsorSettlementRow[] {
   const team = gameState.teams.find((entry) => entry.teamId === contract.teamId);
   const row = buildTeamSeasonOverviewRows({ gameState }).find((entry) => entry.teamId === contract.teamId) ?? null;
   const currentRank = row?.rank ?? null;
   const startRank = contract.startRank ?? row?.startplatz ?? currentRank;
+  const salaryFactor = getCurrentSalaryFactor(gameState);
+  const leagueMinSalary = getLeagueMinimumSalaryTotal(gameState);
   const rows: SponsorSettlementRow[] = [];
 
   for (const component of contract.components) {
@@ -77,23 +89,32 @@ function buildSeasonEndRows(gameState: GameState, contract: TeamSponsorContract)
     }
 
     if (component.kind === "rank") {
-      const target = typeof component.targetValue === "number" ? component.targetValue : 16;
-      const payoutFraction =
-        currentRank != null ? getTieredRankPayoutFraction(currentRank, target) : 0;
-      const completed = payoutFraction > 0;
+      const starTier = contract.starTier ?? 2;
+      const baseComponent = contract.components.find((entry) => entry.kind === "base");
+      const baseTotal = baseComponent?.rewardCash ?? 0;
+      const targetTotal = getSponsorPayoutForFinalRankAndTier(
+        currentRank,
+        salaryFactor,
+        starTier,
+        leagueMinSalary,
+        contract.archetype,
+      );
+      const payout = roundCash(Math.max(0, targetTotal - baseTotal));
+      const unlockedLabels = getUnlockedMilestones(currentRank).map((milestone) => milestone.label);
+      const unlockedBonus = getRankMilestoneBonus(currentRank, salaryFactor);
+      const completed = payout > 0;
+      const noMilestones = unlockedBonus <= 0;
       rows.push({
         teamId: contract.teamId,
         teamName: team?.name ?? contract.teamId,
         componentId: component.componentId,
         kind: component.kind,
         label: component.label,
-        status: completed ? "paid" : component.penaltyCash ? "failed_penalty" : "skipped",
-        cashDelta: completed
-          ? roundCash(component.rewardCash * payoutFraction)
-          : -(component.penaltyCash ?? 0),
+        status: completed ? "paid" : noMilestones ? "skipped" : component.penaltyCash ? "failed_penalty" : "skipped",
+        cashDelta: completed ? payout : noMilestones ? 0 : -(component.penaltyCash ?? 0),
         reason: completed
-          ? `Rang ${currentRank} → ${Math.round(payoutFraction * 100)}% von Top ${target}`
-          : `Rang ${currentRank ?? "—"} verfehlt Top ${target}`,
+          ? `Rang ${currentRank} → ${unlockedLabels.join(", ") || "—"} (+${unlockedBonus} C Stufen)`
+          : `Rang ${currentRank ?? "—"} — keine Gewinnstufe freigeschaltet`,
       });
       continue;
     }

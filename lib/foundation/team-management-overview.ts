@@ -316,7 +316,7 @@ export function buildTeamSeasonOverviewRows(input: TeamManagementSnapshotInput):
     gameState,
     seasonId = gameState.season.id,
     preferStandingDisciplineValues = false,
-    standingsByTeamId = {},
+    standingsByTeamId = (gameState.seasonState.standings ?? {}) as Record<string, TeamManagementSnapshotStanding>,
     needScoreByTeamId = {},
     transferSummaryByTeamId = {},
   } = input;

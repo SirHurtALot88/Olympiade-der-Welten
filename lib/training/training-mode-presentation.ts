@@ -3,9 +3,9 @@ import { TRAINING_RECOVERY_IMPACT } from "@/lib/training/training-recovery-impac
 import type { PlayerTrainingMode } from "@/lib/training/training-plan-types";
 
 export const TRAINING_SETPOINTS_BY_MODE: Record<PlayerTrainingMode, number> = {
-  leicht: 2.0,
-  mittel: 2.6,
-  hart: 3.6,
+  leicht: 2.2,
+  mittel: 2.8,
+  hart: 4.0,
 };
 
 export const FATIGUE_LOAD_BY_MODE: Record<PlayerTrainingMode, number> = {

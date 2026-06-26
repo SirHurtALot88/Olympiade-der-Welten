@@ -67,7 +67,8 @@ type TransfermarktV2ClientProps = {
   onRemoveWishlist?: ((playerId: string) => void) | null;
   scoutingWatchPlayerIds?: string[];
   scoutingIntelByPlayerId?: Record<string, number>;
-  scoutingPipelineCapacity?: { occupied: number; max: number } | null;
+  scoutingPipelineCapacity?: { occupied: number; max: number | null; draftSuspended?: boolean } | null;
+  scoutingActiveWishlistPlayerIds?: string[];
   onToggleScoutingWatch?: ((item: TransfermarktFreeAgentItem) => void) | null;
   onBuyCompleted?: ((teamId: string) => Promise<void> | void) | null;
   initialPlayerId?: string | null;
@@ -1072,6 +1073,7 @@ export default function TransfermarktV2Client({
   scoutingWatchPlayerIds = [],
   scoutingIntelByPlayerId = {},
   scoutingPipelineCapacity = null,
+  scoutingActiveWishlistPlayerIds = [],
   onToggleScoutingWatch,
   onBuyCompleted,
   initialPlayerId = null,
@@ -1123,6 +1125,10 @@ export default function TransfermarktV2Client({
     return ids;
   }, [effectiveOwnerId, manageableTeamIds, teamControlModesByTeamId, teamControlOwnersByTeamId]);
   const wishlistPlayerIdSet = useMemo(() => new Set(wishlistPlayerIds), [wishlistPlayerIds]);
+  const scoutingActiveWishlistPlayerIdSet = useMemo(
+    () => new Set(scoutingActiveWishlistPlayerIds),
+    [scoutingActiveWishlistPlayerIds],
+  );
   const scoutingWatchPlayerIdSet = useMemo(() => new Set(scoutingWatchPlayerIds), [scoutingWatchPlayerIds]);
   const selectedTeamId = defaultTeamId ?? "";
   const [search, setSearch] = useState("");
@@ -1412,17 +1418,33 @@ export default function TransfermarktV2Client({
     selectedPlayer && scoutingIntelByPlayerId[selectedPlayer.playerId] != null
       ? scoutingIntelByPlayerId[selectedPlayer.playerId]!
       : null;
+  const wishlistSlotsFull = Boolean(
+    scoutingPipelineCapacity &&
+      !scoutingPipelineCapacity.draftSuspended &&
+      scoutingPipelineCapacity.max != null &&
+      scoutingPipelineCapacity.max > 0 &&
+      scoutingPipelineCapacity.occupied >= scoutingPipelineCapacity.max &&
+      !selectedPlayerWishlisted,
+  );
+  const wishlistDisabledReason =
+    scoutingPipelineCapacity?.draftSuspended
+      ? null
+      : wishlistSlotsFull
+        ? `Wishlist voll (${scoutingPipelineCapacity?.occupied}/${scoutingPipelineCapacity?.max}) — Spieler entfernen oder Scouting Office upgraden.`
+        : null;
   const scoutingPipelineFull = Boolean(
     scoutingPipelineCapacity &&
+      !scoutingPipelineCapacity.draftSuspended &&
+      scoutingPipelineCapacity.max != null &&
       scoutingPipelineCapacity.max > 0 &&
       scoutingPipelineCapacity.occupied >= scoutingPipelineCapacity.max &&
       !selectedPlayerScoutingWatched,
   );
   const scoutingWatchDisabledReason =
-    scoutingPipelineCapacity?.max === 0
-      ? "Scouting Office L0 — Facility upgraden, um Beobachtung zu aktivieren."
+    scoutingPipelineCapacity?.draftSuspended
+      ? null
       : scoutingPipelineFull
-        ? `Scouting Office voll (${scoutingPipelineCapacity?.occupied}/${scoutingPipelineCapacity?.max}) — Ziel entfernen oder Facility upgraden.`
+        ? `Scouting voll (${scoutingPipelineCapacity?.occupied}/${scoutingPipelineCapacity?.max}) — Ziel entfernen oder Scouting Office upgraden.`
         : null;
   const activeBoardObjectiveHighlights = useMemo(
     () => boardObjectiveHighlights.filter((objective) => objective.status === "open" || objective.status === "at_risk" || objective.status === "failed").slice(0, 3),
@@ -3320,13 +3342,22 @@ export default function TransfermarktV2Client({
                 <button
                   className={`secondary-button${selectedPlayerWishlisted ? " is-active" : ""}`}
                   type="button"
-                  disabled={!selectedPlayer}
+                  disabled={!selectedPlayer || Boolean(wishlistDisabledReason && !selectedPlayerWishlisted)}
                   onClick={() => {
                     if (selectedPlayer) {
                       onToggleWishlist?.(selectedPlayer);
                     }
                   }}
-                  title={selectedPlayerWishlisted ? "Kaufabsicht — kein Scouting-Slot. Wishlist spiegelt optional passiv ins Scouting (ab Scouting Office L1)." : "Spieler auf die Transfer-Wishlist setzen (Kaufabsicht, nicht Scouting)."}
+                  title={
+                    selectedPlayerWishlisted
+                      ? "Von der Wishlist nehmen — Scouting-Slot wird frei."
+                      : wishlistDisabledReason ??
+                        (scoutingPipelineCapacity?.draftSuspended
+                          ? "Setup-Draft — Wishlist-Limit ausgesetzt, frei vergleichen und merken."
+                          : scoutingPipelineCapacity
+                            ? `Wishlist-Scouting (${scoutingPipelineCapacity.occupied}/${scoutingPipelineCapacity.max ?? "∞"} Slots, 4 + 3/Stufe) — bevorzugt Stück für Stück aufgedeckt.`
+                            : "Spieler auf die Wishlist setzen und bevorzugt scouten.")
+                  }
                 >
                   {selectedPlayerWishlisted ? "Von Wishlist nehmen" : "Auf Wishlist"}
                 </button>
@@ -3533,10 +3564,22 @@ export default function TransfermarktV2Client({
           <details className="market-v2-context-details" open>
             <summary className="market-v2-context-summary">
               <span>
-                <strong>Wishlist & Bedarf</strong>
-                <small>{selectedWishlistEntries.length} gemerkt · konkrete Orientierung fürs Kaufen</small>
+                <strong>Wishlist & Scouting</strong>
+                <small>
+                  {scoutingPipelineCapacity?.draftSuspended
+                    ? `${selectedWishlistEntries.length} gemerkt · Draft — kein Slot-Limit`
+                    : scoutingPipelineCapacity
+                      ? `${selectedWishlistEntries.length}/${scoutingPipelineCapacity.max} Scouting-Slots · progressive Enthüllung`
+                      : `${selectedWishlistEntries.length} gemerkt · konkrete Orientierung fürs Kaufen`}
+                </small>
               </span>
-              <b>{selectedWishlistEntries.length} Spieler</b>
+              <b>
+                {scoutingPipelineCapacity?.draftSuspended
+                  ? `${selectedWishlistEntries.length} · Draft`
+                  : scoutingPipelineCapacity
+                    ? `${selectedWishlistEntries.length}/${scoutingPipelineCapacity.max}`
+                    : `${selectedWishlistEntries.length} Spieler`}
+              </b>
             </summary>
             <div className="market-v2-context-details-body">
               <div className="market-v2-need-summary">
@@ -3662,20 +3705,38 @@ export default function TransfermarktV2Client({
                         )}
                       </td>
                       <td>
-                        <button
-                          className="table-link-button market-v2-context-player"
-                          type="button"
-                          onClick={() => queueWishlistFocus(entry)}
-                          onDoubleClick={(event) => {
-                            event.preventDefault();
-                            event.stopPropagation();
-                            openWishlistDeal(entry);
-                          }}
-                          title="Einmal klicken: Kandidat fokussieren. Doppelklick: Kaufdialog öffnen."
-                        >
-                          <strong>{entry.playerName}</strong>
-                          <small>{entry.race} · Doppelklick Deal</small>
-                        </button>
+                        <div className="market-v2-wishlist-player-cell">
+                          <button
+                            className="table-link-button market-v2-context-player"
+                            type="button"
+                            onClick={() => queueWishlistFocus(entry)}
+                            onDoubleClick={(event) => {
+                              event.preventDefault();
+                              event.stopPropagation();
+                              openWishlistDeal(entry);
+                            }}
+                            title="Einmal klicken: Kandidat fokussieren. Doppelklick: Kaufdialog öffnen."
+                          >
+                            <strong>{entry.playerName}</strong>
+                            <small>{entry.race}</small>
+                          </button>
+                          {scoutingPipelineCapacity?.draftSuspended ? (
+                            <span className="transfer-status-pill is-info" title="Setup-Draft — kein Slot-Limit">
+                              Draft
+                            </span>
+                          ) : scoutingActiveWishlistPlayerIdSet.has(entry.playerId) ? (
+                            <span
+                              className="transfer-status-pill is-ready"
+                              title={`Aktiv gescoutet — Intel ${scoutingIntelByPlayerId[entry.playerId] ?? 0}%`}
+                            >
+                              Scout aktiv {scoutingIntelByPlayerId[entry.playerId] ?? 0}%
+                            </span>
+                          ) : (
+                            <span className="transfer-status-pill" title="Nur gemerkt — kein Scout-Slot">
+                              Nur gemerkt
+                            </span>
+                          )}
+                        </div>
                       </td>
                       <td>{entry.className}</td>
                       <td>{formatTransfermarktCurrency(entry.marketValue)}</td>
@@ -3713,7 +3774,13 @@ export default function TransfermarktV2Client({
             {selectedWishlistEntries.length === 0 ? (
               <div className="market-v2-empty">
                 <strong>Wishlist leer.</strong>
-                <p>Nutze die Bedarfssignale oben als Einkaufsliste und merke Kandidaten im Markt, wenn du später vergleichen willst.</p>
+                <p>
+                  {scoutingPipelineCapacity?.draftSuspended
+                    ? "Im Setup-Draft kannst du unbegrenzt merken und vergleichen. Nach dem Draft gelten 4 Wishlist-Slots (+3 pro Scouting-Stufe)."
+                    : scoutingPipelineCapacity && scoutingPipelineCapacity.max != null
+                      ? `Bis zu ${scoutingPipelineCapacity.max} Spieler auf die Wishlist — bevorzugt gescoutet und Stück für Stück aufgedeckt.`
+                      : "Merke Kandidaten im Markt, um sie später gezielt zu scouten."}
+                </p>
               </div>
             ) : null}
               </div>

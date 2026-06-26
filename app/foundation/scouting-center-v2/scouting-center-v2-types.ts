@@ -26,6 +26,10 @@ export type ScoutingHubV2WatchTarget = {
   potentialGap?: number | null;
   potentialScore?: number | null;
   potentialBand?: PlayerPotentialBand | null;
+  scoutStatus?: "active" | "bookmarked";
+  scoutCertainty?: number | null;
+  scoutSourceLabel?: string | null;
+  scoutMilestone?: string | null;
 };
 
 export type ScoutingHubV2PipelineRecord = {
@@ -40,6 +44,7 @@ export type ScoutingHubV2PipelineSummary = {
   maxSlots: number;
   tickGain: number;
   passiveActive: number;
+  draftSuspended?: boolean;
   records: ScoutingHubV2PipelineRecord[];
 };
 
@@ -58,7 +63,10 @@ export type ScoutingHubV2ClientProps = {
   visibleAtTier: string[];
   hiddenAtTier: string[];
   baseInfoAlwaysVisible: string[];
-  watchTargets: ScoutingHubV2WatchTarget[];
+  activeScoutTargets: ScoutingHubV2WatchTarget[];
+  bookmarkedTargets?: ScoutingHubV2WatchTarget[];
+  /** @deprecated use activeScoutTargets */
+  watchTargets?: ScoutingHubV2WatchTarget[];
   scoutPipeline?: ScoutingHubV2PipelineSummary | null;
   activeTab?: ScoutingHubV2TabId;
   onActiveTabChange?: (tab: ScoutingHubV2TabId) => void;

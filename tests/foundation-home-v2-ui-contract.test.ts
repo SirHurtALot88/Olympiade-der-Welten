@@ -40,9 +40,12 @@ describe("foundation home v2 ui contract", () => {
   it("keeps the Velo-inspired dashboard focused on top players, KPIs and flow actions", async () => {
     const fileText = await fs.readFile(homeV2Path, "utf8");
 
-    expect(fileText).toContain("Top 3 Spieler");
+    expect(fileText).toContain("Top 6 Spieler");
+    expect(fileText).toContain("HOME_V2_TOP_PLAYER_COUNT");
     expect(fileText).toContain("home-v2-player-grid");
-    expect(fileText).toContain("home-v2-kpi-grid");
+    expect(fileText).toContain("home-v2-hero-stats");
+    expect(fileText).toContain("home-v2-signal-strip");
+    expect(fileText).toContain("home-v2-quick-nav");
     expect(fileText).toContain("onContinue");
     expect(fileText).toContain("onOpenBoardObjectives");
     expect(fileText).toContain("home-v2-objective-card");
@@ -55,7 +58,7 @@ describe("foundation home v2 ui contract", () => {
     expect(fileText).toContain('data-testid="foundation-home-v2"');
   });
 
-  it("shows grade letters on orbit chips and potential band on top player cards", async () => {
+  it("shows core axis stats and absolute CA/PO range on top player cards", async () => {
     const [homeText, typesText, foundationText] = await Promise.all([
       fs.readFile(homeV2Path, "utf8"),
       fs.readFile(
@@ -65,17 +68,22 @@ describe("foundation home v2 ui contract", () => {
       fs.readFile(foundationClientPath, "utf8"),
     ]);
 
-    // Grade letters on orbit row
-    expect(homeText).toContain("showGrade");
-    // Potential band pill
-    expect(homeText).toContain('data-testid="home-player-potential-band"');
-    expect(homeText).toContain("getPotentialBandLabel");
-    // Types extended
-    expect(typesText).toContain("potential?");
-    expect(typesText).toContain("potentialBand?");
-    // Foundation populates the fields
-    expect(foundationText).toContain("getPotentialBand");
-    expect(foundationText).toContain("player.potential");
+    expect(homeText).toContain("VeloStatOrbitRow");
+    expect(homeText).not.toContain("showGrade");
+    expect(homeText).not.toContain("VeloStarRating");
+    expect(homeText).toContain('data-testid="home-player-ca-po-row"');
+    expect(homeText).toContain('data-testid="home-player-potential-range"');
+    expect(homeText).toContain("formatPotentialRange");
+    expect(homeText).toContain("formatAbilityPoints");
+    expect(typesText).toContain("caRating");
+    expect(typesText).toContain("poRangeMin");
+    expect(typesText).toContain("poRangeMax");
+    expect(typesText).toContain("pow:");
+    expect(foundationText).toContain("buildPlayerDevelopmentInsight");
+    expect(foundationText).toContain("buildPlayerProgressionForecast");
+    expect(foundationText).toContain("potentialRangeDisplay");
+    expect(typesText).toContain("HOME_V2_TOP_PLAYER_COUNT");
+    expect(foundationText).toContain("homePlayerCards.slice(0, 6)");
   });
 
   it("wires the modern v2 layout classes", async () => {
@@ -83,7 +91,8 @@ describe("foundation home v2 ui contract", () => {
 
     expect(cssText).toContain(".home-v2-shell");
     expect(cssText).toContain(".home-v2-player-card");
-    expect(cssText).toContain(".home-v2-kpi-grid");
+    expect(cssText).toContain(".home-v2-hero");
+    expect(cssText).toContain(".home-v2-signal-strip");
     expect(cssText).toContain(".foundation-home-v2-panel .home-v2-subnav");
   });
 });
@@ -106,7 +115,7 @@ describe("foundation ui v2 roadmap contract", () => {
   it("keeps facilities overview v2 read-only without classic training jump links", async () => {
     const fileText = await fs.readFile(facilitiesOverviewV2Path, "utf8");
 
-    expect(fileText).toContain("Facilities Overview V2");
+    expect(fileText).toContain("Gebäude");
     expect(fileText).not.toContain("onOpenClassicTraining");
     expect(fileText).toContain("facilities-overview-v2-grid");
     expect(fileText).toContain('data-testid="foundation-facilities-overview-v2"');
@@ -115,14 +124,14 @@ describe("foundation ui v2 roadmap contract", () => {
   it("keeps scouting hub v2 as transfermarkt summary, not standalone center", async () => {
     const fileText = await fs.readFile(scoutingHubV2Path, "utf8");
 
-    expect(fileText).toContain("Scouting & Transfermarkt");
+    expect(fileText).toContain("Scouting");
     expect(fileText).toContain("Transfermarkt öffnen");
-    expect(fileText).toContain("Watchlist / Beobachtet");
+    expect(fileText).toContain("Aktiv gescoutet");
     expect(fileText).toContain("Base Infos (immer)");
     expect(fileText).toContain("Draft & Rekrutierung");
     expect(fileText).not.toContain("Recent Reports");
-    expect(fileText).toContain("Nächster Meilenstein");
-    expect(fileText).toContain("Aktive Beobachtung");
+    expect(fileText).toContain("Scout-Pipeline");
+    expect(fileText).toContain("Nur gemerkt");
   });
 
   it("keeps inbox v2 as the canonical compact inbox", async () => {
@@ -130,7 +139,7 @@ describe("foundation ui v2 roadmap contract", () => {
 
     expect(fileText).toContain('data-testid="foundation-inbox-v2"');
     expect(fileText).toContain("inbox-v2-layout");
-    expect(fileText).toContain("Entscheidungen & Hinweise");
+    expect(fileText).toContain("Entscheidungen");
     expect(fileText).not.toContain("Inbox Classic");
   });
 });

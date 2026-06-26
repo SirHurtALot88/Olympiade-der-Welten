@@ -196,6 +196,23 @@ function createInMemoryPersistenceService(initialSave: PersistedSaveGame): Persi
     getSaveById(saveId) {
       return currentSave.saveId === saveId ? cloneCurrentSave() : null;
     },
+    getSaveVersionMetadata(saveId) {
+      if (currentSave.saveId !== saveId) {
+        return null;
+      }
+      return {
+        saveId: currentSave.saveId,
+        updatedAt: currentSave.updatedAt,
+        seasonId: currentSave.gameState.season.id,
+        matchdayId: currentSave.gameState.matchdayState.matchdayId,
+        matchdayResults: currentSave.gameState.seasonState.matchdayResults ?? [],
+        standingsApplyLogs: currentSave.gameState.seasonState.standingsApplyLogs ?? [],
+        seasonSnapshots: currentSave.gameState.seasonState.seasonSnapshots ?? [],
+        disciplineResults: currentSave.gameState.seasonState.disciplineResults ?? [],
+        lineupDraftCount: currentSave.gameState.seasonState.lineupDrafts?.length ?? 0,
+        transferHistoryCount: currentSave.gameState.transferHistory?.length ?? 0,
+      };
+    },
     saveSingleplayerState(saveId, gameState) {
       if (currentSave.saveId !== saveId) {
         throw new Error(`In-memory save ${saveId} could not be found.`);

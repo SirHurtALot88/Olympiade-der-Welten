@@ -210,7 +210,7 @@ export async function loadMatchdayArenaBase(input: {
     contextWarnings: contextResult.ok ? contextResult.warnings : contextResult.warnings,
     contextErrors: contextResult.ok ? [] : contextResult.errors,
     options: buildArenaOptions(save, params),
-    scoreSummary: scoreResult.summary as MatchdayMvpScoringResult | null,
+    scoreSummary: scoreResult,
     scoreWarnings: scoreResult.warnings ?? [],
     scoreBlockingReasons: scoreResult.blockingReasons ?? [],
     resolvePreview,

@@ -1,5 +1,6 @@
 import type { GameState, Player, PlayerScoutIntelRecord, ScoutIntelSource } from "@/lib/data/olyDataTypes";
 import { getFacilityLevel, getTeamFacilityState } from "@/lib/facilities/facility-effects";
+import { getActiveScoutingWishlistEntries, getScoutingPipelineSlotLimit } from "@/lib/scouting/scouting-wishlist-slots";
 import { getScoutingWatchlistForTeam } from "@/lib/scouting/scouting-watchlist-service";
 
 export type ScoutPipelineConfig = {
@@ -9,12 +10,12 @@ export type ScoutPipelineConfig = {
 };
 
 const SCOUTING_LEVEL_CONFIG: Record<number, ScoutPipelineConfig> = {
-  0: { maxSlots: 0, tickGain: 0, passiveSlots: 0 },
-  1: { maxSlots: 2, tickGain: 8, passiveSlots: 0 },
-  2: { maxSlots: 3, tickGain: 10, passiveSlots: 1 },
-  3: { maxSlots: 5, tickGain: 12, passiveSlots: 2 },
-  4: { maxSlots: 6, tickGain: 15, passiveSlots: 3 },
-  5: { maxSlots: 8, tickGain: 18, passiveSlots: 4 },
+  0: { maxSlots: 4, tickGain: 0, passiveSlots: 0 },
+  1: { maxSlots: 7, tickGain: 8, passiveSlots: 0 },
+  2: { maxSlots: 10, tickGain: 10, passiveSlots: 1 },
+  3: { maxSlots: 13, tickGain: 12, passiveSlots: 2 },
+  4: { maxSlots: 16, tickGain: 15, passiveSlots: 3 },
+  5: { maxSlots: 19, tickGain: 18, passiveSlots: 4 },
 };
 
 function clamp(value: number, min: number, max: number) {
@@ -33,7 +34,11 @@ function getStableUnitHash(seed: string) {
 export function getScoutPipelineConfig(gameState: GameState, teamId: string): ScoutPipelineConfig {
   const teamFacilities = getTeamFacilityState(gameState, teamId);
   const level = getFacilityLevel(teamFacilities, "scouting_office");
-  return SCOUTING_LEVEL_CONFIG[level] ?? SCOUTING_LEVEL_CONFIG[0]!;
+  const base = SCOUTING_LEVEL_CONFIG[level] ?? SCOUTING_LEVEL_CONFIG[0]!;
+  return {
+    ...base,
+    maxSlots: getScoutingPipelineSlotLimit(gameState, teamId),
+  };
 }
 
 export function getTeamScoutIntelRecords(gameState: GameState, teamId: string) {
@@ -57,12 +62,15 @@ export function getEffectiveScoutingLevel(gameState: GameState, teamId: string, 
   return clamp(facilityLevel + Math.floor(certainty / 25), 0, 5);
 }
 
-function tickGainForSource(config: ScoutPipelineConfig, source: ScoutIntelSource) {
+function tickGainForSource(config: ScoutPipelineConfig, source: ScoutIntelSource, facilityLevel: number) {
+  if (facilityLevel <= 0) {
+    return 0;
+  }
   if (source === "wishlist_mirror") {
-    return Math.max(1, config.tickGain - 2);
+    return Math.max(1, config.tickGain + 3);
   }
   if (source === "passive_need") {
-    return Math.max(1, config.tickGain - 1);
+    return Math.max(1, config.tickGain - 2);
   }
   return config.tickGain;
 }
@@ -94,81 +102,59 @@ function buildPassiveCandidates(gameState: GameState, teamId: string, count: num
   return candidates;
 }
 
-function upsertIntelRecord(input: {
-  records: PlayerScoutIntelRecord[];
-  playerId: string;
-  teamId: string;
-  seasonId: string;
-  source: ScoutIntelSource;
-}) {
-  const existing = input.records.find((entry) => entry.playerId === input.playerId) ?? null;
-  if (existing) {
-    return input.records;
+export function refreshScoutPipeline(gameState: GameState, teamId: string): GameState {
+  const config = getScoutPipelineConfig(gameState, teamId);
+  const seasonId = gameState.season.id;
+  const existingByPlayerId = new Map(
+    getTeamScoutIntelRecords(gameState, teamId).map((entry) => [entry.playerId, entry] as const),
+  );
+
+  type SlotAssignment = { playerId: string; source: ScoutIntelSource };
+  const assignments: SlotAssignment[] = [];
+  const assigned = new Set<string>();
+
+  const addAssignment = (playerId: string, source: ScoutIntelSource) => {
+    if (config.maxSlots <= 0 || assignments.length >= config.maxSlots || assigned.has(playerId)) {
+      return;
+    }
+    assignments.push({ playerId, source });
+    assigned.add(playerId);
+  };
+
+  for (const entry of getActiveScoutingWishlistEntries(gameState, teamId)) {
+    addAssignment(entry.playerId, "wishlist_mirror");
   }
-  return [
-    ...input.records,
-    {
-      playerId: input.playerId,
-      teamId: input.teamId,
-      seasonId: input.seasonId,
-      source: input.source,
+
+  for (const entry of getScoutingWatchlistForTeam(gameState, teamId)) {
+    if (entry.source === "transfer_wishlist_mirror") {
+      continue;
+    }
+    addAssignment(entry.playerId, "watchlist");
+  }
+
+  for (const playerId of buildPassiveCandidates(gameState, teamId, config.passiveSlots)) {
+    addAssignment(playerId, "passive_need");
+  }
+
+  const records: PlayerScoutIntelRecord[] = assignments.map(({ playerId, source }) => {
+    const existing = existingByPlayerId.get(playerId);
+    if (existing) {
+      return {
+        ...existing,
+        source,
+      };
+    }
+    return {
+      playerId,
+      teamId,
+      seasonId,
+      source,
       certainty: 0,
       startedAt: new Date().toISOString(),
       lastTickAt: null,
       ticksCompleted: 0,
-    },
-  ];
-}
-
-export function refreshScoutPipeline(gameState: GameState, teamId: string): GameState {
-  const config = getScoutPipelineConfig(gameState, teamId);
-  const seasonId = gameState.season.id;
-  let records = [...getTeamScoutIntelRecords(gameState, teamId)];
-
-  const watchlist = getScoutingWatchlistForTeam(gameState, teamId);
-  for (const entry of watchlist) {
-    records = upsertIntelRecord({
-      records,
-      playerId: entry.playerId,
-      teamId,
-      seasonId,
-      source: entry.source === "transfer_wishlist_mirror" ? "wishlist_mirror" : "watchlist",
-    });
-  }
-
-  const wishlistIds =
-    config.maxSlots > 0
-      ? (gameState.seasonState.transferWishlist ?? [])
-          .filter((entry) => entry.teamId === teamId)
-          .map((entry) => entry.playerId)
-      : [];
-  for (const playerId of wishlistIds) {
-    if (!records.some((entry) => entry.playerId === playerId)) {
-      records = upsertIntelRecord({ records, playerId, teamId, seasonId, source: "wishlist_mirror" });
-    }
-  }
-
-  const passiveCandidates = buildPassiveCandidates(gameState, teamId, config.passiveSlots);
-  for (const playerId of passiveCandidates) {
-    if (records.length >= config.maxSlots) {
-      break;
-    }
-    if (!records.some((entry) => entry.playerId === playerId)) {
-      records = upsertIntelRecord({ records, playerId, teamId, seasonId, source: "passive_need" });
-    }
-  }
-
-  if (records.length > config.maxSlots) {
-    const priority: Record<ScoutIntelSource, number> = {
-      watchlist: 4,
-      wishlist_mirror: 3,
-      passive_need: 2,
-      roster: 1,
     };
-    records = [...records]
-      .sort((left, right) => priority[right.source] - priority[left.source] || right.certainty - left.certainty)
-      .slice(0, config.maxSlots);
-  }
+  });
 
   return {
     ...gameState,
@@ -201,11 +187,12 @@ export function advanceScoutIntelTick(input: {
 
   for (const teamId of teamIds) {
     const config = getScoutPipelineConfig(next, teamId);
-    if (config.maxSlots === 0) {
+    const facilityLevel = getFacilityLevel(getTeamFacilityState(next, teamId), "scouting_office");
+    if (config.maxSlots === 0 || facilityLevel <= 0) {
       continue;
     }
     const records = getTeamScoutIntelRecords(next, teamId).map((record) => {
-      const gain = tickGainForSource(config, record.source);
+      const gain = tickGainForSource(config, record.source, facilityLevel);
       const certainty = clamp(record.certainty + gain, 0, 100);
       return {
         ...record,
@@ -237,6 +224,7 @@ export function buildScoutPipelineSummary(gameState: GameState, teamId: string) 
     records,
     occupiedSlots: records.length,
     passiveActive: records.filter((entry) => entry.source === "passive_need").length,
+    wishlistActive: records.filter((entry) => entry.source === "wishlist_mirror").length,
   };
 }
 

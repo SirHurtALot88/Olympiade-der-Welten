@@ -135,6 +135,21 @@ function buildStaticPersistence(save: PersistedSaveGame): PersistenceService {
     bootstrapSingleplayerSave: () => ({ save, createdFromSeed: false }),
     getActiveSave: () => save,
     getSaveById: (saveId: string) => (saveId === save.saveId ? save : null),
+    getSaveVersionMetadata: (saveId: string) =>
+      saveId === save.saveId
+        ? {
+            saveId: save.saveId,
+            updatedAt: save.updatedAt,
+            seasonId: save.gameState.season.id,
+            matchdayId: save.gameState.matchdayState.matchdayId,
+            matchdayResults: save.gameState.seasonState.matchdayResults ?? [],
+            standingsApplyLogs: save.gameState.seasonState.standingsApplyLogs ?? [],
+            seasonSnapshots: save.gameState.seasonState.seasonSnapshots ?? [],
+            disciplineResults: save.gameState.seasonState.disciplineResults ?? [],
+            lineupDraftCount: save.gameState.seasonState.lineupDrafts?.length ?? 0,
+            transferHistoryCount: save.gameState.transferHistory?.length ?? 0,
+          }
+        : null,
     saveSingleplayerState: () => save,
     createSave: () => save,
     createFreshSeasonOneSave: () => save,

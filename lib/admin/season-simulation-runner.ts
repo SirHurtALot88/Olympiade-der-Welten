@@ -369,6 +369,23 @@ function createSingleSavePersistenceHarness(initialSave: PersistedSaveGame) {
     getSaveById(saveId) {
       return currentSave.saveId === saveId ? currentSave : null;
     },
+    getSaveVersionMetadata(saveId) {
+      if (currentSave.saveId !== saveId) {
+        return null;
+      }
+      return {
+        saveId: currentSave.saveId,
+        updatedAt: currentSave.updatedAt,
+        seasonId: currentSave.gameState.season.id,
+        matchdayId: currentSave.gameState.matchdayState.matchdayId,
+        matchdayResults: currentSave.gameState.seasonState.matchdayResults ?? [],
+        standingsApplyLogs: currentSave.gameState.seasonState.standingsApplyLogs ?? [],
+        seasonSnapshots: currentSave.gameState.seasonState.seasonSnapshots ?? [],
+        disciplineResults: currentSave.gameState.seasonState.disciplineResults ?? [],
+        lineupDraftCount: 0,
+        transferHistoryCount: 0,
+      };
+    },
     saveSingleplayerState(saveId, gameState) {
       if (currentSave.saveId !== saveId) {
         throw new Error(`Admin simulation dry-run save ${saveId} wurde nicht gefunden.`);

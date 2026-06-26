@@ -63,11 +63,15 @@ body {
     linear-gradient(180deg, #f8f3eb 0%, var(--bg) 100%);
   color: var(--ink);
   font-family: "RaniraSeason", Georgia, "Times New Roman", serif;
+  font-style: italic;
+  font-weight: 700;
 }
 
 .foundation-app,
 .foundation-app .foundation-shell {
   font-family: "RaniraSeason", Georgia, "Times New Roman", serif;
+  font-style: italic;
+  font-weight: 700;
 }
 
 .foundation-drilldown-page {
@@ -20049,6 +20053,60 @@ a {
   font-size: 0.94rem;
 }
 
+/* Foundation UI Copy: Erklärungen nur per Tooltip, nicht als Layout-Spam */
+.foundation-shell .foundation-flow-coach,
+.foundation-shell .foundation-flow-coach-compact {
+  display: none !important;
+}
+
+.foundation-shell .foundation-screen-action-copy,
+.foundation-shell .foundation-screen-action-reason,
+.foundation-shell .foundation-access-banner-copy {
+  display: none !important;
+}
+
+.foundation-shell .foundation-screen-action.is-compact {
+  margin: 0;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  box-shadow: none;
+  justify-content: flex-end;
+}
+
+.foundation-shell .foundation-access-banner.is-compact {
+  margin: 0;
+  padding: 4px 0;
+  border: 0;
+  background: transparent;
+  box-shadow: none;
+}
+
+.foundation-shell .foundation-warning-inbox-item small,
+.foundation-shell .foundation-flow-coach-action small,
+.foundation-shell .foundation-flow-loop-step small,
+.foundation-shell .home-v2-signal-chip small {
+  display: none;
+}
+
+.foundation-shell .training-v2-mode-guide {
+  display: none !important;
+}
+
+.foundation-shell .training-v2-lock-note span {
+  display: none;
+}
+
+.foundation-shell .market-v2-empty p {
+  display: none;
+}
+
+.foundation-shell .home-v2-hero-meta-line {
+  margin: 0;
+  color: rgba(235, 239, 247, 0.62);
+  font-size: 0.82rem;
+}
+
 .foundation-shell .foundation-flow-controller {
   min-height: 58px;
 }
@@ -31510,8 +31568,17 @@ a {
 .home-v2-player-grid {
   display: grid;
   grid-template-columns: repeat(3, minmax(0, 1fr));
-  gap: 14px;
+  gap: 12px;
   margin: 14px 0;
+}
+
+.home-v2-player-card:not(.is-featured) .home-v2-player-portrait {
+  width: 72px;
+  height: 72px;
+}
+
+.home-v2-player-card:not(.is-featured) .home-v2-player-stats {
+  font-size: 0.82rem;
 }
 
 .home-v2-player-card {
@@ -31550,6 +31617,7 @@ a {
 }
 
 .home-v2-player-stats,
+.home-v2-ca-po-row,
 .home-v2-axis-row,
 .home-v2-warning-row,
 .home-v2-board-meta,
@@ -31558,6 +31626,41 @@ a {
   display: flex;
   flex-wrap: wrap;
   gap: 8px;
+}
+
+.home-v2-ca-po-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: stretch;
+  gap: 8px 12px;
+}
+
+.home-v2-ca-po-metric {
+  display: grid;
+  gap: 2px;
+  min-width: 72px;
+  padding: 6px 8px;
+  border-radius: 10px;
+  background: rgba(255, 255, 255, 0.04);
+  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.06);
+}
+
+.home-v2-ca-po-metric small {
+  font-size: 0.68rem;
+  font-weight: 850;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: rgba(255, 255, 255, 0.58);
+}
+
+.home-v2-ca-po-metric strong {
+  font-size: 0.96rem;
+  line-height: 1;
+  color: rgba(245, 239, 224, 0.96);
+}
+
+.home-v2-ca-po-metric:last-child strong {
+  color: rgba(255, 214, 120, 0.96);
 }
 
 .home-v2-objective-list {
@@ -31648,6 +31751,218 @@ a {
 
 .home-v2-continue {
   min-width: 140px;
+}
+
+.home-v2-shell-compact {
+  gap: 14px;
+}
+
+.home-v2-hero {
+  display: grid;
+  grid-template-columns: minmax(220px, 1.1fr) minmax(280px, 1.4fr) auto;
+  gap: 16px;
+  align-items: center;
+  padding: 18px 20px;
+  border-radius: 22px;
+  border: 1px solid rgba(112, 138, 187, 0.2);
+  background:
+    radial-gradient(circle at top left, rgba(97, 134, 214, 0.18), transparent 34%),
+    linear-gradient(180deg, rgba(12, 21, 37, 0.98), rgba(9, 15, 27, 0.92));
+}
+
+.home-v2-hero-main {
+  display: flex;
+  gap: 14px;
+  align-items: center;
+  min-width: 0;
+}
+
+.home-v2-hero-copy h2 {
+  margin: 0 0 6px;
+  font-size: 1.35rem;
+}
+
+.home-v2-hero-meta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.home-v2-hero-stats {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 8px;
+}
+
+.home-v2-hero-stat {
+  display: grid;
+  gap: 2px;
+  padding: 10px 12px;
+  border-radius: 14px;
+  border: 1px solid rgba(112, 138, 187, 0.16);
+  background: rgba(255, 255, 255, 0.03);
+}
+
+.home-v2-hero-stat span {
+  font-size: 0.68rem;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: rgba(235, 239, 247, 0.58);
+}
+
+.home-v2-hero-stat strong {
+  font-size: 1rem;
+}
+
+.home-v2-hero-stat.is-muted strong {
+  color: rgba(235, 239, 247, 0.82);
+}
+
+.home-v2-signal-strip {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 10px;
+}
+
+.home-v2-signal-chip {
+  display: grid;
+  gap: 2px;
+  padding: 12px 14px;
+  border-radius: 16px;
+  border: 1px solid rgba(112, 138, 187, 0.18);
+  background: rgba(255, 255, 255, 0.03);
+  text-align: left;
+  cursor: pointer;
+  color: inherit;
+  font: inherit;
+}
+
+.home-v2-signal-chip.is-static {
+  cursor: default;
+}
+
+.home-v2-signal-chip span {
+  font-size: 0.68rem;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: rgba(145, 185, 244, 0.88);
+}
+
+.home-v2-signal-chip strong {
+  font-size: 0.92rem;
+}
+
+.home-v2-signal-chip small {
+  color: rgba(235, 239, 247, 0.58);
+  font-size: 0.74rem;
+}
+
+.home-v2-signal-chip.is-warning {
+  border-color: rgba(255, 196, 86, 0.28);
+  background: rgba(255, 196, 86, 0.08);
+}
+
+.home-v2-signal-chip.is-ready {
+  border-color: rgba(134, 239, 172, 0.24);
+}
+
+.home-v2-quick-nav {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.home-v2-quick-link {
+  padding: 8px 14px;
+  border-radius: 999px;
+  border: 1px solid rgba(112, 138, 187, 0.22);
+  background: rgba(255, 255, 255, 0.04);
+  color: rgba(235, 239, 247, 0.88);
+  font-size: 0.82rem;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.home-v2-quick-link:hover,
+.home-v2-quick-link:focus-visible {
+  border-color: rgba(145, 185, 244, 0.42);
+  background: rgba(91, 145, 218, 0.12);
+}
+
+.home-v2-main-grid-compact {
+  align-items: start;
+}
+
+.home-v2-side-stack {
+  grid-column: span 4;
+  display: grid;
+  gap: 14px;
+}
+
+.home-v2-main-grid-compact .home-v2-top-players {
+  grid-column: span 8;
+}
+
+.home-v2-next-button {
+  width: 100%;
+  margin-top: 10px;
+}
+
+.home-v2-inbox-item {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  width: 100%;
+  padding: 8px 10px;
+  border: 0;
+  border-radius: 12px;
+  background: rgba(255, 255, 255, 0.03);
+  color: inherit;
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+
+.home-v2-facility-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.home-v2-facility-chip {
+  display: grid;
+  gap: 2px;
+  padding: 8px 10px;
+  border-radius: 12px;
+  background: rgba(255, 255, 255, 0.04);
+  border: 1px solid rgba(255, 255, 255, 0.06);
+}
+
+.home-v2-facility-chip strong {
+  font-size: 0.78rem;
+}
+
+.home-v2-facility-chip small {
+  color: rgba(235, 239, 247, 0.56);
+}
+
+.home-v2-facilities-panel.is-compact {
+  padding-bottom: 14px;
+}
+
+@media (max-width: 1100px) {
+  .home-v2-hero {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .home-v2-signal-strip {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .home-v2-main-grid-compact .home-v2-top-players,
+  .home-v2-side-stack {
+    grid-column: span 12;
+  }
 }
 
 .facilities-overview-v2-top,
@@ -31802,6 +32117,37 @@ a {
   gap: 6px;
   text-align: left;
   cursor: pointer;
+}
+
+.scouting-hub-v2-target-card.is-active-scout {
+  border-color: rgba(86, 196, 142, 0.45);
+  box-shadow: inset 0 0 0 1px rgba(86, 196, 142, 0.12);
+}
+
+.scouting-hub-v2-target-card.is-bookmarked-only {
+  opacity: 0.82;
+}
+
+.scouting-hub-v2-target-head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 10px;
+}
+
+.scouting-hub-v2-target-head strong {
+  display: block;
+}
+
+.market-v2-wishlist-player-cell {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 6px;
+}
+
+.market-v2-wishlist-player-cell .transfer-status-pill {
+  font-size: 11px;
 }
 
 @media (max-width: 1200px) {

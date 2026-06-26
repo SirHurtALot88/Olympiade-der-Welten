@@ -1,12 +1,54 @@
 import { describe, expect, it } from "vitest";
 
+import type { SponsorTeamQualityRank } from "@/lib/sponsor/sponsor-team-quality-rank";
 import { getDemandMultiplier, getRewardMultiplier, rollSponsorStarTiers } from "@/lib/sponsor/sponsor-tier-pool";
 
+function createQualityRank(overrides: Partial<SponsorTeamQualityRank> & Pick<SponsorTeamQualityRank, "teamId">): SponsorTeamQualityRank {
+  return {
+    qualityRank: 16,
+    components: [],
+    maxStarTier: 3,
+    targetStarTier: 3,
+    leaguePosition: 16,
+    leaguePercentile: 50,
+    ...overrides,
+  };
+}
+
 describe("sponsor tier pool", () => {
-  it("rolls deterministic tiers with offer variation", () => {
-    const tiers = rollSponsorStarTiers({ seasonId: "season-2", teamId: "M-M", commercialRating: 95, standingRank: 1 });
-    expect(tiers).toHaveLength(3);
-    expect(new Set(tiers).size).toBeGreaterThan(1);
+  it("clusters elite teams around 4-5 stars when quality rank is top", () => {
+    const roll = rollSponsorStarTiers({
+      seasonId: "season-2",
+      teamId: "M-M",
+      qualityRank: createQualityRank({
+        teamId: "M-M",
+        qualityRank: 1.5,
+        maxStarTier: 5,
+        targetStarTier: 5,
+        leaguePosition: 1,
+        leaguePercentile: 99,
+      }),
+    });
+    expect(roll.tiers).toHaveLength(3);
+    expect(Math.min(...roll.tiers)).toBeGreaterThanOrEqual(4);
+    expect(Math.max(...roll.tiers)).toBeGreaterThanOrEqual(4);
+  });
+
+  it("keeps bottom-table teams on 1-2 stars with rare golden-card luck", () => {
+    const roll = rollSponsorStarTiers({
+      seasonId: "season-1",
+      teamId: "R-R",
+      qualityRank: createQualityRank({
+        teamId: "R-R",
+        qualityRank: 30,
+        maxStarTier: 1,
+        targetStarTier: 1,
+        leaguePosition: 31,
+        leaguePercentile: 3,
+      }),
+    });
+    expect(Math.max(...roll.tiers)).toBeLessThanOrEqual(2);
+    expect(Math.min(...roll.tiers)).toBe(1);
   });
 
   it("scales rewards and demands with star tier", () => {
@@ -14,49 +56,49 @@ describe("sponsor tier pool", () => {
     expect(getDemandMultiplier(5)).toBeGreaterThan(getDemandMultiplier(2));
   });
 
-  it("never returns three identical tiers when cap allows variety", () => {
-    for (const cr of [50, 75, 95, 100]) {
-      for (const seed of ["season-1", "season-2", "season-99"]) {
-        const tiers = rollSponsorStarTiers({ seasonId: seed, teamId: "TEST", commercialRating: cr, standingRank: 10 });
-        expect(tiers).toHaveLength(3);
-        expect(new Set(tiers).size).toBeGreaterThan(1);
-      }
-    }
+  it("does not force artificial 1-5 spread for mid-table teams", () => {
+    const roll = rollSponsorStarTiers({
+      seasonId: "season-mid",
+      teamId: "MID",
+      qualityRank: createQualityRank({
+        teamId: "MID",
+        qualityRank: 14,
+        maxStarTier: 3,
+        targetStarTier: 3,
+        leaguePosition: 14,
+        leaguePercentile: 55,
+      }),
+    });
+    expect(roll.tiers.every((tier) => tier >= 2 && tier <= 4)).toBe(true);
   });
 
   it("caps star tiers for bottom-table teams at season start", () => {
     const bottom = rollSponsorStarTiers({
       seasonId: "season-1",
       teamId: "R-R",
-      commercialRating: 21,
-      standingRank: 32,
+      qualityRank: createQualityRank({
+        teamId: "R-R",
+        qualityRank: 31,
+        maxStarTier: 1,
+        targetStarTier: 1,
+        leaguePosition: 32,
+        leaguePercentile: 0,
+      }),
     });
-    expect(Math.max(...bottom)).toBeLessThanOrEqual(1);
+    expect(Math.max(...bottom.tiers)).toBeLessThanOrEqual(1);
 
     const top = rollSponsorStarTiers({
       seasonId: "season-1",
       teamId: "M-M",
-      commercialRating: 88,
-      standingRank: 1,
+      qualityRank: createQualityRank({
+        teamId: "M-M",
+        qualityRank: 2,
+        maxStarTier: 5,
+        targetStarTier: 4,
+        leaguePosition: 2,
+        leaguePercentile: 94,
+      }),
     });
-    expect(Math.max(...top)).toBeGreaterThanOrEqual(4);
-  });
-
-  it("adjustTiers boundary: high-tier teams still spread within cap", () => {
-    let seenSpread = false;
-    for (let index = 0; index < 50; index += 1) {
-      const tiers = rollSponsorStarTiers({
-        seasonId: `season-adjust-${index}`,
-        teamId: "BOUNDARY",
-        commercialRating: 100,
-        standingRank: 1,
-      });
-      const unique = new Set(tiers).size;
-      expect(unique).toBeGreaterThan(1);
-      if (unique === 3) {
-        seenSpread = true;
-      }
-    }
-    expect(seenSpread).toBe(true);
+    expect(Math.min(...top.tiers)).toBeGreaterThanOrEqual(4);
   });
 });

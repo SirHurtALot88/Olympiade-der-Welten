@@ -50,7 +50,7 @@ describe("foundation transfermarkt ui contract", () => {
     expect(fileText).toContain("Deal-Desk");
     expect(fileText).toContain("Deal-Vorschau");
     expect(fileText).toContain("Aktueller Kader");
-    expect(fileText).toContain("Wishlist & Bedarf");
+    expect(fileText).toContain("Wishlist & Scouting");
     expect(fileText).toContain("Deal prüfen");
     expect(fileText).toContain("Auf Wishlist");
     expect(fileText).toContain("Beobachten");

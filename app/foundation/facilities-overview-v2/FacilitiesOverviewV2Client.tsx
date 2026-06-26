@@ -27,9 +27,9 @@ export default function FacilitiesOverviewV2Client({
     <div className="facilities-overview-v2-shell" data-testid="foundation-facilities-overview-v2" id="foundation-facilities-overview-v2">
       <header className="facilities-overview-v2-header">
         <div>
-          <span className="eyebrow">Facilities Overview V2</span>
+          <span className="eyebrow">Gebäude</span>
           <h2>{teamName}</h2>
-          <p className="muted">{teamCode} · Infrastruktur auf einen Blick</p>
+          <p className="home-v2-hero-meta-line">{teamCode}</p>
         </div>
         <div className="facilities-overview-v2-actions" />
       </header>

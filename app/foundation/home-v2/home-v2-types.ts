@@ -1,28 +1,24 @@
-import type { PlayerPotentialBand } from "@/lib/data/olyDataTypes";
-
 export type HomeV2TopPlayerCard = {
   playerId: string;
   name: string;
-  roleTag: string | null;
   portraitUrl: string | null;
   portraitInitials: string;
   playerOvr: number | null;
   playerPps: number | null;
   playerMvs: number | null;
-  ppPow: number | null;
-  ppSpe: number | null;
-  ppMen: number | null;
-  ppSoc: number | null;
+  pow: number | null;
+  spe: number | null;
+  men: number | null;
+  soc: number | null;
   contractLength: number | null;
   marketValue: number | null;
   highlight?: "top" | "prospect" | null;
-  topDisciplineId?: string | null;
-  topDisciplineLabel?: string | null;
-  topDisciplineTier?: string | null;
-  topDisciplineScore?: number | null;
-  potential?: number | null;
-  potentialBand?: PlayerPotentialBand | null;
+  caRating: number | null;
+  poRangeMin: number | null;
+  poRangeMax: number | null;
 };
+
+export const HOME_V2_TOP_PLAYER_COUNT = 6;
 
 export type HomeV2FacilitySnapshot = {
   facilityId: string;
