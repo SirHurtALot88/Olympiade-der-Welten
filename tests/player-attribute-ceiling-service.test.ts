@@ -3,9 +3,12 @@ import { describe, expect, it } from "vitest";
 import type { Player, PlayerPotentialRecord } from "@/lib/data/olyDataTypes";
 import { buildPlayerAxisStarProfile } from "@/lib/scouting/player-axis-star-rating";
 import {
-  buildHiddenAttributeCeilings,
+  buildHiddenAttributeCeilingsFromPotentialScore,
+  deriveAxisPoStarsFromAttributeCeilings,
   getAttributeGrowthMultiplier,
   getAttributeHeadroom,
+  getPerformanceHeadroomGrowthMultiplier,
+  mapNumericCeilingToAxisPoStars,
 } from "@/lib/scouting/player-attribute-ceiling-service";
 import { buildPlayerPotentialCeilingProfile } from "@/lib/scouting/player-potential-ceiling-service";
 import { buildPlayerPotentialRecord } from "@/lib/progression/player-potential-service";
@@ -84,24 +87,56 @@ describe("player attribute ceiling service", () => {
       currentStars,
       hiddenPotentialScore: record.hiddenPotentialScore,
     });
-    const attributeCeiling = buildHiddenAttributeCeilings({
+    const attributeCeiling = buildHiddenAttributeCeilingsFromPotentialScore({
       saveId: "save-kohan",
       player: kohan,
-      axisCeiling: ceiling,
+      currentStars,
+      hiddenPotentialScore: record.hiddenPotentialScore,
     });
+    const derivedAxis = deriveAxisPoStarsFromAttributeCeilings(attributeCeiling);
 
-    expect(ceiling.pow).toBeGreaterThan(ceiling.spe + 1);
-    expect(ceiling.soc).toBeGreaterThan(ceiling.spe);
+    expect(attributeCeiling.power!).toBeGreaterThan(attributeCeiling.speed! + 5);
     expect(attributeCeiling.power).toBeDefined();
     expect(attributeCeiling.speed).toBeDefined();
     expect(attributeCeiling.power!).not.toBe(attributeCeiling.speed!);
     expect(attributeCeiling.power!).toBeGreaterThanOrEqual(kohan.attributeSheetStats!.power!);
+    expect(ceiling.pow).toBeGreaterThanOrEqual(derivedAxis.pow);
+  });
+
+  it("derives axis PO stars from per-attribute ceilings", () => {
+    const attributeCeiling = {
+      power: 88,
+      health: 72,
+      stamina: 70,
+      speed: 55,
+      dexterity: 54,
+      awareness: 52,
+      intelligence: 60,
+      will: 58,
+      charisma: 50,
+      spirit: 48,
+      determination: 49,
+      torment: 80,
+    };
+    const axis = deriveAxisPoStarsFromAttributeCeilings(attributeCeiling);
+    expect(axis.pow).toBe(mapNumericCeilingToAxisPoStars(88));
+    expect(axis.spe).toBe(mapNumericCeilingToAxisPoStars(55));
   });
 
   it("caps attribute growth multiplier at 0.05 when at ceiling", () => {
     expect(getAttributeGrowthMultiplier("capped")).toBe(0.05);
     expect(getAttributeGrowthMultiplier("closing")).toBe(0.45);
     expect(getAttributeGrowthMultiplier("open")).toBe(1);
+  });
+
+  it("only soft-tapers performance growth near attribute ceiling", () => {
+    expect(getPerformanceHeadroomGrowthMultiplier(20)).toBe(1);
+    expect(getPerformanceHeadroomGrowthMultiplier(8)).toBe(1);
+    expect(getPerformanceHeadroomGrowthMultiplier(5)).toBe(1);
+    expect(getPerformanceHeadroomGrowthMultiplier(3)).toBeCloseTo(0.88, 2);
+    expect(getPerformanceHeadroomGrowthMultiplier(2)).toBeGreaterThan(0.72);
+    expect(getPerformanceHeadroomGrowthMultiplier(0)).toBeGreaterThan(0.5);
+    expect(getPerformanceHeadroomGrowthMultiplier(0)).toBeGreaterThan(getAttributeGrowthMultiplier("capped"));
   });
 
   it("detects capped headroom when current value is near ceiling", () => {

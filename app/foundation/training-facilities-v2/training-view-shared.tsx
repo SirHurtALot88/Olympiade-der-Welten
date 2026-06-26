@@ -371,7 +371,7 @@ export function TrainingPlayerLane({
                   <span>Training</span>
                   <strong>+{formatVeloNumber(row.organicForecast.trainingSetpoints, 1)}</strong>
                 </div>
-                <div>
+                <div title="Matchday-Leistung. Sanfter Taper erst nahe Attribut-Decke — nicht wie Training.">
                   <span>Performance</span>
                   <strong>+{formatVeloNumber(row.organicForecast.performanceSetpoints, 1)}</strong>
                 </div>

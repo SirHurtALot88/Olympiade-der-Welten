@@ -6,6 +6,7 @@ import type {
   PlayerPotentialSource,
 } from "@/lib/data/olyDataTypes";
 import { buildPlayerAxisStarProfile } from "@/lib/scouting/player-axis-star-rating";
+import { buildHiddenAttributeCeilingsFromPotentialScore } from "@/lib/scouting/player-attribute-ceiling-service";
 import {
   attachPotentialCeilingToRecord,
   applyAxisCeilingSeasonDrift,
@@ -784,8 +785,19 @@ export function applySeasonEndPotentialUpdate(input: {
     },
   };
 
-  const driftedCeiling = applyAxisCeilingSeasonDrift({
+  const currentAttributeCeiling =
+    input.record.hiddenAttributeCeiling ??
+    buildHiddenAttributeCeilingsFromPotentialScore({
+      saveId: input.saveId,
+      player: input.player,
+      currentStars,
+      hiddenPotentialScore: currentScore,
+    });
+
+  const drifted = applyAxisCeilingSeasonDrift({
     ceiling: currentCeiling,
+    attributeCeilings: currentAttributeCeiling,
+    currentStars,
     saveId: input.saveId,
     playerId: input.player.id,
     seasonId: input.seasonId,
@@ -800,7 +812,7 @@ export function applySeasonEndPotentialUpdate(input: {
       lastSeasonSnapshot: snapshot,
     },
     currentStars,
-    axisCeilingOverride: driftedCeiling,
+    attributeCeilingOverride: drifted.attributeCeilings,
   });
 }
 

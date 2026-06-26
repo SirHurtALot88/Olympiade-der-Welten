@@ -2,13 +2,13 @@ import { describe, expect, it } from "vitest";
 
 import type { Player } from "@/lib/data/olyDataTypes";
 import { buildPlayerAxisStarProfile } from "@/lib/scouting/player-axis-star-rating";
+import { buildPlayerPotentialRecord } from "@/lib/progression/player-potential-service";
 import {
   attachPotentialCeilingToRecord,
   buildPlayerPotentialCeilingProfile,
   buildPotentialGap,
   revealPotentialStars,
 } from "@/lib/scouting/player-potential-ceiling-service";
-import { buildPlayerPotentialRecord } from "@/lib/progression/player-potential-service";
 
 function player(partial: Partial<Player> & { id: string }): Player {
   return {
@@ -87,8 +87,12 @@ describe("player potential ceiling service", () => {
     const record = attachPotentialCeilingToRecord({
       record: { playerId: "p1", potentialBand: "medium", confidence: 0, source: "generated" },
       ceiling,
+      player: target,
+      saveId: "save-1",
+      currentStars: current,
     });
-    expect(record.hiddenPotentialCeilingByAxis?.pow).toBe(ceiling.pow);
+    expect(record.hiddenAttributeCeiling?.power).toBeDefined();
+    expect(record.hiddenPotentialCeilingByAxis?.pow).toBeGreaterThanOrEqual(current.pow);
     expect(revealPotentialStars({ ceiling, currentStars: current, scoutingLevel: 1 }).overallMin).toBeNull();
     expect(revealPotentialStars({ ceiling, currentStars: current, scoutingLevel: 3 }).overallMin).not.toBeNull();
   });

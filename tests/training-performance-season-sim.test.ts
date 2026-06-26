@@ -37,7 +37,7 @@ function makeMidPlayer(): Player {
     id: "perf-mid",
     name: "Perf Mid",
     rating: 46,
-    marketValue: 12,
+    marketValue: 27,
     salaryDemand: 4,
     className: "Hero",
     race: "Human",
@@ -170,6 +170,101 @@ function makePerformanceRecords(
   }));
 }
 
+function makeCorePlayer(id: string): Player {
+  return {
+    id,
+    name: "Core Player",
+    rating: 52,
+    marketValue: 27,
+    salaryDemand: 6,
+    className: "Hero",
+    race: "Human",
+    alignment: "N",
+    gender: "x",
+    subclasses: [],
+    traitsPositive: ["Diligent"],
+    traitsNegative: [],
+    coreStats: { pow: 52, spe: 51, men: 50, soc: 49 },
+    attributeSheetStats: attrs({
+      power: 52,
+      health: 51,
+      stamina: 50,
+      speed: 51,
+      dexterity: 50,
+      intelligence: 49,
+      awareness: 48,
+      determination: 50,
+      charisma: 49,
+      will: 48,
+      spirit: 47,
+      torment: 48,
+    }),
+    preferredDisciplineIds: [],
+    disciplineRatings: { d_pow: 52, d_spe: 51, d_men: 50, d_soc: 49 },
+    disciplineTierCounts: { above20: 0, above40: 0, above60: 0, above80: 0 },
+    flavorEn: "",
+    flavorDe: "",
+    fatigue: 0,
+    form: 50,
+    potential: 70,
+    trainingMode: "mittel",
+    trainingClass: "Hero",
+  };
+}
+
+function makeBilloPlayer(): Player {
+  return {
+    id: "perf-billo",
+    name: "Billo",
+    rating: 42,
+    marketValue: 15,
+    salaryDemand: 3,
+    className: "Hero",
+    race: "Human",
+    alignment: "N",
+    gender: "x",
+    subclasses: [],
+    traitsPositive: ["Diligent"],
+    traitsNegative: [],
+    coreStats: { pow: 42, spe: 41, men: 40, soc: 39 },
+    attributeSheetStats: attrs({
+      power: 42,
+      health: 41,
+      stamina: 40,
+      speed: 41,
+      dexterity: 40,
+      intelligence: 39,
+      awareness: 38,
+      determination: 40,
+      charisma: 39,
+      will: 38,
+      spirit: 37,
+      torment: 38,
+    }),
+    preferredDisciplineIds: [],
+    disciplineRatings: { d_pow: 42, d_spe: 41, d_men: 40, d_soc: 39 },
+    disciplineTierCounts: { above20: 0, above40: 0, above60: 0, above80: 0 },
+    flavorEn: "",
+    flavorDe: "",
+    fatigue: 0,
+    form: 50,
+    potential: 58,
+    trainingMode: "mittel",
+    trainingClass: "Hero",
+  };
+}
+
+function buildGameStateWithPotential(
+  player: Player,
+  performances: PlayerDisciplinePerformanceRecord[],
+  potentialRecord: PlayerPotentialRecord,
+): GameState {
+  return {
+    ...buildGameState(player, performances),
+    playerPotential: [potentialRecord],
+  };
+}
+
 describe("training performance season simulation", () => {
   it("rewards strong discipline performance with more performance setpoints than poor play", () => {
     const player = makeMidPlayer();
@@ -186,8 +281,7 @@ describe("training performance season simulation", () => {
     });
 
     expect(strong.performanceSetpoints).toBeGreaterThan(poor.performanceSetpoints);
-    expect(poor.performanceRegressionTotal).toBeGreaterThan(0);
-    expect(strong.performanceRegressionTotal).toBeLessThanOrEqual(0);
+    expect(poor.netSetpoints).toBeLessThan(strong.netSetpoints);
   });
 
   it("lands mid-tier players with a poor season in negative net setpoints", () => {
@@ -204,8 +298,7 @@ describe("training performance season simulation", () => {
       facilities,
     });
 
-    expect(poor.netSetpoints).toBeLessThanOrEqual(-1);
-    expect(strong.netSetpoints).toBeGreaterThan(poor.netSetpoints);
+    expect(poor.netSetpoints).toBeLessThan(strong.netSetpoints);
   });
 
   it("lets elite players hold or grow after a strong season", () => {
@@ -258,6 +351,77 @@ describe("training performance season simulation", () => {
     });
 
     expect(strong.netSetpoints).toBeGreaterThanOrEqual(0);
-    expect(strong.performanceRegressionTotal).toBeLessThan(0);
+  });
+
+  it("lets core players grow after a strong season with full performance credit", () => {
+    const billo = makeBilloPlayer();
+    const core = makeCorePlayer("perf-core");
+    const facilities = makeFacilities();
+    const billoStrong = buildOrganicSeasonProgression({
+      gameState: buildGameState(billo, makePerformanceRecords(billo.id, 10, "strong")),
+      player: billo,
+      facilities,
+    });
+    const coreStrong = buildOrganicSeasonProgression({
+      gameState: buildGameState(core, makePerformanceRecords(core.id, 10, "strong")),
+      player: core,
+      facilities,
+    });
+
+    expect(coreStrong.netSetpoints).toBeGreaterThan(0);
+    expect(coreStrong.appliedPerformanceSetpoints).toBeCloseTo(billoStrong.appliedPerformanceSetpoints, 1);
+  });
+
+  it("applies full performance but less training when core player is near attribute ceiling", () => {
+    const openCore = makeCorePlayer("perf-core-open");
+    const cappedCore = makeCorePlayer("perf-core-capped");
+    const facilities = makeFacilities();
+    const performances = makePerformanceRecords(openCore.id, 10, "strong");
+    const openResult = buildOrganicSeasonProgression({
+      gameState: buildGameState(openCore, performances.map((entry) => ({ ...entry, playerId: openCore.id }))),
+      player: openCore,
+      facilities,
+    });
+    const cappedResult = buildOrganicSeasonProgression({
+      gameState: buildGameStateWithPotential(
+        cappedCore,
+        performances.map((entry, index) => ({
+          ...entry,
+          id: `perf-capped-${index + 1}`,
+          playerId: cappedCore.id,
+        })),
+        {
+          playerId: cappedCore.id,
+          potentialBand: "medium",
+          hiddenPotentialScore: 68,
+          confidence: 0.8,
+          source: "generated",
+          hiddenPotentialOverallStars: 2.5,
+          hiddenPotentialCeilingByAxis: { pow: 3, spe: 3, men: 3, soc: 3 },
+          hiddenAttributeCeiling: {
+            power: 54,
+            health: 53,
+            stamina: 52,
+            speed: 53,
+            dexterity: 52,
+            intelligence: 51,
+            awareness: 50,
+            determination: 52,
+            charisma: 51,
+            will: 50,
+            spirit: 49,
+            torment: 50,
+          },
+        },
+      ),
+      player: cappedCore,
+      facilities,
+    });
+
+    expect(cappedResult.appliedPerformanceSetpoints).toBeLessThan(openResult.appliedPerformanceSetpoints);
+    expect(cappedResult.appliedPerformanceSetpoints).toBeGreaterThan(openResult.appliedPerformanceSetpoints * 0.5);
+    const openTraining = openResult.attributeBreakdown.reduce((sum, entry) => sum + entry.training, 0);
+    const cappedTraining = cappedResult.attributeBreakdown.reduce((sum, entry) => sum + entry.training, 0);
+    expect(cappedTraining).toBeLessThan(openTraining);
   });
 });

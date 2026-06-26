@@ -1,6 +1,11 @@
-import type { Player, PlayerPotentialRecord } from "@/lib/data/olyDataTypes";
+import type { Player, PlayerGeneratorAttributeName, PlayerPotentialRecord } from "@/lib/data/olyDataTypes";
 import type { PlayerAxisKey, PlayerAxisStarProfile } from "@/lib/scouting/player-axis-star-rating";
-import { buildHiddenAttributeCeilings } from "@/lib/scouting/player-attribute-ceiling-service";
+import {
+  applyAttributeCeilingSeasonDrift,
+  buildHiddenAttributeCeilings,
+  buildHiddenAttributeCeilingsFromPotentialScore,
+  derivePlayerPotentialCeilingProfileFromAttributeCeilings,
+} from "@/lib/scouting/player-attribute-ceiling-service";
 
 export type PlayerPotentialCeilingProfile = {
   pow: number;
@@ -137,41 +142,19 @@ export function buildPlayerPotentialCeilingProfile(input: {
   hiddenPotentialScore?: number | null;
   existing?: PlayerPotentialRecord | null;
 }): PlayerPotentialCeilingProfile {
-  const hiddenPotentialScore = clamp(
-    input.hiddenPotentialScore ??
+  const attributeCeilings = buildHiddenAttributeCeilingsFromPotentialScore({
+    saveId: input.saveId,
+    player: input.player,
+    currentStars: input.currentStars,
+    hiddenPotentialScore:
+      input.hiddenPotentialScore ??
       input.existing?.hiddenPotentialScore ??
-      getPlayerSeedValue(`${input.saveId}:${input.player.id}:potential-v3`) * 64 +
-        35,
-    35,
-    99,
-  );
-
-  const rawValues = AXIS_KEYS.map((axis) => ({
-    axis,
-    value: getAxisRawValue(input.player, axis) ?? 0,
-  }));
-  const maxRaw = Math.max(...rawValues.map((entry) => entry.value), 0);
-  const traitModifier = getTalentTraitCeilingModifier(input.player);
-
-  const ceiling = {} as Record<PlayerAxisKey, number>;
-  for (const axis of AXIS_KEYS) {
-    const axisSeed = getPlayerSeedValue(`${input.saveId}:${input.player.id}:${axis}:ceiling-v2`);
-    const rawValue = getAxisRawValue(input.player, axis) ?? 0;
-    ceiling[axis] = deriveAxisCeiling({
-      axis,
-      currentStars: input.currentStars[axis],
-      hiddenPotentialScore,
-      axisSeed,
-      isStrongestRawAxis: maxRaw > 0 && rawValue >= maxRaw - 0.01,
-      classAffinity: getClassAxisAffinity(input.player.className, axis),
-      traitModifier,
-    });
-  }
-
-  return {
-    ...ceiling,
-    overall: computeOverallFromAxisStars(ceiling),
-  };
+      null,
+  });
+  return derivePlayerPotentialCeilingProfileFromAttributeCeilings({
+    attributeCeilings,
+    currentStars: input.currentStars,
+  });
 }
 
 export function buildPotentialGap(input: {
@@ -252,28 +235,50 @@ export function revealPotentialStars(input: {
 
 export function attachPotentialCeilingToRecord(input: {
   record: PlayerPotentialRecord;
-  ceiling: PlayerPotentialCeilingProfile;
+  ceiling?: PlayerPotentialCeilingProfile;
   player?: Player;
   saveId?: string;
+  currentStars?: PlayerAxisStarProfile;
+  attributeCeiling?: Partial<Record<PlayerGeneratorAttributeName, number>>;
 }): PlayerPotentialRecord {
   const attributeCeiling =
-    input.player && input.saveId
-      ? buildHiddenAttributeCeilings({
+    input.attributeCeiling ??
+    (input.player && input.saveId && input.currentStars
+      ? buildHiddenAttributeCeilingsFromPotentialScore({
           saveId: input.saveId,
           player: input.player,
-          axisCeiling: input.ceiling,
+          currentStars: input.currentStars,
+          hiddenPotentialScore: input.record.hiddenPotentialScore,
         })
-      : input.record.hiddenAttributeCeiling;
+      : input.player && input.saveId && input.ceiling
+        ? buildHiddenAttributeCeilings({
+            saveId: input.saveId,
+            player: input.player,
+            axisCeiling: input.ceiling,
+          })
+        : input.record.hiddenAttributeCeiling);
+
+  const ceiling =
+    attributeCeiling && input.currentStars
+      ? derivePlayerPotentialCeilingProfileFromAttributeCeilings({
+          attributeCeilings: attributeCeiling,
+          currentStars: input.currentStars,
+        })
+      : input.ceiling ?? null;
+
+  if (!ceiling || !attributeCeiling) {
+    return input.record;
+  }
 
   return {
     ...input.record,
     hiddenPotentialCeilingByAxis: {
-      pow: input.ceiling.pow,
-      spe: input.ceiling.spe,
-      men: input.ceiling.men,
-      soc: input.ceiling.soc,
+      pow: ceiling.pow,
+      spe: ceiling.spe,
+      men: ceiling.men,
+      soc: ceiling.soc,
     },
-    hiddenPotentialOverallStars: input.ceiling.overall,
+    hiddenPotentialOverallStars: ceiling.overall,
     hiddenAttributeCeiling: attributeCeiling,
   };
 }
@@ -284,30 +289,61 @@ export function buildPotentialRecordWithCeilings(input: {
   record: PlayerPotentialRecord;
   currentStars: PlayerAxisStarProfile;
   axisCeilingOverride?: PlayerPotentialCeilingProfile | null;
+  attributeCeilingOverride?: Partial<Record<PlayerGeneratorAttributeName, number>> | null;
 }): PlayerPotentialRecord {
-  const ceiling =
-    input.axisCeilingOverride ??
-    buildPlayerPotentialCeilingProfile({
+  const attributeCeiling =
+    input.attributeCeilingOverride ??
+    buildHiddenAttributeCeilingsFromPotentialScore({
       saveId: input.saveId,
       player: input.player,
       currentStars: input.currentStars,
       hiddenPotentialScore: input.record.hiddenPotentialScore,
+    });
+  const ceiling =
+    input.axisCeilingOverride ??
+    derivePlayerPotentialCeilingProfileFromAttributeCeilings({
+      attributeCeilings: attributeCeiling,
+      currentStars: input.currentStars,
     });
   return attachPotentialCeilingToRecord({
     record: input.record,
     ceiling,
     player: input.player,
     saveId: input.saveId,
+    currentStars: input.currentStars,
+    attributeCeiling,
   });
 }
 
 export function applyAxisCeilingSeasonDrift(input: {
   ceiling: PlayerPotentialCeilingProfile;
+  attributeCeilings?: Partial<Record<PlayerGeneratorAttributeName, number>> | null;
+  currentStars: PlayerAxisStarProfile;
   saveId: string;
   playerId: string;
   seasonId: string;
   growthOutlook: "breakout" | "growth" | "stable" | "stagnation" | "regression_risk";
-}): PlayerPotentialCeilingProfile {
+}): {
+  ceiling: PlayerPotentialCeilingProfile;
+  attributeCeilings: Partial<Record<PlayerGeneratorAttributeName, number>>;
+} {
+  if (input.attributeCeilings && Object.keys(input.attributeCeilings).length > 0) {
+    const driftedAttributes = applyAttributeCeilingSeasonDrift({
+      attributeCeilings: input.attributeCeilings,
+      saveId: input.saveId,
+      playerId: input.playerId,
+      seasonId: input.seasonId,
+      growthOutlook: input.growthOutlook,
+    });
+    return {
+      attributeCeilings: driftedAttributes,
+      ceiling: derivePlayerPotentialCeilingProfileFromAttributeCeilings({
+        attributeCeilings: driftedAttributes,
+        currentStars: input.currentStars,
+      }),
+    };
+  }
+
   const drifted = {} as Record<PlayerAxisKey, number>;
   for (const axis of AXIS_KEYS) {
     const seed = getPlayerSeedValue(`${input.saveId}:${input.playerId}:${input.seasonId}:${axis}:axis-drift-v1`);
@@ -318,8 +354,12 @@ export function applyAxisCeilingSeasonDrift(input: {
     else if (input.growthOutlook === "regression_risk") delta = Math.min(delta, -0.5);
     drifted[axis] = roundHalfStar(clamp(input.ceiling[axis] + delta, 0.5, 5));
   }
-  return {
+  const legacyCeiling = {
     ...drifted,
     overall: computeOverallFromAxisStars(drifted),
+  };
+  return {
+    ceiling: legacyCeiling,
+    attributeCeilings: {},
   };
 }

@@ -778,6 +778,7 @@ export type Player = {
     marketValuePressureTotal: number;
     trainingSetpoints: number;
     performanceSetpoints: number;
+    appliedPerformanceSetpoints?: number;
     netSetpoints: number;
     fatigueLoad: number;
     topGains: Array<{ attribute: PlayerGeneratorAttributeName; delta: number }>;
@@ -1126,6 +1127,7 @@ export type SponsorCommercialRating = {
   inputs: {
     lastSeasonRank: number | null;
     avgWeightedRank: number | null;
+    qualityRank: number | null;
     marketValuePercentile: number;
     axisPercentile: number;
     depthScore: number;

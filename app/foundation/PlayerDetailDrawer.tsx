@@ -1668,7 +1668,7 @@ export default function PlayerDetailDrawer({
                       <strong>Weak</strong>
                       <small>{developmentLevelup?.affinity.weakAttribute ?? "Profil offen"}</small>
                     </span>
-                    <span title="Einsatz und gute Disziplin-Performance zahlen zusaetzliche Setpoints in die Entwicklung ein.">
+                    <span title="Matchday-Leistung zahlt Setpoints ein. Nahe der Attribut-Decke nur leicht gedrosselt, deutlich milder als Training.">
                       <strong>Performance +{formatValue(data.organicProgression.performanceSetpoints, 1)}</strong>
                       <small>Matchday-Anteil nach dieser Season</small>
                     </span>

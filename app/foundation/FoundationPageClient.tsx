@@ -15818,7 +15818,7 @@ export default function FoundationPageClient({
               facilityModifierPct: xpSpendPlayer.organicProgression.facilityModifierPct,
               marketValuePressureTotal: xpSpendPlayer.organicProgression.marketValuePressureTotal,
               trainingSetpoints: xpSpendPlayer.organicProgression.trainingSetpoints,
-              performanceSetpoints: xpSpendPlayer.organicProgression.performanceSetpoints,
+              performanceSetpoints: xpSpendPlayer.organicProgression.appliedPerformanceSetpoints,
               netSetpoints: xpSpendPlayer.organicProgression.netSetpoints,
               fatigueLoad: xpSpendPlayer.organicProgression.fatigueLoad,
               topGains: xpSpendPlayer.organicProgression.attributeBreakdown

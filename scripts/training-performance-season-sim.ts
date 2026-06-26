@@ -187,35 +187,73 @@ function makePeerPool(): Player[] {
 
 const PROFILES: SimProfile[] = [
   {
-    id: "mid",
-    label: "Mitte",
+    id: "cheap",
+    label: "Billo",
     player: makePlayer({
-      id: "sim-mid",
-      label: "Liga Mitte",
-      rating: 46,
-      marketValue: 12,
+      id: "sim-cheap",
+      label: "Billo",
+      rating: 42,
+      marketValue: 15,
       className: "Hero",
       trainingClass: "Hero",
       trainingMode: "mittel",
-      coreStats: { pow: 46, spe: 45, men: 44, soc: 43 },
+      coreStats: { pow: 42, spe: 41, men: 40, soc: 39 },
       attributeSheetStats: attrs({
-        power: 46,
-        health: 45,
-        stamina: 44,
-        speed: 45,
-        dexterity: 44,
-        intelligence: 43,
-        awareness: 42,
-        determination: 44,
-        charisma: 43,
-        will: 42,
-        spirit: 41,
-        torment: 42,
+        power: 42,
+        health: 41,
+        stamina: 40,
+        speed: 41,
+        dexterity: 40,
+        intelligence: 39,
+        awareness: 38,
+        determination: 40,
+        charisma: 39,
+        will: 38,
+        spirit: 37,
+        torment: 38,
       }),
-      disciplineRatings: { d_pow: 46, d_spe: 45, d_men: 44, d_soc: 43 },
+      disciplineRatings: { d_pow: 42, d_spe: 41, d_men: 40, d_soc: 39 },
     }),
     potentialRecord: {
-      playerId: "sim-mid",
+      playerId: "sim-cheap",
+      potentialBand: "low",
+      hiddenPotentialScore: 58,
+      confidence: 0,
+      source: "generated",
+      hiddenPotentialOverallStars: 2,
+      hiddenPotentialCeilingByAxis: { pow: 3, spe: 3, men: 3, soc: 3 },
+    },
+  },
+  {
+    id: "core",
+    label: "Core",
+    player: makePlayer({
+      id: "sim-core",
+      label: "Core Spieler",
+      rating: 52,
+      marketValue: 27,
+      className: "Hero",
+      trainingClass: "Hero",
+      trainingMode: "mittel",
+      coreStats: { pow: 52, spe: 51, men: 50, soc: 49 },
+      attributeSheetStats: attrs({
+        power: 52,
+        health: 51,
+        stamina: 50,
+        speed: 51,
+        dexterity: 50,
+        intelligence: 49,
+        awareness: 48,
+        determination: 50,
+        charisma: 49,
+        will: 48,
+        spirit: 47,
+        torment: 48,
+      }),
+      disciplineRatings: { d_pow: 52, d_spe: 51, d_men: 50, d_soc: 49 },
+    }),
+    potentialRecord: {
+      playerId: "sim-core",
       potentialBand: "medium",
       hiddenPotentialScore: 72,
       confidence: 0,
@@ -225,11 +263,62 @@ const PROFILES: SimProfile[] = [
     },
   },
   {
-    id: "top",
-    label: "Top",
+    id: "core-capped",
+    label: "CoreCap",
     player: makePlayer({
-      id: "sim-top",
-      label: "Elite Striker",
+      id: "sim-core-capped",
+      label: "Core capped",
+      rating: 52,
+      marketValue: 27,
+      className: "Hero",
+      trainingClass: "Hero",
+      trainingMode: "mittel",
+      coreStats: { pow: 52, spe: 51, men: 50, soc: 49 },
+      attributeSheetStats: attrs({
+        power: 52,
+        health: 51,
+        stamina: 50,
+        speed: 51,
+        dexterity: 50,
+        intelligence: 49,
+        awareness: 48,
+        determination: 50,
+        charisma: 49,
+        will: 48,
+        spirit: 47,
+        torment: 48,
+      }),
+      disciplineRatings: { d_pow: 52, d_spe: 51, d_men: 50, d_soc: 49 },
+    }),
+    potentialRecord: {
+      playerId: "sim-core-capped",
+      potentialBand: "medium",
+      hiddenPotentialScore: 68,
+      confidence: 0.8,
+      source: "generated",
+      hiddenPotentialOverallStars: 2.5,
+      hiddenPotentialCeilingByAxis: { pow: 3, spe: 3, men: 3, soc: 3 },
+      hiddenAttributeCeiling: {
+        power: 54,
+        health: 53,
+        stamina: 52,
+        speed: 53,
+        dexterity: 52,
+        intelligence: 51,
+        awareness: 50,
+        determination: 52,
+        charisma: 51,
+        will: 50,
+        spirit: 49,
+        torment: 50,
+      },
+    },
+  },
+  {
+    label: "Star",
+    player: makePlayer({
+      id: "sim-star",
+      label: "Star Striker",
       rating: 78,
       marketValue: 55,
       className: "Berserker",
@@ -253,7 +342,7 @@ const PROFILES: SimProfile[] = [
       disciplineRatings: { d_pow: 78, d_spe: 70, d_men: 58, d_soc: 48 },
     }),
     potentialRecord: {
-      playerId: "sim-top",
+      playerId: "sim-star",
       potentialBand: "elite",
       hiddenPotentialScore: 95,
       confidence: 0,
@@ -372,9 +461,14 @@ type SimRow = {
   appearances: number;
   trainingSetpoints: number;
   performanceSetpoints: number;
-  performanceRegressionTotal: number;
+  appliedPerformanceSetpoints: number;
   trainingDeltaSum: number;
-  regressionDeltaSum: number;
+  performanceDeltaSum: number;
+  regressionFlatTotal: number;
+  regressionMarketValueTotal: number;
+  marktwertBase: number;
+  regressionCombinedTotal: number;
+  marketValuePressureRatePct: number;
   netSetpoints: number;
   topGain: string;
   topLoss: string;
@@ -396,9 +490,14 @@ function runSimulation() {
         appearances: scenario.appearances,
         trainingSetpoints: result.trainingSetpoints,
         performanceSetpoints: result.performanceSetpoints,
-        performanceRegressionTotal: result.performanceRegressionTotal,
+        appliedPerformanceSetpoints: result.appliedPerformanceSetpoints,
         trainingDeltaSum: roundValue(result.attributeBreakdown.reduce((sum, entry) => sum + entry.training, 0), 2),
-        regressionDeltaSum: roundValue(result.attributeBreakdown.reduce((sum, entry) => sum + entry.regression, 0), 2),
+        performanceDeltaSum: result.appliedPerformanceSetpoints,
+        regressionFlatTotal: result.regressionBreakdown.baseFlatTotal,
+        regressionMarketValueTotal: result.regressionBreakdown.marketValueTotal,
+        marktwertBase: result.regressionBreakdown.marktwertBase,
+        regressionCombinedTotal: result.regressionBreakdown.combinedTotal,
+        marketValuePressureRatePct: result.regressionBreakdown.marketValuePressureRatePct,
         netSetpoints: result.netSetpoints,
         topGain: formatTopDelta(result.attributeBreakdown, "gain"),
         topLoss: formatTopDelta(result.attributeBreakdown, "loss"),
@@ -414,16 +513,18 @@ function printTable(rows: SimRow[]) {
     "Profil".padEnd(6),
     "Szenario".padEnd(16),
     "Eins".padStart(4),
-    "trainPts".padStart(8),
-    "perfPts".padStart(8),
-    "perfReg".padStart(8),
-    "regSum".padStart(8),
+    "MW".padStart(5),
+    "trainΔ".padStart(7),
+    "perfΔ".padStart(7),
+    "regFlat".padStart(7),
+    "regMW".padStart(7),
     "netPts".padStart(8),
     "Top Gain",
     "Top Loss",
   ].join(" | ");
 
   console.log(`\nPerformance-Saison-Simulation (TC L${TRAINING_CENTER_LEVEL}, ${MATCHDAY_COUNT} Spieltage)\n`);
+  console.log("Net = trainΔ + perfΔ + regFlat + regMW  |  regFlat = −0,25/Attr (−3,00)  |  regMW = −MW × 0,6 % × 12 Attr (kein Relief)\n");
   console.log(header);
   console.log("-".repeat(header.length));
 
@@ -433,15 +534,21 @@ function printTable(rows: SimRow[]) {
         row.profile.padEnd(6),
         row.scenario.padEnd(16),
         String(row.appearances).padStart(4),
-        row.trainingSetpoints.toFixed(2).padStart(8),
-        row.performanceSetpoints.toFixed(2).padStart(8),
-        formatSigned(row.performanceRegressionTotal).padStart(8),
-        formatSigned(row.regressionDeltaSum).padStart(8),
+        row.marktwertBase.toFixed(0).padStart(5),
+        formatSigned(row.trainingDeltaSum).padStart(7),
+        formatSigned(row.performanceDeltaSum).padStart(7),
+        formatSigned(row.regressionFlatTotal).padStart(7),
+        formatSigned(row.regressionMarketValueTotal).padStart(7),
         formatSigned(row.netSetpoints).padStart(8),
         row.topGain,
         row.topLoss,
       ].join(" | "),
     );
+  }
+
+  const sample = rows.find((row) => row.appearances > 0);
+  if (sample) {
+    console.log(`\nFormel: regMW/Attr = −Marktwert × 0,006  |  regMW gesamt = regMW/Attr × 12  |  MW-Rate: ${sample.marketValuePressureRatePct.toFixed(1)} %/Attr`);
   }
 }
 

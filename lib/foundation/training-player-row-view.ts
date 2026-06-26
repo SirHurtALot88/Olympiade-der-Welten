@@ -29,6 +29,7 @@ type TrainingForecastRowInput = {
     potentialTrainingMultiplier: number;
     trainingSetpoints: number;
     performanceSetpoints: number;
+    appliedPerformanceSetpoints: number;
     netSetpoints: number;
     fatigueLoad: number;
     traitModifierPct: number;
@@ -137,7 +138,7 @@ export function buildTrainingPlayerRowView(
       potentialRating: row.organicProgression.potentialRating,
       potentialTrainingMultiplier: row.organicProgression.potentialTrainingMultiplier,
       trainingSetpoints: row.organicProgression.trainingSetpoints,
-      performanceSetpoints: row.organicProgression.performanceSetpoints,
+      performanceSetpoints: row.organicProgression.appliedPerformanceSetpoints,
       netSetpoints: row.organicProgression.netSetpoints,
       fatigueLoad: row.organicProgression.fatigueLoad,
       topGains: attributeForecast

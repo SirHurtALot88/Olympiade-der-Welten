@@ -142,8 +142,10 @@ describe("organic season progression", () => {
     const cheapResult = buildOrganicSeasonProgression({ gameState: gameState(cheap), player: cheap });
     const starResult = buildOrganicSeasonProgression({ gameState: gameState(star), player: star });
 
-    expect(cheapResult.marketValuePressureTotal).toBe(0.4);
-    expect(starResult.marketValuePressureTotal).toBe(2);
+    expect(cheapResult.marketValuePressureTotal).toBe(1.44);
+    expect(starResult.marketValuePressureTotal).toBe(7.2);
+    expect(cheapResult.marketValuePressurePerAttribute).toBe(0.12);
+    expect(starResult.marketValuePressurePerAttribute).toBe(0.6);
     expect(starResult.marketValuePressurePerAttribute).toBeGreaterThan(cheapResult.marketValuePressurePerAttribute);
     expect(starResult.netSetpoints).toBeLessThan(cheapResult.netSetpoints);
   });
@@ -213,17 +215,43 @@ describe("organic season progression", () => {
     expect(power.performance).toBeGreaterThan(intelligence.performance);
   });
 
-  it("adds performance regression pressure after a weak season", () => {
+  it("reduces net setpoints after a weak season through lower performance gains", () => {
     const sourcePlayer = player({ rating: 46, marketValue: 12 });
-    const baselineState = gameState(sourcePlayer);
+    const averageState = gameState(sourcePlayer);
     const poorState = gameState(sourcePlayer);
+    addStrongPowerPerformance(averageState, sourcePlayer.id);
     addPoorSeasonPerformances(poorState, sourcePlayer.id);
+    averageState.seasonState.matchdayResults = Array.from({ length: 10 }, (_, index) => ({
+      id: `avg-result-${index + 1}`,
+      seasonId: "season-1",
+      matchdayId: `avg-md-${index + 1}`,
+      status: "preview_applied" as const,
+    }));
+    averageState.seasonState.playerDisciplinePerformances = Array.from({ length: 10 }, (_, index) => ({
+      id: `avg-perf-${index + 1}`,
+      matchdayResultId: `avg-result-${index + 1}`,
+      teamId: "team-1",
+      playerId: sourcePlayer.id,
+      activePlayerId: null,
+      disciplineId: "gewichtheben",
+      disciplineSide: "d1",
+      slotIndex: 0,
+      baseValue: 70,
+      finalPlayerScore: 95,
+      scoreContribution: 28,
+      rankInTeam: 1,
+      rankInDiscipline: 1,
+      isTop10: true,
+      isMvpCandidate: true,
+      storyWeight: null,
+      createdAt: "2026-06-11T00:00:00.000Z",
+    }));
 
-    const baseline = buildOrganicSeasonProgression({ gameState: baselineState, player: sourcePlayer });
+    const average = buildOrganicSeasonProgression({ gameState: averageState, player: sourcePlayer });
     const poor = buildOrganicSeasonProgression({ gameState: poorState, player: sourcePlayer });
 
-    expect(poor.performanceRegressionTotal).toBeGreaterThan(baseline.performanceRegressionTotal);
-    expect(poor.netSetpoints).toBeLessThan(baseline.netSetpoints);
+    expect(poor.performanceSetpoints).toBeLessThan(average.performanceSetpoints);
+    expect(poor.netSetpoints).toBeLessThan(average.netSetpoints);
   });
 
   it("lets signature attributes gain a little faster in organic progression", () => {
@@ -241,7 +269,7 @@ describe("organic season progression", () => {
 
     expect(signaturePower.affinity).toBe("signature");
     expect(neutralPower.affinity).toBe("neutral");
-    expect(signaturePower.growthMultiplier).toBeGreaterThan(1);
+    expect(signaturePower.trainingGrowthMultiplier).toBeGreaterThan(1);
     expect(signaturePower.performance).toBeGreaterThan(neutralPower.performance);
     expect(signaturePower.training).toBeGreaterThan(neutralPower.training);
   });
@@ -277,7 +305,7 @@ describe("organic season progression", () => {
     expect(weakResult.performanceSetpoints).toBe(neutralResult.performanceSetpoints);
     expect(weakPower.affinity).toBe("weak");
     expect(neutralPower.affinity).toBe("neutral");
-    expect(weakPower.growthMultiplier).toBeLessThan(1);
+    expect(weakPower.trainingGrowthMultiplier).toBeLessThan(1);
     expect(weakPower.performance).toBeLessThan(neutralPower.performance);
   });
 
@@ -386,7 +414,102 @@ describe("organic season progression", () => {
     const power = result.attributeBreakdown.find((entry) => entry.attribute === "power")!;
     const determination = result.attributeBreakdown.find((entry) => entry.attribute === "determination")!;
 
-    expect(power.growthMultiplier).toBeLessThanOrEqual(0.1);
-    expect(determination.growthMultiplier).toBeGreaterThan(power.growthMultiplier);
+    expect(power.trainingGrowthMultiplier).toBeLessThanOrEqual(0.1);
+    expect(determination.trainingGrowthMultiplier).toBeGreaterThan(power.trainingGrowthMultiplier);
+  });
+
+  it("does not reduce performance setpoints near hidden attribute ceiling", () => {
+    const baseStats: PlayerGeneratorAttributes = {
+      power: 52,
+      health: 51,
+      stamina: 50,
+      speed: 51,
+      dexterity: 50,
+      intelligence: 49,
+      awareness: 48,
+      determination: 50,
+      charisma: 49,
+      will: 48,
+      spirit: 47,
+      torment: 48,
+    };
+    const openPlayer = player({
+      id: "open-perf",
+      rating: 52,
+      marketValue: 27,
+      attributeSheetStats: baseStats,
+    });
+    const cappedPlayer = player({
+      id: "capped-perf",
+      rating: 52,
+      marketValue: 27,
+      attributeSheetStats: baseStats,
+    });
+    const performanceRecords = Array.from({ length: 10 }, (_, index) => ({
+      id: `cap-perf-${index + 1}`,
+      matchdayResultId: `cap-result-${index + 1}`,
+      teamId: "team-1",
+      playerId: openPlayer.id,
+      activePlayerId: null,
+      disciplineId: "gewichtheben",
+      disciplineSide: "d1" as const,
+      slotIndex: 0,
+      baseValue: 88,
+      finalPlayerScore: 92,
+      scoreContribution: 26,
+      rankInTeam: 1,
+      rankInDiscipline: 1,
+      isTop10: true,
+      isMvpCandidate: true,
+      storyWeight: null,
+      createdAt: "2026-06-11T00:00:00.000Z",
+    }));
+
+    const openState = gameState(openPlayer);
+    openState.seasonState.playerDisciplinePerformances = performanceRecords.map((entry) => ({
+      ...entry,
+      playerId: openPlayer.id,
+    }));
+    const cappedState = gameState(cappedPlayer);
+    cappedState.seasonState.playerDisciplinePerformances = performanceRecords.map((entry) => ({
+      ...entry,
+      id: entry.id.replace("cap", "capped"),
+      playerId: cappedPlayer.id,
+    }));
+    cappedState.playerPotential = [
+      {
+        playerId: cappedPlayer.id,
+        potentialBand: "medium",
+        hiddenPotentialScore: 68,
+        confidence: 0.8,
+        source: "generated",
+        hiddenPotentialOverallStars: 2.5,
+        hiddenPotentialCeilingByAxis: { pow: 3, spe: 3, men: 3, soc: 3 },
+        hiddenAttributeCeiling: {
+          power: 54,
+          health: 53,
+          stamina: 52,
+          speed: 53,
+          dexterity: 52,
+          intelligence: 51,
+          awareness: 50,
+          determination: 52,
+          charisma: 51,
+          will: 50,
+          spirit: 49,
+          torment: 50,
+        },
+      },
+    ];
+
+    const openResult = buildOrganicSeasonProgression({ gameState: openState, player: openPlayer });
+    const cappedResult = buildOrganicSeasonProgression({ gameState: cappedState, player: cappedPlayer });
+
+    expect(cappedResult.performanceSetpoints).toBeCloseTo(openResult.performanceSetpoints, 1);
+    expect(cappedResult.appliedPerformanceSetpoints).toBeLessThan(openResult.appliedPerformanceSetpoints);
+    expect(cappedResult.appliedPerformanceSetpoints).toBeGreaterThan(openResult.appliedPerformanceSetpoints * 0.5);
+    const openTrainingApplied = openResult.attributeBreakdown.reduce((sum, entry) => sum + entry.training, 0);
+    const cappedTrainingApplied = cappedResult.attributeBreakdown.reduce((sum, entry) => sum + entry.training, 0);
+    expect(cappedTrainingApplied).toBeLessThan(openTrainingApplied);
   });
 });

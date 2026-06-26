@@ -32,7 +32,8 @@ describe("buildTrainingPlayerRowView", () => {
           potentialRating: 80,
           potentialTrainingMultiplier: 1.1,
           trainingSetpoints: 3,
-          performanceSetpoints: 1.2,
+          performanceSetpoints: 7.19,
+          appliedPerformanceSetpoints: 1.2,
           netSetpoints: 2.4,
           fatigueLoad: 12,
           traitModifierPct: 5,
@@ -57,7 +58,8 @@ describe("buildTrainingPlayerRowView", () => {
               training: 1.0,
               performance: 0.3,
               affinity: "signature",
-              growthMultiplier: 1.15,
+              trainingGrowthMultiplier: 1.15,
+              performanceGrowthMultiplier: 1.15,
             },
           ],
         },
@@ -91,6 +93,7 @@ describe("buildTrainingPlayerRowView", () => {
     expect(row.modifiers.signatureAttributes).toContain("Power");
     expect(row.modifiers.weakAttribute).toBe("Dexterity");
     expect(row.traitBoosts[0]?.trait).toBe("Diligent");
+    expect(row.organicForecast.performanceSetpoints).toBe(1.2);
     expect(row.developmentStars.potentialStars).toBe("4,0 Sterne");
   });
 });
