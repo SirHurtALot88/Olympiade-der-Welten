@@ -99,13 +99,13 @@ export type OrganicSeasonProgressionResult = {
   warnings: string[];
 };
 
-const BASE_REGRESSION_PER_ATTRIBUTE = 0.12;
+const BASE_REGRESSION_PER_ATTRIBUTE = 0.1;
 const TRAINING_CENTER_LEVEL_MODIFIER_PCT = [0, 10, 20, 30, 40, 50] as const;
 const MARKET_VALUE_PRESSURE_RATE = 0.02;
 const NEGATIVE_TRAINING_SIDE_EFFECT_SHARE = 0.14;
-const PERFORMANCE_SETPOINT_CAP = 2.0;
-const SEASON_NET_SOFT_GAIN_TARGET = 1.8;
-const SEASON_NET_HARD_GAIN_CAP = 3.8;
+const PERFORMANCE_SETPOINT_CAP = 4.0;
+const SEASON_NET_SOFT_GAIN_TARGET = 1.5;
+const SEASON_NET_HARD_GAIN_CAP = 3.2;
 const SEASON_NET_HARD_LOSS_CAP = -4.0;
 const SIGNATURE_ORGANIC_GROWTH_MULTIPLIER = 1.15;
 const WEAK_ORGANIC_GROWTH_MULTIPLIER = 0.8;
@@ -233,7 +233,7 @@ function getPerformanceSetpoints(record: PlayerDisciplinePerformanceRecord) {
   const scoreSignal = clamp((record.finalPlayerScore ?? 0) / 100, 0, 1.25) * 0.28;
   const rankSignal = record.rankInDiscipline === 1 ? 0.72 : record.isTop10 ? 0.42 : record.rankInDiscipline <= 16 ? 0.18 : 0.08;
   const contributionSignal = clamp((record.scoreContribution ?? 0) / 30, 0, 1.2) * 0.22;
-  return roundValue(scoreSignal + rankSignal + contributionSignal, 3);
+  return roundValue((scoreSignal + rankSignal + contributionSignal) * 0.42, 3);
 }
 
 export type SeasonPerformanceSignals = {
@@ -307,29 +307,35 @@ function getPerformanceRegressionPerAttribute(input: {
     return 0;
   }
 
-  const rpi = input.signals.relativePerformanceIndex;
-  const avgBudget = input.signals.avgPerformanceBudget;
+  if (input.signals.appearances < 4) {
+    return roundValue(0.03, 3);
+  }
 
-  if (input.signals.appearances >= 4 && rpi >= 0.94 && avgBudget >= 0.45) {
-    if (isStar && rpi >= 1.02 && avgBudget >= 0.55) return -0.22;
-    if (isStar && rpi >= 0.96 && avgBudget >= 0.48) return -0.08;
-    return 0;
+  const avgBudget = input.signals.avgPerformanceBudget;
+  const rpi = input.signals.relativePerformanceIndex;
+
+  if (avgBudget >= 0.36) {
+    if (isStar) return -0.28;
+    return -0.06;
+  }
+
+  if (avgBudget >= 0.27) {
+    if (isStar) return -0.14;
+    return -0.03;
+  }
+
+  if (avgBudget >= 0.18) {
+    return roundValue(isStar ? 0.06 : isMidTier ? 0.03 : 0.02, 3);
   }
 
   let penalty = 0;
 
-  if (input.signals.appearances >= 4) {
-    if (avgBudget < 0.15) penalty += isMidTier ? 0.18 : 0.14;
-    else if (avgBudget < 0.35) penalty += isMidTier ? 0.32 : 0.2;
-    else if (avgBudget < 0.5) penalty += isMidTier ? 0.1 : 0.04;
-  }
+  if (avgBudget < 0.08) penalty += isMidTier ? 0.2 : 0.15;
+  else if (avgBudget < 0.13) penalty += isMidTier ? 0.34 : 0.22;
+  else penalty += isMidTier ? 0.12 : 0.08;
 
-  if (rpi < 0.7) penalty += isMidTier ? 0.14 : 0.1;
-  else if (rpi < 0.82) penalty += isMidTier ? 0.1 : 0.05;
-
-  if ((isHighValue || isStar) && input.signals.appearances >= 4 && rpi < 0.78) {
-    penalty += isHighValue ? 0.08 : 0.05;
-  }
+  if (rpi < 0.78) penalty += isMidTier ? 0.08 : 0.05;
+  if ((isHighValue || isStar) && rpi < 0.85) penalty += isHighValue ? 0.06 : 0.04;
 
   return roundValue(penalty, 3);
 }

@@ -84,9 +84,10 @@ describe("transfermarkt v2 performance contract", () => {
     expect(source).toContain("Slots");
   });
 
-  it("opens the player drawer from a candidate card double click", () => {
+  it("opens the player profile from a candidate name click", () => {
     const source = fs.readFileSync(transfermarktV2ClientPath, "utf8");
 
-    expect(source).toContain("onDoubleClick={() => onOpenPlayerDetails?.({ playerId: item.playerId })}");
+    expect(source).toContain('className="table-link-button"');
+    expect(source).toContain("onOpenPlayerDetails?.({ playerId: item.playerId })");
   });
 });

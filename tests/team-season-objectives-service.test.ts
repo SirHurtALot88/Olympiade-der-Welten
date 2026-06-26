@@ -1,3 +1,5 @@
+import path from "node:path";
+
 import { describe, expect, it } from "vitest";
 
 import type { GameState, Player, RosterEntry, Team, TeamIdentity, TeamSeasonObjectiveRecord } from "@/lib/data/olyDataTypes";
@@ -833,7 +835,7 @@ describe("team season objectives service", () => {
 describe("team season objectives build stability", () => {
   it("uses resolveSeasonNumberFromState without duplicate getSeasonNumber exports", async () => {
     const fs = await import("node:fs/promises");
-    const servicePath = "/Users/chrisfalk/Documents/Codex/Olympiade der Welten/lib/board/team-season-objectives-service.ts";
+    const servicePath = path.join(process.cwd(), "lib/board/team-season-objectives-service.ts");
     const serviceText = await fs.readFile(servicePath, "utf8");
 
     expect(serviceText).toContain("function resolveSeasonNumberFromState(gameState: GameState)");

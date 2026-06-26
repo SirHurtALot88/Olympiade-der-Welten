@@ -1,14 +1,16 @@
 import fs from "node:fs/promises";
+import path from "node:path";
 
 import { describe, expect, it } from "vitest";
 
-const foundationClientPath = "/Users/chrisfalk/Documents/Codex/Olympiade der Welten/app/foundation/FoundationPageClient.tsx";
-const foundationViewRoutingPath = "/Users/chrisfalk/Documents/Codex/Olympiade der Welten/lib/foundation/foundation-view-routing.ts";
-const transfermarktV2Path = "/Users/chrisfalk/Documents/Codex/Olympiade der Welten/app/foundation/transfermarkt-v2/TransfermarktV2Client.tsx";
-const lineupPath = "/Users/chrisfalk/Documents/Codex/Olympiade der Welten/app/foundation/legacy-lineup-lab/LegacyLineupLabClient.tsx";
-const teamDrawerPath = "/Users/chrisfalk/Documents/Codex/Olympiade der Welten/app/foundation/TeamDetailDrawer.tsx";
-const fitServicePath = "/Users/chrisfalk/Documents/Codex/Olympiade der Welten/lib/market/transfermarkt-fit.ts";
-const globalsPath = "/Users/chrisfalk/Documents/Codex/Olympiade der Welten/app/globals.css";
+const root = process.cwd();
+const foundationClientPath = path.join(root, "app/foundation/FoundationPageClient.tsx");
+const foundationViewRoutingPath = path.join(root, "lib/foundation/foundation-view-routing.ts");
+const transfermarktV2Path = path.join(root, "app/foundation/transfermarkt-v2/TransfermarktV2Client.tsx");
+const lineupPath = path.join(root, "app/foundation/legacy-lineup-lab/LegacyLineupLabClient.tsx");
+const teamDrawerPath = path.join(root, "app/foundation/TeamDetailDrawer.tsx");
+const fitServicePath = path.join(root, "lib/market/transfermarkt-fit.ts");
+const globalsPath = path.join(root, "app/globals.css");
 
 describe("foundation transfermarkt ui contract", () => {
   it("keeps the global foundation context visible", async () => {

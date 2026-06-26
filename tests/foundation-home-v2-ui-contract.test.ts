@@ -1,17 +1,17 @@
 import fs from "node:fs/promises";
+import path from "node:path";
 
 import { describe, expect, it } from "vitest";
 
-const foundationClientPath = "/Users/chrisfalk/Documents/Codex/Olympiade der Welten/app/foundation/FoundationPageClient.tsx";
-const homeV2Path = "/Users/chrisfalk/Documents/Codex/Olympiade der Welten/app/foundation/home-v2/HomeV2Client.tsx";
-const navConfigPath = "/Users/chrisfalk/Documents/Codex/Olympiade der Welten/lib/foundation/foundation-nav-config.ts";
-const viewRoutingPath = "/Users/chrisfalk/Documents/Codex/Olympiade der Welten/lib/foundation/foundation-view-routing.ts";
-const facilitiesOverviewV2Path =
-  "/Users/chrisfalk/Documents/Codex/Olympiade der Welten/app/foundation/facilities-overview-v2/FacilitiesOverviewV2Client.tsx";
-const scoutingHubV2Path =
-  "/Users/chrisfalk/Documents/Codex/Olympiade der Welten/app/foundation/scouting-center-v2/ScoutingCenterV2Client.tsx";
-const inboxV2Path = "/Users/chrisfalk/Documents/Codex/Olympiade der Welten/app/foundation/inbox-v2/InboxV2Client.tsx";
-const globalsPath = "/Users/chrisfalk/Documents/Codex/Olympiade der Welten/app/globals.css";
+const root = process.cwd();
+const foundationClientPath = path.join(root, "app/foundation/FoundationPageClient.tsx");
+const homeV2Path = path.join(root, "app/foundation/home-v2/HomeV2Client.tsx");
+const navConfigPath = path.join(root, "lib/foundation/foundation-nav-config.ts");
+const viewRoutingPath = path.join(root, "lib/foundation/foundation-view-routing.ts");
+const facilitiesOverviewV2Path = path.join(root, "app/foundation/facilities-overview-v2/FacilitiesOverviewV2Client.tsx");
+const scoutingHubV2Path = path.join(root, "app/foundation/scouting-center-v2/ScoutingCenterV2Client.tsx");
+const inboxV2Path = path.join(root, "app/foundation/inbox-v2/InboxV2Client.tsx");
+const globalsPath = path.join(root, "app/globals.css");
 
 describe("foundation home v2 ui contract", () => {
   it("merges home and office into one home v2 view with sub navigation", async () => {
@@ -25,7 +25,7 @@ describe("foundation home v2 ui contract", () => {
     expect(fileText).toContain('navigateHomeTab("office")');
     expect(fileText).toContain("ManagerOfficeClient");
     const officeText = await fs.readFile(
-      "/Users/chrisfalk/Documents/Codex/Olympiade der Welten/app/foundation/home-v2/ManagerOfficeClient.tsx",
+      path.join(process.cwd(), "app/foundation/home-v2/ManagerOfficeClient.tsx"),
       "utf8",
     );
     expect(officeText).toContain('data-testid="foundation-hq"');
@@ -59,7 +59,7 @@ describe("foundation home v2 ui contract", () => {
     const [homeText, typesText, foundationText] = await Promise.all([
       fs.readFile(homeV2Path, "utf8"),
       fs.readFile(
-        "/Users/chrisfalk/Documents/Codex/Olympiade der Welten/app/foundation/home-v2/home-v2-types.ts",
+        path.join(process.cwd(), "app/foundation/home-v2/home-v2-types.ts"),
         "utf8",
       ),
       fs.readFile(foundationClientPath, "utf8"),
@@ -103,11 +103,11 @@ describe("foundation ui v2 roadmap contract", () => {
     expect(fileText).toContain("getTransfermarktScoutingVisibilityBuckets");
   });
 
-  it("keeps facilities overview v2 read-only and linked back to classic training", async () => {
+  it("keeps facilities overview v2 read-only without classic training jump links", async () => {
     const fileText = await fs.readFile(facilitiesOverviewV2Path, "utf8");
 
     expect(fileText).toContain("Facilities Overview V2");
-    expect(fileText).toContain("Training Classic");
+    expect(fileText).not.toContain("onOpenClassicTraining");
     expect(fileText).toContain("facilities-overview-v2-grid");
     expect(fileText).toContain('data-testid="foundation-facilities-overview-v2"');
   });

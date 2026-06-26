@@ -87,7 +87,7 @@ describe("sponsor catalog v2.6", () => {
 describe("sponsor tier pool v2.6", () => {
   it("allows five-star offers for elite commercial ratings via luck roll", () => {
     const samples = Array.from({ length: 24 }, (_, index) =>
-      rollSponsorStarTiers({ seasonId: `season-luck-${index}`, teamId: "M-M", commercialRating: 95 }),
+      rollSponsorStarTiers({ seasonId: `season-luck-${index}`, teamId: "M-M", commercialRating: 95, standingRank: 1 }),
     );
     expect(samples.some((tiers) => tiers.includes(5))).toBe(true);
   });
