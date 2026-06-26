@@ -9,10 +9,10 @@ jobs:
   season-block-smokes:
     runs-on: ubuntu-latest
     timeout-minutes: 45
-    env:
-      OLY_APP_SQLITE_PATH: ${{ runner.temp }}/ci-oly-nightly.sqlite
     steps:
       - uses: actions/checkout@v4
+      - name: Set CI SQLite path
+        run: echo "OLY_APP_SQLITE_PATH=${RUNNER_TEMP}/ci-oly-nightly.sqlite" >> "$GITHUB_ENV"
       - uses: actions/setup-node@v4
         with:
           node-version: "20"
