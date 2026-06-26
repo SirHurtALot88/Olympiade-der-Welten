@@ -161,6 +161,27 @@ function runMigrations(database: Database.Database) {
       FOREIGN KEY (save_id) REFERENCES saves(save_id) ON DELETE CASCADE
     );
   `);
+
+  ensureSaveVersionColumns(database);
+}
+
+function ensureSaveVersionColumns(database: Database.Database) {
+  const columns = database.prepare("PRAGMA table_info(saves)").all() as Array<{ name: string }>;
+  const names = new Set(columns.map((column) => column.name));
+  const additions = [
+    ["content_signature", "TEXT NOT NULL DEFAULT ''"],
+    ["save_version", "INTEGER NOT NULL DEFAULT 0"],
+    ["season_id", "TEXT NOT NULL DEFAULT ''"],
+    ["matchday_id", "TEXT NOT NULL DEFAULT ''"],
+    ["lineup_draft_count", "INTEGER NOT NULL DEFAULT 0"],
+    ["transfer_history_count", "INTEGER NOT NULL DEFAULT 0"],
+  ] as const;
+
+  for (const [name, definition] of additions) {
+    if (!names.has(name)) {
+      database.exec(`ALTER TABLE saves ADD COLUMN ${name} ${definition}`);
+    }
+  }
 }
 
 export function getDatabase() {

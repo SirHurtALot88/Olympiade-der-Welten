@@ -766,6 +766,28 @@ export function loadLocalLegacyLineupContextFromGameState(
   return buildContextFromGameState(gameState, params);
 }
 
+export function loadAllLocalLegacyLineupContexts(
+  input: {
+    saveId: string;
+    seasonId: string;
+    matchdayId: string;
+    teamIds?: string[];
+  },
+  persistence: PersistenceService = createPersistenceService(),
+): LegacyLineupContextLoadResult[] {
+  const { save } = resolveLocalPersistedSave(persistence, input.saveId);
+  const teamIds = input.teamIds ?? save.gameState.teams.map((team) => team.teamId);
+
+  return teamIds.map((teamId) =>
+    loadLocalLegacyLineupContextFromGameState(save.gameState, {
+      saveId: save.saveId,
+      seasonId: input.seasonId,
+      matchdayId: input.matchdayId,
+      teamId,
+    }),
+  );
+}
+
 function normalizeEntries(entries: LegacyLineupEntryInput[]) {
   return [...entries]
     .map((entry) => ({

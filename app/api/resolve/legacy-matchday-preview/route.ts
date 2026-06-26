@@ -2,22 +2,13 @@ export const dynamic = "force-dynamic";
 
 import { NextResponse } from "next/server";
 
-import { buildLegacyMatchdayReadiness } from "@/lib/lineups/legacy-matchday-readiness";
 import { LegacyLineupContextLoader } from "@/lib/lineups/legacy-lineup-context-loader";
-import { loadLocalLegacyLineupContext } from "@/lib/lineups/legacy-lineup-local-service";
+import { loadAllLocalLegacyLineupContexts } from "@/lib/lineups/legacy-lineup-local-service";
 import { LegacyLineupRepository } from "@/lib/lineups/legacy-lineup-repository";
 import type { LegacyLineupContextLoadResult, LegacyLineupKeyParams } from "@/lib/lineups/legacy-lineup-types";
 import { createPersistenceService } from "@/lib/persistence/persistence-service";
 import { readArenaPreviewCache, writeArenaPreviewCache } from "@/lib/foundation/arena-preview-cache";
-import {
-  buildResolveLabPlayerCatalog,
-  buildResolveLabSummary,
-  buildResolveLabTeamDetails,
-  buildResolveLabTopPlayersBySide,
-  getHighlightCandidatesForTeam,
-  getTopPlayerNameForTeam,
-} from "@/lib/resolve/legacy-resolve-lab";
-import { buildLegacyMatchdayResolvePreview } from "@/lib/resolve/legacy-matchday-resolve-engine";
+import { buildLegacyMatchdayResolvePreviewPayload } from "@/lib/foundation/legacy-matchday-resolve-preview-service";
 import { db } from "@/src/server/db";
 
 function parseOptionalParams(request: Request) {
@@ -88,7 +79,35 @@ async function loadPrismaContexts(params: LegacyLineupKeyParams[]): Promise<Lega
 }
 
 function loadSqliteContexts(params: LegacyLineupKeyParams[]): LegacyLineupContextLoadResult[] {
-  return params.map((entry) => loadLocalLegacyLineupContext(entry));
+  if (params.length === 0) {
+    return [];
+  }
+
+  const first = params[0]!;
+  return loadAllLocalLegacyLineupContexts({
+    saveId: first.saveId,
+    seasonId: first.seasonId,
+    matchdayId: first.matchdayId,
+    teamIds: params.map((entry) => entry.teamId),
+  });
+}
+
+function buildArenaPreviewCacheSignature(versionMeta: {
+  contentSignature?: string | null;
+  saveVersion?: number | null;
+  lineupDraftCount?: number;
+  transferHistoryCount?: number;
+  updatedAt?: string;
+} | null) {
+  if (versionMeta?.contentSignature) {
+    return versionMeta.contentSignature;
+  }
+
+  if (!versionMeta) {
+    return "0";
+  }
+
+  return `${versionMeta.saveVersion ?? 0}|${versionMeta.lineupDraftCount ?? 0}|${versionMeta.transferHistoryCount ?? 0}|${versionMeta.updatedAt ?? ""}`;
 }
 
 export async function GET(request: Request) {
@@ -123,9 +142,7 @@ export async function GET(request: Request) {
       const persistence = createPersistenceService();
       const versionMeta = persistence.getSaveVersionMetadata(params.saveId);
       const cacheKey = `${params.saveId}:${params.seasonId}:${params.matchdayId}`;
-      const cacheSignature = versionMeta
-        ? `${versionMeta.saveVersion}|${versionMeta.lineupDraftCount}|${versionMeta.transferHistoryCount}|${versionMeta.updatedAt}`
-        : "0";
+      const cacheSignature = buildArenaPreviewCacheSignature(versionMeta);
       const cached = readArenaPreviewCache(cacheKey, cacheSignature);
       if (cached) {
         return NextResponse.json(cached);
@@ -137,51 +154,23 @@ export async function GET(request: Request) {
         ? await loadPrismaContexts(teamParams)
         : loadSqliteContexts(teamParams);
 
-    const errors = contextResults.flatMap((result) => (result.ok ? [] : result.errors));
-    const warnings = contextResults.flatMap((result) => result.warnings);
-    const contexts = contextResults.flatMap((result) => (result.ok ? [result.context] : []));
-
-    if (contexts.length === 0) {
-      return NextResponse.json({ error: "No legacy resolve contexts could be loaded.", errors, warnings }, { status: 500 });
-    }
-
-    const readinessRows = contexts.map((context) => buildLegacyMatchdayReadiness(context));
-    const readinessByTeamId = new Map(readinessRows.map((row) => [row.teamId, row]));
-    const preview = buildLegacyMatchdayResolvePreview(contexts);
-    const summary = buildResolveLabSummary(preview, contexts, readinessByTeamId);
-    const teamDetails = buildResolveLabTeamDetails(contexts, preview, readinessByTeamId);
-    const topPlayers = buildResolveLabTopPlayersBySide(preview, contexts);
-    const playerCatalog = buildResolveLabPlayerCatalog(contexts);
-
-    const responsePayload = {
+    const responsePayload = buildLegacyMatchdayResolvePreviewPayload({
       source: parsed.source,
       params,
-      summary,
-      preview,
-      teamDetails,
-      topPlayers,
-      playerCatalog,
-      warnings: Array.from(new Set([...warnings, ...preview.warnings])),
-      teamRows: preview.teamResults.map((team) => ({
-        ...team,
-        topPlayer: getTopPlayerNameForTeam(preview, team.teamId),
-        highlightFlag: getHighlightCandidatesForTeam(preview, team.teamId).length > 0,
-        readinessStatus: readinessByTeamId.get(team.teamId)?.readinessStatus ?? "unknown",
-        readinessReasonCodes: readinessByTeamId.get(team.teamId)?.reasonCodes ?? ["readiness_missing"],
-        activePlayersCount: readinessByTeamId.get(team.teamId)?.activePlayersCount ?? 0,
-        requiredTotalUniquePlayers: readinessByTeamId.get(team.teamId)?.requiredTotalUniquePlayers ?? 0,
-        missingPlayersToRequirement: readinessByTeamId.get(team.teamId)?.missingPlayersToRequirement ?? 0,
-        shortReason: readinessByTeamId.get(team.teamId)?.shortReason ?? "No readiness explanation available.",
-      })),
-    };
+      contextResults,
+    });
+
+    if (!responsePayload) {
+      const errors = contextResults.flatMap((result) => (result.ok ? [] : result.errors));
+      const warnings = contextResults.flatMap((result) => result.warnings);
+      return NextResponse.json({ error: "No legacy resolve contexts could be loaded.", errors, warnings }, { status: 500 });
+    }
 
     if (parsed.source === "sqlite") {
       const persistence = createPersistenceService();
       const versionMeta = persistence.getSaveVersionMetadata(params.saveId);
       const cacheKey = `${params.saveId}:${params.seasonId}:${params.matchdayId}`;
-      const cacheSignature = versionMeta
-        ? `${versionMeta.saveVersion}|${versionMeta.lineupDraftCount}|${versionMeta.transferHistoryCount}|${versionMeta.updatedAt}`
-        : "0";
+      const cacheSignature = buildArenaPreviewCacheSignature(versionMeta);
       writeArenaPreviewCache(cacheKey, cacheSignature, responsePayload);
     }
 

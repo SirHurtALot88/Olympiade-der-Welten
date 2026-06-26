@@ -204,7 +204,14 @@ import { buildSponsorCommercialRating } from "@/lib/sponsor/sponsor-commercial-r
 import { getTeamSponsorContract, getTeamSponsorOffers } from "@/lib/sponsor/sponsor-offer-read";
 import { applySponsorNegotiationToComponents, getSponsorNegotiationMultiplier } from "@/lib/sponsor/sponsor-negotiation";
 import type { SponsorNegotiationProfile } from "@/lib/data/olyDataTypes";
-import { buildScoutPipelineSummary } from "@/lib/scouting/facility-scout-pipeline-service";
+import { buildScoutPipelineSummary, getEffectiveScoutingLevel, refreshScoutPipeline } from "@/lib/scouting/facility-scout-pipeline-service";
+import {
+  canAddPlayerToTransferWishlist,
+  getScoutingWishlistSlotLimit,
+  getScoutingWishlistSlotMessage,
+  getTeamTransferWishlistEntries,
+  isTeamSetupDraftWishlistPhase,
+} from "@/lib/scouting/scouting-wishlist-slots";
 import { buildScoutingWatchTargetStarFields } from "@/lib/scouting/player-star-scouting-bridge";
 import { getTransfermarktBracket } from "@/lib/market/transfermarkt-fit";
 import { getTeamPowerOptions } from "@/lib/lineups/team-powers";
@@ -238,7 +245,7 @@ import type {
   SeasonEndXpSpendPreview,
   SeasonEndXpSpendApplyResult,
 } from "@/lib/progression/season-end-xp-apply-service";
-import { getPotentialBand } from "@/lib/progression/player-potential-service";
+import { buildPlayerDevelopmentInsight, getPotentialBand } from "@/lib/progression/player-potential-service";
 import {
   appendRoomContextToParams,
   readFoundationRoomContextFromLocation,
@@ -7103,13 +7110,27 @@ export default function FoundationPageClient({
       return;
     }
 
-    setGameState((current) => ({
-      ...current,
-      seasonState: {
-        ...current.seasonState,
-        transferWishlist: nextEntries,
-      },
-    }));
+    const teamId = marketTeamId || selectedTeam?.teamId || null;
+    setGameState((current) => {
+      let next: GameState = {
+        ...current,
+        seasonState: {
+          ...current.seasonState,
+          transferWishlist: nextEntries,
+        },
+      };
+      if (teamId) {
+        next = syncWishlistToScoutingWatchlist(next, teamId);
+      }
+      return next;
+    });
+  }
+
+  function showScoutingWishlistSlotNotice(teamId: string, playerId?: string | null) {
+    const message = getScoutingWishlistSlotMessage(canAddPlayerToTransferWishlist(gameState, teamId, playerId));
+    if (message) {
+      window.alert(message);
+    }
   }
 
   function saveTransferSellMarkers(nextEntries: TransferSellMarkerEntry[]) {
@@ -7156,10 +7177,19 @@ export default function FoundationPageClient({
   }
 
   function toggleTransferWishlist(item: TransfermarktFreeAgentItem) {
+    const teamId = marketTeamId || selectedTeam?.teamId || null;
     const currentEntries = gameState.seasonState.transferWishlist ?? [];
     const existing = currentEntries.find((entry) => entry.playerId === item.playerId);
     if (existing) {
       saveTransferWishlist(currentEntries.filter((entry) => entry.playerId !== item.playerId));
+      return;
+    }
+    if (!teamId) {
+      return;
+    }
+    const slotCheck = canAddPlayerToTransferWishlist(gameState, teamId, item.playerId);
+    if (!slotCheck.ok) {
+      showScoutingWishlistSlotNotice(teamId, item.playerId);
       return;
     }
 
@@ -7265,7 +7295,7 @@ export default function FoundationPageClient({
 
     setPlayerProfileData(nextData);
     setPlayerProfileTab(options?.tab ?? "overview");
-    setFoundationView("playerProfile", setActiveView);
+    setActiveView("playerProfile");
     syncFoundationViewInUrl("playerProfile", options?.tab ?? "overview", playerId, {
       push: options?.push ?? false,
       team: selectedTeamId,
@@ -7296,7 +7326,7 @@ export default function FoundationPageClient({
     clearPendingTeamActivation();
     setTeamProfileTeamId(teamId);
     syncFoundationTeamIdInUrl(teamId);
-    setFoundationView("teamProfile", setActiveView);
+    setActiveView("teamProfile");
     syncFoundationUrlState({
       view: "teamProfile",
       tab: null,
@@ -7376,6 +7406,9 @@ export default function FoundationPageClient({
       void openPlayerProfileById(state.playerId, null, {
         tab: (state.tab as PlayerProfileTabId | null) ?? "overview",
       });
+    } else if (state.view === "playerProfile") {
+      setPlayerProfileData(null);
+      setActiveView(state.team ? "teams" : "homeV2");
     } else if (state.view !== "playerProfile") {
       setPlayerProfileData(null);
     }
@@ -10460,10 +10493,25 @@ export default function FoundationPageClient({
       }
     }
 
-    void loadSeasonManagementOverview();
+    const scheduleLoad = () => {
+      if (cancelled) {
+        return;
+      }
+      void loadSeasonManagementOverview();
+    };
+
+    const idleHandle =
+      typeof window !== "undefined" && "requestIdleCallback" in window
+        ? window.requestIdleCallback(scheduleLoad, { timeout: 1500 })
+        : window.setTimeout(scheduleLoad, 150);
 
     return () => {
       cancelled = true;
+      if (typeof window !== "undefined" && "requestIdleCallback" in window && typeof idleHandle === "number") {
+        window.cancelIdleCallback(idleHandle);
+      } else {
+        window.clearTimeout(idleHandle as number);
+      }
     };
   }, [activeSaveId, gameState.season.id, isFoundationBootstrapState, marketReloadToken, readMeta.source, shouldLoadSeasonManagementFeed]);
 
@@ -17229,6 +17277,8 @@ export default function FoundationPageClient({
       entries: unknown[];
       status?: string;
     } | null;
+    saveVersion?: number | null;
+    contentSignature?: string | null;
   }) => {
     const lineupSyncAllowed =
       payload.saveId === activeSaveId &&
@@ -17238,6 +17288,8 @@ export default function FoundationPageClient({
     if (!lineupSyncAllowed) {
       return;
     }
+
+    skipNextFullPersistCountRef.current += 1;
 
     if (payload.draft) {
       setGameState((current) => {
@@ -17255,12 +17307,18 @@ export default function FoundationPageClient({
         }
         return {
           ...current,
+          saveVersion: payload.saveVersion ?? current.saveVersion,
           seasonState: {
             ...current.seasonState,
             lineupDrafts,
           },
         };
       });
+    } else if (payload.saveVersion != null) {
+      setGameState((current) => ({
+        ...current,
+        saveVersion: payload.saveVersion ?? current.saveVersion,
+      }));
     }
 
     if (!payload.silent) {
@@ -17270,7 +17328,7 @@ export default function FoundationPageClient({
         detail: `${getTeamLockedName(payload.teamId)} ist fuer ${currentMatchdayDisplayLabel} aktualisiert. KI-Lineups werden bei Bedarf nachgezogen.`,
       });
     }
-    void reloadLiveSeasonState("manual_apply", { reloadFullGameState: true });
+    void reloadLiveSeasonState("manual_apply", { compactReload: true });
     void ensureAiLineupsForCurrentMatchday("human_lineup_saved");
   };
   useEffect(() => {
@@ -17743,7 +17801,7 @@ export default function FoundationPageClient({
 
           return (right.playerOvr ?? Number.NEGATIVE_INFINITY) - (left.playerOvr ?? Number.NEGATIVE_INFINITY);
         })
-        .slice(0, 8),
+        .slice(0, 6),
     [playerRatingsById, playerSeasonPerformanceMap, selectedRosterTableRows],
   );
 	  const homeTasks = useMemo(
@@ -17837,30 +17895,47 @@ export default function FoundationPageClient({
   );
   const homeV2TopPlayers = useMemo(
     () =>
-      homePlayerCards.slice(0, 3).map((row, index) => ({
-        playerId: row.player.id,
-        name: row.player.name,
-        roleTag: row.entry.roleTag ?? null,
-        portraitUrl: row.portrait.src,
-        portraitInitials: row.portrait.initials,
-        playerOvr: row.playerOvr,
-        playerPps: row.playerPps,
-        playerMvs: row.playerMvs,
-        ppPow: row.ppPow,
-        ppSpe: row.ppSpe,
-        ppMen: row.ppMen,
-        ppSoc: row.ppSoc,
-        contractLength: row.entry.contractLength ?? null,
-        marketValue: row.marketValue,
-        highlight: index === 0 ? ("top" as const) : index === 2 ? ("prospect" as const) : null,
-        topDisciplineId: row.player.className?.toLowerCase() ?? null,
-        topDisciplineLabel: row.player.className ?? row.entry.roleTag ?? "Flex",
-        topDisciplineTier: row.playerOvr != null && row.playerOvr >= 82 ? "S" : row.playerOvr != null && row.playerOvr >= 76 ? "A" : "B",
-        topDisciplineScore: row.playerOvr,
-        potential: row.player.potential ?? null,
-        potentialBand: row.player.potential != null ? getPotentialBand(row.player.potential) : null,
-      })),
-    [homePlayerCards],
+      homePlayerCards.slice(0, 6).map((row, index) => {
+        const rating = playerRatingsById.get(row.player.id) ?? null;
+        const seasonPerformance = playerSeasonPerformanceMap.get(row.player.id) ?? null;
+        const forecast = buildPlayerProgressionForecast({
+          gameState,
+          player: row.player,
+          playerRating: rating,
+          seasonPerformance,
+          currentXP: row.player.currentXP ?? 0,
+          spentXP: row.player.spentXP ?? 0,
+          lifetimeXP: row.player.lifetimeXP ?? null,
+        });
+        const developmentInsight = buildPlayerDevelopmentInsight({
+          gameState,
+          player: row.player,
+          currentRating: forecast.currentAbilityRating,
+          performanceRating: rating?.ratingPps ?? rating?.ppsSeason ?? null,
+          scoutingLevel: 5,
+          scoutPotential: forecast.scoutPotential,
+        });
+        return {
+          playerId: row.player.id,
+          name: row.player.name,
+          portraitUrl: row.portrait.src,
+          portraitInitials: row.portrait.initials,
+          playerOvr: row.playerOvr,
+          playerPps: row.playerPps,
+          playerMvs: row.playerMvs,
+          pow: row.player.coreStats.pow,
+          spe: row.player.coreStats.spe,
+          men: row.player.coreStats.men,
+          soc: row.player.coreStats.soc,
+          contractLength: row.entry.contractLength ?? null,
+          marketValue: row.marketValue,
+          highlight: index === 0 ? ("top" as const) : null,
+          caRating: developmentInsight.currentRating,
+          poRangeMin: developmentInsight.potentialRangeDisplay?.min ?? null,
+          poRangeMax: developmentInsight.potentialRangeDisplay?.max ?? null,
+        };
+      }),
+    [gameState, homePlayerCards, playerRatingsById, playerSeasonPerformanceMap],
   );
   const homeV2ScheduleItems = useMemo(() => {
     const currentIndex = gameState.season.matchdayIds.indexOf(gameState.matchdayState.matchdayId);
@@ -17921,7 +17996,7 @@ export default function FoundationPageClient({
     const syncedState = syncWishlistToScoutingWatchlist(gameState, selectedTeam.teamId);
     const watchlistEntries = getScoutingWatchlistForTeam(syncedState, selectedTeam.teamId);
     const playerById = new Map(gameState.players.map((player) => [player.id, player] as const));
-    const scoutingLevel = Math.max(getFacilityLevel(selectedTeamFacilityState, "scouting_office"), 4);
+    const facilityLevel = getFacilityLevel(selectedTeamFacilityState, "scouting_office");
 
     const enrichWatchTarget = (entry: {
       playerId: string;
@@ -17935,10 +18010,14 @@ export default function FoundationPageClient({
       soc?: number | null;
     }) => {
       const player = playerById.get(entry.playerId);
+      const scoutingLevel = Math.max(
+        facilityLevel,
+        getEffectiveScoutingLevel(syncedState, selectedTeam.teamId, entry.playerId),
+      );
       const starFields =
         player != null
           ? buildScoutingWatchTargetStarFields({
-              gameState,
+              gameState: syncedState,
               player,
               saveId: activeSaveId,
               scoutingLevel,
@@ -21266,6 +21345,7 @@ export default function FoundationPageClient({
                         maxSlots: selectedTeamScoutPipeline.config.maxSlots,
                         tickGain: selectedTeamScoutPipeline.config.tickGain,
                         passiveActive: selectedTeamScoutPipeline.passiveActive,
+                        draftSuspended: isTeamSetupDraftWishlistPhase(gameState, selectedTeam.teamId),
                         records: selectedTeamScoutPipeline.records.map((record) => {
                           const player = gameState.players.find((entry) => entry.id === record.playerId);
                           return {
@@ -30344,10 +30424,11 @@ export default function FoundationPageClient({
                   scoutingWatchPlayerIds={transferMarketScoutingWatchPlayerIds}
                   scoutingIntelByPlayerId={transferMarketScoutingIntelByPlayerId}
                   scoutingPipelineCapacity={
-                    selectedTeamScoutPipeline
+                    activeManagerTeamId
                       ? {
-                          occupied: selectedTeamScoutPipeline.occupiedSlots,
-                          max: selectedTeamScoutPipeline.config.maxSlots,
+                          occupied: getTeamTransferWishlistEntries(gameState, activeManagerTeamId).length,
+                          max: getScoutingWishlistSlotLimit(gameState, activeManagerTeamId),
+                          draftSuspended: isTeamSetupDraftWishlistPhase(gameState, activeManagerTeamId),
                         }
                       : null
                   }

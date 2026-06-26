@@ -116,10 +116,18 @@ function listSavesForMode(persistence: PersistenceService, saveMode: FoundationS
 }
 
 function compactFoundationInitialGameState(gameState: GameState): GameState {
+  const activeMatchdayId = gameState.matchdayState.matchdayId;
+  const activeMatchdayResults = (gameState.seasonState.matchdayResults ?? []).filter(
+    (result) => result.matchdayId === activeMatchdayId,
+  );
+  const activeMatchdayResultIds = new Set(activeMatchdayResults.map((result) => result.id));
+
   return {
     ...gameState,
     playerBaselines: undefined,
     baselineWriteGuardEvents: undefined,
+    transferHistory: [],
+    logs: [],
     players: gameState.players.map((player) => ({
       ...player,
       attributeSheetStats: undefined,
@@ -134,6 +142,14 @@ function compactFoundationInitialGameState(gameState: GameState): GameState {
     seasonState: {
       ...gameState.seasonState,
       seasonSnapshots: undefined,
+      standingsApplyLogs: undefined,
+      disciplineResults: (gameState.seasonState.disciplineResults ?? []).filter((result) =>
+        activeMatchdayResultIds.has(result.matchdayResultId),
+      ),
+      matchdayResults: activeMatchdayResults,
+      lineupDrafts: (gameState.seasonState.lineupDrafts ?? []).filter(
+        (draft) => draft.matchdayId === activeMatchdayId,
+      ),
     },
   };
 }
@@ -312,7 +328,6 @@ export async function PUT(request: Request) {
     );
   }
 
-  const persistence = createPersistenceService();
   const nextGameState = withNormalizedLocalTeamSettings({
     ...body.gameState,
     saveVersion: currentSaveVersion + 1,

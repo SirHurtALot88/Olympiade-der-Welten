@@ -5,7 +5,7 @@ import { NextResponse } from "next/server";
 import { buildAiLegacyLineupPreview } from "@/lib/ai/ai-legacy-lineup-engine";
 import type { AiLegacyLineupPreview, AiLegacyLineupPreviewStatus } from "@/lib/ai/ai-needs-types";
 import { LegacyLineupContextLoader } from "@/lib/lineups/legacy-lineup-context-loader";
-import { loadLocalLegacyLineupContext } from "@/lib/lineups/legacy-lineup-local-service";
+import { loadAllLocalLegacyLineupContexts } from "@/lib/lineups/legacy-lineup-local-service";
 import type { LegacyLineupKeyParams } from "@/lib/lineups/legacy-lineup-types";
 import { createPersistenceService } from "@/lib/persistence/persistence-service";
 import { db } from "@/src/server/db";
@@ -72,6 +72,7 @@ async function resolveSqliteBatchContext(input: {
       : save.gameState.matchdayState.matchdayId;
 
   return {
+    save,
     params: {
       saveId: save.saveId,
       seasonId,
@@ -213,25 +214,45 @@ export async function GET(request: Request) {
         ? await resolvePrismaBatchContext(baseParams)
         : await resolveSqliteBatchContext(baseParams);
 
-    const teams = await Promise.all(
-      baseContext.teams.map(async (team: (typeof baseContext.teams)[number]) => {
-        const params: LegacyLineupKeyParams = {
-          ...baseContext.params,
-          teamId: team.teamId,
-        };
+    const teams =
+      source === "prisma"
+        ? await Promise.all(
+            baseContext.teams.map(async (team: (typeof baseContext.teams)[number]) => {
+              const params: LegacyLineupKeyParams = {
+                ...baseContext.params,
+                teamId: team.teamId,
+              };
 
-        const contextResult =
-          source === "prisma"
-            ? await new LegacyLineupContextLoader().loadLegacyLineupContext(params)
-            : loadLocalLegacyLineupContext(params);
+              const contextResult = await new LegacyLineupContextLoader().loadLegacyLineupContext(params);
+              if (!contextResult.ok) {
+                return toBlockedEntry(team, [...contextResult.errors, ...contextResult.warnings]);
+              }
 
-        if (!contextResult.ok) {
-          return toBlockedEntry(team, [...contextResult.errors, ...contextResult.warnings]);
-        }
+              return toBatchEntry(team, buildAiLegacyLineupPreview(contextResult.context, source));
+            }),
+          )
+        : (() => {
+            const contextResults = loadAllLocalLegacyLineupContexts({
+              saveId: baseContext.params.saveId,
+              seasonId: baseContext.params.seasonId,
+              matchdayId: baseContext.params.matchdayId,
+            });
+            const contextByTeamId = new Map(
+              contextResults.map((result, index) => [baseContext.teams[index]?.teamId ?? "", result] as const),
+            );
 
-        return toBatchEntry(team, buildAiLegacyLineupPreview(contextResult.context, source));
-      }),
-    );
+            return baseContext.teams.map((team) => {
+              const contextResult = contextByTeamId.get(team.teamId);
+              if (!contextResult?.ok) {
+                return toBlockedEntry(team, [
+                  ...(contextResult?.errors ?? ["context_missing"]),
+                  ...(contextResult?.warnings ?? []),
+                ]);
+              }
+
+              return toBatchEntry(team, buildAiLegacyLineupPreview(contextResult.context, source));
+            });
+          })();
 
     const sortedTeams = [...teams].sort((left, right) => {
       if (right.totalExpectedScore !== left.totalExpectedScore) {

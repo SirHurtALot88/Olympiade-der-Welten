@@ -22,9 +22,11 @@ export type SaveVersionMetadata = {
   updatedAt: string;
   seasonId: string;
   matchdayId: string;
+  contentSignature?: string;
   matchdayResults: unknown[];
   standingsApplyLogs: unknown[];
   seasonSnapshots: unknown[];
+  disciplineResults: unknown[];
   saveVersion?: number;
   lineupDraftCount: number;
   transferHistoryCount: number;

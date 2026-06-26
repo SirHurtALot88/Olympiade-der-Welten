@@ -141,6 +141,7 @@ describe("matchday arena ui contract", () => {
     expect(arenaText).toContain("D2, Gesamtwertung, PPs und Saisonrang bleiben verborgen.");
     expect(arenaText).toContain("Finale Tageswerte werden im Result freigeschaltet.");
     expect(arenaText).toContain('fetch("/api/season/matchday-mvp-score"');
+    expect(arenaText).toContain('fetch(`/api/matchday/arena-base?${contextQuery.toString()}`');
     expect(arenaText).toContain("Promise.allSettled");
     expect(arenaText).toContain("loadResolvePreview");
     expect(arenaText).toContain("formatArenaLoadStageLabel");

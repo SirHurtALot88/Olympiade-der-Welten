@@ -185,6 +185,7 @@ export type TransfermarktReadParams = {
   minSalary?: number | null;
   maxSalary?: number | null;
   mode?: "full" | "ai_preview" | null;
+  compactList?: boolean | null;
   scoutingLevel?: number | null;
   localRunContext?: unknown;
 };

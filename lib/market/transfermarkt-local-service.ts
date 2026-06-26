@@ -220,7 +220,6 @@ function buildAiPreviewFreeAgentSlice(items: TransfermarktFreeAgentItem[], limit
 }
 
 const localFreeAgentBaseCache = new Map<string, TransfermarktFreeAgentItem[]>();
-const localFreeAgentTeamCache = new Map<string, TransfermarktFreeAgentItem[]>();
 const localMarketContextCache = new Map<string, LocalMarketContext>();
 const localMarketContextKeyCache = new WeakMap<GameState, string>();
 const localNegotiationPreviewCache = new Map<string, ReturnType<typeof buildContractNegotiationPreview>>();
@@ -1084,6 +1083,8 @@ export function listLocalTransfermarktFreeAgents(input: TransfermarktReadParams 
   const marketContext = buildLocalMarketContext(save);
   const { gameState, playersById, disciplinesById, rosterPlayerIds, cacheKey } = marketContext;
   const aiPreviewMode = input.mode === "ai_preview";
+  const compactListMode = input.compactList !== false && input.mode !== "full";
+  const skipHeavyBaseFields = aiPreviewMode || compactListMode;
   const selectedTeamContext = input.teamId ? marketContext.teamContextsById.get(input.teamId) ?? null : null;
   const selectedTeam = selectedTeamContext?.team ?? null;
   const teamSalary = selectedTeamContext?.salaryTotal ?? 0;
@@ -1092,10 +1093,10 @@ export function listLocalTransfermarktFreeAgents(input: TransfermarktReadParams 
   const playerOpt = selectedTeamContext?.playerOpt ?? null;
   const seasonDisciplinePlayerCountById = buildSeasonDisciplinePlayerCountMap(gameState);
 
-  const baseCacheKey = aiPreviewMode ? `${cacheKey}:ai_preview` : cacheKey;
+  const baseCacheKey = aiPreviewMode ? `${cacheKey}:ai_preview` : compactListMode ? `${cacheKey}:compact_list` : cacheKey;
   let baseItems = localFreeAgentBaseCache.get(baseCacheKey) ?? null;
   if (!baseItems) {
-    const playerRatingsById = aiPreviewMode ? null : buildPlayerRatingContractMap(gameState);
+    const playerRatingsById = skipHeavyBaseFields ? null : buildPlayerRatingContractMap(gameState);
     const playerPotentialById = new Map((gameState.playerPotential ?? []).map((entry) => [entry.playerId, entry] as const));
     baseItems = gameState.players
       .filter((player) => !rosterPlayerIds.has(player.id))
@@ -1103,7 +1104,7 @@ export function listLocalTransfermarktFreeAgents(input: TransfermarktReadParams 
         const marketValue = getPlayerMarketValue(player);
         const salary = getPlayerSalary(player);
         const playerRating = playerRatingsById?.get(player.id) ?? null;
-        const progressionForecast = aiPreviewMode
+        const progressionForecast = skipHeavyBaseFields
           ? null
           : buildPlayerProgressionForecast({
               gameState,
@@ -1115,7 +1116,7 @@ export function listLocalTransfermarktFreeAgents(input: TransfermarktReadParams 
               spentXP: player.spentXP ?? 0,
               lifetimeXP: player.lifetimeXP ?? null,
             });
-        const scoutPotential = aiPreviewMode
+        const scoutPotential = skipHeavyBaseFields
           ? null
           : buildPlayerScoutPotentialFromGameState({
               gameState,
@@ -1157,7 +1158,7 @@ export function listLocalTransfermarktFreeAgents(input: TransfermarktReadParams 
         traitNeg2: baseTraitView.visibleNegativeTraits[1] ?? null,
         traitNeg3: baseTraitView.visibleNegativeTraits[2] ?? null,
         marketValue,
-        ovr: playerRating?.ovrNormalized ?? null,
+        ovr: playerRating?.ovrNormalized ?? player.rating ?? null,
         mvs: playerRating?.mvs ?? null,
         salary,
         marketValueSalaryRatio:
@@ -1188,7 +1189,9 @@ export function listLocalTransfermarktFreeAgents(input: TransfermarktReadParams 
         willRating: normalizeTransfermarktTier(player.attributeSheetRatings?.willRating),
         spiritRating: normalizeTransfermarktTier(player.attributeSheetRatings?.spiritRating),
         tormentRating: normalizeTransfermarktTier(player.attributeSheetRatings?.tormentRating),
-        attributeStatValues: {
+        attributeStatValues: skipHeavyBaseFields
+          ? null
+          : {
           power: player.attributeSheetStats?.power ?? null,
           health: player.attributeSheetStats?.health ?? null,
           stamina: player.attributeSheetStats?.stamina ?? null,
@@ -1202,7 +1205,9 @@ export function listLocalTransfermarktFreeAgents(input: TransfermarktReadParams 
           spirit: player.attributeSheetStats?.spirit ?? null,
           torment: player.attributeSheetStats?.torment ?? null,
         },
-        topDisciplineScores: getTopDisciplineScores({
+        topDisciplineScores: skipHeavyBaseFields
+          ? []
+          : getTopDisciplineScores({
           saveId: save.saveId,
           disciplinesById,
           disciplinePlayerCountById: seasonDisciplinePlayerCountById,
@@ -1285,239 +1290,217 @@ export function listLocalTransfermarktFreeAgents(input: TransfermarktReadParams 
         .filter(Boolean)
         .slice(0, 4)
     : [];
-  const teamCacheKey = selectedTeam
-    ? [
-        cacheKey,
-        input.mode ?? "full",
-        selectedTeam.teamId,
-        selectedTeamContext?.cash ?? selectedTeam.cash,
-        selectedScoutingLevel,
-        selectedNeeds
-          ? `${selectedNeeds.rosterGap}:${selectedNeeds.uncoveredNeedAxes.join(",")}:${Object.values(selectedNeeds.axisDeficits).join(",")}:${selectedNeeds.topNeedDisciplineIds.join(",")}`
-          : "no_needs",
-        playerMin ?? "-",
-        playerOpt ?? "-",
-        selectedTeamContext?.rosterCacheSignature ?? getTeamRosterCacheSignature(gameState, selectedTeam.teamId),
-      ].join(":")
-    : `${cacheKey}:__no_team__`;
-  let items = localFreeAgentTeamCache.get(teamCacheKey) ?? null;
-  if (!items) {
-    items = baseItems.map<TransfermarktFreeAgentItem>((baseItem) => {
-      const playerScoutingLevel =
-        selectedTeam != null
-          ? getEffectiveScoutingLevel(gameState, selectedTeam.teamId, baseItem.playerId)
-          : selectedScoutingLevel;
-      const player = playersById.get(baseItem.playerId) ?? null;
-      const scoutPotential = player
-        ? buildPlayerScoutPotentialFromGameState({
+  const applyTeamOverlay = (baseItem: TransfermarktFreeAgentItem): TransfermarktFreeAgentItem => {
+    if (!selectedTeam) {
+      return baseItem;
+    }
+
+    const playerScoutingLevel = getEffectiveScoutingLevel(gameState, selectedTeam.teamId, baseItem.playerId);
+    const player = playersById.get(baseItem.playerId) ?? null;
+    const scoutPotential =
+      compactListMode || !player
+        ? null
+        : buildPlayerScoutPotentialFromGameState({
             gameState,
             player,
             saveId: save.saveId,
             scoutingLevel: playerScoutingLevel,
-          })
-        : null;
-      const traitView = player
-        ? getScoutedTraitView({
-            traitsPositive: player.traitsPositive,
-            traitsNegative: player.traitsNegative,
-            scoutingLevel: playerScoutingLevel,
-          })
-        : getScoutedTraitView({
-            traitsPositive: baseItem.traitsPositive,
-            traitsNegative: baseItem.traitsNegative,
-            scoutingLevel: playerScoutingLevel,
           });
-      const visiblePreferredDisciplineIds =
-        player && traitView.disclosure.preferredDisciplinesVisible ? player.preferredDisciplineIds : [];
-      const scoutedFitPlayer = player
-        ? {
-            race: player.race,
-            alignment: player.alignment,
-            subclasses: player.subclasses,
-            traitsPositive: traitView.visiblePositiveTraits,
-            traitsNegative: traitView.visibleNegativeTraits,
-          }
-        : null;
-      const fitBreakdown =
-        selectedTeam && scoutedFitPlayer
-          ? calculateTransfermarktFit(scoutedFitPlayer, selectedRosterPlayers, { teamId: selectedTeam.teamId })
-          : {
-              fitRace: 0,
-              fitSubclasses: 0,
-              fitTraits: 0,
-              fitAlignment: 0,
-              teamFit: selectedTeam ? 0 : null,
-            };
-      const scoutedPow = player
-        ? getScoutedNumericEstimate({
-            saveId: save.saveId,
-            playerId: player.id,
-            field: "pow",
-            value: player.coreStats.pow,
-            scoutingLevel: playerScoutingLevel,
-          })
-        : baseItem.pow;
-      const scoutedSpe = player
-        ? getScoutedNumericEstimate({
-            saveId: save.saveId,
-            playerId: player.id,
-            field: "spe",
-            value: player.coreStats.spe,
-            scoutingLevel: playerScoutingLevel,
-          })
-        : baseItem.spe;
-      const scoutedMen = player
-        ? getScoutedNumericEstimate({
-            saveId: save.saveId,
-            playerId: player.id,
-            field: "men",
-            value: player.coreStats.men,
-            scoutingLevel: playerScoutingLevel,
-          })
-        : baseItem.men;
-      const scoutedSoc = player
-        ? getScoutedNumericEstimate({
-            saveId: save.saveId,
-            playerId: player.id,
-            field: "soc",
-            value: player.coreStats.soc,
-            scoutingLevel: playerScoutingLevel,
-          })
-        : baseItem.soc;
-      const needMatch = buildNeedMatchSignal({
-        item: {
-          ...baseItem,
-          pow: scoutedPow,
-          spe: scoutedSpe,
-          men: scoutedMen,
-          soc: scoutedSoc,
-          preferredDisciplineIds: visiblePreferredDisciplineIds,
-        },
-        needs: selectedNeeds,
-        rosterCount,
-        playerMin,
-        playerOpt,
-      });
-
-      const topDisciplineScores = player
-        ? getTopDisciplineScores({
+    const traitView = player
+      ? getScoutedTraitView({
+          traitsPositive: player.traitsPositive,
+          traitsNegative: player.traitsNegative,
+          scoutingLevel: playerScoutingLevel,
+        })
+      : getScoutedTraitView({
+          traitsPositive: baseItem.traitsPositive,
+          traitsNegative: baseItem.traitsNegative,
+          scoutingLevel: playerScoutingLevel,
+        });
+    const visiblePreferredDisciplineIds =
+      player && traitView.disclosure.preferredDisciplinesVisible ? player.preferredDisciplineIds : [];
+    const scoutedFitPlayer = player
+      ? {
+          race: player.race,
+          alignment: player.alignment,
+          subclasses: player.subclasses,
+          traitsPositive: traitView.visiblePositiveTraits,
+          traitsNegative: traitView.visibleNegativeTraits,
+        }
+      : null;
+    const fitBreakdown =
+      scoutedFitPlayer
+        ? calculateTransfermarktFit(scoutedFitPlayer, selectedRosterPlayers, { teamId: selectedTeam.teamId })
+        : {
+            fitRace: 0,
+            fitSubclasses: 0,
+            fitTraits: 0,
+            fitAlignment: 0,
+            teamFit: 0,
+          };
+    const scoutedPow = player
+      ? getScoutedNumericEstimate({
+          saveId: save.saveId,
+          playerId: player.id,
+          field: "pow",
+          value: player.coreStats.pow,
+          scoutingLevel: playerScoutingLevel,
+        })
+      : baseItem.pow;
+    const scoutedSpe = player
+      ? getScoutedNumericEstimate({
+          saveId: save.saveId,
+          playerId: player.id,
+          field: "spe",
+          value: player.coreStats.spe,
+          scoutingLevel: playerScoutingLevel,
+        })
+      : baseItem.spe;
+    const scoutedMen = player
+      ? getScoutedNumericEstimate({
+          saveId: save.saveId,
+          playerId: player.id,
+          field: "men",
+          value: player.coreStats.men,
+          scoutingLevel: playerScoutingLevel,
+        })
+      : baseItem.men;
+    const scoutedSoc = player
+      ? getScoutedNumericEstimate({
+          saveId: save.saveId,
+          playerId: player.id,
+          field: "soc",
+          value: player.coreStats.soc,
+          scoutingLevel: playerScoutingLevel,
+        })
+      : baseItem.soc;
+    const needMatch = buildNeedMatchSignal({
+      item: {
+        ...baseItem,
+        pow: scoutedPow,
+        spe: scoutedSpe,
+        men: scoutedMen,
+        soc: scoutedSoc,
+        preferredDisciplineIds: visiblePreferredDisciplineIds,
+      },
+      needs: selectedNeeds,
+      rosterCount,
+      playerMin,
+      playerOpt,
+    });
+    const topDisciplineScores =
+      compactListMode || !player
+        ? baseItem.topDisciplineScores
+        : getTopDisciplineScores({
             saveId: save.saveId,
             disciplinesById,
             disciplinePlayerCountById,
             teamDisciplineRankById,
             player,
             scoutingLevel: playerScoutingLevel,
-          })
-        : baseItem.topDisciplineScores;
-      const doubleLoadWarnings = player
-        ? buildTransfermarktDoubleLoadWarnings({
+          });
+    const doubleLoadWarnings =
+      compactListMode || !player
+        ? []
+        : buildTransfermarktDoubleLoadWarnings({
             gameState,
             scoutingLevel: playerScoutingLevel,
             topDisciplines: topDisciplineScores,
+          });
+
+    return {
+      ...baseItem,
+      traitsPositive: traitView.visiblePositiveTraits,
+      traitsNegative: traitView.visibleNegativeTraits,
+      preferredDisciplineIds: visiblePreferredDisciplineIds,
+      scoutingLevel: selectedScoutingLevel,
+      scoutingDisclosure: traitView.disclosure,
+      hiddenPositiveTraitCount: traitView.hiddenPositiveTraitCount,
+      hiddenNegativeTraitCount: traitView.hiddenNegativeTraitCount,
+      preferredDisciplineIdsVisible: traitView.disclosure.preferredDisciplinesVisible,
+      traitPos1: traitView.visiblePositiveTraits[0] ?? null,
+      traitPos2: traitView.visiblePositiveTraits[1] ?? null,
+      traitPos3: traitView.visiblePositiveTraits[2] ?? null,
+      traitNeg1: traitView.visibleNegativeTraits[0] ?? null,
+      traitNeg2: traitView.visibleNegativeTraits[1] ?? null,
+      traitNeg3: traitView.visibleNegativeTraits[2] ?? null,
+      pow: scoutedPow,
+      spe: scoutedSpe,
+      men: scoutedMen,
+      soc: scoutedSoc,
+      powTier: getTransfermarktTierFromPoints(scoutedPow),
+      speTier: getTransfermarktTierFromPoints(scoutedSpe),
+      menTier: getTransfermarktTierFromPoints(scoutedMen),
+      socTier: getTransfermarktTierFromPoints(scoutedSoc),
+      mercenary: hasMercenaryTrait({
+        traitsPositive: player?.traitsPositive ?? baseItem.traitsPositive,
+        traitsNegative: player?.traitsNegative ?? baseItem.traitsNegative,
+      }),
+      topDisciplineScores,
+      potentialTier:
+        scoutPotential?.scoutRating == null
+          ? baseItem.potentialTier
+          : getTransfermarktTierFromPoints(scoutPotential.scoutRating),
+      potentialBand: scoutPotential?.band ?? baseItem.potentialBand,
+      potentialRange: scoutPotential?.potentialRange ?? baseItem.potentialRange,
+      ...(player && !compactListMode
+        ? buildStarFieldsForPlayer({
+            gameState,
+            player,
+            saveId: save.saveId,
+            scoutingLevel: playerScoutingLevel,
           })
-        : [];
-      const scoutingWarnings = [
+        : {
+            axisStarsDisplay: baseItem.axisStarsDisplay,
+            axisStarsOverall: baseItem.axisStarsOverall,
+            axisStarsPow: baseItem.axisStarsPow,
+            axisStarsSpe: baseItem.axisStarsSpe,
+            axisStarsMen: baseItem.axisStarsMen,
+            axisStarsSoc: baseItem.axisStarsSoc,
+            potentialStarsDisplay: baseItem.potentialStarsDisplay,
+            potentialStarsMin: baseItem.potentialStarsMin,
+            potentialStarsMax: baseItem.potentialStarsMax,
+            potentialGapStars: baseItem.potentialGapStars,
+          }),
+      scoutingConfidence: scoutPotential?.confidence ?? baseItem.scoutingConfidence,
+      scoutingSource: scoutPotential?.source ?? baseItem.scoutingSource,
+      scoutingWarnings: [
         ...(scoutPotential?.warnings ?? baseItem.scoutingWarnings),
         ...doubleLoadWarnings.map((warning) => warning.tooltip),
-      ];
-
-      return {
-        ...baseItem,
-        traitsPositive: traitView.visiblePositiveTraits,
-        traitsNegative: traitView.visibleNegativeTraits,
-        preferredDisciplineIds: visiblePreferredDisciplineIds,
-        scoutingLevel: selectedScoutingLevel,
-        scoutingDisclosure: traitView.disclosure,
-        hiddenPositiveTraitCount: traitView.hiddenPositiveTraitCount,
-        hiddenNegativeTraitCount: traitView.hiddenNegativeTraitCount,
-        preferredDisciplineIdsVisible: traitView.disclosure.preferredDisciplinesVisible,
-        traitPos1: traitView.visiblePositiveTraits[0] ?? null,
-        traitPos2: traitView.visiblePositiveTraits[1] ?? null,
-        traitPos3: traitView.visiblePositiveTraits[2] ?? null,
-        traitNeg1: traitView.visibleNegativeTraits[0] ?? null,
-        traitNeg2: traitView.visibleNegativeTraits[1] ?? null,
-        traitNeg3: traitView.visibleNegativeTraits[2] ?? null,
-        pow: scoutedPow,
-        spe: scoutedSpe,
-        men: scoutedMen,
-        soc: scoutedSoc,
-        powTier: getTransfermarktTierFromPoints(scoutedPow),
-        speTier: getTransfermarktTierFromPoints(scoutedSpe),
-        menTier: getTransfermarktTierFromPoints(scoutedMen),
-        socTier: getTransfermarktTierFromPoints(scoutedSoc),
-        mercenary: hasMercenaryTrait({
-          traitsPositive: player?.traitsPositive ?? baseItem.traitsPositive,
-          traitsNegative: player?.traitsNegative ?? baseItem.traitsNegative,
-        }),
-        topDisciplineScores,
-        potentialTier:
-          scoutPotential?.scoutRating == null
-            ? baseItem.potentialTier
-            : getTransfermarktTierFromPoints(scoutPotential.scoutRating),
-        potentialBand: scoutPotential?.band ?? baseItem.potentialBand,
-        potentialRange: scoutPotential?.potentialRange ?? baseItem.potentialRange,
-        ...(player
-          ? buildStarFieldsForPlayer({
-              gameState,
-              player,
-              saveId: save.saveId,
-              scoutingLevel: playerScoutingLevel,
-            })
-          : {
-              axisStarsDisplay: baseItem.axisStarsDisplay,
-              axisStarsOverall: baseItem.axisStarsOverall,
-              axisStarsPow: baseItem.axisStarsPow,
-              axisStarsSpe: baseItem.axisStarsSpe,
-              axisStarsMen: baseItem.axisStarsMen,
-              axisStarsSoc: baseItem.axisStarsSoc,
-              potentialStarsDisplay: baseItem.potentialStarsDisplay,
-              potentialStarsMin: baseItem.potentialStarsMin,
-              potentialStarsMax: baseItem.potentialStarsMax,
-              potentialGapStars: baseItem.potentialGapStars,
-            }),
-        scoutingConfidence: scoutPotential?.confidence ?? baseItem.scoutingConfidence,
-        scoutingSource: scoutPotential?.source ?? baseItem.scoutingSource,
-        scoutingWarnings,
-        doubleLoadWarnings,
-        marketValuePotentialPremiumPct:
-          scoutPotential?.marketValuePotentialPremiumPct ?? baseItem.marketValuePotentialPremiumPct,
-        teamContextAvailable: Boolean(selectedTeam),
-        teamCash: selectedTeam?.cash ?? null,
-        teamSalary: selectedTeam ? teamSalary : null,
-        rosterCount: selectedTeam ? rosterCount : null,
-        playerMin,
-        playerOpt,
-        affordabilityStatus:
-          !selectedTeam || baseItem.marketValue == null
-            ? null
-            : selectedTeam.cash >= baseItem.marketValue
-              ? "affordable"
-              : "too_expensive",
-        rosterPressureStatus:
-          !selectedTeam || playerMin == null || playerOpt == null
-            ? null
-            : rosterCount < playerMin
-              ? "under_min"
-              : rosterCount < playerOpt
-                ? "under_opt"
-                : "at_or_above_opt",
-        fitRace: selectedTeam ? fitBreakdown.fitRace : null,
-        fitSubclasses: selectedTeam ? fitBreakdown.fitSubclasses : null,
-        fitTraits: selectedTeam ? fitBreakdown.fitTraits : null,
-        fitAlignment: selectedTeam ? fitBreakdown.fitAlignment : null,
-        fit: selectedTeam ? fitBreakdown.teamFit : null,
-        fitDisplay:
-          !selectedTeam
-            ? "Team waehlen"
-            : baseItem.mercenary
-              ? `${fitBreakdown.teamFit ?? 0} · Mercenary`
-              : `${fitBreakdown.teamFit ?? 0}`,
-        fitSource: selectedTeam ? "local_approximation_not_golden_master" : "select_team_for_fit",
-        ...needMatch,
-      };
-    });
-    localFreeAgentTeamCache.set(teamCacheKey, items);
-  }
+      ],
+      doubleLoadWarnings,
+      marketValuePotentialPremiumPct:
+        scoutPotential?.marketValuePotentialPremiumPct ?? baseItem.marketValuePotentialPremiumPct,
+      teamContextAvailable: true,
+      teamCash: selectedTeam.cash,
+      teamSalary,
+      rosterCount,
+      playerMin,
+      playerOpt,
+      affordabilityStatus:
+        baseItem.marketValue == null
+          ? null
+          : selectedTeam.cash >= baseItem.marketValue
+            ? "affordable"
+            : "too_expensive",
+      rosterPressureStatus:
+        playerMin == null || playerOpt == null
+          ? null
+          : rosterCount < playerMin
+            ? "under_min"
+            : rosterCount < playerOpt
+              ? "under_opt"
+              : "at_or_above_opt",
+      fitRace: fitBreakdown.fitRace,
+      fitSubclasses: fitBreakdown.fitSubclasses,
+      fitTraits: fitBreakdown.fitTraits,
+      fitAlignment: fitBreakdown.fitAlignment,
+      fit: fitBreakdown.teamFit,
+      fitDisplay: baseItem.mercenary ? `${fitBreakdown.teamFit ?? 0} · Mercenary` : `${fitBreakdown.teamFit ?? 0}`,
+      fitSource: "local_approximation_not_golden_master",
+      ...needMatch,
+    };
+  };
 
   const search = input.search?.trim().toLowerCase() ?? "";
   const minMarketValue = input.minMarketValue ?? null;
@@ -1527,7 +1510,7 @@ export function listLocalTransfermarktFreeAgents(input: TransfermarktReadParams 
   const recentlySoldBySelectedTeam = selectedTeam
     ? buildRecentlySoldByTeam(gameState, gameState.season.id).get(selectedTeam.teamId) ?? null
     : null;
-  const filtered = items.filter((item) => {
+  const filtered = baseItems.filter((item) => {
     const searchHaystack = [
       item.name,
       item.className,
@@ -1550,8 +1533,8 @@ export function listLocalTransfermarktFreeAgents(input: TransfermarktReadParams 
     return matchesSearch && matchesMin && matchesMax && matchesSalaryMin && matchesSalaryMax && !wasRecentlySoldBySelectedTeam;
   });
   const teamAvailableTotal = selectedTeam
-    ? items.filter((item) => !(recentlySoldBySelectedTeam?.has(item.playerId) ?? false)).length
-    : items.length;
+    ? baseItems.filter((item) => !(recentlySoldBySelectedTeam?.has(item.playerId) ?? false)).length
+    : baseItems.length;
 
   const itemLimit = input.limit ?? 250;
   const offset = input.offset != null ? Math.max(0, Math.floor(input.offset)) : 0;
@@ -1562,7 +1545,7 @@ export function listLocalTransfermarktFreeAgents(input: TransfermarktReadParams 
       : aiPreviewMode
         ? buildAiPreviewFreeAgentSlice(filtered, Math.min(filtered.length, boundedLimit + offset))
         : buildDiverseFreeAgentSlice(filtered, Math.min(filtered.length, boundedLimit + offset));
-  const visibleItems = orderedItems.slice(offset, offset + boundedLimit);
+  const visibleItems = orderedItems.slice(offset, offset + boundedLimit).map((item) => applyTeamOverlay(item));
 
   return {
     items: visibleItems,

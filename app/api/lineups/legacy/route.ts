@@ -121,8 +121,12 @@ export async function PUT(request: Request) {
       success: true,
     });
 
+    const versionMeta = createPersistenceService().getSaveVersionMetadata(params.saveId);
+
     return NextResponse.json({
       draft: result.draft,
+      saveVersion: versionMeta?.saveVersion ?? null,
+      contentSignature: versionMeta?.contentSignature ?? null,
       warnings: [...phaseGate.warnings, ...writeAuth.warnings, ...result.warnings],
       source: "sqlite",
       readOnly: false,

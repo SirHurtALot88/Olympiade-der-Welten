@@ -27,9 +27,16 @@ import { withNormalizedTeamIdentityOverrides } from "@/lib/foundation/team-ident
 import { withNormalizedTeamGeneralManagers } from "@/lib/foundation/team-general-managers";
 import { buildScenarioMeta, withScenarioMeta } from "@/lib/persistence/scenario-meta";
 import { resolveFoundationSaveMode } from "@/lib/persistence/foundation-save-mode";
-import { enforceRollingSaveRetention } from "@/lib/persistence/save-retention";
+import { buildSaveContentSignature } from "@/lib/persistence/save-content-signature";
 import { invalidateStandingsOverviewCache } from "@/lib/season/standings-overview-cache";
+import { invalidateStandingsPreviewCache } from "@/lib/standings/standings-preview-cache";
 import { invalidateArenaPreviewCache } from "@/lib/foundation/arena-preview-cache";
+import {
+  buildSaveSessionCacheSignature,
+  invalidateSaveSessionCache,
+  readSaveSessionCache,
+  writeSaveSessionCache,
+} from "@/lib/persistence/save-session-cache";
 import { ensurePlayerBaselines, guardPlayerBaselineWrite } from "@/lib/players/player-baseline-service";
 import { withNormalizedSeasonDisciplineSchedule } from "@/lib/season/season-discipline-schedule";
 import type {
@@ -40,7 +47,9 @@ import type {
   SaveVersionMetadata,
 } from "@/lib/persistence/types";
 
-export { enforceRollingSaveRetention } from "@/lib/persistence/save-retention";
+import { enforceRollingSaveRetention } from "@/lib/persistence/save-retention";
+
+export { enforceRollingSaveRetention };
 
 type SaveRow = {
   save_id: string;
@@ -48,6 +57,12 @@ type SaveRow = {
   status: SaveStatus;
   created_at: string;
   updated_at: string;
+  content_signature?: string;
+  save_version?: number;
+  season_id?: string;
+  matchday_id?: string;
+  lineup_draft_count?: number;
+  transfer_history_count?: number;
 };
 
 type GameMetadata = {
@@ -411,14 +426,70 @@ function loadScenarioMetaForSummary(saveId: string, createdAt: string) {
 function loadSaveRow(saveId: string) {
   const database = getDatabase();
   return database
-    .prepare("SELECT save_id, name, status, created_at, updated_at FROM saves WHERE save_id = ?")
+    .prepare(
+      "SELECT save_id, name, status, created_at, updated_at, content_signature, save_version, season_id, matchday_id, lineup_draft_count, transfer_history_count FROM saves WHERE save_id = ?",
+    )
     .get(saveId) as SaveRow | undefined;
+}
+
+function buildVersionMetadataFromGameState(input: {
+  saveId: string;
+  updatedAt: string;
+  gameState: GameState;
+  transferHistoryCount: number;
+}) {
+  const seasonState = input.gameState.seasonState;
+  const saveVersion = input.gameState.saveVersion ?? 0;
+  const lineupDraftCount = seasonState.lineupDrafts?.length ?? 0;
+  const contentSignature = buildSaveContentSignature({
+    seasonId: input.gameState.season.id,
+    matchdayId: input.gameState.matchdayState.matchdayId,
+    saveVersion,
+    lineupDraftCount,
+    transferHistoryCount: input.transferHistoryCount,
+    matchdayResults: seasonState.matchdayResults ?? [],
+    standingsApplyLogs: seasonState.standingsApplyLogs ?? [],
+    seasonSnapshots: seasonState.seasonSnapshots ?? [],
+    disciplineResults: seasonState.disciplineResults ?? [],
+  });
+
+  return {
+    saveId: input.saveId,
+    updatedAt: input.updatedAt,
+    seasonId: input.gameState.season.id,
+    matchdayId: input.gameState.matchdayState.matchdayId,
+    contentSignature,
+    saveVersion,
+    lineupDraftCount,
+    transferHistoryCount: input.transferHistoryCount,
+    matchdayResults: seasonState.matchdayResults ?? [],
+    standingsApplyLogs: seasonState.standingsApplyLogs ?? [],
+    seasonSnapshots: seasonState.seasonSnapshots ?? [],
+    disciplineResults: seasonState.disciplineResults ?? [],
+  } satisfies SaveVersionMetadata;
 }
 
 function loadSaveVersionMetadata(saveId: string): SaveVersionMetadata | null {
   const row = loadSaveRow(saveId);
   if (!row) {
     return null;
+  }
+
+  if (row.content_signature) {
+    return {
+      saveId: row.save_id,
+      updatedAt: row.updated_at,
+      seasonId: row.season_id ?? "",
+      matchdayId: row.matchday_id ?? "",
+      contentSignature: row.content_signature,
+      saveVersion: row.save_version ?? 0,
+      lineupDraftCount: row.lineup_draft_count ?? 0,
+      transferHistoryCount: row.transfer_history_count ?? 0,
+      matchdayResults: [],
+      standingsApplyLogs: [],
+      seasonSnapshots: [],
+      disciplineResults: [],
+    };
   }
 
   const season = loadSingleton<Season>("seasons", saveId);
@@ -434,19 +505,40 @@ function loadSaveVersionMetadata(saveId: string): SaveVersionMetadata | null {
     .prepare("SELECT COUNT(*) AS count FROM transfer_history WHERE save_id = ?")
     .get(saveId) as { count: number };
 
-  return {
+  const metadata = buildVersionMetadataFromGameState({
     saveId: row.save_id,
     updatedAt: row.updated_at,
-    seasonId: season.id,
-    matchdayId: matchdayState.matchdayId,
-    saveVersion: Number.isFinite(gameMetadata?.saveVersion) ? gameMetadata!.saveVersion : 0,
-    matchdayResults: seasonState.matchdayResults ?? [],
-    standingsApplyLogs: seasonState.standingsApplyLogs ?? [],
-    seasonSnapshots: seasonState.seasonSnapshots ?? [],
-    disciplineResults: seasonState.disciplineResults ?? [],
-    lineupDraftCount: (seasonState.lineupDrafts ?? []).length,
+    gameState: {
+      season,
+      seasonState,
+      matchdayState,
+      saveVersion: Number.isFinite(gameMetadata?.saveVersion) ? gameMetadata!.saveVersion : 0,
+    } as GameState,
     transferHistoryCount: transferHistoryRow.count,
-  };
+  });
+
+  database
+    .prepare(
+      `UPDATE saves
+       SET content_signature = @contentSignature,
+           save_version = @saveVersion,
+           season_id = @seasonId,
+           matchday_id = @matchdayId,
+           lineup_draft_count = @lineupDraftCount,
+           transfer_history_count = @transferHistoryCount
+       WHERE save_id = @saveId`,
+    )
+    .run({
+      saveId: metadata.saveId,
+      contentSignature: metadata.contentSignature,
+      saveVersion: metadata.saveVersion ?? 0,
+      seasonId: metadata.seasonId,
+      matchdayId: metadata.matchdayId,
+      lineupDraftCount: metadata.lineupDraftCount,
+      transferHistoryCount: metadata.transferHistoryCount,
+    });
+
+  return metadata;
 }
 
 let baselineSourcePlayersCache: Player[] | null = null;
@@ -731,6 +823,21 @@ function materializePersistedSave(row: SaveRow): PersistedSaveGame | null {
   };
 }
 
+function materializePersistedSaveCached(row: SaveRow): PersistedSaveGame | null {
+  const contentSignature = buildSaveSessionCacheSignature(row);
+  const cached = readSaveSessionCache(row.save_id, row.updated_at, contentSignature);
+  if (cached) {
+    return cached;
+  }
+
+  const save = materializePersistedSave(row);
+  if (save) {
+    writeSaveSessionCache(save, contentSignature);
+  }
+
+  return save;
+}
+
 function createPersistedSaveRecord(input: {
   saveId: string;
   name: string;
@@ -777,13 +884,51 @@ function createPersistedSaveRecord(input: {
   };
 
   const upsertSave = database.prepare(`
-    INSERT INTO saves (save_id, name, status, created_at, updated_at)
-    VALUES (@saveId, @name, @status, @createdAt, @updatedAt)
+    INSERT INTO saves (
+      save_id,
+      name,
+      status,
+      created_at,
+      updated_at,
+      content_signature,
+      save_version,
+      season_id,
+      matchday_id,
+      lineup_draft_count,
+      transfer_history_count
+    )
+    VALUES (
+      @saveId,
+      @name,
+      @status,
+      @createdAt,
+      @updatedAt,
+      @contentSignature,
+      @saveVersion,
+      @seasonId,
+      @matchdayId,
+      @lineupDraftCount,
+      @transferHistoryCount
+    )
     ON CONFLICT(save_id) DO UPDATE SET
       name = excluded.name,
       status = excluded.status,
-      updated_at = excluded.updated_at
+      updated_at = excluded.updated_at,
+      content_signature = excluded.content_signature,
+      save_version = excluded.save_version,
+      season_id = excluded.season_id,
+      matchday_id = excluded.matchday_id,
+      lineup_draft_count = excluded.lineup_draft_count,
+      transfer_history_count = excluded.transfer_history_count
   `);
+
+  const transferHistoryCount = guardedGameState.transferHistory.length;
+  const versionMetadata = buildVersionMetadataFromGameState({
+    saveId: input.saveId,
+    updatedAt,
+    gameState: guardedGameState,
+    transferHistoryCount,
+  });
 
   const transaction = database.transaction(() => {
     upsertSave.run({
@@ -792,6 +937,12 @@ function createPersistedSaveRecord(input: {
       status: input.status,
       createdAt,
       updatedAt,
+      contentSignature: versionMetadata.contentSignature,
+      saveVersion: versionMetadata.saveVersion ?? 0,
+      seasonId: versionMetadata.seasonId,
+      matchdayId: versionMetadata.matchdayId,
+      lineupDraftCount: versionMetadata.lineupDraftCount,
+      transferHistoryCount: versionMetadata.transferHistoryCount,
     });
 
     replaceSingleton("seasons", input.saveId, guardedGameState.season);
@@ -832,6 +983,7 @@ function createPersistedSaveRecord(input: {
 
   transaction();
   invalidateStandingsOverviewCache(input.saveId);
+  invalidateStandingsPreviewCache(input.saveId);
   invalidateArenaPreviewCache(input.saveId);
 
   const gameStateWithScenarioMeta = guardedGameState.scenarioMeta
@@ -841,7 +993,7 @@ function createPersistedSaveRecord(input: {
         scenarioMeta: buildScenarioMeta({ gameState: guardedGameState }),
       };
 
-  return {
+  const persistedSave = {
     saveId: input.saveId,
     name: input.name,
     status: input.status,
@@ -849,6 +1001,10 @@ function createPersistedSaveRecord(input: {
     updatedAt,
     gameState: gameStateWithScenarioMeta,
   };
+
+  writeSaveSessionCache(persistedSave, versionMetadata.contentSignature);
+
+  return persistedSave;
 }
 
 export function createSaveRepository(): SaveRepository {
@@ -858,11 +1014,16 @@ export function createSaveRepository(): SaveRepository {
       const row = database
         .prepare("SELECT save_id, name, status, created_at, updated_at FROM saves WHERE status = 'active' ORDER BY updated_at DESC LIMIT 1")
         .get() as SaveRow | undefined;
-      return row ? materializePersistedSave(row) : null;
+      if (!row) {
+        return null;
+      }
+
+      const fullRow = loadSaveRow(row.save_id);
+      return fullRow ? materializePersistedSaveCached(fullRow) : null;
     },
     getSaveById(saveId: string) {
       const row = loadSaveRow(saveId);
-      return row ? materializePersistedSave(row) : null;
+      return row ? materializePersistedSaveCached(row) : null;
     },
     getSaveVersionMetadata(saveId: string) {
       if (saveId === "active" || saveId === "current") {

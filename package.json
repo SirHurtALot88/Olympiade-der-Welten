@@ -23,6 +23,7 @@
     "project:audit-write-safety": "node --import tsx scripts/audit-write-safety.ts",
     "perf:audit": "tsx scripts/export-performance-audit.ts",
     "perf:regression-smoke": "tsx scripts/perf-regression-smoke.ts",
+    "perf:resolve-preview": "tsx scripts/perf-resolve-preview-benchmark.ts",
     "project:check-mirror": "tsx scripts/check-project-mirror-consistency.ts",
     "project:export-snapshot": "tsx scripts/export-project-snapshot.ts",
     "server:audit-persistence-readiness": "tsx scripts/export-server-persistence-readiness-audit.ts",

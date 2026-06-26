@@ -328,6 +328,8 @@ type LegacyLineupLabClientProps = {
     teamId: string;
     silent: boolean;
     draft?: LegacyLineupDraft | null;
+    saveVersion?: number | null;
+    contentSignature?: string | null;
   }) => void;
   onFormCardPlanSaved?: (payload: {
     saveId: string;
@@ -4708,6 +4710,7 @@ export default function LegacyLineupLabClient(props: LegacyLineupLabClientProps)
       lineupMiniAudit.status === "warning"
         ? "Mini-Audit mit Hinweisen bestanden. Draft gespeichert."
         : "Mini-Audit sauber. Draft gespeichert.",
+      { skipContextReload: source === "sqlite" },
     );
     if (saved) {
       props.onOpenArena?.({
@@ -4796,7 +4799,7 @@ export default function LegacyLineupLabClient(props: LegacyLineupLabClientProps)
   async function saveEntries(
     entriesToSave: LegacyLineupEntryInput[],
     successMessage: string,
-    options?: { silent?: boolean; resetTransientAfterReload?: boolean },
+    options?: { silent?: boolean; resetTransientAfterReload?: boolean; skipContextReload?: boolean },
   ): Promise<boolean> {
     setIsBusy(true);
     setErrors([]);
@@ -4818,6 +4821,8 @@ export default function LegacyLineupLabClient(props: LegacyLineupLabClientProps)
       });
       const payload = (await response.json()) as {
         draft?: LegacyLineupDraft;
+        saveVersion?: number | null;
+        contentSignature?: string | null;
         warnings?: string[];
         errors?: string[];
         error?: string;
@@ -4834,9 +4839,11 @@ export default function LegacyLineupLabClient(props: LegacyLineupLabClientProps)
       if (!options?.silent) {
         setMessage(buildLineupSaveFeedback(entriesToSave, successMessage));
       }
-      await loadContext(params, source, {
-        resetTransient: options?.resetTransientAfterReload ?? true,
-      });
+      if (!options?.skipContextReload) {
+        await loadContext(params, source, {
+          resetTransient: options?.resetTransientAfterReload ?? true,
+        });
+      }
       props.onLineupSaved?.({
         saveId: params.saveId,
         seasonId: params.seasonId,
@@ -4844,6 +4851,8 @@ export default function LegacyLineupLabClient(props: LegacyLineupLabClientProps)
         teamId: params.teamId,
         silent: Boolean(options?.silent),
         draft: payload.draft ?? null,
+        saveVersion: payload.saveVersion ?? null,
+        contentSignature: payload.contentSignature ?? null,
       });
       return true;
     } finally {

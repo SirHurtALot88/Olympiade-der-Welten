@@ -301,7 +301,9 @@ async function main() {
       nextSeasonState.matchdayResults?.length ? "results_not_reset" : null,
       nextSeasonState.formCards?.some((card) => card.seasonId !== finalSave.gameState.season.id) ? "form_cards_wrong_season" : null,
       nextSeasonState.newGameFlow?.active !== true || nextSeasonState.newGameFlow.dismissed === true ? "season_briefing_not_open" : null,
-      flow.currentStepId !== "season_intro" ? `flow_not_at_season_intro:${flow.currentStepId}` : null,
+      !["season_intro", "team_confirm"].includes(flow.currentStepId ?? "")
+        ? `flow_not_at_season_intro:${flow.currentStepId}`
+        : null,
       freeAgents.total <= 0 ? "transfermarkt_empty" : null,
     ].filter((entry): entry is string => Boolean(entry));
 

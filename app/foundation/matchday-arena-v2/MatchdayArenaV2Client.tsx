@@ -92,6 +92,15 @@ type ArenaContextResponse = {
   error?: string;
 };
 
+type ArenaBaseResponse = ArenaContextResponse & {
+  ok?: boolean;
+  scoreSummary?: MatchdayMvpScoringResult | null;
+  scoreWarnings?: string[];
+  scoreBlockingReasons?: string[];
+  resolvePreview?: ArenaResolveResponse | null;
+  standingsPreview?: ArenaStandingsPreviewResponse | null;
+};
+
 type ArenaResolveResponse = {
   source: "sqlite" | "prisma";
   params: {
@@ -881,6 +890,94 @@ export default function MatchdayArenaV2Client(props: MatchdayArenaV2ClientProps)
       });
       const scoreCacheKey = `${resolvedParams.saveId}:${resolvedParams.seasonId}:${resolvedParams.matchdayId}:${nextSource}`;
       const cachedScoreFeed = scoreFeedCacheRef.current.get(scoreCacheKey) ?? null;
+
+      if (nextSource === "sqlite") {
+        const bundleResponse = await fetch(`/api/matchday/arena-base?${contextQuery.toString()}`, {
+          cache: "no-store",
+          signal: baseController.signal,
+        });
+        const bundlePayload = await readArenaJsonPayload<ArenaBaseResponse>(
+          bundleResponse,
+          "Der Arena-v2-Basisblock hat keine lesbare Antwort geliefert.",
+        );
+
+        if (requestSequenceRef.current !== requestId || baseController.signal.aborted) {
+          return;
+        }
+
+        if (!bundleResponse.ok || bundlePayload.error || !bundlePayload.context) {
+          setErrors([bundlePayload.error ?? bundlePayload.contextErrors?.[0] ?? "Arena v2 konnte den Basisblock nicht laden."]);
+          setContext(null);
+          setScoreFeed(null);
+          setLoadStage("idle");
+          return;
+        }
+
+        const scoreSummary = cachedScoreFeed ?? bundlePayload.scoreSummary ?? null;
+        if (!scoreSummary) {
+          setErrors(["Arena v2 konnte die Spieltagswertung nicht laden."]);
+          setParams(bundlePayload.params);
+          setSource(bundlePayload.source);
+          setContext(bundlePayload.context);
+          setTeamOptions(bundlePayload.options.teams);
+          setScoreFeed(null);
+          setLoadStage("idle");
+          return;
+        }
+
+        const storedRevealSession = props.roomContext ? null : readStoredMatchdayArenaRevealSession(bundlePayload.params);
+        setSource(bundlePayload.source);
+        setParams(bundlePayload.params);
+        setContext(bundlePayload.context);
+        setTeamOptions(bundlePayload.options.teams);
+        setScoreFeed(scoreSummary);
+        scoreFeedCacheRef.current.set(scoreCacheKey, scoreSummary);
+        setStandingsPreviewFeed(bundlePayload.standingsPreview ?? null);
+        setFocusTeamId(bundlePayload.params.teamId);
+        setWarnings(
+          Array.from(
+            new Set([
+              ...bundlePayload.contextWarnings,
+              ...bundlePayload.contextErrors,
+              ...(bundlePayload.scoreWarnings ?? []),
+              ...(bundlePayload.scoreBlockingReasons ?? []),
+              ...scoreSummary.warnings,
+              ...scoreSummary.blockingReasons,
+              ...(bundlePayload.resolvePreview?.warnings ?? []),
+            ]),
+          ),
+        );
+        if (storedRevealSession) {
+          setActiveDisciplinePhase(storedRevealSession.activeDisciplinePhase);
+          setPhaseIndex(Math.max(0, MATCHDAY_ARENA_PHASES.findIndex((phase) => phase.id === storedRevealSession.phaseId)));
+          setRevealedSlotCountByDiscipline(storedRevealSession.revealedSlotCountByDiscipline);
+          setCompletedDisciplinePhases(storedRevealSession.completedDisciplinePhases);
+          setRestoredRevealSessionLabel(
+            `Fortgesetzt bei ${storedRevealSession.activeDisciplinePhase.toUpperCase()} · ${
+              MATCHDAY_ARENA_PHASES.find((phase) => phase.id === storedRevealSession.phaseId)?.label ?? "Slots"
+            }`,
+          );
+        } else {
+          setActiveDisciplinePhase("d1");
+          setPhaseIndex(0);
+          setRevealedSlotCountByDiscipline({ d1: 0, d2: 0 });
+          setCompletedDisciplinePhases({ d1: false, d2: false });
+          setRestoredRevealSessionLabel(null);
+        }
+        setIsPlaying(false);
+        if (bundlePayload.resolvePreview) {
+          setResolveFeed(bundlePayload.resolvePreview);
+          setLoadStage("ready");
+          return;
+        }
+
+        setLoadStage("players");
+
+        const resolveController = new AbortController();
+        resolveRequestAbortRef.current = resolveController;
+        void loadResolvePreview(bundlePayload.params, bundlePayload.source, requestId, resolveController.signal);
+        return;
+      }
 
       const [contextResult, scoreResult] = await Promise.allSettled([
         fetch(`/api/lineups/legacy/lab-context?${contextQuery.toString()}`, {
@@ -2147,7 +2244,14 @@ export default function MatchdayArenaV2Client(props: MatchdayArenaV2ClientProps)
   }
 
   useEffect(() => {
-    if (!canShowTotalResults || standingsPreviewFeed || !params.saveId || !params.seasonId || !params.matchdayId) {
+    if (
+      !canShowTotalResults ||
+      standingsPreviewFeed ||
+      source === "sqlite" ||
+      !params.saveId ||
+      !params.seasonId ||
+      !params.matchdayId
+    ) {
       return undefined;
     }
 
