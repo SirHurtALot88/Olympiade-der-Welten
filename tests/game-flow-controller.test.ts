@@ -218,7 +218,7 @@ describe("game flow controller", () => {
     expect(flow.currentStep.targetView).toBe("lineup");
   });
 
-  it("requires form card selections before arena when lineup is complete", () => {
+  it("requires form card selections before arena when lineup is complete but not submitted", () => {
     const flow = buildGameFlowState({
       gameState: gameState({
         players: [player("p-1", "mittel")],
@@ -235,30 +235,48 @@ describe("game flow controller", () => {
     });
 
     expect(flow.currentStepId).toBe("assign_formcards");
-    expect(flow.currentStep.blockers).toContain("missing_formcard_selections");
-    expect(flow.steps.find((step) => step.stepId === "assign_formcards")?.targetPanel).toBe("form-board");
-  });
-
-  it("blocks arena when lineup is complete but form cards are missing", () => {
-    const flow = buildGameFlowState({
-      gameState: gameState({
-        players: [player("p-1", "mittel")],
-        seasonState: {
-          seasonId: "season-2",
-          schedule: [],
-          standings: {},
-          disciplineSchedule: [{ seasonId: "season-2", matchdayId: "season-2-md-1", discipline1: { disciplineId: "d1", playerCount: 1 }, discipline2: null }],
-          formCards: [{ id: "card-1", saveId: "save-1", seasonId: "season-2", teamId: "M-M", playerId: "p-1", playerName: "p-1", cardColor: "red", cardValue: 4, createdAt: "2026-06-12T00:00:00.000Z" }],
-          lineupDrafts: [{ lineupId: "lineup-1", saveId: "save-1", seasonId: "season-2", matchdayId: "season-2-md-1", teamId: "M-M", status: "draft", entries: [{ disciplineId: "d1", disciplineSide: "d1", slotIndex: 0, playerId: "p-1", activePlayerId: "r-1" }], createdAt: "2026-06-12T00:00:00.000Z", updatedAt: "2026-06-12T00:00:00.000Z" }],
-        },
-      }),
-      activeTeamId: "M-M",
-    });
-
-    expect(flow.currentStepId).toBe("assign_formcards");
+    expect(flow.steps.find((step) => step.stepId === "confirm_lineup")?.status).toBe("ready");
     const arenaStep = flow.steps.find((step) => step.stepId === "open_arena");
     expect(arenaStep?.status).toBe("blocked");
-    expect(arenaStep?.blockers).toContain("missing_formcard_selections");
+  });
+
+  it("opens arena when submitted lineup has form card pool but no manual card picks yet", () => {
+    const flow = buildGameFlowState({
+      gameState: gameState({
+        players: [player("p-1", "mittel")],
+        seasonState: {
+          seasonId: "season-2",
+          schedule: [],
+          standings: {},
+          disciplineSchedule: [{ seasonId: "season-2", matchdayId: "season-2-md-1", discipline1: { disciplineId: "d1", playerCount: 1 }, discipline2: null }],
+          formCards: [{ id: "card-1", saveId: "save-1", seasonId: "season-2", teamId: "M-M", playerId: "p-1", playerName: "p-1", cardColor: "red", cardValue: 4, createdAt: "2026-06-12T00:00:00.000Z" }],
+          lineupDrafts: [{ lineupId: "lineup-1", saveId: "save-1", seasonId: "season-2", matchdayId: "season-2-md-1", teamId: "M-M", status: "submitted", entries: [{ disciplineId: "d1", disciplineSide: "d1", slotIndex: 0, playerId: "p-1", activePlayerId: "r-1" }], createdAt: "2026-06-12T00:00:00.000Z", updatedAt: "2026-06-12T00:00:00.000Z" }],
+        },
+      }),
+      activeTeamId: "M-M",
+    });
+
+    expect(flow.currentStepId).toBe("open_arena");
+    expect(flow.steps.find((step) => step.stepId === "assign_formcards")?.status).toBe("completed");
+  });
+
+  it("blocks arena when lineup is complete but form card pool is missing", () => {
+    const flow = buildGameFlowState({
+      gameState: gameState({
+        players: [player("p-1", "mittel")],
+        seasonState: {
+          seasonId: "season-2",
+          schedule: [],
+          standings: {},
+          disciplineSchedule: [{ seasonId: "season-2", matchdayId: "season-2-md-1", discipline1: { disciplineId: "d1", playerCount: 1 }, discipline2: null }],
+          lineupDrafts: [{ lineupId: "lineup-1", saveId: "save-1", seasonId: "season-2", matchdayId: "season-2-md-1", teamId: "M-M", status: "draft", entries: [{ disciplineId: "d1", disciplineSide: "d1", slotIndex: 0, playerId: "p-1", activePlayerId: "r-1" }], createdAt: "2026-06-12T00:00:00.000Z", updatedAt: "2026-06-12T00:00:00.000Z" }],
+        },
+      }),
+      activeTeamId: "M-M",
+    });
+
+    expect(flow.currentStepId).toBe("assign_formcards");
+    expect(flow.currentStep.blockers).toContain("missing_formcard_pool");
   });
 
   it("blocks arena when lineup is complete but not submitted", () => {

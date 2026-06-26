@@ -26,6 +26,7 @@ loadEnvConfig(path.resolve(__dirname, ".."));
 
 import type { GameState, StandingRecord } from "@/lib/data/olyDataTypes";
 import { createSingleplayerGameState } from "@/lib/game-state/singleplayer-state";
+import { buildTeamSeasonOverviewRows } from "@/lib/foundation/team-management-overview";
 import {
   chooseSponsorOfferForAiTeams,
   ensureSeasonSponsorOffers,
@@ -40,8 +41,13 @@ import {
   getPrizeMoneyReference,
   getRankMilestoneBonus,
   getUnlockedMilestones,
+  getTeamDisplaySalaryTotal,
+  getLeagueMinimumSalaryTotal,
 } from "@/lib/sponsor/sponsor-economy-calibration";
 import { getTeamSponsorContract } from "@/lib/sponsor/sponsor-offer-read";
+import { buildLeagueTeamQualityRanks } from "@/lib/sponsor/sponsor-team-quality-rank";
+import { upsertSeasonSnapshotRecord } from "@/lib/season/season-snapshot-service";
+import type { SeasonSnapshotRecord, SeasonSnapshotTeamRecord } from "@/lib/data/olyDataTypes";
 
 // ─── CLI args ──────────────────────────────────────────────────────────────────
 
@@ -49,6 +55,7 @@ const args = process.argv.slice(2);
 const SIM_YEARS = Number(args.find((a) => a.startsWith("--years="))?.split("=")[1] ?? 5);
 const VERBOSE = args.includes("--verbose");
 const SHOWCASE = args.includes("--showcase");
+const SIM_SEED = Number(args.find((a) => a.startsWith("--seed="))?.split("=")[1] ?? Date.now() % 100000);
 const SAVE_ID = "sponsor-sim-5yr";
 
 const SHOWCASE_RANKS = [1, 5, 9, 13, 17, 21, 25, 32] as const;
@@ -85,21 +92,68 @@ function pad(s: string | number, n: number) {
 // ─── Rank simulation ──────────────────────────────────────────────────────────
 
 /**
- * Simulate season ranks based on team.budget (real invest capacity) + Gaussian noise.
- * Budget is already in display C units (same as cash), range ~170-325.
- * σ = 20 simulates form variance, injuries, lucky/unlucky runs.
+ * Simulate season ranks with persistent momentum — teams can rise or fall over years.
+ * Base strength from budget, plus carried momentum and yearly form noise.
  */
-function simulateRankMap(gs: GameState, rng: () => number): Record<string, number> {
-  const scored = gs.teams.map((team) => ({
-    teamId: team.teamId,
-    score: (team.budget ?? 0) + gaussian(rng) * 20,
-  }));
+function simulateRankMap(
+  gs: GameState,
+  rng: () => number,
+  momentumByTeamId: Map<string, number>,
+): Record<string, number> {
+  const scored = gs.teams.map((team) => {
+    const previousMomentum = momentumByTeamId.get(team.teamId) ?? 0;
+    const momentumShift = gaussian(rng) * 5;
+    const nextMomentum = previousMomentum * 0.55 + momentumShift;
+    momentumByTeamId.set(team.teamId, nextMomentum);
+    const score = (team.budget ?? 0) + nextMomentum * 10 + gaussian(rng) * 14;
+    return { teamId: team.teamId, score };
+  });
   scored.sort((a, b) => b.score - a.score);
   const result: Record<string, number> = {};
-  scored.forEach((entry, i) => {
-    result[entry.teamId] = i + 1;
+  scored.forEach((entry, index) => {
+    result[entry.teamId] = index + 1;
   });
   return result;
+}
+
+function buildMinimalSeasonSnapshot(input: {
+  gameState: GameState;
+  seasonId: string;
+  rankMap: Record<string, number>;
+}): SeasonSnapshotRecord {
+  const finalStandings: SeasonSnapshotTeamRecord[] = input.gameState.teams.map((team) => {
+    const rank = input.rankMap[team.teamId] ?? 32;
+    return {
+      teamId: team.teamId,
+      teamCode: team.shortCode,
+      teamName: team.name,
+      rank,
+      points: Math.max(1, 33 - rank) * 3,
+      disciplinePoints: Math.max(1, 33 - rank) * 3,
+      disciplinePointsByArea: { pow: null, spe: null, men: null, soc: null },
+      cashEnd: team.cash,
+      rosterEnd: input.gameState.rosters.filter((entry) => entry.teamId === team.teamId).length,
+      salaryEnd: getTeamDisplaySalaryTotal(input.gameState, team.teamId),
+      marketValueEnd: null,
+      transferCount: 0,
+      transferBuyCount: 0,
+      transferSellCount: 0,
+      transferNet: null,
+      startplatz: rank,
+    };
+  });
+
+  return {
+    seasonId: input.seasonId,
+    seasonName: input.seasonId,
+    archivedAt: new Date().toISOString(),
+    source: "local",
+    status: "completed",
+    sourceStatus: "mapped",
+    finalStandings,
+    playerPerformances: [],
+    warnings: [],
+  };
 }
 
 /** Inject simulated ranks as StandingRecord entries the sponsor settlement reads */
@@ -121,11 +175,14 @@ function injectStandings(gs: GameState, rankMap: Record<string, number>): GameSt
 type TeamYearRow = {
   teamId: string;
   name: string;
+  shortCode: string;
   budget: number;
   rank: number;
+  starTier: number | null;
+  qualityRank: number | null;
   sponsorPayout: number;
-  prizeMoneyRef: number;   // what the old prize money would have been
-  delta: number;           // sponsorPayout - prizeMoneyRef (positive = better than old system)
+  prizeMoneyRef: number;
+  delta: number;
   cashBefore: number;
   cashAfter: number;
 };
@@ -231,6 +288,31 @@ function runShowcase() {
   console.log("\nFertig.\n");
 }
 
+function pickSpotlightTeams(
+  teams: GameState["teams"],
+  rankHistoryByTeamId: Map<string, number[]>,
+): string[] {
+  const sortedByBudget = [...teams].sort((left, right) => (left.budget ?? 0) - (right.budget ?? 0));
+  const picks = new Set<string>();
+  picks.add(sortedByBudget.at(-1)!.teamId);
+  picks.add(sortedByBudget.at(-2)!.teamId);
+  picks.add(sortedByBudget[Math.floor(sortedByBudget.length / 2)]!.teamId);
+  picks.add(sortedByBudget[0]!.teamId);
+  picks.add(sortedByBudget[1]!.teamId);
+
+  const volatile = [...teams]
+    .map((team) => {
+      const ranks = rankHistoryByTeamId.get(team.teamId) ?? [];
+      const swing = ranks.length > 1 ? Math.max(...ranks) - Math.min(...ranks) : 0;
+      return { teamId: team.teamId, swing };
+    })
+    .sort((left, right) => right.swing - left.swing)
+    .slice(0, 3);
+  volatile.forEach((entry) => picks.add(entry.teamId));
+
+  return [...picks].slice(0, 8);
+}
+
 // ─── Main ─────────────────────────────────────────────────────────────────────
 
 async function main() {
@@ -247,11 +329,14 @@ async function main() {
   let gs = createSingleplayerGameState();
 
   console.log(`  ${gs.teams.length} Teams | ${gs.rosters.length} Roster-Einträge | Season: ${gs.season.id}`);
+  console.log(`  Sim-Seed: ${SIM_SEED} | Liga-Min-Gehalt: ${getLeagueMinimumSalaryTotal(gs).toFixed(1)} C`);
   console.log(`  Budget-Spanne: ${Math.min(...gs.teams.map((t) => t.budget)).toFixed(0)} – ${Math.max(...gs.teams.map((t) => t.budget)).toFixed(0)} C`);
   console.log(`  Starting Cash: ${Math.min(...gs.teams.map((t) => t.cash)).toFixed(1)} – ${Math.max(...gs.teams.map((t) => t.cash)).toFixed(1)} C`);
   console.log(`  (Note: Cash-Änderungen nur aus Sponsor-Zahlungen. Preisgeld/Transfers/Facility nicht simuliert.)\n`);
 
   const results: YearSummary[] = [];
+  const momentumByTeamId = new Map<string, number>();
+  const rankHistoryByTeamId = new Map<string, number[]>();
 
   for (let year = 1; year <= SIM_YEARS; year++) {
     const seasonId = `season-${year}`;
@@ -267,9 +352,17 @@ async function main() {
     gs = { ...gs, seasonState: { ...gs.seasonState, seasonEconomyFactors: economyWindow } };
 
     // 2. Simulate ranks via team.budget + Gaussian noise, inject standings
-    const rng = lcg(year * 1013 + 997);
-    const rankMap = simulateRankMap(gs, rng);
+    const rng = lcg(SIM_SEED + year * 1013 + 997);
+    const rankMap = simulateRankMap(gs, rng, momentumByTeamId);
     gs = injectStandings(gs, rankMap);
+    for (const team of gs.teams) {
+      const rank = rankMap[team.teamId] ?? 32;
+      const history = rankHistoryByTeamId.get(team.teamId) ?? [];
+      history.push(rank);
+      rankHistoryByTeamId.set(team.teamId, history);
+    }
+
+    const qualityBeforeOffers = buildLeagueTeamQualityRanks(buildTeamSeasonOverviewRows({ gameState: gs }));
 
     // 3. Record cash before sponsor settlement
     const cashBefore = new Map(gs.teams.map((t) => [t.teamId, t.cash]));
@@ -296,6 +389,8 @@ async function main() {
     // 7. Build per-team result rows
     const teamRows: TeamYearRow[] = gs.teams.map((team) => {
       const rank = rankMap[team.teamId] ?? 32;
+      const contract = getTeamSponsorContract(gs, team.teamId);
+      const quality = qualityBeforeOffers.get(team.teamId) ?? null;
       const sponsorLogs = (gs.seasonState.sponsorPayoutLogs ?? []).filter(
         (log) => log.teamId === team.teamId && log.seasonId === seasonId,
       );
@@ -305,8 +400,11 @@ async function main() {
       return {
         teamId: team.teamId,
         name: team.name,
+        shortCode: team.shortCode,
         budget: team.budget ?? 0,
         rank,
+        starTier: contract?.starTier ?? null,
+        qualityRank: quality?.qualityRank ?? null,
         sponsorPayout,
         prizeMoneyRef,
         delta: round1(sponsorPayout - prizeMoneyRef),
@@ -316,6 +414,17 @@ async function main() {
     });
 
     results.push({ year, seasonId, factor, teams: teamRows });
+
+    gs = {
+      ...gs,
+      seasonState: {
+        ...gs.seasonState,
+        seasonSnapshots: upsertSeasonSnapshotRecord(
+          gs.seasonState.seasonSnapshots,
+          buildMinimalSeasonSnapshot({ gameState: gs, seasonId, rankMap }),
+        ),
+      },
+    };
 
     // Summary
     const sorted = [...teamRows].sort((a, b) => a.rank - b.rank);
@@ -328,13 +437,13 @@ async function main() {
     console.log(`   Besser als Preisgeld: ${aboveRef}/32 Teams`);
 
     if (VERBOSE) {
-      console.log(`\n   Rang  ${"Team".padEnd(26)} ${"Budget".padStart(7)} ${"Sponsor".padStart(8)} ${"PGeld".padStart(7)} ${"Delta".padStart(7)} ${"CashNach".padStart(9)}`);
-      console.log(`   ${"─".repeat(75)}`);
+      console.log(`\n   Rang  ${"Team".padEnd(22)} ${"Q".padStart(5)} ${"★".padStart(2)} ${"Budget".padStart(7)} ${"Sponsor".padStart(8)} ${"PGeld".padStart(7)} ${"Delta".padStart(7)} ${"CashNach".padStart(9)}`);
+      console.log(`   ${"─".repeat(78)}`);
       for (const t of sorted) {
         const dStr = sign(t.delta);
         const flag = t.delta >= 0 ? " ✓" : "  ";
         console.log(
-          `   ${pad(t.rank, 3)}  ${t.name.substring(0, 25).padEnd(26)} ${pad(t.budget, 7)} ${pad(t.sponsorPayout.toFixed(1), 8)} ${pad(t.prizeMoneyRef.toFixed(1), 7)} ${pad(dStr, 7)} ${pad(t.cashAfter.toFixed(1), 9)}${flag}`,
+          `   ${pad(t.rank, 3)}  ${t.shortCode.padEnd(6)} ${t.name.substring(0, 14).padEnd(15)} ${pad(t.qualityRank?.toFixed(1) ?? "—", 5)} ${pad(t.starTier ?? "—", 2)} ${pad(t.budget, 7)} ${pad(t.sponsorPayout.toFixed(1), 8)} ${pad(t.prizeMoneyRef.toFixed(1), 7)} ${pad(dStr, 7)} ${pad(t.cashAfter.toFixed(1), 9)}${flag}`,
         );
       }
       console.log();
@@ -445,6 +554,22 @@ async function main() {
       const t = yr.teams.find((x) => x.teamId === tid)!;
       process.stdout.write(` ${pad(t.cashAfter.toFixed(1), 9)}`);
     }
+    console.log();
+  }
+
+  console.log(`\n${"─".repeat(72)}`);
+  console.log("Platzierungs-Verlauf (8 Teams: Top, Mid, Bottom + stärkste Bewegung):\n");
+  const spotlightIds = pickSpotlightTeams(gs.teams, rankHistoryByTeamId);
+  console.log(
+    `  ${"Team".padEnd(22)} ${results.map((yr) => `J${yr.year}Pl`.padStart(7)).join(" ")} ${results.map((yr) => `J${yr.year}★`.padStart(6)).join(" ")}`,
+  );
+  for (const teamId of spotlightIds) {
+    const team = gs.teams.find((entry) => entry.teamId === teamId)!;
+    const ranks = rankHistoryByTeamId.get(teamId) ?? [];
+    const stars = results.map((yr) => yr.teams.find((entry) => entry.teamId === teamId)?.starTier ?? "—");
+    process.stdout.write(`  ${team.shortCode.padEnd(6)} ${team.name.substring(0, 14).padEnd(15)}`);
+    ranks.forEach((rank) => process.stdout.write(` ${pad(rank, 7)}`));
+    stars.forEach((star) => process.stdout.write(` ${pad(String(star), 6)}`));
     console.log();
   }
 

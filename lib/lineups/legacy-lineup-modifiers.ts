@@ -107,6 +107,49 @@ export function normalizeLineupDraftModifiers(modifiers?: Partial<LineupDraftMod
   };
 }
 
+export function lineupModifiersHaveFormCardSelections(modifiers?: Partial<LineupDraftModifiers> | null) {
+  const normalized = normalizeLineupDraftModifiers(modifiers);
+  return [normalized.d1, normalized.d2].some(
+    (side) => Boolean(side.primaryFormCardId || side.secondaryFormCardId),
+  );
+}
+
+export function autoFillFormCardModifiers(input: {
+  gameState: GameState;
+  seasonId: string;
+  teamId: string;
+  lineupId?: string | null;
+  modifiers?: Partial<LineupDraftModifiers> | null;
+}): LineupDraftModifiers {
+  const normalized = normalizeLineupDraftModifiers(input.modifiers);
+  if (lineupModifiersHaveFormCardSelections(normalized)) {
+    return normalized;
+  }
+
+  const options = getTeamFormCardOptions({
+    gameState: input.gameState,
+    seasonId: input.seasonId,
+    teamId: input.teamId,
+    lineupId: input.lineupId ?? null,
+  });
+  const usedIds = new Set<string>();
+
+  for (const side of ["d1", "d2"] as const) {
+    if (normalized[side].primaryFormCardId || normalized[side].secondaryFormCardId) {
+      continue;
+    }
+    const positive = options
+      .filter((card) => card.value > 0 && !usedIds.has(card.id))
+      .sort((left, right) => right.value - left.value || left.id.localeCompare(right.id))[0];
+    if (positive) {
+      normalized[side].primaryFormCardId = positive.id;
+      usedIds.add(positive.id);
+    }
+  }
+
+  return normalized;
+}
+
 export function getLegacyMutatorTraitOptions(): LegacyMutatorTraitOption[] {
   return [
     ...POSITIVE_MUTATOR_TRAITS.map((trait) => ({

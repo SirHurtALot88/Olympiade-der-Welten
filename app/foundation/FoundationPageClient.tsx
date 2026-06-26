@@ -186,7 +186,7 @@ import {
   type FeatureAuditFilter,
   type FeatureAuditStatus,
 } from "@/lib/foundation/feature-audit-matrix";
-import { buildGameFlowState, type GameFlowStepStatus, type GameFlowView } from "@/lib/foundation/game-flow-controller";
+import { buildGameFlowState, isActiveMatchdayPreparation, type GameFlowStepStatus, type GameFlowView } from "@/lib/foundation/game-flow-controller";
 import { buildGameInboxItems, filterGameInboxItems, getPrimaryInboxTask } from "@/lib/foundation/game-inbox-service";
 import { buildMatchdaySummary, getMatchdaySummaryOptions } from "@/lib/foundation/matchday-summary";
 import { normalizeLineupDisciplineFieldName } from "@/lib/lineups/team-discipline-ranks";
@@ -11578,6 +11578,10 @@ export default function FoundationPageClient({
         .slice(0, 4),
     [activeTeamOpenInboxItems],
   );
+  const focusMatchdayLoop = useMemo(
+    () => isActiveMatchdayPreparation(gameState),
+    [gameState],
+  );
   const inboxPrimaryTeamItem = useMemo(() => {
     const scheduleEntry = (gameState.seasonState.disciplineSchedule ?? []).find(
       (entry) => entry.seasonId === gameState.season.id && entry.matchdayId === gameState.matchdayState.matchdayId,
@@ -11601,8 +11605,8 @@ export default function FoundationPageClient({
         return !isTeamMatchdayLineupComplete(gameState, teamId, draft ?? null);
       },
     );
-    return getPrimaryInboxTask(openItems);
-  }, [activeTeamInboxItems, gameState.matchdayState.matchdayId, gameState.season.id, gameState.seasonState.disciplineSchedule, gameState.seasonState.lineupDrafts]);
+    return getPrimaryInboxTask(openItems, { focusMatchdayLoop });
+  }, [activeTeamInboxItems, focusMatchdayLoop, gameState.matchdayState.matchdayId, gameState.season.id, gameState.seasonState.disciplineSchedule, gameState.seasonState.lineupDrafts]);
 	  const visibleInboxItems = useMemo(
 	    () =>
 	      filterGameInboxItems(activeTeamInboxItems, {
@@ -11645,15 +11649,10 @@ export default function FoundationPageClient({
       gameFlowActionStep.targetView === "market");
   const flowOverrideInboxItem = useMemo(
     () =>
-      shouldPreferGameFlowAction
-        ? (activeTeamOpenInboxItems.find(
-            (item) =>
-              item.category === "sponsor" ||
-              item.category === "contract" ||
-              item.severity === "critical",
-          ) ?? null)
+      shouldPreferGameFlowAction && gameFlowActionStep.stepId === "choose_sponsor"
+        ? (activeTeamOpenInboxItems.find((item) => item.category === "sponsor") ?? null)
         : null,
-    [activeTeamOpenInboxItems, shouldPreferGameFlowAction],
+    [activeTeamOpenInboxItems, gameFlowActionStep.stepId, shouldPreferGameFlowAction],
   );
 	  const primaryInboxItem = useMemo(
 	    () => {
@@ -11669,9 +11668,9 @@ export default function FoundationPageClient({
         const globalTasks = filterGameInboxItems(gameInboxItems, { includeDismissed: false, includeDone: false }).filter(
           (item) => !item.itemId.startsWith("lineup_missing:") || item.teamId === activeManagerTeamId,
         );
-        return getPrimaryInboxTask(globalTasks);
+        return getPrimaryInboxTask(globalTasks, { focusMatchdayLoop });
       },
-	    [activeManagerTeamId, flowOverrideInboxItem, gameInboxItems, inboxPrimaryTeamItem, shouldPreferGameFlowAction],
+	    [activeManagerTeamId, flowOverrideInboxItem, focusMatchdayLoop, gameInboxItems, inboxPrimaryTeamItem, shouldPreferGameFlowAction],
 	  );
 	  const gameFlowCanAutoFix = Boolean(activeContextMeta?.allowTestWrites && gameFlowActionStep.status === "blocked");
   const resolveLineupIssueTeamId = (preferredTeamId?: string | null) => {

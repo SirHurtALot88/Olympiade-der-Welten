@@ -1,5 +1,5 @@
 import type { FormCardPlanRecord, GameState } from "@/lib/data/olyDataTypes";
-import { getFormCardFlowStatus } from "@/lib/foundation/form-card-flow";
+import { getFormCardFlowStatus, isFormCardFlowReadyForMatchday } from "@/lib/foundation/form-card-flow";
 import {
   getMatchdayLineupSideRequirements,
   getTeamMatchdayLineupDraft,
@@ -54,7 +54,9 @@ export function getMatchdayArenaReadiness(gameState: GameState, activeTeamId: st
   const hasResults = hasCurrentMatchdayResult(gameState);
   const formCardsRequired = lineupOperationallyReady && !hasResults;
   const formCardFlow = getFormCardFlowStatus(gameState, activeTeamId);
-  const formCardsReady = !formCardsRequired || formCardFlow.isReady;
+  const formCardsReady =
+    !formCardsRequired ||
+    isFormCardFlowReadyForMatchday(gameState, activeTeamId, { lineupSubmitted: lineupSubmitted });
   const isReady = lineupOperationallyReady && lineupSubmitted && formCardsReady;
 
   let blocker: MatchdayArenaBlockerReason = null;
@@ -64,7 +66,7 @@ export function getMatchdayArenaReadiness(gameState: GameState, activeTeamId: st
     blocker = "incomplete_lineup";
   } else if (!lineupSubmitted) {
     blocker = "lineup_not_submitted";
-  } else if (formCardsRequired && formCardFlow.blocker) {
+  } else if (formCardsRequired && !formCardsReady && formCardFlow.blocker) {
     blocker = formCardFlow.blocker as MatchdayArenaBlockerReason;
   }
 

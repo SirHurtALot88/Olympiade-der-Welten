@@ -21,7 +21,7 @@
 | Lineup bestätigen (submitted) | 🟢 | Pflicht — UI zeigt Blocker + Button "Lineup bestätigen" |
 | Arena startet | 🟢 | Nach Lineup-Bestaetigung — Flow-Gate aktiv |
 | Arena Ergebnisse scrollen | 🟢 | Globaler-Next scrollt direkt zu `#arena-result-summary` statt Arena-Top |
-| Spieltag abschliessen | 🟢 | Button "Spieltag abschliessen" in arena-result-summary — ruft auto-run mit advance |
+| Spieltag abschliessen | 🟢 | Auto-Prep (Formkarten/Lineups) vor Auto-Run; Vertrags-Inbox blockiert Matchday-Flow nicht mehr |
 | Nächster Spieltag | 🟢 | Nach auto-run → homeV2 mit Training/Lineup für neuen Spieltag |
 | Gehalt/MW-Delta-Stack | 🟢 | Deltas unter Wert in Kader-Tabelle, Roster-Grids und Home-Karten |
 | Ranira Bold Italic | 🟢 | `font-style: italic; font-weight: 700` auf Body/Foundation-Shell |
@@ -30,8 +30,6 @@ Legende: 🟢 OK · 🟡 teilweise / Re-Test nötig · 🔴 blockiert
 
 ## Was noch 🟡 ist
 
-- **Spieltag abschliessen (Apply)** — Arena-Play und Cockpit erreichbar; voller Auto-Run-Apply in diesem Smoke nicht ausgeführt.
-- **Save/Team-Control Solo** — für Chris-gesteuertes H-R: `npm run save:repair-team-control -- --team H-R` falls nötig.
 - **Automatisierter Smoke** — `npm run app:smoke-gameplay` benötigt lokal `npx playwright install`.
 
 ## Fix Loop 3 — Foundation Nav-UX (2026-06-25)

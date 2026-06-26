@@ -54,6 +54,18 @@ export function getFormCardFlowStatus(gameState: GameState, activeTeamId: string
   };
 }
 
+export function isFormCardFlowReadyForMatchday(
+  gameState: GameState,
+  activeTeamId: string | null,
+  options?: { lineupSubmitted?: boolean },
+) {
+  const flow = getFormCardFlowStatus(gameState, activeTeamId);
+  if (flow.isReady) {
+    return true;
+  }
+  return Boolean(options?.lineupSubmitted && flow.hasPool);
+}
+
 /** @deprecated Use activeTeamHasFormCardModifierSelections */
 export function activeTeamHasFormCardSelections(gameState: GameState, activeTeamId: string | null) {
   return activeTeamHasFormCardModifierSelections(gameState, activeTeamId);

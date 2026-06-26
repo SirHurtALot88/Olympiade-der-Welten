@@ -12,7 +12,7 @@ import { calculateFacilityIncome, calculateFacilityUpkeep, getTeamFacilityState 
 import { FACILITY_CONDITION_WARNING, getFacilityConditionStatus } from "@/lib/facilities/facility-condition";
 import { buildTeamObjectiveOverview } from "@/lib/board/team-season-objectives-service";
 import { buildMatchdaySummary } from "@/lib/foundation/matchday-summary";
-import { activeTeamHasFormCardSelections } from "@/lib/foundation/form-card-flow";
+import { activeTeamHasFormCardSelections, isFormCardFlowReadyForMatchday } from "@/lib/foundation/form-card-flow";
 import { isTeamMatchdayLineupComplete, isTeamMatchdayLineupSubmitted } from "@/lib/foundation/matchday-lineup-readiness";
 import { getTeamSponsorContract } from "@/lib/sponsor/sponsor-offer-read";
 import { listOpenSponsorEvents } from "@/lib/sponsor/sponsor-event-service";
@@ -225,6 +225,7 @@ function buildTeamTasks(input: BuildGameInboxInput, visibleTeamIds: Set<string>,
       rosterCount > 0 &&
       lineupComplete &&
       !activeTeamHasFormCardSelections(input.gameState, team.teamId) &&
+      !isFormCardFlowReadyForMatchday(input.gameState, team.teamId, { lineupSubmitted: lineupStatus.isSubmitted }) &&
       controlMode === "manual"
     ) {
       items.push(
@@ -907,7 +908,7 @@ export function filterGameInboxItems(items: GameInboxItem[], filter: GameInboxFi
   });
 }
 
-export function getPrimaryInboxTask(items: GameInboxItem[]) {
+export function getPrimaryInboxTask(items: GameInboxItem[], options?: { focusMatchdayLoop?: boolean }) {
   return (
     items.find(
       (item) =>
@@ -915,7 +916,7 @@ export function getPrimaryInboxTask(items: GameInboxItem[]) {
         (item.category === "task" ||
           item.category === "warning" ||
           item.category === "sponsor" ||
-          item.category === "contract" ||
+          (!options?.focusMatchdayLoop && item.category === "contract") ||
           item.severity === "critical"),
     ) ?? null
   );

@@ -8,6 +8,7 @@ import {
   calculateMutatorModifierForSide,
   createDefaultLineupDraftModifiers,
   ensureLocalFormCardsForSeason,
+  autoFillFormCardModifiers,
   getFormCardColorForDisciplineCategory,
   getTeamFormCardOptions,
   buildLegacyMutatorTraitOptionsForRoster,
@@ -1110,7 +1111,8 @@ export function saveLocalLegacyLineupDraft(
       warnings: ["Only the active local matchday can be edited. Older matchdays stay locked after progress."],
     };
   }
-  const contextResult = buildContextFromGameState(save.gameState, effectiveParams);
+  const gameStateWithFormCards = ensureLocalFormCardsForSeason(save.gameState, effectiveParams.saveId, effectiveParams.seasonId);
+  const contextResult = buildContextFromGameState(gameStateWithFormCards, effectiveParams);
   if (!contextResult.ok) {
     return { ok: false, errors: contextResult.errors, warnings: contextResult.warnings };
   }
@@ -1136,7 +1138,7 @@ export function saveLocalLegacyLineupDraft(
 
   const now = new Date().toISOString();
   const lineupId = createLineupDraftId(effectiveParams);
-  const existingDrafts = getStoredDrafts(save.gameState);
+  const existingDrafts = getStoredDrafts(gameStateWithFormCards);
   const existing = existingDrafts.find((draft) => draft.lineupId === lineupId) ?? null;
   if (existing && ["locked", "resolved"].includes(existing.status)) {
     return {
@@ -1145,6 +1147,13 @@ export function saveLocalLegacyLineupDraft(
       warnings: ["This lineup is already locked/resolved and can no longer be overwritten."],
     };
   }
+  const resolvedModifiers = autoFillFormCardModifiers({
+    gameState: gameStateWithFormCards,
+    seasonId: effectiveParams.seasonId,
+    teamId: effectiveParams.teamId,
+    lineupId,
+    modifiers,
+  });
   const nextDraft: LineupDraft = {
     lineupId,
     saveId: effectiveParams.saveId,
@@ -1153,12 +1162,12 @@ export function saveLocalLegacyLineupDraft(
     teamId: effectiveParams.teamId,
     status: "submitted",
     entries: normalizedEntries,
-    modifiers: normalizeLineupDraftModifiers(modifiers),
+    modifiers: normalizeLineupDraftModifiers(resolvedModifiers),
     createdAt: existing?.createdAt ?? now,
     updatedAt: now,
   };
 
-  if (!isTeamMatchdayLineupOperationallyReady(save.gameState, effectiveParams.teamId, nextDraft)) {
+  if (!isTeamMatchdayLineupOperationallyReady(gameStateWithFormCards, effectiveParams.teamId, nextDraft)) {
     return {
       ok: false,
       errors: ["lineup_not_operationally_ready"],
@@ -1167,9 +1176,9 @@ export function saveLocalLegacyLineupDraft(
   }
 
   const nextGameState: GameState = {
-    ...save.gameState,
+    ...gameStateWithFormCards,
     seasonState: {
-      ...save.gameState.seasonState,
+      ...gameStateWithFormCards.seasonState,
       lineupDrafts: [
         ...existingDrafts.filter((draft) => draft.lineupId !== lineupId),
         nextDraft,
