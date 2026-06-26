@@ -14,7 +14,6 @@ export type MatchdayArenaBlockerReason =
   | "missing_lineup"
   | "incomplete_lineup"
   | "lineup_not_submitted"
-  | "missing_formcard_selections"
   | "missing_formcard_pool"
   | null;
 

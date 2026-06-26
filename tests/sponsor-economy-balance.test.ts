@@ -11,13 +11,17 @@ import {
 import { advanceSponsorContractsForNewSeason } from "@/lib/sponsor/sponsor-contract-lifecycle";
 import { getTeamSponsorContract } from "@/lib/sponsor/sponsor-offer-read";
 import {
+  buildOfferCashAmounts,
+  getLeagueFourthFromLowestSalaryTotal,
   getLeagueMinimumSalaryTotal,
   getPrizeMoneyReference,
   getRankMilestoneBonus,
   getSponsorPayoutForFinalRank,
   getSponsorPayoutForFinalRankAndTier,
+  getSponsorRank32BaseAnchorSalary,
   resolveSponsorEconomyAnchors,
   SPONSOR_BASE_FLOOR_C,
+  SPONSOR_BASE_SALARY_BUFFER_C,
 } from "@/lib/sponsor/sponsor-economy-calibration";
 import { applySponsorSettlement } from "@/lib/sponsor/sponsor-settlement-service";
 
@@ -251,7 +255,7 @@ describe("sponsor economy balance", () => {
 
     const settled = runSingleTeamSettlement(gameState, bottomTeam.teamId);
     const payout = teamSeasonSponsorPayout(settled, gameState.season.id, bottomTeam.teamId);
-    const leagueMin = getLeagueMinimumSalaryTotal(gameState);
+    const leagueMin = getSponsorRank32BaseAnchorSalary(gameState);
 
     expect(payout).toBeGreaterThanOrEqual(leagueMin * 0.95);
   }, 60000);
@@ -303,20 +307,67 @@ describe("sponsor economy balance", () => {
     expect(fiveStar / oneStar).toBeGreaterThan(1.12);
   });
 
-  it("never pays security base below league minimum salary", () => {
+  it("anchors rank-32 security base to fourth-lowest salary minus buffer", () => {
     let gameState = createSingleplayerGameState();
-    const leagueMin = getLeagueMinimumSalaryTotal(gameState);
-    const offers = buildSponsorOffersForTeam({ gameState, teamId: gameState.teams[0]!.teamId });
+    const fourthLowest = getLeagueFourthFromLowestSalaryTotal(gameState);
+    const anchor = getSponsorRank32BaseAnchorSalary(gameState);
+    const rrTeam = gameState.teams.find((team) => team.shortCode === "R-R") ?? gameState.teams.at(-1)!;
+    const offers = buildSponsorOffersForTeam({ gameState, teamId: rrTeam.teamId });
     const security = offers.find((offer) => offer.archetype === "security");
     const base = security?.components.find((component) => component.kind === "base")?.rewardCash ?? 0;
 
-    expect(base).toBeGreaterThanOrEqual(leagueMin * 0.98);
+    expect(anchor).toBeGreaterThanOrEqual(fourthLowest - SPONSOR_BASE_SALARY_BUFFER_C - 0.1);
+    expect(base).toBeGreaterThanOrEqual(anchor * 0.98);
+    expect(getSponsorPayoutForFinalRankAndTier(32, 1, security?.starTier ?? 2, anchor, "security", security?.teamQualityRank))
+      .toBeGreaterThanOrEqual(anchor * 0.98);
   }, 180000);
+
+  it("never pays security base below rank-32 anchor for top-table teams", () => {
+    let gameState = createSingleplayerGameState();
+    const anchor = getSponsorRank32BaseAnchorSalary(gameState);
+    const topTeam = gameState.teams.find((team) => team.shortCode === "M-M") ?? gameState.teams[0]!;
+    const offers = buildSponsorOffersForTeam({ gameState, teamId: topTeam.teamId });
+    const security = offers.find((offer) => offer.archetype === "security");
+    const base = security?.components.find((component) => component.kind === "base")?.rewardCash ?? 0;
+
+    expect(base).toBeGreaterThanOrEqual(anchor * 0.98);
+  }, 180000);
+
+  it("softly rebalances milestone upside from top teams to bottom teams", () => {
+    const leagueMin = 35;
+    const salaryFactor = 1;
+    const top = buildOfferCashAmounts({
+      archetype: "performance",
+      salaryFactor,
+      starTier: 3,
+      leagueMinSalary: leagueMin,
+      teamQualityRank: 3,
+    });
+    const bottom = buildOfferCashAmounts({
+      archetype: "performance",
+      salaryFactor,
+      starTier: 2,
+      leagueMinSalary: leagueMin,
+      teamQualityRank: 30,
+    });
+
+    expect(bottom.baseCash).toBeGreaterThanOrEqual(top.baseCash * 0.95);
+    expect(bottom.rankCash).toBeGreaterThan(16);
+
+    const rank32Bottom = getSponsorPayoutForFinalRankAndTier(32, 1, 2, leagueMin, "performance", 30);
+    const rank28Bottom = getSponsorPayoutForFinalRankAndTier(28, 1, 2, leagueMin, "performance", 30);
+    const rank32Top = getSponsorPayoutForFinalRankAndTier(32, 1, 2, leagueMin, "performance", 3);
+    const rank28Top = getSponsorPayoutForFinalRankAndTier(28, 1, 2, leagueMin, "performance", 3);
+
+    expect(rank32Bottom).toBeGreaterThanOrEqual(rank32Top * 0.95);
+    expect(rank28Bottom - rank32Bottom).toBeGreaterThan(rank28Top - rank32Top);
+    expect(rank28Top).toBeLessThan(getSponsorPayoutForFinalRankAndTier(28, 1, 2, leagueMin, "performance", undefined));
+  });
 
   it("pays bottom teams at least league minimum salary without rank milestones", () => {
     let gameState = createSingleplayerGameState();
     const rrTeam = gameState.teams.find((team) => team.shortCode === "R-R") ?? gameState.teams.at(-1)!;
-    const leagueMin = getLeagueMinimumSalaryTotal(gameState);
+    const leagueMin = getSponsorRank32BaseAnchorSalary(gameState);
     const salaryFactor = 1.09;
     gameState = {
       ...gameState,
@@ -354,7 +405,7 @@ describe("sponsor economy balance", () => {
   it("rewards rank-28 milestone for bottom teams", () => {
     let gameState = createSingleplayerGameState();
     const rrTeam = gameState.teams.find((team) => team.shortCode === "R-R") ?? gameState.teams.at(-1)!;
-    const leagueMin = getLeagueMinimumSalaryTotal(gameState);
+    const leagueMin = getSponsorRank32BaseAnchorSalary(gameState);
     const salaryFactor = 1.09;
     gameState = {
       ...gameState,
@@ -393,7 +444,7 @@ describe("sponsor economy balance", () => {
   it("pays top teams above base floor with milestone upside", () => {
     let gameState = createSingleplayerGameState();
     const mmTeam = gameState.teams.find((team) => team.shortCode === "M-M") ?? gameState.teams[0]!;
-    const leagueMin = getLeagueMinimumSalaryTotal(gameState);
+    const leagueMin = getSponsorRank32BaseAnchorSalary(gameState);
     const salaryFactor = 1.09;
     gameState = {
       ...gameState,

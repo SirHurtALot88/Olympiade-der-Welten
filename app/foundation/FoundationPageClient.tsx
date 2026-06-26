@@ -130,6 +130,7 @@ import {
 } from "@/lib/foundation/team-general-managers";
 import { buildGmStoryView } from "@/lib/foundation/gm-story";
 import { getFormCardFlowStatus } from "@/lib/foundation/form-card-flow";
+import { buildFormCardSeasonUsageAudit } from "@/lib/lineups/legacy-lineup-modifiers";
 import {
   formatLineupOperationalGapDetail,
   getMatchdayArenaReadiness,
@@ -310,14 +311,10 @@ const TrainingCompactClient = dynamic(() => import("@/app/foundation/training-co
 const FacilitiesV2Client = dynamic(() => import("@/app/foundation/facilities-v2/FacilitiesV2Client"), {
   ssr: false,
 });
-const HomeV2Client = dynamic(() => import("@/app/foundation/home-v2/HomeV2Client"), {
+const FoundationHomeV2Panel = dynamic(() => import("@/app/foundation/home-v2/FoundationHomeV2Panel"), {
   ssr: false,
   loading: () => <FoundationPanelSkeleton variant="homeV2" label="Home wird geladen…" />,
 });
-const ManagerOfficeClient = dynamic(
-  () => import("@/app/foundation/home-v2/ManagerOfficeClient").then((mod) => mod.ManagerOfficeClient),
-  { ssr: false, loading: () => null },
-);
 const FacilitiesOverviewV2Client = dynamic(
   () => import("@/app/foundation/facilities-overview-v2/FacilitiesOverviewV2Client"),
   { ssr: false },
@@ -5289,7 +5286,7 @@ function formatCockpitReason(reason: string) {
     "resolve_status:missing_sources": "Mindestens eine Resolve-Quelle ist noch unvollstaendig.",
     "resolve_status:blocked": "Resolve Preview ist aktuell blockiert.",
     lineup_not_submitted: "Einsatzliste noch nicht bestaetigt — bitte in der Einsatzliste abschliessen.",
-    missing_formcard_selections: "Formkarten fehlen noch fuer den aktuellen Spieltag.",
+    missing_formcard_selections: "Formkarten sind optional — ohne Auswahl spielst du ohne Bonus/Malus.",
     missing_formcard_pool: "Formkarten fuer diese Saison fehlen noch — bitte in der Einsatzliste erzeugen.",
     missing_lineup: "Einsatzliste ist noch nicht vollstaendig.",
     incomplete_lineup: "Einsatzliste noch nicht spielbereit — alle Slots fuellen oder den gesamten Kader einsetzen.",
@@ -5388,7 +5385,9 @@ function formatHomeWarningLabel(warning: string) {
     no_final_standings: "Tabelle noch offen",
     missing_lineups: "Einsatzliste offen",
     lineup_not_submitted: "Einsatzliste noch nicht bestaetigt — bitte in der Einsatzliste abschliessen.",
-    formcards_open: "Formkarten offen",
+    formcard_pool_missing: "Formkarten-Pool fehlt",
+    unused_negative_formcards: "Negative Formkarten offen",
+    formcards_open: "Formkarten-Pool fehlt",
     room_not_connected: "Room nicht verbunden",
   };
   return mapped[warning] ?? formatCockpitReason(warning);
@@ -15474,9 +15473,9 @@ export default function FoundationPageClient({
           organicProgression,
           appearances,
           seasonPoints,
-          performanceXp: forecast.performanceXP,
-          trainingXp: forecast.baseTrainingXP,
-          totalXp: forecast.seasonProjectedXP,
+          performanceXp: organicProgression.appliedPerformanceSetpoints,
+          trainingXp: organicProgression.trainingSetpoints,
+          totalXp: organicProgression.netSetpoints,
           upgradeEstimate: forecast.possibleUpgradeSummary,
           fatigueWarning: forecast.fatigueStrain.warning,
           recoveryForecast,
@@ -15524,9 +15523,9 @@ export default function FoundationPageClient({
   }, [teamBaseRecoveryForecast.after, trainingPlayerForecastRows]);
   const trainingDevelopmentSummary = useMemo(() => {
     const getTone = (row: (typeof trainingPlayerForecastRows)[number]): Exclude<TrainingDevelopmentFilter, "all"> =>
-      row.forecast.netDevelopmentXP < 0 || row.forecast.regressionRisk === "high"
+      row.organicProgression.netSetpoints < 0
         ? "regression"
-        : row.forecast.netDevelopmentXP >= 45
+        : row.organicProgression.netSetpoints >= 2
           ? "growth"
           : "stable";
 
@@ -15803,6 +15802,9 @@ export default function FoundationPageClient({
               potentialRecord: gameState.playerPotential?.find((entry) => entry.playerId === rosterPlayer.id) ?? null,
             })
           : null;
+      const forecastOrganic =
+        trainingPlayerForecastRows.find((forecastRow) => forecastRow.player.id === row.playerId)?.organicProgression ?? null;
+      const organicSource = xpSpendPlayer?.organicProgression ?? forecastOrganic;
 
       return {
         playerId: row.playerId,
@@ -15823,25 +15825,25 @@ export default function FoundationPageClient({
         ratingTierAfter: row.ratingTierAfter,
         plannedCost,
         topDeltas,
-        organicProgression: xpSpendPlayer?.organicProgression
+        organicProgression: organicSource
           ? {
-              classBefore: xpSpendPlayer.organicProgression.classBefore,
-              classAfter: xpSpendPlayer.organicProgression.classAfter,
-              trainingClass: xpSpendPlayer.organicProgression.primaryTrainingClass,
-              secondaryTrainingClass: xpSpendPlayer.organicProgression.secondaryTrainingClass,
-              traitModifierPct: xpSpendPlayer.organicProgression.traitModifierPct,
-              facilityModifierPct: xpSpendPlayer.organicProgression.facilityModifierPct,
-              marketValuePressureTotal: xpSpendPlayer.organicProgression.marketValuePressureTotal,
-              trainingSetpoints: xpSpendPlayer.organicProgression.trainingSetpoints,
-              performanceSetpoints: xpSpendPlayer.organicProgression.appliedPerformanceSetpoints,
-              netSetpoints: xpSpendPlayer.organicProgression.netSetpoints,
-              fatigueLoad: xpSpendPlayer.organicProgression.fatigueLoad,
-              topGains: xpSpendPlayer.organicProgression.attributeBreakdown
+              classBefore: organicSource.classBefore,
+              classAfter: organicSource.classAfter,
+              trainingClass: organicSource.primaryTrainingClass,
+              secondaryTrainingClass: organicSource.secondaryTrainingClass,
+              traitModifierPct: organicSource.traitModifierPct,
+              facilityModifierPct: organicSource.facilityModifierPct,
+              marketValuePressureTotal: organicSource.marketValuePressureTotal,
+              trainingSetpoints: organicSource.trainingSetpoints,
+              performanceSetpoints: organicSource.appliedPerformanceSetpoints,
+              netSetpoints: organicSource.netSetpoints,
+              fatigueLoad: organicSource.fatigueLoad,
+              topGains: organicSource.attributeBreakdown
                 .filter((entry) => entry.delta > 0)
                 .sort((left, right) => right.delta - left.delta)
                 .slice(0, 3)
                 .map((entry) => ({ attribute: TRAINING_ATTRIBUTE_LABELS[entry.attribute], delta: entry.delta })),
-              topLosses: xpSpendPlayer.organicProgression.attributeBreakdown
+              topLosses: organicSource.attributeBreakdown
                 .filter((entry) => entry.delta < 0)
                 .sort((left, right) => left.delta - right.delta)
                 .slice(0, 2)
@@ -17766,12 +17768,34 @@ export default function FoundationPageClient({
     if (!hasSeasonResultsForHome) warnings.push("season_started_no_results");
     if (activeViewContextWarning?.includes("keine abgeschlossenen")) warnings.push("no_final_standings");
     if (homeNextMatchdayStatus.openSlots > 0) warnings.push("missing_lineups");
-    if (homeNextMatchdayStatus.openSlots > 0 && !homeNextMatchdayStatus.hasFormCards) warnings.push("formcards_open");
+    if (homeNextMatchdayStatus.openSlots > 0 && !homeNextMatchdayStatus.hasFormCardPool) {
+      warnings.push("formcard_pool_missing");
+    }
+    if (activeManagerTeamId) {
+      const formCardAudit = buildFormCardSeasonUsageAudit(gameState, gameState.season.id).rows.find(
+        (row) => row.teamId === activeManagerTeamId,
+      );
+      if ((formCardAudit?.unusedNegativeCards ?? 0) > 0) {
+        warnings.push("unused_negative_formcards");
+      }
+    }
     if ((gameState.scenarioMeta?.scenarioType ?? activeContextMeta?.scenarioType ?? "").includes("manager_multiplayer") && !activeContextMeta?.roomId) {
       warnings.push("room_not_connected");
     }
     return Array.from(new Set(warnings));
-  }, [activeContextMeta?.roomId, activeContextMeta?.scenarioType, activeViewContextWarning, gameState.scenarioMeta?.scenarioType, hasSeasonResultsForHome, homeNextMatchdayStatus.hasFormCards, homeNextMatchdayStatus.openSlots, selectedTeam]);
+  }, [
+    activeContextMeta?.roomId,
+    activeContextMeta?.scenarioType,
+    activeManagerTeamId,
+    activeViewContextWarning,
+    gameState,
+    gameState.scenarioMeta?.scenarioType,
+    gameState.season.id,
+    hasSeasonResultsForHome,
+    homeNextMatchdayStatus.hasFormCardPool,
+    homeNextMatchdayStatus.openSlots,
+    selectedTeam,
+  ]);
   const shouldShowArenaBackToLineup = !activeManagerMatchdayReady;
   const homePlayerCards = useMemo(
     () =>
@@ -21106,102 +21130,93 @@ export default function FoundationPageClient({
           ) : null}
 
 
-          <section className={`panel foundation-home-v2-panel${getViewClass("homeV2")}`} id="foundation-home-v2">
-            {activeView === "homeV2" ? (
-              <>
-                {homeV2Tab === "overview" ? (
-              <HomeV2Client
-                teamName={selectedTeam?.name ?? "Kein Team"}
-                teamCode={selectedTeam?.shortCode ?? "—"}
-                teamLogoUrl={homeActiveTeamLogo?.src ?? null}
-                teamLogoInitials={homeActiveTeamLogo?.initials ?? selectedTeam?.shortCode ?? "?"}
-                seasonName={gameState.season.name}
-                matchdayLabel={currentMatchdayDisplayLabel}
-                managerLabel={activeOwner?.label ?? "—"}
-                controlModeLabel={formatTeamControlModeLabel(selectedTeamControl?.controlMode)}
-                rank={selectedStandingRow?.rank ?? null}
-                points={selectedStandingRow?.points ?? null}
-                cash={selectedStandingRow?.cash ?? null}
-                salaryTotal={selectedStandingRow?.salaryTotal ?? null}
-                guv={selectedStandingRow?.guv ?? null}
-                rosterCount={selectedRosterTableRows.length}
-                gmStoryLabel={selectedHqGmStory?.label ?? null}
-                gmStoryDetail={selectedHqGmStory?.detail ?? null}
-                gmStoryTone={selectedHqGmStory?.tone ?? null}
-                boardPressure={selectedBoardConfidence?.pressure ?? null}
-                boardRating={selectedBoardConfidence?.value ?? null}
-                boardObjectives={homeV2BoardObjectives}
-                nextStepLabel={globalNextLabel}
-                nextStepStatus={getGameFlowStatusLabel(gameFlowActionStep.status)}
-                nextStepDetail={
-                  gameFlowActionStep.blockers[0]
-                    ? formatCockpitReason(gameFlowActionStep.blockers[0])
-                    : gameFlowActionStep.warnings[0]
-                      ? formatCockpitReason(gameFlowActionStep.warnings[0])
-                      : "Flow bereit — weiter zum naechsten Schritt."
-                }
-                warnings={homeWarnings.map(formatHomeWarningLabel)}
-                topPlayers={homeV2TopPlayers}
-                facilities={homeV2Facilities}
-                scheduleItems={homeV2ScheduleItems}
-                inboxItems={homeV2InboxItems}
-                todayCards={homeTodayCards}
-                onContinue={triggerGlobalNext}
-                onOpenTeams={() => setFoundationView("teams", setActiveView)}
-                onOpenLineup={() => setFoundationView("lineup", setActiveView)}
-                onOpenMarket={() => setFoundationView("marketV2", setActiveView)}
-                onOpenTraining={() => setFoundationView("trainingCompact", setActiveView)}
-                onOpenOffice={() => navigateHomeTab("office")}
-                onOpenSeason={() => setFoundationView("seasonV2", setActiveView)}
-                onOpenInbox={() => setFoundationView("inboxV2", setActiveView)}
-                onOpenBoardObjectives={() => {
-                  setFoundationView("teams", setActiveView);
-                  scrollToFoundationTarget("team-board-objectives");
-                }}
-                onOpenPlayer={(playerId) => openPlayerDrawerById(playerId)}
-              />
-            ) : null}
-
-            {homeV2Tab === "office" ? (
-              <ManagerOfficeClient
-                homeNextMatchdayStatus={homeNextMatchdayStatus}
-                selectedTeamPlayerDemands={selectedTeamPlayerDemands}
-                selectedHqFinanceWarnings={selectedHqFinanceWarnings}
-                selectedStandingRow={selectedStandingRow}
-                activeTeamOpenInboxItems={activeTeamOpenInboxItems}
-                activeTeamCriticalInboxItems={activeTeamCriticalInboxItems}
-                selectedOpenObjectives={selectedOpenObjectives}
-                selectedBoardConfidence={selectedBoardConfidence}
-                hqTrainingFocusCount={hqTrainingFocusCount}
-                selectedTeamGeneralManager={selectedTeamGeneralManager}
-                hqTransferWishlistEntries={hqTransferWishlistEntries}
-                selectedTeamCaptainProfile={selectedTeamCaptainProfile}
-                selectedTeamPowers={selectedTeamPowers}
-                hqContractExpiringCount={hqContractExpiringCount}
-                hqTransferSellMarkers={hqTransferSellMarkers}
-                selectedHqMoraleSummary={selectedHqMoraleSummary}
-                selectedRosterTableRows={selectedRosterTableRows}
-                selectedHqAxisSummary={selectedHqAxisSummary}
-                selectedHqInboxItems={selectedHqInboxItems}
-                selectedHqGmStory={selectedHqGmStory}
-                selectedTeam={selectedTeam}
-                selectedTeamControl={selectedTeamControl}
-                homeActiveTeamLogo={homeActiveTeamLogo}
-                gameState={gameState}
-                currentMatchdayDisplayLabel={currentMatchdayDisplayLabel}
-                selectedTeamCanManage={selectedTeamCanManage}
-                isReadOnlyMode={isReadOnlyMode}
-                selectedTeamAverageAxisStats={selectedTeamAverageAxisStats}
-                rosterPlayers={rosterPlayers}
-                onNavigate={(view) => setFoundationView(view, setActiveView)}
-                onOpenTeam={(teamId) => openTeamDrawerById(teamId)}
-                onNavigateInboxItem={navigateToInboxItem}
-              />
-            ) : null}
-
-              </>
-            ) : null}
-          </section>
+          <FoundationHomeV2Panel
+            active={activeView === "homeV2"}
+            tab={homeV2Tab}
+            overview={{
+              teamName: selectedTeam?.name ?? "Kein Team",
+              teamCode: selectedTeam?.shortCode ?? "—",
+              teamLogoUrl: homeActiveTeamLogo?.src ?? null,
+              teamLogoInitials: homeActiveTeamLogo?.initials ?? selectedTeam?.shortCode ?? "?",
+              seasonName: gameState.season.name,
+              matchdayLabel: currentMatchdayDisplayLabel,
+              managerLabel: activeOwner?.label ?? "—",
+              controlModeLabel: formatTeamControlModeLabel(selectedTeamControl?.controlMode),
+              rank: selectedStandingRow?.rank ?? null,
+              points: selectedStandingRow?.points ?? null,
+              cash: selectedStandingRow?.cash ?? null,
+              salaryTotal: selectedStandingRow?.salaryTotal ?? null,
+              guv: selectedStandingRow?.guv ?? null,
+              rosterCount: selectedRosterTableRows.length,
+              gmStoryLabel: selectedHqGmStory?.label ?? null,
+              gmStoryDetail: selectedHqGmStory?.detail ?? null,
+              gmStoryTone: selectedHqGmStory?.tone ?? null,
+              boardPressure: selectedBoardConfidence?.pressure ?? null,
+              boardRating: selectedBoardConfidence?.value ?? null,
+              boardObjectives: homeV2BoardObjectives,
+              nextStepLabel: globalNextLabel,
+              nextStepStatus: getGameFlowStatusLabel(gameFlowActionStep.status),
+              nextStepDetail:
+                gameFlowActionStep.blockers[0]
+                  ? formatCockpitReason(gameFlowActionStep.blockers[0])
+                  : gameFlowActionStep.warnings[0]
+                    ? formatCockpitReason(gameFlowActionStep.warnings[0])
+                    : "Flow bereit — weiter zum naechsten Schritt.",
+              warnings: homeWarnings.map(formatHomeWarningLabel),
+              topPlayers: homeV2TopPlayers,
+              facilities: homeV2Facilities,
+              scheduleItems: homeV2ScheduleItems,
+              inboxItems: homeV2InboxItems,
+              todayCards: homeTodayCards,
+              onContinue: triggerGlobalNext,
+              onOpenTeams: () => setFoundationView("teams", setActiveView),
+              onOpenLineup: () => setFoundationView("lineup", setActiveView),
+              onOpenMarket: () => setFoundationView("marketV2", setActiveView),
+              onOpenTraining: () => setFoundationView("trainingCompact", setActiveView),
+              onOpenOffice: () => navigateHomeTab("office"),
+              onOpenSeason: () => setFoundationView("seasonV2", setActiveView),
+              onOpenInbox: () => setFoundationView("inboxV2", setActiveView),
+              onOpenBoardObjectives: () => {
+                setFoundationView("teams", setActiveView);
+                scrollToFoundationTarget("team-board-objectives");
+              },
+              onOpenPlayer: (playerId) => openPlayerDrawerById(playerId),
+            }}
+            office={{
+              homeNextMatchdayStatus,
+              selectedTeamPlayerDemands,
+              selectedHqFinanceWarnings,
+              selectedStandingRow,
+              activeTeamOpenInboxItems,
+              activeTeamCriticalInboxItems,
+              selectedOpenObjectives,
+              selectedBoardConfidence,
+              hqTrainingFocusCount,
+              selectedTeamGeneralManager,
+              hqTransferWishlistEntries,
+              selectedTeamCaptainProfile,
+              selectedTeamPowers,
+              hqContractExpiringCount,
+              hqTransferSellMarkers,
+              selectedHqMoraleSummary,
+              selectedRosterTableRows,
+              selectedHqAxisSummary,
+              selectedHqInboxItems,
+              selectedHqGmStory,
+              selectedTeam,
+              selectedTeamControl,
+              homeActiveTeamLogo,
+              gameState,
+              currentMatchdayDisplayLabel,
+              selectedTeamCanManage,
+              isReadOnlyMode,
+              selectedTeamAverageAxisStats,
+              rosterPlayers,
+              onNavigate: (view) => setFoundationView(view, setActiveView),
+              onOpenTeam: (teamId) => openTeamDrawerById(teamId),
+              onNavigateInboxItem: navigateToInboxItem,
+            }}
+          />
 
           <section className={`panel foundation-player-profile-panel${getViewClass("playerProfile")}`}>
             {activeView === "playerProfile" && playerProfileData ? (
@@ -30007,6 +30022,9 @@ export default function FoundationPageClient({
                     {seasonEndProgressionPreview.rows.map((row) => {
                       const rosterPlayer = rosterPlayers.find((entry) => entry.player.id === row.playerId)?.player ?? null;
                       const xpSpendPlayer = seasonEndXpSpendPlayerMap.get(row.playerId) ?? null;
+                      const forecastOrganic =
+                        trainingPlayerForecastRows.find((forecastRow) => forecastRow.player.id === row.playerId)?.organicProgression ?? null;
+                      const organicNetSetpoints = xpSpendPlayer?.organicProgression?.netSetpoints ?? forecastOrganic?.netSetpoints ?? null;
                       const topDeltas = (xpSpendPlayer?.disciplineDeltas ?? row.disciplineDeltas)
                         .filter((entry) => (entry.disciplineDelta ?? 0) !== 0)
                         .sort((left, right) => Math.abs(right.disciplineDelta ?? 0) - Math.abs(left.disciplineDelta ?? 0))
@@ -30045,7 +30063,8 @@ export default function FoundationPageClient({
                             <div>
                               <strong>{row.playerName}</strong>
                               <p className="muted">
-                                XP {formatWholeNumber(xpSpendPlayer?.availableXP ?? row.availableXP)} · geplant{" "}
+                                Setpoints {organicNetSetpoints != null ? `${organicNetSetpoints > 0 ? "+" : ""}${formatLocalePoints(organicNetSetpoints, 1)}` : "—"} · Legacy XP{" "}
+                                {formatWholeNumber(xpSpendPlayer?.availableXP ?? row.availableXP)} · geplant{" "}
                                 {formatWholeNumber(xpSpendPlayer?.plannedXP ?? 0)} · Rest{" "}
                                 {formatWholeNumber(xpSpendPlayer?.remainingXP ?? row.remainingXP)}
                               </p>

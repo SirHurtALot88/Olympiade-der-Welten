@@ -66,6 +66,11 @@ export type FormBoardPanelProps = {
   clearActiveFormPickCell: () => void;
   assignFormCardFromDeck: (cardId: string) => void;
   setActiveFormPickCell: (cell: FormBoardPickCell) => void;
+  skipFormCardsForSide: (input: {
+    matchdayId: string;
+    disciplineSide: "d1" | "d2";
+    disciplineId: string | null;
+  }) => void;
 };
 
 export default function FormBoardPanel({
@@ -95,6 +100,7 @@ export default function FormBoardPanel({
   clearActiveFormPickCell,
   assignFormCardFromDeck,
   setActiveFormPickCell,
+  skipFormCardsForSide,
 }: FormBoardPanelProps) {
   return (
     <section
@@ -117,10 +123,13 @@ export default function FormBoardPanel({
       </div>
       <div className="legacy-lineup-form-board-sync-banner" aria-label="Heute-Status">
         <span className={modifiers.d1.primaryFormCardId || modifiers.d2.primaryFormCardId ? "is-ready" : "is-warning"}>
-          Plan → Entwurf {modifiers.d1.primaryFormCardId || modifiers.d2.primaryFormCardId ? "sync ✓" : "offen ⚠"}
+          Plan → Entwurf {modifiers.d1.primaryFormCardId || modifiers.d2.primaryFormCardId ? "sync ✓" : "optional — kein Einsatz"}
         </span>
         <span className={draft ? "is-ready" : "is-warning"}>Gespeichert {draft ? "✓" : "⚠"}</span>
       </div>
+      <p className="legacy-lineup-form-board-hint">
+        Beide Slots sind optional. F1 ± · F2 nur positiv. Negative bis Saisonende abwerfen — offene Negative kosten Strafpunkte.
+      </p>
       <div className="legacy-lineup-form-board-current" aria-label="Aktiver Formplan">
         {(["d1", "d2"] as const).map((disciplineSide) => {
           const discipline = disciplineSide === "d1" ? context?.matchdayContract?.discipline1 : context?.matchdayContract?.discipline2;
@@ -154,6 +163,22 @@ export default function FormBoardPanel({
                   },
                 ]}
               />
+              {matchdayId === context?.matchday.id ? (
+                <button
+                  type="button"
+                  className="secondary-button inline-button legacy-lineup-form-board-skip-side"
+                  disabled={isReadOnly || (!selectedPrimaryCard && !selectedSecondaryCard)}
+                  onClick={() =>
+                    skipFormCardsForSide({
+                      matchdayId,
+                      disciplineSide,
+                      disciplineId: discipline?.disciplineId ?? null,
+                    })
+                  }
+                >
+                  Keine Karten spielen
+                </button>
+              ) : null}
             </article>
           );
         })}

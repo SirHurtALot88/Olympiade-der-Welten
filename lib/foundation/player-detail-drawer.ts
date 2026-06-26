@@ -45,6 +45,7 @@ import {
   type PlayerPotentialAxisStatus,
   type PlayerTrainingRouteImpact,
 } from "@/lib/foundation/player-potential-display-service";
+import { buildOrganicSeasonProgression, type OrganicSeasonProgressionResult } from "@/lib/training/organic-season-progression";
 import { buildPlayerProgressionForecast } from "@/lib/training/player-progression-forecast";
 import {
   buildPlayerDevelopmentLevelupModel,
@@ -252,6 +253,7 @@ export type PlayerDetailDrawerData = {
   scoutPotential: PlayerScoutPotential | null;
   developmentInsight: PlayerDevelopmentInsight | null;
   organicProgression: Player["lastOrganicProgression"] | null;
+  seasonOrganicForecast: OrganicSeasonProgressionResult | null;
   classHistory: NonNullable<Player["classHistory"]>;
   attributeVisibility: AttributeVisibility;
   attributeStats: Array<{
@@ -1652,6 +1654,13 @@ export function buildPlayerDrawerDataFromGameState(input: {
     spentXP: player.spentXP ?? 0,
     lifetimeXP: player.lifetimeXP ?? null,
   });
+  const seasonOrganicForecast =
+    team && team.humanControlled !== false && rosterEntry
+      ? buildOrganicSeasonProgression({
+          gameState: input.gameState,
+          player,
+        })
+      : null;
   const developmentLevelup = buildPlayerDevelopmentLevelupModel({
     gameState: input.gameState,
     player,
@@ -1892,6 +1901,7 @@ export function buildPlayerDrawerDataFromGameState(input: {
             disciplineGlobalRankMaps,
           ),
     progressionForecast,
+    seasonOrganicForecast,
     developmentLevelup,
     progressionEvents,
     seasonPerformance,
@@ -2182,6 +2192,7 @@ export function buildPlayerDrawerDataFromLegacyContext(input: {
     axisCards: maskAxisCardsForVisibility(axisCards, attributeVisibility),
     disciplineValues,
     progressionForecast: null,
+    seasonOrganicForecast: null,
     developmentLevelup: detailPlayer
       ? buildPlayerDevelopmentLevelupModel({
           player: detailPlayer,

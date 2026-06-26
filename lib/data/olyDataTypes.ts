@@ -1114,6 +1114,7 @@ export type SponsorOffer = {
   termSeasons?: SponsorTermSeasons;
   negotiationProfile?: SponsorNegotiationProfile;
   demandProfile?: SponsorDemandProfile;
+  teamQualityRank?: number;
 };
 
 export type SponsorCommercialRating = {
@@ -1162,6 +1163,7 @@ export type TeamSponsorContract = {
   seasonsRemaining?: number;
   negotiationProfile?: SponsorNegotiationProfile;
   demandProfile?: SponsorDemandProfile;
+  teamQualityRankAtSign?: number;
 };
 
 export type ScoutIntelSource = "watchlist" | "wishlist_mirror" | "passive_need" | "roster";

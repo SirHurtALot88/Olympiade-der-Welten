@@ -12,7 +12,8 @@ import { calculateFacilityIncome, calculateFacilityUpkeep, getTeamFacilityState 
 import { FACILITY_CONDITION_WARNING, getFacilityConditionStatus } from "@/lib/facilities/facility-condition";
 import { buildTeamObjectiveOverview } from "@/lib/board/team-season-objectives-service";
 import { buildMatchdaySummary } from "@/lib/foundation/matchday-summary";
-import { activeTeamHasFormCardSelections, isFormCardFlowReadyForMatchday } from "@/lib/foundation/form-card-flow";
+import { getFormCardFlowStatus } from "@/lib/foundation/form-card-flow";
+import { buildFormCardSeasonUsageAudit } from "@/lib/lineups/legacy-lineup-modifiers";
 import { isTeamMatchdayLineupComplete, isTeamMatchdayLineupSubmitted } from "@/lib/foundation/matchday-lineup-readiness";
 import { getTeamSponsorContract } from "@/lib/sponsor/sponsor-offer-read";
 import { listOpenSponsorEvents } from "@/lib/sponsor/sponsor-event-service";
@@ -221,13 +222,8 @@ function buildTeamTasks(input: BuildGameInboxInput, visibleTeamIds: Set<string>,
           draft.teamId === team.teamId,
       ) ?? null;
     const lineupComplete = isTeamMatchdayLineupComplete(input.gameState, team.teamId, lineupDraft);
-    if (
-      rosterCount > 0 &&
-      lineupComplete &&
-      !activeTeamHasFormCardSelections(input.gameState, team.teamId) &&
-      !isFormCardFlowReadyForMatchday(input.gameState, team.teamId, { lineupSubmitted: lineupStatus.isSubmitted }) &&
-      controlMode === "manual"
-    ) {
+    const formCardFlow = getFormCardFlowStatus(input.gameState, team.teamId);
+    if (rosterCount > 0 && lineupComplete && !formCardFlow.hasPool && controlMode === "manual") {
       items.push(
         createItem({
           itemId: `formcards_open:${input.saveId}:${input.gameState.season.id}:${team.teamId}`,
@@ -237,11 +233,35 @@ function buildTeamTasks(input: BuildGameInboxInput, visibleTeamIds: Set<string>,
           teamId: team.teamId,
           category: "task",
           severity: "warning",
-          title: "Formkarten offen",
-          description: `${team.shortCode}: Einsatzliste steht, Formkarten fehlen noch.`,
+          title: "Formkarten-Pool fehlt",
+          description: `${team.shortCode}: Formkarten fuer diese Saison muessen noch in der Einsatzliste erzeugt werden.`,
           targetView: "lineup",
           targetParams: { team: team.teamId, panel: "formcards" },
-          ctaLabel: "Formkarten zuweisen",
+          ctaLabel: "Formkarten erzeugen",
+          source: "season_formcards",
+          createdAt,
+        }),
+      );
+    }
+
+    const formCardUsageAudit = buildFormCardSeasonUsageAudit(input.gameState, input.gameState.season.id).rows.find(
+      (row) => row.teamId === team.teamId,
+    );
+    if (controlMode === "manual" && (formCardUsageAudit?.unusedNegativeCards ?? 0) > 0) {
+      items.push(
+        createItem({
+          itemId: `formcards_negative_open:${input.saveId}:${input.gameState.season.id}:${team.teamId}`,
+          saveId: input.saveId,
+          seasonId: input.gameState.season.id,
+          matchday: input.gameState.matchdayState.matchdayId,
+          teamId: team.teamId,
+          category: "task",
+          severity: "warning",
+          title: "Negative Formkarten offen",
+          description: `${team.shortCode}: ${formCardUsageAudit!.unusedNegativeCards} negative Karte(n) ungenutzt — am Saisonende drohen ${formCardUsageAudit!.negativePenaltyPoints} Strafpunkte.`,
+          targetView: "lineup",
+          targetParams: { team: team.teamId, panel: "formcards" },
+          ctaLabel: "Formkarten pruefen",
           source: "season_formcards",
           createdAt,
         }),

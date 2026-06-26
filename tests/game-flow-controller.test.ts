@@ -218,7 +218,7 @@ describe("game flow controller", () => {
     expect(flow.currentStep.targetView).toBe("lineup");
   });
 
-  it("requires form card selections before arena when lineup is complete but not submitted", () => {
+  it("treats form cards as optional when lineup is complete but not submitted", () => {
     const flow = buildGameFlowState({
       gameState: gameState({
         players: [player("p-1", "mittel")],
@@ -234,7 +234,8 @@ describe("game flow controller", () => {
       activeTeamId: "M-M",
     });
 
-    expect(flow.currentStepId).toBe("assign_formcards");
+    expect(flow.currentStepId).toBe("confirm_lineup");
+    expect(flow.steps.find((step) => step.stepId === "assign_formcards")?.status).toBe("optional");
     expect(flow.steps.find((step) => step.stepId === "confirm_lineup")?.status).toBe("ready");
     const arenaStep = flow.steps.find((step) => step.stepId === "open_arena");
     expect(arenaStep?.status).toBe("blocked");

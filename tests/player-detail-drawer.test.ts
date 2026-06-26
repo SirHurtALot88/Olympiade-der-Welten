@@ -979,6 +979,9 @@ describe("player detail drawer", () => {
     expect(data?.progressionForecast?.audit.productiveWrites).toBe(false);
     expect(data?.disciplineValues.find((entry) => entry.id === "pow-d")?.upgradeDelta).toBe(2);
     expect(data?.disciplineValues.find((entry) => entry.id === "spe-d")?.upgradeDelta).toBe(0);
+    expect(data?.seasonOrganicForecast?.playerId).toBe("player-progression");
+    expect(typeof data?.seasonOrganicForecast?.netSetpoints).toBe("number");
+    expect(data?.seasonOrganicForecast?.trainingSetpoints).toBeGreaterThanOrEqual(0);
   });
 
   it("exposes potential delta and route state for own roster players", () => {

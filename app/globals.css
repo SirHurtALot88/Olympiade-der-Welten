@@ -15535,8 +15535,67 @@ a {
 }
 
 .legacy-lineup-arena-slot.is-next-target {
-  outline: 2px solid rgba(132, 188, 255, 0.72);
+  position: relative;
+  outline: 2px solid rgba(132, 188, 255, 0.92);
   outline-offset: 2px;
+  box-shadow:
+    0 0 0 1px rgba(132, 188, 255, 0.28),
+    0 0 24px rgba(132, 188, 255, 0.22);
+  animation: legacy-lineup-next-target-pulse 1.8s ease-in-out infinite;
+}
+
+.legacy-lineup-arena-slot.is-next-target::after {
+  content: "Naechster Slot";
+  position: absolute;
+  top: 8px;
+  right: 8px;
+  z-index: 2;
+  border-radius: 999px;
+  padding: 2px 8px;
+  background: rgba(132, 188, 255, 0.18);
+  color: #dbeafe;
+  font-size: 0.68rem;
+  font-weight: 800;
+  letter-spacing: 0.02em;
+}
+
+@keyframes legacy-lineup-next-target-pulse {
+  0%,
+  100% {
+    box-shadow:
+      0 0 0 1px rgba(132, 188, 255, 0.28),
+      0 0 18px rgba(132, 188, 255, 0.16);
+  }
+  50% {
+    box-shadow:
+      0 0 0 1px rgba(132, 188, 255, 0.42),
+      0 0 28px rgba(132, 188, 255, 0.28);
+  }
+}
+
+.legacy-lineup-active-slot-strip.has-next-target {
+  border-color: rgba(132, 188, 255, 0.34);
+}
+
+.legacy-lineup-candidate-group-block {
+  display: grid;
+  gap: 8px;
+}
+
+.legacy-lineup-candidate-group-header {
+  color: rgba(211, 224, 243, 0.82);
+  font-size: 0.72rem;
+  font-weight: 800;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+.legacy-lineup-candidate-group-header.is-ready {
+  color: #d8f5dd;
+}
+
+.legacy-lineup-candidate-group-header.is-warning {
+  color: #ffe7a9;
 }
 
 .legacy-lineup-slot-empty-card strong {
@@ -22321,6 +22380,17 @@ a {
 .legacy-lineup-form-board-sync-banner span.is-warning {
   background: rgba(147, 111, 36, 0.28);
   color: #ffe7a9;
+}
+
+.legacy-lineup-form-board-hint {
+  margin: 0;
+  color: rgba(211, 224, 243, 0.78);
+  font-size: 0.78rem;
+  line-height: 1.45;
+}
+
+.legacy-lineup-form-board-skip-side {
+  margin-top: 8px;
 }
 
 .legacy-lineup-form-board-workspace {

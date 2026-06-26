@@ -3,7 +3,6 @@ import { GAME_LANGUAGE } from "@/lib/ui/game-language";
 import {
   activeTeamHasFormCardPool,
   getFormCardFlowStatus,
-  isFormCardFlowReadyForMatchday,
 } from "@/lib/foundation/form-card-flow";
 import {
   getTeamMatchdayLineupDraft,
@@ -118,9 +117,6 @@ function isCurrentMatchdayLineupComplete(gameState: GameState, lineup: ReturnTyp
   return isTeamMatchdayLineupOperationallyReady(gameState, lineup.teamId, lineup);
 }
 
-function activeTeamHasFormCards(gameState: GameState, activeTeamId: string | null, lineupSubmitted = false) {
-  return isFormCardFlowReadyForMatchday(gameState, activeTeamId, { lineupSubmitted });
-}
 
 function activeTeamTrainingComplete(gameState: GameState, activeTeamId: string | null) {
   const rosterPlayerIds = getActiveTeamRosterPlayerIds(gameState, activeTeamId);
@@ -342,11 +338,12 @@ function buildMatchdaySteps(gameState: GameState, activeTeamId: string | null): 
   const activeLineup = getActiveTeamLineup(gameState, activeTeamId);
   const hasLineup = isCurrentMatchdayLineupComplete(gameState, activeLineup);
   const lineupConfirmed = isTeamMatchdayLineupSubmitted(activeLineup);
-  const hasFormCards = activeTeamHasFormCards(gameState, activeTeamId, lineupConfirmed);
+  const formCardFlow = getFormCardFlowStatus(gameState, activeTeamId);
+  const hasFormCardSelections = formCardFlow.hasSelections;
   const hasFormCardPool = activeTeamHasFormCardPool(gameState, activeTeamId);
   const hasResults = hasCurrentMatchdayResult(gameState) || gameState.matchdayState.status === "resolved";
   const formCardsRequired = hasLineup && !hasResults;
-  const arenaPreparationReady = hasLineup && (!formCardsRequired || hasFormCards || (lineupConfirmed && hasFormCardPool));
+  const arenaPreparationReady = hasLineup;
   const matchdayArenaReady = arenaPreparationReady && lineupConfirmed;
   const openArenaBlockers = matchdayArenaReady
     ? []
@@ -354,11 +351,9 @@ function buildMatchdaySteps(gameState: GameState, activeTeamId: string | null): 
       ? activeLineup?.entries?.length
         ? ["incomplete_lineup"]
         : ["missing_lineup"]
-      : formCardsRequired && !hasFormCards
-        ? ["missing_formcard_selections"]
-        : arenaPreparationReady && !lineupConfirmed
-          ? ["lineup_not_submitted"]
-          : ["missing_lineup"];
+      : !lineupConfirmed
+        ? ["lineup_not_submitted"]
+        : ["missing_lineup"];
   const trainingComplete = activeTeamTrainingComplete(gameState, activeTeamId);
   const storedNewGameFlow = gameState.seasonState.newGameFlow ?? null;
   const seasonIntroStep = storedNewGameFlow?.steps?.find((entry) => entry.stepId === "season_intro");
@@ -457,27 +452,25 @@ function buildMatchdaySteps(gameState: GameState, activeTeamId: string | null): 
         ? "blocked"
         : !formCardsRequired
           ? "completed"
-          : hasFormCards
-            ? "completed"
-            : !hasFormCardPool
-              ? "blocked"
+          : !hasFormCardPool
+            ? "blocked"
+            : hasFormCardSelections
+              ? "completed"
               : lineupConfirmed
                 ? "completed"
                 : hasLineup
-                  ? "ready"
+                  ? "optional"
                   : "warning",
       targetView: "lineup",
       targetPanel: "form-board",
       teamId: activeTeamId,
+      optional: formCardsRequired && hasFormCardPool && !hasFormCardSelections,
       blockers: !hasActiveTeam
         ? ["no_active_team"]
         : formCardsRequired && !hasFormCardPool
           ? ["missing_formcard_pool"]
           : [],
-      warnings:
-        formCardsRequired && hasLineup && !hasFormCards && hasFormCardPool && !lineupConfirmed
-          ? ["missing_formcards"]
-          : [],
+      warnings: [],
     }),
     step({
       stepId: "confirm_lineup",

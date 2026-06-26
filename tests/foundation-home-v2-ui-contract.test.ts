@@ -20,10 +20,14 @@ describe("foundation home v2 ui contract", () => {
     const routingText = await fs.readFile(viewRoutingPath, "utf8");
 
     expect(fileText).toContain("FoundationSubNav");
-    expect(fileText).toContain('homeV2Tab === "overview"');
+    const panelText = await fs.readFile(
+      path.join(process.cwd(), "app/foundation/home-v2/FoundationHomeV2Panel.tsx"),
+      "utf8",
+    );
+    expect(panelText).toContain('tab === "overview"');
     expect(fileText).toContain('homeV2Tab === "office"');
     expect(fileText).toContain('navigateHomeTab("office")');
-    expect(fileText).toContain("ManagerOfficeClient");
+    expect(panelText).toContain("ManagerOfficeClient");
     const officeText = await fs.readFile(
       path.join(process.cwd(), "app/foundation/home-v2/ManagerOfficeClient.tsx"),
       "utf8",
@@ -32,7 +36,7 @@ describe("foundation home v2 ui contract", () => {
     expect(fileText).not.toContain('getViewClass("hq")');
     expect(navText).not.toContain('id: "hq"');
     expect(routingText).toContain('if (view === "hq") return "homeV2"');
-    expect(fileText).toContain("<HomeV2Client");
+    expect(fileText).toContain("FoundationHomeV2Panel");
     expect(fileText).toContain("onOpenOffice");
     expect(fileText).not.toContain('onOpenClassicHome={() => setFoundationView("home", setActiveView)}');
   });

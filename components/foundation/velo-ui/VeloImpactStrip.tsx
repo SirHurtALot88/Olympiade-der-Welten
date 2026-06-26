@@ -34,23 +34,30 @@ export function VeloImpactStrip({ items, className = "", flashKey = null }: Velo
 }
 
 export function buildTrainingImpactItems(input: {
-  trainingXp: number;
-  performanceXp: number;
+  trainingSetpoints: number;
+  performanceSetpoints: number;
+  netSetpoints: number;
   recoveryBefore: number;
   recoveryAfter: number;
   recoveryDeltaPct: number;
-  netDevelopmentXp: number;
-  regressionPressure: number;
   regressionRisk: string | null;
+  legacyXpPreview?: number | null;
 }): VeloImpactItem[] {
-  const performanceLabel = input.performanceXp > 0 ? `+${formatVeloNumber(input.performanceXp, 0)} Leistung` : "keine Leistungs-XP";
+  const performanceLabel =
+    input.performanceSetpoints > 0
+      ? `+${formatVeloNumber(input.performanceSetpoints, 1)} Performance`
+      : "keine Performance-Setpoints";
+  const legacyDetail =
+    input.legacyXpPreview != null && Math.abs(input.legacyXpPreview - input.netSetpoints) >= 1
+      ? `XP-Track Preview ${formatVeloNumber(input.legacyXpPreview, 0)}`
+      : undefined;
   return [
     {
       key: "xp",
-      label: "XP Vorschau",
-      value: formatVeloNumber(input.trainingXp + input.performanceXp, 0),
-      detail: `+${formatVeloNumber(input.trainingXp, 0)} Training · ${performanceLabel}`,
-      tone: "neutral",
+      label: "Setpoints",
+      value: formatVeloSignedNumber(input.netSetpoints, 1),
+      detail: `+${formatVeloNumber(input.trainingSetpoints, 1)} Training · ${performanceLabel}${legacyDetail ? ` · ${legacyDetail}` : ""}`,
+      tone: input.netSetpoints >= 0 ? "positive" : "negative",
     },
     {
       key: "recovery",
@@ -61,10 +68,10 @@ export function buildTrainingImpactItems(input: {
     },
     {
       key: "dev",
-      label: "Entwicklung",
-      value: formatVeloSignedNumber(input.netDevelopmentXp, 0),
-      detail: `Rueckschritt ${formatVeloNumber(input.regressionPressure, 0)} · Risiko ${input.regressionRisk ?? "—"}`,
-      tone: input.netDevelopmentXp >= 0 ? "positive" : "negative",
+      label: "Saison-Forecast",
+      value: formatVeloSignedNumber(input.netSetpoints, 1),
+      detail: `Netto nach Training + Matchday · Risiko ${input.regressionRisk ?? "—"}`,
+      tone: input.netSetpoints >= 0 ? "positive" : "negative",
     },
   ];
 }

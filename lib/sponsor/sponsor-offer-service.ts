@@ -33,6 +33,7 @@ import {
   buildOfferCashAmounts,
   estimateExpectedPayout,
   getLeagueMinimumSalaryTotal,
+  getSponsorRank32BaseAnchorSalary,
   getNextMilestoneRank,
   getPrizeMoneyReference,
   getSponsorPayoutForFinalRank,
@@ -44,6 +45,7 @@ import {
   getDemandProfile,
   rollSponsorStarTiers,
 } from "@/lib/sponsor/sponsor-tier-pool";
+import { resolveChallengeSlotIndex } from "@/lib/sponsor/sponsor-special-objectives";
 
 function roundCash(value: number) {
   return Number(value.toFixed(1));
@@ -75,8 +77,10 @@ function buildOffer(input: {
   globalParentUsage?: Record<string, number>;
   leagueMinSalary: number;
   forcePremiumElite?: boolean;
+  teamQualityRank?: number | null;
+  specialMode?: "standard" | "challenge";
 }): SponsorOffer {
-  const { team, identity, profile, archetype, rankTarget, startRank, gameState, starTier, commercialRating, slotIndex, salaryFactor, leagueMinSalary } = input;
+  const { team, identity, profile, archetype, rankTarget, startRank, gameState, starTier, commercialRating, slotIndex, salaryFactor, leagueMinSalary, teamQualityRank, specialMode } = input;
   const demandMult = getDemandMultiplier(starTier);
   const improvementBase = startRank != null ? Math.min(3, Math.max(1, Math.round((startRank - rankTarget) / 3) || 1)) : 1;
   const improvementTarget = improvementBase + (starTier >= 4 ? 1 : 0);
@@ -93,10 +97,15 @@ function buildOffer(input: {
     recentParentBrandIds: input.recentParentBrandIds,
     globalParentUsage: input.globalParentUsage,
     forcePremiumElite: input.forcePremiumElite,
+    specialMode: specialMode ?? "standard",
+    gameState,
   });
-  const cashAmounts = buildOfferCashAmounts({ archetype, salaryFactor, starTier, leagueMinSalary });
+  const cashAmounts = buildOfferCashAmounts({ archetype, salaryFactor, starTier, leagueMinSalary, teamQualityRank });
   const improvementCash = roundCash(cashAmounts.totalAtMaxRank * 0.04);
-  const specialCash = roundCash(Math.max(special.rewardCash > 0 ? cashAmounts.specialCash : 0, cashAmounts.specialCash * 0.5));
+  const specialCash =
+    specialMode === "challenge"
+      ? roundCash(Math.max(cashAmounts.specialCash, cashAmounts.totalAtMaxRank * 0.05))
+      : roundCash(Math.max(special.rewardCash > 0 ? cashAmounts.specialCash * 0.65 : 0, cashAmounts.specialCash * 0.35));
 
   const components: SponsorOfferComponent[] = [
     {
@@ -143,6 +152,7 @@ function buildOffer(input: {
     sponsorParentBrandId: brand.parentBrandId,
     variantKey: brand.variantKey,
     demandProfile: getDemandProfile(starTier),
+    teamQualityRank: teamQualityRank ?? undefined,
   };
 }
 
@@ -175,7 +185,8 @@ export function buildSponsorOffersForTeam(input: {
   const recentParentBrandIds = getRecentSponsorParentIds(input.gameState, input.teamId);
   const globalParentUsage = buildGlobalParentUsageFromOffers(input.gameState.seasonState.sponsorOffersByTeamId);
   const salaryFactor = getCurrentSalaryFactor(input.gameState);
-  const leagueMinSalary = getLeagueMinimumSalaryTotal(input.gameState);
+  const baseAnchorSalary = getSponsorRank32BaseAnchorSalary(input.gameState);
+  const challengeSlotIndex = resolveChallengeSlotIndex(input.gameState.season.id, input.teamId);
 
   return archetypes.map((archetype, slotIndex) => {
     const starTier = tierRoll.tiers[slotIndex] ?? 2;
@@ -192,11 +203,13 @@ export function buildSponsorOffersForTeam(input: {
       commercialRating: commercialRating.score,
       slotIndex,
       salaryFactor,
-      leagueMinSalary,
+      leagueMinSalary: baseAnchorSalary,
       forcePremiumElite: tierRoll.goldenCardSlots.includes(slotIndex),
       usedParentBrandIds,
       recentParentBrandIds,
       globalParentUsage,
+      teamQualityRank: qualityRank.qualityRank,
+      specialMode: slotIndex === challengeSlotIndex ? "challenge" : "standard",
     });
     if (offer.sponsorParentBrandId) {
       usedParentBrandIds.push(offer.sponsorParentBrandId);
@@ -272,7 +285,7 @@ function normalizeTeamSponsorOffers(input: {
 
 function normalizeLeagueSponsorOffers(gameState: GameState, offersByTeamId: Record<string, SponsorOffer[]>) {
   const salaryFactor = getCurrentSalaryFactor(gameState);
-  const leagueMinSalary = getLeagueMinimumSalaryTotal(gameState);
+  const baseAnchorSalary = getSponsorRank32BaseAnchorSalary(gameState);
   const rows = buildTeamSeasonOverviewRows({ gameState });
   const nextOffers: Record<string, SponsorOffer[]> = {};
 
@@ -283,7 +296,7 @@ function normalizeLeagueSponsorOffers(gameState: GameState, offersByTeamId: Reco
       offers: offersByTeamId[team.teamId] ?? [],
       referenceRank,
       salaryFactor,
-      leagueMinSalary,
+      leagueMinSalary: baseAnchorSalary,
     });
   }
   return nextOffers;
@@ -440,6 +453,7 @@ export function chooseSponsorOffer(input: {
     seasonsRemaining: termSeasons,
     negotiationProfile,
     demandProfile: offer.demandProfile,
+    teamQualityRankAtSign: offer.teamQualityRank,
   };
   contract = applySponsorNegotiationToContract(contract, { termSeasons, negotiationProfile });
 

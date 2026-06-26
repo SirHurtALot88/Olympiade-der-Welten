@@ -2,12 +2,14 @@
 
 **Ziel:** Ein Solo-Spielstand, ein manuelles Team, voller Spieltag-Loop ohne Dead-End.
 
-**Letzter Smoke:** 2026-06-26 (Browser: Home Top-6 CA/PO, Training→Lineup→Arena→Spieltag, Escape-Back Profil; CI 114/114)
+**Letzter Smoke:** 2026-06-26 (Build + CI 116/116, Home-Panel extrahiert, Playwright-Smoke lokal)
 
 | Check | Status | Notiz |
 |-------|--------|-------|
 | Production Build | 🟢 | `npm run build` grün |
-| CI flow-smoke | 🟢 | 114/114 Tests (`npm run ci:flow-smoke`) |
+| CI flow-smoke | 🟢 | 116/116 Tests (`npm run ci:flow-smoke`) |
+| Perf regression | 🟢 | `npm run perf:regression-smoke` (<250ms Version-Metadata) |
+| Playwright gameplay | 🟡 | `npx playwright install chromium` + `npm run app:smoke-gameplay -- --no-start` |
 | Save laden | 🟢 | Dev-Server lädt Long Run Sandbox mit A-A · Armageddon Aftermath |
 | Home Top-6 Karten | 🟢 | POW/SPE/MEN/SOC ohne Noten; CA absolut + PO-Range (kein „Gering“/„F“) |
 | Home/Inbox: nächster Schritt | 🟢 | Flow-Controller zeigt korrekten Schritt mit `globalNextLabel` |
@@ -17,7 +19,7 @@
 | Training setzen | 🟢 | "Weiter" navigiert korrekt zu `trainingCompact` (Trainingsmodus) statt Gebäude |
 | Transfermarkt: nur eigenes Team | 🟢 | Buy disabled + Modal-Guard |
 | Verhandlung: Feedback bei Abbruch | 🟢 | Meldung beim Schliessen |
-| Lineup + Formkarten | 🟢 | Blocker-Codes klar: `missing_formcard_pool` / `missing_formcard_selections` |
+| Lineup + Formkarten | 🟢 | Pool-Pflicht (`missing_formcard_pool`); Zuweisung optional, Skip erlaubt |
 | Lineup bestätigen (submitted) | 🟢 | Pflicht — UI zeigt Blocker + Button "Lineup bestätigen" |
 | Arena startet | 🟢 | Nach Lineup-Bestaetigung — Flow-Gate aktiv |
 | Arena Ergebnisse scrollen | 🟢 | Globaler-Next scrollt direkt zu `#arena-result-summary` statt Arena-Top |
@@ -30,7 +32,16 @@ Legende: 🟢 OK · 🟡 teilweise / Re-Test nötig · 🔴 blockiert
 
 ## Was noch 🟡 ist
 
-- **Automatisierter Smoke** — `npm run app:smoke-gameplay` benötigt lokal `npx playwright install`.
+- **Playwright-Smoke lokal** — `npx playwright install chromium` dann `npm run app:smoke-gameplay -- --no-start --base-url=http://127.0.0.1:3000`
+- **Voller Browser-Loop inkl. Apply** — nach Blocker-Fixes noch einmal manuell durchspielen
+
+## Performance (2026-06-26)
+
+| Change | Effekt |
+|--------|--------|
+| `FoundationHomeV2Panel` | Home/Office aus 31k-Zeilen-Monolith extrahiert; View unmountet wenn inaktiv |
+| `save-session-cache` | Version-Reload ohne Full-Save (bereits in CI) |
+| `shouldBuild*` Gating | Schwere Feeds nur bei aktiver View |
 
 ## Fix Loop 3 — Foundation Nav-UX (2026-06-25)
 

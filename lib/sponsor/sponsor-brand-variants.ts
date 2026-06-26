@@ -6,7 +6,9 @@ import { SPONSOR_BRAND_PARENTS } from "@/lib/sponsor/sponsor-brand-parents";
 export type SponsorSpecialTemplateId =
   | "transfer_profit_min"
   | "discipline_top3_count"
-  | "form_color_cover";
+  | "form_color_cover"
+  | "axis_rank_top"
+  | "salary_pressure_max";
 
 export type SponsorVariantKey =
   | "security_standard"
@@ -97,15 +99,15 @@ const CORE_BLUEPRINTS: VariantBlueprint[] = [
 
 function industrySpecialTemplates(industry: SponsorBrandIndustry): SponsorSpecialTemplateId[] {
   if (industry === "logistics" || industry === "finance" || industry === "retail") {
-    return ["transfer_profit_min", "form_color_cover", "discipline_top3_count"];
+    return ["transfer_profit_min", "salary_pressure_max", "form_color_cover", "discipline_top3_count"];
   }
   if (industry === "sport" || industry === "auto" || industry === "airline") {
-    return ["discipline_top3_count", "form_color_cover", "transfer_profit_min"];
+    return ["discipline_top3_count", "axis_rank_top", "form_color_cover", "transfer_profit_min"];
   }
   if (industry === "media" || industry === "telecom" || industry === "food") {
-    return ["form_color_cover", "discipline_top3_count", "transfer_profit_min"];
+    return ["form_color_cover", "axis_rank_top", "discipline_top3_count", "transfer_profit_min"];
   }
-  return ["form_color_cover", "discipline_top3_count", "transfer_profit_min"];
+  return ["form_color_cover", "axis_rank_top", "discipline_top3_count", "transfer_profit_min"];
 }
 
 function blueprintsForParent(parent: SponsorBrandParent): VariantBlueprint[] {

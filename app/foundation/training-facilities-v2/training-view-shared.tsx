@@ -384,14 +384,14 @@ export function TrainingPlayerLane({
               <VeloImpactStrip
                 flashKey={row.mode}
                 items={buildTrainingImpactItems({
-                  trainingXp: row.trainingXp,
-                  performanceXp: row.performanceXp,
+                  trainingSetpoints: row.organicForecast.trainingSetpoints,
+                  performanceSetpoints: row.organicForecast.performanceSetpoints,
+                  netSetpoints: row.organicForecast.netSetpoints,
                   recoveryBefore: row.recoveryForecast.before,
                   recoveryAfter: row.recoveryForecast.after,
                   recoveryDeltaPct: row.recoveryForecast.modifierPct,
-                  netDevelopmentXp: row.forecast.netDevelopmentXP,
-                  regressionPressure: row.forecast.regressionPressure,
                   regressionRisk: row.forecast.regressionRisk,
+                  legacyXpPreview: row.trainingXp + row.performanceXp,
                 })}
               />
 

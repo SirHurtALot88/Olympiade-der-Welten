@@ -397,4 +397,31 @@ describe("game inbox service", () => {
     const items = buildGameInboxItems({ gameState, saveId: "save-1", activeTeamId: "M-M", activeOwnerId: "user_local" });
     expect(items.some((item) => item.itemId.startsWith("sponsor_choice_missing:"))).toBe(false);
   });
+
+  it("warns when negative form cards remain unused before season end", () => {
+    const gameState = makeGameState({
+      seasonState: {
+        seasonId: "season-3",
+        schedule: [],
+        standings: {},
+        formCards: [
+          {
+            id: "card-negative",
+            saveId: "save-1",
+            seasonId: "season-3",
+            teamId: "M-M",
+            playerId: "p-1",
+            playerName: "p-1",
+            cardColor: "red",
+            cardValue: -4,
+            createdAt: "2026-06-12T00:00:00.000Z",
+          },
+        ],
+      },
+    });
+    const items = buildGameInboxItems({ gameState, saveId: "save-1", activeTeamId: "M-M", activeOwnerId: "user_local" });
+    const negativeTask = items.find((item) => item.itemId.startsWith("formcards_negative_open:"));
+    expect(negativeTask?.title).toBe("Negative Formkarten offen");
+    expect(negativeTask?.description).toContain("Strafpunkte");
+  });
 });

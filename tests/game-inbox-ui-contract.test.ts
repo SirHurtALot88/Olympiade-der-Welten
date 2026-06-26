@@ -16,8 +16,8 @@ describe("game inbox UI contract", () => {
     expect(navSource).toContain('{ id: "inboxV2", label: "Inbox"');
     expect(source).toContain("<InboxV2Client");
     expect(routingSource).toContain('if (view === "inbox") return "inboxV2"');
-    expect(source).toContain("<HomeV2Client");
-    expect(source).toContain("ManagerOfficeClient");
+    expect(source).toContain("<FoundationHomeV2Panel");
+    expect(source).toContain("selectedHqGmStory");
     expect(officeSource).toContain('data-testid="foundation-hq"');
     expect(source).toContain("primaryInboxItem");
     expect(source).toContain("navigateToInboxItem");

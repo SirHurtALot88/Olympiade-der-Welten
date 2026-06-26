@@ -93,6 +93,8 @@ describe("form card plan sync", () => {
 
     expect(getFormCardFlowStatus(state as never, "M-M")).toMatchObject({
       hasPlanSelections: true,
+      hasSelections: true,
+      skipped: false,
       isReady: true,
       blocker: null,
     });

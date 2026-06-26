@@ -213,6 +213,37 @@ describe("matchday-arena-readiness", () => {
     expect(readiness.isReady).toBe(true);
   });
 
+  it("opens arena when form card pool exists but selections were skipped", () => {
+    const state = gameState({
+      seasonState: {
+        ...gameState().seasonState,
+        formCards: [{ id: "card-1", saveId: "save-1", seasonId: "season-1", teamId: "H-R", playerId: "p-1", playerName: "p-1", cardColor: "red", cardValue: 2, createdAt: "2026-06-12T00:00:00.000Z" }],
+        lineupDrafts: [
+          {
+            lineupId: "lineup-1",
+            saveId: "save-1",
+            seasonId: "season-1",
+            matchdayId: "season-1-md-1",
+            teamId: "H-R",
+            status: "submitted",
+            entries: [
+              { disciplineId: "d1", disciplineSide: "d1", slotIndex: 0, playerId: "p-1", activePlayerId: "r-1" },
+              { disciplineId: "d1", disciplineSide: "d1", slotIndex: 1, playerId: "p-2", activePlayerId: "r-2" },
+              { disciplineId: "d2", disciplineSide: "d2", slotIndex: 0, playerId: "p-3", activePlayerId: "r-3" },
+              { disciplineId: "d2", disciplineSide: "d2", slotIndex: 1, playerId: "p-1", activePlayerId: "r-1" },
+            ],
+            createdAt: "2026-06-12T00:00:00.000Z",
+            updatedAt: "2026-06-12T00:00:00.000Z",
+          },
+        ],
+      },
+    });
+
+    const readiness = getMatchdayArenaReadiness(state, "H-R");
+    expect(readiness.blocker).toBeNull();
+    expect(readiness.isReady).toBe(true);
+  });
+
   it("merges form card plans for the active team without dropping other teams", () => {
     const merged = mergeFormCardPlansIntoGameState(
       gameState({

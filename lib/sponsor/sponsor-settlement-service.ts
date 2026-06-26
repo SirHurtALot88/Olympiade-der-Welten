@@ -3,7 +3,7 @@ import { randomUUID } from "@/lib/utils/random-id";
 import type { GameState, SponsorOfferComponent, TeamSponsorContract } from "@/lib/data/olyDataTypes";
 import { buildTeamSeasonOverviewRows } from "@/lib/foundation/team-management-overview";
 import {
-  getLeagueMinimumSalaryTotal,
+  getSponsorRank32BaseAnchorSalary,
   getRankMilestoneBonus,
   getSponsorPayoutForFinalRankAndTier,
   getUnlockedMilestones,
@@ -56,7 +56,7 @@ function buildSeasonEndRows(gameState: GameState, contract: TeamSponsorContract)
   const currentRank = row?.rank ?? null;
   const startRank = contract.startRank ?? row?.startplatz ?? currentRank;
   const salaryFactor = getCurrentSalaryFactor(gameState);
-  const leagueMinSalary = getLeagueMinimumSalaryTotal(gameState);
+  const baseAnchorSalary = getSponsorRank32BaseAnchorSalary(gameState);
   const rows: SponsorSettlementRow[] = [];
 
   for (const component of contract.components) {
@@ -96,8 +96,9 @@ function buildSeasonEndRows(gameState: GameState, contract: TeamSponsorContract)
         currentRank,
         salaryFactor,
         starTier,
-        leagueMinSalary,
+        baseAnchorSalary,
         contract.archetype,
+        contract.teamQualityRankAtSign,
       );
       const payout = roundCash(Math.max(0, targetTotal - baseTotal));
       const unlockedLabels = getUnlockedMilestones(currentRank).map((milestone) => milestone.label);

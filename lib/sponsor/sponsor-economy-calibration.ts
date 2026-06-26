@@ -5,6 +5,9 @@ import { PRIZE_MONEY_NORMALIZED_JSON_PATH } from "@/lib/season/prize-money-paths
 
 export const SPONSOR_BASE_FLOOR_C = 32;
 
+/** Abzug vom Referenz-Gehalt für den Rang-32-Basis-Anker (4. niedrigstes Gehalt − Buffer). */
+export const SPONSOR_BASE_SALARY_BUFFER_C = 5;
+
 /** Meilenstein-Kompression erst ab dieser Basis-Erhöhung über statischer Kalibrierung. */
 export const SPONSOR_BASE_ELEVATION_COMPRESSION_THRESHOLD_C = 8;
 
@@ -157,16 +160,35 @@ export function getLeagueMinimumSalaryTotal(gameState: GameState): number {
   return round1(Math.min(...overviewSalaries));
 }
 
+/** Viertniedrigstes Teamgehalt (4. von unten in der Gehaltsliste). */
+export function getLeagueFourthFromLowestSalaryTotal(gameState: GameState): number {
+  const salaries = buildTeamSeasonOverviewRows({ gameState })
+    .map((row) => getTeamDisplaySalaryTotal(gameState, row.teamId))
+    .filter((value) => value > 0)
+    .sort((left, right) => left - right);
+  if (salaries.length === 0) {
+    return SPONSOR_BASE_FLOOR_C;
+  }
+  const index = Math.min(3, salaries.length - 1);
+  return round1(salaries[index] ?? salaries[0]!);
+}
+
+/** Mindest-Basis für Rang 32: Gehalt des 4.-niedrigsten Teams − Buffer, mind. statischer Floor (unskaliert). */
+export function getSponsorRank32BaseAnchorSalary(gameState: GameState): number {
+  const referenceSalary = getLeagueFourthFromLowestSalaryTotal(gameState);
+  return round1(Math.max(SPONSOR_BASE_FLOOR_C, referenceSalary - SPONSOR_BASE_SALARY_BUFFER_C));
+}
+
 export type SponsorEconomyAnchors = {
   effectiveBaseFloor: number;
   milestonePool: number;
   milestoneScale: number;
 };
 
-export function resolveSponsorEconomyAnchors(salaryFactor: number, leagueMinSalary: number): SponsorEconomyAnchors {
+export function resolveSponsorEconomyAnchors(salaryFactor: number, baseAnchorSalary: number): SponsorEconomyAnchors {
   const scaledStaticFloor = round1(SPONSOR_BASE_FLOOR_C * salaryFactor);
-  const scaledLeagueMin = round1(leagueMinSalary * salaryFactor);
-  const effectiveBaseFloor = round1(Math.max(scaledStaticFloor, scaledLeagueMin));
+  const scaledAnchor = round1(baseAnchorSalary * salaryFactor);
+  const effectiveBaseFloor = round1(Math.max(scaledStaticFloor, scaledAnchor));
   const fullMilestoneBonus = getTotalMilestoneBonusC(salaryFactor);
   const baseElevation = Math.max(0, effectiveBaseFloor - scaledStaticFloor);
   const elevationAboveThreshold = Math.max(0, baseElevation - SPONSOR_BASE_ELEVATION_COMPRESSION_THRESHOLD_C);
@@ -188,21 +210,53 @@ export function getScaledRankMilestoneBonus(
   return round1(getRankMilestoneBonus(finalRank, salaryFactor) * milestoneScale);
 }
 
+/** Soft milestone redistribution: top slightly less, bottom slightly more. Base stays flat. */
+export function getQualityRebalanceProfile(teamQualityRank: number | null | undefined): {
+  milestoneScale: number;
+} {
+  if (teamQualityRank == null || !Number.isFinite(teamQualityRank)) {
+    return { milestoneScale: 1 };
+  }
+  const t = (teamQualityRank - 16.5) / 15.5;
+  const clamped = Math.max(-1, Math.min(1, t));
+  return {
+    milestoneScale: round1(1 + clamped * 0.1),
+  };
+}
+
+function applyQualityRebalanceToPayout(input: {
+  base: number;
+  milestoneBonus: number;
+  teamQualityRank?: number | null;
+}) {
+  const profile = getQualityRebalanceProfile(input.teamQualityRank);
+  return {
+    base: input.base,
+    milestoneBonus: round1(input.milestoneBonus * profile.milestoneScale),
+  };
+}
+
 export function getSponsorPayoutForFinalRankAndTier(
   finalRank: number | null | undefined,
   salaryFactor: number,
   starTier: SponsorStarTier,
   leagueMinSalary = SPONSOR_BASE_FLOOR_C,
   archetype: SponsorArchetype = "security",
+  teamQualityRank?: number | null,
 ): number {
   const { effectiveBaseFloor, milestoneScale } = resolveSponsorEconomyAnchors(salaryFactor, leagueMinSalary);
-  const base =
+  const rawBase =
     archetype === "security"
       ? round1(effectiveBaseFloor)
       : round1(effectiveBaseFloor * getStarTierBaseMultiplier(starTier));
-  const milestoneBonus = round1(
+  const rawMilestone = round1(
     getRankMilestoneBonus(finalRank, salaryFactor) * milestoneScale * getStarTierMilestoneMultiplier(starTier),
   );
+  const { base, milestoneBonus } = applyQualityRebalanceToPayout({
+    base: rawBase,
+    milestoneBonus: rawMilestone,
+    teamQualityRank,
+  });
   return round1(base + milestoneBonus);
 }
 
@@ -211,6 +265,7 @@ export function buildOfferCashAmounts(input: {
   salaryFactor: number;
   starTier: SponsorStarTier;
   leagueMinSalary?: number;
+  teamQualityRank?: number | null;
 }): { baseCash: number; rankCash: number; specialCash: number; totalAtMaxRank: number } {
   const leagueMinSalary = input.leagueMinSalary ?? SPONSOR_BASE_FLOOR_C;
   const { effectiveBaseFloor, milestonePool } = resolveSponsorEconomyAnchors(input.salaryFactor, leagueMinSalary);
@@ -224,16 +279,31 @@ export function buildOfferCashAmounts(input: {
   const baseShare = getArchetypeBaseShare(input.archetype);
   const rankShare = getArchetypeRankShare(input.archetype);
 
-  const baseCash =
+  let baseCash =
     input.archetype === "security"
       ? floorTotal
       : round1(floorTotal * (baseShare / getArchetypeBaseShare("security")));
-  const rankCash =
+  let rankCash =
     input.archetype === "security"
       ? round1(milestoneTotal * rankShare)
       : round1(milestoneTotal * (rankShare / getArchetypeRankShare("performance")));
+
+  const rebalance = getQualityRebalanceProfile(input.teamQualityRank);
+  rankCash = round1(rankCash * rebalance.milestoneScale);
+
+  if (input.archetype === "security") {
+    baseCash = round1(Math.max(baseCash, effectiveBaseFloor));
+  }
+
   const totalAtMaxRank = round1(
-    getSponsorPayoutForFinalRankAndTier(1, input.salaryFactor, input.starTier, leagueMinSalary, input.archetype),
+    getSponsorPayoutForFinalRankAndTier(
+      1,
+      input.salaryFactor,
+      input.starTier,
+      leagueMinSalary,
+      input.archetype,
+      input.teamQualityRank,
+    ),
   );
   const specialCash = round1(totalAtMaxRank * 0.04);
   return { baseCash, rankCash, specialCash, totalAtMaxRank };
@@ -282,6 +352,7 @@ export function estimateExpectedPayout(
     starTier,
     resolvedLeagueMin,
     offer.archetype,
+    offer.teamQualityRank,
   );
   let expected = round1(Math.max(baseCash, targetTotal));
   for (const component of offer.components) {

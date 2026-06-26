@@ -380,6 +380,7 @@ export default function LegacyResolveLabClient({
       scoutPotential: null,
       developmentInsight: null,
       organicProgression: null,
+      seasonOrganicForecast: null,
       classHistory: [],
       attributeVisibility: "scouted",
       attributeStats: [],

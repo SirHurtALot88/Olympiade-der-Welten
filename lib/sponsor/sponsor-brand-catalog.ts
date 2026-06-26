@@ -1,4 +1,4 @@
-import type { SponsorArchetype, SponsorOfferComponent, SponsorStarTier, Team, TeamIdentity, TeamStrategyProfile } from "@/lib/data/olyDataTypes";
+import type { GameState, SponsorArchetype, SponsorStarTier, Team, TeamIdentity, TeamStrategyProfile } from "@/lib/data/olyDataTypes";
 
 import {
   SPONSOR_BRAND_PARENTS,
@@ -14,6 +14,10 @@ import {
   type SponsorBrandTemplate,
   type SponsorSpecialTemplateId,
 } from "@/lib/sponsor/sponsor-brand-variants";
+import {
+  buildChallengeSpecialComponent,
+  buildStandardSpecialComponent,
+} from "@/lib/sponsor/sponsor-special-objectives";
 
 export type { SponsorBrandTemplate, SponsorSpecialTemplateId, SponsorVariantKey } from "@/lib/sponsor/sponsor-brand-variants";
 export {
@@ -199,41 +203,8 @@ function buildSpecialComponent(input: {
   templateId: SponsorSpecialTemplateId;
   starTier: SponsorStarTier;
   rewardCash: number;
-}): SponsorOfferComponent {
-  const demandBoost = input.starTier >= 4 ? 1 : input.starTier >= 3 ? 0 : -1;
-  if (input.templateId === "transfer_profit_min") {
-    const target = Math.max(3, 5 + demandBoost + (input.starTier >= 5 ? 2 : 0));
-    return {
-      componentId: "special-transfer-profit",
-      kind: "special",
-      label: `Transfergewinn ≥ ${target}`,
-      targetValue: target,
-      rewardCash: input.rewardCash,
-      penaltyCash: Math.max(1, Math.round(input.rewardCash / 3)),
-      specialKey: "transfer_profit_min",
-    };
-  }
-  if (input.templateId === "discipline_top3_count") {
-    const target = Math.max(1, 2 + demandBoost + (input.starTier >= 5 ? 1 : 0));
-    return {
-      componentId: "special-discipline-top3",
-      kind: "special",
-      label: `≥ ${target} Disziplin-Top-3`,
-      targetValue: target,
-      rewardCash: input.rewardCash,
-      penaltyCash: Math.max(1, Math.round(input.rewardCash / 4)),
-      specialKey: "discipline_top3_count",
-    };
-  }
-  const colors = input.starTier >= 4 ? 5 : 4;
-  return {
-    componentId: "special-roster-form",
-    kind: "special",
-    label: `Kader-Form ${colors} Farben`,
-    targetValue: `${colors} Farben`,
-    rewardCash: input.rewardCash,
-    specialKey: "form_color_cover",
-  };
+}) {
+  return buildStandardSpecialComponent(input);
 }
 
 export function pickSponsorBrandForOffer(input: {
@@ -249,30 +220,48 @@ export function pickSponsorBrandForOffer(input: {
   recentParentBrandIds?: string[];
   globalParentUsage?: Record<string, number>;
   forcePremiumElite?: boolean;
+  specialMode?: "standard" | "challenge";
+  gameState?: GameState;
+  specialRewardCash?: number;
 }) {
   const { parent, brand } = pickBrandForSlot(input);
   const display = resolveSponsorBrandDisplay(parent, brand);
-  const specialTemplate = pickSpecialTemplate({
-    brand,
-    team: input.team,
-    identity: input.identity,
-    profile: input.profile,
-    starTier: input.starTier,
-    slotIndex: input.slotIndex,
-    seasonId: input.seasonId,
-  });
+  const rewardCash = input.specialRewardCash ?? brand.specialCash;
+  const special =
+    input.specialMode === "challenge" && input.gameState
+      ? buildChallengeSpecialComponent({
+          gameState: input.gameState,
+          team: input.team,
+          identity: input.identity,
+          profile: input.profile,
+          starTier: input.starTier,
+          rewardCash,
+          seasonId: input.seasonId,
+        })
+      : buildSpecialComponent({
+          templateId: pickSpecialTemplate({
+            brand,
+            team: input.team,
+            identity: input.identity,
+            profile: input.profile,
+            starTier: input.starTier,
+            slotIndex: input.slotIndex,
+            seasonId: input.seasonId,
+          }),
+          starTier: input.starTier,
+          rewardCash,
+        });
   return {
     parent,
     brand: {
       ...brand,
       name: display.name,
-      flavor: display.flavor,
+      flavor:
+        input.specialMode === "challenge"
+          ? `Challenge-Sponsor · ${display.flavor}`
+          : display.flavor,
     },
-    special: buildSpecialComponent({
-      templateId: specialTemplate,
-      starTier: input.starTier,
-      rewardCash: brand.specialCash,
-    }),
+    special,
   };
 }
 

@@ -1757,10 +1757,45 @@ export default function PlayerDetailDrawer({
                     </small>
                   </article>
                 ) : null}
+                {data.seasonOrganicForecast && !data.organicProgression ? (
+                  <article
+                    className="metric-card player-drawer-xp-balance-card"
+                    title="Organische Saison-Prognose: Setpoints aus Training, Performance und Erhaltungsdruck — das ist die verbindliche Entwicklungslogik."
+                  >
+                    <HelpLabel title="Netto-Setpoints = Training + Performance minus Erhaltungsdruck. Das ist die Hauptzahl fuer organische Entwicklung.">
+                      Saison-Prognose (Setpoints)
+                    </HelpLabel>
+                    <div className="player-drawer-xp-balance-grid">
+                      <span>
+                        <small>Training</small>
+                        <strong>+{formatValue(data.seasonOrganicForecast.trainingSetpoints, 1)}</strong>
+                      </span>
+                      <span>
+                        <small>Performance</small>
+                        <strong>+{formatValue(data.seasonOrganicForecast.appliedPerformanceSetpoints, 1)}</strong>
+                      </span>
+                      <span>
+                        <small>Erhaltung</small>
+                        <strong className="is-negative">-{formatValue(data.seasonOrganicForecast.marketValuePressureTotal, 1)}</strong>
+                      </span>
+                      <span>
+                        <small>Netto</small>
+                        <strong className={getDeltaToneClass(data.seasonOrganicForecast.netSetpoints)}>
+                          {data.seasonOrganicForecast.netSetpoints > 0 ? "+" : ""}
+                          {formatValue(data.seasonOrganicForecast.netSetpoints, 1)}
+                        </strong>
+                      </span>
+                    </div>
+                    <small>
+                      {data.seasonOrganicForecast.classBefore} · Training {data.seasonOrganicForecast.primaryTrainingClass}
+                      {data.seasonOrganicForecast.classChanged ? ` → ${data.seasonOrganicForecast.classAfter}` : ""}
+                    </small>
+                  </article>
+                ) : null}
                 {data.progressionForecast && (!isScoutedProfile || scoutingLevel >= 4) ? (
                   <>
-                    <article className="metric-card player-drawer-xp-balance-card" title="Netto-XP = verdiente XP minus Erhaltung und Regression. Positive Netto-XP werden zu freien XP, negative Werte zeigen Rueckschritt-Risiko.">
-                      <HelpLabel title="Netto-XP = verdiente XP minus Erhaltung und Rueckschritt. Das ist die wichtigste Entwicklungszahl.">XP-Bilanz</HelpLabel>
+                    <article className="metric-card player-drawer-xp-balance-card" title="Legacy XP-Vorschau fuer manuelle Upgrades. Organische Setpoints sind die verbindliche Saison-Entwicklung.">
+                      <HelpLabel title="Legacy XP = altes Upgrade-System fuer manuelle Attribut-Kaeufe am Saisonende.">Legacy XP-Vorschau</HelpLabel>
                       <div className="player-drawer-xp-balance-grid">
                         <span>
                           <small>Verdient</small>

@@ -300,10 +300,10 @@ function formatRiskLabel(value: string | null | undefined) {
 }
 
 function getDevelopmentTone(row: TrainingPlayerRowView) {
-  if (row.forecast.netDevelopmentXP < 0 || row.forecast.regressionRisk === "high") {
+  if (row.organicForecast.netSetpoints < 0 || row.forecast.regressionRisk === "high") {
     return "regression";
   }
-  if (row.forecast.netDevelopmentXP >= 45) {
+  if (row.organicForecast.netSetpoints >= 2) {
     return "growth";
   }
   return "stable";
@@ -638,7 +638,7 @@ export default function TrainingFacilitiesV2Client({
   const topGrowth = useMemo(
     () =>
       [...playerRows]
-        .sort((left, right) => right.forecast.netDevelopmentXP - left.forecast.netDevelopmentXP)[0] ?? null,
+        .sort((left, right) => right.organicForecast.netSetpoints - left.organicForecast.netSetpoints)[0] ?? null,
     [playerRows],
   );
   const topRisk = useMemo(
@@ -647,7 +647,7 @@ export default function TrainingFacilitiesV2Client({
         .sort(
           (left, right) =>
             right.forecast.regressionPressure - left.forecast.regressionPressure ||
-            right.totalXp - left.totalXp,
+            right.organicForecast.netSetpoints - left.organicForecast.netSetpoints,
         )[0] ?? null,
     [playerRows],
   );
@@ -807,7 +807,7 @@ export default function TrainingFacilitiesV2Client({
             )}
             <small>
               {topGrowth
-                ? `+${formatLocaleNumber(topGrowth.forecast.netDevelopmentXP, 0)} Wachstum · ${topGrowth.modeConfig.label}`
+                ? `+${formatLocaleNumber(topGrowth.organicForecast.netSetpoints, 1)} Setpoints · ${topGrowth.modeConfig.label}`
                 : "Kein aktiver Kader"}
             </small>
           </article>

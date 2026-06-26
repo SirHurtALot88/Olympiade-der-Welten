@@ -100,6 +100,7 @@ describe("form card flow", () => {
       hasModifierSelections: true,
       hasPlanSelections: false,
       hasSelections: true,
+      skipped: false,
       isReady: true,
       blocker: null,
     });
@@ -145,7 +146,7 @@ describe("form card flow", () => {
     });
   });
 
-  it("flags missing selections when only the pool exists", () => {
+  it("allows skipping selections when only the pool exists", () => {
     const state = gameState({
       seasonState: {
         seasonId: "season-2",
@@ -167,6 +168,12 @@ describe("form card flow", () => {
       },
     });
 
-    expect(getFormCardFlowStatus(state, "M-M").blocker).toBe("missing_formcard_selections");
+    expect(getFormCardFlowStatus(state, "M-M")).toMatchObject({
+      hasPool: true,
+      hasSelections: false,
+      skipped: true,
+      isReady: true,
+      blocker: null,
+    });
   });
 });

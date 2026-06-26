@@ -426,7 +426,7 @@ type MatchdaySlotDragPreviewCard = {
 
 type MatchdaySlotReadiness = "empty" | "optimal" | "solid" | "risky";
 type TeamdeckFilterMode = "all" | "free" | "assigned" | "blocked";
-type TeamdeckSortMode = "top" | "d1" | "d2" | "captain" | "fatigue" | "wish";
+type TeamdeckSortMode = "fit" | "top" | "d1" | "d2" | "captain" | "fatigue" | "wish";
 type TeamdeckCandidateQualityKey = "instant" | "alternative" | "fatigue" | "blocked" | "emergency";
 
 type LineupMoraleDecision = {
@@ -1843,7 +1843,7 @@ export default function LegacyLineupLabClient(props: LegacyLineupLabClientProps)
   const [roomContext, setRoomContext] = useState<FoundationRoomContext | null>(null);
   const [playerFilter, setPlayerFilter] = useState("");
   const [teamdeckFilterMode, setTeamdeckFilterMode] = useState<TeamdeckFilterMode>("all");
-  const [teamdeckSortMode, setTeamdeckSortMode] = useState<TeamdeckSortMode>("top");
+  const [teamdeckSortMode, setTeamdeckSortMode] = useState<TeamdeckSortMode>("fit");
   const [activeSlotKey, setActiveSlotKey] = useState<string | null>(null);
   const [showOnlyTopSlotCandidates, setShowOnlyTopSlotCandidates] = useState(true);
   const [recentlyAssignedSlotKey, setRecentlyAssignedSlotKey] = useState<string | null>(null);
@@ -2819,6 +2819,10 @@ export default function LegacyLineupLabClient(props: LegacyLineupLabClientProps)
     () => slots.find((slot) => !selections[slot.key])?.key ?? null,
     [selections, slots],
   );
+  const nextOpenSlot = useMemo(
+    () => slots.find((slot) => slot.key === nextOpenSlotKey) ?? null,
+    [nextOpenSlotKey, slots],
+  );
   const activeSlotRole = activeSlot ? slotRoleByKey.get(activeSlot.key) ?? null : null;
 
   useEffect(() => {
@@ -2826,8 +2830,15 @@ export default function LegacyLineupLabClient(props: LegacyLineupLabClientProps)
       return;
     }
     setFocusedDisciplineSide(activeSlot.disciplineSide);
-    setTeamdeckSortMode("top");
+    setTeamdeckSortMode("fit");
   }, [activeSlot?.disciplineSide, activeSlot?.key]);
+
+  useEffect(() => {
+    if (activeSlotKey || !nextOpenSlotKey) {
+      return;
+    }
+    setActiveSlotKey(nextOpenSlotKey);
+  }, [activeSlotKey, nextOpenSlotKey]);
 
   useEffect(() => {
     const requestKey = props.focusMissingRequestKey ?? null;
@@ -3345,12 +3356,18 @@ export default function LegacyLineupLabClient(props: LegacyLineupLabClientProps)
       })
       .filter((group) => group.entries.length > 0);
   }, [showOnlyTopSlotCandidates, teamdeckCandidateEntries, teamdeckFilterMode]);
-  const activeSlotSpotlightCandidates = useMemo(() => {
+  const activeSlotSpotlightGroups = useMemo(() => {
     return teamdeckCandidateGroups
-      .filter((group) => group.key !== "blocked")
-      .flatMap((group) => group.entries.slice(0, group.key === "instant" ? 2 : 1))
-      .slice(0, 4);
+      .filter((group) => group.key !== "blocked" && group.entries.length > 0)
+      .map((group) => ({
+        ...group,
+        entries: group.entries.slice(0, group.key === "instant" ? 3 : 2),
+      }))
+      .filter((group) => group.entries.length > 0);
   }, [teamdeckCandidateGroups]);
+  const activeSlotSpotlightCandidates = useMemo(() => {
+    return activeSlotSpotlightGroups.flatMap((group) => group.entries).slice(0, 6);
+  }, [activeSlotSpotlightGroups]);
   const slotDragPreviewByKey = useMemo(() => {
     if (!draggedActivePlayerId) {
       return new Map<string, MatchdaySlotDragPreviewCard>();
@@ -4178,6 +4195,10 @@ export default function LegacyLineupLabClient(props: LegacyLineupLabClientProps)
   const teamdeckSortInsight = useMemo(() => {
     const activeLabel = activeSlot ? `${activeSlot.disciplineSide.toUpperCase()}-${activeSlot.slotIndex + 1}` : "Auto";
     const labels: Record<TeamdeckSortMode, { label: string; detail: string }> = {
+      fit: {
+        label: "Passt sofort",
+        detail: `Gruppiert nach Slot-Fit fuer ${activeLabel}.`,
+      },
       top: {
         label: "Top Fit",
         detail: `Beste legale Picks fuer ${activeLabel}.`,
@@ -6188,6 +6209,24 @@ export default function LegacyLineupLabClient(props: LegacyLineupLabClientProps)
     setActiveFormPickCell(null);
   }
 
+  function skipFormCardsForSide(input: {
+    matchdayId: string;
+    disciplineSide: "d1" | "d2";
+    disciplineId: string | null;
+  }) {
+    if (isReadOnly) {
+      return;
+    }
+    queueFormCardPlanSave({
+      matchdayId: input.matchdayId,
+      disciplineSide: input.disciplineSide,
+      disciplineId: input.disciplineId,
+      primaryFormCardId: null,
+      secondaryFormCardId: null,
+    });
+    setActiveFormPickCell(null);
+  }
+
   function getTeamPowerOptionsForSide(disciplineSide: "d1" | "d2") {
     const selectedPowerId = modifiers[disciplineSide].teamPowerId;
     const otherPowerId = disciplineSide === "d1" ? modifiers.d2.teamPowerId : modifiers.d1.teamPowerId;
@@ -7134,6 +7173,7 @@ export default function LegacyLineupLabClient(props: LegacyLineupLabClientProps)
               clearActiveFormPickCell={clearActiveFormPickCell}
               assignFormCardFromDeck={assignFormCardFromDeck}
               setActiveFormPickCell={setActiveFormPickCell}
+              skipFormCardsForSide={skipFormCardsForSide}
             />
           ) : null}
 
@@ -7686,6 +7726,7 @@ export default function LegacyLineupLabClient(props: LegacyLineupLabClientProps)
               </div>
 	              <div className="legacy-lineup-deck-filter" role="group" aria-label="Teamdeck Sortierung">
 	                {([
+	                  { value: "fit" as const, label: "Passt sofort" },
 	                  { value: "top" as const, label: "Top Fit" },
 	                  { value: "d1" as const, label: d1Label },
 	                  { value: "d2" as const, label: d2Label },
@@ -8028,13 +8069,15 @@ export default function LegacyLineupLabClient(props: LegacyLineupLabClientProps)
               <span className="pill">{teamdeckCandidateEntries.length}/{matchdayRosterCards.length} Spieler</span>
             </div>
           </div>
-          <div className={`legacy-lineup-active-slot-strip${activeSlot && !selections[activeSlot.key] ? " is-next-open" : ""}`}>
+          <div className={`legacy-lineup-active-slot-strip${activeSlot && !selections[activeSlot.key] ? " is-next-open" : ""}${nextOpenSlotKey && nextOpenSlotKey !== activeSlot?.key ? " has-next-target" : ""}`}>
             <div className="legacy-lineup-active-slot-copy">
-              <span>{activeSlot && !selections[activeSlot.key] ? "Hier weiter" : "Teamdeck sortiert fuer"}</span>
+              <span>{activeSlot && !selections[activeSlot.key] ? "Hier weiter" : nextOpenSlotKey ? "Als Naechstes" : "Teamdeck sortiert fuer"}</span>
               <strong>
-                {activeSlot
+                {activeSlot && !selections[activeSlot.key]
                   ? `${activeSlot.disciplineSide.toUpperCase()}-${activeSlot.slotIndex + 1} · ${activeSlotRole?.label ?? "Standard"}`
-                  : "naechsten freien Slot"}
+                  : nextOpenSlot
+                    ? `${nextOpenSlot.disciplineSide.toUpperCase()}-${nextOpenSlot.slotIndex + 1} · offener Slot`
+                    : "naechsten freien Slot"}
               </strong>
               <small>
                 {activeSlotIssues[0]?.detail ??
@@ -8060,7 +8103,7 @@ export default function LegacyLineupLabClient(props: LegacyLineupLabClientProps)
               ) : null}
             </div>
           </div>
-          {activeSlot && activeSlotSpotlightCandidates.length ? (
+          {activeSlot && activeSlotSpotlightGroups.length ? (
             <div className="legacy-lineup-active-candidate-rail" aria-label="Beste Kandidaten fuer aktiven Slot">
               <div className="legacy-lineup-active-candidate-copy">
                 <span>Direkt spielbar</span>
@@ -8069,7 +8112,10 @@ export default function LegacyLineupLabClient(props: LegacyLineupLabClientProps)
                 </strong>
               </div>
               <div className="legacy-lineup-active-candidate-list">
-                {activeSlotSpotlightCandidates.map((candidate, index) => (
+                {activeSlotSpotlightGroups.map((group) => (
+                  <div key={`spotlight-group-${group.key}`} className="legacy-lineup-candidate-group-block">
+                    <div className={`legacy-lineup-candidate-group-header is-${group.meta.tone}`}>{group.meta.label}</div>
+                    {group.entries.map((candidate, index) => (
                   <button
                     key={`active-slot-candidate-${activeSlot.key}-${candidate.player.activePlayerId}`}
                     className={`legacy-lineup-active-candidate-button${hoveredCandidate?.slotKey === activeSlot.key && hoveredCandidate.activePlayerId === candidate.player.activePlayerId ? " is-previewed" : ""}`}
@@ -8099,6 +8145,8 @@ export default function LegacyLineupLabClient(props: LegacyLineupLabClientProps)
                     />
                     <em>{candidate.activeSlotCandidate?.fitSummary ?? candidate.detail}</em>
                   </button>
+                    ))}
+                  </div>
                 ))}
               </div>
             </div>
@@ -8159,6 +8207,7 @@ export default function LegacyLineupLabClient(props: LegacyLineupLabClientProps)
           </div>
           <div className="legacy-lineup-deck-filter" role="group" aria-label="Teamdeck Sortierung">
             {([
+              { value: "fit" as const, label: "Passt sofort" },
               { value: "top" as const, label: "Top Fit" },
               { value: "d1" as const, label: d1Label },
               { value: "d2" as const, label: d2Label },

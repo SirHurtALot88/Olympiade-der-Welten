@@ -1,5 +1,11 @@
 import type { GameState, SponsorOfferComponent } from "@/lib/data/olyDataTypes";
 import { buildTeamSeasonOverviewRows } from "@/lib/foundation/team-management-overview";
+import { getTeamDisplaySalaryTotal } from "@/lib/sponsor/sponsor-economy-calibration";
+import {
+  getTeamAxisRank,
+  parseAxisTargetValue,
+  type SponsorAxisKey,
+} from "@/lib/sponsor/sponsor-special-objectives";
 
 export function evaluateSponsorRankObjective(currentRank: number | null, targetRank: number) {
   if (currentRank == null) return "open" as const;
@@ -24,6 +30,40 @@ export function evaluateSpecialComponentForObjective(
   const specialKey = component.specialKey ?? "";
   const rows = buildTeamSeasonOverviewRows({ gameState });
   const row = rows.find((entry) => entry.teamId === teamId) ?? null;
+
+  if (specialKey === "axis_rank_top") {
+    const parsed = parseAxisTargetValue(component.targetValue);
+    if (!parsed) {
+      return "open";
+    }
+    const axisRank = getTeamAxisRank(rows, teamId, parsed.axis as SponsorAxisKey);
+    if (axisRank.rank == null) {
+      return "open";
+    }
+    if (axisRank.rank <= parsed.topRank) {
+      return "completed";
+    }
+    if (axisRank.rank <= parsed.topRank + 2) {
+      return "at_risk";
+    }
+    return "open";
+  }
+
+  if (specialKey === "salary_pressure_max") {
+    const target = typeof component.targetValue === "number" ? component.targetValue : Number(component.targetValue);
+    const salary = row?.salaryTotal ?? getTeamDisplaySalaryTotal(gameState, teamId);
+    if (!Number.isFinite(target) || target <= 0) {
+      return "open";
+    }
+    if (salary <= target) {
+      return "completed";
+    }
+    if (salary <= target * 1.05) {
+      return "at_risk";
+    }
+    return "open";
+  }
+
   if (specialKey === "transfer_profit_min") {
     const target = typeof component.targetValue === "number" ? component.targetValue : 5;
     return (row?.transferNet ?? 0) >= target ? "completed" : (row?.transferNet ?? 0) >= target - 2 ? "at_risk" : "open";

@@ -74,11 +74,12 @@ export default function TrainingCompactClient({
 }: TrainingCompactClientProps) {
   const teamLogo = getTeamLogoModel(selectedTeam);
   const trainingModeReadOnly = managementLocked;
-  const topGrowth = [...playerRows].sort((left, right) => right.forecast.netDevelopmentXP - left.forecast.netDevelopmentXP)[0] ?? null;
+  const topGrowth = [...playerRows].sort((left, right) => right.organicForecast.netSetpoints - left.organicForecast.netSetpoints)[0] ?? null;
   const topRisk =
     [...playerRows].sort(
       (left, right) =>
-        right.forecast.regressionPressure - left.forecast.regressionPressure || right.totalXp - left.totalXp,
+        right.forecast.regressionPressure - left.forecast.regressionPressure ||
+        right.organicForecast.netSetpoints - left.organicForecast.netSetpoints,
     )[0] ?? null;
 
   return (
@@ -126,14 +127,14 @@ export default function TrainingCompactClient({
             </small>
           </article>
           <article className="training-v2-summary-card">
-            <span>Trainingsertrag</span>
-            <strong>{formatLocaleNumber(summary.trainingXpAfter, 0)}</strong>
+            <span>Trainings-Setpoints</span>
+            <strong>{formatLocaleNumber(summary.trainingXpAfter, 1)}</strong>
             <small>Facility {formatSignedPercent(summary.trainingXpModifierPct)}</small>
           </article>
           <article className="training-v2-summary-card">
-            <span>Performance XP</span>
-            <strong>{formatLocaleNumber(summary.performanceXp, 0)}</strong>
-            <small>Gesamt {formatLocaleNumber(summary.totalXp, 0)}</small>
+            <span>Performance</span>
+            <strong>{formatLocaleNumber(summary.performanceXp, 1)}</strong>
+            <small>Netto {formatLocaleNumber(summary.totalXp, 1)} Setpoints</small>
           </article>
           <article className="training-v2-summary-card">
             <span>Entwicklung</span>
@@ -150,7 +151,7 @@ export default function TrainingCompactClient({
             <strong>{topGrowth?.player.name ?? "—"}</strong>
             <small>
               {topGrowth
-                ? `+${formatLocaleNumber(topGrowth.forecast.netDevelopmentXP, 0)} Wachstum · ${topGrowth.modeConfig.label}`
+                ? `+${formatLocaleNumber(topGrowth.organicForecast.netSetpoints, 1)} Setpoints · ${topGrowth.modeConfig.label}`
                 : "Kein aktiver Kader"}
             </small>
           </article>

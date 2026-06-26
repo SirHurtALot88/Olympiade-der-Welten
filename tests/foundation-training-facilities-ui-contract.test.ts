@@ -48,7 +48,7 @@ describe("foundation training and facilities ui contract", () => {
 
     expect(fileText).toContain('data-testid="foundation-training-compact"');
     expect(fileText).toContain("TrainingPlayerLane");
-    expect(fileText).toContain("Gebaeude oeffnen");
+    expect(fileText).toContain("organicForecast.netSetpoints");
     expect(fileText).toContain("Training");
   });
 
@@ -56,6 +56,7 @@ describe("foundation training and facilities ui contract", () => {
     const fileText = await fs.readFile(foundationClientPath, "utf8");
 
     expect(fileText).toContain("buildPlayerProgressionForecast");
+    expect(fileText).toContain("buildOrganicSeasonProgression");
     expect(fileText).toContain("buildTrainingPlayerRowView");
     expect(fileText).toContain("trainingModeDraft");
     expect(fileText).toContain("async function setPlayerTrainingMode");
