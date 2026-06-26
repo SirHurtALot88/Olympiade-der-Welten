@@ -25,7 +25,7 @@ describe("gameplay smoke script contract", () => {
     expect(scriptText).toContain("smoke-arena.png");
     expect(scriptText).toContain("smoke-preseason.png");
     expect(scriptText).toContain("foundation-context-banner");
-    expect(scriptText).toContain('timeoutMs: Number(args.get("timeout-ms") ?? "45000")');
+    expect(scriptText).toContain('timeoutMs: Number(args.get("timeout-ms") ?? "60000")');
     expect(scriptText).toContain("Boolean(select && !select.disabled)");
     expect(scriptText).toContain('page.route("**/api/media/**"');
     expect(scriptText).toContain("save-switch-context-hardening");
@@ -36,7 +36,7 @@ describe("gameplay smoke script contract", () => {
     expect(scriptText).toContain("foundation-save-switch-select");
     expect(scriptText).toContain("foundation-active-save-id");
     expect(scriptText).toContain("transfer-market");
-    expect(scriptText).toContain("foundation-training-facilities");
+    expect(scriptText).toContain("foundation-training-compact");
     expect(scriptText).toContain("foundation-lineup");
     expect(scriptText).toContain("foundation-cockpit");
     expect(scriptText).toContain("matchdayArena");
