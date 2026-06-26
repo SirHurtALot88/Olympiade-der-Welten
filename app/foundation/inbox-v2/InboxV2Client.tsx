@@ -33,10 +33,10 @@ export default function InboxV2Client({
   onIncludeDoneChange,
   includeDismissed = false,
   onIncludeDismissedChange,
-  onOpenHomeV2,
   onRunChoice,
   onMarkDone,
   onDismiss,
+  hideCategoryFilters = false,
 }: InboxV2ClientProps) {
   const selectedItem = useMemo(
     () => items.find((item) => item.id === selectedItemId) ?? items[0] ?? null,
@@ -54,15 +54,10 @@ export default function InboxV2Client({
         <div className="inbox-v2-actions">
           <span className="pill">{openCount} offen</span>
           {criticalCount > 0 ? <span className="pill is-warning">{criticalCount} kritisch</span> : null}
-          {onOpenHomeV2 ? (
-            <button type="button" className="secondary-button" onClick={onOpenHomeV2}>
-              Home V2
-            </button>
-          ) : null}
         </div>
       </header>
 
-      {onCategoryFilterChange ? (
+      {onCategoryFilterChange && !hideCategoryFilters ? (
         <div className="inbox-v2-filters">
           <div className="velo-intensity-rail inbox-v2-category-rail" aria-label="Inbox Kategorien">
             {INBOX_CATEGORY_FILTERS.map((filter) => (

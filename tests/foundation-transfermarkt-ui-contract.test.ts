@@ -201,14 +201,13 @@ describe("foundation transfermarkt ui contract", () => {
     ]);
 
     expect(fileText).toContain("Kaufdialog");
-    expect(foundationText).toContain("Auto-Angebot"); // classic TM in FoundationPageClient
     expect(fileText).toContain("resetBuyDemandFrame");
     expect(fileText).toContain("Spieler ist noch angefressen");
     expect(fileText).toContain('buyNegotiationOutcome?.status !== "accepted"');
     expect(fileText).toContain('persistNegotiationOutcome(buyPreview, "countered")');
     expect(foundationText).toContain("toggleScoutingWatch");
     expect(foundationText).toContain("onToggleScoutingWatch");
-    expect(foundationText).toContain("clearNegotiationOutcome: false");
+    expect(foundationText).toContain("openMarketOfferPanel");
   });
 
   it("keeps the lineup coach wording tied to the new candidate quality flow", async () => {
@@ -240,21 +239,22 @@ describe("foundation transfermarkt ui contract", () => {
     expect(fileText).toContain('defaultSeasonId === "loading"');
   });
 
-  it("blocks classic market buy for teams the active owner cannot manage", async () => {
-    const fileText = await fs.readFile(foundationClientPath, "utf8");
-
-    expect(fileText).toContain('data-testid="transfer-buy-open-button"');
-    expect(fileText).toContain("!canManageTeamId(marketTeamId)");
-    expect(fileText).toContain("Nicht dein Team");
-  });
-
-  it("shows negotiation abort feedback when closing buy modals", async () => {
+  it("blocks market buy for teams the active owner cannot manage", async () => {
     const [foundationText, v2Text] = await Promise.all([
       fs.readFile(foundationClientPath, "utf8"),
       fs.readFile(transfermarktV2Path, "utf8"),
     ]);
 
-    expect(foundationText).toContain("Kauf von ${abortPlayerName} abgebrochen");
+    expect(foundationText).toContain("openMarketBuyModal");
+    expect(foundationText).toContain("!canManageTeamId(effectiveTeamId)");
+    expect(v2Text).toContain("manageableTeamIdSet");
+    expect(v2Text).toContain("steuerbaren Teams");
+  });
+
+  it("shows negotiation abort feedback when closing buy offer pages", async () => {
+    const v2Text = await fs.readFile(transfermarktV2Path, "utf8");
+
     expect(v2Text).toContain("Kauf von ${playerName} abgebrochen");
+    expect(v2Text).toContain("data-testid=\"transfer-offer-page\"");
   });
 });

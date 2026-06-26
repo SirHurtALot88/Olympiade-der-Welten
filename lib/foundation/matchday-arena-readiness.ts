@@ -65,7 +65,7 @@ export function getMatchdayArenaReadiness(gameState: GameState, activeTeamId: st
   } else if (!lineupSubmitted) {
     blocker = "lineup_not_submitted";
   } else if (formCardsRequired && formCardFlow.blocker) {
-    blocker = formCardFlow.blocker;
+    blocker = formCardFlow.blocker as MatchdayArenaBlockerReason;
   }
 
   return {

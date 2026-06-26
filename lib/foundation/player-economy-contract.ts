@@ -102,6 +102,11 @@ function normalizeStoredEconomyValue(value: number | null | undefined) {
   return numericValue;
 }
 
+/** Display-scale economy value (raw roster cents → game cash units). */
+export function normalizeEconomyMoney(value: number | null | undefined): number | null {
+  return normalizeStoredEconomyValue(value);
+}
+
 function resolveImportedMarketValueSource(player?: EconomyPlayer | null): ImportedMarketValueSource {
   if (toFiniteNumber(player?.displayMarketValue) != null) {
     return "imported_display";

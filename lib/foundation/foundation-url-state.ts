@@ -1,4 +1,10 @@
 import type { FoundationViewId } from "@/lib/foundation/foundation-view-routing";
+import {
+  buildFoundationHref,
+  type FoundationPanelId,
+  type FoundationUrlState,
+  writeFoundationUrlState,
+} from "@/lib/foundation/foundation-navigation-history";
 
 export function parseFoundationTabFromUrl(): string | null {
   if (typeof window === "undefined") return null;
@@ -10,27 +16,30 @@ export function parseFoundationPlayerIdFromUrl(): string | null {
   return new URL(window.location.href).searchParams.get("playerId");
 }
 
-export function syncFoundationUrlState(input: {
+export type { FoundationPanelId, FoundationUrlState };
+
+export function syncFoundationUrlState(
+  input: FoundationUrlState,
+  options?: { mode?: "push" | "replace" },
+) {
+  writeFoundationUrlState(input, options?.mode ?? "replace");
+}
+
+/** @deprecated use syncFoundationUrlState */
+export function syncFoundationUrlStateLegacy(input: {
   view: FoundationViewId;
   tab?: string | null;
   playerId?: string | null;
 }) {
-  if (typeof window === "undefined") return;
-
-  const nextUrl = new URL(window.location.href);
-  nextUrl.searchParams.set("view", input.view);
-
-  if (input.tab) {
-    nextUrl.searchParams.set("tab", input.tab);
-  } else {
-    nextUrl.searchParams.delete("tab");
-  }
-
-  if (input.playerId) {
-    nextUrl.searchParams.set("playerId", input.playerId);
-  } else {
-    nextUrl.searchParams.delete("playerId");
-  }
-
-  window.history.replaceState({}, "", nextUrl.toString());
+  syncFoundationUrlState({
+    view: input.view,
+    tab: input.tab ?? null,
+    playerId: input.playerId ?? null,
+    team: typeof window !== "undefined" ? new URL(window.location.href).searchParams.get("team") : null,
+    panel: null,
+    facilityId: null,
+    facilityAction: null,
+  });
 }
+
+export { buildFoundationHref };

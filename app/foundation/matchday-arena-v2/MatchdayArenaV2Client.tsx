@@ -38,6 +38,7 @@ import {
   getMatchdayArenaPhaseScore,
   ARENA_SCORE_TRACK_SEGMENT_LABELS,
   type MatchdayArenaScoreboardRowView,
+  type MatchdayArenaPhaseBreakdownItem,
 } from "@/lib/season/matchday-arena-presenter";
 import type {
   MatchdayMvpScoringResult,
@@ -576,10 +577,13 @@ type ArenaBoardRowModel = {
   stepRankDelta: number | null;
   score: number;
   points: number | null;
+  baseRank?: number;
+  rankDelta?: number;
+  projectedRank?: number | null;
   tone: string;
   detailChips: string[];
   trackSegments?: Array<{ id: string; value: number; tone: string; label: string }>;
-  breakdown?: Array<{ id: string; label: string; value: number | null; tone?: string }>;
+  breakdown?: MatchdayArenaPhaseBreakdownItem[];
 };
 
 type ArenaBoardRowProps = {
@@ -596,7 +600,7 @@ type ArenaBoardRowProps = {
   teamResult: { seasonRank?: number | null; seasonRankDelta?: number | null } | null;
   paramsTeamId: string;
   onTeamRowClick: (teamId: string) => void;
-  onTeamRowDoubleClick: (teamId: string) => void;
+  onOpenTeam?: (teamId: string) => void;
   registerRowRef: (teamId: string, node: HTMLElement | null) => void;
 };
 
@@ -614,7 +618,7 @@ const ArenaBoardRow = memo(function ArenaBoardRow({
   teamResult,
   paramsTeamId,
   onTeamRowClick,
-  onTeamRowDoubleClick,
+  onOpenTeam,
   registerRowRef,
 }: ArenaBoardRowProps) {
   return (
@@ -624,9 +628,8 @@ const ArenaBoardRow = memo(function ArenaBoardRow({
       role="listitem"
       tabIndex={0}
       aria-current={isSelected ? "true" : undefined}
-      title={isSelected ? "Team-Fokus aufheben" : `${row.teamName} fokussieren · Doppelklick für Team-Drawer`}
+      title={isSelected ? "Team-Fokus aufheben" : `${row.teamName} fokussieren`}
       onClick={() => onTeamRowClick(row.teamId)}
-      onDoubleClick={() => onTeamRowDoubleClick(row.teamId)}
       onKeyDown={(event) => {
         if (event.key === "Enter" || event.key === " ") {
           event.preventDefault();
@@ -652,7 +655,16 @@ const ArenaBoardRow = memo(function ArenaBoardRow({
           <span className="arena-v2-board-logo arena-v2-board-logo-fallback">—</span>
         )}
         <div className="arena-v2-board-copy">
-          <strong>{row.teamName}</strong>
+          <button
+            type="button"
+            className="table-link-button arena-v2-board-team-link"
+            onClick={(event) => {
+              event.stopPropagation();
+              onOpenTeam?.(row.teamId);
+            }}
+          >
+            {row.teamName}
+          </button>
           {row.detailChips.length > 0 ? (
             <div className="arena-v2-board-chips">
               {row.detailChips.slice(0, effectiveBoardMode === "total" ? 2 : 4).map((chip) => (
@@ -693,7 +705,7 @@ const ArenaBoardRow = memo(function ArenaBoardRow({
           items={row.breakdown!.slice(0, 5).map((entry) => ({
             key: entry.id,
             label: entry.label,
-            value: entry.value == null ? "—" : formatDecimalScore(entry.value, 1),
+            value: entry.valueLabel || "—",
             tone: entry.tone === "negative" ? "negative" : entry.tone === "positive" ? "positive" : "neutral",
           }))}
         />
@@ -961,7 +973,12 @@ export default function MatchdayArenaV2Client(props: MatchdayArenaV2ClientProps)
       }
 
       if (scoreResult.status === "fulfilled" && (!scoreResult.value.ok || !scoreResult.value.payload.summary)) {
-        setErrors([scoreResult.value.payload.error ?? "Arena v2 konnte die Spieltagswertung nicht laden."]);
+        const errorPayload = scoreResult.value.payload;
+        setErrors([
+          "error" in errorPayload && errorPayload.error
+            ? errorPayload.error
+            : "Arena v2 konnte die Spieltagswertung nicht laden.",
+        ]);
         setParams(canonicalParams);
         setSource(contextPayload.source);
         setContext(contextPayload.context);
@@ -1956,11 +1973,7 @@ export default function MatchdayArenaV2Client(props: MatchdayArenaV2ClientProps)
     }, 220);
   }
 
-  function handleTeamRowDoubleClick(teamId: string) {
-    if (teamRowClickTimerRef.current) {
-      window.clearTimeout(teamRowClickTimerRef.current);
-      teamRowClickTimerRef.current = null;
-    }
+  function handleTeamProfileOpen(teamId: string) {
     props.onOpenTeam?.(teamId);
   }
 
@@ -2271,6 +2284,29 @@ export default function MatchdayArenaV2Client(props: MatchdayArenaV2ClientProps)
         event.preventDefault();
         setIsPlaying(false);
         rewindArenaStep();
+      }
+
+      if (event.code === "ArrowDown" || event.code === "ArrowUp") {
+        if (!boardRows.length) {
+          return;
+        }
+        event.preventDefault();
+        setIsPlaying(false);
+        const currentIndex = focusTeamId ? boardRows.findIndex((row) => row.teamId === focusTeamId) : -1;
+        const startIndex = currentIndex >= 0 ? currentIndex : event.code === "ArrowDown" ? -1 : boardRows.length;
+        const nextIndex = Math.min(
+          Math.max(startIndex + (event.code === "ArrowDown" ? 1 : -1), 0),
+          boardRows.length - 1,
+        );
+        const nextTeamId = boardRows[nextIndex]?.teamId;
+        if (!nextTeamId) {
+          return;
+        }
+        setFocusTeamId(nextTeamId);
+        scrollArenaTeamIntoView(nextTeamId, "auto");
+        window.requestAnimationFrame(() => {
+          boardRowRefs.current.get(nextTeamId)?.focus({ preventScroll: true });
+        });
       }
     };
 
@@ -2817,7 +2853,7 @@ export default function MatchdayArenaV2Client(props: MatchdayArenaV2ClientProps)
                       teamResult={teamResult}
                       paramsTeamId={params.teamId}
                       onTeamRowClick={handleTeamRowClick}
-                      onTeamRowDoubleClick={handleTeamRowDoubleClick}
+                      onOpenTeam={handleTeamProfileOpen}
                       registerRowRef={(teamId, node) => {
                         if (node) {
                           boardRowRefs.current.set(teamId, node);

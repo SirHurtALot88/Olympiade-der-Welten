@@ -318,7 +318,13 @@ export function TrainingPlayerLane({
 
                 <div className="training-v2-rider-copy">
                   <div className="training-v2-rider-title-row">
-                    <strong className="training-v2-clickable">{row.player.name}</strong>
+                    <button
+                      type="button"
+                      className="table-link-button"
+                      onClick={() => onOpenPlayerDetails?.({ playerId: row.player.id, activePlayerId: row.entryId })}
+                    >
+                      {row.player.name}
+                    </button>
                     <span className={`training-v2-badge is-${tone}`}>{getDevelopmentBadgeLabel(tone)}</span>
                     {isHighRisk ? <span className="training-v2-badge is-risk-urgent">10/10 Risiko</span> : null}
                   </div>

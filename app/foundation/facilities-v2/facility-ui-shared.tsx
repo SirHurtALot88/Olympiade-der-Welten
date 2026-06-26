@@ -175,22 +175,22 @@ export function FacilityDecisionModal({
   const activeBusy = facilityDialog.action === "maintenance" ? facilityMaintenanceBusy : facilityUpgradeBusy;
 
   return (
-    <div className="foundation-modal-backdrop" onClick={onClose}>
-      <div className="foundation-modal training-v2-facility-modal" onClick={(event) => event.stopPropagation()}>
-        <div className="foundation-modal-header">
-          <div>
-            <h3>{selectedFacility.name}</h3>
-            <p>
-              {selectedTeam.shortCode} · L{selectedFacility.level} · {formatLocaleNumber(selectedFacility.conditionPct, 0)}% ·{" "}
-              {formatLocaleNumber(selectedFacility.efficiencyPct, 0)}%
-            </p>
-          </div>
-          <button className="secondary-button" type="button" onClick={onClose}>
-            Schliessen
-          </button>
+    <section className="foundation-drilldown-page facility-upgrade-page" data-testid="facility-upgrade-page">
+      <header className="foundation-drilldown-header">
+        <div>
+          <span className="eyebrow">{facilityDialog.action === "maintenance" ? "Wartung" : facilityDialog.action === "downgrade" ? "Downgrade" : "Upgrade"}</span>
+          <h1>{selectedFacility.name}</h1>
+          <p>
+            {selectedTeam.shortCode} · L{selectedFacility.level} · {formatLocaleNumber(selectedFacility.conditionPct, 0)}% ·{" "}
+            {formatLocaleNumber(selectedFacility.efficiencyPct, 0)}%
+          </p>
         </div>
+        <button className="secondary-button" type="button" onClick={onClose}>
+          Zurück
+        </button>
+      </header>
 
-        <div className="foundation-modal-body training-v2-facility-modal-body">
+      <div className="foundation-drilldown-body training-v2-facility-modal-body">
           <section className="training-v2-facility-modal-hero">
             <div>
               <span>Jetzt</span>
@@ -371,7 +371,6 @@ export function FacilityDecisionModal({
           )}
         </div>
         {activeConfirmReason ? <p className="foundation-screen-action-reason training-v2-modal-action-reason">{activeConfirmReason}</p> : null}
-      </div>
-    </div>
+    </section>
   );
 }

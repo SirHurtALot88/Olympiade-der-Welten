@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 
 import { TooltipHeading } from "@/components/ui/TooltipHeading";
 import { formatTransfermarktCurrency } from "@/lib/market/transfermarkt-formatting-contract";
@@ -23,6 +23,9 @@ export default function FacilitiesV2Client({
   seasonLabel,
   onOpenTraining,
   onOpenTeams,
+  facilityPanelTarget = null,
+  onOpenFacilityPanel,
+  onCloseFacilityPanel,
   summary,
   facilityRows,
   specialistWingVariant,
@@ -98,6 +101,10 @@ export default function FacilitiesV2Client({
       : null;
 
   function openFacilityDialog(facilityId: FacilityId, action: "upgrade" | "downgrade" | "maintenance") {
+    if (onOpenFacilityPanel) {
+      onOpenFacilityPanel(facilityId, action);
+      return;
+    }
     setSelectedFacilityId(facilityId);
     setFacilityDialog({ facilityId, action });
     if (action === "maintenance") {
@@ -105,6 +112,33 @@ export default function FacilitiesV2Client({
       return;
     }
     onRunFacilityUpgradePreview(facilityId, action);
+  }
+
+  useEffect(() => {
+    if (!facilityPanelTarget) {
+      setFacilityDialog(null);
+      return;
+    }
+
+    setSelectedFacilityId(facilityPanelTarget.facilityId);
+    setFacilityDialog({
+      facilityId: facilityPanelTarget.facilityId,
+      action: facilityPanelTarget.action,
+    });
+    if (facilityPanelTarget.action === "maintenance") {
+      onRunFacilityMaintenancePreview(facilityPanelTarget.facilityId);
+      return;
+    }
+    onRunFacilityUpgradePreview(facilityPanelTarget.facilityId, facilityPanelTarget.action);
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- preview handlers are stable enough for panel transitions
+  }, [facilityPanelTarget?.facilityId, facilityPanelTarget?.action]);
+
+  function closeFacilityDialog() {
+    if (onCloseFacilityPanel) {
+      onCloseFacilityPanel();
+      return;
+    }
+    setFacilityDialog(null);
   }
 
   function runFacilityDialogAction(action: "upgrade" | "downgrade" | "maintenance") {
@@ -120,7 +154,11 @@ export default function FacilitiesV2Client({
   const activeFacility = selectedFacility;
 
   return (
-    <section className="facilities-v2-shell" data-testid="foundation-facilities-v2" id="foundation-facilities-v2">
+    <section
+      className={`facilities-v2-shell${facilityDialog ? " is-facility-mode" : ""}`}
+      data-testid="foundation-facilities-v2"
+      id="foundation-facilities-v2"
+    >
       <header className="facilities-v2-header">
         <div className="facilities-v2-header-main">
           <TooltipHeading as="h2" tooltip="Upgrade, Wartung und Unterhalt pro Gebaeude.">
@@ -130,18 +168,7 @@ export default function FacilitiesV2Client({
             {selectedTeam.shortCode} · {selectedTeamControlMode ?? "manual"} · {seasonLabel}
           </p>
         </div>
-        <div className="facilities-v2-header-actions">
-          {onOpenTraining ? (
-            <button className="secondary-button inline-button" type="button" onClick={onOpenTraining}>
-              Training
-            </button>
-          ) : null}
-          {onOpenTeams ? (
-            <button className="secondary-button inline-button" type="button" onClick={onOpenTeams}>
-              Team
-            </button>
-          ) : null}
-        </div>
+        <div className="facilities-v2-header-actions" />
       </header>
 
       {managementLockedReason ? <p className="text-negative">{managementLockedReason}</p> : null}
@@ -234,7 +261,7 @@ export default function FacilitiesV2Client({
           facilityMaintenanceSuccess={facilityMaintenanceSuccess}
           facilityUpgradeConfirmReason={facilityUpgradeConfirmReason}
           facilityMaintenanceConfirmReason={facilityMaintenanceConfirmReason}
-          onClose={() => setFacilityDialog(null)}
+          onClose={closeFacilityDialog}
           onRunAction={runFacilityDialogAction}
           onConfirmUpgrade={onConfirmFacilityUpgrade}
           onConfirmMaintenance={onConfirmFacilityMaintenance}

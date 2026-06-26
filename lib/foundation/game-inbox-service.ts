@@ -76,6 +76,10 @@ function withStoredStatus(item: GameInboxItem, storedStatusById: Map<string, Gam
   };
 }
 
+function resolvePlayerDisplayName(gameState: GameState, playerId: string) {
+  return gameState.players.find((player) => player.id === playerId)?.name ?? playerId;
+}
+
 function createItem(
   input: Omit<GameInboxItem, "saveId" | "seasonId" | "createdAt" | "status"> & {
     saveId: string;
@@ -504,7 +508,7 @@ function buildTeamTasks(input: BuildGameInboxInput, visibleTeamIds: Set<string>,
           category: "transfer",
           severity: "info",
           title: "Scouting-Fortschritt",
-          description: `${entry.playerName ?? entry.playerId}: Certainty ${entry.certainty}% — Intel wird schärfer.`,
+          description: `${resolvePlayerDisplayName(input.gameState, entry.playerId)}: Certainty ${entry.certainty}% — Intel wird schärfer.`,
           targetView: "market",
           targetParams: { team: teamId, player: entry.playerId },
           source: "scout_intel_pipeline",

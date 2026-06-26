@@ -312,6 +312,9 @@ type LegacyLineupLabClientProps = {
   highlightMissingSlots?: boolean;
   focusMissingRequestKey?: string | null;
   initialDraftBoardView?: "lineup" | "formBoard";
+  draftBoardView?: "lineup" | "formBoard";
+  onDraftBoardViewChange?: (view: "lineup" | "formBoard") => void;
+  shellControlledDraftBoardView?: boolean;
   onDraftBoardViewApplied?: () => void;
   activeOwnerId?: string | null;
   manageableTeamIds?: string[];
@@ -1860,13 +1863,24 @@ export default function LegacyLineupLabClient(props: LegacyLineupLabClientProps)
   const [draggedActivePlayerId, setDraggedActivePlayerId] = useState<string | null>(null);
   const [focusedDisciplineSide, setFocusedDisciplineSide] = useState<"d1" | "d2">("d1");
   const [activeMissingHighlightKey, setActiveMissingHighlightKey] = useState<string | null>(null);
-  const [draftBoardView, setDraftBoardView] = useState<"lineup" | "formBoard">(props.initialDraftBoardView ?? "lineup");
+  const [internalDraftBoardView, setInternalDraftBoardView] = useState<"lineup" | "formBoard">(
+    props.draftBoardView ?? props.initialDraftBoardView ?? "lineup",
+  );
+  const draftBoardView = props.draftBoardView ?? internalDraftBoardView;
+  const setDraftBoardView = (view: "lineup" | "formBoard") => {
+    props.onDraftBoardViewChange?.(view);
+    if (props.draftBoardView == null) {
+      setInternalDraftBoardView(view);
+    }
+  };
 
   useEffect(() => {
-    if (props.initialDraftBoardView) {
-      setDraftBoardView(props.initialDraftBoardView);
+    if (props.draftBoardView) {
+      setInternalDraftBoardView(props.draftBoardView);
+    } else if (props.initialDraftBoardView) {
+      setInternalDraftBoardView(props.initialDraftBoardView);
     }
-  }, [props.initialDraftBoardView]);
+  }, [props.draftBoardView, props.initialDraftBoardView]);
 
   useEffect(() => {
     if (props.initialDraftBoardView === "formBoard") {
@@ -6915,6 +6929,7 @@ export default function LegacyLineupLabClient(props: LegacyLineupLabClientProps)
             </div>
           </div>
 
+          {!props.shellControlledDraftBoardView ? (
           <div className="legacy-lineup-draft-view-tabs" role="tablist" aria-label="Einsatzlisten-Ansicht">
             <button
               id="legacy-lineup-tab-lineup"
@@ -6940,6 +6955,7 @@ export default function LegacyLineupLabClient(props: LegacyLineupLabClientProps)
               {formPlanOpenCells > 0 ? <span className="legacy-lineup-draft-view-tab-badge">{formPlanOpenCells}</span> : null}
             </button>
           </div>
+          ) : null}
 
           {draftBoardView === "lineup" ? (
             <DraftWorkspace>
@@ -7308,10 +7324,20 @@ export default function LegacyLineupLabClient(props: LegacyLineupLabClientProps)
                         </div>
                       </div>
                     </div>
-                    <div className="legacy-lineup-captain-strip">
-                      <div onDoubleClick={() => openPlayerDetailsForActivePlayer(captains[disciplineSide])}>
+                      <div className="legacy-lineup-captain-strip">
+                      <div>
                         <span>Captain-Ressource</span>
-                        <strong>{captains[disciplineSide] ? getSelectedOptionMeta(captains[disciplineSide])?.name ?? "gesetzt" : "offen"}</strong>
+                        {captains[disciplineSide] ? (
+                          <button
+                            type="button"
+                            className="table-link-button legacy-lineup-player-link"
+                            onClick={() => openPlayerDetailsForActivePlayer(captains[disciplineSide])}
+                          >
+                            {getSelectedOptionMeta(captains[disciplineSide])?.name ?? "gesetzt"}
+                          </button>
+                        ) : (
+                          <strong>offen</strong>
+                        )}
                         <small>
                           {selectedCaptainInfo
                             ? `Beitrag +${formatNullableScore(selectedCaptainInfo.estimatedCaptainBonus)} · ${
@@ -7479,7 +7505,22 @@ export default function LegacyLineupLabClient(props: LegacyLineupLabClientProps)
                                   <span className="legacy-lineup-draft-slot-portrait">—</span>
                                 )}
                                 <div>
-                                  <strong>{selectedRosterCard.name}</strong>
+                                  <strong>
+                                    {selectedRosterCard ? (
+                                      <button
+                                        type="button"
+                                        className="table-link-button legacy-lineup-player-link"
+                                        onClick={(event) => {
+                                          event.stopPropagation();
+                                          openPlayerDetails(selectedRosterCard.id, selectedRosterCard.activePlayerId);
+                                        }}
+                                      >
+                                        {selectedRosterCard.name}
+                                      </button>
+                                    ) : (
+                                      "Spieler wählen"
+                                    )}
+                                  </strong>
                                   <span>
                                     Base {formatNullableScore(selectedScore)} · Slot {slotPreview?.projected.totalProjected != null ? formatScore(slotPreview.projected.totalProjected) : "—"}
                                   </span>
@@ -7733,7 +7774,6 @@ export default function LegacyLineupLabClient(props: LegacyLineupLabClientProps)
                           }
                           assignPlayerToSide(player.activePlayerId, focusedDisciplineSide);
                         }}
-                        onDoubleClick={() => openPlayerDetails(player.id, player.activePlayerId)}
                       >
                         {player.portraitUrl ? (
                           <OptimizedMediaImage className="legacy-lineup-draft-player-portrait" src={player.portraitUrl} alt={player.name} width={48} height={48} />
@@ -7742,7 +7782,16 @@ export default function LegacyLineupLabClient(props: LegacyLineupLabClientProps)
                         )}
                         <div className="legacy-lineup-draft-player-main">
                           <div className="legacy-lineup-draft-player-title">
-                            <strong>{player.name}</strong>
+                            <button
+                              type="button"
+                              className="table-link-button legacy-lineup-player-link"
+                              onClick={(event) => {
+                                event.stopPropagation();
+                                openPlayerDetails(player.id, player.activePlayerId);
+                              }}
+                            >
+                              {player.name}
+                            </button>
                             <span>{player.className ?? "—"} · F {Math.round(player.fatigueCount ?? 0)}</span>
                           </div>
                           <div className="legacy-lineup-draft-player-scores">
@@ -8179,7 +8228,6 @@ export default function LegacyLineupLabClient(props: LegacyLineupLabClientProps)
                           }
                           assignPlayerToSide(player.activePlayerId, focusedDisciplineSide);
                         }}
-                        onDoubleClick={() => openPlayerDetails(player.id, player.activePlayerId)}
                       >
                         <div className="legacy-matchday-player-head">
                           {player.portraitUrl ? (
@@ -8194,7 +8242,16 @@ export default function LegacyLineupLabClient(props: LegacyLineupLabClientProps)
                             <span className="legacy-matchday-player-portrait legacy-matchday-player-portrait-fallback">—</span>
                           )}
                           <div className="legacy-matchday-player-title">
-                            <strong>{player.name}</strong>
+                            <button
+                              type="button"
+                              className="table-link-button legacy-lineup-player-link"
+                              onClick={(event) => {
+                                event.stopPropagation();
+                                openPlayerDetails(player.id, player.activePlayerId);
+                              }}
+                            >
+                              {player.name}
+                            </button>
                             <span>{player.className ?? "—"} · {player.contractLength ?? "—"} Jahre</span>
                             <span>{assignmentLabel}</span>
                           </div>
@@ -8503,10 +8560,20 @@ export default function LegacyLineupLabClient(props: LegacyLineupLabClientProps)
                     </span>
                   </div>
                   <div className="legacy-lineup-side-body legacy-lineup-arena-slot-grid">
-                    <div className="legacy-lineup-captain-strip">
-                      <div onDoubleClick={() => openPlayerDetailsForActivePlayer(captains[disciplineSide])}>
+                      <div className="legacy-lineup-captain-strip">
+                      <div>
                         <span>Captain-Ressource</span>
-                        <strong>{captains[disciplineSide] ? getSelectedOptionMeta(captains[disciplineSide])?.name ?? "gesetzt" : "offen"}</strong>
+                        {captains[disciplineSide] ? (
+                          <button
+                            type="button"
+                            className="table-link-button legacy-lineup-player-link"
+                            onClick={() => openPlayerDetailsForActivePlayer(captains[disciplineSide])}
+                          >
+                            {getSelectedOptionMeta(captains[disciplineSide])?.name ?? "gesetzt"}
+                          </button>
+                        ) : (
+                          <strong>offen</strong>
+                        )}
                         <small>
                           {selectedCaptainInfo
                             ? `Beitrag +${formatNullableScore(selectedCaptainInfo.estimatedCaptainBonus)} · ${
@@ -8666,7 +8733,6 @@ export default function LegacyLineupLabClient(props: LegacyLineupLabClientProps)
                           setActiveSlotKey(slot.key);
                           setFocusedDisciplineSide(slot.disciplineSide);
                         }}
-                        onDoubleClick={() => openPlayerDetailsForActivePlayer(selections[slot.key])}
                         onDragOver={(event) => {
                           const dragPreview = slotDragPreviewByKey.get(slot.key) ?? null;
                           if (dragPreview?.blockReason) {
@@ -8972,7 +9038,22 @@ export default function LegacyLineupLabClient(props: LegacyLineupLabClientProps)
                                       F {Math.round(selectedOption?.fatigueCount ?? 0)}
                                     </span>
                                     <div className="legacy-lineup-slot-player-copy">
-                                      <strong>{selectedRosterCard.name}</strong>
+                                      <strong>
+                                    {selectedRosterCard ? (
+                                      <button
+                                        type="button"
+                                        className="table-link-button legacy-lineup-player-link"
+                                        onClick={(event) => {
+                                          event.stopPropagation();
+                                          openPlayerDetails(selectedRosterCard.id, selectedRosterCard.activePlayerId);
+                                        }}
+                                      >
+                                        {selectedRosterCard.name}
+                                      </button>
+                                    ) : (
+                                      "Spieler wählen"
+                                    )}
+                                  </strong>
                                       <span>{selectedRosterCard.className ?? "—"} · {selectedRosterCard.contractLength ?? "—"} Jahre</span>
                                     </div>
                                   </div>
@@ -9273,7 +9354,7 @@ export default function LegacyLineupLabClient(props: LegacyLineupLabClientProps)
                     </p>
                     <div className="legacy-matchday-room-badges">
                       <span className="pill">Weiter: Resolve Detail behalten</span>
-                      <span className="pill">Done: Player Drawer per Klick/Doppelklick</span>
+                      <span className="pill">Done: Player Profil per Namensklick</span>
                     </div>
                   </article>
                   <div className="legacy-lineup-result-team-cards">
@@ -9299,7 +9380,6 @@ export default function LegacyLineupLabClient(props: LegacyLineupLabClientProps)
                         <article
                           key={`result-top-player-card-${visibleScoreboardSide}-${entry.playerId}-${entry.rankInDiscipline}`}
                           className="legacy-lineup-top-player-card"
-                          onDoubleClick={() => openPlayerDetails(entry.playerId, entry.activePlayerId)}
                           onClick={() => openPlayerDetails(entry.playerId, entry.activePlayerId)}
                         >
                           <div className="legacy-lineup-top-player-card-head">
@@ -9561,7 +9641,7 @@ export default function LegacyLineupLabClient(props: LegacyLineupLabClientProps)
                       </tr>
                     ) : null}
                     {visibleExpertPlayerRows.map((player) => (
-                      <tr key={player.id} onDoubleClick={() => openPlayerDetails(player.id, player.activePlayerId)}>
+                      <tr key={player.id}>
                         {visibleLineupPlayerTableColumns.map((column) => {
                           if (column.id === "image") {
                             return (
@@ -9827,11 +9907,14 @@ export default function LegacyLineupLabClient(props: LegacyLineupLabClientProps)
                     </div>
                     <ul className="legacy-ai-preview-player-list">
                       {side.selectedEntries.map((entry) => (
-                        <li
-                          key={`${side.disciplineSide}-${entry.activePlayerId ?? entry.playerId}`}
-                          onDoubleClick={() => openPlayerDetails(entry.playerId, entry.activePlayerId)}
-                        >
-                          <strong>{entry.name ?? entry.playerId}</strong>
+                        <li key={`${side.disciplineSide}-${entry.activePlayerId ?? entry.playerId}`}>
+                          <button
+                            type="button"
+                            className="table-link-button legacy-lineup-player-link"
+                            onClick={() => openPlayerDetails(entry.playerId, entry.activePlayerId)}
+                          >
+                            {entry.name ?? entry.playerId}
+                          </button>
                           <span>
                             Base {formatNullableScore(entry.baseScore)} · {formatExhaustionPoints(entry.baseScore, entry.fatigueCount)} · Final{" "}
                             {formatNullableScore(entry.finalContribution)}

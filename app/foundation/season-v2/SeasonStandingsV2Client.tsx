@@ -319,7 +319,8 @@ type SeasonStandingsV2ClientProps = {
   onChangeSeason: (seasonId: string) => void;
   onOpenTeam: (teamId: string) => void;
   onOpenPlayer: (playerId: string) => void;
-  onOpenClassic?: (() => void) | null;
+  viewMode?: SeasonV2ViewMode;
+  onViewModeChange?: (mode: SeasonV2ViewMode) => void;
   onOpenRanks?: (() => void) | null;
   onOpenPrize?: (() => void) | null;
 };
@@ -642,7 +643,8 @@ export default function SeasonStandingsV2Client({
   onChangeSeason,
   onOpenTeam,
   onOpenPlayer,
-  onOpenClassic,
+  viewMode,
+  onViewModeChange,
   onOpenRanks,
   onOpenPrize,
 }: SeasonStandingsV2ClientProps) {
@@ -674,7 +676,15 @@ export default function SeasonStandingsV2Client({
   });
   const [showTopPlayerAxes, setShowTopPlayerAxes] = useState(true);
   const [showFinanceColumns, setShowFinanceColumns] = useState(true);
-  const [seasonV2Mode, setSeasonV2Mode] = useState<SeasonV2ViewMode>(SEASON_V2_DEFAULT_MODE);
+  const [internalSeasonV2Mode, setInternalSeasonV2Mode] = useState<SeasonV2ViewMode>(SEASON_V2_DEFAULT_MODE);
+  const seasonV2Mode = viewMode ?? internalSeasonV2Mode;
+  const setSeasonV2Mode = (mode: SeasonV2ViewMode) => {
+    if (onViewModeChange) {
+      onViewModeChange(mode);
+      return;
+    }
+    setInternalSeasonV2Mode(mode);
+  };
   const [cardsScrollTop, setCardsScrollTop] = useState(0);
   const [cardsViewportHeight, setCardsViewportHeight] = useState(640);
   const [standingsTableScrollTop, setStandingsTableScrollTop] = useState(0);
@@ -1125,26 +1135,7 @@ export default function SeasonStandingsV2Client({
               ))}
             </select>
           </label>
-          <div className="season-v2-action-row season-v2-view-switch" role="tablist" aria-label="Saisonstand Ansicht">
-            {onOpenClassic ? (
-              <button className="secondary-button inline-button" type="button" onClick={onOpenClassic} aria-pressed="false">
-                Classic
-              </button>
-            ) : null}
-            <button className="secondary-button inline-button is-active" type="button" aria-pressed="true">
-              V2
-            </button>
-            {onOpenRanks ? (
-              <button className="secondary-button inline-button" type="button" onClick={onOpenRanks}>
-                Ranks
-              </button>
-            ) : null}
-            {onOpenPrize ? (
-              <button className="secondary-button inline-button" type="button" onClick={onOpenPrize}>
-                Preisgeld
-              </button>
-            ) : null}
-          </div>
+          {!onViewModeChange ? (
           <div className="season-v2-action-row season-v2-mode-switch" role="tablist" aria-label="Saisonstand Modus">
             <button
               className={`secondary-button inline-button${seasonV2Mode === "cards" ? " is-active" : ""}`}
@@ -1171,6 +1162,7 @@ export default function SeasonStandingsV2Client({
               GM Board
             </button>
           </div>
+          ) : null}
         </div>
       </section>
 
@@ -1533,7 +1525,6 @@ export default function SeasonStandingsV2Client({
                     key={row.teamId}
                     className={`season-v2-table-row${row.isSelected ? " is-selected" : ""}${focusedTeamId === row.teamId ? " is-focused" : ""}`}
                     onClick={() => selectTeam(row.teamId)}
-                    onDoubleClick={() => onOpenTeam(row.teamId)}
                   >
                     <td className="season-v2-rank-cell">
                       <span>{row.rank ?? "—"}</span>
@@ -1542,7 +1533,7 @@ export default function SeasonStandingsV2Client({
                       ) : null}
                     </td>
                     <td className="season-v2-team-cell">
-                      <button className="table-link-button season-v2-team-link" type="button" onClick={() => selectTeam(row.teamId)}>
+                      <button className="table-link-button season-v2-team-link" type="button" onClick={() => onOpenTeam(row.teamId)}>
                         <span className="season-v2-team-ident">
                           <OptimizedMediaImage
                             src={row.logoUrl}
@@ -1624,7 +1615,7 @@ export default function SeasonStandingsV2Client({
         <section className="season-v2-table-panel">
           <div className="panel-header season-v2-panel-header">
             <div className="stack">
-              <TooltipHeading as="h3" tooltip="Ein Klick auf ein Team zeigt hier den Kader. Doppelklick auf Spieler öffnet den Drawer.">
+              <TooltipHeading as="h3" tooltip="Ein Klick auf ein Team zeigt hier den Kader. Klick auf Spielername öffnet das Profil.">
                 {focusedTeam ? focusedTeam.teamName : "Top Player"}
               </TooltipHeading>
               <small className="muted">{focusedTeam ? `${rightPanelPlayers.length} Spieler im Kader` : "Globale Bestenliste"}</small>
@@ -1713,7 +1704,7 @@ export default function SeasonStandingsV2Client({
               </thead>
               <tbody>
                 {sortedTopPlayers.map((player) => (
-                  <tr key={player.playerId} className="season-v2-player-table-row" onDoubleClick={() => onOpenPlayer(player.playerId)}>
+                  <tr key={player.playerId} className="season-v2-player-table-row">
                     <td className="season-v2-rank-cell">
                       <span>{player.rank}</span>
                     </td>

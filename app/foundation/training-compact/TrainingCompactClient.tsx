@@ -87,7 +87,7 @@ export default function TrainingCompactClient({
       data-testid="foundation-training-compact"
       id="foundation-training-compact"
     >
-      <header className="training-compact-hero training-v2-hero">
+      <header className="training-compact-hero training-v2-hero" id="training-compact-controls">
         <div className="training-v2-hero-main">
           <div className="training-v2-team">
             {teamLogo.src ? (
@@ -111,20 +111,6 @@ export default function TrainingCompactClient({
               <p>
                 {selectedTeam.shortCode} · {selectedTeamControlMode ?? "manual"} · {seasonLabel}
               </p>
-            </div>
-          </div>
-          <div className="training-v2-hero-actions">
-            <div className="training-v2-hero-button-row">
-              {onOpenFacilities ? (
-                <button className="secondary-button inline-button" type="button" onClick={onOpenFacilities}>
-                  Gebaeude oeffnen
-                </button>
-              ) : null}
-              {onOpenTeams ? (
-                <button className="secondary-button inline-button" type="button" onClick={onOpenTeams}>
-                  Team ansehen
-                </button>
-              ) : null}
             </div>
           </div>
         </div>
@@ -158,7 +144,7 @@ export default function TrainingCompactClient({
           </article>
         </div>
 
-        <div className="training-compact-story-grid training-v2-story-grid">
+        <div className="training-compact-story-grid training-v2-story-grid" id="training-compact-forecast">
           <article className="training-v2-story-card is-growth">
             <span>Top Steigerer</span>
             <strong>{topGrowth?.player.name ?? "—"}</strong>

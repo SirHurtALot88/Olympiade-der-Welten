@@ -1,9 +1,9 @@
 "use client";
 
-import type { ScoutingHubV2ClientProps } from "@/app/foundation/scouting-center-v2/scouting-center-v2-types";
+import type { ScoutingHubV2ClientProps, ScoutingHubV2WatchTarget } from "@/app/foundation/scouting-center-v2/scouting-center-v2-types";
 import FoundationSubNav from "@/app/foundation/shell/FoundationSubNav";
 import DisciplineIcon from "@/app/foundation/DisciplineIcon";
-import { VeloScoutMetric } from "@/components/foundation/velo-ui";
+import { VeloScoutMetric, VeloStarRating, VeloStatOrbitRow } from "@/components/foundation/velo-ui";
 import { useState } from "react";
 
 function renderStars(level: number) {
@@ -12,6 +12,32 @@ function renderStars(level: number) {
       ★
     </span>
   ));
+}
+
+function getPotentialBandLabel(band: string | null | undefined) {
+  if (band === "elite") return "★ Elite";
+  if (band === "high") return "↑ Hoch";
+  if (band === "medium") return "Mittel";
+  if (band === "low") return "Gering";
+  return null;
+}
+
+function formatHalfStar(value: number | null | undefined) {
+  if (value == null || !Number.isFinite(value)) return "—";
+  return `${value}★`;
+}
+
+function hasAxisStats(target: ScoutingHubV2WatchTarget) {
+  return (
+    target.pow != null ||
+    target.spe != null ||
+    target.men != null ||
+    target.soc != null
+  );
+}
+
+function hasCaStars(target: ScoutingHubV2WatchTarget) {
+  return target.caOverall != null;
 }
 
 export default function ScoutingCenterV2Client({
@@ -29,11 +55,20 @@ export default function ScoutingCenterV2Client({
   baseInfoAlwaysVisible,
   watchTargets,
   scoutPipeline = null,
+  activeTab: controlledActiveTab,
+  onActiveTabChange,
+  hideSubNav = false,
   onOpenMarket,
-  onOpenHomeV2,
   onOpenPlayer,
 }: ScoutingHubV2ClientProps) {
-  const [activeTab, setActiveTab] = useState<"overview" | "reports" | "recommended">("overview");
+  const [internalActiveTab, setInternalActiveTab] = useState<"overview" | "reports" | "recommended">("overview");
+  const activeTab = controlledActiveTab ?? internalActiveTab;
+  const setActiveTab = (tab: "overview" | "reports" | "recommended") => {
+    onActiveTabChange?.(tab);
+    if (controlledActiveTab == null) {
+      setInternalActiveTab(tab);
+    }
+  };
   const rosterGap =
     rosterMinimum != null && rosterCount < rosterMinimum ? rosterMinimum - rosterCount : 0;
 
@@ -47,26 +82,21 @@ export default function ScoutingCenterV2Client({
             {scoutingFacilityLabel} · Scouting L{scoutingFacilityLevel} · Markt-Hub (kein separates Scouting Center — Potenzial aus Kader/Facilities)
           </p>
         </div>
-        <div className="scouting-center-v2-actions">
-          <button type="button" className="secondary-button" onClick={onOpenHomeV2}>
-            Home V2
-          </button>
-          <button type="button" className="primary-button" onClick={onOpenMarket}>
-            Transfermarkt öffnen
-          </button>
-        </div>
+        <div className="scouting-center-v2-actions" />
       </header>
 
+      {!hideSubNav ? (
       <FoundationSubNav
         className="scouting-center-v2-subnav"
         activeId={activeTab}
         onSelect={(id) => setActiveTab(id as typeof activeTab)}
         items={[
-          { id: "overview", label: "Overview" },
+          { id: "overview", label: "Übersicht" },
           { id: "reports", label: "Reports" },
-          { id: "recommended", label: "Recommended" },
+          { id: "recommended", label: "Empfehlungen" },
         ]}
       />
+      ) : null}
 
       {(activeTab === "overview" || activeTab === "recommended") ? (
       <section className="scouting-hub-v2-recruitment">
@@ -210,11 +240,64 @@ export default function ScoutingCenterV2Client({
                 type="button"
                 className="scouting-hub-v2-target-card"
                 onClick={() => onOpenPlayer(target.playerId)}
+                data-testid="scouting-watchlist-card"
               >
                 <strong>{target.playerName}</strong>
                 <span>{target.className}</span>
-                <span>MW {target.marketValue}</span>
-                <small>{target.baseInfoSummary}</small>
+                {hasAxisStats(target) ? (
+                  <VeloStatOrbitRow
+                    showGrade
+                    stats={{
+                      pow: target.pow ?? 0,
+                      spe: target.spe ?? 0,
+                      men: target.men ?? 0,
+                      soc: target.soc ?? 0,
+                    }}
+                    ariaLabel={`${target.playerName} Achsenwerte`}
+                  />
+                ) : (
+                  <small className="muted">MW {target.marketValue}</small>
+                )}
+                {hasCaStars(target) ? (
+                  <div className="scouting-hub-v2-ca-po-row" data-testid="scouting-ca-po-row">
+                    <VeloStarRating compact label="CA" value={target.caOverall} />
+                    {target.caPow != null ? (
+                      <small className="muted scouting-hub-v2-axis-stars">
+                        P {formatHalfStar(target.caPow)} · S {formatHalfStar(target.caSpe)} · M{" "}
+                        {formatHalfStar(target.caMen)} · So {formatHalfStar(target.caSoc)}
+                      </small>
+                    ) : null}
+                    {target.poDisplay ? (
+                      <span className="scouting-hub-v2-po-label" data-testid="scouting-potential-stars">
+                        PO {target.poDisplay}
+                        {target.potentialGap != null && target.potentialGap > 0
+                          ? ` · Gap +${target.potentialGap}★`
+                          : ""}
+                      </span>
+                    ) : null}
+                    {target.poPow != null ? (
+                      <small className="muted scouting-hub-v2-axis-stars" data-testid="scouting-po-axis-stars">
+                        PO-Achsen P {formatHalfStar(target.poPow)} · S {formatHalfStar(target.poSpe)} · M{" "}
+                        {formatHalfStar(target.poMen)} · So {formatHalfStar(target.poSoc)}
+                      </small>
+                    ) : null}
+                  </div>
+                ) : null}
+                {target.potentialBand ? (
+                  <span
+                    className={
+                      target.potentialBand === "elite"
+                        ? "transfer-status-pill is-ready"
+                        : target.potentialBand === "high"
+                          ? "transfer-status-pill is-info"
+                          : "pill"
+                    }
+                    data-testid="scouting-potential-band"
+                  >
+                    {getPotentialBandLabel(target.potentialBand)}
+                  </span>
+                ) : null}
+                <small className="muted">{target.baseInfoSummary}</small>
               </button>
             ))}
           </div>

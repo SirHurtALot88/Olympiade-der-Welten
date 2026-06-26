@@ -70,6 +70,9 @@ export type FacilitiesV2ClientProps = {
   seasonLabel: string;
   onOpenTraining?: () => void;
   onOpenTeams?: () => void;
+  facilityPanelTarget?: { facilityId: FacilityId; action: "upgrade" | "downgrade" | "maintenance" } | null;
+  onOpenFacilityPanel?: (facilityId: FacilityId, action: "upgrade" | "downgrade" | "maintenance") => void;
+  onCloseFacilityPanel?: () => void;
   summary: {
     cashCurrent: number;
     netFacilityResult: number;

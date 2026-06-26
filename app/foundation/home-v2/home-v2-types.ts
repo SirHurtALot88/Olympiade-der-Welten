@@ -1,3 +1,5 @@
+import type { PlayerPotentialBand } from "@/lib/data/olyDataTypes";
+
 export type HomeV2TopPlayerCard = {
   playerId: string;
   name: string;
@@ -18,6 +20,8 @@ export type HomeV2TopPlayerCard = {
   topDisciplineLabel?: string | null;
   topDisciplineTier?: string | null;
   topDisciplineScore?: number | null;
+  potential?: number | null;
+  potentialBand?: PlayerPotentialBand | null;
 };
 
 export type HomeV2FacilitySnapshot = {
@@ -53,8 +57,8 @@ export type HomeV2BoardObjective = {
   objectiveId: string;
   label: string;
   status: string;
-  currentValue: string | number | null;
-  targetValue: string | number | null;
+  currentValue: string | number | boolean | null;
+  targetValue: string | number | boolean | null;
 };
 
 export type HomeV2ClientProps = {
@@ -88,7 +92,6 @@ export type HomeV2ClientProps = {
   todayCards: HomeV2TodayCard[];
   boardObjectives: HomeV2BoardObjective[];
   onContinue: () => void;
-  onOpenClassicHome: () => void;
   onOpenTeams: () => void;
   onOpenLineup: () => void;
   onOpenMarket: () => void;

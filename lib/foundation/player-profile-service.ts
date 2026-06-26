@@ -7,10 +7,19 @@ export {
 export type PlayerProfileTabId = "overview" | "details" | "contract" | "training" | "report" | "career";
 
 export const PLAYER_PROFILE_TABS: Array<{ id: PlayerProfileTabId; label: string }> = [
-  { id: "overview", label: "Overview" },
+  { id: "overview", label: "Übersicht" },
   { id: "details", label: "Details" },
-  { id: "contract", label: "Contract" },
+  { id: "contract", label: "Vertrag" },
   { id: "training", label: "Training" },
   { id: "report", label: "Report" },
-  { id: "career", label: "Career" },
+  { id: "career", label: "Karriere" },
 ];
+
+export const PLAYER_PROFILE_TAB_ANCHORS: Record<PlayerProfileTabId, string> = {
+  overview: "player-drawer-profile",
+  details: "player-drawer-axis",
+  contract: "player-drawer-market",
+  training: "player-drawer-development",
+  report: "player-drawer-disciplines",
+  career: "player-drawer-history",
+};

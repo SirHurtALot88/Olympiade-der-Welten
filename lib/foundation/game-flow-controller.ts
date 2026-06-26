@@ -313,8 +313,7 @@ function buildOnboardingFlowSteps(gameState: GameState, activeTeamId: string | n
             ? "completed"
             : (() => {
                 const trainingStatus = onboardingStepStatus(flow, "training_facilities");
-                const trainingHandled = trainingStatus === "completed" || trainingStatus === "skipped";
-                if (!trainingHandled) {
+                if (trainingStatus !== "completed") {
                   return "blocked";
                 }
                 return onboardingStepStatus(flow, "choose_sponsor");

@@ -758,16 +758,6 @@ export default function TrainingFacilitiesV2Client({
               <strong>{selectedTeam.shortCode} · {selectedTeam.name}</strong>
               <small className="muted">Wechsel oben in der Foundation-Leiste.</small>
             </div>
-            <div className="training-v2-hero-button-row">
-              {!showPlayerLane && onOpenTraining ? (
-                <button className="secondary-button inline-button" type="button" onClick={() => onOpenTraining?.()}>
-                  Training oeffnen
-                </button>
-              ) : null}
-              <button className="secondary-button inline-button" type="button" onClick={() => onOpenTeams?.()}>
-                Team ansehen
-              </button>
-            </div>
           </div>
         </div>
 
@@ -807,7 +797,17 @@ export default function TrainingFacilitiesV2Client({
         <div className="training-v2-story-grid">
           <article className="training-v2-story-card is-growth">
             <span>Top Steigerer</span>
-            <strong>{topGrowth?.player.name ?? "—"}</strong>
+            {topGrowth ? (
+              <button
+                type="button"
+                className="table-link-button"
+                onClick={() => onOpenPlayerDetails?.({ playerId: topGrowth.player.id, activePlayerId: topGrowth.entryId })}
+              >
+                {topGrowth.player.name}
+              </button>
+            ) : (
+              <strong>—</strong>
+            )}
             <small>
               {topGrowth
                 ? `+${formatLocaleNumber(topGrowth.forecast.netDevelopmentXP, 0)} Wachstum · ${topGrowth.modeConfig.label}`
@@ -816,7 +816,17 @@ export default function TrainingFacilitiesV2Client({
           </article>
           <article className="training-v2-story-card is-risk">
             <span>Groesstes Risiko</span>
-            <strong>{topRisk?.player.name ?? "—"}</strong>
+            {topRisk ? (
+              <button
+                type="button"
+                className="table-link-button"
+                onClick={() => onOpenPlayerDetails?.({ playerId: topRisk.player.id, activePlayerId: topRisk.entryId })}
+              >
+                {topRisk.player.name}
+              </button>
+            ) : (
+              <strong>—</strong>
+            )}
             <small>
               {topRisk
                 ? `Rueckschritt ${formatLocaleNumber(topRisk.forecast.regressionPressure, 0)} · ${formatRiskLabel(topRisk.forecast.regressionRisk)}`
@@ -1191,12 +1201,11 @@ export default function TrainingFacilitiesV2Client({
       </section>
 
       {facilityDialog && selectedDialogFacility ? (
-        <div className="foundation-modal-backdrop" onClick={() => setFacilityDialog(null)}>
-          <div className="foundation-modal training-v2-facility-modal" onClick={(event) => event.stopPropagation()}>
-            <div className="foundation-modal-header">
+        <section className="foundation-drilldown-page facility-upgrade-page" data-testid="facility-upgrade-page">
+            <header className="foundation-drilldown-header">
               <div>
                 <span className="training-v2-kicker">Gebaeude-Entscheidung</span>
-                <h3>{selectedDialogFacility.name}</h3>
+                <h1>{selectedDialogFacility.name}</h1>
                 <p className="muted">
                   {selectedTeam.shortCode} · Level {selectedDialogFacility.level} · Zustand{" "}
                   {formatLocaleNumber(selectedDialogFacility.conditionPct, 0)}% · Effizienz{" "}
@@ -1204,11 +1213,11 @@ export default function TrainingFacilitiesV2Client({
                 </p>
               </div>
               <button className="secondary-button" type="button" onClick={() => setFacilityDialog(null)}>
-                Schliessen
+                Zurück
               </button>
-            </div>
+            </header>
 
-            <div className="foundation-modal-body training-v2-facility-modal-body">
+            <div className="foundation-drilldown-body training-v2-facility-modal-body">
               <section className="training-v2-facility-modal-hero">
                 <div>
                   <span>Aktuell</span>
@@ -1497,8 +1506,7 @@ export default function TrainingFacilitiesV2Client({
                 Warum nicht: {activeFacilityConfirmReason}
               </p>
             ) : null}
-          </div>
-        </div>
+        </section>
       ) : null}
 
       {(facilityTab === "overview" || facilityTab === "training") && seasonEndRows.length > 0 ? (
@@ -1514,8 +1522,10 @@ export default function TrainingFacilitiesV2Client({
               <article key={row.playerId} className="training-v2-season-end-card">
                 <strong>{row.playerName}</strong>
                 <small>
-                  {row.className ? <ClassColorChip className={row.className} /> : "—"} · {row.organicProgression.classBefore} →{" "}
-                  {row.organicProgression.classAfter}
+                  {row.className ? <ClassColorChip className={row.className} /> : "—"}
+                  {row.organicProgression
+                    ? ` · ${row.organicProgression.classBefore} → ${row.organicProgression.classAfter}`
+                    : null}
                 </small>
                 <span>
                   XP {row.plannedXP}/{row.availableXP}

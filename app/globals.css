@@ -62,7 +62,74 @@ body {
     radial-gradient(circle at top left, rgba(255, 255, 255, 0.8), transparent 30%),
     linear-gradient(180deg, #f8f3eb 0%, var(--bg) 100%);
   color: var(--ink);
-  font-family: Georgia, "Times New Roman", serif;
+  font-family: "RaniraSeason", Georgia, "Times New Roman", serif;
+}
+
+.foundation-app,
+.foundation-app .foundation-shell {
+  font-family: "RaniraSeason", Georgia, "Times New Roman", serif;
+}
+
+.foundation-drilldown-page {
+  display: grid;
+  gap: 16px;
+  margin-bottom: 16px;
+}
+
+.foundation-drilldown-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 16px;
+  flex-wrap: wrap;
+}
+
+.foundation-drilldown-body {
+  display: grid;
+  gap: 16px;
+}
+
+.foundation-shell-subnav {
+  margin: 0 0 12px;
+}
+
+.market-v2-shell.is-offer-mode > :not(.transfer-offer-page) {
+  display: none;
+}
+
+.facilities-v2-shell.is-facility-mode > :not(.facility-upgrade-page) {
+  display: none;
+}
+
+.foundation-shell .table-link-button,
+.foundation-shell tr[data-clickable="true"],
+.foundation-shell .team-drawer-player-card,
+.foundation-shell .market-v2-candidate-card,
+.foundation-shell .season-v2-table-row[data-clickable="true"],
+.foundation-shell .foundation-hq-mini-row,
+.foundation-shell .foundation-clickable-row,
+.foundation-shell .foundation-home-player-card {
+  cursor: pointer;
+}
+
+.foundation-shell tr[data-clickable="true"]:hover,
+.foundation-shell .team-drawer-player-card:hover,
+.foundation-shell .market-v2-candidate-card:hover,
+.foundation-shell .foundation-clickable-row:hover,
+.foundation-shell .foundation-home-player-card:hover,
+.foundation-shell .table-link-button:hover {
+  background: rgba(93, 143, 214, 0.12);
+}
+
+.foundation-shell-content {
+  font-family: "RaniraSeason", Georgia, "Times New Roman", serif;
+}
+
+.foundation-drilldown-page .eyebrow {
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  font-size: 0.72rem;
+  opacity: 0.85;
 }
 
 button,
@@ -505,6 +572,11 @@ a {
   margin-bottom: 6px;
 }
 
+.foundation-sidebar-items {
+  display: grid;
+  gap: 4px;
+}
+
 .foundation-sidebar-item {
   display: flex;
   align-items: center;
@@ -517,6 +589,34 @@ a {
   color: inherit;
   text-align: left;
   cursor: pointer;
+}
+
+.foundation-sidebar-item.is-dragging {
+  opacity: 0.55;
+  border-color: rgba(125, 211, 252, 0.25);
+}
+
+.foundation-sidebar-drag-handle {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 14px;
+  flex: 0 0 14px;
+  font-size: 0.62rem;
+  letter-spacing: -0.12em;
+  line-height: 1;
+  opacity: 0.35;
+  cursor: grab;
+  user-select: none;
+}
+
+.foundation-sidebar-item:hover .foundation-sidebar-drag-handle,
+.foundation-sidebar-item:focus-within .foundation-sidebar-drag-handle {
+  opacity: 0.7;
+}
+
+.foundation-sidebar-drag-handle:active {
+  cursor: grabbing;
 }
 
 .foundation-sidebar-item.is-active {
@@ -570,9 +670,41 @@ a {
 }
 
 .player-profile-shell,
+.team-profile-shell,
 .contract-offer-shell {
   display: grid;
   gap: 16px;
+}
+
+.team-profile-header,
+.team-profile-identity {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  flex-wrap: wrap;
+}
+
+.team-profile-header {
+  justify-content: space-between;
+}
+
+.team-profile-logo {
+  width: 96px;
+  height: 96px;
+  border-radius: 16px;
+  object-fit: contain;
+}
+
+.team-profile-logo.is-placeholder {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(255, 255, 255, 0.06);
+  font-weight: 700;
+}
+
+.team-profile-body {
+  max-width: none;
 }
 
 .player-profile-header,
@@ -3878,12 +4010,34 @@ a {
   min-width: 0;
   min-height: 344px;
   padding: 16px;
+  border: none;
+  color: inherit;
+  text-align: left;
+  width: 100%;
+  cursor: pointer;
   border: 1px solid rgba(255, 255, 255, 0.1);
   border-radius: 18px;
   background:
     radial-gradient(circle at 18% 0%, rgba(120, 158, 234, 0.13), transparent 32%),
     linear-gradient(180deg, rgba(255, 255, 255, 0.062), rgba(255, 255, 255, 0.034));
   box-shadow: 0 16px 34px rgba(0, 0, 0, 0.2);
+}
+
+.transfer-history-v2-team-route {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+  color: rgba(235, 239, 247, 0.72);
+  font-size: 0.86rem;
+}
+
+.market-v2-player-name-link {
+  display: inline-block;
+  margin: 0;
+  font-size: 1.28rem;
+  font-weight: 800;
+  line-height: 1.15;
 }
 
 .foundation-home-player-card-head {
@@ -4066,7 +4220,17 @@ a {
   font-weight: 850;
   line-height: 1.2;
   text-overflow: ellipsis;
+}
+
+.foundation-home-player-stats .economy-money-stack {
+  gap: 2px;
+}
+
+.foundation-home-player-stats .economy-money-stack > span,
+.foundation-home-player-stats .economy-money-stack > strong {
   white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
 .foundation-home-player-hints {
@@ -4119,10 +4283,12 @@ a {
 
 .foundation-home-player-money-delta,
 .player-card-money-delta {
-  display: inline-block;
-  margin-left: 5px;
-  font-size: 0.82em;
-  font-weight: 900;
+  display: block;
+  margin-left: 0;
+  margin-top: 2px;
+  font-size: 0.72rem;
+  font-weight: 800;
+  line-height: 1.1;
 }
 
 .foundation-home-player-money-delta.is-positive,
@@ -4598,13 +4764,25 @@ a {
   min-width: 0;
 }
 
-.selected-roster-sale-cell strong {
+.economy-money-stack {
+  display: grid;
+  gap: 3px;
+  min-width: 0;
+}
+
+.economy-money-stack > strong,
+.economy-money-stack > .economy-money-stack-value {
   white-space: nowrap;
 }
 
+.economy-money-stack small,
 .selected-roster-sale-cell small {
   font-size: 0.72rem;
   line-height: 1.1;
+  white-space: nowrap;
+}
+
+.selected-roster-sale-cell strong {
   white-space: nowrap;
 }
 
@@ -8849,7 +9027,10 @@ a {
 .season-top-player-name-button strong,
 .matchday-arena-winner-team strong,
 .foundation-home-player-card .foundation-home-player-title strong,
-.team-drawer-player-card .team-drawer-player-title strong {
+.team-drawer-player-card .team-drawer-player-title strong,
+.market-v2-player-name-link,
+.transfer-history-v2-player-name.table-link-button,
+.training-v2-rider-title-row .table-link-button {
   text-decoration-line: underline;
   text-decoration-style: solid;
   text-decoration-color: rgba(163, 194, 255, 0.58);
@@ -8936,15 +9117,20 @@ a {
 }
 
 .players-table-money-cell {
-  display: inline-flex;
-  align-items: baseline;
-  gap: 5px;
+  display: grid;
+  gap: 2px;
+  justify-items: end;
+  min-width: 0;
+}
+
+.players-table-money-cell > span {
   white-space: nowrap;
 }
 
 .players-table-money-delta {
-  font-size: 0.78em;
-  font-weight: 900;
+  font-size: 0.72rem;
+  font-weight: 800;
+  line-height: 1.1;
 }
 
 .players-table-money-delta.is-positive {
@@ -11517,20 +11703,20 @@ a {
 }
 
 .player-drawer-inline-value {
-  display: flex;
-  align-items: baseline;
-  gap: 8px;
+  display: grid;
+  gap: 2px;
   min-width: 0;
 }
 
 .player-drawer-inline-value strong {
-  flex: 0 0 auto;
+  white-space: nowrap;
 }
 
 .player-drawer-inline-value .player-drawer-money-delta {
-  flex: 0 1 auto;
-  min-width: 0;
+  margin-top: 0;
+  font-size: 0.72rem;
   font-weight: 800;
+  line-height: 1.1;
   white-space: nowrap;
 }
 
@@ -25708,6 +25894,13 @@ a {
 .market-v2-candidate-media,
 .market-v2-player-media {
   position: relative;
+}
+
+.market-v2-player-media[role="button"] {
+  cursor: pointer;
+  border: none;
+  padding: 0;
+  background: none;
 }
 
 .market-v2-candidate-media {

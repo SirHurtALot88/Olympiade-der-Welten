@@ -36,6 +36,7 @@ describe("transfermarkt v2 performance contract", () => {
 
     expect(source).toContain("candidateButtonRefs");
     expect(source).toContain("handleCandidateKeyDown");
+    expect(source).toContain("onGlobalCandidateKeyDown");
     expect(source).toContain("ArrowDown");
     expect(source).toContain("ArrowUp");
     expect(source).toContain("Home");

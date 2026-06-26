@@ -315,6 +315,10 @@ export default function LegacyResolveLabClient({
       traitsPositive: player.traitsPositive,
       traitsNegative: player.traitsNegative,
       scoutingLevel: null,
+      effectiveScoutingLevel: null,
+      axisStarsDisplay: null,
+      potentialStarsDisplay: null,
+      potentialGapStars: null,
       scoutingDisclosure: null,
       hiddenPositiveTraitCount: 0,
       hiddenNegativeTraitCount: 0,
@@ -465,6 +469,12 @@ export default function LegacyResolveLabClient({
       ],
       economyCompare: null,
       ratingWarnings: ["mvs_source_missing"],
+      potentialOverallStars: null,
+      potentialOverallDelta: null,
+      potentialOverallDeltaSourceLabel: null,
+      potentialAxisStatus: [],
+      attributeCeilingPreview: [],
+      trainingRouteImpact: null,
     });
   }
 
@@ -764,10 +774,15 @@ export default function LegacyResolveLabClient({
                         <div
                           key={`${entry.disciplineId}-${entry.disciplineSide}-${entry.slotIndex}`}
                           className="legacy-resolve-detail-row legacy-resolve-player-row"
-                          onDoubleClick={() => openPlayerDrawer(entry.playerId)}
                         >
                           <span>Slot {entry.slotIndex + 1}</span>
-                          <span>{entry.playerName}</span>
+                          <button
+                            type="button"
+                            className="table-link-button legacy-resolve-player-link"
+                            onClick={() => openPlayerDrawer(entry.playerId)}
+                          >
+                            {entry.playerName}
+                          </button>
                           <span>Base {entry.baseScore == null ? "—" : formatScore(entry.baseScore)}</span>
                           <span>Fatigue {entry.fatigueAdjustedScore == null ? "—" : formatScore(entry.fatigueAdjustedScore)}</span>
                           <span>Captain {entry.captainBonus == null ? "—" : formatScore(entry.captainBonus)}</span>
@@ -799,10 +814,15 @@ export default function LegacyResolveLabClient({
                 <div
                   key={`${player.teamId}-${player.playerName}-${player.rankInDiscipline}`}
                   className="legacy-resolve-detail-row"
-                  onDoubleClick={() => openPlayerDrawer(player.playerId)}
                 >
                   <span>#{player.rankInDiscipline}</span>
-                  <span>{player.playerName}</span>
+                  <button
+                    type="button"
+                    className="table-link-button legacy-resolve-player-link"
+                    onClick={() => openPlayerDrawer(player.playerId)}
+                  >
+                    {player.playerName}
+                  </button>
                   <span>{player.teamName}</span>
                   <span>{formatScore(player.finalPlayerScore)}</span>
                   <span>PPS {player.pointsAwarded == null ? "—" : formatScore(player.pointsAwarded)}</span>
@@ -823,10 +843,15 @@ export default function LegacyResolveLabClient({
                 <div
                   key={`${player.teamId}-${player.playerName}-${player.rankInDiscipline}`}
                   className="legacy-resolve-detail-row"
-                  onDoubleClick={() => openPlayerDrawer(player.playerId)}
                 >
                   <span>#{player.rankInDiscipline}</span>
-                  <span>{player.playerName}</span>
+                  <button
+                    type="button"
+                    className="table-link-button legacy-resolve-player-link"
+                    onClick={() => openPlayerDrawer(player.playerId)}
+                  >
+                    {player.playerName}
+                  </button>
                   <span>{player.teamName}</span>
                   <span>{formatScore(player.finalPlayerScore)}</span>
                   <span>PPS {player.pointsAwarded == null ? "—" : formatScore(player.pointsAwarded)}</span>

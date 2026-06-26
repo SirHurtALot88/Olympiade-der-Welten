@@ -63,7 +63,6 @@ type TransfermarktV2ClientProps = {
   boardObjectiveHighlights?: TeamSeasonObjectiveRecord[];
   onOpenPlayerDetails?: (payload: { playerId: string; activePlayerId?: string | null }) => void;
   onOpenHistory?: (() => void) | null;
-  onOpenClassicMarket?: (() => void) | null;
   onToggleWishlist?: ((item: TransfermarktFreeAgentItem) => void) | null;
   onRemoveWishlist?: ((playerId: string) => void) | null;
   scoutingWatchPlayerIds?: string[];
@@ -73,6 +72,9 @@ type TransfermarktV2ClientProps = {
   onBuyCompleted?: ((teamId: string) => Promise<void> | void) | null;
   initialPlayerId?: string | null;
   onInitialPlayerFocusConsumed?: (() => void) | null;
+  offerPanelActive?: boolean;
+  onOpenOfferPanel?: (playerId: string) => void;
+  onCloseOfferPanel?: () => void;
   onSell?: ((payload: { activePlayerId: string; playerId: string; playerName: string; className: string; race: string | null; portraitUrl: string | null }) => void) | null;
 };
 
@@ -1065,7 +1067,6 @@ export default function TransfermarktV2Client({
   boardObjectiveHighlights = [],
   onOpenPlayerDetails,
   onOpenHistory,
-  onOpenClassicMarket,
   onToggleWishlist,
   onRemoveWishlist,
   scoutingWatchPlayerIds = [],
@@ -1075,6 +1076,9 @@ export default function TransfermarktV2Client({
   onBuyCompleted,
   initialPlayerId = null,
   onInitialPlayerFocusConsumed = null,
+  offerPanelActive = false,
+  onOpenOfferPanel,
+  onCloseOfferPanel,
   onSell,
 }: TransfermarktV2ClientProps) {
   const roomContextRef = useRef(readFoundationRoomContextFromLocation());
@@ -1158,7 +1162,19 @@ export default function TransfermarktV2Client({
   const [buyPreview, setBuyPreview] = useState<TransfermarktBuyPreview | null>(null);
   const [buyPreviewRefreshNonce, setBuyPreviewRefreshNonce] = useState(0);
   const [buyNegotiationOutcome, setBuyNegotiationOutcome] = useState<MarketNegotiationOutcome | null>(null);
-  const [buyModalOpen, setBuyModalOpen] = useState(false);
+  const buyModalOpen = offerPanelActive;
+
+  function activateOfferPanel(playerId?: string) {
+    const targetId = playerId ?? selectedPlayer?.playerId ?? buyModalWishlistEntry?.playerId;
+    if (targetId) {
+      onOpenOfferPanel?.(targetId);
+    }
+  }
+
+  function deactivateOfferPanel() {
+    onCloseOfferPanel?.();
+  }
+
   const [buyModalWishlistEntry, setBuyModalWishlistEntry] = useState<TransferWishlistEntry | null>(null);
   const [reloadToken, setReloadToken] = useState(0);
   const [filterStorageReady, setFilterStorageReady] = useState(false);
@@ -1683,6 +1699,58 @@ export default function TransfermarktV2Client({
     setSelectedPlayerId(playerId);
   }
 
+  function moveCandidateSelection(key: "ArrowDown" | "ArrowUp" | "Home" | "End") {
+    if (!visibleItems.length) {
+      return;
+    }
+
+    const currentIndex = visibleItems.findIndex((item) => item.playerId === selectedPlayerId);
+    const fallbackIndex = currentIndex >= 0 ? currentIndex : 0;
+    const targetIndex =
+      key === "Home"
+        ? 0
+        : key === "End"
+          ? visibleItems.length - 1
+          : Math.min(
+              Math.max(fallbackIndex + (key === "ArrowDown" ? 1 : -1), 0),
+              visibleItems.length - 1,
+            );
+    selectCandidateFromKeyboard(visibleItems[targetIndex].playerId);
+  }
+
+  function handleCandidateKeyDown(event: KeyboardEvent<HTMLButtonElement>, playerId: string) {
+    if (!["ArrowDown", "ArrowUp", "Home", "End"].includes(event.key)) {
+      return;
+    }
+    if (!visibleItems.length) {
+      return;
+    }
+    event.preventDefault();
+    event.stopPropagation();
+    moveCandidateSelection(event.key as "ArrowDown" | "ArrowUp" | "Home" | "End");
+  }
+
+  useEffect(() => {
+    if (buyModalOpen || !visibleItems.length) {
+      return undefined;
+    }
+
+    function onGlobalCandidateKeyDown(event: globalThis.KeyboardEvent) {
+      if (!["ArrowDown", "ArrowUp", "Home", "End"].includes(event.key)) {
+        return;
+      }
+      const target = event.target as HTMLElement | null;
+      if (target?.closest("input, textarea, select, [contenteditable='true']")) {
+        return;
+      }
+      event.preventDefault();
+      moveCandidateSelection(event.key as "ArrowDown" | "ArrowUp" | "Home" | "End");
+    }
+
+    window.addEventListener("keydown", onGlobalCandidateKeyDown);
+    return () => window.removeEventListener("keydown", onGlobalCandidateKeyDown);
+  }, [buyModalOpen, selectedPlayerId, visibleItems]);
+
   async function ensureWishlistCandidateVisible(playerId: string, playerName: string) {
     if (marketItems.some((item) => item.playerId === playerId)) {
       return true;
@@ -1742,7 +1810,7 @@ export default function TransfermarktV2Client({
       setOfferedSalary(null);
       setSalaryEditedManually(false);
       setBuyModalWishlistEntry(entry);
-      setBuyModalOpen(true);
+      activateOfferPanel(entry.playerId);
       setBuyPreviewRefreshNonce((current) => current + 1);
       void ensureWishlistCandidateVisible(entry.playerId, entry.playerName);
       return;
@@ -1782,29 +1850,6 @@ export default function TransfermarktV2Client({
   function openWishlistDeal(entry: TransferWishlistEntry) {
     clearWishlistClickTimer();
     void focusWishlistEntry(entry, { openDeal: true });
-  }
-
-  function handleCandidateKeyDown(event: KeyboardEvent<HTMLButtonElement>, playerId: string) {
-    if (!["ArrowDown", "ArrowUp", "Home", "End"].includes(event.key)) {
-      return;
-    }
-    if (!visibleItems.length) {
-      return;
-    }
-    event.preventDefault();
-
-    const currentIndex = visibleItems.findIndex((item) => item.playerId === playerId);
-    const fallbackIndex = currentIndex >= 0 ? currentIndex : 0;
-    const targetIndex =
-      event.key === "Home"
-        ? 0
-        : event.key === "End"
-          ? visibleItems.length - 1
-          : Math.min(
-              Math.max(fallbackIndex + (event.key === "ArrowDown" ? 1 : -1), 0),
-              visibleItems.length - 1,
-            );
-    selectCandidateFromKeyboard(visibleItems[targetIndex].playerId);
   }
 
   useEffect(() => {
@@ -2217,7 +2262,7 @@ export default function TransfermarktV2Client({
       setBuySuccess(
         `${payload.summary.player?.name ?? "Spieler"} fix fuer ${selectedTeam?.shortCode ?? "dein Team"}: ${formatTransfermarktCurrency(payload.summary.purchasePrice)} Abloese, ${formatTransfermarktCurrency(payload.summary.salary)} Gehalt p.a., ${payload.summary.contractLength} Saison${payload.summary.contractLength === 1 ? "" : "en"}.`,
       );
-      setBuyModalOpen(false);
+      deactivateOfferPanel();
       setBuyNegotiationOutcome(null);
       await onBuyCompleted?.(selectedTeamId);
       setOfferedSalary(null);
@@ -2317,7 +2362,7 @@ export default function TransfermarktV2Client({
     setOfferedSalary(null);
     setSalaryEditedManually(false);
     setBuyModalWishlistEntry(null);
-    setBuyModalOpen(true);
+    activateOfferPanel();
     setBuyPreviewRefreshNonce((current) => current + 1);
   }
 
@@ -2342,7 +2387,7 @@ export default function TransfermarktV2Client({
       hadPreview &&
       !negotiationAccepted &&
       Boolean(buyNegotiationOutcome);
-    setBuyModalOpen(false);
+    deactivateOfferPanel();
     setBuyModalWishlistEntry(null);
     setBuyNegotiationOutcome(null);
     if (hadPreview && !negotiationAccepted && selectedTeamCanManage) {
@@ -2532,7 +2577,7 @@ export default function TransfermarktV2Client({
   }, [selectedPlayer]);
 
   return (
-    <section className="market-v2-shell">
+    <section className={`market-v2-shell${buyModalOpen ? " is-offer-mode" : ""}`}>
       <section className="market-v2-topbar">
         <div className="filter-field">
           <span>Aktives Team</span>
@@ -2559,14 +2604,7 @@ export default function TransfermarktV2Client({
             <option value="salary">Niedriges Gehalt</option>
           </select>
         </label>
-        <div className="market-v2-topbar-actions">
-          <button className="secondary-button inline-button" type="button" onClick={() => onOpenClassicMarket?.()}>
-            Klassischer Markt
-          </button>
-          <button className="secondary-button inline-button" type="button" onClick={() => onOpenHistory?.()}>
-            Historie
-          </button>
-        </div>
+        <div className="market-v2-topbar-actions" />
       </section>
 
       <section className="market-v2-filter-board">
@@ -2890,7 +2928,6 @@ export default function TransfermarktV2Client({
                     shouldFocusSelectedCandidateRef.current = false;
                     setSelectedPlayerId(item.playerId);
                   }}
-                  onDoubleClick={() => onOpenPlayerDetails?.({ playerId: item.playerId })}
                   onKeyDown={(event) => handleCandidateKeyDown(event, item.playerId)}
                 >
                   <div className="market-v2-candidate-media" style={getCandidateFrameStyle(item.className)}>
@@ -2910,7 +2947,17 @@ export default function TransfermarktV2Client({
                   </div>
                   <div className="market-v2-candidate-copy">
                     <div className="market-v2-candidate-head">
-                      <strong title={item.name}>{item.name}</strong>
+                      <button
+                        className="table-link-button"
+                        type="button"
+                        title={`${item.name} Profil öffnen`}
+                        onClick={(event) => {
+                          event.stopPropagation();
+                          onOpenPlayerDetails?.({ playerId: item.playerId });
+                        }}
+                      >
+                        {item.name}
+                      </button>
                       <span className={`${getClassColorClassName(item.className)} market-v2-class-mini`}>{item.className}</span>
                     </div>
                     <small>
@@ -3023,7 +3070,27 @@ export default function TransfermarktV2Client({
           {selectedPlayer ? (
             <>
               <div className="market-v2-player-hero">
-                <div className="market-v2-player-media">
+                <div
+                  className="market-v2-player-media"
+                  role={onOpenPlayerDetails ? "button" : undefined}
+                  tabIndex={onOpenPlayerDetails ? 0 : undefined}
+                  onClick={
+                    onOpenPlayerDetails
+                      ? () => onOpenPlayerDetails({ playerId: selectedPlayer.playerId })
+                      : undefined
+                  }
+                  onKeyDown={
+                    onOpenPlayerDetails
+                      ? (event) => {
+                          if (event.key === "Enter" || event.key === " ") {
+                            event.preventDefault();
+                            onOpenPlayerDetails({ playerId: selectedPlayer.playerId });
+                          }
+                        }
+                      : undefined
+                  }
+                  title={onOpenPlayerDetails ? `${selectedPlayer.name} Profil öffnen` : undefined}
+                >
                   {selectedPortrait?.src ? (
                     <OptimizedMediaImage src={selectedPortrait.src} alt={selectedPlayer.name} width={240} height={240} className="market-v2-player-image" />
                   ) : (
@@ -3034,7 +3101,13 @@ export default function TransfermarktV2Client({
                   <span className="market-v2-kicker" title={scoutingProfileTooltip}>
                     Scouting-Profil
                   </span>
-                  <h3>{selectedPlayer.name}</h3>
+                  <button
+                    type="button"
+                    className="table-link-button market-v2-player-name-link"
+                    onClick={() => onOpenPlayerDetails?.({ playerId: selectedPlayer.playerId })}
+                  >
+                    {selectedPlayer.name}
+                  </button>
                   <p>{selectedPlayer.className} · {selectedPlayer.race} · {selectedPlayer.alignment}</p>
                   <div className="market-v2-pill-row">
                     <span className="pill">{formatTransfermarktCurrency(selectedPlayer.marketValue)} MW</span>
@@ -3070,15 +3143,6 @@ export default function TransfermarktV2Client({
                       {selectedPlayer.potentialGapStars != null ? ` · Gap ${selectedPlayer.potentialGapStars}★` : ""}
                     </p>
                   ) : null}
-                  <div className="market-v2-link-row">
-                    <button
-                      className="secondary-button inline-button"
-                      type="button"
-                      onClick={() => onOpenPlayerDetails?.({ playerId: selectedPlayer.playerId })}
-                    >
-                      Spieler öffnen
-                    </button>
-                  </div>
                 </div>
               </div>
 
@@ -3708,7 +3772,7 @@ export default function TransfermarktV2Client({
               </thead>
               <tbody>
                 {selectedRosterRows.map((row) => (
-                  <tr key={row.activePlayerId} onDoubleClick={() => onOpenPlayerDetails?.({ playerId: row.playerId, activePlayerId: row.activePlayerId })}>
+                  <tr key={row.activePlayerId}>
                     <td>
                       {row.portraitUrl ? (
                         <OptimizedMediaImage
@@ -3728,8 +3792,7 @@ export default function TransfermarktV2Client({
                         type="button"
                         onClick={() => onOpenPlayerDetails?.({ playerId: row.playerId, activePlayerId: row.activePlayerId })}
                       >
-                        <strong>{row.name}</strong>
-                        <small>Doppelklick Details</small>
+                        {row.name}
                       </button>
                     </td>
                     <td>
@@ -3858,26 +3921,18 @@ export default function TransfermarktV2Client({
       </section>
 
       {buyModalOpen ? (
-        <div className="foundation-modal-backdrop" onClick={closeBuyModal}>
-          <div className="foundation-modal transfer-buy-modal" ref={buyModalRef} onClick={(event) => event.stopPropagation()}>
-            <div className="foundation-modal-header">
+        <section className="foundation-drilldown-page transfer-offer-page" data-testid="transfer-offer-page" ref={buyModalRef}>
+            <header className="foundation-drilldown-header">
               <div>
-                <span className="market-v2-kicker">Kaufdialog</span>
-                <h3>{selectedPlayer?.name ?? "Spieler prüfen"}</h3>
-                <p className="muted">
-                  {selectedPlayer
-                    ? `${selectedPlayer.className} · ${selectedPlayer.race} · ${selectedPlayer.alignment || "ohne Fraktion"}`
-                    : buyModalWishlistEntry
-                      ? `${buyModalWishlistEntry.className} · ${buyModalWishlistEntry.race}`
-                      : "Bitte zuerst einen Kandidaten wählen."}
-                </p>
+                <span className="market-v2-kicker">Vertragsangebot</span>
+                <h1>{selectedPlayer?.name ?? "Spieler prüfen"}</h1>
               </div>
               <button className="secondary-button" type="button" onClick={closeBuyModal} disabled={buyBusy}>
-                Schließen
+                Zurück
               </button>
-            </div>
+            </header>
 
-            <div className="foundation-modal-body transfer-buy-modal-body" ref={buyModalBodyRef}>
+            <div className="foundation-drilldown-body transfer-buy-modal-body" ref={buyModalBodyRef}>
               <div className="transfer-buy-player-line">
                 <div className="transfer-modal-player-hero">
                   {selectedPortrait?.src ? (
@@ -4308,8 +4363,7 @@ export default function TransfermarktV2Client({
               </button>
             </div>
             {finalBuyDisabledReason ? <p className="foundation-screen-action-reason">Warum nicht: {finalBuyDisabledReason}</p> : null}
-          </div>
-        </div>
+        </section>
       ) : null}
     </section>
   );

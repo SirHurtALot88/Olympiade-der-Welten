@@ -20,6 +20,7 @@ export const FOUNDATION_VIEW_IDS = [
   "trainingV2",
   "players",
   "playerProfile",
+  "teamProfile",
   "ranks",
   "diszis",
   "prize",
@@ -52,7 +53,7 @@ export function normalizeFoundationViewParam(view: string | null | undefined): F
   if (view === "transfermarkt-v2" || view === "transfermarkt" || view === "market") {
     return "marketV2";
   }
-  if (view === "history-v2" || view === "transferhistorie-v2") {
+  if (view === "history-v2" || view === "transferhistorie-v2" || view === "history") {
     return "historyV2";
   }
   if (view === "teams-v2") {
@@ -67,7 +68,7 @@ export function normalizeFoundationViewParam(view: string | null | undefined): F
   if (view === "lexikon" || view === "glossar" || view === "encyclopedia" || view === "buch") {
     return "encyclopedia";
   }
-  if (view === "home-v2" || view === "homev2") {
+  if (view === "home-v2" || view === "homev2" || view === "home") {
     return "homeV2";
   }
   if (view === "facilities-overview-v2" || view === "facilities-v2-overview") {
@@ -79,9 +80,12 @@ export function normalizeFoundationViewParam(view: string | null | undefined): F
   if (view === "inbox-v2" || view === "inbox") {
     return "inboxV2";
   }
-  if (view === "hq") return "homeV2";
+  if (view === "hq" || view === "home") return "homeV2";
   if (view === "player" || view === "player-profile" || view === "playerProfile") {
     return "playerProfile";
+  }
+  if (view === "team" || view === "team-profile" || view === "teamProfile") {
+    return "teamProfile";
   }
 
   return FOUNDATION_VIEW_IDS.includes(view as FoundationViewId) ? (view as FoundationViewId) : null;
@@ -91,6 +95,7 @@ export function getDefaultFoundationViewTarget(view: FoundationViewId): Foundati
   if (view === "hq") return "homeV2";
   if (view === "home") return "homeV2";
   if (view === "market") return "marketV2";
+  if (view === "history") return "historyV2";
   if (view === "season") return "seasonV2";
   if (view === "training") return "trainingCompact";
   if (view === "facilitiesOverviewV2") return "trainingV2";

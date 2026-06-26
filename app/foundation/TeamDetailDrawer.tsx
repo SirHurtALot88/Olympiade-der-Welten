@@ -3,7 +3,7 @@
 import { useEffect, useMemo } from "react";
 
 import { getGameTermTooltip } from "@/components/ui/GameTerm";
-import type { TeamStrategyBias } from "@/lib/data/olyDataTypes";
+import type { PlayerPotentialBand, TeamStrategyBias } from "@/lib/data/olyDataTypes";
 
 import ClassColorChip, { getClassColorClassName } from "./ClassColorChip";
 import OptimizedMediaImage from "./OptimizedMediaImage";
@@ -55,6 +55,8 @@ export type TeamDetailDrawerPlayerCard = {
     moralePenalty: number;
   }>;
   topDisciplines: Array<{ label: string; value: number | null }>;
+  potential?: number | null;
+  potentialBand?: PlayerPotentialBand | null;
 };
 
 export type TeamDetailDrawerHistoryRow = {
@@ -343,14 +345,16 @@ export default function TeamDetailDrawer({
   onClose,
   onOpenPlayer,
   layerClassName = "",
+  variant = "drawer",
 }: {
   data: TeamDetailDrawerData | null;
   onClose: () => void;
   onOpenPlayer: (playerId: string, activePlayerId: string) => void;
   layerClassName?: string;
+  variant?: "drawer" | "page";
 }) {
   useEffect(() => {
-    if (!data) {
+    if (!data || variant === "page") {
       return undefined;
     }
 
@@ -362,7 +366,7 @@ export default function TeamDetailDrawer({
 
     window.addEventListener("keydown", handleEscape);
     return () => window.removeEventListener("keydown", handleEscape);
-  }, [data, onClose]);
+  }, [data, onClose, variant]);
 
   const visiblePlayers = useMemo(
     () => [...(data?.players ?? [])].sort(comparePlayersByOvr),
@@ -389,49 +393,8 @@ export default function TeamDetailDrawer({
     return null;
   }
 
-  return (
-    <div
-      className={`player-drawer-backdrop${layerClassName ? ` ${layerClassName}` : ""}`}
-      role="presentation"
-      onClick={onClose}
-    >
-      <aside
-        className="player-drawer team-drawer"
-        role="dialog"
-        aria-modal="true"
-        aria-label={`${data.teamName} Squad Sheet`}
-        onClick={(event) => event.stopPropagation()}
-      >
-        <div className="player-drawer-header">
-          <div className="player-drawer-hero">
-            {data.logoUrl ? (
-              <OptimizedMediaImage
-                className="player-drawer-portrait player-drawer-portrait-large team-drawer-logo"
-                src={data.logoUrl}
-                alt={`${data.teamName} Logo`}
-                width={160}
-                height={160}
-                loading="eager"
-                fetchPriority="high"
-              />
-            ) : (
-              <div className="player-drawer-portrait player-drawer-portrait-large player-drawer-portrait-placeholder team-drawer-logo">
-                {data.logoInitials}
-              </div>
-            )}
-            <div className="player-drawer-headline player-drawer-headline-rich">
-              <div className="player-drawer-meta-line">
-                <span className="transfer-status-pill is-info">{formatControlModeLabel(data.controlMode)}</span>
-              </div>
-              <h2>{data.teamName}</h2>
-            </div>
-          </div>
-          <button className="secondary-button inline-button" type="button" onClick={onClose}>
-            Schliessen
-          </button>
-        </div>
-
-        <div className="player-drawer-body team-drawer-body">
+  const profileBody = (
+        <div className={`player-drawer-body team-drawer-body${variant === "page" ? " team-profile-body" : ""}`}>
           <section className="player-drawer-section player-drawer-hero-surface team-drawer-dashboard">
             <div className="team-drawer-dashboard-grid">
               <article className="team-drawer-identity-card">
@@ -735,6 +698,82 @@ export default function TeamDetailDrawer({
             )}
           </section>
         </div>
+  );
+
+  if (variant === "page") {
+    return (
+      <div className="team-profile-shell" data-testid="foundation-team-profile">
+        <header className="team-profile-header">
+          <div className="team-profile-identity">
+            {data.logoUrl ? (
+              <OptimizedMediaImage
+                className="team-profile-logo"
+                src={data.logoUrl}
+                alt={`${data.teamName} Logo`}
+                width={96}
+                height={96}
+                loading="eager"
+                fetchPriority="high"
+              />
+            ) : (
+              <span className="team-profile-logo is-placeholder">{data.logoInitials}</span>
+            )}
+            <div>
+              <span className="eyebrow">{data.shortCode} · {formatControlModeLabel(data.controlMode)}</span>
+              <h1>{data.teamName}</h1>
+            </div>
+          </div>
+          <button className="secondary-button inline-button" type="button" onClick={onClose}>
+            Zurück
+          </button>
+        </header>
+        {profileBody}
+      </div>
+    );
+  }
+
+  return (
+    <div
+      className={`player-drawer-backdrop${layerClassName ? ` ${layerClassName}` : ""}`}
+      role="presentation"
+      onClick={onClose}
+    >
+      <aside
+        className="player-drawer team-drawer"
+        role="dialog"
+        aria-modal="true"
+        aria-label={`${data.teamName} Squad Sheet`}
+        onClick={(event) => event.stopPropagation()}
+      >
+        <div className="player-drawer-header">
+          <div className="player-drawer-hero">
+            {data.logoUrl ? (
+              <OptimizedMediaImage
+                className="player-drawer-portrait player-drawer-portrait-large team-drawer-logo"
+                src={data.logoUrl}
+                alt={`${data.teamName} Logo`}
+                width={160}
+                height={160}
+                loading="eager"
+                fetchPriority="high"
+              />
+            ) : (
+              <div className="player-drawer-portrait player-drawer-portrait-large player-drawer-portrait-placeholder team-drawer-logo">
+                {data.logoInitials}
+              </div>
+            )}
+            <div className="player-drawer-headline player-drawer-headline-rich">
+              <div className="player-drawer-meta-line">
+                <span className="transfer-status-pill is-info">{formatControlModeLabel(data.controlMode)}</span>
+              </div>
+              <h2>{data.teamName}</h2>
+            </div>
+          </div>
+          <button className="secondary-button inline-button" type="button" onClick={onClose}>
+            Schliessen
+          </button>
+        </div>
+        {profileBody}
       </aside>
     </div>
   );

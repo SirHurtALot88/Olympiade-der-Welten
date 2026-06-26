@@ -39,6 +39,12 @@ import {
 } from "@/lib/progression/player-potential-service";
 import { getEffectiveScoutingLevel } from "@/lib/scouting/facility-scout-pipeline-service";
 import { buildPlayerStarScoutingSnapshot } from "@/lib/scouting/player-star-scouting-bridge";
+import {
+  buildPlayerPotentialDisplaySnapshot,
+  type PlayerAttributeCeilingPreview,
+  type PlayerPotentialAxisStatus,
+  type PlayerTrainingRouteImpact,
+} from "@/lib/foundation/player-potential-display-service";
 import { buildPlayerProgressionForecast } from "@/lib/training/player-progression-forecast";
 import {
   buildPlayerDevelopmentLevelupModel,
@@ -128,6 +134,12 @@ export type PlayerDetailDrawerData = {
   axisStarsDisplay: string | null;
   potentialStarsDisplay: string | null;
   potentialGapStars: number | null;
+  potentialOverallStars: number | null;
+  potentialOverallDelta: number | null;
+  potentialOverallDeltaSourceLabel: string | null;
+  potentialAxisStatus: PlayerPotentialAxisStatus[];
+  attributeCeilingPreview: PlayerAttributeCeilingPreview[];
+  trainingRouteImpact: PlayerTrainingRouteImpact | null;
   scoutingDisclosure: TransfermarktScoutingDisclosure | null;
   hiddenPositiveTraitCount: number;
   hiddenNegativeTraitCount: number;
@@ -1646,7 +1658,16 @@ export function buildPlayerDrawerDataFromGameState(input: {
     forecast: progressionForecast,
     teamId: team?.teamId ?? null,
     profile: team?.teamId ? getTeamStrategyProfile(input.gameState, team.teamId) : null,
+    potentialRecord: input.gameState.playerPotential?.find((entry) => entry.playerId === player.id) ?? null,
   });
+  const potentialDisplay =
+    team && team.humanControlled !== false
+      ? buildPlayerPotentialDisplaySnapshot({
+          gameState: input.gameState,
+          player,
+          saveId: input.gameState.season.id,
+        })
+      : null;
   const progressionEvents = [...(input.gameState.playerProgressionEvents ?? [])]
     .filter((event) => event.playerId === player.id)
     .sort((left, right) => right.timestamp.localeCompare(left.timestamp, "de"))
@@ -1709,6 +1730,12 @@ export function buildPlayerDrawerDataFromGameState(input: {
     axisStarsDisplay: starSnapshot?.revealedCurrentStars.displayLabel ?? null,
     potentialStarsDisplay: starSnapshot?.revealedPotentialStars.displayLabel ?? null,
     potentialGapStars: starSnapshot?.potentialGap ?? null,
+    potentialOverallStars: potentialDisplay?.potentialOverallStars ?? null,
+    potentialOverallDelta: potentialDisplay?.potentialOverallDelta ?? null,
+    potentialOverallDeltaSourceLabel: potentialDisplay?.potentialOverallDeltaSourceLabel ?? null,
+    potentialAxisStatus: potentialDisplay?.potentialAxisStatus ?? [],
+    attributeCeilingPreview: potentialDisplay?.attributeCeilingPreview ?? [],
+    trainingRouteImpact: potentialDisplay?.trainingRouteImpact ?? null,
     scoutingDisclosure: traitView.disclosure,
     hiddenPositiveTraitCount: traitView.hiddenPositiveTraitCount,
     hiddenNegativeTraitCount: traitView.hiddenNegativeTraitCount,
@@ -2179,5 +2206,15 @@ export function buildPlayerDrawerDataFromLegacyContext(input: {
     seasonHistory: [],
     historyRows,
     ratingWarnings: playerRating?.warnings ?? [],
+    effectiveScoutingLevel: 0,
+    axisStarsDisplay: null,
+    potentialStarsDisplay: null,
+    potentialGapStars: null,
+    potentialOverallStars: null,
+    potentialOverallDelta: null,
+    potentialOverallDeltaSourceLabel: null,
+    potentialAxisStatus: [],
+    attributeCeilingPreview: [],
+    trainingRouteImpact: null,
   };
 }

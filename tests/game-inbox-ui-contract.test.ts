@@ -8,14 +8,17 @@ describe("game inbox UI contract", () => {
   it("wires the derived inbox into Foundation navigation, Home and global next", () => {
     const source = readFileSync(join(root, "app/foundation/FoundationPageClient.tsx"), "utf8");
     const routingSource = readFileSync(join(root, "lib/foundation/foundation-view-routing.ts"), "utf8");
+    const officeSource = readFileSync(join(root, "app/foundation/home-v2/ManagerOfficeClient.tsx"), "utf8");
 
     expect(source).toContain('import { buildGameInboxItems, filterGameInboxItems, getPrimaryInboxTask }');
     expect(source).toContain('| "inboxV2"');
-    expect(source).toContain('{ id: "inboxV2", label: "Inbox"');
+    const navSource = readFileSync(join(root, "lib/foundation/foundation-nav-config.ts"), "utf8");
+    expect(navSource).toContain('{ id: "inboxV2", label: "Inbox"');
     expect(source).toContain("<InboxV2Client");
     expect(routingSource).toContain('if (view === "inbox") return "inboxV2"');
-    expect(source).toContain('data-testid="home-task-list"');
-    expect(source).toContain('data-testid="home-story-cards"');
+    expect(source).toContain("<HomeV2Client");
+    expect(source).toContain("ManagerOfficeClient");
+    expect(officeSource).toContain('data-testid="foundation-hq"');
     expect(source).toContain("primaryInboxItem");
     expect(source).toContain("navigateToInboxItem");
     expect(source).toContain('section: "Spieler"');
@@ -26,8 +29,6 @@ describe("game inbox UI contract", () => {
     expect(source).toContain('data-testid="foundation-encyclopedia"');
     expect(source).toContain('window.addEventListener("foundation:open-game-term"');
     expect(source).toContain('command.section === "Lexikon" ? 1000 : 0');
-    expect(source).toContain("ManagerOfficeClient");
-    const officeSource = readFileSync(join(root, "app/foundation/home-v2/ManagerOfficeClient.tsx"), "utf8");
     expect(officeSource).toContain('data-testid="foundation-hq-gm-story"');
     expect(source).toContain("resolveFoundationPanelScrollTarget");
     expect(source).toContain("team-sponsor-choice");

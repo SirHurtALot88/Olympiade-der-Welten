@@ -32,6 +32,21 @@ function getPlayerHighlightLabel(card: HomeV2TopPlayerCard) {
   return null;
 }
 
+function getPotentialBandLabel(band: string | null | undefined) {
+  if (band === "elite") return "Potenzial: Elite";
+  if (band === "high") return "Potenzial: Hoch";
+  if (band === "medium") return "Potenzial: Mittel";
+  if (band === "low") return "Potenzial: Gering";
+  return null;
+}
+
+function getPotentialBandPillClass(band: string | null | undefined) {
+  if (band === "elite") return "transfer-status-pill is-ready";
+  if (band === "high") return "transfer-status-pill is-info";
+  if (band === "medium") return "pill";
+  return "pill muted";
+}
+
 function getGmToneClass(tone: string | null | undefined) {
   if (tone === "hot") return "is-danger";
   if (tone === "watch") return "is-warning";
@@ -70,7 +85,6 @@ export default function HomeV2Client({
   inboxItems,
   todayCards,
   onContinue,
-  onOpenClassicHome,
   onOpenTeams,
   onOpenLineup,
   onOpenMarket,
@@ -102,9 +116,6 @@ export default function HomeV2Client({
           </div>
         </div>
         <div className="home-v2-header-actions">
-          <button type="button" className="secondary-button" onClick={onOpenClassicHome}>
-            Classic Home
-          </button>
           <button type="button" className="primary-button home-v2-continue" onClick={onContinue}>
             Weiter
           </button>
@@ -159,12 +170,6 @@ export default function HomeV2Client({
           <div className="home-v2-action-row">
             <button type="button" className="primary-button" onClick={onContinue}>
               Weiter
-            </button>
-            <button type="button" className="secondary-button" onClick={onOpenLineup}>
-              Einsatzliste
-            </button>
-            <button type="button" className="secondary-button" onClick={onOpenMarket}>
-              Markt
             </button>
           </div>
         </section>
@@ -242,6 +247,7 @@ export default function HomeV2Client({
                     <VeloStatOrbitRow
                       ariaLabel={`${player.name} Bereichswerte`}
                       className="home-v2-player-orbit"
+                      showGrade
                       stats={{
                         pow: player.ppPow ?? 0,
                         spe: player.ppSpe ?? 0,
@@ -249,6 +255,15 @@ export default function HomeV2Client({
                         soc: player.ppSoc ?? 0,
                       }}
                     />
+                    {player.potentialBand ? (
+                      <span
+                        className={getPotentialBandPillClass(player.potentialBand)}
+                        title={player.potential != null ? `Potenzial ${player.potential}` : undefined}
+                        data-testid="home-player-potential-band"
+                      >
+                        {getPotentialBandLabel(player.potentialBand)}
+                      </span>
+                    ) : null}
                     {player.topDisciplineLabel ? (
                       <div className="home-v2-player-discipline-row">
                         <DisciplineIcon disciplineId={player.topDisciplineId} label={player.topDisciplineLabel} showLabel />
@@ -270,9 +285,6 @@ export default function HomeV2Client({
               <p className="muted">Noch keine Kaderdaten für Spotlight-Karten.</p>
             )}
           </div>
-          <button type="button" className="secondary-button inline-button" onClick={onOpenTeams}>
-            Kader öffnen
-          </button>
         </section>
 
         <section className="home-v2-panel home-v2-facilities-panel">
@@ -289,9 +301,6 @@ export default function HomeV2Client({
               </article>
             ))}
           </div>
-          <button type="button" className="secondary-button inline-button" onClick={onOpenTraining}>
-            Training & Gebäude
-          </button>
         </section>
 
         <section className="home-v2-panel home-v2-schedule-panel">
@@ -307,9 +316,6 @@ export default function HomeV2Client({
               </li>
             ))}
           </ul>
-          <button type="button" className="secondary-button inline-button" onClick={onOpenSeason}>
-            Saisonstand
-          </button>
         </section>
 
         <section className="home-v2-panel home-v2-today-panel">

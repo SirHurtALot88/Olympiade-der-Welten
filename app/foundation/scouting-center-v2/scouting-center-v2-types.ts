@@ -1,9 +1,31 @@
+import type { PlayerPotentialBand } from "@/lib/data/olyDataTypes";
+
 export type ScoutingHubV2WatchTarget = {
   playerId: string;
   playerName: string;
   className: string;
   marketValue: string;
   baseInfoSummary: string;
+  pow?: number | null;
+  spe?: number | null;
+  men?: number | null;
+  soc?: number | null;
+  caOverall?: number | null;
+  caPow?: number | null;
+  caSpe?: number | null;
+  caMen?: number | null;
+  caSoc?: number | null;
+  caDisplay?: string | null;
+  poDisplay?: string | null;
+  poMin?: number | null;
+  poMax?: number | null;
+  poPow?: number | null;
+  poSpe?: number | null;
+  poMen?: number | null;
+  poSoc?: number | null;
+  potentialGap?: number | null;
+  potentialScore?: number | null;
+  potentialBand?: PlayerPotentialBand | null;
 };
 
 export type ScoutingHubV2PipelineRecord = {
@@ -21,6 +43,8 @@ export type ScoutingHubV2PipelineSummary = {
   records: ScoutingHubV2PipelineRecord[];
 };
 
+export type ScoutingHubV2TabId = "overview" | "reports" | "recommended";
+
 export type ScoutingHubV2ClientProps = {
   teamName: string;
   scoutingFacilityLevel: number;
@@ -36,8 +60,10 @@ export type ScoutingHubV2ClientProps = {
   baseInfoAlwaysVisible: string[];
   watchTargets: ScoutingHubV2WatchTarget[];
   scoutPipeline?: ScoutingHubV2PipelineSummary | null;
+  activeTab?: ScoutingHubV2TabId;
+  onActiveTabChange?: (tab: ScoutingHubV2TabId) => void;
+  hideSubNav?: boolean;
   onOpenMarket: () => void;
-  onOpenHomeV2: () => void;
   onOpenPlayer: (playerId: string) => void;
 };
 

@@ -34,7 +34,7 @@ describe("foundation home v2 ui contract", () => {
     expect(routingText).toContain('if (view === "hq") return "homeV2"');
     expect(fileText).toContain("<HomeV2Client");
     expect(fileText).toContain("onOpenOffice");
-    expect(fileText).toContain('onOpenClassicHome={() => setFoundationView("home", setActiveView)}');
+    expect(fileText).not.toContain('onOpenClassicHome={() => setFoundationView("home", setActiveView)}');
   });
 
   it("keeps the Velo-inspired dashboard focused on top players, KPIs and flow actions", async () => {
@@ -55,6 +55,29 @@ describe("foundation home v2 ui contract", () => {
     expect(fileText).toContain('data-testid="foundation-home-v2"');
   });
 
+  it("shows grade letters on orbit chips and potential band on top player cards", async () => {
+    const [homeText, typesText, foundationText] = await Promise.all([
+      fs.readFile(homeV2Path, "utf8"),
+      fs.readFile(
+        "/Users/chrisfalk/Documents/Codex/Olympiade der Welten/app/foundation/home-v2/home-v2-types.ts",
+        "utf8",
+      ),
+      fs.readFile(foundationClientPath, "utf8"),
+    ]);
+
+    // Grade letters on orbit row
+    expect(homeText).toContain("showGrade");
+    // Potential band pill
+    expect(homeText).toContain('data-testid="home-player-potential-band"');
+    expect(homeText).toContain("getPotentialBandLabel");
+    // Types extended
+    expect(typesText).toContain("potential?");
+    expect(typesText).toContain("potentialBand?");
+    // Foundation populates the fields
+    expect(foundationText).toContain("getPotentialBand");
+    expect(foundationText).toContain("player.potential");
+  });
+
   it("wires the modern v2 layout classes", async () => {
     const cssText = await fs.readFile(globalsPath, "utf8");
 
@@ -68,13 +91,14 @@ describe("foundation home v2 ui contract", () => {
 describe("foundation ui v2 roadmap contract", () => {
   it("routes preview navigation for facilities, scouting hub and inbox v2", async () => {
     const fileText = await fs.readFile(foundationClientPath, "utf8");
+    const navText = await fs.readFile(navConfigPath, "utf8");
 
     expect(fileText).toContain('| "facilitiesOverviewV2"');
     expect(fileText).toContain('| "scoutingCenterV2"');
     expect(fileText).toContain('| "inboxV2"');
     expect(fileText).toContain("<ScoutingCenterV2Client");
     expect(fileText).toContain("<InboxV2Client");
-    expect(fileText).toContain('label: "Inbox"');
+    expect(navText).toContain('{ id: "inboxV2", label: "Inbox"');
     expect(fileText).toContain('label: "Scouting Hub"');
     expect(fileText).toContain("getTransfermarktScoutingVisibilityBuckets");
   });

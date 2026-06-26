@@ -84,7 +84,6 @@ type TransferHistoryV2ClientProps = {
   onResetFilters: () => void;
   onOpenPlayer: (playerId: string) => void;
   onOpenTeam: (teamId: string) => void;
-  onOpenClassic?: (() => void) | null;
 };
 
 type ActivityCard = {
@@ -220,7 +219,6 @@ export default function TransferHistoryV2Client({
   onResetFilters,
   onOpenPlayer,
   onOpenTeam,
-  onOpenClassic,
 }: TransferHistoryV2ClientProps) {
   const [selectedTransferId, setSelectedTransferId] = useState<string | null>(visibleRows[0]?.transferId ?? null);
 
@@ -271,11 +269,6 @@ export default function TransferHistoryV2Client({
             </span>
           </div>
         </div>
-        {onOpenClassic ? (
-          <button className="secondary-button inline-button" type="button" onClick={onOpenClassic}>
-            Klassische Tabelle
-          </button>
-        ) : null}
       </div>
 
       <section className="transfer-history-v2-filters panel">
@@ -434,24 +427,39 @@ export default function TransferHistoryV2Client({
           <div className="transfer-history-v2-timeline">
             {latestRows.length ? (
               latestRows.map((row) => (
-                <button
+                <div
                   key={row.transferId}
-                  type="button"
+                  role="button"
+                  tabIndex={0}
                   className={`transfer-history-v2-timeline-card ${getTransferTone(row.type)}${selectedRow?.transferId === row.transferId ? " is-selected" : ""}`}
                   onClick={() => setSelectedTransferId(row.transferId)}
-                  onDoubleClick={() => onOpenPlayer(row.playerId)}
+                  onKeyDown={(event) => {
+                    if (event.key === "Enter" || event.key === " ") {
+                      event.preventDefault();
+                      setSelectedTransferId(row.transferId);
+                    }
+                  }}
                 >
                   <div className="transfer-history-v2-timeline-head">
                     <span className={`transfer-status-pill ${getTransferTone(row.type)}`}>{formatTransferType(row.type)}</span>
                     <small>{new Date(row.happenedAt).toLocaleString("de-DE")}</small>
                   </div>
-                  <strong>{row.playerName}</strong>
+                  <button
+                    type="button"
+                    className="table-link-button transfer-history-v2-player-link"
+                    onClick={(event) => {
+                      event.stopPropagation();
+                      onOpenPlayer(row.playerId);
+                    }}
+                  >
+                    {row.playerName}
+                  </button>
                   <span className="muted">{getTimelineTargetLabel(row)}</span>
                   <div className="transfer-history-v2-timeline-meta">
                     <span>{formatTransfermarktCurrency(row.fee)}</span>
                     <span>{row.phase ?? row.matchdayId ?? row.seasonLabel}</span>
                   </div>
-                </button>
+                </div>
               ))
             ) : (
               <div className="transfer-market-empty-card">
@@ -495,24 +503,38 @@ export default function TransferHistoryV2Client({
                 />
                 <div className="stack">
                   <span className={`transfer-status-pill ${getTransferTone(selectedRow.type)}`}>{formatTransferType(selectedRow.type)}</span>
-                  <strong className="transfer-history-v2-player-name">{selectedRow.playerName}</strong>
+                  <button
+                    type="button"
+                    className="table-link-button transfer-history-v2-player-name"
+                    onClick={() => onOpenPlayer(selectedRow.playerId)}
+                  >
+                    {selectedRow.playerName}
+                  </button>
                   <div className="transfer-history-v2-icon-row">
                     <ClassIcon classNameValue={selectedRow.className} className="table-identity-icon-chip" iconClassName="table-identity-icon-image" />
                     <RaceIcon race={selectedRow.race} className="table-identity-icon-chip" iconClassName="table-identity-icon-image" />
                   </div>
-                  <div className="transfer-history-v2-action-row">
-                    <button className="primary-button inline-button" type="button" onClick={() => onOpenPlayer(selectedRow.playerId)}>
-                      Spieler öffnen
-                    </button>
-                    {selectedRow.toTeamId ? (
-                      <button className="secondary-button inline-button" type="button" onClick={() => onOpenTeam(selectedRow.toTeamId!)}>
-                        Zielteam
+                  <div className="transfer-history-v2-team-route">
+                    {selectedRow.fromTeamId && selectedRow.fromTeamName ? (
+                      <button
+                        type="button"
+                        className="table-link-button"
+                        onClick={() => onOpenTeam(selectedRow.fromTeamId!)}
+                      >
+                        {selectedRow.fromTeamName}
                       </button>
                     ) : null}
-                    {selectedRow.fromTeamId ? (
-                      <button className="secondary-button inline-button" type="button" onClick={() => onOpenTeam(selectedRow.fromTeamId!)}>
-                        Ursprungsteam
+                    {selectedRow.fromTeamName || selectedRow.toTeamName ? <span aria-hidden="true">→</span> : null}
+                    {selectedRow.toTeamId && selectedRow.toTeamName ? (
+                      <button
+                        type="button"
+                        className="table-link-button"
+                        onClick={() => onOpenTeam(selectedRow.toTeamId!)}
+                      >
+                        {selectedRow.toTeamName}
                       </button>
+                    ) : selectedRow.toTeamName ? (
+                      <span>{selectedRow.toTeamName}</span>
                     ) : null}
                   </div>
                 </div>
@@ -623,7 +645,7 @@ export default function TransferHistoryV2Client({
             </thead>
             <tbody>
               {visibleRows.map((row) => (
-                <tr key={`table-${row.transferId}`} onDoubleClick={() => onOpenPlayer(row.playerId)}>
+                <tr key={`table-${row.transferId}`}>
                   <td>
                     <div className="table-player-cell">
                       <strong>{new Date(row.happenedAt).toLocaleDateString("de-DE")}</strong>
@@ -638,8 +660,29 @@ export default function TransferHistoryV2Client({
                   <td><span className={`transfer-status-pill ${getTransferTone(row.type)}`}>{formatTransferType(row.type)}</span></td>
                   <td>
                     <div className="table-player-cell">
-                      <strong>{row.toTeamName ?? row.fromTeamName ?? "Free Agent"}</strong>
-                      <span>{row.fromTeamName ? `${row.fromTeamName} → ${row.toTeamName ?? "FA"}` : row.toTeamName ?? "—"}</span>
+                      {row.fromTeamId && row.fromTeamName ? (
+                        <button
+                          className="table-link-button"
+                          type="button"
+                          onClick={() => onOpenTeam(row.fromTeamId!)}
+                        >
+                          {row.fromTeamName}
+                        </button>
+                      ) : (
+                        <strong>{row.fromTeamName ?? "Free Agent"}</strong>
+                      )}
+                      <span>
+                        {row.fromTeamName ? `${row.fromTeamName} → ${row.toTeamName ?? "FA"}` : row.toTeamName ?? "—"}
+                      </span>
+                      {row.toTeamId && row.toTeamName ? (
+                        <button
+                          className="table-link-button"
+                          type="button"
+                          onClick={() => onOpenTeam(row.toTeamId!)}
+                        >
+                          {row.toTeamName}
+                        </button>
+                      ) : null}
                     </div>
                   </td>
                   <td>{formatTransfermarktCurrency(row.fee)}</td>

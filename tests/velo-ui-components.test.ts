@@ -23,10 +23,10 @@ describe("velo ui rollout contract", () => {
     expect(cssText).toContain(".season-v2-team-card-grid");
   });
 
-  it("wires teams v2 into foundation navigation", async () => {
+  it("wires classic teams v1 economy tiles into foundation", async () => {
     const fileText = await fs.readFile(foundationClientPath, "utf8");
-    expect(fileText).toContain("TeamsV2Client");
-    expect(fileText).toContain("teamsV2FocusCards");
+    expect(fileText).toContain("teamEconomyTiles");
+    expect(fileText).toContain("teams-v2-focus-card");
   });
 
   it("wires velo rollout across lineup, arena, drawer and facilities", async () => {

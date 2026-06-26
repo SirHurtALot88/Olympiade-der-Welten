@@ -448,8 +448,18 @@ describe("player detail drawer", () => {
 
   it("exposes scout potential as a range and training modifier", () => {
     const player = createPlayer({ id: "player-potential", potential: 86 });
+    const gameState = createGameState({ player, withRoster: true });
+    gameState.playerPotential = [
+      {
+        playerId: player.id,
+        potentialBand: "high",
+        hiddenPotentialScore: 86,
+        confidence: 0,
+        source: "generated",
+      },
+    ];
     const data = buildPlayerDrawerDataFromGameState({
-      gameState: createGameState({ player, withRoster: true }),
+      gameState,
       playerId: player.id,
       source: "sqlite",
     });
@@ -969,5 +979,69 @@ describe("player detail drawer", () => {
     expect(data?.progressionForecast?.audit.productiveWrites).toBe(false);
     expect(data?.disciplineValues.find((entry) => entry.id === "pow-d")?.upgradeDelta).toBe(2);
     expect(data?.disciplineValues.find((entry) => entry.id === "spe-d")?.upgradeDelta).toBe(0);
+  });
+
+  it("exposes potential delta and route state for own roster players", () => {
+    const player = createPlayer({
+      id: "own-roster-potential",
+      attributeSheetStats: {
+        power: 58,
+        health: 52,
+        stamina: 50,
+        speed: 28,
+        dexterity: 24,
+        awareness: 22,
+        intelligence: 26,
+        will: 24,
+        charisma: 30,
+        spirit: 28,
+        determination: 32,
+        torment: 40,
+      },
+    });
+    const gameState = createGameState({ player, withRoster: true });
+    gameState.playerPotential = [
+      {
+        playerId: player.id,
+        potentialBand: "high",
+        hiddenPotentialScore: 80,
+        confidence: 0,
+        source: "generated",
+        hiddenPotentialOverallStars: 4,
+        hiddenPotentialCeilingByAxis: { pow: 4, spe: 2, men: 2, soc: 3.5 },
+        hiddenAttributeCeiling: {
+          power: 70,
+          health: 68,
+          stamina: 66,
+          speed: 55,
+          dexterity: 52,
+          awareness: 50,
+          intelligence: 48,
+          will: 46,
+          charisma: 58,
+          spirit: 56,
+          determination: 60,
+          torment: 62,
+        },
+        lastSeasonSnapshot: {
+          seasonId: "season-0",
+          hiddenPotentialScore: 78,
+          overallStars: 4.5,
+          byAxis: { pow: 4.5, spe: 2.5, men: 2, soc: 3.5 },
+        },
+      },
+    ];
+
+    const data = buildPlayerDrawerDataFromGameState({
+      gameState,
+      playerId: player.id,
+      source: "sqlite",
+    });
+
+    expect(data?.potentialOverallStars).toBe(4);
+    expect(data?.potentialOverallDelta).toBe(-0.5);
+    expect(data?.potentialAxisStatus.some((entry) => entry.axis === "pow" && entry.routeState === "open")).toBe(true);
+    expect(data?.trainingRouteImpact?.note).toContain("POW");
+    expect(data?.attributeCeilingPreview.length).toBeGreaterThan(0);
   });
 });

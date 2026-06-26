@@ -210,6 +210,33 @@ function getDeltaToneClass(value: number | null | undefined) {
   return " is-neutral";
 }
 
+function formatAxisStarValue(value: number | null | undefined) {
+  if (value == null || !Number.isFinite(value)) {
+    return "—";
+  }
+  return `${value % 1 === 0 ? value.toFixed(0) : value.toFixed(1)}★`;
+}
+
+function formatStarDelta(value: number | null | undefined) {
+  if (value == null || !Number.isFinite(value) || value === 0) {
+    return null;
+  }
+  const prefix = value > 0 ? "+" : "";
+  return `${prefix}${value % 1 === 0 ? value.toFixed(0) : value.toFixed(1)}★`;
+}
+
+function getRouteStateChipClass(state: "open" | "closing" | "capped") {
+  if (state === "capped") return " is-negative";
+  if (state === "closing") return " is-neutral";
+  return " is-positive";
+}
+
+function getCeilingStateChipClass(state: "open" | "closing" | "capped") {
+  if (state === "capped") return " is-negative";
+  if (state === "closing") return " is-neutral";
+  return "";
+}
+
 function getMoneyDeltaToneClass(value: number | null | undefined, positiveDirection: "higher" | "lower") {
   if (value == null || !Number.isFinite(value) || Math.abs(value) < 0.01) {
     return "";
@@ -753,6 +780,7 @@ export default function PlayerDetailDrawer({
   onClose,
   onOpenBuyPreview,
   layerClassName = "",
+  variant = "drawer",
 }: {
   data: PlayerDetailDrawerData | null;
   onClose: () => void;
@@ -763,6 +791,7 @@ export default function PlayerDetailDrawer({
     race: string | null;
   }) => void;
   layerClassName?: string;
+  variant?: "drawer" | "page";
 }) {
   const [selectedAxisId, setSelectedAxisId] = useState<string | null>(null);
   const [topDisciplineColumnOrder, setTopDisciplineColumnOrder] = useState<TopDisciplineColumnId[]>(TOP_DISCIPLINE_COLUMN_ORDER);
@@ -773,7 +802,7 @@ export default function PlayerDetailDrawer({
   const [draggedTopDisciplineColumnId, setDraggedTopDisciplineColumnId] = useState<TopDisciplineColumnId | null>(null);
 
   useEffect(() => {
-    if (!data) {
+    if (!data || variant === "page") {
       return undefined;
     }
 
@@ -785,7 +814,7 @@ export default function PlayerDetailDrawer({
 
     window.addEventListener("keydown", handleEscape);
     return () => window.removeEventListener("keydown", handleEscape);
-  }, [data, onClose]);
+  }, [data, onClose, variant]);
 
   useEffect(() => {
     setSelectedAxisId(null);
@@ -874,6 +903,8 @@ export default function PlayerDetailDrawer({
   const developmentPreviewByAttribute = new Map<string, NonNullable<PlayerDetailDrawerData["developmentLevelup"]>["upgradePreview"][number]>(
     (developmentLevelup?.upgradePreview ?? []).map((entry) => [entry.attribute, entry] as const),
   );
+  const attributeCeilingByKey = new Map(data.attributeCeilingPreview.map((entry) => [entry.attribute, entry] as const));
+  const showOwnPotentialSnapshot = !isScoutedProfile && data.potentialOverallStars != null;
   const aiDevelopmentPlanByAttribute = new Map<string, { steps: number; cost: number; reasons: string[] }>();
   if (data.teamHumanControlled === false) {
     for (const row of developmentLevelup?.aiAllocation.spendPlan ?? []) {
@@ -918,20 +949,9 @@ export default function PlayerDetailDrawer({
     },
   ] as const;
 
-  return (
-    <div
-      className={`player-drawer-backdrop${layerClassName ? ` ${layerClassName}` : ""}`}
-      role="presentation"
-      onClick={onClose}
-    >
-      <aside
-        className={`player-drawer player-drawer-dashboard ${getClassColorClassName(data.className, "player-drawer-class-frame")}`}
-        role="dialog"
-        aria-modal="true"
-        aria-label={`${data.name} Details`}
-        onClick={(event) => event.stopPropagation()}
-      >
-        <div className="player-drawer-header">
+  const profileContent = (
+    <>
+          <div className="player-drawer-header">
           <div className="player-drawer-hero">
             {data.portraitUrl ? (
               <OptimizedMediaImage
@@ -1132,7 +1152,7 @@ export default function PlayerDetailDrawer({
                   <strong>{formatMoney(data.marketValue)}</strong>
                   {marketValueDelta != null ? (
                     <small className={`player-drawer-money-delta${getMoneyDeltaToneClass(marketValueDelta, "higher")}`}>
-                      ({formatSignedMoney(marketValueDelta)})
+                      {formatSignedMoney(marketValueDelta)}
                     </small>
                   ) : null}
                 </div>
@@ -1143,7 +1163,7 @@ export default function PlayerDetailDrawer({
                   <strong>{formatMoney(data.salary)}</strong>
                   {salaryDelta != null ? (
                     <small className={`player-drawer-money-delta${getMoneyDeltaToneClass(salaryDelta, "lower")}`}>
-                      ({formatSignedMoney(salaryDelta)})
+                      {formatSignedMoney(salaryDelta)}
                     </small>
                   ) : null}
                 </div>
@@ -1421,6 +1441,7 @@ export default function PlayerDetailDrawer({
             <div className="player-drawer-attribute-grid">
               {data.attributeStats.map((entry) => {
                 const preview = data.attributeVisibility === "exact" ? developmentPreviewByAttribute.get(entry.key) : null;
+                const ceilingPreview = data.attributeVisibility === "exact" ? attributeCeilingByKey.get(entry.key as never) : null;
                 const aiPlan = data.attributeVisibility === "exact" ? aiDevelopmentPlanByAttribute.get(entry.key) : null;
                 const showExactAttribute = entry.value != null;
                 const showRangeAttribute = data.attributeVisibility === "scouted" && entry.revealed && entry.rangeLabel;
@@ -1495,6 +1516,19 @@ export default function PlayerDetailDrawer({
                           }. ${data.teamHumanControlled === false && aiPlan ? aiPlan.reasons.join(" · ") : preview.reason}`}
                         >
                           {data.teamHumanControlled === false && aiPlan ? `${aiPlan.cost} TP Auto` : getAffinityChipText(preview.finalCost)}
+                        </span>
+                      ) : null}
+                      {ceilingPreview && ceilingPreview.state !== "open" ? (
+                        <span
+                          className={`player-drawer-chip${getCeilingStateChipClass(ceilingPreview.state)}`}
+                          title={`Trainingswachstum ×${formatValue(ceilingPreview.growthMultiplier, 2)}`}
+                        >
+                          {ceilingPreview.headroomLabel}
+                        </span>
+                      ) : null}
+                      {preview?.ceilingState === "capped" && preview.blocked ? (
+                        <span className="player-drawer-chip is-negative" title={preview.reason}>
+                          Limit
                         </span>
                       ) : null}
                     </div>
@@ -1654,10 +1688,51 @@ export default function PlayerDetailDrawer({
             </section>
           ) : null}
 
-          {showScoutedDevelopmentSection && (data.scoutPotential || data.progressionForecast) ? (
+          {showScoutedDevelopmentSection && (data.scoutPotential || data.progressionForecast || showOwnPotentialSnapshot) ? (
             <section className="player-drawer-section player-drawer-panel" id={developmentLevelup ? undefined : "player-drawer-development"}>
               <h3 title="Kurzfassung: Potential, XP-Bilanz und Upgrade-Status. Details koennen aufgeklappt werden.">Potential & XP</h3>
               <div className="player-drawer-list-grid player-drawer-list-grid-wide">
+                {showOwnPotentialSnapshot ? (
+                  <article className="metric-card player-drawer-scout-potential-card" title="Achsen-Potential mit Saison-Delta und Route-Status fuer den eigenen Kader.">
+                    <HelpLabel title="PO = geschaetzte Achsen-Decke. Delta zeigt die Veraenderung seit der letzten Saison.">Achsen-Potential</HelpLabel>
+                    <strong className="player-drawer-star-stack">
+                      PO {formatAxisStarValue(data.potentialOverallStars)}
+                      {data.potentialOverallDelta != null ? (
+                        <span className={`player-drawer-delta${getDeltaToneClass(data.potentialOverallDelta)}`}>
+                          {formatStarDelta(data.potentialOverallDelta)}
+                        </span>
+                      ) : null}
+                    </strong>
+                    <small>
+                      {data.potentialAxisStatus
+                        .map((entry) => `${entry.axis.toUpperCase().slice(0, 1)} ${formatAxisStarValue(entry.poStars)}`)
+                        .join(" · ")}
+                    </small>
+                    {data.potentialOverallDeltaSourceLabel ? (
+                      <small>{data.potentialOverallDeltaSourceLabel}</small>
+                    ) : null}
+                    {data.trainingRouteImpact ? (
+                      <small>
+                        Trainingsrate {data.trainingRouteImpact.primaryAxis.toUpperCase()} ×
+                        {formatValue(data.trainingRouteImpact.growthMultiplier, 2)} · {data.trainingRouteImpact.note}
+                      </small>
+                    ) : null}
+                    {data.potentialAxisStatus.length ? (
+                      <div className="player-drawer-chip-row">
+                        {data.potentialAxisStatus.map((entry) => (
+                          <span
+                            key={`axis-po-${entry.axis}`}
+                            className={`player-drawer-chip${getRouteStateChipClass(entry.routeState)}`}
+                            title={entry.label}
+                          >
+                            {entry.axis.toUpperCase()} {formatAxisStarValue(entry.poStars)}
+                            {entry.deltaStars != null ? ` (${formatStarDelta(entry.deltaStars)})` : ""}
+                          </span>
+                        ))}
+                      </div>
+                    ) : null}
+                  </article>
+                ) : null}
                 {data.scoutPotential ? (
                   <article className="metric-card player-drawer-scout-potential-card" title="Potential ist eine gescoutete Spanne, nicht garantiert. Current ist der aktuelle Leistungswert, Gap ist der Abstand zum geschaetzten Potential. Je niedriger Confidence, desto unsicherer die Spanne.">
                     <HelpLabel title="Potential-Spanne = geschaetzter Zielbereich. Current = aktueller Stand. Gap = moegliche Entwicklung. Confidence zeigt, wie sicher das Scouting ist.">Potential</HelpLabel>
@@ -1984,6 +2059,35 @@ export default function PlayerDetailDrawer({
             )}
           </section>
         </div>
+    </>
+  );
+
+  if (variant === "page") {
+    return (
+      <div className="player-profile-shell" data-testid="foundation-player-profile">
+        <div
+          className={`player-drawer player-drawer-dashboard player-drawer-page ${getClassColorClassName(data.className, "player-drawer-class-frame")}`}
+        >
+          {profileContent}
+        </div>
+      </div>
+    );
+  }
+
+  return (
+    <div
+      className={`player-drawer-backdrop${layerClassName ? ` ${layerClassName}` : ""}`}
+      role="presentation"
+      onClick={onClose}
+    >
+      <aside
+        className={`player-drawer player-drawer-dashboard ${getClassColorClassName(data.className, "player-drawer-class-frame")}`}
+        role="dialog"
+        aria-modal="true"
+        aria-label={`${data.name} Details`}
+        onClick={(event) => event.stopPropagation()}
+      >
+        {profileContent}
       </aside>
     </div>
   );

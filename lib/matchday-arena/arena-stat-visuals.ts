@@ -97,6 +97,26 @@ export function getArenaAxisValueTier(value: number | null | undefined): ArenaAx
   return "low";
 }
 
+/** Absolute letter grade for core stats (POW/SPE/MEN/SOC, scale ~25-75).
+ * S  = 70+ (star-level)
+ * A  = 60+ (strong / Liga-gut)
+ * B  = 50+ (solid / Durchschnitt)
+ * C  = 40+ (below average)
+ * D  = 30+ (poor)
+ * F  = below 30
+ */
+export type CoreStatGrade = "S" | "A" | "B" | "C" | "D" | "F";
+
+export function getCoreStatGrade(value: number | null | undefined): CoreStatGrade {
+  if (value == null || !Number.isFinite(value)) return "F";
+  if (value >= 70) return "S";
+  if (value >= 60) return "A";
+  if (value >= 50) return "B";
+  if (value >= 40) return "C";
+  if (value >= 30) return "D";
+  return "F";
+}
+
 export type ArenaRankFields = {
   rankInSlotBase: number | null;
   rankTotalBase: number | null;

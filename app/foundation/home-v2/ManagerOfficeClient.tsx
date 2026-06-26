@@ -2,7 +2,7 @@
 
 import { VeloImpactStrip, VeloStatOrbitRow } from "@/components/foundation/velo-ui";
 import type { GmStoryView } from "@/lib/foundation/gm-story";
-import type { TeamControlMode } from "@/lib/data/olyDataTypes";
+import type { GameInboxItem, TeamControlMode } from "@/lib/data/olyDataTypes";
 import type { FoundationViewId } from "@/lib/foundation/foundation-view-routing";
 
 function formatMoney(value: number) {
@@ -60,12 +60,6 @@ type ManagerActionCard = {
 
 type ManagerPriorityCard = ManagerActionCard & {
   accent: string;
-};
-
-type HqInboxItem = {
-  itemId: string;
-  title: string;
-  description: string;
 };
 
 type HqWishlistEntry = {
@@ -134,7 +128,7 @@ export type ManagerOfficeClientProps = {
     weakestTwo: HqAxisEntry[];
     strongest: HqAxisEntry | null;
   } | null;
-  selectedHqInboxItems: HqInboxItem[];
+  selectedHqInboxItems: GameInboxItem[];
   selectedHqGmStory: GmStoryView | null;
   selectedTeam: { teamId?: string; name?: string; shortCode?: string } | null;
   selectedTeamControl: { controlMode: TeamControlMode | null } | null;
@@ -147,7 +141,7 @@ export type ManagerOfficeClientProps = {
   rosterPlayers: unknown[];
   onNavigate: (view: FoundationViewId) => void;
   onOpenTeam: (teamId: string) => void;
-  onNavigateInboxItem: (item: { itemId: string; title: string; description: string }) => void;
+  onNavigateInboxItem: (item: GameInboxItem) => void;
 };
 
 export function ManagerOfficeClient({
@@ -232,7 +226,7 @@ export function ManagerOfficeClient({
 	                onClick: () => onNavigate("prize"),
 	              },
 	              {
-	                key: "inbox",
+	                key: "inboxV2",
 	                eyebrow: "Sofort",
 	                title: activeTeamOpenInboxItems.length > 0 ? "Inbox öffnen" : "Keine harten To-dos",
 	                detail:
@@ -241,7 +235,7 @@ export function ManagerOfficeClient({
 	                meta: activeTeamCriticalInboxItems.length > 0 ? `Kritisch: ${activeTeamCriticalInboxItems.length}` : `${activeTeamOpenInboxItems.length} offen`,
                   priority: activeTeamCriticalInboxItems.length > 0 ? 86 : activeTeamOpenInboxItems.length > 0 ? 68 : 36,
 	                tone: activeTeamOpenInboxItems.length > 0 ? "warning" : "ready",
-	                onClick: () => onNavigate("inbox"),
+	                onClick: () => onNavigate("inboxV2"),
 	              },
 	            ]);
 	            const seasonCards = sortManagerCards([
@@ -558,18 +552,7 @@ export function ManagerOfficeClient({
                           }}
                         />
                       ) : null}
-	                    <div className="foundation-home-actions">
-	                      <button className="primary-button inline-button" type="button" onClick={() => onNavigate("lineup")}>
-	                        Einsatz planen
-	                      </button>
-	                      <button className="secondary-button inline-button" type="button" onClick={() => onNavigate("marketV2")}>
-	                        Markt prüfen
-	                      </button>
-	                      <button className="secondary-button inline-button" type="button" onClick={() => onNavigate("inbox")}>
-	                        Inbox öffnen
-	                      </button>
-	                    </div>
-	                  </article>
+                  </article>
 	                </div>
                   {selectedTeamGeneralManager && selectedHqGmStory ? (
                     <div

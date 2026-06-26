@@ -130,13 +130,18 @@ import {
 } from "@/lib/foundation/team-general-managers";
 import { buildGmStoryView } from "@/lib/foundation/gm-story";
 import { getFormCardFlowStatus } from "@/lib/foundation/form-card-flow";
-import { getMatchdayArenaReadiness, mergeFormCardPlansIntoGameState } from "@/lib/foundation/matchday-arena-readiness";
+import {
+  formatLineupOperationalGapDetail,
+  getMatchdayArenaReadiness,
+  mergeFormCardPlansIntoGameState,
+} from "@/lib/foundation/matchday-arena-readiness";
 import {
   getLineupDraftSideCounts,
   getMatchdayLineupSideRequirements,
   getTeamMatchdayLineupDraft,
   getTeamMatchdayLineupOpenSlots,
   isTeamMatchdayLineupComplete,
+  isTeamMatchdayLineupOperationallyReady,
   isTeamMatchdayLineupSubmitted,
   mergeTeamLineupDraftIntoGameState,
 } from "@/lib/foundation/matchday-lineup-readiness";
@@ -200,6 +205,7 @@ import { getTeamSponsorContract, getTeamSponsorOffers } from "@/lib/sponsor/spon
 import { applySponsorNegotiationToComponents, getSponsorNegotiationMultiplier } from "@/lib/sponsor/sponsor-negotiation";
 import type { SponsorNegotiationProfile } from "@/lib/data/olyDataTypes";
 import { buildScoutPipelineSummary } from "@/lib/scouting/facility-scout-pipeline-service";
+import { buildScoutingWatchTargetStarFields } from "@/lib/scouting/player-star-scouting-bridge";
 import { getTransfermarktBracket } from "@/lib/market/transfermarkt-fit";
 import { getTeamPowerOptions } from "@/lib/lineups/team-powers";
 import { getDisciplineColor, getSeasonDisciplineSchedule } from "@/lib/season/season-discipline-schedule";
@@ -232,6 +238,7 @@ import type {
   SeasonEndXpSpendPreview,
   SeasonEndXpSpendApplyResult,
 } from "@/lib/progression/season-end-xp-apply-service";
+import { getPotentialBand } from "@/lib/progression/player-potential-service";
 import {
   appendRoomContextToParams,
   readFoundationRoomContextFromLocation,
@@ -256,12 +263,30 @@ import type { RoomRealtimeEvent } from "@/types/game";
 import { VeloImpactStrip, VeloStatOrbitRow } from "@/components/foundation/velo-ui";
 import FoundationPanelSkeleton from "@/components/foundation/FoundationPanelSkeleton";
 import { normalizeFoundationViewParam, getDefaultFoundationViewTarget, type FoundationViewId } from "@/lib/foundation/foundation-view-routing";
-import { parseFoundationPlayerIdFromUrl, parseFoundationTabFromUrl, syncFoundationUrlState } from "@/lib/foundation/foundation-url-state";
+import {
+  canFoundationNavigateBack,
+  foundationNavigateBack,
+  mergeFoundationHistoryReplaceState,
+  parseFoundationFacilityFromUrl,
+  parseFoundationPanelFromUrl,
+  parseFoundationUrlStateFromLocation,
+  readFoundationHistoryState,
+  writeFoundationUrlState,
+  type FoundationPanelId,
+} from "@/lib/foundation/foundation-navigation-history";
+import { parseFoundationPlayerIdFromUrl, parseFoundationTabFromUrl, syncFoundationUrlState, type FoundationUrlState } from "@/lib/foundation/foundation-url-state";
+import { useFoundationKeyboardNavigation } from "@/lib/foundation/use-foundation-keyboard-navigation";
 import FoundationShell from "@/app/foundation/shell/FoundationShell";
 import FoundationSubNav from "@/app/foundation/shell/FoundationSubNav";
-import type { PlayerProfileTabId } from "@/lib/foundation/player-profile-service";
+import { PLAYER_PROFILE_TABS, type PlayerProfileTabId } from "@/lib/foundation/player-profile-service";
 
-const PlayerDetailDrawer = dynamic(() => import("@/app/foundation/PlayerDetailDrawer"), { ssr: false });
+const PlayerProfileClient = dynamic(() => import("@/app/foundation/player-profile/PlayerProfileClient"), {
+  ssr: false,
+});
+const TeamProfileClient = dynamic(() => import("@/app/foundation/team-profile/TeamProfileClient"), {
+  ssr: false,
+  loading: () => null,
+});
 const PlayerGeneratorPanel = dynamic(() => import("@/app/foundation/PlayerGeneratorPanel"), { ssr: false });
 const MatchdayArenaV2Client = dynamic(() => import("@/app/foundation/matchday-arena-v2/MatchdayArenaV2Client"), { ssr: false });
 const TransfermarktV2Client = dynamic(() => import("@/app/foundation/transfermarkt-v2/TransfermarktV2Client"), {
@@ -269,10 +294,6 @@ const TransfermarktV2Client = dynamic(() => import("@/app/foundation/transfermar
   loading: () => <FoundationPanelSkeleton variant="marketV2" label="Transfermarkt wird geladen…" />,
 });
 const TransferHistoryV2Client = dynamic(() => import("@/app/foundation/transfer-history-v2/TransferHistoryV2Client"), { ssr: false });
-const TeamsV2Client = dynamic(() => import("@/app/foundation/teams-v2/TeamsV2Client"), {
-  ssr: false,
-  loading: () => <FoundationPanelSkeleton variant="teams" label="Teams werden geladen…" />,
-});
 const SeasonStandingsV2Client = dynamic(() => import("@/app/foundation/season-v2/SeasonStandingsV2Client"), { ssr: false });
 const TrainingCompactClient = dynamic(() => import("@/app/foundation/training-compact/TrainingCompactClient"), {
   ssr: false,
@@ -288,9 +309,6 @@ const ManagerOfficeClient = dynamic(
   () => import("@/app/foundation/home-v2/ManagerOfficeClient").then((mod) => mod.ManagerOfficeClient),
   { ssr: false, loading: () => null },
 );
-const PlayerProfileClient = dynamic(() => import("@/app/foundation/player-profile/PlayerProfileClient"), {
-  ssr: false,
-});
 const FacilitiesOverviewV2Client = dynamic(
   () => import("@/app/foundation/facilities-overview-v2/FacilitiesOverviewV2Client"),
   { ssr: false },
@@ -299,7 +317,6 @@ const ScoutingCenterV2Client = dynamic(() => import("@/app/foundation/scouting-c
   ssr: false,
 });
 const InboxV2Client = dynamic(() => import("@/app/foundation/inbox-v2/InboxV2Client"), { ssr: false });
-const TeamDetailDrawer = dynamic(() => import("@/app/foundation/TeamDetailDrawer"), { ssr: false });
 const LegacyLineupLabClient = dynamic(() => import("@/app/foundation/legacy-lineup-lab/LegacyLineupLabClient"), {
   ssr: false,
   loading: () => <FoundationPanelSkeleton variant="lineup" label="Einsatzliste wird geladen…" />,
@@ -337,6 +354,7 @@ type FoundationView =
   | "trainingV2"
   | "players"
   | "playerProfile"
+  | "teamProfile"
   | "ranks"
   | "diszis"
   | "prize"
@@ -3417,7 +3435,6 @@ const foundationPrimaryViews: Array<{ id: FoundationView; label: string; tooltip
 
 const foundationAdminViews: Array<{ id: FoundationView; label: string; tooltip: string }> = [
 	  { id: "cockpit", label: "Spieltag", tooltip: "Spieltag steuern, Status pruefen und naechste Phase vorbereiten." },
-	  { id: "inboxV2", label: "Inbox", tooltip: "Kompakte Master-Detail-Inbox mit Hinweisen, Storys und direkten Sprüngen." },
 	  { id: "homeV2", label: "Home v2", tooltip: "Velo-Victory-artiges Manager-Dashboard mit Top-Spielern und KPIs (Preview)." },
 	  { id: "facilitiesOverviewV2", label: "Facilities v2", tooltip: "Legacy-Overview — oeffnet jetzt die volle Gebaeude-V2 mit Save-Anbindung." },
 	  { id: "scoutingCenterV2", label: "Scouting Hub", tooltip: "Scouting-Zusammenfassung und Handoff in den Transfermarkt — kein separates Center (Preview)." },
@@ -3548,7 +3565,7 @@ function resolveFoundationPanelScrollTarget(input: {
     return "foundation-training-compact";
   }
   if (input.panel === "arena-result-summary") {
-    return "foundation-matchday-arena";
+    return "arena-result-summary";
   }
   return input.panel ?? getFoundationViewScrollTarget(input.targetView) ?? "foundation-home";
 }
@@ -3579,16 +3596,38 @@ function parseFoundationViewFromUrl() {
   return normalizeFoundationViewParam(new URL(window.location.href).searchParams.get("view"));
 }
 
-function syncFoundationViewInUrl(view: FoundationView, tab?: string | null, playerId?: string | null) {
+function syncFoundationViewInUrl(
+  view: FoundationView,
+  tab?: string | null,
+  playerId?: string | null,
+  options?: {
+    panel?: FoundationPanelId;
+    push?: boolean;
+    facilityId?: string | null;
+    facilityAction?: string | null;
+    team?: string | null;
+  },
+) {
   if (typeof window === "undefined") {
     return;
   }
 
-  syncFoundationUrlState({
-    view: view as FoundationViewId,
-    tab: tab ?? null,
-    playerId: playerId ?? null,
-  });
+  const team =
+    options?.team ??
+    (typeof window !== "undefined" ? new URL(window.location.href).searchParams.get("team") : null);
+
+  syncFoundationUrlState(
+    {
+      view: view as FoundationViewId,
+      tab: tab ?? null,
+      playerId: playerId ?? null,
+      team,
+      panel: options?.panel ?? null,
+      facilityId: options?.facilityId ?? null,
+      facilityAction: options?.facilityAction ?? null,
+    },
+    { mode: options?.push ? "push" : "replace" },
+  );
 }
 
 function resolveFoundationViewTarget(view: FoundationView): FoundationView {
@@ -3769,7 +3808,7 @@ function persistFoundationSaveMode(saveMode: FoundationSaveMode) {
   } else {
     nextUrl.searchParams.set("saveMode", saveMode);
   }
-  window.history.replaceState({}, "", nextUrl.toString());
+  mergeFoundationHistoryReplaceState(nextUrl.toString());
 }
 
 function resolveDefaultManagerTeamId(teams: Team[], settingsMap?: Record<string, TeamControlSettings> | null) {
@@ -3837,19 +3876,27 @@ function syncFoundationTeamIdInUrl(teamId: string) {
     return;
   }
 
-  const nextUrl = new URL(window.location.href);
-  nextUrl.searchParams.set("team", teamId);
-  window.history.replaceState({}, "", nextUrl.toString());
+  const current = readFoundationHistoryState();
+  syncFoundationUrlState({
+    view: (current?.view ?? parseFoundationViewFromUrl() ?? "homeV2") as FoundationViewId,
+    tab: current?.tab ?? parseFoundationTabFromUrl(),
+    playerId: current?.playerId ?? parseFoundationPlayerIdFromUrl(),
+    team: teamId,
+    panel: current?.panel ?? parseFoundationPanelFromUrl(),
+    facilityId: current?.facilityId ?? parseFoundationFacilityFromUrl().facilityId,
+    facilityAction: current?.facilityAction ?? parseFoundationFacilityFromUrl().facilityAction,
+  });
 }
 
 function setFoundationView(
   view: FoundationView,
   setActiveView: Dispatch<SetStateAction<FoundationView>>,
+  options?: { push?: boolean },
 ) {
   const applyViewChange = () => {
     const targetView = resolveFoundationViewTarget(view);
     setActiveView(targetView);
-    syncFoundationViewInUrl(targetView);
+    syncFoundationViewInUrl(targetView, null, null, { push: options?.push ?? false });
   };
   runFoundationNavigationTransition(applyViewChange);
 }
@@ -5236,7 +5283,7 @@ function formatCockpitReason(reason: string) {
     missing_formcard_selections: "Formkarten fehlen noch fuer den aktuellen Spieltag.",
     missing_formcard_pool: "Formkarten fuer diese Saison fehlen noch — bitte in der Einsatzliste erzeugen.",
     missing_lineup: "Einsatzliste ist noch nicht vollstaendig.",
-    incomplete_lineup: "Einsatzliste ist noch nicht vollstaendig — offene Slots in D1/D2 fuellen.",
+    incomplete_lineup: "Einsatzliste noch nicht spielbereit — alle Slots fuellen oder den gesamten Kader einsetzen.",
     training_missing: "Training fuer alle Kaderspieler muss zuerst gesetzt werden.",
     no_active_team: "Kein aktives Team ausgewaehlt.",
     empty_roster: "Kader ist leer — erst Spieler hinzufuegen.",
@@ -6082,23 +6129,16 @@ export default function FoundationPageClient({
   const [selectedEncyclopediaEntryId, setSelectedEncyclopediaEntryId] = useState(() => getGameEncyclopediaEntry("OVR")?.id ?? "ovr");
   const [lineupFocusRequestKey, setLineupFocusRequestKey] = useState<string | null>(null);
   const [lineupDraftBoardViewRequest, setLineupDraftBoardViewRequest] = useState<"lineup" | "formBoard" | null>(null);
-  const [transferMarketTab, setTransferMarketTab] = useState<"classic" | "v2">(() => (activeView === "marketV2" ? "v2" : "classic"));
-  const activeTransferMarketTab = activeView === "marketV2" ? "v2" : transferMarketTab;
-  const isTransferMarketViewActive = activeView === "market" || activeView === "marketV2";
-  const [transferHistoryTab, setTransferHistoryTab] = useState<"classic" | "v2">(() => (activeView === "historyV2" ? "v2" : "classic"));
-  const activeTransferHistoryTab = activeView === "historyV2" ? "v2" : transferHistoryTab;
-  const isTransferHistoryViewActive = activeView === "history" || activeView === "historyV2";
+  const [lineupDraftBoardView, setLineupDraftBoardView] = useState<"lineup" | "formBoard">("lineup");
+  const [scoutingCenterTab, setScoutingCenterTab] = useState<"overview" | "reports" | "recommended">("overview");
+  const activeTransferMarketTab = "v2" as const;
+  const isTransferMarketViewActive = activeView === "marketV2";
+  const activeTransferHistoryTab = "v2" as const;
+  const isTransferHistoryViewActive = activeView === "historyV2";
   const [showCommandPalette, setShowCommandPalette] = useState(false);
   const [commandSearch, setCommandSearch] = useState("");
   const commandSearchInputRef = useRef<HTMLInputElement | null>(null);
-  const [showTeamsComparison, setShowTeamsComparison] = useState<boolean>(false);
-  const shouldBuildTeamsHeavyComparison = activeView === "teams" && showTeamsComparison;
-
-  useEffect(() => {
-    if (activeView !== "teams") {
-      setShowTeamsComparison(false);
-    }
-  }, [activeView]);
+  const shouldBuildTeamsHeavyComparison = activeView === "teams";
   const shouldBuildDisciplineRanks =
     shouldBuildTeamsHeavyComparison ||
     activeView === "ranks" ||
@@ -6143,7 +6183,7 @@ export default function FoundationPageClient({
   const shouldLoadTransferHistoryFeed = isTransferHistoryViewActive;
   const shouldLoadPrizePreviewFeed = activeView === "prize" || activeView === "cockpit";
   const shouldLoadStandingsPreviewFeed = activeView === "season" || activeView === "cockpit" || activeView === "matchdayArena";
-  const shouldLoadSeasonManagementFeed = activeView === "home" || activeView === "homeV2" || activeView === "inbox" || activeView === "inboxV2" || activeView === "cockpit";
+  const shouldLoadSeasonManagementFeed = activeView === "homeV2" || activeView === "inboxV2" || activeView === "cockpit";
   const isFoundationBootstrapState = gameState.season.id === "loading" || selectedTeamId === "loading-team";
   const [showSeasonTopPlayerAreas, setShowSeasonTopPlayerAreas] = useState<boolean>(false);
   const [tableSorts, setTableSorts] = useState<Record<string, SortState>>({
@@ -6280,6 +6320,8 @@ export default function FoundationPageClient({
   const [marketBracketFilter, setMarketBracketFilter] = useState<string>("ALL");
   const [marketTeamId, setMarketTeamId] = useState<string>("");
   const [marketFocusPlayerId, setMarketFocusPlayerId] = useState<string | null>(null);
+  const [foundationPanel, setFoundationPanel] = useState<FoundationPanelId>(null);
+  const [foundationFacilityTarget, setFoundationFacilityTarget] = useState<{ facilityId: string; action: string } | null>(null);
   const [marketSearch, setMarketSearch] = useState<string>("");
   const [marketMaxValue, setMarketMaxValue] = useState<number>(150);
   const marketValueFilterManualRef = useRef(false);
@@ -6293,7 +6335,7 @@ export default function FoundationPageClient({
   const [marketShowAdvancedColumns, setMarketShowAdvancedColumns] = useState<boolean>(false);
   const [marketShowAutoAnalysis, setMarketShowAutoAnalysis] = useState<boolean>(false);
   const [marketShowTransferRecap, setMarketShowTransferRecap] = useState<boolean>(false);
-  const shouldLoadTransferRecapFeed = activeView === "market" && marketShowTransferRecap;
+  const shouldLoadTransferRecapFeed = false;
   const [marketRenderLimit, setMarketRenderLimit] = useState<number>(TRANSFER_MARKET_INITIAL_RENDER_LIMIT);
   const [marketLoadingMore, setMarketLoadingMore] = useState<boolean>(false);
   const [marketReloadToken, setMarketReloadToken] = useState<number>(0);
@@ -6321,7 +6363,6 @@ export default function FoundationPageClient({
   const [marketBuyPreviewContext, setMarketBuyPreviewContext] = useState<TransfermarktBuyRequestContext | null>(null);
   const [marketNegotiationOutcome, setMarketNegotiationOutcome] = useState<MarketNegotiationOutcome | null>(null);
   const [marketPreviewPlayerId, setMarketPreviewPlayerId] = useState<string | null>(null);
-  const [marketBuyModalOpen, setMarketBuyModalOpen] = useState<boolean>(false);
   const [marketBuySubject, setMarketBuySubject] = useState<TransfermarktBuyPreviewSubject | null>(null);
   const [marketSellBusy, setMarketSellBusy] = useState<boolean>(false);
   const [marketSellError, setMarketSellError] = useState<string | null>(null);
@@ -6342,8 +6383,8 @@ export default function FoundationPageClient({
   const [sponsorChoiceBusy, setSponsorChoiceBusy] = useState<string | null>(null);
   const [sponsorChoiceMessage, setSponsorChoiceMessage] = useState<string | null>(null);
   const [sponsorChoiceProfiles, setSponsorChoiceProfiles] = useState<Record<string, SponsorNegotiationProfile>>({});
-  const [marketSellModalOpen, setMarketSellModalOpen] = useState<boolean>(false);
   const [marketSellSubject, setMarketSellSubject] = useState<TransfermarktSellPreviewSubject | null>(null);
+  const isMarketSellPanelOpen = foundationPanel === "sell" && marketSellSubject != null;
   const [marketContractLengthDraft, setMarketContractLengthDraft] = useState<number | null>(null);
   const [marketContractShapeDraft, setMarketContractShapeDraft] = useState<ContractShape | null>(null);
   const [marketOfferedSalaryDraft, setMarketOfferedSalaryDraft] = useState<number | null>(null);
@@ -6382,8 +6423,7 @@ export default function FoundationPageClient({
   const [aiPickAuditFeed, setAiPickAuditFeed] = useState<FoundationAiPickAuditResetResponse | null>(null);
   const [seasonStartResetBusy, setSeasonStartResetBusy] = useState<boolean>(false);
   const [seasonStartResetFeed, setSeasonStartResetFeed] = useState<FoundationSeasonStartResetResponse | null>(null);
-  const [playerDrawerData, setPlayerDrawerData] = useState<PlayerDetailDrawerData | null>(null);
-  const [teamDrawerTeamId, setTeamDrawerTeamId] = useState<string | null>(null);
+  const [teamProfileTeamId, setTeamProfileTeamId] = useState<string | null>(null);
   const pendingTeamActivationRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   useEffect(() => () => {
@@ -6392,7 +6432,6 @@ export default function FoundationPageClient({
       pendingTeamActivationRef.current = null;
     }
   }, []);
-  const [drawerLayerOrder, setDrawerLayerOrder] = useState<"player" | "team">("player");
   const [historyFeed, setHistoryFeed] = useState<FoundationTransferHistoryResponse | null>(null);
   const [transferRecapFeed, setTransferRecapFeed] = useState<FoundationTransferRecapResponse | null>(null);
   const [resolvePreviewFeed, setResolvePreviewFeed] = useState<FoundationResolvePreviewResponse | null>(null);
@@ -6423,6 +6462,7 @@ export default function FoundationPageClient({
   const [seasonCompletionFeed, setSeasonCompletionFeed] = useState<SeasonCompletionSummaryResponse | null>(null);
   const [seasonTransitionError, setSeasonTransitionError] = useState<string | null>(null);
   const [seasonStandingsFeed, setSeasonStandingsFeed] = useState<FoundationSeasonStandingsOverviewResponse | null>(null);
+  const [seasonStandingsMode, setSeasonStandingsMode] = useState<"cards" | "table" | "gms">("table");
   const [seasonOverviewSeasonId, setSeasonOverviewSeasonId] = useState<string>(initialClientGameState.season.id);
   const seasonOverviewScopeRef = useRef(`${activeSaveId}:${initialClientGameState.season.id}`);
   const [prizePreviewFeed, setPrizePreviewFeed] = useState<FoundationPrizePreviewResponse | null>(null);
@@ -6496,8 +6536,6 @@ export default function FoundationPageClient({
   } | null>(null);
   const tableDragState = useRef<{ tableId: string; columnId: string } | null>(null);
   const marketBuyPreviewRequestVersion = useRef(0);
-  const marketBuyModalRef = useRef<HTMLElement | null>(null);
-  const marketBuyModalBodyRef = useRef<HTMLDivElement | null>(null);
   const marketSellPreviewRequestVersion = useRef(0);
   const marketFeedAbortRef = useRef<AbortController | null>(null);
   const historyFeedAbortRef = useRef<AbortController | null>(null);
@@ -6520,12 +6558,12 @@ export default function FoundationPageClient({
     setMarketBuyError(null);
     setMarketBuySuccess(null);
     setMarketBuySubject(null);
-    setMarketBuyModalOpen(false);
+    setFoundationPanel(null);
     setMarketSellPreview(null);
     setMarketSellError(null);
     setMarketSellSuccess(null);
     setMarketSellSubject(null);
-    setMarketSellModalOpen(false);
+    setFoundationPanel(null);
     setMarketAiPreviewFeed(null);
     setMarketAiSellPreviewFeed(null);
     setMarketAiPlanPreviewFeed(null);
@@ -6567,8 +6605,8 @@ export default function FoundationPageClient({
     setSeasonEndXpSpendError(null);
     setSeasonEndXpSpendSuccess(null);
     setPlannedXpUpgrades([]);
-    setPlayerDrawerData(null);
-    setTeamDrawerTeamId(null);
+    setPlayerProfileData(null);
+    setTeamProfileTeamId(null);
     setFoundationActionFeedback(null);
   }
 
@@ -7204,7 +7242,7 @@ export default function FoundationPageClient({
   async function openPlayerProfileById(
     playerId: string,
     activePlayerId?: string | null,
-    options?: { quickPeek?: boolean; tab?: PlayerProfileTabId },
+    options?: { quickPeek?: boolean; tab?: PlayerProfileTabId; push?: boolean },
   ) {
     const { buildPlayerDrawerDataFromGameState } = await import("@/lib/foundation/player-detail-drawer");
     const nextData = buildPlayerDrawerDataFromGameState({
@@ -7219,20 +7257,17 @@ export default function FoundationPageClient({
       return;
     }
 
-    if (options?.quickPeek) {
-      setPlayerDrawerData(nextData);
-      setDrawerLayerOrder("player");
-      return;
-    }
-
     setPlayerProfileData(nextData);
     setPlayerProfileTab(options?.tab ?? "overview");
     setFoundationView("playerProfile", setActiveView);
-    syncFoundationViewInUrl("playerProfile", options?.tab ?? "overview", playerId);
+    syncFoundationViewInUrl("playerProfile", options?.tab ?? "overview", playerId, {
+      push: options?.push ?? false,
+      team: selectedTeamId,
+    });
   }
 
   async function openPlayerDrawerById(playerId: string, activePlayerId?: string | null) {
-    await openPlayerProfileById(playerId, activePlayerId);
+    await openPlayerProfileById(playerId, activePlayerId, { push: true });
   }
 
   function navigateHomeTab(tab: "overview" | "office") {
@@ -7247,23 +7282,170 @@ export default function FoundationPageClient({
     scrollToFoundationTarget(target === "upgrade" ? `training-upgrade-player-${playerId}` : `training-player-${playerId}`);
   }
 
-  function closePlayerDrawer() {
-    setPlayerDrawerData(null);
-  }
-
-  function openTeamDrawerById(teamId: string) {
+  function openTeamProfileById(teamId: string) {
     if (!gameState.teams.some((team) => team.teamId === teamId)) {
       return;
     }
 
     clearPendingTeamActivation();
-    setPlayerDrawerData(null);
-    setTeamDrawerTeamId(teamId);
-    setDrawerLayerOrder("team");
+    setTeamProfileTeamId(teamId);
+    syncFoundationTeamIdInUrl(teamId);
+    setFoundationView("teamProfile", setActiveView);
+    syncFoundationUrlState({
+      view: "teamProfile",
+      tab: null,
+      playerId: null,
+      team: teamId,
+      panel: null,
+      facilityId: null,
+      facilityAction: null,
+    }, { mode: "push" });
   }
 
-  function closeTeamDrawer() {
-    setTeamDrawerTeamId(null);
+  function openTeamDrawerById(teamId: string) {
+    openTeamProfileById(teamId);
+  }
+
+  function closeTeamProfile() {
+    setTeamProfileTeamId(null);
+    setFoundationView("teams", setActiveView);
+    syncFoundationViewInUrl("teams");
+  }
+
+  function resolveSellSubjectFromPlayerId(playerId: string, teamId: string): TransfermarktSellPreviewSubject | null {
+    const player = gameState.players.find((entry) => entry.id === playerId);
+    if (!player) {
+      return null;
+    }
+
+    const activeEntry = gameState.rosters.find(
+      (entry) => entry.playerId === playerId && entry.teamId === teamId,
+    );
+    if (!activeEntry) {
+      return null;
+    }
+
+    return {
+      activePlayerId: activeEntry.id,
+      playerId: player.id,
+      playerName: player.name,
+      className: player.className,
+      race: player.race,
+      portraitUrl: player.portraitUrl ?? null,
+    };
+  }
+
+  function applyFoundationNavigationState(state: FoundationUrlState) {
+    setActiveView(state.view as FoundationView);
+    setFoundationPanel(state.panel ?? null);
+    if (state.playerId) {
+      setMarketFocusPlayerId(state.playerId);
+    }
+    if (state.facilityId) {
+      setFoundationFacilityTarget({
+        facilityId: state.facilityId,
+        action: state.facilityAction ?? "upgrade",
+      });
+    } else {
+      setFoundationFacilityTarget(null);
+    }
+    if (state.view === "teamProfile" && state.team) {
+      setTeamProfileTeamId(state.team);
+    }
+    if (state.panel === "briefing") {
+      openSeasonBriefingPanel({ push: false });
+    } else {
+      setSeasonBriefingOpen(false);
+    }
+    if (state.panel === "sell" && state.playerId && state.team) {
+      const sellSubject = resolveSellSubjectFromPlayerId(state.playerId, state.team);
+      if (sellSubject) {
+        setMarketSellSubject(sellSubject);
+        void requestTransfermarktSellPreview(sellSubject, state.team);
+      }
+    } else if (state.panel !== "sell") {
+      setMarketSellSubject(null);
+    }
+    if (state.view === "playerProfile" && state.playerId) {
+      void openPlayerProfileById(state.playerId, null, {
+        tab: (state.tab as PlayerProfileTabId | null) ?? "overview",
+      });
+    } else if (state.view !== "playerProfile") {
+      setPlayerProfileData(null);
+    }
+    if (state.view !== "teamProfile") {
+      setTeamProfileTeamId(null);
+    }
+    if (state.panel === "offer" && state.playerId) {
+      setMarketFocusPlayerId(state.playerId);
+    }
+  }
+
+  const applyFoundationNavigationStateRef = useRef(applyFoundationNavigationState);
+  applyFoundationNavigationStateRef.current = applyFoundationNavigationState;
+
+  function openMarketOfferPanel(playerId: string) {
+    setFoundationPanel("offer");
+    setMarketFocusPlayerId(playerId);
+    setFoundationView("marketV2", setActiveView);
+    syncFoundationViewInUrl("marketV2", null, playerId, {
+      panel: "offer",
+      push: true,
+      team: selectedTeamId,
+    });
+  }
+
+  function closeFoundationDrilldownPanel() {
+    if (canFoundationNavigateBack()) {
+      foundationNavigateBack();
+      return;
+    }
+
+    setFoundationPanel(null);
+    setSeasonBriefingOpen(false);
+    setMarketSellSubject(null);
+    setFoundationFacilityTarget(null);
+
+    if (activeView === "playerProfile") {
+      setPlayerProfileData(null);
+      setFoundationView("homeV2", setActiveView);
+      syncFoundationViewInUrl("homeV2", null, null, { team: selectedTeamId });
+      return;
+    }
+
+    if (activeView === "teamProfile") {
+      closeTeamProfile();
+    }
+  }
+
+  function openSeasonBriefingPanel(options?: { push?: boolean }) {
+    setSeasonBriefingOpen(true);
+    setFoundationPanel("briefing");
+    syncFoundationViewInUrl(activeView, null, null, {
+      panel: "briefing",
+      push: options?.push ?? true,
+      team: selectedTeamId,
+    });
+  }
+
+  function openFacilityPanel(facilityId: string, action: "upgrade" | "downgrade" | "maintenance") {
+    setFoundationFacilityTarget({ facilityId, action });
+    setFoundationPanel("facility");
+    const facilityView = activeView === "facilitiesOverviewV2" ? "facilitiesOverviewV2" : "trainingV2";
+    if (activeView !== facilityView) {
+      setFoundationView(facilityView, setActiveView);
+    }
+    syncFoundationViewInUrl(facilityView, null, null, {
+      panel: "facility",
+      facilityId,
+      facilityAction: action,
+      push: true,
+      team: selectedTeamId,
+    });
+  }
+
+  function closeFacilityPanel() {
+    closeFoundationDrilldownPanel();
   }
 
   function exportSelectedTeamSettingsJson() {
@@ -7298,13 +7480,10 @@ export default function FoundationPageClient({
     className: string | null;
     race: string | null;
   }) {
-    closePlayerDrawer();
-    void openMarketBuyModal({
-      playerId: player.playerId,
-      name: player.name,
-      className: player.className ?? "—",
-      race: player.race ?? "—",
-    });
+    if (activeView !== "marketV2") {
+      setFoundationView("marketV2", setActiveView);
+    }
+    openMarketOfferPanel(player.playerId);
   }
 
   function persistContractNegotiationDraftFromSummary(summary: TransfermarktBuySummary | null) {
@@ -7430,7 +7609,6 @@ export default function FoundationPageClient({
         message: `${marketBuyPreview.player.name} bricht die Verhandlung mit ${marketBuyPreview.team.shortCode} ab. Dieses Team-Spieler-Paar bekommt fuer kuenftige Angebote einen Vertrauensmalus.`,
       });
       window.requestAnimationFrame(() => {
-        scrollMarketBuyModalToTop();
       });
       return;
     }
@@ -7457,7 +7635,6 @@ export default function FoundationPageClient({
         counterSalary,
       });
       window.requestAnimationFrame(() => {
-        scrollMarketBuyModalToTop();
       });
       return;
     }
@@ -7470,7 +7647,6 @@ export default function FoundationPageClient({
       message: `${marketBuyPreview.player.name} akzeptiert: Ablöse ${formatTransfermarktCurrency(marketBuyPreview.purchasePrice)}, Vertrag ${marketBuyPreview.contractLength} Season(s), Gehalt gesamt ${marketBuyPreview.totalSalary != null ? formatDisplayMoney(marketBuyPreview.totalSalary) : "—"}, Cash danach ${formatTransfermarktCurrency(marketBuyPreview.cashAfter)}.`,
     });
     window.requestAnimationFrame(() => {
-      scrollMarketBuyModalToTop();
     });
   }
 
@@ -7480,82 +7656,26 @@ export default function FoundationPageClient({
 
   async function openMarketBuyModal(item: TransfermarktBuyPreviewSubject, teamIdOverride?: string) {
     const effectiveTeamId = resolveMarketBuyTeamId(teamIdOverride);
-    // #region agent log
-    fetch("http://127.0.0.1:7744/ingest/8fee0963-e343-46df-a0b4-6cfa69e52b00", {
-      method: "POST",
-      headers: { "Content-Type": "application/json", "X-Debug-Session-Id": "03cfb2" },
-      body: JSON.stringify({
-        sessionId: "03cfb2",
-        runId: "tm-buy-open",
-        hypothesisId: "C-tm-ownership",
-        location: "FoundationPageClient.tsx:openMarketBuyModal",
-        message: "Transfer buy modal open attempt",
-        data: {
-          effectiveTeamId,
-          canManage: canManageTeamId(effectiveTeamId),
-          marketTeamId,
-          selectedTeamId,
-          activeManagerTeamId,
-        },
-        timestamp: Date.now(),
-      }),
-    }).catch(() => {});
-    // #endregion
     if (!canManageTeamId(effectiveTeamId)) {
       setMarketBuyError(`${getTeamLockedName(effectiveTeamId)} gehoert nicht zu deinen steuerbaren Teams. Kaufen ist gesperrt.`);
       showTeamManagementLockedNotice(getTeamLockedName(effectiveTeamId));
       return;
     }
-    setMarketContractLengthDraft(null);
-    setMarketContractShapeDraft(null);
-    setMarketOfferedSalaryDraft(null);
-    setMarketBuyPreview(null);
-    setMarketBuyPreviewContext(null);
-    setMarketNegotiationOutcome(null);
-    setMarketBuyError(null);
-    setMarketBuyModalOpen(true);
-    setMarketBuySuccess(null);
-    setMarketBuySubject(item);
-    await requestTransfermarktBuyPreview(item, effectiveTeamId || undefined, {
-      offeredSalary: null,
-    });
-    window.requestAnimationFrame(() => {
-      scrollMarketBuyModalToTop();
-    });
-  }
 
-  function scrollMarketBuyModalToTop() {
-    marketBuyModalRef.current?.scrollIntoView({ block: "start", behavior: "auto" });
-    marketBuyModalBodyRef.current?.scrollTo({ top: 0, behavior: "auto" });
-  }
-
-  function closeMarketBuyModal() {
-    marketBuyPreviewRequestVersion.current += 1;
-    const hadPreview = Boolean(marketBuyPreview?.player?.id && marketBuyPreview?.team?.id);
-    const negotiationAccepted = marketNegotiationOutcome?.status === "accepted";
-    const shouldApplyAbortMalus =
-      readMeta.source === "sqlite" &&
-      !isReadOnlyMode &&
-      hadPreview &&
-      !negotiationAccepted &&
-      Boolean(marketNegotiationOutcome);
-    const abortPreview = shouldApplyAbortMalus ? marketBuyPreview : null;
-    const abortPlayerName = marketBuyPreview?.player?.name ?? "dem Spieler";
-    setMarketBuyModalOpen(false);
-    setMarketBuySubject(null);
-    setMarketBuyPreview(null);
-    setMarketBuyPreviewContext(null);
-    setMarketNegotiationOutcome(null);
-    if (hadPreview && !negotiationAccepted) {
-      if (shouldApplyAbortMalus && abortPreview) {
-        persistContractNegotiationOutcome(abortPreview, "rejected_bad_experience", ["negotiation_cancelled_after_contact"]);
+    if (effectiveTeamId) {
+      setMarketTeamId(effectiveTeamId);
+      if (effectiveTeamId !== selectedTeamId) {
+        setSelectedTeamId(effectiveTeamId);
+        syncFoundationTeamIdInUrl(effectiveTeamId);
       }
-      setMarketBuyError(
-        shouldApplyAbortMalus
-          ? `Verhandlung mit ${abortPlayerName} abgebrochen. Das gibt einen Malus fuer die naechste Runde.`
-          : `Kauf von ${abortPlayerName} abgebrochen.`,
-      );
     }
+
+    if (activeView !== "marketV2") {
+      setFoundationView("marketV2", setActiveView);
+    }
+
+    setMarketFocusPlayerId(item.playerId);
+    openMarketOfferPanel(item.playerId);
   }
 
   function resetMarketBuyDemandFrame() {
@@ -7663,15 +7783,18 @@ export default function FoundationPageClient({
     setMarketSellSuccess(null);
     setMarketSellPreview(null);
     setMarketSellSubject(subject);
-    closePlayerDrawer();
-    setMarketSellModalOpen(true);
+    setFoundationPanel("sell");
+    syncFoundationViewInUrl(activeView, null, subject.playerId, {
+      panel: "sell",
+      push: true,
+      team: effectiveTeamId,
+    });
     await requestTransfermarktSellPreview(subject, teamIdOverride);
   }
 
   function closeMarketSellModal() {
     marketSellPreviewRequestVersion.current += 1;
-    setMarketSellModalOpen(false);
-    setMarketSellSubject(null);
+    closeFoundationDrilldownPanel();
   }
 
   async function confirmTransfermarktSell() {
@@ -7734,7 +7857,8 @@ export default function FoundationPageClient({
         title: "Verkauf abgeschlossen",
         detail: sellFeedback,
       });
-      setMarketSellModalOpen(false);
+      setMarketSellSubject(null);
+      setFoundationPanel(null);
       await Promise.all([
         loadSave(activeSaveId),
         reloadMarketFeed(marketTeamId),
@@ -9120,6 +9244,46 @@ export default function FoundationPageClient({
       });
     }
 
+    if (requestedView === "teamProfile") {
+      const teamId = parseFoundationTeamIdFromUrl(initialClientGameState.teams);
+      if (teamId) {
+        setTeamProfileTeamId(teamId);
+      }
+    }
+
+    const requestedPanel = parseFoundationPanelFromUrl();
+    if (requestedPanel) {
+      setFoundationPanel(requestedPanel);
+      if (requestedPanel === "offer") {
+        const offerPlayerId = parseFoundationPlayerIdFromUrl();
+        if (offerPlayerId) {
+          setMarketFocusPlayerId(offerPlayerId);
+        }
+      }
+      if (requestedPanel === "briefing") {
+        openSeasonBriefingPanel({ push: false });
+      }
+      if (requestedPanel === "sell") {
+        const sellPlayerId = parseFoundationPlayerIdFromUrl();
+        const sellTeamId = parseFoundationTeamIdFromUrl(initialClientGameState.teams);
+        if (sellPlayerId && sellTeamId) {
+          const sellSubject = resolveSellSubjectFromPlayerId(sellPlayerId, sellTeamId);
+          if (sellSubject) {
+            setMarketSellSubject(sellSubject);
+            void requestTransfermarktSellPreview(sellSubject, sellTeamId);
+          }
+        }
+      }
+    }
+
+    const facilityTarget = parseFoundationFacilityFromUrl();
+    if (facilityTarget.facilityId) {
+      setFoundationFacilityTarget({
+        facilityId: facilityTarget.facilityId,
+        action: facilityTarget.facilityAction ?? "upgrade",
+      });
+    }
+
     if (requestedTab === "office" || requestedView === "hq") {
       setHomeV2Tab("office");
     }
@@ -9135,7 +9299,47 @@ export default function FoundationPageClient({
       setActiveManagerTeamSource(requestedTeamContext.source);
       setActiveManagerTeamWarning(requestedTeamContext.warning ?? null);
     }
+
+    writeFoundationUrlState(
+      {
+        view: (requestedView ?? "homeV2") as FoundationViewId,
+        tab: requestedTab,
+        playerId: requestedPlayerId,
+        team: parseFoundationTeamIdFromUrl(initialClientGameState.teams) ?? requestedTeamContext.teamId,
+        panel: requestedPanel,
+        facilityId: facilityTarget.facilityId,
+        facilityAction: facilityTarget.facilityAction,
+      },
+      "replace",
+    );
   }, [initialSelectedTeamId]);
+
+  useEffect(() => {
+    function handlePopState() {
+      const fromHistory = readFoundationHistoryState();
+      if (fromHistory) {
+        applyFoundationNavigationStateRef.current(fromHistory);
+        return;
+      }
+      applyFoundationNavigationStateRef.current(parseFoundationUrlStateFromLocation());
+    }
+
+    window.addEventListener("popstate", handlePopState);
+    return () => window.removeEventListener("popstate", handlePopState);
+  }, []);
+
+  useFoundationKeyboardNavigation({
+    onBack: () => {
+      if (canFoundationNavigateBack()) {
+        foundationNavigateBack();
+        return;
+      }
+      closeFoundationDrilldownPanel();
+    },
+    canBack: () =>
+      canFoundationNavigateBack() ||
+      Boolean(foundationPanel || activeView === "playerProfile" || activeView === "teamProfile" || playerProfileData),
+  });
 
   useEffect(() => {
     if (!gameState.teams.some((team) => team.teamId === selectedTeamId)) {
@@ -9816,7 +10020,10 @@ export default function FoundationPageClient({
     options: { skipGameStateReload?: boolean; reloadFullGameState?: boolean } = {},
   ) {
     void reason;
-    const nextGameState = options.skipGameStateReload
+    const skipGameStateReload =
+      options.skipGameStateReload ??
+      (reason === "local_save_version" && !options.reloadFullGameState);
+    const nextGameState = skipGameStateReload
       ? null
       : await loadSave(activeSaveId, foundationSaveMode, { compactInitial: options.reloadFullGameState ? false : true });
     const nextSeasonId = nextGameState?.season.id ?? gameState.season.id;
@@ -9826,8 +10033,6 @@ export default function FoundationPageClient({
 
     const refreshes: Array<Promise<unknown>> = [];
     const shouldRefreshSeasonOverview =
-      activeView === "home" ||
-      activeView === "season" ||
       activeView === "seasonV2" ||
       activeView === "prize" ||
       activeView === "teams" ||
@@ -9846,11 +10051,8 @@ export default function FoundationPageClient({
     if (shouldLoadSeasonManagementFeed) {
       refreshes.push(reloadSeasonManagementOverview());
     }
-    if (activeView === "history" || activeView === "historyV2") {
+    if (activeView === "historyV2") {
       refreshes.push(reloadHistoryFeed(), reloadTransferRecapFeed());
-    }
-    if (activeView === "market") {
-      setMarketReloadToken((current) => current + 1);
     }
     if (refreshes.length > 0) {
       await Promise.all(refreshes);
@@ -9935,20 +10137,21 @@ export default function FoundationPageClient({
       try {
         const params = new URLSearchParams({ saveId: activeSaveId });
         const response = await fetch(`/api/singleplayer-state/version?${params.toString()}`, { cache: "no-store" });
-        const payload = (await response.json()) as { ok?: boolean; signature?: string };
-        if (!response.ok || !payload.ok || !payload.signature) {
+        const payload = (await response.json()) as { ok?: boolean; signature?: string; contentSignature?: string };
+        const nextSignature = payload.contentSignature ?? payload.signature;
+        if (!response.ok || !payload.ok || !nextSignature) {
           return;
         }
 
         const previousSignature = liveSaveVersionSignatureRef.current;
-        liveSaveVersionSignatureRef.current = payload.signature;
-        if (!previousSignature || previousSignature === payload.signature) {
+        liveSaveVersionSignatureRef.current = nextSignature;
+        if (!previousSignature || previousSignature === nextSignature) {
           return;
         }
 
         liveSaveRefreshInFlightRef.current = true;
         try {
-          await reloadLiveSeasonState("local_save_version");
+          await reloadLiveSeasonState("local_save_version", { skipGameStateReload: true });
         } finally {
           liveSaveRefreshInFlightRef.current = false;
         }
@@ -9970,10 +10173,28 @@ export default function FoundationPageClient({
       document.removeEventListener("visibilitychange", onVisibilityChange);
       window.clearInterval(intervalId);
     };
-  }, [activeSaveId, gameState.season.id, readMeta.source, seasonOverviewSeasonId]);
+  }, [activeSaveId, readMeta.source]);
 
   useEffect(() => {
-    const shouldLoadMarketFeed = activeView === "market";
+    if (activeView === "home") {
+      setFoundationView("homeV2", setActiveView);
+    }
+    if (activeView === "inbox") {
+      setFoundationView("inboxV2", setActiveView);
+    }
+    if (activeView === "market") {
+      setFoundationView("marketV2", setActiveView);
+    }
+    if (activeView === "history") {
+      setFoundationView("historyV2", setActiveView);
+    }
+    if (activeView === "season") {
+      setFoundationView("seasonV2", setActiveView);
+    }
+  }, [activeView]);
+
+  useEffect(() => {
+    const shouldLoadMarketFeed = false;
     if (!shouldLoadMarketFeed || isFoundationBootstrapState) {
       marketFeedAbortRef.current?.abort();
       marketFeedAbortRef.current = null;
@@ -10116,33 +10337,6 @@ export default function FoundationPageClient({
       cancelled = true;
     };
   }, [activeSaveId, gameState.matchdayState.matchdayId, gameState.season.id, marketReloadToken, readMeta.source, shouldLoadPrizePreviewFeed]);
-
-  useEffect(() => {
-    if (!shouldLoadSeasonManagementFeed || isFoundationBootstrapState) {
-      return undefined;
-    }
-
-    let cancelled = false;
-
-    async function loadSeasonStandingsOverview() {
-      try {
-        const payload = await reloadSeasonStandingsOverview();
-        if (cancelled || !payload) {
-          return;
-        }
-      } catch {
-        if (!cancelled) {
-          setSeasonStandingsFeed(null);
-        }
-      }
-    }
-
-    void loadSeasonStandingsOverview();
-
-    return () => {
-      cancelled = true;
-    };
-  }, [activeSaveId, gameState.season.id, isFoundationBootstrapState, marketReloadToken, readMeta.source, shouldLoadSeasonManagementFeed]);
 
   useEffect(() => {
     if (!shouldLoadSeasonManagementFeed || isFoundationBootstrapState) {
@@ -10400,44 +10594,6 @@ export default function FoundationPageClient({
     }
   }
 
-  useEffect(() => {
-    if (!marketBuyModalOpen || !marketBuySubject || !marketBuyPreview) {
-      return undefined;
-    }
-
-    if (
-      marketContractLengthDraft == null &&
-      marketContractShapeDraft == null &&
-      marketOfferedSalaryDraft == null
-    ) {
-      return undefined;
-    }
-
-    const teamId = resolveMarketBuyTeamId(marketBuyPreview.team?.id);
-    if (!teamId) {
-      return undefined;
-    }
-
-    const timer = window.setTimeout(() => {
-      void requestTransfermarktBuyPreview(marketBuySubject, teamId, {
-        contractLength: marketContractLengthDraft,
-        contractShape: marketContractShapeDraft,
-        offeredSalary: marketOfferedSalaryDraft,
-        clearNegotiationOutcome: false,
-      });
-    }, 120);
-
-    return () => window.clearTimeout(timer);
-  }, [
-    marketBuyModalOpen,
-    marketBuySubject,
-    marketBuyPreview,
-    marketTeamId,
-    marketContractLengthDraft,
-    marketContractShapeDraft,
-    marketOfferedSalaryDraft,
-  ]);
-
   async function confirmTransfermarktBuy() {
     if (readMeta.source === "prisma") {
       setMarketBuyError("Prisma-Referenz ist read-only. Fuer Kaeufe bitte lokalen Testspielstand starten.");
@@ -10520,7 +10676,8 @@ export default function FoundationPageClient({
         detail: buyFeedback,
       });
       setActiveManagerTeam(payload.summary.team?.id ?? marketBuyPreview.team.id, "manual_select");
-      setMarketBuyModalOpen(false);
+      setFoundationPanel(null);
+      syncFoundationViewInUrl("marketV2", null, null, { team: selectedTeamId });
       setMarketBuySubject(null);
       setMarketBuyPreviewContext(null);
       await Promise.all([
@@ -10929,7 +11086,7 @@ export default function FoundationPageClient({
         setNewGameSuccess(`Neuer Spielstand aktiv: ${payload.result.save.name}`);
         setActiveView("home");
         syncFoundationViewInUrl("home");
-        setSeasonBriefingOpen(true);
+        openSeasonBriefingPanel();
       }
     } catch {
       setNewGameError("New-Game-Setup konnte nicht geladen werden.");
@@ -11408,9 +11565,9 @@ export default function FoundationPageClient({
       }
     }
     if (targetPanel === "season-briefing") {
-      setFoundationView("home", setActiveView);
+      setFoundationView("homeV2", setActiveView);
       setShowGameFlowPanel(false);
-      setSeasonBriefingOpen(true);
+      openSeasonBriefingPanel();
       scrollToFoundationTarget("foundation-home");
       return;
     }
@@ -11570,14 +11727,14 @@ export default function FoundationPageClient({
     }
 
     if (stepId === "season_intro") {
-      setFoundationView("home", setActiveView);
-      setSeasonBriefingOpen(true);
+      setFoundationView("homeV2", setActiveView);
+      openSeasonBriefingPanel();
       scrollToFoundationTarget("foundation-home");
       return;
     }
 
     if (stepId === "team_confirm") {
-      setFoundationView("home", setActiveView);
+      setFoundationView("homeV2", setActiveView);
       scrollToFoundationTarget("foundation-home");
       return;
     }
@@ -11986,7 +12143,7 @@ export default function FoundationPageClient({
         detail: "Manager-Zentrale",
         section: "Aktion",
         keywords: "home dashboard manager zentrale",
-        tone: activeView === "home" ? "ready" : undefined,
+        tone: activeView === "homeV2" ? "ready" : undefined,
         run: () => openFoundationViewCommand("home"),
       },
       ...teamCommands,
@@ -12163,7 +12320,7 @@ export default function FoundationPageClient({
           terms: ["Value", "Gehalt", "LZ", "POW"],
           progressLabel: "Kaderarbeit",
           progressPct: 36,
-          shortcut: "Doppelklick = Drawer",
+          shortcut: "Klick = Profil",
           actions: [
             { label: "Gebäude", targetView: "trainingV2", detail: "Upgrades", tone: "primary" },
             { label: "Transfermarkt", targetView: "marketV2", detail: "Kaufen/Verkaufen" },
@@ -12261,7 +12418,7 @@ export default function FoundationPageClient({
           terms: ["OVR", "PPs", "MVS", "MW"],
           progressLabel: "Scouting",
           progressPct: 34,
-          shortcut: "Doppelklick = Profil",
+          shortcut: "Klick = Profil",
           actions: [
             { label: "Training", targetView: "trainingCompact", detail: "Entwicklung", tone: "primary" },
             { label: "Office", targetView: "hq", detail: "Rollen" },
@@ -12375,7 +12532,7 @@ export default function FoundationPageClient({
         tagName === "select" ||
         target?.isContentEditable ||
         target?.closest("[contenteditable='true']");
-      const modalOpen = Boolean(document.querySelector(".foundation-modal-backdrop, .player-drawer-backdrop, [role='dialog']"));
+      const modalOpen = Boolean(document.querySelector(".foundation-drilldown-page, .player-drawer-backdrop, [role='dialog']"));
       const activeViewHandlesOwnSpace = activeView === "lineup" || activeView === "matchdayArena";
       if (isTextTarget || modalOpen || activeViewHandlesOwnSpace || globalNextDisabled) return;
       event.preventDefault();
@@ -12698,7 +12855,7 @@ export default function FoundationPageClient({
     setMarketBuySuccess(null);
     setMarketPreviewPlayerId(null);
     setMarketBuySubject(null);
-    setMarketBuyModalOpen(false);
+    setFoundationPanel(null);
   }, [activeSaveId, marketTeamId, readMeta.source]);
 
   useEffect(() => {
@@ -12708,7 +12865,7 @@ export default function FoundationPageClient({
     setMarketBuyError(null);
     setMarketBuySuccess(null);
     setMarketBuySubject(null);
-    setMarketBuyModalOpen(false);
+    setFoundationPanel(null);
   }, [marketTeamId]);
 
   useEffect(() => {
@@ -14819,6 +14976,8 @@ export default function FoundationPageClient({
             moralePenalty: demand.moralePenalty,
           })),
           topDisciplines,
+          potential: player.potential ?? null,
+          potentialBand: player.potential != null ? getPotentialBand(player.potential) : null,
         };
       })
       .filter((entry): entry is NonNullable<typeof entry> => Boolean(entry))
@@ -14904,14 +15063,14 @@ export default function FoundationPageClient({
       players: rosterCards,
     };
   };
-  const teamDrawerData = useMemo<TeamDetailDrawerData | null>(() => buildTeamDetailDrawerData(teamDrawerTeamId), [
+  const teamProfileData = useMemo<TeamDetailDrawerData | null>(() => buildTeamDetailDrawerData(teamProfileTeamId), [
     canonicalSeasonLabel,
     currentAreaRanksByTeamId,
     currentMatchdayDisciplineSchedule,
     gameState,
     playerRatingsById,
     seasonPointsLedger,
-    teamDrawerTeamId,
+    teamProfileTeamId,
     teamObjectiveOverview.boardConfidence,
     teamObjectiveOverview.objectives,
     seasonStandRows,
@@ -14930,12 +15089,11 @@ export default function FoundationPageClient({
     teamObjectiveOverview.objectives,
     seasonStandRows,
   ]);
-  const teamsV2FocusCards = useMemo(() => {
+  const teamEconomyTiles = useMemo(() => {
     const data = selectedTeamsHistoryData;
     if (!data) {
       return [];
     }
-    const expiringContracts = data.players.filter((player) => (player.contractLength ?? 99) <= 1).length;
     return [
       {
         label: "Gehalt",
@@ -14948,22 +15106,8 @@ export default function FoundationPageClient({
         label: "Marktwert",
         value: data.marketValueTotal != null ? formatMoney(data.marketValueTotal) : "—",
         note: data.cash != null ? `Cash ${formatMoney(data.cash)}` : "—",
-        detail: "Team-Marktwert und Liquiditaet",
+        detail: "Team-Marktwert und Liquidität",
         tone: "value" as const,
-      },
-      {
-        label: "Achsen",
-        value: data.powRank != null ? `POW #${data.powRank}` : "—",
-        note: [data.speRank, data.menRank, data.socRank].filter(Boolean).length ? `SPE/MEN/SOC gerankt` : "keine Ranks",
-        detail: "Aggregierte Team-Achsenstaerke",
-        tone: "training" as const,
-      },
-      {
-        label: "Vertraege",
-        value: String(expiringContracts),
-        note: "laufen <= 1 Saison aus",
-        detail: "Vertragsdruck im Kader",
-        tone: "contract" as const,
       },
     ];
   }, [selectedTeamsHistoryData]);
@@ -14992,10 +15136,10 @@ export default function FoundationPageClient({
 
   const playerSeasonPerformanceMap = useMemo(
     () =>
-      shouldBuildTrainingView || shouldBuildPlayerDirectory || shouldBuildMarketView || marketSellModalOpen
+      shouldBuildTrainingView || shouldBuildPlayerDirectory || shouldBuildMarketView || isMarketSellPanelOpen
         ? buildPlayerSeasonPerformanceMap(gameState, seasonPointsLedger)
         : new Map(),
-    [gameState, marketSellModalOpen, seasonPointsLedger, shouldBuildMarketView, shouldBuildPlayerDirectory, shouldBuildTrainingView],
+    [gameState, isMarketSellPanelOpen, seasonPointsLedger, shouldBuildMarketView, shouldBuildPlayerDirectory, shouldBuildTrainingView],
   );
   const marketSellPlayerContext = useMemo(() => {
     const playerId =
@@ -15491,6 +15635,7 @@ export default function FoundationPageClient({
               forecast: trainingPlayerForecastRows.find((forecastRow) => forecastRow.player.id === row.playerId)?.forecast ?? null,
               teamId: selectedTeam.teamId,
               profile: getTeamStrategyProfile(gameState, selectedTeam.teamId),
+              potentialRecord: gameState.playerPotential?.find((entry) => entry.playerId === rosterPlayer.id) ?? null,
             })
           : null;
 
@@ -16221,11 +16366,7 @@ export default function FoundationPageClient({
           className="table-team-cell table-team-cell-button"
           onClick={(event) => {
             event.stopPropagation();
-            openTeamDrawerById(row.team.teamId);
-          }}
-          onDoubleClick={(event) => {
-            event.stopPropagation();
-            openTeamDrawerById(row.team.teamId);
+            openTeamProfileById(row.team.teamId);
           }}
         >
           <span className="season-team-identity">
@@ -16833,7 +16974,7 @@ export default function FoundationPageClient({
   const currentMatchdayRequiredLineupSlots = getMatchdayLineupSideRequirements(gameState).totalRequired;
   const isCurrentMatchdayLineupComplete = useCallback(
     (draft: { teamId: string; entries: unknown[] } | null | undefined) =>
-      Boolean(draft && isTeamMatchdayLineupComplete(gameState, draft.teamId, draft as Parameters<typeof isTeamMatchdayLineupComplete>[2])),
+      Boolean(draft && isTeamMatchdayLineupOperationallyReady(gameState, draft.teamId, draft as Parameters<typeof isTeamMatchdayLineupOperationallyReady>[2])),
     [gameState],
   );
   const aiLineupMissingTeamIds = useMemo(() => {
@@ -16898,32 +17039,7 @@ export default function FoundationPageClient({
   );
   const activeManagerMatchdayReady = matchdayArenaReadiness.isReady;
   const activeManagerArenaBlockerReason = matchdayArenaReadiness.blocker;
-  useEffect(() => {
-    // #region agent log
-    fetch("http://127.0.0.1:7744/ingest/8fee0963-e343-46df-a0b4-6cfa69e52b00", {
-      method: "POST",
-      headers: { "Content-Type": "application/json", "X-Debug-Session-Id": "03cfb2" },
-      body: JSON.stringify({
-        sessionId: "03cfb2",
-        runId: "arena-readiness",
-        hypothesisId: "A-formcard-sync",
-        location: "FoundationPageClient.tsx:matchdayArenaReadiness",
-        message: "Arena readiness snapshot",
-        data: {
-          teamId: activeManagerTeamId,
-          isReady: matchdayArenaReadiness.isReady,
-          blocker: matchdayArenaReadiness.blocker,
-          lineupSubmitted: matchdayArenaReadiness.lineupSubmitted,
-          formCardsRequired: matchdayArenaReadiness.formCardsRequired,
-          formCardBlocker: matchdayArenaReadiness.formCardFlow.blocker,
-          openLineupSlots: matchdayArenaReadiness.openLineupSlots,
-          sideRequirements: matchdayArenaReadiness.sideRequirements,
-        },
-        timestamp: Date.now(),
-      }),
-    }).catch(() => {});
-    // #endregion
-  }, [activeManagerTeamId, gameState.seasonState.formCardPlans, matchdayArenaReadiness]);
+  const activeManagerArenaGapDetail = formatLineupOperationalGapDetail(matchdayArenaReadiness);
   async function ensureAiLineupsForCurrentMatchday(trigger: "human_lineup_saved" | "arena_open" | "manual" = "manual") {
     if (
       readMeta.source !== "sqlite" ||
@@ -16997,25 +17113,6 @@ export default function FoundationPageClient({
       }),
     );
 
-    // #region agent log
-    fetch("http://127.0.0.1:7744/ingest/8fee0963-e343-46df-a0b4-6cfa69e52b00", {
-      method: "POST",
-      headers: { "Content-Type": "application/json", "X-Debug-Session-Id": "03cfb2" },
-      body: JSON.stringify({
-        sessionId: "03cfb2",
-        runId: "formcard-plan-sync",
-        hypothesisId: "A-formcard-sync",
-        location: "FoundationPageClient.tsx:handleFormCardPlanSaved",
-        message: "Form card plans merged into foundation gameState",
-        data: {
-          teamId: payload.teamId,
-          matchdayId: payload.matchdayId,
-          planCount: payload.plans.length,
-        },
-        timestamp: Date.now(),
-      }),
-    }).catch(() => {});
-    // #endregion
   };
   const handleHumanLineupSaved = (payload: {
     saveId: string;
@@ -17036,25 +17133,6 @@ export default function FoundationPageClient({
       payload.seasonId === gameState.season.id &&
       payload.matchdayId === gameState.matchdayState.matchdayId &&
       canManageTeamId(payload.teamId);
-    // #region agent log
-    fetch("http://127.0.0.1:7744/ingest/8fee0963-e343-46df-a0b4-6cfa69e52b00", {
-      method: "POST",
-      headers: { "Content-Type": "application/json", "X-Debug-Session-Id": "03cfb2" },
-      body: JSON.stringify({
-        sessionId: "03cfb2",
-        runId: "lineup-save-sync",
-        hypothesisId: "B-lineup-sync",
-        location: "FoundationPageClient.tsx:handleHumanLineupSaved",
-        message: lineupSyncAllowed ? "Lineup save accepted for foundation sync" : "Lineup save ignored by foundation sync guard",
-        data: {
-          teamId: payload.teamId,
-          draftStatus: payload.draft?.status ?? null,
-          lineupSyncAllowed,
-        },
-        timestamp: Date.now(),
-      }),
-    }).catch(() => {});
-    // #endregion
     if (!lineupSyncAllowed) {
       return;
     }
@@ -17236,7 +17314,7 @@ export default function FoundationPageClient({
         title: "Sponsor wählen",
         kicker: "Budget",
         detail: selectedTeamSponsorContract
-          ? `Aktiver Sponsor: ${selectedTeamSponsorContract.brandLabel ?? selectedTeamSponsorContract.brandId}.`
+          ? `Aktiver Sponsor: ${selectedTeamSponsorContract.name}.`
           : "Wähle einen von drei Sponsor-Verträgen — beeinflusst Saisoneinkommen und Objectives.",
         targetLabel: "Sponsor prüfen",
         targetView: "teams",
@@ -17372,10 +17450,10 @@ export default function FoundationPageClient({
   useEffect(() => {
     if (seasonBriefingStepStatus === "open") {
       if (activeView !== "home") {
-        setFoundationView("home", setActiveView);
+        setFoundationView("homeV2", setActiveView);
         syncFoundationViewInUrl("home");
       }
-      setSeasonBriefingOpen(true);
+      openSeasonBriefingPanel();
     }
   }, [activeSaveId, activeView, gameState.season.id, seasonBriefingStepStatus]);
   useEffect(() => {
@@ -17483,9 +17561,14 @@ export default function FoundationPageClient({
     readMeta.source,
   ]);
   const closeSeasonBriefing = (markCompleted = true) => {
+    const wasBriefingPanel = foundationPanel === "briefing";
     setSeasonBriefingOpen(false);
+    setFoundationPanel(null);
     if (markCompleted && seasonBriefingStepStatus === "open") {
       updateNewGameFlowStepStatus("season_intro", "completed");
+    }
+    if (wasBriefingPanel) {
+      closeFoundationDrilldownPanel();
     }
   };
   const completeSeasonBriefingAndContinue = () => {
@@ -17672,6 +17755,8 @@ export default function FoundationPageClient({
         topDisciplineLabel: row.player.className ?? row.entry.roleTag ?? "Flex",
         topDisciplineTier: row.playerOvr != null && row.playerOvr >= 82 ? "S" : row.playerOvr != null && row.playerOvr >= 76 ? "A" : "B",
         topDisciplineScore: row.playerOvr,
+        potential: row.player.potential ?? null,
+        potentialBand: row.player.potential != null ? getPotentialBand(row.player.potential) : null,
       })),
     [homePlayerCards],
   );
@@ -17734,10 +17819,39 @@ export default function FoundationPageClient({
     const syncedState = syncWishlistToScoutingWatchlist(gameState, selectedTeam.teamId);
     const watchlistEntries = getScoutingWatchlistForTeam(syncedState, selectedTeam.teamId);
     const playerById = new Map(gameState.players.map((player) => [player.id, player] as const));
+    const scoutingLevel = Math.max(getFacilityLevel(selectedTeamFacilityState, "scouting_office"), 4);
+
+    const enrichWatchTarget = (entry: {
+      playerId: string;
+      playerName: string;
+      className: string;
+      marketValue: string;
+      baseInfoSummary: string;
+      pow?: number | null;
+      spe?: number | null;
+      men?: number | null;
+      soc?: number | null;
+    }) => {
+      const player = playerById.get(entry.playerId);
+      const starFields =
+        player != null
+          ? buildScoutingWatchTargetStarFields({
+              gameState,
+              player,
+              saveId: activeSaveId,
+              scoutingLevel,
+            })
+          : null;
+      return {
+        ...entry,
+        ...starFields,
+      };
+    };
+
     const fromWatchlist = watchlistEntries.map((entry) => {
       const player = playerById.get(entry.playerId);
       const marketEntry = transferWishlistEntriesForMarketV2.find((candidate) => candidate.playerId === entry.playerId);
-      return {
+      return enrichWatchTarget({
         playerId: entry.playerId,
         playerName: player?.name ?? marketEntry?.playerName ?? entry.playerId,
         className: player?.className ?? marketEntry?.className ?? "—",
@@ -17748,27 +17862,38 @@ export default function FoundationPageClient({
               ? formatTransfermarktCurrency(player.marketValue)
               : "—",
         baseInfoSummary: entry.note ?? "Scouting Watchlist",
-      };
+        pow: player?.coreStats.pow ?? marketEntry?.pow ?? null,
+        spe: player?.coreStats.spe ?? marketEntry?.spe ?? null,
+        men: player?.coreStats.men ?? marketEntry?.men ?? null,
+        soc: player?.coreStats.soc ?? marketEntry?.soc ?? null,
+      });
     });
     if (fromWatchlist.length > 0) {
       return fromWatchlist.slice(0, 6);
     }
-    return transferWishlistEntriesForMarketV2.slice(0, 6).map((entry) => ({
-      playerId: entry.playerId,
-      playerName: entry.playerName,
-      className: entry.className,
-      marketValue: entry.marketValue != null ? formatTransfermarktCurrency(entry.marketValue) : "—",
-      baseInfoSummary: [
-        entry.pow != null ? `POW ${formatLocalePoints(entry.pow, 0)}` : null,
-        entry.spe != null ? `SPE ${formatLocalePoints(entry.spe, 0)}` : null,
-        entry.men != null ? `MEN ${formatLocalePoints(entry.men, 0)}` : null,
-        entry.soc != null ? `SOC ${formatLocalePoints(entry.soc, 0)}` : null,
-        entry.salary != null ? `Gehalt ${formatTransfermarktCurrency(entry.salary)}` : null,
-      ]
-        .filter(Boolean)
-        .join(" · "),
-    }));
-  }, [gameState, selectedTeam, transferWishlistEntriesForMarketV2]);
+    return transferWishlistEntriesForMarketV2.slice(0, 6).map((entry) => {
+      const player = playerById.get(entry.playerId);
+      return enrichWatchTarget({
+        playerId: entry.playerId,
+        playerName: entry.playerName,
+        className: entry.className,
+        marketValue: entry.marketValue != null ? formatTransfermarktCurrency(entry.marketValue) : "—",
+        baseInfoSummary: [
+          entry.pow != null ? `POW ${formatLocalePoints(entry.pow, 0)}` : null,
+          entry.spe != null ? `SPE ${formatLocalePoints(entry.spe, 0)}` : null,
+          entry.men != null ? `MEN ${formatLocalePoints(entry.men, 0)}` : null,
+          entry.soc != null ? `SOC ${formatLocalePoints(entry.soc, 0)}` : null,
+          entry.salary != null ? `Gehalt ${formatTransfermarktCurrency(entry.salary)}` : null,
+        ]
+          .filter(Boolean)
+          .join(" · "),
+        pow: entry.pow ?? null,
+        spe: entry.spe ?? null,
+        men: entry.men ?? null,
+        soc: entry.soc ?? null,
+      });
+    });
+  }, [activeSaveId, gameState, selectedTeam, selectedTeamFacilityState, transferWishlistEntriesForMarketV2]);
   const scoutingHubV2Visibility = useMemo(() => {
     const scoutingLevel = getFacilityLevel(selectedTeamFacilityState, "scouting_office");
     const buckets = getTransfermarktScoutingVisibilityBuckets(scoutingLevel);
@@ -19675,19 +19800,6 @@ export default function FoundationPageClient({
   );
 
   const screenPrimaryAction = useMemo<FoundationScreenPrimaryAction | null>(() => {
-    if (activeView === "home") {
-      return {
-        kicker: "Hauptaktion",
-        title: globalNextLabel,
-        detail: primaryInboxItem ? primaryInboxItem.description : gameFlowActionStep.cta,
-        status: globalNextDisabled ? "blockiert" : "bereit",
-        buttonLabel: globalNextDisabled ? "Warum blockiert?" : "Zum nächsten Schritt",
-        onClick: triggerGlobalNext,
-        disabled: false,
-        disabledReason: globalNextDisabled ? globalNextTitle : null,
-      };
-    }
-
     if (activeView === "homeV2" && homeV2Tab === "office") {
       if (homeNextMatchdayStatus.openSlots > 0) {
         return {
@@ -19757,7 +19869,7 @@ export default function FoundationPageClient({
       };
     }
 
-    if (activeView === "market" || activeView === "marketV2") {
+    if (activeView === "marketV2") {
       const marketTeamLocked = marketSelectedTeam ? !canManageTeamId(marketSelectedTeam.teamId) : false;
       const selectedCandidate = marketPreviewPlayer;
       const disabledReason =
@@ -19774,13 +19886,16 @@ export default function FoundationPageClient({
         kicker: "Hauptaktion",
         title: selectedCandidate ? `${selectedCandidate.name} prüfen` : "Deal vorbereiten",
         detail: selectedCandidate
-          ? "Kaufmodal mit Forderung, Vertrag und Teamwirkung öffnen."
+          ? "Vertragsangebot mit Forderung, Vertrag und Teamwirkung öffnen."
           : "Links Kandidat wählen, dann Vertrag und Folgen sauber prüfen.",
         status: disabledReason ? "blockiert" : "bereit",
-        buttonLabel: selectedCandidate ? "Kaufmodal öffnen" : "Kandidat wählen",
+        buttonLabel: selectedCandidate ? "Vertragsangebot öffnen" : "Kandidat wählen",
         onClick: () => {
           if (selectedCandidate) {
-            void openMarketBuyModal(selectedCandidate);
+            if (activeView !== "marketV2") {
+              setFoundationView("marketV2", setActiveView);
+            }
+            openMarketOfferPanel(selectedCandidate.playerId);
           }
         },
         disabled: Boolean(disabledReason),
@@ -19925,15 +20040,161 @@ export default function FoundationPageClient({
   ]);
 
   const showCompactHeader = activeView !== "home" && activeView !== "homeV2";
-  const showFlowCoach = activeView === "home" || activeView === "homeV2";
+  const showFlowCoach = activeView === "homeV2";
   const showCompactFlowCoach = activeView !== "home" && activeView !== "admin";
 
   return (
-    <main className="app-shell foundation-shell">
+    <main className="app-shell foundation-shell foundation-app">
       <FoundationShell
         activeView={activeView as FoundationViewId}
-        onNavigate={(view) => setFoundationView(view as FoundationView, setActiveView)}
+        onNavigate={(view) => setFoundationView(view as FoundationView, setActiveView, { push: true })}
         isPending={isPending}
+        subNav={
+          activeView === "marketV2" ? (
+            <FoundationSubNav
+              className="foundation-shell-subnav"
+              items={[
+                { id: "browse", label: "Markt" },
+                ...(foundationPanel === "offer" ? [{ id: "offer", label: "Vertragsangebot" }] : []),
+                ...(foundationPanel === "sell" ? [{ id: "sell", label: "Verkauf" }] : []),
+              ]}
+              activeId={
+                foundationPanel === "offer" ? "offer" : foundationPanel === "sell" ? "sell" : "browse"
+              }
+              onSelect={(id) => {
+                if (id === "browse") {
+                  closeFoundationDrilldownPanel();
+                }
+              }}
+            />
+          ) : activeView === "homeV2" ? (
+            <FoundationSubNav
+              className="foundation-shell-subnav"
+              items={[
+                { id: "overview", label: "Übersicht" },
+                { id: "office", label: "Office" },
+              ]}
+              activeId={homeV2Tab}
+              onSelect={(id) => navigateHomeTab(id === "office" ? "office" : "overview")}
+            />
+          ) : activeView === "seasonV2" ? (
+            <FoundationSubNav
+              className="foundation-shell-subnav"
+              items={[
+                { id: "table", label: "Datenansicht" },
+                { id: "cards", label: "Karten" },
+                { id: "gms", label: "Manager" },
+              ]}
+              activeId={seasonStandingsMode}
+              onSelect={(id) => setSeasonStandingsMode(id as "cards" | "table" | "gms")}
+            />
+          ) : activeView === "playerProfile" ? (
+            <FoundationSubNav
+              className="foundation-shell-subnav"
+              items={PLAYER_PROFILE_TABS.map((tab) => ({ id: tab.id, label: tab.label }))}
+              activeId={playerProfileTab}
+              onSelect={(id) => {
+                setPlayerProfileTab(id as PlayerProfileTabId);
+                if (playerProfileData) {
+                  syncFoundationViewInUrl("playerProfile", id, playerProfileData.playerId);
+                }
+              }}
+            />
+          ) : activeView === "lineup" ? (
+            <FoundationSubNav
+              className="foundation-shell-subnav"
+              items={[
+                { id: "lineup", label: "Einsatzliste" },
+                { id: "formBoard", label: "Formplan" },
+              ]}
+              activeId={lineupDraftBoardViewRequest ?? lineupDraftBoardView}
+              onSelect={(id) => {
+                const nextView = id === "formBoard" ? "formBoard" : "lineup";
+                setLineupDraftBoardView(nextView);
+                setLineupDraftBoardViewRequest(null);
+                syncFoundationViewInUrl("lineup", nextView === "formBoard" ? "formplan" : "lineup", null, { push: true });
+              }}
+            />
+          ) : activeView === "inboxV2" ? (
+            <FoundationSubNav
+              className="foundation-shell-subnav"
+              items={[
+                { id: "ALL", label: "Alle" },
+                { id: "task", label: "Aufgaben" },
+                { id: "warning", label: "Warnungen" },
+                { id: "transfer", label: "Transfers" },
+                { id: "finance", label: "Finanzen" },
+                { id: "training", label: "Training" },
+              ]}
+              activeId={inboxCategoryFilter}
+              onSelect={(id) => {
+                setInboxCategoryFilter(id);
+                syncFoundationViewInUrl("inboxV2", id === "ALL" ? null : id, null, { push: true });
+              }}
+            />
+          ) : activeView === "scoutingCenterV2" ? (
+            <FoundationSubNav
+              className="foundation-shell-subnav"
+              items={[
+                { id: "overview", label: "Übersicht" },
+                { id: "reports", label: "Reports" },
+                { id: "recommended", label: "Empfehlungen" },
+              ]}
+              activeId={scoutingCenterTab}
+              onSelect={(id) => {
+                setScoutingCenterTab(id as typeof scoutingCenterTab);
+                syncFoundationViewInUrl("scoutingCenterV2", id, null, { push: true });
+              }}
+            />
+          ) : activeView === "trainingCompact" ? (
+            <FoundationSubNav
+              className="foundation-shell-subnav"
+              items={[
+                { id: "control", label: "Steuerung" },
+                { id: "forecast", label: "Forecast" },
+              ]}
+              activeId="control"
+              onSelect={(id) => {
+                const targetId = id === "forecast" ? "training-compact-forecast" : "training-compact-controls";
+                document.getElementById(targetId)?.scrollIntoView({ behavior: "smooth", block: "start" });
+              }}
+            />
+          ) : activeView === "teams" && selectedTeam ? (
+            <FoundationSubNav
+              className="foundation-shell-subnav"
+              items={[
+                { id: "roster", label: "Kader" },
+                { id: "contracts", label: "Verträge" },
+              ]}
+              activeId={selectedTeamDetailTab}
+              onSelect={(id) => setSelectedTeamDetailTab(id as "roster" | "contracts")}
+            />
+          ) : activeView === "trainingV2" || activeView === "facilitiesOverviewV2" ? (
+            foundationPanel === "facility" && foundationFacilityTarget ? (
+              <FoundationSubNav
+                className="foundation-shell-subnav"
+                items={[
+                  { id: "overview", label: "Gebäude" },
+                  {
+                    id: "facility",
+                    label:
+                      foundationFacilityTarget.action === "maintenance"
+                        ? "Wartung"
+                        : foundationFacilityTarget.action === "downgrade"
+                          ? "Downgrade"
+                          : "Upgrade",
+                  },
+                ]}
+                activeId="facility"
+                onSelect={(id) => {
+                  if (id === "overview") {
+                    closeFacilityPanel();
+                  }
+                }}
+              />
+            ) : null
+          ) : null
+        }
         headerActions={
           <>
             <button
@@ -20149,27 +20410,17 @@ export default function FoundationPageClient({
       ) : null}
 
       {seasonBriefingOpen ? (
-        <div
-          className="foundation-modal-backdrop season-briefing-backdrop"
-          role="presentation"
-          onMouseDown={(event) => {
-            if (event.target === event.currentTarget) {
-              closeSeasonBriefing(false);
-            }
-          }}
-        >
-          <section className="foundation-modal season-briefing-modal" role="dialog" aria-modal="true" aria-label="Season-Briefing">
-            <div className="foundation-modal-header season-briefing-header">
+        <section className="foundation-drilldown-page season-briefing-page" data-testid="season-briefing-page">
+            <header className="foundation-drilldown-header season-briefing-header">
               <div className="stack">
                 <span className="eyebrow">Season-Briefing</span>
-                <h2>{gameState.season.name}: Was jetzt wichtig ist</h2>
-                <p className="muted">Factor, Reihenfolge, Slot-Druck und Farb-Dopplungen, bevor du Geld und Lineups festziehst.</p>
+                <h1>{gameState.season.name}</h1>
               </div>
               <button className="secondary-button inline-button" type="button" onClick={() => closeSeasonBriefing(false)}>
-                Schliessen
+                Zurück
               </button>
-            </div>
-            <div className="foundation-modal-body season-briefing-body">
+            </header>
+            <div className="foundation-drilldown-body season-briefing-body">
               <section className="season-briefing-kpis" aria-label="Season-Faktoren">
                 <article>
                   <span>Salary Factor</span>
@@ -20278,7 +20529,6 @@ export default function FoundationPageClient({
               </button>
             </div>
           </section>
-        </div>
       ) : null}
 
       <section className={`foundation-context-banner${isSaveBusy ? " is-loading" : ""}${showCompactHeader ? " is-compact" : ""}`} data-testid="foundation-context-banner">
@@ -20367,7 +20617,7 @@ export default function FoundationPageClient({
             </button>
           </div>
         ) : null}
-        {(activeView === "home" || activeView === "homeV2") ? (
+        {activeView === "homeV2" ? (
         <div className={`foundation-flow-controller ${getGameFlowStatusClass(gameFlowActionStep.status)}`} data-testid="foundation-flow-controller">
           <div className="foundation-flow-copy">
             <span className="eyebrow">
@@ -20542,7 +20792,6 @@ export default function FoundationPageClient({
                   key={`quick-team-${team.teamId}`}
                   className={`table-link-button${team.teamId === selectedTeam.teamId ? " is-active" : ""}`}
                   type="button"
-                  onDoubleClick={() => openTeamDrawerById(team.teamId)}
                   onClick={() => scheduleActiveManagerTeam(team.teamId, "manual_select")}
                 >
                   {team.shortCode}
@@ -20609,7 +20858,7 @@ export default function FoundationPageClient({
         </section>
       ) : null}
 
-      {activeView === "home" && foundationWarningInboxItems.length > 0 ? (
+      {activeView === "homeV2" && foundationWarningInboxItems.length > 0 ? (
         <section className="foundation-warning-inbox" aria-label="Offene Hinweise">
           <div className="foundation-warning-inbox-summary">
             <span className="eyebrow">Hinweise</span>
@@ -20716,769 +20965,10 @@ export default function FoundationPageClient({
           </section>
           ) : null}
 
-          {activeView === "home" ? (
-          <section className={`panel foundation-home-panel${getViewClass("home")}`} data-testid="foundation-home" id="foundation-home">
-            <div className="foundation-home-hero">
-              <div
-                className="foundation-home-team-card"
-                role="button"
-                tabIndex={0}
-                onClick={() => setFoundationView("teams", setActiveView)}
-                onKeyDown={(event) => {
-                  if (event.key === "Enter") {
-                    setFoundationView("teams", setActiveView);
-                  }
-                }}
-                onDoubleClick={() => {
-                  if (selectedTeam?.teamId) {
-                    openTeamDrawerById(selectedTeam.teamId);
-                  }
-                }}
-                title="Klick öffnet Teams, Doppelklick den Team-Drawer"
-              >
-                {homeActiveTeamLogo?.src ? (
-                  <img
-                    className="foundation-home-logo"
-                    src={homeActiveTeamLogo.src}
-                    alt={`${selectedTeam?.name ?? "Team"} Logo`}
-                    loading="eager"
-                    decoding="async"
-                    fetchPriority="high"
-                  />
-                ) : (
-                  <span className="foundation-home-logo team-logo-placeholder">{homeActiveTeamLogo?.initials ?? selectedTeam?.shortCode ?? "?"}</span>
-                )}
-                <div className="stack">
-                  <span className="eyebrow">Manager-Zentrale</span>
-                  <h1>{selectedTeam?.name ?? "Kein Team ausgewählt"}</h1>
-                  <div className="room-meta foundation-admin-meta">
-                    <span className="pill">{selectedTeam?.shortCode ?? "—"}</span>
-                    <span className="pill">Manager {activeOwner?.label ?? "—"}</span>
-                    <span className="pill">{formatTeamControlModeLabel(selectedTeamControl?.controlMode)}</span>
-                    <span className="pill">{gameState.season.name}</span>
-                    <span className="pill">{currentMatchdayDisplayLabel}</span>
-                  </div>
-                </div>
-              </div>
-              <div className="foundation-home-next-card">
-                <span className="eyebrow">Nächster Schritt</span>
-                <strong>{gameFlowActionStep.label}</strong>
-                <p className="muted">
-                  {getGameFlowStatusLabel(gameFlowActionStep.status)}
-                  {gameFlowActionStep.blockers[0] ? ` · ${formatCockpitReason(gameFlowActionStep.blockers[0])}` : ""}
-                </p>
-                <div className="room-meta foundation-admin-meta" data-testid="home-data-warnings">
-                  {homeWarnings.length > 0 ? (
-                    homeWarnings.map((warning) => (
-                      <span key={`home-warning-${warning}`} className="transfer-status-pill is-warning">
-                        {formatHomeWarningLabel(warning)}
-                      </span>
-                    ))
-                  ) : (
-                    <span className="transfer-status-pill is-ready">Bereit</span>
-                  )}
-                </div>
-                <div className="foundation-home-actions">
-                  <button
-                    className="primary-button"
-                    type="button"
-                    onClick={triggerGlobalNext}
-                  >
-                    Zum nächsten Schritt
-                  </button>
-                  <button className="secondary-button" type="button" onClick={() => setFoundationView("lineup", setActiveView)}>
-                    Einsatzliste öffnen
-                  </button>
-                  <button className="secondary-button" type="button" onClick={() => setFoundationView("marketV2", setActiveView)}>
-                    Transfermarkt öffnen
-                  </button>
-                </div>
-              </div>
-            </div>
-
-            {seasonSetupFlow ? (
-              <section
-                className={joinClassNames("foundation-season-setup", seasonSetupFlow.isReady && "is-ready")}
-                aria-label="Manager-Briefing Season Setup"
-                data-testid="season-setup-panel"
-              >
-                <div className="foundation-season-setup-head">
-                  <div className="stack">
-                    <span className="eyebrow">Manager-Briefing</span>
-                    <h2>{seasonSetupFlow.isReady ? "Bereit für Matchday 1" : "Season Setup"}</h2>
-                    <p className="muted">
-                      {seasonSetupFlow.openStep
-                        ? `Naechster Fokus: ${seasonSetupFlow.openStep.title}.`
-                        : "Alle Startsignale sind geklaert. Du kannst das Panel ausblenden oder direkt in den Matchday gehen."}
-                    </p>
-                  </div>
-                  <div className="foundation-season-setup-actions">
-                    <span className="foundation-season-setup-progress">
-                      {seasonSetupFlow.completedCount}/{seasonSetupFlow.steps.length} erledigt
-                    </span>
-                    <button className="ghost-button" type="button" onClick={dismissNewGameFlow}>
-                      Später
-                    </button>
-                    <button
-                      className="primary-button"
-                      type="button"
-                      onClick={() =>
-                        seasonSetupFlow.openStep
-                          ? navigateSeasonSetupStep(seasonSetupFlow.openStep.stepId)
-                          : navigateToGameFlowStep("lineup", selectedTeam?.teamId)
-                      }
-                    >
-                      {seasonSetupFlow.openStep ? seasonSetupFlow.openStep.targetLabel : "Zum Matchday"}
-                    </button>
-                  </div>
-                </div>
-
-                <div className="foundation-season-setup-summary">
-                  <span>
-                    <strong>{selectedTeam?.shortCode ?? "—"}</strong>
-                    Aktives Team
-                  </span>
-                  <span>
-                    <strong>
-                      {seasonSetupFlow.rosterCount}/{seasonSetupFlow.targetRosterCount}
-                    </strong>
-                    Kaderziel
-                  </span>
-                  <span>
-                    <strong>{seasonSetupFlow.strongestAxis?.label ?? "—"}</strong>
-                    Staerke {formatWholeNumber(seasonSetupFlow.strongestAxis?.value)}
-                  </span>
-                  <span>
-                    <strong>{seasonSetupFlow.weakestAxis?.label ?? "—"}</strong>
-                    Luecke {formatWholeNumber(seasonSetupFlow.weakestAxis?.value)}
-                  </span>
-                  <span>
-                    <strong>
-                      {homeNextMatchdayStatus.requiredSlots > 0
-                        ? `${homeNextMatchdayStatus.filledSlots}/${homeNextMatchdayStatus.requiredSlots}`
-                        : "—"}
-                    </strong>
-                    Einsatz-Slots
-                  </span>
-                </div>
-
-                <div className="foundation-season-setup-grid">
-                  {seasonSetupFlow.steps.map((step, index) => (
-                    <article
-                      key={`season-setup-${step.stepId}`}
-                      className={joinClassNames(
-                        "foundation-season-setup-card",
-                        `is-${step.status}`,
-                        seasonSetupFlow.openStep?.stepId === step.stepId && "is-current",
-                      )}
-                    >
-                      <div className="foundation-season-setup-card-head">
-                        <span className="foundation-season-setup-step-index">{index + 1}</span>
-                        <div>
-                          <span className="eyebrow">{step.kicker}</span>
-                          <h3>{step.title}</h3>
-                        </div>
-                        <span className={`transfer-status-pill is-${step.status === "open" ? "warning" : "ready"}`}>
-                          {step.status === "completed" ? "erledigt" : step.status === "skipped" ? "später" : step.progress}
-                        </span>
-                      </div>
-                      <p className="muted">{step.detail}</p>
-                      <div className="foundation-season-setup-card-actions">
-                        <button className="secondary-button" type="button" onClick={() => navigateSeasonSetupStep(step.stepId)}>
-                          {step.targetLabel}
-                        </button>
-                        {step.status === "open" ? (
-                          <>
-                            <button className="ghost-button" type="button" onClick={() => updateNewGameFlowStepStatus(step.stepId, "completed")}>
-                              Als erledigt markieren
-                            </button>
-                            <button className="ghost-button" type="button" onClick={() => updateNewGameFlowStepStatus(step.stepId, "skipped")}>
-                              Später
-                            </button>
-                          </>
-                        ) : null}
-                      </div>
-                    </article>
-                  ))}
-                </div>
-              </section>
-            ) : null}
-
-            <section className="foundation-home-play-lane" aria-label="Spielzug Schnellstart">
-              <button className="foundation-home-play-card is-lineup" type="button" onClick={() => setFoundationView("lineup", setActiveView)} title="Einsatzliste: Slots fuellen, Team-Boost setzen und speichern.">
-                <span>Vorbereiten</span>
-                <strong>{homeNextMatchdayStatus.openSlots > 0 ? `${homeNextMatchdayStatus.openSlots} Slots offen` : "Einsatz bereit"}</strong>
-                <small>{currentMatchdayDisciplineSchedule?.discipline1?.displayName ?? "D1"} / {currentMatchdayDisciplineSchedule?.discipline2?.displayName ?? "D2"}</small>
-              </button>
-              <button className="foundation-home-play-card is-arena" type="button" onClick={() => setFoundationView("matchdayArena", setActiveView)} title="Arena: Spieltag als Reveal ansehen und Score verstehen.">
-                <span>Spielen</span>
-                <strong>{homeNextMatchdayStatus.resultAvailable ? "Ergebnis ansehen" : homeNextMatchdayStatus.openSlots > 0 ? "Einsatzliste offen" : "Arena bereit"}</strong>
-                <small>{currentMatchdayDisplayLabel}</small>
-              </button>
-              <button className="foundation-home-play-card is-season" type="button" onClick={() => setFoundationView("season", setActiveView)} title="Saisonstand: Punkte, Rang und Bereichsstaerken lesen.">
-                <span>Auswerten</span>
-                <strong>{selectedStandingRow?.rank != null ? `Rang #${selectedStandingRow.rank}` : "Tabelle offen"}</strong>
-                <small>{selectedStandingRow?.points != null ? `${formatLocalePoints(selectedStandingRow.points, 1)} Punkte` : "Noch keine Punkte"}</small>
-              </button>
-              <button className="foundation-home-play-card is-training" type="button" onClick={() => setFoundationView("trainingCompact", setActiveView)} title="Training: XP, Upgrades, Erschoepfung und Rueckschritt-Risiko pruefen.">
-                <span>Entwickeln</span>
-                <strong>{selectedRosterDecisionCards.trainingCandidate?.player.name ?? "Training prüfen"}</strong>
-                <small>{selectedRosterDecisionCards.trainingCandidate ? "Spieler im Fokus" : "XP und Risiko"}</small>
-              </button>
-              <button className="foundation-home-play-card is-market" type="button" onClick={() => setFoundationView("marketV2", setActiveView)} title="Transfermarkt: Value, Gehalt und Kaderbedarf pruefen.">
-                <span>Handeln</span>
-                <strong>{selectedRosterDecisionCards.salaryOutlier?.player.name ?? "Markt prüfen"}</strong>
-                <small>{selectedRosterDecisionCards.salaryOutlier ? "Gehaltsdruck" : "Kaufen / verkaufen"}</small>
-              </button>
-            </section>
-
-            <section className="foundation-home-today-strip" aria-label="Heute wichtig">
-              {homeTodayCards.map((card) => (
-                <button
-                  key={`home-today-${card.key}`}
-                  className={`foundation-home-today-card is-${card.tone}`}
-                  type="button"
-                  onClick={() => setFoundationView(card.view, setActiveView)}
-                >
-                  <span>{card.kicker}</span>
-                  <strong>{card.title}</strong>
-                  <small>{card.detail}</small>
-                </button>
-              ))}
-            </section>
-
-            <article className="foundation-home-card foundation-home-owner-overview" data-testid="home-owner-overview">
-              <div className="panel-header compact">
-                <div className="stack">
-                  <h2>Meine Teams / Multiplayer</h2>
-                  <p className="muted">Schneller Wechsel zwischen deinen Teams, Mitspielern und automatisch gefuehrten Teams.</p>
-                </div>
-                <span className="pill">Auto {aiTeams.length}</span>
-              </div>
-              <div className="foundation-home-owner-grid">
-                {homeMultiplayerOwnerGroups.map((group) => (
-                  <article
-                    key={`home-owner-group-${group.owner.ownerId}`}
-                    className={joinClassNames(
-                      "foundation-home-owner-card",
-                      group.isActiveOwner && "is-active-owner",
-                      group.owner.ownerId === AI_OWNER_ID && "is-ai-owner",
-                    )}
-                  >
-                    <div className="foundation-home-owner-card-head">
-                      <div>
-                        <span className="eyebrow">{group.owner.type.replaceAll("_", " ")}</span>
-                        <strong>{group.owner.label}</strong>
-                      </div>
-                      <span className="pill">{group.teamIds.length} Teams</span>
-                    </div>
-                    <p className="muted">{group.readyState}</p>
-                    <div className="foundation-home-owner-team-list">
-                      {group.rows.slice(0, group.owner.ownerId === AI_OWNER_ID ? 4 : 6).map((row) => (
-                        <button
-                          key={`home-owner-group-team-${group.owner.ownerId}-${row.teamId}`}
-                          className={joinClassNames(
-                            "foundation-home-owner-team-chip",
-                            row.teamId === activeManagerTeamId && "is-active-team",
-                            getOwnerTeamHighlightClass(resolvedTeamControlSettings[row.teamId]),
-                          )}
-                          type="button"
-                          onDoubleClick={() => openTeamDrawerById(row.teamId)}
-                          onClick={() => {
-                            if (row.controlMode !== "ai") {
-                              scheduleActiveManagerTeam(row.teamId, "manual_select");
-                            }
-                          }}
-                        >
-                          <strong>{row.teamCode}</strong>
-                          <span>{row.rank != null ? `#${row.rank}` : "—"}</span>
-                          <span>{row.points != null ? formatLocalePoints(row.points, 1) : "0"}</span>
-                          <span>{row.cash != null ? formatMoney(row.cash) : "—"}</span>
-                        </button>
-                      ))}
-                      {group.rows.length > (group.owner.ownerId === AI_OWNER_ID ? 4 : 6) ? (
-                        <span className="pill">+{group.rows.length - (group.owner.ownerId === AI_OWNER_ID ? 4 : 6)} weitere</span>
-                      ) : null}
-                    </div>
-                  </article>
-                ))}
-              </div>
-            </article>
-
-            <div className="foundation-home-metrics" data-testid="home-active-team-metrics">
-              <article className="metric-card">
-                <span>Tabellenplatz</span>
-                <strong>{selectedStandingRow?.rank != null ? `#${selectedStandingRow.rank}` : "—"}</strong>
-              </article>
-              <article className="metric-card">
-                <span>Punkte</span>
-                <strong>{selectedStandingRow?.points != null ? formatLocalePoints(selectedStandingRow.points, 1) : "—"}</strong>
-              </article>
-              <article className="metric-card">
-                <span>Cash</span>
-                <strong>{selectedStandingRow?.cash != null ? formatMoney(selectedStandingRow.cash) : "—"}</strong>
-              </article>
-              <article className="metric-card">
-                <span>Gehalt</span>
-                <strong>{selectedStandingRow?.salaryTotal != null ? formatMoney(selectedStandingRow.salaryTotal) : "—"}</strong>
-              </article>
-              <article className="metric-card">
-                <span>Ø LZ</span>
-                <strong>{selectedStandingRow?.avgContractLength != null ? formatLocalePoints(selectedStandingRow.avgContractLength, 1) : "—"}</strong>
-              </article>
-              <article className="metric-card">
-                <span>GuV</span>
-                <strong>{selectedStandingRow?.guv != null ? formatMoney(selectedStandingRow.guv) : "—"}</strong>
-              </article>
-            </div>
-
-            <article className="foundation-home-card" data-testid="home-board-objectives">
-              <div className="panel-header compact">
-                <div className="stack">
-                  <h2>Board & Saisonziele</h2>
-                  <p className="muted">Board-Ziele werden live getrackt. Sponsor-Boni/Mali werden am Saisonende über die Settlement-Logik angewendet.</p>
-                </div>
-                <div className="room-meta foundation-admin-meta">
-                  <span
-                    className={`transfer-status-pill${(selectedBoardConfidence?.pressure ?? 0) >= 8 ? " is-warning" : " is-ready"}`}
-                    title={TEAM_BOARD_PRESSURE_TOOLTIP}
-                  >
-                    Druck {selectedBoardConfidence?.pressure ?? "—"}/10
-                  </span>
-                  <span className="pill" title={TEAM_BOARD_RATING_TOOLTIP}>
-                    Board Rating {selectedBoardConfidence?.value ?? "—"}/10
-                  </span>
-                </div>
-              </div>
-              <div className="foundation-home-owner-grid">
-                {selectedOpenObjectives.slice(0, 4).map((objective) => (
-                  <article
-                    key={`home-objective-${objective.objectiveId}`}
-                    className="metric-card teams-summary-card"
-                    title={`Grundlage: ${objective.source}`}
-                  >
-                    <span>{objective.category.toUpperCase()}</span>
-                    <strong>{objective.label}</strong>
-                    <small className="muted">
-                      {String(objective.currentValue ?? "—")} / {String(objective.targetValue ?? "—")}
-                    </small>
-                    {objective.detail ? <small className="muted">{objective.detail}</small> : null}
-                    {objective.actionHint ? <small className="muted">{objective.actionHint}</small> : null}
-                    <div className="room-meta foundation-admin-meta">
-                      <span className={`transfer-status-pill${objective.status === "completed" ? " is-ready" : objective.status === "failed" || objective.status === "at_risk" ? " is-warning" : ""}`}>
-                        {formatObjectiveStatusLabel(objective.status)}
-                      </span>
-                      {objective.rewardCash != null ? <span className="pill">Bonus {formatMoney(objective.rewardCash)}</span> : null}
-                      {objective.penaltyCash != null ? <span className="pill">Malus {formatMoney(objective.penaltyCash)}</span> : null}
-                    </div>
-                  </article>
-                ))}
-                {selectedOpenObjectives.length === 0 ? (
-                  <div className="transfer-callout is-ready">
-                    <strong>Alle aktiven Board-Ziele sind stabil.</strong>
-                    <span>Weiter beobachten: Season Review bewertet die Ziele nach echten Ergebnissen.</span>
-                  </div>
-                ) : null}
-              </div>
-              {teamObjectiveOverview.warnings.length > 0 ? (
-                <p className="muted">Hinweise: {teamObjectiveOverview.warnings.map(formatCockpitReason).join(", ")}</p>
-              ) : null}
-            </article>
-
-            <article className="foundation-home-card foundation-home-players" data-testid="home-player-cards">
-              <div className="panel-header compact">
-                <div className="stack">
-                  <h2>Meine Spieler</h2>
-                  <p className="muted">
-                    Top 6–8 nach Rolle, <GameTerm term="PPs" />, <GameTerm term="MVS" /> und <GameTerm term="OVR" />.
-                  </p>
-                </div>
-                <button className="secondary-button inline-button" type="button" onClick={() => setFoundationView("teams", setActiveView)}>
-                  Alle Spieler
-                </button>
-              </div>
-              <div className="foundation-home-player-grid">
-                {homePlayerCards.map((row) => (
-                  <article
-                    key={`home-player-${row.player.id}`}
-                    className="foundation-home-player-card"
-                    onDoubleClick={() => openPlayerDrawerById(row.player.id, row.entry.id)}
-                    title="Doppelklick öffnet den Spieler-Drawer"
-                  >
-                    <div className="foundation-home-player-card-head">
-                      <div className="foundation-home-player-title">
-                        <strong>{row.player.name}</strong>
-                        <span>{row.entry.roleTag ?? "ohne Rolle"}</span>
-                      </div>
-                      <span className="foundation-home-player-rating" title={getGameTermTooltip("OVR") ?? undefined}>
-                        {row.playerOvr != null ? formatLocalePoints(row.playerOvr, 1) : "—"}
-                      </span>
-                    </div>
-                    <div className="foundation-home-player-hero">
-                      <div className="foundation-home-player-portrait-shell">
-                        <PlayerPortrait
-                          src={row.portrait.src}
-                          initials={row.portrait.initials}
-                          alt={row.player.name}
-                          className="foundation-home-player-portrait player-avatar-fallback"
-                        />
-                      </div>
-                      <div className="foundation-home-player-meta">
-                        <div className="foundation-home-player-type">
-                          <ClassColorChip className={row.player.className} />
-                          <RaceIcon race={row.player.race} className="race-icon-chip-inline" />
-                        </div>
-                        <div className="foundation-home-player-core-stats">
-                          <span title={getGameTermTooltip("MVS") ?? undefined}>MVS {row.playerMvs != null ? formatLocalePoints(row.playerMvs, 1) : "—"}</span>
-                          <span title={getGameTermTooltip("PPs") ?? undefined}>PPs {row.playerPps != null ? formatPpsValue(row.playerPps) : "—"}</span>
-                        </div>
-                      </div>
-                    </div>
-                    <div className="foundation-home-player-body">
-                      <div className="foundation-home-player-axis">
-                        <span className="is-power" title={getGameTermTooltip("POW") ?? undefined}>
-                          POW
-                          <b>{formatWholeNumber(row.player.coreStats.pow)}</b>
-                          <small>PP {formatNullablePps(row.ppPow)}</small>
-                        </span>
-                        <span className="is-speed" title={getGameTermTooltip("SPE") ?? undefined}>
-                          SPE
-                          <b>{formatWholeNumber(row.player.coreStats.spe)}</b>
-                          <small>PP {formatNullablePps(row.ppSpe)}</small>
-                        </span>
-                        <span className="is-mental" title={getGameTermTooltip("MEN") ?? undefined}>
-                          MEN
-                          <b>{formatWholeNumber(row.player.coreStats.men)}</b>
-                          <small>PP {formatNullablePps(row.ppMen)}</small>
-                        </span>
-                        <span className="is-social" title={getGameTermTooltip("SOC") ?? undefined}>
-                          SOC
-                          <b>{formatWholeNumber(row.player.coreStats.soc)}</b>
-                          <small>PP {formatNullablePps(row.ppSoc)}</small>
-                        </span>
-                      </div>
-                      <div className="foundation-home-player-stats">
-                        <span>
-                          MW {row.marketValue != null ? formatMoney(row.marketValue) : "—"}
-                          {row.marketValueDelta != null ? (
-                            <small className={`foundation-home-player-money-delta${getEconomyDeltaClass(row.marketValueDelta, "higher")}`}>
-                              {formatSignedDisplayMoney(row.marketValueDelta)}
-                            </small>
-                          ) : null}
-                        </span>
-                        <span>
-                          Gehalt {row.salary != null ? formatMoney(row.salary) : "—"}
-                          {row.salaryDelta != null ? (
-                            <small className={`foundation-home-player-money-delta${getEconomyDeltaClass(row.salaryDelta, "lower")}`}>
-                              {formatSignedDisplayMoney(row.salaryDelta)}
-                            </small>
-                          ) : null}
-                        </span>
-                        {row.xp > 0 ? <span>XP {row.xp}</span> : null}
-                        {row.fatigue > 0 ? <span>Erschoepfung {row.fatigue}</span> : null}
-                        <span>LZ {row.entry.contractLength ?? "—"}</span>
-                      </div>
-                    </div>
-                    {row.fatigue > 0 || row.xp > 0 || (row.marketValueDelta != null && Math.abs(row.marketValueDelta) >= 1) ? (
-                      <div className="foundation-home-player-hints" aria-label="Spieler Hinweise">
-                        {row.fatigue > 0 ? <span className="is-warning">Erschoepfung {row.fatigue}</span> : null}
-                        {row.xp > 0 ? <span className="is-ready">Upgrade bereit</span> : null}
-                        {row.marketValueDelta != null && Math.abs(row.marketValueDelta) >= 1 ? (
-                          <span className={row.marketValueDelta > 0 ? "is-ready" : "is-warning"}>
-                            MW {formatSignedDisplayMoney(row.marketValueDelta)}
-                          </span>
-                        ) : null}
-                      </div>
-                    ) : null}
-                    <div className="foundation-home-actions foundation-home-player-actions">
-                      <button className="secondary-button inline-button" type="button" onClick={() => openPlayerDrawerById(row.player.id, row.entry.id)}>
-                        Details
-                      </button>
-                      <button className="secondary-button inline-button" type="button" onClick={() => openTrainingPlayerTarget(row.player.id, "training")}>
-                        Training
-                      </button>
-                      <button
-                        className="secondary-button inline-button"
-                        type="button"
-                        disabled={marketSellBusy}
-                        onClick={() =>
-                          void openMarketSellModal({
-                            activePlayerId: row.entry.id,
-                            playerId: row.player.id,
-                            playerName: row.player.name,
-                            className: row.player.className,
-                            race: row.player.race,
-                            portraitUrl: row.portrait.src,
-                          }, selectedTeam?.teamId)
-                        }
-                      >
-                        Verkaufen
-                      </button>
-                      {row.xp > 0 ? (
-                        <button className="primary-button inline-button" type="button" onClick={() => openTrainingPlayerTarget(row.player.id, "upgrade")}>
-                          Upgrade
-                        </button>
-                      ) : null}
-                    </div>
-                  </article>
-                ))}
-              </div>
-            </article>
-
-            <div className="foundation-home-grid">
-              <article className="foundation-home-card foundation-home-league-card">
-                <div className="panel-header compact">
-                  <div className="stack">
-                    <h2>Liga kurz</h2>
-                    <p className="muted">
-                      {hasSeasonResultsForHome
-                        ? "Top 5 plus dein Team und direkte Nachbarn."
-                        : `${gameState.season.name} noch ohne Ergebnisse.`}
-                    </p>
-                  </div>
-                  <button className="secondary-button inline-button" type="button" onClick={() => setFoundationView("season", setActiveView)}>
-                    Zur vollen Tabelle
-                  </button>
-                </div>
-                {!hasSeasonResultsForHome ? (
-                  <div className="transfer-callout is-warning">
-                    <strong>{gameState.season.name} noch ohne Ergebnisse</strong>
-                    <span>Die Tabelle zeigt den aktiven Save-Kontext, aber noch keinen fertigen Saisonstand.</span>
-                  </div>
-                ) : null}
-                <div className="foundation-home-mini-table" data-testid="home-league-table">
-                  <div className="foundation-home-mini-row is-header">
-                    <span>Rang</span>
-                    <span>Team</span>
-                    <span>Pts</span>
-                    <span>POW</span>
-                    <span>SPE</span>
-                    <span>MEN</span>
-                    <span>SOC</span>
-                    <span>Cash</span>
-                    <span>GuV</span>
-                  </div>
-                  {homeLeagueRows.map((row) => (
-                    <button
-                      key={`home-league-${row.teamId}`}
-                      className={joinClassNames(
-                        "foundation-home-mini-row",
-                        row.teamId === activeManagerTeamId && "is-active-team",
-                        getOwnerTeamHighlightClass(resolvedTeamControlSettings[row.teamId]),
-                      )}
-                      type="button"
-                      onDoubleClick={() => openTeamDrawerById(row.teamId)}
-                      onClick={() => scheduleActiveManagerTeam(row.teamId, "manual_select")}
-                    >
-                      <span>{row.rank ?? "—"}</span>
-                      <strong>{row.teamCode}</strong>
-                      <span>{row.points != null ? formatLocalePoints(row.points, 1) : "—"}</span>
-                      <span>{formatNullablePps(row.ppsPow)}</span>
-                      <span>{formatNullablePps(row.ppsSpe)}</span>
-                      <span>{formatNullablePps(row.ppsMen)}</span>
-                      <span>{formatNullablePps(row.ppsSoc)}</span>
-                      <span>{row.cash != null ? formatMoney(row.cash) : "—"}</span>
-                      <span>{row.guv != null ? formatMoney(row.guv) : "—"}</span>
-                    </button>
-                  ))}
-                </div>
-              </article>
-
-              <article className="foundation-home-card" data-testid="home-next-matchday">
-                <div className="panel-header compact">
-                  <div className="stack">
-                    <h2>Nächster Spieltag</h2>
-                    <p className="muted">{gameState.season.id} · {currentMatchdayDisplayLabel}</p>
-                  </div>
-                  <span className={`transfer-status-pill${homeNextMatchdayStatus.resultAvailable ? " is-ready" : homeNextMatchdayStatus.openSlots > 0 ? " is-warning" : " is-ready"}`}>
-                    {homeNextMatchdayStatus.statusLabel}
-                  </span>
-                </div>
-                <div className="foundation-home-matchday-diszis">
-                  <div>
-                    <span className="eyebrow">D1</span>
-                    <strong>{currentMatchdayDisciplineSchedule?.discipline1?.displayName ?? "—"}</strong>
-                    <small>{homeNextMatchdayStatus.d1Slots || "—"} Slots</small>
-                  </div>
-                  <div>
-                    <span className="eyebrow">D2</span>
-                    <strong>{currentMatchdayDisciplineSchedule?.discipline2?.displayName ?? "—"}</strong>
-                    <small>{homeNextMatchdayStatus.d2Slots || "—"} Slots</small>
-                  </div>
-                </div>
-                <div className="foundation-home-matchday-progress" aria-label="Einsatz-Fortschritt">
-                  <span
-                    style={{
-                      width: `${
-                        homeNextMatchdayStatus.requiredSlots > 0
-                          ? Math.min(100, Math.round((homeNextMatchdayStatus.filledSlots / homeNextMatchdayStatus.requiredSlots) * 100))
-                          : 0
-                      }%`,
-                    }}
-                  />
-                  <small>
-                    {homeNextMatchdayStatus.filledSlots}/{homeNextMatchdayStatus.requiredSlots || "—"} Slots gesetzt
-                  </small>
-                </div>
-                <div className="room-meta foundation-admin-meta">
-                  <span className="pill">Offen {homeNextMatchdayStatus.openSlots}</span>
-                  <span className={`pill${homeNextMatchdayStatus.hasFormCards ? " is-ready" : homeNextMatchdayStatus.hasFormCardPool ? " is-warning" : " is-blocked"}`}>
-                    Formkarten {homeNextMatchdayStatus.hasFormCards ? "gesetzt" : homeNextMatchdayStatus.hasFormCardPool ? "offen" : "Pool fehlt"}
-                  </span>
-                  <span className="pill">Fatigue {homePlayerCards.filter((row) => row.fatigue > 0).length}</span>
-                </div>
-                <div className="foundation-home-actions">
-                  <button className="primary-button inline-button" type="button" onClick={() => setFoundationView("lineup", setActiveView)}>
-                    Einsatzliste
-                  </button>
-                  <button className="secondary-button inline-button" type="button" onClick={() => setFoundationView("matchdayArena", setActiveView)}>
-                    Arena
-                  </button>
-                  <button
-                    className="secondary-button inline-button"
-                    type="button"
-                    onClick={() => {
-                      setFoundationView("matchdayArena", setActiveView);
-                      window.setTimeout(() => {
-                        document.getElementById("arena-result-summary")?.scrollIntoView({ behavior: "smooth", block: "start" });
-                      }, 80);
-                    }}
-                  >
-                    Ergebnis ansehen
-                  </button>
-                </div>
-              </article>
-
-	              <article className="foundation-home-card foundation-home-tasks" data-testid="home-task-list">
-	                <div className="panel-header compact">
-	                  <h2>Aufgaben</h2>
-	                  <button className="secondary-button inline-button" type="button" onClick={() => setFoundationView("inbox", setActiveView)}>
-	                    Alle anzeigen
-	                  </button>
-	                </div>
-	                {homeTasks.map((task, index) => (
-	                  <button
-	                    key={`home-task-${task.itemId}`}
-	                    className={`foundation-home-task${task.itemId === primaryInboxItem?.itemId ? " is-primary" : ""}`}
-	                    type="button"
-	                    onClick={() => navigateToInboxItem(task)}
-	                  >
-                      <span className="foundation-home-task-index">Q{index + 1}</span>
-	                    <span>
-	                      <strong>{task.title}</strong>
-	                      <small>{task.description}</small>
-	                    </span>
-	                    <span className={getInboxSeverityPillClass(task.severity)}>{getInboxSeverityLabel(task.severity)}</span>
-	                  </button>
-	                ))}
-	              </article>
-
-              <article className="foundation-home-card foundation-home-story-cards" data-testid="home-story-cards">
-                <div className="panel-header compact">
-                  <h2>Story Cards</h2>
-                  <span className="pill">{homeStoryItems.length} echte Quelle(n)</span>
-                </div>
-                {homeStoryItems.length > 0 ? (
-                  <ul className="foundation-home-news-list">
-                    {homeStoryItems.map((item) => (
-                      <li key={`home-story-${item.itemId}`}>
-                        <button className="foundation-text-button" type="button" onClick={() => navigateToInboxItem(item)}>
-                          <span className="foundation-home-news-icon">{getInboxCategoryIcon(item.category)}</span>
-                          <span>
-                            <strong>{item.title.replace("Story Card: ", "")}</strong>
-                            <small>{item.description}</small>
-                          </span>
-                        </button>
-                      </li>
-                    ))}
-                  </ul>
-                ) : (
-                  <p className="muted">Noch keine Story Card aus echten Result-, Snapshot- oder XP-Daten.</p>
-                )}
-              </article>
-
-              <article className="foundation-home-card">
-                <div className="panel-header compact">
-                  <h2>News</h2>
-                </div>
-	                {homeNewsItems.length > 0 ? (
-	                  <ul className="foundation-home-news-list">
-	                    {homeNewsItems.map((item) => (
-	                      <li key={`home-news-${item.itemId}`}>
-	                        <button className="foundation-text-button" type="button" onClick={() => navigateToInboxItem(item)}>
-                            <span className="foundation-home-news-icon">{getInboxCategoryIcon(item.category)}</span>
-                            <span>
-	                            <strong>{item.title}</strong>
-	                            <small>{item.description}</small>
-                            </span>
-	                        </button>
-	                      </li>
-	                    ))}
-	                  </ul>
-                ) : (
-                  <p className="muted">Noch keine belastbaren News aus echten Save-Daten.</p>
-                )}
-              </article>
-            </div>
-
-            {homeOwnerTeamRows.length > 1 ? (
-              <article className="foundation-home-card" data-testid="home-my-teams-panel">
-                <div className="panel-header compact">
-                  <h2>Meine Teams</h2>
-                </div>
-                <div className="foundation-home-mini-table">
-                  <div className="foundation-home-mini-row is-header is-owner-team-row">
-                    <span>Rang</span>
-                    <span>Team</span>
-                    <span>Pts</span>
-                    <span>Cash</span>
-                    <span>GuV</span>
-                    <span>Gehalt</span>
-                    <span>Next</span>
-                    <span>Ready</span>
-                    <span>Status</span>
-                  </div>
-                  {homeOwnerTeamRows.map((row) => (
-                    <button
-                      key={`home-owner-team-${row.teamId}`}
-                      className={joinClassNames(
-                        "foundation-home-mini-row",
-                        row.teamId === activeManagerTeamId && "is-active-team",
-                        getOwnerTeamHighlightClass(resolvedTeamControlSettings[row.teamId]),
-                      )}
-                      type="button"
-                      onDoubleClick={() => openTeamDrawerById(row.teamId)}
-                      onClick={() => scheduleActiveManagerTeam(row.teamId, "manual_select")}
-                    >
-                      <span>{row.rank ?? "—"}</span>
-                      <strong>{row.teamCode}</strong>
-                      <span>{row.points != null ? formatLocalePoints(row.points, 1) : "—"}</span>
-                      <span>{row.cash != null ? formatMoney(row.cash) : "—"}</span>
-                      <span>{row.guv != null ? formatMoney(row.guv) : "—"}</span>
-                      <span>{row.salaryTotal != null ? formatMoney(row.salaryTotal) : "—"}</span>
-                      <span>{gameFlowActionStep.label}</span>
-                      <span>{homeNextMatchdayStatus.openSlots > 0 ? "offen" : "bereit"}</span>
-                      <span>{formatTeamControlModeLabel(resolvedTeamControlSettings[row.teamId]?.controlMode)}</span>
-                    </button>
-                  ))}
-                </div>
-              </article>
-            ) : null}
-	          </section>
-          ) : null}
 
           <section className={`panel foundation-home-v2-panel${getViewClass("homeV2")}`} id="foundation-home-v2">
             {activeView === "homeV2" ? (
               <>
-                <FoundationSubNav
-                  className="home-v2-subnav"
-                  activeId={homeV2Tab}
-                  onSelect={(id) => navigateHomeTab(id as "overview" | "office")}
-                  items={[
-                    { id: "overview", label: "Übersicht" },
-                    { id: "office", label: "Office" },
-                  ]}
-                />
                 {homeV2Tab === "overview" ? (
               <HomeV2Client
                 teamName={selectedTeam?.name ?? "Kein Team"}
@@ -21517,7 +21007,6 @@ export default function FoundationPageClient({
                 inboxItems={homeV2InboxItems}
                 todayCards={homeTodayCards}
                 onContinue={triggerGlobalNext}
-                onOpenClassicHome={() => setFoundationView("home", setActiveView)}
                 onOpenTeams={() => setFoundationView("teams", setActiveView)}
                 onOpenLineup={() => setFoundationView("lineup", setActiveView)}
                 onOpenMarket={() => setFoundationView("marketV2", setActiveView)}
@@ -21588,11 +21077,18 @@ export default function FoundationPageClient({
                   setFoundationView("homeV2", setActiveView);
                   syncFoundationViewInUrl("homeV2");
                 }}
-                onOpenQuickPeek={() => {
-                  void openPlayerProfileById(playerProfileData.playerId, playerProfileData.activePlayerId, { quickPeek: true });
-                }}
                 onOpenTraining={() => openTrainingPlayerTarget(playerProfileData.playerId)}
                 onOpenContractOffer={() => setFoundationView("marketV2", setActiveView)}
+              />
+            ) : null}
+          </section>
+
+          <section className={`panel foundation-team-profile-panel${getViewClass("teamProfile")}`}>
+            {activeView === "teamProfile" && teamProfileData ? (
+              <TeamProfileClient
+                data={teamProfileData}
+                onClose={closeTeamProfile}
+                onOpenPlayer={(playerId, activePlayerId) => void openPlayerProfileById(playerId, activePlayerId)}
               />
             ) : null}
           </section>
@@ -21612,6 +21108,16 @@ export default function FoundationPageClient({
                 seasonLabel={canonicalSeasonLabel}
                 onOpenTraining={() => setFoundationView("trainingCompact", setActiveView)}
                 onOpenTeams={() => setFoundationView("teams", setActiveView)}
+                facilityPanelTarget={
+                  foundationPanel === "facility" && foundationFacilityTarget
+                    ? {
+                        facilityId: foundationFacilityTarget.facilityId as FacilityId,
+                        action: foundationFacilityTarget.action as "upgrade" | "downgrade" | "maintenance",
+                      }
+                    : null
+                }
+                onOpenFacilityPanel={(facilityId, action) => openFacilityPanel(facilityId, action)}
+                onCloseFacilityPanel={closeFacilityPanel}
                 summary={{
                   cashCurrent: selectedTeam.cash,
                   netFacilityResult: trainingFacilitySeasonEndFinance.netFacilityResult,
@@ -21651,6 +21157,9 @@ export default function FoundationPageClient({
           <section className={`panel foundation-scouting-center-v2-panel${getViewClass("scoutingCenterV2")}`}>
             {activeView === "scoutingCenterV2" ? (
               <ScoutingCenterV2Client
+                activeTab={scoutingCenterTab}
+                onActiveTabChange={setScoutingCenterTab}
+                hideSubNav
                 teamName={selectedTeam?.name ?? "Kein Team"}
                 scoutingFacilityLevel={scoutingHubV2Visibility.scoutingLevel}
                 scoutingFacilityLabel={
@@ -21686,8 +21195,7 @@ export default function FoundationPageClient({
                     : null
                 }
                 onOpenMarket={() => setFoundationView("marketV2", setActiveView)}
-                onOpenHomeV2={() => setFoundationView("homeV2", setActiveView)}
-                onOpenPlayer={(playerId) => openPlayerDrawerById(playerId)}
+                onOpenPlayer={(playerId) => openPlayerProfileById(playerId)}
               />
             ) : null}
           </section>
@@ -21703,11 +21211,11 @@ export default function FoundationPageClient({
                 teamLabel={selectedTeam ? `${selectedTeam.shortCode} · ${selectedTeam.name}` : null}
                 categoryFilter={inboxCategoryFilter}
                 onCategoryFilterChange={setInboxCategoryFilter}
+                hideCategoryFilters
                 includeDone={inboxIncludeDone}
                 onIncludeDoneChange={setInboxIncludeDone}
                 includeDismissed={inboxIncludeDismissed}
                 onIncludeDismissedChange={setInboxIncludeDismissed}
-                onOpenHomeV2={() => setFoundationView("homeV2", setActiveView)}
                 onRunChoice={(_itemId, choiceId) => {
                   if (choiceId !== "open-target") {
                     return;
@@ -21735,253 +21243,6 @@ export default function FoundationPageClient({
           </section>
 
 
-	          {false ? (
-	          <section className={`panel foundation-inbox-panel${getViewClass("inbox")}`} data-testid="foundation-inbox-legacy" id="foundation-inbox">
-	            <div className="panel-header">
-	              <div>
-	                <h2>Inbox</h2>
-	                <p className="muted">Nur dein aktives Team. Highlights, Storylines und klare To-dos statt einer globalen Sammelbox.</p>
-	              </div>
-	              <div className="room-meta foundation-admin-meta">
-	                <span className="pill foundation-source-pill">{getViewSourceBadgeLabel("inbox", activeContextMeta)}</span>
-	                <span className="pill">{activeTeamOpenInboxItems.length} offen</span>
-	                <span className="pill">{activeTeamCriticalInboxItems.length} kritisch</span>
-	              </div>
-	            </div>
-              <div className="foundation-inbox-hero">
-                <article className="foundation-inbox-team-card">
-                  <span>Aktives Team</span>
-                  <strong>{selectedTeam ? `${selectedTeam.shortCode} · ${selectedTeam.name}` : "Kein Team aktiv"}</strong>
-                  <small>
-                    {selectedTeam
-                      ? "Die Inbox zeigt nur Signale, Storys und Aufgaben fuer dieses Team."
-                      : "Waehle ein steuerbares Team, damit die Inbox wieder Signale zeigen kann."}
-                  </small>
-                </article>
-                <article className="foundation-inbox-team-card foundation-inbox-primary-card">
-                  <span>Nächster Fokus</span>
-                  <strong>{inboxPrimaryTeamItem?.title ?? "Gerade ruhig"}</strong>
-                  <small>
-                    {inboxPrimaryTeamItem?.description ??
-                      "Für dein aktives Team gibt es gerade keinen blockierenden Team-To-do-Moment."}
-                  </small>
-                  {inboxPrimaryTeamItem ? (
-                    <div className="foundation-inbox-primary-actions">
-                      <span className={getInboxSeverityPillClass(inboxPrimaryTeamItem.severity)}>
-                        {getInboxSeverityLabel(inboxPrimaryTeamItem.severity)}
-                      </span>
-                      <button className="primary-button inline-button" type="button" onClick={() => navigateToInboxItem(inboxPrimaryTeamItem)}>
-                        Öffnen
-                      </button>
-                    </div>
-                  ) : null}
-                </article>
-                <div className="foundation-inbox-stat-grid">
-                  <article>
-                    <span>Offen</span>
-                    <strong>{activeTeamOpenInboxItems.length}</strong>
-                  </article>
-                  <article>
-                    <span>Kritisch</span>
-                    <strong>{activeTeamCriticalInboxItems.length}</strong>
-                  </article>
-                  <article>
-                    <span>Storys</span>
-                    <strong>{activeTeamStoryInboxItems.length}</strong>
-                  </article>
-                  <article>
-                    <span>Entscheidungen</span>
-                    <strong>{activeTeamDecisionInboxItems.length}</strong>
-                  </article>
-                </div>
-              </div>
-              <div className="foundation-inbox-quick-grid">
-                <article className="foundation-inbox-story-strip">
-                  <div className="panel-header">
-                    <h3>Sofort jetzt</h3>
-                    <span className="pill">{Math.min(activeTeamDecisionInboxItems.length, 3)}</span>
-                  </div>
-                  <div className="foundation-inbox-quick-list">
-                    {activeTeamDecisionInboxItems.slice(0, 3).map((item) => (
-                      <button
-                        key={`inbox-quick-${item.itemId}`}
-                        className={`foundation-inbox-quick-card is-${item.severity}`}
-                        type="button"
-                        onClick={() => navigateToInboxItem(item)}
-                      >
-                        <span className={getInboxSeverityPillClass(item.severity)}>{getInboxSeverityLabel(item.severity)}</span>
-                        <strong>{item.title}</strong>
-                        <small>{item.description}</small>
-                      </button>
-                    ))}
-                    {activeTeamDecisionInboxItems.length === 0 ? (
-                      <p className="muted">Kein akuter Team-Fix offen.</p>
-                    ) : null}
-                  </div>
-                </article>
-                <article className="foundation-inbox-story-strip">
-                  <div className="panel-header">
-                    <h3>Letzte Storyline</h3>
-                    <span className="pill">{inboxLoreItems.length > 0 ? "live" : "ruhig"}</span>
-                  </div>
-                  {inboxLoreItems[0] ? (
-                    <button
-                      className={`foundation-inbox-lore-lead is-${inboxLoreItems[0].severity}`}
-                      type="button"
-                      onClick={() => navigateToInboxItem(inboxLoreItems[0])}
-                    >
-                      <span className="foundation-inbox-story-icon">{getInboxCategoryIcon(inboxLoreItems[0].category)}</span>
-                      <span>
-                        <strong>{inboxLoreItems[0].title}</strong>
-                        <small>{inboxLoreItems[0].description}</small>
-                      </span>
-                    </button>
-                  ) : (
-                    <p className="muted">Noch keine frische Team-Story für diesen Moment.</p>
-                  )}
-                </article>
-              </div>
-	            <div className="foundation-filter-grid">
-	              <label className="filter-field">
-	                <span>Kategorie</span>
-	                <select className="input" value={inboxCategoryFilter} onChange={(event) => setInboxCategoryFilter(event.target.value)}>
-	                  <option value="ALL">Alle Kategorien</option>
-	                  <option value="task">Aufgaben</option>
-	                  <option value="warning">Warnungen</option>
-	                  <option value="news">News</option>
-	                  <option value="result">Results</option>
-	                  <option value="finance">Finanzen</option>
-	                  <option value="transfer">Transfers</option>
-	                  <option value="training">Training</option>
-	                  <option value="contract">Verträge</option>
-	                  <option value="facility">Facilities</option>
-	                </select>
-	              </label>
-	              <label className="filter-field checkbox-field">
-	                <input type="checkbox" checked={inboxIncludeDone} onChange={(event) => setInboxIncludeDone(event.target.checked)} />
-	                <span>Erledigte anzeigen</span>
-	              </label>
-	              <label className="filter-field checkbox-field">
-	                <input type="checkbox" checked={inboxIncludeDismissed} onChange={(event) => setInboxIncludeDismissed(event.target.checked)} />
-	                <span>Ausgeblendete anzeigen</span>
-	              </label>
-	            </div>
-              <div className="foundation-inbox-highlight-grid">
-                {inboxHighlightItems.length > 0 ? (
-                  inboxHighlightItems.map((item) => (
-                    <button
-                      key={`inbox-highlight-${item.itemId}`}
-                      className={`foundation-inbox-highlight-card is-${item.severity}`}
-                      type="button"
-                      onClick={() => navigateToInboxItem(item)}
-                    >
-                      <div className="room-meta foundation-admin-meta">
-                        <span className={getInboxSeverityPillClass(item.severity)}>{getInboxSeverityLabel(item.severity)}</span>
-                        <span className="pill">{getInboxCategoryLabel(item.category)}</span>
-                      </div>
-                      <strong>{item.title}</strong>
-                      <p>{item.description}</p>
-                      <small>{item.matchday ?? item.seasonId}</small>
-                    </button>
-                  ))
-                ) : (
-                  <div className="transfer-callout">
-                    <strong>Keine Team-Highlights</strong>
-                    <span>Aktuell gibt es fuer dieses Team weder kritische Signale noch frische Story-Momente.</span>
-                  </div>
-                )}
-              </div>
-              <div className="foundation-inbox-story-strip">
-                <div className="panel-header">
-                  <h3>Highlights & Lore</h3>
-                  <span className="pill">{inboxLoreItems.length}</span>
-                </div>
-                <div className="foundation-inbox-story-list">
-                  {inboxLoreItems.length > 0 ? (
-                    inboxLoreItems.map((item) => (
-                      <button
-                        key={`inbox-story-${item.itemId}`}
-                        className={`foundation-inbox-story-card is-${item.severity}`}
-                        type="button"
-                        onClick={() => navigateToInboxItem(item)}
-                      >
-                        <span className="foundation-inbox-story-icon">{getInboxCategoryIcon(item.category)}</span>
-                        <span>
-                          <strong>{item.title}</strong>
-                          <small>{item.description}</small>
-                        </span>
-                      </button>
-                    ))
-                  ) : (
-                    <p className="muted">Noch keine Story-Karten oder Reveal-Highlights fuer dieses Team.</p>
-                  )}
-                </div>
-              </div>
-              <div className="panel-header">
-                <h3>Team-Aufgaben</h3>
-                <span className="pill">{visibleInboxItems.length}</span>
-              </div>
-	            <div className="foundation-inbox-list">
-	              {visibleInboxItems.length > 0 ? (
-	                visibleInboxItems.map((item) => {
-	                  return (
-	                    <article key={`inbox-item-${item.itemId}`} className={`foundation-inbox-item is-${item.severity}`}>
-	                      <div>
-	                        <div className="room-meta foundation-admin-meta">
-	                          <span className={getInboxSeverityPillClass(item.severity)}>{getInboxSeverityLabel(item.severity)}</span>
-	                          <span className="pill">{getInboxCategoryLabel(item.category)}</span>
-	                          <span className={getInboxStatusPillClass(item.status)}>{getInboxStatusLabel(item.status)}</span>
-                            <span className="pill">{item.matchday ?? item.seasonId}</span>
-	                        </div>
-	                        <h3>{item.title}</h3>
-	                        <p>{item.description}</p>
-	                        <small className="muted">
-	                          {item.source} · {item.matchday ?? item.seasonId}
-	                        </small>
-	                      </div>
-                        <div className="foundation-inbox-item-actions">
-	                      <button className="primary-button inline-button" type="button" onClick={() => navigateToInboxItem(item)}>
-	                        Öffnen
-	                      </button>
-                          {item.status === "open" ? (
-                            <>
-                              <button
-                                className="secondary-button inline-button"
-                                type="button"
-                                onClick={() => updateInboxItemStatus(item, "done")}
-                              >
-                                Erledigt
-                              </button>
-                              <button
-                                className="secondary-button inline-button"
-                                type="button"
-                                onClick={() => updateInboxItemStatus(item, "dismissed")}
-                              >
-                                Ausblenden
-                              </button>
-                            </>
-                          ) : (
-                            <button
-                              className="secondary-button inline-button"
-                              type="button"
-                              onClick={() => updateInboxItemStatus(item, "open")}
-                            >
-                              Wieder öffnen
-                            </button>
-                          )}
-                        </div>
-	                    </article>
-	                  );
-	                })
-	              ) : (
-	                <div className="transfer-callout">
-	                  <strong>Keine Inbox-Einträge</strong>
-	                  <span>Fuer dieses Team gibt es in den aktuellen Filtern gerade keine offenen Signale.</span>
-	                </div>
-	              )}
-	            </div>
-	          </section>
-          ) : null}
 
 	          <section className={`panel${getViewClass("teamSettings")}`} id="foundation-team-settings">
             <div className="panel-header">
@@ -22292,8 +21553,8 @@ export default function FoundationPageClient({
                                 <div
                                   key={`new-game-team-${team.teamId}`}
                                   className={`team-settings-team-card${isChris ? " is-owned-by-user" : ""}${isFranky ? " is-owned-by-remote" : ""}`}
-                                  onDoubleClick={() => openTeamDrawerById(team.teamId)}
-                                  title="Doppelklick öffnet den Team-Drawer"
+                                  onClick={() => openTeamProfileById(team.teamId)}
+                                  title="Teamprofil öffnen"
                                 >
                                   <strong>{team.shortCode}</strong>
                                   <span>{team.name}</span>
@@ -22431,7 +21692,7 @@ export default function FoundationPageClient({
                                 .filter((team) => team.ownerLabel !== "AI" || team.startRank <= 5 || team.teamId === "R-R")
                                 .sort((a, b) => a.startRank - b.startRank)
                                 .map((team) => (
-                                  <tr key={`new-game-preview-${team.teamId}`} onDoubleClick={() => openTeamDrawerById(team.teamId)}>
+                                  <tr key={`new-game-preview-${team.teamId}`} onClick={() => openTeamProfileById(team.teamId)}>
                                     <td>{team.startRank}</td>
                                     <td>{team.shortCode} · {team.name}</td>
                                     <td>{formatMoney(team.budget)}</td>
@@ -22635,7 +21896,7 @@ export default function FoundationPageClient({
                           </thead>
                           <tbody>
                             {seasonStartResetFeed.teams.map((team) => (
-                              <tr key={`season-start-reset-${team.teamId}`} onDoubleClick={() => openTeamDrawerById(team.teamId)}>
+                              <tr key={`season-start-reset-${team.teamId}`} onClick={() => openTeamProfileById(team.teamId)}>
                                 <td>{team.teamCode} · {team.teamName}</td>
                                 <td>{formatTransfermarktCurrency(team.currentCash)}</td>
                                 <td>{formatTransfermarktCurrency(team.resetCash)}</td>
@@ -22879,31 +22140,10 @@ export default function FoundationPageClient({
                     className="secondary-button"
                     type="button"
                     disabled={!selectedTeam}
-                    title={selectedTeam ? "Oeffnet das aktive Team direkt im Drawer." : "Waehle zuerst ein Team aus."}
-                    onClick={() => selectedTeam && openTeamDrawerById(selectedTeam.teamId)}
+                    title={selectedTeam ? "Teamprofil öffnen" : "Waehle zuerst ein Team aus."}
+                    onClick={() => selectedTeam && openTeamProfileById(selectedTeam.teamId)}
                   >
-                    Team-Drawer
-                  </button>
-                  <button
-                    className="secondary-button"
-                    type="button"
-                    onClick={() => setFoundationView("teams", setActiveView)}
-                  >
-                    Kader öffnen
-                  </button>
-                  <button
-                    className="secondary-button"
-                    type="button"
-                    onClick={() => setFoundationView("marketV2", setActiveView)}
-                  >
-                    Markt öffnen
-                  </button>
-                  <button
-                    className="secondary-button"
-                    type="button"
-                    onClick={() => setFoundationView("lineup", setActiveView)}
-                  >
-                    Einsatzliste
+                    Teamprofil
                   </button>
                 </div>
               </section>
@@ -23001,7 +22241,6 @@ export default function FoundationPageClient({
                         key={team.teamId}
                         className={`team-selector-card${isActive ? " is-active" : ""}`}
                         type="button"
-                        onDoubleClick={() => openTeamDrawerById(team.teamId)}
                         onClick={() => {
                           selectTeamSettingsTeam(team.teamId);
                           setFoundationView("teamSettings", setActiveView);
@@ -24302,7 +23541,7 @@ export default function FoundationPageClient({
                       </thead>
                       <tbody>
                         {sortedMultiSeasonTeamRows.slice(0, 12).map((row) => (
-                          <tr key={row.teamId} onDoubleClick={() => openTeamDrawerById(row.teamId)}>
+                          <tr key={row.teamId} onClick={() => openTeamProfileById(row.teamId)}>
                             {visibleMultiSeasonTeamBalanceColumns.map((column) => (
                               <td key={`${row.teamId}-${column.id}`}>{renderMultiSeasonTeamCell(row, column.id)}</td>
                             ))}
@@ -24346,7 +23585,7 @@ export default function FoundationPageClient({
                       </thead>
                       <tbody>
                         {sortedMultiSeasonEconomyRows.slice(0, 12).map((row) => (
-                          <tr key={row.teamId} onDoubleClick={() => openTeamDrawerById(row.teamId)}>
+                          <tr key={row.teamId} onClick={() => openTeamProfileById(row.teamId)}>
                             {visibleMultiSeasonEconomyColumns.map((column) => (
                               <td key={`${row.teamId}-${column.id}`}>{renderMultiSeasonEconomyCell(row, column.id)}</td>
                             ))}
@@ -24390,7 +23629,7 @@ export default function FoundationPageClient({
                       </thead>
                       <tbody>
                         {sortedMultiSeasonPlayerRows.slice(0, 12).map((row) => (
-                          <tr key={row.playerId} onDoubleClick={() => openPlayerDrawerById(row.playerId)}>
+                          <tr key={row.playerId} onClick={() => void openPlayerDrawerById(row.playerId)}>
                             {visibleMultiSeasonPlayerColumns.map((column) => (
                               <td key={`${row.playerId}-${column.id}`}>{renderMultiSeasonPlayerCell(row, column.id)}</td>
                             ))}
@@ -25181,7 +24420,7 @@ export default function FoundationPageClient({
                           </thead>
                           <tbody>
                             {wholeSeasonDryRunFeed.projectedFinalStandings.slice(0, 12).map((row) => (
-                              <tr key={`whole-season-standing-${row.teamId}`} onDoubleClick={() => openTeamDrawerById(row.teamId)}>
+                              <tr key={`whole-season-standing-${row.teamId}`} onClick={() => openTeamProfileById(row.teamId)}>
                                 <td>{row.rank ?? "—"}</td>
                                 <td>{row.teamName}</td>
                                 <td>{row.points ?? "—"}</td>
@@ -25430,7 +24669,7 @@ export default function FoundationPageClient({
                         </thead>
                         <tbody>
                           {rosterFillFeed.teams.map((entry) => (
-                            <tr key={`roster-fill-${entry.teamId}`} onDoubleClick={() => openTeamDrawerById(entry.teamId)}>
+                            <tr key={`roster-fill-${entry.teamId}`} onClick={() => openTeamProfileById(entry.teamId)}>
                               <td>{entry.teamName}</td>
                               <td>{entry.controlMode}</td>
                               <td>{entry.rosterBefore}</td>
@@ -25778,7 +25017,7 @@ export default function FoundationPageClient({
                         </thead>
                         <tbody>
                           {matchdayMvpScoringFeed.lineupTeams.map((entry) => (
-                            <tr key={`matchday-mvp-lineup-${entry.teamId}`} onDoubleClick={() => openTeamDrawerById(entry.teamId)}>
+                            <tr key={`matchday-mvp-lineup-${entry.teamId}`} onClick={() => openTeamProfileById(entry.teamId)}>
                               <td>{entry.teamName}</td>
                               <td>{entry.controlMode}</td>
                               <td>{entry.autoGenerated ? "auto_lineup_source" : "existing_lineup"}</td>
@@ -25814,7 +25053,7 @@ export default function FoundationPageClient({
                         </thead>
                         <tbody>
                           {matchdayMvpScoringFeed.d1Scoreboard.map((entry) => (
-                            <tr key={`matchday-mvp-d1-${entry.teamId}`} onDoubleClick={() => openTeamDrawerById(entry.teamId)}>
+                            <tr key={`matchday-mvp-d1-${entry.teamId}`} onClick={() => openTeamProfileById(entry.teamId)}>
                               <td>{entry.rank}</td>
                               <td>{entry.teamName}</td>
                               <td>{formatLocalePoints(entry.baseScore, 0)}</td>
@@ -25855,7 +25094,7 @@ export default function FoundationPageClient({
                         </thead>
                         <tbody>
                           {matchdayMvpScoringFeed.d2Scoreboard.map((entry) => (
-                            <tr key={`matchday-mvp-d2-${entry.teamId}`} onDoubleClick={() => openTeamDrawerById(entry.teamId)}>
+                            <tr key={`matchday-mvp-d2-${entry.teamId}`} onClick={() => openTeamProfileById(entry.teamId)}>
                               <td>{entry.rank}</td>
                               <td>{entry.teamName}</td>
                               <td>{formatLocalePoints(entry.baseScore, 0)}</td>
@@ -25891,7 +25130,7 @@ export default function FoundationPageClient({
                         </thead>
                         <tbody>
                           {matchdayMvpScoringFeed.d1TopPlayers.map((entry) => (
-                            <tr key={`matchday-mvp-top-d1-${entry.playerId}-${entry.rankInDiscipline}`} onDoubleClick={() => openPlayerDrawerById(entry.playerId)}>
+                            <tr key={`matchday-mvp-top-d1-${entry.playerId}-${entry.rankInDiscipline}`} onClick={() => void openPlayerDrawerById(entry.playerId)}>
                               <td>{entry.rankInDiscipline}</td>
                               <td>{entry.playerName}</td>
                               <td>{entry.teamName}</td>
@@ -25922,7 +25161,7 @@ export default function FoundationPageClient({
                         </thead>
                         <tbody>
                           {matchdayMvpScoringFeed.d2TopPlayers.map((entry) => (
-                            <tr key={`matchday-mvp-top-d2-${entry.playerId}-${entry.rankInDiscipline}`} onDoubleClick={() => openPlayerDrawerById(entry.playerId)}>
+                            <tr key={`matchday-mvp-top-d2-${entry.playerId}-${entry.rankInDiscipline}`} onClick={() => void openPlayerDrawerById(entry.playerId)}>
                               <td>{entry.rankInDiscipline}</td>
                               <td>{entry.playerName}</td>
                               <td>{entry.teamName}</td>
@@ -25952,7 +25191,7 @@ export default function FoundationPageClient({
                         </thead>
                         <tbody>
                           {matchdayMvpScoringFeed.ppWinners.map((entry) => (
-                            <tr key={`matchday-mvp-pp-${entry.disciplineSide}-${entry.playerId}-${entry.rankInDiscipline}`} onDoubleClick={() => openPlayerDrawerById(entry.playerId)}>
+                            <tr key={`matchday-mvp-pp-${entry.disciplineSide}-${entry.playerId}-${entry.rankInDiscipline}`} onClick={() => void openPlayerDrawerById(entry.playerId)}>
                               <td>{entry.disciplineName}</td>
                               <td>{entry.playerName}</td>
                               <td>{entry.teamName}</td>
@@ -26006,7 +25245,7 @@ export default function FoundationPageClient({
                         <button
                           className="table-link-button"
                           type="button"
-                          onDoubleClick={() => openPlayerDrawerById(player.playerId)}
+                          onClick={() => void openPlayerDrawerById(player.playerId)}
                         >
                           {player.playerName} ({player.teamName})
                         </button>
@@ -26023,7 +25262,7 @@ export default function FoundationPageClient({
                         <button
                           className="table-link-button"
                           type="button"
-                          onDoubleClick={() => openPlayerDrawerById(player.playerId)}
+                          onClick={() => void openPlayerDrawerById(player.playerId)}
                         >
                           {player.playerName} ({player.teamName})
                         </button>
@@ -26932,6 +26171,13 @@ export default function FoundationPageClient({
               defaultTeamId={activeManagerTeamId}
               highlightMissingSlots={Boolean(lineupFocusRequestKey)}
               focusMissingRequestKey={lineupFocusRequestKey}
+              draftBoardView={lineupDraftBoardViewRequest ?? lineupDraftBoardView}
+              onDraftBoardViewChange={(view) => {
+                setLineupDraftBoardView(view);
+                setLineupDraftBoardViewRequest(null);
+                syncFoundationViewInUrl("lineup", view === "formBoard" ? "formplan" : "lineup", null, { push: true });
+              }}
+              shellControlledDraftBoardView
               initialDraftBoardView={lineupDraftBoardViewRequest ?? undefined}
               onDraftBoardViewApplied={() => setLineupDraftBoardViewRequest(null)}
               activeOwnerId={effectiveActiveOwnerId}
@@ -26961,9 +26207,7 @@ export default function FoundationPageClient({
                     <strong>Arena noch nicht bereit</strong>
                     <span>
                       {formatCockpitReason(activeManagerArenaBlockerReason)}
-                      {matchdayArenaReadiness.openLineupSlots > 0
-                        ? ` (${matchdayArenaReadiness.openLineupSlots} offene Slot${matchdayArenaReadiness.openLineupSlots === 1 ? "" : "s"})`
-                        : ""}
+                      {activeManagerArenaGapDetail ? ` (${activeManagerArenaGapDetail})` : null}
                     </span>
                     <div className="foundation-save-actions save-summary-actions" style={{ marginTop: 8 }}>
                       <button className="primary-button inline-button" type="button" onClick={() => setFoundationView("lineup", setActiveView)}>
@@ -26992,7 +26236,7 @@ export default function FoundationPageClient({
                       document.getElementById("arena-result-summary")?.scrollIntoView({ behavior: "smooth", block: "start" });
                     }, 40);
                   }}
-                  onOpenSeason={() => setFoundationView("season", setActiveView)}
+                  onOpenSeason={() => setFoundationView("seasonV2", setActiveView)}
                 />
                 <section className="panel arena-result-summary" id="arena-result-summary" data-testid="arena-result-summary">
                   <div className="panel-header">
@@ -27006,7 +26250,7 @@ export default function FoundationPageClient({
                       <button className="secondary-button inline-button" type="button" onClick={() => setFoundationView("matchdayArena", setActiveView)}>
                         Zur Arena
                       </button>
-                      <button className="secondary-button inline-button" type="button" onClick={() => setFoundationView("season", setActiveView)}>
+                      <button className="secondary-button inline-button" type="button" onClick={() => setFoundationView("seasonV2", setActiveView)}>
                         Saisonstand ansehen
                       </button>
                       {matchdaySummary.hasResult ? (
@@ -27119,7 +26363,7 @@ export default function FoundationPageClient({
                 <button className="secondary-button inline-button" type="button" onClick={() => setFoundationView("matchdayArena", setActiveView)}>
                   Zur Arena
                 </button>
-                <button className="primary-button inline-button" type="button" onClick={() => setFoundationView("season", setActiveView)}>
+                <button className="primary-button inline-button" type="button" onClick={() => setFoundationView("seasonV2", setActiveView)}>
                   Saisonstand anzeigen
                 </button>
               </div>
@@ -27208,7 +26452,7 @@ export default function FoundationPageClient({
                           row.teamId === activeManagerTeamId && "is-active-team-row",
                           getOwnerTeamHighlightClass(resolvedTeamControlSettings[row.teamId]),
                         )}
-                        onDoubleClick={() => openTeamDrawerById(row.teamId)}
+                        onClick={() => openTeamProfileById(row.teamId)}
                       >
                         <td><strong>{row.teamShortCode}</strong> · {row.teamName}</td>
                         <td>{row.matchdayRank ?? "—"}</td>
@@ -27251,700 +26495,8 @@ export default function FoundationPageClient({
             </section>
           </section>
 
-          {activeView === "season" ? (
-          <section className={`panel${getViewClass("season")}`} id="team-table">
-            <div className="panel-header">
-              <div className="stack season-panel-head">
-                <TooltipHeading
-                  as="h2"
-                  tooltip="Kernansicht der Season mit Punkten, Disziplinspalten und Finanzblock. Zusatzlogik bleibt im Expert Modus."
-                >
-                  Saisonstand
-                </TooltipHeading>
-                <p className="muted">
-                  Ausgewählt: {selectedSeasonOverviewLabel} · {seasonOverviewSourceLabel}
-                </p>
-              </div>
-              <div className="season-toolbar">
-                <div className="season-view-switch" role="tablist" aria-label="Saisonstand Ansicht">
-                  <button className="secondary-button inline-button is-active" type="button" aria-pressed="true">
-                    Classic
-                  </button>
-                  <button
-                    className="secondary-button inline-button"
-                    type="button"
-                    aria-pressed="false"
-                    onClick={() => setFoundationView("seasonV2", setActiveView)}
-                  >
-                    V2
-                  </button>
-                </div>
-                <label className="filter-field season-history-select">
-                  <span>Saison anzeigen</span>
-                  <select
-                    className="input"
-                    value={seasonOverviewSeasonId}
-                    onChange={(event) => {
-                      const nextSeasonId = event.target.value;
-                      setSeasonOverviewSeasonId(nextSeasonId);
-                      void reloadSeasonStandingsOverview(nextSeasonId);
-                    }}
-                  >
-                    {seasonOverviewOptions.map((option) => (
-                      <option key={option.seasonId} value={option.seasonId}>
-                        {option.seasonName} {option.status === "active" ? "(aktiv)" : "(Archiv)"}
-                      </option>
-                    ))}
-                  </select>
-                </label>
-                <span className={`pill foundation-source-pill${isViewingArchivedSeason ? " is-readonly" : ""}`}>
-                  {isViewingArchivedSeason ? "read-only archive" : "source: local season results"}
-                </span>
-                <div className="season-toolbar-expert-tools">
-                  <div className="season-jump-links" aria-label="Saisonstand Blöcke">
-                    <button className="secondary-button inline-button" type="button" onClick={() => scrollSeasonTableToColumn("platz")}>
-                      Kern
-                    </button>
-                    <button className="secondary-button inline-button" type="button" onClick={() => scrollSeasonTableToColumn("vertragslange")}>
-                      Finanzen
-                    </button>
-                  </div>
-                  <button
-                    className="primary-button inline-button"
-                    type="button"
-                    disabled={isViewingArchivedSeason || isReadOnlyMode || seasonTransitionBusy || !localSeasonTransitionGate.canCompleteSeason}
-                    title={isViewingArchivedSeason ? "Archivansicht ist read-only." : localSeasonTransitionGate.disabledReason ?? "Saisonwechsel-Assistent öffnen"}
-                    onClick={() => {
-                      void runSeasonTransition("start_transition");
-                    }}
-                  >
-                    Saison abschließen
-                  </button>
-                </div>
-              </div>
-            </div>
-            <div className="training-warning-strip">
-              {isViewingArchivedSeason ? (
-                <>
-                  <span className="transfer-status-pill is-info">Archivmodus</span>
-                  <span>
-                    Archiv-Snapshot: Standings, PPs, Topspieler und Disziplin-Bestenlisten werden aus {selectedSeasonOverviewLabel} geladen.
-                  </span>
-                </>
-              ) : (
-                <>
-                  <span className={`transfer-status-pill ${localSeasonTransitionGate.canCompleteSeason ? "is-ready" : "is-warning"}`}>
-                    GamePhase: {localSeasonTransitionGate.gamePhase}
-                  </span>
-                  <span>
-                    {localSeasonTransitionGate.canCompleteSeason
-                      ? "Letzter Spieltag abgeschlossen · Saisonwechsel-Assistent bereit."
-                      : `Saison abschließen deaktiviert: ${localSeasonTransitionGate.disabledReason ?? "Quelle fehlt"} · letzter Spieltag ${localSeasonTransitionGate.lastMatchdayId}`}
-                  </span>
-                </>
-              )}
-            </div>
-            {isViewingArchivedSeason ? (
-              <div className="teams-summary-grid history-summary-grid season-archive-overview-grid">
-                <article className="metric-card">
-                  <span>Archiv-Teams</span>
-                  <strong>{selectedSeasonSnapshot?.finalStandings.length ?? 0}</strong>
-                  <small>{seasonStandingsFeed?.source.kind === "season_snapshot" ? "Snapshot geladen" : "wartet auf Snapshot"}</small>
-                </article>
-                <article className="metric-card">
-                  <span>Spielerleistungen</span>
-                  <strong>{selectedSeasonSnapshot?.playerPerformances.length ?? 0}</strong>
-                  <small>für Top-Player & Drawer-Historie</small>
-                </article>
-                <article className="metric-card">
-                  <span>Disziplin-Boards</span>
-                  <strong>{archivedSeasonDisciplineLeaderboards.length}</strong>
-                  <small>aus Performance-Breakdowns</small>
-                </article>
-                <article className="metric-card">
-                  <span>Diszi-Results</span>
-                  <strong>{selectedSeasonSnapshot?.disciplineResults?.length ?? 0}</strong>
-                  <small>roh im Snapshot gespeichert</small>
-                </article>
-                <article className="metric-card">
-                  <span>Transfers</span>
-                  <strong>{selectedSeasonSnapshot?.transferSnapshots?.length ?? 0}</strong>
-                  <small>historisch im Save</small>
-                </article>
-              </div>
-            ) : null}
-            <div className="table-shell season-table-shell" ref={seasonTableShellRef}>
-              <table className={`team-table season-standings-table season-standings-table-${seasonTableMode}`}>
-                <colgroup>
-                  {visibleSeasonTableColumns.map((column) => (
-                    <col key={column.id} style={{ width: `${getSeasonTableColumnWidth(column)}px` }} />
-                  ))}
-                </colgroup>
-                <thead>
-                  <tr>
-                    {visibleSeasonTableColumns.map((column) => (
-                      <th
-                        key={column.id}
-                        className={getSeasonTableCellClass(column.id)}
-                        {...getTableHeaderDragProps("seasonTable", column, visibleSeasonTableColumns)}
-                        style={{
-                          width: `${getSeasonTableColumnWidth(column)}px`,
-                          minWidth: `${column.minWidth}px`,
-                          ...(seasonTablePinnedOffsets.has(column.id)
-                            ? {
-                                position: "sticky",
-                                left: `${seasonTablePinnedOffsets.get(column.id) ?? 0}px`,
-                                zIndex: getSeasonPinnedZIndex(column.id, true),
-                              }
-                            : {}),
-                          ...(column.id !== "actions"
-                            ? (() => {
-                                const contractColumn = getSeasonContractColumn(column.id);
-                                return contractColumn
-                                  ? {
-                                      textAlign: saisonstandDisciplineColumns.includes(
-                                        contractColumn.normalizedKey as (typeof saisonstandDisciplineColumns)[number],
-                                      )
-                                        ? "center"
-                                        : contractColumn.alignment === "right"
-                                          ? "right"
-                                          : contractColumn.normalizedKey === "mannschaft"
-                                            ? "left"
-                                            : "left",
-                                      background: contractColumn.headerBackgroundColor ?? undefined,
-                                      color: contractColumn.headerTextColor ?? undefined,
-                                    }
-                                  : {};
-                              })()
-                            : {}),
-                        }}
-                      >
-                        <div className="resizable-header-cell">
-                          {column.id === "actions" ? (
-                            <span>Aktion</span>
-                          ) : (
-                            <SortableHeader
-                              label={column.label}
-                              tableId="teamTable"
-                              columnKey={column.dataKey}
-                              sortState={tableSorts.teamTable}
-                              onToggle={toggleTableSort}
-                              tooltip={column.tooltip}
-                            />
-                          )}
-                          <span
-                            className="column-resizer"
-                            draggable={false}
-                            role="separator"
-                            aria-orientation="vertical"
-                            aria-label={`${column.label} Breite anpassen`}
-                            onMouseDown={(event) => startTableColumnResize("seasonTable", column, event)}
-                            onDoubleClick={() => resetTableColumnWidth("seasonTable", column)}
-                          />
-                        </div>
-                      </th>
-                    ))}
-                  </tr>
-                </thead>
-                <tbody>
-                  {sortedSeasonStandRows.map((row, rowIndex) => (
-                    <tr
-                      key={row.team.teamId}
-                      className={joinClassNames(
-                        "season-standings-row",
-                        selectedTeam?.teamId === row.team.teamId && "is-selected",
-                        row.team.teamId === activeManagerTeamId && "is-active-team",
-                        row.rank != null && row.rank <= 3 && `is-podium-${row.rank}`,
-                        getOwnerTeamHighlightClass(resolvedTeamControlSettings[row.team.teamId]),
-                      )}
-                      onDoubleClick={() => openTeamDrawerById(row.team.teamId)}
-                    >
-                      {visibleSeasonTableColumns.map((column) => {
-                        if (column.id !== "actions") {
-                          const contractColumn = getSeasonContractColumn(column.id);
-                          if (!contractColumn) {
-                            return <td key={column.id}>—</td>;
-                          }
-                          return (
-                            <td
-                              key={column.id}
-                              className={(() => {
-                                const baseClass = getSeasonTableCellClass(column.id);
-                                if (column.id === "platzierung" && row.sponsorRank != null && row.sponsorRank !== 0) {
-                                  return joinClassNames(
-                                    baseClass,
-                                    row.sponsorRank > 0
-                                      ? "season-standings-cell-placement-positive"
-                                      : "season-standings-cell-placement-negative",
-                                  );
-                                }
-                                if (column.id === "punkte" && (row.points ?? 0) > 0) {
-                                  return `${baseClass} ${getSeasonMatrixRankClass(rowIndex + 1)}`.trim();
-                                }
-                                if (
-                                  saisonstandDisciplineColumns.includes(column.id as (typeof saisonstandDisciplineColumns)[number]) &&
-                                  (row.disciplineValues[column.id] ?? 0) > 0
-                                ) {
-                                  const disciplineRank =
-                                    seasonDisciplineRankMaps[column.id as (typeof saisonstandDisciplineColumns)[number]]?.get(row.teamId) ?? null;
-                                  return disciplineRank
-                                    ? `${baseClass} ${getSeasonMatrixRankClass(disciplineRank)}`.trim()
-                                    : baseClass;
-                                }
-                                return baseClass;
-                              })()}
-                              style={{
-                                ...(seasonTablePinnedOffsets.has(column.id)
-                                  ? {
-                                      position: "sticky",
-                                      left: `${seasonTablePinnedOffsets.get(column.id) ?? 0}px`,
-                                      zIndex: getSeasonPinnedZIndex(column.id, false),
-                                    }
-                                  : {}),
-                                textAlign: saisonstandDisciplineColumns.includes(
-                                  contractColumn.normalizedKey as (typeof saisonstandDisciplineColumns)[number],
-                                )
-                                  ? "center"
-                                  : saisonstandFinanceColumns.includes(
-                                      contractColumn.normalizedKey as (typeof saisonstandFinanceColumns)[number],
-                                    )
-                                    ? "center"
-                                  : contractColumn.alignment === "right"
-                                    ? "right"
-                                    : contractColumn.normalizedKey === "mannschaft"
-                                      ? "left"
-                                      : "left",
-                              }}
-                            >
-                              {renderSeasonContractCell(row, contractColumn)}
-                            </td>
-                          );
-                        }
-                        return (
-                          <td key={column.id} className={getSeasonTableCellClass(column.id)}>
-                            <button className="secondary-button inline-button" type="button" onClick={() => { setActiveManagerTeam(row.team.teamId, "manual_select"); setActiveView("teams"); }}>
-                              Ansehen
-                            </button>
-                          </td>
-                        );
-                      })}
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-            <div className="season-pp-layout">
-              <div className="season-pp-summary">
-                <div className="panel-header season-subpanel-header">
-                  <div className="stack">
-                    <TooltipHeading
-                      as="h3"
-                      tooltip="Summe aus POW, SPE, MEN und SOC je Team. Werte in Klammern, z.B. (+8), zeigen den reinen Formkartenbonus, der in diese Punkte eingeflossen ist. Top 3 sind stark markiert, Rang 4-10 markiert, ab Rang 11 neutral."
-                    >
-                      PPs pro Bereich
-                    </TooltipHeading>
-                  </div>
-                </div>
-                <div className="table-shell narrow-table-shell season-pp-summary-shell">
-                  <table className="team-table pp-table season-pp-table">
-                    <thead>
-                      <tr>
-                        <th><SortableHeader label="Rank" tableId="ppArea" columnKey="rank" sortState={tableSorts.ppArea} onToggle={toggleTableSort} /></th>
-                        <th><SortableHeader label="Team" tableId="ppArea" columnKey="team" sortState={tableSorts.ppArea} onToggle={toggleTableSort} /></th>
-                        <th className="pp-head-pps"><SortableHeader label="PPs" tableId="ppArea" columnKey="pps" sortState={tableSorts.ppArea} onToggle={toggleTableSort} /></th>
-                        <th className="pp-head-pow"><SortableHeader label="PP Pow" tableId="ppArea" columnKey="pow" sortState={tableSorts.ppArea} onToggle={toggleTableSort} /></th>
-                        <th className="pp-head-spe"><SortableHeader label="PP Spe" tableId="ppArea" columnKey="spe" sortState={tableSorts.ppArea} onToggle={toggleTableSort} /></th>
-                        <th className="pp-head-men"><SortableHeader label="PP Men" tableId="ppArea" columnKey="men" sortState={tableSorts.ppArea} onToggle={toggleTableSort} /></th>
-                        <th className="pp-head-soc"><SortableHeader label="PP Soc" tableId="ppArea" columnKey="soc" sortState={tableSorts.ppArea} onToggle={toggleTableSort} /></th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {sortedPpAreaRows.map((row) => {
-                        const teamId = row.team.teamId;
-                        return (
-                          <tr key={`season-pp-${row.team.teamId}`} onDoubleClick={() => openTeamDrawerById(row.team.teamId)}>
-                            <td>{row.rank}</td>
-                            <td>{row.team.name}</td>
-                            <td className={ppAreaRankClassMaps.total.get(teamId) || undefined}>
-                              {renderMetricBar(row.pps.total, {
-                                tone: "pps",
-                                pool: ppAreaMetricPools.total,
-                                fallbackMax: 300,
-                                format: (value) => formatPpsValue(value),
-                                detail: formatPpFormBonus(row.formBonus.total),
-                                detailNegative: (row.formBonus.total ?? 0) < 0,
-                              })}
-                            </td>
-                            <td className={ppAreaRankClassMaps.pow.get(teamId) || undefined}>
-                              {renderMetricBar(row.pps.pow, {
-                                tone: "pow",
-                                pool: ppAreaMetricPools.pow,
-                                fallbackMax: 120,
-                                format: (value) => formatPpsValue(value),
-                                detail: formatPpFormBonus(row.formBonus.pow),
-                                detailNegative: (row.formBonus.pow ?? 0) < 0,
-                              })}
-                            </td>
-                            <td className={ppAreaRankClassMaps.spe.get(teamId) || undefined}>
-                              {renderMetricBar(row.pps.spe, {
-                                tone: "spe",
-                                pool: ppAreaMetricPools.spe,
-                                fallbackMax: 120,
-                                format: (value) => formatPpsValue(value),
-                                detail: formatPpFormBonus(row.formBonus.spe),
-                                detailNegative: (row.formBonus.spe ?? 0) < 0,
-                              })}
-                            </td>
-                            <td className={ppAreaRankClassMaps.men.get(teamId) || undefined}>
-                              {renderMetricBar(row.pps.men, {
-                                tone: "men",
-                                pool: ppAreaMetricPools.men,
-                                fallbackMax: 120,
-                                format: (value) => formatPpsValue(value),
-                                detail: formatPpFormBonus(row.formBonus.men),
-                                detailNegative: (row.formBonus.men ?? 0) < 0,
-                              })}
-                            </td>
-                            <td className={ppAreaRankClassMaps.soc.get(teamId) || undefined}>
-                              {renderMetricBar(row.pps.soc, {
-                                tone: "soc",
-                                pool: ppAreaMetricPools.soc,
-                                fallbackMax: 120,
-                                format: (value) => formatPpsValue(value),
-                                detail: formatPpFormBonus(row.formBonus.soc),
-                                detailNegative: (row.formBonus.soc ?? 0) < 0,
-                              })}
-                            </td>
-                          </tr>
-                        );
-                      })}
-                    </tbody>
-                  </table>
-                </div>
-              </div>
-              <div className="season-top-players-panel">
-                <div className="panel-header season-subpanel-header season-top-players-header">
-                  <div className="stack">
-                    <TooltipHeading
-                      as="h3"
-                      tooltip="Top 20 Spieler der gewählten Season nach gespeicherten Season-PPs. Im Archivmodus kommen die Werte aus dem Season-Snapshot."
-                    >
-                      Top Player {selectedSeasonOverviewLabel}
-                    </TooltipHeading>
-                  </div>
-                  <button
-                    className="secondary-button inline-button"
-                    type="button"
-                    onClick={() => setShowSeasonTopPlayerAreas((current) => !current)}
-                    title={showSeasonTopPlayerAreas ? "PP-Bereiche einklappen" : "PP-Bereiche ausklappen"}
-                  >
-                    PP-Bereiche
-                  </button>
-                </div>
-                <div className="table-shell season-top-players-shell">
-                  <table className="team-table compact-table season-top-players-table">
-                    <thead>
-                      <tr>
-                        <th><SortableHeader label="#" tableId="seasonTopPlayers" columnKey="rank" sortState={tableSorts.seasonTopPlayers} onToggle={toggleTableSort} /></th>
-                        <th><SortableHeader label="Spieler" tableId="seasonTopPlayers" columnKey="name" sortState={tableSorts.seasonTopPlayers} onToggle={toggleTableSort} /></th>
-                        <th><SortableHeader label="Team" tableId="seasonTopPlayers" columnKey="team" sortState={tableSorts.seasonTopPlayers} onToggle={toggleTableSort} /></th>
-                        <th className="pp-head-pps"><SortableHeader label="PPs" tableId="seasonTopPlayers" columnKey="pps" sortState={tableSorts.seasonTopPlayers} onToggle={toggleTableSort} /></th>
-                        {showSeasonTopPlayerAreas ? (
-                          <>
-                            <th className="pp-head-pow"><SortableHeader label="POW" tableId="seasonTopPlayers" columnKey="pow" sortState={tableSorts.seasonTopPlayers} onToggle={toggleTableSort} /></th>
-                            <th className="pp-head-spe"><SortableHeader label="SPE" tableId="seasonTopPlayers" columnKey="spe" sortState={tableSorts.seasonTopPlayers} onToggle={toggleTableSort} /></th>
-                            <th className="pp-head-men"><SortableHeader label="MEN" tableId="seasonTopPlayers" columnKey="men" sortState={tableSorts.seasonTopPlayers} onToggle={toggleTableSort} /></th>
-                            <th className="pp-head-soc"><SortableHeader label="SOC" tableId="seasonTopPlayers" columnKey="soc" sortState={tableSorts.seasonTopPlayers} onToggle={toggleTableSort} /></th>
-                          </>
-                        ) : null}
-                        <th><SortableHeader label="OVR" tableId="seasonTopPlayers" columnKey="ovr" sortState={tableSorts.seasonTopPlayers} onToggle={toggleTableSort} /></th>
-                        <th><SortableHeader label="MVS" tableId="seasonTopPlayers" columnKey="mvs" sortState={tableSorts.seasonTopPlayers} onToggle={toggleTableSort} /></th>
-                        <th><SortableHeader label="MW" tableId="seasonTopPlayers" columnKey="marketValue" sortState={tableSorts.seasonTopPlayers} onToggle={toggleTableSort} /></th>
-                        <th><SortableHeader label="Bracket" tableId="seasonTopPlayers" columnKey="bracket" sortState={tableSorts.seasonTopPlayers} onToggle={toggleTableSort} /></th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {sortedSeasonTopPlayerRows.map((row) => {
-                        return (
-                          <tr
-                            key={`season-top-player-${row.playerId}`}
-                            className={joinClassNames(
-                              "season-top-player-row",
-                              row.rank <= 3 && `is-top-${row.rank}`,
-                            )}
-                            onDoubleClick={() => openPlayerDrawerById(row.playerId)}
-                          >
-                            <td>{row.rank}</td>
-                            <td>
-                              <button
-                                className="season-top-player-name-button"
-                                type="button"
-                                onClick={(event) => {
-                                  event.stopPropagation();
-                                  openPlayerDrawerById(row.playerId);
-                                }}
-                                title={`${row.name} öffnen`}
-                              >
-                                <span className="table-player-cell">
-                                  <strong>{row.name}</strong>
-                                  <span className="season-top-player-class-line">
-                                    <ClassIcon
-                                      classNameValue={row.className}
-                                      className="season-top-player-class-chip"
-                                      iconClassName="season-top-player-class-icon"
-                                    />
-                                  </span>
-                                </span>
-                              </button>
-                            </td>
-                            <td>
-                              {row.teamId ? (
-                                <button
-                                  className="table-link-button season-top-player-team-link season-top-player-team-tag"
-                                  style={getSeasonTopPlayerTeamTagStyle(row.teamCode)}
-                                  type="button"
-                                  onClick={(event) => {
-                                    event.stopPropagation();
-                                    openTeamDrawerById(row.teamId!);
-                                  }}
-                                  title={`${row.teamName} öffnen`}
-                                >
-                                  {row.teamCode ?? row.teamName ?? "—"}
-                                </button>
-                              ) : (
-                                <span
-                                  className="season-top-player-team-link season-top-player-team-tag is-empty"
-                                  style={getSeasonTopPlayerTeamTagStyle(row.teamCode)}
-                                >
-                                  {row.teamCode ?? "—"}
-                                </span>
-                              )}
-                            </td>
-                            <td className={seasonTopPlayerRankClassMaps.pps.get(row.playerId) || undefined}>
-                              {renderMetricBar(row.pps, {
-                                tone: "pps",
-                                pool: seasonTopPlayerMetricPools.pps,
-                                fallbackMax: 120,
-                                format: (value) => formatPpsValue(value),
-                              })}
-                            </td>
-                            {showSeasonTopPlayerAreas ? (
-                              <>
-                                <td className={seasonTopPlayerRankClassMaps.pow.get(row.playerId) || undefined}>
-                                  {renderMetricBar(row.ppPow, {
-                                    tone: "pow",
-                                    pool: seasonTopPlayerMetricPools.pow,
-                                    fallbackMax: 60,
-                                    format: (value) => formatPpsValue(value),
-                                  })}
-                                </td>
-                                <td className={seasonTopPlayerRankClassMaps.spe.get(row.playerId) || undefined}>
-                                  {renderMetricBar(row.ppSpe, {
-                                    tone: "spe",
-                                    pool: seasonTopPlayerMetricPools.spe,
-                                    fallbackMax: 60,
-                                    format: (value) => formatPpsValue(value),
-                                  })}
-                                </td>
-                                <td className={seasonTopPlayerRankClassMaps.men.get(row.playerId) || undefined}>
-                                  {renderMetricBar(row.ppMen, {
-                                    tone: "men",
-                                    pool: seasonTopPlayerMetricPools.men,
-                                    fallbackMax: 60,
-                                    format: (value) => formatPpsValue(value),
-                                  })}
-                                </td>
-                                <td className={seasonTopPlayerRankClassMaps.soc.get(row.playerId) || undefined}>
-                                  {renderMetricBar(row.ppSoc, {
-                                    tone: "soc",
-                                    pool: seasonTopPlayerMetricPools.soc,
-                                    fallbackMax: 60,
-                                    format: (value) => formatPpsValue(value),
-                                  })}
-                                </td>
-                              </>
-                            ) : null}
-                            <td className={seasonTopPlayerRankClassMaps.ovr.get(row.playerId) || undefined}>
-                              {renderMetricBar(row.ovr, {
-                                tone: "ovr",
-                                pool: seasonTopPlayerMetricPools.ovr,
-                                fallbackMax: 100,
-                                format: (value) => formatWholeNumber(value),
-                              })}
-                            </td>
-                            <td className={seasonTopPlayerRankClassMaps.mvs.get(row.playerId) || undefined}>
-                              {renderMetricBar(row.mvs, {
-                                tone: "mvs",
-                                pool: seasonTopPlayerMetricPools.mvs,
-                                fallbackMax: 40,
-                                format: (value) => formatPpsValue(value),
-                              })}
-                            </td>
-                            <td>{formatLocalePoints(row.marketValue, 2)}</td>
-                            <td>{row.bracket ?? "—"}</td>
-                          </tr>
-                        );
-                      })}
-                    </tbody>
-                  </table>
-                </div>
-              </div>
-            </div>
-            {isViewingArchivedSeason ? (
-              <section className="season-archive-discipline-panel">
-                <div className="panel-header season-subpanel-header">
-                  <div className="stack">
-                    <TooltipHeading
-                      as="h3"
-                      tooltip="Archivierte Disziplin-Bestenlisten aus den gespeicherten Player-Performance-Breakdowns der gewählten Season. Sortiert nach gespeicherten PPs/Contribution, dann Durchschnittsscore."
-                    >
-                      Disziplin-Ergebnisse {selectedSeasonOverviewLabel}
-                    </TooltipHeading>
-                    <span className="muted">Archivansicht · keine aktiven S2-Werte gemischt.</span>
-                  </div>
-                </div>
-                <div className="season-archive-discipline-grid">
-                  {archivedSeasonDisciplineLeaderboards.slice(0, 18).map((discipline) => (
-                    <article key={`archive-discipline-${discipline.disciplineId}`} className="season-archive-discipline-card">
-                      <header>
-                        <strong>{discipline.disciplineName}</strong>
-                        <span>{discipline.players.length} Spieler</span>
-                      </header>
-                      <ol>
-                        {discipline.players.map((player, index) => (
-                          <li
-                            key={`${discipline.disciplineId}-${player.playerId}`}
-                            onDoubleClick={() => openPlayerDrawerById(player.playerId)}
-                            title="Doppelklick öffnet den Spieler-Drawer"
-                          >
-                            <span>
-                              <strong>#{index + 1} {player.playerName}</strong>
-                              <small>{player.teamCode ?? player.teamName ?? "—"} · {player.appearances} Eins.</small>
-                            </span>
-                            <span>
-                              {player.totalContribution != null ? formatLocalePoints(player.totalContribution, 1) : "—"}
-                              <small>Ø {player.averageFinalScore != null ? formatLocalePoints(player.averageFinalScore, 1) : "—"}</small>
-                            </span>
-                          </li>
-                        ))}
-                      </ol>
-                    </article>
-                  ))}
-                  {archivedSeasonDisciplineLeaderboards.length === 0 ? (
-                    <p className="muted">Kein gespeicherter Disziplin-Breakdown in diesem Snapshot.</p>
-                  ) : null}
-                </div>
-              </section>
-            ) : null}
-            <details className="season-history-panel" open={false}>
-              <summary className="season-history-summary">
-                Historie anzeigen
-                <span className="muted">
-                  {seasonHistorySnapshots.length > 0
-                    ? `${seasonHistorySnapshots.length} archivierte Saisonstaende lokal gespeichert.`
-                    : "Noch keine archivierte Saison vorhanden."}
-                </span>
-              </summary>
-              <div className="cockpit-actions season-history-actions">
-                <button
-                  className="secondary-button inline-button"
-                  type="button"
-                  disabled={isReadOnlyMode || cockpitBusyKey != null}
-                  onClick={() => {
-                    void runSeasonSnapshotAction(false);
-                  }}
-                >
-                  Snapshot DryRun pruefen
-                </button>
-                <button
-                  className="primary-button inline-button"
-                  type="button"
-                  disabled={isReadOnlyMode || cockpitBusyKey != null || cockpitSeasonSnapshotStatus.status !== "ready"}
-                  onClick={() => {
-                    const confirmed = window.confirm(
-                      "Season Snapshot archiviert die aktuelle lokale Saisonhistorie read-only im Save. Fortfahren?",
-                    );
-                    if (!confirmed) return;
-                    void runSeasonSnapshotAction(true);
-                  }}
-                >
-                  Season Snapshot lokal speichern
-                </button>
-              </div>
-              {seasonSnapshotFeed ? (
-                <ul className="warning-list compact-list cockpit-detail-list">
-                  <li>Status: {seasonSnapshotFeed.snapshot.status ?? "—"}</li>
-                  <li>Season completed: {String(seasonSnapshotFeed.seasonCompleted)}</li>
-                  <li>Duplicate: {String(seasonSnapshotFeed.duplicateDetected)}</li>
-                  <li>Player Performances: {seasonSnapshotFeed.snapshot.playerPerformances.length}</li>
-                  <li>Transfers: {seasonSnapshotFeed.snapshot.transferSnapshots?.length ?? 0}</li>
-                </ul>
-              ) : null}
-              {(seasonSnapshotFeed?.blockingReasons.length ?? 0) > 0 ? (
-                <ul className="warning-list compact-list cockpit-detail-list cockpit-detail-list-warning">
-                  {seasonSnapshotFeed?.blockingReasons.slice(0, 4).map((reason) => (
-                    <li key={reason}>{formatCockpitReason(reason)}</li>
-                  ))}
-                </ul>
-              ) : null}
-              {seasonHistorySnapshots.length > 0 ? (
-                <div className="season-history-stack">
-                  {seasonHistorySnapshots.map((snapshot) => (
-                    <section key={snapshot.seasonId} className="season-history-card">
-                      <div className="season-history-card-header">
-                        <div className="stack">
-                          <h4>{snapshot.seasonName}</h4>
-                          <p className="muted">
-                            Archiviert {new Date(snapshot.archivedAt).toLocaleString("de-DE")} · Teams{" "}
-                            {snapshot.finalStandings.length} · Spielerleistungen {snapshot.playerPerformances.length}
-                          </p>
-                        </div>
-                      </div>
-                      <div className="table-shell season-history-shell">
-                        <table className="team-table season-history-table">
-                          <thead>
-                            <tr>
-                              <th>Platz</th>
-                              <th>Team</th>
-                              <th>Punkte</th>
-                              <th>POW</th>
-                              <th>SPE</th>
-                              <th>MEN</th>
-                              <th>SOC</th>
-                              <th>Cash Ende</th>
-                              <th>Kader</th>
-                              <th>Transfers</th>
-                            </tr>
-                          </thead>
-                          <tbody>
-                            {snapshot.finalStandings.map((row) => (
-                              <tr key={`${snapshot.seasonId}-${row.teamId}`} onDoubleClick={() => openTeamDrawerById(row.teamId)}>
-                                <td>{row.rank ?? "—"}</td>
-                                <td>{row.teamName}</td>
-                                <td>{row.points != null ? formatLocalePoints(row.points, 1) : "—"}</td>
-                                <td>{row.disciplinePointsByArea.pow != null ? formatLocalePoints(row.disciplinePointsByArea.pow, 1) : "—"}</td>
-                                <td>{row.disciplinePointsByArea.spe != null ? formatLocalePoints(row.disciplinePointsByArea.spe, 1) : "—"}</td>
-                                <td>{row.disciplinePointsByArea.men != null ? formatLocalePoints(row.disciplinePointsByArea.men, 1) : "—"}</td>
-                                <td>{row.disciplinePointsByArea.soc != null ? formatLocalePoints(row.disciplinePointsByArea.soc, 1) : "—"}</td>
-                                <td>{row.cashEnd != null ? formatMoney(row.cashEnd) : "—"}</td>
-                                <td>{row.rosterEnd}</td>
-                                <td>{row.transferNet != null ? formatLocalePoints(row.transferNet, 1) : "—"}</td>
-                              </tr>
-                            ))}
-                          </tbody>
-                        </table>
-                      </div>
-                    </section>
-                  ))}
-                </div>
-              ) : (
-                <p className="muted season-history-empty">Fresh Season ohne Historie: archivierte Saisonstaende erscheinen erst nach einem echten Season-Abschluss.</p>
-              )}
-            </details>
-          </section>
-          ) : null}
 
-          {(activeView === "seasonV2" || activeView === "season") ? (
+          {(activeView === "seasonV2") ? (
           <section className="panel" id="foundation-season-v2">
             {activeView === "seasonV2" ? (
               <SeasonStandingsV2Client
@@ -27969,9 +26521,10 @@ export default function FoundationPageClient({
                   setSeasonOverviewSeasonId(seasonId);
                   void reloadSeasonStandingsOverview(seasonId);
                 }}
-                onOpenTeam={(teamId) => openTeamDrawerById(teamId)}
-                onOpenPlayer={(playerId) => openPlayerDrawerById(playerId)}
-                onOpenClassic={() => setFoundationView("season", setActiveView)}
+                onOpenTeam={(teamId) => openTeamProfileById(teamId)}
+                onOpenPlayer={(playerId) => openPlayerProfileById(playerId)}
+                viewMode={seasonStandingsMode}
+                onViewModeChange={setSeasonStandingsMode}
                 onOpenRanks={() => setFoundationView("ranks", setActiveView)}
                 onOpenPrize={() => setFoundationView("prize", setActiveView)}
               />
@@ -28084,7 +26637,7 @@ export default function FoundationPageClient({
                 </thead>
                 <tbody>
                   {sortedStandingsPreviewRows.map((row) => (
-                    <tr key={row.teamId} onDoubleClick={() => openTeamDrawerById(row.teamId)}>
+                    <tr key={row.teamId} onClick={() => openTeamProfileById(row.teamId)}>
                       {visibleStandingsPreviewColumns.map((column) => {
                         if (column.id === "team") return <td key={column.id}><div className="table-team-cell"><strong>{row.teamName}</strong><span>{row.teamId}</span></div></td>;
                         if (column.id === "warnings") return <td key={column.id}>{row.warnings.join(", ") || "—"}</td>;
@@ -28191,7 +26744,7 @@ export default function FoundationPageClient({
                 </thead>
                 <tbody>
                   {sortedPlayersTableRows.slice(0, 160).map((row) => (
-                    <tr key={row.player.id} onDoubleClick={() => openPlayerDrawerById(row.player.id, row.roster?.id)}>
+                    <tr key={row.player.id} onClick={() => void openPlayerDrawerById(row.player.id, row.roster?.id)}>
                       {visiblePlayersTableColumns.map((column) => {
                         if (column.id === "image") {
                           const portrait = getPlayerPortraitModel(row.player);
@@ -28217,7 +26770,23 @@ export default function FoundationPageClient({
                           );
                         }
                         if (column.id === "name") {
-                          return <td key={column.id}><div className="table-player-cell"><strong>{row.player.name}</strong><span>{row.seasonPerformance?.sourceLabel ?? row.transferStatus}</span></div></td>;
+                          return (
+                            <td key={column.id}>
+                              <div className="table-player-cell">
+                                <button
+                                  className="table-link-button"
+                                  type="button"
+                                  onClick={(event) => {
+                                    event.stopPropagation();
+                                    openPlayerDrawerById(row.player.id, row.roster?.id);
+                                  }}
+                                >
+                                  {row.player.name}
+                                </button>
+                                <span>{row.seasonPerformance?.sourceLabel ?? row.transferStatus}</span>
+                              </div>
+                            </td>
+                          );
                         }
                         if (column.id === "team") {
                           const teamLogo = row.team ? getTeamLogoModel(row.team) : null;
@@ -28229,11 +26798,8 @@ export default function FoundationPageClient({
                                 onClick={(event) => {
                                   event.stopPropagation();
                                   if (row.team) {
-                                    openTeamDrawerById(row.team.teamId);
+                                    openTeamProfileById(row.team.teamId);
                                   }
-                                }}
-                                onDoubleClick={(event) => {
-                                  event.stopPropagation();
                                 }}
                               >
                                 {teamLogo?.src ? (
@@ -28373,7 +26939,7 @@ export default function FoundationPageClient({
                     </thead>
                     <tbody>
                       {playerEconomyCompareReport.summary.topLegacyOvervaluedPlayers.slice(0, 10).map((entry) => (
-                        <tr key={`over-${entry.playerId}`} onDoubleClick={() => openPlayerDrawerById(entry.playerId)}>
+                        <tr key={`over-${entry.playerId}`} onClick={() => void openPlayerDrawerById(entry.playerId)}>
                           <td>{entry.name}</td>
                           <td>{entry.teamCode ?? "FA"}</td>
                           <td>{entry.className ?? "—"}</td>
@@ -28409,7 +26975,7 @@ export default function FoundationPageClient({
                     </thead>
                     <tbody>
                       {playerEconomyCompareReport.summary.topLegacyUndervaluedPlayers.slice(0, 10).map((entry) => (
-                        <tr key={`under-${entry.playerId}`} onDoubleClick={() => openPlayerDrawerById(entry.playerId)}>
+                        <tr key={`under-${entry.playerId}`} onClick={() => void openPlayerDrawerById(entry.playerId)}>
                           <td>{entry.name}</td>
                           <td>{entry.teamCode ?? "FA"}</td>
                           <td>{entry.className ?? "—"}</td>
@@ -28446,7 +27012,7 @@ export default function FoundationPageClient({
                   </thead>
                   <tbody>
                     {playerEconomyCompareReport.summary.topSalaryOutliers.slice(0, 12).map((entry) => (
-                      <tr key={`salary-${entry.playerId}`} onDoubleClick={() => openPlayerDrawerById(entry.playerId)}>
+                      <tr key={`salary-${entry.playerId}`} onClick={() => void openPlayerDrawerById(entry.playerId)}>
                         <td>{entry.name}</td>
                         <td>{entry.teamCode ?? "FA"}</td>
                         <td>{formatNullableMoney(entry.legacyValue)}</td>
@@ -28482,14 +27048,14 @@ export default function FoundationPageClient({
                     </thead>
                     <tbody>
                       {playerEconomyCompareReport.summary.salaryFloorAppliedPlayers.slice(0, 6).map((entry) => (
-                        <tr key={`floor-${entry.playerId}`} onDoubleClick={() => openPlayerDrawerById(entry.playerId)}>
+                        <tr key={`floor-${entry.playerId}`} onClick={() => void openPlayerDrawerById(entry.playerId)}>
                           <td>{entry.name}</td>
                           <td>{entry.teamCode ?? "FA"}</td>
                           <td>{entry.outlierFlags.join(", ")}</td>
                         </tr>
                       ))}
                       {playerEconomyCompareReport.summary.playersWithMissingSources.slice(0, 6).map((entry) => (
-                        <tr key={`missing-${entry.playerId}`} onDoubleClick={() => openPlayerDrawerById(entry.playerId)}>
+                        <tr key={`missing-${entry.playerId}`} onClick={() => void openPlayerDrawerById(entry.playerId)}>
                           <td>{entry.name}</td>
                           <td>{entry.teamCode ?? "FA"}</td>
                           <td>{entry.missingSources.join(", ")}</td>
@@ -28535,212 +27101,6 @@ export default function FoundationPageClient({
                 </div>
               </section>
             </div>
-          </section>
-          ) : null}
-
-          {activeView === "teams" ? (
-          <section className="panel teams-view-panel" id="teams-view">
-            {showTeamsComparison ? (
-            <>
-            <div className="teams-comparison-header">
-              <div>
-                <span className="eyebrow">Teams · Vergleich</span>
-                <strong>Klassische Teamtabelle</strong>
-              </div>
-              <button className="secondary-button inline-button" type="button" onClick={() => setShowTeamsComparison(false)}>
-                Zurück zu Teams
-              </button>
-            </div>
-            <div className="table-shell teams-overview-shell">
-              <table className="team-table teams-overview-table">
-                <colgroup>
-                  {visibleTeamsViewColumns.map((column) => (
-                    <col key={column.id} style={{ width: `${getTableColumnWidth("teamsView", column)}px` }} />
-                  ))}
-                </colgroup>
-                <thead>
-                  <tr>
-                    {visibleTeamsViewColumns.map((column) => (
-                      <th
-                        key={column.id}
-                        {...getTableHeaderDragProps("teamsView", column, visibleTeamsViewColumns)}
-                        className={
-                          column.id === "pow"
-                            ? "teams-view-head-pow"
-                            : column.id === "spe"
-                              ? "teams-view-head-spe"
-                              : column.id === "men"
-                                ? "teams-view-head-men"
-                                : column.id === "soc"
-                                  ? "teams-view-head-soc"
-                                  : ""
-                        }
-                        style={{ width: `${getTableColumnWidth("teamsView", column)}px`, minWidth: `${column.minWidth}px` }}
-                        title={getTeamsViewColumnTitle(column.id)}
-                      >
-                        <div className="resizable-header-cell">
-                          <SortableHeader label={column.label} tableId="teamsView" columnKey={column.dataKey} sortState={tableSorts.teamsView} onToggle={toggleTableSort} />
-                          <span className="column-resizer" draggable={false} role="separator" aria-orientation="vertical" aria-label={`${column.label} Breite anpassen`} onMouseDown={(event) => startTableColumnResize("teamsView", column, event)} onDoubleClick={() => resetTableColumnWidth("teamsView", column)} />
-                        </div>
-                      </th>
-                    ))}
-                  </tr>
-                </thead>
-                <tbody>
-                  {sortedTeamsViewRows.map((row) => (
-                    <tr
-                      key={row.team.teamId}
-                      className={joinClassNames(
-                        selectedTeam?.teamId === row.team.teamId && "is-selected",
-                        getOwnerTeamHighlightClass(resolvedTeamControlSettings[row.team.teamId]),
-                      )}
-                      onClick={() => {
-                        scheduleActiveManagerTeam(row.team.teamId, "manual_select");
-                      }}
-                      onDoubleClick={() => openTeamDrawerById(row.team.teamId)}
-                    >
-                      {visibleTeamsViewColumns.map((column) => {
-                        if (column.id === "team") {
-                          return <td key={column.id} className="teams-view-team-cell"><button className="table-link-button" type="button" onClick={(event) => { event.stopPropagation(); scheduleActiveManagerTeam(row.team.teamId, "manual_select"); }} onDoubleClick={(event) => { event.stopPropagation(); openTeamDrawerById(row.team.teamId); }}>{row.team.name}</button></td>;
-                        }
-                        if (column.id === "overallRank") return <td key={column.id} className="teams-view-rank-cell">{row.overallRank ?? "—"}</td>;
-                        if (column.id === "cash") return <td key={column.id} className={`teams-view-finance-cell teams-view-cash-cell ${row.cash != null ? getSeasonCashHeatClass(row.cash, sortedTeamsViewRows) : ""}`}>{row.cash != null ? formatMoney(row.cash) : "—"}</td>;
-                        if (column.id === "guv") return <td key={column.id} className={`teams-view-finance-cell ${row.guv == null ? "" : row.guv >= 0 ? "text-positive" : "text-negative"}`}>{row.guv != null ? formatLocalePoints(row.guv, 1) : "—"}</td>;
-                        if (column.id === "roster") return <td key={column.id} className="teams-view-meta-cell">{row.rosterCount}</td>;
-                        if (column.id === "mw") return <td key={column.id} className="teams-view-finance-cell">{row.marketValueTotal != null ? formatLocalePoints(row.marketValueTotal, 2) : "—"}</td>;
-                        if (column.id === "salary") return <td key={column.id} className="teams-view-finance-cell">{formatLocalePoints(row.salaryTotal, 2)}</td>;
-                        if (column.id === "sponsor") return <td key={column.id} className="teams-view-finance-cell">{row.sponsorTotal != null ? formatLocalePoints(row.sponsorTotal, 1) : "—"}</td>;
-                        if (column.id === "pow") return <td key={column.id} title={row.rosterCount === 0 ? "Kein aktiver Kader vorhanden" : getTeamAxisRankTooltip("POW")} className={`teams-view-axis-cell teams-view-axis-cell-pow ${row.currentPowRank != null ? getRankHeatClass(row.currentPowRank, gameState.teams.length) : ""}`}>{row.currentPowRank != null ? formatWholeNumber(row.currentPowRank) : "—"}</td>;
-                        if (column.id === "spe") return <td key={column.id} title={row.rosterCount === 0 ? "Kein aktiver Kader vorhanden" : getTeamAxisRankTooltip("SPE")} className={`teams-view-axis-cell teams-view-axis-cell-spe ${row.currentSpeRank != null ? getRankHeatClass(row.currentSpeRank, gameState.teams.length) : ""}`}>{row.currentSpeRank != null ? formatWholeNumber(row.currentSpeRank) : "—"}</td>;
-                        if (column.id === "men") return <td key={column.id} title={row.rosterCount === 0 ? "Kein aktiver Kader vorhanden" : getTeamAxisRankTooltip("MEN")} className={`teams-view-axis-cell teams-view-axis-cell-men ${row.currentMenRank != null ? getRankHeatClass(row.currentMenRank, gameState.teams.length) : ""}`}>{row.currentMenRank != null ? formatWholeNumber(row.currentMenRank) : "—"}</td>;
-                        if (column.id === "soc") return <td key={column.id} title={row.rosterCount === 0 ? "Kein aktiver Kader vorhanden" : getTeamAxisRankTooltip("SOC")} className={`teams-view-axis-cell teams-view-axis-cell-soc ${row.currentSocRank != null ? getRankHeatClass(row.currentSocRank, gameState.teams.length) : ""}`}>{row.currentSocRank != null ? formatWholeNumber(row.currentSocRank) : "—"}</td>;
-                        if (column.id === "histPoints") {
-                          const rank = teamHistoryPointRankMaps.total.get(row.team.teamId);
-                          return <td key={column.id} className={`teams-view-history-points-cell ${rank != null ? getRankHeatClass(rank, gameState.teams.length) : ""}`}>{row.historicalPointsTotal != null ? formatLocalePoints(row.historicalPointsTotal, 1) : "—"}</td>;
-                        }
-                        if (column.id === "avgPoints") {
-                          const rank = teamHistoryPointRankMaps.average.get(row.team.teamId);
-                          return <td key={column.id} className={`teams-view-history-points-cell ${rank != null ? getRankHeatClass(rank, gameState.teams.length) : ""}`}>{row.avgPoints != null ? formatLocalePoints(row.avgPoints, 1) : "—"}</td>;
-                        }
-                        if (column.id === "gold") return <td key={column.id} className="teams-view-medal-cell" title="Goldmedaillen">🥇 {row.goldCount}</td>;
-                        if (column.id === "silver") return <td key={column.id} className="teams-view-medal-cell" title="Silbermedaillen">🥈 {row.silverCount}</td>;
-                        if (column.id === "bronze") return <td key={column.id} className="teams-view-medal-cell" title="Bronzemedaillen">🥉 {row.bronzeCount}</td>;
-                        if (column.id === "top5") return <td key={column.id} className="teams-view-meta-cell">{row.top5}</td>;
-                        if (column.id === "top10") return <td key={column.id} className="teams-view-meta-cell">{row.top10}</td>;
-                        if (column.id === "avgRank") return <td key={column.id} className="teams-view-meta-cell">{row.avgRank != null ? formatWholeNumber(row.avgRank) : "—"}</td>;
-                        if (column.id === "seasonPoints") {
-                          const historyEntries = [...row.historicalPointsBySeason].sort((left, right) =>
-                            left.seasonId.localeCompare(right.seasonId, "de", { numeric: true }),
-                          );
-                          return (
-                            <td key={column.id} className="teams-view-season-points-cell">
-                              {historyEntries.length > 0 ? (
-                                <details>
-                                  <summary>{historyEntries.length} Seasons</summary>
-                                  <div className="teams-view-season-points-list">
-                                    {historyEntries.map((entry) => (
-                                      <span key={`${row.team.teamId}-${entry.seasonId}`}>
-                                        <b>{entry.seasonName.replace("Season ", "S")}</b>
-                                        {formatLocalePoints(entry.points, 1)}
-                                        {entry.rank != null ? <small>#{entry.rank}</small> : null}
-                                      </span>
-                                    ))}
-                                  </div>
-                                </details>
-                              ) : (
-                                "—"
-                              )}
-                            </td>
-                          );
-                        }
-                        return <td key={column.id}>—</td>;
-                      })}
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-            <section className="teams-v2-history-panel teams-history-panel" aria-label="Team-Historie">
-              <div className="teams-v2-section-head">
-                <div>
-                  <TooltipHeading
-                    as="h3"
-                    tooltip="Live-Season zuerst, darunter die echten Team-Snapshots. So sieht man schnell Rang, Punkte, PPs, Bereichswerte, Cash, Gehalt, MW und die größten Deals."
-                  >
-                    {selectedTeam ? `${selectedTeam.name} - Historie` : "Team-Historie"}
-                  </TooltipHeading>
-                  <p className="muted">Die alte Ewige-Tabelle fliegt raus. Unten bleibt nur noch die lesbare Verlaufs-Historie des ausgewählten Teams.</p>
-                </div>
-              </div>
-              {selectedTeamsHistoryData?.history?.length ? (
-                <div className="table-shell teams-history-shell">
-                  <table className="team-table teams-v2-history-table">
-                    <thead>
-                      <tr>
-                        <th>Saison</th>
-                        <th>Rang</th>
-                        <th>Punkte</th>
-                        <th>PPs</th>
-                        <th>POW</th>
-                        <th>SPE</th>
-                        <th>MEN</th>
-                        <th>SOC</th>
-                        <th>Cash</th>
-                        <th>Gehalt</th>
-                        <th>MW</th>
-                        <th>GuV</th>
-                        <th>Top Einkauf</th>
-                        <th>Top Verkauf</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {selectedTeamsHistoryData.history.map((row) => (
-                        <tr key={`team-history-${row.seasonId}`} className={row.isLive ? "is-live" : ""}>
-                          <td className="teams-v2-season-cell">
-                            <strong>{row.seasonName}</strong>
-                            {row.isLive ? <span className="pill">Live</span> : null}
-                          </td>
-                          <td className={`teams-v2-rank-cell ${getTeamHistoryRankToneClass(row.rank)}`}>{row.rank != null ? `#${row.rank}` : "—"}</td>
-                          <td>{formatLocalePoints(row.points, 1)}</td>
-                          <td>{formatLocalePoints(row.pps, 1)}</td>
-                          <td className="teams-v2-area-cell is-pow">{formatLocalePoints(row.ppPow, 1)}</td>
-                          <td className="teams-v2-area-cell is-spe">{formatLocalePoints(row.ppSpe, 1)}</td>
-                          <td className="teams-v2-area-cell is-men">{formatLocalePoints(row.ppMen, 1)}</td>
-                          <td className="teams-v2-area-cell is-soc">{formatLocalePoints(row.ppSoc, 1)}</td>
-                          <td>{formatNullableMoney(row.cash)}</td>
-                          <td>{formatNullableMoney(row.salaryTotal)}</td>
-                          <td>{formatNullableMoney(row.marketValue)}</td>
-                          <td className={row.guv != null && row.guv < 0 ? "text-negative" : "text-positive"}>
-                            {formatSignedDisplayMoney(row.guv)}
-                          </td>
-                          <td>{row.topBuyPlayer ? `${row.topBuyPlayer} · ${formatNullableMoney(row.topBuyAmount)}` : "—"}</td>
-                          <td>{row.topSellPlayer ? `${row.topSellPlayer} · ${formatNullableMoney(row.topSellAmount)}` : "—"}</td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
-                </div>
-              ) : (
-                <p className="muted">Für dieses Team ist noch keine Historie verfügbar.</p>
-              )}
-            </section>
-            </>
-            ) : selectedTeamsHistoryData && selectedTeam ? (
-              <TeamsV2Client
-                teams={gameState.teams}
-                selectedTeam={selectedTeam}
-                selectedTeamControlMode={formatTeamControlModeLabel(selectedTeamControl?.controlMode)}
-                teamData={selectedTeamsHistoryData}
-                focusCards={teamsV2FocusCards}
-                onSelectTeam={(teamId) => scheduleActiveManagerTeam(teamId, "manual_select")}
-                onOpenPlayerDetails={({ playerId, activePlayerId }) => openPlayerDrawerById(playerId, activePlayerId ?? null)}
-                onOpenClassicTeams={() => setShowTeamsComparison(true)}
-                onOpenTraining={() => setActiveView("trainingCompact")}
-                onOpenMarket={() => setActiveView("marketV2")}
-              />
-            ) : (
-              <p className="muted teams-view-note">Kein Team ausgewählt oder Teamdaten noch nicht geladen.</p>
-            )}
           </section>
           ) : null}
 
@@ -28823,7 +27183,7 @@ export default function FoundationPageClient({
                         row.team.teamId === activeManagerTeamId && "is-active-team-row",
                         getOwnerTeamHighlightClass(resolvedTeamControlSettings[row.team.teamId]),
                       )}
-                      onDoubleClick={() => openTeamDrawerById(row.team.teamId)}
+                      onClick={() => openTeamProfileById(row.team.teamId)}
                     >
                       {visibleDisciplineRanksColumns.map((column, columnIndex) => {
                         if (column.id === "team") {
@@ -29028,7 +27388,7 @@ export default function FoundationPageClient({
                   {sortedPpAreaRows.map((row) => {
                     const teamId = row.team.teamId;
                     return (
-                      <tr key={row.team.teamId} onDoubleClick={() => openTeamDrawerById(row.team.teamId)}>
+                      <tr key={row.team.teamId} onClick={() => openTeamProfileById(row.team.teamId)}>
                         <td>{row.rank}</td>
                         <td>{row.team.name}</td>
                             <td className={ppAreaRankClassMaps.total.get(teamId) || undefined}>
@@ -29298,7 +27658,7 @@ export default function FoundationPageClient({
                     <tr
                       key={row.teamId}
                       className={`prize-team-table-row${row.teamId === selectedTeam?.teamId ? " is-selected" : ""}`}
-                      onDoubleClick={() => openTeamDrawerById(row.teamId)}
+                      onClick={() => openTeamProfileById(row.teamId)}
                     >
                       {visiblePrizePreviewColumns.map((column) => {
                         if (column.id === "team") return <td key={column.id}>{row.teamName}</td>;
@@ -29406,6 +27766,201 @@ export default function FoundationPageClient({
 
           {activeView === "teams" && selectedTeam ? (
             <>
+              <section className={`panel teams-league-panel${getViewClass("teams")}`} id="teams-league-overview">
+                <div className="teams-comparison-header">
+                  <div>
+                    <span className="eyebrow">Teams · Liga</span>
+                    <strong>Teamtabelle</strong>
+                  </div>
+                </div>
+                <div className="table-shell teams-overview-shell">
+                  <table className="team-table teams-overview-table">
+                    <colgroup>
+                      {visibleTeamsViewColumns.map((column) => (
+                        <col key={column.id} style={{ width: `${getTableColumnWidth("teamsView", column)}px` }} />
+                      ))}
+                    </colgroup>
+                    <thead>
+                      <tr>
+                        {visibleTeamsViewColumns.map((column) => (
+                          <th
+                            key={column.id}
+                            {...getTableHeaderDragProps("teamsView", column, visibleTeamsViewColumns)}
+                            className={
+                              column.id === "pow"
+                                ? "teams-view-head-pow"
+                                : column.id === "spe"
+                                  ? "teams-view-head-spe"
+                                  : column.id === "men"
+                                    ? "teams-view-head-men"
+                                    : column.id === "soc"
+                                      ? "teams-view-head-soc"
+                                      : ""
+                            }
+                            style={{ width: `${getTableColumnWidth("teamsView", column)}px`, minWidth: `${column.minWidth}px` }}
+                            title={getTeamsViewColumnTitle(column.id)}
+                          >
+                            <div className="resizable-header-cell">
+                              <SortableHeader label={column.label} tableId="teamsView" columnKey={column.dataKey} sortState={tableSorts.teamsView} onToggle={toggleTableSort} />
+                              <span className="column-resizer" draggable={false} role="separator" aria-orientation="vertical" aria-label={`${column.label} Breite anpassen`} onMouseDown={(event) => startTableColumnResize("teamsView", column, event)} onDoubleClick={() => resetTableColumnWidth("teamsView", column)} />
+                            </div>
+                          </th>
+                        ))}
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {sortedTeamsViewRows.map((row) => (
+                        <tr
+                          key={row.team.teamId}
+                          className={joinClassNames(
+                            selectedTeam?.teamId === row.team.teamId && "is-selected",
+                            getOwnerTeamHighlightClass(resolvedTeamControlSettings[row.team.teamId]),
+                          )}
+                          onClick={() => {
+                            scheduleActiveManagerTeam(row.team.teamId, "manual_select");
+                          }}
+                        >
+                          {visibleTeamsViewColumns.map((column) => {
+                            if (column.id === "team") {
+                              return <td key={column.id} className="teams-view-team-cell"><button className="table-link-button" type="button" onClick={(event) => { event.stopPropagation(); openTeamProfileById(row.team.teamId); }}>{row.team.name}</button></td>;
+                            }
+                            if (column.id === "overallRank") return <td key={column.id} className="teams-view-rank-cell">{row.overallRank ?? "—"}</td>;
+                            if (column.id === "cash") return <td key={column.id} className={`teams-view-finance-cell teams-view-cash-cell ${row.cash != null ? getSeasonCashHeatClass(row.cash, sortedTeamsViewRows) : ""}`}>{row.cash != null ? formatMoney(row.cash) : "—"}</td>;
+                            if (column.id === "guv") return <td key={column.id} className={`teams-view-finance-cell ${row.guv == null ? "" : row.guv >= 0 ? "text-positive" : "text-negative"}`}>{row.guv != null ? formatLocalePoints(row.guv, 1) : "—"}</td>;
+                            if (column.id === "roster") return <td key={column.id} className="teams-view-meta-cell">{row.rosterCount}</td>;
+                            if (column.id === "mw") return <td key={column.id} className="teams-view-finance-cell">{row.marketValueTotal != null ? formatLocalePoints(row.marketValueTotal, 2) : "—"}</td>;
+                            if (column.id === "salary") return <td key={column.id} className="teams-view-finance-cell">{formatLocalePoints(row.salaryTotal, 2)}</td>;
+                            if (column.id === "sponsor") return <td key={column.id} className="teams-view-finance-cell">{row.sponsorTotal != null ? formatLocalePoints(row.sponsorTotal, 1) : "—"}</td>;
+                            if (column.id === "pow") return <td key={column.id} title={row.rosterCount === 0 ? "Kein aktiver Kader vorhanden" : getTeamAxisRankTooltip("POW")} className={`teams-view-axis-cell teams-view-axis-cell-pow ${row.currentPowRank != null ? getRankHeatClass(row.currentPowRank, gameState.teams.length) : ""}`}>{row.currentPowRank != null ? formatWholeNumber(row.currentPowRank) : "—"}</td>;
+                            if (column.id === "spe") return <td key={column.id} title={row.rosterCount === 0 ? "Kein aktiver Kader vorhanden" : getTeamAxisRankTooltip("SPE")} className={`teams-view-axis-cell teams-view-axis-cell-spe ${row.currentSpeRank != null ? getRankHeatClass(row.currentSpeRank, gameState.teams.length) : ""}`}>{row.currentSpeRank != null ? formatWholeNumber(row.currentSpeRank) : "—"}</td>;
+                            if (column.id === "men") return <td key={column.id} title={row.rosterCount === 0 ? "Kein aktiver Kader vorhanden" : getTeamAxisRankTooltip("MEN")} className={`teams-view-axis-cell teams-view-axis-cell-men ${row.currentMenRank != null ? getRankHeatClass(row.currentMenRank, gameState.teams.length) : ""}`}>{row.currentMenRank != null ? formatWholeNumber(row.currentMenRank) : "—"}</td>;
+                            if (column.id === "soc") return <td key={column.id} title={row.rosterCount === 0 ? "Kein aktiver Kader vorhanden" : getTeamAxisRankTooltip("SOC")} className={`teams-view-axis-cell teams-view-axis-cell-soc ${row.currentSocRank != null ? getRankHeatClass(row.currentSocRank, gameState.teams.length) : ""}`}>{row.currentSocRank != null ? formatWholeNumber(row.currentSocRank) : "—"}</td>;
+                            if (column.id === "histPoints") {
+                              const rank = teamHistoryPointRankMaps.total.get(row.team.teamId);
+                              return <td key={column.id} className={`teams-view-history-points-cell ${rank != null ? getRankHeatClass(rank, gameState.teams.length) : ""}`}>{row.historicalPointsTotal != null ? formatLocalePoints(row.historicalPointsTotal, 1) : "—"}</td>;
+                            }
+                            if (column.id === "avgPoints") {
+                              const rank = teamHistoryPointRankMaps.average.get(row.team.teamId);
+                              return <td key={column.id} className={`teams-view-history-points-cell ${rank != null ? getRankHeatClass(rank, gameState.teams.length) : ""}`}>{row.avgPoints != null ? formatLocalePoints(row.avgPoints, 1) : "—"}</td>;
+                            }
+                            if (column.id === "gold") return <td key={column.id} className="teams-view-medal-cell" title="Goldmedaillen">🥇 {row.goldCount}</td>;
+                            if (column.id === "silver") return <td key={column.id} className="teams-view-medal-cell" title="Silbermedaillen">🥈 {row.silverCount}</td>;
+                            if (column.id === "bronze") return <td key={column.id} className="teams-view-medal-cell" title="Bronzemedaillen">🥉 {row.bronzeCount}</td>;
+                            if (column.id === "top5") return <td key={column.id} className="teams-view-meta-cell">{row.top5}</td>;
+                            if (column.id === "top10") return <td key={column.id} className="teams-view-meta-cell">{row.top10}</td>;
+                            if (column.id === "avgRank") return <td key={column.id} className="teams-view-meta-cell">{row.avgRank != null ? formatWholeNumber(row.avgRank) : "—"}</td>;
+                            if (column.id === "seasonPoints") {
+                              const historyEntries = [...row.historicalPointsBySeason].sort((left, right) =>
+                                left.seasonId.localeCompare(right.seasonId, "de", { numeric: true }),
+                              );
+                              return (
+                                <td key={column.id} className="teams-view-season-points-cell">
+                                  {historyEntries.length > 0 ? (
+                                    <details>
+                                      <summary>{historyEntries.length} Seasons</summary>
+                                      <div className="teams-view-season-points-list">
+                                        {historyEntries.map((entry) => (
+                                          <span key={`${row.team.teamId}-${entry.seasonId}`}>
+                                            <b>{entry.seasonName.replace("Season ", "S")}</b>
+                                            {formatLocalePoints(entry.points, 1)}
+                                            {entry.rank != null ? <small>#{entry.rank}</small> : null}
+                                          </span>
+                                        ))}
+                                      </div>
+                                    </details>
+                                  ) : (
+                                    "—"
+                                  )}
+                                </td>
+                              );
+                            }
+                            return <td key={column.id}>—</td>;
+                          })}
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              </section>
+
+              {selectedTeamsHistoryData ? (
+                <section className={`panel teams-economy-panel${getViewClass("teams")}`} aria-label="Team-Kennzahlen">
+                  <div className="teams-v2-focus-grid">
+                    {teamEconomyTiles.map((tile) => (
+                      <article key={tile.label} className={`teams-v2-focus-card is-${tile.tone}`} title={tile.detail}>
+                        <span>{tile.label}</span>
+                        <strong>{tile.value}</strong>
+                        <small>{tile.note}</small>
+                      </article>
+                    ))}
+                  </div>
+                </section>
+              ) : null}
+
+              <section className={`panel teams-history-panel teams-v2-history-panel${getViewClass("teams")}`} aria-label="Team-Historie">
+                <div className="teams-v2-section-head">
+                  <div>
+                    <TooltipHeading
+                      as="h3"
+                      tooltip="Live-Season zuerst, darunter die echten Team-Snapshots mit Rang, Punkten, PPs, Achsen, Cash, Gehalt und Marktwert."
+                    >
+                      {selectedTeam.name} · Historie
+                    </TooltipHeading>
+                  </div>
+                </div>
+                {selectedTeamsHistoryData?.history?.length ? (
+                  <div className="table-shell teams-history-shell">
+                    <table className="team-table teams-v2-history-table">
+                      <thead>
+                        <tr>
+                          <th>Saison</th>
+                          <th>Rang</th>
+                          <th>Punkte</th>
+                          <th>PPs</th>
+                          <th>POW</th>
+                          <th>SPE</th>
+                          <th>MEN</th>
+                          <th>SOC</th>
+                          <th>Cash</th>
+                          <th>Gehalt</th>
+                          <th>MW</th>
+                          <th>GuV</th>
+                          <th>Top Einkauf</th>
+                          <th>Top Verkauf</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {selectedTeamsHistoryData.history.map((row) => (
+                          <tr key={`team-history-${row.seasonId}`} className={row.isLive ? "is-live" : ""}>
+                            <td className="teams-v2-season-cell">
+                              <strong>{row.seasonName}</strong>
+                              {row.isLive ? <span className="pill">Live</span> : null}
+                            </td>
+                            <td className={`teams-v2-rank-cell ${getTeamHistoryRankToneClass(row.rank)}`}>{row.rank != null ? `#${row.rank}` : "—"}</td>
+                            <td>{formatLocalePoints(row.points, 1)}</td>
+                            <td>{formatLocalePoints(row.pps, 1)}</td>
+                            <td className="teams-v2-area-cell is-pow">{formatLocalePoints(row.ppPow, 1)}</td>
+                            <td className="teams-v2-area-cell is-spe">{formatLocalePoints(row.ppSpe, 1)}</td>
+                            <td className="teams-v2-area-cell is-men">{formatLocalePoints(row.ppMen, 1)}</td>
+                            <td className="teams-v2-area-cell is-soc">{formatLocalePoints(row.ppSoc, 1)}</td>
+                            <td>{formatNullableMoney(row.cash)}</td>
+                            <td>{formatNullableMoney(row.salaryTotal)}</td>
+                            <td>{formatNullableMoney(row.marketValue)}</td>
+                            <td className={row.guv != null && row.guv < 0 ? "text-negative" : "text-positive"}>
+                              {formatSignedDisplayMoney(row.guv)}
+                            </td>
+                            <td>{row.topBuyPlayer ? `${row.topBuyPlayer} · ${formatNullableMoney(row.topBuyAmount)}` : "—"}</td>
+                            <td>{row.topSellPlayer ? `${row.topSellPlayer} · ${formatNullableMoney(row.topSellAmount)}` : "—"}</td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                ) : (
+                  <p className="muted">Für dieses Team ist noch keine Historie verfügbar.</p>
+                )}
+              </section>
+
               <section className={`panel team-objectives-panel teams-secondary-objectives-panel${getViewClass("teams")}`} data-testid="team-board-objectives" id="team-board-objectives">
                 <div className="panel-header compact">
                   <div className="stack">
@@ -29578,23 +28133,6 @@ export default function FoundationPageClient({
                     Diszis
                   </button>
                 </div>
-                <div className="team-detail-subtabs">
-                  <button
-                    className={`secondary-button inline-button${selectedTeamDetailTab === "roster" ? " is-active" : ""}`}
-                    type="button"
-                    onClick={() => setSelectedTeamDetailTab("roster")}
-                  >
-                    Kader
-                  </button>
-                  <button
-                    className={`secondary-button inline-button${selectedTeamDetailTab === "contracts" ? " is-active" : ""}`}
-                    type="button"
-                    onClick={() => setSelectedTeamDetailTab("contracts")}
-                  >
-                    Verträge
-                  </button>
-                </div>
-
                 {selectedTeamDetailTab === "roster" ? (
                   <>
                     <div className="team-roster-role-filterbar" aria-label="Kaderrollen filtern">
@@ -29666,7 +28204,7 @@ export default function FoundationPageClient({
                               <Fragment key={entry.id}>
                               <tr
                                 className={entry.contractLength <= 1 ? "is-contract-expiring" : undefined}
-                                onDoubleClick={() => openPlayerDrawerById(player.id, entry.id)}
+                                onClick={() => void openPlayerDrawerById(player.id, entry.id)}
                               >
                                 {visibleSelectedRosterColumns.map((column) => {
                                   if (column.id === "image") {
@@ -29690,7 +28228,16 @@ export default function FoundationPageClient({
                                     return (
                                       <td key={column.id}>
                                         <div className="table-player-cell">
-                                          <strong>{player.name}</strong>
+                                          <button
+                                            className="table-link-button"
+                                            type="button"
+                                            onClick={(event) => {
+                                              event.stopPropagation();
+                                              openPlayerDrawerById(player.id, entry.id);
+                                            }}
+                                          >
+                                            {player.name}
+                                          </button>
                                           <span>{entry.roleTag}</span>
                                           {selectedTeamRosterActionsAvailable ? (
                                             <div className="transfermarkt-inline-actions">
@@ -29698,7 +28245,8 @@ export default function FoundationPageClient({
                                                 className="secondary-button inline-button"
                                                 type="button"
                                                 disabled={marketSellBusy}
-                                                onClick={() =>
+                                                onClick={(event) => {
+                                                  event.stopPropagation();
                                                   void openMarketSellModal({
                                                     activePlayerId: entry.id,
                                                     playerId: player.id,
@@ -29706,8 +28254,8 @@ export default function FoundationPageClient({
                                                     className: player.className,
                                                     race: player.race,
                                                     portraitUrl: getPlayerPortraitModel(player).src,
-                                                  }, selectedTeam?.teamId)
-                                                }
+                                                  }, selectedTeam?.teamId);
+                                                }}
                                               >
                                                 Verkaufen
                                               </button>
@@ -29716,14 +28264,15 @@ export default function FoundationPageClient({
                                                   className="secondary-button inline-button"
                                                   type="button"
                                                   disabled={contractRenewalBusy != null}
-                                                  onClick={() =>
+                                                  onClick={(event) => {
+                                                    event.stopPropagation();
                                                     void openContractRenewalNegotiation({
                                                       teamId: selectedTeam.teamId,
                                                       playerId: player.id,
                                                       playerName: player.name,
                                                       contractLength: 2,
-                                                    })
-                                                  }
+                                                    });
+                                                  }}
                                                 >
                                                   Verlängern
                                                 </button>
@@ -29748,7 +28297,22 @@ export default function FoundationPageClient({
                                       </td>
                                     );
                                   }
-                                  if (column.id === "mw") return <td key={column.id}>{formatLocalePoints(getRosterEntryDisplayMarketValue(entry, player), 1)}</td>;
+                                  if (column.id === "mw") {
+                                    const marketValue = getRosterEntryDisplayMarketValue(entry, player);
+                                    const marketValueDelta = getPlayerDisplayMarketValueDelta(player, entry);
+                                    return (
+                                      <td key={column.id}>
+                                        <div className="economy-money-stack">
+                                          <strong>{formatLocalePoints(marketValue, 1)}</strong>
+                                          {marketValueDelta != null && Math.abs(marketValueDelta) >= 0.01 ? (
+                                            <small className={marketValueDelta >= 0 ? "text-positive" : "text-negative"}>
+                                              {formatSignedDisplayMoney(marketValueDelta)}
+                                            </small>
+                                          ) : null}
+                                        </div>
+                                      </td>
+                                    );
+                                  }
                                   if (column.id === "salePrice") {
                                     const saleMarketValueDelta =
                                       saleBreakdown.salePrice != null && saleBreakdown.baseMarketValue != null
@@ -29789,12 +28353,14 @@ export default function FoundationPageClient({
                                     const salaryDelta = getRosterEntrySalaryDelta(entry, player);
                                     return (
                                       <td key={column.id}>
-                                        <span>{formatDisplayMoney(currentSalary)}</span>
-                                        {salaryDelta != null && Math.abs(salaryDelta) >= 0.01 ? (
-                                          <small className={salaryDelta <= 0 ? "text-positive" : "text-negative"}>
-                                            {" "}({formatSignedDisplayMoney(salaryDelta)})
-                                          </small>
-                                        ) : null}
+                                        <div className="economy-money-stack">
+                                          <strong>{formatDisplayMoney(currentSalary)}</strong>
+                                          {salaryDelta != null && Math.abs(salaryDelta) >= 0.01 ? (
+                                            <small className={salaryDelta <= 0 ? "text-positive" : "text-negative"}>
+                                              {formatSignedDisplayMoney(salaryDelta)}
+                                            </small>
+                                          ) : null}
+                                        </div>
                                       </td>
                                     );
                                   }
@@ -30080,7 +28646,7 @@ export default function FoundationPageClient({
                                 selectedTeam != null &&
                                 transferSellMarkerKeySet.has(`${selectedTeam.teamId}:${row.playerId}`);
                               return (
-                              <tr key={row.rowId} onDoubleClick={() => openPlayerDrawerById(row.playerId)}>
+                              <tr key={row.rowId} onClick={() => void openPlayerDrawerById(row.playerId)}>
                                 <td>
                                   <div className="table-player-cell">
                                     <strong>{row.playerName}</strong>
@@ -30245,8 +28811,8 @@ export default function FoundationPageClient({
                       <article
                         className={`player-card player-card-spotlight ${getClassColorClassName(player.className, "player-card-class-frame")}`}
                         key={entry.id}
-                        onDoubleClick={() => openPlayerDrawerById(player.id, entry.id)}
-                        title="Doppelklick öffnet den Spieler-Drawer"
+                        onClick={() => void openPlayerDrawerById(player.id, entry.id)}
+                        title="Spielerprofil öffnen"
                       >
                         <div className="player-card-hero">
                           <PlayerPortrait
@@ -30274,14 +28840,19 @@ export default function FoundationPageClient({
                         <p className="muted">
                           OVR {formatWholeNumber(playerRatingsById.get(player.id)?.ovrNormalized ?? null)} · MVS{" "}
                           {playerRatingsById.get(player.id)?.mvs != null ? formatPpsValue(playerRatingsById.get(player.id)?.mvs ?? null) : "—"} · PPs{" "}
-                          {playerRatingsById.get(player.id)?.ppsSeason != null ? formatPpsValue(playerRatingsById.get(player.id)?.ppsSeason ?? null) : "—"} · MW{" "}
-                          {formatLocalePoints(getRosterEntryDisplayMarketValue(entry, player), 2)}
-                          {renderEconomyDelta(getPlayerDisplayMarketValueDelta(player, entry), "higher")}
+                          {playerRatingsById.get(player.id)?.ppsSeason != null ? formatPpsValue(playerRatingsById.get(player.id)?.ppsSeason ?? null) : "—"} · MW
                         </p>
+                        <div className="economy-money-stack">
+                          <strong>{formatLocalePoints(getRosterEntryDisplayMarketValue(entry, player), 2)}</strong>
+                          {renderEconomyDelta(getPlayerDisplayMarketValueDelta(player, entry), "higher", "player-card-money-delta")}
+                        </div>
                         <p className="muted">
-                          Kosten {formatMoney(player.cost ?? player.marketValue)} · Gehalt {formatDisplayMoney(getRosterEntryDisplaySalary(entry, player))}
-                          {renderEconomyDelta(getRosterEntrySalaryDelta(entry, player), "lower")}
+                          Kosten {formatMoney(player.cost ?? player.marketValue)} · Gehalt
                         </p>
+                        <div className="economy-money-stack">
+                          <strong>{formatDisplayMoney(getRosterEntryDisplaySalary(entry, player))}</strong>
+                          {renderEconomyDelta(getRosterEntrySalaryDelta(entry, player), "lower", "player-card-money-delta")}
+                        </div>
                         <p className="muted">
                           Traits {player.traitsPositive.slice(0, 2).join(", ") || "-"} · Alignment{" "}
                           {player.alignment || "-"}
@@ -30301,8 +28872,8 @@ export default function FoundationPageClient({
                       <article
                         className={`player-card compact player-card-spotlight ${getClassColorClassName(player.className, "player-card-class-frame")}`}
                         key={entry.id}
-                        onDoubleClick={() => openPlayerDrawerById(player.id, entry.id)}
-                        title="Doppelklick öffnet den Spieler-Drawer"
+                        onClick={() => void openPlayerDrawerById(player.id, entry.id)}
+                        title="Spielerprofil öffnen"
                       >
                         <div className="player-card-hero">
                           <PlayerPortrait
@@ -30330,14 +28901,17 @@ export default function FoundationPageClient({
                         <p className="muted">
                           OVR {formatWholeNumber(playerRatingsById.get(player.id)?.ovrNormalized ?? null)} · MVS{" "}
                           {playerRatingsById.get(player.id)?.mvs != null ? formatPpsValue(playerRatingsById.get(player.id)?.mvs ?? null) : "—"} · PPs{" "}
-                          {playerRatingsById.get(player.id)?.ppsSeason != null ? formatPpsValue(playerRatingsById.get(player.id)?.ppsSeason ?? null) : "—"} · MW{" "}
-                          {formatLocalePoints(getRosterEntryDisplayMarketValue(entry, player), 2)}
-                          {renderEconomyDelta(getPlayerDisplayMarketValueDelta(player, entry), "higher")}
+                          {playerRatingsById.get(player.id)?.ppsSeason != null ? formatPpsValue(playerRatingsById.get(player.id)?.ppsSeason ?? null) : "—"} · MW
                         </p>
-                        <p className="muted">
-                          Gehalt {formatDisplayMoney(getRosterEntryDisplaySalary(entry, player))}
-                          {renderEconomyDelta(getRosterEntrySalaryDelta(entry, player), "lower")} · LZ {entry.contractLength}
-                        </p>
+                        <div className="economy-money-stack">
+                          <strong>{formatLocalePoints(getRosterEntryDisplayMarketValue(entry, player), 2)}</strong>
+                          {renderEconomyDelta(getPlayerDisplayMarketValueDelta(player, entry), "higher", "player-card-money-delta")}
+                        </div>
+                        <p className="muted">Gehalt · LZ {entry.contractLength}</p>
+                        <div className="economy-money-stack">
+                          <strong>{formatDisplayMoney(getRosterEntryDisplaySalary(entry, player))}</strong>
+                          {renderEconomyDelta(getRosterEntrySalaryDelta(entry, player), "lower", "player-card-money-delta")}
+                        </div>
                       </article>
                     ))}
                     {bench.length === 0 ? <p className="muted">Keine Bench-Spieler im Moment.</p> : null}
@@ -30692,8 +29266,8 @@ export default function FoundationPageClient({
                             className="training-player-card"
                             id={`training-player-${row.player.id}`}
                             key={row.entry.id}
-                            onDoubleClick={() => openPlayerDrawerById(row.player.id, row.entry.id)}
-                            title="Doppelklick öffnet den Spieler-Drawer"
+                            onClick={() => void openPlayerDrawerById(row.player.id, row.entry.id)}
+                            title="Spielerprofil öffnen"
                           >
                             <div className="training-player-main">
                               {portrait.src ? (
@@ -31313,6 +29887,7 @@ export default function FoundationPageClient({
                             forecast: trainingPlayerForecastRows.find((forecastRow) => forecastRow.player.id === row.playerId)?.forecast ?? null,
                             teamId: selectedTeam.teamId,
                             profile: getTeamStrategyProfile(gameState, selectedTeam.teamId),
+                            potentialRecord: gameState.playerPotential?.find((entry) => entry.playerId === rosterPlayer.id) ?? null,
                           })
                         : null;
                       return (
@@ -31320,8 +29895,8 @@ export default function FoundationPageClient({
                           className="training-player-card"
                           id={`training-upgrade-player-${row.playerId}`}
                           key={`season-end-${row.playerId}`}
-                          onDoubleClick={() => openPlayerDrawerById(row.playerId)}
-                          title="Doppelklick öffnet den Spieler-Drawer"
+                          onClick={() => void openPlayerDrawerById(row.playerId)}
+                          title="Spielerprofil öffnen"
                         >
                           <div className="training-player-main">
                             <div>
@@ -31558,6 +30133,16 @@ export default function FoundationPageClient({
                 seasonLabel={canonicalSeasonLabel}
                 onOpenTraining={() => setFoundationView("trainingCompact", setActiveView)}
                 onOpenTeams={() => setFoundationView("teams", setActiveView)}
+                facilityPanelTarget={
+                  foundationPanel === "facility" && foundationFacilityTarget
+                    ? {
+                        facilityId: foundationFacilityTarget.facilityId as FacilityId,
+                        action: foundationFacilityTarget.action as "upgrade" | "downgrade" | "maintenance",
+                      }
+                    : null
+                }
+                onOpenFacilityPanel={(facilityId, action) => openFacilityPanel(facilityId, action)}
+                onCloseFacilityPanel={closeFacilityPanel}
                 summary={{
                   cashCurrent: selectedTeam.cash,
                   netFacilityResult: trainingFacilitySeasonEndFinance.netFacilityResult,
@@ -31606,36 +30191,6 @@ export default function FoundationPageClient({
               </TooltipHeading>
               <span className="pill foundation-source-pill">source: active local save</span>
             </div>
-            <div className="transfer-market-view-tabs" role="tablist" aria-label="Transfermarkt Ansicht">
-              <button
-                className={`transfer-market-view-tab${activeTransferMarketTab === "classic" ? " is-active" : ""}`}
-                type="button"
-                role="tab"
-                aria-selected={activeTransferMarketTab === "classic"}
-                onClick={() => {
-                  setTransferMarketTab("classic");
-                  if (activeView === "marketV2") {
-                    setFoundationView("market", setActiveView);
-                  }
-                }}
-              >
-                Klassisch
-              </button>
-              <button
-                className={`transfer-market-view-tab${activeTransferMarketTab === "v2" ? " is-active" : ""}`}
-                type="button"
-                role="tab"
-                aria-selected={activeTransferMarketTab === "v2"}
-                onClick={() => {
-                  setTransferMarketTab("v2");
-                  if (activeView !== "marketV2") {
-                    setFoundationView("marketV2", setActiveView);
-                  }
-                }}
-              >
-                V2
-              </button>
-            </div>
             <div
               className={`transfer-callout ${transferWindowStatus.open ? "is-info" : "is-blocked"}`}
               data-testid="foundation-transfer-window-status"
@@ -31661,15 +30216,13 @@ export default function FoundationPageClient({
                 </span>
               </div>
             </div>
-            {activeTransferMarketTab === "v2" ? (
-              <>
-                <div className="foundation-view-source-row">
-                  <span className="pill foundation-source-pill">{getViewSourceBadgeLabel("marketV2", activeContextMeta)}</span>
-                  <span className="muted">
-                    {activeSaveName} · {gameState.season.id} · Aktives Team {selectedTeam ? `${selectedTeam.shortCode} · ${selectedTeam.name}` : "—"}
-                  </span>
-                </div>
-                <TransfermarktV2Client
+            <div className="foundation-view-source-row">
+              <span className="pill foundation-source-pill">{getViewSourceBadgeLabel("marketV2", activeContextMeta)}</span>
+              <span className="muted">
+                {activeSaveName} · {gameState.season.id} · Aktives Team {selectedTeam ? `${selectedTeam.shortCode} · ${selectedTeam.name}` : "—"}
+              </span>
+            </div>
+            <TransfermarktV2Client
                   key={`market-v2-${activeSaveId}-${gameState.season.id}`}
                   defaultSaveId={activeSaveId}
                   defaultSeasonId={gameState.season.id}
@@ -31697,11 +30250,7 @@ export default function FoundationPageClient({
                   wishlistPlayerIds={transferWishlistEntriesForMarketV2.map((entry) => entry.playerId)}
                   boardObjectiveHighlights={selectedTransfermarktBoardObjectives}
                   onOpenPlayerDetails={(payload) => openPlayerDrawerById(payload.playerId, payload.activePlayerId)}
-                  onOpenHistory={() => setFoundationView("history", setActiveView)}
-                  onOpenClassicMarket={() => {
-                    setTransferMarketTab("classic");
-                    setFoundationView("market", setActiveView);
-                  }}
+                  onOpenHistory={() => setFoundationView("historyV2", setActiveView)}
                   onToggleWishlist={(item) => {
                     toggleTransferWishlist(item);
                   }}
@@ -31723,6 +30272,9 @@ export default function FoundationPageClient({
                   }}
                   initialPlayerId={marketFocusPlayerId}
                   onInitialPlayerFocusConsumed={() => setMarketFocusPlayerId(null)}
+                  offerPanelActive={foundationPanel === "offer" && activeView === "marketV2"}
+                  onOpenOfferPanel={openMarketOfferPanel}
+                  onCloseOfferPanel={closeFoundationDrilldownPanel}
                   onBuyCompleted={async (teamId) => {
                     setActiveManagerTeam(teamId, "manual_select");
                     setFoundationActionFeedback({
@@ -31743,3417 +30295,25 @@ export default function FoundationPageClient({
                     });
                   }}
                 />
-              </>
-            ) : (
-            <>
-            <section className="transfer-decision-board" aria-label="Transfermarkt Entscheidungen">
-              <article className="transfer-decision-card is-buy">
-                <span>Kaufen</span>
-                <strong>{transferDecisionBoard.buyPick?.item.name ?? "Kein Kandidat"}</strong>
-                <small>
-                  {transferDecisionBoard.buyPick
-                    ? `${formatFitDisplay(transferDecisionBoard.buyPick.item)} · ${formatTransfermarktCurrency(transferDecisionBoard.buyPick.item.marketValue)}`
-                    : "Filter anpassen oder Team waehlen"}
-                </small>
-                <div className="transfer-decision-chip-row" aria-label="Kaufgruende">
-                  {transferDecisionBoard.buyReasons.map((reason) => (
-                    <span key={`buy-reason-${reason}`} className="transfer-decision-chip is-good">{reason}</span>
-                  ))}
-                  {transferDecisionBoard.buyWarnings.map((warning) => (
-                    <span key={`buy-warning-${warning}`} className="transfer-decision-chip is-warn">{warning}</span>
-                  ))}
-                </div>
-                <button
-                  className="primary-button inline-button"
-                  type="button"
-                  disabled={!transferDecisionBoard.buyPick || !marketTeamId}
-                  title={
-                    !marketTeamId
-                      ? "Waehle erst ein Team, damit Budget und Kaderlage fuer den Kauf geprueft werden."
-                      : !transferDecisionBoard.buyPick
-                        ? "Gerade gibt es keinen klaren Kaufkandidaten. Filter anpassen oder Team wechseln."
-                        : "Kaufmodal mit Vertrag und Forderung öffnen."
-                  }
-                  onClick={() => {
-                    if (transferDecisionBoard.buyPick) {
-                      void openMarketBuyModal(transferDecisionBoard.buyPick.item);
-                    }
-                  }}
-                >
-                  Kaufen pruefen
-                </button>
-              </article>
-              <article className="transfer-decision-card is-watch">
-                <span>Watch</span>
-                <strong>{transferDecisionBoard.watchPick?.item.name ?? "Watchlist leer"}</strong>
-                <small>
-                  {transferDecisionBoard.watchPick
-                    ? `OVR ${formatWholeNumber(transferDecisionBoard.watchPick.item.ovr)} · MVS ${transferDecisionBoard.watchPick.item.mvs != null ? formatPpsValue(transferDecisionBoard.watchPick.item.mvs) : "—"}`
-                    : "Kandidaten merken"}
-                </small>
-                <div className="transfer-decision-chip-row" aria-label="Watchgruende">
-                  {transferDecisionBoard.watchReasons.map((reason) => (
-                    <span key={`watch-reason-${reason}`} className="transfer-decision-chip is-watch">{reason}</span>
-                  ))}
-                </div>
-                <button
-                  className="secondary-button inline-button"
-                  type="button"
-                  disabled={!transferDecisionBoard.watchPick}
-                  onClick={() => {
-                    if (transferDecisionBoard.watchPick) {
-                      toggleTransferWishlist(transferDecisionBoard.watchPick.item);
-                    }
-                  }}
-                >
-                  {transferDecisionBoard.watchPick && transferWishlistByPlayerId.has(transferDecisionBoard.watchPick.item.playerId) ? "Gemerkt" : "Merken"}
-                </button>
-              </article>
-              <article className="transfer-decision-card is-sell">
-                <span>Sell</span>
-                <strong>{transferDecisionBoard.sellPick?.row.player.name ?? "Kader stabil"}</strong>
-                <small>
-                  {transferDecisionBoard.sellPick
-                    ? `Gehalt ${formatMoney(transferDecisionBoard.sellPick.salary)} · PPs ${transferDecisionBoard.sellPick.row.playerPps != null ? formatPpsValue(transferDecisionBoard.sellPick.row.playerPps) : "—"}`
-                    : "kein aktiver Kader"}
-                </small>
-                <div className="transfer-decision-chip-row" aria-label="Verkaufsgruende">
-                  {transferDecisionBoard.sellReasons.map((reason) => (
-                    <span key={`sell-reason-${reason}`} className="transfer-decision-chip is-sell">{reason}</span>
-                  ))}
-                </div>
-                <button
-                  className="secondary-button inline-button"
-                  type="button"
-                  disabled={!transferDecisionBoard.sellPick || !marketTeamId}
-                  onClick={() => {
-                    const pick = transferDecisionBoard.sellPick;
-                    if (!pick) return;
-                    void openMarketSellModal({
-                      activePlayerId: pick.row.entry.id,
-                      playerId: pick.row.player.id,
-                      playerName: pick.row.player.name,
-                      className: pick.row.player.className,
-                      race: pick.row.player.race,
-                      portraitUrl: pick.row.player.portraitUrl ?? null,
-                    });
-                  }}
-                >
-                  Verkaufen
-                </button>
-              </article>
-            </section>
-            <div className="transfer-market-layout">
-              <div className="table-shell transfer-market-table-shell">
-                <div className={`transfer-active-filter-chips${activeMarketFilterChips.length === 0 ? " is-empty" : ""}`} aria-label="Aktive Marktfilter">
-                  {activeMarketFilterChips.length === 0 ? (
-                    <span>Keine Extra-Filter aktiv</span>
-                  ) : (
-                    activeMarketFilterChips.map((chip) => <span key={`market-filter-chip-${chip}`}>{chip}</span>)
-                  )}
-                </div>
-                <table className="team-table transfer-table">
-                  <colgroup>
-                    {visibleTransfermarktColumns.map((column) => (
-                      <col key={column.id} style={{ width: `${getTableColumnWidth("transferMarketTable", column)}px` }} />
-                    ))}
-                    <col className="transfermarkt-actions-col" />
-                  </colgroup>
-                  <thead>
-                    <tr>
-                      {visibleTransfermarktColumns.map((column) => (
-                        <th
-                          key={column.id}
-                          {...getTableHeaderDragProps("transferMarketTable", column, visibleTransfermarktColumns)}
-                          style={{
-                            width: `${getTableColumnWidth("transferMarketTable", column)}px`,
-                            minWidth: `${column.minWidth}px`,
-                          }}
-                        >
-                          <div className="resizable-header-cell">
-                            <SortableHeader
-                              label={column.label}
-                              tableId="transferMarket"
-                              columnKey={column.dataKey}
-                              sortState={tableSorts.transferMarket}
-                              onToggle={toggleTableSort}
-                            />
-                            <span
-                              className="column-resizer"
-                              draggable={false}
-                              role="separator"
-                              aria-orientation="vertical"
-                              aria-label={`${column.label} Breite anpassen`}
-                              onMouseDown={(event) => startTableColumnResize("transferMarketTable", column, event)}
-                              onDoubleClick={() => resetTableColumnWidth("transferMarketTable", column)}
-                            />
-                          </div>
-                        </th>
-                      ))}
-                      <th className="transfermarkt-row-actions-header" aria-label="Aktionen" />
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {visibleTransferMarketRows.map((row) => (
-                      <tr key={row.id} onDoubleClick={() => openPlayerDrawerById(row.item.playerId)}>
-                        {visibleTransfermarktColumns.map((column) => {
-                          if (column.id === "imageUrl") {
-                            const portrait = getTransfermarktPortraitModel(row.item);
-                            const portraitSize = clampValue(getTableColumnWidth("transferMarketTable", column) - 26, 56, 160);
-                            return (
-                              <td key={column.id}>
-                                {portrait.src ? (
-                                  <img
-                                    className="transfermarkt-portrait"
-                                    src={portrait.src}
-                                    alt={row.item.name}
-                                    width={portraitSize}
-                                    height={portraitSize}
-                                    loading="lazy"
-                                    decoding="async"
-                                    fetchPriority="low"
-                                    style={{ width: `${portraitSize}px`, height: `${portraitSize}px` }}
-                                  />
-                                ) : (
-                                  <div
-                                    className="transfermarkt-portrait transfermarkt-portrait-placeholder"
-                                    aria-label={`${row.item.name} placeholder`}
-                                    style={{ width: `${portraitSize}px`, height: `${portraitSize}px`, fontSize: `${Math.max(18, portraitSize * 0.34)}px` }}
-                                  >
-                                    {portrait.initials}
-                                  </div>
-                                )}
-                              </td>
-                            );
-                          }
-                          if (column.id === "name") {
-                            return (
-                              <td key={column.id}>
-                                <div className="table-player-cell">
-                                  <strong>{row.item.name}</strong>
-                                  <span className="transfermarkt-name-meta">
-                                    <RaceIcon race={row.item.race} className="race-icon-chip-inline" />
-                                    <span>{row.item.race}</span>
-                                    {row.item.mercenary ? " · Mercenary" : ""}
-                                  </span>
-                                </div>
-                              </td>
-                            );
-                          }
-                          if (column.id === "className") {
-                            return (
-                              <td key={column.id}>
-                                <ClassColorChip className={row.item.className} />
-                              </td>
-                            );
-                          }
-                          if (column.id === "subclasses") {
-                            return (
-                              <td key={column.id}>
-                                {row.item.subclasses.length ? (
-                                  <span className="transfermarkt-subclass-list">
-                                    {row.item.subclasses.map((subclass) => (
-                                      <span key={subclass} className="pill transfermarkt-subclass-pill">
-                                        {subclass}
-                                      </span>
-                                    ))}
-                                  </span>
-                                ) : (
-                                  "—"
-                                )}
-                              </td>
-                            );
-                          }
-                          if (column.id === "traits") return <td key={column.id}>{renderMarketTraitList(row.item)}</td>;
-                          if (column.id === "race") return <td key={column.id}>{row.item.race}</td>;
-                          if (column.id === "alignment") return <td key={column.id}>{renderPillValue(row.item.alignment)}</td>;
-                          if (column.id === "gender") return <td key={column.id}>{row.item.gender || "—"}</td>;
-                          if (column.id === "marketValue") return <td key={column.id}>{formatTransfermarktCurrency(row.item.marketValue)}</td>;
-                          if (column.id === "salary") return <td key={column.id}>{formatTransfermarktCurrency(row.item.salary)}</td>;
-                          if (column.id === "ovr") {
-                            return (
-                              <td key={column.id} className={row.item.ovr != null ? getPoolHeatClass(row.item.ovr, leaguePlayerHeatPools.ovr) : ""}>
-                                {formatWholeNumber(row.item.ovr)}
-                              </td>
-                            );
-                          }
-                          if (column.id === "mvs") {
-                            return (
-                              <td key={column.id} className={row.item.mvs != null ? getPoolHeatClass(row.item.mvs, leaguePlayerHeatPools.mvs) : ""}>
-                                {row.item.mvs != null ? formatPpsValue(row.item.mvs) : "—"}
-                              </td>
-                            );
-                          }
-                          if (column.id === "marketValueSalaryRatio") {
-                            return <td key={column.id}>{formatTransfermarktRatio(row.item.marketValueSalaryRatio)}</td>;
-                          }
-                          if (column.id === "bracket") return <td key={column.id}>{row.item.bracket ?? "—"}</td>;
-                          if (column.id === "pow") {
-                            return (
-                              <td key={column.id} className={row.item.pow != null ? getPoolHeatClass(row.item.pow, leaguePlayerHeatPools.pow) : ""}>
-                                {row.item.pow == null ? "—" : formatWholeNumber(row.item.pow)}
-                              </td>
-                            );
-                          }
-                          if (column.id === "spe") {
-                            return (
-                              <td key={column.id} className={row.item.spe != null ? getPoolHeatClass(row.item.spe, leaguePlayerHeatPools.spe) : ""}>
-                                {row.item.spe == null ? "—" : formatWholeNumber(row.item.spe)}
-                              </td>
-                            );
-                          }
-                          if (column.id === "men") {
-                            return (
-                              <td key={column.id} className={row.item.men != null ? getPoolHeatClass(row.item.men, leaguePlayerHeatPools.men) : ""}>
-                                {row.item.men == null ? "—" : formatWholeNumber(row.item.men)}
-                              </td>
-                            );
-                          }
-                          if (column.id === "soc") {
-                            return (
-                              <td key={column.id} className={row.item.soc != null ? getPoolHeatClass(row.item.soc, leaguePlayerHeatPools.soc) : ""}>
-                                {row.item.soc == null ? "—" : formatWholeNumber(row.item.soc)}
-                              </td>
-                            );
-                          }
-                          if (column.id === "above20") return <td key={column.id}>{row.item.above20 ?? "—"}</td>;
-                          if (column.id === "above40") return <td key={column.id}>{row.item.above40 ?? "—"}</td>;
-                          if (column.id === "above60") return <td key={column.id}>{row.item.above60 ?? "—"}</td>;
-                          if (column.id === "above80") return <td key={column.id}>{row.item.above80 ?? "—"}</td>;
-                          if (column.id === "powerRating") return <td key={column.id} style={getConfirmedTierStyle(row.item.powerRating)}>{row.item.powerRating ?? "—"}</td>;
-                          if (column.id === "healthRating") return <td key={column.id} style={getConfirmedTierStyle(row.item.healthRating)}>{row.item.healthRating ?? "—"}</td>;
-                          if (column.id === "staminaRating") return <td key={column.id} style={getConfirmedTierStyle(row.item.staminaRating)}>{row.item.staminaRating ?? "—"}</td>;
-                          if (column.id === "intelligenceRating") return <td key={column.id} style={getConfirmedTierStyle(row.item.intelligenceRating)}>{row.item.intelligenceRating ?? "—"}</td>;
-                          if (column.id === "determinationRating") return <td key={column.id} style={getConfirmedTierStyle(row.item.determinationRating)}>{row.item.determinationRating ?? "—"}</td>;
-                          if (column.id === "awarenessRating") return <td key={column.id} style={getConfirmedTierStyle(row.item.awarenessRating)}>{row.item.awarenessRating ?? "—"}</td>;
-                          if (column.id === "speedRating") return <td key={column.id} style={getConfirmedTierStyle(row.item.speedRating)}>{row.item.speedRating ?? "—"}</td>;
-                          if (column.id === "dexterityRating") return <td key={column.id} style={getConfirmedTierStyle(row.item.dexterityRating)}>{row.item.dexterityRating ?? "—"}</td>;
-                          if (column.id === "charismaRating") return <td key={column.id} style={getConfirmedTierStyle(row.item.charismaRating)}>{row.item.charismaRating ?? "—"}</td>;
-                          if (column.id === "willRating") return <td key={column.id} style={getConfirmedTierStyle(row.item.willRating)}>{row.item.willRating ?? "—"}</td>;
-                          if (column.id === "spiritRating") return <td key={column.id} style={getConfirmedTierStyle(row.item.spiritRating)}>{row.item.spiritRating ?? "—"}</td>;
-                          if (column.id === "tormentRating") return <td key={column.id} style={getConfirmedTierStyle(row.item.tormentRating)}>{row.item.tormentRating ?? "—"}</td>;
-                          if (column.id === "subclass1") return <td key={column.id}>{renderPillValue(row.item.subclasses[0] ?? null)}</td>;
-                          if (column.id === "subclass2") return <td key={column.id}>{renderPillValue(row.item.subclasses[1] ?? null)}</td>;
-                          if (column.id === "subclass3") return <td key={column.id}>{renderPillValue(row.item.subclasses[2] ?? null)}</td>;
-                          if (column.id === "traitPos1") return <td key={column.id}>{renderPillValue(row.item.traitsPositive[0] ?? null)}</td>;
-                          if (column.id === "traitPos2") return <td key={column.id}>{renderPillValue(row.item.traitsPositive[1] ?? null)}</td>;
-                          if (column.id === "traitPos3") return <td key={column.id}>{renderPillValue(row.item.traitsPositive[2] ?? null)}</td>;
-                          if (column.id === "traitNeg1") return <td key={column.id}>{renderPillValue(row.item.traitsNegative[0] ?? null)}</td>;
-                          if (column.id === "traitNeg2") return <td key={column.id}>{renderPillValue(row.item.traitsNegative[1] ?? null)}</td>;
-                          if (column.id === "traitNeg3") return <td key={column.id}>{renderPillValue(row.item.traitsNegative[2] ?? null)}</td>;
-                          if (column.id === "topDisciplineScores") return <td key={column.id}>{formatTopDisciplineScores(row.item)}</td>;
-                          if (column.id === "currentAbilityTier") return <td key={column.id} style={getMarketTierStyle(row.item.currentAbilityTier)}>{row.item.currentAbilityTier ?? "—"}</td>;
-                          if (column.id === "potentialTier") return <td key={column.id}>{renderTransfermarktPotential(row.item)}</td>;
-                          if (column.id === "trainingFormTier") return <td key={column.id} style={getMarketTierStyle(row.item.trainingFormTier)}>{row.item.trainingFormTier ?? "—"}</td>;
-                          if (column.id === "developmentTrend") return <td key={column.id}>{formatMarketDevelopmentTrend(row.item.developmentTrend)}</td>;
-                          if (column.id === "developmentRoute") return <td key={column.id}>{formatMarketDevelopmentRoute(row.item.developmentRoute)}</td>;
-                          if (column.id === "regressionRisk") return <td key={column.id}>{formatMarketRisk(row.item.regressionRisk)}</td>;
-                          if (column.id === "availabilityReason") return <td key={column.id}>{row.item.availabilityReason}</td>;
-                          if (column.id === "affordabilityStatus") return <td key={column.id}>{row.item.teamContextAvailable ? row.item.affordabilityStatus ?? "—" : "Team waehlen"}</td>;
-                          if (column.id === "teamCash") {
-                            return (
-                              <td key={column.id}>
-                                {row.item.teamContextAvailable
-                                  ? row.item.teamCash == null
-                                    ? "—"
-                                    : `${formatMoney(row.item.teamCash)} €`
-                                  : "Team waehlen"}
-                              </td>
-                            );
-                          }
-                          if (column.id === "rosterPressureStatus") return <td key={column.id}>{row.item.teamContextAvailable ? row.item.rosterPressureStatus ?? "—" : "Team waehlen"}</td>;
-                          if (column.id === "playerTargets") return <td key={column.id}>{row.item.teamContextAvailable ? `${row.item.playerMin ?? "—"} / ${row.item.playerOpt ?? "—"}` : "Team waehlen"}</td>;
-                          if (column.id === "fitDisplay") return <td key={column.id}>{formatFitDisplay(row.item)}</td>;
-                          if (column.id === "fitRace") return <td key={column.id}>{row.item.teamContextAvailable ? row.item.fitRace ?? "—" : "Team waehlen"}</td>;
-                          if (column.id === "fitSubclasses") return <td key={column.id}>{row.item.teamContextAvailable ? row.item.fitSubclasses ?? "—" : "Team waehlen"}</td>;
-                          if (column.id === "fitTraits") return <td key={column.id}>{row.item.teamContextAvailable ? row.item.fitTraits ?? "—" : "Team waehlen"}</td>;
-                          if (column.id === "fitAlignment") return <td key={column.id}>{row.item.teamContextAvailable ? row.item.fitAlignment ?? "—" : "Team waehlen"}</td>;
-                          return <td key={column.id}>—</td>;
-                        })}
-                        <td className="transfermarkt-row-actions-cell">
-                          <div className="transfermarkt-row-actions">
-                            <button
-                              className="secondary-button inline-button"
-                              data-testid="transfer-buy-open-button"
-                              type="button"
-                              disabled={
-                                !marketTeamId ||
-                                !canManageTeamId(marketTeamId) ||
-                                (marketBuyBusy && marketPreviewPlayerId === row.item.playerId)
-                              }
-                              title={
-                                !marketTeamId
-                                  ? "Waehle erst ein Team, damit der Kauf sauber geprüft werden kann."
-                                  : !canManageTeamId(marketTeamId)
-                                    ? `${getTeamLockedName(marketTeamId)} gehoert nicht zu deinen steuerbaren Teams.`
-                                    : marketBuyBusy && marketPreviewPlayerId === row.item.playerId
-                                      ? "Dieser Spieler wird gerade für dein Team vorbereitet."
-                                      : "Kaufmodal mit Vertrag, Forderung und Folgen öffnen."
-                              }
-                              onClick={() => {
-                                void openMarketBuyModal(row.item);
-                              }}
-                            >
-                              {!marketTeamId
-                                ? "Team waehlen"
-                                : !canManageTeamId(marketTeamId)
-                                  ? "Nicht dein Team"
-                                  : marketBuyBusy && marketPreviewPlayerId === row.item.playerId
-                                    ? "Pruefe..."
-                                    : "Kaufen"}
-                            </button>
-                            <button
-                              className={`secondary-button inline-button${transferWishlistByPlayerId.has(row.item.playerId) ? " is-active" : ""}`}
-                              type="button"
-                              onClick={() => toggleTransferWishlist(row.item)}
-                            >
-                              {transferWishlistByPlayerId.has(row.item.playerId) ? "Gemerkt" : "Merken"}
-                            </button>
-                          </div>
-                        </td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
-
-              <aside className="transfer-filter-panel">
-                <div className="transfer-filter-panel-stack">
-                  <section className="panel transfer-filter-card">
-                    <div className="transfer-panel-section transfer-panel-section--context">
-                      <div className="transfer-panel-title">
-                        <h3>Team & Status</h3>
-                        <p className="muted transfer-panel-note">
-                          Budget, Kaderdruck und Teamwirkung fuer deine naechste Entscheidung.
-                        </p>
-                      </div>
-                      {readMeta.source === "prisma" ? (
-                        <div className="transfer-readonly-banner">
-                          <strong>Referenzmodus aktiv</strong>
-                          <span>Kauefe und Verkaeufe bleiben im normalen Testmodus lokal.</span>
-                        </div>
-                      ) : null}
-                      <div className="transfer-context-banner">
-                        <strong>{marketSelectedTeam ? `${marketSelectedTeam.shortCode} · ${marketSelectedTeam.name}` : "Noch kein Team gewaehlt"}</strong>
-                        <span className="muted">
-                          {marketSelectedTeam
-                            ? "Kaufvorschau und Teamwirkung beziehen sich jetzt auf dieses Team."
-                            : "Bitte zuerst ein Team waehlen, damit Cash, Gehalt und Rosterwirkung sichtbar werden."}
-                        </span>
-                      </div>
-                      <div className="transfer-status-grid">
-                        <article className="metric-card">
-                          <span>Cash</span>
-                          <strong>{marketFeed?.teamContext ? `${formatMoney(marketFeed.teamContext.teamCash)} €` : "Team waehlen"}</strong>
-                        </article>
-                        <article className="metric-card">
-                          <span>Gehalt</span>
-                          <strong>{marketFeed?.teamContext ? `${formatMoney(marketFeed.teamContext.teamSalary)} €` : "Team waehlen"}</strong>
-                        </article>
-                        <article className="metric-card">
-                          <span># Spieler</span>
-                          <strong>{marketFeed?.teamContext ? `${marketFeed.teamContext.rosterCount}` : "Team waehlen"}</strong>
-                        </article>
-                        <article className="metric-card">
-                          <span>Kaderziel</span>
-                          <strong>
-                            {marketFeed?.teamContext
-                              ? `${marketFeed.teamContext.playerMin} / ${marketFeed.teamContext.playerOpt}`
-                              : "Team waehlen"}
-                          </strong>
-                        </article>
-                        <article className="metric-card">
-                          <span>Finanzspielraum</span>
-                          <strong>{marketFeed?.teamContext?.affordabilityStatus === "affordable" ? "passt" : marketFeed?.teamContext?.affordabilityStatus ?? "Team waehlen"}</strong>
-                        </article>
-                        <article className="metric-card">
-                          <span>Kaderdruck</span>
-                          <strong>{marketFeed?.teamContext?.rosterPressureStatus === "under_min" ? "zu klein" : marketFeed?.teamContext?.rosterPressureStatus === "under_opt" ? "Tiefe fehlt" : marketFeed?.teamContext?.rosterPressureStatus === "at_or_above_opt" ? "gut besetzt" : "Team waehlen"}</strong>
-                        </article>
-                        <article className="metric-card transfer-filter-span-2">
-                          <span>Marktstatus</span>
-                          <strong>{marketFeed?.teamContext?.readinessStatus === "ready" ? "bereit" : marketFeed?.teamContext?.readinessStatus ?? "Team waehlen"}</strong>
-                        </article>
-                      </div>
-                    </div>
-
-                    <div className="transfer-panel-section transfer-panel-section--pool">
-                      <div className="transfer-panel-title">
-                        <h3>Marktueberblick</h3>
-                        <p className="muted transfer-panel-note">Freie Spieler, Kaufkandidaten und Budgetwirkung im gleichen Marktfenster.</p>
-                      </div>
-                      <div className="transfer-status-grid">
-                        <article className="metric-card">
-                          <span>Freie Spieler</span>
-                          <strong>{marketFeed?.poolAudit.activeFreeAgentCount ?? "—"}</strong>
-                        </article>
-                        <article className="metric-card">
-                          <span>Sichtbar</span>
-                          <strong>{marketFeed?.poolAudit.visibleFeedCount ?? "—"}</strong>
-                        </article>
-                        <article className="metric-card transfer-filter-span-2">
-                          <span>Guenstigster sichtbar</span>
-                          <strong>
-                            {marketFeed?.poolAudit.cheapestVisiblePlayer
-                              ? `${marketFeed.poolAudit.cheapestVisiblePlayer.name} · ${formatTransfermarktCurrency(marketFeed.poolAudit.cheapestVisiblePlayer.marketValue)}`
-                              : "—"}
-                          </strong>
-                        </article>
-                        <article className="metric-card transfer-filter-span-2">
-                          <span>Guenstigster kaufbar</span>
-                          <strong>
-                            {marketFeed?.poolAudit.cheapestBuyablePlayer
-                              ? `${marketFeed.poolAudit.cheapestBuyablePlayer.name} · ${formatTransfermarktCurrency(marketFeed.poolAudit.cheapestBuyablePlayer.marketValue)}`
-                              : "—"}
-                          </strong>
-                        </article>
-                        <article className="metric-card transfer-filter-span-2">
-                          <span>Guenstigster Auto-Kandidat</span>
-                          <strong>
-                            {marketFeed?.poolAudit.cheapestCandidatePoolPlayer
-                              ? `${marketFeed.poolAudit.cheapestCandidatePoolPlayer.name} · ${formatTransfermarktCurrency(marketFeed.poolAudit.cheapestCandidatePoolPlayer.marketValue)}`
-                              : "—"}
-                          </strong>
-                        </article>
-                      </div>
-                      <div className="compact-table-shell" style={{ marginTop: 12 }}>
-                        <table className="compact-table">
-                          <thead>
-                            <tr>
-                              <th>MW Bucket</th>
-                              <th>Anzahl</th>
-                            </tr>
-                          </thead>
-                          <tbody>
-                            {(marketFeed?.poolAudit.marketValueBuckets ?? []).map((bucket) => (
-                              <tr key={`market-pool-${bucket.label}`}>
-                                <td>{bucket.label}</td>
-                                <td>{bucket.count}</td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-                {marketFeed ? (
-                  <div className="transfer-render-limit-note" role="status">
-                    <span>
-                      Schnellansicht: {visibleTransferMarketRows.length} von {marketFeed.total} Treffern sichtbar.
-                      {marketFeed.total > marketLoadedCount ? ` ${marketLoadedCount} Spieler sind aktuell geladen.` : ""}
-                    </span>
-                    {marketFeed.hasMore ? (
-                      <button
-                        className="secondary-button inline-button"
-                        type="button"
-                        disabled={marketLoadingMore}
-                        onClick={() => {
-                          void loadMoreMarketFeed();
-                        }}
-                      >
-                        {marketLoadingMore ? "Laedt mehr..." : "Mehr laden"}
-                      </button>
-                    ) : null}
-                  </div>
-                ) : null}
-              </div>
-            </div>
-
-                    <div className="transfer-auto-analysis-toggle panel">
-                      <div>
-                        <strong>Auto-Analyse</strong>
-                        <span>Planungsbereiche fuer automatische Teams nur einblenden, wenn du sie wirklich brauchst.</span>
-                      </div>
-                      <button
-                        className={`secondary-button inline-button${marketShowAutoAnalysis ? " is-selected" : ""}`}
-                        type="button"
-                        onClick={() => setMarketShowAutoAnalysis((current) => !current)}
-                      >
-                        {marketShowAutoAnalysis ? "Auto-Analyse ausblenden" : "Auto-Analyse anzeigen"}
-                      </button>
-                    </div>
-
-                    <div className={joinClassNames("transfer-panel-section transfer-panel-section--ai", !marketShowAutoAnalysis && "is-collapsed")}>
-                      <div className="transfer-panel-title">
-                        <h3>Auto-Kaufideen</h3>
-                        <p className="muted transfer-panel-note">Kaufideen auf Basis von Cash, Kaderdruck und Teamprofil.</p>
-                      </div>
-                      <section className="panel transfer-ai-panel">
-                        <div className="transfer-ai-controls">
-                          <label className="filter-field">
-                            <span>Teams</span>
-                            <select
-                              className="input"
-                              value={marketAiTeamScope}
-                              onChange={(event) => setMarketAiTeamScope(event.target.value as "ai" | "all")}
-                            >
-                              <option value="ai">Nur Auto-Teams</option>
-                              <option value="all">Alle Teams</option>
-                            </select>
-                          </label>
-                          <div className="transfer-ai-actions">
-                            <button
-                              className="secondary-button"
-                              type="button"
-                              disabled={marketAiPreviewBusy}
-                              onClick={() => {
-                                void reloadAiTransferPreview();
-                              }}
-                            >
-                              {marketAiPreviewBusy ? "Laedt..." : "Auto-Kaufideen anzeigen"}
-                            </button>
-                          </div>
-                        </div>
-                        {marketAiPreviewError ? (
-                          <div className="transfer-feedback-banner is-error">
-                            <strong>AI-Preview blockiert</strong>
-                            <span>{marketAiPreviewError}</span>
-                          </div>
-                        ) : null}
-                        {marketAiPreviewFeed ? (
-                          <>
-                            <div className="metric-grid compact transfer-ai-summary-grid">
-                              <article className="metric-card">
-                                <span>Teams</span>
-                                <strong>{marketAiPreviewFeed.totalTeams}</strong>
-                              </article>
-                              <article className="metric-card">
-                                <span>Auto-Teams</span>
-                                <strong>{marketAiPreviewFeed.aiTeams}</strong>
-                              </article>
-                              <article className="metric-card">
-                                <span>Kaufbereit</span>
-                                <strong>{marketAiPreviewFeed.readyTeams}</strong>
-                              </article>
-                              <article className="metric-card">
-                                <span>Hinweise</span>
-                                <strong>{marketAiPreviewFeed.warningTeams}</strong>
-                              </article>
-                              <article className="metric-card">
-                                <span>Eher sparen</span>
-                                <strong>{marketAiPreviewFeed.blockedTeams}</strong>
-                              </article>
-                              <article className="metric-card">
-                                <span>Gefuehrte uebersprungen</span>
-                                <strong>{marketAiPreviewFeed.skippedManual}</strong>
-                              </article>
-                              <article className="metric-card">
-                                <span>Beobachtete uebersprungen</span>
-                                <strong>{marketAiPreviewFeed.skippedPassive}</strong>
-                              </article>
-                              <article className="metric-card">
-                                <span>Auto aus</span>
-                                <strong>{marketAiPreviewFeed.skippedDisabled}</strong>
-                              </article>
-                            </div>
-                            <div className="table-shell transfer-ai-table-shell">
-                              <table className="data-table compact-table transfer-ai-table">
-                                <thead>
-                                  <tr>
-                                    <th>Team</th>
-                                    <th>Status</th>
-                                    <th>Budget</th>
-                                    <th>Roster</th>
-                                    <th>Top Vorschlag</th>
-                                    <th>Preis</th>
-                                    <th>Gehalt</th>
-                                    <th>Cash nach Kauf</th>
-                                  </tr>
-                                </thead>
-                                <tbody>
-                                  {marketAiPreviewFeed.teams.map((entry) => {
-                                    const top = entry.recommendedBuys[0] ?? null;
-                                    return (
-                                      <tr
-                                        key={`market-ai-${entry.teamId}`}
-                                        className={marketAiPreviewSelectedTeamId === entry.teamId ? "is-selected" : undefined}
-                                        onDoubleClick={() => openTeamDrawerById(entry.teamId)}
-                                        onClick={() => setMarketAiPreviewSelectedTeamId(entry.teamId)}
-                                      >
-                                        <td>
-                                          <button
-                                            className="table-link-button"
-                                            type="button"
-                                            onClick={(event) => {
-                                              event.stopPropagation();
-                                              scheduleActiveManagerTeam(entry.teamId, "manual_select", () => setFoundationView("teams", setActiveView));
-                                            }}
-                                            onDoubleClick={(event) => {
-                                              event.stopPropagation();
-                                              openTeamDrawerById(entry.teamId);
-                                            }}
-                                          >
-                                            {entry.teamName}
-                                          </button>
-                                        </td>
-                                        <td>
-                                          <span className={getAiTransferStatusPillClass(entry.status)}>{getAiTransferStatusLabel(entry.status)}</span>
-                                        </td>
-                                        <td>{getAiTransferBudgetLabel(entry.budgetStatus)}</td>
-                                        <td>{getAiTransferRosterLabel(entry.rosterStatus)}</td>
-                                        <td>{top ? `${top.name}` : "—"}</td>
-                                        <td>{top ? formatTransfermarktCurrency(top.price) : "—"}</td>
-                                        <td>{top ? formatTransfermarktCurrency(top.salary) : "—"}</td>
-                                        <td>{top ? formatTransfermarktCurrency(top.cashAfter) : "—"}</td>
-                                      </tr>
-                                    );
-                                  })}
-                                </tbody>
-                              </table>
-                            </div>
-                            {marketAiSelectedTeam ? (
-                              <div className="transfer-ai-detail">
-                                <div className="transfer-ai-detail-head">
-                                  <div>
-                                    <h4>{marketAiSelectedTeam.teamName}</h4>
-                                    <p className="muted">{marketAiSelectedTeam.needSummary}</p>
-                                  </div>
-                                  <div className="room-meta">
-                                    <span className="pill">Steuerung {formatTeamControlModeLabel(marketAiSelectedTeam.controlMode)}</span>
-                                    <span className="pill">Auto {marketAiSelectedTeam.aiTransferPreviewEnabled ? "an" : "aus"}</span>
-                                  </div>
-                                </div>
-                                <div className="metric-grid compact" style={{ marginBottom: 12 }}>
-                                  <article className="metric-card">
-                                    <span>Cash</span>
-                                    <strong>{formatTransfermarktCurrency(marketAiSelectedTeam.cash)}</strong>
-                                  </article>
-                                  <article className="metric-card">
-                                    <span>Gehalt</span>
-                                    <strong>{formatTransfermarktCurrency(marketAiSelectedTeam.salaryTotal)}</strong>
-                                  </article>
-                                  <article className="metric-card">
-                                    <span>Kader</span>
-                                    <strong>{marketAiSelectedTeam.rosterCount ?? "—"}</strong>
-                                  </article>
-                                  <article className="metric-card">
-                                    <span>MW</span>
-                                    <strong>{formatTransfermarktCurrency(marketAiSelectedTeam.marketValueTotal)}</strong>
-                                  </article>
-                                  <article className="metric-card">
-                                    <span>Min / Opt</span>
-                                    <strong>
-                                      {marketAiSelectedTeam.targetRosterMin ?? "—"} / {marketAiSelectedTeam.targetRosterOpt ?? "—"}
-                                    </strong>
-                                  </article>
-                                </div>
-                                <p className="muted">{marketAiSelectedTeam.explanation}</p>
-                                {marketAiSelectedTeam.warnings.length ? (
-                                  <ul className="warning-list compact-list">
-                                    {marketAiSelectedTeam.warnings.map((warning) => (
-                                      <li key={`${marketAiSelectedTeam.teamId}-${warning}`}>{warning}</li>
-                                    ))}
-                                  </ul>
-                                ) : null}
-                                <div className="transfer-ai-candidate-grid">
-                                  <section className="panel transfer-ai-candidate-panel">
-                                    <div className="panel-header">
-                                      <h4>Empfohlene Kauefe</h4>
-                                    </div>
-                                    {marketAiSelectedTeam.recommendedBuys.length === 0 ? (
-                                      <p className="muted">Noch kein sauberer Kaufvorschlag fuer dieses Team.</p>
-                                    ) : (
-                                      <div className="transfer-ai-candidate-list">
-                                        {marketAiSelectedTeam.recommendedBuys.map((entry) => {
-                                          return (
-                                            <article
-                                              key={`${marketAiSelectedTeam.teamId}-${entry.playerId}`}
-                                              className="transfer-ai-candidate-card"
-                                              onDoubleClick={() => openPlayerDrawerById(entry.playerId)}
-                                              title="Doppelklick öffnet den Spieler-Drawer"
-                                            >
-                                              <div className="transfer-ai-candidate-head">
-                                                <button
-                                                  className="table-link-button"
-                                                  type="button"
-                                                  onDoubleClick={() => openPlayerDrawerById(entry.playerId)}
-                                                >
-                                                  {entry.name}
-                                                </button>
-                                                <span className="pill">{formatLocalePoints(entry.score, 1)}</span>
-                                              </div>
-                                              <p className="muted">
-                                                <ClassColorChip className={entry.className} /> · <RaceIcon race={entry.race} className="race-icon-chip-inline" />
-                                              </p>
-                                              <p className="muted">{entry.fitSummary}</p>
-                                              <p className="muted">{entry.sportsSummary}</p>
-                                              <div className="metric-grid compact">
-                                                <article className="metric-card">
-                                                  <span>Preis</span>
-                                                  <strong>{formatTransfermarktCurrency(entry.price)}</strong>
-                                                </article>
-                                                <article className="metric-card">
-                                                  <span>Gehalt</span>
-                                                  <strong>{formatTransfermarktCurrency(entry.salary)}</strong>
-                                                </article>
-                                                <article className="metric-card">
-                                                  <span>Cash nach Kauf</span>
-                                                  <strong>{formatTransfermarktCurrency(entry.cashAfter)}</strong>
-                                                </article>
-                                                <article className="metric-card">
-                                                  <span>Gehalt nach Kauf</span>
-                                                  <strong>{formatTransfermarktCurrency(entry.salaryAfter)}</strong>
-                                                </article>
-                                                <article className="metric-card">
-                                                  <span>Roster nach Kauf</span>
-                                                  <strong>{entry.rosterAfter ?? "—"}</strong>
-                                                </article>
-                                                <article className="metric-card">
-                                                  <span>Score</span>
-                                                  <strong>{formatLocalePoints(entry.overallRecommendationScore, 1)}</strong>
-                                                </article>
-                                                <article className="metric-card">
-                                                  <span>OVR</span>
-                                                  <strong>{formatWholeNumber(entry.ovr)}</strong>
-                                                </article>
-                                                <article className="metric-card">
-                                                  <span>MVS</span>
-                                                  <strong>{entry.mvs != null ? formatPpsValue(entry.mvs) : "—"}</strong>
-                                                </article>
-                                              </div>
-                                              <p>{entry.reason}</p>
-                                              {entry.budgetReason.length ? <p className="muted">Budget: {entry.budgetReason.join(" · ")}</p> : null}
-                                              {entry.fitNotes.length ? <p className="muted">Fit: {entry.fitNotes.join(" · ")}</p> : null}
-                                              {entry.strategyNotes.length ? <p className="muted">Strategie: {entry.strategyNotes.join(" · ")}</p> : null}
-                                              {entry.riskNotes.length ? <p className="muted text-negative">Risiko: {entry.riskNotes.join(" · ")}</p> : null}
-                                              {entry.warnings.length ? <p className="muted text-negative">Hinweise: {entry.warnings.join(" · ")}</p> : null}
-                                              <div className="transfer-inline-actions">
-                                                <button
-                                                  className="secondary-button inline-button"
-                                                  data-testid="transfer-buy-open-button"
-                                                  type="button"
-                                                  disabled={readMeta.source === "prisma" || !canManageTeamId(marketAiSelectedTeam.teamId)}
-                                                  title={
-                                                    !canManageTeamId(marketAiSelectedTeam.teamId)
-                                                      ? `${getTeamLockedName(marketAiSelectedTeam.teamId)} gehoert nicht zu deinen steuerbaren Teams.`
-                                                      : undefined
-                                                  }
-                                                  onClick={() => {
-                                                    setMarketTeamId(marketAiSelectedTeam.teamId);
-                                                    void openMarketBuyModal(
-                                                      {
-                                                        playerId: entry.playerId,
-                                                        name: entry.name,
-                                                        className: entry.className,
-                                                        race: entry.race,
-                                                      },
-                                                      marketAiSelectedTeam.teamId,
-                                                    );
-                                                  }}
-                                                >
-                                                  Angebot pruefen
-                                                </button>
-                                              </div>
-                                            </article>
-                                          );
-                                        })}
-                                      </div>
-                                    )}
-                                  </section>
-                                  <section className="panel transfer-ai-candidate-panel">
-                                    <div className="panel-header">
-                                      <h4>Bewusst uebersprungen</h4>
-                                    </div>
-                                    {marketAiSelectedTeam.skippedTargets.length === 0 ? (
-                                      <p className="muted">Keine uebersprungenen Kandidaten im aktuellen Marktfenster.</p>
-                                    ) : (
-                                      <ul className="warning-list compact-list">
-                                        {marketAiSelectedTeam.skippedTargets.map((entry) => (
-                                          <li key={`${marketAiSelectedTeam.teamId}-skip-${entry.playerId}`}>
-                                            <strong>{entry.name}</strong>: {entry.reason}
-                                            {entry.blockingReasons.length ? ` (${entry.blockingReasons.join(", ")})` : ""}
-                                          </li>
-                                        ))}
-                                      </ul>
-                                    )}
-                                  </section>
-                                </div>
-                              </div>
-                            ) : null}
-                          </>
-                        ) : (
-                          <p className="muted">Noch keine Auto-Kaufideen geladen.</p>
-                        )}
-                      </section>
-                    </div>
-
-                    <div className={joinClassNames("transfer-panel-section transfer-panel-section--ai", !marketShowAutoAnalysis && "is-collapsed")}>
-                      <div className="transfer-panel-title">
-                        <h3>Auto-Marktplan</h3>
-                        <p className="muted transfer-panel-note">
-                          Strategischer Plan aus Kauf- und Verkaufsvorschau. Erst pruefen, dann handeln.
-                        </p>
-                      </div>
-                      <section className="panel transfer-ai-panel">
-                        <div className="transfer-ai-controls">
-                          <label className="filter-field">
-                            <span>Teams</span>
-                            <select
-                              className="input"
-                              value={marketAiPlanTeamScope}
-                              onChange={(event) => setMarketAiPlanTeamScope(event.target.value as "ai" | "all")}
-                            >
-                              <option value="ai">Nur Auto-Teams</option>
-                              <option value="all">Alle Teams</option>
-                            </select>
-                          </label>
-                          <div className="transfer-ai-actions">
-                            <button
-                              className="secondary-button"
-                              type="button"
-                              disabled={marketAiPlanPreviewBusy}
-                              onClick={() => {
-                                void reloadAiMarketPlanPreview();
-                              }}
-                            >
-                              {marketAiPlanPreviewBusy ? "Laedt..." : "Auto-Marktplan laden"}
-                            </button>
-                          </div>
-                        </div>
-                        <div className="transfer-context-banner">
-                          <strong>Planungsansicht</strong>
-                          <span>Dieser Bereich kombiniert Kauf- und Verkaufsideen. Handeln passiert danach bewusst einzeln.</span>
-                        </div>
-                        {marketAiPlanPreviewError ? (
-                          <div className="transfer-feedback-banner is-error">
-                            <strong>Auto-Marktplan blockiert</strong>
-                            <span>{marketAiPlanPreviewError}</span>
-                          </div>
-                        ) : null}
-                        {marketAiPlanPreviewFeed ? (
-                          <>
-                            <div className="metric-grid compact transfer-ai-summary-grid">
-                              <article className="metric-card">
-                                <span>Auto-Teams</span>
-                                <strong>{marketAiPlanPreviewFeed.aiTeams}</strong>
-                              </article>
-                              <article className="metric-card">
-                                <span>Halten</span>
-                                <strong>{marketAiPlanPreviewFeed.holdTeams}</strong>
-                              </article>
-                              <article className="metric-card">
-                                <span>Nur kaufen</span>
-                                <strong>{marketAiPlanPreviewFeed.buyOnlyTeams}</strong>
-                              </article>
-                              <article className="metric-card">
-                                <span>Nur verkaufen</span>
-                                <strong>{marketAiPlanPreviewFeed.sellOnlyTeams}</strong>
-                              </article>
-                              <article className="metric-card">
-                                <span>Erst verkaufen</span>
-                                <strong>{marketAiPlanPreviewFeed.sellThenBuyTeams}</strong>
-                              </article>
-                              <article className="metric-card">
-                                <span>Gefuehrte uebersprungen</span>
-                                <strong>{marketAiPlanPreviewFeed.skippedManual}</strong>
-                              </article>
-                              <article className="metric-card">
-                                <span>Beobachtete uebersprungen</span>
-                                <strong>{marketAiPlanPreviewFeed.skippedPassive}</strong>
-                              </article>
-                              <article className="metric-card">
-                                <span>Auto aus</span>
-                                <strong>{marketAiPlanPreviewFeed.skippedDisabled}</strong>
-                              </article>
-                            </div>
-                            <div className="table-shell transfer-ai-table-shell">
-                              <table className="data-table compact-table transfer-ai-table">
-                                <thead>
-                                  <tr>
-                                    <th>Team</th>
-                                    <th>Status</th>
-                                    <th>Cash</th>
-                                    <th>Kader</th>
-                                    <th>Kaufen</th>
-                                    <th>Verkaufen</th>
-                                    <th>Cash nach Plan</th>
-                                  </tr>
-                                </thead>
-                                <tbody>
-                                  {marketAiPlanPreviewFeed.teams.map((entry) => (
-                                    <tr
-                                      key={`market-plan-${entry.teamId}`}
-                                      className={marketAiPlanPreviewSelectedTeamId === entry.teamId ? "is-selected" : undefined}
-                                      onDoubleClick={() => openTeamDrawerById(entry.teamId)}
-                                      onClick={() => setMarketAiPlanPreviewSelectedTeamId(entry.teamId)}
-                                    >
-                                      <td>
-                                        <button
-                                          className="table-link-button"
-                                          type="button"
-                                          onClick={(event) => {
-                                            event.stopPropagation();
-                                            scheduleActiveManagerTeam(entry.teamId, "manual_select", () => setFoundationView("teams", setActiveView));
-                                          }}
-                                          onDoubleClick={(event) => {
-                                            event.stopPropagation();
-                                            openTeamDrawerById(entry.teamId);
-                                          }}
-                                        >
-                                          {entry.teamName}
-                                        </button>
-                                      </td>
-                                      <td>
-                                        <span className={getAiMarketPlanStatusPillClass(entry.status)}>{getAiMarketPlanStatusLabel(entry.status)}</span>
-                                      </td>
-                                      <td>{formatTransfermarktCurrency(entry.currentState.cash)}</td>
-                                      <td>
-                                        {entry.currentState.rosterCount ?? "—"}
-                                        {entry.currentState.playerMin != null || entry.currentState.playerOpt != null
-                                          ? ` (${entry.currentState.playerMin ?? "—"}/${entry.currentState.playerOpt ?? "—"})`
-                                          : ""}
-                                      </td>
-                                      <td>{entry.buyPlan.candidates[0]?.name ?? "—"}</td>
-                                      <td>{entry.sellPlan.candidates[0]?.playerName ?? "—"}</td>
-                                      <td>{formatTransfermarktCurrency(entry.projectedState.cashAfterPlan)}</td>
-                                    </tr>
-                                  ))}
-                                </tbody>
-                              </table>
-                            </div>
-                            {marketAiPlanSelectedTeam ? (
-                              <div className="transfer-ai-detail">
-                                <div className="transfer-ai-detail-head">
-                                  <div>
-                                    <h4>{marketAiPlanSelectedTeam.teamName}</h4>
-                                    <p className="muted">{marketAiPlanSelectedTeam.strategySummary}</p>
-                                  </div>
-                                  <div className="room-meta">
-                                    <span className="pill">Steuerung {formatTeamControlModeLabel(marketAiPlanSelectedTeam.controlMode)}</span>
-                                    <span className="pill">{getAiMarketPlanStatusLabel(marketAiPlanSelectedTeam.status)}</span>
-                                  </div>
-                                </div>
-                                <div className="room-meta">
-                                  <span className="pill">Gesamtplan</span>
-                                  <span className="pill">Kaufen</span>
-                                  <span className="pill">Verkaufen</span>
-                                </div>
-                                <div className="transfer-ai-candidate-grid">
-                                  <section className="panel transfer-ai-candidate-panel">
-                                    <div className="panel-header">
-                                      <h4>Gesamtplan</h4>
-                                    </div>
-                                    <div className="metric-grid compact">
-                                      <article className="metric-card">
-                                        <span>Cash</span>
-                                        <strong>{formatTransfermarktCurrency(marketAiPlanSelectedTeam.currentState.cash)}</strong>
-                                      </article>
-                                      <article className="metric-card">
-                                        <span>Kader</span>
-                                        <strong>{marketAiPlanSelectedTeam.currentState.rosterCount ?? "—"}</strong>
-                                      </article>
-                                      <article className="metric-card">
-                                        <span>Min / Opt</span>
-                                        <strong>
-                                          {marketAiPlanSelectedTeam.currentState.playerMin ?? "—"} / {marketAiPlanSelectedTeam.currentState.playerOpt ?? "—"}
-                                        </strong>
-                                      </article>
-                                      <article className="metric-card">
-                                        <span>Gehalt</span>
-                                        <strong>{formatTransfermarktCurrency(marketAiPlanSelectedTeam.currentState.salaryTotal)}</strong>
-                                      </article>
-                                      <article className="metric-card">
-                                        <span>MW</span>
-                                        <strong>{formatTransfermarktCurrency(marketAiPlanSelectedTeam.currentState.marketValueTotal)}</strong>
-                                      </article>
-                                      <article className="metric-card">
-                                        <span>Cash nach Plan</span>
-                                        <strong>{formatTransfermarktCurrency(marketAiPlanSelectedTeam.projectedState.cashAfterPlan)}</strong>
-                                      </article>
-                                      <article className="metric-card">
-                                        <span>Kader nach Plan</span>
-                                        <strong>{marketAiPlanSelectedTeam.projectedState.rosterAfterPlan ?? "—"}</strong>
-                                      </article>
-                                      <article className="metric-card">
-                                        <span>Gehalt nach Plan</span>
-                                        <strong>{formatTransfermarktCurrency(marketAiPlanSelectedTeam.projectedState.salaryAfterPlan)}</strong>
-                                      </article>
-                                      <article className="metric-card">
-                                        <span>MW nach Plan</span>
-                                        <strong>{formatTransfermarktCurrency(marketAiPlanSelectedTeam.projectedState.marketValueAfterPlan)}</strong>
-                                      </article>
-                                    </div>
-                                    {marketAiPlanSelectedTeam.planSteps.length ? (
-                                      <ul className="warning-list compact-list">
-                                        {marketAiPlanSelectedTeam.planSteps.map((step, index) => (
-                                          <li key={`${marketAiPlanSelectedTeam.teamId}-step-${index}-${step.stepType}-${step.playerId ?? "none"}`}>
-                                            {step.playerName ? `${step.playerName}: ` : ""}
-                                            {step.reason}
-                                          </li>
-                                        ))}
-                                      </ul>
-                                    ) : null}
-                                  </section>
-                                  <section className="panel transfer-ai-candidate-panel">
-                                    <div className="panel-header">
-                                      <h4>Kaufen</h4>
-                                    </div>
-                                    <div className="metric-grid compact">
-                                      <article className="metric-card">
-                                        <span>Ausgabe</span>
-                                        <strong>{formatTransfermarktCurrency(marketAiPlanSelectedTeam.buyPlan.plannedSpend)}</strong>
-                                      </article>
-                                      <article className="metric-card">
-                                        <span>Gehalt plus</span>
-                                        <strong>{formatTransfermarktCurrency(marketAiPlanSelectedTeam.buyPlan.plannedSalaryAdded)}</strong>
-                                      </article>
-                                      <article className="metric-card">
-                                        <span>Kader nach Kauf</span>
-                                        <strong>{marketAiPlanSelectedTeam.buyPlan.rosterAfterBuy ?? "—"}</strong>
-                                      </article>
-                                    </div>
-                                    {marketAiPlanSelectedTeam.buyPlan.warnings.length ? (
-                                      <p className="muted text-negative">Hinweise: {marketAiPlanSelectedTeam.buyPlan.warnings.join(" · ")}</p>
-                                    ) : null}
-                                    {marketAiPlanSelectedTeam.buyPlan.candidates.length === 0 ? (
-                                      <p className="muted">Kein sauberer Buy-Plan.</p>
-                                    ) : (
-                                      <div className="transfer-ai-candidate-list">
-                                        {marketAiPlanSelectedTeam.buyPlan.candidates.map((entry) => (
-                                          <article
-                                            key={`${marketAiPlanSelectedTeam.teamId}-plan-buy-${entry.playerId}`}
-                                            className="transfer-ai-candidate-card"
-                                            onDoubleClick={() => openPlayerDrawerById(entry.playerId)}
-                                            title="Doppelklick öffnet den Spieler-Drawer"
-                                          >
-                                            <div className="transfer-ai-candidate-head">
-                                              <button className="table-link-button" type="button" onDoubleClick={() => openPlayerDrawerById(entry.playerId)}>
-                                                {entry.name}
-                                              </button>
-                                              <span className="pill">{formatLocalePoints(entry.score, 1)}</span>
-                                            </div>
-                                            <p className="muted">
-                                              <ClassColorChip className={entry.className} /> · <RaceIcon race={entry.race} className="race-icon-chip-inline" />
-                                            </p>
-                                            <p className="muted">
-                                              OVR {formatWholeNumber(entry.ovr)} · MVS {entry.mvs != null ? formatPpsValue(entry.mvs) : "—"}
-                                            </p>
-                                            <p className="muted">{entry.fitSummary}</p>
-                                            <p>{entry.reason}</p>
-                                          </article>
-                                        ))}
-                                      </div>
-                                    )}
-                                  </section>
-                                  <section className="panel transfer-ai-candidate-panel">
-                                    <div className="panel-header">
-                                      <h4>Verkaufen</h4>
-                                    </div>
-                                    <div className="metric-grid compact">
-                                      <article className="metric-card">
-                                        <span>Gehalt frei</span>
-                                        <strong>{formatTransfermarktCurrency(marketAiPlanSelectedTeam.sellPlan.salaryFreed)}</strong>
-                                      </article>
-                                      <article className="metric-card">
-                                        <span>Erlos</span>
-                                        <strong>{formatTransfermarktCurrency(marketAiPlanSelectedTeam.sellPlan.totalExpectedSellValue)}</strong>
-                                      </article>
-                                      <article className="metric-card">
-                                        <span>Kader nach Verkauf</span>
-                                        <strong>{marketAiPlanSelectedTeam.sellPlan.rosterAfterSell ?? "—"}</strong>
-                                      </article>
-                                    </div>
-                                    {marketAiPlanSelectedTeam.sellPlan.warnings.length ? (
-                                      <p className="muted text-negative">Hinweise: {marketAiPlanSelectedTeam.sellPlan.warnings.join(" · ")}</p>
-                                    ) : null}
-                                    {marketAiPlanSelectedTeam.sellPlan.candidates.length === 0 ? (
-                                      <p className="muted">Kein sauberer Sell-Plan.</p>
-                                    ) : (
-                                      <div className="transfer-ai-candidate-list">
-                                        {marketAiPlanSelectedTeam.sellPlan.candidates.map((entry) => (
-                                          <article
-                                            key={`${marketAiPlanSelectedTeam.teamId}-plan-sell-${entry.activePlayerId}`}
-                                            className="transfer-ai-candidate-card"
-                                            onDoubleClick={() => openPlayerDrawerById(entry.playerId, entry.activePlayerId)}
-                                            title="Doppelklick öffnet den Spieler-Drawer"
-                                          >
-                                            <div className="transfer-ai-candidate-head">
-                                              <button
-                                                className="table-link-button"
-                                                type="button"
-                                                onDoubleClick={() => openPlayerDrawerById(entry.playerId, entry.activePlayerId)}
-                                              >
-                                                {entry.playerName}
-                                              </button>
-                                              <span className="pill">{entry.sellPriority}</span>
-                                            </div>
-                                            <p className="muted">
-                                              <ClassColorChip className={entry.className} /> · <RaceIcon race={entry.race} className="race-icon-chip-inline" />
-                                            </p>
-                                            <p className="muted">
-                                              OVR {formatWholeNumber(entry.ovr)} · MVS {entry.mvs != null ? formatPpsValue(entry.mvs) : "—"}
-                                            </p>
-                                            <p className="muted">{entry.strategyFitSummary}</p>
-                                            {entry.reasonToSell.length ? <p>Sell: {entry.reasonToSell.join(" · ")}</p> : null}
-                                            {entry.reasonToKeep.length ? <p className="muted">Keep: {entry.reasonToKeep.join(" · ")}</p> : null}
-                                          </article>
-                                        ))}
-                                      </div>
-                                    )}
-                                  </section>
-                                  <section className="panel transfer-ai-candidate-panel">
-                                    <div className="panel-header">
-                                      <h4>Hinweise</h4>
-                                    </div>
-                                    {marketAiPlanSelectedTeam.reasons.length ? (
-                                      <p className="muted">Gruende: {marketAiPlanSelectedTeam.reasons.join(" · ")}</p>
-                                    ) : null}
-                                    {marketAiPlanSelectedTeam.warnings.length ? (
-                                      <ul className="warning-list compact-list">
-                                        {marketAiPlanSelectedTeam.warnings.map((warning) => (
-                                          <li key={`${marketAiPlanSelectedTeam.teamId}-plan-warning-${warning}`}>{warning}</li>
-                                        ))}
-                                      </ul>
-                                    ) : null}
-                                    {marketAiPlanSelectedTeam.blockingReasons.length ? (
-                                      <p className="muted text-negative">Blocker: {marketAiPlanSelectedTeam.blockingReasons.join(" · ")}</p>
-                                    ) : null}
-                                  </section>
-                                </div>
-                              </div>
-                            ) : null}
-                          </>
-                        ) : (
-                          <p className="muted">Noch kein Auto-Marktplan geladen.</p>
-                        )}
-                      </section>
-                    </div>
-
-                    <div className={joinClassNames("transfer-panel-section transfer-panel-section--ai", !marketShowAutoAnalysis && "is-collapsed")}>
-                      <div className="transfer-panel-title">
-                        <h3>Needs & Picks</h3>
-                        <p className="muted transfer-panel-note">
-                          Vergleich fuer Pick-Reihenfolge, Teamneeds und Budget-Lanes.
-                        </p>
-                      </div>
-                      <section className="panel transfer-ai-panel">
-                        <div className="transfer-ai-controls">
-                          <label className="filter-field">
-                            <span>Teams</span>
-                            <select
-                              className="input"
-                              value={marketAiCompareTeamScope}
-                              onChange={(event) => setMarketAiCompareTeamScope(event.target.value as "ai" | "all")}
-                            >
-                              <option value="ai">Nur Auto-Teams</option>
-                              <option value="all">Alle Teams</option>
-                            </select>
-                          </label>
-                          <div className="transfer-ai-actions">
-                            <button
-                              className="secondary-button"
-                              type="button"
-                              disabled={marketAiCompareBusy}
-                              onClick={() => {
-                                void reloadAiNeedsPicksCompare();
-                              }}
-                            >
-                              {marketAiCompareBusy ? "Laedt..." : "Needs & Picks laden"}
-                            </button>
-                          </div>
-                        </div>
-                        <div className="transfer-context-banner">
-                          <strong>Abgleich</strong>
-                          <span>Retool-Logikdateien werden gelesen. Wenn keine eingefrorenen Pick-Zeilen vorliegen, bleibt der Vergleich bewusst logisch statt gefaelscht.</span>
-                        </div>
-                        {marketAiCompareError ? (
-                          <div className="transfer-feedback-banner is-error">
-                            <strong>Needs & Picks blockiert</strong>
-                            <span>{marketAiCompareError}</span>
-                          </div>
-                        ) : null}
-                        {marketAiCompareFeed ? (
-                          <>
-                            <div className="metric-grid compact transfer-ai-summary-grid">
-                              <article className="metric-card">
-                                <span>Verglichene Teams</span>
-                                <strong>{marketAiCompareFeed.comparedTeams}</strong>
-                              </article>
-                              <article className="metric-card">
-                                <span>Retool fehlt</span>
-                                <strong>{marketAiCompareFeed.missingRetoolTeams}</strong>
-                              </article>
-                              <article className="metric-card">
-                                <span>Teilweise</span>
-                                <strong>{marketAiCompareFeed.partialTeams}</strong>
-                              </article>
-                              <article className="metric-card">
-                                <span>Abweichung</span>
-                                <strong>{marketAiCompareFeed.deviatedTeams}</strong>
-                              </article>
-                              <article className="metric-card">
-                                <span>Manual uebersprungen</span>
-                                <strong>{marketAiCompareFeed.skippedManual}</strong>
-                              </article>
-                              <article className="metric-card">
-                                <span>Passive uebersprungen</span>
-                                <strong>{marketAiCompareFeed.skippedPassive}</strong>
-                              </article>
-                            </div>
-                            <div className="compact-table-shell" style={{ marginTop: 12 }}>
-                              <table className="compact-table">
-                                <thead>
-                                  <tr>
-                                    <th>Retool Quelle</th>
-                                    <th>Status</th>
-                                    <th>Lokale Datei</th>
-                                    <th>Gap</th>
-                                  </tr>
-                                </thead>
-                                <tbody>
-                                  {marketAiCompareFeed.retoolParityMatrix.slice(0, 8).map((entry) => (
-                                    <tr key={`retool-parity-${entry.retoolFile}`}>
-                                      <td>{entry.retoolFile.split("/").pop() ?? entry.retoolFile}</td>
-                                      <td>{entry.status}</td>
-                                      <td>{entry.localAppFile.split("/").pop() ?? entry.localAppFile}</td>
-                                      <td>{entry.openGap}</td>
-                                    </tr>
-                                  ))}
-                                </tbody>
-                              </table>
-                            </div>
-                            <div className="table-shell transfer-ai-table-shell">
-                              <table className="data-table compact-table transfer-ai-table">
-                                <thead>
-                                  <tr>
-                                    <th>Team</th>
-                                    <th>Status</th>
-                                    <th>Kader</th>
-                                    <th>Top Need</th>
-                                    <th>Pick 1</th>
-                                    <th>Pick 2</th>
-                                    <th>Retool</th>
-                                  </tr>
-                                </thead>
-                                <tbody>
-                                  {marketAiCompareFeed.teams.map((entry) => (
-                                    <tr
-                                      key={`market-ai-compare-${entry.teamId}`}
-                                      className={marketAiCompareSelectedTeamId === entry.teamId ? "is-selected" : undefined}
-                                      onDoubleClick={() => openTeamDrawerById(entry.teamId)}
-                                      onClick={() => setMarketAiCompareSelectedTeamId(entry.teamId)}
-                                    >
-                                      <td>
-                                        <button
-                                          className="table-link-button"
-                                          type="button"
-                                          onClick={(event) => {
-                                            event.stopPropagation();
-                                            scheduleActiveManagerTeam(entry.teamId, "manual_select", () => setFoundationView("teams", setActiveView));
-                                          }}
-                                          onDoubleClick={(event) => {
-                                            event.stopPropagation();
-                                            openTeamDrawerById(entry.teamId);
-                                          }}
-                                        >
-                                          {entry.teamName}
-                                        </button>
-                                      </td>
-                                      <td>
-                                        <span className={getAiNeedsCompareStatusPillClass(entry.compareStatus)}>
-                                          {getAiNeedsCompareStatusLabel(entry.compareStatus)}
-                                        </span>
-                                      </td>
-                                      <td>
-                                        {entry.currentRosterState.rosterCount ?? "—"}
-                                        {entry.currentRosterState.targetRosterSize != null ? ` / ${entry.currentRosterState.targetRosterSize}` : ""}
-                                      </td>
-                                      <td>{entry.openNeeds[0]?.label ?? "—"}</td>
-                                      <td>{entry.plannedPicks[0]?.playerName ?? "—"}</td>
-                                      <td>{entry.plannedPicks[1]?.playerName ?? "—"}</td>
-                                      <td>{entry.retoolTopPicksStatus === "available" ? "Top Picks" : "Quelle fehlt"}</td>
-                                    </tr>
-                                  ))}
-                                </tbody>
-                              </table>
-                            </div>
-                            {marketAiCompareSelectedTeam ? (
-                              <div className="transfer-ai-detail">
-                                <div className="transfer-ai-detail-head">
-                                  <div>
-                                    <h4>{marketAiCompareSelectedTeam.teamName}</h4>
-                                    <p className="muted">
-                                      Kader {marketAiCompareSelectedTeam.currentRosterState.rosterCount ?? "—"} / {marketAiCompareSelectedTeam.currentRosterState.targetRosterSize ?? "—"} · Budget {getAiTransferBudgetLabel(marketAiCompareSelectedTeam.currentRosterState.budgetStatus)}
-                                    </p>
-                                  </div>
-                                  <div className="room-meta">
-                                    <span className="pill">Steuerung {formatTeamControlModeLabel(marketAiCompareSelectedTeam.controlMode)}</span>
-                                    <span className={getAiNeedsCompareStatusPillClass(marketAiCompareSelectedTeam.compareStatus)}>
-                                      {getAiNeedsCompareStatusLabel(marketAiCompareSelectedTeam.compareStatus)}
-                                    </span>
-                                  </div>
-                                </div>
-                                <div className="transfer-ai-candidate-grid">
-                                  <section className="panel transfer-ai-candidate-panel">
-                                    <div className="panel-header">
-                                      <h4>Planner</h4>
-                                    </div>
-                                    <div className="metric-grid compact">
-                                      <article className="metric-card">
-                                        <span>Slot-Plan</span>
-                                        <strong>{marketAiCompareSelectedTeam.planner.slotPlan.join(" · ") || "—"}</strong>
-                                        <small>{marketAiCompareSelectedTeam.planner.plannerSource === "retool_reference" ? "Retool-Lane-Modell + lokale Budgetableitung" : "Lokale Planner-Ableitung"}</small>
-                                      </article>
-                                      <article className="metric-card">
-                                        <span>Star / Superstar</span>
-                                        <strong>
-                                          {marketAiCompareSelectedTeam.planner.starAllowed} / {marketAiCompareSelectedTeam.planner.superstarAllowed}
-                                        </strong>
-                                        <small>Erlaubte High-End-Lanes</small>
-                                      </article>
-                                      <article className="metric-card">
-                                        <span>Core / Depth</span>
-                                        <strong>
-                                          {marketAiCompareSelectedTeam.planner.coreNeeded} / {marketAiCompareSelectedTeam.planner.depthNeeded}
-                                        </strong>
-                                        <small>Noetige Rueckgrat- und Breiten-Slots</small>
-                                      </article>
-                                      <article className="metric-card">
-                                        <span>Specialist / Fill / Backup</span>
-                                        <strong>
-                                          {marketAiCompareSelectedTeam.planner.specialistNeeded} / {marketAiCompareSelectedTeam.planner.cheapFillNeeded} / {marketAiCompareSelectedTeam.planner.backupNeeded}
-                                        </strong>
-                                        <small>Gezielte Luecken und spaete Bench-Slots</small>
-                                      </article>
-                                    </div>
-                                    {marketAiCompareSelectedTeam.planner.blockingReasons.length ? (
-                                      <ul className="warning-list compact-list">
-                                        {marketAiCompareSelectedTeam.planner.blockingReasons.map((warning) => (
-                                          <li key={`${marketAiCompareSelectedTeam.teamId}-planner-block-${warning}`}>{warning}</li>
-                                        ))}
-                                      </ul>
-                                    ) : null}
-                                  </section>
-                                  <section className="panel transfer-ai-candidate-panel">
-                                    <div className="panel-header">
-                                      <h4>Cash-Strategie</h4>
-                                    </div>
-                                    <div className="metric-grid compact">
-                                      <article className="metric-card">
-                                        <span>Cash jetzt / Start</span>
-                                        <strong>
-                                          {formatTransfermarktCurrency(marketAiCompareSelectedTeam.cashStrategy.currentCash)} / {formatTransfermarktCurrency(marketAiCompareSelectedTeam.cashStrategy.startingCash)}
-                                        </strong>
-                                        <small>{marketAiCompareSelectedTeam.cashStrategy.strategySource}</small>
-                                      </article>
-                                      <article className="metric-card">
-                                        <span>Reserve Minimum / Depth</span>
-                                        <strong>
-                                          {formatTransfermarktCurrency(marketAiCompareSelectedTeam.cashStrategy.reservedCashForMinimum)} / {formatTransfermarktCurrency(marketAiCompareSelectedTeam.cashStrategy.reservedCashForDepth)}
-                                        </strong>
-                                        <small>verfuegbar jetzt {formatTransfermarktCurrency(marketAiCompareSelectedTeam.cashStrategy.availableCashForCurrentPick)}</small>
-                                      </article>
-                                      <article className="metric-card">
-                                        <span>Finances / Ambition</span>
-                                        <strong>
-                                          {marketAiCompareSelectedTeam.cashStrategy.financesValue} / {marketAiCompareSelectedTeam.cashStrategy.ambitionValue}
-                                        </strong>
-                                        <small>Harmony {marketAiCompareSelectedTeam.cashStrategy.harmonyValue} · Druck {marketAiCompareSelectedTeam.cashStrategy.boardPressureValue}</small>
-                                      </article>
-                                      <article className="metric-card">
-                                        <span>Aggro / Disziplin</span>
-                                        <strong>
-                                          {formatLocalePoints(marketAiCompareSelectedTeam.cashStrategy.cashAggression * 100, 0)} / {formatLocalePoints(marketAiCompareSelectedTeam.cashStrategy.cashDiscipline * 100, 0)}
-                                        </strong>
-                                        <small>Overspend {formatLocalePoints(marketAiCompareSelectedTeam.cashStrategy.overspendTolerance * 100, 0)}%</small>
-                                      </article>
-                                      <article className="metric-card">
-                                        <span>Save Cash</span>
-                                        <strong>{marketAiCompareSelectedTeam.cashStrategy.shouldSaveCash ? "Ja" : "Nein"}</strong>
-                                        <small>Star {marketAiCompareSelectedTeam.cashStrategy.canBuyStar ? "ok" : "nein"} · Superstar {marketAiCompareSelectedTeam.cashStrategy.canBuySuperstar ? "ok" : "nein"}</small>
-                                      </article>
-                                      <article className="metric-card">
-                                        <span>Finance Posture / Spend</span>
-                                        <strong>
-                                          {marketAiCompareSelectedTeam.cashStrategy.financePosture} · {marketAiCompareSelectedTeam.cashStrategy.spendFactor != null ? formatLocalePoints(marketAiCompareSelectedTeam.cashStrategy.spendFactor, 2) : "—"}
-                                        </strong>
-                                        <small>
-                                          allowed_budget_for_search {formatTransfermarktCurrency(marketAiCompareSelectedTeam.cashStrategy.allowedBudgetForSearch)}
-                                        </small>
-                                      </article>
-                                      <article className="metric-card">
-                                        <span>Attack / Savings</span>
-                                        <strong>
-                                          {formatLocalePoints(marketAiCompareSelectedTeam.cashStrategy.attackPressure * 100, 0)} / {formatLocalePoints(marketAiCompareSelectedTeam.cashStrategy.savingsBias * 100, 0)}
-                                        </strong>
-                                        <small>
-                                          rosterPressure {formatLocalePoints(marketAiCompareSelectedTeam.cashStrategy.rosterPressure * 100, 0)} · needPressure {formatLocalePoints(marketAiCompareSelectedTeam.cashStrategy.needPressure * 100, 0)}
-                                        </small>
-                                      </article>
-                                      <article className="metric-card">
-                                        <span>Min Buffer / Window</span>
-                                        <strong>
-                                          {formatTransfermarktCurrency(marketAiCompareSelectedTeam.cashStrategy.minCashBuffer)} / {formatTransfermarktCurrency(marketAiCompareSelectedTeam.cashStrategy.spendArchitecture.maxSpendTotalThisWindow)}
-                                        </strong>
-                                        <small>{marketAiCompareSelectedTeam.cashStrategy.spendArchitecture.reason}</small>
-                                      </article>
-                                      <article className="metric-card">
-                                        <span>Max Spend / Mindestslot</span>
-                                        <strong>
-                                          {formatTransfermarktCurrency(marketAiCompareSelectedTeam.cashStrategy.maxSpendPerPick)} / {formatTransfermarktCurrency(marketAiCompareSelectedTeam.cashStrategy.expectedMinimumSlotCost)}
-                                        </strong>
-                                        <small>
-                                          Minimum {marketAiCompareSelectedTeam.cashStrategy.missingMinimumSlots} offen · Optimum {marketAiCompareSelectedTeam.cashStrategy.missingTargetSlots} offen
-                                        </small>
-                                      </article>
-                                      <article className="metric-card">
-                                        <span>Lane-Caps</span>
-                                        <strong>
-                                          Star {formatTransfermarktCurrency(marketAiCompareSelectedTeam.cashStrategy.maxSpendByLane.star)} · Core {formatTransfermarktCurrency(marketAiCompareSelectedTeam.cashStrategy.maxSpendByLane.core)}
-                                        </strong>
-                                        <small>
-                                          Cheap {formatTransfermarktCurrency(marketAiCompareSelectedTeam.cashStrategy.maxSpendByLane.cheap_fill)} · Depth {formatTransfermarktCurrency(marketAiCompareSelectedTeam.cashStrategy.maxSpendByLane.depth)}
-                                        </small>
-                                      </article>
-                                      <article className="metric-card">
-                                        <span>Prize Signal (5 Seasons)</span>
-                                        <strong>
-                                          {formatTransfermarktCurrency(marketAiCompareSelectedTeam.cashStrategy.expectedPrizeSignal.expectedPrizeFiveSeasonSum)}
-                                        </strong>
-                                        <small>
-                                          aktuell {formatTransfermarktCurrency(marketAiCompareSelectedTeam.cashStrategy.expectedPrizeSignal.expectedPrizeCurrentSeason)} · Trend {marketAiCompareSelectedTeam.cashStrategy.expectedPrizeSignal.expectedPrizeTrend} · {marketAiCompareSelectedTeam.cashStrategy.expectedPrizeSignal.prizeSourceStatus}
-                                        </small>
-                                      </article>
-                                    </div>
-                                    {marketAiCompareSelectedTeam.cashStrategy.warnings.length ? (
-                                      <ul className="warning-list compact-list">
-                                        {marketAiCompareSelectedTeam.cashStrategy.warnings.map((warning) => (
-                                          <li key={`${marketAiCompareSelectedTeam.teamId}-cash-warning-${warning}`}>{warning}</li>
-                                        ))}
-                                      </ul>
-                                    ) : null}
-                                    {marketAiCompareSelectedTeam.cashStrategy.expectedPrizeSignal.warnings.length ? (
-                                      <ul className="warning-list compact-list">
-                                        {marketAiCompareSelectedTeam.cashStrategy.expectedPrizeSignal.warnings.map((warning) => (
-                                          <li key={`${marketAiCompareSelectedTeam.teamId}-prize-warning-${warning}`}>{warning}</li>
-                                        ))}
-                                      </ul>
-                                    ) : null}
-                                  </section>
-                                  <section className="panel transfer-ai-candidate-panel">
-                                    <div className="panel-header">
-                                      <h4>Open Needs</h4>
-                                    </div>
-                                    <div className="metric-grid compact">
-                                      {marketAiCompareSelectedTeam.openNeeds.map((need) => (
-                                        <article key={`${marketAiCompareSelectedTeam.teamId}-need-${need.axis}`} className="metric-card">
-                                          <span>{need.label}</span>
-                                          <strong>{formatLocalePoints(need.importance * 100, 0)}</strong>
-                                          <small>{need.reason}</small>
-                                        </article>
-                                      ))}
-                                    </div>
-                                    <div className="metric-grid compact">
-                                      {marketAiCompareSelectedTeam.budgetLanes.map((lane) => (
-                                        <article key={`${marketAiCompareSelectedTeam.teamId}-lane-${lane.lane}`} className="metric-card">
-                                          <span>{lane.lane.toUpperCase()}</span>
-                                          <strong>{formatTransfermarktCurrency(lane.priceCap)}</strong>
-                                          <small>
-                                            {lane.reason} · Slots {lane.remainingSlots}/{lane.plannedSlots} · Used {formatTransfermarktCurrency(lane.spendUsed)}
-                                          </small>
-                                          <small>
-                                            Cash-Share {lane.maxCashShare != null ? `${formatLocalePoints(lane.maxCashShare * 100, 0)}%` : "—"} · Min Need {formatLocalePoints(lane.minNeedScore, 1)} · Min Fit {formatLocalePoints(lane.minTeamFitScore, 1)}
-                                          </small>
-                                        </article>
-                                      ))}
-                                    </div>
-                                  </section>
-                                  <section className="panel transfer-ai-candidate-panel">
-                                    <div className="panel-header">
-                                      <h4>Geplante Picks</h4>
-                                    </div>
-                                    {marketAiCompareSelectedTeam.plannedPicks.length === 0 ? (
-                                      <p className="muted">Noch keine Pick-Folge im aktuellen Marktfenster.</p>
-                                    ) : (
-                                      <div className="transfer-ai-candidate-list">
-                                        {marketAiCompareSelectedTeam.plannedPicks.map((entry) => (
-                                          <article
-                                            key={`${marketAiCompareSelectedTeam.teamId}-compare-pick-${entry.step}-${entry.playerId}`}
-                                            className="transfer-ai-candidate-card"
-                                            onDoubleClick={() => openPlayerDrawerById(entry.playerId)}
-                                            title="Doppelklick öffnet den Spieler-Drawer"
-                                          >
-                                            <div className="transfer-ai-candidate-head">
-                                              <button className="table-link-button" type="button" onDoubleClick={() => openPlayerDrawerById(entry.playerId)}>
-                                                #{entry.step} {entry.playerName}
-                                              </button>
-                                              <span className="pill">{formatLocalePoints(entry.finalScore, 1)}</span>
-                                            </div>
-                                            <p className="muted">
-                                              {entry.lane.toUpperCase()} · <ClassColorChip className={entry.className} /> · <RaceIcon race={entry.race} className="race-icon-chip-inline" />
-                                            </p>
-                                            <p className="muted">
-                                              Lane {formatTransfermarktCurrency(entry.laneBudgetUsed)} / {formatTransfermarktCurrency(entry.laneBudgetLimit)} · {entry.laneReason}
-                                            </p>
-                                            <p className="muted">
-                                              OVR {formatWholeNumber(entry.ovr ?? null)} · MVS {entry.mvs != null ? formatPpsValue(entry.mvs) : "—"} · MW {formatTransfermarktCurrency(entry.price)}
-                                            </p>
-                                            <p className="muted">
-                                              Need {formatLocalePoints(entry.scoreBreakdown.needMatchScore, 1)} · Diszi {formatLocalePoints(entry.scoreBreakdown.disciplineCoverageScore, 1)} · Theme {formatLocalePoints(entry.scoreBreakdown.teamIdentityScore, 1)} · Lane {formatLocalePoints(entry.scoreBreakdown.laneFitScore, 1)}
-                                            </p>
-                                            <p className="muted">
-                                              Balance {formatLocalePoints(entry.scoreBreakdown.rosterBalanceScore, 1)} · Value {formatLocalePoints(entry.scoreBreakdown.valueScore, 1)} · Spam {formatLocalePoints(entry.scoreBreakdown.classSpamPenalty, 1)}
-                                            </p>
-                                            <p className="muted">
-                                              {entry.isSuperstar ? "Superstar" : entry.isStar ? "Star" : "Value/Core"} ·
-                                              {entry.specialistNeedFilled ? " Specialist" : ""}{entry.coreNeedFilled ? " Core" : ""}{entry.depthNeedFilled ? " Depth" : ""}
-                                              {entry.cheaperAlternativeAvailable ? " · guenstigere Alternative vorhanden" : ""}
-                                            </p>
-                                            {entry.starPressureWarning ? <p className="muted text-negative">{entry.starPressureWarning}</p> : null}
-                                            <p>{entry.reasons.join(" · ")}</p>
-                                          </article>
-                                        ))}
-                                      </div>
-                                    )}
-                                  </section>
-                                  <section className="panel transfer-ai-candidate-panel">
-                                    <div className="panel-header">
-                                      <h4>Kandidatenpool Top</h4>
-                                    </div>
-                                    {marketAiCompareSelectedTeam.candidatePoolTop.length === 0 ? (
-                                      <p className="muted">Kein belastbarer Kandidatenpool vorhanden.</p>
-                                    ) : (
-                                      <div className="transfer-ai-candidate-list">
-                                        {marketAiCompareSelectedTeam.candidatePoolTop.map((entry) => (
-                                          <article
-                                            key={`${marketAiCompareSelectedTeam.teamId}-compare-candidate-${entry.playerId}`}
-                                            className="transfer-ai-candidate-card"
-                                            onDoubleClick={() => openPlayerDrawerById(entry.playerId)}
-                                            title="Doppelklick öffnet den Spieler-Drawer"
-                                          >
-                                            <div className="transfer-ai-candidate-head">
-                                              <button className="table-link-button" type="button" onDoubleClick={() => openPlayerDrawerById(entry.playerId)}>
-                                                {entry.playerName}
-                                              </button>
-                                              <span className="pill">{formatLocalePoints(entry.finalScore, 1)}</span>
-                                            </div>
-                                            <p className="muted">
-                                              <ClassColorChip className={entry.className} /> · <RaceIcon race={entry.race} className="race-icon-chip-inline" /> · Achse {entry.candidateAxis?.toUpperCase() ?? "—"}
-                                            </p>
-                                            <p className="muted">
-                                              Quality {formatLocalePoints(entry.scoreBreakdown.playerQualityScore, 1)} · Budget {formatLocalePoints(entry.scoreBreakdown.budgetFitScore, 1)} · Value {formatLocalePoints(entry.scoreBreakdown.valueScore, 1)}
-                                            </p>
-                                            <p className="muted">
-                                              Theme {formatLocalePoints(entry.scoreBreakdown.teamIdentityScore, 1)} · Coverage {formatLocalePoints(entry.scoreBreakdown.disciplineCoverageScore, 1)} · Spam {formatLocalePoints(entry.scoreBreakdown.classSpamPenalty, 1)}
-                                            </p>
-                                            <p>{entry.reasons.slice(0, 3).join(" · ")}</p>
-                                          </article>
-                                        ))}
-                                      </div>
-                                    )}
-                                  </section>
-                                  <section className="panel transfer-ai-candidate-panel">
-                                    <div className="panel-header">
-                                      <h4>Retool-Abgleich</h4>
-                                    </div>
-                                    <p className="muted">
-                                      Status: {marketAiCompareSelectedTeam.retoolTopPicksStatus === "available" ? "Top Picks vorhanden" : "frozen top picks fehlen"}
-                                    </p>
-                                    {marketAiCompareSelectedTeam.retoolReferenceFiles.length ? (
-                                      <p className="muted">
-                                        Quellen: {marketAiCompareSelectedTeam.retoolReferenceFiles.map((entry) => entry.split("/").pop()).join(" · ")}
-                                      </p>
-                                    ) : null}
-                                    {marketAiCompareSelectedTeam.deviationReasons.length ? (
-                                      <ul className="warning-list compact-list">
-                                        {marketAiCompareSelectedTeam.deviationReasons.map((warning) => (
-                                          <li key={`${marketAiCompareSelectedTeam.teamId}-compare-dev-${warning}`}>{warning}</li>
-                                        ))}
-                                      </ul>
-                                    ) : null}
-                                    {marketAiCompareSelectedTeam.warnings.length ? (
-                                      <p className="muted text-negative">Hinweise: {marketAiCompareSelectedTeam.warnings.join(" · ")}</p>
-                                    ) : null}
-                                  </section>
-                                </div>
-                              </div>
-                            ) : null}
-                          </>
-                        ) : (
-                                      <p className="muted">Needs & Picks wurden noch nicht geladen.</p>
-                        )}
-                      </section>
-                    </div>
-
-                    <div className={joinClassNames("transfer-panel-section transfer-panel-section--ai", !marketShowAutoAnalysis && "is-collapsed")}>
-                      <div className="transfer-panel-title">
-                        <h3>Auto-Verkaufsideen</h3>
-                        <p className="muted transfer-panel-note">
-                          Verkaufsideen auf Basis von Gehalt, Kaderdruck, Leistung und Teamprofil.
-                        </p>
-                      </div>
-                      <section className="panel transfer-ai-panel">
-                        <div className="transfer-ai-controls">
-                          <label className="filter-field">
-                            <span>Teams</span>
-                            <select
-                              className="input"
-                              value={marketAiSellTeamScope}
-                              onChange={(event) => setMarketAiSellTeamScope(event.target.value as "ai" | "all")}
-                            >
-                              <option value="ai">Nur Auto-Teams</option>
-                              <option value="all">Alle Teams</option>
-                            </select>
-                          </label>
-                          <div className="transfer-ai-actions">
-                            <button
-                              className="secondary-button"
-                              type="button"
-                              disabled={marketAiSellPreviewBusy}
-                              onClick={() => {
-                                void reloadAiSellPreview();
-                              }}
-                            >
-                              {marketAiSellPreviewBusy ? "Laedt..." : "Auto-Verkaufsideen laden"}
-                            </button>
-                          </div>
-                        </div>
-                        {marketAiSellPreviewError ? (
-                          <div className="transfer-feedback-banner is-error">
-                            <strong>Auto-Verkauf blockiert</strong>
-                            <span>{marketAiSellPreviewError}</span>
-                          </div>
-                        ) : null}
-                        {marketAiSellPreviewFeed ? (
-                          <>
-                            <div className="metric-grid compact transfer-ai-summary-grid">
-                              <article className="metric-card">
-                                <span>Teams</span>
-                                <strong>{marketAiSellPreviewFeed.totalTeams}</strong>
-                              </article>
-                              <article className="metric-card">
-                                <span>Auto-Teams</span>
-                                <strong>{marketAiSellPreviewFeed.aiTeams}</strong>
-                              </article>
-                              <article className="metric-card">
-                                <span>Gefuehrte uebersprungen</span>
-                                <strong>{marketAiSellPreviewFeed.skippedManual}</strong>
-                              </article>
-                              <article className="metric-card">
-                                <span>Beobachtete uebersprungen</span>
-                                <strong>{marketAiSellPreviewFeed.skippedPassive}</strong>
-                              </article>
-                              <article className="metric-card">
-                                <span>Auto aus</span>
-                                <strong>{marketAiSellPreviewFeed.skippedDisabled}</strong>
-                              </article>
-                              <article className="metric-card">
-                                <span>Verkauf moeglich</span>
-                                <strong>{marketAiSellPreviewFeed.readyTeams}</strong>
-                              </article>
-                              <article className="metric-card">
-                                <span>Hinweise</span>
-                                <strong>{marketAiSellPreviewFeed.warningTeams}</strong>
-                              </article>
-                              <article className="metric-card">
-                                <span>Blockiert</span>
-                                <strong>{marketAiSellPreviewFeed.blockedTeams}</strong>
-                              </article>
-                            </div>
-                            <div className="table-shell transfer-ai-table-shell">
-                              <table className="data-table compact-table transfer-ai-table">
-                                <thead>
-                                  <tr>
-                                    <th>Team</th>
-                                    <th>Status</th>
-                                    <th>Budget</th>
-                                    <th>Kader</th>
-                                    <th>Top Kandidat</th>
-                                    <th>Erlos</th>
-                                    <th>Gehalt</th>
-                                    <th>LZ</th>
-                                  </tr>
-                                </thead>
-                                <tbody>
-                                  {marketAiSellPreviewFeed.teams.map((entry) => {
-                                    const top = entry.sellCandidates[0] ?? null;
-                                    return (
-                                      <tr
-                                        key={`market-ai-sell-${entry.teamId}`}
-                                        className={marketAiSellPreviewSelectedTeamId === entry.teamId ? "is-selected" : undefined}
-                                        onDoubleClick={() => openTeamDrawerById(entry.teamId)}
-                                        onClick={() => setMarketAiSellPreviewSelectedTeamId(entry.teamId)}
-                                      >
-                                        <td>
-                                          <button
-                                            className="table-link-button"
-                                            type="button"
-                                            onClick={(event) => {
-                                              event.stopPropagation();
-                                              scheduleActiveManagerTeam(entry.teamId, "manual_select", () => setFoundationView("teams", setActiveView));
-                                            }}
-                                            onDoubleClick={(event) => {
-                                              event.stopPropagation();
-                                              openTeamDrawerById(entry.teamId);
-                                            }}
-                                          >
-                                            {entry.teamName}
-                                          </button>
-                                        </td>
-                                        <td>
-                                          <span className={getAiTransferStatusPillClass(entry.status)}>{getAiTransferStatusLabel(entry.status)}</span>
-                                        </td>
-                                        <td>{getAiTransferBudgetLabel(entry.budgetPressure)}</td>
-                                        <td>
-                                          {entry.rosterSize ?? "—"}
-                                          {entry.targetRosterMin != null || entry.targetRosterOpt != null
-                                            ? ` (${entry.targetRosterMin ?? "—"}/${entry.targetRosterOpt ?? "—"})`
-                                            : ""}
-                                        </td>
-                                        <td>{top ? top.playerName : "—"}</td>
-                                        <td>{top ? formatTransfermarktCurrency(top.expectedSellValue) : "—"}</td>
-                                        <td>{top ? formatTransfermarktCurrency(top.salary) : "—"}</td>
-                                        <td>{top?.contractLength ?? "—"}</td>
-                                      </tr>
-                                    );
-                                  })}
-                                </tbody>
-                              </table>
-                            </div>
-                            {marketAiSellSelectedTeam ? (
-                              <div className="transfer-ai-detail">
-                                <div className="transfer-ai-detail-head">
-                                  <div>
-                                    <h4>{marketAiSellSelectedTeam.teamName}</h4>
-                                    <p className="muted">{marketAiSellSelectedTeam.strategySummary}</p>
-                                    <p className="muted">{marketAiSellSelectedTeam.explanation}</p>
-                                  </div>
-                                  <div className="room-meta">
-                                    <span className="pill">Steuerung {formatTeamControlModeLabel(marketAiSellSelectedTeam.controlMode)}</span>
-                                    <span className="pill">Auto {marketAiSellSelectedTeam.aiSellPreviewEnabled ? "an" : "aus"}</span>
-                                  </div>
-                                </div>
-                                <div className="metric-grid compact" style={{ marginBottom: 12 }}>
-                                  <article className="metric-card">
-                                    <span>Cash</span>
-                                    <strong>{formatTransfermarktCurrency(marketAiSellSelectedTeam.cash)}</strong>
-                                  </article>
-                                  <article className="metric-card">
-                                    <span>Gehalt</span>
-                                    <strong>{formatTransfermarktCurrency(marketAiSellSelectedTeam.salaryTotal)}</strong>
-                                  </article>
-                                  <article className="metric-card">
-                                    <span>Kader</span>
-                                    <strong>{marketAiSellSelectedTeam.rosterCount ?? marketAiSellSelectedTeam.rosterSize ?? "—"}</strong>
-                                  </article>
-                                  <article className="metric-card">
-                                    <span>MW</span>
-                                    <strong>{formatTransfermarktCurrency(marketAiSellSelectedTeam.marketValueTotal)}</strong>
-                                  </article>
-                                  <article className="metric-card">
-                                    <span>Min / Opt</span>
-                                    <strong>
-                                      {marketAiSellSelectedTeam.playerMin ?? marketAiSellSelectedTeam.targetRosterMin ?? "—"} /{" "}
-                                      {marketAiSellSelectedTeam.playerOpt ?? marketAiSellSelectedTeam.targetRosterOpt ?? "—"}
-                                    </strong>
-                                  </article>
-                                  <article className="metric-card">
-                                    <span>Budgetdruck</span>
-                                    <strong>{getAiTransferBudgetLabel(marketAiSellSelectedTeam.budgetPressure)}</strong>
-                                  </article>
-                                </div>
-                                {marketAiSellSelectedTeam.warnings.length ? (
-                                  <ul className="warning-list compact-list">
-                                    {marketAiSellSelectedTeam.warnings.map((warning) => (
-                                      <li key={`${marketAiSellSelectedTeam.teamId}-sell-warning-${warning}`}>{warning}</li>
-                                    ))}
-                                  </ul>
-                                ) : null}
-                                {marketAiSellSelectedTeam.blockingReasons.length ? (
-                                  <p className="muted text-negative">Blocker: {marketAiSellSelectedTeam.blockingReasons.join(" · ")}</p>
-                                ) : null}
-                                <section className="panel transfer-ai-candidate-panel">
-                                  <div className="panel-header">
-                                    <h4>Keep Core</h4>
-                                  </div>
-                                  {marketAiSellSelectedTeam.keepCore.length === 0 ? (
-                                    <p className="muted">Kein klarer Keep-Core aus den aktuellen lokalen Daten ableitbar.</p>
-                                  ) : (
-                                    <div className="transfer-ai-candidate-list">
-                                      {marketAiSellSelectedTeam.keepCore.map((entry) => (
-                                        <article
-                                          key={`${marketAiSellSelectedTeam.teamId}-keep-${entry.activePlayerId}`}
-                                          className="transfer-ai-candidate-card"
-                                          onDoubleClick={() => openPlayerDrawerById(entry.playerId, entry.activePlayerId)}
-                                          title="Doppelklick öffnet den Spieler-Drawer"
-                                        >
-                                          <div className="transfer-ai-candidate-head">
-                                            <button
-                                              className="table-link-button"
-                                              type="button"
-                                              onDoubleClick={() => openPlayerDrawerById(entry.playerId, entry.activePlayerId)}
-                                            >
-                                              {entry.playerName}
-                                            </button>
-                                            <span className="pill">Keep</span>
-                                          </div>
-                                            <p className="muted">
-                                              <ClassColorChip className={entry.className} /> · <RaceIcon race={entry.raceName} className="race-icon-chip-inline" />
-                                            </p>
-                                          <p className="muted">
-                                            OVR {formatWholeNumber(entry.ovr)} · MVS {entry.mvs != null ? formatPpsValue(entry.mvs) : "—"}
-                                          </p>
-                                          <p className="muted">{entry.performanceSummary}</p>
-                                          {entry.reasonsToKeep.length ? <p>Keep: {entry.reasonsToKeep.join(" · ")}</p> : null}
-                                        </article>
-                                      ))}
-                                    </div>
-                                  )}
-                                </section>
-                                <section className="panel transfer-ai-candidate-panel">
-                                  <div className="panel-header">
-                                    <h4>Verkaufskandidaten</h4>
-                                  </div>
-                                  {marketAiSellSelectedTeam.sellCandidates.length === 0 ? (
-                                    <p className="muted">Noch kein sauberer Verkaufsvorschlag fuer dieses Team.</p>
-                                  ) : (
-                                    <div className="transfer-ai-candidate-list">
-                                      {marketAiSellSelectedTeam.sellCandidates.map((entry) => (
-                                        <article
-                                          key={`${marketAiSellSelectedTeam.teamId}-sell-${entry.activePlayerId}`}
-                                          className="transfer-ai-candidate-card"
-                                          onDoubleClick={() => openPlayerDrawerById(entry.playerId, entry.activePlayerId)}
-                                          title="Doppelklick öffnet den Spieler-Drawer"
-                                        >
-                                          <div className="transfer-ai-candidate-head">
-                                            <button
-                                              className="table-link-button"
-                                              type="button"
-                                              onDoubleClick={() => openPlayerDrawerById(entry.playerId, entry.activePlayerId)}
-                                            >
-                                              {entry.playerName}
-                                            </button>
-                                            <span className="pill">{entry.sellPriority}</span>
-                                          </div>
-                                          <p className="muted">
-                                            <ClassColorChip className={entry.className} /> · <RaceIcon race={entry.raceName} className="race-icon-chip-inline" />
-                                          </p>
-                                          <p className="muted">
-                                            OVR {formatWholeNumber(entry.ovr)} · MVS {entry.mvs != null ? formatPpsValue(entry.mvs) : "—"}
-                                          </p>
-                                          <p className="muted">{entry.strategyFitSummary}</p>
-                                          <p className="muted">{entry.performanceSummary}</p>
-                                          <div className="metric-grid compact">
-                                            <article className="metric-card">
-                                              <span>MW</span>
-                                              <strong>{formatTransfermarktCurrency(entry.marketValue)}</strong>
-                                            </article>
-                                            <article className="metric-card">
-                                              <span>Erlos</span>
-                                              <strong>{formatTransfermarktCurrency(entry.expectedSellValue)}</strong>
-                                            </article>
-                                            <article className="metric-card">
-                                              <span>Gehalt</span>
-                                              <strong>{formatTransfermarktCurrency(entry.salary)}</strong>
-                                            </article>
-                                            <article className="metric-card">
-                                              <span>Vertrag</span>
-                                              <strong>{entry.contractLength ?? "—"}</strong>
-                                            </article>
-                                            <article className="metric-card">
-                                              <span>Prioritaet</span>
-                                              <strong>{entry.sellPriorityScore}</strong>
-                                            </article>
-                                            <article className="metric-card">
-                                              <span>OVR</span>
-                                              <strong>{formatWholeNumber(entry.ovr)}</strong>
-                                            </article>
-                                            <article className="metric-card">
-                                              <span>MVS</span>
-                                              <strong>{entry.mvs != null ? formatPpsValue(entry.mvs) : "—"}</strong>
-                                            </article>
-                                            <article className="metric-card">
-                                              <span>Kader nachher</span>
-                                              <strong>{entry.rosterAfter ?? "—"}</strong>
-                                            </article>
-                                            <article className="metric-card">
-                                              <span>Cash nachher</span>
-                                              <strong>{formatTransfermarktCurrency(entry.cashAfter)}</strong>
-                                            </article>
-                                          </div>
-                                          {entry.reasonsToSell.length ? <p>Sell: {entry.reasonsToSell.join(" · ")}</p> : null}
-                                          {entry.reasonsToKeep.length ? <p className="muted">Keep: {entry.reasonsToKeep.join(" · ")}</p> : null}
-                                          {entry.warnings.length ? <p className="muted text-negative">Hinweise: {entry.warnings.join(" · ")}</p> : null}
-                                        </article>
-                                      ))}
-                                    </div>
-                                  )}
-                                </section>
-                              </div>
-                            ) : null}
-                          </>
-                        ) : (
-                          <p className="muted">Noch keine Auto-Verkaufsideen geladen.</p>
-                        )}
-                      </section>
-                    </div>
-
-                    <div className="transfer-panel-section transfer-panel-section--filter">
-                      <div className="transfer-filter-header-row">
-                        <div className="transfer-panel-title">
-                          <h3>Filter</h3>
-                          <p className="muted transfer-panel-note">Suche, Teamwahl und Markt-Filter zuerst im Hauptflow.</p>
-                        </div>
-                        <ColumnVisibilityManager
-                          title="Spalten"
-                          columns={[...getTransfermarktBaseColumns(), ...getTransfermarktAdvancedColumns()]}
-                          presets={transferMarketPresets}
-                          activePreset={getTableActivePreset("transferMarketTable")}
-                          isVisible={(columnId, visibleByDefault) =>
-                            isTableColumnVisible("transferMarketTable", columnId, visibleByDefault)
-                          }
-                          onToggle={(columnId, nextVisible) =>
-                            setTableColumnVisible("transferMarketTable", columnId, nextVisible)
-                          }
-                          onMove={(columnId, direction) =>
-                            moveTableColumn("transferMarketTable", columnId, direction, transfermarktAllColumns)
-                          }
-                          getWidth={(column) => getTableColumnWidth("transferMarketTable", column)}
-                          onStepWidth={(column, delta) => adjustTableColumnWidth("transferMarketTable", column, delta)}
-                          onResetWidth={(column) => resetTableColumnWidth("transferMarketTable", column)}
-                          onApplyPreset={(presetId) => {
-                            const preset = transferMarketPresets.find((entry) => entry.id === presetId);
-                            if (!preset) {
-                              return;
-                            }
-
-                            const advancedIds = new Set(getTransfermarktAdvancedColumns().map((column) => column.id));
-                            setMarketShowAdvancedColumns(
-                              preset.visibleColumnIds.some((columnId) => advancedIds.has(columnId)),
-                            );
-                            applyTablePreset("transferMarketTable", preset, transfermarktAllColumns);
-                          }}
-                          onResetToDefault={() => {
-                            const preset = transferMarketPresets.find((entry) => entry.id === "retool_default");
-                            if (preset) {
-                              setMarketShowAdvancedColumns(false);
-                              applyTablePreset("transferMarketTable", preset, transfermarktAllColumns);
-                            }
-                          }}
-                        />
-                      </div>
-                      <div className="transfer-filter-actions">
-                        <button
-                          className="secondary-button"
-                          type="button"
-                          onClick={() => setTransferMarketAdvancedColumnsVisible(!marketShowAdvancedColumns)}
-                        >
-                          {marketShowAdvancedColumns ? "Attribute ausblenden" : "Attribute einblenden"}
-                        </button>
-                        <button
-                          className="secondary-button"
-                          type="button"
-                          onClick={() => setMarketReloadToken((current) => current + 1)}
-                        >
-                          Neu laden
-                        </button>
-                      </div>
-                      <div className="transfer-filter-grid">
-                        <label className="filter-field transfer-filter-span-2">
-                          <span>Team</span>
-                          <select
-                            className="input"
-                            data-testid="transfer-market-team-select"
-                            value={marketTeamId}
-                            onChange={(event) => setMarketTeamId(event.target.value)}
-                          >
-                            <option value="">Team waehlen</option>
-                            {gameState.teams.map((team) => (
-                              <option key={team.teamId} value={team.teamId}>
-                                {team.teamId} · {team.name}
-                              </option>
-                            ))}
-                          </select>
-                        </label>
-
-                        <label className="filter-field transfer-filter-span-2">
-                          <span>Spielername</span>
-                          <input
-                            className="input"
-                            placeholder="Suche nach Name"
-                            value={marketSearch}
-                            onChange={(event) => setMarketSearch(event.target.value)}
-                          />
-                        </label>
-
-                        <label className="filter-field">
-                          <span>Rasse</span>
-                          <select
-                            className="input"
-                            value={marketRaceFilter}
-                            onChange={(event) => setMarketRaceFilter(event.target.value)}
-                          >
-                            <option value="ALL">Alle</option>
-                            {playerRaceOptions.map((race) => (
-                              <option key={race} value={race}>
-                                {race}
-                              </option>
-                            ))}
-                          </select>
-                        </label>
-
-                        <label className="filter-field">
-                          <span>Subclass</span>
-                          <select
-                            className="input"
-                            value={marketSubclassFilter}
-                            onChange={(event) => setMarketSubclassFilter(event.target.value)}
-                          >
-                            <option value="ALL">Alle</option>
-                            {marketSubclassOptions.map((subclass) => (
-                              <option key={subclass} value={subclass}>
-                                {subclass}
-                              </option>
-                            ))}
-                          </select>
-                        </label>
-
-                        <label className="filter-field">
-                          <span>Klasse</span>
-                          <select
-                            className="input"
-                            value={marketClassFilter}
-                            onChange={(event) => setMarketClassFilter(event.target.value)}
-                          >
-                            <option value="ALL">Alle</option>
-                            {playerClassOptions.map((className) => (
-                              <option key={className} value={className}>
-                                {className}
-                              </option>
-                            ))}
-                          </select>
-                        </label>
-
-                        <label className="filter-field">
-                          <span>Kartenfarbe</span>
-                          <select className="input" disabled value="NOT_PORTED" aria-label="Kartenfarbe nicht portiert">
-                            <option value="NOT_PORTED">Noch nicht portiert</option>
-                          </select>
-                        </label>
-
-                        <label className="filter-field">
-                          <span>Traits+</span>
-                          <select
-                            className="input"
-                            value={marketPositiveTraitFilter}
-                            onChange={(event) => setMarketPositiveTraitFilter(event.target.value)}
-                          >
-                            <option value="ALL">Alle</option>
-                            {marketPositiveTraitOptions.map((trait) => (
-                              <option key={trait} value={trait}>
-                                {trait}
-                              </option>
-                            ))}
-                          </select>
-                        </label>
-
-                        <label className="filter-field">
-                          <span>Traits-</span>
-                          <select
-                            className="input"
-                            value={marketNegativeTraitFilter}
-                            onChange={(event) => setMarketNegativeTraitFilter(event.target.value)}
-                          >
-                            <option value="ALL">Alle</option>
-                            {marketNegativeTraitOptions.map((trait) => (
-                              <option key={trait} value={trait}>
-                                {trait}
-                              </option>
-                            ))}
-                          </select>
-                        </label>
-
-                        <label className="filter-field">
-                          <span>Bracket</span>
-                          <select
-                            className="input"
-                            value={marketBracketFilter}
-                            onChange={(event) => setMarketBracketFilter(event.target.value)}
-                          >
-                            <option value="ALL">Alle</option>
-                            {Array.from({ length: 9 }, (_, index) => String(index + 1)).map((bracket) => (
-                              <option key={bracket} value={bracket}>
-                                {bracket}
-                              </option>
-                            ))}
-                          </select>
-                        </label>
-
-                        <label className="filter-field">
-                          <span>Alignment</span>
-                          <select
-                            className="input"
-                            value={marketAlignmentFilter}
-                            onChange={(event) => setMarketAlignmentFilter(event.target.value)}
-                          >
-                            <option value="ALL">Alle</option>
-                            {marketAlignmentOptions.map((alignment) => (
-                              <option key={alignment} value={alignment}>
-                                {alignment}
-                              </option>
-                            ))}
-                          </select>
-                        </label>
-
-                        <label className="filter-field">
-                          <span>Geschlecht</span>
-                          <select
-                            className="input"
-                            value={marketGenderFilter}
-                            onChange={(event) => setMarketGenderFilter(event.target.value)}
-                          >
-                            <option value="ALL">Alle</option>
-                            {marketGenderOptions.map((gender) => (
-                              <option key={gender} value={gender}>
-                                {gender}
-                              </option>
-                            ))}
-                          </select>
-                        </label>
-
-                        <label className="filter-field">
-                          <span>
-                            Marktwert 0-{formatLocalePoints(marketMaxValue, marketMaxValue % 1 === 0 ? 0 : 1)}
-                            {marketSelectedTeam ? " · Cash-Limit" : ""}
-                          </span>
-                          <input
-                            type="range"
-                            min={0}
-                            max={150}
-                            step={0.5}
-                            value={marketMaxValue}
-                            onChange={(event) => {
-                              marketValueFilterManualRef.current = true;
-                              setMarketMaxValue(Number(event.target.value));
-                            }}
-                          />
-                        </label>
-
-                        <label className="filter-field">
-                          <span>Gehalt {marketMaxSalary === 40 ? "0-40" : `0-${marketMaxSalary}`}</span>
-                          <input
-                            type="range"
-                            min={0}
-                            max={40}
-                            value={marketMaxSalary}
-                            onChange={(event) => setMarketMaxSalary(Number(event.target.value))}
-                          />
-                        </label>
-
-                        <label className="filter-field">
-                          <span>Ratio {marketMinRatio}-20</span>
-                          <input
-                            type="range"
-                            min={0}
-                            max={20}
-                            value={marketMinRatio}
-                            onChange={(event) => setMarketMinRatio(Number(event.target.value))}
-                          />
-                        </label>
-
-                        <label className="filter-field">
-                          <span>Power (Pow)-100</span>
-                          <input
-                            type="range"
-                            min={1}
-                            max={100}
-                            value={marketMinPow}
-                            onChange={(event) => setMarketMinPow(Number(event.target.value))}
-                          />
-                        </label>
-
-                        <label className="filter-field">
-                          <span>Speed (Spe)-100</span>
-                          <input
-                            type="range"
-                            min={1}
-                            max={100}
-                            value={marketMinSpe}
-                            onChange={(event) => setMarketMinSpe(Number(event.target.value))}
-                          />
-                        </label>
-
-                        <label className="filter-field">
-                          <span>Mental (Men)-100</span>
-                          <input
-                            type="range"
-                            min={1}
-                            max={100}
-                            value={marketMinMen}
-                            onChange={(event) => setMarketMinMen(Number(event.target.value))}
-                          />
-                        </label>
-
-                        <label className="filter-field">
-                          <span>Social (Soc)-100</span>
-                          <input
-                            type="range"
-                            min={1}
-                            max={100}
-                            value={marketMinSoc}
-                            onChange={(event) => setMarketMinSoc(Number(event.target.value))}
-                          />
-                        </label>
-
-                        <article className="metric-card transfer-filter-span-2">
-                          <span>Ergebnisse</span>
-                          <strong>{transferMarketRows.length}</strong>
-                        </article>
-
-                        <button
-                          className="secondary-button transfer-filter-span-2"
-                          type="button"
-                          onClick={() => {
-                            setMarketClassFilter("ALL");
-                            setMarketRaceFilter("ALL");
-                            setMarketSubclassFilter("ALL");
-                            setMarketAlignmentFilter("ALL");
-                            setMarketGenderFilter("ALL");
-                            setMarketPositiveTraitFilter("ALL");
-                            setMarketNegativeTraitFilter("ALL");
-                            setMarketBracketFilter("ALL");
-                            setMarketSearch("");
-                            marketValueFilterManualRef.current = false;
-                            setMarketMaxValue(marketCashMaxValue);
-                            setMarketMaxSalary(40);
-                            setMarketMinRatio(0);
-                            setMarketMinPow(1);
-                            setMarketMinSpe(1);
-                            setMarketMinMen(1);
-                            setMarketMinSoc(1);
-                          }}
-                        >
-                          Alle Filter zuruecksetzen
-                        </button>
-                      </div>
-                    </div>
-                  </section>
-                </div>
-              </aside>
-            </div>
-            <section className={`transfer-market-wishlist-strip${transferWishlistRows.length === 0 ? " is-empty" : ""}`} aria-label="Transfermarkt Wishlist">
-              <div className="panel-header">
-                <div>
-                  <h3>Wishlist</h3>
-                  <p className="muted">
-                    Gemerkte Spieler fuer {marketSelectedTeam?.name ?? "das ausgewaehlte Team"}.
-                  </p>
-                </div>
-                <span className="pill">{transferWishlistRows.length}</span>
-              </div>
-              {transferWishlistRows.length === 0 ? (
-                <p className="muted">Noch leer. Fahre ueber eine Markt-Zeile und klicke „Merken“, wenn ein Spieler interessant ist.</p>
-              ) : (
-                <div className="table-shell transfer-market-wishlist-table-shell">
-                  <table className="team-table transfer-table transfer-wishlist-table">
-                    <thead>
-                      <tr>
-                        <th>Bild</th>
-                        <th>Name</th>
-                        <th>MW</th>
-                        <th>Gehalt</th>
-                        <th>POW</th>
-                        <th>SPE</th>
-                        <th>MEN</th>
-                        <th>SOC</th>
-                        <th>Klasse</th>
-                        <th>Fit</th>
-                        <th>Status</th>
-                        <th aria-label="Aktionen" />
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {transferWishlistRows.map(({ entry, liveItem, available }) => {
-                        const portrait = liveItem ? getTransfermarktPortraitModel(liveItem) : null;
-                        return (
-                          <tr key={entry.id} onDoubleClick={() => openPlayerDrawerById(entry.playerId)}>
-                            <td>
-                              {portrait?.src ? (
-                                <img
-                                  className="transfermarkt-portrait transfermarkt-portrait-small"
-                                  src={portrait.src}
-                                  alt={entry.playerName}
-                                  loading="lazy"
-                                  decoding="async"
-                                  fetchPriority="low"
-                                />
-                              ) : (
-                                <div className="transfermarkt-portrait transfermarkt-portrait-placeholder transfermarkt-portrait-small">
-                                  {entry.playerName.slice(0, 2).toUpperCase()}
-                                </div>
-                              )}
-                            </td>
-                            <td>
-                              <div className="table-player-cell">
-                                <strong>{entry.playerName}</strong>
-                                <span className="transfermarkt-name-meta">
-                                  <RaceIcon race={liveItem?.race ?? entry.race} className="race-icon-chip-inline" />
-                                  <span>{liveItem?.race ?? entry.race}</span>
-                                </span>
-                              </div>
-                            </td>
-                            <td>{formatTransfermarktCurrency(liveItem?.marketValue ?? entry.marketValue)}</td>
-                            <td>{formatTransfermarktCurrency(liveItem?.salary ?? entry.salary)}</td>
-                            <td className={liveItem?.pow != null ? getPoolHeatClass(liveItem.pow, leaguePlayerHeatPools.pow) : ""}>
-                              {liveItem?.pow == null ? "—" : formatWholeNumber(liveItem.pow)}
-                            </td>
-                            <td className={liveItem?.spe != null ? getPoolHeatClass(liveItem.spe, leaguePlayerHeatPools.spe) : ""}>
-                              {liveItem?.spe == null ? "—" : formatWholeNumber(liveItem.spe)}
-                            </td>
-                            <td className={liveItem?.men != null ? getPoolHeatClass(liveItem.men, leaguePlayerHeatPools.men) : ""}>
-                              {liveItem?.men == null ? "—" : formatWholeNumber(liveItem.men)}
-                            </td>
-                            <td className={liveItem?.soc != null ? getPoolHeatClass(liveItem.soc, leaguePlayerHeatPools.soc) : ""}>
-                              {liveItem?.soc == null ? "—" : formatWholeNumber(liveItem.soc)}
-                            </td>
-                            <td><ClassColorChip className={liveItem?.className ?? entry.className} /></td>
-                            <td>{liveItem ? formatFitDisplay(liveItem) : "—"}</td>
-                            <td>{available ? "verfuegbar" : "nicht verfuegbar"}</td>
-                            <td className="transfermarkt-row-actions-cell">
-                              <div className="transfermarkt-row-actions transfermarkt-row-actions-visible">
-                                <button
-                                  className="secondary-button inline-button"
-                                  type="button"
-                                  disabled={!available || !liveItem || !marketTeamId || !canManageTeamId(marketTeamId)}
-                                  title={
-                                    marketTeamId && !canManageTeamId(marketTeamId)
-                                      ? `${getTeamLockedName(marketTeamId)} — Kaufen ist für dieses Team gesperrt.`
-                                      : undefined
-                                  }
-                                  onClick={() => {
-                                    if (liveItem) {
-                                      void openMarketBuyModal(liveItem);
-                                    }
-                                  }}
-                                >
-                                  Kaufen
-                                </button>
-                                <button
-                                  className="secondary-button inline-button"
-                                  type="button"
-                                  onClick={() => removeTransferWishlistEntry(entry.playerId)}
-                                >
-                                  Entfernen
-                                </button>
-                              </div>
-                            </td>
-                          </tr>
-                        );
-                      })}
-                    </tbody>
-                  </table>
-                </div>
-              )}
-            </section>
-            {transferMarketRows.length === 0 ? (
-              <div className="transfer-market-empty-card">
-                <strong>Keine Treffer mit diesen Filtern</strong>
-                <span>Lockere zuerst Budget, Klasse oder Bereichswerte. Danach kannst du wieder nach Fit sortieren.</span>
-                <button
-                  className="secondary-button inline-button"
-                  type="button"
-                  onClick={() => {
-                    setMarketClassFilter("ALL");
-                    setMarketRaceFilter("ALL");
-                    setMarketSubclassFilter("ALL");
-                    setMarketAlignmentFilter("ALL");
-                    setMarketGenderFilter("ALL");
-                    setMarketPositiveTraitFilter("ALL");
-                    setMarketNegativeTraitFilter("ALL");
-                    setMarketBracketFilter("ALL");
-                    setMarketSearch("");
-                    marketValueFilterManualRef.current = false;
-                    setMarketMaxValue(marketCashMaxValue);
-                    setMarketMaxSalary(40);
-                    setMarketMinRatio(0);
-                    setMarketMinPow(1);
-                    setMarketMinSpe(1);
-                    setMarketMinMen(1);
-                    setMarketMinSoc(1);
-                  }}
-                >
-                  Filter lockern
-                </button>
-              </div>
-            ) : null}
-            </>
-            )}
           </section>
           ) : null}
 
-          {activeView === "market" && activeTransferMarketTab === "classic" ? (
-          <section className={`panel transfer-market-panel${getViewClass("market")}`} id="transfer-recap">
-            <div className="panel-header">
-              <h2>Transfer Recap</h2>
-              <div className="table-actions">
-                <button
-                  className={`secondary-button inline-button${marketShowTransferRecap ? " is-selected" : ""}`}
-                  type="button"
-                  onClick={() => {
-                    const next = !marketShowTransferRecap;
-                    setMarketShowTransferRecap(next);
-                    if (next && !transferRecapFeed) {
-                      void reloadTransferRecapFeed();
-                    }
-                  }}
-                >
-                  {marketShowTransferRecap ? "Recap einklappen" : "Recap anzeigen"}
-                </button>
-                {marketShowTransferRecap ? (
-                  <button
-                    className="secondary-button"
-                    type="button"
-                    onClick={() => {
-                      void reloadTransferRecapFeed();
-                    }}
-                  >
-                    Recap neu laden
-                  </button>
-                ) : null}
-              </div>
-            </div>
-            <p className="muted">
-              Zusammenfassung aus echter Transferhistorie mit Top-Zugaengen, Abgaengen und Teamuebersicht.
-            </p>
-            {!marketShowTransferRecap ? (
-              <p className="muted">Recap bleibt kompakt, bis du ihn oeffnest.</p>
-            ) : transferRecapFeed ? (
-              <>
-                <div className="transfer-context-banner" style={{ marginBottom: 12 }}>
-                  <strong>
-                    Spielstand {transferRecapFeed.saveContext?.saveName ?? activeSaveName} ·{" "}
-                    {inferSaveTypeLabel(transferRecapFeed.saveContext ?? activeSaveSummary)}
-                  </strong>
-                  <span>
-                    Saison {transferRecapFeed.saveContext?.resolvedSeasonId ?? transferRecapFeed.scope.seasonId ?? gameState.season.id}
-                  </span>
-                </div>
-
-                {transferRecapFeed.saveContext?.scopeWarning ? (
-                  <div className="transfer-callout is-warning" style={{ marginBottom: 12 }}>
-                    <strong>Hinweis zum Spielstand</strong>
-                    <span>{transferRecapFeed.saveContext.scopeWarning}</span>
-                  </div>
-                ) : null}
-
-                <div className="metric-grid compact transfer-ai-summary-grid">
-                  <article className="metric-card">
-                    <span>Kaeufe</span>
-                    <strong>{transferRecapFeed.summary.buys}</strong>
-                  </article>
-                  <article className="metric-card">
-                    <span>Verkaeufe</span>
-                    <strong>{transferRecapFeed.summary.sells}</strong>
-                  </article>
-                  <article className="metric-card">
-                    <span>Ausgaben</span>
-                    <strong>{formatTransfermarktCurrency(transferRecapFeed.summary.totalSpend)}</strong>
-                  </article>
-                  <article className="metric-card">
-                    <span>Einnahmen</span>
-                    <strong>{formatTransfermarktCurrency(transferRecapFeed.summary.totalIncome)}</strong>
-                  </article>
-                  <article className="metric-card">
-                    <span>Gehalt frei</span>
-                    <strong>{formatTransfermarktCurrency(transferRecapFeed.summary.totalSalaryFreed)}</strong>
-                  </article>
-                </div>
-
-                {transferRecapFeed.warnings.length ? (
-                  <div className="transfer-feedback-banner is-warning">
-                    <strong>Hinweise</strong>
-                    <span>{transferRecapFeed.warnings.join(" · ")}</span>
-                  </div>
-                ) : null}
-
-                <div className="transfer-recap-story-grid">
-                  <article className="transfer-recap-story-card is-buy">
-                    <span>Groesster Kauf</span>
-                    <strong>{transferRecapFeed.biggestSpend[0]?.playerName ?? "—"}</strong>
-                    <small>
-                      {transferRecapFeed.biggestSpend[0]
-                        ? `${transferRecapFeed.biggestSpend[0].toTeam ?? "—"} · ${formatTransfermarktCurrency(transferRecapFeed.biggestSpend[0].amount)}`
-                        : "Keine Kaufbewegung"}
-                    </small>
-                  </article>
-                  <article className="transfer-recap-story-card is-profit">
-                    <span>Bester Verkauf</span>
-                    <strong>{transferRecapFeed.biggestProfit[0]?.playerName ?? "—"}</strong>
-                    <small>
-                      {transferRecapFeed.biggestProfit[0]
-                        ? `${transferRecapFeed.biggestProfit[0].fromTeam ?? "—"} · ${transferRecapFeed.biggestProfit[0].realizedProfit != null ? formatTransfermarktCurrency(transferRecapFeed.biggestProfit[0].realizedProfit) : "—"}`
-                        : "Kein Gewinnwert"}
-                    </small>
-                  </article>
-                  <article className="transfer-recap-story-card is-value">
-                    <span>Value Deal</span>
-                    <strong>{transferRecapFeed.bestValueDeals[0]?.playerName ?? "—"}</strong>
-                    <small>
-                      {transferRecapFeed.bestValueDeals[0]
-                        ? `OVR ${transferRecapFeed.bestValueDeals[0].ovr ?? "—"} · ${formatTransfermarktCurrency(transferRecapFeed.bestValueDeals[0].amount)}`
-                        : "Noch kein Value-Signal"}
-                    </small>
-                  </article>
-                  <article className="transfer-recap-story-card is-risk">
-                    <span>Riskanter Move</span>
-                    <strong>{transferRecapFeed.riskyMoves[0]?.playerName ?? "—"}</strong>
-                    <small>
-                      {transferRecapFeed.riskyMoves[0]
-                        ? (transferRecapFeed.riskyMoves[0].warnings[0] ?? transferRecapFeed.riskyMoves[0].strategyFitReason ?? "auffaellig")
-                        : "Keine Auffaelligkeit"}
-                    </small>
-                  </article>
-                </div>
-
-                <div className="transfer-ai-candidate-grid">
-                  <section className="panel transfer-ai-candidate-panel">
-                    <div className="panel-header">
-                      <h3>Top-Zugaenge</h3>
-                    </div>
-                    <div className="table-shell transfer-ai-table-shell">
-                      <table className="data-table compact-table transfer-ai-table">
-                        <thead>
-                          <tr>
-                            <th>Spieler</th>
-                            <th>Zu Team</th>
-                            <th>Ablöse</th>
-                            <th>OVR</th>
-                            <th>PPs</th>
-                            <th>Fit</th>
-                          </tr>
-                        </thead>
-                        <tbody>
-                          {transferRecapFeed.topTransfersIn.map((entry) => (
-                            <tr key={`recap-in-${entry.transferId}`} onDoubleClick={() => openPlayerDrawerById(entry.playerId)}>
-                              <td>
-                                <div className="table-player-cell">
-                                  <strong>{entry.playerName}</strong>
-                                  <span>{entry.reason}</span>
-                                </div>
-                              </td>
-                              <td>{entry.toTeam ?? "—"}</td>
-                              <td>{formatTransfermarktCurrency(entry.amount)}</td>
-                              <td>{entry.ovr ?? "—"}</td>
-                              <td>{entry.pps != null ? formatLocalePoints(entry.pps, 1) : "—"}</td>
-                              <td>{entry.teamFit != null ? formatLocalePoints(entry.teamFit, 1) : "—"}</td>
-                            </tr>
-                          ))}
-                        </tbody>
-                      </table>
-                    </div>
-                  </section>
-
-                  <section className="panel transfer-ai-candidate-panel">
-                    <div className="panel-header">
-                      <h3>Top-Abgaenge</h3>
-                    </div>
-                    <div className="table-shell transfer-ai-table-shell">
-                      <table className="data-table compact-table transfer-ai-table">
-                        <thead>
-                          <tr>
-                            <th>Spieler</th>
-                            <th>Von Team</th>
-                            <th>Erlös</th>
-                            <th>Gewinn</th>
-                            <th>OVR</th>
-                            <th>PPs</th>
-                          </tr>
-                        </thead>
-                        <tbody>
-                          {transferRecapFeed.topTransfersOut.map((entry) => (
-                            <tr key={`recap-out-${entry.transferId}`} onDoubleClick={() => openPlayerDrawerById(entry.playerId)}>
-                              <td>
-                                <div className="table-player-cell">
-                                  <strong>{entry.playerName}</strong>
-                                  <span>{entry.reason}</span>
-                                </div>
-                              </td>
-                              <td>{entry.fromTeam ?? "—"}</td>
-                              <td>{formatTransfermarktCurrency(entry.amount)}</td>
-                              <td>{entry.realizedProfit != null ? formatTransfermarktCurrency(entry.realizedProfit) : "—"}</td>
-                              <td>{entry.ovr ?? "—"}</td>
-                              <td>{entry.pps != null ? formatLocalePoints(entry.pps, 1) : "—"}</td>
-                            </tr>
-                          ))}
-                        </tbody>
-                      </table>
-                    </div>
-                  </section>
-
-                  <section className="panel transfer-ai-candidate-panel">
-                    <div className="panel-header">
-                      <h3>Groesste Ausgaben</h3>
-                    </div>
-                    {transferRecapFeed.biggestSpend.length ? (
-                      <ul className="warning-list compact-list">
-                        {transferRecapFeed.biggestSpend.map((entry) => (
-                          <li key={`recap-spend-${entry.transferId}`} onDoubleClick={() => openPlayerDrawerById(entry.playerId)}>
-                            <strong>{entry.playerName}</strong>: {entry.toTeam ?? "—"} · {formatTransfermarktCurrency(entry.amount)}
-                          </li>
-                        ))}
-                      </ul>
-                    ) : (
-                      <p className="muted">Keine Kaufbewegungen im aktuellen Scope.</p>
-                    )}
-                  </section>
-
-                  <section className="panel transfer-ai-candidate-panel">
-                    <div className="panel-header">
-                      <h3>Groesste Gewinne</h3>
-                    </div>
-                    {transferRecapFeed.biggestProfit.length ? (
-                      <ul className="warning-list compact-list">
-                        {transferRecapFeed.biggestProfit.map((entry) => (
-                          <li key={`recap-profit-${entry.transferId}`} onDoubleClick={() => openPlayerDrawerById(entry.playerId)}>
-                            <strong>{entry.playerName}</strong>: {entry.fromTeam ?? "—"} · {entry.realizedProfit != null ? formatTransfermarktCurrency(entry.realizedProfit) : "—"}
-                          </li>
-                        ))}
-                      </ul>
-                    ) : (
-                      <p className="muted">Kein echter Gewinnwert im Scope hinterlegt.</p>
-                    )}
-                  </section>
-
-                  <section className="panel transfer-ai-candidate-panel">
-                    <div className="panel-header">
-                      <h3>Beste Value-Deals</h3>
-                    </div>
-                    {transferRecapFeed.bestValueDeals.length ? (
-                      <ul className="warning-list compact-list">
-                        {transferRecapFeed.bestValueDeals.map((entry) => (
-                          <li key={`recap-value-${entry.transferId}`} onDoubleClick={() => openPlayerDrawerById(entry.playerId)}>
-                            <strong>{entry.playerName}</strong>: OVR {entry.ovr ?? "—"} · PPs {entry.pps != null ? formatLocalePoints(entry.pps, 1) : "—"} · {formatTransfermarktCurrency(entry.amount)}
-                          </li>
-                        ))}
-                      </ul>
-                    ) : (
-                      <p className="muted">Keine beurteilbaren Value-Deals im aktuellen Scope.</p>
-                    )}
-                  </section>
-
-                  <section className="panel transfer-ai-candidate-panel">
-                    <div className="panel-header">
-                      <h3>Riskante Moves</h3>
-                    </div>
-                    {transferRecapFeed.riskyMoves.length ? (
-                      <ul className="warning-list compact-list">
-                        {transferRecapFeed.riskyMoves.map((entry) => (
-                          <li key={`recap-risk-${entry.transferId}`} onDoubleClick={() => openPlayerDrawerById(entry.playerId)}>
-                            <strong>{entry.playerName}</strong>: {(entry.warnings.length ? entry.warnings.join(" · ") : entry.strategyFitReason) ?? "ohne Zusatzwarnung"}
-                          </li>
-                        ))}
-                      </ul>
-                    ) : (
-                      <p className="muted">Keine auffaelligen Risk-Moves im aktuellen Scope.</p>
-                    )}
-                  </section>
-                </div>
-
-                <section className="panel transfer-ai-candidate-panel">
-                  <div className="panel-header">
-                    <h3>Team Summary</h3>
-                  </div>
-                  <div className="table-shell transfer-ai-table-shell">
-                    <table className="data-table compact-table transfer-ai-table">
-                      <thead>
-                        <tr>
-                          <th>Team</th>
-                          <th>Steuerung</th>
-                          <th>Käufe</th>
-                          <th>Verkäufe</th>
-                          <th>Spend</th>
-                          <th>Income</th>
-                          <th>Netto</th>
-                          <th>Cash</th>
-                          <th>Kader</th>
-                          <th>Gehalt</th>
-                        </tr>
-                      </thead>
-                      <tbody>
-                        {transferRecapFeed.teamSummaries.map((entry) => (
-                          <tr
-                            key={`recap-team-${entry.teamId}`}
-                            onClick={() => {
-                              scheduleActiveManagerTeam(entry.teamId, "manual_select", () => setFoundationView("teams", setActiveView));
-                            }}
-                            onDoubleClick={() => openTeamDrawerById(entry.teamId)}
-                          >
-                            <td>
-                              <button
-                                className="table-link-button"
-                                type="button"
-                                onClick={(event) => {
-                                  event.stopPropagation();
-                                  scheduleActiveManagerTeam(entry.teamId, "manual_select", () => setFoundationView("teams", setActiveView));
-                                }}
-                                onDoubleClick={(event) => {
-                                  event.stopPropagation();
-                                  openTeamDrawerById(entry.teamId);
-                                }}
-                              >
-                                {entry.teamName}
-                              </button>
-                            </td>
-                            <td>{formatTeamControlModeLabel(entry.controlMode)}</td>
-                            <td>{entry.buyCount}</td>
-                            <td>{entry.sellCount}</td>
-                            <td>{formatTransfermarktCurrency(entry.spend)}</td>
-                            <td>{formatTransfermarktCurrency(entry.income)}</td>
-                            <td>{formatTransfermarktCurrency(entry.netCashFlow)}</td>
-                            <td>{formatTransfermarktCurrency(entry.currentCash)}</td>
-                            <td>{entry.currentRoster ?? "—"}</td>
-                            <td>{formatTransfermarktCurrency(entry.currentSalary)}</td>
-                          </tr>
-                        ))}
-                      </tbody>
-                    </table>
-                  </div>
-                </section>
-              </>
-            ) : (
-              <p className="muted">Noch kein Transfer Recap geladen.</p>
-            )}
-          </section>
-          ) : null}
-
-          {marketBuyModalOpen ? (
-            <div className="foundation-modal-backdrop" role="presentation" onClick={closeMarketBuyModal}>
-              <section
-                ref={marketBuyModalRef}
-                className="foundation-modal transfer-buy-modal"
-                role="dialog"
-                aria-modal="true"
-                aria-label="Kaufdialog"
-                onClick={(event) => event.stopPropagation()}
-              >
-                <div className="foundation-modal-header">
+          {isMarketSellPanelOpen ? (
+            <section className="foundation-drilldown-page transfer-sell-page" data-testid="transfer-sell-page" aria-label="Verkaufsdialog">
+                <header className="foundation-drilldown-header">
                   <div className="stack">
-                    <h3>Kaufen</h3>
-                    <p className="muted">
-                      Spielstand: {readMeta.source === "prisma" ? "Referenz" : "lokal"}
-                    </p>
-                  </div>
-                  <button className="secondary-button inline-button" type="button" onClick={closeMarketBuyModal}>
-                    Schliessen
-                  </button>
-                </div>
-
-                <div ref={marketBuyModalBodyRef} className="foundation-modal-body transfer-buy-modal-body">
-                  {(() => {
-                    const portraitSrc = marketPreviewPlayer?.portraitUrl ?? marketBuySubject?.portraitUrl ?? null;
-                    const playerName =
-                      marketBuyPreview?.player?.name ?? marketBuySubject?.name ?? marketPreviewPlayer?.name ?? "Unbekannt";
-                    const className =
-                      marketBuyPreview?.player?.className ?? marketBuySubject?.className ?? marketPreviewPlayer?.className ?? "—";
-                    const race =
-                      marketBuyPreview?.player?.race ?? marketBuySubject?.race ?? marketPreviewPlayer?.race ?? "—";
-                    const bracket = marketBuyPreview?.bracket ?? marketBuySubject?.bracket ?? marketPreviewPlayer?.bracket ?? null;
-                    const ovr = marketPreviewPlayer?.ovr ?? marketBuySubject?.ovr ?? null;
-                    const mvs = marketPreviewPlayer?.mvs ?? marketBuySubject?.mvs ?? null;
-                    const marketValue = marketBuyPreview?.currentValue ?? marketBuySubject?.marketValue ?? marketPreviewPlayer?.marketValue ?? null;
-                    const salary = marketBuyPreview?.salary ?? marketBuySubject?.salary ?? marketPreviewPlayer?.salary ?? null;
-
-                    return (
-                  <div className="transfer-buy-player-line">
-                    <div className="transfer-modal-player-hero">
-                      {portraitSrc ? (
-                        <img
-                          className="transfermarkt-portrait"
-                          src={portraitSrc}
-                          alt={playerName}
-                          width={56}
-                          height={56}
-                          loading="lazy"
-                          decoding="async"
-                          fetchPriority="low"
-                        />
-                      ) : (
-                        <div className="transfermarkt-portrait transfermarkt-portrait-placeholder" aria-label={`${playerName} placeholder`}>
-                          {playerName.slice(0, 2).toUpperCase()}
-                        </div>
-                      )}
-                      <div className="transfer-modal-player-summary">
-                        <div className="transfer-modal-player-head">
-                          <strong
-                            className="transfer-inline-link"
-                            onDoubleClick={() => {
-                              const playerId =
-                                marketBuyPreview?.player?.id ??
-                                marketBuySubject?.playerId ??
-                                marketPreviewPlayer?.playerId;
-                              if (playerId) {
-                                openPlayerDrawerById(playerId);
-                              }
-                            }}
-                          >
-                            {playerName}
-                          </strong>
-                          <div className="transfer-modal-player-meta">
-                            <ClassColorChip className={className} />
-                            <span className="muted">{race}</span>
-                            <span className="pill">Bracket {bracket != null ? formatWholeNumber(bracket) : "—"}</span>
-                            <span className="pill">{marketSelectedTeam?.shortCode ?? "—"} · {marketSelectedTeam?.name ?? "Kein Team gewaehlt"}</span>
-                          </div>
-                        </div>
-                        <div className="transfer-modal-player-kpis">
-                          <article className="transfer-modal-kpi">
-                            <span>OVR / MVS</span>
-                            <strong>
-                              {ovr != null ? formatWholeNumber(ovr) : "—"} / {mvs != null ? formatPpsValue(mvs) : "—"}
-                            </strong>
-                          </article>
-                          <article className="transfer-modal-kpi">
-                            <span>Marktwert</span>
-                            <strong>{formatTransfermarktCurrency(marketValue)}</strong>
-                          </article>
-                          <article className="transfer-modal-kpi">
-                            <span>Gehalt</span>
-                            <strong>{formatTransfermarktCurrency(salary)}</strong>
-                          </article>
-                        </div>
-                      </div>
-                    </div>
-                    <span className={`transfer-status-pill${marketBuyPreview?.canBuy ? " is-ready" : " is-blocked"}`}>
-                      {readMeta.source === "prisma" ? "Referenz" : marketBuyPreview?.canBuy ? "bereit" : "geblockt"}
-                    </span>
-                  </div>
-                    );
-                  })()}
-
-                  {readMeta.source === "prisma" ? (
-                    <div className="transfer-feedback-banner is-error">
-                      <strong>Referenzmodus</strong>
-                      <span>Fuer Kaeufe bitte lokalen Testspielstand nutzen.</span>
-                    </div>
-                  ) : null}
-                  <div className="transfer-feedback-banner is-info">
-                    <strong>Save-Kontext</strong>
-                    <span>
-                      Aktiv {activeSaveId} / {gameState.season.id} · Preview{" "}
-                      {marketBuyPreviewContext
-                        ? `${marketBuyPreviewContext.saveId} / ${marketBuyPreviewContext.seasonId}`
-                        : "—"}
-                    </span>
-                  </div>
-                  {!marketTeamId ? (
-                    <div className="transfer-feedback-banner is-error">
-                      <strong>Team fehlt</strong>
-                      <span>Bitte zuerst ein Team waehlen, bevor du den Kauf bestaetigst.</span>
-                    </div>
-                  ) : null}
-                  {marketBuyError ? (
-                    <div className="transfer-feedback-banner is-error">
-                      <strong>Angebot blockiert</strong>
-                      <span>{marketBuyError}</span>
-                    </div>
-                  ) : null}
-                  {marketBuyPreview && (() => {
-                    const priorBadExperienceDemandEntry =
-                      marketBuyPreview.demandBreakdown?.find((entry) => entry.key === "prior_bad_experience") ?? null;
-                    const priorBadExperienceScoreEntry =
-                      marketBuyPreview.negotiationScoreBreakdown?.find((entry) => entry.key === "bad_experience") ?? null;
-                    const priorBadExperienceActive = Boolean(
-                      marketBuyPreview.warnings?.includes("previous_rejected_offer_reduces_trust") ||
-                        priorBadExperienceDemandEntry ||
-                        priorBadExperienceScoreEntry,
-                    );
-                    if (!priorBadExperienceActive) {
-                      return null;
-                    }
-                    return (
-                      <div className="transfer-feedback-banner is-warning">
-                        <strong>Spieler ist noch angefressen</strong>
-                        <span>
-                          {priorBadExperienceDemandEntry
-                            ? `Die letzte Verhandlung mit diesem Team wirkt noch nach. Seine Forderung liegt dadurch aktuell bei ${formatSignedPercent((priorBadExperienceDemandEntry.multiplier - 1) * 100)} und die Zusage ist spuerbar schlechter.`
-                            : "Die letzte Verhandlung mit diesem Team wirkt noch nach. Dadurch fordert der Spieler mehr und verhandelt misstrauischer."}
-                        </span>
-                      </div>
-                    );
-                  })()}
-                  {marketBuySuccess ? (
-                    <div className="transfer-feedback-banner is-success">
-                      <strong>Kauf erfolgreich</strong>
-                      <span>{marketBuySuccess}</span>
-                    </div>
-                  ) : null}
-                  {marketBuyBusy && !marketBuyPreview ? (
-                    <div className="transfer-feedback-banner">
-                      <strong>Kaufvorschau laedt</strong>
-                      <span>Die lokalen Teamwerte werden gerade fuer diesen Spieler geprueft.</span>
-                    </div>
-                  ) : null}
-
-                  {marketBuyPreview ? (
-                    <>
-                      <div className="transfer-modal-section">
-                        <div className="transfer-callout-title">
-                          <strong>Spieler</strong>
-                          <span className="muted">{marketBuyPreview.team?.shortCode ?? "—"} · {marketBuyPreview.team?.name ?? "—"}</span>
-                        </div>
-                        <div className="metric-grid compact">
-                          <article className="metric-card">
-                            <span>Spieler</span>
-                            <strong>{marketBuyPreview.player?.name ?? marketBuySubject?.name ?? "—"}</strong>
-                          </article>
-                          <article className="metric-card">
-                            <span>Klasse / Rasse</span>
-                            <strong>
-                              {marketBuyPreview.player?.className ?? marketBuySubject?.className ?? "—"} / {marketBuyPreview.player?.race ?? marketBuySubject?.race ?? "—"}
-                            </strong>
-                          </article>
-                          <article className="metric-card">
-                            <span>Bracket</span>
-                            <strong>{marketBuyPreview.bracket != null ? formatWholeNumber(marketBuyPreview.bracket) : "—"}</strong>
-                          </article>
-                          <article className="metric-card">
-                            <span>OVR / MVS</span>
-                            <strong>
-                              {marketPreviewPlayer?.ovr != null ? formatWholeNumber(marketPreviewPlayer.ovr) : "—"} /{" "}
-                              {marketPreviewPlayer?.mvs != null ? formatPpsValue(marketPreviewPlayer.mvs) : "—"}
-                            </strong>
-                          </article>
-                          <article className="metric-card">
-                            <span>MW</span>
-                            <strong>{formatTransfermarktCurrency(marketBuyPreview.currentValue ?? marketPreviewPlayer?.marketValue ?? null)}</strong>
-                          </article>
-                          <article className="metric-card">
-                            <span>Gehalt</span>
-                            <strong>{formatTransfermarktCurrency(marketBuyPreview.salary)}</strong>
-                          </article>
-                        </div>
-                      </div>
-
-                      <div className="transfer-modal-section">
-                        <div className="transfer-callout-title">
-                          <strong>Vertrag</strong>
-                          <span className="muted">Preview-only bis zur Bestaetigung</span>
-                        </div>
-
-                        <div className="transfer-negotiation-grid">
-                        <label className="filter-field">
-                          <span>Vertragslaenge</span>
-                          <select
-                            className="input"
-                            value={marketContractLengthDraft ?? marketBuyPreview.contractLength ?? 1}
-                            onChange={(event) => {
-                              const nextLength = Math.max(1, Math.round(Number(event.target.value)));
-                              setMarketContractLengthDraft(nextLength);
-                            }}
-                          >
-                            {[1, 2, 3, 4, 5].map((years) => (
-                              <option key={years} value={years}>
-                                {years} Season{years > 1 ? "s" : ""}
-                              </option>
-                            ))}
-                          </select>
-                        </label>
-                        <label className="filter-field">
-                          <span>Vertragsform</span>
-                          <select
-                            className="input"
-                            value={marketContractShapeDraft ?? marketBuyPreview.contractShape ?? "balanced"}
-                            onChange={(event) => {
-                              const nextShape = event.target.value as ContractShape;
-                              setMarketContractShapeDraft(nextShape);
-                            }}
-                          >
-                            <option value="balanced">Balanced</option>
-                            <option value="front_loaded">Front-loaded</option>
-                            <option value="back_loaded">Back-loaded</option>
-                          </select>
-                        </label>
-                        <label className="filter-field">
-                          <span>Gehaltsangebot</span>
-                          <input
-                            className="input"
-                            type="number"
-                            min={0}
-                            step={0.1}
-                            value={marketOfferedSalaryDraft ?? marketBuyPreview.expectedSalary ?? marketBuyPreview.salary ?? ""}
-                            onChange={(event) => {
-                              const nextValue = Number(event.target.value);
-                              setMarketOfferedSalaryDraft(Number.isFinite(nextValue) && nextValue > 0 ? nextValue : null);
-                            }}
-                          />
-                        </label>
-                        {marketBuyPreview.expectedSalary != null ? (
-                          <label className="filter-field transfer-slider-field">
-                            <span>Gehaltsregler</span>
-                            <input
-                              type="range"
-                              min={Math.max(0.1, Number((marketBuyPreview.expectedSalary * 0.7).toFixed(1)))}
-                              max={Math.max(
-                                Math.max(0.1, Number((marketBuyPreview.expectedSalary * 0.7).toFixed(1))) + 0.1,
-                                Number((marketBuyPreview.expectedSalary * 1.3).toFixed(1)),
-                              )}
-                              step={0.1}
-                              value={marketOfferedSalaryDraft ?? marketBuyPreview.expectedSalary}
-                              onChange={(event) => {
-                                const nextValue = Number(event.target.value);
-                                setMarketOfferedSalaryDraft(Number.isFinite(nextValue) && nextValue > 0 ? nextValue : null);
-                              }}
-                            />
-                            <small className="muted">
-                              Erwartung {formatDisplayMoney(marketBuyPreview.expectedSalary)} · Angebot{" "}
-                              {formatDisplayMoney(marketOfferedSalaryDraft ?? marketBuyPreview.expectedSalary)}
-                            </small>
-                          </label>
-                        ) : null}
-                        </div>
-
-                        {marketBuyPreview.contractPreference ? (
-                          <div className={`contract-preference-card is-${marketBuyPreview.contractPreference.matchQuality}`}>
-                            <div>
-                              <span className="eyebrow">Spielerpräferenz</span>
-                              <strong>{formatContractLengthPreferenceLabel(marketBuyPreview.contractPreference.lengthPreference)}</strong>
-                              <p className="muted">
-                                Wunschfenster {marketBuyPreview.contractPreference.preferredMinLength}-{marketBuyPreview.contractPreference.preferredMaxLength} Saisons ·
-                                {" "}am liebsten {marketBuyPreview.contractPreference.idealLength} ·{" "}
-                                Form {formatContractShapeLabel(marketBuyPreview.contractPreference.shapePreference)}
-                              </p>
-                              <p className="muted">
-                                {formatContractPreferenceCurrentStatus(
-                                  marketBuyPreview.contractPreference,
-                                  marketContractLengthDraft ?? marketBuyPreview.contractLength ?? 1,
-                                  marketContractShapeDraft ?? marketBuyPreview.contractShape ?? "balanced",
-                                )}{" "}
-                                · {formatContractPreferenceMatchLabel(marketBuyPreview.contractPreference.matchQuality)}
-                              </p>
-                            </div>
-                            <div className="contract-preference-impact">
-                              <span className={marketBuyPreview.contractPreference.salaryAdjustmentPct <= 0 ? "positive-value" : "negative-value"}>
-                                {formatSignedPercent(marketBuyPreview.contractPreference.salaryAdjustmentPct * 100)} Gehalt
-                              </span>
-                              <span className={marketBuyPreview.contractPreference.scoreAdjustment >= 0 ? "positive-value" : "negative-value"}>
-                                {marketBuyPreview.contractPreference.scoreAdjustment > 0 ? "+" : ""}
-                                {marketBuyPreview.contractPreference.scoreAdjustment} Score
-                              </span>
-                            </div>
-                            {marketBuyPreview.contractPreference.warnings.length ? (
-                              <p className="muted">
-                                {marketBuyPreview.contractPreference.warnings[0]}
-                              </p>
-                            ) : (
-                              <p className="muted">{marketBuyPreview.contractPreference.reasons[0]}</p>
-                            )}
-                          </div>
-                        ) : null}
-
-                        <div className="transfer-negotiation-actions">
-                          <button className="secondary-button inline-button" type="button" onClick={resetMarketBuyDemandFrame}>
-                            Auto-Angebot
-                          </button>
-                          <span className="muted">
-                            Auto-Angebot setzt Laufzeit, Form und Gehalt auf die aktuelle Spielerforderung zurueck.
-                          </span>
-                        </div>
-
-                        {marketNegotiationOutcome ? (
-                          <div className={`transfer-feedback-banner ${getNegotiationOutcomeToneClass(marketNegotiationOutcome.tone)}`} style={{ marginTop: 12 }}>
-                            <strong>{marketNegotiationOutcome.title}</strong>
-                            <span>{marketNegotiationOutcome.message}</span>
-                          </div>
-                        ) : null}
-
-                        <div className="metric-grid compact">
-                          <article className="metric-card">
-                            <span>Basisforderung</span>
-                            <strong>{marketBuyPreview.baseExpectedSalary != null ? formatDisplayMoney(marketBuyPreview.baseExpectedSalary) : "—"}</strong>
-                          </article>
-                          <article className="metric-card">
-                            <span>Aktuelle Forderung</span>
-                            <strong>{marketBuyPreview.expectedSalary != null ? formatDisplayMoney(marketBuyPreview.expectedSalary) : "—"}</strong>
-                          </article>
-                          <article className="metric-card">
-                            <span>Forderungsfaktor</span>
-                            <strong>{marketBuyPreview.demandMultiplier != null ? `${formatLocalePoints(marketBuyPreview.demandMultiplier * 100, 0)}%` : "—"}</strong>
-                          </article>
-                          <article className="metric-card">
-                            <span>Angebotsquote</span>
-                            <strong>{marketBuyPreview.offerRatio != null ? formatLocalePoints(marketBuyPreview.offerRatio, 2) : "—"}</strong>
-                          </article>
-                          <article className="metric-card">
-                            <span>Zusage-Score</span>
-                            <strong>{marketBuyPreview.acceptanceScore != null ? formatWholeNumber(marketBuyPreview.acceptanceScore) : "—"}</strong>
-                          </article>
-                          <article className="metric-card">
-                            <span>Zusage / Nachverh. / Ablehnung</span>
-                            <strong className="negotiation-chance-row">
-                              <span className="is-positive">{formatChancePercent(marketBuyPreview.acceptChance)}</span>
-                              <span className="is-warning">{formatChancePercent(marketBuyPreview.counterChance)}</span>
-                              <span className="is-negative">{formatChancePercent(marketBuyPreview.rejectChance)}</span>
-                            </strong>
-                          </article>
-                          <article className="metric-card">
-                            <span>Buyout Preview</span>
-                            <strong>{marketBuyPreview.buyoutCost != null ? formatDisplayMoney(marketBuyPreview.buyoutCost) : "—"}</strong>
-                          </article>
-                          <article className="metric-card">
-                            <span>Fit</span>
-                            <strong>{marketBuyPreview.teamFit != null ? formatLocalePoints(marketBuyPreview.teamFit, 1) : "—"}</strong>
-                          </article>
-                        </div>
-                        {marketBuyPreview.demandBreakdown?.length ? (
-                          <div className="transfer-demand-breakdown" style={{ marginTop: 12 }}>
-                            <div className="transfer-callout-title">
-                              <strong>So entsteht die Forderung</strong>
-                              <span className="muted">
-                                {marketBuyPreview.baseExpectedSalary != null ? formatDisplayMoney(marketBuyPreview.baseExpectedSalary) : "—"} → {marketBuyPreview.expectedSalary != null ? formatDisplayMoney(marketBuyPreview.expectedSalary) : "—"}
-                              </span>
-                            </div>
-                            <ul className="warning-list negotiation-factor-list">
-                              {marketBuyPreview.demandBreakdown.map((entry) => (
-                                <li className={`negotiation-factor is-${entry.multiplier >= 1 ? "negative" : entry.multiplier < 1 ? "positive" : "neutral"}`} key={entry.key}>
-                                  <strong>{entry.label}</strong>
-                                  <span>{entry.reason}</span>
-                                </li>
-                              ))}
-                            </ul>
-                          </div>
-                        ) : null}
-                      </div>
-
-                      <div className="transfer-modal-section transfer-callout is-info">
-                        <div className="transfer-callout-title">
-                          <strong>Jahresplan</strong>
-                          <span className="muted">
-                            {formatContractShapeLabel(marketContractShapeDraft ?? marketBuyPreview.contractShape ?? "balanced")} · {marketContractLengthDraft ?? marketBuyPreview.contractLength ?? 1} Season(s)
-                          </span>
-                        </div>
-                        {marketBuyPreview.yearlySalarySchedule?.length ? (
-                          <div className="contract-schedule-table" role="table" aria-label="Vertrags-Jahresplan">
-                            <div className="contract-schedule-row is-head" role="row">
-                              <span>Jahr</span>
-                              <span>Season</span>
-                              <span>Gehalt</span>
-                            </div>
-                            {marketBuyPreview.yearlySalarySchedule.map((entry) => (
-                              <div className="contract-schedule-row" role="row" key={`${entry.label}-${entry.yearIndex}`}>
-                                <span>Jahr {entry.yearIndex}</span>
-                                <span>{entry.label}</span>
-                                <strong>{formatDisplayMoney(entry.salary)}</strong>
-                              </div>
-                            ))}
-                            <div className="contract-schedule-row is-total" role="row">
-                              <span>Summe</span>
-                              <span>Buyout: {marketBuyPreview.buyoutCost != null ? formatDisplayMoney(marketBuyPreview.buyoutCost) : "—"}</span>
-                              <strong>{marketBuyPreview.totalSalary != null ? formatDisplayMoney(marketBuyPreview.totalSalary) : "—"}</strong>
-                            </div>
-                          </div>
-                        ) : (
-                          <p className="muted">Noch kein Jahresplan verfuegbar.</p>
-                        )}
-                        <p className="muted" style={{ marginTop: 8 }}>
-                          Buyout zahlt das komplette Restgehalt.
-                          {marketBuyPreview.promisedRole ? ` · Versprochene Rolle: ${marketBuyPreview.promisedRole}` : ""}
-                        </p>
-                      </div>
-
-                      <div className="transfer-modal-section">
-                        <div className="transfer-callout-title">
-                          <strong>Team-Auswirkung</strong>
-                          <span className="muted">{marketBuyPreview.transferCreated ? "geschrieben" : "Preview"}</span>
-                        </div>
-                        <div className="metric-grid compact">
-                          <article className="metric-card">
-                            <span>Kaufpreis / Abloese</span>
-                            <strong>{formatTransfermarktCurrency(marketBuyPreview.purchasePrice)}</strong>
-                          </article>
-                          <article className="metric-card">
-                            <span>Cash vorher / nachher</span>
-                            <strong>
-                              {formatTransfermarktCurrency(marketBuyPreview.cashBefore)} / {formatTransfermarktCurrency(marketBuyPreview.cashAfter)}
-                            </strong>
-                          </article>
-                          <article className="metric-card">
-                            <span>Kader vorher / nachher</span>
-                            <strong>
-                              {marketBuyPreview.rosterBefore ?? "—"} / {marketBuyPreview.rosterAfter ?? "—"}
-                            </strong>
-                          </article>
-                          <article className="metric-card">
-                            <span>Gehalt vorher / nachher</span>
-                            <strong>
-                              {formatTransfermarktCurrency(marketBuyPreview.salaryBefore)} / {formatTransfermarktCurrency(marketBuyPreview.salaryAfter)}
-                            </strong>
-                          </article>
-                          <article className="metric-card">
-                            <span>MW vorher / nachher</span>
-                            <strong>
-                              {formatTransfermarktCurrency(marketBuyPreview.marketValueBefore)} / {formatTransfermarktCurrency(marketBuyPreview.marketValueAfter)}
-                            </strong>
-                          </article>
-                          <article className="metric-card">
-                            <span>Historie</span>
-                            <strong>{marketBuyPreview.transferCreated ? "geschrieben" : "Preview"}</strong>
-                          </article>
-                        </div>
-                      </div>
-
-                      <div className="transfer-buy-meta-grid">
-                        <div className="transfer-callout is-blocked">
-                          <div className="transfer-callout-title">
-                            <strong>Blocker</strong>
-                            <span className="muted">{marketBuyPreview.blockingReasons.length}</span>
-                          </div>
-                          {marketBuyPreview.blockingReasons.length > 0 ? (
-                            <ul className="warning-list negotiation-factor-list">
-                              {marketBuyPreview.blockingReasons.map((reason) => (
-                                <li className="negotiation-factor is-negative" key={reason}>{formatNegotiationSignalLabel(reason)}</li>
-                              ))}
-                            </ul>
-                          ) : (
-                            <p className="muted">Keine blockierenden Gruende.</p>
-                          )}
-                        </div>
-                        <div className="transfer-callout is-warning">
-                          <div className="transfer-callout-title">
-                            <strong>Risiken</strong>
-                            <span className="muted">{marketBuyPreview.warnings.length}</span>
-                          </div>
-                          {marketBuyPreview.warnings.length > 0 ? (
-                            <ul className="warning-list negotiation-factor-list">
-                              {marketBuyPreview.warnings.map((warning) => (
-                                <li className="negotiation-factor is-negative" key={warning}>{formatNegotiationSignalLabel(warning)}</li>
-                              ))}
-                            </ul>
-                          ) : (
-                            <p className="muted">Keine Warnungen.</p>
-                          )}
-                        </div>
-                        <div className="transfer-callout is-info">
-                          <div className="transfer-callout-title">
-                            <strong>Score-Aufschluesselung</strong>
-                            <span className="muted">{marketBuyPreview.negotiationScoreBreakdown?.length ?? 0} Faktoren</span>
-                          </div>
-                          {marketBuyPreview.negotiationScoreBreakdown?.length ? (
-                            <ul className="warning-list negotiation-factor-list">
-                              {marketBuyPreview.negotiationScoreBreakdown.map((entry) => (
-                                <li className={`negotiation-factor is-${entry.tone}`} key={entry.key}>
-                                  <strong>{entry.points > 0 ? `+${entry.points}` : entry.points}</strong>
-                                  <span>{entry.label}: {entry.reason}</span>
-                                </li>
-                              ))}
-                            </ul>
-                          ) : (
-                            <p className="muted">Noch keine Score-Faktoren verfuegbar.</p>
-                          )}
-                          {marketBuyPreview.negotiationReasons?.length ? (
-                            <>
-                              <p className="muted" style={{ marginTop: 8 }}>Weitere Hinweise</p>
-                              <ul className="warning-list negotiation-factor-list">
-                                {marketBuyPreview.negotiationReasons.map((reason) => (
-                                  <li className={`negotiation-factor is-${getNegotiationFactorTone(reason, "positive")}`} key={reason}>
-                                    {formatNegotiationSignalLabel(reason)}
-                                  </li>
-                                ))}
-                              </ul>
-                            </>
-                          ) : null}
-                          {marketBuyPreview.negotiationWarnings?.length ? (
-                            <>
-                              <p className="muted" style={{ marginTop: 8 }}>Risiken</p>
-                              <ul className="warning-list negotiation-factor-list">
-                                {marketBuyPreview.negotiationWarnings.map((warning) => (
-                                  <li className={`negotiation-factor is-${getNegotiationFactorTone(warning, "negative")}`} key={warning}>
-                                    {formatNegotiationSignalLabel(warning)}
-                                  </li>
-                                ))}
-                              </ul>
-                            </>
-                          ) : null}
-                          {marketBuyPreview.negotiationBlockingReasons?.length ? (
-                            <>
-                              <p className="muted" style={{ marginTop: 8 }}>Blocker</p>
-                              <ul className="warning-list negotiation-factor-list">
-                                {marketBuyPreview.negotiationBlockingReasons.map((reason) => (
-                                  <li className="negotiation-factor is-negative" key={reason}>{formatNegotiationSignalLabel(reason)}</li>
-                                ))}
-                              </ul>
-                            </>
-                          ) : null}
-                        </div>
-                      </div>
-                    </>
-                  ) : (
-                    <p className="muted transfer-empty-hint">
-                      Kaufvorschau wird geladen oder ist fuer diesen Kontext noch nicht verfuegbar.
-                    </p>
-                  )}
-                </div>
-
-                <div className="foundation-modal-actions">
-                  <button className="secondary-button" type="button" onClick={closeMarketBuyModal}>
-                    Abbrechen
-                  </button>
-                  <button
-                    className={marketNegotiationOutcome?.status === "accepted" ? "primary-button" : "secondary-button"}
-                    data-testid="transfer-buy-negotiate"
-                    type="button"
-                    disabled={readMeta.source === "prisma" || !marketBuyPreview?.canBuy || marketBuyBusy || marketNegotiationOutcome?.status === "rejected"}
-                    title={
-                      readMeta.source === "prisma"
-                        ? "Im Referenzmodus bleibt die Verhandlung gesperrt."
-                        : !marketBuyPreview?.canBuy
-                          ? marketBuyPreview?.blockingReasons?.[0] ?? "Der Deal ist in diesem Zustand noch blockiert."
-                          : marketBuyBusy
-                            ? "Die aktuelle Verhandlung wird gerade vorbereitet."
-                            : marketNegotiationOutcome?.status === "rejected"
-                              ? "Nach einer klaren Absage musst du erst das Angebot oder den Vertrag anpassen."
-                              : "Verhandlung starten und Zustimmung testen."
-                    }
-                    onClick={() => {
-                      void negotiateTransfermarktBuy();
-                    }}
-                  >
-                    {marketBuyBusy ? "Verhandlung laeuft..." : marketNegotiationOutcome?.status === "accepted" ? "Annahme liegt vor" : "Verhandeln"}
-                  </button>
-                  <button
-                    className="primary-button"
-                    data-testid="transfer-buy-confirm"
-                    type="button"
-                    disabled={readMeta.source === "prisma" || !marketBuyPreview?.canBuy || marketBuyBusy || marketNegotiationOutcome?.status !== "accepted"}
-                    title={
-                      readMeta.source === "prisma"
-                        ? "Im Referenzmodus bleibt der Kauf gesperrt."
-                        : !marketBuyPreview?.canBuy
-                          ? marketBuyPreview?.blockingReasons?.[0] ?? "Der Deal ist noch nicht kaufbar."
-                          : marketBuyBusy
-                            ? "Der Kauf wird gerade vorbereitet."
-                            : marketNegotiationOutcome?.status !== "accepted"
-                              ? "Erst verhandeln, bis eine Annahme vorliegt."
-                              : "Kauf jetzt final bestätigen."
-                    }
-                    onClick={() => {
-                      void confirmTransfermarktBuy();
-                    }}
-                  >
-                    {marketBuyBusy ? "Kauf laeuft..." : "Kauf final abschliessen"}
-                  </button>
-                </div>
-              </section>
-            </div>
-          ) : null}
-          {marketSellModalOpen ? (
-            <div className="foundation-modal-backdrop" role="presentation" onClick={closeMarketSellModal}>
-              <section
-                className="foundation-modal transfer-buy-modal transfer-sell-modal"
-                role="dialog"
-                aria-modal="true"
-                aria-label="Verkaufsdialog"
-                onClick={(event) => event.stopPropagation()}
-              >
-                <div className="foundation-modal-header">
-                  <div className="stack">
-                    <h3>Verkaufen</h3>
+                    <span className="eyebrow">Verkauf</span>
+                    <h1>{marketSellPreview?.player?.name ?? marketSellSubject?.playerName ?? "Spieler verkaufen"}</h1>
                     <p className="muted">
                       Spielstand: {readMeta.source === "prisma" ? "Referenz" : "lokal"}
                     </p>
                   </div>
                   <button className="secondary-button inline-button" type="button" onClick={closeMarketSellModal}>
-                    Schliessen
+                    Zurück
                   </button>
-                </div>
+                </header>
 
-                <div className="foundation-modal-body transfer-buy-modal-body">
+                <div className="foundation-drilldown-body foundation-modal-body transfer-buy-modal-body">
                   {(() => {
                     const context = marketSellPlayerContext;
                     const portraitSrc = marketSellSubject?.portraitUrl ?? null;
@@ -35543,8 +30703,7 @@ export default function FoundationPageClient({
                     {marketSellBusy ? "Verkauf laeuft..." : "Verkauf bestaetigen"}
                   </button>
                 </div>
-              </section>
-            </div>
+            </section>
           ) : null}
 
           {isTransferHistoryViewActive ? (
@@ -35557,51 +30716,8 @@ export default function FoundationPageClient({
                 Transferhistorie
               </TooltipHeading>
               <span className="pill foundation-source-pill">source: active local save</span>
-              {activeTransferHistoryTab === "classic" ? (
-                <ColumnVisibilityManager
-                  title="Spalten"
-                  columns={transferHistoryColumns}
-                  isVisible={(columnId, visibleByDefault) =>
-                    isTableColumnVisible("transferHistoryTable", columnId, visibleByDefault)
-                  }
-                  onToggle={(columnId, nextVisible) =>
-                    setTableColumnVisible("transferHistoryTable", columnId, nextVisible)
-                  }
-                />
-              ) : null}
             </div>
-            <div className="transfer-market-view-tabs" role="tablist" aria-label="Transferhistorie Ansicht">
-              <button
-                className={`transfer-market-view-tab${activeTransferHistoryTab === "classic" ? " is-active" : ""}`}
-                type="button"
-                role="tab"
-                aria-selected={activeTransferHistoryTab === "classic"}
-                onClick={() => {
-                  setTransferHistoryTab("classic");
-                  if (activeView === "historyV2") {
-                    setFoundationView("history", setActiveView);
-                  }
-                }}
-              >
-                Klassisch
-              </button>
-              <button
-                className={`transfer-market-view-tab${activeTransferHistoryTab === "v2" ? " is-active" : ""}`}
-                type="button"
-                role="tab"
-                aria-selected={activeTransferHistoryTab === "v2"}
-                onClick={() => {
-                  setTransferHistoryTab("v2");
-                  if (activeView !== "historyV2") {
-                    setFoundationView("historyV2", setActiveView);
-                  }
-                }}
-              >
-                V2
-              </button>
-            </div>
-            {activeTransferHistoryTab === "v2" ? (
-              <TransferHistoryV2Client
+            <TransferHistoryV2Client
                 sourceBadgeLabel={getViewSourceBadgeLabel("historyV2", activeContextMeta)}
                 saveName={historyFeed?.saveContext?.saveName ?? activeSaveName}
                 requestedScopeLabel={`${historyFeed?.saveContext?.requestedSaveId ?? activeSaveId} / ${transferHistoryRequestedSeasonLabel}`}
@@ -35649,384 +30765,9 @@ export default function FoundationPageClient({
                   setHistorySourceFilter("ALL");
                   setHistorySearch("");
                 }}
-                onOpenPlayer={(playerId) => openPlayerDrawerById(playerId)}
-                onOpenTeam={(teamId) => openTeamDrawerById(teamId)}
-                onOpenClassic={() => {
-                  setTransferHistoryTab("classic");
-                  setFoundationView("history", setActiveView);
-                }}
+                onOpenPlayer={(playerId) => openPlayerProfileById(playerId)}
+                onOpenTeam={(teamId) => openTeamProfileById(teamId)}
               />
-            ) : (
-            <>
-            <div className="transfer-context-banner" style={{ marginBottom: 12 }}>
-              <strong>
-                Save {historyFeed?.saveContext?.saveName ?? activeSaveName} ·{" "}
-                {inferSaveTypeLabel(historyFeed?.saveContext ?? activeSaveSummary)}
-              </strong>
-                <span>
-                  Angefragt: {historyFeed?.saveContext?.requestedSaveId ?? activeSaveId} /{" "}
-                  {transferHistoryRequestedSeasonLabel}
-                  {" · "}
-                  Aufgeloest: {historyFeed?.saveContext?.resolvedSaveId ?? historyFeed?.scope?.saveId ?? activeSaveId} /{" "}
-                  {transferHistoryResolvedSeasonLabel}
-                  {" · "}
-                  Zeigt {historyFeed?.items.length ?? 0} von {historyFeed?.total ?? 0} Transfers
-                </span>
-              </div>
-            {historyFeed?.saveContext?.scopeWarning ? (
-              <div className="transfer-callout is-warning" style={{ marginBottom: 12 }}>
-                <strong>Scope-Warnung</strong>
-                <span>{historyFeed.saveContext.scopeWarning}</span>
-              </div>
-            ) : null}
-            {historyFeed?.error ? (
-              <div className="transfer-callout is-blocked" style={{ marginBottom: 12 }}>
-                <strong>Historie konnte nicht geladen werden</strong>
-                <span>{historyFeed.error}</span>
-              </div>
-            ) : null}
-            <div className="teams-summary-grid history-summary-grid" style={{ marginBottom: 12 }}>
-              {transferHistorySeasonBreakdown.map(([seasonLabel, count]) => (
-                <article className="metric-card transfer-history-summary-card" key={seasonLabel}>
-                  <span>{seasonLabel}</span>
-                  <strong>{count}</strong>
-                  <small>Transfers im geladenen Feed</small>
-                </article>
-              ))}
-              <article className="metric-card transfer-history-summary-card">
-                <span>Transfers im Fenster</span>
-                <strong>{transferHistorySummary.count}</strong>
-              </article>
-              <article className="metric-card transfer-history-summary-card">
-                <span>Kaeufe gesamt</span>
-                <strong>{formatTransfermarktCurrency(transferHistorySummary.buyFee)}</strong>
-              </article>
-              <article className="metric-card transfer-history-summary-card">
-                <span>Verkaeufe gesamt</span>
-                <strong>{formatTransfermarktCurrency(transferHistorySummary.sellFee)}</strong>
-              </article>
-              <article className="metric-card transfer-history-summary-card">
-                <span>Ø Abloese</span>
-                <strong>{formatTransfermarktCurrency(transferHistorySummary.averageFee ?? null)}</strong>
-              </article>
-              <article className="metric-card transfer-history-summary-card">
-                <span>Ø GuV</span>
-                <strong>{transferHistorySummary.averageProfit != null ? formatTransfermarktCurrency(transferHistorySummary.averageProfit) : "—"}</strong>
-              </article>
-              <article className="metric-card transfer-history-summary-card">
-                <span>Netto Transferbilanz</span>
-                <strong>{formatTransfermarktCurrency(transferHistorySummary.netTransferBalance)}</strong>
-              </article>
-            </div>
-            <div className="transfer-render-limit-note" role="status" style={{ margin: "8px 0 12px" }}>
-              <span>
-                Zeigt {historyVisibleRangeLabel} von {sortedTransferHistoryRows.length} Treffern.
-                {historyAllSeasonsSelected
-                  ? ` Alle Seasons laufen seitenweise mit ${TRANSFER_HISTORY_ALL_SEASONS_PAGE_SIZE} Transfers pro Seite.`
-                  : " Aktuelle Auswahl zeigt direkt die komplette Season-Ansicht."}
-              </span>
-              {historyAllSeasonsSelected && historyPageCount > 1 ? (
-                <div className="room-meta foundation-admin-meta">
-                  <span className="pill">
-                    Seite {historyPage} / {historyPageCount}
-                  </span>
-                  <button
-                    className="secondary-button inline-button"
-                    type="button"
-                    disabled={historyPage <= 1}
-                    onClick={() => setHistoryPage((current) => Math.max(1, current - 1))}
-                  >
-                    Zurueck
-                  </button>
-                  <button
-                    className="secondary-button inline-button"
-                    type="button"
-                    disabled={historyPage >= historyPageCount}
-                    onClick={() => {
-                      setHistoryPage((current) => Math.min(historyPageCount, current + 1));
-                    }}
-                  >
-                    Weiter
-                  </button>
-                </div>
-              ) : null}
-            </div>
-
-            <div className="transfer-market-layout">
-              <div className="table-shell transfer-market-table-shell">
-                <table className="team-table transfer-history-table">
-                  <colgroup>
-                    {visibleTransferHistoryColumns.map((column) => (
-                      <col key={column.id} style={{ width: `${getTableColumnWidth("transferHistoryTable", column)}px` }} />
-                    ))}
-                  </colgroup>
-                  <thead>
-                    <tr>
-                      {visibleTransferHistoryColumns.map((column) => (
-                        <th
-                          key={column.id}
-                          {...getTableHeaderDragProps("transferHistoryTable", column, visibleTransferHistoryColumns)}
-                          className={[
-                            transferHistoryPinnedOffsets.has(column.id) ? "transfer-history-sticky-cell" : "",
-                            getTransferHistoryAxisHeaderClass(column.id),
-                          ].filter(Boolean).join(" ") || undefined}
-                          style={{
-                            width: `${getTableColumnWidth("transferHistoryTable", column)}px`,
-                            minWidth: `${column.minWidth}px`,
-                            ...getTransferHistoryStickyStyle(column.id, "head"),
-                          }}
-                        >
-                          <div className="resizable-header-cell">
-                            <SortableHeader label={column.label} tableId="transferHistory" columnKey={column.dataKey} sortState={tableSorts.transferHistory} onToggle={toggleTableSort} />
-                            <span className="column-resizer" draggable={false} role="separator" aria-orientation="vertical" aria-label={`${column.label} Breite anpassen`} onMouseDown={(event) => startTableColumnResize("transferHistoryTable", column, event)} onDoubleClick={() => resetTableColumnWidth("transferHistoryTable", column)} />
-                          </div>
-                        </th>
-                      ))}
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {visibleTransferHistoryRows.map((row) => (
-                      <tr key={row.transferId} onDoubleClick={() => openPlayerDrawerById(row.playerId)}>
-                        {visibleTransferHistoryColumns.map((column) => {
-                          const stickyStyle = getTransferHistoryStickyStyle(column.id, "body");
-                          const stickyClass = transferHistoryPinnedOffsets.has(column.id) ? "transfer-history-sticky-cell" : "";
-                          if (column.id === "image") {
-                            const portraitSize = clampValue(getTableColumnWidth("transferHistoryTable", column) - 24, 56, 132);
-                            return (
-                              <td key={column.id} className={stickyClass} style={stickyStyle}>
-                                {row.portraitUrl ? (
-                                  <img
-                                    className="transfermarkt-portrait"
-                                    src={row.portraitUrl}
-                                    alt={row.playerName}
-                                    width={portraitSize}
-                                    height={portraitSize}
-                                    loading="lazy"
-                                    decoding="async"
-                                    fetchPriority="low"
-                                    style={{ width: `${portraitSize}px`, height: `${portraitSize}px` }}
-                                  />
-                                ) : (
-                                  <div
-                                    className="transfermarkt-portrait transfermarkt-portrait-placeholder"
-                                    aria-label={`${row.playerName} placeholder`}
-                                    style={{ width: `${portraitSize}px`, height: `${portraitSize}px`, fontSize: `${Math.max(16, portraitSize * 0.3)}px` }}
-                                  >
-                                    {row.portraitInitials}
-                                  </div>
-                                )}
-                              </td>
-                            );
-                          }
-                          if (column.id === "name") {
-                            return (
-                              <td key={column.id} className={stickyClass} style={stickyStyle}>
-                                <div className="table-player-cell transfer-history-player-cell">
-                                  <strong>{row.playerName}</strong>
-                                  <span>{row.fromTeamName ?? row.toTeamName ?? "Free Agent"}</span>
-                                </div>
-                              </td>
-                            );
-                          }
-                          if (column.id === "season") return <td key={column.id}>{row.seasonLabel}</td>;
-                          if (column.id === "type") return <td key={column.id}><span className={getTransferTypePillClass(row.type)}>{getTransferTypeLabel(row.type)}</span></td>;
-                          if (column.id === "from") return <td key={column.id}>{row.fromTeamName ?? row.fromTeamId ?? "FA"}</td>;
-                          if (column.id === "to") return <td key={column.id}>{row.toTeamName ?? row.toTeamId ?? "FA"}</td>;
-                          if (column.id === "fee") {
-                            return (
-                              <td key={column.id} className="transfer-history-number-cell">
-                                <span className="transfer-history-money-stack">
-                                  <span>{formatTransfermarktCurrency(row.fee)}</span>
-                                  {row.type === "sell" && row.guv != null ? (
-                                    <span className={row.guv >= 0 ? "text-positive" : "text-negative"}>
-                                      ({formatSignedTransfermarktCurrency(row.guv)})
-                                    </span>
-                                  ) : null}
-                                </span>
-                              </td>
-                            );
-                          }
-                          if (column.id === "guv") {
-                            return (
-                              <td key={column.id} className={`transfer-history-number-cell ${row.guv == null ? "" : row.guv >= 0 ? "text-positive" : "text-negative"}`}>
-                                {row.type === "buy"
-                                  ? "—"
-                                  : row.guv != null
-                                    ? formatTransfermarktCurrency(row.guv)
-                                    : "guv_source_missing"}
-                              </td>
-                            );
-                          }
-                          if (column.id === "marketValue") return <td key={column.id} className="transfer-history-number-cell">{formatTransfermarktCurrency(row.marketValue)}</td>;
-                          if (column.id === "pow") return <td key={column.id} className={`transfer-history-axis-cell ${getPoolHeatClass(row.pow, transferHistoryAxisHeatPools.pow)}`}>{formatTransfermarktPoints(row.pow)}</td>;
-                          if (column.id === "spe") return <td key={column.id} className={`transfer-history-axis-cell ${getPoolHeatClass(row.spe, transferHistoryAxisHeatPools.spe)}`}>{formatTransfermarktPoints(row.spe)}</td>;
-                          if (column.id === "men") return <td key={column.id} className={`transfer-history-axis-cell ${getPoolHeatClass(row.men, transferHistoryAxisHeatPools.men)}`}>{formatTransfermarktPoints(row.men)}</td>;
-                          if (column.id === "soc") return <td key={column.id} className={`transfer-history-axis-cell ${getPoolHeatClass(row.soc, transferHistoryAxisHeatPools.soc)}`}>{formatTransfermarktPoints(row.soc)}</td>;
-                          if (column.id === "salary") {
-                            return (
-                              <td key={column.id} className="transfer-history-number-cell">
-                                <span className="transfer-history-money-stack">
-                                  <span>{formatTransfermarktCurrency(row.salary)}</span>
-                                  {row.type === "buy" && row.salaryDelta != null ? (
-                                    <span
-                                      className={row.salaryDelta <= 0 ? "text-positive" : "text-negative"}
-                                      title={row.salaryBenchmark != null ? `Benchmark ${formatTransfermarktCurrency(row.salaryBenchmark)}` : undefined}
-                                    >
-                                      ({formatSignedTransfermarktCurrency(row.salaryDelta)})
-                                    </span>
-                                  ) : null}
-                                </span>
-                              </td>
-                            );
-                          }
-                          if (column.id === "className") {
-                            return (
-                              <td key={column.id}>
-                                <ClassIcon classNameValue={row.className} className="table-identity-icon-chip" iconClassName="table-identity-icon-image" />
-                              </td>
-                            );
-                          }
-                          if (column.id === "race") {
-                            return (
-                              <td key={column.id}>
-                                <RaceIcon race={row.race} className="table-identity-icon-chip" iconClassName="table-identity-icon-image" />
-                              </td>
-                            );
-                          }
-                          if (column.id === "happenedAt") {
-                            return (
-                              <td key={column.id}>
-                                <div className="table-player-cell">
-                                  <strong>{new Date(row.happenedAt).toLocaleString("de-DE")}</strong>
-                                  <span>{row.phase ?? row.matchdayId ?? "ohne Phase"}</span>
-                                </div>
-                              </td>
-                            );
-                          }
-                          if (column.id === "remainingContractLength") return <td key={column.id} className="transfer-history-number-cell">{row.remainingContractLength != null ? `${formatWholeNumber(row.remainingContractLength)} J` : "—"}</td>;
-                          if (column.id === "source") return <td key={column.id}><span className="player-drawer-source-chip">{row.sourceLabel}</span></td>;
-                          return <td key={column.id}>—</td>;
-                        })}
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
-
-              <aside className="transfer-filter-panel">
-                <section className="panel transfer-filter-card">
-                  <div className="panel-header">
-                    <h2>Filter</h2>
-                  </div>
-                  <div className="stack">
-                    <label className="filter-field">
-                      <span>Saison</span>
-                      <select
-                        className="input"
-                        value={historySeasonFilter}
-                        onChange={(event) => setHistorySeasonFilter(event.target.value)}
-                      >
-                        {transferSeasonOptions.map((season) => (
-                          <option key={season.seasonId} value={season.seasonId}>
-                            {season.label}
-                          </option>
-                        ))}
-                        <option value={HISTORY_ALL_SEASONS_FILTER}>Alle Seasons</option>
-                      </select>
-                    </label>
-
-                    <label className="filter-field">
-                      <span>Spielername</span>
-                      <input
-                        className="input"
-                        placeholder="Suche nach Name"
-                        value={historySearch}
-                        onChange={(event) => setHistorySearch(event.target.value)}
-                      />
-                    </label>
-
-                    <label className="filter-field">
-                      <span>Team</span>
-                      <select
-                        className="input"
-                        value={historyTeamFilter}
-                        onChange={(event) => setHistoryTeamFilter(event.target.value)}
-                      >
-                        <option value="ALL">Alle Teams</option>
-                        {gameState.teams.map((team) => (
-                          <option key={team.teamId} value={team.teamId}>
-                            {team.name}
-                          </option>
-                        ))}
-                      </select>
-                    </label>
-
-                    <label className="filter-field">
-                      <span>Transfer-Typ</span>
-                      <select
-                        className="input"
-                        value={historyTypeFilter}
-                        onChange={(event) => setHistoryTypeFilter(event.target.value)}
-                      >
-                        <option value="ALL">Alle Typen</option>
-                        <option value="buy">Kauf</option>
-                        <option value="sell">Verkauf</option>
-                      </select>
-                    </label>
-
-                    <label className="filter-field">
-                      <span>Klasse</span>
-                      <select
-                        className="input"
-                        value={historyClassFilter}
-                        onChange={(event) => setHistoryClassFilter(event.target.value)}
-                      >
-                        <option value="ALL">Alle Klassen</option>
-                        {transferHistoryClassOptions.map((className) => (
-                          <option key={className} value={className}>
-                            {className}
-                          </option>
-                        ))}
-                      </select>
-                    </label>
-
-                    <label className="filter-field">
-                      <span>Quelle</span>
-                      <select
-                        className="input"
-                        value={historySourceFilter}
-                        onChange={(event) => setHistorySourceFilter(event.target.value)}
-                      >
-                        <option value="ALL">Alle Quellen</option>
-                        {transferHistorySourceOptions.map((sourceKey) => (
-                          <option key={sourceKey} value={sourceKey}>
-                            {getTransferSourceLabel(sourceKey === "missing_source" ? null : sourceKey)}
-                          </option>
-                        ))}
-                      </select>
-                    </label>
-
-                    <button
-                      className="secondary-button"
-                      type="button"
-                      onClick={() => {
-                        setHistorySeasonFilter(gameState.season.id);
-                        setHistoryPage(1);
-                        setHistoryTeamFilter("ALL");
-                        setHistoryTypeFilter("ALL");
-                        setHistoryClassFilter("ALL");
-                        setHistorySourceFilter("ALL");
-                        setHistorySearch("");
-                      }}
-                    >
-                      Filter zuruecksetzen
-                    </button>
-                  </div>
-                </section>
-              </aside>
-            </div>
-            </>
-            )}
           </section>
           ) : null}
 
@@ -36072,18 +30813,6 @@ export default function FoundationPageClient({
             <pre className="debug-json">{JSON.stringify(gameState, null, 2)}</pre>
           </section>
 
-          <PlayerDetailDrawer
-            data={playerDrawerData}
-            onClose={closePlayerDrawer}
-            onOpenBuyPreview={openPlayerDrawerBuyPreview}
-            layerClassName={drawerLayerOrder === "player" ? "drawer-layer-front" : "drawer-layer-back"}
-          />
-          <TeamDetailDrawer
-            data={teamDrawerData}
-            onClose={closeTeamDrawer}
-            onOpenPlayer={(playerId, activePlayerId) => openPlayerProfileById(playerId, activePlayerId)}
-            layerClassName={drawerLayerOrder === "team" ? "drawer-layer-front" : "drawer-layer-back"}
-          />
       </div>
       </FoundationShell>
     </main>

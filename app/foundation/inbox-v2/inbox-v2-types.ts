@@ -21,8 +21,8 @@ export type InboxV2ClientProps = {
   onIncludeDoneChange?: (value: boolean) => void;
   includeDismissed?: boolean;
   onIncludeDismissedChange?: (value: boolean) => void;
-  onOpenHomeV2?: () => void;
   onRunChoice?: (itemId: string, choiceId: string) => void;
   onMarkDone?: (itemId: string) => void;
   onDismiss?: (itemId: string) => void;
+  hideCategoryFilters?: boolean;
 };
