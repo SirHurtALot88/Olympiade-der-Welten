@@ -20,6 +20,10 @@ import {
 import { withNormalizedTeamStrategyProfiles } from "@/lib/foundation/team-strategy-profiles";
 import { createPersistenceService } from "@/lib/persistence/persistence-service";
 import {
+  compactFoundationInitialGameState,
+  rehydrateGameStateAfterCompactPut,
+} from "@/lib/persistence/foundation-initial-compact-state";
+import {
   matchesFoundationSaveMode,
   normalizeFoundationSaveMode,
   resolveFoundationSaveMode,
@@ -113,45 +117,6 @@ function enrichSaveSummary(save: SaveSummary): SaveSummary {
 function listSavesForMode(persistence: PersistenceService, saveMode: FoundationSaveMode) {
   const summaries = persistence.listSaves().map(enrichSaveSummary);
   return saveMode === "all" ? summaries : summaries.filter((save) => matchesFoundationSaveMode(saveMode, save));
-}
-
-function compactFoundationInitialGameState(gameState: GameState): GameState {
-  const activeMatchdayId = gameState.matchdayState.matchdayId;
-  const activeMatchdayResults = (gameState.seasonState.matchdayResults ?? []).filter(
-    (result) => result.matchdayId === activeMatchdayId,
-  );
-  const activeMatchdayResultIds = new Set(activeMatchdayResults.map((result) => result.id));
-
-  return {
-    ...gameState,
-    playerBaselines: undefined,
-    baselineWriteGuardEvents: undefined,
-    transferHistory: [],
-    logs: [],
-    players: gameState.players.map((player) => ({
-      ...player,
-      attributeSheetStats: undefined,
-      attributeSheetRatings: undefined,
-      flavorEn: "",
-      flavorDe: "",
-      previousDisciplineRatings: undefined,
-      lastSeasonDisciplineValues: undefined,
-      currentDisciplineValues: undefined,
-      disciplineDelta: undefined,
-    })),
-    seasonState: {
-      ...gameState.seasonState,
-      seasonSnapshots: undefined,
-      standingsApplyLogs: undefined,
-      disciplineResults: (gameState.seasonState.disciplineResults ?? []).filter((result) =>
-        activeMatchdayResultIds.has(result.matchdayResultId),
-      ),
-      matchdayResults: activeMatchdayResults,
-      lineupDrafts: (gameState.seasonState.lineupDrafts ?? []).filter(
-        (draft) => draft.matchdayId === activeMatchdayId,
-      ),
-    },
-  };
 }
 
 async function loadPrismaResponse(saveId?: string) {
@@ -328,10 +293,8 @@ export async function PUT(request: Request) {
     );
   }
 
-  const nextGameState = withNormalizedLocalTeamSettings({
-    ...body.gameState,
-    saveVersion: currentSaveVersion + 1,
-  });
+  const rehydratedGameState = rehydrateGameStateAfterCompactPut(existing.gameState, body.gameState);
+  const nextGameState = withNormalizedLocalTeamSettings(rehydratedGameState);
   const save = persistence.saveSingleplayerState(body.saveId, nextGameState);
 
   return NextResponse.json({

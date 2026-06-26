@@ -79,6 +79,16 @@ export function createDefaultTeamControlSettings(team: Team): TeamControlSetting
   };
 }
 
+/** Teams under manual control (Spieler-Teams aus Admin/Team-Einstellungen). */
+export function getManualControlTeamIds(gameState: GameState): Set<string> {
+  const settingsMap = buildTeamControlSettingsMap(gameState.teams, gameState.seasonState.teamControlSettings);
+  return new Set(
+    gameState.teams
+      .filter((team) => settingsMap[team.teamId]?.controlMode === "manual")
+      .map((team) => team.teamId),
+  );
+}
+
 export function buildTeamControlSettingsMap(teams: Team[], existing?: Record<string, TeamControlSettings> | null) {
   return Object.fromEntries(
     teams.map((team) => {

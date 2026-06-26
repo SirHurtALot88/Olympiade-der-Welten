@@ -10,6 +10,7 @@ import { runAiPicksExecutePreview } from "@/lib/ai/ai-picks-run-service";
 import type { AiPreseasonAutomationRunRecord, GameState } from "@/lib/data/olyDataTypes";
 import {
   buildTeamControlSettingsMap,
+  getManualControlTeamIds,
   withNormalizedTeamControlSettings,
 } from "@/lib/foundation/team-control-settings";
 import { LOCAL_TRANSFER_WINDOW_PHASE } from "@/lib/market/transfer-window-policy";
@@ -21,23 +22,15 @@ function nowIso() {
 
 function getAiTeamIds(gameState: GameState) {
   const control = buildTeamControlSettingsMap(gameState.teams, gameState.seasonState.teamControlSettings);
-  const protectedHumanTeamIds = getProtectedHumanTeamIds(gameState);
+  const manualTeamIds = getManualControlTeamIds(gameState);
   return gameState.teams
-    .filter((team) => control[team.teamId]?.controlMode === "ai" && !protectedHumanTeamIds.has(team.teamId))
+    .filter((team) => control[team.teamId]?.controlMode === "ai" && !manualTeamIds.has(team.teamId))
     .map((team) => team.teamId);
 }
 
-function getProtectedHumanTeamIds(gameState: GameState) {
-  return new Set(
-    Object.values(gameState.seasonState.teamControlSettings ?? {})
-      .filter((settings) => settings.controlMode === "manual")
-      .map((settings) => settings.teamId),
-  );
-}
-
-function protectSelectedHumanTeams(gameState: GameState): GameState {
+function protectManualPlayerTeams(gameState: GameState): GameState {
   const normalized = withNormalizedTeamControlSettings(gameState);
-  const humanTeamIds = getProtectedHumanTeamIds(gameState);
+  const humanTeamIds = getManualControlTeamIds(gameState);
   if (humanTeamIds.size === 0) return gameState;
   const control = buildTeamControlSettingsMap(normalized.teams, normalized.seasonState.teamControlSettings);
   const anyChanged = [...humanTeamIds].some((id) => control[id]?.controlMode !== "manual");
@@ -118,7 +111,7 @@ export async function POST(request: Request) {
     });
   }
 
-  const protectedGameState = protectSelectedHumanTeams(save.gameState);
+  const protectedGameState = protectManualPlayerTeams(save.gameState);
   const protectedSave =
     protectedGameState === save.gameState
       ? save
