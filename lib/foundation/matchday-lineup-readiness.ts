@@ -94,6 +94,38 @@ export function getTeamMatchdayLineupOpenSlots(
   return Math.max(d1Required - counts.d1, 0) + Math.max(d2Required - counts.d2, 0);
 }
 
+export function getTeamRosterPlayerIds(gameState: GameState, teamId: string) {
+  return gameState.rosters.filter((entry) => entry.teamId === teamId).map((entry) => entry.playerId);
+}
+
+export function isTeamAllRosterPlayersDeployedInLineup(
+  gameState: GameState,
+  teamId: string,
+  draft: LineupDraft | null = getTeamMatchdayLineupDraft(gameState, teamId),
+) {
+  const rosterPlayerIds = getTeamRosterPlayerIds(gameState, teamId);
+  if (rosterPlayerIds.length === 0 || !draft?.entries.length) {
+    return false;
+  }
+  const deployedPlayerIds = new Set(draft.entries.map((entry) => entry.playerId));
+  return rosterPlayerIds.every((playerId) => deployedPlayerIds.has(playerId));
+}
+
+/** Slots voll ODER gesamter Kader eingesetzt — beides ist spielbar. */
+export function isTeamMatchdayLineupOperationallyReady(
+  gameState: GameState,
+  teamId: string,
+  draft: LineupDraft | null = getTeamMatchdayLineupDraft(gameState, teamId),
+): boolean {
+  if (!draft?.entries.length) {
+    return false;
+  }
+  if (isTeamMatchdayLineupComplete(gameState, teamId, draft)) {
+    return true;
+  }
+  return isTeamAllRosterPlayersDeployedInLineup(gameState, teamId, draft);
+}
+
 export function isTeamMatchdayLineupSubmitted(draft: LineupDraft | null | undefined) {
   return draft?.status === "submitted" || draft?.status === "locked" || draft?.status === "resolved";
 }

@@ -4,7 +4,9 @@ import {
   getMatchdayLineupSideRequirements,
   getTeamMatchdayLineupDraft,
   getTeamMatchdayLineupOpenSlots,
+  getTeamRosterPlayerIds,
   isTeamMatchdayLineupComplete,
+  isTeamMatchdayLineupOperationallyReady,
   isTeamMatchdayLineupSubmitted,
 } from "@/lib/foundation/matchday-lineup-readiness";
 
@@ -42,19 +44,23 @@ export function mergeFormCardPlansIntoGameState(
 
 export function getMatchdayArenaReadiness(gameState: GameState, activeTeamId: string | null) {
   const lineup = activeTeamId ? getTeamMatchdayLineupDraft(gameState, activeTeamId) : null;
-  const lineupReady = activeTeamId ? isTeamMatchdayLineupComplete(gameState, activeTeamId, lineup) : false;
+  const lineupSlotComplete = activeTeamId ? isTeamMatchdayLineupComplete(gameState, activeTeamId, lineup) : false;
+  const lineupOperationallyReady = activeTeamId ? isTeamMatchdayLineupOperationallyReady(gameState, activeTeamId, lineup) : false;
   const lineupSubmitted = isTeamMatchdayLineupSubmitted(lineup);
   const openLineupSlots = activeTeamId ? getTeamMatchdayLineupOpenSlots(gameState, activeTeamId, lineup) : 0;
+  const rosterPlayerIds = activeTeamId ? getTeamRosterPlayerIds(gameState, activeTeamId) : [];
+  const deployedPlayerIds = new Set((lineup?.entries ?? []).map((entry) => entry.playerId));
+  const undeployedRosterCount = rosterPlayerIds.filter((playerId) => !deployedPlayerIds.has(playerId)).length;
   const hasResults = hasCurrentMatchdayResult(gameState);
-  const formCardsRequired = lineupReady && !hasResults;
+  const formCardsRequired = lineupOperationallyReady && !hasResults;
   const formCardFlow = getFormCardFlowStatus(gameState, activeTeamId);
   const formCardsReady = !formCardsRequired || formCardFlow.isReady;
-  const isReady = lineupReady && lineupSubmitted && formCardsReady;
+  const isReady = lineupOperationallyReady && lineupSubmitted && formCardsReady;
 
   let blocker: MatchdayArenaBlockerReason = null;
   if (!lineup?.entries?.length) {
     blocker = "missing_lineup";
-  } else if (!lineupReady) {
+  } else if (!lineupOperationallyReady) {
     blocker = "incomplete_lineup";
   } else if (!lineupSubmitted) {
     blocker = "lineup_not_submitted";
@@ -66,11 +72,32 @@ export function getMatchdayArenaReadiness(gameState: GameState, activeTeamId: st
     isReady,
     blocker,
     openLineupSlots,
+    undeployedRosterCount,
+    lineupSlotComplete,
+    lineupOperationallyReady,
     sideRequirements: activeTeamId ? getMatchdayLineupSideRequirements(gameState) : null,
     formCardsRequired,
     formCardFlow,
-    lineupReady,
+    lineupReady: lineupOperationallyReady,
     lineupSubmitted,
     hasResults,
   };
+}
+
+export function formatLineupOperationalGapDetail(
+  readiness: Pick<
+    ReturnType<typeof getMatchdayArenaReadiness>,
+    "openLineupSlots" | "undeployedRosterCount"
+  >,
+) {
+  const parts: string[] = [];
+  if (readiness.openLineupSlots > 0) {
+    parts.push(`${readiness.openLineupSlots} offene Slot${readiness.openLineupSlots === 1 ? "" : "s"}`);
+  }
+  if (readiness.undeployedRosterCount > 0) {
+    parts.push(
+      `${readiness.undeployedRosterCount} Kader-Spieler noch nicht eingesetzt`,
+    );
+  }
+  return parts.length > 0 ? parts.join(" · ") : null;
 }

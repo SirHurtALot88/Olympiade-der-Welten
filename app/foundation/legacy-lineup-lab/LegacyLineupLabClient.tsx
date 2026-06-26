@@ -3596,12 +3596,12 @@ export default function LegacyLineupLabClient(props: LegacyLineupLabClientProps)
 
   const lineupReadyToSave = useMemo(() => {
     return (
-      matchdayPreviewCards.openSlots === 0 &&
+      (matchdayPreviewCards.openSlots === 0 || allAvailablePlayersDeployed) &&
       duplicateSelections.length === 0 &&
       !captainBudgetExceeded &&
       entries.length > 0
     );
-  }, [captainBudgetExceeded, duplicateSelections.length, entries.length, matchdayPreviewCards.openSlots]);
+  }, [allAvailablePlayersDeployed, captainBudgetExceeded, duplicateSelections.length, entries.length, matchdayPreviewCards.openSlots]);
 
   const draftIntensityPreview = useMemo(
     () => ({
@@ -4715,7 +4715,7 @@ export default function LegacyLineupLabClient(props: LegacyLineupLabClientProps)
         ? "Mini-Audit mit Hinweisen bestanden. Draft gespeichert."
         : "Mini-Audit sauber. Draft gespeichert.",
     );
-    if (saved && matchdayPreviewCards.openSlots === 0) {
+    if (saved) {
       props.onOpenArena?.({
         saveId: params.saveId,
         seasonId: params.seasonId,

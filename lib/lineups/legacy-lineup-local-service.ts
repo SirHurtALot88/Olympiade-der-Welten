@@ -39,6 +39,7 @@ import type {
 import { getImportedPlayerDisplayMarketValue, getImportedPlayerDisplaySalary } from "@/lib/data/player-economy-display";
 import { getInjuryRiskBand, getPlayerAvailabilityView } from "@/lib/fatigue/fatigue-injury-service";
 import { validateLegacyLineupContext } from "@/lib/lineups/legacy-lineup-validator";
+import { isTeamMatchdayLineupOperationallyReady } from "@/lib/foundation/matchday-lineup-readiness";
 import { officialDisciplineWeightTable, playerGeneratorAttributeKeys, type OfficialDisciplineWeightId } from "@/lib/player-generator/official-discipline-weights";
 import { getSeasonDisciplineScheduleEntry, withNormalizedSeasonDisciplineSchedule } from "@/lib/season/season-discipline-schedule";
 
@@ -1108,7 +1109,7 @@ export function saveLocalLegacyLineupDraft(
       disciplineSidePlayerCounts: buildDisciplineSidePlayerCounts(contextResult.context),
       disciplineSideCaptainCounts: contextResult.context.disciplineSideCaptainCounts,
     },
-    buildValidationOptions(contextResult.context, true),
+    buildValidationOptions(contextResult.context),
   );
 
   if (!validation.isValid) {
@@ -1142,6 +1143,14 @@ export function saveLocalLegacyLineupDraft(
     createdAt: existing?.createdAt ?? now,
     updatedAt: now,
   };
+
+  if (!isTeamMatchdayLineupOperationallyReady(save.gameState, effectiveParams.teamId, nextDraft)) {
+    return {
+      ok: false,
+      errors: ["lineup_not_operationally_ready"],
+      warnings: ["Alle Slots fuellen oder den gesamten Kader einsetzen, bevor die Einsatzliste gespeichert wird."],
+    };
+  }
 
   const nextGameState: GameState = {
     ...save.gameState,
@@ -1218,7 +1227,7 @@ export function saveLocalLegacyLineupDraftBatch(
         disciplineSidePlayerCounts: buildDisciplineSidePlayerCounts(contextResult.context),
         disciplineSideCaptainCounts: contextResult.context.disciplineSideCaptainCounts,
       },
-      buildValidationOptions(contextResult.context, true),
+      buildValidationOptions(contextResult.context),
     );
 
     warnings.push(...validation.warnings);
@@ -1235,8 +1244,7 @@ export function saveLocalLegacyLineupDraftBatch(
       continue;
     }
 
-    nextDraftIds.add(lineupId);
-    nextDrafts.push({
+    const candidateDraft: LineupDraft = {
       lineupId,
       saveId: draftInput.params.saveId,
       seasonId: draftInput.params.seasonId,
@@ -1247,7 +1255,14 @@ export function saveLocalLegacyLineupDraftBatch(
       modifiers: draftInput.modifiers,
       createdAt: existing?.createdAt ?? now,
       updatedAt: now,
-    });
+    };
+    if (!isTeamMatchdayLineupOperationallyReady(save.gameState, draftInput.params.teamId, candidateDraft)) {
+      errors.push("lineup_not_operationally_ready");
+      continue;
+    }
+
+    nextDraftIds.add(lineupId);
+    nextDrafts.push(candidateDraft);
   }
 
   if (errors.length > 0) {

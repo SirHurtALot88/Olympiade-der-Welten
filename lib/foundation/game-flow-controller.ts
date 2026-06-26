@@ -7,6 +7,7 @@ import {
 import {
   getTeamMatchdayLineupDraft,
   isTeamMatchdayLineupComplete,
+  isTeamMatchdayLineupOperationallyReady,
   isTeamMatchdayLineupSubmitted,
 } from "@/lib/foundation/matchday-lineup-readiness";
 import { getTeamSponsorContract } from "@/lib/sponsor/sponsor-offer-read";
@@ -113,7 +114,7 @@ function getActiveTeamLineup(gameState: GameState, activeTeamId: string | null) 
 
 function isCurrentMatchdayLineupComplete(gameState: GameState, lineup: ReturnType<typeof getActiveTeamLineup>) {
   if (!lineup) return false;
-  return isTeamMatchdayLineupComplete(gameState, lineup.teamId, lineup);
+  return isTeamMatchdayLineupOperationallyReady(gameState, lineup.teamId, lineup);
 }
 
 function activeTeamHasFormCards(gameState: GameState, activeTeamId: string | null) {
@@ -353,13 +354,11 @@ function buildMatchdaySteps(gameState: GameState, activeTeamId: string | null): 
       ? activeLineup?.entries?.length
         ? ["incomplete_lineup"]
         : ["missing_lineup"]
-      : formCardsRequired && !hasFormCardPool
-        ? ["missing_formcard_pool"]
-        : formCardsRequired && !hasFormCards
-          ? ["missing_formcard_selections"]
-          : arenaPreparationReady && !lineupConfirmed
-            ? ["lineup_not_submitted"]
-            : ["missing_lineup"];
+      : formCardsRequired && !hasFormCards
+        ? ["missing_formcard_selections"]
+        : arenaPreparationReady && !lineupConfirmed
+          ? ["lineup_not_submitted"]
+          : ["missing_lineup"];
   const trainingComplete = activeTeamTrainingComplete(gameState, activeTeamId);
   const storedNewGameFlow = gameState.seasonState.newGameFlow ?? null;
   const seasonIntroStep = storedNewGameFlow?.steps?.find((entry) => entry.stepId === "season_intro");
@@ -424,8 +423,7 @@ function buildMatchdaySteps(gameState: GameState, activeTeamId: string | null): 
       label: "Training prüfen",
       cta: "Weiter: Training prüfen",
       status: !hasActiveTeam ? "blocked" : activeRosterCount === 0 ? "blocked" : trainingComplete ? "completed" : "ready",
-      targetView: "trainingV2",
-      targetPanel: "training-plan",
+      targetView: "trainingCompact",
       teamId: activeTeamId,
       blockers: !hasActiveTeam ? ["no_active_team"] : activeRosterCount === 0 ? ["empty_roster"] : [],
     }),

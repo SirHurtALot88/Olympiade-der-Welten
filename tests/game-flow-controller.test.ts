@@ -205,7 +205,7 @@ describe("game flow controller", () => {
   it("opens training first when active roster players have no training mode", () => {
     const flow = buildGameFlowState({ gameState: gameState(), activeTeamId: "M-M" });
     expect(flow.currentStepId).toBe("check_training");
-    expect(flow.currentStep.targetView).toBe("trainingV2");
+    expect(flow.currentStep.targetView).toBe("trainingCompact");
     expect(flow.currentStep.cta).toContain("Training");
   });
 

@@ -66,8 +66,12 @@ export function isLegacyLineupDraftComplete(context: LegacyLineupLoadedContext):
   const d1DisciplineId = context.contextMeta.d1DisciplineId;
   const d2DisciplineId = context.contextMeta.d2DisciplineId;
   const sideCounts = getLegacyLineupDraftSideCounts(context);
-  const d1Required = d1DisciplineId ? (context.disciplinePlayerCounts[d1DisciplineId] ?? 0) : 0;
-  const d2Required = d2DisciplineId ? (context.disciplinePlayerCounts[d2DisciplineId] ?? 0) : 0;
+  const d1Required = d1DisciplineId
+    ? (context.disciplineSidePlayerCounts?.[`${d1DisciplineId}::d1`] ?? context.disciplinePlayerCounts[d1DisciplineId] ?? 0)
+    : 0;
+  const d2Required = d2DisciplineId
+    ? (context.disciplineSidePlayerCounts?.[`${d2DisciplineId}::d2`] ?? context.disciplinePlayerCounts[d2DisciplineId] ?? 0)
+    : 0;
 
   if (d1Required > 0 && sideCounts.d1 < d1Required) {
     return false;
@@ -84,7 +88,11 @@ function buildDisciplineSidePlayerCounts(entries: LegacyLineupEntryInput[], cont
   return Object.fromEntries(
     uniquePairs.map((key) => {
       const [disciplineId] = key.split("::");
-      return [key, context.disciplinePlayerCounts[disciplineId] ?? 0] as const;
+      const count =
+        context.disciplineSidePlayerCounts?.[key] ??
+        context.disciplinePlayerCounts[disciplineId] ??
+        0;
+      return [key, count] as const;
     }),
   );
 }
@@ -112,8 +120,12 @@ export function buildLegacyMatchdayReadiness(context: LegacyLineupLoadedContext)
   const entries = draft?.entries ?? [];
   const d1DisciplineId = context.contextMeta.d1DisciplineId;
   const d2DisciplineId = context.contextMeta.d2DisciplineId;
-  const d1Required = d1DisciplineId ? (context.disciplinePlayerCounts[d1DisciplineId] ?? 0) : 0;
-  const d2Required = d2DisciplineId ? (context.disciplinePlayerCounts[d2DisciplineId] ?? 0) : 0;
+  const d1Required = d1DisciplineId
+    ? (context.disciplineSidePlayerCounts?.[`${d1DisciplineId}::d1`] ?? context.disciplinePlayerCounts[d1DisciplineId] ?? 0)
+    : 0;
+  const d2Required = d2DisciplineId
+    ? (context.disciplineSidePlayerCounts?.[`${d2DisciplineId}::d2`] ?? context.disciplinePlayerCounts[d2DisciplineId] ?? 0)
+    : 0;
   const requiredTotalUniquePlayers = d1Required + d2Required;
   const activePlayersCount = context.activePlayers.length;
   const missingPlayersToRequirement = Math.max(0, requiredTotalUniquePlayers - activePlayersCount);
