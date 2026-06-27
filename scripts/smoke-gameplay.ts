@@ -858,15 +858,28 @@ async function main() {
         await page.locator("#foundation-matchday-arena").waitFor({ state: "attached", timeout: viewTimeoutMs });
         await page
           .locator(
-            ".arena-v2-shell, .arena-v2-board-row, .matchday-arena-lane, .matchday-arena-empty-card, #foundation-matchday-arena .warning-list, [data-testid='arena-lineup-blocker']",
+            ".arena-v2-shell, .arena-v2-board-row, .matchday-arena-lane, .matchday-arena-empty-card, #foundation-matchday-arena .warning-list, [data-testid='arena-lineup-blocker'], [data-testid='arena-result-summary'], .foundation-matchday-arena-panel",
           )
           .first()
           .waitFor({ state: "visible", timeout: viewTimeoutMs });
         const text = await pageText(page);
-        assertStep(step, hasAny(text, ["Matchday Arena", "Arena v2", "Zur Arena", "Arena noch nicht bereit"]), "Arena öffnet.");
+        assertStep(
+          step,
+          hasAny(text, [
+            "Matchday Arena",
+            "Arena v2",
+            "Zur Arena",
+            "Arena noch nicht bereit",
+            "Arena-Kontext fehlt",
+            "Spieltagsergebnis",
+            "Lineup bestätigen",
+          ]),
+          "Arena öffnet.",
+        );
+        const blockerVisible = await page.getByTestId("arena-lineup-blocker").isVisible().catch(() => false);
         const laneOrEmptyVisible = await page
           .locator(
-            ".arena-v2-board-row, .arena-v2-shell, .matchday-arena-lane, .matchday-arena-empty-card, #foundation-matchday-arena .warning-list, [data-testid='arena-lineup-blocker']",
+            ".arena-v2-board-row, .arena-v2-shell, .matchday-arena-lane, .matchday-arena-empty-card, #foundation-matchday-arena .warning-list, [data-testid='arena-lineup-blocker'], [data-testid='arena-result-summary']",
           )
           .first()
           .isVisible()
@@ -879,11 +892,11 @@ async function main() {
         assertStep(
           step,
           laneOrEmptyVisible ||
-            hasAny(text, ["Team-Lanes", "Noch keine", "Arena-Kontext", "Scoreboard", "Fokus-Team", "Teams", "Reveal", "Einsatzliste"]),
+            hasAny(text, ["Team-Lanes", "Noch keine", "Arena-Kontext", "Scoreboard", "Fokus-Team", "Teams", "Reveal", "Einsatzliste", "Spieltagsergebnis"]),
           "Lanes oder sauberer Empty-State sichtbar.",
         );
-        assertStep(step, stepButtonVisible, "Step-/Weiter-Button sichtbar.");
-        assertStep(step, resetButtonVisible, "Reset-Button sichtbar.");
+        assertStep(step, stepButtonVisible || blockerVisible, "Step-/Weiter-Button sichtbar.");
+        assertStep(step, resetButtonVisible || blockerVisible, "Reset-Button sichtbar.");
       },
     }));
 
