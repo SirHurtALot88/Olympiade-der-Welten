@@ -1,6 +1,6 @@
 import type { PlayerRatingContractRow } from "@/lib/foundation/player-rating-contract";
 import type { TransferDoctrineProfile } from "@/lib/ai/ai-transfer-doctrine-layer";
-import { adjustBuyDecisionForDoctrine } from "@/lib/ai/ai-transfer-doctrine-layer";
+import { adjustBuyDecisionForDoctrine, getPersonaBlendWeight } from "@/lib/ai/ai-transfer-doctrine-layer";
 import type { ReplacementSlot } from "@/lib/ai/ai-transfer-replacement-memory";
 import { scoreReplacementFitForSlots } from "@/lib/ai/ai-transfer-replacement-memory";
 import type { Player } from "@/lib/data/olyDataTypes";
@@ -154,9 +154,14 @@ export function evaluateAiBuyDecision(input: AiBuyDecisionInput): AiBuyDecisionR
     reasonToPass.push("Kader bereits am oder ueber OPT ohne klaren Upgrade-Case");
   }
 
-  if (input.doctrine.persona === "hoarder" && minGap === 0 && replacementFit.score <= 0) {
-    passIntentScore += 12;
+  const hoarderWeight = getPersonaBlendWeight(input.doctrine.personaBlend, "hoarder");
+  const developerWeight = getPersonaBlendWeight(input.doctrine.personaBlend, "developer");
+  if (hoarderWeight >= 0.25 && minGap === 0 && replacementFit.score <= 0) {
+    passIntentScore += Math.round(12 * hoarderWeight);
     reasonToPass.push(input.doctrine.personaHint);
+  } else if (developerWeight >= 0.2 && minGap === 0 && replacementFit.score <= 0 && (input.score ?? 0) < 48) {
+    passIntentScore += Math.round(6 * developerWeight);
+    reasonToPass.push("Developer wartet auf entwicklungsfaehigen oder klaren Deal");
   }
 
   const price = input.price ?? input.marketValue;
@@ -189,8 +194,10 @@ export function evaluateAiBuyDecision(input: AiBuyDecisionInput): AiBuyDecisionR
     buyDecisionLabel = "Min-Notkauf";
   } else if (optGap > 0 && adjusted.strategicBuyScore >= 35) {
     buyDecisionLabel = "OPT-Upgrade";
-  } else if (input.doctrine.persona === "hoarder" && adjusted.strategicBuyScore < 25) {
+  } else if (hoarderWeight >= 0.35 && adjusted.strategicBuyScore < 25) {
     buyDecisionLabel = "Hoarder wartet";
+  } else if (developerWeight >= 0.25 && adjusted.strategicBuyScore >= 42) {
+    buyDecisionLabel = "Developer-Deal";
   } else if (input.plannedSellCount >= 1 && adjusted.strategicBuyScore >= 40) {
     buyDecisionLabel = "Reinvest";
   } else if (adjusted.strategicBuyScore >= 45) {

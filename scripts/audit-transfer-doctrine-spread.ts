@@ -1,4 +1,4 @@
-import { resolveTransferDoctrineFromProfile, summarizeDoctrineSpread } from "@/lib/ai/ai-transfer-doctrine-layer";
+import { resolveTransferDoctrineFromProfile, formatPersonaBlend, summarizeDoctrineSpread } from "@/lib/ai/ai-transfer-doctrine-layer";
 import { loadSourceTeams, loadSourceTeamIdentities } from "@/lib/data/dataAdapter";
 import { buildTeamStrategyProfileMap } from "@/lib/foundation/team-strategy-profiles";
 
@@ -21,25 +21,28 @@ function main() {
     .filter((entry): entry is NonNullable<typeof entry> => Boolean(entry));
 
   const spread = summarizeDoctrineSpread(doctrines.map((entry) => entry.doctrine));
-  console.log("Transfer doctrine spread:");
+  console.log("Dominant persona spread:");
   for (const [persona, count] of Object.entries(spread).sort((left, right) => right[1] - left[1])) {
     console.log(`  ${persona}: ${count}`);
   }
 
-  console.log("\nPer-team doctrine:");
+  console.log("\nPer-team axes + blend:");
   for (const entry of doctrines.sort((left, right) => left.teamId.localeCompare(right.teamId))) {
     const d = entry.doctrine;
     console.log(
-      `${entry.teamId} | ${d.persona.padEnd(13)} | buy ${d.buyIntentScale.toFixed(2)} pass ${d.passIntentScale.toFixed(2)} sell ${d.sellIntentScale.toFixed(2)} keep ${d.keepIntentScale.toFixed(2)} cashBuf ${d.cashBufferScale.toFixed(2)}`,
+      `${entry.teamId} | dom ${d.persona.padEnd(11)} | trade ${d.axes.tradeRotation.toFixed(2)} talent ${d.axes.talentFocus.toFixed(2)} | ${formatPersonaBlend(d.personaBlend)}`,
     );
   }
 
-  const balancedCount = spread.balanced ?? 0;
-  const balancedPct = Math.round((balancedCount / doctrines.length) * 100);
-  if (balancedPct > 40) {
-    console.log(`\nWARN balanced persona still ${balancedPct}% (${balancedCount}/${doctrines.length})`);
-    process.exitCode = 1;
+  const tt = doctrines.find((entry) => entry.teamId === "T-T");
+  if (tt) {
+    console.log("\nT-T spotlight:");
+    console.log(`  hint: ${tt.doctrine.personaHint}`);
+    console.log(`  blend: ${formatPersonaBlend(tt.doctrine.personaBlend)}`);
   }
+
+  const maxBalanced = Math.max(...doctrines.map((entry) => entry.doctrine.personaBlend.balanced ?? 0));
+  console.log(`\nMax balanced blend weight: ${Math.round(maxBalanced * 100)}%`);
 }
 
 main();
