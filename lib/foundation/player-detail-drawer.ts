@@ -1,5 +1,4 @@
 import { getPlayerPortraitBrowserUrl } from "@/lib/data/mediaAssets";
-import { getImportedPlayerDisplayMarketValue } from "@/lib/data/player-economy-display";
 import type { DisciplineCategory, GameState, Player, RosterEntry, Team, TeamStrategyProfile } from "@/lib/data/olyDataTypes";
 import {
   assessPlayerBoardTrust,
@@ -17,6 +16,7 @@ import {
 } from "@/lib/foundation/player-rating-contract";
 import { buildProjectedClassPreview } from "@/lib/foundation/projected-class-preview";
 import { buildPlayerSeasonPerformance, buildPlayerSeasonPerformanceMap } from "@/lib/foundation/player-season-performance";
+import { getPlayerSeasonZeroMarketValueDelta, getPlayerSeasonZeroMarketValueReference } from "@/lib/foundation/player-display-market-value";
 import { buildSeasonPointsLedger } from "@/lib/foundation/season-points-ledger";
 import { buildSeasonDisciplinePlayerCountMap } from "@/lib/season/season-discipline-schedule";
 import { getPlayerBaselineEconomyReference } from "@/lib/players/player-baseline-service";
@@ -40,6 +40,9 @@ import {
 } from "@/lib/progression/player-potential-service";
 import { getEffectiveScoutingLevel } from "@/lib/scouting/facility-scout-pipeline-service";
 import { buildPlayerStarScoutingSnapshot } from "@/lib/scouting/player-star-scouting-bridge";
+import { buildPlayerAxisStarProfile } from "@/lib/scouting/player-axis-star-rating";
+import { resolvePlayerFlavorDe } from "@/lib/foundation/player-flavor-catalog";
+import { clampPotentialOverallToCurrent } from "@/lib/scouting/player-potential-ceiling-service";
 import {
   buildPlayerPotentialDisplaySnapshot,
   type PlayerAttributeCeilingPreview,
@@ -126,6 +129,7 @@ export type PlayerDetailDrawerData = {
   sourceLabel: string;
   name: string;
   portraitUrl: string | null;
+  flavorDe: string | null;
   teamName: string | null;
   teamCode: string | null;
   teamHumanControlled: boolean | null;
@@ -686,9 +690,21 @@ function buildAttributeStats(
   return maskAttributeStatsForVisibility(buildRawAttributeStats(player), visibility);
 }
 
-function maskAxisCardsForVisibility(cards: PlayerDrawerAxisCard[], visibility: AttributeVisibility): PlayerDrawerAxisCard[] {
+function maskAxisCardsForVisibility(
+  cards: PlayerDrawerAxisCard[],
+  visibility: AttributeVisibility,
+  options?: { preserveCoreStats?: boolean },
+): PlayerDrawerAxisCard[] {
   if (visibility === "exact") {
     return cards;
+  }
+  if (options?.preserveCoreStats) {
+    return cards.map((card) => ({
+      ...card,
+      seasonPoints: null,
+      seasonPointsRank: null,
+      previousSeasonPointsRank: null,
+    }));
   }
   return cards.map((card) => ({
     ...card,
@@ -767,7 +783,7 @@ function resolveAttributeVisibility(input: {
   manageableTeamIds?: string[] | null;
   scoutingLevel?: number | null;
 }): AttributeVisibility {
-  if (input.manageableTeamIds) {
+  if (input.manageableTeamIds && input.manageableTeamIds.length > 0) {
     if (input.teamId && input.manageableTeamIds.includes(input.teamId)) {
       return "exact";
     }
@@ -1163,8 +1179,11 @@ function getSeasonZeroEconomyForPlayer(gameState: GameState, playerId: string) {
 
 function buildSeasonHistory(gameState: GameState, playerId: string) {
   const disciplineCategoryById = new Map(gameState.disciplines.map((discipline) => [discipline.id, discipline.category] as const));
-  const seasonZeroEconomy = getSeasonZeroEconomyForPlayer(gameState, playerId);
-  const baselineMarketValue = seasonZeroEconomy?.marketValue ?? null;
+  const player = gameState.players.find((entry) => entry.id === playerId) ?? null;
+  const baselineMarketValue = getPlayerSeasonZeroMarketValueReference({
+    player,
+    gameState,
+  });
   return [...(gameState.seasonState.seasonSnapshots ?? [])]
     .sort((left, right) => right.seasonId.localeCompare(left.seasonId, "de"))
     .map((snapshot) => {
@@ -1284,8 +1303,6 @@ function buildHistoryRows(input: {
     .sort((left, right) => right.happenedAt.localeCompare(left.happenedAt, "de"))[0] ?? null;
   const activeTransferFee = activeSeasonTransfer?.fee ?? null;
   const activeTransferMarketValue = input.marketValue ?? activeSeasonTransfer?.marketValue ?? null;
-  const seasonZeroEconomy = getSeasonZeroEconomyForPlayer(input.gameState, input.player.id);
-  const baselineMarketValue = seasonZeroEconomy?.marketValue ?? getImportedPlayerDisplayMarketValue(input.player);
   const activeSaleBreakdown = input.rosterEntry
     ? buildTransfermarktSaleFactorBreakdown(input.gameState, input.player, input.rosterEntry)
     : null;
@@ -1309,7 +1326,11 @@ function buildHistoryRows(input: {
     mvs: input.playerRating?.mvs ?? null,
     mvsRank: input.playerRating?.mvsRank ?? null,
     marketValue: input.marketValue,
-    marketValueBaselineDelta: calculateMoneyDelta(input.marketValue, baselineMarketValue),
+    marketValueBaselineDelta: getPlayerSeasonZeroMarketValueDelta({
+      player: input.player,
+      gameState: input.gameState,
+      currentMarketValue: input.marketValue,
+    }),
     transferType: activeSeasonTransfer?.transferType ?? null,
     transferFee: activeTransferFee,
     transferMarketValue: activeTransferMarketValue,
@@ -1581,6 +1602,13 @@ export function buildPlayerDrawerDataFromGameState(input: {
           scoutingLevel,
         })
       : null;
+  const currentAxisStars =
+    starSnapshot?.currentStars ??
+    buildPlayerAxisStarProfile({
+      gameState: input.gameState,
+      player,
+      disciplines: input.gameState.disciplines,
+    });
   const attributeVisibility = resolveAttributeVisibility({
     teamId: rosterEntry?.teamId ?? team?.teamId ?? null,
     teamHumanControlled: team ? team.humanControlled !== false : null,
@@ -1605,7 +1633,10 @@ export function buildPlayerDrawerDataFromGameState(input: {
   const playerRatingsById = buildPlayerRatingContractMap(input.gameState);
   const playerRating = buildPlayerRatingWithSeasonFallback(input.gameState, playerRatingsById.get(player.id) ?? null, player.id);
   const activePlayerIds = Array.from(new Set((input.gameState.rosters ?? []).map((entry) => entry.playerId).filter(Boolean)));
-  const coreAxisRankMaps = buildCoreAxisRankMaps(input.gameState.players, activePlayerIds);
+  const coreAxisRankMaps = buildCoreAxisRankMaps(
+    input.gameState.players,
+    rosterEntry ? activePlayerIds : null,
+  );
   const disciplineGlobalRankMaps = buildDisciplineGlobalRankMaps(input.gameState, input.gameState.disciplines);
   const axisRankContext = buildAxisRankContext({
     gameState: input.gameState,
@@ -1742,6 +1773,7 @@ export function buildPlayerDrawerDataFromGameState(input: {
     sourceLabel: getSourceLabel(input.source),
     name: player.name,
     portraitUrl: getPlayerPortraitBrowserUrl(player.id, player.portraitUrl ?? null, player.portraitPath ?? null),
+    flavorDe: resolvePlayerFlavorDe(player),
     teamName: team?.name ?? null,
     teamCode: team?.shortCode ?? null,
     teamHumanControlled: team ? team.humanControlled !== false : null,
@@ -1756,9 +1788,15 @@ export function buildPlayerDrawerDataFromGameState(input: {
     axisStarsDisplay: starSnapshot?.revealedCurrentStars.displayLabel ?? null,
     potentialStarsDisplay: starSnapshot?.revealedPotentialStars.displayLabel ?? null,
     potentialGapStars: starSnapshot?.potentialGap ?? null,
-    potentialOverallStars: potentialDisplay?.potentialOverallStars ?? null,
+    potentialOverallStars:
+      potentialDisplay?.potentialOverallStars != null
+        ? clampPotentialOverallToCurrent(
+            currentAxisStars.overall,
+            potentialDisplay.potentialOverallStars,
+          )
+        : null,
     currentOverallStars:
-      starSnapshot?.revealedCurrentStars.overall ?? starSnapshot?.currentStars.overall ?? null,
+      starSnapshot?.revealedCurrentStars.overall ?? currentAxisStars.overall ?? null,
     potentialOverallDelta: potentialDisplay?.potentialOverallDelta ?? null,
     potentialOverallDeltaSourceLabel: potentialDisplay?.potentialOverallDeltaSourceLabel ?? null,
     potentialAxisStatus: potentialDisplay?.potentialAxisStatus ?? [],
@@ -1902,6 +1940,7 @@ export function buildPlayerDrawerDataFromGameState(input: {
         axisRankContext,
       }),
       attributeVisibility,
+      { preserveCoreStats: !rosterEntry && attributeVisibility === "scouted" },
     ),
     disciplineValues:
       attributeVisibility === "scouted"
@@ -2081,7 +2120,11 @@ export function buildPlayerDrawerDataFromLegacyContext(input: {
       mvs: playerRating?.mvs ?? null,
       mvsRank: playerRating?.mvsRank ?? null,
       marketValue: economy.marketValue,
-      marketValueBaselineDelta: calculateMoneyDelta(economy.marketValue, catalogPlayer ? getImportedPlayerDisplayMarketValue(catalogPlayer) : null),
+      marketValueBaselineDelta: getPlayerSeasonZeroMarketValueDelta({
+        player: catalogPlayer,
+        gameState: input.context.gameState,
+        currentMarketValue: economy.marketValue,
+      }),
       transferType: null,
       transferFee: null,
       transferMarketValue: null,
@@ -2128,6 +2171,7 @@ export function buildPlayerDrawerDataFromLegacyContext(input: {
           catalogPlayer.portraitPath ?? null,
         )
       : getPlayerPortraitBrowserUrl(input.playerId, rosterPlayer?.portraitUrl ?? null, null),
+    flavorDe: catalogPlayer ? resolvePlayerFlavorDe(catalogPlayer) : null,
     teamName: input.context.team.name,
     teamCode: input.context.team.shortCode,
     teamHumanControlled: (input.context.team as { humanControlled?: boolean }).humanControlled === false ? false : true,

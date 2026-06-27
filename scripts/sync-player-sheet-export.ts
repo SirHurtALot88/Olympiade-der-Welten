@@ -124,13 +124,11 @@ async function main() {
       continue;
     }
 
-    player.displayMarketValue = parseLocaleNumber(row[headerIndex.get("Marktwert") ?? -1]) ?? player.displayMarketValue ?? 0;
-    player.displaySalary = parseLocaleNumber(row[headerIndex.get("Gehalt") ?? -1]) ?? player.displaySalary ?? 0;
-    player.cost = parseIntCell(row[headerIndex.get("Kosten") ?? -1]) ?? player.cost ?? player.marketValue;
-    player.upkeepBase = parseIntCell(row[headerIndex.get("Unterhalt") ?? -1]) ?? player.upkeepBase ?? player.salaryDemand;
     player.referenceClass = parseNullableString(row[headerIndex.get("Referenz Klasse") ?? -1]);
     player.imageSource = parseNullableString(row[headerIndex.get("Bild") ?? -1]);
     player.bracketLabel = parseNullableString(row[headerIndex.get("Bracket") ?? -1]);
+    // Marktwert/Gehalt/Kosten/Unterhalt kommen aus der offiziellen Economy-Engine beim Katalog-Load,
+    // nicht aus dem Sheet-Export.
     updated += 1;
   }
 

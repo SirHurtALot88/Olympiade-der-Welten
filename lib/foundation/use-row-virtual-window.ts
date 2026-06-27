@@ -7,10 +7,12 @@ export function useRowVirtualWindow(input: {
   scrollTop: number;
   viewportHeight: number;
   rowHeight?: number;
+  virtualizeThreshold?: number;
 }) {
   return useMemo(() => {
     const rowHeight = input.rowHeight ?? 42;
-    if (input.count <= VIRTUALIZE_THRESHOLD) {
+    const virtualizeThreshold = input.virtualizeThreshold ?? VIRTUALIZE_THRESHOLD;
+    if (input.count <= virtualizeThreshold) {
       return {
         start: 0,
         end: input.count,
@@ -30,5 +32,5 @@ export function useRowVirtualWindow(input: {
       totalHeight: input.count * rowHeight,
       enabled: true,
     };
-  }, [input.count, input.rowHeight, input.scrollTop, input.viewportHeight]);
+  }, [input.count, input.rowHeight, input.scrollTop, input.viewportHeight, input.virtualizeThreshold]);
 }

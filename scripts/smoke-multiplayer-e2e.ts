@@ -14,17 +14,19 @@ import type {
   ServerToClientEvents,
 } from "@/types/events";
 import type { OlyRoomState } from "@/types/game";
+import { isRoomArenaReady } from "@/lib/room/arena-sync-state";
 
 type JsonObject = Record<string, any>;
 type OlySocket = Socket<ServerToClientEvents, ClientToServerEvents>;
 
 const DEFAULT_BASE_URL = "http://localhost:3000";
-const OUTPUT_DIR = "/Users/chrisfalk/Documents/Codex/2026-06-11/wir-machen-weiter-mit-dem-olympiade/outputs";
+const OUTPUT_DIR = path.join(process.cwd(), "outputs", "multiplayer-e2e");
 const SCREENSHOTS = {
   chrisHome: "multiplayer-chris-home.png",
   frankyHome: "multiplayer-franky-home.png",
   readyState: "multiplayer-ready-state.png",
   forbiddenAction: "multiplayer-forbidden-action.png",
+  foundationArenaSync: "multiplayer-foundation-arena-sync.png",
   resultSync: "multiplayer-result-sync.png",
 } as const;
 
@@ -200,6 +202,45 @@ async function openRoomPage(page: Page, baseUrl: string, roomCode: string, expec
   await page.goto(`${baseUrl}/room/${roomCode}`, { waitUntil: "networkidle" });
   await page.getByText(`Participant ${expectedName}`).waitFor({ timeout: 20_000 });
   await page.getByText(`Code ${roomCode}`).waitFor({ timeout: 20_000 });
+}
+
+function buildFoundationHref(input: {
+  baseUrl: string;
+  view: string;
+  state: OlyRoomState;
+  participant: JsonObject;
+  seatToken: string;
+  teamId?: string | null;
+}) {
+  const params = new URLSearchParams({
+    view: input.view,
+    team: input.teamId ?? input.participant.controlledTeamIds?.[0] ?? "A-A",
+    roomCode: input.state.roomCode.toUpperCase(),
+    participantId: input.participant.participantId,
+    userId: input.participant.userId,
+    seatToken: input.seatToken,
+    saveId: input.state.multiplayerRoom.saveId,
+  });
+  return `${input.baseUrl}/foundation?${params.toString()}`;
+}
+
+async function openFoundationArenaPage(
+  page: Page,
+  input: {
+    baseUrl: string;
+    state: OlyRoomState;
+    participant: JsonObject;
+    seatToken: string;
+  },
+) {
+  await page.goto(
+    buildFoundationHref({
+      ...input,
+      view: "matchdayArena",
+    }),
+    { waitUntil: "networkidle" },
+  );
+  await page.getByTestId("arena-reveal-timeline").waitFor({ timeout: 90_000 });
 }
 
 async function screenshot(page: Page, name: keyof typeof SCREENSHOTS) {
@@ -423,6 +464,81 @@ async function main() {
       "start-room",
     );
 
+    while (state.roomFlowState.step !== "arena") {
+      if (["standings", "season_review"].includes(state.roomFlowState.step)) {
+        break;
+      }
+      state = await completeStep({
+        hostSocket: socketA,
+        roomCode,
+        chrisSeat: created.seatToken,
+        frankySeat: joined.seatToken,
+        currentState: state,
+      });
+    }
+
+    let foundationArenaSync = {
+      ok: false,
+      reason: "arena_step_not_reached",
+      hostSlotRevealIndex: null as number | null,
+      guestSawHostControlledCopy: false,
+    };
+
+    if (state.roomFlowState.step === "arena") {
+      await openFoundationArenaPage(pageA, {
+        baseUrl: options.baseUrl,
+        state,
+        participant: chris,
+        seatToken: created.seatToken,
+      });
+      await openFoundationArenaPage(pageB, {
+        baseUrl: options.baseUrl,
+        state,
+        participant: franky,
+        seatToken: joined.seatToken,
+      });
+
+      state = await emitAndWait(
+        socketA,
+        "setRoomArenaReady",
+        { roomCode, seatToken: created.seatToken, ready: true },
+        (next) => next.arenaSyncState?.readyParticipantIds.includes(chris.participantId) ?? false,
+        "arena-ready-chris",
+      );
+      state = await emitAndWait(
+        socketA,
+        "setRoomArenaReady",
+        { roomCode, seatToken: joined.seatToken, ready: true },
+        (next) => isRoomArenaReady(next.arenaSyncState),
+        "arena-ready-franky",
+      );
+
+      const beforeReveal = state.arenaSyncState?.revealedSlotCountByDiscipline?.d1 ?? 0;
+      state = await emitAndWait(
+        socketA,
+        "advanceRoomArenaStep",
+        {
+          roomCode,
+          seatToken: created.seatToken,
+          force: true,
+          maxSlotRevealCountByDiscipline: { d1: 3, d2: 3 },
+        },
+        (next) => (next.arenaSyncState?.revealedSlotCountByDiscipline?.d1 ?? 0) > beforeReveal,
+        "foundation-arena-advance",
+      );
+
+      await pageA.getByText(/Slots\s+1\//).waitFor({ timeout: 30_000 });
+      await pageB.getByText(/Slots\s+1\//).waitFor({ timeout: 30_000 });
+      await pageB.getByText("Der Host steuert").waitFor({ timeout: 20_000 });
+      screenshots.foundationArenaSync = await screenshot(pageB, "foundationArenaSync");
+      foundationArenaSync = {
+        ok: true,
+        reason: "host_advance_synced_to_guest",
+        hostSlotRevealIndex: state.arenaSyncState?.slotRevealIndex ?? null,
+        guestSawHostControlledCopy: true,
+      };
+    }
+
     while (state.roomFlowState.step !== "standings") {
       state = await completeStep({
         hostSocket: socketA,
@@ -489,6 +605,7 @@ async function main() {
         phase: state.roomFlowState.phase,
         bothBrowsersSawSameRoom: true,
       },
+      foundationArenaSync,
       writeAudit: {
         generatedWrites,
         unauthorizedWrites: [],

@@ -1,0 +1,20 @@
+{
+  "name": "Lady Arthas",
+  "id": "player-1185-lady-arthas",
+  "className": "Rogue",
+  "race": "Demon",
+  "alignment": "N-B",
+  "gender": "f",
+  "subclasses": ["Isolated", "Fallen Angel"],
+  "traitsPositive": [],
+  "traitsNegative": ["Feisty"],
+  "attributes": {
+    "power": 57, "health": 41, "stamina": 47, "intelligence": 50,
+    "awareness": 66, "determination": 54, "speed": 80, "dexterity": 72,
+    "charisma": 77, "will": 43, "spirit": 33, "torment": 47
+  },
+  "flavorDe": "In Ashkara, der Stadt der sieben Türme, trat Lady Arthas früh aus dem Schatten des Hofes — nicht als Dienerin, sondern als jemand, der sich selbst für zu viel hält, um sich klein zu machen. Ihre Flügel sind längst nicht mehr makellos, ihr Stolz schon lange nicht mehr unschuldig, und genau das macht sie gefährlicher als die meisten reinen Dämoninnen. In den oberen Sälen flüstert man ihren Namen wie einen Schnitt: schön, präzise, unangenehm lange sichtbar. Sie braucht keine Arena, um zu regieren — aber wenn sie einen betritt, verlässt niemand denselben Menschen.",
+  "portraitPath": "/Users/chrisfalk/Library/CloudStorage/Dropbox/Chris/Olympiade der Welten/Mark VI Cardgame/Spieler/Lady Arthas.jpg",
+  "cost": 50,
+  "upkeepBase": 5
+}

@@ -8,6 +8,7 @@ import type {
   TeamIdentity,
   TeamStrategyBias,
   TeamStrategyProfile,
+  TransferHistoryEntry,
 } from "@/lib/data/olyDataTypes";
 
 export const GM_INFLUENCE_PCT = 30;
@@ -695,6 +696,36 @@ export function getBoardReplacementProbability(
   return Math.max(0, Math.min(1, prob));
 }
 
+export function applyTransferBalanceRiskToReplacementProbability(
+  baseProbability: number,
+  input: { sellCount: number; buyCount: number; netTransferCash: number; isHotSeat: boolean },
+) {
+  const atRisk =
+    input.isHotSeat &&
+    input.sellCount >= 2 &&
+    input.buyCount === 0 &&
+    input.netTransferCash > 0;
+
+  if (!atRisk) {
+    return baseProbability;
+  }
+
+  return Math.max(baseProbability, Math.min(1, baseProbability + 0.2));
+}
+
+function getTeamSeasonTransferStats(transferHistory: TransferHistoryEntry[] | null | undefined, seasonId: string, teamId: string) {
+  const transfers = (transferHistory ?? []).filter((entry) => entry.seasonId === seasonId);
+  const buys = transfers.filter((entry) => entry.transferType === "buy" && entry.toTeamId === teamId);
+  const sells = transfers.filter((entry) => entry.transferType === "sell" && entry.fromTeamId === teamId);
+  const buyFees = buys.reduce((sum, entry) => sum + (entry.fee ?? 0), 0);
+  const sellProceeds = sells.reduce((sum, entry) => sum + (entry.fee ?? 0), 0);
+  return {
+    buyCount: buys.length,
+    sellCount: sells.length,
+    netTransferCash: sellProceeds - buyFees,
+  };
+}
+
 function pickBestUnusedGeneralManager(input: {
   team: Team;
   teamIndex: number;
@@ -770,6 +801,7 @@ export function buildTeamGeneralManagerAssignments(
   existing?: Record<string, TeamGeneralManagerAssignment> | null,
   teamIdentities?: TeamIdentity[] | null,
   boardConfidenceByTeamId?: Record<string, TeamBoardConfidenceRecord> | null,
+  transferHistory?: TransferHistoryEntry[] | null,
 ) {
   const identityByTeamId = new Map((teamIdentities ?? []).map((identity) => [identity.teamId, identity] as const));
   const usedGmIds = new Set<string>();
@@ -780,9 +812,17 @@ export function buildTeamGeneralManagerAssignments(
     const currentProfile = getTeamGeneralManagerProfile(current?.gmId);
     const identity = identityByTeamId.get(team.teamId) ?? null;
     const shouldEvaluateReplacement = Boolean(current?.assignedSeasonId && current.assignedSeasonId !== seasonId);
-    const boardReplacementProbability = shouldEvaluateReplacement
+    let boardReplacementProbability = shouldEvaluateReplacement
       ? getBoardReplacementProbability(boardConfidenceByTeamId?.[team.teamId], identity)
       : 0;
+    if (transferHistory && shouldEvaluateReplacement) {
+      const statsSeasonId = current?.assignedSeasonId ?? seasonId;
+      const stats = getTeamSeasonTransferStats(transferHistory, statsSeasonId, team.teamId);
+      boardReplacementProbability = applyTransferBalanceRiskToReplacementProbability(boardReplacementProbability, {
+        ...stats,
+        isHotSeat: boardReplacementProbability >= 0.55,
+      });
+    }
     const hotSeatRoll = (hashString(`${seasonId}:${team.teamId}:gm-hotseat-v2`) % 1000) / 1000;
     const isFired = boardReplacementProbability > 0 && hotSeatRoll < boardReplacementProbability && !team.humanControlled;
     if (!current || !currentProfile || usedGmIds.has(currentProfile.gmId)) {
@@ -812,9 +852,17 @@ export function buildTeamGeneralManagerAssignments(
     const currentProfile = getTeamGeneralManagerProfile(current?.gmId);
     const identity = identityByTeamId.get(team.teamId) ?? null;
     const shouldEvaluateReplacement = Boolean(current?.assignedSeasonId && current.assignedSeasonId !== seasonId);
-    const boardReplacementProbability = shouldEvaluateReplacement
+    let boardReplacementProbability = shouldEvaluateReplacement
       ? getBoardReplacementProbability(boardConfidenceByTeamId?.[team.teamId], identity)
       : 0;
+    if (transferHistory && shouldEvaluateReplacement) {
+      const statsSeasonId = current?.assignedSeasonId ?? seasonId;
+      const stats = getTeamSeasonTransferStats(transferHistory, statsSeasonId, team.teamId);
+      boardReplacementProbability = applyTransferBalanceRiskToReplacementProbability(boardReplacementProbability, {
+        ...stats,
+        isHotSeat: boardReplacementProbability >= 0.55,
+      });
+    }
     const hotSeatRoll = (hashString(`${seasonId}:${team.teamId}:gm-hotseat-v2`) % 1000) / 1000;
     const isFired = boardReplacementProbability > 0 && hotSeatRoll < boardReplacementProbability && !team.humanControlled;
     // Determine dismissal reason only if the team is actually being replaced
@@ -926,6 +974,7 @@ export function withNormalizedTeamGeneralManagers(gameState: GameState): GameSta
     gameState.seasonState.teamGeneralManagers,
     gameState.teamIdentities,
     gameState.seasonState.boardConfidence,
+    gameState.transferHistory,
   );
 
   return {

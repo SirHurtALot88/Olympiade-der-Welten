@@ -334,7 +334,14 @@ function formatNumber(value: number | null | undefined, digits = 1) {
 
 function formatMoney(value: number | null | undefined, digits = 1) {
   if (value == null || !Number.isFinite(value)) return "—";
-  return formatNumber(value, digits);
+  return new Intl.NumberFormat("de-DE", {
+    minimumFractionDigits: digits,
+    maximumFractionDigits: digits,
+  }).format(value);
+}
+
+function formatCash(value: number | null | undefined, digits = 1) {
+  return formatMoney(value, digits);
 }
 
 function formatGmTitle(title: string | null | undefined, archetype?: string | null) {
@@ -350,10 +357,6 @@ function formatGmTitle(title: string | null | undefined, archetype?: string | nu
 
 function formatGmLabel(row: SeasonV2StandingsRow) {
   return `${formatGmTitle(row.gmTitle, row.gmArchetype)} · ${row.rosterCount} Spieler`;
-}
-
-function formatCash(value: number | null | undefined, digits = 1) {
-  return formatNumber(value, digits);
 }
 
 function formatSigned(value: number | null | undefined, digits = 1) {
@@ -598,7 +601,7 @@ export default function SeasonStandingsV2Client({
     men: false,
     soc: false,
   });
-  const [showFullStandingsTable, setShowFullStandingsTable] = useState(false);
+  const [showFullStandingsTable, setShowFullStandingsTable] = useState(true);
   const [standingsSort, setStandingsSort] = useState<{ key: SeasonV2StandingsSortKey; direction: SortDirection }>({
     key: "rank",
     direction: "asc",
@@ -762,6 +765,7 @@ export default function SeasonStandingsV2Client({
     scrollTop: standingsTableScrollTop,
     viewportHeight: standingsTableViewportHeight,
     rowHeight: 44,
+    virtualizeThreshold: 48,
   });
   const visibleStandingsTableRows = useMemo(
     () => displayStandingsRows.slice(standingsTableVirtualWindow.start, standingsTableVirtualWindow.end),
@@ -1026,23 +1030,21 @@ export default function SeasonStandingsV2Client({
 
   return (
     <div className="season-v2-shell">
-      <section className="season-v2-hero">
-        <div className="season-v2-hero-copy">
-          <span className="season-v2-kicker">Saisonstand v2</span>
-          <h2>{selectedSeasonLabel}</h2>
-          <p>{sourceLabel}</p>
-          <div className="season-v2-pill-row">
+      <section className="season-v2-compact-toolbar" aria-label="Saisonstand Steuerung">
+        <div className="season-v2-compact-toolbar-main">
+          <div className="season-v2-compact-title">
+            <h2>{selectedSeasonLabel}</h2>
+            <span className="muted">{sourceLabel}</span>
+          </div>
+          <div className="season-v2-pill-row season-v2-compact-pills">
             <span className="pill">{sourceBadgeLabel}</span>
             <span className={`pill ${isArchived ? "is-warning" : "is-ready"}`}>{isArchived ? "Archiv" : "Live"}</span>
             {selectedTeamSummary?.rank != null ? <span className="pill">Dein Rang #{selectedTeamSummary.rank}</span> : null}
-            {pastSeasonOptions.length > 0 ? (
-              <span className="pill">{pastSeasonOptions.length} vergangene Saison{pastSeasonOptions.length === 1 ? "" : "en"}</span>
-            ) : null}
           </div>
         </div>
-        <div className="season-v2-hero-actions">
+        <div className="season-v2-compact-toolbar-actions">
           <label className="filter-field season-v2-season-select">
-            <span>Saison wählen</span>
+            <span>Saison</span>
             <select className="input" value={selectedSeasonId} onChange={(event) => onChangeSeason(event.target.value)}>
               {seasonOptions.map((option) => (
                 <option key={option.seasonId} value={option.seasonId}>
@@ -1052,34 +1054,30 @@ export default function SeasonStandingsV2Client({
             </select>
           </label>
           {!onViewModeChange ? (
-          <div className="season-v2-action-row season-v2-mode-switch" role="tablist" aria-label="Saisonstand Modus">
-            <button
-              className={`secondary-button inline-button${seasonV2Mode === "table" ? " is-active" : ""}`}
-              type="button"
-              onClick={() => setSeasonV2Mode("table")}
-              aria-pressed={seasonV2Mode === "table"}
-            >
-              Datenansicht
-            </button>
-            <button
-              className={`secondary-button inline-button${seasonV2Mode === "gms" ? " is-active" : ""}`}
-              type="button"
-              onClick={() => setSeasonV2Mode("gms")}
-              aria-pressed={seasonV2Mode === "gms"}
-            >
-              GM Board
-            </button>
-          </div>
+            <div className="season-v2-action-row season-v2-mode-switch" role="tablist" aria-label="Saisonstand Modus">
+              <button
+                className={`secondary-button inline-button${seasonV2Mode === "table" ? " is-active" : ""}`}
+                type="button"
+                onClick={() => setSeasonV2Mode("table")}
+                aria-pressed={seasonV2Mode === "table"}
+              >
+                Datenansicht
+              </button>
+              <button
+                className={`secondary-button inline-button${seasonV2Mode === "gms" ? " is-active" : ""}`}
+                type="button"
+                onClick={() => setSeasonV2Mode("gms")}
+                aria-pressed={seasonV2Mode === "gms"}
+              >
+                GM Board
+              </button>
+            </div>
           ) : null}
         </div>
       </section>
 
       {pastSeasonOptions.length > 0 ? (
         <section className="season-v2-history-strip" aria-label="Vergangene Saisons">
-          <div className="season-v2-history-copy">
-            <strong>Vergangene Saisons</strong>
-            <span className="muted">Finalstand, Top-Spieler und GM-Board aus dem Save-Archiv.</span>
-          </div>
           <div className="season-v2-history-chips">
             {pastSeasonOptions.map((option) => (
               <button
@@ -1106,75 +1104,6 @@ export default function SeasonStandingsV2Client({
               Aktuelle Saison
             </button>
           </div>
-        </section>
-      ) : (
-        <section className="season-v2-history-strip season-v2-history-strip-empty" aria-label="Saison-Archiv">
-          <div className="season-v2-history-copy">
-            <strong>Noch kein Saison-Archiv</strong>
-            <span className="muted">Abgeschlossene Saisons erscheinen hier automatisch nach dem Season-Ende.</span>
-          </div>
-        </section>
-      )}
-
-      <section className="season-v2-story-grid" aria-label="Saison-Fokus">
-        {renderSummaryCard(
-          "Titelkurs",
-          leaderTeam ? leaderTeam.teamName : "—",
-          leaderTeam ? `#${leaderTeam.rank ?? "—"} · ${formatNumber(leaderTeam.points, 1)} Punkte` : "kein Leader",
-          "leader",
-        )}
-        {renderSummaryCard(
-          "Dein Team",
-          selectedTeamSummary ? selectedTeamSummary.teamName : "—",
-          selectedTeamSummary
-            ? `#${selectedTeamSummary.rank ?? "—"} · ${formatNumber(selectedTeamSummary.points, 1)} Punkte · Cash ${formatCash(selectedTeamSummary.cash)}`
-            : "kein Team gewählt",
-          "selected",
-        )}
-        {renderSummaryCard(
-          "Momentum",
-          momentumTeam ? momentumTeam.teamName : "—",
-          momentumTeam ? `${formatSigned(momentumTeam.rankDiff, 0)} Plätze · ${formatNumber(momentumTeam.points, 1)} Punkte` : "kein Aufsteiger",
-          "momentum",
-        )}
-        {renderSummaryCard(
-          "Top Player",
-          topPlayer ? topPlayer.name : "—",
-          topPlayer
-            ? `${topPlayer.teamCode ?? topPlayer.teamName ?? "—"} · ${formatNumber(topPlayer.pps, 1)} PPs · OVR ${formatNumber(topPlayer.ovr, 0)}`
-            : "kein Spieler",
-          "player",
-        )}
-      </section>
-
-      {selectedTeamSummary && showFinanceColumns ? (
-        <section className="season-v2-team-strip">
-          <article>
-            <span>Cash</span>
-            <strong>{formatCash(selectedTeamSummary.cash)}</strong>
-          </article>
-          <article>
-            <span>Gehalt</span>
-            <strong>{formatCash(selectedTeamSummary.salaryTotal, 2)}</strong>
-          </article>
-          <article>
-            <span>Ø LZ</span>
-            <strong>{formatNumber(standingsRows.find((row) => row.teamId === selectedTeamSummary.teamId)?.avgContractLength, 1)}</strong>
-          </article>
-          <article>
-            <span>GuV</span>
-            <strong className={selectedTeamSummary.guv != null && selectedTeamSummary.guv < 0 ? "text-negative" : "text-positive"}>
-              {formatMoney(selectedTeamSummary.guv)}
-            </strong>
-          </article>
-          <article>
-            <span>Sponsor</span>
-            <strong>{formatMoney(selectedTeamSummary.sponsorTotal)}</strong>
-          </article>
-          <article>
-            <span>MW</span>
-            <strong>{formatMoney(selectedTeamSummary.marketValueTotal)}</strong>
-          </article>
         </section>
       ) : null}
 
@@ -1306,6 +1235,10 @@ export default function SeasonStandingsV2Client({
                   <button className="secondary-button inline-button" type="button" onClick={() => setShowFullStandingsTable(true)}>
                     Alle {sortedStandingsRows.length} Teams
                   </button>
+                ) : showFullStandingsTable && sortedStandingsRows.length > 6 ? (
+                  <button className="secondary-button inline-button" type="button" onClick={() => setShowFullStandingsTable(false)}>
+                    Top 5
+                  </button>
                 ) : null}
                 <button
                   className={`secondary-button inline-button${standingsSort.key === "points" ? " is-active" : ""}`}
@@ -1318,7 +1251,7 @@ export default function SeasonStandingsV2Client({
             </div>
           </div>
           <div
-            className="table-shell season-v2-table-shell"
+            className="table-shell season-v2-table-shell season-v2-table-shell-full"
             ref={standingsTableShellRef}
             data-virtualized={standingsTableVirtualWindow.enabled ? "true" : undefined}
             onScroll={(event) => setStandingsTableScrollTop(event.currentTarget.scrollTop)}
@@ -1635,6 +1568,39 @@ export default function SeasonStandingsV2Client({
             </table>
           </div>
         </section>
+      </section>
+      ) : null}
+
+      {seasonV2Mode === "table" ? (
+      <section className="season-v2-story-grid season-v2-story-grid-compact" aria-label="Saison-Fokus">
+        {renderSummaryCard(
+          "Titelkurs",
+          leaderTeam ? leaderTeam.teamName : "—",
+          leaderTeam ? `#${leaderTeam.rank ?? "—"} · ${formatNumber(leaderTeam.points, 1)} Punkte` : "kein Leader",
+          "leader",
+        )}
+        {renderSummaryCard(
+          "Dein Team",
+          selectedTeamSummary ? selectedTeamSummary.teamName : "—",
+          selectedTeamSummary
+            ? `#${selectedTeamSummary.rank ?? "—"} · ${formatNumber(selectedTeamSummary.points, 1)} Punkte · Cash ${formatCash(selectedTeamSummary.cash)}`
+            : "kein Team gewählt",
+          "selected",
+        )}
+        {renderSummaryCard(
+          "Momentum",
+          momentumTeam ? momentumTeam.teamName : "—",
+          momentumTeam ? `${formatSigned(momentumTeam.rankDiff, 0)} Plätze · ${formatNumber(momentumTeam.points, 1)} Punkte` : "kein Aufsteiger",
+          "momentum",
+        )}
+        {renderSummaryCard(
+          "Top Player",
+          topPlayer ? topPlayer.name : "—",
+          topPlayer
+            ? `${topPlayer.teamCode ?? topPlayer.teamName ?? "—"} · ${formatNumber(topPlayer.pps, 1)} PPs · OVR ${formatNumber(topPlayer.ovr, 0)}`
+            : "kein Spieler",
+          "player",
+        )}
       </section>
       ) : null}
 

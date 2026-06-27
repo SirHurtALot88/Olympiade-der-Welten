@@ -422,7 +422,7 @@ a {
 }
 
 .foundation-shell {
-  width: min(1360px, calc(100vw - 32px));
+  width: min(1760px, calc(100vw - 24px));
   --foundation-bg: #1f1f1f;
   --foundation-surface: #2b2b2b;
   --foundation-surface-2: #343434;
@@ -459,7 +459,7 @@ a {
 }
 
 .foundation-shell.app-shell {
-  width: min(1600px, calc(100vw - 32px));
+  width: min(1880px, calc(100vw - 24px));
 }
 
 .foundation-loading-shell {
@@ -683,15 +683,29 @@ a {
   margin: 0;
 }
 
-.player-drawer-ca-po-stack {
-  display: grid;
-  gap: 6px;
-}
-
 .player-drawer-ca-po-row {
   display: flex;
-  align-items: center;
-  gap: 8px;
+  flex-wrap: wrap;
+  align-items: stretch;
+  gap: 8px 12px;
+}
+
+.player-drawer-ca-po-metric {
+  display: grid;
+  gap: 2px;
+  min-width: 72px;
+  padding: 6px 8px;
+  border-radius: 10px;
+  background: rgba(255, 255, 255, 0.04);
+  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.06);
+}
+
+.player-drawer-ca-po-metric small {
+  font-size: 0.68rem;
+  font-weight: 850;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: rgba(255, 255, 255, 0.58);
 }
 
 .player-drawer-ca-po-label {
@@ -718,6 +732,246 @@ a {
   background: rgba(255, 255, 255, 0.04);
   color: rgba(241, 245, 255, 0.78);
   font-size: 0.74rem;
+}
+
+.player-drawer-header-scout-compact {
+  display: contents;
+}
+
+.player-drawer-header-metrics-band {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 5px 6px;
+  margin-top: 6px;
+}
+
+.player-drawer-header-metric {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  min-height: 26px;
+  padding: 0 9px;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.05);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  color: rgba(241, 245, 255, 0.82);
+  font-size: 0.76rem;
+  white-space: nowrap;
+}
+
+.player-drawer-header-metric small {
+  color: rgba(163, 194, 255, 0.72);
+  font-size: 0.62rem;
+  font-weight: 850;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+
+.player-drawer-header-metric strong {
+  color: #f7fbff;
+  font-size: 0.8rem;
+  font-weight: 700;
+}
+
+.player-drawer-header-metric em {
+  font-style: normal;
+  font-size: 0.72rem;
+  opacity: 0.88;
+}
+
+.player-drawer-header-metric.is-warning {
+  border-color: rgba(235, 181, 76, 0.42);
+  background: rgba(235, 181, 76, 0.1);
+}
+
+.player-drawer-header-metric.is-negative {
+  border-color: rgba(211, 83, 72, 0.42);
+  background: rgba(211, 83, 72, 0.12);
+}
+
+.player-drawer-header-metrics-band .player-drawer-ca-po-row {
+  display: contents;
+}
+
+.player-drawer-header-metrics-band .player-drawer-ca-po-metric {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  min-height: 26px;
+  padding: 0 9px;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.05);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  min-width: 0;
+}
+
+.player-drawer-header-metrics-band .player-drawer-ca-po-metric small {
+  font-size: 0.62rem;
+}
+
+.player-drawer-header-metrics-band .player-drawer-star-rating {
+  font-size: 0.72rem;
+}
+
+.player-drawer-header-metrics-band .player-drawer-star-text.is-compact {
+  font-size: 0.72rem;
+  max-width: 9rem;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.player-drawer-flavor-de {
+  margin: 8px 0 0;
+  padding: 8px 10px;
+  border-left: 2px solid rgba(139, 171, 230, 0.42);
+  color: rgba(219, 229, 252, 0.82);
+  font-size: 0.78rem;
+  line-height: 1.42;
+  font-style: italic;
+}
+
+.player-drawer-transfer-hero-grid {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+.player-drawer-transfer-hero-grid.is-single {
+  grid-template-columns: minmax(0, 1fr);
+}
+
+.player-drawer-transfer-hero-grid .player-drawer-transfer-note {
+  min-height: auto;
+  height: 100%;
+}
+
+.player-drawer-axis-strip.is-transfer-inline {
+  margin-top: 0;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 6px;
+  align-content: stretch;
+}
+
+.player-drawer-axis-strip.is-transfer-inline.is-compact .player-drawer-axis-chip {
+  min-height: 36px;
+  padding: 4px 6px 4px 0;
+  gap: 0;
+  border-radius: 10px;
+  display: flex;
+  align-items: center;
+  overflow: hidden;
+}
+
+.player-drawer-axis-chip-accent {
+  flex: 0 0 4px;
+  align-self: stretch;
+  border-radius: 10px 0 0 10px;
+  background: rgba(255, 255, 255, 0.28);
+}
+
+.player-drawer-axis-chip.is-power .player-drawer-axis-chip-accent {
+  background: rgba(220, 112, 112, 0.92);
+}
+
+.player-drawer-axis-chip.is-speed .player-drawer-axis-chip-accent {
+  background: rgba(126, 211, 141, 0.92);
+}
+
+.player-drawer-axis-chip.is-mental .player-drawer-axis-chip-accent {
+  background: rgba(124, 165, 236, 0.92);
+}
+
+.player-drawer-axis-chip.is-social .player-drawer-axis-chip-accent {
+  background: rgba(229, 178, 93, 0.92);
+}
+
+.player-drawer-axis-chip-hint {
+  flex: 0 0 auto;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 14px;
+  height: 14px;
+  margin: 0 2px 0 4px;
+  border-radius: 999px;
+  border: 1px solid rgba(255, 255, 255, 0.18);
+  background: rgba(4, 8, 15, 0.42);
+  color: rgba(226, 235, 249, 0.72);
+  font-size: 0.58rem;
+  font-weight: 900;
+  font-style: italic;
+  line-height: 1;
+  cursor: help;
+}
+
+.player-drawer-axis-chip-inline {
+  display: flex;
+  flex: 1 1 auto;
+  align-items: center;
+  justify-content: space-between;
+  gap: 6px;
+  min-width: 0;
+  padding-right: 6px;
+}
+
+.player-drawer-axis-chip-metric {
+  display: inline-flex;
+  align-items: baseline;
+  gap: 4px;
+  min-width: 0;
+}
+
+.player-drawer-axis-chip-metric.is-pp {
+  justify-content: flex-end;
+}
+
+.player-drawer-axis-chip-metric small {
+  color: rgba(226, 235, 249, 0.62);
+  font-size: 0.58rem;
+  font-weight: 800;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+.player-drawer-axis-strip.is-compact .player-drawer-axis-chip strong {
+  font-size: 0.82rem;
+  line-height: 1;
+}
+
+.player-drawer-axis-strip.is-compact .player-drawer-axis-chip-metric em {
+  min-height: 16px;
+  padding: 0 5px;
+  border-radius: 999px;
+  color: rgba(244, 248, 255, 0.88);
+  background: rgba(4, 8, 15, 0.46);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  font-size: 0.6rem;
+  font-style: normal;
+  font-weight: 800;
+  line-height: 16px;
+}
+
+.player-drawer-hero-surface .player-drawer-list-grid-wide {
+  margin-top: 8px;
+}
+
+.player-drawer-hero-surface .player-drawer-list-grid-wide .metric-card {
+  padding: 8px 10px;
+  gap: 4px;
+  min-height: 52px;
+}
+
+.player-drawer-hero-surface .player-drawer-list-grid-wide .metric-card strong {
+  display: inline-flex;
+  align-items: baseline;
+  gap: 6px;
+  font-size: 0.92rem;
+}
+
+.player-drawer-metric-rank {
+  color: rgba(214, 223, 241, 0.72);
+  font-size: 0.72rem;
+  font-style: normal;
+  font-weight: 700;
 }
 
 .player-drawer-page .player-drawer-top-grid {
@@ -12092,22 +12346,24 @@ a {
 }
 
 .player-drawer-transfer-note {
-  min-height: 160px;
+  min-height: 72px;
   display: grid;
   align-content: center;
-  gap: 8px;
-  padding: 20px;
+  gap: 4px;
+  padding: 10px 14px;
   border: 1px solid rgba(118, 155, 224, 0.28);
-  border-radius: 22px;
+  border-radius: 14px;
   color: rgba(219, 229, 252, 0.78);
   background:
     radial-gradient(circle at 18% 16%, rgba(105, 148, 225, 0.28), transparent 34%),
     rgba(19, 25, 38, 0.62);
+  font-size: 0.78rem;
+  line-height: 1.3;
 }
 
 .player-drawer-transfer-note strong {
   color: rgba(245, 248, 255, 0.95);
-  font-size: 1.04rem;
+  font-size: 0.88rem;
 }
 
 .player-drawer-board-trust-card {
@@ -18939,6 +19195,7 @@ a {
   }
 
   .player-drawer-top-grid,
+  .player-drawer-transfer-hero-grid,
   .player-drawer-kpi-grid,
   .player-drawer-metric-grid,
   .player-drawer-attribute-grid,
@@ -18972,7 +19229,15 @@ a {
   .player-drawer-history-card-grid,
   .player-drawer-list-grid-wide,
   .player-drawer-discipline-grid-rich,
-  .player-drawer-axis-strip,
+  .player-drawer-transfer-hero-grid,
+  .player-drawer-axis-strip.is-transfer-inline {
+    grid-template-columns: 1fr 1fr;
+  }
+
+  .player-drawer-axis-strip.is-transfer-inline.is-compact {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
   .player-drawer-kpi-grid {
     grid-template-columns: 1fr;
   }
@@ -30817,7 +31082,69 @@ a {
 
 .season-v2-shell {
   display: grid;
-  gap: 18px;
+  gap: 12px;
+}
+
+.season-v2-compact-toolbar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px 18px;
+  padding: 12px 16px;
+  border: 1px solid rgba(118, 146, 202, 0.18);
+  border-radius: 16px;
+  background: linear-gradient(180deg, rgba(16, 23, 39, 0.94), rgba(12, 18, 31, 0.9));
+}
+
+.season-v2-compact-toolbar-main {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 12px 16px;
+  min-width: 0;
+}
+
+.season-v2-compact-title {
+  display: grid;
+  gap: 2px;
+}
+
+.season-v2-compact-title h2 {
+  margin: 0;
+  font-size: 1.35rem;
+  line-height: 1.05;
+}
+
+.season-v2-compact-title .muted {
+  font-size: 0.82rem;
+}
+
+.season-v2-compact-pills {
+  margin-top: 0;
+}
+
+.season-v2-compact-toolbar-actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: end;
+  gap: 10px;
+}
+
+.season-v2-story-grid-compact {
+  gap: 10px;
+}
+
+.season-v2-story-grid-compact .season-v2-story-card {
+  padding: 10px 12px;
+}
+
+.season-v2-story-grid-compact .season-v2-story-card strong {
+  font-size: 0.98rem;
+}
+
+.season-v2-story-grid-compact .season-v2-story-card small {
+  font-size: 0.76rem;
 }
 
 .season-v2-hero,
@@ -30878,11 +31205,11 @@ a {
   display: flex;
   flex-wrap: wrap;
   align-items: center;
-  justify-content: space-between;
-  gap: 14px;
-  padding: 14px 16px;
+  justify-content: flex-start;
+  gap: 10px;
+  padding: 8px 12px;
   border: 1px solid rgba(118, 146, 202, 0.16);
-  border-radius: 18px;
+  border-radius: 14px;
   background: rgba(10, 16, 28, 0.72);
 }
 
@@ -30988,8 +31315,8 @@ a {
 
 .season-v2-main-grid {
   display: grid;
-  grid-template-columns: minmax(720px, 1.12fr) minmax(520px, 0.98fr);
-  gap: 18px;
+  grid-template-columns: minmax(0, 1.35fr) minmax(420px, 0.85fr);
+  gap: 14px;
   align-items: start;
 }
 
@@ -31250,6 +31577,11 @@ a {
 .season-v2-side-table-shell {
   overflow: auto;
   max-height: 62vh;
+}
+
+.season-v2-table-shell-full {
+  max-height: none;
+  overflow: visible;
 }
 
 .season-v2-table {

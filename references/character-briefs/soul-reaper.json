@@ -1,0 +1,20 @@
+{
+  "name": "Soul Reaper",
+  "id": "player-1354-soul-reaper",
+  "className": "Templar",
+  "race": "Divine",
+  "alignment": "R-B",
+  "gender": "n",
+  "subclasses": ["God", "Prime Evil", "Undead"],
+  "traitsPositive": ["FanFavorite", "Cool", "Flexible"],
+  "traitsNegative": ["ColdBlooded", "Timid", "Obsessive"],
+  "attributes": {
+    "power": 71, "health": 49, "stamina": 74, "intelligence": 67,
+    "awareness": 62, "determination": 78, "speed": 54, "dexterity": 59,
+    "charisma": 92, "will": 99, "spirit": 51, "torment": 99
+  },
+  "flavorDe": "Soul Reaper ist das Prime Evil der Olympiade — nicht ein weiterer Feind auf der Liste, sondern der Tod selbst, wenn er Kapuze trägt und eine Sense hält. In verfallenen Kathedralen und an jeder Schwelle, wo Helden noch glauben, Zeit zu haben, erscheint er mit knochiger Hand und der Geste eines Mannes, der nichts mehr erklären muss. Er ist nicht böse im Sinne von Hass oder Gier. Er ist emotionslos, unbestechlich, so selbstverständlich wie Atem und Ende — und gerade deshalb so schwer zu ertragen. Manche beten, manche fliehen, manche verhandeln. Soul Reaper hört zu, wenn er will. Doch man entkommt ihm nicht. Irgendwann bleibt nur noch der Moment, in dem der Name auf der Liste kein Vorschlag mehr ist.",
+  "portraitPath": "/Users/chrisfalk/Library/CloudStorage/Dropbox/Chris/Olympiade der Welten/Mark VI Cardgame/Spieler/Soul Reaper.jpg",
+  "cost": 100,
+  "upkeepBase": 10
+}

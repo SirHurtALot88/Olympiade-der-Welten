@@ -1,0 +1,20 @@
+{
+  "name": "Lili",
+  "id": "player-1046-lili",
+  "className": "Mage",
+  "race": "Human",
+  "alignment": "N-B",
+  "gender": "f",
+  "subclasses": ["Mage", "Pirate", "Rebel"],
+  "traitsPositive": ["FanFavorite", "Sexy", "FiredUp"],
+  "traitsNegative": ["Diva", "FaintHearted", "Obsessive"],
+  "attributes": {
+    "power": 6, "health": 14, "stamina": 50, "intelligence": 69,
+    "awareness": 59, "determination": 83, "speed": 49, "dexterity": 41,
+    "charisma": 66, "will": 72, "spirit": 24, "torment": 70
+  },
+  "flavorDe": "Auf der Nebelroute erkennt man Lili an ihrem grün leuchtenden Zauberstab, dem Dreispitz und dem Blick, mit dem sie sogar erfahrene Piraten nervös macht. Einst war sie nur die Magierin an Bord, die Zauber wirken sollte und dafür zu wenig Respekt bekam — bis sie merkte, dass Rebellion besser bezahlt wird als Gehorsam. Heute mischt sie Meeresbruch und Arkana so selbstverständlich, als gehörten beides zur selben Sprache, und besteht auf ihren Platz vorne im Rampenlicht, auch wenn das Deck noch brennt. Diva, Piratin, Gefahr — je nachdem, wen man fragt.",
+  "portraitPath": "/Users/chrisfalk/Library/CloudStorage/Dropbox/Chris/Olympiade der Welten/Mark VI Cardgame/Spieler/Lili.jpg",
+  "cost": 40,
+  "upkeepBase": 4
+}

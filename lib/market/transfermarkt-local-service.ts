@@ -21,6 +21,13 @@ import {
   RECENTLY_SOLD_SAME_PRESEASON_OVERRIDE_WARNING,
 } from "@/lib/market/anti-rebuy-guard";
 import { buildTransfermarktSaleFactorBreakdown, normalizeVisibleRosterMoney } from "@/lib/market/transfermarkt-sale-factor";
+import { buildTransfermarktSellCoachingView } from "@/lib/market/transfermarkt-sell-coaching-service";
+import { applySellBoardReactionToGameState } from "@/lib/market/transfermarkt-sell-board-reaction";
+import { applySellPricingPolicyToBreakdown } from "@/lib/market/transfermarkt-sell-pricing-policy";
+import {
+  isPlayerTransferBuyBlocked,
+  SOLD_PLAYER_SEASON_COOLDOWN_BLOCKER,
+} from "@/lib/market/transfer-sold-cooldown";
 import { isTransferSellPhaseOpen, LOCAL_TRANSFER_WINDOW_PHASE } from "@/lib/market/transfer-window-policy";
 import { buildTransfermarktPoolAudit } from "@/lib/market/transfermarkt-pool-audit";
 import { buildTransfermarktDoubleLoadWarnings } from "@/lib/market/transfermarkt-double-load";
@@ -969,6 +976,14 @@ function resolveLocalTransfermarktBuyContext(params: TransfermarktBuyParams): Lo
   if (!team) blockingReasons.push("team_not_found");
   if (!player) blockingReasons.push("player_not_found");
   if (playerAlreadyOwned) blockingReasons.push("player_not_free_agent_in_scope");
+  if (
+    isPlayerTransferBuyBlocked({
+      gameState,
+      playerId: params.playerId,
+    })
+  ) {
+    blockingReasons.push(SOLD_PLAYER_SEASON_COOLDOWN_BLOCKER);
+  }
   if (purchasePrice == null || purchasePrice <= 0) blockingReasons.push("market_value_missing");
   if (salary == null || salary <= 0) blockingReasons.push("salary_demand_missing");
   if (team && rosterBefore >= getTeamPlayerMax(team, teamIdentity)) blockingReasons.push("roster_limit_reached");
@@ -1099,6 +1114,13 @@ export function listLocalTransfermarktFreeAgents(input: TransfermarktReadParams 
     const playerPotentialById = new Map((gameState.playerPotential ?? []).map((entry) => [entry.playerId, entry] as const));
     baseItems = gameState.players
       .filter((player) => !rosterPlayerIds.has(player.id))
+      .filter(
+        (player) =>
+          !isPlayerTransferBuyBlocked({
+            gameState,
+            playerId: player.id,
+          }),
+      )
       .map<TransfermarktFreeAgentItem>((player) => {
         const marketValue = getPlayerMarketValue(player);
         const salary = getPlayerSalary(player);
@@ -1664,6 +1686,14 @@ function executeFastLocalTransfermarktBatchBuy(params: TransfermarktBuyParams, r
   if (!team) blockingReasons.push("team_not_found");
   if (!player) blockingReasons.push("player_not_found");
   if (playerAlreadyOwned) blockingReasons.push("player_not_free_agent_in_scope");
+  if (
+    isPlayerTransferBuyBlocked({
+      gameState,
+      playerId: params.playerId,
+    })
+  ) {
+    blockingReasons.push(SOLD_PLAYER_SEASON_COOLDOWN_BLOCKER);
+  }
   if (purchasePrice == null || purchasePrice <= 0) blockingReasons.push("market_value_missing");
   if (salary == null || salary <= 0) blockingReasons.push("salary_demand_missing");
   if (team && rosterEntries.length >= getTeamPlayerMax(team, teamIdentity)) blockingReasons.push("roster_limit_reached");
@@ -2107,7 +2137,18 @@ export function previewLocalTransfermarktSell(params: TransfermarktSellParams): 
   const cashBefore = teamContext?.cash ?? null;
   const salePlayer = activePlayer ? playersById.get(activePlayer.playerId) ?? null : null;
   const saleEconomy = resolvePlayerEconomyContract({ player: salePlayer, rosterEntry: activePlayer });
-  const saleFactorBreakdown = buildTransfermarktSaleFactorBreakdown(gameState, salePlayer, activePlayer);
+  const saleFactorBreakdownBase = buildTransfermarktSaleFactorBreakdown(gameState, salePlayer, activePlayer);
+  const rosterBefore = teamContext?.rosterCount ?? 0;
+  const rosterAfterPreview = Math.max(0, rosterBefore - 1);
+  const priced = applySellPricingPolicyToBreakdown({
+    gameState,
+    teamId: params.teamId,
+    player: salePlayer,
+    rosterEntry: activePlayer,
+    baseBreakdown: saleFactorBreakdownBase,
+    rosterAfter: rosterAfterPreview,
+  });
+  const saleFactorBreakdown = priced.breakdown;
   const salePrice = saleFactorBreakdown.salePrice ?? saleEconomy.marketValue;
   const marketValueReference = saleFactorBreakdown.baseMarketValue ?? saleEconomy.marketValue ?? null;
   const saleFactor = saleFactorBreakdown.saleFactor;
@@ -2121,8 +2162,8 @@ export function previewLocalTransfermarktSell(params: TransfermarktSellParams): 
       : null;
   const salaryReduction = saleEconomy.salary;
   const teamSalaryBefore = teamContext?.salaryTotal ?? 0;
-  const rosterBefore = teamContext?.rosterCount ?? 0;
   const blockingReasons: string[] = [];
+  const warnings: string[] = [];
 
   if (!team) blockingReasons.push("team_not_found");
   if (!activePlayer) blockingReasons.push("active_player_not_found");
@@ -2133,11 +2174,35 @@ export function previewLocalTransfermarktSell(params: TransfermarktSellParams): 
   }
 
   const canSell = blockingReasons.length === 0;
+  const coaching =
+    player && team
+      ? buildTransfermarktSellCoachingView({
+          gameState,
+          teamId: params.teamId,
+          activePlayerId: params.activePlayerId,
+          playerName: player.name,
+          profit:
+            salePrice != null && normalizedPurchasePrice != null
+              ? roundValue(Math.abs(salePrice - normalizedPurchasePrice) < 0.005 ? 0 : salePrice - normalizedPurchasePrice, 2)
+              : null,
+          pricingPolicy: priced.policy,
+        })
+      : null;
+
+  if (coaching?.gmSoftBlockStarSell && coaching.keepIntentScore != null && coaching.keepIntentScore >= 55) {
+    warnings.push("GM warnt: Core-Verkauf unter Hot-Seat-Bedingungen belastet das Mandat.");
+  }
+  if (coaching?.boardReaction.requiresStrongAcknowledgment) {
+    warnings.push(coaching.boardReaction.description);
+  }
+  for (const note of priced.policy.notes) {
+    warnings.push(note);
+  }
 
   return {
     canSell,
     blockingReasons,
-    warnings: [],
+    warnings,
     player: player
       ? { id: player.id, name: player.name, className: player.className, race: player.race }
       : null,
@@ -2169,6 +2234,8 @@ export function previewLocalTransfermarktSell(params: TransfermarktSellParams): 
     profit,
     salaryReduction,
     projectedReadinessAfterSell: "unknown",
+    coaching,
+    pricingPolicyMultiplier: priced.policy.combinedMultiplier,
   };
 }
 
@@ -2188,7 +2255,7 @@ export function executeLocalTransfermarktSell(params: TransfermarktSellParams): 
 
   const transferHistoryId = `history-${randomUUID()}`;
   const salePrice = preview.salePrice ?? 0;
-  const nextState: GameState = {
+  let nextState: GameState = {
     ...save.gameState,
     teams: save.gameState.teams.map((team) =>
       team.teamId === params.teamId
@@ -2223,6 +2290,16 @@ export function executeLocalTransfermarktSell(params: TransfermarktSellParams): 
       ...save.gameState.transferHistory,
     ],
   };
+
+  if (preview.coaching?.boardReaction) {
+    nextState = applySellBoardReactionToGameState({
+      gameState: nextState,
+      teamId: params.teamId,
+      playerId: preview.player.id,
+      reaction: preview.coaching.boardReaction,
+      saveId: params.saveId,
+    });
+  }
 
   if (runContext) {
     runContext.save = {

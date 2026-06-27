@@ -431,6 +431,34 @@ export function createPlayerBaselinesForPlayers(
   );
 }
 
+function disciplineRatingsLookPlaceholder(ratings: Record<string, number>) {
+  const values = Object.values(ratings).filter((value) => typeof value === "number" && Number.isFinite(value));
+  if (values.length === 0) {
+    return true;
+  }
+  const rounded = values.map((value) => value.toFixed(1));
+  return new Set(rounded).size === 1;
+}
+
+export function baselineIdentityIsStale(existing: PlayerBaselineRecord, sourcePlayer: Player) {
+  if (existing.className !== sourcePlayer.className) {
+    return true;
+  }
+  if (existing.race !== sourcePlayer.race) {
+    return true;
+  }
+  if (existing.name.trim() !== sourcePlayer.name.trim()) {
+    return true;
+  }
+  if (disciplineRatingsLookPlaceholder(existing.disciplineRatings ?? {})) {
+    const sourceRatings = sourcePlayer.disciplineRatings ?? {};
+    if (Object.keys(sourceRatings).length > 0 && !disciplineRatingsLookPlaceholder(sourceRatings)) {
+      return true;
+    }
+  }
+  return false;
+}
+
 export function ensurePlayerBaselines(
   gameState: GameState,
   options?: {
@@ -446,6 +474,15 @@ export function ensurePlayerBaselines(
     const sourcePlayer = sourceByPlayerId.get(player.id);
     if (existing) {
       const normalizedExisting = normalizePlayerBaselineRecord(existing, { createdAt: options?.createdAt });
+      if (sourcePlayer && baselineIdentityIsStale(normalizedExisting, sourcePlayer)) {
+        warnings.push(`baseline_identity_refreshed:${player.id}`);
+        return createPlayerBaselineFromPlayer(sourcePlayer, {
+          source: normalizedExisting.source === "legacy" ? "import" : normalizedExisting.source,
+          createdAt: normalizedExisting.createdAt,
+          importedAt: new Date().toISOString(),
+          sourceFile: normalizedExisting.sourceFile ?? DEFAULT_BASELINE_SOURCE_FILE,
+        });
+      }
       if (sourcePlayer) {
         const sourceAttributes = buildBaselineAttributes(sourcePlayer);
         const sourceEconomy = createSeasonZeroEconomyReferenceFromPlayer(sourcePlayer, {

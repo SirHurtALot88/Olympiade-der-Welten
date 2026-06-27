@@ -10,6 +10,7 @@ import RaceIcon from "@/app/foundation/RaceIcon";
 import { TooltipHeading } from "@/components/ui/TooltipHeading";
 import { SponsorOfferCard } from "@/components/foundation/sponsor/SponsorOfferCard";
 import type { FoundationViewId } from "@/lib/foundation/foundation-view-routing";
+import { TEAM_BOARD_PRESSURE_TOOLTIP, TEAM_BOARD_RATING_TOOLTIP } from "@/lib/foundation/team-board-tooltips";
 
 const TEAM_ROSTER_PORTRAIT_LOADING = {
   loading: "eager",
@@ -171,6 +172,8 @@ export type FoundationTeamsDetailPanelProps = {
   sponsorChoiceProfiles: unknown;
   sponsorChoiceBusy: unknown;
   selectedTeamCanManage: unknown;
+  selectedTeamRosterActionsAvailable: unknown;
+  selectedTeamRosterActionHint: unknown;
   contractRenewalMessage: unknown;
   contractRenewalError: unknown;
 };
@@ -290,6 +293,8 @@ gameState,
   sponsorChoiceProfiles,
   sponsorChoiceBusy,
   selectedTeamCanManage,
+  selectedTeamRosterActionsAvailable,
+  selectedTeamRosterActionHint,
   contractRenewalMessage,
   contractRenewalError,
 }: FoundationTeamsDetailPanelProps) {

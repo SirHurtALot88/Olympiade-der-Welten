@@ -13,7 +13,47 @@ export type FoundationUrlState = {
   facilityAction?: string | null;
 };
 
+export type FoundationRoomUrlParams = {
+  roomCode: string;
+  participantId: string;
+  userId: string;
+  seatToken: string;
+  saveId: string;
+};
+
 const HISTORY_STATE_KEY = "foundationNav";
+
+const ROOM_URL_PARAM_KEYS = ["roomCode", "participantId", "userId", "seatToken", "saveId"] as const;
+
+export function readFoundationRoomParamsFromSearchParams(source: URLSearchParams): FoundationRoomUrlParams | null {
+  const roomCode = source.get("roomCode")?.trim().toUpperCase() ?? "";
+  const participantId = source.get("participantId")?.trim() ?? "";
+  const userId = source.get("userId")?.trim() ?? "";
+  const seatToken = source.get("seatToken")?.trim() ?? "";
+  const saveId = source.get("saveId")?.trim() ?? "";
+
+  if (!roomCode || !participantId || !userId || !seatToken || !saveId) {
+    return null;
+  }
+
+  return { roomCode, participantId, userId, seatToken, saveId };
+}
+
+export function appendFoundationRoomParamsToSearchParams(
+  params: URLSearchParams,
+  roomParams: FoundationRoomUrlParams | null,
+) {
+  if (!roomParams) {
+    return params;
+  }
+
+  params.set("roomCode", roomParams.roomCode);
+  params.set("participantId", roomParams.participantId);
+  params.set("userId", roomParams.userId);
+  params.set("seatToken", roomParams.seatToken);
+  params.set("saveId", roomParams.saveId);
+  return params;
+}
 
 export function parseFoundationPanelFromUrl(): FoundationPanelId {
   if (typeof window === "undefined") return null;
@@ -79,7 +119,10 @@ export function parseFoundationFacilityFromUrl(): { facilityId: string | null; f
   };
 }
 
-export function buildFoundationSearchParams(state: FoundationUrlState): URLSearchParams {
+export function buildFoundationSearchParams(
+  state: FoundationUrlState,
+  options?: { roomParams?: FoundationRoomUrlParams | null; preserveRoomParamsFrom?: URLSearchParams | null },
+): URLSearchParams {
   const params = new URLSearchParams();
   params.set("view", state.view);
 
@@ -90,11 +133,20 @@ export function buildFoundationSearchParams(state: FoundationUrlState): URLSearc
   if (state.facilityId) params.set("facilityId", state.facilityId);
   if (state.facilityAction) params.set("facilityAction", state.facilityAction);
 
+  const roomParams =
+    options?.roomParams ??
+    (options?.preserveRoomParamsFrom ? readFoundationRoomParamsFromSearchParams(options.preserveRoomParamsFrom) : null);
+  appendFoundationRoomParamsToSearchParams(params, roomParams);
+
   return params;
 }
 
-export function buildFoundationHref(state: FoundationUrlState, basePath = "/foundation"): string {
-  const params = buildFoundationSearchParams(state);
+export function buildFoundationHref(
+  state: FoundationUrlState,
+  basePath = "/foundation",
+  options?: { roomParams?: FoundationRoomUrlParams | null; preserveRoomParamsFrom?: URLSearchParams | null },
+): string {
+  const params = buildFoundationSearchParams(state, options);
   const query = params.toString();
   return query ? `${basePath}?${query}` : basePath;
 }
@@ -111,7 +163,8 @@ export function readFoundationHistoryState(): FoundationUrlState | null {
 export function writeFoundationUrlState(state: FoundationUrlState, mode: "push" | "replace" = "replace") {
   if (typeof window === "undefined") return;
 
-  const href = buildFoundationHref(state);
+  const currentSearch = new URL(window.location.href).searchParams;
+  const href = buildFoundationHref(state, "/foundation", { preserveRoomParamsFrom: currentSearch });
   const historyState = { [HISTORY_STATE_KEY]: state };
 
   if (mode === "push") {

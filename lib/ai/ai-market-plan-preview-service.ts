@@ -662,6 +662,7 @@ function buildTeamEntry(input: {
       ? "cash_after_market_plan_below_reserve"
       : null,
     projectedState.rosterAfterPlan != null &&
+    chosenBuys.length > 0 &&
     currentState.playerMin != null &&
     projectedState.rosterAfterPlan < currentState.playerMin
       ? "roster_after_market_plan_below_player_min"

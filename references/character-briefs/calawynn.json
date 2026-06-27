@@ -1,0 +1,20 @@
+{
+  "name": "Calawynn",
+  "id": "player-0605-calawynn",
+  "className": "Sprinter",
+  "race": "Aqua",
+  "alignment": "N",
+  "gender": "f",
+  "subclasses": ["Royalty", "Whore", "Wayfarer"],
+  "traitsPositive": ["Altruistic", "Sexy", "Resourceful"],
+  "traitsNegative": ["FaintHearted", "Diva", "Timid"],
+  "attributes": {
+    "power": 11, "health": 1, "stamina": 27, "intelligence": 65,
+    "awareness": 67, "determination": 2, "speed": 99, "dexterity": 73,
+    "charisma": 60, "will": 11, "spirit": 71, "torment": 1
+  },
+  "flavorDe": "In Luniras tiefen Lichtungen, wo Wasser so klar ist, dass selbst Lügen schwerer sinken, bewegt sich Calawynn wie ein Geheimnis mit Flügeln und Schwanz. Ihre irisierenden Flossen, die schimmernden Libellenflügel und das Gold an den Armen gehören zu den Höfen der Abyssal-Häuser — dort, wo man Schönheit zählt, aber Nähe selten schenkt. Einst war sie nur eine entlaufene Hofgestalt, zu schnell zum Entkommen, zu zart zum Bleiben. Heute gilt sie als seltener Glanz zwischen den Strömungen: großzügig, wenn man sie nicht festhält, flüchtig, sobald jemand zu laut wird. Wer sie einmal in Bewegung gesehen hat, versteht, warum selbst Könige im Wasser leise sprechen.",
+  "portraitPath": "/Users/chrisfalk/Library/CloudStorage/Dropbox/Chris/Olympiade der Welten/Mark VI Cardgame/Spieler/Calawynn.jpg",
+  "cost": 30,
+  "upkeepBase": 2
+}

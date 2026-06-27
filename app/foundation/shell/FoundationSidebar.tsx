@@ -16,6 +16,7 @@ import { getDefaultFoundationViewTarget, type FoundationViewId } from "@/lib/fou
 type FoundationSidebarProps = {
   activeView: FoundationViewId;
   onNavigate: (view: FoundationViewId) => void;
+  onPrefetchView?: (view: FoundationViewId) => void;
 };
 
 type SidebarDragState = {
@@ -23,7 +24,7 @@ type SidebarDragState = {
   itemId: FoundationViewId;
 } | null;
 
-export default function FoundationSidebar({ activeView, onNavigate }: FoundationSidebarProps) {
+export default function FoundationSidebar({ activeView, onNavigate, onPrefetchView }: FoundationSidebarProps) {
   const [navGroups, setNavGroups] = useState(FOUNDATION_NAV_GROUPS);
   const [draggingItem, setDraggingItem] = useState<SidebarDragState>(null);
   const dragState = useRef<SidebarDragState>(null);
@@ -141,6 +142,8 @@ export default function FoundationSidebar({ activeView, onNavigate }: Foundation
                   data-testid={`foundation-nav-${item.id}`}
                   title={item.tooltip}
                   onClick={() => onNavigate(targetView)}
+                  onMouseEnter={() => onPrefetchView?.(item.id)}
+                  onFocus={() => onPrefetchView?.(item.id)}
                   {...getItemDragProps(group.id, item.id)}
                 >
                   <span

@@ -40,6 +40,7 @@ import {
   appendRoomContextToParams,
   readFoundationRoomContextFromLocation,
   withRoomContextBody,
+  type FoundationRoomContext,
 } from "@/lib/room/foundation-room-context-client";
 import { DEFAULT_ACTIVE_OWNER_ID } from "@/lib/foundation/team-control-settings";
 import { getClassTrainingSignals } from "@/lib/training/class-progression-config";
@@ -77,6 +78,7 @@ export type TransfermarktV2ClientProps = {
   onOpenOfferPanel?: (playerId: string) => void;
   onCloseOfferPanel?: () => void;
   onSell?: ((payload: { activePlayerId: string; playerId: string; playerName: string; className: string; race: string | null; portraitUrl: string | null }) => void) | null;
+  roomContext?: FoundationRoomContext | null;
 };
 
 type MarketFeedResponse = TransfermarktReadResult & {
@@ -1082,8 +1084,12 @@ export default function TransfermarktV2Client({
   onOpenOfferPanel,
   onCloseOfferPanel,
   onSell,
+  roomContext: roomContextProp = null,
 }: TransfermarktV2ClientProps) {
-  const roomContextRef = useRef(readFoundationRoomContextFromLocation());
+  const roomContextRef = useRef<FoundationRoomContext | null>(roomContextProp ?? readFoundationRoomContextFromLocation());
+  useEffect(() => {
+    roomContextRef.current = roomContextProp ?? readFoundationRoomContextFromLocation();
+  }, [roomContextProp]);
   const marketCacheRef = useRef(
     new Map<
       string,
@@ -3416,12 +3422,12 @@ export default function TransfermarktV2Client({
                   ))}
                   {selectedPlayer.hiddenPositiveTraitCount > 0 ? (
                     <span className="pill market-v2-trait-pill is-neutral">
-                      +{selectedPlayer.hiddenPositiveTraitCount} verdeckt
+                      Trait verdeckt
                     </span>
                   ) : null}
                   {selectedPlayer.hiddenNegativeTraitCount > 0 ? (
                     <span className="pill market-v2-trait-pill is-neutral">
-                      {selectedPlayer.hiddenNegativeTraitCount} Risiko verdeckt
+                      Risiko verdeckt
                     </span>
                   ) : null}
                   {selectedPlayer.traitsPositive.length === 0 && selectedPlayer.traitsNegative.length === 0 ? (

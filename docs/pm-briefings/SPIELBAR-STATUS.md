@@ -2,15 +2,17 @@
 
 **Ziel:** Ein Solo-Spielstand, ein manuelles Team, voller Spieltag-Loop ohne Dead-End.
 
-**Letzter Smoke:** 2026-06-27 (TrainingCompact re-wired, Write-Guards form-cards/auto-run, `app:smoke-gameplay` 9/10 Steps grün)
+**Letzter Smoke:** 2026-06-27 (Dead-Zones-9/10: Room-URL-Persistenz, MP-E2E Foundation-Arena, CI dedizierter Smoke-Save)
 
 | Check | Status | Notiz |
 |-------|--------|-------|
 | Production Build | 🟢 | `npm run build` grün (SQLite aus Client-Bundle) |
 | CI flow-smoke | 🟢 | 119/119 Tests (`npm run ci:flow-smoke`) |
+| CI import-exists | 🟢 | `npm run ci:import-exists` — keine orphan `@/lib`-Imports |
 | Client-Bundle-Lint | 🟢 | `npm run ci:client-bundle-lint` — kein sqlite/local-service in Foundation-Client |
 | Perf regression | 🟢 | `npm run perf:regression-smoke` (<250ms Version-Metadata) |
-| Playwright gameplay | 🟢 | Home/Training/Arena/Einsatzliste/Drawer OK; Read-only-Signature auf Dev-Save noch flaky |
+| Playwright gameplay | 🟢 | Read-only-Gate via `contentSignature`; dedizierter CI-Smoke-Save |
+| MP E2E in CI | 🟢 | `app:smoke-multiplayer-e2e` inkl. Foundation-Arena-Reveal-Sync |
 | Save laden | 🟢 | Dev-Server lädt Long Run Sandbox mit A-A · Armageddon Aftermath |
 | Home Top-6 Karten | 🟢 | POW/SPE/MEN/SOC ohne Noten; CA absolut + PO-Range (kein „Gering“/„F“) |
 | Home/Inbox: nächster Schritt | 🟢 | Flow-Controller zeigt korrekten Schritt mit `globalNextLabel` |
@@ -48,20 +50,19 @@ Legende: 🟢 OK · 🟡 teilweise / Re-Test nötig · 🔴 blockiert
 
 | Bereich | Score | Status | Notiz |
 |---------|-------|--------|-------|
-| Solo Loop Wiring | ~8/10 | 🟢 | Flow, Arena, Inbox, Board, Preseason-Hooks |
+| Solo Loop Wiring | ~9/10 | 🟢 | `app:smoke-gameplay` + `season:full-ui-playthrough` (Nightly); Matchday-Apply Write-Smoke |
 | Build / Client-Server | ~9/10 | 🟢 | TrainingCompact + Resolve-Blocker client-safe; `ci:client-bundle-lint` |
-| Arena + Reveal (Solo) | ~8/10 | 🟢 | `app:smoke-gameplay` Arena/Einsatzliste/Training/Drawer OK |
-| Room Arena Sync (Unit) | ~8/10 | 🟢 | `room-store.test.ts`, `arena-sync-state.test.ts`, reveal-bridge |
-| Foundation ↔ Room | ~7/10 | 🟡 | Room-Banner + Save-Sync bei `roomCode`; voller 4v4-Flow noch Room-Page |
-| Server-Authority (Writes) | ~7/10 | 🟡 | Guard auf lineup/form-cards/matchday-auto-run; Solo weiter lokal erlaubt |
-| Parallel Coach UX | ~6/10 | 🟡 | Non-Host sieht Sync, steuert Reveal nur Host — by design V1 |
+| Arena + Reveal (Solo) | ~9/10 | 🟢 | Arena/Einsatzliste/Training/Drawer in CI grün |
+| Room Arena Sync | ~9/10 | 🟢 | Unit + 2-Browser Foundation-Arena-E2E in `app:smoke-multiplayer-e2e` |
+| Foundation ↔ Room | ~9/10 | 🟢 | Room-Params in URL-Navigation; Banner mit Flow-Step; `roomContext` an Sub-Panels |
+| Server-Authority (Writes) | ~7/10 | 🟡 | Guard + Room-Context; Prod-DB out of scope |
+| Parallel Coach UX | ~9/10 | 🟢 | Warten/Host-only in Foundation-Banner + Arena; Room-Event-Hinweise |
 
 Legende Score: technische Verdrahtung, nicht Spielspaß.
 
 ## Was noch 🟡 ist
 
-- **Voller Browser-Loop inkl. Apply** — einmal manuell S1→Season-End→S2 durchspielen (Script: `scripts/full-season-ui-playthrough.ts`)
-- **Manueller 15-Min-Playtest** — nach Board/Preseason-Wiring einmal komplett im Browser verifizieren
+- **Manueller 15-Min-Playtest** — Checkliste [playtest-checklist.md](./playtest-checklist.md) einmal im Browser (S1→S2); automatisierter Proof läuft via Nightly `season:full-ui-playthrough`
 
 ## Performance (2026-06-27)
 

@@ -793,6 +793,20 @@ describe("player detail drawer", () => {
     expect(data?.attributeStats.find((entry) => entry.key === "health")?.ratingLabel).toBe("S+");
   });
 
+  it("keeps exact axis stats when manageableTeamIds is empty but the roster team is human-controlled", () => {
+    const player = createPlayer({ id: "player-empty-manageable-scope" });
+    const data = buildPlayerDrawerDataFromGameState({
+      gameState: createGameState({ player, withRoster: true }),
+      playerId: player.id,
+      source: "sqlite",
+      manageableTeamIds: [],
+    });
+
+    expect(data?.attributeVisibility).toBe("exact");
+    expect(data?.axisCards.find((card) => card.id === "pow")?.value).not.toBeNull();
+    expect(data?.axisCards.find((card) => card.id === "pow")?.valueRank).not.toBeNull();
+  });
+
   it("shows rough attribute bands without exact values for non-manageable teams", () => {
     const player = createPlayer({
       id: "player-scouted-attributes",
@@ -952,6 +966,41 @@ describe("player detail drawer", () => {
     expect(data?.disciplineValues).toHaveLength(2);
     expect(data?.disciplineValues.every((entry) => entry.currentDisciplineValues == null)).toBe(true);
     expect(data?.disciplineValues.every((entry) => entry.scoutedTier != null)).toBe(true);
+    expect(data?.axisCards.find((card) => card.id === "pow")?.value).not.toBeNull();
+    expect(data?.axisCards.find((card) => card.id === "pow")?.valueRank).not.toBeNull();
+    expect(data?.axisCards.every((entry) => entry.seasonPoints == null)).toBe(true);
+    expect(data?.axisCards.every((entry) => entry.seasonPointsRank == null)).toBe(true);
+  });
+
+  it("falls back to imported catalog flavor when compact load stripped player lore", () => {
+    const player = createPlayer({
+      id: "player-1537-kiti",
+      name: "Kiti",
+      flavorDe: "",
+    });
+    const data = buildPlayerDrawerDataFromGameState({
+      gameState: createGameState({ player, withRoster: false }),
+      playerId: player.id,
+      source: "sqlite",
+      manageableTeamIds: ["team-1"],
+    });
+
+    expect(data?.flavorDe).toContain("Nebelroute");
+  });
+
+  it("exposes German flavor lore in drawer data when present on the player", () => {
+    const player = createPlayer({
+      id: "player-flavor-de",
+      flavorDe: "Casino-Wal aus den Tiefen von Lunira.",
+    });
+    const data = buildPlayerDrawerDataFromGameState({
+      gameState: createGameState({ player, withRoster: false }),
+      playerId: player.id,
+      source: "sqlite",
+      manageableTeamIds: ["team-1"],
+    });
+
+    expect(data?.flavorDe).toBe("Casino-Wal aus den Tiefen von Lunira.");
   });
 
   it("exposes season-end XP forecast and discipline upgrade deltas", () => {
@@ -1042,6 +1091,7 @@ describe("player detail drawer", () => {
     });
 
     expect(data?.potentialOverallStars).toBe(4);
+    expect(data?.potentialOverallStars).toBeGreaterThanOrEqual(data?.currentOverallStars ?? 0);
     expect(data?.potentialOverallDelta).toBe(-0.5);
     expect(data?.potentialAxisStatus.some((entry) => entry.axis === "pow" && entry.routeState === "open")).toBe(true);
     expect(data?.trainingRouteImpact?.note).toContain("POW");

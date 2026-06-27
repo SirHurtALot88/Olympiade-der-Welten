@@ -74,6 +74,7 @@ type DestructiveSignature = {
   matchdayResults: number;
   standingsApplyLogs: number;
   cashPrizeApplyLogs: number;
+  contentSignature: string | null;
 };
 
 function parseArgs(argv: string[]) {
@@ -175,7 +176,7 @@ async function ensureServer(input: {
   throw new Error(`Gameplay smoke: server did not become reachable at ${input.baseUrl}.`);
 }
 
-function buildDestructiveSignature(body: ActiveSaveResponse): DestructiveSignature {
+function buildDestructiveSignature(body: ActiveSaveResponse, contentSignature: string | null = null): DestructiveSignature {
   const gameState = body.save?.gameState;
   return {
     saveId: body.save?.saveId ?? null,
@@ -189,11 +190,28 @@ function buildDestructiveSignature(body: ActiveSaveResponse): DestructiveSignatu
     matchdayResults: gameState?.seasonState?.matchdayResults?.length ?? 0,
     standingsApplyLogs: gameState?.seasonState?.standingsApplyLogs?.length ?? 0,
     cashPrizeApplyLogs: gameState?.seasonState?.cashPrizeApplyLogs?.length ?? 0,
+    contentSignature,
   };
 }
 
+async function fetchSaveContentSignature(baseUrl: string, saveId: string | null, timeoutMs: number) {
+  if (!saveId) {
+    return null;
+  }
+  const params = new URLSearchParams({ saveId });
+  const payload = await fetchJson<{ ok?: boolean; contentSignature?: string; signature?: string }>(
+    baseUrl,
+    `/api/singleplayer-state/version?${params.toString()}`,
+    timeoutMs,
+  );
+  return payload.contentSignature ?? payload.signature ?? null;
+}
+
 function signaturesEqual(left: DestructiveSignature, right: DestructiveSignature) {
-  return JSON.stringify(left) === JSON.stringify(right);
+  if (left.contentSignature && right.contentSignature) {
+    return left.contentSignature === right.contentSignature;
+  }
+  return JSON.stringify({ ...left, contentSignature: null }) === JSON.stringify({ ...right, contentSignature: null });
 }
 
 function shortSaveId(saveId: string) {
@@ -551,7 +569,8 @@ async function main() {
 
   try {
     const beforeBody = await activeSaveWithRetries(args.baseUrl, args.timeoutMs);
-    const beforeSignature = buildDestructiveSignature(beforeBody);
+    const beforeContentSignature = await fetchSaveContentSignature(args.baseUrl, beforeBody.save?.saveId ?? null, args.timeoutMs);
+    const beforeSignature = buildDestructiveSignature(beforeBody, beforeContentSignature);
     const expectedSaveId = beforeBody.save?.saveId ?? null;
     const expectedTeamId = beforeBody.save?.gameState?.teams?.[0]?.teamId ?? "A-A";
 
@@ -925,12 +944,66 @@ async function main() {
       },
     }));
 
+    if (args.writeMode && args.confirmTestsave) {
+      steps.push(await runStep({
+        id: "matchday-apply-dry-run",
+        label: "Matchday Apply (Write Smoke)",
+        page,
+        screenshots: false,
+        run: async (step) => {
+          const saveId = beforeBody.save?.saveId;
+          const seasonId = beforeBody.save?.gameState?.season?.id;
+          const matchdayId = beforeBody.save?.gameState?.matchdayState?.matchdayId;
+          if (!saveId || !seasonId || !matchdayId) {
+            step.warnings.push("Matchday apply smoke skipped: save context incomplete.");
+            return;
+          }
+
+          const dryRunResponse = await fetch(`${args.baseUrl}/api/resolve/legacy-matchday-apply`, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              saveId,
+              seasonId,
+              matchdayId,
+              source: "sqlite",
+              dryRun: true,
+            }),
+          });
+          const dryRunPayload = (await dryRunResponse.json()) as { success?: boolean; error?: string; canExecute?: boolean };
+          assertStep(step, dryRunResponse.ok, `Matchday apply dry-run HTTP ${dryRunResponse.status}.`);
+          assertStep(step, dryRunPayload.success !== false, dryRunPayload.error ?? "Matchday apply dry-run ok.");
+
+          if (dryRunPayload.canExecute === true) {
+            const executeResponse = await fetch(`${args.baseUrl}/api/resolve/legacy-matchday-apply`, {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({
+                saveId,
+                seasonId,
+                matchdayId,
+                source: "sqlite",
+                execute: true,
+                confirm: "APPLY_MATCHDAY_RESULT",
+              }),
+            });
+            const executePayload = (await executeResponse.json()) as { success?: boolean; error?: string };
+            assertStep(step, executeResponse.ok && executePayload.success !== false, executePayload.error ?? "Matchday apply execute ok.");
+            step.details.push("Destructive matchday apply executed on confirmed testsave.");
+          } else {
+            step.warnings.push("Matchday apply execute skipped: dry-run reported canExecute=false.");
+          }
+        },
+      }));
+    }
+
     let afterBody: ActiveSaveResponse | null = null;
     let afterSignature: DestructiveSignature | null = null;
     let destructiveSignatureUnchanged = false;
     try {
       afterBody = await activeSaveWithRetries(args.baseUrl, args.timeoutMs);
-      afterSignature = buildDestructiveSignature(afterBody);
+      const afterContentSignature = await fetchSaveContentSignature(args.baseUrl, afterBody.save?.saveId ?? null, args.timeoutMs);
+      afterSignature = buildDestructiveSignature(afterBody, afterContentSignature);
       destructiveSignatureUnchanged = signaturesEqual(beforeSignature, afterSignature);
       const signatureStep = makeStep("write-safety-signature", "Write-Safety Signature");
       assertStep(signatureStep, destructiveSignatureUnchanged, "Destructive signature unchanged.");

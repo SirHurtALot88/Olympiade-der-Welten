@@ -7,6 +7,7 @@ import {
   attachPotentialCeilingToRecord,
   buildPlayerPotentialCeilingProfile,
   buildPotentialGap,
+  clampPotentialCeilingToCurrentStars,
   revealPotentialStars,
 } from "@/lib/scouting/player-potential-ceiling-service";
 
@@ -61,7 +62,61 @@ describe("player potential ceiling service", () => {
       hiddenPotentialScore: 82,
     });
     expect(ceiling.pow).toBeGreaterThanOrEqual(current.pow);
-    expect(buildPotentialGap({ currentStars: current, ceiling })).toBeGreaterThan(0);
+    expect(ceiling.overall).toBeGreaterThanOrEqual(current.overall);
+    expect(buildPotentialGap({ currentStars: current, ceiling })).toBeGreaterThanOrEqual(0);
+  });
+
+  it("never reveals overall potential below current overall stars", () => {
+    const target = player({ id: "overall-floor", rating: 58, potential: 82, coreStats: { pow: 58, spe: 60, men: 57, soc: 56 } });
+    const current = buildPlayerAxisStarProfile({
+      gameState: {
+        players: [target],
+        disciplines: [
+          { id: "d_pow", name: "Pow", category: "power", displayOrder: 1, originalOrder: 1, playerCount: 1 },
+          { id: "d_spe", name: "Spe", category: "speed", displayOrder: 2, originalOrder: 2, playerCount: 1 },
+          { id: "d_men", name: "Men", category: "mental", displayOrder: 3, originalOrder: 3, playerCount: 1 },
+          { id: "d_soc", name: "Soc", category: "social", displayOrder: 4, originalOrder: 4, playerCount: 1 },
+        ],
+      } as never,
+      player: target,
+    });
+    const staleCeiling = {
+      pow: Math.max(current.pow, 4),
+      spe: Math.max(current.spe, 3.5),
+      men: Math.max(current.men, 3.5),
+      soc: Math.max(current.soc, 3.5),
+      overall: 3.5,
+    };
+    const revealed = revealPotentialStars({
+      ceiling: staleCeiling,
+      currentStars: current,
+      scoutingLevel: 3,
+    });
+
+    expect(revealed.overallMin).toBeGreaterThanOrEqual(current.overall);
+    expect(revealed.overallMax).toBeGreaterThanOrEqual(current.overall);
+    expect(revealed.overallMin).toBeLessThanOrEqual(revealed.overallMax ?? revealed.overallMin);
+  });
+
+  it("raises stored overall ceiling when CA overall exceeds axis-derived PO overall", () => {
+    const current = {
+      pow: 3,
+      spe: 4.5,
+      men: 3,
+      soc: 3,
+      overall: 4.5,
+      disciplineTags: [],
+    };
+    const staleCeiling = {
+      pow: 3,
+      spe: 4.5,
+      men: 3,
+      soc: 3,
+      overall: 3.5,
+    };
+    const clamped = clampPotentialCeilingToCurrentStars(current, staleCeiling);
+    expect(clamped.overall).toBe(4.5);
+    expect(clamped.overall).toBeGreaterThanOrEqual(current.overall);
   });
 
   it("persists ceiling on record and hides numeric potential before L3", () => {

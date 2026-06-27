@@ -1,0 +1,20 @@
+{
+  "name": "Skeleton King",
+  "id": "player-0383-skeleton-king",
+  "className": "Tank",
+  "race": "Human",
+  "alignment": "N-B",
+  "gender": "m",
+  "subclasses": ["Royalty", "Warrior", "Undead"],
+  "traitsPositive": ["Eloquent", "Motivated", "Fearless"],
+  "traitsNegative": ["Scandalous", "Manipulative", "Obsessive"],
+  "attributes": {
+    "power": 77, "health": 76, "stamina": 81, "intelligence": 51,
+    "awareness": 17, "determination": 76, "speed": 5, "dexterity": 11,
+    "charisma": 49, "will": 63, "spirit": 21, "torment": 64
+  },
+  "flavorDe": "Die Versunkene Krone lag jahrtausendelang unter Stein, Wasser und Gerüchten — bis Skeleton King auftauchte und behauptete, das Reich habe nur auf ihn gewartet. Er trägt die alte Krone wie eine Rechnung, die noch niemand bezahlt hat, und führt Krieger an, die schon tot waren, bevor der Befehl kam. Gegen Mortis Hall und Leorics kalte Ordnung setzt er Rückkehr, Stolz und die feste Meinung, dass ein Thron nicht verfällt, nur weil andere länger darauf sitzen. Ob er der wahre Erbe ist, darüber streiten Chronisten, Generäle und Leichen gleichermaßen.",
+  "portraitPath": "/Users/chrisfalk/Library/CloudStorage/Dropbox/Chris/Olympiade der Welten/Mark VI Cardgame/Spieler/Skeleton King.jpg",
+  "cost": 40,
+  "upkeepBase": 4
+}

@@ -1,0 +1,20 @@
+{
+  "name": "Emperor Dracula",
+  "id": "player-1364-emperor-dracula",
+  "className": "Templar",
+  "race": "Human",
+  "alignment": "N-B",
+  "gender": "m",
+  "subclasses": ["Royalty", "Vampire", "Undead"],
+  "traitsPositive": ["Eloquent", "Cool", "Ambitious"],
+  "traitsNegative": ["Egomaniac", "Feisty", "Obsessive"],
+  "attributes": {
+    "power": 70, "health": 70, "stamina": 33, "intelligence": 58,
+    "awareness": 70, "determination": 72, "speed": 48, "dexterity": 64,
+    "charisma": 78, "will": 83, "spirit": 43, "torment": 90
+  },
+  "flavorDe": "Aus den alten Blutlinien der Kernlande, wo Adel einst noch mit Sonnenlicht sprach und heute nur noch mit Kerzen arbeitet, steht Emperor Dracula wie ein Denkmal, das noch atmet. Das weiße Haar, der schwarze Umhang mit rotem Futter und das schwere Breitschwert im Boden gehören zu ihm wie ein erloschener Hof, der sich weigert, Feierabend zu machen. Einst war er Kaiser in einem Reich, das länger glaubte als lebte. Heute herrscht er mit kühler Eloquenz und der festen Meinung, dass Erinnerung teurer ist als Gold — besonders, wenn man sie aus den Adern anderer liest.",
+  "portraitPath": "/Users/chrisfalk/Library/CloudStorage/Dropbox/Chris/Olympiade der Welten/Mark VI Cardgame/Spieler/Emperor Dracula.jpg",
+  "cost": 85,
+  "upkeepBase": 10
+}

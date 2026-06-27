@@ -345,6 +345,7 @@ type LegacyLineupLabClientProps = {
     matchdayId: string;
     teamId: string;
   }) => void;
+  roomContext?: FoundationRoomContext | null;
 };
 
 type LineupPlayerTableRow = {
@@ -1944,8 +1945,8 @@ export default function LegacyLineupLabClient(props: LegacyLineupLabClientProps)
     };
   }, []);
   useEffect(() => {
-    setRoomContext(readFoundationRoomContextFromLocation());
-  }, []);
+    setRoomContext(props.roomContext ?? readFoundationRoomContextFromLocation());
+  }, [props.roomContext]);
 
   function withRoomQuery(query: URLSearchParams) {
     if (props.activeOwnerId) {

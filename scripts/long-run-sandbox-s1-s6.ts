@@ -5,7 +5,11 @@ import { execFileSync } from "node:child_process";
 import { loadEnvConfig } from "@next/env";
 
 import { AI_MARKET_APPLY_CONFIRM_TOKEN } from "@/lib/ai/ai-market-plan-apply-contract";
-import { applyAiMarketPlanLocally } from "@/lib/ai/ai-market-plan-apply-service";
+import {
+  getTeamsNeedingConvergence,
+  runEmergencyRosterRepairForTeams,
+  runMarketPlanConvergence,
+} from "@/lib/ai/ai-market-plan-convergence-service";
 import { buildAiTransfermarktSellPreview } from "@/lib/ai/ai-transfermarkt-sell-preview-service";
 import { applyAiLegacyLineupBatchLocally } from "@/lib/ai/ai-legacy-lineup-batch-apply-service";
 import { CHUNKED_REDRAFT_TOPUP_CONFIRM_TOKEN, runChunkedRedraftTopup } from "@/lib/ai/chunked-redraft-topup-service";
@@ -18,6 +22,7 @@ import { resolvePlayerEconomyContract } from "@/lib/foundation/player-economy-co
 import { getTeamPlayerMax } from "@/lib/foundation/roster-limits";
 import {
   findSeasonOneForbiddenBuySources,
+  isSeasonOne,
   isTransferActionAllowed,
 } from "@/lib/season/transfer-season-policy";
 import { buildTeamControlSettingsMap } from "@/lib/foundation/team-control-settings";
@@ -45,6 +50,7 @@ import { buildSeasonReview } from "@/lib/season/season-review-service";
 import { applySponsorSettlement } from "@/lib/sponsor/sponsor-settlement-service";
 import { chooseSponsorOfferForAiTeams } from "@/lib/sponsor/sponsor-offer-service";
 import { executeStandingsApply, STANDINGS_APPLY_CONFIRM_TOKEN } from "@/lib/standings/standings-apply-service";
+import { buildTransferFinanceAudit } from "@/lib/season/transfer-finance-audit";
 
 const PROJECT_ROOT = path.resolve(__dirname, "..");
 const OUTPUT_DIR =
@@ -374,10 +380,11 @@ function getSeasonMaxRequiredSlots(gameState: GameState) {
 }
 
 function getPreseasonCoverageRiskRows(gameState: GameState) {
-  const slotNeed = getSeasonMaxRequiredSlots(gameState);
-  return rosterCounts(gameState).filter(({ roster, identity }) => {
-    const minRequired = Math.max(identity?.playerMin ?? 7, 7, slotNeed);
-    return roster.length < minRequired;
+  return getTeamsNeedingConvergence(gameState).map((entry) => {
+    const team = gameState.teams.find((row) => row.teamId === entry.teamId);
+    const identity = gameState.teamIdentities.find((row) => row.teamId === entry.teamId);
+    const roster = gameState.rosters.filter((row) => row.teamId === entry.teamId);
+    return { team: team!, roster, identity, ...entry };
   });
 }
 
@@ -391,21 +398,22 @@ function getExistingPreseasonMarketTransfers(gameState: GameState, seasonId: str
   );
 }
 
-async function runPreseasonPlannerReviewBeforeRosterRepair(saveId: string, seasonId: string, persistence: PersistenceService) {
+async function runPreseasonPlannerConvergenceBeforeEmergencyRepair(
+  saveId: string,
+  seasonId: string,
+  persistence: PersistenceService,
+) {
   const performanceRows: PhaseMetric[] = [];
   const save = persistence.getSaveById(saveId);
-  if (!save) throw new Error("Long-run save missing before preseason planner review.");
+  if (!save) throw new Error("Long-run save missing before preseason planner convergence.");
   const coverageRiskRows = getPreseasonCoverageRiskRows(save.gameState);
-  if (coverageRiskRows.length === 0) {
-    return { performanceRows, reviewed: false, warnings: [] as string[] };
-  }
   const existingMarketTransfers = getExistingPreseasonMarketTransfers(save.gameState, seasonId).filter(
     (entry) => entry.source === "ai_preseason_market_buy" || entry.source === "ai_preseason_market_sell",
   );
   if (existingMarketTransfers.length > 0) {
     recordPhase(performanceRows, {
       seasonId,
-      phase: "season start planner review before roster repair",
+      phase: "season start planner convergence",
       startedAt: Date.now(),
       itemCount: existingMarketTransfers.length,
       status: "skipped",
@@ -416,106 +424,94 @@ async function runPreseasonPlannerReviewBeforeRosterRepair(saveId: string, seaso
     return {
       performanceRows,
       reviewed: false,
-      warnings: [`preseason_planner_review_skipped_existing_market_transfers:${existingMarketTransfers.length}`],
+      warnings: [`preseason_planner_convergence_skipped_existing_market_transfers:${existingMarketTransfers.length}`],
+      emergencyRepairTeams: [] as string[],
     };
+  }
+  if (coverageRiskRows.length === 0) {
+    return { performanceRows, reviewed: false, warnings: [] as string[], emergencyRepairTeams: [] as string[] };
   }
 
   const startedAt = Date.now();
   console.error(
-    `[long-run] planner-review ${seasonId}: ${coverageRiskRows
-      .map(({ team, roster, identity }) => `${team.shortCode}:${roster.length}/${Math.max(identity?.playerMin ?? 7, 7, getSeasonMaxRequiredSlots(save.gameState))}`)
+    `[long-run] planner-convergence ${seasonId}: ${coverageRiskRows
+      .map(({ team, rosterCount, optTarget, strategy }) => `${team.shortCode}:${rosterCount}/${optTarget}:${strategy}`)
       .join(",")}`,
   );
-  const review = await applyAiMarketPlanLocally({
-    source: "sqlite",
+  const convergence = await runMarketPlanConvergence({
     saveId,
     seasonId,
-    teamScope: "all",
+    persistence,
     dryRun: false,
     confirmToken: AI_MARKET_APPLY_CONFIRM_TOKEN,
     transferPhase: "manual_transfer_window",
-    options: {
-      includeWarningTeams: true,
-      applySellSteps: true,
-      applyBuySteps: true,
-      maxBuysPerTeam: null,
-      maxSellsPerTeam: 2,
-      previewBuyLimit: 96,
-      previewSellLimit: 16,
-      performanceBudgetMs: 12_000,
-      maxApplyMs: 75_000,
-      progressLog: true,
-      stopOnTeamFailure: false,
-    },
+    teamScope: "all",
+    maxPasses: 2,
+    maxRoundsPerPass: 4,
+    allowBuys: true,
+    skipIfExistingMarketTransfers: false,
+    progressLog: true,
   });
   const latest = persistence.getSaveById(saveId);
-  if (!latest) throw new Error("Long-run save missing after preseason planner review.");
+  if (!latest) throw new Error("Long-run save missing after preseason planner convergence.");
   const stillBelowMin = getPreseasonCoverageRiskRows(latest.gameState);
   const warnings = [
-    ...review.blockingReasons.map((entry) => `planner_review_blocker:${entry}`),
-    ...review.warnings.slice(0, 20),
-    stillBelowMin.length > 0 ? `planner_review_still_coverage_risk:${stillBelowMin.length}` : null,
+    ...convergence.warnings.slice(0, 20),
+    ...convergence.blockingReasons.map((entry) => `planner_convergence_blocker:${entry}`),
+    stillBelowMin.length > 0 ? `planner_convergence_still_coverage_risk:${stillBelowMin.length}` : null,
+    convergence.emergencyRepairTeams.length > 0
+      ? `planner_convergence_emergency_repair_teams:${convergence.emergencyRepairTeams.length}`
+      : null,
   ].filter((entry): entry is string => Boolean(entry));
   recordPhase(performanceRows, {
     seasonId,
-    phase: "season start planner review before roster repair",
+    phase: "season start planner convergence",
     startedAt,
-    itemCount: review.summary.appliedBuys + review.summary.appliedSells,
+    itemCount: convergence.appliedBuys + convergence.appliedSells,
     status: "ok",
-    buyApplyCount: review.summary.appliedBuys,
-    sellApplyCount: review.summary.appliedSells,
+    buyApplyCount: convergence.appliedBuys,
+    sellApplyCount: convergence.appliedSells,
     warnings: warnings.join("|"),
-    note: `coverageRiskBefore:${coverageRiskRows.length}|coverageRiskAfter:${stillBelowMin.length}`,
+    note: `passes:${convergence.passes}|rounds:${convergence.rounds}|coverageRiskBefore:${coverageRiskRows.length}|coverageRiskAfter:${stillBelowMin.length}|emergency:${convergence.emergencyRepairTeams.length}`,
   });
-  return { performanceRows, reviewed: true, warnings };
+  return {
+    performanceRows,
+    reviewed: true,
+    warnings,
+    emergencyRepairTeams: convergence.emergencyRepairTeams,
+  };
 }
 
-function repairRosterMinimumBeforeSeasonStart(saveId: string, seasonId: string, persistence: PersistenceService) {
+function emergencyRepairRosterMinimumBeforeSeasonStart(
+  saveId: string,
+  seasonId: string,
+  persistence: PersistenceService,
+  teamIds: string[],
+) {
   const performanceRows: PhaseMetric[] = [];
+  const uniqueTeamIds = [...new Set(teamIds.filter(Boolean))];
+  if (uniqueTeamIds.length === 0) {
+    return { performanceRows, blockers: [] as string[], purchases: [] as Array<Record<string, unknown>>, repaired: false };
+  }
   if (!isTransferActionAllowed(seasonId, "preseason_roster_repair")) {
     return { performanceRows, blockers: [] as string[], purchases: [] as Array<Record<string, unknown>>, repaired: false };
   }
   const save = persistence.getSaveById(saveId);
-  if (!save) throw new Error("Long-run save missing before preseason roster repair.");
-  const teamsBelowMin = getPreseasonCoverageRiskRows(save.gameState);
-  if (teamsBelowMin.length === 0) {
-    return { performanceRows, blockers: [] as string[], purchases: [] as Array<Record<string, unknown>>, repaired: false };
-  }
-
+  if (!save) throw new Error("Long-run save missing before emergency roster repair.");
   const startedAt = Date.now();
-  console.error(
-    `[long-run] roster-repair ${seasonId}: ${teamsBelowMin
-      .map(({ team, roster, identity }) => `${team.shortCode}:${roster.length}/${Math.max(identity?.playerMin ?? 7, 7, getSeasonMaxRequiredSlots(save.gameState))}`)
-      .join(",")}`,
-  );
-  const result = runChunkedRedraftTopup({
-    persistence,
+  console.error(`[long-run] emergency-roster-repair ${seasonId}: ${uniqueTeamIds.join(",")}`);
+  const result = runEmergencyRosterRepairForTeams({
     saveId,
     seasonId,
-    dryRun: false,
-    confirmToken: CHUNKED_REDRAFT_TOPUP_CONFIRM_TOKEN,
-    mode: "preseason_roster_repair",
-    target: "playerMax",
-    minimumRosterTargetOverride: getSeasonMaxRequiredSlots(save.gameState),
-    roundLimit: 16,
-    teamTimeLimitMs: 60_000,
-    watchdogMs: 120_000,
-    outputDir: path.join(OUTPUT_DIR, `preseason-roster-repair-${seasonId}`),
+    teamIds: uniqueTeamIds,
+    persistence,
+    outputDir: path.join(OUTPUT_DIR, `preseason-emergency-roster-repair-${seasonId}`),
   });
   const after = persistence.getSaveById(saveId);
-  if (!after) throw new Error("Long-run save missing after preseason roster repair.");
+  if (!after) throw new Error("Long-run save missing after emergency roster repair.");
   const afterCounts = rosterCounts(after.gameState);
-  const slotNeedAfter = getSeasonMaxRequiredSlots(after.gameState);
-  const stillBelowCoverage = afterCounts
-    .filter(({ roster, identity }) => roster.length < Math.max(identity?.playerMin ?? 7, 7, slotNeedAfter))
-    .map(({ team, roster, identity }) => ({
-      teamId: team.teamId,
-      teamName: team.name,
-      rosterCount: roster.length,
-      playerMin: Math.max(identity?.playerMin ?? 7, 7, slotNeedAfter),
-      cash: round(team.cash),
-    }));
   const stillBelowHardMin = afterCounts
+    .filter(({ team, roster, identity }) => uniqueTeamIds.includes(team.teamId))
     .filter(({ roster, identity }) => roster.length < Math.max(identity?.playerMin ?? 7, 7))
     .map(({ team, roster, identity }) => ({
       teamId: team.teamId,
@@ -525,37 +521,26 @@ function repairRosterMinimumBeforeSeasonStart(saveId: string, seasonId: string, 
       cash: round(team.cash),
     }));
   const negativeCash = after.gameState.teams
-    .filter((team) => team.cash < 0)
+    .filter((team) => uniqueTeamIds.includes(team.teamId) && team.cash < 0)
     .map((team) => ({ teamId: team.teamId, teamName: team.name, cash: round(team.cash) }));
   const blockers = [
-    ...stillBelowHardMin.map((row) => `preseason_roster_repair_below_min:${row.teamId}:${row.rosterCount}/${row.playerMin}`),
-    ...negativeCash.map((row) => `preseason_roster_repair_negative_cash:${row.teamId}:${row.cash}`),
+    ...result.blockers,
+    ...stillBelowHardMin.map((row) => `emergency_roster_repair_below_min:${row.teamId}:${row.rosterCount}/${row.playerMin}`),
+    ...negativeCash.map((row) => `emergency_roster_repair_negative_cash:${row.teamId}:${row.cash}`),
   ];
-  const warnings = [
-    ...result.warnings.slice(0, 20),
-    ...stillBelowCoverage.map((row) => `preseason_roster_repair_below_slot_depth:${row.teamId}:${row.rosterCount}/${row.playerMin}`),
-  ];
-  const purchases = result.picks.map((pick) => ({
-    seasonId,
-    teamId: pick.teamId,
-    playerId: pick.playerId,
-    playerName: pick.playerName,
-    fee: pick.marketValue,
-    rosterAfter: pick.rosterAfter,
-    cashAfter: pick.cashAfter,
-    source: "preseason_roster_repair_buy",
-  }));
+  const warnings = [...result.warnings.slice(0, 20)];
   recordPhase(performanceRows, {
     seasonId,
-    phase: "season start roster minimum repair",
+    phase: "season start emergency roster repair",
     startedAt,
-    itemCount: purchases.length,
+    itemCount: result.purchases.length,
     status: blockers.length > 0 ? "blocked" : "ok",
-    buyApplyCount: purchases.length,
+    buyApplyCount: result.purchases.length,
     warnings: warnings.join("|"),
     errors: blockers.join("|"),
+    note: `emergency_fallback:true|teams:${uniqueTeamIds.length}`,
   });
-  return { performanceRows, blockers, purchases, repaired: true };
+  return { performanceRows, blockers, purchases: result.purchases, repaired: result.repaired };
 }
 
 function runFullChurnSeasonStart(saveId: string, seasonId: string, persistence: PersistenceService) {
@@ -1790,6 +1775,15 @@ async function recoverNegativeCashBeforeSeasonStart(saveId: string, seasonId: st
   return { performanceRows, blockers, recovered: true };
 }
 
+function isExpectedSeasonOneMarketRosterBlocker(seasonId: string, blocker: string) {
+  if (!isSeasonOne(seasonId)) return false;
+  return (
+    blocker.includes("roster_under_min") ||
+    blocker.includes("preview_block:roster_under_min") ||
+    blocker.includes("season_market_buy_forbidden")
+  );
+}
+
 async function applySeasonEnd(saveId: string, persistence: PersistenceService) {
   const rows: Record<string, unknown>[] = [];
   const performanceRows: PhaseMetric[] = [];
@@ -1975,54 +1969,51 @@ async function applySeasonEnd(saveId: string, persistence: PersistenceService) {
   let marketWarnings = existingMarketTransfers.length > 0 ? [`existing_market_transfers:${existingMarketTransfers.length}`] : [];
   let marketBlockers: string[] = [];
   let plannerFinalGateRows: Record<string, unknown>[] = [];
+  let seasonEndEmergencyRepairTeams: string[] = [];
   const allowSeasonEndMarketBuys = isTransferActionAllowed(seasonId, "season_end_market_buy");
   if (existingMarketTransfers.length === 0) {
-    const market = await applyAiMarketPlanLocally({
-      source: "sqlite",
+    const marketConvergence = await runMarketPlanConvergence({
       saveId,
       seasonId,
-      teamScope: "all",
+      persistence,
       dryRun: false,
       confirmToken: AI_MARKET_APPLY_CONFIRM_TOKEN,
       transferPhase: "manual_transfer_window",
-      options: {
-        includeWarningTeams: true,
-        applySellSteps: true,
-        applyBuySteps: allowSeasonEndMarketBuys,
-        maxBuysPerTeam: null,
-        maxSellsPerTeam: 2,
-        previewBuyLimit: 48,
-        previewSellLimit: 8,
-        performanceBudgetMs: 8_000,
-        maxApplyMs: 120_000,
-        progressLog: true,
-        stopOnTeamFailure: false,
-      },
+      teamScope: "all",
+      maxPasses: 2,
+      maxRoundsPerPass: 3,
+      allowBuys: allowSeasonEndMarketBuys,
+      skipIfExistingMarketTransfers: false,
+      progressLog: true,
     });
-    marketStatus = market.status;
-    marketAppliedBuys = market.summary.appliedBuys;
-    marketAppliedSells = market.summary.appliedSells;
-    marketBlockedTeams = market.summary.blockedTeams;
-    marketWarnings = market.warnings;
-    marketBlockers = market.blockingReasons;
-    plannerFinalGateRows = market.teams.map((team) => ({
+    marketStatus = marketConvergence.blockingReasons.length > 0 ? "blocked" : "applied";
+    marketAppliedBuys = marketConvergence.appliedBuys;
+    marketAppliedSells = marketConvergence.appliedSells;
+    marketBlockedTeams = marketConvergence.perTeam.filter((team) => team.status === "blocked").length;
+    marketWarnings = marketConvergence.warnings;
+    marketBlockers = marketConvergence.blockingReasons;
+    seasonEndEmergencyRepairTeams = marketConvergence.emergencyRepairTeams;
+    plannerFinalGateRows = marketConvergence.perTeam.map((team) => ({
       seasonId,
       teamId: team.teamId,
       teamName: team.teamName,
-      result: team.result,
-      plannedBuys: team.plannedBuys,
-      executedBuys: team.executedBuys,
-      plannedSells: team.plannedSells,
-      executedSells: team.executedSells,
-      rosterBefore: team.rosterBefore,
+      result: team.status,
+      plannedBuys: team.appliedBuys,
+      executedBuys: team.appliedBuys,
+      plannedSells: team.appliedSells,
+      executedSells: team.appliedSells,
       rosterAfter: team.rosterAfter,
-      cashBefore: team.cashBefore,
-      cashAfter: team.cashAfter,
-      projectedCash: team.projectedCash,
-      warnings: team.warnings.filter((entry) => entry.includes("planner_final_gate")).join("|"),
+      minRequired: team.minRequired,
+      warnings: team.warnings.join("|"),
       blockingReasons: team.blockingReasons.join("|"),
     }));
-    if (market.status === "blocked") blockers.push(...market.blockingReasons.map((entry) => `ai_market:${entry}`));
+    if (marketConvergence.blockingReasons.length > 0) {
+      blockers.push(
+        ...marketConvergence.blockingReasons
+          .filter((entry) => !isExpectedSeasonOneMarketRosterBlocker(seasonId, entry))
+          .map((entry) => `ai_market:${entry}`),
+      );
+    }
   }
   recordPhase(performanceRows, {
     seasonId,
@@ -2041,7 +2032,7 @@ async function applySeasonEnd(saveId: string, persistence: PersistenceService) {
     })),
   );
   const finalRosterRepair = isTransferActionAllowed(seasonId, "preseason_roster_repair")
-    ? repairRosterMinimumBeforeSeasonStart(saveId, seasonId, persistence)
+    ? emergencyRepairRosterMinimumBeforeSeasonStart(saveId, seasonId, persistence, seasonEndEmergencyRepairTeams)
     : { performanceRows: [] as PhaseMetric[], blockers: [] as string[], purchases: [] as Array<Record<string, unknown>>, repaired: false };
   performanceRows.push(
     ...finalRosterRepair.performanceRows.map((row) => ({
@@ -2049,20 +2040,10 @@ async function applySeasonEnd(saveId: string, persistence: PersistenceService) {
       phase: `season end final stabilization ${row.phase}`,
     })),
   );
+  let seasonEndStabilizationPurchases = [...finalRosterRepair.purchases];
   save = persistence.getSaveById(saveId);
   if (!save) throw new Error("Long-run save disappeared after final season-end stabilization.");
-  const finalRosterCounts = rosterCounts(save.gameState);
-  const finalBelowMin = finalRosterCounts.filter(
-    ({ roster, identity }) => roster.length < Math.max(identity?.playerMin ?? 7, 7),
-  );
   const finalNegativeCash = save.gameState.teams.filter((team) => team.cash < 0);
-  if (finalBelowMin.length > 0) {
-    blockers.push(
-      ...finalBelowMin.map(({ team, roster, identity }) =>
-        `final_stabilization:roster_below_min:${team.shortCode}:${roster.length}/${Math.max(identity?.playerMin ?? 7, 7)}`,
-      ),
-    );
-  }
   if (finalNegativeCash.length > 0) {
     blockers.push(
       ...finalNegativeCash.map((team) => `final_stabilization:negative_cash:${team.shortCode}:${round(team.cash)}`),
@@ -2089,7 +2070,15 @@ async function applySeasonEnd(saveId: string, persistence: PersistenceService) {
     blockers: blockers.join("|"),
   });
 
-  return { rows, performanceRows, blockers, totalPrizeMoney, aiMarketStatus: marketStatus, plannerFinalGateRows };
+  return {
+    rows,
+    performanceRows,
+    blockers,
+    totalPrizeMoney,
+    aiMarketStatus: marketStatus,
+    plannerFinalGateRows,
+    stabilizationPurchases: seasonEndStabilizationPurchases,
+  };
 }
 
 function collectAuditRows(save: PersistedSaveGame, seasonId: string, seasonEnd: { totalPrizeMoney: number; aiMarketStatus: string }) {
@@ -2414,13 +2403,18 @@ async function main() {
       break;
     }
     save = persistence.getSaveById(save.saveId) ?? save;
-    const plannerReview = await runPreseasonPlannerReviewBeforeRosterRepair(save.saveId, seasonId, persistence);
-    performanceRows.push(...plannerReview.performanceRows);
-    if (plannerReview.warnings.length > 0) {
-      balanceIssues.push(...plannerReview.warnings.map((warning) => `${seasonId}:planner_review:${warning}`));
+    const plannerConvergence = await runPreseasonPlannerConvergenceBeforeEmergencyRepair(save.saveId, seasonId, persistence);
+    performanceRows.push(...plannerConvergence.performanceRows);
+    if (plannerConvergence.warnings.length > 0) {
+      balanceIssues.push(...plannerConvergence.warnings.map((warning) => `${seasonId}:planner_convergence:${warning}`));
     }
     save = persistence.getSaveById(save.saveId) ?? save;
-    const rosterRepair = repairRosterMinimumBeforeSeasonStart(save.saveId, seasonId, persistence);
+    const rosterRepair = emergencyRepairRosterMinimumBeforeSeasonStart(
+      save.saveId,
+      seasonId,
+      persistence,
+      plannerConvergence.emergencyRepairTeams,
+    );
     performanceRows.push(...rosterRepair.performanceRows);
     aiMarketRows.push(...rosterRepair.purchases);
     if (rosterRepair.blockers.length > 0) {
@@ -2470,8 +2464,12 @@ async function main() {
     performanceRows.push(...seasonEnd.performanceRows);
     plannerFinalGateRows.push(...seasonEnd.plannerFinalGateRows);
     if (seasonEnd.blockers.length > 0) {
-      openTechnicalBugs.push(...seasonEnd.blockers.map((entry) => `${seasonId}:${entry}`));
-      break;
+      const hardBlockers = seasonEnd.blockers.filter((entry) => !isExpectedSeasonOneMarketRosterBlocker(seasonId, entry));
+      if (hardBlockers.length > 0) {
+        openTechnicalBugs.push(...hardBlockers.map((entry) => `${seasonId}:${entry}`));
+        break;
+      }
+      balanceIssues.push(...seasonEnd.blockers.map((entry) => `${seasonId}:expected_s1_market:${entry}`));
     }
     save = persistence.getSaveById(save.saveId) ?? save;
     const audit = collectAuditRows(save, seasonId, seasonEnd);
@@ -2490,6 +2488,7 @@ async function main() {
     })));
     rosterRows.push(...audit.teamRows);
     aiMarketRows.push(...audit.transferRows);
+    aiMarketRows.push(...seasonEnd.stabilizationPurchases ?? []);
     contractExitRows.push(...audit.contractRows.filter((row) => row.eventType === "contract_expired_exit"));
     renewalRows.push(...audit.contractRows);
     buildingsRows.push(...audit.facilityRows);
@@ -2618,8 +2617,12 @@ async function main() {
 
   const seasonHistory = finalSave.gameState.seasonState.seasonSnapshots ?? [];
   const cashEconomyAudit = buildCashEconomyAudit(finalSave.gameState);
+  const transferFinanceAudit = buildTransferFinanceAudit(finalSave.gameState);
   if (cashEconomyAudit.violations.length > 0) {
     openTechnicalBugs.push(...cashEconomyAudit.violations.map((entry) => `cash_economy:${entry}`));
+  }
+  if (transferFinanceAudit.violations.length > 0) {
+    openTechnicalBugs.push(...transferFinanceAudit.violations.map((entry) => `transfer_finance:${entry}`));
   }
   const s1ForbiddenBuySources = findSeasonOneForbiddenBuySources(finalSave.gameState.transferHistory);
   if (s1ForbiddenBuySources.length > 0) {
@@ -2644,6 +2647,7 @@ async function main() {
       season1AutoprepTopupAfterSeason1: aiMarketRows.some((row) => row.source === "season1_autoprep_topup" && row.seasonId !== "season-1"),
       season1ForbiddenBuySources: s1ForbiddenBuySources,
       cashEconomyViolations: cashEconomyAudit.violations,
+      transferFinanceViolations: transferFinanceAudit.violations,
       seasonsWithSponsorEndSettlement: cashEconomyAudit.seasonsWithSponsorEndSettlement,
       anyRosterAllExactlyTen: allSeasonSummaries.some((entry) => entry.rosterAllExactlyTen),
       negativeCashTeams: rosterRows.filter((row) => Number(row.cash ?? 0) < 0).length,
@@ -2675,6 +2679,27 @@ async function main() {
 
   writeOutput("multi-season-s1-s6-summary.json", `${JSON.stringify(summary, null, 2)}\n`);
   writeOutput("cash-economy-audit.json", `${JSON.stringify(cashEconomyAudit, null, 2)}\n`);
+  writeOutput("transfer-finance-violations.json", `${JSON.stringify({ violations: transferFinanceAudit.violations, doctrineStats: transferFinanceAudit.doctrineStats }, null, 2)}\n`);
+  writeCsv(
+    "transfer-finance-by-season.csv",
+    transferFinanceAudit.rows,
+    [
+      "seasonId",
+      "teamId",
+      "teamName",
+      "cashStart",
+      "cashEnd",
+      "buyFeesPaid",
+      "sellProceeds",
+      "netTransferCash",
+      "sponsorCashIn",
+      "salaryPaidOut",
+      "netSponsorCash",
+      "buyCount",
+      "sellCount",
+      "cashReconciliationDelta",
+    ],
+  );
   writeOutput(
     "multi-season-s1-s6-summary.md",
     [

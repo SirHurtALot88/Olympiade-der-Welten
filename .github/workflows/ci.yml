@@ -19,6 +19,7 @@ jobs:
           cache: npm
       - run: npm ci
       - run: npx playwright install chromium --with-deps
+      - run: npm run ci:import-exists
       - run: npm run ci:flow-smoke
       - run: npm run perf:regression-smoke
       - name: Start dev server for browser smokes
@@ -26,7 +27,9 @@ jobs:
           npm run dev &
           echo $! > .dev-server.pid
       - run: npm run app:check-live -- --startup-retries 90 --startup-delay-ms 2000
+      - run: npm run ci:ensure-gameplay-smoke-save
       - run: npm run app:smoke-gameplay
+      - run: npm run app:smoke-multiplayer-e2e -- --no-start
       - name: Stop dev server
         if: always()
         run: kill "$(cat .dev-server.pid)" 2>/dev/null || true

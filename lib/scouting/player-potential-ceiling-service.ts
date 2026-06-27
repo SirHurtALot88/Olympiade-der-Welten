@@ -101,6 +101,27 @@ function computeOverallFromAxisStars(values: Record<PlayerAxisKey, number>) {
   );
 }
 
+export function clampPotentialOverallToCurrent(currentOverall: number, potentialOverall: number) {
+  return roundHalfStar(Math.max(potentialOverall, currentOverall));
+}
+
+export function clampPotentialCeilingToCurrentStars(
+  currentStars: PlayerAxisStarProfile,
+  ceiling: PlayerPotentialCeilingProfile,
+): PlayerPotentialCeilingProfile {
+  const clampedAxis = {} as Record<PlayerAxisKey, number>;
+  for (const axis of AXIS_KEYS) {
+    clampedAxis[axis] = roundHalfStar(Math.max(ceiling[axis], currentStars[axis]));
+  }
+  return {
+    ...clampedAxis,
+    overall: clampPotentialOverallToCurrent(
+      currentStars.overall,
+      Math.max(computeOverallFromAxisStars(clampedAxis), ceiling.overall),
+    ),
+  };
+}
+
 function deriveAxisCeiling(input: {
   axis: PlayerAxisKey;
   currentStars: number;
@@ -151,17 +172,28 @@ export function buildPlayerPotentialCeilingProfile(input: {
       input.existing?.hiddenPotentialScore ??
       null,
   });
-  return derivePlayerPotentialCeilingProfileFromAttributeCeilings({
-    attributeCeilings,
-    currentStars: input.currentStars,
-  });
+  return finalizePotentialCeilingProfile(
+    input.currentStars,
+    derivePlayerPotentialCeilingProfileFromAttributeCeilings({
+      attributeCeilings,
+      currentStars: input.currentStars,
+    }),
+  );
+}
+
+function finalizePotentialCeilingProfile(
+  currentStars: PlayerAxisStarProfile,
+  ceiling: PlayerPotentialCeilingProfile,
+): PlayerPotentialCeilingProfile {
+  return clampPotentialCeilingToCurrentStars(currentStars, ceiling);
 }
 
 export function buildPotentialGap(input: {
   currentStars: PlayerAxisStarProfile;
   ceiling: PlayerPotentialCeilingProfile;
 }) {
-  return roundHalfStar(clamp(input.ceiling.overall - input.currentStars.overall, 0, 5));
+  const ceiling = finalizePotentialCeilingProfile(input.currentStars, input.ceiling);
+  return roundHalfStar(clamp(ceiling.overall - input.currentStars.overall, 0, 5));
 }
 
 export function revealPotentialStars(input: {
@@ -169,8 +201,9 @@ export function revealPotentialStars(input: {
   currentStars: PlayerAxisStarProfile;
   scoutingLevel: number;
 }): RevealedPotentialStars {
+  const ceiling = finalizePotentialCeilingProfile(input.currentStars, input.ceiling);
   const level = clamp(Math.round(input.scoutingLevel), 0, 5);
-  const gap = buildPotentialGap({ currentStars: input.currentStars, ceiling: input.ceiling });
+  const gap = buildPotentialGap({ currentStars: input.currentStars, ceiling });
 
   if (level <= 2) {
     const band =
@@ -192,8 +225,8 @@ export function revealPotentialStars(input: {
   }
 
   const blur = level >= 5 ? 0.25 : level >= 4 ? 0.5 : 1;
-  const overallMin = roundHalfStar(clamp(input.currentStars.overall, 0.5, input.ceiling.overall - blur));
-  const overallMax = roundHalfStar(clamp(input.ceiling.overall + blur, overallMin, 5));
+  const overallMin = roundHalfStar(Math.max(input.currentStars.overall, ceiling.overall - blur));
+  const overallMax = roundHalfStar(Math.max(overallMin, Math.min(5, ceiling.overall + blur)));
 
   if (level <= 3) {
     return {
@@ -208,9 +241,9 @@ export function revealPotentialStars(input: {
   const byAxis: RevealedPotentialStars["byAxis"] = {};
   for (const axis of AXIS_KEYS) {
     byAxis[axis] = {
-      min: roundHalfStar(clamp(input.currentStars[axis], 0.5, input.ceiling[axis] - blur)),
+      min: roundHalfStar(Math.max(input.currentStars[axis], ceiling[axis] - blur)),
       max: roundHalfStar(
-        clamp(input.ceiling[axis] + (level >= 5 ? 0 : blur), input.currentStars[axis], 5),
+        Math.max(input.currentStars[axis], Math.min(5, ceiling[axis] + (level >= 5 ? 0 : blur))),
       ),
     };
   }
@@ -337,10 +370,13 @@ export function applyAxisCeilingSeasonDrift(input: {
     });
     return {
       attributeCeilings: driftedAttributes,
-      ceiling: derivePlayerPotentialCeilingProfileFromAttributeCeilings({
-        attributeCeilings: driftedAttributes,
-        currentStars: input.currentStars,
-      }),
+      ceiling: finalizePotentialCeilingProfile(
+        input.currentStars,
+        derivePlayerPotentialCeilingProfileFromAttributeCeilings({
+          attributeCeilings: driftedAttributes,
+          currentStars: input.currentStars,
+        }),
+      ),
     };
   }
 
@@ -352,14 +388,13 @@ export function applyAxisCeilingSeasonDrift(input: {
     else if (input.growthOutlook === "growth" && delta < 0) delta = 0;
     else if (input.growthOutlook === "stagnation" && delta > 0) delta = 0;
     else if (input.growthOutlook === "regression_risk") delta = Math.min(delta, -0.5);
-    drifted[axis] = roundHalfStar(clamp(input.ceiling[axis] + delta, 0.5, 5));
+    drifted[axis] = roundHalfStar(clamp(input.ceiling[axis] + delta, input.currentStars[axis], 5));
   }
-  const legacyCeiling = {
-    ...drifted,
-    overall: computeOverallFromAxisStars(drifted),
-  };
   return {
-    ceiling: legacyCeiling,
+    ceiling: finalizePotentialCeilingProfile(input.currentStars, {
+      ...drifted,
+      overall: computeOverallFromAxisStars(drifted),
+    }),
     attributeCeilings: {},
   };
 }

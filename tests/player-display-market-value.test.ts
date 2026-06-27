@@ -5,6 +5,8 @@ import { createPlayerBaselinesForPlayers } from "@/lib/players/player-baseline-s
 import {
   getPlayerDisplayMarketValueDelta,
   getPlayerSeasonMarketValueReference,
+  getPlayerSeasonZeroMarketValueDelta,
+  getPlayerSeasonZeroMarketValueReference,
 } from "@/lib/foundation/player-display-market-value";
 
 function createPlayer(partial?: Partial<Player>): Player {
@@ -145,5 +147,58 @@ describe("player display market value delta", () => {
 
     expect(getPlayerSeasonMarketValueReference({ player, rosterEntry: null, gameState })).toBe(8);
     expect(getPlayerDisplayMarketValueDelta({ player, rosterEntry: null, gameState })).toBe(4);
+  });
+
+  it("ignores legacy baseline scale mismatches and uses imported display MW as season-0 reference", () => {
+    const player = createPlayer({
+      id: "player-2984-vip-wal",
+      marketValue: 100,
+      displayMarketValue: 100,
+      salaryDemand: 17,
+      displaySalary: 17,
+    });
+    const gameState = {
+      ...createGameState({ player, roster: null, seasonId: "season-1" }),
+      playerBaselines: [
+        {
+          playerId: player.id,
+          name: player.name,
+          race: player.race,
+          className: player.className,
+          subclasses: [],
+          traits: [],
+          traitsPositive: [],
+          traitsNegative: [],
+          attributes: {},
+          marketValue: 1_000_000,
+          salary: 10,
+          seasonZeroEconomy: {
+            source: "season_0_backfilled",
+            marketValue: 1_000_000,
+            salary: 10,
+            purchasePrice: 1_000_000,
+            salaryMarketValue: 1_000_000,
+            baseMarketValue: null,
+            salaryBase: null,
+            traitPercentSum: null,
+            marketValueSource: "baseline_market_value_backfill",
+            salarySource: "baseline_salary_backfill",
+            computedAt: "2026-06-01T00:00:00.000Z",
+          },
+          disciplineRatings: {},
+          source: "seed",
+          baselineVersion: "player-baseline-v2",
+          createdAt: "2026-06-01T00:00:00.000Z",
+          importedAt: "2026-06-01T00:00:00.000Z",
+          sourceFile: "data/generated/oly-player-stats.json",
+          checksumAlgorithm: "sha256",
+          checksum: "legacy-test",
+        },
+      ],
+    } as GameState;
+
+    expect(getPlayerSeasonZeroMarketValueReference({ player, gameState, currentMarketValue: 100 })).toBe(100);
+    expect(getPlayerSeasonZeroMarketValueDelta({ player, gameState, currentMarketValue: 100 })).toBeNull();
+    expect(getPlayerSeasonMarketValueReference({ player, rosterEntry: null, gameState, currentMarketValue: 100 })).toBe(100);
   });
 });

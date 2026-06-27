@@ -69,6 +69,8 @@ export type TransfermarktSellPreview = {
   profit: number | null;
   salaryReduction: number | null;
   projectedReadinessAfterSell: LegacyMatchdayReadinessStatus | "unknown" | null;
+  coaching?: import("@/lib/market/transfermarkt-sell-coaching-service").TransfermarktSellCoachingView | null;
+  pricingPolicyMultiplier?: number | null;
 };
 
 export type TransfermarktSellExecuteResult = TransfermarktSellPreview & {

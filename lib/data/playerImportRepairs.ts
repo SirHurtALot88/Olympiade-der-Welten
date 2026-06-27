@@ -1,7 +1,5 @@
 import type { Player, PlayerAttributeSheetStats, PlayerGeneratorAttributes } from "@/lib/data/olyDataTypes";
-import { loadPlayerFormulaSources } from "@/lib/player-formulas/formula-source-loader";
-import { calculateMarketValueFromRankTable } from "@/lib/player-formulas/market-value-engine";
-import { calculateSalaryFromMarketValue } from "@/lib/player-formulas/salary-engine";
+import { materializeCalculatedEconomyForPlayers } from "@/lib/player-formulas/imported-player-economy";
 import {
   officialDisciplineWeightMatrix,
   officialDisciplineWeightOrder,
@@ -148,60 +146,7 @@ function repairRileyLeRogue(player: Player): Player {
   };
 }
 
-function hasMissingEconomy(player: Player) {
-  const marketValue = player.displayMarketValue ?? player.marketValue;
-  const salary = player.displaySalary ?? player.salaryDemand;
-  return !isFiniteNumber(marketValue) || marketValue <= 0 || !isFiniteNumber(salary) || salary < 0;
-}
-
-function materializeCalculatedEconomyForMissingPlayers(players: Player[]) {
-  const playersNeedingEconomy = players.filter((player) => isRileyLeRogue(player) && hasMissingEconomy(player));
-  if (playersNeedingEconomy.length === 0) return players;
-
-  const formulaSources = loadPlayerFormulaSources();
-  const marketValueResult = calculateMarketValueFromRankTable({
-    players: players
-      .filter((player) => Object.values(player.disciplineRatings ?? {}).some((value) => isFiniteNumber(value) && value > 0))
-      .map((player) => ({
-        playerId: player.id,
-        scores: player.disciplineRatings ?? {},
-      })),
-    rankToDisciplineMarketValue: formulaSources.rankToDisciplineMarketValue,
-  });
-  if (marketValueResult.status !== "ready") return players;
-
-  const marketValueByPlayerId = new Map(
-    marketValueResult.players.map((entry) => [entry.playerId, entry.marketValueNew] as const),
-  );
-
-  return players.map((player) => {
-    if (!isRileyLeRogue(player) || !hasMissingEconomy(player)) return player;
-    const marketValue = marketValueByPlayerId.get(player.id);
-    const attributes = toGeneratorAttributes(player.attributeSheetStats);
-    if (!isFiniteNumber(marketValue) || marketValue <= 0 || !attributes) return player;
-    if (!formulaSources.attributeSalaryModifiers || !formulaSources.traitSalaryFactors) return player;
-
-    const salary = calculateSalaryFromMarketValue({
-      salaryMarketValue: marketValue,
-      attributes,
-      traitsPositive: player.traitsPositive ?? [],
-      traitsNegative: player.traitsNegative ?? [],
-      attributeSalaryModifiers: formulaSources.attributeSalaryModifiers,
-      traitSalaryFactors: formulaSources.traitSalaryFactors,
-    }).finalSalary;
-
-    return {
-      ...player,
-      marketValue: roundTo2(marketValue),
-      displayMarketValue: roundTo2(marketValue),
-      cost: roundTo2(marketValue),
-      salaryDemand: roundTo2(Math.max(0, salary)),
-      displaySalary: roundTo2(Math.max(0, salary)),
-      upkeepBase: roundTo2(Math.max(0, salary)),
-    };
-  });
-}
-
 export function repairImportedPlayerData(players: Player[]) {
-  return materializeCalculatedEconomyForMissingPlayers(players.map(repairRileyLeRogue));
+  const repaired = players.map(repairRileyLeRogue);
+  return materializeCalculatedEconomyForPlayers(repaired);
 }

@@ -1,5 +1,5 @@
 import type { GameState, Player, RosterEntry, Team } from "@/lib/data/olyDataTypes";
-import { resolvePlayerEconomyContract } from "@/lib/foundation/player-economy-contract";
+import { normalizeEconomyMoney, resolvePlayerEconomyContract } from "@/lib/foundation/player-economy-contract";
 import { buildPlayerRatingContractMap } from "@/lib/foundation/player-rating-contract";
 import { buildSeasonPointsLedger } from "@/lib/foundation/season-points-ledger";
 import { getTeamGeneralManager } from "@/lib/foundation/team-general-managers";
@@ -386,7 +386,10 @@ export function buildTeamSeasonOverviewRows(input: TeamManagementSnapshotInput):
             rosterPlayers.reduce((sum, item) => sum + getRosterDisplaySalary(item.entry, item.player), 0),
             2,
           )
-        : roundValue(roster.reduce((sum, entry) => sum + entry.salary, 0), 2);
+        : roundValue(
+            roster.reduce((sum, entry) => sum + (normalizeEconomyMoney(entry.salary) ?? 0), 0),
+            2,
+          );
     const marketValueTotal =
       rosterPlayers.length > 0
         ? roundValue(
@@ -538,9 +541,9 @@ export function buildTeamSeasonOverviewRows(input: TeamManagementSnapshotInput):
       rank: activeRank,
       points: currentVisiblePoints,
       rosterCount: roster.length > 0 ? roster.length : usesArchivedSnapshotValues ? standing?.rosterCount ?? roster.length : roster.length,
-      salaryTotal: roster.length > 0 ? salaryTotal : usesArchivedSnapshotValues ? standing?.salaryTotal ?? salaryTotal : salaryTotal,
+      salaryTotal: roster.length > 0 ? salaryTotal : usesArchivedSnapshotValues ? normalizeEconomyMoney(standing?.salaryTotal) ?? salaryTotal : salaryTotal,
       avgContractLength,
-      marketValueTotal: roster.length > 0 ? marketValueTotal : usesArchivedSnapshotValues ? standing?.marketValueTotal ?? marketValueTotal : marketValueTotal,
+      marketValueTotal: roster.length > 0 ? marketValueTotal : usesArchivedSnapshotValues ? normalizeEconomyMoney(standing?.marketValueTotal) ?? marketValueTotal : marketValueTotal,
       cash,
       cashFc,
       budget,
@@ -664,8 +667,8 @@ export function buildTeamSeasonOverviewRows(input: TeamManagementSnapshotInput):
         sponsorBasis: prizeSummary?.basis ?? row.sponsorBasis ?? null,
         sponsorRank: prizeSummary?.placementBonus ?? row.sponsorRank ?? null,
         sponsorSeason: prizeSummary?.sponsorSeason ?? row.sponsorSeason ?? null,
-        sponsorTotal: prizeSummary?.sponsorTotal ?? row.sponsorTotal ?? null,
-        guv: prizeSummary?.profitLoss ?? row.guv ?? null,
+        sponsorTotal: normalizeEconomyMoney(prizeSummary?.sponsorTotal ?? row.sponsorTotal) ?? prizeSummary?.sponsorTotal ?? row.sponsorTotal ?? null,
+        guv: normalizeEconomyMoney(prizeSummary?.profitLoss ?? row.guv) ?? prizeSummary?.profitLoss ?? row.guv ?? null,
         cashTotal: prizeSummary?.cashTotal ?? row.cashTotal ?? null,
       };
     })

@@ -1,5 +1,5 @@
 import { evaluateAiNeeds } from "@/lib/ai/aiNeedsEngine";
-import { getAiManagerMarketSpendableCash } from "@/lib/ai/ai-manager-apply-service";
+import { getAiManagerMarketSpendableCash, resolveMarketSpendableCashForPlanner } from "@/lib/ai/ai-manager-apply-service";
 import { getTeamObjectiveAiBias, type TeamObjectiveAiBias } from "@/lib/board/team-season-objectives-service";
 import type { ContractShape, GameState, Player, Team, TeamControlMode, TeamStrategyProfile } from "@/lib/data/olyDataTypes";
 import { resolvePlayerEconomyContract } from "@/lib/foundation/player-economy-contract";
@@ -1552,9 +1552,6 @@ export async function buildAiTransfermarktPreview(params: AiTransferPreviewParam
         playerMin: directPlayerMin > 0 ? directPlayerMin : null,
         playerOpt: directPlayerOpt > 0 ? directPlayerOpt : null,
       });
-      const effectiveMarketCash = getAiManagerMarketSpendableCash(context.gameState, team.teamId, team.cash);
-      const budgetTeam = { ...team, cash: effectiveMarketCash ?? team.cash };
-      const budgetStatus = getBudgetStatus(budgetTeam);
       const forceBuyScanTeamIds = new Set(params.forceBuyScanTeamIds ?? []);
       const shouldDeepScanBuyCandidates =
         requestedTeam != null ||
@@ -1587,6 +1584,15 @@ export async function buildAiTransfermarktPreview(params: AiTransferPreviewParam
         playerMin: effectivePlayerMin > 0 ? effectivePlayerMin : null,
         playerOpt: effectivePlayerOpt > 0 ? effectivePlayerOpt : null,
       });
+      const effectiveMarketCash = resolveMarketSpendableCashForPlanner({
+        gameState: context.gameState,
+        teamId: team.teamId,
+        teamCash: team.cash,
+        rosterBelowMin: rosterStatus === "under_min" || directRosterStatus === "under_min",
+        forceRosterFill: forceBuyScanTeamIds.has(team.teamId),
+      });
+      const budgetTeam = { ...team, cash: effectiveMarketCash ?? team.cash };
+      const budgetStatus = getBudgetStatus(budgetTeam);
       const weakestAxes = needs.uncoveredNeedAxes.slice(0, 2);
       const warnings: string[] = [];
 

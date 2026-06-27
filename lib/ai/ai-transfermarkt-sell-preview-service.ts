@@ -22,7 +22,10 @@ import { assessPlayerBoardTrust, type PlayerBoardTrustRenewalPolicy } from "@/li
 import { evaluateAiSellDecision } from "@/lib/ai/ai-sell-decision-engine";
 import { resolveTransferDoctrine } from "@/lib/ai/ai-transfer-doctrine-layer";
 import type { AiKeepReasonCode, AiSellReasonCode } from "@/lib/ai/ai-transfer-reason-codes";
+import { applyGmArchetypeSellScoreModifier } from "@/lib/ai/gm-sell-archetype-modifier";
 import { buildPlayerDemands } from "@/lib/morale/player-demands-service";
+import { resolveGmPressureBehavior } from "@/lib/foundation/gm-pressure-behavior";
+import { getTeamGeneralManager } from "@/lib/foundation/team-general-managers";
 
 export type AiSellPreviewSource = "sqlite" | "prisma";
 export type AiSellPreviewTeamScope = "ai" | "all";
@@ -459,6 +462,8 @@ function buildCandidate(
     (playerRating?.ovrRank != null && playerRating.ovrRank <= 10) ||
     (playerRating?.ppsSeasonRank != null && playerRating.ppsSeasonRank <= 10) ||
     (playerRating?.mvsRank != null && playerRating.mvsRank <= 10);
+  const gmPressure = resolveGmPressureBehavior(context.gameState, team.teamId);
+  const gmProfile = getTeamGeneralManager(context.gameState, team.teamId)?.profile ?? null;
   const playerDemands = buildPlayerDemands(context.gameState, player.id, team.teamId);
   const openDemands = playerDemands.filter((demand) => demand.status === "open" || demand.status === "at_risk");
   const demandPressureScore = openDemands.reduce((sum, demand) => {
@@ -533,7 +538,13 @@ function buildCandidate(
   }
   if (openDemands.length > 0) {
     const demandLabels = openDemands.slice(0, 2).map((demand) => demand.label).join(", ");
-    if (demandPressureScore >= 0.18 && !starProtection && !coversNeedAxis) {
+    const highPriorityDemand = openDemands.some((demand) => demand.priority === "high");
+    if (gmPressure.acceptPlayerDemandsUnderPressure && highPriorityDemand) {
+      pushKeep(
+        "player_demand_keep",
+        `GM unter Druck geht eher auf Forderungen ein: ${demandLabels}`,
+      );
+    } else if (demandPressureScore >= 0.18 && !starProtection && !coversNeedAxis) {
       pushSell("player_demand_pressure", `offene Spielerforderung erzeugt Kaderdruck: ${demandLabels}`);
     } else {
       pushKeep("player_demand_keep", `offene Forderung muss eingeplant werden: ${demandLabels}`);
@@ -611,8 +622,23 @@ function buildCandidate(
     pushKeep("healthy_cash", "Teamcash ist entspannt");
   }
 
+  let adjustedScoreRaw = scoreRaw;
+  if (gmPressure.chaseBoardObjectivesMultiplier > 1.15 && profitScore != null && profitScore > 0) {
+    adjustedScoreRaw += 8 * (gmPressure.chaseBoardObjectivesMultiplier - 1);
+  }
+  if (gmPressure.isHotSeat && underperformed) {
+    adjustedScoreRaw += 5;
+  }
+
   const doctrine = resolveTransferDoctrine(context.gameState, team.teamId);
-  const sellPriority = Math.round(clamp(scoreRaw, 0, 100));
+  const gmAdjustedScore = applyGmArchetypeSellScoreModifier({
+    baseScore: adjustedScoreRaw,
+    gmProfile,
+    pressure: gmPressure,
+    sellReasonCodes,
+    keepReasonCodes,
+  });
+  const sellPriority = Math.round(clamp(gmAdjustedScore, 0, 100));
   const sellDecision = evaluateAiSellDecision({
     sellPriority,
     reasonToSell,
@@ -919,4 +945,53 @@ export async function buildAiTransfermarktSellPreview(params: AiSellPreviewParam
     },
   };
   return result;
+}
+
+export function buildSellCoachingCandidateForActivePlayer(input: {
+  gameState: GameState;
+  teamId: string;
+  activePlayerId: string;
+}): AiSellPreviewCandidate | null {
+  const gameState = normalizeGameState(input.gameState);
+  const team = gameState.teams.find((entry) => entry.teamId === input.teamId) ?? null;
+  if (!team) {
+    return null;
+  }
+
+  const rosterItems = getTeamRoster(gameState, input.teamId);
+  const rosterItem = rosterItems.find((entry) => entry.roster.id === input.activePlayerId) ?? null;
+  if (!rosterItem) {
+    return null;
+  }
+
+  const context: ResolvedPreviewContext = {
+    source: "sqlite",
+    saveId: "",
+    seasonId: gameState.season.id,
+    gameState,
+  };
+  const cache = buildSellPreviewRunCache(gameState);
+  const playerRatingsById = buildPlayerRatingContractMap(gameState);
+  const identity = gameState.teamIdentities.find((entry) => entry.teamId === input.teamId) ?? null;
+  const profile = getTeamStrategyProfile(gameState, input.teamId);
+  const rosterSize = rosterItems.length;
+  const salaryTotal = rosterItems.reduce(
+    (sum, item) => sum + (resolvePlayerEconomyContract({ player: item.player, rosterEntry: item.roster }).salary ?? 0),
+    0,
+  );
+  const playerMin = identity?.playerMin ?? profile?.rosterMinTarget ?? null;
+  const playerOpt = identity?.playerOpt ?? profile?.rosterOptTarget ?? null;
+
+  return buildCandidate(
+    context,
+    playerRatingsById,
+    team,
+    rosterItem.roster,
+    rosterItem.player,
+    rosterSize,
+    salaryTotal,
+    playerMin,
+    playerOpt,
+    cache,
+  );
 }

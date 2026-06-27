@@ -31,6 +31,7 @@ export type ReplacementSlot = {
 const MARKET_SELL_SOURCES = new Set([
   "ai_preseason_market_sell",
   "manual_transfer_window",
+  "manual_transfermarkt_sell",
   "emergency_negative_cash_liquidation",
 ]);
 

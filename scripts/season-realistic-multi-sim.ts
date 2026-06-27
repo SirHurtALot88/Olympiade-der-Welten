@@ -15,11 +15,13 @@ import path from "node:path";
 import { loadEnvConfig } from "@next/env";
 
 import type { GameState, TransferHistoryEntry } from "@/lib/data/olyDataTypes";
+import { getTeamHardMinRequired, getTeamOptTarget } from "@/lib/ai/ai-market-plan-convergence-service";
 import { calculateOpenBuyoutCost } from "@/lib/market/contract-negotiation-preview";
 import { buildTransfermarktSaleFactorBreakdown } from "@/lib/market/transfermarkt-sale-factor";
 import { createPersistenceService } from "@/lib/persistence/persistence-service";
 import { getSeasonEconomyFactorWindow } from "@/lib/season/season-economy-factors";
 import { buildEconomyAuditReport } from "@/lib/season/economy-audit-report";
+import { buildBuyEconomics, buildTransferFinanceAudit } from "@/lib/season/transfer-finance-audit";
 
 const PROJECT_ROOT = path.resolve(__dirname, "..");
 
@@ -188,6 +190,49 @@ function buildContractShapeBySeason(gameState: GameState, saveId: string) {
   });
 }
 
+function buildRosterOptAchievement(gameState: GameState) {
+  const rows = gameState.teams.map((team) => {
+    const rosterCount = gameState.rosters.filter((entry) => entry.teamId === team.teamId).length;
+    const optTarget = getTeamOptTarget(gameState, team.teamId);
+    const hardMin = getTeamHardMinRequired(gameState, team.teamId);
+    return {
+      teamId: team.teamId,
+      shortCode: team.shortCode,
+      rosterCount,
+      optTarget,
+      hardMin,
+      atOpt: rosterCount >= optTarget,
+      withinOneOfOpt: rosterCount >= optTarget - 1 && rosterCount <= optTarget + 1,
+      belowHardMin: rosterCount < hardMin,
+    };
+  });
+  const totalTeams = rows.length;
+  return {
+    seasonId: gameState.season.id,
+    totalTeams,
+    atOptCount: rows.filter((row) => row.atOpt).length,
+    withinOneOfOptCount: rows.filter((row) => row.withinOneOfOpt).length,
+    belowHardMinCount: rows.filter((row) => row.belowHardMin).length,
+    atOptPct: totalTeams > 0 ? round((rows.filter((row) => row.atOpt).length / totalTeams) * 100, 1) : 0,
+    teams: rows,
+  };
+}
+
+function buildTransferBuySourceBreakdown(transfers: TransferHistoryEntry[]) {
+  const bySource: Record<string, number> = {};
+  for (const entry of transfers) {
+    if (entry.transferType !== "buy") continue;
+    const source = entry.source ?? "unknown";
+    bySource[source] = (bySource[source] ?? 0) + 1;
+  }
+  const strategic =
+    (bySource.ai_preseason_market_buy ?? 0) +
+    (bySource["manual_transfer_window"] ?? 0) +
+    (bySource.ai_season_end_market_buy ?? 0);
+  const repair = bySource.preseason_roster_repair_buy ?? 0;
+  return { bySource, strategicBuyCount: strategic, repairBuyCount: repair };
+}
+
 function buildCashWaterfall(gameState: GameState) {
   const snapshots = gameState.seasonState.seasonSnapshots ?? [];
   if (snapshots.length > 0) {
@@ -224,6 +269,8 @@ function buildMarkdownSummary(report: Record<string, unknown>) {
   const transferStats = report.transferStats as Array<{ seasonId: string; buyCount: number; sellCount: number; buyFees: number; sellFees: number; netFees: number }>;
   const cashWaterfall = report.cashWaterfall as Array<{ seasonId: string; minCash: number; maxCash: number; avgCash: number; cashGini: number; negativeCashTeams: number }>;
   const contractShapes = report.contractEconomics as Array<{ seasonId: string; minUpcomingFactor: number; frontLoadedSharePct: number }>;
+  const rosterOpt = report.rosterOptAchievement as { atOptPct?: number; atOptCount?: number; totalTeams?: number; belowHardMinCount?: number };
+  const buySources = report.transferBuySources as { strategicBuyCount?: number; repairBuyCount?: number };
 
   return [
     "# Realistic Multi-Season Balance Report",
@@ -243,6 +290,14 @@ function buildMarkdownSummary(report: Record<string, unknown>) {
       (row) =>
         `- ${row.seasonId}: ${row.buyCount} buys (${row.buyFees}) · ${row.sellCount} sells (${row.sellFees}) · net ${row.netFees}`,
     ),
+    "",
+    "## Roster OPT Achievement (final state)",
+    `- at OPT: ${rosterOpt.atOptCount ?? 0}/${rosterOpt.totalTeams ?? 0} (${rosterOpt.atOptPct ?? 0}%)`,
+    `- below hard min: ${rosterOpt.belowHardMinCount ?? 0}`,
+    "",
+    "## Buy Sources (league total)",
+    `- strategic market buys: ${buySources.strategicBuyCount ?? 0}`,
+    `- emergency repair buys: ${buySources.repairBuyCount ?? 0}`,
     "",
     "## Contract Shapes vs Salary Factor Window",
     ...contractShapes.map(
@@ -305,6 +360,35 @@ async function main() {
   const cashWaterfall = buildCashWaterfall(saveAfter.gameState);
   const phaseAggregates = aggregatePhaseTimings(phaseTimings);
   const economyAudit = buildEconomyAuditReport({ saveId, gameState: saveAfter.gameState });
+  const transferFinanceAudit = buildTransferFinanceAudit(saveAfter.gameState);
+  const buyEconomics = buildBuyEconomics(saveAfter.gameState);
+  const rosterOptAchievement = buildRosterOptAchievement(saveAfter.gameState);
+  const transferBuySources = buildTransferBuySourceBreakdown(saveAfter.gameState.transferHistory);
+  fs.writeFileSync(path.join(outputDir, "transfer-finance-violations.json"), `${JSON.stringify({ violations: transferFinanceAudit.violations, doctrineStats: transferFinanceAudit.doctrineStats }, null, 2)}\n`);
+  fs.writeFileSync(
+    path.join(outputDir, "transfer-finance-by-season.csv"),
+    [
+      "seasonId,teamId,teamName,cashStart,cashEnd,buyFeesPaid,sellProceeds,netTransferCash,sponsorCashIn,salaryPaidOut,netSponsorCash,buyCount,sellCount,cashReconciliationDelta",
+      ...transferFinanceAudit.rows.map((row) =>
+        [
+          row.seasonId,
+          row.teamId,
+          row.teamName,
+          row.cashStart ?? "",
+          row.cashEnd ?? "",
+          row.buyFeesPaid,
+          row.sellProceeds,
+          row.netTransferCash,
+          row.sponsorCashIn,
+          row.salaryPaidOut,
+          row.netSponsorCash,
+          row.buyCount,
+          row.sellCount,
+          row.cashReconciliationDelta ?? "",
+        ].join(","),
+      ),
+    ].join("\n"),
+  );
 
   const reportPath = path.join(outputDir, "realistic-multi-report.json");
   const report = {
@@ -344,6 +428,20 @@ async function main() {
     contractEconomics,
     cashWaterfall,
     economyAudit,
+    transferFinanceAudit: {
+      violationCount: transferFinanceAudit.violations.length,
+      violations: transferFinanceAudit.violations,
+      doctrineStats: transferFinanceAudit.doctrineStats,
+    },
+    buyEconomicsSummary: {
+      buyCount: buyEconomics.length,
+      avgTotalFirstYearCost: buyEconomics.length
+        ? round(buyEconomics.reduce((sum, row) => sum + row.totalFirstYearCost, 0) / buyEconomics.length)
+        : 0,
+    },
+    buyEconomicsSample: buyEconomics.slice(0, 40),
+    rosterOptAchievement,
+    transferBuySources,
     leagueTotals: {
       transferHistoryEntries: saveAfter.gameState.transferHistory.length,
       totalBuyFees: round(transferStats.reduce((sum, row) => sum + row.buyFees, 0)),
@@ -365,6 +463,12 @@ async function main() {
   }
   console.log(
     `economy audit: ${economyAudit.ok ? "OK" : "WARN"} · repair buys ${economyAudit.preseasonRepairBuyCount} · sponsor season_end ${economyAudit.sponsorSeasonEndLogs}`,
+  );
+  console.log(
+    `roster OPT: ${rosterOptAchievement.atOptCount}/${rosterOptAchievement.totalTeams} at opt (${rosterOptAchievement.atOptPct}%) · below hard min ${rosterOptAchievement.belowHardMinCount}`,
+  );
+  console.log(
+    `buy sources: strategic ${transferBuySources.strategicBuyCount} · repair ${transferBuySources.repairBuyCount}`,
   );
   if (!economyAudit.ok) {
     for (const violation of economyAudit.violations) {

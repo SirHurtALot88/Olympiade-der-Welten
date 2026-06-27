@@ -4,6 +4,8 @@
 
 Start: `npm run play`
 
+**Automatisierter Proof (CI/Nightly):** `npm run app:smoke-gameplay`, `npm run app:smoke-gameplay-write -- --confirm-testsave`, `npm run season:full-ui-playthrough -- --skip-ui --no-start`
+
 ---
 
 ## Spieltag-Loop (das Wichtigste)

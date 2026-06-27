@@ -10,6 +10,7 @@ import {
   type AiMarketPlanSellPlan,
   type AiMarketPlanTeamEntry,
 } from "@/lib/ai/ai-market-plan-preview-service";
+import { resolveMarketSpendableCashForPlanner } from "@/lib/ai/ai-manager-apply-service";
 import type {
   GameLogEntry,
   GameState,
@@ -173,6 +174,7 @@ export type AiMarketPlanApplyResult = {
   phaseAudit: AiMarketPhaseAudit[];
   plannedWrites: Array<{ teamId: string; stepType: "sell" | "buy"; playerId: string; playerName: string }>;
   appliedAudits: string[];
+  buyGateRows?: Array<Record<string, unknown>>;
   auditLogId: string | null;
 };
 
@@ -198,6 +200,12 @@ export type AiMarketPlanApplyParams = {
     maxApplyMs?: number | null;
     progressLog?: boolean;
     stopOnTeamFailure?: boolean;
+    applyBuyStepsInBatch?: number | null;
+    forceBuyScanTeamIds?: string[] | null;
+    returnGateRows?: boolean;
+    excludeBuyPlayerIds?: string[] | null;
+    excludeSellPlayerIds?: string[] | null;
+    convergenceIncrementalFill?: boolean;
   };
 };
 
@@ -265,7 +273,11 @@ function buildHardNoGoBuyReasons(
   team: AiMarketPlanTeamEntry,
   candidates: AiMarketPlanBuyPlan["candidates"],
   playersById = new Map(gameState.players.map((player) => [player.id, player] as const)),
+  skipForCoverageFallback = false,
 ) {
+  if (skipForCoverageFallback) {
+    return [];
+  }
   const profile = getTeamStrategyProfile(gameState, team.teamId);
   if (!profile || profile.hardNoGos.length === 0) {
     return [];
@@ -393,6 +405,12 @@ function getEffectiveOptions(input: AiMarketPlanApplyParams) {
     maxApplyMs: clampPositiveInteger(input.options?.maxApplyMs),
     progressLog: input.options?.progressLog ?? false,
     stopOnTeamFailure: input.options?.stopOnTeamFailure ?? true,
+    applyBuyStepsInBatch: clampPositiveInteger(input.options?.applyBuyStepsInBatch),
+    forceBuyScanTeamIds: input.options?.forceBuyScanTeamIds ?? null,
+    returnGateRows: input.options?.returnGateRows ?? false,
+    excludeBuyPlayerIds: unique((input.options?.excludeBuyPlayerIds ?? []).filter(Boolean)),
+    excludeSellPlayerIds: unique((input.options?.excludeSellPlayerIds ?? []).filter(Boolean)),
+    convergenceIncrementalFill: input.options?.convergenceIncrementalFill ?? false,
   };
 }
 
@@ -502,6 +520,7 @@ function buildFinalBuyGate(input: {
   maxBuysPerTeam: number | null;
   claimedPlayerIds: Set<string>;
   playersById: Map<string, Player>;
+  convergenceIncrementalFill?: boolean;
 }) {
   const rows: Array<Record<string, unknown>> = [];
   const picked: AiMarketPlanBuyPlan["candidates"] = [];
@@ -512,10 +531,23 @@ function buildFinalBuyGate(input: {
   const slotNeed = getSeasonMaxSlotNeed(input.gameState);
   const rosterBase = input.rosterBase ?? input.team.currentState.rosterCount ?? 0;
   const minRoster = Math.max(input.team.currentState.playerMin ?? 0, 7);
-  const targetRoster = Math.max(minRoster, slotNeed);
+  const playerOpt = input.team.currentState.playerOpt ?? minRoster;
+  const targetRoster = input.convergenceIncrementalFill
+    ? Math.max(minRoster, playerOpt)
+    : Math.max(minRoster, slotNeed);
   const coverageFallback = rosterBase < targetRoster;
+  const convergenceCoverageFill = Boolean(input.convergenceIncrementalFill && coverageFallback);
   const profile = getTeamStrategyProfile(input.gameState, input.team.teamId);
-  let cashRemaining = input.team.currentState.cash ?? null;
+  let cashRemaining =
+    convergenceCoverageFill
+      ? resolveMarketSpendableCashForPlanner({
+          gameState: input.gameState,
+          teamId: input.team.teamId,
+          teamCash: input.team.currentState.cash,
+          rosterBelowMin: true,
+          forceRosterFill: true,
+        }) ?? input.team.currentState.cash
+      : input.team.currentState.cash ?? null;
   const classCounts = buildRosterTokenCounts({
     gameState: input.gameState,
     teamId: input.team.teamId,
@@ -556,7 +588,7 @@ function buildFinalBuyGate(input: {
     const cashBlocked = cashAfter == null || cashAfter < buffer;
     const reasons = [
       duplicateClaim ? "candidate_already_claimed" : null,
-      hardNoGo ? "team_hard_no_go" : null,
+      hardNoGo && !convergenceCoverageFill ? "team_hard_no_go" : null,
       cashBlocked ? `cash_buffer_failed:${Math.round((cashAfter ?? -999) * 100) / 100}<${Math.round(buffer * 100) / 100}` : null,
     ].filter((entry): entry is string => Boolean(entry));
     const accepted = reasons.length === 0;
@@ -772,6 +804,7 @@ function buildResolvedBuyCandidateMap(
   applyBuySteps: boolean,
   maxBuysPerTeam: number | null,
   playersById = new Map(gameState.players.map((player) => [player.id, player] as const)),
+  convergenceIncrementalFill = false,
 ) {
   const resolved = new Map<string, AiMarketPlanBuyPlan["candidates"]>();
   const gateRows: Array<Record<string, unknown>> = [];
@@ -807,6 +840,7 @@ function buildResolvedBuyCandidateMap(
       maxBuysPerTeam,
       claimedPlayerIds,
       playersById,
+      convergenceIncrementalFill,
     });
     gateRows.push(...gate.rows);
     resolved.set(team.teamId, gate.candidates);
@@ -815,8 +849,19 @@ function buildResolvedBuyCandidateMap(
   return { resolved, gateRows };
 }
 
-function buildEffectiveSellPlan(team: AiMarketPlanTeamEntry, applySellSteps: boolean, maxSellsPerTeam: number | null): AiMarketPlanSellPlan {
-  const candidates = applySellSteps ? limitItems(team.sellPlan.candidates, maxSellsPerTeam) : [];
+function buildEffectiveSellPlan(
+  team: AiMarketPlanTeamEntry,
+  applySellSteps: boolean,
+  maxSellsPerTeam: number | null,
+  excludeSellPlayerIds?: string[],
+): AiMarketPlanSellPlan {
+  const excludeSet = new Set(excludeSellPlayerIds ?? []);
+  const candidates = applySellSteps
+    ? limitItems(
+        team.sellPlan.candidates.filter((candidate) => !excludeSet.has(candidate.playerId)),
+        maxSellsPerTeam,
+      )
+    : [];
 
   return {
     candidates,
@@ -835,10 +880,17 @@ function buildEffectiveBuyPlan(
   maxBuysPerTeam: number | null,
   rosterBase: number | null,
   buyCandidateOverride?: AiMarketPlanBuyPlan["candidates"],
+  applyBuyStepsInBatch?: number | null,
+  excludeBuyPlayerIds?: string[],
 ): AiMarketPlanBuyPlan {
   const allowedBuyCount = getAllowedBuyCount(team, rosterBase, maxBuysPerTeam);
+  const batchCap = applyBuyStepsInBatch != null ? Math.min(allowedBuyCount, applyBuyStepsInBatch) : allowedBuyCount;
+  const excludeSet = new Set(excludeBuyPlayerIds ?? []);
+  const sourceCandidates = (buyCandidateOverride ?? team.buyPlan.candidates).filter(
+    (candidate) => !excludeSet.has(candidate.playerId),
+  );
   const candidates = applyBuySteps
-    ? buyCandidateOverride ?? limitItems(team.buyPlan.candidates, allowedBuyCount)
+    ? limitItems(sourceCandidates, batchCap > 0 ? batchCap : allowedBuyCount)
     : [];
 
   return {
@@ -873,6 +925,7 @@ function buildMarketStateBlockingReasons(input: {
   projectedState: AiMarketPlanProjectedState;
   playerMin: number | null;
   hasMarketActions: boolean;
+  enforceRosterMinAfterPlan?: boolean;
   cashReason?: string;
   rosterReason?: string;
 }) {
@@ -884,6 +937,7 @@ function buildMarketStateBlockingReasons(input: {
   }
 
   if (
+    (input.enforceRosterMinAfterPlan ?? true) &&
     input.playerMin != null &&
     input.projectedState.rosterAfterPlan != null &&
     input.projectedState.rosterAfterPlan < input.playerMin
@@ -900,6 +954,7 @@ function buildActualMarketStateBlockingReasons(input: {
   cash: number | null;
   roster: number | null;
   playerMin: number | null;
+  enforceRosterMinAfterPlan?: boolean;
 }) {
   return buildMarketStateBlockingReasons({
     projectedState: {
@@ -910,6 +965,7 @@ function buildActualMarketStateBlockingReasons(input: {
     },
     playerMin: input.playerMin,
     hasMarketActions: true,
+    enforceRosterMinAfterPlan: input.enforceRosterMinAfterPlan ?? false,
     cashReason: "post_market_cash_not_positive",
     rosterReason: "post_market_roster_below_player_min",
   });
@@ -1001,12 +1057,12 @@ export async function applyAiMarketPlanLocally(input: AiMarketPlanApplyParams): 
     throw new Error("AI market apply requires an explicit local transfer window phase.");
   }
   let options = getEffectiveOptions(input);
+  const preseasonMarketBuysAllowed = isTransferActionAllowed(input.seasonId, "preseason_market_buy");
   const seasonEndMarketBuysAllowed = isTransferActionAllowed(input.seasonId, "season_end_market_buy");
+  const marketBuysAllowed = preseasonMarketBuysAllowed || seasonEndMarketBuysAllowed;
+  const executeBuySteps = options.applyBuySteps && marketBuysAllowed;
   const policyWarnings: string[] =
-    options.applyBuySteps && !seasonEndMarketBuysAllowed ? ["season_1_market_buy_forbidden"] : [];
-  if (options.applyBuySteps && !seasonEndMarketBuysAllowed) {
-    options = { ...options, applyBuySteps: false };
-  }
+    options.applyBuySteps && !marketBuysAllowed ? ["season_market_buy_forbidden"] : [];
   const includeWarningTeams = options.includeWarningTeams;
   const phaseAudit: AiMarketPhaseAudit[] = [];
   const persistence = createPersistenceService();
@@ -1156,7 +1212,11 @@ export async function applyAiMarketPlanLocally(input: AiMarketPlanApplyParams): 
     sellLimit,
     fullScoringLimit: buyLimit > 0 ? Math.min(48, Math.max(24, buyLimit)) : null,
     buyNeedOnly: true,
-    forceBuyScanTeamIds: preflightSellNeedTeamIds,
+    forceBuyScanTeamIds: unique([
+      ...(options.forceBuyScanTeamIds ?? []),
+      ...preflightSellNeedTeamIds,
+      ...preflightBuyNeedTeamIds,
+    ]),
   };
   const scanStartedAt = Date.now();
   const preview = await buildAiMarketPlanPreview(previewParams);
@@ -1201,6 +1261,7 @@ export async function applyAiMarketPlanLocally(input: AiMarketPlanApplyParams): 
     options.applyBuySteps,
     options.maxBuysPerTeam,
     baselinePlayersById,
+    options.convergenceIncrementalFill,
   );
   const resolvedBuyCandidateMap = finalBuyGate.resolved;
   const results: AiMarketPlanApplyTeamResult[] = [];
@@ -1239,19 +1300,32 @@ export async function applyAiMarketPlanLocally(input: AiMarketPlanApplyParams): 
       results.push(nextResult);
       continue;
     }
-    const effectiveSellPlan = buildEffectiveSellPlan(team, options.applySellSteps, options.maxSellsPerTeam);
+    const effectiveSellPlan = buildEffectiveSellPlan(
+      team,
+      options.applySellSteps,
+      options.maxSellsPerTeam,
+      options.excludeSellPlayerIds,
+    );
     const effectiveBuyPlan = buildEffectiveBuyPlan(
       team,
       options.applyBuySteps,
       options.maxBuysPerTeam,
       effectiveSellPlan.rosterAfterSell ?? team.currentState.rosterCount,
       resolvedBuyCandidateMap.get(team.teamId),
+      options.applyBuyStepsInBatch,
+      options.excludeBuyPlayerIds,
     );
     const effectiveProjectedState = buildEffectiveProjectedState(team.currentState, effectiveSellPlan, effectiveBuyPlan);
     nextResult.plannedSellDetails = buildPlannedSellDetails(effectiveSellPlan.candidates);
     nextResult.plannedBuyDetails = buildPlannedBuyDetails(effectiveBuyPlan.candidates);
     nextResult.plannedSells = nextResult.plannedSellDetails.length;
     nextResult.plannedBuys = nextResult.plannedBuyDetails.length;
+    if (effectiveSellPlan.warnings.length > 0) {
+      nextResult.warnings = unique([...nextResult.warnings, ...effectiveSellPlan.warnings]);
+    }
+    if (effectiveBuyPlan.warnings.length > 0) {
+      nextResult.warnings = unique([...nextResult.warnings, ...effectiveBuyPlan.warnings]);
+    }
     const teamGateRows = finalBuyGate.gateRows.filter((row) => row.teamId === team.teamId);
     const blockedGateRows = teamGateRows.filter((row) => row.status === "blocked");
     if (blockedGateRows.length > 0) {
@@ -1270,24 +1344,41 @@ export async function applyAiMarketPlanLocally(input: AiMarketPlanApplyParams): 
     nextResult.rosterAfter = effectiveProjectedState.rosterAfterPlan;
     nextResult.salaryAfter = effectiveProjectedState.salaryAfterPlan;
     nextResult.marketValueAfter = effectiveProjectedState.marketValueAfterPlan;
+    const rosterBaseForCoverage = effectiveSellPlan.rosterAfterSell ?? team.currentState.rosterCount ?? 0;
+    const slotNeedForCoverage = getSeasonMaxSlotNeed(baselineGameState);
+    const identityPlayerMin =
+      baselineGameState.teamIdentities.find((entry) => entry.teamId === team.teamId)?.playerMin ??
+      team.currentState.playerMin ??
+      7;
+    const identityPlayerOpt = team.currentState.playerOpt ?? identityPlayerMin;
+    const coverageTargetRoster = options.convergenceIncrementalFill
+      ? Math.max(identityPlayerMin, 7, identityPlayerOpt)
+      : Math.max(identityPlayerMin, 7, slotNeedForCoverage);
+    const coverageFallback = rosterBaseForCoverage < coverageTargetRoster;
+    const convergenceCoverageFill = options.convergenceIncrementalFill && coverageFallback;
     const hardNoGoBuyReasons = buildHardNoGoBuyReasons(
       baselineGameState,
       team,
       effectiveBuyPlan.candidates,
       baselinePlayersById,
+      convergenceCoverageFill,
     );
     const rawHardNoGoBuyReasons = buildHardNoGoBuyReasons(
       baselineGameState,
       team,
       team.buyPlan.candidates,
       baselinePlayersById,
+      convergenceCoverageFill,
     );
     const missingSellValue = effectiveSellPlan.candidates.some((candidate) => candidate.expectedSellValue == null);
     const hasMarketActions = effectiveSellPlan.candidates.length + effectiveBuyPlan.candidates.length > 0;
+    const enforcementPlayerMin =
+      options.convergenceIncrementalFill && coverageFallback ? identityPlayerMin : team.currentState.playerMin;
     const preApplyStateBlockingReasons = buildMarketStateBlockingReasons({
       projectedState: effectiveProjectedState,
-      playerMin: team.currentState.playerMin,
+      playerMin: enforcementPlayerMin,
       hasMarketActions,
+      enforceRosterMinAfterPlan: executeBuySteps && effectiveBuyPlan.candidates.length > 0,
     });
     const partialNegativeCashRepair =
       team.currentState.cash != null &&
@@ -1618,7 +1709,7 @@ export async function applyAiMarketPlanLocally(input: AiMarketPlanApplyParams): 
       continue;
     }
 
-    for (const candidate of effectiveBuyPlan.candidates) {
+    for (const candidate of executeBuySteps ? effectiveBuyPlan.candidates : []) {
       const candidatePlayer = preflightGameState.players.find((player) => player.id === candidate.playerId) ?? null;
       const contractOffer = recommendContractOfferForPlayer({
         player: candidatePlayer,
@@ -1752,7 +1843,8 @@ export async function applyAiMarketPlanLocally(input: AiMarketPlanApplyParams): 
     const postApplyStateBlockingReasons = buildActualMarketStateBlockingReasons({
       cash: snapshotAfterTeam.cash,
       roster: snapshotAfterTeam.roster,
-      playerMin: team.currentState.playerMin,
+      playerMin: enforcementPlayerMin,
+      enforceRosterMinAfterPlan: nextResult.executedBuys > 0,
     });
     const postApplyPartialNegativeCashRepair =
       partialNegativeCashRepair &&
@@ -1989,5 +2081,6 @@ export async function applyAiMarketPlanLocally(input: AiMarketPlanApplyParams): 
     plannedWrites,
     appliedAudits,
     auditLogId,
+    buyGateRows: options.returnGateRows ? finalBuyGate.gateRows : undefined,
   };
 }

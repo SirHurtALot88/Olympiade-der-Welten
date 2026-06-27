@@ -1,0 +1,20 @@
+{
+  "name": "Gladiator",
+  "id": "player-1386-gladiator",
+  "className": "Templar",
+  "race": "Human",
+  "alignment": "R-N",
+  "gender": "m",
+  "subclasses": ["Isolated", "Warrior", "Swashbuckler"],
+  "traitsPositive": ["Diligent", "FanFavorite", "Fearless"],
+  "traitsNegative": ["Renegade", "Timid", "Obsessive"],
+  "attributes": {
+    "power": 63, "health": 61, "stamina": 73, "intelligence": 48,
+    "awareness": 55, "determination": 79, "speed": 39, "dexterity": 76,
+    "charisma": 66, "will": 77, "spirit": 7, "torment": 76
+  },
+  "flavorDe": "Im Staub der großen Arena, wo die Menge nach Blut riecht und Helden oft nur einen Tag lang leben, steht Gladiator wie eine Antwort auf die Frage, wie viel ein Mensch tragen kann, bevor er zur Legende wird. Der korinthische Helm mit der schwarzen Helmbuschfeder, die rot glühenden Augenslitze und der blutüberzogene Oberkörper haben tausend Kämpfe erzählt, ohne dass er ein Wort darüber verliert. Einst war er nur ein Mann aus den Randbezirken, der fand, dass Stolz billiger ist als Angst. Heute liebt ihn das Publikum laut, hasst ihn die Szene genauso laut — ein Renegat mit Disziplin, der im Sand bleibt, wenn andere schon fliehen. Wer den Helm hebt, sieht keinen Gott. Nur jemanden, der zu oft zurückkam.",
+  "portraitPath": "/Users/chrisfalk/Library/CloudStorage/Dropbox/Chris/Olympiade der Welten/Mark VI Cardgame/Spieler/Gladiator.JPG",
+  "cost": 65,
+  "upkeepBase": 7
+}

@@ -543,9 +543,18 @@ function loadSaveVersionMetadata(saveId: string): SaveVersionMetadata | null {
 
 let baselineSourcePlayersCache: Player[] | null = null;
 
-function loadBaselineSourcePlayers() {
-  baselineSourcePlayersCache ??= createGameStateFromSeed(loadSeedData()).players;
+export function invalidateBaselineSourcePlayersCache() {
+  baselineSourcePlayersCache = null;
+}
+
+function loadBaselineSourcePlayers(database = getDatabase()) {
+  baselineSourcePlayersCache ??= [...loadPlayerCatalog(database).values()];
   return baselineSourcePlayersCache;
+}
+
+function invalidateCatalogDerivedRuntimeCaches() {
+  invalidateBaselineSourcePlayersCache();
+  invalidateSaveSessionCache();
 }
 
 function valuesEqual(left: unknown, right: unknown) {
@@ -607,6 +616,46 @@ function ensurePlayerCatalog(database: ReturnType<typeof getDatabase>, players: 
   for (const player of players) {
     insertStatement.run(player.id, JSON.stringify(player), updatedAt);
   }
+}
+
+export function upsertPlayerCatalogEntries(players: Player[], updatedAt = new Date().toISOString()) {
+  const database = getDatabase();
+  const statement = database.prepare(
+    `INSERT INTO player_catalog (player_id, payload_json, updated_at) VALUES (?, ?, ?)
+     ON CONFLICT(player_id) DO UPDATE SET
+       payload_json = excluded.payload_json,
+       updated_at = excluded.updated_at`,
+  );
+
+  for (const player of players) {
+    statement.run(player.id, JSON.stringify(player), updatedAt);
+  }
+
+  invalidateCatalogDerivedRuntimeCaches();
+}
+
+export function upsertPlayerBaselineCatalogEntries(
+  baselines: PlayerBaselineRecord[],
+  updatedAt = new Date().toISOString(),
+) {
+  const database = getDatabase();
+  const statement = database.prepare(
+    `INSERT INTO player_baseline_catalog (player_id, payload_json, updated_at) VALUES (?, ?, ?)
+     ON CONFLICT(player_id) DO UPDATE SET
+       payload_json = excluded.payload_json,
+       updated_at = excluded.updated_at`,
+  );
+
+  for (const baseline of baselines) {
+    statement.run(baseline.playerId, JSON.stringify(baseline), updatedAt);
+  }
+
+  invalidateCatalogDerivedRuntimeCaches();
+}
+
+export function clearPlayerSavePatches(playerId: string) {
+  const database = getDatabase();
+  database.prepare("DELETE FROM players WHERE player_id = ?").run(playerId);
 }
 
 function loadPlayersForSave(saveId: string) {

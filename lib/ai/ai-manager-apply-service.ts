@@ -629,3 +629,25 @@ export function getAiManagerMarketSpendableCash(gameState: GameState, teamId: st
     ),
   );
 }
+
+export function resolveMarketSpendableCashForPlanner(input: {
+  gameState: GameState;
+  teamId: string;
+  teamCash: number | null | undefined;
+  rosterBelowMin: boolean;
+  forceRosterFill?: boolean;
+}) {
+  const reserved = getAiManagerMarketSpendableCash(input.gameState, input.teamId, input.teamCash) ?? input.teamCash ?? 0;
+  if (!input.rosterBelowMin && !input.forceRosterFill) return reserved;
+  if (reserved > 0) return reserved;
+  const reservation = input.gameState.seasonState.aiManagerBudgetReservations?.[input.teamId];
+  if (!reservation) return reserved;
+  const rosterFillFloor = round(
+    clamp(
+      (input.teamCash ?? 0) - (reservation.cashReserve ?? 0) - (reservation.emergencyBudget ?? 0),
+      0,
+      input.teamCash ?? 0,
+    ),
+  );
+  return Math.max(reserved, rosterFillFloor);
+}

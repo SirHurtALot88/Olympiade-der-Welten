@@ -278,6 +278,7 @@ describe("transfermarkt local service", () => {
       seasonId: "season-1",
       teamId: "A-A",
       limit: 10,
+      mode: "full",
     }).items.find((item) => item.playerId === "fa-1");
 
     expect(level0?.potentialBand).toBe("elite");
@@ -301,6 +302,7 @@ describe("transfermarkt local service", () => {
       seasonId: "season-1",
       teamId: "A-A",
       limit: 10,
+      mode: "full",
     }).items.find((item) => item.playerId === "fa-1");
 
     expect(level3?.potentialBand).toBe("elite");
@@ -360,6 +362,7 @@ describe("transfermarkt local service", () => {
       seasonId: "season-1",
       teamId: "A-A",
       limit: 10,
+      mode: "full",
     }).items.find((entry) => entry.playerId === "fa-schedule");
 
     expect(item?.topDisciplineScores.find((entry) => entry.disciplineId === "staffel")?.playerCount).toBe(6);
@@ -688,7 +691,7 @@ describe("transfermarkt local service", () => {
     expect(result.transferCreated).toBeFalsy();
   });
 
-  it("blocks same-team rebuy for players sold in the current preseason but still allows other teams", async () => {
+  it("blocks all teams from rebuying players sold in the current season", async () => {
     persistenceState.save = {
       saveId: "save-singleplayer-dev",
       gameState: createGameState({
@@ -734,6 +737,7 @@ describe("transfermarkt local service", () => {
     });
     expect(sameTeamPreview.canBuy).toBe(false);
     expect(sameTeamPreview.blockingReasons).toContain("recently_sold_same_preseason");
+    expect(sameTeamPreview.blockingReasons).toContain("player_sold_this_season_unavailable");
 
     const sameTeamFeed = listLocalTransfermarktFreeAgents({
       saveId: "save-singleplayer-dev",
@@ -750,7 +754,8 @@ describe("transfermarkt local service", () => {
       playerId: "p1",
       transferSource: "auto_roster_fill",
     });
-    expect(otherTeamPreview.canBuy).toBe(true);
+    expect(otherTeamPreview.canBuy).toBe(false);
+    expect(otherTeamPreview.blockingReasons).toContain("player_sold_this_season_unavailable");
 
     const overridePreview = previewLocalTransfermarktBuy({
       saveId: "save-singleplayer-dev",
@@ -760,8 +765,8 @@ describe("transfermarkt local service", () => {
       transferSource: "debug_sandbox_rebuy",
       allowRecentlySoldRebuyOverride: true,
     });
-    expect(overridePreview.canBuy).toBe(true);
-    expect(overridePreview.warnings).toContain("recently_sold_same_preseason_override");
+    expect(overridePreview.canBuy).toBe(false);
+    expect(overridePreview.blockingReasons).toContain("player_sold_this_season_unavailable");
   });
 
   it("normalizes legacy roster prices so equal entry and exit values do not show fake profit", async () => {
@@ -797,9 +802,9 @@ describe("transfermarkt local service", () => {
       activePlayerId: "r1",
     });
 
-    expect(preview.salePrice).toBe(40);
+    expect(preview.salePrice).toBeCloseTo(39.76, 1);
     expect(preview.activePlayer?.purchasePrice).toBe(40);
-    expect(preview.profit).toBe(0);
+    expect(preview.profit).toBeCloseTo(-0.24, 1);
   });
 
   it("uses bracket and mvs ranking for live sale factors once discipline results exist", async () => {
@@ -886,10 +891,10 @@ describe("transfermarkt local service", () => {
       activePlayerId: "r2",
     });
 
-    expect(topPreview.saleFactor).toBe(1.44);
-    expect(topPreview.salePrice).toBe(57.6);
-    expect(lowerPreview.saleFactor).toBe(0.7);
-    expect(lowerPreview.salePrice).toBe(28.7);
+    expect(topPreview.saleFactor).toBeCloseTo(1.555, 2);
+    expect(topPreview.salePrice).toBeCloseTo(62.2, 1);
+    expect(lowerPreview.saleFactor).toBeCloseTo(0.756, 2);
+    expect(lowerPreview.salePrice).toBeCloseTo(31.0, 1);
     expect(topPreview.salePrice).toBeGreaterThan(lowerPreview.salePrice ?? 0);
   });
 
@@ -1080,9 +1085,9 @@ describe("transfermarkt local service", () => {
       activePlayerId: "r1",
     });
 
-    expect(preview.saleFactor).toBe(1);
-    expect(preview.salePrice).toBe(preview.marketValueReference);
-    expect(preview.profit).toBe(0);
+    expect(preview.saleFactor).toBeCloseTo(0.994, 2);
+    expect(preview.salePrice).toBeCloseTo((preview.marketValueReference ?? 0) * 0.994, 1);
+    expect(preview.profit).toBeCloseTo((preview.salePrice ?? 0) - (preview.activePlayer?.purchasePrice ?? 0), 1);
   });
 
   it("builds deterministic contract shapes with identical total salary", () => {

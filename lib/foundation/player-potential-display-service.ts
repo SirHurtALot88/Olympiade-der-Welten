@@ -13,6 +13,7 @@ import {
   type AxisRouteState,
 } from "@/lib/scouting/player-attribute-ceiling-service";
 import { buildPlayerPotentialRecord } from "@/lib/progression/player-potential-service";
+import { clampPotentialCeilingToCurrentStars } from "@/lib/scouting/player-potential-ceiling-service";
 import { playerGeneratorAttributeKeys } from "@/lib/player-generator/official-discipline-weights";
 import type { PlayerGeneratorAttributeName } from "@/lib/data/olyDataTypes";
 import { TRAINING_ATTRIBUTE_LABELS } from "@/lib/training/training-levelup-service";
@@ -83,8 +84,26 @@ export function buildPlayerPotentialDisplaySnapshot(input: {
     player: input.player,
     disciplines: input.gameState.disciplines,
   });
-  const axisPo = record.hiddenPotentialCeilingByAxis;
-  const overallPo = record.hiddenPotentialOverallStars ?? null;
+  const rawCeiling =
+    record.hiddenPotentialCeilingByAxis && record.hiddenPotentialOverallStars != null
+      ? {
+          pow: record.hiddenPotentialCeilingByAxis.pow,
+          spe: record.hiddenPotentialCeilingByAxis.spe,
+          men: record.hiddenPotentialCeilingByAxis.men,
+          soc: record.hiddenPotentialCeilingByAxis.soc,
+          overall: record.hiddenPotentialOverallStars,
+        }
+      : null;
+  const ceiling = rawCeiling ? clampPotentialCeilingToCurrentStars(currentStars, rawCeiling) : null;
+  const axisPo = ceiling
+    ? {
+        pow: ceiling.pow,
+        spe: ceiling.spe,
+        men: ceiling.men,
+        soc: ceiling.soc,
+      }
+    : null;
+  const overallPo = ceiling?.overall ?? null;
   const snapshot = record.lastSeasonSnapshot ?? null;
 
   const potentialAxisStatus: PlayerPotentialAxisStatus[] = (["pow", "spe", "men", "soc"] as const).map((axis) => {

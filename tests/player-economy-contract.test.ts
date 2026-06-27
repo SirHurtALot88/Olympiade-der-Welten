@@ -117,6 +117,16 @@ describe("player economy contract", () => {
     expect(economy.salarySource).toBe("active_contract");
   });
 
+  it("normalizes legacy roster salaries stored in cent-scale", () => {
+    const economy = resolvePlayerEconomyContract({
+      player: buildPlayer(),
+      rosterEntry: buildRosterEntry({ salary: 25000 }),
+    });
+
+    expect(economy.salary).toBe(250);
+    expect(economy.salarySource).toBe("active_contract");
+  });
+
   it("updates expected salary after an attribute upgrade without changing contract salary", () => {
     const rosterEntry = buildRosterEntry({ salary: 11.4 });
     const before = resolvePlayerEconomyContract({ player: buildPlayer(), rosterEntry });

@@ -177,9 +177,10 @@ export function resolvePlayerEconomyContract(input: {
   const storedCalculatedSalary = normalizeStoredEconomyValue(player?.salaryDemand);
   const legacyDisplayMarketValue = normalizeStoredEconomyValue(player?.displayMarketValue);
   const legacyDisplaySalary = normalizeStoredEconomyValue(player?.displaySalary);
-  const rosterPurchasePrice = toFiniteNumber(rosterEntry?.purchasePrice);
-  const rosterScheduledSalary = toFiniteNumber(rosterEntry?.yearlySalarySchedule?.[0]?.salary);
-  const rosterSalary = rosterScheduledSalary ?? toFiniteNumber(rosterEntry?.salary);
+  const rosterPurchasePrice = normalizeStoredEconomyValue(toFiniteNumber(rosterEntry?.purchasePrice));
+  const rosterCurrentValue = normalizeStoredEconomyValue(toFiniteNumber(rosterEntry?.currentValue));
+  const rosterScheduledSalary = normalizeStoredEconomyValue(toFiniteNumber(rosterEntry?.yearlySalarySchedule?.[0]?.salary));
+  const rosterSalary = rosterScheduledSalary ?? normalizeStoredEconomyValue(toFiniteNumber(rosterEntry?.salary));
   const contractLength = toFiniteNumber(rosterEntry?.contractLength);
   const playerEntity = player as Player | null;
   const formulaSources = loadPlayerFormulaSources();
@@ -247,6 +248,7 @@ export function resolvePlayerEconomyContract(input: {
   const marketValue =
     visibleFinalMarketValue ??
     calculatedFinalMarketValue ??
+    rosterCurrentValue ??
     rosterPurchasePrice ??
     null;
   const marketValueSource =

@@ -1,0 +1,20 @@
+{
+  "name": "Grimchoc",
+  "id": "player-0694-grimchoc",
+  "className": "Sprinter",
+  "race": "Demon",
+  "alignment": "C-N",
+  "gender": "m",
+  "subclasses": ["Trickster", "Pet Master"],
+  "traitsPositive": ["Ambitious", "Cool"],
+  "traitsNegative": ["Feisty", "FaintHearted"],
+  "attributes": {
+    "power": 12, "health": 8, "stamina": 42, "intelligence": 7,
+    "awareness": 88, "determination": 24, "speed": 70, "dexterity": 66,
+    "charisma": 3, "will": 16, "spirit": 15, "torment": 35
+  },
+  "flavorDe": "Aus den Höllenschlünden kommt Grimchoc — kleiner Dämon, großes Grinsen, drei Schokoriegel in der Hand wie Kriegstrophäen. Über seinen Ursprung streiten sich die Geister; die meisten vermuten irgendwo zwischen Ablenkungsmanöver und Betriebsunfall. Ehrgeizig genug, überall aufzutauchen, klug genug, den Rückweg zu kennen, und mutig genug, das zehntausendfach zu vergessen. Grimchoc ist kein Naturgewalt-Champion und kein Dunkellord — er ist der Grund, warum in manchen Arena-Ecken noch heute gelacht und gefeiget wird, manchmal von derselben Person.",
+  "portraitPath": "/Users/chrisfalk/Library/CloudStorage/Dropbox/Chris/Olympiade der Welten/Mark VI Cardgame/Spieler/Grimchoc.jpg",
+  "cost": 15,
+  "upkeepBase": 2
+}

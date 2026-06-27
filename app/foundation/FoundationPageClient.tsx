@@ -261,6 +261,7 @@ import {
   withRoomContextBody,
   type FoundationRoomContext,
 } from "@/lib/room/foundation-room-context-client";
+import { describeRoomWriteError, isStaleSaveVersionError } from "@/lib/room/parse-room-write-context";
 import { getClientSocket } from "@/lib/socket/client";
 import type { PlayerTrainingMode } from "@/lib/training/training-plan-types";
 import {
@@ -275,10 +276,13 @@ import {
   type GlobalTableColumnConfig,
 } from "@/lib/ui/global-table-layout";
 import type { PlayerEconomyCompareReport } from "@/lib/foundation/player-economy-compare-service";
-import type { RoomRealtimeEvent } from "@/types/game";
+import type { OlyRoomState, RoomRealtimeEvent } from "@/types/game";
+import { describeRoomFlowButton, getRoomFlowStep } from "@/lib/room/room-flow-controller";
+import { TEAM_BOARD_PRESSURE_TOOLTIP, TEAM_BOARD_RATING_TOOLTIP } from "@/lib/foundation/team-board-tooltips";
 import { VeloImpactStrip, VeloStatOrbitRow } from "@/components/foundation/velo-ui";
 import FoundationPanelSkeleton from "@/components/foundation/FoundationPanelSkeleton";
 import { normalizeFoundationViewParam, getDefaultFoundationViewTarget, type FoundationViewId } from "@/lib/foundation/foundation-view-routing";
+import { prefetchFoundationPanel, prefetchFoundationDefaultPanels } from "@/lib/foundation/foundation-panel-prefetch";
 import {
   canFoundationNavigateBack,
   foundationNavigateBack,
@@ -326,6 +330,7 @@ const FoundationMatchdayArenaPanel = dynamic(
 );
 const FoundationTeamsDetailPanel = dynamic(() => import("@/app/foundation/teams-v2/FoundationTeamsDetailPanel"), {
   ssr: false,
+  loading: () => <FoundationPanelSkeleton variant="teams" label="Teams werden geladen…" />,
 });
 const TrainingCompactClient = dynamic(() => import("@/app/foundation/training-compact/TrainingCompactClient"), {
   ssr: false,
@@ -1251,6 +1256,43 @@ type TransfermarktSellSummary = {
   transferCreated?: boolean;
   teamSeasonStateUpdated?: boolean;
   transferId?: string | null;
+  pricingPolicyMultiplier?: number | null;
+  coaching?: {
+    doctrinePersona: string;
+    doctrineHint: string;
+    strategyFitSummary: string;
+    sellDecisionLabel: string | null;
+    sellPriority: number | null;
+    sellIntentScore: number | null;
+    keepIntentScore: number | null;
+    reasonsToSell: string[];
+    reasonsToKeep: string[];
+    coachingWarnings: string[];
+    boardTrustPolicy: string | null;
+    boardTrustSmiley: string | null;
+    boardReaction: {
+      confidenceDelta: number;
+      severity: string;
+      title: string;
+      description: string;
+      gmNote: string | null;
+      requiresStrongAcknowledgment: boolean;
+    };
+    gmName: string | null;
+    gmArchetype: string | null;
+    gmPressureLevel: string;
+    gmWarning: string | null;
+    gmDetail: string | null;
+    gmSoftBlockStarSell: boolean;
+    replacementSlot: {
+      slotLabel: string;
+      maxBuyPrice: number | null;
+      minOvrBand: number | null;
+      urgency: string;
+    } | null;
+    pricingPolicyNotes: string[];
+    soldPlayerSeasonBanNote: string;
+  } | null;
 };
 
 type TransfermarktSellApiResponse = {
@@ -2424,10 +2466,6 @@ const teamIdentityFieldLabels: Array<{
   { key: "playerMin", label: "Player Min" },
   { key: "playerOpt", label: "Player Opt" },
 ];
-const TEAM_BOARD_RATING_TOOLTIP =
-  "Board Rating ist der interne Team-Vorstandswert von 1 bis 10. Er ist getrennt von der Spieler-Vorstandsbewertung, startet neutral bei 5 und steigt oder faellt mit erledigten, gefaehrdeten oder verfehlten Board-Zielen. Die AI nutzt ihn unter anderem fuer Risiko, Budgetdisziplin und Vertragslaengen.";
-const TEAM_BOARD_PRESSURE_TOOLTIP =
-  "Druck zeigt, wie angespannt das Board gerade ist. Niedriges Board Rating, verfehlte Ziele und Ziele unter Risiko erhoehen den Druck; hoher Druck macht die AI vorsichtiger mit Cash, schneller bei Korrekturen und strenger bei Kader- oder Gehaltsentscheidungen.";
 const teamStrategyBiasFieldLabels: Array<{ key: keyof TeamStrategyBias; label: string }> = [
   { key: "cashPriority", label: "Cash" },
   { key: "valuePriority", label: "Value" },
@@ -6093,6 +6131,8 @@ export default function FoundationPageClient({
     normalizeFoundationSaveMode(initialPersistenceState?._meta?.saveMode ?? readStoredFoundationSaveMode()),
   );
   const [roomContext, setRoomContext] = useState<FoundationRoomContext | null>(null);
+  const [roomLiveState, setRoomLiveState] = useState<OlyRoomState | null>(null);
+  const [roomActivityNotice, setRoomActivityNotice] = useState<{ title: string; detail: string } | null>(null);
   const [activeSaveName, setActiveSaveName] = useState<string>(initialPersistedSave?.name ?? "Singleplayer Foundation");
   const [isSaveBusy, setIsSaveBusy] = useState<boolean>(false);
   const [readMeta, setReadMeta] = useState<FoundationReadMeta>({
@@ -6223,6 +6263,43 @@ export default function FoundationPageClient({
   }, []);
 
   useEffect(() => {
+    if (!roomContext) {
+      setRoomLiveState(null);
+      setRoomActivityNotice(null);
+      return undefined;
+    }
+
+    const currentRoomContext = roomContext;
+    const socket = getClientSocket();
+
+    function handleRoomJoined(payload: { roomCode: string; state: OlyRoomState }) {
+      if (payload.roomCode.toUpperCase() !== currentRoomContext.roomCode.toUpperCase()) {
+        return;
+      }
+      setRoomLiveState(payload.state);
+    }
+
+    function handleRoomState(state: OlyRoomState) {
+      if (state.roomCode.toUpperCase() !== currentRoomContext.roomCode.toUpperCase()) {
+        return;
+      }
+      setRoomLiveState(state);
+    }
+
+    socket.on("roomJoined", handleRoomJoined);
+    socket.on("roomState", handleRoomState);
+    socket.emit("rejoinRoom", {
+      roomCode: currentRoomContext.roomCode,
+      seatToken: currentRoomContext.seatToken,
+    });
+
+    return () => {
+      socket.off("roomJoined", handleRoomJoined);
+      socket.off("roomState", handleRoomState);
+    };
+  }, [roomContext]);
+
+  useEffect(() => {
     if (!roomContext?.saveId || roomContext.saveId === activeSaveId || isSaveBusy) {
       return;
     }
@@ -6328,6 +6405,19 @@ export default function FoundationPageClient({
       roomContext,
     );
   }
+
+  async function handleStaleRoomSaveWrite(payload: unknown) {
+    if (!roomContext || !isStaleSaveVersionError(payload)) {
+      return false;
+    }
+    setFoundationActionFeedback({
+      tone: "warning",
+      title: "Save veraltet",
+      detail: describeRoomWriteError(payload) ?? "Save wird neu geladen.",
+    });
+    await loadSave(activeSaveId);
+    return true;
+  }
   const [marketPositiveTraitFilter, setMarketPositiveTraitFilter] = useState<string>("ALL");
   const [marketNegativeTraitFilter, setMarketNegativeTraitFilter] = useState<string>("ALL");
   const [marketBracketFilter, setMarketBracketFilter] = useState<string>("ALL");
@@ -6401,6 +6491,7 @@ export default function FoundationPageClient({
   const [sponsorChoiceMessage, setSponsorChoiceMessage] = useState<string | null>(null);
   const [sponsorChoiceProfiles, setSponsorChoiceProfiles] = useState<Record<string, SponsorNegotiationProfile>>({});
   const [marketSellSubject, setMarketSellSubject] = useState<TransfermarktSellPreviewSubject | null>(null);
+  const [marketSellRiskAcknowledged, setMarketSellRiskAcknowledged] = useState<boolean>(false);
   const isMarketSellPanelOpen = foundationPanel === "sell" && marketSellSubject != null;
   const shouldBuildPlayerRatings =
     shouldBuildMarketView ||
@@ -6610,6 +6701,7 @@ export default function FoundationPageClient({
     setMarketSellError(null);
     setMarketSellSuccess(null);
     setMarketSellSubject(null);
+    setMarketSellRiskAcknowledged(false);
     setFoundationPanel(null);
     setMarketAiPreviewFeed(null);
     setMarketAiSellPreviewFeed(null);
@@ -7565,6 +7657,7 @@ export default function FoundationPageClient({
       }
     } else if (state.panel !== "sell") {
       setMarketSellSubject(null);
+    setMarketSellRiskAcknowledged(false);
     }
     if (state.view === "playerProfile" && state.playerId) {
       setActiveView("playerProfile");
@@ -7620,6 +7713,7 @@ export default function FoundationPageClient({
     setFoundationPanel(null);
     setSeasonBriefingOpen(false);
     setMarketSellSubject(null);
+    setMarketSellRiskAcknowledged(false);
     setFoundationFacilityTarget(null);
 
     if (activeView === "playerProfile") {
@@ -8076,6 +8170,9 @@ export default function FoundationPageClient({
         })),
       });
       const payload = (await response.json()) as TransfermarktSellApiResponse;
+      if (await handleStaleRoomSaveWrite(payload)) {
+        return;
+      }
       if (payload.summary) {
         setMarketSellPreview(payload.summary);
       }
@@ -8102,6 +8199,7 @@ export default function FoundationPageClient({
         detail: sellFeedback,
       });
       setMarketSellSubject(null);
+    setMarketSellRiskAcknowledged(false);
       setFoundationPanel(null);
       await Promise.all([
         loadSave(activeSaveId),
@@ -9600,6 +9698,7 @@ export default function FoundationPageClient({
 
   useEffect(() => {
     function handlePopState() {
+      setRoomContext(readFoundationRoomContextFromLocation());
       const fromHistory = readFoundationHistoryState();
       if (fromHistory) {
         applyFoundationNavigationStateRef.current(fromHistory);
@@ -9927,6 +10026,20 @@ export default function FoundationPageClient({
       cancelled = true;
     };
   }, [initialSaveId, initialSelectedTeamId]);
+
+  useEffect(() => {
+    if (isFoundationBootstrapState || !activeSaveId || activeSaveId === "loading-save") {
+      return;
+    }
+    prefetchFoundationDefaultPanels();
+  }, [activeSaveId, isFoundationBootstrapState]);
+
+  useEffect(() => {
+    if (isFoundationBootstrapState) {
+      return;
+    }
+    prefetchFoundationPanel(activeView as FoundationViewId);
+  }, [activeView, isFoundationBootstrapState]);
 
   useEffect(() => {
     if (!hasLoadedPersistentState.current) {
@@ -10517,6 +10630,21 @@ export default function FoundationPageClient({
       const affectedViews = Array.isArray(event.payload?.affectedViews)
         ? event.payload.affectedViews.filter((view): view is string => typeof view === "string")
         : [];
+      const actorName =
+        roomLiveState?.roomParticipants.find((participant) => participant.participantId === actorParticipantId)?.displayName ??
+        "Ein anderer Coach";
+      const actionLabel =
+        event.type === "matchday_applied"
+          ? "Spieltag angewendet"
+          : event.type === "lineup_saved"
+            ? "Lineup bestätigt"
+            : event.type === "transfer_completed"
+              ? "Transfer abgeschlossen"
+              : "Room-Aktion";
+      setRoomActivityNotice({
+        title: `${actorName}: ${actionLabel}`,
+        detail: affectedViews.length > 0 ? `Betroffene Views: ${affectedViews.join(", ")}` : "Save wurde im Hintergrund synchronisiert.",
+      });
 
       void (async () => {
         await loadSave(activeSaveId);
@@ -10534,7 +10662,7 @@ export default function FoundationPageClient({
     return () => {
       socket.off("roomGameplayEvent", handleRoomGameplayEvent);
     };
-  }, [activeSaveId, roomContext, readMeta.source]);
+  }, [activeSaveId, roomContext, roomLiveState, readMeta.source]);
 
   useEffect(() => {
     if (readMeta.source !== "sqlite" || !activeSaveId || !hasLoadedPersistentState.current) {
@@ -10572,6 +10700,13 @@ export default function FoundationPageClient({
         try {
           await reloadLiveSeasonState("local_save_version", { compactReload: true });
           setSaveSyncError(null);
+          if (roomContext && previousSignature) {
+            setFoundationActionFeedback({
+              tone: "warning",
+              title: "Save aktualisiert",
+              detail: "Der Spielstand wurde extern geändert und neu geladen.",
+            });
+          }
         } finally {
           liveSaveRefreshInFlightRef.current = false;
         }
@@ -20690,6 +20825,7 @@ export default function FoundationPageClient({
       <FoundationShell
         activeView={activeView as FoundationViewId}
         onNavigate={(view) => setFoundationView(view as FoundationView, setActiveView, { push: true })}
+        onPrefetchView={prefetchFoundationPanel}
         isPending={isPending}
         subNav={
           activeView === "marketV2" ? (
@@ -21228,8 +21364,19 @@ export default function FoundationPageClient({
               <span className="eyebrow">Multiplayer-Room</span>
               <strong>Raum {roomContext.roomCode}</strong>
               <span className="muted">
-                Save {formatShortSaveId(roomContext.saveId)} · Schreibaktionen laufen serverseitig mit Sitzplatz-Token.
+                Save {formatShortSaveId(roomContext.saveId)}
+                {roomLiveState
+                  ? ` · Schritt: ${getRoomFlowStep(roomLiveState.roomFlowState.step).label} · ${
+                      describeRoomFlowButton({
+                        state: roomLiveState,
+                        participantId: roomContext.participantId,
+                      }).label
+                    }`
+                  : " · Schreibaktionen laufen serverseitig mit Sitzplatz-Token."}
               </span>
+              {roomActivityNotice ? (
+                <span className="muted">{roomActivityNotice.title} — {roomActivityNotice.detail}</span>
+              ) : null}
             </div>
             <a className="secondary-button inline-button" href={`/room/${roomContext.roomCode}`}>
               Zur Room-Ansicht
@@ -21584,8 +21731,9 @@ export default function FoundationPageClient({
           ) : null}
 
 
+          {activeView === "homeV2" ? (
           <FoundationHomeV2Panel
-            active={activeView === "homeV2"}
+            active
             tab={homeV2Tab}
             overview={{
               teamName: selectedTeam?.name ?? "Kein Team",
@@ -21671,6 +21819,7 @@ export default function FoundationPageClient({
               onNavigateInboxItem: navigateToInboxItem,
             }}
           />
+          ) : null}
 
           <section className={`panel foundation-training-compact-panel${getViewClass("trainingCompact")}`}>
             {activeView === "trainingCompact" && selectedTeam ? (
@@ -26819,8 +26968,9 @@ export default function FoundationPageClient({
             </div>
           </section>
 
+          {activeView === "lineup" ? (
           <FoundationLineupPanel
-            active={activeView === "lineup"}
+            active
             clientKey={`lineup-${activeSaveId}-${gameState.season.id}-${gameState.matchdayState.matchdayId}-${activeManagerTeamId}-${effectiveActiveOwnerId}`}
             teamTooltip={
               selectedTeam
@@ -26860,11 +27010,14 @@ export default function FoundationPageClient({
               onLineupSaved: handleHumanLineupSaved,
               onFormCardPlanSaved: handleFormCardPlanSaved,
               onOpenArena: () => setFoundationView("matchdayArena", setActiveView),
+              roomContext,
             }}
           />
+          ) : null}
 
+          {activeView === "matchdayArena" ? (
           <FoundationMatchdayArenaPanel
-            active={activeView === "matchdayArena"}
+            active
             ready={saveSummaries.length > 0 && Boolean(selectedTeamId)}
             sourceBadgeLabel={getViewSourceBadgeLabel("matchdayArena", activeContextMeta)}
             contextLabel={`${activeSaveName} · ${gameState.season.id} · ${gameState.matchdayState.matchdayId}`}
@@ -26969,6 +27122,7 @@ export default function FoundationPageClient({
               </section>
             }
           />
+          ) : null}
 
           <section className={`panel${getViewClass("matchdayResult")}`} id="foundation-matchday-result" data-testid="foundation-matchday-result">
             <div className="panel-header">
@@ -28401,8 +28555,9 @@ export default function FoundationPageClient({
             </div>
           </section>
 
+          {activeView === "teams" && selectedTeam ? (
           <FoundationTeamsDetailPanel
-            active={activeView === "teams" && Boolean(selectedTeam)}
+            active
             gameState={gameState}
             selectedTeam={selectedTeam}
             sortedTeamsViewRows={sortedTeamsViewRows}
@@ -28516,12 +28671,16 @@ export default function FoundationPageClient({
             sponsorChoiceProfiles={sponsorChoiceProfiles}
             sponsorChoiceBusy={sponsorChoiceBusy}
             selectedTeamCanManage={selectedTeamCanManage}
+            selectedTeamRosterActionsAvailable={selectedTeamRosterActionsAvailable}
+            selectedTeamRosterActionHint={selectedTeamRosterActionHint}
             contractRenewalMessage={contractRenewalMessage}
             contractRenewalError={contractRenewalError}
           />
+          ) : null}
 
+          {isTransferMarketViewActive ? (
           <FoundationTransfermarktV2Panel
-            active={isTransferMarketViewActive}
+            active
             transferWindowStatus={transferWindowStatus}
             marketVisibleFeedCount={marketFeed?.poolAudit.visibleFeedCount ?? 0}
             marketActiveFreeAgentCount={marketFeed?.poolAudit.activeFreeAgentCount ?? 0}
@@ -28583,6 +28742,7 @@ export default function FoundationPageClient({
               offerPanelActive: foundationPanel === "offer" && activeView === "marketV2",
               onOpenOfferPanel: openMarketOfferPanel,
               onCloseOfferPanel: closeFoundationDrilldownPanel,
+              roomContext,
               onBuyCompleted: async (teamId) => {
                 setActiveManagerTeam(teamId, "manual_select");
                 setFoundationActionFeedback({
@@ -28604,6 +28764,7 @@ export default function FoundationPageClient({
               },
             }}
           />
+          ) : null}
 
           {isMarketSellPanelOpen ? (
             <section className="foundation-drilldown-page transfer-sell-page" data-testid="transfer-sell-page" aria-label="Verkaufsdialog">
@@ -28946,6 +29107,95 @@ export default function FoundationPageClient({
                           </article>
                         </div>
                       </div>
+                      {marketSellPreview.coaching ? (
+                        <div className="transfer-modal-section" data-testid="transfer-sell-coaching-panel">
+                          <div className="transfer-callout-title">
+                            <strong>Strategie & Board</strong>
+                            <span className="muted">{marketSellPreview.coaching.doctrinePersona}</span>
+                          </div>
+                          <p className="muted">{marketSellPreview.coaching.strategyFitSummary}</p>
+                          <div className="metric-grid compact transfer-sell-metric-grid">
+                            <article className="metric-card">
+                              <span>AI-Empfehlung</span>
+                              <strong>{marketSellPreview.coaching.sellDecisionLabel ?? "—"}</strong>
+                              <small>Prioritaet {marketSellPreview.coaching.sellPriority ?? "—"}</small>
+                            </article>
+                            <article className="metric-card">
+                              <span>GM</span>
+                              <strong>{marketSellPreview.coaching.gmName ?? "—"}</strong>
+                              <small>{marketSellPreview.coaching.gmPressureLevel} · {marketSellPreview.coaching.gmArchetype ?? "—"}</small>
+                            </article>
+                            <article className="metric-card">
+                              <span>Board</span>
+                              <strong>{marketSellPreview.coaching.boardReaction.title}</strong>
+                              <small>{marketSellPreview.coaching.boardTrustSmiley ?? "—"} · {marketSellPreview.coaching.boardTrustPolicy ?? "—"}</small>
+                            </article>
+                            <article className="metric-card">
+                              <span>Marktsperre</span>
+                              <strong>1 Saison</strong>
+                              <small>{marketSellPreview.coaching.soldPlayerSeasonBanNote}</small>
+                            </article>
+                          </div>
+                          {marketSellPreview.coaching.gmWarning ? (
+                            <div className="transfer-feedback-banner is-warning">
+                              <strong>GM-Hinweis</strong>
+                              <span>{marketSellPreview.coaching.gmWarning}</span>
+                              {marketSellPreview.coaching.gmDetail ? <small className="muted">{marketSellPreview.coaching.gmDetail}</small> : null}
+                            </div>
+                          ) : null}
+                          {marketSellPreview.coaching.replacementSlot ? (
+                            <div className="transfer-callout is-warning">
+                              <strong>Nachfolger-Slot</strong>
+                              <p>{marketSellPreview.coaching.replacementSlot.slotLabel}</p>
+                              <small className="muted">
+                                Budget bis {formatTransfermarktCurrency(marketSellPreview.coaching.replacementSlot.maxBuyPrice)} ·
+                                Ziel-OVR {marketSellPreview.coaching.replacementSlot.minOvrBand ?? "—"}
+                              </small>
+                            </div>
+                          ) : null}
+                          <div className="transfer-buy-meta-grid">
+                            <div className="transfer-callout">
+                              <strong>Gruende fuer Verkauf</strong>
+                              {marketSellPreview.coaching.reasonsToSell.length ? (
+                                <ul className="warning-list">
+                                  {marketSellPreview.coaching.reasonsToSell.map((reason) => (
+                                    <li key={`sell-${reason}`}>{reason}</li>
+                                  ))}
+                                </ul>
+                              ) : (
+                                <p className="muted">Keine Verkaufsgruende.</p>
+                              )}
+                            </div>
+                            <div className="transfer-callout">
+                              <strong>Gruende dagegen</strong>
+                              {marketSellPreview.coaching.reasonsToKeep.length ? (
+                                <ul className="warning-list">
+                                  {marketSellPreview.coaching.reasonsToKeep.map((reason) => (
+                                    <li key={`keep-${reason}`}>{reason}</li>
+                                  ))}
+                                </ul>
+                              ) : (
+                                <p className="muted">Keine Haltegruende.</p>
+                              )}
+                            </div>
+                          </div>
+                          {(marketSellPreview.coaching.boardReaction.requiresStrongAcknowledgment ||
+                            marketSellPreview.coaching.gmSoftBlockStarSell) &&
+                          (marketSellPreview.coaching.keepIntentScore ?? 0) >= 55 ? (
+                            <label className="transfer-sell-risk-ack">
+                              <input
+                                type="checkbox"
+                                checked={marketSellRiskAcknowledged}
+                                onChange={(event) => setMarketSellRiskAcknowledged(event.target.checked)}
+                              />
+                              <span>
+                                Ich bestaetige den Verkauf trotz Board-/GM-Warnung (
+                                {marketSellPreview.coaching.boardReaction.title})
+                              </span>
+                            </label>
+                          ) : null}
+                        </div>
+                      ) : null}
                       <div className="transfer-buy-meta-grid">
                         <div className="transfer-callout is-blocked">
                           <div className="transfer-callout-title">
@@ -28994,7 +29244,15 @@ export default function FoundationPageClient({
                     className="primary-button"
                     type="button"
                     data-testid="transfer-sell-confirm-button"
-                    disabled={readMeta.source === "prisma" || !marketSellPreview?.canSell || marketSellBusy}
+                    disabled={
+                      readMeta.source === "prisma" ||
+                      !marketSellPreview?.canSell ||
+                      marketSellBusy ||
+                      ((marketSellPreview?.coaching?.boardReaction.requiresStrongAcknowledgment ||
+                        (marketSellPreview?.coaching?.gmSoftBlockStarSell &&
+                          (marketSellPreview?.coaching?.keepIntentScore ?? 0) >= 55)) &&
+                        !marketSellRiskAcknowledged)
+                    }
                     title={
                       readMeta.source === "prisma"
                         ? "Im Referenzmodus bleibt der Verkauf gesperrt."
