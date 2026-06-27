@@ -18,6 +18,8 @@ import {
   applySeasonEndXpSpend,
   previewSeasonEndXpAvailability,
   previewSeasonEndXpSpend,
+  type EconomyPreviewContext,
+  type PreComputedSeasonXpEntry,
   type SeasonEndXpSpendApplyResult,
   type SeasonEndXpSpendPlannedUpgradeInput,
   type SeasonEndXpSpendPreview,
@@ -292,7 +294,7 @@ function getAffordableUpgradeCost(input: {
   return cost.costAfterFacility;
 }
 
-export function previewAiSeasonEndXpSpend(save: PersistedSaveGame, teamId: string): AiXpSpendPlan {
+export function previewAiSeasonEndXpSpend(save: PersistedSaveGame, teamId: string, cachedEconomyContext?: EconomyPreviewContext, options?: { skipAfterEconomyAudit?: boolean }, preComputedSeasonXp?: Map<string, PreComputedSeasonXpEntry>): AiXpSpendPlan {
   const gameState = save.gameState;
   const team = gameState.teams.find((entry) => entry.teamId === teamId) ?? null;
   const controlMode = gameState.seasonState.teamControlSettings?.[teamId]?.controlMode ?? (team?.humanControlled === false ? "ai" : "manual");
@@ -307,7 +309,8 @@ export function previewAiSeasonEndXpSpend(save: PersistedSaveGame, teamId: strin
   if (!profile) warnings.push("team_strategy_profile_missing");
 
   const rosterRows = team ? getRosterRows(gameState, team.teamId) : [];
-  const ratings = buildPlayerRatingContractMap(gameState);
+  // Re-use the economy context's pre-built rating map to avoid recomputing for every team.
+  const ratings = cachedEconomyContext?.beforeRatings ?? buildPlayerRatingContractMap(gameState);
   const rankedRoster = [...rosterRows].sort((left, right) => {
     const leftOvr = ratings.get(left.player.id)?.ovrNormalized ?? left.player.rating ?? 0;
     const rightOvr = ratings.get(right.player.id)?.ovrNormalized ?? right.player.rating ?? 0;
@@ -317,7 +320,7 @@ export function previewAiSeasonEndXpSpend(save: PersistedSaveGame, teamId: strin
   const plannedInputs: SeasonEndXpSpendPlannedUpgradeInput[] = [];
   const reasonsByPlayerId = new Map<string, string[]>();
   const firstAvailabilityByPlayerId = new Map<string, ReturnType<typeof previewSeasonEndXpAvailability>["players"][number]>();
-  const initialAvailability = previewSeasonEndXpAvailability(save, teamId);
+  const initialAvailability = previewSeasonEndXpAvailability(save, teamId, cachedEconomyContext, preComputedSeasonXp);
   warnings.push(...initialAvailability.warnings);
   blockers.push(...initialAvailability.blockingReasons);
   for (const playerPreview of initialAvailability.players) {
@@ -410,14 +413,14 @@ export function previewAiSeasonEndXpSpend(save: PersistedSaveGame, teamId: strin
       else warnings.push(`no_ai_upgrade_above_quality_floor:${player.id}`);
     }
 
-    const seasonPerformance = buildPlayerSeasonPerformance(gameState, player.id);
+    const appearances = preComputedSeasonXp?.get(player.id)?.appearances ?? buildPlayerSeasonPerformance(gameState, player.id)?.appearances ?? null;
     if (role === "young" && !isFiniteNumber(player.potential)) warnings.push(`potential_source_missing:${player.id}`);
-    if ((player.salaryDemand ?? 0) > 20 && (seasonPerformance?.appearances ?? 0) <= 1) {
+    if ((player.salaryDemand ?? 0) > 20 && (appearances ?? 0) <= 1) {
       warnings.push(`expensive_flop_low_usage_guard:${player.id}`);
     }
   }
 
-  const preview = previewSeasonEndXpSpend(save, teamId, plannedInputs);
+  const preview = previewSeasonEndXpSpend(save, teamId, plannedInputs, cachedEconomyContext, options?.skipAfterEconomyAudit ? { skipAfterEconomyAudit: true } : undefined, preComputedSeasonXp);
   const normalizedAiPlannedUpgrades = preview.plannedUpgrades.filter((upgrade) => upgrade.source === "manual_xp_spend_preview");
   const previewWarnings = preview.warnings.filter((warning) => warning !== "ai_xp_spend_apply_not_enabled_v1");
   const playerPlans = rosterRows.flatMap(({ player, roster }) => {
@@ -460,8 +463,15 @@ export function applyAiSeasonEndXpSpend(
   teamId: string,
   confirmToken: string | null | undefined,
   persistence: PersistenceService,
+  cachedEconomyContext?: EconomyPreviewContext,
+  options?: { skipAfterEconomyAudit?: boolean; deferLeagueWideMarketValueRecalc?: boolean },
+  preComputedPlan?: AiXpSpendPlan,
+  preComputedSeasonXp?: Map<string, PreComputedSeasonXpEntry>,
 ): SeasonEndXpSpendApplyResult {
-  const plan = previewAiSeasonEndXpSpend(save, teamId);
+  // Re-use the caller's already-computed plan to avoid a full second preview round-trip.
+  const plan = preComputedPlan && confirmToken && confirmToken === preComputedPlan.confirmToken
+    ? preComputedPlan
+    : previewAiSeasonEndXpSpend(save, teamId, cachedEconomyContext, undefined, preComputedSeasonXp);
   if (plan.blockers.length > 0 || !plan.confirmToken || confirmToken !== plan.confirmToken) {
     return {
       ...plan.preview,
@@ -471,5 +481,9 @@ export function applyAiSeasonEndXpSpend(
       blockingReasons: [...new Set([...plan.blockers, confirmToken ? "ai_xp_spend_preview_stale" : "confirm_token_missing"])],
     };
   }
-  return applySeasonEndXpSpend(save, teamId, plan.plannedUpgrades, confirmToken, persistence, { allowAiTeams: true });
+  return applySeasonEndXpSpend(save, teamId, plan.plannedUpgrades, confirmToken, persistence, {
+    allowAiTeams: true,
+    skipAfterEconomyAudit: options?.skipAfterEconomyAudit,
+    deferLeagueWideMarketValueRecalc: options?.deferLeagueWideMarketValueRecalc,
+  }, cachedEconomyContext, plan.preview, preComputedSeasonXp);
 }

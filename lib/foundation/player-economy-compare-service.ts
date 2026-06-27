@@ -159,6 +159,20 @@ function roundValue(value: number, digits = 2) {
   return Number(value.toFixed(digits));
 }
 
+export function resolveRankTableMarketValueFromCompareRow(
+  row: Pick<PlayerEconomyCompareRow, "calculatedMarketValue" | "calculationBreakdown"> | null | undefined,
+): number | null {
+  if (!row) {
+    return null;
+  }
+  const protectedRaw = row.calculationBreakdown?.protectedRaw;
+  const offset = row.calculationBreakdown?.marketValueBaseOffset;
+  if (typeof protectedRaw === "number" && Number.isFinite(protectedRaw) && typeof offset === "number" && Number.isFinite(offset)) {
+    return roundValue(protectedRaw + offset, 2);
+  }
+  return row.calculatedMarketValue ?? null;
+}
+
 function isFiniteNumber(value: number | null | undefined): value is number {
   return typeof value === "number" && Number.isFinite(value);
 }
