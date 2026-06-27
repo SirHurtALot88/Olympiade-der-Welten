@@ -274,12 +274,23 @@ const GAME_PHASE_VISIBLE_NEEDLES = [
   "Saisonrueckblick",
   "Saison abgeschlossen",
   "Preseason-Management",
+  "Naechste Saison bereit",
   "Vorbereitung",
   "Lineup Setup",
   "Preseason",
   "Transferfenster",
   "Verkaufsfenster",
   "Kaufphase",
+];
+
+const TRANSFER_MARKET_READY_NEEDLES = [
+  "Wishlist & Scouting",
+  "Wishlist",
+  "Aktueller Kader",
+  "Auf Wishlist",
+  "gemerkt",
+  "Verkaufen",
+  "Kader",
 ];
 
 const SEASON_VISIBLE_NEEDLES = [
@@ -324,6 +335,44 @@ async function waitForSaveContext(page: Page, expectedSaveId: string, timeoutMs:
 
 async function pageText(page: Page) {
   return page.locator("body").innerText({ timeout: 5000 }).catch(() => "");
+}
+
+async function elementTextContent(page: Page, testId: string) {
+  return page.getByTestId(testId).evaluate((element) => element.textContent ?? "").catch(() => "");
+}
+
+async function waitForGamePhaseVisible(page: Page, timeoutMs: number) {
+  await page.waitForFunction(
+    (needles) => {
+      const banner = document.querySelector('[data-testid="foundation-context-banner"]');
+      const text = `${banner?.textContent ?? ""}\n${document.body.textContent ?? ""}`;
+      const normalized = text.toLowerCase();
+      return needles.some((needle: string) => normalized.includes(needle.toLowerCase()));
+    },
+    GAME_PHASE_VISIBLE_NEEDLES,
+    { timeout: timeoutMs },
+  ).catch(() => undefined);
+}
+
+async function waitForTransferMarketV2Ready(page: Page, timeoutMs: number) {
+  await page.waitForFunction(
+    (needles) => {
+      const marketRoot = document.querySelector('[data-testid="transfer-market"]');
+      if (!marketRoot) {
+        return false;
+      }
+      const text = marketRoot.textContent ?? "";
+      const normalized = text.toLowerCase();
+      const hasMarketBody =
+        Boolean(marketRoot.querySelector(".market-v2-budget-strip")) ||
+        Boolean(marketRoot.querySelector(".market-v2-context-grid")) ||
+        Boolean(marketRoot.querySelector('[data-testid="transfer-candidate-card"]')) ||
+        Boolean(marketRoot.querySelector('[data-testid="transfer-deal-open-button"]'));
+      return hasMarketBody && needles.some((needle: string) => normalized.includes(needle.toLowerCase()));
+    },
+    TRANSFER_MARKET_READY_NEEDLES,
+    { timeout: timeoutMs },
+  ).catch(() => undefined);
 }
 
 function hasAny(text: string, needles: string[]) {
@@ -535,7 +584,8 @@ async function main() {
       run: async (step) => {
         await gotoFoundation(page, args.baseUrl, "seasonV2", expectedTeamId, expectedSaveId, viewTimeoutMs, "foundation-context-banner");
         await waitForContextBanner(page, expectedSaveId, viewTimeoutMs);
-        const bannerText = await page.getByTestId("foundation-context-banner").innerText();
+        await waitForGamePhaseVisible(page, viewTimeoutMs);
+        const bannerText = await elementTextContent(page, "foundation-context-banner");
         const text = await pageText(page);
         assertStep(
           step,
@@ -671,19 +721,22 @@ async function main() {
         await gotoFoundation(page, args.baseUrl, "marketV2", expectedTeamId, expectedSaveId, viewTimeoutMs, "transfer-market");
         await page.getByTestId("transfer-market").waitFor({ state: "visible", timeout: viewTimeoutMs });
         const selectedTeam = await selectTransferMarketTeam(page, expectedTeamId);
+        await waitForTransferMarketV2Ready(page, viewTimeoutMs);
         await page.waitForFunction(
           () =>
-            document.querySelectorAll('[data-testid="transfer-buy-preview-button"]').length > 0 ||
-            (document.body.textContent ?? "").includes("Freie Spieler") ||
-            (document.body.textContent ?? "").includes("Keine Free Agents") ||
-            (document.body.textContent ?? "").includes("Keine Kandidaten") ||
-            (document.body.textContent ?? "").includes("Weitere Kandidaten") ||
-            (document.body.textContent ?? "").includes("Transfermarkt"),
+            document.querySelectorAll('[data-testid="transfer-deal-open-button"], [data-testid="transfer-buy-preview-button"]').length > 0 ||
+            (document.querySelector('[data-testid="transfer-market"]')?.textContent ?? "").includes("Freie Spieler") ||
+            (document.querySelector('[data-testid="transfer-market"]')?.textContent ?? "").includes("Keine Free Agents") ||
+            (document.querySelector('[data-testid="transfer-market"]')?.textContent ?? "").includes("Keine Kandidaten") ||
+            (document.querySelector('[data-testid="transfer-market"]')?.textContent ?? "").includes("Weitere Kandidaten") ||
+            Boolean(document.querySelector(".market-v2-budget-strip")),
           undefined,
           { timeout: 20_000 },
         ).catch(() => undefined);
-        const buyButtons = await page.getByTestId("transfer-buy-preview-button").count();
-        const text = await pageText(page);
+        const buyButtons =
+          (await page.getByTestId("transfer-deal-open-button").count()) +
+          (await page.getByTestId("transfer-buy-preview-button").count());
+        const text = await page.getByTestId("transfer-market").innerText({ timeout: Math.max(viewTimeoutMs, 15_000) }).catch(() => "");
         assertStep(step, selectedTeam, `Team auswählbar${selectedTeam ? `: ${selectedTeam}` : ""}.`);
         assertStep(
           step,
@@ -737,13 +790,31 @@ async function main() {
           const profileButton = page.locator(".training-v2-rider-portrait-button, .training-v2-rider-copy .table-link-button").first();
           await profileButton.waitFor({ state: "visible", timeout: viewTimeoutMs });
           await profileButton.click({ timeout: viewTimeoutMs });
-          await page.locator(".player-drawer[role='dialog']").waitFor({ state: "visible", timeout: viewTimeoutMs });
-          const drawerText = await page.locator(".player-drawer[role='dialog']").innerText();
-          assertStep(step, hasAny(drawerText, ["XP", "XP Forecast", "Setpoints"]), "Drawer zeigt XP.");
-          assertStep(step, drawerText.includes("OVR"), "Drawer zeigt OVR.");
-          assertStep(step, drawerText.includes("MVS"), "Drawer zeigt MVS.");
-          assertStep(step, drawerText.includes("PPs"), "Drawer zeigt PPs.");
-          await page.keyboard.press("Escape");
+          const playerProfile = page.getByTestId("foundation-player-profile");
+          await playerProfile.waitFor({ state: "visible", timeout: viewTimeoutMs });
+          await page.waitForFunction(
+            () => {
+              const profile = document.querySelector('[data-testid="foundation-player-profile"]');
+              if (!profile) {
+                return false;
+              }
+              const text = profile.textContent ?? "";
+              return text.includes("OVR") || text.includes("Profil") || text.includes("Scouting");
+            },
+            undefined,
+            { timeout: viewTimeoutMs },
+          );
+          const drawerText = await playerProfile.innerText();
+          assertStep(step, hasAny(drawerText, ["XP", "XP Forecast", "Setpoints", "Entwicklung"]), "Spielerprofil zeigt XP/Entwicklung.");
+          assertStep(step, drawerText.includes("OVR"), "Spielerprofil zeigt OVR.");
+          assertStep(step, drawerText.includes("MVS"), "Spielerprofil zeigt MVS.");
+          assertStep(step, drawerText.includes("PPs"), "Spielerprofil zeigt PPs.");
+          const closeButton = page.getByRole("button", { name: /^Schliessen$/ });
+          if (await closeButton.isVisible().catch(() => false)) {
+            await closeButton.click();
+          } else {
+            await gotoFoundation(page, args.baseUrl, "trainingCompact", expectedTeamId, expectedSaveId, viewTimeoutMs, "foundation-training-compact");
+          }
         }
       },
     }));

@@ -37,6 +37,8 @@ describe("gameplay smoke script contract", () => {
     expect(scriptText).toContain("foundation-active-save-id");
     expect(scriptText).toContain("transfer-market");
     expect(scriptText).toContain("foundation-training-compact");
+    expect(scriptText).toContain("foundation-player-profile");
+    expect(scriptText).toContain("transfer-deal-open-button");
     expect(scriptText).toContain("foundation-lineup");
     expect(scriptText).toContain("foundation-cockpit");
     expect(scriptText).toContain("matchdayArena");
