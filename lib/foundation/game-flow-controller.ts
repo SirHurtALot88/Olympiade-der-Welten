@@ -12,6 +12,7 @@ import {
   isTeamMatchdayLineupOperationallyReady,
   isTeamMatchdayLineupSubmitted,
 } from "@/lib/foundation/matchday-lineup-readiness";
+import { getTeamBoardFlowSignals } from "@/lib/board/team-season-objectives-service";
 import { getTeamSponsorContract } from "@/lib/sponsor/sponsor-offer-read";
 
 export type GameFlowPhase =
@@ -146,6 +147,12 @@ function buildPreseasonSteps(gameState: GameState, activeTeamId: string | null):
     seasonIntroStep?.status !== "skipped";
   const isFirstSeason = /season[-_\s]*1\b/i.test(`${gameState.season.id} ${gameState.season.name}`);
   const isSeasonReviewPhase = gamePhase === "season_completed" || gamePhase === "season_review";
+  const boardSignals = getTeamBoardFlowSignals(gameState, activeTeamId);
+  const boardFlowWarnings = uniq([...boardSignals.blockers, ...boardSignals.warnings]);
+  const playerDevelopmentDone = completedTransitionSteps.has("player_development");
+  const preseasonManagementReady =
+    gamePhase === "next_season_ready" ||
+    (hasSeasonHistory && cashApplied && playerDevelopmentDone && gamePhase === "lineup_setup");
 
   return [
     step({
@@ -173,6 +180,7 @@ function buildPreseasonSteps(gameState: GameState, activeTeamId: string | null):
       status: !hasSeasonHistory && isFirstSeason ? "completed" : cashApplied ? "completed" : "ready",
       targetView: "prize",
       teamId: activeTeamId,
+      warnings: !cashApplied && hasSeasonHistory ? ["prize_money_not_applied"] : [],
     }),
     step({
       stepId: "facilities",
@@ -187,10 +195,11 @@ function buildPreseasonSteps(gameState: GameState, activeTeamId: string | null):
       stepId: "player_development",
       label: "Spieler entwickeln",
       cta: "Weiter: Spielerentwicklung",
-      status: !hasSeasonHistory && isFirstSeason ? "completed" : completedTransitionSteps.has("player_development") ? "completed" : "ready",
+      status: !hasSeasonHistory && isFirstSeason ? "completed" : playerDevelopmentDone ? "completed" : "ready",
       targetView: "trainingCompact",
       targetPanel: "season-end-development",
       teamId: activeTeamId,
+      warnings: hasSeasonHistory && !playerDevelopmentDone ? ["player_development_pending"] : [],
     }),
     step({
       stepId: "sell_players",
@@ -236,9 +245,14 @@ function buildPreseasonSteps(gameState: GameState, activeTeamId: string | null):
       stepId: "prepare_season",
       label: "Season vorbereiten",
       cta: "Weiter: Season Setup",
-      status: gamePhase === "next_season_ready" ? "completed" : "ready",
+      status: gamePhase === "next_season_ready" || gamePhase === "season_active" ? "completed" : preseasonManagementReady ? "warning" : "ready",
       targetView: "cockpit",
       teamId: activeTeamId,
+      warnings: uniq([
+        ...boardFlowWarnings,
+        hasSeasonHistory && !cashApplied ? "prize_money_not_applied" : null,
+        hasSeasonHistory && !playerDevelopmentDone ? "player_development_pending" : null,
+      ]),
     }),
     step({
       stepId: "start_matchday_1",
@@ -445,6 +459,8 @@ function buildMatchdaySteps(gameState: GameState, activeTeamId: string | null): 
   const seasonIntroOpen = Boolean(storedNewGameFlow?.active && !storedNewGameFlow.dismissed && !seasonIntroHandled);
   const trainingFacilitiesHandled = trainingFacilitiesStep?.status === "completed" || trainingFacilitiesStep?.status === "skipped";
   const hasSponsorContract = activeTeamId ? getTeamSponsorContract(gameState, activeTeamId) != null : true;
+  const boardSignals = getTeamBoardFlowSignals(gameState, activeTeamId);
+  const boardFlowWarnings = uniq([...boardSignals.blockers, ...boardSignals.warnings]);
 
   return [
     step({
@@ -516,6 +532,7 @@ function buildMatchdaySteps(gameState: GameState, activeTeamId: string | null): 
       targetView: "trainingCompact",
       teamId: activeTeamId,
       blockers: !hasActiveTeam ? ["no_active_team"] : activeRosterCount === 0 ? ["empty_roster"] : [],
+      warnings: boardFlowWarnings,
     }),
     step({
       stepId: "set_lineup",
@@ -537,12 +554,15 @@ function buildMatchdaySteps(gameState: GameState, activeTeamId: string | null): 
         : activeRosterCount === 0
           ? ["empty_roster"]
           : [],
-      warnings: !trainingComplete && !hasLineup ? ["training_missing"] : [],
+      warnings: uniq([
+        ...(!trainingComplete && !hasLineup ? ["training_missing"] : []),
+        ...boardFlowWarnings,
+      ]),
     }),
     step({
       stepId: "assign_formcards",
-      label: "Formkarten-Pool prüfen",
-      cta: "Weiter: Formkarten-Pool",
+      label: GAME_LANGUAGE.flow.formCardPoolLabel,
+      cta: GAME_LANGUAGE.flow.formCardPoolCta,
       status: !hasActiveTeam
         ? "blocked"
         : !formCardsRequired
@@ -565,7 +585,10 @@ function buildMatchdaySteps(gameState: GameState, activeTeamId: string | null): 
         : formCardsRequired && !hasFormCardPool
           ? ["missing_formcard_pool"]
           : [],
-      warnings: [],
+      warnings:
+        formCardsRequired && hasFormCardPool && !hasFormCardSelections && hasLineup && !lineupConfirmed
+          ? ["formcards_assignment_optional"]
+          : [],
     }),
     step({
       stepId: "confirm_lineup",
@@ -584,7 +607,7 @@ function buildMatchdaySteps(gameState: GameState, activeTeamId: string | null): 
       targetView: "matchdayArena",
       teamId: activeTeamId,
       blockers: openArenaBlockers,
-      warnings: [],
+      warnings: boardFlowWarnings,
     }),
     step({
       stepId: "run_reveal",
@@ -617,10 +640,11 @@ function buildMatchdaySteps(gameState: GameState, activeTeamId: string | null): 
       stepId: "advance_to_next_matchday",
       label: "Zum nächsten Spieltag",
       cta: "Weiter: Matchday fortsetzen",
-      status: hasResults ? "ready" : "blocked",
+      status: hasResults ? (boardSignals.blockers.length > 0 ? "warning" : "ready") : "blocked",
       targetView: "cockpit",
       teamId: activeTeamId,
       blockers: hasResults ? [] : ["missing_results"],
+      warnings: boardFlowWarnings,
     }),
   ];
 }

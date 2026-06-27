@@ -1690,6 +1690,28 @@ export function getTeamObjectives(gameState: GameState, teamId: string) {
   return buildTeamObjectiveOverview(gameState).objectives.filter((objective) => objective.teamId === teamId);
 }
 
+export type TeamBoardFlowSignals = {
+  blockers: string[];
+  warnings: string[];
+};
+
+export function getTeamBoardFlowSignals(gameState: GameState, teamId: string | null): TeamBoardFlowSignals {
+  if (!teamId) {
+    return { blockers: [], warnings: [] };
+  }
+
+  const board = buildTeamObjectiveOverview(gameState).boardConfidence[teamId];
+  if (!board) {
+    return { blockers: [], warnings: [] };
+  }
+
+  const blockers = board.warnings.filter((warning) => warning === "board_objectives_failed");
+  const warnings = board.warnings.filter(
+    (warning) => warning === "board_objectives_at_risk" || warning === "high_board_pressure",
+  );
+  return { blockers, warnings };
+}
+
 function buildStoredObjectiveAiBiasByTeamId(gameState: GameState) {
   const cached = TEAM_OBJECTIVE_AI_BIAS_CACHE.get(gameState);
   if (cached) {

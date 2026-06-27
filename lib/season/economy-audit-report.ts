@@ -17,9 +17,11 @@ export function buildEconomyAuditReport(input: { saveId: string; gameState: Game
 
   const baseFirst = sponsorLogs.filter((log) => log.phase === "base_first");
   const seasonEnd = sponsorLogs.filter((log) => log.phase === "season_end");
-  const repairBuys = gameState.transferHistory.filter((entry) => entry.transferSource === "preseason_roster_repair_buy");
+  const repairBuys = gameState.transferHistory.filter((entry) => entry.source === "preseason_roster_repair_buy");
   const negativeCashTeams = gameState.teams.filter((team) => team.cash < -0.01);
-  const repairBuyZeroFee = repairBuys.filter((entry) => entry.kind === "buy" && (entry.fee ?? 0) <= 0);
+  const repairBuyZeroFee = repairBuys.filter(
+    (entry) => entry.transferType === "buy" && (entry.fee ?? 0) <= 0,
+  );
 
   if (negativeCashTeams.length > 0) {
     violations.push(

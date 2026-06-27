@@ -594,7 +594,7 @@ const registry: RegistryInput[] = [
     writePaths: ["lib/season/cash-prize-apply-service.ts", "app/api/season/cash-prize-apply/route.ts"],
     testCoverage: ["season-points-prize-regression smoke"],
     smokeCoverage: ["season:smoke-points-prize-regression", "app:smoke-gameplay"],
-    knownBlockers: ["sponsor_source_still_partial"],
+    knownBlockers: ["sponsor_contract_fallback_documented"],
     proofFiles: ["season-end-prize-rank-change-audit.json", "season-points-prize-regression.json"],
     writeSafety: "covered",
     multiplayerReady: false,

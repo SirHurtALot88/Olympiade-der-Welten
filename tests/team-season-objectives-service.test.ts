@@ -298,8 +298,8 @@ describe("team season objectives service", () => {
         {
           id: "sell-c1",
           playerId: "x",
-          seasonId: "season-3",
-          seasonLabel: "Season 3",
+          seasonId: "season-2",
+          seasonLabel: "Season 2",
           transferType: "sell",
           fromTeamId: "C-C",
           toTeamId: null,
@@ -308,6 +308,7 @@ describe("team season objectives service", () => {
           marketValue: 10,
           remainingContractLength: 1,
           happenedAt: "2026-06-12T00:00:00.000Z",
+          source: "ai_preseason_market_sell",
         },
       ],
     });

@@ -19,6 +19,9 @@ export const GAME_LANGUAGE = {
     confirmLineupLabel: "Einsatzliste bestaetigen",
     confirmLineupCta: "Weiter: Einsatzliste bestaetigen",
     lineupMissing: "Einsatzliste fehlt",
+    formCardPoolLabel: "Formkarten-Pool pruefen",
+    formCardPoolCta: "Weiter: Formkarten-Pool",
+    formCardPoolReadyHint: "Pool bereit — Zuweisung optional",
   },
 } as const;
 

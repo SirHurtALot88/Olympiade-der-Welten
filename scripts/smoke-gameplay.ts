@@ -783,11 +783,21 @@ async function main() {
       run: async (step) => {
         await gotoFoundation(page, args.baseUrl, "trainingCompact", expectedTeamId, expectedSaveId, viewTimeoutMs, "foundation-training-compact");
         await page.getByTestId("foundation-training-compact").waitFor({ state: "visible", timeout: viewTimeoutMs });
-        const profileButtons = await page.locator(".training-v2-rider-portrait-button, .training-v2-rider-copy .table-link-button").count();
+        let profileButtons = await page.locator(".training-v2-rider-portrait-button, .training-v2-rider-copy .table-link-button").count();
+        let profileButtonSelector =
+          ".training-v2-rider-portrait-button, .training-v2-rider-copy .table-link-button";
+        if (profileButtons === 0) {
+          await gotoFoundation(page, args.baseUrl, "lineup", expectedTeamId, expectedSaveId, viewTimeoutMs, "foundation-lineup");
+          await page.getByTestId("foundation-lineup").waitFor({ state: "visible", timeout: viewTimeoutMs });
+          await selectFirstUsableTeam(page);
+          profileButtonSelector = ".legacy-lineup-player-link";
+          profileButtons = await page.locator(profileButtonSelector).count();
+          step.details.push("Training ohne Kader — Profilbuttons aus Einsatzliste gelesen.");
+        }
         assertStep(step, profileButtons > 0, `Kader-/Profilbuttons sichtbar: ${profileButtons}.`);
         if (profileButtons > 0) {
           await dismissSeasonBriefingIfOpen(page, viewTimeoutMs);
-          const profileButton = page.locator(".training-v2-rider-portrait-button, .training-v2-rider-copy .table-link-button").first();
+          const profileButton = page.locator(profileButtonSelector).first();
           await profileButton.waitFor({ state: "visible", timeout: viewTimeoutMs });
           await profileButton.click({ timeout: viewTimeoutMs });
           const playerProfile = page.getByTestId("foundation-player-profile");

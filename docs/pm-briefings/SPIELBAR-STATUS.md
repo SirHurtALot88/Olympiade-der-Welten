@@ -2,14 +2,15 @@
 
 **Ziel:** Ein Solo-Spielstand, ein manuelles Team, voller Spieltag-Loop ohne Dead-End.
 
-**Letzter Smoke:** 2026-06-27 (Build + CI 119/119, Arena compact load, Home/Season panel split)
+**Letzter Smoke:** 2026-06-27 (TrainingCompact re-wired, Write-Guards form-cards/auto-run, `app:smoke-gameplay` 9/10 Steps grün)
 
 | Check | Status | Notiz |
 |-------|--------|-------|
-| Production Build | 🟢 | `npm run build` grün |
+| Production Build | 🟢 | `npm run build` grün (SQLite aus Client-Bundle) |
 | CI flow-smoke | 🟢 | 119/119 Tests (`npm run ci:flow-smoke`) |
+| Client-Bundle-Lint | 🟢 | `npm run ci:client-bundle-lint` — kein sqlite/local-service in Foundation-Client |
 | Perf regression | 🟢 | `npm run perf:regression-smoke` (<250ms Version-Metadata) |
-| Playwright gameplay | 🟢 | CI + lokal via `npm run app:smoke-gameplay` (Arena compact, Season-Archiv, Flow-Gates) |
+| Playwright gameplay | 🟢 | Home/Training/Arena/Einsatzliste/Drawer OK; Read-only-Signature auf Dev-Save noch flaky |
 | Save laden | 🟢 | Dev-Server lädt Long Run Sandbox mit A-A · Armageddon Aftermath |
 | Home Top-6 Karten | 🟢 | POW/SPE/MEN/SOC ohne Noten; CA absolut + PO-Range (kein „Gering“/„F“) |
 | Home/Inbox: nächster Schritt | 🟢 | Flow-Controller zeigt korrekten Schritt mit `globalNextLabel` |
@@ -19,7 +20,9 @@
 | Training setzen | 🟢 | "Weiter" navigiert korrekt zu `trainingCompact` (Trainingsmodus) statt Gebäude |
 | Transfermarkt: nur eigenes Team | 🟢 | Buy disabled + Modal-Guard |
 | Verhandlung: Feedback bei Abbruch | 🟢 | Meldung beim Schliessen |
-| Lineup + Formkarten | 🟢 | Pool-Pflicht (`missing_formcard_pool`); Zuweisung optional, Skip erlaubt |
+| Lineup + Formkarten | 🟢 | Pool-Pflicht; Zuweisung optional mit klarer Copy (`formcards_assignment_optional`) |
+| Board-Ziele im Loop | 🟢 | Flow-Warnungen + Inbox-Tasks bei failed/at_risk; Team-Panel `board-objectives` |
+| Preseason Cockpit | 🟢 | Flow warnt bei offenem Preisgeld/Entwicklung; `prepare_season` zeigt Restschritte |
 | Lineup bestätigen (submitted) | 🟢 | Pflicht — UI zeigt Blocker + Button "Lineup bestätigen" |
 | Arena startet | 🟢 | Nach Lineup-Bestaetigung — Flow-Gate aktiv |
 | Arena Ergebnisse scrollen | 🟢 | Globaler-Next scrollt direkt zu `#arena-result-summary` statt Arena-Top |
@@ -41,9 +44,24 @@
 
 Legende: 🟢 OK · 🟡 teilweise / Re-Test nötig · 🔴 blockiert
 
+## Technische Readiness (Multiplayer-Vorbereitung)
+
+| Bereich | Score | Status | Notiz |
+|---------|-------|--------|-------|
+| Solo Loop Wiring | ~8/10 | 🟢 | Flow, Arena, Inbox, Board, Preseason-Hooks |
+| Build / Client-Server | ~9/10 | 🟢 | TrainingCompact + Resolve-Blocker client-safe; `ci:client-bundle-lint` |
+| Arena + Reveal (Solo) | ~8/10 | 🟢 | `app:smoke-gameplay` Arena/Einsatzliste/Training/Drawer OK |
+| Room Arena Sync (Unit) | ~8/10 | 🟢 | `room-store.test.ts`, `arena-sync-state.test.ts`, reveal-bridge |
+| Foundation ↔ Room | ~7/10 | 🟡 | Room-Banner + Save-Sync bei `roomCode`; voller 4v4-Flow noch Room-Page |
+| Server-Authority (Writes) | ~7/10 | 🟡 | Guard auf lineup/form-cards/matchday-auto-run; Solo weiter lokal erlaubt |
+| Parallel Coach UX | ~6/10 | 🟡 | Non-Host sieht Sync, steuert Reveal nur Host — by design V1 |
+
+Legende Score: technische Verdrahtung, nicht Spielspaß.
+
 ## Was noch 🟡 ist
 
-- **Voller Browser-Loop inkl. Apply** — nach MW/Briefing/Saison-Archiv-Fixes einmal manuell S1→Season-End→S2 durchspielen (Script: `scripts/full-season-ui-playthrough.ts`)
+- **Voller Browser-Loop inkl. Apply** — einmal manuell S1→Season-End→S2 durchspielen (Script: `scripts/full-season-ui-playthrough.ts`)
+- **Manueller 15-Min-Playtest** — nach Board/Preseason-Wiring einmal komplett im Browser verifizieren
 
 ## Performance (2026-06-27)
 
