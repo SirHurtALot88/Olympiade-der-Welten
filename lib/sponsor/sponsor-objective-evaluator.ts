@@ -1,6 +1,6 @@
 import type { GameState, SponsorOfferComponent } from "@/lib/data/olyDataTypes";
 import { buildTeamSeasonOverviewRows } from "@/lib/foundation/team-management-overview";
-import { getTeamDisplaySalaryTotal } from "@/lib/sponsor/sponsor-economy-calibration";
+import { getTeamDisplaySalaryTotal } from "@/lib/sponsor/sponsor-team-salary-display";
 import {
   getTeamAxisRank,
   parseAxisTargetValue,
@@ -36,7 +36,7 @@ export function evaluateSpecialComponentForObjective(
     if (!parsed) {
       return "open";
     }
-    const axisRank = getTeamAxisRank(rows, teamId, parsed.axis as SponsorAxisKey);
+    const axisRank = getTeamAxisRank(rows, teamId, parsed.axis as SponsorAxisKey, gameState);
     if (axisRank.rank == null) {
       return "open";
     }

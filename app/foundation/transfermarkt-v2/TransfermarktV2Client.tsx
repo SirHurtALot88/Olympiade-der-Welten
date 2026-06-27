@@ -2004,6 +2004,8 @@ export default function TransfermarktV2Client({
         let nextOffset = 0;
         let hasMore = true;
 
+        const searchActive = deferredSearch.trim().length > 0;
+
         while (hasMore) {
           const params = appendRoomContextToParams(new URLSearchParams({
             saveId: defaultSaveId,
@@ -2012,7 +2014,7 @@ export default function TransfermarktV2Client({
             teamId: selectedTeamId,
             limit: String(MARKET_PAGE_LIMIT),
             offset: String(nextOffset),
-            ...(deferredSearch.trim() ? { search: deferredSearch.trim() } : {}),
+            ...(searchActive ? { search: deferredSearch.trim() } : {}),
           }), roomContextRef.current);
           const response = await fetch(`/api/transfermarkt/free-agents?${params.toString()}`, {
             cache: "no-store",
@@ -2071,6 +2073,7 @@ export default function TransfermarktV2Client({
           setMarketTotal(0);
           setMarketHasMore(false);
         } else {
+          const finalHasMore = hasMore;
           marketCacheRef.current.set(marketCacheKey, {
             items: [...mergedItems],
             feed: {
@@ -2078,10 +2081,10 @@ export default function TransfermarktV2Client({
               items: mergedItems,
               offset: 0,
               returned: mergedItems.length,
-              hasMore: false,
+              hasMore: finalHasMore,
             },
             total: latestPayload.total,
-            hasMore: false,
+            hasMore: finalHasMore,
           });
         }
       } catch (error) {
@@ -2121,9 +2124,9 @@ export default function TransfermarktV2Client({
       try {
         const params = appendRoomContextToParams(new URLSearchParams({
           saveId: defaultSaveId,
-          seasonId: defaultSeasonId,
           source,
-          limit: "8",
+          allSeasons: "1",
+          limit: "12",
           ...(selectedTeamId ? { teamId: selectedTeamId } : {}),
         }), roomContextRef.current);
         const response = await fetch(`/api/transfermarkt/history?${params.toString()}`, {
@@ -2151,7 +2154,7 @@ export default function TransfermarktV2Client({
         historyAbortRef.current = null;
       }
     };
-  }, [defaultSaveId, defaultSeasonId, reloadToken, selectedTeamId, source]);
+  }, [defaultSaveId, reloadToken, selectedTeamId, source]);
 
   useEffect(() => {
     if (!previewPlayerId || !selectedTeamId) {
@@ -2407,8 +2410,7 @@ export default function TransfermarktV2Client({
       source === "sqlite" &&
       selectedTeamCanManage &&
       hadPreview &&
-      !negotiationAccepted &&
-      Boolean(buyNegotiationOutcome);
+      buyNegotiationOutcome?.status === "countered";
     deactivateOfferPanel();
     setBuyModalWishlistEntry(null);
     setBuyNegotiationOutcome(null);
@@ -2941,6 +2943,7 @@ export default function TransfermarktV2Client({
                   className={`market-v2-candidate-card${isSelected ? " is-selected" : ""}`}
                   key={item.playerId}
                   type="button"
+                  data-testid="transfer-candidate-card"
                   ref={(node) => {
                     setCandidateButtonRef(item.playerId, node);
                   }}
@@ -3333,6 +3336,7 @@ export default function TransfermarktV2Client({
                 <button
                   className="primary-button"
                   type="button"
+                  data-testid="transfer-deal-open-button"
                   disabled={!selectedPlayer || !selectedTeamId || !selectedTeamCanManage}
                   onClick={openBuyModal}
                   title={dealOpenDisabledReason ?? "Öffnet das Kaufmodal mit Vertragsrahmen, Forderung und Teamwirkung."}
@@ -3897,6 +3901,7 @@ export default function TransfermarktV2Client({
                         <button
                           className="secondary-button inline-button"
                           type="button"
+                          data-testid="transfer-roster-sell-button"
                           title={`${row.name} verkaufen`}
                           onClick={() =>
                             onSell({
@@ -3932,8 +3937,8 @@ export default function TransfermarktV2Client({
       <section className="market-v2-bottom-grid">
         <article className="market-v2-activity-panel">
           <div className="market-v2-section-head">
-            <strong>Aktuelle Season-Deals</strong>
-            <small>{historyItems.length} sichtbar</small>
+            <strong>Letzte Deals (alle Seasons)</strong>
+            <small>{historyItems.length} sichtbar{historyFeed?.total != null && historyFeed.total > historyItems.length ? ` · ${historyFeed.total} gesamt` : ""}</small>
           </div>
           <div className="market-v2-activity-list">
             {historyItems.map((entry) => (
@@ -3959,8 +3964,8 @@ export default function TransfermarktV2Client({
             ))}
             {historyItems.length === 0 ? (
               <div className="market-v2-empty">
-                <strong>Noch keine Deals im aktuellen Scope.</strong>
-                <p>Hier landen die Käufe und Verkäufe der gewählten Season direkt im Spielfluss.</p>
+                <strong>Noch keine Deals im Save.</strong>
+                <p>Hier erscheinen Käufe und Verkäufe aus allen Seasons — auch nach dem Saisonwechsel.</p>
               </div>
             ) : null}
           </div>
@@ -4060,9 +4065,23 @@ export default function TransfermarktV2Client({
               </div>
 
               {previewBusy && !buyPreview ? (
-                <div className="transfer-feedback-banner">
-                  <strong>Kaufvorschau lädt</strong>
-                  <span>Forderung, Vertrag und Teamwirkung werden gerade berechnet.</span>
+                <div className="transfer-buy-preview-skeleton" data-testid="transfer-buy-preview-skeleton" aria-busy="true" aria-label="Kaufvorschau lädt">
+                  <div className="transfer-buy-preview-skeleton__banner">
+                    <strong>Kaufvorschau lädt</strong>
+                    <span>Forderung, Vertrag und Teamwirkung werden berechnet.</span>
+                  </div>
+                  <div className="transfer-buy-preview-skeleton__grid">
+                    <div className="transfer-buy-preview-skeleton__block" />
+                    <div className="transfer-buy-preview-skeleton__block" />
+                    <div className="transfer-buy-preview-skeleton__block" />
+                    <div className="transfer-buy-preview-skeleton__block is-wide" />
+                  </div>
+                </div>
+              ) : null}
+              {previewBusy && buyPreview ? (
+                <div className="transfer-feedback-banner is-info" data-testid="transfer-buy-preview-refresh">
+                  <strong>Vorschau aktualisiert</strong>
+                  <span>Vertrag und Gehalt werden neu berechnet.</span>
                 </div>
               ) : null}
               {previewError ? (
@@ -4422,6 +4441,7 @@ export default function TransfermarktV2Client({
               <button
                 className="primary-button"
                 type="button"
+                data-testid="transfer-buy-confirm-button"
                 disabled={source !== "sqlite" || !selectedTeamCanManage || previewBusy || buyBusy || !selectedPlayer || !selectedTeamId || !buyPreview?.canBuy || buyNegotiationOutcome?.status !== "accepted"}
                 onClick={() => void confirmBuy()}
                 title={finalBuyDisabledReason ?? "Bestätigt den Kauf jetzt final in deinem lokalen Spielstand."}

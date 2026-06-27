@@ -107,6 +107,9 @@ function mockHealthyPreview() {
         points: 22,
         currentCash: 37.9,
         prizeMoney: 91.4,
+        basisCash: 52,
+        salaryTotal: 0,
+        rankChangePrize: { bonusMalus: 0, startRank: 1, finalRank: 1, rankDelta: 0, source: "sheet", startRankSource: "standing_startplatz", warning: null },
         projectedCash: 129.3,
         status: "ready",
         warnings: [],
@@ -119,6 +122,9 @@ function mockHealthyPreview() {
         points: 19,
         currentCash: 49.8,
         prizeMoney: 88,
+        basisCash: 48,
+        salaryTotal: 0,
+        rankChangePrize: { bonusMalus: 0, startRank: 2, finalRank: 2, rankDelta: 0, source: "sheet", startRankSource: "standing_startplatz", warning: null },
         projectedCash: 137.8,
         status: "ready",
         warnings: [],
@@ -167,10 +173,9 @@ describe("cash prize apply service", () => {
     expect(save.gameState.teams[0]?.cash).toBe(37.9);
   });
 
-  it("execute writes only local team cash and keeps standings untouched", async () => {
+  it("execute persists benchmark metadata without paying out team cash", async () => {
     const { save, persistence } = createPersistenceMock();
     mockHealthyPreview();
-    const standingsBefore = structuredClone(save.gameState.seasonState.standings);
     const resultsBefore = structuredClone(save.gameState.seasonState.matchdayResults);
 
     const result = await executeCashPrizeApply(
@@ -186,11 +191,14 @@ describe("cash prize apply service", () => {
 
     expect(result.ok).toBe(true);
     expect(result.applied).toBe(true);
-    expect(save.gameState.teams.find((team) => team.teamId === "W-W")?.cash).toBe(129.3);
-    expect(save.gameState.teams.find((team) => team.teamId === "P-S")?.cash).toBe(137.8);
-    expect(save.gameState.seasonState.standings).toEqual(standingsBefore);
+    expect(save.gameState.teams.find((team) => team.teamId === "W-W")?.cash).toBe(37.9);
+    expect(save.gameState.teams.find((team) => team.teamId === "P-S")?.cash).toBe(49.8);
+    expect(save.gameState.seasonState.standings["W-W"]?.cashTotal).toBe(129.3);
+    expect(save.gameState.seasonState.standings["W-W"]?.sponsorBasis).toBe(52);
     expect(save.gameState.seasonState.matchdayResults).toEqual(resultsBefore);
     expect(save.gameState.seasonState.cashPrizeApplyLogs).toHaveLength(1);
+    expect(save.gameState.seasonState.cashPrizeApplyLogs?.[0]?.payload.benchmarkOnly).toBe(true);
+    expect(save.gameState.seasonState.cashPrizeApplyLogs?.[0]?.payload.cashPayoutApplied).toBe(false);
     expect(save.gameState.seasonState.seasonSnapshots ?? []).toHaveLength(0);
   });
 

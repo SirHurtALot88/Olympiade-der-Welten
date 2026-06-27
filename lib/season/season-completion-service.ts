@@ -1,7 +1,5 @@
 import type { CashPrizeApplyResult } from "@/lib/season/cash-prize-apply-service";
 import {
-  CASH_PRIZE_APPLY_CONFIRM_TOKEN,
-  executeCashPrizeApply,
   previewCashPrizeApply,
 } from "@/lib/season/cash-prize-apply-service";
 import { createPersistenceService } from "@/lib/persistence/persistence-service";
@@ -202,45 +200,30 @@ async function runLocalSeasonCompletionUnsafe(
 
   const existingCashLog =
     (initialSave.gameState.seasonState.cashPrizeApplyLogs ?? []).find((log) => log.seasonId === seasonId) ?? null;
-  const cashApply =
-    !dryRun && blockingReasons.size === 0 && !existingCashLog
-      ? await executeCashPrizeApply(
-          {
-            saveId: initialSave.saveId,
-            seasonId,
-            matchdayId,
-            source,
-            phase: "season_end",
-            execute: true,
-            dryRun: false,
-            confirm: CASH_PRIZE_APPLY_CONFIRM_TOKEN,
-          },
-          persistence,
-        )
-      : await previewCashPrizeApply(
-          {
-            saveId: initialSave.saveId,
-            seasonId,
-            matchdayId,
-            source,
-            phase: "season_end",
-            dryRun: true,
-            execute: false,
-          },
-          persistence,
-        );
-  if (!existingCashLog && (!cashApply.ok || (!dryRun && !cashApply.applied))) {
-    cashApply.blockingReasons.forEach((reason) => blockingReasons.add(reason));
+  const cashApply = await previewCashPrizeApply(
+    {
+      saveId: initialSave.saveId,
+      seasonId,
+      matchdayId,
+      source,
+      phase: "season_end",
+      dryRun: true,
+      execute: false,
+    },
+    persistence,
+  );
+  if (existingCashLog) {
+    warnings.add("legacy_cash_prize_apply_log_present_benchmark_only_mode");
   }
   addStep(
     steps,
     {
       key: "cash_apply",
-      label: "Preisgeld",
-      status: existingCashLog ? "already_done" : cashApply.applied ? "applied" : cashApply.canApply ? "planned" : "blocked",
-      warnings: cashApply.warnings,
-      blockingReasons: existingCashLog ? [] : cashApply.blockingReasons,
-      auditId: existingCashLog?.id ?? cashApply.auditLogId,
+      label: "Preisgeld-Benchmark",
+      status: existingCashLog ? "already_done" : cashApply.canApply ? "planned" : "skipped",
+      warnings: [...cashApply.warnings, ...(existingCashLog ? ["legacy_cash_prize_apply_log_present"] : [])],
+      blockingReasons: [],
+      auditId: existingCashLog?.id ?? null,
     },
     warnings,
     blockingReasons,
@@ -253,15 +236,19 @@ async function runLocalSeasonCompletionUnsafe(
       (log) => log.seasonId === seasonId && log.phase === "season_end",
     ) ?? false;
   const shouldApplySponsorSettlement =
-    !dryRun && blockingReasons.size === 0 && sponsorSettlementPreview.canApply && !existingSponsorEndPayout;
+    !dryRun && blockingReasons.size === 0 && !existingSponsorEndPayout;
   const sponsorSettlementApply = shouldApplySponsorSettlement
     ? applySponsorSettlement({
         gameState: afterCashSave.gameState,
         saveId: afterCashSave.saveId,
         phase: "season_end",
         execute: true,
+        deductSalary: true,
       })
     : { gameState: afterCashSave.gameState, preview: sponsorSettlementPreview, applied: false };
+  if (shouldApplySponsorSettlement && !sponsorSettlementApply.applied && sponsorSettlementPreview.canApply) {
+    sponsorSettlementPreview.blockingReasons.forEach((reason) => blockingReasons.add(`sponsor_settlement:${reason}`));
+  }
   if (shouldApplySponsorSettlement && sponsorSettlementApply.applied) {
     persistence.saveSingleplayerState(afterCashSave.saveId, sponsorSettlementApply.gameState);
   }

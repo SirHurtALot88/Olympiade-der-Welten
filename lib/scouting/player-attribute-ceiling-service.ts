@@ -1,11 +1,15 @@
 import type {
   Player,
+  GameState,
   PlayerGeneratorAttributeName,
   PlayerPotentialRecord,
 } from "@/lib/data/olyDataTypes";
 import type { PlayerAxisKey, PlayerAxisStarProfile } from "@/lib/scouting/player-axis-star-rating";
 import type { PlayerPotentialCeilingProfile } from "@/lib/scouting/player-potential-ceiling-service";
 import { playerGeneratorAttributeKeys } from "@/lib/player-generator/official-discipline-weights";
+
+// Per-gameState index so repeated lookups for different players are O(1) not O(n).
+const potentialRecordIndexCache = new WeakMap<object, Map<string, PlayerPotentialRecord>>();
 
 export type AttributeHeadroomState = "open" | "closing" | "capped";
 export type AxisRouteState = "open" | "closing" | "capped";
@@ -328,5 +332,13 @@ export function resolvePlayerPotentialRecordFromGameState(input: {
   gameState?: { playerPotential?: PlayerPotentialRecord[] } | null;
   playerId: string;
 }): PlayerPotentialRecord | null {
-  return input.gameState?.playerPotential?.find((entry) => entry.playerId === input.playerId) ?? null;
+  const gs = input.gameState;
+  if (!gs) return null;
+  // Build or reuse a per-gameState index to turn O(n) .find() into O(1) lookup.
+  let index = potentialRecordIndexCache.get(gs);
+  if (!index) {
+    index = new Map((gs.playerPotential ?? []).map((entry) => [entry.playerId, entry] as const));
+    potentialRecordIndexCache.set(gs, index);
+  }
+  return index.get(input.playerId) ?? null;
 }

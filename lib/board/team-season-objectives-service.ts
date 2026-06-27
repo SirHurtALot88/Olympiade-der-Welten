@@ -238,17 +238,17 @@ function buildSalaryPressureObjective(input: {
   // S1: teams can legitimately spend 90%+ building their roster from scratch.
   // Target loosens gradually as the league economy (salary factors) grows.
   const targetRatio =
-    seasonNumber <= 1 ? 0.90 :
+    seasonNumber <= 1 ? 0.93 :
     seasonNumber === 2 ? 0.78 :
     seasonNumber === 3 ? 0.68 :
     0.62;
   const penaltyThreshold =
-    seasonNumber <= 1 ? 0.97 :
+    seasonNumber <= 1 ? 0.98 :
     seasonNumber === 2 ? 0.88 :
     seasonNumber === 3 ? 0.80 :
     0.75;
   const confidencePenalty =
-    seasonNumber <= 1 ? -0.1 :
+    seasonNumber <= 1 ? -0.05 :
     seasonNumber === 2 ? -0.25 :
     -0.4;
 

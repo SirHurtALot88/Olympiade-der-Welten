@@ -6,6 +6,9 @@ import type { StandingsPreviewSource } from "@/lib/standings/standings-preview-e
 
 export const CASH_PRIZE_APPLY_CONFIRM_TOKEN = "APPLY_LOCAL_CASH_PRIZE";
 
+/** Preisgeld/Sponsor-Benchmark wird persistiert; Team-Cash bleibt unverändert (kein Payout). */
+export const CASH_PRIZE_BENCHMARK_ONLY = true;
+
 export type CashPrizeApplyParams = {
   saveId: string;
   seasonId: string;
@@ -254,16 +257,7 @@ function writeLocalCashPrizeApply(input: {
   const save = resolveLocalSave(input.persistence, input.saveId);
   const now = new Date().toISOString();
   const previewByTeamId = new Map(input.preview.items.map((item) => [item.teamId, item] as const));
-  const nextTeams = save.gameState.teams.map((team) => {
-    const row = previewByTeamId.get(team.teamId) ?? null;
-    if (!row || row.projectedCash == null) {
-      return team;
-    }
-    return {
-      ...team,
-      cash: row.projectedCash,
-    };
-  });
+  const nextTeams = save.gameState.teams;
   const nextStandings = Object.fromEntries(
     Object.entries(save.gameState.seasonState.standings ?? {}).map(([teamId, standing]) => {
       const row = previewByTeamId.get(teamId) ?? null;
@@ -312,6 +306,8 @@ function writeLocalCashPrizeApply(input: {
       totalTeams: input.preview.items.length,
       appliedTeams: input.preview.items.filter((item) => item.projectedCash != null).length,
       totalPrizeMoney: Number(totalPrizeMoney.toFixed(2)),
+      benchmarkOnly: CASH_PRIZE_BENCHMARK_ONLY,
+      cashPayoutApplied: !CASH_PRIZE_BENCHMARK_ONLY,
     },
     createdAt: now,
   };

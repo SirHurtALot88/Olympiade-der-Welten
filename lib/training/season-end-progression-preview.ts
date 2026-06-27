@@ -10,6 +10,7 @@ import { getTeamDevelopmentTrainingBonusPct } from "@/lib/foundation/team-develo
 import { resolvePlayerEconomyContract } from "@/lib/foundation/player-economy-contract";
 import { buildPlayerEconomyCompareReport } from "@/lib/foundation/player-economy-compare-service";
 import { buildPlayerRatingContractMap } from "@/lib/foundation/player-rating-contract";
+import type { OrganicSeasonProgressionResult } from "@/lib/training/organic-season-progression";
 import type { PlayerProgressionForecast, PlayerProgressionRatingTier } from "@/lib/training/training-plan-types";
 import { PLAYER_PROGRESSION_XP_CONSTANTS } from "@/lib/training/player-progression-forecast";
 import {
@@ -82,6 +83,12 @@ export type SeasonEndProgressionPreviewRow = {
   teamId: string | null;
   teamCode: string | null;
   availableXP: number;
+  /** Legacy manual-upgrade pool from XP forecast — not organic setpoints. */
+  legacyAvailableXP: number;
+  organicNetSetpoints: number;
+  organicTrainingSetpoints: number;
+  organicPerformanceSetpoints: number;
+  organicMarketValuePressureTotal: number;
   trainingXP: number;
   performanceXP: number;
   traitModifierPct: number;
@@ -487,6 +494,7 @@ export function buildSeasonEndProgressionPreview(input: {
   gameState: GameState;
   teamId?: string | null;
   forecastsByPlayerId: Map<string, PlayerProgressionForecast>;
+  organicByPlayerId?: Map<string, OrganicSeasonProgressionResult>;
   upgradeRequests?: SeasonEndProgressionUpgradeRequest[];
   facilities?: SeasonEndFacilityPreviewInput;
 }) {
@@ -524,6 +532,7 @@ export function buildSeasonEndProgressionPreview(input: {
   const requestByPlayerId = new Map((input.upgradeRequests ?? []).map((request) => [request.playerId, request] as const));
   const rows: SeasonEndProgressionPreviewRow[] = rosterRows.map(({ player, team }) => {
     const forecast = input.forecastsByPlayerId.get(player.id);
+    const organic = input.organicByPlayerId?.get(player.id) ?? null;
     const request = requestByPlayerId.get(player.id);
     const selectedAttribute = request?.attribute ?? "power";
     const attributeBefore = getAttributeValue(player, selectedAttribute);
@@ -539,7 +548,8 @@ export function buildSeasonEndProgressionPreview(input: {
     const facilityTrainingDelta = trainingFacilityXp.after - trainingFacilityXp.before;
     const spendableDevelopmentXP = Math.max(0, (forecast?.netDevelopmentXP ?? 0) + facilityTrainingDelta);
     const cost = getSeasonEndUpgradeCost({ tier: tierBefore, attribute: selectedAttribute, facilities });
-    const availableXP = spendableDevelopmentXP;
+    const legacyAvailableXP = spendableDevelopmentXP;
+    const availableXP = legacyAvailableXP;
     const blockReason =
       attributeBefore == null
         ? "attribute_source_missing"
@@ -592,6 +602,11 @@ export function buildSeasonEndProgressionPreview(input: {
       teamId: team?.teamId ?? null,
       teamCode: team?.shortCode ?? null,
       availableXP,
+      legacyAvailableXP,
+      organicNetSetpoints: organic?.netSetpoints ?? 0,
+      organicTrainingSetpoints: organic?.trainingSetpoints ?? 0,
+      organicPerformanceSetpoints: organic?.appliedPerformanceSetpoints ?? 0,
+      organicMarketValuePressureTotal: organic?.marketValuePressureTotal ?? 0,
       trainingXP: forecast?.baseTrainingXP ?? 0,
       performanceXP,
       traitModifierPct: forecast?.traitModifierPct ?? 0,

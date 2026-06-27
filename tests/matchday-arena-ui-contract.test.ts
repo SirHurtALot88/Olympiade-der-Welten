@@ -59,7 +59,7 @@ describe("matchday arena ui contract", () => {
     expect(foundationText).toContain("Spieltagsergebnis");
     expect(foundationText).toContain("Saisonstand anzeigen");
     expect(foundationText).toContain("Saisonstand ansehen");
-    expect(foundationText).toContain("openPlayerDrawerById(entry.playerId, entry.activePlayerId)");
+    expect(foundationText).toContain("onOpenPlayerDetails={(payload) => openPlayerDrawerById(payload.playerId, payload.activePlayerId)}");
     expect(foundationText).toContain("foundation-global-next-button");
     expect(foundationText).toContain("triggerGlobalNext");
     expect(foundationText).toContain('activeView === "matchdayArena"');
@@ -94,6 +94,9 @@ describe("matchday arena ui contract", () => {
     expect(arenaText).toContain("Ergebnis");
     expect(arenaText).toContain("activeDisciplinePhase");
     expect(arenaText).toContain("revealedSlotCountByDiscipline");
+    expect(arenaText).toContain("revealEventActive");
+    expect(arenaText).toContain("is-reveal-event");
+    expect(arenaText).toContain('data-testid="arena-reveal-timeline"');
     expect(arenaText).toContain("completedDisciplinePhases");
     expect(arenaRevealPanelText).toContain("MatchdayArenaTimeline");
     expect(arenaText).toContain("ArenaRevealPlaybackPanel");
@@ -121,7 +124,7 @@ describe("matchday arena ui contract", () => {
     expect(arenaText).toContain("arena-v2-board-mutators");
     expect(arenaText).toContain("matchdayMutatorLabelsBySide");
     expect(arenaText).toContain("onOpenTeam");
-    expect(arenaText).toContain("handleTeamRowDoubleClick");
+    expect(arenaText).toContain("handleTeamProfileOpen");
     expect(foundationText).toContain("onOpenTeam={openTeamDrawerById}");
     expect(arenaText).toContain("Team-Fokus aufheben");
     expect(arenaText).toContain("Fortgesetzt bei");
@@ -177,6 +180,8 @@ describe("matchday arena ui contract", () => {
     expect(cssText).toContain(".arena-v2-rank-tag");
     expect(cssText).toContain(".arena-v2-board-track-wrap");
     expect(cssText).toContain(".arena-v2-panel-loading");
+    expect(cssText).toContain(".arena-v2-timeline-panel.is-reveal-event");
+    expect(cssText).toContain("@keyframes arena-v2-reveal-event");
     expect(cssText).toContain("--arena-v2-board-visible-rows");
     expect(cssText).toContain(".pill.is-loading");
     expect(cssText).toContain(".matchday-arena-lane");

@@ -10,9 +10,9 @@ Status: laufende Arbeitsliste fuer die naechsten UI-/Gameplay-/Performance-Patch
 5. Sichtbarer Schnellmodus-Chip im Flow-Coach. Status: erledigt.
 6. Browser-QA ueber Home, Einsatzliste, Arena, Teams, Training, Markt, Historie, Saisonstand, Ranks und Diszis. Status: erledigt, siehe `docs/tab-performance-baseline-v1.md`.
 7. Ladezeitmessung fuer Tab-Wechsel Home -> Einsatz -> Arena -> Markt. Status: erledigt, siehe `docs/tab-performance-baseline-v1.csv`.
-8. Einsatzliste: naechster freier Slot noch deutlicher hervorheben. Status: offen.
-9. Einsatzliste: Kandidaten nach "passt sofort" statt nur Score gruppieren. Status: offen.
-10. Arena: Ergebnis-Reveal staerker als Event inszenieren. Status: offen.
+8. Einsatzliste: naechster freier Slot noch deutlicher hervorheben. Status: erledigt (`LegacyLineupLabClient`: `is-next-target`, Auto-Focus auf `nextOpenSlotKey`).
+9. Einsatzliste: Kandidaten nach "passt sofort" statt nur Score gruppieren. Status: erledigt (`teamdeckSortMode` Default `fit`).
+10. Arena: Ergebnis-Reveal staerker als Event inszenieren. Status: erledigt (`MatchdayArenaV2Client`: `is-reveal-event` Pulse auf Timeline-Panel).
 11. Transferhistorie/Recap nur im Historien-Tab laden. Status: erledigt.
 12. Preisgeld-, Standings-Preview- und Management-Feeds nur in passenden Tabs laden. Status: erledigt.
 13. Einsatzlisten-Fetchfehler abfangen statt Konsolenfehler werfen. Status: erledigt.

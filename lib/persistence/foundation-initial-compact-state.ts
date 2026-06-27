@@ -39,7 +39,7 @@ export function compactFoundationInitialGameState(gameState: GameState): GameSta
     ...gameState,
     playerBaselines: undefined,
     baselineWriteGuardEvents: undefined,
-    transferHistory: [],
+    transferHistory: gameState.transferHistory,
     logs: [],
     players: gameState.players.map((player) => ({
       ...player,
@@ -100,6 +100,14 @@ function mergePlayerAfterCompactEdit(
   return merged;
 }
 
+function lineupDraftMergeKey(draft: NonNullable<GameState["seasonState"]["lineupDrafts"]>[number]) {
+  if (draft.lineupId) {
+    return draft.lineupId;
+  }
+
+  return `${draft.saveId}:${draft.seasonId}:${draft.matchdayId}:${draft.teamId}`;
+}
+
 /** Restore compact-stripped slices when the client PUT still reflects the compact load. */
 export function rehydrateGameStateAfterCompactPut(existing: GameState, incoming: GameState): GameState {
   const compactFromExisting = compactFoundationInitialGameState(existing);
@@ -136,7 +144,7 @@ export function rehydrateGameStateAfterCompactPut(existing: GameState, incoming:
         incoming.seasonState.lineupDrafts ?? [],
         existing.seasonState.lineupDrafts ?? [],
         compactFromExisting.seasonState.lineupDrafts ?? [],
-        (draft) => draft.matchdayId,
+        lineupDraftMergeKey,
       ),
       matchdayResults: mergeKeyedCollection(
         incoming.seasonState.matchdayResults ?? [],

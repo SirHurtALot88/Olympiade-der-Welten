@@ -153,6 +153,7 @@ function buildOffer(input: {
     variantKey: brand.variantKey,
     demandProfile: getDemandProfile(starTier),
     teamQualityRank: teamQualityRank ?? undefined,
+    isChallengeOffer: specialMode === "challenge",
   };
 }
 
@@ -422,6 +423,8 @@ export function chooseSponsorOffer(input: {
   saveId?: string;
   termSeasons?: SponsorTermSeasons;
   negotiationProfile?: SponsorNegotiationProfile;
+  /** When true, skip immediate base_first payout (used for AI auto-sign / balancing sims). */
+  deferBaseFirstPayout?: boolean;
 }): { gameState: GameState; contract: TeamSponsorContract | null; error?: string } {
   const offers = getTeamSponsorOffers(input.gameState, input.teamId);
   const offer = offers.find((entry) => entry.offerId === input.offerId) ?? null;
@@ -468,7 +471,9 @@ export function chooseSponsorOffer(input: {
     },
   };
   nextGameState = appendSponsorBrandHistory(nextGameState, input.teamId, offer.sponsorParentBrandId);
-  nextGameState = payBaseFirstInstallment(nextGameState, contract, input.saveId);
+  if (!input.deferBaseFirstPayout) {
+    nextGameState = payBaseFirstInstallment(nextGameState, contract, input.saveId);
+  }
   const updatedContract = getTeamSponsorContract(nextGameState, input.teamId);
   return { gameState: nextGameState, contract: updatedContract };
 }
@@ -590,6 +595,7 @@ export function chooseSponsorOfferForAiTeams(gameState: GameState, settingsMap?:
       offerId: bestOffer.offerId,
       termSeasons: negotiation.termSeasons,
       negotiationProfile: negotiation.negotiationProfile,
+      deferBaseFirstPayout: true,
     });
     nextGameState = result.gameState;
   }

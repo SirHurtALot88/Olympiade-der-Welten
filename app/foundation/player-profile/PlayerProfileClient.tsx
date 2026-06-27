@@ -8,6 +8,12 @@ import {
   PLAYER_PROFILE_TAB_ANCHORS,
   type PlayerProfileTabId,
 } from "@/lib/foundation/player-profile-service";
+import type {
+  TrainingClassOption,
+  TrainingModeOption,
+  TrainingPlayerRowView,
+} from "@/app/foundation/training-facilities-v2/training-view-types";
+import type { PlayerTrainingMode } from "@/lib/training/training-plan-types";
 
 type PlayerProfileClientProps = {
   data: PlayerDetailDrawerData;
@@ -16,6 +22,12 @@ type PlayerProfileClientProps = {
   onClose?: () => void;
   onOpenTraining?: () => void;
   onOpenContractOffer?: () => void;
+  trainingRow?: TrainingPlayerRowView | null;
+  trainingModeOptions?: TrainingModeOption[];
+  trainingClassOptions?: TrainingClassOption[];
+  onSetTrainingMode?: (playerId: string, mode: PlayerTrainingMode) => void;
+  onSetTrainingClass?: (playerId: string, trainingClass: string) => void;
+  trainingReadOnly?: boolean;
 };
 
 export default function PlayerProfileClient({
@@ -25,6 +37,12 @@ export default function PlayerProfileClient({
   onClose,
   onOpenTraining,
   onOpenContractOffer,
+  trainingRow = null,
+  trainingModeOptions = [],
+  trainingClassOptions = [],
+  onSetTrainingMode,
+  onSetTrainingClass,
+  trainingReadOnly = false,
 }: PlayerProfileClientProps) {
   useEffect(() => {
     const anchorId = PLAYER_PROFILE_TAB_ANCHORS[activeTab];
@@ -41,6 +59,13 @@ export default function PlayerProfileClient({
       onClose={() => {
         onClose?.();
       }}
+      onOpenTraining={onOpenTraining}
+      trainingRow={trainingRow}
+      trainingModeOptions={trainingModeOptions}
+      trainingClassOptions={trainingClassOptions}
+      onSetTrainingMode={onSetTrainingMode}
+      onSetTrainingClass={onSetTrainingClass}
+      trainingReadOnly={trainingReadOnly}
       onOpenBuyPreview={
         onOpenContractOffer
           ? (player) => {

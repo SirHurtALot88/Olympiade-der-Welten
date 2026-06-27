@@ -208,6 +208,7 @@ export default function FacilitiesV2Client({
             <button
               type="button"
               className="secondary-button inline-button"
+              data-testid="facilities-upgrade-button"
               disabled={readOnly || facilityUpgradeBusy || facilityMaintenanceBusy}
               title={facilityLaneActionReason ?? undefined}
               onClick={() => openFacilityDialog(activeFacility.id, "upgrade")}

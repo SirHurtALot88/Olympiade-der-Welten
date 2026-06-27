@@ -3452,6 +3452,9 @@ export function runChunkedRedraftTopup(params: ChunkedRedraftTopupParams) {
   if (params.mode === "season1_initial_topup" && params.seasonId !== "season-1") {
     throw new Error(`season1_autoprep_topup_forbidden_after_s1:${params.seasonId}`);
   }
+  if (params.mode === "preseason_roster_repair" && params.seasonId === "season-1") {
+    throw new Error("preseason_roster_repair_forbidden_in_season_1");
+  }
   if (!dryRun && params.confirmToken !== CHUNKED_REDRAFT_TOPUP_CONFIRM_TOKEN) {
     throw new Error("chunked_redraft_confirm_token_required");
   }
@@ -4228,6 +4231,9 @@ export function runChunkedRedraftTopup(params: ChunkedRedraftTopupParams) {
               detail: `${candidate.player.id}:${result.blockingReasons.join("|")}`,
             });
             continue;
+          }
+          if (typeof result.cashAfter === "number" && result.cashAfter < -0.0001) {
+            throw new Error(`negative_cash_after_pick:${team.teamId}:${roundValue(result.cashAfter)}`);
           }
 
           counters.successfulBuys += 1;

@@ -261,6 +261,9 @@ export type CashPrizeApplyLogRecord = {
     totalTeams: number;
     appliedTeams: number;
     totalPrizeMoney: number;
+    /** Preisgeld-Tabelle ist Benchmark-only; kein Cash-Payout auf Team-Wallets. */
+    benchmarkOnly?: boolean;
+    cashPayoutApplied?: boolean;
   };
   createdAt: string;
 };
@@ -1115,6 +1118,8 @@ export type SponsorOffer = {
   negotiationProfile?: SponsorNegotiationProfile;
   demandProfile?: SponsorDemandProfile;
   teamQualityRank?: number;
+  /** Exactly one offer per team uses challenge specials (axis / salary / transfer). */
+  isChallengeOffer?: boolean;
 };
 
 export type SponsorCommercialRating = {
@@ -1569,6 +1574,8 @@ export type Season = {
   year: number;
   currentMatchday: number;
   matchdayIds: string[];
+  totalMatchdays?: number;
+  isCompleted?: boolean;
 };
 
 export type MatchdayResultStatus = "preview_applied" | "superseded" | "voided";

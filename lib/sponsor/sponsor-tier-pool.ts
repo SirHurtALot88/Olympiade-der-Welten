@@ -30,11 +30,11 @@ function rollClusteredTier(input: {
 }): SponsorStarTier {
   const roll = getStableUnitHash(`${input.seasonId}:${input.teamId}:sponsor-tier:${input.slotIndex}`);
   let tier = input.targetTier;
-  if (roll < 0.12 && tier < input.maxTier) {
+  if (roll < 0.10 && tier < input.maxTier) {
     tier = clampTier(tier + 1, input.maxTier);
-  } else if (roll < 0.32 && tier > 1) {
+  } else if (roll < 0.28 && tier > 1) {
     tier = clampTier(tier - 1, input.maxTier);
-  } else if (roll < 0.42 && tier > 2) {
+  } else if (roll < 0.38 && tier > 2) {
     tier = clampTier(tier - 1, input.maxTier);
   }
   return clampTier(tier, input.maxTier);

@@ -5,6 +5,10 @@ import type {
   PlayerPotentialRecord,
   PlayerPotentialSource,
 } from "@/lib/data/olyDataTypes";
+
+// Cache buildPlayerScoutPotentialFromGameState results per (gameState, playerId) to avoid
+// repeated O(n) scans through playerPotential for the same player in the same state.
+const scoutPotentialCache = new WeakMap<GameState, Map<string, PlayerScoutPotential>>();
 import { buildPlayerAxisStarProfile } from "@/lib/scouting/player-axis-star-rating";
 import { buildHiddenAttributeCeilingsFromPotentialScore } from "@/lib/scouting/player-attribute-ceiling-service";
 import {
@@ -437,6 +441,26 @@ export function buildPlayerScoutPotentialFromGameState(input: {
   saveId?: string | null;
   scoutingLevel?: number | null;
 }): PlayerScoutPotential {
+  // Cache when there's no custom scoutingLevel override (the common season-end path).
+  const gs = input.gameState;
+  if (gs && input.scoutingLevel == null) {
+    let perState = scoutPotentialCache.get(gs);
+    if (!perState) {
+      perState = new Map();
+      scoutPotentialCache.set(gs, perState);
+    }
+    const hit = perState.get(input.player.id);
+    if (hit) return hit;
+    const record = resolvePlayerPotentialRecord(input);
+    const result = buildScoutPotentialFromScore({
+      potentialScore: record.hiddenPotentialScore ?? null,
+      scoutingLevel: input.scoutingLevel,
+      source: record.source,
+      sourceWarning: record.source === "missing" ? "potential_source_missing" : null,
+    });
+    perState.set(input.player.id, result);
+    return result;
+  }
   const record = resolvePlayerPotentialRecord(input);
   return buildScoutPotentialFromScore({
     potentialScore: record.hiddenPotentialScore ?? null,

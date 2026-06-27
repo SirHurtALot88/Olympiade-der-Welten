@@ -358,6 +358,7 @@ export function FacilityDecisionModal({
             <button
               className="primary-button"
               type="button"
+              data-testid="facility-confirm-button"
               disabled={readOnly || facilityUpgradeBusy || !matchingUpgradePreview?.ok || !matchingUpgradePreview.confirmToken}
               onClick={onConfirmUpgrade}
               title={activeConfirmReason ?? undefined}

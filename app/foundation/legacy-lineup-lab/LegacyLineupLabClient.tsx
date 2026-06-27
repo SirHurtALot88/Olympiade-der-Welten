@@ -6505,6 +6505,7 @@ export default function LegacyLineupLabClient(props: LegacyLineupLabClientProps)
               <button
               className={`primary-button${lineupReadyToSave ? " is-ready" : ""}`}
               type="button"
+              data-testid="lineup-save-button"
               onClick={() => void handleSaveDraft()}
               disabled={isBusy || isReadOnly}
               title={lineupSaveCta.detail}
@@ -6828,6 +6829,7 @@ export default function LegacyLineupLabClient(props: LegacyLineupLabClientProps)
           <button
             className={`primary-button${lineupReadyToSave ? " is-ready" : ""}`}
             type="button"
+            data-testid="lineup-save-button"
             onClick={() => void handleSaveDraft()}
             disabled={isBusy || isReadOnly}
             title={lineupSaveCta.detail}
@@ -6984,7 +6986,7 @@ export default function LegacyLineupLabClient(props: LegacyLineupLabClientProps)
               <button className="secondary-button" type="button" onClick={handleAutoFillOpenSlots} disabled={isBusy || slots.every((slot) => Boolean(selections[slot.key]))}>
                 Auto-Fill
               </button>
-              <button className={`primary-button${lineupReadyToSave ? " is-ready" : ""}`} type="button" onClick={() => void handleSaveDraft()} disabled={isBusy || isReadOnly}>
+              <button className={`primary-button${lineupReadyToSave ? " is-ready" : ""}`} type="button" data-testid="lineup-save-button" onClick={() => void handleSaveDraft()} disabled={isBusy || isReadOnly}>
                 {lineupSaveCta.buttonLabel}
               </button>
             </div>
@@ -7963,6 +7965,7 @@ export default function LegacyLineupLabClient(props: LegacyLineupLabClientProps)
                 <button
                   className={`primary-button${lineupReadyToSave ? " is-ready" : ""}`}
                   type="button"
+                  data-testid="lineup-save-button"
                   onClick={() => void handleSaveDraft()}
                   disabled={isBusy || isReadOnly}
                   title={lineupSaveCta.detail}

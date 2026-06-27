@@ -7,7 +7,7 @@ import type {
   TeamStrategyProfile,
 } from "@/lib/data/olyDataTypes";
 import { buildTeamSeasonOverviewRows, type TeamManagementSnapshotRow } from "@/lib/foundation/team-management-overview";
-import { getTeamDisplaySalaryTotal } from "@/lib/sponsor/sponsor-economy-calibration";
+import { getTeamDisplaySalaryTotal } from "@/lib/sponsor/sponsor-team-salary-display";
 import type { SponsorSpecialTemplateId } from "@/lib/sponsor/sponsor-brand-variants";
 
 export type SponsorAxisKey = "pow" | "spe" | "men" | "soc";
@@ -61,17 +61,56 @@ const HISTORICAL_AXIS_ROW_KEY: Record<
   soc: "historicalSoc",
 };
 
-function getAxisValueForRank(row: TeamManagementSnapshotRow, axis: SponsorAxisKey) {
+function getAxisValueForRank(row: TeamManagementSnapshotRow, axis: SponsorAxisKey, gameState?: GameState) {
   const live = Number(row[AXIS_META[axis].rowKey] ?? 0);
   if (live > 0) {
     return live;
   }
-  return Number(row[HISTORICAL_AXIS_ROW_KEY[axis]] ?? 0);
+  const historical = Number(row[HISTORICAL_AXIS_ROW_KEY[axis]] ?? 0);
+  if (historical > 0) {
+    return historical;
+  }
+  if (row.rosterPlayers.length > 0) {
+    const sum = row.rosterPlayers.reduce(
+      (total, item) => total + Number(item.player.coreStats?.[axis] ?? 0),
+      0,
+    );
+    if (sum > 0) {
+      return round1(sum);
+    }
+  }
+  if (gameState) {
+    const disciplineTotals = row.disciplineValues ?? {};
+    const categoryTotals = { pow: 0, spe: 0, men: 0, soc: 0 };
+    for (const discipline of gameState.disciplines) {
+      const value = disciplineTotals[normalizeDisciplineKey(discipline.id)];
+      if (typeof value !== "number" || !Number.isFinite(value)) {
+        continue;
+      }
+      if (discipline.category === "power") categoryTotals.pow += value;
+      if (discipline.category === "speed") categoryTotals.spe += value;
+      if (discipline.category === "mental") categoryTotals.men += value;
+      if (discipline.category === "social") categoryTotals.soc += value;
+    }
+    if (categoryTotals[axis] > 0) {
+      return round1(categoryTotals[axis]);
+    }
+  }
+  return 0;
 }
 
-export function getTeamAxisRank(rows: TeamManagementSnapshotRow[], teamId: string, axis: SponsorAxisKey) {
+function normalizeDisciplineKey(value: string) {
+  return value.trim().toLowerCase().replace(/\s+/g, "_").replace(/-/g, "_");
+}
+
+export function getTeamAxisRank(
+  rows: TeamManagementSnapshotRow[],
+  teamId: string,
+  axis: SponsorAxisKey,
+  gameState?: GameState,
+) {
   const ordered = [...rows]
-    .map((row) => ({ teamId: row.teamId, value: getAxisValueForRank(row, axis) }))
+    .map((row) => ({ teamId: row.teamId, value: getAxisValueForRank(row, axis, gameState) }))
     .sort((left, right) => right.value - left.value);
   if (!ordered.some((entry) => entry.value > 0)) {
     return { rank: null as number | null, teamCount: ordered.length, value: null as number | null };
@@ -236,7 +275,7 @@ export function buildChallengeSpecialComponent(input: {
     identity: input.identity,
     profile: input.profile,
   });
-  const axisRank = getTeamAxisRank(rows, input.team.teamId, axis);
+  const axisRank = getTeamAxisRank(rows, input.team.teamId, axis, input.gameState);
   const targetRank = resolveRealisticAxisTargetRank(axisRank.rank, axisRank.teamCount || rows.length);
   const label =
     axisRank.rank != null && axisRank.rank <= 3

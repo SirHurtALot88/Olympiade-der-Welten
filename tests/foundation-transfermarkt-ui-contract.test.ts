@@ -257,6 +257,24 @@ describe("foundation transfermarkt ui contract", () => {
     const v2Text = await fs.readFile(transfermarktV2Path, "utf8");
 
     expect(v2Text).toContain("Kauf von ${playerName} abgebrochen");
+    expect(v2Text).toContain("Verhandlung mit ${playerName} abgebrochen");
     expect(v2Text).toContain("data-testid=\"transfer-offer-page\"");
+  });
+
+  it("loads buy preview skeleton and two-step confirm flow in Transfermarkt V2", async () => {
+    const [v2Text, cssText] = await Promise.all([
+      fs.readFile(transfermarktV2Path, "utf8"),
+      fs.readFile(globalsPath, "utf8"),
+    ]);
+
+    expect(v2Text).toContain("data-testid=\"transfer-buy-preview-skeleton\"");
+    expect(v2Text).toContain("data-testid=\"transfer-buy-confirm-button\"");
+    expect(v2Text).toContain("Kauf final abschließen");
+    expect(v2Text).toContain("buyNegotiationOutcome?.status !== \"accepted\"");
+    expect(v2Text).toContain("negotiation_cancelled_after_contact");
+    expect(v2Text).toContain("Spieler ist noch angefressen");
+    expect(v2Text).toContain("allSeasons: \"1\"");
+    expect(v2Text).toContain("Letzte Deals (alle Seasons)");
+    expect(cssText).toContain(".transfer-buy-preview-skeleton");
   });
 });

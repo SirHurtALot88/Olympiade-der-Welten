@@ -866,6 +866,38 @@ describe("team season objectives build stability", () => {
 });
 
 describe("human board pressure + C-C eco rules", () => {
+  it("uses a softer S1 salary-ratio target so early roster building stays playable", async () => {
+    const fs = await import("node:fs/promises");
+    const servicePath = path.join(process.cwd(), "lib/board/team-season-objectives-service.ts");
+    const serviceText = await fs.readFile(servicePath, "utf8");
+
+    expect(serviceText).toContain("seasonNumber <= 1 ? 0.93");
+    expect(serviceText).toContain("seasonNumber <= 1 ? 0.98");
+    expect(serviceText).toContain("seasonNumber <= 1 ? -0.05");
+
+    const team = createTeam({ teamId: "S-1", shortCode: "S-1", cash: 10, humanControlled: true });
+    const gameState = createGameState({
+      teams: [team],
+      identities: [createIdentity("S-1")],
+      players: [createPlayer("s1")],
+      rosters: [createRoster("s1", { teamId: "S-1", salary: 190 })],
+    });
+    gameState.season = {
+      id: "season-1",
+      name: "Season 1",
+      year: 2026,
+      currentMatchday: 1,
+      matchdayIds: ["md-1"],
+    };
+    gameState.seasonState.seasonId = "season-1";
+
+    const overview = buildTeamObjectiveOverview(gameState);
+    const salaryObjective = overview.objectives.find((entry) => entry.teamId === "S-1" && entry.objectiveId === "finance-salary-ratio");
+
+    expect(salaryObjective?.targetValue).toBe("<= 93%");
+    expect(salaryObjective?.status).toBe("at_risk");
+  });
+
   it("adds board-confidence-budget-cut objective for human team with low confidence", () => {
     const team = createTeam({ teamId: "H-T", shortCode: "H-T", humanControlled: true });
     const gameState = createGameState({

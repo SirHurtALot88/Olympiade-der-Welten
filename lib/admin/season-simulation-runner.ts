@@ -1672,7 +1672,7 @@ async function runSeasonEndCash(run: AdminSeasonSimulationRunState, save: Persis
     markBlocked(run, "season_end_cash", result.blockingReasons[0] ?? "Season-End Cash blockiert.", "season_end_cash_blocked");
     return;
   }
-  log(run, "info", "season_end_cash", `Cash Apply: ${result.plannedChanges.length} Teams.`);
+  log(run, "info", "season_end_cash", `Preisgeld-Benchmark: ${result.plannedChanges.length} Teams (kein Cash-Payout).`);
   advanceUnit(run);
   run.cursor.phaseIndex += 1;
 }

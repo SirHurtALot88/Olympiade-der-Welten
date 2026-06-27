@@ -27,7 +27,7 @@ describe("sponsor special objectives", () => {
     const identity = gameState.teamIdentities.find((entry) => entry.teamId === team.teamId) ?? null;
     const profile = getTeamStrategyProfile(gameState, team.teamId);
     const rows = buildTeamSeasonOverviewRows({ gameState });
-    const menRank = getTeamAxisRank(rows, team.teamId, "men");
+    const menRank = getTeamAxisRank(rows, team.teamId, "men", gameState);
 
     const component = buildChallengeSpecialComponent({
       gameState,
@@ -53,7 +53,7 @@ describe("sponsor special objectives", () => {
     const gameState = createSingleplayerGameState();
     const teamId = gameState.teams.find((entry) => entry.shortCode === "R-R")?.teamId ?? gameState.teams[0]!.teamId;
     const offers = buildSponsorOffersForTeam({ gameState, teamId });
-    const challengeOffers = offers.filter((offer) => offer.flavor.includes("Challenge-Sponsor"));
+    const challengeOffers = offers.filter((offer) => offer.isChallengeOffer === true);
     expect(offers).toHaveLength(3);
     expect(challengeOffers).toHaveLength(1);
     expect(resolveChallengeSlotIndex(gameState.season.id, teamId)).toBeGreaterThanOrEqual(0);
@@ -64,7 +64,7 @@ describe("sponsor special objectives", () => {
     const gameState = createSingleplayerGameState();
     const team = gameState.teams.find((entry) => entry.shortCode === "M-M")!;
     const rows = buildTeamSeasonOverviewRows({ gameState });
-    const powRank = getTeamAxisRank(rows, team.teamId, "pow").rank ?? 1;
+    const powRank = getTeamAxisRank(rows, team.teamId, "pow", gameState).rank ?? 99;
     const status = evaluateSpecialComponentForObjective(gameState, team.teamId, {
       componentId: "special-axis-pow",
       kind: "special",

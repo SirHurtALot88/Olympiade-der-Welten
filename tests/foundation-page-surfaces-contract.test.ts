@@ -50,3 +50,15 @@ describe("team profile ui contract", () => {
     expect(drawerText).toContain("onOpenPlayer");
   });
 });
+
+describe("drawer-to-page layout contract", () => {
+  it("uses full-width page styles for converted drawer surfaces", async () => {
+    const cssText = await fs.readFile(`${root}/app/globals.css`, "utf8");
+
+    expect(cssText).toContain(".player-drawer.player-drawer-page");
+    expect(cssText).toContain("max-width: none");
+    expect(cssText).toContain(".foundation-player-profile-panel.panel");
+    expect(cssText).toContain(".foundation-team-profile-panel.panel");
+    expect(cssText).toContain(".foundation-drilldown-page");
+  });
+});

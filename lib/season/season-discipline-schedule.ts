@@ -298,50 +298,58 @@ export function buildMatchdaysFromSeasonDisciplineSchedule(
   }));
 }
 
-export function getSeasonDisciplineScheduleEntry(gameState: GameState, matchdayId: string) {
-  const stored = gameState.seasonState.disciplineSchedule ?? [];
-  if (hasCompleteSeasonDisciplineSchedule({ disciplines: gameState.disciplines, disciplineSchedule: stored, seasonId: gameState.season.id })) {
-    return sortScheduleEntries(stored.filter((entry) => entry.seasonId === gameState.season.id)).find((entry) => entry.matchdayId === matchdayId) ?? null;
-  }
-
-  const matchdayIds = buildNormalizedMatchdayIds({
-    seasonId: gameState.season.id,
-    disciplines: gameState.disciplines,
-    matchdayIds: gameState.season.matchdayIds,
-  });
-  const fallback = buildSeasonSeededDisciplineSchedule({
-    saveId: "normalized-local-save",
-    seasonId: gameState.season.id,
-    disciplines: gameState.disciplines,
-    matchdayIds,
-    matchdayCount: matchdayIds.length,
-  }).entries;
-  return fallback.find((entry) => entry.matchdayId === matchdayId) ?? null;
+function scheduleHasPopulatedDisciplineSlots(entries: SeasonDisciplineScheduleEntry[]) {
+  return entries.some((entry) => Boolean(entry.discipline1?.disciplineId || entry.discipline2?.disciplineId));
 }
 
-export function getSeasonDisciplineSchedule(gameState: GameState) {
-  if (
-    hasCompleteSeasonDisciplineSchedule({
-      disciplines: gameState.disciplines,
-      disciplineSchedule: gameState.seasonState.disciplineSchedule,
-      seasonId: gameState.season.id,
-    })
-  ) {
-    return sortScheduleEntries((gameState.seasonState.disciplineSchedule ?? []).filter((entry) => entry.seasonId === gameState.season.id));
-  }
-
+function buildResolvedSeasonDisciplineSchedule(
+  gameState: GameState,
+  saveId = "normalized-local-save",
+): SeasonDisciplineScheduleEntry[] {
   const matchdayIds = buildNormalizedMatchdayIds({
     seasonId: gameState.season.id,
     disciplines: gameState.disciplines,
     matchdayIds: gameState.season.matchdayIds,
   });
   return buildSeasonSeededDisciplineSchedule({
-    saveId: "normalized-local-save",
+    saveId,
     seasonId: gameState.season.id,
     disciplines: gameState.disciplines,
     matchdayIds,
     matchdayCount: matchdayIds.length,
   }).entries;
+}
+
+export function getSeasonDisciplineScheduleEntry(
+  gameState: GameState,
+  matchdayId: string,
+  options?: { saveId?: string },
+) {
+  const schedule = getSeasonDisciplineSchedule(gameState, options);
+  return schedule.find((entry) => entry.matchdayId === matchdayId) ?? null;
+}
+
+export function getSeasonDisciplineSchedule(gameState: GameState, options?: { saveId?: string }) {
+  const saveId = options?.saveId ?? "normalized-local-save";
+  const stored = gameState.seasonState.disciplineSchedule ?? [];
+  if (
+    hasCompleteSeasonDisciplineSchedule({
+      disciplines: gameState.disciplines,
+      disciplineSchedule: stored,
+      seasonId: gameState.season.id,
+    })
+  ) {
+    const activeSchedule = sortScheduleEntries(stored.filter((entry) => entry.seasonId === gameState.season.id));
+    if (scheduleHasPopulatedDisciplineSlots(activeSchedule) || gameState.disciplines.length === 0) {
+      return activeSchedule;
+    }
+  }
+
+  if (gameState.disciplines.length === 0) {
+    return sortScheduleEntries(stored.filter((entry) => entry.seasonId === gameState.season.id));
+  }
+
+  return buildResolvedSeasonDisciplineSchedule(gameState, saveId);
 }
 
 export function buildSeasonDisciplinePlayerCountMap(gameState: GameState) {

@@ -15,6 +15,7 @@ import {
   buildPlayerRatingContractRows,
   type PlayerRatingContractRow,
 } from "@/lib/foundation/player-rating-contract";
+import { buildProjectedClassPreview } from "@/lib/foundation/projected-class-preview";
 import { buildPlayerSeasonPerformance, buildPlayerSeasonPerformanceMap } from "@/lib/foundation/player-season-performance";
 import { buildSeasonPointsLedger } from "@/lib/foundation/season-points-ledger";
 import { buildSeasonDisciplinePlayerCountMap } from "@/lib/season/season-discipline-schedule";
@@ -45,7 +46,11 @@ import {
   type PlayerPotentialAxisStatus,
   type PlayerTrainingRouteImpact,
 } from "@/lib/foundation/player-potential-display-service";
-import { buildOrganicSeasonProgression, type OrganicSeasonProgressionResult } from "@/lib/training/organic-season-progression";
+import {
+  buildOrganicSeasonProgression,
+  normalizePlayerAttributes,
+  type OrganicSeasonProgressionResult,
+} from "@/lib/training/organic-season-progression";
 import { buildPlayerProgressionForecast } from "@/lib/training/player-progression-forecast";
 import {
   buildPlayerDevelopmentLevelupModel,
@@ -136,6 +141,7 @@ export type PlayerDetailDrawerData = {
   potentialStarsDisplay: string | null;
   potentialGapStars: number | null;
   potentialOverallStars: number | null;
+  currentOverallStars: number | null;
   potentialOverallDelta: number | null;
   potentialOverallDeltaSourceLabel: string | null;
   potentialAxisStatus: PlayerPotentialAxisStatus[];
@@ -299,12 +305,19 @@ export type PlayerDetailDrawerData = {
     scoutedTier?: TransfermarktRatingTier | null;
   }>;
   progressionForecast: PlayerProgressionForecast | null;
+  projectedClassPreview: {
+    currentClassName: string | null;
+    projectedTop3: Array<{ className: string; score: number }>;
+    projectedPrimaryClass: string;
+    reclassRecommended: boolean;
+  } | null;
   developmentLevelup: PlayerDevelopmentLevelupModel | null;
   progressionEvents: Array<{
     eventId: string;
     seasonId: string;
     xpSpent: number;
     timestamp: string;
+    source: "manual_season_end_xp_spend" | "organic_season_progression";
     upgrades: Array<{
       attribute: string;
       fromValue: number;
@@ -1669,6 +1682,10 @@ export function buildPlayerDrawerDataFromGameState(input: {
     profile: team?.teamId ? getTeamStrategyProfile(input.gameState, team.teamId) : null,
     potentialRecord: input.gameState.playerPotential?.find((entry) => entry.playerId === player.id) ?? null,
   });
+  const normalizedAttributes = normalizePlayerAttributes(player);
+  const projectedClassPreview = normalizedAttributes
+    ? buildProjectedClassPreview(normalizedAttributes, player.className, input.gameState.seasonState.adminBalancingConfig)
+    : null;
   const potentialDisplay =
     team && team.humanControlled !== false
       ? buildPlayerPotentialDisplaySnapshot({
@@ -1680,12 +1697,12 @@ export function buildPlayerDrawerDataFromGameState(input: {
   const progressionEvents = [...(input.gameState.playerProgressionEvents ?? [])]
     .filter((event) => event.playerId === player.id)
     .sort((left, right) => right.timestamp.localeCompare(left.timestamp, "de"))
-    .slice(0, 5)
     .map((event) => ({
       eventId: event.eventId,
       seasonId: event.seasonId,
       xpSpent: event.xpSpent,
       timestamp: event.timestamp,
+      source: event.source,
       upgrades: event.upgrades.map((upgrade) => ({
         attribute: upgrade.attribute,
         fromValue: upgrade.fromValue,
@@ -1740,6 +1757,8 @@ export function buildPlayerDrawerDataFromGameState(input: {
     potentialStarsDisplay: starSnapshot?.revealedPotentialStars.displayLabel ?? null,
     potentialGapStars: starSnapshot?.potentialGap ?? null,
     potentialOverallStars: potentialDisplay?.potentialOverallStars ?? null,
+    currentOverallStars:
+      starSnapshot?.revealedCurrentStars.overall ?? starSnapshot?.currentStars.overall ?? null,
     potentialOverallDelta: potentialDisplay?.potentialOverallDelta ?? null,
     potentialOverallDeltaSourceLabel: potentialDisplay?.potentialOverallDeltaSourceLabel ?? null,
     potentialAxisStatus: potentialDisplay?.potentialAxisStatus ?? [],
@@ -1901,6 +1920,7 @@ export function buildPlayerDrawerDataFromGameState(input: {
             disciplineGlobalRankMaps,
           ),
     progressionForecast,
+    projectedClassPreview,
     seasonOrganicForecast,
     developmentLevelup,
     progressionEvents,
@@ -2192,6 +2212,13 @@ export function buildPlayerDrawerDataFromLegacyContext(input: {
     axisCards: maskAxisCardsForVisibility(axisCards, attributeVisibility),
     disciplineValues,
     progressionForecast: null,
+    projectedClassPreview: detailPlayer && normalizePlayerAttributes(detailPlayer)
+      ? buildProjectedClassPreview(
+          normalizePlayerAttributes(detailPlayer)!,
+          detailPlayer.className,
+          input.context.gameState?.seasonState?.adminBalancingConfig,
+        )
+      : null,
     seasonOrganicForecast: null,
     developmentLevelup: detailPlayer
       ? buildPlayerDevelopmentLevelupModel({
@@ -2222,6 +2249,7 @@ export function buildPlayerDrawerDataFromLegacyContext(input: {
     potentialStarsDisplay: null,
     potentialGapStars: null,
     potentialOverallStars: null,
+    currentOverallStars: null,
     potentialOverallDelta: null,
     potentialOverallDeltaSourceLabel: null,
     potentialAxisStatus: [],

@@ -747,6 +747,7 @@ export default function MatchdayArenaV2Client(props: MatchdayArenaV2ClientProps)
   });
   const [restoredRevealSessionLabel, setRestoredRevealSessionLabel] = useState<string | null>(null);
   const [isPlaying, setIsPlaying] = useState(false);
+  const [revealEventActive, setRevealEventActive] = useState(false);
   const [speed, setSpeed] = useState<ArenaPhaseControlSpeed>(1);
   const [roomSyncRole, setRoomSyncRole] = useState<CoachRole | null>(null);
   const [roomArenaSyncState, setRoomArenaSyncState] = useState<RoomArenaState | null>(null);
@@ -758,6 +759,8 @@ export default function MatchdayArenaV2Client(props: MatchdayArenaV2ClientProps)
   const boardListRef = useRef<HTMLDivElement | null>(null);
   const boardRowRefs = useRef<Map<string, HTMLElement>>(new Map());
   const scoreFeedCacheRef = useRef<Map<string, MatchdayMvpScoringResult>>(new Map());
+  const revealPulseTimerRef = useRef<number | null>(null);
+  const revealSignatureRef = useRef<string | null>(null);
   const [boardScrollTop, setBoardScrollTop] = useState(0);
   const [boardViewportHeight, setBoardViewportHeight] = useState(560);
   const boardScrollRafRef = useRef<number | null>(null);
@@ -1637,6 +1640,23 @@ export default function MatchdayArenaV2Client(props: MatchdayArenaV2ClientProps)
         revealedSlotCountByDiscipline.d2 >= maxD2SlotRevealCount &&
         phaseIndex >= finalPhaseIndex));
   const isSlotsPhase = displayPhase === "slots";
+
+  useEffect(() => {
+    const signature = `${activeDisciplinePhase}:${displayPhase}:${revealedSlotCount}:${phaseIndex}`;
+    if (revealSignatureRef.current && revealSignatureRef.current !== signature) {
+      setRevealEventActive(true);
+      if (revealPulseTimerRef.current) {
+        window.clearTimeout(revealPulseTimerRef.current);
+      }
+      revealPulseTimerRef.current = window.setTimeout(() => setRevealEventActive(false), 720);
+    }
+    revealSignatureRef.current = signature;
+    return () => {
+      if (revealPulseTimerRef.current) {
+        window.clearTimeout(revealPulseTimerRef.current);
+      }
+    };
+  }, [activeDisciplinePhase, displayPhase, phaseIndex, revealedSlotCount]);
 
   const slotScoresAtCount = useMemo(() => {
     const teamDetails = resolveFeed?.teamDetails ?? [];
@@ -2744,7 +2764,7 @@ export default function MatchdayArenaV2Client(props: MatchdayArenaV2ClientProps)
         </section>
       )}
 
-      <section className="panel arena-v2-timeline-panel">
+      <section className={`panel arena-v2-timeline-panel${revealEventActive ? " is-reveal-event" : ""}`} data-testid="arena-reveal-timeline">
         <div className="arena-v2-timeline-head">
           <div>
             <strong>Reveal-Fortschritt</strong>

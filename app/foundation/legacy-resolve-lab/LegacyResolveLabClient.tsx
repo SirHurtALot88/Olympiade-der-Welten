@@ -471,10 +471,12 @@ export default function LegacyResolveLabClient({
       economyCompare: null,
       ratingWarnings: ["mvs_source_missing"],
       potentialOverallStars: null,
+      currentOverallStars: null,
       potentialOverallDelta: null,
       potentialOverallDeltaSourceLabel: null,
       potentialAxisStatus: [],
       attributeCeilingPreview: [],
+      projectedClassPreview: null,
       trainingRouteImpact: null,
     });
   }

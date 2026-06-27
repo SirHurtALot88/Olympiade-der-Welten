@@ -1047,4 +1047,81 @@ describe("player detail drawer", () => {
     expect(data?.trainingRouteImpact?.note).toContain("POW");
     expect(data?.attributeCeilingPreview.length).toBeGreaterThan(0);
   });
+
+  it("exposes transfer history and full progression events with source labels", () => {
+    const player = createPlayer({ id: "player-transfer-history" });
+    const gameState = createGameState({ player, withRoster: true });
+    gameState.transferHistory = [
+      {
+        id: "history-buy-1",
+        playerId: player.id,
+        playerName: player.name,
+        fromTeamId: null,
+        toTeamId: "team-1",
+        transferType: "buy",
+        seasonId: "season-1",
+        seasonLabel: "Season 1",
+        fee: 42,
+        salary: 8,
+        marketValue: 36,
+        remainingContractLength: 3,
+        happenedAt: "2026-06-01T10:00:00.000Z",
+        source: "test",
+      } as GameState["transferHistory"][number],
+      {
+        id: "history-sell-1",
+        playerId: player.id,
+        playerName: player.name,
+        fromTeamId: "team-1",
+        toTeamId: "team-2",
+        transferType: "sell",
+        seasonId: "season-2",
+        seasonLabel: "Season 2",
+        fee: 55,
+        salary: 9,
+        marketValue: 48,
+        remainingContractLength: 0,
+        happenedAt: "2026-07-01T10:00:00.000Z",
+        source: "test",
+      } as GameState["transferHistory"][number],
+    ];
+    gameState.playerProgressionEvents = [
+      {
+        eventId: "prog-organic-1",
+        seasonId: "season-1",
+        teamId: "team-1",
+        playerId: player.id,
+        upgrades: [{ attribute: "power", fromValue: 50, toValue: 52, cost: 0 }],
+        xpSpent: 0,
+        timestamp: "2026-06-10T10:00:00.000Z",
+        source: "organic_season_progression",
+      },
+      {
+        eventId: "prog-xp-1",
+        seasonId: "season-1",
+        teamId: "team-1",
+        playerId: player.id,
+        upgrades: [{ attribute: "speed", fromValue: 48, toValue: 50, cost: 12 }],
+        xpSpent: 12,
+        timestamp: "2026-06-11T10:00:00.000Z",
+        source: "manual_season_end_xp_spend",
+      },
+    ];
+
+    const data = buildPlayerDrawerDataFromGameState({
+      gameState,
+      playerId: player.id,
+      source: "sqlite",
+    });
+
+    expect(data?.transferHistory).toHaveLength(2);
+    expect(data?.transferHistory[0]?.transferType).toBe("sell");
+    expect(data?.transferHistory[0]?.toTeamName).toBe("team-2");
+    expect(data?.transferHistory[1]?.fromTeamName).toBeNull();
+    expect(data?.transferHistory[1]?.fee).toBe(42);
+
+    expect(data?.progressionEvents).toHaveLength(2);
+    expect(data?.progressionEvents.some((entry) => entry.source === "organic_season_progression")).toBe(true);
+    expect(data?.progressionEvents.some((entry) => entry.source === "manual_season_end_xp_spend")).toBe(true);
+  });
 });

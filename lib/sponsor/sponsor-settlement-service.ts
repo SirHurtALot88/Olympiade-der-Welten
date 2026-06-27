@@ -1,6 +1,7 @@
 import { randomUUID } from "@/lib/utils/random-id";
 
 import type { GameState, SponsorOfferComponent, TeamSponsorContract } from "@/lib/data/olyDataTypes";
+import { resolvePlayerEconomyContract } from "@/lib/foundation/player-economy-contract";
 import { buildTeamSeasonOverviewRows } from "@/lib/foundation/team-management-overview";
 import {
   getSponsorRank32BaseAnchorSalary,
@@ -50,6 +51,19 @@ function getCurrentSalaryFactor(gameState: GameState): number {
   return typeof factor === "number" && Number.isFinite(factor) && factor > 0 ? factor : 1;
 }
 
+function getTeamSalaryTotal(gameState: GameState, teamId: string): number {
+  const rosterEntries = gameState.rosters.filter((entry) => entry.teamId === teamId);
+  if (rosterEntries.length === 0) {
+    return 0;
+  }
+  return roundCash(
+    rosterEntries.reduce((sum, entry) => {
+      const player = gameState.players.find((candidate) => candidate.id === entry.playerId) ?? null;
+      return sum + (resolvePlayerEconomyContract({ player, rosterEntry: entry }).salary ?? 0);
+    }, 0),
+  );
+}
+
 function buildSeasonEndRows(gameState: GameState, contract: TeamSponsorContract): SponsorSettlementRow[] {
   const team = gameState.teams.find((entry) => entry.teamId === contract.teamId);
   const row = buildTeamSeasonOverviewRows({ gameState }).find((entry) => entry.teamId === contract.teamId) ?? null;
@@ -74,16 +88,18 @@ function buildSeasonEndRows(gameState: GameState, contract: TeamSponsorContract)
         });
         continue;
       }
-      const payout = roundCash(component.rewardCash / 2);
+      const payout = contract.payouts.baseFirstPaid
+        ? roundCash(component.rewardCash / 2)
+        : roundCash(component.rewardCash);
       rows.push({
         teamId: contract.teamId,
         teamName: team?.name ?? contract.teamId,
         componentId: component.componentId,
         kind: component.kind,
-        label: `${component.label} (2. Rate)`,
+        label: contract.payouts.baseFirstPaid ? `${component.label} (2. Rate)` : `${component.label} (Saisonbasis)`,
         status: "paid",
         cashDelta: payout,
-        reason: `Restbasis ${payout}`,
+        reason: contract.payouts.baseFirstPaid ? `Restbasis ${payout}` : `Saisonbasis ${payout}`,
       });
       continue;
     }
@@ -202,10 +218,12 @@ export function applySponsorSettlement(input: {
   saveId: string;
   phase?: SponsorSettlementPhase;
   execute?: boolean;
+  /** When true, deduct roster salary once as part of season-end settlement (replaces cash-prize salary deduction). */
+  deductSalary?: boolean;
 }): { gameState: GameState; preview: SponsorSettlementPreview; applied: boolean } {
   const phase = input.phase ?? "season_end";
   const preview = previewSponsorSettlement(input.gameState, phase);
-  if (!input.execute || !preview.canApply) {
+  if (!input.execute || (!preview.canApply && !input.deductSalary)) {
     return { gameState: input.gameState, preview, applied: false };
   }
 
@@ -214,12 +232,32 @@ export function applySponsorSettlement(input: {
   const contracts = { ...(input.gameState.seasonState.sponsorContractsByTeamId ?? {}) };
 
   for (const team of input.gameState.teams) {
-    const contract = getTeamSponsorContract(input.gameState, team.teamId);
-    if (!contract || hasSeasonEndPayoutLog(input.gameState, input.gameState.season.id, team.teamId)) {
+    if (hasSeasonEndPayoutLog(input.gameState, input.gameState.season.id, team.teamId)) {
       continue;
     }
-    const teamRows = preview.rows.filter((row) => row.teamId === team.teamId && row.cashDelta !== 0);
-    const delta = roundCash(teamRows.reduce((sum, row) => sum + row.cashDelta, 0));
+    const contract = getTeamSponsorContract(input.gameState, team.teamId);
+    const teamRows = contract ? preview.rows.filter((row) => row.teamId === team.teamId && row.cashDelta !== 0) : [];
+    let delta = roundCash(teamRows.reduce((sum, row) => sum + row.cashDelta, 0));
+    if (input.deductSalary) {
+      const salaryTotal = getTeamSalaryTotal(input.gameState, team.teamId);
+      if (salaryTotal > 0) {
+        delta = roundCash(delta - salaryTotal);
+        payoutLogs.push({
+          id: `sponsor-payout:${input.gameState.season.id}:${team.teamId}:salary_deduct:${randomUUID()}`,
+          saveId: input.saveId,
+          seasonId: input.gameState.season.id,
+          teamId: team.teamId,
+          phase: "season_end",
+          componentId: "salary_deduct",
+          cashDelta: -salaryTotal,
+          action: "apply",
+          createdAt: new Date().toISOString(),
+        });
+      }
+    }
+    if (!contract && teamRows.length === 0 && delta === 0) {
+      continue;
+    }
     if (delta !== 0) {
       cashByTeamId.set(team.teamId, delta);
     }
@@ -236,11 +274,16 @@ export function applySponsorSettlement(input: {
         createdAt: new Date().toISOString(),
       });
     }
+    if (!contract) {
+      continue;
+    }
+    const paidBase = teamRows.some((row) => row.kind === "base" && row.status === "paid");
     contracts[team.teamId] = {
       ...contract,
       payouts: {
         ...contract.payouts,
-        baseSecondPaid: true,
+        baseFirstPaid: paidBase ? true : contract.payouts.baseFirstPaid,
+        baseSecondPaid: paidBase ? true : contract.payouts.baseSecondPaid,
         rankPaid: teamRows.some((row) => row.kind === "rank" && row.status === "paid") || contract.payouts.rankPaid,
         improvementPaid:
           teamRows.some((row) => row.kind === "improvement" && row.status === "paid") || contract.payouts.improvementPaid,

@@ -57,6 +57,10 @@ describe("foundation training and facilities ui contract", () => {
 
     expect(fileText).toContain("buildPlayerProgressionForecast");
     expect(fileText).toContain("buildOrganicSeasonProgression");
+    expect(fileText).toContain("organicByPlayerId");
+    expect(fileText).toContain("Organische Saison-Entwicklung");
+    expect(fileText).toContain("Organische Entwicklung anwenden");
+    expect(fileText).toContain("organicNetSetpoints");
     expect(fileText).toContain("buildTrainingPlayerRowView");
     expect(fileText).toContain("trainingModeDraft");
     expect(fileText).toContain("async function setPlayerTrainingMode");

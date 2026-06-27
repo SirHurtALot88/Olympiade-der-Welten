@@ -188,7 +188,7 @@ import {
   type FeatureAuditFilter,
   type FeatureAuditStatus,
 } from "@/lib/foundation/feature-audit-matrix";
-import { buildGameFlowState, isActiveMatchdayPreparation, type GameFlowStepStatus, type GameFlowView } from "@/lib/foundation/game-flow-controller";
+import { buildGameFlowState, isActiveMatchdayPreparation, shouldAutoOpenSeasonBriefing, type GameFlowStepStatus, type GameFlowView } from "@/lib/foundation/game-flow-controller";
 import { buildGameInboxItems, filterGameInboxItems, getPrimaryInboxTask } from "@/lib/foundation/game-inbox-service";
 import { buildMatchdaySummary, getMatchdaySummaryOptions } from "@/lib/foundation/matchday-summary";
 import { normalizeLineupDisciplineFieldName } from "@/lib/lineups/team-discipline-ranks";
@@ -3427,7 +3427,7 @@ function applyStoredColumnOrder(
 
 const foundationPrimaryViews: Array<{ id: FoundationView; label: string; tooltip: string }> = [
   { id: "home", label: "Home", tooltip: "Manager-Zentrale: naechste Schritte, wichtigste Spieler, Liga-Lage und To-dos." },
-  { id: "season", label: "Saisonstand", tooltip: "Tabelle, Story-Karten, Teamstaerken und Punkteentwicklung." },
+  { id: "season", label: "Saisonstand", tooltip: "Tabelle, Manager, Teamstaerken und Punkteentwicklung." },
   { id: "lineup", label: "Einsatzliste", tooltip: "Spieler in Slots setzen, Team-Boost waehlen und Spieltag vorbereiten." },
   { id: "matchdayArena", label: "Arena", tooltip: "Spieltag als Reveal/Event ansehen und Ergebnis verstehen." },
   { id: "teams", label: "Teams", tooltip: "Kader, Vertraege, Value, Achsenprofil und Teamdetails pruefen." },
@@ -6499,7 +6499,7 @@ export default function FoundationPageClient({
   const [seasonCompletionFeed, setSeasonCompletionFeed] = useState<SeasonCompletionSummaryResponse | null>(null);
   const [seasonTransitionError, setSeasonTransitionError] = useState<string | null>(null);
   const [seasonStandingsFeed, setSeasonStandingsFeed] = useState<FoundationSeasonStandingsOverviewResponse | null>(null);
-  const [seasonStandingsMode, setSeasonStandingsMode] = useState<"cards" | "table" | "gms">("table");
+  const [seasonStandingsMode, setSeasonStandingsMode] = useState<"table" | "gms">("table");
   const [seasonOverviewSeasonId, setSeasonOverviewSeasonId] = useState<string>(initialClientGameState.season.id);
   const seasonOverviewScopeRef = useRef(`${activeSaveId}:${initialClientGameState.season.id}`);
   const [prizePreviewFeed, setPrizePreviewFeed] = useState<FoundationPrizePreviewResponse | null>(null);
@@ -7651,7 +7651,8 @@ export default function FoundationPageClient({
     return (
       seasonBriefingDismissedRef.current.has(briefingKey) ||
       seasonIntroStep?.status === "completed" ||
-      seasonIntroStep?.status === "skipped"
+      seasonIntroStep?.status === "skipped" ||
+      !shouldAutoOpenSeasonBriefing(gameState, seasonIntroStep?.status)
     );
   }
 
@@ -17970,7 +17971,10 @@ export default function FoundationPageClient({
   }, [seasonBriefingOpen]);
 
   useEffect(() => {
-    if (seasonBriefingStepStatus !== "open" || !seasonBriefingScheduleReady) {
+    if (
+      !shouldAutoOpenSeasonBriefing(gameState, seasonBriefingStepStatus) ||
+      !seasonBriefingScheduleReady
+    ) {
       return;
     }
 
@@ -17984,7 +17988,34 @@ export default function FoundationPageClient({
 
     seasonBriefingAutoOpenedRef.current = autoOpenKey;
     openSeasonBriefingPanel({ push: false });
-  }, [activeSaveId, gameState.season.id, seasonBriefingScheduleReady, seasonBriefingStepStatus]);
+  }, [
+    activeSaveId,
+    gameState,
+    gameState.gamePhase,
+    gameState.season.currentMatchday,
+    gameState.season.id,
+    gameState.season.isCompleted,
+    seasonBriefingScheduleReady,
+    seasonBriefingStepStatus,
+  ]);
+  useEffect(() => {
+    if (!seasonBriefingOpen || !shouldSuppressSeasonBriefingReopen()) {
+      return;
+    }
+
+    setSeasonBriefingOpen(false);
+    setFoundationPanel((current) => (current === "briefing" ? null : current));
+    clearSeasonBriefingFromUrl();
+  }, [
+    activeSaveId,
+    gameState,
+    gameState.gamePhase,
+    gameState.season.currentMatchday,
+    gameState.season.id,
+    gameState.season.isCompleted,
+    seasonBriefingOpen,
+    seasonBriefingStepStatus,
+  ]);
   useEffect(() => {
     const isFirstSeason = /season[-_\s]*1\b/i.test(`${gameState.season.id} ${gameState.season.name}`);
     const storedStatus = aiPreseasonStoredRun?.status ?? null;
@@ -18095,8 +18126,8 @@ export default function FoundationPageClient({
     setSeasonBriefingOpen(false);
     setFoundationPanel((current) => (current === "briefing" ? null : current));
     seasonBriefingDismissedRef.current.add(`${activeSaveId}:${gameState.season.id}`);
-    if (markCompleted && seasonBriefingStepStatus === "open") {
-      updateNewGameFlowStepStatus("season_intro", "completed");
+    if (seasonBriefingStepStatus === "open") {
+      updateNewGameFlowStepStatus("season_intro", markCompleted ? "completed" : "skipped");
     }
     clearSeasonBriefingFromUrl();
   };
@@ -20594,11 +20625,10 @@ export default function FoundationPageClient({
               className="foundation-shell-subnav"
               items={[
                 { id: "table", label: "Datenansicht" },
-                { id: "cards", label: "Karten" },
                 { id: "gms", label: "Manager" },
               ]}
               activeId={seasonStandingsMode}
-              onSelect={(id) => setSeasonStandingsMode(id as "cards" | "table" | "gms")}
+              onSelect={(id) => setSeasonStandingsMode(id as "table" | "gms")}
             />
           ) : activeView === "playerProfile" ? (
             <FoundationSubNav
@@ -20923,7 +20953,7 @@ export default function FoundationPageClient({
 
       {seasonBriefingOpen ? (
         <div
-          className="foundation-modal-backdrop"
+          className="season-briefing-backdrop"
           role="dialog"
           aria-modal="true"
           aria-labelledby="season-briefing-title"
@@ -20934,7 +20964,7 @@ export default function FoundationPageClient({
             }
           }}
         >
-          <section className="foundation-modal season-briefing-modal season-briefing-page" data-testid="season-briefing-page">
+          <section className="foundation-modal season-briefing-page" data-testid="season-briefing-page">
             <header className="foundation-drilldown-header season-briefing-header">
               <div className="stack">
                 <span className="eyebrow">Season-Einstieg</span>

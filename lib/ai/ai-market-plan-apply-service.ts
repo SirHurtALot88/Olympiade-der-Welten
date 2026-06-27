@@ -19,6 +19,7 @@ import type {
 } from "@/lib/data/olyDataTypes";
 import { getTeamControlSettings } from "@/lib/foundation/team-control-settings";
 import { deriveRosterTargets } from "@/lib/foundation/roster-limits";
+import { isTransferActionAllowed } from "@/lib/season/transfer-season-policy";
 import { getTeamStrategyProfile } from "@/lib/foundation/team-strategy-profiles";
 import { getScoutingWatchlistForTeam } from "@/lib/scouting/scouting-watchlist-service";
 import { getPlayerScoutCertainty } from "@/lib/scouting/facility-scout-pipeline-service";
@@ -991,7 +992,13 @@ export async function applyAiMarketPlanLocally(input: AiMarketPlanApplyParams): 
   if (!dryRun && !isExplicitLocalTransferWindowPhase(input.transferPhase)) {
     throw new Error("AI market apply requires an explicit local transfer window phase.");
   }
-  const options = getEffectiveOptions(input);
+  let options = getEffectiveOptions(input);
+  const seasonEndMarketBuysAllowed = isTransferActionAllowed(input.seasonId, "season_end_market_buy");
+  const policyWarnings: string[] =
+    options.applyBuySteps && !seasonEndMarketBuysAllowed ? ["season_1_market_buy_forbidden"] : [];
+  if (options.applyBuySteps && !seasonEndMarketBuysAllowed) {
+    options = { ...options, applyBuySteps: false };
+  }
   const includeWarningTeams = options.includeWarningTeams;
   const phaseAudit: AiMarketPhaseAudit[] = [];
   const persistence = createPersistenceService();
@@ -1876,7 +1883,7 @@ export async function applyAiMarketPlanLocally(input: AiMarketPlanApplyParams): 
     ),
   };
 
-  const warnings = unique(results.flatMap((entry) => entry.warnings));
+  const warnings = unique([...policyWarnings, ...results.flatMap((entry) => entry.warnings)]);
   const nonBlockingSkipReasons = new Set([
     "team_control_mode_manual",
     "team_control_mode_passive",

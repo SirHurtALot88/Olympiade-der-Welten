@@ -375,6 +375,16 @@ export function buildPlayerSeasonPerformanceMap(gameState: GameState, seasonPoin
   return summaryMap;
 }
 
+const playerSeasonPerformanceMapCache = new WeakMap<GameState, ReturnType<typeof buildPlayerSeasonPerformanceMap>>();
+
+function getCachedPlayerSeasonPerformanceMap(gameState: GameState): ReturnType<typeof buildPlayerSeasonPerformanceMap> {
+  const cached = playerSeasonPerformanceMapCache.get(gameState);
+  if (cached) return cached;
+  const map = buildPlayerSeasonPerformanceMap(gameState);
+  playerSeasonPerformanceMapCache.set(gameState, map);
+  return map;
+}
+
 export function buildPlayerSeasonPerformance(gameState: GameState, playerId: string) {
-  return buildPlayerSeasonPerformanceMap(gameState).get(playerId) ?? null;
+  return getCachedPlayerSeasonPerformanceMap(gameState).get(playerId) ?? null;
 }

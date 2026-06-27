@@ -16,6 +16,10 @@ import { getFacilityEfficiency, getFacilityLevel, getTeamFacilityState } from "@
 import { applyFacilitySeasonEndFinance, previewFacilitySeasonEndFinance } from "@/lib/facilities/facility-season-end-service";
 import { resolvePlayerEconomyContract } from "@/lib/foundation/player-economy-contract";
 import { getTeamPlayerMax } from "@/lib/foundation/roster-limits";
+import {
+  findSeasonOneForbiddenBuySources,
+  isTransferActionAllowed,
+} from "@/lib/season/transfer-season-policy";
 import { buildTeamControlSettingsMap } from "@/lib/foundation/team-control-settings";
 import {
   createLocalTransfermarktRunContext,
@@ -36,8 +40,10 @@ import { applySeasonEndXpSpend } from "@/lib/progression/season-end-xp-apply-ser
 import { APPLY_CONFIRM_TOKEN, LegacyMatchdayResultApplyService } from "@/lib/resolve/legacy-matchday-result-apply-service";
 import { ADVANCE_MATCHDAY_CONFIRM_TOKEN, executeMatchdayAdvance } from "@/lib/season/matchday-progress-service";
 import { applyPreSeasonNextSeasonSetupLightweight, buildPreSeasonNextSeasonSetupToken } from "@/lib/season/preseason-workflow-service";
-import { CASH_PRIZE_APPLY_CONFIRM_TOKEN, executeCashPrizeApply, previewCashPrizeApply } from "@/lib/season/cash-prize-apply-service";
+import { previewCashPrizeApply } from "@/lib/season/cash-prize-apply-service";
 import { buildSeasonReview } from "@/lib/season/season-review-service";
+import { applySponsorSettlement } from "@/lib/sponsor/sponsor-settlement-service";
+import { chooseSponsorOfferForAiTeams } from "@/lib/sponsor/sponsor-offer-service";
 import { executeStandingsApply, STANDINGS_APPLY_CONFIRM_TOKEN } from "@/lib/standings/standings-apply-service";
 
 const PROJECT_ROOT = path.resolve(__dirname, "..");
@@ -124,6 +130,59 @@ function writeCsv(fileName: string, rows: Array<Record<string, unknown>>, prefer
 
 function round(value: number, digits = 2) {
   return Number(value.toFixed(digits));
+}
+
+function buildCashEconomyAudit(gameState: GameState) {
+  const cashPrizeLogs = gameState.seasonState.cashPrizeApplyLogs ?? [];
+  const sponsorLogs = gameState.seasonState.sponsorPayoutLogs ?? [];
+  const cashValues = gameState.teams.map((team) => team.cash);
+  const violations: string[] = [];
+  if (cashPrizeLogs.some((log) => log.action === "apply")) {
+    violations.push("cash_prize_apply_executed");
+  }
+  const baseFirstLogs = sponsorLogs.filter((log) => log.phase === "base_first");
+  if (baseFirstLogs.length > 0) {
+    violations.push(`sponsor_base_first_executed:${baseFirstLogs.length}`);
+  }
+  const seasonEndLogs = sponsorLogs.filter((log) => log.phase === "season_end");
+  const seasonsWithEnd = new Set(seasonEndLogs.map((log) => log.seasonId));
+  const cashPrizeBySeason = Object.fromEntries(
+    [...new Set(cashPrizeLogs.map((log) => log.seasonId))].map((seasonId) => [
+      seasonId,
+      {
+        applyLogs: cashPrizeLogs.filter((log) => log.seasonId === seasonId && log.action === "apply").length,
+        totalPrizeMoney: cashPrizeLogs
+          .filter((log) => log.seasonId === seasonId && log.action === "apply")
+          .reduce((sum, log) => sum + Number((log.payload as { totalPrizeMoney?: number })?.totalPrizeMoney ?? 0), 0),
+      },
+    ]),
+  );
+  const sponsorBySeasonPhase = Object.fromEntries(
+    [...new Set(sponsorLogs.map((log) => `${log.seasonId}:${log.phase}`))].map((key) => {
+      const [seasonId, phase] = key.split(":");
+      const rows = sponsorLogs.filter((log) => log.seasonId === seasonId && log.phase === phase);
+      return [
+        key,
+        {
+          seasonId,
+          phase,
+          count: rows.length,
+          totalCashDelta: round(rows.reduce((sum, log) => sum + log.cashDelta, 0)),
+        },
+      ];
+    }),
+  );
+  return {
+    violations,
+    cashPrizeBySeason,
+    sponsorBySeasonPhase,
+    seasonsWithSponsorEndSettlement: [...seasonsWithEnd],
+    leagueCash: {
+      min: cashValues.length ? Math.min(...cashValues) : 0,
+      max: cashValues.length ? Math.max(...cashValues) : 0,
+      avg: cashValues.length ? round(cashValues.reduce((sum, value) => sum + value, 0) / cashValues.length) : 0,
+    },
+  };
 }
 
 function memoryMb() {
@@ -284,7 +343,7 @@ function topUpSeasonOneToTargets(saveId: string, persistence: PersistenceService
     dryRun: false,
     confirmToken: CHUNKED_REDRAFT_TOPUP_CONFIRM_TOKEN,
     mode: "season1_initial_topup",
-    target: "playerMin",
+    target: "playerOpt",
     roundLimit: 16,
     teamTimeLimitMs: 10_000,
     outputDir: OUTPUT_DIR,
@@ -413,6 +472,9 @@ async function runPreseasonPlannerReviewBeforeRosterRepair(saveId: string, seaso
 
 function repairRosterMinimumBeforeSeasonStart(saveId: string, seasonId: string, persistence: PersistenceService) {
   const performanceRows: PhaseMetric[] = [];
+  if (!isTransferActionAllowed(seasonId, "preseason_roster_repair")) {
+    return { performanceRows, blockers: [] as string[], purchases: [] as Array<Record<string, unknown>>, repaired: false };
+  }
   const save = persistence.getSaveById(saveId);
   if (!save) throw new Error("Long-run save missing before preseason roster repair.");
   const teamsBelowMin = getPreseasonCoverageRiskRows(save.gameState);
@@ -1735,38 +1797,67 @@ async function applySeasonEnd(saveId: string, persistence: PersistenceService) {
   let save = persistence.getSaveById(saveId);
   if (!save) throw new Error("Long-run save disappeared before season-end.");
   const seasonId = save.gameState.season.id;
-  console.error(`[long-run] season-end ${seasonId}: cash`);
+  console.error(`[long-run] season-end ${seasonId}: prize-benchmark-preview`);
 
   let startedAt = Date.now();
   const cashPreview = await previewCashPrizeApply(
     { saveId, seasonId, matchdayId: save.gameState.matchdayState.matchdayId, source: "sqlite", phase: "season_end" },
     persistence,
   );
-  let totalPrizeMoney = cashPreview.plannedChanges.reduce((sum, row) => sum + (row.prizeMoney ?? 0), 0);
-  if (cashPreview.blockingReasons.length === 0 && !cashPreview.duplicateDetected) {
-    const cashApply = await executeCashPrizeApply(
-      {
-        saveId,
-        seasonId,
-        matchdayId: save.gameState.matchdayState.matchdayId,
-        source: "sqlite",
-        phase: "season_end",
-        execute: true,
-        confirm: CASH_PRIZE_APPLY_CONFIRM_TOKEN,
-      },
-      persistence,
-    );
-    totalPrizeMoney = cashApply.plannedChanges.reduce((sum, row) => sum + (row.prizeMoney ?? 0), 0);
-    if (!cashApply.ok || !cashApply.applied) blockers.push(...cashApply.blockingReasons.map((entry) => `cash:${entry}`));
+  const totalPrizeMoney = cashPreview.plannedChanges.reduce((sum, row) => sum + (row.prizeMoney ?? 0), 0);
+  if (cashPreview.blockingReasons.length > 0) {
+    blockers.push(...cashPreview.blockingReasons.map((entry) => `cash_preview:${entry}`));
   }
   recordPhase(performanceRows, {
     seasonId,
-    phase: "season end prize money",
+    phase: "season end prize benchmark preview",
     startedAt,
     itemCount: cashPreview.plannedChanges.length,
-    status: blockers.some((entry) => entry.startsWith("cash:")) ? "blocked" : "ok",
-    note: cashPreview.blockingReasons.join("|"),
+    status: blockers.some((entry) => entry.startsWith("cash_preview:")) ? "blocked" : "ok",
+    note: `benchmarkOnly:true|totalPrizeMoney:${totalPrizeMoney}|${cashPreview.blockingReasons.join("|")}`,
   });
+
+  save = persistence.getSaveById(saveId);
+  if (!save) throw new Error("Long-run save disappeared before sponsor settlement.");
+  console.error(`[long-run] season-end ${seasonId}: sponsor-settlement`);
+  startedAt = Date.now();
+  const existingSponsorEndPayout = (save.gameState.seasonState.sponsorPayoutLogs ?? []).some(
+    (log) => log.seasonId === seasonId && log.phase === "season_end",
+  );
+  if (existingSponsorEndPayout) {
+    recordPhase(performanceRows, {
+      seasonId,
+      phase: "season end sponsor settlement",
+      startedAt,
+      itemCount: 0,
+      status: "ok",
+      note: "already_applied",
+    });
+  } else {
+    const sponsorApply = applySponsorSettlement({
+      gameState: save.gameState,
+      saveId,
+      phase: "season_end",
+      execute: true,
+      deductSalary: true,
+    });
+    if (!sponsorApply.applied) {
+      blockers.push(...sponsorApply.preview.blockingReasons.map((entry) => `sponsor:${entry}`));
+      if (sponsorApply.preview.warnings.length > 0) {
+        blockers.push(...sponsorApply.preview.warnings.slice(0, 8).map((entry) => `sponsor_warn:${entry}`));
+      }
+    } else {
+      persistence.saveSingleplayerState(saveId, sponsorApply.gameState);
+    }
+    recordPhase(performanceRows, {
+      seasonId,
+      phase: "season end sponsor settlement",
+      startedAt,
+      itemCount: sponsorApply.preview.rows.filter((row) => row.cashDelta !== 0).length,
+      status: blockers.some((entry) => entry.startsWith("sponsor:")) ? "blocked" : "ok",
+      note: `totalCashDelta:${sponsorApply.preview.totalCashDelta}|benchmarkPrizeMoney:${totalPrizeMoney}|deductSalary:true`,
+    });
+  }
 
   save = persistence.getSaveById(saveId);
   if (!save) throw new Error("Long-run save disappeared before facilities.");
@@ -1884,6 +1975,7 @@ async function applySeasonEnd(saveId: string, persistence: PersistenceService) {
   let marketWarnings = existingMarketTransfers.length > 0 ? [`existing_market_transfers:${existingMarketTransfers.length}`] : [];
   let marketBlockers: string[] = [];
   let plannerFinalGateRows: Record<string, unknown>[] = [];
+  const allowSeasonEndMarketBuys = isTransferActionAllowed(seasonId, "season_end_market_buy");
   if (existingMarketTransfers.length === 0) {
     const market = await applyAiMarketPlanLocally({
       source: "sqlite",
@@ -1896,7 +1988,7 @@ async function applySeasonEnd(saveId: string, persistence: PersistenceService) {
       options: {
         includeWarningTeams: true,
         applySellSteps: true,
-        applyBuySteps: true,
+        applyBuySteps: allowSeasonEndMarketBuys,
         maxBuysPerTeam: null,
         maxSellsPerTeam: 2,
         previewBuyLimit: 48,
@@ -1948,7 +2040,9 @@ async function applySeasonEnd(saveId: string, persistence: PersistenceService) {
       phase: `season end final stabilization ${row.phase}`,
     })),
   );
-  const finalRosterRepair = repairRosterMinimumBeforeSeasonStart(saveId, seasonId, persistence);
+  const finalRosterRepair = isTransferActionAllowed(seasonId, "preseason_roster_repair")
+    ? repairRosterMinimumBeforeSeasonStart(saveId, seasonId, persistence)
+    : { performanceRows: [] as PhaseMetric[], blockers: [] as string[], purchases: [] as Array<Record<string, unknown>>, repaired: false };
   performanceRows.push(
     ...finalRosterRepair.performanceRows.map((row) => ({
       ...row,
@@ -2207,6 +2301,9 @@ function collectAuditRows(save: PersistedSaveGame, seasonId: string, seasonEnd: 
         transfers.some((entry) => entry.source === "season1_autoprep_topup" && seasonId !== "season-1")
           ? "season1_autoprep_topup_after_s1_detected"
           : null,
+        findSeasonOneForbiddenBuySources(transfers).length > 0
+          ? `s1_forbidden_buy_source_detected:${findSeasonOneForbiddenBuySources(transfers).join("|")}`
+          : null,
       ].filter((entry): entry is string => Boolean(entry)),
       blockers: [],
     } satisfies SeasonAudit,
@@ -2249,6 +2346,9 @@ async function main() {
         throw new Error(`S1 top-up blocked: ${topUp.blockers.join(" | ")}`);
       }
     }
+    save = persistence.getSaveById(save.saveId) ?? save;
+    console.error(`[long-run] choosing sponsor contracts for ${save.gameState.season.id}`);
+    persistence.saveSingleplayerState(save.saveId, chooseSponsorOfferForAiTeams(save.gameState));
     save = persistence.getSaveById(save.saveId) ?? save;
   }
   const teamRatingsPlayerOptSyncRowsAtStart = buildTeamRatingsPlayerOptSyncRows(save);
@@ -2517,6 +2617,14 @@ async function main() {
   });
 
   const seasonHistory = finalSave.gameState.seasonState.seasonSnapshots ?? [];
+  const cashEconomyAudit = buildCashEconomyAudit(finalSave.gameState);
+  if (cashEconomyAudit.violations.length > 0) {
+    openTechnicalBugs.push(...cashEconomyAudit.violations.map((entry) => `cash_economy:${entry}`));
+  }
+  const s1ForbiddenBuySources = findSeasonOneForbiddenBuySources(finalSave.gameState.transferHistory);
+  if (s1ForbiddenBuySources.length > 0) {
+    openTechnicalBugs.push(`s1_forbidden_buy_source_detected:${s1ForbiddenBuySources.join("|")}`);
+  }
   const unresolvedSlotCoverage = slotCoverageRows.filter((row) => row.status === "hard_unresolved").length;
   const captainWarningRows = slotCoverageRows.filter((row) => Number(row.captainWarnings ?? 0) > 0).length;
   const depthWarningRows = slotCoverageRows.filter((row) => Number(row.depthWarnings ?? 0) > 0).length;
@@ -2534,6 +2642,9 @@ async function main() {
     summaries: allSeasonSummaries,
     guardChecks: {
       season1AutoprepTopupAfterSeason1: aiMarketRows.some((row) => row.source === "season1_autoprep_topup" && row.seasonId !== "season-1"),
+      season1ForbiddenBuySources: s1ForbiddenBuySources,
+      cashEconomyViolations: cashEconomyAudit.violations,
+      seasonsWithSponsorEndSettlement: cashEconomyAudit.seasonsWithSponsorEndSettlement,
       anyRosterAllExactlyTen: allSeasonSummaries.some((entry) => entry.rosterAllExactlyTen),
       negativeCashTeams: rosterRows.filter((row) => Number(row.cash ?? 0) < 0).length,
       contractExitRows: contractExitRows.length,
@@ -2563,6 +2674,7 @@ async function main() {
   };
 
   writeOutput("multi-season-s1-s6-summary.json", `${JSON.stringify(summary, null, 2)}\n`);
+  writeOutput("cash-economy-audit.json", `${JSON.stringify(cashEconomyAudit, null, 2)}\n`);
   writeOutput(
     "multi-season-s1-s6-summary.md",
     [

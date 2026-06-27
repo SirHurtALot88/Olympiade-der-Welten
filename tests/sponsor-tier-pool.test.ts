@@ -101,4 +101,15 @@ describe("sponsor tier pool", () => {
     });
     expect(Math.min(...top.tiers)).toBeGreaterThanOrEqual(4);
   });
+
+  it("uses softer tier mobility thresholds for season balancing", async () => {
+    const fs = await import("node:fs/promises");
+    const path = await import("node:path");
+    const poolPath = path.join(process.cwd(), "lib/sponsor/sponsor-tier-pool.ts");
+    const poolText = await fs.readFile(poolPath, "utf8");
+
+    expect(poolText).toContain("roll < 0.10");
+    expect(poolText).toContain("roll < 0.28");
+    expect(poolText).toContain("roll < 0.38");
+  });
 });

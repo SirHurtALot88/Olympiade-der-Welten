@@ -1089,7 +1089,7 @@ export function applyAiLegacyLineupBatchLocally(
         result: "skipped_manual",
         overwriteExisting: false,
         warnings: [],
-        blockingReasons: ["team_control_mode_manual"],
+        blockingReasons: [],
         saved: false,
       });
       continue;
@@ -1110,7 +1110,7 @@ export function applyAiLegacyLineupBatchLocally(
         result: "skipped_passive",
         overwriteExisting: false,
         warnings: [],
-        blockingReasons: ["team_control_mode_passive"],
+        blockingReasons: [],
         saved: false,
       });
       continue;

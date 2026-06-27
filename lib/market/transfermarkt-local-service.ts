@@ -21,7 +21,7 @@ import {
   RECENTLY_SOLD_SAME_PRESEASON_OVERRIDE_WARNING,
 } from "@/lib/market/anti-rebuy-guard";
 import { buildTransfermarktSaleFactorBreakdown, normalizeVisibleRosterMoney } from "@/lib/market/transfermarkt-sale-factor";
-import { LOCAL_TRANSFER_WINDOW_PHASE } from "@/lib/market/transfer-window-policy";
+import { isTransferSellPhaseOpen, LOCAL_TRANSFER_WINDOW_PHASE } from "@/lib/market/transfer-window-policy";
 import { buildTransfermarktPoolAudit } from "@/lib/market/transfermarkt-pool-audit";
 import { buildTransfermarktDoubleLoadWarnings } from "@/lib/market/transfermarkt-double-load";
 import {
@@ -76,10 +76,10 @@ const LOCAL_SYSTEM_SELL_SOURCES = new Set([
 ]);
 
 function isLocalTransferSellWindowOpen(gameState: GameState) {
-  const phase = gameState.gamePhase ?? "season_active";
-  if (LOCAL_SELL_WINDOW_PHASES.has(phase)) {
+  if (isTransferSellPhaseOpen(gameState)) {
     return true;
   }
+  const phase = gameState.gamePhase ?? "season_active";
   if (phase !== "season_active") {
     return false;
   }
@@ -988,7 +988,6 @@ function resolveLocalTransfermarktBuyContext(params: TransfermarktBuyParams): Lo
 
   const priorRejectedNegotiation = (gameState.seasonState.contractNegotiationDrafts ?? []).some(
     (draft) =>
-      draft.seasonId === gameState.season.id &&
       draft.teamId === params.teamId &&
       draft.playerId === params.playerId &&
       draft.status === "rejected_bad_experience",

@@ -9,10 +9,11 @@ import { AI_PICKS_RUN_CONFIRM_TOKEN } from "@/lib/ai/ai-picks-run-contract";
 import { runAiPicksExecutePreview } from "@/lib/ai/ai-picks-run-service";
 import type { AiPreseasonAutomationRunRecord, GameState } from "@/lib/data/olyDataTypes";
 import {
-  buildTeamControlSettingsMap,
-  getManualControlTeamIds,
-  withNormalizedTeamControlSettings,
-} from "@/lib/foundation/team-control-settings";
+  allowsAiPreseasonManualTeamOverride,
+  getProtectedHumanTeamIds,
+  protectManualPlayerTeams,
+} from "@/lib/ai/ai-preseason-manual-team-guard";
+import { buildTeamControlSettingsMap } from "@/lib/foundation/team-control-settings";
 import { LOCAL_TRANSFER_WINDOW_PHASE } from "@/lib/market/transfer-window-policy";
 import { createPersistenceService } from "@/lib/persistence/persistence-service";
 
@@ -22,19 +23,10 @@ function nowIso() {
 
 function getAiTeamIds(gameState: GameState) {
   const control = buildTeamControlSettingsMap(gameState.teams, gameState.seasonState.teamControlSettings);
-  const manualTeamIds = getManualControlTeamIds(gameState);
+  const protectedHumanTeamIds = getProtectedHumanTeamIds(gameState);
   return gameState.teams
-    .filter((team) => control[team.teamId]?.controlMode === "ai" && !manualTeamIds.has(team.teamId))
+    .filter((team) => control[team.teamId]?.controlMode === "ai" && !protectedHumanTeamIds.has(team.teamId))
     .map((team) => team.teamId);
-}
-
-function protectManualPlayerTeams(gameState: GameState): GameState {
-  const normalized = withNormalizedTeamControlSettings(gameState);
-  const humanTeamIds = getManualControlTeamIds(gameState);
-  if (humanTeamIds.size === 0) return gameState;
-  const control = buildTeamControlSettingsMap(normalized.teams, normalized.seasonState.teamControlSettings);
-  const anyChanged = [...humanTeamIds].some((id) => control[id]?.controlMode !== "manual");
-  return anyChanged ? normalized : gameState;
 }
 
 function isStaleRunningRun(run: AiPreseasonAutomationRunRecord | null) {
@@ -111,7 +103,13 @@ export async function POST(request: Request) {
     });
   }
 
-  const protectedGameState = protectManualPlayerTeams(save.gameState);
+  const allowManualTeamOverride = searchParams.get("allowManualTeamOverride") === "true";
+  const skipManualProtection = allowsAiPreseasonManualTeamOverride({
+    saveId,
+    gameState: save.gameState,
+    explicitOverride: allowManualTeamOverride,
+  });
+  const protectedGameState = skipManualProtection ? save.gameState : protectManualPlayerTeams(save.gameState);
   const protectedSave =
     protectedGameState === save.gameState
       ? save

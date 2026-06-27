@@ -1,4 +1,4 @@
-import type { GameState } from "@/lib/data/olyDataTypes";
+import type { GamePhase, GameState, NewGameFlowStepStatus } from "@/lib/data/olyDataTypes";
 import { GAME_LANGUAGE } from "@/lib/ui/game-language";
 import {
   activeTeamHasFormCardPool,
@@ -558,6 +558,74 @@ export function isActiveMatchdayPreparation(gameState: GameState) {
     return false;
   }
   return (gameState.gamePhase ?? "season_active") === "season_active";
+}
+
+const SEASON_BRIEFING_END_GAME_PHASES = new Set<GamePhase>([
+  "season_completed",
+  "season_review",
+  "season_rewards",
+  "player_development",
+]);
+
+const SEASON_BRIEFING_PRESEASON_GAME_PHASES = new Set<GamePhase>([
+  "preseason_management",
+  "transfer_sell_phase",
+  "transfer_buy_phase",
+  "lineup_setup",
+  "next_season_ready",
+]);
+
+export function shouldAutoOpenSeasonBriefing(
+  gameState: GameState,
+  seasonIntroStepStatus: NewGameFlowStepStatus | null | undefined,
+): boolean {
+  if (seasonIntroStepStatus !== "open") {
+    return false;
+  }
+
+  if (gameState.season.isCompleted === true) {
+    return false;
+  }
+
+  const gamePhase = gameState.gamePhase ?? "season_active";
+  if (SEASON_BRIEFING_END_GAME_PHASES.has(gamePhase)) {
+    return false;
+  }
+
+  if (SEASON_BRIEFING_PRESEASON_GAME_PHASES.has(gamePhase)) {
+    return true;
+  }
+
+  if (gamePhase !== "season_active") {
+    return false;
+  }
+
+  const seasonId = gameState.season.id;
+  const currentMatchday = gameState.season.currentMatchday ?? 1;
+  const totalMatchdays = gameState.season.totalMatchdays ?? 10;
+  if (currentMatchday > 1) {
+    return false;
+  }
+
+  if (currentMatchday >= totalMatchdays && gameState.matchdayState.status === "resolved") {
+    return false;
+  }
+
+  const hasResolvedSeasonResults = (gameState.seasonState.matchdayResults ?? []).some(
+    (result) => result.seasonId === seasonId,
+  );
+  if (hasResolvedSeasonResults) {
+    return false;
+  }
+
+  const standingsHavePoints = Object.values(gameState.seasonState.standings ?? {}).some(
+    (entry) => (entry.points ?? 0) > 0,
+  );
+  if (standingsHavePoints) {
+    return false;
+  }
+
+  return true;
 }
 
 export function buildGameFlowState(input: { gameState: GameState; activeTeamId?: string | null }): GameFlowState {

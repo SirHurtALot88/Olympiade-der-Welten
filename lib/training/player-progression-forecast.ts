@@ -29,6 +29,43 @@ import type {
   PlayerTrainingMode,
 } from "@/lib/training/training-plan-types";
 
+// WeakMap caches keyed on gameState to avoid O(n²) rebuilds per player within the same state.
+const matchdayResultSeasonCache = new WeakMap<GameState, Map<string, string>>();
+const seasonPerformancesByPlayerCache = new WeakMap<GameState, Map<string, PlayerDisciplinePerformanceRecord[]>>();
+// Cache for full forecast results: keyed on gameState → playerId. Only used when all inputs
+// are derivable from gameState + player (i.e., no custom boardTrustScore or facilities override).
+const forecastResultCache = new WeakMap<GameState, Map<string, PlayerProgressionForecast>>();
+
+function getMatchdayResultSeasonIndex(gameState: GameState): Map<string, string> {
+  const cached = matchdayResultSeasonCache.get(gameState);
+  if (cached) return cached;
+  const index = new Map<string, string>(
+    (gameState.seasonState.matchdayResults ?? []).map((result) => [result.id, result.seasonId ?? gameState.season.id] as const),
+  );
+  matchdayResultSeasonCache.set(gameState, index);
+  return index;
+}
+
+function getSeasonPerformancesByPlayer(gameState: GameState): Map<string, PlayerDisciplinePerformanceRecord[]> {
+  const cached = seasonPerformancesByPlayerCache.get(gameState);
+  if (cached) return cached;
+  const seasonId = gameState.season.id;
+  const resultSeasonIndex = getMatchdayResultSeasonIndex(gameState);
+  const index = new Map<string, PlayerDisciplinePerformanceRecord[]>();
+  for (const entry of (gameState.seasonState.playerDisciplinePerformances ?? [])) {
+    const resultSeasonId = resultSeasonIndex.get(entry.matchdayResultId) ?? seasonId;
+    if (resultSeasonId !== seasonId) continue;
+    const existing = index.get(entry.playerId);
+    if (existing) {
+      existing.push(entry);
+    } else {
+      index.set(entry.playerId, [entry]);
+    }
+  }
+  seasonPerformancesByPlayerCache.set(gameState, index);
+  return index;
+}
+
 export const PLAYER_PROGRESSION_XP_CONSTANTS = {
   trainingByMode: {
     leicht: 40,
@@ -568,7 +605,17 @@ export function buildPlayerProgressionForecast(input: {
   lifetimeXP?: number | null;
   boardTrustScore?: number | null;
   facilities?: TeamFacilityCollection | null;
-}) {
+}): PlayerProgressionForecast {
+  // Short-circuit with cached result when called repeatedly for the same player within the same
+  // gameState (e.g. previewSeasonEndXpAvailability + previewSeasonEndXpSpend both call this).
+  // Only cache when no custom overrides are in play.
+  const canCache = input.boardTrustScore == null && input.facilities == null;
+  if (canCache) {
+    const perState = forecastResultCache.get(input.gameState);
+    const hit = perState?.get(input.player.id);
+    if (hit) return hit;
+  }
+
   const mode = getTrainingMode(input.player, input.trainingModeByPlayerId);
   const rosterEntry = input.gameState.rosters.find((entry) => entry.playerId === input.player.id);
   const facilities =
@@ -615,10 +662,7 @@ export function buildPlayerProgressionForecast(input: {
         )
       : 1;
   const potentialTrainingMultiplier = scoutPotential.trainingSpeedMultiplier * ceilingTrainingMultiplier;
-  const performances = (input.gameState.seasonState.playerDisciplinePerformances ?? []).filter((entry) => {
-    const result = (input.gameState.seasonState.matchdayResults ?? []).find((candidate) => candidate.id === entry.matchdayResultId);
-    return entry.playerId === input.player.id && (result?.seasonId ?? input.gameState.season.id) === input.gameState.season.id;
-  });
+  const performances = getSeasonPerformancesByPlayer(input.gameState).get(input.player.id) ?? [];
   const appearances = input.seasonPerformance?.appearances ?? performances.length;
   const mvs = input.playerRating?.mvs ?? null;
   const pps = input.playerRating?.ppsSeason ?? input.seasonPerformance?.totalPoints ?? null;
@@ -778,7 +822,7 @@ export function buildPlayerProgressionForecast(input: {
   });
   const spendableProjectedXP = Math.max(0, balancedNetDevelopmentXP);
 
-  return {
+  const result: PlayerProgressionForecast = {
     playerId: input.player.id,
     trainingMode: mode,
     currentXP: input.currentXP ?? 0,
@@ -855,5 +899,15 @@ export function buildPlayerProgressionForecast(input: {
 	        ...(regressionRisk === "high" ? ["regression_risk_high"] : []),
 	      ],
     },
-  } satisfies PlayerProgressionForecast;
+  };
+
+  if (canCache) {
+    let perState = forecastResultCache.get(input.gameState);
+    if (!perState) {
+      perState = new Map();
+      forecastResultCache.set(input.gameState, perState);
+    }
+    perState.set(input.player.id, result);
+  }
+  return result;
 }

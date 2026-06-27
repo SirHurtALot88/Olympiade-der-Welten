@@ -229,12 +229,38 @@ function getSecondaryTrainingClass(player: Player, facilities: TeamFacilityColle
   return normalizeProgressionClassName(explicit);
 }
 
-function getPerformanceRecords(gameState: GameState, playerId: string) {
-  return (gameState.seasonState.playerDisciplinePerformances ?? []).filter((entry) => {
-    if (entry.playerId !== playerId) return false;
-    const result = (gameState.seasonState.matchdayResults ?? []).find((candidate) => candidate.id === entry.matchdayResultId);
-    return (result?.seasonId ?? gameState.season.id) === gameState.season.id;
-  });
+type PerformanceIndex = {
+  byPlayerId: Map<string, PlayerDisciplinePerformanceRecord[]>;
+};
+
+const performanceIndexCache = new WeakMap<GameState, PerformanceIndex>();
+
+function getPerformanceIndex(gameState: GameState): PerformanceIndex {
+  const cached = performanceIndexCache.get(gameState);
+  if (cached) return cached;
+  const seasonId = gameState.season.id;
+  const validResultIds = new Set(
+    (gameState.seasonState.matchdayResults ?? [])
+      .filter((r) => (r.seasonId ?? seasonId) === seasonId)
+      .map((r) => r.id),
+  );
+  const byPlayerId = new Map<string, PlayerDisciplinePerformanceRecord[]>();
+  for (const entry of gameState.seasonState.playerDisciplinePerformances ?? []) {
+    if (!validResultIds.has(entry.matchdayResultId)) continue;
+    const existing = byPlayerId.get(entry.playerId);
+    if (existing) {
+      existing.push(entry);
+    } else {
+      byPlayerId.set(entry.playerId, [entry]);
+    }
+  }
+  const index: PerformanceIndex = { byPlayerId };
+  performanceIndexCache.set(gameState, index);
+  return index;
+}
+
+function getPerformanceRecords(gameState: GameState, playerId: string): PlayerDisciplinePerformanceRecord[] {
+  return getPerformanceIndex(gameState).byPlayerId.get(playerId) ?? [];
 }
 
 function getDisciplineWeightDistribution(disciplineId: string) {

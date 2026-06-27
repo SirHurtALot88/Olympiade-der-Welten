@@ -25,8 +25,8 @@ function createGameState(): GameState {
         { id: "disc-md-2", matchdayResultId: "result-md-2" } as never,
       ],
       lineupDrafts: [
-        { id: "lineup-md-1", matchdayId: "md-1" } as never,
-        { id: "lineup-md-2", matchdayId: "md-2" } as never,
+        { lineupId: "lineup-md-1", matchdayId: "md-1", teamId: "H-R", saveId: "save-1", seasonId: "season-1" } as never,
+        { lineupId: "lineup-md-2", matchdayId: "md-2", teamId: "H-R", saveId: "save-1", seasonId: "season-1" } as never,
       ],
     },
     matchdayState: { matchdayId: "md-2", status: "planning", pendingTeamIds: [], resolvedFixtureIds: [] },
@@ -80,6 +80,12 @@ function createGameState(): GameState {
 }
 
 describe("foundation initial compact state", () => {
+  it("keeps transfer history on compact initial load", () => {
+    const existing = createGameState();
+    const compact = compactFoundationInitialGameState(existing);
+    expect(compact.transferHistory).toEqual(existing.transferHistory);
+  });
+
   it("rehydrates compact PUT payloads without wiping archived save slices", () => {
     const existing = createGameState();
     const compactClientState = compactFoundationInitialGameState(existing);
@@ -111,8 +117,15 @@ describe("foundation initial compact state", () => {
         ...compactClientState.seasonState,
         lineupDrafts: [
           {
-            ...(compactClientState.seasonState.lineupDrafts?.[0] ?? { id: "lineup-md-2", matchdayId: "md-2" }),
-            id: "lineup-md-2-edited",
+            ...(compactClientState.seasonState.lineupDrafts?.[0] ?? {
+              lineupId: "lineup-md-2",
+              matchdayId: "md-2",
+              teamId: "H-R",
+              saveId: "save-1",
+              seasonId: "season-1",
+              status: "draft",
+            }),
+            status: "submitted",
           } as never,
         ],
       },
@@ -123,6 +136,30 @@ describe("foundation initial compact state", () => {
     expect(rehydrated.logs).toEqual(editedClientState.logs);
     expect(rehydrated.players.find((player) => player.id === "p-1")?.name).toBe("Edited Hero");
     expect(rehydrated.players.find((player) => player.id === "p-1")?.attributeSheetStats).toEqual({ power: 70 });
-    expect(rehydrated.seasonState.lineupDrafts?.map((draft) => draft.id)).toEqual(["lineup-md-1", "lineup-md-2-edited"]);
+    expect(rehydrated.seasonState.lineupDrafts?.map((draft) => draft.lineupId)).toEqual(["lineup-md-1", "lineup-md-2"]);
+    expect(rehydrated.seasonState.lineupDrafts?.find((draft) => draft.lineupId === "lineup-md-2")?.status).toBe("submitted");
+  });
+
+  it("preserves lineup drafts for other teams on the same matchday during compact PUT", () => {
+    const existing = createGameState();
+    existing.seasonState.lineupDrafts = [
+      { lineupId: "lineup-md-1", matchdayId: "md-1", teamId: "H-R", saveId: "save-1", seasonId: "season-1" } as never,
+      { lineupId: "lineup-md-2-hr", matchdayId: "md-2", teamId: "H-R", saveId: "save-1", seasonId: "season-1" } as never,
+      { lineupId: "lineup-md-2-aa", matchdayId: "md-2", teamId: "A-A", saveId: "save-1", seasonId: "season-1" } as never,
+    ];
+
+    const compactClientState = compactFoundationInitialGameState(existing);
+    expect(compactClientState.seasonState.lineupDrafts?.map((draft) => draft.lineupId)).toEqual([
+      "lineup-md-2-hr",
+      "lineup-md-2-aa",
+    ]);
+
+    const rehydrated = rehydrateGameStateAfterCompactPut(existing, compactClientState);
+
+    expect(rehydrated.seasonState.lineupDrafts?.map((draft) => draft.lineupId)).toEqual([
+      "lineup-md-1",
+      "lineup-md-2-hr",
+      "lineup-md-2-aa",
+    ]);
   });
 });

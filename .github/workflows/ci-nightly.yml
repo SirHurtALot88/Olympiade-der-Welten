@@ -21,7 +21,7 @@ jobs:
       - name: Run season block smokes
         run: |
           npm run season:smoke-block-1 2>&1 | tee block1.log
-          BLOCK2_SAVE_ID=$(node -e "const fs=require('fs');const lines=fs.readFileSync('block1.log','utf8').trim().split(/\n/).filter((line)=>line.startsWith('{'));const payload=JSON.parse(lines[lines.length-1]);process.stdout.write(payload.saveId);")
+          BLOCK2_SAVE_ID=$(node -e "const fs=require('fs');const log=fs.readFileSync('block1.log','utf8');const matches=log.match(/\{[\s\S]*\}/g);if(!matches?.length) throw new Error('No JSON payload in block1.log');const payload=JSON.parse(matches[matches.length-1]);if(!payload.saveId) throw new Error('saveId missing in block1 payload');process.stdout.write(String(payload.saveId));")
           test -n "$BLOCK2_SAVE_ID"
           BLOCK2_SAVE_ID="$BLOCK2_SAVE_ID" npm run season:smoke-block-2
           BLOCK3_SAVE_ID="$BLOCK2_SAVE_ID" npm run season:smoke-block-3

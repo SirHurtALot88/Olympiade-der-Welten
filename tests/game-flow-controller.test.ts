@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 
 import type { GameState, Player, Team } from "@/lib/data/olyDataTypes";
-import { buildGameFlowState } from "@/lib/foundation/game-flow-controller";
+import { buildGameFlowState, shouldAutoOpenSeasonBriefing } from "@/lib/foundation/game-flow-controller";
 
 function team(partial?: Partial<Team>): Team {
   return {
@@ -95,6 +95,69 @@ function gameState(partial?: Partial<GameState>): GameState {
 }
 
 describe("game flow controller", () => {
+  it("auto-opens season briefing only at season start", () => {
+    expect(
+      shouldAutoOpenSeasonBriefing(
+        gameState({
+          gamePhase: "transfer_buy_phase",
+          seasonState: {
+            seasonId: "season-2",
+            schedule: [],
+            standings: {},
+            newGameFlow: {
+              active: true,
+              dismissed: false,
+              selectedTeamId: "M-M",
+              steps: [{ stepId: "season_intro", status: "open" }],
+            },
+          },
+        }),
+        "open",
+      ),
+    ).toBe(true);
+
+    expect(
+      shouldAutoOpenSeasonBriefing(
+        gameState({
+          gamePhase: "season_completed",
+          season: { id: "season-2", name: "Season 2", year: 2027, currentMatchday: 10, matchdayIds: ["season-2-md-10"], isCompleted: true },
+          seasonState: {
+            seasonId: "season-2",
+            schedule: [],
+            standings: {},
+            newGameFlow: {
+              active: true,
+              dismissed: false,
+              selectedTeamId: "M-M",
+              steps: [{ stepId: "season_intro", status: "open" }],
+            },
+          },
+        }),
+        "open",
+      ),
+    ).toBe(false);
+
+    expect(
+      shouldAutoOpenSeasonBriefing(
+        gameState({
+          season: { id: "season-2", name: "Season 2", year: 2027, currentMatchday: 6, matchdayIds: ["season-2-md-6"] },
+          seasonState: {
+            seasonId: "season-2",
+            schedule: [],
+            standings: {},
+            newGameFlow: {
+              active: true,
+              dismissed: false,
+              selectedTeamId: "M-M",
+              steps: [{ stepId: "season_intro", status: "open" }],
+            },
+          },
+        }),
+        "open",
+      ),
+    ).toBe(false);
+  });
+
   it("starts empty new-game rosters with the season briefing before training", () => {
     const flow = buildGameFlowState({
       gameState: gameState({

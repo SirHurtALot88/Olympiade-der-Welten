@@ -39,10 +39,10 @@ export function formatSignedPercent(value: number | null | undefined) {
 }
 
 export function getDevelopmentTone(row: TrainingPlayerRowView) {
-  if (row.forecast.netDevelopmentXP < 0 || row.forecast.regressionRisk === "high") {
+  if (row.organicForecast.netSetpoints < 0 || row.forecast.regressionRisk === "high") {
     return "regression";
   }
-  if (row.forecast.netDevelopmentXP >= 45) {
+  if (row.organicForecast.netSetpoints >= 2) {
     return "growth";
   }
   return "stable";
@@ -342,9 +342,12 @@ export function TrainingPlayerLane({
 
                 <div className="training-v2-rider-ability-stack">
                   <div className={`training-v2-rider-ability velo-value-flash-target is-${tone}`}>
-                    <span>DEV</span>
-                    <strong>{formatVeloNumber(row.forecast.netDevelopmentXP, 0)}</strong>
-                    <small>Entwicklung</small>
+                    <span>Setpoints</span>
+                    <strong className={row.organicForecast.netSetpoints >= 0 ? "text-positive" : "text-negative"}>
+                      {row.organicForecast.netSetpoints > 0 ? "+" : ""}
+                      {formatVeloNumber(row.organicForecast.netSetpoints, 1)}
+                    </strong>
+                    <small>Organische Saison</small>
                   </div>
                   {row.playerPps != null ? (
                     <div className="training-v2-rider-ability is-pps">

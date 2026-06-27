@@ -1,5 +1,9 @@
 import type { Discipline, GameState, Player } from "@/lib/data/olyDataTypes";
 
+// Per-gameState caches so that O(n)-over-all-players work is only done once per distinct state.
+const leagueAxisValuesCache = new WeakMap<GameState, Record<PlayerAxisKey, number[]>>();
+const leagueDisciplineRanksCache = new WeakMap<GameState, Map<string, Map<string, number>>>();
+
 export type PlayerAxisKey = "pow" | "spe" | "men" | "soc";
 
 export type PlayerDisciplineStarTag = {
@@ -91,7 +95,9 @@ function hashPlayerId(playerId: string): number {
   return (h >>> 0) / 4294967295;
 }
 
-function buildLeagueAxisValues(gameState: GameState) {
+function buildLeagueAxisValues(gameState: GameState): Record<PlayerAxisKey, number[]> {
+  const cached = leagueAxisValuesCache.get(gameState);
+  if (cached) return cached;
   const values: Record<PlayerAxisKey, number[]> = { pow: [], spe: [], men: [], soc: [] };
   for (const player of gameState.players) {
     for (const axis of AXIS_KEYS) {
@@ -102,10 +108,13 @@ function buildLeagueAxisValues(gameState: GameState) {
   for (const axis of AXIS_KEYS) {
     values[axis].sort((left, right) => left - right);
   }
+  leagueAxisValuesCache.set(gameState, values);
   return values;
 }
 
-function buildLeagueDisciplineRanks(gameState: GameState, disciplines: Discipline[]) {
+function buildLeagueDisciplineRanks(gameState: GameState, disciplines: Discipline[]): Map<string, Map<string, number>> {
+  const cached = leagueDisciplineRanksCache.get(gameState);
+  if (cached) return cached;
   const ranksByPlayer = new Map<string, Map<string, number>>();
   for (const discipline of disciplines) {
     const scored = gameState.players
@@ -121,6 +130,7 @@ function buildLeagueDisciplineRanks(gameState: GameState, disciplines: Disciplin
       ranksByPlayer.set(entry.playerId, playerRanks);
     });
   }
+  leagueDisciplineRanksCache.set(gameState, ranksByPlayer);
   return ranksByPlayer;
 }
 

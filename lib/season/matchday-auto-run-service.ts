@@ -404,9 +404,14 @@ function addStep(result: MatchdayAutoRunResult, step: MatchdayAutoRunStep) {
     result.warnings.push(...step.warnings);
   }
   if (step.blockingReasons.length > 0) {
-    result.blockingReasons.push(...step.blockingReasons);
-    result.ok = false;
-    result.status = "blocked";
+    if (!step.canContinue) {
+      result.blockingReasons.push(...step.blockingReasons);
+      result.ok = false;
+      result.status = "blocked";
+    } else {
+      // canContinue=true with blocking reasons means non-fatal issues (e.g. skipped_disabled teams)
+      result.warnings.push(...step.blockingReasons);
+    }
   }
   if (step.plannedWrites > 0) {
     result.plannedWrites.push({

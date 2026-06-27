@@ -9,7 +9,7 @@
 | Production Build | 🟢 | `npm run build` grün |
 | CI flow-smoke | 🟢 | 116/116 Tests (`npm run ci:flow-smoke`) |
 | Perf regression | 🟢 | `npm run perf:regression-smoke` (<250ms Version-Metadata) |
-| Playwright gameplay | 🟡 | `npx playwright install chromium` + `npm run app:smoke-gameplay -- --no-start` |
+| Playwright gameplay | 🟢 | CI: `.github/workflows/ci.yml` (`playwright install chromium` + `npm run app:smoke-gameplay`); lokal: `npx playwright install chromium && npm run app:smoke-gameplay -- --no-start --base-url=http://127.0.0.1:3000` |
 | Save laden | 🟢 | Dev-Server lädt Long Run Sandbox mit A-A · Armageddon Aftermath |
 | Home Top-6 Karten | 🟢 | POW/SPE/MEN/SOC ohne Noten; CA absolut + PO-Range (kein „Gering“/„F“) |
 | Home/Inbox: nächster Schritt | 🟢 | Flow-Controller zeigt korrekten Schritt mit `globalNextLabel` |
@@ -61,7 +61,7 @@ Legende: 🟢 OK · 🟡 teilweise / Re-Test nötig · 🔴 blockiert
 - Nur **Solo 1 Team** — Online 4v4 kommt später
 - V2-Preview-Screens (Scouting Hub etc.) sind optional, nicht Teil des Loops
 - GM-Story / Hot Seat ist Design-Feedback, kein SP-Blocker
-- Automatischer Smoke: `npm run app:smoke-gameplay` (Entwickler-Check)
+- Automatischer Smoke: `npm run app:smoke-gameplay` (CI + Entwickler-Check; lokal einmalig `npx playwright install chromium`)
 - Transfermarkt-Wishlist: Doppelklick auf Kandidat öffnet weiterhin Kaufdialog (bewusst)
 
 ## Vollständiger Solo-Loop (8-9/10)

@@ -701,6 +701,7 @@ function pickBestUnusedGeneralManager(input: {
   seasonId: string;
   identity: TeamIdentity | null;
   usedGmIds: Set<string>;
+  excludedArchetypes?: Iterable<TeamGeneralManagerArchetype>;
 }): PickedGeneralManager {
   if (input.team.humanControlled) {
     const preferred =
@@ -714,8 +715,14 @@ function pickBestUnusedGeneralManager(input: {
     }
   }
 
-  const candidates = TEAM_GENERAL_MANAGER_PROFILES.filter((profile) => !input.usedGmIds.has(profile.gmId));
-  const scoredCandidates = candidates
+  const excludedArchetypeSet = new Set(input.excludedArchetypes ?? []);
+  const availableProfiles = TEAM_GENERAL_MANAGER_PROFILES.filter((profile) => !input.usedGmIds.has(profile.gmId));
+  const candidates =
+    excludedArchetypeSet.size > 0
+      ? availableProfiles.filter((profile) => !excludedArchetypeSet.has(profile.archetype))
+      : availableProfiles;
+  const candidatePool = candidates.length > 0 ? candidates : availableProfiles;
+  const scoredCandidates = candidatePool
     .map((profile) => ({
       profile,
       score: scoreGeneralManagerFit(input.team, input.identity, profile, input.seasonId),
@@ -820,6 +827,8 @@ export function buildTeamGeneralManagerAssignments(
       seasonId,
       identity,
       usedGmIds,
+      excludedArchetypes:
+        isFired && currentProfile ? [currentProfile.archetype] : undefined,
     });
     const profile = picked.profile;
     usedGmIds.add(profile.gmId);

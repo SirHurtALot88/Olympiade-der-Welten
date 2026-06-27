@@ -8,6 +8,7 @@ import {
   previewSeasonEndXpSpend,
   type SeasonEndXpSpendPlannedUpgradeInput,
 } from "@/lib/progression/season-end-xp-apply-service";
+import { buildSeasonTransitionPreview } from "@/lib/season/season-transition-service";
 
 const baseAttributes: PlayerGeneratorAttributes = {
   power: 30,
@@ -288,6 +289,13 @@ describe("season-end XP spend apply service", () => {
     expect(organicUpgrades.length).toBeGreaterThan(0);
     expect(organicUpgrades.every((entry) => entry.source === "organic_season_progression")).toBe(true);
     expect(savedPlayer?.lastOrganicProgression?.performanceSetpoints).toBeGreaterThan(0);
+
+    const transitionPreview = buildSeasonTransitionPreview({
+      ...save,
+      gameState: getSavedState() ?? save.gameState,
+    });
+    expect(transitionPreview.canCompleteSeason).toBe(true);
+    expect(transitionPreview.steps.some((step) => step.stepId === "player_development")).toBe(true);
   });
 
   it("does not materialize the same season XP twice", () => {

@@ -1,7 +1,7 @@
 import type { GameState, SponsorArchetype, SponsorOffer, SponsorOfferComponent, SponsorStarTier } from "@/lib/data/olyDataTypes";
-import { normalizeEconomyMoney, resolvePlayerEconomyContract } from "@/lib/foundation/player-economy-contract";
 import { buildTeamSeasonOverviewRows } from "@/lib/foundation/team-management-overview";
 import { PRIZE_MONEY_NORMALIZED_JSON_PATH } from "@/lib/season/prize-money-paths";
+import { getTeamDisplaySalaryTotal } from "@/lib/sponsor/sponsor-team-salary-display";
 
 export const SPONSOR_BASE_FLOOR_C = 32;
 
@@ -137,18 +137,7 @@ export function getRewardMultiplierForTier(starTier: SponsorStarTier): number {
   return getStarTierMilestoneMultiplier(starTier);
 }
 
-export function getTeamDisplaySalaryTotal(gameState: GameState, teamId: string): number {
-  const playerById = new Map(gameState.players.map((player) => [player.id, player] as const));
-  const total = gameState.rosters
-    .filter((entry) => entry.teamId === teamId)
-    .reduce((sum, entry) => {
-      const player = playerById.get(entry.playerId) ?? null;
-      const contract = resolvePlayerEconomyContract({ player, rosterEntry: entry });
-      const salary = contract.expectedSalary ?? normalizeEconomyMoney(contract.salary) ?? 0;
-      return sum + salary;
-    }, 0);
-  return round1(total);
-}
+export { getTeamDisplaySalaryTotal } from "@/lib/sponsor/sponsor-team-salary-display";
 
 export function getLeagueMinimumSalaryTotal(gameState: GameState): number {
   const overviewSalaries = buildTeamSeasonOverviewRows({ gameState })
