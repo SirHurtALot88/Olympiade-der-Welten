@@ -223,9 +223,22 @@ export default function HomeV2Client({
                     )}
                     <strong>{player.name}</strong>
                     <div className="home-v2-player-stats">
-                      <span>OVR {formatNumber(player.playerOvr, 1)}</span>
-                      <span>PPs {formatNumber(player.playerPps, 1)}</span>
-                      <span>MVS {formatNumber(player.playerMvs, 1)}</span>
+                      <span className="home-v2-player-stat is-rank">
+                        <small>Rank</small>
+                        <strong>#{player.rosterRank}</strong>
+                      </span>
+                      <span className="home-v2-player-stat">
+                        <small>OVR</small>
+                        <strong>{formatNumber(player.playerOvr, 1)}</strong>
+                      </span>
+                      <span className="home-v2-player-stat">
+                        <small>PPs</small>
+                        <strong>{formatNumber(player.playerPps, 1)}</strong>
+                      </span>
+                      <span className="home-v2-player-stat">
+                        <small>MVS</small>
+                        <strong>{formatNumber(player.playerMvs, 1)}</strong>
+                      </span>
                     </div>
                     <VeloStatOrbitRow
                       ariaLabel={`${player.name} Achsenwerte POW SPE MEN SOC`}

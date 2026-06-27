@@ -3,6 +3,7 @@ export type HomeV2TopPlayerCard = {
   name: string;
   portraitUrl: string | null;
   portraitInitials: string;
+  rosterRank: number;
   playerOvr: number | null;
   playerPps: number | null;
   playerMvs: number | null;

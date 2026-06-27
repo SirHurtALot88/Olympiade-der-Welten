@@ -112,6 +112,7 @@ import {
   type SaisonstandColumnContractEntry,
 } from "@/lib/foundation/saisonstand-column-contract";
 import type { PlayerDetailDrawerData } from "@/lib/foundation/player-detail-drawer";
+import { getPlayerDisplayMarketValueDelta as resolvePlayerDisplayMarketValueDelta } from "@/lib/foundation/player-display-market-value";
 import { getPlayerBaselineEconomyReference } from "@/lib/players/player-baseline-service";
 import { buildPlayerRatingContractMap } from "@/lib/foundation/player-rating-contract";
 import { buildPlayerSeasonPerformanceMap } from "@/lib/foundation/player-season-performance";
@@ -204,6 +205,7 @@ import {
 import { buildSponsorCommercialRating } from "@/lib/sponsor/sponsor-commercial-rating-service";
 import { getTeamSponsorContract, getTeamSponsorOffers } from "@/lib/sponsor/sponsor-offer-read";
 import { applySponsorNegotiationToComponents, getSponsorNegotiationMultiplier } from "@/lib/sponsor/sponsor-negotiation";
+import { SponsorOfferCard } from "@/components/foundation/sponsor/SponsorOfferCard";
 import type { SponsorNegotiationProfile } from "@/lib/data/olyDataTypes";
 import { buildScoutPipelineSummary } from "@/lib/scouting/facility-scout-pipeline-service";
 import {
@@ -3594,6 +3596,18 @@ function scrollToFoundationTarget(targetId: string | null | undefined) {
   }, 90);
 }
 
+function buildPlayerProfileHydrationSuccessKey(seasonId: string, playerId: string) {
+  return `${seasonId}:${playerId}`;
+}
+
+function buildPlayerProfileHydrationFailureKey(seasonId: string, playerId: string, playersLoaded: number) {
+  return `${seasonId}:${playerId}:fail:${playersLoaded}`;
+}
+
+function buildPlayerProfileHydrationLoadingKey(seasonId: string, playerId: string) {
+  return `${seasonId}:${playerId}:loading`;
+}
+
 function parseFoundationViewFromUrl() {
   if (typeof window === "undefined") {
     return null;
@@ -3659,6 +3673,9 @@ function parseFoundationTeamIdFromUrl(teams: Team[]) {
   }
 
   const team = new URL(window.location.href).searchParams.get("team");
+  if (!team || team === "loading-team") {
+    return null;
+  }
   return resolveFoundationTeamId(teams, team);
 }
 
@@ -4127,6 +4144,11 @@ function getPlayerPortraitModel(player: Pick<Player, "id" | "name" | "portraitUr
   return { src, initials };
 }
 
+const TEAM_ROSTER_PORTRAIT_LOADING = {
+  loading: "eager",
+  fetchPriority: "high",
+} as const;
+
 function PlayerPortrait({
   src,
   initials,
@@ -4134,7 +4156,7 @@ function PlayerPortrait({
   className,
   style,
   loading = "lazy",
-  fetchPriority = "low",
+  fetchPriority = "auto",
 }: {
   src: string | null;
   initials: string;
@@ -5503,16 +5525,14 @@ function isPlausibleSalaryDeltaReference(
 
 function getPlayerDisplayMarketValueDelta(
   player?: Player | null,
-  entry?: Pick<RosterEntry, "currentValue" | "purchasePrice"> | null,
+  entry?: Pick<RosterEntry, "currentValue" | "purchasePrice" | "joinedSeasonId"> | null,
+  gameState?: GameState | null,
 ) {
-  const marketValue = getPlayerDisplayMarketValue(player);
-  const previousValue = getRosterEntryDisplayMarketValue(entry, player);
-  if (marketValue == null || previousValue == null) {
-    return null;
-  }
-
-  const delta = marketValue - previousValue;
-  return Math.abs(delta) >= 0.01 ? roundViewNumber(delta, 2) : null;
+  return resolvePlayerDisplayMarketValueDelta({
+    player,
+    rosterEntry: entry,
+    gameState,
+  });
 }
 
 function getRosterEntrySalaryDelta(
@@ -6071,6 +6091,7 @@ export default function FoundationPageClient({
   const initialPersistedSave = initialPersistenceState?.save?.gameState ? initialPersistenceState.save : null;
   const initialClientGameState = withNormalizedLocalTeamSettings(initialPersistedSave?.gameState ?? initialGameState);
   const [gameState, setGameState] = useState<GameState>(() => initialClientGameState);
+  const gameStateRef = useRef(initialClientGameState);
   const [teamIdentityDraft, setTeamIdentityDraft] = useState<TeamIdentityDraftMap>(() =>
     buildTeamIdentityDraftMap(initialClientGameState.teams, initialClientGameState.teamIdentities),
   );
@@ -6133,6 +6154,7 @@ export default function FoundationPageClient({
   });
   const [playerProfileTab, setPlayerProfileTab] = useState<PlayerProfileTabId>("overview");
   const [playerProfileData, setPlayerProfileData] = useState<PlayerDetailDrawerData | null>(null);
+  const [playerProfileLoading, setPlayerProfileLoading] = useState(false);
   const [inboxV2SelectedItemId, setInboxV2SelectedItemId] = useState<string | null>(null);
   const [selectedEncyclopediaEntryId, setSelectedEncyclopediaEntryId] = useState(() => getGameEncyclopediaEntry("OVR")?.id ?? "ovr");
   const [lineupFocusRequestKey, setLineupFocusRequestKey] = useState<string | null>(null);
@@ -6157,6 +6179,7 @@ export default function FoundationPageClient({
   const shouldBuildTeamHistory = shouldBuildTeamsHeavyComparison;
   const shouldBuildTrainingView =
     activeView === "trainingV2" || activeView === "trainingCompact" || activeView === "facilitiesOverviewV2";
+  const shouldBuildPlayerProfileTrainingRow = activeView === "playerProfile" && Boolean(playerProfileData);
   const shouldBuildPlayerDirectory = activeView === "players";
   const shouldBuildMarketView = isTransferMarketViewActive;
   const shouldBuildTransferHistoryView = isTransferHistoryViewActive;
@@ -6286,9 +6309,9 @@ export default function FoundationPageClient({
 
     setAdminBalancingBusy(true);
     setAdminBalancingMessage(null);
+    setGameState(nextGameState);
     try {
       await persistLocalGameStateImmediately(nextGameState);
-      setGameState(nextGameState);
       setAdminBalancingDraft(nextConfig);
       setAdminBalancingMessage("Balancing-Matrix gespeichert. Neue Progression/Preisgeld-Previews nutzen diese Werte.");
     } catch (error) {
@@ -6428,6 +6451,8 @@ export default function FoundationPageClient({
   const [aiPreseasonBusy, setAiPreseasonBusy] = useState<boolean>(false);
   const [aiPreseasonFeed, setAiPreseasonFeed] = useState<FoundationAiPreseasonAutomationResponse | null>(null);
   const aiPreseasonRunStartedRef = useRef<Set<string>>(new Set());
+  const seasonBriefingAutoOpenedRef = useRef<string | null>(null);
+  const seasonBriefingDismissedRef = useRef<Set<string>>(new Set());
   const [aiLineupEnsureBusy, setAiLineupEnsureBusy] = useState<boolean>(false);
   const [aiLineupEnsureFeed, setAiLineupEnsureFeed] = useState<FoundationAiLineupBatchApplyResponse | null>(null);
   const aiLineupEnsureRunStartedRef = useRef<Set<string>>(new Set());
@@ -6562,6 +6587,14 @@ export default function FoundationPageClient({
   const autoPersistPausedRef = useRef(false);
   const autoPersistTimerRef = useRef<number | null>(null);
   const fullSeasonArchiveLoadKeyRef = useRef<string | null>(null);
+  const pendingPlayerProfileHydrationRef = useRef<{ playerId: string; tab: PlayerProfileTabId } | null>(null);
+  const persistRequestVersionRef = useRef(0);
+  const persistSnapshotRef = useRef<{ requestVersion: number; snapshot: GameState } | null>(null);
+  const briefingUrlHydratedRef = useRef(false);
+  const playerProfileHydrationAttemptRef = useRef<string | null>(null);
+  const playerProfileHydrationSequenceRef = useRef(0);
+  const playerProfileDataRef = useRef<PlayerDetailDrawerData | null>(null);
+  playerProfileDataRef.current = playerProfileData;
 
   function clearSaveScopedFeeds() {
     setMarketFeed(null);
@@ -6729,21 +6762,69 @@ export default function FoundationPageClient({
     window.alert(`${teamName} gehoert nicht zu deinen steuerbaren Teams. Du kannst es ansehen, aber Management-Aktionen sind gesperrt.`);
   }
 
-  async function persistLocalGameStateImmediately(nextGameState: GameState) {
+  function resetOptimisticDraftsAfterSaveConflictReload() {
+    setTrainingModeDraft({});
+    setTrainingClassDraft({});
+  }
+
+  async function persistLocalGameStateImmediately(nextGameState: GameState): Promise<GameState> {
+    const requestVersion = ++persistRequestVersionRef.current;
+    persistSnapshotRef.current = { requestVersion, snapshot: nextGameState };
+
     const response = await fetch("/api/singleplayer-state", {
       method: "PUT",
       headers: {
         "Content-Type": "application/json",
       },
-      body: JSON.stringify({ saveId: activeSaveId, gameState: nextGameState }),
+      body: JSON.stringify({
+        saveId: activeSaveId,
+        gameState: nextGameState,
+        expectedSaveVersion: nextGameState.saveVersion ?? 0,
+      }),
     });
+
+    if (response.status === 409) {
+      setPersistenceError("Save-Konflikt erkannt. Stand wird neu geladen.");
+      const reloaded = await loadSave(activeSaveId, foundationSaveMode, { compactInitial: false });
+      if (reloaded) {
+        autoPersistPausedRef.current = true;
+        setGameState(reloaded);
+        resetOptimisticDraftsAfterSaveConflictReload();
+        const profilePlayerId = playerProfileDataRef.current?.playerId ?? null;
+        if (profilePlayerId) {
+          playerProfileHydrationAttemptRef.current = null;
+          try {
+            const { buildPlayerDrawerDataFromGameState } = await import("@/lib/foundation/player-detail-drawer");
+            const refreshedProfile = buildPlayerDrawerDataFromGameState({
+              gameState: reloaded,
+              playerId: profilePlayerId,
+              source: readMeta.source,
+              manageableTeamIds: ownerQuickSwitchTeams.map((team) => team.teamId),
+            });
+            setPlayerProfileData(refreshedProfile);
+            if (refreshedProfile) {
+              playerProfileHydrationAttemptRef.current = buildPlayerProfileHydrationSuccessKey(
+                reloaded.season.id,
+                profilePlayerId,
+              );
+            }
+          } catch {
+            setPlayerProfileData(null);
+          }
+        }
+        window.setTimeout(() => {
+          autoPersistPausedRef.current = false;
+        }, 0);
+      }
+      throw new Error("Save-Konflikt erkannt. Stand wird neu geladen.");
+    }
 
     if (!response.ok) {
       throw new Error("Lokaler Save konnte nicht aktualisiert werden.");
     }
 
     const payload = (await response.json()) as {
-      save?: { saveId: string; name?: string };
+      save?: { saveId: string; name?: string; saveVersion?: number };
       saves?: SaveSummary[];
     };
     if (payload.save?.name) {
@@ -6752,6 +6833,34 @@ export default function FoundationPageClient({
     if (payload.saves) {
       setSaveSummaries(payload.saves);
     }
+    if (payload.save?.saveVersion != null) {
+      const newSaveVersion = payload.save.saveVersion;
+      setGameState((current) => {
+        if (requestVersion !== persistRequestVersionRef.current) {
+          return current;
+        }
+        const pendingPersist = persistSnapshotRef.current;
+        if (!pendingPersist || pendingPersist.requestVersion !== requestVersion) {
+          return current;
+        }
+        if (current !== pendingPersist.snapshot) {
+          return current;
+        }
+        if (current.saveVersion === newSaveVersion) {
+          return current;
+        }
+        return {
+          ...current,
+          saveVersion: newSaveVersion,
+        };
+      });
+    }
+    return payload.save?.saveVersion != null
+      ? {
+          ...nextGameState,
+          saveVersion: payload.save.saveVersion,
+        }
+      : nextGameState;
   }
 
   async function persistNewGameFlowStepStatus(stepId: NewGameFlowStepId, status: NewGameFlowStepStatus) {
@@ -6784,7 +6893,7 @@ export default function FoundationPageClient({
     }
 
     const payload = (await response.json()) as {
-      save?: { saveId: string; name?: string };
+      save?: { saveId: string; name?: string; saveVersion?: number };
       saves?: SaveSummary[];
     };
     if (payload.save?.name) {
@@ -6792,6 +6901,16 @@ export default function FoundationPageClient({
     }
     if (payload.saves) {
       setSaveSummaries(payload.saves);
+    }
+    if (payload.save?.saveVersion != null) {
+      setGameState((current) =>
+        current.saveVersion === payload.save?.saveVersion
+          ? current
+          : {
+              ...current,
+              saveVersion: payload.save?.saveVersion,
+            },
+      );
     }
   }
 
@@ -6984,12 +7103,12 @@ export default function FoundationPageClient({
       },
     });
 
+    setGameState(nextGameState);
     setIsSaveBusy(true);
     try {
       await persistLocalGameStateImmediately(nextGameState);
       hasPersistedInitialState.current = false;
       hasLoadedPersistentState.current = true;
-      setGameState(nextGameState);
       setTeamControlDraft(nextTeamControlSettings);
       const savedOwnership = deriveChrisFrankyTeamIdsFromSettings(nextGameState.teams, nextTeamControlSettings);
       setGameModeOwnershipChrisIds(savedOwnership.chrisTeamIds);
@@ -7281,26 +7400,66 @@ export default function FoundationPageClient({
     activePlayerId?: string | null,
     options?: { quickPeek?: boolean; tab?: PlayerProfileTabId; push?: boolean },
   ) {
-    const { buildPlayerDrawerDataFromGameState } = await import("@/lib/foundation/player-detail-drawer");
-    const nextData = buildPlayerDrawerDataFromGameState({
-      gameState,
-      playerId,
-      activePlayerId,
-      source: readMeta.source,
-      manageableTeamIds: ownerQuickSwitchTeams.map((team) => team.teamId),
-    });
-
-    if (!nextData) {
-      return;
+    setSeasonBriefingOpen(false);
+    setFoundationPanel((current) => (current === "briefing" ? null : current));
+    const hydrationSuccessKey = buildPlayerProfileHydrationSuccessKey(gameState.season.id, playerId);
+    const hydrationRequestId = ++playerProfileHydrationSequenceRef.current;
+    playerProfileHydrationAttemptRef.current = buildPlayerProfileHydrationLoadingKey(gameState.season.id, playerId);
+    if (playerProfileData?.playerId !== playerId) {
+      setPlayerProfileData(null);
     }
-
-    setPlayerProfileData(nextData);
+    setPlayerProfileLoading(true);
     setPlayerProfileTab(options?.tab ?? "overview");
     setActiveView("playerProfile");
     syncFoundationViewInUrl("playerProfile", options?.tab ?? "overview", playerId, {
       push: options?.push ?? false,
       team: selectedTeamId,
     });
+    try {
+      const { buildPlayerDrawerDataFromGameState } = await import("@/lib/foundation/player-detail-drawer");
+      const nextData = buildPlayerDrawerDataFromGameState({
+        gameState: gameStateRef.current,
+        playerId,
+        activePlayerId,
+        source: readMeta.source,
+        manageableTeamIds: ownerQuickSwitchTeams.map((team) => team.teamId),
+      });
+
+      if (!nextData) {
+        if (hydrationRequestId !== playerProfileHydrationSequenceRef.current) {
+          return;
+        }
+        setPlayerProfileData(null);
+        playerProfileHydrationAttemptRef.current = buildPlayerProfileHydrationFailureKey(
+          gameState.season.id,
+          playerId,
+          gameState.players.length,
+        );
+        return;
+      }
+
+      if (hydrationRequestId !== playerProfileHydrationSequenceRef.current) {
+        return;
+      }
+
+      playerProfileHydrationAttemptRef.current = hydrationSuccessKey;
+      setPlayerProfileData(nextData);
+    } catch (error) {
+      if (hydrationRequestId !== playerProfileHydrationSequenceRef.current) {
+        return;
+      }
+      console.warn("Player profile hydration failed.", error);
+      setPlayerProfileData(null);
+      playerProfileHydrationAttemptRef.current = buildPlayerProfileHydrationFailureKey(
+        gameState.season.id,
+        playerId,
+        gameState.players.length,
+      );
+    } finally {
+      if (hydrationRequestId === playerProfileHydrationSequenceRef.current) {
+        setPlayerProfileLoading(false);
+      }
+    }
   }
 
   async function openPlayerDrawerById(playerId: string, activePlayerId?: string | null) {
@@ -7373,8 +7532,9 @@ export default function FoundationPageClient({
   }
 
   function applyFoundationNavigationState(state: FoundationUrlState) {
-    setActiveView(state.view as FoundationView);
-    setFoundationPanel(state.panel ?? null);
+    const resolvedPanel =
+      state.view === "playerProfile" && state.panel === "briefing" ? null : (state.panel ?? null);
+    setFoundationPanel(resolvedPanel);
     if (state.playerId) {
       setMarketFocusPlayerId(state.playerId);
     }
@@ -7389,10 +7549,13 @@ export default function FoundationPageClient({
     if (state.view === "teamProfile" && state.team) {
       setTeamProfileTeamId(state.team);
     }
-    if (state.panel === "briefing") {
+    if (state.panel === "briefing" && state.view !== "playerProfile" && !shouldSuppressSeasonBriefingReopen()) {
       openSeasonBriefingPanel({ push: false });
     } else {
       setSeasonBriefingOpen(false);
+      if (state.panel === "briefing") {
+        setFoundationPanel(null);
+      }
     }
     if (state.panel === "sell" && state.playerId && state.team) {
       const sellSubject = resolveSellSubjectFromPlayerId(state.playerId, state.team);
@@ -7404,13 +7567,21 @@ export default function FoundationPageClient({
       setMarketSellSubject(null);
     }
     if (state.view === "playerProfile" && state.playerId) {
+      setActiveView("playerProfile");
+      if (playerProfileData?.playerId !== state.playerId) {
+        setPlayerProfileData(null);
+      }
+      setPlayerProfileLoading(true);
       void openPlayerProfileById(state.playerId, null, {
         tab: (state.tab as PlayerProfileTabId | null) ?? "overview",
       });
     } else if (state.view === "playerProfile") {
+      playerProfileHydrationSequenceRef.current += 1;
       setPlayerProfileData(null);
       setActiveView(state.team ? "teams" : "homeV2");
     } else {
+      playerProfileHydrationSequenceRef.current += 1;
+      setActiveView(state.view as FoundationView);
       setPlayerProfileData(null);
     }
     if (state.view !== "teamProfile") {
@@ -7436,6 +7607,11 @@ export default function FoundationPageClient({
   }
 
   function closeFoundationDrilldownPanel() {
+    if (seasonBriefingOpen || foundationPanel === "briefing") {
+      closeSeasonBriefing(false);
+      return;
+    }
+
     if (canFoundationNavigateBack()) {
       foundationNavigateBack();
       return;
@@ -7447,6 +7623,7 @@ export default function FoundationPageClient({
     setFoundationFacilityTarget(null);
 
     if (activeView === "playerProfile") {
+      playerProfileHydrationSequenceRef.current += 1;
       setPlayerProfileData(null);
       setFoundationView("homeV2", setActiveView);
       syncFoundationViewInUrl("homeV2", null, null, { team: selectedTeamId });
@@ -7464,6 +7641,30 @@ export default function FoundationPageClient({
     syncFoundationViewInUrl(activeView, null, null, {
       panel: "briefing",
       push: options?.push ?? true,
+      team: selectedTeamId,
+    });
+  }
+
+  function shouldSuppressSeasonBriefingReopen() {
+    const briefingKey = `${activeSaveId}:${gameState.season.id}`;
+    const seasonIntroStep = gameState.seasonState.newGameFlow?.steps?.find((step) => step.stepId === "season_intro");
+    return (
+      seasonBriefingDismissedRef.current.has(briefingKey) ||
+      seasonIntroStep?.status === "completed" ||
+      seasonIntroStep?.status === "skipped"
+    );
+  }
+
+  function clearSeasonBriefingFromUrl() {
+    const tab =
+      activeView === "homeV2" && homeV2Tab === "office"
+        ? "office"
+        : activeView === "playerProfile"
+          ? playerProfileTab
+          : null;
+    syncFoundationViewInUrl(activeView, tab, playerProfileData?.playerId ?? null, {
+      panel: null,
+      push: false,
       team: selectedTeamId,
     });
   }
@@ -7626,7 +7827,9 @@ export default function FoundationPageClient({
       },
     };
     setGameState(nextGameState);
-    void persistLocalGameStateImmediately(nextGameState);
+    void persistLocalGameStateImmediately(nextGameState).catch((error) => {
+      console.warn("Contract negotiation draft persist failed.", error);
+    });
   }
 
   async function negotiateTransfermarktBuy() {
@@ -9239,6 +9442,10 @@ export default function FoundationPageClient({
   }
 
   useEffect(() => {
+    gameStateRef.current = gameState;
+  }, [gameState]);
+
+  useEffect(() => {
     if (adminSimulationRun?.status !== "running" || adminSimulationBusy) {
       return;
     }
@@ -9272,16 +9479,18 @@ export default function FoundationPageClient({
 
   useEffect(() => {
     const requestedView = parseFoundationViewFromUrl();
-    if (requestedView) {
-      setActiveView(requestedView);
-    }
-
     const requestedPlayerId = parseFoundationPlayerIdFromUrl();
     const requestedTab = parseFoundationTabFromUrl();
     if (requestedView === "playerProfile" && requestedPlayerId) {
-      void openPlayerProfileById(requestedPlayerId, null, {
+      pendingPlayerProfileHydrationRef.current = {
+        playerId: requestedPlayerId,
         tab: (requestedTab as PlayerProfileTabId | null) ?? "overview",
-      });
+      };
+      setPlayerProfileTab((requestedTab as PlayerProfileTabId | null) ?? "overview");
+      setPlayerProfileLoading(true);
+      setActiveView("playerProfile");
+    } else if (requestedView) {
+      setActiveView(requestedView);
     }
 
     if (requestedView === "teamProfile") {
@@ -9293,15 +9502,14 @@ export default function FoundationPageClient({
 
     const requestedPanel = parseFoundationPanelFromUrl();
     if (requestedPanel) {
-      setFoundationPanel(requestedPanel);
+      if (requestedPanel !== "briefing") {
+        setFoundationPanel(requestedPanel);
+      }
       if (requestedPanel === "offer") {
         const offerPlayerId = parseFoundationPlayerIdFromUrl();
         if (offerPlayerId) {
           setMarketFocusPlayerId(offerPlayerId);
         }
-      }
-      if (requestedPanel === "briefing") {
-        openSeasonBriefingPanel({ push: false });
       }
       if (requestedPanel === "sell") {
         const sellPlayerId = parseFoundationPlayerIdFromUrl();
@@ -9334,7 +9542,7 @@ export default function FoundationPageClient({
       initialTeamId: initialSelectedTeamId,
       settingsMap: buildTeamControlSettingsMap(initialClientGameState.teams, initialClientGameState.seasonState.teamControlSettings),
     });
-    if (requestedTeamContext.teamId) {
+    if (requestedTeamContext.teamId && requestedTeamContext.teamId !== "loading-team") {
       setSelectedTeamId(requestedTeamContext.teamId);
       setActiveManagerTeamSource(requestedTeamContext.source);
       setActiveManagerTeamWarning(requestedTeamContext.warning ?? null);
@@ -9345,7 +9553,10 @@ export default function FoundationPageClient({
         view: (requestedView ?? "homeV2") as FoundationViewId,
         tab: requestedTab,
         playerId: requestedPlayerId,
-        team: parseFoundationTeamIdFromUrl(initialClientGameState.teams) ?? requestedTeamContext.teamId,
+        team:
+          requestedTeamContext.teamId && requestedTeamContext.teamId !== "loading-team"
+            ? requestedTeamContext.teamId
+            : parseFoundationTeamIdFromUrl(initialClientGameState.teams),
         panel: requestedPanel,
         facilityId: facilityTarget.facilityId,
         facilityAction: facilityTarget.facilityAction,
@@ -9353,6 +9564,38 @@ export default function FoundationPageClient({
       "replace",
     );
   }, [initialSelectedTeamId]);
+
+  useEffect(() => {
+    if (gameState.season.id === "loading" || playerProfileData) {
+      return;
+    }
+    if (activeView !== "playerProfile") {
+      return;
+    }
+
+    const pending = pendingPlayerProfileHydrationRef.current;
+    const urlState = parseFoundationUrlStateFromLocation();
+    const playerId = pending?.playerId ?? urlState.playerId;
+    const tab = pending?.tab ?? (urlState.tab as PlayerProfileTabId | null) ?? playerProfileTab;
+
+    if (!playerId) {
+      return;
+    }
+
+    const attemptKey = buildPlayerProfileHydrationSuccessKey(gameState.season.id, playerId);
+    const failureKey = buildPlayerProfileHydrationFailureKey(gameState.season.id, playerId, gameState.players.length);
+    const loadingKey = buildPlayerProfileHydrationLoadingKey(gameState.season.id, playerId);
+    if (
+      playerProfileHydrationAttemptRef.current === attemptKey ||
+      playerProfileHydrationAttemptRef.current === failureKey ||
+      playerProfileHydrationAttemptRef.current === loadingKey
+    ) {
+      return;
+    }
+
+    pendingPlayerProfileHydrationRef.current = null;
+    void openPlayerProfileById(playerId, null, { tab });
+  }, [activeView, gameState.players.length, gameState.season.id, playerProfileData, playerProfileTab]);
 
   useEffect(() => {
     function handlePopState() {
@@ -9564,7 +9807,12 @@ export default function FoundationPageClient({
   }
 
   useEffect(() => {
-    if (activeView !== "season" || isFoundationBootstrapState || !activeSaveId || activeSaveId === "loading-save") {
+    const shouldLoadSeasonArchive =
+      activeView === "season" ||
+      activeView === "seasonV2" ||
+      activeView === "prize" ||
+      activeView === "ranks";
+    if (!shouldLoadSeasonArchive || isFoundationBootstrapState || !activeSaveId || activeSaveId === "loading-save") {
       return;
     }
 
@@ -9580,9 +9828,17 @@ export default function FoundationPageClient({
 
     fullSeasonArchiveLoadKeyRef.current = archiveLoadKey;
     void loadSave(activeSaveId, foundationSaveMode, { compactInitial: false }).then((nextGameState) => {
-      if (nextGameState?.seasonState.seasonSnapshots !== undefined) {
-        void reloadSeasonStandingsOverview(seasonOverviewSeasonId || nextGameState.season.id);
+      if (nextGameState?.seasonState.seasonSnapshots === undefined) {
+        return;
       }
+      setGameState((previous) => ({
+        ...previous,
+        seasonState: {
+          ...previous.seasonState,
+          seasonSnapshots: nextGameState.seasonState.seasonSnapshots,
+        },
+      }));
+      void reloadSeasonStandingsOverview(seasonOverviewSeasonId || nextGameState.season.id);
     });
   }, [
     activeSaveId,
@@ -9657,9 +9913,10 @@ export default function FoundationPageClient({
       setSelectedTeamId(nextTeamContext.teamId);
       setActiveManagerTeamSource(nextTeamContext.source);
       setActiveManagerTeamWarning(nextTeamContext.warning ?? null);
-      if (nextTeamContext.teamId) {
+      if (nextTeamContext.teamId && nextTeamContext.teamId !== "loading-team") {
         setMarketTeamId(nextTeamContext.teamId);
         persistFoundationManagerTeamId(nextTeamContext.teamId, payload.save.saveId, nextTeamContext.source);
+        syncFoundationTeamIdInUrl(nextTeamContext.teamId);
       }
     }
 
@@ -9717,10 +9974,33 @@ export default function FoundationPageClient({
         .then(async (response) => {
           if (response.status === 409) {
             setPersistenceError("Save-Konflikt erkannt. Stand wird neu geladen.");
-            const reloaded = await loadSave(activeSaveId, foundationSaveMode, { compactInitial: true });
+            const reloaded = await loadSave(activeSaveId, foundationSaveMode, { compactInitial: false });
             if (reloaded) {
               autoPersistPausedRef.current = true;
               setGameState(reloaded);
+              resetOptimisticDraftsAfterSaveConflictReload();
+              const profilePlayerId = playerProfileDataRef.current?.playerId ?? null;
+              if (profilePlayerId) {
+                playerProfileHydrationAttemptRef.current = null;
+                try {
+                  const { buildPlayerDrawerDataFromGameState } = await import("@/lib/foundation/player-detail-drawer");
+                  const refreshedProfile = buildPlayerDrawerDataFromGameState({
+                    gameState: reloaded,
+                    playerId: profilePlayerId,
+                    source: readMeta.source,
+                    manageableTeamIds: ownerQuickSwitchTeams.map((team) => team.teamId),
+                  });
+                  setPlayerProfileData(refreshedProfile);
+                  if (refreshedProfile) {
+                    playerProfileHydrationAttemptRef.current = buildPlayerProfileHydrationSuccessKey(
+                      reloaded.season.id,
+                      profilePlayerId,
+                    );
+                  }
+                } catch {
+                  setPlayerProfileData(null);
+                }
+              }
               window.setTimeout(() => {
                 autoPersistPausedRef.current = false;
               }, 0);
@@ -11884,6 +12164,7 @@ export default function FoundationPageClient({
     }
 
     if (stepId === "season_intro") {
+      seasonBriefingDismissedRef.current.delete(`${activeSaveId}:${gameState.season.id}`);
       setFoundationView("homeV2", setActiveView);
       openSeasonBriefingPanel();
       scrollToFoundationTarget("foundation-home");
@@ -14858,7 +15139,7 @@ export default function FoundationPageClient({
   const selectedRosterDecisionCards = useMemo(() => {
     const rows = selectedRosterTableRows.map((row) => {
       const salary = getRosterEntryDisplaySalary(row.entry, row.player);
-      const salaryDelta = getRosterEntrySalaryDelta(row.entry, row.player);
+      const salaryDelta = getRosterEntrySalaryDelta(row.entry, row.player, gameState);
       const marketValue = getRosterEntryDisplayMarketValue(row.entry, row.player);
       const valueScore =
         row.playerPps != null && row.playerPps > 0 && salary != null && salary > 0
@@ -14897,8 +15178,17 @@ export default function FoundationPageClient({
     };
   }, [selectedRosterTableRows]);
   const seasonDisciplineScheduleRows = useMemo(
-    () => getSeasonDisciplineSchedule(gameState),
-    [gameState],
+    () => getSeasonDisciplineSchedule(gameState, { saveId: activeSaveId || "normalized-local-save" }),
+    [activeSaveId, gameState],
+  );
+  const seasonBriefingScheduleReady = useMemo(
+    () =>
+      !isFoundationBootstrapState &&
+      gameState.disciplines.length > 0 &&
+      seasonDisciplineScheduleRows.some(
+        (entry) => Boolean(entry.discipline1?.disciplineId || entry.discipline2?.disciplineId),
+      ),
+    [gameState.disciplines.length, isFoundationBootstrapState, seasonDisciplineScheduleRows],
   );
   const seasonDisciplineConfigMap = useMemo(() => {
     const slotMeta = new Map<string, { displayOrder: number; playerCount: number | null }>();
@@ -15078,12 +15368,7 @@ export default function FoundationPageClient({
         }
         const economy = resolvePlayerEconomyContract({ playerId: player.id, player, rosterEntry: entry });
         const marketValue = economy.marketValue;
-        const baselineEconomy = getPlayerBaselineEconomy(gameState, player.id);
-        const marketValueBenchmark = baselineEconomy?.marketValue ?? entry.currentValue ?? entry.purchasePrice ?? null;
-        const marketValueDelta =
-          marketValueBenchmark != null && marketValue != null && Math.abs(marketValue - marketValueBenchmark) >= 0.01
-            ? roundViewNumber(marketValue - marketValueBenchmark, 2)
-            : null;
+        const marketValueDelta = getPlayerDisplayMarketValueDelta(player, entry, gameState);
         const salary = getRosterEntryDisplaySalary(entry, player);
         const salaryDelta = getRosterEntrySalaryDelta(entry, player, gameState);
         if (liveAverageSalary != null && salary > liveAverageSalary * 1.35) {
@@ -15364,9 +15649,9 @@ export default function FoundationPageClient({
       ? getPlayerDisplayMarketValue(player)
       : marketSellPreview?.marketValueReference ?? null;
     const rosterMarketValue = player && rosterEntry ? getRosterEntryDisplayMarketValue(rosterEntry, player) : marketSellPreview?.activePlayer?.currentValue ?? null;
-    const marketValueDelta = player && rosterEntry ? getPlayerDisplayMarketValueDelta(player, rosterEntry) : null;
+    const marketValueDelta = player && rosterEntry ? getPlayerDisplayMarketValueDelta(player, rosterEntry, gameState) : null;
     const salary = player && rosterEntry ? getRosterEntryDisplaySalary(rosterEntry, player) : marketSellPreview?.activePlayer?.salary ?? null;
-    const salaryDelta = player && rosterEntry ? getRosterEntrySalaryDelta(rosterEntry, player) : null;
+    const salaryDelta = player && rosterEntry ? getRosterEntrySalaryDelta(rosterEntry, player, gameState) : null;
     const saleProfit =
       marketSellPreview?.salePrice != null && purchasePrice != null
         ? roundViewNumber(marketSellPreview.salePrice - purchasePrice, 2)
@@ -15416,11 +15701,20 @@ export default function FoundationPageClient({
   );
   const trainingPlayerForecastRows = useMemo(
     () => {
-      if (!shouldBuildTrainingView) {
+      if (!shouldBuildTrainingView && !shouldBuildPlayerProfileTrainingRow) {
         return [];
       }
 
-      return rosterPlayers.map(({ entry, player }) => {
+      const profilePlayerId = shouldBuildPlayerProfileTrainingRow ? playerProfileData?.playerId ?? null : null;
+      const forecastRosterPlayers = profilePlayerId
+        ? rosterPlayers.filter(({ player }) => player.id === profilePlayerId)
+        : rosterPlayers;
+
+      if (forecastRosterPlayers.length === 0) {
+        return [];
+      }
+
+      return forecastRosterPlayers.map(({ entry, player }) => {
         const mode = trainingModeDraft[player.id] ?? player.trainingMode ?? "mittel";
         const trainingClass = trainingClassDraft[player.id] ?? player.trainingClass ?? player.className;
         const trainingPlayer = {
@@ -15497,7 +15791,9 @@ export default function FoundationPageClient({
       playerSeasonPerformanceMap,
       rosterPlayers,
       selectedTeamFacilityState,
+      shouldBuildPlayerProfileTrainingRow,
       shouldBuildTrainingView,
+      playerProfileData,
       teamBaseRecoveryForecast.after,
       trainingClassDraft,
       trainingModeDraft,
@@ -15549,9 +15845,9 @@ export default function FoundationPageClient({
 
     return trainingPlayerForecastRows.filter((row) => {
       const tone =
-        row.forecast.netDevelopmentXP < 0 || row.forecast.regressionRisk === "high"
+        row.organicProgression.netSetpoints < 0 || row.forecast.regressionRisk === "high"
           ? "regression"
-          : row.forecast.netDevelopmentXP >= 45
+          : row.organicProgression.netSetpoints >= 2
             ? "growth"
             : "stable";
       return tone === trainingDevelopmentFilter;
@@ -15561,6 +15857,13 @@ export default function FoundationPageClient({
     () => filteredTrainingPlayerForecastRows.map((row) => buildTrainingPlayerRowView(row, TRAINING_ATTRIBUTE_LABELS)),
     [filteredTrainingPlayerForecastRows],
   );
+  const playerProfileTrainingRow = useMemo(() => {
+    if (!playerProfileData) {
+      return null;
+    }
+    const row = trainingPlayerForecastRows.find((entry) => entry.player.id === playerProfileData.playerId);
+    return row ? buildTrainingPlayerRowView(row, TRAINING_ATTRIBUTE_LABELS) : null;
+  }, [playerProfileData, trainingPlayerForecastRows]);
   const trainingFacilityRows = useMemo(
     () => {
       if (!shouldBuildTrainingView) {
@@ -15734,10 +16037,12 @@ export default function FoundationPageClient({
     }
 
     const forecastsByPlayerId = new Map(trainingPlayerForecastRows.map((row) => [row.player.id, row.forecast] as const));
+    const organicByPlayerId = new Map(trainingPlayerForecastRows.map((row) => [row.player.id, row.organicProgression] as const));
     return buildSeasonEndProgressionPreview({
       gameState,
       teamId: selectedTeam.teamId,
       forecastsByPlayerId,
+      organicByPlayerId,
       upgradeRequests: rosterPlayers.map(({ player }) => ({
         playerId: player.id,
         attribute: seasonEndAttributeDraft[player.id] ?? "power",
@@ -17568,7 +17873,7 @@ export default function FoundationPageClient({
           color: getDisciplineColor(slot.category) ?? "neutral",
         })),
     );
-    const firstMatchdays = seasonDisciplineScheduleRows.slice(0, 5).map((entry, index) => ({
+    const firstMatchdays = seasonDisciplineScheduleRows.map((entry, index) => ({
       matchdayId: entry.matchdayId,
       label: entry.matchdayLabel || `Spieltag ${index + 1}`,
       disciplines: [entry.discipline1, entry.discipline2].filter((slot): slot is NonNullable<typeof slot> => Boolean(slot)).map((slot) => ({
@@ -17625,14 +17930,61 @@ export default function FoundationPageClient({
         : aiPreseasonStoredRun;
   const showAiPreseasonBanner = aiPreseasonBusy || aiPreseasonDisplayRun?.status === "running";
   useEffect(() => {
-    if (seasonBriefingStepStatus === "open") {
-      if (activeView !== "home") {
-        setFoundationView("homeV2", setActiveView);
-        syncFoundationViewInUrl("home");
-      }
-      openSeasonBriefingPanel();
+    seasonBriefingAutoOpenedRef.current = null;
+    briefingUrlHydratedRef.current = false;
+  }, [activeSaveId, gameState.season.id]);
+  useEffect(() => {
+    if (isFoundationBootstrapState || briefingUrlHydratedRef.current) {
+      return;
     }
-  }, [activeSaveId, activeView, gameState.season.id, seasonBriefingStepStatus]);
+
+    const requestedPanel = parseFoundationPanelFromUrl();
+    if (requestedPanel !== "briefing") {
+      briefingUrlHydratedRef.current = true;
+      return;
+    }
+
+    briefingUrlHydratedRef.current = true;
+    if (shouldSuppressSeasonBriefingReopen()) {
+      setSeasonBriefingOpen(false);
+      setFoundationPanel(null);
+      clearSeasonBriefingFromUrl();
+      return;
+    }
+
+    openSeasonBriefingPanel({ push: false });
+  }, [activeSaveId, gameState.season.id, isFoundationBootstrapState, seasonBriefingStepStatus]);
+  useEffect(() => {
+    if (!seasonBriefingOpen) {
+      return undefined;
+    }
+
+    function handleEscape(event: KeyboardEvent) {
+      if (event.key === "Escape") {
+        closeSeasonBriefing(false);
+      }
+    }
+
+    window.addEventListener("keydown", handleEscape);
+    return () => window.removeEventListener("keydown", handleEscape);
+  }, [seasonBriefingOpen]);
+
+  useEffect(() => {
+    if (seasonBriefingStepStatus !== "open" || !seasonBriefingScheduleReady) {
+      return;
+    }
+
+    const autoOpenKey = `${activeSaveId}:${gameState.season.id}`;
+    if (
+      seasonBriefingAutoOpenedRef.current === autoOpenKey ||
+      seasonBriefingDismissedRef.current.has(autoOpenKey)
+    ) {
+      return;
+    }
+
+    seasonBriefingAutoOpenedRef.current = autoOpenKey;
+    openSeasonBriefingPanel({ push: false });
+  }, [activeSaveId, gameState.season.id, seasonBriefingScheduleReady, seasonBriefingStepStatus]);
   useEffect(() => {
     const isFirstSeason = /season[-_\s]*1\b/i.test(`${gameState.season.id} ${gameState.season.name}`);
     const storedStatus = aiPreseasonStoredRun?.status ?? null;
@@ -17641,9 +17993,11 @@ export default function FoundationPageClient({
       storedStatus === "completed" ||
       storedStatus === "skipped" ||
       storedStatus === "failed";
+    const seasonIntroHandled =
+      seasonBriefingStepStatus === "completed" || seasonBriefingStepStatus === "skipped";
     const firstSeasonTrigger =
       isFirstSeason &&
-      seasonBriefingStepStatus === "completed" &&
+      seasonIntroHandled &&
       (gameFlowState.currentStepId === "scouting_facilities" || gameFlowState.currentStepId === "buy_players");
     const followingSeasonTrigger =
       !isFirstSeason &&
@@ -17738,15 +18092,13 @@ export default function FoundationPageClient({
     readMeta.source,
   ]);
   const closeSeasonBriefing = (markCompleted = true) => {
-    const wasBriefingPanel = foundationPanel === "briefing";
     setSeasonBriefingOpen(false);
-    setFoundationPanel(null);
+    setFoundationPanel((current) => (current === "briefing" ? null : current));
+    seasonBriefingDismissedRef.current.add(`${activeSaveId}:${gameState.season.id}`);
     if (markCompleted && seasonBriefingStepStatus === "open") {
       updateNewGameFlowStepStatus("season_intro", "completed");
     }
-    if (wasBriefingPanel) {
-      closeFoundationDrilldownPanel();
-    }
+    clearSeasonBriefingFromUrl();
   };
   const completeSeasonBriefingAndContinue = () => {
     closeSeasonBriefing(true);
@@ -17755,7 +18107,11 @@ export default function FoundationPageClient({
     );
     const nextFlowStep = nextRequiredFlowStep ?? gameFlowState.nextStep;
 
-    if (nextFlowStep && nextFlowStep.stepId !== "season_intro") {
+    if (
+      nextFlowStep &&
+      nextFlowStep.stepId !== "season_intro" &&
+      nextFlowStep.targetPanel !== "season-briefing"
+    ) {
       navigateToGameFlowStep(nextFlowStep.targetView, nextFlowStep.teamId ?? activeManagerTeamId, nextFlowStep.targetPanel);
       return;
     }
@@ -17811,8 +18167,8 @@ export default function FoundationPageClient({
             portrait,
             salary,
             marketValue,
-            marketValueDelta: getPlayerDisplayMarketValueDelta(row.player, row.entry),
-            salaryDelta: getRosterEntrySalaryDelta(row.entry, row.player),
+            marketValueDelta: getPlayerDisplayMarketValueDelta(row.player, row.entry, gameState),
+            salaryDelta: getRosterEntrySalaryDelta(row.entry, row.player, gameState),
             xp: row.player.currentXP ?? 0,
             fatigue: row.player.fatigue ?? 0,
             ppPow: rating?.ppPow ?? seasonPerformance?.pointsByArea.pow ?? null,
@@ -17841,7 +18197,7 @@ export default function FoundationPageClient({
           return (right.playerOvr ?? Number.NEGATIVE_INFINITY) - (left.playerOvr ?? Number.NEGATIVE_INFINITY);
         })
         .slice(0, 6),
-    [playerRatingsById, playerSeasonPerformanceMap, selectedRosterTableRows],
+    [gameState, playerRatingsById, playerSeasonPerformanceMap, selectedRosterTableRows],
   );
 	  const homeTasks = useMemo(
 	    () =>
@@ -17959,6 +18315,7 @@ export default function FoundationPageClient({
           name: row.player.name,
           portraitUrl: row.portrait.src,
           portraitInitials: row.portrait.initials,
+          rosterRank: index + 1,
           playerOvr: row.playerOvr,
           playerPps: row.playerPps,
           playerMvs: row.playerMvs,
@@ -18770,7 +19127,7 @@ export default function FoundationPageClient({
           : "Verkaufen und Verlängern öffnen erst am Season-End. Während der laufenden Season bleibt der Kader gesperrt.";
   const teamRosterFocusOptions = useMemo(() => {
     const salaryCount = selectedRosterTableRows.filter((row) => {
-      const delta = getRosterEntrySalaryDelta(row.entry, row.player);
+      const delta = getRosterEntrySalaryDelta(row.entry, row.player, gameState);
       return delta != null && delta > 0;
     }).length;
     const valueCount = selectedRosterTableRows.filter((row) => {
@@ -18786,7 +19143,7 @@ export default function FoundationPageClient({
       { id: "contracts" as const, label: "Vertraege", count: expiringCount },
       { id: "training" as const, label: "Training", count: trainingCount },
     ].filter((entry) => entry.id === "default" || entry.count > 0);
-  }, [selectedRosterTableRows]);
+  }, [gameState, selectedRosterTableRows]);
   const focusedSelectedRosterTableRows = useMemo(() => {
     if (teamRosterFocusMode === "default") {
       return sortedSelectedRosterTableRows;
@@ -18795,8 +19152,8 @@ export default function FoundationPageClient({
     const rows = [...sortedSelectedRosterTableRows];
     if (teamRosterFocusMode === "salary") {
       return rows.sort((left, right) => {
-        const rightDelta = getRosterEntrySalaryDelta(right.entry, right.player) ?? Number.NEGATIVE_INFINITY;
-        const leftDelta = getRosterEntrySalaryDelta(left.entry, left.player) ?? Number.NEGATIVE_INFINITY;
+        const rightDelta = getRosterEntrySalaryDelta(right.entry, right.player, gameState) ?? Number.NEGATIVE_INFINITY;
+        const leftDelta = getRosterEntrySalaryDelta(left.entry, left.player, gameState) ?? Number.NEGATIVE_INFINITY;
         return rightDelta - leftDelta;
       });
     }
@@ -18817,7 +19174,7 @@ export default function FoundationPageClient({
       const leftScore = (left.player.currentXP ?? 0) * 100 + (left.player.fatigue ?? 0);
       return rightScore - leftScore;
     });
-  }, [sortedSelectedRosterTableRows, teamRosterFocusMode]);
+  }, [gameState, sortedSelectedRosterTableRows, teamRosterFocusMode]);
   const hqContractExpiringCount = useMemo(
     () => selectedRosterTableRows.filter((row) => row.entry.contractLength <= 1).length,
     [selectedRosterTableRows],
@@ -20565,17 +20922,35 @@ export default function FoundationPageClient({
       ) : null}
 
       {seasonBriefingOpen ? (
-        <section className="foundation-drilldown-page season-briefing-page" data-testid="season-briefing-page">
+        <div
+          className="foundation-modal-backdrop"
+          role="dialog"
+          aria-modal="true"
+          aria-labelledby="season-briefing-title"
+          data-testid="season-briefing-backdrop"
+          onClick={(event) => {
+            if (event.target === event.currentTarget) {
+              closeSeasonBriefing(false);
+            }
+          }}
+        >
+          <section className="foundation-modal season-briefing-modal season-briefing-page" data-testid="season-briefing-page">
             <header className="foundation-drilldown-header season-briefing-header">
               <div className="stack">
-                <span className="eyebrow">Season-Briefing</span>
-                <h1>{gameState.season.name}</h1>
+                <span className="eyebrow">Season-Einstieg</span>
+                <h1 id="season-briefing-title">{gameState.season.name}</h1>
+                <p className="muted">Lies die Saison-Vorschau durch und markiere sie danach als erledigt.</p>
               </div>
               <button className="secondary-button inline-button" type="button" onClick={() => closeSeasonBriefing(false)}>
-                Zurück
+                Später
               </button>
             </header>
             <div className="foundation-drilldown-body season-briefing-body">
+              {!seasonBriefingScheduleReady ? (
+                <p className="muted season-briefing-loading" data-testid="season-briefing-loading">
+                  Diszi-Plan und Saison-Faktoren werden geladen …
+                </p>
+              ) : null}
               <section className="season-briefing-kpis" aria-label="Season-Faktoren">
                 <article>
                   <span>Salary Factor</span>
@@ -20602,28 +20977,32 @@ export default function FoundationPageClient({
               <section className="season-briefing-section">
                 <div className="panel-header compact">
                   <div className="stack">
-                    <h3>Erste Spieltage</h3>
-                    <p className="muted">Die Reihenfolge entscheidet, ob du sofort Spezialisten brauchst oder breiter einkaufen kannst.</p>
+                    <h3>Spieltags-Reihenfolge</h3>
+                    <p className="muted">Alle Diszi-Paare der Season — Farb-Dopplungen sind markiert.</p>
                   </div>
                 </div>
                 <div className="season-briefing-matchday-grid">
-                  {seasonBriefingData.firstMatchdays.map((entry) => (
-                    <article key={`season-briefing-md-${entry.matchdayId}`} className={joinClassNames("season-briefing-matchday", entry.sameColor && "has-same-color")}>
-                      <span className="eyebrow">{entry.label}</span>
-                      <div className="season-briefing-discipline-row">
-                        {entry.disciplines.map((discipline) => (
-                          <span
-                            key={`season-briefing-md-${entry.matchdayId}-${discipline.name}`}
-                            className={`season-briefing-discipline-chip is-${discipline.color}`}
-                          >
-                            <b>{discipline.name}</b>
-                            <small>{discipline.playerCount ?? "—"} Slots · {formatDisciplineCategoryLabel(discipline.category)}</small>
-                          </span>
-                        ))}
-                      </div>
-                      {entry.sameColor ? <small className="text-warning">gleiche Farbe am selben Spieltag</small> : null}
-                    </article>
-                  ))}
+                  {seasonBriefingScheduleReady ? (
+                    seasonBriefingData.firstMatchdays.map((entry) => (
+                      <article key={`season-briefing-md-${entry.matchdayId}`} className={joinClassNames("season-briefing-matchday", entry.sameColor && "has-same-color")}>
+                        <span className="eyebrow">{entry.label}</span>
+                        <div className="season-briefing-discipline-row">
+                          {entry.disciplines.map((discipline) => (
+                            <span
+                              key={`season-briefing-md-${entry.matchdayId}-${discipline.name}`}
+                              className={`season-briefing-discipline-chip is-${discipline.color}`}
+                            >
+                              <b>{discipline.name}</b>
+                              <small>{discipline.playerCount ?? "—"} Slots · {formatDisciplineCategoryLabel(discipline.category)}</small>
+                            </span>
+                          ))}
+                        </div>
+                        {entry.sameColor ? <small className="text-warning">Farb-Dopplung: gleiche Kategorie am selben Spieltag</small> : null}
+                      </article>
+                    ))
+                  ) : (
+                    <p className="muted">Spieltags-Paare erscheinen, sobald der Diszi-Plan geladen ist.</p>
+                  )}
                 </div>
               </section>
 
@@ -20632,17 +21011,23 @@ export default function FoundationPageClient({
                   <h3>Große Diszis</h3>
                   <p className="muted">Nach Slotgröße sortiert; die Spieltags-Reihenfolge steht oben.</p>
                   <div className="season-briefing-chip-list">
-                    {seasonBriefingData.bigDisciplines.map((slot) => (
-                      <span key={`season-briefing-big-${slot.matchdayId}-${slot.disciplineId}`} className={`season-briefing-discipline-chip is-${slot.color}`}>
-                        <b>{slot.displayName}</b>
-                        <small>{slot.matchdayLabel} · {slot.playerCount ?? "—"} Slots</small>
-                      </span>
-                    ))}
+                    {seasonBriefingScheduleReady ? (
+                      seasonBriefingData.bigDisciplines.map((slot) => (
+                        <span key={`season-briefing-big-${slot.matchdayId}-${slot.disciplineId}`} className={`season-briefing-discipline-chip is-${slot.color}`}>
+                          <b>{slot.displayName}</b>
+                          <small>{slot.matchdayLabel} · {slot.playerCount ?? "—"} Slots</small>
+                        </span>
+                      ))
+                    ) : (
+                      <p className="muted">Slot-Groessen folgen mit dem Diszi-Plan.</p>
+                    )}
                   </div>
                 </article>
                 <article className="season-briefing-section">
                   <h3>Farb-Dopplungen</h3>
-                  {seasonBriefingData.sameColorMatchdays.length > 0 ? (
+                  {!seasonBriefingScheduleReady ? (
+                    <p className="muted">Farb-Kollisionen werden nach dem Laden des Diszi-Plans angezeigt.</p>
+                  ) : seasonBriefingData.sameColorMatchdays.length > 0 ? (
                     <div className="season-briefing-chip-list">
                       {seasonBriefingData.sameColorMatchdays.map((entry) => (
                         <span key={`season-briefing-double-${entry.matchdayId}`} className="season-briefing-warning-chip">
@@ -20652,7 +21037,7 @@ export default function FoundationPageClient({
                       ))}
                     </div>
                   ) : (
-                    <p className="muted">In den ersten Spieltagen keine gleiche Farbe doppelt. Breiter Kader wird etwas entspannter.</p>
+                    <p className="muted">In dieser Season keine gleiche Farbe doppelt am selben Spieltag. Breiter Kader wird etwas entspannter.</p>
                   )}
                   <div className="season-briefing-factor-row">
                     {seasonBriefingData.futureFactors.map((entry) => (
@@ -20684,6 +21069,7 @@ export default function FoundationPageClient({
               </button>
             </div>
           </section>
+        </div>
       ) : null}
 
       <section className={`foundation-context-banner${isSaveBusy ? " is-loading" : ""}${showCompactHeader ? " is-compact" : ""}`} data-testid="foundation-context-banner">
@@ -21228,13 +21614,40 @@ export default function FoundationPageClient({
                   syncFoundationViewInUrl("playerProfile", tab, playerProfileData.playerId);
                 }}
                 onClose={() => {
+                  playerProfileHydrationSequenceRef.current += 1;
                   setPlayerProfileData(null);
                   setFoundationView("homeV2", setActiveView);
                   syncFoundationViewInUrl("homeV2");
                 }}
                 onOpenTraining={() => openTrainingPlayerTarget(playerProfileData.playerId)}
                 onOpenContractOffer={() => setFoundationView("marketV2", setActiveView)}
+                trainingRow={playerProfileTrainingRow}
+                trainingModeOptions={trainingV2ModeOptions}
+                trainingClassOptions={PROGRESSION_CLASS_ORDER.map((className) => ({ value: className, label: className }))}
+                onSetTrainingMode={(playerId, mode) => {
+                  void setPlayerTrainingMode(playerId, mode);
+                }}
+                onSetTrainingClass={(playerId, trainingClass) => {
+                  void setPlayerTrainingClass(playerId, trainingClass);
+                }}
+                trainingReadOnly={isSelectedTeamManagementLocked}
               />
+            ) : activeView === "playerProfile" ? (
+              <div className="foundation-view-loading-panel" data-testid="foundation-player-profile-loading">
+                {gameState.season.id === "loading" || playerProfileLoading ? (
+                  <p className="foundation-view-loading">Spielerprofil wird geladen …</p>
+                ) : (
+                  <div className="player-drawer-callout">
+                    <strong>Spielerprofil nicht verfügbar</strong>
+                    <p className="muted">
+                      Der Spieler konnte im aktuellen Save nicht geladen werden. Prüfe die URL oder wähle den Spieler erneut aus dem Kader.
+                    </p>
+                    <button className="secondary-button" type="button" onClick={() => closeFoundationDrilldownPanel()}>
+                      Zurück
+                    </button>
+                  </div>
+                )}
+              </div>
             ) : null}
           </section>
 
@@ -26998,11 +27411,7 @@ export default function FoundationPageClient({
                         if (column.id === "mvs") return <td key={column.id} className={row.playerMvs != null ? getPoolHeatClass(row.playerMvs, leaguePlayerHeatPools.mvs) : ""}>{row.playerMvs != null ? formatPpsValue(row.playerMvs) : "—"}</td>;
                         if (column.id === "mw") {
                           const marketValue = getPlayerDisplayMarketValue(row.player);
-                          const purchaseReference = normalizeVisibleRosterMoney(row.roster?.purchasePrice ?? null, marketValue);
-                          const marketValueDelta =
-                            marketValue != null && purchaseReference != null && Math.abs(marketValue - purchaseReference) >= 0.01
-                              ? roundViewNumber(marketValue - purchaseReference, 2)
-                              : null;
+                          const marketValueDelta = getPlayerDisplayMarketValueDelta(row.player, row.roster, gameState);
                           return (
                             <td key={column.id}>
                               <span className="players-table-money-cell">
@@ -27014,7 +27423,7 @@ export default function FoundationPageClient({
                         }
                         if (column.id === "salary") {
                           const salary = row.roster ? getRosterEntryDisplaySalary(row.roster, row.player) : getPlayerDisplaySalary(row.player);
-                          const salaryDelta = getRosterEntrySalaryDelta(row.roster, row.player);
+                          const salaryDelta = getRosterEntrySalaryDelta(row.roster, row.player, gameState);
                           return (
                             <td key={column.id}>
                               <span className="players-table-money-cell">
@@ -28207,51 +28616,25 @@ export default function FoundationPageClient({
                       });
                       const multiplier = getSponsorNegotiationMultiplier({ termSeasons: 1, negotiationProfile });
                       return (
-                      <article key={offer.offerId} className="metric-card teams-summary-card">
-                        <span>
-                          {offer.archetype.toUpperCase()}
-                          {offer.starTier ? ` · ★${offer.starTier}` : ""}
-                          {offer.demandProfile ? ` · ${offer.demandProfile}` : ""}
-                          {offer.variantKey ? ` · ${offer.variantKey.replace(/_/g, " ")}` : ""}
-                        </span>
-                        <strong>{offer.name}</strong>
-                        <small className="muted">{offer.flavor}</small>
-                        <div className="stack compact sponsor-choice-controls">
-                          <label className="muted">
-                            Profil
-                            <select
-                              value={negotiationProfile}
-                              onChange={(event) =>
-                                setSponsorChoiceProfiles((current) => ({
-                                  ...current,
-                                  [offer.offerId]: event.target.value as SponsorNegotiationProfile,
-                                }))
-                              }
-                            >
-                              <option value="safe">Sicher (−5 %)</option>
-                              <option value="balanced">Ausgewogen</option>
-                              <option value="ambitious">Ambitioniert (+8 %)</option>
-                            </select>
-                          </label>
-                          <small className="muted">Cash-Faktor ×{multiplier.toFixed(2)} · 1 Saison</small>
-                        </div>
-                        <ul className="muted">
-                          {adjustedComponents.map((component) => (
-                            <li key={component.componentId}>
-                              {component.label}: {typeof component.rewardCash === "number" ? formatMoney(component.rewardCash) : component.rewardCash}
-                            </li>
-                          ))}
-                        </ul>
-                        <button
-                          type="button"
-                          className="primary-button inline-button"
-                          disabled={sponsorChoiceBusy != null || !selectedTeamCanManage}
-                          onClick={() => void chooseTeamSponsor(offer.offerId)}
-                        >
-                          {sponsorChoiceBusy === offer.offerId ? "Speichert…" : "Wählen"}
-                        </button>
-                      </article>
-                    );
+                        <SponsorOfferCard
+                          key={offer.offerId}
+                          offer={offer}
+                          gameState={gameState}
+                          adjustedComponents={adjustedComponents}
+                          negotiationProfile={negotiationProfile}
+                          multiplier={multiplier}
+                          chooseBusy={sponsorChoiceBusy === offer.offerId}
+                          canManage={selectedTeamCanManage}
+                          onNegotiationProfileChange={(profile) =>
+                            setSponsorChoiceProfiles((current) => ({
+                              ...current,
+                              [offer.offerId]: profile,
+                            }))
+                          }
+                          onChoose={() => void chooseTeamSponsor(offer.offerId)}
+                          formatCash={formatMoney}
+                        />
+                      );
                     })}
                   </div>
                 )}
@@ -28378,6 +28761,7 @@ export default function FoundationPageClient({
                                           alt={player.name}
                                           className="transfermarkt-portrait"
                                           style={{ width: imageSize, height: imageSize }}
+                                          {...TEAM_ROSTER_PORTRAIT_LOADING}
                                         />
                                       </td>
                                     );
@@ -28457,7 +28841,7 @@ export default function FoundationPageClient({
                                   }
                                   if (column.id === "mw") {
                                     const marketValue = getRosterEntryDisplayMarketValue(entry, player);
-                                    const marketValueDelta = getPlayerDisplayMarketValueDelta(player, entry);
+                                    const marketValueDelta = getPlayerDisplayMarketValueDelta(player, entry, gameState);
                                     return (
                                       <td key={column.id}>
                                         <div className="economy-money-stack">
@@ -28472,19 +28856,10 @@ export default function FoundationPageClient({
                                     );
                                   }
                                   if (column.id === "salePrice") {
-                                    const saleMarketValueDelta =
-                                      saleBreakdown.salePrice != null && saleBreakdown.baseMarketValue != null
-                                        ? saleBreakdown.salePrice - saleBreakdown.baseMarketValue
-                                        : null;
                                     return (
                                       <td key={column.id}>
                                         <div className="selected-roster-sale-cell">
                                           <strong>{saleBreakdown.salePrice != null ? formatTransfermarktCurrency(saleBreakdown.salePrice) : "—"}</strong>
-                                          {saleMarketValueDelta != null ? (
-                                            <small className={saleMarketValueDelta >= 0 ? "text-positive" : "text-negative"}>
-                                              {formatSignedTransfermarktCurrency(saleMarketValueDelta)}
-                                            </small>
-                                          ) : null}
                                           <small className="muted">
                                             {saleBreakdown.bracket != null ? `Bracket ${saleBreakdown.bracket}` : "kein Bracket"}
                                           </small>
@@ -28508,7 +28883,7 @@ export default function FoundationPageClient({
                                   }
                                   if (column.id === "salary") {
                                     const currentSalary = getRosterEntryDisplaySalary(entry, player);
-                                    const salaryDelta = getRosterEntrySalaryDelta(entry, player);
+                                    const salaryDelta = getRosterEntrySalaryDelta(entry, player, gameState);
                                     return (
                                       <td key={column.id}>
                                         <div className="economy-money-stack">
@@ -28965,7 +29340,9 @@ export default function FoundationPageClient({
                     <h2>Starter</h2>
                   </div>
                   <div className="roster-grid">
-                    {starters.map(({ entry, player }) => (
+                    {starters.map(({ entry, player }) => {
+                      const portrait = getPlayerPortraitModel(player);
+                      return (
                       <article
                         className={`player-card player-card-spotlight ${getClassColorClassName(player.className, "player-card-class-frame")}`}
                         key={entry.id}
@@ -28974,10 +29351,11 @@ export default function FoundationPageClient({
                       >
                         <div className="player-card-hero">
                           <PlayerPortrait
-                            src={getPlayerPortraitModel(player).src}
-                            initials={getPlayerPortraitModel(player).initials}
+                            src={portrait.src}
+                            initials={portrait.initials}
                             alt={player.name}
                             className="player-card-portrait player-avatar-fallback"
+                            {...TEAM_ROSTER_PORTRAIT_LOADING}
                           />
                           <div className="player-card-head">
                             <div>
@@ -29002,21 +29380,22 @@ export default function FoundationPageClient({
                         </p>
                         <div className="economy-money-stack">
                           <strong>{formatLocalePoints(getRosterEntryDisplayMarketValue(entry, player), 2)}</strong>
-                          {renderEconomyDelta(getPlayerDisplayMarketValueDelta(player, entry), "higher", "player-card-money-delta")}
+                          {renderEconomyDelta(getPlayerDisplayMarketValueDelta(player, entry, gameState), "higher", "player-card-money-delta")}
                         </div>
                         <p className="muted">
                           Kosten {formatMoney(player.cost ?? player.marketValue)} · Gehalt
                         </p>
                         <div className="economy-money-stack">
                           <strong>{formatDisplayMoney(getRosterEntryDisplaySalary(entry, player))}</strong>
-                          {renderEconomyDelta(getRosterEntrySalaryDelta(entry, player), "lower", "player-card-money-delta")}
+                          {renderEconomyDelta(getRosterEntrySalaryDelta(entry, player, gameState), "lower", "player-card-money-delta")}
                         </div>
                         <p className="muted">
                           Traits {player.traitsPositive.slice(0, 2).join(", ") || "-"} · Alignment{" "}
                           {player.alignment || "-"}
                         </p>
                       </article>
-                    ))}
+                      );
+                    })}
                     {starters.length === 0 ? <p className="muted">Noch keine Starter im Kader.</p> : null}
                   </div>
                 </section>
@@ -29063,12 +29442,12 @@ export default function FoundationPageClient({
                         </p>
                         <div className="economy-money-stack">
                           <strong>{formatLocalePoints(getRosterEntryDisplayMarketValue(entry, player), 2)}</strong>
-                          {renderEconomyDelta(getPlayerDisplayMarketValueDelta(player, entry), "higher", "player-card-money-delta")}
+                          {renderEconomyDelta(getPlayerDisplayMarketValueDelta(player, entry, gameState), "higher", "player-card-money-delta")}
                         </div>
                         <p className="muted">Gehalt · LZ {entry.contractLength}</p>
                         <div className="economy-money-stack">
                           <strong>{formatDisplayMoney(getRosterEntryDisplaySalary(entry, player))}</strong>
-                          {renderEconomyDelta(getRosterEntrySalaryDelta(entry, player), "lower", "player-card-money-delta")}
+                          {renderEconomyDelta(getRosterEntrySalaryDelta(entry, player, gameState), "lower", "player-card-money-delta")}
                         </div>
                       </article>
                     ))}
@@ -29408,9 +29787,9 @@ export default function FoundationPageClient({
                       {filteredTrainingPlayerForecastRows.map((row) => {
                         const portrait = getPlayerPortraitModel(row.player);
                         const developmentTone =
-                          row.forecast.netDevelopmentXP < 0 || row.forecast.regressionRisk === "high"
+                          row.organicProgression.netSetpoints < 0 || row.forecast.regressionRisk === "high"
                             ? "is-regression"
-                            : row.forecast.netDevelopmentXP >= 45
+                            : row.organicProgression.netSetpoints >= 2
                               ? "is-growth"
                               : "is-stable";
                         const developmentLabel =
@@ -29494,11 +29873,14 @@ export default function FoundationPageClient({
                             </div>
                             <div className="training-impact-grid">
                               <div className="training-impact-card is-xp">
-                                <span>XP Vorschau</span>
-                                <strong>{formatWholeNumber(row.totalXp)}</strong>
+                                <span>Setpoints</span>
+                                <strong className={row.organicProgression.netSetpoints >= 0 ? "text-positive" : "text-negative"}>
+                                  {row.organicProgression.netSetpoints > 0 ? "+" : ""}
+                                  {formatLocalePoints(row.organicProgression.netSetpoints, 1)}
+                                </strong>
                                 <small>
-                                  +{row.trainingXp} Training ·{" "}
-                                  {row.performanceXp > 0 ? `+${row.performanceXp} Leistung` : "keine Leistungs-XP"}
+                                  +{formatLocalePoints(row.organicProgression.trainingSetpoints, 1)} Training · +
+                                  {formatLocalePoints(row.organicProgression.appliedPerformanceSetpoints, 1)} Performance
                                 </small>
                               </div>
                               <div className="training-impact-card is-recovery">
@@ -29512,8 +29894,8 @@ export default function FoundationPageClient({
                                     : `${formatSignedPercent(row.recoveryForecast.modifierPct)} durch ${row.modeConfig.label}`}
                                 </small>
                               </div>
-                              <div className={`training-impact-card is-regression${row.forecast.netDevelopmentXP < 0 || row.forecast.regressionRisk === "high" ? " is-warning" : ""}`}>
-                                <span>Entwicklung</span>
+                              <details className="training-impact-card is-regression training-legacy-xp-details">
+                                <summary>Legacy XP-Vorschau</summary>
                                 <strong className={row.forecast.netDevelopmentXP >= 0 ? "text-positive" : "text-negative"}>
                                   {row.forecast.netDevelopmentXP > 0 ? "+" : ""}
                                   {formatWholeNumber(row.forecast.netDevelopmentXP)}
@@ -29521,7 +29903,7 @@ export default function FoundationPageClient({
                                 <small>
                                   Rueckschritt {formatWholeNumber(row.forecast.regressionPressure)} · Risiko {formatMarketRisk(row.forecast.regressionRisk)}
                                 </small>
-                              </div>
+                              </details>
                             </div>
                             <div className="training-forecast-line">
                               <strong>{row.modeConfig.note}</strong>
@@ -29937,46 +30319,17 @@ export default function FoundationPageClient({
                   <div className="panel-header training-subheader">
                     <TooltipHeading
                       as="h3"
-                      tooltip="Hier planst du echte Spielerentwicklung am Saisonende: XP einsammeln, Upgrades waehlen, dann gesammelt bestaetigen."
+                      tooltip="Organische Setpoints werden am Saisonende automatisch auf Attribute angewendet. Legacy-XP-Upgrades sind optional und nur fuer manuelle Attribut-Kaeufe."
                     >
-                      Season-End Entwicklung
+                      Organische Saison-Entwicklung
                     </TooltipHeading>
-                    <span className="pill">Planen · dann bestaetigen</span>
+                    <span className="pill">Setpoints · automatisch am Saisonende</span>
                   </div>
                   <div className="training-warning-strip">
-                    <span className="transfer-status-pill is-ready">Warenkorb aktiv</span>
+                    <span className="transfer-status-pill is-ready">Organic Apply</span>
                     <span>
-                      +1 legt ein Upgrade in den Warenkorb. Beim Bestaetigen werden XP eingesammelt, Upgrades bezahlt und Rest-XP bleibt erhalten.
+                      Netto-Setpoints aus Training + Performance minus Erhaltungsdruck werden beim Einsammeln direkt auf Attribute geschrieben.
                     </span>
-                  </div>
-                  <div className="training-warning-strip">
-                    <span className={`transfer-status-pill ${seasonEndXpSpendPreview?.ok ? "is-ready" : plannedXpUpgrades.length ? "is-warning" : "is-info"}`}>
-                      {plannedXpUpgrades.length > 0 ? `${plannedXpUpgrades.length} Upgrade(s)` : "XP einsammeln"}
-                    </span>
-                    <span>
-                      Verfuegbar {formatWholeNumber(seasonEndXpSpendPreview?.totals.xpAvailable ?? 0)} XP · Geplant{" "}
-                      {formatWholeNumber(seasonEndXpSpendPreview?.totals.xpPlanned ?? 0)} XP · Rest{" "}
-                      {seasonEndXpSpendPreview ? formatWholeNumber(seasonEndXpSpendPreview!.totals.xpRemaining) : "—"}
-                    </span>
-                    <button
-                      className="secondary-button inline-button"
-                      type="button"
-                      disabled={plannedXpUpgrades.length === 0 || seasonEndXpSpendBusy}
-                      title={
-                        seasonEndXpSpendBusy
-                          ? getBusyActionReason("Der XP-Warenkorb")
-                          : plannedXpUpgrades.length === 0
-                            ? "Im Warenkorb liegt gerade kein geplantes Upgrade."
-                            : "Entfernt alle geplanten XP-Upgrades aus dem Warenkorb."
-                      }
-                      onClick={() => {
-                        setPlannedXpUpgrades([]);
-                        setSeasonEndXpSpendPreview(null);
-                        setSeasonEndXpSpendError(null);
-                      }}
-                    >
-                      Warenkorb leeren
-                    </button>
                     <button
                       className="primary-button inline-button"
                       type="button"
@@ -29985,36 +30338,30 @@ export default function FoundationPageClient({
                         readMeta.source === "prisma" ||
                         !seasonEndXpSpendPreview?.ok ||
                         !seasonEndXpSpendPreview!.confirmToken ||
+                        plannedXpUpgrades.length > 0 ||
                         seasonEndXpSpendPreview!.warnings.some((warning) => warning.includes("ai_xp_spend_apply_not_enabled_v1")) ||
                         seasonEndXpSpendPreview!.warnings.some((warning) => warning.includes("xp_spend_apply_phase_blocked"))
                       }
                       title={
-                        seasonEndXpSpendBusy
-                          ? getBusyActionReason("Der Season-End-XP-Schritt")
-                          : readMeta.source === "prisma"
-                            ? getReadOnlyActionReason("Season-End-XP")
-                            : !seasonEndXpSpendPreview?.ok || !seasonEndXpSpendPreview!.confirmToken
-                              ? `Noch offen: ${seasonEndXpSpendPreview?.blockingReasons?.join(" · ") ?? "Bitte zuerst eine gueltige XP-Preview laden."}`
-                              : seasonEndXpSpendPreview!.warnings.some((warning) => warning.includes("ai_xp_spend_apply_not_enabled_v1"))
-                                ? "AI-Teams duerfen in diesem Schritt noch keine XP automatisch anwenden."
-                                : seasonEndXpSpendPreview!.warnings.some((warning) => warning.includes("xp_spend_apply_phase_blocked"))
-                                  ? "Season-End-XP ist in der aktuellen Phase noch blockiert."
-                                  : plannedXpUpgrades.length > 0
-                                    ? "Bestaetigt alle geplanten XP-Upgrades gesammelt."
-                                    : "Sammelt die Season-XP fuer das aktive Team ein."
+                        plannedXpUpgrades.length > 0
+                          ? "Bitte zuerst Legacy-Warenkorb leeren oder bestaetigen."
+                          : seasonEndXpSpendBusy
+                            ? getBusyActionReason("Die organische Saison-Entwicklung")
+                            : readMeta.source === "prisma"
+                              ? getReadOnlyActionReason("Season-End-Entwicklung")
+                              : !seasonEndXpSpendPreview?.ok || !seasonEndXpSpendPreview!.confirmToken
+                                ? `Noch offen: ${seasonEndXpSpendPreview?.blockingReasons?.join(" · ") ?? "Bitte zuerst Preview laden."}`
+                                : "Wendet organische Setpoints fuer alle Kaderspieler an."
                       }
                       onClick={() => {
                         void confirmSeasonEndXpSpend();
                       }}
                     >
-                      {seasonEndXpSpendBusy ? "Pruefe..." : plannedXpUpgrades.length > 0 ? "XP-Upgrades bestaetigen" : "Season-XP einsammeln"}
+                      {seasonEndXpSpendBusy ? "Pruefe..." : "Organische Entwicklung anwenden"}
                     </button>
                   </div>
                   {seasonEndXpSpendPreview?.blockingReasons.length ? (
                     <p className="muted">Noch offen: {seasonEndXpSpendPreview!.blockingReasons.join(" · ")}</p>
-                  ) : null}
-                  {seasonEndXpSpendPreview?.warnings.length ? (
-                    <p className="muted">Hinweise: {seasonEndXpSpendPreview!.warnings.slice(0, 4).join(" · ")}</p>
                   ) : null}
                   {seasonEndXpSpendError ? <p className="text-negative">{seasonEndXpSpendError}</p> : null}
                   {seasonEndXpSpendSuccess ? <p className="text-positive">{seasonEndXpSpendSuccess}</p> : null}
@@ -30024,7 +30371,9 @@ export default function FoundationPageClient({
                       const xpSpendPlayer = seasonEndXpSpendPlayerMap.get(row.playerId) ?? null;
                       const forecastOrganic =
                         trainingPlayerForecastRows.find((forecastRow) => forecastRow.player.id === row.playerId)?.organicProgression ?? null;
-                      const organicNetSetpoints = xpSpendPlayer?.organicProgression?.netSetpoints ?? forecastOrganic?.netSetpoints ?? null;
+                      const organicNetSetpoints = row.organicNetSetpoints ?? xpSpendPlayer?.organicProgression?.netSetpoints ?? forecastOrganic?.netSetpoints ?? null;
+                      const organicTrainingSetpoints = row.organicTrainingSetpoints ?? forecastOrganic?.trainingSetpoints ?? null;
+                      const organicPerformanceSetpoints = row.organicPerformanceSetpoints ?? forecastOrganic?.appliedPerformanceSetpoints ?? null;
                       const topDeltas = (xpSpendPlayer?.disciplineDeltas ?? row.disciplineDeltas)
                         .filter((entry) => (entry.disciplineDelta ?? 0) !== 0)
                         .sort((left, right) => Math.abs(right.disciplineDelta ?? 0) - Math.abs(left.disciplineDelta ?? 0))
@@ -30063,16 +30412,18 @@ export default function FoundationPageClient({
                             <div>
                               <strong>{row.playerName}</strong>
                               <p className="muted">
-                                Setpoints {organicNetSetpoints != null ? `${organicNetSetpoints > 0 ? "+" : ""}${formatLocalePoints(organicNetSetpoints, 1)}` : "—"} · Legacy XP{" "}
-                                {formatWholeNumber(xpSpendPlayer?.availableXP ?? row.availableXP)} · geplant{" "}
-                                {formatWholeNumber(xpSpendPlayer?.plannedXP ?? 0)} · Rest{" "}
-                                {formatWholeNumber(xpSpendPlayer?.remainingXP ?? row.remainingXP)}
+                                Setpoints {organicNetSetpoints != null ? `${organicNetSetpoints > 0 ? "+" : ""}${formatLocalePoints(organicNetSetpoints, 1)}` : "—"}
+                                {organicTrainingSetpoints != null
+                                  ? ` · Training +${formatLocalePoints(organicTrainingSetpoints, 1)} · Performance +${formatLocalePoints(organicPerformanceSetpoints ?? 0, 1)}`
+                                  : ""}
                               </p>
                             </div>
-                            <span className={`transfer-status-pill ${row.status === "planned" ? "is-ready" : "is-warning"}`}>
-                              {plannedForPlayer > 0 ? `${plannedForPlayer} im Warenkorb` : row.status === "planned" ? "preview ok" : row.blockReason}
+                            <span className={`transfer-status-pill ${organicNetSetpoints != null && organicNetSetpoints >= 0 ? "is-ready" : "is-warning"}`}>
+                              {organicNetSetpoints != null && organicNetSetpoints >= 2 ? "stark" : organicNetSetpoints != null && organicNetSetpoints < 0 ? "Druck" : "stabil"}
                             </span>
                           </div>
+                          <details className="training-legacy-xp-player-details">
+                            <summary>Legacy XP-Upgrade (optional)</summary>
                           <label className="filter-field training-mode-field">
                             <span>Attribut</span>
                             <select
@@ -30220,6 +30571,7 @@ export default function FoundationPageClient({
                               Hinweise: {[...economyAudit.marketValueWarnings, ...economyAudit.salaryWarnings].slice(0, 4).join(" · ")}
                             </p>
                           ) : null}
+                          </details>
                         </article>
                       );
                     })}
@@ -30227,6 +30579,52 @@ export default function FoundationPageClient({
                       <p className="muted">Kein aktiver Kader fuer die Season-End Entwicklung.</p>
                     ) : null}
                   </div>
+                  <details className="training-legacy-xp-panel">
+                    <summary>Legacy XP-Warenkorb (optional · manuell)</summary>
+                    <div className="training-warning-strip">
+                      <span className={`transfer-status-pill ${seasonEndXpSpendPreview?.ok ? "is-ready" : plannedXpUpgrades.length ? "is-warning" : "is-info"}`}>
+                        {plannedXpUpgrades.length > 0 ? `${plannedXpUpgrades.length} Upgrade(s)` : "leer"}
+                      </span>
+                      <span>
+                        Legacy XP {formatWholeNumber(seasonEndXpSpendPreview?.totals.xpAvailable ?? 0)} · geplant{" "}
+                        {formatWholeNumber(seasonEndXpSpendPreview?.totals.xpPlanned ?? 0)} · Rest{" "}
+                        {seasonEndXpSpendPreview ? formatWholeNumber(seasonEndXpSpendPreview!.totals.xpRemaining) : "—"}
+                      </span>
+                      <button
+                        className="secondary-button inline-button"
+                        type="button"
+                        disabled={plannedXpUpgrades.length === 0 || seasonEndXpSpendBusy}
+                        onClick={() => {
+                          setPlannedXpUpgrades([]);
+                          setSeasonEndXpSpendPreview(null);
+                          setSeasonEndXpSpendError(null);
+                        }}
+                      >
+                        Warenkorb leeren
+                      </button>
+                      <button
+                        className="primary-button inline-button"
+                        type="button"
+                        disabled={
+                          seasonEndXpSpendBusy ||
+                          readMeta.source === "prisma" ||
+                          !seasonEndXpSpendPreview?.ok ||
+                          !seasonEndXpSpendPreview!.confirmToken ||
+                          plannedXpUpgrades.length === 0 ||
+                          seasonEndXpSpendPreview!.warnings.some((warning) => warning.includes("ai_xp_spend_apply_not_enabled_v1")) ||
+                          seasonEndXpSpendPreview!.warnings.some((warning) => warning.includes("xp_spend_apply_phase_blocked"))
+                        }
+                        onClick={() => {
+                          void confirmSeasonEndXpSpend();
+                        }}
+                      >
+                        {seasonEndXpSpendBusy ? "Pruefe..." : "Legacy XP-Upgrades bestaetigen"}
+                      </button>
+                    </div>
+                    {seasonEndXpSpendPreview?.warnings.length ? (
+                      <p className="muted">Hinweise: {seasonEndXpSpendPreview!.warnings.slice(0, 4).join(" · ")}</p>
+                    ) : null}
+                  </details>
                 </section>
               </>
             ) : (
@@ -30850,6 +31248,7 @@ export default function FoundationPageClient({
                   <button
                     className="primary-button"
                     type="button"
+                    data-testid="transfer-sell-confirm-button"
                     disabled={readMeta.source === "prisma" || !marketSellPreview?.canSell || marketSellBusy}
                     title={
                       readMeta.source === "prisma"

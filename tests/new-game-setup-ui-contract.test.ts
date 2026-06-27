@@ -44,5 +44,12 @@ describe("new game setup UI contract", () => {
     expect(source).toContain("completeSeasonBriefingAndContinue");
     expect(source).toMatch(/onClick=\{completeSeasonBriefingAndContinue\}[\s\S]*?>\s*Erledigt\s*<\/button>/);
     expect(source).toContain('closeSeasonBriefing(false)');
+    expect(source).toContain("seasonBriefingDismissedRef");
+    expect(source).not.toContain("closeFoundationDrilldownPanel();\n    }\n  };\n  const completeSeasonBriefingAndContinue");
+    expect(source).toContain('data-testid="season-briefing-backdrop"');
+    expect(source).toContain("seasonBriefingScheduleReady");
+    expect(source).toContain('data-testid="season-briefing-loading"');
+    expect(source).toContain("foundation-modal-backdrop");
+    expect(source).toContain("expectedSaveVersion: nextGameState.saveVersion");
   });
 });

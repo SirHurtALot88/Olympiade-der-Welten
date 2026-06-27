@@ -673,11 +673,94 @@ a {
   background: rgba(250, 204, 21, 0.12);
 }
 
+.player-drawer-profile-card.is-compact {
+  display: grid;
+  gap: 8px;
+  padding: 12px 14px;
+}
+
+.player-drawer-role-line {
+  margin: 0;
+}
+
+.player-drawer-ca-po-stack {
+  display: grid;
+  gap: 6px;
+}
+
+.player-drawer-ca-po-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.player-drawer-ca-po-label {
+  min-width: 24px;
+  color: rgba(163, 194, 255, 0.82);
+  font-size: 0.68rem;
+  font-weight: 900;
+  letter-spacing: 0.06em;
+}
+
+.player-drawer-scout-meta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.player-drawer-scout-meta span {
+  display: inline-flex;
+  min-height: 24px;
+  align-items: center;
+  padding: 0 8px;
+  border-radius: 999px;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  background: rgba(255, 255, 255, 0.04);
+  color: rgba(241, 245, 255, 0.78);
+  font-size: 0.74rem;
+}
+
+.player-drawer-page .player-drawer-top-grid {
+  grid-template-columns: minmax(200px, 0.72fr) minmax(320px, 1.28fr);
+  gap: 12px;
+}
+
+.player-drawer-page .player-drawer-profile-card.is-compact {
+  min-height: 100%;
+}
+
+.player-drawer-hero-axis-grid {
+  margin-top: 2px;
+}
+
+.player-drawer-axis-source {
+  margin: 0 0 8px;
+  font-size: 0.78rem;
+}
+
+.player-drawer-stats-chart {
+  display: grid;
+  gap: 10px;
+  margin-top: 12px;
+}
+
+.player-drawer-stats-chart h3 {
+  margin: 0;
+  font-size: 1rem;
+}
+
+.player-drawer-section-block {
+  display: grid;
+  gap: 10px;
+}
+
 .player-profile-shell,
 .team-profile-shell,
 .contract-offer-shell {
   display: grid;
   gap: 16px;
+  width: 100%;
+  min-width: 0;
 }
 
 .team-profile-header,
@@ -709,6 +792,101 @@ a {
 
 .team-profile-body {
   max-width: none;
+}
+
+/* Former drawer surfaces as full pages — use available content width (15" layout) */
+.foundation-player-profile-panel.panel,
+.foundation-team-profile-panel.panel {
+  padding: 0;
+  background: transparent;
+  border: none;
+  box-shadow: none;
+  overflow: visible;
+}
+
+.player-drawer.player-drawer-page {
+  width: 100%;
+  max-width: none;
+  max-height: none;
+  overflow: visible;
+}
+
+.foundation-drilldown-page {
+  width: 100%;
+  min-width: 0;
+}
+
+.contract-offer-grid {
+  display: grid;
+  gap: 14px;
+  grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+}
+
+.contract-offer-panel {
+  display: grid;
+  gap: 12px;
+  padding: 16px;
+  border-radius: 18px;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  background: rgba(255, 255, 255, 0.04);
+}
+
+@media (min-width: 1180px) {
+  .player-drawer-page .player-drawer-top-grid {
+    grid-template-columns: minmax(280px, 0.95fr) minmax(320px, 1.35fr);
+  }
+
+  .player-drawer-page .player-drawer-attribute-grid.is-compact {
+    grid-template-columns: repeat(12, minmax(0, 1fr));
+  }
+
+  .player-drawer-page .player-drawer-list-grid,
+  .player-drawer-page .player-drawer-list-grid-wide {
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+  }
+
+  .player-drawer-page .player-drawer-development-hero {
+    grid-template-columns: minmax(0, 1.4fr) minmax(280px, 0.9fr);
+  }
+
+  .player-drawer-page .player-drawer-transfer-history-shell,
+  .player-drawer-page .player-drawer-training-history-shell,
+  .player-drawer-page .player-attribute-progress-table-shell {
+    max-height: 360px;
+  }
+
+  .team-profile-body .team-drawer-dashboard-grid {
+    grid-template-columns: minmax(260px, 0.85fr) minmax(280px, 1fr) minmax(280px, 1fr);
+  }
+
+  .team-profile-body .team-drawer-card-grid {
+    grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+  }
+
+  .transfer-offer-page .transfer-modal-player-kpis,
+  .transfer-sell-page .transfer-sell-kpis {
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+  }
+
+  .transfer-sell-page .transfer-sell-metric-grid {
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+  }
+
+  .facility-upgrade-page .training-v2-facility-modal-hero,
+  .facility-upgrade-page .training-v2-facility-modal-grid,
+  .facility-upgrade-page .training-v2-facility-logic-grid {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+}
+
+@media (min-width: 1320px) {
+  .player-drawer-page .player-drawer-top-grid {
+    grid-template-columns: minmax(300px, 1fr) minmax(360px, 1.2fr);
+  }
+
+  .contract-offer-grid {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
 }
 
 .player-profile-header,
@@ -2546,10 +2724,27 @@ a {
 
 .season-briefing-modal {
   width: min(1120px, calc(100vw - 36px));
+  display: grid;
+  grid-template-rows: auto minmax(0, 1fr) auto;
+  overflow: hidden;
   border-color: rgba(132, 188, 255, 0.34);
   background:
     linear-gradient(150deg, rgba(22, 38, 62, 0.98), rgba(18, 22, 30, 0.98)),
     rgba(18, 22, 30, 0.98);
+}
+
+.season-briefing-modal .season-briefing-header {
+  padding: 20px 20px 0;
+}
+
+.season-briefing-modal .season-briefing-body {
+  overflow: auto;
+  padding: 0 20px;
+}
+
+.season-briefing-modal .foundation-modal-actions {
+  border-top: 1px solid rgba(255, 255, 255, 0.08);
+  background: rgba(8, 12, 20, 0.55);
 }
 
 .season-briefing-header h2 {
@@ -11080,6 +11275,47 @@ a {
   gap: 8px;
 }
 
+.player-drawer-header-facts {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 4px;
+}
+
+.player-drawer-header-facts span {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  min-height: 30px;
+  padding: 0 11px;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.05);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  color: rgba(241, 245, 255, 0.82);
+  font-size: 0.8rem;
+}
+
+.player-drawer-header-facts span strong {
+  color: #f7fbff;
+  font-size: 0.86rem;
+}
+
+.player-drawer-header-facts span em {
+  font-style: normal;
+  font-size: 0.74rem;
+  opacity: 0.88;
+}
+
+.player-drawer-header-facts span.is-warning {
+  border-color: rgba(235, 181, 76, 0.42);
+  background: rgba(235, 181, 76, 0.1);
+}
+
+.player-drawer-header-facts span.is-negative {
+  border-color: rgba(211, 83, 72, 0.42);
+  background: rgba(211, 83, 72, 0.12);
+}
+
 .player-drawer-mini-facts span {
   display: inline-flex;
   min-height: 28px;
@@ -11315,6 +11551,43 @@ a {
 
 .player-drawer-attribute-grid {
   grid-template-columns: repeat(6, minmax(0, 1fr));
+}
+
+.player-drawer-attribute-grid.is-compact {
+  grid-template-columns: repeat(12, minmax(52px, 1fr));
+  gap: 6px;
+}
+
+.player-drawer-attribute-grid.is-compact .player-drawer-attribute-card {
+  min-height: 0;
+  padding: 7px 6px;
+  gap: 2px;
+}
+
+.player-drawer-attribute-grid.is-compact .player-drawer-attribute-title {
+  font-size: 0.62rem;
+  letter-spacing: 0.02em;
+  line-height: 1.05;
+}
+
+.player-drawer-attribute-grid.is-compact .player-drawer-attribute-card strong {
+  font-size: 0.88rem;
+  line-height: 1.05;
+}
+
+.player-drawer-attribute-grid.is-compact .player-drawer-affinity-badge {
+  width: 14px;
+  height: 14px;
+  font-size: 0.58rem;
+}
+
+.player-drawer-class-fit-row {
+  display: grid;
+  gap: 8px;
+}
+
+.player-drawer-section-lead {
+  margin: 0;
 }
 
 .player-drawer-discipline-grid {
@@ -12829,6 +13102,173 @@ a {
   font-size: 0.68rem;
   font-weight: 800;
   text-transform: uppercase;
+}
+
+.player-drawer-transfer-history-block,
+.player-drawer-training-history {
+  margin-top: 18px;
+  display: grid;
+  gap: 10px;
+}
+
+.player-drawer-transfer-history-shell,
+.player-drawer-training-history-shell,
+.player-attribute-progress-table-shell {
+  max-height: 280px;
+  overflow: auto;
+  border-radius: 18px;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  background: rgba(5, 8, 14, 0.22);
+}
+
+.player-drawer-transfer-history-table,
+.player-drawer-training-history-table,
+.player-attribute-progress-table {
+  width: 100%;
+  min-width: 720px;
+  border-collapse: separate;
+  border-spacing: 0;
+}
+
+.player-drawer-transfer-history-table th,
+.player-drawer-transfer-history-table td,
+.player-drawer-training-history-table th,
+.player-drawer-training-history-table td,
+.player-attribute-progress-table th,
+.player-attribute-progress-table td {
+  padding: 9px 10px;
+  white-space: nowrap;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.065);
+  font-size: 0.74rem;
+  text-align: left;
+}
+
+.player-training-controls {
+  display: grid;
+  gap: 14px;
+}
+
+.player-training-controls-head {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+.player-training-controls-forecast {
+  margin-top: 0;
+}
+
+.player-attribute-progress-chart {
+  display: grid;
+  gap: 12px;
+}
+
+.player-attribute-progress-chart-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
+.player-attribute-progress-chart-metrics {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.player-attribute-progress-metric {
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  background: rgba(255, 255, 255, 0.04);
+  color: inherit;
+  border-radius: 999px;
+  padding: 4px 10px;
+  font-size: 0.72rem;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.player-attribute-progress-metric.is-active {
+  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.24);
+}
+
+.player-attribute-progress-chart-shell {
+  display: grid;
+  gap: 8px;
+  padding: 12px;
+  border-radius: 18px;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  background: rgba(5, 8, 14, 0.22);
+}
+
+.player-attribute-progress-svg {
+  width: 100%;
+  height: auto;
+}
+
+.player-attribute-progress-axis {
+  stroke: rgba(255, 255, 255, 0.16);
+  stroke-width: 1;
+}
+
+.player-attribute-progress-line {
+  fill: none;
+  stroke-width: 2.5;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
+.player-attribute-progress-svg.is-neutral .player-attribute-progress-line,
+.player-attribute-progress-svg.is-neutral .player-attribute-progress-dot {
+  stroke: #d8dee8;
+  fill: #d8dee8;
+}
+
+.player-attribute-progress-svg.is-power .player-attribute-progress-line,
+.player-attribute-progress-svg.is-power .player-attribute-progress-dot {
+  stroke: #ff6b57;
+  fill: #ff6b57;
+}
+
+.player-attribute-progress-svg.is-speed .player-attribute-progress-line,
+.player-attribute-progress-svg.is-speed .player-attribute-progress-dot {
+  stroke: #57c7ff;
+  fill: #57c7ff;
+}
+
+.player-attribute-progress-svg.is-mental .player-attribute-progress-line,
+.player-attribute-progress-svg.is-mental .player-attribute-progress-dot {
+  stroke: #b58cff;
+  fill: #b58cff;
+}
+
+.player-attribute-progress-svg.is-social .player-attribute-progress-line,
+.player-attribute-progress-svg.is-social .player-attribute-progress-dot {
+  stroke: #e0c06a;
+  fill: #e0c06a;
+}
+
+.player-attribute-progress-dot {
+  stroke-width: 2;
+}
+
+.player-attribute-progress-labels {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(48px, 1fr));
+  gap: 6px;
+  font-size: 0.68rem;
+  color: rgba(255, 255, 255, 0.72);
+  text-align: center;
+}
+
+.player-attribute-progress-labels .is-live {
+  color: #9ef0ad;
+  font-weight: 700;
+}
+
+.player-drawer-training-history-empty {
+  margin-top: 8px;
 }
 
 .team-drawer-history-section {
@@ -23842,6 +24282,31 @@ a {
   }
 }
 
+.arena-v2-timeline-panel.is-reveal-event {
+  animation: arena-v2-reveal-event 720ms ease-out;
+}
+
+@keyframes arena-v2-reveal-event {
+  0% {
+    box-shadow:
+      inset 0 1px 0 rgba(255, 255, 255, 0.03),
+      0 0 0 0 rgba(120, 200, 255, 0.55);
+    border-color: rgba(120, 200, 255, 0.65);
+  }
+
+  45% {
+    box-shadow:
+      inset 0 1px 0 rgba(255, 255, 255, 0.08),
+      0 0 28px 4px rgba(120, 200, 255, 0.35);
+    border-color: rgba(160, 220, 255, 0.85);
+  }
+
+  100% {
+    box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.03);
+    border-color: rgba(120, 154, 214, 0.22);
+  }
+}
+
 .arena-v2-hero,
 .arena-v2-timeline-panel,
 .arena-v2-side-panel,
@@ -30315,6 +30780,45 @@ a {
   min-width: 260px;
 }
 
+.season-v2-history-strip {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 14px;
+  padding: 14px 16px;
+  border: 1px solid rgba(118, 146, 202, 0.16);
+  border-radius: 18px;
+  background: rgba(10, 16, 28, 0.72);
+}
+
+.season-v2-history-strip-empty {
+  border-style: dashed;
+}
+
+.season-v2-history-copy {
+  display: grid;
+  gap: 4px;
+  min-width: min(320px, 100%);
+}
+
+.season-v2-history-copy strong {
+  font-size: 0.95rem;
+}
+
+.season-v2-history-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  justify-content: flex-end;
+}
+
+.season-v2-history-chip.is-active,
+.season-v2-history-chip-live.is-active {
+  border-color: rgba(118, 198, 255, 0.55);
+  background: rgba(72, 132, 210, 0.18);
+}
+
 .season-v2-story-grid {
   display: grid;
   grid-template-columns: repeat(4, minmax(0, 1fr));
@@ -31647,8 +32151,8 @@ a {
   height: 72px;
 }
 
-.home-v2-player-card:not(.is-featured) .home-v2-player-stats {
-  font-size: 0.82rem;
+.home-v2-player-card:not(.is-featured) .home-v2-player-stat strong {
+  font-size: 0.84rem;
 }
 
 .home-v2-player-card {
@@ -31696,6 +32200,39 @@ a {
   display: flex;
   flex-wrap: wrap;
   gap: 8px;
+}
+
+.home-v2-player-stat {
+  display: grid;
+  gap: 1px;
+  min-width: 52px;
+  padding: 4px 7px;
+  border-radius: 8px;
+  background: rgba(255, 255, 255, 0.08);
+  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.14);
+}
+
+.home-v2-player-stat small {
+  font-size: 0.62rem;
+  font-weight: 850;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: rgba(255, 255, 255, 0.72);
+}
+
+.home-v2-player-stat strong {
+  font-size: 0.88rem;
+  line-height: 1.1;
+  color: rgba(245, 239, 224, 0.98);
+}
+
+.home-v2-player-stat.is-rank strong {
+  color: rgba(255, 214, 120, 0.96);
+}
+
+.home-v2-player-card.is-featured .home-v2-player-stat {
+  background: rgba(255, 208, 84, 0.12);
+  box-shadow: inset 0 0 0 1px rgba(255, 208, 84, 0.22);
 }
 
 .home-v2-ca-po-row {
@@ -32324,4 +32861,169 @@ a {
   background: linear-gradient(90deg, rgba(51, 65, 85, 0.35), rgba(71, 85, 105, 0.55), rgba(51, 65, 85, 0.35));
   background-size: 200% 100%;
   animation: foundation-panel-skeleton-shimmer 1.4s ease-in-out infinite;
+}
+
+.transfer-buy-preview-skeleton {
+  display: grid;
+  gap: 0.85rem;
+}
+
+.transfer-buy-preview-skeleton__banner {
+  display: grid;
+  gap: 0.25rem;
+  padding: 0.75rem 0.9rem;
+  border-radius: 12px;
+  border: 1px solid rgba(120, 154, 214, 0.22);
+  background: rgba(15, 23, 42, 0.55);
+}
+
+.transfer-buy-preview-skeleton__grid {
+  display: grid;
+  gap: 0.65rem;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+.transfer-buy-preview-skeleton__block {
+  min-height: 72px;
+  border-radius: 12px;
+  background: linear-gradient(90deg, rgba(51, 65, 85, 0.35), rgba(71, 85, 105, 0.55), rgba(51, 65, 85, 0.35));
+  background-size: 200% 100%;
+  animation: foundation-panel-skeleton-shimmer 1.4s ease-in-out infinite;
+}
+
+.transfer-buy-preview-skeleton__block.is-wide {
+  grid-column: 1 / -1;
+  min-height: 120px;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .transfer-buy-preview-skeleton__block {
+    animation: none;
+  }
+}
+
+.sponsor-offer-card {
+  display: grid;
+  gap: 0.55rem;
+}
+
+.sponsor-offer-card-challenge {
+  border-color: rgba(245, 158, 11, 0.45);
+  box-shadow: inset 0 0 0 1px rgba(245, 158, 11, 0.18);
+}
+
+.sponsor-offer-card-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.5rem;
+}
+
+.sponsor-offer-badge {
+  border-radius: 999px;
+  padding: 0.12rem 0.55rem;
+  font-size: 0.68rem;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: #92400e;
+  background: rgba(251, 191, 36, 0.22);
+}
+
+.sponsor-challenge-panel {
+  display: grid;
+  gap: 0.35rem;
+  padding: 0.65rem 0.75rem;
+  border-radius: 0.65rem;
+  background: rgba(15, 23, 42, 0.04);
+  border: 1px solid rgba(148, 163, 184, 0.25);
+}
+
+.sponsor-challenge-panel-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.5rem;
+}
+
+.sponsor-axis-chip {
+  border-radius: 999px;
+  padding: 0.1rem 0.55rem;
+  font-size: 0.68rem;
+  font-weight: 800;
+  letter-spacing: 0.06em;
+}
+
+.sponsor-axis-pow {
+  color: #991b1b;
+  background: rgba(248, 113, 113, 0.18);
+}
+
+.sponsor-axis-spe {
+  color: #1d4ed8;
+  background: rgba(96, 165, 250, 0.18);
+}
+
+.sponsor-axis-men {
+  color: #6d28d9;
+  background: rgba(167, 139, 250, 0.2);
+}
+
+.sponsor-axis-soc {
+  color: #047857;
+  background: rgba(52, 211, 153, 0.18);
+}
+
+.sponsor-axis-neutral {
+  color: #334155;
+  background: rgba(148, 163, 184, 0.2);
+}
+
+.sponsor-difficulty {
+  border-radius: 999px;
+  padding: 0.1rem 0.5rem;
+  font-size: 0.66rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+.sponsor-difficulty-leicht {
+  color: #166534;
+  background: rgba(74, 222, 128, 0.18);
+}
+
+.sponsor-difficulty-mittel {
+  color: #92400e;
+  background: rgba(251, 191, 36, 0.2);
+}
+
+.sponsor-difficulty-hart {
+  color: #991b1b;
+  background: rgba(248, 113, 113, 0.18);
+}
+
+.sponsor-challenge-title {
+  font-size: 0.95rem;
+}
+
+.sponsor-challenge-reward {
+  font-size: 0.78rem;
+  color: rgba(51, 65, 85, 0.88);
+}
+
+.sponsor-offer-component-list {
+  display: grid;
+  gap: 0.25rem;
+}
+
+.sponsor-component-kind {
+  display: inline-block;
+  min-width: 5.5rem;
+  margin-right: 0.35rem;
+  font-size: 0.68rem;
+  font-weight: 700;
+  letter-spacing: 0.03em;
+  text-transform: uppercase;
+  color: rgba(71, 85, 105, 0.85);
 }

@@ -1,19 +1,24 @@
 import type { GameState, Player, RosterEntry, SeasonSnapshotRecord } from "@/lib/data/olyDataTypes";
 import { resolvePlayerEconomyContract } from "@/lib/foundation/player-economy-contract";
 import { buildPlayerRatingContractMap } from "@/lib/foundation/player-rating-contract";
+import { buildSeasonPointsLedger } from "@/lib/foundation/season-points-ledger";
 import { getTransfermarktBracket } from "@/lib/market/transfermarkt-fit";
 
 function roundValue(value: number, digits = 2) {
   return Number(value.toFixed(digits));
 }
 
+// Retool `calculateSaleFactorAndPriceSaison` bracketDefs (9 brackets).
 const SALE_FACTOR_BRACKET_RANGES = {
   1: { minFactor: 0.35, maxFactor: 1.5 },
-  2: { minFactor: 0.35, maxFactor: 1.5 },
-  3: { minFactor: 0.45, maxFactor: 1.4 },
-  4: { minFactor: 0.55, maxFactor: 1.3 },
-  5: { minFactor: 0.65, maxFactor: 1.25 },
-  6: { minFactor: 0.75, maxFactor: 1.2 },
+  2: { minFactor: 0.4, maxFactor: 1.46 },
+  3: { minFactor: 0.45, maxFactor: 1.42 },
+  4: { minFactor: 0.5, maxFactor: 1.38 },
+  5: { minFactor: 0.55, maxFactor: 1.33 },
+  6: { minFactor: 0.6, maxFactor: 1.29 },
+  7: { minFactor: 0.66, maxFactor: 1.25 },
+  8: { minFactor: 0.72, maxFactor: 1.22 },
+  9: { minFactor: 0.75, maxFactor: 1.2 },
 } as const;
 
 export type TransfermarktSaleFactorBreakdown = {
@@ -48,6 +53,35 @@ type SaleFactorRankContext = {
 
 const saleFactorRankContextCache = new WeakMap<GameState, SaleFactorRankContext>();
 
+export function hasCurrentSeasonSaleFactorRanking(gameState: GameState): boolean {
+  const appliedResultIds = new Set(
+    (gameState.seasonState.matchdayResults ?? [])
+      .filter((result) => result.seasonId === gameState.season.id && result.status === "preview_applied")
+      .map((result) => result.id),
+  );
+
+  if (appliedResultIds.size > 0) {
+    for (const performance of gameState.seasonState.playerDisciplinePerformances ?? []) {
+      if (appliedResultIds.has(performance.matchdayResultId) && (performance.scoreContribution ?? 0) > 0) {
+        return true;
+      }
+    }
+    return false;
+  }
+
+  if ((gameState.disciplines?.length ?? 0) === 0) {
+    return false;
+  }
+
+  const ledger = buildSeasonPointsLedger(gameState);
+  for (const summary of ledger.playerSummariesByPlayerId.values()) {
+    if ((summary.totalPoints ?? 0) > 0) {
+      return true;
+    }
+  }
+  return false;
+}
+
 function getLatestCompletedSeasonSnapshot(gameState: GameState): SeasonSnapshotRecord | null {
   return [...(gameState.seasonState.seasonSnapshots ?? [])]
     .filter((snapshot) => snapshot.status !== "dry_run" && snapshot.playerPerformances.length > 0)
@@ -62,31 +96,30 @@ function getLatestCompletedSeasonSnapshot(gameState: GameState): SeasonSnapshotR
 }
 
 function getBracketRange(bracket: number) {
-  const normalizedBracket = Math.min(Math.max(bracket, 1), 6) as keyof typeof SALE_FACTOR_BRACKET_RANGES;
+  const normalizedBracket = Math.min(Math.max(bracket, 1), 9) as keyof typeof SALE_FACTOR_BRACKET_RANGES;
   return SALE_FACTOR_BRACKET_RANGES[normalizedBracket];
 }
 
 function getRankBonus(rank: number, total: number) {
-  if (total <= 1) {
-    return 0;
+  if (rank === 1) {
+    return 0.15;
   }
-
-  const topBonus =
-    rank === 1 ? 0.15
-    : rank === 2 ? 0.1
-    : rank === 3 ? 0.05
-    : null;
-  const bottomBonus =
-    rank === total ? -0.15
-    : rank === total - 1 ? -0.1
-    : rank === total - 2 ? -0.05
-    : null;
-
-  if (topBonus != null && bottomBonus != null) {
-    return rank <= Math.ceil(total / 2) ? topBonus : bottomBonus;
+  if (rank === 2) {
+    return 0.1;
   }
-
-  return topBonus ?? bottomBonus ?? 0;
+  if (rank === 3) {
+    return 0.05;
+  }
+  if (rank === total) {
+    return -0.15;
+  }
+  if (rank === total - 1) {
+    return -0.1;
+  }
+  if (rank === total - 2) {
+    return -0.05;
+  }
+  return 0;
 }
 
 export function normalizeVisibleRosterMoney(
@@ -180,7 +213,7 @@ function getSaleFactorRankContext(gameState: GameState): SaleFactorRankContext {
   }
 
   const playerRatingsById = buildPlayerRatingContractMap(gameState);
-  const hasLivePerformance = (gameState.seasonState.playerDisciplinePerformances ?? []).length > 0;
+  const hasLivePerformance = hasCurrentSeasonSaleFactorRanking(gameState);
   const latestSnapshot = hasLivePerformance ? null : getLatestCompletedSeasonSnapshot(gameState);
   const groupedCandidates = buildRankedCandidates(gameState, playerRatingsById, hasLivePerformance, latestSnapshot);
   const context = {
@@ -218,6 +251,22 @@ export function buildTransfermarktSaleFactorBreakdown(
   }
 
   const bracket = getTransfermarktBracket(baseMarketValue);
+  if (!hasCurrentSeasonSaleFactorRanking(gameState)) {
+    return {
+      bracket,
+      bracketGroupSize: 0,
+      baseMarketValue,
+      mvs: null,
+      ppsSeason: null,
+      rankInBracket: null,
+      baseFactor: 1,
+      rankBonus: 0,
+      saleFactor: 1,
+      salePrice: baseMarketValue,
+      factorSource: "fallback_no_ranked_group",
+    };
+  }
+
   const rankContext = getSaleFactorRankContext(gameState);
   const playerRating = player ? rankContext.playerRatingsById.get(player.id) ?? null : null;
   const latestSnapshot = rankContext.latestSnapshot;

@@ -27,6 +27,8 @@ describe("foundation home v2 ui contract", () => {
     expect(panelText).toContain('tab === "overview"');
     expect(fileText).toContain('homeV2Tab === "office"');
     expect(fileText).toContain('navigateHomeTab("office")');
+    expect(panelText).toContain('if (!active)');
+    expect(panelText).toContain('id="foundation-home-v2"');
     expect(panelText).toContain("ManagerOfficeClient");
     const officeText = await fs.readFile(
       path.join(process.cwd(), "app/foundation/home-v2/ManagerOfficeClient.tsx"),
@@ -79,9 +81,12 @@ describe("foundation home v2 ui contract", () => {
     expect(homeText).toContain('data-testid="home-player-potential-range"');
     expect(homeText).toContain("formatPotentialRange");
     expect(homeText).toContain("formatAbilityPoints");
+    expect(homeText).toContain("home-v2-player-stat");
+    expect(homeText).toContain("Rank");
     expect(typesText).toContain("caRating");
     expect(typesText).toContain("poRangeMin");
     expect(typesText).toContain("poRangeMax");
+    expect(typesText).toContain("rosterRank");
     expect(typesText).toContain("pow:");
     expect(foundationText).toContain("buildPlayerDevelopmentInsight");
     expect(foundationText).toContain("buildPlayerProgressionForecast");
@@ -95,6 +100,7 @@ describe("foundation home v2 ui contract", () => {
 
     expect(cssText).toContain(".home-v2-shell");
     expect(cssText).toContain(".home-v2-player-card");
+    expect(cssText).toContain(".home-v2-player-stat");
     expect(cssText).toContain(".home-v2-hero");
     expect(cssText).toContain(".home-v2-signal-strip");
     expect(cssText).toContain(".foundation-home-v2-panel .home-v2-subnav");

@@ -178,6 +178,26 @@ function createGameState(input?: {
   };
 }
 
+function createAppliedMatchdayResult(id = "result-1") {
+  return {
+    id,
+    saveId: "save-singleplayer-dev",
+    seasonId: "season-1",
+    matchdayId: "matchday-1",
+    status: "preview_applied" as const,
+    sourceVersion: "test",
+    teamsTotal: 1,
+    teamsReady: 1,
+    teamsUnderfilled: 0,
+    teamsMissingLineup: 0,
+    teamsInvalidLineup: 0,
+    teamsMissingScoreCoverage: 0,
+    warningsCount: 0,
+    createdAt: "2026-06-10T12:00:00.000Z",
+    updatedAt: "2026-06-10T12:00:00.000Z",
+  };
+}
+
 describe("transfermarkt local service", () => {
   beforeEach(() => {
     persistenceState.saveSingleplayerState.mockReset();
@@ -563,6 +583,7 @@ describe("transfermarkt local service", () => {
 
     const allHistory = listLocalTransferHistory({
       saveId: "save-singleplayer-dev",
+      allSeasons: true,
       limit: 10,
     });
     expect(allHistory.items.map((entry) => entry.seasonLabel)).toEqual(["Season 3", "Season 1"]);
@@ -619,16 +640,31 @@ describe("transfermarkt local service", () => {
   it("blocks local sells during an active unresolved season", async () => {
     persistenceState.save = {
       saveId: "save-singleplayer-dev",
-      gameState: createGameState({
-        gamePhase: "season_active",
-        teams: [createTeam({ teamId: "A-A", shortCode: "A-A", cash: 175 })],
-        players: [
-          createPlayer("p1", { marketValue: 40, displayMarketValue: 40, salaryDemand: 10, displaySalary: 10 }),
-        ],
-        rosters: [
-          createRosterEntry("r1", "p1", { salary: 10, contractLength: 3, currentValue: 40, purchasePrice: 40 }),
-        ],
-      }),
+      gameState: {
+        ...createGameState({
+          gamePhase: "season_active",
+          teams: [createTeam({ teamId: "A-A", shortCode: "A-A", cash: 175 })],
+          players: [
+            createPlayer("p1", { marketValue: 40, displayMarketValue: 40, salaryDemand: 10, displaySalary: 10 }),
+          ],
+          rosters: [
+            createRosterEntry("r1", "p1", { salary: 10, contractLength: 3, currentValue: 40, purchasePrice: 40 }),
+          ],
+        }),
+        season: {
+          id: "season-1",
+          name: "Season 1",
+          year: 2026,
+          currentMatchday: 3,
+          matchdayIds: ["matchday-1", "matchday-2", "matchday-3"],
+        },
+        matchdayState: {
+          matchdayId: "matchday-3",
+          status: "planning",
+          pendingTeamIds: [],
+          resolvedFixtureIds: [],
+        },
+      },
     };
 
     const { previewLocalTransfermarktSell, executeLocalTransfermarktSell } =
@@ -794,6 +830,7 @@ describe("transfermarkt local service", () => {
       }),
     };
 
+    persistenceState.save!.gameState.seasonState.matchdayResults = [createAppliedMatchdayResult()];
     persistenceState.save!.gameState.seasonState.playerDisciplinePerformances = [
       {
         id: "perf-1",
@@ -849,10 +886,10 @@ describe("transfermarkt local service", () => {
       activePlayerId: "r2",
     });
 
-    expect(topPreview.saleFactor).toBe(1.35);
-    expect(topPreview.salePrice).toBe(54);
-    expect(lowerPreview.saleFactor).toBe(0.6);
-    expect(lowerPreview.salePrice).toBe(24.6);
+    expect(topPreview.saleFactor).toBe(1.44);
+    expect(topPreview.salePrice).toBe(57.6);
+    expect(lowerPreview.saleFactor).toBe(0.7);
+    expect(lowerPreview.salePrice).toBe(28.7);
     expect(topPreview.salePrice).toBeGreaterThan(lowerPreview.salePrice ?? 0);
   });
 
@@ -873,6 +910,7 @@ describe("transfermarkt local service", () => {
         ],
       }),
     };
+    persistenceState.save.gameState.seasonState.matchdayResults = [createAppliedMatchdayResult()];
     persistenceState.save.gameState.seasonState.playerDisciplinePerformances = [
       {
         id: "perf-1",
@@ -945,7 +983,7 @@ describe("transfermarkt local service", () => {
     expect(preview.salePrice).toBeGreaterThan(preview.marketValueReference ?? 0);
   });
 
-  it("uses the latest completed season snapshot for sale factors after a season reset", async () => {
+  it("keeps sale factors neutral after a season reset until the new season has applied matchday scores", async () => {
     persistenceState.save = {
       saveId: "save-singleplayer-dev",
       gameState: createGameState({
@@ -1042,9 +1080,9 @@ describe("transfermarkt local service", () => {
       activePlayerId: "r1",
     });
 
-    expect(preview.saleFactor).toBeGreaterThan(1);
-    expect(preview.salePrice).toBeGreaterThan(preview.marketValueReference ?? 0);
-    expect(preview.profit).toBeGreaterThan(0);
+    expect(preview.saleFactor).toBe(1);
+    expect(preview.salePrice).toBe(preview.marketValueReference);
+    expect(preview.profit).toBe(0);
   });
 
   it("builds deterministic contract shapes with identical total salary", () => {
@@ -1694,5 +1732,50 @@ describe("transfermarkt local service", () => {
     expect(table.seasonLabels).toHaveLength(5);
     expect(table.totalsCommitted).toHaveLength(5);
     expect(table.totalsWithPreview[0]?.salary).toBeGreaterThan(table.totalsCommitted[0]?.salary ?? 0);
+  });
+
+  it("applies prior bad-experience trust from an earlier season draft", async () => {
+    const { previewLocalTransfermarktBuy } = await import("@/lib/market/transfermarkt-local-service");
+    const gameState = persistenceState.save!.gameState;
+    gameState.season.id = "season-2";
+    gameState.seasonState.seasonId = "season-2";
+    gameState.seasonState.contractNegotiationDrafts = [
+      {
+        draftId: "contract-draft:season-1:A-A:fa-1",
+        saveId: "save-singleplayer-dev",
+        seasonId: "season-1",
+        teamId: "A-A",
+        playerId: "fa-1",
+        playerName: "fa-1",
+        contractLength: 2,
+        contractShape: "balanced",
+        expectedSalary: 6,
+        offeredSalary: 6,
+        yearlySalarySchedule: [],
+        totalSalary: 12,
+        roundingAdjustment: 0,
+        buyoutCost: 12,
+        bracket: 4,
+        teamFit: 8,
+        acceptanceScore: 40,
+        acceptChance: 20,
+        counterChance: 30,
+        rejectChance: 50,
+        reasons: [],
+        warnings: ["negotiation_cancelled_after_contact"],
+        blockingReasons: [],
+        status: "rejected_bad_experience",
+        updatedAt: new Date().toISOString(),
+      },
+    ];
+
+    const preview = previewLocalTransfermarktBuy({
+      saveId: "save-singleplayer-dev",
+      seasonId: "season-2",
+      teamId: "A-A",
+      playerId: "fa-1",
+    });
+
+    expect(preview.negotiationWarnings).toContain("previous_rejected_offer_reduces_trust");
   });
 });

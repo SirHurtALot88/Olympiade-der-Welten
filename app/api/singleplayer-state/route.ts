@@ -468,7 +468,13 @@ export async function POST(request: Request) {
   }
 
   return NextResponse.json({
-    save: save ? { saveId: save.saveId } : null,
+    save: save
+      ? {
+          saveId: save.saveId,
+          name: save.name,
+          saveVersion: save.gameState.saveVersion,
+        }
+      : null,
     saves: listSavesForMode(persistence, saveMode).map(serializeSaveSummary),
   });
 }

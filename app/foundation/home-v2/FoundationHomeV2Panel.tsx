@@ -31,7 +31,7 @@ export default function FoundationHomeV2Panel({ active, tab, overview, office }:
   }
 
   return (
-    <section className="panel foundation-home-v2-panel" id="foundation-home-v2">
+    <section className="panel foundation-home-v2-panel" id="foundation-home-v2" data-testid="foundation-home-v2">
       {tab === "overview" ? <HomeV2Client {...overview} /> : null}
       {tab === "office" ? <ManagerOfficeClient {...office} /> : null}
     </section>

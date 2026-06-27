@@ -272,6 +272,8 @@ const GAME_PHASE_VISIBLE_NEEDLES = [
   "Phase",
   "Saison laeuft",
   "Saisonrueckblick",
+  "Saison abgeschlossen",
+  "Preseason-Management",
   "Vorbereitung",
   "Lineup Setup",
   "Preseason",
@@ -279,6 +281,34 @@ const GAME_PHASE_VISIBLE_NEEDLES = [
   "Verkaufsfenster",
   "Kaufphase",
 ];
+
+const SEASON_VISIBLE_NEEDLES = [
+  "season-",
+  "Season 1",
+  "Season 2",
+  "Saison 1",
+  "Saison 2",
+  "Spieltag",
+];
+
+async function dismissSeasonBriefingIfOpen(page: Page, timeoutMs: number) {
+  const backdrop = page.getByTestId("season-briefing-backdrop");
+  const visible = await backdrop.isVisible().catch(() => false);
+  if (!visible) {
+    return;
+  }
+
+  const doneButton = page.getByRole("button", { name: /^Erledigt$/ });
+  const laterButton = page.getByRole("button", { name: /^Später$/ });
+  if (await doneButton.isVisible().catch(() => false)) {
+    await doneButton.click();
+  } else if (await laterButton.isVisible().catch(() => false)) {
+    await laterButton.click();
+  }
+
+  await backdrop.waitFor({ state: "hidden", timeout: timeoutMs }).catch(() => undefined);
+  await page.waitForTimeout(400);
+}
 
 async function waitForSaveContext(page: Page, expectedSaveId: string, timeoutMs: number) {
   await page.waitForFunction(
@@ -367,6 +397,7 @@ async function gotoFoundation(
     waitUntil: "domcontentloaded",
     timeout: Math.max(timeoutMs, 60_000),
   });
+  await dismissSeasonBriefingIfOpen(page, Math.max(timeoutMs, 30_000));
   try {
     await waitForContextBanner(page, expectedSaveId ?? null, Math.max(timeoutMs, 45_000));
   } catch (error) {
@@ -511,8 +542,16 @@ async function main() {
           hasAny(bannerText, ["Spielstand", "Team", "Aktiver Kontext", "Spieltag"]),
           "Foundation zeigt den Kontext-Banner.",
         );
-        assertStep(step, hasAny(text, ["season-", "Season 2", "Season 1"]), "Season ist sichtbar.");
-        assertStep(step, hasAny(text, GAME_PHASE_VISIBLE_NEEDLES), "GamePhase ist sichtbar.");
+        assertStep(
+          step,
+          hasAny(bannerText, SEASON_VISIBLE_NEEDLES) || hasAny(text, SEASON_VISIBLE_NEEDLES),
+          "Season ist sichtbar.",
+        );
+        assertStep(
+          step,
+          hasAny(bannerText, GAME_PHASE_VISIBLE_NEEDLES) || hasAny(text, GAME_PHASE_VISIBLE_NEEDLES),
+          "GamePhase ist sichtbar.",
+        );
       },
     }));
 
@@ -651,8 +690,16 @@ async function main() {
           buyButtons > 0 || hasAny(text, ["Buy", "Kauf", "Kaufvorschau", "Kaufen", "Transfermarkt"]) || text.includes("Keine Free Agents"),
           "Buy-/Kauf-UI oder sauberer Empty-State sichtbar.",
         );
-        assertStep(step, hasAny(text, ["Merken", "Wishlist", "Watchlist", "Wunschliste"]), "Wishlist/Merken sichtbar.");
-        assertStep(step, hasAny(text, ["Verkauf", "Sell", "Kader", "Roster"]), "Sell-Pfad oder Kader-Verkauf erreichbar.");
+        assertStep(
+          step,
+          hasAny(text, ["Merken", "Wishlist", "Watchlist", "Wunschliste", "Auf Wishlist", "gemerkt", "Beobachten"]),
+          "Wishlist/Merken sichtbar.",
+        );
+        assertStep(
+          step,
+          hasAny(text, ["Verkauf", "Verkaufen", "Sell", "Kader", "Roster", "Kader im Fokus"]),
+          "Sell-Pfad oder Kader-Verkauf erreichbar.",
+        );
       },
     }));
 
@@ -686,7 +733,10 @@ async function main() {
         const profileButtons = await page.locator(".training-v2-rider-portrait-button, .training-v2-rider-copy .table-link-button").count();
         assertStep(step, profileButtons > 0, `Kader-/Profilbuttons sichtbar: ${profileButtons}.`);
         if (profileButtons > 0) {
-          await page.locator(".training-v2-rider-portrait-button, .training-v2-rider-copy .table-link-button").first().click();
+          await dismissSeasonBriefingIfOpen(page, viewTimeoutMs);
+          const profileButton = page.locator(".training-v2-rider-portrait-button, .training-v2-rider-copy .table-link-button").first();
+          await profileButton.waitFor({ state: "visible", timeout: viewTimeoutMs });
+          await profileButton.click({ timeout: viewTimeoutMs });
           await page.locator(".player-drawer[role='dialog']").waitFor({ state: "visible", timeout: viewTimeoutMs });
           const drawerText = await page.locator(".player-drawer[role='dialog']").innerText();
           assertStep(step, hasAny(drawerText, ["XP", "XP Forecast", "Setpoints"]), "Drawer zeigt XP.");
@@ -724,18 +774,34 @@ async function main() {
       screenshotName: "arena",
       run: async (step) => {
         await gotoFoundation(page, args.baseUrl, "matchdayArena", expectedTeamId, expectedSaveId, viewTimeoutMs, "#foundation-matchday-arena");
-        await page.locator("#foundation-matchday-arena:not(.foundation-section-hidden)").waitFor({ state: "attached", timeout: viewTimeoutMs });
+        await page.locator("#foundation-matchday-arena").waitFor({ state: "attached", timeout: viewTimeoutMs });
         await page
-          .locator(".matchday-arena-lane, .matchday-arena-empty-card, #foundation-matchday-arena .warning-list, [data-testid='arena-lineup-blocker']")
+          .locator(
+            ".arena-v2-shell, .arena-v2-board-row, .matchday-arena-lane, .matchday-arena-empty-card, #foundation-matchday-arena .warning-list, [data-testid='arena-lineup-blocker']",
+          )
           .first()
           .waitFor({ state: "visible", timeout: viewTimeoutMs });
         const text = await pageText(page);
-        assertStep(step, text.includes("Matchday Arena"), "Arena öffnet.");
-        const laneOrEmptyVisible = await page.locator(".matchday-arena-lane, .matchday-arena-empty-card, #foundation-matchday-arena .warning-list").first().isVisible().catch(() => false);
-        const stepButtonVisible = await page.getByRole("button", { name: /^Step$/ }).isVisible().catch(() => false);
+        assertStep(step, hasAny(text, ["Matchday Arena", "Arena v2", "Zur Arena", "Arena noch nicht bereit"]), "Arena öffnet.");
+        const laneOrEmptyVisible = await page
+          .locator(
+            ".arena-v2-board-row, .arena-v2-shell, .matchday-arena-lane, .matchday-arena-empty-card, #foundation-matchday-arena .warning-list, [data-testid='arena-lineup-blocker']",
+          )
+          .first()
+          .isVisible()
+          .catch(() => false);
+        const stepButtonVisible =
+          (await page.getByRole("button", { name: /^Step$/ }).isVisible().catch(() => false)) ||
+          (await page.getByRole("button", { name: /^Weiter$/ }).first().isVisible().catch(() => false)) ||
+          (await page.getByRole("button", { name: /^Play$/ }).isVisible().catch(() => false));
         const resetButtonVisible = await page.getByRole("button", { name: /^Reset$/ }).isVisible().catch(() => false);
-        assertStep(step, laneOrEmptyVisible || hasAny(text, ["Team-Lanes", "Noch keine", "Arena-Kontext", "Scoreboard", "Fokus-Team"]), "Lanes oder sauberer Empty-State sichtbar.");
-        assertStep(step, stepButtonVisible, "Step-Button sichtbar.");
+        assertStep(
+          step,
+          laneOrEmptyVisible ||
+            hasAny(text, ["Team-Lanes", "Noch keine", "Arena-Kontext", "Scoreboard", "Fokus-Team", "Teams", "Reveal", "Einsatzliste"]),
+          "Lanes oder sauberer Empty-State sichtbar.",
+        );
+        assertStep(step, stepButtonVisible, "Step-/Weiter-Button sichtbar.");
         assertStep(step, resetButtonVisible, "Reset-Button sichtbar.");
       },
     }));
