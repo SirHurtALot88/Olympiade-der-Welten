@@ -4758,7 +4758,7 @@ export default function LegacyLineupLabClient(props: LegacyLineupLabClientProps)
     setMessage("");
 
     try {
-      const query = new URLSearchParams(params);
+      const query = withRoomQuery(new URLSearchParams(params));
       query.set("source", source);
       const response = await fetch(`/api/lineups/legacy/form-cards?${query.toString()}`, {
         method: "POST",
@@ -6098,13 +6098,13 @@ export default function LegacyLineupLabClient(props: LegacyLineupLabClientProps)
     setErrors([]);
     setMessage("");
     try {
-      const query = new URLSearchParams({
+      const query = withRoomQuery(new URLSearchParams({
         saveId: params.saveId,
         seasonId: params.seasonId,
         matchdayId: input.matchdayId,
         teamId: params.teamId,
         source,
-      });
+      }));
       const response = await fetch(`/api/lineups/legacy/form-card-plan?${query.toString()}`, {
         method: "PUT",
         headers: { "Content-Type": "application/json" },

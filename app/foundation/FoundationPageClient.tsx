@@ -9227,7 +9227,7 @@ export default function FoundationPageClient({
       const response = await fetch("/api/season/matchday-auto-run", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
+        body: JSON.stringify(withRoomBody({
           saveId: activeSaveId,
           seasonId: gameState.season.id,
           matchdayId: gameState.matchdayState.matchdayId,
@@ -9241,7 +9241,7 @@ export default function FoundationPageClient({
             stopOnTie: matchdayAutoRunStopOnTie,
             advanceAfterCashApply: true,
           },
-        }),
+        })),
       });
       const payload = (await response.json()) as {
         success?: boolean;
