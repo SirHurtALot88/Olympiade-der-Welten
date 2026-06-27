@@ -48,6 +48,48 @@ export function allowsAiPreseasonManualTeamOverride(input: {
   return /smoke|sandbox|test|block-/i.test(input.saveId);
 }
 
+function buildProtectedManualControlSettings(
+  teamId: string,
+  team: GameState["teams"][number] | undefined,
+  current: ReturnType<typeof buildTeamControlSettingsMap>[string] | undefined,
+) {
+  return {
+    ...current,
+    teamId,
+    controlMode: "manual" as const,
+    ownerId: current?.ownerId && current.ownerId !== "ai" ? current.ownerId : DEFAULT_ACTIVE_OWNER_ID,
+    ownerSlot: current?.ownerSlot && current.ownerSlot !== "ai" ? current.ownerSlot : "user",
+    displayLabel: current?.displayLabel ?? team?.shortCode ?? teamId,
+    aiLineupPreviewEnabled: false,
+    aiLineupApplyEnabled: false,
+    aiLineupAutoApplyEnabled: false,
+    aiTransferPreviewEnabled: false,
+    aiTransferAutoApplyEnabled: false,
+    aiSellPreviewEnabled: false,
+    aiSellAutoApplyEnabled: false,
+    notes: current?.notes ?? null,
+    strategyLock: current?.strategyLock ?? null,
+  };
+}
+
+function hasProtectedManualControlSettings(
+  settings: ReturnType<typeof buildTeamControlSettingsMap>[string] | undefined,
+): boolean {
+  if (!settings || settings.controlMode !== "manual") {
+    return false;
+  }
+
+  return (
+    settings.aiLineupPreviewEnabled === false &&
+    settings.aiLineupApplyEnabled === false &&
+    settings.aiLineupAutoApplyEnabled === false &&
+    settings.aiTransferPreviewEnabled === false &&
+    settings.aiTransferAutoApplyEnabled === false &&
+    settings.aiSellPreviewEnabled === false &&
+    settings.aiSellAutoApplyEnabled === false
+  );
+}
+
 export function protectManualPlayerTeams(gameState: GameState): GameState {
   const protectedHumanTeamIds = getProtectedHumanTeamIds(gameState);
   if (protectedHumanTeamIds.size === 0) {
@@ -69,30 +111,9 @@ export function protectManualPlayerTeams(gameState: GameState): GameState {
     [...protectedHumanTeamIds].map((teamId) => {
       const team = gameState.teams.find((entry) => entry.teamId === teamId);
       const current = existingControl[teamId];
-      const nextSettings = {
-        ...current,
-        teamId,
-        controlMode: "manual" as const,
-        ownerId: current?.ownerId && current.ownerId !== "ai" ? current.ownerId : DEFAULT_ACTIVE_OWNER_ID,
-        ownerSlot: current?.ownerSlot && current.ownerSlot !== "ai" ? current.ownerSlot : "user",
-        displayLabel: current?.displayLabel ?? team?.shortCode ?? teamId,
-        aiLineupPreviewEnabled: false,
-        aiLineupApplyEnabled: false,
-        aiLineupAutoApplyEnabled: false,
-        aiTransferPreviewEnabled: false,
-        aiTransferAutoApplyEnabled: false,
-        aiSellPreviewEnabled: false,
-        aiSellAutoApplyEnabled: false,
-        notes: current?.notes ?? null,
-        strategyLock: current?.strategyLock ?? null,
-      };
+      const nextSettings = buildProtectedManualControlSettings(teamId, team, current);
 
-      if (
-        current?.controlMode === "manual" &&
-        current.aiLineupAutoApplyEnabled === false &&
-        current.aiTransferAutoApplyEnabled === false &&
-        current.aiSellAutoApplyEnabled === false
-      ) {
+      if (hasProtectedManualControlSettings(current)) {
         return [teamId, current] as const;
       }
 

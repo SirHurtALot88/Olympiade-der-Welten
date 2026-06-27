@@ -173,4 +173,37 @@ describe("ai preseason manual team guard", () => {
 
     expect(protectManualPlayerTeams(gameState)).toBe(gameState);
   });
+
+  it("disables AI preview flags on protected manual teams in normal saves", () => {
+    const gameState = createGameState({
+      selectedTeamId: "H-R",
+      teamControlSettings: {
+        "H-R": {
+          teamId: "H-R",
+          controlMode: "manual",
+          ownerId: "user_local",
+          ownerSlot: "user",
+          displayLabel: "H-R",
+          aiLineupPreviewEnabled: true,
+          aiLineupApplyEnabled: false,
+          aiLineupAutoApplyEnabled: false,
+          aiTransferPreviewEnabled: true,
+          aiTransferAutoApplyEnabled: false,
+          aiSellPreviewEnabled: true,
+          aiSellAutoApplyEnabled: false,
+          notes: null,
+          strategyLock: null,
+        },
+      },
+      teams: [createTeam({ teamId: "H-R", humanControlled: true })],
+    });
+
+    const protectedState = protectManualPlayerTeams(gameState);
+    const hrSettings = protectedState.seasonState.teamControlSettings?.["H-R"];
+
+    expect(hrSettings?.controlMode).toBe("manual");
+    expect(hrSettings?.aiLineupPreviewEnabled).toBe(false);
+    expect(hrSettings?.aiTransferPreviewEnabled).toBe(false);
+    expect(hrSettings?.aiSellPreviewEnabled).toBe(false);
+  });
 });
