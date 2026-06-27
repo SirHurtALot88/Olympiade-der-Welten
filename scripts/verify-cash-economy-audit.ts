@@ -9,6 +9,8 @@ import { loadEnvConfig } from "@next/env";
 import path from "node:path";
 
 import { createPersistenceService } from "@/lib/persistence/persistence-service";
+import { buildTeamControlSettingsMap } from "@/lib/foundation/team-control-settings";
+import { buildEconomyAuditReport } from "@/lib/season/economy-audit-report";
 
 const PROJECT_ROOT = path.resolve(__dirname, "..");
 
@@ -19,10 +21,6 @@ function argValue(name: string) {
   const index = process.argv.indexOf(name);
   if (index >= 0) return process.argv[index + 1] ?? null;
   return null;
-}
-
-function round(value: number, digits = 2) {
-  return Number(value.toFixed(digits));
 }
 
 function main() {
@@ -40,40 +38,19 @@ function main() {
     process.exit(1);
   }
 
-  const cashPrizeLogs = save.gameState.seasonState.cashPrizeApplyLogs ?? [];
-  const sponsorLogs = save.gameState.seasonState.sponsorPayoutLogs ?? [];
-  const violations: string[] = [];
-
-  const appliedCashPrize = cashPrizeLogs.filter((log) => log.action === "apply");
-  if (appliedCashPrize.length > 0) {
-    violations.push(`FAIL: cash_prize_apply executed ${appliedCashPrize.length}x`);
+  const report = buildEconomyAuditReport({ saveId, gameState: save.gameState });
+  const controlSettings = buildTeamControlSettingsMap(save.gameState.teams, save.gameState.seasonState.teamControlSettings);
+  const manualTeamIds = new Set(
+    save.gameState.teams
+      .filter((team) => (controlSettings[team.teamId]?.controlMode ?? "manual") === "manual")
+      .map((team) => team.teamId),
+  );
+  const baseFirst = save.gameState.seasonState.sponsorPayoutLogs?.filter((log) => log.phase === "base_first") ?? [];
+  const unexpectedBaseFirst = baseFirst.filter((log) => !manualTeamIds.has(log.teamId));
+  if (unexpectedBaseFirst.length > 0) {
+    report.violations.push(`sponsor_base_first_executed_for_ai:${unexpectedBaseFirst.length}`);
+    report.ok = false;
   }
-
-  const baseFirst = sponsorLogs.filter((log) => log.phase === "base_first");
-  if (baseFirst.length > 0) {
-    violations.push(`FAIL: sponsor base_first executed ${baseFirst.length}x (expected deferred for AI)`);
-  }
-
-  const seasonEnd = sponsorLogs.filter((log) => log.phase === "season_end");
-  const seasonsWithEnd = [...new Set(seasonEnd.map((log) => log.seasonId))].sort();
-  const cashValues = save.gameState.teams.map((team) => team.cash);
-
-  const report = {
-    saveId,
-    seasonId: save.gameState.season.id,
-    gamePhase: save.gameState.gamePhase,
-    ok: violations.length === 0,
-    violations,
-    cashPrizeApplyLogs: appliedCashPrize.length,
-    sponsorBaseFirstLogs: baseFirst.length,
-    sponsorSeasonEndLogs: seasonEnd.length,
-    seasonsWithSponsorEndSettlement: seasonsWithEnd,
-    leagueCash: {
-      min: Math.min(...cashValues),
-      max: Math.max(...cashValues),
-      avg: round(cashValues.reduce((sum, value) => sum + value, 0) / cashValues.length),
-    },
-  };
 
   console.log(JSON.stringify(report, null, 2));
   if (!report.ok) {

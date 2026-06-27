@@ -296,7 +296,7 @@ type SeasonV2GmRow = {
   history: SeasonV2GmHistoryRow[];
 };
 
-type SeasonStandingsV2ClientProps = {
+export type SeasonStandingsV2ClientProps = {
   selectedSeasonId: string;
   selectedSeasonLabel: string;
   sourceLabel: string;
@@ -321,6 +321,7 @@ type SeasonStandingsV2ClientProps = {
   onViewModeChange?: (mode: SeasonV2ViewMode) => void;
   onOpenRanks?: (() => void) | null;
   onOpenPrize?: (() => void) | null;
+  isLoading?: boolean;
 };
 
 function formatNumber(value: number | null | undefined, digits = 1) {
@@ -577,6 +578,7 @@ export default function SeasonStandingsV2Client({
   onViewModeChange,
   onOpenRanks,
   onOpenPrize,
+  isLoading = false,
 }: SeasonStandingsV2ClientProps) {
   const standingsPowPool = useMemo(() => standingsRows.map((row) => row.pow), [standingsRows]);
   const standingsSpePool = useMemo(() => standingsRows.map((row) => row.spe), [standingsRows]);
@@ -606,7 +608,7 @@ export default function SeasonStandingsV2Client({
     direction: "asc",
   });
   const [showTopPlayerAxes, setShowTopPlayerAxes] = useState(true);
-  const [showFinanceColumns, setShowFinanceColumns] = useState(true);
+  const [showFinanceColumns, setShowFinanceColumns] = useState(false);
   const [internalSeasonV2Mode, setInternalSeasonV2Mode] = useState<SeasonV2ViewMode>(SEASON_V2_DEFAULT_MODE);
   const seasonV2Mode = viewMode ?? internalSeasonV2Mode;
   const setSeasonV2Mode = (mode: SeasonV2ViewMode) => {
@@ -1392,6 +1394,16 @@ export default function SeasonStandingsV2Client({
                 </tr>
               </thead>
               <tbody>
+                {isLoading && standingsRows.length === 0 ? (
+                  Array.from({ length: 6 }, (_, index) => (
+                    <tr key={`season-v2-skeleton-${index}`} className="season-v2-table-row is-skeleton" aria-hidden="true">
+                      <td colSpan={visibleStandingsColumnIds.length}>
+                        <div className="season-v2-table-skeleton-row" style={{ width: `${Math.max(52, 96 - index * 6)}%` }} />
+                      </td>
+                    </tr>
+                  ))
+                ) : (
+                  <>
                 {standingsTableVirtualWindow.enabled ? (
                   <tr aria-hidden="true">
                     <td colSpan={visibleStandingsColumnIds.length} style={{ height: standingsTableVirtualWindow.offsetY, padding: 0, border: 0 }} />
@@ -1484,6 +1496,8 @@ export default function SeasonStandingsV2Client({
                     />
                   </tr>
                 ) : null}
+                  </>
+                )}
               </tbody>
             </table>
           </div>

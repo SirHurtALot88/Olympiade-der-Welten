@@ -145,6 +145,9 @@ describe("matchday arena ui contract", () => {
     expect(arenaText).toContain("Finale Tageswerte werden im Result freigeschaltet.");
     expect(arenaText).toContain('fetch("/api/season/matchday-mvp-score"');
     expect(arenaText).toContain('fetch(`/api/matchday/arena-base?${contextQuery.toString()}`');
+    expect(arenaText).toContain('includeDetails: "0"');
+    expect(arenaText).toContain("arena-v2-broadcast-panel");
+    expect(arenaText).toContain("arena-v2-board-skeleton-row");
     expect(arenaText).toContain("Promise.allSettled");
     expect(arenaText).toContain("loadResolvePreview");
     expect(arenaText).toContain("formatArenaLoadStageLabel");

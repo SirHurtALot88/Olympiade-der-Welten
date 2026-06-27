@@ -24263,6 +24263,98 @@ a {
   animation: arena-v2-loading-pulse 1.6s ease-in-out infinite;
 }
 
+.arena-v2-board-skeleton-rows {
+  display: grid;
+  gap: var(--arena-v2-board-list-gap, 8px);
+  width: min(100%, 720px);
+  margin: 8px auto 0;
+}
+
+.arena-v2-board-skeleton-row {
+  height: var(--arena-v2-board-row-size, 58px);
+  border-radius: 12px;
+  background: linear-gradient(
+    90deg,
+    rgba(122, 145, 187, 0.12) 0%,
+    rgba(164, 214, 255, 0.22) 45%,
+    rgba(122, 145, 187, 0.12) 100%
+  );
+  background-size: 200% 100%;
+  animation: arena-v2-skeleton-shimmer 1.4s ease-in-out infinite;
+}
+
+.arena-v2-broadcast-panel {
+  margin: 0 0 12px;
+  padding: 14px 16px;
+  border-radius: 16px;
+  border: 1px solid rgba(164, 214, 255, 0.18);
+  background: linear-gradient(135deg, rgba(18, 28, 48, 0.92), rgba(10, 16, 28, 0.88));
+}
+
+.arena-v2-broadcast-stage {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr);
+  gap: 12px;
+  align-items: center;
+}
+
+.arena-v2-broadcast-team {
+  display: grid;
+  gap: 4px;
+  padding: 10px 12px;
+  border-radius: 12px;
+  background: rgba(255, 255, 255, 0.03);
+}
+
+.arena-v2-broadcast-team.is-leader {
+  border: 1px solid rgba(164, 214, 255, 0.28);
+}
+
+.arena-v2-broadcast-rank {
+  color: rgba(164, 214, 255, 0.82);
+  font-size: 0.72rem;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.arena-v2-broadcast-team strong {
+  font-size: 1rem;
+}
+
+.arena-v2-broadcast-team small {
+  color: rgba(214, 220, 230, 0.76);
+  font-size: 0.78rem;
+}
+
+.arena-v2-broadcast-vs {
+  display: grid;
+  gap: 2px;
+  justify-items: center;
+  padding: 0 8px;
+  text-align: center;
+}
+
+.arena-v2-broadcast-vs span {
+  color: rgba(164, 214, 255, 0.78);
+  font-size: 0.72rem;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+
+.arena-v2-broadcast-vs strong {
+  font-size: 1.05rem;
+  color: rgba(214, 236, 255, 0.96);
+}
+
+@keyframes arena-v2-skeleton-shimmer {
+  0% {
+    background-position: 100% 0;
+  }
+  100% {
+    background-position: -100% 0;
+  }
+}
+
 .arena-v2-side-loading {
   animation: arena-v2-loading-pulse 1.8s ease-in-out infinite;
 }
@@ -31359,6 +31451,24 @@ a {
   background: rgba(99, 146, 226, 0.18);
   outline: 1px solid rgba(132, 178, 255, 0.34);
   outline-offset: -1px;
+}
+
+.season-v2-table-row.is-skeleton td {
+  padding: 8px 10px;
+  border: 0;
+}
+
+.season-v2-table-skeleton-row {
+  height: 28px;
+  border-radius: 10px;
+  background: linear-gradient(
+    90deg,
+    rgba(122, 145, 187, 0.12) 0%,
+    rgba(164, 214, 255, 0.2) 45%,
+    rgba(122, 145, 187, 0.12) 100%
+  );
+  background-size: 200% 100%;
+  animation: arena-v2-skeleton-shimmer 1.4s ease-in-out infinite;
 }
 
 .season-v2-table tbody tr:hover,

@@ -207,9 +207,9 @@ describe("game flow controller", () => {
     });
 
     expect(flow.currentStepId).toBe("scouting_facilities");
-    expect(flow.currentStep.targetView).toBe("trainingV2");
-    expect(flow.currentStep.targetPanel).toBe("facilities");
-    expect(flow.currentStep.cta).toContain("Gebäude");
+    expect(flow.currentStep.targetView).toBe("scoutingCenterV2");
+    expect(flow.currentStep.targetPanel).toBeNull();
+    expect(flow.currentStep.cta).toContain("Scouting");
     expect(flow.nextStepId).toBe("buy_players");
   });
 

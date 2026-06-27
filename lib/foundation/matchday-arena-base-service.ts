@@ -169,7 +169,7 @@ export async function loadMatchdayArenaBase(input: {
   let resolvePreview: LegacyMatchdayResolvePreviewPayload | null = null;
   let standingsPreview: Awaited<ReturnType<typeof buildStandingsPreview>> | null = null;
 
-  if (input.includeDetails !== false) {
+  if (input.includeDetails === true) {
     const resolveCacheKey = `${save.saveId}:${params.seasonId}:${params.matchdayId}`;
     const cacheSignature = contentSignature ?? `${versionMeta?.updatedAt ?? save.updatedAt}`;
     resolvePreview =

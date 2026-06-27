@@ -2,14 +2,14 @@
 
 **Ziel:** Ein Solo-Spielstand, ein manuelles Team, voller Spieltag-Loop ohne Dead-End.
 
-**Letzter Smoke:** 2026-06-26 (Build + CI 116/116, Home-Panel extrahiert, Playwright-Smoke lokal)
+**Letzter Smoke:** 2026-06-27 (Build + CI 119/119, Arena compact load, Home/Season panel split)
 
 | Check | Status | Notiz |
 |-------|--------|-------|
 | Production Build | 🟢 | `npm run build` grün |
-| CI flow-smoke | 🟢 | 116/116 Tests (`npm run ci:flow-smoke`) |
+| CI flow-smoke | 🟢 | 119/119 Tests (`npm run ci:flow-smoke`) |
 | Perf regression | 🟢 | `npm run perf:regression-smoke` (<250ms Version-Metadata) |
-| Playwright gameplay | 🟢 | CI: `.github/workflows/ci.yml` (`playwright install chromium` + `npm run app:smoke-gameplay`); lokal: `npx playwright install chromium && npm run app:smoke-gameplay -- --no-start --base-url=http://127.0.0.1:3000` |
+| Playwright gameplay | 🟢 | CI + lokal via `npm run app:smoke-gameplay` (Arena compact, Season-Archiv, Flow-Gates) |
 | Save laden | 🟢 | Dev-Server lädt Long Run Sandbox mit A-A · Armageddon Aftermath |
 | Home Top-6 Karten | 🟢 | POW/SPE/MEN/SOC ohne Noten; CA absolut + PO-Range (kein „Gering“/„F“) |
 | Home/Inbox: nächster Schritt | 🟢 | Flow-Controller zeigt korrekten Schritt mit `globalNextLabel` |
@@ -28,12 +28,31 @@
 | Gehalt/MW-Delta-Stack | 🟢 | Deltas unter Wert in Kader-Tabelle, Roster-Grids und Home-Karten |
 | Ranira Bold Italic | 🟢 | `font-style: italic; font-weight: 700` auf Body/Foundation-Shell |
 
+## Economy P0 (2026-06-27)
+
+| Check | Status | Notiz |
+|-------|--------|-------|
+| Cash-Prize nur Benchmark | 🟢 | `cashPrizeApplyLogs=0` auf frischem S1-Audit-Save |
+| Sponsor AI `base_first` deferred | 🟢 | Nur manuelles Team darf `base_first`; Verify filtert AI-Teams |
+| Season-End Sponsor Settlement | 🟢 | 35× `season_end` nach S1 (`fresh-season-1-1782553543626`) |
+| Repair-Buy Cash | 🟢 | Keine `preseason_roster_repair_buy` mit Fee=0 / negative Cash |
+| Economy Audit Script | 🟢 | `npx tsx scripts/verify-cash-economy-audit.ts --save-id <id>` |
+| Realistic Multi-Sim Report | 🟢 | `economyAudit` Block in `scripts/season-realistic-multi-sim.ts` |
+
 Legende: 🟢 OK · 🟡 teilweise / Re-Test nötig · 🔴 blockiert
 
 ## Was noch 🟡 ist
 
-- **Playwright-Smoke lokal** — `npx playwright install chromium` dann `npm run app:smoke-gameplay -- --no-start --base-url=http://127.0.0.1:3000`
-- **Voller Browser-Loop inkl. Apply** — nach Blocker-Fixes noch einmal manuell durchspielen
+- **Voller Browser-Loop inkl. Apply** — nach MW/Briefing/Saison-Archiv-Fixes einmal manuell S1→Season-End→S2 durchspielen (Script: `scripts/full-season-ui-playthrough.ts`)
+
+## Performance (2026-06-27)
+
+| Change | Effekt |
+|--------|--------|
+| Arena `includeDetails=0` | Erster Arena-Load ohne Resolve/Standings auf dem Basis-Endpoint; Details per `/api/resolve/legacy-matchday-preview` + `/api/standings/preview` |
+| `FoundationSeasonV2Panel` | Saisonstand aus Monolith extrahiert; Feed nur bei aktiver Season-View |
+| Home Management Feed | Nur noch bei Home-Tab „Office“, nicht mehr beim Overview-Start |
+| Saisonstand UX | Top-5 + eigenes Team, Finanzspalten default eingeklappt, Tabellen-Skeleton |
 
 ## Performance (2026-06-26)
 

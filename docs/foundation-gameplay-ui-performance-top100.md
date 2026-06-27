@@ -22,12 +22,12 @@ Status: laufende Arbeitsliste fuer die naechsten UI-/Gameplay-/Performance-Patch
 - Eingebettete Einsatzliste darf Kontext/Preview nicht doppelt laden. Status: erledigt.
 - Live-Save-Refresh darf schwere Feeds nur fuer den aktiven Tab nachladen. Status: erledigt.
 - Teams-Tab startet als leichter Kader-/Board-Fokus; Vergleich, History und grosse Tabellen bauen erst nach Klick. Status: erledigt, siehe `docs/tab-performance-hotspots-v2.md`.
-- Arena-Preview ist entkoppelt: Basis/Score zuerst, Resolve/Standings im Hintergrund. Status: erledigt.
+- Arena-Preview ist entkoppelt: Basis/Score zuerst, Resolve/Standings im Hintergrund. Status: erledigt (`includeDetails=0` auf `/api/matchday/arena-base`, Details per Preview-APIs).
 - Markt-, Historie-, Recap-, Resolve- und Standings-Fetches sind abortable. Status: erledigt.
 - Version-Polling ist von 4s auf 25s plus Visibility-Pause entschaerft. Status: erledigt; aktuell 45s plus leichter Metadata-Pfad (<50ms).
 
 ## Einsatzliste
-15. Slot-Status mit klaren Labels: offen, gefuellt, Konflikt, speichern.
+15. Slot-Status mit klaren Labels: offen, gefuellt, Konflikt, speichern. Status: erledigt (Draft-Slots: `legacy-lineup-slot-state-pill`, Issue-Chips, Save-CTA).
 16. D1/D2-Flow als zwei sichtbare Arbeitsschritte statt langer Liste.
 17. Team-Boost-Panel sticky neben den Slots halten.
 18. "Beste Kandidaten" mit Grund anzeigen: Score, Fit, Fatigue, Rolle.
@@ -46,7 +46,7 @@ Status: laufende Arbeitsliste fuer die naechsten UI-/Gameplay-/Performance-Patch
 31. Fehlende Teamliste in Arena direkt zur Einsatzliste fuehren.
 
 ## Arena
-32. Broadcast-Modus mit grosser Top-Duell-Buehne.
+32. Broadcast-Modus mit grosser Top-Duell-Buehne. Status: erledigt (`arena-v2-broadcast-panel` waehrend Slots-Phase).
 33. Phasen-Reveal mit klarer "naechster Reveal"-Taste.
 34. Score-Delta animiert einblenden.
 35. Gewinnerzeile kurz hervorheben.
@@ -60,7 +60,7 @@ Status: laufende Arbeitsliste fuer die naechsten UI-/Gameplay-/Performance-Patch
 43. Tabellenbereich virtualisieren oder begrenzen.
 44. Spielerbilder im Reveal lazy halten.
 45. Sticky Mini-Score oben auf Mobile.
-- Arena-Ladezustand als Skeleton statt leerer Panel.
+- Arena-Ladezustand als Skeleton statt leerer Panel. Status: erledigt (`arena-v2-board-skeleton-row`).
 
 ## Home
 46. Home weiter als Manager-Zentrale straffen.
@@ -111,27 +111,27 @@ Status: laufende Arbeitsliste fuer die naechsten UI-/Gameplay-/Performance-Patch
 85. Transferhistorie mit Story-Karten vor Tabelle.
 
 ## Saisonstand/Ranks/Diszis
-86. Saisonstand zuerst Top 5 + eigenes Team zeigen.
+86. Saisonstand zuerst Top 5 + eigenes Team zeigen. Status: erledigt (`displayStandingsRows`, „Alle Teams“-Toggle).
 87. POW/SPE/MEN/SOC-Farben beibehalten, Rang klein dazu.
-88. Finanzspalten standardmaessig einklappbar.
+88. Finanzspalten standardmaessig einklappbar. Status: erledigt (Default `showFinanceColumns=false`, Kern/Finanzen-Toggle).
 89. Tabellenkopf-Texte mit Tooltips.
 90. Sticky aktive Teamzeile pruefen.
 91. Historische Punkte als Trend statt Zahlenwand.
 92. Diszi-Konfig als Karten + Tabelle danach.
 93. Mobile Tabellen horizontal stabiler.
 94. Spaltenpresets klarer benennen.
-95. Tabellen-Skeletons beim Laden.
+95. Tabellen-Skeletons beim Laden. Status: erledigt (`season-v2-table-skeleton-row`, `isLoading`-Prop).
 
 ## Technik/Performance
 96. Dev-Server Browser-Performance-Audit pro Haupttab.
-97. Memo-Grenzen fuer Home/Teams/Market weiter schaerfen.
+97. Memo-Grenzen fuer Home/Teams/Market weiter schaerfen. Status: teilweise (`FoundationSeasonV2Panel`, Home-Management nur Office-Tab).
 98. Grosse Tabellen listenweise paginieren oder virtualisieren. Status: weiter umgesetzt mit Transfermarkt-Schnellansicht und paginierter Transferhistorie; weitere Tabellen offen.
 99. Bilder oberhalb des Folds eager, alle anderen lazy.
 100. Alte TypeScript-Testfehler getrennt aufraeumen, damit Checks wieder voll gruen werden.
 
 ## QA V1 Neue Findings
 - Teams-Tab entlasten: 22s Baseline durch Tabellen-/History-Vollrender und alte Arena-Requests. Status: erledigt in V2, neuer Wert ca. 10,4s im Dev-QA.
-- Arena-Preview/Standings beschleunigen oder entkoppeln: Resolve/Standings lagen bei 11-12s. Status: entkoppelt in V2, Caching/Buendelung bleibt offen.
+- Arena-Preview/Standings beschleunigen oder entkoppeln: Resolve/Standings lagen bei 11-12s. Status: erledigt in V3 (`includeDetails=0`, separate Preview-Endpoints).
 - Markt- und History-Fetches mit AbortController abbrechen, damit alte Requests nach Tabwechsel nicht weiterlaufen. Status: erledigt fuer UI-Fetches; Server kann bereits gestartete Dev-Requests noch fertig loggen.
 - Saisonstand-Teamlogos und grosse Tabellenabschnitte weiter lazy/limitiert rendern.
 - Version-Polling von 4s auf Idle-/Visibility-/Action-Takt pruefen. Status: V2 auf 25s plus hidden-pause entschaerft.

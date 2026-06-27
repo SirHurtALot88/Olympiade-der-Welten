@@ -19,8 +19,11 @@ describe("season standings v2 ui contract", () => {
     expect(seasonText).toContain("Datenansicht");
     expect(seasonText).toContain("Vergangene Saisons");
     expect(seasonText).toContain("season-v2-history-strip");
-    expect(seasonText).toContain("Saison wählen");
-    expect(foundationText).toContain('{ id: "table", label: "Datenansicht" }');
+    expect(seasonText).toContain("season-v2-table-skeleton-row");
+    expect(seasonText).toContain("isLoading = false");
+    expect(foundationText).toContain("FoundationSeasonV2Panel");
+    expect(foundationText).toContain('shouldLoadSeasonOverviewFeed');
+    expect(foundationText).toContain('homeV2Tab === "office"');
     expect(foundationText).toContain('{ id: "gms", label: "Manager" }');
     expect(foundationText).not.toContain('{ id: "cards", label: "Karten" }');
   });

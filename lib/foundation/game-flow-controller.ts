@@ -1,4 +1,6 @@
-import type { GamePhase, GameState, NewGameFlowStepStatus } from "@/lib/data/olyDataTypes";
+import type { GamePhase, GameState, NewGameFlowStepId, NewGameFlowStepStatus } from "@/lib/data/olyDataTypes";
+import { evaluateGamePhaseAction } from "@/lib/foundation/game-phase-action-policy";
+import { getTransferWindowStatus } from "@/lib/market/transfer-window-policy";
 import { GAME_LANGUAGE } from "@/lib/ui/game-language";
 import {
   activeTeamHasFormCardPool,
@@ -38,6 +40,7 @@ export type GameFlowView =
   | "trainingV2"
   | "prize"
   | "market"
+  | "scoutingCenterV2"
   | "admin";
 
 export type GameFlowStep = {
@@ -75,6 +78,7 @@ function uniq(values: Array<string | null | undefined>) {
 function step(input: Omit<GameFlowStep, "blockers" | "warnings"> & { blockers?: string[]; warnings?: string[] }): GameFlowStep {
   return {
     ...input,
+    targetPanel: input.targetPanel ?? null,
     blockers: uniq(input.blockers ?? []),
     warnings: uniq(input.warnings ?? []),
   };
@@ -192,20 +196,32 @@ function buildPreseasonSteps(gameState: GameState, activeTeamId: string | null):
       stepId: "sell_players",
       label: "Spieler verkaufen",
       cta: "Weiter: Spieler verkaufen",
-      status: !hasActiveTeam ? "blocked" : activeRosterCount === 0 ? "completed" : "ready",
+      status: !hasActiveTeam
+        ? "blocked"
+        : activeRosterCount === 0
+          ? "completed"
+          : buildTransferStepGate(gameState, "sell_players").allowed
+            ? "ready"
+            : "blocked",
       targetView: "teams",
       targetPanel: "roster",
       teamId: activeTeamId,
-      blockers: hasActiveTeam ? [] : ["no_active_team"],
+      blockers: !hasActiveTeam
+        ? ["no_active_team"]
+        : buildTransferStepGate(gameState, "sell_players").blockers,
+      warnings: buildTransferStepGate(gameState, "sell_players").warnings,
     }),
     step({
       stepId: "buy_players",
       label: "Spieler kaufen",
       cta: "Weiter: Spieler kaufen",
-      status: hasActiveTeam ? "ready" : "blocked",
+      status: !hasActiveTeam ? "blocked" : buildTransferStepGate(gameState, "buy_players").allowed ? "ready" : "blocked",
       targetView: "market",
       teamId: activeTeamId,
-      blockers: hasActiveTeam ? [] : ["no_active_team"],
+      blockers: !hasActiveTeam
+        ? ["no_active_team"]
+        : buildTransferStepGate(gameState, "buy_players").blockers,
+      warnings: buildTransferStepGate(gameState, "buy_players").warnings,
     }),
     step({
       stepId: "set_training",
@@ -235,9 +251,26 @@ function buildPreseasonSteps(gameState: GameState, activeTeamId: string | null):
   ];
 }
 
-function onboardingStepStatus(
+function getOnboardingTargetRosterCount(gameState: GameState, activeTeamId: string | null) {
+  const team = activeTeamId ? gameState.teams.find((entry) => entry.teamId === activeTeamId) : null;
+  return Math.max(10, Math.min(12, team?.rosterLimit ?? 12));
+}
+
+function teamHasSeasonTransferActivity(gameState: GameState, teamId: string | null, seasonId: string) {
+  if (!teamId) {
+    return false;
+  }
+  return gameState.transferHistory.some(
+    (transfer) =>
+      transfer.seasonId === seasonId && (transfer.toTeamId === teamId || transfer.fromTeamId === teamId),
+  );
+}
+
+function resolveOnboardingStepStatus(
   flow: NonNullable<GameState["seasonState"]["newGameFlow"]> | null | undefined,
-  stepId: string,
+  stepId: NewGameFlowStepId,
+  gameState: GameState,
+  activeTeamId: string | null,
 ): GameFlowStepStatus {
   const entry = flow?.steps?.find((step) => step.stepId === stepId);
   if (!flow?.active || flow.dismissed || !entry) {
@@ -246,7 +279,44 @@ function onboardingStepStatus(
   if (entry.status === "completed" || entry.status === "skipped") {
     return "completed";
   }
+
+  const rosterCount = getActiveTeamRosterPlayerIds(gameState, activeTeamId).length;
+  const targetRosterCount = getOnboardingTargetRosterCount(gameState, activeTeamId);
+  const hasTransfers = teamHasSeasonTransferActivity(gameState, activeTeamId, gameState.season.id);
+
+  if (stepId === "team_confirm") {
+    return activeTeamId ? "completed" : "ready";
+  }
+  if (stepId === "roster_review") {
+    return rosterCount > 0 ? "completed" : "ready";
+  }
+  if (stepId === "first_transfers") {
+    return hasTransfers ? "completed" : "ready";
+  }
+  if (stepId === "fill_roster") {
+    return rosterCount >= targetRosterCount ? "completed" : "ready";
+  }
+  if (stepId === "training_facilities") {
+    return activeTeamTrainingComplete(gameState, activeTeamId) ? "completed" : "ready";
+  }
+  if (stepId === "choose_sponsor") {
+    return activeTeamId && getTeamSponsorContract(gameState, activeTeamId) ? "completed" : "ready";
+  }
+  if (stepId === "set_lineup") {
+    const lineup = getActiveTeamLineup(gameState, activeTeamId);
+    return isCurrentMatchdayLineupComplete(gameState, lineup) ? "completed" : "ready";
+  }
+
   return "ready";
+}
+
+function buildTransferStepGate(gameState: GameState, action: "buy_players" | "sell_players") {
+  const gate = evaluateGamePhaseAction(gameState, action);
+  return {
+    allowed: gate.allowed,
+    blockers: gate.allowed || !gate.reason ? [] : [gate.reason],
+    warnings: gate.warnings,
+  };
 }
 
 function buildOnboardingFlowSteps(gameState: GameState, activeTeamId: string | null): GameFlowStep[] {
@@ -261,7 +331,7 @@ function buildOnboardingFlowSteps(gameState: GameState, activeTeamId: string | n
       stepId: "team_confirm",
       label: "Team bestätigen",
       cta: "Weiter: Team bestätigen",
-      status: onboardingStepStatus(flow, "team_confirm"),
+      status: resolveOnboardingStepStatus(flow, "team_confirm", gameState, teamId),
       targetView: "home",
       teamId,
     }),
@@ -269,7 +339,7 @@ function buildOnboardingFlowSteps(gameState: GameState, activeTeamId: string | n
       stepId: "roster_review",
       label: "Kader prüfen",
       cta: "Weiter: Kader prüfen",
-      status: onboardingStepStatus(flow, "roster_review"),
+      status: resolveOnboardingStepStatus(flow, "roster_review", gameState, teamId),
       targetView: "teams",
       targetPanel: "roster",
       teamId,
@@ -278,25 +348,38 @@ function buildOnboardingFlowSteps(gameState: GameState, activeTeamId: string | n
       stepId: "first_transfers",
       label: "Erste Transfers",
       cta: "Weiter: Transfermarkt",
-      status: onboardingStepStatus(flow, "first_transfers"),
+      status: resolveOnboardingStepStatus(flow, "first_transfers", gameState, teamId),
       targetView: "market",
       teamId,
+      ...(() => {
+        const gate = buildTransferStepGate(gameState, "buy_players");
+        return {
+          blockers: gate.allowed ? [] : gate.blockers,
+          warnings: gate.warnings,
+        };
+      })(),
     }),
     step({
       stepId: "fill_roster",
       label: "Kader auffüllen",
       cta: "Weiter: Transfermarkt",
-      status: onboardingStepStatus(flow, "fill_roster"),
+      status: resolveOnboardingStepStatus(flow, "fill_roster", gameState, teamId),
       targetView: "market",
       teamId,
+      ...(() => {
+        const gate = buildTransferStepGate(gameState, "buy_players");
+        return {
+          blockers: gate.allowed ? [] : gate.blockers,
+          warnings: gate.warnings,
+        };
+      })(),
     }),
     step({
       stepId: "training_facilities",
-      label: "Training & Gebäude",
-      cta: "Weiter: Training prüfen",
-      status: onboardingStepStatus(flow, "training_facilities"),
-      targetView: "trainingV2",
-      targetPanel: "facilities",
+      label: "Scouting & Gebäude",
+      cta: "Weiter: Scouting prüfen",
+      status: resolveOnboardingStepStatus(flow, "training_facilities", gameState, teamId),
+      targetView: "scoutingCenterV2",
       teamId,
     }),
     step({
@@ -309,11 +392,11 @@ function buildOnboardingFlowSteps(gameState: GameState, activeTeamId: string | n
           : getTeamSponsorContract(gameState, teamId)
             ? "completed"
             : (() => {
-                const trainingStatus = onboardingStepStatus(flow, "training_facilities");
+                const trainingStatus = resolveOnboardingStepStatus(flow, "training_facilities", gameState, teamId);
                 if (trainingStatus !== "completed") {
                   return "blocked";
                 }
-                return onboardingStepStatus(flow, "choose_sponsor");
+                return resolveOnboardingStepStatus(flow, "choose_sponsor", gameState, teamId);
               })(),
       targetView: "teams",
       targetPanel: "sponsor-choice",
@@ -376,11 +459,10 @@ function buildMatchdaySteps(gameState: GameState, activeTeamId: string | null): 
     }),
     step({
       stepId: "scouting_facilities",
-      label: "Scouting & Gebäude prüfen",
-      cta: "Weiter: Gebäude prüfen",
+      label: "Scouting prüfen",
+      cta: "Weiter: Scouting Hub",
       status: !hasActiveTeam ? "blocked" : activeRosterCount === 0 && !trainingFacilitiesHandled ? "ready" : "completed",
-      targetView: "trainingV2",
-      targetPanel: "facilities",
+      targetView: "scoutingCenterV2",
       teamId: activeTeamId,
       blockers: hasActiveTeam ? [] : ["no_active_team"],
     }),
@@ -388,11 +470,24 @@ function buildMatchdaySteps(gameState: GameState, activeTeamId: string | null): 
       stepId: "buy_players",
       label: "Kader aufbauen",
       cta: "Weiter: Transfermarkt",
-      status: !hasActiveTeam ? "blocked" : activeRosterCount === 0 ? "ready" : "completed",
+      status: !hasActiveTeam
+        ? "blocked"
+        : activeRosterCount === 0
+          ? buildTransferStepGate(gameState, "buy_players").allowed
+            ? "ready"
+            : "blocked"
+          : "completed",
       targetView: "market",
       teamId: activeTeamId,
-      blockers: hasActiveTeam ? [] : ["no_active_team"],
-      warnings: activeRosterCount === 0 ? ["empty_roster"] : [],
+      blockers: !hasActiveTeam
+        ? ["no_active_team"]
+        : activeRosterCount === 0
+          ? buildTransferStepGate(gameState, "buy_players").blockers
+          : [],
+      warnings:
+        activeRosterCount === 0
+          ? ["empty_roster", ...buildTransferStepGate(gameState, "buy_players").warnings]
+          : buildTransferStepGate(gameState, "buy_players").warnings.filter((warning) => warning === "transfer_window_closed"),
     }),
     step({
       stepId: "choose_sponsor",
@@ -446,8 +541,8 @@ function buildMatchdaySteps(gameState: GameState, activeTeamId: string | null): 
     }),
     step({
       stepId: "assign_formcards",
-      label: "Formkarten zuweisen",
-      cta: "Weiter: Formkarten prüfen",
+      label: "Formkarten-Pool prüfen",
+      cta: "Weiter: Formkarten-Pool",
       status: !hasActiveTeam
         ? "blocked"
         : !formCardsRequired
@@ -626,6 +721,10 @@ export function shouldAutoOpenSeasonBriefing(
   }
 
   return true;
+}
+
+export function getGameFlowTransferWindowHint(gameState: GameState) {
+  return getTransferWindowStatus(gameState);
 }
 
 export function buildGameFlowState(input: { gameState: GameState; activeTeamId?: string | null }): GameFlowState {

@@ -13,7 +13,7 @@ Start: `npm run play`
 - [ ] Home/Inbox zeigt klaren **nächsten Schritt**
 - [ ] Training für alle Kader-Spieler gesetzt
 - [ ] Einsatzliste voll (9/9 o.ä.)
-- [ ] Formkarten gesetzt
+- [ ] Formkarten-Pool vorhanden (Zuweisung optional)
 - [ ] **Lineup bestätigt** (nicht nur gespeichert — Status „submitted“)
 - [ ] **Arena startet** und zeigt Reveal/Ergebnis
 - [ ] Nach Arena: nächster Spieltag ohne Cockpit-Geheimwissen
@@ -21,7 +21,24 @@ Start: `npm run play`
 **Notizen:**
 
 ```
+Blocker-ID (falls Stall):
 ```
+
+---
+
+## Blocker-IDs (Diagnose)
+
+| ID | Bedeutung | Fix |
+|----|-----------|-----|
+| `lineup_not_submitted` | Slots voll, Lineup nicht bestätigt | Einsatzliste → „Lineup bestätigen“ |
+| `missing_lineup` / `incomplete_lineup` | Slots/Kader noch nicht spielbereit | Einsatzliste füllen |
+| `missing_formcard_pool` | Kein Formkarten-Pool für die Season | Einsatzliste → Pool erzeugen |
+| `training_missing` | Nicht alle Spieler haben Training | Training Compact |
+| `phase_blocked:buy_players:*` | Transferfenster zu | Warten auf Preseason/Setup-Fenster |
+| `resolve_status:missing_lineups` | Andere Teams ohne Lineup | AI-Lineups / Cockpit |
+| `board_objectives_failed` | Board-Ziel verfehlt | Team → Board Objectives |
+
+Automatisierter Check: `npm run ci:flow-smoke`
 
 ---
 
@@ -53,6 +70,7 @@ Start: `npm run play`
 ZIEL:
 ERWARTUNG:
 IST-ZUSTAND:
+Blocker-ID:
 Team / URL:
 ```
 

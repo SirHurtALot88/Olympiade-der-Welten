@@ -171,6 +171,7 @@ import {
   withNormalizedTeamStrategyProfiles,
 } from "@/lib/foundation/team-strategy-profiles";
 import { buildTeamSeasonOverviewRows } from "@/lib/foundation/team-management-overview";
+import { buildStandingsTransferBalanceByTeamId } from "@/lib/season/transfer-standings-balance";
 import {
   buildMultiSeasonBalanceDashboard,
   type MultiSeasonBalanceDashboard,
@@ -188,7 +189,10 @@ import {
   type FeatureAuditFilter,
   type FeatureAuditStatus,
 } from "@/lib/foundation/feature-audit-matrix";
-import { buildGameFlowState, isActiveMatchdayPreparation, shouldAutoOpenSeasonBriefing, type GameFlowStepStatus, type GameFlowView } from "@/lib/foundation/game-flow-controller";
+import { buildGameFlowState, getGameFlowTransferWindowHint, isActiveMatchdayPreparation, shouldAutoOpenSeasonBriefing, type GameFlowStepStatus, type GameFlowView } from "@/lib/foundation/game-flow-controller";
+import { formatGameFlowBlocker, formatGameFlowBlockerList } from "@/lib/foundation/game-flow-blocker-labels";
+import { buildMatchdayArenaBlockerSummary } from "@/lib/foundation/matchday-arena-blocker-summary";
+import { extractMatchdayResolveBlockerStatus } from "@/lib/foundation/legacy-matchday-resolve-preview-service";
 import { buildGameInboxItems, filterGameInboxItems, getPrimaryInboxTask } from "@/lib/foundation/game-inbox-service";
 import { buildMatchdaySummary, getMatchdaySummaryOptions } from "@/lib/foundation/matchday-summary";
 import { normalizeLineupDisciplineFieldName } from "@/lib/lineups/team-discipline-ranks";
@@ -306,7 +310,10 @@ const TransfermarktV2Client = dynamic(() => import("@/app/foundation/transfermar
   loading: () => <FoundationPanelSkeleton variant="marketV2" label="Transfermarkt wird geladen…" />,
 });
 const TransferHistoryV2Client = dynamic(() => import("@/app/foundation/transfer-history-v2/TransferHistoryV2Client"), { ssr: false });
-const SeasonStandingsV2Client = dynamic(() => import("@/app/foundation/season-v2/SeasonStandingsV2Client"), { ssr: false });
+const FoundationSeasonV2Panel = dynamic(() => import("@/app/foundation/season-v2/FoundationSeasonV2Panel"), {
+  ssr: false,
+  loading: () => <FoundationPanelSkeleton variant="seasonV2" label="Saisonstand wird geladen…" />,
+});
 const TrainingCompactClient = dynamic(() => import("@/app/foundation/training-compact/TrainingCompactClient"), {
   ssr: false,
 });
@@ -5282,56 +5289,11 @@ function getAiTransferRosterLabel(status: "under_min" | "under_opt" | "at_or_abo
 }
 
 function formatCockpitReason(reason: string) {
-  const mapped: Record<string, string> = {
-    missing_manual_lineup: "Mindestens ein manuell gesteuertes Team hat noch keine gespeicherte Einsatzliste.",
-    passive_missing_lineup: "Mindestens ein passives Team hat noch keine gespeicherte Einsatzliste.",
-    result_apply_missing_for_current_matchday: "Result Apply fehlt noch fuer diesen Spieltag.",
-    standings_apply_missing_for_current_matchday: "Standings Apply fehlt noch fuer diesen Spieltag.",
-    cash_apply_missing_for_current_matchday: "Cash Apply fehlt noch fuer diesen Spieltag.",
-    tie_groups_require_confirmed_policy: "Tie-Policy blockiert den lokalen Standings-Schritt.",
-    no_next_matchday_configured: "Kein weiterer Matchday ist im lokalen Seed konfiguriert.",
-    duplicate_matchday_advance_for_current_scope: "Dieser Matchday wurde fuer diesen Save bereits abgeschlossen.",
-    duplicate_apply_detected: "Dieser Apply wurde fuer Save und Matchday bereits gespeichert.",
-    duplicate_apply_for_save_season_block: "Dieser Schritt wurde fuer Save und Matchday bereits angewendet.",
-    season_end_only: "Preisgeld und Cash sind nur im Saisonabschluss erlaubt.",
-    under_minimum_matchday_players: "Mindestens 7 aktive Spieler sind fuer den Spieltag noetig.",
-    partial_lineup_allowed: "Das Team darf mit Mindestkader auch nur eine Disziplin voll besetzen.",
-    lineup_matchday_is_not_active: "Lineups lassen sich nur fuer den aktuell aktiven Matchday aendern.",
-    preview_status_not_ready: "Die Vorschau ist noch nicht im Status bereit.",
-    board_objectives_failed: "Mindestens ein Board-Ziel ist verfehlt.",
-    board_objectives_at_risk: "Mindestens ein Board-Ziel steht unter Druck.",
-    sponsor_objective_source_missing: "Sponsor-Ziel kann gerade nicht sauber gelesen werden.",
-    source_missing: "Eine Quelle fuer diese Bewertung fehlt noch.",
-    "resolve_status:incomplete_lineups": "Mindestens eine Einsatzliste ist noch unvollstaendig.",
-    "resolve_status:missing_lineups": "Mindestens eine Einsatzliste fehlt noch komplett.",
-    "resolve_status:missing_scores": "Mindestens ein Team hat noch fehlende Score-Quellen.",
-    "resolve_status:missing_sources": "Mindestens eine Resolve-Quelle ist noch unvollstaendig.",
-    "resolve_status:blocked": "Resolve Preview ist aktuell blockiert.",
-    lineup_not_submitted: "Einsatzliste noch nicht bestaetigt — bitte in der Einsatzliste abschliessen.",
-    missing_formcard_selections: "Formkarten sind optional — ohne Auswahl spielst du ohne Bonus/Malus.",
-    missing_formcard_pool: "Formkarten fuer diese Saison fehlen noch — bitte in der Einsatzliste erzeugen.",
-    missing_lineup: "Einsatzliste ist noch nicht vollstaendig.",
-    incomplete_lineup: "Einsatzliste noch nicht spielbereit — alle Slots fuellen oder den gesamten Kader einsetzen.",
-    training_missing: "Training fuer alle Kaderspieler muss zuerst gesetzt werden.",
-    no_active_team: "Kein aktives Team ausgewaehlt.",
-    empty_roster: "Kader ist leer — erst Spieler hinzufuegen.",
-  };
-
-  if (mapped[reason]) {
-    return mapped[reason];
+  const shared = formatGameFlowBlocker(reason);
+  if (shared !== reason.replaceAll("_", " ")) {
+    return shared;
   }
 
-  if (reason.startsWith("blockedRule:")) {
-    return `Blocker: ${reason.replace("blockedRule:", "")}`;
-  }
-
-    if (reason.startsWith("missing_projected_cash:")) {
-    return "Mindestens ein Team hat noch keinen berechenbaren Cash-nachher-Wert.";
-  }
-
-  if (reason.startsWith("phase_blocked:facility_apply:")) {
-    return "Bauen ist in dieser Phase noch nicht dran. Du kannst die Kosten trotzdem prüfen; bestätigen geht erst im Management-Fenster.";
-  }
   if (reason === "insufficient_cash") return "Nicht genug Cash fuer dieses Upgrade.";
   if (reason === "facility_max_level") return "Dieses Gebaeude ist bereits auf Max-Level.";
   if (reason === "facility_disabled") return "Dieses Gebaeude ist aktuell deaktiviert und muss erst stabilisiert werden.";
@@ -5346,11 +5308,7 @@ function formatCockpitReason(reason: string) {
   if (reason === "facility_maintenance_preview_stale") return "Die Wartungs-Vorschau ist veraltet. Bitte noch einmal pruefen.";
   if (reason === "early_season_setup_allowed_before_first_result") return "Frueher Saisonstart: Management-Aktion ist bis zum ersten echten Resultat erlaubt.";
 
-  if (reason.startsWith("tie_warning")) {
-    return "Gleichstand blockiert diesen Schritt aktuell.";
-  }
-
-  return reason.replaceAll("_", " ");
+  return shared;
 }
 
 function formatObjectiveStatusLabel(status: string | null | undefined) {
@@ -6214,7 +6172,10 @@ export default function FoundationPageClient({
   const shouldLoadTransferHistoryFeed = isTransferHistoryViewActive;
   const shouldLoadPrizePreviewFeed = activeView === "prize" || activeView === "cockpit";
   const shouldLoadStandingsPreviewFeed = activeView === "season" || activeView === "cockpit" || activeView === "matchdayArena";
-  const shouldLoadSeasonManagementFeed = activeView === "homeV2" || activeView === "inboxV2" || activeView === "cockpit";
+  const shouldLoadSeasonManagementFeed =
+    (activeView === "homeV2" && homeV2Tab === "office") || activeView === "inboxV2" || activeView === "cockpit";
+  const shouldLoadSeasonOverviewFeed =
+    activeView === "seasonV2" || activeView === "prize" || activeView === "ranks" || activeView === "diszis" || activeView === "teams";
   const isFoundationBootstrapState = gameState.season.id === "loading" || selectedTeamId === "loading-team";
   const [showSeasonTopPlayerAreas, setShowSeasonTopPlayerAreas] = useState<boolean>(false);
   const [tableSorts, setTableSorts] = useState<Record<string, SortState>>({
@@ -6499,6 +6460,7 @@ export default function FoundationPageClient({
   const [seasonCompletionFeed, setSeasonCompletionFeed] = useState<SeasonCompletionSummaryResponse | null>(null);
   const [seasonTransitionError, setSeasonTransitionError] = useState<string | null>(null);
   const [seasonStandingsFeed, setSeasonStandingsFeed] = useState<FoundationSeasonStandingsOverviewResponse | null>(null);
+  const [seasonStandingsLoading, setSeasonStandingsLoading] = useState(false);
   const [seasonStandingsMode, setSeasonStandingsMode] = useState<"table" | "gms">("table");
   const [seasonOverviewSeasonId, setSeasonOverviewSeasonId] = useState<string>(initialClientGameState.season.id);
   const seasonOverviewScopeRef = useRef(`${activeSaveId}:${initialClientGameState.season.id}`);
@@ -10403,8 +10365,10 @@ export default function FoundationPageClient({
       const targetSeasonId = seasonIdOverride || seasonOverviewSeasonId || gameState.season.id;
       if (targetSeasonId === "loading") {
         setSeasonStandingsFeed(null);
+        setSeasonStandingsLoading(false);
         return null;
       }
+      setSeasonStandingsLoading(true);
       const params = new URLSearchParams({
         saveId: activeSaveId,
         seasonId: targetSeasonId,
@@ -10417,6 +10381,8 @@ export default function FoundationPageClient({
     } catch {
       setSeasonStandingsFeed(null);
       return null;
+    } finally {
+      setSeasonStandingsLoading(false);
     }
   }
 
@@ -10785,7 +10751,7 @@ export default function FoundationPageClient({
     let idleHandle: ReturnType<typeof setTimeout> | number | null = null;
     if (typeof window !== "undefined") {
       if ("requestIdleCallback" in window) {
-        idleHandle = window.requestIdleCallback(scheduleLoad, { timeout: 1500 });
+        idleHandle = window.requestIdleCallback(scheduleLoad, { timeout: 3000 });
       } else {
         idleHandle = setTimeout(scheduleLoad, 150);
       }
@@ -11908,6 +11874,27 @@ export default function FoundationPageClient({
       (gameFlowState.currentStep.status === "completed" ? gameFlowState.nextStep ?? gameFlowState.currentStep : gameFlowState.currentStep)
     );
   }, [acknowledgedFlowStepIds, gameFlowState]);
+  const matchdayArenaReadiness = useMemo(
+    () => getMatchdayArenaReadiness(gameState, activeManagerTeamId),
+    [activeManagerTeamId, gameState],
+  );
+  const matchdayArenaBlockerSummary = useMemo(
+    () =>
+      buildMatchdayArenaBlockerSummary({
+        gameState,
+        activeTeamId: activeManagerTeamId,
+        flowStep: gameFlowActionStep,
+        resolvePreviewStatus: extractMatchdayResolveBlockerStatus({
+          preview: resolvePreviewFeed,
+          activeTeamId: activeManagerTeamId,
+        }),
+      }),
+    [activeManagerTeamId, gameFlowActionStep, gameState, resolvePreviewFeed],
+  );
+  const transferWindowHint = useMemo(() => getGameFlowTransferWindowHint(gameState), [gameState]);
+  const activeManagerMatchdayReady = matchdayArenaBlockerSummary.isArenaReady;
+  const activeManagerArenaBlockerReason = matchdayArenaBlockerSummary.primaryReason as typeof matchdayArenaReadiness.blocker;
+  const activeManagerArenaGapDetail = matchdayArenaBlockerSummary.detail;
   const shouldPreferGameFlowAction =
     gameFlowActionStep.status !== "completed" &&
     (gameFlowActionStep.stepId === "season_intro" ||
@@ -12135,6 +12122,43 @@ export default function FoundationPageClient({
     isReadOnlyMode,
     readMeta.source,
   ]);
+  useEffect(() => {
+    const flow = gameState.seasonState.newGameFlow;
+    if (readMeta.source !== "sqlite" || isReadOnlyMode || !flow?.active || flow.dismissed || !activeManagerTeamId) {
+      return;
+    }
+
+    const storedStatusById = new Map((flow.steps ?? []).map((step) => [step.stepId, step.status] as const));
+    const rosterCount = gameState.rosters.filter((entry) => entry.teamId === activeManagerTeamId).length;
+    const targetRosterCount = Math.max(
+      10,
+      Math.min(12, gameState.teams.find((team) => team.teamId === activeManagerTeamId)?.rosterLimit ?? 12),
+    );
+    const hasTransfers = gameState.transferHistory.some(
+      (transfer) =>
+        transfer.seasonId === gameState.season.id &&
+        (transfer.toTeamId === activeManagerTeamId || transfer.fromTeamId === activeManagerTeamId),
+    );
+
+    if (storedStatusById.get("roster_review") === "open" && rosterCount > 0) {
+      updateNewGameFlowStepStatus("roster_review", "completed");
+    }
+    if (storedStatusById.get("first_transfers") === "open" && hasTransfers) {
+      updateNewGameFlowStepStatus("first_transfers", "completed");
+    }
+    if (storedStatusById.get("fill_roster") === "open" && rosterCount >= targetRosterCount) {
+      updateNewGameFlowStepStatus("fill_roster", "completed");
+    }
+  }, [
+    activeManagerTeamId,
+    gameState.rosters,
+    gameState.season.id,
+    gameState.seasonState.newGameFlow,
+    gameState.transferHistory,
+    gameState.teams,
+    isReadOnlyMode,
+    readMeta.source,
+  ]);
   const dismissNewGameFlow = () => {
     if (isReadOnlyMode) {
       showReadOnlyNotice();
@@ -12213,8 +12237,8 @@ export default function FoundationPageClient({
     }
 
     if (stepId === "training_facilities") {
-      setFoundationView("trainingV2", setActiveView);
-      scrollToFoundationTarget("foundation-facilities-v2");
+      setFoundationView("scoutingCenterV2", setActiveView);
+      scrollToFoundationTarget("foundation-scouting-hub-v2");
       return;
     }
 
@@ -12370,10 +12394,16 @@ export default function FoundationPageClient({
   const globalNextTitle = primaryInboxItem
     ? `${primaryInboxItem.title}: ${primaryInboxItem.description}`
     : gameFlowActionStep.status === "blocked"
-      ? gameFlowActionStep.blockers.map(formatCockpitReason).join(" · ") || "Leertaste: zum blockierten Schritt springen"
+      ? formatGameFlowBlockerList(
+          matchdayArenaBlockerSummary.reasons.length > 0
+            ? matchdayArenaBlockerSummary.reasons
+            : gameFlowActionStep.blockers,
+        ) || "Leertaste: zum blockierten Schritt springen"
       : globalNextDisabled
         ? "Aktion laeuft gerade."
-        : "Leertaste: Weiter";
+        : transferWindowHint.open
+          ? `Leertaste: Weiter · ${transferWindowHint.label}`
+          : "Leertaste: Weiter";
   const globalNextStatusClass = primaryInboxItem
     ? primaryInboxItem.severity === "critical"
       ? "is-blocked"
@@ -14070,49 +14100,9 @@ export default function FoundationPageClient({
   );
 
   const transferSummaryByTeamId = useMemo(() => {
-    const summary = new Map<
-      string,
-      {
-        transferCount: number;
-        transferBuyTotal: number;
-        transferSellTotal: number;
-      }
-    >();
-
-    for (const entry of historyFeed?.items ?? []) {
-      if (entry.type === "buy" && entry.toTeamId) {
-        const current = summary.get(entry.toTeamId) ?? {
-          transferCount: 0,
-          transferBuyTotal: 0,
-          transferSellTotal: 0,
-        };
-        current.transferCount += 1;
-        current.transferBuyTotal += entry.fee;
-        summary.set(entry.toTeamId, current);
-      }
-
-      if (entry.type === "sell" && entry.fromTeamId) {
-        const current = summary.get(entry.fromTeamId) ?? {
-          transferCount: 0,
-          transferBuyTotal: 0,
-          transferSellTotal: 0,
-        };
-        current.transferCount += 1;
-        current.transferSellTotal += entry.fee;
-        summary.set(entry.fromTeamId, current);
-      }
-    }
-
-    return Object.fromEntries(
-      Array.from(summary.entries()).map(([teamId, item]) => [
-        teamId,
-        {
-          ...item,
-          transferNet: Number((item.transferSellTotal - item.transferBuyTotal).toFixed(2)),
-        },
-      ]),
-    );
-  }, [historyFeed]);
+    const seasonId = seasonOverviewSeasonId ?? gameState.season.id;
+    return buildStandingsTransferBalanceByTeamId(gameState, seasonId);
+  }, [gameState, seasonOverviewSeasonId]);
 
   const seasonStandRows = useMemo(
     () => {
@@ -14175,7 +14165,6 @@ export default function FoundationPageClient({
     },
     [
       gameState,
-      historyFeed,
       seasonManagementByTeamId,
       seasonOverviewSeasonId,
       seasonStandingsFeed?.source.kind,
@@ -14683,7 +14672,7 @@ export default function FoundationPageClient({
     : "Aktive Season · lokale Results";
 
   useEffect(() => {
-    if (isFoundationBootstrapState) {
+    if (isFoundationBootstrapState || !shouldLoadSeasonOverviewFeed) {
       return;
     }
 
@@ -14700,7 +14689,14 @@ export default function FoundationPageClient({
     }
     setSeasonOverviewSeasonId(gameState.season.id);
     void reloadSeasonStandingsOverview(gameState.season.id);
-  }, [activeSaveId, gameState.season.id, isFoundationBootstrapState, seasonOverviewOptions, seasonOverviewSeasonId]);
+  }, [
+    activeSaveId,
+    gameState.season.id,
+    isFoundationBootstrapState,
+    seasonOverviewOptions,
+    seasonOverviewSeasonId,
+    shouldLoadSeasonOverviewFeed,
+  ]);
 
   const archivedSeasonDisciplineLeaderboards = useMemo(() => {
     if (!selectedSeasonSnapshot) {
@@ -17506,13 +17502,6 @@ export default function FoundationPageClient({
     homeCurrentLineupDraft,
     activeManagerLineupSubmitted,
   ]);
-  const matchdayArenaReadiness = useMemo(
-    () => getMatchdayArenaReadiness(gameState, activeManagerTeamId),
-    [activeManagerTeamId, gameState],
-  );
-  const activeManagerMatchdayReady = matchdayArenaReadiness.isReady;
-  const activeManagerArenaBlockerReason = matchdayArenaReadiness.blocker;
-  const activeManagerArenaGapDetail = formatLineupOperationalGapDetail(matchdayArenaReadiness);
   async function ensureAiLineupsForCurrentMatchday(trigger: "human_lineup_saved" | "arena_open" | "manual" = "manual") {
     if (
       readMeta.source !== "sqlite" ||
@@ -20953,7 +20942,7 @@ export default function FoundationPageClient({
 
       {seasonBriefingOpen ? (
         <div
-          className="season-briefing-backdrop"
+          className="foundation-modal-backdrop season-briefing-backdrop"
           role="dialog"
           aria-modal="true"
           aria-labelledby="season-briefing-title"
@@ -26803,16 +26792,16 @@ export default function FoundationPageClient({
                     {activeSaveName} · {gameState.season.id} · {gameState.matchdayState.matchdayId}
                   </span>
                 </div>
-                {activeManagerArenaBlockerReason ? (
+                {matchdayArenaBlockerSummary.primaryReason ? (
                   <div className="transfer-callout is-warning" data-testid="arena-lineup-blocker" style={{ marginTop: 12 }}>
                     <strong>Arena noch nicht bereit</strong>
                     <span>
-                      {formatCockpitReason(activeManagerArenaBlockerReason)}
+                      {formatGameFlowBlockerList(matchdayArenaBlockerSummary.reasons)}
                       {activeManagerArenaGapDetail ? ` (${activeManagerArenaGapDetail})` : null}
                     </span>
                     <div className="foundation-save-actions save-summary-actions" style={{ marginTop: 8 }}>
                       <button className="primary-button inline-button" type="button" onClick={() => setFoundationView("lineup", setActiveView)}>
-                        {activeManagerArenaBlockerReason === "lineup_not_submitted" ? "Lineup bestätigen" : "Zur Einsatzliste"}
+                        {matchdayArenaBlockerSummary.primaryReason === "lineup_not_submitted" ? "Lineup bestätigen" : "Zur Einsatzliste"}
                       </button>
                     </div>
                   </div>
@@ -27098,39 +27087,37 @@ export default function FoundationPageClient({
 
 
           {(activeView === "seasonV2") ? (
-          <section className="panel" id="foundation-season-v2">
-            {activeView === "seasonV2" ? (
-              <SeasonStandingsV2Client
-                selectedSeasonId={seasonOverviewSeasonId}
-                selectedSeasonLabel={selectedSeasonOverviewLabel}
-                sourceLabel={seasonOverviewSourceLabel}
-                sourceBadgeLabel={getViewSourceBadgeLabel("seasonV2", activeContextMeta)}
-                isArchived={isViewingArchivedSeason}
-                seasonOptions={seasonOverviewOptions}
-                selectedTeamSummary={seasonV2SelectedTeamSummary}
-                leaderTeam={seasonV2LeaderTeam}
-                momentumTeam={seasonV2MomentumTeam}
-                pressureTeam={seasonV2PressureTeam}
-                topPlayer={seasonV2TopPlayers[0] ?? null}
-                standingsRows={seasonV2StandingsRows}
-                topPlayers={seasonV2TopPlayers}
-                playerRows={seasonV2PlayerRows}
-                gmRows={seasonV2GmRows}
-                archiveRows={seasonV2ArchiveRows}
-                disciplineLeaders={seasonV2DisciplineLeaders}
-                onChangeSeason={(seasonId) => {
-                  setSeasonOverviewSeasonId(seasonId);
-                  void reloadSeasonStandingsOverview(seasonId);
-                }}
-                onOpenTeam={(teamId) => openTeamProfileById(teamId)}
-                onOpenPlayer={(playerId) => openPlayerProfileById(playerId)}
-                viewMode={seasonStandingsMode}
-                onViewModeChange={setSeasonStandingsMode}
-                onOpenRanks={() => setFoundationView("ranks", setActiveView)}
-                onOpenPrize={() => setFoundationView("prize", setActiveView)}
-              />
-            ) : null}
-          </section>
+            <FoundationSeasonV2Panel
+              active={activeView === "seasonV2"}
+              selectedSeasonId={seasonOverviewSeasonId}
+              selectedSeasonLabel={selectedSeasonOverviewLabel}
+              sourceLabel={seasonOverviewSourceLabel}
+              sourceBadgeLabel={getViewSourceBadgeLabel("seasonV2", activeContextMeta)}
+              isArchived={isViewingArchivedSeason}
+              seasonOptions={seasonOverviewOptions}
+              selectedTeamSummary={seasonV2SelectedTeamSummary}
+              leaderTeam={seasonV2LeaderTeam}
+              momentumTeam={seasonV2MomentumTeam}
+              pressureTeam={seasonV2PressureTeam}
+              topPlayer={seasonV2TopPlayers[0] ?? null}
+              standingsRows={seasonV2StandingsRows}
+              topPlayers={seasonV2TopPlayers}
+              playerRows={seasonV2PlayerRows}
+              gmRows={seasonV2GmRows}
+              archiveRows={seasonV2ArchiveRows}
+              disciplineLeaders={seasonV2DisciplineLeaders}
+              isLoading={seasonStandingsLoading}
+              onChangeSeason={(seasonId) => {
+                setSeasonOverviewSeasonId(seasonId);
+                void reloadSeasonStandingsOverview(seasonId);
+              }}
+              onOpenTeam={(teamId) => openTeamProfileById(teamId)}
+              onOpenPlayer={(playerId) => openPlayerProfileById(playerId)}
+              viewMode={seasonStandingsMode}
+              onViewModeChange={setSeasonStandingsMode}
+              onOpenRanks={() => setFoundationView("ranks", setActiveView)}
+              onOpenPrize={() => setFoundationView("prize", setActiveView)}
+            />
           ) : null}
 
           <section className={`panel${getViewClass("seasonPreview")}`} id="standings-preview">

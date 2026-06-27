@@ -890,6 +890,7 @@ export default function MatchdayArenaV2Client(props: MatchdayArenaV2ClientProps)
         matchdayId: resolvedParams.matchdayId,
         teamId: resolvedParams.teamId,
         source: nextSource,
+        includeDetails: "0",
       });
       const scoreCacheKey = `${resolvedParams.saveId}:${resolvedParams.seasonId}:${resolvedParams.matchdayId}:${nextSource}`;
       const cachedScoreFeed = scoreFeedCacheRef.current.get(scoreCacheKey) ?? null;
@@ -1998,6 +1999,21 @@ export default function MatchdayArenaV2Client(props: MatchdayArenaV2ClientProps)
 
   const leaderRow = boardRows[0] ?? null;
   const boardLeaderLabel = leaderRow?.teamName ?? "—";
+  const topDuelBroadcast = useMemo(() => {
+    if (loadStage !== "ready" || boardRows.length < 2) {
+      return null;
+    }
+    const leader = boardRows[0];
+    const challenger = boardRows[1];
+    if (!leader || !challenger || (leader.score ?? 0) <= 0) {
+      return null;
+    }
+    return {
+      leader,
+      challenger,
+      gap: Math.max(0, (leader.score ?? 0) - (challenger.score ?? 0)),
+    };
+  }, [boardRows, loadStage]);
   const boardVirtualWindow = useMemo(() => {
     const start = Math.max(0, Math.floor(boardScrollTop / ARENA_BOARD_ROW_STRIDE) - ARENA_BOARD_VIRTUAL_OVERSCAN);
     const end = Math.min(
@@ -2267,7 +2283,6 @@ export default function MatchdayArenaV2Client(props: MatchdayArenaV2ClientProps)
     if (
       !canShowTotalResults ||
       standingsPreviewFeed ||
-      source === "sqlite" ||
       !params.saveId ||
       !params.seasonId ||
       !params.matchdayId
@@ -2854,6 +2869,27 @@ export default function MatchdayArenaV2Client(props: MatchdayArenaV2ClientProps)
         />
       </section>
 
+      {topDuelBroadcast && isSlotsPhase ? (
+        <section className="arena-v2-broadcast-panel" aria-label="Top-Duell Broadcast">
+          <div className="arena-v2-broadcast-stage">
+            <article className="arena-v2-broadcast-team is-leader">
+              <span className="arena-v2-broadcast-rank">#1</span>
+              <strong>{topDuelBroadcast.leader.teamName}</strong>
+              <small>{formatDecimalScore(topDuelBroadcast.leader.score, 1)} Score</small>
+            </article>
+            <div className="arena-v2-broadcast-vs" aria-hidden="true">
+              <span>Top-Duell</span>
+              <strong>+{formatDecimalScore(topDuelBroadcast.gap, 1)}</strong>
+            </div>
+            <article className="arena-v2-broadcast-team">
+              <span className="arena-v2-broadcast-rank">#2</span>
+              <strong>{topDuelBroadcast.challenger.teamName}</strong>
+              <small>{formatDecimalScore(topDuelBroadcast.challenger.score, 1)} Score</small>
+            </article>
+          </div>
+        </section>
+      ) : null}
+
       <section className={`arena-v2-main-grid is-full-stage${canShowResultLayer ? "" : " is-single-discipline"}`}>
         <section className="panel arena-v2-board-panel">
           <div className="arena-v2-board-sticky-stack">
@@ -2925,6 +2961,15 @@ export default function MatchdayArenaV2Client(props: MatchdayArenaV2ClientProps)
             <div className="arena-v2-panel-loading arena-v2-board-loading" role="status" aria-live="polite">
               <strong>Wertung für 32 Teams wird berechnet</strong>
               <span>Auto-Lineups, Formkarten und Resolve laufen serverseitig. Das dauert meist ein paar Sekunden.</span>
+              <div className="arena-v2-board-skeleton-rows" aria-hidden="true">
+                {Array.from({ length: 8 }, (_, index) => (
+                  <div
+                    key={`arena-board-skeleton-${index}`}
+                    className="arena-v2-board-skeleton-row"
+                    style={{ width: `${Math.max(58, 96 - index * 4)}%` }}
+                  />
+                ))}
+              </div>
             </div>
           ) : (
           <div

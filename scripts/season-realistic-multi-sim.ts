@@ -19,6 +19,7 @@ import { calculateOpenBuyoutCost } from "@/lib/market/contract-negotiation-previ
 import { buildTransfermarktSaleFactorBreakdown } from "@/lib/market/transfermarkt-sale-factor";
 import { createPersistenceService } from "@/lib/persistence/persistence-service";
 import { getSeasonEconomyFactorWindow } from "@/lib/season/season-economy-factors";
+import { buildEconomyAuditReport } from "@/lib/season/economy-audit-report";
 
 const PROJECT_ROOT = path.resolve(__dirname, "..");
 
@@ -303,6 +304,7 @@ async function main() {
   const contractEconomics = buildContractShapeBySeason(saveAfter.gameState, saveId);
   const cashWaterfall = buildCashWaterfall(saveAfter.gameState);
   const phaseAggregates = aggregatePhaseTimings(phaseTimings);
+  const economyAudit = buildEconomyAuditReport({ saveId, gameState: saveAfter.gameState });
 
   const reportPath = path.join(outputDir, "realistic-multi-report.json");
   const report = {
@@ -341,6 +343,7 @@ async function main() {
     sellEconomicsSample: sellEconomics.slice(0, 40),
     contractEconomics,
     cashWaterfall,
+    economyAudit,
     leagueTotals: {
       transferHistoryEntries: saveAfter.gameState.transferHistory.length,
       totalBuyFees: round(transferStats.reduce((sum, row) => sum + row.buyFees, 0)),
@@ -359,6 +362,14 @@ async function main() {
   console.log(`transfers: ${report.leagueTotals.transferHistoryEntries} entries · buys ${report.leagueTotals.totalBuyFees} · sells ${report.leagueTotals.totalSellFees}`);
   for (const row of cashWaterfall) {
     console.log(`  ${row.seasonId} cash: ${row.minCash}–${row.maxCash} (avg ${row.avgCash}, Gini ${row.cashGini})`);
+  }
+  console.log(
+    `economy audit: ${economyAudit.ok ? "OK" : "WARN"} · repair buys ${economyAudit.preseasonRepairBuyCount} · sponsor season_end ${economyAudit.sponsorSeasonEndLogs}`,
+  );
+  if (!economyAudit.ok) {
+    for (const violation of economyAudit.violations) {
+      console.log(`  violation: ${violation}`);
+    }
   }
   console.log(`top phases:`);
   for (const row of phaseAggregates.slice(0, 5)) {

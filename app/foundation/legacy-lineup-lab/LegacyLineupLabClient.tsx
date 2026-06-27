@@ -7502,6 +7502,7 @@ export default function LegacyLineupLabClient(props: LegacyLineupLabClientProps)
                         const dragPreview = slotDragPreviewByKey.get(slot.key) ?? null;
                         const slotCandidateSummary = slotCandidateSummaryByKey.get(slot.key) ?? null;
                         const isActiveSlot = activeSlot?.key === slot.key;
+                        const slotReadiness = getSlotReadiness(slotPreview, selectedScore);
                         const slotMicroStepStates = resolveSlotMicroStepStates({
                           hasSelection: Boolean(selections[slot.key]),
                           isActiveSlot,
@@ -7556,6 +7557,14 @@ export default function LegacyLineupLabClient(props: LegacyLineupLabClientProps)
                             ) : null}
                             <div className="legacy-lineup-draft-slot-head">
                               <span>{disciplineSide.toUpperCase()}-{slot.slotIndex + 1}</span>
+                              <div className="legacy-lineup-slot-head-tags">
+                                {isActiveSlot && !selectedRosterCard ? (
+                                  <span className="legacy-lineup-slot-focus-chip">Hier weiter</span>
+                                ) : null}
+                                <span className={`legacy-lineup-slot-state-pill is-${slotReadiness.key}`} title={slotReadiness.detail}>
+                                  {selectedRosterCard ? slotReadiness.label : "Offen"}
+                                </span>
+                              </div>
                               <strong>{role?.label ?? `Slot ${slot.slotIndex + 1}`}</strong>
                               {(!selectedRosterCard || isActiveSlot) ? (
                                 <small>{role?.description ?? "Standard-Rolle"}</small>

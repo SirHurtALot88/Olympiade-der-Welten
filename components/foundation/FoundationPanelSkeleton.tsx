@@ -1,5 +1,5 @@
 type FoundationPanelSkeletonProps = {
-  variant?: "default" | "homeV2" | "marketV2" | "lineup" | "teams";
+  variant?: "default" | "homeV2" | "marketV2" | "lineup" | "teams" | "seasonV2";
   label?: string;
 };
 
@@ -25,6 +25,12 @@ export default function FoundationPanelSkeleton({
           <>
             <div className="foundation-panel-skeleton__block is-tall" />
             <div className="foundation-panel-skeleton__block is-tall" />
+          </>
+        ) : null}
+        {variant === "seasonV2" ? (
+          <>
+            <div className="foundation-panel-skeleton__block is-wide is-tall" />
+            <div className="foundation-panel-skeleton__block is-wide" />
           </>
         ) : null}
       </div>

@@ -29,12 +29,19 @@ export async function GET(request: Request) {
       );
     }
 
+    const includeDetailsParam = searchParams.get("includeDetails")?.trim().toLowerCase() ?? "";
+    const includeDetails =
+      includeDetailsParam === "1" ||
+      includeDetailsParam === "true" ||
+      includeDetailsParam === "yes";
+
     const payload = await loadMatchdayArenaBase({
       saveId,
       seasonId,
       matchdayId,
       teamId,
       activeOwnerId,
+      includeDetails,
     });
 
     if (!payload.context) {
