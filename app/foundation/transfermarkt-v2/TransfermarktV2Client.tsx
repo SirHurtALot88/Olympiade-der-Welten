@@ -45,7 +45,7 @@ import { DEFAULT_ACTIVE_OWNER_ID } from "@/lib/foundation/team-control-settings"
 import { getClassTrainingSignals } from "@/lib/training/class-progression-config";
 import { VeloAttributeFocusTags, VeloStatOrbitRow } from "@/components/foundation/velo-ui";
 
-type TransfermarktV2ClientProps = {
+export type TransfermarktV2ClientProps = {
   defaultSaveId: string;
   defaultSeasonId: string;
   bootstrapReady?: boolean;

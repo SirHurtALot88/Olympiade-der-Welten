@@ -159,7 +159,8 @@ describe("foundation transfermarkt ui contract", () => {
     expect(fileText).toContain("localUserManualTeams");
     expect(fileText).toContain("settings.ownerSlot === \"user\"");
     expect(fileText).toContain("settings.displayLabel === \"Chris\"");
-    expect(fileText).toContain("manageableTeamIds={ownerQuickSwitchTeams.map((team) => team.teamId)}");
+    expect(fileText).toContain("FoundationTransfermarktV2Panel");
+    expect(fileText).toContain("manageableTeamIds: ownerQuickSwitchTeams.map((team) => team.teamId)");
     expect(fileText).toContain("targetControl?.ownerSlot === \"user\"");
     expect(fileText).toContain("activeOwnerId: resolvedOwnerId");
   });
