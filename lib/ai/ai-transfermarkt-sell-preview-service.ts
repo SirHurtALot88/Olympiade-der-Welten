@@ -19,6 +19,9 @@ import { normalizeTransfermarktToken } from "@/lib/market/transfermarkt-fit";
 import { buildTransfermarktSaleFactorBreakdown } from "@/lib/market/transfermarkt-sale-factor";
 import { createPersistenceService } from "@/lib/persistence/persistence-service";
 import { assessPlayerBoardTrust, type PlayerBoardTrustRenewalPolicy } from "@/lib/ai/player-board-trust-service";
+import { evaluateAiSellDecision } from "@/lib/ai/ai-sell-decision-engine";
+import { resolveTransferDoctrine } from "@/lib/ai/ai-transfer-doctrine-layer";
+import type { AiKeepReasonCode, AiSellReasonCode } from "@/lib/ai/ai-transfer-reason-codes";
 import { buildPlayerDemands } from "@/lib/morale/player-demands-service";
 
 export type AiSellPreviewSource = "sqlite" | "prisma";
@@ -62,6 +65,8 @@ export type AiSellPreviewCandidate = {
   strategyFitSummary: string;
   reasonToSell: string[];
   reasonToKeep: string[];
+  sellReasonCodes?: AiSellReasonCode[];
+  keepReasonCodes?: AiKeepReasonCode[];
   reasonsToSell: string[];
   reasonsToKeep: string[];
   warnings: string[];
@@ -73,6 +78,11 @@ export type AiSellPreviewCandidate = {
   salaryCapMultiplier: number | null;
   sellPriority: number;
   sellPriorityScore: number;
+  sellIntentScore?: number | null;
+  keepIntentScore?: number | null;
+  strategicSellScore?: number | null;
+  sellDecisionLabel?: string | null;
+  productiveElite?: boolean;
 };
 
 export type AiSellPreviewTeamEntry = {
@@ -386,6 +396,20 @@ function buildCandidate(
   const salary = economy.salary;
   const reasonToSell: string[] = [];
   const reasonToKeep: string[] = [];
+  const sellReasonCodes: AiSellReasonCode[] = [];
+  const keepReasonCodes: AiKeepReasonCode[] = [];
+  const pushSell = (code: AiSellReasonCode, reason: string) => {
+    sellReasonCodes.push(code);
+    reasonToSell.push(reason);
+  };
+  const pushKeep = (code: AiKeepReasonCode, reason: string) => {
+    keepReasonCodes.push(code);
+    reasonToKeep.push(reason);
+  };
+  const unshiftSell = (code: AiSellReasonCode, reason: string) => {
+    sellReasonCodes.unshift(code);
+    reasonToSell.unshift(reason);
+  };
   const warnings: string[] = [];
   const hardNoGoHit = matchesHardNoGo(profile, player);
   const rosterAfter = Math.max(rosterSize - 1, 0);
@@ -432,9 +456,9 @@ function buildCandidate(
   const wageSensitivity = (profile?.bias.wageSensitivity ?? 5) / 10;
   const loyaltyBias = (profile?.bias.loyaltyBias ?? 5) / 10;
   const starProtection =
-    (playerRating?.ovrRank != null && playerRating.ovrRank <= 20) ||
-    (playerRating?.ppsSeasonRank != null && playerRating.ppsSeasonRank <= 20) ||
-    (playerRating?.mvsRank != null && playerRating.mvsRank <= 20);
+    (playerRating?.ovrRank != null && playerRating.ovrRank <= 10) ||
+    (playerRating?.ppsSeasonRank != null && playerRating.ppsSeasonRank <= 10) ||
+    (playerRating?.mvsRank != null && playerRating.mvsRank <= 10);
   const playerDemands = buildPlayerDemands(context.gameState, player.id, team.teamId);
   const openDemands = playerDemands.filter((demand) => demand.status === "open" || demand.status === "at_risk");
   const demandPressureScore = openDemands.reduce((sum, demand) => {
@@ -475,79 +499,79 @@ function buildCandidate(
   });
 
   if (salary != null && wagePressureScore >= 0.28) {
-    reasonToSell.push("hohes Gehalt im Verhaeltnis zum aktuellen Teambudget");
+    pushSell("high_wage_burden", "hohes Gehalt im Verhaeltnis zum aktuellen Teambudget");
   } else if (salary != null && wagePressureScore <= 0.12) {
-    reasonToKeep.push("geringe Gehaltslast");
+    pushKeep("low_wage_burden", "geringe Gehaltslast");
   }
 
   if (profitDelta != null && profitDelta > 0) {
-    reasonToSell.push(`realisierbarer Gewinn von ${roundValue(profitDelta, 1)}`);
+    pushSell("profit_window", `realisierbarer Gewinn von ${roundValue(profitDelta, 1)}`);
   } else if (profitDelta != null && profitDelta < 0) {
-    reasonToKeep.push("aktueller Verkauf wuerde unter Einkauf liegen");
+    pushKeep("sell_below_purchase", "aktueller Verkauf wuerde unter Einkauf liegen");
   }
 
   if (underperformed) {
-    reasonToSell.push("Performance blieb unter Erwartung");
+    pushSell("underperformance", "Performance blieb unter Erwartung");
   } else if (performance.averageContribution != null && performance.averageContribution < 25) {
-    reasonToSell.push("schwache lokale Score-Beitraege");
+    pushSell("weak_contribution", "schwache lokale Score-Beitraege");
   }
   if (performance.averageContribution != null && performance.averageContribution >= 40) {
-    reasonToKeep.push("starke lokale Score-Beitraege");
+    pushKeep("strong_contribution", "starke lokale Score-Beitraege");
   }
   if (performance.top10Count > 0) {
-    reasonToKeep.push(`Top-10-Praesenz in ${performance.top10Count} Diszi-Einsaetzen`);
+    pushKeep("top10_presence", `Top-10-Praesenz in ${performance.top10Count} Diszi-Einsaetzen`);
   }
 
   if (strategy.avoidedHits > strategy.preferredHits) {
-    reasonToSell.push("passt nur schwach zum Teamprofil");
+    pushSell("poor_team_fit", "passt nur schwach zum Teamprofil");
   }
   if (strategy.preferredHits > strategy.avoidedHits) {
-    reasonToKeep.push("passt gut zum Teamprofil");
+    pushKeep("good_team_fit", "passt gut zum Teamprofil");
   }
   if (starProtection) {
-    reasonToKeep.push("Star-/Core-Spieler wird nur bei echtem Finanz- oder Boarddruck bewegt");
+    pushKeep("star_core_protection", "Star-/Core-Spieler wird nur bei echtem Finanz- oder Boarddruck bewegt");
   }
   if (openDemands.length > 0) {
     const demandLabels = openDemands.slice(0, 2).map((demand) => demand.label).join(", ");
     if (demandPressureScore >= 0.18 && !starProtection && !coversNeedAxis) {
-      reasonToSell.push(`offene Spielerforderung erzeugt Kaderdruck: ${demandLabels}`);
+      pushSell("player_demand_pressure", `offene Spielerforderung erzeugt Kaderdruck: ${demandLabels}`);
     } else {
-      reasonToKeep.push(`offene Forderung muss eingeplant werden: ${demandLabels}`);
+      pushKeep("player_demand_keep", `offene Forderung muss eingeplant werden: ${demandLabels}`);
     }
   }
   if (hardNoGoHit) {
-    reasonToSell.push("faellt in ein Team-Hard-No-Go");
+    pushSell("hard_no_go", "faellt in ein Team-Hard-No-Go");
   }
   if (boardTrust.renewalPolicy === "salary_cap") {
-    reasonToSell.push("Vorstand begrenzt Vertragsrahmen wegen Vertrauensverlust");
+    pushSell("board_salary_cap", "Vorstand begrenzt Vertragsrahmen wegen Vertrauensverlust");
   }
   if (boardTrust.renewalPolicy === "renewal_warning") {
-    reasonToSell.push("Vorstand warnt vor voller Verlaengerung");
+    pushSell("board_renewal_warning", "Vorstand warnt vor voller Verlaengerung");
   }
   if (boardTrust.renewalPolicy === "do_not_renew") {
-    reasonToSell.push("Vorstand will keine Verlaengerung");
+    pushSell("board_do_not_renew", "Vorstand will keine Verlaengerung");
   }
   if (coversNeedAxis) {
-    reasonToKeep.push(`deckt die aktuelle Achsenluecke ${playerAxis?.toUpperCase() ?? ""}`);
+    pushKeep("covers_need_axis", `deckt die aktuelle Achsenluecke ${playerAxis?.toUpperCase() ?? ""}`);
   }
   if (rosterSize > (playerOpt ?? rosterSize)) {
-    reasonToSell.push("Kader liegt ueber dem Optimum");
+    pushSell("roster_over_opt", "Kader liegt ueber dem Optimum");
   }
   if (roster.contractLength <= 1) {
     if (strategy.avoidedHits >= strategy.preferredHits || underperformed || hardNoGoHit) {
-      reasonToSell.push("Vertrag laeuft aus und Fit/Leistung rechtfertigt keine automatische Verlaengerung");
+      pushSell("short_contract", "Vertrag laeuft aus und Fit/Leistung rechtfertigt keine automatische Verlaengerung");
     } else {
-      reasonToSell.push("kurze Restvertragslaenge");
+      pushSell("short_contract", "kurze Restvertragslaenge");
     }
   } else if (roster.contractLength >= 3) {
-    reasonToKeep.push("laengerer Restvertrag");
+    pushKeep("long_contract", "laengerer Restvertrag");
   }
   const expiringStrategicPressure = roster.contractLength <= 1 && !coversNeedAxis && keepPerformanceScore < 0.7;
   const expiringCoreDecisionPressure =
     roster.contractLength <= 1 &&
     (boardPressure >= 0.45 || teamSalaryPressure >= 0.3 || lowCashReservePressure || negativeCashPressure);
   if (expiringCoreDecisionPressure) {
-    reasonToSell.push("auslaufender Vertrag braucht vor Ablauf eine aktive Marktentscheidung");
+    pushSell("expiring_contract", "auslaufender Vertrag braucht vor Ablauf eine aktive Marktentscheidung");
   }
 
   const scoreRaw =
@@ -580,14 +604,30 @@ function buildCandidate(
     loyaltyBias * (roster.contractLength >= 3 ? 8 : 2);
 
   if (negativeCashPressure) {
-    reasonToSell.unshift("negatives Teamcash zum Seasonstart");
+    unshiftSell("negative_cash", "negatives Teamcash zum Seasonstart");
   } else if (lowCashReservePressure) {
-    reasonToSell.unshift("Cash-Reserve ist zu knapp fuer sichere Kaderplanung");
+    unshiftSell("low_cash_reserve", "Cash-Reserve ist zu knapp fuer sichere Kaderplanung");
   } else if (budgetPressure === "healthy") {
-    reasonToKeep.push("Teamcash ist entspannt");
+    pushKeep("healthy_cash", "Teamcash ist entspannt");
   }
 
+  const doctrine = resolveTransferDoctrine(context.gameState, team.teamId);
   const sellPriority = Math.round(clamp(scoreRaw, 0, 100));
+  const sellDecision = evaluateAiSellDecision({
+    sellPriority,
+    reasonToSell,
+    reasonToKeep,
+    sellReasonCodes,
+    keepReasonCodes,
+    expectedSellValue,
+    marketValue,
+    contractLength: roster.contractLength,
+    teamCash: team.cash ?? null,
+    ovrRank: playerRating?.ovrRank ?? null,
+    ppsSeasonRank: playerRating?.ppsSeasonRank ?? null,
+    underperformed,
+    doctrine,
+  });
 
   return {
     activePlayerId: roster.id,
@@ -610,6 +650,8 @@ function buildCandidate(
     strategyFitSummary: `${strategy.summary} ${profile?.sellStyleNote ?? profile?.sellStyle ?? ""}`.trim(),
     reasonToSell,
     reasonToKeep,
+    sellReasonCodes: sellDecision.sellReasonCodes,
+    keepReasonCodes: sellDecision.keepReasonCodes,
     reasonsToSell: reasonToSell,
     reasonsToKeep: reasonToKeep,
     warnings,
@@ -621,6 +663,11 @@ function buildCandidate(
     salaryCapMultiplier: boardTrust.salaryCapMultiplier,
     sellPriority,
     sellPriorityScore: sellPriority,
+    sellIntentScore: sellDecision.sellIntentScore,
+    keepIntentScore: sellDecision.keepIntentScore,
+    strategicSellScore: sellDecision.strategicSellScore,
+    sellDecisionLabel: sellDecision.sellDecisionLabel,
+    productiveElite: sellDecision.productiveElite,
   } satisfies AiSellPreviewCandidate;
 }
 

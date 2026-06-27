@@ -9,6 +9,7 @@ import {
   resolveTransferDoctrine,
   type TransferDoctrineProfile,
 } from "@/lib/ai/ai-transfer-doctrine-layer";
+import { compareStrategicSellCandidates } from "@/lib/ai/ai-sell-decision-engine";
 import {
   buildReplacementSlotsFromHistory,
   buildReplacementSlotsFromPlannedSells,
@@ -62,16 +63,17 @@ export function applyDoctrineToSellCandidates(input: {
 }): DoctrineAdjustedSellCandidate[] {
   return [...input.candidates]
     .map((candidate) => {
-      const baseScore = candidate.sellPriority ?? candidate.sellPriorityScore ?? 0;
       const strategicSellScore = adjustSellScoreForDoctrine({
-        baseScore,
+        baseScore: candidate.strategicSellScore ?? candidate.sellPriority ?? candidate.sellPriorityScore ?? 0,
         reasonToSell: candidate.reasonToSell,
         reasonToKeep: candidate.reasonToKeep,
+        sellReasonCodes: candidate.sellReasonCodes,
+        keepReasonCodes: candidate.keepReasonCodes,
         doctrine: input.doctrine,
       });
       return { ...candidate, strategicSellScore };
     })
-    .sort((left, right) => (right.strategicSellScore ?? 0) - (left.strategicSellScore ?? 0));
+    .sort(compareStrategicSellCandidates);
 }
 
 export function annotateBuyRecommendations(input: {
