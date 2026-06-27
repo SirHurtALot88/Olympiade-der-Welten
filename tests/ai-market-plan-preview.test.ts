@@ -11,6 +11,18 @@ vi.mock("@/lib/ai/ai-transfermarkt-sell-preview-service", () => ({
   buildAiTransfermarktSellPreview,
 }));
 
+vi.mock("@/lib/persistence/persistence-service", () => ({
+  createPersistenceService: () => ({
+    bootstrapSingleplayerSave: () => ({ save: null }),
+    getSaveById: () => null,
+    getActiveSave: () => null,
+  }),
+}));
+
+vi.mock("@/lib/db/read/foundation-read-repository", () => ({
+  loadFoundationSnapshotFromPrisma: async () => null,
+}));
+
 describe("ai market plan preview service", () => {
   beforeEach(() => {
     buildAiTransfermarktPreview.mockReset();
@@ -704,8 +716,8 @@ describe("ai market plan preview service", () => {
     expect(result.sellThenBuyTeams).toBe(1);
     expect(result.teams[0].status).toBe("sell_then_buy");
     expect(result.teams[0].sellPlan.candidates.map((candidate) => candidate.playerName)).toEqual([
-      "Peak Value",
       "Flat Season",
+      "Peak Value",
     ]);
     expect(result.teams[0].buyPlan.candidates.map((candidate) => candidate.playerName)).toContain("Top Ten Push");
     expect(result.teams[0].planSteps.filter((step) => step.stepType === "sell")).toHaveLength(2);
@@ -830,10 +842,10 @@ describe("ai market plan preview service", () => {
 
     expect(result.teams[0].status).toBe("sell_only");
     expect(result.teams[0].sellPlan.candidates.map((candidate) => candidate.playerName)).toEqual([
-      "Debt Relief 1",
-      "Debt Relief 2",
-      "Debt Relief 3",
       "Debt Relief 4",
+      "Debt Relief 3",
+      "Debt Relief 2",
+      "Debt Relief 1",
     ]);
     expect(result.teams[0].projectedState.cashAfterPlan).toBe(9);
     expect(result.teams[0].projectedState.rosterAfterPlan).toBe(4);

@@ -743,6 +743,14 @@ function rankFinalBuyCandidates(input: {
   watchPlayerIds: Set<string>;
 }) {
   return [...input.candidates].sort((left, right) => {
+    const leftStrategic = left.strategicBuyScore ?? null;
+    const rightStrategic = right.strategicBuyScore ?? null;
+    if (leftStrategic != null || rightStrategic != null) {
+      const leftScore = leftStrategic ?? left.overallRecommendationScore ?? left.score ?? 0;
+      const rightScore = rightStrategic ?? right.overallRecommendationScore ?? right.score ?? 0;
+      if (rightScore !== leftScore) return rightScore - leftScore;
+    }
+
     const leftBase = left.overallRecommendationScore ?? left.score ?? 0;
     const rightBase = right.overallRecommendationScore ?? right.score ?? 0;
     if (input.pickedCount === 0 && rightBase !== leftBase) return rightBase - leftBase;

@@ -12,6 +12,21 @@ import {
   type AiSellPreviewResult,
   type AiSellPreviewTeamEntry,
 } from "@/lib/ai/ai-transfermarkt-sell-preview-service";
+import {
+  applyDoctrineToSellCandidates,
+  chooseSwapAwarePackages,
+  enrichBuyRecommendations,
+  loadDoctrineContext,
+  resolveTeamReplacementSlots,
+  type DoctrineAdjustedSellCandidate,
+  type EnrichedBuyRecommendation,
+} from "@/lib/ai/ai-transfer-plan-enrichment";
+import type { GameState } from "@/lib/data/olyDataTypes";
+import { loadFoundationSnapshotFromPrisma } from "@/lib/db/read/foundation-read-repository";
+import { projectFoundationStateFromPrisma } from "@/lib/db/read/foundation-read-projection";
+import { withNormalizedTeamControlSettings } from "@/lib/foundation/team-control-settings";
+import { withNormalizedTeamStrategyProfiles } from "@/lib/foundation/team-strategy-profiles";
+import { createPersistenceService } from "@/lib/persistence/persistence-service";
 import type { TeamControlMode } from "@/lib/data/olyDataTypes";
 
 export type AiMarketPlanPreviewSource = AiTransferPreviewSource;
@@ -179,12 +194,21 @@ function getPreviewCashBuffer(input: {
   return Math.max(longContractHint ? 10 : 6, salaryBase * 0.08, missingMin * 2, remainingBuys * 2);
 }
 
-function chooseBuyCandidates(team: AiTransferPreviewTeamEntry, plannedSellCount = 0, cashAfterSell?: number | null) {
+function chooseBuyCandidates(
+  team: AiTransferPreviewTeamEntry,
+  plannedSellCount = 0,
+  cashAfterSell?: number | null,
+  buyCandidatesOverride?: EnrichedBuyRecommendation[],
+) {
   const rosterCount = team.rosterCount ?? team.rosterSize ?? null;
   const playerMin = team.targetRosterMin ?? null;
   const playerOpt = team.targetRosterOpt ?? null;
   const rosterAfterSell = rosterCount != null ? rosterCount - plannedSellCount : null;
-  const buyCandidates = team.recommendedBuys ?? [];
+  const buyCandidates = [...(buyCandidatesOverride ?? team.recommendedBuys ?? [])].sort((left, right) => {
+    const leftScore = left.strategicBuyScore ?? left.overallRecommendationScore ?? 0;
+    const rightScore = right.strategicBuyScore ?? right.overallRecommendationScore ?? 0;
+    return rightScore - leftScore;
+  });
   const topScore = buyCandidates[0]?.overallRecommendationScore ?? 0;
   const aggressiveBuy =
     team.explanation.includes("Win-at-all-costs") ||
@@ -239,11 +263,12 @@ function chooseBuyCandidates(team: AiTransferPreviewTeamEntry, plannedSellCount 
   return selected;
 }
 
-function chooseSellCandidates(team: AiSellPreviewTeamEntry) {
+function chooseSellCandidates(team: AiSellPreviewTeamEntry, candidatesOverride?: DoctrineAdjustedSellCandidate[]) {
   const rosterCount = team.rosterSize ?? null;
   const playerMin = team.targetRosterMin ?? team.playerMin ?? null;
   const playerOpt = team.targetRosterOpt ?? null;
-  const safeCandidates = team.sellCandidates.filter(
+  const sourceCandidates = candidatesOverride ?? team.sellCandidates;
+  const safeCandidates = sourceCandidates.filter(
     (candidate) => !candidate.warnings.some((warning) => warning.includes("unter das Team-Minimum")),
   );
   const sellCapacity =
@@ -350,7 +375,41 @@ function chooseSellCandidates(team: AiSellPreviewTeamEntry) {
   return uniqueById(
     [...negativeCashRecoveryCandidates, ...proactiveCandidates.slice(0, finalWantedCount)],
     (candidate) => candidate.activePlayerId,
-  ).slice(0, sellCapacity);
+  )
+    .slice(0, sellCapacity)
+    .sort((left, right) => {
+      const leftScore = (left as DoctrineAdjustedSellCandidate).strategicSellScore ?? left.sellPriority ?? 0;
+      const rightScore = (right as DoctrineAdjustedSellCandidate).strategicSellScore ?? right.sellPriority ?? 0;
+      return rightScore - leftScore;
+    });
+}
+
+function normalizeMarketPlanGameState(gameState: GameState) {
+  return withNormalizedTeamStrategyProfiles(withNormalizedTeamControlSettings(gameState));
+}
+
+async function loadMarketPlanGameState(params: {
+  source?: AiTransferPreviewSource;
+  saveId?: string | null;
+}): Promise<GameState | null> {
+  try {
+    const source = params.source === "prisma" ? "prisma" : "sqlite";
+    if (source === "prisma") {
+      const snapshot = await loadFoundationSnapshotFromPrisma(params.saveId ?? undefined);
+      if (!snapshot) return null;
+      const projected = projectFoundationStateFromPrisma(snapshot);
+      return normalizeMarketPlanGameState(projected.save.gameState);
+    }
+
+    const persistence = createPersistenceService();
+    const bootstrapped = persistence.bootstrapSingleplayerSave();
+    const requestedSave = params.saveId ? persistence.getSaveById(params.saveId) : null;
+    const save = requestedSave ?? persistence.getActiveSave() ?? bootstrapped.save;
+    if (!save) return null;
+    return normalizeMarketPlanGameState(save.gameState);
+  } catch {
+    return null;
+  }
 }
 
 function buildProjectedState(input: {
@@ -428,6 +487,7 @@ function buildTeamEntry(input: {
   teamScope: AiMarketPlanPreviewTeamScope;
   buyScanSkipped?: boolean;
   sellScanSkipped?: boolean;
+  gameState?: GameState | null;
 }) {
   const buyTeam = input.buyTeam;
   const sellTeam = input.sellTeam;
@@ -448,13 +508,71 @@ function buildTeamEntry(input: {
     marketValueTotal: buyTeam?.marketValueTotal ?? sellTeam?.marketValueTotal ?? null,
   };
 
-  const chosenSells = sellTeam ? chooseSellCandidates(sellTeam) : [];
+  const doctrine =
+    input.gameState && teamId ? loadDoctrineContext(input.gameState, teamId) : null;
+  const doctrineAdjustedSells =
+    sellTeam && doctrine
+      ? applyDoctrineToSellCandidates({ candidates: sellTeam.sellCandidates, doctrine })
+      : sellTeam?.sellCandidates ?? [];
+
+  const chosenSells = sellTeam ? chooseSellCandidates(sellTeam, doctrineAdjustedSells) : [];
   const expectedSellValue = chosenSells.length > 0 ? sumKnown(chosenSells.map((candidate) => candidate.expectedSellValue)) : 0;
   const cashAfterSell =
     currentState.cash != null && expectedSellValue != null
       ? currentState.cash + expectedSellValue
       : null;
-  const chosenBuys = buyTeam ? chooseBuyCandidates(buyTeam, chosenSells.length, cashAfterSell) : [];
+
+  const enrichedBuyPool =
+    buyTeam && input.gameState
+      ? enrichBuyRecommendations({
+          gameState: input.gameState,
+          teamId,
+          recommendations: buyTeam.recommendedBuys ?? [],
+          doctrine: doctrine!,
+          replacementSlots: resolveTeamReplacementSlots({
+            gameState: input.gameState,
+            teamId,
+            plannedSells: chosenSells,
+          }),
+          rosterAfterSell:
+            currentState.rosterCount != null ? currentState.rosterCount - chosenSells.length : null,
+          playerMin: currentState.playerMin,
+          playerOpt: currentState.playerOpt,
+          teamCash: currentState.cash,
+          cashAfterSell,
+          plannedSellCount: chosenSells.length,
+          rosterPlayerIds: input.gameState.rosters
+            .filter((entry) => entry.teamId === teamId)
+            .map((entry) => entry.playerId),
+        })
+      : undefined;
+
+  const initialBuys = buyTeam ? chooseBuyCandidates(buyTeam, chosenSells.length, cashAfterSell, enrichedBuyPool) : [];
+  const swapResult =
+    input.gameState && sellTeam && buyTeam
+      ? chooseSwapAwarePackages({
+          sellCandidates: doctrineAdjustedSells,
+          buyCandidates: enrichedBuyPool ?? initialBuys,
+          chosenSells,
+          chosenBuys: initialBuys,
+          replacementSlots: resolveTeamReplacementSlots({
+            gameState: input.gameState,
+            teamId,
+            plannedSells: chosenSells,
+          }),
+          rosterNetQualityLoss: (sell, buy) => {
+            const sellRank = sell.ovr ?? 0;
+            const buyRank = buy.ovr ?? 0;
+            return sellRank > buyRank + 6 ? 8 : 0;
+          },
+        })
+      : { sells: chosenSells, buys: initialBuys, swapReason: null as string | null };
+
+  const chosenBuys = swapResult.buys;
+  const finalSells = swapResult.sells;
+  const swapReason = swapResult.swapReason;
+  const finalExpectedSellValue =
+    finalSells.length > 0 ? sumKnown(finalSells.map((candidate) => candidate.expectedSellValue)) : 0;
   const buyPlan: AiMarketPlanBuyPlan = {
     candidates: chosenBuys,
     plannedSpend: chosenBuys.length > 0 ? sumKnown(chosenBuys.map((candidate) => candidate.price)) : 0,
@@ -468,20 +586,22 @@ function buildTeamEntry(input: {
     ]),
   };
   const sellPlan: AiMarketPlanSellPlan = {
-    candidates: chosenSells,
-    salaryFreed: chosenSells.length > 0 ? sumKnown(chosenSells.map((candidate) => candidate.salary)) : 0,
-    expectedSellValue: chosenSells.length > 0 ? sumKnown(chosenSells.map((candidate) => candidate.expectedSellValue)) : 0,
-    totalExpectedSellValue: chosenSells.length > 0 ? sumKnown(chosenSells.map((candidate) => candidate.expectedSellValue)) : 0,
-    rosterAfterSell: currentState.rosterCount != null ? currentState.rosterCount - chosenSells.length : null,
+    candidates: finalSells,
+    salaryFreed: finalSells.length > 0 ? sumKnown(finalSells.map((candidate) => candidate.salary)) : 0,
+    expectedSellValue: finalExpectedSellValue,
+    totalExpectedSellValue: finalExpectedSellValue,
+    rosterAfterSell: currentState.rosterCount != null ? currentState.rosterCount - finalSells.length : null,
     warnings: unique([
-      ...chosenSells.flatMap((candidate) => candidate.warnings),
-      chosenSells.some((candidate) => candidate.expectedSellValue == null)
+      ...finalSells.flatMap((candidate) => candidate.warnings),
+      finalSells.some((candidate) => candidate.expectedSellValue == null)
         ? "Mindestens ein geplanter Verkauf hat keinen belastbaren Verkaufserloes."
         : null,
     ]),
   };
 
   const reasons = unique([
+    doctrine?.personaHint ?? null,
+    swapReason,
     buyTeam?.explanation,
     sellTeam?.explanation,
     currentState.rosterCount != null &&
@@ -495,16 +615,16 @@ function buildTeamEntry(input: {
       ? "Kader liegt ueber dem Team-Optimum und bietet Verkaufsdruck."
       : null,
     chosenBuys[0]?.reason,
-    chosenBuys[0]?.strategyNotes?.[0],
-    chosenSells[0]?.reasonToSell?.[0],
-    chosenSells[0]?.strategyFitSummary,
+    chosenBuys[0]?.buyDecisionLabel ?? chosenBuys[0]?.strategyNotes?.[0],
+    finalSells[0]?.reasonToSell?.[0],
+    finalSells[0]?.strategyFitSummary,
   ]);
   const warnings = unique([
     ...(buyTeam?.warnings ?? []),
     ...(sellTeam?.warnings ?? []),
     ...chosenBuys.flatMap((candidate) => candidate.warnings),
-    ...chosenSells.flatMap((candidate) => candidate.warnings),
-    chosenSells.some((candidate) => candidate.expectedSellValue == null)
+    ...finalSells.flatMap((candidate) => candidate.warnings),
+    finalSells.some((candidate) => candidate.expectedSellValue == null)
       ? "Mindestens ein geplanter Verkauf hat keinen belastbaren Verkaufserloes."
       : null,
     input.teamScope === "all" && controlMode === "manual" ? "manuell gesteuertes Team – Marktplan nur informativ" : null,
@@ -527,7 +647,7 @@ function buildTeamEntry(input: {
     currentState.rosterCount != null &&
     currentState.playerOpt != null &&
     currentState.rosterCount > currentState.playerOpt &&
-    chosenSells.length === 0
+    finalSells.length === 0
       ? "roster_over_opt_without_sell_candidate"
       : null,
     currentState.cash != null && currentState.cash < 0 && projectedState.cashAfterPlan != null && projectedState.cashAfterPlan <= 0
@@ -552,14 +672,14 @@ function buildTeamEntry(input: {
     buyEnabled,
     sellEnabled,
     buyCandidates: chosenBuys,
-    sellCandidates: chosenSells,
+    sellCandidates: finalSells,
     currentState,
     warnings,
     blockingReasons,
   });
 
   const planSteps: AiMarketPlanStep[] = [
-    ...chosenSells.map((candidate) => ({
+    ...finalSells.map((candidate) => ({
       stepType: "sell" as const,
       playerId: candidate.playerId,
       playerName: candidate.playerName,
@@ -576,7 +696,7 @@ function buildTeamEntry(input: {
       amount: candidate.price,
       salaryImpact: candidate.salary,
       rosterImpact: 1,
-      reason: candidate.reason,
+      reason: candidate.reasonToBuy?.[0] ?? candidate.buyDecisionLabel ?? candidate.reason,
       sourceStatus:
         candidate.price != null && candidate.salary != null
           ? ("mapped" as const)
@@ -592,7 +712,7 @@ function buildTeamEntry(input: {
     });
   }
 
-  if (status === "warning" && chosenBuys.length === 0 && chosenSells.length === 0) {
+  if (status === "warning" && chosenBuys.length === 0 && finalSells.length === 0) {
     planSteps.push({
       stepType: "warning",
       reason: "Vor einem Marktplan fehlen noch saubere Kauf- oder Verkaufskandidaten.",
@@ -630,6 +750,10 @@ export async function buildAiMarketPlanPreview(params: AiMarketPlanPreviewParams
   };
   const skipBuyScan = params.buyLimit === 0;
   const skipSellScan = params.sellLimit === 0;
+  const gameState = await loadMarketPlanGameState({
+    source: previewParams.source,
+    saveId: previewParams.saveId,
+  });
 
   const [buyPreview, sellPreview] = await Promise.all([
     skipBuyScan
@@ -660,6 +784,7 @@ export async function buildAiMarketPlanPreview(params: AiMarketPlanPreviewParams
         teamScope: previewParams.teamScope ?? "ai",
         buyScanSkipped: skipBuyScan,
         sellScanSkipped: skipSellScan,
+        gameState,
       }),
     )
     .filter((entry): entry is AiMarketPlanTeamEntry => Boolean(entry))

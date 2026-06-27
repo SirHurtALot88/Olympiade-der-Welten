@@ -23,6 +23,11 @@ import {
   normalizeTransfermarktToken,
 } from "@/lib/market/transfermarkt-fit";
 import { createPersistenceService } from "@/lib/persistence/persistence-service";
+import {
+  annotateBuyRecommendations,
+  loadDoctrineContext,
+  resolveTeamReplacementSlots,
+} from "@/lib/ai/ai-transfer-plan-enrichment";
 import { getSeasonDisciplineScheduleEntry } from "@/lib/season/season-discipline-schedule";
 import {
   buildTeamThemeCompositionRuntimeContext,
@@ -79,6 +84,14 @@ export type AiTransferPreviewRecommendation = {
   fitNotes: string[];
   riskNotes: string[];
   strategyNotes: string[];
+  buyIntentScore?: number | null;
+  passIntentScore?: number | null;
+  replacementFitScore?: number | null;
+  strategicBuyScore?: number | null;
+  buyDecisionLabel?: string | null;
+  replacementSlotId?: string | null;
+  reasonToBuy?: string[];
+  reasonToPass?: string[];
 };
 
 export type AiTransferPreviewSkippedTarget = {
@@ -1796,7 +1809,7 @@ export async function buildAiTransfermarktPreview(params: AiTransferPreviewParam
           return (right.score ?? 0) - (left.score ?? 0);
         });
 
-      const recommendedBuys = rankedAffordableCandidates
+      const recommendedBuysRaw = rankedAffordableCandidates
         .slice(0, 3)
         .map<AiTransferPreviewRecommendation>((entry) =>
           toPreviewRecommendation({
@@ -1805,6 +1818,28 @@ export async function buildAiTransfermarktPreview(params: AiTransferPreviewParam
             strategyProfile,
           }),
         );
+      const doctrine = loadDoctrineContext(context.gameState, team.teamId);
+      const replacementSlots = resolveTeamReplacementSlots({
+        gameState: context.gameState,
+        teamId: team.teamId,
+      });
+      const recommendedBuys = annotateBuyRecommendations({
+        gameState: context.gameState,
+        teamId: team.teamId,
+        recommendations: recommendedBuysRaw,
+        doctrine,
+        replacementSlots,
+        rosterAfterSell: rosterEconomy.rosterCount,
+        playerMin: effectivePlayerMin > 0 ? effectivePlayerMin : null,
+        playerOpt: effectivePlayerOpt > 0 ? effectivePlayerOpt : null,
+        teamCash: team.cash ?? null,
+        cashAfterSell: team.cash ?? null,
+        plannedSellCount: 0,
+        rosterPlayerIds: context.gameState.rosters
+          .filter((entry) => entry.teamId === team.teamId)
+          .map((entry) => entry.playerId),
+        coversNeedAxis: (candidate) => Boolean(candidate.needMatchLabel),
+      });
 
       const skippedTargets = [
         ...stage0SkippedTargets,
