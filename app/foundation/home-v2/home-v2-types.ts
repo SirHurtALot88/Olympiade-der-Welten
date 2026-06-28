@@ -1,3 +1,5 @@
+import type { LeaguePlayerHeatPools } from "@/lib/foundation/player-league-heat";
+
 export type HomeV2TopPlayerCard = {
   playerId: string;
   name: string;
@@ -83,6 +85,7 @@ export type HomeV2ClientProps = {
   nextStepDetail: string;
   warnings: string[];
   topPlayers: HomeV2TopPlayerCard[];
+  leagueHeatPools: LeaguePlayerHeatPools;
   facilities: HomeV2FacilitySnapshot[];
   scheduleItems: HomeV2ScheduleItem[];
   inboxItems: HomeV2InboxItem[];

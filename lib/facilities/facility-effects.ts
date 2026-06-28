@@ -117,6 +117,11 @@ export function applyRecoveryFacilityModifiers(baseRecovery: number, facilities:
   };
 }
 
+/** Reduces season-end training fatigue load (on top of matchday fatigue) by REHA level. */
+export function getRecoveryTrainingFatigueReductionPct(facilities: TeamFacilityCollection | null | undefined) {
+  return applyRecoveryFacilityModifiers(0, facilities).modifierPct;
+}
+
 function getAcademyDiscountPct(ratingTier: PlayerProgressionRatingTier, facilities: TeamFacilityCollection | null | undefined) {
   if (ratingTier !== "F" && ratingTier !== "E" && ratingTier !== "D") {
     return 0;

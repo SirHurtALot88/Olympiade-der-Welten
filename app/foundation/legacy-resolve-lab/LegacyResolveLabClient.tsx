@@ -7,6 +7,7 @@ import PlayerDetailDrawer from "@/app/foundation/PlayerDetailDrawer";
 import type { DisciplineCategory } from "@/lib/data/olyDataTypes";
 import type { LegacyMatchdayReadinessStatus } from "@/lib/lineups/legacy-matchday-readiness";
 import type { PlayerDetailDrawerData } from "@/lib/foundation/player-detail-drawer";
+import type { PlayerHistoryDisciplineValues } from "@/lib/season/season-discipline-area-groups";
 import type { DisciplineHighlightCandidate, LegacyMatchdayResolvePreview, ResolvePreviewStatus } from "@/lib/resolve/legacy-matchday-resolve-types";
 
 type ResolveLabResponse = {
@@ -368,6 +369,7 @@ export default function LegacyResolveLabClient({
         injuryRiskPercent: 0,
         injuryRiskBand: "none",
         injuryRiskLabel: "kein Risiko",
+        performancePenaltyPercent: 0,
         isUnavailable: false,
         blocker: null,
         lastRoll: null,
@@ -439,11 +441,13 @@ export default function LegacyResolveLabClient({
           teamName: player.teamName,
           teamCode: player.teamCode,
           appearances: null,
+          averageFatigue: null,
           totalPoints: null,
           pow: null,
           spe: null,
           men: null,
           soc: null,
+          disciplineValues: {} satisfies PlayerHistoryDisciplineValues,
           ovr: player.ovr,
           ovrRank: null,
           pps: null,
@@ -460,11 +464,15 @@ export default function LegacyResolveLabClient({
           projectedSellValue: null,
           projectedSellFactor: null,
           projectedSellSourceLabel: null,
+          saleFactorRankInBracket: null,
+          saleFactorBracketSize: null,
           salary: player.salary,
           contractLength: player.contractLength,
           averageContribution: null,
           averageFinalScore: null,
           bestDisciplineLabel: player.disciplineValues[0]?.label ?? null,
+          injuriesCount: null,
+          matchdaysMissed: null,
           warnings: [],
         },
       ],
@@ -478,7 +486,7 @@ export default function LegacyResolveLabClient({
       attributeCeilingPreview: [],
       projectedClassPreview: null,
       trainingRouteImpact: null,
-    });
+    } as unknown as PlayerDetailDrawerData);
   }
 
   async function runApply(mode: "dry-run" | "execute") {

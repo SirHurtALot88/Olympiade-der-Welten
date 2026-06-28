@@ -241,7 +241,6 @@ function getTalentTraitPotentialModifier(player: Pick<Player, "traitsPositive" |
 
 function deriveHiddenPotentialScore(input: { saveId: string; player: Player }) {
   const seed = getPlayerSeedValue(`${input.saveId}:${input.player.id}:potential-v3`);
-  // Wide random roll — decoupled from current ability. Per-axis floors live in the ceiling profile.
   const rawRoll = roundValue(35 + seed * 64, 0);
   const traitBonus = getTalentTraitPotentialModifier(input.player);
   return clamp(rawRoll + traitBonus, 35, 99);

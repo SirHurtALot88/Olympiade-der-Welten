@@ -616,24 +616,6 @@ export default function TrainingFacilitiesV2Client({
           : !facilityMaintenancePreview?.confirmToken
             ? "Wartungs-Preview bitte einmal frisch laden."
             : null;
-  const seasonEndResetReason =
-    readOnly
-      ? "Nur eigene Teams duerfen XP-Planungen aendern."
-      : seasonEndBusy
-        ? "Erst die laufende XP-Aktion fertig rechnen lassen."
-        : seasonEndStatus.plannedCount === 0
-          ? "Es liegen noch keine XP-Upgrades im Warenkorb."
-          : null;
-  const seasonEndConfirmReason =
-    readOnly
-      ? "Nur eigene Teams duerfen Season-End-Upgrades bestaetigen."
-      : seasonEndBusy
-        ? "Season-End-XP wird gerade berechnet."
-        : !seasonEndStatus.ok
-          ? seasonEndStatus.blockingReasons[0] ?? "Bitte erst alle Blocker im XP-Plan loesen."
-          : !seasonEndStatus.confirmToken
-            ? "Bitte den XP-Plan einmal frisch aufbauen."
-            : null;
 
   const topGrowth = useMemo(
     () =>
@@ -786,7 +768,7 @@ export default function TrainingFacilitiesV2Client({
               {formatPps(summary.recoveryBeforeTraining)} → {formatPps(summary.recoveryAfterTraining)}
             </strong>
             <small>
-              Performance {formatLocaleNumber(summary.performanceXp, 0)} · Gesamt {formatLocaleNumber(summary.totalXp, 0)}
+              Performance {formatLocaleNumber(summary.performanceXp, 0)} Setpoints · Netto {formatLocaleNumber(summary.totalXp, 0)} Setpoints
             </small>
           </article>
         </div>
@@ -1057,7 +1039,7 @@ export default function TrainingFacilitiesV2Client({
                 items={[
                   {
                     key: "xp",
-                    label: "Training-XP",
+                    label: "Trainings-Setpoints",
                     value: `${formatLocaleNumber(summary.trainingXpBefore, 0)} → ${formatLocaleNumber(summary.trainingXpAfter, 0)}`,
                     tone: summary.trainingXpAfter >= summary.trainingXpBefore ? "positive" : "neutral",
                   },
@@ -1510,53 +1492,6 @@ export default function TrainingFacilitiesV2Client({
                 Warum nicht: {activeFacilityConfirmReason}
               </p>
             ) : null}
-        </section>
-      ) : null}
-
-      {(facilityTab === "overview" || facilityTab === "training") && seasonEndRows.length > 0 ? (
-        <section className="training-v2-season-end-panel" data-testid="training-v2-season-end-panel">
-          <div className="training-v2-season-end-head">
-            <h3>Season-End XP</h3>
-            <p className="muted">{seasonEndStatus.plannedCount} Upgrades geplant · {seasonEndStatus.xpRemaining} XP frei</p>
-          </div>
-          {seasonEndError ? <p className="text-negative">{seasonEndError}</p> : null}
-          {seasonEndSuccess ? <p className="text-positive">{seasonEndSuccess}</p> : null}
-          <div className="training-v2-season-end-grid">
-            {seasonEndRows.slice(0, 8).map((row) => (
-              <article key={row.playerId} className="training-v2-season-end-card">
-                <strong>{row.playerName}</strong>
-                <small>
-                  {row.className ? <ClassColorChip className={row.className} /> : "—"}
-                  {row.organicProgression
-                    ? ` · ${row.organicProgression.classBefore} → ${row.organicProgression.classAfter}`
-                    : null}
-                </small>
-                <span>
-                  XP {row.plannedXP}/{row.availableXP}
-                </span>
-              </article>
-            ))}
-          </div>
-          <div className="training-v2-season-end-actions">
-            <button
-              type="button"
-              className="secondary-button inline-button"
-              disabled={Boolean(seasonEndResetReason)}
-              title={seasonEndResetReason ?? undefined}
-              onClick={() => onClearUpgradeCart()}
-            >
-              Warenkorb leeren
-            </button>
-            <button
-              type="button"
-              className="primary-button inline-button"
-              disabled={Boolean(seasonEndConfirmReason) || seasonEndBusy}
-              title={seasonEndConfirmReason ?? undefined}
-              onClick={() => onConfirmSeasonEndXpSpend()}
-            >
-              {seasonEndBusy ? "XP wird gebucht…" : "Season-End XP bestätigen"}
-            </button>
-          </div>
         </section>
       ) : null}
 

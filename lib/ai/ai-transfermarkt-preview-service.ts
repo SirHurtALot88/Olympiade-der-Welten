@@ -49,9 +49,16 @@ export type AiTransferPreviewParams = {
   excludedPlayerIds?: string[] | null;
   limit?: number | null;
   fullScoringLimit?: number | null;
+  /** Picks/planner: budget-only stage-0 over full FA feed. Default strategic funnel for TM board. */
+  candidateScopeMode?: AiPreviewCandidateScopeMode | null;
   buyNeedOnly?: boolean | null;
   forceBuyScanTeamIds?: string[] | null;
 };
+
+export type AiPreviewCandidateScopeMode = "strategic" | "budget_wide";
+
+/** Full-score cap for budget_wide when caller does not pass fullScoringLimit. */
+export const AI_PREVIEW_BUDGET_WIDE_DEFAULT_FULL_SCORING = 480;
 
 export type AiTransferPreviewRecommendation = {
   playerId: string;
@@ -853,6 +860,67 @@ function buildStrategicAiPreviewScope(input: {
   };
 }
 
+export function buildBudgetWideAffordableScope(input: {
+  baseFreeAgents: TransfermarktFreeAgentItem[];
+  marketValueSortedAsc?: boolean;
+  spendableCash: number;
+  globallyExcludedPlayerIds: Set<string>;
+  recentlySoldPlayerIds: Set<string>;
+  onScan?: (item: TransfermarktFreeAgentItem) => void;
+}) {
+  const candidates: TransfermarktFreeAgentItem[] = [];
+  const stage0SkippedTargets: AiTransferPreviewSkippedTarget[] = [];
+  const budget = Math.max(0, input.spendableCash);
+
+  for (const item of input.baseFreeAgents) {
+    if (input.globallyExcludedPlayerIds.has(item.playerId)) continue;
+    if (input.recentlySoldPlayerIds.has(item.playerId)) continue;
+    if (item.marketValue == null || item.salary == null) continue;
+    if (item.marketValue > budget) {
+      if (stage0SkippedTargets.length < 5) {
+        stage0SkippedTargets.push({
+          playerId: item.playerId,
+          name: item.name,
+          reason: "insufficient_cash",
+          blockingReasons: ["insufficient_cash"],
+        });
+      }
+      if (input.marketValueSortedAsc) {
+        break;
+      }
+      continue;
+    }
+    input.onScan?.(item);
+    candidates.push(item);
+  }
+
+  return {
+    candidates,
+    stage0SkippedTargets,
+    affordableCount: candidates.length,
+  };
+}
+
+function resolveRoughShortlistLimit(input: {
+  candidateScopeMode: AiPreviewCandidateScopeMode;
+  scopedCount: number;
+  limit: number;
+  fullScoringLimit: number | null;
+  rosterStatus: AiTransferPreviewTeamEntry["rosterStatus"];
+}) {
+  if (input.candidateScopeMode === "budget_wide") {
+    const cap = input.fullScoringLimit ?? AI_PREVIEW_BUDGET_WIDE_DEFAULT_FULL_SCORING;
+    return Math.min(input.scopedCount, Math.max(120, cap));
+  }
+  if (input.fullScoringLimit != null) {
+    return Math.min(input.scopedCount, input.fullScoringLimit);
+  }
+  if (input.limit >= input.scopedCount) {
+    return Math.min(input.scopedCount, Math.max(72, Math.ceil(input.scopedCount * 0.12)));
+  }
+  return Math.max(16, Math.min(24, input.limit));
+}
+
 function enrichCandidateForTeam(input: {
   context: ResolvedPreviewContext;
   team: Team;
@@ -1459,6 +1527,8 @@ export async function buildAiTransfermarktPreview(params: AiTransferPreviewParam
   const contextResolvedAt = Date.now();
   const teamScope = params.teamScope === "all" ? "all" : "ai";
   const limit = typeof params.limit === "number" && Number.isFinite(params.limit) ? Math.max(10, Math.round(params.limit)) : 90;
+  const candidateScopeMode: AiPreviewCandidateScopeMode =
+    params.candidateScopeMode === "budget_wide" ? "budget_wide" : "strategic";
   const globallyExcludedPlayerIds = new Set((params.excludedPlayerIds ?? []).filter(Boolean));
   const currentMatchdayRosterRequirement = getCurrentMatchdayRosterRequirement(context.gameState);
 
@@ -1619,6 +1689,22 @@ export async function buildAiTransfermarktPreview(params: AiTransferPreviewParam
                 if (teamRosterEntries.length >= team.rosterLimit || spendableCash <= 0) {
                   return [];
                 }
+                const recentlySoldPlayerIds = recentlySoldByTeamPlayer.get(team.teamId) ?? new Set<string>();
+                const onScan = () => {
+                  debugPerformance.candidateScans += 1;
+                };
+                if (candidateScopeMode === "budget_wide") {
+                  const budgetScope = buildBudgetWideAffordableScope({
+                    baseFreeAgents,
+                    marketValueSortedAsc: true,
+                    spendableCash,
+                    globallyExcludedPlayerIds,
+                    recentlySoldPlayerIds,
+                    onScan,
+                  });
+                  stage0SkippedTargets.push(...budgetScope.stage0SkippedTargets);
+                  return budgetScope.candidates;
+                }
                 const strategicScope = buildStrategicAiPreviewScope({
                   baseFreeAgents,
                   marketValueSortedAsc: true,
@@ -1634,10 +1720,8 @@ export async function buildAiTransfermarktPreview(params: AiTransferPreviewParam
                   objectiveBias,
                   rosterStatus,
                   globallyExcludedPlayerIds,
-                  recentlySoldPlayerIds: recentlySoldByTeamPlayer.get(team.teamId) ?? new Set<string>(),
-                  onScan: () => {
-                    debugPerformance.candidateScans += 1;
-                  },
+                  recentlySoldPlayerIds,
+                  onScan,
                 });
                 stage0SkippedTargets.push(...strategicScope.stage0SkippedTargets);
                 return strategicScope.candidates;
@@ -1656,12 +1740,13 @@ export async function buildAiTransfermarktPreview(params: AiTransferPreviewParam
         warnings.push(`aktueller Spieltag braucht ${Math.min(currentMatchdayRosterRequirement, team.rosterLimit)} aktive Slots`);
       }
 
-      const roughShortlistLimit =
-        fullScoringLimit != null
-          ? Math.min(scopedFreeAgents.length, fullScoringLimit)
-          : limit >= scopedFreeAgents.length
-            ? Math.min(scopedFreeAgents.length, Math.max(72, Math.ceil(scopedFreeAgents.length * 0.12)))
-            : Math.max(16, Math.min(24, limit));
+      const roughShortlistLimit = resolveRoughShortlistLimit({
+        candidateScopeMode,
+        scopedCount: scopedFreeAgents.length,
+        limit,
+        fullScoringLimit,
+        rosterStatus,
+      });
       const roughShortlistStartedAt = Date.now();
       const roughShortlist =
         context.source === "sqlite"
@@ -1684,6 +1769,16 @@ export async function buildAiTransfermarktPreview(params: AiTransferPreviewParam
                 selected.set(entry.item.playerId, entry.item);
               }
 
+              if (candidateScopeMode === "budget_wide") {
+                let cheapFillAdded = 0;
+                for (const item of scopedFreeAgents) {
+                  if (cheapFillAdded >= 240) break;
+                  if (!isAiCheapFillCandidate(item)) continue;
+                  selected.set(item.playerId, item);
+                  cheapFillAdded += 1;
+                }
+              }
+
               const addShortlistCoverage = (items: TransfermarktFreeAgentItem[], maxCount: number) => {
                 for (const item of items.slice(0, Math.max(0, maxCount))) {
                   selected.set(item.playerId, item);
@@ -1694,11 +1789,16 @@ export async function buildAiTransfermarktPreview(params: AiTransferPreviewParam
               // Coverage is drawn from price, ratio, need axes and discipline needs so every pick lane can still surface.
               const cheapCoverageLimit = Math.min(
                 scopedFreeAgents.length,
-                rosterStatus === "under_min"
-                  ? Math.max(32, Math.ceil(roughShortlistLimit * 1.25))
-                  : Math.max(24, Math.ceil(roughShortlistLimit * 1.1)),
+                candidateScopeMode === "budget_wide"
+                  ? Math.max(160, Math.ceil(roughShortlistLimit * 0.45))
+                  : rosterStatus === "under_min"
+                    ? Math.max(32, Math.ceil(roughShortlistLimit * 1.25))
+                    : Math.max(24, Math.ceil(roughShortlistLimit * 1.1)),
               );
-              const coverageChunk = Math.max(5, Math.ceil(cheapCoverageLimit / 4));
+              const coverageChunk =
+                candidateScopeMode === "budget_wide"
+                  ? Math.max(24, Math.ceil(cheapCoverageLimit / 6))
+                  : Math.max(5, Math.ceil(cheapCoverageLimit / 4));
               addShortlistCoverage(
                 [...scopedFreeAgents].sort((left, right) => {
                   const priceDelta =

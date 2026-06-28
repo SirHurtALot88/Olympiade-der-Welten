@@ -283,9 +283,8 @@ describe("pre-season workflow service", () => {
       "facilities",
       "player_development",
       "preseason_management",
-      "transfer_sell_phase",
+      "transfer_window_session",
       "contract_renewal",
-      "transfer_buy_phase",
       "sponsor_choice",
       "next_season_setup",
       "next_season_ready",
@@ -322,15 +321,12 @@ describe("pre-season workflow service", () => {
     const { persistence } = persistenceMock(sourceSave);
 
     const preview = await buildPreSeasonWorkflowPreview(sourceSave, persistence);
-    const sell = preview.steps.find((step) => step.stepId === "transfer_sell_phase")!;
-    const buy = preview.steps.find((step) => step.stepId === "transfer_buy_phase")!;
+    const transferWindow = preview.steps.find((step) => step.stepId === "transfer_window_session")!;
 
     expect(preview.controlSummary.manualTeams).toBe(1);
     expect(preview.controlSummary.aiTeams).toBe(1);
-    expect(sell.warnings).toContain("human_teams_no_auto_sell");
-    expect(buy.warnings).toContain("human_teams_no_auto_buy");
-    expect(sell.summary.usesSellService).toBe(true);
-    expect(buy.summary.usesBuyService).toBe(true);
+    expect(transferWindow.warnings).toContain("human_teams_no_auto_transfer");
+    expect(transferWindow.summary.usesSellThenBuyCycles).toBe(true);
   });
 
   it("blocks next season setup without confirm token", async () => {
@@ -535,7 +531,6 @@ describe("pre-season workflow service", () => {
     );
 
     expect(source).not.toMatch(/PrismaClient|@prisma\/client|prisma\./);
-    expect(source).toContain("executeLocalTransfermarktSell");
-    expect(source).toContain("executeLocalTransfermarktBuy");
+    expect(source).toContain("transfer_window_session");
   });
 });

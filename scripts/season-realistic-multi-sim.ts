@@ -16,6 +16,7 @@ import { loadEnvConfig } from "@next/env";
 
 import type { GameState, TransferHistoryEntry } from "@/lib/data/olyDataTypes";
 import { getTeamHardMinRequired, getTeamOptTarget } from "@/lib/ai/ai-market-plan-convergence-service";
+import { previewSeasonEndContracts } from "@/lib/contracts/contract-renewal-service";
 import { calculateOpenBuyoutCost } from "@/lib/market/contract-negotiation-preview";
 import { buildTransfermarktSaleFactorBreakdown } from "@/lib/market/transfermarkt-sale-factor";
 import { createPersistenceService } from "@/lib/persistence/persistence-service";
@@ -233,6 +234,82 @@ function buildTransferBuySourceBreakdown(transfers: TransferHistoryEntry[]) {
   return { bySource, strategicBuyCount: strategic, repairBuyCount: repair };
 }
 
+function buildStrategicVsRepairBySeason(transfers: TransferHistoryEntry[]) {
+  const bySeason: Record<string, { strategic: number; repair: number; strategicPct: number }> = {};
+  for (const entry of transfers) {
+    if (entry.transferType !== "buy") continue;
+    const seasonId = entry.seasonId ?? "unknown";
+    if (!bySeason[seasonId]) {
+      bySeason[seasonId] = { strategic: 0, repair: 0, strategicPct: 0 };
+    }
+    if (entry.source === "preseason_roster_repair_buy") {
+      bySeason[seasonId].repair += 1;
+    } else if (
+      entry.source === "ai_preseason_market_buy" ||
+      entry.source === "manual_transfer_window" ||
+      entry.source === "ai_season_end_market_buy"
+    ) {
+      bySeason[seasonId].strategic += 1;
+    }
+  }
+  for (const row of Object.values(bySeason)) {
+    const total = row.strategic + row.repair;
+    row.strategicPct = total > 0 ? round((row.strategic / total) * 100, 1) : 0;
+  }
+  return bySeason;
+}
+
+function buildRenewalAudit(save: { gameState: GameState }) {
+  const preview = previewSeasonEndContracts(save as never);
+  const events = save.gameState.seasonState.contractEvents ?? [];
+  const renewed = events.filter((event) => event.eventType === "contract_renewed").length;
+  const released = events.filter((event) => event.eventType === "contract_expired_exit").length;
+  const expiringRows = preview.rows.filter((row) => row.statusBeforeTick === "expiring");
+  const cashBlocked = preview.rows.filter((row) => row.renewalBlockReason === "cash_gate").length;
+  return {
+    expiringBeforeTick: expiringRows.length,
+    renewed,
+    released,
+    renewRate: renewed + released > 0 ? round((renewed / (renewed + released)) * 100, 1) : null,
+    cashBlockedCandidates: cashBlocked,
+    aiRenewCandidates: preview.aiRenewalCandidates,
+    aiReleaseCandidates: preview.aiReleaseCandidates,
+  };
+}
+
+function buildPostPreseasonSnapshots(gameState: GameState) {
+  return (gameState.seasonState.seasonSnapshots ?? []).map((snapshot) => ({
+    seasonId: snapshot.seasonId,
+    rosterOptAchievement: buildRosterOptAchievementFromStandings(snapshot.finalStandings, gameState),
+  }));
+}
+
+function buildRosterOptAchievementFromStandings(
+  standings: Array<{ teamId?: string; rosterCount?: number | null }>,
+  gameState: GameState,
+) {
+  const rows = standings.map((row) => {
+    const teamId = row.teamId ?? "";
+    const rosterCount = row.rosterCount ?? gameState.rosters.filter((entry) => entry.teamId === teamId).length;
+    const hardMin = getTeamHardMinRequired(gameState, teamId);
+    const optTarget = getTeamOptTarget(gameState, teamId);
+    return {
+      teamId,
+      rosterCount,
+      hardMin,
+      optTarget,
+      atOpt: rosterCount >= optTarget,
+      belowHardMin: rosterCount < hardMin,
+    };
+  });
+  return {
+    totalTeams: rows.length,
+    atOptCount: rows.filter((row) => row.atOpt).length,
+    belowHardMinCount: rows.filter((row) => row.belowHardMin).length,
+    atOptPct: rows.length > 0 ? round((rows.filter((row) => row.atOpt).length / rows.length) * 100, 1) : 0,
+  };
+}
+
 function buildCashWaterfall(gameState: GameState) {
   const snapshots = gameState.seasonState.seasonSnapshots ?? [];
   if (snapshots.length > 0) {
@@ -299,6 +376,15 @@ function buildMarkdownSummary(report: Record<string, unknown>) {
     `- strategic market buys: ${buySources.strategicBuyCount ?? 0}`,
     `- emergency repair buys: ${buySources.repairBuyCount ?? 0}`,
     "",
+    "## Strategic vs Repair by Season",
+    ...Object.entries(report.strategicVsRepairBySeason ?? {}).map(
+      ([seasonId, row]) =>
+        `- ${seasonId}: strategic ${(row as { strategic: number }).strategic} · repair ${(row as { repair: number }).repair} · strategic ${(row as { strategicPct: number }).strategicPct}%`,
+    ),
+    "",
+    "## Renewal Audit",
+    `- renewed: ${(report.renewalAudit as { renewed?: number })?.renewed ?? 0} · released: ${(report.renewalAudit as { released?: number })?.released ?? 0} · renew rate ${(report.renewalAudit as { renewRate?: number | null })?.renewRate ?? "n/a"}%`,
+    "",
     "## Contract Shapes vs Salary Factor Window",
     ...contractShapes.map(
       (row) => `- ${row.seasonId}: min upcoming factor ${row.minUpcomingFactor} · front_loaded ${row.frontLoadedSharePct}%`,
@@ -364,6 +450,9 @@ async function main() {
   const buyEconomics = buildBuyEconomics(saveAfter.gameState);
   const rosterOptAchievement = buildRosterOptAchievement(saveAfter.gameState);
   const transferBuySources = buildTransferBuySourceBreakdown(saveAfter.gameState.transferHistory);
+  const strategicVsRepairBySeason = buildStrategicVsRepairBySeason(saveAfter.gameState.transferHistory);
+  const renewalAudit = buildRenewalAudit(saveAfter);
+  const postPreseasonSnapshots = buildPostPreseasonSnapshots(saveAfter.gameState);
   fs.writeFileSync(path.join(outputDir, "transfer-finance-violations.json"), `${JSON.stringify({ violations: transferFinanceAudit.violations, doctrineStats: transferFinanceAudit.doctrineStats }, null, 2)}\n`);
   fs.writeFileSync(
     path.join(outputDir, "transfer-finance-by-season.csv"),
@@ -442,6 +531,9 @@ async function main() {
     buyEconomicsSample: buyEconomics.slice(0, 40),
     rosterOptAchievement,
     transferBuySources,
+    strategicVsRepairBySeason,
+    renewalAudit,
+    postPreseasonSnapshots,
     leagueTotals: {
       transferHistoryEntries: saveAfter.gameState.transferHistory.length,
       totalBuyFees: round(transferStats.reduce((sum, row) => sum + row.buyFees, 0)),

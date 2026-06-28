@@ -11,6 +11,7 @@ import {
   type AiMarketPlanTeamEntry,
 } from "@/lib/ai/ai-market-plan-preview-service";
 import { resolveMarketSpendableCashForPlanner } from "@/lib/ai/ai-manager-apply-service";
+import { assessTeamSellRunwayPressure } from "@/lib/ai/team-sell-runway-pressure";
 import type {
   GameLogEntry,
   GameState,
@@ -206,6 +207,7 @@ export type AiMarketPlanApplyParams = {
     excludeBuyPlayerIds?: string[] | null;
     excludeSellPlayerIds?: string[] | null;
     convergenceIncrementalFill?: boolean;
+    transferWindowCycleMode?: boolean;
   };
 };
 
@@ -411,6 +413,7 @@ function getEffectiveOptions(input: AiMarketPlanApplyParams) {
     excludeBuyPlayerIds: unique((input.options?.excludeBuyPlayerIds ?? []).filter(Boolean)),
     excludeSellPlayerIds: unique((input.options?.excludeSellPlayerIds ?? []).filter(Boolean)),
     convergenceIncrementalFill: input.options?.convergenceIncrementalFill ?? false,
+    transferWindowCycleMode: input.options?.transferWindowCycleMode ?? false,
   };
 }
 
@@ -1110,12 +1113,18 @@ export async function applyAiMarketPlanLocally(input: AiMarketPlanApplyParams): 
         expiringCount > 0 &&
         rosterCount > playerMin &&
         (expiryCreatesOptRisk || salaryPressure > 0.6 || boardPressure >= 6 || lowCashBuffer);
+      const sellRunway = assessTeamSellRunwayPressure({
+        gameState: preflightGameState,
+        team,
+        salaryTotal,
+      });
       return (
         rosterCount > playerOpt ||
         (typeof team.cash === "number" && Number.isFinite(team.cash) && team.cash < 0) ||
         expiryNeedsDecision ||
         salaryPressure > 0.75 ||
         boardPressure >= 6 ||
+        sellRunway.cashPressureScore >= 0.45 ||
         hasValueSellOpportunity(preflightGameState, team, playerMin, preflightPlayersById)
       );
     })
@@ -1737,8 +1746,10 @@ export async function applyAiMarketPlanLocally(input: AiMarketPlanApplyParams): 
       });
 
       if (!buyPreview.canBuy) {
-        resetTransferRunContext(beforeTeamRun);
-        nextResult.result = "failed_buy";
+        if (!(options.transferWindowCycleMode && nextResult.executedSells > 0)) {
+          resetTransferRunContext(beforeTeamRun);
+        }
+        nextResult.result = options.transferWindowCycleMode && nextResult.executedSells > 0 ? "applied" : "failed_buy";
         nextResult.blockingReasons = unique([
           ...nextResult.blockingReasons,
           ...buyPreview.blockingReasons,
@@ -1772,8 +1783,10 @@ export async function applyAiMarketPlanLocally(input: AiMarketPlanApplyParams): 
       });
 
       if (!buyResult.canBuy || !buyResult.transferCreated) {
-        resetTransferRunContext(beforeTeamRun);
-        nextResult.result = "failed_buy";
+        if (!(options.transferWindowCycleMode && nextResult.executedSells > 0)) {
+          resetTransferRunContext(beforeTeamRun);
+        }
+        nextResult.result = options.transferWindowCycleMode && nextResult.executedSells > 0 ? "applied" : "failed_buy";
         nextResult.blockingReasons = unique([
           ...nextResult.blockingReasons,
           ...buyResult.blockingReasons,
@@ -1865,50 +1878,73 @@ export async function applyAiMarketPlanLocally(input: AiMarketPlanApplyParams): 
       ]);
     }
     if (effectivePostApplyStateBlockingReasons.length > 0) {
-      resetTransferRunContext(beforeTeamRun);
-      nextResult.result = "blocked";
+      const keepPartialCycle =
+        options.transferWindowCycleMode &&
+        ( !executeBuySteps || (nextResult.executedSells > 0 && nextResult.executedBuys === 0));
+      if (!keepPartialCycle) {
+        resetTransferRunContext(beforeTeamRun);
+        nextResult.result = "blocked";
+        nextResult.blockingReasons = unique([
+          ...nextResult.blockingReasons,
+          ...effectivePostApplyStateBlockingReasons,
+        ]);
+        nextResult.warnings = unique([
+          ...nextResult.warnings,
+          "Teamlauf wurde zurueckgedreht, weil Cash/Kader nach Transfers nicht regelkonform war.",
+        ]);
+        nextResult.executedSells = 0;
+        nextResult.executedBuys = 0;
+        nextResult.appliedSellDetails = [];
+        nextResult.appliedBuyDetails = [];
+        nextResult.cashAfter = nextResult.cashBefore;
+        nextResult.rosterAfter = nextResult.rosterBefore;
+        nextResult.salaryAfter = nextResult.salaryBefore;
+        nextResult.marketValueAfter = nextResult.marketValueBefore;
+
+        if (options.stopOnTeamFailure) {
+          resetTransferRunContext(baselineGameState);
+          abortedAfterFailure = true;
+          abortedByTeamId = team.teamId;
+          for (const previous of results) {
+            if (previous.result === "applied") {
+              previous.result = "blocked";
+              previous.executedSells = 0;
+              previous.executedBuys = 0;
+              previous.appliedSellDetails = [];
+              previous.appliedBuyDetails = [];
+              previous.cashAfter = previous.cashBefore;
+              previous.rosterAfter = previous.rosterBefore;
+              previous.salaryAfter = previous.salaryBefore;
+              previous.marketValueAfter = previous.marketValueBefore;
+              previous.blockingReasons = unique([...previous.blockingReasons, "execution_rolled_back_after_team_failure"]);
+              previous.warnings = unique([...previous.warnings, `Rollback nach Team-Fehler bei ${team.teamName}.`]);
+            }
+          }
+        }
+        results.push(nextResult);
+        if (options.stopOnTeamFailure) {
+          break;
+        }
+        continue;
+      }
+
+      nextResult.result = nextResult.executedSells + nextResult.executedBuys > 0 ? "applied" : "blocked";
       nextResult.blockingReasons = unique([
         ...nextResult.blockingReasons,
         ...effectivePostApplyStateBlockingReasons,
       ]);
       nextResult.warnings = unique([
         ...nextResult.warnings,
-        "Teamlauf wurde zurueckgedreht, weil Cash/Kader nach Transfers nicht regelkonform war.",
+        "transfer_window_cycle_partial_apply_kept",
+        "Teiltransfers im Fenster-Zyklus behalten; naechster Preview/Buy-Schritt folgt.",
       ]);
-      nextResult.executedSells = 0;
-      nextResult.executedBuys = 0;
-      nextResult.appliedSellDetails = [];
-      nextResult.appliedBuyDetails = [];
-      nextResult.cashAfter = nextResult.cashBefore;
-      nextResult.rosterAfter = nextResult.rosterBefore;
-      nextResult.salaryAfter = nextResult.salaryBefore;
-      nextResult.marketValueAfter = nextResult.marketValueBefore;
-
-      if (options.stopOnTeamFailure) {
-        resetTransferRunContext(baselineGameState);
-        abortedAfterFailure = true;
-        abortedByTeamId = team.teamId;
-        for (const previous of results) {
-          if (previous.result === "applied") {
-            previous.result = "blocked";
-            previous.executedSells = 0;
-            previous.executedBuys = 0;
-            previous.appliedSellDetails = [];
-            previous.appliedBuyDetails = [];
-            previous.cashAfter = previous.cashBefore;
-            previous.rosterAfter = previous.rosterBefore;
-            previous.salaryAfter = previous.salaryBefore;
-            previous.marketValueAfter = previous.marketValueBefore;
-            previous.blockingReasons = unique([...previous.blockingReasons, "execution_rolled_back_after_team_failure"]);
-            previous.warnings = unique([...previous.warnings, `Rollback nach Team-Fehler bei ${team.teamName}.`]);
-          }
-        }
-      }
-
+      const currentGameStatePartial = transferRunContext?.save.gameState ?? resolveLocalSave(persistence, preview.scope.saveId).gameState;
+      const snapshotPartial = getTeamStateSnapshot(currentGameStatePartial, team.teamId);
+      nextResult.cashAfter = snapshotPartial.cash;
+      nextResult.rosterAfter = snapshotPartial.roster;
+      nextResult.salaryAfter = snapshotPartial.salary;
+      nextResult.marketValueAfter = snapshotPartial.marketValue;
       results.push(nextResult);
-      if (options.stopOnTeamFailure) {
-        break;
-      }
       continue;
     }
     plannedWrites.push(

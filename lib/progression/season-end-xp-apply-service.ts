@@ -28,6 +28,7 @@ import type { PersistedSaveGame, PersistenceService } from "@/lib/persistence/ty
 import { buildPlayerProgressionForecast } from "@/lib/training/player-progression-forecast";
 import { buildPlayerDevelopmentLevelupModel, type DevelopmentRegressionEventPreview } from "@/lib/training/training-levelup-service";
 import { buildOrganicSeasonProgression, type OrganicSeasonProgressionResult } from "@/lib/training/organic-season-progression";
+import { reconcilePlayerPotentialRecordsForGameState } from "@/lib/scouting/player-potential-ceiling-service";
 import {
   buildCoreStatsFromDisciplineRatings,
   buildPreviewDisciplineRatingsFromAttributes,
@@ -962,6 +963,19 @@ export function applySeasonEndXpSpend(
       economyWarnings: playerPreview.economyAudit.warnings,
       timestamp,
       source: playerPreview.organicProgression ? "organic_season_progression" : "manual_season_end_xp_spend",
+      organicMeta: playerPreview.organicProgression
+        ? {
+            trainingClass: playerPreview.organicProgression.primaryTrainingClass,
+            secondaryTrainingClass: playerPreview.organicProgression.secondaryTrainingClass,
+            trainingMode: playerPreview.organicProgression.trainingMode,
+            classBefore: playerPreview.organicProgression.classBefore,
+            classAfter: playerPreview.organicProgression.classAfter,
+            netSetpoints: playerPreview.organicProgression.netSetpoints,
+            trainingSetpoints: playerPreview.organicProgression.trainingSetpoints,
+            performanceSetpoints: playerPreview.organicProgression.appliedPerformanceSetpoints,
+            traitModifierPct: playerPreview.organicProgression.traitModifierPct,
+          }
+        : undefined,
     };
   });
 
@@ -1060,6 +1074,15 @@ export function applySeasonEndXpSpend(
     players: nextPlayers,
     rosters: nextRosters,
     playerProgressionEvents: [...events, ...(save.gameState.playerProgressionEvents ?? [])],
+    playerPotential: reconcilePlayerPotentialRecordsForGameState({
+      gameState: {
+        ...save.gameState,
+        players: nextPlayers,
+        rosters: nextRosters,
+        playerProgressionEvents: [...events, ...(save.gameState.playerProgressionEvents ?? [])],
+      },
+      playerIds: preview.players.map((player) => player.playerId),
+    }),
   };
 
   if (!options.deferLeagueWideMarketValueRecalc) {

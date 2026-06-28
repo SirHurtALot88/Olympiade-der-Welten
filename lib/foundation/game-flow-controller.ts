@@ -412,7 +412,7 @@ function buildOnboardingFlowSteps(gameState: GameState, activeTeamId: string | n
                 }
                 return resolveOnboardingStepStatus(flow, "choose_sponsor", gameState, teamId);
               })(),
-      targetView: "teams",
+      targetView: "prize",
       targetPanel: "sponsor-choice",
       teamId,
       blockers: teamId ? [] : ["no_active_team"],
@@ -510,7 +510,7 @@ function buildMatchdaySteps(gameState: GameState, activeTeamId: string | null): 
       label: "Sponsor wählen",
       cta: "Weiter: Sponsor wählen",
       status: !hasActiveTeam ? "blocked" : hasSponsorContract ? "completed" : "optional",
-      targetView: "teams",
+      targetView: "prize",
       targetPanel: "sponsor-choice",
       teamId: activeTeamId,
       optional: !hasSponsorContract,

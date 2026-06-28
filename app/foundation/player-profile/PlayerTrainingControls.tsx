@@ -4,7 +4,7 @@ import {
   buildTrainingImpactItems,
   buildTrainingModeSegments,
   formatVeloNumber,
-  VeloAttributeFocusTags,
+  formatVeloSignedNumber,
   VeloImpactStrip,
   VeloIntensityRail,
 } from "@/components/foundation/velo-ui";
@@ -12,7 +12,11 @@ import { getTrainingModePresentation } from "@/lib/training/training-mode-presen
 import type { PlayerDemandStatus } from "@/lib/data/olyDataTypes";
 import type { PlayerTrainingMode } from "@/lib/training/training-plan-types";
 
-import { formatSignedPercent, getDevelopmentTone } from "@/app/foundation/training-facilities-v2/training-view-shared";
+import {
+  formatSignedPercent,
+  getDevelopmentTone,
+  TrainingAttributeForecastGrid,
+} from "@/app/foundation/training-facilities-v2/training-view-shared";
 import type {
   TrainingClassOption,
   TrainingModeOption,
@@ -39,6 +43,17 @@ function getDemandStatusLabel(status: PlayerDemandStatus) {
     default:
       return "offen";
   }
+}
+
+function buildStatForecastTooltip(row: TrainingPlayerRowView) {
+  const appliedTraining = row.attributeForecast.reduce((sum, entry) => sum + entry.training, 0);
+  const appliedPerformance = row.attributeForecast.reduce((sum, entry) => sum + entry.performance, 0);
+  const appliedRegression = row.attributeForecast.reduce((sum, entry) => sum + entry.regression, 0);
+  return [
+    "Netto = Summe aller Attribut-Deltas nach Regression, Training und Performance.",
+    `Angewendet: Training ${formatVeloSignedNumber(appliedTraining, 1)} · Performance ${formatVeloSignedNumber(appliedPerformance, 1)} · Regression ${formatVeloSignedNumber(appliedRegression, 1)}`,
+    `Budget Training +${formatVeloNumber(row.organicForecast.trainingSetpoints, 1)} vor Affinity- und Potential-Multiplikatoren.`,
+  ].join("\n");
 }
 
 function TrainingModeDemandBanner({ row }: { row: TrainingPlayerRowView }) {
@@ -71,6 +86,8 @@ export default function PlayerTrainingControls({
   readOnly = false,
 }: PlayerTrainingControlsProps) {
   const tone = getDevelopmentTone(row);
+  const appliedPerformanceSetpoints = row.organicForecast.performanceSetpoints;
+  const statForecastTooltip = buildStatForecastTooltip(row);
   const modeSegments = buildTrainingModeSegments(
     trainingModeOptions.map((option) => ({
       value: option.value,
@@ -96,20 +113,20 @@ export default function PlayerTrainingControls({
       <TrainingModeDemandBanner row={row} />
 
       <div className="training-v2-rider-forecast-row player-training-controls-forecast">
-        <div>
+        <div title={statForecastTooltip}>
           <span>Stat Forecast</span>
           <strong className={row.organicForecast.netSetpoints >= 0 ? "text-positive" : "text-negative"}>
             {row.organicForecast.netSetpoints > 0 ? "+" : ""}
             {formatVeloNumber(row.organicForecast.netSetpoints, 1)}
           </strong>
         </div>
-        <div>
+        <div title="Trainingsbudget vor Verteilung auf 12 Attribute (Traits, Facility, Potential eingerechnet).">
           <span>Training</span>
           <strong>+{formatVeloNumber(row.organicForecast.trainingSetpoints, 1)}</strong>
         </div>
-        <div title="Matchday-Leistung. Sanfter Taper erst nahe Attribut-Decke — nicht wie Training.">
+        <div title="Angewendete Matchday-Performance-Setpoints. Sanfter Taper erst nahe Attribut-Decke — nicht wie Training.">
           <span>Performance</span>
-          <strong>+{formatVeloNumber(row.organicForecast.performanceSetpoints, 1)}</strong>
+          <strong>+{formatVeloNumber(appliedPerformanceSetpoints, 1)}</strong>
         </div>
         <div>
           <span>Fatigue</span>
@@ -121,13 +138,12 @@ export default function PlayerTrainingControls({
         flashKey={row.mode}
         items={buildTrainingImpactItems({
           trainingSetpoints: row.organicForecast.trainingSetpoints,
-          performanceSetpoints: row.organicForecast.performanceSetpoints,
+          performanceSetpoints: appliedPerformanceSetpoints,
           netSetpoints: row.organicForecast.netSetpoints,
           recoveryBefore: row.recoveryForecast.before,
           recoveryAfter: row.recoveryForecast.after,
           recoveryDeltaPct: row.recoveryForecast.modifierPct,
           regressionRisk: row.forecast.regressionRisk,
-          legacyXpPreview: row.trainingXp + row.performanceXp,
         })}
       />
 
@@ -158,7 +174,7 @@ export default function PlayerTrainingControls({
         </label>
       </div>
 
-      <VeloAttributeFocusTags primary={row.classTrainingFocus.primary} risks={row.classTrainingFocus.risks} />
+      <TrainingAttributeForecastGrid row={row} />
 
       <div className="training-v2-player-foot training-v2-modifier-row">
         <small>

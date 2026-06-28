@@ -5,6 +5,7 @@ import {
   getProtectedHumanTeamIds,
   protectManualPlayerTeams,
 } from "@/lib/ai/ai-preseason-manual-team-guard";
+import { DEFAULT_ACTIVE_OWNER_ID } from "@/lib/foundation/team-control-settings";
 import type { GameState, ScenarioType, Team, TeamControlSettings } from "@/lib/data/olyDataTypes";
 
 function createTeam(partial: Partial<Team> & Pick<Team, "teamId">): Team {
@@ -143,9 +144,8 @@ describe("ai preseason manual team guard", () => {
       allowsAiPreseasonManualTeamOverride({
         saveId: "my-campaign-save",
         gameState: normalSave,
-        explicitOverride: true,
       }),
-    ).toBe(true);
+    ).toBe(false);
   });
 
   it("returns the original reference when no manual protection is needed", () => {
@@ -205,5 +205,37 @@ describe("ai preseason manual team guard", () => {
     expect(hrSettings?.aiLineupPreviewEnabled).toBe(false);
     expect(hrSettings?.aiTransferPreviewEnabled).toBe(false);
     expect(hrSettings?.aiSellPreviewEnabled).toBe(false);
+  });
+
+  it("rewrites stale ai ownerId on otherwise protected manual teams", () => {
+    const gameState = createGameState({
+      selectedTeamId: "H-R",
+      teamControlSettings: {
+        "H-R": {
+          teamId: "H-R",
+          controlMode: "manual",
+          ownerId: "ai",
+          ownerSlot: "ai",
+          displayLabel: "H-R",
+          aiLineupPreviewEnabled: false,
+          aiLineupApplyEnabled: false,
+          aiLineupAutoApplyEnabled: false,
+          aiTransferPreviewEnabled: false,
+          aiTransferAutoApplyEnabled: false,
+          aiSellPreviewEnabled: false,
+          aiSellAutoApplyEnabled: false,
+          notes: null,
+          strategyLock: null,
+        },
+      },
+      teams: [createTeam({ teamId: "H-R", humanControlled: true })],
+    });
+
+    const protectedState = protectManualPlayerTeams(gameState);
+    const hrSettings = protectedState.seasonState.teamControlSettings?.["H-R"];
+
+    expect(hrSettings?.ownerId).toBe(DEFAULT_ACTIVE_OWNER_ID);
+    expect(hrSettings?.ownerSlot).toBe("user");
+    expect(hrSettings?.aiLineupPreviewEnabled).toBe(false);
   });
 });

@@ -16,7 +16,7 @@ import { previewFacilityUpgrade, applyFacilityUpgrade } from "@/lib/facilities/f
 import type { FacilityId } from "@/lib/facilities/facility-catalog";
 import { createPersistenceService } from "@/lib/persistence/persistence-service";
 import type { PersistedSaveGame, PersistenceService } from "@/lib/persistence/types";
-import { applyTeamTrainingSettings, previewTeamTrainingSettings } from "@/lib/training/training-settings-service";
+import { applyTeamTrainingSettings, applyPlayerTrainingModes, previewPlayerTrainingModes, previewTeamTrainingSettings } from "@/lib/training/training-settings-service";
 
 export type AiManagerActionType =
   | "maintain_building"
@@ -25,6 +25,7 @@ export type AiManagerActionType =
   | "downgrade_building"
   | "set_training_focus"
   | "set_training_intensity"
+  | "set_player_training_modes"
   | "reserve_transfer_budget"
   | "reserve_salary_budget"
   | "reserve_maintenance_budget"
@@ -334,6 +335,24 @@ function buildTrainingActions(save: PersistedSaveGame, preview: AiLeagueManageme
         risk: riskFromWarnings(training.blockingReasons, training.warnings),
         trainingIntensity: training.trainingIntensity,
       },
+      {
+        ...base,
+        actionId: actionId([sourcePlanId, teamPlan.teamId, "player_training_modes"]),
+        actionType: "set_player_training_modes" as const,
+        expectedEffect: `${teamPlan.trainingPlan.playerTrainingPlans.length} individuelle Trainingsmodi`,
+        reason:
+          teamPlan.trainingPlan.playerTrainingPlans
+            .filter((plan) => plan.selectedMode !== plan.teamBaselineMode || plan.needsLineupRest)
+            .slice(0, 3)
+            .map((plan) => `${plan.playerName}: ${plan.selectedMode}${plan.needsLineupRest ? " +Pause" : ""}`)
+            .join(" | ") || "Per-Player Load Plan",
+        risk: riskFromWarnings(
+          training.blockingReasons,
+          teamPlan.trainingPlan.playerTrainingPlans.some((plan) => plan.needsLineupRest)
+            ? [...training.warnings, "lineup_rest_recommended"]
+            : training.warnings,
+        ),
+      },
     ];
   });
 }
@@ -525,7 +544,8 @@ export function applyAiManagerPlan(input: {
     return { ...preview, dryRun: true, actions: selectedActions };
   }
 
-  let currentSave = writeManagerPlanState(input.save, selectedActions, persistence, buildAiLeagueManagementPreview(input.save.gameState));
+  const leaguePlanPreview = buildAiLeagueManagementPreview(input.save.gameState);
+  let currentSave = writeManagerPlanState(input.save, selectedActions, persistence, leaguePlanPreview);
   const appliedIds = new Set<string>();
   const orderedFacilityActions = selectedActions.filter(
     (action) =>
@@ -590,6 +610,34 @@ export function applyAiManagerPlan(input: {
     const result = applyTeamTrainingSettings(currentSave, teamId, focus, intensity, trainingPreview.confirmToken, preview.sourcePlanId, persistence);
     if (result.applied) {
       for (const action of actions) appliedIds.add(action.actionId);
+      currentSave = persistence.getSaveById(currentSave.saveId) ?? currentSave;
+    }
+  }
+
+  const playerModeActions = selectedActions.filter(
+    (action) => action.canApply && action.actionType === "set_player_training_modes",
+  );
+  for (const action of playerModeActions) {
+    const teamPlan = leaguePlanPreview.teams.find((team) => team.teamId === action.teamId);
+    if (!teamPlan) continue;
+    const assignments = teamPlan.trainingPlan.playerTrainingPlans.map((plan) => ({
+      playerId: plan.playerId,
+      trainingMode: plan.selectedMode,
+    }));
+    const modesPreview = previewPlayerTrainingModes({
+      save: currentSave,
+      teamId: action.teamId,
+      assignments,
+    });
+    const modesResult = applyPlayerTrainingModes(
+      currentSave,
+      action.teamId,
+      assignments,
+      modesPreview.confirmToken,
+      persistence,
+    );
+    if (modesResult.applied) {
+      appliedIds.add(action.actionId);
       currentSave = persistence.getSaveById(currentSave.saveId) ?? currentSave;
     }
   }

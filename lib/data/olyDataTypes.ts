@@ -339,6 +339,17 @@ export type PlayerProgressionSpendEventRecord = {
   economyWarnings?: string[];
   timestamp: string;
   source: "manual_season_end_xp_spend" | "organic_season_progression";
+  organicMeta?: {
+    trainingClass: string;
+    secondaryTrainingClass?: string | null;
+    trainingMode: "leicht" | "mittel" | "hart";
+    classBefore: string;
+    classAfter: string;
+    netSetpoints: number;
+    trainingSetpoints: number;
+    performanceSetpoints: number;
+    traitModifierPct?: number;
+  };
 };
 
 export type PlayerBaselineRecord = {
@@ -769,6 +780,7 @@ export type Player = {
     reason: "seed" | "organic_progression" | "manual";
     createdAt: string;
   }>;
+  injuryHistory?: PlayerInjuryHistoryRecord[];
   lastOrganicProgression?: {
     seasonId: string;
     classBefore: string;
@@ -1355,6 +1367,21 @@ export type InjuryEventRecord = {
   timestamp: string;
 };
 
+export type PlayerInjuryHistoryRecord = {
+  eventId: string;
+  seasonId: string;
+  seasonName?: string;
+  matchdayId: string;
+  matchdayLabel?: string;
+  teamId: string;
+  fatigueBefore: number;
+  riskPercent: number;
+  unavailableUntil: string | null;
+  matchdaysMissed: number;
+  injuryRecoveryPct: number;
+  timestamp: string;
+};
+
 export type PreSeasonWorkflowLogRecord = {
   logId: string;
   saveId: string;
@@ -1751,6 +1778,12 @@ export type SeasonSnapshotPlayerPerformanceRecord = {
   mvs?: number | null;
   mvsRank?: number | null;
   marketValue?: number | null;
+  purchasePrice?: number | null;
+  projectedSellValue?: number | null;
+  projectedSellFactor?: number | null;
+  saleFactorBracket?: number | null;
+  saleFactorRankInBracket?: number | null;
+  saleFactorBracketSize?: number | null;
   salary?: number | null;
   contractLength?: number | null;
   promisedRole?: RosterPromisedRole | null;

@@ -21,13 +21,17 @@ import {
   type DoctrineAdjustedSellCandidate,
   type EnrichedBuyRecommendation,
 } from "@/lib/ai/ai-transfer-plan-enrichment";
-import type { GameState } from "@/lib/data/olyDataTypes";
+import {
+  assessTeamSellRunwayPressure,
+  getProfitWindowSellThreshold,
+  isAttractiveProfitSell,
+} from "@/lib/ai/team-sell-runway-pressure";
 import { loadFoundationSnapshotFromPrisma } from "@/lib/db/read/foundation-read-repository";
 import { projectFoundationStateFromPrisma } from "@/lib/db/read/foundation-read-projection";
 import { withNormalizedTeamControlSettings } from "@/lib/foundation/team-control-settings";
 import { withNormalizedTeamStrategyProfiles } from "@/lib/foundation/team-strategy-profiles";
 import { createPersistenceService } from "@/lib/persistence/persistence-service";
-import type { TeamControlMode } from "@/lib/data/olyDataTypes";
+import type { GameState, TeamControlMode } from "@/lib/data/olyDataTypes";
 
 export type AiMarketPlanPreviewSource = AiTransferPreviewSource;
 export type AiMarketPlanPreviewTeamScope = "ai" | "all";
@@ -49,6 +53,7 @@ export type AiMarketPlanPreviewParams = {
 export type AiMarketPlanCurrentState = {
   cash: number | null;
   rosterCount: number | null;
+  projectedRosterAfterExits: number | null;
   playerMin: number | null;
   playerOpt: number | null;
   salaryTotal: number | null;
@@ -263,7 +268,11 @@ function chooseBuyCandidates(
   return selected;
 }
 
-function chooseSellCandidates(team: AiSellPreviewTeamEntry, candidatesOverride?: DoctrineAdjustedSellCandidate[]) {
+function chooseSellCandidates(
+  team: AiSellPreviewTeamEntry,
+  candidatesOverride?: DoctrineAdjustedSellCandidate[],
+  gameState?: GameState | null,
+) {
   const rosterCount = team.rosterSize ?? null;
   const playerMin = team.targetRosterMin ?? team.playerMin ?? null;
   const playerOpt = team.targetRosterOpt ?? null;
@@ -290,6 +299,12 @@ function chooseSellCandidates(team: AiSellPreviewTeamEntry, candidatesOverride?:
     team.explanation.includes("Loyal") ||
     team.explanation.includes("Mentor");
   const hasNegativeCash = team.cash != null && Number.isFinite(team.cash) && team.cash < 0;
+  const salaryTotal = team.salaryTotal ?? 0;
+  const teamState = gameState?.teams.find((entry) => entry.teamId === team.teamId) ?? null;
+  const sellRunway =
+    gameState && teamState
+      ? assessTeamSellRunwayPressure({ gameState, team: teamState, salaryTotal })
+      : null;
   const topReasons = safeCandidates[0]?.reasonToSell ?? [];
   const hasExpiringContractPressure = safeCandidates.some((candidate) =>
     candidate.reasonToSell.some((reason) => reason.includes("Vertrag laeuft aus") || reason.includes("kurze Restvertragslaenge")),
@@ -322,12 +337,23 @@ function chooseSellCandidates(team: AiSellPreviewTeamEntry, candidatesOverride?:
     wantedCount = 1;
   } else if (!highLoyalty && hasExpiringContractPressure && topPriority >= 48) {
     wantedCount = 1;
-  } else if (!highLoyalty && hasProfitWindow && topPriority >= 38) {
-    wantedCount = 1;
   } else if (!highLoyalty && topProfitRatio >= 0.18 && topPriority >= 42) {
     wantedCount = 1;
   } else if (!highLoyalty && topPriority >= 72) {
     wantedCount = 1;
+  }
+
+  const profitWindowThreshold = getProfitWindowSellThreshold(sellRunway?.cashPressureScore ?? 0);
+  if (!highLoyalty && hasProfitWindow && topPriority >= profitWindowThreshold) {
+    wantedCount = Math.max(wantedCount, 1);
+  } else if (
+    !highLoyalty &&
+    sellRunway &&
+    sellRunway.cashPressureScore >= 0.55 &&
+    topProfitRatio >= 0.12 &&
+    topPriority >= profitWindowThreshold - 4
+  ) {
+    wantedCount = Math.max(wantedCount, 1);
   }
 
   const proactiveCandidates = safeCandidates.filter((candidate) => {
@@ -335,6 +361,14 @@ function chooseSellCandidates(team: AiSellPreviewTeamEntry, candidatesOverride?:
       candidate.expectedSellValue != null && candidate.marketValue != null && candidate.marketValue > 0
         ? (candidate.expectedSellValue - candidate.marketValue) / candidate.marketValue
         : 0;
+    const attractiveProfit =
+      candidate.expectedSellValue != null &&
+      candidate.marketValue != null &&
+      isAttractiveProfitSell({
+        expectedSellValue: candidate.expectedSellValue,
+        marketValue: candidate.marketValue,
+        cashPressureScore: sellRunway?.cashPressureScore ?? 0,
+      });
     const hasStrongReason = candidate.reasonToSell.some(
       (reason) =>
         reason.includes("negatives Teamcash") ||
@@ -343,9 +377,17 @@ function chooseSellCandidates(team: AiSellPreviewTeamEntry, candidatesOverride?:
         reason.includes("kurze Restvertragslaenge") ||
         reason.includes("Teamcash ist kritisch") ||
         reason.includes("Vorstand") ||
-        reason.includes("Kader liegt ueber dem Optimum"),
+        reason.includes("Kader liegt ueber dem Optimum") ||
+        reason.includes("Gehaltslast uebersteigt verfuegbares Cash") ||
+        reason.includes("realisierbarer Gewinn"),
     );
-    return hasStrongReason || candidateProfitRatio >= 0.1 || candidate.sellPriority >= 68;
+    const profitThreshold = (sellRunway?.cashPressureScore ?? 0) >= 0.5 ? 0.05 : 0.1;
+    return (
+      hasStrongReason ||
+      attractiveProfit ||
+      candidateProfitRatio >= profitThreshold ||
+      candidate.sellPriority >= 68
+    );
   });
 
   const maxWantedByContext =
@@ -481,6 +523,10 @@ function getTeamStatus(input: {
   return "hold" as const;
 }
 
+function resolveProjectedRosterAfterExits(_gameState: GameState | null | undefined, _teamId: string, rosterCount: number | null) {
+  return rosterCount;
+}
+
 function buildTeamEntry(input: {
   buyTeam: AiTransferPreviewTeamEntry | undefined;
   sellTeam: AiSellPreviewTeamEntry | undefined;
@@ -499,9 +545,11 @@ function buildTeamEntry(input: {
   const controlMode = buyTeam?.controlMode ?? sellTeam?.controlMode ?? "manual";
   const buyEnabled = input.buyScanSkipped ? true : buyTeam?.aiTransferPreviewEnabled ?? false;
   const sellEnabled = input.sellScanSkipped ? true : sellTeam?.aiSellPreviewEnabled ?? false;
+  const rosterCount = buyTeam?.rosterCount ?? buyTeam?.rosterSize ?? sellTeam?.rosterSize ?? null;
   const currentState: AiMarketPlanCurrentState = {
     cash: buyTeam?.cash ?? sellTeam?.cash ?? null,
-    rosterCount: buyTeam?.rosterCount ?? buyTeam?.rosterSize ?? sellTeam?.rosterSize ?? null,
+    rosterCount,
+    projectedRosterAfterExits: resolveProjectedRosterAfterExits(input.gameState, teamId, rosterCount),
     playerMin: sellTeam?.targetRosterMin ?? sellTeam?.playerMin ?? buyTeam?.targetRosterMin ?? null,
     playerOpt: sellTeam?.targetRosterOpt ?? sellTeam?.playerOpt ?? buyTeam?.targetRosterOpt ?? null,
     salaryTotal: buyTeam?.salaryTotal ?? buyTeam?.salary ?? sellTeam?.salaryTotal ?? null,
@@ -515,7 +563,7 @@ function buildTeamEntry(input: {
       ? applyDoctrineToSellCandidates({ candidates: sellTeam.sellCandidates, doctrine })
       : sellTeam?.sellCandidates ?? [];
 
-  const chosenSells = sellTeam ? chooseSellCandidates(sellTeam, doctrineAdjustedSells) : [];
+  const chosenSells = sellTeam ? chooseSellCandidates(sellTeam, doctrineAdjustedSells, input.gameState) : [];
   const expectedSellValue = chosenSells.length > 0 ? sumKnown(chosenSells.map((candidate) => candidate.expectedSellValue)) : 0;
   const cashAfterSell =
     currentState.cash != null && expectedSellValue != null

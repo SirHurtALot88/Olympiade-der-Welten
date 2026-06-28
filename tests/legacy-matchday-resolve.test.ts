@@ -3,6 +3,7 @@ import { describe, expect, it } from "vitest";
 import type { LegacyLineupLoadedContext } from "@/lib/lineups/legacy-lineup-types";
 import { buildMatchdayMutatorTraitsBySide } from "@/lib/lineups/legacy-lineup-modifiers";
 import { buildLegacyMatchdayResolvePreview } from "@/lib/resolve/legacy-matchday-resolve-engine";
+import { buildLegacyMatchdayResolvePreviewPayload } from "@/lib/foundation/legacy-matchday-resolve-preview-service";
 
 function createContext(input: {
   teamId: string;
@@ -383,5 +384,29 @@ describe("legacy matchday resolve preview", () => {
     expect(preview.status).toBe("missing_scores");
     expect(preview.teamResults[0]?.d1Status).toBe("missing_scores");
     expect(preview.teamResults[0]?.missingScores.length).toBeGreaterThan(0);
+  });
+});
+
+describe("legacy matchday resolve preview payload", () => {
+  it("does not expose failed context load errors as user-facing warnings", () => {
+    const context = createContext({
+      teamId: "A-A",
+      teamName: "Alpha",
+      d1Scores: [10, 30],
+      d2Scores: [40],
+    });
+
+    const payload = buildLegacyMatchdayResolvePreviewPayload({
+      source: "sqlite",
+      params: { saveId: "save-1", seasonId: "season-1", matchdayId: "matchday-1" },
+      contextResults: [
+        { ok: true, context, warnings: ["context-warning"] },
+        { ok: false, errors: ["team-load-failed"], warnings: [] },
+      ],
+    });
+
+    expect(payload).not.toBeNull();
+    expect(payload?.warnings).toContain("context-warning");
+    expect(payload?.warnings).not.toContain("team-load-failed");
   });
 });

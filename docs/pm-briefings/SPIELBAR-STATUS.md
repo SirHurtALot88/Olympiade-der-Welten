@@ -55,7 +55,7 @@ Legende: 🟢 OK · 🟡 teilweise / Re-Test nötig · 🔴 blockiert
 | Arena + Reveal (Solo) | ~9/10 | 🟢 | Arena/Einsatzliste/Training/Drawer in CI grün |
 | Room Arena Sync | ~9/10 | 🟢 | Unit + 2-Browser Foundation-Arena-E2E in `app:smoke-multiplayer-e2e` |
 | Foundation ↔ Room | ~9/10 | 🟢 | Room-Params in URL-Navigation; Banner mit Flow-Step; `roomContext` an Sub-Panels |
-| Server-Authority (Writes) | ~7/10 | 🟡 | Guard + Room-Context; Prod-DB out of scope |
+| Server-Authority (Writes) | ~9/10 | 🟢 | Guard + Contract-Test für mutierende API-Routes; Host-only AI/Season-Writes |
 | Parallel Coach UX | ~9/10 | 🟢 | Warten/Host-only in Foundation-Banner + Arena; Room-Event-Hinweise |
 
 Legende Score: technische Verdrahtung, nicht Spielspaß.

@@ -1,0 +1,13 @@
+{
+  "name": "Tyrael",
+  "id": "player-1634-tyrael",
+  "className": "Hero",
+  "race": "Divine",
+  "alignment": "R-G",
+  "gender": "m",
+  "subclasses": ["Vigilante", "Angel"],
+  "traitsPositive": ["Loyal", "Flexible", "FanFavorite"],
+  "traitsNegative": ["Obsessive"],
+  "flavorDe": "Tyrael glaubte einst, Gerechtigkeit müsse rein bleiben. Dann brannte Ashkara, und der Rat des Himmelsschnitts sprach länger über Ordnung, als unten Menschen starben. In dieser Stunde verstand er, dass ein Urteil ohne Handlung nur ein schöneres Wegsehen ist. Er riss die Flügel ab, wurde sterblich und schmiedete aus dem Glockenbruch von Lichtfurt seine Klinge. Seitdem sucht er Orte, an denen Macht sich hinter Regeln versteckt. Zur Olympiade kommt Tyrael, weil hier Ruhm oft als Freispruch verkauft wird.",
+  "portraitPath": "/Users/chrisfalk/Library/CloudStorage/Dropbox/Chris/Olympiade der Welten/Mark VI Cardgame/Spieler/Tyrael.JPG"
+}

@@ -14,6 +14,22 @@ import type {
 export const GM_INFLUENCE_PCT = 30;
 export const GM_WILDCARD_ASSIGNMENT_CHANCE_PCT = 7;
 const GM_WILDCARD_MAX_SCORE_GAP = 75;
+/** Score-Band um den Best-Fit, aus dem ein Seed-Salt einen GM wählen darf (Audit-Varianz). */
+const GM_SEED_VARIATION_SCORE_GAP = 60;
+const GM_SEED_VARIATION_POOL_SIZE = 6;
+
+/**
+ * Optionales, prozessweites Seed-Salt für die GM-Zuweisung. Wird (z.B. von Audits) pro Lauf
+ * gesetzt, damit frische Saves desselben Season-IDs unterschiedliche, aber fit-nahe GMs ziehen.
+ * Greift nur bei Neuzuweisung (fresh saves); bestehende Zuweisungen bleiben unberührt.
+ */
+let gmAssignmentSeedSalt: string | null = null;
+export function setGmAssignmentSeedSalt(salt: string | null | undefined) {
+  gmAssignmentSeedSalt = salt && salt.trim().length > 0 ? salt.trim() : null;
+}
+export function getGmAssignmentSeedSalt() {
+  return gmAssignmentSeedSalt;
+}
 export const GM_BOARD_REPLACEMENT_CONFIDENCE_THRESHOLD = 2.5;
 export const GM_BOARD_REPLACEMENT_PRESSURE_THRESHOLD = 9;
 
@@ -733,6 +749,7 @@ function pickBestUnusedGeneralManager(input: {
   identity: TeamIdentity | null;
   usedGmIds: Set<string>;
   excludedArchetypes?: Iterable<TeamGeneralManagerArchetype>;
+  seedSalt?: string | null;
 }): PickedGeneralManager {
   if (input.team.humanControlled) {
     const preferred =
@@ -769,6 +786,22 @@ function pickBestUnusedGeneralManager(input: {
     return { profile: chooseProfileForTeam(input.team, input.seasonId, input.teamIndex), source: "auto_generated" };
   }
 
+  // Seed-Salt (Audit-Varianz): wähle fit-nah aus dem Top-Band, damit verschiedene Läufe
+  // unterschiedliche – aber weiterhin sinnvolle – GMs zuweisen.
+  const seedSalt = input.seedSalt && input.seedSalt.trim().length > 0 ? input.seedSalt.trim() : null;
+  if (seedSalt) {
+    const variationPool = scoredCandidates
+      .filter((candidate) => candidate.score >= best.score - GM_SEED_VARIATION_SCORE_GAP)
+      .slice(0, GM_SEED_VARIATION_POOL_SIZE);
+    if (variationPool.length > 0) {
+      const chosen =
+        variationPool[hashString(`${seedSalt}:${input.seasonId}:${input.team.teamId}:gm-seed-variation`) % variationPool.length];
+      if (chosen) {
+        return { profile: chosen.profile, source: "auto_generated" };
+      }
+    }
+  }
+
   const wildcardRoll = hashString(`${input.seasonId}:${input.team.teamId}:${input.team.shortCode}:gm-wildcard-v8`) % 100;
   if (wildcardRoll < GM_WILDCARD_ASSIGNMENT_CHANCE_PCT) {
     const wildcardPool = scoredCandidates.filter(
@@ -802,7 +835,10 @@ export function buildTeamGeneralManagerAssignments(
   teamIdentities?: TeamIdentity[] | null,
   boardConfidenceByTeamId?: Record<string, TeamBoardConfidenceRecord> | null,
   transferHistory?: TransferHistoryEntry[] | null,
+  seedSalt?: string | null,
 ) {
+  const effectiveSeedSalt =
+    seedSalt && seedSalt.trim().length > 0 ? seedSalt.trim() : gmAssignmentSeedSalt;
   const identityByTeamId = new Map((teamIdentities ?? []).map((identity) => [identity.teamId, identity] as const));
   const usedGmIds = new Set<string>();
   const assignments: Record<string, TeamGeneralManagerAssignment> = {};
@@ -877,6 +913,7 @@ export function buildTeamGeneralManagerAssignments(
       usedGmIds,
       excludedArchetypes:
         isFired && currentProfile ? [currentProfile.archetype] : undefined,
+      seedSalt: effectiveSeedSalt,
     });
     const profile = picked.profile;
     usedGmIds.add(profile.gmId);

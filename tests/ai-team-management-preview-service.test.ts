@@ -192,6 +192,32 @@ describe("ai team management preview service", () => {
     expect(preview?.buildingPlan.find((row) => row.buildingType === "recovery_center")?.score ?? 0).toBeGreaterThan(40);
   });
 
+  it("switches to light training when a single injury or elevated injury risk is present", () => {
+    const injuredOnly = buildGameState({
+      injuries: ["p1"],
+      players: [
+        buildPlayer("p1", { fatigue: 35 }),
+        buildPlayer("p2", { fatigue: 30 }),
+        buildPlayer("p3", { fatigue: 28 }),
+        buildPlayer("p4", { fatigue: 25 }),
+      ],
+    });
+
+    expect(buildAiTeamManagementPreview(injuredOnly, "T-1")?.trainingPlan.selectedTrainingIntensity).toBe("light");
+    expect(buildAiTeamManagementPreview(injuredOnly, "T-1")?.trainingPlan.selectedTrainingFocus).toBe("RECOVERY");
+
+    const highRisk = buildGameState({
+      players: [
+        buildPlayer("p1", { fatigue: 78 }),
+        buildPlayer("p2", { fatigue: 76 }),
+        buildPlayer("p3", { fatigue: 74 }),
+        buildPlayer("p4", { fatigue: 20 }),
+      ],
+    });
+
+    expect(buildAiTeamManagementPreview(highRisk, "T-1")?.trainingPlan.selectedTrainingIntensity).toBe("light");
+  });
+
   it("prioritizes training and hard intensity for young rebuild teams", () => {
     const gameState = buildGameState({
       identity: { ambition: 72, finances: 55 },

@@ -5,8 +5,13 @@ import { NextResponse } from "next/server";
 import { createPersistenceService } from "@/lib/persistence/persistence-service";
 import {
   addScoutingWatchlistEntry,
+  getScoutingWatchlistForTeam,
   removeScoutingWatchlistEntry,
 } from "@/lib/scouting/scouting-watchlist-service";
+import {
+  canAddManualScoutingWatchEntry,
+  getScoutingWishlistSlotMessage,
+} from "@/lib/scouting/scouting-wishlist-slots";
 import { authorizeServerRoomWrite } from "@/lib/room/server-authoritative-write-guard";
 import { notifyRoomGameplayWrite } from "@/lib/room/room-gameplay-write-notifier";
 
@@ -68,10 +73,61 @@ export async function POST(request: Request) {
       return NextResponse.json({ success: false, error: writeAuth.reason }, { status: writeAuth.status });
     }
 
+    const currentWatchlist = getScoutingWatchlistForTeam(save.gameState, teamId);
+    if (action === "add") {
+      if (currentWatchlist.some((entry) => entry.playerId === playerId)) {
+        return NextResponse.json(
+          {
+            success: false,
+            error: "watchlist_player_already_listed",
+            applied: false,
+            watchlist: currentWatchlist,
+          },
+          { status: 409 },
+        );
+      }
+
+      const slotCheck = canAddManualScoutingWatchEntry(save.gameState, teamId);
+      if (!slotCheck.ok) {
+        return NextResponse.json(
+          {
+            success: false,
+            error: slotCheck.reason ?? "watchlist_slots_full",
+            message: getScoutingWishlistSlotMessage(slotCheck),
+            applied: false,
+            watchlist: currentWatchlist,
+          },
+          { status: 409 },
+        );
+      }
+    } else if (!currentWatchlist.some((entry) => entry.playerId === playerId)) {
+      return NextResponse.json(
+        {
+          success: false,
+          error: "watchlist_player_not_listed",
+          applied: false,
+          watchlist: currentWatchlist,
+        },
+        { status: 404 },
+      );
+    }
+
     const nextGameState =
       action === "remove"
         ? removeScoutingWatchlistEntry({ gameState: save.gameState, teamId, playerId })
         : addScoutingWatchlistEntry({ gameState: save.gameState, teamId, playerId, note: body.note });
+
+    if (nextGameState === save.gameState) {
+      return NextResponse.json(
+        {
+          success: false,
+          error: "watchlist_unchanged",
+          applied: false,
+          watchlist: currentWatchlist,
+        },
+        { status: 409 },
+      );
+    }
 
     if (!dryRun) {
       persistence.saveSingleplayerState(saveId, nextGameState);
@@ -89,7 +145,7 @@ export async function POST(request: Request) {
     return NextResponse.json({
       success: true,
       applied: !dryRun,
-      watchlist: nextGameState.seasonState.scoutingWatchlist ?? [],
+      watchlist: getScoutingWatchlistForTeam(nextGameState, teamId),
     });
   } catch (error) {
     return NextResponse.json(

@@ -45,7 +45,7 @@ export async function POST(request: Request) {
     ...parseRoomWriteContextFromRequest(request),
     saveId: params.saveId,
     teamId: params.teamId,
-    action: "formcards",
+    action: "formcards_season_regenerate",
     source: "sqlite",
     dryRun: false,
   });
@@ -67,7 +67,7 @@ export async function POST(request: Request) {
   notifyRoomGameplayWrite(writeAuth, {
     saveId: params.saveId,
     teamId: params.teamId,
-    action: "formcards",
+    action: "formcards_season_regenerate",
     eventType: "lineup_updated",
     affectedViews: ["home", "lineup", "matchday", "arena"],
     dryRun: false,

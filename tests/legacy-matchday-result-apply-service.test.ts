@@ -151,8 +151,15 @@ function createContext(input: {
       d1DisciplineId: "mini-dm",
       d2DisciplineId: "fechten",
     },
+    contextLoadMode: "sqlite_local",
     fatigueByPlayerId: {},
     fatigueSourceStatus: "mapped",
+    teamPowerSource: {
+      selectionStatus: "ready",
+      effectStatus: "ready",
+      sourceLabel: "test",
+      warnings: [],
+    },
     formCardSource: {
       selectionStatus: "ready",
       effectStatus: "ready",

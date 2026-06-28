@@ -5,6 +5,8 @@ import { useDeferredValue, useEffect, useMemo, useRef, useState, type CSSPropert
 import { getClassColorClassName, getClassColorToken } from "@/app/foundation/ClassColorChip";
 import ClassIcon from "@/app/foundation/ClassIcon";
 import ContractOfferClient from "@/app/foundation/contract-offer/ContractOfferClient";
+import FoundationPlayerPortraitCard from "@/components/foundation/player-portrait-card/FoundationPlayerPortraitCard";
+import FoundationPlayerPortraitPreview from "@/components/foundation/player-portrait-card/FoundationPlayerPortraitPreview";
 import OptimizedMediaImage from "@/app/foundation/OptimizedMediaImage";
 import RaceIcon from "@/app/foundation/RaceIcon";
 import { getPlayerPortraitBrowserUrl } from "@/lib/data/mediaAssets";
@@ -44,7 +46,8 @@ import {
 } from "@/lib/room/foundation-room-context-client";
 import { DEFAULT_ACTIVE_OWNER_ID } from "@/lib/foundation/team-control-settings";
 import { getClassTrainingSignals } from "@/lib/training/class-progression-config";
-import { VeloAttributeFocusTags, VeloStatOrbitRow } from "@/components/foundation/velo-ui";
+import { VeloAttributeFocusTags } from "@/components/foundation/velo-ui";
+import { createEmptyLeaguePlayerHeatPools } from "@/lib/foundation/player-league-heat";
 
 export type TransfermarktV2ClientProps = {
   defaultSaveId: string;
@@ -2961,115 +2964,73 @@ export default function TransfermarktV2Client({
                   }}
                   onKeyDown={(event) => handleCandidateKeyDown(event, item.playerId)}
                 >
-                  <div className="market-v2-candidate-media" style={getCandidateFrameStyle(item.className)}>
-                    {portrait.src ? (
-                      <OptimizedMediaImage
-                        src={portrait.src}
-                        alt={item.name}
-                        width={68}
-                        height={68}
-                        className="market-v2-candidate-image"
-                        loading={isSelected || index < 6 ? "eager" : "lazy"}
-                        fetchPriority={isSelected || index < 3 ? "high" : "low"}
-                      />
-                    ) : (
-                      <span className="market-v2-candidate-placeholder">{portrait.initials}</span>
-                    )}
-                  </div>
-                  <div className="market-v2-candidate-copy">
-                    <div className="market-v2-candidate-head">
-                      <button
-                        className="table-link-button"
-                        type="button"
-                        title={`${item.name} Profil öffnen`}
-                        onClick={(event) => {
-                          event.stopPropagation();
-                          onOpenPlayerDetails?.({ playerId: item.playerId });
-                        }}
-                      >
-                        {item.name}
-                      </button>
-                      <span className={`${getClassColorClassName(item.className)} market-v2-class-mini`}>{item.className}</span>
-                    </div>
-                    <small>
-                      {item.race} · {item.alignment}
-                      {item.mercenary ? " · Mercenary" : ""}
-                    </small>
-                    <div className="market-v2-candidate-metric-row">
-                      <span>
-                        <b>{formatTransfermarktCurrency(item.marketValue)}</b>
-                        <small>MW</small>
-                      </span>
-                      <span>
-                        <b>{formatTransfermarktCurrency(item.salary)}</b>
-                        <small>Gehalt</small>
-                      </span>
-                      <span className={getToneClass(ratioTone)}>
-                        <b>{formatTransfermarktRatio(item.marketValueSalaryRatio)}</b>
-                        <small>MW/Geh</small>
-                      </span>
-                      <span className={getToneClass(fitInfo.tone)}>
-                        <b>{item.fitDisplay}</b>
-                        <small>Fit</small>
-                      </span>
-                      <span className={getToneClass(needInfo.tone)}>
-                        <b>{item.needMatchScore != null ? formatCompactNumber(item.needMatchScore, 0) : "—"}</b>
-                        <small>Bedarf</small>
-                      </span>
-                    </div>
-                    {item.doubleLoadWarnings?.length ? (
-                      <div className="market-v2-candidate-read-row">
-                        <span className="market-v2-signal-badge is-negative" title={getDoubleLoadTooltip(item)}>
-                          Doppelbelastung
-                        </span>
-                      </div>
-                    ) : null}
-                    <VeloStatOrbitRow
-                      ariaLabel={`${item.name} Achsenwerte`}
-                      className="market-v2-candidate-orbit"
-                      stats={{
-                        pow: item.pow ?? 0,
-                        spe: item.spe ?? 0,
-                        men: item.men ?? 0,
-                        soc: item.soc ?? 0,
-                      }}
-                    />
-                    {(() => {
-                      const classFocus = getClassTrainingImpact(item.className);
-                      return (
-                        <VeloAttributeFocusTags
-                          primary={classFocus.positive.map((entry) => ({
-                            attribute: TRAINING_ATTRIBUTE_LABELS[entry.attribute as PlayerGeneratorAttributeKey],
-                            weight: entry.weight,
-                          }))}
-                          risks={classFocus.negative.map((entry) => ({
-                            attribute: TRAINING_ATTRIBUTE_LABELS[entry.attribute as PlayerGeneratorAttributeKey],
-                            weight: entry.weight,
-                          }))}
-                          className="market-v2-candidate-class-focus"
-                        />
-                      );
-                    })()}
-                    <div className="market-v2-scouting-disclosure velo-scouting-disclosure" aria-label="Scouting Transparenz">
-                      {(() => {
-                        const buckets = getTransfermarktScoutingVisibilityBuckets(item.scoutingLevel ?? 0);
-                        return (
-                          <>
-                            <span className="velo-scouting-segment is-visible has-data">Sichtbar {buckets.scouted.length}</span>
-                            <span className={`velo-scouting-segment is-hidden${buckets.hidden.length > 0 ? " has-data" : ""}`}>Versteckt {buckets.hidden.length}</span>
-                            <span className="velo-scouting-segment is-base has-data">Basis {buckets.knowledge.length}</span>
-                          </>
-                        );
-                      })()}
-                    </div>
-                    <div className="market-v2-candidate-axis-row is-legacy">
-                      {focusAxes.map((entry) => (
-                        <span className={`market-v2-axis-chip ${AXIS_META[entry.axis].className}`} key={`${item.playerId}-${entry.axis}`}>
-                          {AXIS_META[entry.axis].label} {formatCompactNumber(entry.value, 0)}
-                        </span>
-                      ))}
-                    </div>
-                  </div>
+                  <FoundationPlayerPortraitCard
+                    playerId={item.playerId}
+                    name={item.name}
+                    portraitUrl={portrait.src}
+                    portraitInitials={portrait.initials}
+                    playerOvr={item.ovr ?? null}
+                    playerMvs={item.mvs ?? null}
+                    pow={item.pow ?? null}
+                    spe={item.spe ?? null}
+                    men={item.men ?? null}
+                    soc={item.soc ?? null}
+                    leagueHeatPools={createEmptyLeaguePlayerHeatPools()}
+                    variant="team"
+                    context="market"
+                    density="compact"
+                    selected={isSelected}
+                    interactive={false}
+                    className={getClassColorClassName(item.className, "player-card-class-frame")}
+                    subMeta={[item.race, item.alignment, item.mercenary ? "Mercenary" : null].filter(Boolean).join(" · ")}
+                    highlight={item.doubleLoadWarnings?.length ? "Doppelbelastung" : null}
+                    contextData={{
+                      market: {
+                        fitDisplay: item.fitDisplay,
+                        marketValue: formatTransfermarktCurrency(item.marketValue),
+                        salary: formatTransfermarktCurrency(item.salary),
+                        ratio: formatTransfermarktRatio(item.marketValueSalaryRatio),
+                        needScore: item.needMatchScore != null ? formatCompactNumber(item.needMatchScore, 0) : null,
+                        ovr: item.ovr ?? null,
+                        fitToneClass: getToneClass(fitInfo.tone),
+                        needToneClass: getToneClass(needInfo.tone),
+                        ratioToneClass: getToneClass(ratioTone),
+                      },
+                    }}
+                    footerSlot={
+                      <>
+                        {(() => {
+                          const classFocus = getClassTrainingImpact(item.className);
+                          return (
+                            <VeloAttributeFocusTags
+                              primary={classFocus.positive.map((entry) => ({
+                                attribute: TRAINING_ATTRIBUTE_LABELS[entry.attribute as PlayerGeneratorAttributeKey],
+                                weight: entry.weight,
+                              }))}
+                              risks={classFocus.negative.map((entry) => ({
+                                attribute: TRAINING_ATTRIBUTE_LABELS[entry.attribute as PlayerGeneratorAttributeKey],
+                                weight: entry.weight,
+                              }))}
+                              className="market-v2-candidate-class-focus"
+                            />
+                          );
+                        })()}
+                        <div className="market-v2-scouting-disclosure velo-scouting-disclosure" aria-label="Scouting Transparenz">
+                          {(() => {
+                            const buckets = getTransfermarktScoutingVisibilityBuckets(item.scoutingLevel ?? 0);
+                            return (
+                              <>
+                                <span className="velo-scouting-segment is-visible has-data">Sichtbar {buckets.scouted.length}</span>
+                                <span className={`velo-scouting-segment is-hidden${buckets.hidden.length > 0 ? " has-data" : ""}`}>Versteckt {buckets.hidden.length}</span>
+                                <span className="velo-scouting-segment is-base has-data">Basis {buckets.knowledge.length}</span>
+                              </>
+                            );
+                          })()}
+                        </div>
+                      </>
+                    }
+                    onOpen={() => onOpenPlayerDetails?.({ playerId: item.playerId })}
+                  />
                 </button>
               );
             })}
@@ -3692,6 +3653,9 @@ export default function TransfermarktV2Client({
                   const marketItem = marketItemByPlayerId.get(entry.playerId);
                   const portrait = marketItem ? getTransfermarktPortraitModel(marketItem) : null;
                   const wishlistPortraitSrc = portrait?.src ?? getPlayerPortraitBrowserUrl(entry.playerId);
+                  const fitInfo = marketItem ? getFitSignal(marketItem) : null;
+                  const needInfo = marketItem ? getNeedSignal(marketItem) : null;
+                  const ratioTone = marketItem ? getRatioTone(marketItem.marketValueSalaryRatio) : "neutral";
                   return (
                     <tr
                       key={entry.id}
@@ -3700,19 +3664,50 @@ export default function TransfermarktV2Client({
                       onDoubleClick={() => openWishlistDeal(entry)}
                     >
                       <td>
-                        {wishlistPortraitSrc ? (
-                          <OptimizedMediaImage
-                            src={wishlistPortraitSrc}
-                            alt={entry.playerName}
-                            width={42}
-                            height={42}
-                            className="market-v2-roster-context-portrait"
-                          />
-                        ) : (
-                          <div className="market-v2-roster-context-placeholder">
-                            {(portrait?.initials ?? entry.playerName.slice(0, 2)).toUpperCase()}
-                          </div>
-                        )}
+                        <FoundationPlayerPortraitPreview
+                          playerId={entry.playerId}
+                          name={entry.playerName}
+                          portraitUrl={wishlistPortraitSrc}
+                          portraitInitials={(portrait?.initials ?? entry.playerName.slice(0, 2)).toUpperCase()}
+                          playerOvr={marketItem?.ovr ?? null}
+                          playerMvs={marketItem?.mvs ?? null}
+                          pow={marketItem?.pow ?? null}
+                          spe={marketItem?.spe ?? null}
+                          men={marketItem?.men ?? null}
+                          soc={marketItem?.soc ?? null}
+                          leagueHeatPools={createEmptyLeaguePlayerHeatPools()}
+                          variant="team"
+                          context="market"
+                          playerClassName={entry.className}
+                          subMeta={entry.race}
+                          contextData={{
+                            market: {
+                              fitDisplay: marketItem?.fitDisplay ?? null,
+                              marketValue: formatTransfermarktCurrency(entry.marketValue),
+                              salary: formatTransfermarktCurrency(entry.salary),
+                              ratio: marketItem ? formatTransfermarktRatio(marketItem.marketValueSalaryRatio) : "—",
+                              needScore: marketItem?.needMatchScore != null ? formatCompactNumber(marketItem.needMatchScore, 0) : null,
+                              ovr: marketItem?.ovr ?? null,
+                              fitToneClass: fitInfo ? getToneClass(fitInfo.tone) : undefined,
+                              needToneClass: needInfo ? getToneClass(needInfo.tone) : undefined,
+                              ratioToneClass: getToneClass(ratioTone),
+                            },
+                          }}
+                        >
+                          {wishlistPortraitSrc ? (
+                            <OptimizedMediaImage
+                              src={wishlistPortraitSrc}
+                              alt={entry.playerName}
+                              width={42}
+                              height={42}
+                              className="market-v2-roster-context-portrait"
+                            />
+                          ) : (
+                            <div className="market-v2-roster-context-placeholder">
+                              {(portrait?.initials ?? entry.playerName.slice(0, 2)).toUpperCase()}
+                            </div>
+                          )}
+                        </FoundationPlayerPortraitPreview>
                       </td>
                       <td>
                         <div className="market-v2-wishlist-player-cell">
@@ -3851,17 +3846,35 @@ export default function TransfermarktV2Client({
                 {selectedRosterRows.map((row) => (
                   <tr key={row.activePlayerId}>
                     <td>
-                      {row.portraitUrl ? (
-                        <OptimizedMediaImage
-                          src={row.portraitUrl}
-                          alt={row.name}
-                          width={42}
-                          height={42}
-                          className="market-v2-roster-context-portrait"
-                        />
-                      ) : (
-                        <div className="market-v2-roster-context-placeholder">{row.name.slice(0, 2).toUpperCase()}</div>
-                      )}
+                      <FoundationPlayerPortraitPreview
+                        playerId={row.playerId}
+                        name={row.name}
+                        portraitUrl={row.portraitUrl ?? getPlayerPortraitBrowserUrl(row.playerId)}
+                        portraitInitials={row.name.slice(0, 2).toUpperCase()}
+                        playerOvr={row.ovr ?? null}
+                        playerMvs={row.mvs ?? null}
+                        pow={row.pow ?? null}
+                        spe={row.spe ?? null}
+                        men={row.men ?? null}
+                        soc={row.soc ?? null}
+                        leagueHeatPools={createEmptyLeaguePlayerHeatPools()}
+                        variant="team"
+                        context="roster"
+                        playerClassName={row.className}
+                        subMeta={row.race ?? undefined}
+                      >
+                        {row.portraitUrl ? (
+                          <OptimizedMediaImage
+                            src={row.portraitUrl}
+                            alt={row.name}
+                            width={42}
+                            height={42}
+                            className="market-v2-roster-context-portrait"
+                          />
+                        ) : (
+                          <div className="market-v2-roster-context-placeholder">{row.name.slice(0, 2).toUpperCase()}</div>
+                        )}
+                      </FoundationPlayerPortraitPreview>
                     </td>
                     <td>
                       <button

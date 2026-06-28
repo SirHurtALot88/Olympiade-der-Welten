@@ -1,4 +1,5 @@
 import type {
+  AiLineupStrategy,
   DisciplineCategory,
   FormCardPlanRecord,
   FormCardColor,
@@ -297,6 +298,7 @@ export type LegacyLineupContextMeta = LegacyLineupKeyParams & {
 
 export type LegacyLineupLoadedContext = LegacyLineupRepositoryContext & {
   gameState?: GameState;
+  lineupStrategy?: AiLineupStrategy;
   save: {
     id: string;
     name: string;

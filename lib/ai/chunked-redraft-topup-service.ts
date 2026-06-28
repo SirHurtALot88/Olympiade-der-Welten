@@ -57,11 +57,22 @@ function getCalculatedPlayerSalary(player: Player) {
   return resolvePlayerEconomyContract({ player }).salary;
 }
 
-function getEmergencyMinimumSigningFee(input: { teamCash: number; marketValue: number; enabled: boolean }) {
-  if (!input.enabled) return input.marketValue;
-  const positiveCash = Math.max(0, input.teamCash);
-  if (positiveCash <= 1) return input.marketValue;
-  return roundValue(Math.min(input.marketValue, Math.max(1, Math.min(8, positiveCash * 0.12))), 2);
+/** Preseason repair may only fill with cheap free agents — never discounted star signings. */
+export const PRESEASON_REPAIR_MARKET_VALUE_CAP = 15;
+
+export function getPreseasonRepairMarketValueCap() {
+  return PRESEASON_REPAIR_MARKET_VALUE_CAP;
+}
+
+export function isPreseasonRepairCandidateEligible(input: { marketValue: number | null; teamCash: number }) {
+  const marketValue = input.marketValue;
+  if (marketValue == null || marketValue <= 0) {
+    return false;
+  }
+  if (marketValue > PRESEASON_REPAIR_MARKET_VALUE_CAP + 0.01) {
+    return false;
+  }
+  return input.teamCash >= marketValue - 0.01;
 }
 
 export type ChunkedRedraftState = {
@@ -4652,15 +4663,20 @@ export function runChunkedRedraftTopup(params: ChunkedRedraftTopupParams) {
       });
       const minimumRosterGap = Math.max(0, (targetPlan?.minTarget ?? teamTarget.playerMin) - rosterCount);
       const phaseAMinimumGuard = phasePlan.phase === "phase_a_minimum" && minimumRosterGap > 0;
-      const getCandidateCashCost = (candidate: Candidate) =>
-        getEmergencyMinimumSigningFee({
-          teamCash: latestTeam.cash,
-          marketValue: candidate.marketValue,
-          enabled: params.mode === "preseason_roster_repair" && phaseAMinimumGuard,
-        });
+      const repairMode = params.mode === "preseason_roster_repair" && phaseAMinimumGuard;
+      const getCandidateCashCost = (candidate: Candidate) => candidate.marketValue;
       const cashAffordableCandidates = candidatePool
         .filter((candidate) => !pickedPlayerIds.has(candidate.player.id))
-        .filter((candidate) => latestTeam.cash * (1 - phasePlan.cashReservePct) >= getCandidateCashCost(candidate));
+        .filter((candidate) => {
+          const cashCost = getCandidateCashCost(candidate);
+          if (cashCost == null || cashCost <= 0) {
+            return false;
+          }
+          if (repairMode && !isPreseasonRepairCandidateEligible({ marketValue: cashCost, teamCash: latestTeam.cash })) {
+            return false;
+          }
+          return latestTeam.cash * (1 - phasePlan.cashReservePct) >= cashCost;
+        });
       counters.rejectedByCash += Math.max(0, candidatePool.length - cashAffordableCandidates.length);
       const teamRosterPlayers = getRosterPlayers(runContext.save.gameState, teamRoster);
       const fitChecked = cashAffordableCandidates.map((candidate) => {
@@ -4881,14 +4897,6 @@ export function runChunkedRedraftTopup(params: ChunkedRedraftTopupParams) {
           teamRosterOpt: targetPlan.desiredRosterTarget,
           isFirstSeason: runContext.save.gameState.season.id === "season-1",
         });
-        const emergencySigningFee =
-          params.mode === "preseason_roster_repair" && phaseAMinimumGuard
-            ? getEmergencyMinimumSigningFee({
-                teamCash: latestTeam.cash,
-                marketValue: candidate.marketValue,
-                enabled: true,
-              })
-            : null;
         const result = executeLocalTransfermarktBuy({
           saveId: runContext.save.saveId,
           seasonId: runContext.save.gameState.season.id,
@@ -4897,8 +4905,6 @@ export function runChunkedRedraftTopup(params: ChunkedRedraftTopupParams) {
           contractLength: contractOffer.contractLength,
           contractShape: contractOffer.contractShape,
           transferSource,
-          purchasePriceOverride: emergencySigningFee ?? undefined,
-          purchasePriceOverrideReason: emergencySigningFee != null ? "preseason_minimum_roster_repair_signing_fee" : undefined,
           fastLocalBatch: true,
           localRunContext: runContext,
           deferPersist: true,

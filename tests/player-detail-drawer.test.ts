@@ -1173,5 +1173,7 @@ describe("player detail drawer", () => {
     expect(data?.progressionEvents).toHaveLength(2);
     expect(data?.progressionEvents.some((entry) => entry.source === "organic_season_progression")).toBe(true);
     expect(data?.progressionEvents.some((entry) => entry.source === "manual_season_end_xp_spend")).toBe(true);
+    expect(data?.trainingHistoryRows.every((entry) => entry.source === "organic")).toBe(true);
+    expect(data?.trainingHistoryRows).toHaveLength(1);
   });
 });

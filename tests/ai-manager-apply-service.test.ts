@@ -5,6 +5,7 @@ import {
   buildAiManagerApplyPreview,
   getAiManagerMarketSpendableCash,
 } from "@/lib/ai/ai-manager-apply-service";
+import { buildAiLeagueManagementPreview } from "@/lib/ai/ai-team-management-preview-service";
 import type { GameState, Player, Team, TeamIdentity } from "@/lib/data/olyDataTypes";
 import type { PersistedSaveGame, PersistenceService } from "@/lib/persistence/types";
 import { previewTeamTrainingSettings } from "@/lib/training/training-settings-service";
@@ -326,13 +327,16 @@ describe("ai manager apply service", () => {
     expect(mock.current.gameState.seasonState.facilityEvents?.[0]?.source).toBe("manual_facility_downgrade");
   });
 
-  it("stores team training settings and player training modes through the training service", () => {
+  it("stores team training settings and per-player training modes through the training service", () => {
     const source = save();
     const mock = persistenceMock(source);
+    const leaguePreview = buildAiLeagueManagementPreview(source.gameState);
+    const teamPreview = leaguePreview.teams.find((team) => team.teamId === "T-1");
+    expect(teamPreview?.trainingPlan.playerTrainingPlans.length).toBeGreaterThan(0);
     const result = applyAiManagerPlan({
       save: source,
       dryRun: false,
-      actionTypes: ["set_training_focus", "set_training_intensity"],
+      actionTypes: ["set_training_focus", "set_training_intensity", "set_player_training_modes"],
       persistence: mock.persistence,
     });
 
@@ -342,7 +346,8 @@ describe("ai manager apply service", () => {
       trainingIntensity: "hard",
       playerTrainingMode: "hart",
     });
-    expect(mock.current.gameState.players.every((entry) => entry.trainingMode === "hart")).toBe(true);
+    expect(mock.current.gameState.players.every((entry) => entry.trainingMode != null)).toBe(true);
+    expect(result.actions.some((action) => action.actionType === "set_player_training_modes" && action.applied)).toBe(true);
   });
 
   it("hard training lowers recovery forecast while light training improves it", () => {

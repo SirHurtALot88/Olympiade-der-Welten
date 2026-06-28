@@ -9,6 +9,7 @@ import {
   calculateFacilityIncome,
   calculateFacilityUpkeep,
   getAnalyticsForecastQuality,
+  getRecoveryTrainingFatigueReductionPct,
   getScoutingConfidence,
   getTeamFacilityState,
 } from "@/lib/facilities/facility-effects";
@@ -112,6 +113,11 @@ describe("facility effects", () => {
 
     expect(result.modifierPct).toBe(15);
     expect(result.after).toBe(92);
+  });
+
+  it("recovery center reduces training fatigue load by the same modifier pct", () => {
+    expect(getRecoveryTrainingFatigueReductionPct(facilities({ recovery_center: { level: 5, enabled: true } }))).toBe(25);
+    expect(getRecoveryTrainingFatigueReductionPct(facilities({ recovery_center: { level: 0, enabled: false } }))).toBe(0);
   });
 
   it("fan shop and arena upgrade generate season income", () => {

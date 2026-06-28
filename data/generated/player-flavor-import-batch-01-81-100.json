@@ -1,0 +1,85 @@
+{
+  "version": 1,
+  "entries": [
+    {
+      "id": "player-0081-skryx",
+      "flavorDe": "Tief in einem nebligen Sümpf, wo Wurzeln wie Finger aus dem Schlamm ragen und kleine Lichter schweben, als würden sie auf etwas warten, herrscht Skryx — halb Hahn, halb Drache, ganz schlechte Laune. Sein Kamm leuchtet rot wie eine Warnung, seine Flügel werfen Schatten, die länger sind als die meisten Legenden. Man erzählt, sein Blick könne Stein brechen; wer das testet, redet danach selten noch. Er bewegt sich niedrig und schnell, als wäre der Sumpf sein Thron und jeder Schritt ein Urteil. Wer ihn hört, hört zuerst Federn und Knochen. Wer zu nah kommt, merkt, dass beides scharf ist."
+    },
+    {
+      "id": "player-0082-goro",
+      "flavorDe": "Goro stammt aus einem moosigen Urwald, den Karten meistens zu klein zeichnen — dort, wo alte Stämme wie Säulen stehen und das Licht grün schmeckt. Sein Panzer trägt Gold wie Ehrenzeichen, die niemand ausgesprochen hat; der Helm sitzt schwer, der Blick darunter noch schwerer. Er hält sein Schwert, als wäre Stille die eigentliche Waffe. Man sagt, er passe sich an, wenn der Wald es verlangt — nicht aus List, sondern aus Respekt vor etwas, das älter ist als Clans. Wer ihn fordert, trifft nicht nur Schuppen. Er trifft jemanden, der gelernt hat, dass Geschwindigkeit manchmal bedeutet: warten, bis der Feind zuerst blinzelt."
+    },
+    {
+      "id": "player-0083-scruffy",
+      "flavorDe": "Aus rissigen Ödlanden kommt Scruffy — klein wie ein Haustier, groß wie ein Skandal, wenn die roten Augen aufleuchten. Fell, Flügel und Rüstung passen nicht zusammen, und genau deshalb folgt ihr niemand gern zu lange. Man flüstert, sie habe gelernt, dass Größe im Kampf Nebensache ist, wenn man laut genug knurrt und fleißig genug beißt. Ihre Flügel sind zerrissen wie alte Verträge; ihre Pfoten tragen Metall, als wäre Zärtlichkeit nur eine Form von Tarnung. Wer sie unterschätzt, merkt schnell: Hier wohnt etwas Hitze, das nicht nett fragt, bevor es antwortet."
+    },
+    {
+      "id": "player-0084-xix",
+      "flavorDe": "In einer feuchten Höhle, wo Tropfen auf Stein klingen wie Uhren ohne Zeit, sitzt Xix reglos — bis er es nicht mehr ist. Sein Körper wirkt aus schwarzem Glas gemeißelt, die Augen schmal und blau wie kaltes Wasser unter Eis. In der Brust pulsiert etwas, das nicht wie Herz klingt, und seine Hände sind Klingen, bevor man Klinge sagt. Man sagt, er sei abtrünnig, weil er niemandem mehr gehorcht, der nicht laut genug ist. Skandalös wirkt er, hitzig, wenn jemand den falschen Schritt macht. Wer ihn trifft, riecht Mineral und Regen. Und versteht: Hier gibt es keine Verhandlung — nur Distanz oder Schnitt."
+    },
+    {
+      "id": "player-0085-summer",
+      "flavorDe": "Summer lebt dort, wo der Dschungel so dicht ist, dass Sonne nur in Streifen fällt und jeder Schritt nach feuchter Erde riecht. Ihre Haut trägt Schmutz wie Rüstung, ihre Augen Kriegsbemalung wie eine Sprache, die man nicht übersetzt, wenn man klug ist. An der Kette hängen Klingen, die nicht nett fragen — sie antworten. Man sagt, sie sei laut im Kampf und leise danach, als würde sie selbst manchmal zögern, bevor sie wieder losläuft. Diva klingt falsch, bis man sieht, wie sie erwartet, dass die Welt Schritt hält. Wer sie verfolgt, verliert sie in der ersten Kurve. Wer bleibt, findet heraus, dass Sommer hier kein Wetter ist — sondern ein Urteil."
+    },
+    {
+      "id": "player-0086-olaf",
+      "flavorDe": "Olaf kommt aus den gefrorenen Nordpassen, wo Schnee Schritte verschluckt und Berge ehrlicher sind als Versprechen. Sein Bart ist nass vom Wind, sein Speer lang genug, um Distanz zu erzählen, und neben ihm geht ein Bär, der brüllt, als wäre Loyalität eine Waffe. Man erzählt, er habe einst ein Dorf gerettet, indem er es nicht verraten hat — und ein anderes Mal gewonnen, indem er die Regeln gebogen hat, bevor sie ihn bogen. Altruistisch klingt er selten; treu schon. Wer ihn im Sturm trifft, sieht zuerst den Atem. Dann die Spitze."
+    },
+    {
+      "id": "player-0087-mary-slayblade",
+      "flavorDe": "Mary Slayblade erscheint in verschneiten Wäldern wie ein Geschenk, das niemand bestellt hat — roter Mantel, weißes Fell, Augen, die glühen, als wäre Festtagsstimmung nur Tarnung. Ihre Klingen sitzen an den Unterarmen wie eingebaute Antworten; die Flügel auf dem Rücken tragen rote Augen, die zu viel sehen. Man flüstert, sie sei hitzig und hinterlistig zugleich, und manchmal zögerlich, wenn der Schnee zu leise wird. Wer glaubt, Weihnachten sei sanft, lernt schnell: Sie bringt Geschenke nur, wenn jemand zuerst fällt. In der Arena nennen sie sie die Klinge im Rot — nicht weil sie singt, sondern weil sie klingt."
+    },
+    {
+      "id": "player-0088-yasuo-windthrift",
+      "flavorDe": "Yasuo Windthrift stammt aus einem Nebeltal, wo Kirschblüten fallen wie rosa Schnee und Wasserfälle lauter sind als Eide. Sein Gewand trägt Drachen in Gold, sein Katana ruht in der Hand wie eine alte Gewohnheit. Man sagt, er sei motiviert genug, um jeden Morgen zu trainieren, und skandalös genug, um danach die falschen Leute zu besiegen. Treu hält er, was er einmal zugesagt hat — söldnerisch nur, wenn der Preis die Schande wert ist. Wer ihn fordert, trifft nicht Vergangenheit. Er trifft Disziplin, die noch funktioniert, wenn alles andere schon brennt."
+    },
+    {
+      "id": "player-0089-yuuri-shadowhand",
+      "flavorDe": "Yuuri Shadowhand wandert durch verfallene Steinarkaden, wo Sonnenstrahlen Staub wie Gold machen und Schatten länger sind als Erinnerungen. Ihr Schwert leuchtet blau wie kaltes Feuer; ihre Rüstung trägt Federn, als hätte jemand den Himmel in Schwarz gefärbt. Man erzählt, sie sei motiviert, wenn der Auftrag passt, und teuer, wenn er es nicht tut. Diva klingt passend, bis man sieht, wie präzise sie tritt — als wäre Eleganz nur die Form, in der Geld arbeitet. Wer sie im Licht trifft, sollte nicht nach Adel fragen. Er sollte fragen, ob er noch schnell genug ist, bevor die Klinge antwortet."
+    },
+    {
+      "id": "player-0090-grasshopper-m-vi",
+      "flavorDe": "Grasshopper M-VI wurde in einer hallenhohen Schmiede gebaut, wo Öl riecht nach Versprechen und blaues Licht aus jedem Gelenk kommt, als wäre es Atem. Vier Beine, zwei Waffen, ein Auge — mehr braucht er nicht, um den Boden zum Schweigen zu bringen. Man sagt, er denke nicht; er rechnet. Treu bleibt er dem, der ihn nicht als Werkzeug behandelt; hitzig, wenn jemand die falsche Taste drückt. Zwischen Gerüsten und Ketten steht er wie ein Grenzstein zwischen Mensch und Maschine. Wer vor ihm steht, hört zuerst Hydraulik. Dann hört er auf, Dinge zu hören."
+    },
+    {
+      "id": "player-0091-moknar",
+      "flavorDe": "Moknar regiert in einer rauchigen Schmiede, wo Hämmer klingen wie Herzschläge und Flammen an den Rändern seiner Rüstung lecken. Sein Hammer trägt Risse aus Glut, sein Gürtel einen Schädel, der zu viel gelächelt hat. Man erzählt, er sei ehrgeizig genug, um jeden Raum kleiner wirken zu lassen, und rachsüchtig genug, wenn jemand seinen Namen falsch ausspricht. Flexibel im Kampf, hitzig im Kopf — beides passt zu jemandem, der glaubt, Größe sei eine Meinung und er habe die lauteste. Wer ihn fordert, riecht Metall und Schweiß. Und merkt: Hier endet Selbstvertrauen oft als Funken."
+    },
+    {
+      "id": "player-0092-micro",
+      "flavorDe": "Micro trainiert auf staubigen Schießständen jenseits der großen Städte, wo Ziele weiß sind und die Hügel zu weit weg, um Fragen zu stellen. Sein Visier leuchtet orange wie eine kleine Sonne; sein Gewehr ruht bereit, als wäre Ruhe nur eine andere Form von Anspannung. Man sagt, er diene dem, der zahlt — treu genug, um nicht zu fliehen, söldnerisch genug, um nicht zu fragen. Hinter der Maske steckt vielleicht ein Mensch, vielleicht eine Gewohnheit. Wer ihn trifft, sieht keine Mimik. Er sieht Kaliber."
+    },
+    {
+      "id": "player-0093-draven",
+      "flavorDe": "Draven steht in verfallenen Ruinen wie auf einer Bühne, die niemand gebaut hat und jeder bezahlt, um sie zu sehen. Sein Grinsen ist breiter als fair, seine Axt schwerer als sein Ruf — und der Ruf ist schon laut genug, dass Blitze manchmal mitklatschen. Man erzählt, er sei cool, bis er es nicht mehr ist; ehrgeizig genug, um jeden Applaus zu wollen, rachsüchtig genug, wenn jemand ihn übersieht. Skandalös nennen ihn die einen, legendär die anderen — meistens dieselben Leute, nur zu unterschiedlichen Zeiten. Wer ihn fordert, sollte nicht nach Ehre fragen. Er sollte fragen, ob er noch schnell genug ist, bevor die Axt antwortet."
+    },
+    {
+      "id": "player-0094-dualflame",
+      "flavorDe": "Dualflame wacht an einem Ort, den Karten meistens weglassen — halb Lava, halb Eis, ganz unmöglich. Zwei Köpfe, ein Körper, zu viel Temperament für einen Namen: Feuer brüllt links, Frost beißt rechts, und in der Mitte steigt Dampf wie ein stilles Gebet. Man sagt, sie sei cool genug, um nicht zu wählen, und hitzig genug, wenn jemand glaubt, man könne sie teilen. Wer sie sieht, versteht schnell: Hier gibt es keine Mitte — nur welche Seite zuerst antwortet. In der Olympiade nennen sie sie manchmal das Wetter mit Zähnen."
+    },
+    {
+      "id": "player-0095-lumen",
+      "flavorDe": "Lumen bewegt sich durch neblige Wälder, wo Bäume wie Säulen stehen und das Licht grün wird, wenn ihre Klinge leuchtet. Ihre Maske verdeckt nichts Wichtiges — sie zeigt, dass Gesichter hier Nebensache sind. Man flüstert, sie sei fleißig genug, um jeden Schatten zu zählen, und spielt gern mit Risiko, wenn der Preis stimmt. Söldnerisch nur, wenn jemand den falschen Pfad wählt; motiviert immer, wenn etwas zu schützen ist, das sie nicht erklärt. Wer sie folgt, verliert sie in der ersten Kurve. Wer bleibt, geht anders zurück — wenn er geht."
+    },
+    {
+      "id": "player-0096-faceless-void",
+      "flavorDe": "Faceless Void kommt aus hallenhohen Ruinen, wo Stein auf Stein atmet und Zeit sich manchmal vergisst. Sein Gesicht ist glatt bis auf ein Auge, das leuchtet wie ein kleiner Stern; weitere Augen sitzen an Brust und Schulter, als würde er aus mehreren Richtungen zugleich sehen. Die Axt in seinen Händen ist schwer genug, um Stille zu erzählen. Man sagt, er sei cool, flexibel im Kampf und rachsüchtig, wenn jemand glaubt, Leere sei Schwäche. Wer ihn trifft, hört kein Lachen. Er hört Schritte, die zu regelmäßig sind, um menschlich zu sein — und eine Ruhe, die gefährlicher ist als Zorn."
+    },
+    {
+      "id": "player-0097-tremble",
+      "flavorDe": "Tremble erhebt sich über ein Feld aus Schädeln, wo Blitze den Himmel zerreißen und grünes Feuer in seinen Knochen pulsiert wie ein zweites Herz. Er ist groß genug, dass Erde zittert, bevor er spricht — und er spricht selten. Man erzählt, er sei gesund im Sinne von: zu viel übrig, um zu sterben, und hitzig genug, wenn jemand sein Revier betritt. Skandalös wirkt er, kaltblütig im besten und schlimmsten Sinn zugleich. Wer ihn sieht, riecht Asche und alte Mythen. Und versteht: Hier gibt es keine Verhandlung — nur Distanz oder Ende."
+    },
+    {
+      "id": "player-0098-vasdrotdir-undemshield",
+      "flavorDe": "Vasdrotdir Undemshield stammt aus einem Bergpass, wo Ruinen aus Stein und Nebel bestehen und Bärte so lang sind wie Geschichten. Sein Haar sitzt im Knoten, der Bart in goldenen Ringen — fleißig gepflegt, gesund genug, um jeden Winter zu überstehen. Die Axt in seiner Hand trägt Gravuren, die älter sind als manche Clans; die Rüstung trägt Pelz wie eine zweite Ehre. Man sagt, er rede wenig und schlage präzise. Wer ihn fordert, trifft nicht Alter. Er trifft jemanden, der schon vergessen hat, wie man zittert."
+    },
+    {
+      "id": "player-0099-drake",
+      "flavorDe": "Drake patrouilliert durch eine alte Steinstadt, wo Giebel wie Speere in den Himmel zeigen und rote Banner im Wind hängen wie Erinnerungen. Seine Schuppen leuchten wie offene Glut, seine Rüstung trägt Kratzer, die mehr erzählen als Worte. Die Hellebarde in seiner Faust ist lang genug, um Ordnung zu erzwingen — treu, wenn man es verdient, hitzig und abtrünnig, wenn jemand glaubt, Drachen gehorchten aus Höflichkeit. Man erzählt, er habe einst eine Brücke verteidigt, die niemand mehr benennt. Wer ihn trifft, hört zuerst Metall. Dann Entscheidung."
+    },
+    {
+      "id": "player-0100-red-riding-hood",
+      "flavorDe": "Red Riding Hood lebt in einem Wald, der so freundlich aussieht, dass man vergisst, wie schnell Freundlichkeit enden kann — roter Umhang, silbernes Haar, Rüstung mit grünen Steinen wie kleine Lichter. Hinter ihr steht ein Haus mit warmen Fenstern; vor ihr steht meistens jemand, der zu spät merkt, dass Märchen hier Waffen tragen. Man sagt, sie sei beliebt genug, dass Zuschauer jubeln, und treu genug, um nicht zu fliehen, wenn es ernst wird — hitzig im Kampf, zaghaft nur, wenn niemand hinsieht. Wer sie unterschätzt, findet heraus: Rot ist hier keine Farbe. Es ist eine Warnung."
+    }
+  ]
+}

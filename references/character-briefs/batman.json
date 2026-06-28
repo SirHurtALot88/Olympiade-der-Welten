@@ -1,0 +1,13 @@
+{
+  "name": "Batman",
+  "id": "player-1726-batman",
+  "className": "Tactician",
+  "race": "Human",
+  "alignment": "R-G",
+  "gender": "m",
+  "subclasses": ["Guardian", "Vigilante", "Trickster"],
+  "traitsPositive": ["Flexible", "Diligent", "FanFavorite"],
+  "traitsNegative": ["Vindictive", "Obsessive"],
+  "flavorDe": "Bruce Wayne verlor in Gotham City seine Eltern; Batman wurde in derselben Nacht geboren. Alles danach war Training: Körper, Verstand, Geld, Schmerz. Er hat keine Superkräfte; er machte sich selbst zur Fledermaus, weil Kriminelle Angst besser verstehen als Bitten. Gotham ließ er nicht allein zurück — Verbündete halten die Stadt. Zur Olympiade kommt er, weil seine Ermittlungen zeigen: Waffen, Geldwäsche und Einfluss der Gotham-Schurken laufen hier zusammen. Batman ist hier, um die Quelle zu finden.",
+  "portraitPath": "/Users/chrisfalk/Library/CloudStorage/Dropbox/Chris/Olympiade der Welten/Mark VI Cardgame/Spieler/Batman.JPG"
+}

@@ -288,7 +288,7 @@ export function buildRetoolAi2BudgetPlan(input: {
     10,
   );
   const rosterSize = Math.max(0, Math.round(input.rosterSize));
-  const playerMin = clamp(Math.round(Number(input.playerMin ?? input.teamIdentity?.playerMin) || (finances >= 7 ? 10 : 9)), 7, 12);
+  const playerMin = clamp(Math.round(Number(input.playerMin ?? input.teamIdentity?.playerMin) || (finances >= 7 ? 10 : 9)), 8, 12);
   const optimum = clamp(Math.round(Number(input.optimum ?? input.teamIdentity?.playerOpt) || Math.max(playerMin, finances >= 6 ? 11 : 10)), playerMin, 12);
   const missingToMin = Math.max(0, playerMin - rosterSize);
   const missingToOptimum = Math.max(0, optimum - rosterSize);

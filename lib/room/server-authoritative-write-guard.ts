@@ -44,6 +44,13 @@ export type ServerRoomWriteBlocked = {
 export type ServerRoomWriteAuthorization = ServerRoomWriteAllowed | ServerRoomWriteBlocked;
 
 const HOST_LEVEL_ACTIONS = new Set<TeamWriteAction>([
+  "formcards_season_regenerate",
+  "lineup_ai_batch_apply",
+  "ai_preseason_background",
+  "ai_picks_run_execute",
+  "ai_market_plan_apply",
+  "ai_roster_fill_execute",
+  "ai_xp_spend_apply",
   "matchday_resolve",
   "season_transition",
   "season_completion",

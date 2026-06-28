@@ -204,6 +204,47 @@ describe("server-authoritative room write guard", () => {
       }),
     ).toMatchObject({ allowed: false, reason: "host_only_action" });
 
+    expect(
+      authorizeServerRoomWrite({
+        roomCode: created.room.roomCode,
+        participantId: chris.participantId,
+        userId: chris.userId,
+        saveId: "sandbox-manager-test-save-3",
+        action: "formcards_season_regenerate",
+      }).allowed,
+    ).toBe(true);
+
+    expect(
+      authorizeServerRoomWrite({
+        roomCode: created.room.roomCode,
+        participantId: franky.participantId,
+        userId: franky.userId,
+        saveId: "sandbox-manager-test-save-3",
+        teamId: "C-S",
+        action: "formcards_season_regenerate",
+      }),
+    ).toMatchObject({ allowed: false, reason: "host_only_action" });
+
+    expect(
+      authorizeServerRoomWrite({
+        roomCode: created.room.roomCode,
+        participantId: chris.participantId,
+        userId: chris.userId,
+        saveId: "sandbox-manager-test-save-3",
+        action: "lineup_ai_batch_apply",
+      }).allowed,
+    ).toBe(true);
+
+    expect(
+      authorizeServerRoomWrite({
+        roomCode: created.room.roomCode,
+        participantId: franky.participantId,
+        userId: franky.userId,
+        saveId: "sandbox-manager-test-save-3",
+        action: "ai_preseason_background",
+      }),
+    ).toMatchObject({ allowed: false, reason: "host_only_action" });
+
     const override = authorizeServerRoomWrite({
       roomCode: created.room.roomCode,
       participantId: chris.participantId,

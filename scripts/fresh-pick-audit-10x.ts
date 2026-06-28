@@ -7,6 +7,7 @@ import type { GameState, Player, RosterEntry, RosterPromisedRole, Team, Transfer
 import { deriveRosterTargets } from "@/lib/foundation/roster-limits";
 import { createPersistenceService } from "@/lib/persistence/persistence-service";
 import { withScenarioMeta } from "@/lib/persistence/scenario-meta";
+import { setGmAssignmentSeedSalt } from "@/lib/foundation/team-general-managers";
 import { AI_PICKS_RUN_CONFIRM_TOKEN } from "@/lib/ai/ai-picks-run-contract";
 
 const OUTPUT_DIR = path.join(process.env.OLY_EXPORT_DIR ?? "outputs", "fresh-pick-audit-10x");
@@ -766,10 +767,14 @@ async function main() {
   for (let run = 1; run <= args.runs; run += 1) {
     const started = Date.now();
     const draftSeed = `fresh-pick-audit-10x:run-${run}`;
+    // Pro Lauf andere GMs zuweisen (fit-nah aus dem Top-Band), damit Audits zeigen,
+    // wie sich Picks unter Star-Picker- vs. Depth-Spammer-GMs verschieben.
+    setGmAssignmentSeedSalt(`gm-run-${run}`);
     const save = persistence.createFreshSeasonOneSave({
       saveId: `fresh-pick-audit-run-${run}-${Date.now()}`,
       name: `fresh-pick-audit-run-${run}-${new Date().toISOString()}`,
     });
+    setGmAssignmentSeedSalt(null);
     const preview = await runAiPicksExecutePreview({
       source: "sqlite",
       saveId: save.saveId,

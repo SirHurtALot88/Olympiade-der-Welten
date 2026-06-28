@@ -4,6 +4,7 @@ import Link from "next/link";
 import { memo, useCallback, useEffect, useMemo, useRef, useState } from "react";
 
 import { calculateLocalLegacyLineupPreviewFromContext } from "@/lib/lineups/legacy-lineup-preview-from-context";
+import LegacyLineupFocusV2Board from "@/app/foundation/legacy-lineup-lab-v2/LegacyLineupFocusV2Board";
 import DraftWorkspace from "@/app/foundation/legacy-lineup-lab/DraftWorkspace";
 import FormBoardPanel from "@/app/foundation/legacy-lineup-lab/FormBoardPanel";
 import LineupExpertPanels from "@/app/foundation/legacy-lineup-lab/LineupExpertPanels";
@@ -13,7 +14,10 @@ import { resolveFirstOpenFormPickCell } from "@/lib/foundation/resolve-first-ope
 
 import DisciplineIcon from "@/app/foundation/DisciplineIcon";
 import OptimizedMediaImage from "@/app/foundation/OptimizedMediaImage";
+import FoundationPlayerPortraitCard from "@/components/foundation/player-portrait-card/FoundationPlayerPortraitCard";
 import { VeloImpactStrip, VeloStatOrbitRow } from "@/components/foundation/velo-ui";
+import { createEmptyLeaguePlayerHeatPools } from "@/lib/foundation/player-league-heat";
+import { isFoundationTeamManagementLocked } from "@/lib/foundation/foundation-admin-dev-flags";
 import { getGameTermTooltip } from "@/components/ui/GameTerm";
 import { TooltipHeading } from "@/components/ui/TooltipHeading";
 import { getPlayerPortraitBrowserUrl, getTeamLogoBrowserUrl } from "@/lib/data/mediaAssets";
@@ -23,6 +27,7 @@ import {
   readFoundationRoomContextFromLocation,
   type FoundationRoomContext,
 } from "@/lib/room/foundation-room-context-client";
+import { getFatiguePerformanceMultiplier, getFatiguePerformancePenaltyPercent, getInjuryRiskPercent } from "@/lib/fatigue/fatigue-calibration";
 import {
   buildLegacyLineupEntriesFromSelections,
   buildLegacyLineupLabPlayerOptions,
@@ -304,6 +309,9 @@ type AiBatchPreviewEntry = {
 
 type LegacyLineupLabClientProps = {
   embedded?: boolean;
+  uiVariant?: "classic" | "focusV2";
+  onSwitchToClassic?: () => void;
+  onSwitchToFocusV2?: () => void;
   initialSource?: "sqlite" | "prisma";
   defaultSaveId?: string;
   defaultSaveName?: string;
@@ -884,7 +892,7 @@ function LegacyLineupSlotMicroSteps({
   );
 }
 
-function getDragFitTierClass(fitTier: LegacyLineupDragFitTier | null) {
+function getDragFitTierClass(fitTier: LegacyLineupDragFitTier | string | null) {
   switch (fitTier) {
     case "best":
       return "is-fit-best";
@@ -1137,28 +1145,41 @@ function formatTraitList(values: string[] | null | undefined) {
   return values.join(", ");
 }
 
-function getExhaustionMultiplier(count: number | null | undefined) {
-  if (count == null || count <= 0) {
-    return 1;
-  }
-  if (count >= 4) return 0.8;
-  if (count >= 3) return 0.85;
-  if (count >= 2) return 0.9;
-  return 0.95;
+const FATIGUE_UI_MEDIUM = 40;
+const FATIGUE_UI_HIGH = 65;
+
+function isElevatedFatigue(fatigue: number | null | undefined) {
+  return (fatigue ?? 0) >= FATIGUE_UI_MEDIUM;
 }
 
-function formatExhaustionPoints(score: number | null | undefined, count: number | null | undefined) {
-  if (count == null) {
+function formatFatigueImpactDetail(fatigue: number | null | undefined) {
+  const value = Math.round(fatigue ?? 0);
+  if (value <= 0) {
+    return "Fatigue 0";
+  }
+  const penalty = getFatiguePerformancePenaltyPercent(fatigue);
+  const injury = getInjuryRiskPercent(fatigue);
+  return `Fatigue ${value} · −${formatDecimalScore(penalty, 1)}% Leistung · ${formatDecimalScore(injury, 1)}% Verletzungsrisiko`;
+}
+
+function getExhaustionMultiplier(fatigue: number | null | undefined) {
+  return getFatiguePerformanceMultiplier(fatigue);
+}
+
+function formatExhaustionPoints(score: number | null | undefined, fatigue: number | null | undefined) {
+  const value = Math.round(fatigue ?? 0);
+  if (fatigue == null) {
     return "Erschöpfung —";
   }
-  if (count <= 0) {
+  if (value <= 0) {
     return "Erschöpfung 0";
   }
+  const penaltyPercent = getFatiguePerformancePenaltyPercent(fatigue);
   if (score == null || !Number.isFinite(score)) {
-    return "Erschöpfung —";
+    return `Erschöpfung F${value} · −${formatDecimalScore(penaltyPercent, 1)}%`;
   }
-  const penalty = Number((score - score * getExhaustionMultiplier(count)).toFixed(2));
-  return `Erschöpfung -${formatScore(penalty)}`;
+  const penalty = Number((score * penaltyPercent / 100).toFixed(2));
+  return `Erschöpfung F${value} · −${formatScore(penalty)} (−${formatDecimalScore(penaltyPercent, 1)}%)`;
 }
 
 function formatFatigueHint(score: number | null | undefined, count: number | null | undefined) {
@@ -1361,10 +1382,10 @@ function getFatigueHeatClass(value: number | null | undefined) {
   if (value == null) {
     return "";
   }
-  if (value >= 3) {
+  if (value >= FATIGUE_UI_HIGH) {
     return "is-fatigue-high";
   }
-  if (value >= 1) {
+  if (value >= FATIGUE_UI_MEDIUM) {
     return "is-fatigue-mid";
   }
   return "is-fatigue-low";
@@ -1805,6 +1826,7 @@ function buildLineupMeta(context: LegacyLineupLoadedContext | null, selections: 
 }
 
 export default function LegacyLineupLabClient(props: LegacyLineupLabClientProps) {
+  const uiVariant = props.uiVariant ?? "classic";
   const [params, setParams] = useState(() => defaultParamsFromProps(props));
   const [source, setSource] = useState<"sqlite" | "prisma">(props.initialSource ?? "sqlite");
   const [options, setOptions] = useState<LabOptions>({
@@ -1846,7 +1868,7 @@ export default function LegacyLineupLabClient(props: LegacyLineupLabClientProps)
   const [teamdeckFilterMode, setTeamdeckFilterMode] = useState<TeamdeckFilterMode>("all");
   const [teamdeckSortMode, setTeamdeckSortMode] = useState<TeamdeckSortMode>("fit");
   const [activeSlotKey, setActiveSlotKey] = useState<string | null>(null);
-  const [showOnlyTopSlotCandidates, setShowOnlyTopSlotCandidates] = useState(true);
+  const [showOnlyTopSlotCandidates, setShowOnlyTopSlotCandidates] = useState(false);
   const [recentlyAssignedSlotKey, setRecentlyAssignedSlotKey] = useState<string | null>(null);
   const [lineupUndoSnapshot, setLineupUndoSnapshot] = useState<LegacyLineupUndoSnapshot | null>(null);
   const [hoveredCandidate, setHoveredCandidate] = useState<LegacyLineupHoveredCandidate | null>(null);
@@ -2418,12 +2440,7 @@ export default function LegacyLineupLabClient(props: LegacyLineupLabClientProps)
     () => options.teams.find((team) => team.id === params.teamId) ?? null,
     [options.teams, params.teamId],
   );
-  const isTeamManagementLocked = Boolean(
-    params.teamId &&
-      props.manageableTeamIds &&
-      props.manageableTeamIds.length > 0 &&
-      !props.manageableTeamIds.includes(params.teamId),
-  );
+  const isTeamManagementLocked = isFoundationTeamManagementLocked(params.teamId, props.manageableTeamIds);
   const isReadOnly = sourceReadOnly || isTeamManagementLocked;
   const selectedMatchdayOption = useMemo(
     () => options.matchdays.find((matchday) => matchday.id === params.matchdayId) ?? null,
@@ -3189,9 +3206,9 @@ export default function LegacyLineupLabClient(props: LegacyLineupLabClientProps)
           groupKey = "blocked";
           detail = formatLegacyLineupDragBlockReason(activeSlotCandidate.blockReason) ?? "Gerade nicht legal einsetzbar.";
           shortReason = "blockiert";
-        } else if ((player.fatigueCount ?? 0) >= 3) {
+        } else if (isElevatedFatigue(player.fatigueCount)) {
           groupKey = "fatigue";
-          detail = `Fatigue ${Math.round(player.fatigueCount ?? 0)} macht den Pick spuerbar riskanter.`;
+          detail = `${formatFatigueImpactDetail(player.fatigueCount)} macht den Pick spuerbar riskanter.`;
           shortReason = `F ${Math.round(player.fatigueCount ?? 0)}`;
         } else if (
           fitTier === "poor" ||
@@ -4048,11 +4065,11 @@ export default function LegacyLineupLabClient(props: LegacyLineupLabClientProps)
             detail: "Dieser Spieler ist schon in einem anderen Slot gesetzt.",
           });
         }
-        if ((selectedOption?.fatigueCount ?? 0) >= 3) {
+        if (isElevatedFatigue(selectedOption?.fatigueCount)) {
           issues.push({
             tone: "warning",
             label: "Fatigue-Risiko",
-            detail: `Fatigue ${Math.round(selectedOption?.fatigueCount ?? 0)}: eher rotieren oder Team-Einsatz senken.`,
+            detail: `${formatFatigueImpactDetail(selectedOption?.fatigueCount)}: eher rotieren oder Team-Einsatz senken.`,
           });
         }
         const firstWarning = slotPreview?.projected.warnings[0];
@@ -4075,6 +4092,41 @@ export default function LegacyLineupLabClient(props: LegacyLineupLabClientProps)
       }),
     );
   }, [activeSlot?.key, duplicateSelectionIds, moraleDecisionsByActivePlayerId, rosterCardByActivePlayerId, selections, slotPreviewByKey, slots]);
+  const slotRoleAttributesByKey = useMemo(() => {
+    return new Map(
+      slots.map((slot) => {
+        const role = slotRoleByKey.get(slot.key) ?? null;
+        const selectedRosterCard = rosterCardByActivePlayerId.get(selections[slot.key] ?? "") ?? null;
+        const roleAttributes = role?.keyAttributes
+          ? role.keyAttributes.slice(0, 3).map((attribute) => ({
+              key: attribute.attribute,
+              shortLabel: attributeShortLabels[attribute.attribute] ?? attribute.attribute,
+              ratingLabel: selectedRosterCard
+                ? resolveAttributeGrade(
+                    selectedRosterCard.attributeRatings,
+                    attribute.attribute,
+                    selectedRosterCard.attributeStats?.[attribute.attribute] ?? null,
+                  )
+                : null,
+              emphasis: attribute.emphasis,
+            }))
+          : [];
+        return [slot.key, roleAttributes] as const;
+      }),
+    );
+  }, [rosterCardByActivePlayerId, selections, slotRoleByKey, slots]);
+  const disciplineColorClassBySide = useMemo(() => {
+    const buildSideClass = (disciplineSide: "d1" | "d2") => {
+      const discipline =
+        disciplineSide === "d1" ? context?.matchdayContract?.discipline1 ?? null : context?.matchdayContract?.discipline2 ?? null;
+      const disciplineColor = getFormCardColorForCategory(discipline?.category ?? null);
+      return disciplineColor ? `is-discipline-${disciplineColor}` : "is-discipline-neutral";
+    };
+    return {
+      d1: buildSideClass("d1"),
+      d2: buildSideClass("d2"),
+    };
+  }, [context?.matchdayContract?.discipline1?.category, context?.matchdayContract?.discipline2?.category]);
   const disciplineIssuesBySide = useMemo(() => {
     const next: Record<
       "d1" | "d2",
@@ -4095,7 +4147,7 @@ export default function LegacyLineupLabClient(props: LegacyLineupLabClientProps)
       const duplicateCount = sideSlots.filter((slot) => duplicateSelectionIds.has(selections[slot.key] ?? "")).length;
       const fatigueRiskCount = sideSlots.filter((slot) => {
         const selectedOption = getSelectedOptionMeta(selections[slot.key]);
-        return (selectedOption?.fatigueCount ?? 0) >= 3;
+        return isElevatedFatigue(selectedOption?.fatigueCount);
       }).length;
 
       if (selectedPlayers < requiredPlayers) {
@@ -4281,8 +4333,8 @@ export default function LegacyLineupLabClient(props: LegacyLineupLabClientProps)
           : "kein Captain-Fokus";
     const riskLabel = blockReason
       ? "blockiert"
-      : (option.fatigueCount ?? 0) >= 3
-        ? `Fatigue ${Math.round(option.fatigueCount ?? 0)}`
+      : isElevatedFatigue(option.fatigueCount)
+        ? formatFatigueImpactDetail(option.fatigueCount)
         : projected.warnings[0]
           ? "Hinweis"
           : "niedrig";
@@ -5491,6 +5543,20 @@ export default function LegacyLineupLabClient(props: LegacyLineupLabClientProps)
         return;
       }
 
+      if (event.code === "ArrowUp") {
+        event.preventDefault();
+        event.stopImmediatePropagation();
+        focusSlotByOffset(-1);
+        return;
+      }
+
+      if (event.code === "ArrowDown") {
+        event.preventDefault();
+        event.stopImmediatePropagation();
+        focusSlotByOffset(1);
+        return;
+      }
+
       if (event.code === "Tab") {
         event.preventDefault();
         event.stopImmediatePropagation();
@@ -5512,10 +5578,18 @@ export default function LegacyLineupLabClient(props: LegacyLineupLabClientProps)
         return;
       }
 
-      if (event.code === "Enter" && lineupReadyToSave && !isReadOnly) {
+      if (event.code === "Enter" && !isReadOnly) {
         event.preventDefault();
         event.stopImmediatePropagation();
-        void handleSaveDraft();
+        const topCandidate = activeSlotSpotlightCandidates[0]?.player.activePlayerId ?? null;
+        if (activeSlot && !selections[activeSlot.key] && topCandidate) {
+          updateSelection(activeSlot.key, topCandidate, { advanceFocusToNextOpenSlot: true });
+          return;
+        }
+        if (lineupReadyToSave) {
+          void handleSaveDraft();
+        }
+        return;
       }
     };
 
@@ -5742,6 +5816,95 @@ export default function LegacyLineupLabClient(props: LegacyLineupLabClientProps)
         [key]: value || null,
       },
     }));
+  }
+
+  function updateFormCardSelection(
+    disciplineSide: "d1" | "d2",
+    slot: "primary" | "secondary",
+    cardId: string | null,
+  ) {
+    if (isReadOnly || !context) {
+      return;
+    }
+
+    const discipline =
+      disciplineSide === "d1"
+        ? context.matchdayContract?.discipline1 ?? null
+        : context.matchdayContract?.discipline2 ?? null;
+    const sideModifiers = modifiers[disciplineSide];
+    const nextPrimary = slot === "primary" ? cardId : sideModifiers.primaryFormCardId;
+    const nextSecondary = slot === "secondary" ? cardId : sideModifiers.secondaryFormCardId;
+
+    setPreview(null);
+    setMatchdayScorePreview(null);
+    setVisibleScoreboardSide(null);
+    setDraft(null);
+    setModifiers((current) => ({
+      ...current,
+      [disciplineSide]: {
+        ...current[disciplineSide],
+        primaryFormCardId: nextPrimary,
+        secondaryFormCardId: nextSecondary,
+      },
+    }));
+    queueFormCardPlanSave({
+      matchdayId: params.matchdayId,
+      disciplineSide,
+      disciplineId: discipline?.disciplineId ?? null,
+      primaryFormCardId: nextPrimary ?? null,
+      secondaryFormCardId: nextSecondary ?? null,
+    });
+  }
+
+  function renderInlineFormCardSelectors(
+    disciplineSide: "d1" | "d2",
+    disciplineColor: LegacyFormCardOption["color"] | null,
+  ) {
+    const pendingKey = `${params.matchdayId}:${disciplineSide}`;
+    const isFormPending = formCardPlanPendingKey === pendingKey;
+
+    return (
+      <div className="legacy-lineup-draft-tactics-form">
+        <label className="legacy-lineup-form-select-field">
+          <span>F1</span>
+          <select
+            className="input"
+            value={modifiers[disciplineSide].primaryFormCardId ?? ""}
+            onChange={(event) =>
+              updateFormCardSelection(disciplineSide, "primary", event.target.value || null)
+            }
+            disabled={isReadOnly || isFormPending || missingSeasonFormCards}
+            aria-label={`${disciplineSide.toUpperCase()} Formkarte F1`}
+          >
+            <option value="">Keine Karte</option>
+            {getFormCardOptionsForSide(disciplineSide, "primary").map((card) => (
+              <option key={card.id} value={card.id}>
+                {formatFormCardOptionLabel(card, disciplineColor)}
+              </option>
+            ))}
+          </select>
+        </label>
+        <label className="legacy-lineup-form-select-field">
+          <span>F2</span>
+          <select
+            className="input"
+            value={modifiers[disciplineSide].secondaryFormCardId ?? ""}
+            onChange={(event) =>
+              updateFormCardSelection(disciplineSide, "secondary", event.target.value || null)
+            }
+            disabled={isReadOnly || isFormPending || missingSeasonFormCards}
+            aria-label={`${disciplineSide.toUpperCase()} Formkarte F2`}
+          >
+            <option value="">Keine Karte</option>
+            {getFormCardOptionsForSide(disciplineSide, "secondary").map((card) => (
+              <option key={card.id} value={card.id}>
+                {formatFormCardOptionLabel(card, disciplineColor)}
+              </option>
+            ))}
+          </select>
+        </label>
+      </div>
+    );
   }
 
   function handleAdoptAiPreview() {
@@ -6435,6 +6598,46 @@ export default function LegacyLineupLabClient(props: LegacyLineupLabClientProps)
             {draft ? "gespeichert" : "offen"}
           </span>
         </div>
+        <div className="legacy-lineup-team-boost-panel is-split" data-testid="legacy-lineup-intensity-panel">
+          {(["d1", "d2"] as const).map((disciplineSide) => {
+            const discipline =
+              disciplineSide === "d1" ? context?.matchdayContract?.discipline1 ?? null : context?.matchdayContract?.discipline2 ?? null;
+            const intensity = getDisciplineIntensity(disciplineSide);
+            const intensityConfig = getMatchdayIntensityConfig(intensity);
+            return (
+              <div key={`discipline-intensity-${disciplineSide}`} className={`legacy-lineup-discipline-intensity is-${intensity}`}>
+                <div>
+                  <span className="legacy-lineup-team-boost-kicker">{disciplineSide.toUpperCase()} Einsatz</span>
+                  <strong>
+                    {discipline?.displayName ?? "Diszi"} ·{" "}
+                    {intensity === "conserve" ? "Schonen" : intensity === "push" ? "Push" : "Normal"}
+                  </strong>
+                  <small>
+                    Score {formatSignedCompactInteger(intensityConfig.scoreModifier)} · Fatigue +{formatScore(intensityConfig.fatigueBase)}
+                  </small>
+                </div>
+                <div className="legacy-lineup-team-boost-switch" role="group" aria-label={`${disciplineSide.toUpperCase()} Einsatz`} title={getGameTermTooltip("Boost") ?? undefined}>
+                  {([
+                    { value: "conserve" as const, label: "Schonen" },
+                    { value: "normal" as const, label: "Normal" },
+                    { value: "push" as const, label: "Push" },
+                  ]).map((option) => (
+                    <button
+                      key={`${disciplineSide}-${option.value}`}
+                      className={`secondary-button inline-button${intensity === option.value ? " is-selected" : ""}`}
+                      type="button"
+                      disabled={isReadOnly || isBusy}
+                      onClick={() => updateDisciplineIntensityStage(disciplineSide, option.value)}
+                      title={`${option.label}: ${getGameTermTooltip("Einsatzstufe") ?? ""}`}
+                    >
+                      {option.label}
+                    </button>
+                  ))}
+                </div>
+              </div>
+            );
+          })}
+        </div>
         {SHOW_CLASSIC_LINEUP_WORKSPACE ? (
         <>
         <section id="lineup-command-center" className={`legacy-lineup-command-center is-${lineupFlowSummary.nextStep.tone}`}>
@@ -6702,45 +6905,6 @@ export default function LegacyLineupLabClient(props: LegacyLineupLabClientProps)
             </button>
           </label>
         </div>
-        <div className="legacy-lineup-team-boost-panel is-split">
-          {(["d1", "d2"] as const).map((disciplineSide) => {
-            const discipline =
-              disciplineSide === "d1" ? context?.matchdayContract?.discipline1 ?? null : context?.matchdayContract?.discipline2 ?? null;
-            const intensity = getDisciplineIntensity(disciplineSide);
-            const intensityConfig = getMatchdayIntensityConfig(intensity);
-            return (
-              <div key={`discipline-intensity-${disciplineSide}`} className={`legacy-lineup-discipline-intensity is-${intensity}`}>
-                <div>
-                  <span className="legacy-lineup-team-boost-kicker">{disciplineSide.toUpperCase()} Einsatz</span>
-                  <strong>
-                    {discipline?.displayName ?? "Diszi"} ·{" "}
-                    {intensity === "conserve" ? "Schonen" : intensity === "push" ? "Push" : "Normal"}
-                  </strong>
-                  <small>
-                    Score {formatSignedCompactInteger(intensityConfig.scoreModifier)} · Fatigue +{formatScore(intensityConfig.fatigueBase)}
-                  </small>
-                </div>
-                <div className="legacy-lineup-team-boost-switch" role="group" aria-label={`${disciplineSide.toUpperCase()} Einsatz`} title={getGameTermTooltip("Boost") ?? undefined}>
-                  {([
-                    { value: "conserve" as const, label: "Schonen" },
-                    { value: "normal" as const, label: "Normal" },
-                    { value: "push" as const, label: "Push" },
-                  ]).map((option) => (
-                    <button
-                      key={`${disciplineSide}-${option.value}`}
-                      className={`secondary-button inline-button${intensity === option.value ? " is-selected" : ""}`}
-                      type="button"
-                      onClick={() => updateDisciplineIntensityStage(disciplineSide, option.value)}
-                      title={`${option.label}: ${getGameTermTooltip("Einsatzstufe") ?? ""}`}
-                    >
-                      {option.label}
-                    </button>
-                  ))}
-                </div>
-              </div>
-            );
-          })}
-        </div>
         <div className="legacy-lineup-team-tactics-panel">
           <div className="legacy-lineup-team-tactics-head">
             <div>
@@ -6764,18 +6928,9 @@ export default function LegacyLineupLabClient(props: LegacyLineupLabClientProps)
                     <strong>{disciplineSide.toUpperCase()} · {discipline?.displayName ?? "—"}</strong>
                     <span>{disciplineColor ? formatFormCardColorLabel(disciplineColor) : "—"}</span>
                   </div>
-                  <div className="legacy-lineup-team-tactics-form-readonly">
-                    <span>Diszi-Form</span>
-                    {renderSelectedFormCardChip(modifiers[disciplineSide].primaryFormCardId, disciplineColor) ?? (
-                      <em className="legacy-lineup-draft-tactics-form-empty">—</em>
-                    )}
-                    <span>Bonus</span>
-                    {renderSelectedFormCardChip(modifiers[disciplineSide].secondaryFormCardId, disciplineColor) ?? (
-                      <em className="legacy-lineup-draft-tactics-form-empty">—</em>
-                    )}
-                    <button className="secondary-button" type="button" onClick={() => setDraftBoardView("formBoard")}>
-                      Im Formplan bearbeiten
-                    </button>
+                  <div className="legacy-lineup-team-tactics-form">
+                    <span>Form</span>
+                    {renderInlineFormCardSelectors(disciplineSide, disciplineColor)}
                   </div>
                   <label className="legacy-lineup-lab-slot-row">
                     <span>Team-Power</span>
@@ -6924,6 +7079,7 @@ export default function LegacyLineupLabClient(props: LegacyLineupLabClientProps)
 
       {SHOW_DRAFT_LINEUP_WORKSPACE ? (
         <section className="legacy-lineup-draft-board" data-testid="legacy-lineup-draft-board">
+          {uiVariant !== "focusV2" ? (
 	          <div className="legacy-lineup-draft-command">
 	            <div className="legacy-lineup-draft-command-main">
 	              <span>Matchday Prep</span>
@@ -6992,6 +7148,7 @@ export default function LegacyLineupLabClient(props: LegacyLineupLabClientProps)
               </button>
             </div>
           </div>
+          ) : null}
 
           {!props.shellControlledDraftBoardView ? (
           <div className="legacy-lineup-draft-view-tabs" role="tablist" aria-label="Einsatzlisten-Ansicht">
@@ -7021,7 +7178,7 @@ export default function LegacyLineupLabClient(props: LegacyLineupLabClientProps)
           </div>
           ) : null}
 
-          {draftBoardView === "lineup" ? (
+          {draftBoardView === "lineup" && uiVariant !== "focusV2" ? (
             <DraftWorkspace>
             <div className="legacy-lineup-draft-decision-strip" aria-label="Aktuelle Lineup-Entscheidung">
               <div className="legacy-lineup-draft-decision-main">
@@ -7180,7 +7337,7 @@ export default function LegacyLineupLabClient(props: LegacyLineupLabClientProps)
             />
           ) : null}
 
-          {draftBoardView === "lineup" && disciplineAreaRoadmap.length > 0 ? (
+          {draftBoardView === "lineup" && uiVariant !== "focusV2" && disciplineAreaRoadmap.length > 0 ? (
             <div className="legacy-lineup-draft-roadmap" aria-label="Disziplin-Roadmap nach Bereich">
               {disciplineAreaRoadmap.map((group) => (
                 <section key={`roadmap-${group.key}`} className={`legacy-lineup-draft-roadmap-card is-${group.color}`}>
@@ -7201,7 +7358,7 @@ export default function LegacyLineupLabClient(props: LegacyLineupLabClientProps)
             </div>
           ) : null}
 
-          {draftBoardView === "lineup" ? (
+          {draftBoardView === "lineup" && uiVariant !== "focusV2" ? (
             <div className="legacy-lineup-draft-controls">
               <label>
                 <span>Spieler</span>
@@ -7244,47 +7401,19 @@ export default function LegacyLineupLabClient(props: LegacyLineupLabClientProps)
                   <button
                     key={option.value}
                     className={getDisciplineIntensity("d1") === option.value && getDisciplineIntensity("d2") === option.value ? "is-selected" : ""}
-                    type="button"
-                    onClick={() => updateTeamIntensityStage(option.value)}
+                      type="button"
+                      disabled={isReadOnly || isBusy}
+                      onClick={() => updateTeamIntensityStage(option.value)}
                     title="Setzt D1 und D2 gleichzeitig. Einzelne Diszi unten im Board feinsteuern."
                   >
                     {option.label}
                   </button>
                 ))}
               </div>
-              <VeloImpactStrip
-                className="legacy-lineup-draft-intensity-preview"
-                items={[
-                  {
-                    key: "base",
-                    label: "Base",
-                    value: formatNullableScore(draftIntensityPreview.baseScore),
-                    tone: "neutral",
-                  },
-                  {
-                    key: "tactic",
-                    label: "Taktik",
-                    value: `D1 ${formatIntensityStageLabel(getDisciplineIntensity("d1"))} · D2 ${formatIntensityStageLabel(getDisciplineIntensity("d2"))}`,
-                    tone: "warning",
-                  },
-                  {
-                    key: "final",
-                    label: "Final",
-                    value: formatNullableScore(draftIntensityPreview.finalScore),
-                    tone: "positive",
-                  },
-                  {
-                    key: "fatigue",
-                    label: "Fatigue",
-                    value: formatDecimalScore(draftIntensityPreview.fatigue, 1),
-                    tone: draftIntensityPreview.fatigue >= 40 ? "negative" : "neutral",
-                  },
-                ]}
-              />
             </div>
           ) : null}
 
-          {draftBoardView === "lineup" ? (
+          {draftBoardView === "lineup" && uiVariant !== "focusV2" ? (
             <div className="legacy-lineup-draft-tactics">
               {(["d1", "d2"] as const).map((disciplineSide) => {
                 const discipline =
@@ -7296,16 +7425,7 @@ export default function LegacyLineupLabClient(props: LegacyLineupLabClientProps)
                       <span>{disciplineSide.toUpperCase()}</span>
                       <strong>{discipline?.displayName ?? "—"}</strong>
                     </div>
-                    <div className="legacy-lineup-draft-tactics-form-readonly">
-                      <span>Form</span>
-                      {renderSelectedFormCardChip(modifiers[disciplineSide].primaryFormCardId, disciplineColor) ?? (
-                        <em className="legacy-lineup-draft-tactics-form-empty">—</em>
-                      )}
-                      {renderSelectedFormCardChip(modifiers[disciplineSide].secondaryFormCardId, disciplineColor)}
-                      <button className="secondary-button" type="button" onClick={() => setDraftBoardView("formBoard")}>
-                        Im Formplan bearbeiten
-                      </button>
-                    </div>
+                    {renderInlineFormCardSelectors(disciplineSide, disciplineColor)}
                     <select
                       className="input"
                       value={modifiers[disciplineSide].teamPowerId ?? ""}
@@ -7350,7 +7470,150 @@ export default function LegacyLineupLabClient(props: LegacyLineupLabClientProps)
             </section>
           ) : null}
 
-          {draftBoardView === "lineup" ? (
+          {draftBoardView === "lineup" && uiVariant === "focusV2" ? (
+            <LegacyLineupFocusV2Board
+              context={context}
+              slots={slots}
+              selections={selections}
+              activeSlotKey={activeSlot?.key ?? null}
+              onActiveSlotChange={(slotKey) => {
+                setActiveSlotKey(slotKey);
+                const slot = slots.find((entry) => entry.key === slotKey);
+                if (slot) {
+                  setFocusedDisciplineSide(slot.disciplineSide);
+                }
+              }}
+              rosterCardByActivePlayerId={rosterCardByActivePlayerId}
+              slotCandidateSummaryByKey={slotCandidateSummaryByKey}
+              slotPreviewByKey={slotPreviewByKey}
+              slotRoleByKey={slotRoleByKey}
+              slotIssuesByKey={slotIssuesByKey}
+              slotRoleAttributesByKey={slotRoleAttributesByKey}
+              slotDragPreviewByKey={slotDragPreviewByKey}
+              draggedActivePlayerId={draggedActivePlayerId}
+              onDragStart={handlePlayerCardDragStart}
+              onDragEnd={() => setDraggedActivePlayerId(null)}
+              onDropOnSlot={handleDropOnSlot}
+              getDragFitTierClass={getDragFitTierClass}
+              getTierStyleClass={getTierStyleClass}
+              candidateGroups={teamdeckCandidateGroups}
+              captains={captains}
+              captainSelectEntriesBySide={{
+                d1: getCaptainSelectEntriesForSide("d1"),
+                d2: getCaptainSelectEntriesForSide("d2"),
+              }}
+              captainInfoBySide={captainCandidateInfoBySide}
+              captainDraftRemaining={captainDraftRemaining}
+              captainSeasonUsedWithDraft={captainSeasonUsedWithDraft}
+              captainSeasonLimit={captainSeasonLimit}
+              onUpdateCaptain={updateCaptain}
+              lineupMeta={lineupMeta}
+              d1Rank={d1Rank}
+              d2Rank={d2Rank}
+              getSelectedOptionMeta={getSelectedOptionMeta}
+              onAssignPlayer={(slotKey, activePlayerId) => {
+                updateSelection(slotKey, activePlayerId, { advanceFocusToNextOpenSlot: true });
+                const slot = slots.find((entry) => entry.key === slotKey);
+                if (slot) {
+                  setFocusedDisciplineSide(slot.disciplineSide);
+                }
+              }}
+              onClearSlot={(slotKey) => updateSelection(slotKey, "")}
+              onOpenPlayer={(playerId, activePlayerId) => openPlayerDetails(playerId, activePlayerId)}
+              isReadOnly={isReadOnly}
+              isBusy={isBusy}
+              matchdayHeaderSummary={matchdayHeaderSummary}
+              matchdayPreviewCards={matchdayPreviewCards}
+              lineupFlowSummary={lineupFlowSummary}
+              lineupSaveCta={lineupSaveCta}
+              lineupReadyToSave={lineupReadyToSave}
+              lineupMiniAuditBlockers={lineupMiniAudit.blockingItems.length}
+              captainBudgetExceeded={captainBudgetExceeded}
+              missingSeasonFormCards={missingSeasonFormCards}
+              formatProjectedMetricWindow={formatProjectedMetricWindow}
+              onFocusNextOpenSlot={focusNextOpenSlot}
+              onAutoFillOpenSlots={handleAutoFillOpenSlots}
+              onSaveDraft={() => void handleSaveDraft()}
+              getDisciplineIntensity={getDisciplineIntensity}
+              onUpdateDisciplineIntensity={updateDisciplineIntensityStage}
+              playerFilter={playerFilter}
+              onPlayerFilterChange={setPlayerFilter}
+              disciplineColorClassBySide={disciplineColorClassBySide}
+              controlsSlot={
+                <>
+                  <label>
+                    <span>Spieltag</span>
+                    <select className={`input legacy-lineup-select${selectedMatchdayIsReady ? " is-complete" : ""}`} value={params.matchdayId} onChange={(event) => void loadContext({ matchdayId: event.target.value }, source)}>
+                      {options.matchdays.map((matchday) => (
+                        <option key={matchday.id} value={matchday.id}>
+                          {formatMatchdayOptionLabel(matchday)}
+                        </option>
+                      ))}
+                    </select>
+                  </label>
+                  <label>
+                    <span>Team</span>
+                    <select
+                      className={`input legacy-lineup-select${selectedTeamIsReady ? " is-complete" : ""}`}
+                      value={params.teamId}
+                      onChange={(event) => {
+                        const nextTeamId = event.target.value;
+                        props.onTeamChange?.(nextTeamId);
+                        void loadContext({ teamId: nextTeamId }, source);
+                      }}
+                    >
+                      {filteredTeamOptions.map((team) => (
+                        <option key={team.id} value={team.id}>
+                          {formatTeamOptionLabel(team)}
+                        </option>
+                      ))}
+                    </select>
+                  </label>
+                </>
+              }
+              tacticsSlot={
+                <>
+                  {(["d1", "d2"] as const).map((disciplineSide) => {
+                    const discipline =
+                      disciplineSide === "d1" ? context?.matchdayContract?.discipline1 ?? null : context?.matchdayContract?.discipline2 ?? null;
+                    const disciplineColor = getFormCardColorForCategory(discipline?.category ?? null);
+                    return (
+                      <section key={`v2-draft-tactics-${disciplineSide}`}>
+                        <div>
+                          <span>{disciplineSide.toUpperCase()}</span>
+                          <strong>{discipline?.displayName ?? "—"}</strong>
+                        </div>
+                        {renderInlineFormCardSelectors(disciplineSide, disciplineColor)}
+                        <select
+                          className="input"
+                          value={modifiers[disciplineSide].teamPowerId ?? ""}
+                          onChange={(event) => updateModifier(disciplineSide, "teamPowerId", event.target.value)}
+                          disabled={isReadOnly || context?.teamPowerSource?.selectionStatus === "missing_source"}
+                          aria-label={`${disciplineSide.toUpperCase()} Team-Power`}
+                          title={getTeamPowerSelectTitle(disciplineSide)}
+                        >
+                          <option value="">{getTeamPowerEmptyOptionLabel(disciplineSide)}</option>
+                          {getTeamPowerOptionsForSide(disciplineSide).map((power) => (
+                            <option key={power.id} value={power.id}>
+                              {formatTeamPowerOptionLabel(
+                                power,
+                                discipline?.category ?? null,
+                                getTeamPowerConditionalInfo(power, discipline?.disciplineId).active,
+                                discipline?.disciplineId ?? null,
+                                context?.disciplineWeights ?? null,
+                              )}
+                            </option>
+                          ))}
+                        </select>
+                      </section>
+                    );
+                  })}
+                </>
+              }
+            />
+          ) : null}
+
+          {draftBoardView === "lineup" && uiVariant !== "focusV2" ? (
             <div className="legacy-lineup-draft-layout">
             <section className="legacy-lineup-draft-slots" aria-label="D1 / D2 Lineup-Zonen">
               {(["d1", "d2"] as const).map((disciplineSide) => {
@@ -7572,61 +7835,87 @@ export default function LegacyLineupLabClient(props: LegacyLineupLabClientProps)
                               ) : null}
                             </div>
                             {selectedRosterCard ? (
-                              <div className="legacy-lineup-draft-slot-player">
-                                {selectedRosterCard.portraitUrl ? (
-                                  <OptimizedMediaImage className="legacy-lineup-draft-slot-portrait" src={selectedRosterCard.portraitUrl} alt={selectedRosterCard.name} width={48} height={48} />
-                                ) : (
-                                  <span className="legacy-lineup-draft-slot-portrait">—</span>
-                                )}
-                                <div>
-                                  <strong>
-                                    {selectedRosterCard ? (
-                                      <button
-                                        type="button"
-                                        className="table-link-button legacy-lineup-player-link"
-                                        onClick={(event) => {
-                                          event.stopPropagation();
-                                          openPlayerDetails(selectedRosterCard.id, selectedRosterCard.activePlayerId);
-                                        }}
-                                      >
-                                        {selectedRosterCard.name}
-                                      </button>
-                                    ) : (
-                                      "Spieler wählen"
-                                    )}
-                                  </strong>
-                                  <span>
-                                    Base {formatNullableScore(selectedScore)} · Slot {slotPreview?.projected.totalProjected != null ? formatScore(slotPreview.projected.totalProjected) : "—"}
-                                  </span>
-                                  <small>
-                                    Fatigue -{formatDecimalScore(slotPreview?.projected.fatigueModifier ?? 0, 1)} · Extra +{formatScore(slotPreview?.projected.additionalFatigue ?? 0)}
-                                  </small>
-                                </div>
-                              </div>
-                            ) : (
-                              <div className="legacy-lineup-draft-slot-empty">
-                                <strong>{isActiveSlot ? "Hier ablegen" : "Freier Slot"}</strong>
-                                {slotCandidateSummary?.topCandidates[0] ? (
+                              <FoundationPlayerPortraitCard
+                                playerId={selectedRosterCard.id}
+                                name={selectedRosterCard.name}
+                                portraitUrl={selectedRosterCard.portraitUrl ?? null}
+                                portraitInitials={selectedRosterCard.name.slice(0, 2).toUpperCase()}
+                                playerOvr={null}
+                                playerMvs={null}
+                                pow={null}
+                                spe={null}
+                                men={null}
+                                soc={null}
+                                leagueHeatPools={createEmptyLeaguePlayerHeatPools()}
+                                variant="team"
+                                context="lineup"
+                                density="compact"
+                                interactive={false}
+                                contextData={{
+                                  lineup: {
+                                    d1Score: `D1: ${formatNullableScore(selectedRosterCard.discipline1Score)}`,
+                                    d2Score: `D2: ${formatNullableScore(selectedRosterCard.discipline2Score)}`,
+                                    slotProjection: slotPreview?.projected.totalProjected != null
+                                      ? formatScore(slotPreview.projected.totalProjected)
+                                      : "—",
+                                    fatigueLabel: `F ${Math.round(selectedOption?.fatigueCount ?? 0)}`,
+                                  },
+                                }}
+                                footerSlot={
                                   <button
-                                    className="legacy-lineup-quick-assign-button"
                                     type="button"
+                                    className="secondary-button inline-button"
                                     onClick={(event) => {
-                                      event.preventDefault();
                                       event.stopPropagation();
-                                      updateSelection(slot.key, slotCandidateSummary.topCandidates[0].activePlayerId, {
-                                        advanceFocusToNextOpenSlot: true,
-                                      });
+                                      setActiveSlotKey(slot.key);
                                     }}
-                                    title={`${slotCandidateSummary.topCandidates[0].name} · ${slotCandidateSummary.topCandidates[0].fitDetail}`}
                                   >
-                                    <span>Top Pick: {slotCandidateSummary.topCandidates[0].name}</span>
-                                    <strong>{formatNullableScore(slotCandidateSummary.topCandidates[0].projectedScore)}</strong>
-                                    <LegacyLineupCandidateReasonChips chips={slotCandidateSummary.topCandidates[0].reasonChips} />
-                                    <small>{slotCandidateSummary.topCandidates[0].fitSummary}</small>
+                                    Tauschen
                                   </button>
-                                ) : (
-                                  <span>Spielerkarte hineinziehen</span>
-                                )}
+                                }
+                              />
+                            ) : (
+                              <div className="legacy-lineup-slot-candidates">
+                                {slotCandidateSummary?.topCandidates.slice(0, 2).map((candidate) => {
+                                  const candidateCard = rosterCardByActivePlayerId.get(candidate.activePlayerId) ?? null;
+                                  return (
+                                    <FoundationPlayerPortraitCard
+                                      key={`slot-candidate-${slot.key}-${candidate.activePlayerId}`}
+                                      playerId={candidateCard?.id ?? candidate.activePlayerId}
+                                      name={candidate.name}
+                                      portraitUrl={candidateCard?.portraitUrl ?? null}
+                                      portraitInitials={candidate.name.slice(0, 2).toUpperCase()}
+                                      playerOvr={null}
+                                      playerMvs={null}
+                                      pow={null}
+                                      spe={null}
+                                      men={null}
+                                      soc={null}
+                                      leagueHeatPools={createEmptyLeaguePlayerHeatPools()}
+                                      variant="team"
+                                      context="lineup"
+                                      density="compact"
+                                      interactive={true}
+                                      onOpen={() => {
+                                        updateSelection(slot.key, candidate.activePlayerId, { advanceFocusToNextOpenSlot: true });
+                                      }}
+                                      title={`${candidate.name} · ${formatNullableScore(candidate.projectedScore)}${candidate.scoreDelta != null ? ` · ${candidate.scoreDelta >= 0 ? "+" : ""}${formatDecimalScore(candidate.scoreDelta, 1)}` : ""} · ${candidate.fitDetail}`}
+                                      contextData={{
+                                        lineup: {
+                                          d1Score: `D1: ${formatNullableScore(candidateCard?.discipline1Score ?? null)}`,
+                                          d2Score: `D2: ${formatNullableScore(candidateCard?.discipline2Score ?? null)}`,
+                                          slotProjection: candidate.projectedScore != null
+                                            ? `${formatNullableScore(candidate.projectedScore)}${candidate.scoreDelta != null ? ` ${candidate.scoreDelta >= 0 ? "+" : ""}${formatDecimalScore(candidate.scoreDelta, 1)}` : ""}`
+                                            : "—",
+                                          fatigueLabel: candidate.fitSummary,
+                                        },
+                                      }}
+                                    />
+                                  );
+                                })}
+                                {!slotCandidateSummary?.topCandidates.length ? (
+                                  <span className="legacy-lineup-slot-no-candidates">Spielerkarte hineinziehen</span>
+                                ) : null}
                               </div>
                             )}
                             <div className="legacy-lineup-draft-slot-meta">
@@ -7655,41 +7944,6 @@ export default function LegacyLineupLabClient(props: LegacyLineupLabClientProps)
                                 ))}
                               </div>
                             ) : null}
-                            {!selectedRosterCard && slotCandidateSummary?.topCandidates.length ? (
-                              <div className="legacy-lineup-quick-assign-row">
-                                {slotCandidateSummary.topCandidates.slice(0, 3).map((candidate) => (
-                                  <button
-                                    key={`${slot.key}-draft-quick-${candidate.activePlayerId}`}
-                                    className={`legacy-lineup-quick-assign-button${hoveredCandidate?.slotKey === slot.key && hoveredCandidate.activePlayerId === candidate.activePlayerId ? " is-previewed" : ""}`}
-                                    type="button"
-                                    onMouseEnter={() => scheduleHoveredCandidate({ slotKey: slot.key, activePlayerId: candidate.activePlayerId })}
-                                    onMouseLeave={() => setHoveredCandidate(null)}
-                                    onFocus={() => scheduleHoveredCandidate({ slotKey: slot.key, activePlayerId: candidate.activePlayerId })}
-                                    onBlur={() => setHoveredCandidate(null)}
-                                    onClick={(event) => {
-                                      event.preventDefault();
-                                      event.stopPropagation();
-                                      updateSelection(slot.key, candidate.activePlayerId, {
-                                        advanceFocusToNextOpenSlot: true,
-                                      });
-                                    }}
-                                    title={`${candidate.name} · ${formatNullableScore(candidate.projectedScore)}${
-                                      candidate.scoreDelta != null
-                                        ? ` · ${candidate.scoreDelta >= 0 ? "+" : ""}${formatDecimalScore(candidate.scoreDelta, 1)}`
-                                        : ""
-                                    } · ${candidate.fitDetail}`}
-                                  >
-                                    <span>{candidate.name}</span>
-                                    <strong>{formatNullableScore(candidate.projectedScore)}</strong>
-                                    {candidate.scoreDelta != null ? (
-                                      <small>{candidate.scoreDelta >= 0 ? "+" : ""}{formatDecimalScore(candidate.scoreDelta, 1)}</small>
-                                    ) : null}
-                                    <LegacyLineupCandidateReasonChips chips={candidate.reasonChips} />
-                                    <small>{candidate.fitSummary}</small>
-                                  </button>
-                                ))}
-                              </div>
-                            ) : null}
                             <select
                               className="input"
                               value={selections[slot.key] ?? ""}
@@ -7710,246 +7964,6 @@ export default function LegacyLineupLabClient(props: LegacyLineupLabClientProps)
                 );
               })}
             </section>
-
-            <aside className="legacy-lineup-draft-deck" aria-label="Spielerkarten">
-              <div className="legacy-lineup-draft-deck-head">
-                <div>
-                  <span>Spielerkarten</span>
-                  <strong>{activeSlot ? `${activeSlot.disciplineSide.toUpperCase()}-${activeSlot.slotIndex + 1}` : "Auto-Fokus"}</strong>
-                  <small>
-                    {teamdeckCandidateEntries.length}/{matchdayRosterCards.length} sichtbar · {activeSlotRole?.label ?? "Slot wählen"}
-                  </small>
-                </div>
-                <button className={`secondary-button inline-button${showOnlyTopSlotCandidates ? " is-selected" : ""}`} type="button" onClick={() => setShowOnlyTopSlotCandidates((current) => !current)}>
-                  {showOnlyTopSlotCandidates ? "Top" : "Alle"}
-                </button>
-              </div>
-              <div className="legacy-lineup-deck-filter" role="group" aria-label="Teamdeck Filter">
-                {([
-                  { value: "all" as const, label: "Alle" },
-                  { value: "free" as const, label: "Frei" },
-                  { value: "assigned" as const, label: "Drin" },
-                  { value: "blocked" as const, label: "Blockiert" },
-                ]).map((option) => (
-                  <button key={option.value} className={`secondary-button inline-button${teamdeckFilterMode === option.value ? " is-selected" : ""}`} type="button" onClick={() => setTeamdeckFilterMode(option.value)}>
-                    {option.label}
-                  </button>
-                ))}
-              </div>
-	              <div className="legacy-lineup-deck-filter" role="group" aria-label="Teamdeck Sortierung">
-	                {([
-	                  { value: "fit" as const, label: "Passt sofort" },
-	                  { value: "top" as const, label: "Top Fit" },
-	                  { value: "d1" as const, label: d1Label },
-	                  { value: "d2" as const, label: d2Label },
-	                  { value: "captain" as const, label: "Captain" },
-	                  { value: "fatigue" as const, label: "Low Fatigue" },
-	                  { value: "wish" as const, label: "Wunsch" },
-	                ]).map((option) => (
-	                  <button
-	                    key={option.value}
-                    className={`secondary-button inline-button${teamdeckSortMode === option.value ? " is-selected" : ""}`}
-                    type="button"
-                    onClick={() => setTeamdeckSortMode(option.value)}
-                  >
-                    {option.label}
-                  </button>
-                ))}
-              </div>
-              {hoveredCandidatePreview ? (
-                <div className={`legacy-lineup-draft-hover-preview${hoveredCandidatePreview.blockReason ? " is-blocked" : hoveredCandidatePreview.scoreDelta != null && hoveredCandidatePreview.scoreDelta >= 0 ? " is-positive" : " is-warning"}`}>
-                  <div>
-                    <span>{hoveredCandidatePreview.slotLabel} · {hoveredCandidatePreview.roleLabel}</span>
-                    <strong>{hoveredCandidatePreview.playerName}</strong>
-                  </div>
-                  <div className="legacy-lineup-draft-hover-preview-metrics">
-                    <span>Score <strong>{formatNullableScore(hoveredCandidatePreview.projectedScore)}</strong></span>
-                    <span>
-                      Δ{" "}
-                      <strong>
-                        {hoveredCandidatePreview.scoreDelta != null
-                          ? `${hoveredCandidatePreview.scoreDelta >= 0 ? "+" : ""}${formatDecimalScore(hoveredCandidatePreview.scoreDelta, 1)}`
-                          : "—"}
-                      </strong>
-                    </span>
-                    <span>Ft <strong>+{formatScore(hoveredCandidatePreview.additionalFatigue)}</strong></span>
-                  </div>
-                  <small>
-                    {formatLegacyLineupDragBlockReason(hoveredCandidatePreview.blockReason) ??
-                      hoveredCandidatePreview.warnings[0] ??
-                      hoveredCandidatePreview.fitDetail ??
-                      "passt sauber in den aktiven Slot"}
-                  </small>
-                </div>
-              ) : (
-                <div className="legacy-lineup-draft-hover-preview is-idle">
-                  <div>
-                    <span>Live-Preview</span>
-                    <strong>Karte berühren</strong>
-                  </div>
-                  <small>Score, Delta, Fatigue und Blocker erscheinen hier sofort.</small>
-                </div>
-              )}
-	              <div className="legacy-lineup-draft-card-list">
-	                {teamdeckCandidateGroups.map((group) => (
-                    <section key={`draft-candidate-group-${group.key}`} className={`legacy-lineup-draft-candidate-group is-${group.key}`}>
-                      <div className="legacy-lineup-draft-candidate-group-head">
-                        <strong>{group.meta.label}</strong>
-                        <span>{group.entries.length}/{group.totalCount}</span>
-                      </div>
-                      <div className="legacy-lineup-draft-candidate-group-list">
-	                {group.entries
-	                  .slice(0, showOnlyTopSlotCandidates ? (group.key === "instant" ? 5 : 3) : 40)
-	                  .map(({ player, activeSlotCandidate, captainDemand, groupMeta, groupKey, preferredSlotTags, relevantDisciplineDemands, shortReason, wantsActiveSlot }) => {
-	                    const focusedSideScore = focusedDisciplineSide === "d1" ? player.discipline1Score : player.discipline2Score;
-	                    const bestSlots = playerBestSlotSummaryByActivePlayerId.get(player.activePlayerId ?? "") ?? [];
-	                    const currentTeamdeckDisciplineLabel =
-	                      activeSlot?.disciplineName ??
-	                      (focusedDisciplineSide === "d1"
-	                        ? context?.matchdayContract?.discipline1?.displayName ?? "D1"
-	                        : context?.matchdayContract?.discipline2?.displayName ?? "D2");
-	                    const slotIntentLabel =
-	                      preferredSlotTags.length > 0
-	                        ? preferredSlotTags.join(" / ")
-	                        : bestSlots.length > 0
-	                          ? bestSlots.map((entry) => `${entry.disciplineSide.toUpperCase()}-${entry.slotIndex + 1}`).join(" / ")
-	                          : null;
-	                    const primaryDemand = relevantDisciplineDemands[0] ?? null;
-	                    return (
-	                      <article
-	                        key={`draft-card-${player.id}`}
-                        className={`legacy-lineup-draft-player-card is-${groupKey}${player.selectedSides.length > 0 ? " is-selected" : ""}${activeSlotCandidate && !activeSlotCandidate.blockReason ? " is-active-slot-fit" : ""}`}
-                        draggable={Boolean(player.activePlayerId)}
-                        onDragStart={(event) => {
-                          if (!player.activePlayerId) {
-                            return;
-                          }
-                          event.dataTransfer.setData("text/plain", player.activePlayerId);
-                          handlePlayerCardDragStart(player.activePlayerId);
-                        }}
-                        onDragEnd={() => setDraggedActivePlayerId(null)}
-                        onMouseEnter={() => {
-                          if (activeSlot && player.activePlayerId) {
-                            setHoveredCandidate({ slotKey: activeSlot.key, activePlayerId: player.activePlayerId });
-                          }
-                        }}
-                        onMouseLeave={() => {
-                          if (hoveredCandidate?.activePlayerId === player.activePlayerId) {
-                            setHoveredCandidate(null);
-                          }
-                        }}
-                        onClick={() => {
-                          if (!player.activePlayerId) {
-                            return;
-                          }
-                          if (activeSlot) {
-                            updateSelection(activeSlot.key, player.activePlayerId, { advanceFocusToNextOpenSlot: true });
-                            setFocusedDisciplineSide(activeSlot.disciplineSide);
-                            return;
-                          }
-                          assignPlayerToSide(player.activePlayerId, focusedDisciplineSide);
-                        }}
-                      >
-                        {player.portraitUrl ? (
-                          <OptimizedMediaImage className="legacy-lineup-draft-player-portrait" src={player.portraitUrl} alt={player.name} width={48} height={48} />
-                        ) : (
-                          <span className="legacy-lineup-draft-player-portrait">—</span>
-                        )}
-                        <div className="legacy-lineup-draft-player-main">
-                          <div className="legacy-lineup-draft-player-title">
-                            <button
-                              type="button"
-                              className="table-link-button legacy-lineup-player-link"
-                              onClick={(event) => {
-                                event.stopPropagation();
-                                openPlayerDetails(player.id, player.activePlayerId);
-                              }}
-                            >
-                              {player.name}
-                            </button>
-                            <span>{player.className ?? "—"} · F {Math.round(player.fatigueCount ?? 0)}</span>
-                          </div>
-                          <div className="legacy-lineup-draft-player-scores">
-                            <span className={getDisciplineHeatClass(player.discipline1Score)}>
-                              {player.discipline1Label} {formatNullableScore(player.discipline1Score)}
-                            </span>
-                            <span className={getDisciplineHeatClass(player.discipline2Score)}>
-                              {player.discipline2Label} {formatNullableScore(player.discipline2Score)}
-                            </span>
-                            <span className={getDisciplineHeatClass(activeSlotCandidate?.projectedScore ?? focusedSideScore)}>
-                              Slot {formatNullableScore(activeSlotCandidate?.projectedScore ?? focusedSideScore)}
-                            </span>
-                          </div>
-                          <VeloStatOrbitRow
-                            ariaLabel={`${player.name} Slot-Fit`}
-                            className="legacy-lineup-draft-orbit"
-                            stats={{
-                              pow: player.discipline1Score ?? 0,
-                              spe: player.discipline2Score ?? 0,
-                              men: activeSlotCandidate?.projectedScore ?? focusedSideScore ?? 0,
-                              soc: Math.max(player.discipline1Score ?? 0, player.discipline2Score ?? 0),
-                            }}
-                          />
-                          {activeSlotCandidate ? (
-                            <VeloImpactStrip
-                              className="legacy-lineup-fit-strip"
-                              items={[
-                                {
-                                  key: "base",
-                                  label: "Base",
-                                  value: formatNullableScore(activeSlotCandidate.baseScore ?? null),
-                                  tone: "neutral",
-                                },
-                                {
-                                  key: "final",
-                                  label: "Final",
-                                  value: formatNullableScore(activeSlotCandidate.projectedScore ?? null),
-                                  tone: "positive",
-                                },
-                                {
-                                  key: "delta",
-                                  label: "Delta",
-                                  value:
-                                    activeSlotCandidate.scoreDelta != null
-                                      ? `${activeSlotCandidate.scoreDelta >= 0 ? "+" : ""}${formatDecimalScore(activeSlotCandidate.scoreDelta, 1)}`
-                                      : "—",
-                                  tone: (activeSlotCandidate.scoreDelta ?? 0) >= 0 ? "positive" : "negative",
-                                },
-                              ]}
-                            />
-                          ) : null}
-	                          <div className="legacy-lineup-draft-player-tags">
-	                            <span>{groupMeta.label}</span>
-	                            <span>{activeSlotCandidate?.fitSummary ?? shortReason}</span>
-	                            {slotIntentLabel ? (
-	                              <span title="Beste Slot-Empfehlungen">
-	                                {slotIntentLabel}
-	                              </span>
-	                            ) : null}
-	                            {wantsActiveSlot ? <span title="Der Spieler will genau in diesen Slot oder diese Rolle.">Wunsch {activeSlot?.key?.replace("slot-", "").toUpperCase() ?? currentTeamdeckDisciplineLabel}</span> : null}
-	                            {captainDemand ? <span title={captainDemand.detail}>Captain Wunsch</span> : null}
-	                            {primaryDemand && !captainDemand ? (
-	                              <span key={`draft-demand-${player.id}-${primaryDemand.demandId}`} title={primaryDemand.detail}>
-	                                {primaryDemand.label === "Captain-Rolle"
-	                                  ? `Will Captain in ${currentTeamdeckDisciplineLabel}`
-	                                  : `${currentTeamdeckDisciplineLabel} Wunsch`}
-	                              </span>
-	                            ) : null}
-	                            {activeSlotCandidate?.scoreDelta != null ? (
-	                              <span title="Delta gegenüber dem aktuell belegten Slot.">
-	                                {activeSlotCandidate.scoreDelta >= 0 ? "+" : ""}{formatDecimalScore(activeSlotCandidate.scoreDelta, 1)}
-	                              </span>
-	                            ) : null}
-	                          </div>
-	                        </div>
-	                      </article>
-                    );
-                  })}
-                      </div>
-                    </section>
-                  ))}
-              </div>
-            </aside>
             </div>
           ) : null}
           {draftBoardView === "lineup" ? (
@@ -8274,7 +8288,7 @@ export default function LegacyLineupLabClient(props: LegacyLineupLabClientProps)
                     return (
                       <article
                         key={`card-${player.id}`}
-                        className={`legacy-matchday-player-card${player.selectedSides.length > 0 ? " is-selected" : ""}${activeSlotCandidate && !activeSlotCandidate.blockReason ? " is-active-slot-fit" : ""}${isPreviewedCandidate ? " is-previewed" : ""}`}
+                        className={`legacy-matchday-player-card is-portrait-card${player.selectedSides.length > 0 ? " is-selected" : ""}${activeSlotCandidate && !activeSlotCandidate.blockReason ? " is-active-slot-fit" : ""}${isPreviewedCandidate ? " is-previewed" : ""}`}
                         draggable={Boolean(player.activePlayerId)}
                         title={[
                           `${player.discipline1Label}: ${player.topAttributesD1.map((attribute) => `${attribute.shortLabel} ${attribute.ratingLabel ?? "—"}`).join(" · ")}`,
@@ -8313,71 +8327,49 @@ export default function LegacyLineupLabClient(props: LegacyLineupLabClientProps)
                           assignPlayerToSide(player.activePlayerId, focusedDisciplineSide);
                         }}
                       >
-                        <div className="legacy-matchday-player-head">
-                          {player.portraitUrl ? (
-                            <OptimizedMediaImage
-                              className="legacy-matchday-player-portrait"
-                              src={player.portraitUrl}
-                              alt={player.name}
-                              width={56}
-                              height={56}
-                            />
-                          ) : (
-                            <span className="legacy-matchday-player-portrait legacy-matchday-player-portrait-fallback">—</span>
-                          )}
-                          <div className="legacy-matchday-player-title">
-                            <button
-                              type="button"
-                              className="table-link-button legacy-lineup-player-link"
-                              onClick={(event) => {
-                                event.stopPropagation();
-                                openPlayerDetails(player.id, player.activePlayerId);
-                              }}
-                            >
-                              {player.name}
-                            </button>
-                            <span>{player.className ?? "—"} · {player.contractLength ?? "—"} Jahre</span>
-                            <span>{assignmentLabel}</span>
-                          </div>
-                        </div>
-                        <div className="legacy-matchday-player-score-row">
-                          <span className={`legacy-matchday-player-score-chip ${getDisciplineHeatClass(player.discipline1Score)}`}>
-                            {player.discipline1Label}: {formatNullableScore(player.discipline1Score)}
-                          </span>
-                          <span className={`legacy-matchday-player-score-chip ${getDisciplineHeatClass(player.discipline2Score)}`}>
-                            {player.discipline2Label}: {formatNullableScore(player.discipline2Score)}
-                          </span>
-                        </div>
-                        <div className="legacy-matchday-player-meta-row">
+                        <FoundationPlayerPortraitCard
+                          playerId={player.id}
+                          name={player.name}
+                          portraitUrl={player.portraitUrl}
+                          portraitInitials={player.name.slice(0, 2).toUpperCase()}
+                          playerOvr={null}
+                          playerMvs={null}
+                          pow={null}
+                          spe={null}
+                          men={null}
+                          soc={null}
+                          leagueHeatPools={createEmptyLeaguePlayerHeatPools()}
+                          variant="team"
+                          context="lineup"
+                          density="compact"
+                          interactive={false}
+                          playerClassName={player.className}
+                          subMeta={[player.className ?? "—", `${player.contractLength ?? "—"} Jahre`, assignmentLabel].join(" · ")}
+                          highlight={wantsActiveSlot ? `Wunsch ${activeSlot?.disciplineSide?.toUpperCase() ?? focusedDisciplineSide.toUpperCase()}-${(activeSlot?.slotIndex ?? 0) + 1}` : null}
+                          contextData={{
+                            lineup: {
+                              d1Score: `${player.discipline1Label}: ${formatNullableScore(player.discipline1Score)}`,
+                              d2Score: `${player.discipline2Label}: ${formatNullableScore(player.discipline2Score)}`,
+                              slotProjection: activeSlotCandidate
+                                ? activeSlotCandidate.blockReason
+                                  ? "nein"
+                                  : `${formatNullableScore(activeSlotCandidate.projectedScore)}${
+                                      activeSlotCandidate.scoreDelta != null
+                                        ? ` ${activeSlotCandidate.scoreDelta >= 0 ? "+" : ""}${formatDecimalScore(activeSlotCandidate.scoreDelta, 1)}`
+                                        : ""
+                                    }`
+                                : "—",
+                              qualityGroup: groupMeta.label,
+                              fatigueLabel: formatFatigueHint(
+                                Math.max(player.discipline1Score ?? 0, player.discipline2Score ?? 0),
+                                player.fatigueCount,
+                              ),
+                            },
+                          }}
+                          footerSlot={
+                            <div className="legacy-matchday-player-meta-row">
                           <span className="legacy-matchday-player-score-chip">
                             {player.fitLane === "d1" ? "D1 Fit" : player.fitLane === "d2" ? "D2 Fit" : "Flex Fit"}
-                          </span>
-                          <span className={`legacy-matchday-player-score-chip is-quality-${groupKey}`}>
-                            {groupMeta.label}
-                          </span>
-                          {activeSlotCandidate ? (
-                            <span
-                              className={`legacy-matchday-player-score-chip is-active-slot-chip ${activeSlotCandidate.blockReason ? "is-heat-low" : getDisciplineHeatClass(activeSlotCandidate.projectedScore)}`}
-                              title={
-                                activeSlotCandidate.blockReason
-                                  ? formatLegacyLineupDragBlockReason(activeSlotCandidate.blockReason) ?? "passt nicht"
-                                  : `Aktiver Slot · Score ${formatNullableScore(activeSlotCandidate.projectedScore)}`
-                              }
-                            >
-                              {activeSlotCandidate.blockReason
-                                ? "Slot: nein"
-                                : `Slot ${formatNullableScore(activeSlotCandidate.projectedScore)}${
-                                    activeSlotCandidate.scoreDelta != null
-                                      ? ` ${activeSlotCandidate.scoreDelta >= 0 ? "+" : ""}${formatDecimalScore(activeSlotCandidate.scoreDelta, 1)}`
-                                      : ""
-                                  }`}
-                            </span>
-                          ) : null}
-                          <span className={`legacy-matchday-player-score-chip ${getFatigueHeatClass(player.fatigueCount)}`}>
-                            {formatFatigueHint(
-                              Math.max(player.discipline1Score ?? 0, player.discipline2Score ?? 0),
-                              player.fatigueCount,
-                            )}
                           </span>
                           {wantsActiveSlot ? (
                             <span
@@ -8417,7 +8409,9 @@ export default function LegacyLineupLabClient(props: LegacyLineupLabClientProps)
                               {player.injuryStatus === "recovering" ? "Recovery" : "Verletzt"}
                             </span>
                           ) : null}
-                        </div>
+                            </div>
+                          }
+                        />
                         <div className="legacy-matchday-player-summary-grid">
                           <div className="legacy-matchday-player-summary-card">
                             <span>Beste Slots</span>
@@ -9260,7 +9254,7 @@ export default function LegacyLineupLabClient(props: LegacyLineupLabClientProps)
                                 title={[
                                   `B = Base Score (${selectedScore != null ? formatScore(selectedScore) : "—"})`,
                                   `R = Rollen-Modifikator (${formatDecimalScore(slotPreview?.projected.roleModifier ?? 0, 1)})`,
-                                  `F = Fatigue ${Math.round(selectedOption?.fatigueCount ?? 0)} → -${Math.round(slotPreview?.projected.fatiguePenaltyPercent ?? 0)}% / -${formatDecimalScore(slotPreview?.projected.fatigueModifier ?? 0, 1)}`,
+                                  `F = ${formatFatigueImpactDetail(selectedOption?.fatigueCount)} → -${Math.round(slotPreview?.projected.fatiguePenaltyPercent ?? 0)}% / -${formatDecimalScore(slotPreview?.projected.fatigueModifier ?? 0, 1)}`,
                                   `M = Moral (${moraleValue != null ? formatDecimalScore(moraleValue, 0) : "—"}) → ${formatMoralePercentEffect(moralePercentEffect)} / ${formatMoraleScoreEffect(moraleScoreEffect)}`,
                                   `E = Einsatz-Modifikator (${formatDecimalScore(intensityConfig.scoreModifier, 1)})`,
                                   `S = Projected Score (${slotPreview?.projected.totalProjected != null ? formatScore(slotPreview.projected.totalProjected) : "—"})`,

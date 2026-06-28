@@ -8,8 +8,8 @@ import { AI_MARKET_APPLY_CONFIRM_TOKEN } from "@/lib/ai/ai-market-plan-apply-con
 import {
   getTeamsNeedingConvergence,
   runEmergencyRosterRepairForTeams,
-  runMarketPlanConvergence,
 } from "@/lib/ai/ai-market-plan-convergence-service";
+import { runTransferWindowSession } from "@/lib/ai/ai-transfer-window-session-service";
 import { buildAiTransfermarktSellPreview } from "@/lib/ai/ai-transfermarkt-sell-preview-service";
 import { applyAiLegacyLineupBatchLocally } from "@/lib/ai/ai-legacy-lineup-batch-apply-service";
 import { CHUNKED_REDRAFT_TOPUP_CONFIRM_TOKEN, runChunkedRedraftTopup } from "@/lib/ai/chunked-redraft-topup-service";
@@ -438,19 +438,20 @@ async function runPreseasonPlannerConvergenceBeforeEmergencyRepair(
       .map(({ team, rosterCount, optTarget, strategy }) => `${team.shortCode}:${rosterCount}/${optTarget}:${strategy}`)
       .join(",")}`,
   );
-  const convergence = await runMarketPlanConvergence({
+  const convergence = await runTransferWindowSession({
     saveId,
     seasonId,
     persistence,
+    phase: "preseason",
     dryRun: false,
     confirmToken: AI_MARKET_APPLY_CONFIRM_TOKEN,
     transferPhase: "manual_transfer_window",
     teamScope: "all",
-    maxPasses: 2,
-    maxRoundsPerPass: 4,
+    maxTeamCycles: 5,
+    maxLeagueRounds: 3,
     allowBuys: true,
     skipIfExistingMarketTransfers: false,
-    progressLog: true,
+    progressLog: false,
   });
   const latest = persistence.getSaveById(saveId);
   if (!latest) throw new Error("Long-run save missing after preseason planner convergence.");
@@ -1972,19 +1973,20 @@ async function applySeasonEnd(saveId: string, persistence: PersistenceService) {
   let seasonEndEmergencyRepairTeams: string[] = [];
   const allowSeasonEndMarketBuys = isTransferActionAllowed(seasonId, "season_end_market_buy");
   if (existingMarketTransfers.length === 0) {
-    const marketConvergence = await runMarketPlanConvergence({
+    const marketConvergence = await runTransferWindowSession({
       saveId,
       seasonId,
       persistence,
+      phase: "season_end",
       dryRun: false,
       confirmToken: AI_MARKET_APPLY_CONFIRM_TOKEN,
       transferPhase: "manual_transfer_window",
       teamScope: "all",
-      maxPasses: 2,
-      maxRoundsPerPass: 3,
+      maxTeamCycles: 5,
+      maxLeagueRounds: 3,
       allowBuys: allowSeasonEndMarketBuys,
       skipIfExistingMarketTransfers: false,
-      progressLog: true,
+      progressLog: false,
     });
     marketStatus = marketConvergence.blockingReasons.length > 0 ? "blocked" : "applied";
     marketAppliedBuys = marketConvergence.appliedBuys;

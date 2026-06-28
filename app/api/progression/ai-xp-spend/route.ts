@@ -4,6 +4,8 @@ import { NextResponse } from "next/server";
 
 import { applyAiSeasonEndXpSpend, previewAiSeasonEndXpSpend } from "@/lib/progression/ai-xp-spend-planner";
 import { createPersistenceService } from "@/lib/persistence/persistence-service";
+import { parseRoomWriteContextFromRequest } from "@/lib/room/parse-room-write-context";
+import { authorizeServerRoomWrite } from "@/lib/room/server-authoritative-write-guard";
 
 type AiXpSpendBody = {
   saveId?: string;
@@ -35,6 +37,24 @@ export async function POST(request: Request) {
     const save = persistence.getSaveById(saveId);
     if (!save) {
       return NextResponse.json({ success: false, error: "save_not_found", summary: null }, { status: 404 });
+    }
+
+    if (!dryRun) {
+      const writeAuth = authorizeServerRoomWrite({
+        ...parseRoomWriteContextFromRequest(request),
+        saveId,
+        teamId,
+        action: "ai_xp_spend_apply",
+        source: "sqlite",
+        dryRun,
+        confirmToken: body.confirmToken ?? null,
+      });
+      if (!writeAuth.allowed) {
+        return NextResponse.json(
+          { success: false, error: writeAuth.reason, summary: null, warnings: writeAuth.warnings },
+          { status: writeAuth.status },
+        );
+      }
     }
 
     const summary = dryRun

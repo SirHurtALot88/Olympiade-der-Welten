@@ -176,3 +176,106 @@ export function applyTeamTrainingSettings(
     blockingReasons: [],
   };
 }
+
+export type PlayerTrainingModeAssignment = {
+  playerId: string;
+  trainingMode: PlayerTrainingMode;
+};
+
+export type PlayerTrainingModesPreview = {
+  ok: boolean;
+  dryRun: true;
+  confirmToken: string | null;
+  teamId: string;
+  seasonId: string;
+  assignments: PlayerTrainingModeAssignment[];
+  warnings: string[];
+  blockingReasons: string[];
+};
+
+export type PlayerTrainingModesApplyResult = Omit<PlayerTrainingModesPreview, "dryRun"> & {
+  dryRun: false;
+  applied: boolean;
+};
+
+function buildPlayerModesConfirmToken(input: {
+  saveId: string;
+  seasonId: string;
+  teamId: string;
+  assignments: PlayerTrainingModeAssignment[];
+}) {
+  const payload = input.assignments
+    .slice()
+    .sort((left, right) => left.playerId.localeCompare(right.playerId))
+    .map((entry) => `${entry.playerId}:${entry.trainingMode}`)
+    .join("|");
+  return createHash("sha256")
+    .update([input.saveId, input.seasonId, input.teamId, payload].join(":"))
+    .digest("hex");
+}
+
+export function previewPlayerTrainingModes(input: {
+  save: PersistedSaveGame;
+  teamId: string;
+  assignments: PlayerTrainingModeAssignment[];
+}): PlayerTrainingModesPreview {
+  const rosterPlayerIds = new Set(
+    input.save.gameState.rosters.filter((entry) => entry.teamId === input.teamId).map((entry) => entry.playerId),
+  );
+  const blockingReasons: string[] = [];
+  if (input.save.status !== "active") blockingReasons.push("save_not_active");
+  if (rosterPlayerIds.size <= 0) blockingReasons.push("team_roster_empty");
+  const validAssignments = input.assignments.filter((entry) => rosterPlayerIds.has(entry.playerId));
+  if (validAssignments.length === 0) blockingReasons.push("no_valid_player_assignments");
+  const confirmToken =
+    blockingReasons.length === 0
+      ? buildPlayerModesConfirmToken({
+          saveId: input.save.saveId,
+          seasonId: input.save.gameState.season.id,
+          teamId: input.teamId,
+          assignments: validAssignments,
+        })
+      : null;
+  return {
+    ok: blockingReasons.length === 0,
+    dryRun: true,
+    confirmToken,
+    teamId: input.teamId,
+    seasonId: input.save.gameState.season.id,
+    assignments: validAssignments,
+    warnings: [],
+    blockingReasons,
+  };
+}
+
+export function applyPlayerTrainingModes(
+  save: PersistedSaveGame,
+  teamId: string,
+  assignments: PlayerTrainingModeAssignment[],
+  confirmToken: string | null | undefined,
+  persistence: PersistenceService = createPersistenceService(),
+): PlayerTrainingModesApplyResult {
+  const preview = previewPlayerTrainingModes({ save, teamId, assignments });
+  if (!preview.ok || !preview.confirmToken || confirmToken !== preview.confirmToken) {
+    return {
+      ...preview,
+      dryRun: false,
+      applied: false,
+      blockingReasons: [...preview.blockingReasons, confirmToken ? "player_training_modes_preview_stale" : "confirm_token_required"],
+    };
+  }
+  const assignmentMap = new Map(preview.assignments.map((entry) => [entry.playerId, entry.trainingMode] as const));
+  const nextGameState: GameState = {
+    ...save.gameState,
+    players: save.gameState.players.map((player) =>
+      assignmentMap.has(player.id) ? { ...player, trainingMode: assignmentMap.get(player.id) } : player,
+    ),
+  };
+  persistence.saveSingleplayerState(save.saveId, nextGameState);
+  return {
+    ...preview,
+    dryRun: false,
+    applied: true,
+    blockingReasons: [],
+  };
+}

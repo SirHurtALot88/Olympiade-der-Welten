@@ -53,8 +53,9 @@ export const LEGACY_TRAIT_TRAINING_FACTOR_PCT: LegacyTraitTrainingFactorMap = {
 };
 
 const TRAINING_SIGNAL_COMPRESSION_FACTOR = 0.4;
-const TRAINING_SIGNAL_MIN_PCT = -12;
-const TRAINING_SIGNAL_MAX_PCT = 12;
+/** Effective training budget bonus/malus after compression (not raw trait sum). */
+export const TRAINING_SIGNAL_MIN_PCT = -20;
+export const TRAINING_SIGNAL_MAX_PCT = 25;
 
 function roundValue(value: number, digits = 2) {
   return Number(value.toFixed(digits));

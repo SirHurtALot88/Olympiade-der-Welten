@@ -22,7 +22,7 @@ import type {
 import { createGameStateFromSeed, loadSeedData } from "@/lib/data/dataAdapter";
 import { hydrateGameStateMedia } from "@/lib/data/mediaAssets";
 import { getDatabase } from "@/lib/persistence/sqlite";
-import { getTeamPlayerMax } from "@/lib/foundation/roster-limits";
+import { deriveRosterTargets, getTeamPlayerMax } from "@/lib/foundation/roster-limits";
 import { withNormalizedTeamIdentityOverrides } from "@/lib/foundation/team-identity-settings";
 import { withNormalizedTeamGeneralManagers } from "@/lib/foundation/team-general-managers";
 import { buildScenarioMeta, withScenarioMeta } from "@/lib/persistence/scenario-meta";
@@ -38,6 +38,9 @@ import {
   writeSaveSessionCache,
 } from "@/lib/persistence/save-session-cache";
 import { ensurePlayerBaselines, guardPlayerBaselineWrite } from "@/lib/players/player-baseline-service";
+import { ensurePlayerInjuryHistoryForGameState } from "@/lib/foundation/player-injury-history";
+import { buildPlayerPotentialRecordsForSave } from "@/lib/progression/player-potential-service";
+import { reconcilePlayerPotentialRecordsForGameState } from "@/lib/scouting/player-potential-ceiling-service";
 import { withNormalizedSeasonDisciplineSchedule } from "@/lib/season/season-discipline-schedule";
 import type {
   PersistedSaveGame,
@@ -79,6 +82,7 @@ type GameMetadata = {
   preSeasonWorkflowState?: unknown;
   baselineWriteGuardEvents?: PlayerBaselineWriteGuardEvent[];
   playerProgressionEvents?: GameState["playerProgressionEvents"];
+  playerPotential?: GameState["playerPotential"];
   playerMoraleState?: GameState["playerMoraleState"];
   playerRelationshipEvents?: GameState["playerRelationshipEvents"];
 };
@@ -119,14 +123,29 @@ function normalizeLegacyCashCreatorsColdSteelCodes(gameState: GameState): GameSt
 }
 
 function normalizeLegacyRosterTargets(gameState: GameState): GameState {
-  const identityByTeamId = new Map(gameState.teamIdentities.map((identity) => [identity.teamId, identity]));
-  let changed = false;
+  const teamByTeamId = new Map(gameState.teams.map((team) => [team.teamId, team]));
+
+  // Kader-Minimum ist fix 8 für alle Teams: Identity-playerMin auf den abgeleiteten
+  // (geklammerten) Fixwert ziehen, damit jeder Consumer der identity.playerMin liest 8 sieht.
+  let identitiesChanged = false;
+  const teamIdentities = gameState.teamIdentities.map((identity) => {
+    const team = teamByTeamId.get(identity.teamId);
+    const targets = deriveRosterTargets(team, identity);
+    if (identity.playerMin === targets.playerMin) {
+      return identity;
+    }
+    identitiesChanged = true;
+    return { ...identity, playerMin: targets.playerMin };
+  });
+
+  const identityByTeamId = new Map(teamIdentities.map((identity) => [identity.teamId, identity]));
+  let teamsChanged = false;
   const teams = gameState.teams.map((team) => {
     const identity = identityByTeamId.get(team.teamId);
-    const playerMin = Number.isFinite(identity?.playerMin) ? Math.round(identity!.playerMin) : null;
+    const targets = deriveRosterTargets(team, identity);
     const playerOpt = Number.isFinite(identity?.playerOpt) ? Math.round(identity!.playerOpt) : null;
-    const rosterLimit = getTeamPlayerMax(team, identity);
-    const rosterMinTarget = playerMin;
+    const rosterLimit = targets.playerMax;
+    const rosterMinTarget = targets.playerMin;
     const rosterOptTarget = playerOpt;
     if (
       rosterLimit === team.rosterLimit &&
@@ -135,7 +154,7 @@ function normalizeLegacyRosterTargets(gameState: GameState): GameState {
     ) {
       return team;
     }
-    changed = true;
+    teamsChanged = true;
     return {
       ...team,
       rosterLimit,
@@ -144,7 +163,14 @@ function normalizeLegacyRosterTargets(gameState: GameState): GameState {
     };
   });
 
-  return changed ? { ...gameState, teams } : gameState;
+  if (!identitiesChanged && !teamsChanged) {
+    return gameState;
+  }
+  return {
+    ...gameState,
+    ...(teamsChanged ? { teams } : {}),
+    ...(identitiesChanged ? { teamIdentities } : {}),
+  };
 }
 
 function roundMoney(value: number) {
@@ -634,6 +660,41 @@ export function upsertPlayerCatalogEntries(players: Player[], updatedAt = new Da
   invalidateCatalogDerivedRuntimeCaches();
 }
 
+export function patchPlayerCatalogFlavorEntries(
+  flavorPatches: Map<string, { flavorDe: string; flavorEn: string }>,
+  updatedAt = new Date().toISOString(),
+) {
+  if (flavorPatches.size === 0) return;
+
+  const database = getDatabase();
+  const selectStatement = database.prepare(
+    "SELECT payload_json FROM player_catalog WHERE player_id = ?",
+  );
+  const updateStatement = database.prepare(
+    `UPDATE player_catalog SET payload_json = ?, updated_at = ? WHERE player_id = ?`,
+  );
+
+  for (const [playerId, patch] of flavorPatches) {
+    const row = selectStatement.get(playerId) as { payload_json: string } | undefined;
+    if (!row) continue;
+
+    const payload = parseJsonColumn<Player>(row.payload_json);
+    if (!payload || typeof payload !== "object") continue;
+
+    updateStatement.run(
+      JSON.stringify({
+        ...payload,
+        flavorDe: patch.flavorDe,
+        flavorEn: patch.flavorEn,
+      }),
+      updatedAt,
+      playerId,
+    );
+  }
+
+  invalidateCatalogDerivedRuntimeCaches();
+}
+
 export function upsertPlayerBaselineCatalogEntries(
   baselines: PlayerBaselineRecord[],
   updatedAt = new Date().toISOString(),
@@ -787,6 +848,24 @@ function replacePlayerBaselinesForSave(
   }
 }
 
+function ensurePlayerPotentialForGameState(saveId: string, gameState: GameState): GameState {
+  const withRecords =
+    (gameState.playerPotential?.length ?? 0) > 0
+      ? gameState
+      : {
+          ...gameState,
+          playerPotential: buildPlayerPotentialRecordsForSave({
+            saveId,
+            players: gameState.players,
+            gameState,
+          }),
+        };
+  return {
+    ...withRecords,
+    playerPotential: reconcilePlayerPotentialRecordsForGameState({ gameState: withRecords }),
+  };
+}
+
 function materializePersistedSave(row: SaveRow): PersistedSaveGame | null {
   const saveId = row.save_id;
   const season = loadSingleton<Season>("seasons", saveId);
@@ -824,6 +903,7 @@ function materializePersistedSave(row: SaveRow): PersistedSaveGame | null {
     ...(gameMetadata?.playerProgressionEvents
       ? { playerProgressionEvents: gameMetadata.playerProgressionEvents }
       : {}),
+    ...(gameMetadata?.playerPotential ? { playerPotential: gameMetadata.playerPotential } : {}),
     ...(gameMetadata?.playerMoraleState
       ? { playerMoraleState: gameMetadata.playerMoraleState }
       : {}),
@@ -851,10 +931,15 @@ function materializePersistedSave(row: SaveRow): PersistedSaveGame | null {
       ),
     ),
   );
-  const gameState = ensurePlayerBaselines(gameStateWithoutBaseline, {
-    sourcePlayers: loadBaselineSourcePlayers(),
-    createdAt: row.created_at,
-  }).gameState;
+  const gameState = ensurePlayerPotentialForGameState(
+    saveId,
+    ensurePlayerInjuryHistoryForGameState(
+      ensurePlayerBaselines(gameStateWithoutBaseline, {
+        sourcePlayers: loadBaselineSourcePlayers(),
+        createdAt: row.created_at,
+      }).gameState,
+    ),
+  );
   const gameStateWithScenarioMeta = gameState.scenarioMeta
     ? gameState
     : {
@@ -1012,6 +1097,7 @@ function createPersistedSaveRecord(input: {
       preSeasonWorkflowState: guardedGameState.preSeasonWorkflowState,
       baselineWriteGuardEvents: guardedGameState.baselineWriteGuardEvents,
       playerProgressionEvents: guardedGameState.playerProgressionEvents,
+      playerPotential: guardedGameState.playerPotential,
       playerMoraleState: guardedGameState.playerMoraleState,
       playerRelationshipEvents: guardedGameState.playerRelationshipEvents,
     } satisfies GameMetadata);

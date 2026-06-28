@@ -140,6 +140,14 @@ export function buildTransferFinanceAudit(gameState: GameState): TransferFinance
         if ((buy.fee ?? 0) <= 0 && buy.source !== "preseason_roster_repair_buy") {
           violations.push(`zero_fee_buy:${seasonId}:${teamId}:${buy.playerId}:${buy.source ?? "unknown"}`);
         }
+        if (
+          buy.source === "preseason_roster_repair_buy" &&
+          buy.marketValue != null &&
+          buy.fee != null &&
+          Math.abs(buy.fee - buy.marketValue) > 0.05
+        ) {
+          violations.push(`repair_buy_fee_not_mw:${seasonId}:${teamId}:${buy.playerId}:${buy.fee}<${buy.marketValue}`);
+        }
       }
     }
   }

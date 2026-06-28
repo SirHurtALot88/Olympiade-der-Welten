@@ -1,4 +1,5 @@
 import type { GameState, LineupDraft, LineupDraftEntry } from "@/lib/data/olyDataTypes";
+import { getPlayerAvailabilityView } from "@/lib/fatigue/fatigue-injury-service";
 
 export type MatchdayLineupSideRequirements = {
   d1Required: number;
@@ -111,7 +112,36 @@ export function isTeamAllRosterPlayersDeployedInLineup(
   return rosterPlayerIds.every((playerId) => deployedPlayerIds.has(playerId));
 }
 
-/** Slots voll ODER gesamter Kader eingesetzt — beides ist spielbar. */
+/**
+ * Alle einsatzbereiten (nicht verletzten/gesperrten) Kaderspieler sind aufgestellt.
+ * Offene Slots sind erlaubt: ein Team mit zu dünnem Kader entscheidet sich dann,
+ * welche Disziplin es nicht (voll) besetzt — das ist kein Hard-Block.
+ */
+export function isTeamAllAvailablePlayersDeployedInLineup(
+  gameState: GameState,
+  teamId: string,
+  draft: LineupDraft | null = getTeamMatchdayLineupDraft(gameState, teamId),
+) {
+  const rosterPlayerIds = getTeamRosterPlayerIds(gameState, teamId);
+  if (rosterPlayerIds.length === 0 || !draft?.entries.length) {
+    return false;
+  }
+  const matchdayId = draft.matchdayId ?? gameState.matchdayState.matchdayId;
+  const availablePlayerIds = rosterPlayerIds.filter(
+    (playerId) => !getPlayerAvailabilityView(gameState, playerId, teamId, matchdayId).isUnavailable,
+  );
+  if (availablePlayerIds.length === 0) {
+    return false;
+  }
+  const deployedPlayerIds = new Set(draft.entries.map((entry) => entry.playerId));
+  return availablePlayerIds.every((playerId) => deployedPlayerIds.has(playerId));
+}
+
+/**
+ * Spielbar, wenn entweder alle Slots voll sind, der gesamte Kader eingesetzt ist,
+ * oder alle einsatzbereiten (nicht verletzten) Spieler aufgestellt sind. Offene Slots
+ * durch zu dünnen/verletzten Kader sind dann kein Hard-Block mehr.
+ */
 export function isTeamMatchdayLineupOperationallyReady(
   gameState: GameState,
   teamId: string,
@@ -123,7 +153,10 @@ export function isTeamMatchdayLineupOperationallyReady(
   if (isTeamMatchdayLineupComplete(gameState, teamId, draft)) {
     return true;
   }
-  return isTeamAllRosterPlayersDeployedInLineup(gameState, teamId, draft);
+  if (isTeamAllRosterPlayersDeployedInLineup(gameState, teamId, draft)) {
+    return true;
+  }
+  return isTeamAllAvailablePlayersDeployedInLineup(gameState, teamId, draft);
 }
 
 export function isTeamMatchdayLineupSubmitted(draft: LineupDraft | null | undefined) {

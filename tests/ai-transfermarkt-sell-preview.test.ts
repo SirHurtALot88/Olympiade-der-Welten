@@ -482,11 +482,14 @@ describe("ai transfermarkt sell preview", () => {
 
     const candidate = result.teams[0]?.sellCandidates.find((entry) => entry.playerId === "ai-core");
     expect(candidate?.boardTrustScore).toBeLessThan(40);
-    expect(candidate?.boardTrustPolicy).toBe("do_not_renew");
-    expect(candidate?.salaryCapMultiplier).toBe(0);
+    // do_not_renew wurde entfernt: sehr niedriges Vertrauen fällt nun in den weicheren
+    // (rein informativen) renewal_warning-Tier und erzwingt keinen Verkauf mehr.
+    expect(candidate?.boardTrustPolicy).toBe("renewal_warning");
+    expect(candidate?.salaryCapMultiplier).toBe(0.7);
     expect(candidate?.boardTrustReasons).toContain("low_board_confidence");
     expect(candidate?.boardTrustReasons).toContain("performance_below_board_expectation");
-    expect(candidate?.reasonsToSell).toContain("Vorstand will keine Verlaengerung");
+    expect(candidate?.reasonsToSell).not.toContain("Vorstand will keine Verlaengerung");
+    expect(candidate?.reasonsToSell).not.toContain("Vorstand warnt vor voller Verlaengerung");
   });
 
   it("includes manual and passive teams only as informative rows in all-scope mode", async () => {

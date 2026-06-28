@@ -9,11 +9,12 @@ import {
   getAxisRouteState,
   getAxisRouteTrainingMultiplier,
   getHeadroomLabel,
+  deriveAxisPoStarsFromAttributeCeilings,
   type AttributeHeadroomState,
   type AxisRouteState,
 } from "@/lib/scouting/player-attribute-ceiling-service";
 import { buildPlayerPotentialRecord } from "@/lib/progression/player-potential-service";
-import { clampPotentialCeilingToCurrentStars } from "@/lib/scouting/player-potential-ceiling-service";
+import { clampPotentialCeilingToCurrentStars, reconcilePlayerPotentialRecordToCurrentAbility } from "@/lib/scouting/player-potential-ceiling-service";
 import { playerGeneratorAttributeKeys } from "@/lib/player-generator/official-discipline-weights";
 import type { PlayerGeneratorAttributeName } from "@/lib/data/olyDataTypes";
 import { TRAINING_ATTRIBUTE_LABELS } from "@/lib/training/training-levelup-service";
@@ -84,14 +85,20 @@ export function buildPlayerPotentialDisplaySnapshot(input: {
     player: input.player,
     disciplines: input.gameState.disciplines,
   });
+  const reconciledRecord = reconcilePlayerPotentialRecordToCurrentAbility({
+    player: input.player,
+    record,
+    currentStars,
+    saveId: input.saveId,
+  });
   const rawCeiling =
-    record.hiddenPotentialCeilingByAxis && record.hiddenPotentialOverallStars != null
+    reconciledRecord.hiddenPotentialCeilingByAxis && reconciledRecord.hiddenPotentialOverallStars != null
       ? {
-          pow: record.hiddenPotentialCeilingByAxis.pow,
-          spe: record.hiddenPotentialCeilingByAxis.spe,
-          men: record.hiddenPotentialCeilingByAxis.men,
-          soc: record.hiddenPotentialCeilingByAxis.soc,
-          overall: record.hiddenPotentialOverallStars,
+          pow: reconciledRecord.hiddenPotentialCeilingByAxis.pow,
+          spe: reconciledRecord.hiddenPotentialCeilingByAxis.spe,
+          men: reconciledRecord.hiddenPotentialCeilingByAxis.men,
+          soc: reconciledRecord.hiddenPotentialCeilingByAxis.soc,
+          overall: reconciledRecord.hiddenPotentialOverallStars,
         }
       : null;
   const ceiling = rawCeiling ? clampPotentialCeilingToCurrentStars(currentStars, rawCeiling) : null;
@@ -195,10 +202,16 @@ export function getCombinedAttributeTrainingMultiplier(input: {
     getAttributesForAxis(entry).includes(input.attribute),
   ) ?? "pow";
   const caStars = input.axisCaStars?.[axis] ?? 2.5;
-  const poStars = input.axisPoStars?.[axis];
+  const axisPoFromAttributes =
+    input.record?.hiddenAttributeCeiling &&
+    Object.values(input.record.hiddenAttributeCeiling).some((value) => typeof value === "number" && Number.isFinite(value))
+      ? deriveAxisPoStarsFromAttributeCeilings(input.record.hiddenAttributeCeiling)
+      : null;
+  const poStars = axisPoFromAttributes?.[axis] ?? input.axisPoStars?.[axis] ?? input.record?.hiddenPotentialCeilingByAxis?.[axis];
+  const effectivePoStars = poStars != null ? Math.max(poStars, caStars) : null;
   const routeMult =
-    poStars != null
-      ? getAxisRouteTrainingMultiplier(getAxisRouteState({ caStars, poStars }))
+    effectivePoStars != null
+      ? getAxisRouteTrainingMultiplier(getAxisRouteState({ caStars, poStars: effectivePoStars }))
       : 1;
   return (input.affinityGrowthMultiplier ?? 1) * attributeMult * routeMult;
 }

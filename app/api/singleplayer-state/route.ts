@@ -199,7 +199,8 @@ function loadSqliteResponse(saveId?: string, requestedSaveMode: FoundationSaveMo
     );
   }
 
-  const gameState = refreshTeamObjectiveState(withNormalizedLocalTeamSettings(save.gameState));
+  const normalizedGameState = withNormalizedLocalTeamSettings(save.gameState);
+  const gameState = compactInitial ? normalizedGameState : refreshTeamObjectiveState(normalizedGameState);
 
   return NextResponse.json({
     save: serializeSave({

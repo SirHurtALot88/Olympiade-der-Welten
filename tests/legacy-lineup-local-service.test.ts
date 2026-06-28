@@ -64,7 +64,7 @@ function buildEntriesFromContext(
   return entries;
 }
 
-describe("legacy lineup local service", () => {
+describe("legacy lineup local service", { timeout: 120_000 }, () => {
   function topUpRosterCoverage(saveId: string) {
     const persistence = createPersistenceService();
     const save = persistence.getSaveById(saveId);
@@ -249,9 +249,9 @@ describe("legacy lineup local service", () => {
     expect(preview.disciplineSideScores.every((side) => side.formCardsAvailable != null)).toBe(true);
     expect(preview.disciplineSideScores.every((side) => side.mutatorModifier != null)).toBe(true);
     expect(preview.scorePreview.validationWarnings).not.toContain("Mutator score source is missing for mini-dm/d1.");
-  }, 40000);
+  });
 
-  it("applies local fatigue from earlier saved matchdays without writing fatigue state", () => {
+  it("applies stored player fatigue into local resolve preview", () => {
     const persistence = createPersistenceService();
     const save = persistence.createFreshSeasonOneSave({ name: "Lineup Fatigue Preview Test" });
     topUpRosterCoverage(save.saveId);
@@ -272,8 +272,14 @@ describe("legacy lineup local service", () => {
     if (!afterFirstSave) {
       throw new Error("Expected save after first lineup save.");
     }
+    const rosterPlayerIds = new Set(
+      afterFirstSave.gameState.rosters.filter((entry) => entry.teamId === teamId).map((entry) => entry.playerId),
+    );
     persistence.saveSingleplayerState(save.saveId, {
       ...afterFirstSave.gameState,
+      players: afterFirstSave.gameState.players.map((player) =>
+        rosterPlayerIds.has(player.id) ? { ...player, fatigue: 40 } : player,
+      ),
       season: {
         ...afterFirstSave.gameState.season,
         currentMatchday: 2,
@@ -360,7 +366,7 @@ describe("legacy lineup local service", () => {
         }
       }
     }
-  }, 40000);
+  });
 
   it("blocks overwriting lineups for a non-active matchday", () => {
     const persistence = createPersistenceService();

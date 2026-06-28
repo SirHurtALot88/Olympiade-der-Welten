@@ -18,6 +18,7 @@ import { getTeamStrategyProfile, withNormalizedTeamStrategyProfiles } from "@/li
 import { normalizeTransfermarktToken } from "@/lib/market/transfermarkt-fit";
 import { buildTransfermarktSaleFactorBreakdown } from "@/lib/market/transfermarkt-sale-factor";
 import { createPersistenceService } from "@/lib/persistence/persistence-service";
+import { assessTeamSellRunwayPressure, isAttractiveProfitSell } from "@/lib/ai/team-sell-runway-pressure";
 import { assessPlayerBoardTrust, type PlayerBoardTrustRenewalPolicy } from "@/lib/ai/player-board-trust-service";
 import { evaluateAiSellDecision } from "@/lib/ai/ai-sell-decision-engine";
 import { resolveTransferDoctrine } from "@/lib/ai/ai-transfer-doctrine-layer";
@@ -173,14 +174,25 @@ function normalizeGameState(gameState: GameState) {
   return withNormalizedTeamStrategyProfiles(withNormalizedTeamControlSettings(gameState));
 }
 
-function getBudgetPressure(team: Team): AiSellPreviewBudgetPressure {
-  if (!Number.isFinite(team.cash) || !Number.isFinite(team.budget) || team.budget <= 0) {
+function getBudgetPressure(team: Team, salaryTotal: number): AiSellPreviewBudgetPressure {
+  if (!Number.isFinite(team.cash)) {
     return "unknown";
   }
+  const cash = team.cash;
+  const salary = Math.max(0, Number.isFinite(salaryTotal) ? salaryTotal : 0);
 
-  const ratio = team.cash / team.budget;
-  if (ratio <= 0.18) return "critical";
-  if (ratio <= 0.4) return "tight";
+  // Cash-vs-Gehalt statt Cash/Startbudget: ein cash-reiches Team (z.B. 85M Cash > 66M
+  // Gehalt) ist gesund, nicht "tight". Druck entsteht erst, wenn das Cash die Gehaltslast
+  // einer Saison nicht mehr (gut) abdeckt. Deckt sich mit assessTeamSellRunwayPressure.
+  if (salary <= 0) {
+    return cash < 0 ? "critical" : "healthy";
+  }
+  if (cash <= 0) {
+    return "critical";
+  }
+  const coverage = cash / salary;
+  if (coverage < 0.5) return "critical";
+  if (coverage < 1) return "tight";
   return "healthy";
 }
 
@@ -430,7 +442,7 @@ function buildCandidate(
     warnings.push("Noch keine lokale Leistungs-Historie fuer diesen Spieler.");
   }
 
-  const budgetPressure = getBudgetPressure(team);
+  const budgetPressure = getBudgetPressure(team, salaryTotal);
   const boardPressure = clamp((10 - (identity?.boardConfidence ?? 5)) / 10, 0, 1);
   const teamSalaryPressure = team.cash > 0 ? clamp(salaryTotal / Math.max(team.cash, 1), 0, 3) / 3 : salaryTotal > 0 ? 1 : 0;
   const salaryShare = salary != null && salaryTotal > 0 ? clamp(salary / salaryTotal, 0, 1) : 0;
@@ -509,6 +521,27 @@ function buildCandidate(
     pushKeep("low_wage_burden", "geringe Gehaltslast");
   }
 
+  const sellRunway = assessTeamSellRunwayPressure({
+    gameState: context.gameState,
+    team,
+    salaryTotal,
+  });
+  if (sellRunway.cashPressureScore >= 0.45 && !starProtection) {
+    if (sellRunway.salaryExceedsCash) {
+      pushSell("cash_runway_pressure", "Gehaltslast uebersteigt verfuegbares Cash — Verkauf entlastet den Etat");
+    }
+    if (
+      isAttractiveProfitSell({
+        expectedSellValue,
+        marketValue,
+        purchasePrice,
+        cashPressureScore: sellRunway.cashPressureScore,
+      })
+    ) {
+      pushSell("profit_window", "Verkaufspreis liegt ueber Marktwert — lukrativer Exit moeglich");
+    }
+  }
+
   if (profitDelta != null && profitDelta > 0) {
     pushSell("profit_window", `realisierbarer Gewinn von ${roundValue(profitDelta, 1)}`);
   } else if (profitDelta != null && profitDelta < 0) {
@@ -553,15 +586,8 @@ function buildCandidate(
   if (hardNoGoHit) {
     pushSell("hard_no_go", "faellt in ein Team-Hard-No-Go");
   }
-  if (boardTrust.renewalPolicy === "salary_cap") {
-    pushSell("board_salary_cap", "Vorstand begrenzt Vertragsrahmen wegen Vertrauensverlust");
-  }
-  if (boardTrust.renewalPolicy === "renewal_warning") {
-    pushSell("board_renewal_warning", "Vorstand warnt vor voller Verlaengerung");
-  }
-  if (boardTrust.renewalPolicy === "do_not_renew") {
-    pushSell("board_do_not_renew", "Vorstand will keine Verlaengerung");
-  }
+  // Board-Renewal-Signale sind reine Anzeige (Drawer-UI) und treiben keine Verkäufe mehr.
+  // Verkauf/Entlassung liegt allein beim Team/GM.
   if (coversNeedAxis) {
     pushKeep("covers_need_axis", `deckt die aktuelle Achsenluecke ${playerAxis?.toUpperCase() ?? ""}`);
   }
@@ -600,10 +626,19 @@ function buildCandidate(
     (roster.contractLength <= 1 && (strategy.avoidedHits >= strategy.preferredHits || underperformed || hardNoGoHit) ? 10 : 0) +
     (expiringStrategicPressure ? 8 : 0) +
     (expiringCoreDecisionPressure ? 10 : 0) +
+    (sellRunway.cashPressureScore >= 0.45 && !starProtection
+      ? Math.round(sellRunway.cashPressureScore * 14)
+      : 0) +
+    (sellRunway.cashPressureScore >= 0.45 &&
+    isAttractiveProfitSell({
+      expectedSellValue,
+      marketValue,
+      purchasePrice,
+      cashPressureScore: sellRunway.cashPressureScore,
+    })
+      ? 10
+      : 0) +
     demandPressureScore * 18 +
-    (boardTrust.renewalPolicy === "salary_cap" ? 5 : 0) +
-    (boardTrust.renewalPolicy === "renewal_warning" ? 11 : 0) +
-    (boardTrust.renewalPolicy === "do_not_renew" ? 22 : 0) +
     strategy.avoidedHits * 6 +
     (hardNoGoHit ? 14 : 0) +
     nonStarterBonus * 50 -
@@ -900,7 +935,7 @@ export async function buildAiTransfermarktSellPreview(params: AiSellPreviewParam
       playerOpt,
       targetRosterMin: playerMin,
       targetRosterOpt: playerOpt,
-      budgetPressure: getBudgetPressure(team),
+      budgetPressure: getBudgetPressure(team, salaryTotal),
       sellCandidates,
       keepCore,
       warnings,

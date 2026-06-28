@@ -117,7 +117,14 @@ function main() {
   writeCsv(
     riskBandsCsvPath,
     ["min", "max", "riskBand", "riskPercent", "uiLabel", "source"],
-    injuryRiskBands.map((band) => [band.min, band.max, band.label, band.riskPercent, band.uiLabel, "injuryRiskBands"]),
+    injuryRiskBands.map((band) => [
+      band.min,
+      band.max,
+      band.label,
+      getInjuryRiskPercent(band.max),
+      band.uiLabel,
+      "injuryRiskBands",
+    ]),
   );
   writeCsv(
     eventCsvPath,

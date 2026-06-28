@@ -7,7 +7,7 @@ import type {
   PlayerPotentialRecord,
   TeamFacilityCollection,
 } from "@/lib/data/olyDataTypes";
-import { getFacilityEfficiency, getFacilityLevel } from "@/lib/facilities/facility-effects";
+import { getFacilityEfficiency, getFacilityLevel, getRecoveryTrainingFatigueReductionPct } from "@/lib/facilities/facility-effects";
 import {
   deriveAttributeAffinityProfile,
   getAttributeAffinityKind,
@@ -24,6 +24,7 @@ import {
   resolvePlayerPotentialRecordFromGameState,
 } from "@/lib/scouting/player-attribute-ceiling-service";
 import { buildPlayerAxisStarProfile } from "@/lib/scouting/player-axis-star-rating";
+import { resolvePlayerPotentialRecordForProgression } from "@/lib/scouting/player-potential-ceiling-service";
 import {
   calculateDynamicClassName,
   getClassTrainingProfile,
@@ -119,7 +120,7 @@ export type OrganicRegressionBreakdown = {
   combinedTotal: number;
 };
 
-const BASE_REGRESSION_PER_ATTRIBUTE = 0.25;
+const BASE_REGRESSION_PER_ATTRIBUTE = 0.2;
 const TRAINING_CENTER_LEVEL_MODIFIER_PCT = [0, 10, 20, 30, 40, 50] as const;
 /** 0,6 % vom Marktwert pro Attribut (nicht MVS). */
 const MARKET_VALUE_PRESSURE_RATE = 0.006;
@@ -518,7 +519,10 @@ export function buildOrganicSeasonProgression(input: {
     saveId: input.gameState.season.id,
     scoutingLevel: 5,
   });
-  const potentialRecord = resolvePlayerPotentialRecordFromGameState({ gameState: input.gameState, playerId: input.player.id });
+  const potentialRecord = resolvePlayerPotentialRecordForProgression({
+    gameState: input.gameState,
+    player: input.player,
+  });
   const axisStars = buildPlayerAxisStarProfile({ gameState: input.gameState, player: input.player });
   const axisPoStars = potentialRecord?.hiddenPotentialCeilingByAxis ?? null;
   const potentialGapFactor = getPotentialGapTrainingFactor(starSnapshot.potentialGap);
@@ -620,7 +624,10 @@ export function buildOrganicSeasonProgression(input: {
     primaryTrainingClass,
     secondaryTrainingClass,
     trainingMode,
-    fatigueLoad: roundValue(FATIGUE_LOAD_BY_MODE[trainingMode] * (1 - Math.min(getFacilityLevel(input.facilities, "recovery_center") * 0.04, 0.2)), 1),
+    fatigueLoad: roundValue(
+      FATIGUE_LOAD_BY_MODE[trainingMode] * (1 - getRecoveryTrainingFatigueReductionPct(input.facilities) / 100),
+      1,
+    ),
     potentialRating,
     potentialTrainingMultiplier,
     traitTrainingMultiplier: traitSignal.trainingTraitMultiplier,

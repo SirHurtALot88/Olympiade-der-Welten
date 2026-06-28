@@ -1511,7 +1511,8 @@ function runFormCards(run: AdminSeasonSimulationRunState, save: PersistedSaveGam
       updatedAt: nowIso(),
     };
     for (const playerId of rosterPlayerIdsByTeamId.get(team.teamId) ?? []) {
-      trainingModeByPlayerId.set(playerId, trainingPreview.playerTrainingMode);
+      const plan = preview.trainingPlan.playerTrainingPlans.find((entry) => entry.playerId === playerId);
+      trainingModeByPlayerId.set(playerId, plan?.selectedMode ?? trainingPreview.playerTrainingMode);
     }
     trainingSettingsApplied += 1;
   }

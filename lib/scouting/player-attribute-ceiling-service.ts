@@ -56,7 +56,7 @@ function getPlayerSeedValue(seed: string) {
   return (hash >>> 0) / 4294967295;
 }
 
-function getPlayerAttributeValue(player: Player, attribute: PlayerGeneratorAttributeName): number | null {
+export function getPlayerAttributeValue(player: Player, attribute: PlayerGeneratorAttributeName): number | null {
   const value = player.attributeSheetStats?.[attribute];
   return isFiniteNumber(value) ? value : null;
 }
@@ -268,6 +268,14 @@ export function getAttributeHeadroom(input: {
     };
   }
   const headroom = ceiling - current;
+  if (headroom < 0) {
+    return {
+      current,
+      ceiling: current + 2,
+      headroom: 2,
+      state: "open" as AttributeHeadroomState,
+    };
+  }
   let state: AttributeHeadroomState = "open";
   if (headroom <= CAPPED_HEADROOM_THRESHOLD) state = "capped";
   else if (headroom <= CLOSING_HEADROOM_THRESHOLD) state = "closing";

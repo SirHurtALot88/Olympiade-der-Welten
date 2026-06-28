@@ -13,7 +13,8 @@ export type AiSellReasonCode =
   | "player_demand_pressure"
   | "board_salary_cap"
   | "board_renewal_warning"
-  | "board_do_not_renew";
+  | "board_do_not_renew"
+  | "cash_runway_pressure";
 
 export type AiKeepReasonCode =
   | "low_wage_burden"
@@ -43,6 +44,7 @@ const SELL_REASON_PATTERNS: Array<{ code: AiSellReasonCode; patterns: string[] }
   { code: "board_salary_cap", patterns: ["begrenzt Vertragsrahmen"] },
   { code: "board_renewal_warning", patterns: ["warnt vor voller Verlaengerung"] },
   { code: "board_do_not_renew", patterns: ["will keine Verlaengerung"] },
+  { code: "cash_runway_pressure", patterns: ["Gehaltslast uebersteigt verfuegbares Cash", "Kein Verkauf in dieser Saison trotz enger Cash-Lage"] },
 ];
 
 const KEEP_REASON_PATTERNS: Array<{ code: AiKeepReasonCode; patterns: string[] }> = [

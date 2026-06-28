@@ -143,4 +143,54 @@ describe("player-flavor-batch-service", () => {
     expect(persisted[1]?.flavorDe).toBe("Beta bio.");
     expect(persisted[1]?.rating).toBe(20.2);
   });
+
+  it("persist ignores enriched economy fields from apply input", () => {
+    const dir = mkdtempSync(path.join(os.tmpdir(), "flavor-batch-"));
+    const statsPath = path.join(dir, "players.json");
+    const rawPlayer = makePlayer({
+      id: "player-b",
+      name: "Beta",
+      rating: 55.12,
+      marketValue: 33.44,
+      salaryDemand: 9.87,
+      displayMarketValue: 33.44,
+      displaySalary: 9.87,
+    });
+    writeFileSync(statsPath, `${JSON.stringify([rawPlayer], null, 2)}\n`, "utf8");
+
+    const enrichedApplyResult = {
+      updatedPlayers: [
+        {
+          ...rawPlayer,
+          flavorDe: "Neue Bio.",
+          marketValue: 99.99,
+          salaryDemand: 88.88,
+          displayMarketValue: 99.99,
+          displaySalary: 88.88,
+          portraitPath: "/tmp/enriched.jpg",
+          pps: 55.12,
+          ovr: 60,
+        },
+      ],
+      updatedPlayerIds: ["player-b"],
+      updated: 1,
+      unchanged: 0,
+      skipped: 0,
+      skippedExisting: 0,
+      notFound: 0,
+      issues: [],
+    };
+
+    persistPlayerFlavorImport(enrichedApplyResult, { statsPath });
+
+    const persisted = JSON.parse(readFileSync(statsPath, "utf8")) as Player[];
+    expect(persisted[0]?.flavorDe).toBe("Neue Bio.");
+    expect(persisted[0]?.marketValue).toBe(33.44);
+    expect(persisted[0]?.salaryDemand).toBe(9.87);
+    expect(persisted[0]?.displayMarketValue).toBe(33.44);
+    expect(persisted[0]?.displaySalary).toBe(9.87);
+    expect(persisted[0]).not.toHaveProperty("portraitPath");
+    expect(persisted[0]).not.toHaveProperty("pps");
+    expect(persisted[0]).not.toHaveProperty("ovr");
+  });
 });

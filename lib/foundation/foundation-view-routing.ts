@@ -12,6 +12,7 @@ export const FOUNDATION_VIEW_IDS = [
   "inbox",
   "seasonPreview",
   "lineup",
+  "lineupV2",
   "matchdayArena",
   "matchdayResult",
   "teams",
@@ -41,6 +42,9 @@ export function normalizeFoundationViewParam(view: string | null | undefined): F
     return null;
   }
 
+  if (view === "lineup-v2" || view === "lineupV2" || view === "einsatzliste-v2") {
+    return "lineupV2";
+  }
   if (view === "matchday-arena" || view === "matchday-arena-v2") {
     return "matchdayArena";
   }

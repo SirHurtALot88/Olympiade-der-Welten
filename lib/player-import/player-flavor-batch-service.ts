@@ -3,7 +3,7 @@ import path from "node:path";
 
 import type { Player } from "@/lib/data/olyDataTypes";
 import { loadImportedPlayerStats } from "@/lib/data/playerStatsAdapter";
-import { upsertPlayerCatalogEntries } from "@/lib/persistence/save-repository";
+import { patchPlayerCatalogFlavorEntries } from "@/lib/persistence/save-repository";
 
 export const PLAYER_FLAVOR_BATCH_VERSION = 1;
 
@@ -103,6 +103,11 @@ function normalizeText(value: string | undefined | null) {
 
 function hasFlavorText(value: string | undefined | null) {
   return normalizeText(value).length > 0;
+}
+
+/** Raw catalog JSON on disk — no economy repair, portrait attach, or derived stat enrichment. */
+export function loadRawPlayerStatsFromDisk(statsPath = DEFAULT_STATS_PATH): Player[] {
+  return JSON.parse(readFileSync(statsPath, "utf8")) as Player[];
 }
 
 export function loadPortraitMapFromDisk(portraitMapPath = DEFAULT_PORTRAIT_MAP_PATH) {
@@ -285,7 +290,7 @@ export function applyPlayerFlavorImport(
   entries: PlayerFlavorImportEntry[],
   options: PlayerFlavorImportOptions = {},
 ): PlayerFlavorApplyResult {
-  const sourcePlayers = options.players ?? loadImportedPlayerStats();
+  const sourcePlayers = options.players ?? loadRawPlayerStatsFromDisk();
   const playersById = new Map(sourcePlayers.map((player) => [player.id, player]));
   const playersByName = new Map<string, Player[]>();
   for (const player of sourcePlayers) {
@@ -403,11 +408,31 @@ export function persistPlayerFlavorImport(
   options: { statsPath?: string } = {},
 ): PlayerFlavorPersistResult {
   const statsPath = options.statsPath ?? DEFAULT_STATS_PATH;
-  writeFileSync(statsPath, `${JSON.stringify(result.updatedPlayers, null, 2)}\n`, "utf8");
+  const rawPlayers = loadRawPlayerStatsFromDisk(statsPath);
+  const flavorPatches = new Map<string, { flavorDe: string; flavorEn: string }>();
 
-  const changedPlayers = result.updatedPlayers.filter((player) => result.updatedPlayerIds.includes(player.id));
-  if (changedPlayers.length > 0) {
-    upsertPlayerCatalogEntries(changedPlayers);
+  for (const player of result.updatedPlayers) {
+    if (!result.updatedPlayerIds.includes(player.id)) continue;
+    flavorPatches.set(player.id, {
+      flavorDe: player.flavorDe ?? "",
+      flavorEn: player.flavorEn ?? "",
+    });
+  }
+
+  const persistedPlayers = rawPlayers.map((player) => {
+    const patch = flavorPatches.get(player.id);
+    if (!patch) return player;
+    return {
+      ...player,
+      flavorDe: patch.flavorDe,
+      flavorEn: patch.flavorEn,
+    };
+  });
+
+  writeFileSync(statsPath, `${JSON.stringify(persistedPlayers, null, 2)}\n`, "utf8");
+
+  if (flavorPatches.size > 0) {
+    patchPlayerCatalogFlavorEntries(flavorPatches);
   }
 
   return {
@@ -421,7 +446,7 @@ export function importPlayerFlavorBatchFromFile(
   options: PlayerFlavorImportOptions & { statsPath?: string } = {},
 ) {
   const entries = loadPlayerFlavorImportEntriesFromFile(filePath);
-  const players = options.players ?? loadImportedPlayerStats();
+  const players = options.players ?? loadRawPlayerStatsFromDisk(options.statsPath);
   const result = applyPlayerFlavorImport(entries, { ...options, players });
   const persistResult = persistPlayerFlavorImport(result, { statsPath: options.statsPath });
   return { ...result, ...persistResult };

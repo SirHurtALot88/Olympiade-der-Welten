@@ -4,6 +4,7 @@ export type FoundationSubNavItem = {
   id: string;
   label: string;
   title?: string;
+  needsAttention?: boolean;
 };
 
 type FoundationSubNavProps = {
@@ -26,7 +27,7 @@ export default function FoundationSubNav({ items, activeId, onSelect, className 
         <button
           key={item.id}
           type="button"
-          className={`foundation-subnav-item${activeId === item.id ? " is-active" : ""}`}
+          className={`foundation-subnav-item${activeId === item.id ? " is-active" : ""}${item.needsAttention ? " is-attention" : ""}`}
           data-testid={`foundation-subnav-${item.id}`}
           title={item.title ?? item.label}
           onClick={() => onSelect(item.id)}

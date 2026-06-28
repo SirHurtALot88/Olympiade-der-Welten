@@ -35,14 +35,25 @@ describe("trait training signal", () => {
     expect(signal.traitCapReached).toBe(false);
   });
 
-  it("caps a large positive raw signal at plus twelve percent", () => {
+  it("caps a large positive raw signal at plus twenty-five percent effective", () => {
     const signal = buildTrainingTraitSignal({
       traitsPositive: ["Diligent", "Ambitious"],
     });
 
     expect(signal.rawTraitTrainingSignalPct).toBe(40);
-    expect(signal.compressedTraitTrainingPct).toBe(12);
-    expect(signal.trainingTraitMultiplier).toBe(1.12);
+    expect(signal.compressedTraitTrainingPct).toBe(16);
+    expect(signal.trainingTraitMultiplier).toBe(1.16);
+    expect(signal.traitCapReached).toBe(false);
+  });
+
+  it("caps a stacked positive raw signal at plus twenty-five percent effective", () => {
+    const signal = buildTrainingTraitSignal({
+      traitsPositive: ["Diligent", "Ambitious", "Motivated", "FiredUp"],
+    });
+
+    expect(signal.rawTraitTrainingSignalPct).toBe(70);
+    expect(signal.compressedTraitTrainingPct).toBe(25);
+    expect(signal.trainingTraitMultiplier).toBe(1.25);
     expect(signal.traitCapReached).toBe(true);
   });
 
@@ -57,14 +68,25 @@ describe("trait training signal", () => {
     expect(signal.traitCapReached).toBe(false);
   });
 
-  it("caps a large negative raw signal at minus twelve percent", () => {
+  it("caps a large negative raw signal at minus twenty percent effective", () => {
     const signal = buildTrainingTraitSignal({
       traitsNegative: ["Lazy", "Diva", "Fair"],
     });
 
     expect(signal.rawTraitTrainingSignalPct).toBe(-35);
-    expect(signal.compressedTraitTrainingPct).toBe(-12);
-    expect(signal.trainingTraitMultiplier).toBe(0.88);
+    expect(signal.compressedTraitTrainingPct).toBe(-14);
+    expect(signal.trainingTraitMultiplier).toBe(0.86);
+    expect(signal.traitCapReached).toBe(false);
+  });
+
+  it("caps a stacked negative raw signal at minus twenty percent effective", () => {
+    const signal = buildTrainingTraitSignal({
+      traitsNegative: ["Lazy", "Diva", "Paranoid", "Relaxed"],
+    });
+
+    expect(signal.rawTraitTrainingSignalPct).toBe(-60);
+    expect(signal.compressedTraitTrainingPct).toBe(-20);
+    expect(signal.trainingTraitMultiplier).toBe(0.8);
     expect(signal.traitCapReached).toBe(true);
   });
 

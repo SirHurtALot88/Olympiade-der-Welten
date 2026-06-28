@@ -1,23 +1,9 @@
 "use client";
 
 import OptimizedMediaImage from "@/app/foundation/OptimizedMediaImage";
-import { VeloStatOrbitRow } from "@/components/foundation/velo-ui";
+import FoundationPlayerPortraitCard from "@/components/foundation/player-portrait-card/FoundationPlayerPortraitCard";
 import type { HomeV2ClientProps, HomeV2TopPlayerCard } from "@/app/foundation/home-v2/home-v2-types";
 import { HOME_V2_TOP_PLAYER_COUNT } from "@/app/foundation/home-v2/home-v2-types";
-
-function formatAbilityPoints(value: number | null | undefined, digits = 0) {
-  if (value == null || !Number.isFinite(value)) return "—";
-  return value.toLocaleString("de-DE", {
-    minimumFractionDigits: digits,
-    maximumFractionDigits: digits,
-  });
-}
-
-function formatPotentialRange(min: number | null | undefined, max: number | null | undefined) {
-  if (min == null || max == null || !Number.isFinite(min) || !Number.isFinite(max)) return "—";
-  if (Math.round(min) === Math.round(max)) return formatAbilityPoints(min, 0);
-  return `${formatAbilityPoints(min, 0)}–${formatAbilityPoints(max, 0)}`;
-}
 
 function formatNumber(value: number | null | undefined, digits = 1) {
   if (value == null || !Number.isFinite(value)) return "—";
@@ -29,13 +15,23 @@ function formatNumber(value: number | null | undefined, digits = 1) {
 
 function formatMoney(value: number | null | undefined) {
   if (value == null || !Number.isFinite(value)) return "—";
-  return formatNumber(value, 2);
+  return value.toLocaleString("de-DE", {
+    minimumFractionDigits: 2,
+    maximumFractionDigits: 2,
+  });
 }
 
 function getPlayerHighlightLabel(card: HomeV2TopPlayerCard) {
   if (card.highlight === "prospect") return "Prospect";
   if (card.highlight === "top") return "Top";
   return null;
+}
+
+function getPlayerRankFrameClass(index: number) {
+  if (index === 0) return " is-rank-gold";
+  if (index === 1) return " is-rank-silver";
+  if (index === 2) return " is-rank-bronze";
+  return "";
 }
 
 function getGmToneClass(tone: string | null | undefined) {
@@ -74,6 +70,7 @@ export default function HomeV2Client({
   nextStepStatus,
   warnings,
   topPlayers,
+  leagueHeatPools,
   facilities,
   inboxItems,
   todayCards,
@@ -199,72 +196,32 @@ export default function HomeV2Client({
           </div>
           <div className="home-v2-player-grid">
             {topPlayers.length > 0 ? (
-              topPlayers.slice(0, HOME_V2_TOP_PLAYER_COUNT).map((player, index) => {
-                const highlight = getPlayerHighlightLabel(player);
-                return (
-                  <button
-                    key={player.playerId}
-                    type="button"
-                    className={`home-v2-player-card${index === 0 ? " is-featured" : ""}`}
-                    onClick={() => onOpenPlayer(player.playerId)}
-                    title={`${player.name} öffnen · Top-6 Kader #${index + 1}`}
-                  >
-                    {highlight ? <span className="home-v2-player-badge">{highlight}</span> : null}
-                    {player.portraitUrl ? (
-                      <OptimizedMediaImage
-                        className="home-v2-player-portrait"
-                        src={player.portraitUrl}
-                        alt={player.name}
-                        width={88}
-                        height={88}
-                      />
-                    ) : (
-                      <span className="home-v2-player-portrait is-placeholder">{player.portraitInitials}</span>
-                    )}
-                    <strong>{player.name}</strong>
-                    <div className="home-v2-player-stats">
-                      <span className="home-v2-player-stat is-rank">
-                        <small>Rank</small>
-                        <strong>#{player.rosterRank}</strong>
-                      </span>
-                      <span className="home-v2-player-stat">
-                        <small>OVR</small>
-                        <strong>{formatNumber(player.playerOvr, 1)}</strong>
-                      </span>
-                      <span className="home-v2-player-stat">
-                        <small>PPs</small>
-                        <strong>{formatNumber(player.playerPps, 1)}</strong>
-                      </span>
-                      <span className="home-v2-player-stat">
-                        <small>MVS</small>
-                        <strong>{formatNumber(player.playerMvs, 1)}</strong>
-                      </span>
-                    </div>
-                    <VeloStatOrbitRow
-                      ariaLabel={`${player.name} Achsenwerte POW SPE MEN SOC`}
-                      className="home-v2-player-orbit"
-                      stats={{
-                        pow: player.pow ?? 0,
-                        spe: player.spe ?? 0,
-                        men: player.men ?? 0,
-                        soc: player.soc ?? 0,
-                      }}
-                    />
-                    <div className="home-v2-ca-po-row" data-testid="home-player-ca-po-row">
-                      <span className="home-v2-ca-po-metric">
-                        <small>CA</small>
-                        <strong>{formatAbilityPoints(player.caRating, 0)}</strong>
-                      </span>
-                      <span className="home-v2-ca-po-metric">
-                        <small>PO</small>
-                        <strong data-testid="home-player-potential-range">
-                          {formatPotentialRange(player.poRangeMin, player.poRangeMax)}
-                        </strong>
-                      </span>
-                    </div>
-                  </button>
-                );
-              })
+              topPlayers.slice(0, HOME_V2_TOP_PLAYER_COUNT).map((player, index) => (
+                <FoundationPlayerPortraitCard
+                  key={player.playerId}
+                  playerId={player.playerId}
+                  name={player.name}
+                  portraitUrl={player.portraitUrl}
+                  portraitInitials={player.portraitInitials}
+                  playerOvr={player.playerOvr}
+                  playerMvs={player.playerMvs}
+                  playerPps={player.playerPps}
+                  pow={player.pow}
+                  spe={player.spe}
+                  men={player.men}
+                  soc={player.soc}
+                  leagueHeatPools={leagueHeatPools}
+                  rosterRank={player.rosterRank}
+                  highlight={getPlayerHighlightLabel(player)}
+                  rankFrameClass={getPlayerRankFrameClass(index)}
+                  caRating={player.caRating}
+                  poRangeMin={player.poRangeMin}
+                  poRangeMax={player.poRangeMax}
+                  variant="home"
+                  onOpen={() => onOpenPlayer(player.playerId)}
+                  title={`${player.name} öffnen · Top-6 Kader #${index + 1}`}
+                />
+              ))
             ) : (
               <p className="muted">Noch keine Kaderdaten.</p>
             )}

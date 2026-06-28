@@ -1,5 +1,5 @@
 import { getPlayerPortraitBrowserUrl } from "@/lib/data/mediaAssets";
-import type { DisciplineCategory, GameState, Player, RosterEntry, Team, TeamStrategyProfile } from "@/lib/data/olyDataTypes";
+import type { DisciplineCategory, GameState, Player, RosterEntry, SeasonSnapshotTransferRecord, Team, TeamStrategyProfile } from "@/lib/data/olyDataTypes";
 import {
   assessPlayerBoardTrust,
   type PlayerBoardTrustMood,
@@ -8,6 +8,7 @@ import {
 import type { PlayerEconomyCompareRow } from "@/lib/foundation/player-economy-compare-service";
 import { buildPlayerEconomyCompareMap } from "@/lib/foundation/player-economy-compare-service";
 import { resolvePlayerEconomyContract } from "@/lib/foundation/player-economy-contract";
+import { getFatiguePerformancePenaltyPercent } from "@/lib/fatigue/fatigue-calibration";
 import { calculateTeamRecovery, getInjuryRiskBand, getInjuryRiskPercent, getPlayerAvailabilityView } from "@/lib/fatigue/fatigue-injury-service";
 import {
   buildPlayerRatingContractMap,
@@ -15,6 +16,7 @@ import {
   type PlayerRatingContractRow,
 } from "@/lib/foundation/player-rating-contract";
 import { buildProjectedClassPreview } from "@/lib/foundation/projected-class-preview";
+import { buildPlayerAverageMatchdayFatigueBySeason } from "@/lib/foundation/player-season-fatigue-stats";
 import { buildPlayerSeasonPerformance, buildPlayerSeasonPerformanceMap } from "@/lib/foundation/player-season-performance";
 import { getPlayerSeasonZeroMarketValueDelta, getPlayerSeasonZeroMarketValueReference } from "@/lib/foundation/player-display-market-value";
 import { buildSeasonPointsLedger } from "@/lib/foundation/season-points-ledger";
@@ -25,6 +27,17 @@ import { getTeamStrategyProfile } from "@/lib/foundation/team-strategy-profiles"
 import type { LegacyLineupLoadedContext } from "@/lib/lineups/legacy-lineup-types";
 import { normalizeTransfermarktToken } from "@/lib/market/transfermarkt-fit";
 import { buildTransfermarktSaleFactorBreakdown } from "@/lib/market/transfermarkt-sale-factor";
+import { getCanonicalSeasonLabel } from "@/lib/season/season-label";
+import { buildPlayerAttributeHistoryRows, type PlayerAttributeHistoryRow } from "@/lib/foundation/player-attribute-history";
+import {
+  aggregatePlayerInjuryHistoryBySeason,
+  buildPlayerInjuryHistoryFromEvents,
+  buildPlayerInjurySummary,
+  type PlayerInjurySummary,
+} from "@/lib/foundation/player-injury-history";
+import type { PlayerInjuryHistoryRecord } from "@/lib/data/olyDataTypes";
+import { buildPlayerTrainingHistoryRows, type PlayerTrainingHistoryRow } from "@/lib/foundation/player-training-history";
+import { buildPlayerHistoryDisciplineValues, type PlayerHistoryDisciplineValues } from "@/lib/season/season-discipline-area-groups";
 import {
   buildScoutedDisciplineTiers,
   getScoutedTraitView,
@@ -54,6 +67,7 @@ import {
   normalizePlayerAttributes,
   type OrganicSeasonProgressionResult,
 } from "@/lib/training/organic-season-progression";
+import { DEBUG_FORCE_PLAYER_VISIBILITY } from "@/lib/foundation/debug-player-visibility";
 import { buildPlayerProgressionForecast } from "@/lib/training/player-progression-forecast";
 import {
   buildPlayerDevelopmentLevelupModel,
@@ -85,7 +99,7 @@ type DisciplineGlobalRankMaps = {
   allTimePointsRanksByDiscipline: Map<string, Map<string, number | null>>;
 };
 
-type PlayerDrawerHistoryRow = {
+export type PlayerDrawerHistoryRow = {
   seasonId: string | null;
   seasonName: string;
   isActiveSeason: boolean;
@@ -93,11 +107,13 @@ type PlayerDrawerHistoryRow = {
   teamName: string | null;
   teamCode: string | null;
   appearances: number | null;
+  averageFatigue: number | null;
   totalPoints: number | null;
   pow: number | null;
   spe: number | null;
   men: number | null;
   soc: number | null;
+  disciplineValues: PlayerHistoryDisciplineValues;
   ovr: number | null;
   ovrRank: number | null;
   pps: number | null;
@@ -114,11 +130,15 @@ type PlayerDrawerHistoryRow = {
   projectedSellValue: number | null;
   projectedSellFactor: number | null;
   projectedSellSourceLabel: string | null;
+  saleFactorRankInBracket: number | null;
+  saleFactorBracketSize: number | null;
   salary: number | null;
   contractLength: number | null;
   averageContribution: number | null;
   averageFinalScore: number | null;
   bestDisciplineLabel: string | null;
+  injuriesCount: number | null;
+  matchdaysMissed: number | null;
   warnings: string[];
 };
 
@@ -135,6 +155,8 @@ export type PlayerDetailDrawerData = {
   teamHumanControlled: boolean | null;
   transferStatus: string;
   className: string | null;
+  trainingClass: string | null;
+  trainingMode: Player["trainingMode"] | null;
   race: string | null;
   subclasses: string[];
   traitsPositive: string[];
@@ -235,6 +257,7 @@ export type PlayerDetailDrawerData = {
     injuryRiskPercent: number;
     injuryRiskBand: string;
     injuryRiskLabel: string;
+    performancePenaltyPercent: number;
     isUnavailable: boolean;
     blocker: "player_injured_unavailable" | null;
     lastRoll: {
@@ -246,18 +269,10 @@ export type PlayerDetailDrawerData = {
     } | null;
     normalRecovery: number | null;
     injuryRecovery: number | null;
-    injuryHistory: Array<{
-      eventId: string;
-      seasonId: string;
-      matchdayId: string;
-      fatigueBefore: number;
-      riskPercent: number;
-      roll: number;
-      result: "healthy" | "injured";
-      unavailableUntil: string | null;
-      timestamp: string;
-    }>;
+    injuryHistory: PlayerInjuryHistoryRecord[];
   };
+  injurySummary: PlayerInjurySummary;
+  injuryHistoryRows: PlayerInjuryHistoryRecord[];
   form: number | null;
   potential: number | null;
   scoutPotential: PlayerScoutPotential | null;
@@ -329,6 +344,8 @@ export type PlayerDetailDrawerData = {
       cost: number;
     }>;
   }>;
+  trainingHistoryRows: PlayerTrainingHistoryRow[];
+  attributeHistoryRows: PlayerAttributeHistoryRow[];
   progressionEconomyPreview: {
     marketValuePreview: number | null;
     currentContractSalary: number | null;
@@ -437,6 +454,7 @@ export type PlayerDetailDrawerData = {
     spe: number | null;
     men: number | null;
     soc: number | null;
+    disciplineValues: PlayerHistoryDisciplineValues;
     ovr: number | null;
     ovrRank: number | null;
     pps: number | null;
@@ -453,6 +471,8 @@ export type PlayerDetailDrawerData = {
     projectedSellValue: number | null;
     projectedSellFactor: number | null;
     projectedSellSourceLabel: string | null;
+    saleFactorRankInBracket: number | null;
+    saleFactorBracketSize: number | null;
     salary: number | null;
     contractLength: number | null;
     top10Count: number;
@@ -690,6 +710,30 @@ function buildAttributeStats(
   return maskAttributeStatsForVisibility(buildRawAttributeStats(player), visibility);
 }
 
+function applyOrganicAttributeFallback(
+  rows: ReturnType<typeof buildAttributeStats>,
+  attributesBefore: OrganicSeasonProgressionResult["attributesBefore"] | null | undefined,
+) {
+  if (!attributesBefore) {
+    return rows;
+  }
+  return rows.map((row) => {
+    if (row.value != null) {
+      return row;
+    }
+    const key = row.key as keyof typeof attributesBefore;
+    const fallbackValue = attributesBefore[key];
+    if (typeof fallbackValue !== "number" || !Number.isFinite(fallbackValue)) {
+      return row;
+    }
+    return {
+      ...row,
+      value: fallbackValue,
+      ratingLabel: row.ratingLabel ?? deriveAttributeRatingLabel(fallbackValue),
+    };
+  });
+}
+
 function maskAxisCardsForVisibility(
   cards: PlayerDrawerAxisCard[],
   visibility: AttributeVisibility,
@@ -783,6 +827,9 @@ function resolveAttributeVisibility(input: {
   manageableTeamIds?: string[] | null;
   scoutingLevel?: number | null;
 }): AttributeVisibility {
+  if (DEBUG_FORCE_PLAYER_VISIBILITY) {
+    return "exact";
+  }
   if (input.manageableTeamIds && input.manageableTeamIds.length > 0) {
     if (input.teamId && input.manageableTeamIds.includes(input.teamId)) {
       return "exact";
@@ -1177,12 +1224,95 @@ function getSeasonZeroEconomyForPlayer(gameState: GameState, playerId: string) {
   return getPlayerBaselineEconomyReference(baseline);
 }
 
-function buildSeasonHistory(gameState: GameState, playerId: string) {
+function resolvePlayerMarketValueReference(input: {
+  player: Player;
+  gameState: GameState;
+  rosterPurchasePrice?: number | null;
+  currentMarketValue?: number | null;
+}) {
+  if (input.rosterPurchasePrice != null && input.rosterPurchasePrice > 0) {
+    return input.rosterPurchasePrice;
+  }
+  return getPlayerSeasonZeroMarketValueReference({
+    player: input.player,
+    gameState: input.gameState,
+    currentMarketValue: input.currentMarketValue,
+  });
+}
+
+function buildSnapshotSaleProjection(
+  gameState: GameState,
+  player: Player,
+  row: SeasonSnapshotRecord["playerPerformances"][number],
+  seasonTransfer: SeasonSnapshotTransferRecord | null,
+) {
+  if (seasonTransfer?.type === "sell" && seasonTransfer.amount != null) {
+    const transferMarketValue = row.marketValue ?? seasonTransfer.marketValue ?? null;
+    return {
+      projectedSellValue: seasonTransfer.amount,
+      projectedSellFactor:
+        seasonTransfer.amountMarketValueFactor ??
+        calculateMoneyFactor(seasonTransfer.amount, transferMarketValue),
+      projectedSellSourceLabel: "Archivierter Verkauf",
+      saleFactorRankInBracket: row.saleFactorRankInBracket ?? null,
+      saleFactorBracketSize: row.saleFactorBracketSize ?? null,
+    };
+  }
+
+  if (row.projectedSellFactor != null) {
+    return {
+      projectedSellValue: row.projectedSellValue ?? null,
+      projectedSellFactor: row.projectedSellFactor,
+      projectedSellSourceLabel: "snapshot_sale_factor",
+      saleFactorRankInBracket: row.saleFactorRankInBracket ?? null,
+      saleFactorBracketSize: row.saleFactorBracketSize ?? null,
+    };
+  }
+
+  const marketValue = row.marketValue ?? seasonTransfer?.marketValue ?? null;
+  if (marketValue == null) {
+    return {
+      projectedSellValue: null,
+      projectedSellFactor: null,
+      projectedSellSourceLabel: null,
+      saleFactorRankInBracket: null,
+      saleFactorBracketSize: null,
+    };
+  }
+
+  const syntheticRoster: RosterEntry = {
+    id: `snapshot-sale-${row.playerId}-${row.seasonId ?? "unknown"}`,
+    playerId: row.playerId,
+    teamId: row.teamId ?? "",
+    contractLength: row.contractLength ?? 0,
+    salary: row.salary ?? 0,
+    upkeep: 0,
+    currentValue: marketValue,
+    purchasePrice: marketValue,
+    roleTag: "prospect",
+    promisedRole: row.promisedRole ?? null,
+    joinedSeasonId: row.seasonId ?? gameState.season.id,
+  };
+  const breakdown = buildTransfermarktSaleFactorBreakdown(gameState, player, syntheticRoster);
+  return {
+    projectedSellValue: breakdown.salePrice,
+    projectedSellFactor: breakdown.saleFactor,
+    projectedSellSourceLabel: breakdown.factorSource,
+    saleFactorRankInBracket: breakdown.rankInBracket,
+    saleFactorBracketSize: breakdown.bracketGroupSize,
+  };
+}
+
+function buildSeasonHistory(gameState: GameState, playerId: string, player: Player) {
   const disciplineCategoryById = new Map(gameState.disciplines.map((discipline) => [discipline.id, discipline.category] as const));
-  const player = gameState.players.find((entry) => entry.id === playerId) ?? null;
-  const baselineMarketValue = getPlayerSeasonZeroMarketValueReference({
+  const rosterPurchasePrice =
+    gameState.rosters.find((entry) => entry.playerId === playerId)?.purchasePrice ??
+    gameState.transferHistory.find((entry) => entry.playerId === playerId && entry.transferType === "buy")?.fee ??
+    null;
+  const referenceMarketValue = resolvePlayerMarketValueReference({
     player,
     gameState,
+    rosterPurchasePrice,
   });
   return [...(gameState.seasonState.seasonSnapshots ?? [])]
     .sort((left, right) => right.seasonId.localeCompare(left.seasonId, "de"))
@@ -1203,6 +1333,7 @@ function buildSeasonHistory(gameState: GameState, playerId: string) {
         })[0] ?? null;
       const transferFee = seasonTransfer?.amount ?? null;
       const transferMarketValue = row.marketValue ?? seasonTransfer?.marketValue ?? null;
+      const saleProjection = buildSnapshotSaleProjection(gameState, player, row, seasonTransfer);
       const ppsRankMap = buildSharedRankMap(
         snapshot.playerPerformances.map((entry) => ({
           playerId: entry.playerId,
@@ -1236,6 +1367,7 @@ function buildSeasonHistory(gameState: GameState, playerId: string) {
         spe: row.spePoints ?? (hasDisciplineBreakdown ? roundValue(pointsByArea.spe, 1) : null),
         men: row.menPoints ?? (hasDisciplineBreakdown ? roundValue(pointsByArea.men, 1) : null),
         soc: row.socPoints ?? (hasDisciplineBreakdown ? roundValue(pointsByArea.soc, 1) : null),
+        disciplineValues: buildPlayerHistoryDisciplineValues(row.disciplineBreakdown),
         ovr: row.ovr ?? null,
         ovrRank: row.ovrRank ?? null,
         pps: row.pps ?? row.totalPoints ?? row.totalContribution ?? null,
@@ -1243,17 +1375,20 @@ function buildSeasonHistory(gameState: GameState, playerId: string) {
         mvs: row.mvs ?? null,
         mvsRank: row.mvsRank ?? null,
         marketValue: row.marketValue ?? null,
-        marketValueBaselineDelta: calculateMoneyDelta(row.marketValue, baselineMarketValue),
+        marketValueBaselineDelta: calculateMoneyDelta(
+          row.marketValue,
+          row.purchasePrice ?? referenceMarketValue,
+        ),
         transferType: seasonTransfer?.type ?? null,
         transferFee,
         transferMarketValue,
         transferDeltaToMarketValue: seasonTransfer?.amountDeltaToMarketValue ?? calculateMoneyDelta(transferFee, transferMarketValue),
         transferMarketValueFactor: seasonTransfer?.amountMarketValueFactor ?? calculateMoneyFactor(transferFee, transferMarketValue),
-        projectedSellValue: seasonTransfer?.type === "sell" ? transferFee : null,
-        projectedSellFactor: seasonTransfer?.type === "sell"
-          ? seasonTransfer?.amountMarketValueFactor ?? calculateMoneyFactor(transferFee, transferMarketValue)
-          : null,
-        projectedSellSourceLabel: seasonTransfer?.type === "sell" ? "Archivierter Verkauf" : null,
+        projectedSellValue: saleProjection.projectedSellValue,
+        projectedSellFactor: saleProjection.projectedSellFactor,
+        projectedSellSourceLabel: saleProjection.projectedSellSourceLabel,
+        saleFactorRankInBracket: saleProjection.saleFactorRankInBracket ?? null,
+        saleFactorBracketSize: saleProjection.saleFactorBracketSize ?? null,
         salary: row.salary ?? null,
         contractLength: row.contractLength ?? null,
         bestDisciplineLabel: row.bestDisciplineLabel ?? null,
@@ -1262,6 +1397,115 @@ function buildSeasonHistory(gameState: GameState, playerId: string) {
       };
     })
     .filter((entry): entry is NonNullable<typeof entry> => Boolean(entry));
+}
+
+function mergeSeasonHistoryWithTransferFallback(
+  gameState: GameState,
+  player: Player,
+  snapshotHistory: PlayerDetailDrawerData["seasonHistory"],
+): PlayerDetailDrawerData["seasonHistory"] {
+  const bySeasonId = new Map(snapshotHistory.map((entry) => [entry.seasonId, entry] as const));
+
+  for (const transfer of gameState.transferHistory) {
+    if (transfer.playerId !== player.id) {
+      continue;
+    }
+    if (transfer.seasonId === gameState.season.id || bySeasonId.has(transfer.seasonId)) {
+      continue;
+    }
+
+    const teamId = transfer.toTeamId ?? transfer.fromTeamId;
+    const team = gameState.teams.find((entry) => entry.teamId === teamId) ?? null;
+    const marketValue = transfer.marketValue ?? null;
+    const baselineMarketValue = getPlayerSeasonZeroMarketValueReference({ player, gameState });
+    const saleProjection = buildSnapshotSaleProjection(
+      gameState,
+      player,
+      {
+        playerId: player.id,
+        playerName: player.name,
+        teamId,
+        teamCode: team?.shortCode ?? null,
+        teamName: team?.name ?? null,
+        seasonId: transfer.seasonId,
+        appearances: 0,
+        totalContribution: null,
+        averageContribution: null,
+        averageFinalScore: null,
+        top10Count: 0,
+        mvpCount: 0,
+        bestDisciplineId: null,
+        bestDisciplineScore: null,
+        marketValue,
+        salary: transfer.salary,
+        contractLength: transfer.remainingContractLength,
+        promisedRole: null,
+      },
+      {
+        transferId: transfer.id,
+        seasonId: transfer.seasonId,
+        playerId: player.id,
+        playerName: player.name,
+        fromTeamId: transfer.fromTeamId,
+        fromTeamName: null,
+        toTeamId: transfer.toTeamId,
+        toTeamName: null,
+        type: transfer.transferType,
+        amount: transfer.fee,
+        salary: transfer.salary,
+        marketValue,
+        amountMarketValueFactor: calculateMoneyFactor(transfer.fee, marketValue),
+        contractLength: transfer.remainingContractLength,
+        source: transfer.source ?? "transfer_history_fallback",
+        happenedAt: transfer.happenedAt,
+      },
+    );
+
+    bySeasonId.set(transfer.seasonId, {
+      seasonId: transfer.seasonId,
+      seasonName: getCanonicalSeasonLabel({ seasonId: transfer.seasonId, seasonName: transfer.seasonLabel }),
+      teamName: team?.name ?? null,
+      teamCode: team?.shortCode ?? null,
+      appearances: 0,
+      totalPoints: null,
+      averageContribution: null,
+      averageFinalScore: null,
+      pow: null,
+      spe: null,
+      men: null,
+      soc: null,
+      disciplineValues: {},
+      ovr: null,
+      ovrRank: null,
+      pps: null,
+      ppsRank: null,
+      mvs: null,
+      mvsRank: null,
+      marketValue,
+      marketValueBaselineDelta: calculateMoneyDelta(marketValue, baselineMarketValue),
+      transferType: transfer.transferType,
+      transferFee: transfer.fee,
+      transferMarketValue: marketValue,
+      transferDeltaToMarketValue: calculateMoneyDelta(transfer.fee, marketValue),
+      transferMarketValueFactor: calculateMoneyFactor(transfer.fee, marketValue),
+      projectedSellValue: saleProjection.projectedSellValue,
+      projectedSellFactor: saleProjection.projectedSellFactor,
+      projectedSellSourceLabel: saleProjection.projectedSellSourceLabel,
+      saleFactorRankInBracket: saleProjection.saleFactorRankInBracket ?? null,
+      saleFactorBracketSize: saleProjection.saleFactorBracketSize ?? null,
+      salary: transfer.salary,
+      contractLength: transfer.remainingContractLength,
+      top10Count: 0,
+      mvpCount: 0,
+      bestDisciplineLabel: null,
+      bestDisciplineScore: null,
+      warnings: ["transfer_fallback_without_snapshot_performance"],
+    });
+  }
+
+  return [...bySeasonId.values()].sort((left, right) =>
+    right.seasonId.localeCompare(left.seasonId, "de", { numeric: true }),
+  );
 }
 
 function findLatestArchivedPlayerPerformance(gameState: GameState, playerId: string) {
@@ -1294,6 +1538,8 @@ function buildHistoryRows(input: {
   salary: number | null;
   contractLength: number | null;
   seasonHistory: PlayerDetailDrawerData["seasonHistory"];
+  injuryBySeasonId?: Map<string, { injuriesCount: number; matchdaysMissed: number }>;
+  averageFatigueBySeasonId?: Map<string, number>;
 }) {
   const hasActiveSeasonPerformance =
     input.seasonPerformance?.seasonId === input.gameState.season.id &&
@@ -1306,6 +1552,7 @@ function buildHistoryRows(input: {
   const activeSaleBreakdown = input.rosterEntry
     ? buildTransfermarktSaleFactorBreakdown(input.gameState, input.player, input.rosterEntry)
     : null;
+  const activeInjuryStats = input.injuryBySeasonId?.get(input.gameState.season.id) ?? { injuriesCount: 0, matchdaysMissed: 0 };
   const activeSeasonRow: PlayerDrawerHistoryRow = {
     seasonId: input.gameState.season.id,
     seasonName: input.gameState.season.name,
@@ -1314,11 +1561,18 @@ function buildHistoryRows(input: {
     teamName: input.teamName,
     teamCode: input.teamCode,
     appearances: hasActiveSeasonPerformance ? input.seasonPerformance?.appearances ?? null : null,
+    averageFatigue:
+      hasActiveSeasonPerformance && (input.seasonPerformance?.appearances ?? 0) > 0
+        ? input.averageFatigueBySeasonId?.get(input.gameState.season.id) ?? null
+        : null,
     totalPoints: hasActiveSeasonPerformance ? input.seasonPerformance?.totalPoints ?? null : null,
     pow: hasActiveSeasonPerformance ? input.playerRating?.ppPow ?? null : null,
     spe: hasActiveSeasonPerformance ? input.playerRating?.ppSpe ?? null : null,
     men: hasActiveSeasonPerformance ? input.playerRating?.ppMen ?? null : null,
     soc: hasActiveSeasonPerformance ? input.playerRating?.ppSoc ?? null : null,
+    disciplineValues: hasActiveSeasonPerformance
+      ? buildPlayerHistoryDisciplineValues(input.seasonPerformance?.disciplineBreakdown)
+      : {},
     ovr: input.playerRating?.ovrNormalized ?? null,
     ovrRank: input.playerRating?.ovrRank ?? null,
     pps: hasActiveSeasonPerformance ? input.playerRating?.ppsSeason ?? null : null,
@@ -1326,11 +1580,15 @@ function buildHistoryRows(input: {
     mvs: input.playerRating?.mvs ?? null,
     mvsRank: input.playerRating?.mvsRank ?? null,
     marketValue: input.marketValue,
-    marketValueBaselineDelta: getPlayerSeasonZeroMarketValueDelta({
-      player: input.player,
-      gameState: input.gameState,
-      currentMarketValue: input.marketValue,
-    }),
+    marketValueBaselineDelta: calculateMoneyDelta(
+      input.marketValue,
+      resolvePlayerMarketValueReference({
+        player: input.player,
+        gameState: input.gameState,
+        rosterPurchasePrice: input.rosterEntry?.purchasePrice ?? activeTransferFee,
+        currentMarketValue: input.marketValue,
+      }),
+    ),
     transferType: activeSeasonTransfer?.transferType ?? null,
     transferFee: activeTransferFee,
     transferMarketValue: activeTransferMarketValue,
@@ -1339,17 +1597,23 @@ function buildHistoryRows(input: {
     projectedSellValue: activeSaleBreakdown?.salePrice ?? null,
     projectedSellFactor: activeSaleBreakdown?.saleFactor ?? null,
     projectedSellSourceLabel: activeSaleBreakdown ? activeSaleBreakdown.factorSource : null,
+    saleFactorRankInBracket: activeSaleBreakdown?.rankInBracket ?? null,
+    saleFactorBracketSize: activeSaleBreakdown?.bracketGroupSize ?? null,
     salary: input.salary,
     contractLength: input.contractLength,
     averageContribution: hasActiveSeasonPerformance ? input.seasonPerformance?.averageContribution ?? null : null,
     averageFinalScore: hasActiveSeasonPerformance ? input.seasonPerformance?.averageFinalScore ?? null : null,
     bestDisciplineLabel: hasActiveSeasonPerformance ? input.seasonPerformance?.bestDisciplineLabel ?? null : null,
+    injuriesCount: activeInjuryStats.injuriesCount > 0 ? activeInjuryStats.injuriesCount : null,
+    matchdaysMissed: activeInjuryStats.matchdaysMissed > 0 ? activeInjuryStats.matchdaysMissed : null,
     warnings: hasActiveSeasonPerformance ? input.seasonPerformance?.warnings ?? [] : [],
   };
 
   const archivedRows: PlayerDrawerHistoryRow[] = input.seasonHistory
     .filter((entry) => entry.seasonId !== input.gameState.season.id)
-    .map((entry) => ({
+    .map((entry) => {
+      const injuryStats = input.injuryBySeasonId?.get(entry.seasonId ?? "") ?? { injuriesCount: 0, matchdaysMissed: 0 };
+      return {
       seasonId: entry.seasonId,
       seasonName: entry.seasonName,
       isActiveSeason: false,
@@ -1357,11 +1621,14 @@ function buildHistoryRows(input: {
       teamName: entry.teamName,
       teamCode: entry.teamCode,
       appearances: entry.appearances,
+      averageFatigue:
+        entry.appearances > 0 ? input.averageFatigueBySeasonId?.get(entry.seasonId ?? "") ?? null : null,
       totalPoints: entry.totalPoints,
       pow: entry.pow,
       spe: entry.spe,
       men: entry.men,
       soc: entry.soc,
+      disciplineValues: entry.disciplineValues ?? {},
       ovr: entry.ovr,
       ovrRank: entry.ovrRank,
       pps: entry.pps,
@@ -1378,13 +1645,18 @@ function buildHistoryRows(input: {
       projectedSellValue: entry.projectedSellValue,
       projectedSellFactor: entry.projectedSellFactor,
       projectedSellSourceLabel: entry.projectedSellSourceLabel,
+      saleFactorRankInBracket: entry.saleFactorRankInBracket ?? null,
+      saleFactorBracketSize: entry.saleFactorBracketSize ?? null,
       salary: entry.salary,
       contractLength: entry.contractLength,
       averageContribution: entry.averageContribution,
       averageFinalScore: entry.averageFinalScore,
       bestDisciplineLabel: entry.bestDisciplineLabel,
+      injuriesCount: injuryStats.injuriesCount > 0 ? injuryStats.injuriesCount : null,
+      matchdaysMissed: injuryStats.matchdaysMissed > 0 ? injuryStats.matchdaysMissed : null,
       warnings: entry.warnings,
-    }));
+    };
+    });
 
   return [activeSeasonRow, ...archivedRows];
 }
@@ -1672,8 +1944,22 @@ export function buildPlayerDrawerDataFromGameState(input: {
       })
     : null;
   const playerDemands = team && rosterEntry ? buildPlayerDemands(input.gameState, player.id, team.teamId) : [];
-  const seasonHistory = buildSeasonHistory(input.gameState, player.id);
+  const seasonHistory = mergeSeasonHistoryWithTransferFallback(
+    input.gameState,
+    player,
+    buildSeasonHistory(input.gameState, player.id, player),
+  );
   const latestArchivedPerformance = findLatestArchivedPlayerPerformance(input.gameState, player.id);
+  const injuryHistoryRows = buildPlayerInjuryHistoryFromEvents({
+    playerId: player.id,
+    gameState: input.gameState,
+    persistedHistory: player.injuryHistory,
+  });
+  const injurySummary = buildPlayerInjurySummary(injuryHistoryRows);
+  const injuryBySeasonId = new Map(
+    aggregatePlayerInjuryHistoryBySeason(injuryHistoryRows).map((entry) => [entry.seasonId, entry] as const),
+  );
+  const averageFatigueBySeasonId = buildPlayerAverageMatchdayFatigueBySeason(input.gameState, player.id);
   const historyRows = buildHistoryRows({
     gameState: input.gameState,
     player,
@@ -1686,6 +1972,8 @@ export function buildPlayerDrawerDataFromGameState(input: {
     salary: economy.salary,
     contractLength: economy.contractLength,
     seasonHistory,
+    injuryBySeasonId,
+    averageFatigueBySeasonId,
   });
   const previousHistoryRow = historyRows.find((entry) => !entry.isActiveSeason) ?? null;
   const progressionForecast = buildPlayerProgressionForecast({
@@ -1699,10 +1987,11 @@ export function buildPlayerDrawerDataFromGameState(input: {
     lifetimeXP: player.lifetimeXP ?? null,
   });
   const seasonOrganicForecast =
-    team && team.humanControlled !== false && rosterEntry
+    team && rosterEntry && (team.humanControlled !== false || DEBUG_FORCE_PLAYER_VISIBILITY)
       ? buildOrganicSeasonProgression({
           gameState: input.gameState,
           player,
+          facilities: team ? getTeamFacilityState(input.gameState, team.teamId) : undefined,
         })
       : null;
   const developmentLevelup = buildPlayerDevelopmentLevelupModel({
@@ -1741,6 +2030,25 @@ export function buildPlayerDrawerDataFromGameState(input: {
         cost: upgrade.cost,
       })),
     }));
+  const rawProgressionEvents = (input.gameState.playerProgressionEvents ?? []).filter((event) => event.playerId === player.id);
+  const baselineAttributes = input.gameState.playerBaselines?.find((entry) => entry.playerId === player.id)?.attributes ?? null;
+  const attributeHistoryRows = buildPlayerAttributeHistoryRows({
+    seasonAnchors: historyRows.map((row) => ({
+      seasonId: row.seasonId,
+      seasonName: row.seasonName,
+      isActiveSeason: row.isActiveSeason,
+    })),
+    progressionEvents: rawProgressionEvents.filter((event) => event.source === "organic_season_progression"),
+    baselineAttributes,
+    currentAttributes: player.attributeSheetStats ?? null,
+  });
+  const trainingHistoryRows = buildPlayerTrainingHistoryRows({
+    progressionEvents: rawProgressionEvents,
+    classHistory: player.classHistory ?? [],
+    organicSnapshot: player.lastOrganicProgression ?? null,
+    currentTrainingClass: player.trainingClass ?? player.className ?? null,
+    currentTrainingMode: player.trainingMode ?? null,
+  });
   const playerTeamId = rosterEntry?.teamId ?? team?.teamId ?? "";
   const availability = getPlayerAvailabilityView(
     input.gameState,
@@ -1750,21 +2058,7 @@ export function buildPlayerDrawerDataFromGameState(input: {
   );
   const recovery = playerTeamId ? calculateTeamRecovery(input.gameState, playerTeamId) : null;
   const injuryRiskBand = getInjuryRiskBand(availability.fatigue ?? player.fatigue ?? 0);
-  const injuryHistory = [...(input.gameState.seasonState.injuryEvents ?? [])]
-    .filter((event) => event.playerId === player.id)
-    .sort((left, right) => right.timestamp.localeCompare(left.timestamp, "de"))
-    .slice(0, 5)
-    .map((event) => ({
-      eventId: event.eventId,
-      seasonId: event.seasonId,
-      matchdayId: event.matchdayId,
-      fatigueBefore: event.fatigueBefore,
-      riskPercent: event.riskPercent,
-      roll: event.roll,
-      result: event.result,
-      unavailableUntil: event.unavailableUntil ?? null,
-      timestamp: event.timestamp,
-    }));
+  const performancePenaltyPercent = getFatiguePerformancePenaltyPercent(availability.fatigue ?? player.fatigue ?? 0);
 
   return {
     playerId: player.id,
@@ -1779,6 +2073,8 @@ export function buildPlayerDrawerDataFromGameState(input: {
     teamHumanControlled: team ? team.humanControlled !== false : null,
     transferStatus: rosterEntry ? "Active Player" : "Free Agent",
     className: player.className ?? null,
+    trainingClass: player.trainingClass ?? player.className ?? null,
+    trainingMode: player.trainingMode ?? null,
     race: player.race ?? null,
     subclasses: player.subclasses ?? [],
     traitsPositive: traitView.visiblePositiveTraits,
@@ -1899,6 +2195,7 @@ export function buildPlayerDrawerDataFromGameState(input: {
       injuryRiskPercent: injuryRiskBand.riskPercent,
       injuryRiskBand: injuryRiskBand.label,
       injuryRiskLabel: injuryRiskBand.uiLabel,
+      performancePenaltyPercent,
       isUnavailable: availability.isUnavailable,
       blocker: availability.blocker,
       lastRoll: availability.injuryRiskLastRoll
@@ -1912,8 +2209,10 @@ export function buildPlayerDrawerDataFromGameState(input: {
         : null,
       normalRecovery: recovery?.normalRecovery ?? null,
       injuryRecovery: recovery?.injuryRecovery ?? null,
-      injuryHistory,
+      injuryHistory: injuryHistoryRows,
     },
+    injurySummary,
+    injuryHistoryRows,
     form: player.form ?? null,
     potential: player.potential ?? null,
     scoutPotential: progressionForecast.scoutPotential,
@@ -1927,10 +2226,13 @@ export function buildPlayerDrawerDataFromGameState(input: {
     organicProgression: player.lastOrganicProgression ?? null,
     classHistory: player.classHistory ?? [],
     attributeVisibility,
-    attributeStats: buildAttributeStats(player, attributeVisibility, scoutingLevel, {
-      saveId: getGameStateScoutingSeed(input.gameState),
-      playerId: player.id,
-    }),
+    attributeStats: applyOrganicAttributeFallback(
+      buildAttributeStats(player, attributeVisibility, scoutingLevel, {
+        saveId: getGameStateScoutingSeed(input.gameState),
+        playerId: player.id,
+      }),
+      seasonOrganicForecast?.attributesBefore,
+    ),
     baselineAttributeDeltas: buildBaselineAttributeDeltas(player, input.gameState, progressionEvents),
     axisCards: maskAxisCardsForVisibility(
       buildAxisCards({
@@ -1943,7 +2245,7 @@ export function buildPlayerDrawerDataFromGameState(input: {
       { preserveCoreStats: !rosterEntry && attributeVisibility === "scouted" },
     ),
     disciplineValues:
-      attributeVisibility === "scouted"
+      attributeVisibility === "scouted" && !DEBUG_FORCE_PLAYER_VISIBILITY
         ? buildScoutedDisciplineValuesFromPlayer({
             gameState: input.gameState,
             player,
@@ -1963,6 +2265,8 @@ export function buildPlayerDrawerDataFromGameState(input: {
     seasonOrganicForecast,
     developmentLevelup,
     progressionEvents,
+    trainingHistoryRows,
+    attributeHistoryRows,
     seasonPerformance,
     transferContext: {
       ...buildTransferContext(input.gameState, player.id, rosterEntry),
@@ -2108,11 +2412,13 @@ export function buildPlayerDrawerDataFromLegacyContext(input: {
       teamName: input.context.team.name,
       teamCode: input.context.team.shortCode,
       appearances: null,
+      averageFatigue: null,
       totalPoints: null,
       pow: null,
       spe: null,
       men: null,
       soc: null,
+      disciplineValues: {},
       ovr: playerRating?.ovrNormalized ?? null,
       ovrRank: playerRating?.ovrRank ?? null,
       pps: null,
@@ -2133,11 +2439,15 @@ export function buildPlayerDrawerDataFromLegacyContext(input: {
       projectedSellValue: null,
       projectedSellFactor: null,
       projectedSellSourceLabel: null,
+      saleFactorRankInBracket: null,
+      saleFactorBracketSize: null,
       salary: economy.salary,
       contractLength: economy.contractLength,
       averageContribution: null,
       averageFinalScore: null,
       bestDisciplineLabel: disciplineValues[0]?.label ?? null,
+      injuriesCount: null,
+      matchdaysMissed: null,
       warnings: [],
     },
   ];
@@ -2177,6 +2487,8 @@ export function buildPlayerDrawerDataFromLegacyContext(input: {
     teamHumanControlled: (input.context.team as { humanControlled?: boolean }).humanControlled === false ? false : true,
     transferStatus: activePlayer ? "Active Player" : "Preview / Kontextspieler",
     className: catalogPlayer?.className ?? rosterPlayer?.className ?? null,
+    trainingClass: catalogPlayer?.trainingClass ?? catalogPlayer?.className ?? rosterPlayer?.className ?? null,
+    trainingMode: catalogPlayer?.trainingMode ?? null,
     race: catalogPlayer?.race ?? null,
     subclasses: catalogPlayer?.subclasses ?? [],
     traitsPositive: legacyTraitView.visiblePositiveTraits,
@@ -2237,6 +2549,9 @@ export function buildPlayerDrawerDataFromLegacyContext(input: {
       injuryRiskPercent: rosterPlayer?.injuryRiskPercent ?? 0,
       injuryRiskBand: rosterPlayer ? getInjuryRiskBand(rosterPlayer.fatigue ?? catalogPlayer?.fatigue ?? 0).label : "none",
       injuryRiskLabel: rosterPlayer ? getInjuryRiskBand(rosterPlayer.fatigue ?? catalogPlayer?.fatigue ?? 0).uiLabel : "kein Risiko",
+      performancePenaltyPercent: getFatiguePerformancePenaltyPercent(
+        rosterPlayer?.fatigue ?? catalogPlayer?.fatigue ?? 0,
+      ),
       isUnavailable: rosterPlayer?.availabilityBlocker === "player_injured_unavailable",
       blocker: rosterPlayer?.availabilityBlocker ?? null,
       lastRoll: null,
@@ -2244,6 +2559,12 @@ export function buildPlayerDrawerDataFromLegacyContext(input: {
       injuryRecovery: null,
       injuryHistory: [],
     },
+    injurySummary: {
+      totalInjuries: 0,
+      totalMatchdaysMissed: 0,
+      seasonsAffected: 0,
+    },
+    injuryHistoryRows: [],
     form: catalogPlayer?.form ?? rosterPlayer?.form ?? null,
     potential: catalogPlayer?.potential ?? rosterPlayer?.potential ?? null,
     scoutPotential: null,
@@ -2273,6 +2594,8 @@ export function buildPlayerDrawerDataFromLegacyContext(input: {
         })
       : null,
     progressionEvents: [],
+    trainingHistoryRows: [],
+    attributeHistoryRows: [],
     progressionEconomyPreview: null,
     seasonPerformance: null,
     transferContext: {

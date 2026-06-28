@@ -8,7 +8,10 @@ import ClassIcon from "@/app/foundation/ClassIcon";
 import DisciplineIcon from "@/app/foundation/DisciplineIcon";
 import RaceIcon from "@/app/foundation/RaceIcon";
 import { TooltipHeading } from "@/components/ui/TooltipHeading";
-import { SponsorOfferCard } from "@/components/foundation/sponsor/SponsorOfferCard";
+import FoundationPlayerPortraitCard from "@/components/foundation/player-portrait-card/FoundationPlayerPortraitCard";
+import FoundationPlayerPortraitPreview from "@/components/foundation/player-portrait-card/FoundationPlayerPortraitPreview";
+import TeamDrawerHistoryTable from "@/components/foundation/team-drawer/TeamDrawerHistoryTable";
+import { isSeasonDisciplineKey } from "@/lib/season/season-discipline-area-groups";
 import type { FoundationViewId } from "@/lib/foundation/foundation-view-routing";
 import { TEAM_BOARD_PRESSURE_TOOLTIP, TEAM_BOARD_RATING_TOOLTIP } from "@/lib/foundation/team-board-tooltips";
 
@@ -102,6 +105,9 @@ export type FoundationTeamsDetailPanelProps = {
   teamRosterFocusMode: unknown;
   setTeamRosterFocusMode: unknown;
   sortedSelectedRosterTableRows: unknown;
+  filteredSelectedRosterTableRows: unknown;
+  selectedStandingRow: unknown;
+  selectedRoster: unknown;
   visibleSelectedRosterColumns: unknown;
   selectedTeamContractTable: unknown;
   showTeamContractPreviewRows: unknown;
@@ -223,6 +229,9 @@ gameState,
   teamRosterFocusMode,
   setTeamRosterFocusMode,
   sortedSelectedRosterTableRows,
+  filteredSelectedRosterTableRows,
+  selectedStandingRow,
+  selectedRoster,
   visibleSelectedRosterColumns,
   selectedTeamContractTable,
   showTeamContractPreviewRows,
@@ -448,53 +457,53 @@ gameState,
                   </div>
                 </div>
                 {selectedTeamsHistoryData?.history?.length ? (
-                  <div className="table-shell teams-history-shell">
-                    <table className="team-table teams-v2-history-table">
-                      <thead>
-                        <tr>
-                          <th>Saison</th>
-                          <th>Rang</th>
-                          <th>Punkte</th>
-                          <th>PPs</th>
-                          <th>POW</th>
-                          <th>SPE</th>
-                          <th>MEN</th>
-                          <th>SOC</th>
-                          <th>Cash</th>
-                          <th>Gehalt</th>
-                          <th>MW</th>
-                          <th>GuV</th>
-                          <th>Top Einkauf</th>
-                          <th>Top Verkauf</th>
-                        </tr>
-                      </thead>
-                      <tbody>
-                        {selectedTeamsHistoryData.history.map((row) => (
-                          <tr key={`team-history-${row.seasonId}`} className={row.isLive ? "is-live" : ""}>
-                            <td className="teams-v2-season-cell">
-                              <strong>{row.seasonName}</strong>
-                              {row.isLive ? <span className="pill">Live</span> : null}
-                            </td>
-                            <td className={`teams-v2-rank-cell ${getTeamHistoryRankToneClass(row.rank)}`}>{row.rank != null ? `#${row.rank}` : "—"}</td>
-                            <td>{formatLocalePoints(row.points, 1)}</td>
-                            <td>{formatLocalePoints(row.pps, 1)}</td>
-                            <td className="teams-v2-area-cell is-pow">{formatLocalePoints(row.ppPow, 1)}</td>
-                            <td className="teams-v2-area-cell is-spe">{formatLocalePoints(row.ppSpe, 1)}</td>
-                            <td className="teams-v2-area-cell is-men">{formatLocalePoints(row.ppMen, 1)}</td>
-                            <td className="teams-v2-area-cell is-soc">{formatLocalePoints(row.ppSoc, 1)}</td>
-                            <td>{formatNullableMoney(row.cash)}</td>
-                            <td>{formatNullableMoney(row.salaryTotal)}</td>
-                            <td>{formatNullableMoney(row.marketValue)}</td>
-                            <td className={row.guv != null && row.guv < 0 ? "text-negative" : "text-positive"}>
-                              {formatSignedDisplayMoney(row.guv)}
-                            </td>
-                            <td>{row.topBuyPlayer ? `${row.topBuyPlayer} · ${formatNullableMoney(row.topBuyAmount)}` : "—"}</td>
-                            <td>{row.topSellPlayer ? `${row.topSellPlayer} · ${formatNullableMoney(row.topSellAmount)}` : "—"}</td>
-                          </tr>
-                        ))}
-                      </tbody>
-                    </table>
-                  </div>
+                  <TeamDrawerHistoryTable
+                    rows={selectedTeamsHistoryData.history}
+                    getRowClassName={(row) => (row.isLive ? "is-live" : undefined)}
+                    renderCell={(columnId, row) => {
+                      if (columnId === "season") {
+                        return (
+                          <>
+                            <strong>{row.seasonName}</strong>
+                            {row.isLive ? <span className="pill">Live</span> : null}
+                          </>
+                        );
+                      }
+                      if (columnId === "rank") {
+                        return (
+                          <span className={`teams-v2-rank-cell ${getTeamHistoryRankToneClass(row.rank)}`}>
+                            {row.rank != null ? `#${row.rank}` : "—"}
+                          </span>
+                        );
+                      }
+                      if (columnId === "points") return formatLocalePoints(row.points, 1);
+                      if (columnId === "pps") return formatLocalePoints(row.pps, 1);
+                      if (columnId === "pow") return formatLocalePoints(row.ppPow, 1);
+                      if (columnId === "spe") return formatLocalePoints(row.ppSpe, 1);
+                      if (columnId === "men") return formatLocalePoints(row.ppMen, 1);
+                      if (columnId === "soc") return formatLocalePoints(row.ppSoc, 1);
+                      if (isSeasonDisciplineKey(columnId)) {
+                        return formatLocalePoints(row.disciplineValues[columnId], 1);
+                      }
+                      if (columnId === "cash") return formatNullableMoney(row.cash);
+                      if (columnId === "salary") return formatNullableMoney(row.salaryTotal);
+                      if (columnId === "mw") return formatNullableMoney(row.marketValue);
+                      if (columnId === "guv") {
+                        return (
+                          <span className={row.guv != null && row.guv < 0 ? "text-negative" : "text-positive"}>
+                            {formatSignedDisplayMoney(row.guv)}
+                          </span>
+                        );
+                      }
+                      if (columnId === "topBuy") {
+                        return row.topBuyPlayer ? `${row.topBuyPlayer} · ${formatNullableMoney(row.topBuyAmount)}` : "—";
+                      }
+                      if (columnId === "topSell") {
+                        return row.topSellPlayer ? `${row.topSellPlayer} · ${formatNullableMoney(row.topSellAmount)}` : "—";
+                      }
+                      return "—";
+                    }}
+                  />
                 ) : (
                   <p className="muted">Für dieses Team ist noch keine Historie verfügbar.</p>
                 )}
@@ -545,72 +554,6 @@ gameState,
                 ) : null}
               </section>
 
-              <section className={`panel team-sponsor-panel teams-secondary-objectives-panel${getViewClass("teams")}`} data-testid="team-sponsor-choice" id="team-sponsor-choice">
-                <div className="panel-header compact">
-                  <div className="stack">
-                    <h2>Sponsor-Vertrag</h2>
-                    <p className="muted">Drei Angebote pro Saison — Sterne-Tier, Basis, Platzierung, Verbesserung und Sonderziel.</p>
-                    {selectedTeamCommercialRating ? (
-                      <p className="muted">
-                        Commercial Rating {selectedTeamCommercialRating.score}/100 · Erwartung ★{selectedTeamCommercialRating.tierHint}
-                        {" · "}Historie {selectedTeamCommercialRating.breakdown.recentPerformance.toFixed(0)} · Kader{" "}
-                        {selectedTeamCommercialRating.breakdown.rosterPotential.toFixed(0)} · Prestige{" "}
-                        {selectedTeamCommercialRating.breakdown.prestige.toFixed(0)}
-                      </p>
-                    ) : null}
-                  </div>
-                </div>
-                {sponsorChoiceMessage ? <div className="status-banner is-success">{sponsorChoiceMessage}</div> : null}
-                {selectedTeamSponsorContract ? (
-                  <div className="teams-summary-grid history-summary-grid">
-                    <article className="metric-card teams-summary-card">
-                      <span>
-                        AKTIV{selectedTeamSponsorContract.starTier ? ` · ★${selectedTeamSponsorContract.starTier}` : ""}
-                        {selectedTeamSponsorContract.termSeasons ? ` · ${selectedTeamSponsorContract.termSeasons} Saison` : ""}
-                      </span>
-                      <strong>{selectedTeamSponsorContract.name}</strong>
-                      <small className="muted">
-                        {selectedTeamSponsorContract.variantKey ? `${selectedTeamSponsorContract.variantKey.replace(/_/g, " ")} · ` : ""}
-                        {selectedTeamSponsorContract.components.length} Vertragskomponenten
-                        {selectedTeamSponsorContract.negotiationProfile ? ` · Profil ${selectedTeamSponsorContract.negotiationProfile}` : ""}
-                      </small>
-                    </article>
-                  </div>
-                ) : (
-                  <div className="teams-summary-grid history-summary-grid">
-                    {selectedTeamSponsorOffers.map((offer) => {
-                      const negotiationProfile = sponsorChoiceProfiles[offer.offerId] ?? "balanced";
-                      const adjustedComponents = applySponsorNegotiationToComponents({
-                        components: offer.components,
-                        termSeasons: 1,
-                        negotiationProfile,
-                        starTier: offer.starTier,
-                      });
-                      const multiplier = getSponsorNegotiationMultiplier({ termSeasons: 1, negotiationProfile });
-                      return (
-                        <SponsorOfferCard
-                          key={offer.offerId}
-                          offer={offer}
-                          gameState={gameState}
-                          adjustedComponents={adjustedComponents}
-                          negotiationProfile={negotiationProfile}
-                          multiplier={multiplier}
-                          chooseBusy={sponsorChoiceBusy === offer.offerId}
-                          canManage={selectedTeamCanManage}
-                          onNegotiationProfileChange={(profile) =>
-                            setSponsorChoiceProfiles((current) => ({
-                              ...current,
-                              [offer.offerId]: profile,
-                            }))
-                          }
-                          onChoose={() => void chooseTeamSponsor(offer.offerId)}
-                          formatCash={formatMoney}
-                        />
-                      );
-                    })}
-                  </div>
-                )}
-              </section>
 
               <section className={`panel team-focus-panel teams-primary-roster-panel${getViewClass("teams")}`} id="team-focus-roster">
                 <div className="panel-header team-focus-header">
@@ -634,7 +577,10 @@ gameState,
                     })()}
                     <div>
                     <p className="eyebrow">Team Fokus</p>
-                    <h2>{selectedTeam.name} - Kader</h2>
+                    <h2>
+                      {selectedTeam.name}
+                      {selectedTeamDetailTab === "portraits" ? " - Portraits" : selectedTeamDetailTab === "contracts" ? " - Verträge" : " - Kader"}
+                    </h2>
                     </div>
                   </div>
                   <button
@@ -727,14 +673,33 @@ gameState,
                                     );
                                     return (
                                       <td key={column.id}>
-                                        <PlayerPortrait
-                                          src={portrait.src}
-                                          initials={portrait.initials}
-                                          alt={player.name}
-                                          className="transfermarkt-portrait"
-                                          style={{ width: imageSize, height: imageSize }}
-                                          {...TEAM_ROSTER_PORTRAIT_LOADING}
-                                        />
+                                        <FoundationPlayerPortraitPreview
+                                          playerId={player.id}
+                                          name={player.name}
+                                          portraitUrl={portrait.src}
+                                          portraitInitials={portrait.initials}
+                                          playerOvr={playerOvr}
+                                          playerMvs={playerMvs}
+                                          playerPps={playerPps}
+                                          pow={player.coreStats.pow ?? null}
+                                          spe={player.coreStats.spe ?? null}
+                                          men={player.coreStats.men ?? null}
+                                          soc={player.coreStats.soc ?? null}
+                                          leagueHeatPools={leaguePlayerHeatPools}
+                                          variant="team"
+                                          context="roster"
+                                          roleTag={entry.roleTag}
+                                          playerClassName={player.className}
+                                        >
+                                          <PlayerPortrait
+                                            src={portrait.src}
+                                            initials={portrait.initials}
+                                            alt={player.name}
+                                            className="transfermarkt-portrait"
+                                            style={{ width: imageSize, height: imageSize }}
+                                            {...TEAM_ROSTER_PORTRAIT_LOADING}
+                                          />
+                                        </FoundationPlayerPortraitPreview>
                                       </td>
                                     );
                                   }
@@ -968,6 +933,70 @@ gameState,
                         </div>
                       </div>
                     </div>
+                  </>
+                ) : selectedTeamDetailTab === "portraits" ? (
+                  <>
+                    <div className="team-roster-role-filterbar" aria-label="Kaderrollen filtern">
+                      {teamRosterRoleFilterOptions.map((option) => (
+                        <button
+                          key={`team-portraits-role-filter-${option.id}`}
+                          className={`secondary-button inline-button${teamRosterRoleFilter === option.id ? " is-active" : ""}`}
+                          type="button"
+                          onClick={() => setTeamRosterRoleFilter(option.id)}
+                        >
+                          {option.label} <span>{option.count}</span>
+                        </button>
+                      ))}
+                    </div>
+
+                    <div className="team-roster-focusbar" aria-label="Kaderfokus waehlen">
+                      {teamRosterFocusOptions.map((option) => (
+                        <button
+                          key={`team-portraits-focus-${option.id}`}
+                          className={`secondary-button inline-button${teamRosterFocusMode === option.id ? " is-active" : ""}`}
+                          type="button"
+                          onClick={() => setTeamRosterFocusMode(option.id)}
+                        >
+                          {option.label} <span>{option.count}</span>
+                        </button>
+                      ))}
+                    </div>
+                    <section className="team-portraits-panel" id="team-focus-portraits" aria-label="Kader Portraits">
+                      <div className="team-portraits-grid" data-testid="team-portraits-grid">
+                        {filteredSelectedRosterTableRows.length > 0 ? (
+                          filteredSelectedRosterTableRows.map(({ entry, player, playerOvr, playerMvs, playerPps }) => {
+                            const portrait = getPlayerPortraitModel(player);
+                            return (
+                              <FoundationPlayerPortraitCard
+                                key={entry.id}
+                                playerId={player.id}
+                                name={player.name}
+                                portraitUrl={portrait.src}
+                                portraitInitials={portrait.initials}
+                                playerOvr={playerOvr}
+                                playerMvs={playerMvs}
+                                playerPps={playerPps}
+                                pow={player.coreStats.pow}
+                                spe={player.coreStats.spe}
+                                men={player.coreStats.men}
+                                soc={player.coreStats.soc}
+                                leagueHeatPools={leaguePlayerHeatPools}
+                                variant="team"
+                                roleTag={entry.roleTag}
+                                playerClassName={player.className}
+                                onOpen={() => void openPlayerDrawerById(player.id, entry.id)}
+                                title={`${player.name} öffnen`}
+                              />
+                            );
+                          })
+                        ) : (
+                          <p className="muted">Keine Spieler für den aktuellen Filter.</p>
+                        )}
+                      </div>
+                      <p className="muted team-portraits-meta">
+                        {filteredSelectedRosterTableRows.length} / {selectedStandingRow?.rosterCount ?? selectedRoster.length} Spieler · OVR/MVS relativ zur Liga
+                      </p>
+                    </section>
                   </>
                 ) : (
                   <div className="team-focus-layout">
@@ -1311,61 +1340,54 @@ gameState,
                   <div className="panel-header">
                     <h2>Starter</h2>
                   </div>
-                  <div className="roster-grid">
+                  <div className="roster-grid team-portraits-grid">
                     {starters.map(({ entry, player }) => {
                       const portrait = getPlayerPortraitModel(player);
+                      const ratings = playerRatingsById.get(player.id);
+                      const marketValueDelta = getPlayerDisplayMarketValueDelta(player, entry, gameState);
+                      const salaryDelta = getRosterEntrySalaryDelta(entry, player, gameState);
                       return (
-                      <article
-                        className={`player-card player-card-spotlight ${getClassColorClassName(player.className, "player-card-class-frame")}`}
-                        key={entry.id}
-                        onClick={() => void openPlayerDrawerById(player.id, entry.id)}
-                        title="Spielerprofil öffnen"
-                      >
-                        <div className="player-card-hero">
-                          <PlayerPortrait
-                            src={portrait.src}
-                            initials={portrait.initials}
-                            alt={player.name}
-                            className="player-card-portrait player-avatar-fallback"
-                            {...TEAM_ROSTER_PORTRAIT_LOADING}
-                          />
-                          <div className="player-card-head">
-                            <div>
-                            <strong>{player.name}</strong>
-                            <p className="muted">
-                              <ClassIcon classNameValue={player.className} className="class-icon-chip-inline" /> · <RaceIcon race={player.race} className="race-icon-chip-inline" />
-                            </p>
-                            </div>
-                            <span className="rating-pill">{formatWholeNumber(playerRatingsById.get(player.id)?.ovrNormalized ?? null)}</span>
-                          </div>
-                        </div>
-                        <div className="axis-row">
-                          <span>POW {formatWholeNumber(player.coreStats.pow)}</span>
-                          <span>SPE {formatWholeNumber(player.coreStats.spe)}</span>
-                          <span>MEN {formatWholeNumber(player.coreStats.men)}</span>
-                          <span>SOC {formatWholeNumber(player.coreStats.soc)}</span>
-                        </div>
-                        <p className="muted">
-                          OVR {formatWholeNumber(playerRatingsById.get(player.id)?.ovrNormalized ?? null)} · MVS{" "}
-                          {playerRatingsById.get(player.id)?.mvs != null ? formatPpsValue(playerRatingsById.get(player.id)?.mvs ?? null) : "—"} · PPs{" "}
-                          {playerRatingsById.get(player.id)?.ppsSeason != null ? formatPpsValue(playerRatingsById.get(player.id)?.ppsSeason ?? null) : "—"} · MW
-                        </p>
-                        <div className="economy-money-stack">
-                          <strong>{formatLocalePoints(getRosterEntryDisplayMarketValue(entry, player), 2)}</strong>
-                          {renderEconomyDelta(getPlayerDisplayMarketValueDelta(player, entry, gameState), "higher", "player-card-money-delta")}
-                        </div>
-                        <p className="muted">
-                          Kosten {formatMoney(player.cost ?? player.marketValue)} · Gehalt
-                        </p>
-                        <div className="economy-money-stack">
-                          <strong>{formatDisplayMoney(getRosterEntryDisplaySalary(entry, player))}</strong>
-                          {renderEconomyDelta(getRosterEntrySalaryDelta(entry, player, gameState), "lower", "player-card-money-delta")}
-                        </div>
-                        <p className="muted">
-                          Traits {player.traitsPositive.slice(0, 2).join(", ") || "-"} · Alignment{" "}
-                          {player.alignment || "-"}
-                        </p>
-                      </article>
+                        <FoundationPlayerPortraitCard
+                          key={entry.id}
+                          playerId={player.id}
+                          name={player.name}
+                          portraitUrl={portrait.src}
+                          portraitInitials={portrait.initials}
+                          playerOvr={ratings?.ovrNormalized ?? null}
+                          playerMvs={ratings?.mvs ?? null}
+                          playerPps={ratings?.ppsSeason ?? null}
+                          pow={player.coreStats.pow}
+                          spe={player.coreStats.spe}
+                          men={player.coreStats.men}
+                          soc={player.coreStats.soc}
+                          leagueHeatPools={leaguePlayerHeatPools}
+                          variant="team"
+                          className={getClassColorClassName(player.className, "player-card-class-frame")}
+                          subMeta={`${entry.roleTag ?? "Starter"} · ${player.className ?? "—"} · ${player.race ?? "—"}`}
+                          onOpen={() => void openPlayerDrawerById(player.id, entry.id)}
+                          title="Spielerprofil öffnen"
+                          economyStats={[
+                            {
+                              label: "MW",
+                              value: formatLocalePoints(getRosterEntryDisplayMarketValue(entry, player), 2),
+                              delta:
+                                marketValueDelta != null && Math.abs(marketValueDelta) >= 0.01
+                                  ? `${marketValueDelta > 0 ? "+" : ""}${formatLocalePoints(marketValueDelta, 2)}`
+                                  : null,
+                              deltaClass: marketValueDelta != null && marketValueDelta > 0 ? "text-positive" : marketValueDelta != null && marketValueDelta < 0 ? "text-negative" : "",
+                            },
+                            {
+                              label: "Gehalt",
+                              value: formatDisplayMoney(getRosterEntryDisplaySalary(entry, player)),
+                              delta:
+                                salaryDelta != null && Math.abs(salaryDelta) >= 0.01
+                                  ? `${salaryDelta > 0 ? "+" : ""}${formatDisplayMoney(salaryDelta)}`
+                                  : null,
+                              deltaClass: salaryDelta != null && salaryDelta < 0 ? "text-positive" : salaryDelta != null && salaryDelta > 0 ? "text-negative" : "",
+                            },
+                            { label: "LZ", value: String(entry.contractLength ?? "—") },
+                          ]}
+                        />
                       );
                     })}
                     {starters.length === 0 ? <p className="muted">Noch keine Starter im Kader.</p> : null}
@@ -1376,53 +1398,56 @@ gameState,
                   <div className="panel-header">
                     <h2>Bench & Prospects</h2>
                   </div>
-                  <div className="roster-grid">
-                    {bench.map(({ entry, player }) => (
-                      <article
-                        className={`player-card compact player-card-spotlight ${getClassColorClassName(player.className, "player-card-class-frame")}`}
-                        key={entry.id}
-                        onClick={() => void openPlayerDrawerById(player.id, entry.id)}
-                        title="Spielerprofil öffnen"
-                      >
-                        <div className="player-card-hero">
-                          <PlayerPortrait
-                            src={getPlayerPortraitModel(player).src}
-                            initials={getPlayerPortraitModel(player).initials}
-                            alt={player.name}
-                            className="player-card-portrait player-avatar-fallback"
-                          />
-                          <div className="player-card-head">
-                            <div>
-                            <strong>{player.name}</strong>
-                            <p className="muted">
-                              {entry.roleTag} · <ClassColorChip className={player.className} /> · <RaceIcon race={player.race} className="race-icon-chip-inline" />
-                            </p>
-                            </div>
-                            <span className="rating-pill">{formatWholeNumber(playerRatingsById.get(player.id)?.ovrNormalized ?? null)}</span>
-                          </div>
-                        </div>
-                        <div className="axis-row">
-                          <span>POW {formatWholeNumber(player.coreStats.pow)}</span>
-                          <span>SPE {formatWholeNumber(player.coreStats.spe)}</span>
-                          <span>MEN {formatWholeNumber(player.coreStats.men)}</span>
-                          <span>SOC {formatWholeNumber(player.coreStats.soc)}</span>
-                        </div>
-                        <p className="muted">
-                          OVR {formatWholeNumber(playerRatingsById.get(player.id)?.ovrNormalized ?? null)} · MVS{" "}
-                          {playerRatingsById.get(player.id)?.mvs != null ? formatPpsValue(playerRatingsById.get(player.id)?.mvs ?? null) : "—"} · PPs{" "}
-                          {playerRatingsById.get(player.id)?.ppsSeason != null ? formatPpsValue(playerRatingsById.get(player.id)?.ppsSeason ?? null) : "—"} · MW
-                        </p>
-                        <div className="economy-money-stack">
-                          <strong>{formatLocalePoints(getRosterEntryDisplayMarketValue(entry, player), 2)}</strong>
-                          {renderEconomyDelta(getPlayerDisplayMarketValueDelta(player, entry, gameState), "higher", "player-card-money-delta")}
-                        </div>
-                        <p className="muted">Gehalt · LZ {entry.contractLength}</p>
-                        <div className="economy-money-stack">
-                          <strong>{formatDisplayMoney(getRosterEntryDisplaySalary(entry, player))}</strong>
-                          {renderEconomyDelta(getRosterEntrySalaryDelta(entry, player, gameState), "lower", "player-card-money-delta")}
-                        </div>
-                      </article>
-                    ))}
+                  <div className="roster-grid team-portraits-grid">
+                    {bench.map(({ entry, player }) => {
+                      const portrait = getPlayerPortraitModel(player);
+                      const ratings = playerRatingsById.get(player.id);
+                      const marketValueDelta = getPlayerDisplayMarketValueDelta(player, entry, gameState);
+                      const salaryDelta = getRosterEntrySalaryDelta(entry, player, gameState);
+                      return (
+                        <FoundationPlayerPortraitCard
+                          key={entry.id}
+                          playerId={player.id}
+                          name={player.name}
+                          portraitUrl={portrait.src}
+                          portraitInitials={portrait.initials}
+                          playerOvr={ratings?.ovrNormalized ?? null}
+                          playerMvs={ratings?.mvs ?? null}
+                          playerPps={ratings?.ppsSeason ?? null}
+                          pow={player.coreStats.pow}
+                          spe={player.coreStats.spe}
+                          men={player.coreStats.men}
+                          soc={player.coreStats.soc}
+                          leagueHeatPools={leaguePlayerHeatPools}
+                          variant="team"
+                          className={getClassColorClassName(player.className, "player-card-class-frame")}
+                          subMeta={`${entry.roleTag ?? "Bank"} · ${player.className ?? "—"} · ${player.race ?? "—"}`}
+                          onOpen={() => void openPlayerDrawerById(player.id, entry.id)}
+                          title="Spielerprofil öffnen"
+                          economyStats={[
+                            {
+                              label: "MW",
+                              value: formatLocalePoints(getRosterEntryDisplayMarketValue(entry, player), 2),
+                              delta:
+                                marketValueDelta != null && Math.abs(marketValueDelta) >= 0.01
+                                  ? `${marketValueDelta > 0 ? "+" : ""}${formatLocalePoints(marketValueDelta, 2)}`
+                                  : null,
+                              deltaClass: marketValueDelta != null && marketValueDelta > 0 ? "text-positive" : marketValueDelta != null && marketValueDelta < 0 ? "text-negative" : "",
+                            },
+                            {
+                              label: "Gehalt",
+                              value: formatDisplayMoney(getRosterEntryDisplaySalary(entry, player)),
+                              delta:
+                                salaryDelta != null && Math.abs(salaryDelta) >= 0.01
+                                  ? `${salaryDelta > 0 ? "+" : ""}${formatDisplayMoney(salaryDelta)}`
+                                  : null,
+                              deltaClass: salaryDelta != null && salaryDelta < 0 ? "text-positive" : salaryDelta != null && salaryDelta > 0 ? "text-negative" : "",
+                            },
+                            { label: "LZ", value: String(entry.contractLength ?? "—") },
+                          ]}
+                        />
+                      );
+                    })}
                     {bench.length === 0 ? <p className="muted">Keine Bench-Spieler im Moment.</p> : null}
                   </div>
                 </section>

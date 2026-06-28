@@ -10,6 +10,8 @@ import { projectFoundationStateFromPrisma } from "@/lib/db/read/foundation-read-
 import { getTeamControlSettings, withNormalizedTeamControlSettings } from "@/lib/foundation/team-control-settings";
 import { deriveTeamIdentityAxisWeightMap } from "@/lib/foundation/team-identity-settings";
 import { getTeamStrategyProfile, withNormalizedTeamStrategyProfiles } from "@/lib/foundation/team-strategy-profiles";
+import { getTeamGeneralManager } from "@/lib/foundation/team-general-managers";
+import type { TeamGeneralManagerProfile } from "@/lib/data/olyDataTypes";
 import { deriveRosterTargets } from "@/lib/foundation/roster-limits";
 import { getPlayerClassColor } from "@/lib/lineups/legacy-lineup-modifiers";
 import {
@@ -34,6 +36,44 @@ const AI_CHEAP_FILL_MARKET_VALUE_CAP = 15;
 const AI_RESERVE_MARKET_VALUE_CAP = 20;
 const AI_EXPENSIVE_EARLY_SCAN_CAP = 60;
 
+/**
+ * Static per-candidate components precomputed once before the pick loop.
+ * All fields depend only on team-profile × player data — not on pick-loop state.
+ * Allows the per-step scoring loop to skip the expensive token-matching passes.
+ */
+export type CandidateStaticScore = {
+  /** getStrategyMatchScore result — fully static */
+  strategyFit: { score: number; reasons: string[] };
+  /** scoreTeamIdentityComponents static parts */
+  teamThemeFitScore: number;
+  classFitScore: number;
+  raceOrArchetypeFitScore: number;
+  harmonyPenalty: number;
+  /** axisWeight*10 + axisStrength*5 - 3, unclamped, without needsThisAxis +2.5 */
+  teamAxisFitScoreBase: number;
+  /** normalizeManagementValue(identity.ambition) — for per-step ambitionLaneBias */
+  ambitionFactor: number;
+  /** normalizeManagementValue(identity.finances) — for per-step financeLaneBias */
+  financesFactor: number;
+  identityBaseReasons: string[];
+  /** scoreV4FocusTeamFit static token-hit counts */
+  v4HardRuleFailure: string | null;
+  v4MajorHits: number;
+  v4MinorHits: number;
+  v4AvoidHits: number;
+  v4AxisHit: number;
+  /** Player-derived values (static, reused in dynamic path) */
+  candidateAxis: "pow" | "spe" | "men" | "soc" | null;
+  playerRole: "superstar" | "star" | "core" | "depth" | "specialist" | "backup";
+  normalizedClass: string;
+  playerQualityScore: number;
+  bestDisciplineEntry: { disciplineId: string; score: number } | null;
+  sportsQuality: ReturnType<typeof getPlayerSportsQuality>;
+  cheapFillEligible: boolean;
+  rawTier: ReturnType<typeof classifyCandidateTier>;
+  playerFormColor: FormCardColor | null;
+};
+
 export type AiNeedsPicksCompareParams = {
   source?: AiNeedsPicksCompareSource;
   saveId?: string | null;
@@ -44,6 +84,7 @@ export type AiNeedsPicksCompareParams = {
   excludedPlayerIds?: string[] | null;
   limit?: number | null;
   fullScoringLimit?: number | null;
+  candidateScopeMode?: "strategic" | "budget_wide" | null;
   steps?: number | null;
   runMode?: AiNeedsPicksRunMode | null;
   draftSeed?: string | null;
@@ -1538,6 +1579,66 @@ function getSeason1LanePhilosophy(team: Team) {
   } as const;
 }
 
+type Season1LanePhilosophy = {
+  premiumCap: number;
+  superstarCap: number;
+  coreBias: number;
+  specialistBias: number;
+  depthBias: number;
+  backupBias: number;
+  preferDepthOverStars: boolean;
+  label: string;
+};
+
+/**
+ * Verschiebt die (Team-Code-)Lane-Philosophie anhand des GM-Archetyps, damit derselbe
+ * Klub unter einem Star-Picker- vs. Depth-Spammer-GM spürbar anders draftet. Der Tilt
+ * stammt aus den GM-Bias-Werten (starPriority/eliteSmallRoster/riskTolerance vs.
+ * rosterDepthPreference) und hebt/senkt premium/superstar-Caps und Core/Depth-Bias.
+ */
+function applyGmLanePhilosophyTilt(
+  base: Season1LanePhilosophy,
+  gmProfile: TeamGeneralManagerProfile | null,
+): Season1LanePhilosophy {
+  if (!gmProfile?.bias) {
+    return base;
+  }
+  const bias = gmProfile.bias;
+  const norm = (value: number | undefined, fallback = 5) =>
+    clamp(((typeof value === "number" && Number.isFinite(value) ? value : fallback) - 1) / 9, 0, 1);
+  const starScore = (norm(bias.starPriority) + norm(bias.eliteSmallRosterPreference) + norm(bias.riskTolerance)) / 3;
+  const depthScore =
+    (norm(bias.rosterDepthPreference) + (1 - norm(bias.eliteSmallRosterPreference)) + (1 - norm(bias.starPriority))) / 3;
+  const tilt = clamp(starScore - depthScore, -1, 1);
+
+  if (tilt >= 0.22) {
+    return {
+      ...base,
+      premiumCap: Math.min(base.premiumCap + 1, 3),
+      superstarCap: Math.max(base.superstarCap, 1),
+      coreBias: clamp(base.coreBias + 0.05 * tilt, 0.18, 0.45),
+      depthBias: clamp(base.depthBias - 0.08 * tilt, 0.1, 0.48),
+      backupBias: clamp(base.backupBias - 0.04 * tilt, 0.04, 0.32),
+      preferDepthOverStars: false,
+      label: `${base.label}+gm_star`,
+    };
+  }
+  if (tilt <= -0.22) {
+    const depthMag = -tilt;
+    return {
+      ...base,
+      premiumCap: Math.max(base.premiumCap - 1, 1),
+      superstarCap: 0,
+      coreBias: clamp(base.coreBias - 0.03 * depthMag, 0.18, 0.45),
+      depthBias: clamp(base.depthBias + 0.08 * depthMag, 0.1, 0.48),
+      backupBias: clamp(base.backupBias + 0.04 * depthMag, 0.04, 0.32),
+      preferDepthOverStars: true,
+      label: `${base.label}+gm_depth`,
+    };
+  }
+  return base;
+}
+
 function getSeason1OptimumSpendTargetPct(team: Team, identity: ReturnType<typeof getTeamIdentityRow>) {
   const code = normalizeTeamCode(team.shortCode || team.teamId);
   let targetPct = 0.93;
@@ -1651,6 +1752,35 @@ function getAdjustedSeason1OptimumSpendTargetPct(
   const base = getSeason1OptimumSpendTargetPct(team, identity);
   const corridor = getSeason1SpendCorridor(team, identity, expectedPrizeSignal);
   return roundValue(clamp(base + getPrizeTrendSpendAdjustment(expectedPrizeSignal, identity), corridor.minPct, corridor.maxPct), 3);
+}
+
+/**
+ * GM-getriebener Draft-Puffer (S1): aus den (bereits GM-geblendeten) Strategy-Bias-Werten
+ * wird ein Spend-Tilt abgeleitet. Aggressive GMs (Star/Risk) spenden mehr → kleinerer Puffer
+ * (~3-5%), Value/Spar-GMs (Cash/Wage/Value) sparen mehr → größerer Puffer (~12-15%).
+ * Liefert eine harte Puffer-Fraktion (Anteil des Startbudgets, der nicht verplant wird).
+ */
+const GM_DRAFT_BUFFER_MIN = 0.03;
+const GM_DRAFT_BUFFER_MAX = 0.15;
+function getGmDraftBufferPct(
+  profile: TeamStrategyProfile | null,
+  corridorSpendTargetPct: number,
+): number {
+  const corridorBuffer = clamp(1 - corridorSpendTargetPct, GM_DRAFT_BUFFER_MIN, GM_DRAFT_BUFFER_MAX);
+  const bias = profile?.bias;
+  if (!bias) {
+    return roundValue(corridorBuffer, 3);
+  }
+  const norm = (value: number | undefined, fallback = 5) =>
+    clamp(((typeof value === "number" && Number.isFinite(value) ? value : fallback) - 1) / 9, 0, 1);
+  const aggressionScore =
+    (norm(bias.starPriority) + norm(bias.riskTolerance) + norm(bias.eliteSmallRosterPreference)) / 3;
+  const thriftScore =
+    (norm(bias.cashPriority) + norm(bias.wageSensitivity) + norm(bias.valuePriority)) / 3;
+  // Positiv = sparsamer → größerer Puffer; negativ = aggressiver → kleinerer Puffer.
+  const spendTilt = thriftScore - aggressionScore; // [-1, 1]
+  const gmBuffer = corridorBuffer + spendTilt * 0.05;
+  return roundValue(clamp(gmBuffer, GM_DRAFT_BUFFER_MIN, GM_DRAFT_BUFFER_MAX), 3);
 }
 
 function isColdSteelThemeBreaker(playerClass: string | null | undefined, race: string | null | undefined) {
@@ -3018,6 +3148,366 @@ function scoreTeamIdentityComponents(input: {
   };
 }
 
+/**
+ * Pre-computes the expensive static components of scoreCandidate for every candidate
+ * in the pool — once, before the pick loop. Returns a Map<playerId, CandidateStaticScore>.
+ *
+ * Per-step costs reduced: getStrategyMatchScore + scoreTeamIdentityComponents static parts
+ * + scoreV4FocusTeamFit token matching are each called once instead of once per step.
+ */
+export function buildCandidateStaticScoreCache(input: {
+  candidates: AiTransferPreviewRecommendation[];
+  gameState: GameState;
+  team: Team;
+  profile: TeamStrategyProfile | null;
+  anchors: LaneMarketAnchors;
+}): Map<string, CandidateStaticScore> {
+  const cache = new Map<string, CandidateStaticScore>();
+  const identity = getTeamIdentityRow(input.gameState, input.team.teamId);
+  const axisWeights = deriveTeamIdentityAxisWeightMap(identity);
+  const harmonyFactor = normalizeManagementValue(identity?.harmony);
+  const financesFactor = normalizeManagementValue(identity?.finances);
+  const ambitionFactor = normalizeManagementValue(identity?.ambition);
+  const v4Profile = getV4FocusTeamProfile(input.team);
+  const override = getRetoolIdentityOverride(input.team);
+  const overrideTraitPreferences = override && "traitPreferences" in override ? override.traitPreferences : undefined;
+  const overrideRequiredTraits =
+    overrideTraitPreferences && "requiredPrimary" in overrideTraitPreferences
+      ? [...overrideTraitPreferences.requiredPrimary]
+      : [];
+  const overridePreferredTraits =
+    overrideTraitPreferences && "preferred" in overrideTraitPreferences
+      ? [...overrideTraitPreferences.preferred]
+      : [];
+  const explicitThemeTokens = [
+    ...(input.profile?.preferredArchetypes ?? []),
+    ...(input.profile?.secondaryArchetypes ?? []),
+    ...tokenizeThemeText(input.profile?.fantasyTheme),
+    ...tokenizeThemeText(input.profile?.loreTheme),
+    ...tokenizeThemeText(override?.archetype),
+  ];
+
+  for (const recommendation of input.candidates) {
+    const player = input.gameState.players.find((p) => p.id === recommendation.playerId) ?? null;
+    if (!player) continue;
+
+    const candidateAxis = getPlayerAxis(player);
+    const playerRole = getPlayerRoleTag(player, candidateAxis);
+    const normalizedClass = normalizeToken(player.className);
+    const sportsQuality = getPlayerSportsQuality(player, candidateAxis);
+    const playerQualityScore = roundValue(
+      clamp(((sportsQuality?.quality ?? 0) / 100) * 24 + ((sportsQuality?.strongDisciplineCount ?? 0) / 5) * 8, 0, 32),
+      1,
+    );
+    const bestDisciplineEntry = getPlayerPrimaryDiscipline(player);
+    const rawTier = classifyCandidateTier({
+      price: recommendation.price ?? recommendation.marketValue ?? null,
+      anchors: input.anchors,
+    });
+    const cheapFillEligible = isCheapFillCandidate({
+      price: recommendation.price ?? recommendation.marketValue ?? null,
+      salary: recommendation.salary ?? null,
+      anchors: input.anchors,
+    });
+    const playerFormColor = (getPlayerClassColor(player) ?? CLASS_COLOR_BY_CLASS[normalizedClass] ?? null) as FormCardColor | null;
+
+    // getStrategyMatchScore — fully static
+    const strategyFit = getStrategyMatchScore(input.profile, player);
+
+    // scoreTeamIdentityComponents static parts (without openNeeds/budgetLane)
+    const candidateTokens = buildPlayerThemeTokens(player);
+    const preferredClassHits = countSemanticMatches(input.profile?.preferredClasses ?? [], candidateTokens);
+    const avoidedClassHits = countSemanticMatches(input.profile?.avoidedClasses ?? [], candidateTokens);
+    const dislikedClassHits = countSemanticMatches(input.profile?.dislikedClasses ?? [], candidateTokens);
+    const preferredRaceHits = countSemanticMatches(input.profile?.preferredRaces ?? [], [player.race, ...candidateTokens]);
+    const avoidedRaceHits = countSemanticMatches(input.profile?.avoidedRaces ?? [], [player.race, ...candidateTokens]);
+    const dislikedRaceHits = countSemanticMatches(input.profile?.dislikedRaces ?? [], [player.race, ...candidateTokens]);
+    const preferredArchetypeHits = countSemanticMatches(input.profile?.preferredArchetypes ?? [], candidateTokens);
+    const avoidedArchetypeHits = countSemanticMatches(input.profile?.avoidedArchetypes ?? [], candidateTokens);
+    const dislikedArchetypeHits = countSemanticMatches(input.profile?.dislikedArchetypes ?? [], candidateTokens);
+    const requiredTraitHits = countSemanticMatches(overrideRequiredTraits, candidateTokens);
+    const preferredOverrideTraitHits = countSemanticMatches(overridePreferredTraits, candidateTokens);
+    const themeHits = countSemanticMatches(explicitThemeTokens, candidateTokens);
+
+    const candidateAxisStrength =
+      candidateAxis != null ? clamp((player.coreStats[candidateAxis] ?? 0) / 100, 0, 1) : 0.4;
+    const axisWeight =
+      candidateAxis != null
+        ? axisWeights[candidateAxis]
+        : Math.max(axisWeights.pow, axisWeights.spe, axisWeights.men, axisWeights.soc) || 0.25;
+    // store unclamped base: per-step adds (needsThisAxis ? 2.5 : 0) then clamps
+    const teamAxisFitScoreBase = axisWeight * 10 + candidateAxisStrength * 5 - 3;
+
+    const teamThemeFitScore = roundValue(
+      clamp(
+        themeHits * 2.2 +
+          preferredOverrideTraitHits * 1.5 +
+          (requiredTraitHits > 0 ? 2.4 : 0) -
+          (explicitThemeTokens.length > 0 && themeHits === 0 ? 3.5 : 0),
+        -8,
+        10,
+      ),
+      1,
+    );
+    const classFitScore = roundValue(
+      clamp(
+        preferredClassHits * 4.8 -
+          avoidedClassHits * 4.4 -
+          dislikedClassHits * 3.2 -
+          ((input.profile?.preferredClasses.length ?? 0) > 0 && preferredClassHits === 0 ? 4.2 : 0),
+        -12,
+        12,
+      ),
+      1,
+    );
+    const raceOrArchetypeFitScore = roundValue(
+      clamp(
+        preferredRaceHits * 2.6 +
+          preferredArchetypeHits * 3.2 +
+          requiredTraitHits * 2 -
+          avoidedRaceHits * 3.1 -
+          dislikedRaceHits * 2.4 -
+          avoidedArchetypeHits * 3.4 -
+          dislikedArchetypeHits * 2.1,
+        -12,
+        12,
+      ),
+      1,
+    );
+    const negativeSignals =
+      avoidedClassHits +
+      dislikedClassHits +
+      avoidedRaceHits +
+      dislikedRaceHits +
+      avoidedArchetypeHits +
+      dislikedArchetypeHits +
+      ((input.profile?.preferredClasses.length ?? 0) > 0 && preferredClassHits === 0 ? 1 : 0) +
+      ((input.profile?.preferredArchetypes.length ?? 0) > 0 && preferredArchetypeHits === 0 ? 1 : 0) +
+      (overrideRequiredTraits.length > 0 && requiredTraitHits === 0 ? 2 : 0);
+    const harmonyPenalty = roundValue(-clamp(negativeSignals * (1 + harmonyFactor * 1.8), 0, 14), 1);
+
+    const identityBaseReasons = [...strategyFit.reasons];
+    // static identity signal reasons
+    const staticTeamThemeFitForReasons = teamThemeFitScore;
+    const staticClassFitForReasons = classFitScore;
+    const staticRaceFitForReasons = raceOrArchetypeFitScore;
+    if (staticClassFitForReasons >= 4) identityBaseReasons.push("starker Klassenfit");
+    if (staticRaceFitForReasons >= 4) identityBaseReasons.push("Rasse/Archetyp trifft Teamprofil");
+    if (staticTeamThemeFitForReasons >= 4) identityBaseReasons.push("passt deutlich zum Teamthema");
+    if (harmonyPenalty <= -5) identityBaseReasons.push("Harmony straft den Pick spuerbar ab");
+
+    // V4 static token hits
+    let v4HardRuleFailure: string | null = null;
+    let v4MajorHits = 0;
+    let v4MinorHits = 0;
+    let v4AvoidHits = 0;
+    let v4AxisHit = 0;
+    if (v4Profile) {
+      v4HardRuleFailure = getHardFocusRuleFailure(v4Profile.code, player);
+      if (!v4HardRuleFailure) {
+        const tokenPool = [player.race, ...candidateTokens];
+        v4MajorHits = countSemanticMatches(v4Profile.primaryTokens, tokenPool);
+        v4MinorHits = countSemanticMatches(v4Profile.secondaryTokens, tokenPool);
+        v4AvoidHits = countSemanticMatches(v4Profile.avoidTokens, tokenPool);
+        v4AxisHit = candidateAxis != null && v4Profile.preferredAxes.includes(candidateAxis) ? 1 : 0;
+      }
+    }
+
+    cache.set(player.id, {
+      strategyFit,
+      teamThemeFitScore,
+      classFitScore,
+      raceOrArchetypeFitScore,
+      harmonyPenalty,
+      teamAxisFitScoreBase,
+      ambitionFactor,
+      financesFactor,
+      identityBaseReasons,
+      v4HardRuleFailure,
+      v4MajorHits,
+      v4MinorHits,
+      v4AvoidHits,
+      v4AxisHit,
+      candidateAxis,
+      playerRole,
+      normalizedClass,
+      playerQualityScore,
+      bestDisciplineEntry,
+      sportsQuality,
+      cheapFillEligible,
+      rawTier,
+      playerFormColor,
+    });
+  }
+
+  return cache;
+}
+
+// ---------------------------------------------------------------------------
+// Needs-Fingerprint: pre-filter full budget pool to a relevant active pool
+// ---------------------------------------------------------------------------
+
+export type TeamNeedsFingerprint = {
+  needAxes: Set<"pow" | "spe" | "men" | "soc">;
+  needDisciplineIds: Set<string>;
+  needRoles: Set<string>;
+};
+
+export function buildTeamNeedsFingerprint(input: {
+  needs: ReturnType<typeof evaluateAiNeeds>;
+  openNeeds: AiNeedsPicksOpenNeed[];
+}): TeamNeedsFingerprint {
+  const needAxes = new Set(
+    input.needs.uncoveredNeedAxes.filter(
+      (axis): axis is "pow" | "spe" | "men" | "soc" =>
+        axis === "pow" || axis === "spe" || axis === "men" || axis === "soc",
+    ),
+  );
+  // also add axes that appear in openNeeds with meaningful importance
+  for (const need of input.openNeeds) {
+    if (
+      (need.axis === "pow" || need.axis === "spe" || need.axis === "men" || need.axis === "soc") &&
+      need.importance >= 0.2
+    ) {
+      needAxes.add(need.axis);
+    }
+  }
+  const needDisciplineIds = new Set(input.needs.topNeedDisciplineIds);
+  const needRoles = new Set<string>(
+    input.openNeeds
+      .map((entry) => entry.axis)
+      .filter(
+        (axis) =>
+          axis === "star" ||
+          axis === "core" ||
+          axis === "depth" ||
+          axis === "specialist" ||
+          axis === "backup",
+      ),
+  );
+  return { needAxes, needDisciplineIds, needRoles };
+}
+
+const FINGERPRINT_AXIS_MIN_STAT = 35;
+const FINGERPRINT_DISCIPLINE_MIN_SCORE = 42;
+const FINGERPRINT_IDENTITY_TOP_N = 40;
+const FINGERPRINT_IDENTITY_MAX_SAME_CLASS = 4;
+
+/**
+ * Builds a fallback active scoring pool for non-S1 use.
+ * In S1 mode the full compareCandidates pool is scored every step — no pre-filter needed.
+ *
+ * Covers every team need dimension via axis/discipline/role matches and a diverse
+ * identity safety net (max FINGERPRINT_IDENTITY_MAX_SAME_CLASS per class to prevent
+ * the same identity archetype dominating all slots).
+ */
+export function buildNeedsFingerprintActivePool(input: {
+  compareCandidates: AiTransferPreviewRecommendation[];
+  gameState: GameState;
+  fingerprint: TeamNeedsFingerprint;
+  staticScoreCache: Map<string, CandidateStaticScore>;
+}): AiTransferPreviewRecommendation[] {
+  const active: AiTransferPreviewRecommendation[] = [];
+  const identityTopQueue: { recommendation: AiTransferPreviewRecommendation; identityScore: number; normalizedClass: string | null }[] = [];
+
+  for (const rec of input.compareCandidates) {
+    const price = rec.price ?? rec.marketValue ?? null;
+    const cached = input.staticScoreCache.get(rec.playerId);
+    const player = input.gameState.players.find((p) => p.id === rec.playerId) ?? null;
+
+    // Always include cheap fills (reserve safety)
+    if (price != null && price < AI_CHEAP_FILL_MARKET_VALUE_CAP) {
+      active.push(rec);
+      continue;
+    }
+
+    let relevant = false;
+
+    // Axis match via cached axis or direct player lookup
+    const candidateAxis = cached?.candidateAxis ?? (player ? getPlayerAxis(player) : null);
+    if (candidateAxis && input.fingerprint.needAxes.has(candidateAxis)) {
+      relevant = true;
+    }
+    // Also check raw stat values for any needed axis
+    if (!relevant && player) {
+      for (const axis of input.fingerprint.needAxes) {
+        if ((player.coreStats[axis] ?? 0) >= FINGERPRINT_AXIS_MIN_STAT) {
+          relevant = true;
+          break;
+        }
+      }
+    }
+    // Discipline match via player discipline ratings
+    if (!relevant && player) {
+      for (const disciplineId of input.fingerprint.needDisciplineIds) {
+        if ((player.disciplineRatings?.[disciplineId] ?? 0) >= FINGERPRINT_DISCIPLINE_MIN_SCORE) {
+          relevant = true;
+          break;
+        }
+      }
+    }
+    // Role match via cached playerRole
+    if (!relevant && cached) {
+      if (input.fingerprint.needRoles.has(cached.playerRole)) {
+        relevant = true;
+      }
+    }
+
+    if (relevant) {
+      active.push(rec);
+    }
+
+    // Track for identity safety net
+    if (cached) {
+      const identityScore =
+        cached.teamThemeFitScore +
+        cached.classFitScore +
+        cached.raceOrArchetypeFitScore +
+        cached.strategyFit.score;
+      identityTopQueue.push({ recommendation: rec, identityScore, normalizedClass: cached.normalizedClass });
+    }
+  }
+
+  // Safety net: top-N identity-strong players, with class diversity cap to prevent
+  // the same class (e.g. demon) from occupying all identity slots.
+  const activeIds = new Set(active.map((r) => r.playerId));
+  identityTopQueue.sort((left, right) => right.identityScore - left.identityScore);
+  let added = 0;
+  const identityClassCounts = new Map<string, number>();
+  for (const { recommendation, normalizedClass } of identityTopQueue) {
+    if (added >= FINGERPRINT_IDENTITY_TOP_N) break;
+    if (activeIds.has(recommendation.playerId)) continue;
+    const classKey = normalizedClass ?? "__unknown__";
+    if ((identityClassCounts.get(classKey) ?? 0) >= FINGERPRINT_IDENTITY_MAX_SAME_CLASS) continue;
+    active.push(recommendation);
+    activeIds.add(recommendation.playerId);
+    identityClassCounts.set(classKey, (identityClassCounts.get(classKey) ?? 0) + 1);
+    added += 1;
+  }
+
+  return active;
+}
+
+/**
+ * Returns true when a simulated pick has covered a need axis or discipline
+ * that was in the fingerprint — meaning the active pool should be rebuilt.
+ */
+export function fingerprintIsStale(input: {
+  fingerprint: TeamNeedsFingerprint;
+  pickedAxis: "pow" | "spe" | "men" | "soc" | null;
+  pickedDisciplineIds: string[];
+  coveredAxisHits: Record<"pow" | "spe" | "men" | "soc", number>;
+}): boolean {
+  if (input.pickedAxis && input.fingerprint.needAxes.has(input.pickedAxis)) {
+    // axis was needed; after this pick it may be sufficiently covered
+    if (input.coveredAxisHits[input.pickedAxis] >= 2) return true;
+  }
+  for (const disciplineId of input.pickedDisciplineIds) {
+    if (input.fingerprint.needDisciplineIds.has(disciplineId)) return true;
+  }
+  return false;
+}
+
 type CandidateIdentityEligibility = {
   status: "eligible" | "warning" | "risky_but_allowed" | "blocked_technical";
   reason: string | null;
@@ -3580,7 +4070,11 @@ function buildPickPlanner(input: {
   const cash = input.team.cash;
   const rosterGap = input.targetRosterSize != null ? Math.max(input.targetRosterSize - input.rosterCount, 0) : 0;
   const missingToMin = Math.max(input.playerMin - input.rosterCount, 0);
-  const lanePhilosophy = getSeason1LanePhilosophy(input.team);
+  const baseLanePhilosophy = getSeason1LanePhilosophy(input.team);
+  const gmProfileForLanes = season1OptimumMode
+    ? getTeamGeneralManager(input.gameState, input.team.teamId)?.profile ?? null
+    : null;
+  const lanePhilosophy = applyGmLanePhilosophyTilt(baseLanePhilosophy, gmProfileForLanes);
   const draftSeed = input.draftSeed?.trim() || null;
   const variance = getDraftVarianceConfig(teamCode);
   const seededLaneBias = (key: string) => (draftSeed ? draftCentered(`${draftSeed}:${teamCode}:planner:${key}`) * variance.laneBias : 0);
@@ -3837,9 +4331,17 @@ function buildCashStrategy(input: {
   const season1SpendCorridor = season1OptimumMode
     ? getSeason1SpendCorridor(input.team, input.identity, input.expectedPrizeSignal)
     : null;
-  const season1SpendTargetPct = season1OptimumMode
+  const season1CorridorSpendTargetPct = season1OptimumMode
     ? getAdjustedSeason1OptimumSpendTargetPct(input.team, input.identity, input.expectedPrizeSignal)
     : null;
+  // GM-getriebener harter Draft-Puffer: ersetzt das weiche Korridor-Ziel im S1-Draft.
+  // Der Puffer wird ab Pick 1 als minCashBuffer durchgesetzt (siehe maxSpendTotalThisWindow).
+  const season1GmDraftBufferPct =
+    season1OptimumMode && season1CorridorSpendTargetPct != null
+      ? getGmDraftBufferPct(input.profile, season1CorridorSpendTargetPct)
+      : null;
+  const season1SpendTargetPct =
+    season1GmDraftBufferPct != null ? roundValue(1 - season1GmDraftBufferPct, 3) : season1CorridorSpendTargetPct;
   const season1TargetCashLeft =
     season1SpendTargetPct != null && startingCash != null && startingCash > 0
       ? roundValue(startingCash * (1 - season1SpendTargetPct), 2)
@@ -4032,6 +4534,9 @@ function buildCashStrategy(input: {
   }
   if (season1SpendTargetPct != null) {
     warnings.push(`season1_spend_target:${roundValue(season1SpendTargetPct * 100, 1)}pct`);
+    if (season1GmDraftBufferPct != null) {
+      warnings.push(`season1_gm_draft_buffer:${roundValue(season1GmDraftBufferPct * 100, 1)}pct`);
+    }
     if (season1SpendCorridor) {
       warnings.push(
         `season1_spend_corridor:${season1SpendCorridor.archetype}:${roundValue(season1SpendCorridor.minPct * 100, 1)}-${roundValue(season1SpendCorridor.maxPct * 100, 1)}pct`,
@@ -4697,6 +5202,8 @@ function scoreCandidate(input: {
   roleCounts: Map<string, number>;
   disciplinePeak: Map<string, number>;
   cashStrategy: AiNeedsPicksCashStrategy;
+  /** When provided the expensive static parts (identity, strategy, V4 token matching) are read from cache. */
+  staticScoreCache?: Map<string, CandidateStaticScore>;
   seasonStrategy: AiNeedsPicksSeasonStrategy;
   pickPhase:
     | "minimum_skeleton"
@@ -4709,21 +5216,23 @@ function scoreCandidate(input: {
 }) {
   const player = input.player;
   const candidateAxis = player ? getPlayerAxis(player) : null;
-  const normalizedClass = normalizeToken(player?.className ?? input.recommendation.className);
+  const cached = player != null ? input.staticScoreCache?.get(player.id) : undefined;
+
+  const normalizedClass = cached?.normalizedClass ?? normalizeToken(player?.className ?? input.recommendation.className);
   const normalizedRace = normalizeToken(player?.race ?? input.recommendation.race);
-  const playerRole = player ? getPlayerRoleTag(player, candidateAxis) : "depth";
-  const rawTier = classifyCandidateTier({
+  const playerRole = cached?.playerRole ?? (player ? getPlayerRoleTag(player, candidateAxis) : "depth");
+  const rawTier = cached?.rawTier ?? classifyCandidateTier({
     price: input.recommendation.price ?? input.recommendation.marketValue ?? null,
     anchors: input.anchors,
   });
-  const cheapFillEligible = isCheapFillCandidate({
+  const cheapFillEligible = cached?.cheapFillEligible ?? isCheapFillCandidate({
     price: input.recommendation.price ?? input.recommendation.marketValue ?? null,
     salary: input.recommendation.salary ?? null,
     anchors: input.anchors,
   });
-  const bestDisciplineEntry = player ? getPlayerPrimaryDiscipline(player) : null;
-  const sportsQuality = player ? getPlayerSportsQuality(player, candidateAxis) : null;
-  const playerQualityScore = roundValue(
+  const bestDisciplineEntry = cached?.bestDisciplineEntry ?? (player ? getPlayerPrimaryDiscipline(player) : null);
+  const sportsQuality = cached?.sportsQuality ?? (player ? getPlayerSportsQuality(player, candidateAxis) : null);
+  const playerQualityScore = cached?.playerQualityScore ?? roundValue(
     clamp(((sportsQuality?.quality ?? 0) / 100) * 24 + ((sportsQuality?.strongDisciplineCount ?? 0) / 5) * 8, 0, 32),
     1,
   );
@@ -4741,20 +5250,77 @@ function scoreCandidate(input: {
       : 0,
     1,
   );
-  const strategyFitResult = player ? getStrategyMatchScore(input.profile, player) : { score: 0, reasons: ["Keine Spielerdaten."] };
-  const identityBreakdown =
+  const strategyFitResult = cached?.strategyFit ?? (player ? getStrategyMatchScore(input.profile, player) : { score: 0, reasons: ["Keine Spielerdaten."] });
+
+  // Identity breakdown: use cached static parts + recompute only the step-dynamic delta
+  const identityBreakdown: ReturnType<typeof scoreTeamIdentityComponents> =
     player != null
-      ? scoreTeamIdentityComponents({
-          gameState: input.gameState,
-          team: input.team,
-          profile: input.profile,
-          player,
-          candidateAxis,
-          playerRole,
-          strategyFitResult,
-          openNeeds: input.openNeeds,
-          budgetLane: input.budgetLane,
-        })
+      ? cached != null
+        ? (() => {
+            const needsThisAxis = input.openNeeds.some((entry) => entry.axis === cached.candidateAxis);
+            const teamAxisFitScore = roundValue(
+              clamp(cached.teamAxisFitScoreBase + (needsThisAxis ? 2.5 : 0), -6, 12),
+              1,
+            );
+            const ambitionLaneBias = roundValue(
+              clamp(
+                input.budgetLane.lane === "star" || input.budgetLane.lane === "superstar"
+                  ? (cached.ambitionFactor - 0.5) * 8
+                  : input.budgetLane.lane === "cheap_fill" || input.budgetLane.lane === "backup"
+                    ? (0.55 - cached.ambitionFactor) * 4
+                    : 0,
+                -4,
+                4,
+              ),
+              1,
+            );
+            const financeLaneBias = roundValue(
+              clamp(
+                input.budgetLane.lane === "cheap_fill" ||
+                input.budgetLane.lane === "depth" ||
+                input.budgetLane.lane === "backup"
+                  ? (cached.financesFactor - 0.5) * 6
+                  : input.budgetLane.lane === "star" || input.budgetLane.lane === "superstar"
+                    ? (0.45 - cached.financesFactor) * 5
+                    : (cached.financesFactor - 0.5) * 2,
+                -4,
+                4,
+              ),
+              1,
+            );
+            const teamIdentityScoreFromCache = roundValue(
+              teamAxisFitScore +
+                cached.teamThemeFitScore +
+                cached.classFitScore +
+                cached.raceOrArchetypeFitScore +
+                cached.harmonyPenalty,
+              1,
+            );
+            const reasons = [...cached.identityBaseReasons];
+            if (teamAxisFitScore >= 6) reasons.push("passt zu den Teamachsen");
+            return {
+              teamAxisFitScore,
+              teamThemeFitScore: cached.teamThemeFitScore,
+              classFitScore: cached.classFitScore,
+              raceOrArchetypeFitScore: cached.raceOrArchetypeFitScore,
+              harmonyPenalty: cached.harmonyPenalty,
+              ambitionLaneBias,
+              financeLaneBias,
+              teamIdentityScore: teamIdentityScoreFromCache,
+              reasons: Array.from(new Set(reasons)),
+            };
+          })()
+        : scoreTeamIdentityComponents({
+            gameState: input.gameState,
+            team: input.team,
+            profile: input.profile,
+            player,
+            candidateAxis,
+            playerRole,
+            strategyFitResult,
+            openNeeds: input.openNeeds,
+            budgetLane: input.budgetLane,
+          })
       : {
           teamAxisFitScore: 0,
           teamThemeFitScore: 0,
@@ -4767,7 +5333,7 @@ function scoreCandidate(input: {
           reasons: ["Keine Spielerdaten."],
         };
   const teamIdentityScore = identityBreakdown.teamIdentityScore;
-  const playerFormColor = player ? getPlayerClassColor(player) : CLASS_COLOR_BY_CLASS[normalizedClass] ?? null;
+  const playerFormColor = cached?.playerFormColor ?? ((player ? getPlayerClassColor(player) : CLASS_COLOR_BY_CLASS[normalizedClass] ?? null) as FormCardColor | null);
   const primaryColorHit = playerFormColor != null && input.seasonStrategy.formCardColorPlan.primaryFormColors.includes(playerFormColor);
   const secondaryColorHit = playerFormColor != null && input.seasonStrategy.formCardColorPlan.secondaryFormColors.includes(playerFormColor);
   const missingColorHit = playerFormColor != null && input.seasonStrategy.formCardColorPlan.missingFormColors.includes(playerFormColor);
@@ -5017,21 +5583,80 @@ function scoreCandidate(input: {
             ? "picked_for_roster_balance"
             : "value_pick_despite_theme_risk"
     : null;
-  const focusTeamFit =
-    player != null
-      ? scoreV4FocusTeamFit({
-          team: input.team,
-          player,
-          candidateAxis,
-          pickPhase: input.pickPhase,
-          budgetLane: input.budgetLane,
-          price,
-          laneCap,
-          needMatchScore,
-          teamIdentityScore,
-          strategicException,
-        })
-      : { fitScore: 0, status: "ok" as const, reason: null, metrics: {}, reasons: [] };
+  const focusTeamFit: ReturnType<typeof scoreV4FocusTeamFit> = (() => {
+    if (player == null) return { fitScore: 0, status: "ok" as const, reason: null, metrics: {}, reasons: [] };
+    if (cached != null) {
+      // V4 static: use cached token hits, recompute dynamic parts cheaply
+      const v4Profile = getV4FocusTeamProfile(input.team);
+      if (!v4Profile) return { fitScore: 0, status: "ok" as const, reason: null, metrics: {}, reasons: [] };
+      if (cached.v4HardRuleFailure) {
+        return {
+          fitScore: -18,
+          status: "blocked" as const,
+          reason: cached.v4HardRuleFailure,
+          metrics: Object.fromEntries(v4Profile.namedMetricKeys.map((key) => [key, -10])),
+          reasons: ["Harte Team-Identity-Regel blockiert diesen Pick."],
+        };
+      }
+      const earlyPhase =
+        input.pickPhase === "minimum_skeleton" ||
+        input.pickPhase === "early_core" ||
+        input.pickPhase === "identity_core" ||
+        input.pickPhase === "specialist_fill";
+      const lanePremium =
+        input.budgetLane.lane === "star" ||
+        input.budgetLane.lane === "superstar" ||
+        input.budgetLane.lane === "core";
+      const capPressure = price != null && laneCap != null && price > laneCap + 0.01 ? 1 : 0;
+      const fitScore = roundValue(
+        clamp(
+          cached.v4MajorHits * 4 +
+            cached.v4MinorHits * 1.75 +
+            cached.v4AxisHit * 2.5 +
+            (lanePremium && teamIdentityScore >= 6 ? 1.5 : 0) +
+            (needMatchScore >= input.budgetLane.minNeedScore + 1 ? 1 : 0) -
+            cached.v4AvoidHits * 5 -
+            (earlyPhase && cached.v4MajorHits === 0 && cached.v4AxisHit === 0 ? 3.5 : 0) -
+            (capPressure && earlyPhase ? 2.5 : 0),
+          -14,
+          14,
+        ),
+        1,
+      );
+      let status: "ok" | "warning" | "blocked" = "ok";
+      let reason: string | null = null;
+      if (earlyPhase && fitScore <= -4 && !strategicException) {
+        status = "warning";
+        reason = "focus_team_early_phase_off_theme";
+      } else if (fitScore <= 1) {
+        status = "warning";
+        reason =
+          capPressure && v4Profile.code === "N-N" ? "early_phase_cap_exceeded" : "focus_team_soft_warning";
+      }
+      const reasons: string[] = [];
+      if (cached.v4MajorHits > 0) reasons.push("Fokus-Team-Identity trifft Kernprofil.");
+      if (cached.v4MinorHits > 0 && cached.v4MajorHits === 0) reasons.push("Fokus-Team-Identity trifft Nebenprofil.");
+      if (cached.v4AxisHit > 0) reasons.push("Spieler passt zu den priorisierten Teamachsen.");
+      if (cached.v4AvoidHits > 0) reasons.push("Spieler wirkt fuer das Fokus-Team off-theme.");
+      if (status === "warning" && reason === "early_phase_cap_exceeded")
+        reasons.push("Fruehphase prueft dieses Team besonders streng gegen teure Ausreisser.");
+      if (status === "warning" && reason === "focus_team_early_phase_off_theme")
+        reasons.push("Fruehphase markiert off-theme Picks, laesst sie aber fuer harte Kader-Needs im Pool.");
+      return { fitScore, status, reason, metrics: {}, reasons };
+    }
+    return scoreV4FocusTeamFit({
+      team: input.team,
+      player,
+      candidateAxis,
+      pickPhase: input.pickPhase,
+      budgetLane: input.budgetLane,
+      price,
+      laneCap,
+      needMatchScore,
+      teamIdentityScore,
+      strategicException,
+    });
+  })();
   const adjustedTeamIdentityScore = roundValue(teamIdentityScore + focusTeamFit.fitScore, 1);
   const mercenaryNegativeFitPenalty = getMercenaryNegativeFitPenalty({
     teamId: input.team.teamId,
@@ -5422,7 +6047,7 @@ function buildTeamEntry(input: {
   const rosterComposition = buildRosterComposition(input.context.gameState, team.teamId);
   const rosterEntries = getRosterEntriesForTeam(input.context.gameState, team.teamId);
   const rosterCount = input.previewTeam.rosterCount ?? input.previewTeam.rosterSize ?? rosterEntries.length ?? null;
-  const targetRosterSize = rosterTargets.playerOpt;
+  const targetRosterSize = season1OptimumMode ? rosterTargets.playerMax : rosterTargets.playerOpt;
   const playerMin = rosterTargets.playerMin;
   const targetRosterGap =
     rosterCount != null && targetRosterSize != null ? Math.max(targetRosterSize - rosterCount, 0) : null;
@@ -5569,6 +6194,17 @@ function buildTeamEntry(input: {
     topNeedDisciplineIds: needs.topNeedDisciplineIds,
   });
 
+  // Build static score cache once for all candidates (pre-computes expensive token matching)
+  const staticScoreCache = buildCandidateStaticScoreCache({
+    candidates: compareCandidates,
+    gameState: input.context.gameState,
+    team,
+    profile,
+    anchors,
+  });
+
+  // All affordable candidates are scored every step — static cache makes full-pool scoring fast.
+
   const initiallyScoredCandidates = compareCandidates
     .map((entry) =>
       scoreCandidate({
@@ -5594,6 +6230,7 @@ function buildTeamEntry(input: {
           seasonStrategy: seasonPlanning.seasonStrategy,
           pickPhase: "minimum_skeleton",
           teamCashTier,
+          staticScoreCache,
         }),
       )
       .sort((left, right) => right.finalScore - left.finalScore);
@@ -5693,8 +6330,24 @@ function buildTeamEntry(input: {
       minimumSecured &&
       simulatedRosterCount != null &&
       simulatedRosterCount < minimumAcceptedRosterTarget;
-    const candidateEvaluations = compareCandidates
-      .filter((entry) => !pickedPlayerIds.includes(entry.playerId))
+    const scoringPool = compareCandidates.filter((entry) => !pickedPlayerIds.includes(entry.playerId));
+
+    // S1 quality gate: once playerOpt is reached, only allow non-cheap picks in extra slots.
+    // Prevents cheap fills from padding the roster beyond the intended optimal size.
+    const s1PostOptReached =
+      season1OptimumMode &&
+      simulatedRosterCount != null &&
+      rosterTargets.playerOpt != null &&
+      simulatedRosterCount >= rosterTargets.playerOpt;
+    const effectiveScoringPool = s1PostOptReached
+      ? scoringPool.filter((entry) => (entry.price ?? entry.marketValue ?? 0) >= AI_CHEAP_FILL_MARKET_VALUE_CAP)
+      : scoringPool;
+    if (s1PostOptReached && effectiveScoringPool.length === 0) {
+      warnings.push("s1_extra_pick_quality_floor_stop");
+      break;
+    }
+
+    const candidateEvaluations = effectiveScoringPool
       .map((entry) => {
         const player = getPlayerById(input.context.gameState, entry.playerId);
         const price = entry.price ?? entry.marketValue ?? null;
@@ -5821,6 +6474,7 @@ function buildTeamEntry(input: {
           seasonStrategy: seasonPlanning.seasonStrategy,
           pickPhase,
           teamCashTier,
+          staticScoreCache,
           });
           const optimumDepthBonus = getSeason1OptimumDepthPressureBonus({
             candidate: scoredCandidate,
@@ -6368,6 +7022,7 @@ function buildTeamEntry(input: {
     simulatedRoleCounts.set(pickedRole, (simulatedRoleCounts.get(pickedRole) ?? 0) + 1);
     if (pickedPlayer) {
       simulatedRosterPlayers.push(pickedPlayer);
+
       for (const [disciplineId, rawScore] of Object.entries(pickedPlayer.disciplineRatings ?? {})) {
         const score = Number(rawScore ?? 0);
         const current = simulatedDisciplinePeak.get(disciplineId) ?? 0;
@@ -6666,6 +7321,7 @@ export async function buildAiNeedsPicksCompare(
         excludedPlayerIds: params.excludedPlayerIds ?? [],
         limit: params.limit ?? fullFreeAgentPoolSize,
         fullScoringLimit: params.fullScoringLimit ?? null,
+        candidateScopeMode: params.candidateScopeMode ?? "budget_wide",
       } satisfies AiTransferPreviewParams),
     ),
   );

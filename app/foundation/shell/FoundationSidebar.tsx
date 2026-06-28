@@ -4,6 +4,7 @@ import Link from "next/link";
 import { useEffect, useRef, useState } from "react";
 
 import { FOUNDATION_NAV_GROUPS, isFoundationNavViewActive } from "@/lib/foundation/foundation-nav-config";
+import type { FoundationNavAttentionMap } from "@/lib/foundation/foundation-nav-attention";
 import {
   applyFoundationSidebarOrder,
   loadFoundationSidebarOrder,
@@ -17,6 +18,7 @@ type FoundationSidebarProps = {
   activeView: FoundationViewId;
   onNavigate: (view: FoundationViewId) => void;
   onPrefetchView?: (view: FoundationViewId) => void;
+  attentionByViewId?: FoundationNavAttentionMap;
 };
 
 type SidebarDragState = {
@@ -24,7 +26,7 @@ type SidebarDragState = {
   itemId: FoundationViewId;
 } | null;
 
-export default function FoundationSidebar({ activeView, onNavigate, onPrefetchView }: FoundationSidebarProps) {
+export default function FoundationSidebar({ activeView, onNavigate, onPrefetchView, attentionByViewId }: FoundationSidebarProps) {
   const [navGroups, setNavGroups] = useState(FOUNDATION_NAV_GROUPS);
   const [draggingItem, setDraggingItem] = useState<SidebarDragState>(null);
   const dragState = useRef<SidebarDragState>(null);
@@ -133,12 +135,13 @@ export default function FoundationSidebar({ activeView, onNavigate, onPrefetchVi
             {group.items.map((item) => {
               const targetView = getDefaultFoundationViewTarget(item.id);
               const isActive = isFoundationNavViewActive(activeView, item.id);
+              const needsAttention = Boolean(attentionByViewId?.[item.id]);
               const isDragging = draggingItem?.groupId === group.id && draggingItem.itemId === item.id;
               return (
                 <button
                   key={item.id}
                   type="button"
-                  className={`foundation-sidebar-item${isActive ? " is-active" : ""}${isDragging ? " is-dragging" : ""}`}
+                  className={`foundation-sidebar-item${isActive ? " is-active" : ""}${needsAttention ? " is-attention" : ""}${isDragging ? " is-dragging" : ""}`}
                   data-testid={`foundation-nav-${item.id}`}
                   title={item.tooltip}
                   onClick={() => onNavigate(targetView)}

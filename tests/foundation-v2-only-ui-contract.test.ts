@@ -41,6 +41,7 @@ describe("foundation v2-only ui contract", () => {
 
   it("uses classic teams v1 with league table, history and economy tiles", async () => {
     const foundationText = await fs.readFile(`${root}/app/foundation/FoundationPageClient.tsx`, "utf8");
+    const teamsPanelText = await fs.readFile(`${root}/app/foundation/teams-v2/FoundationTeamsDetailPanel.tsx`, "utf8");
 
     expect(foundationText).not.toContain("TeamsV2Client");
     expect(foundationText).not.toContain("teamsViewMode");
@@ -48,7 +49,10 @@ describe("foundation v2-only ui contract", () => {
     expect(foundationText).toContain('id="teams-league-overview"');
     expect(foundationText).toContain("teamEconomyTiles");
     expect(foundationText).toContain("teams-v2-focus-card");
-    expect(foundationText).toContain("teams-v2-history-table");
+    expect(foundationText).toContain("shouldLoadSeasonArchive");
+    expect(teamsPanelText).toContain("TeamDrawerHistoryTable");
+    expect(teamsPanelText).toContain("teams-v2-history-table");
+    expect(teamsPanelText).toContain("isSeasonDisciplineKey");
     expect(foundationText).toContain('data-testid="team-board-objectives"');
     expect(foundationText).not.toMatch(/\{false\s*\?\s*\([\s\S]*foundation-inbox-panel/);
   });

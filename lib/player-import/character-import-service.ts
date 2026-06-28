@@ -257,8 +257,6 @@ function materializeStatsPlayerFromBrief(
     fatigue: 0,
     form: 0,
     potential: roundTo2(Math.max(rating, topAverage) + 4),
-    age: null,
-    nationality: null,
     cost: brief.cost ?? 0,
     upkeepBase: brief.upkeepBase ?? 0,
     portraitPath: brief.portraitPath ?? null,

@@ -2,8 +2,6 @@
 
 import { useMemo, useState } from "react";
 
-import ClassColorChip from "@/app/foundation/ClassColorChip";
-import OptimizedMediaImage from "@/app/foundation/OptimizedMediaImage";
 import { TooltipHeading } from "@/components/ui/TooltipHeading";
 import {
   buildTrainingImpactItems,
@@ -13,9 +11,9 @@ import {
   VeloAttributeFocusTags,
   VeloImpactStrip,
   VeloIntensityRail,
-  VeloStarRating,
-  VeloStatOrbitRow,
 } from "@/components/foundation/velo-ui";
+import FoundationPlayerPortraitCard from "@/components/foundation/player-portrait-card/FoundationPlayerPortraitCard";
+import { createEmptyLeaguePlayerHeatPools } from "@/lib/foundation/player-league-heat";
 import { getTrainingModePresentation } from "@/lib/training/training-mode-presentation";
 import { getPlayerPortraitBrowserUrl } from "@/lib/data/mediaAssets";
 import type { PlayerTrainingMode } from "@/lib/training/training-plan-types";
@@ -129,7 +127,7 @@ function TrainingModeDemandBanner({ row }: { row: TrainingPlayerRowView }) {
   );
 }
 
-function TrainingAttributeForecastGrid({ row }: { row: TrainingPlayerRowView }) {
+export function TrainingAttributeForecastGrid({ row }: { row: TrainingPlayerRowView }) {
   const [expanded, setExpanded] = useState(false);
   const sorted = [...row.attributeForecast].sort((left, right) => Math.abs(right.delta) - Math.abs(left.delta));
   const visible = expanded ? sorted : sorted.slice(0, 5);
@@ -185,7 +183,7 @@ export function TrainingModeGuide({ trainingModeOptions }: TrainingModeGuideProp
       {trainingModeOptions.map((option) => (
         <article className={`training-v2-mode-guide-card velo-mode-guide-card is-${option.fatigueRisk === "niedrig" ? "growth" : option.fatigueRisk === "hoch" ? "regression" : "stable"}`} key={`mode-guide-${option.value}`}>
           <span>{option.label}</span>
-          <strong>+{formatVeloNumber(option.baseXp, 0)} XP · Fatigue {formatVeloNumber(option.fatigueLoad, 0)}</strong>
+          <strong>+{formatVeloNumber(option.baseXp, 0)} Setpoints · Fatigue {formatVeloNumber(option.fatigueLoad, 0)}</strong>
           <small>
             {option.recoveryDeltaPct > 0 ? `+${option.recoveryDeltaPct}% Reg` : option.recoveryDeltaPct < 0 ? `${option.recoveryDeltaPct}% Reg` : "±0 Reg"} · {option.note}
           </small>
@@ -286,78 +284,79 @@ export function TrainingPlayerLane({
         ))}
       </div>
 
-      <div className="training-v2-player-list training-v2-rider-grid">
+      <div className="training-v2-player-list training-v2-rider-grid team-portraits-grid">
         {playerRows.map((row) => {
           const portrait = getPortraitModel(row.player);
           const tone = getDevelopmentTone(row);
           const isHighRisk = row.forecast.regressionRisk === "high";
+          const modePresentation = getTrainingModePresentation(row.mode);
           return (
             <article className={`training-v2-rider-card velo-rider-card is-${tone}${isHighRisk ? " is-high-risk" : ""}`} id={`training-player-${row.player.id}`} key={row.entryId}>
-              <VeloStatOrbitRow stats={row.player.coreStats} ariaLabel={`${row.player.name} Achsenwerte`} />
-
-              <div className="training-v2-rider-hero">
-                <button
-                  className="training-v2-rider-portrait-button"
-                  type="button"
-                  onClick={() => onOpenPlayerDetails?.({ playerId: row.player.id, activePlayerId: row.entryId })}
-                >
-                  <div className="training-v2-rider-portrait-wrap">
-                    {portrait.src ? (
-                      <OptimizedMediaImage
-                        src={portrait.src}
-                        alt={row.player.name}
-                        width={112}
-                        height={112}
-                        className="training-v2-rider-portrait"
+              <FoundationPlayerPortraitCard
+                playerId={row.player.id}
+                name={row.player.name}
+                portraitUrl={portrait.src}
+                portraitInitials={portrait.initials}
+                playerOvr={row.developmentStars.currentAbilityRating}
+                playerMvs={row.playerMvs}
+                playerPps={row.playerPps}
+                pow={row.player.coreStats.pow}
+                spe={row.player.coreStats.spe}
+                men={row.player.coreStats.men}
+                soc={row.player.coreStats.soc}
+                leagueHeatPools={createEmptyLeaguePlayerHeatPools()}
+                variant="team"
+                context="training"
+                density="full"
+                highlight={getDevelopmentBadgeLabel(tone)}
+                subMeta={`${row.player.className} · ${row.roleTag ?? "ohne Rolle"} · ${row.organicForecast.classBefore} → ${row.organicForecast.classAfter}`}
+                contextData={{
+                  training: {
+                    caRating: row.developmentStars.currentAbilityRating,
+                    poDisplay: row.developmentStars.potentialStars ?? formatVeloNumber(row.developmentStars.potentialRating, 0),
+                    netSetpoints: row.organicForecast.netSetpoints,
+                    regressionRisk: row.forecast.regressionRisk,
+                    trainingModeLabel: modePresentation.label,
+                    traitModifierPct: row.modifiers.traitModifierPct,
+                  },
+                }}
+                onOpen={() => onOpenPlayerDetails?.({ playerId: row.player.id, activePlayerId: row.entryId })}
+                title={`${row.player.name} Profil öffnen`}
+                testId="training-player-portrait-card"
+                footerSlot={
+                  <>
+                    {showIntensityRail ? (
+                      <VeloIntensityRail
+                        ariaLabel={`${row.player.name} Trainingsmodus`}
+                        segments={modeSegments}
+                        activeValue={row.mode}
+                        demandValue={
+                          row.trainingDemand && row.trainingDemand.status !== "fulfilled" ? row.trainingDemand.preferredMode : null
+                        }
+                        disabled={trainingModeReadOnly}
+                        onSelect={(value) => onSetTrainingMode(row.player.id, value as PlayerTrainingMode)}
                       />
-                    ) : (
-                      <div className="training-v2-rider-portrait training-v2-rider-portrait-fallback">{portrait.initials}</div>
-                    )}
-                  </div>
-                </button>
-
-                <div className="training-v2-rider-copy">
-                  <div className="training-v2-rider-title-row">
-                    <button
-                      type="button"
-                      className="table-link-button"
-                      onClick={() => onOpenPlayerDetails?.({ playerId: row.player.id, activePlayerId: row.entryId })}
-                    >
-                      {row.player.name}
-                    </button>
-                    <span className={`training-v2-badge is-${tone}`}>{getDevelopmentBadgeLabel(tone)}</span>
-                    {isHighRisk ? <span className="training-v2-badge is-risk-urgent">10/10 Risiko</span> : null}
-                  </div>
-                  <p className="training-v2-rider-meta">
-                    <ClassColorChip className={row.player.className} /> · {row.roleTag ?? "ohne Rolle"}
-                  </p>
-                  <div className="training-v2-rider-star-stack velo-star-stack">
-                    <VeloStarRating compact label="CA" value={row.developmentStars.currentAbilityStars ?? row.developmentStars.currentAbilityRating} />
-                    <VeloStarRating compact label="PO" tone="gold" value={row.developmentStars.potentialStars ?? row.developmentStars.potentialRating} />
-                  </div>
-                  <p className="training-v2-rider-class-line">
-                    Klasse {row.organicForecast.classBefore} → {row.organicForecast.classAfter}
-                  </p>
-                </div>
-
-                <div className="training-v2-rider-ability-stack">
-                  <div className={`training-v2-rider-ability velo-value-flash-target is-${tone}`}>
-                    <span>Setpoints</span>
-                    <strong className={row.organicForecast.netSetpoints >= 0 ? "text-positive" : "text-negative"}>
-                      {row.organicForecast.netSetpoints > 0 ? "+" : ""}
-                      {formatVeloNumber(row.organicForecast.netSetpoints, 1)}
-                    </strong>
-                    <small>Organische Saison</small>
-                  </div>
-                  {row.playerPps != null ? (
-                    <div className="training-v2-rider-ability is-pps">
-                      <span>PPs</span>
-                      <strong>{formatVeloNumber(row.playerPps, 1)}</strong>
-                      <small>Leistung</small>
+                    ) : null}
+                    <div className="training-v2-plan-controls">
+                      <label className="filter-field training-v2-class-select">
+                        <span>Trainingsklasse</span>
+                        <select
+                          className="input"
+                          value={row.trainingClass}
+                          disabled={trainingModeReadOnly}
+                          onChange={(event) => onSetTrainingClass(row.player.id, event.target.value)}
+                        >
+                          {trainingClassOptions.map((option) => (
+                            <option key={option.value} value={option.value}>
+                              {option.label}
+                            </option>
+                          ))}
+                        </select>
+                      </label>
                     </div>
-                  ) : null}
-                </div>
-              </div>
+                  </>
+                }
+              />
 
               <TrainingTraitBoostRow row={row} />
               <TrainingModeDemandBanner row={row} />
@@ -394,38 +393,8 @@ export function TrainingPlayerLane({
                   recoveryAfter: row.recoveryForecast.after,
                   recoveryDeltaPct: row.recoveryForecast.modifierPct,
                   regressionRisk: row.forecast.regressionRisk,
-                  legacyXpPreview: row.trainingXp + row.performanceXp,
                 })}
               />
-
-              {showIntensityRail ? (
-              <VeloIntensityRail
-                ariaLabel={`${row.player.name} Trainingsmodus`}
-                segments={modeSegments}
-                activeValue={row.mode}
-                demandValue={row.trainingDemand && row.trainingDemand.status !== "fulfilled" ? row.trainingDemand.preferredMode : null}
-                disabled={trainingModeReadOnly}
-                onSelect={(value) => onSetTrainingMode(row.player.id, value as PlayerTrainingMode)}
-              />
-              ) : null}
-
-              <div className="training-v2-plan-controls">
-                <label className="filter-field training-v2-class-select">
-                  <span>Trainingsklasse</span>
-                  <select
-                    className="input"
-                    value={row.trainingClass}
-                    disabled={trainingModeReadOnly}
-                    onChange={(event) => onSetTrainingClass(row.player.id, event.target.value)}
-                  >
-                    {trainingClassOptions.map((option) => (
-                      <option key={option.value} value={option.value}>
-                        {option.label}
-                      </option>
-                    ))}
-                  </select>
-                </label>
-              </div>
 
               <VeloAttributeFocusTags primary={row.classTrainingFocus.primary} risks={row.classTrainingFocus.risks} />
 

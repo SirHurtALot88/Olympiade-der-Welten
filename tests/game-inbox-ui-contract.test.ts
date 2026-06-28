@@ -31,7 +31,8 @@ describe("game inbox UI contract", () => {
     expect(source).toContain('command.section === "Lexikon" ? 1000 : 0');
     expect(officeSource).toContain('data-testid="foundation-hq-gm-story"');
     expect(source).toContain("resolveFoundationPanelScrollTarget");
-    expect(source).toContain("team-sponsor-choice");
+    expect(source).toContain("FoundationSponsorsPanel");
+    expect(readFileSync(join(root, "app/foundation/sponsors-v2/FoundationSponsorsPanel.tsx"), "utf8")).toContain("team-sponsor-choice");
     expect(source).toContain("team-board-objectives");
     expect(source).toContain("marketFocusPlayerId");
     expect(source).toContain("exactLabelMatch");

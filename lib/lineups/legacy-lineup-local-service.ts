@@ -39,7 +39,9 @@ import type {
   LegacyLineupValidationOptions,
 } from "@/lib/lineups/legacy-lineup-types";
 import { getImportedPlayerDisplayMarketValue, getImportedPlayerDisplaySalary } from "@/lib/data/player-economy-display";
+import { getFatiguePerformanceMultiplier } from "@/lib/fatigue/fatigue-calibration";
 import { getInjuryRiskBand, getPlayerAvailabilityView } from "@/lib/fatigue/fatigue-injury-service";
+import { resolveLineupStrategyForTeam } from "@/lib/ai/ai-manager-doctrine-service";
 import { validateLegacyLineupContext } from "@/lib/lineups/legacy-lineup-validator";
 import { calculateLocalLegacyLineupPreviewFromContext } from "@/lib/lineups/legacy-lineup-preview-from-context";
 import { isTeamMatchdayLineupOperationallyReady } from "@/lib/foundation/matchday-lineup-readiness";
@@ -160,51 +162,23 @@ function buildLocalFatigueMap(gameState: GameState, params: LegacyLineupKeyParam
     return null;
   }
 
-  const currentIndex = season.matchdayIds.findIndex((matchdayId) => matchdayId === params.matchdayId);
-  if (currentIndex <= 0) {
-    return {};
-  }
-
-  const previousMatchdayIds = season.matchdayIds.slice(Math.max(0, currentIndex - 4), currentIndex);
-  const drafts = (normalizedGameState.seasonState.lineupDrafts ?? [])
-    .filter((draft) => draft.seasonId === params.seasonId && draft.teamId === params.teamId)
-    .filter((draft) => previousMatchdayIds.includes(draft.matchdayId));
-  const matchdayOrder = new Map(season.matchdayIds.map((matchdayId, index) => [matchdayId, index]));
-  const playerByMatchday = new Map<string, Set<number>>();
-
-  for (const draft of drafts) {
-    const order = matchdayOrder.get(draft.matchdayId);
-    if (order == null) {
+  const fatigueMap: Record<string, { count: number; multiplier: number }> = {};
+  for (const roster of normalizedGameState.rosters.filter((entry) => entry.teamId === params.teamId)) {
+    const player = normalizedGameState.players.find((entry) => entry.id === roster.playerId);
+    if (!player) {
       continue;
     }
-    for (const playerId of new Set(draft.entries.map((entry) => entry.playerId))) {
-      const used = playerByMatchday.get(playerId) ?? new Set<number>();
-      used.add(order);
-      playerByMatchday.set(playerId, used);
-    }
-  }
-
-  const fatigueMap: Record<string, { count: number; multiplier: number }> = {};
-  for (const [playerId, orders] of playerByMatchday.entries()) {
-    const sorted = Array.from(orders).sort((left, right) => right - left);
-    let count = 0;
-    let cursor = currentIndex - 1;
-    for (const order of sorted) {
-      if (order === cursor) {
-        count += 1;
-        cursor -= 1;
-      } else if (order < cursor) {
-        break;
-      }
-    }
-
-    let multiplier = 1;
-    if (count >= 4) multiplier = 0.8;
-    else if (count >= 3) multiplier = 0.85;
-    else if (count >= 2) multiplier = 0.9;
-    else if (count >= 1) multiplier = 0.95;
-
-    fatigueMap[playerId] = { count, multiplier };
+    const availability = getPlayerAvailabilityView(
+      normalizedGameState,
+      roster.playerId,
+      params.teamId,
+      params.matchdayId,
+    );
+    const fatigue = availability.fatigue ?? player.fatigue ?? 0;
+    fatigueMap[roster.playerId] = {
+      count: fatigue,
+      multiplier: getFatiguePerformanceMultiplier(fatigue),
+    };
   }
 
   return fatigueMap;
@@ -594,6 +568,8 @@ function buildContextFromGameState(gameState: GameState, params: LegacyLineupKey
       seasonId: params.seasonId,
       matchdayId: params.matchdayId,
       teamId: params.teamId,
+      gameState: normalizedGameState,
+      lineupStrategy: resolveLineupStrategyForTeam(normalizedGameState, params.teamId),
       entries: existingDraft?.entries ?? [],
       disciplinePlayerCounts: Object.fromEntries(
         lineupContract.map((entry) => [entry.disciplineId, entry.requiredPlayers ?? 0]),

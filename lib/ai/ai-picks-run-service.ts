@@ -1904,6 +1904,7 @@ async function buildTeamPreviewEntry(input: {
   excludedPlayerIds?: string[];
   candidateLimit?: number;
   candidateFullScoringLimit?: number;
+  candidateScopeMode?: "strategic" | "budget_wide";
   draftSeed?: string | null;
 }) {
   const compare = await buildAiNeedsPicksCompare({
@@ -1915,6 +1916,7 @@ async function buildTeamPreviewEntry(input: {
     steps: input.stepsPerTeam,
     limit: input.candidateLimit ?? 120,
     fullScoringLimit: input.candidateFullScoringLimit ?? null,
+    candidateScopeMode: input.candidateScopeMode ?? "budget_wide",
     excludedPlayerIds: input.excludedPlayerIds ?? [],
     runMode: input.runMode,
     draftSeed: input.draftSeed ?? null,
@@ -2020,20 +2022,25 @@ async function buildTeamPreviewEntryWithDraftState(input: {
       ? Math.round(input.team.rosterMinTarget)
       : null;
   const underMinimumRoster = targetRosterMin != null && rosterCount < targetRosterMin;
-  const candidateWindow = Math.min(fullFreeAgentPoolSize, liveSetupMode ? (underMinimumRoster ? 240 : 80) : 360);
+  const candidateWindow = fullFreeAgentPoolSize;
   const fullScoringWindow = focusFullScoring
-    ? Math.min(fullFreeAgentPoolSize, liveSetupMode ? 160 : 960)
-    : Math.min(fullFreeAgentPoolSize, liveSetupMode ? (underMinimumRoster ? 160 : 48) : 240);
+    ? Math.min(fullFreeAgentPoolSize, liveSetupMode ? 320 : 960)
+    : Math.min(
+        fullFreeAgentPoolSize,
+        liveSetupMode ? (underMinimumRoster ? 320 : 200) : 480,
+      );
   const previewTeam = await buildTeamPreviewEntry({
     ...input,
     candidateLimit: Math.max(10, candidateWindow),
     candidateFullScoringLimit: fullScoringWindow,
+    candidateScopeMode: "budget_wide",
   });
 
   previewTeam.warnings = unique([
     ...previewTeam.warnings,
     `free_agent_pool_available:${fullFreeAgentPoolSize}`,
-    `ai_candidate_window:${candidateWindow}`,
+    `ai_candidate_scope:budget_wide`,
+    `ai_budget_affordable_scan:${candidateWindow}`,
     underMinimumRoster ? `minimum_rescue_candidate_window:${teamCode}:${rosterCount}/${targetRosterMin}` : null,
     focusFullScoring ? `focus_team_buy_preview_window:${teamCode}:${fullScoringWindow}` : `buy_preview_shortlist:${fullScoringWindow}_plus_cheap_coverage`,
     input.excludedPlayerIds.length > 0 ? `global_reserved_players:${input.excludedPlayerIds.length}` : null,
@@ -2313,7 +2320,7 @@ export async function runAiPicksExecutePreview(
   const teamScope = params.teamScope === "all" ? "all" : "ai";
   const allowSetupAllTeams = Boolean(params.allowSetupAllTeams);
   const runMode: AiNeedsPicksRunMode = params.runMode === "season1_optimum_execute" ? "season1_optimum_execute" : "default";
-  const defaultStepsPerTeam = runMode === "season1_optimum_execute" ? 12 : 5;
+  const defaultStepsPerTeam = runMode === "season1_optimum_execute" ? 14 : 5;
   const stepsPerTeam = Math.max(1, Math.min(Math.round(params.stepsPerTeam ?? defaultStepsPerTeam), 16));
   const save = resolveStrictLocalSave(persistence, params.saveId);
   const draftSeed = params.draftSeed?.trim() || `${save.saveId}:draft`;

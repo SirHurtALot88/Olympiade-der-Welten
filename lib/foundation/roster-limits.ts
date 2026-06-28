@@ -1,7 +1,9 @@
 import type { Team, TeamIdentity } from "@/lib/data/olyDataTypes";
 
 export const DEFAULT_ROSTER_MAX = 14;
-export const DEFAULT_ROSTER_MIN_FLOOR = 7;
+/** Fixes Kader-Minimum für jedes Team (unabhängig von Sheet-/Identity-Daten). */
+export const FIXED_ROSTER_MIN = 8;
+export const DEFAULT_ROSTER_MIN_FLOOR = FIXED_ROSTER_MIN;
 
 export type TeamRosterLimitInput = Pick<Team, "rosterLimit"> | null | undefined;
 export type TeamRosterIdentityInput = Pick<TeamIdentity, "playerMin" | "playerOpt"> | null | undefined;
@@ -25,12 +27,12 @@ export function clampRosterTargetToPlayerMax(target: number, team?: TeamRosterLi
 export function deriveRosterTargets(
   team?: TeamRosterLimitInput,
   identity?: TeamRosterIdentityInput,
-  fallbackMin = DEFAULT_ROSTER_MIN_FLOOR,
+  _fallbackMin = FIXED_ROSTER_MIN,
   fallbackOpt = 10,
 ) {
   const playerMax = getTeamPlayerMax(team, identity);
-  const rawMin = finiteRounded(identity?.playerMin) ?? fallbackMin;
-  const playerMin = Math.min(Math.max(0, rawMin), playerMax);
+  // Kader-Minimum ist fix 8 für alle Teams (Sheet-/Identity-playerMin wird ignoriert).
+  const playerMin = Math.min(FIXED_ROSTER_MIN, playerMax);
   const rawOpt = finiteRounded(identity?.playerOpt) ?? Math.max(fallbackOpt, playerMin);
   const playerOpt = Math.min(Math.max(rawOpt, playerMin), playerMax);
   return { playerMin, playerOpt, playerMax };

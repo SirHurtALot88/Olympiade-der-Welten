@@ -31,11 +31,7 @@ export function getProtectedHumanTeamIds(gameState: GameState): Set<string> {
 export function allowsAiPreseasonManualTeamOverride(input: {
   saveId: string;
   gameState: GameState;
-  explicitOverride?: boolean;
 }): boolean {
-  if (input.explicitOverride) {
-    return true;
-  }
   if (allowsSandboxTestWrites(input.gameState)) {
     return true;
   }
@@ -90,6 +86,16 @@ function hasProtectedManualControlSettings(
   );
 }
 
+function isFullyProtectedManualControlSettings(
+  settings: ReturnType<typeof buildTeamControlSettingsMap>[string] | undefined,
+): boolean {
+  if (!settings || !hasProtectedManualControlSettings(settings)) {
+    return false;
+  }
+
+  return settings.ownerId !== "ai" && settings.ownerSlot !== "ai";
+}
+
 export function protectManualPlayerTeams(gameState: GameState): GameState {
   const protectedHumanTeamIds = getProtectedHumanTeamIds(gameState);
   if (protectedHumanTeamIds.size === 0) {
@@ -113,7 +119,7 @@ export function protectManualPlayerTeams(gameState: GameState): GameState {
       const current = existingControl[teamId];
       const nextSettings = buildProtectedManualControlSettings(teamId, team, current);
 
-      if (hasProtectedManualControlSettings(current)) {
+      if (isFullyProtectedManualControlSettings(current)) {
         return [teamId, current] as const;
       }
 

@@ -18,6 +18,7 @@ jobs:
           node-version: "20"
           cache: npm
       - run: npm ci
+      - run: npm run build
       - run: npx playwright install chromium --with-deps
       - run: npm run ci:import-exists
       - run: npm run ci:flow-smoke
@@ -28,6 +29,7 @@ jobs:
           echo $! > .dev-server.pid
       - run: npm run app:check-live -- --startup-retries 90 --startup-delay-ms 2000
       - run: npm run ci:ensure-gameplay-smoke-save
+      - run: npm run perf:resolve-preview
       - run: npm run app:smoke-gameplay
       - run: npm run app:smoke-multiplayer-e2e -- --no-start
       - name: Stop dev server

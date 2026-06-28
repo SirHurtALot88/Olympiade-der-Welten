@@ -7,8 +7,12 @@ import type {
   AiLegacyLineupSuggestionSide,
   AiNeedAxis,
 } from "@/lib/ai/ai-needs-types";
+import { resolveLineupStrategyForTeam } from "@/lib/ai/ai-manager-doctrine-service";
+import { playerNeedsLineupRestFromTrainingLoad } from "@/lib/ai/ai-player-training-load-service";
 import { evaluateLegacyAiNeeds } from "@/lib/ai/ai-needs-engine";
+import type { AiLineupStrategy } from "@/lib/data/olyDataTypes";
 import { deriveTeamIdentityAxisWeightMap } from "@/lib/foundation/team-identity-settings";
+import { getFatiguePerformanceMultiplier, getInjuryRiskPercent } from "@/lib/fatigue/fatigue-calibration";
 import { buildLegacyLineupAggregateScore } from "@/lib/lineups/legacy-score-engine";
 import { scoreLegacyLineupDisciplineSide } from "@/lib/lineups/legacy-score-engine";
 import type { DisciplineSide, LegacyLineupEntryInput, LegacyLineupLoadedContext } from "@/lib/lineups/legacy-lineup-types";
@@ -55,6 +59,98 @@ function getIdentityTieBreakScore(
   return focusAxes.reduce((sum, axis) => sum + axisScores[axis], 0);
 }
 
+type RosterHealthSnapshot = {
+  fatigue: number;
+  injuryRiskPercent: number;
+};
+
+function getRosterHealth(context: LegacyLineupLoadedContext, playerId: string): RosterHealthSnapshot {
+  const roster = context.rosterPlayers?.find((entry) => entry.id === playerId);
+  const fatigue =
+    roster?.fatigue ??
+    context.fatigueByPlayerId?.[playerId]?.count ??
+    0;
+  const injuryRiskPercent = roster?.injuryRiskPercent ?? getInjuryRiskPercent(fatigue);
+  return { fatigue, injuryRiskPercent };
+}
+
+function inferLineupStrategyFromRoster(context: LegacyLineupLoadedContext): AiLineupStrategy {
+  const players = context.rosterPlayers ?? [];
+  const highFatigue = players.filter((player) => (player.fatigue ?? 0) >= 70).length;
+  const criticalFatigue = players.filter((player) => (player.fatigue ?? 0) >= 85).length;
+  const highInjuryRisk = players.filter(
+    (player) => (player.injuryRiskPercent ?? getInjuryRiskPercent(player.fatigue ?? 0)) >= 12,
+  ).length;
+  if (criticalFatigue >= 2 || highInjuryRisk >= 3) return "avoid_injury";
+  if (highFatigue >= 3) return "rotate_depth";
+  return "best_score_now";
+}
+
+function resolveLineupStrategy(context: LegacyLineupLoadedContext): AiLineupStrategy {
+  if (context.lineupStrategy) {
+    return context.lineupStrategy;
+  }
+  if (context.gameState) {
+    return resolveLineupStrategyForTeam(context.gameState, context.teamId);
+  }
+  return inferLineupStrategyFromRoster(context);
+}
+
+function getHealthLineupPenalty(strategy: AiLineupStrategy, health: RosterHealthSnapshot) {
+  const { fatigue, injuryRiskPercent } = health;
+  let penalty = 0;
+
+  if (fatigue >= 85) penalty += 12;
+  else if (fatigue >= 70) penalty += 6;
+  else if (fatigue >= 55) penalty += 2;
+
+  if (injuryRiskPercent >= 25) penalty += 10;
+  else if (injuryRiskPercent >= 12) penalty += 5;
+  else if (injuryRiskPercent >= 8) penalty += 2;
+
+  if (strategy === "avoid_injury") {
+    penalty *= 2;
+    if (fatigue >= 65 || injuryRiskPercent >= 10) penalty += 10;
+  } else if (strategy === "rotate_depth") {
+    penalty *= 1.6;
+    if (fatigue >= 70) penalty += 6;
+  } else if (strategy === "protect_stars" || strategy === "captain_safe") {
+    if (fatigue >= 60) penalty += 4;
+  }
+
+  return penalty;
+}
+
+function playerNeedsLineupRest(context: LegacyLineupLoadedContext, playerId: string) {
+  if (context.gameState) {
+    return playerNeedsLineupRestFromTrainingLoad({
+      gameState: context.gameState,
+      teamId: context.teamId,
+      playerId,
+    });
+  }
+  const health = getRosterHealth(context, playerId);
+  return health.fatigue >= 85 || health.injuryRiskPercent >= 25;
+}
+
+function getSelectionScore(
+  context: LegacyLineupLoadedContext,
+  playerId: string,
+  rawScore: number,
+  strategy: AiLineupStrategy,
+) {
+  if (!Number.isFinite(rawScore) || rawScore === Number.NEGATIVE_INFINITY) {
+    return rawScore;
+  }
+  const health = getRosterHealth(context, playerId);
+  const fatigueAdjusted = rawScore * getFatiguePerformanceMultiplier(health.fatigue);
+  let score = fatigueAdjusted - getHealthLineupPenalty(strategy, health);
+  if (playerNeedsLineupRest(context, playerId)) {
+    score -= 28;
+  }
+  return score;
+}
+
 function buildEntriesForDisciplineSide(
   context: LegacyLineupLoadedContext,
   disciplineId: string | null,
@@ -74,6 +170,7 @@ function buildEntriesForDisciplineSide(
     context.disciplineSidePlayerCounts?.[`${disciplineId}::${disciplineSide}`] ??
     context.disciplinePlayerCounts[disciplineId] ??
     0;
+  const lineupStrategy = resolveLineupStrategy(context);
   const candidates = context.activePlayers
     .filter((player) => !usedPlayerIds.has(player.playerId))
     .map((player) => {
@@ -82,21 +179,25 @@ function buildEntriesForDisciplineSide(
       );
       const score = disciplineScore?.score ?? Number.NEGATIVE_INFINITY;
       const tieBreak = getIdentityTieBreakScore(context, player.playerId, focusAxes);
+      const health = getRosterHealth(context, player.playerId);
+      const selectionScore = getSelectionScore(context, player.playerId, score, lineupStrategy);
 
       return {
         activePlayerId: player.id,
         playerId: player.playerId,
         score,
+        selectionScore,
         hasScore: disciplineScore != null,
         tieBreak,
+        health,
       };
     })
     .sort((left, right) => {
       if (left.hasScore !== right.hasScore) {
         return left.hasScore ? -1 : 1;
       }
-      if (right.score !== left.score) {
-        return right.score - left.score;
+      if (right.selectionScore !== left.selectionScore) {
+        return right.selectionScore - left.selectionScore;
       }
       if (right.tieBreak !== left.tieBreak) {
         return right.tieBreak - left.tieBreak;
@@ -123,7 +224,7 @@ function buildEntriesForDisciplineSide(
     ],
     reasoning: picked.map(
       (player, index) =>
-        `${disciplineSide.toUpperCase()} slot ${index + 1}: ${player.playerId} via disciplineScore=${player.hasScore ? player.score.toFixed(2) : "missing"} tieBreak=${player.tieBreak.toFixed(2)}`,
+        `${disciplineSide.toUpperCase()} slot ${index + 1}: ${player.playerId} via selectionScore=${player.hasScore ? player.selectionScore.toFixed(2) : "missing"} disciplineScore=${player.hasScore ? player.score.toFixed(2) : "missing"} fatigue=${player.health.fatigue.toFixed(0)} injuryRisk=${player.health.injuryRiskPercent.toFixed(1)}% strategy=${lineupStrategy} tieBreak=${player.tieBreak.toFixed(2)}`,
     ),
   };
 }

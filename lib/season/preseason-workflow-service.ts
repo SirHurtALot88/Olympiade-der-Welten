@@ -39,6 +39,7 @@ export type PreSeasonWorkflowStepId =
   | "facilities"
   | "player_development"
   | "preseason_management"
+  | "transfer_window_session"
   | "transfer_sell_phase"
   | "contract_renewal"
   | "transfer_buy_phase"
@@ -1115,14 +1116,27 @@ export async function buildPreSeasonWorkflowPreview(
       confirmToken: null,
     },
     {
-      stepId: "transfer_sell_phase",
-      label: "Verkäufe",
+      stepId: "transfer_window_session",
+      label: "Transferfenster",
       status: controlSummary.aiTeams > 0 ? "ready" : "preview_only",
       productive: true,
-      summary: { aiTeams: controlSummary.aiTeams, sellTeams: null, manualTeamsSkipped: controlSummary.manualTeams, passiveTeamsSkipped: controlSummary.passiveTeams, usesSellService: true },
-      warnings: ["human_teams_no_auto_sell", "ai_sell_before_buy", "uses executeLocalTransfermarktSell via ai-market-plan-apply-service", "transfer_history_required", marketPreviewWarning],
+      summary: {
+        aiTeams: controlSummary.aiTeams,
+        manualTeamsSkipped: controlSummary.manualTeams,
+        passiveTeamsSkipped: controlSummary.passiveTeams,
+        usesSellThenBuyCycles: true,
+        maxTeamCycles: 5,
+        maxLeagueRounds: 3,
+      },
+      warnings: [
+        "human_teams_no_auto_transfer",
+        "sell_then_repreview_then_buy_per_team_cycle",
+        "uses runTransferWindowSession via ai-transfer-window-session-service",
+        "transfer_history_required",
+        marketPreviewWarning,
+      ],
       blockingReasons: [],
-      confirmToken: "USE_AI_MARKET_APPLY_CONFIRM_TOKEN_SELL_ONLY",
+      confirmToken: "USE_AI_MARKET_APPLY_CONFIRM_TOKEN_TRANSFER_WINDOW",
     },
     {
       stepId: "contract_renewal",
@@ -1141,16 +1155,6 @@ export async function buildPreSeasonWorkflowPreview(
       warnings: contractPreview.warnings,
       blockingReasons: contractPreview.blockingReasons,
       confirmToken: contractPreview.confirmToken,
-    },
-    {
-      stepId: "transfer_buy_phase",
-      label: "Kaufen",
-      status: controlSummary.aiTeams > 0 ? "ready" : "preview_only",
-      productive: true,
-      summary: { aiTeams: controlSummary.aiTeams, buyTeams: null, manualTeamsSkipped: controlSummary.manualTeams, passiveTeamsSkipped: controlSummary.passiveTeams, usesBuyService: true },
-      warnings: ["human_teams_no_auto_buy", "buy_after_sell", "uses executeLocalTransfermarktBuy via ai-market-plan-apply-service", "transfer_history_required", marketPreviewWarning],
-      blockingReasons: [],
-      confirmToken: "USE_AI_MARKET_APPLY_CONFIRM_TOKEN_BUY_AFTER_SELL",
     },
     {
       stepId: "sponsor_choice",

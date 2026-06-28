@@ -49,6 +49,19 @@ export async function POST(request: Request) {
       return NextResponse.json({ success: false, error: "sponsor_event_not_found" }, { status: 404 });
     }
 
+    if (event.status !== "open") {
+      return NextResponse.json(
+        {
+          success: false,
+          error: "sponsor_event_not_open",
+          eventStatus: event.status,
+          applied: false,
+          cashDelta: 0,
+        },
+        { status: 409 },
+      );
+    }
+
     const writeAuth = authorizeServerRoomWrite({
       roomCode: body.roomCode,
       participantId: body.participantId,
@@ -68,6 +81,19 @@ export async function POST(request: Request) {
     }
 
     const nextGameState = resolveSponsorEvent(save.gameState, eventId, action);
+    if (nextGameState === save.gameState) {
+      return NextResponse.json(
+        {
+          success: false,
+          error: "sponsor_event_unchanged",
+          eventStatus: event.status,
+          applied: false,
+          cashDelta: 0,
+        },
+        { status: 409 },
+      );
+    }
+
     if (!dryRun) {
       persistence.saveSingleplayerState(saveId, nextGameState);
       notifyRoomGameplayWrite(writeAuth, {

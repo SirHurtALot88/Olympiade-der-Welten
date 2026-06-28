@@ -142,24 +142,24 @@ function createGameState(playerId = "player-1", fatigue = 83): GameState {
 
 describe("fatigue injury service", () => {
   it("uses the requested fatigue risk curve", () => {
-    expect(injuryRiskBands).toEqual([
-      { min: 0, max: 29, label: "none", riskPercent: 0, uiLabel: "kein Risiko" },
-      { min: 30, max: 49, label: "minimal", riskPercent: 2, uiLabel: "minimales Verletzungsrisiko" },
-      { min: 50, max: 69, label: "mittel", riskPercent: 6, uiLabel: "mittleres Verletzungsrisiko" },
-      { min: 70, max: 84, label: "stark", riskPercent: 12, uiLabel: "starkes Verletzungsrisiko" },
-      { min: 85, max: 100, label: "sehr_stark", riskPercent: 22, uiLabel: "sehr starkes Verletzungsrisiko" },
+    expect(injuryRiskBands.map((band) => band.label)).toEqual([
+      "none",
+      "minimal",
+      "mittel",
+      "stark",
+      "sehr_stark",
     ]);
-    expect(getInjuryRiskPercent(29)).toBe(0);
+    expect(getInjuryRiskPercent(29)).toBe(4.83);
     expect(getInjuryRiskBand(29).label).toBe("none");
-    expect(getInjuryRiskPercent(30)).toBe(2);
+    expect(getInjuryRiskPercent(30)).toBe(5);
     expect(getInjuryRiskBand(30).label).toBe("minimal");
-    expect(getInjuryRiskPercent(50)).toBe(6);
+    expect(getInjuryRiskPercent(50)).toBe(10);
     expect(getInjuryRiskBand(50).label).toBe("mittel");
-    expect(getInjuryRiskPercent(70)).toBe(12);
+    expect(getInjuryRiskPercent(70)).toBe(20);
     expect(getInjuryRiskBand(70).label).toBe("stark");
-    expect(getInjuryRiskPercent(85)).toBe(22);
+    expect(getInjuryRiskPercent(85)).toBe(28.75);
     expect(getInjuryRiskBand(85).label).toBe("sehr_stark");
-    expect(getInjuryRiskPercent(100)).toBe(22);
+    expect(getInjuryRiskPercent(100)).toBe(40);
   });
 
   it("rolls injury risk deterministically from save, season, matchday and player", () => {

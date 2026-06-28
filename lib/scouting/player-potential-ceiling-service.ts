@@ -1,11 +1,16 @@
 import type { Player, PlayerGeneratorAttributeName, PlayerPotentialRecord } from "@/lib/data/olyDataTypes";
+import { playerGeneratorAttributeKeys } from "@/lib/player-generator/official-discipline-weights";
 import type { PlayerAxisKey, PlayerAxisStarProfile } from "@/lib/scouting/player-axis-star-rating";
+import { buildPlayerAxisStarProfile } from "@/lib/scouting/player-axis-star-rating";
 import {
   applyAttributeCeilingSeasonDrift,
   buildHiddenAttributeCeilings,
   buildHiddenAttributeCeilingsFromPotentialScore,
+  deriveAxisPoStarsFromAttributeCeilings,
   derivePlayerPotentialCeilingProfileFromAttributeCeilings,
+  getPlayerAttributeValue,
 } from "@/lib/scouting/player-attribute-ceiling-service";
+import type { GameState } from "@/lib/data/olyDataTypes";
 
 export type PlayerPotentialCeilingProfile = {
   pow: number;
@@ -24,6 +29,7 @@ export type RevealedPotentialStars = {
 };
 
 const AXIS_KEYS: PlayerAxisKey[] = ["pow", "spe", "men", "soc"];
+const MIN_AXIS_PO_UPSIDE_STARS = 0.5;
 
 const CLASS_AXIS_AFFINITY: Record<PlayerAxisKey, string[]> = {
   pow: ["charger", "warrior", "tank", "berserker", "power"],
@@ -99,6 +105,20 @@ function computeOverallFromAxisStars(values: Record<PlayerAxisKey, number>) {
       sorted[3] * 0.10 +
       sorted[3] * 0.10,
   );
+}
+
+export function resolveEffectiveAxisPoStars(
+  currentStars: PlayerAxisStarProfile,
+  poStars: Partial<Record<PlayerAxisKey, number>> | null | undefined,
+): Record<PlayerAxisKey, number> {
+  const resolved = {} as Record<PlayerAxisKey, number>;
+  for (const axis of AXIS_KEYS) {
+    const stored = poStars?.[axis] ?? currentStars[axis];
+    resolved[axis] = roundHalfStar(
+      Math.min(5, Math.max(stored, currentStars[axis], currentStars[axis] + MIN_AXIS_PO_UPSIDE_STARS)),
+    );
+  }
+  return resolved;
 }
 
 export function clampPotentialOverallToCurrent(currentOverall: number, potentialOverall: number) {
@@ -397,4 +417,130 @@ export function applyAxisCeilingSeasonDrift(input: {
     }),
     attributeCeilings: {},
   };
+}
+
+export function reconcilePlayerPotentialRecordToCurrentAbility(input: {
+  player: Player;
+  record: PlayerPotentialRecord;
+  currentStars: PlayerAxisStarProfile;
+  saveId?: string | null;
+}): PlayerPotentialRecord {
+  let attributeCeiling: Partial<Record<PlayerGeneratorAttributeName, number>> = {
+    ...(input.record.hiddenAttributeCeiling ?? {}),
+  };
+  const hasAttributeCeilings = playerGeneratorAttributeKeys.some((attribute) =>
+    isFiniteNumber(attributeCeiling[attribute]),
+  );
+
+  if (!hasAttributeCeilings && input.saveId) {
+    if (input.record.hiddenPotentialScore != null) {
+      attributeCeiling = buildHiddenAttributeCeilingsFromPotentialScore({
+        saveId: input.saveId,
+        player: input.player,
+        currentStars: input.currentStars,
+        hiddenPotentialScore: input.record.hiddenPotentialScore,
+      });
+    } else if (input.record.hiddenPotentialCeilingByAxis) {
+      const effectiveAxis = resolveEffectiveAxisPoStars(
+        input.currentStars,
+        input.record.hiddenPotentialCeilingByAxis,
+      );
+      attributeCeiling = buildHiddenAttributeCeilings({
+        saveId: input.saveId,
+        player: input.player,
+        axisCeiling: {
+          pow: effectiveAxis.pow,
+          spe: effectiveAxis.spe,
+          men: effectiveAxis.men,
+          soc: effectiveAxis.soc,
+          overall: clampPotentialOverallToCurrent(
+            input.currentStars.overall,
+            input.record.hiddenPotentialOverallStars ?? input.currentStars.overall,
+          ),
+        },
+      });
+    }
+  }
+
+  for (const attribute of playerGeneratorAttributeKeys) {
+    const current = getPlayerAttributeValue(input.player, attribute);
+    if (!isFiniteNumber(current)) {
+      continue;
+    }
+    const stored = attributeCeiling[attribute];
+    const minOpenCeiling = Math.min(99, Math.round(current + 6));
+    attributeCeiling[attribute] = isFiniteNumber(stored)
+      ? Math.max(stored, minOpenCeiling, Math.round(current))
+      : Math.min(99, Math.round(current + 12));
+  }
+
+  const ceilingProfile = finalizePotentialCeilingProfile(
+    input.currentStars,
+    derivePlayerPotentialCeilingProfileFromAttributeCeilings({
+      attributeCeilings: attributeCeiling,
+      currentStars: input.currentStars,
+    }),
+  );
+
+  return {
+    ...input.record,
+    hiddenPotentialCeilingByAxis: {
+      pow: ceilingProfile.pow,
+      spe: ceilingProfile.spe,
+      men: ceilingProfile.men,
+      soc: ceilingProfile.soc,
+    },
+    hiddenPotentialOverallStars: ceilingProfile.overall,
+    hiddenAttributeCeiling: attributeCeiling,
+  };
+}
+
+export function resolvePlayerPotentialRecordForProgression(input: {
+  gameState: GameState;
+  player: Player;
+}): PlayerPotentialRecord | null {
+  const record = input.gameState.playerPotential?.find((entry) => entry.playerId === input.player.id) ?? null;
+  if (!record) {
+    return null;
+  }
+  const currentStars = buildPlayerAxisStarProfile({
+    gameState: input.gameState,
+    player: input.player,
+    disciplines: input.gameState.disciplines,
+  });
+  return reconcilePlayerPotentialRecordToCurrentAbility({
+    player: input.player,
+    record,
+    currentStars,
+    saveId: input.gameState.season.id,
+  });
+}
+
+export function reconcilePlayerPotentialRecordsForGameState(input: {
+  gameState: GameState;
+  playerIds?: string[];
+}): PlayerPotentialRecord[] {
+  const targetIds = input.playerIds ? new Set(input.playerIds) : null;
+  const recordsByPlayerId = new Map((input.gameState.playerPotential ?? []).map((record) => [record.playerId, record] as const));
+
+  return (input.gameState.playerPotential ?? []).map((record) => {
+    if (targetIds && !targetIds.has(record.playerId)) {
+      return record;
+    }
+    const player = input.gameState.players.find((entry) => entry.id === record.playerId);
+    if (!player) {
+      return record;
+    }
+    const currentStars = buildPlayerAxisStarProfile({
+      gameState: input.gameState,
+      player,
+      disciplines: input.gameState.disciplines,
+    });
+    return reconcilePlayerPotentialRecordToCurrentAbility({
+      player,
+      record,
+      currentStars,
+      saveId: input.gameState.season.id,
+    });
+  });
 }

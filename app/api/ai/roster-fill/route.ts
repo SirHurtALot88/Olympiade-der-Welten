@@ -6,6 +6,8 @@ import { AUTO_ROSTER_FILL_CONFIRM_TOKEN } from "@/lib/ai/auto-roster-fill-contra
 import {
   runAutoRosterFillForMatchdaySetup,
 } from "@/lib/ai/auto-roster-fill-service";
+import { parseRoomWriteContextFromRequest } from "@/lib/room/parse-room-write-context";
+import { authorizeServerRoomWrite } from "@/lib/room/server-authoritative-write-guard";
 
 export async function POST(request: Request) {
   const { searchParams } = new URL(request.url);
@@ -40,6 +42,18 @@ export async function POST(request: Request) {
       },
       { status: 409 },
     );
+  }
+
+  const writeAuth = authorizeServerRoomWrite({
+    ...parseRoomWriteContextFromRequest(request),
+    saveId,
+    action: "ai_roster_fill_execute",
+    source: "sqlite",
+    dryRun,
+    confirmToken: body.confirmToken ?? null,
+  });
+  if (!writeAuth.allowed) {
+    return NextResponse.json({ error: writeAuth.reason, warnings: writeAuth.warnings }, { status: writeAuth.status });
   }
 
   try {

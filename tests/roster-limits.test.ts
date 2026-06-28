@@ -28,6 +28,17 @@ describe("roster limits", () => {
     });
   });
 
+  it("forces a fixed minimum of 8 even when identity playerMin is lower", () => {
+    const team = { rosterLimit: 14 };
+    const identity = { playerMin: 7, playerOpt: 9 };
+
+    expect(deriveRosterTargets(team, identity)).toEqual({
+      playerMin: 8,
+      playerOpt: 9,
+      playerMax: 14,
+    });
+  });
+
   it("caps legacy oversized roster limits at 14", () => {
     const team = { rosterLimit: 18 };
     const identity = { playerMin: 8, playerOpt: 15 };

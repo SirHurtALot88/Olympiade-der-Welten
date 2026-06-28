@@ -7,6 +7,7 @@ import {
   buildSeasonSnapshot,
   buildSeasonSnapshotDryRun,
   createSeasonSnapshot,
+  resolveSeasonSnapshotTeamRecords,
   SEASON_SNAPSHOT_CONFIRM_TOKEN,
   upsertSeasonSnapshotRecord,
 } from "@/lib/season/season-snapshot-service";
@@ -525,5 +526,15 @@ describe("season snapshot service", () => {
 
     expect(result).toHaveLength(1);
     expect(result[0]?.archivedAt).toBe("2026-06-06T00:00:00.000Z");
+  });
+
+  it("falls back to finalStandings when teamSnapshots is empty", () => {
+    const snapshot = buildSeasonSnapshot(createGameState());
+    const withEmptyTeamSnapshots = {
+      ...snapshot,
+      teamSnapshots: [],
+    };
+
+    expect(resolveSeasonSnapshotTeamRecords(withEmptyTeamSnapshots)).toEqual(snapshot.finalStandings);
   });
 });

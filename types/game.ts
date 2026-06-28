@@ -71,6 +71,7 @@ export type RoomFlowStepId =
   | "training"
   | "lineup"
   | "formcards"
+  | "formcards_season_regenerate"
   | "arena"
   | "result"
   | "standings"

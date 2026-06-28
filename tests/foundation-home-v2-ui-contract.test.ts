@@ -74,15 +74,16 @@ describe("foundation home v2 ui contract", () => {
       fs.readFile(foundationClientPath, "utf8"),
     ]);
 
-    expect(homeText).toContain("VeloStatOrbitRow");
-    expect(homeText).not.toContain("showGrade");
+    expect(homeText).toContain("FoundationPlayerPortraitCard");
+    expect(homeText).toContain("leagueHeatPools");
+    expect(homeText).toContain("is-rank-gold");
+    expect(homeText).toContain("is-rank-silver");
+    expect(homeText).toContain("is-rank-bronze");
     expect(homeText).not.toContain("VeloStarRating");
-    expect(homeText).toContain('data-testid="home-player-ca-po-row"');
-    expect(homeText).toContain('data-testid="home-player-potential-range"');
-    expect(homeText).toContain("formatPotentialRange");
-    expect(homeText).toContain("formatAbilityPoints");
-    expect(homeText).toContain("home-v2-player-stat");
-    expect(homeText).toContain("Rank");
+    expect(foundationText).toContain("leagueHeatPools: leaguePlayerHeatPools");
+    expect(foundationText).toContain('activeView !== "homeV2"');
+    expect(foundationText).toContain('activeView !== "teams"');
+    expect(typesText).toContain("leagueHeatPools");
     expect(typesText).toContain("caRating");
     expect(typesText).toContain("poRangeMin");
     expect(typesText).toContain("poRangeMax");
@@ -100,7 +101,14 @@ describe("foundation home v2 ui contract", () => {
 
     expect(cssText).toContain(".home-v2-shell");
     expect(cssText).toContain(".home-v2-player-card");
-    expect(cssText).toContain(".home-v2-player-stat");
+    expect(cssText).toContain(".home-v2-player-hero");
+    expect(cssText).toContain(".home-v2-player-overlay");
+    expect(cssText).toContain(".is-rank-gold");
+    expect(cssText).toContain(".is-rank-silver");
+    expect(cssText).toContain(".is-rank-bronze");
+    expect(cssText).toContain(".foundation-player-portrait-stat");
+    expect(cssText).toContain(".home-v2-player-orbit.is-overlay .velo-stat-orbit-chip.is-pow");
+    expect(cssText).toContain(".team-portraits-grid");
     expect(cssText).toContain(".home-v2-hero");
     expect(cssText).toContain(".home-v2-signal-strip");
     expect(cssText).toContain(".foundation-home-v2-panel .home-v2-subnav");

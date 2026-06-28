@@ -78,9 +78,7 @@ export function buildSellPricingPolicyBreakdown(input: {
   baseBreakdown: TransfermarktSaleFactorBreakdown;
   rosterAfter: number;
 }): SellPricingPolicyBreakdown {
-  const identity =
-    input.gameState.teamIdentities.find((entry) => entry.teamId === input.teamId) ??
-    ({ playerMin: null } satisfies Partial<TeamIdentity>);
+  const identity = input.gameState.teamIdentities.find((entry) => entry.teamId === input.teamId);
   const profile = getTeamStrategyProfile(input.gameState, input.teamId);
   const playerMin = identity?.playerMin ?? profile?.rosterMinTarget ?? null;
   const notes: string[] = [];

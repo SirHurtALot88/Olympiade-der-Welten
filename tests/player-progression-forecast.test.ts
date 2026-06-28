@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 
 import type { GameState, Player } from "@/lib/data/olyDataTypes";
+import { playerGeneratorAttributeKeys } from "@/lib/player-generator/official-discipline-weights";
 import type { PlayerRatingContractRow } from "@/lib/foundation/player-rating-contract";
 import type { PlayerSeasonPerformanceSummary } from "@/lib/foundation/player-season-performance";
 import {
@@ -167,11 +168,15 @@ function createSeasonPerformance(partial: Partial<PlayerSeasonPerformanceSummary
 }
 
 function pinNeutralPotential(gameState: GameState, playerId: string) {
+  const openCeiling = Object.fromEntries(playerGeneratorAttributeKeys.map((attribute) => [attribute, 99]));
   gameState.playerPotential = [
     {
       playerId,
       potentialBand: "medium",
       hiddenPotentialScore: 58,
+      hiddenPotentialOverallStars: 5,
+      hiddenPotentialCeilingByAxis: { pow: 5, spe: 5, men: 5, soc: 5 },
+      hiddenAttributeCeiling: openCeiling,
       confidence: 0,
       source: "generated",
     },

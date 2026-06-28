@@ -4,20 +4,18 @@ import {
   type AiMarketPlanApplyResult,
   type AiMarketPlanApplyTeamResult,
 } from "@/lib/ai/ai-market-plan-apply-service";
-import {
-  buildSeasonStrategyState,
-  type AiSeasonStrategy,
-} from "@/lib/ai/ai-manager-doctrine-service";
+import { buildSeasonStrategyState } from "@/lib/ai/ai-manager-doctrine-service";
 import {
   CHUNKED_REDRAFT_TOPUP_CONFIRM_TOKEN,
   runChunkedRedraftTopup,
 } from "@/lib/ai/chunked-redraft-topup-service";
-import type { GameState } from "@/lib/data/olyDataTypes";
+import type { AiSeasonStrategy, GameState } from "@/lib/data/olyDataTypes";
 import { deriveRosterTargets } from "@/lib/foundation/roster-limits";
 import { isSeasonOne, isTransferActionAllowed } from "@/lib/season/transfer-season-policy";
 import { createPersistenceService } from "@/lib/persistence/persistence-service";
 import type { PersistenceService } from "@/lib/persistence/types";
 import type { LocalTransferWindowPhase } from "@/lib/market/transfer-window-policy";
+import { runTransferWindowSession } from "@/lib/ai/ai-transfer-window-session-service";
 
 const CONVERGENCE_BUY_STRATEGIES: AiSeasonStrategy[] = ["roster_repair", "depth_repair", "win_now_push"];
 
@@ -111,8 +109,9 @@ export function getSeasonMaxRequiredSlots(gameState: GameState) {
 }
 
 export function getTeamHardMinRequired(gameState: GameState, teamId: string) {
+  const team = gameState.teams.find((entry) => entry.teamId === teamId);
   const identity = gameState.teamIdentities.find((entry) => entry.teamId === teamId);
-  return Math.max(identity?.playerMin ?? 7, 7);
+  return deriveRosterTargets(team, identity).playerMin;
 }
 
 export function getTeamOptTarget(gameState: GameState, teamId: string) {
@@ -273,7 +272,7 @@ function buildRoundProfile(input: {
 }
 
 function resolveTeamStatus(input: {
-  team: AiMarketPlanApplyTeamResult;
+  team: { result?: string; executedBuys?: number; executedSells?: number };
   rosterAfter: number;
   hardMin: number;
   optTarget: number;
@@ -284,10 +283,10 @@ function resolveTeamStatus(input: {
   if (team.result === "blocked" || team.result === "failed_buy" || team.result === "failed_sell") {
     return exhausted ? "convergence_exhausted" : "blocked";
   }
-  if (team.executedBuys > 0 && rosterAfter < hardMin) {
+  if ((team.executedBuys ?? 0) > 0 && rosterAfter < hardMin) {
     return exhausted ? "convergence_exhausted" : "blocked";
   }
-  if (rosterAfter < hardMin && team.executedBuys === 0) {
+  if (rosterAfter < hardMin && (team.executedBuys ?? 0) === 0) {
     return exhausted ? "convergence_exhausted" : "valid_sell_only_below_min";
   }
   if (needsConvergence && rosterAfter < optTarget) {
@@ -295,6 +294,8 @@ function resolveTeamStatus(input: {
   }
   return "converged";
 }
+
+export { resolveTeamStatus };
 
 function mergeTeamResults(
   existing: Map<string, ConvergenceTeamResult>,
@@ -346,217 +347,34 @@ function mergeTeamResults(
 }
 
 export async function runMarketPlanConvergence(input: MarketPlanConvergenceInput): Promise<MarketPlanConvergenceResult> {
-  const persistence = input.persistence ?? createPersistenceService();
-  const save = persistence.getSaveById(input.saveId);
-  if (!save) throw new Error("Save missing for market plan convergence.");
-
-  const maxPasses = Math.max(1, input.maxPasses ?? 2);
-  const maxRoundsPerPass = Math.max(1, input.maxRoundsPerPass ?? 4);
-  const allowBuys = (input.allowBuys ?? true) && !isSeasonOne(input.seasonId);
-  const teamScope = input.teamScope ?? "all";
-
-  if (input.skipIfExistingMarketTransfers !== false) {
-    const existing = getExistingMarketTransfers(save.gameState, input.seasonId);
-    if (existing.length > 0) {
-      return {
-        passes: 0,
-        rounds: 0,
-        perTeam: [],
-        emergencyRepairTeams: [],
-        appliedBuys: 0,
-        appliedSells: 0,
-        warnings: [`convergence_skipped_existing_market_transfers:${existing.length}`],
-        blockingReasons: [],
-        skipped: true,
-        roundHistory: [],
-      };
-    }
-  }
-
-  const teamResults = new Map<string, ConvergenceTeamResult>();
-  const roundHistory: ConvergenceRoundRecord[] = [];
-  const warnings: string[] = [];
-  const blockingReasons: string[] = [];
-  let totalAppliedBuys = 0;
-  let totalAppliedSells = 0;
-  let totalRounds = 0;
-  let completedPasses = 0;
-
-  const attemptedBuyPlayerIds = new Set<string>();
-  const attemptedSellPlayerIds = new Set<string>();
-  const seenRoundFingerprints = new Set<string>();
-  const exhaustedTeamIds = new Set<string>();
-
-  const scopedTeamIds = unique(input.targetTeamIds ?? []);
-  const scopeTeam = (teamIds: string[]) =>
-    scopedTeamIds.length > 0 ? teamIds.filter((teamId) => scopedTeamIds.includes(teamId)) : teamIds;
-
-  for (let passIndex = 1; passIndex <= maxPasses; passIndex += 1) {
-    const passId: ConvergencePassId = passIndex === 1 ? "standard" : "escalated";
-    let passProgress = false;
-    let passFingerprintStreak = 0;
-    let lastPassFingerprint: string | null = null;
-
-    const passTargets =
-      scopedTeamIds.length > 0
-        ? scopedTeamIds
-        : [null as string | null];
-
-    for (const scopedTeamId of passTargets) {
-      for (let roundIndex = 1; roundIndex <= maxRoundsPerPass; roundIndex += 1) {
-        const latestSave = persistence.getSaveById(input.saveId);
-        if (!latestSave) throw new Error("Save missing during market plan convergence.");
-        const teamsNeeding = scopeTeam(getTeamsNeedingConvergence(latestSave.gameState).map((entry) => entry.teamId));
-        const teamsBelowHardMin = scopeTeam(getTeamsBelowHardMin(latestSave.gameState).map((entry) => entry.teamId));
-        if (teamsNeeding.length === 0) {
-          completedPasses = passIndex;
-          break;
-        }
-        if (scopedTeamId && !teamsNeeding.includes(scopedTeamId) && roundIndex > 1) {
-          break;
-        }
-        if (teamsNeeding.length === 0 && passIndex > 1 && roundIndex > 1) {
-          break;
-        }
-
-        const profile = buildRoundProfile({
-          passId,
-          round: roundIndex,
-          allowBuys,
-          teamsNeedingConvergenceCount: teamsNeeding.length,
-        });
-        const forceBuyScanTeamIds = teamsNeeding;
-
-        if (input.progressLog) {
-          console.error(
-            `[convergence] ${input.seasonId}${scopedTeamId ? ` team=${scopedTeamId}` : ""} pass=${passId} round=${roundIndex} needing=${teamsNeeding.length} belowHardMin=${teamsBelowHardMin.length} sells=${profile.applySellSteps} buys=${profile.applyBuySteps}`,
-          );
-        }
-
-        const apply = await applyAiMarketPlanLocally({
-          source: "sqlite",
-          saveId: input.saveId,
-          seasonId: input.seasonId,
-          teamId: scopedTeamId,
-          teamScope,
-          dryRun: input.dryRun ?? false,
-          confirmToken: input.confirmToken ?? AI_MARKET_APPLY_CONFIRM_TOKEN,
-          transferPhase: input.transferPhase,
-          options: {
-            includeWarningTeams: true,
-            applySellSteps: profile.applySellSteps,
-            applyBuySteps: profile.applyBuySteps,
-            maxBuysPerTeam: null,
-            maxSellsPerTeam: profile.maxSellsPerTeam,
-            previewBuyLimit: profile.previewBuyLimit,
-            previewSellLimit: profile.previewSellLimit,
-            performanceBudgetMs: profile.performanceBudgetMs,
-            maxApplyMs: profile.maxApplyMs,
-            progressLog: input.progressLog ?? false,
-            stopOnTeamFailure: false,
-            applyBuyStepsInBatch: profile.applyBuyStepsInBatch,
-            forceBuyScanTeamIds,
-            returnGateRows: true,
-          excludeBuyPlayerIds: [...attemptedBuyPlayerIds],
-          excludeSellPlayerIds: [...attemptedSellPlayerIds],
-          convergenceIncrementalFill: true,
-        },
-      });
-
-      totalRounds += 1;
-      totalAppliedBuys += apply.summary.appliedBuys;
-      totalAppliedSells += apply.summary.appliedSells;
-      warnings.push(...apply.warnings.slice(0, 12));
-      blockingReasons.push(...apply.blockingReasons);
-
-      for (const playerId of collectAttemptedBuyPlayerIds(apply)) attemptedBuyPlayerIds.add(playerId);
-      for (const playerId of collectAttemptedSellPlayerIds(apply)) attemptedSellPlayerIds.add(playerId);
-
-      const fingerprint = buildRoundFingerprint(apply);
-      const roundRecord: ConvergenceRoundRecord = {
-        passId,
-        round: roundIndex,
-        appliedBuys: apply.summary.appliedBuys,
-        appliedSells: apply.summary.appliedSells,
-        fingerprint,
-        blockingReasons: apply.blockingReasons,
-        warnings: apply.warnings.slice(0, 8),
-      };
-      roundHistory.push(roundRecord);
-
-      const afterSave = persistence.getSaveById(input.saveId);
-      if (!afterSave) throw new Error("Save missing after convergence round.");
-      mergeTeamResults(teamResults, apply, afterSave.gameState, roundRecord, passIndex, roundIndex, exhaustedTeamIds);
-
-      const madeProgress = apply.summary.appliedBuys + apply.summary.appliedSells > 0;
-      if (madeProgress) {
-        passProgress = true;
-        passFingerprintStreak = 0;
-      } else if (fingerprint === lastPassFingerprint || seenRoundFingerprints.has(fingerprint)) {
-        passFingerprintStreak += 1;
-        for (const teamId of teamsNeeding) {
-          if (passFingerprintStreak >= 1) exhaustedTeamIds.add(teamId);
-        }
-      }
-      seenRoundFingerprints.add(fingerprint);
-      lastPassFingerprint = fingerprint;
-
-      const stillNeeding = scopeTeam(getTeamsNeedingConvergence(afterSave.gameState).map((entry) => entry.teamId));
-      const teamsWithBuyBlocks = apply.teams.filter(
-        (team) =>
-          (!scopedTeamId || team.teamId === scopedTeamId) &&
-          team.executedBuys > 0 &&
-          (team.rosterAfter ?? 0) < getTeamHardMinRequired(afterSave.gameState, team.teamId),
-      );
-      if (stillNeeding.length === 0 && teamsWithBuyBlocks.length === 0 && apply.blockingReasons.length === 0) {
-        completedPasses = passIndex;
-        if (scopedTeamIds.length === 0) {
-          break;
-        }
-        continue;
-      }
-
-      if (!madeProgress && passFingerprintStreak >= 1) {
-        warnings.push(`convergence_stalled:${passId}:round:${roundIndex}${scopedTeamId ? `:team:${scopedTeamId}` : ""}`);
-        break;
-      }
-      }
-    }
-
-    completedPasses = passIndex;
-    const afterPassSave = persistence.getSaveById(input.saveId);
-    if (!afterPassSave) throw new Error("Save missing after convergence pass.");
-    const stillNeedingAfterPass = scopeTeam(getTeamsNeedingConvergence(afterPassSave.gameState).map((entry) => entry.teamId));
-    const buyBlocked = [...teamResults.values()].some(
-      (entry) => entry.status === "blocked" && entry.appliedBuys > 0,
-    );
-    if (stillNeedingAfterPass.length === 0 && !buyBlocked) {
-      break;
-    }
-    if (passIndex < maxPasses && !passProgress) {
-      warnings.push(`convergence_pass_${passId}_no_progress`);
-    }
-  }
-
-  const finalSave = persistence.getSaveById(input.saveId);
-  if (!finalSave) throw new Error("Save missing after market plan convergence.");
-  const emergencyRepairTeams = scopeTeam(
-    getTeamsBelowHardMin(finalSave.gameState)
-      .map((entry) => entry.teamId)
-      .filter((teamId) => teamResults.get(teamId)?.status === "convergence_exhausted"),
-  );
+  const session = await runTransferWindowSession({
+    saveId: input.saveId,
+    seasonId: input.seasonId,
+    persistence: input.persistence,
+    phase: "preseason",
+    dryRun: input.dryRun,
+    confirmToken: input.confirmToken,
+    transferPhase: input.transferPhase,
+    teamScope: input.teamScope,
+    targetTeamIds: input.targetTeamIds,
+    maxTeamCycles: Math.max(1, input.maxRoundsPerPass ?? 5),
+    maxLeagueRounds: Math.max(1, input.maxPasses ?? 3),
+    allowBuys: input.allowBuys,
+    skipIfExistingMarketTransfers: input.skipIfExistingMarketTransfers,
+    progressLog: input.progressLog,
+  });
 
   return {
-    passes: completedPasses,
-    rounds: totalRounds,
-    perTeam: [...teamResults.values()],
-    emergencyRepairTeams,
-    appliedBuys: totalAppliedBuys,
-    appliedSells: totalAppliedSells,
-    warnings: unique(warnings),
-    blockingReasons: unique(blockingReasons),
-    skipped: false,
-    roundHistory,
+    passes: session.passes,
+    rounds: session.rounds,
+    perTeam: session.perTeam,
+    emergencyRepairTeams: session.emergencyRepairTeams,
+    appliedBuys: session.appliedBuys,
+    appliedSells: session.appliedSells,
+    warnings: session.warnings,
+    blockingReasons: session.blockingReasons,
+    skipped: session.skipped,
+    roundHistory: session.roundHistory,
   };
 }
 

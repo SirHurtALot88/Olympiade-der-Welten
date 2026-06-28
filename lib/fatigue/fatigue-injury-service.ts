@@ -4,9 +4,21 @@ import type {
   LineupDraft,
   Player,
   PlayerAvailabilityStateRecord,
+  PlayerInjuryHistoryRecord,
   PlayerInjuryRiskRollRecord,
 } from "@/lib/data/olyDataTypes";
 import { applyRecoveryFacilityModifiers, getTeamFacilityState } from "@/lib/facilities/facility-effects";
+import {
+  appendPlayerInjuryHistory,
+  injuryEventToPlayerHistoryRecord,
+} from "@/lib/foundation/player-injury-history";
+import {
+  FATIGUE_INJURY_RISK_ANCHORS,
+  getInjuryRiskBand,
+  getInjuryRiskPercent,
+  injuryRiskBands,
+  type InjuryRiskBand,
+} from "@/lib/fatigue/fatigue-calibration";
 import { applyTrainingRecoveryImpact } from "@/lib/training/training-recovery-impact";
 import type { PlayerTrainingMode } from "@/lib/training/training-plan-types";
 
@@ -15,17 +27,8 @@ export const FATIGUE_INJURY_REHEARSAL_SOURCE = "fatigue_injury_rehearsal_v1" as 
 export const MATCHDAY_FATIGUE_LOAD = 12;
 export const BASE_MATCHDAY_RECOVERY = 20;
 
-export const injuryRiskBands = [
-  { min: 0, max: 29, label: "none", riskPercent: 0, uiLabel: "kein Risiko" },
-  { min: 30, max: 49, label: "minimal", riskPercent: 2, uiLabel: "minimales Verletzungsrisiko" },
-  { min: 50, max: 69, label: "mittel", riskPercent: 6, uiLabel: "mittleres Verletzungsrisiko" },
-  { min: 70, max: 84, label: "stark", riskPercent: 12, uiLabel: "starkes Verletzungsrisiko" },
-  { min: 85, max: 100, label: "sehr_stark", riskPercent: 22, uiLabel: "sehr starkes Verletzungsrisiko" },
-] as const;
-
-export const FATIGUE_INJURY_RISK_CURVE = injuryRiskBands;
-
-export type InjuryRiskBand = (typeof injuryRiskBands)[number];
+export { getInjuryRiskBand, getInjuryRiskPercent, injuryRiskBands, type InjuryRiskBand };
+export const FATIGUE_INJURY_RISK_CURVE = FATIGUE_INJURY_RISK_ANCHORS;
 
 export type PlayerAvailabilityView = PlayerAvailabilityStateRecord & {
   isUnavailable: boolean;
@@ -81,6 +84,18 @@ function isActiveRosterPlayer(gameState: GameState, playerId: string, teamId: st
   return gameState.rosters.some((entry) => entry.playerId === playerId && entry.teamId === teamId);
 }
 
+export function isPlayerAvailabilityInjured(
+  entry: Pick<PlayerAvailabilityStateRecord, "injuryStatus"> & { status?: string },
+): boolean {
+  return entry.injuryStatus === "injured" || entry.status === "injured";
+}
+
+export function countTeamInjuredPlayers(gameState: GameState, teamId: string) {
+  return (gameState.seasonState.playerAvailabilityState ?? []).filter(
+    (entry) => entry.teamId === teamId && isPlayerAvailabilityInjured(entry),
+  ).length;
+}
+
 function getPlayerCurrentFatigue(gameState: GameState, player: Player, teamId: string) {
   if (!isActiveRosterPlayer(gameState, player.id, teamId)) {
     return 0;
@@ -89,15 +104,6 @@ function getPlayerCurrentFatigue(gameState: GameState, player: Player, teamId: s
     (entry) => entry.playerId === player.id && entry.teamId === teamId,
   );
   return clampFatigue(availability?.fatigue ?? player.fatigue ?? 0);
-}
-
-export function getInjuryRiskPercent(fatigue: number) {
-  return getInjuryRiskBand(fatigue).riskPercent;
-}
-
-export function getInjuryRiskBand(fatigue: number): InjuryRiskBand {
-  const normalized = clampFatigue(fatigue);
-  return injuryRiskBands.find((entry) => normalized >= entry.min && normalized <= entry.max) ?? injuryRiskBands[0];
 }
 
 export function rollInjuryRisk(input: {
@@ -368,6 +374,7 @@ export function applyFatigueAndInjuryAfterMatchday(input: {
     );
     if (availabilityView.isUnavailable) continue;
 
+    const recovery = calculatePlayerRecovery(input.gameState, use.teamId, player.trainingMode);
     const fatigueBeforeRoll = clampFatigue(getPlayerCurrentFatigue(input.gameState, player, use.teamId) + MATCHDAY_FATIGUE_LOAD);
     const riskPercent = getInjuryRiskPercent(fatigueBeforeRoll);
     if (riskPercent <= 0) {
@@ -382,7 +389,31 @@ export function applyFatigueAndInjuryAfterMatchday(input: {
         injuryReason: availabilityView.injuryReason,
         injuryRiskLastRoll: availabilityView.injuryRiskLastRoll,
       });
-      nextPlayers[playerIndex] = { ...player, fatigue: fatigueBeforeRoll };
+      nextPlayers[playerIndex] = { ...nextPlayers[playerIndex], fatigue: fatigueBeforeRoll };
+      newEvents.push({
+        eventId: buildInjuryEventId({
+          saveId: input.saveId,
+          seasonId: input.seasonId,
+          matchdayId: input.matchdayId,
+          teamId: use.teamId,
+          playerId: use.playerId,
+        }),
+        seasonId: input.seasonId,
+        matchdayId: input.matchdayId,
+        teamId: use.teamId,
+        playerId: use.playerId,
+        fatigueBefore: fatigueBeforeRoll,
+        riskPercent: 0,
+        roll: 0,
+        result: "healthy",
+        unavailableForMatchdays: 1,
+        unavailableUntil: null,
+        normalRecovery: recovery.normalRecovery,
+        injuryRecovery: null,
+        fatigueAfterRecovery: null,
+        source: FATIGUE_INJURY_SOURCE,
+        timestamp: input.timestamp,
+      });
       continue;
     }
     const initialRoll = injuryRehearsal
@@ -408,7 +439,6 @@ export function applyFatigueAndInjuryAfterMatchday(input: {
     if (roll.result === "injured" && injuryRehearsal) {
       rehearsalInjuriesCreated += 1;
     }
-    const recovery = calculatePlayerRecovery(input.gameState, use.teamId, player.trainingMode);
     const event: InjuryEventRecord = {
       eventId: buildInjuryEventId({
         saveId: input.saveId,
@@ -434,6 +464,12 @@ export function applyFatigueAndInjuryAfterMatchday(input: {
       timestamp: input.timestamp,
     };
     newEvents.push(event);
+    if (roll.result === "injured") {
+      const historyRecord = injuryEventToPlayerHistoryRecord(event, input.gameState);
+      if (historyRecord) {
+        nextPlayers[playerIndex] = appendPlayerInjuryHistory(nextPlayers[playerIndex], historyRecord);
+      }
+    }
     nextAvailability = updateAvailability(nextAvailability, {
       playerId: use.playerId,
       teamId: use.teamId,
@@ -445,7 +481,7 @@ export function applyFatigueAndInjuryAfterMatchday(input: {
       injuryReason: roll.result === "injured" ? "fatigue_over_30_after_matchday_use" : availabilityView.injuryReason,
       injuryRiskLastRoll: roll,
     });
-    nextPlayers[playerIndex] = { ...player, fatigue: fatigueBeforeRoll };
+    nextPlayers[playerIndex] = { ...nextPlayers[playerIndex], fatigue: fatigueBeforeRoll };
   }
 
   const injuryHighlights = newEvents

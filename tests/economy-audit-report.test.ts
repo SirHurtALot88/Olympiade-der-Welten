@@ -35,20 +35,33 @@ describe("buildEconomyAuditReport", () => {
     expect(report.violations.some((entry) => entry.startsWith("negative_cash_teams"))).toBe(true);
   });
 
-  it("flags preseason repair buys without transfer fees", () => {
+  it("flags preseason repair buys without transfer fees or below market value", () => {
     const report = buildEconomyAuditReport({
       saveId: "save-1",
       gameState: buildMinimalGameState({
         transferHistory: [
           {
             id: "tx-1",
-            kind: "buy",
-            transferSource: "preseason_roster_repair_buy",
-            fee: 0,
             playerId: "p-1",
+            seasonId: "season-2",
+            transferType: "buy",
+            source: "preseason_roster_repair_buy",
+            fee: 0,
+            marketValue: 12,
             fromTeamId: null,
             toTeamId: "A-A",
+            happenedAt: "2026-01-01T00:00:00.000Z",
+          },
+          {
+            id: "tx-2",
+            playerId: "p-2",
             seasonId: "season-2",
+            transferType: "buy",
+            source: "preseason_roster_repair_buy",
+            fee: 8,
+            marketValue: 66.91,
+            fromTeamId: null,
+            toTeamId: "A-A",
             happenedAt: "2026-01-01T00:00:00.000Z",
           },
         ],
@@ -57,5 +70,6 @@ describe("buildEconomyAuditReport", () => {
 
     expect(report.ok).toBe(false);
     expect(report.violations).toContain("preseason_roster_repair_buy_zero_fee:1");
+    expect(report.violations).toContain("preseason_roster_repair_buy_fee_not_market_value:2");
   });
 });

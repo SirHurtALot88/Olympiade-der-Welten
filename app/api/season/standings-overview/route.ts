@@ -60,6 +60,27 @@ function buildLocalSeasonDisciplineValues(input: {
   );
 }
 
+function buildStandingsOverviewCacheSignature(input: {
+  localSave: NonNullable<ReturnType<ReturnType<typeof createPersistenceService>["getSaveById"]>>;
+  seasonId: string;
+  sourceKind: "live" | "season_snapshot" | "season_snapshot_missing";
+}) {
+  const versionMeta = createPersistenceService().getSaveVersionMetadata(input.localSave.saveId);
+  const base = versionMeta
+    ? [
+        versionMeta.seasonId,
+        versionMeta.matchdayId,
+        String(versionMeta.saveVersion),
+        String(versionMeta.lineupDraftCount),
+        String(versionMeta.transferHistoryCount),
+        versionMeta.updatedAt,
+        input.seasonId,
+        input.sourceKind,
+      ].join("|")
+    : `${input.localSave.updatedAt}|${input.seasonId}|${input.sourceKind}`;
+  return base;
+}
+
 export async function GET(request: Request) {
   try {
     const { searchParams } = new URL(request.url);
@@ -81,46 +102,60 @@ export async function GET(request: Request) {
     const seasonId = requestedSeasonId ?? localSave?.gameState.season.id ?? "season-1";
 
     if (source === "sqlite" && localSave) {
-      const versionMeta = createPersistenceService().getSaveVersionMetadata(localSave.saveId);
-      const cacheSignature = versionMeta
-        ? [
-            versionMeta.seasonId,
-            versionMeta.matchdayId,
-            String(versionMeta.saveVersion),
-            String(versionMeta.lineupDraftCount),
-            String(versionMeta.transferHistoryCount),
-            versionMeta.updatedAt,
+      const activeSeasonId = localSave.gameState.season.id;
+      const isCurrentSeason = seasonId === activeSeasonId;
+      const archivedSnapshot = !isCurrentSeason
+        ? (localSave.gameState.seasonState.seasonSnapshots ?? []).find((snapshot) => snapshot.seasonId === seasonId) ?? null
+        : null;
+
+      if (!isCurrentSeason && !archivedSnapshot) {
+        return NextResponse.json({
+          items: [],
+          missingMappings: [],
+          mappingWarnings: [`season_snapshot_missing:${seasonId}`],
+          source: {
+            kind: "season_snapshot_missing",
+            access: "local_save",
+            detectedColumns: [],
+            disciplineColumns: SEASON_STANDINGS_DISCIPLINE_COLUMNS,
+          },
+          scope: {
+            saveId: localSave.saveId,
             seasonId,
-          ].join("|")
-        : `${localSave.updatedAt}|${seasonId}`;
+          },
+        });
+      }
+
       const cacheKey = `${localSave.saveId}:${seasonId}`;
+      const cacheSignature = buildStandingsOverviewCacheSignature({
+        localSave,
+        seasonId,
+        sourceKind: archivedSnapshot ? "season_snapshot" : "live",
+      });
       const cached = readStandingsOverviewCache(cacheKey, cacheSignature);
       if (cached) {
         return NextResponse.json(cached);
       }
-    }
 
-    const archivedSnapshot =
-      source === "sqlite" && seasonId !== localSave!.gameState.season.id
-        ? (localSave!.gameState.seasonState.seasonSnapshots ?? []).find((snapshot) => snapshot.seasonId === seasonId) ?? null
-        : null;
-
-    if (archivedSnapshot) {
-      return NextResponse.json({
-        items: buildArchivedSeasonStandingsOverviewItems(archivedSnapshot),
-        missingMappings: [],
-        mappingWarnings: archivedSnapshot.warnings ?? [],
-        source: {
-          kind: "season_snapshot",
-          access: "local_save",
-          detectedColumns: [],
-          disciplineColumns: SEASON_STANDINGS_DISCIPLINE_COLUMNS,
-        },
-        scope: {
-          saveId: localSave!.saveId,
-          seasonId,
-        },
-      });
+      if (archivedSnapshot) {
+        const archivedPayload = {
+          items: buildArchivedSeasonStandingsOverviewItems(archivedSnapshot),
+          missingMappings: [],
+          mappingWarnings: archivedSnapshot.warnings ?? [],
+          source: {
+            kind: "season_snapshot",
+            access: "local_save",
+            detectedColumns: [],
+            disciplineColumns: SEASON_STANDINGS_DISCIPLINE_COLUMNS,
+          },
+          scope: {
+            saveId: localSave.saveId,
+            seasonId,
+          },
+        };
+        writeStandingsOverviewCache(cacheKey, cacheSignature, archivedPayload);
+        return NextResponse.json(archivedPayload);
+      }
     }
 
     const teamStates =
@@ -355,19 +390,13 @@ export async function GET(request: Request) {
     };
 
     if (source === "sqlite" && localSave) {
-      const versionMeta = createPersistenceService().getSaveVersionMetadata(localSave.saveId);
-      const cacheSignature = versionMeta
-        ? [
-            versionMeta.seasonId,
-            versionMeta.matchdayId,
-            String(versionMeta.saveVersion),
-            String(versionMeta.lineupDraftCount),
-            String(versionMeta.transferHistoryCount),
-            versionMeta.updatedAt,
-            seasonId,
-          ].join("|")
-        : `${localSave.updatedAt}|${seasonId}`;
-      writeStandingsOverviewCache(`${localSave.saveId}:${seasonId}`, cacheSignature, responsePayload);
+      const cacheKey = `${localSave.saveId}:${seasonId}`;
+      const cacheSignature = buildStandingsOverviewCacheSignature({
+        localSave,
+        seasonId,
+        sourceKind: "live",
+      });
+      writeStandingsOverviewCache(cacheKey, cacheSignature, responsePayload);
     }
 
     return NextResponse.json(responsePayload);

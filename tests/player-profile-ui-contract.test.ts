@@ -4,7 +4,7 @@ import { describe, expect, it } from "vitest";
 
 describe("player profile ui contract", () => {
   it("provides full-page player profile with tabs and projected classes report", async () => {
-    const [profileText, foundationText, serviceText, previewText, drawerText, trainingControlsText, chartText] =
+    const [profileText, foundationText, serviceText, previewText, drawerText, trainingControlsText, chartText, trainingSharedText] =
       await Promise.all([
         fs.readFile(
           "/Users/chrisfalk/Documents/Codex/Olympiade der Welten/app/foundation/player-profile/PlayerProfileClient.tsx",
@@ -22,6 +22,10 @@ describe("player profile ui contract", () => {
           "/Users/chrisfalk/Documents/Codex/Olympiade der Welten/app/foundation/player-profile/PlayerAttributeProgressChart.tsx",
           "utf8",
         ),
+        fs.readFile(
+          "/Users/chrisfalk/Documents/Codex/Olympiade der Welten/app/foundation/training-facilities-v2/training-view-shared.tsx",
+          "utf8",
+        ),
       ]);
 
     expect(profileText).toContain("PlayerDetailDrawer");
@@ -29,9 +33,14 @@ describe("player profile ui contract", () => {
     expect(profileText).toContain("trainingRow");
     expect(profileText).toContain("onSetTrainingMode");
     expect(foundationText).toContain("openPlayerProfileById");
+    expect(foundationText).toContain("shouldLoadSeasonArchive");
+    expect(foundationText).toContain("loadedSeasonArchiveSignatureRef");
     expect(foundationText).toContain("setPlayerProfileLoading(true)");
     expect(foundationText).toContain("PlayerProfileClient");
     expect(foundationText).toContain("playerProfileTrainingRow");
+    expect(foundationText).toContain("playerProfileTrainingReadOnly");
+    expect(foundationText).toContain("refreshOpenPlayerProfileAfterTrainingChange");
+    expect(foundationText).toContain("profilePlayer = gameState.players.find");
     expect(serviceText).toContain("Stats");
     expect(serviceText).toContain("player-drawer-training-controls");
     expect(previewText).toContain("buildProjectedClassPreview");
@@ -42,15 +51,19 @@ describe("player profile ui contract", () => {
     expect(drawerText).toContain("headroomLabel");
     expect(drawerText).toContain("data.transferHistory");
     expect(drawerText).toContain("player-drawer-training-controls");
-    expect(drawerText).toContain("player-drawer-transfer-history");
+    expect(drawerText).toContain("PlayerDrawerHistoryTable");
+    expect(drawerText).toContain("PLAYER_DRAWER_HISTORY_ABLOESE_TOOLTIP");
+    expect(drawerText).toContain("isSeasonDisciplineKey");
+    expect(drawerText).toContain("formatValue(row.pow, 1)");
+    expect(drawerText).toContain("PlayerDrawerTransferHistoryTable");
     expect(drawerText).toContain("PlayerAttributeProgressChart");
     expect(drawerText).toContain("PlayerTrainingControls");
-    expect(drawerText).toContain("projectedClassPreview");
-    expect(drawerText).toContain("Top 3 Klassen-Fit");
     expect(drawerText).toContain("PlayerCaPoStarStack");
     expect(drawerText).toContain("player-drawer-ca-po-row");
     expect(drawerText).toContain('data-testid="player-drawer-ca-po-row"');
     expect(drawerText).toContain("player-drawer-hero-axis-grid");
+    expect(drawerText).toContain("showFullAxisGrid");
+    expect(drawerText).toContain("showCompactAxisStrip");
     expect(drawerText).toContain("player-drawer-axis-strip");
     expect(drawerText).toContain('data-testid="player-drawer-axis-strip"');
     expect(drawerText).toContain("player-drawer-axis-chip-hint");
@@ -61,7 +74,31 @@ describe("player profile ui contract", () => {
     expect(drawerText).toContain("player-drawer-flavor-de");
     expect(drawerText).toContain('data-testid="player-drawer-flavor-de"');
     expect(drawerText).toContain("player-drawer-stats-chart");
+    expect(drawerText).toContain("player-drawer-season-snapshot");
+    expect(drawerText).toContain("player-drawer-top-disciplines-layout");
+    expect(drawerText).toContain("player-drawer-potential");
+    expect(drawerText).toContain("player-drawer-training-history");
+    expect(drawerText).toContain("Trainingshistorie");
+    expect(drawerText).not.toContain("Legacy XP-Vorschau");
+    expect(drawerText).not.toContain("<h3>Klassen-Training</h3>");
+    expect(drawerText).not.toContain("Spendbare XP");
     expect(trainingControlsText).toContain("VeloIntensityRail");
+    expect(trainingControlsText).toContain("TrainingAttributeForecastGrid");
+    expect(trainingControlsText).not.toContain("VeloAttributeFocusTags");
+    expect(trainingControlsText).toContain("buildStatForecastTooltip");
+    expect(trainingSharedText).toContain("export function TrainingAttributeForecastGrid");
     expect(chartText).toContain('data-testid="player-attribute-progress-chart"');
+    expect(chartText).toContain('data-testid="player-attribute-progress-summary"');
+    expect(chartText).toContain('data-testid="player-attribute-progress-str-line"');
+    expect(chartText).toContain('data-testid="player-attribute-progress-attribute-table"');
+    expect(chartText).toContain("PLAYER_ATTRIBUTE_CHART_LABELS");
+    expect(chartText).toContain("attributeHistoryRows");
+    expect(drawerText).toContain("trainingHistoryRows");
+    expect(drawerText).toContain("player-drawer-injury-banner");
+    expect(drawerText).toContain("player-drawer-injury-history");
+    expect(drawerText).toContain("Verletzungshistorie");
+    expect(drawerText).toContain("player-drawer-injury-summary");
+    expect(drawerText).toContain("injuriesCount");
+    expect(drawerText).toContain("matchdaysMissed");
   });
 });

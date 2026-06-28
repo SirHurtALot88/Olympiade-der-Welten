@@ -47,7 +47,6 @@ export function buildLegacyMatchdayResolvePreviewPayload(input: {
   };
   contextResults: LegacyLineupContextLoadResult[];
 }): LegacyMatchdayResolvePreviewPayload | null {
-  const errors = input.contextResults.flatMap((result) => (result.ok ? [] : result.errors));
   const warnings = input.contextResults.flatMap((result) => result.warnings);
   const contexts = input.contextResults.flatMap((result) => (result.ok ? [result.context] : []));
 
@@ -71,7 +70,7 @@ export function buildLegacyMatchdayResolvePreviewPayload(input: {
     teamDetails,
     topPlayers,
     playerCatalog,
-    warnings: Array.from(new Set([...warnings, ...preview.warnings, ...errors])),
+    warnings: Array.from(new Set([...warnings, ...preview.warnings])),
     teamRows: preview.teamResults.map((team) => ({
       ...team,
       topPlayer: getTopPlayerNameForTeam(preview, team.teamId),

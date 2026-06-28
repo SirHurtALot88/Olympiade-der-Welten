@@ -87,7 +87,7 @@ describe("transfermarkt v2 performance contract", () => {
   it("opens the player profile from a candidate name click", () => {
     const source = fs.readFileSync(transfermarktV2ClientPath, "utf8");
 
-    expect(source).toContain('className="table-link-button"');
+    expect(source).toContain("table-link-button");
     expect(source).toContain("onOpenPlayerDetails?.({ playerId: item.playerId })");
   });
 });

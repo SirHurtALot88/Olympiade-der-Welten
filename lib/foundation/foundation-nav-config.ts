@@ -21,6 +21,7 @@ export const FOUNDATION_NAV_GROUPS: FoundationNavGroup[] = [
       { id: "homeV2", label: "Home", tooltip: "Manager-Dashboard mit KPIs, Top-Spielern und Flow.", icon: "⌂" },
       { id: "inboxV2", label: "Inbox", tooltip: "Entscheidungen, Hinweise und Storys für dein Team.", icon: "✉" },
       { id: "lineup", label: "Einsatzliste", tooltip: "Spieler setzen, Formplan und Team-Taktik.", icon: "▣" },
+      { id: "lineupV2", label: "Einsatzliste v2", tooltip: "Preview: Focus Mode mit kompakter Slot-Rail.", icon: "▣" },
       { id: "matchdayArena", label: "Arena", tooltip: "Spieltag als Reveal/Event.", icon: "◉" },
       { id: "seasonV2", label: "Saisonstand", tooltip: "Tabelle, Cards und Teamstaerken.", icon: "▤" },
     ],
@@ -50,7 +51,7 @@ export const FOUNDATION_NAV_GROUPS: FoundationNavGroup[] = [
     items: [
       { id: "ranks", label: "Ranks", tooltip: "Team- und Disziplinranks.", icon: "▥" },
       { id: "diszis", label: "Diszis", tooltip: "Disziplinen und Mutatoren.", icon: "◫" },
-      { id: "prize", label: "Preisgeld", tooltip: "Preisgeld-Ausblick.", icon: "€" },
+      { id: "prize", label: "Sponsoren", tooltip: "Sponsor-Vertrag wählen und Saisonfinanzen prüfen.", icon: "€" },
       { id: "encyclopedia", label: "Lexikon", tooltip: "Spielbegriffe und Regeln.", icon: "?" },
     ],
   },

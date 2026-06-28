@@ -74,7 +74,7 @@ export function buildTrainingModeSegments(options: TrainingModeSegmentInput[]): 
     toneClass: `is-${option.value}`,
     note: option.note,
     lines: [
-      `+${formatVeloNumber(option.baseXp, 0)} XP`,
+      `+${formatVeloNumber(option.baseXp, 0)} Setpoints`,
       formatTrainingModeRecoveryLabel(option.recoveryDeltaPct),
       `Fatigue ${formatVeloNumber(option.fatigueLoad, 0)}`,
     ],

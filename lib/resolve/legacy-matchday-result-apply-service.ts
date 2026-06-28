@@ -140,7 +140,6 @@ type ContextLoaderLike = Pick<LegacyLineupContextLoader, "loadLegacyLineupContex
 type LocalContextLoaderLike = (params: LegacyMatchdayScopeParams & { teamId: string }) => LegacyLineupContextLoadResult;
 
 const APPLY_CONFIRM_TOKEN = "APPLY_MATCHDAY_RESULT";
-const FATIGUE_INJURY_ENABLED = process.env.OLY_ENABLE_INJURIES === "1";
 
 function elapsedSince(startedAt: number) {
   return Math.max(0, Math.round(performance.now() - startedAt));
@@ -680,16 +679,14 @@ export class LegacyMatchdayResultApplyService {
     };
     const recordMapMs = elapsedSince(recordMapStartedAt);
 
-    const injuryResult = FATIGUE_INJURY_ENABLED
-      ? applyFatigueAndInjuryAfterMatchday({
+    const injuryResult = applyFatigueAndInjuryAfterMatchday({
           gameState: nextGameState,
           saveId: params.saveId,
           seasonId: params.seasonId,
           matchdayId: params.matchdayId,
           matchdayResultId,
           timestamp: now,
-        })
-      : { gameState: nextGameState, injuryEvents: [] };
+        });
 
     const objectiveStartedAt = performance.now();
     const refreshedGameState = refreshTeamObjectiveState(injuryResult.gameState);

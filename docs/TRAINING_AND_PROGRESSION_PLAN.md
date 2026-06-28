@@ -26,15 +26,16 @@ Unknown traits:
 
 V1 compression is intentionally simple and transparent:
 
-- `compressedTraitTrainingPct = clamp(rawTraitTrainingSignalPct * 0.40, -12, 12)`
+- `compressedTraitTrainingPct = clamp(rawTraitTrainingSignalPct * 0.40, -20, 25)`
 - `trainingTraitMultiplier = 1 + compressedTraitTrainingPct / 100`
 
 Examples:
 
 - raw `+25` -> compressed `+10` -> multiplier `1.10`
-- raw `+40` -> compressed `+12` -> multiplier `1.12`
+- raw `+40` -> compressed `+16` -> multiplier `1.16`
+- raw `+70` (stack cap) -> compressed `+25` -> multiplier `1.25`
 - raw `-20` -> compressed `-8` -> multiplier `0.92`
-- raw `-35` -> compressed `-12` -> multiplier `0.88`
+- raw `-50` (stack cap) -> compressed `-20` -> multiplier `0.80`
 
 ### Design Intent
 

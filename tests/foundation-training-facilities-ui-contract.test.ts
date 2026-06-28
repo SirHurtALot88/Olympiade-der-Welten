@@ -5,6 +5,7 @@ import { describe, expect, it } from "vitest";
 const foundationClientPath = "/Users/chrisfalk/Documents/Codex/Olympiade der Welten/app/foundation/FoundationPageClient.tsx";
 const facilitiesV2Path = "/Users/chrisfalk/Documents/Codex/Olympiade der Welten/app/foundation/facilities-v2/FacilitiesV2Client.tsx";
 const trainingCompactPath = "/Users/chrisfalk/Documents/Codex/Olympiade der Welten/app/foundation/training-compact/TrainingCompactClient.tsx";
+const trainingViewSharedPath = "/Users/chrisfalk/Documents/Codex/Olympiade der Welten/app/foundation/training-facilities-v2/training-view-shared.tsx";
 const globalsPath = "/Users/chrisfalk/Documents/Codex/Olympiade der Welten/app/globals.css";
 
 describe("foundation training and facilities ui contract", () => {
@@ -86,5 +87,22 @@ describe("foundation training and facilities ui contract", () => {
     expect(cssText).toContain(".facilities-v2-card");
     expect(cssText).toContain(".facilities-v2-level-strip");
     expect(cssText).toContain(".facilities-v2-action-bar");
+  });
+
+  it("uses full-art portrait cards with training context presets in the player lane", async () => {
+    const [trainingText, cssText] = await Promise.all([
+      fs.readFile(trainingViewSharedPath, "utf8"),
+      fs.readFile(globalsPath, "utf8"),
+    ]);
+
+    expect(trainingText).toContain("FoundationPlayerPortraitCard");
+    expect(trainingText).toContain('context="training"');
+    expect(trainingText).toContain('density="full"');
+    expect(trainingText).toContain("organicForecast.netSetpoints");
+    expect(trainingText).toContain("forecast.regressionRisk");
+    expect(trainingText).toContain("trainingModeLabel");
+    expect(trainingText).toContain("footerSlot");
+    expect(trainingText).toContain("team-portraits-grid");
+    expect(cssText).toContain(".foundation-player-portrait-card.is-density-compact");
   });
 });

@@ -15,6 +15,7 @@ import type {
 } from "@/lib/data/olyDataTypes";
 import { getTeamStrategyProfile } from "@/lib/foundation/team-strategy-profiles";
 import { getTeamThemeCompositionTarget } from "@/lib/ai/team-theme-composition-service";
+import { countTeamInjuredPlayers } from "@/lib/fatigue/fatigue-injury-service";
 
 export type DoctrineSeasonTeamReviewRow = {
   teamId: string;
@@ -274,7 +275,7 @@ function seasonStrategyFor(gameState: GameState, teamId: string): AiSeasonStrate
 function deriveTacticalMode(gameState: GameState, teamId: string): AiTacticalMode {
   const players = rosterPlayers(gameState, teamId);
   const highFatigue = players.filter((player) => (player.fatigue ?? 0) >= 70).length;
-  const injured = gameState.seasonState.playerAvailabilityState?.filter((entry: any) => entry.teamId === teamId && entry.status === "injured").length ?? 0;
+  const injured = countTeamInjuredPlayers(gameState, teamId);
   const rank = gameState.seasonState.standings?.[teamId]?.rank ?? null;
   const cash = team(gameState, teamId)?.cash ?? 0;
 
@@ -516,18 +517,25 @@ export function buildTacticalAdaptationAudit(gameState: GameState): TacticalAdap
   });
 }
 
+export function resolveLineupStrategyForTeam(gameState: GameState, teamId: string): AiLineupStrategy {
+  const strategies = buildSeasonStrategyState(gameState);
+  const tacticalMode = strategies[teamId]?.tacticalMode ?? "standard";
+  const seasonStrategy = strategies[teamId]?.seasonStrategy ?? "balanced_growth";
+
+  if (tacticalMode === "injury_crisis") return "avoid_injury";
+  if (tacticalMode === "fatigue_crisis") return "rotate_depth";
+  if (seasonStrategy === "rebuild_prospect") return "develop_prospects";
+  if (tacticalMode === "protect_lead") return "protect_stars";
+  if (seasonStrategy === "win_now_push") return "captain_star";
+  return "best_score_now";
+}
+
 export function buildLineupStrategyAudit(gameState: GameState): LineupStrategyAuditRow[] {
   const strategies = buildSeasonStrategyState(gameState);
   return gameState.teams.map((teamRow) => {
     const tacticalMode = strategies[teamRow.teamId]?.tacticalMode ?? "standard";
     const seasonStrategy = strategies[teamRow.teamId]?.seasonStrategy ?? "balanced_growth";
-    let lineupStrategy: AiLineupStrategy = "best_score_now";
-
-    if (tacticalMode === "injury_crisis") lineupStrategy = "avoid_injury";
-    else if (tacticalMode === "fatigue_crisis") lineupStrategy = "rotate_depth";
-    else if (seasonStrategy === "rebuild_prospect") lineupStrategy = "develop_prospects";
-    else if (tacticalMode === "protect_lead") lineupStrategy = "protect_stars";
-    else if (seasonStrategy === "win_now_push") lineupStrategy = "captain_star";
+    const lineupStrategy = resolveLineupStrategyForTeam(gameState, teamRow.teamId);
 
     return {
       teamId: teamRow.teamId,

@@ -4,6 +4,8 @@ import { NextResponse } from "next/server";
 
 import { AI_PICKS_RUN_CONFIRM_TOKEN } from "@/lib/ai/ai-picks-run-contract";
 import { runAiPicksExecutePreview } from "@/lib/ai/ai-picks-run-service";
+import { parseRoomWriteContextFromRequest } from "@/lib/room/parse-room-write-context";
+import { authorizeServerRoomWrite } from "@/lib/room/server-authoritative-write-guard";
 
 function parseOptionalNumber(value: string | null) {
   if (!value) {
@@ -52,6 +54,18 @@ export async function POST(request: Request) {
       },
       { status: 409 },
     );
+  }
+
+  const writeAuth = authorizeServerRoomWrite({
+    ...parseRoomWriteContextFromRequest(request),
+    saveId,
+    action: "ai_picks_run_execute",
+    source: "sqlite",
+    dryRun,
+    confirmToken: body.confirmToken ?? null,
+  });
+  if (!writeAuth.allowed) {
+    return NextResponse.json({ error: writeAuth.reason, warnings: writeAuth.warnings }, { status: writeAuth.status });
   }
 
   try {

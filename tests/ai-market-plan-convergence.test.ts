@@ -111,14 +111,22 @@ describe("ai market plan convergence service", () => {
   });
 
   it("marks sell-only below-min teams as valid without global blockers", async () => {
-    const gameState = buildGameState();
+    const gameState = buildGameState({
+      rosters: Array.from({ length: 9 }, (_, index) => ({
+        id: `r-a-${index}`,
+        teamId: "team-a",
+        playerId: `p-a-${index}`,
+        slot: index,
+      })),
+    });
     const persistence = {
       getSaveById: () => ({ saveId: "save-1", gameState }),
     };
 
-    applyAiMarketPlanLocally.mockResolvedValue(
-      buildApplyResult({ appliedSells: 1, rosterAfter: 5, result: "applied" }),
-    );
+    applyAiMarketPlanLocally
+      .mockResolvedValueOnce(buildApplyResult({ appliedSells: 1, rosterAfter: 9, result: "applied" }))
+      .mockResolvedValueOnce(buildApplyResult({ appliedBuys: 0, appliedSells: 0, rosterAfter: 9, result: "hold" }))
+      .mockResolvedValue(buildApplyResult({ appliedBuys: 0, appliedSells: 0, rosterAfter: 9, result: "hold" }));
 
     const result = await runMarketPlanConvergence({
       saveId: "save-1",
@@ -190,13 +198,12 @@ describe("ai market plan convergence service", () => {
 
     applyAiMarketPlanLocally.mockImplementation(async (params) => {
       call += 1;
-      if (call === 1) {
-        expect(params.options?.maxSellsPerTeam).toBe(0);
-        return buildApplyResult({ appliedBuys: 0, appliedSells: 0, rosterAfter: rosterCount });
+      if (params.options?.applySellSteps && !params.options?.applyBuySteps) {
+        expect(params.options?.maxSellsPerTeam).toBe(1);
+        return buildApplyResult({ appliedSells: 1, rosterAfter: 6 });
       }
-      expect(params.options?.maxSellsPerTeam).toBe(1);
       rosterCount = 8;
-      return buildApplyResult({ appliedBuys: 2, appliedSells: 1, rosterAfter: rosterCount, executedBuys: 2 });
+      return buildApplyResult({ appliedBuys: 2, appliedSells: 0, rosterAfter: rosterCount, executedBuys: 2 });
     });
 
     const result = await runMarketPlanConvergence({
@@ -238,30 +245,39 @@ describe("ai market plan convergence service", () => {
     });
 
     expect(call).toBeLessThan(8);
-    expect(result.warnings.some((entry) => entry.startsWith("convergence_stalled"))).toBe(true);
+    expect(result.warnings.some((entry) => entry.startsWith("transfer_window_stalled"))).toBe(true);
     expect(result.emergencyRepairTeams).toContain("team-a");
     expect(result.perTeam[0]?.status).toBe("convergence_exhausted");
   });
 
   it("passes exclude lists to avoid repeating the same buy attempts", async () => {
-    const gameState = buildGameState();
+    const gameState = buildGameState({
+      rosters: Array.from({ length: 9 }, (_, index) => ({
+        id: `r-a-${index}`,
+        teamId: "team-a",
+        playerId: `p-a-${index}`,
+        slot: index,
+      })),
+    });
     const persistence = {
       getSaveById: () => ({ saveId: "save-1", gameState }),
     };
 
     applyAiMarketPlanLocally
+      .mockResolvedValueOnce(buildApplyResult({ appliedBuys: 0, appliedSells: 0, rosterAfter: 10 }))
       .mockResolvedValueOnce({
-        ...buildApplyResult({ appliedBuys: 0, appliedSells: 0, rosterAfter: 6 }),
+        ...buildApplyResult({ appliedBuys: 0, appliedSells: 0, rosterAfter: 10 }),
         buyGateRows: [{ teamId: "team-a", playerId: "fa-blocked", reason: "cash_buffer_failed" }],
         teams: [
           {
-            ...buildApplyResult({ rosterAfter: 6 }).teams[0],
+            ...buildApplyResult({ rosterAfter: 10 }).teams[0],
             plannedBuyDetails: [{ stepType: "buy", playerId: "fa-blocked", playerName: "Blocked", amount: 10, salaryImpact: 1, rosterImpact: 1, status: "blocked", reason: "cash" }],
             skippedSteps: [],
           },
         ],
       })
-      .mockResolvedValueOnce(buildApplyResult({ appliedBuys: 1, executedBuys: 1, rosterAfter: 8 }));
+      .mockResolvedValueOnce(buildApplyResult({ appliedBuys: 1, executedBuys: 1, rosterAfter: 9 }))
+      .mockResolvedValue(buildApplyResult({ appliedBuys: 0, appliedSells: 0, rosterAfter: 9 }));
 
     const { runMarketPlanConvergence } = await import("@/lib/ai/ai-market-plan-convergence-service");
     await runMarketPlanConvergence({
@@ -274,8 +290,8 @@ describe("ai market plan convergence service", () => {
       skipIfExistingMarketTransfers: false,
     });
 
-    const secondCall = applyAiMarketPlanLocally.mock.calls[1]?.[0];
-    expect(secondCall?.options?.excludeBuyPlayerIds).toContain("fa-blocked");
+    const thirdCall = applyAiMarketPlanLocally.mock.calls[2]?.[0];
+    expect(thirdCall?.options?.excludeBuyPlayerIds).toContain("fa-blocked");
   });
 
   it("skips convergence for team already at identity opt even when below slot depth", async () => {

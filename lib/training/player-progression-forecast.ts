@@ -6,6 +6,7 @@ import { getTeamDevelopmentTrainingBonusPct } from "@/lib/foundation/team-develo
 import { getCombinedAttributeTrainingMultiplier, getPotentialGapXpFactor } from "@/lib/foundation/player-potential-display-service";
 import { buildPlayerAxisStarProfile } from "@/lib/scouting/player-axis-star-rating";
 import { resolvePlayerPotentialRecordFromGameState } from "@/lib/scouting/player-attribute-ceiling-service";
+import { resolvePlayerPotentialRecordForProgression } from "@/lib/scouting/player-potential-ceiling-service";
 import { buildPlayerStarScoutingSnapshot } from "@/lib/scouting/player-star-scouting-bridge";
 import { getEffectiveScoutingLevel } from "@/lib/scouting/facility-scout-pipeline-service";
 import { buildPlayerScoutPotentialFromGameState } from "@/lib/progression/player-potential-service";
@@ -610,11 +611,6 @@ export function buildPlayerProgressionForecast(input: {
   // gameState (e.g. previewSeasonEndXpAvailability + previewSeasonEndXpSpend both call this).
   // Only cache when no custom overrides are in play.
   const canCache = input.boardTrustScore == null && input.facilities == null;
-  if (canCache) {
-    const perState = forecastResultCache.get(input.gameState);
-    const hit = perState?.get(input.player.id);
-    if (hit) return hit;
-  }
 
   const mode = getTrainingMode(input.player, input.trainingModeByPlayerId);
   const rosterEntry = input.gameState.rosters.find((entry) => entry.playerId === input.player.id);
@@ -628,15 +624,27 @@ export function buildPlayerProgressionForecast(input: {
   });
   const traitMultiplier = traitSignal.trainingTraitMultiplier;
   const traitModifierPct = getTraitModifierPct(traitMultiplier);
+  const cacheKey = `${input.player.id}:${mode}`;
+  if (canCache) {
+    const perState = forecastResultCache.get(input.gameState);
+    const hit = perState?.get(cacheKey);
+    if (hit) return hit;
+  }
+
   const scoutPotential = buildPlayerScoutPotentialFromGameState({
     gameState: input.gameState,
     player: input.player,
     saveId: input.gameState.season.id,
   });
-  const potentialRecord = resolvePlayerPotentialRecordFromGameState({
-    gameState: input.gameState,
-    playerId: input.player.id,
-  });
+  const potentialRecord =
+    resolvePlayerPotentialRecordForProgression({
+      gameState: input.gameState,
+      player: input.player,
+    }) ??
+    resolvePlayerPotentialRecordFromGameState({
+      gameState: input.gameState,
+      playerId: input.player.id,
+    });
   const axisStars = buildPlayerAxisStarProfile({
     gameState: input.gameState,
     player: input.player,
@@ -907,7 +915,7 @@ export function buildPlayerProgressionForecast(input: {
       perState = new Map();
       forecastResultCache.set(input.gameState, perState);
     }
-    perState.set(input.player.id, result);
+    perState.set(cacheKey, result);
   }
   return result;
 }

@@ -58,6 +58,7 @@ export type ContractRenewalPreviewRow = {
   recommendedLength: number;
   recommendedContractShape: ContractShape;
   recommendedAction: "renew" | "sell_or_replace" | "release" | "manual_decision" | "no_action";
+  renewalBlockReason: "none" | "cash_gate" | "heuristic" | "morale" | "bad_value" | "manual" | null;
   marketValue: number | null;
   ovr: number | null;
   mvs: number | null;
@@ -185,6 +186,25 @@ function getRecommendedLength(entry: RosterEntry, rating: PlayerRatingContractRo
   return conservativeTeam ? 1 : 2;
 }
 
+function getTeamRosterCount(gameState: GameState, teamId: string) {
+  return gameState.rosters.filter((entry) => entry.teamId === teamId).length;
+}
+
+function getTeamPlayerMin(gameState: GameState, teamId: string) {
+  const identity = gameState.teamIdentities.find((entry) => entry.teamId === teamId);
+  return Math.max(identity?.playerMin ?? 7, 7);
+}
+
+function isForceReleaseCase(input: {
+  morale?: PlayerMoraleAssessment | null;
+  badValueContract: boolean;
+}) {
+  return (
+    input.badValueContract ||
+    input.morale?.contractIntent === "refuses_extension"
+  );
+}
+
 function shouldAiRenewContract(input: {
   entry: RosterEntry;
   player: Player | null;
@@ -226,13 +246,23 @@ function shouldAiRenewContract(input: {
     marketValue >= 14 &&
     salaryToMarketRatio <= 0.38;
   const cheapBridgeSignal = marketValue >= 18 && salaryToMarketRatio <= 0.28;
+  const hasRotationSignal =
+    (rating?.ovrRank != null && rating.ovrRank <= 100) &&
+    (entry.roleTag === "starter" || entry.roleTag === "prospect") &&
+    !badValueContract;
+  const moraleBridgeRenew =
+    morale?.contractIntent === "considering_exit" &&
+    rating?.ovrRank != null &&
+    rating.ovrRank <= 19;
 
   return (
     hasStrongSeasonSignal ||
     hasStrongRosterSignal ||
     hasMarketValueSignal ||
     usefulRoleSignal ||
-    cheapBridgeSignal
+    cheapBridgeSignal ||
+    hasRotationSignal ||
+    moraleBridgeRenew
   ) && !salaryRisk && !badValueContract && !moraleBlocksLongRenewal && !moraleSalaryRisk;
 }
 
@@ -252,6 +282,9 @@ function buildAiRenewalCashGate(input: {
 }) {
   const cash = input.team?.cash ?? 0;
   const salaryTotal = getTeamRosterSalaryTotal(input.gameState, input.teamId);
+  const rosterCount = getTeamRosterCount(input.gameState, input.teamId);
+  const playerMin = getTeamPlayerMin(input.gameState, input.teamId);
+  const rosterUnderMin = rosterCount < playerMin;
   const bias = input.profile?.bias ?? null;
   const longContractPreference = bias?.longContractPreference ?? (input.profile?.longContractsBias === "high" ? 8 : input.profile?.longContractsBias === "low" ? 3 : 5);
   const riskTolerance = bias?.riskTolerance ?? (input.profile?.riskToleranceLevel === "high" ? 8 : input.profile?.riskToleranceLevel === "low" ? 3 : 5);
@@ -265,13 +298,15 @@ function buildAiRenewalCashGate(input: {
     cashPriority * 0.6 +
     Math.max(0, 6 - riskTolerance) * 0.9;
   const requiredReserve = roundMoney(baseReserve + strategyReserve + salaryIncrease * 2) ?? 0;
-  const canRenew = cash > 0 && cash >= requiredReserve;
+  const effectiveReserve = rosterUnderMin ? Math.min(requiredReserve, Math.max(1, cash * 0.15)) : requiredReserve;
+  const canRenew = cash > 0 && cash >= effectiveReserve;
   return {
     canRenew,
     cash,
-    requiredReserve,
+    requiredReserve: effectiveReserve,
     salaryTotal: roundMoney(salaryTotal) ?? salaryTotal,
-    warning: canRenew ? null : `ai_cash_buffer_required:${requiredReserve.toFixed(1)}`,
+    warning: canRenew ? null : `ai_cash_buffer_required:${effectiveReserve.toFixed(1)}`,
+    rosterUnderMin,
   };
 }
 
@@ -455,6 +490,7 @@ function buildPreviewRow(input: {
       recommendedLength,
       recommendedContractShape: "balanced",
       recommendedAction: "no_action",
+      renewalBlockReason: null,
       marketValue: roundMoney(marketValue),
       ovr: rating?.ovrNormalized ?? null,
       mvs: rating?.mvs ?? null,
@@ -518,14 +554,48 @@ function buildPreviewRow(input: {
     ...(morale?.warnings ?? []),
   ].filter((warning): warning is string => Boolean(warning));
 
+  const wouldRenewHeuristic = shouldAiRenewContract({
+    entry,
+    player,
+    rating,
+    renewalSalaryPreview: moraleAdjustedRenewalSalary,
+    morale,
+  });
+  const marketValueForBad =
+    rating?.marketValue ??
+    player?.displayMarketValue ??
+    player?.marketValue ??
+    entry.currentValue ??
+    0;
+  const ratingValueForBad = rating?.rawOvrScore ?? player?.rating ?? 0;
+  const salaryAfterRenewalForBad = moraleAdjustedRenewalSalary ?? entry.salary ?? 0;
+  const salaryToMarketRatioForBad = marketValueForBad > 0 ? salaryAfterRenewalForBad / marketValueForBad : 1;
+  const badValueContract =
+    marketValueForBad > 0 && salaryToMarketRatioForBad > 0.42 && ratingValueForBad < 65;
+
   const recommendedAction =
     tick.nextStatus !== "out_of_contract"
       ? "no_action"
       : controlMode === "manual"
         ? "manual_decision"
-        : renewalCashGate.canRenew && shouldAiRenewContract({ entry, player, rating, renewalSalaryPreview: moraleAdjustedRenewalSalary, morale })
+        : renewalCashGate.canRenew && wouldRenewHeuristic
           ? "renew"
           : "release";
+
+  const renewalBlockReason: ContractRenewalPreviewRow["renewalBlockReason"] =
+    tick.nextStatus !== "out_of_contract"
+      ? null
+      : controlMode === "manual"
+        ? "manual"
+        : recommendedAction === "renew"
+          ? "none"
+          : !renewalCashGate.canRenew
+            ? "cash_gate"
+            : badValueContract
+              ? "bad_value"
+              : morale?.contractIntent === "refuses_extension" || morale?.contractIntent === "considering_exit"
+                ? "morale"
+                : "heuristic";
 
   return {
     rowId: entry.id,
@@ -563,6 +633,7 @@ function buildPreviewRow(input: {
     recommendedLength,
     recommendedContractShape,
     recommendedAction,
+    renewalBlockReason,
     marketValue: roundMoney(marketValue),
     ovr: rating?.ovrNormalized ?? null,
     mvs: rating?.mvs ?? null,
@@ -695,6 +766,8 @@ export function applySeasonEndContractTick(
   const contractEvents: ContractEventRecord[] = [];
   const transferHistory: TransferHistoryEntry[] = [];
   const cashDeltaByTeamId = new Map<string, number>();
+  const teamReleaseCounts = new Map<string, number>();
+  const MAX_RELEASES_PER_TEAM_PER_TICK = 3;
 
   for (const entry of save.gameState.rosters) {
     const tick = statusAfterSeasonTick(entry);
@@ -721,9 +794,13 @@ export function applySeasonEndContractTick(
       if (row?.controlMode === "ai" && row.recommendedAction === "renew" && renewalCashGate.canRenew) {
         const newSalary = roundMoney(row.renewalSalaryPreview ?? entry.salary) ?? entry.salary;
         const contractShape = row.recommendedContractShape ?? "balanced";
+        const bridgeRenew =
+          row.renewalBlockReason === "heuristic" &&
+          (teamReleaseCounts.get(entry.teamId) ?? 0) >= MAX_RELEASES_PER_TEAM_PER_TICK;
+        const renewLength = bridgeRenew ? 1 : row.recommendedLength;
         const nextContractSchedule = buildContractSalarySchedule({
           annualSalary: newSalary,
-          contractLength: row.recommendedLength,
+          contractLength: renewLength,
           shape: contractShape,
           seasonIdBase: save.gameState.season.id,
           seasonLabelBase: getSeasonLabel(save.gameState),
@@ -732,8 +809,8 @@ export function applySeasonEndContractTick(
           ...entry,
           salary: newSalary,
           upkeep: newSalary,
-          contractLength: row.recommendedLength,
-          contractStatus: row.recommendedLength === 1 ? "expiring" : "active",
+          contractLength: renewLength,
+          contractStatus: renewLength === 1 ? "expiring" : "active",
           contractShape,
           yearlySalarySchedule: nextContractSchedule,
         });
@@ -746,15 +823,51 @@ export function applySeasonEndContractTick(
             oldSalary: roundMoney(entry.salary),
             newSalary,
             oldLength: normalizeLength(entry.contractLength),
-            newLength: row.recommendedLength,
+            newLength: renewLength,
             source: "ai_contract_renewal",
           }),
         );
         continue;
       }
 
-      const player = playersById.get(entry.playerId) ?? null;
-      const exit = buildContractExitValue(save.gameState, player, entry);
+      const releaseCount = teamReleaseCounts.get(entry.teamId) ?? 0;
+      const playerForExit = playersById.get(entry.playerId) ?? null;
+      const badValue =
+        row?.renewalBlockReason === "bad_value" || row?.renewalBlockReason === "morale";
+      if (
+        row?.controlMode === "ai" &&
+        releaseCount >= MAX_RELEASES_PER_TEAM_PER_TICK &&
+        !badValue &&
+        row.recommendedAction === "release"
+      ) {
+        const bridgeSalary = roundMoney(row.renewalSalaryPreview ?? entry.salary) ?? entry.salary;
+        nextRosters.push({
+          ...entry,
+          salary: bridgeSalary,
+          upkeep: bridgeSalary,
+          contractLength: 1,
+          contractStatus: "expiring",
+          contractShape: "balanced",
+        });
+        contractEvents.push(
+          buildContractEvent({
+            seasonId: save.gameState.season.id,
+            teamId: entry.teamId,
+            playerId: entry.playerId,
+            eventType: "contract_renewed",
+            oldSalary: roundMoney(entry.salary),
+            newSalary: bridgeSalary,
+            oldLength: normalizeLength(entry.contractLength),
+            newLength: 1,
+            source: "ai_contract_renewal",
+          }),
+        );
+        continue;
+      }
+
+      teamReleaseCounts.set(entry.teamId, releaseCount + 1);
+
+      const exit = buildContractExitValue(save.gameState, playerForExit, entry);
       const source: ContractEventRecord["source"] = row?.controlMode === "ai" ? "ai_contract_expiry" : "manual_contract_expiry";
       if (exit.exitValue != null) {
         cashDeltaByTeamId.set(entry.teamId, (cashDeltaByTeamId.get(entry.teamId) ?? 0) + exit.exitValue);
@@ -763,7 +876,7 @@ export function applySeasonEndContractTick(
         buildContractExitTransferHistory({
           gameState: save.gameState,
           entry,
-          player,
+          player: playerForExit,
           exit,
           source,
         }),

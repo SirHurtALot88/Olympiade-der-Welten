@@ -90,6 +90,8 @@ Die **Olympiade** ist kein Krieg und kein Frieden. Sie ist der seltene Moment, i
 
 **Bekannte Bezüge:** Agenten, Assassinen, Spezialeinheiten
 
+**Unterorte:** **Nachtburg** (finstere Megastadt, Gotham-Analog), **Neonkern** (Reaktortürme, Midgar-Analog)
+
 ---
 
 ## Lexikon — Dämonen & ihre Herkunft
@@ -237,6 +239,18 @@ Die **Olympiade** ist kein Krieg und kein Frieden. Sie ist der seltene Moment, i
 ### Soul Reaper — Das Prime Evil der Olympiade
 
 > Wenn die Welten der Olympiade aneinander reiben, ist Soul Reaper nicht bloß ein weiterer Name im Katalog — er ist der Tod selbst. Nicht böse im Sinne von Wut oder Gier, sondern emotionslos und unabwendbar, wie Atem, Winter oder das Ende eines langen Tages. Manche nennen ihn das Prime Evil der Olympiade, nicht weil er sie hasst, sondern weil er ihr letztes Wort ist. Er erscheint in verfallenen Kathedralen und an jeder Schwelle, wo noch jemand glaubt, es gäbe einen Ausweg. Beten, fliehen, verhandeln — Soul Reaper hört zu, wenn er will. Doch man entkommt ihm nicht.
+
+---
+
+### Tyrael — Der gefallene Richter des Lichts
+
+> Tyrael glaubte einst, Gerechtigkeit müsse rein bleiben. Dann brannte Ashkara, und der Rat des Himmelsschnitts sprach länger über Ordnung, als unten Menschen starben. In dieser Stunde verstand er, dass ein Urteil ohne Handlung nur ein schöneres Wegsehen ist. Er riss die Flügel ab, wurde sterblich und schmiedete aus dem Glockenbruch von Lichtfurt seine Klinge. Zur Olympiade kommt Tyrael, weil hier Ruhm oft als Freispruch verkauft wird.
+
+---
+
+### Batman — Der Detektiv aus Gotham City
+
+> Bruce Wayne verlor in Gotham City seine Eltern; Batman wurde in derselben Nacht geboren. Alles danach war Training: Körper, Verstand, Geld, Schmerz. Gotham ließ er nicht allein zurück — Verbündete halten die Stadt. Zur Olympiade kommt Batman, weil seine Ermittlungen zeigen: Waffen, Geldwäsche und Einfluss der Gotham-Schurken laufen hier zusammen. Er ist hier, um die Quelle zu finden.
 
 ---
 

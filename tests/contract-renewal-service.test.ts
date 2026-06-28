@@ -572,4 +572,59 @@ describe("contract renewal service", () => {
     expect(humanRow?.recommendedAction).toBe("manual_decision");
     expect(preview.manualDecisionCount).toBe(1);
   });
+
+  it("renews rotation players when roster is under min despite tight cash", () => {
+    const team = createTeam({ teamId: "A-A", cash: 12, humanControlled: false });
+    const players = Array.from({ length: 7 }, (_, index) =>
+      createPlayer(`p-${index}`, { rating: 74, marketValue: 30, salaryDemand: 3 }),
+    );
+    const rosters = players.map((player) =>
+      createRosterEntry(player.id, {
+        teamId: "A-A",
+        contractLength: 1,
+        roleTag: "starter",
+        salary: 3,
+      }),
+    );
+    const gameState = createGameState({ teams: [team], players, rosters });
+    gameState.teamIdentities = [{ teamId: "A-A", identityId: "A-A", playerMin: 8, playerMax: 14, playerOpt: 10 }];
+    const save = createSave(gameState);
+
+    const preview = previewSeasonEndContracts(save);
+    const row = preview.rows.find((entry) => entry.playerId === "p-3");
+    expect(row?.recommendedAction).toBe("renew");
+    expect(row?.renewalBlockReason).not.toBe("cash_gate");
+  });
+
+  it("caps mass releases per team tick and bridges with 1-year renewals", () => {
+    const team = createTeam({ teamId: "A-A", cash: 80, humanControlled: false });
+    const players = Array.from({ length: 12 }, (_, index) =>
+      createPlayer(`p-${index}`, { rating: 52 + index, marketValue: 40 }),
+    );
+    const rosters = players.map((player) =>
+      createRosterEntry(player.id, {
+        teamId: "A-A",
+        contractLength: 1,
+        roleTag: "rotation",
+        salary: 3,
+      }),
+    );
+    const save = createSave(createGameState({ teams: [team], players, rosters }));
+    const preview = previewSeasonEndContracts(save);
+    const releaseCandidates = preview.rows.filter((row) => row.recommendedAction === "release");
+    expect(releaseCandidates.length).toBeGreaterThan(3);
+
+    const persistence = {
+      getSaveById: () => save,
+      saveSingleplayerState: vi.fn((saveId: string, gameState: GameState) => {
+        save.gameState = gameState;
+        return { saveId, updatedAt: new Date().toISOString(), gameState };
+      }),
+    } as unknown as PersistenceService;
+
+    const apply = applySeasonEndContractTick(save, preview.confirmToken, persistence, preview);
+    expect(apply.applied).toBe(true);
+    expect(apply.releasedPlayers).toBeLessThanOrEqual(3);
+    expect(apply.renewedPlayers).toBeGreaterThan(0);
+  });
 });

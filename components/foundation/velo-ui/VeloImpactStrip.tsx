@@ -41,22 +41,17 @@ export function buildTrainingImpactItems(input: {
   recoveryAfter: number;
   recoveryDeltaPct: number;
   regressionRisk: string | null;
-  legacyXpPreview?: number | null;
 }): VeloImpactItem[] {
   const performanceLabel =
     input.performanceSetpoints > 0
       ? `+${formatVeloNumber(input.performanceSetpoints, 1)} Performance`
       : "keine Performance-Setpoints";
-  const legacyDetail =
-    input.legacyXpPreview != null && Math.abs(input.legacyXpPreview - input.netSetpoints) >= 1
-      ? `XP-Track Preview ${formatVeloNumber(input.legacyXpPreview, 0)}`
-      : undefined;
   return [
     {
       key: "xp",
       label: "Setpoints",
       value: formatVeloSignedNumber(input.netSetpoints, 1),
-      detail: `+${formatVeloNumber(input.trainingSetpoints, 1)} Training · ${performanceLabel}${legacyDetail ? ` · ${legacyDetail}` : ""}`,
+      detail: `+${formatVeloNumber(input.trainingSetpoints, 1)} Training · ${performanceLabel}`,
       tone: input.netSetpoints >= 0 ? "positive" : "negative",
     },
     {

@@ -3,7 +3,10 @@
 import type { ScoutingHubV2ClientProps, ScoutingHubV2WatchTarget } from "@/app/foundation/scouting-center-v2/scouting-center-v2-types";
 import FoundationSubNav from "@/app/foundation/shell/FoundationSubNav";
 import DisciplineIcon from "@/app/foundation/DisciplineIcon";
-import { VeloScoutMetric, VeloStarRating, VeloStatOrbitRow } from "@/components/foundation/velo-ui";
+import FoundationPlayerPortraitCard from "@/components/foundation/player-portrait-card/FoundationPlayerPortraitCard";
+import { getPlayerPortraitBrowserUrl } from "@/lib/data/mediaAssets";
+import { VeloScoutMetric } from "@/components/foundation/velo-ui";
+import { createEmptyLeaguePlayerHeatPools } from "@/lib/foundation/player-league-heat";
 import { useState } from "react";
 
 function renderStars(level: number) {
@@ -35,6 +38,18 @@ function hasCaStars(target: ScoutingHubV2WatchTarget) {
   return target.caOverall != null;
 }
 
+function getScoutingPortraitModel(target: ScoutingHubV2WatchTarget) {
+  const src = getPlayerPortraitBrowserUrl(target.playerId, null, null);
+  const initials =
+    target.playerName
+      .split(/\s+/)
+      .filter(Boolean)
+      .slice(0, 2)
+      .map((part) => part[0]?.toUpperCase() ?? "")
+      .join("") || "?";
+  return { src, initials };
+}
+
 function renderScoutTargetCard(input: {
   target: ScoutingHubV2WatchTarget;
   onOpenPlayer: (playerId: string) => void;
@@ -42,6 +57,7 @@ function renderScoutTargetCard(input: {
 }) {
   const { target, onOpenPlayer, testId } = input;
   const isActive = target.scoutStatus !== "bookmarked";
+  const portrait = getScoutingPortraitModel(target);
 
   return (
     <button
@@ -52,70 +68,39 @@ function renderScoutTargetCard(input: {
       data-testid={testId}
       title={isActive ? "Aktiv gescoutet — Klick öffnet Spielerprofil." : "Nur gemerkt — kein Scout-Slot. Im Markt entfernen oder Slot freimachen."}
     >
-      <div className="scouting-hub-v2-target-head">
-        <strong>{target.playerName}</strong>
-        <span
-          className={`transfer-status-pill${isActive ? " is-ready" : ""}`}
-          title={isActive ? "Dieser Spieler ist in der aktiven Scout-Pipeline." : "Nur auf der Wishlist, wird nicht aktiv gescoutet."}
-        >
-          {isActive ? `Scout aktiv${target.scoutCertainty != null ? ` ${target.scoutCertainty}%` : ""}` : "Nur gemerkt"}
-        </span>
-      </div>
-      <span>{target.className}</span>
-      {target.scoutSourceLabel ? <span>{target.scoutSourceLabel}</span> : null}
-      {hasAxisStats(target) ? (
-        <VeloStatOrbitRow
-          showGrade
-          stats={{
-            pow: target.pow ?? 0,
-            spe: target.spe ?? 0,
-            men: target.men ?? 0,
-            soc: target.soc ?? 0,
-          }}
-          ariaLabel={`${target.playerName} Achsenwerte`}
-        />
-      ) : (
-        <small className="muted">MW {target.marketValue}</small>
-      )}
-      {hasCaStars(target) ? (
-        <div className="scouting-hub-v2-ca-po-row" data-testid="scouting-ca-po-row">
-          <VeloStarRating compact label="CA" value={target.caOverall} />
-          {target.caPow != null ? (
-            <small className="muted scouting-hub-v2-axis-stars">
-              P {formatHalfStar(target.caPow)} · S {formatHalfStar(target.caSpe)} · M {formatHalfStar(target.caMen)} · So{" "}
-              {formatHalfStar(target.caSoc)}
-            </small>
-          ) : null}
-          {target.poDisplay ? (
-            <span className="scouting-hub-v2-po-label" data-testid="scouting-potential-stars">
-              PO {target.poDisplay}
-              {target.potentialGap != null && target.potentialGap > 0 ? ` · Gap +${target.potentialGap}★` : ""}
-            </span>
-          ) : null}
-          {target.poPow != null ? (
-            <small className="muted scouting-hub-v2-axis-stars" data-testid="scouting-po-axis-stars">
-              PO-Achsen P {formatHalfStar(target.poPow)} · S {formatHalfStar(target.poSpe)} · M {formatHalfStar(target.poMen)} · So{" "}
-              {formatHalfStar(target.poSoc)}
-            </small>
-          ) : null}
-        </div>
-      ) : null}
-      {target.potentialBand ? (
-        <span
-          className={
-            target.potentialBand === "elite"
-              ? "transfer-status-pill is-ready"
-              : target.potentialBand === "high"
-                ? "transfer-status-pill is-info"
-                : "pill"
-          }
-          data-testid="scouting-potential-band"
-        >
-          {getPotentialBandLabel(target.potentialBand)}
-        </span>
-      ) : null}
-      {isActive && target.scoutMilestone ? <small className="muted">{target.scoutMilestone}</small> : null}
-      <small className="muted">{target.baseInfoSummary}</small>
+      <FoundationPlayerPortraitCard
+        playerId={target.playerId}
+        name={target.playerName}
+        portraitUrl={portrait.src}
+        portraitInitials={portrait.initials}
+        playerOvr={target.caOverall ?? null}
+        playerMvs={null}
+        playerPps={null}
+        pow={target.pow ?? null}
+        spe={target.spe ?? null}
+        men={target.men ?? null}
+        soc={target.soc ?? null}
+        leagueHeatPools={createEmptyLeaguePlayerHeatPools()}
+        variant="team"
+        context="scouting"
+        density="full"
+        highlight={isActive ? "Scout aktiv" : "Gemerkt"}
+        subMeta={[target.className, target.scoutSourceLabel, target.baseInfoSummary].filter(Boolean).join(" · ")}
+        contextData={{
+          scouting: {
+            scoutStatusLabel: isActive
+              ? `Aktiv${target.scoutCertainty != null ? ` ${target.scoutCertainty}%` : ""}`
+              : "Nur gemerkt",
+            caOverall: target.caOverall ?? null,
+            poDisplay: target.poDisplay ?? null,
+            potentialBandLabel: getPotentialBandLabel(target.potentialBand) ?? undefined,
+            scoutMilestone: isActive ? target.scoutMilestone ?? undefined : undefined,
+            sourceLabel: target.scoutSourceLabel ?? undefined,
+          },
+        }}
+        interactive={false}
+        onOpen={() => onOpenPlayer(target.playerId)}
+      />
     </button>
   );
 }

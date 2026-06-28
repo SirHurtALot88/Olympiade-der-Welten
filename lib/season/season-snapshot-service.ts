@@ -8,6 +8,7 @@ import type {
 } from "@/lib/data/olyDataTypes";
 import { getImportedPlayerDisplayMarketValue } from "@/lib/data/player-economy-display";
 import { resolvePlayerEconomyContract } from "@/lib/foundation/player-economy-contract";
+import { buildTransfermarktSaleFactorBreakdown } from "@/lib/market/transfermarkt-sale-factor";
 import { buildPlayerRatingContractMap } from "@/lib/foundation/player-rating-contract";
 import { buildSeasonPointsLedger } from "@/lib/foundation/season-points-ledger";
 import { buildTeamObjectiveOverview } from "@/lib/board/team-season-objectives-service";
@@ -18,7 +19,7 @@ import {
   buildAllTimeTableFromSnapshots,
   type SeasonSnapshotAllTimeRow,
 } from "@/lib/season/season-snapshot-helpers";
-export { buildAllTimeTableFromSnapshots } from "@/lib/season/season-snapshot-helpers";
+export { buildAllTimeTableFromSnapshots, resolveSeasonSnapshotTeamRecords } from "@/lib/season/season-snapshot-helpers";
 
 export const SEASON_SNAPSHOT_CONFIRM_TOKEN = "CREATE_LOCAL_SEASON_SNAPSHOT";
 
@@ -417,6 +418,8 @@ function buildSeasonSnapshotRecord(gameState: GameState, seasonId: string = game
       const economy = player
         ? resolvePlayerEconomyContract({ playerId: player.id, player, rosterEntry })
         : null;
+      const saleBreakdown =
+        player && rosterEntry ? buildTransfermarktSaleFactorBreakdown(gameState, player, rosterEntry) : null;
 
       return {
         playerId: entry.playerId,
@@ -441,6 +444,12 @@ function buildSeasonSnapshotRecord(gameState: GameState, seasonId: string = game
         mvs: rating?.mvs ?? null,
         mvsRank: rating?.mvsRank ?? null,
         marketValue: economy?.marketValue ?? rosterEntry?.currentValue ?? rosterEntry?.purchasePrice ?? null,
+        purchasePrice: rosterEntry?.purchasePrice ?? null,
+        projectedSellValue: saleBreakdown?.salePrice ?? null,
+        projectedSellFactor: saleBreakdown?.saleFactor ?? null,
+        saleFactorBracket: saleBreakdown?.bracket ?? null,
+        saleFactorRankInBracket: saleBreakdown?.rankInBracket ?? null,
+        saleFactorBracketSize: saleBreakdown?.bracketGroupSize ?? null,
         salary: economy?.salary ?? rosterEntry?.salary ?? null,
         contractLength: economy?.contractLength ?? rosterEntry?.contractLength ?? null,
         promisedRole: rosterEntry?.promisedRole ?? null,

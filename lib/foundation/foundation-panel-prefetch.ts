@@ -5,6 +5,7 @@ const panelPrefetchByView: Partial<Record<FoundationViewId, () => Promise<unknow
   teams: () => import("@/app/foundation/teams-v2/FoundationTeamsDetailPanel"),
   marketV2: () => import("@/app/foundation/transfermarkt-v2/FoundationTransfermarktV2Panel"),
   lineup: () => import("@/app/foundation/legacy-lineup-lab/FoundationLineupPanel"),
+  lineupV2: () => import("@/app/foundation/legacy-lineup-lab/FoundationLineupPanel"),
   matchdayArena: () => import("@/app/foundation/matchday-arena-v2/FoundationMatchdayArenaPanel"),
   seasonV2: () => import("@/app/foundation/season-v2/FoundationSeasonV2Panel"),
   trainingCompact: () => import("@/app/foundation/training-compact/TrainingCompactClient"),

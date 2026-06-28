@@ -1,5 +1,6 @@
 import FoundationPageClient from "@/app/foundation/FoundationPageClient";
 import { normalizeFoundationViewParam } from "@/lib/foundation/foundation-view-routing";
+import { loadFoundationInitialPersistenceState } from "@/lib/persistence/foundation-state-read";
 
 export const dynamic = "force-dynamic";
 
@@ -20,6 +21,13 @@ export default async function FoundationPage({ searchParams }: FoundationPagePro
   const saveId = resolvedSearchParams?.saveId;
   const initialView = normalizeFoundationViewParam(resolvedSearchParams?.view);
   const initialReadSource = source === "prisma" ? "prisma" : "sqlite";
+  const initialPersistenceState =
+    initialReadSource === "sqlite"
+      ? loadFoundationInitialPersistenceState({
+          saveId,
+          saveMode: resolvedSearchParams?.saveMode,
+        })
+      : null;
 
   return (
     <FoundationPageClient
@@ -27,7 +35,7 @@ export default async function FoundationPage({ searchParams }: FoundationPagePro
       initialSelectedTeamId={team ?? null}
       initialSaveId={saveId ?? null}
       initialView={initialView}
-      initialPersistenceState={null}
+      initialPersistenceState={initialPersistenceState}
     />
   );
 }

@@ -32,6 +32,16 @@ export function buildEconomyAuditReport(input: { saveId: string; gameState: Game
   if (repairBuyZeroFee.length > 0) {
     violations.push(`preseason_roster_repair_buy_zero_fee:${repairBuyZeroFee.length}`);
   }
+  const repairBuyDiscounted = repairBuys.filter(
+    (entry) =>
+      entry.transferType === "buy" &&
+      entry.marketValue != null &&
+      entry.fee != null &&
+      Math.abs(entry.fee - entry.marketValue) > 0.05,
+  );
+  if (repairBuyDiscounted.length > 0) {
+    violations.push(`preseason_roster_repair_buy_fee_not_market_value:${repairBuyDiscounted.length}`);
+  }
 
   const cashValues = gameState.teams.map((team) => team.cash);
 

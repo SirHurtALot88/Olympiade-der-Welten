@@ -160,7 +160,7 @@ describe("foundation transfermarkt ui contract", () => {
     expect(fileText).toContain("settings.ownerSlot === \"user\"");
     expect(fileText).toContain("settings.displayLabel === \"Chris\"");
     expect(fileText).toContain("FoundationTransfermarktV2Panel");
-    expect(fileText).toContain("manageableTeamIds: ownerQuickSwitchTeams.map((team) => team.teamId)");
+    expect(fileText).toContain("manageableTeamIds: foundationManageableTeamIds");
     expect(fileText).toContain("targetControl?.ownerSlot === \"user\"");
     expect(fileText).toContain("activeOwnerId: resolvedOwnerId");
   });
@@ -181,6 +181,22 @@ describe("foundation transfermarkt ui contract", () => {
     expect(fileText).toContain("scorePresenceArray");
     expect(fileText).toContain("scorePresenceToken(raceKey, tokenCounts.races, -2)");
     expect(fileText).toContain("scorePresenceArray(traitKeys, tokenCounts.traits, -1)");
+  });
+
+  it("uses compact full-art portrait cards in the candidate rail and table hover previews", async () => {
+    const [fileText, cssText] = await Promise.all([
+      fs.readFile(transfermarktV2Path, "utf8"),
+      fs.readFile(globalsPath, "utf8"),
+    ]);
+
+    expect(fileText).toContain("FoundationPlayerPortraitCard");
+    expect(fileText).toContain('context="market"');
+    expect(fileText).toContain('density="compact"');
+    expect(fileText).toContain('data-testid="transfer-candidate-card"');
+    expect(fileText).toContain("FoundationPlayerPortraitPreview");
+    expect(fileText).toContain("market-v2-wishlist-row");
+    expect(fileText).toContain("market-v2-roster-context-table");
+    expect(cssText).toContain(".foundation-player-portrait-preview-panel");
   });
 
   it("keeps the team drawer relationship cards alive", async () => {
