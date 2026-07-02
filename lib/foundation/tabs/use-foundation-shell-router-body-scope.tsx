@@ -2365,9 +2365,17 @@ export function useFoundationShellRouterBodyScope({
         }
         resolve();
       });
-      const { buildPlayerDrawerDataFromGameState } = await import("@/lib/foundation/player-detail-drawer");
-      const nextData = buildPlayerDrawerDataFromGameState({
+      const [{ buildPlayerDrawerDataFromGameState }, { hydrateGameStatePlayerAttributeSheet }] = await Promise.all([
+        import("@/lib/foundation/player-detail-drawer"),
+        import("@/lib/foundation/hydrate-player-attribute-sheet"),
+      ]);
+      const hydratedGameState = await hydrateGameStatePlayerAttributeSheet({
         gameState: gameStateRef.current,
+        saveId: activeSaveId,
+        playerId,
+      });
+      const nextData = buildPlayerDrawerDataFromGameState({
+        gameState: hydratedGameState,
         playerId,
         activePlayerId,
         source: readMeta.source,
@@ -4129,6 +4137,48 @@ export function useFoundationShellRouterBodyScope({
   }, [activeView, gameState, playerProfileData?.playerId]);
 
   useEffect(() => {
+    if (activeView !== "playerProfile" || playerProfileTab !== "contract" || !playerProfileData?.playerId) {
+      return;
+    }
+
+    let cancelled = false;
+    void (async () => {
+      const { buildPlayerDrawerDataFromGameState } = await import("@/lib/foundation/player-detail-drawer");
+      const { hydrateGameStatePlayerAttributeSheet } = await import("@/lib/foundation/hydrate-player-attribute-sheet");
+      const hydratedGameState = await hydrateGameStatePlayerAttributeSheet({
+        gameState: gameStateRef.current,
+        saveId: activeSaveId,
+        playerId: playerProfileData.playerId,
+      });
+      if (cancelled) {
+        return;
+      }
+      const refreshedProfile = buildPlayerDrawerDataFromGameState({
+        gameState: hydratedGameState,
+        playerId: playerProfileData.playerId,
+        source: readMeta.source,
+        manageableTeamIds: foundationManageableTeamIds,
+        saveId: activeSaveId,
+      });
+      if (cancelled || !refreshedProfile) {
+        return;
+      }
+      setPlayerProfileData(refreshedProfile);
+    })();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [
+    activeSaveId,
+    activeView,
+    foundationManageableTeamIds,
+    playerProfileData?.playerId,
+    playerProfileTab,
+    readMeta.source,
+  ]);
+
+  useEffect(() => {
     function handlePopState() {
       setRoomContext(readFoundationRoomContextFromLocation());
       const fromHistory = readFoundationHistoryState();
@@ -5729,27 +5779,35 @@ export function useFoundationShellRouterBodyScope({
     window.setTimeout(() => commandSearchInputRef.current?.focus(), 30);
   }, [showCommandPalette]);
 
+  const shouldBuildTeamSettingsView = activeView === "teamSettings";
+
   const selectedIdentity = useMemo(
     () =>
-      selectedTeam
+      shouldBuildTeamSettingsView && selectedTeam
         ? gameState.teamIdentities.find((identity) => identity.teamId === selectedTeam.teamId) ?? null
         : null,
-    [gameState.teamIdentities, selectedTeam],
+    [gameState.teamIdentities, selectedTeam, shouldBuildTeamSettingsView],
   );
   const selectedIdentityDraft = useMemo(
-    () => (selectedTeam ? teamIdentityDraft[selectedTeam.teamId] ?? selectedIdentity ?? null : null),
-    [selectedIdentity, selectedTeam, teamIdentityDraft],
+    () =>
+      shouldBuildTeamSettingsView && selectedTeam
+        ? teamIdentityDraft[selectedTeam.teamId] ?? selectedIdentity ?? null
+        : null,
+    [selectedIdentity, selectedTeam, shouldBuildTeamSettingsView, teamIdentityDraft],
   );
   const selectedIdentityAxisBias = useMemo(
-    () => deriveTeamIdentityAxisBias(selectedIdentityDraft),
-    [selectedIdentityDraft],
+    () => (shouldBuildTeamSettingsView ? deriveTeamIdentityAxisBias(selectedIdentityDraft) : null),
+    [selectedIdentityDraft, shouldBuildTeamSettingsView],
   );
   const selectedTeamStrategyDraft = useMemo(
-    () => (selectedTeam ? teamStrategyDraft[selectedTeam.teamId] ?? resolvedTeamStrategyProfiles[selectedTeam.teamId] ?? null : null),
-    [resolvedTeamStrategyProfiles, selectedTeam, teamStrategyDraft],
+    () =>
+      shouldBuildTeamSettingsView && selectedTeam
+        ? teamStrategyDraft[selectedTeam.teamId] ?? resolvedTeamStrategyProfiles[selectedTeam.teamId] ?? null
+        : null,
+    [resolvedTeamStrategyProfiles, selectedTeam, shouldBuildTeamSettingsView, teamStrategyDraft],
   );
   const selectedTeamHasUnsavedChanges = useMemo(() => {
-    if (!selectedTeam) {
+    if (!shouldBuildTeamSettingsView || !selectedTeam) {
       return false;
     }
 
@@ -5764,15 +5822,20 @@ export function useFoundationShellRouterBodyScope({
 
     return identityChanged || controlChanged || strategyChanged;
   }, [
+    gameModeOwnershipDraftChanged,
     resolvedTeamControlSettings,
     resolvedTeamStrategyProfiles,
     selectedIdentity,
     selectedTeam,
+    shouldBuildTeamSettingsView,
     teamControlDraft,
     teamIdentityDraft,
     teamStrategyDraft,
   ]);
   const filteredTeamSettingsTeams = useMemo(() => {
+    if (!shouldBuildTeamSettingsView) {
+      return gameState.teams;
+    }
     const query = teamSettingsSearch.trim().toLowerCase();
     if (!query) {
       return gameState.teams;
@@ -5782,7 +5845,7 @@ export function useFoundationShellRouterBodyScope({
       const haystack = `${team.name} ${team.shortCode} ${team.teamId}`.toLowerCase();
       return haystack.includes(query);
     });
-  }, [gameState.teams, teamSettingsSearch]);
+  }, [gameState.teams, shouldBuildTeamSettingsView, teamSettingsSearch]);
   const selectedTeamSettingsIndex = useMemo(
     () => gameState.teams.findIndex((team) => team.teamId === selectedTeamId),
     [gameState.teams, selectedTeamId],

@@ -2353,9 +2353,9 @@ export default function PlayerDetailDrawer({
             {variant !== "page" ? <PlayerAttributeProgressChart historyRows={data.historyRows} attributeHistoryRows={data.attributeHistoryRows} /> : null}
           </section>
 
-          {isFreeAgent && onOpenBuyPreview ? (
-            <section className="player-drawer-section player-drawer-panel" id="player-drawer-market">
-              <h3>Transfer</h3>
+          <section className="player-drawer-section player-drawer-panel" id="player-drawer-market">
+            <h3>{isFreeAgent ? "Transfer" : "Vertrag"}</h3>
+            {isFreeAgent && onOpenBuyPreview ? (
               <div className="player-drawer-inline-actions">
                 <button
                   className="secondary-button"
@@ -2373,8 +2373,20 @@ export default function PlayerDetailDrawer({
                 </button>
                 <span className="muted">Öffnet direkt den Kaufdialog.</span>
               </div>
-            </section>
-          ) : null}
+            ) : (
+              <div className="player-drawer-contract-summary" data-testid="player-drawer-contract-summary">
+                <p className="muted">
+                  Gehalt {formatMoney(data.salary)} · Laufzeit {data.contractLength ?? "—"}
+                  {formatContractShapeShortLabel(data.contractShape) ? ` · ${formatContractShapeShortLabel(data.contractShape)}` : ""}
+                </p>
+                {data.morale ? (
+                  <p className="muted">
+                    Moral {data.morale.moodLabel} · {formatMoraleContractIntent(data.morale.contractIntent)}
+                  </p>
+                ) : null}
+              </div>
+            )}
+          </section>
 
           <section className="player-drawer-section player-drawer-panel" id="player-drawer-history">
             <h3>Historie</h3>

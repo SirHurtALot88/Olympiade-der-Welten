@@ -13,6 +13,7 @@ import { useRowVirtualWindow } from "@/lib/foundation/use-row-virtual-window";
 import { resolveFirstOpenFormPickCell } from "@/lib/foundation/resolve-first-open-form-cell";
 
 import DisciplineIcon from "@/app/foundation/DisciplineIcon";
+import BudgetedMediaImage from "@/components/foundation/BudgetedMediaImage";
 import OptimizedMediaImage from "@/app/foundation/OptimizedMediaImage";
 import FoundationPlayerPortraitCard from "@/components/foundation/player-portrait-card/FoundationPlayerPortraitCard";
 import { VeloImpactStrip, VeloStatOrbitRow } from "@/components/foundation/velo-ui";
@@ -9125,7 +9126,7 @@ export default function LegacyLineupLabClient(props: LegacyLineupLabClientProps)
                                       </span>
                                     ) : null}
                                     {selectedRosterCard.portraitUrl ? (
-                                      <OptimizedMediaImage
+                                      <BudgetedMediaImage
                                         className="legacy-lineup-slot-player-portrait"
                                         src={selectedRosterCard.portraitUrl}
                                         alt={selectedRosterCard.name}
@@ -9486,7 +9487,7 @@ export default function LegacyLineupLabClient(props: LegacyLineupLabClientProps)
                           <div className="legacy-lineup-top-player-card-head">
                             <span className="legacy-lineup-result-rank">#{entry.rankInDiscipline}</span>
                             {entry.portraitUrl ? (
-                              <OptimizedMediaImage
+                              <BudgetedMediaImage
                                 className="legacy-matchday-player-portrait"
                                 src={entry.portraitUrl}
                                 alt={entry.playerName}
@@ -9748,7 +9749,7 @@ export default function LegacyLineupLabClient(props: LegacyLineupLabClientProps)
                             return (
                               <td key={column.id}>
                                 {player.portraitUrl ? (
-                                  <OptimizedMediaImage
+                                  <BudgetedMediaImage
                                     className="legacy-lineup-player-portrait"
                                     src={player.portraitUrl}
                                     alt={player.name}

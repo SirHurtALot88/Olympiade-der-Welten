@@ -1,232 +1,46 @@
 "use client";
 
+import type { FoundationShellRouterBodyProps } from "@/app/foundation/foundation-shell-router-body-props";
+import {
+  FOUNDATION_SAVE_MODE_OPTIONS,
+  NEW_GAME_PRESET_DEFAULTS,
+  NEW_GAME_VISIBLE_PRESET_IDS,
+  buildResolvedTeamIdentities,
+  buildScenarioWarning,
+  buildTeamControlSettingsMap,
+  buildTeamIdentityDraftMap,
+  buildTeamStrategyProfileMap,
+  clampBiasValue,
+  clampIdentityValue,
+  deriveChrisFrankyTeamIdsFromSettings,
+  formatCockpitReason,
+  formatCsvList,
+  formatFoundationSaveModeLabel,
+  formatIdentityWeight,
+  formatLocalePoints,
+  formatMoney,
+  formatScenarioTypeLabel,
+  formatShortSaveId,
+  formatTeamControlModeLabel,
+  formatTransfermarktCurrency,
+  normalizeFoundationSaveMode,
+  normalizeTeamStrategyLevel,
+  parseCsvList,
+  resolveFoundationSaveMode,
+  setFoundationView,
+  teamIdentityFieldLabels,
+  teamStrategyBiasFieldLabels,
+  teamStrategyIdentityListFieldLabels,
+  teamStrategyLevelFieldLabels,
+  teamStrategyListFieldLabels,
+  teamStrategySportsBiasAxisMap,
+  teamStrategySportsBiasFieldLabels,
+  withSynchronizedStrategyAliases,
+} from "@/app/foundation/foundation-page-client-exports";
+import type { NewGamePresetId } from "@/app/foundation/foundation-page-client-exports";
+
 /** Dumb Team Settings panel (Strangler Phase 3). */
-export type FoundationTeamSettingsPanelProps = {
-  activeMatchday: unknown;
-  activeSaveGameMode: unknown;
-  activeSaveId: unknown;
-  activeSaveIsInCurrentMode: unknown;
-  activeSaveName: unknown;
-  activeSaveSummary: unknown;
-  activeScenarioWarning: unknown;
-  activeSeasonId: unknown;
-  aiLineupApplyEnabled: unknown;
-  aiLineupAutoApplyEnabled: unknown;
-  aiLineupPreviewEnabled: unknown;
-  aiSellPreviewEnabled: unknown;
-  aiTeams: unknown;
-  aiTransferPreviewEnabled: unknown;
-  allowTestWrites: unknown;
-  applyNewGamePreset: unknown;
-  baselineCount: unknown;
-  blockingReasons: unknown;
-  buildResolvedTeamIdentities: unknown;
-  buildScenarioWarning: unknown;
-  buildTeamControlSettingsMap: unknown;
-  buildTeamIdentityDraftMap: unknown;
-  buildTeamStrategyProfileMap: unknown;
-  buyStyle: unknown;
-  canonicalSeasonLabel: unknown;
-  changeFoundationSaveMode: unknown;
-  chrisMax: unknown;
-  chrisTeamIds: unknown;
-  clampBiasValue: unknown;
-  clampIdentityValue: unknown;
-  containsFinalStandings: unknown;
-  contractStyle: unknown;
-  controlMode: unknown;
-  currentCash: unknown;
-  currentMatchday: unknown;
-  currentMatchdayResults: unknown;
-  currentRosterCount: unknown;
-  currentRosterEntries: unknown;
-  currentSaveOwnership: unknown;
-  currentStoredLineups: unknown;
-  currentTransferCount: unknown;
-  currentTransfers: unknown;
-  deriveChrisFrankyTeamIdsFromSettings: unknown;
-  dryRun: unknown;
-  exportSelectedTeamSettingsJson: unknown;
-  facilityPriorities: unknown;
-  fantasyTheme: unknown;
-  filteredTeamSettingsTeams: unknown;
-  formatCockpitReason: unknown;
-  formatCsvList: unknown;
-  formatFoundationSaveModeLabel: unknown;
-  formatIdentityWeight: unknown;
-  formatLocalePoints: unknown;
-  formatMoney: unknown;
-  formatScenarioTypeLabel: unknown;
-  formatShortSaveId: unknown;
-  formatTeamControlModeLabel: unknown;
-  formatTransfermarktCurrency: unknown;
-  foundationSaveMode: unknown;
-  frankyMax: unknown;
-  frankyTeamIds: unknown;
-  freshSeasonStartMessage: unknown;
-  gameModeOwnershipChrisIds: unknown;
-  gameModeOwnershipLimits: unknown;
-  gamePhase: unknown;
-  gameState: unknown;
-  getBusyActionReason: unknown;
-  getCockpitStatusLabel: unknown;
-  getCockpitStatusPillClass: unknown;
-  getReadOnlyActionReason: unknown;
-  importedPlayerCount: unknown;
-  influencePct: unknown;
-  isActive: unknown;
-  isChris: unknown;
-  isFranky: unknown;
-  isHotSeat: unknown;
-  isReplacement: unknown;
-  isSaveBusy: unknown;
-  isStableTestPoint: unknown;
-  lineupDoctrine: unknown;
-  lineupStyleNote: unknown;
-  loreTheme: unknown;
-  manualTeams: unknown;
-  mappingReport: unknown;
-  marketDoctrine: unknown;
-  marketValueTotal: unknown;
-  matchdayCount: unknown;
-  matchedRosterCount: unknown;
-  newGameBusy: unknown;
-  newGameChrisTeamIds: unknown;
-  newGameError: unknown;
-  newGameFrankyTeamIds: unknown;
-  newGamePresetId: unknown;
-  newGamePreview: unknown;
-  newGameSandbox: unknown;
-  newGameSaveName: unknown;
-  newGameSuccess: unknown;
-  nextSaveId: unknown;
-  nextTeam: unknown;
-  nextValue: unknown;
-  normalizeFoundationSaveMode: unknown;
-  normalizeTeamStrategyLevel: unknown;
-  openTeamProfileById: unknown;
-  ownerLabel: unknown;
-  parseCsvList: unknown;
-  passiveTeams: unknown;
-  playerCount: unknown;
-  playerMin: unknown;
-  playerOpt: unknown;
-  playerType: unknown;
-  previousTeam: unknown;
-  rawValue: unknown;
-  readMeta: unknown;
-  readSourceLabel: unknown;
-  resetCash: unknown;
-  resetIdentities: unknown;
-  resetIdentity: unknown;
-  resetMatchdayResults: unknown;
-  resetProfile: unknown;
-  resetRosterCount: unknown;
-  resetRosterEntries: unknown;
-  resetStoredLineups: unknown;
-  resetTransfers: unknown;
-  resolveFoundationSaveMode: unknown;
-  resolvedSaveMode: unknown;
-  resolvedSeasonId: unknown;
-  resolvedTeamControlSettings: unknown;
-  rosterMinTarget: unknown;
-  rosterOptTarget: unknown;
-  rosterStyle: unknown;
-  runNewGameSetup: unknown;
-  runSaveAction: unknown;
-  runSeasonStartReset: unknown;
-  salaryTotal: unknown;
-  saveContext: unknown;
-  saveId: unknown;
-  saveMode: unknown;
-  saveName: unknown;
-  saveSummaries: unknown;
-  saveTeamSettings: unknown;
-  savedOwnership: unknown;
-  savedSettings: unknown;
-  scenarioMeta: unknown;
-  scenarioType: unknown;
-  scopeWarning: unknown;
-  seasonId: unknown;
-  seasonSetup: unknown;
-  seasonStartResetBusy: unknown;
-  seasonStartResetFeed: unknown;
-  seasonState: unknown;
-  selectTeamSettingsTeam: unknown;
-  selectedHqGmStory: unknown;
-  selectedIdentityAxisBias: unknown;
-  selectedIdentityDraft: unknown;
-  selectedRoster: unknown;
-  selectedStandingRow: unknown;
-  selectedTeam: unknown;
-  selectedTeamControl: unknown;
-  selectedTeamGeneralManager: unknown;
-  selectedTeamGmAxisShares: unknown;
-  selectedTeamGmBiasHighlights: unknown;
-  selectedTeamHasUnsavedChanges: unknown;
-  selectedTeamId: unknown;
-  selectedTeamSettingsIndex: unknown;
-  selectedTeamStrategyDraft: unknown;
-  selectedTeamStrategyProfile: unknown;
-  sellStyle: unknown;
-  sellStyleNote: unknown;
-  setActiveView: unknown;
-  setFoundationView: unknown;
-  setFreshSeasonStartMessage: unknown;
-  setGameModeOwnershipChrisIds: unknown;
-  setGameModeOwnershipFrankyIds: unknown;
-  setNewGamePreview: unknown;
-  setNewGameSandbox: unknown;
-  setNewGameSaveName: unknown;
-  setNewGameSoloTeam: unknown;
-  setSoloPlayerTeam: unknown;
-  setTeamControlDraft: unknown;
-  setTeamControlMessage: unknown;
-  setTeamIdentityDraft: unknown;
-  setTeamIdentityMessage: unknown;
-  setTeamSettingsSearch: unknown;
-  setTeamStrategyDraft: unknown;
-  setTeamStrategyMessage: unknown;
-  shortCode: unknown;
-  sourceNote: unknown;
-  sourceSaveId: unknown;
-  sponsorTotal: unknown;
-  startCashRowsApplied: unknown;
-  startCashSource: unknown;
-  startRank: unknown;
-  statusLabel: unknown;
-  strategySummary: unknown;
-  strategyVersion: unknown;
-  teamCode: unknown;
-  teamControlDraft: unknown;
-  teamControlMessage: unknown;
-  teamControlSettings: unknown;
-  teamCount: unknown;
-  teamId: unknown;
-  teamIdentities: unknown;
-  teamIdentityFieldLabels: unknown;
-  teamIdentityMessage: unknown;
-  teamIdentityOverrides: unknown;
-  teamName: unknown;
-  teamSettings: unknown;
-  teamSettingsSearch: unknown;
-  teamStrategyBiasFieldLabels: unknown;
-  teamStrategyIdentityListFieldLabels: unknown;
-  teamStrategyLevelFieldLabels: unknown;
-  teamStrategyListFieldLabels: unknown;
-  teamStrategyMessage: unknown;
-  teamStrategyProfiles: unknown;
-  teamStrategySportsBiasAxisMap: unknown;
-  teamStrategySportsBiasFieldLabels: unknown;
-  toggleGameModeOwnershipTeam: unknown;
-  toggleNewGameTeam: unknown;
-  transferStyleNote: unknown;
-  updateTeamControlDraft: unknown;
-  updateTeamIdentityDraft: unknown;
-  updateTeamStrategyDraft: unknown;
-  updatedAt: unknown;
-  withSynchronizedStrategyAliases: unknown;
-};
+export type FoundationTeamSettingsPanelProps = FoundationShellRouterBodyProps;
 
 export default function FoundationTeamSettingsPanel(props: FoundationTeamSettingsPanelProps) {
   const {
