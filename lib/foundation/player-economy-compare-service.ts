@@ -6,7 +6,7 @@ import type {
   Team,
 } from "@/lib/data/olyDataTypes";
 import { resolvePlayerEconomyContract } from "@/lib/foundation/player-economy-contract";
-import { buildPlayerRatingContractMap } from "@/lib/foundation/player-rating-contract";
+import { getSeasonDerivations } from "@/lib/foundation/get-season-derivations";
 import {
   calculateAllrounderBonus,
   calculateMarketValueBonuses,
@@ -431,6 +431,7 @@ function buildSummary(rows: PlayerEconomyCompareRow[]): PlayerEconomyCompareSumm
 
 export function buildPlayerEconomyCompareReport(input: {
   gameState: GameState;
+  saveId?: string | null;
   economyMode?: PlayerEconomyMode;
   salaryMarketValueOverridesByPlayerId?: Map<string, number>;
   baseMarketValueOverridesByPlayerId?: Map<string, number>;
@@ -451,7 +452,10 @@ export function buildPlayerEconomyCompareReport(input: {
           ...gameState,
           players: effectivePlayers,
         } satisfies GameState);
-  const ratingByPlayerId = buildPlayerRatingContractMap(effectiveGameState);
+  const ratingByPlayerId = getSeasonDerivations({
+    gameState: effectiveGameState,
+    saveId: input.saveId ?? `economy-compare:${effectiveGameState.season.id}`,
+  }).ratingsById;
   const marketValueInputs = gameState.players
     .map((player) => input.playerOverridesById?.get(player.id) ?? player)
     .filter((player) =>

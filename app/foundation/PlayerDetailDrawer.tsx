@@ -1,8 +1,9 @@
 "use client";
 
-import { useEffect, useState, type DragEvent, type ReactNode } from "react";
+import { useEffect, useMemo, useState, type DragEvent, type ReactNode } from "react";
 
 import type { PlayerDetailDrawerData } from "@/lib/foundation/player-detail-drawer";
+import { PLAYER_ATTRIBUTE_CHART_LABELS } from "@/lib/foundation/player-attribute-history";
 
 import PlayerAttributeProgressChart from "@/app/foundation/player-profile/PlayerAttributeProgressChart";
 import PlayerTrainingControls from "@/app/foundation/player-profile/PlayerTrainingControls";
@@ -26,8 +27,15 @@ import OptimizedMediaImage from "./OptimizedMediaImage";
 import RaceIcon from "./RaceIcon";
 import { getCanonicalSeasonLabel } from "@/lib/season/season-label";
 import { clampPotentialOverallToCurrent } from "@/lib/scouting/player-potential-ceiling-service";
+import {
+  buildPotentialRangeStarSlots,
+  potentialScoreToStars,
+  shouldShowPotentialRangeStars,
+} from "@/lib/progression/player-potential-service";
 import { getTrainingModePresentation } from "@/lib/training/training-mode-presentation";
+import { resolveOrganicRegressionCombinedTotal } from "@/lib/training/organic-season-progression";
 import { GameTerm, getGameTermTooltip } from "@/components/ui/GameTerm";
+import { formatContractShapeLabel, formatContractShapeShortLabel } from "@/lib/foundation/player-economy-contract";
 
 function formatValue(value: number | null | undefined, digits = 0) {
   if (value == null || !Number.isFinite(value)) {
@@ -44,7 +52,7 @@ function formatPointsWithAppearances(points: number | null | undefined, appearan
   if (points == null || !Number.isFinite(points)) {
     return "—";
   }
-  return `${formatValue(points, 1)}${appearances != null ? ` / ${appearances} Eins.` : ""}`;
+  return `${formatValue(points, 1)}${appearances != null ? ` / ${appearances}` : ""}`;
 }
 
 function formatPointsWithRank(points: number | null | undefined, rank: number | null | undefined) {
@@ -62,14 +70,8 @@ function formatPointsWithAppearancesAndRank(
   if (points == null || !Number.isFinite(points)) {
     return "—";
   }
-  const fragments = [formatValue(points, 1)];
-  if (appearances != null) {
-    fragments.push(`${appearances} Eins.`);
-  }
-  if (rank != null) {
-    fragments.push(`#${rank}`);
-  }
-  return fragments.join(" · ");
+  const base = `${formatValue(points, 1)}${appearances != null ? ` / ${appearances}` : ""}`;
+  return rank != null ? `${base} · #${rank}` : base;
 }
 
 function formatAveragePoints(points: number | null | undefined, appearances: number | null | undefined) {
@@ -148,11 +150,35 @@ function formatTransferHistoryDate(value: string | null | undefined) {
   }).format(parsed);
 }
 
-function formatTrainingHistorySource(source: PlayerDetailDrawerData["trainingHistoryRows"][number]["source"]) {
-  if (source === "organic") {
-    return "Organisches Klassen-Training";
+function formatTrainingSeasonLabel(seasonId: string) {
+  const match = seasonId.match(/season-(\d+)/i);
+  if (match) {
+    return `S${match[1]}`;
   }
-  return "Legacy Saison-Ende";
+  return getCanonicalSeasonLabel(seasonId) ?? seasonId;
+}
+
+function formatTrainingAttributeLabel(attribute: string) {
+  return (
+    PLAYER_ATTRIBUTE_CHART_LABELS[attribute as keyof typeof PLAYER_ATTRIBUTE_CHART_LABELS] ??
+    attribute.slice(0, 3).toUpperCase()
+  );
+}
+
+function formatTrainingModeShort(mode: string | null | undefined) {
+  if (!mode) {
+    return "—";
+  }
+  if (mode === "leicht") {
+    return "L";
+  }
+  if (mode === "mittel") {
+    return "M";
+  }
+  if (mode === "schwer") {
+    return "S";
+  }
+  return mode;
 }
 
 function formatSignedPercent(value: number | null | undefined) {
@@ -162,6 +188,36 @@ function formatSignedPercent(value: number | null | undefined) {
 
   const prefix = value > 0 ? "+" : "";
   return `${prefix}${formatValue(value, 1)}%`;
+}
+
+function formatSignedSetpoints(value: number | null | undefined, digits = 1) {
+  if (value == null || !Number.isFinite(value)) {
+    return "—";
+  }
+
+  const prefix = value > 0 ? "+" : "";
+  return `${prefix}${formatValue(value, digits)}`;
+}
+
+function formatTrainingClassDirection(
+  currentClass: string | null | undefined,
+  trainingClass: string | null | undefined,
+) {
+  if (!currentClass) {
+    return "—";
+  }
+  if (!trainingClass || trainingClass === currentClass) {
+    return `${currentClass} (stabil)`;
+  }
+  return `${currentClass} → ${trainingClass}`;
+}
+
+function formatOrganicNetSubline(input: {
+  appliedTrainingSetpoints: number;
+  appliedPerformanceSetpoints: number;
+  regressionCombinedTotal: number;
+}) {
+  return `Training ${formatSignedSetpoints(input.appliedTrainingSetpoints)} · Performance ${formatSignedSetpoints(input.appliedPerformanceSetpoints)} · Regression ${formatSignedSetpoints(input.regressionCombinedTotal)}`;
 }
 
 function buildInitials(name: string) {
@@ -576,6 +632,58 @@ function buildFatigueImpactTooltip(data: Pick<PlayerDetailDrawerData, "fatigue" 
   return parts.join(" · ");
 }
 
+function sumHistoryAppearances(rows: PlayerDetailDrawerData["historyRows"]) {
+  let total = 0;
+  let hasAny = false;
+  for (const row of rows) {
+    if (row.appearances != null && Number.isFinite(row.appearances)) {
+      total += row.appearances;
+      hasAny = true;
+    }
+  }
+  return hasAny ? total : null;
+}
+
+function computeCareerAverageFatigue(rows: PlayerDetailDrawerData["historyRows"]) {
+  let weightedTotal = 0;
+  let weight = 0;
+  for (const row of rows) {
+    if (
+      row.averageFatigue != null &&
+      Number.isFinite(row.averageFatigue) &&
+      row.appearances != null &&
+      row.appearances > 0
+    ) {
+      weightedTotal += row.averageFatigue * row.appearances;
+      weight += row.appearances;
+    }
+  }
+  return weight > 0 ? Number((weightedTotal / weight).toFixed(1)) : null;
+}
+
+function renderSeasonSnapshotMetricPair(input: {
+  label: string;
+  seasonValue: string;
+  allTimeValue: string;
+  title?: string;
+}) {
+  return (
+    <article className="player-drawer-season-snapshot-card" title={input.title}>
+      <small>{input.label}</small>
+      <div className="player-drawer-season-snapshot-values">
+        <div className="player-drawer-season-snapshot-value">
+          <strong>{input.seasonValue}</strong>
+          <em>Saison</em>
+        </div>
+        <div className="player-drawer-season-snapshot-value">
+          <strong>{input.allTimeValue}</strong>
+          <em>All Time</em>
+        </div>
+      </div>
+    </article>
+  );
+}
+
 function renderInjuryStatusBanner(data: PlayerDetailDrawerData) {
   if (data.availability.isUnavailable || data.availability.injuryStatus === "injured") {
     return (
@@ -646,11 +754,15 @@ function parseStarValue(value: string | number | null | undefined) {
 function ScoutStarDisplay({
   axisDisplay,
   starRating,
+  starRangeMin,
+  starRangeMax,
   label,
   compact = false,
 }: {
   axisDisplay?: string | null;
   starRating?: string | number | null;
+  starRangeMin?: number | null;
+  starRangeMax?: number | null;
   label?: string;
   compact?: boolean;
 }) {
@@ -660,6 +772,20 @@ function ScoutStarDisplay({
         {label ? `${label} ` : ""}
         {axisDisplay}
       </span>
+    );
+  }
+  if (
+    starRangeMin != null &&
+    starRangeMax != null &&
+    shouldShowPotentialRangeStars(starRangeMin, starRangeMax)
+  ) {
+    return (
+      <PotentialRangeStarRating
+        minScore={starRangeMin}
+        maxScore={starRangeMax}
+        label={label}
+        compact={compact}
+      />
     );
   }
   if (starRating) {
@@ -698,6 +824,68 @@ function StarRating({
               <span className="player-drawer-star-fill" style={{ width: `${fillPct}%` }}>
                 ★
               </span>
+            </span>
+          );
+        })}
+      </span>
+    </span>
+  );
+}
+
+function PotentialRangeStarRating({
+  minScore,
+  maxScore,
+  label,
+  compact = false,
+}: {
+  minScore: number;
+  maxScore: number;
+  label?: string;
+  compact?: boolean;
+}) {
+  const slots = buildPotentialRangeStarSlots(minScore, maxScore);
+  const minStars = potentialScoreToStars(minScore);
+  const maxStars = potentialScoreToStars(maxScore);
+
+  return (
+    <span
+      className={`player-drawer-star-rating is-range${compact ? " is-compact" : ""}`}
+      aria-label={`${label ? `${label}: ` : ""}Potential ${formatValue(minStars, 1)} bis ${formatValue(maxStars, 1)} von 5 Sternen`}
+      title={`${label ? `${label}: ` : ""}Potential ${formatValue(minScore, 0)}-${formatValue(maxScore, 0)} (${formatValue(minStars, 1)}-${formatValue(maxStars, 1)} Sterne). Schwarze Sterne = moegliches, aber unsicheres Maximum.`}
+    >
+      {label ? <span className="player-drawer-star-label">{label}</span> : null}
+      <span className="player-drawer-stars" aria-hidden="true">
+        {slots.map((slot) => {
+          if (slot.maxFill <= 0) {
+            return (
+              <span key={`range-star-${slot.index}`} className="player-drawer-star is-inactive">
+                <span className="player-drawer-star-empty">★</span>
+              </span>
+            );
+          }
+
+          return (
+            <span
+              key={`range-star-${slot.index}`}
+              className={`player-drawer-star${slot.showUncertain ? " has-uncertain" : ""}`}
+            >
+              <span className="player-drawer-star-empty">★</span>
+              {slot.minFill > 0 ? (
+                <span className="player-drawer-star-fill" style={{ width: `${slot.minFill * 100}%` }}>
+                  ★
+                </span>
+              ) : null}
+              {slot.showUncertain ? (
+                <span
+                  className="player-drawer-star-uncertain"
+                  style={{
+                    left: `${slot.minFill * 100}%`,
+                    width: `${(slot.maxFill - slot.minFill) * 100}%`,
+                  }}
+                >
+                  ★
+                </span>
+              ) : null}
             </span>
           );
         })}
@@ -983,6 +1171,16 @@ export default function PlayerDetailDrawer({
     setSelectedAxisId(null);
   }, [data?.playerId]);
 
+  const trainingAttributeColumns = useMemo(
+    () =>
+      [
+        ...new Set(
+          (data?.trainingHistoryRows ?? []).flatMap((row) => row.upgrades.map((upgrade) => upgrade.attribute)),
+        ),
+      ].sort((left, right) => left.localeCompare(right, "de")),
+    [data?.trainingHistoryRows],
+  );
+
   if (!data) {
     return null;
   }
@@ -1015,10 +1213,11 @@ export default function PlayerDetailDrawer({
   );
   const activeHistoryRow = data.historyRows.find((row) => row.isActiveSeason) ?? null;
   const seasonSnapshotAppearances = seasonPerformance?.appearances ?? activeHistoryRow?.appearances ?? null;
-  const seasonSnapshotFatigue = activeHistoryRow?.averageFatigue ?? data.fatigue ?? null;
-  const seasonSnapshotTrainingMode = trainingRow?.mode ?? data.trainingMode ?? null;
-  const seasonSnapshotNetForecast =
-    trainingRow?.organicForecast.netSetpoints ?? data.seasonOrganicForecast?.netSetpoints ?? null;
+  const careerSnapshotAppearances = sumHistoryAppearances(data.historyRows);
+  const seasonSnapshotFatigue = activeHistoryRow?.averageFatigue ?? null;
+  const careerSnapshotFatigue = computeCareerAverageFatigue(data.historyRows);
+  const seasonSnapshotInjuries = activeHistoryRow?.injuriesCount ?? 0;
+  const careerSnapshotInjuries = data.injurySummary.totalInjuries;
   const seasonSnapshotTopGains = trainingRow?.organicForecast.topGains ?? [];
   const handleTopDisciplineSort = (columnId: TopDisciplineColumnId) => {
     setTopDisciplineSort((current) => ({
@@ -1249,7 +1448,13 @@ export default function PlayerDetailDrawer({
                 </span>
                 <span className="player-drawer-header-metric" title="Vertragslaufzeit">
                   <small>Vertrag</small>
-                  <strong>{data.contractLength ?? "—"}</strong>
+                  <strong>
+                    {data.contractLength ?? "—"}
+                    {formatContractShapeShortLabel(data.contractShape) ? ` · ${formatContractShapeShortLabel(data.contractShape)}` : ""}
+                  </strong>
+                  {formatContractShapeLabel(data.contractShape) !== "Ausgeglichen" ? (
+                    <em title={formatContractShapeLabel(data.contractShape)}>{formatContractShapeLabel(data.contractShape)}</em>
+                  ) : null}
                   {transferContext.promisedRole ? (
                     <em> · {formatRoleTag(transferContext.promisedRole)}</em>
                   ) : null}
@@ -1606,40 +1811,22 @@ export default function PlayerDetailDrawer({
               {!isScoutedProfile ? (
                 <aside className="player-drawer-season-snapshot" aria-label="Saison-Snapshot">
                   <div className="player-drawer-season-snapshot-grid">
-                    <article className="player-drawer-season-snapshot-card">
-                      <small>Einsätze</small>
-                      <strong>{formatValue(seasonSnapshotAppearances)}</strong>
-                      <em>{seasonPerformance?.seasonName ?? "aktuelle Saison"}</em>
-                    </article>
-                    <article className="player-drawer-season-snapshot-card">
-                      <small>Ø Fatigue</small>
-                      <strong>{seasonSnapshotFatigue != null ? formatValue(seasonSnapshotFatigue, 1) : "—"}</strong>
-                      <em>{data.fatigue != null ? `aktuell ${formatValue(data.fatigue, 0)}` : "keine Belastung"}</em>
-                    </article>
-                    <article className="player-drawer-season-snapshot-card">
-                      <small>Training</small>
-                      <strong>
-                        {seasonSnapshotTrainingMode
-                          ? getTrainingModePresentation(seasonSnapshotTrainingMode).label
-                          : "—"}
-                      </strong>
-                      <em>
-                        {seasonSnapshotNetForecast != null
-                          ? `Forecast ${seasonSnapshotNetForecast > 0 ? "+" : ""}${formatValue(seasonSnapshotNetForecast, 1)}`
-                          : "keine Prognose"}
-                      </em>
-                    </article>
-                    <article className="player-drawer-season-snapshot-card">
-                      <small>Verletzungen</small>
-                      <strong>{formatValue(data.injurySummary.totalInjuries)}</strong>
-                      <em>
-                        {data.availability.injuryStatus === "healthy"
-                          ? "kein Risiko"
-                          : data.availability.injuryStatus === "injured"
-                            ? "ausgefallen"
-                            : "in Erholung"}
-                      </em>
-                    </article>
+                    {renderSeasonSnapshotMetricPair({
+                      label: "Einsätze",
+                      seasonValue: formatValue(seasonSnapshotAppearances),
+                      allTimeValue: formatValue(careerSnapshotAppearances),
+                    })}
+                    {renderSeasonSnapshotMetricPair({
+                      label: "Ø Fatigue",
+                      seasonValue: seasonSnapshotFatigue != null ? formatValue(seasonSnapshotFatigue, 1) : "—",
+                      allTimeValue: careerSnapshotFatigue != null ? formatValue(careerSnapshotFatigue, 1) : "—",
+                      title: buildFatigueImpactTooltip(data),
+                    })}
+                    {renderSeasonSnapshotMetricPair({
+                      label: "Verletzungen",
+                      seasonValue: formatValue(seasonSnapshotInjuries),
+                      allTimeValue: formatValue(careerSnapshotInjuries),
+                    })}
                   </div>
                   {seasonSnapshotTopGains.length ? (
                     <div className="player-drawer-chip-row">
@@ -1842,10 +2029,12 @@ export default function PlayerDetailDrawer({
                     <article className="metric-card">
                       <span>Klassen-Prognose</span>
                       <strong>
-                        {data.seasonOrganicForecast.classBefore}
-                        {data.seasonOrganicForecast.classChanged ? ` → ${data.seasonOrganicForecast.classAfter}` : " (stabil)"}
+                        {formatTrainingClassDirection(data.className, data.seasonOrganicForecast.primaryTrainingClass)}
                       </strong>
-                      <small>Training: {data.seasonOrganicForecast.primaryTrainingClass}</small>
+                      <small>
+                        Prognose nach Setpoints: {data.seasonOrganicForecast.classBefore}
+                        {data.seasonOrganicForecast.classChanged ? ` → ${data.seasonOrganicForecast.classAfter}` : " (stabil)"}
+                      </small>
                     </article>
                     <article className="metric-card">
                       <span>Netto-Setpoints</span>
@@ -1854,17 +2043,22 @@ export default function PlayerDetailDrawer({
                         {formatValue(data.seasonOrganicForecast.netSetpoints, 1)}
                       </strong>
                       <small>
-                        Training +{formatValue(data.seasonOrganicForecast.trainingSetpoints, 1)} · Performance +
-                        {formatValue(data.seasonOrganicForecast.appliedPerformanceSetpoints, 1)}
+                        {formatOrganicNetSubline({
+                          appliedTrainingSetpoints: data.seasonOrganicForecast.appliedTrainingSetpoints,
+                          appliedPerformanceSetpoints: data.seasonOrganicForecast.appliedPerformanceSetpoints,
+                          regressionCombinedTotal:
+                            resolveOrganicRegressionCombinedTotal(data.seasonOrganicForecast) ?? 0,
+                        })}
                       </small>
                     </article>
                     <article className="metric-card">
-                      <span>Erhaltungsdruck</span>
-                      <strong>-{formatValue(data.seasonOrganicForecast.marketValuePressureTotal, 1)}</strong>
+                      <span>Regression</span>
+                      <strong className="is-negative">
+                        {formatSignedSetpoints(resolveOrganicRegressionCombinedTotal(data.seasonOrganicForecast) ?? 0, 1)}
+                      </strong>
                       <small>
-                        Traits {data.seasonOrganicForecast.traitModifierPct > 0 ? "+" : ""}
-                        {formatValue(data.seasonOrganicForecast.traitModifierPct, 1)}% · Facility +
-                        {formatValue(data.seasonOrganicForecast.facilityModifierPct, 1)}%
+                        Basis {formatSignedSetpoints(data.seasonOrganicForecast.regressionBreakdown.baseFlatTotal, 1)} · MW{" "}
+                        {formatSignedSetpoints(data.seasonOrganicForecast.regressionBreakdown.marketValueTotal, 1)}
                       </small>
                     </article>
                   </div>
@@ -1877,12 +2071,13 @@ export default function PlayerDetailDrawer({
                   </p>
                   <div className="player-drawer-list-grid player-drawer-list-grid-wide">
                     <article className="metric-card">
-                      <span>Klassenwechsel</span>
+                      <span>Letzter Klassenwechsel</span>
                       <strong>
                         {data.organicProgression.classBefore} → {data.organicProgression.classAfter}
                       </strong>
                       <small>
-                        Aktuelle Klasse: {data.className} · Training: {data.organicProgression.trainingClass}
+                        {getCanonicalSeasonLabel({ seasonId: data.organicProgression.seasonId })} · damals Training:{" "}
+                        {data.organicProgression.trainingClass}
                       </small>
                     </article>
                     <article className="metric-card">
@@ -1892,13 +2087,25 @@ export default function PlayerDetailDrawer({
                         {formatValue(data.organicProgression.netSetpoints, 1)}
                       </strong>
                       <small>
-                        Training +{formatValue(data.organicProgression.trainingSetpoints, 1)} · Performance +
-                        {formatValue(data.organicProgression.performanceSetpoints, 1)}
+                        {formatOrganicNetSubline({
+                          appliedTrainingSetpoints:
+                            data.organicProgression.appliedTrainingSetpoints ?? data.organicProgression.trainingSetpoints,
+                          appliedPerformanceSetpoints:
+                            data.organicProgression.appliedPerformanceSetpoints ?? data.organicProgression.performanceSetpoints,
+                          regressionCombinedTotal:
+                            resolveOrganicRegressionCombinedTotal(data.organicProgression) ?? -data.organicProgression.marketValuePressureTotal,
+                        })}
                       </small>
                     </article>
                     <article className="metric-card">
-                      <span>Erhaltungsdruck</span>
-                      <strong>-{formatValue(data.organicProgression.marketValuePressureTotal, 1)}</strong>
+                      <span>Regression</span>
+                      <strong className="is-negative">
+                        {formatSignedSetpoints(
+                          resolveOrganicRegressionCombinedTotal(data.organicProgression) ??
+                            -data.organicProgression.marketValuePressureTotal,
+                          1,
+                        )}
+                      </strong>
                       <small>
                         Traits {data.organicProgression.traitModifierPct > 0 ? "+" : ""}
                         {formatValue(data.organicProgression.traitModifierPct, 1)}% · Facility +
@@ -2008,6 +2215,16 @@ export default function PlayerDetailDrawer({
                         <ScoutStarDisplay
                           axisDisplay={data.potentialStarsDisplay}
                           starRating={data.scoutPotential?.starRating}
+                          starRangeMin={
+                            data.developmentInsight?.potentialRangeDisplay?.min ??
+                            data.scoutPotential?.potentialRange?.min ??
+                            null
+                          }
+                          starRangeMax={
+                            data.developmentInsight?.potentialRangeDisplay?.max ??
+                            data.scoutPotential?.potentialRange?.max ??
+                            null
+                          }
                           compact
                         />
                       ) : null}
@@ -2028,21 +2245,23 @@ export default function PlayerDetailDrawer({
                     className="metric-card player-drawer-xp-balance-card"
                     title="Organische Saison-Prognose: Setpoints aus Training, Performance und Erhaltungsdruck — das ist die verbindliche Entwicklungslogik."
                   >
-                    <HelpLabel title="Netto-Setpoints = Training + Performance minus Erhaltungsdruck. Das ist die Hauptzahl fuer organische Entwicklung.">
+                    <HelpLabel title="Netto-Setpoints = angewandtes Training + Performance + Regression (Basis + Marktwert). Das ist die Hauptzahl fuer organische Entwicklung.">
                       Saison-Prognose (Setpoints)
                     </HelpLabel>
                     <div className="player-drawer-xp-balance-grid">
                       <span>
                         <small>Training</small>
-                        <strong>+{formatValue(data.seasonOrganicForecast.trainingSetpoints, 1)}</strong>
+                        <strong>+{formatValue(data.seasonOrganicForecast.appliedTrainingSetpoints, 1)}</strong>
                       </span>
                       <span>
                         <small>Performance</small>
                         <strong>+{formatValue(data.seasonOrganicForecast.appliedPerformanceSetpoints, 1)}</strong>
                       </span>
                       <span>
-                        <small>Erhaltung</small>
-                        <strong className="is-negative">-{formatValue(data.seasonOrganicForecast.marketValuePressureTotal, 1)}</strong>
+                        <small>Regression</small>
+                        <strong className="is-negative">
+                          {formatSignedSetpoints(resolveOrganicRegressionCombinedTotal(data.seasonOrganicForecast) ?? 0, 1)}
+                        </strong>
                       </span>
                       <span>
                         <small>Netto</small>
@@ -2053,8 +2272,8 @@ export default function PlayerDetailDrawer({
                       </span>
                     </div>
                     <small>
-                      {data.seasonOrganicForecast.classBefore} · Training {data.seasonOrganicForecast.primaryTrainingClass}
-                      {data.seasonOrganicForecast.classChanged ? ` → ${data.seasonOrganicForecast.classAfter}` : ""}
+                      {formatTrainingClassDirection(data.className, data.seasonOrganicForecast.primaryTrainingClass)}
+                      {data.seasonOrganicForecast.classChanged ? ` · Prognose ${data.seasonOrganicForecast.classAfter}` : ""}
                     </small>
                   </article>
                 ) : null}
@@ -2291,36 +2510,55 @@ export default function PlayerDetailDrawer({
                   <table className="team-table player-drawer-training-history-table">
                     <thead>
                       <tr>
-                        <th>Saison</th>
-                        <th>Quelle</th>
-                        <th>Trainingsklasse</th>
-                        <th>Modus</th>
-                        <th>Traits</th>
+                        <th>S</th>
+                        <th>Klasse</th>
+                        <th>Mod.</th>
+                        <th>Tr.</th>
                         <th>Netto</th>
-                        <th>Attribute</th>
+                        {trainingAttributeColumns.map((attribute) => (
+                          <th key={`training-attr-${attribute}`} className="is-attribute-col" title={attribute}>
+                            {formatTrainingAttributeLabel(attribute)}
+                          </th>
+                        ))}
                       </tr>
                     </thead>
                     <tbody>
                       {data.trainingHistoryRows.map((row) => (
                         <tr key={row.eventId}>
-                          <td>{row.seasonId}</td>
-                          <td>{formatTrainingHistorySource(row.source)}</td>
+                          <td>{formatTrainingSeasonLabel(row.seasonId)}</td>
                           <td>
                             {row.trainingClass ?? "—"}
                             {row.classBefore && row.classAfter && row.classBefore !== row.classAfter
                               ? ` (${row.classBefore}→${row.classAfter})`
                               : ""}
                           </td>
-                          <td>{row.trainingMode ?? "—"}</td>
+                          <td title={row.trainingMode ?? undefined}>{formatTrainingModeShort(row.trainingMode)}</td>
                           <td className={getDeltaToneClass(row.traitModifierPct)}>
                             {row.traitModifierPct != null && Number.isFinite(row.traitModifierPct)
-                              ? `${row.traitModifierPct > 0 ? "+" : ""}${formatValue(row.traitModifierPct, 1)}%`
+                              ? `${row.traitModifierPct > 0 ? "+" : ""}${formatValue(row.traitModifierPct, 0)}%`
                               : "—"}
                           </td>
                           <td className={getDeltaToneClass(row.netSetpoints)}>
                             {row.netSetpoints != null ? `${row.netSetpoints > 0 ? "+" : ""}${formatValue(row.netSetpoints, 1)}` : "—"}
                           </td>
-                          <td>{row.attributeSummary}</td>
+                          {trainingAttributeColumns.map((attribute) => {
+                            const upgrade = row.upgrades.find((entry) => entry.attribute === attribute) ?? null;
+                            return (
+                              <td
+                                key={`${row.eventId}-${attribute}`}
+                                className={`is-attribute-col ${getDeltaToneClass(upgrade?.delta ?? null)}`}
+                                title={
+                                  upgrade
+                                    ? `${attribute}: ${formatValue(upgrade.fromValue, 1)} → ${formatValue(upgrade.toValue, 1)}`
+                                    : undefined
+                                }
+                              >
+                                {upgrade
+                                  ? `${upgrade.delta > 0 ? "+" : ""}${formatValue(upgrade.delta, 1)}`
+                                  : "—"}
+                              </td>
+                            );
+                          })}
                         </tr>
                       ))}
                     </tbody>

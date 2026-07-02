@@ -1,8 +1,13 @@
 import type { GameState, TransferHistoryEntry } from "@/lib/data/olyDataTypes";
+import {
+  isMarketBuyTransferEntry,
+  isSeasonOneDraftBuySource,
+  SEASON_ONE_DRAFT_BUY_SOURCES,
+} from "@/lib/season/transfer-season-policy";
 
 export const SEASON_END_MARKET_SELL_SOURCES = ["ai_preseason_market_sell"] as const;
 export const PRESEASON_MARKET_BUY_SOURCES = ["preseason_roster_repair_buy", "ai_preseason_market_buy"] as const;
-export const DRAFT_BUY_SOURCES = ["season1_autoprep_topup"] as const;
+export const DRAFT_BUY_SOURCES = SEASON_ONE_DRAFT_BUY_SOURCES;
 
 export type StandingsTransferBalance = {
   transferCount: number;
@@ -32,8 +37,10 @@ export function previousSeasonId(seasonId: string): string | null {
 }
 
 export function isDraftBuySource(source: string | null | undefined): boolean {
-  return (DRAFT_BUY_SOURCES as readonly string[]).includes(source ?? "");
+  return isSeasonOneDraftBuySource(source);
 }
+
+export { isMarketBuyTransferEntry };
 
 export function isSeasonEndMarketSell(entry: TransferHistoryEntry): boolean {
   return (

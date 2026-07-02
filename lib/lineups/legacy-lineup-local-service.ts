@@ -568,7 +568,6 @@ function buildContextFromGameState(gameState: GameState, params: LegacyLineupKey
       seasonId: params.seasonId,
       matchdayId: params.matchdayId,
       teamId: params.teamId,
-      gameState: normalizedGameState,
       lineupStrategy: resolveLineupStrategyForTeam(normalizedGameState, params.teamId),
       entries: existingDraft?.entries ?? [],
       disciplinePlayerCounts: Object.fromEntries(
@@ -1300,16 +1299,19 @@ export function calculateLocalLegacyLineupPreview(
   modifiers?: LegacyLineupDraft["modifiers"],
   persistence?: PersistenceService,
 ): LegacyLineupPreviewResult {
-  const contextResult = loadLocalLegacyLineupContext(params, persistence);
+  const persistenceService = persistence ?? createPersistenceService();
+  const contextResult = loadLocalLegacyLineupContext(params, persistenceService);
   if (!contextResult.ok) {
     return contextResult;
   }
+  const { save } = resolveLocalPersistedSave(persistenceService, params.saveId);
 
   return calculateLocalLegacyLineupPreviewFromContext(
     contextResult.context,
     entries,
     modifiers,
     contextResult.context.fatigueByPlayerId ?? null,
+    save.gameState,
   );
 }
 

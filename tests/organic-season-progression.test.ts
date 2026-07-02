@@ -1,7 +1,12 @@
 import { describe, expect, it } from "vitest";
 
 import type { GameState, Player, PlayerGeneratorAttributes } from "@/lib/data/olyDataTypes";
-import { buildOrganicSeasonProgression } from "@/lib/training/organic-season-progression";
+import {
+  buildOrganicSeasonProgression,
+  ORGANIC_BASE_REGRESSION_PER_ATTRIBUTE,
+  resolveOrganicRegressionCombinedTotal,
+} from "@/lib/training/organic-season-progression";
+import { PROGRESSION_ATTRIBUTE_ORDER } from "@/lib/training/class-progression-config";
 
 const attrs: PlayerGeneratorAttributes = {
   power: 70,
@@ -142,10 +147,10 @@ describe("organic season progression", () => {
     const cheapResult = buildOrganicSeasonProgression({ gameState: gameState(cheap), player: cheap });
     const starResult = buildOrganicSeasonProgression({ gameState: gameState(star), player: star });
 
-    expect(cheapResult.marketValuePressureTotal).toBe(1.44);
-    expect(starResult.marketValuePressureTotal).toBe(7.2);
-    expect(cheapResult.marketValuePressurePerAttribute).toBe(0.12);
-    expect(starResult.marketValuePressurePerAttribute).toBe(0.6);
+    expect(cheapResult.marketValuePressureTotal).toBeCloseTo(2.21, 1);
+    expect(starResult.marketValuePressureTotal).toBeCloseTo(11.04, 1);
+    expect(cheapResult.marketValuePressurePerAttribute).toBeCloseTo(0.184, 2);
+    expect(starResult.marketValuePressurePerAttribute).toBeCloseTo(0.92, 2);
     expect(starResult.marketValuePressurePerAttribute).toBeGreaterThan(cheapResult.marketValuePressurePerAttribute);
     expect(starResult.netSetpoints).toBeLessThan(cheapResult.netSetpoints);
   });
@@ -465,12 +470,20 @@ describe("organic season progression", () => {
       createdAt: "2026-06-11T00:00:00.000Z",
     }));
 
+    // Performance-Records werden nur gezaehlt, wenn ihre matchdayResultId in den
+    // matchdayResults der aktuellen Saison existiert (Filter in getPerformanceIndex).
+    const matchdayResults = performanceRecords.map((entry) => ({
+      id: entry.matchdayResultId,
+      seasonId: "season-1",
+    })) as unknown as GameState["seasonState"]["matchdayResults"];
     const openState = gameState(openPlayer);
+    openState.seasonState.matchdayResults = matchdayResults;
     openState.seasonState.playerDisciplinePerformances = performanceRecords.map((entry) => ({
       ...entry,
       playerId: openPlayer.id,
     }));
     const cappedState = gameState(cappedPlayer);
+    cappedState.seasonState.matchdayResults = matchdayResults;
     cappedState.seasonState.playerDisciplinePerformances = performanceRecords.map((entry) => ({
       ...entry,
       id: entry.id.replace("cap", "capped"),
@@ -511,5 +524,68 @@ describe("organic season progression", () => {
     const openTrainingApplied = openResult.attributeBreakdown.reduce((sum, entry) => sum + entry.training, 0);
     const cappedTrainingApplied = cappedResult.attributeBreakdown.reduce((sum, entry) => sum + entry.training, 0);
     expect(cappedTrainingApplied).toBeLessThan(openTrainingApplied);
+  });
+
+  it("keeps net setpoints aligned with applied training, performance and full regression", () => {
+    const subject = player({
+      id: "net-math-player",
+      className: "Berserker",
+      trainingClass: "Tank",
+      trainingMode: "mittel",
+      rating: 84,
+    });
+    const state = gameState(subject);
+    const result = buildOrganicSeasonProgression({ gameState: state, player: subject });
+
+    expect(result.appliedTrainingSetpoints).toBeCloseTo(
+      result.attributeBreakdown.reduce((sum, entry) => sum + entry.training, 0),
+      2,
+    );
+    expect(result.appliedPerformanceSetpoints).toBeCloseTo(
+      result.attributeBreakdown.reduce((sum, entry) => sum + entry.performance, 0),
+      2,
+    );
+    expect(result.regressionBreakdown.combinedTotal).toBeCloseTo(
+      result.attributeBreakdown.reduce((sum, entry) => sum + entry.regression, 0),
+      2,
+    );
+    expect(result.netSetpoints).toBeCloseTo(
+      result.attributeBreakdown.reduce((sum, entry) => sum + entry.delta, 0),
+      2,
+    );
+  });
+});
+
+describe("resolveOrganicRegressionCombinedTotal", () => {
+  it("prefers saved regressionCombinedTotal when present", () => {
+    expect(
+      resolveOrganicRegressionCombinedTotal({
+        regressionCombinedTotal: -4.44,
+        regressionBreakdown: { combinedTotal: -9.99 },
+        marketValuePressureTotal: 1.68,
+      }),
+    ).toBe(-4.44);
+  });
+
+  it("falls back to regressionBreakdown.combinedTotal for legacy saves", () => {
+    expect(
+      resolveOrganicRegressionCombinedTotal({
+        regressionBreakdown: { combinedTotal: -4.44 },
+        marketValuePressureTotal: 1.68,
+      }),
+    ).toBe(-4.44);
+  });
+
+  it("reconstructs base flat regression plus market value pressure for oldest saves", () => {
+    const marketValuePressureTotal = 1.68;
+    const expected = Number(
+      (-ORGANIC_BASE_REGRESSION_PER_ATTRIBUTE * PROGRESSION_ATTRIBUTE_ORDER.length - marketValuePressureTotal).toFixed(2),
+    );
+
+    expect(
+      resolveOrganicRegressionCombinedTotal({
+        marketValuePressureTotal,
+      }),
+    ).toBe(expected);
   });
 });

@@ -9,6 +9,8 @@ import type {
 import { getImportedPlayerDisplayMarketValue } from "@/lib/data/player-economy-display";
 import { resolvePlayerEconomyContract } from "@/lib/foundation/player-economy-contract";
 import { buildTransfermarktSaleFactorBreakdown } from "@/lib/market/transfermarkt-sale-factor";
+import { getSeasonDerivations } from "@/lib/foundation/get-season-derivations";
+import { persistGameStateWithMaterializedDerivations } from "@/lib/foundation/materialize-season-derivations";
 import { buildPlayerRatingContractMap } from "@/lib/foundation/player-rating-contract";
 import { buildSeasonPointsLedger } from "@/lib/foundation/season-points-ledger";
 import { buildTeamObjectiveOverview } from "@/lib/board/team-season-objectives-service";
@@ -166,14 +168,21 @@ function buildSnapshotId(seasonId: string) {
   return `season-snapshot__${seasonId}`;
 }
 
-function buildSeasonSnapshotRecord(gameState: GameState, seasonId: string = gameState.season.id): SeasonSnapshotRecord {
+function buildSeasonSnapshotRecord(
+  gameState: GameState,
+  seasonId: string = gameState.season.id,
+  saveId?: string | null,
+): SeasonSnapshotRecord {
   const disciplineCategoryById = buildDisciplineCategoryMap(gameState);
   const disciplineById = new Map(gameState.disciplines.map((discipline) => [discipline.id, discipline] as const));
   const playerById = new Map(gameState.players.map((player) => [player.id, player] as const));
   const teamById = new Map(gameState.teams.map((team) => [team.teamId, team] as const));
-  const seasonPointsLedger = buildSeasonPointsLedger(gameState, seasonId);
+  const derivations = saveId
+    ? getSeasonDerivations({ gameState, saveId, seasonId })
+    : null;
+  const seasonPointsLedger = derivations?.ledger ?? buildSeasonPointsLedger(gameState, seasonId);
   const teamObjectiveOverview = buildTeamObjectiveOverview(gameState);
-  const playerRatingsById = buildPlayerRatingContractMap(gameState);
+  const playerRatingsById = derivations?.ratingsById ?? buildPlayerRatingContractMap(gameState, seasonPointsLedger);
   const seasonResultIds = buildSeasonResultIdSet(gameState, seasonId);
   const coverage = buildSeasonCoverage(gameState, seasonId);
   const seasonMatchdayResults = (gameState.seasonState.matchdayResults ?? []).filter(
@@ -419,7 +428,9 @@ function buildSeasonSnapshotRecord(gameState: GameState, seasonId: string = game
         ? resolvePlayerEconomyContract({ playerId: player.id, player, rosterEntry })
         : null;
       const saleBreakdown =
-        player && rosterEntry ? buildTransfermarktSaleFactorBreakdown(gameState, player, rosterEntry) : null;
+        player && rosterEntry
+          ? buildTransfermarktSaleFactorBreakdown(gameState, player, rosterEntry, { saveId: saveId ?? null })
+          : null;
 
       return {
         playerId: entry.playerId,
@@ -580,8 +591,12 @@ function buildSeasonSnapshotRecord(gameState: GameState, seasonId: string = game
   };
 }
 
-export function buildSeasonSnapshot(gameState: GameState, seasonId: string = gameState.season.id): SeasonSnapshotRecord {
-  return buildSeasonSnapshotRecord(gameState, seasonId);
+export function buildSeasonSnapshot(
+  gameState: GameState,
+  seasonId: string = gameState.season.id,
+  saveId?: string | null,
+): SeasonSnapshotRecord {
+  return buildSeasonSnapshotRecord(gameState, seasonId, saveId);
 }
 
 export function upsertSeasonSnapshotRecord(
@@ -613,7 +628,7 @@ export function buildSeasonSnapshotDryRun(
 ): SeasonSnapshotBuildResult {
   const seasonId = input?.seasonId ?? gameState.season.id;
   const coverage = buildSeasonCoverage(gameState, seasonId);
-  const snapshot = buildSeasonSnapshotRecord(gameState, seasonId);
+  const snapshot = buildSeasonSnapshotRecord(gameState, seasonId, input?.saveId ?? null);
   const existingSnapshot =
     (gameState.seasonState.seasonSnapshots ?? []).find((entry) => entry.seasonId === seasonId) ?? null;
   const seasonCompleted =
@@ -773,7 +788,7 @@ export function createSeasonSnapshot(
     status: preview.seasonCompleted ? "completed" : "partial",
   });
 
-  persistence.saveSingleplayerState(save.saveId, {
+  persistGameStateWithMaterializedDerivations(persistence, save.saveId, {
     ...save.gameState,
     seasonState: {
       ...save.gameState.seasonState,

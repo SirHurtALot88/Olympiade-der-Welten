@@ -1,7 +1,10 @@
 import { describe, expect, it } from "vitest";
 
 import type { GameState, Player, RosterEntry, Team } from "@/lib/data/olyDataTypes";
-import { buildTeamSeasonOverviewRows } from "@/lib/foundation/team-management-overview";
+import {
+  buildLightweightTeamSeasonStandRows,
+  buildTeamSeasonOverviewRows,
+} from "@/lib/foundation/team-management-overview";
 
 function createTeam(partial?: Partial<Team>): Team {
   return {
@@ -186,6 +189,26 @@ describe("team management overview", () => {
     expect(result[0]?.cash).toBe(222);
     expect(result[0]?.historicalLastSeasonRank).toBe(4);
     expect(result[0]?.historicalLastSeasonPoints).toBe(118.4);
+  });
+
+  it("builds lightweight standings rows without season derivations", () => {
+    const gameState = createGameState();
+    const lightweight = buildLightweightTeamSeasonStandRows({
+      gameState,
+      standingsByTeamId: {
+        [gameState.teams[0]!.teamId]: {
+          rank: 1,
+          points: 42,
+          cash: gameState.teams[0]!.cash,
+        },
+      },
+    });
+
+    expect(lightweight).toHaveLength(gameState.teams.length);
+    expect(lightweight[0]?.rank).toBe(1);
+    expect(lightweight[0]?.points).toBe(42);
+    expect(lightweight[0]?.ppsTotal).toBe(0);
+    expect(lightweight[0]?.disciplineValues.bonuspunkte).toBeNull();
   });
 
   it("aggregates roster count, visible salary total and average contract length", () => {
@@ -628,6 +651,80 @@ describe("team management overview", () => {
     });
 
     expect(result[0]?.points).toBe(4.6);
+  });
+
+  it("uses discipline area totals when ledger area points are zero but standings exist", () => {
+    const players = [createPlayer("p1")];
+    const rosters = [createRosterEntry("r1", "p1", { salary: 1000 })];
+
+    const result = buildTeamSeasonOverviewRows({
+      gameState: createGameState({
+        players,
+        rosters,
+        disciplines: [
+          { id: "mini-dm", name: "Mini DM", category: "power", weight: 1 },
+          { id: "fechten", name: "Fechten", category: "speed", weight: 1 },
+          { id: "schach", name: "Schach", category: "mental", weight: 1 },
+          { id: "football", name: "Football", category: "social", weight: 1 },
+        ],
+      }),
+      preferStandingDisciplineValues: true,
+      standingsByTeamId: {
+        "A-A": {
+          rank: 1,
+          points: 35,
+          cash: 240,
+          disciplineValues: {
+            mini_dm: 11,
+            schach: 7,
+            fechten: 12,
+            football: 5,
+          },
+        },
+      },
+    });
+
+    expect(result[0]?.ppsPow).toBe(11);
+    expect(result[0]?.ppsSpe).toBe(12);
+    expect(result[0]?.ppsMen).toBe(7);
+    expect(result[0]?.ppsSoc).toBe(5);
+  });
+
+  it("preserves standing discipline values when ledger discipline totals are zero", () => {
+    const players = [createPlayer("p1")];
+    const rosters = [createRosterEntry("r1", "p1", { salary: 1000 })];
+
+    const result = buildTeamSeasonOverviewRows({
+      gameState: createGameState({
+        players,
+        rosters,
+        disciplines: [
+          { id: "mini-dm", name: "Mini DM", category: "power", weight: 1 },
+          { id: "fechten", name: "Fechten", category: "speed", weight: 1 },
+          { id: "schach", name: "Schach", category: "mental", weight: 1 },
+          { id: "football", name: "Football", category: "social", weight: 1 },
+        ],
+      }),
+      standingsByTeamId: {
+        "A-A": {
+          rank: 1,
+          points: 35,
+          cash: 240,
+          disciplineValues: {
+            mini_dm: 11,
+            schach: 7,
+            fechten: 12,
+            football: 5,
+          },
+        },
+      },
+    });
+
+    expect(result[0]?.disciplineValues.mini_dm).toBe(11);
+    expect(result[0]?.ppsPow).toBe(11);
+    expect(result[0]?.ppsSpe).toBe(12);
+    expect(result[0]?.ppsMen).toBe(7);
+    expect(result[0]?.ppsSoc).toBe(5);
   });
 
   it("keeps stored standing points even when visible discipline values are real zero", () => {

@@ -6,17 +6,32 @@ const root = process.cwd();
 
 describe("game inbox UI contract", () => {
   it("wires the derived inbox into Foundation navigation, Home and global next", () => {
-    const source = readFileSync(join(root, "app/foundation/FoundationPageClient.tsx"), "utf8");
+    const crossTabGameFlowSource = readFileSync(
+      join(root, "lib/foundation/tabs/use-foundation-cross-tab-game-flow.ts"),
+      "utf8",
+    );
+    const gameFlowSource = readFileSync(join(root, "lib/foundation/tabs/use-foundation-game-flow.ts"), "utf8");
+    const source =
+      readFileSync(join(root, "app/foundation/FoundationPageClient.tsx"), "utf8") +
+      readFileSync(join(root, "app/foundation/FoundationShellRouterBody.tsx"), "utf8") +
+      crossTabGameFlowSource +
+      gameFlowSource;
     const routingSource = readFileSync(join(root, "lib/foundation/foundation-view-routing.ts"), "utf8");
     const officeSource = readFileSync(join(root, "app/foundation/home-v2/ManagerOfficeClient.tsx"), "utf8");
+    const pageTypesSource = readFileSync(join(root, "lib/foundation/tabs/foundation-page-types.ts"), "utf8");
+    const pageModuleHelpersSource = readFileSync(join(root, "lib/foundation/tabs/foundation-page-module-helpers.tsx"), "utf8");
 
-    expect(source).toContain('import { buildGameInboxItems, filterGameInboxItems, getPrimaryInboxTask }');
-    expect(source).toContain('| "inboxV2"');
+    expect(source).toContain("buildGameInboxItems");
+    expect(source).toContain("filterInboxItemsByMode");
+    expect(pageTypesSource).toContain('| "inboxV2"');
     const navSource = readFileSync(join(root, "lib/foundation/foundation-nav-config.ts"), "utf8");
     expect(navSource).toContain('{ id: "inboxV2", label: "Inbox"');
-    expect(source).toContain("<InboxV2Client");
+    expect(navSource).toContain("Offene Aufgaben & Warnungen");
+    expect(source).toContain("FoundationShellRouterInboxV2");
+    const inboxHostSource = readFileSync(join(root, "app/foundation/inbox-v2/FoundationInboxV2Host.tsx"), "utf8");
+    expect(inboxHostSource).toContain("<InboxV2Client");
     expect(routingSource).toContain('if (view === "inbox") return "inboxV2"');
-    expect(source).toContain("<FoundationHomeV2Panel");
+    expect(source).toContain("FoundationShellRouterHomeV2");
     expect(source).toContain("selectedHqGmStory");
     expect(officeSource).toContain('data-testid="foundation-hq"');
     expect(source).toContain("primaryInboxItem");
@@ -33,7 +48,7 @@ describe("game inbox UI contract", () => {
     expect(source).toContain("resolveFoundationPanelScrollTarget");
     expect(source).toContain("FoundationSponsorsPanel");
     expect(readFileSync(join(root, "app/foundation/sponsors-v2/FoundationSponsorsPanel.tsx"), "utf8")).toContain("team-sponsor-choice");
-    expect(source).toContain("team-board-objectives");
+    expect(pageModuleHelpersSource).toContain("team-board-objectives");
     expect(source).toContain("marketFocusPlayerId");
     expect(source).toContain("exactLabelMatch");
     expect(source).toContain("handleHumanLineupSaved");
@@ -42,7 +57,25 @@ describe("game inbox UI contract", () => {
     expect(source).toContain("activeViewHandlesOwnSpace");
     expect(source).toContain('gameFlowActionStep.stepId === "advance_to_next_matchday"');
     expect(source).toContain("runCockpitMatchdayAdvance(true)");
-    expect(source).toContain("Alle anzeigen");
+    expect(
+      readFileSync(join(root, "components/foundation/FoundationTableUi.tsx"), "utf8"),
+    ).toContain("Alle anzeigen");
+    expect(source).toContain("ColumnVisibilityManager");
+    expect(source).toContain('label: "Entscheidungen"');
+    expect(source).toContain('label: "Chronik"');
+    expect(source).toContain("activeTeamDecisionInboxItems");
+    expect(source).toContain("filterInboxItemsByMode");
+    expect(
+      readFileSync(join(root, "app/foundation/home-v2/FoundationHomeV2Host.tsx"), "utf8"),
+    ).toContain("inboxCriticalCount");
+    expect(readFileSync(join(root, "app/foundation/home-v2/HomeV2Client.tsx"), "utf8")).toContain("Alle Aufgaben");
+    expect(readFileSync(join(root, "app/foundation/inbox-v2/InboxV2Client.tsx"), "utf8")).toContain('data-inbox-mode={mode}');
+    expect(readFileSync(join(root, "app/foundation/home-v2/ManagerOfficeClient.tsx"), "utf8")).toContain("Entscheidungen öffnen");
+    expect(inboxHostSource).toContain("applyInboxQuickAction");
+    expect(
+      readFileSync(join(root, "lib/foundation/tabs/use-inbox-v2-derivations.ts"), "utf8"),
+    ).toContain("mapInboxQuickActionsToChoices");
+    expect(source).toContain("seasonReadinessChecklist");
   });
 
   it("keeps the searchable game encyclopedia wired to tooltips", () => {

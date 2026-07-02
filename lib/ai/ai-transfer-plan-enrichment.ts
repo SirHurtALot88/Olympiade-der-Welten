@@ -18,6 +18,7 @@ import {
 } from "@/lib/ai/ai-transfer-replacement-memory";
 import type { AiSellPreviewCandidate } from "@/lib/ai/ai-transfermarkt-sell-preview-service";
 import type { AiTransferPreviewRecommendation } from "@/lib/ai/ai-transfermarkt-preview-service";
+import { getSeasonDerivations } from "@/lib/foundation/get-season-derivations";
 import { buildPlayerRatingContractMap } from "@/lib/foundation/player-rating-contract";
 import type { GameState, Player } from "@/lib/data/olyDataTypes";
 
@@ -45,13 +46,15 @@ function getPlayerAxis(player: Player | null): "pow" | "spe" | "men" | "soc" | n
 
 export function resolveTeamReplacementSlots(input: {
   gameState: GameState;
+  saveId?: string | null;
   teamId: string;
   plannedSells?: AiSellPreviewCandidate[];
 }) {
-  const historySlots = buildReplacementSlotsFromHistory(input.gameState, input.teamId);
+  const historySlots = buildReplacementSlotsFromHistory(input.gameState, input.teamId, 3, input.saveId ?? null);
   return buildReplacementSlotsFromPlannedSells({
     teamId: input.teamId,
     gameState: input.gameState,
+    saveId: input.saveId ?? null,
     plannedSells: input.plannedSells ?? [],
     existingSlots: historySlots,
   });
@@ -78,6 +81,7 @@ export function applyDoctrineToSellCandidates(input: {
 
 export function annotateBuyRecommendations(input: {
   gameState: GameState;
+  saveId?: string | null;
   teamId: string;
   recommendations: AiTransferPreviewRecommendation[];
   doctrine: TransferDoctrineProfile;
@@ -92,7 +96,9 @@ export function annotateBuyRecommendations(input: {
   coversNeedAxis?: (candidate: AiTransferPreviewRecommendation, player: Player | null) => boolean;
 }): EnrichedBuyRecommendation[] {
   const playersById = new Map(input.gameState.players.map((player) => [player.id, player] as const));
-  const ratingsById = buildPlayerRatingContractMap(input.gameState);
+  const ratingsById = input.saveId
+    ? getSeasonDerivations({ gameState: input.gameState, saveId: input.saveId }).ratingsById
+    : buildPlayerRatingContractMap(input.gameState);
 
   return input.recommendations.map((candidate) => {
     const player = playersById.get(candidate.playerId) ?? null;

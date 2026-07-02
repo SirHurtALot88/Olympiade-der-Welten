@@ -160,7 +160,7 @@ export function buildHiddenAttributeCeilingsFromPotentialScore(input: {
       upside += attributeSeed * 0.75;
     }
 
-    upside *= getClassAxisAffinity(input.player.className, axis);
+    upside *= getClassAxisAffinity(input.player.trainingClass ?? input.player.className, axis);
     upside += traitModifier * (0.35 + attributeSeed * 0.4);
 
     const attributePoStars = roundHalfStar(clamp(currentAttrStars + upside, currentAttrStars, 5));

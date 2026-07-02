@@ -831,7 +831,7 @@ export default function MatchdayArenaClient(props: MatchdayArenaClientProps) {
       return {
         teamId,
         teamName: d1?.teamName ?? d2?.teamName ?? team?.name ?? teamId,
-        teamLogoUrl: team ? getTeamLogoBrowserUrl(team.teamId, team.logoPath ?? null) : null,
+        teamLogoUrl: team ? getTeamLogoBrowserUrl(team.teamId, team.logoPath ?? null, { variant: "thumb" }) : null,
         rank: 0,
         medal: null,
         d1Points,
@@ -2063,7 +2063,11 @@ export default function MatchdayArenaClient(props: MatchdayArenaClientProps) {
                         key={`arena-winner-lane-${disciplineSide}-${row.teamId}`}
                         rank={index + 1}
                         teamName={row.teamName}
-                        teamLogoUrl={teamModel ? getTeamLogoBrowserUrl(teamModel.teamId, teamModel.logoPath ?? null) : null}
+                        teamLogoUrl={
+                          teamModel
+                            ? getTeamLogoBrowserUrl(teamModel.teamId, teamModel.logoPath ?? null, { variant: "thumb" })
+                            : null
+                        }
                         scoreLabel={formatDecimalScore(laneScore, 1)}
                         deltaLabel={formatSignedDelta(delta)}
                         rankShiftLabel={

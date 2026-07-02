@@ -12,8 +12,12 @@ import type {
   TeamStrategyProfile,
   TransferHistoryEntry,
 } from "@/lib/data/olyDataTypes";
+import { deriveRosterTargets } from "@/lib/foundation/roster-limits";
+import { getSeasonDerivations } from "@/lib/foundation/get-season-derivations";
+import { persistGameStateWithMaterializedDerivations } from "@/lib/foundation/materialize-season-derivations";
+import { getSeasonEconomyFactorWindow } from "@/lib/season/season-economy-factors";
 import { getTeamControlSettings } from "@/lib/foundation/team-control-settings";
-import { buildPlayerRatingContractMap, type PlayerRatingContractRow } from "@/lib/foundation/player-rating-contract";
+import type { PlayerRatingContractRow } from "@/lib/foundation/player-rating-contract";
 import { getTeamStrategyProfile } from "@/lib/foundation/team-strategy-profiles";
 import { resolvePlayerEconomyContract } from "@/lib/foundation/player-economy-contract";
 import { buildContractNegotiationPreview, buildContractSalarySchedule, type ContractNegotiationPreview } from "@/lib/market/contract-negotiation-preview";
@@ -211,8 +215,14 @@ function shouldAiRenewContract(input: {
   rating: PlayerRatingContractRow | null;
   renewalSalaryPreview: number | null;
   morale?: PlayerMoraleAssessment | null;
+  contractStrategy?: string | null;
+  rosterAfterRelease?: number;
+  playerOpt?: number;
 }) {
-  const { entry, player, rating, renewalSalaryPreview, morale } = input;
+  const { entry, player, rating, renewalSalaryPreview, morale, contractStrategy, rosterAfterRelease, playerOpt } = input;
+  if (contractStrategy === "do_not_renew" || contractStrategy === "market_test") {
+    return false;
+  }
   const hasStrongSeasonSignal =
     (rating?.ppsSeason != null && rating.ppsSeason > 0 && rating.ppsSeasonRank != null && rating.ppsSeasonRank <= 80) ||
     (rating?.mvs != null && rating.mvs > 0 && rating.mvsRank != null && rating.mvsRank <= 80);
@@ -254,15 +264,28 @@ function shouldAiRenewContract(input: {
     morale?.contractIntent === "considering_exit" &&
     rating?.ovrRank != null &&
     rating.ovrRank <= 19;
+  const rosterRetentionSignal =
+    playerOpt != null &&
+    rosterAfterRelease != null &&
+    rosterAfterRelease < playerOpt &&
+    ratingValue >= 42 &&
+    !badValueContract;
+
+  const strategyRenewBias =
+    contractStrategy === "extend_core" ||
+    contractStrategy === "prospect_hold" ||
+    contractStrategy === "wait_and_see";
 
   return (
+    strategyRenewBias ||
     hasStrongSeasonSignal ||
     hasStrongRosterSignal ||
     hasMarketValueSignal ||
     usefulRoleSignal ||
     cheapBridgeSignal ||
     hasRotationSignal ||
-    moraleBridgeRenew
+    moraleBridgeRenew ||
+    rosterRetentionSignal
   ) && !salaryRisk && !badValueContract && !moraleBlocksLongRenewal && !moraleSalaryRisk;
 }
 
@@ -290,13 +313,23 @@ function buildAiRenewalCashGate(input: {
   const riskTolerance = bias?.riskTolerance ?? (input.profile?.riskToleranceLevel === "high" ? 8 : input.profile?.riskToleranceLevel === "low" ? 3 : 5);
   const wageSensitivity = bias?.wageSensitivity ?? 5;
   const cashPriority = bias?.cashPriority ?? 5;
+  const identity = input.gameState.teamIdentities.find((entry) => entry.teamId === input.teamId) ?? null;
+  const identityFinances = identity?.finances ?? 5;
+  const salaryFactorCurrent =
+    getSeasonEconomyFactorWindow({
+      saveId: input.gameState.season.id,
+      seasonId: input.gameState.season.id,
+      seasonState: input.gameState.seasonState,
+    })[0]?.factor ?? 1;
   const salaryIncrease = Math.max(0, (input.renewalSalary ?? input.currentSalary) - input.currentSalary);
   const baseReserve = 3 + salaryTotal * 0.08;
   const strategyReserve =
     longContractPreference * 0.9 +
     wageSensitivity * 0.55 +
     cashPriority * 0.6 +
-    Math.max(0, 6 - riskTolerance) * 0.9;
+    Math.max(0, 6 - riskTolerance) * 0.9 +
+    Math.max(0, identityFinances - 5) * 0.45 +
+    (salaryFactorCurrent < 1 ? (1 - salaryFactorCurrent) * 8 : 0);
   const requiredReserve = roundMoney(baseReserve + strategyReserve + salaryIncrease * 2) ?? 0;
   const effectiveReserve = rosterUnderMin ? Math.min(requiredReserve, Math.max(1, cash * 0.15)) : requiredReserve;
   const canRenew = cash > 0 && cash >= effectiveReserve;
@@ -560,6 +593,13 @@ function buildPreviewRow(input: {
     rating,
     renewalSalaryPreview: moraleAdjustedRenewalSalary,
     morale,
+    contractStrategy:
+      save.gameState.seasonState.aiManagerContractStrategies?.[`${entry.teamId}:${entry.playerId}`]?.strategy ?? null,
+    rosterAfterRelease: save.gameState.rosters.filter(
+      (roster) => roster.teamId === entry.teamId && roster.playerId !== entry.playerId,
+    ).length,
+    playerOpt: deriveRosterTargets(team, save.gameState.teamIdentities.find((row) => row.teamId === entry.teamId))
+      .playerOpt,
   });
   const marketValueForBad =
     rating?.marketValue ??
@@ -646,7 +686,7 @@ function buildPreviewRow(input: {
 }
 
 export function previewSeasonEndContracts(save: PersistedSaveGame): ContractSeasonEndPreview {
-  const ratingMap = buildPlayerRatingContractMap(save.gameState);
+  const ratingMap = getSeasonDerivations({ gameState: save.gameState, saveId: save.saveId }).ratingsById;
   const playersById = new Map(save.gameState.players.map((player) => [player.id, player] as const));
   const teamsById = new Map(save.gameState.teams.map((team) => [team.teamId, team] as const));
   const rows = save.gameState.rosters.map((entry) =>
@@ -700,7 +740,7 @@ function saveGameStateWithContractEvents(
   gameState: GameState,
   persistence: PersistenceService,
 ) {
-  persistence.saveSingleplayerState(save.saveId, {
+  persistGameStateWithMaterializedDerivations(persistence, save.saveId, {
     ...gameState,
     seasonState: {
       ...gameState.seasonState,
@@ -1039,6 +1079,7 @@ export function previewContractRenewalAction(input: {
     morale?.moraleContractLengthLimit != null && contractLength > morale.moraleContractLengthLimit
       ? "morale_contract_length_limited"
       : null,
+    morale?.contractIntent === "refuses_extension" ? "morale_refuses_extension" : null,
   ].filter((blocker): blocker is string => Boolean(blocker));
   const warnings = [
     ...(negotiationPreview?.warnings.filter((warning) => warning !== "preview_only_contract_negotiation") ?? []),

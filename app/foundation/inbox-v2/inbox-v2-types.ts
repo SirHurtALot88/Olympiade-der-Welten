@@ -8,6 +8,8 @@ export type InboxV2Item = {
   choices?: Array<{ id: string; label: string; detail: string }>;
 };
 
+export type InboxV2Mode = "decisions" | "chronicle";
+
 export type InboxV2ClientProps = {
   items: InboxV2Item[];
   selectedItemId: string | null;
@@ -15,6 +17,7 @@ export type InboxV2ClientProps = {
   teamLabel?: string | null;
   openCount?: number;
   criticalCount?: number;
+  mode?: InboxV2Mode;
   categoryFilter?: string;
   onCategoryFilterChange?: (value: string) => void;
   includeDone?: boolean;

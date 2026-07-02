@@ -25,6 +25,7 @@ import type {
   TrainingModeOption,
   TrainingPlayerRowView,
 } from "@/app/foundation/training-facilities-v2/training-view-types";
+import { sortTrainingAttributeForecastByClassProfile } from "@/lib/training/training-forecast-display";
 
 export function formatLocaleNumber(value: number | null | undefined, digits = 0) {
   return formatVeloNumber(value, digits);
@@ -129,7 +130,15 @@ function TrainingModeDemandBanner({ row }: { row: TrainingPlayerRowView }) {
 
 export function TrainingAttributeForecastGrid({ row }: { row: TrainingPlayerRowView }) {
   const [expanded, setExpanded] = useState(false);
-  const sorted = [...row.attributeForecast].sort((left, right) => Math.abs(right.delta) - Math.abs(left.delta));
+  const sorted = useMemo(
+    () =>
+      sortTrainingAttributeForecastByClassProfile(
+        row.attributeForecast,
+        row.trainingClass,
+        row.adminBalancingConfig,
+      ),
+    [row.adminBalancingConfig, row.attributeForecast, row.trainingClass],
+  );
   const visible = expanded ? sorted : sorted.slice(0, 5);
 
   if (visible.length === 0) {
@@ -149,13 +158,28 @@ export function TrainingAttributeForecastGrid({ row }: { row: TrainingPlayerRowV
       <div className="training-v2-attribute-forecast-grid">
         {visible.map((entry) => (
           <article
-            className={`training-v2-attribute-forecast-card${entry.delta < 0 ? " is-risk" : entry.delta > 0 ? " is-gain" : ""}${entry.affinity === "signature" ? " is-signature" : entry.affinity === "weak" ? " is-weak" : ""}`}
-            key={`${row.player.id}-${entry.attribute}`}
+            className={`training-v2-attribute-forecast-card${entry.delta < 0 ? " is-risk" : entry.delta > 0 ? " is-gain" : ""}${entry.affinity === "signature" ? " is-signature" : entry.affinity === "weak" ? " is-weak" : ""}${entry.ceilingState === "capped" ? " is-ceiling-capped" : entry.ceilingState === "closing" ? " is-ceiling-closing" : ""}`}
+            key={`${row.player.id}-${entry.attributeKey}`}
           >
             <div className="training-v2-attribute-forecast-title">
               <small>{entry.attribute}</small>
               {entry.affinity === "signature" ? <span className="training-v2-affinity-mark is-signature">★</span> : null}
               {entry.affinity === "weak" ? <span className="training-v2-affinity-mark is-weak">◆</span> : null}
+              {entry.ceilingState === "capped" ? (
+                <span
+                  className="training-v2-ceiling-mark is-capped"
+                  title="Potential erreicht — kaum noch Trainingswachstum moeglich"
+                >
+                  Limit
+                </span>
+              ) : entry.ceilingState === "closing" ? (
+                <span
+                  className="training-v2-ceiling-mark is-closing"
+                  title={`Potential fast erreicht — ${entry.headroomLabel ?? "eng"}`}
+                >
+                  {entry.headroomLabel ?? "eng"}
+                </span>
+              ) : null}
             </div>
             <strong>
               {formatVeloNumber(entry.before, 1)} → {formatVeloNumber(entry.after, 1)}
@@ -290,8 +314,18 @@ export function TrainingPlayerLane({
           const tone = getDevelopmentTone(row);
           const isHighRisk = row.forecast.regressionRisk === "high";
           const modePresentation = getTrainingModePresentation(row.mode);
+          const recommendedMode = row.recommendedTrainingMode ?? null;
+          const recommendedPresentation = recommendedMode ? getTrainingModePresentation(recommendedMode) : null;
+          const showRecommendation =
+            recommendedMode != null && recommendedMode !== row.mode && row.recommendedTrainingMatchesCurrent === false;
           return (
             <article className={`training-v2-rider-card velo-rider-card is-${tone}${isHighRisk ? " is-high-risk" : ""}`} id={`training-player-${row.player.id}`} key={row.entryId}>
+              {showRecommendation && recommendedPresentation ? (
+                <div className="training-v2-ai-recommendation" data-testid="training-ai-recommendation">
+                  <span>Empfohlen: {recommendedPresentation.label}</span>
+                  {row.recommendedTrainingDetail ? <small>{row.recommendedTrainingDetail}</small> : null}
+                </div>
+              ) : null}
               <FoundationPlayerPortraitCard
                 playerId={row.player.id}
                 name={row.player.name}
@@ -308,6 +342,7 @@ export function TrainingPlayerLane({
                 variant="team"
                 context="training"
                 density="full"
+                interactive={false}
                 highlight={getDevelopmentBadgeLabel(tone)}
                 subMeta={`${row.player.className} · ${row.roleTag ?? "ohne Rolle"} · ${row.organicForecast.classBefore} → ${row.organicForecast.classAfter}`}
                 contextData={{
@@ -320,11 +355,19 @@ export function TrainingPlayerLane({
                     traitModifierPct: row.modifiers.traitModifierPct,
                   },
                 }}
-                onOpen={() => onOpenPlayerDetails?.({ playerId: row.player.id, activePlayerId: row.entryId })}
                 title={`${row.player.name} Profil öffnen`}
                 testId="training-player-portrait-card"
                 footerSlot={
                   <>
+                    {onOpenPlayerDetails ? (
+                      <button
+                        type="button"
+                        className="table-link-button training-v2-open-profile"
+                        onClick={() => onOpenPlayerDetails({ playerId: row.player.id, activePlayerId: row.entryId })}
+                      >
+                        Profil öffnen
+                      </button>
+                    ) : null}
                     {showIntensityRail ? (
                       <VeloIntensityRail
                         ariaLabel={`${row.player.name} Trainingsmodus`}

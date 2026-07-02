@@ -11,9 +11,11 @@ import {
   type MarketPlanConvergenceResult,
 } from "@/lib/ai/ai-market-plan-convergence-service";
 import { buildSeasonStrategyState } from "@/lib/ai/ai-manager-doctrine-service";
+import { createLocalTransfermarktRunContext, type LocalTransfermarktRunContext } from "@/lib/market/transfermarkt-local-service";
 import { isSeasonOne } from "@/lib/season/transfer-season-policy";
 import { createPersistenceService } from "@/lib/persistence/persistence-service";
-import type { PersistenceService } from "@/lib/persistence/types";
+import type { PersistedSaveGame, PersistenceService } from "@/lib/persistence/types";
+import type { GameState } from "@/lib/data/olyDataTypes";
 import type { LocalTransferWindowPhase } from "@/lib/market/transfer-window-policy";
 
 export type TransferWindowPhase = "preseason" | "season_end";
@@ -62,11 +64,20 @@ function rosterCount(gameState: { rosters: Array<{ teamId: string }> }, teamId: 
   return gameState.rosters.filter((entry) => entry.teamId === teamId).length;
 }
 
+function rosterCountsByTeam(gameState: GameState) {
+  const counts = new Map<string, number>();
+  for (const entry of gameState.rosters) {
+    counts.set(entry.teamId, (counts.get(entry.teamId) ?? 0) + 1);
+  }
+  return counts;
+}
+
 async function runTeamCycle(input: {
   saveId: string;
   seasonId: string;
   teamId: string;
   persistence: PersistenceService;
+  sessionRunContext: LocalTransfermarktRunContext | null;
   dryRun: boolean;
   confirmToken: string;
   transferPhase: string;
@@ -83,12 +94,11 @@ async function runTeamCycle(input: {
   let appliedBuys = 0;
   const warnings: string[] = [];
 
-  const saveBefore = input.persistence.getSaveById(input.saveId);
-  if (!saveBefore) throw new Error("Save missing before team cycle.");
-  const hardMin = getTeamHardMinRequired(saveBefore.gameState, input.teamId);
-  const currentRoster = rosterCount(saveBefore.gameState, input.teamId);
+  const liveSave = input.sessionRunContext?.save ?? input.persistence.getSaveById(input.saveId);
+  if (!liveSave) throw new Error("Save missing before team cycle.");
+  const currentRoster = rosterCount(liveSave.gameState, input.teamId);
 
-  const canSell = input.allowSells && currentRoster > hardMin;
+  const canSell = input.allowSells && currentRoster > 0;
   if (canSell) {
     const sellApply = await applyAiMarketPlanLocally({
       source: "sqlite",
@@ -99,6 +109,8 @@ async function runTeamCycle(input: {
       dryRun: input.dryRun,
       confirmToken: input.confirmToken,
       transferPhase: input.transferPhase,
+      persistence: input.persistence,
+      localRunContext: input.sessionRunContext,
       options: {
         includeWarningTeams: true,
         applySellSteps: true,
@@ -128,7 +140,8 @@ async function runTeamCycle(input: {
     }
   }
 
-  if (input.allowBuys && teamNeedsMarketConvergence(input.persistence.getSaveById(input.saveId)!.gameState, input.teamId)) {
+  const afterSellSave = input.sessionRunContext?.save ?? input.persistence.getSaveById(input.saveId);
+  if (input.allowBuys && afterSellSave && teamNeedsMarketConvergence(afterSellSave.gameState, input.teamId)) {
     const buyApply = await applyAiMarketPlanLocally({
       source: "sqlite",
       saveId: input.saveId,
@@ -138,6 +151,8 @@ async function runTeamCycle(input: {
       dryRun: input.dryRun,
       confirmToken: input.confirmToken,
       transferPhase: input.transferPhase,
+      persistence: input.persistence,
+      localRunContext: input.sessionRunContext,
       options: {
         includeWarningTeams: true,
         applySellSteps: false,
@@ -186,6 +201,10 @@ export async function runTransferWindowSession(input: TransferWindowSessionInput
   const persistence = input.persistence ?? createPersistenceService();
   const save = persistence.getSaveById(input.saveId);
   if (!save) throw new Error("Save missing for transfer window session.");
+  const sessionRunContext: LocalTransfermarktRunContext | null =
+    input.dryRun === true ? null : createLocalTransfermarktRunContext({ persistence, save });
+
+  const readLiveSave = (): PersistedSaveGame | null => sessionRunContext?.save ?? persistence.getSaveById(input.saveId);
 
   const maxTeamCycles = Math.max(1, input.maxTeamCycles ?? 5);
   const maxLeagueRounds = Math.max(1, input.maxLeagueRounds ?? 3);
@@ -232,8 +251,9 @@ export async function runTransferWindowSession(input: TransferWindowSessionInput
   const exhaustedTeamIds = new Set<string>();
 
   for (let leagueRound = 1; leagueRound <= maxLeagueRounds; leagueRound += 1) {
-    const latestSave = persistence.getSaveById(input.saveId);
+    const latestSave = readLiveSave();
     if (!latestSave) throw new Error("Save missing during transfer window.");
+    const coverageRiskBefore = getTeamsNeedingConvergence(latestSave.gameState).length;
     const needing = scopeTeam(getTeamsNeedingConvergence(latestSave.gameState).map((entry) => entry.teamId));
     if (needing.length === 0) {
       leagueRoundsCompleted = leagueRound;
@@ -241,9 +261,11 @@ export async function runTransferWindowSession(input: TransferWindowSessionInput
     }
 
     let roundProgress = false;
+    let roundAppliedBuys = 0;
+    let roundAppliedSells = 0;
     for (const teamId of needing) {
       for (let cycle = 1; cycle <= maxTeamCycles; cycle += 1) {
-        const midSave = persistence.getSaveById(input.saveId);
+        const midSave = readLiveSave();
         if (!midSave || !teamNeedsMarketConvergence(midSave.gameState, teamId)) break;
         const rosterBeforeCycle = rosterCount(midSave.gameState, teamId);
 
@@ -252,6 +274,7 @@ export async function runTransferWindowSession(input: TransferWindowSessionInput
           seasonId: input.seasonId,
           teamId,
           persistence,
+          sessionRunContext,
           dryRun: input.dryRun ?? false,
           confirmToken,
           transferPhase,
@@ -267,10 +290,12 @@ export async function runTransferWindowSession(input: TransferWindowSessionInput
         totalTeamCycles += 1;
         totalAppliedBuys += cycleResult.appliedBuys;
         totalAppliedSells += cycleResult.appliedSells;
+        roundAppliedBuys += cycleResult.appliedBuys;
+        roundAppliedSells += cycleResult.appliedSells;
         warnings.push(...cycleResult.warnings);
         if (cycleResult.appliedBuys + cycleResult.appliedSells > 0) roundProgress = true;
 
-        const afterSave = persistence.getSaveById(input.saveId);
+        const afterSave = readLiveSave();
         if (!afterSave) break;
         const rosterAfter = rosterCount(afterSave.gameState, teamId);
         const effectiveRosterAfter = rosterBeforeCycle + cycleResult.appliedBuys - cycleResult.appliedSells;
@@ -323,6 +348,17 @@ export async function runTransferWindowSession(input: TransferWindowSessionInput
     }
 
     leagueRoundsCompleted = leagueRound;
+    const afterRoundSave = readLiveSave();
+    const coverageRiskAfter = afterRoundSave ? getTeamsNeedingConvergence(afterRoundSave.gameState).length : coverageRiskBefore;
+    const stalledWithUnchangedCoverage =
+      roundAppliedBuys === 0 && roundAppliedSells === 0 && coverageRiskBefore === coverageRiskAfter;
+    if (stalledWithUnchangedCoverage) {
+      warnings.push(
+        `transfer_window_stalled_coverage_risk_unchanged:round:${leagueRound}:count:${coverageRiskAfter}`,
+      );
+      for (const teamId of needing) exhaustedTeamIds.add(teamId);
+      break;
+    }
     if (!roundProgress) {
       warnings.push(`transfer_window_stalled:round:${leagueRound}`);
       for (const teamId of needing) exhaustedTeamIds.add(teamId);
@@ -330,11 +366,12 @@ export async function runTransferWindowSession(input: TransferWindowSessionInput
     }
   }
 
-  const finalSave = persistence.getSaveById(input.saveId);
+  const finalSave = readLiveSave();
   if (!finalSave) throw new Error("Save missing after transfer window session.");
+  const finalRosterCounts = rosterCountsByTeam(finalSave.gameState);
 
   for (const [teamId, result] of perTeamMap) {
-    const rosterAfter = rosterCount(finalSave.gameState, teamId);
+    const rosterAfter = finalRosterCounts.get(teamId) ?? rosterCount(finalSave.gameState, teamId);
     const hardMin = getTeamHardMinRequired(finalSave.gameState, teamId);
     const optTarget = getTeamOptTarget(finalSave.gameState, teamId);
     const needsConvergence = teamNeedsMarketConvergence(finalSave.gameState, teamId);
@@ -349,11 +386,18 @@ export async function runTransferWindowSession(input: TransferWindowSessionInput
     result.rosterAfter = rosterAfter;
   }
 
-  const emergencyRepairTeams = scopeTeam(
+  const stillNeedingConvergence = scopeTeam(
+    getTeamsNeedingConvergence(finalSave.gameState).map((entry) => entry.teamId),
+  );
+  const belowMinExhausted = scopeTeam(
     getTeamsBelowHardMin(finalSave.gameState)
       .map((entry) => entry.teamId)
-      .filter((teamId) => perTeamMap.get(teamId)?.status === "convergence_exhausted"),
+      .filter((teamId) => exhaustedTeamIds.has(teamId) || perTeamMap.get(teamId)?.status === "convergence_exhausted"),
   );
+  const emergencyRepairTeams = unique([
+    ...belowMinExhausted,
+    ...(leagueRoundsCompleted >= maxLeagueRounds ? stillNeedingConvergence : []),
+  ]);
 
   return {
     phase: input.phase,

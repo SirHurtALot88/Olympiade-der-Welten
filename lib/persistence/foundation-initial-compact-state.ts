@@ -1,4 +1,5 @@
 import type { GameState } from "@/lib/data/olyDataTypes";
+import { FOUNDATION_ADMIN_UNLOCK_ALL_TEAMS } from "@/lib/foundation/foundation-admin-dev-flags";
 
 function stableJson(value: unknown) {
   return JSON.stringify(value);
@@ -43,8 +44,8 @@ export function compactFoundationInitialGameState(gameState: GameState): GameSta
     logs: [],
     players: gameState.players.map((player) => ({
       ...player,
-      attributeSheetStats: undefined,
-      attributeSheetRatings: undefined,
+      attributeSheetStats: FOUNDATION_ADMIN_UNLOCK_ALL_TEAMS ? player.attributeSheetStats : undefined,
+      attributeSheetRatings: FOUNDATION_ADMIN_UNLOCK_ALL_TEAMS ? player.attributeSheetRatings : undefined,
       flavorEn: "",
       flavorDe: "",
       previousDisciplineRatings: undefined,
@@ -54,6 +55,7 @@ export function compactFoundationInitialGameState(gameState: GameState): GameSta
     })),
     seasonState: {
       ...gameState.seasonState,
+      persistedSeasonDerivations: undefined,
       seasonSnapshots: undefined,
       standingsApplyLogs: undefined,
       disciplineResults: (gameState.seasonState.disciplineResults ?? []).filter((result) =>
@@ -138,6 +140,8 @@ export function rehydrateGameStateAfterCompactPut(existing: GameState, incoming:
     players: [...preservedPlayers, ...rehydratedPlayers],
     seasonState: {
       ...incoming.seasonState,
+      persistedSeasonDerivations:
+        incoming.seasonState.persistedSeasonDerivations ?? existing.seasonState.persistedSeasonDerivations,
       seasonSnapshots: incoming.seasonState.seasonSnapshots ?? existing.seasonState.seasonSnapshots,
       standingsApplyLogs: incoming.seasonState.standingsApplyLogs ?? existing.seasonState.standingsApplyLogs,
       lineupDrafts: mergeKeyedCollection(

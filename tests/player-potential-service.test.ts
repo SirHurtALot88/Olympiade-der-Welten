@@ -7,7 +7,10 @@ import {
   buildPlayerPotentialRecord,
   buildPlayerScoutPotential,
   buildPlayerScoutPotentialFromGameState,
+  buildPotentialRangeStarSlots,
+  potentialScoreToStars,
   revealPlayerPotentialRecord,
+  shouldShowPotentialRangeStars,
 } from "@/lib/progression/player-potential-service";
 import { buildPlayerAxisStarProfile } from "@/lib/scouting/player-axis-star-rating";
 
@@ -33,6 +36,17 @@ describe("player potential service", () => {
     expect(potential.starRating).toBe("4.5 Sterne");
     expect(potential.band).toBe("elite");
     expect(potential.ceilingMode).toBe("soft_range_no_hard_ceiling");
+  });
+
+  it("maps potential ranges to FM-style min/max star slots", () => {
+    expect(potentialScoreToStars(72)).toBe(3.5);
+    expect(potentialScoreToStars(99)).toBe(5);
+    expect(shouldShowPotentialRangeStars(72, 99)).toBe(true);
+    expect(shouldShowPotentialRangeStars(88, 93)).toBe(false);
+
+    const slots = buildPotentialRangeStarSlots(72, 99);
+    expect(slots[3]).toMatchObject({ minFill: 0.5, maxFill: 1, showUncertain: true });
+    expect(slots[4]).toMatchObject({ minFill: 0, maxFill: 1, showUncertain: true });
   });
 
   it("turns high potential into training speed and economy preview premiums", () => {

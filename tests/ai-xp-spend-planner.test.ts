@@ -247,17 +247,19 @@ describe("AI season-end XP spend planner", () => {
     expect(plan.playerPlans[0]?.reasons).toContain("cash_creators_value_upgrade");
   });
 
-  it("applies via the same human XP service with explicit AI allowance", () => {
+  it("blocks manual AI XP apply (organic-only season end)", () => {
     const team = createTeam({ teamId: "W-W", shortCode: "W-W", name: "Wicked Wizards" });
     const save = createSave({ team, players: [createPlayer({ id: "wiz", name: "Wizard", className: "Wizard", currentXP: 400 })] });
     const plan = previewAiSeasonEndXpSpend(save, team.teamId);
     const blockedHumanApply = applySeasonEndXpSpend(save, team.teamId, plan.plannedUpgrades, plan.confirmToken, createPersistence().persistence);
-    const { persistence, getSavedState } = createPersistence();
+    const { persistence } = createPersistence();
     const applied = applyAiSeasonEndXpSpend(save, team.teamId, plan.confirmToken, persistence);
 
+    expect(plan.blockers).toContain("manual_xp_spend_disabled");
+    expect(plan.confirmToken).toBeNull();
     expect(blockedHumanApply.applied).toBe(false);
-    expect(blockedHumanApply.blockingReasons).toContain("ai_xp_spend_apply_not_enabled_v1");
-    expect(applied.applied).toBe(true);
-    expect(getSavedState()?.playerProgressionEvents?.[0]?.source).toBe("manual_season_end_xp_spend");
+    expect(blockedHumanApply.blockingReasons).toContain("manual_xp_spend_disabled");
+    expect(applied.applied).toBe(false);
+    expect(applied.blockingReasons.some((reason) => reason.includes("manual_xp_spend_disabled") || reason.includes("confirm_token"))).toBe(true);
   });
 });

@@ -1,13 +1,8 @@
 "use client";
 
-import dynamic from "next/dynamic";
-
-import type { SeasonStandingsV2ClientProps } from "@/app/foundation/season-v2/SeasonStandingsV2Client";
-
-const SeasonStandingsV2Client = dynamic(() => import("@/app/foundation/season-v2/SeasonStandingsV2Client"), {
-  ssr: false,
-  loading: () => <p className="foundation-view-loading">Saisonstand wird geladen …</p>,
-});
+import SeasonStandingsV2Client, {
+  type SeasonStandingsV2ClientProps,
+} from "@/app/foundation/season-v2/SeasonStandingsV2Client";
 
 export type FoundationSeasonV2PanelProps = {
   active: boolean;

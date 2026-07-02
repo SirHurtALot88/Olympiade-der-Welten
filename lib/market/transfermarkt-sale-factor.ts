@@ -1,5 +1,7 @@
 import type { GameState, Player, RosterEntry, SeasonSnapshotRecord } from "@/lib/data/olyDataTypes";
 import { resolvePlayerEconomyContract } from "@/lib/foundation/player-economy-contract";
+import type { PlayerRatingContractRow } from "@/lib/foundation/player-rating-contract";
+import { getSeasonDerivations } from "@/lib/foundation/get-season-derivations";
 import { buildPlayerRatingContractMap } from "@/lib/foundation/player-rating-contract";
 import { buildSeasonPointsLedger } from "@/lib/foundation/season-points-ledger";
 import { getTransfermarktBracket } from "@/lib/market/transfermarkt-fit";
@@ -53,7 +55,13 @@ type SaleFactorRankContext = {
 
 const saleFactorRankContextCache = new WeakMap<GameState, SaleFactorRankContext>();
 
-export function hasCurrentSeasonSaleFactorRanking(gameState: GameState): boolean {
+function hasRatingsMapEntries(
+  map: Map<string, PlayerRatingContractRow> | null | undefined,
+): map is Map<string, PlayerRatingContractRow> {
+  return map != null && map.size > 0;
+}
+
+export function hasCurrentSeasonSaleFactorRanking(gameState: GameState, saveId?: string | null): boolean {
   const appliedResultIds = new Set(
     (gameState.seasonState.matchdayResults ?? [])
       .filter((result) => result.seasonId === gameState.season.id && result.status === "preview_applied")
@@ -73,7 +81,9 @@ export function hasCurrentSeasonSaleFactorRanking(gameState: GameState): boolean
     return false;
   }
 
-  const ledger = buildSeasonPointsLedger(gameState);
+  const ledger = saveId
+    ? getSeasonDerivations({ gameState, saveId }).ledger
+    : buildSeasonPointsLedger(gameState);
   for (const summary of ledger.playerSummariesByPlayerId.values()) {
     if ((summary.totalPoints ?? 0) > 0) {
       return true;
@@ -82,9 +92,27 @@ export function hasCurrentSeasonSaleFactorRanking(gameState: GameState): boolean
   return false;
 }
 
+function getSnapshotPlayerPerformances(snapshot: SeasonSnapshotRecord) {
+  const byPlayerId = new Map<string, SeasonSnapshotRecord["playerPerformances"][number]>();
+  for (const row of snapshot.playerPerformances ?? []) {
+    byPlayerId.set(row.playerId, row);
+  }
+  for (const row of snapshot.playerPerformanceSnapshots ?? []) {
+    if (!byPlayerId.has(row.playerId)) {
+      byPlayerId.set(row.playerId, row);
+    }
+  }
+  return [...byPlayerId.values()];
+}
+
 function getLatestCompletedSeasonSnapshot(gameState: GameState): SeasonSnapshotRecord | null {
   return [...(gameState.seasonState.seasonSnapshots ?? [])]
-    .filter((snapshot) => snapshot.status !== "dry_run" && snapshot.playerPerformances.length > 0)
+    .filter((snapshot) => {
+      if (snapshot.status === "dry_run") {
+        return false;
+      }
+      return getSnapshotPlayerPerformances(snapshot).length > 0;
+    })
     .sort((left, right) => {
       const leftTime = Date.parse(left.archivedAt ?? left.createdAt ?? "");
       const rightTime = Date.parse(right.archivedAt ?? right.createdAt ?? "");
@@ -167,7 +195,7 @@ function buildRankedCandidates(
     }
   }
   const snapshotPerformanceByPlayerId = new Map(
-    (latestSnapshot?.playerPerformances ?? []).map((performance) => [performance.playerId, performance] as const),
+    (latestSnapshot ? getSnapshotPlayerPerformances(latestSnapshot) : []).map((performance) => [performance.playerId, performance] as const),
   );
 
   for (const rosterEntry of gameState.rosters) {
@@ -206,14 +234,26 @@ function buildRankedCandidates(
   return groupedCandidates;
 }
 
-function getSaleFactorRankContext(gameState: GameState): SaleFactorRankContext {
-  const cached = saleFactorRankContextCache.get(gameState);
-  if (cached) {
-    return cached;
+function getSaleFactorRankContext(
+  gameState: GameState,
+  saveId?: string | null,
+  playerRatingsByIdOverride?: Map<string, PlayerRatingContractRow> | null,
+): SaleFactorRankContext {
+  const hasRatingsOverride = hasRatingsMapEntries(playerRatingsByIdOverride);
+  if (!hasRatingsOverride) {
+    const cached = saleFactorRankContextCache.get(gameState);
+    if (cached) {
+      return cached;
+    }
   }
 
-  const playerRatingsById = buildPlayerRatingContractMap(gameState);
-  const hasLivePerformance = hasCurrentSeasonSaleFactorRanking(gameState);
+  const playerRatingsById =
+    hasRatingsOverride
+      ? playerRatingsByIdOverride
+      : saveId
+        ? getSeasonDerivations({ gameState, saveId }).ratingsById
+        : buildPlayerRatingContractMap(gameState);
+  const hasLivePerformance = hasCurrentSeasonSaleFactorRanking(gameState, saveId);
   const latestSnapshot = hasLivePerformance ? null : getLatestCompletedSeasonSnapshot(gameState);
   const groupedCandidates = buildRankedCandidates(gameState, playerRatingsById, hasLivePerformance, latestSnapshot);
   const context = {
@@ -222,7 +262,9 @@ function getSaleFactorRankContext(gameState: GameState): SaleFactorRankContext {
     latestSnapshot,
     hasLivePerformance,
   };
-  saleFactorRankContextCache.set(gameState, context);
+  if (!hasRatingsOverride) {
+    saleFactorRankContextCache.set(gameState, context);
+  }
   return context;
 }
 
@@ -230,7 +272,9 @@ export function buildTransfermarktSaleFactorBreakdown(
   gameState: GameState,
   player: Player | null | undefined,
   rosterEntry?: RosterEntry | null,
+  options?: { saveId?: string | null; playerRatingsById?: Map<string, PlayerRatingContractRow> | null },
 ): TransfermarktSaleFactorBreakdown {
+  const saveId = options?.saveId ?? null;
   const economy = resolvePlayerEconomyContract({ player, rosterEntry });
   const baseMarketValue = normalizeVisibleRosterMoney(rosterEntry?.currentValue, economy.marketValue) ?? economy.marketValue ?? null;
 
@@ -251,7 +295,7 @@ export function buildTransfermarktSaleFactorBreakdown(
   }
 
   const bracket = getTransfermarktBracket(baseMarketValue);
-  if (!hasCurrentSeasonSaleFactorRanking(gameState)) {
+  if (!hasCurrentSeasonSaleFactorRanking(gameState, saveId)) {
     return {
       bracket,
       bracketGroupSize: 0,
@@ -267,7 +311,7 @@ export function buildTransfermarktSaleFactorBreakdown(
     };
   }
 
-  const rankContext = getSaleFactorRankContext(gameState);
+  const rankContext = getSaleFactorRankContext(gameState, saveId, options?.playerRatingsById ?? null);
   const playerRating = player ? rankContext.playerRatingsById.get(player.id) ?? null : null;
   const latestSnapshot = rankContext.latestSnapshot;
   const snapshotPerformance = player

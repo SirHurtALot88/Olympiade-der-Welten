@@ -6,11 +6,24 @@ import { LegacyLineupContextLoader } from "@/lib/lineups/legacy-lineup-context-l
 import { loadLocalLegacyLineupContext, loadLocalLegacyLineupContextFromGameState } from "@/lib/lineups/legacy-lineup-local-service";
 import { LegacyLineupRepository } from "@/lib/lineups/legacy-lineup-repository";
 import { DEFAULT_ACTIVE_OWNER_ID, buildTeamControlSettingsMap, canLocalUserManageTeam } from "@/lib/foundation/team-control-settings";
-import { buildLineupDisciplineContract, buildMatchdayLineupContract, countSeasonCaptains, countSeasonLineupDisciplineSides, formatLineupTeamStatusLabel, SEASON_CAPTAIN_SLOTS } from "@/lib/lineups/lineup-discipline-contract";
+import { canFoundationLocalUserManageTeam } from "@/lib/foundation/foundation-admin-dev-flags";
+import {
+  buildLegacyLineupLabContextCacheKey,
+  readLegacyLineupLabContextCache,
+  writeLegacyLineupLabContextCache,
+} from "@/lib/lineups/legacy-lineup-lab-context-cache";
 import type { LegacyLineupKeyParams } from "@/lib/lineups/legacy-lineup-types";
 import { createPersistenceService } from "@/lib/persistence/persistence-service";
 import { resolveLocalPersistedSave } from "@/lib/persistence/resolve-local-save";
 import type { PersistedSaveGame } from "@/lib/persistence/types";
+import {
+  buildLineupDisciplineContract,
+  buildMatchdayLineupContract,
+  countSeasonCaptains,
+  countSeasonLineupDisciplineSides,
+  formatLineupTeamStatusLabel,
+  SEASON_CAPTAIN_SLOTS,
+} from "@/lib/lineups/lineup-discipline-contract";
 import { getSeasonDisciplineSchedule } from "@/lib/season/season-discipline-schedule";
 import { db } from "@/src/server/db";
 
@@ -399,7 +412,7 @@ function loadSqliteOptions(save: PersistedSaveGame, persistence: ReturnType<type
 }
 
 function isSqliteLineupReadOnly(save: PersistedSaveGame, params: LegacyLineupKeyParams, activeOwnerId: string) {
-  return !canLocalUserManageTeam(save.gameState, params.teamId, activeOwnerId);
+  return !canFoundationLocalUserManageTeam(canLocalUserManageTeam(save.gameState, params.teamId, activeOwnerId));
 }
 
 export async function GET(request: Request) {
@@ -494,9 +507,28 @@ export async function GET(request: Request) {
     const persistence = createPersistenceService();
     const { save } = resolveLocalPersistedSave(persistence, parsed.saveId);
     const params = resolveDefaultSqliteParamsFromSave(save, parsed);
+    const versionMeta = persistence.getSaveVersionMetadata(save.saveId);
+    const cacheKey = buildLegacyLineupLabContextCacheKey({
+      saveId: params.saveId,
+      seasonId: params.seasonId,
+      matchdayId: params.matchdayId,
+      teamId: params.teamId,
+      activeOwnerId: parsed.activeOwnerId,
+    });
+    const cacheSignature = versionMeta?.contentSignature ?? `${save.saveId}:${versionMeta?.saveVersion ?? 0}`;
+    const cachedPayload = readLegacyLineupLabContextCache<Record<string, unknown>>(cacheKey, cacheSignature);
+    if (cachedPayload) {
+      return NextResponse.json(cachedPayload, {
+        headers: {
+          "Cache-Control": "private, max-age=30",
+          ETag: `"${cacheSignature}:${cacheKey}"`,
+        },
+      });
+    }
+
     const contextResult = loadLocalLegacyLineupContextFromGameState(save.gameState, params);
     const options = loadSqliteOptions(save, persistence, params);
-    return NextResponse.json({
+    const payload = {
       params,
       source: "sqlite",
       readOnly: isSqliteLineupReadOnly(save, params, parsed.activeOwnerId),
@@ -504,6 +536,13 @@ export async function GET(request: Request) {
       contextWarnings: contextResult.ok ? contextResult.warnings : contextResult.warnings,
       contextErrors: contextResult.ok ? [] : contextResult.errors,
       options,
+    };
+    writeLegacyLineupLabContextCache(cacheKey, cacheSignature, payload);
+    return NextResponse.json(payload, {
+      headers: {
+        "Cache-Control": "private, max-age=30",
+        ETag: `"${cacheSignature}:${cacheKey}"`,
+      },
     });
   } catch (error) {
     return NextResponse.json(

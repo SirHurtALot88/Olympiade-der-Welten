@@ -8,11 +8,16 @@ export function buildFoundationNavAttention(input: {
   gameState: GameState;
   activeManagerTeamId: string | null;
   canManageActiveTeam: boolean;
+  criticalDecisionCount?: number;
 }): FoundationNavAttentionMap {
   const attention: FoundationNavAttentionMap = {};
 
   if (!input.activeManagerTeamId || !input.canManageActiveTeam) {
     return attention;
+  }
+
+  if ((input.criticalDecisionCount ?? 0) > 0) {
+    attention.inboxV2 = true;
   }
 
   const sponsorContract = getTeamSponsorContract(input.gameState, input.activeManagerTeamId);

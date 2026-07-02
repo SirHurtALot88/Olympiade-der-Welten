@@ -73,6 +73,7 @@ export default function HomeV2Client({
   leagueHeatPools,
   facilities,
   inboxItems,
+  inboxCriticalCount = 0,
   todayCards,
   onContinue,
   onOpenLineup,
@@ -276,8 +277,11 @@ export default function HomeV2Client({
           {inboxItems.length > 0 ? (
             <section className="home-v2-panel home-v2-inbox-panel">
               <div className="home-v2-panel-head">
-                <span className="eyebrow">Inbox</span>
-                <h3>{inboxItems.length} offen</h3>
+                <span className="eyebrow">Entscheidungen</span>
+                <h3>
+                  {inboxItems.length} offen
+                  {inboxCriticalCount > 0 ? <span className="pill is-warning">{inboxCriticalCount} kritisch</span> : null}
+                </h3>
               </div>
               <ul className="home-v2-inbox-list">
                 {inboxItems.slice(0, 3).map((item) => (
@@ -291,6 +295,9 @@ export default function HomeV2Client({
                   </li>
                 ))}
               </ul>
+              <button type="button" className="secondary-button inline-button" onClick={onOpenInbox}>
+                Alle Aufgaben
+              </button>
             </section>
           ) : null}
 

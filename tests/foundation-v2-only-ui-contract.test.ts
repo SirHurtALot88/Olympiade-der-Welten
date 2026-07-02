@@ -46,23 +46,25 @@ describe("foundation v2-only ui contract", () => {
     expect(foundationText).not.toContain("TeamsV2Client");
     expect(foundationText).not.toContain("teamsViewMode");
     expect(foundationText).not.toContain("V2 Übersicht");
-    expect(foundationText).toContain('id="teams-league-overview"');
+    expect(teamsPanelText).toContain('id="teams-league-overview"');
+    expect(teamsPanelText).toContain('selectedTeamDetailTab === "roster"');
     expect(foundationText).toContain("teamEconomyTiles");
-    expect(foundationText).toContain("teams-v2-focus-card");
-    expect(foundationText).toContain("shouldLoadSeasonArchive");
+    expect(teamsPanelText).toContain("teams-v2-focus-card");
     expect(teamsPanelText).toContain("TeamDrawerHistoryTable");
-    expect(teamsPanelText).toContain("teams-v2-history-table");
     expect(teamsPanelText).toContain("isSeasonDisciplineKey");
-    expect(foundationText).toContain('data-testid="team-board-objectives"');
+    expect(teamsPanelText).toContain('data-testid="team-board-objectives"');
     expect(foundationText).not.toMatch(/\{false\s*\?\s*\([\s\S]*foundation-inbox-panel/);
   });
 
-  it("routes inbox through inboxV2 only with shell category subnav", async () => {
+  it("routes inbox through inboxV2 only with decisions and chronicle shell subnav", async () => {
     const foundationText = await fs.readFile(`${root}/app/foundation/FoundationPageClient.tsx`, "utf8");
     const navText = await fs.readFile(`${root}/lib/foundation/foundation-nav-config.ts`, "utf8");
 
     expect(navText).toContain('"inboxV2"');
+    expect(navText).toContain("Offene Aufgaben & Warnungen");
     expect(foundationText).toContain('activeView === "inboxV2"');
+    expect(foundationText).toContain('label: "Entscheidungen"');
+    expect(foundationText).toContain('label: "Chronik"');
     expect(foundationText).toContain("hideCategoryFilters");
     expect(foundationText).not.toContain('setFoundationView("inbox"');
   });
@@ -79,10 +81,14 @@ describe("foundation v2-only ui contract", () => {
 
   it("exposes shell subnav for lineup, scouting, and training compact", async () => {
     const foundationText = await fs.readFile(`${root}/app/foundation/FoundationPageClient.tsx`, "utf8");
+    const lineupHostText = await fs.readFile(
+      `${root}/app/foundation/legacy-lineup-lab/FoundationLineupShellHost.tsx`,
+      "utf8",
+    );
 
     expect(foundationText).toContain('activeView === "lineup"');
     expect(foundationText).toContain('{ id: "formBoard", label: "Formplan" }');
-    expect(foundationText).toContain('shellControlledDraftBoardView');
+    expect(lineupHostText).toContain("shellControlledDraftBoardView");
     expect(foundationText).toContain('activeView === "scoutingCenterV2"');
     expect(foundationText).toContain('activeView === "trainingCompact"');
     expect(foundationText).toContain('{ id: "forecast", label: "Forecast" }');

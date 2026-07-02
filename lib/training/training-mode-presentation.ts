@@ -2,10 +2,12 @@ import { PLAYER_PROGRESSION_XP_CONSTANTS } from "@/lib/training/player-progressi
 import { TRAINING_RECOVERY_IMPACT } from "@/lib/training/training-recovery-impact";
 import type { PlayerTrainingMode } from "@/lib/training/training-plan-types";
 
+/** Base training budget per mode (season-end organic progression).
+ *  Calibrated for peak P90 ~4.5–8 and league Ø Δ within ±0.4. */
 export const TRAINING_SETPOINTS_BY_MODE: Record<PlayerTrainingMode, number> = {
-  leicht: 2.2,
-  mittel: 2.8,
-  hart: 4.0,
+  leicht: 3.19,
+  mittel: 4.04,
+  hart: 5.74,
 };
 
 export const FATIGUE_LOAD_BY_MODE: Record<PlayerTrainingMode, number> = {

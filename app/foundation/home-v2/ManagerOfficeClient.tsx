@@ -4,6 +4,7 @@ import { VeloImpactStrip, VeloStatOrbitRow } from "@/components/foundation/velo-
 import type { GmStoryView } from "@/lib/foundation/gm-story";
 import type { GameInboxItem, TeamControlMode } from "@/lib/data/olyDataTypes";
 import type { FoundationViewId } from "@/lib/foundation/foundation-view-routing";
+import type { SeasonReadinessChecklist } from "@/lib/foundation/season-readiness-checklist";
 
 function formatMoney(value: number) {
   return new Intl.NumberFormat("de-DE", {
@@ -142,6 +143,7 @@ export type ManagerOfficeClientProps = {
   onNavigate: (view: FoundationViewId) => void;
   onOpenTeam: (teamId: string) => void;
   onNavigateInboxItem: (item: GameInboxItem) => void;
+  seasonReadinessChecklist?: SeasonReadinessChecklist | null;
 };
 
 export function ManagerOfficeClient({
@@ -177,6 +179,7 @@ export function ManagerOfficeClient({
   onNavigate,
   onOpenTeam,
   onNavigateInboxItem,
+  seasonReadinessChecklist,
 }: ManagerOfficeClientProps) {
               function sortManagerCards<T extends { priority: number; title: string }>(cards: T[]) {
                 return [...cards].sort((left, right) => right.priority - left.priority || left.title.localeCompare(right.title, "de"));
@@ -228,10 +231,10 @@ export function ManagerOfficeClient({
 	              {
 	                key: "inboxV2",
 	                eyebrow: "Sofort",
-	                title: activeTeamOpenInboxItems.length > 0 ? "Inbox öffnen" : "Keine harten To-dos",
+	                title: activeTeamOpenInboxItems.length > 0 ? "Entscheidungen öffnen" : "Keine harten To-dos",
 	                detail:
 	                  activeTeamOpenInboxItems[0]?.title ??
-	                  "Story, Hinweise und Aufgaben bleiben hier gesammelt und teamfokussiert.",
+	                  "Offene Aufgaben und Warnungen für dein Team triagieren.",
 	                meta: activeTeamCriticalInboxItems.length > 0 ? `Kritisch: ${activeTeamCriticalInboxItems.length}` : `${activeTeamOpenInboxItems.length} offen`,
                   priority: activeTeamCriticalInboxItems.length > 0 ? 86 : activeTeamOpenInboxItems.length > 0 ? 68 : 36,
 	                tone: activeTeamOpenInboxItems.length > 0 ? "warning" : "ready",
@@ -554,6 +557,36 @@ export function ManagerOfficeClient({
                       ) : null}
                   </article>
 	                </div>
+                  {seasonReadinessChecklist ? (
+                    <section className="foundation-hq-readiness-checklist" data-testid="foundation-season-readiness-checklist" aria-label={seasonReadinessChecklist.title}>
+                      <div className="foundation-hq-readiness-head">
+                        <span className="eyebrow">{seasonReadinessChecklist.title}</span>
+                        <strong>
+                          {seasonReadinessChecklist.readyCount}/{seasonReadinessChecklist.totalCount} bereit
+                        </strong>
+                      </div>
+                      <div className="foundation-hq-readiness-grid">
+                        {seasonReadinessChecklist.items.map((item) => (
+                          <button
+                            key={item.id}
+                            type="button"
+                            className={`foundation-hq-readiness-item is-${item.status}`}
+                            onClick={() => {
+                              onNavigate(item.targetView);
+                              if (item.targetPanel) {
+                                window.setTimeout(() => {
+                                  document.getElementById(item.targetPanel!)?.scrollIntoView({ behavior: "smooth", block: "start" });
+                                }, 120);
+                              }
+                            }}
+                          >
+                            <strong>{item.label}</strong>
+                            <small>{item.detail}</small>
+                          </button>
+                        ))}
+                      </div>
+                    </section>
+                  ) : null}
                   {selectedTeamGeneralManager && selectedHqGmStory ? (
                     <div
                       className={`season-v2-gm-story is-${selectedHqGmStory.tone}`}

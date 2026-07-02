@@ -4,7 +4,7 @@ import { NextResponse } from "next/server";
 
 import { AI_PICKS_RUN_CONFIRM_TOKEN } from "@/lib/ai/ai-picks-run-contract";
 import { runAiPicksExecutePreview } from "@/lib/ai/ai-picks-run-service";
-import { parseRoomWriteContextFromRequest } from "@/lib/room/parse-room-write-context";
+import { parseRoomWriteContextFromRequestAndBody } from "@/lib/room/parse-room-write-context";
 import { authorizeServerRoomWrite } from "@/lib/room/server-authoritative-write-guard";
 
 function parseOptionalNumber(value: string | null) {
@@ -57,7 +57,7 @@ export async function POST(request: Request) {
   }
 
   const writeAuth = authorizeServerRoomWrite({
-    ...parseRoomWriteContextFromRequest(request),
+    ...parseRoomWriteContextFromRequestAndBody(request, body),
     saveId,
     action: "ai_picks_run_execute",
     source: "sqlite",

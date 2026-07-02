@@ -4,7 +4,7 @@ import type { ScoutingHubV2ClientProps, ScoutingHubV2WatchTarget } from "@/app/f
 import FoundationSubNav from "@/app/foundation/shell/FoundationSubNav";
 import DisciplineIcon from "@/app/foundation/DisciplineIcon";
 import FoundationPlayerPortraitCard from "@/components/foundation/player-portrait-card/FoundationPlayerPortraitCard";
-import { getPlayerPortraitBrowserUrl } from "@/lib/data/mediaAssets";
+import { appendMediaImageVariant, getPlayerPortraitBrowserUrl } from "@/lib/data/mediaAssets";
 import { VeloScoutMetric } from "@/components/foundation/velo-ui";
 import { createEmptyLeaguePlayerHeatPools } from "@/lib/foundation/player-league-heat";
 import { useState } from "react";
@@ -47,7 +47,11 @@ function getScoutingPortraitModel(target: ScoutingHubV2WatchTarget) {
       .slice(0, 2)
       .map((part) => part[0]?.toUpperCase() ?? "")
       .join("") || "?";
-  return { src, initials };
+  return {
+    src,
+    previewSrc: appendMediaImageVariant(src, "preview"),
+    initials,
+  };
 }
 
 function renderScoutTargetCard(input: {
@@ -71,7 +75,7 @@ function renderScoutTargetCard(input: {
       <FoundationPlayerPortraitCard
         playerId={target.playerId}
         name={target.playerName}
-        portraitUrl={portrait.src}
+        portraitUrl={portrait.previewSrc ?? portrait.src}
         portraitInitials={portrait.initials}
         playerOvr={target.caOverall ?? null}
         playerMvs={null}

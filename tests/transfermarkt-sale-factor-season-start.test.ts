@@ -183,6 +183,39 @@ describe("transfermarkt sale factor season start", () => {
     expect(breakdown.factorSource).toBe("fallback_no_ranked_group");
   });
 
+  it("treats an empty playerRatingsById override like no override at season start", () => {
+    const gameState = createSeasonStartGameState({ seasonId: "season-2" });
+    const rosterEntry = gameState.rosters[0]!;
+    const player = gameState.players.find((entry) => entry.id === rosterEntry.playerId)!;
+
+    gameState.seasonState = {
+      ...gameState.seasonState,
+      playerDisciplinePerformances: [],
+      seasonSnapshots: [
+        {
+          seasonId: "season-1",
+          status: "completed",
+          createdAt: "2026-01-01T00:00:00.000Z",
+          archivedAt: "2026-06-01T00:00:00.000Z",
+          playerPerformances: [
+            {
+              playerId: player.id,
+              totalPoints: 42,
+              totalContribution: 42,
+            },
+          ],
+        },
+      ],
+    };
+
+    const breakdown = buildTransfermarktSaleFactorBreakdown(gameState, player, rosterEntry, {
+      playerRatingsById: new Map(),
+    });
+
+    expect(breakdown.saleFactor).toBe(1);
+    expect(breakdown.factorSource).toBe("fallback_no_ranked_group");
+  });
+
   it("matches Retool bracket-8 pricing for rank 2 in a five-player group", () => {
     const players = Array.from({ length: 5 }, (_, index) =>
       createPlayer(`p${index + 1}`, {

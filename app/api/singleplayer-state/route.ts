@@ -23,6 +23,8 @@ import {
   compactFoundationInitialGameState,
   rehydrateGameStateAfterCompactPut,
 } from "@/lib/persistence/foundation-initial-compact-state";
+import { prepareGameStateForPersistence } from "@/lib/foundation/materialize-on-save";
+import { withPersistedSeasonDerivations } from "@/lib/foundation/materialize-season-derivations";
 import {
   matchesFoundationSaveMode,
   normalizeFoundationSaveMode,
@@ -249,6 +251,9 @@ export async function PUT(request: Request) {
     gameState?: GameState;
     expectedSaveVersion?: number;
     expectedUpdatedAt?: string;
+    materializeSeasonDerivations?: boolean;
+    compactPut?: boolean;
+    skipMaterializeIfUnchanged?: boolean;
   };
   if (!body.saveId || !body.gameState) {
     return NextResponse.json({ error: "saveId and gameState are required." }, { status: 400 });
@@ -296,7 +301,12 @@ export async function PUT(request: Request) {
 
   const rehydratedGameState = rehydrateGameStateAfterCompactPut(existing.gameState, body.gameState);
   const nextGameState = withNormalizedLocalTeamSettings(rehydratedGameState);
-  const save = persistence.saveSingleplayerState(body.saveId, nextGameState);
+  const preparedGameState = body.materializeSeasonDerivations
+    ? withPersistedSeasonDerivations(nextGameState)
+    : body.skipMaterializeIfUnchanged === false
+      ? withPersistedSeasonDerivations(nextGameState)
+      : prepareGameStateForPersistence(existing.gameState, nextGameState);
+  const save = persistence.saveSingleplayerState(body.saveId, preparedGameState);
 
   return NextResponse.json({
     save: {

@@ -4,13 +4,16 @@ import path from "node:path";
 import type { GameState, Player, RosterEntry, TeamIdentity, TeamStrategyProfile } from "@/lib/data/olyDataTypes";
 import { resolvePlayerEconomyContract } from "@/lib/foundation/player-economy-contract";
 import { deriveRosterTargets } from "@/lib/foundation/roster-limits";
+import { getSeasonEconomyFactorWindow } from "@/lib/season/season-economy-factors";
 import { buildTeamStrategyScores } from "@/lib/foundation/team-strategy-score-service";
 import { buildTeamStrategyProfileMap } from "@/lib/foundation/team-strategy-profiles";
 import {
   buildTeamThemeCompositionAudit,
   calculateThemeCompositionScore,
+  classifyIdentityQuotaRole,
   derivePlayerThemeTags,
   getTeamThemeCompositionTarget,
+  isQuotaScopedTarget,
   type TeamThemeCompositionTarget,
   type TeamThemeCompositionScore,
 } from "@/lib/ai/team-theme-composition-service";
@@ -57,19 +60,24 @@ function getCalculatedPlayerSalary(player: Player) {
   return resolvePlayerEconomyContract({ player }).salary;
 }
 
-/** Preseason repair may only fill with cheap free agents — never discounted star signings. */
+/** Preseason repair may only fill with affordable free agents — cap scales with team cash. */
 export const PRESEASON_REPAIR_MARKET_VALUE_CAP = 15;
 
-export function getPreseasonRepairMarketValueCap() {
-  return PRESEASON_REPAIR_MARKET_VALUE_CAP;
+export function resolvePreseasonRepairMarketValueCap(teamCash: number) {
+  return Math.max(PRESEASON_REPAIR_MARKET_VALUE_CAP, Math.min(40, Math.round(teamCash * 0.25 * 10) / 10));
+}
+
+export function getPreseasonRepairMarketValueCap(teamCash?: number) {
+  return teamCash != null ? resolvePreseasonRepairMarketValueCap(teamCash) : PRESEASON_REPAIR_MARKET_VALUE_CAP;
 }
 
 export function isPreseasonRepairCandidateEligible(input: { marketValue: number | null; teamCash: number }) {
   const marketValue = input.marketValue;
+  const cap = resolvePreseasonRepairMarketValueCap(input.teamCash);
   if (marketValue == null || marketValue <= 0) {
     return false;
   }
-  if (marketValue > PRESEASON_REPAIR_MARKET_VALUE_CAP + 0.01) {
+  if (marketValue > cap + 0.01) {
     return false;
   }
   return input.teamCash >= marketValue - 0.01;
@@ -874,7 +882,7 @@ function buildPhasePlan(input: {
       : plannedSpendableCash / remainingSlots;
 
   if (phase === "phase_a_minimum") {
-    const reservePct = Math.min(0.08, plannedReservePct ?? 0.02);
+    const reservePct = Math.min(0.13, plannedReservePct ?? 0.07);
     const spendableCash = input.teamCash * (1 - reservePct);
     return {
       phase,
@@ -1444,19 +1452,33 @@ function buildDraftRoleSequence(input: {
   }
 }
 
-function getPrimaryThemeCountForRoster(input: {
+function getPrimaryThemeShareForRoster(input: {
   gameState: GameState;
   roster: RosterEntry[];
   target: TeamThemeCompositionTarget | null;
-}) {
-  if (!input.target || input.roster.length === 0) return 0;
+}): { primaryCount: number; denom: number } {
+  if (!input.target || input.roster.length === 0) return { primaryCount: 0, denom: input.roster.length };
+  const target = input.target;
   const playerById = new Map(input.gameState.players.map((player) => [player.id, player] as const));
-  return input.roster.reduce((count, entry) => {
+  const quotaScoped = isQuotaScopedTarget(target);
+  let primaryCount = 0;
+  let denom = 0;
+  for (const entry of input.roster) {
     const player = playerById.get(entry.playerId);
-    if (!player) return count;
-    const tags = new Set(derivePlayerThemeTags(player).playerThemeTags);
-    return input.target?.primaryThemeTags.some((tag) => tags.has(tag)) ? count + 1 : count;
-  }, 0);
+    if (!player) continue;
+    if (quotaScoped) {
+      // Exempt (Pets/Tiere) und none zaehlen weder in Zaehler noch Nenner der Mindestquote.
+      const role = classifyIdentityQuotaRole(player, target);
+      if (role === "exempt" || role === "none") continue;
+      denom += 1;
+      if (role === "counts") primaryCount += 1;
+    } else {
+      denom += 1;
+      const tags = new Set(derivePlayerThemeTags(player).playerThemeTags);
+      if (target.primaryThemeTags.some((tag) => tags.has(tag))) primaryCount += 1;
+    }
+  }
+  return { primaryCount, denom };
 }
 
 function needsThemePickToProtectMinimum(input: {
@@ -1468,10 +1490,10 @@ function needsThemePickToProtectMinimum(input: {
   const target = input.target;
   if (!target || input.phase === "phase_c_depth_luxury") return false;
   if (target.strictness !== "hard" && target.strictness !== "strong") return false;
-  const rosterCount = input.roster.length;
-  const primaryCount = getPrimaryThemeCountForRoster({ gameState: input.gameState, roster: input.roster, target });
-  const currentShare = rosterCount > 0 ? primaryCount / rosterCount : 0;
-  const projectedNonThemeShare = primaryCount / Math.max(1, rosterCount + 1);
+  const { primaryCount, denom } = getPrimaryThemeShareForRoster({ gameState: input.gameState, roster: input.roster, target });
+  const currentShare = denom > 0 ? primaryCount / denom : 0;
+  // Projektion: ein zusaetzlicher Nicht-Quoten-Spieler vergroessert nur den Nenner.
+  const projectedNonThemeShare = primaryCount / Math.max(1, denom + 1);
   return currentShare < target.minimumShare || projectedNonThemeShare < target.minimumShare;
 }
 
@@ -1798,6 +1820,7 @@ function buildTeamReadinessScore(input: {
 
 function buildRosterTargetPlan(input: {
   gameState: GameState;
+  saveId?: string;
   teamId: string;
   target: ChunkedRedraftTarget;
   strategyProfile: TeamStrategyProfile | null | undefined;
@@ -1844,6 +1867,11 @@ function buildRosterTargetPlan(input: {
     currentRank: standing?.rank ?? standing?.startplatz ?? 32,
     previousRank: standing?.startplatz ?? standing?.rank ?? 32,
     sponsorSupport: standing?.sponsorTotal ?? standing?.sponsorSeason ?? standing?.sponsorBasis ?? null,
+    salaryFactors5: getSeasonEconomyFactorWindow({
+      saveId: input.saveId ?? input.gameState.season.id,
+      seasonId: input.gameState.season.id,
+      seasonState: input.gameState.seasonState,
+    }).map((entry) => entry.factor),
   });
   const reserveBudget = budgetPlan.reserveTarget;
   const spendableBudget = budgetPlan.allowedBudgetForSearch;
@@ -1972,6 +2000,7 @@ function buildRosterTargetPlan(input: {
 
 function buildRosterTargetPlans(input: {
   gameState: GameState;
+  saveId?: string;
   target: ChunkedRedraftTarget;
   strategyProfiles: Record<string, TeamStrategyProfile>;
   candidatePool: Candidate[];
@@ -1983,6 +2012,7 @@ function buildRosterTargetPlans(input: {
       team.teamId,
       buildRosterTargetPlan({
         gameState: input.gameState,
+        saveId: input.saveId,
         teamId: team.teamId,
         target: input.target,
         strategyProfile: input.strategyProfiles[team.teamId],
@@ -3535,6 +3565,7 @@ export function runChunkedRedraftTopup(params: ChunkedRedraftTopupParams) {
   const requirePlayerOptTarget = target === "playerOpt";
   const targetPlans = buildRosterTargetPlans({
     gameState: runContext.save.gameState,
+    saveId: runContext.save.saveId,
     target,
     strategyProfiles,
     candidatePool: initialCandidatePool,

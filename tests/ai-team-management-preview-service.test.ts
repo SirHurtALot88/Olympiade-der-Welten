@@ -190,6 +190,7 @@ describe("ai team management preview service", () => {
     expect(preview?.trainingPlan.selectedTrainingFocus).toBe("RECOVERY");
     expect(preview?.trainingPlan.selectedTrainingIntensity).toBe("light");
     expect(preview?.buildingPlan.find((row) => row.buildingType === "recovery_center")?.score ?? 0).toBeGreaterThan(40);
+    expect(preview?.buildingPlan.find((row) => row.buildingType === "recovery_center")?.action).toBe("build_new");
   });
 
   it("switches to light training when a single injury or elevated injury risk is present", () => {
@@ -216,6 +217,58 @@ describe("ai team management preview service", () => {
     });
 
     expect(buildAiTeamManagementPreview(highRisk, "T-1")?.trainingPlan.selectedTrainingIntensity).toBe("light");
+  });
+
+  it("blocks hard training after heavy previous season injury load", () => {
+    const players = [
+      buildPlayer("p1", {
+        fatigue: 0,
+        injuryHistory: Array.from({ length: 6 }, (_, index) => ({
+          eventId: `inj-${index}`,
+          seasonId: "season-1",
+          matchdayId: "md-1",
+          teamId: "T-1",
+          fatigueBefore: 72,
+          riskPercent: 18,
+          unavailableUntil: null,
+          matchdaysMissed: 1,
+          injuryRecoveryPct: 50,
+          timestamp: new Date().toISOString(),
+        })),
+      }),
+      buildPlayer("p2", {
+        fatigue: 0,
+        injuryHistory: Array.from({ length: 5 }, (_, index) => ({
+          eventId: `inj-p2-${index}`,
+          seasonId: "season-1",
+          matchdayId: "md-1",
+          teamId: "T-1",
+          fatigueBefore: 68,
+          riskPercent: 16,
+          unavailableUntil: null,
+          matchdaysMissed: 1,
+          injuryRecoveryPct: 50,
+          timestamp: new Date().toISOString(),
+        })),
+      }),
+      buildPlayer("p3", { fatigue: 0 }),
+      buildPlayer("p4", { fatigue: 0 }),
+    ];
+    const gameState = {
+      ...buildGameState({ identity: { ambition: 72 }, players }),
+      season: { id: "season-2", name: "Season 2", currentMatchday: 1 },
+      seasonState: {
+        ...buildGameState({ players }).seasonState,
+        seasonId: "season-2",
+        seasonSnapshots: [{ seasonId: "season-1", finalStandings: [] }],
+        playerAvailabilityState: [],
+      },
+    } as ReturnType<typeof buildGameState>;
+
+    const preview = buildAiTeamManagementPreview(gameState, "T-1");
+    expect(preview?.trainingPlan.selectedTrainingIntensity).not.toBe("hard");
+    expect(preview?.trainingPlan.playerTrainingClassPlans.length).toBeGreaterThan(0);
+    expect(preview?.buildingPlan.find((row) => row.buildingType === "recovery_center")?.score ?? 0).toBeGreaterThan(35);
   });
 
   it("prioritizes training and hard intensity for young rebuild teams", () => {
@@ -254,7 +307,7 @@ describe("ai team management preview service", () => {
     expect(economyBuildings.every((row) => row.action !== "build_new" && row.action !== "upgrade_existing")).toBe(true);
   });
 
-  it("keeps transfer budget below full free cash once building reserve exists", () => {
+  it("allocates all post-reserve free cash to transfer and building buckets", () => {
     const gameState = buildGameState({
       team: { cash: 65 },
       players: [
@@ -266,8 +319,10 @@ describe("ai team management preview service", () => {
 
     const preview = buildAiTeamManagementPreview(gameState, "T-1");
     const buckets = preview?.budgetPlan.bucketsBefore;
+    const freeCash = preview?.budgetPlan.freeCashAfterReserves ?? 0;
 
     expect((buckets?.buildingBudget ?? 0)).toBeGreaterThan(0);
-    expect((buckets?.transferBudget ?? 0) + (buckets?.buildingBudget ?? 0)).toBeLessThan(65);
+    expect((buckets?.transferBudget ?? 0) + (buckets?.buildingBudget ?? 0)).toBeCloseTo(freeCash, 0);
+    expect(freeCash).toBeLessThan(65);
   });
 });

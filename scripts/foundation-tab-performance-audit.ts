@@ -1,4 +1,5 @@
 import { spawn, type ChildProcessWithoutNullStreams } from "node:child_process";
+import { createWriteStream } from "node:fs";
 import fs from "node:fs/promises";
 import path from "node:path";
 import { setTimeout as delay } from "node:timers/promises";
@@ -12,6 +13,19 @@ const DEFAULT_BASE_URL = "http://127.0.0.1:3000";
 const OUTPUT_DIR = path.join(process.cwd(), "outputs", "foundation-tab-performance-audit");
 const DOCS_CSV = path.join(process.cwd(), "docs", "tab-performance-hotspots-v4.csv");
 const DOCS_MD = path.join(process.cwd(), "docs", "tab-performance-hotspots-v4.md");
+const DOCS_V5_CSV = path.join(process.cwd(), "docs", "tab-performance-hotspots-v5.csv");
+const DOCS_V5_MD = path.join(process.cwd(), "docs", "tab-performance-hotspots-v5.md");
+const DOCS_V6_CSV = path.join(process.cwd(), "docs", "tab-performance-hotspots-v6.csv");
+const DOCS_V6_MD = path.join(process.cwd(), "docs", "tab-performance-hotspots-v6.md");
+const DOCS_V61_CSV = path.join(process.cwd(), "docs", "tab-performance-hotspots-v6.1.csv");
+const DOCS_V61_MD = path.join(process.cwd(), "docs", "tab-performance-hotspots-v6.1.md");
+const DOCS_V61_COMPARISON_MD = path.join(process.cwd(), "docs", "tab-performance-hotspots-v6.1-comparison.md");
+const DOCS_V7_CSV = path.join(process.cwd(), "docs", "tab-performance-hotspots-v7.csv");
+const DOCS_V7_MD = path.join(process.cwd(), "docs", "tab-performance-hotspots-v7.md");
+const DOCS_V8_CSV = path.join(process.cwd(), "docs", "tab-performance-hotspots-v8.csv");
+const DOCS_V8_MD = path.join(process.cwd(), "docs", "tab-performance-hotspots-v8.md");
+
+const TEAMS_READY_FALLBACK_MS = 30_000;
 
 type TabStep = {
   navId: string;
@@ -45,7 +59,7 @@ const TAB_STEPS: TabStep[] = [
   { navId: "historyV2", label: "Historie", readySelector: ".transfer-history-v2-shell" },
   { navId: "ranks", label: "Ranks", readySelector: "#discipline-ranks:not(.foundation-section-hidden)" },
   { navId: "diszis", label: "Diszis", readySelector: "#discipline-config:not(.foundation-section-hidden)" },
-  { navId: "prize", label: "Sponsoren", readySelector: '[data-testid="team-sponsor-choice"]:not(.foundation-section-hidden)' },
+  { navId: "prize", label: "Sponsoren", readySelector: '[data-testid="team-sponsor-choice"]:not(.foundation-section-hidden), [data-testid="foundation-sponsors"]:not(.foundation-section-hidden)' },
   { navId: "encyclopedia", label: "Lexikon", readySelector: '[data-testid="foundation-encyclopedia"]' },
 ];
 
@@ -103,13 +117,16 @@ async function isServerReachable(baseUrl: string, timeoutMs: number) {
 }
 
 function startServer() {
+  const logPath = path.join(OUTPUT_DIR, "dev-server.log");
+  const logStream = createWriteStream(logPath, { flags: "a" });
   const child = spawn("npm", ["run", "dev"], {
     cwd: process.cwd(),
     env: process.env,
     stdio: "pipe",
   });
-  child.stdout.on("data", (chunk) => process.stdout.write(`[tab-perf-server] ${chunk}`));
-  child.stderr.on("data", (chunk) => process.stderr.write(`[tab-perf-server] ${chunk}`));
+  child.stdout.on("data", (chunk) => logStream.write(chunk));
+  child.stderr.on("data", (chunk) => logStream.write(chunk));
+  child.on("close", () => logStream.end());
   return child;
 }
 
@@ -134,6 +151,23 @@ async function gotoFoundation(page: Page, baseUrl: string, view: string, teamId:
   url.searchParams.set("saveId", saveId);
   await page.goto(url.toString(), { waitUntil: "domcontentloaded", timeout: Math.max(timeoutMs, 60_000) });
   await page.getByTestId("foundation-context-banner").waitFor({ state: "visible", timeout: timeoutMs }).catch(() => undefined);
+}
+
+// The season-briefing modal auto-opens on season entry and its backdrop intercepts sidebar
+// nav clicks (this is what made the Ranks->Diszis step time out in V6.1). Dismiss it before
+// measuring so navigation is not blocked and the timing is not polluted by the modal.
+async function dismissSeasonBriefingIfPresent(page: Page) {
+  const backdrop = page.getByTestId("season-briefing-backdrop");
+  const visible = await backdrop.isVisible().catch(() => false);
+  if (!visible) {
+    return;
+  }
+  await page
+    .getByRole("button", { name: "Später" })
+    .first()
+    .click({ timeout: 5_000 })
+    .catch(() => undefined);
+  await backdrop.waitFor({ state: "hidden", timeout: 5_000 }).catch(() => undefined);
 }
 
 type TrackedRequest = {
@@ -188,13 +222,39 @@ async function measureTabSwitch(
   tracker: ReturnType<typeof trackApiRequests>,
   timeoutMs: number,
 ): Promise<TabMeasurement> {
+  await dismissSeasonBriefingIfPresent(page);
   tracker.reset();
   const startedAt = Date.now();
   const warnings: string[] = [];
+  const readyTimeoutMs = step.navId === "teams" ? Math.min(TEAMS_READY_FALLBACK_MS, timeoutMs) : timeoutMs;
 
   try {
     await page.getByTestId(`foundation-nav-${step.navId}`).click({ timeout: timeoutMs });
-    await page.locator(step.readySelector).first().waitFor({ state: "visible", timeout: timeoutMs });
+    if (step.navId === "prize") {
+      await page.getByTestId("foundation-subnav-sponsors").click({ timeout: timeoutMs }).catch(() => undefined);
+    }
+    try {
+      await page.locator(step.readySelector).first().waitFor({ state: "visible", timeout: readyTimeoutMs });
+    } catch (readyError) {
+      if (step.navId !== "teams") {
+        throw readyError;
+      }
+      const shellVisible = await page
+        .locator('[data-testid="foundation-teams-view"], [data-testid="foundation-shell"]')
+        .first()
+        .isVisible()
+        .catch(() => false);
+      warnings.push(
+        shellVisible
+          ? `teams_ready_fallback_after_${readyTimeoutMs}ms`
+          : readyError instanceof Error
+            ? readyError.message
+            : "teams_ready_timeout",
+      );
+      if (!shellVisible) {
+        throw readyError;
+      }
+    }
     await page.waitForTimeout(300);
   } catch (error) {
     const durationMs = Date.now() - startedAt;
@@ -289,6 +349,266 @@ function buildMarkdownReport(input: {
   return `${lines.join("\n")}\n`;
 }
 
+function buildV5MarkdownReport(input: {
+  generatedAt: string;
+  baseUrl: string;
+  saveId: string;
+  teamId: string;
+  initialLoadMs: number;
+  measurements: TabMeasurement[];
+  browserErrors: string[];
+}) {
+  const slowest = [...input.measurements].sort((left, right) => right.durationMs - left.durationMs).slice(0, 5);
+  const lines = [
+    "# Foundation Performance Hotspots V5",
+    "",
+    `Datum: ${input.generatedAt.slice(0, 10)}`,
+    "",
+    "## Kurzfazit",
+    "",
+    `- Initialer Home-Load: **${input.initialLoadMs} ms**`,
+    `- Langsamster Tabwechsel: **${slowest[0]?.toTab ?? "—"}** (${slowest[0]?.durationMs ?? 0} ms von ${slowest[0]?.fromTab ?? "—"})`,
+    `- Geprüfte Tab-Schritte: ${input.measurements.length} (inkl. Training-Revisit)`,
+    `- Save: \`${input.saveId}\`, Team: \`${input.teamId}\``,
+    `- Browser-Errors: ${input.browserErrors.length === 0 ? "keine" : input.browserErrors.join("; ")}`,
+    "",
+    "Siehe [V4 vs V5 Vergleich](./tab-performance-hotspots-v5-comparison.md) für Backend-Impact und Baseline-Delta.",
+    "",
+    "## Messwerte V5 (Rohdaten)",
+    "",
+    "| Von | Nach | V5 ms | API Calls | Langsamste API | Status | Befund |",
+    "| --- | --- | ---: | ---: | --- | --- | --- |",
+    ...input.measurements.map((row) =>
+      `| ${row.fromTab} | ${row.toTab} | ${row.durationMs} | ${row.apiCallsCount} | ${row.slowestApiPath ? `${row.slowestApiPath} ${row.slowestApiMs}ms` : "—"} | ${row.status} | ${row.warnings.join("; ") || "—"} |`,
+    ),
+    "",
+    `CSV: [tab-performance-hotspots-v5.csv](./tab-performance-hotspots-v5.csv)`,
+    "",
+    `Backend-Audit: [outputs/performance-audit-summary.md](../outputs/performance-audit-summary.md) via \`npm run perf:audit\`.`,
+    "",
+  ];
+  return `${lines.join("\n")}\n`;
+}
+
+function buildV6MarkdownReport(input: {
+  generatedAt: string;
+  baseUrl: string;
+  saveId: string;
+  teamId: string;
+  initialLoadMs: number;
+  measurements: TabMeasurement[];
+  browserErrors: string[];
+}) {
+  const slowest = [...input.measurements].sort((left, right) => right.durationMs - left.durationMs).slice(0, 5);
+  const lines = [
+    "# Foundation Performance Hotspots V6",
+    "",
+    `Datum: ${input.generatedAt.slice(0, 10)}`,
+    "",
+    "## Kurzfazit",
+    "",
+    `- Initialer Home-Load: **${input.initialLoadMs} ms**`,
+    `- Langsamster Tabwechsel: **${slowest[0]?.toTab ?? "—"}** (${slowest[0]?.durationMs ?? 0} ms von ${slowest[0]?.fromTab ?? "—"})`,
+    `- Geprüfte Tab-Schritte: ${input.measurements.length} (inkl. Training-Revisit)`,
+    `- Save: \`${input.saveId}\`, Team: \`${input.teamId}\``,
+    `- Browser-Errors: ${input.browserErrors.length === 0 ? "keine" : input.browserErrors.join("; ")}`,
+    "",
+    "Siehe [V4/V5 vs V6 Vergleich](./tab-performance-hotspots-v6-comparison.md).",
+    "",
+    "## Messwerte V6 (Rohdaten)",
+    "",
+    "| Von | Nach | V6 ms | API Calls | Langsamste API | Status | Befund |",
+    "| --- | --- | ---: | ---: | --- | --- | --- |",
+    ...input.measurements.map((row) =>
+      `| ${row.fromTab} | ${row.toTab} | ${row.durationMs} | ${row.apiCallsCount} | ${row.slowestApiPath ? `${row.slowestApiPath} ${row.slowestApiMs}ms` : "—"} | ${row.status} | ${row.warnings.join("; ") || "—"} |`,
+    ),
+    "",
+    `CSV: [tab-performance-hotspots-v6.csv](./tab-performance-hotspots-v6.csv)`,
+    "",
+    `Backend-Audit: [outputs/performance-audit-summary.md](../outputs/performance-audit-summary.md) via \`npm run perf:audit\`.`,
+    "",
+  ];
+  return `${lines.join("\n")}\n`;
+}
+
+function buildV61MarkdownReport(input: {
+  generatedAt: string;
+  baseUrl: string;
+  saveId: string;
+  teamId: string;
+  initialLoadMs: number;
+  measurements: TabMeasurement[];
+  browserErrors: string[];
+}) {
+  const slowest = [...input.measurements].sort((left, right) => right.durationMs - left.durationMs).slice(0, 5);
+  const lines = [
+    "# Foundation Performance Hotspots V6.1",
+    "",
+    `Datum: ${input.generatedAt.slice(0, 10)}`,
+    "",
+    "## Kurzfazit",
+    "",
+    `- Initialer Home-Load: **${input.initialLoadMs} ms**`,
+    `- Langsamster Tabwechsel: **${slowest[0]?.toTab ?? "—"}** (${slowest[0]?.durationMs ?? 0} ms von ${slowest[0]?.fromTab ?? "—"})`,
+    `- Geprüfte Tab-Schritte: ${input.measurements.length} (inkl. Training-Revisit)`,
+    `- Save: \`${input.saveId}\`, Team: \`${input.teamId}\``,
+    `- Browser-Errors: ${input.browserErrors.length === 0 ? "keine" : input.browserErrors.join("; ")}`,
+    "",
+    "Siehe [V6 vs V6.1 Vergleich](./tab-performance-hotspots-v6.1-comparison.md).",
+    "",
+    "## Messwerte V6.1 (Rohdaten)",
+    "",
+    "| Von | Nach | V6.1 ms | API Calls | Langsamste API | Status | Befund |",
+    "| --- | --- | ---: | ---: | --- | --- | --- |",
+    ...input.measurements.map((row) =>
+      `| ${row.fromTab} | ${row.toTab} | ${row.durationMs} | ${row.apiCallsCount} | ${row.slowestApiPath ? `${row.slowestApiPath} ${row.slowestApiMs}ms` : "—"} | ${row.status} | ${row.warnings.join("; ") || "—"} |`,
+    ),
+    "",
+    `CSV: [tab-performance-hotspots-v6.1.csv](./tab-performance-hotspots-v6.1.csv)`,
+    "",
+    `Backend-Audit: [outputs/performance-audit-summary.md](../outputs/performance-audit-summary.md) via \`npm run perf:audit\`.`,
+    "",
+  ];
+  return `${lines.join("\n")}\n`;
+}
+
+function buildV7MarkdownReport(input: {
+  generatedAt: string;
+  baseUrl: string;
+  saveId: string;
+  teamId: string;
+  initialLoadMs: number;
+  measurements: TabMeasurement[];
+  browserErrors: string[];
+}) {
+  const slowest = [...input.measurements].sort((left, right) => right.durationMs - left.durationMs).slice(0, 5);
+  const failed = input.measurements.filter((row) => row.status === "failed");
+  const slowCount = input.measurements.filter((row) => row.status === "slow").length;
+  const lines = [
+    "# Foundation Performance Hotspots V7",
+    "",
+    `Datum: ${input.generatedAt.slice(0, 10)}`,
+    "",
+    "## Kurzfazit",
+    "",
+    `- Initialer Home-Load: **${input.initialLoadMs} ms**`,
+    `- Langsamster Tabwechsel: **${slowest[0]?.toTab ?? "—"}** (${slowest[0]?.durationMs ?? 0} ms von ${slowest[0]?.fromTab ?? "—"})`,
+    `- Geprüfte Tab-Schritte: ${input.measurements.length} (inkl. Training-Revisit)`,
+    `- Slow (>=8s): ${slowCount} · Failed: ${failed.length}`,
+    `- Save: \`${input.saveId}\`, Team: \`${input.teamId}\``,
+    `- Messung auf ruhiger Maschine (kein paralleler Long-Run-Sim, daher kein Version-Poll-Reload-Storm).`,
+    `- Browser-Errors: ${input.browserErrors.length === 0 ? "keine" : input.browserErrors.join("; ")}`,
+    "",
+    "## Messwerte V7 (Rohdaten)",
+    "",
+    "| Von | Nach | V7 ms | API Calls | Langsamste API | Status | Befund |",
+    "| --- | --- | ---: | ---: | --- | --- | --- |",
+    ...input.measurements.map((row) =>
+      `| ${row.fromTab} | ${row.toTab} | ${row.durationMs} | ${row.apiCallsCount} | ${row.slowestApiPath ? `${row.slowestApiPath} ${row.slowestApiMs}ms` : "—"} | ${row.status} | ${row.warnings.join("; ") || "—"} |`,
+    ),
+    "",
+    "## V7 Änderungen",
+    "",
+    "- Audit-Harness verwirft das Season-Briefing-Modal vor jeder Navigation (kein Backdrop-Intercept mehr -> Diszis/Sponsoren messbar).",
+    "- Long-Run wird self-contained mit echtem Cash-Draft gefahren; Messung erfolgt ohne parallelen Sim, damit der 45s-Version-Poll nicht dauernd Full-Reloads triggert.",
+    "",
+    `CSV: [tab-performance-hotspots-v7.csv](./tab-performance-hotspots-v7.csv)`,
+    "",
+    `Backend-Audit: [outputs/performance-audit-summary.md](../outputs/performance-audit-summary.md) via \`npm run perf:audit\`.`,
+    "",
+  ];
+  return `${lines.join("\n")}\n`;
+}
+
+function buildV8MarkdownReport(input: {
+  generatedAt: string;
+  baseUrl: string;
+  saveId: string;
+  teamId: string;
+  initialLoadMs: number;
+  measurements: TabMeasurement[];
+  browserErrors: string[];
+}) {
+  const slowest = [...input.measurements].sort((left, right) => right.durationMs - left.durationMs).slice(0, 5);
+  const failed = input.measurements.filter((row) => row.status === "failed");
+  const slowCount = input.measurements.filter((row) => row.status === "slow").length;
+  const lines = [
+    "# Foundation Performance Hotspots V8",
+    "",
+    `Datum: ${input.generatedAt.slice(0, 10)}`,
+    "",
+    "## Kurzfazit",
+    "",
+    `- Initialer Home-Load: **${input.initialLoadMs} ms**`,
+    `- Langsamster Tabwechsel: **${slowest[0]?.toTab ?? "—"}** (${slowest[0]?.durationMs ?? 0} ms von ${slowest[0]?.fromTab ?? "—"})`,
+    `- Geprüfte Tab-Schritte: ${input.measurements.length} (inkl. Training-Revisit)`,
+    `- Slow (>=8s): ${slowCount} · Failed: ${failed.length}`,
+    `- Save: \`${input.saveId}\`, Team: \`${input.teamId}\``,
+    `- Messung auf ruhiger Maschine (kein paralleler Long-Run-Sim, daher kein Version-Poll-Reload-Storm).`,
+    `- Browser-Errors: ${input.browserErrors.length === 0 ? "keine" : input.browserErrors.join("; ")}`,
+    "",
+    "## Messwerte V8 (Rohdaten)",
+    "",
+    "| Von | Nach | V8 ms | API Calls | Langsamste API | Status | Befund |",
+    "| --- | --- | ---: | ---: | --- | --- | --- |",
+    ...input.measurements.map((row) =>
+      `| ${row.fromTab} | ${row.toTab} | ${row.durationMs} | ${row.apiCallsCount} | ${row.slowestApiPath ? `${row.slowestApiPath} ${row.slowestApiMs}ms` : "—"} | ${row.status} | ${row.warnings.join("; ") || "—"} |`,
+    ),
+    "",
+    "## V8 Änderungen",
+    "",
+    "- Top-Priority-Optimierungen: Teams, Spieler, Saisonstand, Training (siehe V8-comparison vs V7).",
+    "",
+    `CSV: [tab-performance-hotspots-v8.csv](./tab-performance-hotspots-v8.csv)`,
+    "",
+    `V7-Baseline: [tab-performance-hotspots-v8-comparison.md](./tab-performance-hotspots-v8-comparison.md)`,
+    "",
+    `Backend-Audit: [outputs/performance-audit-summary.md](../outputs/performance-audit-summary.md) via \`npm run perf:audit\`.`,
+    "",
+  ];
+  return `${lines.join("\n")}\n`;
+}
+
+function buildV61ComparisonMarkdown(input: {
+  generatedAt: string;
+  v61Measurements: TabMeasurement[];
+  initialLoadMs: number;
+}) {
+  const findMs = (toTab: string) => input.v61Measurements.find((row) => row.toTab === toTab)?.durationMs ?? null;
+  const trainingMs = findMs("Training");
+  const trainingRevisitMs = input.v61Measurements.find((row) => row.toTab.includes("Training (revisit)"))?.durationMs ?? null;
+  const teamsMs = findMs("Teams");
+  const marketMs = findMs("Transfermarkt");
+  const sponsorsMs = findMs("Sponsoren");
+  const lines = [
+    "# Foundation Tab Performance — V6 vs V6.1",
+    "",
+    `Datum: ${input.generatedAt.slice(0, 10)}`,
+    "",
+    "## Delta (Browser-Audit)",
+    "",
+    "| Metrik | V6 gemessen | V6.1 gemessen | V6.1 Ziel |",
+    "| --- | ---: | ---: | --- |",
+    `| Initial Home | 10 000 ms | **${input.initialLoadMs} ms** | — |`,
+    `| Spieler → Training | 89 000 ms | **${trainingMs ?? "—"} ms** | <15 000 ms |`,
+    `| Training-Revisit | 25 500 ms | **${trainingRevisitMs ?? "—"} ms** | <3 000 ms |`,
+    `| Teams | 37 000 ms | **${teamsMs ?? "—"} ms** | <10 000 ms |`,
+    `| Transfermarkt | 12 000 ms | **${marketMs ?? "—"} ms** | warm <20 ms |`,
+    `| Sponsoren-Audit | fail/timeout | **${sponsorsMs != null ? `${sponsorsMs} ms` : "—"}** | ok |`,
+    "",
+    "## V6.1 Änderungen",
+    "",
+    "- Archive-Sentinel + Snapshots-Slice-API statt Full-Reload auf Saisonstand/Diszis.",
+    "- Auto-Persist + Version-Poll während Tab-Wechsel pausiert.",
+    "- Training: Button-Nesting-Fix, initial Forecast-Batch 12.",
+    "- Transfermarkt: Browse-Index + Lazy-Hydration für Compact-Liste.",
+    "",
+    `Rohdaten: [tab-performance-hotspots-v6.1.md](./tab-performance-hotspots-v6.1.md) · V6-Baseline: [tab-performance-hotspots-v6-comparison.md](./tab-performance-hotspots-v6-comparison.md)`,
+    "",
+  ];
+  return `${lines.join("\n")}\n`;
+}
+
 async function main() {
   loadEnvConfig(path.resolve(process.cwd()));
   const args = parseArgs(process.argv.slice(2));
@@ -331,6 +651,7 @@ async function main() {
     await gotoFoundation(page, args.baseUrl, "homeV2", teamId, saveId, args.timeoutMs);
     await page.locator('[data-testid="foundation-home-v2"]').first().waitFor({ state: "visible", timeout: args.timeoutMs });
     const initialLoadMs = Date.now() - initialStartedAt;
+    await dismissSeasonBriefingIfPresent(page);
 
     const measurements: TabMeasurement[] = [];
     let fromTab = "START";
@@ -343,10 +664,31 @@ async function main() {
       const measurement = await measureTabSwitch(page, fromTab, step, tracker, args.timeoutMs);
       measurements.push(measurement);
       fromTab = step.label;
+
+      if (step.navId === "teams") {
+        const teamsRevisit = await measureTabSwitch(page, step.label, step, tracker, args.timeoutMs);
+        measurements.push({
+          ...teamsRevisit,
+          fromTab: step.label,
+          toTab: `${step.label} (revisit)`,
+        });
+      }
+
+      if (step.navId === "trainingV2") {
+        const trainingStep = TAB_STEPS.find((entry) => entry.navId === "trainingCompact");
+        if (trainingStep) {
+          const revisit = await measureTabSwitch(page, step.label, trainingStep, tracker, args.timeoutMs);
+          measurements.push({
+            ...revisit,
+            fromTab: step.label,
+            toTab: `${trainingStep.label} (revisit)`,
+          });
+        }
+      }
     }
 
     const generatedAt = new Date().toISOString();
-    const csvHeader = "fromTab,toTab,v4Ms,apiCallsCount,slowestApiMs,slowestApiPath,warnings,status";
+    const csvHeader = "fromTab,toTab,v8Ms,apiCallsCount,slowestApiMs,slowestApiPath,warnings,status";
     const csvBody = measurements
       .map((row) =>
         [
@@ -363,21 +705,21 @@ async function main() {
       .join("\n");
 
     const csv = `${csvHeader}\n${csvBody}\nSTART,Home,${initialLoadMs},,,initial_load,,ok\n`;
-    const markdown = buildMarkdownReport({
+
+    const browserErrorsTrimmed = [...new Set(browserErrors)].slice(0, 8);
+    await fs.writeFile(DOCS_V8_CSV, csv, "utf8");
+    await fs.writeFile(DOCS_V8_MD, buildV8MarkdownReport({
       generatedAt,
       baseUrl: args.baseUrl,
       saveId,
       teamId,
       initialLoadMs,
       measurements,
-      browserErrors: [...new Set(browserErrors)].slice(0, 8),
-    });
+      browserErrors: browserErrorsTrimmed,
+    }), "utf8");
+    await fs.writeFile(path.join(OUTPUT_DIR, "latest-v8.json"), JSON.stringify({ generatedAt, saveId, teamId, initialLoadMs, measurements, browserErrors }, null, 2), "utf8");
 
-    await fs.writeFile(DOCS_CSV, csv, "utf8");
-    await fs.writeFile(DOCS_MD, markdown, "utf8");
-    await fs.writeFile(path.join(OUTPUT_DIR, "latest.json"), JSON.stringify({ generatedAt, saveId, teamId, initialLoadMs, measurements, browserErrors }, null, 2), "utf8");
-
-    console.log(JSON.stringify({ ok: true, saveId, teamId, initialLoadMs, measurementCount: measurements.length, docs: { csv: DOCS_CSV, md: DOCS_MD } }, null, 2));
+    console.log(JSON.stringify({ ok: true, saveId, teamId, initialLoadMs, measurementCount: measurements.length, docs: { v8Md: DOCS_V8_MD, v8Csv: DOCS_V8_CSV } }, null, 2));
   } finally {
     if (browser) await browser.close().catch(() => undefined);
     if (startedServer) startedServer.kill("SIGTERM");

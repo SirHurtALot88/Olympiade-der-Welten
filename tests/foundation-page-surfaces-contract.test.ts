@@ -48,6 +48,10 @@ describe("team profile ui contract", () => {
     expect(teamProfileText).toContain('variant="page"');
     expect(drawerText).toContain('data-testid="foundation-team-profile"');
     expect(drawerText).toContain("onOpenPlayer");
+    expect(drawerText).toContain("team-drawer-lead-summary");
+    expect(drawerText).toContain("team-drawer-relations-panel");
+    expect(drawerText).toContain("team-drawer-objective-board");
+    expect(drawerText).toContain("team-drawer-objective-row-main");
   });
 });
 
@@ -60,5 +64,9 @@ describe("drawer-to-page layout contract", () => {
     expect(cssText).toContain(".foundation-player-profile-panel.panel");
     expect(cssText).toContain(".foundation-team-profile-panel.panel");
     expect(cssText).toContain(".foundation-drilldown-page");
+    expect(cssText).toContain(".team-drawer-lead-summary");
+    expect(cssText).toContain(".team-drawer-relations-panel");
+    expect(cssText).toContain(".team-drawer-objective-board");
+    expect(cssText).toContain(".team-drawer-objective-row-main");
   });
 });

@@ -74,4 +74,15 @@ describe("buildFoundationNavAttention", () => {
       }).prize,
     ).toBeUndefined();
   });
+
+  it("marks inbox nav when critical decisions are open", () => {
+    expect(
+      buildFoundationNavAttention({
+        gameState: gameState(),
+        activeManagerTeamId: "team-a",
+        canManageActiveTeam: true,
+        criticalDecisionCount: 2,
+      }).inboxV2,
+    ).toBe(true);
+  });
 });

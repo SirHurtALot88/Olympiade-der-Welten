@@ -4,12 +4,12 @@ import { useDeferredValue, useEffect, useMemo, useRef, useState, type CSSPropert
 
 import { getClassColorClassName, getClassColorToken } from "@/app/foundation/ClassColorChip";
 import ClassIcon from "@/app/foundation/ClassIcon";
-import ContractOfferClient from "@/app/foundation/contract-offer/ContractOfferClient";
+import { FoundationShellRouterMarketBuy } from "@/app/foundation/FoundationShellRouter";
 import FoundationPlayerPortraitCard from "@/components/foundation/player-portrait-card/FoundationPlayerPortraitCard";
 import FoundationPlayerPortraitPreview from "@/components/foundation/player-portrait-card/FoundationPlayerPortraitPreview";
 import OptimizedMediaImage from "@/app/foundation/OptimizedMediaImage";
 import RaceIcon from "@/app/foundation/RaceIcon";
-import { getPlayerPortraitBrowserUrl } from "@/lib/data/mediaAssets";
+import { appendMediaImageVariant, getPlayerPortraitBrowserUrl } from "@/lib/data/mediaAssets";
 import type { ContractShape, Discipline, Team, TeamControlMode, TeamSeasonObjectiveRecord, TransferWishlistEntry } from "@/lib/data/olyDataTypes";
 import {
   formatTransfermarktCurrency,
@@ -48,6 +48,7 @@ import { DEFAULT_ACTIVE_OWNER_ID } from "@/lib/foundation/team-control-settings"
 import { getClassTrainingSignals } from "@/lib/training/class-progression-config";
 import { VeloAttributeFocusTags } from "@/components/foundation/velo-ui";
 import { createEmptyLeaguePlayerHeatPools } from "@/lib/foundation/player-league-heat";
+import type { MarketBuyNegotiationOutcome } from "@/lib/foundation/tabs/use-market-buy-derivations";
 
 export type TransfermarktV2ClientProps = {
   defaultSaveId: string;
@@ -98,14 +99,6 @@ type MarketBuyResponse = {
 type MarketHistoryResponse = TransferHistoryReadResult & {
   error?: string;
 };
-type MarketNegotiationOutcome = {
-  status: "accepted" | "countered" | "rejected";
-  title: string;
-  message: string;
-  tone: "success" | "warning" | "error";
-  counterSalary?: number | null;
-};
-
 type MarketSortMode = "need" | "fit" | "value" | "cheap" | "potential" | "salary";
 type MarketAxisKey = keyof typeof AXIS_META;
 type MarketClassAxisFilter = "pow" | "spe" | "men" | "soc";
@@ -915,7 +908,7 @@ function formatNegotiationSignalLabel(value: string) {
   return labels[value] ?? value.replaceAll("_", " ");
 }
 
-function getNegotiationOutcomeToneClass(tone: MarketNegotiationOutcome["tone"]) {
+function getNegotiationOutcomeToneClass(tone: MarketBuyNegotiationOutcome["tone"]) {
   if (tone === "success") return "is-success";
   if (tone === "warning") return "is-warning";
   return "is-error";
@@ -1176,7 +1169,7 @@ export default function TransfermarktV2Client({
   const [buySuccess, setBuySuccess] = useState<string | null>(null);
   const [buyPreview, setBuyPreview] = useState<TransfermarktBuyPreview | null>(null);
   const [buyPreviewRefreshNonce, setBuyPreviewRefreshNonce] = useState(0);
-  const [buyNegotiationOutcome, setBuyNegotiationOutcome] = useState<MarketNegotiationOutcome | null>(null);
+  const [buyNegotiationOutcome, setBuyNegotiationOutcome] = useState<MarketBuyNegotiationOutcome | null>(null);
   const buyModalOpen = offerPanelActive;
 
   function activateOfferPanel(playerId?: string) {
@@ -1692,30 +1685,9 @@ export default function TransfermarktV2Client({
   const hiddenTrainingNegative = Math.max(0, (selectedTrainingImpact?.negative.length ?? 0) - visibleTrainingNegative.length);
   const effectiveOfferedSalary = salaryEditedManually ? offeredSalary : null;
   const previewPlayerId = selectedPlayer?.playerId ?? (buyModalOpen ? buyModalWishlistEntry?.playerId ?? null : null);
-  const contractPreference = buyPreview?.contractPreference ?? null;
-  const activeContractLength = contractLength ?? buyPreview?.contractLength ?? contractPreference?.idealLength ?? 1;
-  const activeContractShape = contractShape ?? buyPreview?.contractShape ?? contractPreference?.shapePreference ?? "balanced";
-  const contractSalaryAdjustmentPct = contractPreference?.salaryAdjustmentPct ?? null;
-  const contractScoreAdjustment = contractPreference?.scoreAdjustment ?? null;
   const fitSalaryDiscountActive = (buyPreview?.teamFit ?? selectedPlayer?.fit ?? null) != null
     ? Number(buyPreview?.teamFit ?? selectedPlayer?.fit) >= 25
     : false;
-  const contractLengthOutsidePreference = contractPreference
-    ? activeContractLength < contractPreference.preferredMinLength || activeContractLength > contractPreference.preferredMaxLength
-    : false;
-  const contractShapeMismatch = contractPreference
-    ? activeContractShape !== contractPreference.shapePreference
-    : false;
-  const contractPressureTone =
-    (contractSalaryAdjustmentPct ?? 0) > 0 || (contractScoreAdjustment ?? 0) < 0
-      ? "negative"
-      : (contractSalaryAdjustmentPct ?? 0) < 0 || (contractScoreAdjustment ?? 0) > 0
-        ? "positive"
-        : "neutral";
-  const marketAndFitDelta =
-    buyPreview?.expectedSalary != null && buyPreview.baseExpectedSalary != null
-      ? buyPreview.expectedSalary - buyPreview.baseExpectedSalary
-      : null;
 
   function setCandidateButtonRef(playerId: string, node: HTMLButtonElement | null) {
     if (node) {
@@ -2465,8 +2437,6 @@ export default function TransfermarktV2Client({
     buyPreview?.expectedSalary != null
       ? `${formatTransfermarktCurrency(buyPreview.baseExpectedSalary ?? null)} → ${formatTransfermarktCurrency(buyPreview.expectedSalary)}`
       : formatTransfermarktCurrency(previewAnnualSalary);
-  const activeOfferLabel =
-    buyPreview?.offeredSalary != null ? formatTransfermarktCurrency(buyPreview.offeredSalary) : "auto";
   const dealOpenDisabledReason =
     !selectedTeamId
       ? "Bitte erst ein Team wählen."
@@ -2475,116 +2445,6 @@ export default function TransfermarktV2Client({
         : !selectedTeamCanManage
           ? selectedTeamReadOnlyReason ?? "Dieses Team ist hier nur Ansicht."
           : null;
-  const finalBuyDisabledReason =
-    source !== "sqlite"
-      ? "Im Referenzmodus ist nur Vorschau möglich."
-      : !selectedTeamCanManage
-        ? selectedTeamReadOnlyReason ?? "Dieses Team ist hier nur Ansicht."
-        : previewBusy
-          ? "Die Deal-Vorschau rechnet gerade noch."
-          : buyBusy
-            ? "Der Kauf wird gerade verarbeitet."
-            : !selectedPlayer || !selectedTeamId
-              ? "Bitte erst Team und Kandidat wählen."
-              : !buyPreview?.canBuy
-                ? buyPreview?.blockingReasons?.map(formatNegotiationSignalLabel).join(" · ") || "Der Deal ist noch nicht bereit."
-                : buyNegotiationOutcome?.status !== "accepted"
-                  ? "Erst verhandeln, dann final bestätigen."
-                : null;
-  const modalPlayerName = buyPreview?.player?.name ?? selectedPlayer?.name ?? buyModalWishlistEntry?.playerName ?? "Unbekannt";
-  const modalPlayerClass = buyPreview?.player?.className ?? selectedPlayer?.className ?? buyModalWishlistEntry?.className ?? "—";
-  const modalPlayerRace = buyPreview?.player?.race ?? selectedPlayer?.race ?? buyModalWishlistEntry?.race ?? "—";
-  const modalPlayerBracket = buyPreview?.bracket ?? selectedPlayer?.bracket ?? buyModalWishlistEntry?.bracket ?? null;
-  const modalPlayerMarketValue = buyPreview?.currentValue ?? selectedPlayer?.marketValue ?? buyModalWishlistEntry?.marketValue ?? null;
-  const modalPlayerSalary = buyPreview?.salary ?? selectedPlayer?.salary ?? buyModalWishlistEntry?.salary ?? null;
-  const modalOfferValue = salaryEditedManually
-    ? offeredSalary
-    : buyPreview?.offeredSalary ?? selectedPlayer?.salary ?? null;
-  const modalSalarySliderMin =
-    buyPreview?.expectedSalary != null
-      ? Math.max(0.1, Number((buyPreview.expectedSalary * 0.7).toFixed(1)))
-      : 0.1;
-  const modalSalarySliderMax =
-    buyPreview?.expectedSalary != null
-      ? Math.max(modalSalarySliderMin + 0.1, Number((buyPreview.expectedSalary * 1.3).toFixed(1)))
-      : Math.max(1, Number(((modalOfferValue ?? selectedPlayer?.salary ?? 1) * 1.3).toFixed(1)));
-  const compactNegotiationFeedback = useMemo(() => {
-    const likes: string[] = [];
-    const concerns: string[] = [];
-
-    if (contractPreference) {
-      if (contractLengthOutsidePreference) {
-        concerns.push(
-          activeContractLength < contractPreference.preferredMinLength
-            ? `Laufzeit zu kurz fuer den Wunsch (${contractPreference.preferredMinLength}-${contractPreference.preferredMaxLength} Saisons okay)`
-            : `Laufzeit zu lang fuer den Wunsch (${contractPreference.preferredMinLength}-${contractPreference.preferredMaxLength} Saisons okay)`,
-        );
-      } else {
-        likes.push(`Laufzeit passt in sein Wunschfenster (${contractPreference.preferredMinLength}-${contractPreference.preferredMaxLength})`);
-      }
-
-      if (contractShapeMismatch) {
-        concerns.push(
-          `Vertragsform mag er weniger (${formatContractShapeLabel(activeContractShape)} statt ${formatContractShapeLabel(contractPreference.shapePreference)})`,
-        );
-      } else {
-        likes.push(`Vertragsform passt (${formatContractShapeLabel(activeContractShape)})`);
-      }
-    }
-
-    if (buyPreview?.expectedSalary != null && modalOfferValue != null) {
-      const salaryDelta = Number((modalOfferValue - buyPreview.expectedSalary).toFixed(1));
-      if (salaryDelta >= 0) {
-        likes.push(
-          salaryDelta === 0
-            ? "Gehalt trifft genau seine aktuelle Forderung"
-            : `Gehalt liegt ${formatTransfermarktCurrency(salaryDelta)} ueber seiner Forderung`,
-        );
-      } else {
-        concerns.push(`Gehalt liegt ${formatTransfermarktCurrency(Math.abs(salaryDelta))} unter seiner Forderung`);
-      }
-    }
-
-    const breakdown = buyPreview?.negotiationScoreBreakdown ?? [];
-    for (const entry of breakdown) {
-      if (entry.tone === "positive" && likes.length < 3) {
-        likes.push(`${entry.label}: ${entry.reason}`);
-      }
-      if (entry.tone === "negative" && concerns.length < 3) {
-        concerns.push(`${entry.label}: ${entry.reason}`);
-      }
-      if (likes.length >= 3 && concerns.length >= 3) {
-        break;
-      }
-    }
-
-    return {
-      likes: likes.slice(0, 3),
-      concerns: concerns.slice(0, 3),
-    };
-  }, [
-    activeContractLength,
-    activeContractShape,
-    buyPreview?.expectedSalary,
-    buyPreview?.negotiationScoreBreakdown,
-    contractLengthOutsidePreference,
-    contractPreference,
-    contractShapeMismatch,
-    modalOfferValue,
-  ]);
-  const priorBadExperienceDemandEntry = useMemo(
-    () => buyPreview?.demandBreakdown?.find((entry) => entry.key === "prior_bad_experience") ?? null,
-    [buyPreview?.demandBreakdown],
-  );
-  const priorBadExperienceScoreEntry = useMemo(
-    () => buyPreview?.negotiationScoreBreakdown?.find((entry) => entry.key === "bad_experience") ?? null,
-    [buyPreview?.negotiationScoreBreakdown],
-  );
-  const priorBadExperienceActive = Boolean(
-    buyPreview?.warnings?.includes("previous_rejected_offer_reduces_trust") ||
-    priorBadExperienceDemandEntry ||
-    priorBadExperienceScoreEntry,
-  );
   const needBreakdownSummary = useMemo(() => {
     const breakdown = selectedPlayer?.needMatchBreakdown;
     if (!breakdown) {
@@ -2967,7 +2827,7 @@ export default function TransfermarktV2Client({
                   <FoundationPlayerPortraitCard
                     playerId={item.playerId}
                     name={item.name}
-                    portraitUrl={portrait.src}
+                    portraitUrl={appendMediaImageVariant(portrait.src, "preview") ?? portrait.src}
                     portraitInitials={portrait.initials}
                     playerOvr={item.ovr ?? null}
                     playerMvs={item.mvs ?? null}
@@ -3652,7 +3512,9 @@ export default function TransfermarktV2Client({
                 {selectedWishlistEntries.map((entry) => {
                   const marketItem = marketItemByPlayerId.get(entry.playerId);
                   const portrait = marketItem ? getTransfermarktPortraitModel(marketItem) : null;
-                  const wishlistPortraitSrc = portrait?.src ?? getPlayerPortraitBrowserUrl(entry.playerId);
+                  const wishlistPortraitBase = portrait?.src ?? getPlayerPortraitBrowserUrl(entry.playerId);
+                  const wishlistPortraitThumb = appendMediaImageVariant(wishlistPortraitBase, "thumb") ?? wishlistPortraitBase;
+                  const wishlistPortraitPreview = appendMediaImageVariant(wishlistPortraitBase, "preview") ?? wishlistPortraitBase;
                   const fitInfo = marketItem ? getFitSignal(marketItem) : null;
                   const needInfo = marketItem ? getNeedSignal(marketItem) : null;
                   const ratioTone = marketItem ? getRatioTone(marketItem.marketValueSalaryRatio) : "neutral";
@@ -3667,7 +3529,7 @@ export default function TransfermarktV2Client({
                         <FoundationPlayerPortraitPreview
                           playerId={entry.playerId}
                           name={entry.playerName}
-                          portraitUrl={wishlistPortraitSrc}
+                          portraitUrl={wishlistPortraitPreview}
                           portraitInitials={(portrait?.initials ?? entry.playerName.slice(0, 2)).toUpperCase()}
                           playerOvr={marketItem?.ovr ?? null}
                           playerMvs={marketItem?.mvs ?? null}
@@ -3694,9 +3556,9 @@ export default function TransfermarktV2Client({
                             },
                           }}
                         >
-                          {wishlistPortraitSrc ? (
+                          {wishlistPortraitThumb ? (
                             <OptimizedMediaImage
-                              src={wishlistPortraitSrc}
+                              src={wishlistPortraitThumb}
                               alt={entry.playerName}
                               width={42}
                               height={42}
@@ -3846,10 +3708,15 @@ export default function TransfermarktV2Client({
                 {selectedRosterRows.map((row) => (
                   <tr key={row.activePlayerId}>
                     <td>
+                      {(() => {
+                        const rosterPortraitBase = row.portraitUrl ?? getPlayerPortraitBrowserUrl(row.playerId);
+                        const rosterPortraitThumb = appendMediaImageVariant(rosterPortraitBase, "thumb") ?? rosterPortraitBase;
+                        const rosterPortraitPreview = appendMediaImageVariant(rosterPortraitBase, "preview") ?? rosterPortraitBase;
+                        return (
                       <FoundationPlayerPortraitPreview
                         playerId={row.playerId}
                         name={row.name}
-                        portraitUrl={row.portraitUrl ?? getPlayerPortraitBrowserUrl(row.playerId)}
+                        portraitUrl={rosterPortraitPreview}
                         portraitInitials={row.name.slice(0, 2).toUpperCase()}
                         playerOvr={row.ovr ?? null}
                         playerMvs={row.mvs ?? null}
@@ -3863,9 +3730,9 @@ export default function TransfermarktV2Client({
                         playerClassName={row.className}
                         subMeta={row.race ?? undefined}
                       >
-                        {row.portraitUrl ? (
+                        {rosterPortraitThumb ? (
                           <OptimizedMediaImage
-                            src={row.portraitUrl}
+                            src={rosterPortraitThumb}
                             alt={row.name}
                             width={42}
                             height={42}
@@ -3875,6 +3742,8 @@ export default function TransfermarktV2Client({
                           <div className="market-v2-roster-context-placeholder">{row.name.slice(0, 2).toUpperCase()}</div>
                         )}
                       </FoundationPlayerPortraitPreview>
+                        );
+                      })()}
                     </td>
                     <td>
                       <button
@@ -4011,466 +3880,47 @@ export default function TransfermarktV2Client({
         </article>
       </section>
 
-      {buyModalOpen ? (
-        <section className="foundation-drilldown-page transfer-offer-page" data-testid="transfer-offer-page" ref={buyModalRef}>
-            <header className="foundation-drilldown-header">
-              <div>
-                <span className="market-v2-kicker">Vertragsangebot</span>
-                <h1>{selectedPlayer?.name ?? "Spieler prüfen"}</h1>
-              </div>
-              <button className="secondary-button" type="button" onClick={closeBuyModal} disabled={buyBusy}>
-                Zurück
-              </button>
-            </header>
-
-            <div className="foundation-drilldown-body transfer-buy-modal-body" ref={buyModalBodyRef}>
-              <div className="transfer-buy-player-line">
-                <div className="transfer-modal-player-hero">
-                  {selectedPortrait?.src ? (
-                    <OptimizedMediaImage
-                      src={selectedPortrait.src}
-                      alt={modalPlayerName}
-                      width={72}
-                      height={72}
-                      className="transfermarkt-portrait"
-                    />
-                  ) : buyModalWishlistEntry ? (
-                    <OptimizedMediaImage
-                      src={getPlayerPortraitBrowserUrl(buyModalWishlistEntry.playerId)}
-                      alt={modalPlayerName}
-                      width={72}
-                      height={72}
-                      className="transfermarkt-portrait"
-                    />
-                  ) : (
-                    <div className="transfermarkt-portrait transfermarkt-portrait-placeholder" aria-label={`${modalPlayerName} placeholder`}>
-                      {(selectedPortrait?.initials ?? modalPlayerName.slice(0, 2)).toUpperCase()}
-                    </div>
-                  )}
-                  <div className="transfer-modal-player-summary">
-                    <div className="transfer-modal-player-head">
-                      <strong>{modalPlayerName}</strong>
-                      <div className="transfer-modal-player-meta">
-                        <ClassIcon classNameValue={modalPlayerClass} showLabel={false} />
-                        <span className="muted">{modalPlayerClass}</span>
-                        <span className="muted">{modalPlayerRace}</span>
-                        <span className="pill">Bracket {modalPlayerBracket != null ? formatCompactNumber(modalPlayerBracket, 0) : "—"}</span>
-                        <span className="pill">{selectedTeam ? `${selectedTeam.shortCode} · ${selectedTeam.name}` : "Kein Team gewählt"}</span>
-                      </div>
-                    </div>
-                    <div className="transfer-modal-player-kpis">
-                      <article className="transfer-modal-kpi">
-                        <span>Marktwert</span>
-                        <strong>{formatTransfermarktCurrency(modalPlayerMarketValue)}</strong>
-                      </article>
-                      <article className="transfer-modal-kpi">
-                        <span>Basisgehalt</span>
-                        <strong>{formatTransfermarktCurrency(modalPlayerSalary)}</strong>
-                      </article>
-                      <article className="transfer-modal-kpi">
-                        <span>Aktuelle Forderung</span>
-                        <strong>{formatTransfermarktCurrency(buyPreview?.expectedSalary ?? null)}</strong>
-                      </article>
-                      <article className="transfer-modal-kpi">
-                        <span>Zusage</span>
-                        <strong>{formatPercentLabel(buyPreview?.acceptChance)}</strong>
-                      </article>
-                    </div>
-                  </div>
-                </div>
-                <span className={`transfer-status-pill${buyPreview?.canBuy ? " is-ready" : " is-blocked"}`}>
-                  {source !== "sqlite" ? "nur Ansicht" : buyPreview?.canBuy ? "bereit" : "pruefen"}
-                </span>
-              </div>
-
-              {previewBusy && !buyPreview ? (
-                <div className="transfer-buy-preview-skeleton" data-testid="transfer-buy-preview-skeleton" aria-busy="true" aria-label="Kaufvorschau lädt">
-                  <div className="transfer-buy-preview-skeleton__banner">
-                    <strong>Kaufvorschau lädt</strong>
-                    <span>Forderung, Vertrag und Teamwirkung werden berechnet.</span>
-                  </div>
-                  <div className="transfer-buy-preview-skeleton__grid">
-                    <div className="transfer-buy-preview-skeleton__block" />
-                    <div className="transfer-buy-preview-skeleton__block" />
-                    <div className="transfer-buy-preview-skeleton__block" />
-                    <div className="transfer-buy-preview-skeleton__block is-wide" />
-                  </div>
-                </div>
-              ) : null}
-              {previewBusy && buyPreview ? (
-                <div className="transfer-feedback-banner is-info" data-testid="transfer-buy-preview-refresh">
-                  <strong>Vorschau aktualisiert</strong>
-                  <span>Vertrag und Gehalt werden neu berechnet.</span>
-                </div>
-              ) : null}
-              {previewError ? (
-                <div className="transfer-feedback-banner is-error">
-                  <strong>Vorschau blockiert</strong>
-                  <span>{previewError}</span>
-                </div>
-              ) : null}
-              {buySuccess ? (
-                <div className="transfer-feedback-banner is-success">
-                  <strong>Kauf erfolgreich</strong>
-                  <span>{buySuccess}</span>
-                </div>
-              ) : null}
-              {source !== "sqlite" ? (
-                <div className="transfer-feedback-banner is-info">
-                  <strong>Read-only</strong>
-                  <span>Hier kannst du alles prüfen, aber in diesem Modus keinen Kauf final schreiben.</span>
-                </div>
-              ) : null}
-              {priorBadExperienceActive ? (
-                <div className="transfer-feedback-banner is-warning">
-                  <strong>Spieler ist noch angefressen</strong>
-                  <span>
-                    {priorBadExperienceDemandEntry
-                      ? `Die letzte Verhandlung mit diesem Team wirkt noch nach. Seine Forderung liegt dadurch aktuell bei ${formatDemandPercent(priorBadExperienceDemandEntry.percent)} und die Zusage ist spuerbar schlechter.`
-                      : "Die letzte Verhandlung mit diesem Team wirkt noch nach. Dadurch fordert der Spieler mehr und verhandelt misstrauischer."}
-                  </span>
-                </div>
-              ) : null}
-
-              <ContractOfferClient
-                playerName={modalPlayerName}
-                roleLabel={modalPlayerClass}
-                expectedSalary={buyPreview?.expectedSalary ?? null}
-                offeredSalary={modalOfferValue}
-                contractLength={activeContractLength}
-                contractShape={activeContractShape}
-                budgetAvailable={buyPreview?.cashBefore ?? null}
-                acceptChance={buyPreview?.acceptChance ?? null}
-                counterChance={buyPreview?.counterChance ?? null}
-                rejectChance={buyPreview?.rejectChance ?? null}
-                negotiationOutcome={
-                  buyNegotiationOutcome
-                    ? {
-                        title: buyNegotiationOutcome.title,
-                        message: buyNegotiationOutcome.message,
-                        tone: buyNegotiationOutcome.tone,
-                      }
-                    : null
-                }
-                busy={buyBusy}
-                onContractLengthChange={(value) => {
-                  setBuyNegotiationOutcome(null);
-                  setContractLength(value);
-                }}
-                onContractShapeChange={(value) => {
-                  setBuyNegotiationOutcome(null);
-                  setContractShape(value);
-                }}
-                onSalaryChange={(value) => {
-                  setBuyNegotiationOutcome(null);
-                  setOfferedSalary(value);
-                  setSalaryEditedManually(value != null);
-                }}
-                onResetSuggestion={resetBuyDemandFrame}
-                onSendOffer={() => void negotiateBuy()}
-                onCancel={closeBuyModal}
-              />
-
-              <div className="transfer-modal-section transfer-callout is-info transfer-compact-feedback-callout">
-                <div className="transfer-callout-title">
-                  <strong>Kompakt: Was er am Vertrag mag</strong>
-                  <span className="muted">schneller Check ohne Scrollen</span>
-                </div>
-                <div className="transfer-compact-feedback-grid">
-                    <div className="transfer-compact-feedback-column">
-                      <span className="muted">Passt gut</span>
-                      <div className="negotiation-factor-list">
-                        {compactNegotiationFeedback.likes.length ? (
-                          compactNegotiationFeedback.likes.map((entry) => (
-                            <span className="negotiation-factor is-positive" key={`buy-like-${entry}`}>
-                              {entry}
-                            </span>
-                          ))
-                        ) : (
-                          <span className="negotiation-factor is-neutral">Noch kein klarer Pluspunkt sichtbar</span>
-                        )}
-                      </div>
-                    </div>
-                    <div className="transfer-compact-feedback-column">
-                      <span className="muted">Stoert ihn</span>
-                      <div className="negotiation-factor-list">
-                        {compactNegotiationFeedback.concerns.length ? (
-                          compactNegotiationFeedback.concerns.map((entry) => (
-                            <span className="negotiation-factor is-negative" key={`buy-concern-${entry}`}>
-                              {entry}
-                            </span>
-                          ))
-                        ) : (
-                          <span className="negotiation-factor is-positive">Aktuell kein klarer Vertrags-Nachteil</span>
-                        )}
-                        {priorBadExperienceScoreEntry ? (
-                          <span className="negotiation-factor is-negative">
-                            {priorBadExperienceScoreEntry.label}: {priorBadExperienceScoreEntry.reason}
-                          </span>
-                        ) : null}
-                      </div>
-                    </div>
-                  </div>
-              </div>
-
-                {contractPreference ? (
-                  <div className={`contract-preference-card is-${contractPreference.matchQuality}`}>
-                    <div>
-                      <span className="eyebrow">Spielerwunsch</span>
-                      <strong>{formatContractLengthPreference(contractPreference.lengthPreference)}</strong>
-                      <p className="muted">
-                        Wunschfenster {contractPreference.preferredMinLength}-{contractPreference.preferredMaxLength} Saisons · am liebsten{" "}
-                        {contractPreference.idealLength} · Form {formatContractShapeLabel(contractPreference.shapePreference)}
-                      </p>
-                      <p className="muted">
-                        {formatContractPreferenceCurrentStatus(
-                          contractPreference,
-                          activeContractLength,
-                          activeContractShape,
-                        )}
-                      </p>
-                    </div>
-                    <div className="contract-preference-impact">
-                      <span className={contractSalaryAdjustmentPct != null && contractSalaryAdjustmentPct <= 0 ? "positive-value" : "negative-value"}>
-                        {formatSignedPercentDelta(contractSalaryAdjustmentPct)} Gehalt
-                      </span>
-                      <span className={contractScoreAdjustment != null && contractScoreAdjustment >= 0 ? "positive-value" : "negative-value"}>
-                        {formatSignedPoints(contractScoreAdjustment)} Score
-                      </span>
-                    </div>
-                  </div>
-                ) : null}
-
-                <div className="metric-grid compact">
-                  <article className="metric-card">
-                    <span>Basisforderung</span>
-                    <strong>{formatTransfermarktCurrency(buyPreview?.baseExpectedSalary ?? null)}</strong>
-                  </article>
-                  <article className="metric-card">
-                    <span>Aktuelle Forderung</span>
-                    <strong>{formatTransfermarktCurrency(buyPreview?.expectedSalary ?? null)}</strong>
-                  </article>
-                  <article className="metric-card">
-                    <span>Forderungsfaktor</span>
-                    <strong>{buyPreview?.demandMultiplier != null ? `${formatCompactNumber(buyPreview.demandMultiplier * 100, 0)}%` : "—"}</strong>
-                  </article>
-                  <article className="metric-card">
-                    <span>Zusage / Nachf. / Absage</span>
-                    <strong className="negotiation-chance-row">
-                      <span className="is-positive">{formatPercentLabel(buyPreview?.acceptChance)}</span>
-                      <span className="is-warning">{formatPercentLabel(buyPreview?.counterChance)}</span>
-                      <span className="is-negative">{formatPercentLabel(buyPreview?.rejectChance)}</span>
-                    </strong>
-                  </article>
-                  <article className="metric-card">
-                    <span>Buyout</span>
-                    <strong>{formatTransfermarktCurrency(buyPreview?.buyoutCost ?? null)}</strong>
-                  </article>
-                </div>
-                {buyPreview?.demandBreakdown?.length ? (
-                  <div className="transfer-demand-breakdown">
-                    <div className="transfer-callout-title">
-                      <strong>So entsteht die Forderung</strong>
-                      <span className="muted">
-                        {formatTransfermarktCurrency(buyPreview.baseExpectedSalary ?? null)} → {formatTransfermarktCurrency(buyPreview.expectedSalary ?? null)}
-                      </span>
-                    </div>
-                    <ul className="warning-list negotiation-factor-list">
-                      {buyPreview.demandBreakdown.map((entry) => (
-                        <li className={`negotiation-factor is-${entry.tone}`} key={entry.key}>
-                          <strong>{formatDemandPercent(entry.percent)}</strong>
-                          <span>{entry.label}: {entry.reason}</span>
-                        </li>
-                      ))}
-                    </ul>
-                  </div>
-                ) : null}
-
-              {buyPreview ? (
-                <>
-                  <div className="transfer-modal-section transfer-callout is-info">
-                    <div className="transfer-callout-title">
-                      <strong>Jahresplan</strong>
-                      <span className="muted">
-                        {formatContractShapeLabel(buyPreview.contractShape ?? activeContractShape)} · {buyPreview.contractLength} Saison{buyPreview.contractLength === 1 ? "" : "en"}
-                      </span>
-                    </div>
-                    {buyPreview.yearlySalarySchedule?.length ? (
-                      <div className="contract-schedule-table" role="table" aria-label="Vertrags-Jahresplan">
-                        <div className="contract-schedule-row is-head" role="row">
-                          <span>Jahr</span>
-                          <span>Season</span>
-                          <span>Gehalt</span>
-                        </div>
-                        {buyPreview.yearlySalarySchedule.map((entry) => (
-                          <div className="contract-schedule-row" role="row" key={`${entry.label}-${entry.yearIndex}`}>
-                            <span>Jahr {entry.yearIndex}</span>
-                            <span>{entry.label}</span>
-                            <strong>{formatTransfermarktCurrency(entry.salary)}</strong>
-                          </div>
-                        ))}
-                        <div className="contract-schedule-row is-total" role="row">
-                          <span>Summe</span>
-                          <span>Buyout {formatTransfermarktCurrency(buyPreview.buyoutCost ?? null)}</span>
-                          <strong>{formatTransfermarktCurrency(buyPreview.totalSalary ?? null)}</strong>
-                        </div>
-                      </div>
-                    ) : (
-                      <p className="muted">Noch kein Jahresplan verfuegbar.</p>
-                    )}
-                    <p className="muted" style={{ marginTop: 8 }}>
-                      Forderungsweg: Basis {formatTransfermarktCurrency(buyPreview.baseExpectedSalary ?? null)} · aktuelle Forderung{" "}
-                      {formatTransfermarktCurrency(buyPreview.expectedSalary ?? null)} · Gesamtverschiebung {formatTransfermarktCurrency(marketAndFitDelta)}
-                      {fitSalaryDiscountActive ? " · Fit-Bonus zuletzt aktiv" : ""}
-                    </p>
-                  </div>
-
-                  <div className="transfer-modal-section">
-                    <div className="transfer-callout-title">
-                      <strong>Team-Auswirkung</strong>
-                      <span className="muted">Sofort sichtbar, final erst beim Abschluss</span>
-                    </div>
-                    <div className="metric-grid compact">
-                      <article className="metric-card">
-                        <span>Kaufpreis / Abloese</span>
-                        <strong>{formatTransfermarktCurrency(buyPreview.purchasePrice)}</strong>
-                      </article>
-                      <article className="metric-card">
-                        <span>Cash vorher / nachher</span>
-                        <strong>{formatTransfermarktCurrency(buyPreview.cashBefore)} / {formatTransfermarktCurrency(buyPreview.cashAfter)}</strong>
-                      </article>
-                      <article className="metric-card">
-                        <span>Kader vorher / nachher</span>
-                        <strong>{buyPreview.rosterBefore ?? "—"} / {buyPreview.rosterAfter ?? "—"}</strong>
-                      </article>
-                      <article className="metric-card">
-                        <span>Gehalt vorher / nachher</span>
-                        <strong>{formatTransfermarktCurrency(buyPreview.salaryBefore)} / {formatTransfermarktCurrency(buyPreview.salaryAfter)}</strong>
-                      </article>
-                      <article className="metric-card">
-                        <span>MW vorher / nachher</span>
-                        <strong>{formatTransfermarktCurrency(buyPreview.marketValueBefore)} / {formatTransfermarktCurrency(buyPreview.marketValueAfter)}</strong>
-                      </article>
-                      <article className="metric-card">
-                        <span>Rolle</span>
-                        <strong>{buyPreview.promisedRole ?? "offen"}</strong>
-                      </article>
-                    </div>
-                  </div>
-
-                  <div className="transfer-buy-meta-grid">
-                    <div className="transfer-callout is-blocked">
-                      <div className="transfer-callout-title">
-                        <strong>Blocker</strong>
-                        <span className="muted">{buyPreview.blockingReasons.length}</span>
-                      </div>
-                      {buyPreview.blockingReasons.length > 0 ? (
-                        <ul className="warning-list negotiation-factor-list">
-                          {buyPreview.blockingReasons.map((reason) => (
-                            <li className="negotiation-factor is-negative" key={reason}>{formatNegotiationSignalLabel(reason)}</li>
-                          ))}
-                        </ul>
-                      ) : (
-                        <p className="muted">Keine blockierenden Gruende.</p>
-                      )}
-                    </div>
-                    <div className="transfer-callout is-warning">
-                      <div className="transfer-callout-title">
-                        <strong>Hinweise</strong>
-                        <span className="muted">{buyPreview.warnings.length}</span>
-                      </div>
-                      {buyPreview.warnings.length > 0 ? (
-                        <ul className="warning-list negotiation-factor-list">
-                          {buyPreview.warnings.map((warning) => (
-                            <li className="negotiation-factor is-negative" key={warning}>{formatNegotiationSignalLabel(warning)}</li>
-                          ))}
-                        </ul>
-                      ) : (
-                        <p className="muted">Keine Warnungen.</p>
-                      )}
-                    </div>
-                    <div className="transfer-callout is-info">
-                      <div className="transfer-callout-title">
-                        <strong>Warum der Deal so ausfällt</strong>
-                        <span className="muted">{buyPreview.negotiationScoreBreakdown?.length ?? 0} Faktoren</span>
-                      </div>
-                      {buyPreview.negotiationScoreBreakdown?.length ? (
-                        <ul className="warning-list negotiation-factor-list">
-                          {buyPreview.negotiationScoreBreakdown.map((entry) => (
-                            <li className={`negotiation-factor is-${entry.tone}`} key={entry.key}>
-                              <strong>{entry.points > 0 ? `+${entry.points}` : entry.points}</strong>
-                              <span>{entry.label}: {entry.reason}</span>
-                            </li>
-                          ))}
-                        </ul>
-                      ) : (
-                        <p className="muted">Noch keine Score-Faktoren verfuegbar.</p>
-                      )}
-                      {buyPreview.negotiationReasons?.length ? (
-                        <>
-                          <p className="muted" style={{ marginTop: 8 }}>Treiber</p>
-                          <ul className="warning-list negotiation-factor-list">
-                            {buyPreview.negotiationReasons.map((reason) => (
-                              <li className="negotiation-factor is-positive" key={reason}>{formatNegotiationSignalLabel(reason)}</li>
-                            ))}
-                          </ul>
-                        </>
-                      ) : null}
-                      {buyPreview.negotiationWarnings?.length ? (
-                        <>
-                          <p className="muted" style={{ marginTop: 8 }}>Risiken</p>
-                          <ul className="warning-list negotiation-factor-list">
-                            {buyPreview.negotiationWarnings.map((warning) => (
-                              <li className="negotiation-factor is-negative" key={warning}>{formatNegotiationSignalLabel(warning)}</li>
-                            ))}
-                          </ul>
-                        </>
-                      ) : null}
-                    </div>
-                  </div>
-                </>
-              ) : (
-                <p className="muted transfer-empty-hint">
-                  Kaufvorschau wird geladen oder ist fuer diesen Kontext noch nicht verfuegbar.
-                </p>
-              )}
-            </div>
-
-            <div className="foundation-modal-actions">
-              <button className="secondary-button" type="button" onClick={closeBuyModal} disabled={buyBusy}>
-                Abbrechen
-              </button>
-              <button
-                className={buyNegotiationOutcome?.status === "accepted" ? "primary-button" : "secondary-button"}
-                type="button"
-                disabled={source !== "sqlite" || !selectedTeamCanManage || previewBusy || buyBusy || !selectedPlayer || !selectedTeamId || !buyPreview?.canBuy || buyNegotiationOutcome?.status === "rejected"}
-                onClick={() => void negotiateBuy()}
-                title={
-                  source !== "sqlite"
-                    ? "Im Referenzmodus bleibt die Verhandlung gesperrt."
-                    : !buyPreview?.canBuy
-                      ? buyPreview?.blockingReasons?.map(formatNegotiationSignalLabel).join(" · ") || "Der Deal ist noch nicht bereit."
-                      : buyNegotiationOutcome?.status === "rejected"
-                        ? "Nach einer Absage erst Angebot oder Vertrag anpassen."
-                        : "Verhandlung starten und Reaktion der Gegenseite prüfen."
-                }
-              >
-                {buyBusy ? "verhandelt..." : buyNegotiationOutcome?.status === "accepted" ? "Annahme liegt vor" : "Verhandeln"}
-              </button>
-              <button
-                className="primary-button"
-                type="button"
-                data-testid="transfer-buy-confirm-button"
-                disabled={source !== "sqlite" || !selectedTeamCanManage || previewBusy || buyBusy || !selectedPlayer || !selectedTeamId || !buyPreview?.canBuy || buyNegotiationOutcome?.status !== "accepted"}
-                onClick={() => void confirmBuy()}
-                title={finalBuyDisabledReason ?? "Bestätigt den Kauf jetzt final in deinem lokalen Spielstand."}
-              >
-                {buyBusy ? "kauft..." : "Kauf final abschließen"}
-              </button>
-            </div>
-            {finalBuyDisabledReason ? <p className="foundation-screen-action-reason">Warum nicht: {finalBuyDisabledReason}</p> : null}
-        </section>
-      ) : null}
+      <FoundationShellRouterMarketBuy
+        active={buyModalOpen}
+        hostProps={{
+          buyModalRef,
+          buyModalBodyRef,
+          source,
+          selectedTeam,
+          selectedPlayer,
+          buyModalWishlistEntry,
+          selectedPortrait,
+          selectedTeamCanManage,
+          selectedTeamId,
+          buyPreview,
+          previewBusy,
+          previewError,
+          buyBusy,
+          buySuccess,
+          buyNegotiationOutcome,
+          contractLength,
+          contractShape,
+          offeredSalary,
+          salaryEditedManually,
+          derivationsInput: {
+            source,
+            selectedTeamCanManage,
+            selectedTeamReadOnlyReason,
+            selectedTeamId,
+            previewBusy,
+            buyBusy,
+          },
+          onContractLengthChange: setContractLength,
+          onContractShapeChange: setContractShape,
+          onOfferedSalaryChange: setOfferedSalary,
+          onSalaryEditedManuallyChange: setSalaryEditedManually,
+          onBuyNegotiationOutcomeChange: setBuyNegotiationOutcome,
+          closeBuyModal,
+          negotiateBuy,
+          confirmBuy,
+          resetBuyDemandFrame,
+        }}
+      />
     </section>
   );
 }

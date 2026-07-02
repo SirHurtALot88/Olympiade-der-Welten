@@ -3,6 +3,7 @@ import path from "node:path";
 import { describe, expect, it } from "vitest";
 
 const foundationClientPath = path.join(process.cwd(), "app/foundation/FoundationPageClient.tsx");
+const foundationPageTypesPath = path.join(process.cwd(), "lib/foundation/tabs/foundation-page-types.ts");
 
 describe("new game setup UI contract", () => {
   it("exposes the New Game wizard with preview/confirm controls", () => {
@@ -32,10 +33,11 @@ describe("new game setup UI contract", () => {
 
   it("keeps Online 4v4 ownership preset visible in the client", () => {
     const source = fs.readFileSync(foundationClientPath, "utf8");
+    const pageTypesSource = fs.readFileSync(foundationPageTypesPath, "utf8");
 
     expect(source).toContain('online_4v4');
-    expect(source).toContain('["P-S", "D-P", "M-M", "V-W"]');
-    expect(source).toContain('["M-S", "P-C", "C-S", "G-G"]');
+    expect(pageTypesSource).toContain('["P-S", "D-P", "M-M", "V-W"]');
+    expect(pageTypesSource).toContain('["M-S", "P-C", "C-S", "G-G"]');
   });
 
   it("lets the season briefing complete and continue the setup flow", () => {

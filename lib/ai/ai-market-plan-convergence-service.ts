@@ -384,6 +384,8 @@ export function runEmergencyRosterRepairForTeams(input: {
   teamIds: string[];
   persistence: PersistenceService;
   outputDir?: string;
+  /** Planner-delegated coverage-risk teams (optional metadata for logging). */
+  convergenceExhaustedTeamIds?: string[];
 }): EmergencyRosterRepairResult {
   const uniqueTeamIds = unique(input.teamIds);
   if (uniqueTeamIds.length === 0) {

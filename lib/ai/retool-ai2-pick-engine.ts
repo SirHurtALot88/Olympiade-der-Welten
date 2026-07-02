@@ -351,7 +351,8 @@ export function buildRetoolAi2BudgetPlan(input: {
       0.14 * trendUp01 +
       0.1 * (missingToMin <= 0 ? 1 : 0) +
       0.26 * clamp(salaryBurdenRatio / 0.45, 0, 1) -
-      0.14 * cashRunway01,
+      0.14 * cashRunway01 +
+      (salaryFactorCurrent < 1 ? (1 - salaryFactorCurrent) * 0.5 : 0),
     0,
     1,
   );

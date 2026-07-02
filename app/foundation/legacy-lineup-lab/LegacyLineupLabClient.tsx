@@ -21,7 +21,7 @@ import { isFoundationTeamManagementLocked } from "@/lib/foundation/foundation-ad
 import { getGameTermTooltip } from "@/components/ui/GameTerm";
 import { TooltipHeading } from "@/components/ui/TooltipHeading";
 import { getPlayerPortraitBrowserUrl, getTeamLogoBrowserUrl } from "@/lib/data/mediaAssets";
-import type { DisciplineCategory, FormCardPlanRecord, LineupDraftModifiers, Player, PlayerAttributeSheetStats } from "@/lib/data/olyDataTypes";
+import type { DisciplineCategory, FormCardPlanRecord, GameState, LineupDraftModifiers, Player, PlayerAttributeSheetStats } from "@/lib/data/olyDataTypes";
 import {
   appendRoomContextToParams,
   readFoundationRoomContextFromLocation,
@@ -329,6 +329,7 @@ type LegacyLineupLabClientProps = {
   manageableTeamIds?: string[];
   onTeamChange?: (teamId: string) => void;
   playerCatalog?: Player[];
+  embeddedGameState?: GameState;
   onOpenPlayerDetails?: (payload: { playerId: string; activePlayerId?: string | null }) => void;
   onLineupSaved?: (payload: {
     saveId: string;
@@ -2010,7 +2011,7 @@ export default function LegacyLineupLabClient(props: LegacyLineupLabClientProps)
         (disciplineId): disciplineId is string => Boolean(disciplineId),
       ),
     );
-    const scheduleEntries = [...(context.gameState?.seasonState.disciplineSchedule ?? [])]
+    const scheduleEntries = [...(context.seasonDisciplineSchedule ?? [])]
       .filter((entry) => entry.seasonId === context.season.id)
       .sort((left, right) => left.matchdayIndex - right.matchdayIndex);
 
@@ -2516,7 +2517,10 @@ export default function LegacyLineupLabClient(props: LegacyLineupLabClientProps)
     [context?.formCards, plannedFormCardIds],
   );
   const teamLogoUrl = useMemo(
-    () => (context?.team ? getTeamLogoBrowserUrl(context.team.id, context.team.logoPath ?? null) : null),
+    () =>
+      context?.team
+        ? getTeamLogoBrowserUrl(context.team.id, context.team.logoPath ?? null, { variant: "thumb" })
+        : null,
     [context?.team],
   );
   const teamLogoInitials = useMemo(() => {
@@ -4065,6 +4069,19 @@ export default function LegacyLineupLabClient(props: LegacyLineupLabClientProps)
             detail: "Dieser Spieler ist schon in einem anderen Slot gesetzt.",
           });
         }
+        if (selectedOption?.injuryStatus === "injured") {
+          issues.unshift({
+            tone: "blocked",
+            label: "Verletzt",
+            detail: "Verletzter Spieler — aus dem Lineup nehmen oder ersetzen.",
+          });
+        } else if (selectedOption?.injuryStatus === "recovering") {
+          issues.unshift({
+            tone: "warning",
+            label: "Recovery",
+            detail: "Spieler erholt sich noch — Belastung reduzieren.",
+          });
+        }
         if (isElevatedFatigue(selectedOption?.fatigueCount)) {
           issues.push({
             tone: "warning",
@@ -4964,7 +4981,13 @@ export default function LegacyLineupLabClient(props: LegacyLineupLabClientProps)
 
     try {
       if (options?.silent && source === "sqlite" && context) {
-        const localResult = calculateLocalLegacyLineupPreviewFromContext(context, entriesToPreview, previewModifiers);
+        const localResult = calculateLocalLegacyLineupPreviewFromContext(
+          context,
+          entriesToPreview,
+          previewModifiers,
+          context.fatigueByPlayerId ?? null,
+          props.embeddedGameState ?? null,
+        );
         if (options?.silent && previewSequence !== previewSequenceRef.current) {
           return;
         }

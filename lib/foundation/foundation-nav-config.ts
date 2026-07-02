@@ -19,7 +19,7 @@ export const FOUNDATION_NAV_GROUPS: FoundationNavGroup[] = [
     label: "Spieltag",
     items: [
       { id: "homeV2", label: "Home", tooltip: "Manager-Dashboard mit KPIs, Top-Spielern und Flow.", icon: "⌂" },
-      { id: "inboxV2", label: "Inbox", tooltip: "Entscheidungen, Hinweise und Storys für dein Team.", icon: "✉" },
+      { id: "inboxV2", label: "Inbox", tooltip: "Offene Aufgaben & Warnungen für dein Team.", icon: "✉" },
       { id: "lineup", label: "Einsatzliste", tooltip: "Spieler setzen, Formplan und Team-Taktik.", icon: "▣" },
       { id: "lineupV2", label: "Einsatzliste v2", tooltip: "Preview: Focus Mode mit kompakter Slot-Rail.", icon: "▣" },
       { id: "matchdayArena", label: "Arena", tooltip: "Spieltag als Reveal/Event.", icon: "◉" },

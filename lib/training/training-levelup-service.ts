@@ -236,6 +236,15 @@ function pushUnique<T>(target: T[], value: T) {
   if (!target.includes(value)) target.push(value);
 }
 
+function stableTrainingAllocationHash(value: string) {
+  let hash = 2166136261;
+  for (let index = 0; index < value.length; index += 1) {
+    hash ^= value.charCodeAt(index);
+    hash = Math.imul(hash, 16777619);
+  }
+  return hash >>> 0;
+}
+
 export function deriveAttributeAffinityProfile(player: Player): AttributeAffinityProfile {
   const signatureCandidates: PlayerGeneratorAttributeName[] = [];
   const weakCandidates: PlayerGeneratorAttributeName[] = [];
@@ -619,13 +628,19 @@ export function buildAiTrainingPointAllocation(input: {
             : []),
   ] as PlayerGeneratorAttributeName[];
   const uniquePreferred = preferred.filter((attribute, index) => preferred.indexOf(attribute) === index);
+  const signatureBoost =
+    stableTrainingAllocationHash(`${input.player.id}:ai-training-points`) % 100 < 38 ? 2.5 : 1;
   const ranked = [...input.preview].sort((left, right) => {
     const leftPreferred = uniquePreferred.includes(left.attribute) ? 1 : 0;
     const rightPreferred = uniquePreferred.includes(right.attribute) ? 1 : 0;
+    const leftSignatureBoost = left.affinity === "signature" ? signatureBoost : 0;
+    const rightSignatureBoost = right.affinity === "signature" ? signatureBoost : 0;
     const leftWeakPenalty = left.affinity === "weak" ? -0.8 : 0;
     const rightWeakPenalty = right.affinity === "weak" ? -0.8 : 0;
-    const leftScore = leftPreferred * 5 + left.currentRatingDelta * 3 - (left.finalCost ?? 99) + leftWeakPenalty;
-    const rightScore = rightPreferred * 5 + right.currentRatingDelta * 3 - (right.finalCost ?? 99) + rightWeakPenalty;
+    const leftScore =
+      leftPreferred * 5 + leftSignatureBoost + left.currentRatingDelta * 3 - (left.finalCost ?? 99) + leftWeakPenalty;
+    const rightScore =
+      rightPreferred * 5 + rightSignatureBoost + right.currentRatingDelta * 3 - (right.finalCost ?? 99) + rightWeakPenalty;
     return rightScore - leftScore;
   });
   let remaining = input.level.trainingPointsAvailable;

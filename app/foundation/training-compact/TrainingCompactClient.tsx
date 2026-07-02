@@ -37,7 +37,7 @@ type TrainingCompactClientProps = {
 };
 
 function getTeamLogoModel(team: Pick<Team, "teamId" | "name" | "logoPath">) {
-  const src = getTeamLogoBrowserUrl(team.teamId, team.logoPath ?? null);
+  const src = getTeamLogoBrowserUrl(team.teamId, team.logoPath ?? null, { variant: "thumb" });
   const initials =
     team.name
       .split(/\s+/)

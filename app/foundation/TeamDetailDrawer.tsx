@@ -6,6 +6,8 @@ import { getGameTermTooltip } from "@/components/ui/GameTerm";
 import TeamDrawerHistoryTable from "@/components/foundation/team-drawer/TeamDrawerHistoryTable";
 import FoundationPlayerPortraitCard from "@/components/foundation/player-portrait-card/FoundationPlayerPortraitCard";
 import { createEmptyLeaguePlayerHeatPools, type LeaguePlayerHeatPools } from "@/lib/foundation/player-league-heat";
+import { compareTeamRosterPlayersByOvrOrMarketValue } from "@/lib/foundation/team-roster-player-sort";
+import { groupObjectivesByCategory } from "@/lib/foundation/team-board-objectives";
 import { isSeasonDisciplineKey } from "@/lib/season/season-discipline-area-groups";
 import type { PlayerPotentialBand, TeamStrategyBias } from "@/lib/data/olyDataTypes";
 
@@ -263,21 +265,22 @@ function formatRelationshipList(
   emptyLabel: string,
 ) {
   if (rows.length === 0) {
-    return <small className="muted">{emptyLabel}</small>;
+    return <p className="team-drawer-relations-empty">{emptyLabel}</p>;
   }
 
   return (
     <div className="team-drawer-relationship-list">
       {rows.slice(0, 4).map((row) => (
-        <span
+        <div
           key={row.teamId}
-          className={`team-drawer-relationship-chip${row.changed ? " has-change" : ""}`}
+          className={`team-drawer-relationship-row${row.changed ? " has-change" : ""}`}
           title={row.reasons.length ? row.reasons.map(formatRelationshipReason).join(" · ") : undefined}
         >
-          <strong>{row.shortCode} {formatNumber(row.value, 1)}</strong>
+          <strong>{row.shortCode}</strong>
+          <span>{formatNumber(row.value, 1)}</span>
           {row.changeLabel ? <em>{row.changeLabel}</em> : null}
           {row.changed && row.reasons[0] ? <small>{formatRelationshipReason(row.reasons[0])}</small> : null}
-        </span>
+        </div>
       ))}
     </div>
   );
@@ -317,28 +320,29 @@ function getRoleLabel(roleTag: string | null | undefined) {
 }
 
 function comparePlayersByOvr(left: TeamDetailDrawerPlayerCard, right: TeamDetailDrawerPlayerCard) {
-  const ovrDelta = (right.ovr ?? Number.NEGATIVE_INFINITY) - (left.ovr ?? Number.NEGATIVE_INFINITY);
-  if (ovrDelta !== 0) {
-    return ovrDelta;
-  }
-
-  const mvsDelta = (right.mvs ?? Number.NEGATIVE_INFINITY) - (left.mvs ?? Number.NEGATIVE_INFINITY);
-  if (mvsDelta !== 0) {
-    return mvsDelta;
-  }
-
-  const ppsDelta = (right.pps ?? Number.NEGATIVE_INFINITY) - (left.pps ?? Number.NEGATIVE_INFINITY);
-  if (ppsDelta !== 0) {
-    return ppsDelta;
-  }
-
-  return left.name.localeCompare(right.name, "de");
+  return compareTeamRosterPlayersByOvrOrMarketValue({
+    left: {
+      ovr: left.ovr,
+      marketValue: left.marketValue,
+      mvs: left.mvs,
+      pps: left.pps,
+      name: left.name,
+    },
+    right: {
+      ovr: right.ovr,
+      marketValue: right.marketValue,
+      mvs: right.mvs,
+      pps: right.pps,
+      name: right.name,
+    },
+  });
 }
 
 export default function TeamDetailDrawer({
   data,
   onClose,
   onOpenPlayer,
+  onOpenContracts,
   layerClassName = "",
   variant = "drawer",
   leagueHeatPools,
@@ -346,6 +350,7 @@ export default function TeamDetailDrawer({
   data: TeamDetailDrawerData | null;
   onClose: () => void;
   onOpenPlayer: (playerId: string, activePlayerId: string) => void;
+  onOpenContracts?: () => void;
   layerClassName?: string;
   variant?: "drawer" | "page";
   leagueHeatPools?: LeaguePlayerHeatPools;
@@ -382,6 +387,11 @@ export default function TeamDetailDrawer({
       expiringCount,
     };
   }, [data?.players]);
+
+  const groupedObjectives = useMemo(
+    () => groupObjectivesByCategory(data?.objectives ?? []),
+    [data?.objectives],
+  );
 
   if (!data) {
     return null;
@@ -433,7 +443,7 @@ export default function TeamDetailDrawer({
                 <p className="muted">Ziele, Rivalitätsdruck und Teamkapitän.</p>
               </div>
             </div>
-            <div className="team-drawer-leadership-strip">
+            <div className="team-drawer-lead-summary">
               {data.boardConfidence ? (
                 <article
                   className={`team-drawer-lead-chip${data.boardConfidence.pressure >= 8 ? " is-blocked" : data.boardConfidence.value >= 7 ? " is-ready" : ""}`}
@@ -443,45 +453,6 @@ export default function TeamDetailDrawer({
                   <small>
                     Druck {formatNumber(data.boardConfidence.pressure, 1)} · {data.boardConfidence.warnings.length} Warnungen
                   </small>
-                </article>
-              ) : null}
-              {data.generalManager ? (
-                <article className="team-drawer-lead-card is-gm is-info">
-                  <div className="team-drawer-lead-card-head">
-                    <span>General Manager</span>
-                    <strong>{data.generalManager.name}</strong>
-                    <small>
-                      {data.generalManager.title} · Einfluss {formatNumber(data.generalManager.influencePct)}%
-                    </small>
-                  </div>
-                  <div className="team-drawer-gm-axis-row is-compact" aria-label="GM Achsen">
-                    <span className="is-pow">POW {formatNumber(data.generalManager.pow, 1)}</span>
-                    <span className="is-spe">SPE {formatNumber(data.generalManager.spe, 1)}</span>
-                    <span className="is-men">MEN {formatNumber(data.generalManager.men, 1)}</span>
-                    <span className="is-soc">SOC {formatNumber(data.generalManager.soc, 1)}</span>
-                  </div>
-                  <details className="team-drawer-gm-details">
-                    <summary>Gewichtungen & Fokus</summary>
-                    <small className="team-drawer-gm-doctrine">
-                      {data.generalManager.marketDoctrine} · {data.generalManager.lineupDoctrine}
-                    </small>
-                    {data.generalManager.facilityPriorities.length ? (
-                      <small className="team-drawer-gm-doctrine">
-                        Fokus: {data.generalManager.facilityPriorities.slice(0, 3).join(" · ")}
-                      </small>
-                    ) : null}
-                    <div className="team-drawer-gm-bias-grid is-compact" aria-label="GM Gewichtungen">
-                      {getVisibleGeneralManagerBiases(data.generalManager.bias).map((bias) => (
-                        <div key={bias.key} className="team-drawer-gm-bias-row">
-                          <span>{bias.label}</span>
-                          <div className="team-drawer-gm-bias-track" aria-hidden="true">
-                            <i style={{ width: `${Math.max(10, Math.min(100, bias.value * 10))}%` }} />
-                          </div>
-                          <strong>{formatNumber(bias.value)}</strong>
-                        </div>
-                      ))}
-                    </div>
-                  </details>
                 </article>
               ) : null}
               {data.teamCaptain ? (
@@ -494,29 +465,86 @@ export default function TeamDetailDrawer({
                   </small>
                 </article>
               ) : null}
-              <div className="team-drawer-relation-chips">
-                <article className="team-drawer-lead-chip is-ready">
+            </div>
+            {data.generalManager ? (
+              <article className="team-drawer-lead-card is-gm is-info">
+                <div className="team-drawer-lead-card-head">
+                  <span>General Manager</span>
+                  <strong>{data.generalManager.name}</strong>
+                  <small>
+                    {data.generalManager.title} · Einfluss {formatNumber(data.generalManager.influencePct)}%
+                  </small>
+                </div>
+                <div className="team-drawer-gm-axis-row is-compact" aria-label="GM Achsen">
+                  <span className="is-pow">POW {formatNumber(data.generalManager.pow, 1)}</span>
+                  <span className="is-spe">SPE {formatNumber(data.generalManager.spe, 1)}</span>
+                  <span className="is-men">MEN {formatNumber(data.generalManager.men, 1)}</span>
+                  <span className="is-soc">SOC {formatNumber(data.generalManager.soc, 1)}</span>
+                </div>
+                <details className="team-drawer-gm-details">
+                  <summary>Gewichtungen & Fokus</summary>
+                  <small className="team-drawer-gm-doctrine">
+                    {data.generalManager.marketDoctrine} · {data.generalManager.lineupDoctrine}
+                  </small>
+                  {data.generalManager.facilityPriorities.length ? (
+                    <small className="team-drawer-gm-doctrine">
+                      Fokus: {data.generalManager.facilityPriorities.slice(0, 3).join(" · ")}
+                    </small>
+                  ) : null}
+                  <div className="team-drawer-gm-bias-grid is-compact" aria-label="GM Gewichtungen">
+                    {getVisibleGeneralManagerBiases(data.generalManager.bias).map((bias) => (
+                      <div key={bias.key} className="team-drawer-gm-bias-row">
+                        <span>{bias.label}</span>
+                        <div className="team-drawer-gm-bias-track" aria-hidden="true">
+                          <i style={{ width: `${Math.max(10, Math.min(100, bias.value * 10))}%` }} />
+                        </div>
+                        <strong>{formatNumber(bias.value)}</strong>
+                      </div>
+                    ))}
+                  </div>
+                </details>
+              </article>
+            ) : null}
+            <div className="team-drawer-relations-panel" aria-label="Teambeziehungen">
+              <article className="team-drawer-relations-column is-ready">
+                <header>
                   <span>Ally</span>
                   <strong>{data.relationships.allies.length}</strong>
-                  {formatRelationshipList(data.relationships.allies, "Keine Ally-Beziehung ab 4+")}
-                </article>
-                <article className="team-drawer-lead-chip is-blocked">
+                </header>
+                {formatRelationshipList(data.relationships.allies, "Keine Ally-Beziehung ab 4+")}
+              </article>
+              <article className="team-drawer-relations-column is-blocked">
+                <header>
                   <span>Rival</span>
                   <strong>{data.relationships.rivals.length}</strong>
-                  {formatRelationshipList(data.relationships.rivals, "Keine Rivalität ab -4")}
-                </article>
-              </div>
+                </header>
+                {formatRelationshipList(data.relationships.rivals, "Keine Rivalität ab -4")}
+              </article>
             </div>
-            {data.objectives.length ? (
-              <div className="team-drawer-objective-grid is-compact" aria-label="Board-Ziele">
-                {data.objectives.map((objective) => (
-                  <article key={objective.objectiveId} className={`team-drawer-objective-card${getObjectiveTone(objective.status)}`}>
-                    <span>{objective.category}</span>
-                    <strong>{objective.label}</strong>
-                    <small>
-                      {formatObjectiveStatus(objective.status)} · {String(objective.currentValue ?? "—")} / {String(objective.targetValue ?? "—")}
-                    </small>
-                  </article>
+            {groupedObjectives.length ? (
+              <div className="team-drawer-objective-board" aria-label="Board-Ziele">
+                {groupedObjectives.map(({ category, objectives }) => (
+                  <section key={category} className="team-drawer-objective-category">
+                    <h4>{category}</h4>
+                    {objectives.map((objective) => (
+                      <article
+                        key={objective.objectiveId}
+                        className={`team-drawer-objective-row${getObjectiveTone(objective.status)}`}
+                      >
+                        <div className="team-drawer-objective-row-main">
+                          <span className={`transfer-status-pill${getObjectiveTone(objective.status) || " is-info"}`}>
+                            {formatObjectiveStatus(objective.status)}
+                          </span>
+                          <div className="team-drawer-objective-copy">
+                            <strong>{objective.label}</strong>
+                            <span className="team-drawer-objective-progress">
+                              {String(objective.currentValue ?? "—")} / {String(objective.targetValue ?? "—")}
+                            </span>
+                          </div>
+                        </div>
+                      </article>
+                    ))}
+                  </section>
                 ))}
               </div>
             ) : null}
@@ -679,9 +707,16 @@ export default function TeamDetailDrawer({
               <h1>{data.teamName}</h1>
             </div>
           </div>
-          <button className="secondary-button inline-button" type="button" onClick={onClose}>
-            Zurück
-          </button>
+          <div className="team-profile-header-actions">
+            {onOpenContracts ? (
+              <button className="primary-button inline-button" type="button" onClick={onOpenContracts}>
+                Verträge
+              </button>
+            ) : null}
+            <button className="secondary-button inline-button" type="button" onClick={onClose}>
+              Zurück
+            </button>
+          </div>
         </header>
         {profileBody}
       </div>

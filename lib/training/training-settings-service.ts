@@ -2,6 +2,7 @@ import { createHash } from "node:crypto";
 
 import type { AiManagerTrainingSettingRecord, GameState } from "@/lib/data/olyDataTypes";
 import { createPersistenceService } from "@/lib/persistence/persistence-service";
+import { persistGameStateWithMaterializedDerivations } from "@/lib/foundation/materialize-season-derivations";
 import type { PersistedSaveGame, PersistenceService } from "@/lib/persistence/types";
 import type { AiManagementTrainingFocus, AiManagementTrainingIntensity } from "@/lib/ai/ai-team-management-preview-service";
 import type { PlayerTrainingMode } from "@/lib/training/training-plan-types";
@@ -168,7 +169,110 @@ export function applyTeamTrainingSettings(
       },
     },
   };
-  persistence.saveSingleplayerState(save.saveId, nextGameState);
+  persistGameStateWithMaterializedDerivations(persistence, save.saveId, nextGameState);
+  return {
+    ...preview,
+    dryRun: false,
+    applied: true,
+    blockingReasons: [],
+  };
+}
+
+export type PlayerTrainingClassAssignment = {
+  playerId: string;
+  trainingClass: string;
+};
+
+export type PlayerTrainingClassesPreview = {
+  ok: boolean;
+  dryRun: true;
+  confirmToken: string | null;
+  teamId: string;
+  seasonId: string;
+  assignments: PlayerTrainingClassAssignment[];
+  warnings: string[];
+  blockingReasons: string[];
+};
+
+export type PlayerTrainingClassesApplyResult = Omit<PlayerTrainingClassesPreview, "dryRun"> & {
+  dryRun: false;
+  applied: boolean;
+};
+
+function buildPlayerClassesConfirmToken(input: {
+  saveId: string;
+  seasonId: string;
+  teamId: string;
+  assignments: PlayerTrainingClassAssignment[];
+}) {
+  const payload = input.assignments
+    .slice()
+    .sort((left, right) => left.playerId.localeCompare(right.playerId))
+    .map((entry) => `${entry.playerId}:${entry.trainingClass}`)
+    .join("|");
+  return createHash("sha256")
+    .update([input.saveId, input.seasonId, input.teamId, payload].join(":"))
+    .digest("hex");
+}
+
+export function previewPlayerTrainingClasses(input: {
+  save: PersistedSaveGame;
+  teamId: string;
+  assignments: PlayerTrainingClassAssignment[];
+}): PlayerTrainingClassesPreview {
+  const rosterPlayerIds = new Set(
+    input.save.gameState.rosters.filter((entry) => entry.teamId === input.teamId).map((entry) => entry.playerId),
+  );
+  const blockingReasons: string[] = [];
+  if (input.save.status !== "active") blockingReasons.push("save_not_active");
+  if (rosterPlayerIds.size <= 0) blockingReasons.push("team_roster_empty");
+  const validAssignments = input.assignments.filter((entry) => rosterPlayerIds.has(entry.playerId) && entry.trainingClass);
+  if (validAssignments.length === 0) blockingReasons.push("no_valid_player_assignments");
+  const confirmToken =
+    blockingReasons.length === 0
+      ? buildPlayerClassesConfirmToken({
+          saveId: input.save.saveId,
+          seasonId: input.save.gameState.season.id,
+          teamId: input.teamId,
+          assignments: validAssignments,
+        })
+      : null;
+  return {
+    ok: blockingReasons.length === 0,
+    dryRun: true,
+    confirmToken,
+    teamId: input.teamId,
+    seasonId: input.save.gameState.season.id,
+    assignments: validAssignments,
+    warnings: [],
+    blockingReasons,
+  };
+}
+
+export function applyPlayerTrainingClasses(
+  save: PersistedSaveGame,
+  teamId: string,
+  assignments: PlayerTrainingClassAssignment[],
+  confirmToken: string | null | undefined,
+  persistence: PersistenceService = createPersistenceService(),
+): PlayerTrainingClassesApplyResult {
+  const preview = previewPlayerTrainingClasses({ save, teamId, assignments });
+  if (!preview.ok || !preview.confirmToken || confirmToken !== preview.confirmToken) {
+    return {
+      ...preview,
+      dryRun: false,
+      applied: false,
+      blockingReasons: [...preview.blockingReasons, confirmToken ? "player_training_classes_preview_stale" : "confirm_token_required"],
+    };
+  }
+  const assignmentMap = new Map(preview.assignments.map((entry) => [entry.playerId, entry.trainingClass] as const));
+  const nextGameState: GameState = {
+    ...save.gameState,
+    players: save.gameState.players.map((player) =>
+      assignmentMap.has(player.id) ? { ...player, trainingClass: assignmentMap.get(player.id) } : player,
+    ),
+  };
+  persistGameStateWithMaterializedDerivations(persistence, save.saveId, nextGameState);
   return {
     ...preview,
     dryRun: false,
@@ -271,7 +375,7 @@ export function applyPlayerTrainingModes(
       assignmentMap.has(player.id) ? { ...player, trainingMode: assignmentMap.get(player.id) } : player,
     ),
   };
-  persistence.saveSingleplayerState(save.saveId, nextGameState);
+  persistGameStateWithMaterializedDerivations(persistence, save.saveId, nextGameState);
   return {
     ...preview,
     dryRun: false,

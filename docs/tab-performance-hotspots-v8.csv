@@ -1,0 +1,22 @@
+fromTab,toTab,v8Ms,apiCallsCount,slowestApiMs,slowestApiPath,warnings,status
+Home,Inbox,180079,0,0,,"locator.waitFor: Timeout 180000ms exceeded.
+Call log:
+  - waiting for locator('[data-testid=""foundation-inbox-v2""]').first() to be visible
+",failed
+Inbox,Einsatzliste,2953,0,0,,,ok
+Einsatzliste,Arena,5640,0,0,,Tabwechsel >5s,ok
+Arena,Saisonstand,5375,0,0,,Tabwechsel >5s,ok
+Saisonstand,Teams,10703,0,0,,Tabwechsel >5s,slow
+Teams,Teams (revisit),2960,0,0,,,ok
+Teams,Spieler,2950,0,0,,,ok
+Spieler,Training,5564,0,0,,Tabwechsel >5s,ok
+Training,Gebäude,5552,0,0,,Tabwechsel >5s,ok
+Gebäude,Training (revisit),4267,0,0,,,ok
+Gebäude,Transfermarkt,12300,0,0,,Tabwechsel >5s,slow
+Transfermarkt,Scouting,4360,0,0,,,ok
+Scouting,Historie,4294,0,0,,,ok
+Historie,Ranks,6565,0,0,,Tabwechsel >5s,ok
+Ranks,Diszis,4760,0,0,,,ok
+Diszis,Sponsoren,12153,0,0,,Tabwechsel >5s,slow
+Sponsoren,Lexikon,5429,0,0,,Tabwechsel >5s,ok
+START,Home,680,,,initial_load,,ok

@@ -89,6 +89,7 @@ export type HomeV2ClientProps = {
   facilities: HomeV2FacilitySnapshot[];
   scheduleItems: HomeV2ScheduleItem[];
   inboxItems: HomeV2InboxItem[];
+  inboxCriticalCount?: number;
   todayCards: HomeV2TodayCard[];
   boardObjectives: HomeV2BoardObjective[];
   onContinue: () => void;

@@ -24,6 +24,7 @@ import type { PersistenceService } from "@/lib/persistence/types";
 import { db } from "@/src/server/db";
 import { applyFatigueAndInjuryAfterMatchday } from "@/lib/fatigue/fatigue-injury-service";
 import { refreshTeamObjectiveState } from "@/lib/board/team-season-objectives-service";
+import { persistGameStateWithMaterializedDerivations } from "@/lib/foundation/materialize-season-derivations";
 
 type DbClient = typeof db;
 
@@ -692,7 +693,7 @@ export class LegacyMatchdayResultApplyService {
     const refreshedGameState = refreshTeamObjectiveState(injuryResult.gameState);
     const standingsObjectiveRefreshMs = elapsedSince(objectiveStartedAt);
     const saveStartedAt = performance.now();
-    this.persistence.saveSingleplayerState(save.saveId, refreshedGameState);
+    persistGameStateWithMaterializedDerivations(this.persistence, save.saveId, refreshedGameState);
     const saveWriteMs = elapsedSince(saveStartedAt);
 
     return {

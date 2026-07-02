@@ -7,7 +7,7 @@
 | Check | Status | Notiz |
 |-------|--------|-------|
 | Production Build | 🟢 | `npm run build` grün (SQLite aus Client-Bundle) |
-| CI flow-smoke | 🟢 | 119/119 Tests (`npm run ci:flow-smoke`) |
+| CI flow-smoke | 🟢 | Blocker-Routing, Inbox-Apply, Season-Readiness, Fatigue→Inbox (`npm run ci:flow-smoke`) |
 | CI import-exists | 🟢 | `npm run ci:import-exists` — keine orphan `@/lib`-Imports |
 | Client-Bundle-Lint | 🟢 | `npm run ci:client-bundle-lint` — kein sqlite/local-service in Foundation-Client |
 | Perf regression | 🟢 | `npm run perf:regression-smoke` (<250ms Version-Metadata) |
@@ -15,7 +15,7 @@
 | MP E2E in CI | 🟢 | `app:smoke-multiplayer-e2e` inkl. Foundation-Arena-Reveal-Sync |
 | Save laden | 🟢 | Dev-Server lädt Long Run Sandbox mit A-A · Armageddon Aftermath |
 | Home Top-6 Karten | 🟢 | POW/SPE/MEN/SOC ohne Noten; CA absolut + PO-Range (kein „Gering“/„F“) |
-| Home/Inbox: nächster Schritt | 🟢 | Flow-Controller zeigt korrekten Schritt mit `globalNextLabel` |
+| Home/Inbox: nächster Schritt | 🟢 | Flow + Inbox Quick-Actions (Training leicht, Später) + Health-Priorität |
 | Sidebar-Reihenfolge | 🟢 | Drag pro Gruppe, localStorage persistiert nach Reload |
 | Entity-Navigation (Klick) | 🟢 | Spieler-/Teamnamen öffnen Profil per Single-Click; Escape/Backspace navigiert zurück |
 | Escape-Back Profil | 🟢 | Teams → Spieler → Escape kehrt zu Teams zurück (kein URL-Sync-Dead-End) |
@@ -50,7 +50,7 @@ Legende: 🟢 OK · 🟡 teilweise / Re-Test nötig · 🔴 blockiert
 
 | Bereich | Score | Status | Notiz |
 |---------|-------|--------|-------|
-| Solo Loop Wiring | ~9/10 | 🟢 | `app:smoke-gameplay` + `season:full-ui-playthrough` (Nightly); Matchday-Apply Write-Smoke |
+| Solo Loop Wiring | **10/10** | 🟢 | `ci:flow-smoke` + Blocker-Routing + Write-Smoke (Inbox/Training/Matchday) |
 | Build / Client-Server | ~9/10 | 🟢 | TrainingCompact + Resolve-Blocker client-safe; `ci:client-bundle-lint` |
 | Arena + Reveal (Solo) | ~9/10 | 🟢 | Arena/Einsatzliste/Training/Drawer in CI grün |
 | Room Arena Sync | ~9/10 | 🟢 | Unit + 2-Browser Foundation-Arena-E2E in `app:smoke-multiplayer-e2e` |
@@ -62,7 +62,19 @@ Legende Score: technische Verdrahtung, nicht Spielspaß.
 
 ## Was noch 🟡 ist
 
-- **Manueller 15-Min-Playtest** — Checkliste [playtest-checklist.md](./playtest-checklist.md) einmal im Browser (S1→S2); automatisierter Proof läuft via Nightly `season:full-ui-playthrough`
+- **Manueller 15-Min-Playtest S1→S2** — Checkliste [playtest-checklist.md](./playtest-checklist.md) einmal im Browser; automatisierter Proof: `npm run ci:flow-smoke` + `app:smoke-gameplay-write -- --confirm-testsave`
+- **Spielgefühl Feintuning** — System-Verknüpfungen sind sichtbar (Training-AI, Health-Inbox, Arena-Recap); menschlicher Proof bleibt Playtest-Ritual
+
+## Gameplay 10/10 Proof (2026-06-26)
+
+| Dimension | Status | Proof |
+|-----------|--------|-------|
+| Blocker → Fix-Pfad | 🟢 | `tests/flow-blocker-routing.test.ts` — alle playtest-checklist IDs geroutet |
+| Inbox Entscheidungen | 🟢 | Quick-Actions: Training leicht, Später, Lineup — `inbox-quick-action-service` |
+| Load/Verletzung sichtbar | 🟢 | Lineup-Slot Issues + Training AI-Empfehlung + Health-Inbox |
+| Saison-Bogen | 🟢 | Preseason/Season-End Checklist in Manager Office |
+| Arena → Chronik | 🟢 | Spieltag-Recap in Inbox Chronik (`story:matchday_recap`) |
+| Cross-System | 🟢 | `tests/fatigue-injury-inbox-integration.test.ts` |
 
 ## Performance (2026-06-27)
 

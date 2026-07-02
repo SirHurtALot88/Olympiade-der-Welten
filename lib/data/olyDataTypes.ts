@@ -792,8 +792,10 @@ export type Player = {
     facilityModifierPct: number;
     marketValuePressureTotal: number;
     trainingSetpoints: number;
+    appliedTrainingSetpoints?: number;
     performanceSetpoints: number;
     appliedPerformanceSetpoints?: number;
+    regressionCombinedTotal?: number;
     netSetpoints: number;
     fatigueLoad: number;
     topGains: Array<{ attribute: PlayerGeneratorAttributeName; delta: number }>;
@@ -2138,6 +2140,8 @@ export type SeasonState = {
   aiManagerDecisionJournal?: AiManagerDecisionJournalEntry[];
   newGameFlow?: NewGameFlowState;
   adminBalancingConfig?: AdminBalancingConfigInput;
+  /** Pre-computed ledger + OVR/PPS/MVS ratings; invalidated via contentSignature. */
+  persistedSeasonDerivations?: unknown;
 };
 
 export type SeasonEconomyFactorRecord = {

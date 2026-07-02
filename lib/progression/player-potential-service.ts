@@ -153,14 +153,45 @@ export function getPotentialBand(potential: number): PlayerPotentialBand {
   return "low";
 }
 
+export function potentialScoreToStars(score: number) {
+  const normalized = clamp(Math.round(score), 35, 99);
+  if (normalized >= 94) return 5.0;
+  if (normalized >= 88) return 4.5;
+  if (normalized >= 80) return 4.0;
+  if (normalized >= 72) return 3.5;
+  if (normalized >= 64) return 3.0;
+  if (normalized >= 56) return 2.5;
+  return 2.0;
+}
+
+export type PotentialRangeStarSlot = {
+  index: number;
+  minFill: number;
+  maxFill: number;
+  showUncertain: boolean;
+};
+
+export function buildPotentialRangeStarSlots(minScore: number, maxScore: number): PotentialRangeStarSlot[] {
+  const minStars = potentialScoreToStars(minScore);
+  const maxStars = potentialScoreToStars(maxScore);
+  return [0, 1, 2, 3, 4].map((index) => {
+    const minFill = Math.max(0, Math.min(1, minStars - index));
+    const maxFill = Math.max(0, Math.min(1, maxStars - index));
+    return {
+      index,
+      minFill,
+      maxFill,
+      showUncertain: maxFill > minFill,
+    };
+  });
+}
+
+export function shouldShowPotentialRangeStars(minScore: number, maxScore: number) {
+  return potentialScoreToStars(maxScore) > potentialScoreToStars(minScore);
+}
+
 function getStarRating(potential: number) {
-  if (potential >= 94) return "5.0 Sterne";
-  if (potential >= 88) return "4.5 Sterne";
-  if (potential >= 80) return "4.0 Sterne";
-  if (potential >= 72) return "3.5 Sterne";
-  if (potential >= 64) return "3.0 Sterne";
-  if (potential >= 56) return "2.5 Sterne";
-  return "2.0 Sterne";
+  return `${potentialScoreToStars(potential).toFixed(1)} Sterne`;
 }
 
 function getTrainingSpeedMultiplier(potential: number) {

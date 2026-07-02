@@ -136,6 +136,52 @@ describe("ai transfer window session service", () => {
     expect(result.perTeam[0]?.status).toBe("convergence_exhausted");
   });
 
+  it("aborts early when a round has zero transfers and unchanged coverage risk", async () => {
+    const gameState = buildGameState();
+    const persistence = {
+      getSaveById: () => ({ saveId: "save-1", gameState }),
+    };
+
+    applyAiMarketPlanLocally.mockResolvedValue(buildApplyResult({ appliedBuys: 0, appliedSells: 0 }));
+
+    const result = await runTransferWindowSession({
+      saveId: "save-1",
+      seasonId: "season-2",
+      persistence: persistence as never,
+      phase: "preseason",
+      maxTeamCycles: 1,
+      maxLeagueRounds: 3,
+      skipIfExistingMarketTransfers: false,
+    });
+
+    expect(
+      result.warnings.some((entry) => entry.startsWith("transfer_window_stalled_coverage_risk_unchanged")),
+    ).toBe(true);
+    expect(result.leagueRounds).toBe(1);
+  });
+
+  it("delegates remaining coverage-risk teams after max league rounds", async () => {
+    const gameState = buildGameState();
+    const persistence = {
+      getSaveById: () => ({ saveId: "save-1", gameState }),
+    };
+
+    applyAiMarketPlanLocally.mockResolvedValue(buildApplyResult({ appliedBuys: 0, appliedSells: 0 }));
+
+    const result = await runTransferWindowSession({
+      saveId: "save-1",
+      seasonId: "season-2",
+      persistence: persistence as never,
+      phase: "preseason",
+      maxTeamCycles: 1,
+      maxLeagueRounds: 1,
+      skipIfExistingMarketTransfers: false,
+    });
+
+    expect(result.emergencyRepairTeams).toContain("team-a");
+    expect(result.leagueRounds).toBe(1);
+  });
+
   it("passes exclude lists between cycles", async () => {
     let rosterSize = 9;
     const buildState = () =>

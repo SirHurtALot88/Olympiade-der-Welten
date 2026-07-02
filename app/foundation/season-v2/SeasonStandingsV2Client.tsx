@@ -12,7 +12,7 @@ import {
   type ReactNode,
 } from "react";
 
-import OptimizedMediaImage from "@/app/foundation/OptimizedMediaImage";
+import BudgetedMediaImage from "@/components/foundation/BudgetedMediaImage";
 import { TooltipHeading } from "@/components/ui/TooltipHeading";
 import {
   formatGmDismissalReason,
@@ -22,68 +22,25 @@ import {
 } from "@/lib/foundation/gm-story";
 import { clampTableColumnWidth } from "@/lib/ui/global-table-layout";
 import { useRowVirtualWindow } from "@/lib/foundation/use-row-virtual-window";
+import {
+  resolveSeasonDisciplineAreaTotal,
+  SEASON_DISCIPLINE_AREA_GROUPS,
+  SEASON_DISCIPLINE_LABELS,
+  type SeasonDisciplineKey,
+} from "@/lib/season/season-discipline-area-groups";
 
 type SeasonV2AreaId = "pow" | "spe" | "men" | "soc";
 
 type SeasonV2ExpandableColumnId = "points" | SeasonV2AreaId;
 
-type SeasonV2DisciplineKey =
-  | "bonuspunkte"
-  | "tdm"
-  | "mini_dm"
-  | "gewichtheben"
-  | "hockey"
-  | "breaking"
-  | "staffel"
-  | "time_trial"
-  | "spurt"
-  | "climbing"
-  | "fechten"
-  | "schach"
-  | "takeshi"
-  | "tennis"
-  | "i_spy"
-  | "wettessen"
-  | "basketball"
-  | "football"
-  | "battlefield"
-  | "eiskunst"
-  | "showcase";
+type SeasonV2DisciplineKey = SeasonDisciplineKey | "bonuspunkte";
 
 const seasonV2DisciplineLabels: Record<SeasonV2DisciplineKey, string> = {
   bonuspunkte: "Bonus",
-  tdm: "TDM",
-  mini_dm: "MIN",
-  gewichtheben: "GEW",
-  hockey: "HOC",
-  breaking: "BRE",
-  staffel: "STA",
-  time_trial: "TIT",
-  spurt: "SPU",
-  climbing: "CLI",
-  fechten: "FEC",
-  schach: "SCH",
-  takeshi: "TAK",
-  tennis: "TEN",
-  i_spy: "ISP",
-  wettessen: "WET",
-  basketball: "BAS",
-  football: "FOO",
-  battlefield: "BAT",
-  eiskunst: "EIS",
-  showcase: "SHO",
+  ...SEASON_DISCIPLINE_LABELS,
 };
 
-const seasonV2AreaGroups: Array<{
-  id: SeasonV2AreaId;
-  label: string;
-  keys: SeasonV2DisciplineKey[];
-}> = [
-  { id: "pow", label: "POW", keys: ["tdm", "mini_dm", "gewichtheben", "hockey", "breaking"] },
-  { id: "spe", label: "SPE", keys: ["staffel", "time_trial", "spurt", "climbing", "fechten"] },
-  { id: "men", label: "MEN", keys: ["schach", "takeshi", "tennis", "i_spy", "wettessen"] },
-  { id: "soc", label: "SOC", keys: ["basketball", "football", "battlefield", "eiskunst", "showcase"] },
-];
+const seasonV2AreaGroups = SEASON_DISCIPLINE_AREA_GROUPS;
 
 type SeasonV2Option = {
   seasonId: string;
@@ -583,10 +540,21 @@ export default function SeasonStandingsV2Client({
   onOpenPrize,
   isLoading = false,
 }: SeasonStandingsV2ClientProps) {
-  const standingsPowPool = useMemo(() => standingsRows.map((row) => row.pow), [standingsRows]);
-  const standingsSpePool = useMemo(() => standingsRows.map((row) => row.spe), [standingsRows]);
-  const standingsMenPool = useMemo(() => standingsRows.map((row) => row.men), [standingsRows]);
-  const standingsSocPool = useMemo(() => standingsRows.map((row) => row.soc), [standingsRows]);
+  const resolvedStandingsRows = useMemo(
+    () =>
+      standingsRows.map((row) => ({
+        ...row,
+        pow: resolveSeasonDisciplineAreaTotal(row.disciplineValues, "pow", row.pow),
+        spe: resolveSeasonDisciplineAreaTotal(row.disciplineValues, "spe", row.spe),
+        men: resolveSeasonDisciplineAreaTotal(row.disciplineValues, "men", row.men),
+        soc: resolveSeasonDisciplineAreaTotal(row.disciplineValues, "soc", row.soc),
+      })),
+    [standingsRows],
+  );
+  const standingsPowPool = useMemo(() => resolvedStandingsRows.map((row) => row.pow), [resolvedStandingsRows]);
+  const standingsSpePool = useMemo(() => resolvedStandingsRows.map((row) => row.spe), [resolvedStandingsRows]);
+  const standingsMenPool = useMemo(() => resolvedStandingsRows.map((row) => row.men), [resolvedStandingsRows]);
+  const standingsSocPool = useMemo(() => resolvedStandingsRows.map((row) => row.soc), [resolvedStandingsRows]);
   const topPlayerPpsPool = useMemo(() => topPlayers.map((row) => row.pps), [topPlayers]);
   const topPlayerPowPool = useMemo(() => topPlayers.map((row) => row.ppPow), [topPlayers]);
   const topPlayerSpePool = useMemo(() => topPlayers.map((row) => row.ppSpe), [topPlayers]);
@@ -680,13 +648,13 @@ export default function SeasonStandingsV2Client({
     ) as Record<SeasonV2DisciplineKey, Map<string, string>>;
     return {
       points: buildValueRankClassMap(standingsRows, (row) => row.points),
-      pow: buildValueRankClassMap(standingsRows, (row) => row.pow),
-      spe: buildValueRankClassMap(standingsRows, (row) => row.spe),
-      men: buildValueRankClassMap(standingsRows, (row) => row.men),
-      soc: buildValueRankClassMap(standingsRows, (row) => row.soc),
+      pow: buildValueRankClassMap(resolvedStandingsRows, (row) => row.pow),
+      spe: buildValueRankClassMap(resolvedStandingsRows, (row) => row.spe),
+      men: buildValueRankClassMap(resolvedStandingsRows, (row) => row.men),
+      soc: buildValueRankClassMap(resolvedStandingsRows, (row) => row.soc),
       disciplines: disciplineMaps,
     };
-  }, [standingsRows]);
+  }, [resolvedStandingsRows, standingsRows]);
   const pointsRankClassByTeamId = seasonV2RankClassMaps.points;
   const areaRankClassByTeamId = {
     pow: seasonV2RankClassMaps.pow,
@@ -697,7 +665,7 @@ export default function SeasonStandingsV2Client({
   const disciplineRankClassByKey = seasonV2RankClassMaps.disciplines;
   const sortedStandingsRows = useMemo(() => {
     const direction = standingsSort.direction === "asc" ? 1 : -1;
-    return [...standingsRows].sort((left, right) => {
+    return [...resolvedStandingsRows].sort((left, right) => {
       let result = 0;
       switch (standingsSort.key) {
         case "rank":
@@ -745,7 +713,7 @@ export default function SeasonStandingsV2Client({
       }
       return result * direction;
     });
-  }, [standingsRows, standingsSort]);
+  }, [resolvedStandingsRows, standingsSort]);
 
   const displayStandingsRows = useMemo(() => {
     if (showFullStandingsTable || sortedStandingsRows.length <= 6) {
@@ -785,12 +753,25 @@ export default function SeasonStandingsV2Client({
   }, [seasonV2Mode, sortedStandingsRows.length]);
 
   const focusedTeam = useMemo(
-    () => standingsRows.find((row) => row.teamId === focusedTeamId) ?? null,
-    [focusedTeamId, standingsRows],
+    () => resolvedStandingsRows.find((row) => row.teamId === focusedTeamId) ?? null,
+    [focusedTeamId, resolvedStandingsRows],
   );
   const rightPanelPlayers = useMemo(() => {
     const sourceRows = focusedTeamId ? playerRows.filter((player) => player.teamId === focusedTeamId) : topPlayers;
-    return sourceRows.map((player, index) => ({ ...player, rank: focusedTeamId ? index + 1 : player.rank }));
+    const sortedRows = focusedTeamId
+      ? [...sourceRows].sort((left, right) => {
+          const ppsDelta = (right.pps ?? Number.NEGATIVE_INFINITY) - (left.pps ?? Number.NEGATIVE_INFINITY);
+          if (ppsDelta !== 0) {
+            return ppsDelta;
+          }
+          const ovrDelta = (right.ovr ?? Number.NEGATIVE_INFINITY) - (left.ovr ?? Number.NEGATIVE_INFINITY);
+          if (ovrDelta !== 0) {
+            return ovrDelta;
+          }
+          return left.name.localeCompare(right.name, "de");
+        })
+      : sourceRows;
+    return sortedRows.map((player, index) => ({ ...player, rank: index + 1 }));
   }, [focusedTeamId, playerRows, topPlayers]);
   const sortedTopPlayers = useMemo(() => {
     const direction = topPlayerSort.direction === "asc" ? 1 : -1;
@@ -1136,7 +1117,7 @@ export default function SeasonStandingsV2Client({
               return (
                 <article key={row.teamId} className={`season-v2-gm-card${isHotSeat ? " is-hot" : ""}${row.source === "board_replacement" ? " is-new" : ""}`}>
                   <button className="season-v2-gm-team" type="button" onClick={() => onOpenTeam(row.teamId)}>
-                    <OptimizedMediaImage
+                    <BudgetedMediaImage
                       src={row.logoUrl}
                       alt={`${row.teamName} Logo`}
                       className="season-v2-team-logo"
@@ -1357,7 +1338,7 @@ export default function SeasonStandingsV2Client({
                     <td className="season-v2-team-cell">
                       <button className="table-link-button season-v2-team-link" type="button" onClick={() => onOpenTeam(row.teamId)}>
                         <span className="season-v2-team-ident">
-                          <OptimizedMediaImage
+                          <BudgetedMediaImage
                             src={row.logoUrl}
                             alt={`${row.teamName} Logo`}
                             className="season-v2-team-logo"

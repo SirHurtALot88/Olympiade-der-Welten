@@ -946,6 +946,44 @@ async function main() {
 
     if (args.writeMode && args.confirmTestsave) {
       steps.push(await runStep({
+        id: "inbox-status-write",
+        label: "Inbox Status (Write Smoke)",
+        page,
+        screenshots: false,
+        run: async (step) => {
+          await gotoFoundation(page, args.baseUrl, "inboxV2", expectedTeamId, expectedSaveId, viewTimeoutMs, "foundation-inbox-v2");
+          await page.getByTestId("foundation-inbox-v2").waitFor({ state: "visible", timeout: viewTimeoutMs });
+          const dismissButton = page.getByRole("button", { name: "Ausblenden" }).first();
+          const hasDismiss = await dismissButton.isVisible().catch(() => false);
+          if (hasDismiss) {
+            await dismissButton.click();
+            step.details.push("Inbox item dismissed on testsave.");
+          } else {
+            step.warnings.push("No dismissable inbox item visible — skipped.");
+          }
+        },
+      }));
+
+      steps.push(await runStep({
+        id: "training-mode-write",
+        label: "Training Mode (Write Smoke)",
+        page,
+        screenshots: false,
+        run: async (step) => {
+          await gotoFoundation(page, args.baseUrl, "trainingCompact", expectedTeamId, expectedSaveId, viewTimeoutMs, "foundation-training-compact");
+          await page.locator("#foundation-training-compact").waitFor({ state: "visible", timeout: viewTimeoutMs });
+          const lightSegment = page.locator(".velo-intensity-segment").filter({ hasText: "Leicht" }).first();
+          const visible = await lightSegment.isVisible().catch(() => false);
+          if (visible) {
+            await lightSegment.click();
+            step.details.push("Training mode segment clicked on testsave.");
+          } else {
+            step.warnings.push("No training intensity segment visible — skipped.");
+          }
+        },
+      }));
+
+      steps.push(await runStep({
         id: "matchday-apply-dry-run",
         label: "Matchday Apply (Write Smoke)",
         page,

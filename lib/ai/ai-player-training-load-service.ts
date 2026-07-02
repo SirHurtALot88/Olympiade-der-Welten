@@ -3,6 +3,7 @@ import { getFacilityLevel, getRecoveryTrainingFatigueReductionPct, getTeamFacili
 import { buildPlayerSeasonPerformanceMap } from "@/lib/foundation/player-season-performance";
 import { MATCHDAY_FATIGUE_LOAD, getInjuryRiskPercent } from "@/lib/fatigue/fatigue-injury-service";
 import { buildTrainingModeDemand } from "@/lib/training/training-mode-demand-service";
+import { deriveAttributeAffinityProfile } from "@/lib/training/training-levelup-service";
 import { FATIGUE_LOAD_BY_MODE } from "@/lib/training/training-mode-presentation";
 import type { PlayerTrainingMode } from "@/lib/training/training-plan-types";
 
@@ -32,6 +33,15 @@ export type AiPlayerTrainingLoadPlan = {
 
 function clampFatigue(value: number) {
   return Math.max(0, Math.min(100, Number(value.toFixed(2))));
+}
+
+function stableTrainingLoadHash(value: string) {
+  let hash = 2166136261;
+  for (let index = 0; index < value.length; index += 1) {
+    hash ^= value.charCodeAt(index);
+    hash = Math.imul(hash, 16777619);
+  }
+  return hash >>> 0;
 }
 
 function countCompletedMatchdays(gameState: GameState) {
@@ -95,6 +105,7 @@ function resolveModeForPlayer(input: {
   recoveryCenterLevel: number;
   recoveryReductionPct: number;
   demandPreferred: PlayerTrainingMode | null;
+  prevSeasonStress?: boolean;
 }): Pick<AiPlayerTrainingLoadPlan, "selectedMode" | "projectedInjuryRiskPercent" | "needsLineupRest" | "reasons"> {
   const fatigue = input.player.fatigue ?? 0;
   const currentRisk = getInjuryRiskPercent(fatigue);
@@ -202,11 +213,48 @@ function resolveModeForPlayer(input: {
     }
   }
 
-  const selectedMode =
-    input.teamBaselineMode === "hart" && (fatigue >= 55 || currentRisk >= 10)
+  if (
+    benchOrProspect &&
+    stableTrainingLoadHash(`${input.player.id}:signature-training-load`) % 100 < 35
+  ) {
+    const affinity = deriveAttributeAffinityProfile(input.player);
+    const mediumRisk = evaluateMode("mittel");
+    const hardRisk = evaluateMode("hart");
+    if (hardRisk < 20 && input.teamBaselineMode !== "leicht") {
+      reasons.push(`Signature-Entwicklung (${affinity.signatureAttributes.join(", ")}) → hart`);
+      return {
+        selectedMode: "hart",
+        projectedInjuryRiskPercent: hardRisk,
+        needsLineupRest: false,
+        reasons,
+      };
+    }
+    if (mediumRisk < 16 && input.teamBaselineMode === "hart") {
+      reasons.push(`Signature-Entwicklung (${affinity.signatureAttributes.join(", ")}) → mittel`);
+      return {
+        selectedMode: "mittel",
+        projectedInjuryRiskPercent: mediumRisk,
+        needsLineupRest: false,
+        reasons,
+      };
+    }
+  }
+
+  const baselineMode =
+    input.prevSeasonStress && input.teamBaselineMode === "hart"
       ? "mittel"
-      : input.teamBaselineMode;
-  reasons.push(`Team-Baseline ${input.teamBaselineMode}`);
+      : input.prevSeasonStress && input.teamBaselineMode === "mittel"
+        ? "leicht"
+        : input.teamBaselineMode;
+  if (baselineMode !== input.teamBaselineMode) {
+    reasons.push("Vorsaison-Belastung deckelt Team-Baseline");
+  }
+
+  const selectedMode =
+    baselineMode === "hart" && (fatigue >= 55 || currentRisk >= 10)
+      ? "mittel"
+      : baselineMode;
+  reasons.push(`Team-Baseline ${selectedMode}`);
   const projected = evaluateMode(selectedMode);
   return {
     selectedMode,
@@ -220,6 +268,7 @@ export function buildTeamPlayerTrainingLoadPlans(input: {
   gameState: GameState;
   teamId: string;
   teamBaselineIntensity: AiTeamTrainingIntensity;
+  prevSeasonStress?: boolean;
 }): AiPlayerTrainingLoadPlan[] {
   const teamBaselineMode = trainingIntensityToMode(input.teamBaselineIntensity);
   const rosterEntries = input.gameState.rosters.filter((entry) => entry.teamId === input.teamId);
@@ -260,6 +309,7 @@ export function buildTeamPlayerTrainingLoadPlans(input: {
         recoveryCenterLevel,
         recoveryReductionPct,
         demandPreferred: demand?.preferredMode ?? null,
+        prevSeasonStress: input.prevSeasonStress,
       });
       const fatigue = player.fatigue ?? 0;
       return {

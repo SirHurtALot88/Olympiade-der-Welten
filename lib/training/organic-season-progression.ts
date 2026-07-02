@@ -39,6 +39,8 @@ import { getTeamDevelopmentTendency } from "@/lib/foundation/team-development-te
 import { getTeamStrategyProfile } from "@/lib/foundation/team-strategy-profiles";
 import type { PlayerTrainingMode } from "@/lib/training/training-plan-types";
 import { FATIGUE_LOAD_BY_MODE, TRAINING_SETPOINTS_BY_MODE } from "@/lib/training/training-mode-presentation";
+import { getDevelopmentRouteBonusMultiplier } from "@/lib/training/development-route-bonus";
+import type { PlayerDevelopmentRouteSuggestion } from "@/lib/progression/player-potential-service";
 import {
   officialDisciplineWeightOrder,
   officialDisciplineWeightTable,
@@ -84,6 +86,8 @@ export type OrganicSeasonProgressionResult = {
   marketValuePressurePerAttribute: number;
   marketValueMaintenanceReliefPct: number;
   trainingSetpoints: number;
+  /** Sum of applied training deltas after class distribution and multipliers. */
+  appliedTrainingSetpoints: number;
   /** Raw performance budget before affinity multipliers. */
   performanceSetpoints: number;
   /** Sum of applied performance deltas after affinity multipliers. */
@@ -120,12 +124,14 @@ export type OrganicRegressionBreakdown = {
   combinedTotal: number;
 };
 
-const BASE_REGRESSION_PER_ATTRIBUTE = 0.2;
-const TRAINING_CENTER_LEVEL_MODIFIER_PCT = [0, 10, 20, 30, 40, 50] as const;
-/** 0,6 % vom Marktwert pro Attribut (nicht MVS). */
-const MARKET_VALUE_PRESSURE_RATE = 0.006;
+/** Tunable via scripts/long-run-auto-tune-organic.ts (--apply regression scale). */
+export const ORGANIC_BASE_REGRESSION_PER_ATTRIBUTE = 0.305;
+const TRAINING_CENTER_LEVEL_MODIFIER_PCT = [0, 14, 28, 42, 56, 70] as const;
+/** 0,7 % vom Marktwert pro Attribut (nicht MVS). Tunable via auto-tune. */
+export const ORGANIC_MARKET_VALUE_PRESSURE_RATE = 0.0092;
 const NEGATIVE_TRAINING_SIDE_EFFECT_SHARE = 0.14;
-const PERFORMANCE_SETPOINT_SCALE = 0.58;
+/** Performance budget scale — boosts peak P90 vs league median. Tunable via auto-tune. */
+export const ORGANIC_PERFORMANCE_SETPOINT_SCALE = 0.64;
 const PERFORMANCE_SEASON_SOFT_KNEE = 5.5;
 const STAR_PERFORMANCE_GROWTH_FLOOR = 0.78;
 const STAR_TRAINING_GROWTH_FLOOR = 0.35;
@@ -157,6 +163,25 @@ function isFiniteNumber(value: number | null | undefined): value is number {
 
 function normalizeTrainingMode(value: Player["trainingMode"]): PlayerTrainingMode {
   return value === "leicht" || value === "mittel" || value === "hart" ? value : "mittel";
+}
+
+function classNameToDevelopmentRoute(className: ProgressionClassName): PlayerDevelopmentRouteSuggestion {
+  if (className === "Berserker" || className === "Warlord" || className === "Tank" || className === "Badass") return "POW";
+  if (className === "Sprinter" || className === "Rogue" || className === "Charger") return "SPE";
+  if (className === "Mage" || className === "Overseer" || className === "Tactician") return "MEN";
+  if (className === "Bard" || className === "Hero" || className === "Templar") return "SOC";
+  return "BALANCED";
+}
+
+function resolveTeamTrainingFocusAxis(gameState: GameState, playerId: string) {
+  const rosterEntry = gameState.rosters.find((entry) => entry.playerId === playerId);
+  if (!rosterEntry) return null;
+  const focus = gameState.seasonState.aiManagerTrainingSettings?.[rosterEntry.teamId]?.trainingFocus;
+  if (focus === "POW") return "pow" as const;
+  if (focus === "SPE") return "spe" as const;
+  if (focus === "MEN") return "men" as const;
+  if (focus === "SOC") return "soc" as const;
+  return null;
 }
 
 /** Marktwert fuer organische Regression — bewusst ohne MVS/displayMarketValue. */
@@ -279,7 +304,7 @@ function getPerformanceSetpoints(record: PlayerDisciplinePerformanceRecord) {
   const scoreSignal = clamp((record.finalPlayerScore ?? 0) / 100, 0, 1.25) * 0.28;
   const rankSignal = record.rankInDiscipline === 1 ? 0.72 : record.isTop10 ? 0.42 : record.rankInDiscipline <= 16 ? 0.18 : 0.08;
   const contributionSignal = clamp((record.scoreContribution ?? 0) / 30, 0, 1.2) * 0.22;
-  return roundValue((scoreSignal + rankSignal + contributionSignal) * PERFORMANCE_SETPOINT_SCALE, 3);
+  return roundValue((scoreSignal + rankSignal + contributionSignal) * ORGANIC_PERFORMANCE_SETPOINT_SCALE, 3);
 }
 
 export type SeasonPerformanceSignals = {
@@ -374,15 +399,44 @@ function buildOrganicRegressionBreakdown(input: {
   marketValuePressurePerAttribute: number;
 }): OrganicRegressionBreakdown {
   const attributeCount = PROGRESSION_ATTRIBUTE_ORDER.length;
-  const baseFlatTotal = roundValue(-BASE_REGRESSION_PER_ATTRIBUTE * attributeCount, 2);
+  const baseFlatTotal = roundValue(-ORGANIC_BASE_REGRESSION_PER_ATTRIBUTE * attributeCount, 2);
   const marketValueTotal = roundValue(-input.marketValuePressurePerAttribute * attributeCount, 2);
   return {
     baseFlatTotal,
     marketValueTotal,
     marktwertBase: roundValue(input.marktwertBase, 2),
-    marketValuePressureRatePct: roundValue(MARKET_VALUE_PRESSURE_RATE * 100, 2),
+    marketValuePressureRatePct: roundValue(ORGANIC_MARKET_VALUE_PRESSURE_RATE * 100, 2),
     combinedTotal: roundValue(baseFlatTotal + marketValueTotal, 2),
   };
+}
+
+export function resolveOrganicRegressionCombinedTotal(input: {
+  regressionCombinedTotal?: number | null;
+  regressionBreakdown?: Pick<OrganicRegressionBreakdown, "combinedTotal" | "baseFlatTotal" | "marketValueTotal"> | null;
+  marketValuePressureTotal?: number | null;
+}) {
+  if (input.regressionCombinedTotal != null && Number.isFinite(input.regressionCombinedTotal)) {
+    return input.regressionCombinedTotal;
+  }
+  if (input.regressionBreakdown?.combinedTotal != null && Number.isFinite(input.regressionBreakdown.combinedTotal)) {
+    return input.regressionBreakdown.combinedTotal;
+  }
+  if (
+    input.regressionBreakdown?.baseFlatTotal != null &&
+    input.regressionBreakdown?.marketValueTotal != null &&
+    Number.isFinite(input.regressionBreakdown.baseFlatTotal) &&
+    Number.isFinite(input.regressionBreakdown.marketValueTotal)
+  ) {
+    return roundValue(input.regressionBreakdown.baseFlatTotal + input.regressionBreakdown.marketValueTotal, 2);
+  }
+  if (input.marketValuePressureTotal != null && Number.isFinite(input.marketValuePressureTotal)) {
+    const attributeCount = PROGRESSION_ATTRIBUTE_ORDER.length;
+    return roundValue(
+      -ORGANIC_BASE_REGRESSION_PER_ATTRIBUTE * attributeCount - input.marketValuePressureTotal,
+      2,
+    );
+  }
+  return null;
 }
 
 function getOrganicGrowthMultiplier(affinity: AttributeAffinityKind) {
@@ -460,11 +514,12 @@ export function buildOrganicSeasonProgression(input: {
       traitModifierPct: 0,
       traitBreakdown: [],
       facilityModifierPct: 0,
-      baseRegressionPerAttribute: BASE_REGRESSION_PER_ATTRIBUTE,
+      baseRegressionPerAttribute: ORGANIC_BASE_REGRESSION_PER_ATTRIBUTE,
       marketValuePressureTotal: 0,
       marketValuePressurePerAttribute: 0,
       marketValueMaintenanceReliefPct: 0,
       trainingSetpoints: 0,
+      appliedTrainingSetpoints: 0,
       performanceSetpoints: 0,
       appliedPerformanceSetpoints: 0,
       performanceRegressionTotal: 0,
@@ -510,6 +565,7 @@ export function buildOrganicSeasonProgression(input: {
   const facilityModifierPct = getFacilityTrainingModifierPct(input.facilities, developmentTendency?.score ?? 0);
   const primaryTrainingClass =
     normalizeProgressionClassName(input.player.trainingClass) ??
+    normalizeProgressionClassName(input.player.className) ??
     calculateDynamicClassName(attributesBefore, input.gameState.seasonState.adminBalancingConfig);
   const secondaryTrainingClass = getSecondaryTrainingClass(input.player, input.facilities);
   const potentialRating = resolvePlayerPotentialRecordFromGameState({ gameState: input.gameState, playerId: input.player.id })?.hiddenPotentialScore ?? null;
@@ -528,8 +584,12 @@ export function buildOrganicSeasonProgression(input: {
   const potentialGapFactor = getPotentialGapTrainingFactor(starSnapshot.potentialGap);
   const potentialTrainingMultiplier = getPotentialTrainingMultiplierFromRecord(input.gameState, input.player) * potentialGapFactor;
   const baseTrainingBudget = TRAINING_SETPOINTS_BY_MODE[trainingMode];
+  const routeBonusMultiplier = getDevelopmentRouteBonusMultiplier(
+    classNameToDevelopmentRoute(primaryTrainingClass),
+    resolveTeamTrainingFocusAxis(input.gameState, input.player.id),
+  );
   const trainingSetpoints = roundValue(
-    baseTrainingBudget * traitSignal.trainingTraitMultiplier * potentialTrainingMultiplier * (1 + facilityModifierPct / 100),
+    baseTrainingBudget * traitSignal.trainingTraitMultiplier * potentialTrainingMultiplier * routeBonusMultiplier * (1 + facilityModifierPct / 100),
     2,
   );
   const primaryShare = secondaryTrainingClass ? 0.7 : 1;
@@ -555,7 +615,7 @@ export function buildOrganicSeasonProgression(input: {
     playerRating: input.player.rating,
   });
   const marktwertBase = getMarktwertForRegression(input.player);
-  const marketValuePressurePerAttribute = roundValue(marktwertBase * MARKET_VALUE_PRESSURE_RATE, 3);
+  const marketValuePressurePerAttribute = roundValue(marktwertBase * ORGANIC_MARKET_VALUE_PRESSURE_RATE, 3);
   const marketValuePressureTotal = roundValue(
     marketValuePressurePerAttribute * PROGRESSION_ATTRIBUTE_ORDER.length,
     2,
@@ -585,7 +645,7 @@ export function buildOrganicSeasonProgression(input: {
       affinityProfile,
       signals: performanceSignals,
     });
-    const regression = -(BASE_REGRESSION_PER_ATTRIBUTE + marketValuePressurePerAttribute);
+    const regression = -(ORGANIC_BASE_REGRESSION_PER_ATTRIBUTE + marketValuePressurePerAttribute);
     const training = applyTrainingGrowthMultiplier(primaryTrainingDeltas[attribute] + secondaryTrainingDeltas[attribute], trainingMultiplier);
     const performanceDelta = applyPositiveGrowthMultiplier(performance.deltas[attribute], performanceGrowthMultiplier);
     const delta = roundValue(regression + training + performanceDelta, 2);
@@ -605,6 +665,18 @@ export function buildOrganicSeasonProgression(input: {
     };
   });
   const attributeBreakdown = rawAttributeBreakdown;
+  const regressionCombinedFromAttributes = roundValue(
+    attributeBreakdown.reduce((sum, entry) => sum + entry.regression, 0),
+    2,
+  );
+  const regressionBreakdownAligned = {
+    ...regressionBreakdown,
+    combinedTotal: regressionCombinedFromAttributes,
+  };
+  const appliedTrainingSetpoints = roundValue(
+    attributeBreakdown.reduce((sum, entry) => sum + entry.training, 0),
+    2,
+  );
   const appliedPerformanceSetpoints = roundValue(
     attributeBreakdown.reduce((sum, entry) => sum + entry.performance, 0),
     2,
@@ -644,16 +716,17 @@ export function buildOrganicSeasonProgression(input: {
             : ("neutral" as const),
     })),
     facilityModifierPct,
-    baseRegressionPerAttribute: BASE_REGRESSION_PER_ATTRIBUTE,
+    baseRegressionPerAttribute: ORGANIC_BASE_REGRESSION_PER_ATTRIBUTE,
     marketValuePressureTotal,
     marketValuePressurePerAttribute,
     marketValueMaintenanceReliefPct: 0,
     trainingSetpoints,
+    appliedTrainingSetpoints,
     performanceSetpoints: performance.totalBudget,
     appliedPerformanceSetpoints,
     performanceRegressionTotal: 0,
     performanceRegressionPerAttribute: 0,
-    regressionBreakdown,
+    regressionBreakdown: regressionBreakdownAligned,
     netSetpoints: roundValue(attributeBreakdown.reduce((sum, entry) => sum + entry.delta, 0), 2),
     topTrainingAttributes: classSignals.primaryAttributes,
     negativeTrainingRisks: classSignals.negativeRisks,

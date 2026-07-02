@@ -2,10 +2,8 @@ export const dynamic = "force-dynamic";
 
 import { NextResponse } from "next/server";
 
-import { applyAiSeasonEndXpSpend, previewAiSeasonEndXpSpend } from "@/lib/progression/ai-xp-spend-planner";
+import { previewAiSeasonEndXpSpend } from "@/lib/progression/ai-xp-spend-planner";
 import { createPersistenceService } from "@/lib/persistence/persistence-service";
-import { parseRoomWriteContextFromRequest } from "@/lib/room/parse-room-write-context";
-import { authorizeServerRoomWrite } from "@/lib/room/server-authoritative-write-guard";
 
 type AiXpSpendBody = {
   saveId?: string;
@@ -40,28 +38,20 @@ export async function POST(request: Request) {
     }
 
     if (!dryRun) {
-      const writeAuth = authorizeServerRoomWrite({
-        ...parseRoomWriteContextFromRequest(request),
-        saveId,
-        teamId,
-        action: "ai_xp_spend_apply",
-        source: "sqlite",
-        dryRun,
-        confirmToken: body.confirmToken ?? null,
-      });
-      if (!writeAuth.allowed) {
-        return NextResponse.json(
-          { success: false, error: writeAuth.reason, summary: null, warnings: writeAuth.warnings },
-          { status: writeAuth.status },
-        );
-      }
+      return NextResponse.json(
+        {
+          success: false,
+          error: "manual_xp_spend_disabled",
+          summary: null,
+          blockingReasons: ["manual_xp_spend_disabled"],
+        },
+        { status: 410 },
+      );
     }
 
-    const summary = dryRun
-      ? previewAiSeasonEndXpSpend(save, teamId)
-      : applyAiSeasonEndXpSpend(save, teamId, body.confirmToken ?? null, persistence);
-    const success = "applied" in summary ? summary.applied : summary.blockers.length === 0 && summary.normalizedPlannedUpgrades.length > 0;
-    const blockingReasons = "applied" in summary ? summary.blockingReasons : summary.blockers;
+    const summary = previewAiSeasonEndXpSpend(save, teamId);
+    const success = summary.blockers.length === 0 && summary.normalizedPlannedUpgrades.length > 0;
+    const blockingReasons = summary.blockers;
 
     return NextResponse.json(
       {

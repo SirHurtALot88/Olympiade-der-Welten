@@ -8,6 +8,7 @@ import {
   previewSeasonEndContracts,
 } from "@/lib/contracts/contract-renewal-service";
 import type { PersistedSaveGame, PersistenceService } from "@/lib/persistence/types";
+import { assessPlayerMorale } from "@/lib/morale/player-morale-service";
 
 function createTeam(partial?: Partial<Team>): Team {
   return {
@@ -168,6 +169,74 @@ function createSave(gameState: GameState): PersistedSaveGame {
     updatedAt: "2026-06-12T00:00:00.000Z",
     gameState,
   };
+}
+
+function createAngryRenewalGameState() {
+  const team = createTeam({ teamId: "C-C", shortCode: "C-C" });
+  const player = createPlayer("angry", {
+    traitsNegative: ["Lazy", "Diva", "Mercenary", "Renegade"],
+    trainingMode: "hart",
+  });
+  const teammate = createPlayer("bad-fit", { className: "Mage", race: "Elf", traitsPositive: ["Saintly"] });
+  return {
+    ...createGameState({
+      teams: [team],
+      players: [player, teammate],
+      rosters: [
+        createRosterEntry("angry", {
+          teamId: "C-C",
+          contractLength: 0,
+          contractStatus: "renewal_pending",
+          salary: 3,
+          roleTag: "starter",
+        }),
+        createRosterEntry("bad-fit", { teamId: "C-C", roleTag: "bench" }),
+      ],
+    }),
+    teamIdentities: [
+      {
+        teamId: "C-C",
+        pow: 8,
+        spe: 5,
+        men: 5,
+        soc: 4,
+        ambition: 5,
+        finances: 5,
+        boardConfidence: 50,
+        harmony: 5,
+        manners: 5,
+        popularity: 5,
+        cooperation: 5,
+        playerMin: 7,
+        playerOpt: 10,
+      },
+    ],
+    disciplines: [{ id: "climb", name: "Climbing", category: "power", weight: 1, playerCount: 6 }],
+    seasonState: {
+      ...createGameState().seasonState,
+      standings: { "C-C": { points: 0, rank: 32 } },
+      matchdayResults: [
+        {
+          id: "result-1",
+          saveId: "save",
+          seasonId: "season-2",
+          matchdayId: "matchday-1",
+          status: "preview_applied",
+          sourceVersion: "test",
+          teamsTotal: 1,
+          teamsReady: 1,
+          teamsUnderfilled: 0,
+          teamsMissingLineup: 0,
+          teamsInvalidLineup: 0,
+          teamsMissingScoreCoverage: 0,
+          warningsCount: 0,
+          createdAt: "",
+          updatedAt: "",
+        },
+      ],
+      playerDisciplinePerformances: [],
+    },
+  } satisfies GameState;
 }
 
 function createPersistenceMock() {
@@ -505,6 +574,30 @@ describe("contract renewal service", () => {
     expect(shortPreview.moraleAdjustedExpectedSalary).toBeGreaterThan(shortPreview.negotiationPreview?.expectedSalary ?? 0);
     expect(longPreview.ok).toBe(false);
     expect(longPreview.blockingReasons).toContain("morale_contract_length_limited");
+  });
+
+  it("blocks manual renewal when player refuses extension", () => {
+    const gameState = createAngryRenewalGameState();
+    const morale = assessPlayerMorale({
+      gameState,
+      playerId: "angry",
+      teamId: "C-C",
+      renewalSalaryPreview: 10,
+    });
+    expect(morale?.contractIntent).toBe("refuses_extension");
+
+    const save = createSave(gameState);
+    const preview = previewContractRenewalAction({
+      save,
+      teamId: "C-C",
+      playerId: "angry",
+      action: "renew",
+      contractLength: 1,
+    });
+
+    expect(preview.morale?.contractIntent).toBe("refuses_extension");
+    expect(preview.ok).toBe(false);
+    expect(preview.blockingReasons).toContain("morale_refuses_extension");
   });
 
   it("pays current VK and writes contract_exit history when a human releases a player", () => {

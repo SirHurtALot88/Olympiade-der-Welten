@@ -17,7 +17,7 @@ import { buildTeamControlSettingsMap } from "@/lib/foundation/team-control-setti
 import { LOCAL_TRANSFER_WINDOW_PHASE } from "@/lib/market/transfer-window-policy";
 import { createPersistenceService } from "@/lib/persistence/persistence-service";
 import type { PersistenceService } from "@/lib/persistence/types";
-import { parseRoomWriteContextFromRequest } from "@/lib/room/parse-room-write-context";
+import { parseRoomWriteContextFromRequestAndBody } from "@/lib/room/parse-room-write-context";
 import { authorizeServerRoomWrite } from "@/lib/room/server-authoritative-write-guard";
 
 const inFlightRunKeys = new Set<string>();
@@ -86,7 +86,7 @@ async function executeAiPreseasonBackgroundWork(input: {
   aiTeamIds: string[];
   setupDraftMode: boolean;
   protectedSave: NonNullable<ReturnType<PersistenceService["getSaveById"]>>;
-}) {
+}): Promise<AiPreseasonAutomationRunRecord> {
   const { saveId, seasonId, baseRecord, aiTeamIds, setupDraftMode, protectedSave } = input;
   const persistence = createPersistenceService();
 
@@ -171,7 +171,7 @@ async function executeAiPreseasonBackgroundWork(input: {
         blockingReasons: Array.from(new Set(blockingReasons)),
       };
       writeRunRecord(saveId, finalRecord);
-      return;
+      return finalRecord;
     }
 
     const market = await applyAiMarketPlanLocally({
@@ -203,6 +203,7 @@ async function executeAiPreseasonBackgroundWork(input: {
       blockingReasons: [...managerResult.blockers, ...market.blockingReasons],
     };
     writeRunRecord(saveId, finalRecord);
+    return finalRecord;
   } catch (error) {
     const failedRecord: AiPreseasonAutomationRunRecord = {
       ...baseRecord,
@@ -213,6 +214,7 @@ async function executeAiPreseasonBackgroundWork(input: {
     };
     writeRunRecord(saveId, failedRecord);
     console.error("AI preseason background failed.", error);
+    return failedRecord;
   } finally {
     inFlightRunKeys.delete(buildRunKey(saveId, seasonId));
   }
@@ -241,8 +243,10 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: `Season ${seasonId} is not active in save ${saveId}.` }, { status: 409 });
   }
 
+  const body = (await request.json().catch(() => ({}))) as Record<string, unknown>;
+
   const writeAuth = authorizeServerRoomWrite({
-    ...parseRoomWriteContextFromRequest(request),
+    ...parseRoomWriteContextFromRequestAndBody(request, body),
     saveId,
     action: "ai_preseason_background",
     source: "sqlite",
@@ -253,75 +257,102 @@ export async function POST(request: Request) {
   }
 
   const runKey = buildRunKey(saveId, seasonId);
-  const existingRun = save.gameState.seasonState.aiPreseasonAutomationRuns?.[seasonId] ?? null;
-  if (
-    existingRun?.status === "completed" ||
-    inFlightRunKeys.has(runKey) ||
-    (existingRun?.status === "running" && !isStaleRunningRun(existingRun))
-  ) {
+  if (inFlightRunKeys.has(runKey)) {
+    const latestRun = persistence.getSaveById(saveId)?.gameState.seasonState.aiPreseasonAutomationRuns?.[seasonId] ?? null;
     return NextResponse.json({
       ok: true,
       skipped: true,
-      reason:
-        existingRun?.status === "running" || inFlightRunKeys.has(runKey)
-          ? "ai_preseason_already_running"
-          : "ai_preseason_already_completed",
-      run: existingRun,
+      reason: "ai_preseason_already_running",
+      run: latestRun,
     });
   }
 
-  const skipManualProtection = allowsAiPreseasonManualTeamOverride({
-    saveId,
-    gameState: save.gameState,
-  });
-  const protectedGameState = skipManualProtection ? save.gameState : protectManualPlayerTeams(save.gameState);
-  const protectedSave =
-    protectedGameState === save.gameState
-      ? save
-      : persistence.saveSingleplayerState(save.saveId, protectedGameState, { status: save.status });
-  const aiTeamIds = getAiTeamIds(protectedSave.gameState);
-  const startedAt = nowIso();
-  const setupDraftMode = shouldRunSetupDraft(protectedSave.gameState, aiTeamIds);
-  const baseRecord: AiPreseasonAutomationRunRecord = {
-    runId: `ai-preseason-${saveId}-${seasonId}-${Date.now()}`,
-    seasonId,
-    status: aiTeamIds.length === 0 ? "skipped" : "running",
-    mode: aiTeamIds.length === 0 ? "none" : setupDraftMode ? "setup_draft" : "season_market",
-    startedAt,
-    completedAt: null,
-    aiTeamsTotal: aiTeamIds.length,
-    aiTeamsCompleted: 0,
-    managerActionsApplied: 0,
-    transferBuysApplied: 0,
-    transferSellsApplied: 0,
-    warnings: [],
-    blockingReasons: [],
-  };
-
-  if (aiTeamIds.length === 0) {
-    const skippedRecord: AiPreseasonAutomationRunRecord = { ...baseRecord, completedAt: nowIso() };
-    writeRunRecord(saveId, skippedRecord);
-    return NextResponse.json({ ok: true, skipped: true, reason: "no_ai_teams", run: skippedRecord });
-  }
-
-  writeRunRecord(saveId, baseRecord);
   inFlightRunKeys.add(runKey);
-  void executeAiPreseasonBackgroundWork({
-    saveId,
-    seasonId,
-    baseRecord,
-    aiTeamIds,
-    setupDraftMode,
-    protectedSave,
-  });
+  let handedToExecute = false;
 
-  return NextResponse.json(
-    {
-      ok: true,
-      skipped: false,
-      accepted: true,
-      run: baseRecord,
-    },
-    { status: 202 },
-  );
+  try {
+    const freshSave = persistence.getSaveById(saveId);
+    if (!freshSave) {
+      return NextResponse.json({ error: `Save ${saveId} not found.` }, { status: 404 });
+    }
+
+    const existingRun = freshSave.gameState.seasonState.aiPreseasonAutomationRuns?.[seasonId] ?? null;
+    if (
+      existingRun?.status === "completed" ||
+      (existingRun?.status === "running" && !isStaleRunningRun(existingRun))
+    ) {
+      return NextResponse.json({
+        ok: true,
+        skipped: true,
+        reason: existingRun?.status === "running" ? "ai_preseason_already_running" : "ai_preseason_already_completed",
+        run: existingRun,
+      });
+    }
+
+    const skipManualProtection = allowsAiPreseasonManualTeamOverride({
+      saveId,
+      gameState: freshSave.gameState,
+    });
+    const protectedGameState = skipManualProtection ? freshSave.gameState : protectManualPlayerTeams(freshSave.gameState);
+    const protectedSave =
+      protectedGameState === freshSave.gameState
+        ? freshSave
+        : persistence.saveSingleplayerState(freshSave.saveId, protectedGameState, { status: freshSave.status });
+    const aiTeamIds = getAiTeamIds(protectedSave.gameState);
+    const startedAt = nowIso();
+    const setupDraftMode = shouldRunSetupDraft(protectedSave.gameState, aiTeamIds);
+    const baseRecord: AiPreseasonAutomationRunRecord = {
+      runId: `ai-preseason-${saveId}-${seasonId}-${Date.now()}`,
+      seasonId,
+      status: aiTeamIds.length === 0 ? "skipped" : "running",
+      mode: aiTeamIds.length === 0 ? "none" : setupDraftMode ? "setup_draft" : "season_market",
+      startedAt,
+      completedAt: null,
+      aiTeamsTotal: aiTeamIds.length,
+      aiTeamsCompleted: 0,
+      managerActionsApplied: 0,
+      transferBuysApplied: 0,
+      transferSellsApplied: 0,
+      warnings: [],
+      blockingReasons: [],
+    };
+
+    if (aiTeamIds.length === 0) {
+      const skippedRecord: AiPreseasonAutomationRunRecord = { ...baseRecord, completedAt: nowIso() };
+      writeRunRecord(saveId, skippedRecord);
+      return NextResponse.json({ ok: true, skipped: true, reason: "no_ai_teams", run: skippedRecord });
+    }
+
+    writeRunRecord(saveId, baseRecord);
+    handedToExecute = true;
+    const finalRun = await executeAiPreseasonBackgroundWork({
+      saveId,
+      seasonId,
+      baseRecord,
+      aiTeamIds,
+      setupDraftMode,
+      protectedSave,
+    });
+
+    const succeeded = finalRun.status === "completed";
+    return NextResponse.json(
+      {
+        ok: succeeded,
+        skipped: false,
+        run: finalRun,
+      },
+      { status: succeeded ? 200 : 500 },
+    );
+  } catch (error) {
+    return NextResponse.json(
+      {
+        error: error instanceof Error ? error.message : "AI preseason background failed.",
+      },
+      { status: 500 },
+    );
+  } finally {
+    if (!handedToExecute) {
+      inFlightRunKeys.delete(runKey);
+    }
+  }
 }

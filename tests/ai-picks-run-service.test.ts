@@ -46,6 +46,7 @@ vi.mock("@/lib/market/transfermarkt-local-service", () => ({
   executeLocalTransfermarktBuy,
   listLocalTransferHistory,
   listLocalTransfermarktFreeAgents,
+  warmLocalTransfermarktFreeAgentBrowseIndex: vi.fn(),
   createLocalTransfermarktRunContext: ({ save }: { save: typeof persistenceState.save }) => ({
     save,
     persistence: {

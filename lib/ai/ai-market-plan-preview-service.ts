@@ -22,16 +22,36 @@ import {
   type EnrichedBuyRecommendation,
 } from "@/lib/ai/ai-transfer-plan-enrichment";
 import {
+  mapPlannedPicksToBuyCandidates,
+  planUnifiedTeamPicks,
+  resolveUnifiedMarketPickSteps,
+  isUnifiedPickEnabledForMarket,
+} from "@/lib/ai/unified-pick-planner-service";
+import {
+  PRESEASON_CASH_PRESSURE_THRESHOLD,
+} from "@/lib/ai/preseason-cash-recovery-service";
+import {
   assessTeamSellRunwayPressure,
   getProfitWindowSellThreshold,
   isAttractiveProfitSell,
 } from "@/lib/ai/team-sell-runway-pressure";
+import { isSeasonOne } from "@/lib/season/transfer-season-policy";
+import {
+  buildLeagueMarketAnchors,
+  resolvePlannerSpendableCash,
+} from "@/lib/ai/ai-market-slot-plan-service";
+import { resolveMarketQualityProfile } from "@/lib/ai/ai-market-quality-profile-service";
+import { buildBudgetEnvelope } from "@/lib/ai/market-pick-engine/budget-envelope";
+import { pickCandidateForSlot, reconcileEnvelopeAfterPick } from "@/lib/ai/market-pick-engine/pick-step";
+import { resolveTeamCashRunwayReserve } from "@/lib/ai/ai-team-cash-reserve-service";
+import { teamNeedsPostOptUpgradeDeploy } from "@/lib/ai/ai-budget-deploy-service";
 import { loadFoundationSnapshotFromPrisma } from "@/lib/db/read/foundation-read-repository";
 import { projectFoundationStateFromPrisma } from "@/lib/db/read/foundation-read-projection";
 import { withNormalizedTeamControlSettings } from "@/lib/foundation/team-control-settings";
 import { withNormalizedTeamStrategyProfiles } from "@/lib/foundation/team-strategy-profiles";
 import { createPersistenceService } from "@/lib/persistence/persistence-service";
 import type { GameState, TeamControlMode } from "@/lib/data/olyDataTypes";
+import type { LocalTransfermarktRunContext } from "@/lib/market/transfermarkt-local-service";
 
 export type AiMarketPlanPreviewSource = AiTransferPreviewSource;
 export type AiMarketPlanPreviewTeamScope = "ai" | "all";
@@ -48,6 +68,8 @@ export type AiMarketPlanPreviewParams = {
   fullScoringLimit?: number | null;
   buyNeedOnly?: boolean | null;
   forceBuyScanTeamIds?: string[] | null;
+  localRunContext?: LocalTransfermarktRunContext | null;
+  gameState?: GameState | null;
 };
 
 export type AiMarketPlanCurrentState = {
@@ -204,10 +226,12 @@ function chooseBuyCandidates(
   plannedSellCount = 0,
   cashAfterSell?: number | null,
   buyCandidatesOverride?: EnrichedBuyRecommendation[],
+  runwayReserve?: number | null,
+  gameState?: GameState | null,
 ) {
   const rosterCount = team.rosterCount ?? team.rosterSize ?? null;
   const playerMin = team.targetRosterMin ?? null;
-  const playerOpt = team.targetRosterOpt ?? null;
+  const identityPlayerOpt = team.targetRosterOpt ?? null;
   const rosterAfterSell = rosterCount != null ? rosterCount - plannedSellCount : null;
   const buyCandidates = [...(buyCandidatesOverride ?? team.recommendedBuys ?? [])].sort((left, right) => {
     const leftScore = left.strategicBuyScore ?? left.overallRecommendationScore ?? 0;
@@ -221,48 +245,108 @@ function chooseBuyCandidates(
     team.explanation.includes("Titel") ||
     team.explanation.includes("Opportun");
 
+  const qualityProfile =
+    gameState && rosterAfterSell != null
+      ? resolveMarketQualityProfile({
+          gameState,
+          teamId: team.teamId,
+          rosterCount: rosterAfterSell,
+          spendable: cashAfterSell ?? resolvePlannerSpendableCash(gameState, team.teamId, team.cash),
+        })
+      : null;
+  const playerOpt = identityPlayerOpt;
+
   let wantedCount = 0;
   if (rosterAfterSell != null && playerMin != null && rosterAfterSell < playerMin) {
     wantedCount = Math.min(Math.max(playerMin - rosterAfterSell, 1), 3);
   } else if (rosterAfterSell != null && playerOpt != null && rosterAfterSell < playerOpt) {
     wantedCount = Math.min(Math.max(playerOpt - rosterAfterSell, 1), plannedSellCount >= 2 ? 3 : 2);
   } else if (plannedSellCount >= 2 && topScore >= 58 && team.budgetStatus !== "critical") {
-    wantedCount = 2;
+    wantedCount = qualityProfile?.starChaser ? 1 : 2;
   } else if (plannedSellCount >= 1 && topScore >= 52 && team.budgetStatus !== "critical") {
     wantedCount = 1;
   } else if (aggressiveBuy && topScore >= 65 && team.budgetStatus !== "critical") {
     wantedCount = 1;
   }
 
-  const candidateWindow = wantedCount > 0 ? Math.min(buyCandidates.length, wantedCount + 12) : 0;
+  const candidateWindow = wantedCount > 0 ? Math.min(buyCandidates.length, wantedCount + 16) : 0;
   const visibleCandidates = buyCandidates.slice(0, candidateWindow);
   if (cashAfterSell == null || !Number.isFinite(cashAfterSell)) {
-    return visibleCandidates;
+    return visibleCandidates.slice(0, wantedCount);
   }
 
   const selected: AiTransferPreviewRecommendation[] = [];
+  const usedPlayerIds = new Set<string>();
   let cashRemaining = cashAfterSell;
-  for (const candidate of visibleCandidates) {
+
+  const pickWithCash = (candidate: AiTransferPreviewRecommendation) => {
     const priceValue = candidate.price ?? candidate.marketValue ?? null;
-    if (!isKnownPositiveMoney(priceValue)) {
-      continue;
+    if (!isKnownPositiveMoney(priceValue) || usedPlayerIds.has(candidate.playerId)) {
+      return false;
     }
-    const cashBuffer = getPreviewCashBuffer({
-      salaryTotal: team.salaryTotal ?? team.salary ?? null,
-      rosterAfterSell,
-      playerMin,
-      wantedCount,
-      plannedBuyCount: selected.length,
-      strategySummary: team.explanation,
-    });
+    const cashBuffer =
+      runwayReserve != null && Number.isFinite(runwayReserve)
+        ? runwayReserve
+        : getPreviewCashBuffer({
+            salaryTotal: team.salaryTotal ?? team.salary ?? null,
+            rosterAfterSell,
+            playerMin,
+            wantedCount,
+            plannedBuyCount: selected.length,
+            strategySummary: team.explanation,
+          });
     if (cashRemaining - priceValue < cashBuffer) {
-      continue;
+      return false;
     }
     selected.push(candidate);
+    usedPlayerIds.add(candidate.playerId);
     cashRemaining -= priceValue;
-    if (selected.length >= wantedCount) {
-      break;
+    return true;
+  };
+
+  if (qualityProfile && wantedCount > 0 && gameState) {
+    const faPrices = gameState.players.map((player) => player.marketValue ?? player.displayMarketValue ?? null);
+    const anchors = buildLeagueMarketAnchors(faPrices);
+    const missingToMin =
+      playerMin != null && rosterAfterSell != null ? Math.max(0, playerMin - rosterAfterSell) : 0;
+    const rosterGap =
+      playerOpt != null && rosterAfterSell != null ? Math.max(0, playerOpt - rosterAfterSell) : wantedCount;
+    const envelope = buildBudgetEnvelope({
+      spendable: cashRemaining,
+      rosterGap,
+      missingToMin,
+      steps: wantedCount,
+      profile: qualityProfile,
+      faPrices,
+    });
+    const effectivePickPhase = qualityProfile.pickPhase;
+
+    for (let slotIndex = 0; slotIndex < wantedCount; slotIndex += 1) {
+      if (selected.length >= wantedCount) break;
+      const pickResult = pickCandidateForSlot({
+        slotIndex,
+        envelope,
+        candidates: visibleCandidates,
+        usedPlayerIds,
+        qualityProfile,
+        pickPhase: effectivePickPhase,
+        allowMinFillFallback: missingToMin > 0 && rosterAfterSell != null && playerMin != null && rosterAfterSell < playerMin,
+      });
+      if (!pickResult) continue;
+      const candidate = pickResult.candidate as AiTransferPreviewRecommendation;
+      if (pickWithCash(candidate)) {
+        reconcileEnvelopeAfterPick({
+          envelope,
+          slotIndex,
+          overspendDelta: pickResult.overspendDelta,
+        });
+      }
     }
+  }
+
+  for (const candidate of visibleCandidates) {
+    if (selected.length >= wantedCount) break;
+    pickWithCash(candidate);
   }
 
   return selected;
@@ -272,27 +356,24 @@ function chooseSellCandidates(
   team: AiSellPreviewTeamEntry,
   candidatesOverride?: DoctrineAdjustedSellCandidate[],
   gameState?: GameState | null,
+  options?: { buyTopScore?: number },
 ) {
   const rosterCount = team.rosterSize ?? null;
   const playerMin = team.targetRosterMin ?? team.playerMin ?? null;
   const playerOpt = team.targetRosterOpt ?? null;
+  const buyTopScore = options?.buyTopScore ?? 0;
   const sourceCandidates = candidatesOverride ?? team.sellCandidates;
-  const safeCandidates = sourceCandidates.filter(
-    (candidate) => !candidate.warnings.some((warning) => warning.includes("unter das Team-Minimum")),
-  );
   const sellCapacity =
-    rosterCount != null && playerMin != null
-      ? Math.max(0, rosterCount - playerMin)
-      : safeCandidates.length;
-  if (sellCapacity <= 0) {
+    rosterCount != null && rosterCount > 0 ? rosterCount : sourceCandidates.length;
+  if (sourceCandidates.length === 0 || sellCapacity <= 0) {
     return [];
   }
-  const topPriority = safeCandidates[0]?.sellPriority ?? 0;
+  const topPriority = sourceCandidates[0]?.sellPriority ?? 0;
   const topProfitRatio =
-    safeCandidates[0]?.expectedSellValue != null &&
-    safeCandidates[0]?.marketValue != null &&
-    safeCandidates[0].marketValue > 0
-      ? (safeCandidates[0].expectedSellValue - safeCandidates[0].marketValue) / safeCandidates[0].marketValue
+    sourceCandidates[0]?.expectedSellValue != null &&
+    sourceCandidates[0]?.marketValue != null &&
+    sourceCandidates[0].marketValue > 0
+      ? (sourceCandidates[0].expectedSellValue - sourceCandidates[0].marketValue) / sourceCandidates[0].marketValue
       : 0;
   const highLoyalty =
     team.explanation.includes("Bindet") ||
@@ -305,16 +386,28 @@ function chooseSellCandidates(
     gameState && teamState
       ? assessTeamSellRunwayPressure({ gameState, team: teamState, salaryTotal })
       : null;
-  const topReasons = safeCandidates[0]?.reasonToSell ?? [];
-  const hasExpiringContractPressure = safeCandidates.some((candidate) =>
+  const lowCashBuffer =
+    team.cash != null &&
+    Number.isFinite(team.cash) &&
+    team.cash >= 0 &&
+    team.cash < PRESEASON_CASH_PRESSURE_THRESHOLD;
+  const topReasons = sourceCandidates[0]?.reasonToSell ?? [];
+  const profitWindowThreshold = getProfitWindowSellThreshold(sellRunway?.cashPressureScore ?? 0);
+  const hasExpiringContractPressure = sourceCandidates.some((candidate) =>
     candidate.reasonToSell.some((reason) => reason.includes("Vertrag laeuft aus") || reason.includes("kurze Restvertragslaenge")),
   );
-  const hasProfitWindow = safeCandidates.some((candidate) => {
+  const hasProfitWindow = sourceCandidates.some((candidate) => {
     if (candidate.expectedSellValue == null || candidate.marketValue == null || candidate.marketValue <= 0) {
       return false;
     }
     const profitRatio = (candidate.expectedSellValue - candidate.marketValue) / candidate.marketValue;
-    return profitRatio >= 0.1 && candidate.sellPriority >= 38;
+    const profitAbsolute = candidate.expectedSellValue - candidate.marketValue;
+    const cashPressure = sellRunway?.cashPressureScore ?? 0;
+    return (
+      (profitRatio >= (cashPressure >= 0.45 ? 0.08 : 0.07) &&
+        candidate.sellPriority >= (cashPressure >= 0.45 ? 30 : profitWindowThreshold)) ||
+      (profitAbsolute >= 3 && cashPressure >= 0.45 && candidate.sellPriority >= 28)
+    );
   });
   const hasManagementSellReason = topReasons.some(
     (reason) =>
@@ -331,32 +424,68 @@ function chooseSellCandidates(
     wantedCount = Math.min(Math.max(rosterCount - playerOpt, 1), 3);
   } else if (hasNegativeCash && topPriority >= 25) {
     wantedCount = 2;
-  } else if (team.budgetPressure === "critical" && topPriority >= 55) {
+  } else if (
+    (lowCashBuffer || (sellRunway?.lowCashBuffer ?? false)) &&
+    topPriority >= 28 &&
+    (sellRunway?.cashPressureScore ?? 0) >= 0.35
+  ) {
+    wantedCount = team.cash != null && team.cash < 5 ? 2 : 1;
+  } else if (team.budgetPressure === "critical" && topPriority >= 50) {
     wantedCount = 2;
-  } else if (!highLoyalty && hasManagementSellReason && topPriority >= 58) {
+  } else if (!highLoyalty && hasManagementSellReason && topPriority >= 50) {
     wantedCount = 1;
-  } else if (!highLoyalty && hasExpiringContractPressure && topPriority >= 48) {
+  } else if (!highLoyalty && hasExpiringContractPressure && topPriority >= 45) {
     wantedCount = 1;
-  } else if (!highLoyalty && topProfitRatio >= 0.18 && topPriority >= 42) {
+  } else if (!highLoyalty && topProfitRatio >= 0.08 && topPriority >= 38) {
     wantedCount = 1;
-  } else if (!highLoyalty && topPriority >= 72) {
+  } else if (!highLoyalty && topProfitRatio >= 0.12 && topPriority >= 40) {
+    wantedCount = 1;
+  } else if (
+    !highLoyalty &&
+    rosterCount != null &&
+    playerOpt != null &&
+    rosterCount === playerOpt &&
+    hasProfitWindow &&
+    topPriority >= 50
+  ) {
+    wantedCount = 1;
+  } else if (
+    !highLoyalty &&
+    rosterCount != null &&
+    playerMin != null &&
+    rosterCount === playerMin &&
+    hasProfitWindow &&
+    topPriority >= 50
+  ) {
+    wantedCount = 1;
+  } else if (!highLoyalty && topPriority >= 58) {
     wantedCount = 1;
   }
 
-  const profitWindowThreshold = getProfitWindowSellThreshold(sellRunway?.cashPressureScore ?? 0);
   if (!highLoyalty && hasProfitWindow && topPriority >= profitWindowThreshold) {
     wantedCount = Math.max(wantedCount, 1);
   } else if (
     !highLoyalty &&
     sellRunway &&
     sellRunway.cashPressureScore >= 0.55 &&
-    topProfitRatio >= 0.12 &&
+    topProfitRatio >= 0.08 &&
     topPriority >= profitWindowThreshold - 4
+  ) {
+    wantedCount = Math.max(wantedCount, 1);
+  } else if (
+    !highLoyalty &&
+    buyTopScore >= 52 &&
+    hasProfitWindow &&
+    topPriority >= 45 &&
+    rosterCount != null &&
+    playerOpt != null &&
+    rosterCount >= (playerMin ?? 0) &&
+    rosterCount <= playerOpt
   ) {
     wantedCount = Math.max(wantedCount, 1);
   }
 
-  const proactiveCandidates = safeCandidates.filter((candidate) => {
+  const proactiveCandidates = sourceCandidates.filter((candidate) => {
     const candidateProfitRatio =
       candidate.expectedSellValue != null && candidate.marketValue != null && candidate.marketValue > 0
         ? (candidate.expectedSellValue - candidate.marketValue) / candidate.marketValue
@@ -381,17 +510,20 @@ function chooseSellCandidates(
         reason.includes("Gehaltslast uebersteigt verfuegbares Cash") ||
         reason.includes("realisierbarer Gewinn"),
     );
-    const profitThreshold = (sellRunway?.cashPressureScore ?? 0) >= 0.5 ? 0.05 : 0.1;
+    const profitThreshold = (sellRunway?.cashPressureScore ?? 0) >= 0.5 ? 0.05 : 0.07;
     return (
       hasStrongReason ||
       attractiveProfit ||
       candidateProfitRatio >= profitThreshold ||
-      candidate.sellPriority >= 68
+      candidate.sellPriority >= 50
     );
   });
 
   const maxWantedByContext =
-    hasNegativeCash || team.budgetPressure === "critical" || (rosterCount != null && playerOpt != null && rosterCount > playerOpt)
+    hasNegativeCash ||
+    lowCashBuffer ||
+    team.budgetPressure === "critical" ||
+    (rosterCount != null && playerOpt != null && rosterCount > playerOpt)
       ? 3
       : highLoyalty
         ? 1
@@ -399,7 +531,7 @@ function chooseSellCandidates(
   const negativeCashRecoveryCandidates: AiSellPreviewCandidate[] = [];
   if (hasNegativeCash) {
     let projectedCash = team.cash ?? 0;
-    for (const candidate of safeCandidates) {
+    for (const candidate of sourceCandidates) {
       const expectedSellValue = candidate.expectedSellValue;
       if (!isKnownPositiveMoney(expectedSellValue)) {
         continue;
@@ -413,6 +545,17 @@ function chooseSellCandidates(
   }
 
   const finalWantedCount = Math.min(Math.max(wantedCount, proactiveCandidates.length > 1 ? 2 : wantedCount), maxWantedByContext, sellCapacity);
+
+  if (gameState && teamNeedsPostOptUpgradeDeploy(gameState, team.teamId, gameState.season.id)) {
+    const weakest = [...sourceCandidates].sort((left, right) => {
+      const leftValue = left.marketValue ?? left.ovr ?? 0;
+      const rightValue = right.marketValue ?? right.ovr ?? 0;
+      return leftValue - rightValue;
+    });
+    if (weakest[0]) {
+      return [weakest[0]];
+    }
+  }
 
   return uniqueById(
     [...negativeCashRecoveryCandidates, ...proactiveCandidates.slice(0, finalWantedCount)],
@@ -563,7 +706,11 @@ function buildTeamEntry(input: {
       ? applyDoctrineToSellCandidates({ candidates: sellTeam.sellCandidates, doctrine })
       : sellTeam?.sellCandidates ?? [];
 
-  const chosenSells = sellTeam ? chooseSellCandidates(sellTeam, doctrineAdjustedSells, input.gameState) : [];
+  const buyTopScore =
+    buyTeam?.recommendedBuys?.[0]?.overallRecommendationScore ?? buyTeam?.recommendedBuys?.[0]?.score ?? 0;
+  const chosenSells = sellTeam
+    ? chooseSellCandidates(sellTeam, doctrineAdjustedSells, input.gameState, { buyTopScore })
+    : [];
   const expectedSellValue = chosenSells.length > 0 ? sumKnown(chosenSells.map((candidate) => candidate.expectedSellValue)) : 0;
   const cashAfterSell =
     currentState.cash != null && expectedSellValue != null
@@ -595,7 +742,16 @@ function buildTeamEntry(input: {
         })
       : undefined;
 
-  const initialBuys = buyTeam ? chooseBuyCandidates(buyTeam, chosenSells.length, cashAfterSell, enrichedBuyPool) : [];
+  const initialBuys = buyTeam
+    ? chooseBuyCandidates(
+        buyTeam,
+        chosenSells.length,
+        cashAfterSell,
+        enrichedBuyPool,
+        input.gameState && teamId ? resolveTeamCashRunwayReserve(input.gameState, teamId) : null,
+        input.gameState,
+      )
+    : [];
   const swapResult =
     input.gameState && sellTeam && buyTeam
       ? chooseSwapAwarePackages({
@@ -789,6 +945,73 @@ function buildTeamEntry(input: {
   } satisfies AiMarketPlanTeamEntry;
 }
 
+async function overlayUnifiedCompareBuyPlans(input: {
+  teams: AiMarketPlanTeamEntry[];
+  saveId: string;
+  seasonId: string;
+  buyPreview: AiTransferPreviewResult | null;
+}) {
+  if (!isUnifiedPickEnabledForMarket() || isSeasonOne(input.seasonId) || !input.saveId) {
+    return input.teams;
+  }
+
+  const buyByTeam = new Map((input.buyPreview?.teams ?? []).map((team) => [team.teamId, team] as const));
+  const overlayed: AiMarketPlanTeamEntry[] = [];
+
+  for (const team of input.teams) {
+    const steps = resolveUnifiedMarketPickSteps(team);
+    const poolTeam = buyByTeam.get(team.teamId);
+    const pool = poolTeam?.legalCandidatePool ?? poolTeam?.recommendedBuys ?? [];
+    if (
+      steps <= 0 ||
+      !poolTeam ||
+      pool.length === 0 ||
+      (team.status !== "buy_only" && team.status !== "sell_then_buy" && team.status !== "warning")
+    ) {
+      overlayed.push(team);
+      continue;
+    }
+
+    const planned = await planUnifiedTeamPicks({
+      saveId: input.saveId,
+      seasonId: input.seasonId,
+      teamId: team.teamId,
+      steps,
+      runMode: "default",
+    });
+    const unifiedBuys = mapPlannedPicksToBuyCandidates(planned.plannedPicks, pool);
+    if (unifiedBuys.length === 0) {
+      overlayed.push({
+        ...team,
+        warnings: unique([...team.warnings, ...planned.warnings, "unified_pick_no_mapped_candidates"]),
+      });
+      continue;
+    }
+
+    overlayed.push({
+      ...team,
+      buyPlan: {
+        ...team.buyPlan,
+        candidates: unifiedBuys,
+        plannedSpend: unifiedBuys.length > 0 ? sumKnown(unifiedBuys.map((candidate) => candidate.price)) : 0,
+        plannedSalaryAdded:
+          unifiedBuys.length > 0 ? sumKnown(unifiedBuys.map((candidate) => candidate.salary)) : 0,
+        rosterAfterBuy:
+          team.currentState.rosterCount != null ? team.currentState.rosterCount + unifiedBuys.length : null,
+        warnings: unique([
+          ...team.buyPlan.warnings,
+          ...planned.warnings,
+          unifiedBuys.length < steps ? "unified_pick_partial_fill" : null,
+        ]),
+      },
+      warnings: unique([...team.warnings, ...planned.warnings]),
+      blockingReasons: unique([...team.blockingReasons, ...planned.blockingReasons]),
+    });
+  }
+
+  return overlayed;
+}
+
 export async function buildAiMarketPlanPreview(params: AiMarketPlanPreviewParams = {}): Promise<AiMarketPlanPreviewResult> {
   const previewParams: AiTransferPreviewParams = {
     source: params.source === "prisma" ? "prisma" : "sqlite",
@@ -799,16 +1022,25 @@ export async function buildAiMarketPlanPreview(params: AiMarketPlanPreviewParams
   };
   const skipBuyScan = params.buyLimit === 0;
   const skipSellScan = params.sellLimit === 0;
-  const gameState = await loadMarketPlanGameState({
-    source: previewParams.source,
-    saveId: previewParams.saveId,
-  });
+  const gameState =
+    params.gameState != null
+      ? normalizeMarketPlanGameState(params.gameState)
+      : params.localRunContext?.save.gameState != null
+        ? normalizeMarketPlanGameState(params.localRunContext.save.gameState)
+        : await loadMarketPlanGameState({
+            source: previewParams.source,
+            saveId: previewParams.saveId,
+          });
+  const previewContext = {
+    localRunContext: params.localRunContext ?? undefined,
+  };
 
   const [buyPreview, sellPreview] = await Promise.all([
     skipBuyScan
       ? Promise.resolve(null)
       : buildAiTransfermarktPreview({
           ...previewParams,
+          ...previewContext,
           limit: params.buyLimit ?? 90,
           fullScoringLimit: params.fullScoringLimit ?? null,
           buyNeedOnly: params.buyNeedOnly ?? false,
@@ -818,7 +1050,9 @@ export async function buildAiMarketPlanPreview(params: AiMarketPlanPreviewParams
       ? Promise.resolve(null)
       : buildAiTransfermarktSellPreview({
           ...previewParams,
+          ...previewContext,
           limit: params.sellLimit ?? 6,
+          allowSellBelowRosterMin: true,
         }),
   ]);
 
@@ -845,6 +1079,15 @@ export async function buildAiMarketPlanPreview(params: AiMarketPlanPreviewParams
       }
       return left.teamName.localeCompare(right.teamName, "de");
     });
+
+  const seasonId = previewParams.seasonId ?? buyPreview?.scope.seasonId ?? sellPreview?.scope.seasonId ?? "";
+  const saveId = previewParams.saveId ?? buyPreview?.scope.saveId ?? sellPreview?.scope.saveId ?? "";
+  const unifiedTeams = await overlayUnifiedCompareBuyPlans({
+    teams,
+    saveId,
+    seasonId,
+    buyPreview,
+  });
 
   return {
     readOnly: true,
@@ -880,6 +1123,6 @@ export async function buildAiMarketPlanPreview(params: AiMarketPlanPreviewParams
       warning: teams.filter((team) => team.status === "warning").length,
       blocked: teams.filter((team) => team.status === "blocked").length,
     },
-    teams,
+    teams: unifiedTeams,
   };
 }

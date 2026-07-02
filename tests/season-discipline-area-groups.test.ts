@@ -4,6 +4,7 @@ import {
   buildPlayerHistoryDisciplineValues,
   buildTeamHistoryDisciplineValuesFromRecord,
   buildTeamHistoryDisciplineValuesFromSnapshot,
+  resolveSeasonDisciplineAreaTotal,
   SEASON_DISCIPLINE_AREA_GROUPS,
 } from "@/lib/season/season-discipline-area-groups";
 
@@ -65,5 +66,21 @@ describe("season-discipline-area-groups", () => {
     expect(values.tdm).toBe(12.3);
     expect(values.hockey).toBe(3);
     expect(values.bonuspunkte).toBeUndefined();
+  });
+
+  it("resolves area totals from discipline keys before ledger fallback", () => {
+    expect(
+      resolveSeasonDisciplineAreaTotal(
+        {
+          tdm: 7.2,
+          mini_dm: 2.4,
+          hockey: 5.3,
+          schach: 4.1,
+        },
+        "pow",
+        0,
+      ),
+    ).toBe(14.9);
+    expect(resolveSeasonDisciplineAreaTotal({ schach: 4.1 }, "pow", 12.5)).toBe(12.5);
   });
 });

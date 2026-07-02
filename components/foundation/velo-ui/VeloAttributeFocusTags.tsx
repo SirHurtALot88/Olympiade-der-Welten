@@ -1,6 +1,6 @@
 "use client";
 
-import { formatTrainingAttributeWeight } from "@/components/foundation/velo-ui/formatters";
+import { formatVeloSignedNumber } from "@/components/foundation/velo-ui/formatters";
 
 export type VeloAttributeFocusEntry = {
   attribute: string;
@@ -22,11 +22,11 @@ export function VeloAttributeFocusTags({ primary, risks, className = "" }: VeloA
     <div className={`velo-class-focus training-v2-class-focus${className ? ` ${className}` : ""}`}>
       {primary.length > 0 ? (
         <div className="velo-class-focus-row is-primary">
-          <span>Trainiert</span>
+          <span>Signature</span>
           <div className="velo-class-focus-tags">
             {primary.map((entry) => (
-              <span className="velo-class-focus-tag is-gain" key={`primary-${entry.attribute}`} title={`Gewicht ${formatTrainingAttributeWeight(entry.weight)}`}>
-                {entry.attribute} {formatTrainingAttributeWeight(entry.weight)}
+              <span className="velo-class-focus-tag is-gain" key={`primary-${entry.attribute}`} title={`Prognose ${formatVeloSignedNumber(entry.weight, 1)} Setpoints`}>
+                {entry.attribute} {formatVeloSignedNumber(entry.weight, 1)}
               </span>
             ))}
           </div>
@@ -34,11 +34,11 @@ export function VeloAttributeFocusTags({ primary, risks, className = "" }: VeloA
       ) : null}
       {risks.length > 0 ? (
         <div className="velo-class-focus-row is-risk">
-          <span>Risiko</span>
+          <span>Weak</span>
           <div className="velo-class-focus-tags">
             {risks.map((entry) => (
-              <span className="velo-class-focus-tag is-loss" key={`risk-${entry.attribute}`} title={`Gewicht ${formatTrainingAttributeWeight(entry.weight)}`}>
-                {entry.attribute} {formatTrainingAttributeWeight(entry.weight)}
+              <span className="velo-class-focus-tag is-loss" key={`risk-${entry.attribute}`} title={`Prognose ${formatVeloSignedNumber(entry.weight, 1)} Setpoints`}>
+                {entry.attribute} {formatVeloSignedNumber(entry.weight, 1)}
               </span>
             ))}
           </div>

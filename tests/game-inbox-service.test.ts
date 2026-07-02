@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 
 import type { GameInboxItem, GameState, Player, Team } from "@/lib/data/olyDataTypes";
-import { buildGameInboxItems, filterGameInboxItems } from "@/lib/foundation/game-inbox-service";
+import { buildGameInboxItems, filterGameInboxItems, filterInboxItemsByMode, getPrimaryInboxTask, isGameInboxChronicleItem, isGameInboxDecisionItem } from "@/lib/foundation/game-inbox-service";
 
 function makeTeam(partial?: Partial<Team>): Team {
   return {
@@ -53,7 +53,14 @@ function makeGameState(partial?: Partial<GameState>): GameState {
   const players = partial?.players ?? [makePlayer("p-1")];
   return {
     gamePhase: partial?.gamePhase ?? "season_active",
-    season: { id: "season-3", name: "Season 3", year: 2028, currentMatchday: 1, matchdayIds: ["season-3-matchday-1"] },
+    season: {
+      id: "season-3",
+      name: "Season 3",
+      year: 2028,
+      currentMatchday: 1,
+      matchdayIds: ["season-3-matchday-1"],
+      ...(partial?.season ?? {}),
+    },
     seasonState: {
       seasonId: "season-3",
       schedule: [],
@@ -423,5 +430,173 @@ describe("game inbox service", () => {
     const negativeTask = items.find((item) => item.itemId.startsWith("formcards_negative_open:"));
     expect(negativeTask?.title).toBe("Negative Formkarten offen");
     expect(negativeTask?.description).toContain("Strafpunkte");
+  });
+
+  it("separates decision and chronicle inbox items", () => {
+    const gameState = makeGameState({
+      transferHistory: [
+        {
+          id: "transfer-1",
+          playerId: "p-1",
+          fromTeamId: "P-C",
+          toTeamId: "M-M",
+          seasonId: "season-3",
+          matchdayId: "season-3-matchday-1",
+          transferType: "buy",
+          fee: 10,
+          salary: 2,
+          happenedAt: "2026-06-25T00:00:00.000Z",
+        },
+      ],
+    });
+    const items = buildGameInboxItems({ gameState, saveId: "save-1", activeTeamId: "M-M", activeOwnerId: "user_local" });
+    const decisions = filterInboxItemsByMode(items, "decisions");
+    const chronicle = filterInboxItemsByMode(items, "chronicle");
+
+    expect(decisions.some((item) => item.itemId.startsWith("sponsor_choice_missing:"))).toBe(true);
+    expect(chronicle.some((item) => item.source === "transfer_history")).toBe(true);
+    expect(decisions.some((item) => item.source === "transfer_history")).toBe(false);
+    expect(isGameInboxDecisionItem(decisions[0]!)).toBe(true);
+    expect(isGameInboxChronicleItem(chronicle.find((item) => item.source === "transfer_history")!)).toBe(true);
+  });
+
+  it("creates health inbox tasks for injured and fatigued players", () => {
+    const gameState = makeGameState({
+      season: {
+        id: "season-3",
+        name: "Season 3",
+        year: 2028,
+        currentMatchday: 2,
+        matchdayIds: ["season-3-matchday-1", "season-3-matchday-2"],
+      },
+      matchdayState: {
+        matchdayId: "season-3-matchday-2",
+        status: "preparation",
+        pendingTeamIds: [],
+        resolvedFixtureIds: ["season-3-matchday-1"],
+      },
+      players: [
+        makePlayer("p-1", { fatigue: 88, traitsPositive: ["Ambitious", "Motivated"] }),
+        makePlayer("p-2", { fatigue: 20 }),
+      ],
+      rosters: [
+        { id: "r-1", teamId: "M-M", playerId: "p-1", contractLength: 2, salary: 2, upkeep: 2, roleTag: "starter", joinedSeasonId: "season-3" },
+        { id: "r-2", teamId: "M-M", playerId: "p-2", contractLength: 2, salary: 2, upkeep: 2, roleTag: "bench", joinedSeasonId: "season-3" },
+      ],
+      seasonState: {
+        seasonId: "season-3",
+        schedule: [],
+        standings: {},
+        teamControlSettings: {
+          "M-M": {
+            teamId: "M-M",
+            controlMode: "manual",
+            ownerId: "user_local",
+            ownerSlot: "user",
+            displayLabel: "Chris",
+            aiLineupPreviewEnabled: false,
+            aiLineupApplyEnabled: false,
+            aiLineupAutoApplyEnabled: false,
+            aiTransferPreviewEnabled: false,
+            aiTransferAutoApplyEnabled: false,
+            aiSellPreviewEnabled: false,
+            aiSellAutoApplyEnabled: false,
+          },
+        },
+        playerAvailabilityState: [
+          {
+            playerId: "p-2",
+            teamId: "M-M",
+            fatigue: 20,
+            injuryStatus: "injured",
+            injuryUntilMatchday: "season-3-matchday-2",
+            injuredAtSeasonId: "season-3",
+            injuredAtMatchdayId: "season-3-matchday-1",
+            injuryReason: "fatigue_over_30_after_matchday_use",
+          },
+        ],
+        playerDisciplinePerformances: [
+          { playerId: "p-1", teamId: "M-M", seasonId: "season-3", appearances: 8 },
+        ],
+      },
+    });
+
+    const items = buildGameInboxItems({ gameState, saveId: "save-1", activeTeamId: "M-M", activeOwnerId: "user_local" });
+    const injuredTask = items.find((item) => item.itemId.startsWith("player_injured:"));
+    const fatigueTask = items.find((item) => item.itemId.startsWith("player_fatigue_risk:"));
+
+    expect(injuredTask?.severity).toBe("critical");
+    expect(injuredTask?.targetView).toBe("lineup");
+    expect(fatigueTask?.title).toMatch(/Verletzungsrisiko|Ermüdung/);
+    expect(isGameInboxDecisionItem(injuredTask!)).toBe(true);
+    expect(isGameInboxDecisionItem(fatigueTask!)).toBe(true);
+  });
+
+  it("creates lineup_not_submitted task when lineup is complete but not submitted", () => {
+    const gameState = makeGameState({
+      seasonState: {
+        seasonId: "season-3",
+        schedule: [],
+        standings: {},
+        lineupDrafts: [
+          {
+            seasonId: "season-3",
+            matchdayId: "season-3-matchday-1",
+            teamId: "M-M",
+            entries: Array.from({ length: 9 }, (_, index) => ({
+              slotKey: `slot-${index}`,
+              playerId: `p-${index + 1}`,
+              activePlayerId: `ap-${index + 1}`,
+            })),
+            submittedAt: null,
+          },
+        ],
+      },
+      players: Array.from({ length: 9 }, (_, index) => makePlayer(`p-${index + 1}`)),
+      rosters: Array.from({ length: 9 }, (_, index) => ({
+        teamId: "M-M",
+        playerId: `p-${index + 1}`,
+        contractLength: 2,
+        salary: 2,
+      })),
+    });
+    const items = buildGameInboxItems({ gameState, saveId: "save-1", activeTeamId: "M-M", activeOwnerId: "user_local" });
+    const task = items.find((item) => item.itemId.startsWith("lineup_not_submitted:"));
+    expect(task?.title).toBe("Lineup bestätigen");
+    expect(task?.severity).toBe("critical");
+  });
+
+  it("prioritizes critical health tasks in getPrimaryInboxTask", () => {
+    const items = [
+      {
+        itemId: "info-task",
+        saveId: "save-1",
+        seasonId: "season-3",
+        category: "task" as const,
+        severity: "info" as const,
+        title: "Info Task",
+        description: "Later",
+        targetView: "home",
+        targetParams: {},
+        source: "lineup_drafts",
+        status: "open" as const,
+        createdAt: "2026-06-12T00:00:00.000Z",
+      },
+      {
+        itemId: "injury-task",
+        saveId: "save-1",
+        seasonId: "season-3",
+        category: "warning" as const,
+        severity: "critical" as const,
+        title: "Verletzter Spieler",
+        description: "Now",
+        targetView: "lineup",
+        targetParams: {},
+        source: "player_health_injury",
+        status: "open" as const,
+        createdAt: "2026-06-12T00:00:00.000Z",
+      },
+    ];
+    expect(getPrimaryInboxTask(items)?.itemId).toBe("injury-task");
   });
 });

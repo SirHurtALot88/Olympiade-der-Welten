@@ -1,4 +1,5 @@
-import type { PlayerGeneratorAttributeName } from "@/lib/data/olyDataTypes";
+import type { AdminBalancingConfigInput, PlayerGeneratorAttributeName } from "@/lib/data/olyDataTypes";
+import type { AttributeHeadroomState } from "@/lib/scouting/player-attribute-ceiling-service";
 import type { ProgressionClassName } from "@/lib/training/class-progression-config";
 import type { PlayerTrainingMode } from "@/lib/training/training-plan-types";
 import type { TrainingModeDemandView } from "@/lib/training/training-mode-demand-service";
@@ -15,6 +16,7 @@ export type TrainingModeOption = {
 };
 
 export type TrainingAttributeForecastEntry = {
+  attributeKey: PlayerGeneratorAttributeName;
   attribute: string;
   before: number;
   after: number;
@@ -23,6 +25,8 @@ export type TrainingAttributeForecastEntry = {
   performance: number;
   regression: number;
   affinity: "signature" | "weak" | "neutral";
+  ceilingState?: AttributeHeadroomState;
+  headroomLabel?: string | null;
 };
 
 export type TrainingPlayerRowView = {
@@ -112,6 +116,10 @@ export type TrainingPlayerRowView = {
       label: "niedrig" | "mittel" | "hoch";
     };
   };
+  recommendedTrainingMode?: PlayerTrainingMode | null;
+  recommendedTrainingDetail?: string | null;
+  recommendedTrainingMatchesCurrent?: boolean;
+  adminBalancingConfig?: AdminBalancingConfigInput | null;
 };
 
 export type TrainingDevelopmentFilter = "all" | "growth" | "stable" | "regression";

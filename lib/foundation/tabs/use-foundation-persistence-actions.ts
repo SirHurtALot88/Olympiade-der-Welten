@@ -1,0 +1,789 @@
+"use client";
+
+import { useCallback, useEffect, useRef } from "react";
+import type { Dispatch, MutableRefObject, SetStateAction } from "react";
+
+import type { GameState } from "@/lib/data/olyDataTypes";
+import { refreshTeamObjectiveState } from "@/lib/board/team-season-objectives-service";
+import { applyCompactSeasonArchiveSentinelIfNeeded } from "@/lib/foundation/apply-compact-season-archive-sentinel";
+import {
+  buildAutoPersistContentSignature,
+  buildFoundationPersistPutBody,
+  putFoundationGameState,
+} from "@/lib/foundation/tabs/use-foundation-persist";
+import {
+  normalizeFoundationSaveMode,
+  type FoundationSaveMode,
+} from "@/lib/persistence/foundation-save-mode";
+import type { SaveSummary } from "@/lib/persistence/types";
+import { describeRoomWriteError, isStaleSaveVersionError } from "@/lib/room/parse-room-write-context";
+import type {
+  FoundationReadMeta,
+  FoundationReadSource,
+  FoundationView,
+  SaveActionRequest,
+  SeasonEndXpSpendPreview,
+} from "@/lib/foundation/tabs/foundation-page-types";
+import { TRANSFER_MARKET_INITIAL_RENDER_LIMIT } from "@/lib/foundation/tabs/foundation-page-types";
+import type { ActiveManagerTeamSource } from "@/lib/foundation/tabs/foundation-page-types";
+import {
+  persistFoundationManagerTeamId,
+  persistFoundationSaveMode,
+  resolveFoundationTeamId,
+  resolvePreferredFoundationTeamContext,
+  syncFoundationTeamIdInUrl,
+  withNormalizedLocalTeamSettings,
+} from "@/lib/foundation/tabs/foundation-page-module-helpers";
+import { buildTeamControlSettingsMap } from "@/lib/foundation/team-control-settings";
+import type { TrainingClassDraft, TrainingModeDraft } from "@/lib/foundation/tabs/foundation-page-types";
+import type { PlayerDetailDrawerData } from "@/lib/foundation/player-detail-drawer";
+
+export type FoundationSaveScopedFeedSetters = {
+  setMarketFeed: Dispatch<SetStateAction<unknown>>;
+  setMarketRenderLimit: Dispatch<SetStateAction<number>>;
+  setMarketLoadingMore: Dispatch<SetStateAction<boolean>>;
+  setMarketBuyPreview: Dispatch<SetStateAction<unknown>>;
+  setMarketBuyPreviewContext: Dispatch<SetStateAction<unknown>>;
+  setMarketBuyError: Dispatch<SetStateAction<string | null>>;
+  setMarketBuySuccess: Dispatch<SetStateAction<string | null>>;
+  setMarketBuySubject: Dispatch<SetStateAction<unknown>>;
+  setFoundationPanel: Dispatch<SetStateAction<string | null>>;
+  setMarketSellPreview: Dispatch<SetStateAction<unknown>>;
+  setMarketSellError: Dispatch<SetStateAction<string | null>>;
+  setMarketSellSuccess: Dispatch<SetStateAction<string | null>>;
+  setMarketSellSubject: Dispatch<SetStateAction<unknown>>;
+  setMarketSellRiskAcknowledged: Dispatch<SetStateAction<boolean>>;
+  setMarketAiPreviewFeed: Dispatch<SetStateAction<unknown>>;
+  setMarketAiSellPreviewFeed: Dispatch<SetStateAction<unknown>>;
+  setMarketAiPlanPreviewFeed: Dispatch<SetStateAction<unknown>>;
+  setMarketAiCompareFeed: Dispatch<SetStateAction<unknown>>;
+  setMarketAiApplyFeed: Dispatch<SetStateAction<unknown>>;
+  setRosterFillFeed: Dispatch<SetStateAction<unknown>>;
+  setAiPreseasonFeed: Dispatch<SetStateAction<unknown>>;
+  setAiPreseasonBusy: Dispatch<SetStateAction<boolean>>;
+  setAiPickAuditFeed: Dispatch<SetStateAction<unknown>>;
+  setSeasonStartResetFeed: Dispatch<SetStateAction<unknown>>;
+  setHistoryFeed: Dispatch<SetStateAction<unknown>>;
+  setHistorySeasonFilter: Dispatch<SetStateAction<string>>;
+  setTransferRecapFeed: Dispatch<SetStateAction<unknown>>;
+  setResolvePreviewFeed: Dispatch<SetStateAction<unknown>>;
+  setCockpitAiBatchApplyFeed: Dispatch<SetStateAction<unknown>>;
+  setMatchdayMvpScoringFeed: Dispatch<SetStateAction<unknown>>;
+  setResultApplyFeed: Dispatch<SetStateAction<unknown>>;
+  setStandingsPreviewFeed: Dispatch<SetStateAction<unknown>>;
+  setStandingsApplyFeed: Dispatch<SetStateAction<unknown>>;
+  setSeasonManagementFeed: Dispatch<SetStateAction<unknown>>;
+  setFacilityUpgradePreview: Dispatch<SetStateAction<unknown>>;
+  setFacilityUpgradeError: Dispatch<SetStateAction<string | null>>;
+  setFacilityUpgradeSuccess: Dispatch<SetStateAction<string | null>>;
+  setPreSeasonWorkflowFeed: Dispatch<SetStateAction<unknown>>;
+  setPreSeasonWorkflowError: Dispatch<SetStateAction<string | null>>;
+  setSeasonTransitionFeed: Dispatch<SetStateAction<unknown>>;
+  setSeasonCompletionFeed: Dispatch<SetStateAction<unknown>>;
+  setSeasonTransitionError: Dispatch<SetStateAction<string | null>>;
+  setSeasonStandingsFeed: Dispatch<SetStateAction<unknown>>;
+  setSeasonOverviewSeasonId: Dispatch<SetStateAction<string | null>>;
+  setPrizePreviewFeed: Dispatch<SetStateAction<unknown>>;
+  setCashApplyFeed: Dispatch<SetStateAction<unknown>>;
+  setMatchdayAdvanceFeed: Dispatch<SetStateAction<unknown>>;
+  setMatchdayAutoRunFeed: Dispatch<SetStateAction<unknown>>;
+  setWholeSeasonDryRunFeed: Dispatch<SetStateAction<unknown>>;
+  setSeasonSnapshotFeed: Dispatch<SetStateAction<unknown>>;
+  setSeasonEndXpSpendPreview: Dispatch<SetStateAction<SeasonEndXpSpendPreview | null>>;
+  setSeasonEndXpSpendError: Dispatch<SetStateAction<string | null>>;
+  setSeasonEndXpSpendSuccess: Dispatch<SetStateAction<string | null>>;
+  setPlannedXpUpgrades: Dispatch<SetStateAction<unknown[]>>;
+  setPlayerProfileData: Dispatch<SetStateAction<PlayerDetailDrawerData | null>>;
+  setTeamProfileTeamId: Dispatch<SetStateAction<string | null>>;
+  setFoundationActionFeedback: Dispatch<SetStateAction<unknown>>;
+};
+
+export type UseFoundationPersistenceActionsInput = {
+  initialPersistedSave?: { gameState?: GameState } | null;
+  initialSaveId?: string;
+  initialReadSource?: FoundationReadSource;
+  initialSelectedTeamId?: string;
+  gameState: GameState;
+  setGameState: Dispatch<SetStateAction<GameState>>;
+  gameStateRef: MutableRefObject<GameState>;
+  activeSaveId: string;
+  setActiveSaveId: Dispatch<SetStateAction<string>>;
+  setActiveSaveName: Dispatch<SetStateAction<string>>;
+  foundationSaveMode: FoundationSaveMode;
+  setFoundationSaveMode: Dispatch<SetStateAction<FoundationSaveMode>>;
+  setSaveSummaries: Dispatch<SetStateAction<SaveSummary[]>>;
+  readMeta: FoundationReadMeta;
+  setReadMeta: Dispatch<SetStateAction<FoundationReadMeta>>;
+  selectedTeamId: string;
+  setSelectedTeamId: Dispatch<SetStateAction<string>>;
+  activeManagerTeamSource: ActiveManagerTeamSource;
+  setActiveManagerTeamSource: Dispatch<SetStateAction<ActiveManagerTeamSource>>;
+  setActiveManagerTeamWarning: Dispatch<SetStateAction<string | null>>;
+  setMarketTeamId: Dispatch<SetStateAction<string | null>>;
+  setIsSaveBusy: Dispatch<SetStateAction<boolean>>;
+  setPersistenceError: Dispatch<SetStateAction<string | null>>;
+  setBootstrapError: Dispatch<SetStateAction<string | null>>;
+  setTrainingModeDraft: Dispatch<SetStateAction<TrainingModeDraft>>;
+  setTrainingClassDraft: Dispatch<SetStateAction<TrainingClassDraft>>;
+  setActiveView: Dispatch<SetStateAction<FoundationView>>;
+  setSeasonOverviewSeasonId: Dispatch<SetStateAction<string | null>>;
+  roomContext: unknown;
+  feedSetters: FoundationSaveScopedFeedSetters;
+  onSaveConflictReload: (reloaded: GameState) => Promise<void>;
+  showReadOnlyNotice: () => void;
+  syncFoundationViewInUrl: (view: string) => void;
+  setFreshSeasonStartMessage: Dispatch<SetStateAction<string | null>>;
+};
+
+export function useFoundationPersistenceActions(input: UseFoundationPersistenceActionsInput) {
+  const {
+    initialPersistedSave,
+    initialSaveId,
+    initialReadSource,
+    initialSelectedTeamId,
+    gameState,
+    setGameState,
+    gameStateRef,
+    activeSaveId,
+    setActiveSaveId,
+    setActiveSaveName,
+    foundationSaveMode,
+    setFoundationSaveMode,
+    setSaveSummaries,
+    readMeta,
+    setReadMeta,
+    selectedTeamId,
+    setSelectedTeamId,
+    activeManagerTeamSource,
+    setActiveManagerTeamSource,
+    setActiveManagerTeamWarning,
+    setMarketTeamId,
+    setIsSaveBusy,
+    setPersistenceError,
+    setBootstrapError,
+    setTrainingModeDraft,
+    setTrainingClassDraft,
+    setActiveView,
+    setSeasonOverviewSeasonId,
+    roomContext,
+    feedSetters,
+    onSaveConflictReload,
+    showReadOnlyNotice,
+    syncFoundationViewInUrl,
+    setFreshSeasonStartMessage,
+  } = input;
+
+  const hasPersistedInitialState = useRef(false);
+  const hasLoadedPersistentState = useRef(Boolean(initialPersistedSave));
+  const skipInitialClientBootstrapRef = useRef(Boolean(initialPersistedSave?.gameState));
+  const loadSaveRequestVersion = useRef(0);
+  const saveActionRequestVersion = useRef(0);
+  const skipNextFullPersistCountRef = useRef(0);
+  const liveSaveVersionSignatureRef = useRef<string | null>(null);
+  const liveSaveRefreshInFlightRef = useRef(false);
+  const autoPersistPausedRef = useRef(false);
+  const autoPersistTimerRef = useRef<number | null>(null);
+  const autoPersistInFlightRef = useRef(false);
+  const autoPersistContentSignatureRef = useRef<string | null>(null);
+  const foundationViewTransitionUntilRef = useRef(0);
+  const persistRequestVersionRef = useRef(0);
+  const persistSnapshotRef = useRef<{ requestVersion: number; snapshot: GameState } | null>(null);
+  const loadedWithCompactInitialRef = useRef(true);
+
+  const feedSettersRef = useRef(feedSetters);
+  feedSettersRef.current = feedSetters;
+  const onSaveConflictReloadRef = useRef(onSaveConflictReload);
+  onSaveConflictReloadRef.current = onSaveConflictReload;
+
+  const clearSaveScopedFeeds = useCallback(() => {
+    const setters = feedSettersRef.current;
+    setters.setMarketFeed(null);
+    setters.setMarketRenderLimit(TRANSFER_MARKET_INITIAL_RENDER_LIMIT);
+    setters.setMarketLoadingMore(false);
+    setters.setMarketBuyPreview(null);
+    setters.setMarketBuyPreviewContext(null);
+    setters.setMarketBuyError(null);
+    setters.setMarketBuySuccess(null);
+    setters.setMarketBuySubject(null);
+    setters.setFoundationPanel(null);
+    setters.setMarketSellPreview(null);
+    setters.setMarketSellError(null);
+    setters.setMarketSellSuccess(null);
+    setters.setMarketSellSubject(null);
+    setters.setMarketSellRiskAcknowledged(false);
+    setters.setMarketAiPreviewFeed(null);
+    setters.setMarketAiSellPreviewFeed(null);
+    setters.setMarketAiPlanPreviewFeed(null);
+    setters.setMarketAiCompareFeed(null);
+    setters.setMarketAiApplyFeed(null);
+    setters.setRosterFillFeed(null);
+    setters.setAiPreseasonFeed(null);
+    setters.setAiPreseasonBusy(false);
+    setters.setAiPickAuditFeed(null);
+    setters.setSeasonStartResetFeed(null);
+    setters.setHistoryFeed(null);
+    setters.setHistorySeasonFilter(gameState.season.id);
+    setters.setTransferRecapFeed(null);
+    setters.setResolvePreviewFeed(null);
+    setters.setCockpitAiBatchApplyFeed(null);
+    setters.setMatchdayMvpScoringFeed(null);
+    setters.setResultApplyFeed(null);
+    setters.setStandingsPreviewFeed(null);
+    setters.setStandingsApplyFeed(null);
+    setters.setSeasonManagementFeed(null);
+    setters.setFacilityUpgradePreview(null);
+    setters.setFacilityUpgradeError(null);
+    setters.setFacilityUpgradeSuccess(null);
+    setters.setPreSeasonWorkflowFeed(null);
+    setters.setPreSeasonWorkflowError(null);
+    setters.setSeasonTransitionFeed(null);
+    setters.setSeasonCompletionFeed(null);
+    setters.setSeasonTransitionError(null);
+    setters.setSeasonStandingsFeed(null);
+    setters.setSeasonOverviewSeasonId(gameState.season.id);
+    setters.setPrizePreviewFeed(null);
+    setters.setCashApplyFeed(null);
+    setters.setMatchdayAdvanceFeed(null);
+    setters.setMatchdayAutoRunFeed(null);
+    setters.setWholeSeasonDryRunFeed(null);
+    setters.setSeasonSnapshotFeed(null);
+    setters.setSeasonEndXpSpendPreview(null);
+    setters.setSeasonEndXpSpendError(null);
+    setters.setSeasonEndXpSpendSuccess(null);
+    setters.setPlannedXpUpgrades([]);
+    setters.setPlayerProfileData(null);
+    setters.setTeamProfileTeamId(null);
+    setters.setFoundationActionFeedback(null);
+  }, [gameState.season.id, setSeasonOverviewSeasonId]);
+
+  function buildStateApiPath(
+    saveId?: string,
+    saveMode: FoundationSaveMode = foundationSaveMode,
+    options?: { compactInitial?: boolean },
+  ) {
+    const params = new URLSearchParams();
+    if (saveId) {
+      params.set("saveId", saveId);
+    }
+    if (saveMode !== "all") {
+      params.set("saveMode", saveMode);
+    }
+    if (initialReadSource) {
+      params.set("source", initialReadSource);
+    }
+    if (options?.compactInitial) {
+      params.set("compact", "foundation-initial");
+    }
+
+    const query = params.toString();
+    return `/api/singleplayer-state${query ? `?${query}` : ""}`;
+  }
+
+  function resetOptimisticDraftsAfterSaveConflictReload() {
+    setTrainingModeDraft({});
+    setTrainingClassDraft({});
+  }
+
+  async function applySaveConflictReload(reloaded: GameState) {
+    autoPersistPausedRef.current = true;
+    autoPersistContentSignatureRef.current = buildAutoPersistContentSignature(reloaded);
+    setGameState(reloaded);
+    resetOptimisticDraftsAfterSaveConflictReload();
+    await onSaveConflictReloadRef.current(reloaded);
+    window.setTimeout(() => {
+      autoPersistPausedRef.current = false;
+    }, 0);
+  }
+
+  async function loadSave(
+    saveId?: string,
+    saveMode: FoundationSaveMode = foundationSaveMode,
+    options: { compactInitial?: boolean } = { compactInitial: true },
+  ) {
+      const requestVersion = loadSaveRequestVersion.current + 1;
+      loadSaveRequestVersion.current = requestVersion;
+
+      if (saveId && saveId !== activeSaveId) {
+        clearSaveScopedFeeds();
+      }
+
+      let response: Response;
+      try {
+        response = await fetch(buildStateApiPath(saveId, saveMode, { compactInitial: options.compactInitial ?? true }), {
+          cache: "no-store",
+        });
+      } catch (error) {
+        console.warn("Save konnte gerade nicht geladen werden.", error);
+        return null;
+      }
+      if (!response.ok) {
+        return null;
+      }
+
+      const payload = (await response.json()) as {
+        save?: { saveId: string; name?: string; gameState: GameState };
+        saves?: SaveSummary[];
+        _meta?: FoundationReadMeta;
+      };
+
+      if (!payload.save?.gameState) {
+        return null;
+      }
+
+      const normalizedGameState =
+        payload._meta?.source === "prisma" ? payload.save.gameState : withNormalizedLocalTeamSettings(payload.save.gameState);
+      const sponsorOffersBefore = JSON.stringify(normalizedGameState.seasonState.sponsorOffersByTeamId ?? {});
+      const nextGameState = applyCompactSeasonArchiveSentinelIfNeeded(refreshTeamObjectiveState(normalizedGameState), options);
+      const sponsorOffersHydrated = sponsorOffersBefore !== JSON.stringify(nextGameState.seasonState.sponsorOffersByTeamId ?? {});
+
+      if (requestVersion !== loadSaveRequestVersion.current) {
+        return null;
+      }
+
+      hasPersistedInitialState.current = false;
+      hasLoadedPersistentState.current = true;
+      loadedWithCompactInitialRef.current = options.compactInitial ?? true;
+      autoPersistContentSignatureRef.current = buildAutoPersistContentSignature(nextGameState);
+      setGameState(nextGameState);
+      if (
+        sponsorOffersHydrated &&
+        payload._meta?.source !== "prisma" &&
+        !payload._meta?.readOnly &&
+        payload.save.saveId
+      ) {
+        void persistLocalGameStateImmediately(nextGameState).catch((error) => {
+          console.warn("Sponsor-Hydration konnte nicht persistiert werden.", error);
+        });
+      }
+      if (payload.save.saveId !== activeSaveId) {
+        setSeasonOverviewSeasonId(nextGameState.season.id);
+      }
+      setActiveSaveId(payload.save.saveId);
+      setActiveSaveName(payload.save.name ?? "Oly Save");
+      setSaveSummaries(payload.saves ?? []);
+      if (payload._meta?.saveMode) {
+        setFoundationSaveMode(normalizeFoundationSaveMode(payload._meta.saveMode));
+      }
+      if (payload._meta) {
+        setReadMeta(payload._meta);
+      }
+      const saveSelectedTeamId = resolveFoundationTeamId(nextGameState.teams, nextGameState.seasonState.newGameFlow?.selectedTeamId);
+      const nextTeamContext = saveSelectedTeamId
+        ? { teamId: saveSelectedTeamId, source: "saved_preference" as const, warning: null }
+        : resolvePreferredFoundationTeamContext(nextGameState.teams, {
+            currentTeamId: selectedTeamId,
+            currentSource: activeManagerTeamSource,
+            initialTeamId: initialSelectedTeamId,
+            settingsMap: buildTeamControlSettingsMap(nextGameState.teams, nextGameState.seasonState.teamControlSettings),
+          });
+      setSelectedTeamId(nextTeamContext.teamId);
+      setActiveManagerTeamSource(nextTeamContext.source);
+      setActiveManagerTeamWarning(nextTeamContext.warning ?? null);
+      if (nextTeamContext.teamId) {
+        setMarketTeamId(nextTeamContext.teamId);
+        persistFoundationManagerTeamId(nextTeamContext.teamId, payload.save.saveId, nextTeamContext.source);
+      }
+
+      if (payload._meta?.source !== "prisma" && payload.save.saveId) {
+        void fetch(`/api/season/warmup-derivations?saveId=${encodeURIComponent(payload.save.saveId)}`, {
+          method: "POST",
+        }).catch(() => null);
+      }
+
+      return nextGameState;
+  }
+
+  async function persistLocalGameStateImmediately(
+    nextGameState: GameState,
+    options?: { materializeSeasonDerivations?: boolean },
+  ): Promise<GameState> {
+    const requestVersion = ++persistRequestVersionRef.current;
+    persistSnapshotRef.current = { requestVersion, snapshot: nextGameState };
+
+    const response = await putFoundationGameState(
+      buildFoundationPersistPutBody({
+        saveId: activeSaveId,
+        gameState: nextGameState,
+        compactPut: loadedWithCompactInitialRef.current,
+        materializeSeasonDerivations: options?.materializeSeasonDerivations,
+      }),
+    );
+
+    if (response.status === 409) {
+      setPersistenceError("Save-Konflikt erkannt. Stand wird neu geladen.");
+      const reloaded = await loadSave(activeSaveId, foundationSaveMode, { compactInitial: true });
+      if (reloaded) {
+        await applySaveConflictReload(reloaded);
+      }
+      throw new Error("Save-Konflikt erkannt. Stand wird neu geladen.");
+    }
+
+    if (!response.ok) {
+      throw new Error("Lokaler Save konnte nicht aktualisiert werden.");
+    }
+
+    const payload = (await response.json()) as {
+      save?: { saveId: string; name?: string; saveVersion?: number };
+      saves?: SaveSummary[];
+    };
+    if (payload.save?.name) {
+      setActiveSaveName(payload.save.name);
+    }
+    if (payload.saves) {
+      setSaveSummaries(payload.saves);
+    }
+    if (payload.save?.saveVersion != null) {
+      const newSaveVersion = payload.save.saveVersion;
+      autoPersistContentSignatureRef.current = buildAutoPersistContentSignature({
+        ...nextGameState,
+        saveVersion: newSaveVersion,
+      });
+      setGameState((current) => {
+        if (requestVersion !== persistRequestVersionRef.current) {
+          return current;
+        }
+        const pendingPersist = persistSnapshotRef.current;
+        if (!pendingPersist || pendingPersist.requestVersion !== requestVersion) {
+          return current;
+        }
+        if (current !== pendingPersist.snapshot) {
+          return current;
+        }
+        if (current.saveVersion === newSaveVersion) {
+          return current;
+        }
+        return {
+          ...current,
+          saveVersion: newSaveVersion,
+        };
+      });
+    }
+    return payload.save?.saveVersion != null
+      ? {
+          ...nextGameState,
+          saveVersion: payload.save.saveVersion,
+        }
+      : nextGameState;
+  }
+
+  async function handleStaleRoomSaveWrite(payload: unknown) {
+    if (!roomContext || !isStaleSaveVersionError(payload)) {
+      return false;
+    }
+    feedSettersRef.current.setFoundationActionFeedback({
+      tone: "warning",
+      title: "Save veraltet",
+      detail: describeRoomWriteError(payload) ?? "Save wird neu geladen.",
+    });
+    await loadSave(activeSaveId);
+    return true;
+  }
+
+  const runSaveAction = useCallback(
+    async (body: SaveActionRequest) => {
+      if (readMeta.readOnly) {
+        showReadOnlyNotice();
+        return;
+      }
+
+      setIsSaveBusy(true);
+      const requestVersion = saveActionRequestVersion.current + 1;
+      saveActionRequestVersion.current = requestVersion;
+      if (body.action === "activate" || body.action === "clone" || body.action === "snapshot" || body.action === "fresh-season-1") {
+        clearSaveScopedFeeds();
+      }
+
+      try {
+        const response = await fetch(buildStateApiPath(undefined, foundationSaveMode), {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify(body),
+        });
+
+        if (!response.ok) {
+          return;
+        }
+
+        const payload = (await response.json()) as {
+          save?: { saveId: string };
+          saves?: SaveSummary[];
+        };
+
+        setSaveSummaries(payload.saves ?? []);
+
+        if (payload.save?.saveId) {
+          if (requestVersion !== saveActionRequestVersion.current) {
+            return;
+          }
+          await loadSave(payload.save.saveId);
+          if (requestVersion !== saveActionRequestVersion.current) {
+            return;
+          }
+          if (body.action === "fresh-season-1") {
+            setActiveView("season");
+            syncFoundationViewInUrl("season");
+            setFreshSeasonStartMessage("Neuer lokaler Season-1-Testspielstand aktiv. Saisonstand ist bereit.");
+          }
+        }
+      } finally {
+        if (requestVersion === saveActionRequestVersion.current) {
+          setIsSaveBusy(false);
+        }
+      }
+    },
+    [
+      clearSaveScopedFeeds,
+      foundationSaveMode,
+      readMeta.readOnly,
+      setActiveView,
+      setFreshSeasonStartMessage,
+      setIsSaveBusy,
+      setSaveSummaries,
+      showReadOnlyNotice,
+      syncFoundationViewInUrl,
+    ],
+  );
+
+  const changeFoundationSaveMode = useCallback(
+    (nextSaveMode: FoundationSaveMode) => {
+      setFoundationSaveMode(nextSaveMode);
+      clearSaveScopedFeeds();
+      void loadSave(undefined, nextSaveMode);
+    },
+    [clearSaveScopedFeeds, loadSave, setFoundationSaveMode],
+  );
+
+  useEffect(() => {
+    persistFoundationSaveMode(foundationSaveMode);
+  }, [foundationSaveMode]);
+
+  useEffect(() => {
+    if (
+      skipInitialClientBootstrapRef.current &&
+      gameStateRef.current.season.id !== "loading" &&
+      (!initialSaveId || initialSaveId === activeSaveId)
+    ) {
+      skipInitialClientBootstrapRef.current = false;
+      return undefined;
+    }
+
+    let cancelled = false;
+
+    async function loadPersistentState() {
+      let response: Response;
+      try {
+        response = await fetch(buildStateApiPath(initialSaveId ?? undefined, foundationSaveMode, { compactInitial: true }), {
+          cache: "no-store",
+        });
+      } catch (error) {
+        console.warn("Initialer Spielstand konnte gerade nicht geladen werden.", error);
+        if (!cancelled) {
+          setBootstrapError("Der Spielstand konnte nicht geladen werden.");
+        }
+        return;
+      }
+      if (!response.ok || cancelled) {
+        if (!cancelled) {
+          setBootstrapError("Der Spielstand konnte nicht geladen werden.");
+        }
+        return;
+      }
+
+      const payload = (await response.json()) as {
+        save?: { saveId: string; name?: string; gameState: GameState };
+        saves?: SaveSummary[];
+        _meta?: FoundationReadMeta;
+      };
+      if (!payload.save?.gameState || cancelled) {
+        if (!cancelled) {
+          setBootstrapError("Der Spielstand konnte nicht geladen werden.");
+        }
+        return;
+      }
+
+      setBootstrapError(null);
+
+      const nextGameState = applyCompactSeasonArchiveSentinelIfNeeded(
+        payload._meta?.source === "prisma" ? payload.save.gameState : withNormalizedLocalTeamSettings(payload.save.gameState),
+        { compactInitial: true },
+      );
+
+      hasPersistedInitialState.current = false;
+      hasLoadedPersistentState.current = true;
+      autoPersistContentSignatureRef.current = buildAutoPersistContentSignature(nextGameState);
+      setGameState(nextGameState);
+      setActiveSaveId(payload.save.saveId);
+      setActiveSaveName(payload.save.name ?? "Oly Save");
+      setSaveSummaries(payload.saves ?? []);
+      if (payload._meta?.saveMode) {
+        setFoundationSaveMode(normalizeFoundationSaveMode(payload._meta.saveMode));
+      }
+      if (payload._meta) {
+        setReadMeta(payload._meta);
+      }
+      const saveSelectedTeamId = resolveFoundationTeamId(nextGameState.teams, nextGameState.seasonState.newGameFlow?.selectedTeamId);
+      const nextTeamContext = saveSelectedTeamId
+        ? { teamId: saveSelectedTeamId, source: "saved_preference" as const, warning: null }
+        : resolvePreferredFoundationTeamContext(nextGameState.teams, {
+            currentTeamId: selectedTeamId,
+            currentSource: activeManagerTeamSource,
+            initialTeamId: initialSelectedTeamId,
+            settingsMap: buildTeamControlSettingsMap(nextGameState.teams, nextGameState.seasonState.teamControlSettings),
+          });
+      setSelectedTeamId(nextTeamContext.teamId);
+      setActiveManagerTeamSource(nextTeamContext.source);
+      setActiveManagerTeamWarning(nextTeamContext.warning ?? null);
+      if (nextTeamContext.teamId && nextTeamContext.teamId !== "loading-team") {
+        setMarketTeamId(nextTeamContext.teamId);
+        persistFoundationManagerTeamId(nextTeamContext.teamId, payload.save.saveId, nextTeamContext.source);
+        syncFoundationTeamIdInUrl(nextTeamContext.teamId);
+      }
+    }
+
+    void loadPersistentState();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [foundationSaveMode, initialSaveId]);
+
+  useEffect(() => {
+    if (!hasLoadedPersistentState.current) {
+      return;
+    }
+
+    if (readMeta.readOnly) {
+      return;
+    }
+
+    if (!hasPersistedInitialState.current) {
+      hasPersistedInitialState.current = true;
+      autoPersistContentSignatureRef.current = buildAutoPersistContentSignature(gameState);
+      return;
+    }
+
+    const nextPersistSignature = buildAutoPersistContentSignature(gameState);
+    if (autoPersistContentSignatureRef.current === nextPersistSignature) {
+      return;
+    }
+
+    if (skipNextFullPersistCountRef.current > 0) {
+      skipNextFullPersistCountRef.current -= 1;
+      return;
+    }
+
+    if (autoPersistPausedRef.current || liveSaveRefreshInFlightRef.current) {
+      return;
+    }
+
+    if (Date.now() < foundationViewTransitionUntilRef.current) {
+      return;
+    }
+
+    if (autoPersistTimerRef.current != null) {
+      window.clearTimeout(autoPersistTimerRef.current);
+    }
+
+    autoPersistTimerRef.current = window.setTimeout(() => {
+      autoPersistTimerRef.current = null;
+      if (autoPersistPausedRef.current || liveSaveRefreshInFlightRef.current || autoPersistInFlightRef.current) {
+        return;
+      }
+
+      if (Date.now() < foundationViewTransitionUntilRef.current) {
+        return;
+      }
+
+      const snapshot = gameStateRef.current;
+      const persistSignature = buildAutoPersistContentSignature(snapshot);
+      if (autoPersistContentSignatureRef.current === persistSignature) {
+        return;
+      }
+
+      autoPersistInFlightRef.current = true;
+      void putFoundationGameState(
+        buildFoundationPersistPutBody({
+          saveId: activeSaveId,
+          gameState: snapshot,
+          compactPut: loadedWithCompactInitialRef.current,
+        }),
+      )
+        .then(async (response) => {
+          if (response.status === 409) {
+            setPersistenceError("Save-Konflikt erkannt. Stand wird neu geladen.");
+            const reloaded = await loadSave(activeSaveId, foundationSaveMode, { compactInitial: true });
+            if (reloaded) {
+              await applySaveConflictReload(reloaded);
+            }
+            return null;
+          }
+          if (!response.ok) {
+            setPersistenceError("Auto-Save fehlgeschlagen.");
+            return null;
+          }
+
+          setPersistenceError(null);
+          return (await response.json()) as {
+            save?: { saveId: string; name?: string; saveVersion?: number };
+            saves?: SaveSummary[];
+          };
+        })
+        .then((payload) => {
+          if (!payload) {
+            return;
+          }
+
+          autoPersistContentSignatureRef.current = persistSignature;
+
+          if (payload.save?.name) {
+            setActiveSaveName(payload.save.name);
+          }
+          if (payload.saves) {
+            setSaveSummaries(payload.saves);
+          }
+          if (payload.save?.saveVersion != null) {
+            setGameState((current) =>
+              current.saveVersion === payload.save?.saveVersion
+                ? current
+                : {
+                    ...current,
+                    saveVersion: payload.save?.saveVersion,
+                  },
+            );
+          }
+        })
+        .catch((error) => {
+          console.warn("Auto-Save konnte gerade nicht gespeichert werden.", error);
+          setPersistenceError("Auto-Save fehlgeschlagen.");
+        })
+        .finally(() => {
+          autoPersistInFlightRef.current = false;
+        });
+    }, 2500);
+
+    return () => {
+      if (autoPersistTimerRef.current != null) {
+        window.clearTimeout(autoPersistTimerRef.current);
+        autoPersistTimerRef.current = null;
+      }
+    };
+  }, [activeSaveId, foundationSaveMode, gameState, readMeta.readOnly, setActiveSaveName, setGameState, setSaveSummaries, setPersistenceError]);
+
+  return {
+    loadSave,
+    persistLocalGameStateImmediately,
+    handleStaleRoomSaveWrite,
+    runSaveAction,
+    changeFoundationSaveMode,
+    clearSaveScopedFeeds,
+    skipNextFullPersistCountRef,
+    hasPersistedInitialState,
+    hasLoadedPersistentState,
+    foundationViewTransitionUntilRef,
+    autoPersistPausedRef,
+    liveSaveRefreshInFlightRef,
+    liveSaveVersionSignatureRef,
+  };
+}

@@ -7,7 +7,7 @@ import {
   applyAiMarketPlanLocally,
 } from "@/lib/ai/ai-market-plan-apply-service";
 import { isExplicitLocalTransferWindowPhase, LOCAL_TRANSFER_WINDOW_PHASE } from "@/lib/market/transfer-window-policy";
-import { parseRoomWriteContextFromRequest } from "@/lib/room/parse-room-write-context";
+import { parseRoomWriteContextFromRequestAndBody } from "@/lib/room/parse-room-write-context";
 import { authorizeServerRoomWrite } from "@/lib/room/server-authoritative-write-guard";
 
 function parseSource(request: Request) {
@@ -73,7 +73,7 @@ export async function POST(request: Request) {
   }
 
   const writeAuth = authorizeServerRoomWrite({
-    ...parseRoomWriteContextFromRequest(request),
+    ...parseRoomWriteContextFromRequestAndBody(request, body),
     saveId,
     teamId,
     action: "ai_market_plan_apply",

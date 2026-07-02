@@ -61,6 +61,18 @@ describe("buildTrainingPlayerRowView", () => {
               trainingGrowthMultiplier: 1.15,
               performanceGrowthMultiplier: 1.15,
             },
+            {
+              attribute: "dexterity",
+              before: 44,
+              after: 44.1,
+              delta: 0.1,
+              regression: -0.1,
+              training: 0.05,
+              performance: 0.15,
+              affinity: "weak",
+              trainingGrowthMultiplier: 0.8,
+              performanceGrowthMultiplier: 0.8,
+            },
           ],
         },
         forecast: {
@@ -88,7 +100,8 @@ describe("buildTrainingPlayerRowView", () => {
     );
 
     expect(row.classTrainingFocus.primary[0]?.attribute).toBe("Power");
-    expect(row.classTrainingFocus.risks[0]?.attribute).toBe("Charisma");
+    expect(row.classTrainingFocus.primary[0]?.weight).toBe(1.2);
+    expect(row.classTrainingFocus.risks[0]?.attribute).toBe("Dexterity");
     expect(row.attributeForecast[0]?.affinity).toBe("signature");
     expect(row.modifiers.signatureAttributes).toContain("Power");
     expect(row.modifiers.weakAttribute).toBe("Dexterity");

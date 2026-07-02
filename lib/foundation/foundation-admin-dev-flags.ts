@@ -32,3 +32,21 @@ export function resolveFoundationManageableTeamIds(
   }
   return scopedTeamIds;
 }
+
+export function isFoundationLineupReadOnly(input: {
+  source: string;
+  sourceReadOnly: boolean;
+  teamManagementLocked: boolean;
+}): boolean {
+  if (input.source === "prisma") {
+    return true;
+  }
+  if (FOUNDATION_ADMIN_UNLOCK_ALL_TEAMS) {
+    return false;
+  }
+  return input.sourceReadOnly || input.teamManagementLocked;
+}
+
+export function canFoundationLocalUserManageTeam(canManage: boolean): boolean {
+  return FOUNDATION_ADMIN_UNLOCK_ALL_TEAMS || canManage;
+}

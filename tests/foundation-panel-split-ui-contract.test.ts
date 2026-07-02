@@ -9,12 +9,14 @@ describe("foundation panel split ui contract", () => {
       "utf8",
     );
 
-    expect(foundationText).toContain("FoundationHomeV2Panel");
-    expect(foundationText).toContain("FoundationSeasonV2Panel");
-    expect(foundationText).toContain("FoundationLineupPanel");
-    expect(foundationText).toContain("FoundationMatchdayArenaPanel");
-    expect(foundationText).toContain("FoundationTransfermarktV2Panel");
-    expect(foundationText).toContain("FoundationTeamsDetailPanel");
+    expect(foundationText).toContain("FoundationShellRouterHomeV2");
+    expect(foundationText).toContain("FoundationShellRouterSeasonV2");
+    expect(foundationText).toContain("FoundationShellRouterLineup");
+    expect(foundationText).toContain("FoundationShellRouterMarketV2");
+    expect(foundationText).toContain("FoundationShellRouterMatchdayArena");
+    expect(foundationText).toContain("FoundationShellRouterMatchdayArena");
+    expect(foundationText).not.toContain("FoundationMatchdayArenaPanel");
+    expect(foundationText).toContain("FoundationShellRouterTeams");
     expect(foundationText).toContain("shouldBuildHomeV2Overview");
     expect(foundationText).toContain("shouldBuildPlayerRatings");
     expect(foundationText).not.toContain("<MatchdayArenaV2Client");

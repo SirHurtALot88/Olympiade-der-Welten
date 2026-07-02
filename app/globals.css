@@ -562,6 +562,21 @@ a {
   gap: 6px;
 }
 
+.foundation-sidebar-season-context {
+  display: inline-flex;
+  align-self: start;
+  align-items: center;
+  padding: 4px 9px;
+  border-radius: 999px;
+  border: 1px solid rgba(125, 211, 252, 0.22);
+  background: rgba(56, 189, 248, 0.08);
+  color: rgba(224, 242, 254, 0.92);
+  font-size: 0.72rem;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
 .foundation-sidebar-save-link {
   font-size: 0.78rem;
   opacity: 0.8;
@@ -1135,6 +1150,8 @@ a {
   display: grid;
   gap: 10px;
   margin-top: 12px;
+  width: 100%;
+  min-width: 0;
 }
 
 .player-drawer-stats-chart h3 {
@@ -1153,6 +1170,7 @@ a {
   display: grid;
   gap: 16px;
   width: 100%;
+  max-width: none;
   min-width: 0;
 }
 
@@ -1166,6 +1184,13 @@ a {
 
 .team-profile-header {
   justify-content: space-between;
+}
+
+.team-profile-header-actions {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
 }
 
 .team-profile-logo {
@@ -3372,6 +3397,61 @@ a {
   display: grid;
   align-content: center;
   gap: 10px;
+}
+
+.foundation-hq-readiness-checklist {
+  display: grid;
+  gap: 10px;
+  padding: 14px;
+  border: 1px solid var(--border-subtle, rgba(255, 255, 255, 0.08));
+  border-radius: 12px;
+  background: rgba(255, 255, 255, 0.02);
+}
+
+.foundation-hq-readiness-head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.foundation-hq-readiness-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+  gap: 8px;
+}
+
+.foundation-hq-readiness-item {
+  display: grid;
+  gap: 4px;
+  text-align: left;
+  padding: 10px 12px;
+  border-radius: 10px;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  background: rgba(255, 255, 255, 0.03);
+}
+
+.foundation-hq-readiness-item.is-ready {
+  border-color: rgba(72, 187, 120, 0.35);
+}
+
+.foundation-hq-readiness-item.is-open {
+  border-color: rgba(237, 137, 54, 0.35);
+}
+
+.foundation-hq-readiness-item.is-blocked {
+  border-color: rgba(245, 101, 101, 0.35);
+}
+
+.training-v2-ai-recommendation {
+  display: grid;
+  gap: 2px;
+  margin-bottom: 8px;
+  padding: 8px 10px;
+  border-radius: 8px;
+  background: rgba(237, 137, 54, 0.12);
+  border: 1px solid rgba(237, 137, 54, 0.28);
+  font-size: 0.85rem;
 }
 
 .foundation-hq-metrics {
@@ -7870,6 +7950,12 @@ a {
   background: rgba(255, 255, 255, 0.04);
   font-size: 0.72rem;
   line-height: 1;
+  cursor: pointer;
+}
+
+.bracket-pill.is-active {
+  border-color: rgba(120, 190, 255, 0.55);
+  background: rgba(80, 150, 255, 0.16);
 }
 
 .bracket-pill-bracket {
@@ -8773,6 +8859,230 @@ a {
 
 .team-contracts-table {
   min-width: 1080px;
+}
+
+.team-contracts-table tr.is-contract-expiring td {
+  background: rgba(251, 191, 36, 0.06);
+}
+
+.team-contracts-table tr.is-contract-expiring td:first-child {
+  box-shadow: inset 3px 0 0 rgba(251, 191, 36, 0.55);
+}
+
+.team-contracts-table tr.is-preview-row td {
+  opacity: 0.88;
+}
+
+.team-contracts-table tr.is-sell-marked td:first-child {
+  box-shadow: inset 3px 0 0 rgba(251, 191, 36, 0.45);
+}
+
+.team-contracts-layout {
+  display: grid;
+  gap: 14px;
+}
+
+.team-contracts-summary-grid {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 8px;
+}
+
+.team-contracts-summary-grid .metric-card small {
+  display: block;
+  margin-top: 4px;
+  font-size: 0.72rem;
+  color: rgba(226, 232, 240, 0.72);
+}
+
+.team-contracts-section-head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 10px;
+  margin-bottom: 8px;
+}
+
+.team-contracts-mix-details {
+  border: 1px solid rgba(148, 163, 184, 0.16);
+  border-radius: 14px;
+  padding: 10px 12px;
+  background: rgba(15, 23, 42, 0.42);
+}
+
+.team-contracts-mix-details summary {
+  cursor: pointer;
+  font-weight: 700;
+  color: #e2e8f0;
+}
+
+.team-contracts-toolbar {
+  display: flex;
+  justify-content: flex-end;
+}
+
+.team-contracts-player-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+  gap: 10px;
+}
+
+.team-contract-player-card {
+  display: grid;
+  gap: 10px;
+  padding: 12px;
+  border-radius: 14px;
+  border: 1px solid rgba(148, 163, 184, 0.16);
+  background: rgba(15, 23, 42, 0.55);
+  cursor: pointer;
+  transition: border-color 120ms ease, transform 120ms ease;
+}
+
+.team-contract-player-card:hover {
+  border-color: rgba(96, 165, 250, 0.45);
+  transform: translateY(-1px);
+}
+
+.team-contract-player-card.is-preview {
+  border-style: dashed;
+  opacity: 0.92;
+}
+
+.team-contract-player-card.is-expiring {
+  border-color: rgba(251, 191, 36, 0.45);
+}
+
+.team-contract-player-card.is-sell-marked {
+  box-shadow: inset 0 0 0 1px rgba(251, 191, 36, 0.35);
+}
+
+.team-contract-player-head {
+  display: flex;
+  align-items: start;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.team-contract-player-head strong {
+  display: block;
+}
+
+.team-contract-player-meta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  align-items: center;
+  font-size: 0.82rem;
+}
+
+.team-contract-shape {
+  padding: 2px 8px;
+  border-radius: 999px;
+  font-size: 0.72rem;
+  font-weight: 800;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  background: rgba(148, 163, 184, 0.14);
+}
+
+.team-contract-shape.is-front-loaded {
+  color: #fca5a5;
+  background: rgba(239, 68, 68, 0.14);
+}
+
+.team-contract-shape.is-back-loaded {
+  color: #86efac;
+  background: rgba(34, 197, 94, 0.14);
+}
+
+.team-contract-season-row {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(72px, 1fr));
+  gap: 6px;
+}
+
+.team-contract-season-chip {
+  display: grid;
+  gap: 2px;
+  padding: 6px 8px;
+  border-radius: 10px;
+  background: rgba(17, 24, 39, 0.72);
+  border: 1px solid rgba(148, 163, 184, 0.12);
+}
+
+.team-contract-season-chip span {
+  font-size: 0.68rem;
+  color: rgba(226, 232, 240, 0.68);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+.team-contract-season-chip strong {
+  font-size: 0.86rem;
+}
+
+.team-contract-player-foot {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  font-size: 0.78rem;
+  color: rgba(226, 232, 240, 0.78);
+}
+
+.team-contract-player-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.team-contracts-empty {
+  grid-column: 1 / -1;
+}
+
+.team-contracts-totals-bar {
+  display: grid;
+  gap: 8px;
+  padding: 10px 12px;
+  border-radius: 14px;
+  border: 1px solid rgba(148, 163, 184, 0.16);
+  background: rgba(17, 24, 39, 0.68);
+}
+
+.team-contracts-totals-row {
+  display: grid;
+  grid-template-columns: auto repeat(auto-fit, minmax(72px, 1fr));
+  gap: 8px;
+  align-items: center;
+}
+
+.team-contracts-totals-row.is-preview {
+  opacity: 0.82;
+}
+
+.team-contracts-totals-label {
+  font-size: 0.78rem;
+  font-weight: 800;
+  color: rgba(226, 232, 240, 0.82);
+  min-width: 96px;
+}
+
+.team-contract-season-chip.is-total {
+  background: rgba(30, 41, 59, 0.82);
+}
+
+.team-contracts-footnote {
+  margin: 0;
+  font-size: 0.82rem;
+}
+
+.teams-portraits-dashboard {
+  margin-bottom: 4px;
+}
+
+@media (max-width: 960px) {
+  .team-contracts-summary-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
 }
 
 .selected-team-roster-table {
@@ -9780,6 +10090,40 @@ a {
 
 .players-table-money-delta.is-negative {
   color: #f08e86;
+}
+
+.players-table-salary-primary {
+  display: inline-flex;
+  align-items: baseline;
+  justify-content: flex-end;
+  gap: 6px;
+  white-space: nowrap;
+}
+
+.players-table-salary-season {
+  color: rgba(196, 208, 232, 0.72);
+  font-size: 0.72rem;
+  font-weight: 700;
+  line-height: 1.1;
+  white-space: nowrap;
+}
+
+.players-table-contract-cell {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  white-space: nowrap;
+}
+
+.players-table-contract-shape {
+  padding: 2px 6px;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.08);
+  color: rgba(236, 244, 255, 0.92);
+  font-size: 0.68rem;
+  font-weight: 900;
+  letter-spacing: 0.04em;
+  line-height: 1.2;
 }
 
 .transfer-history-money-stack {
@@ -11127,7 +11471,7 @@ a {
 
 .foundation-modal,
 .player-drawer {
-  width: min(980px, calc(100vw - 40px));
+  width: min(1240px, calc(100vw - 32px));
   max-height: calc(100vh - 40px);
   overflow: auto;
   border-radius: 24px;
@@ -12158,8 +12502,8 @@ a {
 
 .player-drawer-top-disciplines-layout {
   display: grid;
-  grid-template-columns: minmax(0, 1.65fr) minmax(220px, 0.85fr);
-  gap: 12px;
+  grid-template-columns: minmax(0, 1fr) minmax(132px, 152px);
+  gap: 10px;
   align-items: start;
 }
 
@@ -12171,17 +12515,29 @@ a {
 
 .player-drawer-season-snapshot-grid {
   display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 8px;
+  grid-template-columns: minmax(0, 1fr);
+  gap: 6px;
 }
 
 .player-drawer-season-snapshot-card {
   display: grid;
-  gap: 3px;
-  padding: 8px 10px;
+  gap: 4px;
+  padding: 7px 8px;
   border-radius: 12px;
   border: 1px solid rgba(255, 255, 255, 0.08);
   background: rgba(255, 255, 255, 0.04);
+}
+
+.player-drawer-season-snapshot-values {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 6px;
+}
+
+.player-drawer-season-snapshot-value {
+  display: grid;
+  gap: 1px;
+  min-width: 0;
 }
 
 .player-drawer-season-snapshot-card small {
@@ -12189,6 +12545,21 @@ a {
   font-size: 0.62rem;
   font-weight: 850;
   letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+
+.player-drawer-season-snapshot-value strong {
+  color: #f7fbff;
+  font-size: 0.82rem;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+}
+
+.player-drawer-season-snapshot-value em {
+  color: rgba(214, 223, 238, 0.68);
+  font-size: 0.62rem;
+  font-style: normal;
+  letter-spacing: 0.03em;
   text-transform: uppercase;
 }
 
@@ -12609,6 +12980,28 @@ a {
   color: rgba(103, 89, 61, 0.58);
 }
 
+.player-drawer-star-rating.is-range .player-drawer-stars {
+  filter: none;
+}
+
+.player-drawer-star.is-inactive .player-drawer-star-empty {
+  color: rgba(103, 89, 61, 0.28);
+}
+
+.player-drawer-star-uncertain {
+  position: absolute;
+  inset: 0 auto 0 0;
+  overflow: hidden;
+  color: #12151c;
+  text-shadow:
+    0 0 1px rgba(255, 255, 255, 0.18),
+    0 1px 0 rgba(0, 0, 0, 0.85);
+}
+
+.player-drawer-star.has-uncertain .player-drawer-star-uncertain {
+  filter: drop-shadow(0 0 4px rgba(0, 0, 0, 0.55));
+}
+
 .player-drawer-star-stack {
   display: grid;
   gap: 5px;
@@ -12743,6 +13136,11 @@ a {
 
 .player-drawer-attribute-card strong {
   font-size: 1.05rem;
+  color: rgba(255, 255, 255, 0.96);
+}
+
+.player-drawer-attribute-grid.is-compact .player-drawer-attribute-card strong {
+  color: rgba(255, 255, 255, 0.96);
 }
 
 .player-drawer-attribute-card.is-tier-splus strong,
@@ -13380,6 +13778,234 @@ a {
   margin-bottom: 10px;
 }
 
+.team-drawer-board-velo {
+  --board-velo-ink: rgba(248, 251, 255, 0.98);
+  --board-velo-muted: rgba(196, 208, 228, 0.78);
+  color: var(--board-velo-ink);
+}
+
+.team-drawer-board-velo .muted,
+.team-drawer-board-velo small:not(.transfer-status-pill) {
+  color: var(--board-velo-muted);
+}
+
+.team-drawer-board-velo strong {
+  color: var(--board-velo-ink);
+}
+
+.team-drawer-lead-summary {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px;
+  margin-bottom: 10px;
+}
+
+.team-drawer-lead-summary .team-drawer-lead-chip {
+  grid-column: auto;
+}
+
+.team-drawer-board-velo .team-drawer-lead-card.is-gm {
+  grid-column: auto;
+  width: 100%;
+  margin-bottom: 10px;
+}
+
+.team-drawer-board-velo .team-drawer-gm-axis-row span {
+  color: #fff;
+  font-weight: 900;
+  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.45);
+}
+
+.team-drawer-relations-panel {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px;
+  margin-bottom: 14px;
+}
+
+.team-drawer-relations-column {
+  display: grid;
+  gap: 8px;
+  min-width: 0;
+  padding: 12px 14px;
+  border: 1px solid rgba(112, 138, 187, 0.22);
+  border-radius: 14px;
+  background: linear-gradient(180deg, rgba(11, 18, 32, 0.96), rgba(9, 15, 27, 0.9));
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.04);
+}
+
+.team-drawer-relations-column.is-ready {
+  border-color: rgba(95, 168, 93, 0.34);
+}
+
+.team-drawer-relations-column.is-blocked {
+  border-color: rgba(224, 76, 76, 0.34);
+}
+
+.team-drawer-relations-column header {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.team-drawer-relations-column header span {
+  color: rgba(196, 208, 228, 0.72);
+  font-size: 0.62rem;
+  font-weight: 800;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.team-drawer-relations-column header strong {
+  font-size: 1.1rem;
+  line-height: 1;
+}
+
+.team-drawer-relations-empty {
+  margin: 0;
+  color: var(--board-velo-muted);
+  font-size: 0.72rem;
+  line-height: 1.35;
+}
+
+.team-drawer-relationship-row {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  gap: 4px 10px;
+  align-items: center;
+  padding: 8px 10px;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 10px;
+  background: rgba(255, 255, 255, 0.05);
+}
+
+.team-drawer-relationship-row.has-change {
+  border-color: rgba(237, 190, 88, 0.45);
+  background: rgba(237, 190, 88, 0.12);
+}
+
+.team-drawer-relationship-row strong {
+  color: rgba(248, 251, 255, 0.98);
+  font-size: 0.82rem;
+}
+
+.team-drawer-relationship-row > span {
+  color: rgba(248, 251, 255, 0.92);
+  font-size: 0.82rem;
+  font-weight: 800;
+  text-align: right;
+}
+
+.team-drawer-relationship-row em {
+  color: rgba(255, 218, 143, 0.92);
+  font-size: 0.72rem;
+  font-style: normal;
+  font-weight: 800;
+}
+
+.team-drawer-relationship-row small {
+  grid-column: 1 / -1;
+  color: rgba(255, 229, 173, 0.82);
+  font-size: 0.66rem;
+  font-weight: 800;
+  letter-spacing: 0.04em;
+  line-height: 1.2;
+  text-transform: uppercase;
+}
+
+.team-drawer-objective-board {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 340px), 1fr));
+  gap: 12px;
+}
+
+.team-drawer-objective-category {
+  display: grid;
+  gap: 8px;
+  min-width: 0;
+  padding: 12px 14px;
+  border: 1px solid rgba(112, 138, 187, 0.2);
+  border-radius: 14px;
+  background: linear-gradient(180deg, rgba(11, 18, 32, 0.96), rgba(9, 15, 27, 0.9));
+}
+
+.team-drawer-objective-category h4 {
+  margin: 0;
+  color: var(--board-velo-muted);
+  font-size: 0.68rem;
+  font-weight: 800;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+}
+
+.team-drawer-objective-row {
+  min-width: 0;
+  padding: 10px 12px;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 12px;
+  background: rgba(255, 255, 255, 0.04);
+}
+
+.team-drawer-objective-row-main {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  min-width: 0;
+}
+
+.team-drawer-objective-row .transfer-status-pill {
+  flex: 0 0 auto;
+  min-height: 24px;
+  padding: 3px 8px;
+  font-size: 0.68rem;
+}
+
+.team-drawer-objective-copy {
+  display: grid;
+  gap: 4px;
+  min-width: 0;
+  flex: 1 1 auto;
+}
+
+.team-drawer-objective-row.is-ready {
+  border-color: rgba(95, 168, 93, 0.28);
+}
+
+.team-drawer-objective-row.is-blocked {
+  border-color: rgba(224, 76, 76, 0.28);
+}
+
+.team-drawer-objective-row.is-warning {
+  border-color: rgba(213, 165, 57, 0.28);
+}
+
+.team-drawer-objective-row strong {
+  font-size: 0.84rem;
+  line-height: 1.35;
+  overflow-wrap: anywhere;
+}
+
+.team-drawer-objective-progress {
+  color: var(--board-velo-muted);
+  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
+  font-size: 0.72rem;
+  line-height: 1.35;
+  overflow-wrap: anywhere;
+  white-space: normal;
+}
+
+@media (max-width: 760px) {
+  .team-drawer-lead-summary,
+  .team-drawer-relations-panel {
+    grid-template-columns: 1fr;
+  }
+
+  .team-drawer-objective-board {
+    grid-template-columns: 1fr;
+  }
+}
+
 .team-drawer-leadership-strip {
   display: grid;
   grid-template-columns: repeat(12, minmax(0, 1fr));
@@ -13499,7 +14125,24 @@ a {
 }
 
 .team-drawer-gm-axis-row.is-compact {
-  margin-top: 4px;
+  display: flex;
+  justify-content: center;
+  align-items: stretch;
+  gap: 10px;
+  margin-top: 10px;
+  width: 100%;
+}
+
+.team-drawer-gm-axis-row.is-compact span {
+  flex: 1 1 0;
+  min-width: 0;
+  min-height: 38px;
+  padding: 10px 8px;
+  font-size: 0.82rem;
+  letter-spacing: 0.04em;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
 }
 
 @media (max-width: 1180px) {
@@ -13773,19 +14416,23 @@ a {
   text-align: center;
 }
 
-.player-drawer-history-table .player-drawer-history-axis.is-power {
+.player-drawer-history-table .player-drawer-history-axis.is-power,
+.player-attribute-progress-table .player-drawer-history-axis.is-power {
   background: rgba(141, 52, 54, 0.58);
 }
 
-.player-drawer-history-table .player-drawer-history-axis.is-speed {
+.player-drawer-history-table .player-drawer-history-axis.is-speed,
+.player-attribute-progress-table .player-drawer-history-axis.is-speed {
   background: rgba(79, 142, 73, 0.58);
 }
 
-.player-drawer-history-table .player-drawer-history-axis.is-mental {
+.player-drawer-history-table .player-drawer-history-axis.is-mental,
+.player-attribute-progress-table .player-drawer-history-axis.is-mental {
   background: rgba(36, 79, 159, 0.58);
 }
 
-.player-drawer-history-table .player-drawer-history-axis.is-social {
+.player-drawer-history-table .player-drawer-history-axis.is-social,
+.player-attribute-progress-table .player-drawer-history-axis.is-social {
   background: rgba(203, 169, 93, 0.58);
   color: #14120f;
 }
@@ -13833,9 +14480,22 @@ a {
 .player-drawer-training-history-table,
 .player-attribute-progress-table {
   width: 100%;
-  min-width: 720px;
+  min-width: 0;
   border-collapse: separate;
   border-spacing: 0;
+}
+
+.player-drawer-training-history-table th,
+.player-drawer-training-history-table td {
+  padding: 6px 7px;
+  font-size: 0.68rem;
+}
+
+.player-drawer-training-history-table th.is-attribute-col,
+.player-drawer-training-history-table td.is-attribute-col {
+  min-width: 38px;
+  text-align: center;
+  font-variant-numeric: tabular-nums;
 }
 
 .player-drawer-transfer-history-table th,
@@ -13870,6 +14530,208 @@ a {
 .player-attribute-progress-chart {
   display: grid;
   gap: 12px;
+  width: 100%;
+  min-width: 0;
+}
+
+.player-attribute-progress-pp-blocks {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px;
+  width: 100%;
+}
+
+@media (min-width: 960px) {
+  .player-attribute-progress-pp-blocks {
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+  }
+}
+
+.player-attribute-progress-pp-metric-block.is-power {
+  border-color: rgba(211, 83, 72, 0.28);
+  background: rgba(128, 42, 42, 0.16);
+}
+
+.player-attribute-progress-pp-metric-block.is-speed {
+  border-color: rgba(109, 176, 105, 0.28);
+  background: rgba(43, 99, 54, 0.16);
+}
+
+.player-attribute-progress-pp-metric-block.is-mental {
+  border-color: rgba(91, 145, 218, 0.3);
+  background: rgba(43, 78, 142, 0.16);
+}
+
+.player-attribute-progress-pp-metric-block.is-social {
+  border-color: rgba(235, 181, 76, 0.32);
+  background: rgba(126, 87, 28, 0.16);
+}
+
+.player-attribute-progress-pp-metric-block.is-power .player-attribute-progress-pp-metric-head strong {
+  color: #ffb3ac;
+}
+
+.player-attribute-progress-pp-metric-block.is-speed .player-attribute-progress-pp-metric-head strong {
+  color: #b9f6c0;
+}
+
+.player-attribute-progress-pp-metric-block.is-mental .player-attribute-progress-pp-metric-head strong {
+  color: #bdd7ff;
+}
+
+.player-attribute-progress-pp-metric-block.is-social .player-attribute-progress-pp-metric-head strong {
+  color: #ffe1a3;
+}
+
+.player-attribute-progress-delta-chip.player-drawer-history-axis.is-power {
+  border-color: rgba(220, 112, 112, 0.3);
+  background: rgba(154, 43, 43, 0.24);
+}
+
+.player-attribute-progress-delta-chip.player-drawer-history-axis.is-speed {
+  border-color: rgba(126, 211, 141, 0.3);
+  background: rgba(52, 132, 67, 0.24);
+}
+
+.player-attribute-progress-delta-chip.player-drawer-history-axis.is-mental {
+  border-color: rgba(124, 165, 236, 0.3);
+  background: rgba(38, 89, 165, 0.24);
+}
+
+.player-attribute-progress-delta-chip.player-drawer-history-axis.is-social {
+  border-color: rgba(229, 178, 93, 0.32);
+  background: rgba(180, 125, 36, 0.24);
+}
+
+.player-attribute-progress-delta-chip.player-drawer-history-axis.is-neutral {
+  border-color: rgba(255, 255, 255, 0.16);
+  background: rgba(255, 255, 255, 0.06);
+}
+
+.player-attribute-progress-pp-metric-block {
+  display: grid;
+  gap: 6px;
+  padding: 10px;
+  border-radius: 14px;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  background: rgba(255, 255, 255, 0.03);
+}
+
+.player-attribute-progress-pp-metric-head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.player-attribute-progress-pp-metric-head strong {
+  font-size: 0.82rem;
+  letter-spacing: 0.04em;
+}
+
+.player-attribute-progress-pp-metric-head .muted {
+  font-size: 0.66rem;
+}
+
+.player-attribute-progress-pp-metric-svg {
+  width: 100%;
+  height: auto;
+  max-height: 132px;
+  display: block;
+}
+
+.player-attribute-progress-value-label.is-empty {
+  fill: rgba(255, 255, 255, 0.34);
+  font-size: 10px;
+  font-weight: 500;
+}
+
+@media (max-width: 560px) {
+  .player-attribute-progress-pp-blocks {
+    grid-template-columns: 1fr;
+  }
+}
+
+.player-attribute-progress-collapsible {
+  border-radius: 16px;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  background: rgba(5, 8, 14, 0.18);
+  width: 100%;
+  min-width: 0;
+}
+
+.player-attribute-progress-collapsible summary {
+  list-style: none;
+}
+
+.player-attribute-progress-collapsible summary::-webkit-details-marker {
+  display: none;
+}
+
+.player-attribute-progress-collapsible-summary {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  padding: 12px 14px;
+  cursor: pointer;
+  user-select: none;
+}
+
+.player-attribute-progress-collapsible-summary::after {
+  content: "▸";
+  flex: 0 0 auto;
+  color: rgba(255, 255, 255, 0.56);
+  font-size: 0.82rem;
+  transition: transform 0.16s ease;
+}
+
+.player-attribute-progress-collapsible[open] .player-attribute-progress-collapsible-summary::after {
+  transform: rotate(90deg);
+}
+
+.player-attribute-progress-collapsible[open] .player-attribute-progress-collapsible-summary {
+  border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+}
+
+.player-attribute-progress-collapsible-copy {
+  display: grid;
+  gap: 2px;
+  min-width: 0;
+}
+
+.player-attribute-progress-collapsible-copy strong {
+  font-size: 0.86rem;
+  font-weight: 700;
+}
+
+.player-attribute-progress-collapsible-copy .muted {
+  font-size: 0.72rem;
+}
+
+.player-attribute-progress-collapsible-body {
+  display: grid;
+  gap: 8px;
+  padding: 12px;
+}
+
+.player-attribute-progress-collapsible.player-attribute-progress-line-chart-shell,
+.player-attribute-progress-collapsible.player-attribute-progress-bar-chart-shell {
+  padding: 0;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  background: rgba(5, 8, 14, 0.18);
+}
+
+.player-attribute-progress-line-chart-shell,
+.player-attribute-progress-bar-chart-shell {
+  display: grid;
+  gap: 8px;
+  padding: 12px;
+  border-radius: 16px;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  background: rgba(5, 8, 14, 0.18);
+  width: 100%;
+  min-width: 0;
 }
 
 .player-attribute-progress-chart-head {
@@ -14047,20 +14909,12 @@ a {
   font-size: 0.86rem;
 }
 
-.player-attribute-progress-line-chart-shell,
-.player-attribute-progress-bar-chart-shell {
-  display: grid;
-  gap: 8px;
-  padding: 12px;
-  border-radius: 16px;
-  border: 1px solid rgba(255, 255, 255, 0.08);
-  background: rgba(5, 8, 14, 0.18);
-}
-
 .player-attribute-progress-line-chart-svg,
 .player-attribute-progress-bar-chart-svg {
   width: 100%;
   height: auto;
+  max-height: 180px;
+  display: block;
 }
 
 .player-attribute-progress-attribute-line {
@@ -14097,35 +14951,35 @@ a {
 }
 
 .player-attribute-progress-bar.is-power {
-  fill: #ff6b57;
+  fill: #dc7070;
 }
 
 .player-attribute-progress-bar.is-speed {
-  fill: #57c7ff;
+  fill: #7ed38d;
 }
 
 .player-attribute-progress-bar.is-mental {
-  fill: #b58cff;
+  fill: #7ca5ec;
 }
 
 .player-attribute-progress-bar.is-social {
-  fill: #e0c06a;
+  fill: #e5b25d;
 }
 
 .player-attribute-progress-pp-legend-item.is-power {
-  color: #ff6b57;
+  color: #ffb3ac;
 }
 
 .player-attribute-progress-pp-legend-item.is-speed {
-  color: #57c7ff;
+  color: #b9f6c0;
 }
 
 .player-attribute-progress-pp-legend-item.is-mental {
-  color: #b58cff;
+  color: #bdd7ff;
 }
 
 .player-attribute-progress-pp-legend-item.is-social {
-  color: #e0c06a;
+  color: #ffe1a3;
 }
 
 .player-attribute-progress-season-label {
@@ -14168,32 +15022,32 @@ a {
 .player-attribute-progress-svg.is-power .player-attribute-progress-dot,
 .player-attribute-progress-sparkline-svg.is-power .player-attribute-progress-line,
 .player-attribute-progress-sparkline-svg.is-power .player-attribute-progress-dot {
-  stroke: #ff6b57;
-  fill: #ff6b57;
+  stroke: #dc7070;
+  fill: #dc7070;
 }
 
 .player-attribute-progress-svg.is-speed .player-attribute-progress-line,
 .player-attribute-progress-svg.is-speed .player-attribute-progress-dot,
 .player-attribute-progress-sparkline-svg.is-speed .player-attribute-progress-line,
 .player-attribute-progress-sparkline-svg.is-speed .player-attribute-progress-dot {
-  stroke: #57c7ff;
-  fill: #57c7ff;
+  stroke: #7ed38d;
+  fill: #7ed38d;
 }
 
 .player-attribute-progress-svg.is-mental .player-attribute-progress-line,
 .player-attribute-progress-svg.is-mental .player-attribute-progress-dot,
 .player-attribute-progress-sparkline-svg.is-mental .player-attribute-progress-line,
 .player-attribute-progress-sparkline-svg.is-mental .player-attribute-progress-dot {
-  stroke: #b58cff;
-  fill: #b58cff;
+  stroke: #7ca5ec;
+  fill: #7ca5ec;
 }
 
 .player-attribute-progress-svg.is-social .player-attribute-progress-line,
 .player-attribute-progress-svg.is-social .player-attribute-progress-dot,
 .player-attribute-progress-sparkline-svg.is-social .player-attribute-progress-line,
 .player-attribute-progress-sparkline-svg.is-social .player-attribute-progress-dot {
-  stroke: #e0c06a;
-  fill: #e0c06a;
+  stroke: #e5b25d;
+  fill: #e5b25d;
 }
 
 .player-attribute-progress-dot {
@@ -30245,9 +31099,42 @@ a {
 }
 
 .training-v2-attribute-forecast-split span {
-  color: rgba(198, 210, 232, 0.72);
+  color: rgba(218, 229, 245, 0.88);
   font-size: 0.68rem;
   font-weight: 800;
+}
+
+.training-v2-ceiling-mark {
+  margin-left: auto;
+  padding: 1px 6px;
+  border-radius: 999px;
+  font-size: 0.62rem;
+  font-weight: 850;
+  letter-spacing: 0.02em;
+  text-transform: uppercase;
+  white-space: nowrap;
+}
+
+.training-v2-ceiling-mark.is-capped {
+  color: rgba(255, 196, 190, 0.96);
+  background: rgba(214, 93, 86, 0.18);
+  border: 1px solid rgba(214, 93, 86, 0.28);
+}
+
+.training-v2-ceiling-mark.is-closing {
+  color: rgba(232, 210, 160, 0.92);
+  background: rgba(255, 214, 120, 0.1);
+  border: 1px solid rgba(255, 214, 120, 0.18);
+}
+
+.training-v2-attribute-forecast-card.is-ceiling-capped {
+  opacity: 0.82;
+  border-color: rgba(214, 93, 86, 0.24);
+  background: rgba(214, 93, 86, 0.06);
+}
+
+.training-v2-attribute-forecast-card.is-ceiling-closing {
+  border-color: rgba(255, 214, 120, 0.16);
 }
 
 .training-v2-modifier-row {
@@ -31297,6 +32184,16 @@ a {
     0 20px 44px rgba(0, 0, 0, 0.18);
 }
 
+.teams-v2-history-panel {
+  content-visibility: auto;
+  contain-intrinsic-size: auto 320px;
+}
+
+.team-portraits-grid {
+  content-visibility: auto;
+  contain-intrinsic-size: auto 520px;
+}
+
 .teams-v2-hero {
   display: grid;
   grid-template-columns: minmax(0, 1.2fr) minmax(280px, 0.8fr);
@@ -32079,7 +32976,7 @@ a {
 
 .season-v2-main-grid {
   display: grid;
-  grid-template-columns: minmax(0, 1.35fr) minmax(420px, 0.85fr);
+  grid-template-columns: minmax(0, 1fr);
   gap: 14px;
   align-items: start;
 }
@@ -32088,6 +32985,8 @@ a {
 .season-v2-side-rail {
   display: grid;
   gap: 18px;
+  min-width: 0;
+  overflow: hidden;
 }
 
 .season-v2-table-panel,
@@ -32341,11 +33240,19 @@ a {
 .season-v2-side-table-shell {
   overflow: auto;
   max-height: 62vh;
+  overscroll-behavior-x: contain;
 }
 
 .season-v2-table-shell-full {
   max-height: none;
-  overflow: visible;
+  width: 100%;
+  overflow-x: auto;
+  overflow-y: visible;
+}
+
+.season-v2-side-table-shell {
+  width: 100%;
+  overflow-x: auto;
 }
 
 .season-v2-table {
@@ -32898,7 +33805,7 @@ a {
   gap: 10px;
 }
 
-@media (max-width: 1480px) {
+@media (max-width: 1680px) {
   .season-v2-story-grid {
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
@@ -33573,6 +34480,20 @@ a {
 .foundation-player-portrait-stat.heat-band-7,
 .foundation-player-portrait-stat.heat-band-8 {
   box-shadow: none;
+  backdrop-filter: blur(4px);
+  border: 1px solid rgba(255, 255, 255, 0.16);
+}
+
+.foundation-player-portrait-card .foundation-player-portrait-stat[class*="heat-band-"] strong {
+  color: rgba(255, 255, 255, 0.96);
+}
+
+.foundation-player-portrait-card .foundation-player-portrait-stat.heat-band-3,
+.foundation-player-portrait-card .foundation-player-portrait-stat.heat-band-4,
+.foundation-player-portrait-card .foundation-player-portrait-stat.heat-band-5,
+.foundation-player-portrait-card .foundation-player-portrait-stat.heat-band-7 {
+  background-color: rgba(8, 12, 20, 0.42);
+  background-blend-mode: multiply;
 }
 
 .foundation-player-portrait-stat small {

@@ -11,7 +11,15 @@ import {
   type AiMarketPlanTeamEntry,
 } from "@/lib/ai/ai-market-plan-preview-service";
 import { resolveMarketSpendableCashForPlanner } from "@/lib/ai/ai-manager-apply-service";
+import { resolveTeamCashRunwayReserve } from "@/lib/ai/ai-team-cash-reserve-service";
+import { getBudgetStatus } from "@/lib/ai/ai-transfermarkt-preview-service";
 import { assessTeamSellRunwayPressure } from "@/lib/ai/team-sell-runway-pressure";
+import {
+  estimateUpgradeBuyFloorMw,
+  hasUpgradeSellOpportunity,
+  isTeamOverCashSalarySoftTarget,
+  teamNeedsPostOptUpgradeDeploy,
+} from "@/lib/ai/ai-budget-deploy-service";
 import type {
   GameLogEntry,
   GameState,
@@ -39,6 +47,7 @@ import {
 import { normalizeTransfermarktToken } from "@/lib/market/transfermarkt-fit";
 import { isExplicitLocalTransferWindowPhase, type LocalTransferWindowPhase } from "@/lib/market/transfer-window-policy";
 import { createPersistenceService } from "@/lib/persistence/persistence-service";
+import { recordPhase } from "@/lib/ai/transfer-window-profiler";
 import type { PersistedSaveGame, PersistenceService } from "@/lib/persistence/types";
 
 export type AiMarketPlanApplyResultStatus =
@@ -189,6 +198,8 @@ export type AiMarketPlanApplyParams = {
   includeWarningTeams?: boolean;
   confirmToken?: string | null;
   transferPhase?: LocalTransferWindowPhase | string | null;
+  persistence?: PersistenceService;
+  localRunContext?: ReturnType<typeof createLocalTransfermarktRunContext> | null;
   options?: {
     includeWarningTeams?: boolean;
     applySellSteps?: boolean;
@@ -208,6 +219,8 @@ export type AiMarketPlanApplyParams = {
     excludeSellPlayerIds?: string[] | null;
     convergenceIncrementalFill?: boolean;
     transferWindowCycleMode?: boolean;
+    postOptUpgradeDeploy?: boolean;
+    minUpgradeBuyPrice?: number | null;
   };
 };
 
@@ -414,6 +427,8 @@ function getEffectiveOptions(input: AiMarketPlanApplyParams) {
     excludeSellPlayerIds: unique((input.options?.excludeSellPlayerIds ?? []).filter(Boolean)),
     convergenceIncrementalFill: input.options?.convergenceIncrementalFill ?? false,
     transferWindowCycleMode: input.options?.transferWindowCycleMode ?? false,
+    postOptUpgradeDeploy: input.options?.postOptUpgradeDeploy ?? false,
+    minUpgradeBuyPrice: input.options?.minUpgradeBuyPrice ?? null,
   };
 }
 
@@ -506,12 +521,9 @@ function getSeasonMaxSlotNeed(gameState: GameState) {
   return Math.max(7, Math.max(...counts) * 2);
 }
 
-function getTeamCashBuffer(team: AiMarketPlanTeamEntry, coverageFallback: boolean) {
+function getTeamCashBuffer(gameState: GameState, teamId: string, coverageFallback: boolean) {
   if (coverageFallback) return 0;
-  const salaryBase = Math.max(0, team.currentState.salaryTotal ?? 0);
-  const longContractHint = /long|vertrag|loyal/i.test(team.strategySummary ?? "");
-  const base = longContractHint ? 10 : 6;
-  return Math.max(base, salaryBase * 0.08);
+  return resolveTeamCashRunwayReserve(gameState, teamId);
 }
 
 function buildFinalBuyGate(input: {
@@ -524,6 +536,7 @@ function buildFinalBuyGate(input: {
   claimedPlayerIds: Set<string>;
   playersById: Map<string, Player>;
   convergenceIncrementalFill?: boolean;
+  minUpgradeBuyPrice?: number | null;
 }) {
   const rows: Array<Record<string, unknown>> = [];
   const picked: AiMarketPlanBuyPlan["candidates"] = [];
@@ -535,6 +548,15 @@ function buildFinalBuyGate(input: {
   const rosterBase = input.rosterBase ?? input.team.currentState.rosterCount ?? 0;
   const minRoster = Math.max(input.team.currentState.playerMin ?? 0, 7);
   const playerOpt = input.team.currentState.playerOpt ?? minRoster;
+  const atOrAboveOpt = rosterBase >= playerOpt;
+  const autoUpgradeFloor =
+    atOrAboveOpt && isTeamOverCashSalarySoftTarget(input.gameState, input.team.teamId, input.gameState.season.id)
+      ? estimateUpgradeBuyFloorMw(input.gameState, input.team.teamId)
+      : null;
+  const effectiveMinUpgradeBuyPrice =
+    input.minUpgradeBuyPrice != null && input.minUpgradeBuyPrice > 0
+      ? input.minUpgradeBuyPrice
+      : autoUpgradeFloor;
   const targetRoster = input.convergenceIncrementalFill
     ? Math.max(minRoster, playerOpt)
     : Math.max(minRoster, slotNeed);
@@ -584,14 +606,20 @@ function buildFinalBuyGate(input: {
     const player = input.playersById.get(candidate.playerId) ?? null;
     const hardNoGo = Boolean(profile && player && matchesHardNoGo(profile, player));
     const price = candidate.price ?? candidate.marketValue ?? null;
+    const belowUpgradeFloor =
+      effectiveMinUpgradeBuyPrice != null &&
+      effectiveMinUpgradeBuyPrice > 0 &&
+      price != null &&
+      price + 0.01 < effectiveMinUpgradeBuyPrice;
     const cashAfter = cashRemaining != null && price != null ? cashRemaining - price : candidate.cashAfter;
     const rosterAfter = rosterBase + picked.length + 1;
-    const buffer = getTeamCashBuffer(input.team, coverageFallback);
+    const buffer = getTeamCashBuffer(input.gameState, input.team.teamId, coverageFallback);
     const duplicateClaim = input.claimedPlayerIds.has(candidate.playerId);
     const cashBlocked = cashAfter == null || cashAfter < buffer;
     const reasons = [
       duplicateClaim ? "candidate_already_claimed" : null,
       hardNoGo && !convergenceCoverageFill ? "team_hard_no_go" : null,
+      belowUpgradeFloor ? `below_upgrade_floor:${price}<${effectiveMinUpgradeBuyPrice}` : null,
       cashBlocked ? `cash_buffer_failed:${Math.round((cashAfter ?? -999) * 100) / 100}<${Math.round(buffer * 100) / 100}` : null,
     ].filter((entry): entry is string => Boolean(entry));
     const accepted = reasons.length === 0;
@@ -639,7 +667,12 @@ function buildFinalBuyGate(input: {
   return { candidates: picked, rows };
 }
 
-function getAllowedBuyCount(team: AiMarketPlanTeamEntry, rosterBase: number | null, maxBuysPerTeam: number | null) {
+function getAllowedBuyCount(
+  team: AiMarketPlanTeamEntry,
+  rosterBase: number | null,
+  maxBuysPerTeam: number | null,
+  opts?: { postOptUpgradeDeploy?: boolean; minUpgradeBuyPrice?: number | null },
+) {
   const optionLimit = maxBuysPerTeam ?? Number.POSITIVE_INFINITY;
   const currentRoster = rosterBase ?? team.currentState.rosterCount ?? null;
   const playerMin = team.currentState.playerMin ?? 0;
@@ -658,8 +691,22 @@ function getAllowedBuyCount(team: AiMarketPlanTeamEntry, rosterBase: number | nu
     return Math.min(Math.max(plannedExpiryNeed, 1), optionLimit);
   }
 
+  if (currentRoster >= playerOpt && !opts?.postOptUpgradeDeploy) {
+    return 0;
+  }
+
   const hasAggressiveOpportunity = team.buyPlan.candidates.length > 0 && getTopBuyCandidateScore(team) >= 65;
   const plannedSellCount = team.sellPlan.candidates.length;
+  if (opts?.postOptUpgradeDeploy) {
+    const minPrice = opts.minUpgradeBuyPrice ?? 0;
+    const upgradeCandidate = team.buyPlan.candidates.find((candidate) => {
+      const price = candidate.price ?? candidate.marketValue ?? 0;
+      return price + 0.01 >= minPrice;
+    });
+    if (upgradeCandidate && (plannedSellCount >= 1 || hasAggressiveOpportunity)) {
+      return Math.min(1, optionLimit);
+    }
+  }
   if (plannedSellCount >= 2 && getTopBuyCandidateScore(team) >= 58) {
     return Math.min(2, optionLimit);
   }
@@ -672,11 +719,11 @@ function getAllowedBuyCount(team: AiMarketPlanTeamEntry, rosterBase: number | nu
 function hasValueSellOpportunity(
   gameState: GameState,
   team: GameState["teams"][number],
-  playerMin: number,
+  _playerMin: number,
   playersById = new Map(gameState.players.map((player) => [player.id, player] as const)),
 ) {
   const roster = gameState.rosters.filter((entry) => entry.teamId === team.teamId);
-  if (roster.length - 1 < playerMin) {
+  if (roster.length === 0) {
     return false;
   }
 
@@ -808,6 +855,7 @@ function buildResolvedBuyCandidateMap(
   maxBuysPerTeam: number | null,
   playersById = new Map(gameState.players.map((player) => [player.id, player] as const)),
   convergenceIncrementalFill = false,
+  buyGateOpts?: { postOptUpgradeDeploy?: boolean; minUpgradeBuyPrice?: number | null },
 ) {
   const resolved = new Map<string, AiMarketPlanBuyPlan["candidates"]>();
   const gateRows: Array<Record<string, unknown>> = [];
@@ -829,7 +877,12 @@ function buildResolvedBuyCandidateMap(
   });
 
   for (const team of teamPriority) {
-    const allowedBuyCount = getAllowedBuyCount(team, team.sellPlan.rosterAfterSell ?? team.currentState.rosterCount, maxBuysPerTeam);
+    const allowedBuyCount = getAllowedBuyCount(
+      team,
+      team.sellPlan.rosterAfterSell ?? team.currentState.rosterCount,
+      maxBuysPerTeam,
+      buyGateOpts,
+    );
     if (allowedBuyCount <= 0) {
       resolved.set(team.teamId, []);
       continue;
@@ -844,6 +897,7 @@ function buildResolvedBuyCandidateMap(
       claimedPlayerIds,
       playersById,
       convergenceIncrementalFill,
+      minUpgradeBuyPrice: buyGateOpts?.minUpgradeBuyPrice ?? null,
     });
     gateRows.push(...gate.rows);
     resolved.set(team.teamId, gate.candidates);
@@ -885,12 +939,18 @@ function buildEffectiveBuyPlan(
   buyCandidateOverride?: AiMarketPlanBuyPlan["candidates"],
   applyBuyStepsInBatch?: number | null,
   excludeBuyPlayerIds?: string[],
+  buyGateOpts?: { postOptUpgradeDeploy?: boolean; minUpgradeBuyPrice?: number | null },
 ): AiMarketPlanBuyPlan {
-  const allowedBuyCount = getAllowedBuyCount(team, rosterBase, maxBuysPerTeam);
+  const allowedBuyCount = getAllowedBuyCount(team, rosterBase, maxBuysPerTeam, buyGateOpts);
   const batchCap = applyBuyStepsInBatch != null ? Math.min(allowedBuyCount, applyBuyStepsInBatch) : allowedBuyCount;
   const excludeSet = new Set(excludeBuyPlayerIds ?? []);
+  const minUpgradeBuyPrice = buyGateOpts?.minUpgradeBuyPrice ?? null;
   const sourceCandidates = (buyCandidateOverride ?? team.buyPlan.candidates).filter(
-    (candidate) => !excludeSet.has(candidate.playerId),
+    (candidate) =>
+      !excludeSet.has(candidate.playerId) &&
+      (minUpgradeBuyPrice == null ||
+        minUpgradeBuyPrice <= 0 ||
+        (candidate.price ?? candidate.marketValue ?? 0) + 0.01 >= minUpgradeBuyPrice),
   );
   const candidates = applyBuySteps
     ? limitItems(sourceCandidates, batchCap > 0 ? batchCap : allowedBuyCount)
@@ -1068,9 +1128,9 @@ export async function applyAiMarketPlanLocally(input: AiMarketPlanApplyParams): 
     options.applyBuySteps && !marketBuysAllowed ? ["season_market_buy_forbidden"] : [];
   const includeWarningTeams = options.includeWarningTeams;
   const phaseAudit: AiMarketPhaseAudit[] = [];
-  const persistence = createPersistenceService();
+  const persistence = input.persistence ?? createPersistenceService();
   const preflightStartedAt = Date.now();
-  const preflightSave = resolveLocalSave(persistence, input.saveId);
+  const preflightSave = input.localRunContext?.save ?? resolveLocalSave(persistence, input.saveId);
   const preflightGameState = preflightSave.gameState;
   const preflightPlayersById = new Map(preflightGameState.players.map((player) => [player.id, player] as const));
   const preflightIdentityByTeamId = new Map(preflightGameState.teamIdentities.map((entry) => [entry.teamId, entry] as const));
@@ -1091,6 +1151,7 @@ export async function applyAiMarketPlanLocally(input: AiMarketPlanApplyParams): 
       const { playerMin, playerOpt } = deriveRosterTargets(team, identity);
       const expiringCount = preflightGameState.rosters.filter((entry) => entry.teamId === team.teamId && (entry.contractLength ?? 99) <= 1).length;
       const rosterAfterExpiry = Math.max(0, rosterCount - expiringCount);
+      if (teamNeedsPostOptUpgradeDeploy(preflightGameState, team.teamId, input.seasonId)) return true;
       return rosterCount < playerOpt || rosterAfterExpiry < playerOpt || rosterAfterExpiry < playerMin;
     })
     .map((team) => team.teamId);
@@ -1111,7 +1172,7 @@ export async function applyAiMarketPlanLocally(input: AiMarketPlanApplyParams): 
         typeof team.cash === "number" && Number.isFinite(team.cash) && team.cash < Math.max(10, salaryTotal * 0.2);
       const expiryNeedsDecision =
         expiringCount > 0 &&
-        rosterCount > playerMin &&
+        rosterCount > 0 &&
         (expiryCreatesOptRisk || salaryPressure > 0.6 || boardPressure >= 6 || lowCashBuffer);
       const sellRunway = assessTeamSellRunwayPressure({
         gameState: preflightGameState,
@@ -1125,8 +1186,31 @@ export async function applyAiMarketPlanLocally(input: AiMarketPlanApplyParams): 
         salaryPressure > 0.75 ||
         boardPressure >= 6 ||
         sellRunway.cashPressureScore >= 0.45 ||
-        hasValueSellOpportunity(preflightGameState, team, playerMin, preflightPlayersById)
+        hasValueSellOpportunity(preflightGameState, team, playerMin, preflightPlayersById) ||
+        hasUpgradeSellOpportunity(preflightGameState, team.teamId, input.seasonId, playerMin)
       );
+    })
+    .map((team) => team.teamId);
+  const preflightMaintenanceTeamIds = preflightGameState.teams
+    .filter((team) => aiTeamIds.has(team.teamId))
+    .filter((team) => {
+      const identity = preflightIdentityByTeamId.get(team.teamId) ?? null;
+      const rosterEntries = preflightGameState.rosters.filter((entry) => entry.teamId === team.teamId);
+      const expiringCount = rosterEntries.filter((entry) => (entry.contractLength ?? 99) <= 1).length;
+      const salaryTotal = rosterEntries.reduce((sum, entry) => sum + (entry.salary ?? entry.upkeep ?? 0), 0);
+      const salaryPressure = team.cash > 0 ? salaryTotal / Math.max(team.cash, 1) : salaryTotal > 0 ? 99 : 0;
+      const budgetStatus = getBudgetStatus(team, {
+        salaryTotal,
+        identityFinances: identity?.finances ?? null,
+        marketSpendableCash: resolveMarketSpendableCashForPlanner({
+          gameState: preflightGameState,
+          teamId: team.teamId,
+          teamCash: team.cash,
+          rosterBelowMin: false,
+          forceRosterFill: false,
+        }),
+      });
+      return expiringCount > 0 || salaryPressure > 0.5 || budgetStatus !== "healthy";
     })
     .map((team) => team.teamId);
   phaseAudit.push(
@@ -1142,8 +1226,8 @@ export async function applyAiMarketPlanLocally(input: AiMarketPlanApplyParams): 
   // Apply audits the full team set so manual/passive teams stay visible as skipped instead of disappearing.
   const teamScope = "all" as const;
   const season2PlusNeedGate = !/^season-?1$/i.test(input.seasonId);
-  const buyLimit = options.applyBuySteps && (!season2PlusNeedGate || preflightBuyNeedTeamIds.length > 0) ? options.previewBuyLimit : 0;
-  const sellLimit = options.applySellSteps && (!season2PlusNeedGate || preflightSellNeedTeamIds.length > 0) ? options.previewSellLimit : 0;
+  const buyLimit = options.applyBuySteps && (!season2PlusNeedGate || preflightBuyNeedTeamIds.length > 0 || preflightMaintenanceTeamIds.length > 0) ? options.previewBuyLimit : 0;
+  const sellLimit = options.applySellSteps && (!season2PlusNeedGate || preflightSellNeedTeamIds.length > 0 || preflightMaintenanceTeamIds.length > 0) ? options.previewSellLimit : 0;
   if (season2PlusNeedGate && buyLimit === 0 && sellLimit === 0) {
     const results = preflightGameState.teams.map((team) => buildPreflightTeamResult(preflightGameState, team));
     const summary: AiMarketPlanApplySummary = {
@@ -1227,9 +1311,21 @@ export async function applyAiMarketPlanLocally(input: AiMarketPlanApplyParams): 
       ...preflightBuyNeedTeamIds,
     ]),
   };
+  recordPhase("preflight", Date.now() - totalStartedAt);
   const scanStartedAt = Date.now();
-  const preview = await buildAiMarketPlanPreview(previewParams);
-  const baselineGameState = dryRun ? preflightGameState : structuredClone(resolveLocalSave(persistence, preview.scope.saveId).gameState);
+  const preview = await buildAiMarketPlanPreview({
+    ...previewParams,
+    localRunContext: input.localRunContext ?? undefined,
+    gameState: preflightGameState,
+  });
+  recordPhase("marketPlanPreview", Date.now() - scanStartedAt);
+  const baselineCloneStartedAt = Date.now();
+  const baselineGameState = dryRun
+    ? preflightGameState
+    : options.transferWindowCycleMode && input.localRunContext
+      ? input.localRunContext.save.gameState
+      : structuredClone(resolveLocalSave(persistence, preview.scope.saveId).gameState);
+  recordPhase("baselineClone", Date.now() - baselineCloneStartedAt);
   const baselinePlayersById = dryRun
     ? preflightPlayersById
     : new Map(baselineGameState.players.map((player) => [player.id, player] as const));
@@ -1237,6 +1333,19 @@ export async function applyAiMarketPlanLocally(input: AiMarketPlanApplyParams): 
   const buyNeedTeams = preview.teams.filter((team) => getRosterNeedGap(team) > 0 || team.buyPlan.candidates.length > 0);
   const buyCandidateCount = preview.teams.reduce((sum, team) => sum + team.buyPlan.candidates.length, 0);
   const scanElapsed = Date.now() - scanStartedAt;
+  const renewalScanStartedAt = Date.now();
+  // The renewal scan is informational only (renewals apply in the season-end contract tick, not here).
+  // Inside a transfer-window cycle this previewSeasonEndContracts() pass is recomputed on every team
+  // cycle and dominates runtime, so skip it in cycle mode and emit a lightweight skipped audit.
+  const renewalScanPhaseAudit = options.transferWindowCycleMode && process.env.OLY_TW_DISABLE_RENEWAL_SKIP !== "1"
+    ? buildPhaseAudit({
+        phaseId: "ai_renewal_scan",
+        status: "skipped",
+        startedAt: scanStartedAt,
+        warnings: ["renewals_apply_in_contract_tick"],
+      })
+    : buildAiRenewalScanPhaseAudit({ save: preflightSave, startedAt: scanStartedAt, teamId: previewTeamId });
+  recordPhase("renewalScan", Date.now() - renewalScanStartedAt);
   phaseAudit.push(
     buildPhaseAudit({
       phaseId: "ai_sell_scan",
@@ -1246,7 +1355,7 @@ export async function applyAiMarketPlanLocally(input: AiMarketPlanApplyParams): 
       candidatesScanned: sellCandidateCount,
       scanLimit: previewParams.sellLimit ?? null,
     }),
-    buildAiRenewalScanPhaseAudit({ save: preflightSave, startedAt: scanStartedAt, teamId: previewTeamId }),
+    renewalScanPhaseAudit,
     buildPhaseAudit({
       phaseId: "ai_buy_need_scan",
       status: options.applyBuySteps ? "ready" : "skipped",
@@ -1264,6 +1373,7 @@ export async function applyAiMarketPlanLocally(input: AiMarketPlanApplyParams): 
       warnings: scanElapsed > options.performanceBudgetMs ? ["ai_market_candidate_scan_over_budget"] : [],
     }),
   );
+  const buyGateStartedAt = Date.now();
   const finalBuyGate = buildResolvedBuyCandidateMap(
     baselineGameState,
     preview.teams,
@@ -1271,7 +1381,12 @@ export async function applyAiMarketPlanLocally(input: AiMarketPlanApplyParams): 
     options.maxBuysPerTeam,
     baselinePlayersById,
     options.convergenceIncrementalFill,
+    {
+      postOptUpgradeDeploy: options.postOptUpgradeDeploy,
+      minUpgradeBuyPrice: options.minUpgradeBuyPrice,
+    },
   );
+  recordPhase("buildResolvedBuyCandidateMap", Date.now() - buyGateStartedAt);
   const resolvedBuyCandidateMap = finalBuyGate.resolved;
   const results: AiMarketPlanApplyTeamResult[] = [];
   const plannedWrites: AiMarketPlanApplyResult["plannedWrites"] = [];
@@ -1281,10 +1396,11 @@ export async function applyAiMarketPlanLocally(input: AiMarketPlanApplyParams): 
   const applyStartedAt = Date.now();
   const transferRunContext = dryRun
     ? null
-    : createLocalTransfermarktRunContext({
+    : (input.localRunContext ??
+      createLocalTransfermarktRunContext({
         persistence,
         save: resolveLocalSave(persistence, preview.scope.saveId),
-      });
+      }));
 
   for (const [teamIndex, team] of preview.teams.entries()) {
     const nextResult = buildBaseTeamResult(team);
@@ -1323,6 +1439,10 @@ export async function applyAiMarketPlanLocally(input: AiMarketPlanApplyParams): 
       resolvedBuyCandidateMap.get(team.teamId),
       options.applyBuyStepsInBatch,
       options.excludeBuyPlayerIds,
+      {
+        postOptUpgradeDeploy: options.postOptUpgradeDeploy,
+        minUpgradeBuyPrice: options.minUpgradeBuyPrice,
+      },
     );
     const effectiveProjectedState = buildEffectiveProjectedState(team.currentState, effectiveSellPlan, effectiveBuyPlan);
     nextResult.plannedSellDetails = buildPlannedSellDetails(effectiveSellPlan.candidates);
@@ -1607,7 +1727,9 @@ export async function applyAiMarketPlanLocally(input: AiMarketPlanApplyParams): 
         gameState: snapshot,
       };
     };
+    const beforeTeamRunCloneStartedAt = Date.now();
     const beforeTeamRun = structuredClone((transferRunContext?.save.gameState ?? resolveLocalSave(persistence, preview.scope.saveId).gameState));
+    recordPhase("beforeTeamRunClone", Date.now() - beforeTeamRunCloneStartedAt);
     let teamFailed = false;
 
     for (const candidate of effectiveSellPlan.candidates) {
@@ -1968,9 +2090,12 @@ export async function applyAiMarketPlanLocally(input: AiMarketPlanApplyParams): 
     results.push(nextResult);
   }
 
+  recordPhase("applyLoop", Date.now() - applyStartedAt);
+  const flushStartedAt = Date.now();
   if (transferRunContext && transferRunContext.deferredWrites > 0 && !abortedAfterFailure) {
     flushLocalTransfermarktRunContext(transferRunContext);
   }
+  recordPhase("flush", Date.now() - flushStartedAt);
 
   if (abortedAfterFailure) {
     const remainingTeams = preview.teams.filter((team) => !results.some((entry) => entry.teamId === team.teamId));
@@ -2083,6 +2208,7 @@ export async function applyAiMarketPlanLocally(input: AiMarketPlanApplyParams): 
   if (auditLogId) {
     appliedAudits.push(auditLogId);
   }
+  recordPhase("applyTotal", Date.now() - totalStartedAt);
 
   return {
     source: "sqlite",

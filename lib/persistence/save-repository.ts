@@ -28,7 +28,14 @@ import { withNormalizedTeamGeneralManagers } from "@/lib/foundation/team-general
 import { buildScenarioMeta, withScenarioMeta } from "@/lib/persistence/scenario-meta";
 import { resolveFoundationSaveMode } from "@/lib/persistence/foundation-save-mode";
 import { buildSaveContentSignature } from "@/lib/persistence/save-content-signature";
+import { invalidateSeasonDerivationsCache } from "@/lib/foundation/season-derivations-cache";
+import {
+  deleteSeasonDerivationsSidecar,
+  writeSeasonDerivationsSidecar,
+} from "@/lib/persistence/season-derivations-sidecar";
+import type { PersistedSeasonDerivationsRecord } from "@/lib/foundation/materialize-season-derivations";
 import { invalidateStandingsOverviewCache } from "@/lib/season/standings-overview-cache";
+import { invalidateLegacyLineupLabContextCache } from "@/lib/lineups/legacy-lineup-lab-context-cache";
 import { invalidateStandingsPreviewCache } from "@/lib/standings/standings-preview-cache";
 import { invalidateArenaPreviewCache } from "@/lib/foundation/arena-preview-cache";
 import {
@@ -957,6 +964,55 @@ function materializePersistedSave(row: SaveRow): PersistedSaveGame | null {
   };
 }
 
+/** Load teams/players/rosters + season head without baselines, potential, or session cache. */
+export function readSliceGameStateForSave(saveId: string): GameState | null {
+  const season = loadSingleton<Season>("seasons", saveId);
+  const seasonState = loadSingleton<SeasonState>("season_states", saveId);
+  const matchdayState = loadSingleton<MatchdayState>("matchday_states", saveId);
+  const mappingReport = loadSingleton<MappingReport>("mapping_reports", saveId);
+  const gameMetadata = loadSingleton<GameMetadata>("game_metadata", saveId);
+
+  if (!season || !seasonState || !matchdayState || !mappingReport) {
+    return null;
+  }
+
+  const gamePhase = inferCompletedGamePhase({ metadata: gameMetadata, season, seasonState, matchdayState });
+  const hydrated = hydrateGameStateMedia({
+    ...(gamePhase ? { gamePhase } : {}),
+    ...(gameMetadata?.scenarioMeta ? { scenarioMeta: gameMetadata.scenarioMeta } : {}),
+    ...(Number.isFinite(gameMetadata?.saveVersion) ? { saveVersion: gameMetadata?.saveVersion } : {}),
+    season,
+    seasonState,
+    matchdayState,
+    teams: loadCollection<Team>("teams", "team_id", saveId),
+    teamIdentities: loadCollection<TeamIdentity>("team_identities", "team_id", saveId),
+    players: loadPlayersForSave(saveId),
+    disciplines: loadCollection<Discipline>("disciplines", "discipline_id", saveId),
+    rosters: loadCollection<RosterEntry>("rosters", "roster_id", saveId),
+    contracts: [],
+    transferListings: [],
+    transferHistory: loadCollection<TransferHistoryEntry>("transfer_history", "history_id", saveId),
+    logs: [],
+    mappingReport,
+  });
+
+  return normalizeLegacyRosterTargets(
+    normalizeLegacyFinanceScale(withNormalizedTeamGeneralManagers(withNormalizedTeamIdentityOverrides(hydrated))),
+  );
+}
+
+function persistSeasonDerivationsSidecarFromGameState(saveId: string, gameState: GameState) {
+  const record = gameState.seasonState.persistedSeasonDerivations as
+    | PersistedSeasonDerivationsRecord
+    | null
+    | undefined;
+  if (record && record.seasonId === gameState.season.id) {
+    writeSeasonDerivationsSidecar(saveId, record);
+    return;
+  }
+  deleteSeasonDerivationsSidecar(saveId);
+}
+
 function materializePersistedSaveCached(row: SaveRow): PersistedSaveGame | null {
   const contentSignature = buildSaveSessionCacheSignature(row);
   const cached = readSaveSessionCache(row.save_id, row.updated_at, contentSignature);
@@ -1118,6 +1174,8 @@ function createPersistedSaveRecord(input: {
 
   transaction();
   invalidateStandingsOverviewCache(input.saveId);
+  invalidateSeasonDerivationsCache(input.saveId);
+  invalidateLegacyLineupLabContextCache(input.saveId);
   invalidateStandingsPreviewCache(input.saveId);
   invalidateArenaPreviewCache(input.saveId);
 
@@ -1138,6 +1196,7 @@ function createPersistedSaveRecord(input: {
   };
 
   writeSaveSessionCache(persistedSave, versionMetadata.contentSignature);
+  persistSeasonDerivationsSidecarFromGameState(input.saveId, guardedGameState);
 
   return persistedSave;
 }

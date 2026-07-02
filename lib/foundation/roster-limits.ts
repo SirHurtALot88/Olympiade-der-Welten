@@ -2,7 +2,9 @@ import type { Team, TeamIdentity } from "@/lib/data/olyDataTypes";
 
 export const DEFAULT_ROSTER_MAX = 14;
 /** Fixes Kader-Minimum für jedes Team (unabhängig von Sheet-/Identity-Daten). */
-export const FIXED_ROSTER_MIN = 8;
+export const FIXED_ROSTER_MIN = 7;
+/** Hartes Gameplay-Minimum bleibt 7, auch wenn Identity-Sheets höher planen. */
+export const GAMEPLAY_HARD_ROSTER_MIN = FIXED_ROSTER_MIN;
 export const DEFAULT_ROSTER_MIN_FLOOR = FIXED_ROSTER_MIN;
 
 export type TeamRosterLimitInput = Pick<Team, "rosterLimit"> | null | undefined;

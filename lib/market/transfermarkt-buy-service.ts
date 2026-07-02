@@ -3,6 +3,7 @@ import { randomUUID } from "node:crypto";
 
 import { buildActivePlayerId } from "@/lib/db/seed/mappers";
 import { db } from "@/src/server/db";
+import { resolveSeasonOneMarketBuyBlocker } from "@/lib/season/transfer-season-policy";
 import type { ContractShape, ContractYearSalary, RosterPromisedRole } from "@/lib/data/olyDataTypes";
 import type {
   NegotiationDemandBreakdownEntry,
@@ -243,6 +244,10 @@ async function resolveBuyContext(
   }
   if (contractLength !== 1) {
     warnings.push("contract_length_override_in_effect");
+  }
+  const seasonOneMarketBlocker = resolveSeasonOneMarketBuyBlocker(params.seasonId, params.transferSource);
+  if (seasonOneMarketBlocker) {
+    blockingReasons.push(seasonOneMarketBlocker);
   }
 
   const canBuy = blockingReasons.length === 0;

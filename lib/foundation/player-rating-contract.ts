@@ -307,12 +307,14 @@ function buildRetoolMvsByPlayerId(input: {
 
 export function buildPlayerRatingContractRows(input: {
   players: Player[];
+  mvsPlayers?: Player[] | null;
   seasonPointsLedger?: SeasonPointsLedger | null;
   mvsPerformances?: PlayerDisciplinePerformanceRecord[] | null;
   normalizationPoolPlayerIds?: string[] | null;
   rankPoolPlayerIds?: string[] | null;
 }) {
   const players = input.players;
+  const mvsPlayers = input.mvsPlayers ?? players;
   const seasonPointsLedger = input.seasonPointsLedger ?? null;
   const normalizationPoolPlayerIds = input.normalizationPoolPlayerIds ?? null;
   const normalizationPoolIdSet =
@@ -342,7 +344,7 @@ export function buildPlayerRatingContractRows(input: {
   const mvsByPlayerId =
     performanceRows != null
       ? buildRetoolMvsByPlayerId({
-          players,
+          players: mvsPlayers,
           seasonPointsLedger,
           mvsPerformances: performanceRows,
         })
@@ -539,12 +541,23 @@ export function buildPlayerRatingContractRows(input: {
   }));
 }
 
-export function buildPlayerRatingContractMap(gameState: GameState, seasonPointsLedger?: SeasonPointsLedger) {
+export function buildPlayerRatingContractMap(
+  gameState: GameState,
+  seasonPointsLedger?: SeasonPointsLedger,
+  options?: { playerIds?: string[] | null },
+) {
   const pointsLedger = seasonPointsLedger ?? buildSeasonPointsLedger(gameState);
   const activePlayerIds = Array.from(new Set((gameState.rosters ?? []).map((entry) => entry.playerId).filter(Boolean)));
+  const outputPlayerIdSet =
+    options?.playerIds != null ? new Set(options.playerIds.filter(Boolean)) : null;
+  const rowPlayers = outputPlayerIdSet
+    ? gameState.players.filter((player) => outputPlayerIdSet.has(player.id))
+    : gameState.players;
+
   return new Map(
     buildPlayerRatingContractRows({
-      players: gameState.players,
+      players: rowPlayers,
+      mvsPlayers: gameState.players,
       seasonPointsLedger: pointsLedger,
       mvsPerformances: gameState.seasonState.playerDisciplinePerformances ?? [],
       normalizationPoolPlayerIds: activePlayerIds,

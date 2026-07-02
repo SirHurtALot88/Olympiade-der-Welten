@@ -60,6 +60,8 @@ export type FoundationPlayerPortraitCardProps = {
   selected?: boolean;
   style?: CSSProperties;
   testId?: string;
+  portraitLoading?: "eager" | "lazy";
+  portraitFetchPriority?: "high" | "low" | "auto";
 };
 
 function renderOverlayStat(stat: PortraitOverlayStat) {
@@ -112,6 +114,8 @@ export default function FoundationPlayerPortraitCard({
   selected = false,
   style,
   testId,
+  portraitLoading = "lazy",
+  portraitFetchPriority = "auto",
 }: FoundationPlayerPortraitCardProps) {
   const resolvedHeatPools = leagueHeatPools ?? createEmptyLeaguePlayerHeatPools();
   const showCaPo = variant === "home" && context === "roster" && (caRating != null || poRangeMin != null || poRangeMax != null);
@@ -166,7 +170,15 @@ export default function FoundationPlayerPortraitCard({
   const cardBody = (
     <div className="home-v2-player-hero foundation-player-portrait-hero">
       {portraitUrl ? (
-        <OptimizedMediaImage className="home-v2-player-portrait" src={portraitUrl} alt={name} width={280} height={373} />
+        <OptimizedMediaImage
+          className="home-v2-player-portrait"
+          src={portraitUrl}
+          alt={name}
+          width={280}
+          height={373}
+          loading={portraitLoading}
+          fetchPriority={portraitFetchPriority}
+        />
       ) : (
         <span className="home-v2-player-portrait is-placeholder">{portraitInitials}</span>
       )}

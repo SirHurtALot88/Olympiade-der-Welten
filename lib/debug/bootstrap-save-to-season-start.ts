@@ -6,6 +6,10 @@ import {
   runLocalMatchdayAutoRun,
   MATCHDAY_AUTO_RUN_CONFIRM_TOKEN,
 } from "@/lib/season/matchday-auto-run-service";
+import {
+  MATCHDAY_MVP_SCORING_CONFIRM_TOKEN,
+  runMatchdayMvpScoring,
+} from "@/lib/season/matchday-mvp-scoring-service";
 import { ADVANCE_MATCHDAY_CONFIRM_TOKEN, executeMatchdayAdvance } from "@/lib/season/matchday-progress-service";
 import {
   applyPreSeasonNextSeasonSetupLightweight,
@@ -58,7 +62,7 @@ function setAllTeamsAi(save: PersistedSaveGame, persistence: PersistenceService)
         displayLabel: `AI · ${team.shortCode}`,
         aiLineupPreviewEnabled: true,
         aiLineupApplyEnabled: true,
-        aiLineupAutoApplyEnabled: false,
+        aiLineupAutoApplyEnabled: true,
         aiTransferPreviewEnabled: true,
         aiTransferAutoApplyEnabled: true,
         aiSellPreviewEnabled: true,
@@ -97,6 +101,30 @@ function hasMatchdayResult(save: PersistedSaveGame, seasonId: string, matchdayId
   );
 }
 
+function healAllPlayersForBootstrap(save: PersistedSaveGame, persistence: PersistenceService) {
+  const gameState = {
+    ...save.gameState,
+    players: save.gameState.players.map((player) => ({
+      ...player,
+      fatigue: 0,
+    })),
+    seasonState: {
+      ...save.gameState.seasonState,
+      playerAvailabilityState: (save.gameState.seasonState.playerAvailabilityState ?? []).map((entry) => ({
+        ...entry,
+        fatigue: 0,
+        injuryStatus: "healthy" as const,
+        injuryUntilMatchday: undefined,
+        injuredAtSeasonId: undefined,
+        injuredAtMatchdayId: undefined,
+        injuryReason: undefined,
+        injuryRiskLastRoll: undefined,
+      })),
+    },
+  };
+  return persistence.saveSingleplayerState(save.saveId, gameState);
+}
+
 async function runRemainingMatchdaysForSeason(
   saveId: string,
   seasonId: string,
@@ -108,13 +136,15 @@ async function runRemainingMatchdaysForSeason(
   const maxIterations = 16;
 
   for (let iteration = 0; iteration < maxIterations; iteration += 1) {
-    const save = persistence.getSaveById(saveId);
+    let save = persistence.getSaveById(saveId);
     if (!save) throw new Error(`Save ${saveId} missing during matchday loop.`);
 
     if (save.gameState.season.id !== seasonId) break;
     if (isSeasonComplete(save.gameState)) break;
 
     const matchdayId = save.gameState.matchdayState.matchdayId;
+    save = healAllPlayersForBootstrap(save, persistence);
+
     if (hasMatchdayResult(save, seasonId, matchdayId)) {
       const advance = await executeMatchdayAdvance(
         { saveId, seasonId, source: "sqlite", execute: true, confirm: ADVANCE_MATCHDAY_CONFIRM_TOKEN },
@@ -128,6 +158,7 @@ async function runRemainingMatchdaysForSeason(
     }
 
     log(progressLog, `resolve ${seasonId} ${matchdayId}`);
+    let matchdayResolved = false;
     const autoRun = await runLocalMatchdayAutoRun(
       {
         saveId,
@@ -146,8 +177,38 @@ async function runRemainingMatchdaysForSeason(
       },
       persistence,
     );
-    if (!autoRun.ok) {
+    if (autoRun.ok) {
+      matchdayResolved = true;
+    } else if (autoRun.blockingReasons.some((reason) => reason.includes("incomplete_lineups"))) {
+      log(progressLog, `auto-run incomplete lineups on ${matchdayId}, retry via MVP scoring`);
+      const mvpRun = await runMatchdayMvpScoring(
+        {
+          saveId,
+          seasonId,
+          matchdayId,
+          source: "sqlite",
+          execute: true,
+          dryRun: false,
+          confirmToken: MATCHDAY_MVP_SCORING_CONFIRM_TOKEN,
+          forceReplace: true,
+        },
+        persistence,
+      );
+      if (mvpRun.blockingReasons.length === 0 && mvpRun.resultApply.applied && mvpRun.standingsApply.applied) {
+        matchdayResolved = true;
+      } else {
+        blockers.push(
+          `mvp_fallback:${seasonId}:${matchdayId}:${mvpRun.blockingReasons.join("|") || "result_or_standings_not_applied"}`,
+        );
+        break;
+      }
+    } else {
       blockers.push(`auto_run:${seasonId}:${matchdayId}:${autoRun.blockingReasons.join("|")}`);
+      break;
+    }
+
+    if (!matchdayResolved) {
+      blockers.push(`matchday_unresolved:${seasonId}:${matchdayId}`);
       break;
     }
 

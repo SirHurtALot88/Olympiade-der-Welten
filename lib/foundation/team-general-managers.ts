@@ -504,6 +504,12 @@ function slug(value: string) {
   return value.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "");
 }
 
+function resolveGmInfluencePct(identity: TeamIdentity | null | undefined, isReplacement: boolean) {
+  const boardConfidence = identity?.boardConfidence ?? 5;
+  const base = Math.max(20, Math.min(50, Math.round(20 + boardConfidence * 3)));
+  return isReplacement ? Math.min(50, base + 3) : base;
+}
+
 function blend(base: number, target: number, influencePct = GM_INFLUENCE_PCT) {
   const weight = influencePct / 100;
   return clamp(base * (1 - weight) + target * weight, 0, 20);
@@ -873,8 +879,8 @@ export function buildTeamGeneralManagerAssignments(
     assignments[team.teamId] = {
       teamId: team.teamId,
       gmId: currentProfile.gmId,
-      assignedSeasonId: current.assignedSeasonId ?? seasonId,
-      influencePct: current.influencePct ?? GM_INFLUENCE_PCT,
+      assignedSeasonId: seasonId,
+      influencePct: current.influencePct ?? resolveGmInfluencePct(identity, false),
       source: current.source ?? (team.humanControlled ? "human_slot" : "auto_generated"),
     };
   });
@@ -921,7 +927,7 @@ export function buildTeamGeneralManagerAssignments(
       teamId: team.teamId,
       gmId: profile.gmId,
       assignedSeasonId: seasonId,
-      influencePct: existing?.[team.teamId]?.influencePct ?? GM_INFLUENCE_PCT,
+      influencePct: resolveGmInfluencePct(identity, isFired),
       source: isFired && currentProfile ? "board_replacement" : (existing?.[team.teamId]?.source ?? picked.source),
       previousGmId: isFired && currentProfile ? currentProfile.gmId : undefined,
       dismissalReason: boardReplacementReason ?? undefined,

@@ -1340,7 +1340,7 @@ export default function MatchdayArenaV2Client(props: MatchdayArenaV2ClientProps)
       return {
         teamId,
         teamName: d1?.teamName ?? d2?.teamName ?? team?.name ?? teamId,
-        teamLogoUrl: team ? getTeamLogoBrowserUrl(team.teamId, team.logoPath ?? null) : null,
+        teamLogoUrl: team ? getTeamLogoBrowserUrl(team.teamId, team.logoPath ?? null, { variant: "thumb" }) : null,
         rank: 0,
         medal: null,
         d1Points,
@@ -1395,13 +1395,11 @@ export default function MatchdayArenaV2Client(props: MatchdayArenaV2ClientProps)
 
   function resolveArenaPortrait(playerId: string, fallbackPortraitUrl?: string | null) {
     const foundationPlayer = foundationPlayerById.get(playerId) ?? null;
-    return (
-      fallbackPortraitUrl ??
-      getPlayerPortraitBrowserUrl(
-        playerId,
-        foundationPlayer?.portraitUrl ?? null,
-        foundationPlayer?.portraitPath ?? null,
-      )
+    return getPlayerPortraitBrowserUrl(
+      playerId,
+      fallbackPortraitUrl ?? foundationPlayer?.portraitUrl ?? null,
+      foundationPlayer?.portraitPath ?? null,
+      { variant: "thumb" },
     );
   }
 
@@ -1444,7 +1442,7 @@ export default function MatchdayArenaV2Client(props: MatchdayArenaV2ClientProps)
   const focusTeamName = focusWinnerRow?.teamName ?? focusTeamDetail?.teamName ?? focusTeam?.name ?? "Top Player";
   const focusTeamLogoUrl =
     focusWinnerRow?.teamLogoUrl ??
-    (focusTeam ? getTeamLogoBrowserUrl(focusTeam.teamId, focusTeam.logoPath ?? null) : null);
+    (focusTeam ? getTeamLogoBrowserUrl(focusTeam.teamId, focusTeam.logoPath ?? null, { variant: "thumb" }) : null);
 
   const topPlayersBySide = useMemo(() => {
     const buildTopPlayers = (topPlayers: MatchdayMvpTopPlayerRow[], scoreboard: MatchdayArenaScoreboardRowView[]) =>
@@ -1911,7 +1909,7 @@ export default function MatchdayArenaV2Client(props: MatchdayArenaV2ClientProps)
         return {
           teamId: row.teamId,
           teamName: row.teamName,
-          teamLogoUrl: getTeamLogoBrowserUrl(row.teamId, props.teams.find((team) => team.teamId === row.teamId)?.logoPath ?? null),
+          teamLogoUrl: getTeamLogoBrowserUrl(row.teamId, props.teams.find((team) => team.teamId === row.teamId)?.logoPath ?? null, { variant: "thumb" }),
           rank: arenaTeamRankMaps.currentRankByTeamId.get(row.teamId) ?? index + 1,
           stepRankDelta: arenaTeamRankMaps.stepRankDeltaByTeamId.get(row.teamId) ?? null,
           score:

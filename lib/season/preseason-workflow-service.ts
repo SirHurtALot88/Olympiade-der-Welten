@@ -7,9 +7,10 @@ import { previewFacilitySeasonEndFinance } from "@/lib/facilities/facility-seaso
 import { createPersistenceService } from "@/lib/persistence/persistence-service";
 import type { PersistedSaveGame, PersistenceService } from "@/lib/persistence/types";
 import { normalizePlayerBaselineRecord } from "@/lib/players/player-baseline-service";
-import { applyAiSeasonEndXpSpend, previewAiSeasonEndXpSpend } from "@/lib/progression/ai-xp-spend-planner";
-import { applySeasonEndXpSpend, buildEconomyPreviewContext, buildPreComputedSeasonXpMap, previewSeasonEndXpSpend } from "@/lib/progression/season-end-xp-apply-service";
-import { applyRankTableMarketValuesToGameState, patchSeasonProgressionEventMarketValues } from "@/lib/player-formulas/market-value-apply";
+import {
+  runSeasonEndProgressionBatch,
+  type SeasonEndProgressionBatchResult,
+} from "@/lib/progression/season-end-progression-batch";
 import { buildSeasonSeededDisciplineSchedule } from "@/lib/season/season-discipline-schedule";
 import { buildPlayerProgressionForecast } from "@/lib/training/player-progression-forecast";
 import { buildCoreStatsFromDisciplineRatings, buildPreviewDisciplineRatingsFromAttributes } from "@/lib/training/season-end-progression-preview";
@@ -86,17 +87,7 @@ export type PreSeasonWorkflowApplyResult = Omit<PreSeasonWorkflowPreview, "dryRu
   auditLogId: string | null;
 };
 
-export type PreSeasonProgressionMaterializationResult = {
-  save: PersistedSaveGame;
-  teamsProcessed: number;
-  teamsApplied: number;
-  humanOrganicTeams: number;
-  aiPlannedTeams: number;
-  aiOrganicFallbackTeams: number;
-  playerEventsCreated: number;
-  warnings: string[];
-  blockingReasons: string[];
-};
+export type PreSeasonProgressionMaterializationResult = SeasonEndProgressionBatchResult;
 
 function roundValue(value: number, digits = 2) {
   return Number(value.toFixed(digits));
@@ -229,20 +220,28 @@ export function applySeasonBaselineProgression(gameState: GameState, options: { 
 
     const isRostered = rosterPlayerIds.has(player.id);
     const hasSeasonEndProgression = progressedThisSeasonPlayerIds.has(player.id);
-    const attributeFraction = isRostered ? 0.18 : 0.22;
-    const economyFraction = isRostered ? 0.18 : 0.24;
+    const freeAgentRecoveryFraction = 0.12;
     const nextAttributePatch = Object.fromEntries(
-      ATTRIBUTE_KEYS.map((attribute) => [
-        attribute,
-        hasSeasonEndProgression
-          ? (toFiniteNumber(player.attributeSheetStats?.[attribute]) ?? baseline.attributes[attribute])
-          : driftTowardBaseline({
-              current: player.attributeSheetStats?.[attribute],
-              baseline: baseline.attributes[attribute],
-              fraction: attributeFraction,
-              minStep: 1,
-            }),
-      ]),
+      ATTRIBUTE_KEYS.map((attribute) => {
+        const currentValue = toFiniteNumber(player.attributeSheetStats?.[attribute]);
+        if (isRostered) {
+          return [
+            attribute,
+            hasSeasonEndProgression
+              ? (currentValue ?? baseline.attributes[attribute])
+              : (currentValue ?? baseline.attributes[attribute]),
+          ];
+        }
+        return [
+          attribute,
+          driftTowardBaseline({
+            current: player.attributeSheetStats?.[attribute],
+            baseline: baseline.attributes[attribute],
+            fraction: freeAgentRecoveryFraction,
+            minStep: 1,
+          }),
+        ];
+      }),
     ) as PlayerGeneratorAttributes;
     const attributesAfter = normalizePlayerAttributes({
       ...(player.attributeSheetStats ?? {}),
@@ -267,38 +266,42 @@ export function applySeasonBaselineProgression(gameState: GameState, options: { 
       rawScaleDivisor: 1000,
       maxVisible: 80,
     });
-    const nextMarketValue =
-      driftTowardBaseline({
-        current: player.marketValue ?? currentEconomy.marketValue,
-        baseline: baselineMarketValue,
-        fraction: economyFraction,
-        minStep: 0.6,
-        digits: 2,
-      }) ?? currentEconomy.marketValue ?? player.marketValue;
-    const nextDisplayMarketValue =
-      driftTowardBaseline({
-        current: player.displayMarketValue ?? player.marketValue ?? currentEconomy.marketValue,
-        baseline: baselineMarketValue,
-        fraction: economyFraction,
-        minStep: 0.6,
-        digits: 2,
-      }) ?? nextMarketValue;
-    const nextSalaryDemand =
-      driftTowardBaseline({
-        current: player.salaryDemand ?? currentEconomy.salary,
-        baseline: baselineSalary,
-        fraction: economyFraction,
-        minStep: 0.08,
-        digits: 2,
-      }) ?? currentEconomy.salary ?? player.salaryDemand;
-    const nextDisplaySalary =
-      driftTowardBaseline({
-        current: player.displaySalary ?? player.salaryDemand ?? currentEconomy.salary,
-        baseline: baselineSalary,
-        fraction: economyFraction,
-        minStep: 0.08,
-        digits: 2,
-      }) ?? nextSalaryDemand;
+    const nextMarketValue = isRostered
+      ? (player.marketValue ?? currentEconomy.marketValue)
+      : driftTowardBaseline({
+          current: player.marketValue ?? currentEconomy.marketValue,
+          baseline: baselineMarketValue,
+          fraction: freeAgentRecoveryFraction,
+          minStep: 0.6,
+          digits: 2,
+        }) ?? currentEconomy.marketValue ?? player.marketValue;
+    const nextDisplayMarketValue = isRostered
+      ? (player.displayMarketValue ?? player.marketValue ?? currentEconomy.marketValue)
+      : driftTowardBaseline({
+          current: player.displayMarketValue ?? player.marketValue ?? currentEconomy.marketValue,
+          baseline: baselineMarketValue,
+          fraction: freeAgentRecoveryFraction,
+          minStep: 0.6,
+          digits: 2,
+        }) ?? nextMarketValue;
+    const nextSalaryDemand = isRostered
+      ? (player.salaryDemand ?? currentEconomy.salary)
+      : driftTowardBaseline({
+          current: player.salaryDemand ?? currentEconomy.salary,
+          baseline: baselineSalary,
+          fraction: freeAgentRecoveryFraction,
+          minStep: 0.08,
+          digits: 2,
+        }) ?? currentEconomy.salary ?? player.salaryDemand;
+    const nextDisplaySalary = isRostered
+      ? (player.displaySalary ?? player.salaryDemand ?? currentEconomy.salary)
+      : driftTowardBaseline({
+          current: player.displaySalary ?? player.salaryDemand ?? currentEconomy.salary,
+          baseline: baselineSalary,
+          fraction: freeAgentRecoveryFraction,
+          minStep: 0.08,
+          digits: 2,
+        }) ?? nextSalaryDemand;
 
     nextMarketValueByPlayerId.set(player.id, nextDisplayMarketValue ?? nextMarketValue ?? null);
 
@@ -324,7 +327,7 @@ export function applySeasonBaselineProgression(gameState: GameState, options: { 
       bracketLabel: baseline.bracket ?? player.bracketLabel,
       currentXP: isRostered ? player.currentXP : coolOffFreeAgentXp(player.currentXP),
       trainingMode: null,
-      fatigue: clamp(player.fatigue ?? 0, 0, 100),
+      fatigue: isRostered ? 0 : clamp(player.fatigue ?? 0, 0, 100),
     };
   });
 
@@ -343,168 +346,11 @@ export function applySeasonBaselineProgression(gameState: GameState, options: { 
   };
 }
 
-function createProgressionCapturePersistence(input: {
-  save: PersistedSaveGame;
-  delegate: PersistenceService;
-  /**
-   * When true, intermediate `saveSingleplayerState` calls only update the in-memory capture
-   * and do NOT propagate to the delegate (SQLite). The caller is responsible for persisting
-   * the final accumulated state after the capture loop completes. This eliminates O(n) SQLite
-   * round-trips (one per team) and is safe because `applyPreSeasonNextSeasonSetupLightweight`
-   * always writes the final state itself.
-   */
-  skipDelegateWrites?: boolean;
-}): { persistence: PersistenceService; getSave: () => PersistedSaveGame } {
-  let currentSave = structuredClone(input.save);
-  const persistence: PersistenceService = {
-    ...input.delegate,
-    bootstrapSingleplayerSave() {
-      return { save: structuredClone(currentSave), createdFromSeed: false };
-    },
-    getActiveSave() {
-      return structuredClone(currentSave);
-    },
-    getSaveById(saveId) {
-      return saveId === currentSave.saveId ? structuredClone(currentSave) : input.delegate.getSaveById(saveId);
-    },
-    saveSingleplayerState(saveId, nextGameState) {
-      if (input.skipDelegateWrites) {
-        if (saveId === currentSave.saveId) {
-          currentSave = {
-            ...currentSave,
-            updatedAt: new Date().toISOString(),
-            gameState: structuredClone(nextGameState),
-          };
-        }
-        return structuredClone(currentSave);
-      }
-      const saved = input.delegate.saveSingleplayerState(saveId, nextGameState);
-      if (saveId === currentSave.saveId) {
-        currentSave = {
-          ...currentSave,
-          updatedAt: saved.updatedAt ?? new Date().toISOString(),
-          gameState: structuredClone(nextGameState),
-        };
-      }
-      return structuredClone(currentSave);
-    },
-  };
-  return {
-    persistence,
-    getSave: () => structuredClone(currentSave),
-  };
-}
-
 function materializeSeasonEndProgressionBeforeNextSeason(
   save: PersistedSaveGame,
   persistence: PersistenceService,
 ): PreSeasonProgressionMaterializationResult {
-  const materializationSave: PersistedSaveGame = { ...save, status: "active" };
-  // skipDelegateWrites: do not write to SQLite on each team iteration — the caller writes the
-  // final accumulated state once, so intermediate writes are pure overhead (O(n) disk I/O).
-  const capture = createProgressionCapturePersistence({ save: materializationSave, delegate: persistence, skipDelegateWrites: true });
-  const completedSeasonId = save.gameState.season.id;
-  const teamControlSettings = materializationSave.gameState.seasonState.teamControlSettings ?? {};
-  const warnings: string[] = [];
-  const blockingReasons: string[] = [];
-  let teamsProcessed = 0;
-  let teamsApplied = 0;
-  let humanOrganicTeams = 0;
-  let aiPlannedTeams = 0;
-  let aiOrganicFallbackTeams = 0;
-  let playerEventsCreated = 0;
-
-  // Build the economy context once on the initial state. The "before" ratings and market values
-  // are a snapshot that is valid for all teams throughout this loop — recomputing per-team
-  // causes O(n²) cost because capture.getSave() returns a new object each iteration (WeakMap miss).
-  const sharedEconomyContext = buildEconomyPreviewContext(materializationSave.gameState);
-
-  // Pre-compute per-player season XP and organic progression for ALL players using the initial
-  // gameState. These values depend only on the season's performance data and player attributes
-  // BEFORE any XP spend — they do not change as other teams spend XP. Pre-computing here avoids
-  // repeated WeakMap cache misses that occur because capture.getSave() clones the gameState each
-  // iteration, invalidating the internal caches in buildPlayerProgressionForecast and
-  // buildOrganicSeasonProgression.
-  const sharedPreComputedSeasonXp = buildPreComputedSeasonXpMap(materializationSave);
-
-  for (const team of materializationSave.gameState.teams) {
-    const currentSave = capture.getSave();
-    const rosterCount = currentSave.gameState.rosters.filter((entry) => entry.teamId === team.teamId).length;
-    if (rosterCount === 0) continue;
-    teamsProcessed += 1;
-    const controlMode = teamControlSettings[team.teamId]?.controlMode ?? (team.humanControlled === false ? "ai" : "manual");
-
-    if (controlMode === "ai") {
-      const plan = previewAiSeasonEndXpSpend(currentSave, team.teamId, sharedEconomyContext, { skipAfterEconomyAudit: true }, sharedPreComputedSeasonXp);
-      if (plan.confirmToken && plan.blockers.length === 0 && plan.plannedUpgrades.length > 0) {
-        const result = applyAiSeasonEndXpSpend(currentSave, team.teamId, plan.confirmToken, capture.persistence, sharedEconomyContext, { skipAfterEconomyAudit: true, deferLeagueWideMarketValueRecalc: true }, plan, sharedPreComputedSeasonXp);
-        warnings.push(...result.warnings.map((warning) => `${team.shortCode}:${warning}`));
-        if (result.applied) {
-          teamsApplied += 1;
-          aiPlannedTeams += 1;
-          playerEventsCreated += result.eventIds.length;
-          continue;
-        }
-        blockingReasons.push(...result.blockingReasons.map((reason) => `${team.shortCode}:${reason}`));
-      } else {
-        warnings.push(...plan.warnings.map((warning) => `${team.shortCode}:${warning}`));
-      }
-    }
-
-    const fallbackSave = capture.getSave();
-    const preview = previewSeasonEndXpSpend(fallbackSave, team.teamId, [], sharedEconomyContext, { skipAfterEconomyAudit: true }, sharedPreComputedSeasonXp);
-    if (!preview.confirmToken || !preview.ok) {
-      const softReasons = preview.blockingReasons.filter((reason) => reason !== "season_xp_no_unmaterialized_xp");
-      warnings.push(...preview.warnings.map((warning) => `${team.shortCode}:${warning}`));
-      warnings.push(...softReasons.map((reason) => `${team.shortCode}:${reason}`));
-      continue;
-    }
-    const result = applySeasonEndXpSpend(fallbackSave, team.teamId, [], preview.confirmToken, capture.persistence, {
-      allowAiTeams: controlMode !== "manual",
-      skipAfterEconomyAudit: true,
-      deferLeagueWideMarketValueRecalc: true,
-    }, sharedEconomyContext, preview, sharedPreComputedSeasonXp);
-    warnings.push(...result.warnings.map((warning) => `${team.shortCode}:${warning}`));
-    if (result.applied) {
-      teamsApplied += 1;
-      playerEventsCreated += result.eventIds.length;
-      if (controlMode === "ai") aiOrganicFallbackTeams += 1;
-      else humanOrganicTeams += 1;
-    } else {
-      blockingReasons.push(...result.blockingReasons.map((reason) => `${team.shortCode}:${reason}`));
-    }
-  }
-
-  const finalSeasonEventCount = (capture.getSave().gameState.playerProgressionEvents ?? []).filter(
-    (event) => event.seasonId === completedSeasonId,
-  ).length;
-  if (teamsProcessed > 0 && finalSeasonEventCount === 0) {
-    blockingReasons.push("season_end_progression_no_player_events");
-  }
-
-  const beforeBatchSave = capture.getSave();
-  const progressedPlayerIds = (beforeBatchSave.gameState.playerProgressionEvents ?? [])
-    .filter((event) => event.seasonId === completedSeasonId)
-    .map((event) => event.playerId);
-  const batchedGameState = patchSeasonProgressionEventMarketValues({
-    gameState: applyRankTableMarketValuesToGameState(beforeBatchSave.gameState),
-    seasonId: completedSeasonId,
-    playerIds: progressedPlayerIds,
-  });
-  capture.persistence.saveSingleplayerState(beforeBatchSave.saveId, batchedGameState);
-  const batchedSave = capture.getSave();
-
-  return {
-    save: batchedSave,
-    teamsProcessed,
-    teamsApplied,
-    humanOrganicTeams,
-    aiPlannedTeams,
-    aiOrganicFallbackTeams,
-    playerEventsCreated,
-    warnings: [...new Set(warnings)],
-    blockingReasons: [...new Set(blockingReasons)],
-  };
+  return runSeasonEndProgressionBatch({ save, persistence, persistFinalState: false });
 }
 
 function parseSeasonNumber(season: GameState["season"]) {
@@ -649,6 +495,7 @@ function buildNextSeasonGameState(save: PersistedSaveGame): { gameState: GameSta
     standingsApplyLogs: [],
     matchdayAdvanceLogs: [],
     cashPrizeApplyLogs: save.gameState.seasonState.cashPrizeApplyLogs ?? [],
+    playerAvailabilityState: [],
     newGameFlow: {
       active: true,
       dismissed: false,

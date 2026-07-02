@@ -418,19 +418,50 @@ async function main() {
   const outputDir = path.join(PROJECT_ROOT, "outputs", "balance-audit", `realistic-multi-${timestamp}`);
   fs.mkdirSync(outputDir, { recursive: true });
 
-  log(`Starting long-run sandbox on ${saveId} → S${targetSeasons}…`);
+  const useResilientOrchestrator = process.argv.includes("--orchestrator=resilient");
+  const nodeOptions = process.env.NODE_OPTIONS?.includes("max-old-space-size")
+    ? process.env.NODE_OPTIONS
+    : "--max-old-space-size=8192";
+
+  log(`Starting ${useResilientOrchestrator ? "resilient orchestrator" : "long-run sandbox"} on ${saveId} → S${targetSeasons}…`);
   const longRunStartedAt = Date.now();
-  execFileSync("tsx", [path.join(PROJECT_ROOT, "scripts", "long-run-sandbox-s1-s6.ts")], {
-    cwd: PROJECT_ROOT,
-    stdio: "inherit",
-    env: {
-      ...process.env,
-      OLY_LONG_RUN_SAVE_ID: saveId,
-      OLY_LONG_RUN_FINAL_SEASON: String(targetSeasons),
-      OLY_LONG_RUN_OUTPUT_DIR: outputDir,
-      OLY_LONG_RUN_LABEL: `Realistic Multi S1-S${targetSeasons}`,
-    },
-  });
+  if (useResilientOrchestrator) {
+    execFileSync(
+      "tsx",
+      [
+        path.join(PROJECT_ROOT, "scripts", "run-resilient-multiseason.ts"),
+        "--save-id",
+        saveId,
+        "--seasons",
+        String(targetSeasons),
+        "--output-dir",
+        outputDir,
+      ],
+      {
+        cwd: PROJECT_ROOT,
+        stdio: "inherit",
+        env: {
+          ...process.env,
+          NODE_OPTIONS: nodeOptions,
+          OLY_LONG_RUN_REQUIRE_NO_DEV_SERVER: "1",
+        },
+      },
+    );
+  } else {
+    execFileSync("tsx", [path.join(PROJECT_ROOT, "scripts", "long-run-sandbox-s1-s6.ts")], {
+      cwd: PROJECT_ROOT,
+      stdio: "inherit",
+      env: {
+        ...process.env,
+        NODE_OPTIONS: nodeOptions,
+        OLY_LONG_RUN_REQUIRE_NO_DEV_SERVER: "1",
+        OLY_LONG_RUN_SAVE_ID: saveId,
+        OLY_LONG_RUN_FINAL_SEASON: String(targetSeasons),
+        OLY_LONG_RUN_OUTPUT_DIR: outputDir,
+        OLY_LONG_RUN_LABEL: `Realistic Multi S1-S${targetSeasons}`,
+      },
+    });
+  }
   const longRunMs = Date.now() - longRunStartedAt;
 
   const saveAfter = persistence.getSaveById(saveId);

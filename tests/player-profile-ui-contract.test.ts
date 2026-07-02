@@ -87,9 +87,12 @@ describe("player profile ui contract", () => {
     expect(trainingControlsText).not.toContain("VeloAttributeFocusTags");
     expect(trainingControlsText).toContain("buildStatForecastTooltip");
     expect(trainingSharedText).toContain("export function TrainingAttributeForecastGrid");
+    expect(trainingSharedText).toContain("sortTrainingAttributeForecastByClassProfile");
+    expect(trainingSharedText).toContain("training-v2-ceiling-mark");
     expect(chartText).toContain('data-testid="player-attribute-progress-chart"');
     expect(chartText).toContain('data-testid="player-attribute-progress-summary"');
     expect(chartText).toContain('data-testid="player-attribute-progress-str-line"');
+    expect(chartText).toContain('data-testid="player-attribute-progress-pp-metric-pow"');
     expect(chartText).toContain('data-testid="player-attribute-progress-attribute-table"');
     expect(chartText).toContain("PLAYER_ATTRIBUTE_CHART_LABELS");
     expect(chartText).toContain("attributeHistoryRows");

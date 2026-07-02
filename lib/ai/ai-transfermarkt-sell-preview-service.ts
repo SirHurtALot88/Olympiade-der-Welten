@@ -1,4 +1,5 @@
 import { evaluateAiNeeds } from "@/lib/ai/aiNeedsEngine";
+import { recordSellPreview } from "@/lib/ai/transfer-window-profiler";
 import type {
   GameState,
   Player,
@@ -12,10 +13,12 @@ import type {
 import { loadFoundationSnapshotFromPrisma } from "@/lib/db/read/foundation-read-repository";
 import { projectFoundationStateFromPrisma } from "@/lib/db/read/foundation-read-projection";
 import { resolvePlayerEconomyContract } from "@/lib/foundation/player-economy-contract";
+import { getSeasonDerivations } from "@/lib/foundation/get-season-derivations";
 import { buildPlayerRatingContractMap, type PlayerRatingContractRow } from "@/lib/foundation/player-rating-contract";
 import { getTeamControlSettings, withNormalizedTeamControlSettings } from "@/lib/foundation/team-control-settings";
 import { getTeamStrategyProfile, withNormalizedTeamStrategyProfiles } from "@/lib/foundation/team-strategy-profiles";
 import { normalizeTransfermarktToken } from "@/lib/market/transfermarkt-fit";
+import type { LocalTransfermarktRunContext } from "@/lib/market/transfermarkt-local-service";
 import { buildTransfermarktSaleFactorBreakdown } from "@/lib/market/transfermarkt-sale-factor";
 import { createPersistenceService } from "@/lib/persistence/persistence-service";
 import { assessTeamSellRunwayPressure, isAttractiveProfitSell } from "@/lib/ai/team-sell-runway-pressure";
@@ -46,6 +49,9 @@ export type AiSellPreviewParams = {
   teamId?: string | null;
   teamScope?: AiSellPreviewTeamScope;
   limit?: number | null;
+  /** AI/market-plan paths may sell below roster min and refill later. Default keeps UI advisory warning. */
+  allowSellBelowRosterMin?: boolean;
+  localRunContext?: LocalTransfermarktRunContext | null;
 };
 
 export type AiSellPreviewCandidate = {
@@ -396,6 +402,7 @@ function buildCandidate(
   playerMin: number | null,
   playerOpt: number | null,
   cache: SellPreviewRunCache,
+  allowSellBelowRosterMin = false,
 ) {
   const profile = getTeamStrategyProfile(context.gameState, team.teamId);
   const playerRating = playerRatingsById.get(player.id) ?? null;
@@ -429,7 +436,7 @@ function buildCandidate(
   const hardNoGoHit = matchesHardNoGo(profile, player);
   const rosterAfter = Math.max(rosterSize - 1, 0);
 
-  if (playerMin != null && rosterSize - 1 < playerMin) {
+  if (!allowSellBelowRosterMin && playerMin != null && rosterSize - 1 < playerMin) {
     warnings.push("Verkauf wuerde den Kader unter das Team-Minimum druecken.");
   }
   if (rosterSize <= 7) {
@@ -750,6 +757,16 @@ async function resolvePreviewContext(params: AiSellPreviewParams): Promise<Resol
     };
   }
 
+  const runContext = params.localRunContext ?? null;
+  if (runContext?.save) {
+    return {
+      source,
+      saveId: runContext.save.saveId,
+      seasonId: runContext.save.gameState.season.id,
+      gameState: normalizeGameState(runContext.save.gameState),
+    };
+  }
+
   const persistence = createPersistenceService();
   const bootstrapped = persistence.bootstrapSingleplayerSave();
   const requestedSave = params.saveId ? persistence.getSaveById(params.saveId) : null;
@@ -783,6 +800,7 @@ function getTeamStatus(entry: {
   teamScope: AiSellPreviewTeamScope;
   rosterSize: number;
   playerMin: number | null;
+  allowSellBelowRosterMin?: boolean;
 }) {
   if (!entry.aiSellPreviewEnabled && entry.controlMode === "ai") {
     return "blocked" as const;
@@ -793,7 +811,11 @@ function getTeamStatus(entry: {
   if (entry.teamScope === "all" && entry.controlMode !== "ai") {
     return "warning" as const;
   }
-  if (entry.playerMin != null && entry.rosterSize <= entry.playerMin) {
+  if (
+    !entry.allowSellBelowRosterMin &&
+    entry.playerMin != null &&
+    entry.rosterSize <= entry.playerMin
+  ) {
     return "low_roster_depth" as const;
   }
   if (entry.sellCandidates.length === 0) {
@@ -808,10 +830,11 @@ function getTeamStatus(entry: {
 export async function buildAiTransfermarktSellPreview(params: AiSellPreviewParams = {}): Promise<AiSellPreviewResult> {
   const startedAt = Date.now();
   const context = await resolvePreviewContext(params);
-  const playerRatingsById = buildPlayerRatingContractMap(context.gameState);
+  const playerRatingsById = getSeasonDerivations({ gameState: context.gameState, saveId: context.saveId }).ratingsById;
   const runCache = buildSellPreviewRunCache(context.gameState);
   const teamScope = params.teamScope === "all" ? "all" : "ai";
   const limit = typeof params.limit === "number" && Number.isFinite(params.limit) ? Math.max(1, Math.round(params.limit)) : 5;
+  const allowSellBelowRosterMin = params.allowSellBelowRosterMin ?? false;
   let candidateCount = 0;
 
   const requestedTeam =
@@ -875,6 +898,7 @@ export async function buildAiTransfermarktSellPreview(params: AiSellPreviewParam
           playerMin,
           playerOpt,
           runCache,
+          allowSellBelowRosterMin,
         ),
       )
       .sort((left, right) => right.sellPriority - left.sellPriority || left.playerName.localeCompare(right.playerName, "de"));
@@ -916,6 +940,7 @@ export async function buildAiTransfermarktSellPreview(params: AiSellPreviewParam
       teamScope,
       rosterSize,
       playerMin,
+      allowSellBelowRosterMin,
     });
 
     return {
@@ -979,6 +1004,7 @@ export async function buildAiTransfermarktSellPreview(params: AiSellPreviewParam
       snapshotLookupCount: runCache.latestSnapshot ? 1 : 0,
     },
   };
+  recordSellPreview(result.debugPerformance?.durationMs ?? Date.now() - startedAt);
   return result;
 }
 

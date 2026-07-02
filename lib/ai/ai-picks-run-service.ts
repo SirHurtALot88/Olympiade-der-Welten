@@ -9,6 +9,8 @@ import {
   listLocalTransfermarktFreeAgents,
   createLocalTransfermarktRunContext,
   flushLocalTransfermarktRunContext,
+  warmLocalTransfermarktFreeAgentBrowseIndex,
+  type LocalTransfermarktRunContext,
 } from "@/lib/market/transfermarkt-local-service";
 import { createPersistenceService } from "@/lib/persistence/persistence-service";
 import type { PersistenceService } from "@/lib/persistence/types";
@@ -22,6 +24,8 @@ import {
   type AiNeedsPicksCompareTeamEntry,
 } from "@/lib/ai/ai-needs-picks-compare-service";
 import { AI_PICKS_RUN_CONFIRM_TOKEN } from "@/lib/ai/ai-picks-run-contract";
+import { resolveSeason1BonusDraftSteps } from "@/lib/ai/season1-draft-cash-planner";
+import { isLongRunContext } from "@/lib/season/long-run-profile";
 
 const LEGAL_MINIMUM_ROSTER_SIZE = 7;
 
@@ -1906,6 +1910,7 @@ async function buildTeamPreviewEntry(input: {
   candidateFullScoringLimit?: number;
   candidateScopeMode?: "strategic" | "budget_wide";
   draftSeed?: string | null;
+  localRunContext?: LocalTransfermarktRunContext | null;
 }) {
   const compare = await buildAiNeedsPicksCompare({
     source: "sqlite",
@@ -1920,6 +1925,8 @@ async function buildTeamPreviewEntry(input: {
     excludedPlayerIds: input.excludedPlayerIds ?? [],
     runMode: input.runMode,
     draftSeed: input.draftSeed ?? null,
+    gameState: input.gameState,
+    localRunContext: input.localRunContext ?? null,
   });
   const compareEntry = compare.teams[0] ?? null;
   const snapshot = buildTeamEconomySnapshot(input.gameState, input.team);
@@ -2011,6 +2018,7 @@ async function buildTeamPreviewEntryWithDraftState(input: {
   runMode: AiNeedsPicksRunMode;
   excludedPlayerIds: string[];
   draftSeed?: string | null;
+  localRunContext?: LocalTransfermarktRunContext | null;
 }) {
   const fullFreeAgentPoolSize = getFreeAgentPoolSize(input.gameState);
   const teamCode = input.team.shortCode || input.team.teamId;
@@ -2034,6 +2042,7 @@ async function buildTeamPreviewEntryWithDraftState(input: {
     candidateLimit: Math.max(10, candidateWindow),
     candidateFullScoringLimit: fullScoringWindow,
     candidateScopeMode: "budget_wide",
+    localRunContext: input.localRunContext ?? null,
   });
 
   previewTeam.warnings = unique([
@@ -2321,7 +2330,7 @@ export async function runAiPicksExecutePreview(
   const allowSetupAllTeams = Boolean(params.allowSetupAllTeams);
   const runMode: AiNeedsPicksRunMode = params.runMode === "season1_optimum_execute" ? "season1_optimum_execute" : "default";
   const defaultStepsPerTeam = runMode === "season1_optimum_execute" ? 14 : 5;
-  const stepsPerTeam = Math.max(1, Math.min(Math.round(params.stepsPerTeam ?? defaultStepsPerTeam), 16));
+  const baseStepsPerTeam = Math.max(1, Math.min(Math.round(params.stepsPerTeam ?? defaultStepsPerTeam), 16));
   const save = resolveStrictLocalSave(persistence, params.saveId);
   const draftSeed = params.draftSeed?.trim() || `${save.saveId}:draft`;
   const seasonId = params.seasonId?.trim() || save.gameState.season.id;
@@ -2330,18 +2339,30 @@ export async function runAiPicksExecutePreview(
   }
 
   const currentGameState = resolveStrictLocalSave(persistence, save.saveId).gameState;
-  const localRunContext = {
+  const previewRunContext = createLocalTransfermarktRunContext({
     persistence,
-    save: {
-      ...save,
-      gameState: currentGameState,
-    },
-    deferredWrites: 0,
-  };
+    save: { ...save, gameState: currentGameState },
+  });
+  if (isLongRunContext()) {
+    warmLocalTransfermarktFreeAgentBrowseIndex({ saveId: save.saveId, seasonId });
+    listLocalTransfermarktFreeAgents({
+      saveId: save.saveId,
+      seasonId,
+      limit: Math.max(currentGameState.players.length, 5000),
+      mode: "ai_preview",
+      localRunContext: previewRunContext,
+    });
+  }
+  const localRunContext = previewRunContext;
   const selectedTeams = orderTeamsForDraft(
     currentGameState,
     chooseTeams(currentGameState, teamScope, allowSetupAllTeams, params.teamIds),
   );
+  const bonusDraftSteps =
+    runMode === "season1_optimum_execute"
+      ? selectedTeams.reduce((max, team) => Math.max(max, resolveSeason1BonusDraftSteps(team)), 0)
+      : 0;
+  const stepsPerTeam = Math.max(1, Math.min(baseStepsPerTeam + bonusDraftSteps, 16));
   const previewTeams: AiPicksRunTeamResult[] = [];
   const previewStartedAt = Date.now();
   const teamTimings = new Map<string, {
@@ -2367,6 +2388,7 @@ export async function runAiPicksExecutePreview(
       runMode,
       excludedPlayerIds: [...globallyReservedPlayerIds],
       draftSeed,
+      localRunContext,
     });
     const previewMs = Date.now() - teamPreviewStartedAt;
     teamTimings.set(team.teamId, {

@@ -106,20 +106,35 @@ export function applyTrainingXpFacilityModifiers(
   };
 }
 
-export function applyRecoveryFacilityModifiers(baseRecovery: number, facilities: TeamFacilityCollection | null | undefined) {
+/** Cumulative flat recovery bonus by REHA level (Basis 20 → L1=22, L2=24, L3=26, L4=29, L5=32 at 100% condition). */
+export const RECOVERY_FLAT_BONUS_BY_LEVEL = [0, 2, 4, 6, 9, 12] as const;
+
+export function getRecoveryFlatBonusAtLevel(level: number) {
+  return RECOVERY_FLAT_BONUS_BY_LEVEL[clampLevel(level)] ?? 0;
+}
+
+export function getRecoveryFlatBonus(facilities: TeamFacilityCollection | null | undefined) {
   const level = getFacilityLevel(facilities, "recovery_center");
   const efficiencyPct = getFacilityEfficiency(facilities, "recovery_center").efficiencyPct;
-  const modifierPct = roundValue(((getFacilityLevelDefinition("recovery_center", level)?.modifierPct ?? 0) * efficiencyPct) / 100);
+  return roundValue(getRecoveryFlatBonusAtLevel(level) * (efficiencyPct / 100));
+}
+
+export function applyRecoveryFacilityModifiers(baseRecovery: number, facilities: TeamFacilityCollection | null | undefined) {
+  const flatBonus = getRecoveryFlatBonus(facilities);
+  const modifierPct =
+    baseRecovery > 0 ? roundValue((flatBonus / baseRecovery) * 100) : flatBonus > 0 ? flatBonus * 5 : 0;
   return {
     before: baseRecovery,
     modifierPct,
-    after: roundValue(baseRecovery * (1 + modifierPct / 100), 2),
+    flatBonus,
+    after: roundValue(baseRecovery + flatBonus, 2),
   };
 }
 
-/** Reduces season-end training fatigue load (on top of matchday fatigue) by REHA level. */
+/** Reduces season-end training fatigue load (on top of matchday fatigue) by REHA flat bonus vs basis 20. */
 export function getRecoveryTrainingFatigueReductionPct(facilities: TeamFacilityCollection | null | undefined) {
-  return applyRecoveryFacilityModifiers(0, facilities).modifierPct;
+  const flatBonus = getRecoveryFlatBonus(facilities);
+  return roundValue((flatBonus / 20) * 100);
 }
 
 function getAcademyDiscountPct(ratingTier: PlayerProgressionRatingTier, facilities: TeamFacilityCollection | null | undefined) {

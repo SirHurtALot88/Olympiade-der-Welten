@@ -130,28 +130,36 @@ function upgrade(attribute = "power" as const): SeasonEndXpSpendPlannedUpgradeIn
 }
 
 describe("season-end XP spend apply service", () => {
-  it("previews a valid XP upgrade without writing", () => {
-    const preview = previewSeasonEndXpSpend(createSave(createPlayer({ currentXP: 100 })), "team-1", [upgrade()]);
+  it("blocks manual XP preview and apply", () => {
+    const save = createSave(createPlayer({ currentXP: 100 }));
+    const preview = previewSeasonEndXpSpend(save, "team-1", [upgrade()]);
+    const { persistence } = createPersistence();
 
-    expect(preview.ok).toBe(true);
-    expect(preview.confirmToken).toBeTruthy();
+    expect(preview.ok).toBe(false);
+    expect(preview.confirmToken).toBeNull();
+    expect(preview.blockingReasons).toContain("manual_xp_spend_disabled");
     expect(preview.players[0]?.plannedUpgrades[0]).toMatchObject({ fromValue: 30, toValue: 31, cost: 70 });
-    expect(preview.players[0]?.remainingXP).toBeGreaterThanOrEqual(0);
+
+    const result = applySeasonEndXpSpend(save, "team-1", [upgrade()], "any-token", persistence);
+    expect(result.applied).toBe(false);
+    expect(result.blockingReasons).toContain("manual_xp_spend_disabled");
   });
 
-  it("blocks when XP is insufficient", () => {
+  it("still surfaces per-player blockers when manual XP is requested", () => {
     const player = createPlayer({ attributeSheetStats: { ...baseAttributes, power: 80 }, currentXP: 0 });
     const preview = previewSeasonEndXpSpend(createSave(player), "team-1", [upgrade()]);
 
     expect(preview.ok).toBe(false);
+    expect(preview.blockingReasons).toContain("manual_xp_spend_disabled");
     expect(preview.blockingReasons).toContain("xp_insufficient:player-1");
   });
 
-  it("blocks attributes at 99", () => {
+  it("blocks manual XP when attribute is already at 99", () => {
     const player = createPlayer({ attributeSheetStats: { ...baseAttributes, power: 99 }, currentXP: 999 });
     const preview = previewSeasonEndXpSpend(createSave(player), "team-1", [upgrade()]);
 
     expect(preview.ok).toBe(false);
+    expect(preview.blockingReasons).toContain("manual_xp_spend_disabled");
     expect(preview.blockingReasons).toContain("attribute_at_99:player-1:power");
   });
 
@@ -171,16 +179,66 @@ describe("season-end XP spend apply service", () => {
     expect(two.players[0]?.remainingXP).toBe((one.players[0]?.remainingXP ?? 0) - 70);
   });
 
-  it("blocks apply without confirm token", () => {
-    const result = applySeasonEndXpSpend(createSave(createPlayer({ currentXP: 100 })), "team-1", [upgrade()], null, createPersistence().persistence);
+  it("blocks apply without confirm token for organic-only spend", () => {
+    const save = createSave(createPlayer({ currentXP: 100 }));
+    save.gameState.seasonState.matchdayResults = [
+      { id: "result-1", seasonId: "season-1", matchdayId: "matchday-1", status: "preview_applied" },
+    ];
+    save.gameState.seasonState.playerDisciplinePerformances = [
+      {
+        id: "perf-1",
+        matchdayResultId: "result-1",
+        teamId: "team-1",
+        playerId: "player-1",
+        activePlayerId: null,
+        disciplineId: "tdm",
+        disciplineSide: "d1",
+        slotIndex: 0,
+        baseValue: 80,
+        finalPlayerScore: 95,
+        scoreContribution: 25,
+        rankInTeam: 1,
+        rankInDiscipline: 1,
+        isTop10: true,
+        isMvpCandidate: true,
+        storyWeight: null,
+        createdAt: "2026-06-11T00:00:00.000Z",
+      },
+    ];
+
+    const result = applySeasonEndXpSpend(save, "team-1", [], null, createPersistence().persistence);
 
     expect(result.applied).toBe(false);
     expect(result.blockingReasons).toContain("confirm_token_missing");
   });
 
-  it("blocks stale previews when attributes drift", () => {
+  it("blocks stale organic previews when attributes drift", () => {
     const save = createSave(createPlayer({ currentXP: 100 }));
-    const preview = previewSeasonEndXpSpend(save, "team-1", [upgrade()]);
+    save.gameState.seasonState.matchdayResults = [
+      { id: "result-1", seasonId: "season-1", matchdayId: "matchday-1", status: "preview_applied" },
+    ];
+    save.gameState.seasonState.playerDisciplinePerformances = [
+      {
+        id: "perf-1",
+        matchdayResultId: "result-1",
+        teamId: "team-1",
+        playerId: "player-1",
+        activePlayerId: null,
+        disciplineId: "tdm",
+        disciplineSide: "d1",
+        slotIndex: 0,
+        baseValue: 80,
+        finalPlayerScore: 95,
+        scoreContribution: 25,
+        rankInTeam: 1,
+        rankInDiscipline: 1,
+        isTop10: true,
+        isMvpCandidate: true,
+        storyWeight: null,
+        createdAt: "2026-06-11T00:00:00.000Z",
+      },
+    ];
+    const preview = previewSeasonEndXpSpend(save, "team-1", []);
     const drifted = {
       ...save,
       gameState: {
@@ -189,45 +247,10 @@ describe("season-end XP spend apply service", () => {
       },
     } satisfies PersistedSaveGame;
 
-    const result = applySeasonEndXpSpend(drifted, "team-1", [upgrade()], preview.confirmToken, createPersistence().persistence);
+    const result = applySeasonEndXpSpend(drifted, "team-1", [], preview.confirmToken, createPersistence().persistence);
 
     expect(result.applied).toBe(false);
     expect(result.blockingReasons).toContain("xp_spend_preview_stale");
-  });
-
-  it("applies local attributes, XP, discipline deltas and progression event", () => {
-    const save = createSave(createPlayer({ attributeSheetStats: { ...baseAttributes, power: 98 }, currentXP: 500 }));
-    const baselineChecksumBefore = save.gameState.playerBaselines?.[0]?.checksum;
-    const preview = previewSeasonEndXpSpend(save, "team-1", [upgrade()]);
-    const { persistence, getSavedState } = createPersistence();
-
-    const result = applySeasonEndXpSpend(save, "team-1", [upgrade()], preview.confirmToken, persistence);
-    const savedPlayer = getSavedState()?.players[0];
-
-    expect(result.applied).toBe(true);
-    expect(savedPlayer?.attributeSheetStats?.power).toBe(99);
-    expect(savedPlayer?.spentXP).toBe(360);
-    expect(savedPlayer?.currentXP).toBe((preview.players[0]?.remainingXP ?? 0));
-    expect(savedPlayer?.lifetimeXP).toBe(120 + (preview.players[0]?.earnedSeasonXP ?? 0));
-    expect(getSavedState()?.playerProgressionEvents?.[0]?.source).toBe("manual_season_end_xp_spend");
-    expect(getSavedState()?.playerProgressionEvents?.[0]?.xpEarned).toBe(preview.players[0]?.earnedSeasonXP);
-    expect(getSavedState()?.playerProgressionEvents?.[0]?.currentXPAfter).toBe(savedPlayer?.currentXP);
-    expect(getSavedState()?.playerProgressionEvents?.[0]?.lifetimeXPAfter).toBe(savedPlayer?.lifetimeXP);
-    expect(getSavedState()?.playerProgressionEvents?.[0]?.progressionSnapshotBefore?.marketValue).toBe(10);
-    expect(getSavedState()?.playerProgressionEvents?.[0]?.progressionSnapshotAfter?.marketValuePreview).not.toBeUndefined();
-    expect(Object.values(savedPlayer?.disciplineDelta ?? {}).some((value) => value > 0)).toBe(true);
-    expect(savedPlayer?.economyAfterUpgradePreview?.source).toBe("season_end_xp_spend_preview");
-    expect(savedPlayer?.economyAfterUpgradePreview?.currentContractSalary).toBe(1);
-    expect(savedPlayer?.economyAfterUpgradePreview?.renewalSalaryPreview).not.toBeUndefined();
-    expect(savedPlayer?.marketValue).toBe(savedPlayer?.economyAfterUpgradePreview?.marketValuePreview);
-    expect(savedPlayer?.displayMarketValue).toBe(savedPlayer?.economyAfterUpgradePreview?.marketValuePreview);
-    expect(savedPlayer?.salaryDemand).toBe(savedPlayer?.economyAfterUpgradePreview?.salaryExpectation);
-    expect(savedPlayer?.displaySalary).toBe(savedPlayer?.economyAfterUpgradePreview?.salaryExpectation);
-    expect(getSavedState()?.rosters[0]?.salary).toBe(1);
-    expect(getSavedState()?.rosters[0]?.currentValue).toBe(savedPlayer?.economyAfterUpgradePreview?.marketValuePreview);
-    expect(getSavedState()?.playerBaselines?.[0]?.attributes.power).toBe(98);
-    expect(getSavedState()?.playerBaselines?.[0]?.baselineVersion).toBe("player-baseline-v2");
-    expect(getSavedState()?.playerBaselines?.[0]?.checksum).toBe(baselineChecksumBefore);
   });
 
   it("can materialize earned season XP without spending it", () => {
@@ -326,6 +349,7 @@ describe("season-end XP spend apply service", () => {
     const preview = previewSeasonEndXpSpend(save, "team-1", [upgrade()]);
 
     expect(preview.ok).toBe(false);
+    expect(preview.blockingReasons).toContain("manual_xp_spend_disabled");
     expect(preview.blockingReasons).toContain("player_baseline_missing:player-1");
   });
 });

@@ -5,17 +5,29 @@ import { describe, expect, it } from "vitest";
 
 const root = process.cwd();
 const foundationClientPath = path.join(root, "app/foundation/FoundationPageClient.tsx");
+const foundationShellRouterBodyPath = path.join(root, "app/foundation/FoundationShellRouterBody.tsx");
+
+async function readFoundationSurfaceSource() {
+  const [foundationText, shellRouterBodyText] = await Promise.all([
+    fs.readFile(foundationClientPath, "utf8"),
+    fs.readFile(foundationShellRouterBodyPath, "utf8"),
+  ]);
+  return foundationText + shellRouterBodyText;
+}
+const foundationPageModuleHelpersPath = path.join(root, "lib/foundation/tabs/foundation-page-module-helpers.tsx");
 const foundationViewRoutingPath = path.join(root, "lib/foundation/foundation-view-routing.ts");
 const transfermarktV2Path = path.join(root, "app/foundation/transfermarkt-v2/TransfermarktV2Client.tsx");
+const marketBuyHostPath = path.join(root, "app/foundation/transfermarkt-v2/FoundationMarketBuyShellHost.tsx");
 const lineupPath = path.join(root, "app/foundation/legacy-lineup-lab/LegacyLineupLabClient.tsx");
 const teamDrawerPath = path.join(root, "app/foundation/TeamDetailDrawer.tsx");
+const teamsRosterHookPath = path.join(root, "lib/foundation/tabs/use-foundation-cross-tab-teams-roster.ts");
 const fitServicePath = path.join(root, "lib/market/transfermarkt-fit.ts");
 const globalsPath = path.join(root, "app/globals.css");
 
 describe("foundation transfermarkt ui contract", () => {
   it("keeps the global foundation context visible", async () => {
     const [fileText, cssText] = await Promise.all([
-      fs.readFile(foundationClientPath, "utf8"),
+      readFoundationSurfaceSource(),
       fs.readFile(globalsPath, "utf8"),
     ]);
 
@@ -35,13 +47,15 @@ describe("foundation transfermarkt ui contract", () => {
     expect(routingText).toContain('view === "transfermarkt-v2" || view === "transfermarkt" || view === "market"');
     expect(routingText).toContain('return "marketV2"');
     expect(fileText).toContain("normalizeFoundationViewParam");
-    expect(fileText).toContain("getDefaultFoundationViewTarget(view as FoundationViewId)");
+    const moduleHelpersText = await fs.readFile(foundationPageModuleHelpersPath, "utf8");
+    expect(moduleHelpersText).toContain("getDefaultFoundationViewTarget(view as FoundationViewId)");
     expect(fileText).toContain('setFoundationView("marketV2", setActiveView)');
   });
 
   it("keeps Transfermarkt V2 centered on scouting, deal preview and own roster context", async () => {
-    const [fileText, cssText] = await Promise.all([
+    const [fileText, buyHostText, cssText] = await Promise.all([
       fs.readFile(transfermarktV2Path, "utf8"),
+      fs.readFile(marketBuyHostPath, "utf8"),
       fs.readFile(globalsPath, "utf8"),
     ]);
 
@@ -65,8 +79,8 @@ describe("foundation transfermarkt ui contract", () => {
     expect(fileText).toContain("marketValueBrackets");
     expect(fileText).toContain("Board-Fokus");
     expect(fileText).toContain("Kaufdialog");
-    expect(fileText).toContain("Kauf final abschließen");
-    expect(fileText).toContain("Warum der Deal so ausfällt");
+    expect(buyHostText).toContain("Kauf final abschließen");
+    expect(buyHostText).toContain("Warum der Deal so ausfällt");
     expect(fileText).toContain("getCandidateFrameStyle");
   });
 
@@ -200,33 +214,38 @@ describe("foundation transfermarkt ui contract", () => {
   });
 
   it("keeps the team drawer relationship cards alive", async () => {
-    const [clientText, drawerText, cssText] = await Promise.all([
+    const [clientText, teamsRosterHookText, drawerText, cssText] = await Promise.all([
       fs.readFile(foundationClientPath, "utf8"),
+      fs.readFile(teamsRosterHookPath, "utf8"),
       fs.readFile(teamDrawerPath, "utf8"),
       fs.readFile(globalsPath, "utf8"),
     ]);
 
-    expect(clientText).toContain("buildTeamRelationshipCards");
-    expect(clientText).toContain("relationships: drawerRelationships");
+    expect(clientText).toContain("buildTeamDetailDrawerData");
+    expect(teamsRosterHookText).toContain("buildTeamRelationshipCards");
+    expect(teamsRosterHookText).toContain("relationships: drawerRelationships");
     expect(drawerText).toContain("relationships:");
     expect(drawerText).toContain("formatRelationshipList");
     expect(cssText).toContain(".team-drawer-relationship-chip");
   });
 
   it("keeps Transfermarkt V2 buy dialog negotiation affordances", async () => {
-    const [fileText, foundationText] = await Promise.all([
+    const [fileText, buyHostText, foundationText, marketHostText] = await Promise.all([
       fs.readFile(transfermarktV2Path, "utf8"),
+      fs.readFile(marketBuyHostPath, "utf8"),
       fs.readFile(foundationClientPath, "utf8"),
+      fs.readFile(path.join(root, "app/foundation/transfermarkt-v2/FoundationMarketV2ShellHost.tsx"), "utf8"),
     ]);
 
     expect(fileText).toContain("Kaufdialog");
     expect(fileText).toContain("resetBuyDemandFrame");
-    expect(fileText).toContain("Spieler ist noch angefressen");
-    expect(fileText).toContain('buyNegotiationOutcome?.status !== "accepted"');
+    expect(buyHostText).toContain("Spieler ist noch angefressen");
+    expect(buyHostText).toContain('buyNegotiationOutcome?.status !== "accepted"');
     expect(fileText).toContain('persistNegotiationOutcome(buyPreview, "countered")');
     expect(foundationText).toContain("toggleScoutingWatch");
-    expect(foundationText).toContain("onToggleScoutingWatch");
+    expect(marketHostText).toContain("onToggleScoutingWatch");
     expect(foundationText).toContain("openMarketOfferPanel");
+    expect(fileText).toContain("FoundationShellRouterMarketBuy");
   });
 
   it("keeps the lineup coach wording tied to the new candidate quality flow", async () => {
@@ -271,25 +290,30 @@ describe("foundation transfermarkt ui contract", () => {
   });
 
   it("shows negotiation abort feedback when closing buy offer pages", async () => {
-    const v2Text = await fs.readFile(transfermarktV2Path, "utf8");
+    const [v2Text, buyHostText] = await Promise.all([
+      fs.readFile(transfermarktV2Path, "utf8"),
+      fs.readFile(marketBuyHostPath, "utf8"),
+    ]);
 
     expect(v2Text).toContain("Kauf von ${playerName} abgebrochen");
     expect(v2Text).toContain("Verhandlung mit ${playerName} abgebrochen");
-    expect(v2Text).toContain("data-testid=\"transfer-offer-page\"");
+    expect(buyHostText).toContain("data-testid=\"transfer-offer-page\"");
+    expect(v2Text).toContain("FoundationShellRouterMarketBuy");
   });
 
   it("loads buy preview skeleton and two-step confirm flow in Transfermarkt V2", async () => {
-    const [v2Text, cssText] = await Promise.all([
+    const [v2Text, buyHostText, cssText] = await Promise.all([
       fs.readFile(transfermarktV2Path, "utf8"),
+      fs.readFile(marketBuyHostPath, "utf8"),
       fs.readFile(globalsPath, "utf8"),
     ]);
 
-    expect(v2Text).toContain("data-testid=\"transfer-buy-preview-skeleton\"");
-    expect(v2Text).toContain("data-testid=\"transfer-buy-confirm-button\"");
-    expect(v2Text).toContain("Kauf final abschließen");
-    expect(v2Text).toContain("buyNegotiationOutcome?.status !== \"accepted\"");
+    expect(buyHostText).toContain("data-testid=\"transfer-buy-preview-skeleton\"");
+    expect(buyHostText).toContain("data-testid=\"transfer-buy-confirm-button\"");
+    expect(buyHostText).toContain("Kauf final abschließen");
+    expect(buyHostText).toContain("buyNegotiationOutcome?.status !== \"accepted\"");
     expect(v2Text).toContain("negotiation_cancelled_after_contact");
-    expect(v2Text).toContain("Spieler ist noch angefressen");
+    expect(buyHostText).toContain("Spieler ist noch angefressen");
     expect(v2Text).toContain("allSeasons: \"1\"");
     expect(v2Text).toContain("Letzte Deals (alle Seasons)");
     expect(cssText).toContain(".transfer-buy-preview-skeleton");

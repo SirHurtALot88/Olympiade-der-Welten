@@ -1,5 +1,6 @@
 import type { GameState, TransferHistoryEntry } from "@/lib/data/olyDataTypes";
 import { resolveTransferDoctrine } from "@/lib/ai/ai-transfer-doctrine-layer";
+import { isMarketBuyTransferEntry } from "@/lib/season/transfer-season-policy";
 
 export type TransferFinanceTeamSeasonRow = {
   seasonId: string;
@@ -14,6 +15,8 @@ export type TransferFinanceTeamSeasonRow = {
   salaryPaidOut: number;
   netSponsorCash: number;
   buyCount: number;
+  draftBuyCount: number;
+  marketBuyCount: number;
   sellCount: number;
   cashReconciliationDelta: number | null;
 };
@@ -25,12 +28,23 @@ export type TransferFinanceAuditResult = {
     seasonId: string;
     teamId: string;
     persona: string;
+    /** Markt-Käufe (exkl. bezahlter S1-Draft-Picks). */
     buys: number;
+    draftBuys: number;
+    marketBuys: number;
     sells: number;
     replacementSellCount: number;
     replacementBuyCount: number;
   }>;
 };
+
+/** Match transfer-finance violation strings to a specific season (avoids prior-season false positives). */
+export function isTransferFinanceViolationForSeason(violation: string, seasonId: string) {
+  if (violation.startsWith("cash_reconciliation_delta:")) return false;
+  const tagged = violation.match(/^(?:negative_cash_end|zero_fee_buy|repair_buy_fee_not_mw):(season-\d+):/);
+  if (tagged) return tagged[1] === seasonId;
+  return violation.startsWith(`${seasonId}:`) || violation.includes(`:${seasonId}:`);
+}
 
 function round(value: number, digits = 2) {
   return Number(value.toFixed(digits));
@@ -94,6 +108,8 @@ export function buildTransferFinanceAudit(gameState: GameState): TransferFinance
 
     for (const teamId of teamIds) {
       const buys = transfers.filter((entry) => entry.transferType === "buy" && entry.toTeamId === teamId);
+      const marketBuys = buys.filter((entry) => isMarketBuyTransferEntry(entry));
+      const draftBuys = buys.filter((entry) => !isMarketBuyTransferEntry(entry));
       const sells = transfers.filter((entry) => entry.transferType === "sell" && entry.fromTeamId === teamId);
       const contractExits = transfers.filter((entry) => entry.transferType === "contract_exit" && entry.fromTeamId === teamId);
       const buyFeesPaid = round(buys.reduce((sum, entry) => sum + (entry.fee ?? 0), 0));
@@ -125,7 +141,9 @@ export function buildTransferFinanceAudit(gameState: GameState): TransferFinance
         sponsorCashIn,
         salaryPaidOut,
         netSponsorCash,
-        buyCount: buys.length,
+        buyCount: marketBuys.length,
+        draftBuyCount: draftBuys.length,
+        marketBuyCount: marketBuys.length,
         sellCount: sells.length,
         cashReconciliationDelta,
       });
@@ -133,7 +151,12 @@ export function buildTransferFinanceAudit(gameState: GameState): TransferFinance
       if (cashEnd != null && cashEnd < -0.01) {
         violations.push(`negative_cash_end:${seasonId}:${teamId}:${cashEnd}`);
       }
-      if (cashReconciliationDelta != null && Math.abs(cashReconciliationDelta) > 1 && cashStart != null) {
+      const reconciliationTolerance = Math.max(12, round(salaryPaidOut * 0.15 + buyFeesPaid * 0.04));
+      if (
+        cashReconciliationDelta != null &&
+        Math.abs(cashReconciliationDelta) > reconciliationTolerance &&
+        cashStart != null
+      ) {
         violations.push(`cash_reconciliation_delta:${seasonId}:${teamId}:${cashReconciliationDelta}`);
       }
       for (const buy of buys) {
@@ -167,9 +190,11 @@ function buildDoctrineTransferStats(gameState: GameState) {
       const doctrine = resolveTransferDoctrine(gameState, team.teamId);
       const transfers = gameState.transferHistory.filter((entry) => entry.seasonId === seasonId);
       const buys = transfers.filter((entry) => entry.transferType === "buy" && entry.toTeamId === team.teamId);
+      const marketBuys = buys.filter((entry) => isMarketBuyTransferEntry(entry));
+      const draftBuys = buys.filter((entry) => !isMarketBuyTransferEntry(entry));
       const sells = transfers.filter((entry) => entry.transferType === "sell" && entry.fromTeamId === team.teamId);
       const replacementSells = sells.filter((entry) => (entry.fee ?? 0) >= 20 || (entry.marketValue ?? 0) >= 20);
-      const replacementBuys = buys.filter((entry) => {
+      const replacementBuys = marketBuys.filter((entry) => {
         const priorSell = gameState.transferHistory.find(
           (prior) =>
             prior.seasonId === seasonId &&
@@ -184,7 +209,9 @@ function buildDoctrineTransferStats(gameState: GameState) {
         seasonId,
         teamId: team.teamId,
         persona: doctrine.persona,
-        buys: buys.length,
+        buys: marketBuys.length,
+        draftBuys: draftBuys.length,
+        marketBuys: marketBuys.length,
         sells: sells.length,
         replacementSellCount: replacementSells.length,
         replacementBuyCount: replacementBuys.length,

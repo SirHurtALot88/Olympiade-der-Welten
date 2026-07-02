@@ -3,7 +3,7 @@ export const dynamic = "force-dynamic";
 import { NextResponse } from "next/server";
 
 import { applyAiLegacyLineupBatchLocally } from "@/lib/ai/ai-legacy-lineup-batch-apply-service";
-import { parseRoomWriteContextFromRequest } from "@/lib/room/parse-room-write-context";
+import { parseRoomWriteContextFromRequestAndBody } from "@/lib/room/parse-room-write-context";
 import { authorizeServerRoomWrite } from "@/lib/room/server-authoritative-write-guard";
 
 function parseSource(request: Request) {
@@ -48,7 +48,7 @@ export async function POST(request: Request) {
   }
 
   const writeAuth = authorizeServerRoomWrite({
-    ...parseRoomWriteContextFromRequest(request),
+    ...parseRoomWriteContextFromRequestAndBody(request, body),
     saveId,
     action: "lineup_ai_batch_apply",
     source: "sqlite",

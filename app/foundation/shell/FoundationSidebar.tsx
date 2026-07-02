@@ -19,6 +19,7 @@ type FoundationSidebarProps = {
   onNavigate: (view: FoundationViewId) => void;
   onPrefetchView?: (view: FoundationViewId) => void;
   attentionByViewId?: FoundationNavAttentionMap;
+  seasonContextLabel?: string | null;
 };
 
 type SidebarDragState = {
@@ -26,7 +27,13 @@ type SidebarDragState = {
   itemId: FoundationViewId;
 } | null;
 
-export default function FoundationSidebar({ activeView, onNavigate, onPrefetchView, attentionByViewId }: FoundationSidebarProps) {
+export default function FoundationSidebar({
+  activeView,
+  onNavigate,
+  onPrefetchView,
+  attentionByViewId,
+  seasonContextLabel,
+}: FoundationSidebarProps) {
   const [navGroups, setNavGroups] = useState(FOUNDATION_NAV_GROUPS);
   const [draggingItem, setDraggingItem] = useState<SidebarDragState>(null);
   const dragState = useRef<SidebarDragState>(null);
@@ -127,6 +134,15 @@ export default function FoundationSidebar({ activeView, onNavigate, onPrefetchVi
           Spielstände
         </Link>
         <strong>Oly Manager</strong>
+        {seasonContextLabel ? (
+          <span
+            className="foundation-sidebar-season-context"
+            data-testid="foundation-season-context"
+            title={`${seasonContextLabel} — aktuelle Saison und Spieltag`}
+          >
+            {seasonContextLabel}
+          </span>
+        ) : null}
       </div>
       {navGroups.map((group) => (
         <section key={group.id} className="foundation-sidebar-group">

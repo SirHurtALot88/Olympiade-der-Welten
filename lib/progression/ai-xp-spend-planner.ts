@@ -10,6 +10,7 @@ import type {
 } from "@/lib/data/olyDataTypes";
 import { deriveTeamIdentityAxisWeightMap } from "@/lib/foundation/team-identity-settings";
 import { getTeamStrategyProfile } from "@/lib/foundation/team-strategy-profiles";
+import { getSeasonDerivations } from "@/lib/foundation/get-season-derivations";
 import { buildPlayerRatingContractMap } from "@/lib/foundation/player-rating-contract";
 import { buildPlayerSeasonPerformance } from "@/lib/foundation/player-season-performance";
 import type { PersistedSaveGame, PersistenceService } from "@/lib/persistence/types";
@@ -310,7 +311,9 @@ export function previewAiSeasonEndXpSpend(save: PersistedSaveGame, teamId: strin
 
   const rosterRows = team ? getRosterRows(gameState, team.teamId) : [];
   // Re-use the economy context's pre-built rating map to avoid recomputing for every team.
-  const ratings = cachedEconomyContext?.beforeRatings ?? buildPlayerRatingContractMap(gameState);
+  const ratings =
+    cachedEconomyContext?.beforeRatings ??
+    getSeasonDerivations({ gameState, saveId: save.saveId }).ratingsById;
   const rankedRoster = [...rosterRows].sort((left, right) => {
     const leftOvr = ratings.get(left.player.id)?.ovrNormalized ?? left.player.rating ?? 0;
     const rightOvr = ratings.get(right.player.id)?.ovrNormalized ?? right.player.rating ?? 0;

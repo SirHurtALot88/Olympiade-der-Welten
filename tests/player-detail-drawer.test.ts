@@ -395,6 +395,148 @@ describe("player detail drawer", () => {
     expect(basketball?.seasonPoints).toBeGreaterThan(0.9);
   });
 
+  it("keeps S1 snapshot and S2 live history stats when liveRatingsById is partial", () => {
+    const player = createPlayer({ id: "player-s2-live", pps: 54.4 });
+    const gameState = createResultGameState(player);
+    gameState.season = {
+      id: "season-2",
+      name: "Season 2",
+      currentMatchday: 2,
+      totalMatchdays: 10,
+      isCompleted: false,
+    } as unknown as GameState["season"];
+    gameState.seasonState.seasonId = "season-2";
+    gameState.seasonState.matchdayResults = [
+      {
+        id: "result-s2-1",
+        seasonId: "season-2",
+        matchdayId: "matchday-1",
+        status: "preview_applied",
+      } as NonNullable<GameState["seasonState"]["matchdayResults"]>[number],
+    ];
+    gameState.seasonState.playerDisciplinePerformances = [
+      {
+        id: "perf-s2-1",
+        matchdayResultId: "result-s2-1",
+        teamId: "team-1",
+        playerId: player.id,
+        activePlayerId: "roster-1",
+        disciplineId: "pow-d",
+        disciplineSide: "d1",
+        slotIndex: 0,
+        baseValue: 50,
+        finalPlayerScore: 51.2,
+        scoreContribution: 12.5,
+        rankInTeam: 1,
+        rankInDiscipline: 3,
+        isTop10: true,
+        isMvpCandidate: false,
+        storyWeight: null,
+        createdAt: "2026-06-06T10:00:00.000Z",
+      },
+    ];
+    gameState.seasonState.seasonSnapshots = [
+      {
+        seasonId: "season-1",
+        seasonName: "Season 1",
+        status: "completed",
+        archivedAt: "2026-06-06T10:00:00.000Z",
+        finalStandings: [],
+        playerPerformances: [
+          {
+            playerId: player.id,
+            playerName: player.name,
+            teamId: "team-1",
+            teamCode: "T-1",
+            teamName: "Team One",
+            appearances: 4,
+            totalContribution: 88.8,
+            totalPoints: 88.8,
+            averageContribution: 22.2,
+            averageFinalScore: 44.4,
+            powPoints: 12.5,
+            spePoints: 8.5,
+            menPoints: 4.2,
+            socPoints: 1.8,
+            ovr: 64.2,
+            ovrRank: 7,
+            pps: 88.8,
+            ppsRank: 5,
+            mvs: 41.3,
+            mvsRank: 9,
+            marketValue: 31.75,
+            salary: 7.2,
+            contractLength: 2,
+            top10Count: 1,
+            mvpCount: 0,
+            bestDisciplineId: "pow-d",
+            bestDisciplineLabel: "Power Diszi",
+            bestDisciplineScore: 55.5,
+          },
+        ],
+        transferSnapshots: [],
+      },
+    ] as unknown as NonNullable<GameState["seasonState"]["seasonSnapshots"]>;
+
+    const fullRatings = buildPlayerRatingContractMap(gameState);
+    const partialRatings = new Map<string, (typeof fullRatings extends Map<string, infer T> ? T : never)>();
+    const data = buildPlayerDrawerDataFromGameState({
+      gameState,
+      playerId: player.id,
+      source: "sqlite",
+      liveRatingsById: partialRatings,
+    });
+
+    const archived = data?.historyRows.find((row) => row.seasonId === "season-1");
+    const active = data?.historyRows.find((row) => row.seasonId === "season-2");
+
+    expect(archived?.pps).toBe(88.8);
+    expect(archived?.ovr).toBe(64.2);
+    expect(archived?.mvs).toBe(41.3);
+    expect(archived?.pow).toBe(12.5);
+    expect(active?.isActiveSeason).toBe(true);
+    expect(active?.pps).toBe(12.5);
+    expect(active?.ovr).not.toBeNull();
+    expect(active?.mvs).not.toBeNull();
+    expect(active?.pow).toBe(12.5);
+  });
+
+  it("hydrates archived drawer history from playerPerformanceSnapshots when playerPerformances is empty", () => {
+    const player = createPlayer({ id: "player-snapshot-alias", pps: 54.4 });
+    const gameState = createGameState({ player, withRoster: true, snapshotPoints: 88.8 });
+    gameState.season = {
+      id: "season-2",
+      name: "Season 2",
+      currentMatchday: 1,
+      totalMatchdays: 10,
+      isCompleted: false,
+    } as unknown as GameState["season"];
+    gameState.seasonState.seasonId = "season-2";
+    const snapshotRow = gameState.seasonState.seasonSnapshots?.[0]?.playerPerformances?.[0];
+    if (!snapshotRow) {
+      throw new Error("expected seeded season snapshot row");
+    }
+    gameState.seasonState.seasonSnapshots = [
+      {
+        ...gameState.seasonState.seasonSnapshots![0],
+        playerPerformances: [],
+        playerPerformanceSnapshots: [snapshotRow],
+      },
+    ] as unknown as NonNullable<GameState["seasonState"]["seasonSnapshots"]>;
+
+    const data = buildPlayerDrawerDataFromGameState({
+      gameState,
+      playerId: player.id,
+      source: "sqlite",
+      liveRatingsById: new Map(),
+    });
+    const archived = data?.historyRows.find((row) => row.seasonId === "season-1");
+
+    expect(archived?.pps).toBe(88.8);
+    expect(archived?.ovr).toBe(64.2);
+    expect(archived?.pow).toBe(12.5);
+  });
+
   it("hydrates archived drawer history with saved player metrics in later seasons", () => {
     const player = createPlayer({ id: "player-history", pps: 54.4 });
     const gameState = createGameState({ player, withRoster: true, snapshotPoints: 88.8 });
@@ -429,6 +571,177 @@ describe("player detail drawer", () => {
     expect(archived?.salary).toBe(7.2);
     expect(archived?.contractLength).toBe(2);
     expect(archived?.pow).toBe(12.5);
+  });
+
+  it("fills missing snapshot seasons in history timeline for PP charts", () => {
+    const player = createPlayer({ id: "player-timeline", pps: 54.4 });
+    const gameState = createGameState({ player, withRoster: true, snapshotPoints: 88.8 });
+    gameState.season = {
+      id: "season-5",
+      name: "Season 5",
+      currentMatchday: 1,
+      totalMatchdays: 10,
+      isCompleted: false,
+    } as unknown as GameState["season"];
+    gameState.seasonState.seasonId = "season-5";
+    gameState.seasonState.seasonSnapshots = [
+      {
+        seasonId: "season-1",
+        seasonName: "Season 1",
+        playerPerformances: [],
+      },
+      {
+        seasonId: "season-4",
+        seasonName: "Season 4",
+        playerPerformances: [
+          {
+            playerId: player.id,
+            playerName: player.name,
+            teamId: "team-1",
+            teamCode: "T-T",
+            teamName: "Terrible Teachers",
+            appearances: 6,
+            totalPoints: 44,
+            powPoints: 12,
+            spePoints: 8,
+            menPoints: 14,
+            socPoints: 10,
+            disciplineBreakdown: [],
+          },
+        ],
+      },
+    ] as unknown as NonNullable<GameState["seasonState"]["seasonSnapshots"]>;
+
+    const data = buildPlayerDrawerDataFromGameState({
+      gameState,
+      playerId: player.id,
+      source: "sqlite",
+    });
+
+    expect(data?.historyRows.map((row) => row.seasonId)).toEqual([
+      "season-1",
+      "season-4",
+      "season-5",
+    ]);
+    expect(data?.historyRows.find((row) => row.seasonId === "season-1")?.pps).toBeNull();
+    expect(data?.historyRows.find((row) => row.seasonId === "season-4")?.pow).toBe(12);
+    expect(data?.historyRows.find((row) => row.seasonId === "season-5")?.isActiveSeason).toBe(true);
+  });
+
+  it("rebuilds archived season PP rows from snapshot discipline performances", () => {
+    const player = createPlayer({ id: "player-disc-fallback", pps: 44.4 });
+    const gameState = createGameState({ player, withRoster: true, snapshotPoints: 88.8 });
+    gameState.disciplines = [
+      { id: "d1", name: "Diszi 1", category: "power", displayOrder: 1 } as GameState["disciplines"][number],
+      { id: "d2", name: "Diszi 2", category: "speed", displayOrder: 2 } as GameState["disciplines"][number],
+    ];
+    gameState.season = {
+      id: "season-5",
+      name: "Season 5",
+      currentMatchday: 1,
+      totalMatchdays: 10,
+      isCompleted: false,
+    } as unknown as GameState["season"];
+    gameState.seasonState.seasonId = "season-5";
+    gameState.seasonState.seasonSnapshots = [
+      {
+        seasonId: "season-4",
+        seasonName: "Season 4",
+        playerPerformances: [],
+        matchdayResults: [
+          {
+            id: "matchday-result-season-4-md-1",
+            seasonId: "season-4",
+            matchdayId: "season-4-matchday-1",
+            status: "preview_applied",
+          },
+        ],
+        playerDisciplinePerformances: [
+          {
+            id: "player-performance-season-4-md-1",
+            matchdayResultId: "matchday-result-season-4-md-1",
+            teamId: "team-1",
+            playerId: player.id,
+            disciplineId: "d1",
+            disciplineSide: "d1",
+            slotIndex: 0,
+            finalPlayerScore: 80,
+            scoreContribution: 4.2,
+            isTop10: false,
+            isMvpCandidate: false,
+            createdAt: "2026-01-01T00:00:00.000Z",
+          },
+          {
+            id: "player-performance-season-4-md-1-spe",
+            matchdayResultId: "matchday-result-season-4-md-1",
+            teamId: "team-1",
+            playerId: player.id,
+            disciplineId: "d2",
+            disciplineSide: "d2",
+            slotIndex: 0,
+            finalPlayerScore: 70,
+            scoreContribution: 2.1,
+            isTop10: false,
+            isMvpCandidate: false,
+            createdAt: "2026-01-01T00:00:00.000Z",
+          },
+        ],
+      },
+    ] as unknown as NonNullable<GameState["seasonState"]["seasonSnapshots"]>;
+
+    const data = buildPlayerDrawerDataFromGameState({
+      gameState,
+      playerId: player.id,
+      source: "sqlite",
+    });
+
+    expect(data?.historyRows.find((row) => row.seasonId === "season-4")?.pow).toBe(4.2);
+    expect(data?.historyRows.find((row) => row.seasonId === "season-4")?.spe).toBe(2.1);
+  });
+
+  it("starts the PP timeline at joinedSeasonId for late roster arrivals", () => {
+    const player = createPlayer({ id: "player-late-join", pps: 54.4 });
+    const gameState = createGameState({ player, withRoster: true, snapshotPoints: 88.8 });
+    const roster = gameState.rosters.find((entry) => entry.playerId === player.id);
+    if (roster) {
+      roster.joinedSeasonId = "season-4";
+    }
+    gameState.transferHistory.push({
+      id: "transfer-late-join",
+      playerId: player.id,
+      seasonId: "season-4",
+      seasonLabel: "Season 4",
+      transferType: "buy",
+      toTeamId: roster?.teamId ?? "team-1",
+      fee: 25,
+      salary: 8,
+      marketValue: 25,
+      happenedAt: "2026-01-01T00:00:00.000Z",
+    } as GameState["transferHistory"][number]);
+    gameState.season = {
+      id: "season-5",
+      name: "Season 5",
+      currentMatchday: 1,
+      totalMatchdays: 10,
+      isCompleted: false,
+    } as unknown as GameState["season"];
+    gameState.seasonState.seasonId = "season-5";
+    gameState.seasonState.seasonSnapshots = [
+      { seasonId: "season-1", seasonName: "Season 1", playerPerformances: [] },
+      { seasonId: "season-2", seasonName: "Season 2", playerPerformances: [] },
+      { seasonId: "season-3", seasonName: "Season 3", playerPerformances: [] },
+      { seasonId: "season-4", seasonName: "Season 4", playerPerformances: [] },
+    ] as unknown as NonNullable<GameState["seasonState"]["seasonSnapshots"]>;
+
+    const data = buildPlayerDrawerDataFromGameState({
+      gameState,
+      playerId: player.id,
+      source: "sqlite",
+    });
+
+    expect(data?.historyRows.map((row) => row.seasonId)).toEqual(["season-4", "season-5"]);
+    expect(data?.historyRows.find((row) => row.seasonId === "season-4")?.pow).toBe(0);
+    expect(data?.historyRows.find((row) => row.seasonId === "season-4")?.pps).toBe(0);
   });
 
   it("uses the internal player salary source for free agents", () => {
@@ -698,8 +1011,64 @@ describe("player detail drawer", () => {
     expect(data?.seasonPerformance?.seasonId).toBe("season-2");
     expect(data?.seasonPerformance?.sourceLabel).toBe("Season Snapshot");
     expect(data?.pps).toBe(44.4);
+    expect(data?.ppsRank).toBeNull();
     expect(data?.axisCards.find((card) => card.id === "pow")?.seasonPoints).toBe(30.1);
     expect(data?.axisCards.find((card) => card.id === "spe")?.seasonPoints).toBe(14.3);
+  });
+
+  it("still merges live current-season performance into rating pps at season start", () => {
+    const player = createPlayer({ id: "player-live-s3", pps: 61 });
+    const gameState = createResultGameState(player);
+    gameState.season = {
+      id: "season-3",
+      name: "Season 3",
+      currentMatchday: 2,
+      totalMatchdays: 10,
+      isCompleted: false,
+    } as unknown as GameState["season"];
+    gameState.seasonState.seasonId = "season-3";
+    gameState.seasonState.matchdayResults = (gameState.seasonState.matchdayResults ?? []).map((entry) => ({
+      ...entry,
+      seasonId: "season-3",
+    }));
+    gameState.seasonState.seasonSnapshots = [
+      {
+        seasonId: "season-2",
+        seasonName: "Season 2",
+        status: "completed",
+        archivedAt: "2026-06-12T10:00:00.000Z",
+        finalStandings: [],
+        playerPerformances: [
+          {
+            playerId: player.id,
+            playerName: player.name,
+            teamId: "team-1",
+            teamCode: "T-1",
+            teamName: "Team One",
+            appearances: 7,
+            totalContribution: 99.9,
+            totalPoints: 99.9,
+            powPoints: 50,
+            spePoints: 20,
+            menPoints: 15,
+            socPoints: 14.9,
+          },
+        ],
+      },
+    ] as unknown as NonNullable<GameState["seasonState"]["seasonSnapshots"]>;
+
+    const data = buildPlayerDrawerDataFromGameState({
+      gameState,
+      playerId: player.id,
+      source: "sqlite",
+    });
+    const ratingRow = buildPlayerRatingContractMap(gameState).get(player.id);
+
+    expect(data?.seasonPerformance?.seasonId).toBe("season-3");
+    expect(data?.seasonPerformance?.sourceLabel).toBe("Aktuelle Matchday-Results");
+    expect(data?.pps).toBe(28);
+    expect(data?.ppsRank).toBe(ratingRow?.ppsSeasonRank ?? null);
+    expect(data?.axisCards.find((card) => card.id === "pow")?.seasonPoints).toBe(12.5);
   });
 
   it("exposes board trust and renewal policy for underperforming expiring players", () => {
@@ -742,8 +1111,8 @@ describe("player detail drawer", () => {
 
     expect(data?.boardTrust?.trustScore).toBeLessThan(25);
     expect(data?.boardTrust?.smiley).toBe(">:(");
-    expect(data?.boardTrust?.renewalPolicy).toBe("do_not_renew");
-    expect(data?.boardTrust?.salaryCapMultiplier).toBe(0);
+    expect(data?.boardTrust?.renewalPolicy).toBe("renewal_warning");
+    expect(data?.boardTrust?.salaryCapMultiplier).toBe(0.7);
     expect(data?.boardTrust?.reasons).toContain("low_board_confidence");
     expect(data?.boardTrust?.reasons).toContain("performance_below_board_expectation");
   });
@@ -1090,9 +1459,9 @@ describe("player detail drawer", () => {
       source: "sqlite",
     });
 
-    expect(data?.potentialOverallStars).toBe(4);
+    expect(data?.potentialOverallStars).toBe(3);
     expect(data?.potentialOverallStars).toBeGreaterThanOrEqual(data?.currentOverallStars ?? 0);
-    expect(data?.potentialOverallDelta).toBe(-0.5);
+    expect(data?.potentialOverallDelta).toBe(-1.5);
     expect(data?.potentialAxisStatus.some((entry) => entry.axis === "pow" && entry.routeState === "open")).toBe(true);
     expect(data?.trainingRouteImpact?.note).toContain("POW");
     expect(data?.attributeCeilingPreview.length).toBeGreaterThan(0);

@@ -22,8 +22,51 @@ type EconomyRosterEntry = {
   purchasePrice?: number | null;
   currentValue?: number | null;
   contractLength?: number | null;
+  contractShape?: "balanced" | "front_loaded" | "back_loaded" | null;
   yearlySalarySchedule?: ContractYearSalary[] | null;
 };
+
+export type RosterContractSalaries = {
+  /** Cash obligation for the current contract year (schedule year 1). */
+  currentSeasonSalary: number | null;
+  /** Negotiated annual benchmark used for roster tables and market comparison. */
+  annualSalary: number | null;
+};
+
+export function resolveRosterContractSalaries(
+  rosterEntry: EconomyRosterEntry | null | undefined,
+): RosterContractSalaries {
+  if (!rosterEntry) {
+    return { currentSeasonSalary: null, annualSalary: null };
+  }
+
+  const storedSalary = normalizeStoredEconomyValue(toFiniteNumber(rosterEntry.salary));
+  const schedule = rosterEntry.yearlySalarySchedule ?? [];
+  if (schedule.length === 0) {
+    return { currentSeasonSalary: storedSalary, annualSalary: storedSalary };
+  }
+
+  const currentSeasonSalary =
+    normalizeStoredEconomyValue(toFiniteNumber(schedule[0]?.salary)) ?? storedSalary;
+  const scheduleTotal = schedule.reduce(
+    (sum, row) => sum + (normalizeStoredEconomyValue(toFiniteNumber(row.salary)) ?? 0),
+    0,
+  );
+  const scheduleAverage = schedule.length > 0 ? roundTo2(scheduleTotal / schedule.length) : null;
+  const contractShape = rosterEntry.contractShape ?? "balanced";
+
+  if (contractShape === "front_loaded" || contractShape === "back_loaded") {
+    return {
+      currentSeasonSalary,
+      annualSalary: storedSalary ?? scheduleAverage ?? currentSeasonSalary,
+    };
+  }
+
+  return {
+    currentSeasonSalary,
+    annualSalary: currentSeasonSalary ?? storedSalary ?? scheduleAverage,
+  };
+}
 
 export type PlayerEconomyMarketValueSource =
   | "calculated_stored"
@@ -66,6 +109,8 @@ export type PlayerEconomyContract = {
   marketValue: number | null;
   marketValueSource: PlayerEconomyMarketValueSource;
   salary: number | null;
+  /** Negotiated annual salary for display; differs from salary on shaped contracts. */
+  annualSalary: number | null;
   salarySource: PlayerEconomySalarySource;
   purchasePrice: number | null;
   purchasePriceSource: PlayerEconomyPurchasePriceSource;
@@ -179,8 +224,8 @@ export function resolvePlayerEconomyContract(input: {
   const legacyDisplaySalary = normalizeStoredEconomyValue(player?.displaySalary);
   const rosterPurchasePrice = normalizeStoredEconomyValue(toFiniteNumber(rosterEntry?.purchasePrice));
   const rosterCurrentValue = normalizeStoredEconomyValue(toFiniteNumber(rosterEntry?.currentValue));
-  const rosterScheduledSalary = normalizeStoredEconomyValue(toFiniteNumber(rosterEntry?.yearlySalarySchedule?.[0]?.salary));
-  const rosterSalary = rosterScheduledSalary ?? normalizeStoredEconomyValue(toFiniteNumber(rosterEntry?.salary));
+  const rosterContractSalaries = resolveRosterContractSalaries(rosterEntry);
+  const rosterSalary = rosterContractSalaries.currentSeasonSalary;
   const contractLength = toFiniteNumber(rosterEntry?.contractLength);
   const playerEntity = player as Player | null;
   const formulaSources = loadPlayerFormulaSources();
@@ -319,6 +364,8 @@ export function resolvePlayerEconomyContract(input: {
     marketValue: marketValue != null ? roundTo2(marketValue) : null,
     marketValueSource,
     salary: salary != null ? roundTo2(salary) : null,
+    annualSalary:
+      rosterContractSalaries.annualSalary != null ? roundTo2(rosterContractSalaries.annualSalary) : salary != null ? roundTo2(salary) : null,
     salarySource,
     purchasePrice: purchasePrice != null ? roundTo2(purchasePrice) : null,
     purchasePriceSource,
@@ -334,4 +381,41 @@ export function resolvePlayerEconomyContract(input: {
     isImportedEconomy,
     economyStatus,
   };
+}
+
+export function formatContractShapeShortLabel(
+  shape: EconomyRosterEntry["contractShape"] | null | undefined,
+): string | null {
+  if (shape === "front_loaded") {
+    return "FL";
+  }
+  if (shape === "back_loaded") {
+    return "BL";
+  }
+  return null;
+}
+
+export function formatContractShapeLabel(
+  shape: EconomyRosterEntry["contractShape"] | null | undefined,
+): string {
+  if (shape === "front_loaded") {
+    return "Vorne schwer";
+  }
+  if (shape === "back_loaded") {
+    return "Hinten schwer";
+  }
+  if (shape === "balanced") {
+    return "Ausgeglichen";
+  }
+  return "—";
+}
+
+export function rosterSalariesDifferForDisplay(
+  currentSeasonSalary: number | null | undefined,
+  annualSalary: number | null | undefined,
+): boolean {
+  if (currentSeasonSalary == null || annualSalary == null) {
+    return false;
+  }
+  return Math.abs(currentSeasonSalary - annualSalary) >= 0.01;
 }

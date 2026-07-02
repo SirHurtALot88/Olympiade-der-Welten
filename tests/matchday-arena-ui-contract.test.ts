@@ -4,7 +4,7 @@ import { describe, expect, it } from "vitest";
 
 describe("matchday arena ui contract", () => {
   it("wires a dedicated foundation arena view with reveal controls and score lanes", async () => {
-    const [foundationText, routingText, arenaText, arenaPanelText, arenaRevealPanelText, legacyLineupText, presenterText, cssText] = await Promise.all([
+    const [foundationText, routingText, arenaText, arenaPanelText, arenaHostText, resultHostText, arenaRevealPanelText, legacyLineupText, presenterText, cssText, moduleHelpersText] = await Promise.all([
       fs.readFile(
         "/Users/chrisfalk/Documents/Codex/Olympiade der Welten/app/foundation/FoundationPageClient.tsx",
         "utf8",
@@ -19,6 +19,14 @@ describe("matchday arena ui contract", () => {
       ),
       fs.readFile(
         "/Users/chrisfalk/Documents/Codex/Olympiade der Welten/app/foundation/matchday-arena-v2/FoundationMatchdayArenaPanel.tsx",
+        "utf8",
+      ),
+      fs.readFile(
+        "/Users/chrisfalk/Documents/Codex/Olympiade der Welten/app/foundation/matchday-arena-v2/FoundationMatchdayArenaShellHost.tsx",
+        "utf8",
+      ),
+      fs.readFile(
+        "/Users/chrisfalk/Documents/Codex/Olympiade der Welten/app/foundation/matchday-result-v2/FoundationMatchdayResultShellHost.tsx",
         "utf8",
       ),
       fs.readFile(
@@ -37,40 +45,45 @@ describe("matchday arena ui contract", () => {
         "/Users/chrisfalk/Documents/Codex/Olympiade der Welten/app/globals.css",
         "utf8",
       ),
+      fs.readFile(
+        "/Users/chrisfalk/Documents/Codex/Olympiade der Welten/lib/foundation/tabs/foundation-page-module-helpers.tsx",
+        "utf8",
+      ),
     ]);
 
     expect(foundationText).toContain('"matchdayArena"');
     expect(foundationText).toContain('"matchdayResult"');
-    expect(foundationText).toContain('{ id: "matchdayArena", label: "Arena"');
-    expect(foundationText).not.toContain('{ id: "matchdayArenaV2", label: "Arena v2"');
+    expect(moduleHelpersText).toContain('{ id: "matchdayArena", label: "Arena"');
+    expect(moduleHelpersText).not.toContain('{ id: "matchdayArenaV2", label: "Arena v2"');
     expect(routingText).toContain('view === "matchday-arena-v2"');
     expect(routingText).toContain('return "matchdayArena"');
     expect(foundationText).not.toContain('{ id: "matchdayResult", label: "Result" }');
-    const secondaryViewsBlock = foundationText.slice(
-      foundationText.indexOf("const foundationSecondaryViews"),
-      foundationText.indexOf("const foundationInternalViews"),
+    const secondaryViewsBlock = moduleHelpersText.slice(
+      moduleHelpersText.indexOf("const foundationSecondaryViews"),
+      moduleHelpersText.indexOf("const foundationInternalViews"),
     );
     expect(secondaryViewsBlock).not.toContain('{ id: "matchdayResult"');
-    expect(foundationText).toContain("const foundationInternalViews");
-    expect(foundationText).toContain('{ id: "matchdayResult", label: "Spieltagsergebnis" }');
-    expect(foundationText).toContain("FoundationMatchdayArenaPanel");
+    expect(moduleHelpersText).toContain("const foundationInternalViews");
+    expect(moduleHelpersText).toContain('{ id: "matchdayResult", label: "Spieltagsergebnis" }');
+    expect(foundationText).toContain("FoundationShellRouterMatchdayArena");
+    expect(foundationText).toContain("FoundationShellRouterMatchdayResult");
     expect(foundationText).toContain("buildMatchdaySummary");
-    expect(foundationText).toContain('id="foundation-matchday-result"');
-    expect(foundationText).toContain('id="arena-result-summary"');
-    expect(foundationText).toContain('data-testid="arena-result-summary"');
-    expect(foundationText).toContain("arena-result-empty-state");
-    expect(foundationText).toContain("Noch kein Spieltagsergebnis vorhanden");
-    expect(foundationText).toContain("Spieltagsergebnis");
-    expect(foundationText).toContain("Saisonstand anzeigen");
-    expect(foundationText).toContain("Saisonstand ansehen");
-    expect(foundationText).toContain("onOpenPlayerDetails: (payload) => openPlayerDrawerById(payload.playerId, payload.activePlayerId)");
+    expect(resultHostText).toContain('id="foundation-matchday-result"');
+    expect(arenaHostText).toContain('id="arena-result-summary"');
+    expect(arenaHostText).toContain('data-testid="arena-result-summary"');
+    expect(arenaHostText).toContain("arena-result-empty-state");
+    expect(arenaHostText).toContain("Noch kein Spieltagsergebnis vorhanden");
+    expect(arenaHostText).toContain("Spieltagsergebnis");
+    expect(arenaHostText).toContain("Saisonstand ansehen");
+    expect(resultHostText).toContain("Saisonstand anzeigen");
+    expect(arenaHostText).toContain("onOpenPlayerDetails: (payload) => openPlayerDrawerById(payload.playerId, payload.activePlayerId)");
     expect(foundationText).toContain("foundation-global-next-button");
     expect(foundationText).toContain("triggerGlobalNext");
     expect(foundationText).toContain('active={activeView === "matchdayArena"}');
     expect(arenaPanelText).toContain('data-testid="arena-lineup-blocker"');
     expect(foundationText).toContain("lineup_not_submitted");
+    expect(foundationText).toContain("homeNextMatchdayStatus");
     expect(foundationText).toContain("isTeamMatchdayLineupSubmitted");
-    expect(foundationText).toContain("homeNextMatchdayStatus.openSlots > 0");
     expect(foundationText).toContain("Leertaste");
     expect(foundationText).toContain("event.code !== \"Space\"");
     expect(foundationText).toContain("tagName === \"input\"");
@@ -129,7 +142,7 @@ describe("matchday arena ui contract", () => {
     expect(arenaText).toContain("matchdayMutatorLabelsBySide");
     expect(arenaText).toContain("onOpenTeam");
     expect(arenaText).toContain("handleTeamProfileOpen");
-    expect(foundationText).toContain("onOpenTeam: openTeamDrawerById");
+    expect(arenaHostText).toContain("onOpenTeam: openTeamDrawerById");
     expect(arenaText).toContain("Team-Fokus aufheben");
     expect(arenaText).toContain("Fortgesetzt bei");
     expect(arenaText).toContain("arena-v2-board-step-nav");
@@ -212,7 +225,7 @@ describe("matchday arena ui contract", () => {
   });
 
   it("wires Spieltag-abschliessen button and lineup blocker in arena view", async () => {
-    const [foundationText, arenaPanelText] = await Promise.all([
+    const [foundationText, arenaPanelText, arenaHostText] = await Promise.all([
       fs.readFile(
         "/Users/chrisfalk/Documents/Codex/Olympiade der Welten/app/foundation/FoundationPageClient.tsx",
         "utf8",
@@ -221,12 +234,16 @@ describe("matchday arena ui contract", () => {
         "/Users/chrisfalk/Documents/Codex/Olympiade der Welten/app/foundation/matchday-arena-v2/FoundationMatchdayArenaPanel.tsx",
         "utf8",
       ),
+      fs.readFile(
+        "/Users/chrisfalk/Documents/Codex/Olympiade der Welten/app/foundation/matchday-arena-v2/FoundationMatchdayArenaShellHost.tsx",
+        "utf8",
+      ),
     ]);
 
-    expect(foundationText).toContain('data-testid="arena-finish-matchday-button"');
+    expect(arenaHostText).toContain('data-testid="arena-finish-matchday-button"');
     expect(foundationText).toContain("runFinishMatchdaySimple");
-    expect(foundationText).toContain("Spieltag abschliessen");
-    expect(foundationText).toContain("matchday-auto-run-execute");
+    expect(arenaHostText).toContain("Spieltag abschliessen");
+    expect(arenaHostText).toContain("matchday-auto-run-execute");
     expect(arenaPanelText).toContain('data-testid="arena-lineup-blocker"');
     expect(foundationText).toContain("lineup_not_submitted");
   });

@@ -1,11 +1,16 @@
 import type { GameFlowState, GameFlowStep } from "@/lib/foundation/game-flow-controller";
+import { buildTeamPlayerTrainingLoadPlans, type AiTeamTrainingIntensity } from "@/lib/ai/ai-player-training-load-service";
 import type {
   GameInboxItem,
   GameInboxSeverity,
   GameInboxStatus,
   GameState,
+  Player,
+  RosterEntry,
+  Team,
   TeamControlSettings,
 } from "@/lib/data/olyDataTypes";
+import { getInjuryRiskPercent, getPlayerAvailabilityView } from "@/lib/fatigue/fatigue-injury-service";
 import { buildTeamControlSettingsMap, DEFAULT_ACTIVE_OWNER_ID, getTeamOwner } from "@/lib/foundation/team-control-settings";
 import { FACILITY_CATALOG } from "@/lib/facilities/facility-catalog";
 import { calculateFacilityIncome, calculateFacilityUpkeep, getTeamFacilityState } from "@/lib/facilities/facility-effects";
@@ -148,6 +153,149 @@ function teamTrainingMissingCount(gameState: GameState, teamId: string) {
   return getTeamRosterPlayerIds(gameState, teamId).filter((playerId) => playersById.get(playerId)?.trainingMode == null).length;
 }
 
+function resolveTeamTrainingBaselineIntensity(gameState: GameState, teamId: string): AiTeamTrainingIntensity {
+  const settings = gameState.seasonState.aiManagerTrainingSettings?.[teamId];
+  if (settings?.trainingIntensity === "light") return "light";
+  if (settings?.trainingIntensity === "hard") return "hard";
+  return "normal";
+}
+
+function buildPlayerHealthInboxTasks(input: {
+  saveId: string;
+  gameState: GameState;
+  team: Team;
+  roster: RosterEntry[];
+  playerById: Map<string, Player>;
+  controlMode: string;
+  createdAt: string;
+}) {
+  if (input.controlMode !== "manual") {
+    return [] as GameInboxItem[];
+  }
+
+  const items: GameInboxItem[] = [];
+  const matchdayId = input.gameState.matchdayState.matchdayId;
+  const seasonId = input.gameState.season.id;
+  const teamBaselineIntensity = resolveTeamTrainingBaselineIntensity(input.gameState, input.team.teamId);
+  const trainingPlans = buildTeamPlayerTrainingLoadPlans({
+    gameState: input.gameState,
+    teamId: input.team.teamId,
+    teamBaselineIntensity,
+  });
+  const lineupRestPlayerIds = new Set<string>();
+
+  for (const entry of input.roster) {
+    const player = input.playerById.get(entry.playerId);
+    if (!player) continue;
+
+    const availability = getPlayerAvailabilityView(
+      input.gameState,
+      entry.playerId,
+      input.team.teamId,
+      matchdayId,
+    );
+
+    if (availability.isUnavailable && availability.injuryStatus === "injured") {
+      items.push(
+        createItem({
+          itemId: `player_injured:${input.saveId}:${seasonId}:${matchdayId}:${input.team.teamId}:${entry.playerId}`,
+          saveId: input.saveId,
+          seasonId,
+          matchday: matchdayId,
+          teamId: input.team.teamId,
+          playerId: entry.playerId,
+          category: "warning",
+          severity: "critical",
+          title: "Verletzter Spieler",
+          description: `${getPlayerName(input.gameState, entry.playerId)} fehlt${availability.injuryUntilMatchday ? ` bis ${availability.injuryUntilMatchday}` : ""}.`,
+          targetView: "lineup",
+          targetParams: { team: input.team.teamId, player: entry.playerId },
+          ctaLabel: "Lineup prüfen",
+          source: "player_health_injury",
+          createdAt: input.createdAt,
+        }),
+      );
+      continue;
+    }
+
+    const fatigue = player.fatigue ?? availability.fatigue ?? 0;
+    const riskPercent = getInjuryRiskPercent(fatigue);
+    if (fatigue >= 70 || riskPercent >= 15) {
+      items.push(
+        createItem({
+          itemId: `player_fatigue_risk:${input.saveId}:${seasonId}:${input.team.teamId}:${entry.playerId}`,
+          saveId: input.saveId,
+          seasonId,
+          matchday: matchdayId,
+          teamId: input.team.teamId,
+          playerId: entry.playerId,
+          category: "training",
+          severity: fatigue >= 80 || riskPercent >= 25 ? "critical" : "warning",
+          title: fatigue >= 80 || riskPercent >= 25 ? "Hohes Verletzungsrisiko" : "Ermüdung beobachten",
+          description: `${getPlayerName(input.gameState, entry.playerId)}: Fatigue ${Math.round(fatigue)}, Verletzungsrisiko ${riskPercent}%.`,
+          targetView: "training",
+          targetParams: { team: input.team.teamId, player: entry.playerId },
+          ctaLabel: "Training prüfen",
+          source: "player_health_fatigue_risk",
+          createdAt: input.createdAt,
+        }),
+      );
+    }
+  }
+
+  for (const plan of trainingPlans) {
+    if (plan.needsLineupRest && !lineupRestPlayerIds.has(plan.playerId)) {
+      lineupRestPlayerIds.add(plan.playerId);
+      items.push(
+        createItem({
+          itemId: `player_lineup_rest:${input.saveId}:${seasonId}:${matchdayId}:${input.team.teamId}:${plan.playerId}`,
+          saveId: input.saveId,
+          seasonId,
+          matchday: matchdayId,
+          teamId: input.team.teamId,
+          playerId: plan.playerId,
+          category: "warning",
+          severity: "warning",
+          title: "Spielpause empfohlen",
+          description: `${plan.playerName}: hohe Belastung — für den nächsten Spieltag pausieren.`,
+          targetView: "lineup",
+          targetParams: { team: input.team.teamId, player: plan.playerId },
+          ctaLabel: "Lineup prüfen",
+          source: "player_health_lineup_rest",
+          createdAt: input.createdAt,
+        }),
+      );
+    }
+
+    if (
+      plan.trainingDemandPreferred === "hart" &&
+      (plan.currentFatigue >= 55 || plan.currentInjuryRiskPercent >= 10)
+    ) {
+      items.push(
+        createItem({
+          itemId: `player_training_load:${input.saveId}:${seasonId}:${input.team.teamId}:${plan.playerId}`,
+          saveId: input.saveId,
+          seasonId,
+          matchday: matchdayId,
+          teamId: input.team.teamId,
+          playerId: plan.playerId,
+          category: "training",
+          severity: plan.projectedInjuryRiskPercent >= 20 ? "warning" : "info",
+          title: "Hard-Training vs. Erholung",
+          description: `${plan.playerName}: Hard-Demand unter Belastung (Fatigue ${Math.round(plan.currentFatigue)}, Modus ${plan.selectedMode}).`,
+          targetView: "training",
+          targetParams: { team: input.team.teamId, player: plan.playerId },
+          ctaLabel: "Training steuern",
+          source: "player_health_training_load",
+          createdAt: input.createdAt,
+        }),
+      );
+    }
+  }
+
+  return items;
+}
+
 function buildFlowItem(input: BuildGameInboxInput, createdAt: string): GameInboxItem | null {
   const step = input.gameFlowState?.currentStep;
   if (!step) return null;
@@ -182,16 +330,16 @@ function buildTeamTasks(input: BuildGameInboxInput, visibleTeamIds: Set<string>,
     const controlMode = settingsMap[team.teamId]?.controlMode ?? (team.humanControlled ? "manual" : "ai");
     const roster = input.gameState.rosters.filter((entry) => entry.teamId === team.teamId);
     const rosterCount = roster.length;
+    const lineupDraft =
+      (input.gameState.seasonState.lineupDrafts ?? []).find(
+        (draft) =>
+          draft.seasonId === input.gameState.season.id &&
+          draft.matchdayId === input.gameState.matchdayState.matchdayId &&
+          draft.teamId === team.teamId,
+      ) ?? null;
     const lineupStatus = {
-      hasLineup: isTeamMatchdayLineupComplete(input.gameState, team.teamId),
-      isSubmitted: isTeamMatchdayLineupSubmitted(
-        (input.gameState.seasonState.lineupDrafts ?? []).find(
-          (draft) =>
-            draft.seasonId === input.gameState.season.id &&
-            draft.matchdayId === input.gameState.matchdayState.matchdayId &&
-            draft.teamId === team.teamId,
-        ) ?? null,
-      ),
+      hasLineup: isTeamMatchdayLineupComplete(input.gameState, team.teamId, lineupDraft),
+      isSubmitted: isTeamMatchdayLineupSubmitted(lineupDraft),
     };
     if (rosterCount > 0 && !lineupStatus.hasLineup && controlMode === "manual") {
       items.push(
@@ -214,14 +362,27 @@ function buildTeamTasks(input: BuildGameInboxInput, visibleTeamIds: Set<string>,
       );
     }
 
-    const lineupDraft =
-      (input.gameState.seasonState.lineupDrafts ?? []).find(
-        (draft) =>
-          draft.seasonId === input.gameState.season.id &&
-          draft.matchdayId === input.gameState.matchdayState.matchdayId &&
-          draft.teamId === team.teamId,
-      ) ?? null;
-    const lineupComplete = isTeamMatchdayLineupComplete(input.gameState, team.teamId, lineupDraft);
+    const lineupComplete = lineupStatus.hasLineup;
+    if (rosterCount > 0 && lineupComplete && !lineupStatus.isSubmitted && controlMode === "manual") {
+      items.push(
+        createItem({
+          itemId: `lineup_not_submitted:${input.saveId}:${input.gameState.season.id}:${input.gameState.matchdayState.matchdayId}:${team.teamId}`,
+          saveId: input.saveId,
+          seasonId: input.gameState.season.id,
+          matchday: input.gameState.matchdayState.matchdayId,
+          teamId: team.teamId,
+          category: "task",
+          severity: team.teamId === input.activeTeamId ? "critical" : "warning",
+          title: "Lineup bestätigen",
+          description: `${team.shortCode}: Einsatzliste ist voll, aber noch nicht bestätigt.`,
+          targetView: "lineup",
+          targetParams: { team: team.teamId },
+          ctaLabel: "Lineup bestätigen",
+          source: "lineup_drafts",
+          createdAt,
+        }),
+      );
+    }
     const formCardFlow = getFormCardFlowStatus(input.gameState, team.teamId);
     if (rosterCount > 0 && lineupComplete && !formCardFlow.hasPool && controlMode === "manual") {
       items.push(
@@ -488,6 +649,18 @@ function buildTeamTasks(input: BuildGameInboxInput, visibleTeamIds: Set<string>,
         }),
       );
     }
+
+    items.push(
+      ...buildPlayerHealthInboxTasks({
+        saveId: input.saveId,
+        gameState: input.gameState,
+        team,
+        roster,
+        playerById,
+        controlMode,
+        createdAt,
+      }),
+    );
   }
 
   const objectiveOverview = buildTeamObjectiveOverview(input.gameState);
@@ -768,6 +941,42 @@ function buildNews(input: BuildGameInboxInput, visibleTeamIds: Set<string>, crea
     .find((result) => result.status === "preview_applied" && result.seasonId === seasonId);
   if (latestResult) {
     const summary = buildMatchdaySummary(input.gameState, { seasonId, matchdayId: latestResult.matchdayId });
+    const injuryEvents = (input.gameState.seasonState.injuryEvents ?? []).filter(
+      (event) => event.seasonId === seasonId && event.matchdayId === latestResult.matchdayId && event.result === "injured",
+    );
+
+    for (const teamRow of summary.teamRows.filter((row) => teamVisible(row.teamId))) {
+      const topPlayer = summary.topPlayers.find((player) => player.teamId === teamRow.teamId && player.rankInDiscipline === 1);
+      const teamInjuries = injuryEvents.filter((event) => event.teamId === teamRow.teamId);
+      const rankDetail =
+        teamRow.rankDelta != null && teamRow.rankDelta !== 0
+          ? `${teamRow.rankDelta > 0 ? "+" : ""}${teamRow.rankDelta} Platz${Math.abs(teamRow.rankDelta) === 1 ? "" : "e"}`
+          : "Rang unverändert";
+      const mvpDetail = topPlayer ? `MVP: ${topPlayer.playerName} (${topPlayer.disciplineName})` : "Kein MVP-Signal";
+      const injuryDetail =
+        teamInjuries.length > 0
+          ? `${teamInjuries.length} Verletzung(en) nach Belastung`
+          : "Keine neuen Verletzungen";
+
+      items.push(
+        createItem({
+          itemId: `matchday_recap:${input.saveId}:${latestResult.id}:${teamRow.teamId}`,
+          saveId: input.saveId,
+          seasonId,
+          matchday: latestResult.matchdayId,
+          teamId: teamRow.teamId,
+          category: "result",
+          severity: teamInjuries.length > 0 ? "warning" : "info",
+          title: `Spieltag-Recap: ${teamRow.teamShortCode}`,
+          description: `${latestResult.matchdayId}: ${rankDetail} · ${mvpDetail} · ${injuryDetail}.`,
+          targetView: "matchdayArena",
+          targetParams: { team: teamRow.teamId, matchday: latestResult.matchdayId, panel: "arena-result-summary" },
+          source: "story:matchday_recap",
+          createdAt: latestResult.updatedAt ?? createdAt,
+        }),
+      );
+    }
+
     const mutatorBonusByTeam = new Map<string, number>();
     for (const perf of input.gameState.seasonState.playerDisciplinePerformances ?? []) {
       if (perf.matchdayResultId !== latestResult.id) continue;
@@ -929,17 +1138,47 @@ export function filterGameInboxItems(items: GameInboxItem[], filter: GameInboxFi
 }
 
 export function getPrimaryInboxTask(items: GameInboxItem[], options?: { focusMatchdayLoop?: boolean }) {
-  return (
-    items.find(
-      (item) =>
-        item.status === "open" &&
-        (item.category === "task" ||
-          item.category === "warning" ||
-          item.category === "sponsor" ||
-          (!options?.focusMatchdayLoop && item.category === "contract") ||
-          item.severity === "critical"),
-    ) ?? null
+  const severityRank: Record<GameInboxItem["severity"], number> = {
+    critical: 0,
+    warning: 1,
+    info: 2,
+  };
+  const sourcePriority: Record<string, number> = {
+    player_health_injury: 0,
+    player_health_fatigue_risk: 1,
+    player_health_lineup_rest: 2,
+    player_health_training_load: 3,
+    lineup_drafts: 4,
+    game_flow_controller: 5,
+    team_season_objectives: 6,
+  };
+
+  const candidates = items.filter(
+    (item) =>
+      item.status === "open" &&
+      (item.category === "task" ||
+        item.category === "warning" ||
+        item.category === "sponsor" ||
+        item.category === "training" ||
+        (!options?.focusMatchdayLoop && item.category === "contract") ||
+        item.severity === "critical"),
   );
+
+  if (candidates.length === 0) {
+    return null;
+  }
+
+  return [...candidates].sort((left, right) => {
+    const severityDiff = severityRank[left.severity] - severityRank[right.severity];
+    if (severityDiff !== 0) {
+      return severityDiff;
+    }
+    const sourceDiff = (sourcePriority[left.source] ?? 50) - (sourcePriority[right.source] ?? 50);
+    if (sourceDiff !== 0) {
+      return sourceDiff;
+    }
+    return left.title.localeCompare(right.title, "de");
+  })[0];
 }
 
 export function mapInboxItemToFlowStep(item: GameInboxItem): Pick<GameFlowStep, "label" | "cta" | "status" | "targetView" | "targetPanel" | "teamId" | "blockers" | "warnings"> {
@@ -954,4 +1193,68 @@ export function mapInboxItemToFlowStep(item: GameInboxItem): Pick<GameFlowStep, 
     blockers: isCritical ? [item.description] : [],
     warnings: isCritical ? [] : [item.description],
   };
+}
+
+export const INBOX_DECISION_CATEGORIES = [
+  "task",
+  "warning",
+  "transfer",
+  "finance",
+  "contract",
+  "training",
+  "facility",
+  "sponsor",
+] as const;
+
+export const INBOX_CHRONICLE_CATEGORIES = ["news", "result"] as const;
+
+export function isGameInboxDecisionItem(item: GameInboxItem) {
+  if (item.source.startsWith("player_health_")) {
+    return true;
+  }
+  if ((INBOX_DECISION_CATEGORIES as readonly string[]).includes(item.category)) {
+    if (item.category === "transfer" && item.source === "transfer_history") {
+      return false;
+    }
+    return true;
+  }
+  return false;
+}
+
+export function isGameInboxChronicleItem(item: GameInboxItem) {
+  if ((INBOX_CHRONICLE_CATEGORIES as readonly string[]).includes(item.category)) {
+    return true;
+  }
+  if (item.source.startsWith("story:")) {
+    return true;
+  }
+  if (item.source === "story:matchday_recap") {
+    return true;
+  }
+  if (item.source === "season_snapshots" || item.source === "transfer_history") {
+    return true;
+  }
+  if (item.source === "facility_events" || item.source === "player_progression_events") {
+    return true;
+  }
+  if (item.source === "cash_prize_apply_logs" || item.source === "matchday_results") {
+    return true;
+  }
+  if (item.category === "finance" && item.source === "cash_prize_apply_logs") {
+    return true;
+  }
+  if (item.category === "transfer" && item.source === "transfer_history") {
+    return true;
+  }
+  if (item.category === "facility" && item.source === "facility_events") {
+    return true;
+  }
+  if (item.category === "training" && item.source === "player_progression_events") {
+    return true;
+  }
+  return false;
+}
+
+export function filterInboxItemsByMode(items: GameInboxItem[], mode: "decisions" | "chronicle") {
+  return items.filter((item) => (mode === "decisions" ? isGameInboxDecisionItem(item) : isGameInboxChronicleItem(item)));
 }

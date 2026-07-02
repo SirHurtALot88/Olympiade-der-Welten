@@ -2,6 +2,7 @@ import { getActiveRoomBySaveId, getRoom } from "@/lib/room/room-store";
 import { findSeatByToken } from "@/lib/room/rejoin";
 import { authorizeTeamWrite, type TeamWriteAction } from "@/lib/room/online-room-model";
 import { DEFAULT_ACTIVE_OWNER_ID, canLocalUserManageTeam } from "@/lib/foundation/team-control-settings";
+import { canFoundationLocalUserManageTeam } from "@/lib/foundation/foundation-admin-dev-flags";
 import { createPersistenceService } from "@/lib/persistence/persistence-service";
 import type { RoomParticipant, TeamControllerType, TeamOwnershipRecord } from "@/types/game";
 import type { RuntimeRoom } from "@/types/room";
@@ -103,7 +104,7 @@ function authorizeLocalSingleplayerTeamWrite(input: ServerRoomWriteContext, warn
   }
 
   const activeOwnerId = input.activeOwnerId?.trim() || DEFAULT_ACTIVE_OWNER_ID;
-  if (!canLocalUserManageTeam(save.gameState, input.teamId, activeOwnerId)) {
+  if (!canFoundationLocalUserManageTeam(canLocalUserManageTeam(save.gameState, input.teamId, activeOwnerId))) {
     return {
       allowed: false,
       status: 403,

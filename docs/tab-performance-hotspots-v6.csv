@@ -1,0 +1,21 @@
+fromTab,toTab,v6Ms,apiCallsCount,slowestApiMs,slowestApiPath,warnings,status
+Home,Inbox,4228,6,3648,/api/media/player-portrait/player-2262-nimri,,ok
+Inbox,Einsatzliste,10900,1,106,/api/lineups/legacy/lab-context,Tabwechsel >5s,slow
+Einsatzliste,Arena,17030,1,2,/api/standings/preview,Tabwechsel >5s,slow
+Arena,Saisonstand,11029,1,3395,/api/matchday/arena-base,Tabwechsel >5s,slow
+Saisonstand,Teams,37027,11,10932,/api/singleplayer-state/version,Tabwechsel >5s,slow
+Teams,Spieler,27717,39,10228,/api/singleplayer-state/version,1 API responses still completing after ready; Tabwechsel >5s,slow
+Spieler,Training,89504,12,25819,/api/singleplayer-state,Tabwechsel >5s,slow
+Training,Gebäude,61940,1,11038,/api/singleplayer-state/version,Tabwechsel >5s,slow
+Gebäude,Training (revisit),25541,10,6257,/api/singleplayer-state/version,Tabwechsel >5s,slow
+Gebäude,Transfermarkt,19635,0,0,,Tabwechsel >5s,slow
+Transfermarkt,Scouting,50631,1,31858,/api/singleplayer-state/version,Tabwechsel >5s,slow
+Scouting,Historie,20975,3,4442,/api/singleplayer-state/version,Tabwechsel >5s,slow
+Historie,Ranks,13153,0,0,,Tabwechsel >5s,slow
+Ranks,Diszis,12275,0,0,,Tabwechsel >5s,slow
+Diszis,Sponsoren,127912,0,0,,"locator.waitFor: Timeout 120000ms exceeded.
+Call log:
+  - waiting for locator('[data-testid=""team-sponsor-choice""]:not(.foundation-section-hidden)').first() to be visible
+",failed
+Sponsoren,Lexikon,10719,1,10,/api/singleplayer-state/version,Tabwechsel >5s,slow
+START,Home,16925,,,initial_load,,ok

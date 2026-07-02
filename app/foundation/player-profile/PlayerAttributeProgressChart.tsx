@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo } from "react";
+import { useMemo, type ReactNode } from "react";
 
 import {
   buildAttributeHistoryDelta,
@@ -43,6 +43,38 @@ function formatChartValue(value: number | null | undefined) {
     return "—";
   }
   return new Intl.NumberFormat("de-DE", { maximumFractionDigits: 1 }).format(value);
+}
+
+function ProgressChartCollapsible({
+  testId,
+  title,
+  subtitle,
+  shellClassName = "",
+  defaultOpen = false,
+  children,
+}: {
+  testId: string;
+  title: string;
+  subtitle?: string;
+  shellClassName?: string;
+  defaultOpen?: boolean;
+  children: ReactNode;
+}) {
+  return (
+    <details
+      className={`player-attribute-progress-collapsible ${shellClassName}`.trim()}
+      data-testid={testId}
+      {...(defaultOpen ? { open: true } : {})}
+    >
+      <summary className="player-attribute-progress-collapsible-summary">
+        <span className="player-attribute-progress-collapsible-copy">
+          <strong>{title}</strong>
+          {subtitle ? <span className="muted">{subtitle}</span> : null}
+        </span>
+      </summary>
+      <div className="player-attribute-progress-collapsible-body">{children}</div>
+    </details>
+  );
 }
 
 function buildFocusedAttributeLineGeometry(rows: PlayerAttributeHistoryRow[], attribute: (typeof PLAYER_ATTRIBUTE_CHART_KEYS)[number]) {
@@ -92,45 +124,61 @@ function buildFocusedAttributeLineGeometry(rows: PlayerAttributeHistoryRow[], at
   };
 }
 
-function buildPpBarChartGeometry(rows: PlayerProgressHistoryRow[]) {
-  const width = 560;
-  const height = 220;
-  const paddingLeft = 42;
-  const paddingRight = 16;
-  const paddingTop = 18;
-  const paddingBottom = 42;
+function formatSeasonShortLabel(seasonName: string, seasonId: string | null) {
+  const match = (seasonId ?? seasonName).match(/season-(\d+)/i);
+  if (match) {
+    return `S${match[1]}`;
+  }
+  return seasonName.replace(/^Season\s+/i, "S");
+}
+
+function buildPpMetricBlockChartsGeometry(rows: PlayerProgressHistoryRow[]) {
+  const width = 280;
+  const height = 148;
+  const paddingLeft = 28;
+  const paddingRight = 10;
+  const paddingTop = 16;
+  const paddingBottom = 34;
   const innerWidth = width - paddingLeft - paddingRight;
   const innerHeight = height - paddingTop - paddingBottom;
+  const slotWidth = innerWidth / Math.max(rows.length, 1);
+  const barWidth = Math.min(16, slotWidth * 0.52);
 
-  const values = rows.flatMap((row) => PP_METRICS.map((metric) => row[metric.id]).filter((value): value is number => value != null && Number.isFinite(value)));
-  const maxValue = Math.max(...values, 1);
-  const groupWidth = innerWidth / Math.max(rows.length, 1);
-  const barWidth = Math.min(14, groupWidth / (PP_METRICS.length + 1));
+  return PP_METRICS.map((metric) => {
+    const values = rows
+      .map((row) => row[metric.id])
+      .filter((value): value is number => value != null && Number.isFinite(value));
+    const maxValue = Math.max(...values, 1);
 
-  const groups = rows.map((row, rowIndex) => {
-    const groupX = paddingLeft + rowIndex * groupWidth + groupWidth / 2;
-    const bars = PP_METRICS.map((metric, metricIndex) => {
+    const bars = rows.map((row, index) => {
       const value = row[metric.id];
-      const barHeight = value != null && Number.isFinite(value) ? (value / maxValue) * innerHeight : 0;
-      const x = groupX - ((PP_METRICS.length * barWidth) / 2) + metricIndex * (barWidth + 2);
+      const hasValue = value != null && Number.isFinite(value);
+      const centerX = paddingLeft + index * slotWidth + slotWidth / 2;
+      const barHeight = hasValue && value > 0 ? (value / maxValue) * innerHeight : 0;
+      const x = centerX - barWidth / 2;
       const y = paddingTop + innerHeight - barHeight;
       return {
-        metric,
-        value,
+        row,
+        value: hasValue ? value : null,
+        centerX,
         x,
         y,
         width: barWidth,
         height: barHeight,
       };
     });
+
     return {
-      row,
-      groupX,
+      metric,
+      width,
+      height,
+      paddingTop,
+      paddingBottom,
+      innerHeight,
+      maxValue,
       bars,
     };
   });
-
-  return { width, height, paddingTop, paddingBottom, innerHeight, maxValue, groups };
 }
 
 function buildAttributeLineChartGeometry(rows: PlayerAttributeHistoryRow[]) {
@@ -192,7 +240,10 @@ export default function PlayerAttributeProgressChart({
 }: PlayerAttributeProgressChartProps) {
   const sortedRows = useMemo(() => sortPlayerProgressHistoryRows(historyRows), [historyRows]);
   const summary = useMemo(() => buildPlayerProgressSummary(sortedRows), [sortedRows]);
-  const ppChart = useMemo(() => (sortedRows.length > 0 ? buildPpBarChartGeometry(sortedRows) : null), [sortedRows]);
+  const ppMetricCharts = useMemo(
+    () => (sortedRows.length > 0 ? buildPpMetricBlockChartsGeometry(sortedRows) : []),
+    [sortedRows],
+  );
   const attributeChart = useMemo(
     () => (attributeHistoryRows.length >= 2 ? buildAttributeLineChartGeometry(attributeHistoryRows) : null),
     [attributeHistoryRows],
@@ -241,23 +292,20 @@ export default function PlayerAttributeProgressChart({
       </div>
 
       {strChart ? (
-        <div className="player-attribute-progress-line-chart-shell is-focused" data-testid="player-attribute-progress-str-line">
-          <div className="player-attribute-progress-chart-subhead">
-            <h5>STR (Power)</h5>
-            <p className="muted">
-              Entwicklung über {attributeHistoryRows.length} Saisons
-              {strChart.delta != null ? (
-                <>
-                  {" "}
-                  · Bilanz {strChart.delta > 0 ? "+" : ""}
-                  {formatChartValue(strChart.delta)}
-                </>
-              ) : null}
-            </p>
-          </div>
+        <ProgressChartCollapsible
+          testId="player-attribute-progress-str-line"
+          title="STR (Power)"
+          shellClassName="player-attribute-progress-line-chart-shell is-focused"
+          subtitle={`Entwicklung über ${attributeHistoryRows.length} Saisons${
+            strChart.delta != null
+              ? ` · Bilanz ${strChart.delta > 0 ? "+" : ""}${formatChartValue(strChart.delta)}`
+              : ""
+          }`}
+        >
           <svg
             className="player-attribute-progress-line-chart-svg is-focused"
             viewBox={`0 0 ${strChart.width} ${strChart.height}`}
+            preserveAspectRatio="xMidYMid meet"
             role="img"
             aria-label="STR Entwicklung über Saisons"
           >
@@ -292,18 +340,20 @@ export default function PlayerAttributeProgressChart({
               </g>
             ))}
           </svg>
-        </div>
+        </ProgressChartCollapsible>
       ) : null}
 
       {attributeChart ? (
-        <div className="player-attribute-progress-line-chart-shell" data-testid="player-attribute-progress-attribute-lines">
-          <div className="player-attribute-progress-chart-subhead">
-            <h5>Attribute</h5>
-            <p className="muted">Liniendiagramm der Kernattribute über die Saisons.</p>
-          </div>
+        <ProgressChartCollapsible
+          testId="player-attribute-progress-attribute-lines"
+          title="Attribute"
+          shellClassName="player-attribute-progress-line-chart-shell"
+          subtitle="Liniendiagramm der Kernattribute über die Saisons."
+        >
           <svg
             className="player-attribute-progress-line-chart-svg"
             viewBox={`0 0 ${attributeChart.width} ${attributeChart.height}`}
+            preserveAspectRatio="xMidYMid meet"
             role="img"
             aria-label="Attribut-Entwicklung über Saisons"
           >
@@ -359,74 +409,90 @@ export default function PlayerAttributeProgressChart({
               </span>
             ))}
           </div>
-        </div>
+        </ProgressChartCollapsible>
       ) : null}
 
-      {ppChart ? (
-        <div className="player-attribute-progress-bar-chart-shell" data-testid="player-attribute-progress-pp-bars">
-          <div className="player-attribute-progress-chart-subhead">
-            <h5>PP-Entwicklung</h5>
-            <p className="muted">Alle Achsen-PPs je Saison im Säulendiagramm.</p>
-          </div>
-          <svg
-            className="player-attribute-progress-bar-chart-svg"
-            viewBox={`0 0 ${ppChart.width} ${ppChart.height}`}
-            role="img"
-            aria-label="PP-Entwicklung über Saisons"
-          >
-            <text x={4} y={ppChart.height - ppChart.paddingBottom + 4} className="player-attribute-progress-y-tick">
-              0
-            </text>
-            <text x={4} y={ppChart.paddingTop + 4} className="player-attribute-progress-y-tick">
-              {formatChartValue(ppChart.maxValue)}
-            </text>
-            <line
-              x1={42}
-              y1={ppChart.height - ppChart.paddingBottom}
-              x2={ppChart.width - 16}
-              y2={ppChart.height - ppChart.paddingBottom}
-              className="player-attribute-progress-axis"
-            />
-            {ppChart.groups.map((group) => (
-              <g key={`pp-group-${group.row.seasonId ?? group.row.seasonName}`}>
-                {group.bars.map((bar) => (
-                  <rect
-                    key={`${group.row.seasonName}-${bar.metric.id}`}
-                    x={bar.x}
-                    y={bar.y}
-                    width={bar.width}
-                    height={bar.height}
-                    className={`player-attribute-progress-bar ${bar.metric.className}`}
-                    rx={2}
-                  >
-                    <title>
-                      {bar.metric.label}: {formatChartValue(bar.value)} ({group.row.seasonName})
-                    </title>
-                  </rect>
-                ))}
-                <text
-                  x={group.groupX}
-                  y={ppChart.height - 12}
-                  textAnchor="middle"
-                  className={`player-attribute-progress-season-label${group.row.isActiveSeason ? " is-live" : ""}`}
+      {ppMetricCharts.length > 0 ? (
+        <ProgressChartCollapsible
+          testId="player-attribute-progress-pp-bars"
+          title="PP-Entwicklung"
+          shellClassName="player-attribute-progress-bar-chart-shell"
+          subtitle="Je Achse ein Block — Saisons direkt vergleichbar."
+          defaultOpen
+        >
+          <div className="player-attribute-progress-pp-blocks">
+            {ppMetricCharts.map((chart) => (
+              <article
+                key={`pp-metric-${chart.metric.id}`}
+                className={`player-attribute-progress-pp-metric-block ${chart.metric.className}`}
+                data-testid={`player-attribute-progress-pp-metric-${chart.metric.id}`}
+              >
+                <header className="player-attribute-progress-pp-metric-head">
+                  <strong>{chart.metric.label}</strong>
+                  <span className="muted">max {formatChartValue(chart.maxValue)}</span>
+                </header>
+                <svg
+                  className="player-attribute-progress-pp-metric-svg"
+                  viewBox={`0 0 ${chart.width} ${chart.height}`}
+                  preserveAspectRatio="xMidYMid meet"
+                  role="img"
+                  aria-label={`${chart.metric.label} PP je Saison`}
                 >
-                  {group.row.seasonName}
-                </text>
-              </g>
-            ))}
-          </svg>
-          <div className="player-attribute-progress-pp-legend">
-            {PP_METRICS.map((metric) => (
-              <span key={`pp-legend-${metric.id}`} className={`player-attribute-progress-pp-legend-item ${metric.className}`}>
-                {metric.label}
-              </span>
+                  <line
+                    x1={28}
+                    y1={chart.height - chart.paddingBottom}
+                    x2={chart.width - 10}
+                    y2={chart.height - chart.paddingBottom}
+                    className="player-attribute-progress-axis"
+                  />
+                  {chart.bars.map((bar) => (
+                    <g key={`${chart.metric.id}-${bar.row.seasonId ?? bar.row.seasonName}`}>
+                      {bar.height > 0 ? (
+                        <rect
+                          x={bar.x}
+                          y={bar.y}
+                          width={bar.width}
+                          height={bar.height}
+                          className={`player-attribute-progress-bar ${chart.metric.className}`}
+                          rx={2}
+                        >
+                          <title>
+                            {chart.metric.label}: {formatChartValue(bar.value)} ({bar.row.seasonName})
+                          </title>
+                        </rect>
+                      ) : null}
+                      <text
+                        x={bar.centerX}
+                        y={bar.height > 0 ? bar.y - 4 : chart.paddingTop + chart.innerHeight / 2}
+                        textAnchor="middle"
+                        className={`player-attribute-progress-value-label${bar.value == null ? " is-empty" : ""}`}
+                      >
+                        {formatChartValue(bar.value)}
+                      </text>
+                      <text
+                        x={bar.centerX}
+                        y={chart.height - 10}
+                        textAnchor="middle"
+                        className={`player-attribute-progress-season-label${bar.row.isActiveSeason ? " is-live" : ""}`}
+                      >
+                        {formatSeasonShortLabel(bar.row.seasonName, bar.row.seasonId)}
+                      </text>
+                    </g>
+                  ))}
+                </svg>
+              </article>
             ))}
           </div>
-        </div>
+        </ProgressChartCollapsible>
       ) : null}
 
       {attributeHistoryRows.length > 0 ? (
-        <div className="table-shell player-attribute-progress-table-shell" data-testid="player-attribute-progress-attribute-table">
+        <ProgressChartCollapsible
+          testId="player-attribute-progress-attribute-table"
+          title="Attribut-Tabelle"
+          subtitle="Saisonwerte und Deltas je Kernattribut."
+        >
+          <div className="table-shell player-attribute-progress-table-shell">
           <table className="team-table player-attribute-progress-table player-attribute-progress-attribute-table">
             <thead>
               <tr>
@@ -467,10 +533,17 @@ export default function PlayerAttributeProgressChart({
               ))}
             </tbody>
           </table>
-        </div>
+          </div>
+        </ProgressChartCollapsible>
       ) : null}
 
-      <div className="table-shell player-attribute-progress-table-shell">
+      <ProgressChartCollapsible
+        testId="player-attribute-progress-pp-table"
+        title="PP-Tabelle"
+        subtitle="OVR und Achsen-PPs je Saison."
+        defaultOpen
+      >
+        <div className="table-shell player-attribute-progress-table-shell">
         <table className="team-table player-attribute-progress-table">
           <thead>
             <tr>
@@ -500,7 +573,8 @@ export default function PlayerAttributeProgressChart({
             ))}
           </tbody>
         </table>
-      </div>
+        </div>
+      </ProgressChartCollapsible>
     </div>
   );
 }

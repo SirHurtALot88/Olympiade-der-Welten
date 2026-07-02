@@ -15,7 +15,6 @@ type FoundationSponsorsPanelProps = {
   sponsorChoiceProfiles: Record<string, SponsorNegotiationProfile>;
   sponsorChoiceBusy: string | null;
   selectedTeamCanManage: boolean;
-  getViewClass: (...views: Array<"prize">) => string;
   formatMoney: (value: number) => string;
   applySponsorNegotiationToComponents: (input: {
     components: SponsorOfferComponent[];
@@ -42,7 +41,6 @@ export default function FoundationSponsorsPanel({
   sponsorChoiceProfiles,
   sponsorChoiceBusy,
   selectedTeamCanManage,
-  getViewClass,
   formatMoney,
   applySponsorNegotiationToComponents,
   getSponsorNegotiationMultiplier,
@@ -51,11 +49,12 @@ export default function FoundationSponsorsPanel({
   prizeFinanceTab,
 }: FoundationSponsorsPanelProps) {
   return (
-    <section
-      className={`panel team-sponsor-panel prize-sponsors-panel${getViewClass("prize")}${prizeFinanceTab !== "sponsors" ? " foundation-section-hidden" : ""}`}
-      data-testid="team-sponsor-choice"
-      id="sponsor-choice"
-    >
+    <div data-testid="foundation-sponsors">
+      <section
+        className="panel team-sponsor-panel prize-sponsors-panel"
+        data-testid="team-sponsor-choice"
+        id="sponsor-choice"
+      >
       <div className="prize-v2-shell">
         <section className="prize-v2-hero">
           <div className="prize-v2-hero-copy">
@@ -130,5 +129,6 @@ export default function FoundationSponsorsPanel({
         )}
       </div>
     </section>
+    </div>
   );
 }

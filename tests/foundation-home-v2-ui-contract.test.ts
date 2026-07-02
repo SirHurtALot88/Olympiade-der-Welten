@@ -5,6 +5,8 @@ import { describe, expect, it } from "vitest";
 
 const root = process.cwd();
 const foundationClientPath = path.join(root, "app/foundation/FoundationPageClient.tsx");
+const foundationPageTypesPath = path.join(root, "lib/foundation/tabs/foundation-page-types.ts");
+const moduleHelpersPath = path.join(root, "lib/foundation/tabs/foundation-page-module-helpers.tsx");
 const homeV2Path = path.join(root, "app/foundation/home-v2/HomeV2Client.tsx");
 const navConfigPath = path.join(root, "lib/foundation/foundation-nav-config.ts");
 const viewRoutingPath = path.join(root, "lib/foundation/foundation-view-routing.ts");
@@ -119,14 +121,19 @@ describe("foundation ui v2 roadmap contract", () => {
   it("routes preview navigation for facilities, scouting hub and inbox v2", async () => {
     const fileText = await fs.readFile(foundationClientPath, "utf8");
     const navText = await fs.readFile(navConfigPath, "utf8");
+    const pageTypesText = await fs.readFile(foundationPageTypesPath, "utf8");
+    const moduleHelpersText = await fs.readFile(moduleHelpersPath, "utf8");
 
-    expect(fileText).toContain('| "facilitiesOverviewV2"');
-    expect(fileText).toContain('| "scoutingCenterV2"');
-    expect(fileText).toContain('| "inboxV2"');
+    expect(pageTypesText).toContain('| "facilitiesOverviewV2"');
+    expect(pageTypesText).toContain('| "scoutingCenterV2"');
+    expect(pageTypesText).toContain('| "inboxV2"');
     expect(fileText).toContain("<ScoutingCenterV2Client");
-    expect(fileText).toContain("<InboxV2Client");
+    expect(fileText).toContain("FoundationShellRouterInboxV2");
+    expect(
+      (await fs.readFile(path.join(root, "app/foundation/inbox-v2/FoundationInboxV2Host.tsx"), "utf8")),
+    ).toContain("<InboxV2Client");
     expect(navText).toContain('{ id: "inboxV2", label: "Inbox"');
-    expect(fileText).toContain('label: "Scouting Hub"');
+    expect(moduleHelpersText).toContain('label: "Scouting Hub"');
     expect(fileText).toContain("getTransfermarktScoutingVisibilityBuckets");
   });
 

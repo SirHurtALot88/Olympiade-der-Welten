@@ -1,6 +1,11 @@
 import { describe, expect, it } from "vitest";
 
-import { resolvePlayerEconomyContract } from "@/lib/foundation/player-economy-contract";
+import {
+  formatContractShapeLabel,
+  formatContractShapeShortLabel,
+  resolvePlayerEconomyContract,
+  rosterSalariesDifferForDisplay,
+} from "@/lib/foundation/player-economy-contract";
 import type { Player, RosterEntry } from "@/lib/data/olyDataTypes";
 
 function buildPlayer(overrides: Partial<Player> = {}): Player {
@@ -114,7 +119,47 @@ describe("player economy contract", () => {
     });
 
     expect(economy.salary).toBe(14.8);
+    expect(economy.annualSalary).toBe(14.8);
     expect(economy.salarySource).toBe("active_contract");
+  });
+
+  it("keeps annual salary separate from current season cash on shaped contracts", () => {
+    const economy = resolvePlayerEconomyContract({
+      player: buildPlayer({ displaySalary: 18.18, salaryDemand: 18.18 }),
+      rosterEntry: buildRosterEntry({
+        salary: 18.63,
+        contractLength: 4,
+        contractShape: "front_loaded",
+        yearlySalarySchedule: [
+          { yearIndex: 1, seasonOffset: 0, label: "Season 1", salary: 29.81 },
+          { yearIndex: 2, seasonOffset: 1, label: "Season 2", salary: 22.36 },
+          { yearIndex: 3, seasonOffset: 2, label: "Season 3", salary: 14.9 },
+          { yearIndex: 4, seasonOffset: 3, label: "Season 4", salary: 7.45 },
+        ],
+      }),
+    });
+
+    expect(economy.salary).toBe(29.81);
+    expect(economy.annualSalary).toBe(18.63);
+  });
+
+  it("uses negotiated annual salary for back-loaded contracts", () => {
+    const economy = resolvePlayerEconomyContract({
+      player: buildPlayer({ displaySalary: 22.29, salaryDemand: 22.29 }),
+      rosterEntry: buildRosterEntry({
+        salary: 22.79,
+        contractLength: 3,
+        contractShape: "back_loaded",
+        yearlySalarySchedule: [
+          { yearIndex: 1, seasonOffset: 0, label: "Season 1", salary: 11.4 },
+          { yearIndex: 2, seasonOffset: 1, label: "Season 2", salary: 22.79 },
+          { yearIndex: 3, seasonOffset: 2, label: "Season 3", salary: 34.18 },
+        ],
+      }),
+    });
+
+    expect(economy.salary).toBe(11.4);
+    expect(economy.annualSalary).toBe(22.79);
   });
 
   it("normalizes legacy roster salaries stored in cent-scale", () => {
@@ -145,5 +190,22 @@ describe("player economy contract", () => {
 
     expect(after.salary).toBe(11.4);
     expect((after.expectedSalary ?? 0)).toBeGreaterThan(before.expectedSalary ?? 0);
+  });
+
+  it("formats contract shape badges for roster tables", () => {
+    expect(formatContractShapeShortLabel("front_loaded")).toBe("FL");
+    expect(formatContractShapeShortLabel("back_loaded")).toBe("BL");
+    expect(formatContractShapeShortLabel("balanced")).toBeNull();
+    expect(formatContractShapeShortLabel(null)).toBeNull();
+    expect(formatContractShapeLabel("balanced")).toBe("Ausgeglichen");
+    expect(formatContractShapeLabel("front_loaded")).toBe("Vorne schwer");
+    expect(formatContractShapeLabel(null)).toBe("—");
+  });
+
+  it("detects when shaped contracts need a season salary subline", () => {
+    expect(rosterSalariesDifferForDisplay(29.81, 18.63)).toBe(true);
+    expect(rosterSalariesDifferForDisplay(11.4, 22.79)).toBe(true);
+    expect(rosterSalariesDifferForDisplay(18.63, 18.63)).toBe(false);
+    expect(rosterSalariesDifferForDisplay(null, 18.63)).toBe(false);
   });
 });

@@ -6,7 +6,7 @@ import { AUTO_ROSTER_FILL_CONFIRM_TOKEN } from "@/lib/ai/auto-roster-fill-contra
 import {
   runAutoRosterFillForMatchdaySetup,
 } from "@/lib/ai/auto-roster-fill-service";
-import { parseRoomWriteContextFromRequest } from "@/lib/room/parse-room-write-context";
+import { parseRoomWriteContextFromRequestAndBody } from "@/lib/room/parse-room-write-context";
 import { authorizeServerRoomWrite } from "@/lib/room/server-authoritative-write-guard";
 
 export async function POST(request: Request) {
@@ -45,7 +45,7 @@ export async function POST(request: Request) {
   }
 
   const writeAuth = authorizeServerRoomWrite({
-    ...parseRoomWriteContextFromRequest(request),
+    ...parseRoomWriteContextFromRequestAndBody(request, body),
     saveId,
     action: "ai_roster_fill_execute",
     source: "sqlite",

@@ -478,8 +478,10 @@ function summarizeOrganicProgression(progress: OrganicSeasonProgressionResult | 
     facilityModifierPct: progress.facilityModifierPct,
     marketValuePressureTotal: progress.marketValuePressureTotal,
     trainingSetpoints: progress.trainingSetpoints,
+    appliedTrainingSetpoints: progress.appliedTrainingSetpoints,
     performanceSetpoints: progress.appliedPerformanceSetpoints,
     appliedPerformanceSetpoints: progress.appliedPerformanceSetpoints,
+    regressionCombinedTotal: progress.regressionBreakdown.combinedTotal,
     netSetpoints: progress.netSetpoints,
     fatigueLoad: progress.fatigueLoad,
     topGains: sorted.filter((entry) => entry.delta > 0).slice(0, 3).map((entry) => ({ attribute: entry.attribute, delta: entry.delta })),
@@ -777,10 +779,16 @@ export function previewSeasonEndXpSpend(
 
   if (save.status !== "active") blockingReasons.push("save_not_active");
   if (!team) blockingReasons.push("team_not_found");
+  if (plannedUpgrades.length > 0) blockingReasons.push("manual_xp_spend_disabled");
   if (!APPLY_PHASES.has(gamePhase)) warnings.push(`xp_spend_apply_phase_blocked:${gamePhase}`);
   if (team && team.humanControlled === false) warnings.push("ai_xp_spend_apply_not_enabled_v1");
 
   const rosterPlayerIds = new Set(gameState.rosters.filter((entry) => entry.teamId === teamId).map((entry) => entry.playerId));
+  const materializedPlayerIds = new Set(
+    (gameState.playerProgressionEvents ?? [])
+      .filter((event) => event.seasonId === gameState.season.id && rosterPlayerIds.has(event.playerId))
+      .map((event) => event.playerId),
+  );
   const baselinePlayerIds = new Set((gameState.playerBaselines ?? []).map((baseline) => baseline.playerId));
   const inputsByPlayerId = new Map<string, SeasonEndXpSpendPlannedUpgradeInput[]>();
   for (const upgrade of plannedUpgrades) {
@@ -797,6 +805,7 @@ export function previewSeasonEndXpSpend(
 
   if (plannedUpgrades.length === 0) {
     for (const playerId of rosterPlayerIds) {
+      if (materializedPlayerIds.has(playerId)) continue;
       if (!baselinePlayerIds.has(playerId)) {
         blockingReasons.push(`player_baseline_missing:${playerId}`);
         continue;
@@ -806,11 +815,6 @@ export function previewSeasonEndXpSpend(
   }
 
   if (plannedUpgrades.length === 0 && rosterPlayerIds.size > 0 && blockingReasons.length === 0) {
-    const materializedPlayerIds = new Set(
-      (gameState.playerProgressionEvents ?? [])
-        .filter((event) => event.seasonId === gameState.season.id && rosterPlayerIds.has(event.playerId))
-        .map((event) => event.playerId),
-    );
     if (materializedPlayerIds.size >= rosterPlayerIds.size) {
       const hardBlockingReasons = ["season_xp_no_unmaterialized_xp"];
       return {
@@ -929,6 +933,7 @@ export function applySeasonEndXpSpend(
   if (!APPLY_PHASES.has(preview.saveContext.gamePhase)) applyBlockers.push(`xp_spend_apply_phase_blocked:${preview.saveContext.gamePhase}`);
   if (preview.team?.humanControlled === false && !options.allowAiTeams) applyBlockers.push("ai_xp_spend_apply_not_enabled_v1");
   if (!preview.ok) applyBlockers.push(...preview.blockingReasons);
+  if (plannedUpgrades.length > 0) applyBlockers.push("manual_xp_spend_disabled");
 
   if (applyBlockers.length > 0) {
     return {

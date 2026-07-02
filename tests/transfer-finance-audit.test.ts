@@ -85,6 +85,53 @@ describe("transfer-finance-audit", () => {
 
     expect(audit.violations.some((entry) => entry.startsWith("zero_fee_buy:"))).toBe(true);
     expect(audit.rows.some((row) => row.teamId === "T1" && row.seasonId === "season-1")).toBe(true);
+    expect(audit.rows.find((row) => row.teamId === "T1" && row.seasonId === "season-1")).toMatchObject({
+      buyCount: 1,
+      draftBuyCount: 0,
+      marketBuyCount: 1,
+    });
     expect(audit.doctrineStats.length).toBeGreaterThan(0);
+    expect(audit.doctrineStats.find((row) => row.teamId === "T1" && row.seasonId === "season-1")).toMatchObject({
+      buys: 1,
+      draftBuys: 0,
+      marketBuys: 1,
+    });
+  });
+
+  it("counts draft picks separately from market buys in season 1", () => {
+    const audit = buildTransferFinanceAudit(
+      minimalGameState({
+        transferHistory: [
+          {
+            seasonId: "season-1",
+            transferType: "buy",
+            playerId: "p-draft",
+            toTeamId: "T1",
+            fee: 25,
+            source: "ai_roster_fill",
+          },
+          {
+            seasonId: "season-1",
+            transferType: "buy",
+            playerId: "p-draft-2",
+            toTeamId: "T1",
+            fee: 18,
+            source: "season1_autoprep_topup",
+          },
+        ],
+      }),
+    );
+
+    expect(audit.rows.find((row) => row.teamId === "T1" && row.seasonId === "season-1")).toMatchObject({
+      buyCount: 0,
+      draftBuyCount: 2,
+      marketBuyCount: 0,
+      buyFeesPaid: 43,
+    });
+    expect(audit.doctrineStats.find((row) => row.teamId === "T1" && row.seasonId === "season-1")).toMatchObject({
+      buys: 0,
+      draftBuys: 2,
+      marketBuys: 0,
+    });
   });
 });

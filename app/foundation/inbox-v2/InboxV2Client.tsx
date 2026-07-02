@@ -2,22 +2,25 @@
 
 import { useMemo } from "react";
 
-import OptimizedMediaImage from "@/app/foundation/OptimizedMediaImage";
-import { VeloStatOrbitRow } from "@/components/foundation/velo-ui";
-
 import type { InboxV2ClientProps } from "@/app/foundation/inbox-v2/inbox-v2-types";
 
-const INBOX_CATEGORY_FILTERS = [
+const INBOX_DECISION_CATEGORY_FILTERS = [
   { value: "ALL", label: "Alle" },
   { value: "task", label: "Aufgaben" },
   { value: "warning", label: "Warnungen" },
-  { value: "news", label: "News" },
-  { value: "result", label: "Results" },
-  { value: "finance", label: "Finanzen" },
   { value: "transfer", label: "Transfers" },
+  { value: "finance", label: "Finanzen" },
   { value: "training", label: "Training" },
   { value: "contract", label: "Vertraege" },
   { value: "facility", label: "Facilities" },
+  { value: "sponsor", label: "Sponsoren" },
+] as const;
+
+const INBOX_CHRONICLE_CATEGORY_FILTERS = [
+  { value: "ALL", label: "Alle" },
+  { value: "news", label: "News" },
+  { value: "result", label: "Results" },
+  { value: "transfer", label: "Transfers" },
 ] as const;
 
 export default function InboxV2Client({
@@ -27,6 +30,7 @@ export default function InboxV2Client({
   teamLabel,
   openCount = 0,
   criticalCount = 0,
+  mode = "decisions",
   categoryFilter = "ALL",
   onCategoryFilterChange,
   includeDone = false,
@@ -42,13 +46,17 @@ export default function InboxV2Client({
     () => items.find((item) => item.id === selectedItemId) ?? items[0] ?? null,
     [items, selectedItemId],
   );
+  const categoryFilters = mode === "chronicle" ? INBOX_CHRONICLE_CATEGORY_FILTERS : INBOX_DECISION_CATEGORY_FILTERS;
+  const headerTitle = mode === "chronicle" ? "Chronik" : "Entscheidungen";
+  const emptyLabel =
+    mode === "chronicle" ? "Noch keine Chronik-Einträge." : "Keine offenen Aufgaben.";
 
   return (
-    <div className="inbox-v2-shell" data-testid="foundation-inbox-v2" id="foundation-inbox-v2">
+    <div className="inbox-v2-shell" data-testid="foundation-inbox-v2" id="foundation-inbox-v2" data-inbox-mode={mode}>
       <header className="inbox-v2-header">
         <div>
           <span className="eyebrow">Inbox</span>
-          <h2 title={teamLabel ?? undefined}>Entscheidungen</h2>
+          <h2 title={teamLabel ?? undefined}>{headerTitle}</h2>
           {teamLabel ? <p className="home-v2-hero-meta-line">{teamLabel}</p> : null}
         </div>
         <div className="inbox-v2-actions">
@@ -60,7 +68,7 @@ export default function InboxV2Client({
       {onCategoryFilterChange && !hideCategoryFilters ? (
         <div className="inbox-v2-filters">
           <div className="velo-intensity-rail inbox-v2-category-rail" aria-label="Inbox Kategorien">
-            {INBOX_CATEGORY_FILTERS.map((filter) => (
+            {categoryFilters.map((filter) => (
               <button
                 key={filter.value}
                 className={`velo-intensity-segment inbox-v2-category-segment${categoryFilter === filter.value ? " is-active" : ""}`}
@@ -104,7 +112,7 @@ export default function InboxV2Client({
               </button>
             ))
           ) : (
-            <p className="muted">Keine offenen Inbox-Einträge.</p>
+            <p className="muted">{emptyLabel}</p>
           )}
         </aside>
 
@@ -115,12 +123,13 @@ export default function InboxV2Client({
               <h3>{selectedItem.title}</h3>
               <p>{selectedItem.detail}</p>
               {selectedItem.choices && selectedItem.choices.length > 0 ? (
-                <div className="inbox-v2-choices">
+                <div className="inbox-v2-choices" data-testid="inbox-v2-quick-actions">
                   {selectedItem.choices.map((choice) => (
                     <button
                       key={choice.id}
                       type="button"
                       className="inbox-v2-choice-card"
+                      data-testid={`inbox-quick-action-${choice.id}`}
                       onClick={() => onRunChoice?.(selectedItem.id, choice.id)}
                     >
                       <strong>{choice.label}</strong>

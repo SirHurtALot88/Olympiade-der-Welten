@@ -86,6 +86,35 @@ describe("foundation initial compact state", () => {
     expect(compact.transferHistory).toEqual(existing.transferHistory);
   });
 
+  it("keeps attribute sheets on compact initial load while admin unlock is enabled", () => {
+    const existing = createGameState();
+    const compact = compactFoundationInitialGameState(existing);
+    expect(compact.players[0]?.attributeSheetStats).toEqual({ power: 70 });
+  });
+
+  it("strips persisted season derivations from compact payloads", () => {
+    const existing = createGameState();
+    existing.seasonState.persistedSeasonDerivations = {
+      seasonId: existing.season.id,
+      contentSignature: "sig-test",
+      updatedAt: new Date().toISOString(),
+      ledger: {
+        hasResultSource: false,
+        pointEntries: [],
+        warnings: [],
+        teamSummariesByTeamId: {},
+        playerSummariesByPlayerId: {},
+      },
+      ratingsByPlayerId: {},
+      performanceByPlayerId: {},
+    };
+    const compact = compactFoundationInitialGameState(existing);
+    expect(compact.seasonState.persistedSeasonDerivations).toBeUndefined();
+
+    const rehydrated = rehydrateGameStateAfterCompactPut(existing, compact);
+    expect(rehydrated.seasonState.persistedSeasonDerivations).toEqual(existing.seasonState.persistedSeasonDerivations);
+  });
+
   it("rehydrates compact PUT payloads without wiping archived save slices", () => {
     const existing = createGameState();
     const compactClientState = compactFoundationInitialGameState(existing);

@@ -16,6 +16,61 @@ export function parseRoomWriteContextFromRequest(request: Request) {
 
 export type ParsedRoomWriteContext = ReturnType<typeof parseRoomWriteContextFromSearchParams>;
 
+function readRoomWriteStringField(source: Record<string, unknown>, key: keyof ParsedRoomWriteContext): string | null {
+  const value = source[key];
+  if (typeof value !== "string") {
+    return null;
+  }
+  const trimmed = value.trim();
+  return trimmed.length > 0 ? trimmed : null;
+}
+
+function readRoomWriteControlMode(source: Record<string, unknown>): ParsedRoomWriteContext["controlMode"] {
+  const value = readRoomWriteStringField(source, "controlMode");
+  if (value === "human" || value === "ai" || value === "passive" || value === "manual") {
+    return value;
+  }
+  return null;
+}
+
+export function parseRoomWriteContextFromBody(body: Record<string, unknown> | null | undefined): Partial<ParsedRoomWriteContext> {
+  if (!body || typeof body !== "object") {
+    return {};
+  }
+
+  return {
+    roomCode: readRoomWriteStringField(body, "roomCode"),
+    participantId: readRoomWriteStringField(body, "participantId"),
+    seatToken: readRoomWriteStringField(body, "seatToken"),
+    userId: readRoomWriteStringField(body, "userId"),
+    activeManagerTeamId: readRoomWriteStringField(body, "activeManagerTeamId"),
+    activeOwnerId: readRoomWriteStringField(body, "activeOwnerId"),
+    controlMode: readRoomWriteControlMode(body),
+  };
+}
+
+export function mergeRoomWriteContext(
+  fromParams: ParsedRoomWriteContext,
+  fromBody: Partial<ParsedRoomWriteContext>,
+): ParsedRoomWriteContext {
+  return {
+    roomCode: fromBody.roomCode ?? fromParams.roomCode,
+    participantId: fromBody.participantId ?? fromParams.participantId,
+    seatToken: fromBody.seatToken ?? fromParams.seatToken,
+    userId: fromBody.userId ?? fromParams.userId,
+    activeManagerTeamId: fromBody.activeManagerTeamId ?? fromParams.activeManagerTeamId,
+    activeOwnerId: fromBody.activeOwnerId ?? fromParams.activeOwnerId,
+    controlMode: fromBody.controlMode ?? fromParams.controlMode,
+  };
+}
+
+export function parseRoomWriteContextFromRequestAndBody(
+  request: Request,
+  body?: Record<string, unknown> | null,
+): ParsedRoomWriteContext {
+  return mergeRoomWriteContext(parseRoomWriteContextFromRequest(request), parseRoomWriteContextFromBody(body));
+}
+
 export function readRoomWriteErrorCode(payload: unknown): string | null {
   if (!payload || typeof payload !== "object") {
     return null;

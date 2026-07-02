@@ -1,24 +1,39 @@
 // @ts-nocheck
 "use client";
 
-import { Fragment, startTransition, useState, type CSSProperties } from "react";
+import { Fragment, memo, startTransition, useEffect, useState, type CSSProperties } from "react";
+import dynamic from "next/dynamic";
 
 import ClassColorChip, { getClassColorClassName } from "@/app/foundation/ClassColorChip";
 import ClassIcon from "@/app/foundation/ClassIcon";
 import DisciplineIcon from "@/app/foundation/DisciplineIcon";
 import RaceIcon from "@/app/foundation/RaceIcon";
 import { TooltipHeading } from "@/components/ui/TooltipHeading";
-import FoundationPlayerPortraitCard from "@/components/foundation/player-portrait-card/FoundationPlayerPortraitCard";
+import BudgetedMediaImage from "@/components/foundation/BudgetedMediaImage";
 import FoundationPlayerPortraitPreview from "@/components/foundation/player-portrait-card/FoundationPlayerPortraitPreview";
+import { formatContractShapeShortLabel, rosterSalariesDifferForDisplay } from "@/lib/foundation/player-economy-contract";
 import TeamDrawerHistoryTable from "@/components/foundation/team-drawer/TeamDrawerHistoryTable";
 import { isSeasonDisciplineKey } from "@/lib/season/season-discipline-area-groups";
-import type { FoundationViewId } from "@/lib/foundation/foundation-view-routing";
 import { TEAM_BOARD_PRESSURE_TOOLTIP, TEAM_BOARD_RATING_TOOLTIP } from "@/lib/foundation/team-board-tooltips";
 
 const TEAM_ROSTER_PORTRAIT_LOADING = {
-  loading: "eager",
-  fetchPriority: "high",
+  loading: "lazy",
+  fetchPriority: "auto",
 } as const;
+
+/** League-table logos beyond the selected row load after shell paint (+200 ms idle). */
+const TEAMS_INITIAL_VISIBLE_LOGO_ROWS = 10;
+const TEAMS_DEFERRED_LOGO_IDLE_MS = 200;
+
+const FoundationTeamsPortraitsTab = dynamic(() => import("./FoundationTeamsPortraitsTab"), {
+  ssr: false,
+  loading: () => <p className="muted team-portraits-loading">Portraits werden geladen…</p>,
+});
+
+const FoundationPlayerPortraitCard = dynamic(
+  () => import("@/components/foundation/player-portrait-card/FoundationPlayerPortraitCard"),
+  { ssr: false },
+);
 
 function PlayerPortrait({
   src,
@@ -62,11 +77,11 @@ function PlayerPortrait({
 
 export type FoundationTeamsDetailPanelProps = {
   active: boolean;
+  teamsHydrationPhase?: "shell" | "full";
   gameState: unknown;
   selectedTeam: unknown;
   sortedTeamsViewRows: unknown;
   visibleTeamsViewColumns: unknown;
-  getViewClass: (...views: FoundationViewId[]) => string;
   SortableHeader: unknown;
   getTableColumnWidth: unknown;
   getTableHeaderDragProps: unknown;
@@ -110,9 +125,12 @@ export type FoundationTeamsDetailPanelProps = {
   selectedRoster: unknown;
   visibleSelectedRosterColumns: unknown;
   selectedTeamContractTable: unknown;
+  selectedTeamContractPreviewRowCount: unknown;
+  visibleSelectedTeamContractRows: unknown;
   showTeamContractPreviewRows: unknown;
   setShowTeamContractPreviewRows: unknown;
   contractRenewalBusy: unknown;
+  marketSellBusy?: boolean;
   openContractRenewalNegotiation: unknown;
   openMarketSellModal: unknown;
   openPlayerDrawerById: unknown;
@@ -120,6 +138,7 @@ export type FoundationTeamsDetailPanelProps = {
   getPlayerPortraitModel: unknown;
   getClassColorClassName: unknown;
   getRosterEntryDisplaySalary: unknown;
+  getRosterEntryCurrentSeasonSalary: unknown;
   getRosterEntryDisplayMarketValue: unknown;
   renderEconomyDelta: unknown;
   getPlayerDisplayMarketValueDelta: unknown;
@@ -167,6 +186,7 @@ export type FoundationTeamsDetailPanelProps = {
   setShowTeamDisciplines: unknown;
   setSponsorChoiceProfiles: unknown;
   toggleTransferSellMarker: unknown;
+  transferSellMarkerKeySet: unknown;
   selectedBoardConfidence: unknown;
   selectedTeamCommercialRating: unknown;
   showTeamDisciplines: unknown;
@@ -184,13 +204,13 @@ export type FoundationTeamsDetailPanelProps = {
   contractRenewalError: unknown;
 };
 
-export default function FoundationTeamsDetailPanel({
+function FoundationTeamsDetailPanel({
   active,
-gameState,
+  teamsHydrationPhase = "full",
+  gameState,
   selectedTeam,
   sortedTeamsViewRows,
   visibleTeamsViewColumns,
-  getViewClass,
   SortableHeader,
   getTableColumnWidth,
   getTableHeaderDragProps,
@@ -234,9 +254,12 @@ gameState,
   selectedRoster,
   visibleSelectedRosterColumns,
   selectedTeamContractTable,
+  selectedTeamContractPreviewRowCount,
+  visibleSelectedTeamContractRows,
   showTeamContractPreviewRows,
   setShowTeamContractPreviewRows,
   contractRenewalBusy,
+  marketSellBusy = false,
   openContractRenewalNegotiation,
   openMarketSellModal,
   openPlayerDrawerById,
@@ -244,6 +267,7 @@ gameState,
   getPlayerPortraitModel,
   getClassColorClassName,
   getRosterEntryDisplaySalary,
+  getRosterEntryCurrentSeasonSalary,
   getRosterEntryDisplayMarketValue,
   renderEconomyDelta,
   getPlayerDisplayMarketValueDelta,
@@ -291,6 +315,7 @@ gameState,
   setShowTeamDisciplines,
   setSponsorChoiceProfiles,
   toggleTransferSellMarker,
+  transferSellMarkerKeySet,
   selectedBoardConfidence,
   selectedTeamCommercialRating,
   showTeamDisciplines,
@@ -311,263 +336,90 @@ gameState,
     return null;
   }
 
+  const showLeagueLogos = teamsHydrationPhase === "full";
+  const showSecondaryPanels = teamsHydrationPhase === "full";
+  const [showDeferredTeamLogos, setShowDeferredTeamLogos] = useState(false);
+
+  useEffect(() => {
+    if (!showLeagueLogos) {
+      setShowDeferredTeamLogos(false);
+      return;
+    }
+
+    let cancelled = false;
+    const finish = () => {
+      if (!cancelled) {
+        setShowDeferredTeamLogos(true);
+      }
+    };
+
+    if (typeof globalThis.requestIdleCallback === "function") {
+      const idleId = globalThis.requestIdleCallback(finish, { timeout: TEAMS_DEFERRED_LOGO_IDLE_MS });
+      return () => {
+        cancelled = true;
+        globalThis.cancelIdleCallback?.(idleId);
+      };
+    }
+
+    const timerId = globalThis.setTimeout(finish, TEAMS_DEFERRED_LOGO_IDLE_MS);
+    return () => {
+      cancelled = true;
+      globalThis.clearTimeout(timerId);
+    };
+  }, [showLeagueLogos, selectedTeam?.teamId]);
+
+  const shouldShowTeamRowLogo = (teamId: string, rowIndex: number) =>
+    showLeagueLogos &&
+    (showDeferredTeamLogos ||
+      rowIndex < TEAMS_INITIAL_VISIBLE_LOGO_ROWS ||
+      teamId === selectedTeam?.teamId);
+  const selectedTeamViewRow = sortedTeamsViewRows.find((row) => row.team?.teamId === selectedTeam?.teamId) ?? null;
+  const portraitExpiringCount =
+    selectedTeamDetailTab === "portraits"
+      ? filteredSelectedRosterTableRows.filter(({ entry }) => entry.contractLength <= 1).length
+      : 0;
+  const portraitAvgOvr =
+    selectedTeamDetailTab === "portraits"
+      ? (() => {
+          const values = filteredSelectedRosterTableRows
+            .map(({ playerOvr }) => playerOvr)
+            .filter((value) => value != null && Number.isFinite(value));
+          return values.length > 0 ? values.reduce((sum, value) => sum + value, 0) / values.length : null;
+        })()
+      : null;
+  const portraitAvgSalary =
+    selectedTeamDetailTab === "portraits"
+      ? (() => {
+          const values = filteredSelectedRosterTableRows
+            .map(({ entry, player }) => getRosterEntryCurrentSeasonSalary(entry, player))
+            .filter((value) => value != null && Number.isFinite(value));
+          return values.length > 0 ? values.reduce((sum, value) => sum + value, 0) / values.length : null;
+        })()
+      : null;
+  const contractExpiringCount = selectedRoster.filter((entry) => entry.contractLength <= 1).length;
+
   return (
-    <div className="foundation-teams-view-panel" data-testid="foundation-teams-view">
+    <div className="foundation-teams-view-panel" data-testid="foundation-teams-view" data-team-tab={selectedTeamDetailTab}>
             <>
-              <section className={`panel teams-league-panel${getViewClass("teams")}`} id="teams-league-overview">
-                <div className="teams-comparison-header">
-                  <div>
-                    <span className="eyebrow">Teams · Liga</span>
-                    <strong>Teamtabelle</strong>
-                  </div>
-                </div>
-                <div className="table-shell teams-overview-shell">
-                  <table className="team-table teams-overview-table">
-                    <colgroup>
-                      {visibleTeamsViewColumns.map((column) => (
-                        <col key={column.id} style={{ width: `${getTableColumnWidth("teamsView", column)}px` }} />
-                      ))}
-                    </colgroup>
-                    <thead>
-                      <tr>
-                        {visibleTeamsViewColumns.map((column) => (
-                          <th
-                            key={column.id}
-                            {...getTableHeaderDragProps("teamsView", column, visibleTeamsViewColumns)}
-                            className={
-                              column.id === "pow"
-                                ? "teams-view-head-pow"
-                                : column.id === "spe"
-                                  ? "teams-view-head-spe"
-                                  : column.id === "men"
-                                    ? "teams-view-head-men"
-                                    : column.id === "soc"
-                                      ? "teams-view-head-soc"
-                                      : ""
-                            }
-                            style={{ width: `${getTableColumnWidth("teamsView", column)}px`, minWidth: `${column.minWidth}px` }}
-                            title={getTeamsViewColumnTitle(column.id)}
-                          >
-                            <div className="resizable-header-cell">
-                              <SortableHeader label={column.label} tableId="teamsView" columnKey={column.dataKey} sortState={tableSorts.teamsView} onToggle={toggleTableSort} />
-                              <span className="column-resizer" draggable={false} role="separator" aria-orientation="vertical" aria-label={`${column.label} Breite anpassen`} onMouseDown={(event) => startTableColumnResize("teamsView", column, event)} onDoubleClick={() => resetTableColumnWidth("teamsView", column)} />
-                            </div>
-                          </th>
-                        ))}
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {sortedTeamsViewRows.map((row) => (
-                        <tr
-                          key={row.team.teamId}
-                          className={joinClassNames(
-                            selectedTeam?.teamId === row.team.teamId && "is-selected",
-                            getOwnerTeamHighlightClass(resolvedTeamControlSettings[row.team.teamId]),
-                          )}
-                          onClick={() => {
-                            scheduleActiveManagerTeam(row.team.teamId, "manual_select");
-                          }}
-                        >
-                          {visibleTeamsViewColumns.map((column) => {
-                            if (column.id === "team") {
-                              return <td key={column.id} className="teams-view-team-cell"><button className="table-link-button" type="button" onClick={(event) => { event.stopPropagation(); openTeamProfileById(row.team.teamId); }}>{row.team.name}</button></td>;
-                            }
-                            if (column.id === "overallRank") return <td key={column.id} className="teams-view-rank-cell">{row.overallRank ?? "—"}</td>;
-                            if (column.id === "cash") return <td key={column.id} className={`teams-view-finance-cell teams-view-cash-cell ${row.cash != null ? getSeasonCashHeatClass(row.cash, sortedTeamsViewRows) : ""}`}>{row.cash != null ? formatMoney(row.cash) : "—"}</td>;
-                            if (column.id === "guv") return <td key={column.id} className={`teams-view-finance-cell ${row.guv == null ? "" : row.guv >= 0 ? "text-positive" : "text-negative"}`}>{row.guv != null ? formatLocalePoints(row.guv, 1) : "—"}</td>;
-                            if (column.id === "roster") return <td key={column.id} className="teams-view-meta-cell">{row.rosterCount}</td>;
-                            if (column.id === "mw") return <td key={column.id} className="teams-view-finance-cell">{row.marketValueTotal != null ? formatLocalePoints(row.marketValueTotal, 2) : "—"}</td>;
-                            if (column.id === "salary") return <td key={column.id} className="teams-view-finance-cell">{formatLocalePoints(row.salaryTotal, 2)}</td>;
-                            if (column.id === "sponsor") return <td key={column.id} className="teams-view-finance-cell">{row.sponsorTotal != null ? formatLocalePoints(row.sponsorTotal, 1) : "—"}</td>;
-                            if (column.id === "pow") return <td key={column.id} title={row.rosterCount === 0 ? "Kein aktiver Kader vorhanden" : getTeamAxisRankTooltip("POW")} className={`teams-view-axis-cell teams-view-axis-cell-pow ${row.currentPowRank != null ? getRankHeatClass(row.currentPowRank, gameState.teams.length) : ""}`}>{row.currentPowRank != null ? formatWholeNumber(row.currentPowRank) : "—"}</td>;
-                            if (column.id === "spe") return <td key={column.id} title={row.rosterCount === 0 ? "Kein aktiver Kader vorhanden" : getTeamAxisRankTooltip("SPE")} className={`teams-view-axis-cell teams-view-axis-cell-spe ${row.currentSpeRank != null ? getRankHeatClass(row.currentSpeRank, gameState.teams.length) : ""}`}>{row.currentSpeRank != null ? formatWholeNumber(row.currentSpeRank) : "—"}</td>;
-                            if (column.id === "men") return <td key={column.id} title={row.rosterCount === 0 ? "Kein aktiver Kader vorhanden" : getTeamAxisRankTooltip("MEN")} className={`teams-view-axis-cell teams-view-axis-cell-men ${row.currentMenRank != null ? getRankHeatClass(row.currentMenRank, gameState.teams.length) : ""}`}>{row.currentMenRank != null ? formatWholeNumber(row.currentMenRank) : "—"}</td>;
-                            if (column.id === "soc") return <td key={column.id} title={row.rosterCount === 0 ? "Kein aktiver Kader vorhanden" : getTeamAxisRankTooltip("SOC")} className={`teams-view-axis-cell teams-view-axis-cell-soc ${row.currentSocRank != null ? getRankHeatClass(row.currentSocRank, gameState.teams.length) : ""}`}>{row.currentSocRank != null ? formatWholeNumber(row.currentSocRank) : "—"}</td>;
-                            if (column.id === "histPoints") {
-                              const rank = teamHistoryPointRankMaps.total.get(row.team.teamId);
-                              return <td key={column.id} className={`teams-view-history-points-cell ${rank != null ? getRankHeatClass(rank, gameState.teams.length) : ""}`}>{row.historicalPointsTotal != null ? formatLocalePoints(row.historicalPointsTotal, 1) : "—"}</td>;
-                            }
-                            if (column.id === "avgPoints") {
-                              const rank = teamHistoryPointRankMaps.average.get(row.team.teamId);
-                              return <td key={column.id} className={`teams-view-history-points-cell ${rank != null ? getRankHeatClass(rank, gameState.teams.length) : ""}`}>{row.avgPoints != null ? formatLocalePoints(row.avgPoints, 1) : "—"}</td>;
-                            }
-                            if (column.id === "gold") return <td key={column.id} className="teams-view-medal-cell" title="Goldmedaillen">🥇 {row.goldCount}</td>;
-                            if (column.id === "silver") return <td key={column.id} className="teams-view-medal-cell" title="Silbermedaillen">🥈 {row.silverCount}</td>;
-                            if (column.id === "bronze") return <td key={column.id} className="teams-view-medal-cell" title="Bronzemedaillen">🥉 {row.bronzeCount}</td>;
-                            if (column.id === "top5") return <td key={column.id} className="teams-view-meta-cell">{row.top5}</td>;
-                            if (column.id === "top10") return <td key={column.id} className="teams-view-meta-cell">{row.top10}</td>;
-                            if (column.id === "avgRank") return <td key={column.id} className="teams-view-meta-cell">{row.avgRank != null ? formatWholeNumber(row.avgRank) : "—"}</td>;
-                            if (column.id === "seasonPoints") {
-                              const historyEntries = [...row.historicalPointsBySeason].sort((left, right) =>
-                                left.seasonId.localeCompare(right.seasonId, "de", { numeric: true }),
-                              );
-                              return (
-                                <td key={column.id} className="teams-view-season-points-cell">
-                                  {historyEntries.length > 0 ? (
-                                    <details>
-                                      <summary>{historyEntries.length} Seasons</summary>
-                                      <div className="teams-view-season-points-list">
-                                        {historyEntries.map((entry) => (
-                                          <span key={`${row.team.teamId}-${entry.seasonId}`}>
-                                            <b>{entry.seasonName.replace("Season ", "S")}</b>
-                                            {formatLocalePoints(entry.points, 1)}
-                                            {entry.rank != null ? <small>#{entry.rank}</small> : null}
-                                          </span>
-                                        ))}
-                                      </div>
-                                    </details>
-                                  ) : (
-                                    "—"
-                                  )}
-                                </td>
-                              );
-                            }
-                            return <td key={column.id}>—</td>;
-                          })}
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
-                </div>
-              </section>
-
-              {selectedTeamsHistoryData ? (
-                <section className={`panel teams-economy-panel${getViewClass("teams")}`} aria-label="Team-Kennzahlen">
-                  <div className="teams-v2-focus-grid">
-                    {teamEconomyTiles.map((tile) => (
-                      <article key={tile.label} className={`teams-v2-focus-card is-${tile.tone}`} title={tile.detail}>
-                        <span>{tile.label}</span>
-                        <strong>{tile.value}</strong>
-                        <small>{tile.note}</small>
-                      </article>
-                    ))}
-                  </div>
-                </section>
-              ) : null}
-
-              <section className={`panel teams-history-panel teams-v2-history-panel${getViewClass("teams")}`} aria-label="Team-Historie">
-                <div className="teams-v2-section-head">
-                  <div>
-                    <TooltipHeading
-                      as="h3"
-                      tooltip="Live-Season zuerst, darunter die echten Team-Snapshots mit Rang, Punkten, PPs, Achsen, Cash, Gehalt und Marktwert."
-                    >
-                      {selectedTeam.name} · Historie
-                    </TooltipHeading>
-                  </div>
-                </div>
-                {selectedTeamsHistoryData?.history?.length ? (
-                  <TeamDrawerHistoryTable
-                    rows={selectedTeamsHistoryData.history}
-                    getRowClassName={(row) => (row.isLive ? "is-live" : undefined)}
-                    renderCell={(columnId, row) => {
-                      if (columnId === "season") {
-                        return (
-                          <>
-                            <strong>{row.seasonName}</strong>
-                            {row.isLive ? <span className="pill">Live</span> : null}
-                          </>
-                        );
-                      }
-                      if (columnId === "rank") {
-                        return (
-                          <span className={`teams-v2-rank-cell ${getTeamHistoryRankToneClass(row.rank)}`}>
-                            {row.rank != null ? `#${row.rank}` : "—"}
-                          </span>
-                        );
-                      }
-                      if (columnId === "points") return formatLocalePoints(row.points, 1);
-                      if (columnId === "pps") return formatLocalePoints(row.pps, 1);
-                      if (columnId === "pow") return formatLocalePoints(row.ppPow, 1);
-                      if (columnId === "spe") return formatLocalePoints(row.ppSpe, 1);
-                      if (columnId === "men") return formatLocalePoints(row.ppMen, 1);
-                      if (columnId === "soc") return formatLocalePoints(row.ppSoc, 1);
-                      if (isSeasonDisciplineKey(columnId)) {
-                        return formatLocalePoints(row.disciplineValues[columnId], 1);
-                      }
-                      if (columnId === "cash") return formatNullableMoney(row.cash);
-                      if (columnId === "salary") return formatNullableMoney(row.salaryTotal);
-                      if (columnId === "mw") return formatNullableMoney(row.marketValue);
-                      if (columnId === "guv") {
-                        return (
-                          <span className={row.guv != null && row.guv < 0 ? "text-negative" : "text-positive"}>
-                            {formatSignedDisplayMoney(row.guv)}
-                          </span>
-                        );
-                      }
-                      if (columnId === "topBuy") {
-                        return row.topBuyPlayer ? `${row.topBuyPlayer} · ${formatNullableMoney(row.topBuyAmount)}` : "—";
-                      }
-                      if (columnId === "topSell") {
-                        return row.topSellPlayer ? `${row.topSellPlayer} · ${formatNullableMoney(row.topSellAmount)}` : "—";
-                      }
-                      return "—";
-                    }}
-                  />
-                ) : (
-                  <p className="muted">Für dieses Team ist noch keine Historie verfügbar.</p>
-                )}
-              </section>
-
-              <section className={`panel team-objectives-panel teams-secondary-objectives-panel${getViewClass("teams")}`} data-testid="team-board-objectives" id="team-board-objectives">
-                <div className="panel-header compact">
-                  <div className="stack">
-                    <h2>Board-Ziele</h2>
-                    <p className="muted">Saisonziele fuer Sport, Finanzen, Transfers, Kader, Facilities und Entwicklung.</p>
-                  </div>
-                  <div className="room-meta foundation-admin-meta">
-                    <span className="pill" title={TEAM_BOARD_RATING_TOOLTIP}>
-                      Board Rating {selectedBoardConfidence?.value ?? "—"}/10
-                    </span>
-                    <span
-                      className={`transfer-status-pill${(selectedBoardConfidence?.pressure ?? 0) >= 8 ? " is-warning" : " is-ready"}`}
-                      title={TEAM_BOARD_PRESSURE_TOOLTIP}
-                    >
-                      Druck {selectedBoardConfidence?.pressure ?? "—"}/10
-                    </span>
-                  </div>
-                </div>
-                <div className="teams-summary-grid history-summary-grid">
-                  {selectedTeamObjectives.map((objective) => (
-                    <article
-                      key={`team-objective-${objective.objectiveId}`}
-                      className="metric-card teams-summary-card"
-                      title={`Grundlage: ${objective.source}`}
-                    >
-                      <span>{objective.category.toUpperCase()}</span>
-                      <strong>{objective.label}</strong>
-                      <small className="muted">
-                        Ist {String(objective.currentValue ?? "—")} · Ziel {String(objective.targetValue ?? "—")}
-                      </small>
-                      <div className="room-meta foundation-admin-meta">
-                        <span className={`transfer-status-pill${objective.status === "completed" ? " is-ready" : objective.status === "failed" || objective.status === "at_risk" ? " is-warning" : ""}`}>
-                          {formatObjectiveStatusLabel(objective.status)}
-                        </span>
-                        {objective.rewardCash != null ? <span className="pill">Bonus {formatMoney(objective.rewardCash)}</span> : null}
-                        {objective.penaltyCash != null ? <span className="pill">Malus {formatMoney(objective.penaltyCash)}</span> : null}
-                      </div>
-                    </article>
-                  ))}
-                </div>
-                {selectedBoardConfidence?.warnings.length ? (
-                  <p className="muted">Board-Hinweise: {selectedBoardConfidence.warnings.map(formatCockpitReason).join(", ")}</p>
-                ) : null}
-              </section>
-
-
-              <section className={`panel team-focus-panel teams-primary-roster-panel${getViewClass("teams")}`} id="team-focus-roster">
+              <section className="panel team-focus-panel teams-primary-roster-panel" id="team-focus-roster">
                 <div className="panel-header team-focus-header">
                   <div className="team-focus-title-wrap">
                     {(() => {
-                      const logo = getTeamLogoModel(selectedTeam);
-                      return logo.src ? (
-                        <img
+                      const logo = getTeamLogoModel(selectedTeam, { variant: "thumb" });
+                      return showLeagueLogos && logo.src ? (
+                        <BudgetedMediaImage
                           className="team-focus-logo"
                           src={logo.src}
                           alt={`${selectedTeam.name} Logo`}
+                          width={72}
+                          height={72}
                           loading="eager"
-                          decoding="async"
                           fetchPriority="high"
+                          fallback={
+                            <div className="team-focus-logo team-logo-placeholder" aria-label={`${selectedTeam.name} Logo Platzhalter`}>
+                              {logo.initials}
+                            </div>
+                          }
                         />
                       ) : (
                         <div className="team-focus-logo team-logo-placeholder" aria-label={`${selectedTeam.name} Logo Platzhalter`}>
@@ -576,21 +428,33 @@ gameState,
                       );
                     })()}
                     <div>
-                    <p className="eyebrow">Team Fokus</p>
+                    <p className="eyebrow">{selectedTeamDetailTab === "portraits" ? "Kaderprofil" : "Team Fokus"}</p>
                     <h2>
                       {selectedTeam.name}
-                      {selectedTeamDetailTab === "portraits" ? " - Portraits" : selectedTeamDetailTab === "contracts" ? " - Verträge" : " - Kader"}
+                      {selectedTeamDetailTab === "portraits" ? "" : selectedTeamDetailTab === "contracts" ? " · Verträge" : " · Kader"}
                     </h2>
                     </div>
                   </div>
-                  <button
-                    className="secondary-button inline-button"
-                    type="button"
-                    onClick={() => setShowTeamDisciplines((current) => !current)}
-                    title={showTeamDisciplines ? "Diszi-Spalten ausblenden" : "Diszi-Spalten einblenden"}
-                  >
-                    Diszis
-                  </button>
+                  <div className="team-focus-header-actions">
+                    {selectedTeamDetailTab === "roster" ? (
+                      <button
+                        className="secondary-button inline-button"
+                        type="button"
+                        onClick={() => setShowTeamDisciplines((current) => !current)}
+                        title={showTeamDisciplines ? "Diszi-Spalten ausblenden" : "Diszi-Spalten einblenden"}
+                      >
+                        Diszis
+                      </button>
+                    ) : (
+                      <button
+                        className="secondary-button inline-button"
+                        type="button"
+                        onClick={() => openTeamProfileById(selectedTeam.teamId)}
+                      >
+                        Profil
+                      </button>
+                    )}
+                  </div>
                 </div>
                 {selectedTeamDetailTab === "roster" ? (
                   <>
@@ -673,33 +537,43 @@ gameState,
                                     );
                                     return (
                                       <td key={column.id}>
-                                        <FoundationPlayerPortraitPreview
-                                          playerId={player.id}
-                                          name={player.name}
-                                          portraitUrl={portrait.src}
-                                          portraitInitials={portrait.initials}
-                                          playerOvr={playerOvr}
-                                          playerMvs={playerMvs}
-                                          playerPps={playerPps}
-                                          pow={player.coreStats.pow ?? null}
-                                          spe={player.coreStats.spe ?? null}
-                                          men={player.coreStats.men ?? null}
-                                          soc={player.coreStats.soc ?? null}
-                                          leagueHeatPools={leaguePlayerHeatPools}
-                                          variant="team"
-                                          context="roster"
-                                          roleTag={entry.roleTag}
-                                          playerClassName={player.className}
-                                        >
+                                        {showLeagueLogos ? (
+                                          <FoundationPlayerPortraitPreview
+                                            playerId={player.id}
+                                            name={player.name}
+                                            portraitUrl={portrait.thumbSrc ?? portrait.src}
+                                            portraitInitials={portrait.initials}
+                                            playerOvr={playerOvr}
+                                            playerMvs={playerMvs}
+                                            playerPps={playerPps}
+                                            pow={player.coreStats.pow ?? null}
+                                            spe={player.coreStats.spe ?? null}
+                                            men={player.coreStats.men ?? null}
+                                            soc={player.coreStats.soc ?? null}
+                                            leagueHeatPools={leaguePlayerHeatPools}
+                                            variant="team"
+                                            context="roster"
+                                            roleTag={entry.roleTag}
+                                            playerClassName={player.className}
+                                          >
+                                            <PlayerPortrait
+                                              src={portrait.thumbSrc ?? portrait.src}
+                                              initials={portrait.initials}
+                                              alt={player.name}
+                                              className="transfermarkt-portrait"
+                                              style={{ width: imageSize, height: imageSize }}
+                                              {...TEAM_ROSTER_PORTRAIT_LOADING}
+                                            />
+                                          </FoundationPlayerPortraitPreview>
+                                        ) : (
                                           <PlayerPortrait
-                                            src={portrait.src}
+                                            src={null}
                                             initials={portrait.initials}
                                             alt={player.name}
                                             className="transfermarkt-portrait"
                                             style={{ width: imageSize, height: imageSize }}
-                                            {...TEAM_ROSTER_PORTRAIT_LOADING}
                                           />
-                                        </FoundationPlayerPortraitPreview>
+                                        )}
                                       </td>
                                     );
                                   }
@@ -732,7 +606,7 @@ gameState,
                                                     playerName: player.name,
                                                     className: player.className,
                                                     race: player.race,
-                                                    portraitUrl: getPlayerPortraitModel(player).src,
+                                                    portraitUrl: getPlayerPortraitModel(player).previewSrc ?? getPlayerPortraitModel(player).src,
                                                   }, selectedTeam?.teamId);
                                                 }}
                                               >
@@ -819,15 +693,22 @@ gameState,
                                     );
                                   }
                                   if (column.id === "salary") {
-                                    const currentSalary = getRosterEntryDisplaySalary(entry, player);
+                                    const annualSalary = getRosterEntryDisplaySalary(entry, player);
+                                    const currentSeasonSalary = getRosterEntryCurrentSeasonSalary(entry, player);
                                     const salaryDelta = getRosterEntrySalaryDelta(entry, player, gameState);
+                                    const showSeasonSubline = rosterSalariesDifferForDisplay(currentSeasonSalary, annualSalary);
                                     return (
                                       <td key={column.id}>
                                         <div className="economy-money-stack">
-                                          <strong>{formatDisplayMoney(currentSalary)}</strong>
+                                          <strong>{formatDisplayMoney(annualSalary)}</strong>
                                           {salaryDelta != null && Math.abs(salaryDelta) >= 0.01 ? (
                                             <small className={salaryDelta <= 0 ? "text-positive" : "text-negative"}>
                                               {formatSignedDisplayMoney(salaryDelta)}
+                                            </small>
+                                          ) : null}
+                                          {showSeasonSubline ? (
+                                            <small className="players-table-salary-season" title="Gehalt diese Saison (Vertragsjahr 1)">
+                                              Saison: {formatDisplayMoney(currentSeasonSalary)}
                                             </small>
                                           ) : null}
                                         </div>
@@ -935,90 +816,60 @@ gameState,
                     </div>
                   </>
                 ) : selectedTeamDetailTab === "portraits" ? (
-                  <>
-                    <div className="team-roster-role-filterbar" aria-label="Kaderrollen filtern">
-                      {teamRosterRoleFilterOptions.map((option) => (
-                        <button
-                          key={`team-portraits-role-filter-${option.id}`}
-                          className={`secondary-button inline-button${teamRosterRoleFilter === option.id ? " is-active" : ""}`}
-                          type="button"
-                          onClick={() => setTeamRosterRoleFilter(option.id)}
-                        >
-                          {option.label} <span>{option.count}</span>
-                        </button>
-                      ))}
-                    </div>
-
-                    <div className="team-roster-focusbar" aria-label="Kaderfokus waehlen">
-                      {teamRosterFocusOptions.map((option) => (
-                        <button
-                          key={`team-portraits-focus-${option.id}`}
-                          className={`secondary-button inline-button${teamRosterFocusMode === option.id ? " is-active" : ""}`}
-                          type="button"
-                          onClick={() => setTeamRosterFocusMode(option.id)}
-                        >
-                          {option.label} <span>{option.count}</span>
-                        </button>
-                      ))}
-                    </div>
-                    <section className="team-portraits-panel" id="team-focus-portraits" aria-label="Kader Portraits">
-                      <div className="team-portraits-grid" data-testid="team-portraits-grid">
-                        {filteredSelectedRosterTableRows.length > 0 ? (
-                          filteredSelectedRosterTableRows.map(({ entry, player, playerOvr, playerMvs, playerPps }) => {
-                            const portrait = getPlayerPortraitModel(player);
-                            return (
-                              <FoundationPlayerPortraitCard
-                                key={entry.id}
-                                playerId={player.id}
-                                name={player.name}
-                                portraitUrl={portrait.src}
-                                portraitInitials={portrait.initials}
-                                playerOvr={playerOvr}
-                                playerMvs={playerMvs}
-                                playerPps={playerPps}
-                                pow={player.coreStats.pow}
-                                spe={player.coreStats.spe}
-                                men={player.coreStats.men}
-                                soc={player.coreStats.soc}
-                                leagueHeatPools={leaguePlayerHeatPools}
-                                variant="team"
-                                roleTag={entry.roleTag}
-                                playerClassName={player.className}
-                                onOpen={() => void openPlayerDrawerById(player.id, entry.id)}
-                                title={`${player.name} öffnen`}
-                              />
-                            );
-                          })
-                        ) : (
-                          <p className="muted">Keine Spieler für den aktuellen Filter.</p>
-                        )}
-                      </div>
-                      <p className="muted team-portraits-meta">
-                        {filteredSelectedRosterTableRows.length} / {selectedStandingRow?.rosterCount ?? selectedRoster.length} Spieler · OVR/MVS relativ zur Liga
-                      </p>
-                    </section>
-                  </>
+                  <FoundationTeamsPortraitsTab
+                    selectedTeam={selectedTeam}
+                    selectedTeamViewRow={selectedTeamViewRow}
+                    filteredSelectedRosterTableRows={filteredSelectedRosterTableRows}
+                    selectedStandingRow={selectedStandingRow}
+                    selectedRoster={selectedRoster}
+                    teamRosterRoleFilterOptions={teamRosterRoleFilterOptions}
+                    teamRosterRoleFilter={teamRosterRoleFilter}
+                    setTeamRosterRoleFilter={setTeamRosterRoleFilter}
+                    teamRosterFocusOptions={teamRosterFocusOptions}
+                    teamRosterFocusMode={teamRosterFocusMode}
+                    setTeamRosterFocusMode={setTeamRosterFocusMode}
+                    gameState={gameState}
+                    leaguePlayerHeatPools={leaguePlayerHeatPools}
+                    getPlayerPortraitModel={getPlayerPortraitModel}
+                    getClassColorClassName={getClassColorClassName}
+                    openPlayerDrawerById={openPlayerDrawerById}
+                    formatLocalePoints={formatLocalePoints}
+                    formatDisplayMoney={formatDisplayMoney}
+                    formatMoney={formatMoney}
+                    getRosterEntryDisplayMarketValue={getRosterEntryDisplayMarketValue}
+                    getRosterEntryDisplaySalary={getRosterEntryDisplaySalary}
+                    getRosterEntryCurrentSeasonSalary={getRosterEntryCurrentSeasonSalary}
+                    getPlayerDisplayMarketValueDelta={getPlayerDisplayMarketValueDelta}
+                    getRosterEntrySalaryDelta={getRosterEntrySalaryDelta}
+                    formatWholeNumber={formatWholeNumber}
+                    portraitAvgOvr={portraitAvgOvr}
+                    portraitAvgSalary={portraitAvgSalary}
+                    contractExpiringCount={portraitExpiringCount}
+                  />
                 ) : (
-                  <div className="team-focus-layout">
-                    <div className="team-focus-summary">
+                  <div className="team-contracts-layout">
+                    <div className="team-contracts-summary-grid">
                       <article className="metric-card">
                         <span>Aktive Verträge</span>
                         <strong>{selectedRoster.length}</strong>
                       </article>
                       <article className="metric-card">
+                        <span>Laufen aus</span>
+                        <strong>{contractExpiringCount}</strong>
+                      </article>
+                      <article className="metric-card">
                         <span>Preview-Drafts</span>
-                        <strong>
-                          {selectedTeamContractPreviewRowCount}
-                        </strong>
+                        <strong>{selectedTeamContractPreviewRowCount}</strong>
                       </article>
-                      <article className="metric-card">
-                        <span>Altverträge</span>
-                        <strong>V1 = Balanced</strong>
-                      </article>
-                      <article className="metric-card">
-                        <span>Buyout-Regel</span>
-                        <strong>Restgehalt komplett</strong>
-                      </article>
+                      {selectedTeamContractShapeMix ? (
+                        <article className="metric-card">
+                          <span>Strukturiert</span>
+                          <strong>
+                            {selectedTeamContractShapeMix.nonBalancedCount}/{selectedTeamContractShapeMix.totalCount}
+                          </strong>
+                          <small>Δ jetzt {formatSignedDisplayMoney(selectedTeamContractShapeMix.currentDelta)}</small>
+                        </article>
+                      ) : null}
                     </div>
                     {contractRenewalMessage ? (
                       <div className="status-banner is-success">{contractRenewalMessage}</div>
@@ -1065,65 +916,11 @@ gameState,
                         <span>{selectedTeamRosterActionHint}</span>
                       </div>
                     ) : null}
-	                    <div className="transfer-callout">
-	                      <strong>Contract Exit Value</strong>
-	                      <span>Wenn ein Vertrag ausläuft oder ein Spieler freigegeben wird, erhält das Team den aktuellen VK-Wert.</span>
-	                    </div>
-                    {selectedTeamContractShapeMix ? (
-                      <div className="team-contract-mix-panel">
-                        <div className="team-contract-mix-head">
-                          <div>
-                            <strong>Vertragsmix</strong>
-                            <span className="muted">Anteil und Cashflow-Verschiebung gegen gleiche Gesamtgehälter als Balanced.</span>
-                          </div>
-                          <div className="team-contract-mix-summary">
-                            <span>
-                              {selectedTeamContractShapeMix.totalCount > 0
-                                ? `${selectedTeamContractShapeMix.nonBalancedCount}/${selectedTeamContractShapeMix.totalCount} strukturiert`
-                                : "keine aktiven Verträge"}
-                            </span>
-                            <strong className={selectedTeamContractShapeMix.currentDelta > 0 ? "negative-value" : selectedTeamContractShapeMix.currentDelta < 0 ? "positive-value" : undefined}>
-                              Jetzt {formatSignedDisplayMoney(selectedTeamContractShapeMix.currentDelta)}
-                            </strong>
-                            <small className={selectedTeamContractShapeMix.futureDelta > 0 ? "negative-value" : selectedTeamContractShapeMix.futureDelta < 0 ? "positive-value" : "muted"}>
-                              Später {formatSignedDisplayMoney(selectedTeamContractShapeMix.futureDelta)}
-                            </small>
-                          </div>
-                        </div>
-                        <div className="team-contract-mix-grid">
-                          {selectedTeamContractShapeMix.entries.map((entry) => (
-                            <article className={`team-contract-mix-card is-${entry.shape.replace("_", "-")}`} key={entry.shape}>
-                              <div className="team-contract-mix-card-head">
-                                <span>{entry.label}</span>
-                                <strong>{formatLocalePoints(entry.share, 0)}%</strong>
-                              </div>
-                              <div className="team-contract-mix-bar" aria-hidden="true">
-                                <span style={{ width: entry.share > 0 ? `${Math.max(3, entry.share)}%` : "0%" }} />
-                              </div>
-                              <div className="team-contract-mix-metrics">
-                                <span>
-                                  <strong>{entry.count}</strong> Verträge
-                                </span>
-                                <span>
-                                  <strong>{formatDisplayMoney(entry.totalSalary)}</strong> gebunden
-                                </span>
-                                <span className={entry.currentDelta > 0 ? "negative-value" : entry.currentDelta < 0 ? "positive-value" : undefined}>
-                                  Jetzt {formatSignedDisplayMoney(entry.currentDelta)}
-                                </span>
-                                <span className={entry.futureDelta > 0 ? "negative-value" : entry.futureDelta < 0 ? "positive-value" : "muted"}>
-                                  Später {formatSignedDisplayMoney(entry.futureDelta)}
-                                </span>
-                              </div>
-                            </article>
-                          ))}
-                        </div>
-                      </div>
-                    ) : null}
-	                    {selectedTeamContractTable ? (
-	                      <div className="contract-forecast-panel">
-                        <div className="transfer-callout-title">
-                          <strong>5-Seasons Gehaltsforecast</strong>
-                          <span className="muted">NBA-Style: gebundene Gehälter je Season</span>
+                    {selectedTeamContractTable ? (
+                      <div className="team-contracts-forecast-row contract-forecast-panel">
+                        <div className="team-contracts-section-head">
+                          <strong>Gehaltsforecast</strong>
+                          <span className="muted">Gebundene Summen je Saison</span>
                         </div>
                         <div className="contract-forecast-grid">
                           {selectedTeamContractTable.totalsCommitted.map((entry, index) => {
@@ -1132,62 +929,137 @@ gameState,
                               <article className="contract-forecast-card" key={entry.label}>
                                 <span>{entry.label}</span>
                                 <strong>{formatDisplayMoney(entry.salary)}</strong>
-                                <small className="muted">
-                                  mit Preview {preview ? formatDisplayMoney(preview.salary) : "—"}
-                                </small>
+                                <small className="muted">Preview {preview ? formatDisplayMoney(preview.salary) : "—"}</small>
                               </article>
                             );
                           })}
                         </div>
-	                      </div>
-	                    ) : null}
-	                    {selectedTeamContractPreviewRowCount > 0 ? (
-	                      <div className="team-detail-actions">
-	                        <button
-	                          className={`secondary-button inline-button${showTeamContractPreviewRows ? " is-active" : ""}`}
-	                          type="button"
-	                          onClick={() => setShowTeamContractPreviewRows((current) => !current)}
-	                          title={showTeamContractPreviewRows ? "Preview-Zeilen ausblenden" : "Preview-Zeilen einblenden"}
-	                        >
-	                          Preview {showTeamContractPreviewRows ? "an" : "aus"} · {selectedTeamContractPreviewRowCount}
-	                        </button>
-	                      </div>
-	                    ) : null}
-	                    <div className="table-shell team-focus-table-shell">
-	                      <table className="team-table team-contracts-table">
-	                        <thead>
+                      </div>
+                    ) : null}
+                    {selectedTeamContractShapeMix ? (
+                      <details className="team-contracts-mix-details">
+                        <summary>
+                          Vertragsmix · {selectedTeamContractShapeMix.nonBalancedCount}/{selectedTeamContractShapeMix.totalCount} strukturiert
+                        </summary>
+                        <div className="team-contract-mix-grid">
+                          {selectedTeamContractShapeMix.entries.map((entry) => (
+                            <article className={`team-contract-mix-card is-${entry.shape.replace("_", "-")}`} key={entry.shape}>
+                              <div className="team-contract-mix-card-head">
+                                <span>{entry.label}</span>
+                                <strong>{formatLocalePoints(entry.share, 0)}%</strong>
+                              </div>
+                              <div className="team-contract-mix-metrics">
+                                <span>
+                                  <strong>{entry.count}</strong> Verträge
+                                </span>
+                                <span>
+                                  <strong>{formatDisplayMoney(entry.totalSalary)}</strong> gebunden
+                                </span>
+                              </div>
+                            </article>
+                          ))}
+                        </div>
+                      </details>
+                    ) : null}
+                    <div className="team-contracts-toolbar">
+                      {selectedTeamContractPreviewRowCount > 0 ? (
+                        <button
+                          className={`secondary-button inline-button${showTeamContractPreviewRows ? " is-active" : ""}`}
+                          type="button"
+                          onClick={() => setShowTeamContractPreviewRows((current) => !current)}
+                          title={showTeamContractPreviewRows ? "Preview-Zeilen ausblenden" : "Preview-Zeilen einblenden"}
+                        >
+                          Preview {showTeamContractPreviewRows ? "an" : "aus"} · {selectedTeamContractPreviewRowCount}
+                        </button>
+                      ) : null}
+                    </div>
+                    <div className="table-shell team-focus-table-shell">
+                      <table className="team-table team-contracts-table">
+                        <thead>
                           <tr>
                             <th>Spieler</th>
                             <th>Status</th>
                             <th>Form</th>
-	                            <th>LZ</th>
-	                            <th>Moral</th>
-	                            <th>Intent</th>
-	                            <th>Buyout</th>
-	                            <th>MW</th>
-	                            <th>Faktor</th>
-	                            <th>VK bei Abgang</th>
-	                            {selectedTeamContractTable?.seasonLabels.map((label) => (
-	                              <th key={label}>{label}</th>
-	                            ))}
+                            <th>LZ</th>
+                            <th>Moral</th>
+                            <th>Intent</th>
+                            <th>Buyout</th>
+                            <th>VK</th>
+                            {selectedTeamContractTable?.seasonLabels.map((label) => (
+                              <th key={label}>{label}</th>
+                            ))}
+                            <th>Aktionen</th>
                           </tr>
                         </thead>
                         <tbody>
-	                          {visibleSelectedTeamContractRows.length ? (
-	                            visibleSelectedTeamContractRows.map((row) => {
+                          {visibleSelectedTeamContractRows.length ? (
+                            visibleSelectedTeamContractRows.map((row) => {
                               const isSellMarked =
                                 row.status === "active" &&
                                 selectedTeam != null &&
                                 transferSellMarkerKeySet.has(`${selectedTeam.teamId}:${row.playerId}`);
+                              const shapeClass = (row.contractShape ?? "balanced").replace("_", "-");
                               return (
-                              <tr key={row.rowId} onClick={() => void openPlayerDrawerById(row.playerId)}>
-                                <td>
-                                  <div className="table-player-cell">
-                                    <strong>{row.playerName}</strong>
-                                    <span>{row.roleTag ?? "—"}</span>
-                                    {isSellMarked ? <span className="pill pill-warning">VK vorgemerkt</span> : null}
+                                <tr
+                                  key={row.rowId}
+                                  className={joinClassNames(
+                                    row.status === "preview" && "is-preview-row",
+                                    row.contractLength <= 1 && "is-contract-expiring",
+                                    isSellMarked && "is-sell-marked",
+                                  )}
+                                  onClick={() => void openPlayerDrawerById(row.playerId)}
+                                >
+                                  <td>
+                                    <div className="table-player-cell">
+                                      <strong>{row.playerName}</strong>
+                                      <span>{row.roleTag ?? "Kader"}</span>
+                                      {isSellMarked ? <span className="pill pill-warning">VK vorgemerkt</span> : null}
+                                    </div>
+                                  </td>
+                                  <td>{row.status === "preview" ? "Preview" : "Aktiv"}</td>
+                                  <td>
+                                    <span className={`team-contract-shape is-${shapeClass}`}>
+                                      {formatContractShapeLabel(row.contractShape)}
+                                    </span>
+                                  </td>
+                                  <td>{formatWholeNumber(row.contractLength)}</td>
+                                  <td>
+                                    {row.morale != null ? (
+                                      <span title={row.moraleMood ?? "Moral"}>
+                                        {row.moraleSmiley ?? ""} {formatWholeNumber(row.morale)}
+                                        {row.moraleSalaryModifier != null ? ` · x${formatLocalePoints(row.moraleSalaryModifier, 2)}` : ""}
+                                      </span>
+                                    ) : (
+                                      "—"
+                                    )}
+                                  </td>
+                                  <td>
+                                    {row.moraleContractIntent ? (
+                                      <span
+                                        title={
+                                          row.moraleRenewalRisk != null
+                                            ? `Renewal Risk ${formatWholeNumber(row.moraleRenewalRisk)}%`
+                                            : undefined
+                                        }
+                                      >
+                                        {formatMoraleContractIntentLabel(row.moraleContractIntent)}
+                                      </span>
+                                    ) : (
+                                      "—"
+                                    )}
+                                  </td>
+                                  <td>{row.buyoutCost != null ? formatDisplayMoney(row.buyoutCost) : "—"}</td>
+                                  <td>{row.exitValue != null ? formatDisplayMoney(row.exitValue) : "—"}</td>
+                                  {selectedTeamContractTable?.seasonLabels.map((label, index) => (
+                                    <td key={`${row.rowId}-${label}`}>
+                                      {row.yearlySalarySchedule[index]?.salary != null
+                                        ? formatDisplayMoney(row.yearlySalarySchedule[index]!.salary)
+                                        : "—"}
+                                    </td>
+                                  )) ?? null}
+                                  <td>
                                     {row.status === "active" && selectedTeamRosterActionsAvailable ? (
-                                      <div className="transfermarkt-inline-actions">
+                                      <div className="transfermarkt-inline-actions" onClick={(event) => event.stopPropagation()}>
                                         {selectedTeam ? (
                                           <button
                                             className="secondary-button inline-button"
@@ -1218,11 +1090,13 @@ gameState,
                                                 playerId: row.playerId,
                                                 playerName: row.playerName,
                                                 className:
-                                                  gameState.players.find((candidate) => candidate.id === row.playerId)?.className ?? "—",
+                                                  gameState.players.find((candidate) => candidate.id === row.playerId)?.className ??
+                                                  "—",
                                                 race:
                                                   gameState.players.find((candidate) => candidate.id === row.playerId)?.race ?? "—",
                                                 portraitUrl:
-                                                  gameState.players.find((candidate) => candidate.id === row.playerId)?.portraitUrl ?? null,
+                                                  gameState.players.find((candidate) => candidate.id === row.playerId)?.portraitUrl ??
+                                                  null,
                                               },
                                               selectedTeam?.teamId,
                                             )
@@ -1247,95 +1121,349 @@ gameState,
                                           </button>
                                         ) : null}
                                       </div>
-                                    ) : null}
-                                  </div>
-                                </td>
-                                <td>{row.status === "preview" ? "Preview" : "Aktiv"}</td>
-                                <td>{formatContractShapeLabel(row.contractShape)}</td>
-	                                <td>{formatWholeNumber(row.contractLength)}</td>
-	                                <td>
-	                                  {row.morale != null ? (
-	                                    <span title={row.moraleMood ?? "Moral"}>
-	                                      {row.moraleSmiley ?? ""} {formatWholeNumber(row.morale)}
-	                                      {row.moraleSalaryModifier != null ? ` · x${formatLocalePoints(row.moraleSalaryModifier, 2)}` : ""}
-	                                    </span>
-	                                  ) : (
-	                                    "—"
-	                                  )}
-	                                </td>
-	                                <td>
-	                                  {row.moraleContractIntent ? (
-	                                    <span title={row.moraleRenewalRisk != null ? `Renewal Risk ${formatWholeNumber(row.moraleRenewalRisk)}%` : undefined}>
-	                                      {formatMoraleContractIntentLabel(row.moraleContractIntent)}
-	                                    </span>
-	                                  ) : (
-	                                    "—"
-	                                  )}
-	                                </td>
-	                                <td>{row.buyoutCost != null ? formatDisplayMoney(row.buyoutCost) : "—"}</td>
-	                                <td>{row.marketValueAtExit != null ? formatDisplayMoney(row.marketValueAtExit) : "—"}</td>
-	                                <td>{row.saleFactor != null ? `${formatLocalePoints(row.saleFactor, 2)}x` : "—"}</td>
-	                                <td>{row.exitValue != null ? formatDisplayMoney(row.exitValue) : "—"}</td>
-	                                {selectedTeamContractTable?.seasonLabels.map((label, index) => (
-	                                  <td key={`${row.rowId}-${label}`}>
-                                    {row.yearlySalarySchedule[index]?.salary != null
-                                      ? formatDisplayMoney(row.yearlySalarySchedule[index]!.salary)
-                                      : "—"}
+                                    ) : (
+                                      "—"
+                                    )}
                                   </td>
-                                )) ?? null}
-                              </tr>
-                            )})
-	                          ) : (
-	                            <tr>
-	                              <td colSpan={10 + (selectedTeamContractTable?.seasonLabels.length ?? 0)} className="muted">
-	                                {selectedTeamContractTable?.rows.length
-	                                  ? "Aktuell sind nur Preview-Zeilen vorhanden. Schalte Preview ein, um sie zu sehen."
-	                                  : "Noch keine Vertragsdaten im aktuellen Scope."}
-	                              </td>
-	                            </tr>
-	                          )}
+                                </tr>
+                              );
+                            })
+                          ) : (
+                            <tr>
+                              <td colSpan={8 + (selectedTeamContractTable?.seasonLabels.length ?? 0) + 1} className="muted">
+                                {selectedTeamContractTable?.rows.length
+                                  ? "Aktuell sind nur Preview-Zeilen vorhanden. Schalte Preview ein, um sie zu sehen."
+                                  : "Noch keine Vertragsdaten im aktuellen Scope."}
+                              </td>
+                            </tr>
+                          )}
                         </tbody>
-	                        {selectedTeamContractTable ? (
-	                          <tfoot>
-	                            <tr>
-	                              <td colSpan={10}><strong>Summe aktiv</strong></td>
+                        {selectedTeamContractTable ? (
+                          <tfoot>
+                            <tr>
+                              <td colSpan={8}>
+                                <strong>Summe aktiv</strong>
+                              </td>
                               {selectedTeamContractTable.totalsCommitted.map((entry) => (
-                                <td key={`committed-${entry.label}`}><strong>{formatDisplayMoney(entry.salary)}</strong></td>
+                                <td key={`committed-${entry.label}`}>
+                                  <strong>{formatDisplayMoney(entry.salary)}</strong>
+                                </td>
                               ))}
+                              <td />
                             </tr>
                             <tr>
-                              <td colSpan={10}><strong>Summe mit Preview</strong></td>
+                              <td colSpan={8}>
+                                <strong>Summe mit Preview</strong>
+                              </td>
                               {selectedTeamContractTable.totalsWithPreview.map((entry) => (
-                                <td key={`preview-${entry.label}`}><strong>{formatDisplayMoney(entry.salary)}</strong></td>
+                                <td key={`preview-${entry.label}`}>
+                                  <strong>{formatDisplayMoney(entry.salary)}</strong>
+                                </td>
                               ))}
+                              <td />
                             </tr>
                           </tfoot>
                         ) : null}
                       </table>
                     </div>
-                    <div className="team-focus-footer">
-                      <div className="team-focus-footer-stats">
-                        <article>
-                          <span>Vertragslogik</span>
-                          <strong>Bestehende aktive Verträge werden in V1 als balanced gelesen.</strong>
-                        </article>
-                        <article>
-                          <span>Buyout-Hinweis</span>
-                          <strong>Buyout zahlt das komplette Restgehalt.</strong>
-                        </article>
-                      </div>
-                      <div className="team-focus-footer-actions">
-                        <span className="muted">
-                          Preview-Drafts kommen nur aus dem Kaufdialog und schreiben in diesem Block keinen echten Roster-Vertrag.
-                        </span>
-                      </div>
-                    </div>
+                    <p className="muted team-contracts-footnote">
+                      Preview-Drafts stammen aus dem Kaufdialog. Buyout zahlt das komplette Restgehalt; bei Abgang erhält das Team den VK-Wert.
+                    </p>
+
                   </div>
                 )}
               </section>
 
-              {showExtendedTeamPanels ? (
-              <div className={`foundation-main-grid${getViewClass("teams")}`}>
+              {selectedTeamDetailTab === "roster" ? (
+                <>
+                  <section className="panel teams-league-panel" id="teams-league-overview">
+                    <div className="teams-comparison-header">
+                      <div>
+                        <span className="eyebrow">Teams · Liga</span>
+                        <strong>Teamtabelle</strong>
+                      </div>
+                    </div>
+                    <div className="table-shell teams-overview-shell">
+                      <table className="team-table teams-overview-table">
+                        <colgroup>
+                          {visibleTeamsViewColumns.map((column) => (
+                            <col key={column.id} style={{ width: `${getTableColumnWidth("teamsView", column)}px` }} />
+                          ))}
+                        </colgroup>
+                        <thead>
+                          <tr>
+                            {visibleTeamsViewColumns.map((column) => (
+                              <th
+                                key={column.id}
+                                {...getTableHeaderDragProps("teamsView", column, visibleTeamsViewColumns)}
+                                className={
+                                  column.id === "pow"
+                                    ? "teams-view-head-pow"
+                                    : column.id === "spe"
+                                      ? "teams-view-head-spe"
+                                      : column.id === "men"
+                                        ? "teams-view-head-men"
+                                        : column.id === "soc"
+                                          ? "teams-view-head-soc"
+                                          : ""
+                                }
+                                style={{ width: `${getTableColumnWidth("teamsView", column)}px`, minWidth: `${column.minWidth}px` }}
+                                title={getTeamsViewColumnTitle(column.id)}
+                              >
+                                <div className="resizable-header-cell">
+                                  <SortableHeader label={column.label} tableId="teamsView" columnKey={column.dataKey} sortState={tableSorts.teamsView} onToggle={toggleTableSort} />
+                                  <span className="column-resizer" draggable={false} role="separator" aria-orientation="vertical" aria-label={`${column.label} Breite anpassen`} onMouseDown={(event) => startTableColumnResize("teamsView", column, event)} onDoubleClick={() => resetTableColumnWidth("teamsView", column)} />
+                                </div>
+                              </th>
+                            ))}
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {sortedTeamsViewRows.map((row, rowIndex) => (
+                            <tr
+                              key={row.team.teamId}
+                              className={joinClassNames(
+                                selectedTeam?.teamId === row.team.teamId && "is-selected",
+                                getOwnerTeamHighlightClass(resolvedTeamControlSettings[row.team.teamId]),
+                              )}
+                              onClick={() => {
+                                scheduleActiveManagerTeam(row.team.teamId, "manual_select");
+                              }}
+                            >
+                              {visibleTeamsViewColumns.map((column) => {
+                                if (column.id === "team") {
+                                  const logo = getTeamLogoModel(row.team, { variant: "thumb" });
+                                  return (
+                                    <td key={column.id} className="teams-view-team-cell">
+                                      <button
+                                        className="table-link-button players-table-team-button"
+                                        type="button"
+                                        onClick={(event) => {
+                                          event.stopPropagation();
+                                          openTeamProfileById(row.team.teamId);
+                                        }}
+                                      >
+                                        {shouldShowTeamRowLogo(row.team.teamId, rowIndex) && logo.src ? (
+                                          <BudgetedMediaImage
+                                            className="players-table-team-logo"
+                                            src={logo.src}
+                                            alt={`${row.team.name} Logo`}
+                                            width={30}
+                                            height={30}
+                                            loading="lazy"
+                                            fetchPriority="low"
+                                            fallback={
+                                              <span
+                                                className="players-table-team-logo players-table-team-logo-placeholder"
+                                                aria-label={`${row.team.name} Logo Platzhalter`}
+                                              >
+                                                {logo.initials}
+                                              </span>
+                                            }
+                                          />
+                                        ) : (
+                                          <span
+                                            className="players-table-team-logo players-table-team-logo-placeholder"
+                                            aria-label={`${row.team.name} Logo Platzhalter`}
+                                          >
+                                            {logo.initials}
+                                          </span>
+                                        )}
+                                        <span>{row.team.name}</span>
+                                      </button>
+                                    </td>
+                                  );
+                                }
+                                if (column.id === "overallRank") return <td key={column.id} className="teams-view-rank-cell">{row.overallRank ?? "—"}</td>;
+                                if (column.id === "cash") return <td key={column.id} className={`teams-view-finance-cell teams-view-cash-cell ${row.cash != null ? getSeasonCashHeatClass(row.cash, sortedTeamsViewRows) : ""}`}>{row.cash != null ? formatMoney(row.cash) : "—"}</td>;
+                                if (column.id === "guv") return <td key={column.id} className={`teams-view-finance-cell ${row.guv == null ? "" : row.guv >= 0 ? "text-positive" : "text-negative"}`}>{row.guv != null ? formatLocalePoints(row.guv, 1) : "—"}</td>;
+                                if (column.id === "roster") return <td key={column.id} className="teams-view-meta-cell">{row.rosterCount}</td>;
+                                if (column.id === "mw") return <td key={column.id} className="teams-view-finance-cell">{row.marketValueTotal != null ? formatLocalePoints(row.marketValueTotal, 2) : "—"}</td>;
+                                if (column.id === "salary") return <td key={column.id} className="teams-view-finance-cell">{formatLocalePoints(row.salaryTotal, 2)}</td>;
+                                if (column.id === "sponsor") return <td key={column.id} className="teams-view-finance-cell">{row.sponsorTotal != null ? formatLocalePoints(row.sponsorTotal, 1) : "—"}</td>;
+                                if (column.id === "pow") return <td key={column.id} title={row.rosterCount === 0 ? "Kein aktiver Kader vorhanden" : getTeamAxisRankTooltip("POW")} className={`teams-view-axis-cell teams-view-axis-cell-pow ${row.currentPowRank != null ? getRankHeatClass(row.currentPowRank, gameState.teams.length) : ""}`}>{row.currentPowRank != null ? formatWholeNumber(row.currentPowRank) : "—"}</td>;
+                                if (column.id === "spe") return <td key={column.id} title={row.rosterCount === 0 ? "Kein aktiver Kader vorhanden" : getTeamAxisRankTooltip("SPE")} className={`teams-view-axis-cell teams-view-axis-cell-spe ${row.currentSpeRank != null ? getRankHeatClass(row.currentSpeRank, gameState.teams.length) : ""}`}>{row.currentSpeRank != null ? formatWholeNumber(row.currentSpeRank) : "—"}</td>;
+                                if (column.id === "men") return <td key={column.id} title={row.rosterCount === 0 ? "Kein aktiver Kader vorhanden" : getTeamAxisRankTooltip("MEN")} className={`teams-view-axis-cell teams-view-axis-cell-men ${row.currentMenRank != null ? getRankHeatClass(row.currentMenRank, gameState.teams.length) : ""}`}>{row.currentMenRank != null ? formatWholeNumber(row.currentMenRank) : "—"}</td>;
+                                if (column.id === "soc") return <td key={column.id} title={row.rosterCount === 0 ? "Kein aktiver Kader vorhanden" : getTeamAxisRankTooltip("SOC")} className={`teams-view-axis-cell teams-view-axis-cell-soc ${row.currentSocRank != null ? getRankHeatClass(row.currentSocRank, gameState.teams.length) : ""}`}>{row.currentSocRank != null ? formatWholeNumber(row.currentSocRank) : "—"}</td>;
+                                if (column.id === "histPoints") {
+                                  const rank = teamHistoryPointRankMaps.total.get(row.team.teamId);
+                                  return <td key={column.id} className={`teams-view-history-points-cell ${rank != null ? getRankHeatClass(rank, gameState.teams.length) : ""}`}>{row.historicalPointsTotal != null ? formatLocalePoints(row.historicalPointsTotal, 1) : "—"}</td>;
+                                }
+                                if (column.id === "avgPoints") {
+                                  const rank = teamHistoryPointRankMaps.average.get(row.team.teamId);
+                                  return <td key={column.id} className={`teams-view-history-points-cell ${rank != null ? getRankHeatClass(rank, gameState.teams.length) : ""}`}>{row.avgPoints != null ? formatLocalePoints(row.avgPoints, 1) : "—"}</td>;
+                                }
+                                if (column.id === "gold") return <td key={column.id} className="teams-view-medal-cell" title="Goldmedaillen">🥇 {row.goldCount}</td>;
+                                if (column.id === "silver") return <td key={column.id} className="teams-view-medal-cell" title="Silbermedaillen">🥈 {row.silverCount}</td>;
+                                if (column.id === "bronze") return <td key={column.id} className="teams-view-medal-cell" title="Bronzemedaillen">🥉 {row.bronzeCount}</td>;
+                                if (column.id === "top5") return <td key={column.id} className="teams-view-meta-cell">{row.top5}</td>;
+                                if (column.id === "top10") return <td key={column.id} className="teams-view-meta-cell">{row.top10}</td>;
+                                if (column.id === "avgRank") return <td key={column.id} className="teams-view-meta-cell">{row.avgRank != null ? formatWholeNumber(row.avgRank) : "—"}</td>;
+                                if (column.id === "seasonPoints") {
+                                  const historyEntries = [...row.historicalPointsBySeason].sort((left, right) =>
+                                    left.seasonId.localeCompare(right.seasonId, "de", { numeric: true }),
+                                  );
+                                  return (
+                                    <td key={column.id} className="teams-view-season-points-cell">
+                                      {historyEntries.length > 0 ? (
+                                        <details>
+                                          <summary>{historyEntries.length} Seasons</summary>
+                                          <div className="teams-view-season-points-list">
+                                            {historyEntries.map((entry) => (
+                                              <span key={`${row.team.teamId}-${entry.seasonId}`}>
+                                                <b>{entry.seasonName.replace("Season ", "S")}</b>
+                                                {formatLocalePoints(entry.points, 1)}
+                                                {entry.rank != null ? <small>#{entry.rank}</small> : null}
+                                              </span>
+                                            ))}
+                                          </div>
+                                        </details>
+                                      ) : (
+                                        "—"
+                                      )}
+                                    </td>
+                                  );
+                                }
+                                return <td key={column.id}>—</td>;
+                              })}
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    </div>
+                  </section>
+
+                  {showSecondaryPanels && selectedTeamsHistoryData ? (
+                    <section className="panel teams-economy-panel" aria-label="Team-Kennzahlen">
+                      <div className="teams-v2-focus-grid">
+                        {teamEconomyTiles.map((tile) => (
+                          <article key={tile.label} className={`teams-v2-focus-card is-${tile.tone}`} title={tile.detail}>
+                            <span>{tile.label}</span>
+                            <strong>{tile.value}</strong>
+                            <small>{tile.note}</small>
+                          </article>
+                        ))}
+                      </div>
+                    </section>
+                  ) : null}
+
+                  {showSecondaryPanels ? (
+                    <>
+                  <section className="panel teams-history-panel teams-v2-history-panel" aria-label="Team-Historie">
+                    <div className="teams-v2-section-head">
+                      <div>
+                        <TooltipHeading
+                          as="h3"
+                          tooltip="Live-Season zuerst, darunter die echten Team-Snapshots mit Rang, Punkten, PPs, Achsen, Cash, Gehalt und Marktwert."
+                        >
+                          {selectedTeam.name} · Historie
+                        </TooltipHeading>
+                      </div>
+                    </div>
+                    {selectedTeamsHistoryData?.history?.length ? (
+                      <TeamDrawerHistoryTable
+                        rows={selectedTeamsHistoryData.history}
+                        getRowClassName={(row) => (row.isLive ? "is-live" : undefined)}
+                        renderCell={(columnId, row) => {
+                          if (columnId === "season") {
+                            return (
+                              <>
+                                <strong>{row.seasonName}</strong>
+                                {row.isLive ? <span className="pill">Live</span> : null}
+                              </>
+                            );
+                          }
+                          if (columnId === "rank") {
+                            return (
+                              <span className={`teams-v2-rank-cell ${getTeamHistoryRankToneClass(row.rank)}`}>
+                                {row.rank != null ? `#${row.rank}` : "—"}
+                              </span>
+                            );
+                          }
+                          if (columnId === "points") return formatLocalePoints(row.points, 1);
+                          if (columnId === "pps") return formatLocalePoints(row.pps, 1);
+                          if (columnId === "pow") return formatLocalePoints(row.ppPow, 1);
+                          if (columnId === "spe") return formatLocalePoints(row.ppSpe, 1);
+                          if (columnId === "men") return formatLocalePoints(row.ppMen, 1);
+                          if (columnId === "soc") return formatLocalePoints(row.ppSoc, 1);
+                          if (isSeasonDisciplineKey(columnId)) {
+                            return formatLocalePoints(row.disciplineValues[columnId], 1);
+                          }
+                          if (columnId === "cash") return formatNullableMoney(row.cash);
+                          if (columnId === "salary") return formatNullableMoney(row.salaryTotal);
+                          if (columnId === "mw") return formatNullableMoney(row.marketValue);
+                          if (columnId === "guv") {
+                            return (
+                              <span className={row.guv != null && row.guv < 0 ? "text-negative" : "text-positive"}>
+                                {formatSignedDisplayMoney(row.guv)}
+                              </span>
+                            );
+                          }
+                          if (columnId === "topBuy") {
+                            return row.topBuyPlayer ? `${row.topBuyPlayer} · ${formatNullableMoney(row.topBuyAmount)}` : "—";
+                          }
+                          if (columnId === "topSell") {
+                            return row.topSellPlayer ? `${row.topSellPlayer} · ${formatNullableMoney(row.topSellAmount)}` : "—";
+                          }
+                          return "—";
+                        }}
+                      />
+                    ) : (
+                      <p className="muted">Für dieses Team ist noch keine Historie verfügbar.</p>
+                    )}
+                  </section>
+
+                  <section className="panel team-objectives-panel teams-secondary-objectives-panel" data-testid="team-board-objectives" id="team-board-objectives">
+                    <div className="panel-header compact">
+                      <div className="stack">
+                        <h2>Board-Ziele</h2>
+                        <p className="muted">Saisonziele fuer Sport, Finanzen, Transfers, Kader, Facilities und Entwicklung.</p>
+                      </div>
+                      <div className="room-meta foundation-admin-meta">
+                        <span className="pill" title={TEAM_BOARD_RATING_TOOLTIP}>
+                          Board Rating {selectedBoardConfidence?.value ?? "—"}/10
+                        </span>
+                        <span
+                          className={`transfer-status-pill${(selectedBoardConfidence?.pressure ?? 0) >= 8 ? " is-warning" : " is-ready"}`}
+                          title={TEAM_BOARD_PRESSURE_TOOLTIP}
+                        >
+                          Druck {selectedBoardConfidence?.pressure ?? "—"}/10
+                        </span>
+                      </div>
+                    </div>
+                    <div className="teams-summary-grid history-summary-grid">
+                      {selectedTeamObjectives.map((objective) => (
+                        <article
+                          key={`team-objective-${objective.objectiveId}`}
+                          className="metric-card teams-summary-card"
+                          title={`Grundlage: ${objective.source}`}
+                        >
+                          <span>{objective.category.toUpperCase()}</span>
+                          <strong>{objective.label}</strong>
+                          <small className="muted">
+                            Ist {String(objective.currentValue ?? "—")} · Ziel {String(objective.targetValue ?? "—")}
+                          </small>
+                          <div className="room-meta foundation-admin-meta">
+                            <span className={`transfer-status-pill${objective.status === "completed" ? " is-ready" : objective.status === "failed" || objective.status === "at_risk" ? " is-warning" : ""}`}>
+                              {formatObjectiveStatusLabel(objective.status)}
+                            </span>
+                            {objective.rewardCash != null ? <span className="pill">Bonus {formatMoney(objective.rewardCash)}</span> : null}
+                            {objective.penaltyCash != null ? <span className="pill">Malus {formatMoney(objective.penaltyCash)}</span> : null}
+                          </div>
+                        </article>
+                      ))}
+                    </div>
+                    {selectedBoardConfidence?.warnings.length ? (
+                      <p className="muted">Board-Hinweise: {selectedBoardConfidence.warnings.map(formatCockpitReason).join(", ")}</p>
+                    ) : null}
+                  </section>
+                    </>
+                  ) : null}
+                </>
+              ) : null}
+
+              {selectedTeamDetailTab === "roster" && showExtendedTeamPanels ? (
+              <div className="foundation-main-grid">
                 <section className="panel">
                   <div className="panel-header">
                     <h2>Starter</h2>
@@ -1351,7 +1479,7 @@ gameState,
                           key={entry.id}
                           playerId={player.id}
                           name={player.name}
-                          portraitUrl={portrait.src}
+                          portraitUrl={portrait.thumbSrc ?? portrait.src}
                           portraitInitials={portrait.initials}
                           playerOvr={ratings?.ovrNormalized ?? null}
                           playerMvs={ratings?.mvs ?? null}
@@ -1385,7 +1513,7 @@ gameState,
                                   : null,
                               deltaClass: salaryDelta != null && salaryDelta < 0 ? "text-positive" : salaryDelta != null && salaryDelta > 0 ? "text-negative" : "",
                             },
-                            { label: "LZ", value: String(entry.contractLength ?? "—") },
+                            { label: "LZ", value: `${entry.contractLength ?? "—"}${formatContractShapeShortLabel(entry.contractShape) ? ` · ${formatContractShapeShortLabel(entry.contractShape)}` : ""}` },
                           ]}
                         />
                       );
@@ -1409,7 +1537,7 @@ gameState,
                           key={entry.id}
                           playerId={player.id}
                           name={player.name}
-                          portraitUrl={portrait.src}
+                          portraitUrl={portrait.thumbSrc ?? portrait.src}
                           portraitInitials={portrait.initials}
                           playerOvr={ratings?.ovrNormalized ?? null}
                           playerMvs={ratings?.mvs ?? null}
@@ -1443,7 +1571,7 @@ gameState,
                                   : null,
                               deltaClass: salaryDelta != null && salaryDelta < 0 ? "text-positive" : salaryDelta != null && salaryDelta > 0 ? "text-negative" : "",
                             },
-                            { label: "LZ", value: String(entry.contractLength ?? "—") },
+                            { label: "LZ", value: `${entry.contractLength ?? "—"}${formatContractShapeShortLabel(entry.contractShape) ? ` · ${formatContractShapeShortLabel(entry.contractShape)}` : ""}` },
                           ]}
                         />
                       );
@@ -1622,3 +1750,5 @@ gameState,
     </div>
   );
 }
+
+export default memo(FoundationTeamsDetailPanel);

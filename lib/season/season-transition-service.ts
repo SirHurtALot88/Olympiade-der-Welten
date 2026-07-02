@@ -2,6 +2,7 @@ import { randomUUID } from "node:crypto";
 
 import type { GamePhase, GameState, SeasonTransitionState } from "@/lib/data/olyDataTypes";
 import { buildFormCardSeasonUsageAudit } from "@/lib/lineups/legacy-lineup-modifiers";
+import { persistGameStateWithMaterializedDerivations } from "@/lib/foundation/materialize-season-derivations";
 import { createPersistenceService } from "@/lib/persistence/persistence-service";
 import type { PersistedSaveGame, PersistenceService } from "@/lib/persistence/types";
 import { applySeasonEndPotentialUpdates } from "@/lib/progression/player-potential-service";
@@ -238,7 +239,7 @@ export function startSeasonTransition(
     seasonTransition: transition,
     playerPotential: updatedPlayerPotential,
   };
-  persistence.saveSingleplayerState(save.saveId, nextGameState);
+  persistGameStateWithMaterializedDerivations(persistence, save.saveId, nextGameState);
 
   return {
     ...buildSeasonTransitionPreview({ ...save, gameState: nextGameState }),

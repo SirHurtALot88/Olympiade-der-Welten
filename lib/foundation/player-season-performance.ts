@@ -156,6 +156,22 @@ function buildSummaryFromSnapshotRow(
   };
 }
 
+function getSnapshotPlayerPerformances(snapshot: {
+  playerPerformances?: SeasonSnapshotPlayerPerformanceRecord[];
+  playerPerformanceSnapshots?: SeasonSnapshotPlayerPerformanceRecord[];
+}) {
+  const byPlayerId = new Map<string, SeasonSnapshotPlayerPerformanceRecord>();
+  for (const row of snapshot.playerPerformances ?? []) {
+    byPlayerId.set(row.playerId, row);
+  }
+  for (const row of snapshot.playerPerformanceSnapshots ?? []) {
+    if (!byPlayerId.has(row.playerId)) {
+      byPlayerId.set(row.playerId, row);
+    }
+  }
+  return [...byPlayerId.values()];
+}
+
 export function buildPlayerSeasonPerformanceMap(gameState: GameState, seasonPointsLedger?: SeasonPointsLedger) {
   const matchdayResultsById = new Map((gameState.seasonState.matchdayResults ?? []).map((entry) => [entry.id, entry] as const));
   const disciplineNamesById = new Map(gameState.disciplines.map((discipline) => [discipline.id, discipline.name] as const));
@@ -299,7 +315,7 @@ export function buildPlayerSeasonPerformanceMap(gameState: GameState, seasonPoin
   );
   const snapshot = sortedSnapshots.find((entry) => entry.status == null || entry.status === "completed") ?? null;
   const snapshotMap = new Map(
-    (snapshot?.playerPerformances ?? []).map((row) => [row.playerId, buildSummaryFromSnapshotRow(gameState, row, snapshot)] as const),
+    (snapshot ? getSnapshotPlayerPerformances(snapshot) : []).map((row) => [row.playerId, buildSummaryFromSnapshotRow(gameState, row, snapshot)] as const),
   );
 
   const summaryMap = new Map<string, PlayerSeasonPerformanceSummary>();
@@ -383,6 +399,13 @@ function getCachedPlayerSeasonPerformanceMap(gameState: GameState): ReturnType<t
   const map = buildPlayerSeasonPerformanceMap(gameState);
   playerSeasonPerformanceMapCache.set(gameState, map);
   return map;
+}
+
+export function isCurrentSeasonLivePerformanceSummary(
+  gameState: GameState,
+  summary: PlayerSeasonPerformanceSummary,
+) {
+  return summary.seasonId === gameState.season.id && summary.sourceLabel === "Aktuelle Matchday-Results";
 }
 
 export function buildPlayerSeasonPerformance(gameState: GameState, playerId: string) {

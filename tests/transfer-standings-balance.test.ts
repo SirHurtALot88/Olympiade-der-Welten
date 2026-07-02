@@ -64,6 +64,25 @@ describe("transfer-standings-balance", () => {
     expect(balance.transferNet).toBe(30);
   });
 
+  it("ignores ai_roster_fill draft buys in season 1", () => {
+    const balance = buildStandingsTransferBalanceForTeam(
+      gameState([
+        transfer({
+          transferType: "buy",
+          seasonId: "season-1",
+          toTeamId: "A-A",
+          source: "ai_roster_fill",
+          fee: 180,
+        }),
+      ]),
+      "season-1",
+      "A-A",
+    );
+
+    expect(balance.transferBuyCount).toBe(0);
+    expect(balance.transferBuyTotal).toBe(0);
+  });
+
   it("pairs prior-season end sells with current-season preseason buys from season 2 onward", () => {
     const balance = buildStandingsTransferBalanceForTeam(
       gameState([

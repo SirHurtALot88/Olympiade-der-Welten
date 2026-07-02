@@ -1,5 +1,46 @@
 import type { GameState, Player, RosterEntry, Team, TeamStrategyProfile } from "@/lib/data/olyDataTypes";
 
+// Gender-/Quota-Logik (z.B. D-P): Nicht-humanoide Kreaturen (Tiere, Drachen, ...) zaehlen
+// NICHT in das Frauen-Limit hinein und sind unabhaengig vom Geschlecht erlaubt.
+// Humanoide (Mensch, Zwerg, Ork, Elf, Daemon, ...) zaehlen in das Limit; maennliche
+// Humanoide draengen den Frauenanteil. Klassifikation primaer ueber die Rasse.
+export const NON_HUMANOID_GENDER_QUOTA_RACES = new Set([
+  "animal",
+  "dragon",
+  "lizard",
+  "aqua",
+  "fish",
+  "plant",
+]);
+
+export function isHumanoidForGenderQuota(player: Pick<Player, "race">): boolean {
+  const race = String(player.race ?? "").trim().toLowerCase();
+  if (!race) return true;
+  return !NON_HUMANOID_GENDER_QUOTA_RACES.has(race);
+}
+
+export function isFemaleGenderPlayer(player: Pick<Player, "gender">): boolean {
+  const gender = String(player.gender ?? "").trim().toLowerCase();
+  return gender === "f" || gender === "w" || gender === "female" || gender === "weiblich" || gender === "frau";
+}
+
+/** V-D women-only: female humanoids + male/neutral animals only. */
+export function isVdWomenOnlyEligiblePlayer(player: Pick<Player, "race" | "gender">): boolean {
+  if (String(player.race ?? "").trim().toLowerCase() === "animal") return true;
+  return isFemaleGenderPlayer(player);
+}
+
+export function getHardFocusIdentityBlockReason(
+  teamCode: string,
+  player: Pick<Player, "race" | "gender">,
+): string | null {
+  const code = String(teamCode ?? "").trim().toUpperCase();
+  if (code === "V-D" && !isVdWomenOnlyEligiblePlayer(player)) {
+    return "hard_focus_v-d_requires_female_or_pet";
+  }
+  return null;
+}
+
 export type TeamThemeStrictness = "hard" | "strong" | "medium" | "soft";
 export type TeamThemeStatus = "green_above_target" | "yellow_above_minimum" | "red_below_minimum" | "accepted_exception";
 
@@ -16,7 +57,46 @@ export type TeamThemeCompositionTarget = {
   exceptionPolicy: "only_if_major_upgrade" | "normal_quality_fit_allowed" | "phase_a_minimum_relaxed" | "audit_required";
   qualityOverrideThreshold: number;
   notes: string;
+  // Wenn gesetzt, wird der primaryShare nur ueber humanoide Spieler berechnet
+  // (nicht-humanoide Kreaturen wie Tiere/Drachen sind aus Zaehler UND Nenner ausgenommen).
+  genderQuotaHumanoidScoped?: boolean;
+  // Wenn gesetzt, wird der primaryShare als Rassen-Mindestquote berechnet: Anteil der Spieler,
+  // deren Rasse in `races` liegt, am Gesamtkader (unabhaengig von Theme-Tags). Fuer Teams wie
+  // H-R, die mindestens X% einer konkreten Rasse (z.B. Demon) im Kader halten sollen.
+  raceQuotaScoped?: { races: string[] };
 };
+
+export type IdentityQuotaRole = "counts" | "exempt" | "violates" | "none";
+
+function normalizeRaceToken(race: string | null | undefined): string {
+  return String(race ?? "").trim().toLowerCase();
+}
+
+export function isQuotaScopedTarget(
+  target: Pick<TeamThemeCompositionTarget, "raceQuotaScoped" | "genderQuotaHumanoidScoped">,
+): boolean {
+  return Boolean((target.raceQuotaScoped && target.raceQuotaScoped.races.length > 0) || target.genderQuotaHumanoidScoped);
+}
+
+// Klassifiziert einen Spieler relativ zur Identitaets-Mindestquote des Teams:
+// - "counts": zaehlt in den Quoten-Zaehler (z.B. Demon-Rasse bei H-R, Frau bei D-P/V-D)
+// - "violates": zaehlt in den Nenner, erfuellt die Quote aber nicht (draengt den Anteil)
+// - "exempt": ausgenommen (z.B. Tiere/Pets bei Gender-Quote) – weder Zaehler noch Nenner
+// - "none": Team hat keine quoten-basierte Identitaet
+export function classifyIdentityQuotaRole(
+  player: Pick<Player, "race" | "gender">,
+  target: Pick<TeamThemeCompositionTarget, "raceQuotaScoped" | "genderQuotaHumanoidScoped">,
+): IdentityQuotaRole {
+  if (target.raceQuotaScoped && target.raceQuotaScoped.races.length > 0) {
+    const wanted = target.raceQuotaScoped.races.map((entry) => entry.toLowerCase());
+    return wanted.includes(normalizeRaceToken(player.race)) ? "counts" : "violates";
+  }
+  if (target.genderQuotaHumanoidScoped) {
+    if (!isHumanoidForGenderQuota(player)) return "exempt";
+    return isFemaleGenderPlayer(player) ? "counts" : "violates";
+  }
+  return "none";
+}
 
 export type PlayerThemeTagRow = {
   playerId: string;
@@ -47,6 +127,11 @@ export type TeamThemeCompositionScore = {
   themeTier: "core_theme" | "secondary_theme" | "soft_theme" | "outsider_exception" | "outsider" | "avoid";
   exceptionAllowed: boolean;
   reason: string;
+  // Quoten-Identitaet: Rolle des Kandidaten relativ zur Mindestquote und ein starker,
+  // NICHT geclampter rawScore-Delta fuer die Markt-Bewertung (positiv = zieht zur Quote hoch,
+  // negativ = draengt die Quote, exempt/none = 0). Niemals als Hard-Block gedacht.
+  identityQuotaRole: IdentityQuotaRole;
+  identityFloorAdjustment: number;
 };
 
 export type TeamThemeCompositionRuntimeContext = {
@@ -86,7 +171,7 @@ const THEME_TARGETS: Record<string, TeamThemeCompositionTarget> = {
     strictness: "hard",
     exceptionPolicy: "only_if_major_upgrade",
     qualityOverrideThreshold: 22,
-    notes: "Last Ride muss visuell als Undead-/Reaper-Team erkennbar bleiben.",
+    notes: "Last Ride: Undead ist Subclass/Theme-Tag (nicht Rasse). Lich/Ghost/Vampire zaehlen mit.",
   },
   "L-K": {
     teamId: "L-K",
@@ -114,7 +199,11 @@ const THEME_TARGETS: Record<string, TeamThemeCompositionTarget> = {
     strictness: "hard",
     exceptionPolicy: "only_if_major_upgrade",
     qualityOverrideThreshold: 22,
-    notes: "Hell Raisers sollen als Demon-/Infernal-Team lesbar sein.",
+    // Mindestquote auf die Rasse Demon: H-R soll dauerhaft >= 75% Daemonen im Kader haben
+    // (mehr ist besser, nie hart blocken). Nicht-Daemonen (Devil/Fiend/Undead-Allies) bleiben als
+    // Secondary/Outsider erlaubt, zaehlen aber nicht in die Demon-Quote.
+    raceQuotaScoped: { races: ["demon"] },
+    notes: "Hell Raisers: mindestens 75% Demon-Rasse (Ziel 90%), Rest infernale Verbuendete.",
   },
   "R-R": {
     teamId: "R-R",
@@ -128,6 +217,7 @@ const THEME_TARGETS: Record<string, TeamThemeCompositionTarget> = {
     strictness: "strong",
     exceptionPolicy: "audit_required",
     qualityOverrideThreshold: 16,
+    raceQuotaScoped: { races: ["fish", "aqua", "lizard"] },
     notes: "Riptide Rivers: mindestens 60% Fish/Aqua-Kern; Alien ist gewuenschter Secondary-Vibe, Value bleibt Strategie statt Monokultur.",
   },
   "G-G": {
@@ -219,14 +309,16 @@ const THEME_TARGETS: Record<string, TeamThemeCompositionTarget> = {
     primaryThemeTags: ["Female"],
     secondaryThemeTags: ["Succubus", "Demon", "Dark", "Temptress", "SexyDemon"],
     softPreferredTags: ["Shadow", "Seduction", "Agile", "Charisma"],
-    allowedOutsiderTags: ["Demon", "Dark", "Assassin"],
-    avoidTags: ["Male", "Holy", "Angel", "Construct"],
-    targetShare: 0.9,
-    minimumShare: 0.8,
+    allowedOutsiderTags: ["Demon", "Dark", "Assassin", "Animal", "Beast", "Dragon"],
+    avoidTags: ["Holy", "Angel", "Construct"],
+    targetShare: 0.75,
+    minimumShare: 0.65,
     strictness: "hard",
     exceptionPolicy: "only_if_major_upgrade",
     qualityOverrideThreshold: 24,
-    notes: "Death Peaches: weibliches Dark-Fantasy-/Succubus-Team; W-Anteil >80% ist Pflicht.",
+    genderQuotaHumanoidScoped: true,
+    notes:
+      "Death Peaches: weibliches Dark-Fantasy-Team. Frauenanteil unter Humanoiden mindestens 65% (Ziel 75%); nicht-humanoide Kreaturen (Tiere/Drachen) sind unabhaengig vom Geschlecht erlaubt und zaehlen nicht ins Limit.",
   },
   "S-C": {
     teamId: "S-C",
@@ -404,11 +496,11 @@ const THEME_TARGETS: Record<string, TeamThemeCompositionTarget> = {
     allowedOutsiderTags: ["Orc", "Tauren", "Dragon"],
     avoidTags: ["Small", "Tiny", "Gnome"],
     targetShare: 0.9,
-    minimumShare: 0.8,
+    minimumShare: 0.6,
     strictness: "hard",
     exceptionPolicy: "only_if_major_upgrade",
     qualityOverrideThreshold: 24,
-    notes: "The Giants: Height >= 6 / grosse Charaktere sind Pflichtfantasie.",
+    notes: "The Giants: mindestens 60% Kader mit Groesse >= 6 (Tall/Giant-Tags).",
   },
   "Z-H": {
     teamId: "Z-H",
@@ -454,9 +546,9 @@ const THEME_TARGETS: Record<string, TeamThemeCompositionTarget> = {
   },
   "V-D": {
     teamId: "V-D",
-    primaryThemeTags: ["Female", "Pet", "Animal", "Beast"],
+    primaryThemeTags: ["Female"],
     secondaryThemeTags: ["Amazon", "Huntress", "Elf", "Nature"],
-    softPreferredTags: ["Forest", "Agile", "Social"],
+    softPreferredTags: ["Pet", "Animal", "Beast", "Forest", "Agile", "Social"],
     allowedOutsiderTags: ["Animal", "Beast", "Pet"],
     avoidTags: ["Male", "Brute", "Machine"],
     targetShare: 1,
@@ -464,7 +556,10 @@ const THEME_TARGETS: Record<string, TeamThemeCompositionTarget> = {
     strictness: "hard",
     exceptionPolicy: "only_if_major_upgrade",
     qualityOverrideThreshold: 26,
-    notes: "Vicious & Delicious: Amazonen-Team, nur Frauen und Pets; keine M-Charaktere.",
+    // Frauen-Quote unter Nicht-Tieren: Pets/Tiere sind ausgenommen (duerfen jedes Geschlecht haben),
+    // alle anderen muessen Frauen sein -> faktisch 100% Frauen im humanoiden Anteil.
+    genderQuotaHumanoidScoped: true,
+    notes: "Vicious & Delicious: Amazonen-Team. Alle Nicht-Tiere muessen weiblich sein; Pets/Tiere sind unabhaengig vom Geschlecht erlaubt.",
   },
   "V-V": {
     teamId: "V-V",
@@ -725,12 +820,29 @@ export function derivePlayerThemeTags(player: Player): PlayerThemeTagRow {
       if (value.includes("raider")) addTag(tags, sources, "Raider", source);
     }
 
-    if (valueContains(value, ["sword", "swordsman", "duelist", "blade", "codex", "fair"])) {
-      if (value.includes("sword") || value.includes("blade")) addTag(tags, sources, "Swordsman", source);
+    if (valueContains(value, ["sword", "swordsman", "duelist", "blade", "codex", "fair", "gladiator", "samurai"])) {
+      if (value.includes("sword") || value.includes("blade") || value.includes("gladiator") || value.includes("samurai")) {
+        addTag(tags, sources, "Swordsman", source);
+      }
       if (value.includes("duelist")) addTag(tags, sources, "Duelist", source);
       if (value.includes("codex")) addTag(tags, sources, "Codex", source);
       if (value.includes("fair")) addTag(tags, sources, "Fair", source);
       addTag(tags, sources, "Agile", source);
+    }
+    if (valueContains(value, ["warrior", "fighter", "knight", "swashbuckler"]) && !value.includes("warlord")) {
+      if (value.includes("knight") || value.includes("swashbuckler")) addTag(tags, sources, "Knight", source);
+      if (value.includes("warrior") || value.includes("fighter")) addTag(tags, sources, "Swordsman", source);
+      if (value.includes("swashbuckler")) addTag(tags, sources, "Swashbuckler", source);
+    }
+    if (valueContains(value, ["crusader", "templar", "inquisitor", "holy war"])) {
+      addTag(tags, sources, "Crusader", source);
+      if (value.includes("templar") || value.includes("holy war")) addTag(tags, sources, "Paladin", source);
+    }
+    if (valueContains(value, ["cleric", "healer", "monk", "peace", "faith", "church"])) {
+      if (value.includes("cleric")) addTag(tags, sources, "Cleric", source);
+      if (value.includes("healer")) addTag(tags, sources, "Healer", source);
+      if (value.includes("monk")) addTag(tags, sources, "Monk", source);
+      if (value.includes("peace") || value.includes("faith") || value.includes("church")) addTag(tags, sources, "Faith", source);
     }
 
     if (valueContains(value, ["teacher", "mentor", "student", "pupil", "prospect", "leader", "captain"])) {
@@ -831,6 +943,31 @@ function hasAny(tags: Set<string>, candidates: string[]) {
   return candidates.some((tag) => tags.has(tag));
 }
 
+export const UNDEAD_IDENTITY_THEME_TAGS = [
+  "Undead",
+  "Vampire",
+  "Skeleton",
+  "Ghoul",
+  "Lich",
+  "Zombie",
+  "Ghost",
+  "Reaper",
+] as const;
+
+export function isUndeadIdentityThemePlayer(player: Player): boolean {
+  const tags = new Set(getCachedPlayerThemeTags(player).playerThemeTags);
+  return hasAny(tags, [...UNDEAD_IDENTITY_THEME_TAGS]);
+}
+
+function playerCountsForPrimaryThemeShare(player: Player, target: TeamThemeCompositionTarget): boolean {
+  const tags = new Set(getCachedPlayerThemeTags(player).playerThemeTags);
+  if (hasAny(tags, target.primaryThemeTags)) return true;
+  if (target.teamId === "L-R" || target.teamId === "L-K") {
+    return hasAny(tags, target.secondaryThemeTags);
+  }
+  return false;
+}
+
 function hasHardIdentityOverride(teamId: string, tags: Set<string>) {
   switch (teamId) {
     case "H-R":
@@ -848,7 +985,8 @@ function hasHardIdentityOverride(teamId: string, tags: Set<string>) {
     case "S-S":
       return hasAny(tags, ["Construct", "Robot", "Android", "Machine", "Augmented", "Cyborg", "Steel"]);
     case "L-K":
-      return hasAny(tags, ["Undead", "Vampire", "Skeleton", "Ghoul", "Lich", "Zombie", "Ghost"]);
+    case "L-R":
+      return hasAny(tags, [...UNDEAD_IDENTITY_THEME_TAGS]);
     default:
       return false;
   }
@@ -864,11 +1002,28 @@ function calculateRosterShareUncached(input: { gameState: GameState; teamId: str
   if (count === 0) {
     return { rosterPlayers, primaryCount: 0, secondaryCount: 0, combinedCount: 0, primaryShare: 0, combinedShare: 0 };
   }
+  // Quoten-Identitaeten (H-R Demon-Rasse, D-P/V-D Frauen unter Nicht-Tieren) berechnen den
+  // primaryShare ueber die Rollen-Klassifikation: "exempt"/"none" sind aus Zaehler UND Nenner
+  // ausgenommen, "violates" zaehlt nur in den Nenner. combinedShare bleibt auf dem Gesamtkader.
+  const quotaScoped = isQuotaScopedTarget(input.target);
   let primaryCount = 0;
+  let primaryDenominator = 0;
+  if (quotaScoped) {
+    for (const player of rosterPlayers) {
+      const role = classifyIdentityQuotaRole(player, input.target);
+      if (role === "exempt" || role === "none") continue;
+      primaryDenominator += 1;
+      if (role === "counts") primaryCount += 1;
+    }
+  } else {
+    primaryDenominator = rosterPlayers.length;
+    for (const player of rosterPlayers) {
+      if (playerCountsForPrimaryThemeShare(player, input.target)) primaryCount += 1;
+    }
+  }
   let secondaryCount = 0;
   for (const player of rosterPlayers) {
     const tags = new Set(getCachedPlayerThemeTags(player).playerThemeTags);
-    if (hasAny(tags, input.target.primaryThemeTags)) primaryCount += 1;
     if (hasAny(tags, input.target.secondaryThemeTags)) secondaryCount += 1;
   }
   const combinedCount = rosterPlayers.filter((player) => {
@@ -880,7 +1035,7 @@ function calculateRosterShareUncached(input: { gameState: GameState; teamId: str
     primaryCount,
     secondaryCount,
     combinedCount,
-    primaryShare: primaryCount / count,
+    primaryShare: primaryDenominator > 0 ? primaryCount / primaryDenominator : 1,
     combinedShare: combinedCount / count,
   };
 }
@@ -977,15 +1132,26 @@ export function calculateThemeCompositionScore(input: {
       themeTier: "soft_theme",
       exceptionAllowed: true,
       reason: "no_theme_target",
+      identityQuotaRole: "none",
+      identityFloorAdjustment: 0,
     };
   }
 
   const share = input.runtimeContext?.rosterShare ?? rosterShare({ gameState: input.gameState, teamId: input.team.teamId, target });
-  const primaryMatch = hasAny(tags, target.primaryThemeTags);
+  // Quoten-Identitaeten (H-R Demon-Rasse, D-P/V-D Frauen unter Nicht-Tieren) leiten den
+  // Primary-Match aus der Rollen-Klassifikation ab, damit Floor-Metrik und Scoring konsistent sind.
+  const quotaScoped = isQuotaScopedTarget(target);
+  const quotaRole: IdentityQuotaRole = quotaScoped ? classifyIdentityQuotaRole(input.player, target) : "none";
+  const quotaCounts = quotaRole === "counts";
+  const quotaExempt = quotaRole === "exempt";
+  const quotaViolates = quotaRole === "violates";
+  const primaryMatch = quotaScoped ? quotaCounts : playerCountsForPrimaryThemeShare(input.player, target);
   const secondaryMatch = hasAny(tags, target.secondaryThemeTags);
   const softMatch = hasAny(tags, target.softPreferredTags);
   const allowedOutsider = hasAny(tags, target.allowedOutsiderTags);
-  const hardIdentityOverride = hasHardIdentityOverride(input.team.teamId, tags);
+  // Bei Quoten-Teams gilt: "counts" und "exempt" wirken wie ein Identity-Override (kein Avoid-/Miss-
+  // Malus), "violates" nicht. Sonst weiter ueber die teamspezifische Tag-Heuristik.
+  const hardIdentityOverride = quotaScoped ? quotaCounts || quotaExempt : hasHardIdentityOverride(input.team.teamId, tags);
   const avoidMatch = hasAny(tags, target.avoidTags) && !hardIdentityOverride;
   const belowMinimum = share.primaryShare < target.minimumShare;
   const belowTarget = share.primaryShare < target.targetShare;
@@ -999,8 +1165,40 @@ export function calculateThemeCompositionScore(input: {
   const outsider = !primaryMatch && !secondaryMatch && !softMatch;
   const outsiderPenalty = outsider && !allowedOutsider ? -18 * strictnessWeight * phaseWeight : outsider ? -7 * phaseWeight : 0;
   const avoidTagPenalty = avoidMatch ? -26 * strictnessWeight : 0;
-  const hardQuotaRecoveryBonus = target.strictness === "hard" && belowMinimum && hardIdentityOverride ? 35 : 0;
-  const hardQuotaMissPenalty = target.strictness === "hard" && belowMinimum && !hardIdentityOverride ? -80 : 0;
+  // Floor-Eligibilitaet: Bei Quoten-Teams strikt ueber die Rolle (exempt ist neutral, kein Miss),
+  // sonst wie bisher ueber den Identity-Override.
+  const recoveryEligible = quotaScoped ? quotaCounts : hardIdentityOverride;
+  const missEligible = quotaScoped ? quotaViolates : !hardIdentityOverride;
+  const hardQuotaRecoveryBonus = target.strictness === "hard" && belowMinimum && recoveryEligible ? 35 : 0;
+  const hardQuotaMissPenalty = target.strictness === "hard" && belowMinimum && missEligible ? -80 : 0;
+  // Starker, NICHT geclampter rawScore-Delta fuer die Markt-Bewertung: nur fuer Quoten-Teams.
+  // Unter Minimum dominiert er (Quote-Kandidaten hoch, Verletzer runter, exempt neutral); zwischen
+  // Minimum und Ziel bleibt ein milder Anreiz ("mehr ist besser"). Niemals ein Hard-Block.
+  const enforceQuotaFloor = quotaScoped && (target.strictness === "hard" || target.strictness === "strong");
+  const enforceTagFloor = !quotaScoped && (target.strictness === "hard" || target.strictness === "strong");
+  const tagThemed = primaryMatch || secondaryMatch;
+  const tagSoftThemed = softMatch;
+  const tagMiss = !tagThemed && !tagSoftThemed && avoidMatch;
+  const identityFloorAdjustment =
+    !enforceQuotaFloor && !enforceTagFloor
+      ? 0
+      : belowMinimum
+        ? quotaScoped
+          ? quotaCounts
+            ? 0.6
+            : quotaViolates
+              ? -0.9
+              : 0
+          : tagThemed
+            ? 0.6
+            : tagSoftThemed
+              ? 0.25
+              : tagMiss
+                ? -0.9
+                : -0.35
+        : belowTarget && (quotaScoped ? quotaCounts : tagThemed)
+          ? 0.1
+          : 0;
   const roleFit = input.candidateRoleFit ?? 0;
   const qualityOverrideBonus =
     outsider && input.candidateQuality + roleFit >= target.qualityOverrideThreshold ? Math.min(18, (input.candidateQuality + roleFit - target.qualityOverrideThreshold) * 0.45) : 0;
@@ -1067,9 +1265,12 @@ export function calculateThemeCompositionScore(input: {
       hardIdentityOverride ? "hard_identity_match" : null,
       hardQuotaMissPenalty < 0 ? "hard_quota_miss" : null,
       qualityOverrideBonus > 0 ? "quality_override" : null,
+      quotaScoped ? `quota_${quotaRole}` : null,
     ]
       .filter(Boolean)
       .join("|"),
+    identityQuotaRole: quotaRole,
+    identityFloorAdjustment: Number(identityFloorAdjustment.toFixed(2)),
   };
 }
 
@@ -1150,6 +1351,80 @@ export function buildTeamThemeCompositionAudit(gameState: GameState, options: { 
       },
     ];
   });
+}
+
+export type DraftThemePickPhase =
+  | "minimum_skeleton"
+  | "early_core"
+  | "identity_core"
+  | "identity_reserve"
+  | "specialist_fill"
+  | "late_core_investment"
+  | "star_investment";
+
+export function mapDraftPickPhaseToThemePhase(
+  pickPhase: DraftThemePickPhase,
+): "phase_a_minimum" | "phase_b_core_optimum" | "phase_c_depth_luxury" {
+  if (pickPhase === "minimum_skeleton") return "phase_a_minimum";
+  if (pickPhase === "identity_reserve" || pickPhase === "identity_core" || pickPhase === "early_core") {
+    return "phase_b_core_optimum";
+  }
+  return "phase_c_depth_luxury";
+}
+
+export function computeDraftThemePickScoreContribution(input: {
+  themeScore: TeamThemeCompositionScore;
+  strictness: TeamThemeStrictness | null | undefined;
+  pickPhase: DraftThemePickPhase;
+}): number {
+  const phase = mapDraftPickPhaseToThemePhase(input.pickPhase);
+  const phaseMultiplier = phase === "phase_a_minimum" ? 0.1 : phase === "phase_b_core_optimum" ? 0.16 : 0.11;
+  const strictnessMultiplier =
+    input.strictness === "hard" ? 1.25 : input.strictness === "strong" ? 1.1 : input.strictness === "medium" ? 0.9 : 0.75;
+  const composition = input.themeScore.themeCompositionScore * phaseMultiplier * strictnessMultiplier;
+  const floor = input.themeScore.identityFloorAdjustment * 28;
+  const reserveBoost =
+    input.pickPhase === "identity_reserve" &&
+    (input.themeScore.themeTier === "core_theme" || input.themeScore.themeTier === "secondary_theme")
+      ? 6
+      : 0;
+  const identityReserveAvoidPenalty =
+    input.pickPhase === "identity_reserve" && input.themeScore.themeTier === "avoid" ? -20 : 0;
+  const strictEarlyThemeLane =
+    (input.strictness === "hard" || input.strictness === "strong") &&
+    (phase === "phase_a_minimum" || phase === "phase_b_core_optimum");
+  const strictEarlyCoreBoost =
+    strictEarlyThemeLane &&
+    (input.themeScore.themeTier === "core_theme" || input.themeScore.themeTier === "secondary_theme")
+      ? 8
+      : 0;
+  const strictEarlyAvoidPenalty =
+    strictEarlyThemeLane && input.themeScore.themeTier === "avoid" ? -14 : 0;
+  return Number(
+    (
+      composition +
+      floor +
+      reserveBoost +
+      identityReserveAvoidPenalty +
+      strictEarlyCoreBoost +
+      strictEarlyAvoidPenalty
+    ).toFixed(2),
+  );
+}
+
+export function teamNeedsThemeReserve(context: TeamThemeCompositionRuntimeContext | null | undefined) {
+  const target = context?.target ?? null;
+  const share = context?.rosterShare ?? null;
+  if (!target || !share) return false;
+  if (target.strictness !== "hard" && target.strictness !== "strong") return false;
+  const currentShare = share.primaryShare;
+  const projectedNonThemeShare =
+    share.rosterPlayers.length > 0
+      ? share.primaryCount / Math.max(1, share.rosterPlayers.length + 1)
+      : 0;
+  return (
+    currentShare + 0.001 < target.minimumShare || projectedNonThemeShare + 0.001 < target.minimumShare
+  );
 }
 
 export function buildPlayerThemeTagRows(players: Player[]): PlayerThemeTagRow[] {

@@ -4,7 +4,7 @@ import { NextResponse } from "next/server";
 
 import type { GameState } from "@/lib/data/olyDataTypes";
 import { resolvePlayerEconomyContract } from "@/lib/foundation/player-economy-contract";
-import { buildSeasonPointsLedger } from "@/lib/foundation/season-points-ledger";
+import { getSeasonPointsLedger } from "@/lib/foundation/get-season-derivations";
 import { createPersistenceService } from "@/lib/persistence/persistence-service";
 import { readStandingsOverviewCache, writeStandingsOverviewCache } from "@/lib/season/standings-overview-cache";
 import { buildArchivedSeasonStandingsOverviewItems } from "@/lib/season/archived-standings-overview";
@@ -18,6 +18,7 @@ import {
   SEASON_STANDINGS_DISCIPLINE_COLUMNS,
   type SeasonStandingsSheetRow,
 } from "@/lib/standings/season-standings-sheet";
+import { respondWithSliceEtag } from "@/lib/foundation/season-slice-http";
 import { db } from "@/src/server/db";
 
 function roundValue(value: number, digits = 1) {
@@ -27,8 +28,15 @@ function roundValue(value: number, digits = 1) {
 function buildLocalSeasonDisciplineValues(input: {
   gameState: GameState;
   seasonId: string;
+  saveId: string;
+  contentSignature?: string | null;
 }) {
-  const ledger = buildSeasonPointsLedger(input.gameState, input.seasonId);
+  const ledger = getSeasonPointsLedger({
+    gameState: input.gameState,
+    saveId: input.saveId,
+    seasonId: input.seasonId,
+    contentSignature: input.contentSignature ?? null,
+  });
 
   return new Map(
     input.gameState.teams.map((team) => {
@@ -64,6 +72,7 @@ function buildStandingsOverviewCacheSignature(input: {
   localSave: NonNullable<ReturnType<ReturnType<typeof createPersistenceService>["getSaveById"]>>;
   seasonId: string;
   sourceKind: "live" | "season_snapshot" | "season_snapshot_missing";
+  contentSignature?: string | null;
 }) {
   const versionMeta = createPersistenceService().getSaveVersionMetadata(input.localSave.saveId);
   const base = versionMeta
@@ -76,8 +85,9 @@ function buildStandingsOverviewCacheSignature(input: {
         versionMeta.updatedAt,
         input.seasonId,
         input.sourceKind,
+        input.contentSignature ?? versionMeta.contentSignature ?? "",
       ].join("|")
-    : `${input.localSave.updatedAt}|${input.seasonId}|${input.sourceKind}`;
+    : `${input.localSave.updatedAt}|${input.seasonId}|${input.sourceKind}|${input.contentSignature ?? ""}`;
   return base;
 }
 
@@ -86,6 +96,7 @@ export async function GET(request: Request) {
     const { searchParams } = new URL(request.url);
     const saveId = searchParams.get("saveId")?.trim() || undefined;
     const requestedSeasonId = searchParams.get("seasonId")?.trim() || undefined;
+    const requestedContentSignature = searchParams.get("contentSignature")?.trim() || undefined;
     const source = searchParams.get("source")?.trim() === "prisma" ? "prisma" : "sqlite";
 
     const localSave =
@@ -100,6 +111,9 @@ export async function GET(request: Request) {
           })()
         : null;
     const seasonId = requestedSeasonId ?? localSave?.gameState.season.id ?? "season-1";
+    const contentSignature =
+      requestedContentSignature ??
+      (localSave ? createPersistenceService().getSaveVersionMetadata(localSave.saveId)?.contentSignature ?? null : null);
 
     if (source === "sqlite" && localSave) {
       const activeSeasonId = localSave.gameState.season.id;
@@ -131,9 +145,19 @@ export async function GET(request: Request) {
         localSave,
         seasonId,
         sourceKind: archivedSnapshot ? "season_snapshot" : "live",
+        contentSignature,
       });
       const cached = readStandingsOverviewCache(cacheKey, cacheSignature);
       if (cached) {
+        if (contentSignature) {
+          return respondWithSliceEtag(request, {
+            slice: "standings-overview",
+            saveId: localSave.saveId,
+            seasonId,
+            contentSignature,
+            payload: cached as Record<string, unknown>,
+          });
+        }
         return NextResponse.json(cached);
       }
 
@@ -154,6 +178,15 @@ export async function GET(request: Request) {
           },
         };
         writeStandingsOverviewCache(cacheKey, cacheSignature, archivedPayload);
+        if (contentSignature) {
+          return respondWithSliceEtag(request, {
+            slice: "standings-overview",
+            saveId: localSave.saveId,
+            seasonId,
+            contentSignature,
+            payload: archivedPayload,
+          });
+        }
         return NextResponse.json(archivedPayload);
       }
     }
@@ -222,6 +255,8 @@ export async function GET(request: Request) {
         ? buildLocalSeasonDisciplineValues({
             gameState: localSave!.gameState,
             seasonId,
+            saveId: localSave!.saveId,
+            contentSignature: contentSignature ?? null,
           })
         : null;
 
@@ -395,8 +430,19 @@ export async function GET(request: Request) {
         localSave,
         seasonId,
         sourceKind: "live",
+        contentSignature,
       });
       writeStandingsOverviewCache(cacheKey, cacheSignature, responsePayload);
+    }
+
+    if (source === "sqlite" && localSave && contentSignature) {
+      return respondWithSliceEtag(request, {
+        slice: "standings-overview",
+        saveId: localSave.saveId,
+        seasonId,
+        contentSignature,
+        payload: responsePayload,
+      });
     }
 
     return NextResponse.json(responsePayload);

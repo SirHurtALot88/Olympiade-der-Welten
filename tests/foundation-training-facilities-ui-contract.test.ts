@@ -3,6 +3,8 @@ import fs from "node:fs/promises";
 import { describe, expect, it } from "vitest";
 
 const foundationClientPath = "/Users/chrisfalk/Documents/Codex/Olympiade der Welten/app/foundation/FoundationPageClient.tsx";
+const foundationPageTypesPath = "/Users/chrisfalk/Documents/Codex/Olympiade der Welten/lib/foundation/tabs/foundation-page-types.ts";
+const moduleHelpersPath = "/Users/chrisfalk/Documents/Codex/Olympiade der Welten/lib/foundation/tabs/foundation-page-module-helpers.tsx";
 const facilitiesV2Path = "/Users/chrisfalk/Documents/Codex/Olympiade der Welten/app/foundation/facilities-v2/FacilitiesV2Client.tsx";
 const trainingCompactPath = "/Users/chrisfalk/Documents/Codex/Olympiade der Welten/app/foundation/training-compact/TrainingCompactClient.tsx";
 const trainingViewSharedPath = "/Users/chrisfalk/Documents/Codex/Olympiade der Welten/app/foundation/training-facilities-v2/training-view-shared.tsx";
@@ -11,13 +13,15 @@ const globalsPath = "/Users/chrisfalk/Documents/Codex/Olympiade der Welten/app/g
 describe("foundation training and facilities ui contract", () => {
   it("routes the main navigation into compact training and facilities v2 grid", async () => {
     const fileText = await fs.readFile(foundationClientPath, "utf8");
+    const pageTypesText = await fs.readFile(foundationPageTypesPath, "utf8");
+    const moduleHelpersText = await fs.readFile(moduleHelpersPath, "utf8");
 
-    expect(fileText).toContain('| "trainingCompact"');
-    expect(fileText).toContain('| "trainingV2"');
-    expect(fileText).toContain('{ id: "trainingCompact", label: "Training"');
-    expect(fileText).toContain('{ id: "trainingV2", label: "Gebäude"');
-    expect(fileText).toContain('return "foundation-training-compact";');
-    expect(fileText).toContain('return "foundation-facilities-v2";');
+    expect(pageTypesText).toContain('| "trainingCompact"');
+    expect(pageTypesText).toContain('| "trainingV2"');
+    expect(moduleHelpersText).toContain('{ id: "trainingCompact", label: "Training"');
+    expect(moduleHelpersText).toContain('{ id: "trainingV2", label: "Gebäude"');
+    expect(moduleHelpersText).toContain('return "foundation-training-compact";');
+    expect(moduleHelpersText).toContain('return "foundation-facilities-v2";');
     expect(fileText).toContain('id="foundation-training-compact"');
     expect(fileText).toContain('id="foundation-facilities-v2"');
     expect(fileText).toContain("<TrainingCompactClient");

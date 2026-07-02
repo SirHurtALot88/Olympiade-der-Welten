@@ -1,4 +1,5 @@
 import type { GameState, Player, TransferHistoryEntry } from "@/lib/data/olyDataTypes";
+import { getSeasonDerivations } from "@/lib/foundation/get-season-derivations";
 import { buildPlayerRatingContractMap, type PlayerRatingContractRow } from "@/lib/foundation/player-rating-contract";
 import type { AiSellPreviewCandidate } from "@/lib/ai/ai-transfermarkt-sell-preview-service";
 import type { AiTransferPreviewRecommendation } from "@/lib/ai/ai-transfermarkt-preview-service";
@@ -33,6 +34,7 @@ const MARKET_SELL_SOURCES = new Set([
   "manual_transfer_window",
   "manual_transfermarkt_sell",
   "emergency_negative_cash_liquidation",
+  "preseason_proactive_cash_recovery_sell",
 ]);
 
 function clamp(value: number, min: number, max: number) {
@@ -129,10 +131,17 @@ function buildSlotFromSell(input: {
   };
 }
 
-export function buildReplacementSlotsFromHistory(gameState: GameState, teamId: string, maxSlots = 3): ReplacementSlot[] {
+export function buildReplacementSlotsFromHistory(
+  gameState: GameState,
+  teamId: string,
+  maxSlots = 3,
+  saveId?: string | null,
+): ReplacementSlot[] {
   const seasonId = gameState.season.id;
   const playersById = new Map(gameState.players.map((player) => [player.id, player] as const));
-  const ratingsById = buildPlayerRatingContractMap(gameState);
+  const ratingsById = saveId
+    ? getSeasonDerivations({ gameState, saveId }).ratingsById
+    : buildPlayerRatingContractMap(gameState);
   const slots: ReplacementSlot[] = [];
 
   for (const entry of gameState.transferHistory) {
@@ -161,13 +170,16 @@ export function buildReplacementSlotsFromHistory(gameState: GameState, teamId: s
 export function buildReplacementSlotsFromPlannedSells(input: {
   teamId: string;
   gameState: GameState;
+  saveId?: string | null;
   plannedSells: AiSellPreviewCandidate[];
   existingSlots?: ReplacementSlot[];
   maxSlots?: number;
 }): ReplacementSlot[] {
   const maxSlots = input.maxSlots ?? 3;
   const playersById = new Map(input.gameState.players.map((player) => [player.id, player] as const));
-  const ratingsById = buildPlayerRatingContractMap(input.gameState);
+  const ratingsById = input.saveId
+    ? getSeasonDerivations({ gameState: input.gameState, saveId: input.saveId }).ratingsById
+    : buildPlayerRatingContractMap(input.gameState);
   const slots = [...(input.existingSlots ?? [])];
   const usedPlayerIds = new Set(slots.map((slot) => slot.soldPlayerId));
 

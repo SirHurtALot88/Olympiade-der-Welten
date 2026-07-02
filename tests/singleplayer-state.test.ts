@@ -90,7 +90,8 @@ describe("singleplayer game state", () => {
     const reloaded = persistence.getSaveById(first.save.saveId);
     const cashCreators = reloaded?.gameState.teams.find((team) => team.teamId === "C-C");
     expect(cashCreators?.rosterLimit).toBe(14);
-    expect(cashCreators?.rosterMinTarget).toBe(11);
+    // Kader-Minimum ist jetzt fix 8 für jedes Team (unabhängig vom Sheet-/Identity-playerMin).
+    expect(cashCreators?.rosterMinTarget).toBe(8);
     expect(cashCreators?.rosterOptTarget).toBe(13);
   }, 60000);
 
@@ -989,7 +990,8 @@ describe("singleplayer game state", () => {
       playerOpt: 12,
     });
     expect(reloaded?.gameState.teamIdentities.find((entry) => entry.teamId === "C-C")?.finances).toBe(9.3);
-    expect(reloaded?.gameState.teamIdentities.find((entry) => entry.teamId === "C-C")?.playerMin).toBe(11);
+    // playerMin ist jetzt fix 8 (Sheet-/Override-playerMin wird für das Minimum ignoriert).
+    expect(reloaded?.gameState.teamIdentities.find((entry) => entry.teamId === "C-C")?.playerMin).toBe(8);
     expect(reloaded?.gameState.teamIdentities.find((entry) => entry.teamId === "C-C")?.playerOpt).toBe(13);
     expect(getTeamGeneralManager(reloaded!.gameState, "C-C")?.profile.title).toContain("Bargain Hunter");
     expect(createFreshSeasonOneGameState().teamIdentities.find((entry) => entry.teamId === "C-C")?.finances).toBe(10);

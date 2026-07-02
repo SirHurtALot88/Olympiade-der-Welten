@@ -18,6 +18,7 @@ type CliArgs = {
   runs: number;
   stepsPerTeam: number;
   apply: boolean;
+  summaryOnly: boolean;
 };
 
 type RunRecord = {
@@ -170,6 +171,7 @@ function parseArgs(argv: string[]): CliArgs {
   let runs = 10;
   let stepsPerTeam = 12;
   let apply = true;
+  let summaryOnly = false;
   for (let index = 0; index < argv.length; index += 1) {
     const token = argv[index];
     if (token === "--runs") {
@@ -182,9 +184,11 @@ function parseArgs(argv: string[]): CliArgs {
       index += 1;
     } else if (token === "--preview-only") {
       apply = false;
+    } else if (token === "--summary-only") {
+      summaryOnly = true;
     }
   }
-  return { runs, stepsPerTeam, apply };
+  return { runs, stepsPerTeam, apply, summaryOnly };
 }
 
 function csvCell(value: unknown) {
@@ -269,8 +273,22 @@ function hasAny(tokens: Set<string>, needles: string[]) {
   return needles.some((needle) => tokens.has(normalize(needle)) || [...tokens].some((token) => token.includes(normalize(needle))));
 }
 
+const NON_HUMANOID_RACES = new Set(["animal", "dragon", "lizard", "aqua", "fish", "plant"]);
+
+function isHumanoid(player: Player | null | undefined) {
+  const race = normalize(player?.race);
+  return !race || !NON_HUMANOID_RACES.has(race);
+}
+
 function isFemale(player: Player | null | undefined, tokens = playerTokens(player)) {
-  return normalize(player?.gender) === "female" || hasAny(tokens, ["female", "woman", "girl", "lady", "madame", "queen", "princess", "witch", "succubus"]);
+  const gender = normalize(player?.gender);
+  return (
+    gender === "f" ||
+    gender === "w" ||
+    gender === "female" ||
+    gender === "weiblich" ||
+    hasAny(tokens, ["female", "woman", "girl", "lady", "madame", "queen", "princess", "witch", "succubus"])
+  );
 }
 
 function isPet(player: Player | null | undefined, tokens = playerTokens(player)) {
@@ -300,7 +318,13 @@ function specialQuotaForTeam(teamId: string, players: Player[]) {
   if (teamId === "L-K") return { label: "Undead/Vampire/Skeleton/Ghoul", share: share(count((_p, t) => hasAny(t, ["undead", "vampire", "skeleton", "ghoul", "lich", "zombie", "ghost", "wraith", "revenant", "mummy"]))), target: 0.75, hard: false };
   if (teamId === "P-C") return { label: "Pirate/Swashbuckler/Wayfarer", share: share(count((_p, t) => hasAny(t, ["pirate", "swashbuckler", "wayfarer", "corsair"]))), target: 0.75, hard: true };
   if (teamId === "V-D") return { label: "Female/Pet", share: share(count((p, t) => isFemale(p, t) || isPet(p, t))), target: 1, hard: true };
-  if (teamId === "D-P") return { label: "Female", share: share(count((p, t) => isFemale(p, t))), target: 0.8, hard: true };
+  if (teamId === "D-P") {
+    // Humanoid-skalierte Frauen-Quote: nicht-humanoide Kreaturen (Tiere/Drachen) zaehlen nicht.
+    const humanoids = players.filter((p) => isHumanoid(p));
+    const femaleHumanoids = humanoids.filter((p) => isFemale(p, playerTokens(p))).length;
+    const humanoidShare = humanoids.length > 0 ? round(femaleHumanoids / humanoids.length, 3) ?? 1 : 1;
+    return { label: "FemaleHumanoid", share: humanoidShare, target: 0.65, hard: true };
+  }
   if (teamId === "T-G") return { label: "Height>=5/SizeTheme", share: share(count((p, t) => isHeightOrSizeThemePlayer(p, t))), target: 1, hard: true };
   if (teamId === "D-L") return { label: "Human", share: share(count((p, t) => normalize(p.race) === "human" || hasAny(t, ["human"]))), target: 0.75, hard: false };
   if (teamId === "S-S") return { label: "Construct/Bot/Augmented", share: share(count((_p, t) => hasAny(t, ["construct", "robot", "android", "machine", "augmented", "cyborg", "bot"]))), target: 0.6, hard: true };
@@ -822,7 +846,9 @@ async function main() {
     await writeFile(path.join(OUTPUT_DIR, "fresh-pick-audit-10x-rejected-candidates.csv"), toCsv(rejectedRows as unknown as Array<Record<string, unknown>>), "utf8");
     await writeFile(path.join(OUTPUT_DIR, "fresh-pick-audit-10x-overspend.csv"), toCsv(overspendRows as unknown as Array<Record<string, unknown>>), "utf8");
     await writeFile(path.join(OUTPUT_DIR, "fresh-pick-audit-10x-summary.md"), buildSummary({ runRows, teamRows, pickRows }), "utf8");
-    console.log(JSON.stringify(records.runRecord));
+    if (!args.summaryOnly) {
+      console.log(JSON.stringify(records.runRecord));
+    }
   }
 
   if (bestSaveId) {
@@ -832,14 +858,16 @@ async function main() {
   }
 
   const active = persistence.getActiveSave();
-  console.log(JSON.stringify({
+  const finalSummary = {
     outputDir: OUTPUT_DIR,
     overall: combineLevel(runRows.map((row) => row.status)),
     runs: runRows.length,
     bestSaveId,
     activeSaveId: active?.saveId ?? null,
     activeRosters: active?.gameState.rosters.length ?? null,
-  }, null, 2));
+  };
+  await writeFile(path.join(OUTPUT_DIR, "fresh-pick-audit-10x-final.json"), JSON.stringify(finalSummary, null, 2), "utf8");
+  console.log(JSON.stringify(finalSummary));
 }
 
 main().catch(async (error) => {

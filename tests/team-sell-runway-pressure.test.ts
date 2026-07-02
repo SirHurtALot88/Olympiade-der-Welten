@@ -39,6 +39,7 @@ describe("team sell runway pressure", () => {
     });
     expect(result.seasonSells).toBe(0);
     expect(result.cashPressureScore).toBeGreaterThan(0.5);
+    expect(result.lowCashBuffer).toBe(true);
     expect("needsProactiveSell" in result).toBe(false);
   });
 
@@ -64,6 +65,16 @@ describe("team sell runway pressure", () => {
         cashPressureScore: 0.1,
       }),
     ).toBe(false);
+  });
+
+  it("flags moderate profit edges when cash is healthy after threshold loosening", () => {
+    expect(
+      isAttractiveProfitSell({
+        expectedSellValue: 55,
+        marketValue: 50,
+        cashPressureScore: 0.1,
+      }),
+    ).toBe(true);
   });
 
   it("counts season sells", () => {

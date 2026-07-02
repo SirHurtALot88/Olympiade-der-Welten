@@ -196,8 +196,8 @@ describe("foundation player portrait preview ui contract", () => {
     expect(previewText).toContain('event.key === "Escape"');
     expect(previewText).toContain('matchMedia("(hover: none)")');
     expect(foundationText).toContain("FoundationPlayerPortraitPreview");
-    expect(foundationText).toContain('context="roster"');
     expect(teamsText).toContain("FoundationPlayerPortraitPreview");
+    expect(teamsText).toContain('context="roster"');
     expect(marketText).toContain("FoundationPlayerPortraitPreview");
     expect(marketText).toContain('context="market"');
   });
@@ -209,19 +209,21 @@ describe("teams portraits tab contract", () => {
     const path = await import("node:path");
     const root = process.cwd();
 
-    const [foundationText, panelText] = await Promise.all([
-      fs.readFile(path.join(root, "app/foundation/FoundationPageClient.tsx"), "utf8"),
+    const [shellText, panelText, portraitsTabText] = await Promise.all([
+      fs.readFile(path.join(root, "app/foundation/FoundationShellRouterBody.tsx"), "utf8"),
       fs.readFile(path.join(root, "app/foundation/teams-v2/FoundationTeamsDetailPanel.tsx"), "utf8"),
+      fs.readFile(path.join(root, "app/foundation/teams-v2/FoundationTeamsPortraitsTab.tsx"), "utf8"),
     ]);
 
-    expect(foundationText).toContain('{ id: "portraits", label: "Portraits" }');
-    expect(foundationText).toContain('"roster" | "contracts" | "portraits"');
-    expect(foundationText).toContain("filteredSelectedRosterTableRows={filteredSelectedRosterTableRows}");
+    expect(shellText).toContain('{ id: "portraits", label: "Portraits" }');
+    expect(shellText).toContain('"roster" | "contracts" | "portraits"');
     expect(panelText).toContain('selectedTeamDetailTab === "portraits"');
-    expect(panelText).toContain('data-testid="team-portraits-grid"');
-    expect(panelText).toContain("FoundationPlayerPortraitCard");
-    expect(panelText).toContain("roleTag={entry.roleTag}");
-    expect(panelText).toContain("playerClassName={player.className}");
+    expect(panelText).toContain("FoundationTeamsPortraitsTab");
+    expect(portraitsTabText).toContain('data-testid="team-portraits-grid"');
+    expect(panelText).toContain("team-contracts-table");
+    expect(portraitsTabText).toContain("FoundationPlayerPortraitCard");
+    expect(portraitsTabText).toContain("roleTag={entry.roleTag}");
+    expect(portraitsTabText).toContain("playerClassName={player.className}");
     expect(panelText).toContain("FoundationPlayerPortraitPreview");
   });
 });

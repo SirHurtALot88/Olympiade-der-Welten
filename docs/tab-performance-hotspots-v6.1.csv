@@ -1,0 +1,50 @@
+fromTab,toTab,v61Ms,apiCallsCount,slowestApiMs,slowestApiPath,warnings,status
+Home,Inbox,30000,8,4046,/api/media/player-portrait/player-0002-kargath,Tabwechsel >5s,slow
+Inbox,Einsatzliste,24804,0,0,,Tabwechsel >5s,slow
+Einsatzliste,Arena,95417,5,52126,/api/standings/preview,Tabwechsel >5s,slow
+Arena,Saisonstand,195178,0,0,,"locator.waitFor: Timeout 120000ms exceeded.
+Call log:
+  - waiting for locator('[data-testid=""foundation-season-v2""]').first() to be visible
+",failed
+Saisonstand,Teams,58554,0,0,,"locator.waitFor: Timeout 30000ms exceeded.
+Call log:
+  - waiting for locator('[data-testid=""foundation-teams-view""]').first() to be visible
+",failed
+Teams,Spieler,100185,99,32374,/api/singleplayer-state,Tabwechsel >5s,slow
+Spieler,Training,113680,3,40799,/api/singleplayer-state,Tabwechsel >5s,slow
+Training,Gebäude,101929,2,29557,/api/singleplayer-state,Tabwechsel >5s,slow
+Gebäude,Training (revisit),81637,14,12967,/api/singleplayer-state,Tabwechsel >5s,slow
+Gebäude,Transfermarkt,13532,0,0,,Tabwechsel >5s,slow
+Transfermarkt,Scouting,17117,0,0,,Tabwechsel >5s,slow
+Scouting,Historie,19677,2,4848,/api/singleplayer-state/version,Tabwechsel >5s,slow
+Historie,Ranks,19838,0,0,,Tabwechsel >5s,slow
+Ranks,Diszis,120008,0,0,,"locator.click: Timeout 120000ms exceeded.
+Call log:
+  - waiting for getByTestId('foundation-nav-diszis')
+    - locator resolved to <button type=""button"" class=""foundation-sidebar-item"" title=""Disziplinen und Mutatoren."" data-testid=""foundation-nav-diszis"">…</button>
+  - attempting click action
+    2 × waiting for element to be visible, enabled and stable
+      - element is visible, enabled and stable
+      - scrolling into view if needed
+      - done scrolling
+      - <div role=""dialog"" aria-modal=""true"" data-testid=""season-briefing-backdrop"" aria-labelledby=""season-briefing-title"" class=""foundation-modal-backdrop season-briefing-backdrop"">…</div> from <div class=""foundation-shell-main"">…</div> subtree intercepts pointer events
+    - retrying click action
+    - waiting 20ms
+    2 × waiting for element to be visible, enabled and stable
+      - element is visible, enabled and stable
+      - scrolling into view if needed
+      - done scrolling
+      - <div role=""dialog"" aria-modal=""true"" data-testid=""season-briefing-backdrop"" aria-labelledby=""season-briefing-title"" class=""foundation-modal-backdrop season-briefing-backdrop"">…</div> from <div class=""foundation-shell-main"">…</div> subtree intercepts pointer events
+    - retrying click action
+      - waiting 100ms
+    34 × waiting for element to be visible, enabled and stable
+       - element is visible, enabled and stable
+       - scrolling into view if needed
+       - done scrolling
+       - <div role=""dialog"" aria-modal=""true"" data-testid=""season-briefing-backdrop"" aria-labelledby=""season-briefing-title"" class=""foundation-modal-backdrop season-briefing-backdrop"">…</div> from <div class=""foundation-shell-main"">…</div> subtree intercepts pointer events
+     - retrying click action
+       - waiting 500ms
+",failed
+Diszis,Sponsoren,120445,5,72667,/api/singleplayer-state,Tabwechsel >5s,slow
+Sponsoren,Lexikon,69031,5,19929,/api/singleplayer-state,Tabwechsel >5s,slow
+START,Home,110286,,,initial_load,,ok

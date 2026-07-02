@@ -130,6 +130,7 @@ function buildWarnings(input: {
   currentIncome: number;
   newIncome: number;
   upgradeCost: number | null;
+  isIncomeFacility: boolean;
 }) {
   const warnings: string[] = [];
   if (input.cashBefore != null && input.upgradeCost != null && input.upgradeCost > input.cashBefore * 0.35) {
@@ -141,7 +142,7 @@ function buildWarnings(input: {
   if (input.cashAfter != null && input.cashAfter < 10) {
     warnings.push("cash_after_upgrade_low");
   }
-  if (input.newIncome <= input.currentIncome) {
+  if (input.isIncomeFacility && input.newIncome <= input.currentIncome) {
     warnings.push("income_source_missing");
   }
   if (input.newUpkeep > input.currentUpkeep) {
@@ -267,7 +268,16 @@ export function previewFacilityUpgrade(
     newIncome,
     cashBefore,
     cashAfter,
-    warnings: buildWarnings({ cashBefore, cashAfter, currentUpkeep, newUpkeep, currentIncome, newIncome, upgradeCost }),
+    warnings: buildWarnings({
+      cashBefore,
+      cashAfter,
+      currentUpkeep,
+      newUpkeep,
+      currentIncome,
+      newIncome,
+      upgradeCost,
+      isIncomeFacility: facility?.effectType === "season_income",
+    }),
     blockingReasons,
     saveContext: {
       saveId: save.saveId,

@@ -89,6 +89,44 @@ export function buildPlayerHistoryDisciplineValues(
   return result;
 }
 
+export function sumSeasonDisciplineAreaTotal(
+  disciplineValues: Record<string, number | null | undefined> | undefined,
+  areaId: SeasonDisciplineAreaId,
+) {
+  const group = SEASON_DISCIPLINE_AREA_GROUPS.find((entry) => entry.id === areaId);
+  if (!group) {
+    return 0;
+  }
+
+  let total = 0;
+  for (const key of group.keys) {
+    const value = disciplineValues?.[key];
+    if (typeof value === "number" && Number.isFinite(value)) {
+      total += value;
+    }
+  }
+
+  return roundValue(total, 1);
+}
+
+export function resolveSeasonDisciplineAreaTotal(
+  disciplineValues: Record<string, number | null | undefined> | undefined,
+  areaId: SeasonDisciplineAreaId,
+  ledgerAreaTotal?: number | null,
+) {
+  const disciplineTotal = sumSeasonDisciplineAreaTotal(disciplineValues, areaId);
+  if (disciplineTotal > 0) {
+    return disciplineTotal;
+  }
+  if (ledgerAreaTotal != null && Number.isFinite(ledgerAreaTotal) && ledgerAreaTotal > 0) {
+    return roundValue(ledgerAreaTotal, 1);
+  }
+  if (disciplineTotal === 0 && ledgerAreaTotal === 0) {
+    return 0;
+  }
+  return ledgerAreaTotal != null && Number.isFinite(ledgerAreaTotal) ? roundValue(ledgerAreaTotal, 1) : null;
+}
+
 export function buildTeamHistoryDisciplineValuesFromRecord(
   disciplineValues: Record<string, number | null | undefined> | undefined,
 ): PlayerHistoryDisciplineValues {

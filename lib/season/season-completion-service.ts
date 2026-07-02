@@ -2,6 +2,7 @@ import type { CashPrizeApplyResult } from "@/lib/season/cash-prize-apply-service
 import {
   previewCashPrizeApply,
 } from "@/lib/season/cash-prize-apply-service";
+import { persistGameStateWithMaterializedDerivations } from "@/lib/foundation/materialize-season-derivations";
 import { createPersistenceService } from "@/lib/persistence/persistence-service";
 import { runWithSaveRecovery } from "@/lib/persistence/atomic-save-write";
 import type { PersistenceService } from "@/lib/persistence/types";
@@ -427,7 +428,7 @@ async function runLocalSeasonCompletionUnsafe(
   const applied = !dryRun && blockingList.length === 0;
   if (applied) {
     const latestSave = resolveLocalSave(persistence, initialSave.saveId);
-    persistence.saveSingleplayerState(latestSave.saveId, {
+    persistGameStateWithMaterializedDerivations(persistence, latestSave.saveId, {
       ...latestSave.gameState,
       seasonReviewState: buildSeasonConsequencesReviewState({
         previousState: latestSave.gameState.seasonReviewState,

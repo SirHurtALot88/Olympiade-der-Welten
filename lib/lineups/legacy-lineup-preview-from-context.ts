@@ -10,7 +10,7 @@ import { SEASON_CAPTAIN_SLOTS } from "@/lib/lineups/lineup-discipline-contract";
 import { buildLegacyLineupAggregateScore, scoreLegacyLineupDisciplineSide } from "@/lib/lineups/legacy-score-engine";
 import { selectTeamCaptain } from "@/lib/morale/player-demands-service";
 import { buildPlayerMoralePerformanceMap } from "@/lib/morale/player-morale-performance";
-import type { LineupDraft } from "@/lib/data/olyDataTypes";
+import type { GameState, LineupDraft } from "@/lib/data/olyDataTypes";
 import type {
   LegacyLineupDraft,
   LegacyLineupEntryInput,
@@ -77,16 +77,20 @@ export function calculateLocalLegacyLineupPreviewFromContext(
   entries?: LegacyLineupEntryInput[],
   modifiers?: LegacyLineupDraft["modifiers"],
   fatigueMap: LegacyLineupLoadedContext["fatigueByPlayerId"] = context.fatigueByPlayerId ?? null,
+  gameStateOverride?: GameState | null,
 ): LegacyLineupPreviewResult {
   const previewEntries = normalizeEntries(entries ?? context.existingDraft?.entries ?? []);
   const previewPlayerIds = new Set(previewEntries.map((entry) => entry.playerId));
-  const moraleByPlayerId = buildPlayerMoralePerformanceMap({
-    gameState: context.gameState,
-    teamId: context.teamId,
-    rosterEntries:
-      context.gameState?.rosters.filter((entry) => entry.teamId === context.teamId && previewPlayerIds.has(entry.playerId)) ??
-      null,
-  });
+  const resolvedGameState = gameStateOverride ?? context.gameState ?? null;
+  const moraleByPlayerId = resolvedGameState
+    ? buildPlayerMoralePerformanceMap({
+        gameState: resolvedGameState,
+        teamId: context.teamId,
+        rosterEntries:
+          resolvedGameState.rosters.filter((entry) => entry.teamId === context.teamId && previewPlayerIds.has(entry.playerId)) ??
+          null,
+      })
+    : {};
   const previewModifiers = normalizeLineupDraftModifiers(modifiers ?? context.existingDraft?.modifiers);
   const matchdayMutatorTraitsBySide = buildMatchdayMutatorTraitsBySide({
     saveId: context.saveId,
@@ -115,7 +119,7 @@ export function calculateLocalLegacyLineupPreviewFromContext(
     ...previewEntries.map((entry) => `${entry.disciplineId}::${entry.disciplineSide}`),
   ].filter((value): value is string => Boolean(value));
   const uniquePairs = Array.from(new Set(previewPairs));
-  const teamCaptain = context.gameState ? selectTeamCaptain(context.gameState, context.teamId) : null;
+  const teamCaptain = resolvedGameState ? selectTeamCaptain(resolvedGameState, context.teamId) : null;
   const scorePartsWithModifierWarnings = uniquePairs.map((pair) => {
     const [disciplineId, disciplineSide] = pair.split("::") as [string, "d1" | "d2"];
     const sideEntries = previewEntries.filter(

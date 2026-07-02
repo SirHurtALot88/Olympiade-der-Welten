@@ -769,6 +769,58 @@ describe("transfermarkt local service", () => {
     expect(overridePreview.blockingReasons).toContain("player_sold_this_season_unavailable");
   });
 
+  it("blocks season-1 transfer-market buys at preview and execute while allowing draft picks", async () => {
+    const { SEASON_ONE_MARKET_BUY_BLOCKER } = await import("@/lib/season/transfer-season-policy");
+    persistenceState.save = {
+      saveId: "save-singleplayer-dev",
+      gameState: createGameState({
+        teams: [createTeam({ teamId: "A-A", shortCode: "A-A", cash: 500 })],
+        players: [
+          createPlayer("fa-1", {
+            name: "Free Agent",
+            marketValue: 40,
+            displayMarketValue: 40,
+            salaryDemand: 10,
+            displaySalary: 10,
+          }),
+        ],
+      }),
+    };
+
+    const { previewLocalTransfermarktBuy, executeLocalTransfermarktBuy } =
+      await import("@/lib/market/transfermarkt-local-service");
+
+    const draftPreview = previewLocalTransfermarktBuy({
+      saveId: "save-singleplayer-dev",
+      seasonId: "season-1",
+      teamId: "A-A",
+      playerId: "fa-1",
+      transferSource: "ai_roster_fill",
+    });
+    expect(draftPreview.blockingReasons).not.toContain(SEASON_ONE_MARKET_BUY_BLOCKER);
+
+    const marketPreview = previewLocalTransfermarktBuy({
+      saveId: "save-singleplayer-dev",
+      seasonId: "season-1",
+      teamId: "A-A",
+      playerId: "fa-1",
+      transferSource: "ai_preseason_market_buy",
+    });
+    expect(marketPreview.canBuy).toBe(false);
+    expect(marketPreview.blockingReasons).toContain(SEASON_ONE_MARKET_BUY_BLOCKER);
+
+    const marketExecute = executeLocalTransfermarktBuy({
+      saveId: "save-singleplayer-dev",
+      seasonId: "season-1",
+      teamId: "A-A",
+      playerId: "fa-1",
+      transferSource: "manual_transfermarkt_buy",
+    });
+    expect(marketExecute.transferCreated).toBe(false);
+    expect(marketExecute.blockingReasons).toContain(SEASON_ONE_MARKET_BUY_BLOCKER);
+    expect(persistenceState.save?.gameState.transferHistory).toHaveLength(0);
+  });
+
   it("normalizes legacy roster prices so equal entry and exit values do not show fake profit", async () => {
     persistenceState.save = {
       saveId: "save-singleplayer-dev",

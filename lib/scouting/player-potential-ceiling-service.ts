@@ -468,10 +468,19 @@ export function reconcilePlayerPotentialRecordToCurrentAbility(input: {
       continue;
     }
     const stored = attributeCeiling[attribute];
-    const minOpenCeiling = Math.min(99, Math.round(current + 6));
+    const currentRounded = Math.round(current);
+    // Hybrid-Ceiling:
+    //  - Gespeichertes Ceiling >= CA: unveraendert respektieren. So greift die Near-Ceiling-
+    //    Drosselung am ECHTEN Potenzial (kein kuenstlicher Puffer -> keine Ceiling-Inflation).
+    //  - Gespeichertes Ceiling < CA (PO ist hinter die Faehigkeit zurueckgefallen): auf
+    //    current + 6 anheben, damit der Spieler wieder offenen Wachstums-Headroom bekommt
+    //    (garantiert PA > CA fuer diesen Sonderfall).
+    //  - Kein Ceiling vorhanden: offener Headroom (current + 12).
     attributeCeiling[attribute] = isFiniteNumber(stored)
-      ? Math.max(stored, minOpenCeiling, Math.round(current))
-      : Math.min(99, Math.round(current + 12));
+      ? stored >= currentRounded
+        ? stored
+        : Math.min(99, currentRounded + 6)
+      : Math.min(99, currentRounded + 12);
   }
 
   const ceilingProfile = finalizePotentialCeilingProfile(
