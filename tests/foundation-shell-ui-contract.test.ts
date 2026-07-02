@@ -3,20 +3,18 @@ import path from "node:path";
 
 import { describe, expect, it } from "vitest";
 
+import { readFoundationOrchestratorSource, readFoundationSurfaceSource } from "./foundation-orchestrator-source";
+
 const root = "/Users/chrisfalk/Documents/Codex/Olympiade der Welten";
 
-async function readFoundationSurfaceSource() {
-  const [foundationText, shellRouterBodyText] = await Promise.all([
-    fs.readFile(path.join(root, "app/foundation/FoundationPageClient.tsx"), "utf8"),
-    fs.readFile(path.join(root, "app/foundation/FoundationShellRouterBody.tsx"), "utf8"),
-  ]);
-  return foundationText + shellRouterBodyText;
+async function readFoundationSurfaceSourceLocal() {
+  return readFoundationSurfaceSource(root);
 }
 
 describe("foundation shell ui contract", () => {
   it("uses left sidebar shell with subnav and url state helpers", async () => {
     const [foundationText, shellText, sidebarText, cssText, navConfigText, routingText, playersTableText] = await Promise.all([
-      readFoundationSurfaceSource(),
+      readFoundationSurfaceSourceLocal(),
       fs.readFile(path.join(root, "app/foundation/shell/FoundationShell.tsx"), "utf8"),
       fs.readFile(path.join(root, "app/foundation/shell/FoundationSidebar.tsx"), "utf8"),
       fs.readFile(path.join(root, "app/globals.css"), "utf8"),

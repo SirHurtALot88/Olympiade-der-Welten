@@ -2,15 +2,21 @@ import fs from "node:fs/promises";
 
 import { describe, expect, it } from "vitest";
 
+import { readFoundationOrchestratorSource } from "./foundation-orchestrator-source";
+
 describe("player profile ui contract", () => {
   it("provides full-page player profile with tabs and projected classes report", async () => {
-    const [profileText, foundationText, serviceText, previewText, drawerText, trainingControlsText, chartText, trainingSharedText] =
+    const [profileText, foundationText, scopeText, serviceText, previewText, drawerText, trainingControlsText, chartText, trainingSharedText] =
       await Promise.all([
         fs.readFile(
           "/Users/chrisfalk/Documents/Codex/Olympiade der Welten/app/foundation/player-profile/PlayerProfileClient.tsx",
           "utf8",
         ),
-        fs.readFile("/Users/chrisfalk/Documents/Codex/Olympiade der Welten/app/foundation/FoundationPageClient.tsx", "utf8"),
+        readFoundationOrchestratorSource(),
+        fs.readFile(
+          "/Users/chrisfalk/Documents/Codex/Olympiade der Welten/lib/foundation/tabs/use-foundation-shell-router-body-scope.tsx",
+          "utf8",
+        ),
         fs.readFile("/Users/chrisfalk/Documents/Codex/Olympiade der Welten/lib/foundation/player-profile-service.ts", "utf8"),
         fs.readFile("/Users/chrisfalk/Documents/Codex/Olympiade der Welten/lib/foundation/projected-class-preview.ts", "utf8"),
         fs.readFile("/Users/chrisfalk/Documents/Codex/Olympiade der Welten/app/foundation/PlayerDetailDrawer.tsx", "utf8"),
@@ -38,9 +44,13 @@ describe("player profile ui contract", () => {
     expect(foundationText).toContain("setPlayerProfileLoading(true)");
     expect(foundationText).toContain("PlayerProfileClient");
     expect(foundationText).toContain("playerProfileTrainingRow");
-    expect(foundationText).toContain("playerProfileTrainingReadOnly");
+    expect(scopeText).toContain("const playerProfileTrainingReadOnly");
+    expect(scopeText).toContain("!canManageTeamId(playerProfileData.teamId)");
     expect(foundationText).toContain("refreshOpenPlayerProfileAfterTrainingChange");
-    expect(foundationText).toContain("profilePlayer = gameState.players.find");
+    expect(scopeText).toContain("openPlayerProfileById");
+    expect(scopeText).toContain("shouldLoadSeasonArchive");
+    expect(scopeText).toContain("loadedSeasonArchiveSignatureRef");
+    expect(scopeText).toContain("setPlayerProfileLoading(true)");
     expect(serviceText).toContain("Stats");
     expect(serviceText).toContain("player-drawer-training-controls");
     expect(previewText).toContain("buildProjectedClassPreview");

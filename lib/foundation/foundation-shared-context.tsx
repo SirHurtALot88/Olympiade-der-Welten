@@ -10,7 +10,7 @@ import {
   type SetStateAction,
 } from "react";
 
-import type { FoundationAiLineupBatchApplyResponse } from "@/app/foundation/FoundationPageClient";
+import type { FoundationAiLineupBatchApplyResponse } from "@/lib/foundation/tabs/foundation-page-types";
 
 export type FoundationSharedContextValue = {
   cockpitBusyKey: string | null;

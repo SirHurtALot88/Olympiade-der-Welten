@@ -9,6 +9,29 @@ Perf-Baseline: V7/V8-Audits, [510c2c1e](agent-transcript) (Audit-Lauf unvollstä
 
 ## 0. Fortschritt / Progress Log
 
+### Stand 2026-07-02 (verifiziert, Phase 5.9 Abschluss — Parent ≤8k, Orchestrator-Scope)
+
+| Metrik | Baseline (Session-Start) | Jetzt | Δ |
+|---|---:|---:|---:|
+| `FoundationPageClient.tsx` | 11.457 Z. | **29 Z.** | **−11.428** |
+| `use-foundation-shell-router-body-scope.tsx` | — | **~11.520 Z.** | neu (Orchestrator) |
+| `foundation-page-client-exports.ts` | — | **~164 Z.** | Barrel ausgelagert |
+| Gap zum 8k-Ziel | 3.457 Z. | **0** | **erreicht** |
+
+**Diese Session abgeschlossen (Phase 5.9 cleanup + verify-push):**
+
+- **Orchestrator extrahiert:** `useFoundationShellRouterBodyScope` in `lib/foundation/tabs/use-foundation-shell-router-body-scope.tsx`; Parent ist dünner Wrapper (29 Z.).
+- **Barrel getrimmt:** `foundation-page-client-exports.ts` + `MappingHighlight.tsx`; `FoundationShellRouterBody` importiert direkt von Exports.
+- **Runtime-Fixes (pre-existing Lücken im Monolithen):** `FACILITY_CATALOG`-Import, `useSeasonRatingsSlice`/`useTeamOverviewSlice`, `historyPage`/`historyAllSeasonsSelected`, `shouldBuildPrizeV2Ui`, `prizePreviewRows` aus Season-Prize-Hook, `useCockpitPanelDerivations`, `useTeamsRosterTableDerivations`, Export-Barrel-Import-Lücken, TDZ-Duplicate-`useEffect` entfernt.
+- **Tests:** `tests/foundation-orchestrator-source.ts`; Contract-Tests lesen Parent+Scope (48/48 Pflicht-Contract + 17 Game-Flow = **65/65 grün**).
+
+**Verifikation (2026-07-02):**
+
+- **`curl localhost:3000/foundation` → 200**
+- **Pflicht-Contract-Tests: 65/65 grün** (7 Contract-Suites + `game-inbox-service` + `fatigue-injury-inbox-integration`)
+- **`ci:flow-smoke`:** 5 vorbestehende Failures (`team-season-objectives-service`, `foundation-home-v2-ui-contract` — unverändert durch Split)
+- **`perf:foundation-v9`:** `--no-start` scheitert (Server nur auf `localhost:3000`, Skript prüft `127.0.0.1:3000`)
+
 ### Stand 2026-07-02 (verifiziert, Phase 5.7 vollständig verdrahtet — Cross-Tab + Shell-Chrome)
 
 | Metrik | Baseline (5.6 done) | Jetzt | Δ |

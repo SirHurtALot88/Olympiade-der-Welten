@@ -17,6 +17,7 @@ describe("game inbox UI contract", () => {
     const gameFlowSource = readFileSync(join(root, "lib/foundation/tabs/use-foundation-game-flow.ts"), "utf8");
     const source =
       readFileSync(join(root, "app/foundation/FoundationPageClient.tsx"), "utf8") +
+      readFileSync(join(root, "lib/foundation/tabs/use-foundation-shell-router-body-scope.tsx"), "utf8") +
       readFileSync(join(root, "app/foundation/FoundationShellRouterBody.tsx"), "utf8") +
       crossTabGameFlowSource +
       commandPaletteSource +
@@ -84,7 +85,9 @@ describe("game inbox UI contract", () => {
   });
 
   it("keeps the searchable game encyclopedia wired to tooltips", () => {
-    const foundationSource = readFileSync(join(root, "app/foundation/FoundationPageClient.tsx"), "utf8");
+    const foundationSource =
+      readFileSync(join(root, "app/foundation/FoundationPageClient.tsx"), "utf8") +
+      readFileSync(join(root, "lib/foundation/tabs/use-foundation-shell-router-body-scope.tsx"), "utf8");
     const termSource = readFileSync(join(root, "components/ui/GameTerm.tsx"), "utf8");
     const encyclopediaSource = readFileSync(join(root, "lib/ui/game-encyclopedia.ts"), "utf8");
 
@@ -97,7 +100,9 @@ describe("game inbox UI contract", () => {
   });
 
   it("persists inbox done and dismissed status into the local save", () => {
-    const source = readFileSync(join(root, "app/foundation/FoundationPageClient.tsx"), "utf8");
+    const source =
+      readFileSync(join(root, "app/foundation/FoundationPageClient.tsx"), "utf8") +
+      readFileSync(join(root, "lib/foundation/tabs/use-foundation-shell-router-body-scope.tsx"), "utf8");
 
     expect(source).toContain("updateInboxItemStatus");
     expect(source).toContain("persistLocalGameStateImmediately(nextGameState)");

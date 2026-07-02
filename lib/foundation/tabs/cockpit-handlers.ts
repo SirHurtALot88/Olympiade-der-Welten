@@ -2,7 +2,7 @@ import { AUTO_ROSTER_FILL_CONFIRM_TOKEN } from "@/lib/ai/auto-roster-fill-contra
 import { AI_MARKET_APPLY_CONFIRM_TOKEN } from "@/lib/ai/ai-market-plan-apply-contract";
 import { LOCAL_TRANSFER_WINDOW_PHASE } from "@/lib/market/transfer-window-policy";
 import { withRoomContextBody, type FoundationRoomContext } from "@/lib/room/foundation-room-context-client";
-import type { FoundationAiMarketPlanApplyResponse } from "@/app/foundation/FoundationPageClient";
+import type { FoundationAiMarketPlanApplyResponse } from "@/lib/foundation/tabs/foundation-page-types";
 import type {
   FoundationAiLineupBatchApplyResponse,
   FoundationApplySummary,

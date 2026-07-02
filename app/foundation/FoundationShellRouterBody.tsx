@@ -147,7 +147,7 @@ import {
   teamStrategySportsBiasAxisMap,
   teamStrategySportsBiasFieldLabels,
   withSynchronizedStrategyAliases,
-} from "@/app/foundation/FoundationPageClient";
+} from "@/app/foundation/foundation-page-client-exports";
 import type {
   DisciplineCategoryFilter,
   FacilityId,
@@ -160,7 +160,7 @@ import type {
   SpecialistWingVariant,
   TeamControlFilter,
   TeamStrategyProfile,
-} from "@/app/foundation/FoundationPageClient";
+} from "@/app/foundation/foundation-page-client-exports";
 
 export function FoundationShellRouterBody({
   activeContextMeta,

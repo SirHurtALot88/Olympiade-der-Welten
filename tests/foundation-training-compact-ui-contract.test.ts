@@ -1,12 +1,15 @@
-import { describe, expect, it } from "vitest";
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
+
+import { describe, expect, it } from "vitest";
 
 const root = process.cwd();
 
 describe("foundation training compact UI contract", () => {
   it("shows AI training recommendation and inbox quick actions are wired", () => {
-    const foundationSource = readFileSync(join(root, "app/foundation/FoundationPageClient.tsx"), "utf8");
+    const foundationSource =
+      readFileSync(join(root, "app/foundation/FoundationPageClient.tsx"), "utf8") +
+      readFileSync(join(root, "lib/foundation/tabs/use-foundation-shell-router-body-scope.tsx"), "utf8");
     const trainingCrossTabSource = readFileSync(
       join(root, "lib/foundation/tabs/use-foundation-cross-tab-training.ts"),
       "utf8",

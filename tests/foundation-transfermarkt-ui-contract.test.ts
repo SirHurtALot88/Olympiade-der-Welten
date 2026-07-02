@@ -3,16 +3,14 @@ import path from "node:path";
 
 import { describe, expect, it } from "vitest";
 
+import { readFoundationOrchestratorSource, readFoundationSurfaceSource } from "./foundation-orchestrator-source";
+
 const root = process.cwd();
 const foundationClientPath = path.join(root, "app/foundation/FoundationPageClient.tsx");
 const foundationShellRouterBodyPath = path.join(root, "app/foundation/FoundationShellRouterBody.tsx");
 
-async function readFoundationSurfaceSource() {
-  const [foundationText, shellRouterBodyText] = await Promise.all([
-    fs.readFile(foundationClientPath, "utf8"),
-    fs.readFile(foundationShellRouterBodyPath, "utf8"),
-  ]);
-  return foundationText + shellRouterBodyText;
+async function readFoundationSurfaceSourceLocal() {
+  return readFoundationSurfaceSource(root);
 }
 const foundationPageModuleHelpersPath = path.join(root, "lib/foundation/tabs/foundation-page-module-helpers.tsx");
 const foundationViewRoutingPath = path.join(root, "lib/foundation/foundation-view-routing.ts");
@@ -27,7 +25,7 @@ const globalsPath = path.join(root, "app/globals.css");
 describe("foundation transfermarkt ui contract", () => {
   it("keeps the global foundation context visible", async () => {
     const [fileText, cssText] = await Promise.all([
-      readFoundationSurfaceSource(),
+      readFoundationSurfaceSourceLocal(),
       fs.readFile(globalsPath, "utf8"),
     ]);
 
@@ -40,7 +38,7 @@ describe("foundation transfermarkt ui contract", () => {
 
   it("opens Transfermarkt V2 as the primary market flow", async () => {
     const [fileText, routingText] = await Promise.all([
-      fs.readFile(foundationClientPath, "utf8"),
+      readFoundationOrchestratorSource(root),
       fs.readFile(foundationViewRoutingPath, "utf8"),
     ]);
 
@@ -168,7 +166,7 @@ describe("foundation transfermarkt ui contract", () => {
   });
 
   it("lets local Chris/manual teams stay manageable in quick market views", async () => {
-    const fileText = await fs.readFile(foundationClientPath, "utf8");
+    const fileText = await readFoundationOrchestratorSource(root);
     const teamControlHookText = await fs.readFile(
       path.join(root, "lib/foundation/tabs/use-foundation-cross-tab-team-control.ts"),
       "utf8",
@@ -219,7 +217,7 @@ describe("foundation transfermarkt ui contract", () => {
 
   it("keeps the team drawer relationship cards alive", async () => {
     const [clientText, teamsRosterHookText, drawerText, cssText] = await Promise.all([
-      fs.readFile(foundationClientPath, "utf8"),
+      readFoundationOrchestratorSource(root),
       fs.readFile(teamsRosterHookPath, "utf8"),
       fs.readFile(teamDrawerPath, "utf8"),
       fs.readFile(globalsPath, "utf8"),
@@ -237,7 +235,7 @@ describe("foundation transfermarkt ui contract", () => {
     const [fileText, buyHostText, foundationText, marketHostText] = await Promise.all([
       fs.readFile(transfermarktV2Path, "utf8"),
       fs.readFile(marketBuyHostPath, "utf8"),
-      fs.readFile(foundationClientPath, "utf8"),
+      readFoundationOrchestratorSource(root),
       fs.readFile(path.join(root, "app/foundation/transfermarkt-v2/FoundationMarketV2ShellHost.tsx"), "utf8"),
     ]);
 
@@ -283,7 +281,7 @@ describe("foundation transfermarkt ui contract", () => {
 
   it("blocks market buy for teams the active owner cannot manage", async () => {
     const [foundationText, v2Text] = await Promise.all([
-      fs.readFile(foundationClientPath, "utf8"),
+      readFoundationOrchestratorSource(root),
       fs.readFile(transfermarktV2Path, "utf8"),
     ]);
 

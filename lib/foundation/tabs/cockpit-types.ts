@@ -40,4 +40,4 @@ export type {
   SeasonTransitionSummaryResponse,
   SortState,
   TransfermarktBuySummary,
-} from "@/app/foundation/FoundationPageClient";
+} from "@/lib/foundation/tabs/foundation-page-types";

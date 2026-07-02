@@ -2,11 +2,13 @@ import fs from "node:fs/promises";
 
 import { describe, expect, it } from "vitest";
 
+import { readFoundationOrchestratorSource, readFoundationSurfaceSource } from "./foundation-orchestrator-source";
+
 const root = "/Users/chrisfalk/Documents/Codex/Olympiade der Welten";
 
 describe("foundation v2-only ui contract", () => {
   it("hides classic transfer market and history tabs from the main shell", async () => {
-    const foundationText = await fs.readFile(`${root}/app/foundation/FoundationPageClient.tsx`, "utf8");
+    const foundationText = await readFoundationOrchestratorSource(root);
     const transferText = await fs.readFile(`${root}/app/foundation/transfermarkt-v2/TransfermarktV2Client.tsx`, "utf8");
     const routingText = await fs.readFile(`${root}/lib/foundation/foundation-view-routing.ts`, "utf8");
 
@@ -21,7 +23,7 @@ describe("foundation v2-only ui contract", () => {
   });
 
   it("uses shell subnav for home and season without duplicate player profile tabs", async () => {
-    const foundationText = await fs.readFile(`${root}/app/foundation/FoundationPageClient.tsx`, "utf8");
+    const foundationText = await readFoundationOrchestratorSource(root);
     const playerProfileText = await fs.readFile(`${root}/app/foundation/player-profile/PlayerProfileClient.tsx`, "utf8");
     const homeText = await fs.readFile(`${root}/app/foundation/home-v2/HomeV2Client.tsx`, "utf8");
     const routingText = await fs.readFile(`${root}/lib/foundation/foundation-view-routing.ts`, "utf8");
@@ -40,7 +42,7 @@ describe("foundation v2-only ui contract", () => {
   });
 
   it("uses classic teams v1 with league table, history and economy tiles", async () => {
-    const foundationText = await fs.readFile(`${root}/app/foundation/FoundationPageClient.tsx`, "utf8");
+    const foundationText = await readFoundationOrchestratorSource(root);
     const teamsPanelText = await fs.readFile(`${root}/app/foundation/teams-v2/FoundationTeamsDetailPanel.tsx`, "utf8");
 
     expect(foundationText).not.toContain("TeamsV2Client");
@@ -57,14 +59,18 @@ describe("foundation v2-only ui contract", () => {
   });
 
   it("routes inbox through inboxV2 only with decisions and chronicle shell subnav", async () => {
-    const foundationText = await fs.readFile(`${root}/app/foundation/FoundationPageClient.tsx`, "utf8");
+    const foundationText = await readFoundationSurfaceSource(root);
+    const commandPaletteText = await fs.readFile(
+      `${root}/lib/foundation/tabs/use-foundation-cross-tab-command-palette.ts`,
+      "utf8",
+    );
     const navText = await fs.readFile(`${root}/lib/foundation/foundation-nav-config.ts`, "utf8");
 
     expect(navText).toContain('"inboxV2"');
     expect(navText).toContain("Offene Aufgaben & Warnungen");
     expect(foundationText).toContain('activeView === "inboxV2"');
-    expect(foundationText).toContain('label: "Entscheidungen"');
-    expect(foundationText).toContain('label: "Chronik"');
+    expect(commandPaletteText).toContain('label: "Entscheidungen"');
+    expect(commandPaletteText).toContain('label: "Chronik"');
     expect(foundationText).toContain("hideCategoryFilters");
     expect(foundationText).not.toContain('setFoundationView("inbox"');
   });
@@ -80,7 +86,7 @@ describe("foundation v2-only ui contract", () => {
   });
 
   it("exposes shell subnav for lineup, scouting, and training compact", async () => {
-    const foundationText = await fs.readFile(`${root}/app/foundation/FoundationPageClient.tsx`, "utf8");
+    const foundationText = await readFoundationSurfaceSource(root);
     const lineupHostText = await fs.readFile(
       `${root}/app/foundation/legacy-lineup-lab/FoundationLineupShellHost.tsx`,
       "utf8",

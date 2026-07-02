@@ -1,5 +1,7 @@
 import { describe, expect, it } from "vitest";
 
+import { readFoundationOrchestratorSource } from "./foundation-orchestrator-source";
+
 import {
   buildLegacyLineupLabContextCacheKey,
   invalidateLegacyLineupLabContextCache,
@@ -449,10 +451,11 @@ describe("foundation performance architecture helpers", () => {
   });
 
   it("wires marketSellBusy into the teams detail panel", async () => {
-    const [foundationText, shellRouterBodyText] = await Promise.all([
-      fs.readFile(path.join(root, "app/foundation/FoundationPageClient.tsx"), "utf8"),
-      fs.readFile(path.join(root, "app/foundation/FoundationShellRouterBody.tsx"), "utf8"),
-    ]);
+    const foundationText = await readFoundationOrchestratorSource(root);
+    const shellRouterBodyText = await fs.readFile(
+      path.join(root, "app/foundation/FoundationShellRouterBody.tsx"),
+      "utf8",
+    );
     const foundationSurfaceText = foundationText + shellRouterBodyText;
     const sharedContextText = await fs.readFile(
       path.join(root, "lib/foundation/foundation-shared-context.tsx"),
