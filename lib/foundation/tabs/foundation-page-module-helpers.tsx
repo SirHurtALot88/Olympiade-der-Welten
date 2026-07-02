@@ -1003,3 +1003,28 @@ export function withSynchronizedStrategyAliases(current: TeamStrategyProfile, pa
   return next;
 }
 
+export function WarningList({
+  title,
+  warnings,
+}: {
+  title: string;
+  warnings: string[];
+}) {
+  return (
+    <section className="panel">
+      <div className="panel-header">
+        <h2>{title}</h2>
+      </div>
+      {warnings.length > 0 ? (
+        <ul className="warning-list">
+          {warnings.map((warning) => (
+            <li key={warning}>{warning}</li>
+          ))}
+        </ul>
+      ) : (
+        <p className="muted">Aktuell keine offenen Punkte.</p>
+      )}
+    </section>
+  );
+}
+
