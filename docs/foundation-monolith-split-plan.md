@@ -9,6 +9,27 @@ Perf-Baseline: V7/V8-Audits, [510c2c1e](agent-transcript) (Audit-Lauf unvollstä
 
 ## 0. Fortschritt / Progress Log
 
+### Stand 2026-07-02 (verifiziert, Phase 5.4 + 5.5 echt verdrahtet — Ausgangslage 22.056 Z. am HEAD `aa8b735`)
+
+**Ausgangslage (verifiziert, nicht die aspirativen „8k"-Logeinträge unten):** Commit `aa8b735` („Wire foundation split surface…") hatte den Monolithen wieder in `FoundationPageClient.tsx` **eingebettet** → **22.056 Z.**, inkl. Marker-freiem aber ungenutztem `foundationSurfaceDependencies` `void`-Hack. Die extrahierten `lib/foundation/tabs/*`-Dateien existierten, wurden vom Parent aber NICHT konsumiert.
+
+| Metrik | HEAD `aa8b735` | Jetzt | Δ |
+|---|---:|---:|---:|
+| `app/foundation/FoundationPageClient.tsx` | 22.056 Z. | **16.781 Z.** | **−5.275** |
+
+**Diese Session abgeschlossen:**
+
+- **Phase 5.4 (Modul-Scope entdupliziert):** 333 modul-scope Deklarationen (Types, Konstanten, Helper, `PlayerPortrait`, View-Arrays, Confirm-Tokens, Rank-/Economy-Helper) aus dem Parent **gelöscht** und stattdessen aus den kanonischen extrahierten Dateien importiert (`foundation-page-types`, `foundation-page-module-helpers`, `foundation-format-render-helpers`, `season-stand-render-helpers`, `cockpit-ui-helpers`, `transfermarkt-render-helpers`, `cockpit-confirm-tokens`, `pp-area-form-bonus`, `foundation-table-ui-types`, `foundation-navigation`, …). Re-Export-Barrel unten (für `FoundationShellRouterBody`) bleibt intakt. **−5.007 Z.**
+- **Phase 5.5 (State-Init → Hook):** Inline-State-Block (240 `useState`/`useRef`-Statements, 467 Werte) durch `const { … } = useFoundationPageState({ … })` ersetzt. Ausnahme: `teamsHydrationPhase`/`seasonV2HydrationPhase` bleiben als hartkodierte `"full"`-Consts im Parent (bewusste Divergenz zur Hook-`useState`-Variante), um Laufzeitverhalten nicht zu ändern. **−269 Z.**
+
+**Verifikation (2026-07-02):**
+
+- **Pflicht-Contract-Tests grün: 49/49** (`foundation-performance-architecture`, `foundation-shell-ui-contract`, `foundation-transfermarkt-ui-contract`, `game-inbox-ui-contract`, `foundation-player-portrait-card`).
+- **`tsc --noEmit`:** `FoundationPageClient.tsx` **fehlerfrei** (verbleibende TS7006-Meldungen in `FoundationShellRouterBody.tsx`/`FoundationCockpitPanel.tsx` sind vorbestehend — `Record<string, any>`-Props, Auto-Gen mit `eslint-disable`).
+- **`curl localhost:3000/foundation` → 200.**
+
+**Noch offen (Phase 5.6 + 5.7 zum 8k-Ziel):** Die Cross-Tab-/Feed-/Persistence-Hooks sind **inhaltlich vom Inline-Body divergiert** (umbenannte Memos z. B. `activeTeamCriticalInboxItems` → `activeTeamDecisionCriticalInboxItems`, zusätzliche `shouldBuild*`-View-Gates, abweichende Decision-Item-Logik `isGameInboxDecisionItem` vs. Kategorie-Liste, body-only Memos wie `inboxHighlightItems`/`inboxLoreItems`/`visibleInboxItems`, die kein Hook liefert). Echte Verdrahtung erfordert **pro Hook** Input-Mapping + Consumer-Reconciliation im 9k-Body + Props-Bundle — verhaltensändernd und nur mit sorgfältiger Einzelverifikation sicher (grep-Tests + `curl 200` fangen subtile UI-Regressionen NICHT). Bewusst nicht überstürzt, um die Live-Foundation nicht zu brechen. `foundationSurfaceDependencies` `void`-Hack bleibt bis zur echten Hook-Verdrahtung bestehen (sonst brechen die grep-Contracts).
+
 ### Stand 2026-07-02 (Recovery-Sync nach lokal verlorenem Split-Stand)
 
 | Metrik | Vorher | Jetzt |
