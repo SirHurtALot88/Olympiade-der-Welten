@@ -9,6 +9,24 @@ Perf-Baseline: V7/V8-Audits, [510c2c1e](agent-transcript) (Audit-Lauf unvollstä
 
 ## 0. Fortschritt / Progress Log
 
+### Stand 2026-07-02 (Phase P — Warm Path, Navigation Coalescing + Dedup)
+
+| Metrik | Vor Phase P | Jetzt | Δ |
+|---|---:|---:|---:|
+| `use-foundation-shell-router-body-scope.tsx` | 11.508 Z. | **11.248 Z.** | **−260** |
+| Gap zum 8k-Ziel (Scope) | ~3.508 Z. | **~3.248 Z.** | −260 |
+| `lib/foundation/navigation-coalescing.ts` | — | **33 Z.** | neu |
+
+**Phase P abgeschlossen (P0–P5 partial):**
+
+- **P1:** `navigation-coalescing.ts`; `bindFoundationNavigationStart` wired; `reloadLiveSeasonState` skip during quiet window; `markFoundationNavigationQuiet` in live-sync.
+- **P2:** `useSeasonStandRows` + `useTeamsViewRowDerivations` — inline season/teams memos entfernt.
+- **P3a:** Spielerprofil `requestAnimationFrame` defer vor Drawer-Build.
+- **P4:** `BudgetedMediaImage` für Team-Logos (Spieler-Tabelle); Salary-Export fix.
+- **P0/P5:** `docs/tab-performance-hotspots-v10-comparison.md`; regression-smoke ok; full V10 chain audit pending.
+
+**Verifikation:** 45/45 Contract-Tests + `perf:regression-smoke` ok.
+
 ### Stand 2026-07-02 (verifiziert, Phase 5.9 Runtime + Barrel — Scope noch >8k)
 
 | Metrik | Baseline (Session-Start) | Jetzt | Δ |

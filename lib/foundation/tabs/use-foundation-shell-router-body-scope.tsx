@@ -272,7 +272,11 @@ import {
   prefetchPlayerDirectoryData,
   prefetchSeasonStandingsData,
 } from "@/lib/foundation/foundation-panel-prefetch";
-import { bindFoundationNavigationStart } from "@/lib/foundation/foundation-navigation";
+import {
+  isFoundationNavigationQuiet,
+  markFoundationNavigationQuiet,
+  pauseFoundationNavigationSideEffects,
+} from "@/lib/foundation/navigation-coalescing";
 import {
   canFoundationNavigateBack,
   foundationNavigateBack,
@@ -337,7 +341,7 @@ import {
 } from "@/lib/foundation/tabs/prize-v2-derivations";
 import { useSeasonStandRows } from "@/lib/foundation/tabs/use-season-stand-rows";
 import { resolveShouldBuildTeamsScopedRatings } from "@/lib/foundation/tabs/teams-view-derivations";
-import { useTeamsHydrationPhase } from "@/lib/foundation/tabs/use-teams-view-derivations";
+import { useTeamsHydrationPhase, useTeamsViewRowDerivations } from "@/lib/foundation/tabs/use-teams-view-derivations";
 import { useTeamsRosterTableDerivations } from "@/lib/foundation/tabs/use-teams-roster-table-derivations";
 import FoundationShell from "@/app/foundation/shell/FoundationShell";
 import FoundationSubNav from "@/app/foundation/shell/FoundationSubNav";
@@ -734,6 +738,7 @@ import {
 } from "@/lib/foundation/foundation-table-ui-types";
 import {
   FoundationNavigationTransition,
+  bindFoundationNavigationStart,
   bindFoundationNavigationTransition,
   setFoundationView,
 } from "@/lib/foundation/foundation-navigation";
@@ -1097,6 +1102,11 @@ export function useFoundationShellRouterBodyScope({
     shouldBuildTeamsView,
     shouldBuildHomeV2Overview,
   });
+  const shouldBuildFullSeasonStandRowsGate = shouldBuildFullSeasonStandRows({
+    activeView: activeView as FoundationViewId,
+    shouldBuildTeamsView,
+    shouldBuildHomeV2Overview,
+  });
   const shouldBuildSeasonHistorySnapshotsGate = shouldBuildSeasonHistorySnapshots({
     activeView: activeView as FoundationViewId,
     shouldLoadSeasonOverviewFeedActive,
@@ -1296,6 +1306,16 @@ export function useFoundationShellRouterBodyScope({
     seasonId: seasonOverviewSeasonId || gameState.season.id,
     contentSignature: seasonContentSignature,
   });
+  const { seasonStandRows } = useSeasonStandRows({
+    shouldBuildSeasonStandRows: shouldBuildSeasonStandRowsGate,
+    shouldBuildFullSeasonStandRows: shouldBuildFullSeasonStandRowsGate,
+    gameState,
+    activeSaveId,
+    seasonOverviewSeasonId: seasonOverviewSeasonId || gameState.season.id,
+    seasonStandingsFeed,
+    seasonManagementFeed,
+    teamOverviewSlice,
+  });
   const shouldLoadSeasonDerivations =
     (shouldLoadSeasonLedger && Boolean(playerDirectorySlice.error)) ||
     (shouldLoadSeasonRatings && (Boolean(seasonRatingsSlice.error) || seasonRatingsSlice.ratingsById.size === 0));
@@ -1304,10 +1324,17 @@ export function useFoundationShellRouterBodyScope({
   const [isPending, startTransition] = useTransition();
   useEffect(() => {
     bindFoundationNavigationTransition(startTransition);
+    bindFoundationNavigationStart(() => {
+      pauseFoundationNavigationSideEffects({
+        autoPersistPausedRef,
+        foundationViewTransitionUntilRef,
+      });
+    });
     return () => {
       bindFoundationNavigationTransition((callback) => {
         callback();
       });
+      bindFoundationNavigationStart(() => undefined);
     };
   }, []);
   const [isTeamSwitchPending, startTeamSwitchTransition] = useTransition();
@@ -2331,6 +2358,13 @@ export function useFoundationShellRouterBodyScope({
       team: selectedTeamId,
     });
     try {
+      await new Promise<void>((resolve) => {
+        if (typeof requestAnimationFrame === "function") {
+          requestAnimationFrame(() => resolve());
+          return;
+        }
+        resolve();
+      });
       const { buildPlayerDrawerDataFromGameState } = await import("@/lib/foundation/player-detail-drawer");
       const nextData = buildPlayerDrawerDataFromGameState({
         gameState: gameStateRef.current,
@@ -6555,132 +6589,6 @@ export function useFoundationShellRouterBodyScope({
     });
   };
 
-  const standingsSnapshotByTeamId = useMemo(
-    () =>
-      Object.fromEntries(
-        (seasonStandingsFeed?.items ?? []).map((item) => [
-          item.teamId,
-          {
-            rank: item.rank,
-            points: item.points,
-            cash: item.cash,
-            cashFc: item.cashFc,
-            startplatz: item.startplatz,
-            rankDiff: item.rankDiff,
-            sponsorBasis: item.sponsorBasis,
-            sponsorRank: item.sponsorRank,
-            sponsorTotal: item.sponsorTotal,
-            guv: item.guv,
-            cashTotal: item.cashTotal,
-            form: item.form,
-            transfers: item.transfers,
-            rosterCount: item.rosterCount,
-            salaryTotal: item.salaryTotal,
-            marketValueTotal: item.marketValueTotal,
-            disciplineValues: item.disciplineValues,
-          },
-        ]),
-      ),
-    [seasonStandingsFeed],
-  );
-
-  const seasonManagementByTeamId = useMemo(
-    () =>
-      Object.fromEntries(
-        (seasonManagementFeed?.items ?? []).map((item) => [
-          item.teamId,
-          {
-            budget: item.startBudget,
-            playerMin: item.playerMin,
-            playerOpt: item.playerOpt,
-          },
-        ]),
-      ),
-    [seasonManagementFeed],
-  );
-
-  const transferSummaryByTeamId = useMemo(() => {
-    const seasonId = seasonOverviewSeasonId ?? gameState.season.id;
-    return buildStandingsTransferBalanceByTeamId(gameState, seasonId);
-  }, [gameState, seasonOverviewSeasonId]);
-
-  const seasonStandRows = useMemo(
-    () => {
-      if (!shouldBuildSeasonStandRowsGate) {
-        return [];
-      }
-
-      if (teamOverviewSlice.rows.length > 0 && !teamOverviewSlice.error) {
-        return hydrateTeamOverviewSliceRows(teamOverviewSlice.rows, gameState);
-      }
-
-      const fallbackSorted = [...gameState.teams]
-        .map((team) => ({
-          teamId: team.teamId,
-          points: gameState.seasonState.standings[team.teamId]?.points ?? 0,
-          cash: team.cash,
-        }))
-        .sort((left, right) => {
-          if (right.points !== left.points) {
-            return right.points - left.points;
-          }
-
-          return right.cash - left.cash;
-        });
-
-      const fallbackStandingsByTeamId = Object.fromEntries(
-        fallbackSorted.map((row, index) => [
-          row.teamId,
-          {
-            rank: index + 1,
-            points: row.points,
-            cash: row.cash,
-          },
-        ]),
-      );
-
-      return buildTeamSeasonOverviewRows({
-        gameState,
-        seasonId: seasonOverviewSeasonId,
-        preferStandingDisciplineValues:
-          seasonOverviewSeasonId !== gameState.season.id || seasonStandingsFeed?.source.kind === "season_snapshot",
-        standingsByTeamId: {
-          ...Object.fromEntries(
-            Object.entries(fallbackStandingsByTeamId).map(([teamId, row]) => [
-              teamId,
-              {
-                ...row,
-                budget: seasonManagementByTeamId[teamId]?.budget ?? null,
-                playerMin: seasonManagementByTeamId[teamId]?.playerMin ?? null,
-                playerOpt: seasonManagementByTeamId[teamId]?.playerOpt ?? null,
-              },
-            ]),
-          ),
-          ...Object.fromEntries(
-            Object.entries(standingsSnapshotByTeamId).map(([teamId, row]) => [
-              teamId,
-              {
-                ...row,
-                budget: seasonManagementByTeamId[teamId]?.budget ?? null,
-                playerMin: seasonManagementByTeamId[teamId]?.playerMin ?? null,
-                playerOpt: seasonManagementByTeamId[teamId]?.playerOpt ?? null,
-              },
-            ]),
-          ),
-        },
-        transferSummaryByTeamId,
-      });
-    },
-    [
-      gameState,
-      seasonManagementByTeamId,
-      seasonOverviewSeasonId,
-      seasonStandingsFeed?.source.kind,
-      standingsSnapshotByTeamId,
-      transferSummaryByTeamId,
-    ],
-  );
-
   const seasonDisciplineRankMaps = useMemo(() => {
     if (activeView !== "seasonV2") {
       return Object.fromEntries(
@@ -7193,159 +7101,22 @@ export function useFoundationShellRouterBodyScope({
     );
   }, [activeView, disciplineRankRows, seasonStandRows, shouldBuildDisciplineRanks, shouldBuildTeamsView]);
 
-  const teamsViewRows = useMemo(() => {
-    if (!shouldBuildTeamsView) {
-      return [];
-    }
-
-    const seasonStandRowByTeamId = new Map(seasonStandRows.map((row) => [row.teamId, row] as const));
-    return [...seasonStandRows]
-      .map((row) => {
-        const standing = seasonStandRowByTeamId.get(row.team.teamId) ?? null;
-        const currentAreaRanks = currentAreaRanksByTeamId.get(row.team.teamId) ?? null;
-        const avgSalary =
-          row.rosterCount > 0 ? roundViewNumber(row.salaryTotal / row.rosterCount, 2) : null;
-        const hasActiveRoster = row.rosterCount > 0;
-
-        return {
-          ...row,
-          currentPowRank: hasActiveRoster ? (currentAreaRanks?.pow ?? null) : null,
-          currentSpeRank: hasActiveRoster ? (currentAreaRanks?.spe ?? null) : null,
-          currentMenRank: hasActiveRoster ? (currentAreaRanks?.men ?? null) : null,
-          currentSocRank: hasActiveRoster ? (currentAreaRanks?.soc ?? null) : null,
-          historicalPow: row.historicalPow,
-          historicalSpe: row.historicalSpe,
-          historicalMen: row.historicalMen,
-          historicalSoc: row.historicalSoc,
-          historicalPointsTotal: row.historicalPointsTotal,
-          historicalAvgPoints: row.historicalAvgPoints,
-          historicalPointsBySeason: row.historicalPointsBySeason,
-          historicalHasData: row.historicalHasData,
-          historicalSeasonsPlayed: row.historicalSeasonsPlayed,
-          historicalBestRank: row.historicalBestRank,
-          historicalLastSeasonRank: row.historicalLastSeasonRank,
-          historicalLastSeasonPoints: row.historicalLastSeasonPoints,
-          overallRank: standing?.rank ?? null,
-          cash: row.cash ?? standing?.cash ?? null,
-          guv: standing?.guv ?? null,
-          sponsorTotal: standing?.sponsorTotal ?? null,
-          avgMarketValue: row.avgMarketValue,
-          avgSalary,
-          goldCount: row.historicalGoldCount,
-          silverCount: row.historicalSilverCount,
-          bronzeCount: row.historicalBronzeCount,
-          avgRank: row.historicalAvgRank,
-          avgPoints: row.historicalAvgPoints,
-          top5: row.historicalTop5Count,
-          top10: row.historicalTop10Count,
-        };
-      })
-      .sort((left, right) => {
-        const leftRank = left.overallRank ?? Number.POSITIVE_INFINITY;
-        const rightRank = right.overallRank ?? Number.POSITIVE_INFINITY;
-        if (leftRank !== rightRank) {
-          return leftRank - rightRank;
-        }
-        return (left.avgRank ?? Number.POSITIVE_INFINITY) - (right.avgRank ?? Number.POSITIVE_INFINITY);
-      });
-  }, [currentAreaRanksByTeamId, seasonStandRows, shouldBuildTeamsView]);
-  const teamHistorySeasonPointColumns = useMemo(() => {
-    if (!shouldBuildTeamsOverviewTable) {
-      return [];
-    }
-
-    const seasonMap = new Map<string, { seasonId: string; seasonName: string }>();
-    for (const row of teamsViewRows) {
-      for (const entry of row.historicalPointsBySeason ?? []) {
-        seasonMap.set(entry.seasonId, {
-          seasonId: entry.seasonId,
-          seasonName: entry.seasonName,
-        });
-      }
-    }
-
-    return Array.from(seasonMap.values()).sort((left, right) =>
-      left.seasonId.localeCompare(right.seasonId, "de", { numeric: true }),
-    );
-  }, [shouldBuildTeamsOverviewTable, teamsViewRows]);
-  const teamHistoryPointRankMaps = useMemo(() => {
-    if (!shouldBuildTeamsOverviewTable) {
-      return {
-        total: new Map<string, number | null>(),
-        average: new Map<string, number | null>(),
-        bySeason: new Map<string, Map<string, number | null>>(),
-      };
-    }
-
-    const total = buildNullableSharedRankMap(
-      teamsViewRows.map((row) => ({
-        teamId: row.team.teamId,
-        value: row.historicalPointsTotal,
-      })),
-    );
-    const average = buildNullableSharedRankMap(
-      teamsViewRows.map((row) => ({
-        teamId: row.team.teamId,
-        value: row.historicalAvgPoints,
-      })),
-    );
-    const bySeason = new Map(
-      teamHistorySeasonPointColumns.map((seasonColumn) => [
-        seasonColumn.seasonId,
-        buildNullableSharedRankMap(
-          teamsViewRows.map((row) => ({
-            teamId: row.team.teamId,
-            value:
-              row.historicalPointsBySeason.find((entry) => entry.seasonId === seasonColumn.seasonId)?.points ??
-              null,
-          })),
-        ),
-      ]),
-    );
-
-    return { total, average, bySeason };
-  }, [shouldBuildTeamsOverviewTable, teamHistorySeasonPointColumns, teamsViewRows]);
-
-  const teamsViewSummary = useMemo(() => {
-    if (!selectedTeam) {
-      return null;
-    }
-
-    const row = teamsViewRows.find((entry) => entry.team.teamId === selectedTeam.teamId);
-    if (!row) {
-      return null;
-    }
-
-    const currentAreaRanks = currentAreaRanksByTeamId.get(selectedTeam.teamId) ?? null;
-    return {
-      ...row,
-      powRank: row.rosterCount > 0 ? (currentAreaRanks?.pow ?? null) : null,
-      speRank: row.rosterCount > 0 ? (currentAreaRanks?.spe ?? null) : null,
-      menRank: row.rosterCount > 0 ? (currentAreaRanks?.men ?? null) : null,
-      socRank: row.rosterCount > 0 ? (currentAreaRanks?.soc ?? null) : null,
-    };
-  }, [currentAreaRanksByTeamId, selectedTeam, teamsViewRows]);
-  const selectedHqAxisSummary = useMemo(() => {
-    if (!teamsViewSummary) {
-      return null;
-    }
-    const axes = [
-      { label: "POW", rank: teamsViewSummary.powRank },
-      { label: "SPE", rank: teamsViewSummary.speRank },
-      { label: "MEN", rank: teamsViewSummary.menRank },
-      { label: "SOC", rank: teamsViewSummary.socRank },
-    ]
-      .filter((entry): entry is { label: "POW" | "SPE" | "MEN" | "SOC"; rank: number } => entry.rank != null)
-      .sort((left, right) => left.rank - right.rank);
-    if (axes.length === 0) {
-      return null;
-    }
-    return {
-      strongest: axes[0] ?? null,
-      weakest: axes[axes.length - 1] ?? null,
-      weakestTwo: [...axes].sort((left, right) => right.rank - left.rank).slice(0, 2),
-    };
-  }, [teamsViewSummary]);
+  const {
+    teamsViewRows,
+    sortedTeamsViewRows,
+    teamHistorySeasonPointColumns,
+    teamHistoryPointRankMaps,
+    teamsViewSummary,
+    selectedHqAxisSummary,
+  } = useTeamsViewRowDerivations({
+    enabled: shouldBuildTeamsView,
+    teamsHydrationPhase,
+    shouldBuildTeamsOverviewTable,
+    selectedTeam,
+    seasonStandRows,
+    currentAreaRanksByTeamId,
+    teamsViewSort: tableSorts.teamsView,
+  });
 
   const selectedTeamAverageAxisStats = useMemo(() => {
     if (rosterPlayers.length === 0) {
@@ -8941,37 +8712,6 @@ export function useFoundationShellRouterBodyScope({
       });
     },
     [activeView, seasonFormBonusByTeamId, seasonStandRows, tableSorts.teamTable],
-  );
-  const sortedTeamsViewRows = useMemo(
-    () => {
-      if (!shouldBuildTeamsView) {
-        return [];
-      }
-      return sortRows(teamsViewRows, tableSorts.teamsView, {
-        team: (row) => row.team.name,
-        overallRank: (row) => row.overallRank ?? Number.POSITIVE_INFINITY,
-        cash: (row) => row.cash ?? Number.NEGATIVE_INFINITY,
-        guv: (row) => row.guv ?? Number.NEGATIVE_INFINITY,
-        roster: (row) => row.rosterCount,
-        mw: (row) => row.marketValueTotal ?? Number.NEGATIVE_INFINITY,
-        salary: (row) => row.salaryTotal,
-        sponsor: (row) => row.sponsorTotal ?? Number.NEGATIVE_INFINITY,
-        pow: (row) => -(row.currentPowRank ?? Number.POSITIVE_INFINITY),
-        spe: (row) => -(row.currentSpeRank ?? Number.POSITIVE_INFINITY),
-        men: (row) => -(row.currentMenRank ?? Number.POSITIVE_INFINITY),
-        soc: (row) => -(row.currentSocRank ?? Number.POSITIVE_INFINITY),
-        histPoints: (row) => row.historicalPointsTotal ?? Number.NEGATIVE_INFINITY,
-        avgPoints: (row) => row.avgPoints ?? Number.NEGATIVE_INFINITY,
-        gold: (row) => row.goldCount,
-        silver: (row) => row.silverCount,
-        bronze: (row) => row.bronzeCount,
-        top5: (row) => row.top5,
-        top10: (row) => row.top10,
-        avgRank: (row) => row.avgRank ?? Number.POSITIVE_INFINITY,
-        seasonPoints: (row) => row.historicalPointsBySeason.length,
-      });
-    },
-    [shouldBuildTeamsView, tableSorts.teamsView, teamsViewRows],
   );
   const seasonTopPlayerRows = useMemo(() => {
     if (!shouldBuildSeasonTopPlayerRows) {

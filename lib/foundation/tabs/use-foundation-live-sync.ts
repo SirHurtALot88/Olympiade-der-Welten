@@ -6,6 +6,7 @@ import type { Dispatch, MutableRefObject, SetStateAction } from "react";
 import type { GameState } from "@/lib/data/olyDataTypes";
 import type { FoundationSaveMode } from "@/lib/persistence/foundation-save-mode";
 import type { FoundationReadMeta, FoundationView } from "@/lib/foundation/tabs/foundation-page-types";
+import { isFoundationNavigationQuiet, markFoundationNavigationQuiet } from "@/lib/foundation/navigation-coalescing";
 import { shouldRefreshSeasonOverviewOnReload } from "@/lib/foundation/tabs/use-standings-preview-feed";
 import { getClientSocket } from "@/lib/socket/client";
 import type { OlyRoomState, RoomRealtimeEvent } from "@/types/game";
@@ -95,6 +96,12 @@ export function useFoundationLiveSync(input: UseFoundationLiveSyncInput) {
     options: { skipGameStateReload?: boolean; reloadFullGameState?: boolean; compactReload?: boolean } = {},
   ) {
     void reason;
+    if (
+      reason === "local_save_version" &&
+      isFoundationNavigationQuiet(input.foundationViewTransitionUntilRef)
+    ) {
+      return;
+    }
     const shouldReloadGameState =
       options.compactReload ||
       options.reloadFullGameState ||
@@ -269,7 +276,7 @@ export function useFoundationLiveSync(input: UseFoundationLiveSyncInput) {
   }, [activeSaveId, readMeta.source]);
 
   useEffect(() => {
-    foundationViewTransitionUntilRef.current = Date.now() + 4000;
+    markFoundationNavigationQuiet(foundationViewTransitionUntilRef);
   }, [activeView]);
 
   return {

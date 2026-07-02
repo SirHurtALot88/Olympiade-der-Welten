@@ -1,6 +1,7 @@
 "use client";
 
 /** Canonical re-exports for FoundationShellRouterBody (not via scope hook). */
+export { default as BudgetedMediaImage } from "@/components/foundation/BudgetedMediaImage";
 export { default as ClassColorChip, getClassColorClassName } from "@/app/foundation/ClassColorChip";
 export { default as ClassIcon } from "@/app/foundation/ClassIcon";
 export { default as DisciplineIcon } from "@/app/foundation/DisciplineIcon";
@@ -118,6 +119,7 @@ export {
   getRankHeatClass,
   getRosterEntryDisplayMarketValue,
   getRosterEntryDisplaySalary,
+  getRosterEntryCurrentSeasonSalary,
   getRosterEntrySalaryDelta,
   getSeasonCashHeatClass,
   getTeamHistoryRankToneClass,

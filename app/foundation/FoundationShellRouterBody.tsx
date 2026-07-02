@@ -4,6 +4,7 @@
 // Contains the real Foundation shell UI (previously the monolith return block).
 import type { FoundationShellRouterBodyProps } from "@/app/foundation/foundation-shell-router-body-props";
 import {
+  BudgetedMediaImage,
   ClassColorChip,
   ClassIcon,
   ColumnVisibilityManager,
@@ -7608,7 +7609,7 @@ export function FoundationShellRouterBody({
                                 }}
                               >
                                 {teamLogo?.src ? (
-                                  <img
+                                  <BudgetedMediaImage
                                     className="players-table-team-logo"
                                     src={teamLogo.src}
                                     alt={`${row.team?.name ?? "Team"} Logo`}
