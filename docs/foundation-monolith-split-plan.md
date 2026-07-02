@@ -9,6 +9,27 @@ Perf-Baseline: V7/V8-Audits, [510c2c1e](agent-transcript) (Audit-Lauf unvollstä
 
 ## 0. Fortschritt / Progress Log
 
+### Stand 2026-07-02 (Recovery-Sync nach lokal verlorenem Split-Stand)
+
+| Metrik | Vorher | Jetzt |
+|---|---:|---:|
+| `app/foundation/FoundationPageClient.tsx` | 29.589 Z. | **115 Z.** |
+| `app/foundation/FoundationPageClientInnerLegacy.tsx` | — | **29.589 Z.** |
+| `app/foundation/FoundationShellRouterBody.tsx` | 0 Z. (fehlend) | **40 Z.** |
+
+**Recovery-Maßnahmen in dieser Session:**
+
+- Runtime-sicherer Recovery-Bridge: Monolith 1:1 nach `FoundationPageClientInnerLegacy.tsx` verschoben.
+- `FoundationPageClient.tsx` als dünner Wrapper wiederhergestellt (`FoundationPageClient`-Surface + Import auf `FoundationShellRouterBody`).
+- `FoundationShellRouterBody.tsx` neu angelegt, damit die Split-Struktur wieder als eigenständige Datei existiert.
+- Pflicht-Contract-Tests für Foundation/Shell/Transfermarkt/Inbox/Portrait erneut ausgeführt (**49/49 grün**).
+
+**Perf-Audit-Status:**
+
+- `npm run perf:foundation-v9 -- --no-start --timeout-ms 120000 --skip-warmup` gestartet, aber im Lauf ohne weitere Ausgabe hängen geblieben.
+- Fallback `npm run perf:foundation-tabs -- --no-start --timeout-ms 120000` ebenfalls ohne Ergebnis hängen geblieben.
+- Playwright-Browser wurden installiert (`npx playwright install`), Audit-Skripte müssen separat erneut mit stabiler Laufumgebung verifiziert werden.
+
 ### Stand 2026-07-02 (verifiziert, Phase 5.7 Slice 10 — 8k-Ziel erreicht: screenPrimaryAction + shell chrome)
 
 | Metrik | Baseline (Slice 9) | Jetzt | Δ |

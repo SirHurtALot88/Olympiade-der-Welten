@@ -8353,28 +8353,27 @@ export default function FoundationPageClient({
     setCockpitBusyKey(execute ? "ai-market-apply" : "ai-market-dry-run");
     setMarketAiApplyBusy(true);
     try {
-      const response = await fetch(
-        `/api/ai/market-plan-apply?${new URLSearchParams({
-          saveId: activeSaveId,
-          seasonId: gameState.season.id,
-          source: readMeta.source,
-          teamScope: "ai",
-        }).toString()}`,
-        {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            dryRun: !execute,
-            includeWarningTeams: marketAiApplyIncludeWarnings,
-            confirmToken: execute ? AI_MARKET_APPLY_CONFIRM_TOKEN : undefined,
-            transferPhase: execute ? LOCAL_TRANSFER_WINDOW_PHASE : undefined,
-            options: {
+      const marketApplyParams = buildCockpitScopeParams();
+      marketApplyParams.set("teamScope", "ai");
+      const response = await fetch(`/api/ai/market-plan-apply?${marketApplyParams.toString()}`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(
+          withRoomContextBody(
+            {
+              dryRun: !execute,
               includeWarningTeams: marketAiApplyIncludeWarnings,
-              stopOnTeamFailure: true,
+              confirmToken: execute ? AI_MARKET_APPLY_CONFIRM_TOKEN : undefined,
+              transferPhase: execute ? LOCAL_TRANSFER_WINDOW_PHASE : undefined,
+              options: {
+                includeWarningTeams: marketAiApplyIncludeWarnings,
+                stopOnTeamFailure: true,
+              },
             },
-          }),
-        },
-      );
+            roomContext,
+          ),
+        ),
+      });
       const payload = (await response.json()) as FoundationAiMarketPlanApplyResponse;
       setMarketAiApplyFeed(payload);
       if (execute && response.ok && payload.executed) {
@@ -8407,21 +8406,19 @@ export default function FoundationPageClient({
     setCockpitBusyKey(execute ? "roster-fill-apply" : "roster-fill-dry-run");
     setRosterFillBusy(true);
     try {
-      const response = await fetch(
-        `/api/ai/roster-fill?${new URLSearchParams({
-          saveId: activeSaveId,
-          seasonId: gameState.season.id,
-          source: readMeta.source,
-        }).toString()}`,
-        {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            dryRun: !execute,
-            confirmToken: execute ? AUTO_ROSTER_FILL_CONFIRM_TOKEN : undefined,
-          }),
-        },
-      );
+      const response = await fetch(`/api/ai/roster-fill?${buildCockpitScopeParams().toString()}`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(
+          withRoomContextBody(
+            {
+              dryRun: !execute,
+              confirmToken: execute ? AUTO_ROSTER_FILL_CONFIRM_TOKEN : undefined,
+            },
+            roomContext,
+          ),
+        ),
+      });
       const payload = (await response.json()) as FoundationAutoRosterFillResponse;
       setRosterFillFeed(payload);
       if (execute && response.ok && payload.executed) {
@@ -8453,25 +8450,16 @@ export default function FoundationPageClient({
     setAiPreseasonBusy(true);
     setAiPreseasonFeed(null);
     try {
-      const response = await fetch(
-        `/api/ai/preseason-background?${new URLSearchParams({
-          saveId: activeSaveId,
-          seasonId: gameState.season.id,
-          source: readMeta.source,
-        }).toString()}`,
-        {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({}),
-        },
-      );
+      const response = await fetch(`/api/ai/preseason-background?${buildCockpitScopeParams().toString()}`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(withRoomContextBody({}, roomContext)),
+      });
       const payload = (await response.json()) as FoundationAiPreseasonAutomationResponse;
       setAiPreseasonFeed(payload);
-      const acceptedAsyncRun = response.status === 202 || payload.accepted === true;
-      if (acceptedAsyncRun && payload.run?.status === "running") {
-        return payload;
-      }
-      if (response.ok && payload.run?.status !== "running") {
+      const preseasonRunFinished =
+        !payload.skipped && payload.run != null && payload.run.status !== "running";
+      if (preseasonRunFinished) {
         await Promise.all([
           loadSave(activeSaveId),
           reloadMarketFeed(),
@@ -8959,12 +8947,17 @@ export default function FoundationPageClient({
       const response = await fetch(`/api/lineups/legacy/ai-batch-apply?${buildCockpitScopeParams().toString()}`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          dryRun: !execute,
-          confirm: execute,
-          includeWarningTeams: cockpitAiIncludeWarningTeams,
-          overwriteExisting: cockpitAiOverwriteExisting,
-        }),
+        body: JSON.stringify(
+          withRoomContextBody(
+            {
+              dryRun: !execute,
+              confirm: execute,
+              includeWarningTeams: cockpitAiIncludeWarningTeams,
+              overwriteExisting: cockpitAiOverwriteExisting,
+            },
+            roomContext,
+          ),
+        ),
       });
       const payload = (await response.json()) as FoundationAiLineupBatchApplyResponse;
       setCockpitAiBatchApplyFeed(payload);
@@ -9632,11 +9625,17 @@ export default function FoundationPageClient({
   }, [adminSimulationBusy, adminSimulationRun?.runId, adminSimulationRun?.status, adminSimulationRun?.updatedAt]);
 
   useEffect(() => {
-    if (readMeta.source === "prisma" || readMeta.readOnly || !activeSaveId || activeSaveId === "loading-save") {
+    if (
+      readMeta.source === "prisma" ||
+      readMeta.readOnly ||
+      !activeSaveId ||
+      activeSaveId === "loading-save" ||
+      !adminSimulationRun?.runId
+    ) {
       return;
     }
     void postAdminSeasonSimulation("status");
-  }, [activeSaveId, readMeta.readOnly, readMeta.source]);
+  }, [activeSaveId, adminSimulationRun?.runId, readMeta.readOnly, readMeta.source]);
 
   useEffect(() => {
     if (!adminSimulationRun || !["running", "paused"].includes(adminSimulationRun.status)) {
@@ -17953,22 +17952,30 @@ export default function FoundationPageClient({
     aiLineupEnsureRunStartedRef.current.add(runKey);
     setAiLineupEnsureBusy(true);
     try {
-      const query = new URLSearchParams({
-        saveId: activeSaveId,
-        seasonId: gameState.season.id,
-        matchdayId: gameState.matchdayState.matchdayId,
-        source: readMeta.source,
-      });
+      const query = appendRoomContextToParams(
+        new URLSearchParams({
+          saveId: activeSaveId,
+          seasonId: gameState.season.id,
+          matchdayId: gameState.matchdayState.matchdayId,
+          source: readMeta.source,
+        }),
+        roomContext,
+      );
       const response = await fetch(`/api/lineups/legacy/ai-batch-apply?${query.toString()}`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          dryRun: false,
-          confirm: true,
-          includeWarningTeams: true,
-          overwriteExisting: false,
-          forceAiTeams: true,
-        }),
+        body: JSON.stringify(
+          withRoomContextBody(
+            {
+              dryRun: false,
+              confirm: true,
+              includeWarningTeams: true,
+              overwriteExisting: false,
+              forceAiTeams: true,
+            },
+            roomContext,
+          ),
+        ),
       });
       const payload = (await response.json()) as FoundationAiLineupBatchApplyResponse;
       setAiLineupEnsureFeed(payload);
@@ -28811,6 +28818,8 @@ export default function FoundationPageClient({
             selectedRoster={selectedRoster}
             visibleSelectedRosterColumns={visibleSelectedRosterColumns}
             selectedTeamContractTable={selectedTeamContractTable}
+            selectedTeamContractPreviewRowCount={selectedTeamContractPreviewRowCount}
+            visibleSelectedTeamContractRows={visibleSelectedTeamContractRows}
             showTeamContractPreviewRows={showTeamContractPreviewRows}
             setShowTeamContractPreviewRows={setShowTeamContractPreviewRows}
             contractRenewalBusy={contractRenewalBusy}
