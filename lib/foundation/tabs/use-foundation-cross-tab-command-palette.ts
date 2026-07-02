@@ -7,6 +7,8 @@ import {
   foundationPrimaryViews,
   foundationSecondaryViews,
   resolveFoundationViewTarget,
+  setFoundationView,
+  syncFoundationViewInUrl,
 } from "@/lib/foundation/tabs/foundation-page-module-helpers";
 import type { FoundationCommandItem, FoundationView } from "@/lib/foundation/tabs/foundation-page-types";
 
@@ -26,6 +28,9 @@ export function useFoundationCrossTabCommandPalette(input: {
   openTeamDrawerById: (teamId: string) => void;
   openPlayerDrawerById: (playerId: string, rosterId?: string | null) => void;
   openEncyclopediaEntry: (termOrId: string) => void;
+  inboxCategoryFilter: string;
+  setInboxCategoryFilter: (filter: string) => void;
+  setActiveView: (view: FoundationView) => void;
 }) {
   const foundationCommandItems = useMemo<FoundationCommandItem[]>(() => {
     const viewCommands: FoundationCommandItem[] = [
@@ -146,6 +151,32 @@ export function useFoundationCrossTabCommandPalette(input: {
         tone: input.activeView === "homeV2" ? "ready" : undefined,
         run: () => input.openFoundationViewCommand("home"),
       },
+      {
+        id: "inbox-decisions",
+        label: "Entscheidungen",
+        detail: "Inbox nach Entscheidungen filtern",
+        section: "Aktion",
+        keywords: "inbox entscheidungen warning task",
+        tone: input.activeView === "inboxV2" && input.inboxCategoryFilter === "task" ? "ready" : undefined,
+        run: () => {
+          setFoundationView("inboxV2", input.setActiveView);
+          input.setInboxCategoryFilter("task");
+          syncFoundationViewInUrl("inboxV2", "task", null, { push: true });
+        },
+      },
+      {
+        id: "inbox-chronicle",
+        label: "Chronik",
+        detail: "Inbox als Chronik öffnen",
+        section: "Aktion",
+        keywords: "inbox chronik transfer finance training history",
+        tone: input.activeView === "inboxV2" && input.inboxCategoryFilter === "ALL" ? "ready" : undefined,
+        run: () => {
+          setFoundationView("inboxV2", input.setActiveView);
+          input.setInboxCategoryFilter("ALL");
+          syncFoundationViewInUrl("inboxV2", null, null, { push: true });
+        },
+      },
       ...teamCommands,
       ...playerCommands,
       ...encyclopediaCommands,
@@ -160,6 +191,7 @@ export function useFoundationCrossTabCommandPalette(input: {
     input.gameState.teams,
     input.globalNextLabel,
     input.globalNextStatusClass,
+    input.inboxCategoryFilter,
     input.isTransferMarketViewActive,
     input.openEncyclopediaEntry,
     input.openFoundationViewCommand,
@@ -167,6 +199,8 @@ export function useFoundationCrossTabCommandPalette(input: {
     input.openTeamDrawerById,
     input.primaryInboxItem,
     input.selectedEncyclopediaEntryId,
+    input.setActiveView,
+    input.setInboxCategoryFilter,
     input.triggerGlobalNext,
   ]);
 

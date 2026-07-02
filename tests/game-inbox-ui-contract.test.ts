@@ -10,11 +10,16 @@ describe("game inbox UI contract", () => {
       join(root, "lib/foundation/tabs/use-foundation-cross-tab-game-flow.ts"),
       "utf8",
     );
+    const commandPaletteSource = readFileSync(
+      join(root, "lib/foundation/tabs/use-foundation-cross-tab-command-palette.ts"),
+      "utf8",
+    );
     const gameFlowSource = readFileSync(join(root, "lib/foundation/tabs/use-foundation-game-flow.ts"), "utf8");
     const source =
       readFileSync(join(root, "app/foundation/FoundationPageClient.tsx"), "utf8") +
       readFileSync(join(root, "app/foundation/FoundationShellRouterBody.tsx"), "utf8") +
       crossTabGameFlowSource +
+      commandPaletteSource +
       gameFlowSource;
     const routingSource = readFileSync(join(root, "lib/foundation/foundation-view-routing.ts"), "utf8");
     const officeSource = readFileSync(join(root, "app/foundation/home-v2/ManagerOfficeClient.tsx"), "utf8");

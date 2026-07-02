@@ -169,8 +169,12 @@ describe("foundation transfermarkt ui contract", () => {
 
   it("lets local Chris/manual teams stay manageable in quick market views", async () => {
     const fileText = await fs.readFile(foundationClientPath, "utf8");
+    const teamControlHookText = await fs.readFile(
+      path.join(root, "lib/foundation/tabs/use-foundation-cross-tab-team-control.ts"),
+      "utf8",
+    );
 
-    expect(fileText).toContain("localUserManualTeams");
+    expect(teamControlHookText).toContain("localUserManualTeams");
     expect(fileText).toContain("settings.ownerSlot === \"user\"");
     expect(fileText).toContain("settings.displayLabel === \"Chris\"");
     expect(fileText).toContain("FoundationTransfermarktV2Panel");

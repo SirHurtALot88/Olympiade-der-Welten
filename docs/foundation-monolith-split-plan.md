@@ -9,6 +9,29 @@ Perf-Baseline: V7/V8-Audits, [510c2c1e](agent-transcript) (Audit-Lauf unvollstä
 
 ## 0. Fortschritt / Progress Log
 
+### Stand 2026-07-02 (verifiziert, Phase 5.7 vollständig verdrahtet — Cross-Tab + Shell-Chrome)
+
+| Metrik | Baseline (5.6 done) | Jetzt | Δ |
+|---|---:|---:|---:|
+| `FoundationPageClient.tsx` | 16.781 Z. (HEAD) / 14.237 Z. (Session-Start) | **11.545 Z.** | **−5.236 / −2.692** |
+| Gap zum 8k-Ziel | — | **3.545 Z.** | offen |
+
+**Diese Session abgeschlossen (Phase 5.7 + Slice 10):**
+
+- **Cross-Tab-Hooks vollständig verdrahtet** (Inline-Memos gelöscht): `useFoundationCrossTabSeasonPrize`, `Training`, `DisciplineRanks`, `PlayerDirectory` (+ `usePlayerDirectorySortWorker`), `MarketFilters`, `TeamsRoster`, `MatchdayLineup`, `SeasonBriefing`.
+- **Shell-Chrome:** `useFoundationCrossTabCommandPalette`, `FlowCoach`, `ScreenPrimaryAction`, `FoundationActivities`.
+- **Re-Export-Barrel** auf `setFoundationView` + `syncFoundationViewInUrl` getrimmt.
+- **`foundationSurfaceDependencies` void-Hack** entfernt (bleibt).
+- **Import-Block** aus HEAD wiederhergestellt + neue Hook-Imports gemerged (korrupte Import-Phase bereinigt).
+
+**Verifikation (2026-07-02):**
+
+- **`foundation-performance-architecture` + `foundation-training-compact-ui-contract`:** 15/15 grün.
+- **`ci:flow-smoke`:** einige vorbestehende Failures (`team-season-objectives-service`, `foundation-home-v2-ui-contract` Router-Marker).
+- **`perf:foundation-v9`:** separat ausführen (Sandbox EPERM ohne `all`).
+
+**Noch offen zum 8k-Ziel (~3.545 Z.):** Saison-Tabellen-Render-Helper (`getSeasonContractCellValue`/`renderSeasonContractCell`, ~400 Z.), verbleibende Handler-Cluster, ggf. `useFoundationStateContextValue` + direkte ShellRouterBody-Prop-Imports statt Re-Exports.
+
 ### Stand 2026-07-02 (verifiziert, Phase 5.6.1–5.6.3 + partielle 5.7 — Feed-Hooks + Cross-Tab-Start)
 
 | Metrik | Baseline (5.5 done) | Jetzt | Δ |
