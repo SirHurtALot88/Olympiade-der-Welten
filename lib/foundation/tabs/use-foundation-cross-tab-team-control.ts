@@ -123,6 +123,15 @@ export function useFoundationCrossTabTeamControl(input: {
     manualTeams,
     resolvedTeamControlSettings,
   ]);
+  const localUserManualTeams = useMemo(() => {
+    return input.gameState.teams.filter((team) => {
+      const settings = resolvedTeamControlSettings[team.teamId];
+      return (
+        settings?.controlMode === "manual" &&
+        (settings.ownerId === DEFAULT_ACTIVE_OWNER_ID || settings.ownerSlot === "user" || settings.displayLabel === "Chris")
+      );
+    });
+  }, [input.gameState.teams, resolvedTeamControlSettings]);
   const ownerQuickSwitchTeams = useMemo(() => {
     const ownerTeams = filterTeamsByControlScope(
       input.gameState.teams,
@@ -130,18 +139,11 @@ export function useFoundationCrossTabTeamControl(input: {
       "my_teams",
       effectiveActiveOwnerId,
     );
-    const localUserManualTeams = input.gameState.teams.filter((team) => {
-      const settings = resolvedTeamControlSettings[team.teamId];
-      return (
-        settings?.controlMode === "manual" &&
-        (settings.ownerId === DEFAULT_ACTIVE_OWNER_ID || settings.ownerSlot === "user" || settings.displayLabel === "Chris")
-      );
-    });
     const merged = [...ownerTeams, ...localUserManualTeams].filter(
       (team, index, teams) => teams.findIndex((entry) => entry.teamId === team.teamId) === index,
     );
     return merged.length ? merged : manualTeams;
-  }, [effectiveActiveOwnerId, input.gameState.teams, manualTeams, resolvedTeamControlSettings]);
+  }, [effectiveActiveOwnerId, localUserManualTeams, manualTeams, resolvedTeamControlSettings]);
   const foundationManageableTeamIds = useMemo(
     () =>
       resolveFoundationManageableTeamIds(
@@ -170,6 +172,7 @@ export function useFoundationCrossTabTeamControl(input: {
     activeOwner,
     effectiveActiveOwnerId,
     managerTeamOptions,
+    localUserManualTeams,
     ownerQuickSwitchTeams,
     foundationManageableTeamIds,
   };

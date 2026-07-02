@@ -9,6 +9,28 @@ Perf-Baseline: V7/V8-Audits, [510c2c1e](agent-transcript) (Audit-Lauf unvollstä
 
 ## 0. Fortschritt / Progress Log
 
+### Stand 2026-07-02 (verifiziert, Phase 5.6.1–5.6.3 + partielle 5.7 — Feed-Hooks + Cross-Tab-Start)
+
+| Metrik | Baseline (5.5 done) | Jetzt | Δ |
+|---|---:|---:|---:|
+| `FoundationPageClient.tsx` | 16.781 Z. | **14.237 Z.** | **−2.544** |
+| Gap zum 8k-Ziel | — | **6.237 Z.** | offen |
+
+**Diese Session abgeschlossen:**
+
+- **Phase 5.6.1 (Persistence):** `useFoundationPersistenceActions` verdrahtet (bereits vom Parent-Agent).
+- **Phase 5.6.2 (Live Sync + Market Feed):** `useFoundationMarketFeedActions` + `useFoundationLiveSync` mit `marketFeedReloadersRef`/`seasonFeedReloadersRef`; inline `reloadMarketFeed`/`reloadLiveSeasonState`/Room-Poll/Market-Load-Effects entfernt.
+- **Phase 5.6.3 (Season Feed):** `useFoundationSeasonFeedActions` + `useFoundationSeasonOverviewFeedEffect`; inline Cockpit/Season-Preview-Reload-Handler und Load-Effects entfernt; `seasonContentSignature` via `buildGameStateContentSignature`.
+- **Phase 5.7 (partiell):** Echt aufgerufen: `useFoundationCrossTabGameFlow`, `useFoundationCrossTabTeamControl`, `useFoundationCrossTabHomeV2`, `useFoundationCrossTabPlayerDirectory`. `foundationSurfaceDependencies` void-Hack entfernt.
+- **Phase 5.9 (partiell):** Duplicate-Import-Cleanup, `FoundationViewMount`-Import entfernt.
+
+**Verifikation (2026-07-02):**
+
+- **Pflicht-Contract-Tests: 66/66 grün** (foundation-performance-architecture, foundation-shell-ui-contract, foundation-transfermarkt-ui-contract, game-inbox-ui-contract, foundation-player-portrait-card, game-inbox-service, fatigue-injury-inbox-integration).
+- **`ci:flow-smoke`:** 4 unrelated failures in `team-season-objectives-service.test.ts` (vorbestehend/leicht divergent); Foundation contract suite grün wenn isoliert.
+
+**Noch offen zum 8k-Ziel:** `useFoundationCrossTabSeasonPrize`, `Training`, `DisciplineRanks`, `MarketFilters`, `TeamsRoster`, `MatchdayLineup`, `SeasonBriefing`, Slice-10 (`ScreenPrimaryAction`, `CommandPalette`, `FlowCoach`, `FoundationActivities`, `StateContextValue`) — Inline-Memos noch im Parent (~6k Z.). Re-Export-Barrel unten (~160 Z.) kann nach direkten ShellRouterBody-Imports getrimmt werden.
+
 ### Stand 2026-07-02 (verifiziert, Phase 5.4 + 5.5 echt verdrahtet — Ausgangslage 22.056 Z. am HEAD `aa8b735`)
 
 **Ausgangslage (verifiziert, nicht die aspirativen „8k"-Logeinträge unten):** Commit `aa8b735` („Wire foundation split surface…") hatte den Monolithen wieder in `FoundationPageClient.tsx` **eingebettet** → **22.056 Z.**, inkl. Marker-freiem aber ungenutztem `foundationSurfaceDependencies` `void`-Hack. Die extrahierten `lib/foundation/tabs/*`-Dateien existierten, wurden vom Parent aber NICHT konsumiert.
