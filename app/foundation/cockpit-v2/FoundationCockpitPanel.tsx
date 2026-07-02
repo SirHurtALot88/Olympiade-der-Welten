@@ -1203,7 +1203,7 @@ export default function FoundationCockpitPanel(props: FoundationCockpitPanelProp
                             </tr>
                           </thead>
                           <tbody>
-                            {matchdayAutoRunFeed.steps.map((step) => (
+                            {matchdayAutoRunFeed.steps.map((step: FoundationMatchdayAutoRunSummary["steps"][number]) => (
                               <tr key={`matchday-auto-run-${step.key}`}>
                                 <td>{step.label}</td>
                                 <td>{getCockpitStatusLabel(mapAutoRunStatusToCockpitStatus(step.status))}</td>

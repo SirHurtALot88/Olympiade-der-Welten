@@ -584,6 +584,10 @@ export function useFoundationPageState({
   const [aiLineupEnsureBusy, setAiLineupEnsureBusy] = useState<boolean>(false);
   const [aiLineupEnsureFeed, setAiLineupEnsureFeed] = useState<FoundationAiLineupBatchApplyResponse | null>(null);
   const aiLineupEnsureRunStartedRef = useRef<Set<string>>(new Set());
+  const [cockpitAiBatchApplyFeed, setCockpitAiBatchApplyFeed] = useState<FoundationAiLineupBatchApplyResponse | null>(null);
+  const [cockpitAiIncludeWarningTeams, setCockpitAiIncludeWarningTeams] = useState<boolean>(false);
+  const [cockpitAiOverwriteExisting, setCockpitAiOverwriteExisting] = useState<boolean>(false);
+  const [cockpitBusyKey, setCockpitBusyKey] = useState<string | null>(null);
   const [aiPickAuditBusy, setAiPickAuditBusy] = useState<boolean>(false);
   const [aiPickAuditFeed, setAiPickAuditFeed] = useState<FoundationAiPickAuditResetResponse | null>(null);
   const [seasonStartResetBusy, setSeasonStartResetBusy] = useState<boolean>(false);
@@ -1011,6 +1015,14 @@ export function useFoundationPageState({
     setAiLineupEnsureBusy,
     aiLineupEnsureFeed,
     setAiLineupEnsureFeed,
+    cockpitAiBatchApplyFeed,
+    setCockpitAiBatchApplyFeed,
+    cockpitAiIncludeWarningTeams,
+    setCockpitAiIncludeWarningTeams,
+    cockpitAiOverwriteExisting,
+    setCockpitAiOverwriteExisting,
+    cockpitBusyKey,
+    setCockpitBusyKey,
     aiPickAuditBusy,
     setAiPickAuditBusy,
     aiPickAuditFeed,

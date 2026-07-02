@@ -22,6 +22,14 @@ import { authorizeServerRoomWrite } from "@/lib/room/server-authoritative-write-
 
 const inFlightRunKeys = new Set<string>();
 
+function claimPreseasonRunKey(runKey: string) {
+  if (inFlightRunKeys.has(runKey)) {
+    return false;
+  }
+  inFlightRunKeys.add(runKey);
+  return true;
+}
+
 function nowIso() {
   return new Date().toISOString();
 }
@@ -257,7 +265,7 @@ export async function POST(request: Request) {
   }
 
   const runKey = buildRunKey(saveId, seasonId);
-  if (inFlightRunKeys.has(runKey)) {
+  if (!claimPreseasonRunKey(runKey)) {
     const latestRun = persistence.getSaveById(saveId)?.gameState.seasonState.aiPreseasonAutomationRuns?.[seasonId] ?? null;
     return NextResponse.json({
       ok: true,
@@ -267,7 +275,6 @@ export async function POST(request: Request) {
     });
   }
 
-  inFlightRunKeys.add(runKey);
   let handedToExecute = false;
 
   try {
@@ -321,6 +328,17 @@ export async function POST(request: Request) {
       const skippedRecord: AiPreseasonAutomationRunRecord = { ...baseRecord, completedAt: nowIso() };
       writeRunRecord(saveId, skippedRecord);
       return NextResponse.json({ ok: true, skipped: true, reason: "no_ai_teams", run: skippedRecord });
+    }
+
+    const latestBeforeStart = persistence.getSaveById(saveId);
+    const runningRecord = latestBeforeStart?.gameState.seasonState.aiPreseasonAutomationRuns?.[seasonId] ?? null;
+    if (runningRecord?.status === "running" && !isStaleRunningRun(runningRecord)) {
+      return NextResponse.json({
+        ok: true,
+        skipped: true,
+        reason: "ai_preseason_already_running",
+        run: runningRecord,
+      });
     }
 
     writeRunRecord(saveId, baseRecord);
