@@ -9,30 +9,30 @@ Perf-Baseline: V7/V8-Audits, [510c2c1e](agent-transcript) (Audit-Lauf unvollstä
 
 ## 0. Fortschritt / Progress Log
 
-### Stand 2026-07-02 (verifiziert, Phase 5.9 Abschluss — Parent ≤8k, Orchestrator-Scope)
+### Stand 2026-07-02 (verifiziert, Phase 5.9 Runtime + Barrel — Scope noch >8k)
 
 | Metrik | Baseline (Session-Start) | Jetzt | Δ |
 |---|---:|---:|---:|
 | `FoundationPageClient.tsx` | 11.457 Z. | **29 Z.** | **−11.428** |
-| `use-foundation-shell-router-body-scope.tsx` | — | **~11.520 Z.** | neu (Orchestrator) |
-| `foundation-page-client-exports.ts` | — | **~164 Z.** | Barrel ausgelagert |
-| Gap zum 8k-Ziel | 3.457 Z. | **0** | **erreicht** |
+| `use-foundation-shell-router-body-scope.tsx` | ~11.472 Z. | **11.508 Z.** | +36 (Handler-Wiring) / −252 (Dead-Code) net |
+| `foundation-page-client-exports.ts` | ~164 Z. | **~172 Z.** | kanonische Re-Exports (nicht via Scope) |
+| Gap zum 8k-Ziel (Scope) | ~3.472 Z. | **~3.508 Z.** | **offen** |
 
-**Diese Session abgeschlossen (Phase 5.9 cleanup + verify-push):**
+**Diese Session abgeschlossen:**
 
-- **Orchestrator extrahiert:** `useFoundationShellRouterBodyScope` in `lib/foundation/tabs/use-foundation-shell-router-body-scope.tsx`; Parent ist dünner Wrapper (29 Z.).
-- **Barrel getrimmt:** `foundation-page-client-exports.ts` + `MappingHighlight.tsx`; `FoundationShellRouterBody` importiert direkt von Exports.
-- **Runtime-Fixes (pre-existing Lücken im Monolithen):** `FACILITY_CATALOG`-Import, `useSeasonRatingsSlice`/`useTeamOverviewSlice`, `historyPage`/`historyAllSeasonsSelected`, `shouldBuildPrizeV2Ui`, `prizePreviewRows` aus Season-Prize-Hook, `useCockpitPanelDerivations`, `useTeamsRosterTableDerivations`, Export-Barrel-Import-Lücken, TDZ-Duplicate-`useEffect` entfernt.
-- **Tests:** `tests/foundation-orchestrator-source.ts`; Contract-Tests lesen Parent+Scope (48/48 Pflicht-Contract + 17 Game-Flow = **65/65 grün**).
+- **Runtime `/foundation` → 200:** Cockpit-Handler (`createCockpitMatchdayApplyHandlers`, Preseason, SeasonTransition), fehlende Derivations (`prizePreviewGlobalWarnings`, `visibleTeamsViewColumns`, `sortedStandingsPreviewRows`, Transfermarkt-Scouting, `transferSeasonOptions`), `formatHomeWarningLabel`-Import.
+- **Extraktionen:** `multiseason-balance-cell-renderers.tsx`; `getTeamLogoModel`/`WarningList` → `foundation-page-module-helpers.tsx`; ~252 Z. toter Season-Contract-Render-Code entfernt; Scope-Export-Barrel (~160 Z.) entfernt.
+- **Barrel-Fix:** `foundation-page-client-exports.ts` importiert von kanonischen Modulen (`default as` für Panel-Komponenten); behebt `featureAuditFilters`/`ClassColorChip`-Export-Fehler.
 
 **Verifikation (2026-07-02):**
 
 - **`curl localhost:3000/foundation` → 200**
-- **Pflicht-Contract-Tests: 65/65 grün** (7 Contract-Suites + `game-inbox-service` + `fatigue-injury-inbox-integration`)
-- **`ci:flow-smoke`:** 5 vorbestehende Failures (`team-season-objectives-service`, `foundation-home-v2-ui-contract` — unverändert durch Split)
-- **`perf:foundation-v9`:** `--no-start` scheitert (Server nur auf `localhost:3000`, Skript prüft `127.0.0.1:3000`)
+- **Pflicht-Contract-Tests: 65/65 grün**
+- **`ci:flow-smoke`:** 5 vorbestehende Failures (`team-season-objectives-service`, `foundation-home-v2-ui-contract` — unverändert)
 
-### Stand 2026-07-02 (verifiziert, Phase 5.7 vollständig verdrahtet — Cross-Tab + Shell-Chrome)
+**Noch offen zum 8k-Ziel (~3.508 Z. auf Scope):** Teams-View-Hook (`useTeamsViewRowDerivations`), Season-Contract-Cells-Modul, verbleibende Inline-Memos/Handler-Cluster, `useFoundationStateContextValue`-Verdrahtung.
+
+### Stand 2026-07-02 (verifiziert, Phase 5.9 Abschluss — Parent ≤8k, Orchestrator-Scope)
 
 | Metrik | Baseline (5.6 done) | Jetzt | Δ |
 |---|---:|---:|---:|
