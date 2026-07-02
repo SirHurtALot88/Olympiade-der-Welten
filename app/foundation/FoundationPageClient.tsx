@@ -148,6 +148,8 @@ import {
   getTeamMatchdayLineupDraft,
   getTeamMatchdayLineupOpenSlots,
   isTeamMatchdayLineupComplete,
+  isTeamMatchdayLineupOperationallyReady,
+  isTeamMatchdayLineupSubmitted,
   mergeTeamLineupDraftIntoGameState,
 } from "@/lib/foundation/matchday-lineup-readiness";
 import { buildFormCardSeasonUsageAudit } from "@/lib/lineups/legacy-lineup-modifiers";
@@ -156,14 +158,6 @@ import {
   mergeFormCardPlansIntoGameState,
 } from "@/lib/foundation/matchday-arena-readiness";
 import {
-  getLineupDraftSideCounts,
-  getMatchdayLineupSideRequirements,
-  getTeamMatchdayLineupDraft,
-  getTeamMatchdayLineupOpenSlots,
-  isTeamMatchdayLineupComplete,
-  isTeamMatchdayLineupOperationallyReady,
-  isTeamMatchdayLineupSubmitted,
-  mergeTeamLineupDraftIntoGameState,
   AI_OWNER_ID,
   DEFAULT_ACTIVE_OWNER_ID,
   applyChrisFrankyOwnershipToTeamControlSettings,
@@ -224,11 +218,6 @@ import { getDisciplineColor, getSeasonDisciplineSchedule, getSeasonDisciplineSch
 import { getSeasonEconomyFactorWindow } from "@/lib/season/season-economy-factors";
 import { getCanonicalSeasonLabel } from "@/lib/season/season-label";
 import { resolveSeasonSnapshotTeamRecords } from "@/lib/season/season-snapshot-service";
-import { resolveSeasonSnapshotTeamRecords } from "@/lib/season/season-snapshot-helpers";
-import {
-  buildTeamHistoryDisciplineValuesFromRecord,
-  buildTeamHistoryDisciplineValuesFromSnapshot,
-} from "@/lib/season/season-discipline-area-groups";
 import {
   buildTeamHistoryDisciplineValuesFromRecord,
   buildTeamHistoryDisciplineValuesFromSnapshot,
@@ -306,7 +295,6 @@ import { useFoundationCrossTabSeasonBriefing } from "@/lib/foundation/tabs/use-f
 import { useFoundationCrossTabHomeV2 } from "@/lib/foundation/tabs/use-foundation-cross-tab-home-v2";
 import { useFoundationCrossTabGameFlow } from "@/lib/foundation/tabs/use-foundation-cross-tab-game-flow";
 import { useFoundationCrossTabSeasonPrize } from "@/lib/foundation/tabs/use-foundation-cross-tab-season-prize";
-import { useFoundationCrossTabMatchdayLineup } from "@/lib/foundation/tabs/use-foundation-cross-tab-matchday-lineup";
 import { useFoundationCrossTabTeamControl } from "@/lib/foundation/tabs/use-foundation-cross-tab-team-control";
 import { useFoundationCrossTabCommandPalette } from "@/lib/foundation/tabs/use-foundation-cross-tab-command-palette";
 import { useFoundationCrossTabFlowCoach } from "@/lib/foundation/tabs/use-foundation-cross-tab-flow-coach";
@@ -330,10 +318,6 @@ import { useSeasonStandRows } from "@/lib/foundation/tabs/use-season-stand-rows"
 import { resolveShouldBuildTeamsScopedRatings } from "@/lib/foundation/tabs/teams-view-derivations";
 import FoundationShell from "@/app/foundation/shell/FoundationShell";
 import FoundationSubNav from "@/app/foundation/shell/FoundationSubNav";
-import {
-  FoundationStateProvider,
-  type FoundationStateContextValue,
-} from "@/lib/foundation/foundation-state-context";
 import {
   shouldBuildFoundationGameFlow,
   useFoundationGameInboxItems,
@@ -740,7 +724,6 @@ const FoundationTransfermarktV2Panel = dynamic(
   },
 );
 const TransferHistoryV2Client = dynamic(() => import("@/app/foundation/transfer-history-v2/TransferHistoryV2Client"), { ssr: false });
-const TeamsV2Client = dynamic(() => import("@/app/foundation/teams-v2/TeamsV2Client"), { ssr: false });
 const FoundationSeasonV2Host = dynamic(() => import("@/app/foundation/season-v2/FoundationSeasonV2Host"), {
   ssr: false,
   loading: () => <FoundationPanelSkeleton variant="seasonV2" label="Saisonstand wird geladen…" />,
@@ -882,177 +865,6 @@ function hashTeamColorSeed(value: string) {
     hash = (hash * 31 + value.charCodeAt(index)) >>> 0;
   }
   return hash;
-}
-
-function getPpAreaKeyForDisciplineCategory(category: string | null | undefined): Exclude<PpAreaKey, "total"> | null {
-  label,
-  tableId,
-  columnKey,
-  sortState,
-  onToggle,
-  tooltip,
-}: {
-  label: string;
-  tableId: string;
-  columnKey: string;
-  sortState?: SortState;
-  onToggle: (tableId: string, columnKey: string) => void;
-  tooltip?: string | null;
-}) {
-  const isActive = sortState?.key === columnKey;
-  const arrow = !isActive ? "↕" : sortState.direction === "asc" ? "↑" : "↓";
-  const resolvedTooltip = tooltip ?? getGameTermTooltip(label) ?? getGameTermTooltip(columnKey);
-
-  return (
-    <button
-      className={`sortable-header${isActive ? " is-active" : ""}`}
-      type="button"
-      onClick={() => onToggle(tableId, columnKey)}
-      title={resolvedTooltip ?? `Nach ${label} sortieren`}
-      aria-label={`${label} sortieren${resolvedTooltip ? `: ${resolvedTooltip}` : ""}`}
-    >
-      <span>{label}</span>
-      {resolvedTooltip ? <span className="sortable-help-dot" aria-hidden="true">?</span> : null}
-      <span className="sortable-arrow">{arrow}</span>
-    </button>
-  );
-}
-
-function ColumnVisibilityManager({
-  title,
-  columns,
-  presets = [],
-  activePreset = null,
-  isVisible,
-  onToggle,
-  onMove,
-  getWidth,
-  onStepWidth,
-  onResetWidth,
-  onApplyPreset,
-  onResetToDefault,
-}: {
-  title: string;
-  columns: FoundationTableColumn[];
-  presets?: FoundationTablePreset[];
-  activePreset?: FoundationTablePresetId | null;
-  isVisible: (columnId: string, visibleByDefault?: boolean) => boolean;
-  onToggle: (columnId: string, nextVisible: boolean) => void;
-  onMove?: (columnId: string, direction: "left" | "right") => void;
-  getWidth?: (column: FoundationTableColumn) => number;
-  onStepWidth?: (column: FoundationTableColumn, delta: number) => void;
-  onResetWidth?: (column: FoundationTableColumn) => void;
-  onApplyPreset?: (presetId: Exclude<FoundationTablePresetId, "custom">) => void;
-  onResetToDefault?: () => void;
-}) {
-  const [isOpen, setIsOpen] = useState(false);
-
-  return (
-    <div className={`column-visibility-manager${isOpen ? " is-open" : ""}`}>
-      <button
-        className="column-visibility-toggle"
-        type="button"
-        title="Spalten, Breite & Reihenfolge"
-        aria-expanded={isOpen}
-        onClick={() => setIsOpen((current) => !current)}
-      >
-        <span>{title}</span>
-        <span className="column-visibility-toggle-icon" aria-hidden="true">
-          {isOpen ? "−" : "+"}
-        </span>
-      </button>
-      {isOpen && presets.length > 0 ? (
-        <div className="table-customization-presets">
-          <label className="filter-field table-customization-preset-field">
-            <span>Preset</span>
-            <select
-              className="input"
-              value={activePreset && activePreset !== "custom" ? activePreset : "custom"}
-              onChange={(event) => {
-                if (event.target.value === "custom") {
-                  return;
-                }
-                onApplyPreset?.(event.target.value as Exclude<FoundationTablePresetId, "custom">);
-              }}
-            >
-              {presets.map((preset) => (
-                <option key={preset.id} value={preset.id}>
-                  {preset.label}
-                </option>
-              ))}
-              <option value="custom">Custom</option>
-            </select>
-          </label>
-          <button className="secondary-button inline-button" type="button" onClick={onResetToDefault}>
-            Layout zurücksetzen
-          </button>
-        </div>
-      ) : null}
-      {isOpen ? (
-        <div className="table-customization-presets">
-          <button
-            className="secondary-button inline-button"
-            type="button"
-            onClick={() => columns.forEach((column) => onToggle(column.id, true))}
-          >
-            Alle anzeigen
-          </button>
-          {presets.length === 0 && onResetToDefault ? (
-            <button className="secondary-button inline-button" type="button" onClick={onResetToDefault}>
-              Layout zurücksetzen
-            </button>
-          ) : null}
-        </div>
-      ) : null}
-      {isOpen ? <div className="column-visibility-grid">
-        {columns.map((column) => {
-          const checked = isVisible(column.id, column.visibleByDefault);
-          return (
-            <div key={column.id} className="column-visibility-option">
-              <div className="table-customization-option-main">
-                <label className="table-customization-checkbox">
-                  <input
-                    type="checkbox"
-                    checked={checked}
-                    onChange={(event) => onToggle(column.id, event.target.checked)}
-                  />
-                  <span>{column.label}</span>
-                </label>
-              </div>
-              <div className="table-customization-option-actions">
-                {typeof getWidth === "function" ? <span className="table-customization-width">{getWidth(column)} px</span> : null}
-                {onMove ? (
-                  <>
-                    <button className="ghost-button" type="button" onClick={() => onMove(column.id, "left")} aria-label={`${column.label} nach links`}>
-                      ←
-                    </button>
-                    <button className="ghost-button" type="button" onClick={() => onMove(column.id, "right")} aria-label={`${column.label} nach rechts`}>
-                      →
-                    </button>
-                  </>
-                ) : null}
-                {onStepWidth ? (
-                  <>
-                    <button className="ghost-button" type="button" onClick={() => onStepWidth(column, -16)} aria-label={`${column.label} schmaler`}>
-                      −
-                    </button>
-                    <button className="ghost-button" type="button" onClick={() => onStepWidth(column, 16)} aria-label={`${column.label} breiter`}>
-                      +
-                    </button>
-                  </>
-                ) : null}
-                {onResetWidth ? (
-                  <button className="ghost-button" type="button" onClick={() => onResetWidth(column)} aria-label={`${column.label} Breite zurücksetzen`}>
-                    Reset
-                  </button>
-                ) : null}
-              </div>
-            </div>
-          );
-        })}
-      </div> : null}
-    </div>
-  );
 }
 
 function getPpAreaKeyForDisciplineCategory(category: string | null | undefined): Exclude<PpAreaKey, "total"> | null {
@@ -1360,17 +1172,6 @@ function FoundationPageClientInner({
     activeView === "ranks" ||
     activeView === "diszis" ||
     activeView === "prize";
-  const shouldBuildPlayerRatings =
-    shouldBuildMarketView ||
-    shouldBuildPlayerDirectory ||
-    shouldBuildHomeV2Overview ||
-    isMarketSellPanelOpen ||
-    shouldBuildExtendedTeamPanels ||
-    activeView === "teams" ||
-    activeView === "seasonV2" ||
-    activeView === "ranks" ||
-    activeView === "diszis" ||
-    activeView === "prize";
   const shouldLoadSeasonLedger = shouldBuildPlayerDirectory;
   const shouldLoadSeasonRatings = shouldBuildPlayerRatings || shouldBuildTrainingView;
   const shouldFetchSeasonRatingsFromApi = shouldLoadSeasonRatings && !shouldLoadSeasonLedger;
@@ -1391,24 +1192,6 @@ function FoundationPageClientInner({
   const shouldLoadSeasonDerivations =
     (shouldLoadSeasonLedger && Boolean(playerDirectorySlice.error)) ||
     (shouldLoadSeasonRatings && (Boolean(seasonRatingsSlice.error) || seasonRatingsSlice.ratingsById.size === 0));
-  const shouldBuildSeasonTopPlayerRows = resolveShouldBuildSeasonTopPlayerRows({
-    shouldBuildSeasonV2PlayerRatings,
-    activeView: activeView as FoundationViewId,
-  });
-
-  useEffect(() => () => {
-    if (pendingTeamActivationRef.current) {
-      clearTimeout(pendingTeamActivationRef.current);
-      pendingTeamActivationRef.current = null;
-    }
-  }, []);
-  const [cockpitAiBatchApplyFeed, setCockpitAiBatchApplyFeed] = useState<FoundationAiLineupBatchApplyResponse | null>(null);
-  const [cockpitAiIncludeWarningTeams, setCockpitAiIncludeWarningTeams] = useState<boolean>(false);
-  const [cockpitAiOverwriteExisting, setCockpitAiOverwriteExisting] = useState<boolean>(false);
-  const [prizeForecastRank, setPrizeForecastRank] = useState<number>(1);
-  const [cockpitBusyKey, setCockpitBusyKey] = useState<string | null>(null);
-  const [historyPage, setHistoryPage] = useState<number>(1);
-  const [isPending, startTransition] = useTransition();
   const deferredGameState = useDeferredValue(gameState);
   const inboxGameState = deferredGameState;
   useEffect(() => {
@@ -11512,14 +11295,151 @@ function FoundationPageClientInner({
   };
   return <FoundationShellRouterBody {...(foundationShellRouterBodyProps as FoundationShellRouterBodyProps)} />;
 }
-
-
-
 export {
+  ClassColorChip,
+  ClassIcon,
+  ColumnVisibilityManager,
+  DEFAULT_ACTIVE_OWNER_ID,
+  DisciplineIcon,
+  FACILITY_CATALOG,
+  FOUNDATION_ADMIN_UNLOCK_ALL_TEAMS,
+  FOUNDATION_SAVE_MODE_OPTIONS,
+  FacilitiesV2Client,
+  FoundationHomeV2Panel,
+  FoundationLineupPanel,
+  FoundationMatchdayArenaPanel,
+  FoundationPlayerPortraitPreview,
+  FoundationSeasonV2Panel,
+  FoundationShell,
+  FoundationSponsorsPanel,
+  FoundationSubNav,
+  FoundationTeamsDetailPanel,
+  FoundationTransfermarktV2Panel,
+  GAME_ENCYCLOPEDIA_ENTRIES,
+  GameTerm,
+  HISTORY_ALL_SEASONS_FILTER,
+  InboxV2Client,
+  MappingHighlight,
+  NEW_GAME_PRESET_DEFAULTS,
+  NEW_GAME_VISIBLE_PRESET_IDS,
+  PLAYER_PROFILE_TABS,
+  PROGRESSION_CLASS_ORDER,
+  PlayerGeneratorPanel,
+  PlayerPortrait,
+  PlayerProfileClient,
+  RaceIcon,
+  SEASON_TRANSITION_STATIC_STEPS,
+  SPECIALIST_WING_VARIANTS,
+  ScoutingCenterV2Client,
+  SortableHeader,
+  TeamProfileClient,
+  TooltipHeading,
+  TrainingCompactClient,
+  TransferHistoryV2Client,
+  WarningList,
+  applySponsorNegotiationToComponents,
+  buildResolvedTeamIdentities,
+  buildScenarioWarning,
+  buildTeamControlSettingsMap,
+  buildTeamIdentityDraftMap,
+  buildTeamStrategyProfileMap,
+  clampBiasValue,
+  clampIdentityValue,
+  clampValue,
+  deriveChrisFrankyTeamIdsFromSettings,
+  describeRoomFlowButton,
+  featureAuditFilters,
+  filterTeamsByControlScope,
+  formatActiveManagerTeamSource,
+  formatAiLineupAuditWarning,
+  formatCockpitReason,
+  formatContractShapeLabel,
+  formatCsvList,
+  formatDisciplineCategoryLabel,
+  formatDisplayMoney,
+  formatFeatureAuditStatus,
+  formatFoundationSaveModeLabel,
+  formatGamePhaseLabel,
+  formatHomeWarningLabel,
+  formatIdentityWeight,
+  formatLocalePoints,
+  formatMatchdayMvpWarning,
+  formatMoney,
+  formatMoraleContractIntentLabel,
+  formatNullableMoney,
+  formatObjectiveStatusLabel,
+  formatPpFormBonus,
+  formatPpsValue,
+  formatScenarioTypeLabel,
+  formatSeasonCompletionStepStatus,
+  formatShortSaveId,
+  formatSignedDisplayMoney,
+  formatSignedNumber,
+  formatSignedTransfermarktCurrency,
+  formatTeamControlModeLabel,
+  formatTransfermarktCurrency,
+  formatWholeNumber,
+  foundationSecondaryViews,
+  getClassColorClassName,
+  getCockpitStatusLabel,
+  getCockpitStatusPillClass,
+  getCockpitStepTone,
+  getFeatureAuditFlags,
+  getFoundationViewScrollTarget,
+  getGameFlowStatusLabel,
+  getLineupDraftSideCounts,
+  getOwnerTeamHighlightClass,
+  getPlayerDisplayMarketValue,
+  getPlayerDisplayMarketValueDelta,
+  getPlayerDisplaySalary,
+  getPlayerPortraitModel,
+  getPoolHeatClass,
+  getRankHeatClass,
+  getRanksMetricToneClass,
+  getResponsiveTableImageSize,
+  getRoomFlowStep,
+  getRosterEntryDisplayMarketValue,
+  getRosterEntryDisplaySalary,
+  getRosterEntrySalaryDelta,
+  getScoutingWishlistSlotLimit,
+  getSeasonCashHeatClass,
+  getSeasonCompletionStepTone,
+  getSponsorNegotiationMultiplier,
+  getTeamAxisRankTooltip,
+  getTeamHistoryRankToneClass,
+  getTeamLogoModel,
+  getTeamTransferWishlistEntries,
+  getTeamsViewColumnTitle,
+  getTransferSourceLabel,
+  getTransferTypePillClass,
+  getTransfermarktScoutingDisclosure,
+  getViewSourceBadgeLabel,
+  inferSaveTypeLabel,
+  isTeamSetupDraftWishlistPhase,
+  joinClassNames,
+  mapAutoRunStatusToCockpitStatus,
+  normalizeFoundationSaveMode,
+  normalizeTeamStrategyLevel,
+  parseCsvList,
+  prefetchFoundationPanel,
+  renderEconomyDelta,
+  renderMetricBar,
+  resolveFoundationSaveMode,
+  resolveScenarioMetaLabel,
+  roundViewNumber,
+  runAiTurn,
+  scrollToFoundationTarget,
   setFoundationView,
   syncFoundationViewInUrl,
+  teamIdentityFieldLabels,
+  teamStrategyBiasFieldLabels,
+  teamStrategyIdentityListFieldLabels,
+  teamStrategyLevelFieldLabels,
+  teamStrategyListFieldLabels,
+  teamStrategySportsBiasAxisMap,
+  teamStrategySportsBiasFieldLabels,
+  withSynchronizedStrategyAliases,
 };
-
 
 export type {
   DisciplineCategoryFilter,

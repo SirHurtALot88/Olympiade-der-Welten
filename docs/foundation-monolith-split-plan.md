@@ -32,27 +32,28 @@ Perf-Baseline: V7/V8-Audits, [510c2c1e](agent-transcript) (Audit-Lauf unvollstä
 
 **Noch offen zum 8k-Ziel (~3.545 Z.):** Saison-Tabellen-Render-Helper (`getSeasonContractCellValue`/`renderSeasonContractCell`, ~400 Z.), verbleibende Handler-Cluster, ggf. `useFoundationStateContextValue` + direkte ShellRouterBody-Prop-Imports statt Re-Exports.
 
-### Stand 2026-07-02 (verifiziert, Phase 5.6.1–5.6.3 + partielle 5.7 — Feed-Hooks + Cross-Tab-Start)
+### Stand 2026-07-02 (verifiziert, Phase 5.6.2–5.7 + 5.9 partial — Hook-Verdrahtung + Dedup)
 
-| Metrik | Baseline (5.5 done) | Jetzt | Δ |
+| Metrik | Baseline (690661c) | Jetzt | Δ |
 |---|---:|---:|---:|
-| `FoundationPageClient.tsx` | 16.781 Z. | **14.237 Z.** | **−2.544** |
-| Gap zum 8k-Ziel | — | **6.237 Z.** | offen |
+| `FoundationPageClient.tsx` | 14.285 Z. | **11.457 Z.** | **−2.828** |
+| Gap zum 8k-Ziel | — | **3.457 Z.** | offen |
 
 **Diese Session abgeschlossen:**
 
-- **Phase 5.6.1 (Persistence):** `useFoundationPersistenceActions` verdrahtet (bereits vom Parent-Agent).
-- **Phase 5.6.2 (Live Sync + Market Feed):** `useFoundationMarketFeedActions` + `useFoundationLiveSync` mit `marketFeedReloadersRef`/`seasonFeedReloadersRef`; inline `reloadMarketFeed`/`reloadLiveSeasonState`/Room-Poll/Market-Load-Effects entfernt.
-- **Phase 5.6.3 (Season Feed):** `useFoundationSeasonFeedActions` + `useFoundationSeasonOverviewFeedEffect`; inline Cockpit/Season-Preview-Reload-Handler und Load-Effects entfernt; `seasonContentSignature` via `buildGameStateContentSignature`.
-- **Phase 5.7 (partiell):** Echt aufgerufen: `useFoundationCrossTabGameFlow`, `useFoundationCrossTabTeamControl`, `useFoundationCrossTabHomeV2`, `useFoundationCrossTabPlayerDirectory`. `foundationSurfaceDependencies` void-Hack entfernt.
-- **Phase 5.9 (partiell):** Duplicate-Import-Cleanup, `FoundationViewMount`-Import entfernt.
+- **Phase 5.6.2:** `useFoundationMarketFeedActions` + `useFoundationLiveSync` verdrahtet; inline Market/Live-Sync-Handler entfernt.
+- **Phase 5.6.3:** `useFoundationSeasonFeedActions` + `useFoundationSeasonOverviewFeedEffect` verdrahtet.
+- **Phase 5.7:** Alle Cross-Tab-Hooks aufgerufen: GameFlow, TeamControl, HomeV2, SeasonPrize, DisciplineRanks, PlayerDirectory, MarketFilters, TeamsRoster, MatchdayLineup, SeasonBriefing, Training, CommandPalette, FlowCoach, ScreenPrimaryAction, FoundationActivities.
+- **Phase 5.9 (partial):** `foundationSurfaceDependencies` void-Hack entfernt; Duplicate-Import/Deklaration-Cleanup; Command-Palette Inbox-Aktionen (Entscheidungen/Chronik) wiederhergestellt; ShellRouterBody `activeView === "teamSettings"` Gate.
+- **Fixes:** Syntax-Korruptionen aus Patch-Merge behoben; `TeamsV2Client`-Ghost-Import entfernt; Export-Barrel für ShellRouterBody-Kompatibilität wiederhergestellt.
 
 **Verifikation (2026-07-02):**
 
-- **Pflicht-Contract-Tests: 66/66 grün** (foundation-performance-architecture, foundation-shell-ui-contract, foundation-transfermarkt-ui-contract, game-inbox-ui-contract, foundation-player-portrait-card, game-inbox-service, fatigue-injury-inbox-integration).
-- **`ci:flow-smoke`:** 4 unrelated failures in `team-season-objectives-service.test.ts` (vorbestehend/leicht divergent); Foundation contract suite grün wenn isoliert.
+- **Pflicht-Contract-Tests: 66/66 grün**
+- **`curl localhost:3000/foundation`:** noch **500** (Runtime-Fehler nach Compile-Fix; weiteres Debugging nötig)
+- **`ci:flow-smoke`:** weiterhin unrelated failures (`team-season-objectives-service`, `foundation-home-v2-ui-contract` Prefetch-Import)
 
-**Noch offen zum 8k-Ziel:** `useFoundationCrossTabSeasonPrize`, `Training`, `DisciplineRanks`, `MarketFilters`, `TeamsRoster`, `MatchdayLineup`, `SeasonBriefing`, Slice-10 (`ScreenPrimaryAction`, `CommandPalette`, `FlowCoach`, `FoundationActivities`, `StateContextValue`) — Inline-Memos noch im Parent (~6k Z.). Re-Export-Barrel unten (~160 Z.) kann nach direkten ShellRouterBody-Imports getrimmt werden.
+**Noch offen zum 8k-Ziel:** ~3.457 Z. — vor allem Export-Barrel (~160 Z.), verbleibende Inline-Handler/Cockpit-Actions, `useFoundationStateContextValue` nicht verdrahtet, ShellRouterBody-Import-Migration auf kanonische Quellen.
 
 ### Stand 2026-07-02 (verifiziert, Phase 5.4 + 5.5 echt verdrahtet — Ausgangslage 22.056 Z. am HEAD `aa8b735`)
 

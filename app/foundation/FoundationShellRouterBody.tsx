@@ -756,6 +756,7 @@ export function FoundationShellRouterBody({
   wholeSeasonOverwriteExistingLineups,
   wholeSeasonStopOnTie,
 }: FoundationShellRouterBodyProps) {
+  const isTeamSettingsViewActive = activeView === "teamSettings";
   return (
     (
     <main className="app-shell foundation-shell foundation-app">

@@ -7,9 +7,9 @@ import {
   foundationPrimaryViews,
   foundationSecondaryViews,
   resolveFoundationViewTarget,
-  setFoundationView,
   syncFoundationViewInUrl,
 } from "@/lib/foundation/tabs/foundation-page-module-helpers";
+import { setFoundationView } from "@/lib/foundation/foundation-navigation";
 import type { FoundationCommandItem, FoundationView } from "@/lib/foundation/tabs/foundation-page-types";
 
 export function useFoundationCrossTabCommandPalette(input: {
