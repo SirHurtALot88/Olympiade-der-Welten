@@ -2,6 +2,7 @@
 /* eslint-disable */
 // AUTO-GENERATED render body extracted from the Foundation page component.
 // Contains the real Foundation shell UI (previously the monolith return block).
+import { FoundationDeferredMount } from "@/lib/foundation/FoundationDeferredMount";
 import { FoundationShellRouterHistoryV2, FoundationShellRouterMatchdayResult, FoundationShellRouterSeasonPreview, FoundationShellRouterTeams } from "@/app/foundation/FoundationShellRouter";
 import type { FoundationShellRouterBodyProps } from "@/app/foundation/foundation-shell-router-body-props";
 import {
@@ -1764,8 +1765,19 @@ export function FoundationShellRouterBody(props: FoundationShellRouterBodyProps)
           />
           ) : null}
 
-          <section className={`panel foundation-training-compact-panel${activeView === "trainingCompact" ? " is-active" : ""}`}>
+          <FoundationShellRouterTeams
+            active={activeView === "teams"}
+            selectedTeam={selectedTeam}
+            hostProps={foundationTeamsViewHostProps}
+          />
+
+          <section
+            className={`panel foundation-training-compact-panel${activeView === "trainingCompact" ? " is-active" : ""}`}
+            data-testid={activeView === "trainingCompact" ? "foundation-training-compact" : undefined}
+            id={activeView === "trainingCompact" ? "foundation-training-compact" : undefined}
+          >
             {activeView === "trainingCompact" && selectedTeam ? (
+              <FoundationDeferredMount>
               <TrainingCompactClient
                 selectedTeam={selectedTeam}
                 selectedTeamControlMode={formatTeamControlModeLabel(selectedTeamControl?.controlMode)}
@@ -1803,6 +1815,7 @@ export function FoundationShellRouterBody(props: FoundationShellRouterBodyProps)
                 onOpenFacilities={() => setFoundationView("trainingV2", setActiveView)}
                 onOpenTeams={() => setFoundationView("teams", setActiveView)}
               />
+              </FoundationDeferredMount>
             ) : null}
           </section>
 
@@ -6181,12 +6194,6 @@ export function FoundationShellRouterBody(props: FoundationShellRouterBodyProps)
               </section>
             </div>
           </section>
-
-          <FoundationShellRouterTeams
-            active={activeView === "teams"}
-            selectedTeam={selectedTeam}
-            hostProps={foundationTeamsViewHostProps}
-          />
 
           {isTransferMarketViewActive ? (
           <FoundationTransfermarktV2Panel

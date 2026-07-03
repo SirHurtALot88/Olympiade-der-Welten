@@ -4,13 +4,22 @@ import type { ReactNode } from "react";
 
 export type FoundationTeamsViewPanelProps = {
   active: boolean;
-  children: ReactNode;
+  teamTab?: string;
+  children?: ReactNode;
 };
 
-export default function FoundationTeamsViewPanel({ active, children }: FoundationTeamsViewPanelProps) {
+export default function FoundationTeamsViewPanel({ active, teamTab, children }: FoundationTeamsViewPanelProps) {
   if (!active) {
     return null;
   }
 
-  return <div className="foundation-teams-view-panel" data-testid="foundation-teams-view">{children}</div>;
+  return (
+    <div
+      className="foundation-teams-view-panel foundation-teams-view-shell"
+      data-testid="foundation-teams-view"
+      data-team-tab={teamTab}
+    >
+      {children}
+    </div>
+  );
 }

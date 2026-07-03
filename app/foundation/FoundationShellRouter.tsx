@@ -1,11 +1,16 @@
 "use client";
 
+import { useCallback, useState } from "react";
+
 import type { GameInboxItem, Team } from "@/lib/data/olyDataTypes";
+import { FoundationDeferredMount } from "@/lib/foundation/FoundationDeferredMount";
 import { FoundationTabActiveHost } from "@/lib/foundation/foundation-tab-active-host";
+import FoundationPanelSkeleton from "@/components/foundation/FoundationPanelSkeleton";
 import FoundationHomeV2Host, { type FoundationHomeV2HostProps } from "@/app/foundation/home-v2/FoundationHomeV2Host";
 import FoundationTeamsViewHost, {
   type FoundationTeamsViewHostProps,
 } from "@/app/foundation/teams-v2/FoundationTeamsViewHost";
+import FoundationTeamsViewPanel from "@/app/foundation/teams-v2/FoundationTeamsViewPanel";
 import FoundationCockpitHost, {
   type FoundationCockpitHostProps,
 } from "@/app/foundation/cockpit-v2/FoundationCockpitHost";
@@ -129,6 +134,32 @@ export type FoundationShellRouterTeamsProps = {
 /**
  * Incremental Phase 5.3 shell slice: Teams route with unmount gate.
  */
+function FoundationShellRouterTeamsContent({
+  selectedTeam,
+  hostProps,
+}: {
+  selectedTeam: Team;
+  hostProps: Omit<FoundationTeamsViewHostProps, "selectedTeam">;
+}) {
+  const [hostMounted, setHostMounted] = useState(false);
+  const handleHostMounted = useCallback(() => {
+    setHostMounted(true);
+  }, []);
+
+  return (
+    <>
+      {!hostMounted ? (
+        <FoundationTeamsViewPanel active teamTab={hostProps.selectedTeamDetailTab}>
+          <FoundationPanelSkeleton variant="default" label="Teams werden geladen…" />
+        </FoundationTeamsViewPanel>
+      ) : null}
+      <FoundationDeferredMount onMounted={handleHostMounted}>
+        <FoundationTeamsViewHost {...hostProps} selectedTeam={selectedTeam} />
+      </FoundationDeferredMount>
+    </>
+  );
+}
+
 export function FoundationShellRouterTeams({ active, selectedTeam, hostProps }: FoundationShellRouterTeamsProps) {
   if (!active || !selectedTeam) {
     return null;
@@ -136,7 +167,7 @@ export function FoundationShellRouterTeams({ active, selectedTeam, hostProps }: 
 
   return (
     <FoundationTabActiveHost active={active}>
-      <FoundationTeamsViewHost {...hostProps} selectedTeam={selectedTeam} />
+      <FoundationShellRouterTeamsContent selectedTeam={selectedTeam} hostProps={hostProps} />
     </FoundationTabActiveHost>
   );
 }

@@ -3,7 +3,7 @@
 import { useEffect, useState } from "react";
 
 export const TRAINING_FORECAST_BATCH_SIZE = 24;
-export const TRAINING_FORECAST_INITIAL_BATCH_SIZE = 12;
+export const TRAINING_FORECAST_INITIAL_BATCH_SIZE = 6;
 
 export function useTrainingForecastLimit(input: {
   enabled: boolean;
