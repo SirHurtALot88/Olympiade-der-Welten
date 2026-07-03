@@ -317,7 +317,6 @@ import {
   getFoundationBusyActionReason,
   getFoundationCockpitBusyReason,
   getFoundationReadOnlyActionReason,
-  useFoundationStateContextValue,
 } from "@/lib/foundation/tabs/use-foundation-state-context-value";
 import { useFoundationCrossTabTraining } from "@/lib/foundation/tabs/use-foundation-cross-tab-training";
 import {
@@ -337,8 +336,15 @@ import {
 } from "@/lib/foundation/tabs/prize-v2-derivations";
 import { useSeasonStandRows } from "@/lib/foundation/tabs/use-season-stand-rows";
 import { resolveShouldBuildTeamsScopedRatings } from "@/lib/foundation/tabs/teams-view-derivations";
-import { useTeamsHydrationPhase, useTeamsViewRowDerivations } from "@/lib/foundation/tabs/use-teams-view-derivations";
-import { useTeamsRosterTableDerivations } from "@/lib/foundation/tabs/use-teams-roster-table-derivations";
+import type { FoundationMatchdayResultShellHostProps } from "@/app/foundation/matchday-result-v2/FoundationMatchdayResultShellHost";
+import type { FoundationHistoryV2ShellHostProps } from "@/app/foundation/transfer-history-v2/FoundationHistoryV2ShellHost";
+import type { FoundationSeasonPreviewShellHostProps } from "@/app/foundation/season-preview-v2/FoundationSeasonPreviewShellHost";
+import type { FoundationTeamsViewHostProps } from "@/app/foundation/teams-v2/FoundationTeamsViewHost";
+import {
+  resolveShouldBuildTeamsOverviewTable,
+  resolveShouldBuildTeamsPlayerRatings,
+  shouldBuildTeamsView as resolveShouldBuildTeamsView,
+} from "@/lib/foundation/tabs/use-teams-view-derivations";
 import FoundationShell from "@/app/foundation/shell/FoundationShell";
 import FoundationSubNav from "@/app/foundation/shell/FoundationSubNav";
 import {
@@ -705,7 +711,6 @@ import {
   buildTransferMarketScoutingWatchPlayerIds,
 } from "@/lib/foundation/tabs/use-market-v2-derivations";
 import { getPrizePreviewGlobalWarnings } from "@/lib/foundation/tabs/use-prize-panel-derivations";
-import { useSeasonPreviewDerivations } from "@/lib/foundation/tabs/use-season-preview-derivations";
 import {
   formatFitDisplay,
   formatMarketDevelopmentRoute,
@@ -1037,7 +1042,7 @@ export function useFoundationShellRouterBodyScope({
   const activeTransferMarketTab = "v2" as const;
   const isTransferMarketViewActive = activeView === "marketV2";
   const activeTransferHistoryTab = "v2" as const;
-  const isTransferHistoryViewActive = activeView === "historyV2";
+  const isTransferHistoryViewActive = activeView === "historyV2" || activeView === "history";
   const shouldBuildTeamsHeavyComparison = activeView === "teams" && showExtendedTeamPanels;
   const shouldBuildDisciplineRanks = resolveShouldBuildDisciplineRanks({
     activeView: activeView as FoundationViewId,
@@ -1057,18 +1062,26 @@ export function useFoundationShellRouterBodyScope({
   const [matchdaySummaryTab, setMatchdaySummaryTab] = useState<"matchday" | "season">("matchday");
   const shouldBuildTeamContracts = activeView === "teams" && selectedTeamDetailTab === "contracts";
   const shouldBuildExtendedTeamPanels = activeView === "teams" && showExtendedTeamPanels;
-  const {
-    shouldBuildTeamsView,
-    shouldBuildTeamsOverviewTable,
-    shouldBuildTeamsPlayerRatings,
-    teamsHydrationPhase,
-  } = useTeamsHydrationPhase({
+  const [teamsHydrationPhase, setTeamsHydrationPhase] = useState<"shell" | "full">("shell");
+  const handleTeamsHydrationPhaseChange = useCallback((phase: "shell" | "full") => {
+    setTeamsHydrationPhase(phase);
+  }, []);
+  const shouldBuildTeamsView = resolveShouldBuildTeamsView(activeView);
+  const shouldBuildTeamsOverviewTable = resolveShouldBuildTeamsOverviewTable(
     activeView,
-    selectedTeamId,
+    selectedTeamDetailTab,
+  );
+  const shouldBuildTeamsPlayerRatings = resolveShouldBuildTeamsPlayerRatings(
+    activeView,
     selectedTeamDetailTab,
     shouldBuildTeamContracts,
     shouldBuildExtendedTeamPanels,
-  });
+  );
+  useEffect(() => {
+    if (!shouldBuildTeamsView) {
+      setTeamsHydrationPhase("shell");
+    }
+  }, [shouldBuildTeamsView]);
   const shouldLoadTransferHistoryFeed = resolveShouldLoadTransferHistoryFeed(activeView as FoundationViewId);
   const shouldLoadPrizePreviewFeed = resolveShouldLoadPrizePreviewFeed(
     activeView as FoundationViewId,
@@ -4302,12 +4315,28 @@ export function useFoundationShellRouterBodyScope({
       return;
     }
     prefetchFoundationPanel(activeView as FoundationViewId);
-    if (activeView === "players") {
-      prefetchFoundationPanel("trainingCompact");
-    }
     if (activeView === "matchdayArena") {
       prefetchFoundationPanel("seasonV2");
     }
+  }, [activeView, isFoundationBootstrapState]);
+
+  useEffect(() => {
+    if (isFoundationBootstrapState || activeView !== "players") {
+      return;
+    }
+    const idleWindow = window as Window & {
+      requestIdleCallback?: (callback: IdleRequestCallback, options?: IdleRequestOptions) => number;
+      cancelIdleCallback?: (handle: number) => void;
+    };
+    if (typeof idleWindow.requestIdleCallback !== "function") {
+      return;
+    }
+    const idleHandle = idleWindow.requestIdleCallback(() => {
+      prefetchFoundationPanel("trainingCompact");
+    });
+    return () => {
+      idleWindow.cancelIdleCallback?.(idleHandle);
+    };
   }, [activeView, isFoundationBootstrapState]);
 
   useEffect(() => {
@@ -6153,25 +6182,6 @@ export function useFoundationShellRouterBodyScope({
     ],
     [],
   );
-  const standingsPreviewColumns = useMemo<FoundationTableColumn[]>(
-    () => [
-      { id: "team", label: "Team", dataKey: "team", defaultWidth: 220, minWidth: 170 },
-      { id: "currentPoints", label: "Aktuelle Punkte", dataKey: "currentPoints", defaultWidth: 120, minWidth: 100 },
-      { id: "matchdayScore", label: "Matchday Score", dataKey: "matchdayScore", defaultWidth: 120, minWidth: 100 },
-      { id: "matchdayRank", label: "Matchday Rang", dataKey: "matchdayRank", defaultWidth: 110, minWidth: 90 },
-      { id: "pointsDelta", label: "Punkte Delta", dataKey: "pointsDelta", defaultWidth: 110, minWidth: 90 },
-      { id: "projectedPoints", label: "Punkte nachher", dataKey: "projectedPoints", defaultWidth: 120, minWidth: 100 },
-      { id: "projectedRank", label: "Preview Rang", dataKey: "projectedRank", defaultWidth: 110, minWidth: 90 },
-      { id: "currentRank", label: "Aktueller Rang", dataKey: "currentRank", defaultWidth: 110, minWidth: 90, visibleByDefault: false },
-      { id: "resultStatus", label: "Result Status", dataKey: "resultStatus", defaultWidth: 140, minWidth: 120 },
-      { id: "d1Score", label: "D1", dataKey: "d1Score", defaultWidth: 90, minWidth: 72, visibleByDefault: false },
-      { id: "d2Score", label: "D2", dataKey: "d2Score", defaultWidth: 90, minWidth: 72, visibleByDefault: false },
-      { id: "cash", label: "Cash", dataKey: "cash", defaultWidth: 110, minWidth: 90, visibleByDefault: false },
-      { id: "readinessStatus", label: "Readiness", dataKey: "readinessStatus", defaultWidth: 140, minWidth: 120, visibleByDefault: false },
-      { id: "warnings", label: "Warnings", dataKey: "warnings", defaultWidth: 260, minWidth: 180 },
-    ],
-    [],
-  );
   const orderedDisciplines = useMemo(() => {
     const saisonstandOrderIndex = new Map<string, number>(
       saisonstandDisciplineColumns.map((disciplineKey, index) => [disciplineKey, index] as const),
@@ -6961,21 +6971,6 @@ export function useFoundationShellRouterBodyScope({
       }),
     [playerRatingsById, rosterPlayers],
   );
-  const starters = useMemo(
-    () =>
-      activeView === "teams" && showExtendedTeamPanels
-        ? rosterPlayersByOvr.filter((item) => item.entry.roleTag === "starter")
-        : [],
-    [activeView, rosterPlayersByOvr, showExtendedTeamPanels],
-  );
-  const bench = useMemo(
-    () =>
-      activeView === "teams" && showExtendedTeamPanels
-        ? rosterPlayersByOvr.filter((item) => item.entry.roleTag !== "starter")
-        : [],
-    [activeView, rosterPlayersByOvr, showExtendedTeamPanels],
-  );
-
   const {
     ppAreaRows,
     seasonHistorySnapshots,
@@ -7163,22 +7158,7 @@ export function useFoundationShellRouterBodyScope({
     );
   }, [activeView, disciplineRankRows, seasonStandRows, shouldBuildDisciplineRanks, shouldBuildTeamsView]);
 
-  const {
-    teamsViewRows,
-    sortedTeamsViewRows,
-    teamHistorySeasonPointColumns,
-    teamHistoryPointRankMaps,
-    teamsViewSummary,
-    selectedHqAxisSummary,
-  } = useTeamsViewRowDerivations({
-    enabled: shouldBuildTeamsView,
-    teamsHydrationPhase,
-    shouldBuildTeamsOverviewTable,
-    selectedTeam,
-    seasonStandRows,
-    currentAreaRanksByTeamId,
-    teamsViewSort: tableSorts.teamsView,
-  });
+  const selectedHqAxisSummary = null;
 
   const selectedTeamAverageAxisStats = useMemo(() => {
     if (rosterPlayers.length === 0) {
@@ -7222,46 +7202,6 @@ export function useFoundationShellRouterBodyScope({
     currentMatchdayDisciplineSchedule,
   });
 
-  const selectedTeamsHistoryData = useMemo<TeamDetailDrawerData | null>(() => {
-    if (activeView !== "teams") {
-      return null;
-    }
-    return buildTeamDetailDrawerData(selectedTeam.teamId, "history-summary");
-  }, [
-    activeView,
-    canonicalSeasonLabel,
-    currentAreaRanksByTeamId,
-    currentMatchdayDisciplineSchedule,
-    gameState,
-    playerRatingsById,
-    seasonPointsLedger,
-    selectedTeam.teamId,
-    teamObjectiveOverview.boardConfidence,
-    teamObjectiveOverview.objectives,
-    seasonStandRows,
-  ]);
-  const teamEconomyTiles = useMemo(() => {
-    const data = selectedTeamsHistoryData;
-    if (!data) {
-      return [];
-    }
-    return [
-      {
-        label: "Gehalt",
-        value: data.salaryTotal != null ? formatMoney(data.salaryTotal) : "—",
-        note: `${data.rosterSize} Spieler`,
-        detail: "Gesamtgehaltsblock des aktiven Kaders",
-        tone: "salary" as const,
-      },
-      {
-        label: "Marktwert",
-        value: data.marketValueTotal != null ? formatMoney(data.marketValueTotal) : "—",
-        note: data.cash != null ? `Cash ${formatMoney(data.cash)}` : "—",
-        detail: "Team-Marktwert und Liquidität",
-        tone: "value" as const,
-      },
-    ];
-  }, [selectedTeamsHistoryData]);
   const freeAgents = useMemo(() => {
     if (!shouldBuildExtendedTeamPanels) {
       return [];
@@ -9237,23 +9177,6 @@ export function useFoundationShellRouterBodyScope({
     }),
     [seasonTopPlayerRows],
   );
-  const {
-    sortedSelectedRosterTableRows,
-    filteredSelectedRosterTableRows,
-    teamRosterFocusOptions,
-    teamRosterRoleFilterOptions,
-  } = useTeamsRosterTableDerivations({
-    selectedRosterTableRows,
-    selectedRosterSort: tableSorts.selectedRoster,
-    disciplines: gameState.disciplines,
-    gameState,
-    teamRosterFocusMode,
-    teamRosterRoleFilter,
-    getRosterEntryDisplayMarketValue,
-    getRosterEntryDisplaySalary,
-    getRosterEntrySalarySortValue,
-    getRosterEntrySalaryDelta,
-  });
   const sortedTransferMarketRows = useMemo(
     () =>
       sortRows(transferMarketRows, tableSorts.transferMarket, {
@@ -10430,22 +10353,6 @@ export function useFoundationShellRouterBodyScope({
   const seasonV2HydrationPhase: "shell" | "full" = "full";
   const seasonRatingsPlayerIds: string[] = [];
   const shouldBuildTeamsAreaRanks = teamsHydrationPhase === "full";
-  const handleTeamsHydrationPhaseChange = (_phase: "shell" | "full") => undefined;
-  const foundationRouterMigrationPreview = (
-    <Fragment>
-      <FoundationShellRouterTeams active={activeView === "teams"} selectedTeam={selectedTeam} hostProps={undefined as never} />
-      <FoundationShellRouterCockpit active={activeView === "cockpit"} hostProps={undefined as never} />
-      <FoundationShellRouterSeasonV2 active={activeView === "seasonV2"} hostProps={undefined as never} />
-      <FoundationShellRouterPrize active={activeView === "prize"} hostProps={undefined as never} />
-      <FoundationShellRouterLineup active={activeView === "lineup" || activeView === "lineupV2"} hostProps={undefined as never} />
-      <FoundationShellRouterMarketV2 active={activeView === "marketV2"} hostProps={undefined as never} />
-      <FoundationShellRouterMarketSell active={activeView === "marketV2" && foundationPanel === "sell"} hostProps={undefined as never} />
-      <FoundationShellRouterMatchdayArena active={activeView === "matchdayArena"} hostProps={undefined as never} />
-      <FoundationShellRouterMatchdayResult active={activeView === "matchdayResult"} hostProps={undefined as never} />
-      <FoundationShellRouterHistoryV2 active={activeView === "history" || activeView === "historyV2"} hostProps={undefined as never} />
-      <FoundationShellRouterSeasonPreview active={activeView === "seasonPreview"} hostProps={undefined as never} />
-    </Fragment>
-  );
   void isAdminView;
   void isGeneratorView;
   void isDebugView;
@@ -10455,33 +10362,87 @@ export function useFoundationShellRouterBodyScope({
   void seasonRatingsPlayerIds;
   void shouldBuildTeamsPlayerRatings;
   void shouldBuildTeamsAreaRanks;
-  void handleTeamsHydrationPhaseChange;
-  void foundationRouterMigrationPreview;
 
   const prizePreviewGlobalWarnings = useMemo(
     () => getPrizePreviewGlobalWarnings(prizePreviewFeed),
     [prizePreviewFeed],
   );
 
-  const { visibleStandingsPreviewColumns, sortedStandingsPreviewRows } = useSeasonPreviewDerivations({
+  const matchdayResultSourceBadgeLabel = useMemo(
+    () => getViewSourceBadgeLabel("matchdayResult", activeContextMeta),
+    [activeContextMeta],
+  );
+
+  const foundationMatchdayResultHostProps: FoundationMatchdayResultShellHostProps = {
+    sourceBadgeLabel: matchdayResultSourceBadgeLabel,
+    matchdaySummary,
+    activeMatchdaySummaryId,
+    matchdaySummaryOptions,
+    activeTeamMatchdaySummaryRow,
+    activeManagerTeamId,
+    selectedTeam,
+    resolvedTeamControlSettings,
+    setSelectedMatchdaySummaryId,
+    setActiveView,
+    openTeamProfileById,
+  };
+
+  const foundationSeasonPreviewHostProps: FoundationSeasonPreviewShellHostProps = {
+    activeSaveId,
+    gameState,
     standingsPreviewFeed,
     tableColumnPreferences,
-    standingsPreviewSort: tableSorts.standingsPreview,
+    tableSorts,
     isTableColumnVisible,
+    setTableColumnVisible,
+    getTableColumnWidth,
+    getTableHeaderDragProps,
+    startTableColumnResize,
+    resetTableColumnWidth,
+    toggleTableSort,
     getTablePinnedLeftIds,
     getTablePinnedRightIds,
-  });
+    ColumnVisibilityManager,
+    SortableHeader,
+    openTeamProfileById,
+  };
 
-  const visibleTeamsViewColumns = useMemo(
-    () =>
-      applyStoredColumnOrder(
-        TEAMS_VIEW_COLUMNS,
-        tableColumnPreferences.teamsView?.columnOrder,
-        getTablePinnedLeftIds("teamsView"),
-        getTablePinnedRightIds("teamsView"),
-      ).filter((column) => isTableColumnVisible("teamsView", column.id, column.visibleByDefault)),
-    [getTablePinnedLeftIds, getTablePinnedRightIds, isTableColumnVisible, tableColumnPreferences],
+  const historySourceBadgeLabel = useMemo(
+    () => getViewSourceBadgeLabel("historyV2", activeContextMeta),
+    [activeContextMeta],
   );
+
+  const foundationHistoryV2HostProps: FoundationHistoryV2ShellHostProps = {
+    sourceBadgeLabel: historySourceBadgeLabel,
+    activeSaveId,
+    saveName: activeSaveName,
+    gameState,
+    historyFeed,
+    playerRatingsById,
+    transferHistorySort: tableSorts.transferHistory,
+    seasonFilter: historySeasonFilter,
+    onSeasonFilterChange: setHistorySeasonFilter,
+    teamFilter: historyTeamFilter,
+    onTeamFilterChange: setHistoryTeamFilter,
+    typeFilter: historyTypeFilter,
+    onTypeFilterChange: setHistoryTypeFilter,
+    classFilter: historyClassFilter,
+    onClassFilterChange: setHistoryClassFilter,
+    sourceFilter: historySourceFilter,
+    onSourceFilterChange: setHistorySourceFilter,
+    search: historySearch,
+    onSearchChange: setHistorySearch,
+    teamOptions: gameState.teams.map((team) => ({
+      teamId: team.teamId,
+      name: team.name,
+      shortCode: team.shortCode,
+    })),
+    onOpenPlayer: openPlayerProfileById,
+    onOpenTeam: openTeamProfileById,
+    hasMore: (historyFeed?.total ?? 0) > (historyFeed?.items.length ?? 0),
+    loadingMore: historyLoadingMore,
+    onLoadMore: loadMoreHistoryFeed,
+  };
 
   const transferWindowStatus = useMemo(
     () => (shouldBuildMarketView ? getTransferWindowStatus(gameState) : null),
@@ -10552,6 +10513,134 @@ export function useFoundationShellRouterBodyScope({
     gameState.transferHistory,
   ]);
 
+
+  const foundationTeamsViewHostProps: Omit<FoundationTeamsViewHostProps, "selectedTeam"> = {
+    activeView,
+    selectedTeamId,
+    gameState,
+    tableSorts,
+    seasonStandRows,
+    shouldBuildDisciplineRanks,
+    disciplineRankRows,
+    teamsViewSort: tableSorts.teamsView,
+    teamRosterFocusMode,
+    teamRosterRoleFilter,
+    onHydrationPhaseChange: handleTeamsHydrationPhaseChange,
+    rosterPlayers,
+    tableColumnPreferences,
+    isTableColumnVisible,
+    getTablePinnedLeftIds,
+    getTablePinnedRightIds,
+    buildTeamDetailDrawerData,
+    formatMoney,
+    getRosterEntrySalarySortValue,
+    selectedRosterTableRows,
+    shouldBuildTeamContracts,
+    showExtendedTeamPanels,
+    selectedTeamDetailTab,
+    getRosterEntryDisplayMarketValue,
+    getRosterEntryDisplaySalary,
+    getRosterEntryCurrentSeasonSalary,
+    getRosterEntrySalaryDelta,
+    playerRatingsById,
+    getViewClass,
+    SortableHeader,
+    getTableColumnWidth,
+    getTableHeaderDragProps,
+    toggleTableSort,
+    startTableColumnResize,
+    resetTableColumnWidth,
+    joinClassNames,
+    getOwnerTeamHighlightClass,
+    resolvedTeamControlSettings,
+    scheduleActiveManagerTeam,
+    openTeamProfileById,
+    formatLocalePoints,
+    getSeasonCashHeatClass,
+    formatWholeNumber,
+    formatNullableMoney,
+    formatSignedDisplayMoney,
+    getTeamHistoryRankToneClass,
+    selectedTeamObjectives,
+    teamObjectiveOverview,
+    selectedTeamSponsorContract,
+    selectedTeamSponsorOffers,
+    selectedTeamCommercialRating,
+    sponsorChoiceMessage,
+    sponsorChoiceProfiles,
+    sponsorChoiceBusy,
+    applySponsorNegotiationToComponents,
+    getSponsorNegotiationMultiplier,
+    setSponsorChoiceProfiles,
+    chooseTeamSponsor,
+    selectedTeamContractShapeMix,
+    renderMetricBar,
+    leaguePlayerHeatPools,
+    setTeamRosterRoleFilter,
+    setTeamRosterFocusMode,
+    selectedStandingRow,
+    selectedRoster,
+    visibleSelectedRosterColumns,
+    selectedTeamContractTable,
+    selectedTeamContractPreviewRowCount,
+    visibleSelectedTeamContractRows,
+    showTeamContractPreviewRows,
+    setShowTeamContractPreviewRows,
+    contractRenewalBusy,
+    openContractRenewalNegotiation,
+    openMarketSellModal,
+    openPlayerDrawerById,
+    getPlayerPortraitModel,
+    getClassColorClassName,
+    renderEconomyDelta,
+    getPlayerDisplayMarketValueDelta,
+    formatPpsValue,
+    formatDisplayMoney,
+    formatContractShapeLabel,
+    formatMoraleContractIntentLabel,
+    getPlayerDisplaySalary,
+    selectedIdentity,
+    freeAgents,
+    aiPreview,
+    selectedAiTeamId,
+    aiMarketPreview,
+    isPending,
+    isReadOnlyMode: readMeta.readOnly,
+    showReadOnlyNotice,
+    setGameState,
+    runAiTurn,
+    setShowExtendedTeamPanels,
+    formatTransfermarktCurrency,
+    foundationTeamsViewHostProps,
+    roundViewNumber,
+    getLineupDraftSideCounts,
+    isSelectedTeamManagementLocked,
+    selectedTeamControl,
+    formatTeamControlModeLabel,
+    openTeamDrawerById,
+    playerSeasonPerformanceMap,
+    confirmContractRenewalNegotiation,
+    formatObjectiveStatusLabel,
+    formatCockpitReason,
+    getPoolHeatClass,
+    getResponsiveTableImageSize,
+    getTeamLogoModel,
+    setContractRenewalNegotiation,
+    setShowSelectedRosterPpsBreakdown,
+    setShowTeamDisciplines,
+    toggleTransferSellMarker,
+    selectedBoardConfidence,
+    showTeamDisciplines,
+    contractRenewalNegotiation,
+    showSelectedRosterPpsBreakdown,
+    selectedTeamCanManage,
+    selectedTeamRosterActionsAvailable,
+    selectedTeamRosterActionHint,
+    contractRenewalMessage,
+    contractRenewalError,
+    marketSellBusy,
+  };
+
   const foundationShellRouterBodyProps = {
     activeContextMeta,
     activeContextStatusChips,
@@ -10587,7 +10676,6 @@ export function useFoundationShellRouterBodyScope({
     aiPreview,
     aiTeams,
     applyNewGamePreset,
-    bench,
     bootstrapError,
     canonicalSeasonLabel,
     cashApplyFeed,
@@ -10655,7 +10743,6 @@ export function useFoundationShellRouterBodyScope({
     featureAuditFilter,
     featureAuditMatrix,
     filteredFeatureAuditEntries,
-    filteredSelectedRosterTableRows,
     filteredTeamSettingsTeams,
     foundationActionFeedback,
     foundationActivities,
@@ -10962,7 +11049,6 @@ export function useFoundationShellRouterBodyScope({
     selectedTeamSponsorOffers,
     selectedTeamStrategyDraft,
     selectedTeamStrategyProfile,
-    selectedTeamsHistoryData,
     selectedTransfermarktBoardObjectives,
     setActiveManagerTeam,
     setActiveOwnerId,
@@ -11062,34 +11148,28 @@ export function useFoundationShellRouterBodyScope({
     sortedMultiSeasonTeamRows,
     sortedPlayersTableRows,
     sortedPpAreaRows,
-    sortedSelectedRosterTableRows,
-    sortedStandingsPreviewRows,
-    sortedTeamsViewRows,
     sortedTransferHistoryRows,
     specialistWingVariantDraft,
     sponsorChoiceBusy,
     sponsorChoiceMessage,
     sponsorChoiceProfiles,
     standingsApplyFeed,
-    standingsPreviewColumns,
     standingsPreviewFeed,
+    foundationMatchdayResultHostProps,
+    foundationHistoryV2HostProps,
+    foundationSeasonPreviewHostProps,
     startAdminSeasonSimulationRun,
     startTableColumnResize,
-    starters,
     tableSorts,
     teamContextFilter,
     teamControlDraft,
     teamControlMessage,
-    teamEconomyTiles,
-    teamHistoryPointRankMaps,
     teamIdentityMessage,
     teamObjectiveOverview,
     teamOwners,
     teamProfileData,
     teamRosterFocusMode,
-    teamRosterFocusOptions,
     teamRosterRoleFilter,
-    teamRosterRoleFilterOptions,
     teamSettingsSearch,
     teamStrategyMessage,
     toggleGameModeOwnershipTeam,
@@ -11138,8 +11218,6 @@ export function useFoundationShellRouterBodyScope({
     visiblePrizePreviewColumns,
     visibleSelectedRosterColumns,
     visibleSelectedTeamContractRows,
-    visibleStandingsPreviewColumns,
-    visibleTeamsViewColumns,
     visibleTransferHistoryRows,
     wholeSeasonDryRunFeed,
     wholeSeasonIncludeWarningLineups,

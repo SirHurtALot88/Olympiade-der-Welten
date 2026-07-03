@@ -2,6 +2,7 @@
 /* eslint-disable */
 // AUTO-GENERATED render body extracted from the Foundation page component.
 // Contains the real Foundation shell UI (previously the monolith return block).
+import { FoundationShellRouterHistoryV2, FoundationShellRouterMatchdayResult, FoundationShellRouterSeasonPreview, FoundationShellRouterTeams } from "@/app/foundation/FoundationShellRouter";
 import type { FoundationShellRouterBodyProps } from "@/app/foundation/foundation-shell-router-body-props";
 import {
   BudgetedMediaImage,
@@ -109,6 +110,7 @@ import {
   getRoomFlowStep,
   getRosterEntryDisplayMarketValue,
   getRosterEntryDisplaySalary,
+  getRosterEntryCurrentSeasonSalary,
   getRosterEntrySalaryDelta,
   getScoutingWishlistSlotLimit,
   getSeasonCashHeatClass,
@@ -200,7 +202,6 @@ export function FoundationShellRouterBody(props: FoundationShellRouterBodyProps)
   aiPreview,
   aiTeams,
   applyNewGamePreset,
-  bench,
   bootstrapError,
   canonicalSeasonLabel,
   cashApplyFeed,
@@ -268,7 +269,6 @@ export function FoundationShellRouterBody(props: FoundationShellRouterBodyProps)
   featureAuditFilter,
   featureAuditMatrix,
   filteredFeatureAuditEntries,
-  filteredSelectedRosterTableRows,
   filteredTeamSettingsTeams,
   foundationActionFeedback,
   foundationActivities,
@@ -278,6 +278,10 @@ export function FoundationShellRouterBody(props: FoundationShellRouterBodyProps)
   foundationNavAttention,
   foundationPanel,
   foundationSaveMode,
+  foundationMatchdayResultHostProps,
+  foundationHistoryV2HostProps,
+  foundationSeasonPreviewHostProps,
+  foundationTeamsViewHostProps,
   foundationWarningInboxItems,
   freeAgents,
   freshSeasonStartMessage,
@@ -299,18 +303,14 @@ export function FoundationShellRouterBody(props: FoundationShellRouterBodyProps)
   handleFormCardPlanSaved,
   handleHumanLineupSaved,
   handleManagerTeamSelect,
-  historyAllSeasonsSelected,
   historyClassFilter,
   historyFeed,
   historyLoadingMore,
-  historyPage,
-  historyPageCount,
   historySearch,
   historySeasonFilter,
   historySourceFilter,
   historyTeamFilter,
   historyTypeFilter,
-  historyVisibleRangeLabel,
   homeActiveTeamLogo,
   homeNextMatchdayStatus,
   homeTodayCards,
@@ -575,7 +575,6 @@ export function FoundationShellRouterBody(props: FoundationShellRouterBodyProps)
   selectedTeamSponsorOffers,
   selectedTeamStrategyDraft,
   selectedTeamStrategyProfile,
-  selectedTeamsHistoryData,
   selectedTransfermarktBoardObjectives,
   setActiveManagerTeam,
   setActiveOwnerId,
@@ -675,34 +674,24 @@ export function FoundationShellRouterBody(props: FoundationShellRouterBodyProps)
   sortedMultiSeasonTeamRows,
   sortedPlayersTableRows,
   sortedPpAreaRows,
-  sortedSelectedRosterTableRows,
-  sortedStandingsPreviewRows,
-  sortedTeamsViewRows,
-  sortedTransferHistoryRows,
   specialistWingVariantDraft,
   sponsorChoiceBusy,
   sponsorChoiceMessage,
   sponsorChoiceProfiles,
   standingsApplyFeed,
-  standingsPreviewColumns,
   standingsPreviewFeed,
   startAdminSeasonSimulationRun,
   startTableColumnResize,
-  starters,
   tableSorts,
   teamContextFilter,
   teamControlDraft,
   teamControlMessage,
-  teamEconomyTiles,
-  teamHistoryPointRankMaps,
   teamIdentityMessage,
   teamObjectiveOverview,
   teamOwners,
   teamProfileData,
   teamRosterFocusMode,
-  teamRosterFocusOptions,
   teamRosterRoleFilter,
-  teamRosterRoleFilterOptions,
   teamSettingsSearch,
   teamStrategyMessage,
   toggleGameModeOwnershipTeam,
@@ -720,12 +709,6 @@ export function FoundationShellRouterBody(props: FoundationShellRouterBodyProps)
   trainingPlayerForecastRows,
   trainingPlayerRowViews,
   trainingV2ModeOptions,
-  transferHistoryClassOptions,
-  transferHistoryRequestedSeasonLabel,
-  transferHistoryResolvedSeasonLabel,
-  transferHistorySeasonBreakdown,
-  transferHistorySourceOptions,
-  transferHistorySummary,
   transferMarketActiveWishlistPlayerIds,
   transferMarketScoutingIntelByPlayerId,
   transferMarketScoutingWatchPlayerIds,
@@ -751,9 +734,6 @@ export function FoundationShellRouterBody(props: FoundationShellRouterBodyProps)
   visiblePrizePreviewColumns,
   visibleSelectedRosterColumns,
   visibleSelectedTeamContractRows,
-  visibleStandingsPreviewColumns,
-  visibleTeamsViewColumns,
-  visibleTransferHistoryRows,
   wholeSeasonDryRunFeed,
   wholeSeasonIncludeWarningLineups,
   wholeSeasonOverwriteExistingLineups,
@@ -5200,174 +5180,10 @@ export function FoundationShellRouterBody(props: FoundationShellRouterBodyProps)
           />
           ) : null}
 
-          <section className={`panel${getViewClass("matchdayResult")}`} id="foundation-matchday-result" data-testid="foundation-matchday-result">
-            <div className="panel-header">
-              <div className="stack">
-                <TooltipHeading
-                  as="h2"
-                  tooltip="Spieltagsranking nutzt nur die gespeicherten D1+D2-Ergebnisse dieses Matchdays. Saisonstand zeigt kumulierte Punkte bis zu diesem Spieltag."
-                >
-                  Spieltagsergebnis
-                </TooltipHeading>
-                <span className="muted">
-                  {matchdaySummary.seasonId} · Spieltag {matchdaySummary.matchdayNumber ?? "—"} · {matchdaySummary.matchdayId}
-                </span>
-              </div>
-              <div className="matchday-result-actions">
-                <span className="pill foundation-source-pill">{getViewSourceBadgeLabel("matchdayResult", activeContextMeta)}</span>
-                <label className="filter-field compact-filter">
-                  <span>Matchday</span>
-                  <select
-                    className="input"
-                    value={activeMatchdaySummaryId}
-                    onChange={(event) => setSelectedMatchdaySummaryId(event.target.value)}
-                  >
-                    {matchdaySummaryOptions.length ? (
-                      matchdaySummaryOptions.map((option) => (
-                        <option key={option.matchdayId} value={option.matchdayId}>
-                          MD {option.matchdayNumber ?? "—"} · {option.matchdayId}
-                        </option>
-                      ))
-                    ) : (
-                      <option value={activeMatchdaySummaryId}>Keine gespeicherten Results</option>
-                    )}
-                  </select>
-                </label>
-                <button className="secondary-button inline-button" type="button" onClick={() => setFoundationView("matchdayArena", setActiveView)}>
-                  Zur Arena
-                </button>
-                <button className="primary-button inline-button" type="button" onClick={() => setFoundationView("seasonV2", setActiveView)}>
-                  Saisonstand anzeigen
-                </button>
-              </div>
-            </div>
-
-            <div className="matchday-result-hero-grid">
-              <article className="metric-card">
-                <span>D1</span>
-                <strong>{matchdaySummary.d1.disciplineName ?? "—"}</strong>
-                <small>{matchdaySummary.d1.disciplineId ?? "missing_source"}</small>
-              </article>
-              <article className="metric-card">
-                <span>D2</span>
-                <strong>{matchdaySummary.d2.disciplineName ?? "—"}</strong>
-                <small>{matchdaySummary.d2.disciplineId ?? "missing_source"}</small>
-              </article>
-              <article className="metric-card">
-                <span>Aktives Team</span>
-                <strong>{activeTeamMatchdaySummaryRow?.teamShortCode ?? selectedTeam?.shortCode ?? "—"}</strong>
-                <small>
-                  Tagesrang {activeTeamMatchdaySummaryRow?.matchdayRank ?? "—"} · {activeTeamMatchdaySummaryRow?.matchdayPoints ?? "—"} Pkt
-                </small>
-              </article>
-              <article className="metric-card">
-                <span>Rangänderung</span>
-                <strong className={activeTeamMatchdaySummaryRow?.rankDirection === "up" ? "text-positive" : activeTeamMatchdaySummaryRow?.rankDirection === "down" ? "text-negative" : undefined}>
-                  {activeTeamMatchdaySummaryRow?.rankDelta != null
-                    ? activeTeamMatchdaySummaryRow.rankDelta > 0
-                      ? `↑ +${activeTeamMatchdaySummaryRow.rankDelta}`
-                      : activeTeamMatchdaySummaryRow.rankDelta < 0
-                        ? `↓ ${activeTeamMatchdaySummaryRow.rankDelta}`
-                        : "0"
-                    : "—"}
-                </strong>
-                <small>
-                  {activeTeamMatchdaySummaryRow?.seasonRankBeforeMatchday ?? "—"} → {activeTeamMatchdaySummaryRow?.seasonRankAfterMatchday ?? "—"}
-                </small>
-              </article>
-            </div>
-
-            {matchdaySummary.warnings.length ? (
-              <div className="transfer-callout is-warning">
-                <strong>Quellen/Warnungen</strong>
-                <span>{matchdaySummary.warnings.slice(0, 6).join(" · ")}</span>
-              </div>
-            ) : null}
-
-            <div className="matchday-result-tabs" role="tablist" aria-label="Spieltag oder Saisonstand">
-              <button
-                className={`secondary-button inline-button${matchdaySummaryTab === "matchday" ? " is-selected" : ""}`}
-                type="button"
-                onClick={() => setMatchdaySummaryTab("matchday")}
-              >
-                Spieltag
-              </button>
-              <button
-                className={`secondary-button inline-button${matchdaySummaryTab === "season" ? " is-selected" : ""}`}
-                type="button"
-                onClick={() => setMatchdaySummaryTab("season")}
-              >
-                Saisonstand
-              </button>
-            </div>
-
-            {matchdaySummaryTab === "season" ? (
-              <div className="table-shell matchday-result-table-shell">
-                <table className="team-table matchday-result-table">
-                  <thead>
-                    <tr>
-                      <th>Team</th>
-                      <th>Tagesrang</th>
-                      <th>Tagespunkte</th>
-                      <th>D1 Score</th>
-                      <th>D2 Score</th>
-                      <th>Rang vorher</th>
-                      <th>Rang nachher</th>
-                      <th>Δ Rang</th>
-                      <th>Kumuliert</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {matchdaySummary.teamRows.map((row) => (
-                      <tr
-                        key={`matchday-summary-row-${row.teamId}`}
-                        className={joinClassNames(
-                          row.teamId === activeManagerTeamId && "is-active-team-row",
-                          getOwnerTeamHighlightClass(resolvedTeamControlSettings[row.teamId]),
-                        )}
-                        onClick={() => openTeamProfileById(row.teamId)}
-                      >
-                        <td><strong>{row.teamShortCode}</strong> · {row.teamName}</td>
-                        <td>{row.matchdayRank ?? "—"}</td>
-                        <td>{row.matchdayPoints ?? "—"}</td>
-                        <td>{row.d1Score != null ? formatLocalePoints(row.d1Score, 1) : "—"}</td>
-                        <td>{row.d2Score != null ? formatLocalePoints(row.d2Score, 1) : "—"}</td>
-                        <td>{row.seasonRankBeforeMatchday ?? "—"}</td>
-                        <td>{row.seasonRankAfterMatchday ?? "—"}</td>
-                        <td className={row.rankDirection === "up" ? "text-positive" : row.rankDirection === "down" ? "text-negative" : undefined}>
-                          {row.rankDelta != null ? (row.rankDelta > 0 ? `↑ +${row.rankDelta}` : row.rankDelta < 0 ? `↓ ${row.rankDelta}` : "0") : "—"}
-                        </td>
-                        <td>{row.cumulativePoints ?? "—"}</td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
-            ) : null}
-
-            <section className="panel">
-              <div className="panel-header">
-                <h3>Highlights</h3>
-                <button className="primary-button inline-button" type="button" onClick={() => setFoundationView("cockpit", setActiveView)}>
-                  Weiter zum nächsten Schritt
-                </button>
-              </div>
-              {matchdaySummary.highlights.length ? (
-                <div className="matchday-result-highlight-grid">
-                  {matchdaySummary.highlights.map((highlight) => (
-                    <article key={highlight.id} className="metric-card">
-                      <span>{highlight.label}</span>
-                      <strong>{highlight.value}</strong>
-                      <small>{highlight.source}</small>
-                    </article>
-                  ))}
-                </div>
-              ) : (
-                <p className="muted">Keine Highlight-Karten ohne gespeicherte Highlight-Quelle.</p>
-              )}
-            </section>
-          </section>
-
+          <FoundationShellRouterMatchdayResult
+            active={activeView === "matchdayResult"}
+            hostProps={foundationMatchdayResultHostProps}
+          />
 
           {(activeView === "seasonV2") ? (
             <FoundationSeasonV2Panel
@@ -5403,135 +5219,10 @@ export function FoundationShellRouterBody(props: FoundationShellRouterBodyProps)
             />
           ) : null}
 
-          <section className={`panel${getViewClass("seasonPreview")}`} id="standings-preview">
-            <div className="panel-header">
-              <h2>Preview aus gespeicherten Results</h2>
-              <ColumnVisibilityManager
-                title="Spalten"
-                columns={standingsPreviewColumns}
-                isVisible={(columnId, visibleByDefault) =>
-                  isTableColumnVisible("standingsPreviewTable", columnId, visibleByDefault)
-                }
-                onToggle={(columnId, nextVisible) =>
-                  setTableColumnVisible("standingsPreviewTable", columnId, nextVisible)
-                }
-              />
-            </div>
-            <p className="muted">
-              Scope: {standingsPreviewFeed?.scope?.saveId ?? activeSaveId} / {standingsPreviewFeed?.scope?.seasonId ?? gameState.season.id} /{" "}
-              {standingsPreviewFeed?.scope?.matchdayId ?? gameState.matchdayState.matchdayId} · Teams: {standingsPreviewFeed?.summary.totalTeams ?? 0}
-            </p>
-            <p className="muted">
-              Diese Version nutzt globales Gesamtscoring aller Teams; keine Fame-/Draw-/Allianzlogik.
-            </p>
-            <p className="muted">
-              Read-only. Diese Vorschau liest lokale gespeicherte Spieltagsergebnisse, berechnet Punkte-Delta und projected Rank, aber schreibt keine Standings-, Cash- oder Preisgeldwerte.
-            </p>
-            {standingsPreviewFeed?.blockedRules?.length ? (
-              <div className="panel" style={{ marginBottom: 16 }}>
-                <strong>Globales Gesamtranking aller Teams, ohne Fame-, Draw- oder Allianzlogik.</strong>
-                <p className="muted" style={{ marginTop: 8 }}>
-                  Die Preview kombiniert gespeicherte Matchday-Results mit dem aktuellen lokalen Punktestand und der Rank-to-Points-Tabelle.
-                  Offene Blocker betreffen nur fehlende Punkte-Mappings oder echte Tie-Breaker-Faelle.
-                </p>
-                <ul className="warning-list">
-                  {standingsPreviewFeed.blockedRules.map((rule) => (
-                    <li key={rule}>{rule}</li>
-                  ))}
-                </ul>
-                {standingsPreviewFeed.blockedRules.includes("global_score_tie_breaker_missing") &&
-                (standingsPreviewFeed.tieGroups?.length ?? 0) > 0 ? (
-                  <div style={{ marginTop: 12 }}>
-                    <strong>Gleichstand erkannt: Tie-Breaker-Regel fehlt. Apply bleibt blockiert.</strong>
-                    <ul className="warning-list">
-                      {standingsPreviewFeed.tieGroups.map((group, index) => (
-                        <li key={`${group.type}-${group.value}-${index}`}>
-                          {group.type} {formatLocalePoints(group.value, 2)}:{" "}
-                          {group.affectedTeams.map((team) => `${team.teamName} (${team.teamId})`).join(", ")}
-                        </li>
-                      ))}
-                    </ul>
-                  </div>
-                ) : null}
-              </div>
-            ) : null}
-            <div className="teams-summary-grid history-summary-grid">
-              <article className="metric-card">
-                <span>Stored Result</span>
-                <strong>{standingsPreviewFeed?.summary.matchdayResultFound ? "gefunden" : "fehlend"}</strong>
-              </article>
-              <article className="metric-card">
-                <span>Ready Teams</span>
-                <strong>{standingsPreviewFeed?.summary.readyTeams ?? 0}</strong>
-              </article>
-              <article className="metric-card">
-                <span>Blocked Rules</span>
-                <strong>{standingsPreviewFeed?.blockedRules.length ?? 0}</strong>
-              </article>
-            </div>
-            <div className="table-shell">
-              <table className="team-table">
-                <colgroup>
-                  {visibleStandingsPreviewColumns.map((column) => (
-                    <col key={column.id} style={{ width: `${getTableColumnWidth("standingsPreviewTable", column)}px` }} />
-                  ))}
-                </colgroup>
-                <thead>
-                  <tr>
-                    {visibleStandingsPreviewColumns.map((column) => (
-                      <th
-                        key={column.id}
-                        {...getTableHeaderDragProps("standingsPreviewTable", column, visibleStandingsPreviewColumns)}
-                        style={{ width: `${getTableColumnWidth("standingsPreviewTable", column)}px`, minWidth: `${column.minWidth}px` }}
-                      >
-                        <div className="resizable-header-cell">
-                          <SortableHeader
-                            label={column.label}
-                            tableId="standingsPreview"
-                            columnKey={column.dataKey}
-                            sortState={tableSorts.standingsPreview}
-                            onToggle={toggleTableSort}
-                          />
-                          <span
-                            className="column-resizer"
-                            draggable={false}
-                            role="separator"
-                            aria-orientation="vertical"
-                            aria-label={`${column.label} Breite anpassen`}
-                            onMouseDown={(event) => startTableColumnResize("standingsPreviewTable", column, event)}
-                            onDoubleClick={() => resetTableColumnWidth("standingsPreviewTable", column)}
-                          />
-                        </div>
-                      </th>
-                    ))}
-                  </tr>
-                </thead>
-                <tbody>
-                  {sortedStandingsPreviewRows.map((row) => (
-                    <tr key={row.teamId} onClick={() => openTeamProfileById(row.teamId)}>
-                      {visibleStandingsPreviewColumns.map((column) => {
-                        if (column.id === "team") return <td key={column.id}><div className="table-team-cell"><strong>{row.teamName}</strong><span>{row.teamId}</span></div></td>;
-                        if (column.id === "warnings") return <td key={column.id}>{row.warnings.join(", ") || "—"}</td>;
-                        if (column.id === "readinessStatus") return <td key={column.id}>{row.readinessStatus}</td>;
-                        if (column.id === "resultStatus") return <td key={column.id}>{row.resultStatus}</td>;
-                        if (column.id === "currentRank") return <td key={column.id}>{row.currentRank ?? "—"}</td>;
-                        if (column.id === "projectedRank") return <td key={column.id}>{row.projectedRank ?? "—"}</td>;
-                        if (column.id === "currentPoints") return <td key={column.id}>{row.currentPoints ?? "BLOCKED"}</td>;
-                        if (column.id === "projectedPoints") return <td key={column.id}>{row.projectedPoints ?? "—"}</td>;
-                        if (column.id === "pointsDelta") return <td key={column.id}>{row.pointsDelta ?? "—"}</td>;
-                        if (column.id === "matchdayRank") return <td key={column.id}>{row.matchdayRank ?? "—"}</td>;
-                        if (column.id === "matchdayScore") return <td key={column.id}>{row.matchdayScore != null ? formatLocalePoints(row.matchdayScore, 2) : "—"}</td>;
-                        if (column.id === "d1Score") return <td key={column.id}>{row.d1Score != null ? formatLocalePoints(row.d1Score) : "—"}</td>;
-                        if (column.id === "d2Score") return <td key={column.id}>{row.d2Score != null ? formatLocalePoints(row.d2Score) : "—"}</td>;
-                        if (column.id === "cash") return <td key={column.id}>{row.cash != null ? formatTransfermarktCurrency(row.cash) : "—"}</td>;
-                        return <td key={column.id}>{row.totalScore != null ? formatLocalePoints(row.totalScore) : "—"}</td>;
-                      })}
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-          </section>
+          <FoundationShellRouterSeasonPreview
+            active={activeView === "seasonPreview"}
+            hostProps={foundationSeasonPreviewHostProps}
+          />
 
           {activeView === "players" ? (
           <section className={`panel${getViewClass("players")}`} id="players-table">
@@ -6491,133 +6182,11 @@ export function FoundationShellRouterBody(props: FoundationShellRouterBodyProps)
             </div>
           </section>
 
-          {activeView === "teams" && selectedTeam ? (
-          <FoundationTeamsDetailPanel
-            active
-            gameState={gameState}
+          <FoundationShellRouterTeams
+            active={activeView === "teams"}
             selectedTeam={selectedTeam}
-            sortedTeamsViewRows={sortedTeamsViewRows}
-            visibleTeamsViewColumns={visibleTeamsViewColumns}
-            getViewClass={getViewClass}
-            SortableHeader={SortableHeader}
-            getTableColumnWidth={getTableColumnWidth}
-            getTableHeaderDragProps={getTableHeaderDragProps}
-            getTeamsViewColumnTitle={getTeamsViewColumnTitle}
-            toggleTableSort={toggleTableSort}
-            startTableColumnResize={startTableColumnResize}
-            resetTableColumnWidth={resetTableColumnWidth}
-            tableSorts={tableSorts}
-            joinClassNames={joinClassNames}
-            getOwnerTeamHighlightClass={getOwnerTeamHighlightClass}
-            resolvedTeamControlSettings={resolvedTeamControlSettings}
-            scheduleActiveManagerTeam={scheduleActiveManagerTeam}
-            openTeamProfileById={openTeamProfileById}
-            formatMoney={formatMoney}
-            formatLocalePoints={formatLocalePoints}
-            getSeasonCashHeatClass={getSeasonCashHeatClass}
-            formatWholeNumber={formatWholeNumber}
-            getTeamAxisRankTooltip={getTeamAxisRankTooltip}
-            getRankHeatClass={getRankHeatClass}
-            teamHistoryPointRankMaps={teamHistoryPointRankMaps}
-            selectedTeamsHistoryData={selectedTeamsHistoryData}
-            teamEconomyTiles={teamEconomyTiles}
-            formatNullableMoney={formatNullableMoney}
-            formatSignedDisplayMoney={formatSignedDisplayMoney}
-            getTeamHistoryRankToneClass={getTeamHistoryRankToneClass}
-            selectedTeamObjectives={selectedTeamObjectives}
-            teamObjectiveOverview={teamObjectiveOverview}
-            selectedTeamSponsorContract={selectedTeamSponsorContract}
-            selectedTeamSponsorOffers={selectedTeamSponsorOffers}
-            selectedTeamCommercialRating={selectedTeamCommercialRating}
-            sponsorChoiceMessage={sponsorChoiceMessage}
-            sponsorChoiceProfiles={sponsorChoiceProfiles}
-            sponsorChoiceBusy={sponsorChoiceBusy}
-            applySponsorNegotiationToComponents={applySponsorNegotiationToComponents}
-            getSponsorNegotiationMultiplier={getSponsorNegotiationMultiplier}
-            setSponsorChoiceProfiles={setSponsorChoiceProfiles}
-            chooseTeamSponsor={chooseTeamSponsor}
-            selectedTeamContractShapeMix={selectedTeamContractShapeMix}
-            renderMetricBar={renderMetricBar}
-            leaguePlayerHeatPools={leaguePlayerHeatPools}
-            selectedTeamDetailTab={selectedTeamDetailTab}
-            teamRosterRoleFilter={teamRosterRoleFilter}
-            setTeamRosterRoleFilter={setTeamRosterRoleFilter}
-            teamRosterFocusMode={teamRosterFocusMode}
-            setTeamRosterFocusMode={setTeamRosterFocusMode}
-            sortedSelectedRosterTableRows={sortedSelectedRosterTableRows}
-            filteredSelectedRosterTableRows={filteredSelectedRosterTableRows}
-            selectedStandingRow={selectedStandingRow}
-            selectedRoster={selectedRoster}
-            visibleSelectedRosterColumns={visibleSelectedRosterColumns}
-            selectedTeamContractTable={selectedTeamContractTable}
-            selectedTeamContractPreviewRowCount={selectedTeamContractPreviewRowCount}
-            visibleSelectedTeamContractRows={visibleSelectedTeamContractRows}
-            showTeamContractPreviewRows={showTeamContractPreviewRows}
-            setShowTeamContractPreviewRows={setShowTeamContractPreviewRows}
-            contractRenewalBusy={contractRenewalBusy}
-            openContractRenewalNegotiation={openContractRenewalNegotiation}
-            openMarketSellModal={openMarketSellModal}
-            openPlayerDrawerById={openPlayerDrawerById}
-            playerRatingsById={playerRatingsById}
-            getPlayerPortraitModel={getPlayerPortraitModel}
-            getClassColorClassName={getClassColorClassName}
-            getRosterEntryDisplaySalary={getRosterEntryDisplaySalary}
-            getRosterEntryDisplayMarketValue={getRosterEntryDisplayMarketValue}
-            renderEconomyDelta={renderEconomyDelta}
-            getPlayerDisplayMarketValueDelta={getPlayerDisplayMarketValueDelta}
-            getRosterEntrySalaryDelta={getRosterEntrySalaryDelta}
-            formatPpsValue={formatPpsValue}
-            formatDisplayMoney={formatDisplayMoney}
-            formatContractShapeLabel={formatContractShapeLabel}
-            formatMoraleContractIntentLabel={formatMoraleContractIntentLabel}
-            getPlayerDisplaySalary={getPlayerDisplaySalary}
-            starters={starters}
-            bench={bench}
-            selectedIdentity={selectedIdentity}
-            freeAgents={freeAgents}
-            aiPreview={aiPreview}
-            selectedAiTeamId={selectedAiTeamId}
-            aiMarketPreview={aiMarketPreview}
-            isPending={isPending}
-            isReadOnlyMode={readMeta.readOnly}
-            showReadOnlyNotice={showReadOnlyNotice}
-            setGameState={setGameState}
-            runAiTurn={runAiTurn}
-            showExtendedTeamPanels={showExtendedTeamPanels}
-            setShowExtendedTeamPanels={setShowExtendedTeamPanels}
-            formatTransfermarktCurrency={formatTransfermarktCurrency}
-            roundViewNumber={roundViewNumber}
-            getLineupDraftSideCounts={getLineupDraftSideCounts}
-            isSelectedTeamManagementLocked={isSelectedTeamManagementLocked}
-            selectedTeamControl={selectedTeamControl}
-            formatTeamControlModeLabel={formatTeamControlModeLabel}
-            openTeamDrawerById={openTeamDrawerById}
-            selectedRosterTableRows={selectedRosterTableRows}
-            shouldBuildTeamContracts={shouldBuildTeamContracts}
-            playerSeasonPerformanceMap={playerSeasonPerformanceMap}
-            confirmContractRenewalNegotiation={confirmContractRenewalNegotiation}
-            formatObjectiveStatusLabel={formatObjectiveStatusLabel}
-            formatCockpitReason={formatCockpitReason}
-            getPoolHeatClass={getPoolHeatClass}
-            getResponsiveTableImageSize={getResponsiveTableImageSize}
-            getTeamLogoModel={getTeamLogoModel}
-            setContractRenewalNegotiation={setContractRenewalNegotiation}
-            setShowSelectedRosterPpsBreakdown={setShowSelectedRosterPpsBreakdown}
-            setShowTeamDisciplines={setShowTeamDisciplines}
-            toggleTransferSellMarker={toggleTransferSellMarker}
-            selectedBoardConfidence={selectedBoardConfidence}
-            showTeamDisciplines={showTeamDisciplines}
-            teamRosterRoleFilterOptions={teamRosterRoleFilterOptions}
-            teamRosterFocusOptions={teamRosterFocusOptions}
-            contractRenewalNegotiation={contractRenewalNegotiation}
-            showSelectedRosterPpsBreakdown={showSelectedRosterPpsBreakdown}
-            selectedTeamCanManage={selectedTeamCanManage}
-            selectedTeamRosterActionsAvailable={selectedTeamRosterActionsAvailable}
-            selectedTeamRosterActionHint={selectedTeamRosterActionHint}
-            contractRenewalMessage={contractRenewalMessage}
-            contractRenewalError={contractRenewalError}
+            hostProps={foundationTeamsViewHostProps}
           />
-          ) : null}
 
           {isTransferMarketViewActive ? (
           <FoundationTransfermarktV2Panel
@@ -7213,73 +6782,10 @@ export function FoundationShellRouterBody(props: FoundationShellRouterBodyProps)
             </section>
           ) : null}
 
-          {isTransferHistoryViewActive ? (
-          <section className={`panel${getViewClass("history", "historyV2")}`} id="transfer-history">
-            <div className="panel-header">
-              <TooltipHeading
-                as="h2"
-                tooltip="Read-only Verlauf aus dem aktiven Save mit Save- und Season-Scope. Filter und Spalten bleiben direkt daneben."
-              >
-                Transferhistorie
-              </TooltipHeading>
-              <span className="pill foundation-source-pill">source: active local save</span>
-            </div>
-            <TransferHistoryV2Client
-                sourceBadgeLabel={getViewSourceBadgeLabel("historyV2", activeContextMeta)}
-                saveName={historyFeed?.saveContext?.saveName ?? activeSaveName}
-                requestedScopeLabel={`${historyFeed?.saveContext?.requestedSaveId ?? activeSaveId} / ${transferHistoryRequestedSeasonLabel}`}
-                resolvedScopeLabel={`${historyFeed?.saveContext?.resolvedSaveId ?? historyFeed?.scope?.saveId ?? activeSaveId} / ${transferHistoryResolvedSeasonLabel}`}
-                totalLoaded={historyFeed?.items.length ?? 0}
-                totalAvailable={historyFeed?.total ?? 0}
-                seasonBreakdown={transferHistorySeasonBreakdown}
-                summary={transferHistorySummary}
-                filteredRows={sortedTransferHistoryRows}
-                visibleRows={visibleTransferHistoryRows}
-                historyVisibleRangeLabel={historyVisibleRangeLabel}
-                isAllSeasons={historyAllSeasonsSelected}
-                historyPage={historyPage}
-                historyPageCount={historyPageCount}
-                onPrevPage={() => setHistoryPage((current) => Math.max(1, current - 1))}
-                onNextPage={() => setHistoryPage((current) => Math.min(historyPageCount, current + 1))}
-                scopeWarning={historyFeed?.saveContext?.scopeWarning ?? null}
-                error={historyFeed?.error ?? null}
-                seasonFilter={historySeasonFilter}
-                allSeasonsValue={HISTORY_ALL_SEASONS_FILTER}
-                seasonOptions={transferSeasonOptions}
-                teamFilter={historyTeamFilter}
-                teamOptions={gameState.teams.map((team) => ({ teamId: team.teamId, name: team.name, shortCode: team.shortCode }))}
-                typeFilter={historyTypeFilter}
-                classFilter={historyClassFilter}
-                sourceFilter={historySourceFilter}
-                classOptions={transferHistoryClassOptions}
-                sourceOptions={transferHistorySourceOptions.map((sourceKey) => ({
-                  key: sourceKey,
-                  label: getTransferSourceLabel(sourceKey === "missing_source" ? null : sourceKey),
-                }))}
-                search={historySearch}
-                onSeasonFilterChange={setHistorySeasonFilter}
-                onTeamFilterChange={setHistoryTeamFilter}
-                onTypeFilterChange={setHistoryTypeFilter}
-                onClassFilterChange={setHistoryClassFilter}
-                onSourceFilterChange={setHistorySourceFilter}
-                onSearchChange={setHistorySearch}
-                onResetFilters={() => {
-                  setHistorySeasonFilter(gameState.season.id);
-                  setHistoryPage(1);
-                  setHistoryTeamFilter("ALL");
-                  setHistoryTypeFilter("ALL");
-                  setHistoryClassFilter("ALL");
-                  setHistorySourceFilter("ALL");
-                  setHistorySearch("");
-                }}
-                onOpenPlayer={(playerId) => openPlayerProfileById(playerId)}
-                onOpenTeam={(teamId) => openTeamProfileById(teamId)}
-                hasMore={(historyFeed?.total ?? 0) > (historyFeed?.items.length ?? 0)}
-                loadingMore={historyLoadingMore}
-                onLoadMore={() => void loadMoreHistoryFeed()}
-              />
-          </section>
-          ) : null}
+          <FoundationShellRouterHistoryV2
+            active={activeView === "history" || activeView === "historyV2"}
+            hostProps={foundationHistoryV2HostProps}
+          />
 
           <div className={`foundation-warning-grid${getViewClass("debug")}`}>
             <WarningList title="Spieler ohne Team" warnings={gameState.mappingReport.unmappedPlayers} />

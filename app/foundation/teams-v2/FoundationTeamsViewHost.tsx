@@ -102,6 +102,7 @@ export default function FoundationTeamsViewHost({
   gameState,
   getRosterEntryDisplayMarketValue,
   getRosterEntryDisplaySalary,
+  getRosterEntryCurrentSeasonSalary,
   getRosterEntrySalarySortValue,
   getRosterEntrySalaryDelta,
   rosterPlayers,
@@ -237,6 +238,7 @@ export default function FoundationTeamsViewHost({
       teamRosterRoleFilter={teamRosterRoleFilter}
       getRosterEntryDisplayMarketValue={getRosterEntryDisplayMarketValue}
       getRosterEntryDisplaySalary={getRosterEntryDisplaySalary}
+      getRosterEntryCurrentSeasonSalary={getRosterEntryCurrentSeasonSalary}
       getRosterEntrySalaryDelta={getRosterEntrySalaryDelta}
       formatMoney={formatMoney}
       teamsHydrationPhase={teamsHydrationPhase}

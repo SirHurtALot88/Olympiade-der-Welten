@@ -1,64 +1,57 @@
 mode,fromTab,toTab,durationMs,apiCallsCount,slowestApiMs,slowestApiPath,mainThreadHint,warnings,status
-chain,START,Home,89184,0,0,,yes,initial_load; Tabwechsel >5s; main_thread_heavy,slow
-chain,Home,Inbox,67996,2,34953,/api/season/management-overview,no,Tabwechsel >5s,slow
-chain,Inbox,Einsatzliste,33121,3,18575,/api/singleplayer-state/version,no,Tabwechsel >5s,slow
-chain,Einsatzliste,Einsatzliste v2,34707,33,16350,/api/media/player-portrait/player-2361-nestinats,no,Tabwechsel >5s,slow
-chain,Einsatzliste v2,Arena,50110,2,36723,/api/singleplayer-state/version,no,Tabwechsel >5s,slow
-chain,Arena,Saisonstand,80579,3,46404,/api/singleplayer-state,no,Tabwechsel >5s,slow
-chain,Saisonstand,Teams,48632,0,0,,yes,"locator.waitFor: Timeout 30000ms exceeded.
+chain,START,Home,21157,0,0,,yes,initial_load; Tabwechsel >5s; main_thread_heavy,slow
+chain,Home,Inbox,8455,0,0,,yes,Tabwechsel >5s; main_thread_heavy,slow
+chain,Inbox,Einsatzliste,7393,4,63,/api/lineups/legacy/ai-preview,no,Tabwechsel >5s,ok
+chain,Einsatzliste,Einsatzliste v2,2684,1,280,/api/lineups/legacy/lab-context,no,,ok
+chain,Einsatzliste v2,Arena,6171,2,28,/api/lineups/legacy/ai-preview,no,Tabwechsel >5s,ok
+chain,Arena,Saisonstand,6174,32,176,/api/media/team-logo/P-C,no,Tabwechsel >5s,ok
+chain,Saisonstand,Teams,3315,10,117,/api/media/player-portrait/player-1630-chana,no,,ok
+chain,Teams,Teams (revisit),3287,31,1552,/api/media/team-logo/V-V,no,,ok
+chain,Teams,Spieler,4495,0,0,,no,,ok
+chain,Spieler,Training,22408,7,3170,/api/media/team-logo/V-W,no,Tabwechsel >5s,slow
+chain,Training,Gebäude,4999,0,0,,no,,ok
+chain,Gebäude,Training (revisit),3237,0,0,,no,,ok
+chain,Gebäude,Transfermarkt,5340,14,1492,/api/transfermarkt/free-agents,no,Tabwechsel >5s,ok
+chain,Transfermarkt,Scouting,4142,2,635,/api/transfermarkt/free-agents,no,,ok
+chain,Scouting,Historie,4360,1,1327,/api/transfermarkt/history,no,,ok
+chain,Historie,Ranks,3913,0,0,,no,,ok
+chain,Ranks,Diszis,4021,0,0,,no,,ok
+chain,Diszis,Sponsoren,7989,1,2108,/api/season/prize-preview,no,Tabwechsel >5s,ok
+chain,Sponsoren,Lexikon,3525,0,0,,no,,ok
+chain,Lexikon,Cockpit,3147,0,0,,no,,ok
+chain,Cockpit,Generator,126345,0,0,,yes,"locator.waitFor: Timeout 120000ms exceeded.
 Call log:
-  - waiting for locator('[data-testid=""foundation-teams-view""]').first() to be visible
+  - waiting for locator('[data-testid=""foundation-generator""]').first() to be visible
 ; Tabwechsel >5s; main_thread_heavy",failed
-chain,Teams,Teams (revisit),37012,0,0,,yes,"locator.waitFor: Timeout 30000ms exceeded.
+chain,Generator,Settings,3384,0,0,,no,,ok
+chain,Settings,Admin,122498,0,0,,yes,"locator.waitFor: Timeout 120000ms exceeded.
 Call log:
-  - waiting for locator('[data-testid=""foundation-teams-view""]').first() to be visible
+  - waiting for locator('[data-testid=""foundation-admin""]').first() to be visible
 ; Tabwechsel >5s; main_thread_heavy",failed
-chain,Teams,Spieler,15826,0,0,,yes,Tabwechsel >5s; main_thread_heavy,slow
-chain,Spieler,Training,110688,3,44185,/api/singleplayer-state,no,Tabwechsel >5s,slow
-chain,Training,Gebäude,66353,0,0,,yes,Tabwechsel >5s; main_thread_heavy,slow
-chain,Gebäude,Training (revisit),22246,10,9,/api/media/player-portrait/player-0072-swiftstrike,no,Tabwechsel >5s,slow
-chain,Gebäude,Transfermarkt,29809,1,3298,/api/singleplayer-state/version,no,Tabwechsel >5s,slow
-chain,Transfermarkt,Scouting,25218,13,6659,/api/transfermarkt/free-agents,no,Tabwechsel >5s,slow
-chain,Scouting,Historie,13190,2,56,/api/media/player-portrait/player-2519-atchu,no,Tabwechsel >5s,slow
-chain,Historie,Ranks,9725,0,0,,yes,Tabwechsel >5s; main_thread_heavy,slow
-chain,Ranks,Diszis,10281,0,0,,yes,Tabwechsel >5s; main_thread_heavy,slow
-chain,Diszis,Sponsoren,24538,2,3491,/api/singleplayer-state/version,no,Tabwechsel >5s,slow
-chain,Sponsoren,Lexikon,10919,0,0,,yes,Tabwechsel >5s; main_thread_heavy,slow
-chain,Lexikon,Cockpit,10795,3,3506,/api/season/prize-preview,no,Tabwechsel >5s,slow
-chain,Cockpit,Generator,14692,1,3864,/api/singleplayer-state/version,no,Tabwechsel >5s,slow
-chain,Generator,Settings,97021,0,0,,yes,"locator.waitFor: Timeout 90000ms exceeded.
-Call log:
-  - waiting for locator('[data-testid=""foundation-team-settings""]').first() to be visible
-; Tabwechsel >5s; main_thread_heavy",failed
-chain,Settings,Admin,10729,0,0,,yes,Tabwechsel >5s; main_thread_heavy,slow
-drilldown,Spieler,Spielerprofil (cold),96463,6,27332,/api/singleplayer-state,no,Tabwechsel >5s,slow
-drilldown,Spielerprofil,Spielerprofil (warm),39319,5,20176,/api/media/player-portrait/player-0025-kindness,no,Tabwechsel >5s,slow
-drilldown,Spielerprofil,Spieler-Tab overview,341,0,0,,no,,ok
-drilldown,Spielerprofil,Spieler-Tab details,4307,0,0,,no,,ok
-drilldown,Spielerprofil,Spieler-Tab contract,94478,0,0,,yes,"locator.waitFor: Timeout 90000ms exceeded.
-Call log:
-  - waiting for locator('#player-drawer-market').first() to be visible
-; Tabwechsel >5s; main_thread_heavy",failed
-drilldown,Spielerprofil,Spieler-Tab training,33741,0,0,,yes,Tabwechsel >5s; main_thread_heavy,slow
-drilldown,Spielerprofil,Spieler-Tab report,4342,0,0,,no,,ok
-drilldown,Spielerprofil,Spieler-Tab career,3866,0,0,,no,,ok
-drilldown,Teams,Teamprofil (cold),90008,0,0,,yes,"locator.click: Timeout 90000ms exceeded.
+drilldown,Spieler,Spielerprofil (cold),20574,0,0,,yes,Tabwechsel >5s; main_thread_heavy,slow
+drilldown,Spielerprofil,Spielerprofil (warm),30884,72,2819,/api/media/player-portrait/player-1230-lyrna,no,Tabwechsel >5s,slow
+drilldown,Spielerprofil,Spieler-Tab overview,354,0,0,,no,,ok
+drilldown,Spielerprofil,Spieler-Tab details,1607,0,0,,no,,ok
+drilldown,Spielerprofil,Spieler-Tab contract,3836,0,0,,no,,ok
+drilldown,Spielerprofil,Spieler-Tab training,2464,0,0,,no,,ok
+drilldown,Spielerprofil,Spieler-Tab report,2465,0,0,,no,,ok
+drilldown,Spielerprofil,Spieler-Tab career,2595,0,0,,no,,ok
+drilldown,Teams,Teamprofil (cold),120007,0,0,,yes,"locator.click: Timeout 120000ms exceeded.
 Call log:
   - waiting for getByRole('button', { name: 'Teamprofil' }).first()
 ; Tabwechsel >5s; main_thread_heavy",failed
-drilldown,Teamprofil,Teamprofil (warm),185011,0,0,,yes,"locator.click: Timeout 90000ms exceeded.
+drilldown,Teamprofil,Teamprofil (warm),246115,0,0,,yes,"locator.click: Timeout 120000ms exceeded.
 Call log:
   - waiting for getByRole('button', { name: 'Teamprofil' }).first()
+    - waiting for"" http://localhost:3000/foundation?view=teams&team=A-A"" navigation to finish...
+    - navigated to ""http://localhost:3000/foundation?view=teams&team=A-A""
 ; Tabwechsel >5s; main_thread_heavy",failed
-drilldown,Teams,Teams-Tab Portraits,90012,0,0,,yes,"locator.click: Timeout 90000ms exceeded.
+drilldown,Teams,Teams-Tab Portraits,120208,0,0,,yes,"locator.waitFor: Timeout 120000ms exceeded.
 Call log:
-  - waiting for getByTestId('foundation-subnav-portraits')
+  - waiting for locator('[data-testid=""team-portraits-grid""]').first() to be visible
 ; Tabwechsel >5s; main_thread_heavy",failed
-drilldown,Teams,Teams-Tab Kader,90003,0,0,,yes,"locator.click: Timeout 90000ms exceeded.
+drilldown,Teams,Teams-Tab Kader,406,0,0,,no,,ok
+drilldown,Teams,Teams-Tab Verträge,123581,0,0,,yes,"locator.waitFor: Timeout 120000ms exceeded.
 Call log:
-  - waiting for getByTestId('foundation-subnav-roster')
-; Tabwechsel >5s; main_thread_heavy",failed
-drilldown,Teams,Teams-Tab Verträge,90003,0,0,,yes,"locator.click: Timeout 90000ms exceeded.
-Call log:
-  - waiting for getByTestId('foundation-subnav-contracts')
+  - waiting for locator('[data-testid=""foundation-teams-view""][data-team-tab=""contracts""]').first() to be visible
 ; Tabwechsel >5s; main_thread_heavy",failed

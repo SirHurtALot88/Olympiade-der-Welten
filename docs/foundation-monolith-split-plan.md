@@ -9,6 +9,18 @@ Perf-Baseline: V7/V8-Audits, [510c2c1e](agent-transcript) (Audit-Lauf unvollstä
 
 ## 0. Fortschritt / Progress Log
 
+### Stand 2026-07-03 (Post-V10 Q1 — Teams-Host)
+
+| Phase | Änderung |
+|---|---|
+| **Welle 0** | V10 warm audit; [v10-comparison.md](./tab-performance-hotspots-v10-comparison.md) + Gate-Matrix |
+| **Q1** | `FoundationShellRouterTeams` in Body; Teams-Derivations aus Scope → Host; `onHydrationPhaseChange` |
+| **Scope** | ~11.323 Z. (Host-Props-Objekt; net weniger always-on Derivation) |
+
+**Gate-Matrix → nächste Wellen:** Q2 Training (22,4 s), Q3 Spieler/Profil, Q4 Arena→Saisonstand (6,2 s)
+
+**Commits:** `e3eddb5`–`9f99c48` (Phase P), Q1 pending commit
+
 ### Stand 2026-07-03 (Phase P Abschluss — Profile/Settings/Media)
 
 | Phase | Änderung |
