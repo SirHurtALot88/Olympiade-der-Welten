@@ -272,11 +272,7 @@ import {
   prefetchPlayerDirectoryData,
   prefetchSeasonStandingsData,
 } from "@/lib/foundation/foundation-panel-prefetch";
-import {
-  isFoundationNavigationQuiet,
-  markFoundationNavigationQuiet,
-  pauseFoundationNavigationSideEffects,
-} from "@/lib/foundation/navigation-coalescing";
+import { pauseFoundationNavigationSideEffects } from "@/lib/foundation/navigation-coalescing";
 import {
   canFoundationNavigateBack,
   foundationNavigateBack,
@@ -1327,6 +1323,7 @@ export function useFoundationShellRouterBodyScope({
     bindFoundationNavigationStart(() => {
       pauseFoundationNavigationSideEffects({
         autoPersistPausedRef,
+        autoPersistUnpauseTimeoutRef,
         foundationViewTransitionUntilRef,
       });
     });
@@ -1394,6 +1391,7 @@ export function useFoundationShellRouterBodyScope({
     hasLoadedPersistentState,
     foundationViewTransitionUntilRef,
     autoPersistPausedRef,
+    autoPersistUnpauseTimeoutRef,
     liveSaveRefreshInFlightRef,
     liveSaveVersionSignatureRef,
   } = useFoundationPersistenceActions({
@@ -1593,6 +1591,7 @@ export function useFoundationShellRouterBodyScope({
     marketFeedReloadersRef,
     seasonFeedReloadersRef,
     autoPersistPausedRef,
+    autoPersistUnpauseTimeoutRef,
     liveSaveRefreshInFlightRef,
     liveSaveVersionSignatureRef,
     foundationViewTransitionUntilRef,
@@ -4137,48 +4136,6 @@ export function useFoundationShellRouterBodyScope({
   }, [activeView, gameState, playerProfileData?.playerId]);
 
   useEffect(() => {
-    if (activeView !== "playerProfile" || playerProfileTab !== "contract" || !playerProfileData?.playerId) {
-      return;
-    }
-
-    let cancelled = false;
-    void (async () => {
-      const { buildPlayerDrawerDataFromGameState } = await import("@/lib/foundation/player-detail-drawer");
-      const { hydrateGameStatePlayerAttributeSheet } = await import("@/lib/foundation/hydrate-player-attribute-sheet");
-      const hydratedGameState = await hydrateGameStatePlayerAttributeSheet({
-        gameState: gameStateRef.current,
-        saveId: activeSaveId,
-        playerId: playerProfileData.playerId,
-      });
-      if (cancelled) {
-        return;
-      }
-      const refreshedProfile = buildPlayerDrawerDataFromGameState({
-        gameState: hydratedGameState,
-        playerId: playerProfileData.playerId,
-        source: readMeta.source,
-        manageableTeamIds: foundationManageableTeamIds,
-        saveId: activeSaveId,
-      });
-      if (cancelled || !refreshedProfile) {
-        return;
-      }
-      setPlayerProfileData(refreshedProfile);
-    })();
-
-    return () => {
-      cancelled = true;
-    };
-  }, [
-    activeSaveId,
-    activeView,
-    foundationManageableTeamIds,
-    playerProfileData?.playerId,
-    playerProfileTab,
-    readMeta.source,
-  ]);
-
-  useEffect(() => {
     function handlePopState() {
       setRoomContext(readFoundationRoomContextFromLocation());
       const fromHistory = readFoundationHistoryState();
@@ -4978,6 +4935,48 @@ export function useFoundationShellRouterBodyScope({
     gameModeOwnershipChrisIds,
     gameModeOwnershipFrankyIds,
   });
+
+  useEffect(() => {
+    if (activeView !== "playerProfile" || playerProfileTab !== "contract" || !playerProfileData?.playerId) {
+      return;
+    }
+
+    let cancelled = false;
+    void (async () => {
+      const { buildPlayerDrawerDataFromGameState } = await import("@/lib/foundation/player-detail-drawer");
+      const { hydrateGameStatePlayerAttributeSheet } = await import("@/lib/foundation/hydrate-player-attribute-sheet");
+      const hydratedGameState = await hydrateGameStatePlayerAttributeSheet({
+        gameState: gameStateRef.current,
+        saveId: activeSaveId,
+        playerId: playerProfileData.playerId,
+      });
+      if (cancelled) {
+        return;
+      }
+      const refreshedProfile = buildPlayerDrawerDataFromGameState({
+        gameState: hydratedGameState,
+        playerId: playerProfileData.playerId,
+        source: readMeta.source,
+        manageableTeamIds: foundationManageableTeamIds,
+        saveId: activeSaveId,
+      });
+      if (cancelled || !refreshedProfile) {
+        return;
+      }
+      setPlayerProfileData(refreshedProfile);
+    })();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [
+    activeSaveId,
+    activeView,
+    foundationManageableTeamIds,
+    playerProfileData?.playerId,
+    playerProfileTab,
+    readMeta.source,
+  ]);
 
   useEffect(() => {
     const snapshots = gameState.seasonState.seasonSnapshots;

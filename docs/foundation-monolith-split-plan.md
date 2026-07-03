@@ -9,6 +9,19 @@ Perf-Baseline: V7/V8-Audits, [510c2c1e](agent-transcript) (Audit-Lauf unvollstä
 
 ## 0. Fortschritt / Progress Log
 
+### Stand 2026-07-03 (Phase P Abschluss — Profile/Settings/Media)
+
+| Phase | Änderung |
+|---|---|
+| **P3a** | `hydrateGameStatePlayerAttributeSheet` in `openPlayerProfileById`; contract-tab rebuild effect |
+| **P3b/c** | `#player-drawer-market` immer sichtbar; Settings inline → `FoundationTeamSettingsHost` (mount gate) |
+| **P2** | `shouldBuildTeamSettingsView` gate für Identity/GM-Memos |
+| **P4** | `BudgetedMediaImage` auf Einsatzliste-Portraits |
+
+**Commits:** `e3eddb5` (P1/P2 baseline), `de01582` (P3/P4 Abschluss)
+
+**Verifikation:** 22/22 Contract-Tests + `perf:regression-smoke` ok; V10 full chain audit läuft.
+
 ### Stand 2026-07-02 (Phase P — Warm Path, Navigation Coalescing + Dedup)
 
 | Metrik | Vor Phase P | Jetzt | Δ |
