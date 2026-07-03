@@ -4,81 +4,122 @@ Datum: 2026-07-03
 
 ## Kurzfazit
 
-- Initialer Home-Load: **21157 ms**
+- Initialer Home-Load: **16627 ms**
 - Mess-Schritte gesamt: **36** (Chain + Home-direct + Drilldowns)
-- Slow (>=8s): 5 · Failed: 6 · Main-Thread-Hinweise: 9
-- Save: `save-1783053839918-k9dd6k`, Team: `A-A`
-- Langsamster Schritt: **Teamprofil (warm)** (246115 ms, Modus drilldown)
-- Browser-Errors: Cannot read properties of undefined (reading 'has')
+- Slow (>=8s): 5 · Failed: 11 · Main-Thread-Hinweise: 13
+- Save: `fresh-season-1-1783052481107`, Team: `R-R`
+- Langsamster Schritt: **Teamprofil (warm)** (365019 ms, Modus drilldown)
+- Browser-Errors: getRosterEntryCurrentSeasonSalary is not a function; page.goto: Timeout 180000ms exceeded.
+Call log:
+  - navigating to "http://localhost:3000/foundation?view=homeV2&team=R-R&saveId=fresh-season-1-1783052481107", waiting until "domcontentloaded"
+; getRosterEntryCurrentSeasonSalary is not defined; ./app/foundation/FoundationShellRouterBody.tsx:6493:19
+Unexpected token. Did you mean `{'}'}` or `&rbrace;`?
+  6491 |           ) : null}
+  6492 |
+> 6493 |           ) : null}
+       |                   ^
+  6494 |
+  6495 |           {isTransferMarketViewActive ? (
+  6496 |           <FoundationTransfermarktV2Panel
+
+Parsing ecmascript source code failed
+
+Import traces:
+  Client Component Browser:
+    ./app/foundation/FoundationShellRouterBody.tsx [Client Component Browser]
+    ./app/foundation/FoundationPageClient.tsx [Client Component Browser]
+    ./app/foundation/FoundationPageClient.tsx [Server Component]
+    ./app/foundation/page.tsx [Server Component]
+
+  Client Component SSR:
+    ./app/foundation/FoundationShellRouterBody.tsx [Client Component SSR]
+    ./app/foundation/FoundationPageClient.tsx [Client Component SSR]
+    ./app/foundation/FoundationPageClient.tsx [Server Component]
+    ./app/foundation/page.tsx [Server Component]; Failed to load resource: the server responded with a status of 500 (Internal Server Error)
 
 ## Messwerte V9
 
 | Modus | Von | Nach | ms | API | Langsamste API | Main-Thread | Status | Befund |
 | --- | --- | --- | ---: | ---: | --- | --- | --- | --- |
-| chain | START | Home | 21157 | 0 | — | ja | slow | initial_load; Tabwechsel >5s; main_thread_heavy |
-| chain | Home | Inbox | 8455 | 0 | — | ja | slow | Tabwechsel >5s; main_thread_heavy |
-| chain | Inbox | Einsatzliste | 7393 | 4 | /api/lineups/legacy/ai-preview 63ms | nein | ok | Tabwechsel >5s |
-| chain | Einsatzliste | Einsatzliste v2 | 2684 | 1 | /api/lineups/legacy/lab-context 280ms | nein | ok | — |
-| chain | Einsatzliste v2 | Arena | 6171 | 2 | /api/lineups/legacy/ai-preview 28ms | nein | ok | Tabwechsel >5s |
-| chain | Arena | Saisonstand | 6174 | 32 | /api/media/team-logo/P-C 176ms | nein | ok | Tabwechsel >5s |
-| chain | Saisonstand | Teams | 3315 | 10 | /api/media/player-portrait/player-1630-chana 117ms | nein | ok | — |
-| chain | Teams | Teams (revisit) | 3287 | 31 | /api/media/team-logo/V-V 1552ms | nein | ok | — |
-| chain | Teams | Spieler | 4495 | 0 | — | nein | ok | — |
-| chain | Spieler | Training | 22408 | 7 | /api/media/team-logo/V-W 3170ms | nein | slow | Tabwechsel >5s |
-| chain | Training | Gebäude | 4999 | 0 | — | nein | ok | — |
-| chain | Gebäude | Training (revisit) | 3237 | 0 | — | nein | ok | — |
-| chain | Gebäude | Transfermarkt | 5340 | 14 | /api/transfermarkt/free-agents 1492ms | nein | ok | Tabwechsel >5s |
-| chain | Transfermarkt | Scouting | 4142 | 2 | /api/transfermarkt/free-agents 635ms | nein | ok | — |
-| chain | Scouting | Historie | 4360 | 1 | /api/transfermarkt/history 1327ms | nein | ok | — |
-| chain | Historie | Ranks | 3913 | 0 | — | nein | ok | — |
-| chain | Ranks | Diszis | 4021 | 0 | — | nein | ok | — |
-| chain | Diszis | Sponsoren | 7989 | 1 | /api/season/prize-preview 2108ms | nein | ok | Tabwechsel >5s |
-| chain | Sponsoren | Lexikon | 3525 | 0 | — | nein | ok | — |
-| chain | Lexikon | Cockpit | 3147 | 0 | — | nein | ok | — |
-| chain | Cockpit | Generator | 126345 | 0 | — | ja | failed | locator.waitFor: Timeout 120000ms exceeded.
+| chain | START | Home | 16627 | 0 | — | ja | slow | initial_load; Tabwechsel >5s; main_thread_heavy |
+| chain | Home | Inbox | 879 | 0 | — | nein | ok | — |
+| chain | Inbox | Einsatzliste | 1504 | 0 | — | nein | ok | — |
+| chain | Einsatzliste | Einsatzliste v2 | 2601 | 0 | — | nein | ok | — |
+| chain | Einsatzliste v2 | Arena | 3831 | 0 | — | nein | ok | — |
+| chain | Arena | Saisonstand | 5020 | 0 | — | ja | ok | Tabwechsel >5s; main_thread_heavy |
+| chain | Saisonstand | Teams | 32759 | 0 | — | ja | failed | locator.waitFor: Timeout 30000ms exceeded.
+Call log:
+  - waiting for locator('[data-testid="foundation-teams-view"]').first() to be visible
+; Tabwechsel >5s; main_thread_heavy |
+| chain | Teams | Teams (revisit) | 180008 | 0 | — | ja | failed | locator.click: Timeout 180000ms exceeded.
+Call log:
+  - waiting for getByTestId('foundation-nav-teams')
+; Tabwechsel >5s; main_thread_heavy |
+| chain | Teams | Spieler | 180005 | 0 | — | ja | failed | locator.click: Timeout 180000ms exceeded.
+Call log:
+  - waiting for getByTestId('foundation-nav-players')
+; Tabwechsel >5s; main_thread_heavy |
+| chain | Spieler | Training | 293248 | 0 | — | ja | failed | locator.waitFor: Timeout 180000ms exceeded.
+Call log:
+  - waiting for locator('[data-testid="foundation-training-compact"]').first() to be visible
+; Tabwechsel >5s; main_thread_heavy |
+| chain | Training | Gebäude | 16332 | 2 | /api/season/ratings-slice 2184ms | nein | slow | Tabwechsel >5s |
+| chain | Gebäude | Training (revisit) | 2595 | 10 | /api/media/player-portrait/player-0678-ithuriel 168ms | nein | ok | — |
+| chain | Gebäude | Transfermarkt | 4207 | 6 | /api/media/player-portrait/player-2093-reefstalker 99ms | nein | ok | — |
+| chain | Transfermarkt | Scouting | 3866 | 1 | /api/transfermarkt/free-agents 43ms | nein | ok | — |
+| chain | Scouting | Historie | 3434 | 1 | /api/transfermarkt/history 1027ms | nein | ok | — |
+| chain | Historie | Ranks | 3624 | 0 | — | nein | ok | — |
+| chain | Ranks | Diszis | 3678 | 0 | — | nein | ok | — |
+| chain | Diszis | Sponsoren | 13482 | 1 | /api/season/prize-preview 1840ms | nein | slow | Tabwechsel >5s |
+| chain | Sponsoren | Lexikon | 4354 | 0 | — | nein | ok | — |
+| chain | Lexikon | Cockpit | 4203 | 1 | /api/season/prize-preview 1379ms | nein | ok | — |
+| chain | Cockpit | Generator | 182233 | 0 | — | ja | failed | locator.waitFor: Timeout 180000ms exceeded.
 Call log:
   - waiting for locator('[data-testid="foundation-generator"]').first() to be visible
 ; Tabwechsel >5s; main_thread_heavy |
-| chain | Generator | Settings | 3384 | 0 | — | nein | ok | — |
-| chain | Settings | Admin | 122498 | 0 | — | ja | failed | locator.waitFor: Timeout 120000ms exceeded.
+| chain | Generator | Settings | 4502 | 0 | — | nein | ok | — |
+| chain | Settings | Admin | 182421 | 0 | — | ja | failed | locator.waitFor: Timeout 180000ms exceeded.
 Call log:
   - waiting for locator('[data-testid="foundation-admin"]').first() to be visible
 ; Tabwechsel >5s; main_thread_heavy |
-| drilldown | Spieler | Spielerprofil (cold) | 20574 | 0 | — | ja | slow | Tabwechsel >5s; main_thread_heavy |
-| drilldown | Spielerprofil | Spielerprofil (warm) | 30884 | 72 | /api/media/player-portrait/player-1230-lyrna 2819ms | nein | slow | Tabwechsel >5s |
-| drilldown | Spielerprofil | Spieler-Tab overview | 354 | 0 | — | nein | ok | — |
-| drilldown | Spielerprofil | Spieler-Tab details | 1607 | 0 | — | nein | ok | — |
-| drilldown | Spielerprofil | Spieler-Tab contract | 3836 | 0 | — | nein | ok | — |
-| drilldown | Spielerprofil | Spieler-Tab training | 2464 | 0 | — | nein | ok | — |
-| drilldown | Spielerprofil | Spieler-Tab report | 2465 | 0 | — | nein | ok | — |
-| drilldown | Spielerprofil | Spieler-Tab career | 2595 | 0 | — | nein | ok | — |
-| drilldown | Teams | Teamprofil (cold) | 120007 | 0 | — | ja | failed | locator.click: Timeout 120000ms exceeded.
+| drilldown | Spieler | Spielerprofil (cold) | 39594 | 29 | /api/season/player-directory-slice 3555ms | nein | slow | Tabwechsel >5s |
+| drilldown | Spielerprofil | Spielerprofil (warm) | 39779 | 4 | /api/media/player-portrait/player-2586-krass-thul 3764ms | nein | slow | Tabwechsel >5s |
+| drilldown | Spielerprofil | Spieler-Tab overview | 360 | 0 | — | nein | ok | — |
+| drilldown | Spielerprofil | Spieler-Tab details | 1520 | 0 | — | nein | ok | — |
+| drilldown | Spielerprofil | Spieler-Tab contract | 4166 | 0 | — | nein | ok | — |
+| drilldown | Spielerprofil | Spieler-Tab training | 2392 | 0 | — | nein | ok | — |
+| drilldown | Spielerprofil | Spieler-Tab report | 2390 | 0 | — | nein | ok | — |
+| drilldown | Spielerprofil | Spieler-Tab career | 1709 | 0 | — | nein | ok | — |
+| drilldown | Teams | Teamprofil (cold) | 180038 | 0 | — | ja | failed | locator.click: Timeout 180000ms exceeded.
 Call log:
   - waiting for getByRole('button', { name: 'Teamprofil' }).first()
 ; Tabwechsel >5s; main_thread_heavy |
-| drilldown | Teamprofil | Teamprofil (warm) | 246115 | 0 | — | ja | failed | locator.click: Timeout 120000ms exceeded.
+| drilldown | Teamprofil | Teamprofil (warm) | 365019 | 0 | — | ja | failed | locator.click: Timeout 180000ms exceeded.
 Call log:
   - waiting for getByRole('button', { name: 'Teamprofil' }).first()
-    - waiting for" http://localhost:3000/foundation?view=teams&team=A-A" navigation to finish...
-    - navigated to "http://localhost:3000/foundation?view=teams&team=A-A"
 ; Tabwechsel >5s; main_thread_heavy |
-| drilldown | Teams | Teams-Tab Portraits | 120208 | 0 | — | ja | failed | locator.waitFor: Timeout 120000ms exceeded.
+| drilldown | Teams | Teams-Tab Portraits | 180006 | 0 | — | ja | failed | locator.click: Timeout 180000ms exceeded.
 Call log:
-  - waiting for locator('[data-testid="team-portraits-grid"]').first() to be visible
+  - waiting for getByTestId('foundation-subnav-portraits')
 ; Tabwechsel >5s; main_thread_heavy |
-| drilldown | Teams | Teams-Tab Kader | 406 | 0 | — | nein | ok | — |
-| drilldown | Teams | Teams-Tab Verträge | 123581 | 0 | — | ja | failed | locator.waitFor: Timeout 120000ms exceeded.
+| drilldown | Teams | Teams-Tab Kader | 180006 | 0 | — | ja | failed | locator.click: Timeout 180000ms exceeded.
 Call log:
-  - waiting for locator('[data-testid="foundation-teams-view"][data-team-tab="contracts"]').first() to be visible
+  - waiting for getByTestId('foundation-subnav-roster')
+; Tabwechsel >5s; main_thread_heavy |
+| drilldown | Teams | Teams-Tab Verträge | 180009 | 0 | — | ja | failed | locator.click: Timeout 180000ms exceeded.
+Call log:
+  - waiting for getByTestId('foundation-subnav-contracts')
+    - waiting for" http://localhost:3000/foundation?view=teams&team=R-R" navigation to finish...
+    - navigated to "http://localhost:3000/foundation?view=teams&team=R-R"
 ; Tabwechsel >5s; main_thread_heavy |
 
 ## Top-5 Hotspots
 
-1. **Teamprofil (warm)** (drilldown): 246115 ms — Main-Thread
-2. **Generator** (chain): 126345 ms — Main-Thread
-3. **Teams-Tab Verträge** (drilldown): 123581 ms — Main-Thread
-4. **Admin** (chain): 122498 ms — Main-Thread
-5. **Teams-Tab Portraits** (drilldown): 120208 ms — Main-Thread
+1. **Teamprofil (warm)** (drilldown): 365019 ms — Main-Thread
+2. **Training** (chain): 293248 ms — Main-Thread
+3. **Admin** (chain): 182421 ms — Main-Thread
+4. **Generator** (chain): 182233 ms — Main-Thread
+5. **Teamprofil (cold)** (drilldown): 180038 ms — Main-Thread
 
 CSV: [tab-performance-hotspots-v9.csv](./tab-performance-hotspots-v9.csv)
 
