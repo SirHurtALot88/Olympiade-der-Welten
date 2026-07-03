@@ -56,6 +56,7 @@ export type UseFoundationLiveSyncInput = {
   marketFeedReloadersRef: MutableRefObject<FoundationMarketFeedReloaders>;
   seasonFeedReloadersRef: MutableRefObject<FoundationSeasonFeedReloaders>;
   autoPersistPausedRef: MutableRefObject<boolean>;
+  autoPersistUnpauseTimeoutRef: MutableRefObject<ReturnType<typeof setTimeout> | null>;
   liveSaveRefreshInFlightRef: MutableRefObject<boolean>;
   liveSaveVersionSignatureRef: MutableRefObject<string | null>;
   foundationViewTransitionUntilRef: MutableRefObject<number>;
@@ -85,6 +86,7 @@ export function useFoundationLiveSync(input: UseFoundationLiveSyncInput) {
     marketFeedReloadersRef,
     seasonFeedReloadersRef,
     autoPersistPausedRef,
+    autoPersistUnpauseTimeoutRef,
     liveSaveRefreshInFlightRef,
     liveSaveVersionSignatureRef,
     foundationViewTransitionUntilRef,
@@ -94,13 +96,12 @@ export function useFoundationLiveSync(input: UseFoundationLiveSyncInput) {
   async function reloadLiveSeasonState(
     reason: LiveSeasonReloadReason = "local_save_version",
     options: { skipGameStateReload?: boolean; reloadFullGameState?: boolean; compactReload?: boolean } = {},
-  ) {
-    void reason;
+  ): Promise<boolean> {
     if (
       reason === "local_save_version" &&
       isFoundationNavigationQuiet(input.foundationViewTransitionUntilRef)
     ) {
-      return;
+      return false;
     }
     const shouldReloadGameState =
       options.compactReload ||
@@ -146,6 +147,7 @@ export function useFoundationLiveSync(input: UseFoundationLiveSyncInput) {
     if (refreshes.length > 0) {
       await Promise.all(refreshes);
     }
+    return true;
   }
 
   useEffect(() => {
@@ -237,16 +239,23 @@ export function useFoundationLiveSync(input: UseFoundationLiveSyncInput) {
         }
 
         const previousSignature = liveSaveVersionSignatureRef.current;
-        liveSaveVersionSignatureRef.current = nextSignature;
-        if (!previousSignature || previousSignature === nextSignature) {
+        if (!previousSignature) {
+          liveSaveVersionSignatureRef.current = nextSignature;
+          return;
+        }
+        if (previousSignature === nextSignature) {
           return;
         }
 
         liveSaveRefreshInFlightRef.current = true;
         try {
-          await reloadLiveSeasonState("local_save_version", { compactReload: true });
+          const reloaded = await reloadLiveSeasonState("local_save_version", { compactReload: true });
+          if (!reloaded) {
+            return;
+          }
+          liveSaveVersionSignatureRef.current = nextSignature;
           setSaveSyncError(null);
-          if (roomContext && previousSignature) {
+          if (roomContext) {
             setFoundationActionFeedback({
               tone: "warning",
               title: "Save aktualisiert",
@@ -276,8 +285,11 @@ export function useFoundationLiveSync(input: UseFoundationLiveSyncInput) {
   }, [activeSaveId, readMeta.source]);
 
   useEffect(() => {
-    markFoundationNavigationQuiet(foundationViewTransitionUntilRef);
-  }, [activeView]);
+    markFoundationNavigationQuiet(foundationViewTransitionUntilRef, undefined, {
+      autoPersistPausedRef,
+      autoPersistUnpauseTimeoutRef,
+    });
+  }, [activeView, autoPersistPausedRef, autoPersistUnpauseTimeoutRef, foundationViewTransitionUntilRef]);
 
   return {
     reloadLiveSeasonState,
