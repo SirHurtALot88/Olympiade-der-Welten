@@ -265,6 +265,7 @@ export function useFoundationCrossTabFlowCoach(input: {
       { id: "briefing", label: "Briefing", detail: "Home & Hinweise", targetView: "homeV2", views: ["home", "homeV2", "inbox", "inboxV2", "cockpit"] },
       { id: "market", label: "Markt", detail: "Deals & Wishlist", targetView: "marketV2", views: ["market", "marketV2", "history", "historyV2"] },
       { id: "hq", label: "Office", detail: "Druck & Planung", targetView: "hq", views: ["teams", "training", "trainingCompact", "trainingV2", "players", "teamSettings"] },
+      { id: "office", label: "Office", detail: "Kapitän & Board", targetView: "hq", views: ["homeV2"] },
       { id: "lineup", label: "Einsatz", detail: "Slots & Captain", targetView: "lineup", views: ["lineup"] },
       { id: "arena", label: "Arena", detail: "Reveal & Auswertung", targetView: "matchdayArena", views: ["matchdayArena", "matchdayResult", "season", "seasonV2", "ranks", "diszis", "prize", "seasonPreview"] },
     ],

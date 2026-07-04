@@ -147,10 +147,13 @@ describe("organic season progression", () => {
     const cheapResult = buildOrganicSeasonProgression({ gameState: gameState(cheap), player: cheap });
     const starResult = buildOrganicSeasonProgression({ gameState: gameState(star), player: star });
 
-    expect(cheapResult.marketValuePressureTotal).toBeCloseTo(2.54, 1);
-    expect(starResult.marketValuePressureTotal).toBeCloseTo(12.72, 1);
-    expect(cheapResult.marketValuePressurePerAttribute).toBeCloseTo(0.212, 2);
-    expect(starResult.marketValuePressurePerAttribute).toBeCloseTo(1.06, 2);
+    // 2026-07-04 balancing pass: ORGANIC_MARKET_VALUE_PRESSURE_RATE reduced 0.0104 -> 0.007
+    // (top-20-MW regression check showed ~all expensive players net-negative even with a solid
+    // season; see progress-log.md for the before/after distribution).
+    expect(cheapResult.marketValuePressureTotal).toBeCloseTo(1.68, 1);
+    expect(starResult.marketValuePressureTotal).toBeCloseTo(8.4, 1);
+    expect(cheapResult.marketValuePressurePerAttribute).toBeCloseTo(0.14, 2);
+    expect(starResult.marketValuePressurePerAttribute).toBeCloseTo(0.7, 2);
     expect(starResult.marketValuePressurePerAttribute).toBeGreaterThan(cheapResult.marketValuePressurePerAttribute);
     expect(starResult.netSetpoints).toBeLessThan(cheapResult.netSetpoints);
   });

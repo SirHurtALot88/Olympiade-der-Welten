@@ -126,8 +126,6 @@ function forecast(overrides: Partial<PlayerProgressionForecast> = {}): PlayerPro
     xpBeforeTraits: 0,
     xpAfterTraits: 0,
     xpEvents: [],
-    possibleUpgradeSummary: "test",
-    ratingTierCosts: { F: 1, E: 1, D: 1, C: 1, B: 1, A: 1, S: 1, "S+": 1, "99": null },
     fatigueStrain: { label: "niedrig", score: 0, warning: "" },
     sourceStatus: {
       appearances: "missing_source",

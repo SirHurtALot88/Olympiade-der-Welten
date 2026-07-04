@@ -2781,7 +2781,6 @@ export default function MatchdayArenaV2Client(props: MatchdayArenaV2ClientProps)
         <div className="arena-v2-timeline-head">
           <div>
             <strong>Reveal-Fortschritt</strong>
-            <small>{MATCHDAY_ARENA_PHASES.find((phase) => phase.id === displayPhase)?.label ?? "Result"} · {boardLabel}</small>
           </div>
           <div className="arena-v2-phase-pills">
             <span className="pill">Aktiv: {activeDisciplineLabel}</span>
@@ -2927,7 +2926,7 @@ export default function MatchdayArenaV2Client(props: MatchdayArenaV2ClientProps)
                 Zurück
               </button>
               <span>
-                {MATCHDAY_ARENA_PHASES.find((phase) => phase.id === displayPhase)?.label ?? "Result"} · {boardLabel}
+                {MATCHDAY_ARENA_PHASES.find((phase) => phase.id === displayPhase)?.label ?? "Result"}
               </span>
               {canShowResultLayer && props.onOpenMatchdayResult ? (
                 <button

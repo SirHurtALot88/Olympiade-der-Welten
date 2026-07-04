@@ -1299,7 +1299,7 @@ export default function PlayerDetailDrawer({
     {
       key: "pps",
       label: "PPs",
-      value: data.pps,
+      value: data.pps ?? data.ppsRating,
       rank: data.ppsRank,
       delta: data.ppsDelta,
       deltaSourceLabel: data.ppsDeltaSourceLabel,
@@ -1343,7 +1343,7 @@ export default function PlayerDetailDrawer({
                 <em>{formatRankLabel(card.valueRank)}</em>
               </span>
               <span className="player-drawer-axis-chip-metric is-pp">
-                <small>PP</small>
+                <small>PPs</small>
                 <strong>{formatValue(card.seasonPoints, 1)}</strong>
                 <em>{formatRankLabel(card.seasonPointsRank)}</em>
               </span>
@@ -1395,45 +1395,49 @@ export default function PlayerDetailDrawer({
               <div className="player-drawer-portrait player-drawer-portrait-large player-drawer-portrait-placeholder">{buildInitials(data.name)}</div>
             )}
             <div className="player-drawer-headline player-drawer-headline-rich">
-              <div className="player-drawer-meta-line">
-                <span className={`transfer-status-pill${getTransferStatusTone(data.transferStatus)}`}>{data.transferStatus}</span>
-                <span className="player-drawer-source-chip">{isFreeAgent ? "Marktprofil" : "Spielerprofil"}</span>
-              </div>
-              <h2>{data.name}</h2>
-              <p className="player-drawer-subline">
-                {data.teamName ?? "Kein aktives Team"}
-                {data.teamCode ? ` · ${data.teamCode}` : ""}
-              </p>
-              <div className="player-drawer-identity-row">
-                <ClassIcon classNameValue={data.className} className="player-drawer-class-chip" iconClassName="player-drawer-class-icon" />
-                <RaceIcon race={data.race} className="player-drawer-race-chip" iconClassName="player-drawer-race-icon" />
-              </div>
-              <div className="player-drawer-chip-row">
-                {data.subclasses.map((subclass) => (
-                  <span key={`header-subclass-${subclass}`} className="player-drawer-chip is-subclass">
-                    {subclass}
-                  </span>
-                ))}
-                {data.traitsPositive.slice(0, 4).map((trait) => (
-                  <span key={`positive-${trait}`} className="player-drawer-chip is-positive">
-                    + {trait}
-                  </span>
-                ))}
-                {data.traitsNegative.slice(0, 4).map((trait) => (
-                  <span key={`negative-${trait}`} className="player-drawer-chip is-negative">
-                    − {trait}
-                  </span>
-                ))}
-                {data.hiddenPositiveTraitCount > 0 ? (
-                  <span className="player-drawer-chip is-muted" title="Scouting Office upgraden, um weitere positive Traits zu sehen.">
-                    Trait verdeckt
-                  </span>
-                ) : null}
-                {data.hiddenNegativeTraitCount > 0 ? (
-                  <span className="player-drawer-chip is-muted" title="Negative Traits werden ab Scouting-Stufe 4 sichtbar.">
-                    Negativ-Trait verdeckt
-                  </span>
-                ) : null}
+              <div className="player-drawer-headline-top">
+                <div className="player-drawer-headline-primary">
+                  <div className="player-drawer-meta-line">
+                    <span className={`transfer-status-pill${getTransferStatusTone(data.transferStatus)}`}>{data.transferStatus}</span>
+                    <span className="player-drawer-source-chip">{isFreeAgent ? "Marktprofil" : "Spielerprofil"}</span>
+                  </div>
+                  <h2>{data.name}</h2>
+                  <p className="player-drawer-subline">
+                    {data.teamName ?? "Kein aktives Team"}
+                    {data.teamCode ? ` · ${data.teamCode}` : ""}
+                  </p>
+                  <div className="player-drawer-identity-row">
+                    <ClassIcon classNameValue={data.className} className="player-drawer-class-chip" iconClassName="player-drawer-class-icon" />
+                    <RaceIcon race={data.race} className="player-drawer-race-chip" iconClassName="player-drawer-race-icon" />
+                  </div>
+                  <div className="player-drawer-chip-row">
+                    {data.subclasses.map((subclass) => (
+                      <span key={`header-subclass-${subclass}`} className="player-drawer-chip is-subclass">
+                        {subclass}
+                      </span>
+                    ))}
+                    {data.traitsPositive.slice(0, 4).map((trait) => (
+                      <span key={`positive-${trait}`} className="player-drawer-chip is-positive">
+                        + {trait}
+                      </span>
+                    ))}
+                    {data.traitsNegative.slice(0, 4).map((trait) => (
+                      <span key={`negative-${trait}`} className="player-drawer-chip is-negative">
+                        − {trait}
+                      </span>
+                    ))}
+                    {data.hiddenPositiveTraitCount > 0 ? (
+                      <span className="player-drawer-chip is-muted" title="Scouting Office upgraden, um weitere positive Traits zu sehen.">
+                        Trait verdeckt
+                      </span>
+                    ) : null}
+                    {data.hiddenNegativeTraitCount > 0 ? (
+                      <span className="player-drawer-chip is-muted" title="Negative Traits werden ab Scouting-Stufe 4 sichtbar.">
+                        Negativ-Trait verdeckt
+                      </span>
+                    ) : null}
+                  </div>
+                </div>
               </div>
               <div className="player-drawer-header-metrics-band" data-testid="player-drawer-header-metrics-band">
                 <span className="player-drawer-header-metric" title="Marktwert">
@@ -1725,13 +1729,6 @@ export default function PlayerDetailDrawer({
               <article className="metric-card">
                 <span>Einsätze</span>
                 <strong>{hasSeasonPerformance ? seasonPerformance.appearances : "—"}</strong>
-              </article>
-              <article className="metric-card" title={data.ppsSourceLabel ?? undefined}>
-                <span>Saison-PPs</span>
-                <strong>
-                  {formatValue(data.pps, 1)}
-                  {data.ppsRank != null ? <em className="player-drawer-metric-rank">#{data.ppsRank}</em> : null}
-                </strong>
               </article>
               <article className="metric-card">
                 <span>Avg Beitrag</span>
@@ -2384,14 +2381,10 @@ export default function PlayerDetailDrawer({
             ) : (
               <div className="player-drawer-contract-summary" data-testid="player-drawer-contract-summary">
                 <p className="muted">
-                  Gehalt {formatMoney(data.salary)} · Laufzeit {data.contractLength ?? "—"}
+                  Laufzeit {data.contractLength ?? "—"}
                   {formatContractShapeShortLabel(data.contractShape) ? ` · ${formatContractShapeShortLabel(data.contractShape)}` : ""}
+                  {data.morale ? ` · Verlängerung: ${formatMoraleContractIntent(data.morale.contractIntent)}` : ""}
                 </p>
-                {data.morale ? (
-                  <p className="muted">
-                    Moral {data.morale.moodLabel} · {formatMoraleContractIntent(data.morale.contractIntent)}
-                  </p>
-                ) : null}
               </div>
             )}
           </section>

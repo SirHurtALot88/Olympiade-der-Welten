@@ -582,6 +582,43 @@ describe("singleplayer game state", () => {
     expect(new Set(Object.values(assignments).map((assignment) => assignment.gmId)).size).toBe(32);
   });
 
+  it("varies fit-near GM picks across different save seeds", () => {
+    const fresh = createFreshSeasonOneGameState();
+    const identities = loadDefaultTeamIdentities();
+    const team = fresh.teams.find((entry) => entry.teamId === "Z-H");
+    expect(team).toBeTruthy();
+
+    const saveA = buildTeamGeneralManagerAssignments(fresh.teams, fresh.season.id, null, identities, null, null, "save-seed-a");
+    const saveB = buildTeamGeneralManagerAssignments(fresh.teams, fresh.season.id, null, identities, null, null, "save-seed-b");
+    const gmA = saveA["Z-H"]?.gmId;
+    const gmB = saveB["Z-H"]?.gmId;
+
+    expect(gmA).toBeTruthy();
+    expect(gmB).toBeTruthy();
+    expect(gmA).not.toBe(gmB);
+  });
+
+  it("caps repeated GM archetypes in the league pool", () => {
+    const fresh = createFreshSeasonOneGameState();
+    const assignments = buildTeamGeneralManagerAssignments(
+      fresh.teams,
+      fresh.season.id,
+      null,
+      loadDefaultTeamIdentities(),
+      null,
+      null,
+      "diversity-audit-seed",
+    );
+    const archetypeCounts = new Map<string, number>();
+    for (const assignment of Object.values(assignments)) {
+      const profile = TEAM_GENERAL_MANAGER_PROFILES.find((entry) => entry.gmId === assignment.gmId);
+      if (!profile) continue;
+      archetypeCounts.set(profile.archetype, (archetypeCounts.get(profile.archetype) ?? 0) + 1);
+    }
+    const maxSameArchetype = Math.max(...archetypeCounts.values(), 0);
+    expect(maxSameArchetype).toBeLessThanOrEqual(6);
+  });
+
   it("keeps raw sheet identities available separately from GM-adjusted season identities", () => {
     const defaults = loadDefaultTeamIdentities();
 

@@ -22,6 +22,7 @@ import {
   getAttributeHeadroom,
   getPerformanceHeadroomGrowthMultiplier,
   resolvePlayerPotentialRecordFromGameState,
+  type AttributeHeadroomState,
 } from "@/lib/scouting/player-attribute-ceiling-service";
 import { buildPlayerAxisStarProfile } from "@/lib/scouting/player-axis-star-rating";
 import { resolvePlayerPotentialRecordForProgression } from "@/lib/scouting/player-potential-ceiling-service";
@@ -128,15 +129,43 @@ export type OrganicRegressionBreakdown = {
 export const ORGANIC_BASE_REGRESSION_PER_ATTRIBUTE = 0.344;
 const TRAINING_CENTER_LEVEL_MODIFIER_PCT = [0, 14, 28, 42, 56, 70] as const;
 /** 0,7 % vom Marktwert pro Attribut (nicht MVS). Tunable via auto-tune. */
-export const ORGANIC_MARKET_VALUE_PRESSURE_RATE = 0.0104;
+export const ORGANIC_MARKET_VALUE_PRESSURE_RATE = 0.007;
 const NEGATIVE_TRAINING_SIDE_EFFECT_SHARE = 0.14;
 /** Performance budget scale — boosts peak P90 vs league median. Tunable via auto-tune. */
 export const ORGANIC_PERFORMANCE_SETPOINT_SCALE = 0.64;
 const PERFORMANCE_SEASON_SOFT_KNEE = 5.5;
-const STAR_PERFORMANCE_GROWTH_FLOOR = 0.78;
-const STAR_TRAINING_GROWTH_FLOOR = 0.35;
+/**
+ * 2026-07-04 design correction: growth floors must derive from the player's own
+ * potential-cap gap (per the organic design principle — "weit vom Cap = schnell,
+ * nah am Cap = automatisch langsamer"), NOT from a global rating>=72 "isStar" gate.
+ * A rating-gated floor rewarded players who "already made it" instead of players who
+ * are genuinely far from their individual attribute/axis ceiling, which is exactly why
+ * high-potential-but-currently-low-rated players (e.g. many Top-20-MW prospects) fell
+ * through the cracks. See progress-log.md for the before/after distribution.
+ * These floors only ever apply to attributes that are NOT already "capped" per
+ * getAttributeHeadroom — a genuinely maxed-out attribute never gets bailed out, no
+ * matter how large the player's overall potential gap or how good their performance.
+ */
+const HIGH_POTENTIAL_GAP_PERFORMANCE_GROWTH_FLOOR = 0.78;
+const MID_POTENTIAL_GAP_PERFORMANCE_GROWTH_FLOOR = 0.55;
+const HIGH_POTENTIAL_GAP_TRAINING_GROWTH_FLOOR = 0.35;
+/** Star-gap thresholds (same scale as getPotentialGapXpFactor's tiers). */
+const HIGH_POTENTIAL_GAP_STARS_THRESHOLD = 1.5;
+const MID_POTENTIAL_GAP_STARS_THRESHOLD = 0.75;
 const SIGNATURE_ORGANIC_GROWTH_MULTIPLIER = 1.15;
 const WEAK_ORGANIC_GROWTH_MULTIPLIER = 0.8;
+/**
+ * 2026-07-04 balancing pass: shift weight from pure training towards match performance,
+ * concentrated on "mittel" (the default/most-used intensity) so solid performers — not just
+ * players with a high potential-gap growth floor — see more of their good match results
+ * reflected in progression. "leicht"/"hart" stay at their prior balance. Small and
+ * graduated on purpose (+12%); see progress-log.md for the pre/post comparison.
+ */
+const PERFORMANCE_WEIGHT_MULTIPLIER_BY_MODE: Record<PlayerTrainingMode, number> = {
+  leicht: 1.0,
+  mittel: 1.12,
+  hart: 1.0,
+};
 
 function roundValue(value: number, digits = 2) {
   return Number(value.toFixed(digits));
@@ -451,6 +480,7 @@ function getOrganicPerformanceGrowthMultiplier(input: {
   record?: PlayerPotentialRecord | null;
   affinityProfile: AttributeAffinityProfile;
   signals: SeasonPerformanceSignals;
+  potentialGapStars: number;
 }) {
   const affinity = getAttributeAffinityKind(input.attribute, input.affinityProfile);
   const headroom = getAttributeHeadroom({
@@ -458,26 +488,38 @@ function getOrganicPerformanceGrowthMultiplier(input: {
     attribute: input.attribute,
     record: input.record,
   });
-  let multiplier = getOrganicGrowthMultiplier(affinity) * getPerformanceHeadroomGrowthMultiplier(headroom.headroom);
+  const multiplier = getOrganicGrowthMultiplier(affinity) * getPerformanceHeadroomGrowthMultiplier(headroom.headroom);
   if (input.signals.appearances < 4) return multiplier;
+  // A genuinely capped attribute never gets a bailout — the individual cap always wins.
+  if (headroom.state === "capped") return multiplier;
 
   const avgBudget = input.signals.avgPerformanceBudget;
-  const isStar = input.player.rating >= 72;
+  const gapStars = input.potentialGapStars;
 
-  if (isStar && avgBudget >= 0.55) return Math.max(multiplier, STAR_PERFORMANCE_GROWTH_FLOOR);
-  if (isStar && avgBudget >= 0.38) return Math.max(multiplier, 0.55);
+  if (gapStars >= HIGH_POTENTIAL_GAP_STARS_THRESHOLD && avgBudget >= 0.55) {
+    return Math.max(multiplier, HIGH_POTENTIAL_GAP_PERFORMANCE_GROWTH_FLOOR);
+  }
+  if (gapStars >= MID_POTENTIAL_GAP_STARS_THRESHOLD && avgBudget >= 0.38) {
+    return Math.max(multiplier, MID_POTENTIAL_GAP_PERFORMANCE_GROWTH_FLOOR);
+  }
   return multiplier;
 }
 
 function getOrganicTrainingGrowthMultiplier(
   growthMultiplier: number,
-  player: Player,
+  headroomState: AttributeHeadroomState,
+  potentialGapStars: number,
   signals: SeasonPerformanceSignals,
 ) {
-  if (player.rating < 72 || signals.appearances < 4 || signals.avgPerformanceBudget < 0.38) {
+  if (
+    headroomState === "capped" ||
+    potentialGapStars < MID_POTENTIAL_GAP_STARS_THRESHOLD ||
+    signals.appearances < 4 ||
+    signals.avgPerformanceBudget < 0.38
+  ) {
     return growthMultiplier;
   }
-  return Math.max(growthMultiplier, STAR_TRAINING_GROWTH_FLOOR);
+  return Math.max(growthMultiplier, HIGH_POTENTIAL_GAP_TRAINING_GROWTH_FLOOR);
 }
 
 function applyTrainingGrowthMultiplier(value: number, multiplier: number) {
@@ -629,6 +671,7 @@ export function buildOrganicSeasonProgression(input: {
   const rawAttributeBreakdown = PROGRESSION_ATTRIBUTE_ORDER.map((attribute) => {
     const affinity = getAttributeAffinityKind(attribute, affinityProfile);
     const organicAffinityMult = getOrganicGrowthMultiplier(affinity);
+    const attributeHeadroom = getAttributeHeadroom({ player: input.player, attribute, record: potentialRecord });
     const trainingGrowthMultiplier = getCombinedAttributeTrainingMultiplier({
       player: input.player,
       attribute,
@@ -637,17 +680,25 @@ export function buildOrganicSeasonProgression(input: {
       axisPoStars: axisPoStars ?? undefined,
       affinityGrowthMultiplier: organicAffinityMult,
     });
-    const trainingMultiplier = getOrganicTrainingGrowthMultiplier(trainingGrowthMultiplier, input.player, performanceSignals);
+    const trainingMultiplier = getOrganicTrainingGrowthMultiplier(
+      trainingGrowthMultiplier,
+      attributeHeadroom.state,
+      starSnapshot.potentialGap,
+      performanceSignals,
+    );
     const performanceGrowthMultiplier = getOrganicPerformanceGrowthMultiplier({
       player: input.player,
       attribute,
       record: potentialRecord,
       affinityProfile,
       signals: performanceSignals,
+      potentialGapStars: starSnapshot.potentialGap,
     });
     const regression = -(ORGANIC_BASE_REGRESSION_PER_ATTRIBUTE + marketValuePressurePerAttribute);
     const training = applyTrainingGrowthMultiplier(primaryTrainingDeltas[attribute] + secondaryTrainingDeltas[attribute], trainingMultiplier);
-    const performanceDelta = applyPositiveGrowthMultiplier(performance.deltas[attribute], performanceGrowthMultiplier);
+    const performanceDelta =
+      applyPositiveGrowthMultiplier(performance.deltas[attribute], performanceGrowthMultiplier) *
+      PERFORMANCE_WEIGHT_MULTIPLIER_BY_MODE[trainingMode];
     const delta = roundValue(regression + training + performanceDelta, 2);
     const before = attributesBefore[attribute];
     const after = roundValue(clamp(before + delta, 1, 99), 1);

@@ -480,6 +480,41 @@ describe("team season objectives service", () => {
     expect(zeroRating?.pressure).toBe(neutralRating?.pressure);
   });
 
+  it("keeps season 1 preseason board neutral regardless of identity and failed objectives", () => {
+    const team = createTeam({ teamId: "A-A", shortCode: "A-A", cash: -8 });
+    const gameState = createGameState({
+      teams: [team],
+      identities: [createIdentity(team.teamId, { boardConfidence: 1 })],
+    });
+    gameState.season = { ...gameState.season, id: "season-1", name: "Season 1" };
+    gameState.seasonState.seasonId = "season-1";
+    gameState.gamePhase = "preseason_management";
+
+    const overview = buildTeamObjectiveOverview(gameState);
+    const board = overview.boardConfidence[team.teamId];
+
+    expect(board?.value).toBe(5);
+    expect(board?.pressure).toBe(5);
+    expect(board?.warnings).toEqual([]);
+  });
+
+  it("applies board objective pressure after season 1 leaves preseason", () => {
+    const team = createTeam({ teamId: "A-A", shortCode: "A-A", cash: -8 });
+    const gameState = createGameState({
+      teams: [team],
+      identities: [createIdentity(team.teamId, { boardConfidence: 1 })],
+    });
+    gameState.season = { ...gameState.season, id: "season-1", name: "Season 1" };
+    gameState.seasonState.seasonId = "season-1";
+    gameState.gamePhase = "season_active";
+
+    const overview = buildTeamObjectiveOverview(gameState);
+    const board = overview.boardConfidence[team.teamId];
+
+    expect(board?.value).toBeLessThan(5);
+    expect(board?.pressure).toBeGreaterThan(5);
+  });
+
   it("exposes AI objective bias for market decisions", () => {
     const team = createTeam({ teamId: "A-A", shortCode: "A-A", cash: -4 });
     const gameState = createGameState({

@@ -22,7 +22,6 @@ import type {
   FoundationReadSource,
   FoundationView,
   SaveActionRequest,
-  SeasonEndXpSpendPreview,
 } from "@/lib/foundation/tabs/foundation-page-types";
 import { TRANSFER_MARKET_INITIAL_RENDER_LIMIT } from "@/lib/foundation/tabs/foundation-page-types";
 import type { ActiveManagerTeamSource } from "@/lib/foundation/tabs/foundation-page-types";
@@ -89,10 +88,6 @@ export type FoundationSaveScopedFeedSetters = {
   setMatchdayAutoRunFeed: Dispatch<SetStateAction<unknown>>;
   setWholeSeasonDryRunFeed: Dispatch<SetStateAction<unknown>>;
   setSeasonSnapshotFeed: Dispatch<SetStateAction<unknown>>;
-  setSeasonEndXpSpendPreview: Dispatch<SetStateAction<SeasonEndXpSpendPreview | null>>;
-  setSeasonEndXpSpendError: Dispatch<SetStateAction<string | null>>;
-  setSeasonEndXpSpendSuccess: Dispatch<SetStateAction<string | null>>;
-  setPlannedXpUpgrades: Dispatch<SetStateAction<unknown[]>>;
   setPlayerProfileData: Dispatch<SetStateAction<PlayerDetailDrawerData | null>>;
   setTeamProfileTeamId: Dispatch<SetStateAction<string | null>>;
   setFoundationActionFeedback: Dispatch<SetStateAction<unknown>>;
@@ -248,10 +243,6 @@ export function useFoundationPersistenceActions(input: UseFoundationPersistenceA
     setters.setMatchdayAutoRunFeed(null);
     setters.setWholeSeasonDryRunFeed(null);
     setters.setSeasonSnapshotFeed(null);
-    setters.setSeasonEndXpSpendPreview(null);
-    setters.setSeasonEndXpSpendError(null);
-    setters.setSeasonEndXpSpendSuccess(null);
-    setters.setPlannedXpUpgrades([]);
     setters.setPlayerProfileData(null);
     setters.setTeamProfileTeamId(null);
     setters.setFoundationActionFeedback(null);

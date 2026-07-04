@@ -705,25 +705,10 @@ async function runPreseasonPlannerConvergenceBeforeEmergencyRepair(
   const performanceRows: PhaseMetric[] = [];
   const save = persistence.getSaveById(saveId);
   if (!save) throw new Error("Long-run save missing before preseason planner convergence.");
-  // Season 1 has no legal market buys at all (S1_FORBIDDEN_BUY_SOURCES /
-  // isTransferActionAllowed both block "ai_preseason_market_buy" and
-  // "preseason_roster_repair_buy"), but runTransferWindowSession's sell step has no such
-  // gate — running this convergence pass in season-1 would only ever sell, never buy back,
-  // which violates the no-sell-floor rebuild guarantee (see
-  // .cursor/rules/balancing-no-sell-floor-full-rebuild.mdc). Season-1 roster shortfalls can
-  // only be fixed via the draft/topup mechanisms, so skip this pass entirely here.
-  if (isSeasonOne(seasonId)) {
-    const coverageRiskRows = getPreseasonCoverageRiskRows(save.gameState);
-    return {
-      performanceRows,
-      reviewed: false,
-      warnings:
-        coverageRiskRows.length > 0
-          ? [`preseason_planner_convergence_skipped_season_one_no_market_buys:${coverageRiskRows.length}`]
-          : [],
-      emergencyRepairTeams: [] as string[],
-    };
-  }
+  // Course correction (2026-07-04): S1 buys are NOT forbidden — the draft is just the first
+  // ordinary application of the same acquisition engine. This pass now runs unchanged in S1 too,
+  // so a team that sold down (or organically dropped) below hardMin/Opt can rebuy in the same
+  // season via runTransferWindowSession's Unified-backed buy step, exactly like any later season.
   const coverageRiskRows = getPreseasonCoverageRiskRows(save.gameState);
   const deployTeams = getTeamsNeedingTransferBudgetDeploy(save.gameState, seasonId);
   const existingMarketTransfers = getExistingPreseasonMarketTransfers(save.gameState, seasonId).filter(
@@ -2574,14 +2559,12 @@ async function applySeasonEnd(saveId: string, persistence: PersistenceService) {
   let plannerFinalGateRows: Record<string, unknown>[] = [];
   let seasonEndEmergencyRepairTeams: string[] = [];
   const allowSeasonEndMarketBuys = isTransferActionAllowed(seasonId, "season_end_market_buy");
-  // Season 1 forbids market buys entirely (allowSeasonEndMarketBuys is always false here), but
-  // runTransferWindowSession's sell step has no such gate. Running this pass in season-1 season-end
-  // was observed to sell nearly the whole league down towards/at 0 roster (23/32 teams below hardMin
-  // in one balancing run) with zero possibility of buying back in the same pass, violating the
-  // no-sell-floor rebuild guarantee (.cursor/rules/balancing-no-sell-floor-full-rebuild.mdc). Season-1
-  // roster composition is settled by the draft; real rebuilding only becomes possible once season-2's
-  // preseason convergence opens up buys, so skip this pass entirely for season-1.
-  if (existingMarketTransfers.length === 0 && !isSeasonOne(seasonId)) {
+  // Course correction (2026-07-04): S1 market buys are permitted now (allowSeasonEndMarketBuys is
+  // true for every season). The old skip-in-S1 guard here was the wrong fix for the "sell without
+  // buying back" spiral observed previously — the actual root cause (sell-without-matching-buy
+  // across ALL seasons) is now handled by the netNegativeStrikes exhaustion mechanism in
+  // ai-transfer-window-session-service.ts, so this pass runs unchanged in every season including S1.
+  if (existingMarketTransfers.length === 0) {
     const marketConvergence = await runTransferWindowSession({
       saveId,
       seasonId,
@@ -3184,8 +3167,17 @@ async function main() {
       save = postPhase.save;
     }
   } else {
+    // 2026-07-04 incident: createFreshSeasonOneSave defaults to status "active" + activate=true,
+    // which archives whatever save the shared dev server's live UI was showing and replaces it with
+    // this long-run/balancing save — so a background balancing run silently hijacked the save a user
+    // was actively viewing in the browser (saw "S3 MD1" instead of their own game). Long-run/balancing
+    // saves must never become the app's global "active" save; keep them archived so
+    // persistence.getActiveSave()/bootstrapSingleplayerSave() (used by app/api/singleplayer-state and
+    // friends) never resolve to one. See outputs/real-engine-s1s5-final/progress-log.md.
     const created = persistence.createFreshSeasonOneSave({
       name: `${RUN_LABEL} ${new Date().toLocaleString("de-DE")}`,
+      status: "archived",
+      activate: false,
     });
     const reset = await runSeasonStartReset({
       source: "sqlite",

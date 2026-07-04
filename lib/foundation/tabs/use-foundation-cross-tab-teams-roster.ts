@@ -37,6 +37,9 @@ export type FoundationRosterTableRow = {
   playerOvr: number | null;
   playerMvs: number | null;
   playerPps: number | null;
+  ovrRank?: number | null;
+  mvsRank?: number | null;
+  ppsRank?: number | null;
   ppPow: number | null;
   ppSpe: number | null;
   ppMen: number | null;
@@ -126,6 +129,9 @@ export function useFoundationCrossTabTeamsRoster(input: {
           playerOvr: playerRating?.ovrNormalized ?? null,
           playerMvs: playerRating?.mvs ?? null,
           playerPps: playerRating?.ppsSeason ?? null,
+          ovrRank: playerRating?.ovrRank ?? null,
+          mvsRank: playerRating?.mvsRank ?? null,
+          ppsRank: playerRating?.ppsSeasonRank ?? null,
           ppPow: playerRating?.ppPow ?? null,
           ppSpe: playerRating?.ppSpe ?? null,
           ppMen: playerRating?.ppMen ?? null,

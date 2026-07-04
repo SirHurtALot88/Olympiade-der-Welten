@@ -1044,7 +1044,9 @@ function materializePersistedSave(row: SaveRow): PersistedSaveGame | null {
   const gameStateWithoutBaseline = withNormalizedSeasonDisciplineSchedule(
     normalizeLegacyRosterTargets(
       normalizeLegacyFinanceScale(
-        withNormalizedTeamGeneralManagers(withNormalizedTeamIdentityOverrides(normalizeLegacyCashCreatorsColdSteelCodes(hydrated))),
+        withNormalizedTeamGeneralManagers(withNormalizedTeamIdentityOverrides(normalizeLegacyCashCreatorsColdSteelCodes(hydrated)), {
+          saveId,
+        }),
       ),
     ),
   );
@@ -1110,7 +1112,9 @@ export function readSliceGameStateForSave(saveId: string): GameState | null {
   });
 
   return normalizeLegacyRosterTargets(
-    normalizeLegacyFinanceScale(withNormalizedTeamGeneralManagers(withNormalizedTeamIdentityOverrides(hydrated))),
+    normalizeLegacyFinanceScale(
+      withNormalizedTeamGeneralManagers(withNormalizedTeamIdentityOverrides(hydrated), { saveId }),
+    ),
   );
 }
 
@@ -1185,7 +1189,9 @@ function createPersistedSaveRecord(input: {
   const normalizedWithoutBaselines = withNormalizedSeasonDisciplineSchedule(
     normalizeLegacyRosterTargets(
       normalizeLegacyFinanceScale(
-        withNormalizedTeamGeneralManagers(withNormalizedTeamIdentityOverrides(normalizeLegacyCashCreatorsColdSteelCodes(input.gameState))),
+        withNormalizedTeamGeneralManagers(withNormalizedTeamIdentityOverrides(normalizeLegacyCashCreatorsColdSteelCodes(input.gameState)), {
+          saveId: input.saveId,
+        }),
       ),
     ),
   );

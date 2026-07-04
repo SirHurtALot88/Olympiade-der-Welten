@@ -116,7 +116,6 @@ export function useTrainingPanelDerivations(input: UseTrainingPanelDerivationsIn
         performanceXp: organicProgression.appliedPerformanceSetpoints,
         trainingXp: organicProgression.trainingSetpoints,
         totalXp: organicProgression.netSetpoints,
-        upgradeEstimate: forecast.possibleUpgradeSummary,
         fatigueWarning: forecast.fatigueStrain.warning,
         recoveryForecast,
         playerMvs: rating?.mvs ?? null,

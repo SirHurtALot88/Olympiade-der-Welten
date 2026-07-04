@@ -35716,6 +35716,139 @@ a {
   gap: 16px;
 }
 
+.scouting-overview-stats {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 10px;
+}
+
+.scouting-stat-chip {
+  display: grid;
+  gap: 4px;
+  padding: 12px 14px;
+  border-radius: 16px;
+  border: 1px solid rgba(112, 138, 187, 0.18);
+  background: rgba(255, 255, 255, 0.03);
+  cursor: default;
+}
+
+.scouting-stat-chip strong {
+  font-size: 1.05rem;
+}
+
+.scouting-stat-chip .transfer-status-pill {
+  justify-self: start;
+  font-size: 0.7rem;
+}
+
+.scouting-stat-stars {
+  margin: 2px 0;
+}
+
+.scouting-reveal-section {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  border: 1px solid rgba(112, 138, 187, 0.16);
+  border-radius: 18px;
+  background: linear-gradient(180deg, rgba(11, 18, 32, 0.9), rgba(9, 15, 27, 0.82));
+  padding: 16px;
+}
+
+.scouting-reveal-ladder {
+  display: grid;
+  grid-template-columns: repeat(6, minmax(0, 1fr));
+  gap: 6px;
+}
+
+.scouting-reveal-step {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+  padding: 4px 0;
+  border-radius: 12px;
+  opacity: 0.45;
+}
+
+.scouting-reveal-step small {
+  font-size: 0.62rem;
+  letter-spacing: 0.02em;
+  color: rgba(235, 239, 247, 0.7);
+  text-align: center;
+}
+
+.scouting-reveal-step-dot {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 26px;
+  height: 26px;
+  border-radius: 999px;
+  border: 1px solid rgba(148, 163, 184, 0.35);
+  background: rgba(255, 255, 255, 0.04);
+  font-size: 0.72rem;
+  font-weight: 700;
+  color: rgba(235, 239, 247, 0.72);
+}
+
+.scouting-reveal-step.is-reached {
+  opacity: 1;
+}
+
+.scouting-reveal-step.is-reached .scouting-reveal-step-dot {
+  border-color: rgba(134, 239, 172, 0.55);
+  background: rgba(86, 196, 142, 0.16);
+  color: #d3f8df;
+}
+
+.scouting-reveal-step.is-current .scouting-reveal-step-dot {
+  border-color: rgba(145, 185, 244, 0.85);
+  background: rgba(91, 145, 218, 0.28);
+  box-shadow: 0 0 0 3px rgba(91, 145, 218, 0.18);
+  color: #fff;
+}
+
+.scouting-reveal-step.is-current small {
+  color: #fff;
+  font-weight: 700;
+}
+
+.scouting-reveal-pill-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.scouting-reveal-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 5px 10px;
+  border-radius: 999px;
+  font-size: 0.74rem;
+  white-space: nowrap;
+  max-width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.scouting-reveal-pill.is-visible {
+  background: rgba(86, 196, 142, 0.14);
+  border: 1px solid rgba(134, 239, 172, 0.3);
+  color: #d3f8df;
+}
+
+.scouting-reveal-pill.is-visible.is-base {
+  background: rgba(86, 196, 142, 0.22);
+}
+
+.scouting-reveal-pill.is-hidden {
+  background: rgba(148, 163, 184, 0.08);
+  border: 1px solid rgba(148, 163, 184, 0.2);
+  color: rgba(235, 239, 247, 0.55);
+}
+
 .scouting-hub-v2-card,
 .scouting-hub-v2-target-card {
   border: 1px solid rgba(112, 138, 187, 0.2);
@@ -36412,8 +36545,13 @@ a {
   .scouting-hub-v2-recruitment,
   .scouting-hub-v2-disclosure-grid,
   .scouting-hub-v2-target-grid,
+  .scouting-overview-stats,
   .inbox-v2-layout {
     grid-template-columns: 1fr;
+  }
+
+  .scouting-reveal-ladder {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
   }
 }
 

@@ -1,6 +1,10 @@
 "use client";
 
+import { useEffect, useState } from "react";
+
 import { VeloImpactStrip, VeloStatOrbitRow } from "@/components/foundation/velo-ui";
+import { isSeasonOnePreseasonNeutralBoard } from "@/lib/board/team-season-objectives-service";
+import type { GameState } from "@/lib/data/olyDataTypes";
 import type { GmStoryView } from "@/lib/foundation/gm-story";
 import type { GameInboxItem, TeamControlMode } from "@/lib/data/olyDataTypes";
 import type { FoundationViewId } from "@/lib/foundation/foundation-view-routing";
@@ -116,6 +120,23 @@ export type ManagerOfficeClientProps = {
     style: string;
     effects: { moraleBuffer: number };
   } | null;
+  selectedTeamCaptainCandidates: Array<{
+    playerId: string;
+    playerName: string;
+    leadershipScore: number;
+    style: string;
+    effects: {
+      moraleBuffer: number;
+      rivalryPressureReductionPct: number;
+      teamPowerModifierPct: number;
+    };
+    hasCaptaincyDemand: boolean;
+    demandLabel: string | null;
+  }>;
+  selectedTeamCaptainPlayerId: string | null;
+  assignTeamCaptainBusy: boolean;
+  captainEffectsTooltip: string;
+  onAssignTeamCaptain: (playerId: string) => void;
   selectedTeamPowers: unknown[];
   hqContractExpiringCount: number;
   hqTransferSellMarkers: HqSellMarker[];
@@ -134,7 +155,7 @@ export type ManagerOfficeClientProps = {
   selectedTeam: { teamId?: string; name?: string; shortCode?: string } | null;
   selectedTeamControl: { controlMode: TeamControlMode | null } | null;
   homeActiveTeamLogo: { src?: string | null; initials?: string } | null;
-  gameState: { season: { name: string } };
+  gameState: { season: { name: string }; gamePhase?: string | null };
   currentMatchdayDisplayLabel: string;
   selectedTeamCanManage: boolean;
   isReadOnlyMode: boolean;
@@ -159,6 +180,11 @@ export function ManagerOfficeClient({
   selectedTeamGeneralManager,
   hqTransferWishlistEntries,
   selectedTeamCaptainProfile,
+  selectedTeamCaptainCandidates,
+  selectedTeamCaptainPlayerId,
+  assignTeamCaptainBusy,
+  captainEffectsTooltip,
+  onAssignTeamCaptain,
   selectedTeamPowers,
   hqContractExpiringCount,
   hqTransferSellMarkers,
@@ -181,6 +207,11 @@ export function ManagerOfficeClient({
   onNavigateInboxItem,
   seasonReadinessChecklist,
 }: ManagerOfficeClientProps) {
+  const [draftCaptainPlayerId, setDraftCaptainPlayerId] = useState<string | null>(selectedTeamCaptainPlayerId);
+
+  useEffect(() => {
+    setDraftCaptainPlayerId(selectedTeamCaptainPlayerId);
+  }, [selectedTeamCaptainPlayerId, selectedTeam?.teamId]);
               function sortManagerCards<T extends { priority: number; title: string }>(cards: T[]) {
                 return [...cards].sort((left, right) => right.priority - left.priority || left.title.localeCompare(right.title, "de"));
               }
@@ -289,7 +320,12 @@ export function ManagerOfficeClient({
 	                meta: selectedTeamPowers.length > 0 ? `${selectedTeamPowers.length} Powers aktiv` : "Captain-Synergien offen",
                   priority: selectedTeamPowers.length > 0 ? 54 : 46,
 	                tone: selectedTeamPowers.length > 0 ? "ready" : "warning",
-	                onClick: () => onNavigate("lineup"),
+	                onClick: () => {
+                    onNavigate("homeV2");
+                    window.setTimeout(() => {
+                      document.getElementById("foundation-hq-captain-picker")?.scrollIntoView({ behavior: "smooth", block: "start" });
+                    }, 120);
+                  },
 	              },
 	            ]);
 	            const preseasonCards = sortManagerCards([
@@ -431,52 +467,12 @@ export function ManagerOfficeClient({
                 },
               ]);
               const marketWatchRows = hqTransferWishlistEntries.slice(0, 3);
+              // Cash/Gehalt/Kader/Moral/Achsen/Board sind bereits im State-Strip bzw. im Board-Impact-Strip
+              // oben sichtbar - hier bleibt nur der GM-Status, der sonst nirgends kompakt auftaucht.
               const hqGlanceRows = [
                 {
-                  key: "cash",
-                  label: "Cash",
-                  value: selectedStandingRow?.cash != null ? formatMoney(selectedStandingRow.cash) : "—",
-                  detail: selectedHqFinanceWarnings[0] ?? "sofort verfuegbar",
-                },
-                {
-                  key: "salary",
-                  label: "Gehalt",
-                  value: selectedStandingRow?.salaryTotal != null ? formatMoney(selectedStandingRow.salaryTotal) : "—",
-                  detail: "laufender Saisondruck",
-                },
-                {
-                  key: "roster",
-                  label: "Kader",
-                  value: `${selectedStandingRow?.rosterCount ?? rosterPlayers.length}`,
-                  detail: `${hqContractExpiringCount} kurz gebunden`,
-                },
-                {
-                  key: "morale",
-                  label: "Moral",
-                  value: selectedHqMoraleSummary?.average != null ? formatLocalePoints(selectedHqMoraleSummary.average, 1) : "—",
-                  detail: `${selectedHqMoraleSummary?.criticalCount ?? 0} kritisch`,
-                },
-                {
-                  key: "axes",
-                  label: "Achsen",
-                  value:
-                    selectedHqAxisSummary?.weakestTwo.length
-                      ? selectedHqAxisSummary.weakestTwo.map((entry) => `${entry.label} #${entry.rank}`).join(" · ")
-                      : "—",
-                  detail:
-                    selectedHqAxisSummary?.strongest
-                      ? `stark: ${selectedHqAxisSummary.strongest.label} #${selectedHqAxisSummary.strongest.rank}`
-                      : "keine Rangdaten",
-                },
-                {
-                  key: "board",
-                  label: "Board",
-                  value: `${selectedBoardConfidence?.value ?? "—"}/10`,
-                  detail: `Druck ${selectedBoardConfidence?.pressure ?? "—"}/10`,
-                },
-                {
                   key: "gm",
-                  label: "GM",
+                  label: "GM-Status",
                   value: selectedTeamGeneralManager?.profile.name ?? "—",
                   detail:
                     selectedTeamGeneralManager?.assignment.source === "board_replacement" ||
@@ -515,47 +511,28 @@ export function ManagerOfficeClient({
 	                    <div className="stack">
 	                      <span className="eyebrow">HQ / Manager-Zentrale</span>
 	                      <h1>{selectedTeam?.name ?? "Kein Team ausgewählt"}</h1>
-	                      <div className="room-meta foundation-admin-meta">
-	                        <span className="pill">{selectedTeam?.shortCode ?? "—"}</span>
-	                        <span className="pill">{formatTeamControlModeLabel(selectedTeamControl?.controlMode)}</span>
-	                        {selectedTeam && (!selectedTeamCanManage || isReadOnlyMode) ? (
-	                          <span className="transfer-status-pill is-warning">Nur Ansicht</span>
-	                        ) : null}
-	                        <span className="pill">{gameState.season.name}</span>
-	                        <span className="pill">{currentMatchdayDisplayLabel}</span>
-	                      </div>
+                        {selectedTeamGeneralManager ? (
+                          <p className="muted foundation-hq-gm-line">
+                            GM {selectedTeamGeneralManager.profile.name} · {selectedTeamGeneralManager.profile.title}
+                          </p>
+                        ) : null}
+                        {selectedTeam && (!selectedTeamCanManage || isReadOnlyMode) ? (
+                          <span className="transfer-status-pill is-warning">Nur Ansicht</span>
+                        ) : null}
+                        {selectedTeamAverageAxisStats ? (
+                          <VeloStatOrbitRow
+                            ariaLabel="Team Achsen Durchschnitt"
+                            className="foundation-hq-axis-orbit"
+                            stats={{
+                              pow: selectedTeamAverageAxisStats.pow,
+                              spe: selectedTeamAverageAxisStats.spe,
+                              men: selectedTeamAverageAxisStats.men,
+                              soc: selectedTeamAverageAxisStats.soc,
+                            }}
+                          />
+                        ) : null}
 	                    </div>
 	                  </button>
-	                  <article className="foundation-home-next-card foundation-hq-command">
-	                    <span className="eyebrow" title="Front-Office Fokus: nächster priorisierter Schritt">Front-Office Fokus</span>
-	                    <strong>{managerPriorityCards[0]?.title ?? selectedOpenObjectives[0]?.label ?? selectedHqFinanceWarnings[0] ?? "Systeme stabil halten"}</strong>
-                      <div className="foundation-hq-finance-strip">
-                        <span>
-                          Sofort
-                          <strong>{managerPriorityCards[0]?.meta ?? "naechster Zug"}</strong>
-                        </span>
-                        <span>
-                          Diese Season
-                          <strong>{seasonCards[0]?.title ?? "ruhig"}</strong>
-                        </span>
-                        <span>
-                          Wechsel
-                          <strong>{preseasonCards[0]?.title ?? "vorbereiten"}</strong>
-                        </span>
-                      </div>
-                      {selectedTeamAverageAxisStats ? (
-                        <VeloStatOrbitRow
-                          ariaLabel="Team Achsen Durchschnitt"
-                          className="foundation-hq-axis-orbit"
-                          stats={{
-                            pow: selectedTeamAverageAxisStats.pow,
-                            spe: selectedTeamAverageAxisStats.spe,
-                            men: selectedTeamAverageAxisStats.men,
-                            soc: selectedTeamAverageAxisStats.soc,
-                          }}
-                        />
-                      ) : null}
-                  </article>
 	                </div>
                   {seasonReadinessChecklist ? (
                     <section className="foundation-hq-readiness-checklist" data-testid="foundation-season-readiness-checklist" aria-label={seasonReadinessChecklist.title}>
@@ -587,7 +564,7 @@ export function ManagerOfficeClient({
                       </div>
                     </section>
                   ) : null}
-                  {selectedTeamGeneralManager && selectedHqGmStory ? (
+                  {selectedTeamGeneralManager && selectedHqGmStory && !isSeasonOnePreseasonNeutralBoard(gameState as GameState) ? (
                     <div
                       className={`season-v2-gm-story is-${selectedHqGmStory.tone}`}
                       data-testid="foundation-hq-gm-story"
@@ -595,8 +572,7 @@ export function ManagerOfficeClient({
                     >
                       <strong>{selectedHqGmStory.label}</strong>
                       <span>
-                        {selectedTeamGeneralManager.profile.name} · {selectedTeamGeneralManager.profile.title} · Druck{" "}
-                        {selectedBoardConfidence?.pressure ?? "—"}/10 · Confidence {selectedBoardConfidence?.value ?? "—"}/10 ·{" "}
+                        {selectedTeamGeneralManager.profile.name} · {selectedTeamGeneralManager.profile.title} ·{" "}
                         {selectedHqGmStory.detail}
                       </span>
                     </div>
@@ -613,7 +589,7 @@ export function ManagerOfficeClient({
                       },
                       {
                         key: "confidence",
-                        label: "Confidence",
+                        label: "Rating",
                         value: `${selectedBoardConfidence?.value ?? "—"}/10`,
                         tone: (selectedBoardConfidence?.value ?? 0) >= 7 ? "positive" : (selectedBoardConfidence?.value ?? 0) <= 4 ? "negative" : "neutral",
                       },
@@ -626,10 +602,69 @@ export function ManagerOfficeClient({
                     ]}
                   />
 
+                  <section
+                    className="foundation-hq-captain-picker"
+                    id="foundation-hq-captain-picker"
+                    data-testid="foundation-hq-captain-picker"
+                    aria-label="Saison-Kapitän wählen"
+                  >
+                    <div className="foundation-hq-captain-head">
+                      <div className="stack">
+                        <span className="eyebrow">Saison-Führung</span>
+                        <strong title={captainEffectsTooltip}>Kapitän ernennen</strong>
+                        <p className="muted">{captainEffectsTooltip}</p>
+                      </div>
+                      {selectedTeamCaptainProfile ? (
+                        <span className="pill">
+                          Aktiv: {selectedTeamCaptainProfile.playerName} · {selectedTeamCaptainProfile.style}
+                        </span>
+                      ) : null}
+                    </div>
+                    <div className="foundation-hq-captain-candidates">
+                      {selectedTeamCaptainCandidates.length > 0 ? (
+                        selectedTeamCaptainCandidates.map((candidate) => (
+                          <button
+                            key={`hq-captain-${candidate.playerId}`}
+                            type="button"
+                            className={`foundation-hq-captain-candidate${draftCaptainPlayerId === candidate.playerId ? " is-selected" : ""}`}
+                            onClick={() => setDraftCaptainPlayerId(candidate.playerId)}
+                            disabled={!selectedTeamCanManage || isReadOnlyMode}
+                          >
+                            <strong>{candidate.playerName}</strong>
+                            <small>
+                              Leadership {formatLocalePoints(candidate.leadershipScore, 1)} · {candidate.style} · Buffer +
+                              {formatLocalePoints(candidate.effects.moraleBuffer, 1)} · Power +
+                              {formatLocalePoints(candidate.effects.teamPowerModifierPct, 1)}%
+                            </small>
+                            {candidate.hasCaptaincyDemand ? (
+                              <span className="transfer-status-pill is-warning">{candidate.demandLabel ?? "Will Captain sein"}</span>
+                            ) : null}
+                          </button>
+                        ))
+                      ) : (
+                        <p className="muted">Kein Kader für die Kapitänswahl verfügbar.</p>
+                      )}
+                    </div>
+                    <button
+                      className="primary-button"
+                      type="button"
+                      disabled={
+                        !draftCaptainPlayerId ||
+                        !selectedTeamCanManage ||
+                        isReadOnlyMode ||
+                        assignTeamCaptainBusy ||
+                        draftCaptainPlayerId === selectedTeamCaptainPlayerId
+                      }
+                      onClick={() => draftCaptainPlayerId && onAssignTeamCaptain(draftCaptainPlayerId)}
+                    >
+                      {assignTeamCaptainBusy ? "Speichert …" : "Kapitän bestätigen"}
+                    </button>
+                  </section>
+
                   <section className="foundation-hq-priority-rail" aria-label="Manager-Fokus">
                     <div className="foundation-hq-focus-head">
                       <div className="foundation-hq-focus-copy">
-                        <span title="Nach Dringlichkeit sortiert">Manager-Fokus</span>
+                        <span className="eyebrow" title="Nach Dringlichkeit sortiert">Manager-Fokus</span>
                         <strong>Was du jetzt tun solltest</strong>
                       </div>
                       <span className="pill">{managerPriorityCards.filter((card) => card.tone !== "ready").length} aktiv</span>
@@ -652,11 +687,6 @@ export function ManagerOfficeClient({
                   </section>
 
 	                <div className="foundation-hq-state-strip">
-	                  <article className="foundation-hq-state-card">
-	                    <span>Nächster Zug</span>
-	                    <strong>{managerPriorityCards[0]?.title ?? "—"}</strong>
-	                    <small>{managerPriorityCards[0]?.meta ?? "keine akute Baustelle"}</small>
-	                  </article>
 	                  <article className="foundation-hq-state-card">
 	                    <span>Cash</span>
 	                    <strong>{selectedStandingRow?.cash != null ? formatMoney(selectedStandingRow.cash) : "—"}</strong>
@@ -745,7 +775,7 @@ export function ManagerOfficeClient({
 	                    </div>
 	                    <div className="foundation-hq-mini-grid">
 	                      <div className="foundation-hq-mini-card is-glance">
-	                        <span>Teamzustand kompakt</span>
+	                        <span>GM-Status</span>
                           <div className="foundation-hq-glance-grid">
                             {hqGlanceRows.map((row) => (
                               <div key={`hq-glance-${row.key}`} className="foundation-hq-glance-card">

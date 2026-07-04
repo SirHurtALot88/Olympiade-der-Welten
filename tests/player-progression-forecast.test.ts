@@ -384,7 +384,7 @@ describe("player progression forecast", () => {
     expect(lazyForecast.regressionPressure).toBeGreaterThan(diligentForecast.regressionPressure);
   });
 
-  it("exposes rating-tier costs and stays preview-only season-end-only", () => {
+  it("stays preview-only season-end-only", () => {
     const player = createPlayer();
     const forecast = buildPlayerProgressionForecast({
       gameState: createGameState(player),
@@ -393,10 +393,6 @@ describe("player progression forecast", () => {
       seasonPerformance: null,
     });
 
-    expect(forecast.ratingTierCosts.F).toBeLessThan(forecast.ratingTierCosts.C ?? 0);
-    expect(forecast.ratingTierCosts.S).toBeGreaterThan(forecast.ratingTierCosts.B ?? 0);
-    expect(forecast.ratingTierCosts["99"]).toBeNull();
-    expect(forecast.possibleUpgradeSummary).toBe("unter 1 niedriges Upgrade");
     expect(forecast.audit.seasonEndOnly).toBe(true);
     expect(forecast.audit.productiveWrites).toBe(false);
     expect(forecast.sourceStatus.writes).toBe("preview_only");

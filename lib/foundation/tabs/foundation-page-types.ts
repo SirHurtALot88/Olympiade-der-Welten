@@ -13,7 +13,7 @@
  * existing consumers (`cockpit-types.ts`, `foundation-shared-context.tsx`,
  * `cockpit-handlers.ts`) keep working unchanged.
  */
-import type { ContractShape, GameState, NewGameFlowStepId, PlayerGeneratorAttributeName, RosterEntry, TeamControlMode, TeamControlSettings, TeamIdentity, TeamStrategyBias, TeamStrategyProfile } from "@/lib/data/olyDataTypes";
+import type { ContractShape, GameState, NewGameFlowStepId, RosterEntry, TeamControlMode, TeamControlSettings, TeamIdentity, TeamStrategyBias, TeamStrategyProfile } from "@/lib/data/olyDataTypes";
 import type { FacilityId } from "@/lib/facilities/facility-catalog";
 import type { getFacilityConditionStatus } from "@/lib/facilities/facility-condition";
 import type { FoundationSaveMode } from "@/lib/persistence/foundation-save-mode";
@@ -30,14 +30,11 @@ import type {
   PlayerContractPreference,
 } from "@/lib/market/contract-negotiation-preview";
 import type { PlayerTrainingMode } from "@/lib/training/training-plan-types";
-import type { SeasonEndProgressionPreview } from "@/lib/training/season-end-progression-preview";
-import type { SeasonEndXpSpendApplyResult, SeasonEndXpSpendPreview } from "@/lib/progression/season-end-xp-apply-service";
 import type { TransfermarktFreeAgentItem } from "@/lib/market/transfermarkt-read-service";
 
 export type PlayerTableScope = "active" | "free_agents" | "all";
 export type TrainingModeDraft = PlayerTrainingMode;
 export type TrainingClassDraft = string;
-export type SeasonEndAttributeDraft = PlayerGeneratorAttributeName;
 export type TrainingDevelopmentFilter = "all" | "growth" | "stable" | "regression";
 export type { FoundationTableColumn, FoundationTablePreset, FoundationTablePresetId, SortState };
 export type FoundationView =
@@ -80,6 +77,7 @@ export const SEASON_SETUP_STEP_IDS: NewGameFlowStepId[] = [
   "season_intro",
   "team_confirm",
   "roster_review",
+  "appoint_captain",
   "first_transfers",
   "fill_roster",
   "training_facilities",
@@ -139,12 +137,6 @@ export type FoundationScreenPrimaryAction = {
   disabledReason?: string | null;
 };
 
-export const EMPTY_SEASON_END_PROGRESSION_PREVIEW: SeasonEndProgressionPreview = {
-  status: "ready",
-  productiveWrites: false,
-  rows: [],
-  warnings: [],
-};
 
 export type SeasonTableMode = "compact" | "expert";
 export type TeamRosterRoleFilter = "all" | "starter" | "rotation" | "prospect" | "bench" | "other";
@@ -390,16 +382,6 @@ export type FacilityMaintenanceSummary = {
 export type FacilityMaintenanceApiResponse = {
   success: boolean;
   summary: FacilityMaintenanceSummary | null;
-  warnings?: string[];
-  blockingReasons?: string[];
-  error?: string;
-};
-
-export type SeasonEndXpSpendSummary = SeasonEndXpSpendPreview | SeasonEndXpSpendApplyResult;
-
-export type SeasonEndXpSpendApiResponse = {
-  success: boolean;
-  summary: SeasonEndXpSpendSummary | null;
   warnings?: string[];
   blockingReasons?: string[];
   error?: string;

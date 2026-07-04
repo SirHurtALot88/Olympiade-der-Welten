@@ -214,7 +214,7 @@ describe("long-run phase audit", () => {
     expect(transferCheck?.detail).toBe("season-1: 2Draft/0Markt/1V/0X");
   });
 
-  it("flags forbidden S1 market buys in transfer_activity_sane", () => {
+  it("passes S1 market buys in transfer_activity_sane (2026-07-04 course correction: S1 buys are not forbidden)", () => {
     const save = minimalSave({
       season: { id: "season-1", name: "S1", currentMatchday: 10, matchdayIds: Array.from({ length: 10 }, (_, i) => `md${i + 1}`) },
       gamePhase: "season_completed",
@@ -245,6 +245,8 @@ describe("long-run phase audit", () => {
     } as unknown as GameState);
 
     const audit = runPhaseAuditDe(save, "season_end");
-    expect(audit.checks.find((entry) => entry.id === "transfer_activity_sane")?.status).toBe("RED");
+    const transferCheck = audit.checks.find((entry) => entry.id === "transfer_activity_sane");
+    expect(transferCheck?.status).toBe("PASS");
+    expect(transferCheck?.detail).toBe("season-1: 0Draft/1Markt/0V/0X");
   });
 });

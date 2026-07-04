@@ -1,11 +1,27 @@
 import { createHash } from "node:crypto";
 
-import type { AiManagerTrainingSettingRecord, GameState } from "@/lib/data/olyDataTypes";
+import type { AiManagerTrainingSettingRecord, GameState, TrainingIntensityConfirmationRecord } from "@/lib/data/olyDataTypes";
 import { createPersistenceService } from "@/lib/persistence/persistence-service";
 import { persistGameStateWithMaterializedDerivations } from "@/lib/foundation/materialize-season-derivations";
 import type { PersistedSaveGame, PersistenceService } from "@/lib/persistence/types";
 import type { AiManagementTrainingFocus, AiManagementTrainingIntensity } from "@/lib/ai/ai-team-management-preview-service";
 import type { PlayerTrainingMode } from "@/lib/training/training-plan-types";
+import { isTrainingIntensityLockedForSeason } from "@/lib/foundation/game-phase-action-policy";
+
+export const TRAINING_INTENSITY_LOCKED_BLOCKING_REASON = "training_intensity_locked_for_season";
+
+function buildTrainingIntensityConfirmationRecord(input: {
+  teamId: string;
+  seasonId: string;
+  sourcePlanId: string;
+}): TrainingIntensityConfirmationRecord {
+  return {
+    teamId: input.teamId,
+    seasonId: input.seasonId,
+    confirmedAt: new Date().toISOString(),
+    sourcePlanId: input.sourcePlanId,
+  };
+}
 
 export type TeamTrainingSettingsPreview = {
   ok: boolean;
@@ -27,6 +43,9 @@ export type TeamTrainingSettingsPreview = {
 export type TeamTrainingSettingsApplyResult = Omit<TeamTrainingSettingsPreview, "dryRun"> & {
   dryRun: false;
   applied: boolean;
+  // See FacilityUpgradeApplyResult.save in facility-upgrade-service.ts: avoids a redundant full
+  // GameState re-read via persistence.getSaveById() in bulk callers like applyAiManagerPlan.
+  save?: PersistedSaveGame | null;
 };
 
 export function trainingIntensityToMode(intensity: AiManagementTrainingIntensity): PlayerTrainingMode {
@@ -97,6 +116,7 @@ export function previewTeamTrainingSettings(input: {
   if (input.save.status !== "active") blockingReasons.push("save_not_active");
   if (!team) blockingReasons.push("team_not_found");
   if (affectedPlayers <= 0) blockingReasons.push("team_roster_empty");
+  if (isTrainingIntensityLockedForSeason(input.save.gameState)) blockingReasons.push(TRAINING_INTENSITY_LOCKED_BLOCKING_REASON);
   const effects = buildIntensityEffects(input.trainingIntensity);
   const confirmToken =
     blockingReasons.length === 0
@@ -167,14 +187,23 @@ export function applyTeamTrainingSettings(
         ...(save.gameState.seasonState.aiManagerTrainingSettings ?? {}),
         [teamId]: record,
       },
+      trainingIntensityConfirmations: {
+        ...(save.gameState.seasonState.trainingIntensityConfirmations ?? {}),
+        [teamId]: buildTrainingIntensityConfirmationRecord({
+          teamId,
+          seasonId: save.gameState.season.id,
+          sourcePlanId,
+        }),
+      },
     },
   };
-  persistGameStateWithMaterializedDerivations(persistence, save.saveId, nextGameState);
+  const persistedSave = persistGameStateWithMaterializedDerivations(persistence, save.saveId, nextGameState);
   return {
     ...preview,
     dryRun: false,
     applied: true,
     blockingReasons: [],
+    save: persistedSave,
   };
 }
 
@@ -197,6 +226,9 @@ export type PlayerTrainingClassesPreview = {
 export type PlayerTrainingClassesApplyResult = Omit<PlayerTrainingClassesPreview, "dryRun"> & {
   dryRun: false;
   applied: boolean;
+  // See FacilityUpgradeApplyResult.save in facility-upgrade-service.ts: avoids a redundant full
+  // GameState re-read via persistence.getSaveById() in bulk callers like applyAiManagerPlan.
+  save?: PersistedSaveGame | null;
 };
 
 function buildPlayerClassesConfirmToken(input: {
@@ -272,12 +304,13 @@ export function applyPlayerTrainingClasses(
       assignmentMap.has(player.id) ? { ...player, trainingClass: assignmentMap.get(player.id) } : player,
     ),
   };
-  persistGameStateWithMaterializedDerivations(persistence, save.saveId, nextGameState);
+  const persistedSave = persistGameStateWithMaterializedDerivations(persistence, save.saveId, nextGameState);
   return {
     ...preview,
     dryRun: false,
     applied: true,
     blockingReasons: [],
+    save: persistedSave,
   };
 }
 
@@ -300,6 +333,9 @@ export type PlayerTrainingModesPreview = {
 export type PlayerTrainingModesApplyResult = Omit<PlayerTrainingModesPreview, "dryRun"> & {
   dryRun: false;
   applied: boolean;
+  // See FacilityUpgradeApplyResult.save in facility-upgrade-service.ts: avoids a redundant full
+  // GameState re-read via persistence.getSaveById() in bulk callers like applyAiManagerPlan.
+  save?: PersistedSaveGame | null;
 };
 
 function buildPlayerModesConfirmToken(input: {
@@ -329,6 +365,7 @@ export function previewPlayerTrainingModes(input: {
   const blockingReasons: string[] = [];
   if (input.save.status !== "active") blockingReasons.push("save_not_active");
   if (rosterPlayerIds.size <= 0) blockingReasons.push("team_roster_empty");
+  if (isTrainingIntensityLockedForSeason(input.save.gameState)) blockingReasons.push(TRAINING_INTENSITY_LOCKED_BLOCKING_REASON);
   const validAssignments = input.assignments.filter((entry) => rosterPlayerIds.has(entry.playerId));
   if (validAssignments.length === 0) blockingReasons.push("no_valid_player_assignments");
   const confirmToken =
@@ -358,6 +395,7 @@ export function applyPlayerTrainingModes(
   assignments: PlayerTrainingModeAssignment[],
   confirmToken: string | null | undefined,
   persistence: PersistenceService = createPersistenceService(),
+  sourcePlanId = "manual_player_training_modes",
 ): PlayerTrainingModesApplyResult {
   const preview = previewPlayerTrainingModes({ save, teamId, assignments });
   if (!preview.ok || !preview.confirmToken || confirmToken !== preview.confirmToken) {
@@ -374,12 +412,24 @@ export function applyPlayerTrainingModes(
     players: save.gameState.players.map((player) =>
       assignmentMap.has(player.id) ? { ...player, trainingMode: assignmentMap.get(player.id) } : player,
     ),
+    seasonState: {
+      ...save.gameState.seasonState,
+      trainingIntensityConfirmations: {
+        ...(save.gameState.seasonState.trainingIntensityConfirmations ?? {}),
+        [teamId]: buildTrainingIntensityConfirmationRecord({
+          teamId,
+          seasonId: save.gameState.season.id,
+          sourcePlanId,
+        }),
+      },
+    },
   };
-  persistGameStateWithMaterializedDerivations(persistence, save.saveId, nextGameState);
+  const persistedSave = persistGameStateWithMaterializedDerivations(persistence, save.saveId, nextGameState);
   return {
     ...preview,
     dryRun: false,
     applied: true,
     blockingReasons: [],
+    save: persistedSave,
   };
 }

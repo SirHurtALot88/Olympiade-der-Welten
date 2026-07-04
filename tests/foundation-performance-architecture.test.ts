@@ -337,8 +337,15 @@ describe("foundation performance architecture helpers", () => {
         shouldBuildHomeV2Overview: true,
       }),
     ).toBe(true);
-    expect(shouldBuildFoundationScoutingHubDerivations(false)).toBe(false);
-    expect(shouldBuildFoundationScoutingHubDerivations(true)).toBe(true);
+    expect(
+      shouldBuildFoundationScoutingHubDerivations({ shouldBuildMarketView: false, shouldBuildScoutingHubView: false }),
+    ).toBe(false);
+    expect(
+      shouldBuildFoundationScoutingHubDerivations({ shouldBuildMarketView: true, shouldBuildScoutingHubView: false }),
+    ).toBe(true);
+    expect(
+      shouldBuildFoundationScoutingHubDerivations({ shouldBuildMarketView: false, shouldBuildScoutingHubView: true }),
+    ).toBe(true);
     expect(shouldBuildFoundationHqTransferMarkerDerivations(false)).toBe(false);
     expect(shouldBuildFoundationHqTransferMarkerDerivations(true)).toBe(true);
   });

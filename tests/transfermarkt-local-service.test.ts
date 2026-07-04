@@ -804,7 +804,12 @@ describe("transfermarkt local service", () => {
     expect(overridePreview.blockingReasons).toContain("player_sold_this_season_unavailable");
   });
 
-  it("blocks season-1 transfer-market buys at preview and execute while allowing draft picks", async () => {
+  // Course correction (2026-07-04): S1 buys are NOT forbidden — the draft is just the first
+  // ordinary application of the same acquisition engine to empty rosters with starting budget. A
+  // team that sells down (or organically drops) below hardMin/Opt in S1 must be able to rebuy in
+  // the same season, exactly like any later season. This test used to assert the opposite (S1
+  // market buys hard-blocked); it now asserts the new, intended behaviour.
+  it("permits season-1 transfer-market buys at preview and execute, same as draft picks", async () => {
     const { SEASON_ONE_MARKET_BUY_BLOCKER } = await import("@/lib/season/transfer-season-policy");
     persistenceState.save = {
       saveId: "save-singleplayer-dev",
@@ -813,6 +818,13 @@ describe("transfermarkt local service", () => {
         players: [
           createPlayer("fa-1", {
             name: "Free Agent",
+            marketValue: 40,
+            displayMarketValue: 40,
+            salaryDemand: 10,
+            displaySalary: 10,
+          }),
+          createPlayer("fa-2", {
+            name: "Free Agent 2",
             marketValue: 40,
             displayMarketValue: 40,
             salaryDemand: 10,
@@ -838,22 +850,20 @@ describe("transfermarkt local service", () => {
       saveId: "save-singleplayer-dev",
       seasonId: "season-1",
       teamId: "A-A",
-      playerId: "fa-1",
+      playerId: "fa-2",
       transferSource: "ai_preseason_market_buy",
     });
-    expect(marketPreview.canBuy).toBe(false);
-    expect(marketPreview.blockingReasons).toContain(SEASON_ONE_MARKET_BUY_BLOCKER);
+    expect(marketPreview.blockingReasons).not.toContain(SEASON_ONE_MARKET_BUY_BLOCKER);
 
     const marketExecute = executeLocalTransfermarktBuy({
       saveId: "save-singleplayer-dev",
       seasonId: "season-1",
       teamId: "A-A",
-      playerId: "fa-1",
-      transferSource: "manual_transfermarkt_buy",
+      playerId: "fa-2",
+      transferSource: "ai_preseason_market_buy",
     });
-    expect(marketExecute.transferCreated).toBe(false);
-    expect(marketExecute.blockingReasons).toContain(SEASON_ONE_MARKET_BUY_BLOCKER);
-    expect(persistenceState.save?.gameState.transferHistory).toHaveLength(0);
+    expect(marketExecute.blockingReasons).not.toContain(SEASON_ONE_MARKET_BUY_BLOCKER);
+    expect(marketExecute.transferCreated).toBe(true);
   });
 
   it("normalizes legacy roster prices so equal entry and exit values do not show fake profit", async () => {

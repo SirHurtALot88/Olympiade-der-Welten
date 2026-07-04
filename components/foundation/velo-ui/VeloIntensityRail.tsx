@@ -61,7 +61,10 @@ export function VeloIntensityRail({
 export type TrainingModeSegmentInput = {
   value: string;
   label: string;
-  baseXp: number;
+  /** Organic per-training-cycle stat budget (matches the "Training" tile, e.g. 3,4/4,3/6,1). */
+  trainingSetpoints: number;
+  /** Season-end spendable bonus-XP pool for manual attribute upgrades (unrelated scale, e.g. 40/70/110). */
+  baseXp?: number;
   recoveryDeltaPct: number;
   fatigueLoad: number;
   note?: string;
@@ -72,9 +75,12 @@ export function buildTrainingModeSegments(options: TrainingModeSegmentInput[]): 
     value: option.value,
     label: option.label,
     toneClass: `is-${option.value}`,
-    note: option.note,
+    note:
+      option.baseXp != null
+        ? `${option.note ?? ""}${option.note ? " " : ""}Separat: +${formatVeloNumber(option.baseXp, 0)} Saison-Bonus-XP zum manuellen Ausgeben am Saisonende.`.trim()
+        : option.note,
     lines: [
-      `+${formatVeloNumber(option.baseXp, 0)} Setpoints`,
+      `+${formatVeloNumber(option.trainingSetpoints, 1)} Trainingsbudget`,
       formatTrainingModeRecoveryLabel(option.recoveryDeltaPct),
       `Fatigue ${formatVeloNumber(option.fatigueLoad, 0)}`,
     ],

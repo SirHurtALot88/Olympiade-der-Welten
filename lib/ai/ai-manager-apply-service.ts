@@ -605,7 +605,7 @@ export function applyAiManagerPlan(input: {
       const result = applyFacilityMaintenance(currentSave, action.teamId, action.facilityId, maintenancePreview.confirmToken, persistence);
       if (result.applied) {
         appliedIds.add(action.actionId);
-        currentSave = persistence.getSaveById(currentSave.saveId) ?? currentSave;
+        currentSave = result.save ?? persistence.getSaveById(currentSave.saveId) ?? currentSave;
       }
       continue;
     }
@@ -622,7 +622,7 @@ export function applyAiManagerPlan(input: {
       );
       if (result.applied) {
         appliedIds.add(action.actionId);
-        currentSave = persistence.getSaveById(currentSave.saveId) ?? currentSave;
+        currentSave = result.save ?? persistence.getSaveById(currentSave.saveId) ?? currentSave;
       }
       continue;
     }
@@ -637,7 +637,7 @@ export function applyAiManagerPlan(input: {
     );
     if (result.applied) {
       appliedIds.add(action.actionId);
-      currentSave = persistence.getSaveById(currentSave.saveId) ?? currentSave;
+      currentSave = result.save ?? persistence.getSaveById(currentSave.saveId) ?? currentSave;
     }
   }
 
@@ -658,7 +658,7 @@ export function applyAiManagerPlan(input: {
     const result = applyTeamTrainingSettings(currentSave, teamId, focus, intensity, trainingPreview.confirmToken, preview.sourcePlanId, persistence);
     if (result.applied) {
       for (const action of actions) appliedIds.add(action.actionId);
-      currentSave = persistence.getSaveById(currentSave.saveId) ?? currentSave;
+      currentSave = result.save ?? persistence.getSaveById(currentSave.saveId) ?? currentSave;
     }
   }
 
@@ -686,7 +686,7 @@ export function applyAiManagerPlan(input: {
     );
     if (modesResult.applied) {
       appliedIds.add(action.actionId);
-      currentSave = persistence.getSaveById(currentSave.saveId) ?? currentSave;
+      currentSave = modesResult.save ?? persistence.getSaveById(currentSave.saveId) ?? currentSave;
     }
   }
 
@@ -714,7 +714,7 @@ export function applyAiManagerPlan(input: {
     );
     if (classesResult.applied) {
       appliedIds.add(action.actionId);
-      currentSave = persistence.getSaveById(currentSave.saveId) ?? currentSave;
+      currentSave = classesResult.save ?? persistence.getSaveById(currentSave.saveId) ?? currentSave;
     }
   }
 
@@ -726,12 +726,7 @@ export function applyAiManagerPlan(input: {
   for (const teamId of aiControlledTeamIds) {
     const demandResult = applyAiTeamPlayerDemandFulfillment({ gameState: currentSave.gameState, teamId });
     if (demandResult.fulfilledDemandIds.length > 0) {
-      currentSave = {
-        ...currentSave,
-        gameState: demandResult.gameState,
-      };
-      persistence.saveSingleplayerState(currentSave.saveId, currentSave.gameState);
-      currentSave = persistence.getSaveById(currentSave.saveId) ?? currentSave;
+      currentSave = persistence.saveSingleplayerState(currentSave.saveId, demandResult.gameState);
     }
   }
 

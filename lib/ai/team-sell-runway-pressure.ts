@@ -60,6 +60,31 @@ export function getProfitWindowSellThreshold(cashPressureScore: number) {
   return 36;
 }
 
+/**
+ * Cost-dependent probability that a team proactively cashes out a player entering his last
+ * contract year (contractLength === 1) instead of carrying him to natural expiry.
+ *
+ * `buyoutCost` models the economic size of the commitment being cut short (we use the player's
+ * current salary as a simple, auditable proxy: a bigger recurring commitment is a bigger decision
+ * to walk away from early). The higher this cost is relative to the team's own cash cushion, the
+ * less likely the team pulls the trigger — unless genuine roster or cash pressure overrides the
+ * hesitation (a team that actually needs the slot/cash acts regardless of "cost comfort").
+ */
+export function estimateBuyoutLikelihood(input: {
+  buyoutCost: number;
+  teamCash: number;
+  baseLikelihood: number;
+  pressureOverride?: boolean;
+}) {
+  const base = clamp(input.baseLikelihood, 0, 1);
+  if (input.pressureOverride) return round(base, 3);
+  if (input.buyoutCost <= 0) return round(base, 3);
+  const teamCash = Math.max(0, input.teamCash);
+  const costRatio = teamCash > 0 ? input.buyoutCost / teamCash : 1;
+  const affordabilityFactor = clamp(1 - costRatio, 0.1, 1);
+  return round(base * affordabilityFactor, 3);
+}
+
 export function isAttractiveProfitSell(input: {
   expectedSellValue: number | null;
   marketValue: number | null;

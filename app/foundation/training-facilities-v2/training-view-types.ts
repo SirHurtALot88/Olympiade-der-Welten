@@ -58,7 +58,6 @@ export type TrainingPlayerRowView = {
   trainingXp: number;
   performanceXp: number;
   totalXp: number;
-  upgradeEstimate: string;
   fatigueWarning: string;
   recoveryForecast: {
     before: number;
@@ -120,6 +119,13 @@ export type TrainingPlayerRowView = {
   recommendedTrainingDetail?: string | null;
   recommendedTrainingMatchesCurrent?: boolean;
   adminBalancingConfig?: AdminBalancingConfigInput | null;
+  /**
+   * True once the team's training intensity is sealed for the current season
+   * (preseason setup window closed / first matchday result recorded). See
+   * `evaluateGamePhaseAction(gameState, "set_training")` and
+   * docs/training-intensity-season-lock.md.
+   */
+  trainingIntensityLocked?: boolean;
 };
 
 export type TrainingDevelopmentFilter = "all" | "growth" | "stable" | "regression";

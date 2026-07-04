@@ -1,4 +1,5 @@
 import type {
+  GamePhase,
   GameState,
   Team,
   TeamBoardConfidenceRecord,
@@ -1015,6 +1016,22 @@ function resolveSeasonNumberFromState(gameState: GameState) {
   return Number.isFinite(parsed) ? parsed : null;
 }
 
+const SEASON_ONE_PRESEASON_BOARD_NEUTRAL_PHASES = new Set<GamePhase>([
+  "preseason_management",
+  "transfer_sell_phase",
+  "transfer_buy_phase",
+  "lineup_setup",
+  "next_season_ready",
+]);
+
+export function isSeasonOnePreseasonNeutralBoard(gameState: GameState): boolean {
+  if (resolveSeasonNumberFromState(gameState) !== 1) {
+    return false;
+  }
+  const gamePhase = gameState.gamePhase ?? "season_active";
+  return SEASON_ONE_PRESEASON_BOARD_NEUTRAL_PHASES.has(gamePhase);
+}
+
 function pickFirstObjective(
   objectives: ObjectiveDraft[],
   predicate: (objective: ObjectiveDraft) => boolean,
@@ -1335,7 +1352,16 @@ function calculateBoardConfidence(input: {
   storedBoard?: TeamBoardConfidenceRecord | null;
   previousSeasonBoard?: TeamBoardConfidenceRecord | null;
   gmChangedThisSeason?: boolean;
+  neutralPreseasonBoard?: boolean;
 }): TeamBoardConfidenceRecord {
+  if (input.neutralPreseasonBoard) {
+    return {
+      teamId: input.teamId,
+      value: DEFAULT_BOARD_RATING,
+      pressure: DEFAULT_BOARD_RATING,
+      warnings: [],
+    };
+  }
   const identitySeed = normalizeBoardConfidence(input.identity?.boardConfidence ?? input.storedBoard?.value ?? null);
   const prev = input.previousSeasonBoard?.value ?? null;
   let base: number;
@@ -1470,6 +1496,7 @@ export function buildTeamObjectiveOverview(gameState: GameState): TeamObjectiveO
   const boardConfidence: Record<string, TeamBoardConfidenceRecord> = {};
   const aiBiasByTeamId: Record<string, TeamObjectiveAiBias> = {};
   const warnings: string[] = [];
+  const neutralPreseasonBoard = isSeasonOnePreseasonNeutralBoard(gameState);
 
   for (const team of gameState.teams) {
     const row = rowsByTeamId.get(team.teamId);
@@ -1494,6 +1521,7 @@ export function buildTeamObjectiveOverview(gameState: GameState): TeamObjectiveO
       storedBoard,
       previousSeasonBoard,
       gmChangedThisSeason,
+      neutralPreseasonBoard,
     });
     boardConfidence[team.teamId] = board;
     aiBiasByTeamId[team.teamId] = buildAiBias({ teamId: team.teamId, objectives: teamObjectives, board });

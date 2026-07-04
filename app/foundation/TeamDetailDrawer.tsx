@@ -703,7 +703,7 @@ export default function TeamDetailDrawer({
               <span className="team-profile-logo is-placeholder">{data.logoInitials}</span>
             )}
             <div>
-              <span className="eyebrow">{data.shortCode} · {formatControlModeLabel(data.controlMode)}</span>
+              <span className="eyebrow">{formatControlModeLabel(data.controlMode)}</span>
               <h1>{data.teamName}</h1>
             </div>
           </div>

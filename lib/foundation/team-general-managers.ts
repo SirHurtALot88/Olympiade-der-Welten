@@ -17,6 +17,10 @@ const GM_WILDCARD_MAX_SCORE_GAP = 75;
 /** Score-Band um den Best-Fit, aus dem ein Seed-Salt einen GM wählen darf (Audit-Varianz). */
 const GM_SEED_VARIATION_SCORE_GAP = 60;
 const GM_SEED_VARIATION_POOL_SIZE = 6;
+const GM_ARCHETYPE_DIVERSITY_THRESHOLD = 3;
+const GM_ARCHETYPE_DIVERSITY_BASE_MALUS = 12;
+const GM_ARCHETYPE_DIVERSITY_STEP_MALUS = 4;
+const GM_ARCHETYPE_DIVERSITY_MAX_MALUS = 20;
 
 /**
  * Optionales, prozessweites Seed-Salt für die GM-Zuweisung. Wird (z.B. von Audits) pro Lauf
@@ -597,11 +601,27 @@ function chooseProfileForTeam(team: Team, seasonId: string, index: number) {
   return TEAM_GENERAL_MANAGER_PROFILES[profileIndex];
 }
 
+function getArchetypeDiversityMalus(
+  archetype: TeamGeneralManagerArchetype,
+  assignedArchetypeCounts?: Map<TeamGeneralManagerArchetype, number> | null,
+) {
+  const count = assignedArchetypeCounts?.get(archetype) ?? 0;
+  if (count < GM_ARCHETYPE_DIVERSITY_THRESHOLD) {
+    return 0;
+  }
+  const overflow = count - GM_ARCHETYPE_DIVERSITY_THRESHOLD + 1;
+  return Math.min(
+    GM_ARCHETYPE_DIVERSITY_MAX_MALUS,
+    GM_ARCHETYPE_DIVERSITY_BASE_MALUS + (overflow - 1) * GM_ARCHETYPE_DIVERSITY_STEP_MALUS,
+  );
+}
+
 function scoreGeneralManagerFit(
   team: Team,
   identity: TeamIdentity | null,
   profile: TeamGeneralManagerProfile,
   seasonId: string,
+  assignedArchetypeCounts?: Map<TeamGeneralManagerArchetype, number> | null,
 ) {
   const fallbackIdentity: TeamIdentity = identity ?? {
     teamId: team.teamId,
@@ -660,8 +680,18 @@ function scoreGeneralManagerFit(
         ? 5
         : 0;
   const teamSeedTieBreaker = (hashString(`${seasonId}:${team.teamId}:${profile.gmId}`) % 1000) / 1000;
+  const diversityMalus = getArchetypeDiversityMalus(profile.archetype, assignedArchetypeCounts);
 
-  return axisFit * 3 + managementFit * 2 + rosterFit + financeBonus + ambitionBonus + harmonyBonus + teamSeedTieBreaker;
+  return (
+    axisFit * 3 +
+    managementFit * 2 +
+    rosterFit +
+    financeBonus +
+    ambitionBonus +
+    harmonyBonus +
+    teamSeedTieBreaker -
+    diversityMalus
+  );
 }
 
 type PickedGeneralManager = {
@@ -755,6 +785,7 @@ function pickBestUnusedGeneralManager(input: {
   identity: TeamIdentity | null;
   usedGmIds: Set<string>;
   excludedArchetypes?: Iterable<TeamGeneralManagerArchetype>;
+  assignedArchetypeCounts?: Map<TeamGeneralManagerArchetype, number> | null;
   seedSalt?: string | null;
 }): PickedGeneralManager {
   if (input.team.humanControlled) {
@@ -779,7 +810,13 @@ function pickBestUnusedGeneralManager(input: {
   const scoredCandidates = candidatePool
     .map((profile) => ({
       profile,
-      score: scoreGeneralManagerFit(input.team, input.identity, profile, input.seasonId),
+      score: scoreGeneralManagerFit(
+        input.team,
+        input.identity,
+        profile,
+        input.seasonId,
+        input.assignedArchetypeCounts,
+      ),
     }))
     .sort((left, right) => {
       if (right.score !== left.score) {
@@ -847,6 +884,7 @@ export function buildTeamGeneralManagerAssignments(
     seedSalt && seedSalt.trim().length > 0 ? seedSalt.trim() : gmAssignmentSeedSalt;
   const identityByTeamId = new Map((teamIdentities ?? []).map((identity) => [identity.teamId, identity] as const));
   const usedGmIds = new Set<string>();
+  const assignedArchetypeCounts = new Map<TeamGeneralManagerArchetype, number>();
   const assignments: Record<string, TeamGeneralManagerAssignment> = {};
 
   teams.forEach((team) => {
@@ -876,6 +914,10 @@ export function buildTeamGeneralManagerAssignments(
     }
 
     usedGmIds.add(currentProfile.gmId);
+    assignedArchetypeCounts.set(
+      currentProfile.archetype,
+      (assignedArchetypeCounts.get(currentProfile.archetype) ?? 0) + 1,
+    );
     assignments[team.teamId] = {
       teamId: team.teamId,
       gmId: currentProfile.gmId,
@@ -919,10 +961,12 @@ export function buildTeamGeneralManagerAssignments(
       usedGmIds,
       excludedArchetypes:
         isFired && currentProfile ? [currentProfile.archetype] : undefined,
+      assignedArchetypeCounts,
       seedSalt: effectiveSeedSalt,
     });
     const profile = picked.profile;
     usedGmIds.add(profile.gmId);
+    assignedArchetypeCounts.set(profile.archetype, (assignedArchetypeCounts.get(profile.archetype) ?? 0) + 1);
     assignments[team.teamId] = {
       teamId: team.teamId,
       gmId: profile.gmId,
@@ -1010,7 +1054,29 @@ export function applyGeneralManagerStrategyProfileEffect(
   };
 }
 
-export function withNormalizedTeamGeneralManagers(gameState: GameState): GameState {
+export function resolveGmAssignmentSeedSalt(
+  gameState: GameState,
+  options?: { saveId?: string | null },
+): string {
+  if (options?.saveId && options.saveId.trim().length > 0) {
+    return options.saveId.trim();
+  }
+  if (gameState.scenarioMeta?.sourceSaveId?.trim()) {
+    return gameState.scenarioMeta.sourceSaveId.trim();
+  }
+  if (gmAssignmentSeedSalt) {
+    return gmAssignmentSeedSalt;
+  }
+  if (gameState.scenarioMeta?.createdAt?.trim()) {
+    return `${gameState.season.id}:${gameState.scenarioMeta.createdAt.trim()}`;
+  }
+  return gameState.season.id;
+}
+
+export function withNormalizedTeamGeneralManagers(
+  gameState: GameState,
+  options?: { saveId?: string | null },
+): GameState {
   const assignments = buildTeamGeneralManagerAssignments(
     gameState.teams,
     gameState.season.id,
@@ -1018,6 +1084,7 @@ export function withNormalizedTeamGeneralManagers(gameState: GameState): GameSta
     gameState.teamIdentities,
     gameState.seasonState.boardConfidence,
     gameState.transferHistory,
+    resolveGmAssignmentSeedSalt(gameState, options),
   );
 
   return {

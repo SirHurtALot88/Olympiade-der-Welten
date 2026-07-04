@@ -70,6 +70,24 @@ export function shouldBuildFoundationSeasonReadinessChecklist(activeView: string
   return activeView === "homeV2" || activeView === "cockpit";
 }
 
+export function resolveSeasonBriefingMatchdayHighlights(input: {
+  discipline1PlayerCount?: number | null;
+  discipline2PlayerCount?: number | null;
+  sameCategory: boolean;
+}) {
+  const count1 = input.discipline1PlayerCount;
+  const count2 = input.discipline2PlayerCount;
+  const totalSlots = count1 != null && count2 != null ? count1 + count2 : null;
+  const isHeavyRoster = totalSlots === 11 || totalSlots === 12;
+  const isHeavySameColor = isHeavyRoster && input.sameCategory;
+
+  return {
+    totalSlots,
+    isHeavyRoster,
+    isHeavySameColor,
+  };
+}
+
 const EMPTY_SEASON_TRANSITION_GATE = {
   gamePhase: "season_active" as const,
   canCompleteSeason: false,
@@ -90,6 +108,9 @@ const EMPTY_SEASON_BRIEFING_DATA = {
       color: string;
     }>;
     sameColor: boolean;
+    totalSlots: number | null;
+    isHeavyRoster: boolean;
+    isHeavySameColor: boolean;
   }>,
   bigDisciplines: [] as Array<{
     matchdayId: string;
@@ -281,6 +302,23 @@ export function useFoundationCrossTabSeasonBriefing(input: {
         progress: `${rosterCount} Spieler`,
       },
       {
+        stepId: "appoint_captain",
+        title: "Kapitän wählen",
+        kicker: "Führung",
+        detail: "Ernenne einen Saison-Kapitän — Moral-Puffer, Team-Power und Rivalitäts-Druck hängen davon ab.",
+        targetLabel: "Office öffnen",
+        targetView: "home",
+        status: getResolvedStatus(
+          "appoint_captain",
+          Boolean(
+            input.gameState.teamCaptains?.some(
+              (entry) => entry.seasonId === input.gameState.season.id && entry.teamId === input.selectedTeam.teamId,
+            ),
+          ),
+        ),
+        progress: "Saison-Rolle",
+      },
+      {
         stepId: "first_transfers",
         title: "Erste Transfers",
         kicker: "Markt",
@@ -398,20 +436,33 @@ export function useFoundationCrossTabSeasonBriefing(input: {
           color: getDisciplineColor(slot.category) ?? "neutral",
         })),
     );
-    const firstMatchdays = input.seasonDisciplineScheduleRows.map((entry, index) => ({
-      matchdayId: entry.matchdayId,
-      label: entry.matchdayLabel || `Spieltag ${index + 1}`,
-      disciplines: [entry.discipline1, entry.discipline2]
-        .filter((slot): slot is NonNullable<typeof slot> => Boolean(slot))
-        .map((slot) => ({
-          name: slot.displayName,
-          playerCount: slot.playerCount ?? null,
-          category: slot.category,
-          color: getDisciplineColor(slot.category) ?? "neutral",
-        })),
-      sameColor:
-        Boolean(entry.discipline1 && entry.discipline2 && entry.discipline1.category === entry.discipline2.category),
-    }));
+    const firstMatchdays = input.seasonDisciplineScheduleRows.map((entry, index) => {
+      const sameColor = Boolean(
+        entry.discipline1 && entry.discipline2 && entry.discipline1.category === entry.discipline2.category,
+      );
+      const highlights = resolveSeasonBriefingMatchdayHighlights({
+        discipline1PlayerCount: entry.discipline1?.playerCount,
+        discipline2PlayerCount: entry.discipline2?.playerCount,
+        sameCategory: sameColor,
+      });
+
+      return {
+        matchdayId: entry.matchdayId,
+        label: entry.matchdayLabel || `Spieltag ${index + 1}`,
+        disciplines: [entry.discipline1, entry.discipline2]
+          .filter((slot): slot is NonNullable<typeof slot> => Boolean(slot))
+          .map((slot) => ({
+            name: slot.displayName,
+            playerCount: slot.playerCount ?? null,
+            category: slot.category,
+            color: getDisciplineColor(slot.category) ?? "neutral",
+          })),
+        sameColor,
+        totalSlots: highlights.totalSlots,
+        isHeavyRoster: highlights.isHeavyRoster,
+        isHeavySameColor: highlights.isHeavySameColor,
+      };
+    });
     const bigDisciplines = [...slots]
       .sort(
         (left, right) =>

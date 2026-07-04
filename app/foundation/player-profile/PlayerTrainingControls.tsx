@@ -16,6 +16,7 @@ import {
   formatSignedPercent,
   getDevelopmentTone,
   TrainingAttributeForecastGrid,
+  TrainingBudgetBreakdownDisclosure,
 } from "@/app/foundation/training-facilities-v2/training-view-shared";
 import type {
   TrainingClassOption,
@@ -52,8 +53,14 @@ function buildStatForecastTooltip(row: TrainingPlayerRowView) {
   return [
     "Netto = Summe aller Attribut-Deltas nach Regression, Training und Performance.",
     `Angewendet: Training ${formatVeloSignedNumber(appliedTraining, 1)} · Performance ${formatVeloSignedNumber(appliedPerformance, 1)} · Regression ${formatVeloSignedNumber(appliedRegression, 1)}`,
-    `Budget Training +${formatVeloNumber(row.organicForecast.trainingSetpoints, 1)} vor Affinity- und Potential-Multiplikatoren.`,
+    `Trainingsbudget +${formatVeloNumber(row.organicForecast.trainingSetpoints, 1)} vor Affinitaets- und Potential-Multiplikatoren. Schritt-fuer-Schritt unten unter "Wie kommt das zustande?".`,
   ].join("\n");
+}
+
+function buildMatchdayRealityNote(row: TrainingPlayerRowView) {
+  const pps = row.playerPps != null ? formatVeloNumber(row.playerPps, 1) : "—";
+  const mvs = row.playerMvs != null ? formatVeloNumber(row.playerMvs, 1) : "—";
+  return `Saison-PPs ${pps} (echter Punktebeitrag) · MVS ${mvs} (Matchday Value Score). Der Performance-Anteil oben wird separat aus den einzelnen Matchday-Ergebnissen berechnet, zeigt also dieselbe Spielpraxis wie PPs/MVS, nur auf die Stat-Skala uebersetzt.`;
 }
 
 function TrainingModeDemandBanner({ row }: { row: TrainingPlayerRowView }) {
@@ -88,10 +95,13 @@ export default function PlayerTrainingControls({
   const tone = getDevelopmentTone(row);
   const appliedPerformanceSetpoints = row.organicForecast.performanceSetpoints;
   const statForecastTooltip = buildStatForecastTooltip(row);
+  const trainingIntensityLocked = Boolean(row.trainingIntensityLocked);
+  const intensityRailDisabled = readOnly || trainingIntensityLocked;
   const modeSegments = buildTrainingModeSegments(
     trainingModeOptions.map((option) => ({
       value: option.value,
       label: option.label,
+      trainingSetpoints: option.trainingSetpoints,
       baseXp: option.baseXp,
       recoveryDeltaPct: option.recoveryDeltaPct,
       fatigueLoad: option.fatigueLoad,
@@ -120,11 +130,11 @@ export default function PlayerTrainingControls({
             {formatVeloNumber(row.organicForecast.netSetpoints, 1)}
           </strong>
         </div>
-        <div title="Trainingsbudget vor Verteilung auf 12 Attribute (Traits, Facility, Potential eingerechnet).">
+        <div title="Trainingsbudget vor Verteilung auf 12 Attribute (Traits, Facility, Potential eingerechnet). Details unter 'Wie kommt das zustande?'.">
           <span>Training</span>
           <strong>+{formatVeloNumber(row.organicForecast.trainingSetpoints, 1)}</strong>
         </div>
-        <div title="Angewendete Matchday-Performance-Setpoints. Sanfter Taper erst nahe Attribut-Decke — nicht wie Training.">
+        <div title="Angewendeter Performance-Anteil aus echten Matchday-Ergebnissen. Sanfter Taper erst nahe Attribut-Decke — nicht wie Training. Vergleich zu Saison-PPs/MVS unten.">
           <span>Performance</span>
           <strong>+{formatVeloNumber(appliedPerformanceSetpoints, 1)}</strong>
         </div>
@@ -133,6 +143,11 @@ export default function PlayerTrainingControls({
           <strong>+{formatVeloNumber(row.organicForecast.fatigueLoad, 1)}</strong>
         </div>
       </div>
+
+      <p className="muted player-training-controls-reality-note" title={buildMatchdayRealityNote(row)}>
+        Trainingsfleiss vs. echte Spielpraxis: Saison-PPs {row.playerPps != null ? formatVeloNumber(row.playerPps, 1) : "—"} · MVS{" "}
+        {row.playerMvs != null ? formatVeloNumber(row.playerMvs, 1) : "—"}
+      </p>
 
       <VeloImpactStrip
         flashKey={row.mode}
@@ -147,12 +162,20 @@ export default function PlayerTrainingControls({
         })}
       />
 
+      <TrainingBudgetBreakdownDisclosure row={row} />
+
+      {trainingIntensityLocked && !readOnly ? (
+        <p className="muted training-v2-intensity-lock-note" role="status">
+          Trainingsintensitaet fuer diese Season festgelegt — Aenderung erst zum naechsten Saisonstart moeglich.
+        </p>
+      ) : null}
+
       <VeloIntensityRail
         ariaLabel={`${row.player.name} Trainingsmodus`}
         segments={modeSegments}
         activeValue={row.mode}
         demandValue={row.trainingDemand && row.trainingDemand.status !== "fulfilled" ? row.trainingDemand.preferredMode : null}
-        disabled={readOnly}
+        disabled={intensityRailDisabled}
         onSelect={(value) => onSetTrainingMode(row.player.id, value as PlayerTrainingMode)}
       />
 

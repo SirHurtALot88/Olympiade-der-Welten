@@ -5,14 +5,22 @@ export type TransferSeasonAction =
   | "season_end_market_sell"
   | "preseason_market_buy";
 
-/** Paid draft picks in season 1 — not transfer-market purchases. */
+/** Paid draft picks in season 1 — labeled separately from later transfer-market purchases
+ * purely for reporting (draft-vs-market split in audits/recaps), NOT because market buys are
+ * forbidden in S1. Design principle (2026-07-04 course correction): S1 buys are NOT forbidden —
+ * the draft is just the first ordinary application of the same acquisition engine to empty
+ * rosters with starting budget. A team that sells down (or organically drops) below hardMin/Opt
+ * in S1 must be able to (re)buy in the very same season, exactly like any later season. */
 export const SEASON_ONE_DRAFT_BUY_SOURCES = [
   "season1_autoprep_topup",
   "ai_roster_fill",
   "full_churn_redraft_buy",
 ] as const;
 
-export const S1_FORBIDDEN_BUY_SOURCES = ["preseason_roster_repair_buy", "ai_preseason_market_buy"] as const;
+/** @deprecated No S1 buy source is forbidden anymore (see course correction above). Kept as an
+ * empty tuple for backward-compatible imports; `isSeasonOneForbiddenBuySource` always returns
+ * false and `resolveSeasonOneMarketBuyBlocker` always returns null. */
+export const S1_FORBIDDEN_BUY_SOURCES = [] as const;
 
 export const SEASON_ONE_MARKET_BUY_BLOCKER = "season_market_buy_forbidden";
 
@@ -20,30 +28,29 @@ export function isSeasonOne(seasonId: string): boolean {
   return seasonId === "season-1";
 }
 
-export function isTransferActionAllowed(seasonId: string, action: TransferSeasonAction): boolean {
-  if (isSeasonOne(seasonId)) {
-    return action === "season1_draft" || action === "season_end_market_sell";
-  }
+/** All transfer actions are allowed in every season, including season 1. Kept as a function
+ * (rather than inlining `true`) so callers keep an explicit policy seam if a real S1-specific
+ * restriction is ever reintroduced. */
+export function isTransferActionAllowed(_seasonId: string, _action: TransferSeasonAction): boolean {
   return true;
 }
 
-export function isSeasonOneForbiddenBuySource(source: string | null | undefined): boolean {
-  if (!source) return false;
-  return (S1_FORBIDDEN_BUY_SOURCES as readonly string[]).includes(source);
+/** @deprecated Always false — no S1 buy source is forbidden anymore. */
+export function isSeasonOneForbiddenBuySource(_source: string | null | undefined): boolean {
+  return false;
 }
 
 export function isSeasonOneDraftBuySource(source: string | null | undefined): boolean {
   return (SEASON_ONE_DRAFT_BUY_SOURCES as readonly string[]).includes(source ?? "");
 }
 
-/** Blocks any non-draft buy in season 1 at preview/apply layers. */
+/** @deprecated Always returns null — S1 market buys are permitted (see course correction above).
+ * Kept so call sites don't need to change shape; they simply never see a blocker anymore. */
 export function resolveSeasonOneMarketBuyBlocker(
-  seasonId: string,
-  transferSource: string | null | undefined,
+  _seasonId: string,
+  _transferSource: string | null | undefined,
 ): string | null {
-  if (!isSeasonOne(seasonId)) return null;
-  if (isSeasonOneDraftBuySource(transferSource)) return null;
-  return SEASON_ONE_MARKET_BUY_BLOCKER;
+  return null;
 }
 
 /** Transfer-market purchase (excludes paid S1 draft picks). */
@@ -64,16 +71,12 @@ export function countSeasonBuyTransfers(
   return { draftBuyCount, marketBuyCount, totalBuyCount: buyEntries.length };
 }
 
+/** @deprecated Always returns [] — no S1 buy source is forbidden anymore (see course correction
+ * above). Kept for backward-compatible imports/call sites. */
 export function findSeasonOneForbiddenBuySources(
-  transfers: Array<{ seasonId?: string | null; transferType?: string | null; source?: string | null }>,
+  _transfers: Array<{ seasonId?: string | null; transferType?: string | null; source?: string | null }>,
 ): string[] {
-  const violations: string[] = [];
-  for (const entry of transfers) {
-    if (entry.seasonId !== "season-1" || entry.transferType !== "buy") continue;
-    if (isSeasonOneDraftBuySource(entry.source)) continue;
-    violations.push(entry.source ?? "unknown_market_buy");
-  }
-  return [...new Set(violations)];
+  return [];
 }
 
 export type SeasonTransferCountsLabelStyle = "audit" | "recap";

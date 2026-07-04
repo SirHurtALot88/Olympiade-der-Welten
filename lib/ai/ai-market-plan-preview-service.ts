@@ -35,7 +35,6 @@ import {
   getProfitWindowSellThreshold,
   isAttractiveProfitSell,
 } from "@/lib/ai/team-sell-runway-pressure";
-import { isSeasonOne } from "@/lib/season/transfer-season-policy";
 import {
   buildLeagueMarketAnchors,
   resolvePlannerSpendableCash,
@@ -951,7 +950,10 @@ async function overlayUnifiedCompareBuyPlans(input: {
   seasonId: string;
   buyPreview: AiTransferPreviewResult | null;
 }) {
-  if (!isUnifiedPickEnabledForMarket() || isSeasonOne(input.seasonId) || !input.saveId) {
+  // S1 is no longer excluded here (course correction 2026-07-04): the Unified engine must overlay
+  // S1 convergence just like any other season, so a team that sells down below hardMin/Opt in S1
+  // rebuilds through the same acquisition logic as the initial draft.
+  if (!isUnifiedPickEnabledForMarket() || !input.saveId) {
     return input.teams;
   }
 

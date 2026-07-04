@@ -47,6 +47,162 @@ export function getDevelopmentTone(row: TrainingPlayerRowView) {
   return "stable";
 }
 
+export type TrainingBudgetBreakdownStep = {
+  key: string;
+  operator: "base" | "add" | "subtract" | "result";
+  label: string;
+  value: string;
+  detail?: string;
+};
+
+/**
+ * Stepped Basis -> Modifikatoren -> Netto chain for the training/performance forecast.
+ * Pure presentation layer: reuses fields already computed by `buildOrganicSeasonProgression`
+ * (via `TrainingPlayerRowView`), no new balancing math. See docs/training-forecast-breakdown.md.
+ */
+export function buildTrainingBudgetBreakdown(row: TrainingPlayerRowView): TrainingBudgetBreakdownStep[] {
+  const modePresentation = getTrainingModePresentation(row.mode);
+  const baseBudget = modePresentation.trainingSetpoints;
+  const appliedTraining = row.attributeForecast.reduce((sum, entry) => sum + entry.training, 0);
+  const appliedPerformance = row.attributeForecast.reduce((sum, entry) => sum + entry.performance, 0);
+  const appliedRegression = row.attributeForecast.reduce((sum, entry) => sum + entry.regression, 0);
+
+  const knownMultiplier =
+    (1 + row.modifiers.traitModifierPct / 100) *
+    row.modifiers.potentialTrainingMultiplier *
+    (1 + row.modifiers.facilityModifierPct / 100);
+  const totalMultiplier = baseBudget > 0 ? row.organicForecast.trainingSetpoints / baseBudget : 1;
+  const otherBonusPct = knownMultiplier > 0 ? Math.round((totalMultiplier / knownMultiplier - 1) * 1000) / 10 : 0;
+
+  const steps: TrainingBudgetBreakdownStep[] = [
+    {
+      key: "base",
+      operator: "base",
+      label: `Basis-Training (${modePresentation.label})`,
+      value: `+${formatVeloNumber(baseBudget, 2)}`,
+      detail: "Fixer Startwert je Trainingsintensitaet, noch ohne Boni.",
+    },
+    {
+      key: "trait",
+      operator: "add",
+      label: "Trait-Bonus",
+      value: formatSignedPercent(row.modifiers.traitModifierPct),
+      detail: "Charaktereigenschaften wie Diligent (+) oder Lazy (-).",
+    },
+    {
+      key: "potential",
+      operator: "add",
+      label: "Potential-Multiplikator",
+      value: `x${formatVeloNumber(row.modifiers.potentialTrainingMultiplier, 2)}`,
+      detail: "Wie viel Luft zum gescouteten Potential noch nach oben offen ist.",
+    },
+    {
+      key: "facility",
+      operator: "add",
+      label: "Facility-Bonus",
+      value: formatSignedPercent(row.modifiers.facilityModifierPct),
+      detail: "Trainingscenter-Level, Zustand und Team-Entwicklungsfokus.",
+    },
+  ];
+
+  if (Math.abs(otherBonusPct) >= 0.5) {
+    steps.push({
+      key: "other",
+      operator: "add",
+      label: "Weitere Boni (Rolle/Fokus)",
+      value: formatSignedPercent(otherBonusPct),
+      detail: "Rest aus Rollen- und Trainingsfokus-Bonus, nicht einzeln aufgeschluesselt.",
+    });
+  }
+
+  steps.push(
+    {
+      key: "budget",
+      operator: "result",
+      label: "= Trainingsbudget",
+      value: `+${formatVeloNumber(row.organicForecast.trainingSetpoints, 2)}`,
+      detail: "Gesamtbudget, das ueber alle 12 Attribute verteilt wird (Klassenprofil + Affinitaet).",
+    },
+    {
+      key: "applied-training",
+      operator: "add",
+      label: "Angewendet auf Stats",
+      value: `+${formatVeloNumber(appliedTraining, 2)}`,
+      detail: "Nach Verteilung auf Klassenprofil, Signature/Weak-Affinitaet und Attribut-Decke.",
+    },
+    {
+      key: "performance",
+      operator: "add",
+      label: "+ Performance-Anteil",
+      value: `+${formatVeloNumber(appliedPerformance, 2)}`,
+      detail: `Aus echten Matchday-Ergebnissen (Score, Rang, Beitrag). Zum Vergleich: Saison-PPs ${
+        row.playerPps != null ? formatVeloNumber(row.playerPps, 1) : "—"
+      } · MVS ${row.playerMvs != null ? formatVeloNumber(row.playerMvs, 1) : "—"}.`,
+    },
+    {
+      key: "regression",
+      operator: "subtract",
+      label: "− Regression",
+      value: formatVeloNumber(appliedRegression, 2),
+      detail: "Laufende Basis-Abnutzung plus zusaetzlicher Marktwert-Druck bei teuren Spielern.",
+    },
+    {
+      key: "net",
+      operator: "result",
+      label: "= Netto-Forecast",
+      value: formatVeloSignedNumber(row.organicForecast.netSetpoints, 2),
+      detail: "Summe aller 12 Attribut-Deltas: Training + Performance − Regression.",
+    },
+  );
+
+  return steps;
+}
+
+const BREAKDOWN_OPERATOR_SYMBOL: Record<TrainingBudgetBreakdownStep["operator"], string> = {
+  base: "Basis",
+  add: "+",
+  subtract: "−",
+  result: "=",
+};
+
+export function TrainingBudgetBreakdownDisclosure({ row }: { row: TrainingPlayerRowView }) {
+  const [expanded, setExpanded] = useState(false);
+  const steps = useMemo(() => buildTrainingBudgetBreakdown(row), [row]);
+
+  return (
+    <div className="training-budget-breakdown-disclosure">
+      <div className="training-budget-breakdown-head">
+        <button
+          className="secondary-button inline-button"
+          type="button"
+          onClick={() => setExpanded((current) => !current)}
+          aria-expanded={expanded}
+        >
+          {expanded ? "Berechnung ausblenden" : "Wie kommt das zustande?"}
+        </button>
+        <small
+          className="training-budget-breakdown-forecast-hint"
+          title="Diese Werte sind eine laufende Prognose auf Basis des Saisonend-Batch-Modells. Sie werden nicht pro Spieltag verbucht, sondern erst als ein Schritt beim Saisonwechsel final auf den Spieler angewendet."
+        >
+          Forecast · wird erst am Saisonende final angewendet
+        </small>
+      </div>
+      {expanded ? (
+        <div className="training-budget-breakdown" aria-label="Trainings- und Performance-Berechnung Schritt fuer Schritt">
+          {steps.map((step) => (
+            <div className={`training-budget-breakdown-step is-${step.operator}`} key={step.key} title={step.detail}>
+              <span className="training-budget-breakdown-operator">{BREAKDOWN_OPERATOR_SYMBOL[step.operator]}</span>
+              <span className="training-budget-breakdown-label">{step.label}</span>
+              <strong className="training-budget-breakdown-value">{step.value}</strong>
+              {step.detail ? <small className="training-budget-breakdown-detail">{step.detail}</small> : null}
+            </div>
+          ))}
+        </div>
+      ) : null}
+    </div>
+  );
+}
+
 function getPortraitModel(player: TrainingPlayerRowView["player"]) {
   const src = getPlayerPortraitBrowserUrl(player.id, player.portraitUrl, player.portraitPath);
   const initials =
@@ -205,9 +361,13 @@ export function TrainingModeGuide({ trainingModeOptions }: TrainingModeGuideProp
   return (
     <div className="training-v2-mode-guide velo-mode-guide" aria-label="Trainingslast Erklaerung">
       {trainingModeOptions.map((option) => (
-        <article className={`training-v2-mode-guide-card velo-mode-guide-card is-${option.fatigueRisk === "niedrig" ? "growth" : option.fatigueRisk === "hoch" ? "regression" : "stable"}`} key={`mode-guide-${option.value}`}>
+        <article
+          className={`training-v2-mode-guide-card velo-mode-guide-card is-${option.fatigueRisk === "niedrig" ? "growth" : option.fatigueRisk === "hoch" ? "regression" : "stable"}`}
+          key={`mode-guide-${option.value}`}
+          title={`Trainingsbudget vor Trait-, Potential- und Facility-Boni. Separat fliessen +${formatVeloNumber(option.baseXp, 0)} Entwicklungs-XP automatisch in Formkurve und Regressionsschutz ein — kein manuelles Ausgeben.`}
+        >
           <span>{option.label}</span>
-          <strong>+{formatVeloNumber(option.baseXp, 0)} Setpoints · Fatigue {formatVeloNumber(option.fatigueLoad, 0)}</strong>
+          <strong>+{formatVeloNumber(option.trainingSetpoints, 1)} Trainingsbudget · Fatigue {formatVeloNumber(option.fatigueLoad, 0)}</strong>
           <small>
             {option.recoveryDeltaPct > 0 ? `+${option.recoveryDeltaPct}% Reg` : option.recoveryDeltaPct < 0 ? `${option.recoveryDeltaPct}% Reg` : "±0 Reg"} · {option.note}
           </small>
@@ -250,6 +410,7 @@ export function TrainingPlayerLane({
     trainingModeOptions.map((option) => ({
       value: option.value,
       label: option.label,
+      trainingSetpoints: option.trainingSetpoints,
       baseXp: option.baseXp,
       recoveryDeltaPct: option.recoveryDeltaPct,
       fatigueLoad: option.fatigueLoad,
@@ -416,7 +577,7 @@ export function TrainingPlayerLane({
                   <span>Training</span>
                   <strong>+{formatVeloNumber(row.organicForecast.trainingSetpoints, 1)}</strong>
                 </div>
-                <div title="Matchday-Leistung. Sanfter Taper erst nahe Attribut-Decke — nicht wie Training.">
+                <div title="Angewendeter Performance-Anteil aus echten Matchday-Ergebnissen. Sanfter Taper erst nahe Attribut-Decke — nicht wie Training.">
                   <span>Performance</span>
                   <strong>+{formatVeloNumber(row.organicForecast.performanceSetpoints, 1)}</strong>
                 </div>
@@ -425,6 +586,14 @@ export function TrainingPlayerLane({
                   <strong>+{formatVeloNumber(row.organicForecast.fatigueLoad, 1)}</strong>
                 </div>
               </div>
+
+              <p
+                className="muted training-v2-reality-note"
+                title="Der Performance-Anteil wird separat aus den einzelnen Matchday-Ergebnissen berechnet und spiegelt dieselbe Spielpraxis wie PPs/MVS, nur auf die Stat-Skala uebersetzt."
+              >
+                Saison-PPs {row.playerPps != null ? formatVeloNumber(row.playerPps, 1) : "—"} · MVS{" "}
+                {row.playerMvs != null ? formatVeloNumber(row.playerMvs, 1) : "—"}
+              </p>
 
               <VeloImpactStrip
                 flashKey={row.mode}
@@ -438,6 +607,8 @@ export function TrainingPlayerLane({
                   regressionRisk: row.forecast.regressionRisk,
                 })}
               />
+
+              <TrainingBudgetBreakdownDisclosure row={row} />
 
               <VeloAttributeFocusTags primary={row.classTrainingFocus.primary} risks={row.classTrainingFocus.risks} />
 

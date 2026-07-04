@@ -1511,11 +1511,24 @@ export async function applyAiMarketPlanLocally(input: AiMarketPlanApplyParams): 
     const hasMarketActions = effectiveSellPlan.candidates.length + effectiveBuyPlan.candidates.length > 0;
     const enforcementPlayerMin =
       options.convergenceIncrementalFill && coverageFallback ? identityPlayerMin : team.currentState.playerMin;
+    // Bug found during PRIO-3 rebuild-consistency testing (2026-07-04): with this gate enforced
+    // unconditionally, a team rebuilding from a severe roster deficit (e.g. sold to 0-2 players)
+    // could never pass it — a single apply call only buys `applyBuyStepsInBatch` (2-3) candidates,
+    // so the PROJECTED roster never reaches `playerMin` (7) in one shot, and the whole buy plan got
+    // blocked before execution even started, every single cycle (the R-R/A-A stranding pattern from
+    // engine-architecture-ist.md). When the team is in a genuine coverage-fallback rebuild
+    // (`convergenceCoverageFill`), only block here if the plan does NOT move the roster forward at
+    // all — forward progress across multiple cycles/rounds is the expected mechanism, not a single
+    // apply reaching the full target immediately.
+    const enforceRosterMinPreApply =
+      executeBuySteps &&
+      effectiveBuyPlan.candidates.length > 0 &&
+      (!convergenceCoverageFill || (effectiveProjectedState.rosterAfterPlan ?? 0) <= rosterBaseForCoverage);
     const preApplyStateBlockingReasons = buildMarketStateBlockingReasons({
       projectedState: effectiveProjectedState,
       playerMin: enforcementPlayerMin,
       hasMarketActions,
-      enforceRosterMinAfterPlan: executeBuySteps && effectiveBuyPlan.candidates.length > 0,
+      enforceRosterMinAfterPlan: enforceRosterMinPreApply,
     });
     const partialNegativeCashRepair =
       team.currentState.cash != null &&
@@ -1876,6 +1889,11 @@ export async function applyAiMarketPlanLocally(input: AiMarketPlanApplyParams): 
       });
 
       if (!buyPreview.canBuy) {
+        if (process.env.OLY_DEBUG_BUY_GATE === "1") {
+          console.error(
+            `[buy-gate-debug] ${team.teamCode} candidate=${candidate.playerId} canBuy=false blockers=${buyPreview.blockingReasons.join("|")}`,
+          );
+        }
         if (!(options.transferWindowCycleMode && nextResult.executedSells > 0)) {
           resetTransferRunContext(beforeTeamRun);
         }
@@ -1913,6 +1931,11 @@ export async function applyAiMarketPlanLocally(input: AiMarketPlanApplyParams): 
       });
 
       if (!buyResult.canBuy || !buyResult.transferCreated) {
+        if (process.env.OLY_DEBUG_BUY_GATE === "1") {
+          console.error(
+            `[buy-gate-debug] ${team.teamCode} candidate=${candidate.playerId} execute-failed blockers=${buyResult.blockingReasons.join("|")}`,
+          );
+        }
         if (!(options.transferWindowCycleMode && nextResult.executedSells > 0)) {
           resetTransferRunContext(beforeTeamRun);
         }
@@ -1983,12 +2006,30 @@ export async function applyAiMarketPlanLocally(input: AiMarketPlanApplyParams): 
     nextResult.rosterAfter = snapshotAfterTeam.roster;
     nextResult.salaryAfter = snapshotAfterTeam.salary;
     nextResult.marketValueAfter = snapshotAfterTeam.marketValue;
+    // Bug found during PRIO-3 rebuild-consistency testing (2026-07-04): with `enforceRosterMinAfterPlan:
+    // executedBuys > 0` unconditionally, a severely depleted team (e.g. sold to 0-2 players) could never
+    // pass this gate — the buy step only executes `applyBuyStepsInBatch` (2-3) candidates per apply call,
+    // so `rosterAfter` never reaches `playerMin` (7) in a single call, and the ENTIRE apply (including the
+    // buys that WERE executed) got rolled back every single cycle. That silently converted "planned 2
+    // buys" into "executed 0 buys" forever — the exact R-R/A-A stranding pattern from
+    // engine-architecture-ist.md. In incremental convergence/cycle mode (`convergenceIncrementalFill`)
+    // multiple cycles/rounds are expected to gradually close the gap, so only roll back here if the buy
+    // made no forward progress at all (a genuine anomaly), not merely because it didn't reach the full
+    // target in one shot.
+    const rosterMinEnforcementNeeded =
+      nextResult.executedBuys > 0 &&
+      (!convergenceCoverageFill || (snapshotAfterTeam.roster ?? 0) <= (nextResult.rosterBefore ?? 0));
     const postApplyStateBlockingReasons = buildActualMarketStateBlockingReasons({
       cash: snapshotAfterTeam.cash,
       roster: snapshotAfterTeam.roster,
       playerMin: enforcementPlayerMin,
-      enforceRosterMinAfterPlan: nextResult.executedBuys > 0,
+      enforceRosterMinAfterPlan: rosterMinEnforcementNeeded,
     });
+    if (process.env.OLY_DEBUG_BUY_GATE === "1") {
+      console.error(
+        `[buy-gate-debug] ${team.teamCode} postApply executedBuys=${nextResult.executedBuys} rosterBefore=${nextResult.rosterBefore} rosterAfter=${snapshotAfterTeam.roster} enforce=${rosterMinEnforcementNeeded} blockers=${postApplyStateBlockingReasons.join("|")}`,
+      );
+    }
     const postApplyPartialNegativeCashRepair =
       partialNegativeCashRepair &&
       snapshotAfterTeam.cash != null &&

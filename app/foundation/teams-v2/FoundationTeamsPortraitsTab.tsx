@@ -153,7 +153,7 @@ export default function FoundationTeamsPortraitsTab({
       <section className="team-portraits-panel" id="team-focus-portraits" aria-label="Kader Portraits">
         <div className="team-portraits-grid" data-testid="team-portraits-grid">
           {filteredSelectedRosterTableRows.length > 0 ? (
-            filteredSelectedRosterTableRows.map(({ entry, player, playerOvr, playerMvs, playerPps }) => {
+            filteredSelectedRosterTableRows.map(({ entry, player, playerOvr, playerMvs, playerPps, ovrRank, mvsRank, ppsRank }) => {
               const portrait = getPlayerPortraitModel(player);
               const marketValueDelta = getPlayerDisplayMarketValueDelta(player, entry, gameState);
               const salaryDelta = getRosterEntrySalaryDelta(entry, player, gameState);
@@ -172,6 +172,9 @@ export default function FoundationTeamsPortraitsTab({
                   playerOvr={playerOvr}
                   playerMvs={playerMvs}
                   playerPps={playerPps}
+                  ovrRank={ovrRank}
+                  mvsRank={mvsRank}
+                  ppsRank={ppsRank}
                   pow={player.coreStats.pow}
                   spe={player.coreStats.spe}
                   men={player.coreStats.men}

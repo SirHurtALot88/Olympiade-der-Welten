@@ -21,7 +21,7 @@ import { normalizeTransfermarktToken } from "@/lib/market/transfermarkt-fit";
 import type { LocalTransfermarktRunContext } from "@/lib/market/transfermarkt-local-service";
 import { buildTransfermarktSaleFactorBreakdown } from "@/lib/market/transfermarkt-sale-factor";
 import { createPersistenceService } from "@/lib/persistence/persistence-service";
-import { assessTeamSellRunwayPressure, isAttractiveProfitSell } from "@/lib/ai/team-sell-runway-pressure";
+import { assessTeamSellRunwayPressure, estimateBuyoutLikelihood, isAttractiveProfitSell } from "@/lib/ai/team-sell-runway-pressure";
 import { assessPlayerBoardTrust, type PlayerBoardTrustRenewalPolicy } from "@/lib/ai/player-board-trust-service";
 import { evaluateAiSellDecision } from "@/lib/ai/ai-sell-decision-engine";
 import { resolveTransferDoctrine } from "@/lib/ai/ai-transfer-doctrine-layer";
@@ -618,6 +618,26 @@ function buildCandidate(
     pushSell("expiring_contract", "auslaufender Vertrag braucht vor Ablauf eine aktive Marktentscheidung");
   }
 
+  // Proactive early buyout (2026-07-04): a team may choose to cash out a player entering his
+  // last contract year even without acute board/cash pressure. Cost-dependent — see
+  // estimateBuyoutLikelihood — so this rarely overrides an otherwise "keep" case for teams that
+  // can't comfortably afford giving up the commitment, but roster/cash pressure always overrides.
+  const buyoutLikelihood =
+    roster.contractLength === 1 && !expiringCoreDecisionPressure
+      ? estimateBuyoutLikelihood({
+          buyoutCost: Math.max(0, salary ?? 0),
+          teamCash: team.cash,
+          baseLikelihood: 0.35 + sellAggression * 0.25,
+          pressureOverride: rosterPressureScore > 0 || lowCashReservePressure || negativeCashPressure,
+        })
+      : 0;
+  if (buyoutLikelihood >= 0.4) {
+    pushSell(
+      "proactive_early_buyout",
+      `letztes Vertragsjahr — vorzeitiger Marktverkauf lohnt sich (Buyout-Wahrscheinlichkeit ${Math.round(buyoutLikelihood * 100)}%)`,
+    );
+  }
+
   const scoreRaw =
     18 +
     (negativeCashPressure ? 24 : 0) +
@@ -633,6 +653,7 @@ function buildCandidate(
     (roster.contractLength <= 1 && (strategy.avoidedHits >= strategy.preferredHits || underperformed || hardNoGoHit) ? 10 : 0) +
     (expiringStrategicPressure ? 8 : 0) +
     (expiringCoreDecisionPressure ? 10 : 0) +
+    buyoutLikelihood * 12 +
     (sellRunway.cashPressureScore >= 0.45 && !starProtection
       ? Math.round(sellRunway.cashPressureScore * 14)
       : 0) +

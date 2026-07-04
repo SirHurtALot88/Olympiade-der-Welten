@@ -5,6 +5,10 @@ import { describe, expect, it } from "vitest";
 
 const root = process.cwd();
 const foundationClientPath = path.join(root, "app/foundation/FoundationPageClient.tsx");
+const shellRouterBodyPath = path.join(root, "app/foundation/FoundationShellRouterBody.tsx");
+const shellScopePath = path.join(root, "lib/foundation/tabs/use-foundation-shell-router-body-scope.tsx");
+const shellRouterPath = path.join(root, "app/foundation/FoundationShellRouter.tsx");
+const managerOfficePath = path.join(root, "app/foundation/home-v2/ManagerOfficeClient.tsx");
 const foundationPageTypesPath = path.join(root, "lib/foundation/tabs/foundation-page-types.ts");
 const moduleHelpersPath = path.join(root, "lib/foundation/tabs/foundation-page-module-helpers.tsx");
 const homeV2Path = path.join(root, "app/foundation/home-v2/HomeV2Client.tsx");
@@ -17,32 +21,27 @@ const globalsPath = path.join(root, "app/globals.css");
 
 describe("foundation home v2 ui contract", () => {
   it("merges home and office into one home v2 view with sub navigation", async () => {
-    const fileText = await fs.readFile(foundationClientPath, "utf8");
-    const navText = await fs.readFile(navConfigPath, "utf8");
-    const routingText = await fs.readFile(viewRoutingPath, "utf8");
+    const [shellText, navText, routingText, panelText, officeText] = await Promise.all([
+      fs.readFile(shellRouterBodyPath, "utf8"),
+      fs.readFile(navConfigPath, "utf8"),
+      fs.readFile(viewRoutingPath, "utf8"),
+      fs.readFile(path.join(process.cwd(), "app/foundation/home-v2/FoundationHomeV2Panel.tsx"), "utf8"),
+      fs.readFile(managerOfficePath, "utf8"),
+    ]);
 
-    expect(fileText).toContain("FoundationSubNav");
-    const panelText = await fs.readFile(
-      path.join(process.cwd(), "app/foundation/home-v2/FoundationHomeV2Panel.tsx"),
-      "utf8",
-    );
+    expect(shellText).toContain("FoundationSubNav");
     expect(panelText).toContain('tab === "overview"');
-    expect(fileText).toContain('homeV2Tab === "office"');
-    expect(fileText).toContain('navigateHomeTab("office")');
+    expect(shellText).toContain("homeV2Tab");
+    expect(shellText).toContain('navigateHomeTab("office")');
     expect(panelText).toContain('if (!active)');
     expect(panelText).toContain('id="foundation-home-v2"');
     expect(panelText).toContain("ManagerOfficeClient");
-    const officeText = await fs.readFile(
-      path.join(process.cwd(), "app/foundation/home-v2/ManagerOfficeClient.tsx"),
-      "utf8",
-    );
     expect(officeText).toContain('data-testid="foundation-hq"');
-    expect(fileText).not.toContain('getViewClass("hq")');
+    expect(shellText).not.toContain('getViewClass("hq")');
     expect(navText).not.toContain('id: "hq"');
     expect(routingText).toContain('if (view === "hq") return "homeV2"');
-    expect(fileText).toContain("FoundationHomeV2Panel");
-    expect(fileText).toContain("onOpenOffice");
-    expect(fileText).not.toContain('onOpenClassicHome={() => setFoundationView("home", setActiveView)}');
+    expect(shellText).toContain("FoundationHomeV2Panel");
+    expect(shellText).toContain("onOpenOffice");
   });
 
   it("keeps the Velo-inspired dashboard focused on top players, KPIs and flow actions", async () => {
@@ -67,13 +66,14 @@ describe("foundation home v2 ui contract", () => {
   });
 
   it("shows core axis stats and absolute CA/PO range on top player cards", async () => {
-    const [homeText, typesText, foundationText] = await Promise.all([
+    const [homeText, typesText, shellText, scopeText] = await Promise.all([
       fs.readFile(homeV2Path, "utf8"),
       fs.readFile(
         path.join(process.cwd(), "app/foundation/home-v2/home-v2-types.ts"),
         "utf8",
       ),
-      fs.readFile(foundationClientPath, "utf8"),
+      fs.readFile(shellRouterBodyPath, "utf8"),
+      fs.readFile(shellScopePath, "utf8"),
     ]);
 
     expect(homeText).toContain("FoundationPlayerPortraitCard");
@@ -82,20 +82,37 @@ describe("foundation home v2 ui contract", () => {
     expect(homeText).toContain("is-rank-silver");
     expect(homeText).toContain("is-rank-bronze");
     expect(homeText).not.toContain("VeloStarRating");
-    expect(foundationText).toContain("leagueHeatPools: leaguePlayerHeatPools");
-    expect(foundationText).toContain('activeView !== "homeV2"');
-    expect(foundationText).toContain('activeView !== "teams"');
+    expect(shellText).toContain("leagueHeatPools: leaguePlayerHeatPools");
+    expect(scopeText).toContain('activeView !== "homeV2"');
     expect(typesText).toContain("leagueHeatPools");
     expect(typesText).toContain("caRating");
     expect(typesText).toContain("poRangeMin");
     expect(typesText).toContain("poRangeMax");
     expect(typesText).toContain("rosterRank");
     expect(typesText).toContain("pow:");
-    expect(foundationText).toContain("buildPlayerDevelopmentInsight");
-    expect(foundationText).toContain("buildPlayerProgressionForecast");
-    expect(foundationText).toContain("potentialRangeDisplay");
+    expect(scopeText).toContain("buildPlayerDevelopmentInsight");
+    expect(scopeText).toContain("buildPlayerProgressionForecast");
+    expect(scopeText).toContain("potentialRangeDisplay");
     expect(typesText).toContain("HOME_V2_TOP_PLAYER_COUNT");
-    expect(foundationText).toContain("homePlayerCards.slice(0, 6)");
+    expect(scopeText).toContain("homePlayerCards.slice(0, 6)");
+  });
+
+  it("keeps HQ hero lean with captain picker and without duplicate front-office strip", async () => {
+    const [officeText, homeText, cssText, shellText] = await Promise.all([
+      fs.readFile(managerOfficePath, "utf8"),
+      fs.readFile(homeV2Path, "utf8"),
+      fs.readFile(globalsPath, "utf8"),
+      fs.readFile(shellRouterBodyPath, "utf8"),
+    ]);
+
+    expect(officeText).toContain("foundation-hq-gm-line");
+    expect(officeText).toContain('data-testid="foundation-hq-captain-picker"');
+    expect(officeText).toContain("Kapitän ernennen");
+    expect(officeText).not.toContain("Front-Office Fokus");
+    expect(officeText).not.toContain("foundation-hq-command");
+    expect(homeText).not.toContain("home-v2-hero-meta");
+    expect(cssText).toContain(".foundation-hq-captain-picker");
+    expect(shellText).toContain('activeView === "homeV2"');
   });
 
   it("wires the modern v2 layout classes", async () => {
@@ -119,22 +136,26 @@ describe("foundation home v2 ui contract", () => {
 
 describe("foundation ui v2 roadmap contract", () => {
   it("routes preview navigation for facilities, scouting hub and inbox v2", async () => {
-    const fileText = await fs.readFile(foundationClientPath, "utf8");
-    const navText = await fs.readFile(navConfigPath, "utf8");
-    const pageTypesText = await fs.readFile(foundationPageTypesPath, "utf8");
-    const moduleHelpersText = await fs.readFile(moduleHelpersPath, "utf8");
+    const [shellText, scopeText, routerText, navText, pageTypesText, moduleHelpersText] = await Promise.all([
+      fs.readFile(shellRouterBodyPath, "utf8"),
+      fs.readFile(shellScopePath, "utf8"),
+      fs.readFile(shellRouterPath, "utf8"),
+      fs.readFile(navConfigPath, "utf8"),
+      fs.readFile(foundationPageTypesPath, "utf8"),
+      fs.readFile(moduleHelpersPath, "utf8"),
+    ]);
 
     expect(pageTypesText).toContain('| "facilitiesOverviewV2"');
     expect(pageTypesText).toContain('| "scoutingCenterV2"');
     expect(pageTypesText).toContain('| "inboxV2"');
-    expect(fileText).toContain("<ScoutingCenterV2Client");
-    expect(fileText).toContain("FoundationShellRouterInboxV2");
+    expect(shellText).toContain("<ScoutingCenterV2Client");
+    expect(routerText).toContain("FoundationShellRouterInboxV2");
     expect(
       (await fs.readFile(path.join(root, "app/foundation/inbox-v2/FoundationInboxV2Host.tsx"), "utf8")),
     ).toContain("<InboxV2Client");
     expect(navText).toContain('{ id: "inboxV2", label: "Inbox"');
     expect(moduleHelpersText).toContain('label: "Scouting Hub"');
-    expect(fileText).toContain("getTransfermarktScoutingVisibilityBuckets");
+    expect(scopeText).toContain("getTransfermarktScoutingVisibilityBuckets");
   });
 
   it("keeps facilities overview v2 read-only without classic training jump links", async () => {
@@ -151,12 +172,9 @@ describe("foundation ui v2 roadmap contract", () => {
 
     expect(fileText).toContain("Scouting");
     expect(fileText).toContain("Transfermarkt öffnen");
-    expect(fileText).toContain("Aktiv gescoutet");
-    expect(fileText).toContain("Base Infos (immer)");
-    expect(fileText).toContain("Draft & Rekrutierung");
-    expect(fileText).not.toContain("Recent Reports");
-    expect(fileText).toContain("Scout-Pipeline");
-    expect(fileText).toContain("Nur gemerkt");
+    expect(fileText).toContain("Scouting-Warteschlange");
+    expect(fileText).toContain("ScoutingPriorityQueue");
+    expect(fileText).toContain("scoutPipeline");
   });
 
   it("keeps inbox v2 as the canonical compact inbox", async () => {

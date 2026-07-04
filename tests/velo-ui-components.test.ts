@@ -30,11 +30,10 @@ describe("velo ui rollout contract", () => {
   });
 
   it("wires velo rollout across lineup, arena, drawer and facilities", async () => {
-    const [lineupText, arenaText, drawerText, facilitiesText, cssText] = await Promise.all([
+    const [lineupText, arenaText, drawerText, cssText] = await Promise.all([
       fs.readFile("/Users/chrisfalk/Documents/Codex/Olympiade der Welten/app/foundation/legacy-lineup-lab/LegacyLineupLabClient.tsx", "utf8"),
       fs.readFile("/Users/chrisfalk/Documents/Codex/Olympiade der Welten/app/foundation/matchday-arena-v2/MatchdayArenaV2Client.tsx", "utf8"),
       fs.readFile("/Users/chrisfalk/Documents/Codex/Olympiade der Welten/app/foundation/PlayerDetailDrawer.tsx", "utf8"),
-      fs.readFile("/Users/chrisfalk/Documents/Codex/Olympiade der Welten/app/foundation/training-facilities-v2/TrainingFacilitiesV2Client.tsx", "utf8"),
       fs.readFile(globalsPath, "utf8"),
     ]);
 
@@ -46,8 +45,6 @@ describe("velo ui rollout contract", () => {
     expect(arenaText).toContain("mutatorBonus");
     expect(drawerText).toContain("VeloStatOrbitRow");
     expect(drawerText).toContain("player-drawer-scouting-disclosure");
-    expect(facilitiesText).toContain("training-v2-facility-impact-strip");
-    expect(facilitiesText).toContain("training-v2-facility-upgrade-strip");
     expect(cssText).toContain(".player-drawer-axis-orbit");
     expect(cssText).toContain(".arena-v2-slot-impact-strip");
   });

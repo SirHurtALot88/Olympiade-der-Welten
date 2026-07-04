@@ -21,7 +21,6 @@ type TrainingForecastRowInput = {
   trainingXp: number;
   performanceXp: number;
   totalXp: number;
-  upgradeEstimate: string;
   fatigueWarning: string;
   recoveryForecast: TrainingPlayerRowView["recoveryForecast"];
   organicProgression: {
@@ -128,7 +127,6 @@ export function buildTrainingPlayerRowView(
     trainingXp: row.trainingXp,
     performanceXp: row.performanceXp,
     totalXp: row.totalXp,
-    upgradeEstimate: row.upgradeEstimate,
     fatigueWarning: row.fatigueWarning,
     recoveryForecast: row.recoveryForecast,
     classTrainingFocus: {

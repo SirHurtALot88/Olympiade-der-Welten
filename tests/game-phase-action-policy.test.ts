@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 
 import type { GamePhase, GameState, Player, Team } from "@/lib/data/olyDataTypes";
-import { evaluateGamePhaseAction } from "@/lib/foundation/game-phase-action-policy";
+import { evaluateGamePhaseAction, isTrainingIntensityLockedForSeason } from "@/lib/foundation/game-phase-action-policy";
 import { GAME_LANGUAGE } from "@/lib/ui/game-language";
 
 function team(): Team {
@@ -149,6 +149,52 @@ describe("game phase action policy", () => {
   it("allows season completion from a completed season result", () => {
     const gate = evaluateGamePhaseAction(gameState("season_active", { completedSeason: true }), "complete_season");
     expect(gate.allowed).toBe(true);
+  });
+
+  it("keeps training intensity open during preseason and before the first matchday result", () => {
+    expect(evaluateGamePhaseAction(gameState("preseason_management"), "set_training").allowed).toBe(true);
+    expect(evaluateGamePhaseAction(gameState("season_active"), "set_training").allowed).toBe(true);
+    expect(isTrainingIntensityLockedForSeason(gameState("preseason_management"))).toBe(false);
+    expect(isTrainingIntensityLockedForSeason(gameState("season_active"))).toBe(false);
+  });
+
+  it("locks training intensity for the rest of the season once the first matchday result is recorded", () => {
+    const state: GameState = {
+      ...gameState("season_active"),
+      matchdayState: {
+        matchdayId: "season-1-md-1",
+        status: "resolved",
+        pendingTeamIds: [],
+        resolvedFixtureIds: [],
+      },
+      seasonState: {
+        ...gameState("season_active").seasonState,
+        matchdayResults: [
+          {
+            id: "r-1",
+            saveId: "save-1",
+            seasonId: "season-1",
+            matchdayId: "season-1-md-1",
+            status: "preview_applied",
+            sourceVersion: "test",
+            teamsTotal: 1,
+            teamsReady: 1,
+            teamsUnderfilled: 0,
+            teamsMissingLineup: 0,
+            teamsInvalidLineup: 0,
+            teamsMissingScoreCoverage: 0,
+            warningsCount: 0,
+            createdAt: "2026-06-21T00:00:00.000Z",
+            updatedAt: "2026-06-21T00:00:00.000Z",
+          },
+        ],
+      },
+    };
+
+    const gate = evaluateGamePhaseAction(state, "set_training");
+    expect(gate.allowed).toBe(false);
+    expect(gate.reason).toBe("phase_blocked:set_training:season_active");
+    expect(isTrainingIntensityLockedForSeason(state)).toBe(true);
   });
 
   it("keeps the core UI language centralized", () => {

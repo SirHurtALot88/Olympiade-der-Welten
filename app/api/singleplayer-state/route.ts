@@ -34,6 +34,7 @@ import {
 import { buildScenarioMeta } from "@/lib/persistence/scenario-meta";
 import type { PersistenceService, SaveSummary } from "@/lib/persistence/types";
 import { refreshTeamObjectiveState } from "@/lib/board/team-season-objectives-service";
+import { setTeamCaptain } from "@/lib/morale/team-captain-service";
 import { buildContractNegotiationDraft } from "@/lib/market/contract-negotiation-preview";
 import type { TransfermarktBuyPreview } from "@/lib/market/transfermarkt-buy-service";
 import { getActiveRoomBySaveId } from "@/lib/room/room-store";
@@ -44,6 +45,12 @@ type SaveActionBody =
   | { action: "snapshot"; sourceSaveId: string; name?: string }
   | { action: "activate"; saveId: string }
   | { action: "fresh-season-1"; name?: string }
+  | {
+      action: "assign-team-captain";
+      saveId: string;
+      teamId: string;
+      playerId: string;
+    }
   | {
       action: "new-game-flow-step";
       saveId: string;
@@ -63,6 +70,7 @@ const NEW_GAME_FLOW_STEP_IDS: NewGameFlowStepId[] = [
   "season_intro",
   "team_confirm",
   "roster_review",
+  "appoint_captain",
   "first_transfers",
   "fill_roster",
   "training_facilities",
@@ -366,6 +374,32 @@ export async function POST(request: Request) {
     save = persistence.createFreshSeasonOneSave({
       name: body.name,
     });
+  } else if (body.action === "assign-team-captain") {
+    if (!body.saveId || !body.teamId || !body.playerId) {
+      return NextResponse.json({ error: "saveId, teamId and playerId are required." }, { status: 400 });
+    }
+
+    const sourceSave = persistence.getSaveById(body.saveId);
+    if (!sourceSave) {
+      return NextResponse.json({ error: "saveId could not be resolved." }, { status: 404 });
+    }
+
+    const team = sourceSave.gameState.teams.find((entry) => entry.teamId === body.teamId);
+    if (!team?.humanControlled) {
+      return NextResponse.json({ error: "Kapitän kann nur für manuell geführte Teams gesetzt werden." }, { status: 403 });
+    }
+
+    let nextGameState: GameState;
+    try {
+      nextGameState = setTeamCaptain(sourceSave.gameState, body.teamId, body.playerId);
+    } catch (error) {
+      return NextResponse.json(
+        { error: error instanceof Error ? error.message : "Kapitän konnte nicht gesetzt werden." },
+        { status: 400 },
+      );
+    }
+
+    save = persistence.saveSingleplayerState(body.saveId, withNormalizedLocalTeamSettings(nextGameState));
   } else if (body.action === "new-game-flow-step") {
     if (!body.saveId || !NEW_GAME_FLOW_STEP_IDS.includes(body.stepId) || !NEW_GAME_FLOW_STEP_STATUSES.includes(body.status)) {
       return NextResponse.json({ error: "saveId, stepId and status are required." }, { status: 400 });

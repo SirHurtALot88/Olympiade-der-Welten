@@ -15,9 +15,13 @@ const teamLogoPathByTeamId = teamLogoMap as Record<string, string>;
 const portraitPathByPlayerId: Record<string, string> = {
   ...(playerPortraitMap as Record<string, string>),
   "player-0154-riley-le-rouge":
-    "/Users/chrisfalk/Library/CloudStorage/Dropbox/Chris/Olympiade der Welten/Mark VI Cardgame/Spieler/Riley Le Rogue.jpg",
+    "/Users/chrisfalk/.cursor/projects/Users-chrisfalk-Documents-Codex-Olympiade-der-Welten/assets/Riley_Le_Rogue-bef87d06-48fe-4eca-b665-cb9db53399e5.png",
   "player-2969-lakshmi-ekelemann":
     "/Users/chrisfalk/Library/CloudStorage/Dropbox/Chris/Olympiade der Welten/Mark VI Cardgame/Spieler/Lakshmi Ekelmann.jpg",
+  "player-2968-toothkrix":
+    "/Users/chrisfalk/.cursor/projects/Users-chrisfalk-Documents-Codex-Olympiade-der-Welten/assets/Toothkrix-e3306eb2-a689-4084-ba94-5708dd7a9a17.png",
+  "player-2676-peacock":
+    "/Users/chrisfalk/.cursor/projects/Users-chrisfalk-Documents-Codex-Olympiade-der-Welten/assets/Peacock.png",
 };
 
 export function getPlayerPortraitPathById(playerId: string) {

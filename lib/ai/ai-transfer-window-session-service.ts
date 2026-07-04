@@ -18,7 +18,6 @@ import {
   flushLocalTransfermarktRunContext,
   type LocalTransfermarktRunContext,
 } from "@/lib/market/transfermarkt-local-service";
-import { isSeasonOne } from "@/lib/season/transfer-season-policy";
 import { createPersistenceService } from "@/lib/persistence/persistence-service";
 import type { PersistedSaveGame, PersistenceService } from "@/lib/persistence/types";
 import type { GameState } from "@/lib/data/olyDataTypes";
@@ -225,7 +224,10 @@ export async function runTransferWindowSession(input: TransferWindowSessionInput
 
   const maxTeamCycles = Math.max(1, input.maxTeamCycles ?? 5);
   const maxLeagueRounds = Math.max(1, input.maxLeagueRounds ?? 3);
-  const allowBuys = (input.allowBuys ?? true) && !isSeasonOne(input.seasonId);
+  // S1 buys are permitted (course correction 2026-07-04: draft is just the first ordinary buy
+  // pass; a team that sells down below hardMin/Opt in S1 must be able to rebuy in the same
+  // season). Only the explicit caller-supplied `allowBuys` flag can disable buys now.
+  const allowBuys = input.allowBuys ?? true;
   const teamScope = input.teamScope ?? "all";
   const confirmToken = input.confirmToken ?? AI_MARKET_APPLY_CONFIRM_TOKEN;
   const transferPhase = input.transferPhase ?? "manual_transfer_window";
@@ -302,6 +304,17 @@ export async function runTransferWindowSession(input: TransferWindowSessionInput
         const midSave = readLiveSave();
         if (!midSave || !teamNeedsMarketConvergence(midSave.gameState, teamId)) break;
         const rosterBeforeCycle = rosterCount(midSave.gameState, teamId);
+        // Rebuild-mode (course correction 2026-07-04, req C): a team below hardMin needs pure
+        // acquisition, not sell-first-churn. Selling first here was a root cause of a net-zero
+        // churn trap for badly depleted teams (sell 1 low-value bench player, buy 1 similar-value
+        // replacement, roster count never grows) — see engine-architecture-ist.md / R-R case
+        // study. Gate on hardMin (not Opt): teams between hardMin and Opt may legitimately still
+        // sell a poor-fit player as part of roster-quality management (existing behaviour,
+        // covered by tests/ai-market-plan-convergence.test.ts's "sell-only below Opt but above
+        // hardMin" cases) — only a team that hasn't even reached hardMin yet is forced into
+        // buy-only mode.
+        const teamHardMinForCycle = getTeamHardMinRequired(midSave.gameState, teamId);
+        const allowSellsForCycle = rosterBeforeCycle >= teamHardMinForCycle;
 
         const cycleResult = await runTeamCycle({
           saveId: input.saveId,
@@ -314,7 +327,7 @@ export async function runTransferWindowSession(input: TransferWindowSessionInput
           transferPhase,
           teamScope,
           allowBuys,
-          allowSells: true,
+          allowSells: allowSellsForCycle,
           cycleIndex: cycle,
           leagueRound,
           excludeBuyPlayerIds,
@@ -418,6 +431,74 @@ export async function runTransferWindowSession(input: TransferWindowSessionInput
       warnings.push(`transfer_window_stalled:round:${leagueRound}`);
       for (const teamId of needing) exhaustedTeamIds.add(teamId);
       break;
+    }
+  }
+
+  // Opt-gap rescue (2026-07-04): teams above hardMin but still stuck well below Opt (gap>=3) at
+  // this point never get a second look — the emergency repair engine further below only fires for
+  // hardMin violations, and a team can end up here simply because it hit the 2-strike sell-spiral
+  // halt (see netNegativeStrikes above) partway through the main rounds, even though a pure
+  // buy-only attempt against the pool as it stands after every other team's activity this session
+  // was never retried. This pass is buy-only (sells fully disabled) so it cannot add further
+  // net-negative strikes or reduce roster size, reuses the same fit-aware pick engine (no lowered
+  // standards / no emergency filler), and is bounded to the small subset of teams still gapped —
+  // see outputs/real-engine-s1s5-final/progress-log.md for the S1 case study (R-C) that surfaced this.
+  const OPT_GAP_RESCUE_THRESHOLD = 3;
+  const OPT_GAP_RESCUE_MAX_CYCLES = 2;
+  const rescueSave = readLiveSave();
+  if (rescueSave) {
+    const rescueCandidates = scopeTeam(
+      rescueSave.gameState.teams
+        .map((team) => team.teamId)
+        .filter((teamId) => {
+          const rosterAfter = rosterCount(rescueSave.gameState, teamId);
+          const hardMin = getTeamHardMinRequired(rescueSave.gameState, teamId);
+          const optTarget = getTeamOptTarget(rescueSave.gameState, teamId);
+          return rosterAfter >= hardMin && optTarget - rosterAfter >= OPT_GAP_RESCUE_THRESHOLD;
+        }),
+    );
+    for (const teamId of rescueCandidates) {
+      for (let rescueCycle = 1; rescueCycle <= OPT_GAP_RESCUE_MAX_CYCLES; rescueCycle += 1) {
+        const midSave = readLiveSave();
+        if (!midSave || !teamNeedsMarketConvergence(midSave.gameState, teamId)) break;
+        const cycleResult = await runTeamCycle({
+          saveId: input.saveId,
+          seasonId: input.seasonId,
+          teamId,
+          persistence,
+          sessionRunContext,
+          dryRun: input.dryRun ?? false,
+          confirmToken,
+          transferPhase,
+          teamScope,
+          allowBuys: true,
+          allowSells: false,
+          cycleIndex: rescueCycle,
+          leagueRound: leagueRoundsCompleted + 1,
+          excludeBuyPlayerIds,
+          excludeSellPlayerIds,
+          progressLog,
+        });
+        totalTeamCycles += 1;
+        totalAppliedBuys += cycleResult.appliedBuys;
+        const afterRescueSave = readLiveSave();
+        const rosterAfter = afterRescueSave ? rosterCount(afterRescueSave.gameState, teamId) : undefined;
+        const previous = perTeamMap.get(teamId);
+        if (previous) {
+          perTeamMap.set(teamId, {
+            ...previous,
+            appliedBuys: previous.appliedBuys + cycleResult.appliedBuys,
+            rosterAfter: rosterAfter ?? previous.rosterAfter,
+            warnings: unique([...previous.warnings, ...cycleResult.warnings, `opt_gap_rescue_pass:${teamId}:cycle:${rescueCycle}`]),
+          });
+        } else {
+          warnings.push(`opt_gap_rescue_pass:${teamId}:cycle:${rescueCycle}`);
+        }
+        if (cycleResult.appliedBuys === 0) break;
+      }
+    }
+    if (sessionRunContext && sessionRunContext.deferredWrites > 0) {
+      flushLocalTransfermarktRunContext(sessionRunContext);
     }
   }
 

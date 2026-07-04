@@ -16,8 +16,8 @@ function formatNumber(value: number | null | undefined, digits = 1) {
 function formatMoney(value: number | null | undefined) {
   if (value == null || !Number.isFinite(value)) return "—";
   return value.toLocaleString("de-DE", {
-    minimumFractionDigits: 2,
-    maximumFractionDigits: 2,
+    minimumFractionDigits: 1,
+    maximumFractionDigits: 1,
   });
 }
 
@@ -110,12 +110,6 @@ export default function HomeV2Client({
           )}
           <div className="home-v2-hero-copy">
             <h2>{teamName}</h2>
-            <div className="home-v2-hero-meta">
-              <span className="pill">{teamCode}</span>
-              <span className="pill">{seasonName}</span>
-              <span className="pill">{matchdayLabel}</span>
-              <span className="pill muted">{controlModeLabel}</span>
-            </div>
           </div>
         </div>
         <div className="home-v2-hero-stats" aria-label="Team KPIs">
@@ -236,9 +230,7 @@ export default function HomeV2Client({
               <h3 title={nextStepStatus}>{nextStepLabel}</h3>
             </div>
             <span className={`transfer-status-pill ${getNextStepToneClass(nextStepStatus)}`}>{nextStepStatus}</span>
-            <button type="button" className="primary-button home-v2-next-button" onClick={onContinue}>
-              Weiter
-            </button>
+            <p className="muted">Nutze „Weiter“ oben, um direkt hierhin zu springen.</p>
           </section>
 
           <section className="home-v2-panel home-v2-board-panel">

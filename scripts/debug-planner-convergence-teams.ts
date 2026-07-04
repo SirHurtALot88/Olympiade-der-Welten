@@ -196,7 +196,7 @@ async function main() {
 
   console.log("\n=== DEBUG PLANNER CONVERGENCE ===");
   console.log(`saveId: ${saveId}`);
-  console.log(`season: ${seasonId}${isSeasonOne(seasonId) ? " (S1: buys disabled by policy)" : ""}`);
+  console.log(`season: ${seasonId}${isSeasonOne(seasonId) ? " (S1: draft is the first ordinary buy pass)" : ""}`);
   console.log(`rounds: ${convergence.rounds} · passes: ${convergence.passes} · buys: ${convergence.appliedBuys} · sells: ${convergence.appliedSells}`);
   for (const row of finalRows) {
     console.log(`${row.shortCode}: ${row.rosterCount}/${row.optTarget} (min ${row.hardMin}) · ${row.atOpt ? "AT OPT" : row.ok ? "OK" : "BELOW MIN"} · cash ${row.cash.toFixed(1)}`);

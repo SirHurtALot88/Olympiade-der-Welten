@@ -326,9 +326,6 @@ export function FacilityDecisionModal({
                       </strong>
                     </div>
                   </div>
-                  <p>
-                    {matchingUpgradePreview.currentEffect} → {matchingUpgradePreview.nextEffect ?? "Max"}
-                  </p>
                   {matchingUpgradePreview.blockingReasons.length > 0 ? (
                     <p className="text-negative">{matchingUpgradePreview.blockingReasons.map(formatFacilityActionReason).join(" · ")}</p>
                   ) : null}

@@ -34,19 +34,9 @@ import {
   buildPreviewDisciplineRatingsFromAttributes,
   buildSeasonEndDisciplineDeltas,
   getProgressionRatingTier,
-  getSeasonEndUpgradeCost,
   type SeasonEndProgressionDisciplineDelta,
   type SeasonEndProgressionEconomyAudit,
 } from "@/lib/training/season-end-progression-preview";
-
-export type SeasonEndXpSpendPlannedUpgradeInput = {
-  playerId: string;
-  attribute: PlayerGeneratorAttributeName;
-  fromValue?: number | null;
-  toValue?: number | null;
-  cost?: number | null;
-  source?: "manual_xp_spend_preview";
-};
 
 export type SeasonEndXpSpendPreviewPlayer = {
   playerId: string;
@@ -499,7 +489,6 @@ function buildPreviewPlayer(input: {
   save: PersistedSaveGame;
   teamId: string;
   player: Player;
-  plannedInputs: SeasonEndXpSpendPlannedUpgradeInput[];
   facilities: TeamFacilityCollection;
   economyContext: EconomyPreviewContext;
   skipAfterEconomyAudit?: boolean;
@@ -529,16 +518,15 @@ function buildPreviewPlayer(input: {
     lifetimeXPBefore == null && seasonXp.earnedSeasonXP <= 0
       ? null
       : Math.max(0, Math.round(lifetimeXPBefore ?? 0) + Math.round(seasonXp.earnedSeasonXP));
-  let plannedXP = 0;
+  const plannedXP = 0;
   const plannedUpgrades: PlayerProgressionSpendUpgradeRecord[] = [];
-  const organicProgression =
-    input.plannedInputs.length === 0 && attributesAfter
-      ? (input.preComputedSeasonXp?.get(input.player.id)?.organicProgression ?? buildOrganicSeasonProgression({
-          gameState: input.save.gameState,
-          player: input.player,
-          facilities: input.facilities,
-        }))
-      : null;
+  const organicProgression = attributesAfter
+    ? (input.preComputedSeasonXp?.get(input.player.id)?.organicProgression ?? buildOrganicSeasonProgression({
+        gameState: input.save.gameState,
+        player: input.player,
+        facilities: input.facilities,
+      }))
+    : null;
   if (organicProgression && attributesAfter) {
     for (const attribute of ATTRIBUTE_KEYS) {
       attributesAfter[attribute] = organicProgression.attributesAfter[attribute];
@@ -561,7 +549,7 @@ function buildPreviewPlayer(input: {
     }
   }
   const regressionEvent = seasonXp.regressionEvent;
-  if (!organicProgression && input.plannedInputs.length === 0 && attributesAfter && regressionEvent?.attribute && regressionEvent.delta < 0) {
+  if (!organicProgression && attributesAfter && regressionEvent?.attribute && regressionEvent.delta < 0) {
     const currentValue = attributesAfter[regressionEvent.attribute];
     if (isFiniteNumber(currentValue) && currentValue > 0) {
       const toValue = Math.max(0, currentValue + regressionEvent.delta);
@@ -578,47 +566,6 @@ function buildPreviewPlayer(input: {
     } else {
       warnings.push(`${input.player.id}:regression_blocked_attribute_floor:${regressionEvent.attribute}`);
     }
-  }
-
-  for (const upgrade of input.plannedInputs) {
-    if (!attributesAfter) {
-      continue;
-    }
-    const currentValue = attributesAfter[upgrade.attribute];
-    if (!isFiniteNumber(currentValue)) {
-      blockers.push(`attribute_source_missing:${input.player.id}:${upgrade.attribute}`);
-      continue;
-    }
-    if (currentValue >= 99) {
-      blockers.push(`attribute_at_99:${input.player.id}:${upgrade.attribute}`);
-      continue;
-    }
-
-    const cost = getSeasonEndUpgradeCost({
-      tier: getProgressionRatingTier(currentValue),
-      attribute: upgrade.attribute,
-      facilities: { teamFacilities: input.facilities },
-    });
-    if (cost.costAfterFacility == null) {
-      blockers.push(`upgrade_cost_unavailable:${input.player.id}:${upgrade.attribute}`);
-      continue;
-    }
-
-    const toValue = Math.min(99, currentValue + 1);
-    attributesAfter[upgrade.attribute] = toValue;
-    plannedXP += cost.costAfterFacility;
-    plannedUpgrades.push({
-      playerId: input.player.id,
-      attribute: upgrade.attribute,
-      fromValue: currentValue,
-      toValue,
-      cost: cost.costAfterFacility,
-      source: "manual_xp_spend_preview",
-    });
-  }
-
-  if (plannedXP > availableXP) {
-    blockers.push(`xp_insufficient:${input.player.id}`);
   }
 
   const previewDisciplineRatings = buildPreviewDisciplineRatingsFromAttributes({
@@ -766,7 +713,6 @@ export function previewSeasonEndXpAvailability(save: PersistedSaveGame, teamId: 
 export function previewSeasonEndXpSpend(
   save: PersistedSaveGame,
   teamId: string,
-  plannedUpgrades: SeasonEndXpSpendPlannedUpgradeInput[],
   cachedEconomyContext?: EconomyPreviewContext,
   options?: { skipAfterEconomyAudit?: boolean },
   preComputedSeasonXp?: Map<string, PreComputedSeasonXpEntry>,
@@ -779,7 +725,6 @@ export function previewSeasonEndXpSpend(
 
   if (save.status !== "active") blockingReasons.push("save_not_active");
   if (!team) blockingReasons.push("team_not_found");
-  if (plannedUpgrades.length > 0) blockingReasons.push("manual_xp_spend_disabled");
   if (!APPLY_PHASES.has(gamePhase)) warnings.push(`xp_spend_apply_phase_blocked:${gamePhase}`);
   if (team && team.humanControlled === false) warnings.push("ai_xp_spend_apply_not_enabled_v1");
 
@@ -790,31 +735,17 @@ export function previewSeasonEndXpSpend(
       .map((event) => event.playerId),
   );
   const baselinePlayerIds = new Set((gameState.playerBaselines ?? []).map((baseline) => baseline.playerId));
-  const inputsByPlayerId = new Map<string, SeasonEndXpSpendPlannedUpgradeInput[]>();
-  for (const upgrade of plannedUpgrades) {
-    if (!rosterPlayerIds.has(upgrade.playerId)) {
-      blockingReasons.push(`player_not_on_team:${upgrade.playerId}`);
+  const eligiblePlayerIds: string[] = [];
+  for (const playerId of rosterPlayerIds) {
+    if (materializedPlayerIds.has(playerId)) continue;
+    if (!baselinePlayerIds.has(playerId)) {
+      blockingReasons.push(`player_baseline_missing:${playerId}`);
       continue;
     }
-    if (!baselinePlayerIds.has(upgrade.playerId)) {
-      blockingReasons.push(`player_baseline_missing:${upgrade.playerId}`);
-      continue;
-    }
-    inputsByPlayerId.set(upgrade.playerId, [...(inputsByPlayerId.get(upgrade.playerId) ?? []), upgrade]);
+    eligiblePlayerIds.push(playerId);
   }
 
-  if (plannedUpgrades.length === 0) {
-    for (const playerId of rosterPlayerIds) {
-      if (materializedPlayerIds.has(playerId)) continue;
-      if (!baselinePlayerIds.has(playerId)) {
-        blockingReasons.push(`player_baseline_missing:${playerId}`);
-        continue;
-      }
-      inputsByPlayerId.set(playerId, []);
-    }
-  }
-
-  if (plannedUpgrades.length === 0 && rosterPlayerIds.size > 0 && blockingReasons.length === 0) {
+  if (rosterPlayerIds.size > 0 && blockingReasons.length === 0) {
     if (materializedPlayerIds.size >= rosterPlayerIds.size) {
       const hardBlockingReasons = ["season_xp_no_unmaterialized_xp"];
       return {
@@ -846,23 +777,21 @@ export function previewSeasonEndXpSpend(
 
   const facilities = getTeamFacilities(gameState, teamId);
   const playerById = new Map(gameState.players.map((player) => [player.id, player] as const));
-  let previewEntries = [...inputsByPlayerId.entries()];
 
   const economyContext = cachedEconomyContext ?? getEconomyPreviewContext(gameState);
-  const players = previewEntries.map(([playerId, inputs]) => {
+  const players = eligiblePlayerIds.map((playerId) => {
     const player = playerById.get(playerId) ?? null;
     if (!player) {
       blockingReasons.push(`player_not_found:${playerId}`);
       return null;
     }
-    return buildPreviewPlayer({ save, teamId, player, plannedInputs: inputs, facilities, economyContext, skipAfterEconomyAudit: options?.skipAfterEconomyAudit, preComputedSeasonXp });
+    return buildPreviewPlayer({ save, teamId, player, facilities, economyContext, skipAfterEconomyAudit: options?.skipAfterEconomyAudit, preComputedSeasonXp });
   }).filter((entry): entry is SeasonEndXpSpendPreviewPlayer => {
     if (!entry) return false;
-    if (plannedUpgrades.length > 0) return true;
     return entry.earnedSeasonXP > 0 || (entry.organicProgression?.attributeBreakdown.length ?? 0) > 0;
   });
 
-  if (plannedUpgrades.length === 0 && players.length === 0 && blockingReasons.length === 0) {
+  if (players.length === 0 && blockingReasons.length === 0) {
     blockingReasons.push("season_xp_no_unmaterialized_xp");
   }
 
@@ -914,7 +843,6 @@ export function previewSeasonEndXpSpend(
 export function applySeasonEndXpSpend(
   save: PersistedSaveGame,
   teamId: string,
-  plannedUpgrades: SeasonEndXpSpendPlannedUpgradeInput[],
   confirmToken: string | null | undefined,
   persistence: PersistenceService = createPersistenceService(),
   options: SeasonEndXpSpendApplyOptions = {},
@@ -926,14 +854,13 @@ export function applySeasonEndXpSpend(
   const preview =
     preComputedPreview && confirmToken && confirmToken === preComputedPreview.confirmToken
       ? preComputedPreview
-      : previewSeasonEndXpSpend(save, teamId, plannedUpgrades, cachedEconomyContext, options?.skipAfterEconomyAudit ? { skipAfterEconomyAudit: true } : undefined, preComputedSeasonXp);
+      : previewSeasonEndXpSpend(save, teamId, cachedEconomyContext, options?.skipAfterEconomyAudit ? { skipAfterEconomyAudit: true } : undefined, preComputedSeasonXp);
   const applyBlockers: string[] = [];
   if (!confirmToken) applyBlockers.push("confirm_token_missing");
   if (confirmToken && confirmToken !== preview.confirmToken) applyBlockers.push("xp_spend_preview_stale");
   if (!APPLY_PHASES.has(preview.saveContext.gamePhase)) applyBlockers.push(`xp_spend_apply_phase_blocked:${preview.saveContext.gamePhase}`);
   if (preview.team?.humanControlled === false && !options.allowAiTeams) applyBlockers.push("ai_xp_spend_apply_not_enabled_v1");
   if (!preview.ok) applyBlockers.push(...preview.blockingReasons);
-  if (plannedUpgrades.length > 0) applyBlockers.push("manual_xp_spend_disabled");
 
   if (applyBlockers.length > 0) {
     return {

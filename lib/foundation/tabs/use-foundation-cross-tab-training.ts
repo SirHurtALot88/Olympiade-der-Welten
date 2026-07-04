@@ -7,7 +7,6 @@ import { calculateFacilityMaintenanceCost, getFacilityConditionStatus } from "@/
 import {
   applyRecoveryFacilityModifiers,
   applyTrainingXpFacilityModifiers,
-  applyUpgradeCostFacilityModifiers,
   calculateFacilityIncome,
   calculateFacilityUpkeep,
   getAnalyticsForecastQuality,
@@ -17,25 +16,21 @@ import {
   getTeamFacilityState,
 } from "@/lib/facilities/facility-effects";
 import { getTeamDevelopmentTrainingBonusPct } from "@/lib/foundation/team-development-tendency";
+import { isTrainingIntensityLockedForSeason } from "@/lib/foundation/game-phase-action-policy";
 import { buildTrainingPlayerRowView } from "@/lib/foundation/training-player-row-view";
 import { BASE_MATCHDAY_RECOVERY } from "@/lib/fatigue/fatigue-injury-service";
 import { buildOrganicSeasonProgression } from "@/lib/training/organic-season-progression";
-import { buildPlayerProgressionForecast, PLAYER_PROGRESSION_XP_CONSTANTS } from "@/lib/training/player-progression-forecast";
+import { buildPlayerProgressionForecast } from "@/lib/training/player-progression-forecast";
 import { buildTrainingModeDemand } from "@/lib/training/training-mode-demand-service";
 import { getAllTrainingModePresentations } from "@/lib/training/training-mode-presentation";
 import { applyTrainingRecoveryImpact } from "@/lib/training/training-recovery-impact";
 import { TRAINING_ATTRIBUTE_LABELS } from "@/lib/training/training-levelup-service";
-import {
-  buildSeasonEndProgressionPreview,
-  type SeasonEndFacilityPreviewInput,
-} from "@/lib/training/season-end-progression-preview";
 import type {
   FoundationReadMeta,
   TrainingClassDraft,
   TrainingDevelopmentFilter,
   TrainingModeDraft,
 } from "@/lib/foundation/tabs/foundation-page-types";
-import { EMPTY_SEASON_END_PROGRESSION_PREVIEW } from "@/lib/foundation/tabs/foundation-page-types";
 import { trainingModeConfigs } from "@/lib/foundation/tabs/foundation-page-module-helpers";
 import { useTrainingForecastLimit } from "@/lib/foundation/tabs/use-training-forecast-limit";
 import { getRosterPlayers } from "@/lib/foundation/tabs/season-stand-render-helpers";
@@ -74,8 +69,6 @@ export function useFoundationCrossTabTraining(input: {
   trainingFacilityPreviewId: string | null;
   playerProfileData: { playerId: string } | null;
   readMeta: FoundationReadMeta;
-  plannedXpUpgradesLength: number;
-  seasonEndAttributeDraft: Record<string, string>;
 }) {
   const shouldBuildTrainingForecastDerivations = shouldBuildFoundationTrainingForecastDerivations({
     shouldBuildTrainingView: input.shouldBuildTrainingView,
@@ -187,7 +180,6 @@ export function useFoundationCrossTabTraining(input: {
         performanceXp: organicProgression.appliedPerformanceSetpoints,
         trainingXp: organicProgression.trainingSetpoints,
         totalXp: organicProgression.netSetpoints,
-        upgradeEstimate: forecast.possibleUpgradeSummary,
         fatigueWarning: forecast.fatigueStrain.warning,
         recoveryForecast,
         playerMvs: rating?.mvs ?? null,
@@ -304,6 +296,11 @@ export function useFoundationCrossTabTraining(input: {
     });
   }, [input.gameState, input.selectedTeam, shouldBuildTrainingCompactDerivations]);
 
+  const trainingIntensityLocked = useMemo(
+    () => isTrainingIntensityLockedForSeason(input.gameState),
+    [input.gameState],
+  );
+
   const trainingPlayerRowViews = useMemo(() => {
     if (!shouldBuildTrainingCompactDerivations) {
       return [];
@@ -312,24 +309,25 @@ export function useFoundationCrossTabTraining(input: {
       const view = buildTrainingPlayerRowView(row, TRAINING_ATTRIBUTE_LABELS);
       const plan = trainingLoadPlanByPlayerId.get(row.player.id);
       if (!plan) {
-        return view;
+        return { ...view, trainingIntensityLocked };
       }
       return {
         ...view,
         recommendedTrainingMode: plan.selectedMode,
         recommendedTrainingDetail: plan.reasons[0] ?? null,
         recommendedTrainingMatchesCurrent: plan.selectedMode === row.mode,
+        trainingIntensityLocked,
       };
     });
-  }, [filteredTrainingPlayerForecastRows, shouldBuildTrainingCompactDerivations, trainingLoadPlanByPlayerId]);
+  }, [filteredTrainingPlayerForecastRows, shouldBuildTrainingCompactDerivations, trainingLoadPlanByPlayerId, trainingIntensityLocked]);
 
   const playerProfileTrainingRow = useMemo(() => {
     if (!input.playerProfileData) {
       return null;
     }
     const row = trainingPlayerForecastRows.find((entry) => entry.player.id === input.playerProfileData?.playerId);
-    return row ? buildTrainingPlayerRowView(row, TRAINING_ATTRIBUTE_LABELS) : null;
-  }, [input.playerProfileData, trainingPlayerForecastRows]);
+    return row ? { ...buildTrainingPlayerRowView(row, TRAINING_ATTRIBUTE_LABELS), trainingIntensityLocked } : null;
+  }, [input.playerProfileData, trainingPlayerForecastRows, trainingIntensityLocked]);
 
   const trainingFacilityRows = useMemo(() => {
     if (!shouldBuildTrainingFacilitiesDerivations) {
@@ -464,24 +462,6 @@ export function useFoundationCrossTabTraining(input: {
       },
     );
     const recovery = applyRecoveryFacilityModifiers(BASE_MATCHDAY_RECOVERY, input.selectedTeamFacilityState);
-    const academyLowTier = applyUpgradeCostFacilityModifiers(
-      "power",
-      "D",
-      PLAYER_PROGRESSION_XP_CONSTANTS.ratingTierUpgradeCost.D,
-      input.selectedTeamFacilityState,
-    );
-    const specialistPower = applyUpgradeCostFacilityModifiers(
-      "power",
-      "B",
-      PLAYER_PROGRESSION_XP_CONSTANTS.ratingTierUpgradeCost.B,
-      input.selectedTeamFacilityState,
-    );
-    const specialistSpeed = applyUpgradeCostFacilityModifiers(
-      "speed",
-      "B",
-      PLAYER_PROGRESSION_XP_CONSTANTS.ratingTierUpgradeCost.B,
-      input.selectedTeamFacilityState,
-    );
     const scouting = getScoutingConfidence(input.selectedTeamFacilityState);
     const analytics = getAnalyticsForecastQuality(input.selectedTeamFacilityState);
 
@@ -489,9 +469,6 @@ export function useFoundationCrossTabTraining(input: {
       trainingXp,
       recovery,
       recoveryAfterTraining: trainingForecastSummary.recoveryAfterTraining,
-      academyLowTier,
-      specialistPower,
-      specialistSpeed,
       scouting,
       analytics,
       warnings: [
@@ -505,66 +482,6 @@ export function useFoundationCrossTabTraining(input: {
     input.selectedTeamFacilityState,
     trainingForecastSummary.recoveryAfterTraining,
     trainingForecastSummary.trainingXp,
-  ]);
-
-  const seasonEndFacilityInput = useMemo<SeasonEndFacilityPreviewInput>(
-    () => ({
-      teamFacilities: {
-        facilities: {
-          ...input.selectedTeamFacilityState.facilities,
-          ...(input.trainingFacilityPreviewId
-            ? {
-                [input.trainingFacilityPreviewId]: {
-                  ...input.selectedTeamFacilityState.facilities[input.trainingFacilityPreviewId],
-                  level: Math.min(
-                    (input.selectedTeamFacilityState.facilities[input.trainingFacilityPreviewId]?.level ?? 0) + 1,
-                    5,
-                  ),
-                  enabled: true,
-                  activeVariant:
-                    input.trainingFacilityPreviewId === "specialist_wing"
-                      ? input.selectedTeamFacilityState.facilities.specialist_wing?.activeVariant ?? "power_gym"
-                      : input.selectedTeamFacilityState.facilities[input.trainingFacilityPreviewId]?.activeVariant,
-                },
-              }
-            : {}),
-        },
-      },
-    }),
-    [input.selectedTeamFacilityState, input.trainingFacilityPreviewId],
-  );
-
-  const seasonEndProgressionPreview = useMemo(() => {
-    if (!shouldBuildTrainingFacilitiesDerivations || input.plannedXpUpgradesLength === 0) {
-      return EMPTY_SEASON_END_PROGRESSION_PREVIEW;
-    }
-
-    const forecastsByPlayerId = new Map(
-      trainingPlayerForecastRows.map((row) => [row.player.id, row.forecast] as const),
-    );
-    const organicByPlayerId = new Map(
-      trainingPlayerForecastRows.map((row) => [row.player.id, row.organicProgression] as const),
-    );
-    return buildSeasonEndProgressionPreview({
-      gameState: input.gameState,
-      teamId: input.selectedTeam.teamId,
-      forecastsByPlayerId,
-      organicByPlayerId,
-      upgradeRequests: input.rosterPlayers.map(({ player }) => ({
-        playerId: player.id,
-        attribute: input.seasonEndAttributeDraft[player.id] ?? "power",
-      })),
-      facilities: seasonEndFacilityInput,
-    });
-  }, [
-    input.gameState,
-    input.plannedXpUpgradesLength,
-    input.rosterPlayers,
-    input.seasonEndAttributeDraft,
-    input.selectedTeam.teamId,
-    seasonEndFacilityInput,
-    shouldBuildTrainingFacilitiesDerivations,
-    trainingPlayerForecastRows,
   ]);
 
   const trainingV2ModeOptions = useMemo(
@@ -595,8 +512,6 @@ export function useFoundationCrossTabTraining(input: {
     trainingFacilityForecast,
     trainingFacilitySeasonEndFinance,
     trainingFacilityEffectPreview,
-    seasonEndFacilityInput,
-    seasonEndProgressionPreview,
     trainingV2ModeOptions,
   };
 }

@@ -23,7 +23,6 @@ describe("buildTrainingPlayerRowView", () => {
         trainingXp: 70,
         performanceXp: 30,
         totalXp: 100,
-        upgradeEstimate: "offen",
         fatigueWarning: "ok",
         recoveryForecast: { before: 10, after: 10, modifierPct: 0 },
         organicProgression: {

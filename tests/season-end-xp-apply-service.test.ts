@@ -6,7 +6,6 @@ import { createPlayerBaselinesForPlayers } from "@/lib/players/player-baseline-s
 import {
   applySeasonEndXpSpend,
   previewSeasonEndXpSpend,
-  type SeasonEndXpSpendPlannedUpgradeInput,
 } from "@/lib/progression/season-end-xp-apply-service";
 import { buildSeasonTransitionPreview } from "@/lib/season/season-transition-service";
 
@@ -125,60 +124,7 @@ function createPersistence() {
   return { persistence, getSavedState: () => savedState };
 }
 
-function upgrade(attribute = "power" as const): SeasonEndXpSpendPlannedUpgradeInput {
-  return { playerId: "player-1", attribute, source: "manual_xp_spend_preview" };
-}
-
 describe("season-end XP spend apply service", () => {
-  it("blocks manual XP preview and apply", () => {
-    const save = createSave(createPlayer({ currentXP: 100 }));
-    const preview = previewSeasonEndXpSpend(save, "team-1", [upgrade()]);
-    const { persistence } = createPersistence();
-
-    expect(preview.ok).toBe(false);
-    expect(preview.confirmToken).toBeNull();
-    expect(preview.blockingReasons).toContain("manual_xp_spend_disabled");
-    expect(preview.players[0]?.plannedUpgrades[0]).toMatchObject({ fromValue: 30, toValue: 31, cost: 70 });
-
-    const result = applySeasonEndXpSpend(save, "team-1", [upgrade()], "any-token", persistence);
-    expect(result.applied).toBe(false);
-    expect(result.blockingReasons).toContain("manual_xp_spend_disabled");
-  });
-
-  it("still surfaces per-player blockers when manual XP is requested", () => {
-    const player = createPlayer({ attributeSheetStats: { ...baseAttributes, power: 80 }, currentXP: 0 });
-    const preview = previewSeasonEndXpSpend(createSave(player), "team-1", [upgrade()]);
-
-    expect(preview.ok).toBe(false);
-    expect(preview.blockingReasons).toContain("manual_xp_spend_disabled");
-    expect(preview.blockingReasons).toContain("xp_insufficient:player-1");
-  });
-
-  it("blocks manual XP when attribute is already at 99", () => {
-    const player = createPlayer({ attributeSheetStats: { ...baseAttributes, power: 99 }, currentXP: 999 });
-    const preview = previewSeasonEndXpSpend(createSave(player), "team-1", [upgrade()]);
-
-    expect(preview.ok).toBe(false);
-    expect(preview.blockingReasons).toContain("manual_xp_spend_disabled");
-    expect(preview.blockingReasons).toContain("attribute_at_99:player-1:power");
-  });
-
-  it("recalculates costs for multiple upgrades of the same attribute", () => {
-    const player = createPlayer({ attributeSheetStats: { ...baseAttributes, power: 29 }, currentXP: 500 });
-    const preview = previewSeasonEndXpSpend(createSave(player), "team-1", [upgrade(), upgrade()]);
-
-    expect(preview.players[0]?.plannedUpgrades.map((entry) => entry.cost)).toEqual([55, 70]);
-    expect(preview.players[0]?.plannedXP).toBe(125);
-  });
-
-  it("removing an upgrade returns planned XP in the next preview", () => {
-    const player = createPlayer({ attributeSheetStats: { ...baseAttributes, power: 29 }, currentXP: 500 });
-    const two = previewSeasonEndXpSpend(createSave(player), "team-1", [upgrade(), upgrade()]);
-    const one = previewSeasonEndXpSpend(createSave(player), "team-1", [upgrade()]);
-
-    expect(two.players[0]?.remainingXP).toBe((one.players[0]?.remainingXP ?? 0) - 70);
-  });
-
   it("blocks apply without confirm token for organic-only spend", () => {
     const save = createSave(createPlayer({ currentXP: 100 }));
     save.gameState.seasonState.matchdayResults = [
@@ -206,7 +152,7 @@ describe("season-end XP spend apply service", () => {
       },
     ];
 
-    const result = applySeasonEndXpSpend(save, "team-1", [], null, createPersistence().persistence);
+    const result = applySeasonEndXpSpend(save, "team-1", null, createPersistence().persistence);
 
     expect(result.applied).toBe(false);
     expect(result.blockingReasons).toContain("confirm_token_missing");
@@ -238,7 +184,7 @@ describe("season-end XP spend apply service", () => {
         createdAt: "2026-06-11T00:00:00.000Z",
       },
     ];
-    const preview = previewSeasonEndXpSpend(save, "team-1", []);
+    const preview = previewSeasonEndXpSpend(save, "team-1");
     const drifted = {
       ...save,
       gameState: {
@@ -247,7 +193,7 @@ describe("season-end XP spend apply service", () => {
       },
     } satisfies PersistedSaveGame;
 
-    const result = applySeasonEndXpSpend(drifted, "team-1", [], preview.confirmToken, createPersistence().persistence);
+    const result = applySeasonEndXpSpend(drifted, "team-1", preview.confirmToken, createPersistence().persistence);
 
     expect(result.applied).toBe(false);
     expect(result.blockingReasons).toContain("xp_spend_preview_stale");
@@ -296,10 +242,10 @@ describe("season-end XP spend apply service", () => {
       },
     ];
 
-    const preview = previewSeasonEndXpSpend(save, "team-1", []);
+    const preview = previewSeasonEndXpSpend(save, "team-1");
     const { persistence, getSavedState } = createPersistence();
 
-    const result = applySeasonEndXpSpend(save, "team-1", [], preview.confirmToken, persistence);
+    const result = applySeasonEndXpSpend(save, "team-1", preview.confirmToken, persistence);
     const savedPlayer = getSavedState()?.players[0];
 
     expect(preview.ok).toBe(true);
@@ -337,7 +283,7 @@ describe("season-end XP spend apply service", () => {
       },
     ];
 
-    const preview = previewSeasonEndXpSpend(save, "team-1", []);
+    const preview = previewSeasonEndXpSpend(save, "team-1");
 
     expect(preview.ok).toBe(false);
     expect(preview.blockingReasons).toContain("season_xp_no_unmaterialized_xp");
@@ -346,10 +292,9 @@ describe("season-end XP spend apply service", () => {
   it("blocks XP writes when the player baseline is missing", () => {
     const save = createSave(createPlayer({ currentXP: 100 }));
     save.gameState.playerBaselines = [];
-    const preview = previewSeasonEndXpSpend(save, "team-1", [upgrade()]);
+    const preview = previewSeasonEndXpSpend(save, "team-1");
 
     expect(preview.ok).toBe(false);
-    expect(preview.blockingReasons).toContain("manual_xp_spend_disabled");
     expect(preview.blockingReasons).toContain("player_baseline_missing:player-1");
   });
 });

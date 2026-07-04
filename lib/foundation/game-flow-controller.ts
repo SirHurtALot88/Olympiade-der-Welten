@@ -14,6 +14,7 @@ import {
 } from "@/lib/foundation/matchday-lineup-readiness";
 import { getTeamBoardFlowSignals } from "@/lib/board/team-season-objectives-service";
 import { getTeamSponsorContract } from "@/lib/sponsor/sponsor-offer-read";
+import { hasPersistedTeamCaptain } from "@/lib/morale/team-captain-service";
 
 export type GameFlowPhase =
   | "preseason"
@@ -304,6 +305,16 @@ function resolveOnboardingStepStatus(
   if (stepId === "roster_review") {
     return rosterCount > 0 ? "completed" : "ready";
   }
+  if (stepId === "appoint_captain") {
+    if (!activeTeamId) {
+      return "ready";
+    }
+    const team = gameState.teams.find((entry) => entry.teamId === activeTeamId);
+    if (!team?.humanControlled) {
+      return "completed";
+    }
+    return hasPersistedTeamCaptain(gameState, activeTeamId) ? "completed" : "ready";
+  }
   if (stepId === "first_transfers") {
     return hasTransfers ? "completed" : "ready";
   }
@@ -357,6 +368,16 @@ function buildOnboardingFlowSteps(gameState: GameState, activeTeamId: string | n
       targetView: "teams",
       targetPanel: "roster",
       teamId,
+    }),
+    step({
+      stepId: "appoint_captain",
+      label: "Kapitän ernennen",
+      cta: "Weiter: Kapitän wählen",
+      status: resolveOnboardingStepStatus(flow, "appoint_captain", gameState, teamId),
+      targetView: "home",
+      targetPanel: "captain-picker",
+      teamId,
+      blockers: teamId ? [] : ["no_active_team"],
     }),
     step({
       stepId: "first_transfers",

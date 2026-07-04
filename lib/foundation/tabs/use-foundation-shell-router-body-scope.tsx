@@ -3844,6 +3844,12 @@ export function useFoundationShellRouterBodyScope({
       setHomeV2Tab("office");
     }
 
+    if (requestedView === "scoutingCenterV2") {
+      if (requestedTab === "reports" || requestedTab === "recommended" || requestedTab === "overview") {
+        setScoutingCenterTab(requestedTab);
+      }
+    }
+
     const requestedTeamContext = resolvePreferredFoundationTeamContext(initialClientGameState.teams, {
       currentTeamId: selectedTeamId,
       currentSource: activeManagerTeamSource,

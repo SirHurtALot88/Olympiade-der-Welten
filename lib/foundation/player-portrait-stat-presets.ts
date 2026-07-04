@@ -122,10 +122,14 @@ export function buildRosterOverlayStats(input: BuildRosterOverlayInput): Portrai
     stat(formatStatLabel("OVR", input.ovrRank), formatNumber(input.playerOvr, 1), {
       heatClass: getPoolHeatClass(input.playerOvr, input.leagueHeatPools.ovr),
     }),
+    stat(
+      formatStatLabel("PPs", input.ppsRank),
+      input.playerPps != null ? formatNumber(input.playerPps, 1) : "—",
+      input.playerPps != null
+        ? { heatClass: getPoolHeatClass(input.playerPps, input.leagueHeatPools.pps) }
+        : undefined,
+    ),
   ];
-  if (input.playerPps != null) {
-    stats.push(stat(formatStatLabel("PPs", input.ppsRank), formatNumber(input.playerPps, 1)));
-  }
   stats.push(
     stat(formatStatLabel("MVS", input.mvsRank), formatNumber(input.playerMvs, 1), {
       heatClass: getPoolHeatClass(input.playerMvs, input.leagueHeatPools.mvs),

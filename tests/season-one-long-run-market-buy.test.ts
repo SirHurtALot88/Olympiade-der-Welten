@@ -7,11 +7,17 @@ import { createPersistenceService } from "@/lib/persistence/persistence-service"
 import { executeLocalTransfermarktBuy } from "@/lib/market/transfermarkt-local-service";
 import { SEASON_ONE_MARKET_BUY_BLOCKER } from "@/lib/season/transfer-season-policy";
 
-describe("season-one long-run market buy regression", () => {
-  it("keeps S1 market apply at zero buys and blocks direct market execute", async () => {
+// Course correction (2026-07-04): S1 buys are NOT forbidden — the draft is just the first
+// ordinary application of the same acquisition engine to empty rosters with starting budget. A
+// team that sells down (or organically drops) below hardMin/Opt in S1 must be able to rebuy in
+// the same season via the Unified-backed convergence/apply path, exactly like any later season.
+// This test used to assert the opposite (S1 market buys hard-blocked); it now asserts the new,
+// intended behaviour.
+describe("season-one long-run market buy (course-corrected)", () => {
+  it("permits a S1 market buy through applyAiMarketPlanLocally and direct execute", async () => {
     const persistence = createPersistenceService();
     const fresh = persistence.createFreshSeasonOneSave({
-      name: `S1 market guard regression ${Date.now()}`,
+      name: `S1 market buy regression ${Date.now()}`,
     });
     const seasonId = fresh.gameState.season.id;
     const teamId = fresh.gameState.teams[0]?.teamId;
@@ -20,6 +26,29 @@ describe("season-one long-run market buy regression", () => {
     )?.id;
     expect(teamId).toBeTruthy();
     expect(playerId).toBeTruthy();
+
+    const directBuy = executeLocalTransfermarktBuy({
+      saveId: fresh.saveId,
+      seasonId,
+      teamId: teamId!,
+      playerId: playerId!,
+      transferSource: "ai_preseason_market_buy",
+    });
+    expect(directBuy.blockingReasons).not.toContain(SEASON_ONE_MARKET_BUY_BLOCKER);
+    expect(directBuy.transferCreated).toBe(true);
+
+    const after = persistence.getSaveById(fresh.saveId);
+    expect(after).toBeTruthy();
+    const counts = countSeasonBuyTransfers(after!.gameState.transferHistory, seasonId);
+    expect(counts.marketBuyCount).toBe(1);
+  }, 60_000);
+
+  it("no longer forbids S1 market buys in applyAiMarketPlanLocally's marketBuysAllowed gate", async () => {
+    const persistence = createPersistenceService();
+    const fresh = persistence.createFreshSeasonOneSave({
+      name: `S1 market apply regression ${Date.now()}`,
+    });
+    const seasonId = fresh.gameState.season.id;
 
     const marketApply = await applyAiMarketPlanLocally({
       source: "sqlite",
@@ -34,22 +63,6 @@ describe("season-one long-run market buy regression", () => {
       },
     });
 
-    expect(marketApply.summary.appliedBuys).toBe(0);
-    expect(marketApply.warnings).toContain("season_market_buy_forbidden");
-
-    const blockedBuy = executeLocalTransfermarktBuy({
-      saveId: fresh.saveId,
-      seasonId,
-      teamId: teamId!,
-      playerId: playerId!,
-      transferSource: "ai_preseason_market_buy",
-    });
-    expect(blockedBuy.transferCreated).toBe(false);
-    expect(blockedBuy.blockingReasons).toContain(SEASON_ONE_MARKET_BUY_BLOCKER);
-
-    const after = persistence.getSaveById(fresh.saveId);
-    expect(after).toBeTruthy();
-    const counts = countSeasonBuyTransfers(after!.gameState.transferHistory, seasonId);
-    expect(counts.marketBuyCount).toBe(0);
+    expect(marketApply.warnings).not.toContain("season_market_buy_forbidden");
   }, 60_000);
 });

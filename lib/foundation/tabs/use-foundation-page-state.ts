@@ -407,7 +407,14 @@ export function useFoundationPageState({
   const [lineupFocusRequestKey, setLineupFocusRequestKey] = useState<string | null>(null);
   const [lineupDraftBoardViewRequest, setLineupDraftBoardViewRequest] = useState<"lineup" | "formBoard" | null>(null);
   const [lineupDraftBoardView, setLineupDraftBoardView] = useState<"lineup" | "formBoard">("lineup");
-  const [scoutingCenterTab, setScoutingCenterTab] = useState<"overview" | "reports" | "recommended">("overview");
+  const [scoutingCenterTab, setScoutingCenterTab] = useState<"overview" | "reports" | "recommended">(() => {
+    if (typeof window === "undefined") return "overview";
+    const view = normalizeFoundationViewParam(new URL(window.location.href).searchParams.get("view"));
+    const tab = parseFoundationTabFromUrl();
+    if (view !== "scoutingCenterV2" || !tab) return "overview";
+    if (tab === "reports" || tab === "recommended" || tab === "overview") return tab;
+    return "overview";
+  });
   const [scoutingReportSelectedPlayerId, setScoutingReportSelectedPlayerId] = useState<string | null>(null);
   const [showCommandPalette, setShowCommandPalette] = useState(false);
   const [commandSearch, setCommandSearch] = useState("");

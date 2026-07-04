@@ -104,7 +104,6 @@ export function runSeasonEndProgressionBatch(input: {
     const preview = previewSeasonEndXpSpend(
       currentSave,
       team.teamId,
-      [],
       sharedEconomyContext,
       { skipAfterEconomyAudit: true },
       sharedPreComputedSeasonXp,
@@ -118,7 +117,6 @@ export function runSeasonEndProgressionBatch(input: {
     const result = applySeasonEndXpSpend(
       currentSave,
       team.teamId,
-      [],
       preview.confirmToken,
       capture.persistence,
       {

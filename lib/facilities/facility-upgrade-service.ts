@@ -53,6 +53,14 @@ export type FacilityUpgradeApplyResult = Omit<FacilityUpgradePreview, "dryRun"> 
   dryRun: false;
   applied: boolean;
   facilityEventId: string | null;
+  // Populated with the freshly-persisted save whenever `applied` is true, so bulk callers (e.g.
+  // applyAiManagerPlan looping over many teams/actions) can chain straight into it instead of
+  // re-reading via persistence.getSaveById — each such read re-materializes the full GameState
+  // from SQL (cost scales with total players/history and was measured to reach 100+ms and rising
+  // per call on multi-season saves), which turns an O(actions) plan into an O(actions × state size)
+  // one. See outputs/real-engine-s1s5-final/progress-log.md (2026-07-04, applyCanonicalManagerPlan
+  // 141s/season-3 case study).
+  save?: PersistedSaveGame | null;
 };
 
 export type FacilityUpgradeAction = "upgrade" | "downgrade";
@@ -363,7 +371,7 @@ export function applyFacilityUpgrade(
     },
   };
 
-  persistence.saveSingleplayerState(save.saveId, nextGameState);
+  const persistedSave = persistence.saveSingleplayerState(save.saveId, nextGameState);
 
   return {
     ...preview,
@@ -371,5 +379,6 @@ export function applyFacilityUpgrade(
     applied: true,
     facilityEventId: eventId,
     blockingReasons: [],
+    save: persistedSave,
   };
 }

@@ -171,20 +171,6 @@ function calculateHighlightXp(input: {
   );
 }
 
-function buildUpgradeSummary(totalXp: number) {
-  const costs = PLAYER_PROGRESSION_XP_CONSTANTS.ratingTierUpgradeCost;
-  const fd = costs.D ?? 70;
-  const cb = costs.B ?? 130;
-  const as = costs.S ?? 250;
-  const low = Math.max(1, Math.floor(totalXp / fd));
-  const mid = Math.max(0, Math.floor(totalXp / cb));
-  const high = Math.max(0, Math.floor(totalXp / as));
-  if (totalXp < (costs.F ?? 45)) {
-    return "unter 1 niedriges Upgrade";
-  }
-  return `ca. ${low} F/D-Upgrades, ${mid} C/B-Upgrades oder ${high} A/S-Upgrades`;
-}
-
 function buildFatigueStrain(input: {
   mode: PlayerTrainingMode;
   appearances: number;
@@ -868,8 +854,6 @@ export function buildPlayerProgressionForecast(input: {
     xpBeforeTraits,
     xpAfterTraits,
     xpEvents: events,
-    possibleUpgradeSummary: buildUpgradeSummary(spendableProjectedXP),
-    ratingTierCosts: PLAYER_PROGRESSION_XP_CONSTANTS.ratingTierUpgradeCost,
     fatigueStrain: buildFatigueStrain({
       mode,
       appearances,

@@ -44,14 +44,14 @@ export function buildTrainingImpactItems(input: {
 }): VeloImpactItem[] {
   const performanceLabel =
     input.performanceSetpoints > 0
-      ? `+${formatVeloNumber(input.performanceSetpoints, 1)} Performance`
-      : "keine Performance-Setpoints";
+      ? `+${formatVeloNumber(input.performanceSetpoints, 1)} Performance-Anteil`
+      : "kein Performance-Anteil aus Matchdays";
   return [
     {
       key: "xp",
-      label: "Setpoints",
+      label: "Netto-Statwachstum",
       value: formatVeloSignedNumber(input.netSetpoints, 1),
-      detail: `+${formatVeloNumber(input.trainingSetpoints, 1)} Training · ${performanceLabel}`,
+      detail: `+${formatVeloNumber(input.trainingSetpoints, 1)} Trainingsbudget · ${performanceLabel}`,
       tone: input.netSetpoints >= 0 ? "positive" : "negative",
     },
     {
@@ -63,9 +63,9 @@ export function buildTrainingImpactItems(input: {
     },
     {
       key: "dev",
-      label: "Saison-Forecast",
+      label: "Saison-Risiko",
       value: formatVeloSignedNumber(input.netSetpoints, 1),
-      detail: `Netto nach Training + Matchday · Risiko ${input.regressionRisk ?? "—"}`,
+      detail: `Gleicher Netto-Wert, diesmal mit Regressionsrisiko: ${input.regressionRisk ?? "—"}`,
       tone: input.netSetpoints >= 0 ? "positive" : "negative",
     },
   ];

@@ -1,13 +1,14 @@
 "use client";
 
 import type { ReactNode } from "react";
-import { useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
 import OptimizedMediaImage from "@/app/foundation/OptimizedMediaImage";
 import FoundationPlayerPortraitCard from "@/components/foundation/player-portrait-card/FoundationPlayerPortraitCard";
-import { VeloImpactStrip } from "@/components/foundation/velo-ui";
+import { VeloImpactStrip, VeloRangeBar } from "@/components/foundation/velo-ui";
 import { createEmptyLeaguePlayerHeatPools } from "@/lib/foundation/player-league-heat";
-import type { LegacyLineupDragFitTier } from "@/lib/lineups/legacy-lineup-drag-drop";
+import { getLegacyLineupDragFitTier, type LegacyLineupDragFitTier } from "@/lib/lineups/legacy-lineup-drag-drop";
+import { filterLegacyLineupCandidateEntries, type LegacyLineupCandidateTab } from "@/lib/lineups/legacy-lineup-candidate-tabs";
 import type { LegacyLineupLoadedContext } from "@/lib/lineups/legacy-lineup-types";
 import type { LegacyLineupLabSlot } from "@/lib/lineups/legacy-lineup-lab";
 import type { MatchdayIntensityStage, MatchdaySlotRoleDefinition } from "@/lib/lineups/matchday-slot-roles";
@@ -29,6 +30,10 @@ type SlotCandidate = {
   scoreDelta: number | null;
   fitSummary: string;
   fitDetail: string;
+  roleModifier?: number | null;
+  rangeLow?: number | null;
+  rangeHigh?: number | null;
+  warnings?: string[];
 };
 
 type SlotCandidateSummary = {
@@ -36,7 +41,16 @@ type SlotCandidateSummary = {
   currentProjected: number | null;
 };
 
-type CandidateGroupKey = "all" | "instant" | "alternative" | "blocked";
+type CandidateGroupKey = LegacyLineupCandidateTab;
+
+type PlayerBestSlotEntry = {
+  slotKey: string;
+  disciplineSide: "d1" | "d2";
+  slotIndex: number;
+  projectedScore: number | null;
+  projectedDelta: number | null;
+  fitSummary: string;
+};
 
 type FocusCandidateEntry = {
   player: RosterCard & {
@@ -50,12 +64,20 @@ type FocusCandidateEntry = {
     blockReason?: string | null;
     fitSummary?: string;
     baseScore?: number | null;
+    roleModifier?: number | null;
+    rangeLow?: number | null;
+    rangeHigh?: number | null;
+    warnings?: string[];
+    fatigueModifier?: number | null;
+    additionalFatigue?: number | null;
   } | null;
   groupKey: string;
   groupMeta: { label: string };
   wantsActiveSlot: boolean;
   detail: string;
   shortReason: string;
+  fitTier?: string | null;
+  preferredSlotTags?: string[];
 };
 
 type CandidateGroup = {
@@ -111,6 +133,10 @@ export type LegacyLineupFocusV2BoardProps = {
         totalProjected: number | null;
         additionalFatigue?: number | null;
         fatigueModifier?: number | null;
+        roleModifier?: number | null;
+        rangeLow?: number | null;
+        rangeHigh?: number | null;
+        warnings?: string[];
       };
       selectedScore?: number | null;
     }
@@ -126,6 +152,9 @@ export type LegacyLineupFocusV2BoardProps = {
   getDragFitTierClass: (fitTier: LegacyLineupDragFitTier | string | null) => string;
   getTierStyleClass: (ratingLabel: string | null | undefined) => string;
   candidateGroups: CandidateGroup[];
+  candidateTab: LegacyLineupCandidateTab;
+  onCandidateTabChange: (tab: LegacyLineupCandidateTab) => void;
+  playerBestSlotSummaryByActivePlayerId: Map<string, PlayerBestSlotEntry[]>;
   captains: Record<"d1" | "d2", string>;
   captainSelectEntriesBySide: Record<"d1" | "d2", CaptainSelectEntry[]>;
   captainInfoBySide: Record<"d1" | "d2", CaptainInfo[]>;
@@ -138,6 +167,8 @@ export type LegacyLineupFocusV2BoardProps = {
   d2Rank: number | null;
   getSelectedOptionMeta: (activePlayerId: string) => { name: string; fatigueCount?: number | null } | null;
   onAssignPlayer: (slotKey: string, activePlayerId: string) => void;
+  /** Increments on every real assignment (click, digit-key, Enter top-pick) — see LegacyLineupLabClient. */
+  assignPulse?: number;
   onClearSlot: (slotKey: string) => void;
   onOpenPlayer: (playerId: string, activePlayerId?: string | null) => void;
   isReadOnly: boolean;
@@ -192,6 +223,12 @@ function formatNullableScore(value: number | null | undefined) {
   return formatScore(value);
 }
 
+function formatSignedDecimalScore(value: number | null | undefined, digits = 1) {
+  if (value == null || Number.isNaN(value)) return "—";
+  const prefix = value > 0 ? "+" : "";
+  return `${prefix}${value.toFixed(digits)}`;
+}
+
 function formatIntensityLabel(intensity: MatchdayIntensityStage) {
   if (intensity === "push") return "Push";
   if (intensity === "conserve") return "Schonen";
@@ -206,10 +243,24 @@ function getSlotReadinessLabel(hasSelection: boolean, projected: number | null) 
   return "Schwach";
 }
 
-function mapCandidateTab(groupKey: string): CandidateGroupKey {
-  if (groupKey === "instant") return "instant";
-  if (groupKey === "blocked") return "blocked";
-  return "alternative";
+/** Reuses the drag-fit tier vocabulary (best/great/okay/poor/blocked) for a persistent, idle-state
+ * glow so slot/candidate quality reads at a glance without requiring a drag gesture. Mirrors the
+ * arena-v2 tier color language (gold/green/gray/orange/red). */
+function getIdleTierGlowClass(fitTier: string | null | undefined) {
+  switch (fitTier) {
+    case "best":
+      return "is-tier-elite";
+    case "great":
+      return "is-tier-strong";
+    case "okay":
+      return "is-tier-mid";
+    case "poor":
+      return "is-tier-weak";
+    case "blocked":
+      return "is-tier-poor";
+    default:
+      return "";
+  }
 }
 
 export default function LegacyLineupFocusV2Board({
@@ -232,6 +283,9 @@ export default function LegacyLineupFocusV2Board({
   getDragFitTierClass,
   getTierStyleClass,
   candidateGroups,
+  candidateTab,
+  onCandidateTabChange,
+  playerBestSlotSummaryByActivePlayerId,
   captains,
   captainSelectEntriesBySide,
   captainInfoBySide,
@@ -244,6 +298,7 @@ export default function LegacyLineupFocusV2Board({
   d2Rank,
   getSelectedOptionMeta,
   onAssignPlayer,
+  assignPulse,
   onClearSlot,
   onOpenPlayer,
   isReadOnly,
@@ -268,7 +323,9 @@ export default function LegacyLineupFocusV2Board({
   tacticsSlot,
   disciplineColorClassBySide,
 }: LegacyLineupFocusV2BoardProps) {
-  const [candidateTab, setCandidateTab] = useState<CandidateGroupKey>("all");
+  const [focusedPlayerId, setFocusedPlayerId] = useState<string | null>(null);
+  const [pinnedCandidateIds, setPinnedCandidateIds] = useState<string[]>([]);
+  const [flashKey, setFlashKey] = useState<string | null>(null);
 
   const activeSlot = activeSlotKey ? slots.find((slot) => slot.key === activeSlotKey) ?? null : null;
   const activeRole = activeSlot ? slotRoleByKey.get(activeSlot.key) ?? null : null;
@@ -283,16 +340,65 @@ export default function LegacyLineupFocusV2Board({
   const d1Required = d1Discipline?.requiredPlayers ?? 0;
   const d2Required = d2Discipline?.requiredPlayers ?? 0;
 
-  const filteredCandidateGroups = useMemo(() => {
-    const normalizedFilter = playerFilter.trim().toLowerCase();
-    const tabbed = candidateGroups.flatMap((group) =>
-      group.entries
-        .filter((entry) => candidateTab === "all" || mapCandidateTab(group.key) === candidateTab)
-        .map((entry) => ({ ...entry, groupMeta: group.meta })),
-    );
-    if (!normalizedFilter) return tabbed;
-    return tabbed.filter((entry) => entry.player.name.toLowerCase().includes(normalizedFilter));
-  }, [candidateGroups, candidateTab, playerFilter]);
+  // Reset per-slot compare pins when the active slot changes — pins only make sense in the
+  // context of "candidates for this slot".
+  useEffect(() => {
+    setPinnedCandidateIds([]);
+  }, [activeSlot?.key]);
+
+  // Flash the "Slot" impact card whenever the projected total for the *same* active slot changes
+  // in place (e.g. intensity toggle while a slot stays focused). Keyed per slot so merely
+  // switching focus between two slots with different scores doesn't cause a spurious flash.
+  const flashTimeoutRef = useRef<number | null>(null);
+  const triggerSlotFlash = useCallback(() => {
+    if (flashTimeoutRef.current) {
+      window.clearTimeout(flashTimeoutRef.current);
+    }
+    setFlashKey("slot");
+    flashTimeoutRef.current = window.setTimeout(() => {
+      setFlashKey(null);
+      flashTimeoutRef.current = null;
+    }, 650);
+  }, []);
+  useEffect(() => () => {
+    if (flashTimeoutRef.current) window.clearTimeout(flashTimeoutRef.current);
+  }, []);
+
+  const prevFlashTrackingRef = useRef<{ slotKey: string | null; total: number | null } | undefined>(undefined);
+  useEffect(() => {
+    const slotKey = activeSlot?.key ?? null;
+    const total = activeSlotPreview?.projected.totalProjected ?? null;
+    const previous = prevFlashTrackingRef.current;
+    prevFlashTrackingRef.current = { slotKey, total };
+    if (previous === undefined) return;
+    // Only auto-flash when the focused slot stayed the same but its score moved (e.g. intensity
+    // toggle). Assignment-driven flashes are triggered explicitly at the click site below, since
+    // assigning a candidate usually advances focus to the next open slot in the same tick.
+    if (previous.slotKey === slotKey && previous.total !== total) {
+      triggerSlotFlash();
+    }
+  }, [activeSlot?.key, activeSlotPreview?.projected.totalProjected, triggerSlotFlash]);
+
+  // Explicit pulse from the parent covers every real assignment (click, digit-key, Enter
+  // top-pick) uniformly, independent of whether focus then jumps to a different (still empty)
+  // slot in the same render — which is the common case for fast squad building.
+  const prevAssignPulseRef = useRef<number | undefined>(undefined);
+  useEffect(() => {
+    if (assignPulse == null) return;
+    if (prevAssignPulseRef.current === undefined) {
+      prevAssignPulseRef.current = assignPulse;
+      return;
+    }
+    if (prevAssignPulseRef.current !== assignPulse) {
+      prevAssignPulseRef.current = assignPulse;
+      triggerSlotFlash();
+    }
+  }, [assignPulse, triggerSlotFlash]);
+
+  const filteredCandidateGroups = useMemo(
+    () => filterLegacyLineupCandidateEntries(candidateGroups, candidateTab, playerFilter),
+    [candidateGroups, candidateTab, playerFilter],
+  );
 
   const topPickForActiveSlot = filteredCandidateGroups.find((entry) => !entry.activeSlotCandidate?.blockReason) ?? filteredCandidateGroups[0] ?? null;
 
@@ -311,6 +417,37 @@ export default function LegacyLineupFocusV2Board({
   const activeCaptainSide = activeSlot?.disciplineSide ?? "d1";
   const activeCaptainEntries = captainSelectEntriesBySide[activeCaptainSide] ?? [];
   const activeCaptainInfoMap = new Map(captainInfoBySide[activeCaptainSide].map((info) => [info.activePlayerId, info] as const));
+
+  const focusedPlayerName = focusedPlayerId ? rosterCardByActivePlayerId.get(focusedPlayerId)?.name ?? null : null;
+  const focusedPlayerDeltaBySlotKey = useMemo(() => {
+    if (!focusedPlayerId) return new Map<string, PlayerBestSlotEntry>();
+    const entries = playerBestSlotSummaryByActivePlayerId.get(focusedPlayerId) ?? [];
+    return new Map(entries.map((entry) => [entry.slotKey, entry] as const));
+  }, [focusedPlayerId, playerBestSlotSummaryByActivePlayerId]);
+
+  const allCandidateEntries = useMemo(() => candidateGroups.flatMap((group) => group.entries), [candidateGroups]);
+  const candidateEntryByActivePlayerId = useMemo(
+    () => new Map(allCandidateEntries.filter((entry) => entry.player.activePlayerId).map((entry) => [entry.player.activePlayerId as string, entry] as const)),
+    [allCandidateEntries],
+  );
+  const pinnedEntries = pinnedCandidateIds
+    .map((id) => candidateEntryByActivePlayerId.get(id) ?? null)
+    .filter((entry): entry is FocusCandidateEntry => entry != null);
+
+  function togglePinnedCandidate(activePlayerId: string) {
+    setPinnedCandidateIds((current) => {
+      if (current.includes(activePlayerId)) {
+        return current.filter((id) => id !== activePlayerId);
+      }
+      const next = [...current, activePlayerId];
+      return next.length > 2 ? next.slice(next.length - 2) : next;
+    });
+  }
+
+  function toggleFocusedPlayer(activePlayerId: string | null) {
+    if (!activePlayerId) return;
+    setFocusedPlayerId((current) => (current === activePlayerId ? null : activePlayerId));
+  }
 
   return (
     <div className="legacy-lineup-v2-shell" data-testid="legacy-lineup-v2-board">
@@ -348,7 +485,7 @@ export default function LegacyLineupFocusV2Board({
         </div>
         <div className="legacy-lineup-v2-toolbar-actions">
           <span className="legacy-lineup-v2-keyboard-hint" aria-label="Tastaturkürzel">
-            ↑↓ Slots · ⌫ Leeren · 1–4 Kandidat · Enter Top Pick
+            ↑↓ Slots · ⌫ Leeren · 1–4 Kandidat (sichtbare Liste) · Enter Top-Pick
           </span>
           <span className="legacy-lineup-v2-flow-chip" title={lineupFlowSummary.nextStep.detail}>
             {lineupFlowSummary.nextStep.label}
@@ -373,6 +510,17 @@ export default function LegacyLineupFocusV2Board({
       </div>
 
       {controlsSlot ? <div className="legacy-lineup-v2-controls">{controlsSlot}</div> : null}
+
+      {focusedPlayerId ? (
+        <div className="legacy-lineup-v2-focus-player-banner">
+          <span>
+            Fokus: <strong>{focusedPlayerName ?? "Spieler"}</strong> — grün = besser als aktuelle Belegung, rot = schlechter, blau = aktueller Slot.
+          </span>
+          <button type="button" onClick={() => setFocusedPlayerId(null)} aria-label="Fokus aufheben" title="Fokus aufheben">
+            ×
+          </button>
+        </div>
+      ) : null}
 
       <div className="legacy-lineup-v2-layout">
         <section className="legacy-lineup-v2-slots" aria-label="Slot-Übersicht">
@@ -449,11 +597,37 @@ export default function LegacyLineupFocusV2Board({
                     const dragPreview = slotDragPreviewByKey.get(slot.key) ?? null;
                     const isCaptain = captains[slot.disciplineSide] === selectedId && Boolean(selectedId);
 
+                    const knownProjectedScores = [...slotCandidates.map((candidate) => candidate.projectedScore), projected].filter(
+                      (value): value is number => value != null,
+                    );
+                    const bestKnownProjected = knownProjectedScores.length > 0 ? Math.max(...knownProjectedScores) : null;
+                    const idleFitTier =
+                      rosterCard && projected != null && bestKnownProjected != null
+                        ? getLegacyLineupDragFitTier({
+                            blocked: false,
+                            projectedScore: projected,
+                            bestProjectedScore: bestKnownProjected,
+                            currentProjectedScore: projected,
+                          })
+                        : null;
+
+                    const focusEntry = focusedPlayerId ? focusedPlayerDeltaBySlotKey.get(slot.key) ?? null : null;
+                    const isFocusedPlayerCurrentSlot = focusedPlayerId != null && selectedId === focusedPlayerId;
+                    const focusClass = !focusedPlayerId
+                      ? ""
+                      : isFocusedPlayerCurrentSlot
+                        ? " is-focus-current"
+                        : focusEntry?.projectedDelta != null && focusEntry.projectedDelta > 0.05
+                          ? " is-focus-better"
+                          : focusEntry?.projectedDelta != null && focusEntry.projectedDelta < -0.05
+                            ? " is-focus-worse"
+                            : "";
+
                     return (
                       <div
                         key={`v2-slot-${slot.key}`}
                         id={`lineup-slot-${slot.key}`}
-                        className={`legacy-lineup-v2-slot-row${isActive ? " is-active" : ""}${rosterCard ? " is-filled" : " is-empty"}${draggedActivePlayerId ? " is-drop-ready" : ""} ${getDragFitTierClass(dragPreview?.fitTier ?? null)}`.trim()}
+                        className={`legacy-lineup-v2-slot-row${isActive ? " is-active" : ""}${rosterCard ? " is-filled" : " is-empty"}${draggedActivePlayerId ? " is-drop-ready" : ""} ${getDragFitTierClass(dragPreview?.fitTier ?? null)} ${getIdleTierGlowClass(idleFitTier)}${focusClass}`.trim()}
                         onDragOver={(event) => {
                           if (dragPreview?.blockReason) return;
                           event.preventDefault();
@@ -485,6 +659,15 @@ export default function LegacyLineupFocusV2Board({
                           <span className="legacy-lineup-v2-slot-metrics">
                             <em>Base {formatNullableScore(selectedScore)}</em>
                             <strong>Slot {formatNullableScore(projected ?? topCandidate?.projectedScore ?? null)}</strong>
+                            {rosterCard && slotPreview?.projected.rangeLow != null && slotPreview?.projected.rangeHigh != null ? (
+                              <VeloRangeBar
+                                className="legacy-lineup-v2-slot-range"
+                                compact
+                                low={slotPreview.projected.rangeLow}
+                                high={slotPreview.projected.rangeHigh}
+                                point={slotPreview.projected.totalProjected}
+                              />
+                            ) : null}
                             <small>F {Math.round(selectedOption?.fatigueCount ?? 0)}</small>
                           </span>
 
@@ -529,6 +712,14 @@ export default function LegacyLineupFocusV2Board({
                           <span className={`legacy-lineup-v2-slot-drop-preview ${getDragFitTierClass(dragPreview.fitTier)}`}>
                             Drop {formatNullableScore(dragPreview.projected.totalProjected)}
                             {dragPreview.scoreDelta != null ? ` · ${dragPreview.scoreDelta >= 0 ? "+" : ""}${formatDecimalScore(dragPreview.scoreDelta, 1)}` : ""}
+                          </span>
+                        ) : null}
+
+                        {focusedPlayerId && isFocusedPlayerCurrentSlot ? (
+                          <span className="legacy-lineup-v2-slot-focus-delta is-current">Aktueller Slot von {focusedPlayerName ?? "Spieler"}</span>
+                        ) : focusedPlayerId && focusEntry?.projectedDelta != null ? (
+                          <span className={`legacy-lineup-v2-slot-focus-delta ${focusEntry.projectedDelta > 0 ? "is-positive" : focusEntry.projectedDelta < 0 ? "is-negative" : ""}`}>
+                            {focusedPlayerName ?? "Spieler"} hier: {formatSignedDecimalScore(focusEntry.projectedDelta)}
                           </span>
                         ) : null}
                       </div>
@@ -611,10 +802,6 @@ export default function LegacyLineupFocusV2Board({
                     lineup: {
                       d1Score: `D1: ${formatNullableScore(activeRosterCard.discipline1Score)}`,
                       d2Score: `D2: ${formatNullableScore(activeRosterCard.discipline2Score)}`,
-                      slotProjection:
-                        activeSlotPreview?.projected.totalProjected != null
-                          ? formatScore(activeSlotPreview.projected.totalProjected)
-                          : "—",
                       fatigueLabel: `F ${Math.round(activeSelectedOption?.fatigueCount ?? 0)}`,
                     },
                   }}
@@ -635,12 +822,19 @@ export default function LegacyLineupFocusV2Board({
               {activeSlotPreview ? (
                 <VeloImpactStrip
                   className="legacy-lineup-v2-impact"
+                  flashKey={flashKey}
                   items={[
                     {
                       key: "base",
                       label: "Base",
                       value: formatNullableScore(activeSlotPreview.selectedScore ?? null),
                       tone: "neutral",
+                    },
+                    {
+                      key: "role",
+                      label: "Rolle",
+                      value: formatSignedDecimalScore(activeSlotPreview.projected.roleModifier ?? 0, 1),
+                      tone: (activeSlotPreview.projected.roleModifier ?? 0) >= 0 ? "positive" : "negative",
                     },
                     {
                       key: "slot",
@@ -664,6 +858,21 @@ export default function LegacyLineupFocusV2Board({
                 />
               ) : null}
 
+              {activeSlotPreview && activeSlotPreview.projected.rangeLow != null && activeSlotPreview.projected.rangeHigh != null ? (
+                <div className="legacy-lineup-v2-focus-range">
+                  <span>Range ({formatIntensityLabel(getDisciplineIntensity(activeSlot.disciplineSide))})</span>
+                  <VeloRangeBar
+                    low={activeSlotPreview.projected.rangeLow}
+                    high={activeSlotPreview.projected.rangeHigh}
+                    point={activeSlotPreview.projected.totalProjected}
+                    tone="positive"
+                  />
+                  <strong>
+                    {formatNullableScore(activeSlotPreview.projected.rangeLow)}–{formatNullableScore(activeSlotPreview.projected.rangeHigh)}
+                  </strong>
+                </div>
+              ) : null}
+
               <div className="legacy-lineup-v2-captain-strip">
                 <label>
                   <span>Captain {activeCaptainSide.toUpperCase()}</span>
@@ -684,8 +893,75 @@ export default function LegacyLineupFocusV2Board({
                     })}
                   </select>
                 </label>
-                <small>{captainDraftRemaining} frei · {captainSeasonUsedWithDraft}/{captainSeasonLimit} Saison</small>
+                <small>{captainDraftRemaining} frei heute</small>
               </div>
+
+              {pinnedEntries.length > 0 ? (
+                <div className="legacy-lineup-v2-compare" aria-label="Kandidaten-Vergleich">
+                  <div className="legacy-lineup-v2-compare-head">
+                    <span>Vergleich{pinnedEntries.length < 2 ? " · zweiten Kandidaten anheften" : ""}</span>
+                    <button type="button" onClick={() => setPinnedCandidateIds([])} aria-label="Vergleich zurücksetzen" title="Vergleich zurücksetzen">
+                      ×
+                    </button>
+                  </div>
+                  <div className="legacy-lineup-v2-compare-grid">
+                    <span />
+                    {pinnedEntries.map((entry) => (
+                      <span key={`compare-name-${entry.player.activePlayerId}`} className="is-name">
+                        {entry.player.name}
+                      </span>
+                    ))}
+                    {pinnedEntries.length === 1 ? <span /> : null}
+
+                    <span>Base</span>
+                    {pinnedEntries.map((entry) => (
+                      <span key={`compare-base-${entry.player.activePlayerId}`}>{formatNullableScore(entry.activeSlotCandidate?.baseScore ?? null)}</span>
+                    ))}
+                    {pinnedEntries.length === 1 ? <span /> : null}
+
+                    <span>Rolle</span>
+                    {pinnedEntries.map((entry) => (
+                      <span key={`compare-role-${entry.player.activePlayerId}`}>{formatSignedDecimalScore(entry.activeSlotCandidate?.roleModifier ?? null)}</span>
+                    ))}
+                    {pinnedEntries.length === 1 ? <span /> : null}
+
+                    <span>Intensity</span>
+                    {pinnedEntries.map((entry) => (
+                      <span key={`compare-intensity-${entry.player.activePlayerId}`}>{formatIntensityLabel(getDisciplineIntensity(activeSlot.disciplineSide))}</span>
+                    ))}
+                    {pinnedEntries.length === 1 ? <span /> : null}
+
+                    <span>Fatigue</span>
+                    {pinnedEntries.map((entry) => (
+                      <span key={`compare-fatigue-${entry.player.activePlayerId}`}>
+                        -{formatDecimalScore(entry.activeSlotCandidate?.fatigueModifier ?? 0, 1)} / +{formatDecimalScore(entry.activeSlotCandidate?.additionalFatigue ?? 0, 1)}
+                      </span>
+                    ))}
+                    {pinnedEntries.length === 1 ? <span /> : null}
+
+                    <span>Range</span>
+                    {pinnedEntries.map((entry) => (
+                      <span key={`compare-range-${entry.player.activePlayerId}`}>
+                        {formatNullableScore(entry.activeSlotCandidate?.rangeLow ?? null)}–{formatNullableScore(entry.activeSlotCandidate?.rangeHigh ?? null)}
+                      </span>
+                    ))}
+                    {pinnedEntries.length === 1 ? <span /> : null}
+
+                    <span>Score</span>
+                    {pinnedEntries.map((entry, index) => {
+                      const otherScore = pinnedEntries[1 - index]?.activeSlotCandidate?.projectedScore ?? null;
+                      const thisScore = entry.activeSlotCandidate?.projectedScore ?? null;
+                      const isWinner = pinnedEntries.length === 2 && thisScore != null && otherScore != null && thisScore > otherScore;
+                      return (
+                        <span key={`compare-score-${entry.player.activePlayerId}`} className={isWinner ? "is-winner" : ""}>
+                          {formatNullableScore(thisScore)}
+                        </span>
+                      );
+                    })}
+                    {pinnedEntries.length === 1 ? <span /> : null}
+                  </div>
+                </div>
+              ) : null}
 
               <section className="legacy-lineup-v2-candidates" aria-label="Kandidaten für aktiven Slot">
                 <div className="legacy-lineup-v2-candidates-head">
@@ -702,7 +978,7 @@ export default function LegacyLineupFocusV2Board({
                         role="tab"
                         aria-selected={candidateTab === tab.key}
                         className={candidateTab === tab.key ? "is-active" : ""}
-                        onClick={() => setCandidateTab(tab.key)}
+                        onClick={() => onCandidateTabChange(tab.key)}
                       >
                         {tab.label} ({candidateTabCounts[tab.key]})
                       </button>
@@ -721,21 +997,36 @@ export default function LegacyLineupFocusV2Board({
                   {filteredCandidateGroups.length === 0 ? (
                     <span className="legacy-lineup-v2-candidate-empty">Keine Kandidaten in dieser Gruppe.</span>
                   ) : (
-                    filteredCandidateGroups.map((entry) => {
+                    filteredCandidateGroups.map((entry, index) => {
                       const candidate = entry.player;
                       const projectedScore = entry.activeSlotCandidate?.projectedScore ?? null;
                       const scoreDelta = entry.activeSlotCandidate?.scoreDelta ?? null;
                       const isAssigned = activeSelectionId === candidate.activePlayerId;
                       const isBlocked = Boolean(entry.activeSlotCandidate?.blockReason);
+                      const isPinned = Boolean(candidate.activePlayerId && pinnedCandidateIds.includes(candidate.activePlayerId));
+                      const isFocused = Boolean(candidate.activePlayerId && focusedPlayerId === candidate.activePlayerId);
+
+                      const bestSlotEntries = candidate.activePlayerId ? playerBestSlotSummaryByActivePlayerId.get(candidate.activePlayerId) ?? [] : [];
+                      const bestSlot = bestSlotEntries[0] ?? null;
+                      const showBestSlotTag = Boolean(bestSlot && activeSlot && bestSlot.slotKey !== activeSlot.key && bestSlot.projectedScore != null);
+                      const bestSlotDeltaVsHere =
+                        showBestSlotTag && bestSlot && projectedScore != null && bestSlot.projectedScore != null
+                          ? Number((bestSlot.projectedScore - projectedScore).toFixed(1))
+                          : null;
 
                       return (
                         <div
                           key={`v2-candidate-${candidate.id}-${entry.groupKey}`}
-                          className={`legacy-lineup-v2-candidate-row${isAssigned ? " is-assigned" : ""}${isBlocked ? " is-blocked" : ""}`}
+                          className={`legacy-lineup-v2-candidate-row${isAssigned ? " is-assigned" : ""}${isBlocked ? " is-blocked" : ""} ${getIdleTierGlowClass(entry.fitTier)}`.trim()}
                           draggable={Boolean(candidate.activePlayerId) && !isBlocked}
                           onDragStart={() => candidate.activePlayerId && onDragStart(candidate.activePlayerId)}
                           onDragEnd={onDragEnd}
                         >
+                          {index < 4 ? (
+                            <span className="legacy-lineup-v2-candidate-rank-badge" aria-hidden="true">
+                              {index + 1}
+                            </span>
+                          ) : null}
                           <button
                             type="button"
                             className="legacy-lineup-v2-candidate-main-btn"
@@ -758,6 +1049,21 @@ export default function LegacyLineupFocusV2Board({
                                 {entry.shortReason ? ` · ${entry.shortReason}` : ""}
                               </small>
                               <small className="legacy-lineup-v2-candidate-detail">{entry.detail}</small>
+                              {showBestSlotTag && bestSlot ? (
+                                <span className="legacy-lineup-v2-best-slot-tag" title="Slot mit der besten Projektion für diesen Spieler">
+                                  Bester Slot: {bestSlot.disciplineSide.toUpperCase()}-{bestSlot.slotIndex + 1}
+                                  {bestSlotDeltaVsHere != null ? ` (${formatSignedDecimalScore(bestSlotDeltaVsHere)})` : ""}
+                                </span>
+                              ) : null}
+                              {entry.activeSlotCandidate?.rangeLow != null && entry.activeSlotCandidate?.rangeHigh != null ? (
+                                <VeloRangeBar
+                                  className="legacy-lineup-v2-candidate-range"
+                                  compact
+                                  low={entry.activeSlotCandidate.rangeLow}
+                                  high={entry.activeSlotCandidate.rangeHigh}
+                                  point={projectedScore}
+                                />
+                              ) : null}
                             </span>
                             <span className="legacy-lineup-v2-candidate-metrics">
                               <strong>{formatNullableScore(projectedScore)}</strong>
@@ -769,6 +1075,28 @@ export default function LegacyLineupFocusV2Board({
                               ) : null}
                             </span>
                           </button>
+                          <span className="legacy-lineup-v2-candidate-actions">
+                            <button
+                              type="button"
+                              className={`legacy-lineup-v2-focus-btn${isFocused ? " is-active" : ""}`}
+                              title="Beste Slots für diesen Spieler im Slot-Board hervorheben"
+                              aria-label={`Beste Slots für ${candidate.name} anzeigen`}
+                              disabled={!candidate.activePlayerId}
+                              onClick={() => toggleFocusedPlayer(candidate.activePlayerId)}
+                            >
+                              🎯
+                            </button>
+                            <button
+                              type="button"
+                              className={`legacy-lineup-v2-pin-btn${isPinned ? " is-pinned" : ""}`}
+                              title="Zum Vergleich anheften"
+                              aria-label={`${candidate.name} zum Vergleich anheften`}
+                              disabled={!candidate.activePlayerId}
+                              onClick={() => candidate.activePlayerId && togglePinnedCandidate(candidate.activePlayerId)}
+                            >
+                              📌
+                            </button>
+                          </span>
                         </div>
                       );
                     })

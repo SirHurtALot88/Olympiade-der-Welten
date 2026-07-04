@@ -12,10 +12,15 @@ import { resolvePortraitVariantForDisplayPx } from "@/lib/media/mediaThumbnailCo
 
 describe("media assets portrait mapping", () => {
   it("exposes browser-safe api routes for mapped local portrait files", () => {
-    expect(getPlayerPortraitPathById("player-0154-riley-le-rouge")).toContain("Riley Le Rogue.jpg");
+    expect(getPlayerPortraitPathById("player-0154-riley-le-rouge")).toContain("Riley_Le_Rogue-bef87d06-48fe-4eca-b665-cb9db53399e5.png");
     expect(getPlayerPortraitBrowserUrl("player-0154-riley-le-rouge")).toBe(
       "/api/media/player-portrait/player-0154-riley-le-rouge",
     );
+    expect(getPlayerPortraitPathById("player-2969-lakshmi-ekelemann")).toContain("Lakshmi Ekelmann.jpg");
+    expect(getPlayerPortraitBrowserUrl("player-2968-toothkrix")).toBe(
+      "/api/media/player-portrait/player-2968-toothkrix",
+    );
+    expect(getPlayerPortraitPathById("player-2676-peacock")).toContain("Peacock.png");
   });
 
   it("keeps externally hosted portrait urls intact", () => {

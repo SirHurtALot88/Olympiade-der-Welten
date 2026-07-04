@@ -10,6 +10,7 @@ export type AiSellReasonCode =
   | "roster_over_opt"
   | "short_contract"
   | "expiring_contract"
+  | "proactive_early_buyout"
   | "player_demand_pressure"
   | "board_salary_cap"
   | "board_renewal_warning"
@@ -40,6 +41,7 @@ const SELL_REASON_PATTERNS: Array<{ code: AiSellReasonCode; patterns: string[] }
   { code: "roster_over_opt", patterns: ["Kader liegt ueber dem Optimum"] },
   { code: "short_contract", patterns: ["kurze Restvertragslaenge", "Vertrag laeuft aus und Fit"] },
   { code: "expiring_contract", patterns: ["auslaufender Vertrag braucht"] },
+  { code: "proactive_early_buyout", patterns: ["letztes Vertragsjahr"] },
   { code: "player_demand_pressure", patterns: ["offene Spielerforderung erzeugt Kaderdruck"] },
   { code: "board_salary_cap", patterns: ["begrenzt Vertragsrahmen"] },
   { code: "board_renewal_warning", patterns: ["warnt vor voller Verlaengerung"] },

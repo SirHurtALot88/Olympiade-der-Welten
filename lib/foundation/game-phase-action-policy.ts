@@ -124,3 +124,18 @@ export function evaluateGamePhaseAction(gameState: GameState, action: GamePhaseA
     warnings,
   };
 }
+
+/**
+ * Training intensity (leicht/mittel/hart) feeds a single season-end batch
+ * calculation (see lib/training/organic-season-progression.ts), so it must be
+ * fixed for the whole season once matches are underway — otherwise a team
+ * could run "leicht" all season for low fatigue/injury risk and switch to
+ * "hart" right before the season-end XP is booked. This reuses the existing
+ * "set_training" preseason-management gate (same window as facility/transfer
+ * setup) as the single source of truth for the lock: open during preseason
+ * and until the season's first matchday result is recorded, sealed for the
+ * rest of the season afterwards. See docs/training-intensity-season-lock.md.
+ */
+export function isTrainingIntensityLockedForSeason(gameState: GameState): boolean {
+  return !evaluateGamePhaseAction(gameState, "set_training").allowed;
+}

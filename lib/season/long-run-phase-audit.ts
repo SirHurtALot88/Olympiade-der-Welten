@@ -463,13 +463,19 @@ function auditSeasonEndPackage(save: PersistedSaveGame, context: LongRunPhaseAud
   if (seasonId !== "season-1" && buyEntries.length === 0 && sells === 0 && exits === 0) {
     checks.push(check("transfer_activity_sane", "WARN", `${seasonId}: keine Transfers/Exits`));
   } else if (seasonId === "season-1") {
+    // 2026-07-04 course correction (see lib/season/transfer-season-policy.ts): S1 market buys
+    // are NOT forbidden anymore — a team that sells down below hardMin/Opt in S1 must be able to
+    // (re)buy in the very same season, exactly like any later season. findSeasonOneForbiddenBuySources
+    // now always returns [] to reflect that policy; this check must not independently resurrect the
+    // old "any market buy in S1 is RED" rule via `marketBuyCount > 0`, or it just re-blocks the exact
+    // scenario the course correction was meant to unblock.
     const forbiddenMarketSources = findSeasonOneForbiddenBuySources(seasonTransfers);
-    if (forbiddenMarketSources.length > 0 || marketBuyCount > 0) {
+    if (forbiddenMarketSources.length > 0) {
       checks.push(
         check(
           "transfer_activity_sane",
           "RED",
-          `${seasonId}: ${draftBuyCount}Draft/${marketBuyCount}Markt/${sells}V/${exits}X · verbotene Markt-Käufe: ${forbiddenMarketSources.join("|") || marketBuyCount}`,
+          `${seasonId}: ${draftBuyCount}Draft/${marketBuyCount}Markt/${sells}V/${exits}X · verbotene Markt-Käufe: ${forbiddenMarketSources.join("|")}`,
         ),
       );
     } else {
@@ -477,7 +483,7 @@ function auditSeasonEndPackage(save: PersistedSaveGame, context: LongRunPhaseAud
         check(
           "transfer_activity_sane",
           "PASS",
-          `${seasonId}: ${draftBuyCount}Draft/0Markt/${sells}V/${exits}X`,
+          `${seasonId}: ${draftBuyCount}Draft/${marketBuyCount}Markt/${sells}V/${exits}X`,
         ),
       );
     }

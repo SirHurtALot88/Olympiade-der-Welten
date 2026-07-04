@@ -2871,7 +2871,6 @@ export default function TransfermarktV2Client({
         <span className="is-market">MW max {formatCompactNumber(valueSliderMax, 1)}</span>
         <span className="is-salary">Gehalt max {formatCompactNumber(salarySliderMax, 1)}</span>
         <span className="is-market">Ratio top {formatCompactNumber(ratioSliderMax, 1)}</span>
-        <span className="is-feed">{visibleItems.length} sichtbar · {availabilityLabel}</span>
       </section>
       <section className="market-v2-main-grid">
         <aside className="market-v2-candidate-rail">

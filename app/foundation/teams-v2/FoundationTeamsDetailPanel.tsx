@@ -1484,6 +1484,9 @@ function FoundationTeamsDetailPanel({
                           playerOvr={ratings?.ovrNormalized ?? null}
                           playerMvs={ratings?.mvs ?? null}
                           playerPps={ratings?.ppsSeason ?? null}
+                          ovrRank={ratings?.ovrRank ?? null}
+                          mvsRank={ratings?.mvsRank ?? null}
+                          ppsRank={ratings?.ppsSeasonRank ?? null}
                           pow={player.coreStats.pow}
                           spe={player.coreStats.spe}
                           men={player.coreStats.men}
@@ -1542,6 +1545,9 @@ function FoundationTeamsDetailPanel({
                           playerOvr={ratings?.ovrNormalized ?? null}
                           playerMvs={ratings?.mvs ?? null}
                           playerPps={ratings?.ppsSeason ?? null}
+                          ovrRank={ratings?.ovrRank ?? null}
+                          mvsRank={ratings?.mvsRank ?? null}
+                          ppsRank={ratings?.ppsSeasonRank ?? null}
                           pow={player.coreStats.pow}
                           spe={player.coreStats.spe}
                           men={player.coreStats.men}

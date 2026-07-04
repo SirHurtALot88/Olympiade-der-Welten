@@ -14,6 +14,26 @@ function renderStars(level: number) {
   ));
 }
 
+const REVEAL_STEP_LABELS = ["Basis", "Range", "Trait+", "Sterne", "Diszi", "Exakt"];
+
+function renderRevealLadder(disclosureLevel: number) {
+  return (
+    <div className="scouting-reveal-ladder" role="list" aria-label="Scouting-Enthüllungsstufe">
+      {REVEAL_STEP_LABELS.map((label, level) => (
+        <div
+          key={label}
+          role="listitem"
+          className={`scouting-reveal-step${level <= disclosureLevel ? " is-reached" : ""}${level === disclosureLevel ? " is-current" : ""}`}
+          title={`L${level} · ${label}`}
+        >
+          <span className="scouting-reveal-step-dot">{level}</span>
+          <small>{label}</small>
+        </div>
+      ))}
+    </div>
+  );
+}
+
 export default function ScoutingCenterV2Client({
   teamName,
   scoutingFacilityLevel,
@@ -82,71 +102,62 @@ export default function ScoutingCenterV2Client({
       ) : null}
 
       {(activeTab === "overview" || activeTab === "recommended") ? (
-        <section className="scouting-hub-v2-recruitment">
-          <article className="scouting-hub-v2-card">
-            <span className="eyebrow">Draft & Rekrutierung</span>
-            <h3>Kaderaufbau aus leerem Start</h3>
-            <p>{draftContextNote}</p>
-            <div className="scouting-hub-v2-metrics">
-              <div>
-                <span>Budget</span>
-                <strong>{recruitmentBudget}</strong>
-              </div>
-              <div>
-                <span>Kader</span>
-                <strong>
-                  {rosterCount}
-                  {rosterMinimum != null ? ` / min ${rosterMinimum}` : ""}
-                  {rosterOptimum != null ? ` · opt ${rosterOptimum}` : ""}
-                </strong>
-              </div>
-              {rosterGap > 0 ? (
-                <span className="transfer-status-pill is-warning">{rosterGap} Spieler bis Minimum</span>
-              ) : (
-                <span className="transfer-status-pill is-ready">Mindestkader erreicht</span>
-              )}
-            </div>
+        <section className="scouting-overview-stats">
+          <article className="scouting-stat-chip" title={draftContextNote}>
+            <span className="eyebrow">Budget</span>
+            <strong>{recruitmentBudget}</strong>
           </article>
 
-          <article className="scouting-hub-v2-card">
+          <article className="scouting-stat-chip" title={draftContextNote}>
+            <span className="eyebrow">Kader</span>
+            <strong>
+              {rosterCount}
+              {rosterMinimum != null ? `/${rosterMinimum}` : ""}
+            </strong>
+            {rosterGap > 0 ? (
+              <span className="transfer-status-pill is-warning">−{rosterGap} bis Minimum</span>
+            ) : (
+              <span className="transfer-status-pill is-ready">Minimum erreicht</span>
+            )}
+          </article>
+
+          <article className="scouting-stat-chip" title="Progressive Enthüllung im Transfermarkt — Base-Infos bleiben für Rekrutierung sichtbar.">
             <span className="eyebrow">Scouting-Stufe</span>
-            <div className="home-v2-stars">{renderStars(scoutingFacilityLevel)}</div>
-            <p className="muted">
-              Stufe {disclosureLevel}: progressive Enthüllung im Transfermarkt — Base-Infos bleiben für Rekrutierung sichtbar.
-            </p>
+            <div className="home-v2-stars scouting-stat-stars">{renderStars(scoutingFacilityLevel)}</div>
+            <small className="muted">Stufe {disclosureLevel}/5</small>
           </article>
         </section>
       ) : null}
 
       {activeTab === "overview" ? (
         <>
-          <section className="scouting-hub-v2-disclosure">
+          <section className="scouting-reveal-section">
             <div className="home-v2-panel-head">
-              <span className="eyebrow">Sichtbarkeit</span>
-              <h3>Was du bei Scouting L{disclosureLevel} siehst</h3>
+              <span className="eyebrow">Fog of War</span>
+              <h3>Enthüllung bei Scouting L{disclosureLevel}</h3>
             </div>
-            <div className="scouting-hub-v2-disclosure-grid">
-              <article>
-                <strong>Base Infos (immer)</strong>
-                <ul>
-                  {baseInfoAlwaysVisible.map((entry) => (
-                    <li key={entry}>{entry}</li>
-                  ))}
-                </ul>
-              </article>
-              <article>
-                <strong>Aktuell sichtbar</strong>
-                <ul>
-                  {visibleAtTier.length > 0 ? visibleAtTier.map((entry) => <li key={entry}>{entry}</li>) : <li>—</li>}
-                </ul>
-              </article>
-              <article>
-                <strong>Noch verborgen</strong>
-                <ul>
-                  {hiddenAtTier.length > 0 ? hiddenAtTier.map((entry) => <li key={entry}>{entry}</li>) : <li>—</li>}
-                </ul>
-              </article>
+            {renderRevealLadder(disclosureLevel)}
+            <div className="scouting-reveal-pill-row">
+              {baseInfoAlwaysVisible.map((entry) => (
+                <span key={entry} className="scouting-reveal-pill is-visible is-base" title={entry}>
+                  ✓ {entry}
+                </span>
+              ))}
+              {visibleAtTier.map((entry) => (
+                <span key={entry} className="scouting-reveal-pill is-visible" title={entry}>
+                  ✓ {entry}
+                </span>
+              ))}
             </div>
+            {hiddenAtTier.length > 0 ? (
+              <div className="scouting-reveal-pill-row is-hidden-row">
+                {hiddenAtTier.map((entry) => (
+                  <span key={entry} className="scouting-reveal-pill is-hidden" title={entry}>
+                    🔒 {entry}
+                  </span>
+                ))}
+              </div>
+            ) : null}
           </section>
 
           <section className="scouting-hub-v2-watchlist scouting-queue-section">
@@ -159,7 +170,7 @@ export default function ScoutingCenterV2Client({
                     ? `${queueEntries.length} auf der Wishlist · Draft ohne Limit`
                     : `${queueEntries.length} auf der Wishlist · ${scoutPipeline.maxSlots} aktive Slots`
                   : `${queueEntries.length} auf der Wishlist`}
-                {" — Platz 1 wird zuerst voll gescoutet, danach geht es automatisch mit dem nächsten weiter."}
+                {" — Platz 1 zuerst, Rest folgt automatisch."}
               </p>
             </div>
             <ScoutingPriorityQueue

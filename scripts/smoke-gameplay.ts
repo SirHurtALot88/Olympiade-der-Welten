@@ -242,7 +242,6 @@ function isDestructiveSmokeRequest(entry: { method: string; url: string; postDat
     "/api/ai/market-plan-apply",
     "/api/ai/roster-fill",
     "/api/ai/picks-run",
-    "/api/progression/season-end-xp-spend",
     "/api/singleplayer-state/season-start-reset",
   ];
   return destructiveFragments.some((fragment) => entry.url.includes(fragment));

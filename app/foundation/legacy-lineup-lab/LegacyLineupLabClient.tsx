@@ -53,6 +53,10 @@ import {
   type LegacyLineupDragFitTier,
 } from "@/lib/lineups/legacy-lineup-drag-drop";
 import { getTransfermarktTierFromPoints } from "@/lib/market/transfermarkt-sheet-stats";
+import {
+  filterLegacyLineupCandidateEntries,
+  type LegacyLineupCandidateTab,
+} from "@/lib/lineups/legacy-lineup-candidate-tabs";
 import type {
   LegacyLineupDraft,
   LegacyLineupEntryInput,
@@ -1867,11 +1871,16 @@ export default function LegacyLineupLabClient(props: LegacyLineupLabClientProps)
   const [sourceReadOnly, setSourceReadOnly] = useState<boolean>(source === "prisma");
   const [roomContext, setRoomContext] = useState<FoundationRoomContext | null>(null);
   const [playerFilter, setPlayerFilter] = useState("");
+  const [focusV2CandidateTab, setFocusV2CandidateTab] = useState<LegacyLineupCandidateTab>("all");
   const [teamdeckFilterMode, setTeamdeckFilterMode] = useState<TeamdeckFilterMode>("all");
   const [teamdeckSortMode, setTeamdeckSortMode] = useState<TeamdeckSortMode>("fit");
   const [activeSlotKey, setActiveSlotKey] = useState<string | null>(null);
   const [showOnlyTopSlotCandidates, setShowOnlyTopSlotCandidates] = useState(false);
   const [recentlyAssignedSlotKey, setRecentlyAssignedSlotKey] = useState<string | null>(null);
+  // Increments on every real candidate assignment (click, digit-key, Enter top-pick) regardless of
+  // which slot ends up focused afterwards — lets the v2 board flash its score feedback reliably even
+  // though focus usually jumps to the next open slot in the same tick as the assignment.
+  const [lineupAssignPulse, setLineupAssignPulse] = useState(0);
   const [lineupUndoSnapshot, setLineupUndoSnapshot] = useState<LegacyLineupUndoSnapshot | null>(null);
   const [hoveredCandidate, setHoveredCandidate] = useState<LegacyLineupHoveredCandidate | null>(null);
   const hoveredCandidateDebounceRef = useRef<number | null>(null);
@@ -3053,6 +3062,10 @@ export default function LegacyLineupLabClient(props: LegacyLineupLabClientProps)
               fitSummary: fitExplanation.summary,
               fitDetail: fitExplanation.detail,
               reasonChips: buildCandidateAxisReasonChips(role, rosterCard),
+              roleModifier: projected.roleModifier,
+              rangeLow: projected.rangeLow,
+              rangeHigh: projected.rangeHigh,
+              warnings: projected.warnings,
             };
           });
 
@@ -3098,8 +3111,10 @@ export default function LegacyLineupLabClient(props: LegacyLineupLabClientProps)
               return (right.projectedScore ?? Number.NEGATIVE_INFINITY) - (left.projectedScore ?? Number.NEGATIVE_INFINITY);
             }
             return left.slotKey.localeCompare(right.slotKey, "de");
-          })
-          .slice(0, 2);
+          });
+        // Keep the full ranked list here (bounded by slot count, so cheap); callers that only
+        // want the top picks (e.g. classic "Wunsch" tags) slice further at the usage site. The
+        // v2 focus board's player-focus highlight needs the delta for every slot, not just top 2.
 
         return [option.activePlayerId, candidateSlots] as const;
       }),
@@ -3117,6 +3132,12 @@ export default function LegacyLineupLabClient(props: LegacyLineupLabClientProps)
           blockReason: ReturnType<typeof resolveLegacyLineupDragBlockReason>;
           fitSummary: string;
           fitDetail: string;
+          roleModifier: number;
+          rangeLow: number | null;
+          rangeHigh: number | null;
+          warnings: string[];
+          fatigueModifier: number;
+          additionalFatigue: number;
         }
       >();
     }
@@ -3150,6 +3171,12 @@ export default function LegacyLineupLabClient(props: LegacyLineupLabClientProps)
             blockReason,
             fitSummary: fitExplanation.summary,
             fitDetail: fitExplanation.detail,
+            roleModifier: projected.roleModifier,
+            rangeLow: projected.rangeLow,
+            rangeHigh: projected.rangeHigh,
+            warnings: projected.warnings,
+            fatigueModifier: projected.fatigueModifier,
+            additionalFatigue: projected.additionalFatigue,
           },
         ] as const;
       }),
@@ -3379,6 +3406,15 @@ export default function LegacyLineupLabClient(props: LegacyLineupLabClientProps)
       })
       .filter((group) => group.entries.length > 0);
   }, [showOnlyTopSlotCandidates, teamdeckCandidateEntries, teamdeckFilterMode]);
+  // Mirrors the v2 focus board's own candidate-tab + search filtering exactly (same helper,
+  // same source list), so keyboard digit-shortcuts always match what the user visually sees
+  // there instead of a separately-computed "spotlight" list.
+  const focusV2VisibleCandidates = useMemo(() => {
+    if (uiVariant !== "focusV2") {
+      return [];
+    }
+    return filterLegacyLineupCandidateEntries(teamdeckCandidateGroups, focusV2CandidateTab, playerFilter);
+  }, [focusV2CandidateTab, playerFilter, teamdeckCandidateGroups, uiVariant]);
   const activeSlotSpotlightGroups = useMemo(() => {
     return teamdeckCandidateGroups
       .filter((group) => group.key !== "blocked" && group.entries.length > 0)
@@ -5472,10 +5508,13 @@ export default function LegacyLineupLabClient(props: LegacyLineupLabClientProps)
   }
 
   function assignActiveSlotCandidateByIndex(index: number) {
-    if (!activeSlot || !activeSlotSpotlightCandidates[index]) {
+    // In focusV2, resolve against the same tab/search-filtered list the board actually renders,
+    // so "1"-"4" always match the candidate the user sees at that position.
+    const sourceCandidates = uiVariant === "focusV2" ? focusV2VisibleCandidates : activeSlotSpotlightCandidates;
+    if (!activeSlot || !sourceCandidates[index]) {
       return;
     }
-    const candidate = activeSlotSpotlightCandidates[index];
+    const candidate = sourceCandidates[index];
     const activePlayerId = candidate.player.activePlayerId ?? null;
     if (!activePlayerId) {
       return;
@@ -5486,6 +5525,12 @@ export default function LegacyLineupLabClient(props: LegacyLineupLabClientProps)
       return;
     }
     updateSelection(activeSlot.key, activePlayerId, { advanceFocusToNextOpenSlot: true });
+  }
+
+  function getFocusV2TopPickActivePlayerId() {
+    const topPick =
+      focusV2VisibleCandidates.find((entry) => !entry.activeSlotCandidate?.blockReason) ?? focusV2VisibleCandidates[0] ?? null;
+    return topPick?.player.activePlayerId ?? null;
   }
 
   function clearActiveSlotSelection() {
@@ -5506,6 +5551,9 @@ export default function LegacyLineupLabClient(props: LegacyLineupLabClientProps)
 	    setDraft(null);
 	    const nextSelections = buildUpdatedSelections(selections, slotKey, activePlayerId);
     if (JSON.stringify(nextSelections) !== JSON.stringify(selections)) {
+      if (activePlayerId) {
+        setLineupAssignPulse((count) => count + 1);
+      }
       const nextPlayerName = getSelectedOptionMeta(activePlayerId)?.name ?? "";
       const previousPlayerName = getSelectedOptionMeta(selections[slotKey])?.name ?? "";
       rememberLineupUndo(
@@ -5605,7 +5653,10 @@ export default function LegacyLineupLabClient(props: LegacyLineupLabClientProps)
       if (event.code === "Enter" && !isReadOnly) {
         event.preventDefault();
         event.stopImmediatePropagation();
-        const topCandidate = activeSlotSpotlightCandidates[0]?.player.activePlayerId ?? null;
+        const topCandidate =
+          uiVariant === "focusV2"
+            ? getFocusV2TopPickActivePlayerId()
+            : activeSlotSpotlightCandidates[0]?.player.activePlayerId ?? null;
         if (activeSlot && !selections[activeSlot.key] && topCandidate) {
           updateSelection(activeSlot.key, topCandidate, { advanceFocusToNextOpenSlot: true });
           return;
@@ -5630,6 +5681,8 @@ export default function LegacyLineupLabClient(props: LegacyLineupLabClientProps)
     matchdayPreviewCards.openSlots,
     selections,
     slots,
+    uiVariant,
+    focusV2VisibleCandidates,
   ]);
 
   function getProjectedCandidateForSlot(
@@ -5658,6 +5711,7 @@ export default function LegacyLineupLabClient(props: LegacyLineupLabClientProps)
     const nextSelections = { ...selections };
     const assignedActivePlayerIds = new Set(Object.values(nextSelections).filter(Boolean));
     let filledCount = 0;
+    let projectedScoreGain = 0;
 
     for (const slot of slots) {
       if (nextSelections[slot.key]) {
@@ -5689,6 +5743,7 @@ export default function LegacyLineupLabClient(props: LegacyLineupLabClientProps)
         nextSelections[slot.key] = bestCandidate.option.activePlayerId;
         assignedActivePlayerIds.add(bestCandidate.option.activePlayerId);
         filledCount += 1;
+        projectedScoreGain += bestCandidate.projected.totalProjected ?? 0;
       }
     }
 
@@ -5702,7 +5757,7 @@ export default function LegacyLineupLabClient(props: LegacyLineupLabClientProps)
     setHoveredCandidate(null);
     setMessage(
       filledCount > 0
-        ? `${filledCount} offene Slots mit den besten verfuegbaren Kandidaten gefuellt. Captain bleibt bewusst manuell, Saisonlimit ${captainSeasonUsedWithDraft}/${captainSeasonLimit}.`
+        ? `${filledCount} offene Slots mit den besten verfuegbaren Kandidaten gefuellt (Score-Projektion +${projectedScoreGain.toFixed(1)} gesamt). Captain bleibt bewusst manuell, Saisonlimit ${captainSeasonUsedWithDraft}/${captainSeasonLimit}.`
         : "Keine offenen Slots oder keine legalen Kandidaten gefunden.",
     );
   }
@@ -6614,54 +6669,60 @@ export default function LegacyLineupLabClient(props: LegacyLineupLabClientProps)
             {isTeamManagementLocked ? "Nur Ansicht" : isReadOnly ? "Referenzmodus" : "Lokaler Spielstand"}
           </span>
         </div>
-        <div className="legacy-matchday-header-compact">
-          <strong>{matchdayHeaderSummary}</strong>
-          <span>
-            Spielstand: {source === "prisma" ? "Referenz" : "lokal"} · Team {formatLegacyTeamControlModeLabel(selectedTeamOption?.controlMode)}
-            {isTeamManagementLocked ? " · Nur Ansicht" : ""} · Draft{" "}
-            {draft ? "gespeichert" : "offen"}
-          </span>
-        </div>
-        <div className="legacy-lineup-team-boost-panel is-split" data-testid="legacy-lineup-intensity-panel">
-          {(["d1", "d2"] as const).map((disciplineSide) => {
-            const discipline =
-              disciplineSide === "d1" ? context?.matchdayContract?.discipline1 ?? null : context?.matchdayContract?.discipline2 ?? null;
-            const intensity = getDisciplineIntensity(disciplineSide);
-            const intensityConfig = getMatchdayIntensityConfig(intensity);
-            return (
-              <div key={`discipline-intensity-${disciplineSide}`} className={`legacy-lineup-discipline-intensity is-${intensity}`}>
-                <div>
-                  <span className="legacy-lineup-team-boost-kicker">{disciplineSide.toUpperCase()} Einsatz</span>
-                  <strong>
-                    {discipline?.displayName ?? "Diszi"} ·{" "}
-                    {intensity === "conserve" ? "Schonen" : intensity === "push" ? "Push" : "Normal"}
-                  </strong>
-                  <small>
-                    Score {formatSignedCompactInteger(intensityConfig.scoreModifier)} · Fatigue +{formatScore(intensityConfig.fatigueBase)}
-                  </small>
+        {uiVariant !== "focusV2" ? (
+          <div className="legacy-matchday-header-compact">
+            <strong>{matchdayHeaderSummary}</strong>
+            <span>
+              Spielstand: {source === "prisma" ? "Referenz" : "lokal"} · Team {formatLegacyTeamControlModeLabel(selectedTeamOption?.controlMode)}
+              {isTeamManagementLocked ? " · Nur Ansicht" : ""} · Draft{" "}
+              {draft ? "gespeichert" : "offen"}
+            </span>
+          </div>
+        ) : null}
+        {uiVariant !== "focusV2" ? (
+          // focusV2 hat pro Seite bereits einen kontextnahen Intensity-Regler direkt im Slot-Board
+          // (siehe LegacyLineupFocusV2Board) - dieses globale Panel waere dort eine reine Dopplung.
+          <div className="legacy-lineup-team-boost-panel is-split" data-testid="legacy-lineup-intensity-panel">
+            {(["d1", "d2"] as const).map((disciplineSide) => {
+              const discipline =
+                disciplineSide === "d1" ? context?.matchdayContract?.discipline1 ?? null : context?.matchdayContract?.discipline2 ?? null;
+              const intensity = getDisciplineIntensity(disciplineSide);
+              const intensityConfig = getMatchdayIntensityConfig(intensity);
+              return (
+                <div key={`discipline-intensity-${disciplineSide}`} className={`legacy-lineup-discipline-intensity is-${intensity}`}>
+                  <div>
+                    <span className="legacy-lineup-team-boost-kicker">{disciplineSide.toUpperCase()} Einsatz</span>
+                    <strong>
+                      {discipline?.displayName ?? "Diszi"} ·{" "}
+                      {intensity === "conserve" ? "Schonen" : intensity === "push" ? "Push" : "Normal"}
+                    </strong>
+                    <small>
+                      Score {formatSignedCompactInteger(intensityConfig.scoreModifier)} · Fatigue +{formatScore(intensityConfig.fatigueBase)}
+                    </small>
+                  </div>
+                  <div className="legacy-lineup-team-boost-switch" role="group" aria-label={`${disciplineSide.toUpperCase()} Einsatz`} title={getGameTermTooltip("Boost") ?? undefined}>
+                    {([
+                      { value: "conserve" as const, label: "Schonen" },
+                      { value: "normal" as const, label: "Normal" },
+                      { value: "push" as const, label: "Push" },
+                    ]).map((option) => (
+                      <button
+                        key={`${disciplineSide}-${option.value}`}
+                        className={`secondary-button inline-button${intensity === option.value ? " is-selected" : ""}`}
+                        type="button"
+                        disabled={isReadOnly || isBusy}
+                        onClick={() => updateDisciplineIntensityStage(disciplineSide, option.value)}
+                        title={`${option.label}: ${getGameTermTooltip("Einsatzstufe") ?? ""}`}
+                      >
+                        {option.label}
+                      </button>
+                    ))}
+                  </div>
                 </div>
-                <div className="legacy-lineup-team-boost-switch" role="group" aria-label={`${disciplineSide.toUpperCase()} Einsatz`} title={getGameTermTooltip("Boost") ?? undefined}>
-                  {([
-                    { value: "conserve" as const, label: "Schonen" },
-                    { value: "normal" as const, label: "Normal" },
-                    { value: "push" as const, label: "Push" },
-                  ]).map((option) => (
-                    <button
-                      key={`${disciplineSide}-${option.value}`}
-                      className={`secondary-button inline-button${intensity === option.value ? " is-selected" : ""}`}
-                      type="button"
-                      disabled={isReadOnly || isBusy}
-                      onClick={() => updateDisciplineIntensityStage(disciplineSide, option.value)}
-                      title={`${option.label}: ${getGameTermTooltip("Einsatzstufe") ?? ""}`}
-                    >
-                      {option.label}
-                    </button>
-                  ))}
-                </div>
-              </div>
-            );
-          })}
-        </div>
+              );
+            })}
+          </div>
+        ) : null}
         {SHOW_CLASSIC_LINEUP_WORKSPACE ? (
         <>
         <section id="lineup-command-center" className={`legacy-lineup-command-center is-${lineupFlowSummary.nextStep.tone}`}>
@@ -7521,6 +7582,9 @@ export default function LegacyLineupLabClient(props: LegacyLineupLabClientProps)
               getDragFitTierClass={getDragFitTierClass}
               getTierStyleClass={getTierStyleClass}
               candidateGroups={teamdeckCandidateGroups}
+              candidateTab={focusV2CandidateTab}
+              onCandidateTabChange={setFocusV2CandidateTab}
+              playerBestSlotSummaryByActivePlayerId={playerBestSlotSummaryByActivePlayerId}
               captains={captains}
               captainSelectEntriesBySide={{
                 d1: getCaptainSelectEntriesForSide("d1"),
@@ -7535,6 +7599,7 @@ export default function LegacyLineupLabClient(props: LegacyLineupLabClientProps)
               d1Rank={d1Rank}
               d2Rank={d2Rank}
               getSelectedOptionMeta={getSelectedOptionMeta}
+              assignPulse={lineupAssignPulse}
               onAssignPlayer={(slotKey, activePlayerId) => {
                 updateSelection(slotKey, activePlayerId, { advanceFocusToNextOpenSlot: true });
                 const slot = slots.find((entry) => entry.key === slotKey);

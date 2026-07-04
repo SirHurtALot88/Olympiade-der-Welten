@@ -16,5 +16,6 @@ export { VeloAttributeFocusTags, type VeloAttributeFocusEntry } from "@/componen
 export { buildTrainingImpactItems, VeloImpactStrip, type VeloImpactItem } from "@/components/foundation/velo-ui/VeloImpactStrip";
 export { buildTrainingModeSegments, VeloIntensityRail, type VeloIntensitySegment } from "@/components/foundation/velo-ui/VeloIntensityRail";
 export { VeloPotentialStars } from "@/components/foundation/velo-ui/VeloPotentialStars";
+export { VeloRangeBar, type VeloRangeBarProps } from "@/components/foundation/velo-ui/VeloRangeBar";
 export { VeloStarRating } from "@/components/foundation/velo-ui/VeloStarRating";
 export { VeloStatOrbitChip, VeloStatOrbitRow, type VeloAxisKey } from "@/components/foundation/velo-ui/VeloStatOrbitChip";
