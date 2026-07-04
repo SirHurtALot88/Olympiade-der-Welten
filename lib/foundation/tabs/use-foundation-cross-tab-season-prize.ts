@@ -1,5 +1,6 @@
 import { useMemo } from "react";
 
+import { sortTableRows as sortRows } from "@/components/foundation/FoundationTableUi";
 import type { GameState, Team } from "@/lib/data/olyDataTypes";
 import type { FoundationViewId } from "@/lib/foundation/foundation-view-routing";
 import type { SortState } from "@/lib/foundation/foundation-table-ui-types";

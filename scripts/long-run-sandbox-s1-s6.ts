@@ -6,7 +6,9 @@ import { loadEnvConfig } from "@next/env";
 
 import { AI_MARKET_APPLY_CONFIRM_TOKEN } from "@/lib/ai/ai-market-plan-apply-contract";
 import {
+  getTeamOptTarget,
   getTeamsNeedingConvergence,
+  runCompareRescueBeforeEmergencyRepair,
   runEmergencyRosterRepairForTeams,
 } from "@/lib/ai/ai-market-plan-convergence-service";
 import { runTransferWindowSession } from "@/lib/ai/ai-transfer-window-session-service";
@@ -575,11 +577,34 @@ async function runCanonicalPreseasonStart(saveId: string, seasonId: string, pers
   const plannerConvergence = await runPreseasonPlannerConvergenceBeforeEmergencyRepair(saveId, seasonId, persistence);
   performanceRows.push(...plannerConvergence.performanceRows);
 
+  let emergencyRepairTeamIds = plannerConvergence.emergencyRepairTeams;
+  if (emergencyRepairTeamIds.length > 0) {
+    const compareRescueStartedAt = Date.now();
+    const compareRescue = await runCompareRescueBeforeEmergencyRepair({
+      saveId,
+      seasonId,
+      teamIds: emergencyRepairTeamIds,
+      persistence,
+    });
+    recordPhase(performanceRows, {
+      seasonId,
+      phase: "season start compare rescue",
+      startedAt: compareRescueStartedAt,
+      itemCount: compareRescue.appliedBuys + compareRescue.appliedSells,
+      status: "ok",
+      buyApplyCount: compareRescue.appliedBuys,
+      sellApplyCount: compareRescue.appliedSells,
+      warnings: compareRescue.warnings.join("|"),
+      note: `remainingRepairTeams:${compareRescue.remainingTeamIds.length}`,
+    });
+    emergencyRepairTeamIds = compareRescue.remainingTeamIds;
+  }
+
   const rosterRepair = emergencyRepairRosterMinimumBeforeSeasonStart(
     saveId,
     seasonId,
     persistence,
-    plannerConvergence.emergencyRepairTeams,
+    emergencyRepairTeamIds,
   );
   performanceRows.push(...rosterRepair.performanceRows);
 
@@ -680,6 +705,25 @@ async function runPreseasonPlannerConvergenceBeforeEmergencyRepair(
   const performanceRows: PhaseMetric[] = [];
   const save = persistence.getSaveById(saveId);
   if (!save) throw new Error("Long-run save missing before preseason planner convergence.");
+  // Season 1 has no legal market buys at all (S1_FORBIDDEN_BUY_SOURCES /
+  // isTransferActionAllowed both block "ai_preseason_market_buy" and
+  // "preseason_roster_repair_buy"), but runTransferWindowSession's sell step has no such
+  // gate — running this convergence pass in season-1 would only ever sell, never buy back,
+  // which violates the no-sell-floor rebuild guarantee (see
+  // .cursor/rules/balancing-no-sell-floor-full-rebuild.mdc). Season-1 roster shortfalls can
+  // only be fixed via the draft/topup mechanisms, so skip this pass entirely here.
+  if (isSeasonOne(seasonId)) {
+    const coverageRiskRows = getPreseasonCoverageRiskRows(save.gameState);
+    return {
+      performanceRows,
+      reviewed: false,
+      warnings:
+        coverageRiskRows.length > 0
+          ? [`preseason_planner_convergence_skipped_season_one_no_market_buys:${coverageRiskRows.length}`]
+          : [],
+      emergencyRepairTeams: [] as string[],
+    };
+  }
   const coverageRiskRows = getPreseasonCoverageRiskRows(save.gameState);
   const deployTeams = getTeamsNeedingTransferBudgetDeploy(save.gameState, seasonId);
   const existingMarketTransfers = getExistingPreseasonMarketTransfers(save.gameState, seasonId).filter(
@@ -726,8 +770,18 @@ async function runPreseasonPlannerConvergenceBeforeEmergencyRepair(
     maxLeagueRounds: LONG_RUN_PLANNER_MAX_LEAGUE_ROUNDS,
     allowBuys: true,
     skipIfExistingMarketTransfers: false,
-    progressLog: false,
+    progressLog: true,
   });
+  const engineSummary = convergence.perTeam.reduce(
+    (counts, entry) => {
+      counts[entry.pickEngine] = (counts[entry.pickEngine] ?? 0) + 1;
+      return counts;
+    },
+    {} as Record<string, number>,
+  );
+  console.error(
+    `[long-run] planner-convergence engines ${seasonId}: unified=${engineSummary.unified ?? 0} legacy=${engineSummary.legacy ?? 0} repair=${engineSummary.repair ?? 0}`,
+  );
   const latest = persistence.getSaveById(saveId);
   if (!latest) throw new Error("Long-run save missing after preseason planner convergence.");
   const stillBelowMin = getPreseasonCoverageRiskRows(latest.gameState);
@@ -790,6 +844,26 @@ function emergencyRepairRosterMinimumBeforeSeasonStart(
   }
   const startedAt = Date.now();
   console.error(`[long-run] emergency-roster-repair ${effectiveSeasonId}: ${uniqueTeamIds.join(",")}`);
+  // Teams that enter repair fully (or near-)empty need a full rebuild, not just a
+  // hardMin patch: keep retrying those specifically until they clear Opt (or attempts
+  // run out), since the no-sell-floor policy means a team can legitimately hit 0 roster
+  // and must be able to buy its way back to a complete squad in the same preseason pass.
+  const fullRebuildTeamIds = new Set(
+    uniqueTeamIds.filter(
+      (teamId) => save.gameState.rosters.filter((entry) => entry.teamId === teamId).length === 0,
+    ),
+  );
+  const getTeamsNeedingMoreRepair = (gameState: GameState) => {
+    const belowMinIds = new Set(getAllTeamsBelowMinIds(gameState));
+    for (const teamId of fullRebuildTeamIds) {
+      const rosterCount = gameState.rosters.filter((entry) => entry.teamId === teamId).length;
+      const optTarget = getTeamOptTarget(gameState, teamId);
+      if (rosterCount < optTarget) {
+        belowMinIds.add(teamId);
+      }
+    }
+    return [...belowMinIds];
+  };
   let result: ReturnType<typeof runEmergencyRosterRepairForTeams> = {
     repaired: false,
     teamIds: [],
@@ -814,7 +888,7 @@ function emergencyRepairRosterMinimumBeforeSeasonStart(
       allWarnings.push(...result.warnings);
       const mid = persistence.getSaveById(saveId);
       if (!mid) throw new Error("Long-run save missing during emergency roster repair retry.");
-      repairTeamIds = getAllTeamsBelowMinIds(mid.gameState);
+      repairTeamIds = getTeamsNeedingMoreRepair(mid.gameState);
       if (repairTeamIds.length === 0) break;
       console.error(
         `[long-run] emergency-roster-repair retry ${attempt + 2}/3 ${effectiveSeasonId}: ${repairTeamIds.join(",")}`,
@@ -2500,7 +2574,14 @@ async function applySeasonEnd(saveId: string, persistence: PersistenceService) {
   let plannerFinalGateRows: Record<string, unknown>[] = [];
   let seasonEndEmergencyRepairTeams: string[] = [];
   const allowSeasonEndMarketBuys = isTransferActionAllowed(seasonId, "season_end_market_buy");
-  if (existingMarketTransfers.length === 0) {
+  // Season 1 forbids market buys entirely (allowSeasonEndMarketBuys is always false here), but
+  // runTransferWindowSession's sell step has no such gate. Running this pass in season-1 season-end
+  // was observed to sell nearly the whole league down towards/at 0 roster (23/32 teams below hardMin
+  // in one balancing run) with zero possibility of buying back in the same pass, violating the
+  // no-sell-floor rebuild guarantee (.cursor/rules/balancing-no-sell-floor-full-rebuild.mdc). Season-1
+  // roster composition is settled by the draft; real rebuilding only becomes possible once season-2's
+  // preseason convergence opens up buys, so skip this pass entirely for season-1.
+  if (existingMarketTransfers.length === 0 && !isSeasonOne(seasonId)) {
     const marketConvergence = await runTransferWindowSession({
       saveId,
       seasonId,
@@ -2514,7 +2595,7 @@ async function applySeasonEnd(saveId: string, persistence: PersistenceService) {
       maxLeagueRounds: LONG_RUN_PLANNER_MAX_LEAGUE_ROUNDS,
       allowBuys: allowSeasonEndMarketBuys,
       skipIfExistingMarketTransfers: false,
-      progressLog: false,
+      progressLog: true,
     });
     marketStatus = marketConvergence.blockingReasons.length > 0 ? "blocked" : "applied";
     marketAppliedBuys = marketConvergence.appliedBuys;
@@ -2572,17 +2653,39 @@ async function applySeasonEnd(saveId: string, persistence: PersistenceService) {
       phase: `season end final stabilization ${row.phase}`,
     })),
   );
+  let seasonEndRepairTeamIds = seasonEndEmergencyRepairTeams;
+  if (seasonEndRepairTeamIds.length > 0) {
+    const compareRescueStartedAt = Date.now();
+    const compareRescue = await runCompareRescueBeforeEmergencyRepair({
+      saveId,
+      seasonId,
+      teamIds: seasonEndRepairTeamIds,
+      persistence,
+    });
+    recordPhase(performanceRows, {
+      seasonId,
+      phase: "season end compare rescue",
+      startedAt: compareRescueStartedAt,
+      itemCount: compareRescue.appliedBuys + compareRescue.appliedSells,
+      status: "ok",
+      buyApplyCount: compareRescue.appliedBuys,
+      sellApplyCount: compareRescue.appliedSells,
+      warnings: compareRescue.warnings.join("|"),
+      note: `remainingRepairTeams:${compareRescue.remainingTeamIds.length}`,
+    });
+    seasonEndRepairTeamIds = compareRescue.remainingTeamIds;
+  }
   const finalRosterRepair = isTransferActionAllowed(seasonId, "preseason_roster_repair")
     ? emergencyRepairRosterMinimumBeforeSeasonStart(
         saveId,
         seasonId,
         persistence,
-        seasonEndEmergencyRepairTeams,
+        seasonEndRepairTeamIds,
       )
     : isSeasonOne(seasonId)
       ? (() => {
           const repair = repairSeasonOneEndRosterBeforeS2(saveId, persistence, {
-            plannerExhaustedTeamIds: seasonEndEmergencyRepairTeams,
+            plannerExhaustedTeamIds: seasonEndRepairTeamIds,
             outputDir: path.join(OUTPUT_DIR, `s1-end-roster-repair-${seasonId}`),
           });
           const performanceRows: PhaseMetric[] = [];

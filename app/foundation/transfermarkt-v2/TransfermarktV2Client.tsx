@@ -10,6 +10,7 @@ import FoundationPlayerPortraitPreview from "@/components/foundation/player-port
 import OptimizedMediaImage from "@/app/foundation/OptimizedMediaImage";
 import RaceIcon from "@/app/foundation/RaceIcon";
 import { appendMediaImageVariant, getPlayerPortraitBrowserUrl } from "@/lib/data/mediaAssets";
+import { resolvePortraitVariantForDisplayPx } from "@/lib/media/mediaThumbnailConfig";
 import type { ContractShape, Discipline, Team, TeamControlMode, TeamSeasonObjectiveRecord, TransferWishlistEntry } from "@/lib/data/olyDataTypes";
 import {
   formatTransfermarktCurrency,
@@ -17,20 +18,32 @@ import {
   getConfirmedTierStyle,
   type TransfermarktTier,
 } from "@/lib/market/transfermarkt-formatting-contract";
+import { formatNullablePps } from "@/lib/foundation/tabs/foundation-format-render-helpers";
 import { getTransfermarktPortraitModel } from "@/lib/market/transfermarkt-lab";
 import type { TransferHistoryItem, TransferHistoryReadResult } from "@/lib/market/transfer-history-read-service";
 import type { TransfermarktBuyPreview } from "@/lib/market/transfermarkt-buy-service";
 import type { TransfermarktFreeAgentItem, TransfermarktReadResult } from "@/lib/market/transfermarkt-read-service";
 import {
   buildTransfermarktScoutedAttributeRows,
+  getScoutingTierWindow,
   getTransfermarktScoutingDisclosure,
   getTransfermarktScoutingVisibilityBuckets,
   normalizeTransfermarktScoutingLevel,
   getTransfermarktTrainingAffinityVisibility,
+  resolveScoutingConfidenceFromLevel,
+  formatScoutedImpactDelta,
+  isScoutedImpactExact,
   type TransfermarktAttributeRatings,
   type TransfermarktAttributeKey,
   type TransfermarktScoutedAttributeRow,
 } from "@/lib/market/transfermarkt-scouting";
+import {
+  computeCompositeTopSixAverage,
+  computeDisciplineTopSixImpact,
+  computeTopSixAxisImpact,
+  computeCandidateAxisTeamRankEstimates,
+  formatTeamRankEstimateLabel,
+} from "@/lib/market/transfermarkt-roster-impact";
 import {
   officialDisciplineWeightLabels,
   officialDisciplineWeightOrder,
@@ -46,7 +59,6 @@ import {
 } from "@/lib/room/foundation-room-context-client";
 import { DEFAULT_ACTIVE_OWNER_ID } from "@/lib/foundation/team-control-settings";
 import { getClassTrainingSignals } from "@/lib/training/class-progression-config";
-import { VeloAttributeFocusTags } from "@/components/foundation/velo-ui";
 import { createEmptyLeaguePlayerHeatPools } from "@/lib/foundation/player-league-heat";
 import type { MarketBuyNegotiationOutcome } from "@/lib/foundation/tabs/use-market-buy-derivations";
 
@@ -208,7 +220,7 @@ const MARKET_CLASS_DISPLAY_ORDER = [
   "Tactician",
 ] as const;
 
-const SCOUT_TIER_ORDER = ["F", "E", "D", "C", "B", "A", "S", "S+"] as const;
+const MARKET_RAIL_PORTRAIT_PX = 108;
 const DISCIPLINE_ABBREVIATIONS: Record<string, string> = {
   tdm: "TDM",
   "mini-dm": "MDM",
@@ -627,25 +639,6 @@ function getScoutingClarityLabel(confidence: number | null | undefined) {
   return "roh";
 }
 
-function getScoutingTierWindow(tier: string | null | undefined, confidence: number | null | undefined) {
-  if (!tier) {
-    return "—";
-  }
-  const normalizedTier = tier.toUpperCase();
-  const index = SCOUT_TIER_ORDER.indexOf(normalizedTier as (typeof SCOUT_TIER_ORDER)[number]);
-  if (index === -1) {
-    return normalizedTier;
-  }
-  if (confidence != null && confidence >= 75) {
-    return normalizedTier;
-  }
-
-  const radius = confidence != null && confidence >= 50 ? 1 : 2;
-  const lower = SCOUT_TIER_ORDER[Math.max(0, index - radius)];
-  const upper = SCOUT_TIER_ORDER[Math.min(SCOUT_TIER_ORDER.length - 1, index + radius)];
-  return lower === upper ? lower : `${upper}-${lower}`;
-}
-
 function normalizeDisciplineLookup(value: string | null | undefined) {
   return (value ?? "")
     .toLowerCase()
@@ -950,8 +943,29 @@ function sortClassNames(left: string, right: string) {
   return left.localeCompare(right, "de");
 }
 
-function getAxisValue(item: TransfermarktFreeAgentItem, axis: MarketAxisKey) {
-  return item[axis] ?? Number.NEGATIVE_INFINITY;
+function passesMarketMinFitFilter(item: TransfermarktFreeAgentItem, minFit: number) {
+  if (minFit <= 0) {
+    return true;
+  }
+  return (item.fit ?? Number.NEGATIVE_INFINITY) >= minFit;
+}
+
+function passesMarketAxisFilters(
+  item: TransfermarktFreeAgentItem,
+  selectedAxes: MarketAxisKey[],
+  axisMinimums: Record<MarketAxisKey, number>,
+) {
+  if (selectedAxes.length === 0) {
+    return true;
+  }
+  return selectedAxes.every((axis) => {
+    const minimum = axisMinimums[axis];
+    if (minimum <= 0) {
+      return true;
+    }
+    const value = item[axis];
+    return typeof value === "number" && Number.isFinite(value) && value >= minimum;
+  });
 }
 
 function getWishlistAxisValue(
@@ -1369,7 +1383,7 @@ export default function TransfermarktV2Client({
       if (item.marketValueSalaryRatio != null && item.marketValueSalaryRatio < effectiveMinRatio) {
         return false;
       }
-      if ((item.fit ?? -99) < minFit) {
+      if (!passesMarketMinFitFilter(item, minFit)) {
         return false;
       }
       if (selectedClassNames.length > 0 && !selectedClassNames.includes(item.className)) {
@@ -1384,7 +1398,7 @@ export default function TransfermarktV2Client({
           return false;
         }
       }
-      if (selectedAxes.length > 0 && !selectedAxes.every((axis) => getAxisValue(item, axis) >= axisMinimums[axis])) {
+      if (!passesMarketAxisFilters(item, selectedAxes, axisMinimums)) {
         return false;
       }
       return true;
@@ -1645,6 +1659,80 @@ export default function TransfermarktV2Client({
       }),
     [marketContext?.axisAverages, selectedPlayer, wishlistAxes],
   );
+  const selectedTeamRosterRows = useMemo(
+    () => rosterRows.filter((row) => row.teamId === selectedTeamId),
+    [rosterRows, selectedTeamId],
+  );
+  const topSixCount = Math.min(6, marketContext?.playerOpt ?? 6);
+  const topSixAxisImpact = useMemo(
+    () =>
+      computeTopSixAxisImpact(
+        selectedTeamRosterRows,
+        selectedPlayer
+          ? {
+              pow: selectedPlayer.pow,
+              spe: selectedPlayer.spe,
+              men: selectedPlayer.men,
+              soc: selectedPlayer.soc,
+            }
+          : null,
+        topSixCount,
+      ),
+    [selectedPlayer, selectedTeamRosterRows, topSixCount],
+  );
+  const topSixCompositeBefore = useMemo(
+    () => computeCompositeTopSixAverage(topSixAxisImpact, "before"),
+    [topSixAxisImpact],
+  );
+  const topSixCompositeAfter = useMemo(
+    () => computeCompositeTopSixAverage(topSixAxisImpact, "after"),
+    [topSixAxisImpact],
+  );
+  const topSixCompositeDelta = useMemo(() => {
+    if (topSixCompositeBefore == null || topSixCompositeAfter == null) {
+      return null;
+    }
+    return Number((topSixCompositeAfter - topSixCompositeBefore).toFixed(1));
+  }, [topSixCompositeAfter, topSixCompositeBefore]);
+  const selectedScoutingConfidence = useMemo(
+    () =>
+      selectedPlayer?.scoutingConfidence ??
+      resolveScoutingConfidenceFromLevel(selectedPlayer?.scoutingLevel ?? 0),
+    [selectedPlayer?.scoutingConfidence, selectedPlayer?.scoutingLevel],
+  );
+  const topSixAxisRankEstimates = useMemo(
+    () =>
+      computeCandidateAxisTeamRankEstimates(
+        selectedTeamRosterRows,
+        selectedPlayer
+          ? {
+              pow: selectedPlayer.pow,
+              spe: selectedPlayer.spe,
+              men: selectedPlayer.men,
+              soc: selectedPlayer.soc,
+            }
+          : null,
+        selectedScoutingConfidence,
+      ),
+    [selectedPlayer, selectedScoutingConfidence, selectedTeamRosterRows],
+  );
+  const selectedTopDisciplineImpact = useMemo(() => {
+    if (!selectedPlayer) {
+      return [];
+    }
+    const confidence =
+      selectedPlayer.scoutingConfidence ?? resolveScoutingConfidenceFromLevel(selectedPlayer.scoutingLevel);
+    return computeDisciplineTopSixImpact(
+      selectedTeamRosterRows,
+      selectedPlayer.topDisciplineScores.slice(0, 3).map((entry) => ({
+        disciplineId: entry.disciplineId,
+        disciplineName: entry.disciplineName,
+        displayedScore: entry.displayedScore ?? null,
+        tierWindow: getScoutingTierWindow(entry.scoreTier, confidence),
+      })),
+      topSixCount,
+    );
+  }, [selectedPlayer, selectedTeamRosterRows, topSixCount]);
   const selectedPortrait = selectedPlayer ? getTransfermarktPortraitModel(selectedPlayer) : null;
   const fitSignal = selectedPlayer ? getFitSignal(selectedPlayer) : null;
   const growthSignal = selectedPlayer ? getGrowthSignal(selectedPlayer) : null;
@@ -1956,7 +2044,7 @@ export default function TransfermarktV2Client({
     const controller = new AbortController();
     marketAbortRef.current?.abort();
     marketAbortRef.current = controller;
-    const marketCacheKey = `${defaultSaveId}:${defaultSeasonId}:${deferredSearch.trim()}`;
+    const marketCacheKey = `${defaultSaveId}:${defaultSeasonId}:${selectedTeamId}:${deferredSearch.trim()}`;
     const cachedMarket = marketCacheRef.current.get(marketCacheKey);
     if (cachedMarket) {
       setMarketFeed(cachedMarket.feed);
@@ -2093,7 +2181,7 @@ export default function TransfermarktV2Client({
         marketAbortRef.current = null;
       }
     };
-  }, [bootstrapReady, defaultSaveId, defaultSeasonId, deferredSearch, reloadToken, source]);
+  }, [bootstrapReady, defaultSaveId, defaultSeasonId, deferredSearch, reloadToken, selectedTeamId, source]);
 
   useEffect(() => {
     let cancelled = false;
@@ -2802,11 +2890,13 @@ export default function TransfermarktV2Client({
           <div className="market-v2-candidate-list">
             {renderedVisibleItems.map((item, index) => {
               const portrait = getTransfermarktPortraitModel(item);
+              const portraitVariant = resolvePortraitVariantForDisplayPx(MARKET_RAIL_PORTRAIT_PX);
               const isSelected = selectedPlayer?.playerId === item.playerId;
               const fitInfo = getFitSignal(item);
-              const needInfo = getNeedSignal(item);
-              const ratioTone = getRatioTone(item.marketValueSalaryRatio);
-              const focusAxes = getCandidateFocusAxes(item);
+              const scoutingConfidence = item.scoutingConfidence ?? resolveScoutingConfidenceFromLevel(item.scoutingLevel);
+              const railDisciplineTags = item.topDisciplineScores.slice(0, 2).map((entry) =>
+                formatDisciplineScoutTag(entry, scoutingConfidence),
+              );
               return (
                 <button
                   className={`market-v2-candidate-card${isSelected ? " is-selected" : ""}`}
@@ -2827,7 +2917,9 @@ export default function TransfermarktV2Client({
                   <FoundationPlayerPortraitCard
                     playerId={item.playerId}
                     name={item.name}
-                    portraitUrl={appendMediaImageVariant(portrait.src, "preview") ?? portrait.src}
+                    portraitUrl={
+                      appendMediaImageVariant(portrait.src, portraitVariant) ?? portrait.src
+                    }
                     portraitInitials={portrait.initials}
                     playerOvr={item.ovr ?? null}
                     playerMvs={item.mvs ?? null}
@@ -2839,10 +2931,11 @@ export default function TransfermarktV2Client({
                     variant="team"
                     context="market"
                     density="compact"
+                    portraitLayout="rail"
                     selected={isSelected}
                     interactive={false}
                     className={getClassColorClassName(item.className, "player-card-class-frame")}
-                    subMeta={[item.race, item.alignment, item.mercenary ? "Mercenary" : null].filter(Boolean).join(" · ")}
+                    subMeta={item.className}
                     highlight={item.doubleLoadWarnings?.length ? "Doppelbelastung" : null}
                     contextData={{
                       market: {
@@ -2853,41 +2946,20 @@ export default function TransfermarktV2Client({
                         needScore: item.needMatchScore != null ? formatCompactNumber(item.needMatchScore, 0) : null,
                         ovr: item.ovr ?? null,
                         fitToneClass: getToneClass(fitInfo.tone),
-                        needToneClass: getToneClass(needInfo.tone),
-                        ratioToneClass: getToneClass(ratioTone),
+                        needToneClass: getToneClass(getNeedSignal(item).tone),
+                        ratioToneClass: getToneClass(getRatioTone(item.marketValueSalaryRatio)),
                       },
                     }}
-                    footerSlot={
-                      <>
-                        {(() => {
-                          const classFocus = getClassTrainingImpact(item.className);
-                          return (
-                            <VeloAttributeFocusTags
-                              primary={classFocus.positive.map((entry) => ({
-                                attribute: TRAINING_ATTRIBUTE_LABELS[entry.attribute as PlayerGeneratorAttributeKey],
-                                weight: entry.weight,
-                              }))}
-                              risks={classFocus.negative.map((entry) => ({
-                                attribute: TRAINING_ATTRIBUTE_LABELS[entry.attribute as PlayerGeneratorAttributeKey],
-                                weight: entry.weight,
-                              }))}
-                              className="market-v2-candidate-class-focus"
-                            />
-                          );
-                        })()}
-                        <div className="market-v2-scouting-disclosure velo-scouting-disclosure" aria-label="Scouting Transparenz">
-                          {(() => {
-                            const buckets = getTransfermarktScoutingVisibilityBuckets(item.scoutingLevel ?? 0);
-                            return (
-                              <>
-                                <span className="velo-scouting-segment is-visible has-data">Sichtbar {buckets.scouted.length}</span>
-                                <span className={`velo-scouting-segment is-hidden${buckets.hidden.length > 0 ? " has-data" : ""}`}>Versteckt {buckets.hidden.length}</span>
-                                <span className="velo-scouting-segment is-base has-data">Basis {buckets.knowledge.length}</span>
-                              </>
-                            );
-                          })()}
+                    railSummarySlot={
+                      railDisciplineTags.length > 0 ? (
+                        <div className="market-v2-candidate-rail-tags" aria-label={`${item.name} Top-Disziplinen`}>
+                          {railDisciplineTags.map((tag) => (
+                            <span className="market-v2-candidate-rail-tag" key={`${item.playerId}-${tag}`}>
+                              {tag}
+                            </span>
+                          ))}
                         </div>
-                      </>
+                      ) : null
                     }
                     onOpen={() => onOpenPlayerDetails?.({ playerId: item.playerId })}
                   />
@@ -3040,18 +3112,39 @@ export default function TransfermarktV2Client({
                   className="market-v2-info-card market-v2-info-card-top-diszi"
                   title={`Scouting ${getScoutingClarityLabel(selectedPlayer.scoutingConfidence)}: ${getScoutedDisciplineLine(selectedPlayer)}`}
                 >
-                  <div className="market-v2-card-eyebrow">Top-5 Diszis</div>
+                  <div className="market-v2-card-eyebrow">Top-3 Diszis</div>
                   <div className="market-v2-diszi-list">
-                    {selectedPlayer.topDisciplineScores.slice(0, 5).map((entry) => (
-                      <div
-                        className={`market-v2-diszi-row ${getDisciplineCategoryClass(entry)}`}
-                        title={`${entry.disciplineName} · Slots ${entry.playerCount ?? "—"} · Teamrank ${entry.teamRank ?? "—"}`}
-                        key={`${selectedPlayer.playerId}-${entry.disciplineId ?? entry.disciplineName}`}
-                      >
-                        <span>{formatDisciplineContextLabel(entry)}</span>
-                        <strong>{getScoutingTierWindow(entry.scoreTier ?? null, selectedPlayer.scoutingConfidence)}</strong>
-                      </div>
-                    ))}
+                    {selectedPlayer.topDisciplineScores.slice(0, 3).map((entry) => {
+                      const impact = selectedTopDisciplineImpact.find((row) => row.disciplineId === entry.disciplineId);
+                      const impactTone =
+                        impact?.delta == null
+                          ? "is-neutral"
+                          : impact.delta >= 1.5
+                            ? "is-positive"
+                            : impact.delta <= -1.5
+                              ? "is-negative"
+                              : "is-neutral";
+                      return (
+                        <div
+                          className={`market-v2-diszi-row ${getDisciplineCategoryClass(entry)}`}
+                          title={`${entry.disciplineName} · Slots ${entry.playerCount ?? "—"} · Teamrank ${entry.teamRank ?? "—"}`}
+                          key={`${selectedPlayer.playerId}-${entry.disciplineId ?? entry.disciplineName}`}
+                        >
+                          <span>{formatDisciplineContextLabel(entry)}</span>
+                          <strong>{getScoutingTierWindow(entry.scoreTier ?? null, selectedPlayer.scoutingConfidence)}</strong>
+                          {impact ? (
+                            <small className={`market-v2-diszi-impact ${impactTone}`}>
+                              Top-6 Ø {impact.beforeTopSixAvg != null ? formatCompactNumber(impact.beforeTopSixAvg, 1) : "—"}
+                              {" → "}
+                              {impact.afterTopSixAvg != null ? formatCompactNumber(impact.afterTopSixAvg, 1) : "—"}
+                              {impact.delta != null
+                                ? ` (${formatScoutedImpactDelta(impact.delta, selectedScoutingConfidence, formatCompactNumber)})`
+                                : ""}
+                            </small>
+                          ) : null}
+                        </div>
+                      );
+                    })}
                     {selectedPlayer.topDisciplineScores.length === 0 ? <span className="pill">keine Top-Diszis</span> : null}
                   </div>
                   {selectedPlayer.doubleLoadWarnings?.length ? (
@@ -3146,15 +3239,51 @@ export default function TransfermarktV2Client({
                       {needBreakdownSummary}
                     </div>
                   ) : null}
-                  <div className="market-v2-axis-compare-mini" aria-label="Achsenvergleich mit dem aktuellen Kader">
-                    {axisComparisonRows.map((row) => (
-                      <span className={`market-v2-axis-compare-pill ${AXIS_META[row.axis].className} ${row.toneClass}`} key={`team-match-axis-${row.axis}`}>
-                        <b>{AXIS_META[row.axis].label}</b>
-                        <small>
-                          {row.candidateValue != null ? formatCompactNumber(row.candidateValue, 0) : "—"} · Δ {formatAxisComparisonDelta(row.delta)}
-                        </small>
-                      </span>
-                    ))}
+                  <div className="market-v2-top-six-impact" aria-label="Top-6 Achsen-Schnitt mit Kauf">
+                    <p className="market-v2-top-six-impact-summary">
+                      Top-{topSixCount} Schnitt aktuell{" "}
+                      <strong>{topSixCompositeBefore != null ? formatCompactNumber(topSixCompositeBefore, 1) : "—"}</strong>
+                      {topSixCompositeDelta != null ? (
+                        <>
+                          {" · mit Kauf "}
+                          <strong className={topSixCompositeDelta >= 0 ? "text-positive" : "text-negative"}>
+                            {formatScoutedImpactDelta(topSixCompositeDelta, selectedScoutingConfidence, formatCompactNumber)}
+                          </strong>
+                        </>
+                      ) : null}
+                    </p>
+                    {!isScoutedImpactExact(selectedScoutingConfidence) ? (
+                      <small className="market-v2-top-six-impact-note">
+                        Schätzwerte auf Basis des Scouting-Standes — genaue Teamwirkung erst nach mehr Intel.
+                      </small>
+                    ) : null}
+                    <div className="market-v2-axis-compare-mini">
+                      {topSixAxisImpact.map((row) => {
+                        const rankEstimate = topSixAxisRankEstimates.find((entry) => entry.axis === row.axis);
+                        const rankLabel = formatTeamRankEstimateLabel(rankEstimate, selectedScoutingConfidence);
+                        return (
+                        <span
+                          className={`market-v2-axis-compare-pill ${AXIS_META[row.axis].className} ${getAxisComparisonTone(row.delta, wishlistAxes.includes(row.axis))}`}
+                          key={`team-top6-${row.axis}`}
+                        >
+                          <b>{AXIS_META[row.axis].label}</b>
+                          <small>
+                            Ø {row.before != null ? formatCompactNumber(row.before, 1) : "—"}
+                            {" → "}
+                            {row.after != null ? formatCompactNumber(row.after, 1) : "—"}
+                            {row.delta != null
+                              ? ` (${formatScoutedImpactDelta(row.delta, selectedScoutingConfidence, formatCompactNumber)})`
+                              : ""}
+                            {rankLabel ? (
+                              <>
+                                <em className="market-v2-axis-rank-estimate"> · Rang {rankLabel}</em>
+                              </>
+                            ) : null}
+                          </small>
+                        </span>
+                        );
+                      })}
+                    </div>
                   </div>
                 </article>
               </div>
@@ -3251,8 +3380,15 @@ export default function TransfermarktV2Client({
                       Risiko verdeckt
                     </span>
                   ) : null}
-                  {selectedPlayer.traitsPositive.length === 0 && selectedPlayer.traitsNegative.length === 0 ? (
-                    <span className="pill">keine markanten Traits</span>
+                  {selectedPlayer.traitsPositive.length === 0 &&
+                  selectedPlayer.traitsNegative.length === 0 &&
+                  selectedPlayer.hiddenPositiveTraitCount === 0 &&
+                  selectedPlayer.hiddenNegativeTraitCount === 0 ? (
+                    selectedScoutingLevel >= 4 ? (
+                      <span className="pill">keine markanten Traits</span>
+                    ) : (
+                      <span className="pill market-v2-trait-pill is-neutral">Traits noch nicht gescoutet</span>
+                    )
                   ) : null}
                   {selectedPlayer.scoutingWarnings.length ? (
                     <span className="pill" title={selectedPlayer.scoutingWarnings.slice(0, 3).join(" · ")}>
@@ -3766,9 +3902,9 @@ export default function TransfermarktV2Client({
                         <small>{row.race ?? "—"}</small>
                       </span>
                     </td>
-                    <td>{formatCompactNumber(row.pps, 1)}</td>
+                    <td>{formatNullablePps(row.pps)}</td>
                     <td>{formatCompactNumber(row.ovr, 0)}</td>
-                    <td>{formatCompactNumber(row.mvs, 1)}</td>
+                    <td>{formatNullablePps(row.mvs)}</td>
                     <td>{formatTransfermarktCurrency(row.marketValue)}</td>
                     <td>{formatTransfermarktCurrency(row.salary)}</td>
                     <td>{formatTransfermarktRatio(row.valueScore ?? null)}</td>

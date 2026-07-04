@@ -1,8 +1,9 @@
-import { describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it } from "vitest";
 
 import {
   advanceSeasonEconomyFactorWindow,
   getSeasonEconomyFactorWindow,
+  parseSalaryFactorPatternEnv,
   SEASON_ECONOMY_FACTOR_WINDOW_SIZE,
 } from "@/lib/season/season-economy-factors";
 
@@ -30,5 +31,35 @@ describe("season economy factors", () => {
     expect(advanced.rerolledSeasonPlus4.horizonIndex).toBe(4);
     expect(advanced.rerolledSeasonPlus4.factor).toBeGreaterThanOrEqual(0.82);
     expect(advanced.rerolledSeasonPlus4.factor).toBeLessThanOrEqual(1.24);
+  });
+
+  describe("OLY_LONG_RUN_SALARY_FACTOR_PATTERN override", () => {
+    afterEach(() => {
+      delete process.env.OLY_LONG_RUN_SALARY_FACTOR_PATTERN;
+    });
+
+    it("parses a comma-separated pattern into rounded floats", () => {
+      process.env.OLY_LONG_RUN_SALARY_FACTOR_PATTERN = "1.18,1.15,0.85,0.85,0.88";
+      expect(parseSalaryFactorPatternEnv()).toEqual([1.18, 1.15, 0.85, 0.85, 0.88]);
+    });
+
+    it("returns null when unset or invalid", () => {
+      delete process.env.OLY_LONG_RUN_SALARY_FACTOR_PATTERN;
+      expect(parseSalaryFactorPatternEnv()).toBeNull();
+      process.env.OLY_LONG_RUN_SALARY_FACTOR_PATTERN = "not,a,number";
+      expect(parseSalaryFactorPatternEnv()).toBeNull();
+    });
+
+    it("feeds the pattern into the initial window via sheetFactors", () => {
+      process.env.OLY_LONG_RUN_SALARY_FACTOR_PATTERN = "1.18,1.15,0.85,0.85,0.88";
+      const pattern = parseSalaryFactorPatternEnv();
+      const window = getSeasonEconomyFactorWindow({
+        saveId: "save-test",
+        seasonId: "season-1",
+        sheetFactors: pattern?.map((factor) => ({ seasonLabel: "", factor })),
+      });
+      expect(window.map((entry) => entry.factor)).toEqual([1.18, 1.15, 0.85, 0.85, 0.88]);
+      expect(window.map((entry) => entry.source)).toEqual(["sheet_seed", "sheet_seed", "sheet_seed", "sheet_seed", "sheet_seed"]);
+    });
   });
 });

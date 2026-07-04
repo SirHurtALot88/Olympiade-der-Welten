@@ -7,7 +7,6 @@ import {
   FoundationShellRouterInboxV2,
   FoundationShellRouterLineup,
   FoundationShellRouterMarketSell,
-  FoundationShellRouterMarketV2,
   FoundationShellRouterMatchdayArena,
   FoundationShellRouterMatchdayResult,
   FoundationShellRouterPrize,
@@ -182,8 +181,6 @@ import {
 import { buildTeamSeasonOverviewRows } from "@/lib/foundation/team-management-overview";
 import { getTeamDevelopmentTrainingBonusPct } from "@/lib/foundation/team-development-tendency";
 import { buildStandingsTransferBalanceByTeamId } from "@/lib/season/transfer-standings-balance";
-import type { FeatureAuditStatus } from "@/lib/foundation/feature-audit-matrix";
-import { featureAuditFilters, getFeatureAuditFlags } from "@/lib/foundation/feature-audit-matrix";
 import {
   getScoutingWishlistSlotLimit,
   getTeamTransferWishlistEntries,
@@ -308,7 +305,6 @@ import { useFoundationCrossTabHomeV2 } from "@/lib/foundation/tabs/use-foundatio
 import { useFoundationCrossTabGameFlow } from "@/lib/foundation/tabs/use-foundation-cross-tab-game-flow";
 import { useFoundationCrossTabSeasonPrize } from "@/lib/foundation/tabs/use-foundation-cross-tab-season-prize";
 import { useFoundationCrossTabTeamControl } from "@/lib/foundation/tabs/use-foundation-cross-tab-team-control";
-import { useCockpitPanelDerivations } from "@/lib/foundation/tabs/use-cockpit-panel-derivations";
 import { useFoundationCrossTabCommandPalette } from "@/lib/foundation/tabs/use-foundation-cross-tab-command-palette";
 import { useFoundationCrossTabFlowCoach } from "@/lib/foundation/tabs/use-foundation-cross-tab-flow-coach";
 import { useFoundationCrossTabScreenPrimaryAction } from "@/lib/foundation/tabs/use-foundation-cross-tab-screen-primary-action";
@@ -319,6 +315,7 @@ import {
   getFoundationReadOnlyActionReason,
 } from "@/lib/foundation/tabs/use-foundation-state-context-value";
 import { useFoundationCrossTabTraining } from "@/lib/foundation/tabs/use-foundation-cross-tab-training";
+import type { FoundationTrainingCompactShellHostProps } from "@/app/foundation/training-compact/FoundationTrainingCompactShellHost";
 import {
   shouldBuildDisciplineRanks as resolveShouldBuildDisciplineRanks,
   shouldBuildFullSeasonStandRows,
@@ -331,7 +328,6 @@ import {
   shouldBuildSortedSeasonStandRows,
 } from "@/lib/foundation/tabs/season-v2-derivations";
 import {
-  shouldBuildPrizeV2Ui as resolveShouldBuildPrizeV2Ui,
   shouldLoadPrizePreviewFeed as resolveShouldLoadPrizePreviewFeed,
 } from "@/lib/foundation/tabs/prize-v2-derivations";
 import { useSeasonStandRows } from "@/lib/foundation/tabs/use-season-stand-rows";
@@ -340,6 +336,9 @@ import type { FoundationMatchdayResultShellHostProps } from "@/app/foundation/ma
 import type { FoundationHistoryV2ShellHostProps } from "@/app/foundation/transfer-history-v2/FoundationHistoryV2ShellHost";
 import type { FoundationSeasonPreviewShellHostProps } from "@/app/foundation/season-preview-v2/FoundationSeasonPreviewShellHost";
 import type { FoundationTeamsViewHostProps } from "@/app/foundation/teams-v2/FoundationTeamsViewHost";
+import type { FoundationCockpitHostProps } from "@/app/foundation/cockpit-v2/FoundationCockpitHost";
+import type { FoundationPrizeFinanceShellHostProps } from "@/app/foundation/prize-v2/FoundationPrizeFinanceShellHost";
+import type { FoundationPrizeV2PanelProps } from "@/app/foundation/prize-v2/FoundationPrizeV2Panel";
 import {
   resolveShouldBuildTeamsOverviewTable,
   resolveShouldBuildTeamsPlayerRatings,
@@ -358,8 +357,9 @@ import {
   shouldLoadTransferHistoryFeed as resolveShouldLoadTransferHistoryFeed,
   shouldRefreshSeasonOverviewOnReload,
 } from "@/lib/foundation/tabs/use-standings-preview-feed";
-import FoundationDiszisHost from "@/app/foundation/ranks-v2/FoundationDiszisHost";
-import FoundationRanksHost from "@/app/foundation/ranks-v2/FoundationRanksHost";
+import type { FoundationDiszisHostProps } from "@/app/foundation/ranks-v2/FoundationDiszisHost";
+import type { FoundationRanksHostProps } from "@/app/foundation/ranks-v2/FoundationRanksHost";
+import type { FoundationMarketV2ShellHostProps } from "@/app/foundation/transfermarkt-v2/FoundationMarketV2ShellHost";
 import FoundationTeamSettingsHost from "@/app/foundation/team-settings/FoundationTeamSettingsHost";
 import FoundationTeamsViewHost from "@/app/foundation/teams-v2/FoundationTeamsViewHost";
 import { PLAYER_PROFILE_TABS, type PlayerProfileTabId } from "@/lib/foundation/player-profile-service";
@@ -429,8 +429,6 @@ import {
   FoundationMatchdayMvpScoringResponse,
   FoundationMatchdayMvpTopPlayerRow,
   FoundationPageClientProps,
-  FoundationPrizePreviewItem,
-  FoundationPrizePreviewResponse,
   FoundationReadMeta,
   FoundationReadSource,
   FoundationResolvePreviewResponse,
@@ -675,43 +673,18 @@ import {
   roundViewNumber,
 } from "@/lib/foundation/tabs/season-stand-render-helpers";
 import {
-  formatAiLineupAuditWarning,
   formatCockpitReason,
   formatHomeWarningLabel,
-  formatMatchdayMvpWarning,
   formatObjectiveStatusLabel,
-  formatSeasonCompletionStepStatus,
   getAiTransferBudgetLabel,
   getAiTransferRosterLabel,
   getAiTransferStatusLabel,
   getAiTransferStatusPillClass,
-  getCockpitStatusLabel,
   getCockpitStatusPillClass,
-  getCockpitStepTone,
   getGameFlowStatusClass,
   getGameFlowStatusLabel,
-  getSeasonCompletionStepTone,
-  mapAutoRunStatusToCockpitStatus,
 } from "@/lib/foundation/tabs/cockpit-ui-helpers";
-import {
-  createCockpitAiBatchHandlers,
-  createCockpitPreseasonHandlers,
-  createCockpitSeasonTransitionHandlers,
-} from "@/lib/foundation/tabs/cockpit-handlers";
 import { createCockpitMatchdayApplyHandlers } from "@/lib/foundation/tabs/cockpit-matchday-handlers";
-import {
-  renderMultiSeasonEconomyCell,
-  renderMultiSeasonGameplayCell,
-  renderMultiSeasonPlayerCell,
-  renderMultiSeasonTeamCell,
-} from "@/lib/foundation/tabs/multiseason-balance-cell-renderers";
-import { getTransferWindowStatus } from "@/lib/market/transfer-window-policy";
-import {
-  buildTransferMarketActiveWishlistPlayerIds,
-  buildTransferMarketScoutingIntelByPlayerId,
-  buildTransferMarketScoutingWatchPlayerIds,
-} from "@/lib/foundation/tabs/use-market-v2-derivations";
-import { getPrizePreviewGlobalWarnings } from "@/lib/foundation/tabs/use-prize-panel-derivations";
 import {
   formatFitDisplay,
   formatMarketDevelopmentRoute,
@@ -1035,7 +1008,6 @@ export function useFoundationShellRouterBodyScope({
   } = foundationPageState;
 
   const [historyPage, setHistoryPage] = useState(1);
-  const [prizeForecastRank, setPrizeForecastRank] = useState(1);
   useEffect(() => {
     setHistoryPage(1);
   }, [activeSaveId]);
@@ -1059,7 +1031,6 @@ export function useFoundationShellRouterBodyScope({
   const shouldBuildHomeV2Overview = activeView === "homeV2";
   const shouldBuildTransferHistoryView = isTransferHistoryViewActive;
   const shouldBuildDebugView = activeView === "debug";
-  const [featureAuditFilter, setFeatureAuditFilter] = useState<FeatureAuditFilter>("all");
   const [matchdaySummaryTab, setMatchdaySummaryTab] = useState<"matchday" | "season">("matchday");
   const shouldBuildTeamContracts = activeView === "teams" && selectedTeamDetailTab === "contracts";
   const shouldBuildExtendedTeamPanels = activeView === "teams" && showExtendedTeamPanels;
@@ -1088,7 +1059,6 @@ export function useFoundationShellRouterBodyScope({
     activeView as FoundationViewId,
     prizeFinanceTab,
   );
-  const shouldBuildPrizeV2Ui = resolveShouldBuildPrizeV2Ui(activeView as FoundationViewId, prizeFinanceTab);
   const shouldLoadStandingsPreviewFeed = resolveShouldLoadStandingsPreviewFeed(activeView as FoundationViewId);
   const shouldLoadSeasonManagementFeed = resolveShouldLoadSeasonManagementFeed(activeView as FoundationViewId, homeV2Tab);
   const shouldBuildGameFlow = shouldBuildFoundationGameFlow(activeView, homeV2Tab);
@@ -1130,6 +1100,11 @@ export function useFoundationShellRouterBodyScope({
     activeView: activeView as FoundationViewId,
     shouldBuildSeasonStandRows: shouldBuildSeasonStandRowsGate,
   });
+  // Only "teams" (FoundationTeamsDetailPanel) and "prize" (FoundationSponsorsPanel) render
+  // the commercial rating; buildSponsorCommercialRating() runs a full league-wide
+  // buildTeamSeasonOverviewRows() scan, so keep this narrower than shouldBuildSelectedStandingRowGate
+  // (which also fires for ranks/diszis/season/cockpit) to avoid recomputing it on every tab.
+  const shouldBuildSponsorCommercialRatingGate = shouldBuildTeamsView || activeView === "prize";
 
 
   useEffect(() => {
@@ -3166,39 +3141,6 @@ export function useFoundationShellRouterBodyScope({
     reloadTransferRecapFeed,
   ]);
 
-  const { runCockpitAiLineupBatchApply, runCockpitRosterFill } = useMemo(
-    () =>
-      createCockpitAiBatchHandlers({
-        readMetaSource: readMeta.source,
-        showReadOnlyNotice,
-        setCockpitBusyKey,
-        buildCockpitScopeParams,
-        roomContext,
-        marketAiApplyIncludeWarnings,
-        cockpitAiIncludeWarningTeams,
-        cockpitAiOverwriteExisting,
-        setMarketAiApplyBusy,
-        setMarketAiApplyFeed,
-        setRosterFillBusy,
-        setRosterFillFeed,
-        setCockpitAiBatchApplyFeed,
-        reloadAfterMarketRosterApply,
-        reloadResolvePreview,
-      }),
-    [
-      readMeta.source,
-      showReadOnlyNotice,
-      setCockpitBusyKey,
-      buildCockpitScopeParams,
-      roomContext,
-      marketAiApplyIncludeWarnings,
-      cockpitAiIncludeWarningTeams,
-      cockpitAiOverwriteExisting,
-      reloadAfterMarketRosterApply,
-      reloadResolvePreview,
-    ],
-  );
-
   const matchdayArenaApplyHandlers = useMemo(
     () =>
       createCockpitMatchdayApplyHandlers({
@@ -3264,119 +3206,9 @@ export function useFoundationShellRouterBodyScope({
   );
 
   const {
-    runCockpitMatchdayMvpScoring,
-    runCockpitResultApply,
-    runCockpitStandingsApply,
-    runCockpitCashApply,
     runCockpitMatchdayAdvance,
     runCockpitMatchdayAutoRun,
   } = matchdayArenaApplyHandlers;
-
-  const { runPreSeasonWorkflowPreview, runPreSeasonNextSeasonSetup } = useMemo(
-    () =>
-      createCockpitPreseasonHandlers({
-        readMetaSource: readMeta.source,
-        showReadOnlyNotice,
-        setCockpitBusyKey,
-        withRoomBody,
-        activeSaveId,
-        preSeasonWorkflowFeed,
-        setPreSeasonWorkflowBusy,
-        setPreSeasonWorkflowError,
-        setPreSeasonWorkflowFeed,
-        loadSave,
-        reloadSeasonStandingsOverview,
-        reloadSeasonManagementOverview,
-        reloadHistoryFeed,
-        reloadTransferRecapFeed,
-        bumpMarketReloadToken: () => setMarketReloadToken((current) => current + 1),
-        setActiveView,
-        syncFoundationViewInUrl,
-      }),
-    [
-      activeSaveId,
-      loadSave,
-      preSeasonWorkflowFeed,
-      readMeta.source,
-      reloadHistoryFeed,
-      reloadSeasonManagementOverview,
-      reloadSeasonStandingsOverview,
-      reloadTransferRecapFeed,
-      setActiveView,
-      setCockpitBusyKey,
-      setMarketReloadToken,
-      setPreSeasonWorkflowBusy,
-      setPreSeasonWorkflowError,
-      setPreSeasonWorkflowFeed,
-    ],
-  );
-
-  const {
-    runSeasonTransition,
-    runSeasonCompletion,
-    runCockpitWholeSeasonDryRun,
-    runSeasonSnapshotAction,
-    refreshSeasonCockpit,
-  } = useMemo(
-    () =>
-      createCockpitSeasonTransitionHandlers({
-        readMetaSource: readMeta.source,
-        showReadOnlyNotice,
-        setCockpitBusyKey,
-        withRoomBody,
-        activeSaveId,
-        seasonId: gameState.season.id,
-        wholeSeasonMaxMatchdays,
-        wholeSeasonIncludeWarningLineups,
-        wholeSeasonOverwriteExistingLineups,
-        wholeSeasonStopOnTie,
-        setSeasonTransitionBusy,
-        setSeasonTransitionError,
-        setSeasonTransitionFeed,
-        setSeasonCompletionFeed,
-        setCashApplyFeed,
-        setSeasonSnapshotFeed,
-        setWholeSeasonDryRunFeed,
-        setFoundationActionFeedback,
-        loadSave,
-        reloadResolvePreview,
-        reloadStandingsPreviewFeed,
-        reloadPrizePreviewFeed,
-        reloadSeasonStandingsOverview,
-        reloadSeasonManagementOverview,
-        reloadHistoryFeed,
-        reloadTransferRecapFeed,
-        setActiveView,
-        syncFoundationViewInUrl,
-      }),
-    [
-      activeSaveId,
-      gameState.season.id,
-      loadSave,
-      readMeta.source,
-      reloadHistoryFeed,
-      reloadPrizePreviewFeed,
-      reloadResolvePreview,
-      reloadSeasonManagementOverview,
-      reloadSeasonStandingsOverview,
-      reloadStandingsPreviewFeed,
-      reloadTransferRecapFeed,
-      setActiveView,
-      setCashApplyFeed,
-      setCockpitBusyKey,
-      setFoundationActionFeedback,
-      setSeasonCompletionFeed,
-      setSeasonSnapshotFeed,
-      setSeasonTransitionBusy,
-      setSeasonTransitionError,
-      setSeasonTransitionFeed,
-      setWholeSeasonDryRunFeed,
-      wholeSeasonIncludeWarningLineups,
-      wholeSeasonMaxMatchdays,
-      wholeSeasonOverwriteExistingLineups,
-      wholeSeasonStopOnTie,
-    ],
-  );
 
   async function runAiPreseasonBackground() {
     if (readMeta.source === "prisma") {
@@ -4318,8 +4150,24 @@ export function useFoundationShellRouterBodyScope({
     prefetchFoundationPanel(activeView as FoundationViewId);
     if (activeView === "matchdayArena") {
       prefetchFoundationPanel("seasonV2");
+      if (activeSaveId && activeSaveId !== "loading-save" && gameState.season.id !== "loading") {
+        prefetchSeasonStandingsData({
+          saveId: activeSaveId,
+          seasonId: seasonOverviewSeasonId || gameState.season.id,
+          contentSignature: seasonContentSignature,
+          source: readMeta.source,
+        });
+      }
     }
-  }, [activeView, isFoundationBootstrapState]);
+  }, [
+    activeView,
+    isFoundationBootstrapState,
+    activeSaveId,
+    gameState.season.id,
+    seasonOverviewSeasonId,
+    seasonContentSignature,
+    readMeta.source,
+  ]);
 
   useEffect(() => {
     if (isFoundationBootstrapState || activeView !== "players") {
@@ -6352,33 +6200,6 @@ export function useFoundationShellRouterBodyScope({
   const getTablePinnedRightIds = (tableId: string) =>
     (tableColumnPreferences[tableId]?.pinnedRight?.length ? tableColumnPreferences[tableId]?.pinnedRight : GLOBAL_TABLE_STORAGE_KEYS[tableId]?.defaultPinnedRight) ?? [];
 
-  const {
-    featureAuditMatrix,
-    filteredFeatureAuditEntries,
-    multiSeasonBalanceDashboard,
-    multiSeasonTeamBalanceColumns,
-    multiSeasonEconomyColumns,
-    multiSeasonPlayerColumns,
-    multiSeasonGameplayColumns,
-    visibleMultiSeasonTeamBalanceColumns,
-    visibleMultiSeasonEconomyColumns,
-    visibleMultiSeasonPlayerColumns,
-    visibleMultiSeasonGameplayColumns,
-    sortedMultiSeasonTeamRows,
-    sortedMultiSeasonEconomyRows,
-    sortedMultiSeasonPlayerRows,
-    sortedMultiSeasonGameplayRows,
-  } = useCockpitPanelDerivations({
-    gameState,
-    resolvePreviewFeed,
-    featureAuditFilter,
-    tableColumnPreferences,
-    tableSorts,
-    isTableColumnVisible,
-    getTablePinnedLeftIds,
-    getTablePinnedRightIds,
-  });
-
   const markTableAsCustom = (entry: PersistedFoundationTablePreferenceEntry | undefined) => ({
     version: GLOBAL_TABLE_LAYOUT_VERSION,
     widths: entry?.widths ?? {},
@@ -6705,8 +6526,11 @@ export function useFoundationShellRouterBodyScope({
     [gameState, selectedTeam],
   );
   const selectedTeamCommercialRating = useMemo(
-    () => (selectedTeam ? buildSponsorCommercialRating({ gameState, teamId: selectedTeam.teamId }) : null),
-    [gameState, selectedTeam],
+    () =>
+      selectedTeam && shouldBuildSponsorCommercialRatingGate
+        ? buildSponsorCommercialRating({ gameState, teamId: selectedTeam.teamId })
+        : null,
+    [gameState, selectedTeam, shouldBuildSponsorCommercialRatingGate],
   );
   const selectedTeamScoutPipeline = useMemo(
     () => (selectedTeam ? buildScoutPipelineSummary(gameState, selectedTeam.teamId) : null),
@@ -6746,21 +6570,6 @@ export function useFoundationShellRouterBodyScope({
     () => selectedTeamObjectives.filter((objective) => objective.status === "at_risk" || objective.status === "failed"),
     [selectedTeamObjectives],
   );
-  const selectedTransfermarktBoardObjectives = useMemo(
-    () =>
-      selectedTeamObjectives
-        .filter((objective) => objective.status === "open" || objective.status === "at_risk" || objective.status === "failed")
-        .filter((objective) =>
-          objective.category === "transfer" ||
-          objective.category === "player" ||
-          objective.category === "roster" ||
-          objective.objectiveId === "finance-salary-ratio" ||
-          objective.objectiveId === "finance-rebuild-cash-buffer",
-        )
-        .slice(0, 3),
-    [selectedTeamObjectives],
-  );
-
   const selectedTeamCaptainProfile = useMemo(
     () => (selectedTeam ? selectTeamCaptain(gameState, selectedTeam.teamId) : null),
     [gameState, selectedTeam?.teamId],
@@ -6910,46 +6719,6 @@ export function useFoundationShellRouterBodyScope({
     }
     return new Map();
   }, [fullPlayerRatingsById, rosterPlayers, shouldBuildPlayerRatings, shouldBuildTrainingView]);
-  const transferMarketV2RosterRows = useMemo(() => {
-    if (!shouldBuildMarketView) {
-      return [];
-    }
-    const playersById = new Map(gameState.players.map((player) => [player.id, player] as const));
-    return gameState.rosters
-      .map((entry) => {
-        const player = playersById.get(entry.playerId);
-        if (!player) {
-          return null;
-        }
-        const playerRating = playerRatingsById.get(player.id) ?? null;
-        const portrait = getPlayerPortraitModel(player);
-        return {
-          activePlayerId: entry.id,
-          playerId: player.id,
-          teamId: entry.teamId,
-          name: player.name,
-          className: player.className,
-          race: player.race,
-          portraitUrl: portrait.src ?? null,
-          marketValue: getRosterEntryDisplayMarketValue(entry, player),
-          salary: getRosterEntryDisplaySalary(entry, player),
-          contractLength: entry.contractLength ?? null,
-          pps: playerRating?.ppsSeason ?? player.pps ?? null,
-          ovr: playerRating?.ovrNormalized ?? player.ovr ?? null,
-          mvs: playerRating?.mvs ?? null,
-          valueScore:
-            (playerRating?.ppsSeason ?? player.pps ?? null) != null && getRosterEntryDisplaySalary(entry, player) != null && (getRosterEntryDisplaySalary(entry, player) ?? 0) > 0
-              ? (playerRating?.ppsSeason ?? player.pps ?? 0) / (getRosterEntryDisplaySalary(entry, player) ?? 1)
-              : null,
-          pow: player.coreStats.pow ?? null,
-          spe: player.coreStats.spe ?? null,
-          men: player.coreStats.men ?? null,
-          soc: player.coreStats.soc ?? null,
-          disciplineRatings: player.disciplineRatings,
-        };
-      })
-      .filter((row): row is NonNullable<typeof row> => Boolean(row));
-  }, [gameState.players, gameState.rosters, playerRatingsById, shouldBuildMarketView]);
   const rosterPlayersByOvr = useMemo(
     () =>
       [...rosterPlayers].sort((left, right) => {
@@ -7439,8 +7208,13 @@ export function useFoundationShellRouterBodyScope({
     seasonEndProgressionPreview,
     trainingV2ModeOptions,
   } = useFoundationCrossTabTraining({
-    shouldBuildTrainingView,
-    shouldBuildTrainingCompactView,
+    // Compact-tab derivations now live in `FoundationTrainingCompactShellHost`
+    // (Foundation Perf Phase 3): the parent scope hook no longer pays for the
+    // whole-roster `buildOrganicSeasonProgression` pass when only the compact
+    // training tab is active. Facilities view and player-profile training row
+    // still need the shared forecast rows, so those flags stay unchanged.
+    shouldBuildTrainingView: shouldBuildTrainingFacilitiesView,
+    shouldBuildTrainingCompactView: false,
     shouldBuildTrainingFacilitiesView,
     shouldBuildPlayerProfileTrainingRow,
     gameState,
@@ -9435,866 +9209,6 @@ export function useFoundationShellRouterBodyScope({
     }
   }, [historyPage, historyPageCount]);
 
-  useEffect(() => {
-    if (!shouldBuildPrizeV2Ui) {
-      return;
-    }
-    const defaultRank = selectedPrizePreviewRow?.rank ?? selectedStandingRow?.rank ?? 1;
-    setPrizeForecastRank(clampValue(Math.round(defaultRank), 1, 32));
-  }, [selectedPrizePreviewRow?.rank, selectedStandingRow?.rank, selectedTeam?.teamId, shouldBuildPrizeV2Ui]);
-  const prizeForecastRankRow = useMemo(
-    () => prizePreviewRows.find((row) => row.rank === prizeForecastRank) ?? null,
-    [prizeForecastRank, prizePreviewRows],
-  );
-  const prizeForecastSalaryTotal = useMemo(() => {
-    if (!shouldBuildPrizeV2Ui) {
-      return null;
-    }
-    if (selectedPrizePreviewRow?.salaryTotal != null) {
-      return selectedPrizePreviewRow.salaryTotal;
-    }
-
-    if (!selectedTeam) {
-      return null;
-    }
-
-    return roundViewNumber(
-      selectedRoster.reduce((sum, rosterEntry) => {
-        const player = gameState.players.find((candidate) => candidate.id === rosterEntry.playerId) ?? null;
-        return sum + (resolvePlayerEconomyContract({ player, rosterEntry }).salary ?? 0);
-      }, 0),
-      1,
-    );
-  }, [gameState.players, selectedPrizePreviewRow?.salaryTotal, selectedRoster, selectedTeam, shouldBuildPrizeV2Ui]);
-  const prizeForecastRows = useMemo(() => {
-    if (!shouldBuildPrizeV2Ui) {
-      return [];
-    }
-    const startCash = selectedPrizePreviewRow?.currentCash ?? selectedTeam?.cash ?? null;
-    const salaryTotal = prizeForecastSalaryTotal;
-    const rankRow = prizeForecastRankRow;
-    const currentFactor = prizePreviewFeed?.summary.currentFactor ?? null;
-
-    if (startCash == null || salaryTotal == null || !rankRow) {
-      return [];
-    }
-
-    const seasonPrizeRows = [
-      { label: "GuV", factor: currentFactor, prizeMoney: rankRow.prizeMoney ?? null, salaryGrowthFactor: 1 },
-      ...(rankRow.futureSeasons ?? []).slice(0, 4).map((entry, index) => ({
-        label: `GuV +${index + 1}`,
-        factor: entry.factor ?? null,
-        prizeMoney: entry.prizeMoney ?? null,
-        salaryGrowthFactor: entry.salaryGrowthFactor ?? null,
-      })),
-    ];
-
-    const paddedRows = [
-      ...seasonPrizeRows,
-      ...Array.from({ length: Math.max(0, 5 - seasonPrizeRows.length) }, (_, index) => ({
-        label: `GuV +${seasonPrizeRows.length + index}`,
-        factor: null,
-        prizeMoney: rankRow.prizeMoney ?? null,
-        salaryGrowthFactor: 1,
-      })),
-    ].slice(0, 5);
-
-    let runningCash = startCash;
-    return paddedRows.map((row) => {
-      const projectedSalaryTotal = roundViewNumber(salaryTotal, 1);
-      const guv = row.prizeMoney == null ? null : roundViewNumber(row.prizeMoney - projectedSalaryTotal, 1);
-      const cashAfter = guv == null ? null : roundViewNumber(runningCash + guv, 1);
-      if (cashAfter != null) {
-        runningCash = cashAfter;
-      }
-
-      return {
-        ...row,
-        salaryTotal: projectedSalaryTotal,
-        guv,
-        cashAfter,
-      };
-    });
-  }, [prizeForecastRankRow, prizeForecastSalaryTotal, prizePreviewFeed?.summary.currentFactor, selectedPrizePreviewRow?.currentCash, selectedTeam?.cash, shouldBuildPrizeV2Ui]);
-  const sortedPrizePreviewRows = useMemo(
-    () => {
-      if (!shouldBuildPrizeV2Ui) {
-        return [];
-      }
-      return sortRows(prizePreviewRows, tableSorts.prizePreview, {
-        team: (row) => row.teamName,
-        projectedRank: (row) => row.rank ?? Number.POSITIVE_INFINITY,
-        points: (row) => row.points ?? Number.NEGATIVE_INFINITY,
-        currentCash: (row) => row.currentCash ?? Number.NEGATIVE_INFINITY,
-        basisCash: (row) => row.basisCash ?? Number.NEGATIVE_INFINITY,
-        seasonCash: (row) => row.seasonCash ?? Number.NEGATIVE_INFINITY,
-        prizeMoney: (row) => row.prizeMoney ?? Number.NEGATIVE_INFINITY,
-        startRank: (row) => row.rankChangePrize?.startRank ?? Number.POSITIVE_INFINITY,
-        rankDelta: (row) => row.rankChangePrize?.rankDelta ?? Number.NEGATIVE_INFINITY,
-        rankChangePrize: (row) => row.rankChangePrize?.bonusMalus ?? Number.NEGATIVE_INFINITY,
-        payoutIfTenBetter: (row) => row.payoutIfTenBetter ?? Number.NEGATIVE_INFINITY,
-        payoutIfTenWorse: (row) => row.payoutIfTenWorse ?? Number.NEGATIVE_INFINITY,
-        projectedCash: (row) => row.projectedCash ?? Number.NEGATIVE_INFINITY,
-        status: (row) => row.status,
-      });
-    },
-    [prizePreviewRows, shouldBuildPrizeV2Ui, tableSorts.prizePreview],
-  );
-  const displayPrizePreviewRows = useMemo(() => {
-    if (!shouldBuildPrizeV2Ui) {
-      return [];
-    }
-    if (!selectedTeam?.teamId) {
-      return sortedPrizePreviewRows;
-    }
-    const selectedRowIndex = sortedPrizePreviewRows.findIndex((row) => row.teamId === selectedTeam.teamId);
-    if (selectedRowIndex <= 0) {
-      return sortedPrizePreviewRows;
-    }
-    const selectedRow = sortedPrizePreviewRows[selectedRowIndex];
-    return [selectedRow, ...sortedPrizePreviewRows.slice(0, selectedRowIndex), ...sortedPrizePreviewRows.slice(selectedRowIndex + 1)];
-  }, [selectedTeam?.teamId, shouldBuildPrizeV2Ui, sortedPrizePreviewRows]);
-  const prizeFutureSeasonLabels = useMemo(
-    () => {
-      if (!shouldBuildPrizeV2Ui) {
-        return [];
-      }
-      return (prizePreviewFeed?.seasonFactors ?? []).filter((row) => row.seasonLabel !== "Aktuell");
-    },
-    [prizePreviewFeed, shouldBuildPrizeV2Ui],
-  );
-  const prizePreviewTableColumns = useMemo<FoundationTableColumn[]>(
-    () => [
-      { id: "team", label: "Team", dataKey: "team", defaultWidth: 220, minWidth: 170 },
-      { id: "projectedRank", label: "Rang", dataKey: "projectedRank", defaultWidth: 84, minWidth: 68 },
-      { id: "startRank", label: "Start", dataKey: "startRank", defaultWidth: 84, minWidth: 68 },
-      { id: "rankDelta", label: "Δ Rang", dataKey: "rankDelta", defaultWidth: 92, minWidth: 74 },
-      { id: "currentCash", label: "Cash aktuell", dataKey: "currentCash", defaultWidth: 120, minWidth: 96 },
-      { id: "basisCash", label: "Basis Cash", dataKey: "basisCash", defaultWidth: 118, minWidth: 96 },
-      { id: "seasonCash", label: "Season-Anteil", dataKey: "seasonCash", defaultWidth: 128, minWidth: 100 },
-      { id: "currentFactor", label: "Faktor", dataKey: "currentFactor", defaultWidth: 88, minWidth: 74 },
-      { id: "prizeMoney", label: "Preisgeld", dataKey: "prizeMoney", defaultWidth: 116, minWidth: 92 },
-      { id: "rankChangePrize", label: "Rank Bonus", dataKey: "rankChangePrize", defaultWidth: 118, minWidth: 96 },
-      { id: "payoutIfTenBetter", label: "+10 Plätze", dataKey: "payoutIfTenBetter", defaultWidth: 116, minWidth: 92 },
-      { id: "payoutIfTenWorse", label: "-10 Plätze", dataKey: "payoutIfTenWorse", defaultWidth: 116, minWidth: 92 },
-      { id: "projectedCash", label: "Cash nachher", dataKey: "projectedCash", defaultWidth: 126, minWidth: 100 },
-      ...prizeFutureSeasonLabels.map((entry) => ({
-        id: `future-${entry.seasonLabel}`,
-        label: entry.seasonLabel,
-        dataKey: `future-${entry.seasonLabel}`,
-        defaultWidth: 112,
-        minWidth: 90,
-        visibleByDefault: false,
-      })),
-      { id: "warnings", label: "Hinweise", dataKey: "warnings", defaultWidth: 260, minWidth: 170 },
-    ],
-    [prizeFutureSeasonLabels],
-  );
-  const visiblePrizePreviewColumns = useMemo(
-    () => {
-      if (!shouldBuildPrizeV2Ui) {
-        return [];
-      }
-      return applyStoredColumnOrder(
-        prizePreviewTableColumns,
-        tableColumnPreferences.prizePreviewTable?.columnOrder,
-        getTablePinnedLeftIds("prizePreviewTable"),
-        getTablePinnedRightIds("prizePreviewTable"),
-      ).filter((column) =>
-        isTableColumnVisible("prizePreviewTable", column.id, column.visibleByDefault),
-      );
-    },
-    [prizePreviewTableColumns, shouldBuildPrizeV2Ui, tableColumnPreferences],
-  );
-  const prizeV2Rows = useMemo(
-    () => {
-      if (!shouldBuildPrizeV2Ui) {
-        return [];
-      }
-      return sortedPrizePreviewRows.map((row) => {
-        const team = gameState.teams.find((entry) => entry.teamId === row.teamId) ?? null;
-        const logoModel = team
-          ? getTeamLogoModel(team)
-          : {
-              src: null,
-              initials:
-                row.teamCode ||
-                row.teamName
-                  .split(/\s+/)
-                  .filter(Boolean)
-                  .slice(0, 2)
-                  .map((part) => part[0]?.toUpperCase() ?? "")
-                  .join("") ||
-                "?",
-            };
-        return {
-          teamId: row.teamId,
-          teamName: row.teamName,
-          teamCode: row.teamCode,
-          logoUrl: logoModel.src,
-          logoInitials: logoModel.initials,
-          rank: row.rank,
-          points: row.points ?? null,
-          currentCash: row.currentCash ?? null,
-          basisCash: row.basisCash ?? null,
-          seasonCash: row.seasonCash ?? null,
-          currentFactor: prizePreviewFeed?.summary.currentFactor ?? null,
-          prizeMoney: row.prizeMoney ?? null,
-          bonusMalus: row.rankChangePrize?.bonusMalus ?? null,
-          startRank: row.rankChangePrize?.startRank ?? null,
-          rankDelta: row.rankChangePrize?.rankDelta ?? null,
-          projectedCash: row.projectedCash ?? null,
-          salaryTotal: row.salaryTotal ?? null,
-          status: row.status,
-          warnings: row.warnings,
-          isSelected: row.teamId === selectedTeam?.teamId,
-        };
-      });
-    },
-    [gameState.teams, prizePreviewFeed?.summary.currentFactor, selectedTeam?.teamId, shouldBuildPrizeV2Ui, sortedPrizePreviewRows],
-  );
-  const prizeV2SelectedTeamSummary = useMemo(() => {
-    if (!shouldBuildPrizeV2Ui || !selectedPrizePreviewRow) {
-      return null;
-    }
-    return {
-      teamId: selectedPrizePreviewRow.teamId,
-      teamName: selectedPrizePreviewRow.teamName,
-      teamCode: selectedPrizePreviewRow.teamCode,
-      rank: selectedPrizePreviewRow.rank,
-      points: selectedPrizePreviewRow.points ?? null,
-      currentCash: selectedPrizePreviewRow.currentCash ?? null,
-      basisCash: selectedPrizePreviewRow.basisCash ?? null,
-      seasonCash: selectedPrizePreviewRow.seasonCash ?? null,
-      prizeMoney: selectedPrizePreviewRow.prizeMoney ?? null,
-      bonusMalus: selectedPrizePreviewRow.rankChangePrize?.bonusMalus ?? null,
-      projectedCash: selectedPrizePreviewRow.projectedCash ?? null,
-      salaryTotal: selectedPrizePreviewRow.salaryTotal ?? null,
-      payoutIfTenBetter: selectedPrizePreviewRow.payoutIfTenBetter ?? null,
-      payoutIfTenWorse: selectedPrizePreviewRow.payoutIfTenWorse ?? null,
-    };
-  }, [selectedPrizePreviewRow, shouldBuildPrizeV2Ui]);
-  const prizeV2LeaderRow = shouldBuildPrizeV2Ui ? (prizeV2Rows[0] ?? null) : null;
-  const prizeV2SwingRow = useMemo(
-    () => {
-      if (!shouldBuildPrizeV2Ui) {
-        return null;
-      }
-      return (
-      [...prizeV2Rows].sort(
-        (left, right) => Math.abs(right.rankDelta ?? 0) - Math.abs(left.rankDelta ?? 0) || (left.rank ?? 99) - (right.rank ?? 99),
-      )[0] ?? null
-      );
-    },
-    [prizeV2Rows, shouldBuildPrizeV2Ui],
-  );
-  const prizeV2RiskRow = useMemo(
-    () => {
-      if (!shouldBuildPrizeV2Ui) {
-        return null;
-      }
-      return (
-      [...prizeV2Rows].sort((left, right) => {
-        const leftWarnings = left.warnings.length;
-        const rightWarnings = right.warnings.length;
-        if (rightWarnings !== leftWarnings) return rightWarnings - leftWarnings;
-        return (left.projectedCash ?? Number.POSITIVE_INFINITY) - (right.projectedCash ?? Number.POSITIVE_INFINITY);
-      })[0] ?? null
-      );
-    },
-    [prizeV2Rows, shouldBuildPrizeV2Ui],
-  );
-  const prizeV2FactorRows = useMemo(
-    () => {
-      if (!shouldBuildPrizeV2Ui) {
-        return [];
-      }
-      return (prizePreviewFeed?.seasonFactors ?? []).map((entry) => ({ seasonLabel: entry.seasonLabel, factor: entry.factor ?? null }));
-    },
-    [prizePreviewFeed, shouldBuildPrizeV2Ui],
-  );
-  const prizeV2Summary = useMemo(
-    () => {
-      if (!shouldBuildPrizeV2Ui) {
-        return {
-          totalTeams: 0,
-          calculableTeams: 0,
-          blockedItemsCount: 0,
-          currentFactor: null,
-          futureSeasonCount: 0,
-          totalPrizeMoney: null,
-          totalRankChangePrize: null,
-          forecastSalaryFactorPassthrough: null,
-        };
-      }
-      return {
-      totalTeams: prizePreviewFeed?.summary.totalTeams ?? 0,
-      calculableTeams: prizePreviewFeed?.summary.calculableTeams ?? 0,
-      blockedItemsCount: prizePreviewFeed?.summary.blockedItemsCount ?? 0,
-      currentFactor: prizePreviewFeed?.summary.currentFactor ?? null,
-      futureSeasonCount: prizePreviewFeed?.summary.futureSeasonCount ?? 0,
-      totalPrizeMoney: prizePreviewFeed?.summary.totalPrizeMoney ?? null,
-      totalRankChangePrize: prizePreviewFeed?.summary.totalRankChangePrize ?? null,
-      forecastSalaryFactorPassthrough: prizePreviewFeed?.summary.forecastSalaryFactorPassthrough ?? null,
-      };
-    },
-    [prizePreviewFeed, shouldBuildPrizeV2Ui],
-  );
-
-  const lineupStatusSummary = useMemo(() => {
-    const rows = resolvePreviewFeed?.teamRows ?? [];
-    const missingTeams = rows.filter((row) => row.readinessStatus === "missing_lineup").length;
-    const incompleteTeams = rows.filter((row) =>
-      ["underfilled_roster", "invalid_lineup", "missing_score_coverage"].includes(row.readinessStatus),
-    ).length;
-    const readyTeams = rows.filter((row) => row.readinessStatus === "ready").length;
-    return {
-      totalTeams: rows.length,
-      readyTeams,
-      missingTeams,
-      incompleteTeams,
-    };
-  }, [resolvePreviewFeed]);
-
-  const lineupModifierStatusSummary = useMemo(() => {
-    const currentDrafts = (gameState.seasonState.lineupDrafts ?? []).filter(
-      (draft) => draft.seasonId === gameState.season.id && draft.matchdayId === gameState.matchdayState.matchdayId,
-    );
-    const selectedFormCards = currentDrafts.reduce((sum, draft) => {
-      const d1 = draft.modifiers?.d1;
-      const d2 = draft.modifiers?.d2;
-      return (
-        sum +
-        [d1?.primaryFormCardId, d1?.secondaryFormCardId, d2?.primaryFormCardId, d2?.secondaryFormCardId].filter(Boolean)
-          .length
-      );
-    }, 0);
-    const selectedMutators = currentDrafts.reduce((sum, draft) => {
-      const d1 = draft.modifiers?.d1;
-      const d2 = draft.modifiers?.d2;
-      return sum + [d1?.mutatorTrait1, d1?.mutatorTrait2, d2?.mutatorTrait1, d2?.mutatorTrait2].filter(Boolean).length;
-    }, 0);
-
-    return {
-      formCardSourceStatus: "ready" as const,
-      formCardEffectStatus: "ready" as const,
-      mutatorSourceStatus: "ready" as const,
-      mutatorEffectStatus: "ready" as const,
-      selectedFormCards,
-      selectedMutators,
-    };
-  }, [gameState.matchdayState.matchdayId, gameState.season.id, gameState.seasonState.lineupDrafts]);
-
-  const cockpitSaveStatus = useMemo(() => {
-    if (readMeta.source === "prisma") {
-      return {
-        status: "blocked" as const,
-        message: "Prisma/Supabase ist hier nur Referenz. Apply-Aktionen bleiben gesperrt.",
-      };
-    }
-    if (gameState.teams.length === 32) {
-      return {
-        status: "ready" as const,
-        message: "Lokaler Testspielstand ist aktiv und vollstaendig geladen.",
-      };
-    }
-    return {
-      status: "warning" as const,
-      message: "Der lokale Save ist geladen, aber die Teamanzahl weicht vom 32-Team-Contract ab.",
-    };
-  }, [gameState.teams.length, readMeta.source]);
-
-  const cockpitFreshSeasonStatus = useMemo(() => {
-    const totalTeams = seasonStandRows.length;
-    const zeroPointTeams = seasonStandRows.filter((row) => (row.points ?? 0) === 0).length;
-    const budgetAlignedTeams = seasonStandRows.filter(
-      (row) => row.budget != null && row.cash != null && Number(row.budget.toFixed(2)) === Number(row.cash.toFixed(2)),
-    ).length;
-    const hasTransfers = (historyFeed?.items.length ?? 0) > 0 || gameState.transferHistory.length > 0;
-    const hasStoredResults = (gameState.seasonState.matchdayResults?.length ?? 0) > 0;
-
-    if (readMeta.source === "prisma") {
-      return {
-        status: "blocked" as const,
-        message: "Fresh Season 1 kann nur lokal gestartet und bewertet werden.",
-      };
-    }
-
-    if (
-      totalTeams === 32 &&
-      zeroPointTeams === totalTeams &&
-      budgetAlignedTeams === totalTeams &&
-      !hasTransfers &&
-      !hasStoredResults
-    ) {
-      return {
-        status: "ready" as const,
-        message: "Der aktive Save sieht wie ein frischer Season-1-Start aus: Cash = Budget, Punkte = 0.",
-      };
-    }
-
-    if (freshSeasonStartMessage) {
-      return {
-        status: "applied" as const,
-        message: freshSeasonStartMessage,
-      };
-    }
-
-    return {
-      status: "warning" as const,
-      message: "Der aktive Save ist bereits benutzt oder nicht mehr auf frischem Season-1-Stand.",
-    };
-  }, [freshSeasonStartMessage, gameState.seasonState.matchdayResults, gameState.transferHistory.length, historyFeed, readMeta.source, seasonStandRows]);
-
-  const cockpitTransfermarktStatus = useMemo(() => {
-    if (readMeta.source === "prisma") {
-      return {
-        status: "blocked" as const,
-        message: "Prisma bleibt read-only. Testkaeufe laufen nur im lokalen SQLite-Save.",
-      };
-    }
-
-    if (!marketFeed) {
-      return {
-        status: "open" as const,
-        message: "Transfermarkt-Feed noch nicht geladen.",
-      };
-    }
-
-    if (!marketTeamId) {
-      return {
-        status: "open" as const,
-        message: "Team waehlen, damit Kaufvorschau, Cash und Roster-Druck bewertet werden koennen.",
-      };
-    }
-
-    if (!marketFeed.teamContext) {
-      return {
-        status: "warning" as const,
-        message: "Teamkontext fehlt noch. Feed neu laden oder Team erneut waehlen.",
-      };
-    }
-
-    if ((marketFeed.items?.length ?? 0) === 0) {
-      return {
-        status: "warning" as const,
-        message: "Keine Free Agents im aktuellen lokalen Feed gefunden.",
-      };
-    }
-
-    return {
-      status: "ready" as const,
-      message: "Transfermarkt ist lokal spielbar. Kaufvorschau zeigt echte Before/After-Werte.",
-    };
-  }, [marketFeed, marketTeamId, readMeta.source]);
-
-  const cockpitLineupStatus = useMemo(() => {
-    if (!resolvePreviewFeed) {
-      return {
-        status: "open" as const,
-        message: "Status noch nicht geladen. Preview oeffnen, um Readiness und fehlende Teams zu sehen.",
-      };
-    }
-    if (lineupStatusSummary.missingTeams > 0) {
-      return {
-        status: "warning" as const,
-        message: `${lineupStatusSummary.missingTeams} Teams ohne gespeicherte Einsatzliste.`,
-      };
-    }
-    if (lineupStatusSummary.incompleteTeams > 0) {
-      return {
-        status: "warning" as const,
-        message: `${lineupStatusSummary.incompleteTeams} Teams sind noch unvollstaendig oder ohne Score-Coverage.`,
-      };
-    }
-    if (lineupStatusSummary.readyTeams === lineupStatusSummary.totalTeams && lineupStatusSummary.totalTeams > 0) {
-      return {
-        status: "ready" as const,
-        message: "Alle Teams sind fuer diesen Spieltag lineup-seitig ready.",
-      };
-    }
-    return {
-      status: "open" as const,
-      message: "Readiness ist vorhanden, aber noch nicht vollstaendig eingeordnet.",
-    };
-  }, [lineupStatusSummary, resolvePreviewFeed]);
-
-  const cockpitAiLineupStatus = useMemo(() => {
-    if (readMeta.source === "prisma") {
-      return {
-        status: "blocked" as const,
-        message: "Prisma bleibt hier read-only. AI-Teams koennen im Cockpit nur im lokalen Save gespeichert werden.",
-      };
-    }
-    if (cockpitAiBatchApplyFeed?.error) {
-      return {
-        status: "blocked" as const,
-        message: cockpitAiBatchApplyFeed.error,
-      };
-    }
-    if (cockpitAiBatchApplyFeed && !cockpitAiBatchApplyFeed.dryRun && cockpitAiBatchApplyFeed.summary.savedTeams > 0) {
-      return {
-        status: "applied" as const,
-        message: `${cockpitAiBatchApplyFeed.summary.savedTeams} AI-Teams wurden lokal aufgestellt.`,
-      };
-    }
-    if (cockpitAiBatchApplyFeed?.dryRun) {
-      if (cockpitAiBatchApplyFeed.summary.blockedTeams > 0) {
-        return {
-          status: "warning" as const,
-          message: `${cockpitAiBatchApplyFeed.summary.blockedTeams} AI-Teams bleiben im DryRun blockiert.`,
-        };
-      }
-      if (cockpitAiBatchApplyFeed.summary.plannedLineups > 0) {
-        return {
-          status: "ready" as const,
-          message: `${cockpitAiBatchApplyFeed.summary.plannedLineups} AI-Lineups koennen lokal gespeichert werden.`,
-        };
-      }
-      return {
-        status: "warning" as const,
-        message: "Der DryRun hat aktuell keine speicherbaren AI-Lineups gefunden.",
-      };
-    }
-    if (aiLineupApplyTeams.length === 0) {
-      return {
-        status: "warning" as const,
-        message:
-          aiTeams.length > 0
-            ? "AI-Teams sind vorhanden, aber AI-Lineup-Apply ist noch nicht freigegeben. Ueber den Aktivieren-Button oder in den Team Settings kann das lokal freigegeben werden."
-            : "Aktuell ist kein Team mit controlMode=ai und aktivem AI-Lineup-Apply freigegeben.",
-      };
-    }
-    return {
-      status: "open" as const,
-      message: "DryRun zeigt zuerst, welche AI-Teams lokal aufgestellt werden koennen.",
-    };
-  }, [aiLineupApplyTeams.length, aiTeams.length, cockpitAiBatchApplyFeed, readMeta.source]);
-
-  const cockpitResolveStatus = useMemo(() => {
-    const status = resolvePreviewFeed?.preview.status;
-    if (!status) {
-      return { status: "open" as const, message: "Noch keine Resolve Preview geladen." };
-    }
-    if (status === "ready") {
-      return { status: "ready" as const, message: "Resolve Preview ist bereit und zeigt D1/D2 Rankings read-only." };
-    }
-    if (status === "blocked") {
-      return { status: "blocked" as const, message: "Resolve Preview ist blockiert und benoetigt erst geklaerte Quellen oder Lineups." };
-    }
-    return { status: "warning" as const, message: `Resolve Preview meldet ${status}.` };
-  }, [resolvePreviewFeed]);
-
-  const cockpitResultApplyStatus = useMemo(() => {
-    const summary = resultApplyFeed?.summary;
-    const blockingReasons = resultApplyFeed?.blockingReasons ?? summary?.blockingReasons ?? [];
-    if (resultApplyFeed?.applied) {
-      return { status: "applied" as const, message: "Result Apply wurde lokal gespeichert." };
-    }
-    if (resultApplyFeed && (resultApplyFeed.canApply ?? summary?.canApply) === false) {
-      return { status: "blocked" as const, message: blockingReasons[0] ?? "Result Apply ist aktuell blockiert." };
-    }
-    if (resolvePreviewFeed?.preview.status === "ready") {
-      return { status: "ready" as const, message: "Result Apply kann nach Dry-Run lokal bestaetigt werden." };
-    }
-    return { status: "open" as const, message: "Erst Resolve Preview laden, dann Dry-Run oder Apply ausfuehren." };
-  }, [resolvePreviewFeed, resultApplyFeed]);
-
-  const cockpitStandingsPreviewStatus = useMemo(() => {
-    if (!standingsPreviewFeed) {
-      return { status: "open" as const, message: "Noch keine Standings Preview geladen." };
-    }
-    if ((standingsPreviewFeed.blockedRules?.length ?? 0) > 0) {
-      return { status: "warning" as const, message: standingsPreviewFeed.blockedRules[0] ?? "Standings Preview hat offene Blocker." };
-    }
-    if ((standingsPreviewFeed.summary.readyTeams ?? 0) === (standingsPreviewFeed.summary.totalTeams ?? 0) && (standingsPreviewFeed.summary.totalTeams ?? 0) > 0) {
-      return { status: "ready" as const, message: "Punkte-Delta und projected Rank sind fuer alle Teams berechnet." };
-    }
-    return { status: "warning" as const, message: "Standings Preview ist noch nicht fuer alle Teams ready." };
-  }, [standingsPreviewFeed]);
-
-  const cockpitStandingsApplyStatus = useMemo(() => {
-    const summary = standingsApplyFeed?.summary;
-    const blockingReasons = standingsApplyFeed?.blockingReasons ?? summary?.blockingReasons ?? [];
-    if (standingsApplyFeed?.applied) {
-      return { status: "applied" as const, message: "Standings Apply wurde lokal geschrieben." };
-    }
-    if (standingsApplyFeed && (standingsApplyFeed.canApply ?? summary?.canApply) === false) {
-      return { status: "blocked" as const, message: blockingReasons[0] ?? "Standings Apply ist blockiert." };
-    }
-    if ((standingsPreviewFeed?.blockedRules?.length ?? 0) === 0 && (standingsPreviewFeed?.summary.readyTeams ?? 0) > 0) {
-      return { status: "ready" as const, message: "Standings Apply kann nach Dry-Run lokal bestaetigt werden." };
-    }
-    return { status: "open" as const, message: "Erst Standings Preview in einen apply-faehigen Zustand bringen." };
-  }, [standingsApplyFeed, standingsPreviewFeed]);
-
-  const cockpitPrizePreviewStatus = useMemo(() => {
-    if (!prizePreviewFeed) {
-      return { status: "open" as const, message: "Noch keine Preisgeld-Vorschau geladen." };
-    }
-    if (prizePreviewHardBlocked.length > 0) {
-      return { status: "blocked" as const, message: prizePreviewHardBlocked[0] ?? "Preisgeldtabelle ist nicht verwendbar." };
-    }
-    if ((prizePreviewFeed.summary.calculableTeams ?? 0) > 0 && (prizePreviewFeed.summary.blockedItemsCount ?? 0) === 0) {
-      return { status: "ready" as const, message: "Cash vorher, Preisgeld und Cash nachher sind fuer alle Teams berechenbar." };
-    }
-    return { status: "warning" as const, message: "Preisgeld-Vorschau ist nur teilweise berechenbar." };
-  }, [prizePreviewFeed, prizePreviewHardBlocked]);
-
-  const cockpitCashApplyStatus = useMemo(() => {
-    const summary = cashApplyFeed?.summary;
-    const blockingReasons = cashApplyFeed?.blockingReasons ?? summary?.blockingReasons ?? [];
-    if (cashApplyFeed?.applied || currentSeasonCashPrizeApplyLogs.length > 0) {
-      return { status: "applied" as const, message: currentSeasonCashPrizeApplyLogs.length > 0 ? "Preisgeld wurde fuer diese Season bereits angewendet." : "Cash Apply wurde lokal gespeichert." };
-    }
-    if (cashApplyFeed && (cashApplyFeed.canApply ?? summary?.canApply) === false) {
-      return { status: "blocked" as const, message: blockingReasons[0] ?? "Cash Apply ist blockiert." };
-    }
-    if ((prizePreviewFeed?.summary.calculableTeams ?? 0) > 0 && (prizePreviewFeed?.summary.blockedItemsCount ?? 0) === 0) {
-      return { status: "ready" as const, message: "Cash Apply kann nach Dry-Run lokal bestaetigt werden." };
-    }
-    return { status: "open" as const, message: "Erst Preisgeld-Vorschau vollstaendig berechnen." };
-  }, [cashApplyFeed, currentSeasonCashPrizeApplyLogs.length, prizePreviewFeed]);
-
-  const cockpitSeasonSnapshotStatus = useMemo(() => {
-    const currentSeasonSnapshot = (gameState.seasonState.seasonSnapshots ?? []).find(
-      (snapshot) => snapshot.seasonId === gameState.season.id,
-    );
-    if (readMeta.source === "prisma") {
-      return {
-        status: "blocked" as const,
-        message: "Prisma bleibt read-only. Season-Snapshots koennen nur im lokalen SQLite-Save gespeichert werden.",
-      };
-    }
-    if (seasonSnapshotFeed?.applied) {
-      return {
-        status: "applied" as const,
-        message: "Die Saisonhistorie wurde lokal archiviert.",
-      };
-    }
-    if (seasonSnapshotFeed?.canCreate) {
-      return {
-        status: "ready" as const,
-        message: "Die aktuelle Season kann jetzt lokal als Historien-Snapshot gespeichert werden.",
-      };
-    }
-    if (seasonSnapshotFeed && !seasonSnapshotFeed.canCreate) {
-      return {
-        status: "blocked" as const,
-        message: seasonSnapshotFeed.blockingReasons[0] ?? "Season Snapshot ist aktuell blockiert.",
-      };
-    }
-    if (currentSeasonSnapshot) {
-      return {
-        status: "applied" as const,
-        message: "Fuer diese Season existiert bereits ein lokaler Snapshot.",
-      };
-    }
-    return {
-      status: "open" as const,
-      message: "DryRun zeigt zuerst, ob die aktuelle Season bereits sauber archiviert werden kann.",
-    };
-  }, [gameState.season.id, gameState.seasonState.seasonSnapshots, readMeta.source, seasonSnapshotFeed]);
-
-  const cockpitMatchdayAdvanceStatus = useMemo(() => {
-    const summary = matchdayAdvanceFeed?.summary;
-    const blockingReasons = matchdayAdvanceFeed?.blockingReasons ?? summary?.blockingReasons ?? [];
-    if (matchdayAdvanceFeed?.applied) {
-      return { status: "applied" as const, message: "Der lokale Save wurde auf den naechsten Matchday fortgeschrieben." };
-    }
-    if (matchdayAdvanceFeed && (matchdayAdvanceFeed.canApply ?? summary?.canApply) === false) {
-      return { status: "blocked" as const, message: blockingReasons[0] ?? "Matchday-Fortschritt ist blockiert." };
-    }
-    if (cashApplyFeed?.applied) {
-      return { status: "ready" as const, message: "Der Spieltag kann jetzt lokal abgeschlossen und auf den naechsten Matchday gesetzt werden." };
-    }
-    return { status: "open" as const, message: "Erst Result, Standings und Cash fuer den aktuellen Matchday lokal abschliessen." };
-  }, [cashApplyFeed, matchdayAdvanceFeed]);
-
-  const cockpitAutoRunStatus = useMemo(() => {
-    if (!matchdayAutoRunFeed) {
-      return { status: "open" as const, message: "DryRun zeigt zuerst, ob der aktuelle Matchday lokal komplett durchlaufen kann." };
-    }
-    if (matchdayAutoRunFeed.status === "applied") {
-      const formCards = matchdayAutoRunFeed.summary.formCardsSelected ?? 0;
-      const advanceText = matchdayAutoRunFeed.summary.advanceAllowed ? " Der Spieltag wurde fortgeschrieben." : "";
-      return {
-        status: "applied" as const,
-        message: `Der aktuelle Matchday wurde lokal ausgefuehrt. AI-Lineups und ${formCards} Formkarten wurden vorbereitet.${advanceText}`,
-      };
-    }
-    if (matchdayAutoRunFeed.status === "blocked") {
-      return {
-        status: "blocked" as const,
-        message: matchdayAutoRunFeed.blockingReasons[0]
-          ? formatCockpitReason(matchdayAutoRunFeed.blockingReasons[0])
-          : "Der Auto-Run ist blockiert.",
-      };
-    }
-    if (matchdayAutoRunFeed.status === "warning") {
-      return { status: "warning" as const, message: "Der Auto-Run meldet Warnungen. Bitte Step-Details pruefen." };
-    }
-    if (matchdayAutoRunFeed.summary.resolveReady) {
-      const formCards = matchdayAutoRunFeed.summary.formCardsSelected ?? 0;
-      return {
-        status: "ready" as const,
-        message: `DryRun ist bereit: Lineups passen, ${formCards} Formkarten sind im Plan. Der Matchday kann lokal simuliert werden.`,
-      };
-    }
-    return { status: "ready" as const, message: "DryRun ist geladen. Der Matchday kann lokal simuliert werden." };
-  }, [matchdayAutoRunFeed]);
-
-  const cockpitWholeSeasonDryRunStatus = useMemo(() => {
-    if (!wholeSeasonDryRunFeed) {
-      return { status: "open" as const, message: "Die Saison-Simulation nutzt eine isolierte lokale Kopie und zeigt zuerst moegliche Blocker ueber alle Spieltage." };
-    }
-    if (wholeSeasonDryRunFeed.status === "blocked") {
-      if (wholeSeasonDryRunFeed.blockingReasons.includes("ai_lineup_apply_disabled")) {
-        return {
-          status: "blocked" as const,
-          message: `${wholeSeasonDryRunFeed.skippedDisabledAiTeams} AI-Teams sind noch nicht fuer AI-Lineup-Apply freigegeben. Aktiviere zuerst Step 5 oder die Team Settings.`,
-        };
-      }
-      return {
-        status: "blocked" as const,
-        message: wholeSeasonDryRunFeed.blockedAtMatchday
-          ? `${wholeSeasonDryRunFeed.blockedAtMatchday.label}: ${formatCockpitReason(wholeSeasonDryRunFeed.blockingReasons[0] ?? "season_dryrun_blocked")}`
-          : formatCockpitReason(wholeSeasonDryRunFeed.blockingReasons[0] ?? "season_dryrun_blocked"),
-      };
-    }
-    if (wholeSeasonDryRunFeed.status === "completed") {
-      return { status: "applied" as const, message: "Die lokale Saison wurde auf einer isolierten In-Memory-Kopie komplett durchsimuliert." };
-    }
-    if (wholeSeasonDryRunFeed.status === "warning") {
-      return { status: "warning" as const, message: "Die Saison konnte auf der In-Memory-Kopie weitgehend simuliert werden, meldet aber Warnungen." };
-    }
-    return { status: "ready" as const, message: "Die lokale Saison konnte komplett auf einer isolierten Kopie durchsimuliert werden." };
-  }, [wholeSeasonDryRunFeed]);
-
-  const cockpitMatchdayMvpScoringStatus = useMemo(() => {
-    if (!matchdayMvpScoringFeed) {
-      return {
-        status: "open" as const,
-        message: "Noch kein Matchday-1 DryRun geladen. Der MVP rechnet bei Bedarf mit echten Base Scores und markiert Auto-Lineups sauber.",
-      };
-    }
-    if (matchdayMvpScoringFeed.error) {
-      return {
-        status: "blocked" as const,
-        message: matchdayMvpScoringFeed.error,
-      };
-    }
-    if (matchdayMvpScoringFeed.status === "blocked") {
-      return {
-        status: "blocked" as const,
-        message: matchdayMvpScoringFeed.blockingReasons[0]
-          ? formatCockpitReason(matchdayMvpScoringFeed.blockingReasons[0])
-          : "Der Matchday-1 Slice ist aktuell blockiert.",
-      };
-    }
-    if (matchdayMvpScoringFeed.status === "applied") {
-      return {
-        status: "applied" as const,
-        message: "Matchday 1 wurde lokal durchgerechnet und in Result- plus Standings-State geschrieben.",
-      };
-    }
-    if (matchdayMvpScoringFeed.status === "warning") {
-      return {
-        status: "warning" as const,
-        message: "Der Slice ist spielbar. Warnungen betreffen derzeit vor allem Wunschkader, Auto-Lineups oder noch fehlende Spezialquellen.",
-      };
-    }
-    return {
-      status: "ready" as const,
-      message: "DryRun ist bereit. D1 und D2 koennen jetzt lokal in den aktiven Save geschrieben werden.",
-    };
-  }, [matchdayMvpScoringFeed]);
-
-  const cockpitFlowChecklist = useMemo(
-    () => [
-      { label: "Matchday offen", done: true },
-      {
-        label: "AI-Teams aufgestellt",
-        done: Boolean(cockpitAiBatchApplyFeed && !cockpitAiBatchApplyFeed.dryRun && cockpitAiBatchApplyFeed.summary.savedTeams > 0),
-        active: cockpitAiLineupStatus.status === "ready",
-      },
-      { label: "Result Apply", done: Boolean(resultApplyFeed?.applied), active: cockpitResultApplyStatus.status === "ready" },
-      { label: "Standings Apply", done: Boolean(standingsApplyFeed?.applied), active: cockpitStandingsApplyStatus.status === "ready" },
-      { label: "Ergebnis im Saisonstand", done: Boolean(standingsApplyFeed?.applied), active: cockpitStandingsApplyStatus.status === "ready" },
-    ],
-    [
-      cockpitAiBatchApplyFeed,
-      cockpitAiLineupStatus.status,
-      cockpitResultApplyStatus.status,
-      cockpitStandingsApplyStatus.status,
-      resultApplyFeed?.applied,
-      standingsApplyFeed?.applied,
-    ],
-  );
-
-  const cockpitOverallStatus = useMemo(() => {
-    if (matchdayAdvanceFeed?.applied) {
-      return "Matchday abgeschlossen";
-    }
-    if (cockpitMatchdayAdvanceStatus.status === "ready") {
-      return "bereit fuer Matchday-Abschluss";
-    }
-    if (cockpitCashApplyStatus.status === "ready") {
-      return "bereit fuer Cash Apply";
-    }
-    if (cockpitStandingsApplyStatus.status === "ready") {
-      return "bereit fuer Standings Apply";
-    }
-    if (cockpitResultApplyStatus.status === "ready") {
-      return "bereit fuer Result Apply";
-    }
-    if (cockpitAiLineupStatus.status === "ready") {
-      return "bereit fuer AI-Lineup-Save";
-    }
-    if (
-      cockpitAiLineupStatus.status === "warning" ||
-      cockpitResolveStatus.status === "warning" ||
-      cockpitLineupStatus.status === "warning" ||
-      cockpitStandingsPreviewStatus.status === "warning" ||
-      cockpitPrizePreviewStatus.status === "warning"
-    ) {
-      return "Warnings offen";
-    }
-    if (
-      cockpitAiLineupStatus.status === "blocked" ||
-      cockpitResolveStatus.status === "blocked" ||
-      cockpitResultApplyStatus.status === "blocked" ||
-      cockpitStandingsApplyStatus.status === "blocked" ||
-      cockpitCashApplyStatus.status === "blocked" ||
-      cockpitMatchdayAdvanceStatus.status === "blocked"
-    ) {
-      return "blockiert";
-    }
-    return "Matchday offen";
-  }, [
-    cockpitAiLineupStatus.status,
-    cockpitCashApplyStatus.status,
-    cockpitLineupStatus.status,
-    cockpitMatchdayAdvanceStatus.status,
-    cockpitPrizePreviewStatus.status,
-    cockpitResolveStatus.status,
-    cockpitResultApplyStatus.status,
-    cockpitStandingsApplyStatus.status,
-    cockpitStandingsPreviewStatus.status,
-    matchdayAdvanceFeed?.applied,
-  ]);
-
-  const cockpitQuickLinks = useMemo(
-    () =>
-      [
-        { id: "season", label: "Saisonstand" },
-        { id: "lineup", label: "Einsatzliste" },
-        { id: "marketV2", label: "Transfermarkt" },
-        { id: "prize", label: "Preisgeld" },
-      ] as Array<{ id: FoundationView; label: string }>,
-    [],
-  );
-
   const {
     shouldShowArenaBackToLineup,
     seasonEndRosterActionsActive,
@@ -10363,11 +9277,6 @@ export function useFoundationShellRouterBodyScope({
   void seasonRatingsPlayerIds;
   void shouldBuildTeamsPlayerRatings;
   void shouldBuildTeamsAreaRanks;
-
-  const prizePreviewGlobalWarnings = useMemo(
-    () => getPrizePreviewGlobalWarnings(prizePreviewFeed),
-    [prizePreviewFeed],
-  );
 
   const matchdayResultSourceBadgeLabel = useMemo(
     () => getViewSourceBadgeLabel("matchdayResult", activeContextMeta),
@@ -10445,35 +9354,6 @@ export function useFoundationShellRouterBodyScope({
     onLoadMore: loadMoreHistoryFeed,
   };
 
-  const transferWindowStatus = useMemo(
-    () => (shouldBuildMarketView ? getTransferWindowStatus(gameState) : null),
-    [gameState, shouldBuildMarketView],
-  );
-
-  const transferMarketScoutingWatchPlayerIds = useMemo(
-    () =>
-      shouldBuildMarketView
-        ? buildTransferMarketScoutingWatchPlayerIds(gameState, activeManagerTeamId)
-        : [],
-    [activeManagerTeamId, gameState, shouldBuildMarketView],
-  );
-
-  const transferMarketScoutingIntelByPlayerId = useMemo(
-    () =>
-      shouldBuildMarketView
-        ? buildTransferMarketScoutingIntelByPlayerId(gameState, activeManagerTeamId)
-        : new Map(),
-    [activeManagerTeamId, gameState, shouldBuildMarketView],
-  );
-
-  const transferMarketActiveWishlistPlayerIds = useMemo(
-    () =>
-      shouldBuildMarketView
-        ? buildTransferMarketActiveWishlistPlayerIds(gameState, activeManagerTeamId)
-        : [],
-    [activeManagerTeamId, gameState, shouldBuildMarketView],
-  );
-
   const transferSeasonOptions = useMemo(() => {
     const labelBySeasonId = new Map<string, string>();
     labelBySeasonId.set(
@@ -10545,6 +9425,7 @@ export function useFoundationShellRouterBodyScope({
     getRosterEntrySalaryDelta,
     playerRatingsById,
     getViewClass,
+    getRankHeatClass,
     SortableHeader,
     getTableColumnWidth,
     getTableHeaderDragProps,
@@ -10629,6 +9510,7 @@ export function useFoundationShellRouterBodyScope({
     setShowSelectedRosterPpsBreakdown,
     setShowTeamDisciplines,
     toggleTransferSellMarker,
+    transferSellMarkerKeySet,
     selectedBoardConfidence,
     showTeamDisciplines,
     contractRenewalNegotiation,
@@ -10639,6 +9521,360 @@ export function useFoundationShellRouterBodyScope({
     contractRenewalMessage,
     contractRenewalError,
     marketSellBusy,
+  };
+
+  const foundationCockpitHostProps: FoundationCockpitHostProps = {
+    activeSaveId,
+    activeSaveName,
+    activeSaveSummary,
+    activeView,
+    adjustTableColumnWidth,
+    aiLineupApplyTeams,
+    aiTeams,
+    canonicalSeasonLabel,
+    cashApplyFeed,
+    currentMatchdayDisciplineSchedule,
+    currentMatchdayDisplayLabel,
+    currentSeasonCashPrizeApplyLogs,
+    enableAiLineupApplyForAiTeams,
+    formatFeatureAuditStatus,
+    formatLocalePoints,
+    formatMoney,
+    formatNullableMoney,
+    formatSignedNumber,
+    gameState,
+    getBusyActionReason: getFoundationBusyActionReason,
+    getCockpitBusyReason: getFoundationCockpitBusyReason,
+    getPlayerPortraitModel,
+    getReadOnlyActionReason: getFoundationReadOnlyActionReason,
+    getTableColumnWidth,
+    getTableHeaderDragProps,
+    historyFeed,
+    inferSaveTypeLabel,
+    isSaveBusy,
+    isTableColumnVisible,
+    localSeasonTransitionGate,
+    manualTeams,
+    marketBuyPreview,
+    marketFeed,
+    marketSelectedTeam,
+    matchdayAdvanceFeed,
+    matchdayAutoRunFeed,
+    matchdayAutoRunIncludeWarningLineups,
+    matchdayAutoRunOverwriteExistingLineups,
+    matchdayAutoRunStopOnTie,
+    matchdayMvpForceReplaceExisting,
+    matchdayMvpScoringFeed,
+    moveTableColumn,
+    openPlayerDrawerById,
+    openTeamProfileById,
+    passiveTeams,
+    preSeasonWorkflowBusy,
+    preSeasonWorkflowError,
+    preSeasonWorkflowFeed,
+    prizeApplyState,
+    prizeAuditCompact,
+    prizePreviewFeed,
+    readMeta,
+    readSourceLabel,
+    reloadPrizePreviewFeed,
+    reloadResolvePreview,
+    reloadStandingsPreviewFeed,
+    resetTableColumnWidth,
+    resetTableLayout,
+    resolvePreviewFeed,
+    resultApplyFeed,
+    rosterFillBusy,
+    rosterFillFeed,
+    runSaveAction,
+    seasonCompletionFeed,
+    seasonEndChampionRow,
+    seasonHistorySnapshots,
+    seasonSnapshotFeed,
+    seasonStandRows,
+    seasonTransitionBusy,
+    seasonTransitionError,
+    seasonTransitionFeed,
+    selectedPrizePreviewRow,
+    selectedStandingRow,
+    setActiveView,
+    setFreshSeasonStartMessage,
+    setMatchdayAutoRunIncludeWarningLineups,
+    setMatchdayAutoRunOverwriteExistingLineups,
+    setMatchdayAutoRunStopOnTie,
+    setMatchdayMvpForceReplaceExisting,
+    setTableColumnVisible,
+    setWholeSeasonIncludeWarningLineups,
+    setWholeSeasonOverwriteExistingLineups,
+    setWholeSeasonStopOnTie,
+    standingsApplyFeed,
+    standingsPreviewFeed,
+    startTableColumnResize,
+    syncFoundationViewInUrl,
+    tableSorts,
+    toggleTableSort,
+    wholeSeasonDryRunFeed,
+    wholeSeasonIncludeWarningLineups,
+    wholeSeasonOverwriteExistingLineups,
+    wholeSeasonStopOnTie,
+    ColumnVisibilityManager,
+    PlayerPortrait,
+    SEASON_TRANSITION_STATIC_STEPS,
+    SortableHeader,
+    freshSeasonStartMessage,
+    marketTeamId,
+    prizePreviewHardBlocked,
+    tableColumnPreferences,
+    getTablePinnedLeftIds,
+    getTablePinnedRightIds,
+    wholeSeasonMaxMatchdays,
+    aiBatchDeps: {
+      buildCockpitScopeParams,
+      roomContext,
+      marketAiApplyIncludeWarnings,
+      reloadAfterMarketRosterApply,
+      reloadResolvePreview,
+      setMarketAiApplyBusy,
+      setMarketAiApplyFeed,
+      setRosterFillBusy,
+      setRosterFillFeed,
+      showReadOnlyNotice,
+    },
+    matchdayDeps: {
+      showReadOnlyNotice,
+      withRoomBody,
+      activeSaveId,
+      matchdayMvpForceReplaceExisting,
+      matchdayAutoRunIncludeWarningLineups,
+      matchdayAutoRunOverwriteExistingLineups,
+      matchdayAutoRunStopOnTie,
+      setResultApplyFeed,
+      setStandingsApplyFeed,
+      setCashApplyFeed,
+      setMatchdayAdvanceFeed,
+      setMatchdayAutoRunFeed,
+      setMatchdayMvpScoringFeed,
+      reloadResolvePreview,
+      reloadStandingsPreviewFeed,
+      reloadPrizePreviewFeed,
+      reloadLiveSeasonState,
+      loadSave,
+      reloadSeasonStandingsOverview,
+      reloadSeasonManagementOverview,
+      reloadHistoryFeed,
+      reloadTransferRecapFeed,
+      bumpMarketReloadToken: () => setMarketReloadToken((current) => current + 1),
+      setFoundationActionFeedback,
+    },
+    preseasonDeps: {
+      showReadOnlyNotice,
+      withRoomBody,
+      activeSaveId,
+      setPreSeasonWorkflowBusy,
+      setPreSeasonWorkflowError,
+      setPreSeasonWorkflowFeed,
+      loadSave,
+      reloadSeasonStandingsOverview,
+      reloadSeasonManagementOverview,
+      reloadHistoryFeed,
+      reloadTransferRecapFeed,
+      bumpMarketReloadToken: () => setMarketReloadToken((current) => current + 1),
+      setActiveView,
+      syncFoundationViewInUrl,
+    },
+    seasonTransitionDeps: {
+      showReadOnlyNotice,
+      withRoomBody,
+      activeSaveId,
+      setSeasonTransitionBusy,
+      setSeasonTransitionError,
+      setSeasonTransitionFeed,
+      setSeasonCompletionFeed,
+      setCashApplyFeed,
+      setSeasonSnapshotFeed,
+      setWholeSeasonDryRunFeed,
+      setFoundationActionFeedback,
+      loadSave,
+      reloadResolvePreview,
+      reloadStandingsPreviewFeed,
+      reloadPrizePreviewFeed,
+      reloadSeasonStandingsOverview,
+      reloadSeasonManagementOverview,
+      reloadHistoryFeed,
+      reloadTransferRecapFeed,
+      setActiveView,
+      syncFoundationViewInUrl,
+    },
+  };
+
+  const foundationPrizeFinanceShellHostProps: FoundationPrizeFinanceShellHostProps = {
+    activeView: activeView as FoundationViewId,
+    seasonStandRows,
+    prizeFinanceTab,
+    sponsorsPanelProps: {
+      gameState,
+      selectedTeamName: selectedTeam?.name ?? "Team",
+      selectedTeamCommercialRating,
+      selectedTeamSponsorContract,
+      selectedTeamSponsorOffers,
+      sponsorChoiceMessage,
+      sponsorChoiceProfiles,
+      sponsorChoiceBusy,
+      selectedTeamCanManage,
+      formatMoney,
+      applySponsorNegotiationToComponents,
+      getSponsorNegotiationMultiplier,
+      setSponsorChoiceProfiles,
+      chooseTeamSponsor,
+      prizeFinanceTab,
+    },
+    prizePanelBaseProps: {
+      gameState,
+      activeContextMeta,
+      prizePreviewFeed,
+      prizeApplyState,
+      selectedTeam,
+      tableSorts: { prizePreview: tableSorts.prizePreview },
+      formatLocalePoints,
+      formatNullableMoney,
+      formatSignedDisplayMoney,
+      getViewSourceBadgeLabel: getViewSourceBadgeLabel as unknown as (view: string, meta: unknown) => string,
+      setFoundationView: setFoundationView as unknown as (view: string, setActiveViewFn: (view: string) => void) => void,
+      setActiveView: setActiveView as unknown as (view: string) => void,
+      openTeamProfileById,
+      getTableActivePreset,
+      isTableColumnVisible,
+      setTableColumnVisible,
+      moveTableColumn,
+      getTableColumnWidth,
+      adjustTableColumnWidth,
+      resetTableColumnWidth,
+      resetTableLayout,
+      getTableHeaderDragProps,
+      startTableColumnResize,
+      toggleTableSort,
+      ColumnVisibilityManager: ColumnVisibilityManager as unknown as FoundationPrizeV2PanelProps["ColumnVisibilityManager"],
+      SortableHeader,
+      selectedRoster,
+      selectedStandingRow,
+      prizePreviewSort: tableSorts.prizePreview,
+      tableColumnPreferences,
+      getTablePinnedLeftIds,
+      getTablePinnedRightIds,
+    },
+  };
+
+  const foundationRanksHostProps: FoundationRanksHostProps = {
+    sortedPpAreaRows: sortedPpAreaRows as unknown as FoundationRanksHostProps["sortedPpAreaRows"],
+    ppAreaRankClassMaps,
+    ppAreaMetricPools,
+    tableSorts: { ppArea: tableSorts.ppArea },
+    toggleTableSort,
+    openTeamProfileById,
+    renderPpAreaMetricCell: (value, formBonus, options: { tone: string; pool: Array<number | null | undefined>; fallbackMax: number }) =>
+      renderMetricBar(value, {
+        tone: options.tone as Parameters<typeof renderMetricBar>[1]["tone"],
+        pool: options.pool,
+        fallbackMax: options.fallbackMax,
+        format: (nextValue) => formatPpsValue(nextValue),
+        detail: formatPpFormBonus(formBonus),
+        detailNegative: (formBonus ?? 0) < 0,
+      }),
+    SortableHeader,
+  };
+
+  const foundationDiszisHostProps: FoundationDiszisHostProps = {
+    disciplineConfigTableColumns,
+    visibleDisciplineConfigColumns,
+    disciplineCategoryFilter,
+    setDisciplineCategoryFilter,
+    visibleDisciplineConfigRows,
+    seasonDisciplineScheduleRows,
+    currentMatchdayId: gameState.matchdayState.matchdayId,
+    getTableActivePreset,
+    isTableColumnVisible,
+    setTableColumnVisible,
+    moveTableColumn,
+    getTableColumnWidth,
+    adjustTableColumnWidth,
+    resetTableColumnWidth,
+    resetTableLayout,
+    getTableHeaderDragProps,
+    startTableColumnResize,
+    tableSorts: { disciplineConfig: tableSorts.disciplineConfig },
+    toggleTableSort,
+    ColumnVisibilityManager: ColumnVisibilityManager as unknown as FoundationDiszisHostProps["ColumnVisibilityManager"],
+    SortableHeader: SortableHeader as unknown as FoundationDiszisHostProps["SortableHeader"],
+  };
+
+  const foundationTrainingCompactHostProps: Omit<FoundationTrainingCompactShellHostProps, "selectedTeam"> = {
+    gameState,
+    selectedTeamFacilityState,
+    rosterPlayers,
+    playerRatingsById,
+    playerSeasonPerformanceMap,
+    trainingModeDraft,
+    trainingClassDraft,
+    trainingDevelopmentFilter,
+    onSetTrainingDevelopmentFilter: setTrainingDevelopmentFilter,
+    selectedTeamControlMode: formatTeamControlModeLabel(selectedTeamControl?.controlMode),
+    seasonLabel: canonicalSeasonLabel,
+    managementLocked: isSelectedTeamManagementLocked,
+    managementLockedReason:
+      isSelectedTeamManagementLocked && selectedTeam
+        ? `${selectedTeam.name} gehoert nicht zu deinen steuerbaren Teams. Training ist nur zur Ansicht offen.`
+        : null,
+    trainingClassOptions: PROGRESSION_CLASS_ORDER.map((className) => ({ value: className, label: className })),
+    onSetTrainingMode: (playerId, mode) => {
+      void setPlayerTrainingMode(playerId, mode);
+    },
+    onSetTrainingClass: (playerId, trainingClass) => {
+      void setPlayerTrainingClass(playerId, trainingClass);
+    },
+    onOpenPlayerDetails: (payload) => openPlayerDrawerById(payload.playerId, payload.activePlayerId),
+    onOpenFacilities: () => setFoundationView("trainingV2", setActiveView),
+    onOpenTeams: () => setFoundationView("teams", setActiveView),
+  };
+
+  const foundationMarketV2ShellHostProps: FoundationMarketV2ShellHostProps = {
+    gameState,
+    activeSaveId,
+    activeSaveName,
+    activeManagerTeamId,
+    effectiveActiveOwnerId,
+    foundationManageableTeamIds,
+    selectedTeam,
+    selectedTeamObjectives,
+    transferWishlistEntriesForMarketV2: transferWishlistEntriesForMarketV2 as unknown as FoundationMarketV2ShellHostProps["transferWishlistEntriesForMarketV2"],
+    marketVisibleFeedCount: marketFeed?.poolAudit.visibleFeedCount ?? 0,
+    marketActiveFreeAgentCount: marketFeed?.poolAudit.activeFreeAgentCount ?? 0,
+    sourceBadgeLabel: getViewSourceBadgeLabel("marketV2", activeContextMeta),
+    marketFocusPlayerId,
+    foundationPanel,
+    activeView: activeView as FoundationViewId,
+    isFoundationBootstrapState,
+    readMetaSource: readMeta.source,
+    resolvedTeamControlSettings,
+    playerRatingsById,
+    seasonPointsLedger:
+      isTransferMarketViewActive && shouldLoadSeasonDerivations ? seasonDerivations.ledger : undefined,
+    roomContext,
+    formatGamePhaseLabel,
+    getRosterEntryDisplayMarketValue,
+    getRosterEntryDisplaySalary,
+    getTeamLockedName,
+    setActiveView,
+    setActiveManagerTeam,
+    setMarketFocusPlayerId,
+    setFoundationActionFeedback: setFoundationActionFeedback as unknown as FoundationMarketV2ShellHostProps["setFoundationActionFeedback"],
+    openPlayerDrawerById,
+    toggleTransferWishlist,
+    removeTransferWishlistEntry,
+    toggleScoutingWatch,
+    openMarketOfferPanel,
+    closeFoundationDrilldownPanel,
+    openMarketSellModal,
+    loadSave: loadSave as unknown as FoundationMarketV2ShellHostProps["loadSave"],
   };
 
   const foundationShellRouterBodyProps = {
@@ -10680,7 +9916,6 @@ export function useFoundationShellRouterBodyScope({
     canonicalSeasonLabel,
     cashApplyFeed,
     changeFoundationSaveMode,
-    chooseTeamSponsor,
     closeCommandPalette,
     closeFacilityPanel,
     closeFoundationDrilldownPanel,
@@ -10689,27 +9924,8 @@ export function useFoundationShellRouterBodyScope({
     closeTeamProfile,
     cockpitAiBatchApplyFeed,
     cockpitAiIncludeWarningTeams,
-    cockpitAiLineupStatus,
     cockpitAiOverwriteExisting,
-    cockpitAutoRunStatus,
     cockpitBusyKey,
-    cockpitCashApplyStatus,
-    cockpitFlowChecklist,
-    cockpitFreshSeasonStatus,
-    cockpitLineupStatus,
-    cockpitMatchdayAdvanceStatus,
-    cockpitMatchdayMvpScoringStatus,
-    cockpitOverallStatus,
-    cockpitPrizePreviewStatus,
-    cockpitQuickLinks,
-    cockpitResolveStatus,
-    cockpitResultApplyStatus,
-    cockpitSaveStatus,
-    cockpitSeasonSnapshotStatus,
-    cockpitStandingsApplyStatus,
-    cockpitStandingsPreviewStatus,
-    cockpitTransfermarktStatus,
-    cockpitWholeSeasonDryRunStatus,
     commandSearch,
     commandSearchInputRef,
     completeSeasonBriefingAndContinue,
@@ -10724,11 +9940,9 @@ export function useFoundationShellRouterBodyScope({
     currentMatchdayDisciplineSchedule,
     currentMatchdayDisplayLabel,
     currentSaveOwnership,
-    currentSeasonCashPrizeApplyLogs,
     disciplineCategoryFilter,
     disciplineConfigTableColumns,
     disciplineRanksColumns,
-    displayPrizePreviewRows,
     effectiveActiveOwnerId,
     enableAiLineupApplyForAiTeams,
     exportSelectedTeamSettingsJson,
@@ -10740,9 +9954,6 @@ export function useFoundationShellRouterBodyScope({
     facilityUpgradeError,
     facilityUpgradePreview,
     facilityUpgradeSuccess,
-    featureAuditFilter,
-    featureAuditMatrix,
-    filteredFeatureAuditEntries,
     filteredTeamSettingsTeams,
     foundationActionFeedback,
     foundationActivities,
@@ -10818,8 +10029,6 @@ export function useFoundationShellRouterBodyScope({
     lineupDraftBoardView,
     lineupDraftBoardViewRequest,
     lineupFocusRequestKey,
-    lineupModifierStatusSummary,
-    lineupStatusSummary,
     loadMoreHistoryFeed,
     loadSave,
     localSeasonTransitionGate,
@@ -10848,11 +10057,6 @@ export function useFoundationShellRouterBodyScope({
     matchdaySummaryOptions,
     matchdaySummaryTab,
     moveTableColumn,
-    multiSeasonBalanceDashboard,
-    multiSeasonEconomyColumns,
-    multiSeasonGameplayColumns,
-    multiSeasonPlayerColumns,
-    multiSeasonTeamBalanceColumns,
     navigateHomeTab,
     navigatePrizeFinanceTab,
     navigateToGameFlowStep,
@@ -10903,36 +10107,16 @@ export function useFoundationShellRouterBodyScope({
     preSeasonWorkflowBusy,
     preSeasonWorkflowError,
     preSeasonWorkflowFeed,
-    prizeApplyState,
-    prizeAuditCompact,
     prizeFinanceTab,
-    prizeForecastRank,
-    prizeForecastRankRow,
-    prizeForecastRows,
-    prizePreviewFeed,
-    prizePreviewGlobalWarnings,
-    prizePreviewHardBlocked,
-    prizePreviewTableColumns,
-    prizeV2FactorRows,
-    prizeV2LeaderRow,
-    prizeV2RiskRow,
-    prizeV2SelectedTeamSummary,
-    prizeV2Summary,
-    prizeV2SwingRow,
     rankLeaderCards,
     readMeta,
     readOnlyBannerMessage,
     readSourceLabel,
-    refreshSeasonCockpit,
     reloadPrizePreviewFeed,
     reloadResolvePreview,
     reloadSeasonStandingsOverview,
     reloadStandingsPreviewFeed,
     removeTransferWishlistEntry,
-    renderMultiSeasonEconomyCell,
-    renderMultiSeasonGameplayCell,
-    renderMultiSeasonPlayerCell,
-    renderMultiSeasonTeamCell,
     resetTableColumnWidth,
     resetTableLayout,
     resolvePreviewFeed,
@@ -10944,27 +10128,15 @@ export function useFoundationShellRouterBodyScope({
     rosterFillBusy,
     rosterFillFeed,
     rosterPlayers,
-    runCockpitAiLineupBatchApply,
-    runCockpitCashApply,
     runCockpitMatchdayAdvance,
     runCockpitMatchdayAutoRun,
-    runCockpitMatchdayMvpScoring,
-    runCockpitResultApply,
-    runCockpitRosterFill,
-    runCockpitStandingsApply,
-    runCockpitWholeSeasonDryRun,
     runFacilityMaintenancePreview,
     runFacilityUpgradePreview,
     runFinishMatchdaySimple,
     runFoundationCommand,
     runNewGameSetup,
-    runPreSeasonNextSeasonSetup,
-    runPreSeasonWorkflowPreview,
     runSaveAction,
-    runSeasonCompletion,
-    runSeasonSnapshotAction,
     runSeasonStartReset,
-    runSeasonTransition,
     savePlayerGeneratorDrafts,
     saveSummaries,
     saveSyncError,
@@ -10981,7 +10153,6 @@ export function useFoundationShellRouterBodyScope({
     seasonBriefingTeamCash,
     seasonCompletionFeed,
     seasonDisciplineScheduleRows,
-    seasonEndChampionRow,
     seasonHistorySnapshots,
     seasonOverviewOptions,
     seasonOverviewSeasonId,
@@ -11018,7 +10189,6 @@ export function useFoundationShellRouterBodyScope({
     selectedIdentityAxisBias,
     selectedIdentityDraft,
     selectedOpenObjectives,
-    selectedPrizePreviewRow,
     selectedRoster,
     selectedRosterTableRows,
     selectedSeasonOverviewLabel,
@@ -11027,7 +10197,6 @@ export function useFoundationShellRouterBodyScope({
     selectedTeamAverageAxisStats,
     selectedTeamCanManage,
     selectedTeamCaptainProfile,
-    selectedTeamCommercialRating,
     selectedTeamContractPreviewRowCount,
     selectedTeamContractShapeMix,
     selectedTeamContractTable,
@@ -11045,11 +10214,8 @@ export function useFoundationShellRouterBodyScope({
     selectedTeamRosterActionsAvailable,
     selectedTeamScoutPipeline,
     selectedTeamSettingsIndex,
-    selectedTeamSponsorContract,
-    selectedTeamSponsorOffers,
     selectedTeamStrategyDraft,
     selectedTeamStrategyProfile,
-    selectedTransfermarktBoardObjectives,
     setActiveManagerTeam,
     setActiveOwnerId,
     setActiveView,
@@ -11063,7 +10229,6 @@ export function useFoundationShellRouterBodyScope({
     setCommandSearch,
     setContractRenewalNegotiation,
     setDisciplineCategoryFilter,
-    setFeatureAuditFilter,
     setFoundationActionFeedback,
     setFreshSeasonStartMessage,
     setGameModeOwnershipChrisIds,
@@ -11100,7 +10265,6 @@ export function useFoundationShellRouterBodyScope({
     setPlayerTeamFilter,
     setPlayerTrainingClass,
     setPlayerTrainingMode,
-    setPrizeForecastRank,
     setScoutingCenterTab,
     setSeasonOverviewSeasonId,
     setSeasonStandingsMode,
@@ -11114,7 +10278,6 @@ export function useFoundationShellRouterBodyScope({
     setShowTeamDisciplines,
     setSoloPlayerTeam,
     setSpecialistWingVariantDraft,
-    setSponsorChoiceProfiles,
     setTableColumnVisible,
     setTeamContextFilter,
     setTeamControlDraft,
@@ -11142,23 +10305,22 @@ export function useFoundationShellRouterBodyScope({
     showTeamContractPreviewRows,
     showTeamDisciplines,
     sortedDisciplineRankRows,
-    sortedMultiSeasonEconomyRows,
-    sortedMultiSeasonGameplayRows,
-    sortedMultiSeasonPlayerRows,
-    sortedMultiSeasonTeamRows,
     sortedPlayersTableRows,
     sortedPpAreaRows,
     sortedTransferHistoryRows,
     specialistWingVariantDraft,
-    sponsorChoiceBusy,
-    sponsorChoiceMessage,
-    sponsorChoiceProfiles,
     standingsApplyFeed,
     standingsPreviewFeed,
     foundationMatchdayResultHostProps,
     foundationHistoryV2HostProps,
     foundationSeasonPreviewHostProps,
     foundationTeamsViewHostProps,
+    foundationCockpitHostProps,
+    foundationPrizeFinanceShellHostProps,
+    foundationRanksHostProps,
+    foundationDiszisHostProps,
+    foundationMarketV2ShellHostProps,
+    foundationTrainingCompactHostProps,
     startAdminSeasonSimulationRun,
     startTableColumnResize,
     tableSorts,
@@ -11194,12 +10356,7 @@ export function useFoundationShellRouterBodyScope({
     transferHistorySeasonBreakdown,
     transferHistorySourceOptions,
     transferHistorySummary,
-    transferMarketActiveWishlistPlayerIds,
-    transferMarketScoutingIntelByPlayerId,
-    transferMarketScoutingWatchPlayerIds,
-    transferMarketV2RosterRows,
     transferSeasonOptions,
-    transferWindowStatus,
     transferWishlistEntriesForMarketV2,
     triggerGlobalNext,
     updateInboxItemStatus,
@@ -11211,12 +10368,7 @@ export function useFoundationShellRouterBodyScope({
     visibleDisciplineRanksColumns,
     visibleFoundationCommandItems,
     visibleInboxItems,
-    visibleMultiSeasonEconomyColumns,
-    visibleMultiSeasonGameplayColumns,
-    visibleMultiSeasonPlayerColumns,
-    visibleMultiSeasonTeamBalanceColumns,
     visiblePlayersTableColumns,
-    visiblePrizePreviewColumns,
     visibleSelectedRosterColumns,
     visibleSelectedTeamContractRows,
     visibleTransferHistoryRows,
@@ -11281,10 +10433,8 @@ export {
   clampValue,
   deriveChrisFrankyTeamIdsFromSettings,
   describeRoomFlowButton,
-  featureAuditFilters,
   filterTeamsByControlScope,
   formatActiveManagerTeamSource,
-  formatAiLineupAuditWarning,
   formatCockpitReason,
   formatContractShapeLabel,
   formatCsvList,
@@ -11296,7 +10446,6 @@ export {
   formatHomeWarningLabel,
   formatIdentityWeight,
   formatLocalePoints,
-  formatMatchdayMvpWarning,
   formatMoney,
   formatMoraleContractIntentLabel,
   formatNullableMoney,
@@ -11304,7 +10453,6 @@ export {
   formatPpFormBonus,
   formatPpsValue,
   formatScenarioTypeLabel,
-  formatSeasonCompletionStepStatus,
   formatShortSaveId,
   formatSignedDisplayMoney,
   formatSignedNumber,
@@ -11314,10 +10462,7 @@ export {
   formatWholeNumber,
   foundationSecondaryViews,
   getClassColorClassName,
-  getCockpitStatusLabel,
   getCockpitStatusPillClass,
-  getCockpitStepTone,
-  getFeatureAuditFlags,
   getFoundationViewScrollTarget,
   getGameFlowStatusLabel,
   getLineupDraftSideCounts,
@@ -11337,7 +10482,6 @@ export {
   getRosterEntrySalaryDelta,
   getScoutingWishlistSlotLimit,
   getSeasonCashHeatClass,
-  getSeasonCompletionStepTone,
   getSponsorNegotiationMultiplier,
   getTeamAxisRankTooltip,
   getTeamHistoryRankToneClass,
@@ -11351,7 +10495,6 @@ export {
   inferSaveTypeLabel,
   isTeamSetupDraftWishlistPhase,
   joinClassNames,
-  mapAutoRunStatusToCockpitStatus,
   normalizeFoundationSaveMode,
   normalizeTeamStrategyLevel,
   parseCsvList,

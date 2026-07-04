@@ -3,6 +3,7 @@ import type { Discipline, GameState, Player } from "@/lib/data/olyDataTypes";
 // Per-gameState caches so that O(n)-over-all-players work is only done once per distinct state.
 const leagueAxisValuesCache = new WeakMap<GameState, Record<PlayerAxisKey, number[]>>();
 const leagueDisciplineRanksCache = new WeakMap<GameState, Map<string, Map<string, number>>>();
+const leagueSpecialistProfileCache = new WeakMap<GameState, { scoreSpread: number; sortedScores: number[] }>();
 
 export type PlayerAxisKey = "pow" | "spe" | "men" | "soc";
 
@@ -231,15 +232,34 @@ function specialistScoreFingerprint(playerId: string, scoreSpread: number): numb
   return (hashPlayerId(playerId) - 0.5) * scoreSpread * 0.012;
 }
 
-/** Builds a sorted array of specialist scores for all players in the league. */
-function buildLeagueSpecialistScores(gameState: GameState, scoreSpread: number): number[] {
-  return gameState.players
+/**
+ * Builds (and caches per gameState) the league-wide specialist score spread and the
+ * sorted specialist scores used for overall-percentile lookups. Both are pure
+ * functions of `gameState.players`, so computing them once per distinct gameState
+ * avoids redoing an O(n) pass over every player each time a single player's
+ * axis star profile is requested (e.g. when reconciling potential for all players).
+ */
+function buildLeagueSpecialistProfile(gameState: GameState): { scoreSpread: number; sortedScores: number[] } {
+  const cached = leagueSpecialistProfileCache.get(gameState);
+  if (cached) return cached;
+
+  const rawScores = gameState.players
+    .map((player) => computeSpecialistScore(Object.values(player.coreStats ?? {})))
+    .filter(isFiniteNumber)
+    .sort((a, b) => a - b);
+  const scoreSpread = rawScores.length > 0 ? rawScores[rawScores.length - 1]! - rawScores[0]! : 0;
+
+  const sortedScores = gameState.players
     .map((player) => {
       const base = computeSpecialistScore(Object.values(player.coreStats ?? {}));
       return base + specialistScoreFingerprint(player.id, scoreSpread);
     })
     .filter(isFiniteNumber)
     .sort((a, b) => a - b);
+
+  const profile = { scoreSpread, sortedScores };
+  leagueSpecialistProfileCache.set(gameState, profile);
+  return profile;
 }
 
 /** Drag overall down when a player is genuinely awful in at least one axis. */
@@ -289,15 +309,7 @@ export function buildPlayerAxisStarProfile(input: {
 
   // Overall = percentile of this player's specialist score in the full league.
   // Fingerprint jitter + weak-axis penalty break the overly uniform percentile look.
-  const rawSpecialistScores = input.gameState.players
-    .map((p) => computeSpecialistScore(Object.values(p.coreStats ?? {})))
-    .filter(isFiniteNumber)
-    .sort((a, b) => a - b);
-  const scoreSpread =
-    rawSpecialistScores.length > 0
-      ? rawSpecialistScores[rawSpecialistScores.length - 1]! - rawSpecialistScores[0]!
-      : 0;
-  const leagueSpecialistScores = buildLeagueSpecialistScores(input.gameState, scoreSpread);
+  const { scoreSpread, sortedScores: leagueSpecialistScores } = buildLeagueSpecialistProfile(input.gameState);
   const playerSpecialistScore =
     computeSpecialistScore(Object.values(input.player.coreStats ?? {})) +
     specialistScoreFingerprint(input.player.id, scoreSpread);

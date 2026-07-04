@@ -7,6 +7,7 @@ import {
   isLongRunContext,
   isLongRunFastProfile,
   isLongRunRequireNoDevServer,
+  resolveBalanceProfile,
 } from "@/lib/season/long-run-profile";
 
 const ENV_KEYS = [
@@ -15,6 +16,7 @@ const ENV_KEYS = [
   "OLY_LONG_RUN_LABEL",
   "OLY_LONG_RUN",
   "OLY_LONG_RUN_FAST",
+  "OLY_LONG_RUN_BALANCE_PROFILE",
   "OLY_LONG_RUN_PLANNER_MAX_ROUNDS",
   "OLY_LONG_RUN_PLANNER_MAX_TEAM_CYCLES",
   "OLY_LONG_RUN_REQUIRE_NO_DEV_SERVER",
@@ -29,8 +31,8 @@ describe("long-run-profile", () => {
   it("detects long-run context from output dir env", () => {
     process.env.OLY_LONG_RUN_OUTPUT_DIR = "/tmp/out";
     expect(isLongRunContext()).toBe(true);
-    expect(getLongRunPlannerMaxLeagueRounds()).toBe(2);
-    expect(getLongRunPlannerMaxTeamCycles()).toBe(3);
+    expect(getLongRunPlannerMaxLeagueRounds()).toBe(5);
+    expect(getLongRunPlannerMaxTeamCycles()).toBe(5);
     expect(isLongRunRequireNoDevServer()).toBe(true);
     expect(isLongRunAllowDevServer()).toBe(false);
   });
@@ -44,13 +46,33 @@ describe("long-run-profile", () => {
 
   it("uses legacy defaults outside long-run context", () => {
     expect(isLongRunContext()).toBe(false);
-    expect(getLongRunPlannerMaxLeagueRounds()).toBe(3);
+    expect(getLongRunPlannerMaxLeagueRounds()).toBe(5);
     expect(getLongRunPlannerMaxTeamCycles()).toBe(5);
     expect(isLongRunRequireNoDevServer()).toBe(false);
   });
 
-  it("enables fast profile in long-run context", () => {
-    process.env.OLY_LONG_RUN_SAVE_ID = "save-1";
+  it("defaults to iterate balance profile outside long-run context without fast paths", () => {
+    expect(resolveBalanceProfile()).toBe("iterate");
+    expect(isLongRunFastProfile()).toBe(false);
+  });
+
+  it("enables fast manager paths in long-run iterate profile", () => {
+    process.env.OLY_LONG_RUN_OUTPUT_DIR = "/tmp/out";
+    expect(resolveBalanceProfile()).toBe("iterate");
     expect(isLongRunFastProfile()).toBe(true);
+  });
+
+  it("audit profile disables fast manager paths unless OLY_LONG_RUN_FAST=1", () => {
+    process.env.OLY_LONG_RUN_BALANCE_PROFILE = "audit";
+    expect(resolveBalanceProfile()).toBe("audit");
+    expect(isLongRunFastProfile()).toBe(false);
+    process.env.OLY_LONG_RUN_FAST = "1";
+    expect(isLongRunFastProfile()).toBe(true);
+  });
+
+  it("does not enable fast profile merely from long-run context", () => {
+    process.env.OLY_LONG_RUN_SAVE_ID = "save-1";
+    process.env.OLY_LONG_RUN_BALANCE_PROFILE = "audit";
+    expect(isLongRunFastProfile()).toBe(false);
   });
 });

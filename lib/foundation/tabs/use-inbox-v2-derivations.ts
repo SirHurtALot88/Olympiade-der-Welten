@@ -1,7 +1,7 @@
 import { useMemo } from "react";
 
 import type { GameInboxItem } from "@/lib/data/olyDataTypes";
-import { filterGameInboxItems, filterInboxItemsByMode } from "@/lib/foundation/game-inbox-service";
+import { filterGameInboxItems, filterInboxItemsByMode, groupInboxItemsForDisplay } from "@/lib/foundation/game-inbox-service";
 import { mapInboxQuickActionsToChoices } from "@/lib/foundation/inbox-quick-action-service";
 import type { InboxV2Item, InboxV2Mode } from "@/app/foundation/inbox-v2/inbox-v2-types";
 
@@ -38,7 +38,7 @@ export function useInboxV2Derivations(input: UseInboxV2DerivationsInput) {
         inboxMode === "chronicle" ? item.source === "transfer_history" : item.source !== "transfer_history",
       );
     }
-    return filtered;
+    return groupInboxItemsForDisplay(filtered);
   }, [activeTeamInboxItems, inboxCategoryFilter, inboxIncludeDismissed, inboxIncludeDone, inboxMode]);
 
   const inboxV2Items = useMemo(

@@ -59,7 +59,7 @@ const NAV_TAB_STEPS: TabStep[] = [
   { navId: "scoutingCenterV2", label: "Scouting", readySelector: '[data-testid="foundation-scouting-hub-v2"]' },
   { navId: "historyV2", label: "Historie", readySelector: ".transfer-history-v2-shell" },
   { navId: "ranks", label: "Ranks", readySelector: "#discipline-ranks:not(.foundation-section-hidden)" },
-  { navId: "diszis", label: "Diszis", readySelector: "#discipline-config:not(.foundation-section-hidden)" },
+  { navId: "diszis", label: "Diszis", readySelector: '[data-testid="foundation-diszis"]' },
   { navId: "prize", label: "Sponsoren", readySelector: '[data-testid="team-sponsor-choice"]:not(.foundation-section-hidden), [data-testid="foundation-sponsors"]:not(.foundation-section-hidden)', prizeSubnav: true },
   { navId: "encyclopedia", label: "Lexikon", readySelector: '[data-testid="foundation-encyclopedia"]' },
   { navId: "cockpit", label: "Cockpit", readySelector: '[data-testid="foundation-cockpit"]' },
@@ -525,7 +525,9 @@ async function measureDrilldowns(
       tracker,
       timeoutMs,
       async () => {
-        await page.getByRole("button", { name: "Teamprofil" }).first().click({ timeout: timeoutMs });
+        // Team rows no longer expose a literal "Teamprofil" button; each row's
+        // team-name link (.players-table-team-button) opens the profile drawer.
+        await page.locator(".table-link-button.players-table-team-button").first().click({ timeout: timeoutMs });
       },
       async () => {
         await page.locator('[data-testid="foundation-team-profile"]').first().waitFor({ state: "visible", timeout: timeoutMs });
@@ -545,7 +547,7 @@ async function measureDrilldowns(
         await page.getByRole("button", { name: "Schließen" }).first().click({ timeout: timeoutMs }).catch(async () => {
           await page.getByRole("button", { name: "Zurück" }).first().click({ timeout: 5000 }).catch(() => undefined);
         });
-        await page.getByRole("button", { name: "Teamprofil" }).first().click({ timeout: timeoutMs });
+        await page.locator(".table-link-button.players-table-team-button").first().click({ timeout: timeoutMs });
       },
       async () => {
         await page.locator('[data-testid="foundation-team-profile"]').first().waitFor({ state: "visible", timeout: timeoutMs });

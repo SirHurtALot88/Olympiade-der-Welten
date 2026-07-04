@@ -58,6 +58,7 @@ export type FoundationMarketV2ShellHostProps = {
     { controlMode: TeamControlMode; ownerId?: string | null; ownerSlot?: string | null }
   >;
   playerRatingsById: Map<string, { ppsSeason?: number | null; ovrNormalized?: number | null; mvs?: number | null }>;
+  seasonPointsLedger?: import("@/lib/foundation/season-points-ledger").SeasonPointsLedger | null;
   roomContext: FoundationRoomContext | null;
   formatGamePhaseLabel: (phase: string) => string;
   getRosterEntryDisplayMarketValue: (
@@ -116,6 +117,7 @@ export default function FoundationMarketV2ShellHost({
   readMetaSource,
   resolvedTeamControlSettings,
   playerRatingsById,
+  seasonPointsLedger,
   roomContext,
   formatGamePhaseLabel,
   getRosterEntryDisplayMarketValue,
@@ -147,6 +149,7 @@ export default function FoundationMarketV2ShellHost({
     activeSaveId,
     activeManagerTeamId,
     playerRatingsById,
+    seasonPointsLedger,
     selectedTeamObjectives,
     getRosterEntryDisplayMarketValue,
     getRosterEntryDisplaySalary,

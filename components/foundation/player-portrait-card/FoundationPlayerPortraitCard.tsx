@@ -10,6 +10,7 @@ import {
   type PlayerPortraitContext,
   type PlayerPortraitContextData,
   type PlayerPortraitDensity,
+  type PlayerPortraitLayout,
   type PortraitOverlayStat,
 } from "@/lib/foundation/player-portrait-stat-presets";
 import { createEmptyLeaguePlayerHeatPools, type LeaguePlayerHeatPools } from "@/lib/foundation/player-league-heat";
@@ -53,9 +54,11 @@ export type FoundationPlayerPortraitCardProps = {
   ppsRank?: number | null;
   economyStats?: FoundationPlayerPortraitEconomyStat[];
   footerSlot?: ReactNode;
+  railSummarySlot?: ReactNode;
   context?: PlayerPortraitContext;
   contextData?: PlayerPortraitContextData;
   density?: PlayerPortraitDensity;
+  portraitLayout?: PlayerPortraitLayout;
   interactive?: boolean;
   selected?: boolean;
   style?: CSSProperties;
@@ -107,9 +110,11 @@ export default function FoundationPlayerPortraitCard({
   ppsRank,
   economyStats,
   footerSlot,
+  railSummarySlot,
   context = "roster",
   contextData,
   density = "full",
+  portraitLayout = "stack",
   interactive = true,
   selected = false,
   style,
@@ -127,6 +132,7 @@ export default function FoundationPlayerPortraitCard({
     context,
     contextData,
     density,
+    layout: portraitLayout,
     playerOvr,
     playerMvs,
     playerPps,
@@ -141,7 +147,7 @@ export default function FoundationPlayerPortraitCard({
   });
 
   const economyRow =
-    economyStats && economyStats.length > 0 && density !== "mini" ? (
+    economyStats && economyStats.length > 0 && density !== "mini" && portraitLayout !== "rail" ? (
       <div className="foundation-player-portrait-economy" aria-label={`${name} Finanzkennzahlen`}>
         {economyStats.map((stat) => (
           <span key={`${stat.label}-${stat.value}`} className="foundation-player-portrait-economy-stat" title={stat.title}>
@@ -153,11 +159,11 @@ export default function FoundationPlayerPortraitCard({
       </div>
     ) : null;
 
-  const showOrbit = shouldShowPortraitOrbit(context, density);
+  const showOrbit = shouldShowPortraitOrbit(context, density, portraitLayout);
   const orbitRow = showOrbit ? (
     <VeloStatOrbitRow
       ariaLabel={`${name} Achsenwerte POW SPE MEN SOC`}
-      className="home-v2-player-orbit is-overlay foundation-player-portrait-orbit"
+      className={`home-v2-player-orbit is-overlay foundation-player-portrait-orbit${portraitLayout === "rail" ? " is-rail" : ""}`}
       stats={{
         pow: pow ?? 0,
         spe: spe ?? 0,
@@ -167,21 +173,58 @@ export default function FoundationPlayerPortraitCard({
     />
   ) : null;
 
-  const cardBody = (
+  const portraitMedia = portraitUrl ? (
+    <OptimizedMediaImage
+      className="home-v2-player-portrait"
+      src={portraitUrl}
+      alt={name}
+      width={portraitLayout === "rail" ? 108 : 280}
+      height={portraitLayout === "rail" ? 108 : 373}
+      loading={portraitLoading}
+      fetchPriority={portraitFetchPriority}
+    />
+  ) : (
+    <span className="home-v2-player-portrait is-placeholder">{portraitInitials}</span>
+  );
+
+  const overlayStatsRow =
+    overlayStats.length > 0 ? (
+      <div
+        className={`home-v2-player-stats foundation-player-portrait-stats${
+          portraitLayout === "rail" ? " is-rail-tile-overlay" : ""
+        }`}
+        data-testid="foundation-player-portrait-stats"
+      >
+        {overlayStats.map(renderOverlayStat)}
+      </div>
+    ) : null;
+
+  const cardBody =
+    portraitLayout === "rail" ? (
+      <div className="foundation-player-portrait-rail-tile">
+        <div className="home-v2-player-hero foundation-player-portrait-hero is-rail-tile">
+          {portraitMedia}
+          <div
+            className="home-v2-player-overlay foundation-player-portrait-overlay is-rail-tile"
+            aria-hidden={interactive ? true : undefined}
+          >
+            <div className="home-v2-player-overlay-top">
+              {highlight ? <span className="home-v2-player-badge">{highlight}</span> : null}
+            </div>
+            <div className="home-v2-player-overlay-bottom">
+              {resolvedSubMeta ? (
+                <span className="foundation-player-portrait-submeta is-rail-tile">{resolvedSubMeta}</span>
+              ) : null}
+              <strong className="home-v2-player-name is-rail-tile">{name}</strong>
+              {overlayStatsRow}
+              {railSummarySlot}
+            </div>
+          </div>
+        </div>
+      </div>
+    ) : (
     <div className="home-v2-player-hero foundation-player-portrait-hero">
-      {portraitUrl ? (
-        <OptimizedMediaImage
-          className="home-v2-player-portrait"
-          src={portraitUrl}
-          alt={name}
-          width={280}
-          height={373}
-          loading={portraitLoading}
-          fetchPriority={portraitFetchPriority}
-        />
-      ) : (
-        <span className="home-v2-player-portrait is-placeholder">{portraitInitials}</span>
-      )}
+      {portraitMedia}
       <div className="home-v2-player-overlay foundation-player-portrait-overlay" aria-hidden={interactive ? true : undefined}>
         <div className="home-v2-player-overlay-top">
           {rosterRank != null ? (
@@ -196,9 +239,7 @@ export default function FoundationPlayerPortraitCard({
             <span className="foundation-player-portrait-submeta">{resolvedSubMeta}</span>
           ) : null}
           <strong className="home-v2-player-name">{name}</strong>
-          <div className="home-v2-player-stats foundation-player-portrait-stats" data-testid="foundation-player-portrait-stats">
-            {overlayStats.map(renderOverlayStat)}
-          </div>
+          {overlayStatsRow}
           {economyRow}
           {orbitRow}
           {footerSlot && density !== "mini" ? (
@@ -217,6 +258,7 @@ export default function FoundationPlayerPortraitCard({
     "is-full-art",
     variant === "team" ? "is-team-layout" : "",
     `is-density-${density}`,
+    portraitLayout === "rail" ? "is-portrait-rail" : "",
     selected ? "is-selected" : "",
     rankFrameClass,
     className,

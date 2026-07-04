@@ -48,6 +48,7 @@ export type TransfermarktDisciplineScore = {
   disciplineId: string;
   disciplineName: string;
   scoreTier: TransfermarktRatingTier | null;
+  displayedScore?: number | null;
   ppsLastSeason: number | null;
   playerCount?: number | null;
   teamRank?: number | null;
@@ -834,6 +835,7 @@ export async function listTransfermarktFreeAgents(
         disciplineId: entry.disciplineId,
         disciplineName: entry.disciplineName,
         scoreTier: entry.scoreTier,
+        displayedScore: entry.displayedScore,
         ppsLastSeason: null,
         playerCount: disciplinePlayerCountById.get(entry.disciplineId) ?? null,
         teamRank: teamDisciplineRankById.get(entry.disciplineId) ?? null,

@@ -107,8 +107,8 @@ export default function InboxV2Client({
                 onClick={() => onSelectItem(item.id)}
               >
                 <span className="inbox-v2-category">{item.category}</span>
-                <strong>{item.title}</strong>
-                <small>{item.detail}</small>
+                <span className="inbox-v2-list-item-title">{item.title}</span>
+                <span className="inbox-v2-list-item-detail">{item.detail}</span>
               </button>
             ))
           ) : (

@@ -14,6 +14,10 @@ import {
   PlayerDrawerTransferHistoryTable,
 } from "@/components/foundation/player-drawer/PlayerDrawerHistoryTable";
 import { isSeasonDisciplineKey } from "@/lib/season/season-discipline-area-groups";
+import {
+  getScoutingTierWindow,
+  resolveScoutingConfidenceFromLevel,
+} from "@/lib/market/transfermarkt-scouting";
 import type {
   TrainingClassOption,
   TrainingModeOption,
@@ -1069,6 +1073,7 @@ function renderTopDisciplineCell(
   row: TopDisciplineRow,
   columnId: TopDisciplineColumnId,
   isScoutedProfile: boolean,
+  scoutingLevel: number,
 ): ReactNode {
   switch (columnId) {
     case "discipline": {
@@ -1088,9 +1093,12 @@ function renderTopDisciplineCell(
       return isScoutedProfile ? (
         <span
           className={`player-drawer-chip ${getAttributeTierClass(row.scoutedTier ?? formatDisciplineTier(row.value))}`}
-          title="Gescoutete Klasse, keine exakte Diszi-Zahl."
+          title="Gescoutete Klasse als Range, keine exakte Diszi-Zahl."
         >
-          {row.scoutedTier ?? formatDisciplineTier(row.value)}
+          {getScoutingTierWindow(
+            row.scoutedTier ?? formatDisciplineTier(row.value),
+            resolveScoutingConfidenceFromLevel(scoutingLevel),
+          )}
         </span>
       ) : (
         formatDisciplineValue(row.value, row.upgradeDelta)
@@ -1799,7 +1807,7 @@ export default function PlayerDetailDrawer({
                             key={`discipline-breakdown-${entry.id}-${columnId}`}
                             className={columnId === "discipline" ? `player-drawer-discipline-name-cell ${areaClass}` : undefined}
                           >
-                            {renderTopDisciplineCell(entry, columnId, isScoutedProfile)}
+                            {renderTopDisciplineCell(entry, columnId, isScoutedProfile, scoutingLevel)}
                           </td>
                         ))}
                       </tr>

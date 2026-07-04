@@ -249,6 +249,41 @@ describe("transfermarkt local service", () => {
     expect(result.items.slice(0, 4).map((item) => item.marketValue)).toEqual([1, 2, 3, 4]);
   });
 
+  it("returns team fit in compact list mode when a team is selected", async () => {
+    persistenceState.save = {
+      saveId: "save-singleplayer-dev",
+      gameState: createGameState({
+        teams: [createTeam({ teamId: "A-A", shortCode: "A-A", cash: 175 })],
+        players: [
+          createPlayer("p1", { marketValue: 40, displayMarketValue: 40, salaryDemand: 10, displaySalary: 10, race: "Mensch", subclasses: ["Krieger"] }),
+          createPlayer("fa-1", {
+            marketValue: 25,
+            displayMarketValue: 25,
+            salaryDemand: 6,
+            displaySalary: 6,
+            race: "Mensch",
+            subclasses: ["Krieger"],
+          }),
+        ],
+        rosters: [createRosterEntry("r1", "p1", { salary: 10, contractLength: 3, currentValue: 40, purchasePrice: 40 })],
+      }),
+    };
+
+    const { listLocalTransfermarktFreeAgents } = await import("@/lib/market/transfermarkt-local-service");
+    const result = listLocalTransfermarktFreeAgents({
+      saveId: "save-singleplayer-dev",
+      seasonId: "season-1",
+      teamId: "A-A",
+      limit: 5,
+      compactList: true,
+    });
+
+    expect(result.items.length).toBeGreaterThan(0);
+    expect(result.items.every((item) => item.teamContextAvailable)).toBe(true);
+    expect(result.items.every((item) => typeof item.fit === "number")).toBe(true);
+    expect(result.items.every((item) => item.fitSource === "compact_list")).toBe(true);
+  });
+
   it("uses save-stable potential records and scouting office level for transfermarkt scouting", async () => {
     persistenceState.save = {
       saveId: "save-singleplayer-dev",

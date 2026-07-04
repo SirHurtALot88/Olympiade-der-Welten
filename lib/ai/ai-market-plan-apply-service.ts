@@ -221,6 +221,13 @@ export type AiMarketPlanApplyParams = {
     transferWindowCycleMode?: boolean;
     postOptUpgradeDeploy?: boolean;
     minUpgradeBuyPrice?: number | null;
+    /**
+     * When a caller owns the shared localRunContext across many applies (e.g. a whole transfer
+     * window session), it can set this to keep the deferred writes buffered in the context and
+     * persist them itself once per round/phase instead of forcing a full GameState save on every
+     * single apply. Avoids the per-apply full-save (~1.2s on a large save) that dominated runtime.
+     */
+    deferContextFlush?: boolean;
   };
 };
 
@@ -429,6 +436,7 @@ function getEffectiveOptions(input: AiMarketPlanApplyParams) {
     transferWindowCycleMode: input.options?.transferWindowCycleMode ?? false,
     postOptUpgradeDeploy: input.options?.postOptUpgradeDeploy ?? false,
     minUpgradeBuyPrice: input.options?.minUpgradeBuyPrice ?? null,
+    deferContextFlush: input.options?.deferContextFlush ?? false,
   };
 }
 
@@ -2092,7 +2100,13 @@ export async function applyAiMarketPlanLocally(input: AiMarketPlanApplyParams): 
 
   recordPhase("applyLoop", Date.now() - applyStartedAt);
   const flushStartedAt = Date.now();
-  if (transferRunContext && transferRunContext.deferredWrites > 0 && !abortedAfterFailure) {
+  // When the caller owns the shared run context across a whole session (deferContextFlush) we keep
+  // the writes buffered in-memory (context.save.gameState is already mutated and correct for reads)
+  // and let the caller persist once per round/phase. Only force a full save here when we either own
+  // the context ourselves or the caller did not opt into deferring.
+  const callerOwnsRunContext = Boolean(input.localRunContext);
+  const shouldDeferFlush = options.deferContextFlush && callerOwnsRunContext;
+  if (transferRunContext && transferRunContext.deferredWrites > 0 && !abortedAfterFailure && !shouldDeferFlush) {
     flushLocalTransfermarktRunContext(transferRunContext);
   }
   recordPhase("flush", Date.now() - flushStartedAt);
@@ -2204,7 +2218,12 @@ export async function applyAiMarketPlanLocally(input: AiMarketPlanApplyParams): 
     teamScope: preview.scope.teamScope,
   } as const;
   const resolvedSave = resolveLocalSave(persistence, preview.scope.saveId);
-  const auditLogId = !dryRun && !abortedAfterFailure ? writeAuditLog(persistence, scope, summary) : null;
+  // writeAuditLog does a *second* full GameState save (re-read + rewrite of the whole ~3k-player
+  // state) purely to prepend one informational log line. Inside a session-owned cycle (deferContextFlush)
+  // that is called hundreds of times, doubling the per-apply persistence cost. Skip it there — the
+  // session already logs a compact per-team/summary line, and no functional state depends on this log.
+  const skipAuditLogSave = options.deferContextFlush && Boolean(input.localRunContext);
+  const auditLogId = !dryRun && !abortedAfterFailure && !skipAuditLogSave ? writeAuditLog(persistence, scope, summary) : null;
   if (auditLogId) {
     appliedAudits.push(auditLogId);
   }

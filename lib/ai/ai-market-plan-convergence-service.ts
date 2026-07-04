@@ -16,8 +16,20 @@ import { createPersistenceService } from "@/lib/persistence/persistence-service"
 import type { PersistenceService } from "@/lib/persistence/types";
 import type { LocalTransferWindowPhase } from "@/lib/market/transfer-window-policy";
 import { runTransferWindowSession } from "@/lib/ai/ai-transfer-window-session-service";
+import { isUnifiedPickEnabledForMarket } from "@/lib/ai/unified-pick-planner-service";
 
-const CONVERGENCE_BUY_STRATEGIES: AiSeasonStrategy[] = ["roster_repair", "depth_repair", "win_now_push"];
+// cash_recovery teams sit between hardMin and Opt with cash pressure — they must still get real
+// convergence buy passes (routed through the Unified Pick Engine's cash-tier caps / cheap_fill lane,
+// see lib/ai/ai-needs-picks-compare-service.ts resolveTeamCashTier), not just an Opt-skip that
+// strands them until they fall below hardMin and hit the weaker emergency-repair fallback.
+// See .cursor/rules/balancing-no-sell-floor-full-rebuild.mdc: no sell floor, so the buy side must
+// carry the rebuild obligation instead.
+const CONVERGENCE_BUY_STRATEGIES: AiSeasonStrategy[] = [
+  "roster_repair",
+  "depth_repair",
+  "win_now_push",
+  "cash_recovery",
+];
 
 export type ConvergencePassId = "standard" | "escalated";
 
@@ -38,10 +50,13 @@ export type ConvergenceRoundRecord = {
   warnings: string[];
 };
 
+export type ConvergencePickEngine = "unified" | "legacy" | "repair";
+
 export type ConvergenceTeamResult = {
   teamId: string;
   teamName: string;
   status: ConvergenceTeamStatus;
+  pickEngine: ConvergencePickEngine;
   passes: number;
   rounds: number;
   appliedBuys: number;
@@ -55,6 +70,7 @@ export type ConvergenceTeamResult = {
   blockingReasons: string[];
   warnings: string[];
   roundHistory: ConvergenceRoundRecord[];
+  lastApplyResult?: string;
 };
 
 export type MarketPlanConvergenceInput = {
@@ -280,10 +296,10 @@ function resolveTeamStatus(input: {
   exhausted: boolean;
 }): ConvergenceTeamStatus {
   const { team, rosterAfter, hardMin, optTarget, needsConvergence, exhausted } = input;
-  if (team.result === "blocked" || team.result === "failed_buy" || team.result === "failed_sell") {
+  if ((team.executedBuys ?? 0) > 0 && rosterAfter < hardMin) {
     return exhausted ? "convergence_exhausted" : "blocked";
   }
-  if ((team.executedBuys ?? 0) > 0 && rosterAfter < hardMin) {
+  if (team.result === "blocked" || team.result === "failed_buy" || team.result === "failed_sell") {
     return exhausted ? "convergence_exhausted" : "blocked";
   }
   if (rosterAfter < hardMin && (team.executedBuys ?? 0) === 0) {
@@ -330,6 +346,7 @@ function mergeTeamResults(
       teamId: team.teamId,
       teamName: team.teamName,
       status,
+      pickEngine: resolveActiveConvergencePickEngine(),
       passes: Math.max(previous?.passes ?? 0, passIndex),
       rounds: Math.max(previous?.rounds ?? 0, roundIndex),
       appliedBuys: (previous?.appliedBuys ?? 0) + team.executedBuys,
@@ -344,6 +361,65 @@ function mergeTeamResults(
       roundHistory: [...(previous?.roundHistory ?? []), roundRecord],
     });
   }
+}
+
+export function resolveActiveConvergencePickEngine(): Exclude<ConvergencePickEngine, "repair"> {
+  return isUnifiedPickEnabledForMarket() ? "unified" : "legacy";
+}
+
+export async function runCompareRescueBeforeEmergencyRepair(input: {
+  saveId: string;
+  seasonId: string;
+  teamIds: string[];
+  persistence: PersistenceService;
+  transferPhase?: LocalTransferWindowPhase | string;
+}) {
+  const teamIds = unique(input.teamIds);
+  if (teamIds.length === 0 || !isUnifiedPickEnabledForMarket()) {
+    return {
+      appliedBuys: 0,
+      appliedSells: 0,
+      warnings: [] as string[],
+      remainingTeamIds: teamIds,
+    };
+  }
+
+  const session = await runTransferWindowSession({
+    saveId: input.saveId,
+    seasonId: input.seasonId,
+    persistence: input.persistence,
+    phase: "preseason",
+    dryRun: false,
+    confirmToken: AI_MARKET_APPLY_CONFIRM_TOKEN,
+    transferPhase: input.transferPhase ?? "manual_transfer_window",
+    teamScope: "all",
+    targetTeamIds: teamIds,
+    maxTeamCycles: 1,
+    maxLeagueRounds: 1,
+    allowBuys: true,
+    skipIfExistingMarketTransfers: false,
+    progressLog: false,
+  });
+
+  const after = input.persistence.getSaveById(input.saveId);
+  const remainingTeamIds = after
+    ? unique([
+        ...getTeamsBelowHardMin(after.gameState).map((entry) => entry.teamId),
+        ...getTeamsNeedingConvergence(after.gameState)
+          .map((entry) => entry.teamId)
+          .filter((teamId) => teamIds.includes(teamId)),
+      ]).filter((teamId) => teamIds.includes(teamId))
+    : teamIds;
+
+  return {
+    appliedBuys: session.appliedBuys,
+    appliedSells: session.appliedSells,
+    warnings: [
+      `compare_rescue_round:teams:${teamIds.length}:buys:${session.appliedBuys}:remaining:${remainingTeamIds.length}`,
+      ...session.warnings.slice(0, 8),
+    ],
+    remainingTeamIds,
+  };
 }
 
 export async function runMarketPlanConvergence(input: MarketPlanConvergenceInput): Promise<MarketPlanConvergenceResult> {

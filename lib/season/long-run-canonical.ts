@@ -12,7 +12,11 @@ import { withNormalizedTeamGeneralManagers } from "@/lib/foundation/team-general
 import { deriveRosterTargets } from "@/lib/foundation/roster-limits";
 import type { PersistedSaveGame, PersistenceService } from "@/lib/persistence/types";
 import { isLongRunFastProfile } from "@/lib/season/long-run-profile";
-import { getSeasonEconomyFactorWindow, SEASON_ECONOMY_FACTOR_WINDOW_SIZE } from "@/lib/season/season-economy-factors";
+import {
+  getSeasonEconomyFactorWindow,
+  parseSalaryFactorPatternEnv,
+  SEASON_ECONOMY_FACTOR_WINDOW_SIZE,
+} from "@/lib/season/season-economy-factors";
 import { isSeasonOne } from "@/lib/season/transfer-season-policy";
 import { ensureSeasonSponsorOffers, chooseSponsorOfferForAiTeams } from "@/lib/sponsor/sponsor-offer-service";
 import {
@@ -60,7 +64,8 @@ function splitLongRunManagerBlockers(blockers: string[]) {
     if (
       entry.includes(":maintain_building:insufficient_cash") ||
       entry.includes(":upgrade_building:insufficient_cash") ||
-      entry.includes(":buy_building:insufficient_cash")
+      entry.includes(":buy_building:insufficient_cash") ||
+      PRE_DRAFT_ROSTER_EMPTY.test(entry)
     ) {
       soft.push(entry);
       continue;
@@ -76,10 +81,15 @@ export function ensureSalaryFactorWindowSeeded(save: PersistedSaveGame, persiste
   if (existing.length === SEASON_ECONOMY_FACTOR_WINDOW_SIZE) {
     return save;
   }
+  // One-time Season 1 override lets balancing runs script a deterministic salary-factor sequence
+  // (e.g. good seasons then bad seasons as a stress test); the window then shifts season-by-season
+  // via advanceSeasonEconomyFactorWindow as usual, so a single seed covers the whole multi-season run.
+  const patternOverride = seasonId === "season-1" ? parseSalaryFactorPatternEnv() : null;
   const window = getSeasonEconomyFactorWindow({
     saveId: save.saveId,
     seasonId,
     seasonState: save.gameState.seasonState,
+    sheetFactors: patternOverride?.map((factor) => ({ seasonLabel: "", factor })),
   });
   return persistence.saveSingleplayerState(save.saveId, {
     ...save.gameState,
@@ -369,9 +379,10 @@ export function repairSeasonOneEndRosterBeforeS2(
     return { blockers: [], warnings: [], purchases: [], repaired: false };
   }
 
-  // S1 end: only hard-min roster holes — never opt-fill or planner-delegated bonus picks.
-  void options?.plannerExhaustedTeamIds;
-  const teamIds = getAllTeamsBelowMinIds(save.gameState);
+  // S1 end: always repair hard-min holes; union compare-rescue remainder (never skip sell-only below-min).
+  const belowMinIds = getAllTeamsBelowMinIds(save.gameState);
+  const plannerExhausted = (options?.plannerExhaustedTeamIds ?? []).filter(Boolean);
+  const teamIds = [...new Set([...belowMinIds, ...plannerExhausted])];
   if (teamIds.length === 0) {
     return { blockers: [], warnings: [], purchases: [], repaired: false };
   }

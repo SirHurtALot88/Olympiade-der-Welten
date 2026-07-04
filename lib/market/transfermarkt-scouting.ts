@@ -395,3 +395,75 @@ export function buildTransfermarktScoutedAttributeRows(input: {
     } satisfies TransfermarktScoutedAttributeRow;
   });
 }
+
+export const TRANSFERMARKT_SCOUT_TIER_ORDER = ["F", "E", "D", "C", "B", "A", "S", "S+"] as const;
+
+export function resolveScoutingConfidenceFromLevel(level: number | null | undefined) {
+  if (level == null || level <= 0) {
+    return 15;
+  }
+  if (level >= 5) {
+    return 80;
+  }
+  if (level >= 4) {
+    return 72;
+  }
+  if (level >= 3) {
+    return 60;
+  }
+  if (level >= 2) {
+    return 45;
+  }
+  return 25;
+}
+
+export function getScoutingTierWindow(
+  tier: string | null | undefined,
+  confidence: number | null | undefined,
+) {
+  if (!tier) {
+    return "—";
+  }
+  const normalizedTier = tier.toUpperCase();
+  if (confidence != null && confidence >= 75) {
+    return normalizedTier;
+  }
+  return getAttributeRangeLabel(normalizedTier as TransfermarktRatingTier) ?? normalizedTier;
+}
+
+export function isScoutedImpactExact(confidence: number | null | undefined) {
+  return confidence != null && confidence >= 75;
+}
+
+export function getScoutedImpactDeltaMargin(
+  confidence: number | null | undefined,
+  delta: number | null | undefined,
+) {
+  if (delta == null || !Number.isFinite(delta)) {
+    return 0;
+  }
+  if (isScoutedImpactExact(confidence)) {
+    return 0;
+  }
+  const confidenceFactor = 1 - Math.min(1, Math.max(0, (confidence ?? 15) / 100));
+  const baseBand = confidence != null && confidence >= 50 ? 0.55 : 0.95;
+  return Math.max(0.35, baseBand * confidenceFactor + Math.abs(delta) * 0.35);
+}
+
+export function formatScoutedImpactDelta(
+  delta: number | null | undefined,
+  confidence: number | null | undefined,
+  formatValue: (value: number, digits?: number) => string,
+) {
+  if (delta == null || !Number.isFinite(delta)) {
+    return "—";
+  }
+  const margin = getScoutedImpactDeltaMargin(confidence, delta);
+  if (margin <= 0.05) {
+    const sign = delta > 0 ? "+" : "";
+    return `${sign}${formatValue(delta, 1)}`;
+  }
+  const low = delta - margin;
+  const high = delta + margin;
+  return `${formatValue(Math.min(low, high), 1)} – ${formatValue(Math.max(low, high), 1)}`;
+}

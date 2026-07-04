@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 
 import type { GameInboxItem, GameState, Player, Team } from "@/lib/data/olyDataTypes";
-import { buildGameInboxItems, filterGameInboxItems, filterInboxItemsByMode, getPrimaryInboxTask, isGameInboxChronicleItem, isGameInboxDecisionItem } from "@/lib/foundation/game-inbox-service";
+import { buildGameInboxItems, filterGameInboxItems, filterInboxItemsByMode, getPrimaryInboxTask, groupInboxItemsForDisplay, isGameInboxChronicleItem, isGameInboxDecisionItem } from "@/lib/foundation/game-inbox-service";
 
 function makeTeam(partial?: Partial<Team>): Team {
   return {
@@ -458,6 +458,66 @@ describe("game inbox service", () => {
     expect(decisions.some((item) => item.source === "transfer_history")).toBe(false);
     expect(isGameInboxDecisionItem(decisions[0]!)).toBe(true);
     expect(isGameInboxChronicleItem(chronicle.find((item) => item.source === "transfer_history")!)).toBe(true);
+  });
+
+  it("keeps progression and facility news out of decisions and groups them for display", () => {
+    const gameState = makeGameState({
+      playerProgressionEvents: [
+        {
+          eventId: "prog-1",
+          teamId: "M-M",
+          playerId: "p-1",
+          seasonId: "season-3",
+          upgrades: [{ attribute: "pow", delta: 1 }],
+          xpSpent: 0,
+          timestamp: "2026-06-25T00:00:00.000Z",
+        },
+        {
+          eventId: "prog-2",
+          teamId: "M-M",
+          playerId: "p-2",
+          seasonId: "season-3",
+          upgrades: [{ attribute: "spe", delta: 1 }, { attribute: "men", delta: 1 }],
+          xpSpent: 0,
+          timestamp: "2026-06-25T01:00:00.000Z",
+        },
+      ],
+      seasonState: {
+        ...(makeGameState().seasonState ?? {}),
+        facilityEvents: [
+          {
+            eventId: "fac-1",
+            teamId: "M-M",
+            seasonId: "season-3",
+            facilityId: "scouting",
+            previousLevel: 1,
+            nextLevel: 2,
+            timestamp: "2026-06-25T02:00:00.000Z",
+          },
+          {
+            eventId: "fac-2",
+            teamId: "M-M",
+            seasonId: "season-3",
+            facilityId: "training",
+            previousLevel: 2,
+            nextLevel: 3,
+            timestamp: "2026-06-25T03:00:00.000Z",
+          },
+        ],
+      },
+    });
+    const items = buildGameInboxItems({ gameState, saveId: "save-1", activeTeamId: "M-M", activeOwnerId: "user_local" });
+    const decisions = filterInboxItemsByMode(items, "decisions");
+    const chronicle = filterInboxItemsByMode(items, "chronicle");
+
+    expect(decisions.some((item) => item.source === "player_progression_events")).toBe(false);
+    expect(decisions.some((item) => item.source === "facility_events")).toBe(false);
+    expect(chronicle.some((item) => item.source === "player_progression_events")).toBe(true);
+
+    const grouped = groupInboxItemsForDisplay(chronicle);
+    expect(grouped.some((item) => item.itemId.startsWith("grouped:player_progression_events:"))).toBe(true);
+    expect(grouped.some((item) => item.title === "2 XP-Upgrades durchgeführt")).toBe(true);
+    expect(grouped.some((item) => item.title === "2 Facility-Events")).toBe(true);
   });
 
   it("creates health inbox tasks for injured and fatigued players", () => {

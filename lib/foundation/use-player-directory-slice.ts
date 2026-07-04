@@ -1,10 +1,21 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 
 import type { PlayerRatingContractRow } from "@/lib/foundation/player-rating-contract";
 import type { PlayerDirectorySliceResponse } from "@/lib/foundation/player-directory-slice";
 import { hydrateSeasonRatingsSliceMap } from "@/lib/foundation/season-ratings-slice";
+
+// Stable, module-level fallbacks: reused whenever `payload` is null so that
+// consumers relying on referential identity (useMemo/useEffect deps) don't
+// see a "new" value every render. See use-player-directory-slice.ts history:
+// building fresh Map/object literals directly in the render body caused an
+// infinite render loop once the Players tab payload loaded (every downstream
+// useMemo/useEffect "correctly" recomputed forever because its input never
+// stabilized).
+const EMPTY_RATINGS_MAP = new Map<string, PlayerRatingContractRow>();
+const EMPTY_PERFORMANCE_BY_PLAYER_ID: PlayerDirectorySliceResponse["performanceByPlayerId"] = {};
+const EMPTY_CAREER_STATS_BY_PLAYER_ID: PlayerDirectorySliceResponse["careerStatsByPlayerId"] = {};
 
 function buildPlayerDirectorySliceRequestKey(input: {
   saveId: string;
@@ -104,15 +115,18 @@ export function usePlayerDirectorySlice(input: {
     return () => controller.abort();
   }, [input.contentSignature, input.enabled, input.saveId, input.seasonId]);
 
-  const ratingsById = payload
-    ? hydrateSeasonRatingsSliceMap(payload.ratingsByPlayerId)
-    : new Map<string, PlayerRatingContractRow>();
+  const ratingsById = useMemo(
+    () => (payload ? hydrateSeasonRatingsSliceMap(payload.ratingsByPlayerId) : EMPTY_RATINGS_MAP),
+    [payload],
+  );
+  const performanceByPlayerId = payload?.performanceByPlayerId ?? EMPTY_PERFORMANCE_BY_PLAYER_ID;
+  const careerStatsByPlayerId = payload?.careerStatsByPlayerId ?? EMPTY_CAREER_STATS_BY_PLAYER_ID;
 
   return {
     payload,
     ratingsById,
-    performanceByPlayerId: payload?.performanceByPlayerId ?? {},
-    careerStatsByPlayerId: payload?.careerStatsByPlayerId ?? {},
+    performanceByPlayerId,
+    careerStatsByPlayerId,
     loading,
     error,
   };

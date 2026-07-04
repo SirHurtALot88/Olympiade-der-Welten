@@ -152,11 +152,21 @@ function teamStandingRank(gameState: GameState, teamId: string) {
   return Number(row.rank);
 }
 
+function argValue(flag: string) {
+  const index = process.argv.indexOf(flag);
+  if (index === -1) return null;
+  return process.argv[index + 1] ?? null;
+}
+
 async function main() {
   const auditStarted = performance.now();
   loadEnvConfig(PROJECT_ROOT);
   const persistence = createPersistenceService();
-  const cloneFrom = process.env.OLY_PICK_AUDIT_CLONE_FROM ?? "fresh-season-1-1782726659026";
+  const sourceSaveId =
+    argValue("--save-id") ?? process.env.OLY_LONG_RUN_SAVE_ID ?? process.env.OLY_PICK_AUDIT_CLONE_FROM ?? null;
+  if (!sourceSaveId) {
+    throw new Error("Missing --save-id, OLY_LONG_RUN_SAVE_ID, or OLY_PICK_AUDIT_CLONE_FROM");
+  }
   const outputDir =
     process.env.OLY_PICK_AUDIT_OUTPUT_DIR ??
     path.join(PROJECT_ROOT, "outputs", `pick-audit-preseason-${new Date().toISOString().replace(/[:.]/g, "-").slice(0, 19)}`);
@@ -169,9 +179,10 @@ async function main() {
   log(`Output → ${outputDir}`);
   log(`Run label: ${runLabel} | passes=${buyPasses} rounds=${buyRounds} salaryFactor=${salaryFactor}`);
 
-  const clone = persistence.cloneSave(cloneFrom, `Pick Audit Preseason ${Date.now()}`);
+  const clone = persistence.cloneSave(sourceSaveId, `Pick Audit Preseason ${Date.now()}`);
   let save = persistence.getSaveById(clone.saveId);
-  if (!save) throw new Error(`Clone failed from ${cloneFrom}`);
+  if (!save) throw new Error(`Clone failed from ${sourceSaveId}`);
+  log(`Cloned from ${sourceSaveId} → ${save.saveId}`);
 
   if ((save.gameState.gamePhase ?? "") === "season_completed") {
     const setup = buildPreSeasonNextSeasonSetupToken(save);
@@ -514,7 +525,7 @@ async function main() {
     "# Market-Slot Fast Audit",
     "",
     `- Run: **${runLabel}**`,
-    `- Save: \`${save.saveId}\` (clone from \`${cloneFrom}\`)`,
+    `- Save: \`${save.saveId}\` (clone from \`${sourceSaveId}\`)`,
     `- Season: ${seasonId}`,
     `- Convergence: ${convergence.appliedBuys} buys, ${convergence.appliedSells} sells`,
     `- Teams ≥ Opt: **${teamsAtOpt}/32**`,

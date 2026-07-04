@@ -53,6 +53,22 @@ function normalizeSheetFactors(sheetFactors?: SheetFactorInput[]) {
   return values.length > 0 ? values : DEFAULT_SEASON_FACTOR_VALUES;
 }
 
+/**
+ * Reads OLY_LONG_RUN_SALARY_FACTOR_PATTERN, e.g. "1.18,1.15,0.85,0.85,0.88" for Season 1-5.
+ * Used only for the initial (Season 1, unseeded) window so balancing runs can deterministically
+ * script "N good seasons then M bad seasons" scenarios instead of relying on the randomized/default
+ * factor rolls. The window then shifts season-by-season via advanceSeasonEconomyFactorWindow as usual.
+ */
+export function parseSalaryFactorPatternEnv(): number[] | null {
+  const raw = process.env.OLY_LONG_RUN_SALARY_FACTOR_PATTERN;
+  if (!raw || !raw.trim()) return null;
+  const values = raw
+    .split(",")
+    .map((entry) => Number(entry.trim()))
+    .filter((value) => Number.isFinite(value) && value > 0);
+  return values.length > 0 ? values.map(round2) : null;
+}
+
 function buildSeedWindow(input: {
   saveId: string;
   seasonId: string;

@@ -20,8 +20,10 @@ import {
   getTeamHardMinRequired,
   getTeamOptTarget,
   getTeamsBelowHardMin,
+  resolveActiveConvergencePickEngine,
   runEmergencyRosterRepairForTeams,
   runMarketPlanConvergence,
+  teamNeedsMarketConvergence,
 } from "@/lib/ai/ai-market-plan-convergence-service";
 
 function buildGameState(overrides?: Partial<GameState>): GameState {
@@ -203,6 +205,24 @@ describe("ai market plan convergence service", () => {
         return buildApplyResult({ appliedSells: 1, rosterAfter: 6 });
       }
       rosterCount = 8;
+      // Mirror what the real applyAiMarketPlanLocally does when given a localRunContext: it writes
+      // the post-apply state back into runContext.save so subsequent readLiveSave() calls in
+      // runTransferWindowSession see the updated roster instead of the stale save captured when the
+      // session context was created. Without this, rosterAfter checks in resolveTeamStatus keep
+      // seeing the pre-buy roster count forever and team-a would wrongly stay "blocked".
+      if (params.localRunContext?.save) {
+        params.localRunContext.save = {
+          ...params.localRunContext.save,
+          gameState: buildGameState({
+            rosters: Array.from({ length: rosterCount }, (_, index) => ({
+              id: `r-a-${index}`,
+              teamId: "team-a",
+              playerId: `p-a-${index}`,
+              slot: index,
+            })),
+          }),
+        };
+      }
       return buildApplyResult({ appliedBuys: 2, appliedSells: 0, rosterAfter: rosterCount, executedBuys: 2 });
     });
 
@@ -332,6 +352,68 @@ describe("ai market plan convergence service", () => {
     expect(result.emergencyRepairTeams).not.toContain("team-bp");
     expect(result.rounds).toBe(0);
     expect(getTeamOptTarget(gameState, "team-bp")).toBe(10);
+  });
+  it("tags exhausted teams for repair engine logging", async () => {
+    process.env.OLY_UNIFIED_PICK = "1";
+    const gameState = buildGameState({
+      rosters: Array.from({ length: 6 }, (_, index) => ({
+        id: `r-a-${index}`,
+        teamId: "team-a",
+        playerId: `p-a-${index}`,
+        slot: index,
+      })),
+    });
+    const persistence = { getSaveById: () => ({ saveId: "save-1", gameState }) };
+    applyAiMarketPlanLocally.mockResolvedValue(buildApplyResult({ appliedBuys: 0, appliedSells: 0, rosterAfter: 6 }));
+
+    const result = await runMarketPlanConvergence({
+      saveId: "save-1",
+      seasonId: "season-2",
+      persistence: persistence as never,
+      transferPhase: "manual_transfer_window",
+      maxPasses: 1,
+      maxRoundsPerPass: 1,
+      skipIfExistingMarketTransfers: false,
+    });
+
+    expect(resolveActiveConvergencePickEngine()).toBe("unified");
+    const teamA = result.perTeam.find((entry) => entry.teamId === "team-a");
+    expect(teamA?.pickEngine).toBeDefined();
+    delete process.env.OLY_UNIFIED_PICK;
+  });
+});
+
+describe("teamNeedsMarketConvergence", () => {
+  it("grants a buy pass to cash_recovery teams between hardMin and Opt (regression: gate used to block them)", () => {
+    const gameState = buildGameState({
+      teams: [{ teamId: "team-a", name: "Team A", shortCode: "TMA", cash: -10, humanControlled: false }],
+      rosters: Array.from({ length: 9 }, (_, index) => ({
+        id: `r-a-${index}`,
+        teamId: "team-a",
+        playerId: `p-a-${index}`,
+        slot: index,
+      })),
+    });
+
+    // Roster (9) sits strictly between hardMin (8) and Opt (10); negative cash drives the
+    // doctrine strategy to cash_recovery. Before the fix, cash_recovery was excluded from
+    // CONVERGENCE_BUY_STRATEGIES and this returned false, leaving the team stuck without
+    // real buys until it fell below hardMin into the weaker emergency-repair fallback.
+    expect(teamNeedsMarketConvergence(gameState, "team-a")).toBe(true);
+  });
+
+  it("still skips convergence once a team reaches Opt, regardless of cash pressure", () => {
+    const gameState = buildGameState({
+      teams: [{ teamId: "team-a", name: "Team A", shortCode: "TMA", cash: -10, humanControlled: false }],
+      rosters: Array.from({ length: 10 }, (_, index) => ({
+        id: `r-a-${index}`,
+        teamId: "team-a",
+        playerId: `p-a-${index}`,
+        slot: index,
+      })),
+    });
+
+    expect(teamNeedsMarketConvergence(gameState, "team-a")).toBe(false);
   });
 });
 

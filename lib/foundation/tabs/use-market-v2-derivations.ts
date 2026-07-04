@@ -2,6 +2,11 @@ import { useMemo } from "react";
 
 import { getPlayerPortraitMediaModel } from "@/lib/data/mediaAssets";
 import type { GameState, Player, RosterEntry, TeamSeasonObjectiveRecord } from "@/lib/data/olyDataTypes";
+import {
+  resolvePlayerDisplayMvs,
+  resolvePlayerDisplayPps,
+} from "@/lib/foundation/player-rating-contract";
+import { buildSeasonPointsLedger, type SeasonPointsLedger } from "@/lib/foundation/season-points-ledger";
 import { getTransferWindowStatus } from "@/lib/market/transfer-window-policy";
 import { buildScoutPipelineSummary } from "@/lib/scouting/facility-scout-pipeline-service";
 import { getActiveScoutingWishlistEntries } from "@/lib/scouting/scouting-wishlist-slots";
@@ -36,6 +41,7 @@ export function buildMarketV2ClientKey(activeSaveId: string, seasonId: string): 
 export function buildTransferMarketV2RosterRows(input: {
   gameState: GameState;
   playerRatingsById: Map<string, { ppsSeason?: number | null; ovrNormalized?: number | null; mvs?: number | null }>;
+  seasonPointsLedger?: SeasonPointsLedger | null;
   getRosterEntryDisplayMarketValue: (
     entry?: Pick<RosterEntry, "currentValue" | "purchasePrice"> | null,
     player?: Player | null,
@@ -43,6 +49,8 @@ export function buildTransferMarketV2RosterRows(input: {
   getRosterEntryDisplaySalary: (entry: Pick<RosterEntry, "salary">, player?: Player | null) => number | null;
 }): TransferMarketV2RosterRow[] {
   const playersById = new Map(input.gameState.players.map((player) => [player.id, player] as const));
+  const seasonPointsLedger =
+    input.seasonPointsLedger === undefined ? buildSeasonPointsLedger(input.gameState) : input.seasonPointsLedger;
 
   return input.gameState.rosters
     .map((entry) => {
@@ -53,6 +61,12 @@ export function buildTransferMarketV2RosterRows(input: {
       const playerRating = input.playerRatingsById.get(player.id) ?? null;
       const portrait = getPlayerPortraitMediaModel(player);
       const salary = input.getRosterEntryDisplaySalary(entry, player);
+      const pps = resolvePlayerDisplayPps({
+        playerRating,
+        seasonPointsLedger,
+        playerId: player.id,
+      });
+      const mvs = resolvePlayerDisplayMvs({ playerRating });
       return {
         activePlayerId: entry.id,
         playerId: player.id,
@@ -64,13 +78,10 @@ export function buildTransferMarketV2RosterRows(input: {
         marketValue: input.getRosterEntryDisplayMarketValue(entry, player),
         salary,
         contractLength: entry.contractLength ?? null,
-        pps: playerRating?.ppsSeason ?? player.pps ?? null,
+        pps,
         ovr: playerRating?.ovrNormalized ?? player.ovr ?? null,
-        mvs: playerRating?.mvs ?? null,
-        valueScore:
-          (playerRating?.ppsSeason ?? player.pps ?? null) != null && salary != null && salary > 0
-            ? (playerRating?.ppsSeason ?? player.pps ?? 0) / salary
-            : null,
+        mvs,
+        valueScore: pps != null && salary != null && salary > 0 ? pps / salary : null,
         pow: player.coreStats.pow ?? null,
         spe: player.coreStats.spe ?? null,
         men: player.coreStats.men ?? null,
@@ -133,6 +144,7 @@ export interface UseMarketV2DerivationsInput {
   activeSaveId: string;
   activeManagerTeamId: string | null;
   playerRatingsById: Map<string, { ppsSeason?: number | null; ovrNormalized?: number | null; mvs?: number | null }>;
+  seasonPointsLedger?: SeasonPointsLedger | null;
   selectedTeamObjectives: TeamSeasonObjectiveRecord[];
   getRosterEntryDisplayMarketValue: (
     entry?: Pick<RosterEntry, "currentValue" | "purchasePrice"> | null,
@@ -158,6 +170,7 @@ export function useMarketV2Derivations(input: UseMarketV2DerivationsInput) {
       buildTransferMarketV2RosterRows({
         gameState: input.gameState,
         playerRatingsById: input.playerRatingsById,
+        seasonPointsLedger: input.seasonPointsLedger,
         getRosterEntryDisplayMarketValue: input.getRosterEntryDisplayMarketValue,
         getRosterEntryDisplaySalary: input.getRosterEntryDisplaySalary,
       }),
@@ -166,6 +179,7 @@ export function useMarketV2Derivations(input: UseMarketV2DerivationsInput) {
       input.getRosterEntryDisplayMarketValue,
       input.getRosterEntryDisplaySalary,
       input.playerRatingsById,
+      input.seasonPointsLedger,
     ],
   );
 

@@ -47,6 +47,9 @@ import FoundationHistoryV2ShellHost, {
 import FoundationSeasonPreviewShellHost, {
   type FoundationSeasonPreviewShellHostProps,
 } from "@/app/foundation/season-preview-v2/FoundationSeasonPreviewShellHost";
+import FoundationTrainingCompactShellHost, {
+  type FoundationTrainingCompactShellHostProps,
+} from "@/app/foundation/training-compact/FoundationTrainingCompactShellHost";
 
 export type FoundationWarningInboxItem = {
   id: string;
@@ -178,8 +181,30 @@ export type FoundationShellRouterCockpitProps = {
 };
 
 /**
- * Incremental Phase 5.3 shell slice: Cockpit route with unmount gate.
+ * Shell-first slice: Cockpit route with unmount gate. Renders a lightweight
+ * skeleton immediately, then defers the heavy status/derivation host by a
+ * frame (same pattern as the Teams shell-first fix).
  */
+function FoundationShellRouterCockpitContent({ hostProps }: { hostProps: FoundationCockpitHostProps }) {
+  const [hostMounted, setHostMounted] = useState(false);
+  const handleHostMounted = useCallback(() => {
+    setHostMounted(true);
+  }, []);
+
+  return (
+    <>
+      {!hostMounted ? (
+        <section className="panel" id="foundation-cockpit" data-testid="foundation-cockpit">
+          <FoundationPanelSkeleton variant="default" label="Cockpit wird geladen…" />
+        </section>
+      ) : null}
+      <FoundationDeferredMount onMounted={handleHostMounted}>
+        <FoundationCockpitHost {...hostProps} />
+      </FoundationDeferredMount>
+    </>
+  );
+}
+
 export function FoundationShellRouterCockpit({ active, hostProps }: FoundationShellRouterCockpitProps) {
   if (!active) {
     return null;
@@ -187,7 +212,7 @@ export function FoundationShellRouterCockpit({ active, hostProps }: FoundationSh
 
   return (
     <FoundationTabActiveHost active={active}>
-      <FoundationCockpitHost {...hostProps} />
+      <FoundationShellRouterCockpitContent hostProps={hostProps} />
     </FoundationTabActiveHost>
   );
 }
@@ -238,8 +263,30 @@ export type FoundationShellRouterPrizeProps = {
 };
 
 /**
- * Incremental Phase 5.3 shell slice: Prize route with unmount gate.
+ * Shell-first slice: Prize route with unmount gate. Renders a lightweight
+ * skeleton immediately, then defers the heavy prize/sponsor derivation host
+ * by a frame (same pattern as the Cockpit shell-first fix).
  */
+function FoundationShellRouterPrizeContent({ hostProps }: { hostProps: FoundationPrizeFinanceShellHostProps }) {
+  const [hostMounted, setHostMounted] = useState(false);
+  const handleHostMounted = useCallback(() => {
+    setHostMounted(true);
+  }, []);
+
+  return (
+    <>
+      {!hostMounted ? (
+        <section className="panel" id="foundation-prize" data-testid="foundation-prize">
+          <FoundationPanelSkeleton variant="default" label="Sponsoren & Preisgeld werden geladen…" />
+        </section>
+      ) : null}
+      <FoundationDeferredMount onMounted={handleHostMounted}>
+        <FoundationPrizeFinanceShellHost {...hostProps} />
+      </FoundationDeferredMount>
+    </>
+  );
+}
+
 export function FoundationShellRouterPrize({ active, hostProps }: FoundationShellRouterPrizeProps) {
   if (!active) {
     return null;
@@ -247,7 +294,7 @@ export function FoundationShellRouterPrize({ active, hostProps }: FoundationShel
 
   return (
     <FoundationTabActiveHost active={active}>
-      <FoundationPrizeFinanceShellHost {...hostProps} />
+      <FoundationShellRouterPrizeContent hostProps={hostProps} />
     </FoundationTabActiveHost>
   );
 }
@@ -268,6 +315,60 @@ export function FoundationShellRouterLineup({ active, hostProps }: FoundationShe
   return (
     <FoundationTabActiveHost active={active}>
       <FoundationLineupShellHost {...hostProps} />
+    </FoundationTabActiveHost>
+  );
+}
+
+export type FoundationShellRouterTrainingProps = {
+  active: boolean;
+  selectedTeam: Team | null;
+  hostProps: Omit<FoundationTrainingCompactShellHostProps, "selectedTeam">;
+};
+
+/**
+ * Shell-first slice: Training-compact route with unmount gate (Foundation
+ * Perf Phase 3). Renders a lightweight skeleton immediately, then defers the
+ * heavy whole-roster forecast host by a frame (same pattern as the
+ * Cockpit/Prize shell-first fixes).
+ */
+function FoundationShellRouterTrainingContent({
+  selectedTeam,
+  hostProps,
+}: {
+  selectedTeam: Team;
+  hostProps: Omit<FoundationTrainingCompactShellHostProps, "selectedTeam">;
+}) {
+  const [hostMounted, setHostMounted] = useState(false);
+  const handleHostMounted = useCallback(() => {
+    setHostMounted(true);
+  }, []);
+
+  return (
+    <>
+      {!hostMounted ? (
+        <section
+          className="panel foundation-training-compact-panel"
+          id="foundation-training-compact"
+          data-testid="foundation-training-compact"
+        >
+          <FoundationPanelSkeleton variant="default" label="Training wird geladen…" />
+        </section>
+      ) : null}
+      <FoundationDeferredMount onMounted={handleHostMounted}>
+        <FoundationTrainingCompactShellHost {...hostProps} selectedTeam={selectedTeam} />
+      </FoundationDeferredMount>
+    </>
+  );
+}
+
+export function FoundationShellRouterTraining({ active, selectedTeam, hostProps }: FoundationShellRouterTrainingProps) {
+  if (!active || !selectedTeam) {
+    return null;
+  }
+
+  return (
+    <FoundationTabActiveHost active={active}>
+      <FoundationShellRouterTrainingContent selectedTeam={selectedTeam} hostProps={hostProps} />
     </FoundationTabActiveHost>
   );
 }

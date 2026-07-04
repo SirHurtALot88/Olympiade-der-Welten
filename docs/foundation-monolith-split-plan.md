@@ -9,6 +9,70 @@ Perf-Baseline: V7/V8-Audits, [510c2c1e](agent-transcript) (Audit-Lauf unvollstä
 
 ## 0. Fortschritt / Progress Log
 
+### Stand 2026-07-03 (Nacht, spät — Drilldown-Crash-Fix: Spielerprofil-Endlosschleife + Teams-Vertraege-Crash)
+
+Behebt den unten dokumentierten "Neuer Befund (nicht gefixt)" vollständig, plus einen zweiten, davon unabhängigen Crash, der erst nach dem ersten Fix im Re-Audit sichtbar wurde.
+
+| Bug | Root Cause | Fix |
+|---|---|---|
+| **Spielerprofil-Endlosschleife (`Maximum update depth exceeded`)** | [`use-player-directory-slice.ts`](../lib/foundation/use-player-directory-slice.ts) baute `ratingsById` (und die `performanceByPlayerId`/`careerStatsByPlayerId`-Fallbacks) **ungememoized bei jedem Render neu** (`payload ? hydrateSeasonRatingsSliceMap(...) : new Map()`). Die instabile Referenz propagierte durch `playerScopeRows`/`playersTableRows` in `use-foundation-cross-tab-player-directory.ts` bis in den `useEffect`, der `sortPlayerDirectoryRows` aufruft → Endlosschleife, sobald der Spieler-Slice-Payload geladen war. Da es keine React Error Boundary gibt, fror die komplette App danach für den Rest der Browser-Session ein. | `ratingsById` in `useMemo` (dep: `payload`) gepackt; `EMPTY_RATINGS_MAP`/`EMPTY_PERFORMANCE_BY_PLAYER_ID`/`EMPTY_CAREER_STATS_BY_PLAYER_ID` als Modul-Level-Konstanten für den Null-Payload-Fall |
+| **Teams-Tab-Verträge-Crash (`Cannot read properties of undefined (reading 'has')`)** | `transferSellMarkerKeySet` wird in `use-foundation-cross-tab-market-filters.ts` korrekt und stabil per `useMemo` gebaut, fehlte aber im `foundationTeamsViewHostProps`-Objekt in [`use-foundation-shell-router-body-scope.tsx`](../lib/foundation/tabs/use-foundation-shell-router-body-scope.tsx) — dasselbe Muster wie der bereits dokumentierte `getRankHeatClass`-Fix weiter unten (Host-Props-Objekt vergisst ein Feld, das `FoundationTeamsDetailPanel.tsx` unconditionally per `.has(...)` konsumiert). Crashte nur beim Rendern des Verträge-Untertabs. | `transferSellMarkerKeySet` zu `foundationTeamsViewHostProps` ergänzt |
+| **Audit-Script-Bug (kein App-Bug):** `Teamprofil`-Drilldown-Schritte im V9-Audit schlugen mit Locator-Timeout fehl | `scripts/foundation-v9-performance-audit.ts` suchte nach einem Button mit Accessible-Name `"Teamprofil"`; dieser Button existiert nicht mehr — die Teams-Tabelle öffnet das Profil jetzt über den Team-Namen-Button (`.table-link-button.players-table-team-button`) pro Zeile | Selector im Audit-Script korrigiert |
+
+**Verifikation:**
+- Neuer Regressions-Test in [`foundation-performance-architecture.test.ts`](../tests/foundation-performance-architecture.test.ts) prüft per Source-Pattern, dass `ratingsById` in `use-player-directory-slice.ts` weiterhin `useMemo`-gewrappt bleibt.
+- Voller `perf:foundation-v9`-Re-Audit (Save `fresh-season-1-1783097218467`): **0 Failed** (vorher 3), **keine Browser-Errors** (vorher `Maximum update depth exceeded` + `Cannot read properties of undefined (reading 'has')`), alle 76 Messschritte laufen durch. Spielerprofil (cold/warm) + alle 6 Untertabs, Teamprofil (cold/warm), alle 3 Teams-Untertabs (inkl. Verträge) jetzt `ok`/`slow`, keiner mehr `failed`.
+- `Spielerprofil (warm)` (13,2 s) und `Teamprofil (warm)` (122,7 s, Ausreißer durch Dev-Mode-Chunk-Kompilierung direkt nach dem Fix-Deploy) bleiben als **separates Performance-Thema** offen (kein Crash mehr, nur Ladezeit) — nicht Teil dieses Fixes, siehe Top-5-Hotspots in [tab-performance-hotspots-v9.md](./tab-performance-hotspots-v9.md).
+- Bestehende Unit-/Contract-Suite für die betroffenen Bereiche (`use-player-directory-slice`, `use-season-ratings-slice`, `foundation-performance-architecture`, `foundation-training-compact-ui-contract`, `foundation-transfermarkt-ui-contract`, `sponsor-offer-service`) grün. Ein unscoped `vitest run` über das gesamte Repo zeigt zusätzliche Failures in nicht mit diesem Fix zusammenhängenden Bereichen (Balancing/Economy-Tests, plus ein irrtümlich mitgescanntes `node_modules_broken_next_start_*`-Altverzeichnis) — beides vorbestehend aus einem parallelen Balancing-Workstream, nicht durch diesen Fix verursacht.
+
+**Commits:** pending (siehe `git log` auf `pr/ui-einsatzliste-35-36`)
+
+### Stand 2026-07-03 (Nacht — Generator/Admin-Testid, Market/Ranks/Diszis-Wiring, Training-Host, Sponsoren-Regression-Fix)
+
+| Phase | Änderung |
+|---|---|
+| **Generator/Admin-Testid** | `data-testid="foundation-generator"` / `"foundation-admin"` an den wrappenden `<section>`-Elementen ergänzt — Audit-Timeouts waren False-Positives (Views rendern unconditionally, nur CSS-hide), keine echte Perf-Baustelle |
+| **Market/Ranks/Diszis-Wiring** | Bereits existierende, aber nie gerenderte Hosts (`FoundationShellRouterMarketV2`, `FoundationRanksHost`, `FoundationDiszisHost`) in `FoundationShellRouterBody` verdrahtet; doppeltes inline CSS-hide-JSX entfernt |
+| **Training-Host** | Neu: `use-training-panel-derivations.ts` + `FoundationTrainingCompactShellHost` kapseln `useFoundationCrossTabTraining`-Output (inkl. `buildOrganicSeasonProgression` fürs ganze Roster) nur für den aktiven Tab; `FoundationShellRouterTraining` (Deferred-Mount + Skeleton) in `FoundationShellRouterBody` verdrahtet; Scope-Hook baut Trainings-Compact-Ableitungen nicht mehr always-on |
+| **Sponsoren-Regression-Fix** | Ursache gefunden: `selectedTeamCommercialRating` rief `buildSponsorCommercialRating()` (volle Liga-weite `buildTeamSeasonOverviewRows()`-Berechnung) auf **jedem** Tab-Wechsel unconditionally auf, nicht nur auf Teams/Prize. Neues Gate `shouldBuildSponsorCommercialRatingGate` (`shouldBuildTeamsView \|\| activeView === "prize"`) beschränkt die teure Berechnung auf die tatsächlichen zwei Consumer |
+| **Scope** | 10.496 → **10.530 Zeilen** (`use-foundation-shell-router-body-scope.tsx`, netto minimal höher durch neues Gate + Host-Props, aber Trainings-Compact-Ableitung jetzt komplett ausgelagert) |
+
+**Ergebnis (voller V9-Re-Audit, Save `fresh-season-1-1783097218467`):**
+
+| Von → Nach | V8-Baseline | Vorher (V10, Regression) | Jetzt (V9-Re-Audit) |
+|---|---:|---:|---:|
+| Diszis → Sponsoren | 12.153 ms | 13.480 ms (Regression) | **1.788 ms** |
+| Spieler → Training (chain) | 5.564 ms (V8) / 20.200 ms (V9 vor Fix) | — | **9.912 ms** |
+| Home → Training (cold/warm, direct) | — | ~20.200 ms | **913 ms / 878 ms** |
+| Home → Generator (cold/warm) | — | Audit-Timeout (False-Positive) | **1.014 ms / 1.039 ms** |
+| Home → Admin (cold/warm) | — | Audit-Timeout (False-Positive) | **1.016 ms / 1.089 ms** |
+| Home → Diszis / Ranks / Transfermarkt | 6,8 s / 5,1 s / 7,3 s | — | **~0,9–1,7 s** je Tab |
+
+Komplette Chain (Home → Admin) läuft jetzt durchgehend ok, bis auf den initialen kalten Home-Load (Dev-Mode-Kompilierung, kein Regressions-Thema) und "Spieler → Training" (9,9 s, siehe unten). Details: [tab-performance-hotspots-v9.md](./tab-performance-hotspots-v9.md), [tab-performance-hotspots-v9-comparison.md](./tab-performance-hotspots-v9-comparison.md).
+
+**Neuer Befund (außerhalb dieses Plans, nicht gefixt):** Die Drilldown-Schritte (Spielerprofil, Teamprofil, Teams-Tab Verträge) schlagen im V9-Audit reproduzierbar mit `Maximum update depth exceeded` in `usePlayerDirectorySortWorker.useEffect` fehl (Endlosschleife: `setState` in `useEffect` ohne stabile Dependencies) — sobald diese Seite einmal besucht wurde, hängt die Seite fest und blockiert nachfolgende Navigation für mehrere Minuten. Betrifft nicht die in diesem Plan bearbeiteten Tabs, sollte aber als eigener Bugfix priorisiert werden.
+
+**→ Gefixt, siehe Progress-Log-Eintrag "Drilldown-Crash-Fix" oben (neuester Stand).**
+
+**Tests:** 14 Test-Dateien / 107 Tests grün (`ai-market-plan-convergence`, `long-run-canonical-repair`, `long-run-profile`, `navigation-coalescing`, `organic-season-progression`, `season-economy-factors`, `sponsor-offer-service`, `sponsor-v26`, `sponsor-event-service`, `foundation-training-compact-ui-contract`, `foundation-transfermarkt-ui-contract`, `foundation-performance-architecture`, `season-v2-derivations`, `generate-balancing-report`); `perf:regression-smoke` ok. `tsc --noEmit`: keine neuen Fehler durch diese Änderungen.
+
+**Commits:** pending (siehe `git log` auf `pr/ui-einsatzliste-35-36`)
+
+### Stand 2026-07-03 (Abend — Profile-Host, Cockpit-Host, Prize-Host, Arena-Prefetch)
+
+| Phase | Änderung |
+|---|---|
+| **Profile-Host** | Re-Audit bestätigte Teams/Training Shell-first-Fix; Spielerprofil-Hydration-Path (bereits deferred/dynamic-import) im Re-Audit als stabil verifiziert |
+| **Cockpit-Host** | Cockpit-Derivations aus Scope → `foundationCockpitHostProps`; `FoundationShellRouterCockpit` bereits Deferred-Mount |
+| **Prize-Host** | Prize-/Sponsor-Derivations + JSX aus Scope + `FoundationShellRouterBody` entfernt → `foundationPrizeFinanceShellHostProps`; `FoundationShellRouterPrize` auf Deferred-Mount-Shell-first-Muster (`FoundationDeferredMount` + `FoundationPanelSkeleton`) umgestellt |
+| **Arena-Prefetch** | `prefetchSeasonStandingsData` (bislang importiert, nie aufgerufen) beim Betreten von `matchdayArena` verdrahtet → Season-Stand-API-Caches (`standings-overview`, `team-overview-slice`, `ratings-slice`, `snapshots`) werden vorgewärmt, nicht nur der JS-Chunk |
+| **Scope** | 11.390 → **10.496 Zeilen** (`use-foundation-shell-router-body-scope.tsx`) |
+| **Regressions-Fixes (im Zuge der Re-Audit-Verifikation gefunden)** | `FoundationSharedProvider` fehlte im Render-Baum (Cockpit-Tab-Crash); `getRankHeatClass` fehlte in `foundationTeamsViewHostProps` (Teams-Tab-Crash); `getBusyActionReason`/`getCockpitBusyReason`/`getReadOnlyActionReason` Shorthand-Properties ohne passende lokale Variablen (ReferenceError beim Cockpit-Mount) |
+
+**Ergebnis:** Voller V9-Re-Audit ohne Crashes in der Kern-Chain; Arena→Saisonstand **2,05 s** (Gate <5 s **PASS**, vorher 5,02 s knapp FAIL). Details: [tab-performance-hotspots-v10-comparison.md](./tab-performance-hotspots-v10-comparison.md) (Update-Abschnitt oben).
+
+**Commits:** pending (siehe `git log` auf `pr/ui-einsatzliste-35-36`)
+
 ### Stand 2026-07-03 (Post-V10 Q1 — Teams-Host)
 
 | Phase | Änderung |

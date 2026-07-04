@@ -107,6 +107,31 @@ export function getPlayerImportedRatingPps(player: Pick<Player, "disciplineRatin
   return roundValue(ratings.reduce((sum, value) => sum + value, 0) / ratings.length, 2);
 }
 
+export function resolvePlayerDisplayPps(input: {
+  playerRating?: Pick<PlayerRatingContractRow, "ppsSeason"> | null;
+  seasonPointsLedger?: Pick<SeasonPointsLedger, "playerSummariesByPlayerId"> | null;
+  playerId: string;
+}) {
+  if (input.playerRating?.ppsSeason != null && Number.isFinite(input.playerRating.ppsSeason)) {
+    return input.playerRating.ppsSeason;
+  }
+  const ledgerPoints = input.seasonPointsLedger?.playerSummariesByPlayerId.get(input.playerId)?.totalPoints ?? null;
+  if (ledgerPoints != null && Number.isFinite(ledgerPoints)) {
+    return roundValue(ledgerPoints, 1);
+  }
+  return null;
+}
+
+export function resolvePlayerDisplayMvs(input: {
+  playerRating?: Pick<PlayerRatingContractRow, "mvs"> | null;
+}) {
+  const mvs = input.playerRating?.mvs;
+  if (mvs == null || !Number.isFinite(mvs) || mvs <= 0) {
+    return null;
+  }
+  return mvs;
+}
+
 function buildSharedRankMap(values: Array<{ playerId: string; value: number | null }>) {
   const sorted = [...values].sort((left, right) => {
     const leftValue = left.value ?? Number.NEGATIVE_INFINITY;
@@ -355,7 +380,10 @@ export function buildPlayerRatingContractRows(input: {
     const mvs =
       performanceRows == null
         ? null
-        : roundValue(mvsByPlayerId.get(row.player.id) ?? 0, 2);
+        : (() => {
+            const rawMvs = mvsByPlayerId.get(row.player.id);
+            return rawMvs != null && rawMvs > 0 ? roundValue(rawMvs, 2) : null;
+          })();
 
     return {
       ...row,

@@ -362,6 +362,13 @@ function loadCollection<T>(tableName: string, keyColumn: string, saveId: string)
   return (statement.all(saveId) as Array<{ payload_json: string }>).map((row) => parseJsonColumn<T>(row.payload_json));
 }
 
+/**
+ * Perf: this used to unconditionally DELETE every row for the save and re-INSERT the entire
+ * collection on every single incremental save. For collections like rosters/teams that barely
+ * change between two consecutive saves (typically 1-2 entries touched by a single transfer), that
+ * turned a cheap operation into O(collection size) disk writes every time, compounding badly over
+ * a long multi-season run. Diff against what's already persisted and only touch changed/removed rows.
+ */
 function replaceCollection<T>(
   tableName: string,
   keyColumn: string,
@@ -370,14 +377,72 @@ function replaceCollection<T>(
   keySelector: (item: T) => string,
 ) {
   const database = getDatabase();
-  const deleteStatement = database.prepare(`DELETE FROM ${tableName} WHERE save_id = ?`);
-  const insertStatement = database.prepare(
-    `INSERT INTO ${tableName} (save_id, ${keyColumn}, payload_json) VALUES (?, ?, ?)`,
+  const existingRows = database
+    .prepare(`SELECT ${keyColumn} AS key_value, payload_json FROM ${tableName} WHERE save_id = ?`)
+    .all(saveId) as Array<{ key_value: string; payload_json: string }>;
+  const existingPayloadByKey = new Map(existingRows.map((row) => [row.key_value, row.payload_json]));
+
+  const upsertStatement = database.prepare(
+    `INSERT INTO ${tableName} (save_id, ${keyColumn}, payload_json) VALUES (?, ?, ?)
+     ON CONFLICT(save_id, ${keyColumn}) DO UPDATE SET payload_json = excluded.payload_json`,
+  );
+  const deleteStatement = database.prepare(`DELETE FROM ${tableName} WHERE save_id = ? AND ${keyColumn} = ?`);
+
+  const seenKeys = new Set<string>();
+  for (const item of items) {
+    const key = keySelector(item);
+    seenKeys.add(key);
+    const serialized = JSON.stringify(item);
+    if (existingPayloadByKey.get(key) !== serialized) {
+      upsertStatement.run(saveId, key, serialized);
+    }
+  }
+
+  for (const existingKey of existingPayloadByKey.keys()) {
+    if (!seenKeys.has(existingKey)) {
+      deleteStatement.run(saveId, existingKey);
+    }
+  }
+}
+
+/**
+ * Perf: for strictly append-only history collections (transfer_history, game_logs), entries are
+ * never mutated or removed once written — every write path only prepends new entries. Doing a full
+ * DELETE + re-INSERT of the whole table (like replaceCollection) on every single incremental save
+ * turns per-save cost into O(total history so far), which compounds into multi-second saves once a
+ * run has accumulated hundreds/thousands of entries. Instead, only insert keys not already persisted.
+ * Falls back to a full replace if the incoming list is shorter than what's stored (explicit reset).
+ */
+function appendOnlyCollection<T>(
+  tableName: string,
+  keyColumn: string,
+  saveId: string,
+  items: T[],
+  keySelector: (item: T) => string,
+) {
+  const database = getDatabase();
+  const existingKeys = new Set(
+    (
+      database.prepare(`SELECT ${keyColumn} AS key_value FROM ${tableName} WHERE save_id = ?`).all(saveId) as Array<{
+        key_value: string;
+      }>
+    ).map((row) => row.key_value),
   );
 
-  deleteStatement.run(saveId);
+  if (items.length < existingKeys.size) {
+    replaceCollection(tableName, keyColumn, saveId, items, keySelector);
+    return;
+  }
+
+  const insertStatement = database.prepare(
+    `INSERT OR IGNORE INTO ${tableName} (save_id, ${keyColumn}, payload_json) VALUES (?, ?, ?)`,
+  );
   for (const item of items) {
-    insertStatement.run(saveId, keySelector(item), JSON.stringify(item));
+    const key = keySelector(item);
+    if (existingKeys.has(key)) {
+      continue;
+    }
+    insertStatement.run(saveId, key, JSON.stringify(item));
   }
 }
 
@@ -759,13 +824,27 @@ function replacePlayersForSave(saveId: string, players: Player[], catalogSourceP
   const database = getDatabase();
   ensurePlayerCatalog(database, catalogSourcePlayers, updatedAt);
   const catalog = loadPlayerCatalog(database);
-  const deleteStatement = database.prepare("DELETE FROM players WHERE save_id = ?");
-  const insertStatement = database.prepare(
-    "INSERT INTO players (save_id, player_id, payload_json) VALUES (?, ?, ?)",
-  );
 
-  deleteStatement.run(saveId);
+  // Perf: with thousands of players in the universe, a typical incremental save only actually
+  // changes a handful of them (e.g. the 1-2 players involved in a transfer). Blindly doing a full
+  // DELETE + re-INSERT of every player row on every save (as before) makes per-save cost scale with
+  // total player count instead of with the number of players that actually changed. Diff against
+  // what's already persisted and only touch rows whose payload changed.
+  const existingRows = database.prepare("SELECT player_id, payload_json FROM players WHERE save_id = ?").all(saveId) as Array<{
+    player_id: string;
+    payload_json: string;
+  }>;
+  const existingPayloadByPlayerId = new Map(existingRows.map((row) => [row.player_id, row.payload_json]));
+
+  const upsertStatement = database.prepare(
+    `INSERT INTO players (save_id, player_id, payload_json) VALUES (?, ?, ?)
+     ON CONFLICT(save_id, player_id) DO UPDATE SET payload_json = excluded.payload_json`,
+  );
+  const deleteStatement = database.prepare("DELETE FROM players WHERE save_id = ? AND player_id = ?");
+
+  const seenPlayerIds = new Set<string>();
   for (const player of players) {
+    seenPlayerIds.add(player.id);
     const basePlayer = catalog.get(player.id);
     const payload: PlayerSavePayload | null = basePlayer
       ? (() => {
@@ -774,8 +853,22 @@ function replacePlayersForSave(saveId: string, players: Player[], catalogSourceP
         })()
       : { storage: "full", player };
 
-    if (payload) {
-      insertStatement.run(saveId, player.id, JSON.stringify(payload));
+    if (!payload) {
+      if (existingPayloadByPlayerId.has(player.id)) {
+        deleteStatement.run(saveId, player.id);
+      }
+      continue;
+    }
+
+    const serialized = JSON.stringify(payload);
+    if (existingPayloadByPlayerId.get(player.id) !== serialized) {
+      upsertStatement.run(saveId, player.id, serialized);
+    }
+  }
+
+  for (const existingPlayerId of existingPayloadByPlayerId.keys()) {
+    if (!seenPlayerIds.has(existingPlayerId)) {
+      deleteStatement.run(saveId, existingPlayerId);
     }
   }
 }
@@ -874,12 +967,18 @@ function ensurePlayerPotentialForGameState(saveId: string, gameState: GameState)
 }
 
 function materializePersistedSave(row: SaveRow): PersistedSaveGame | null {
+  const PERF_DEBUG = process.env.OLY_DEBUG_MATERIALIZE_TIMING === "1";
+  const mark = (label: string) => {
+    if (PERF_DEBUG) console.timeLog("materializePersistedSave", label);
+  };
+  if (PERF_DEBUG) console.time("materializePersistedSave");
   const saveId = row.save_id;
   const season = loadSingleton<Season>("seasons", saveId);
   const seasonState = loadSingleton<SeasonState>("season_states", saveId);
   const matchdayState = loadSingleton<MatchdayState>("matchday_states", saveId);
   const gameMetadata = loadSingleton<GameMetadata>("game_metadata", saveId);
   const mappingReport = loadSingleton<MappingReport>("mapping_reports", saveId);
+  mark("singletons loaded");
 
   if (!season || !seasonState || !matchdayState || !mappingReport) {
     return null;
@@ -889,7 +988,17 @@ function materializePersistedSave(row: SaveRow): PersistedSaveGame | null {
     saveId,
     (gameMetadata as GameMetadata & { playerBaselines?: PlayerBaselineRecord[] } | null)?.playerBaselines,
   );
+  mark("playerBaselines loaded");
   const gamePhase = inferCompletedGamePhase({ metadata: gameMetadata, season, seasonState, matchdayState });
+  const loadedPlayers = loadPlayersForSave(saveId);
+  mark("players loaded");
+  const loadedTeams = loadCollection<Team>("teams", "team_id", saveId);
+  const loadedRosters = loadCollection<RosterEntry>("rosters", "roster_id", saveId);
+  const loadedContracts = loadCollection<Contract>("contracts", "contract_id", saveId);
+  const loadedTransferListings = loadCollection<TransferListing>("transfer_listings", "listing_id", saveId);
+  const loadedTransferHistory = loadCollection<TransferHistoryEntry>("transfer_history", "history_id", saveId);
+  const loadedLogs = loadCollection<GameLogEntry>("game_logs", "log_id", saveId);
+  mark("collections loaded");
   const hydrated = hydrateGameStateMedia({
     ...(gamePhase ? { gamePhase } : {}),
     ...(gameMetadata?.seasonTransition ? { seasonTransition: gameMetadata.seasonTransition } : {}),
@@ -920,17 +1029,18 @@ function materializePersistedSave(row: SaveRow): PersistedSaveGame | null {
     season,
     seasonState,
     matchdayState,
-    teams: loadCollection<Team>("teams", "team_id", saveId),
+    teams: loadedTeams,
     teamIdentities: loadCollection<TeamIdentity>("team_identities", "team_id", saveId),
-    players: loadPlayersForSave(saveId),
+    players: loadedPlayers,
     disciplines: loadCollection<Discipline>("disciplines", "discipline_id", saveId),
-    rosters: loadCollection<RosterEntry>("rosters", "roster_id", saveId),
-    contracts: loadCollection<Contract>("contracts", "contract_id", saveId),
-    transferListings: loadCollection<TransferListing>("transfer_listings", "listing_id", saveId),
-    transferHistory: loadCollection<TransferHistoryEntry>("transfer_history", "history_id", saveId),
-    logs: loadCollection<GameLogEntry>("game_logs", "log_id", saveId),
+    rosters: loadedRosters,
+    contracts: loadedContracts,
+    transferListings: loadedTransferListings,
+    transferHistory: loadedTransferHistory,
+    logs: loadedLogs,
     mappingReport,
   });
+  mark("hydrateGameStateMedia done");
   const gameStateWithoutBaseline = withNormalizedSeasonDisciplineSchedule(
     normalizeLegacyRosterTargets(
       normalizeLegacyFinanceScale(
@@ -938,21 +1048,24 @@ function materializePersistedSave(row: SaveRow): PersistedSaveGame | null {
       ),
     ),
   );
-  const gameState = ensurePlayerPotentialForGameState(
-    saveId,
-    ensurePlayerInjuryHistoryForGameState(
-      ensurePlayerBaselines(gameStateWithoutBaseline, {
-        sourcePlayers: loadBaselineSourcePlayers(),
-        createdAt: row.created_at,
-      }).gameState,
-    ),
-  );
+  mark("legacy normalization done");
+  const baselineResult = ensurePlayerBaselines(gameStateWithoutBaseline, {
+    sourcePlayers: loadBaselineSourcePlayers(),
+    createdAt: row.created_at,
+  });
+  mark("ensurePlayerBaselines done");
+  const withInjuryHistory = ensurePlayerInjuryHistoryForGameState(baselineResult.gameState);
+  mark("ensurePlayerInjuryHistoryForGameState done");
+  const gameState = ensurePlayerPotentialForGameState(saveId, withInjuryHistory);
+  mark("ensurePlayerPotentialForGameState done");
   const gameStateWithScenarioMeta = gameState.scenarioMeta
     ? gameState
     : {
         ...gameState,
         scenarioMeta: buildScenarioMeta({ gameState }),
       };
+  mark("scenarioMeta done");
+  if (PERF_DEBUG) console.timeEnd("materializePersistedSave");
 
   return {
     saveId,
@@ -1016,16 +1129,43 @@ function persistSeasonDerivationsSidecarFromGameState(saveId: string, gameState:
 function materializePersistedSaveCached(row: SaveRow): PersistedSaveGame | null {
   const contentSignature = buildSaveSessionCacheSignature(row);
   const cached = readSaveSessionCache(row.save_id, row.updated_at, contentSignature);
+  const perfStats = getPersistPerfStats();
   if (cached) {
+    if (perfStats) perfStats.readHit += 1;
     return cached;
   }
 
+  const perfStartedAt = perfStats ? Date.now() : 0;
   const save = materializePersistedSave(row);
   if (save) {
     writeSaveSessionCache(save, contentSignature);
   }
+  if (perfStats) {
+    perfStats.readMiss += 1;
+    perfStats.readMissMs += Date.now() - perfStartedAt;
+  }
 
   return save;
+}
+
+type PersistPerfStats = {
+  writes: number;
+  writeMs: number;
+  readMiss: number;
+  readMissMs: number;
+  readHit: number;
+};
+
+function getPersistPerfStats(): PersistPerfStats | null {
+  if (process.env.OLY_DEBUG_SAVE_TIMING !== "1") return null;
+  const globalScope = globalThis as typeof globalThis & { __olyPersistPerf?: PersistPerfStats };
+  globalScope.__olyPersistPerf ??= { writes: 0, writeMs: 0, readMiss: 0, readMissMs: 0, readHit: 0 };
+  return globalScope.__olyPersistPerf;
+}
+
+export function readPersistPerfStats(): PersistPerfStats | null {
+  const globalScope = globalThis as typeof globalThis & { __olyPersistPerf?: PersistPerfStats };
+  return globalScope.__olyPersistPerf ?? null;
 }
 
 function createPersistedSaveRecord(input: {
@@ -1036,6 +1176,8 @@ function createPersistedSaveRecord(input: {
   updatedAt?: string;
   gameState: GameState;
 }) {
+  const perfStats = getPersistPerfStats();
+  const perfStartedAt = perfStats ? Date.now() : 0;
   const database = getDatabase();
   const now = new Date().toISOString();
   const createdAt = input.createdAt ?? now;
@@ -1167,8 +1309,8 @@ function createPersistedSaveRecord(input: {
     replaceCollection("rosters", "roster_id", input.saveId, guardedGameState.rosters, (roster) => roster.id);
     replaceCollection("contracts", "contract_id", input.saveId, guardedGameState.contracts, (contract) => contract.id);
     replaceCollection("transfer_listings", "listing_id", input.saveId, guardedGameState.transferListings, (listing) => listing.id);
-    replaceCollection("transfer_history", "history_id", input.saveId, guardedGameState.transferHistory, (entry) => entry.id);
-    replaceCollection("game_logs", "log_id", input.saveId, guardedGameState.logs, (log) => log.id);
+    appendOnlyCollection("transfer_history", "history_id", input.saveId, guardedGameState.transferHistory, (entry) => entry.id);
+    appendOnlyCollection("game_logs", "log_id", input.saveId, guardedGameState.logs, (log) => log.id);
     enforceRollingSaveRetention(database, [input.saveId]);
   });
 
@@ -1197,6 +1339,16 @@ function createPersistedSaveRecord(input: {
 
   writeSaveSessionCache(persistedSave, versionMetadata.contentSignature);
   persistSeasonDerivationsSidecarFromGameState(input.saveId, guardedGameState);
+
+  if (perfStats) {
+    perfStats.writes += 1;
+    perfStats.writeMs += Date.now() - perfStartedAt;
+    if (perfStats.writes % 20 === 0) {
+      console.error(
+        `[persist-perf] writes=${perfStats.writes} writeMs=${perfStats.writeMs} (avg ${Math.round(perfStats.writeMs / perfStats.writes)}ms) | readMiss=${perfStats.readMiss} readMissMs=${perfStats.readMissMs} (avg ${perfStats.readMiss ? Math.round(perfStats.readMissMs / perfStats.readMiss) : 0}ms) | readHit=${perfStats.readHit}`,
+      );
+    }
+  }
 
   return persistedSave;
 }

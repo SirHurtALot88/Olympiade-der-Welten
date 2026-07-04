@@ -27,6 +27,7 @@ import {
   writeLongRunPerformanceReport,
 } from "@/lib/season/long-run-performance-analysis";
 import { runPhaseAuditDe, type PhaseAuditResult } from "@/lib/season/long-run-phase-audit";
+import { resolveBalanceProfile } from "@/lib/season/long-run-profile";
 import { filterHardOpenTechnicalBugs, isSoftPhaseAuditRed } from "@/lib/season/long-run-soft-blockers";
 
 const PROJECT_ROOT = path.resolve(__dirname, "..");
@@ -168,6 +169,51 @@ function buildFatigueInjuryReport(saveId: string, targetSeasons: number) {
   return `${lines.join("\n")}\n`;
 }
 
+function runAutoTuneOrganic(saveId: string, seasonId: string) {
+  const autoTuneScript = path.join(PROJECT_ROOT, "scripts", "long-run-auto-tune-organic.ts");
+  return spawnSync(process.execPath, ["--import", "tsx", autoTuneScript, "--save-id", saveId, "--season-id", seasonId, "--apply"], {
+    cwd: PROJECT_ROOT,
+    encoding: "utf8",
+    env: process.env,
+  });
+}
+
+function runFinalExports(saveId: string, outputDir: string, targetSeasons: number) {
+  const scripts = [
+    {
+      name: "balancing-report",
+      args: ["--import", "tsx", path.join(PROJECT_ROOT, "scripts", "generate-balancing-report.ts"), "--save-id", saveId, "--output-dir", outputDir, "--seasons", String(targetSeasons)],
+    },
+    {
+      name: "multiseason-final-audit",
+      args: ["--import", "tsx", path.join(PROJECT_ROOT, "scripts", "multiseason-final-audit.ts"), "--save-id", saveId, "--history"],
+      outFile: "multiseason-final-audit-history.txt",
+    },
+    {
+      name: "facility-levels",
+      args: ["--import", "tsx", path.join(PROJECT_ROOT, "scripts", "dump-facility-levels.ts"), "--save-id", saveId],
+      outFile: "facility-levels.txt",
+    },
+  ];
+  for (const entry of scripts) {
+    if (entry.outFile) {
+      const result = spawnSync(process.execPath, entry.args, { cwd: PROJECT_ROOT, encoding: "utf8", env: process.env });
+      fs.writeFileSync(path.join(outputDir, entry.outFile), `${result.stdout ?? ""}${result.stderr ?? ""}`);
+      if (result.status === 0) log(`Wrote ${entry.outFile}`);
+      else log(`WARN: ${entry.name} failed`);
+    } else {
+      const result = spawnSync(process.execPath, entry.args, { cwd: PROJECT_ROOT, encoding: "utf8", stdio: "pipe", env: process.env });
+      if (result.status === 0) log(`Wrote balancing-report.md`);
+      else log(`WARN: ${entry.name} failed: ${result.stderr || result.stdout}`);
+    }
+  }
+  const strategicCsv = path.join(outputDir, "strategic-transfer-market-by-team.csv");
+  if (fs.existsSync(strategicCsv)) {
+    fs.copyFileSync(strategicCsv, path.join(outputDir, "planned-vs-filler-by-team.csv"));
+    log("Copied planned-vs-filler-by-team.csv from strategic-transfer export");
+  }
+}
+
 function runLongRunSeason(input: {
   saveId: string;
   finalSeason: number;
@@ -214,6 +260,11 @@ async function main() {
 
   const resumeCommand =
     `node --import tsx scripts/run-resilient-multiseason.ts --save-id ${saveId} --seasons ${targetSeasons} --output-dir ${outputDir}`;
+
+  const balanceProfile = resolveBalanceProfile();
+  const tuneRetriesBySeason = new Map<number, number>();
+  const MAX_TUNE_RETRIES = 2;
+  log(`Balance profile: ${balanceProfile}`);
 
   while (true) {
     save = persistence.getSaveById(saveId) ?? save;
@@ -264,7 +315,14 @@ async function main() {
       ) ?? [];
     const auditRed = [...collectHardAuditReds(preseasonAudit), ...collectHardAuditReds(seasonEndAudit)];
 
-    if (result.status == null || result.status !== 0) {
+    // long-run-sandbox-s1-s6.ts itself sets process.exitCode=2 whenever organic_peak_net_corridor
+    // (or a few other hard bugs) shows up in openTechnicalBugs — the exact same condition the
+    // auditRed/openTechnicalBugs-based retry logic below is meant to handle for the "iterate"
+    // balance profile. Previously this early check pre-empted that logic unconditionally, so
+    // "iterate" never actually got a chance to auto-tune-and-continue past a peak-corridor RED.
+    // Only treat a non-zero exit as a hard, unexplained crash (pause immediately) when the audit/
+    // technical-bug data we already extracted from the run's own JSON output gives no explanation.
+    if ((result.status == null || result.status !== 0) && openTechnicalBugs.length === 0 && auditRed.length === 0) {
       writePausedManifest({
         outputDir,
         saveId,
@@ -287,34 +345,59 @@ async function main() {
       if (onlyFinanceRed && openTechnicalBugs.every((entry) => entry.includes("negative_cash") || entry.includes("transfer_finance:"))) {
         log(`WARN: Finance RED (${auditRed.map((entry) => entry.id).join(", ")}) — continuing with balance flag`);
       } else {
+        // long-run-sandbox-s1-s6.ts mirrors the same organic_peak_net_corridor RED into its own
+        // openTechnicalBugs list (see the "season_end_audit" entries), which is the same signal as
+        // auditRed here, not a distinct additional blocker — so allow those mirrored entries through
+        // instead of requiring openTechnicalBugs to be completely empty.
+        const peakOnlyHardRed =
+          auditRed.length > 0 &&
+          auditRed.every((entry) => entry.id === "organic_peak_net_corridor") &&
+          openTechnicalBugs.every((entry) => entry.includes("organic_peak_net_corridor"));
+        const seasonIdForTune = `season-${nextSeason}`;
         if (peakCorridorRed && !organicOnlyRed) {
-          const autoTuneScript = path.join(PROJECT_ROOT, "scripts", "long-run-auto-tune-organic.ts");
-          log("organic_peak_net_corridor RED — running auto-tune --apply");
-          const tuneRun = spawnSync(
-            process.execPath,
-            ["--import", "tsx", autoTuneScript, "--save-id", saveId, "--apply"],
-            { cwd: PROJECT_ROOT, encoding: "utf8", env: process.env },
-          );
+          const retries = (tuneRetriesBySeason.get(nextSeason) ?? 0) + 1;
+          tuneRetriesBySeason.set(nextSeason, retries);
+          log(`organic_peak_net_corridor RED on ${seasonIdForTune} — auto-tune (${retries}/${MAX_TUNE_RETRIES})`);
+          const tuneRun = runAutoTuneOrganic(saveId, seasonIdForTune);
           if (tuneRun.status === 0) {
-            log("Auto-tune applied. Re-run season after fixing code; resume command unchanged.");
+            log("Auto-tune applied.");
           } else {
             log(`Auto-tune failed: ${tuneRun.stderr || tuneRun.stdout}`);
           }
+          if (balanceProfile === "iterate" && peakOnlyHardRed && retries <= MAX_TUNE_RETRIES) {
+            log(`Peak RED — continuing (iterate profile, tune ${retries}/${MAX_TUNE_RETRIES})`);
+          } else {
+            writePausedManifest({
+              outputDir,
+              saveId,
+              seasonId: save.gameState.season.id,
+              phase: auditRed[0]?.id ?? "blocker",
+              reason:
+                auditRed.length > 0
+                  ? `Audit RED: ${auditRed.map((entry) => entry.id).join(", ")}`
+                  : `Technical blockers: ${openTechnicalBugs.slice(0, 3).join(" | ")}`,
+              resumeCommand,
+              openTechnicalBugs,
+              audit: seasonEndAudit ?? preseasonAudit,
+            });
+            process.exit(2);
+          }
+        } else {
+          writePausedManifest({
+            outputDir,
+            saveId,
+            seasonId: save.gameState.season.id,
+            phase: auditRed[0]?.id ?? "blocker",
+            reason:
+              auditRed.length > 0
+                ? `Audit RED: ${auditRed.map((entry) => entry.id).join(", ")}`
+                : `Technical blockers: ${openTechnicalBugs.slice(0, 3).join(" | ")}`,
+            resumeCommand,
+            openTechnicalBugs,
+            audit: seasonEndAudit ?? preseasonAudit,
+          });
+          process.exit(2);
         }
-        writePausedManifest({
-          outputDir,
-          saveId,
-          seasonId: save.gameState.season.id,
-          phase: auditRed[0]?.id ?? "blocker",
-          reason:
-            auditRed.length > 0
-              ? `Audit RED: ${auditRed.map((entry) => entry.id).join(", ")}`
-              : `Technical blockers: ${openTechnicalBugs.slice(0, 3).join(" | ")}`,
-          resumeCommand,
-          openTechnicalBugs,
-          audit: seasonEndAudit ?? preseasonAudit,
-        });
-        process.exit(2);
       }
     }
 
@@ -371,6 +454,7 @@ async function main() {
   }
 
   log(`SUCCESS: ${targetSeasons}-season simulation complete.`);
+  runFinalExports(saveId, outputDir, targetSeasons);
 }
 
 main().catch((error) => {

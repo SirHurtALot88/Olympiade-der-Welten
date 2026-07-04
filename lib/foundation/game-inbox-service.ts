@@ -17,6 +17,7 @@ import { calculateFacilityIncome, calculateFacilityUpkeep, getTeamFacilityState 
 import { FACILITY_CONDITION_WARNING, getFacilityConditionStatus } from "@/lib/facilities/facility-condition";
 import { buildTeamObjectiveOverview } from "@/lib/board/team-season-objectives-service";
 import { buildMatchdaySummary } from "@/lib/foundation/matchday-summary";
+import { formatCockpitReason } from "@/lib/foundation/tabs/cockpit-ui-helpers";
 import { getFormCardFlowStatus } from "@/lib/foundation/form-card-flow";
 import { buildFormCardSeasonUsageAudit } from "@/lib/lineups/legacy-lineup-modifiers";
 import { isTeamMatchdayLineupComplete, isTeamMatchdayLineupSubmitted } from "@/lib/foundation/matchday-lineup-readiness";
@@ -69,6 +70,113 @@ function severityRank(severity: GameInboxSeverity) {
   if (severity === "critical") return 0;
   if (severity === "warning") return 1;
   return 2;
+}
+
+function formatInboxDetail(value: string | null | undefined) {
+  if (!value) {
+    return "—";
+  }
+  return formatCockpitReason(value);
+}
+
+function parseProgressionInboxDescription(description: string) {
+  const upgradesMatch = description.match(/(\d+) Upgrade\(s\)/);
+  const xpMatch = description.match(/(\d+) XP ausgegeben/);
+  return {
+    upgrades: upgradesMatch ? Number(upgradesMatch[1]) : 0,
+    xpSpent: xpMatch ? Number(xpMatch[1]) : 0,
+  };
+}
+
+const INBOX_CHRONICLE_ONLY_SOURCES = new Set([
+  "player_progression_events",
+  "facility_events",
+  "cash_prize_apply_logs",
+  "matchday_results",
+  "season_snapshots",
+  "transfer_history",
+]);
+
+export function isGameInboxChronicleOnlySource(source: string) {
+  return INBOX_CHRONICLE_ONLY_SOURCES.has(source) || source.startsWith("story:");
+}
+
+export function groupInboxItemsForDisplay(items: GameInboxItem[]) {
+  const groupedProgression = new Map<string, GameInboxItem[]>();
+  const groupedFacilities = new Map<string, GameInboxItem[]>();
+  const passthrough: GameInboxItem[] = [];
+
+  for (const item of items) {
+    if (item.source === "player_progression_events") {
+      const key = `${item.teamId ?? "global"}:${item.seasonId ?? "season"}`;
+      const bucket = groupedProgression.get(key) ?? [];
+      bucket.push(item);
+      groupedProgression.set(key, bucket);
+      continue;
+    }
+    if (item.source === "facility_events") {
+      const key = `${item.teamId ?? "global"}:${item.seasonId ?? "season"}`;
+      const bucket = groupedFacilities.get(key) ?? [];
+      bucket.push(item);
+      groupedFacilities.set(key, bucket);
+      continue;
+    }
+    passthrough.push(item);
+  }
+
+  const result = [...passthrough];
+
+  for (const [key, group] of groupedProgression) {
+    if (group.length === 1) {
+      result.push(group[0]!);
+      continue;
+    }
+    const totals = group.reduce(
+      (summary, item) => {
+        const parsed = parseProgressionInboxDescription(item.description);
+        return {
+          upgrades: summary.upgrades + parsed.upgrades,
+          xpSpent: summary.xpSpent + parsed.xpSpent,
+        };
+      },
+      { upgrades: 0, xpSpent: 0 },
+    );
+    const template = [...group].sort((left, right) => Date.parse(right.createdAt) - Date.parse(left.createdAt))[0]!;
+    result.push({
+      ...template,
+      itemId: `grouped:player_progression_events:${key}`,
+      title: `${group.length} XP-Upgrades durchgeführt`,
+      description: `${group.length} Spieler · ${totals.upgrades} Upgrade(s) · ${totals.xpSpent} XP ausgegeben.`,
+      createdAt: template.createdAt,
+    });
+  }
+
+  for (const [key, group] of groupedFacilities) {
+    if (group.length === 1) {
+      result.push(group[0]!);
+      continue;
+    }
+    const template = [...group].sort((left, right) => Date.parse(right.createdAt) - Date.parse(left.createdAt))[0]!;
+    const facilityLabels = group
+      .map((item) => item.description.replace(/: Level .+$/, ""))
+      .slice(0, 3)
+      .join(" · ");
+    result.push({
+      ...template,
+      itemId: `grouped:facility_events:${key}`,
+      title: `${group.length} Facility-Events`,
+      description: `${group.length} Upgrades: ${facilityLabels}${group.length > 3 ? " · …" : ""}.`,
+      createdAt: template.createdAt,
+    });
+  }
+
+  return result.sort((left, right) => {
+    const statusDelta = (left.status === "open" ? 0 : 1) - (right.status === "open" ? 0 : 1);
+    if (statusDelta !== 0) return statusDelta;
+    const severityDelta = severityRank(left.severity) - severityRank(right.severity);
+    if (severityDelta !== 0) return severityDelta;
+    return Date.parse(right.createdAt) - Date.parse(left.createdAt);
+  });
 }
 
 function getStoredStatusMap(gameState: GameState) {
@@ -308,7 +416,7 @@ function buildFlowItem(input: BuildGameInboxInput, createdAt: string): GameInbox
     category: step.status === "blocked" ? "warning" : "task",
     severity: step.status === "blocked" ? "critical" : step.status === "warning" ? "warning" : "info",
     title: step.label,
-    description: step.blockers[0] ?? step.warnings[0] ?? step.cta,
+    description: formatInboxDetail(step.blockers[0] ?? step.warnings[0] ?? step.cta),
     targetView: step.targetView,
     targetParams: {
       team: step.teamId ?? input.activeTeamId ?? null,
@@ -1209,6 +1317,9 @@ export const INBOX_DECISION_CATEGORIES = [
 export const INBOX_CHRONICLE_CATEGORIES = ["news", "result"] as const;
 
 export function isGameInboxDecisionItem(item: GameInboxItem) {
+  if (isGameInboxChronicleOnlySource(item.source)) {
+    return false;
+  }
   if (item.source.startsWith("player_health_")) {
     return true;
   }

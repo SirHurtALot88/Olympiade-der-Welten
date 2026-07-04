@@ -835,12 +835,17 @@ function resolveAttributeVisibility(input: {
   teamHumanControlled: boolean | null | undefined;
   manageableTeamIds?: string[] | null;
   scoutingLevel?: number | null;
+  isOnViewingTeamRoster?: boolean;
 }): AttributeVisibility {
   if (DEBUG_FORCE_PLAYER_VISIBILITY) {
     return "exact";
   }
   if (input.manageableTeamIds && input.manageableTeamIds.length > 0) {
-    if (input.teamId && input.manageableTeamIds.includes(input.teamId)) {
+    if (
+      input.isOnViewingTeamRoster &&
+      input.teamId &&
+      input.manageableTeamIds.includes(input.teamId)
+    ) {
       return "exact";
     }
     return "scouted";
@@ -2222,6 +2227,7 @@ export function buildPlayerDrawerDataFromGameState(input: {
     teamHumanControlled: team ? team.humanControlled !== false : null,
     manageableTeamIds: input.manageableTeamIds ?? null,
     scoutingLevel,
+    isOnViewingTeamRoster: Boolean(rosterEntry && team?.teamId && rosterEntry.teamId === team.teamId),
   });
   const traitView =
     attributeVisibility === "exact"

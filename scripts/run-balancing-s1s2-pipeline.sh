@@ -7,9 +7,10 @@ OUT="${OUT:-outputs/balancing-s1s2-$(date +%Y%m%d-%H%M%S)}"
 mkdir -p "$OUT"
 export NODE_OPTIONS="${NODE_OPTIONS:---max-old-space-size=8192}"
 export OLY_LONG_RUN_ALLOW_DEV_SERVER="${OLY_LONG_RUN_ALLOW_DEV_SERVER:-0}"
-export OLY_LONG_RUN_FAST="${OLY_LONG_RUN_FAST:-1}"
-export OLY_LONG_RUN_PLANNER_MAX_ROUNDS="${OLY_LONG_RUN_PLANNER_MAX_ROUNDS:-2}"
-export OLY_LONG_RUN_PLANNER_MAX_TEAM_CYCLES="${OLY_LONG_RUN_PLANNER_MAX_TEAM_CYCLES:-3}"
+export OLY_LONG_RUN_BALANCE_PROFILE="${OLY_LONG_RUN_BALANCE_PROFILE:-iterate}"
+export OLY_LONG_RUN_PLANNER_MAX_ROUNDS="${OLY_LONG_RUN_PLANNER_MAX_ROUNDS:-5}"
+export OLY_LONG_RUN_PLANNER_MAX_TEAM_CYCLES="${OLY_LONG_RUN_PLANNER_MAX_TEAM_CYCLES:-5}"
+export OLY_UNIFIED_PICK="${OLY_UNIFIED_PICK:-1}"
 export OLY_LONG_RUN_OUTPUT_DIR="$OUT"
 
 log() { echo "[balancing-s1s2] $(date -Iseconds) $*" | tee -a "$OUT/pipeline.log"; }
@@ -99,6 +100,6 @@ npx tsx scripts/export-team-finance-season-table.ts --save-id "$SAVE_ID" > "$OUT
 npx tsx scripts/export-player-progression-rankings.ts --save-id "$SAVE_ID" > "$OUT/player-progression-rankings.md" 2>&1 || true
 npx tsx scripts/dump-facility-levels.ts --save-id "$SAVE_ID" > "$OUT/facility-levels.txt" 2>&1 || true
 node --import tsx scripts/analyze-long-run-performance.ts --output-dir "$OUT" 2>&1 | tee "$OUT/performance-analysis.log" || true
-node --import tsx scripts/generate-balancing-report.ts --save-id "$SAVE_ID" --output-dir "$OUT" 2>&1 | tee "$OUT/balancing-report.log" || true
+node --import tsx scripts/generate-balancing-report.ts --save-id "$SAVE_ID" --output-dir "$OUT" --seasons 2 2>&1 | tee "$OUT/balancing-report.log" || true
 
 log "DONE save=$SAVE_ID out=$OUT"

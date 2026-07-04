@@ -58,7 +58,7 @@ const TAB_STEPS: TabStep[] = [
   { navId: "scoutingCenterV2", label: "Scouting", readySelector: '[data-testid="foundation-scouting-hub-v2"]' },
   { navId: "historyV2", label: "Historie", readySelector: ".transfer-history-v2-shell" },
   { navId: "ranks", label: "Ranks", readySelector: "#discipline-ranks:not(.foundation-section-hidden)" },
-  { navId: "diszis", label: "Diszis", readySelector: "#discipline-config:not(.foundation-section-hidden)" },
+  { navId: "diszis", label: "Diszis", readySelector: '[data-testid="foundation-diszis"]' },
   { navId: "prize", label: "Sponsoren", readySelector: '[data-testid="team-sponsor-choice"]:not(.foundation-section-hidden), [data-testid="foundation-sponsors"]:not(.foundation-section-hidden)' },
   { navId: "encyclopedia", label: "Lexikon", readySelector: '[data-testid="foundation-encyclopedia"]' },
 ];

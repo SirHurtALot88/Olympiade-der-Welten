@@ -155,6 +155,13 @@ export function buildTrainingOverlayStats(data: PlayerPortraitTrainingContextDat
   ];
 }
 
+export function buildMarketRailOverlayStats(data: PlayerPortraitMarketContextData): PortraitOverlayStat[] {
+  return [
+    stat("Fit", data.fitDisplay ?? "—", { valueClass: data.fitToneClass }),
+    stat("MW", data.marketValue ?? "—"),
+  ];
+}
+
 export function buildMarketOverlayStats(data: PlayerPortraitMarketContextData): PortraitOverlayStat[] {
   const stats: PortraitOverlayStat[] = [
     stat("Fit", data.fitDisplay ?? "—", { valueClass: data.fitToneClass }),
@@ -207,10 +214,13 @@ export function buildArenaOverlayStats(data: PlayerPortraitArenaContextData): Po
   return stats;
 }
 
+export type PlayerPortraitLayout = "stack" | "rail";
+
 export type BuildContextOverlayOptions = BuildRosterOverlayInput & {
   context?: PlayerPortraitContext;
   contextData?: PlayerPortraitContextData;
   density?: PlayerPortraitDensity;
+  layout?: PlayerPortraitLayout;
 };
 
 export function buildContextOverlayStats(options: BuildContextOverlayOptions): PortraitOverlayStat[] {
@@ -224,6 +234,9 @@ export function buildContextOverlayStats(options: BuildContextOverlayOptions): P
     return buildTrainingOverlayStats(options.contextData.training).slice(0, density === "compact" ? 4 : 6);
   }
   if (context === "market" && options.contextData?.market) {
+    if (options.layout === "rail") {
+      return buildMarketRailOverlayStats(options.contextData.market);
+    }
     return buildMarketOverlayStats(options.contextData.market).slice(0, density === "compact" ? 4 : 6);
   }
   if (context === "scouting" && options.contextData?.scouting) {
@@ -242,8 +255,14 @@ export function buildContextOverlayStats(options: BuildContextOverlayOptions): P
   return rosterStats;
 }
 
-export function shouldShowPortraitOrbit(context: PlayerPortraitContext | undefined, density: PlayerPortraitDensity) {
+export function shouldShowPortraitOrbit(
+  context: PlayerPortraitContext | undefined,
+  density: PlayerPortraitDensity,
+  layout: PlayerPortraitLayout = "stack",
+) {
+  if (layout === "rail") return false;
   if (density === "mini") return false;
-  if (context === "training" || context === "scouting" || context === "market") return density === "full";
+  if (context === "market") return density === "full" || density === "compact";
+  if (context === "training" || context === "scouting") return density === "full";
   return context === "roster" || context === "tablePreview" || context == null;
 }

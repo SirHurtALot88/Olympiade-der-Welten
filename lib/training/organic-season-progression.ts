@@ -125,10 +125,10 @@ export type OrganicRegressionBreakdown = {
 };
 
 /** Tunable via scripts/long-run-auto-tune-organic.ts (--apply regression scale). */
-export const ORGANIC_BASE_REGRESSION_PER_ATTRIBUTE = 0.305;
+export const ORGANIC_BASE_REGRESSION_PER_ATTRIBUTE = 0.344;
 const TRAINING_CENTER_LEVEL_MODIFIER_PCT = [0, 14, 28, 42, 56, 70] as const;
 /** 0,7 % vom Marktwert pro Attribut (nicht MVS). Tunable via auto-tune. */
-export const ORGANIC_MARKET_VALUE_PRESSURE_RATE = 0.0092;
+export const ORGANIC_MARKET_VALUE_PRESSURE_RATE = 0.0104;
 const NEGATIVE_TRAINING_SIDE_EFFECT_SHARE = 0.14;
 /** Performance budget scale — boosts peak P90 vs league median. Tunable via auto-tune. */
 export const ORGANIC_PERFORMANCE_SETPOINT_SCALE = 0.64;

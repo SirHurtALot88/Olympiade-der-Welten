@@ -530,13 +530,13 @@ export function reconcilePlayerPotentialRecordsForGameState(input: {
   playerIds?: string[];
 }): PlayerPotentialRecord[] {
   const targetIds = input.playerIds ? new Set(input.playerIds) : null;
-  const recordsByPlayerId = new Map((input.gameState.playerPotential ?? []).map((record) => [record.playerId, record] as const));
+  const playersById = new Map(input.gameState.players.map((entry) => [entry.id, entry] as const));
 
   return (input.gameState.playerPotential ?? []).map((record) => {
     if (targetIds && !targetIds.has(record.playerId)) {
       return record;
     }
-    const player = input.gameState.players.find((entry) => entry.id === record.playerId);
+    const player = playersById.get(record.playerId);
     if (!player) {
       return record;
     }

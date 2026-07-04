@@ -28328,7 +28328,7 @@ a {
 
 .market-v2-main-grid {
   display: grid;
-  grid-template-columns: minmax(330px, 0.98fr) minmax(430px, 1.28fr) minmax(300px, 0.88fr);
+  grid-template-columns: minmax(116px, 0.46fr) minmax(430px, 1.38fr) minmax(300px, 0.88fr);
   gap: 14px;
   align-items: start;
 }
@@ -28390,6 +28390,7 @@ a {
   max-height: min(82vh, 1180px);
   overflow: auto;
   padding-right: 4px;
+  gap: 6px;
 }
 
 .market-v2-candidate-card,
@@ -28412,7 +28413,7 @@ a {
   gap: 7px;
   padding: 8px 10px 8px 14px;
   content-visibility: auto;
-  contain-intrinsic-size: 126px;
+  contain-intrinsic-size: 108px;
   border-radius: 14px;
   border-color: color-mix(in srgb, var(--market-v2-candidate-accent, rgba(108, 143, 214, 0.34)) 54%, rgba(124, 147, 190, 0.18));
   background:
@@ -28991,6 +28992,7 @@ a {
   --market-v2-diszi-soft: rgba(255, 255, 255, 0.04);
   --market-v2-diszi-text: rgba(214, 223, 238, 0.78);
   display: flex;
+  flex-wrap: wrap;
   align-items: center;
   justify-content: space-between;
   gap: 10px;
@@ -29042,6 +29044,10 @@ a {
   flex: 0 0 auto;
   color: color-mix(in srgb, var(--market-v2-diszi-text) 80%, #ffffff);
   font-size: 0.78rem;
+}
+
+.market-v2-diszi-row .market-v2-diszi-impact {
+  flex-basis: 100%;
 }
 
 .market-v2-focus-actions {
@@ -34720,6 +34726,252 @@ a {
   width: 100%;
 }
 
+.market-v2-candidate-card .foundation-player-portrait-card.is-portrait-rail {
+  border-radius: 12px;
+  overflow: hidden;
+  background: transparent;
+  box-shadow: none;
+}
+
+.market-v2-candidate-card .foundation-player-portrait-rail-tile {
+  width: 100%;
+}
+
+.market-v2-candidate-card .foundation-player-portrait-hero.is-rail-tile {
+  position: relative;
+  width: 100%;
+  aspect-ratio: 1 / 1;
+  border-radius: 12px;
+  overflow: hidden;
+  box-shadow:
+    inset 0 0 0 1px rgba(255, 255, 255, 0.08),
+    0 10px 22px rgba(8, 14, 26, 0.28);
+}
+
+.market-v2-candidate-card .foundation-player-portrait-hero.is-rail-tile .home-v2-player-portrait {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  object-position: top center;
+}
+
+.market-v2-candidate-card .foundation-player-portrait-overlay.is-rail-tile {
+  inset: 0;
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  background:
+    linear-gradient(180deg, rgba(8, 12, 20, 0.08) 0%, rgba(8, 12, 20, 0.04) 34%, rgba(8, 12, 20, 0.72) 72%, rgba(8, 12, 20, 0.92) 100%);
+  pointer-events: none;
+}
+
+.market-v2-candidate-card .foundation-player-portrait-overlay.is-rail-tile .home-v2-player-overlay-top {
+  padding: 5px 6px 0;
+}
+
+.market-v2-candidate-card .foundation-player-portrait-overlay.is-rail-tile .home-v2-player-overlay-bottom {
+  display: grid;
+  gap: 3px;
+  padding: 6px;
+  min-width: 0;
+}
+
+.market-v2-candidate-card .foundation-player-portrait-submeta.is-rail-tile {
+  font-size: 0.54rem;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: rgba(214, 223, 238, 0.78);
+}
+
+.market-v2-candidate-card .home-v2-player-name.is-rail-tile {
+  font-size: 0.72rem;
+  font-weight: 800;
+  line-height: 1.05;
+  color: rgba(248, 251, 255, 0.98);
+  text-shadow: 0 1px 8px rgba(0, 0, 0, 0.55);
+}
+
+.market-v2-candidate-card .foundation-player-portrait-stats.is-rail-tile-overlay {
+  display: inline-flex;
+  flex-wrap: wrap;
+  gap: 3px;
+}
+
+.market-v2-candidate-card .foundation-player-portrait-stats.is-rail-tile-overlay .foundation-player-portrait-stat {
+  display: inline-grid;
+  min-height: 18px;
+  padding: 1px 5px;
+  border-radius: 999px;
+  background: rgba(8, 12, 20, 0.58);
+  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.1);
+}
+
+.market-v2-candidate-card .foundation-player-portrait-stats.is-rail-tile-overlay .foundation-player-portrait-stat small {
+  font-size: 0.48rem;
+  letter-spacing: 0.04em;
+}
+
+.market-v2-candidate-card .foundation-player-portrait-stats.is-rail-tile-overlay .foundation-player-portrait-stat strong {
+  font-size: 0.62rem;
+  line-height: 1;
+}
+
+.market-v2-candidate-card .foundation-player-portrait-rail-body {
+  display: grid;
+  grid-template-columns: 84px minmax(0, 1fr);
+  gap: 8px;
+  align-items: stretch;
+  min-height: 112px;
+  padding: 6px;
+}
+
+.market-v2-candidate-card .foundation-player-portrait-hero.is-rail-thumb {
+  width: 84px;
+  aspect-ratio: 3 / 4;
+  border-radius: 10px;
+  overflow: hidden;
+  flex-shrink: 0;
+}
+
+.market-v2-candidate-card .foundation-player-portrait-overlay.is-rail-thumb {
+  inset: 0;
+}
+
+.market-v2-candidate-card .foundation-player-portrait-overlay.is-rail-thumb .home-v2-player-overlay-top {
+  padding: 4px;
+}
+
+.market-v2-candidate-card .foundation-player-portrait-overlay.is-rail-thumb .home-v2-player-badge {
+  min-height: 18px;
+  padding: 0 5px;
+  font-size: 0.52rem;
+  letter-spacing: 0.04em;
+}
+
+.market-v2-candidate-card .foundation-player-portrait-rail-meta {
+  display: grid;
+  gap: 4px;
+  align-content: center;
+  min-width: 0;
+  padding-right: 2px;
+}
+
+.market-v2-candidate-card .foundation-player-portrait-submeta.is-rail {
+  font-size: 0.58rem;
+  color: rgba(186, 198, 218, 0.72);
+}
+
+.market-v2-candidate-card .foundation-player-portrait-rail-meta .home-v2-player-name {
+  font-size: 0.76rem;
+  font-weight: 700;
+}
+
+.market-v2-candidate-card .foundation-player-portrait-stats.is-rail-inline {
+  display: inline-flex;
+  flex-wrap: wrap;
+  gap: 4px;
+}
+
+.market-v2-candidate-card .foundation-player-portrait-stats.is-rail-inline .foundation-player-portrait-stat {
+  display: inline-grid;
+  padding: 2px 6px;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.06);
+}
+
+.market-v2-candidate-card .foundation-player-portrait-stats.is-rail-inline .foundation-player-portrait-stat small {
+  font-size: 0.5rem;
+}
+
+.market-v2-candidate-card .foundation-player-portrait-stats.is-rail-inline .foundation-player-portrait-stat strong {
+  font-size: 0.64rem;
+}
+
+.market-v2-candidate-card .foundation-player-portrait-orbit.is-rail {
+  gap: 3px;
+}
+
+.market-v2-candidate-card .foundation-player-portrait-orbit.is-rail .velo-stat-orbit-chip {
+  padding: 2px 2px;
+  border-radius: 7px;
+}
+
+.market-v2-candidate-card .foundation-player-portrait-orbit.is-rail .velo-stat-orbit-chip small {
+  font-size: 0.48rem;
+  letter-spacing: 0.04em;
+}
+
+.market-v2-candidate-card .foundation-player-portrait-orbit.is-rail .velo-stat-orbit-chip strong {
+  font-size: 0.62rem;
+  line-height: 1;
+}
+
+.market-v2-candidate-rail-tags {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 3px;
+}
+
+.market-v2-candidate-rail-tag {
+  display: inline-flex;
+  align-items: center;
+  min-height: 16px;
+  padding: 0 5px;
+  border-radius: 999px;
+  background: rgba(8, 12, 20, 0.62);
+  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.1);
+  font-size: 0.52rem;
+  letter-spacing: 0.03em;
+  color: rgba(236, 242, 252, 0.92);
+  text-shadow: 0 1px 6px rgba(0, 0, 0, 0.45);
+}
+
+.market-v2-top-six-impact {
+  display: grid;
+  gap: 6px;
+  margin-top: 6px;
+}
+
+.market-v2-top-six-impact-summary {
+  margin: 0;
+  font-size: 0.72rem;
+  color: rgba(196, 208, 228, 0.86);
+}
+
+.market-v2-top-six-impact-summary strong {
+  color: rgba(248, 251, 255, 0.96);
+}
+
+.market-v2-top-six-impact-note {
+  display: block;
+  margin: 0;
+  font-size: 0.62rem;
+  line-height: 1.35;
+  color: rgba(170, 184, 208, 0.82);
+}
+
+.market-v2-axis-rank-estimate {
+  font-style: normal;
+  font-size: 0.58rem;
+  color: rgba(170, 184, 208, 0.86);
+}
+
+.market-v2-diszi-impact {
+  display: block;
+  width: 100%;
+  margin-top: 2px;
+  font-size: 0.64rem;
+  color: rgba(186, 198, 218, 0.82);
+}
+
+.market-v2-diszi-impact.is-positive {
+  color: rgba(126, 214, 142, 0.96);
+}
+
+.market-v2-diszi-impact.is-negative {
+  color: rgba(255, 146, 146, 0.96);
+}
+
 .scouting-hub-v2-target-grid .foundation-player-portrait-card {
   width: 100%;
 }
@@ -35160,13 +35412,68 @@ a {
 }
 
 .inbox-v2-list-item {
+  display: grid;
+  gap: 6px;
   padding: 14px;
+  width: 100%;
   text-align: left;
   cursor: pointer;
+  color: rgba(236, 242, 252, 0.96);
+  font: inherit;
+  line-height: 1.35;
+}
+
+.inbox-v2-list-item-title {
+  display: block;
+  font-size: 0.92rem;
+  font-weight: 700;
+  line-height: 1.28;
+  color: rgba(248, 251, 255, 0.98);
+}
+
+.inbox-v2-list-item-detail {
+  display: block;
+  font-size: 0.78rem;
+  line-height: 1.4;
+  color: rgba(186, 198, 218, 0.9);
+  overflow-wrap: anywhere;
 }
 
 .inbox-v2-list-item.is-active {
   border-color: rgba(255, 208, 84, 0.45);
+  background:
+    linear-gradient(180deg, rgba(255, 208, 84, 0.08), rgba(11, 18, 32, 0.96)),
+    linear-gradient(180deg, rgba(11, 18, 32, 0.96), rgba(9, 15, 27, 0.9));
+}
+
+.inbox-v2-detail h3 {
+  margin: 0 0 10px;
+  color: rgba(248, 251, 255, 0.98);
+  line-height: 1.25;
+}
+
+.inbox-v2-detail p {
+  margin: 0;
+  color: rgba(214, 223, 238, 0.92);
+  line-height: 1.45;
+  overflow-wrap: anywhere;
+}
+
+.inbox-v2-choice-card strong,
+.inbox-v2-choice-card small {
+  display: block;
+  color: inherit;
+}
+
+.inbox-v2-choice-card strong {
+  color: rgba(248, 251, 255, 0.98);
+  line-height: 1.28;
+}
+
+.inbox-v2-choice-card small {
+  margin-top: 4px;
+  color: rgba(186, 198, 218, 0.88);
+  line-height: 1.35;
 }
 
 .inbox-v2-detail,
@@ -35401,8 +35708,8 @@ a {
 }
 
 .market-v2-candidate-skeleton__card {
-  min-height: 118px;
-  border-radius: 16px;
+  min-height: 108px;
+  border-radius: 12px;
   background: linear-gradient(90deg, rgba(51, 65, 85, 0.35), rgba(71, 85, 105, 0.55), rgba(51, 65, 85, 0.35));
   background-size: 200% 100%;
   animation: foundation-panel-skeleton-shimmer 1.4s ease-in-out infinite;

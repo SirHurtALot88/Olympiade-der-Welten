@@ -182,6 +182,7 @@ export function useFoundationPersistenceActions(input: UseFoundationPersistenceA
   const liveSaveVersionSignatureRef = useRef<string | null>(null);
   const liveSaveRefreshInFlightRef = useRef(false);
   const autoPersistPausedRef = useRef(false);
+  const autoPersistUnpauseTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const autoPersistTimerRef = useRef<number | null>(null);
   const autoPersistInFlightRef = useRef(false);
   const autoPersistContentSignatureRef = useRef<string | null>(null);
@@ -783,6 +784,7 @@ export function useFoundationPersistenceActions(input: UseFoundationPersistenceA
     hasLoadedPersistentState,
     foundationViewTransitionUntilRef,
     autoPersistPausedRef,
+    autoPersistUnpauseTimeoutRef,
     liveSaveRefreshInFlightRef,
     liveSaveVersionSignatureRef,
   };

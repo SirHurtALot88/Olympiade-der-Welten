@@ -584,6 +584,7 @@ function getTopDisciplineScores(input: {
     disciplineId: entry.disciplineId,
     disciplineName: entry.disciplineName,
     scoreTier: entry.scoreTier,
+    displayedScore: entry.displayedScore,
     ppsLastSeason: null,
     playerCount: input.disciplinePlayerCountById?.get(entry.disciplineId) ?? null,
     teamRank: input.teamDisciplineRankById?.get(entry.disciplineId) ?? null,
@@ -1592,8 +1593,32 @@ export function listLocalTransfermarktFreeAgents(input: TransfermarktReadParams 
     }
 
     if (compactListMode) {
+      const player = playersById.get(baseItem.playerId) ?? null;
+      const playerScoutingLevel = getEffectiveScoutingLevel(gameState, selectedTeam.teamId, baseItem.playerId);
+      const compactFitPlayer = {
+        race: baseItem.race,
+        alignment: baseItem.alignment,
+        subclasses: baseItem.subclasses,
+        traitsPositive: baseItem.traitsPositive,
+        traitsNegative: baseItem.traitsNegative,
+      };
+      const fitBreakdown = calculateTransfermarktFit(compactFitPlayer, selectedRosterPlayers, {
+        teamId: selectedTeam.teamId,
+      });
+      const topDisciplineScores = player
+        ? getTopDisciplineScores({
+            saveId: save.saveId,
+            disciplinesById,
+            disciplinePlayerCountById,
+            teamDisciplineRankById,
+            player,
+            scoutingLevel: playerScoutingLevel,
+          })
+        : baseItem.topDisciplineScores;
       return {
         ...baseItem,
+        scoutingLevel: playerScoutingLevel,
+        topDisciplineScores,
         teamContextAvailable: true,
         teamCash: selectedTeam.cash,
         teamSalary,
@@ -1614,7 +1639,12 @@ export function listLocalTransfermarktFreeAgents(input: TransfermarktReadParams 
               : rosterCount < playerOpt
                 ? "under_opt"
                 : "at_or_above_opt",
-        fitDisplay: baseItem.mercenary ? "Team wählen · Mercenary" : "Team wählen",
+        fitRace: fitBreakdown.fitRace,
+        fitSubclasses: fitBreakdown.fitSubclasses,
+        fitTraits: fitBreakdown.fitTraits,
+        fitAlignment: fitBreakdown.fitAlignment,
+        fit: fitBreakdown.teamFit,
+        fitDisplay: baseItem.mercenary ? `${fitBreakdown.teamFit ?? 0} · Mercenary` : `${fitBreakdown.teamFit ?? 0}`,
         fitSource: "compact_list",
       };
     }

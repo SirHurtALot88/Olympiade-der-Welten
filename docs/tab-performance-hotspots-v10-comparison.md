@@ -1,3 +1,27 @@
+## Update 2026-07-03 (Abend) — Profile-Host, Cockpit-Host, Prize-Host, Arena-Prefetch
+
+Nach Umsetzung des Plans „Foundation Perf: Profile-Host, Cockpit-Host, Prize-Host" (Cockpit- und Prize-Derivations aus dem Scope in dedizierte Hosts mit Deferred-Mount verlagert, Arena→Saisonstand-Prefetch um `prefetchSeasonStandingsData`-API-Warmup ergänzt) wurde ein vollständiger V9-Re-Audit gefahren (`fresh-season-1-1783091067803`, Team `A-A`, warmer Dev-Server, `--skip-home-direct`).
+
+| Gate | Ziel | Ergebnis | Status |
+|---|---|---|---|
+| Arena → Saisonstand | <5 s | **2,05 s** | **PASS** (V8: 5,38 s / vorheriger V10-Lauf: 5,02 s) |
+| Saisonstand → Teams | — | **1,62 s** | PASS |
+| Teams → Spieler | — | **4,32 s** | PASS |
+| Teams-Hydration-Cascade (V10-Blocker) | — | behoben — keine Timeouts mehr in der Chain | PASS |
+| Scope-Datei (`use-foundation-shell-router-body-scope.tsx`) | Richtung 8k | 11.390 → **10.496 Zeilen** | Fortschritt (weiter über Ziel) |
+
+Im Zuge des Re-Audits wurden zusätzlich drei Laufzeit-Regressionen aus vorherigen Session-Schritten aufgedeckt und behoben (keine davon Teil dieses Plans, aber Blocker für jede Verifikation):
+
+1. `useFoundationShared must be used within FoundationSharedProvider` — Cockpit-Tab crashte hart, da `<FoundationSharedProvider>` nie um den Router-Body gerendert wurde. Fix: Provider in `FoundationShellRouterBody.tsx` um den Return-Baum ergänzt.
+2. `getRankHeatClass is not a function` — Teams-Tab crashte, da `foundationTeamsViewHostProps` das Feld nicht an `FoundationTeamsViewHost` durchreichte. Fix: Feld ergänzt.
+3. `getBusyActionReason is not defined` (ReferenceError) — Cockpit-Host-Props nutzten eine Shorthand-Property ohne passende lokale Variable. Fix: auf die tatsächlichen `getFoundation*Reason`-Funktionen aliasiert.
+
+Verbleibend außerhalb des Plan-Scopes: `Cockpit → Generator` und `Settings → Admin` schlagen im Audit fehl, weil die Locators `[data-testid="foundation-generator"]` / `[data-testid="foundation-admin"]` im Code nie gesetzt wurden (Audit-Script-Erwartung ohne Gegenstück) — vorbestehende Lücke, nicht Teil dieses Plans.
+
+Volle Rohdaten: [tab-performance-hotspots-v9.md](./tab-performance-hotspots-v9.md) · [tab-performance-hotspots-v9.csv](./tab-performance-hotspots-v9.csv)
+
+---
+
 # Foundation Tab Performance — V8 Warm vs V10 Phase P
 
 Datum: 2026-07-03  

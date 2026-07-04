@@ -667,4 +667,19 @@ describe("foundation performance architecture helpers", () => {
     invalidateLegacyLineupLabContextCache("save-a");
     expect(readLegacyLineupLabContextCache(cacheKey, "sig-1")).toBeNull();
   });
+
+  it("memoizes usePlayerDirectorySlice ratingsById to avoid an infinite render loop", async () => {
+    // Regression guard: ratingsById used to be rebuilt from `payload` on every
+    // render (not memoized), which gave every downstream useMemo/useEffect in
+    // use-foundation-cross-tab-player-directory.ts a "new" input each render
+    // and caused a "Maximum update depth exceeded" crash on the Players tab
+    // once the API payload arrived (confirmed via foundation-v9 audit).
+    const sliceText = await fs.readFile(
+      path.join(root, "lib/foundation/use-player-directory-slice.ts"),
+      "utf8",
+    );
+    expect(sliceText).toContain("const ratingsById = useMemo(");
+    expect(sliceText).toMatch(/useMemo\(\s*\(\)\s*=>\s*\(payload \? hydrateSeasonRatingsSliceMap\(payload\.ratingsByPlayerId\) : EMPTY_RATINGS_MAP\),\s*\[payload\],\s*\)/);
+    expect(sliceText).not.toMatch(/const ratingsById = payload\s*\n?\s*\?\s*hydrateSeasonRatingsSliceMap/);
+  });
 });

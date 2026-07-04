@@ -147,10 +147,10 @@ describe("organic season progression", () => {
     const cheapResult = buildOrganicSeasonProgression({ gameState: gameState(cheap), player: cheap });
     const starResult = buildOrganicSeasonProgression({ gameState: gameState(star), player: star });
 
-    expect(cheapResult.marketValuePressureTotal).toBeCloseTo(2.21, 1);
-    expect(starResult.marketValuePressureTotal).toBeCloseTo(11.04, 1);
-    expect(cheapResult.marketValuePressurePerAttribute).toBeCloseTo(0.184, 2);
-    expect(starResult.marketValuePressurePerAttribute).toBeCloseTo(0.92, 2);
+    expect(cheapResult.marketValuePressureTotal).toBeCloseTo(2.54, 1);
+    expect(starResult.marketValuePressureTotal).toBeCloseTo(12.72, 1);
+    expect(cheapResult.marketValuePressurePerAttribute).toBeCloseTo(0.212, 2);
+    expect(starResult.marketValuePressurePerAttribute).toBeCloseTo(1.06, 2);
     expect(starResult.marketValuePressurePerAttribute).toBeGreaterThan(cheapResult.marketValuePressurePerAttribute);
     expect(starResult.netSetpoints).toBeLessThan(cheapResult.netSetpoints);
   });
