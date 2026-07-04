@@ -424,6 +424,12 @@ export function FoundationShellRouterBody(props: FoundationShellRouterBodyProps)
   scoutingCenterTab,
   scoutingHubV2TargetSections,
   scoutingHubV2Visibility,
+  scoutingQueueEntries,
+  scoutingFocusSummary,
+  scoutingReport,
+  scoutingReportSelectedPlayerId,
+  setScoutingReportSelectedPlayerId,
+  reorderTransferWishlist,
   screenPrimaryAction,
   seasonBriefingData,
   seasonBriefingOpen,
@@ -476,6 +482,11 @@ export function FoundationShellRouterBody(props: FoundationShellRouterBodyProps)
   selectedTeamAverageAxisStats,
   selectedTeamCanManage,
   selectedTeamCaptainProfile,
+  selectedTeamCaptainCandidates,
+  selectedTeamCaptainPlayerId,
+  assignTeamCaptainBusy,
+  assignTeamCaptainForSelectedTeam,
+  captainEffectsTooltip,
   selectedTeamContractPreviewRowCount,
   selectedTeamContractShapeMix,
   selectedTeamContractTable,
@@ -787,7 +798,7 @@ export function FoundationShellRouterBody(props: FoundationShellRouterBodyProps)
               className="foundation-shell-subnav"
               items={[
                 { id: "overview", label: "Übersicht" },
-                { id: "reports", label: "Reports" },
+                { id: "reports", label: "Scouting Report" },
                 { id: "recommended", label: "Empfehlungen" },
               ]}
               activeId={scoutingCenterTab}
@@ -1131,13 +1142,20 @@ export function FoundationShellRouterBody(props: FoundationShellRouterBodyProps)
                 <div className="panel-header compact">
                   <div className="stack">
                     <h3>Spieltags-Reihenfolge</h3>
-                    <p className="muted">Alle Diszi-Paare der Season — Farb-Dopplungen sind markiert.</p>
+                    <p className="muted">Alle Diszi-Paare der Season — Farb-Dopplungen und Spieltage mit 11–12 Slots sind markiert.</p>
                   </div>
                 </div>
                 <div className="season-briefing-matchday-grid">
                   {seasonBriefingScheduleReady ? (
                     seasonBriefingData.firstMatchdays.map((entry) => (
-                      <article key={`season-briefing-md-${entry.matchdayId}`} className={joinClassNames("season-briefing-matchday", entry.sameColor && "has-same-color")}>
+                      <article
+                        key={`season-briefing-md-${entry.matchdayId}`}
+                        className={joinClassNames(
+                          "season-briefing-matchday",
+                          entry.sameColor && "has-same-color",
+                          entry.isHeavyRoster && "has-heavy-roster",
+                        )}
+                      >
                         <span className="eyebrow">{entry.label}</span>
                         <div className="season-briefing-discipline-row">
                           {entry.disciplines.map((discipline) => (
@@ -1150,7 +1168,17 @@ export function FoundationShellRouterBody(props: FoundationShellRouterBodyProps)
                             </span>
                           ))}
                         </div>
-                        {entry.sameColor ? <small className="text-warning">Farb-Dopplung: gleiche Kategorie am selben Spieltag</small> : null}
+                        {entry.isHeavySameColor ? (
+                          <small className="season-briefing-heavy-label is-multicolor">
+                            Farb-Dopplung + Kaderdruck: {entry.totalSlots} Slots an diesem Spieltag
+                          </small>
+                        ) : entry.sameColor ? (
+                          <small className="text-warning">Farb-Dopplung: gleiche Kategorie am selben Spieltag</small>
+                        ) : entry.isHeavyRoster ? (
+                          <small className="season-briefing-heavy-label">
+                            Kaderdruck: {entry.totalSlots} Slots an diesem Spieltag
+                          </small>
+                        ) : null}
                       </article>
                     ))
                   ) : (
@@ -1236,15 +1264,7 @@ export function FoundationShellRouterBody(props: FoundationShellRouterBodyProps)
             {formatGamePhaseLabel(activeContextMeta?.gamePhase ?? gameState.gamePhase)}
           </span>
             </>
-          ) : (
-            <>
-              <span className="eyebrow">Team</span>
-              <strong>{selectedTeam?.name ?? "Kein Team"}</strong>
-              <span className="muted">
-                {gameState.season.name} · {currentMatchdayDisplayLabel}
-              </span>
-            </>
-          )}
+          ) : null}
         </div>
         {roomContext ? (
           <div className="foundation-ai-preseason-banner is-ready" data-testid="foundation-room-context-banner">
@@ -1635,6 +1655,11 @@ export function FoundationShellRouterBody(props: FoundationShellRouterBodyProps)
               selectedTeamGeneralManager,
               hqTransferWishlistEntries,
               selectedTeamCaptainProfile,
+              selectedTeamCaptainCandidates,
+              selectedTeamCaptainPlayerId,
+              assignTeamCaptainBusy,
+              onAssignTeamCaptain: assignTeamCaptainForSelectedTeam,
+              captainEffectsTooltip,
               selectedTeamPowers,
               hqContractExpiringCount,
               hqTransferSellMarkers,
@@ -1835,6 +1860,17 @@ export function FoundationShellRouterBody(props: FoundationShellRouterBodyProps)
                 }
                 onOpenMarket={() => setFoundationView("marketV2", setActiveView)}
                 onOpenPlayer={(playerId) => openPlayerProfileById(playerId)}
+                queueEntries={scoutingQueueEntries}
+                focusEtaLabel={
+                  scoutingFocusSummary && Number.isFinite(scoutingFocusSummary.etaMatchdays)
+                    ? `noch ${scoutingFocusSummary.etaMatchdays} Spieltag${scoutingFocusSummary.etaMatchdays === 1 ? "" : "e"}`
+                    : null
+                }
+                onReorderQueue={reorderTransferWishlist}
+                onRemoveFromQueue={removeTransferWishlistEntry}
+                report={scoutingReport}
+                selectedReportPlayerId={scoutingReportSelectedPlayerId}
+                onSelectReportPlayer={setScoutingReportSelectedPlayerId}
               />
             ) : null}
           </section>

@@ -13,8 +13,12 @@ import { getFacilityLevel } from "@/lib/facilities/facility-effects";
 import { buildScoutingWatchTargetStarFields } from "@/lib/scouting/player-star-scouting-bridge";
 import {
   buildScoutingHubTargetSections,
+  buildScoutingQueueEntries,
   type ScoutingHubTargetDraft,
+  type ScoutingQueueEntryDraft,
 } from "@/lib/scouting/scouting-hub-targets-service";
+import { getScoutFocusSummary } from "@/lib/scouting/facility-scout-pipeline-service";
+import { buildScoutingReport, type ScoutingReportData } from "@/lib/scouting/scouting-report-service";
 
 export type FoundationTransferWishlistEntryForMarketV2 = {
   playerId: string;
@@ -42,8 +46,11 @@ export function shouldBuildFoundationTransferSellMarkerDerivations(input: {
   return input.shouldBuildMarketView || input.shouldBuildTeamsView || input.shouldBuildHomeV2Overview;
 }
 
-export function shouldBuildFoundationScoutingHubDerivations(shouldBuildMarketView: boolean): boolean {
-  return shouldBuildMarketView;
+export function shouldBuildFoundationScoutingHubDerivations(input: {
+  shouldBuildMarketView: boolean;
+  shouldBuildScoutingHubView: boolean;
+}): boolean {
+  return input.shouldBuildMarketView || input.shouldBuildScoutingHubView;
 }
 
 export function shouldBuildFoundationHqTransferMarkerDerivations(shouldBuildHomeV2Overview: boolean): boolean {
@@ -53,12 +60,14 @@ export function shouldBuildFoundationHqTransferMarkerDerivations(shouldBuildHome
 export function useFoundationCrossTabMarketFilters(input: {
   activeView: FoundationViewId;
   shouldBuildMarketView: boolean;
+  shouldBuildScoutingHubView: boolean;
   shouldBuildTeamsView: boolean;
   shouldBuildHomeV2Overview: boolean;
   activeSaveId: string;
   gameState: GameState;
   selectedTeam: Team | null;
   selectedTeamFacilityState: TeamFacilityCollection;
+  scoutingReportSelectedPlayerId?: string | null;
   selectedRosterTableRows: Array<{
     entry: { contractLength: number };
     player: { currentXP?: number | null; fatigue?: number | null };
@@ -71,7 +80,10 @@ export function useFoundationCrossTabMarketFilters(input: {
     shouldBuildTeamsView: input.shouldBuildTeamsView,
     shouldBuildHomeV2Overview: input.shouldBuildHomeV2Overview,
   });
-  const shouldBuildScoutingHub = shouldBuildFoundationScoutingHubDerivations(input.shouldBuildMarketView);
+  const shouldBuildScoutingHub = shouldBuildFoundationScoutingHubDerivations({
+    shouldBuildMarketView: input.shouldBuildMarketView,
+    shouldBuildScoutingHubView: input.shouldBuildScoutingHubView,
+  });
   const shouldBuildHqTransferMarkers = shouldBuildFoundationHqTransferMarkerDerivations(input.shouldBuildHomeV2Overview);
 
   const transferWishlistEntries = useMemo(
@@ -181,6 +193,49 @@ export function useFoundationCrossTabMarketFilters(input: {
     transferWishlistEntriesForMarketV2,
   ]);
 
+  const scoutingQueueEntries = useMemo((): ScoutingQueueEntryDraft[] => {
+    if (!shouldBuildScoutingHub || !input.selectedTeam) {
+      return [];
+    }
+    return buildScoutingQueueEntries({
+      gameState: input.gameState,
+      teamId: input.selectedTeam.teamId,
+      resolveMarketEntry: (playerId) => {
+        const entry = transferWishlistEntriesForMarketV2.find((candidate) => candidate.playerId === playerId);
+        if (!entry) {
+          return null;
+        }
+        return {
+          playerName: entry.playerName,
+          className: entry.className,
+          race: entry.race,
+          marketValue: entry.marketValue != null ? formatTransfermarktCurrency(entry.marketValue) : "—",
+        };
+      },
+    });
+  }, [input.gameState, input.selectedTeam, shouldBuildScoutingHub, transferWishlistEntriesForMarketV2]);
+
+  const scoutingFocusSummary = useMemo(() => {
+    if (!shouldBuildScoutingHub || !input.selectedTeam) {
+      return null;
+    }
+    return getScoutFocusSummary(input.gameState, input.selectedTeam.teamId);
+  }, [input.gameState, input.selectedTeam, shouldBuildScoutingHub]);
+
+  const scoutingReportPlayerId = input.scoutingReportSelectedPlayerId ?? scoutingFocusSummary?.playerId ?? scoutingQueueEntries[0]?.playerId ?? null;
+
+  const scoutingReport = useMemo((): ScoutingReportData | null => {
+    if (!shouldBuildScoutingHub || !input.selectedTeam || !scoutingReportPlayerId) {
+      return null;
+    }
+    return buildScoutingReport({
+      gameState: input.gameState,
+      teamId: input.selectedTeam.teamId,
+      playerId: scoutingReportPlayerId,
+      saveId: input.activeSaveId,
+    });
+  }, [input.activeSaveId, input.gameState, input.selectedTeam, scoutingReportPlayerId, shouldBuildScoutingHub]);
+
   const scoutingHubV2Visibility = useMemo(() => {
     if (!shouldBuildScoutingHub) {
       return {
@@ -253,6 +308,9 @@ export function useFoundationCrossTabMarketFilters(input: {
     transferWishlistEntriesForMarketV2,
     scoutingHubV2TargetSections,
     scoutingHubV2Visibility,
+    scoutingQueueEntries,
+    scoutingFocusSummary,
+    scoutingReport,
     hqTransferWishlistEntries,
     hqTransferSellMarkers,
     hqContractExpiringCount,

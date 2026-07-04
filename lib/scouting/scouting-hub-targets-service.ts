@@ -1,6 +1,16 @@
 import type { GameState } from "@/lib/data/olyDataTypes";
-import { buildScoutPipelineSummary, getEffectiveScoutingLevel } from "@/lib/scouting/facility-scout-pipeline-service";
-import { getActiveScoutingWishlistEntries, getTeamTransferWishlistEntries } from "@/lib/scouting/scouting-wishlist-slots";
+import {
+  buildScoutPipelineSummary,
+  getEffectiveScoutingLevel,
+  getFocusScoutTarget,
+  getPlayerScoutCertainty,
+} from "@/lib/scouting/facility-scout-pipeline-service";
+import {
+  getActiveScoutingWishlistEntries,
+  getScoutingWishlistSlotLimit,
+  getTeamTransferWishlistEntries,
+  getWishlistEntryPriorityRank,
+} from "@/lib/scouting/scouting-wishlist-slots";
 import { syncWishlistToScoutingWatchlist } from "@/lib/scouting/scouting-watchlist-service";
 
 export type ScoutingHubTargetDraft = {
@@ -101,4 +111,62 @@ export function buildScoutingHubTargetSections(input: {
     getScoutingLevelForPlayer: (playerId: string, facilityLevel: number) =>
       Math.max(facilityLevel, getEffectiveScoutingLevel(syncedState, input.teamId, playerId)),
   };
+}
+
+export type ScoutingQueueEntryDraft = {
+  playerId: string;
+  playerName: string;
+  className: string;
+  race: string;
+  marketValue: string;
+  certainty: number;
+  effectiveScoutingLevel: number;
+  isActiveSlot: boolean;
+  isFocusTarget: boolean;
+  isFullyScouted: boolean;
+};
+
+/**
+ * Full scouting focus queue: every wishlist entry for the team, in priority
+ * order (rank 0 first), annotated with intel progress so the UI can render a
+ * single drag-and-drop reorderable list with a highlighted focus target and
+ * a visual "active slot" cutoff.
+ */
+export function buildScoutingQueueEntries(input: {
+  gameState: GameState;
+  teamId: string;
+  resolveMarketEntry: (playerId: string) => { playerName: string; className: string; race?: string; marketValue: string } | null;
+}): ScoutingQueueEntryDraft[] {
+  const { gameState, teamId } = input;
+  const playerById = new Map(gameState.players.map((player) => [player.id, player] as const));
+  const entries = [...getTeamTransferWishlistEntries(gameState, teamId)].sort(
+    (left, right) => getWishlistEntryPriorityRank(left) - getWishlistEntryPriorityRank(right),
+  );
+  const slotLimit = getScoutingWishlistSlotLimit(gameState, teamId);
+  const activePlayerIds = new Set(getActiveScoutingWishlistEntries(gameState, teamId).map((entry) => entry.playerId));
+  const focusPlayerId = getFocusScoutTarget(gameState, teamId)?.playerId ?? null;
+
+  return entries
+    .map((entry): ScoutingQueueEntryDraft | null => {
+      const player = playerById.get(entry.playerId) ?? null;
+      const marketEntry = input.resolveMarketEntry(entry.playerId);
+      if (!player && !marketEntry) {
+        return null;
+      }
+      const certainty = getPlayerScoutCertainty(gameState, teamId, entry.playerId);
+      const effectiveScoutingLevel = getEffectiveScoutingLevel(gameState, teamId, entry.playerId);
+      return {
+        playerId: entry.playerId,
+        playerName: player?.name ?? marketEntry?.playerName ?? entry.playerId,
+        className: player?.className ?? marketEntry?.className ?? entry.className ?? "—",
+        race: player?.race ?? marketEntry?.race ?? entry.race ?? "—",
+        marketValue: marketEntry?.marketValue ?? (player?.marketValue != null ? String(player.marketValue) : "—"),
+        certainty,
+        effectiveScoutingLevel,
+        isActiveSlot: slotLimit == null || activePlayerIds.has(entry.playerId),
+        isFocusTarget: focusPlayerId === entry.playerId,
+        isFullyScouted: effectiveScoutingLevel >= 5,
+      };
+    })
+    .filter((entry): entry is ScoutingQueueEntryDraft => Boolean(entry));
 }

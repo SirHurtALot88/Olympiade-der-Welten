@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 
 import type { GameState } from "@/lib/data/olyDataTypes";
-import { buildScoutingHubTargetSections } from "@/lib/scouting/scouting-hub-targets-service";
+import { buildScoutingHubTargetSections, buildScoutingQueueEntries } from "@/lib/scouting/scouting-hub-targets-service";
 
 function createGameState(input?: {
   scoutingLevel?: number;
@@ -126,5 +126,36 @@ describe("scouting hub targets service", () => {
     expect(sections.activeTargets.every((entry) => entry.scoutStatus === "active")).toBe(true);
     expect(sections.bookmarkedTargets.map((entry) => entry.playerId)).toEqual(["p-5"]);
     expect(sections.bookmarkedTargets[0]?.scoutStatus).toBe("bookmarked");
+  });
+
+  it("builds a single priority-ordered queue with focus + active-slot flags", () => {
+    const gameState = createGameState({
+      scoutingLevel: 0,
+      rosterCount: 10,
+      wishlist: [
+        { playerId: "p-1", createdAt: "2026-06-25T00:00:00.000Z" },
+        { playerId: "p-2", createdAt: "2026-06-25T01:00:00.000Z" },
+        { playerId: "p-3", createdAt: "2026-06-25T02:00:00.000Z" },
+        { playerId: "p-4", createdAt: "2026-06-25T03:00:00.000Z" },
+        { playerId: "p-5", createdAt: "2026-06-25T04:00:00.000Z" },
+      ],
+    });
+
+    const queue = buildScoutingQueueEntries({
+      gameState,
+      teamId: "M-M",
+      resolveMarketEntry: (playerId) => ({ playerName: playerId, className: "Hero", marketValue: "10M" }),
+    });
+
+    expect(queue.map((entry) => entry.playerId)).toEqual(["p-1", "p-2", "p-3", "p-4", "p-5"]);
+    expect(queue.filter((entry) => entry.isActiveSlot).map((entry) => entry.playerId)).toEqual([
+      "p-1",
+      "p-2",
+      "p-3",
+      "p-4",
+    ]);
+    expect(queue.find((entry) => entry.playerId === "p-5")?.isActiveSlot).toBe(false);
+    // Scouting office L0 never ticks, so nobody can become an active focus target.
+    expect(queue.every((entry) => !entry.isFocusTarget)).toBe(true);
   });
 });

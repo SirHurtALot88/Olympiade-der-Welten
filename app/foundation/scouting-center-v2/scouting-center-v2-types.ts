@@ -1,4 +1,6 @@
 import type { PlayerPotentialBand } from "@/lib/data/olyDataTypes";
+import type { ScoutingQueueRow } from "@/app/foundation/scouting-center-v2/ScoutingPriorityQueue";
+import type { ScoutingReportData } from "@/lib/scouting/scouting-report-service";
 
 export type ScoutingHubV2WatchTarget = {
   playerId: string;
@@ -73,6 +75,14 @@ export type ScoutingHubV2ClientProps = {
   hideSubNav?: boolean;
   onOpenMarket: () => void;
   onOpenPlayer: (playerId: string) => void;
+  queueEntries?: ScoutingQueueRow[];
+  focusEtaLabel?: string | null;
+  wishlistSlotLimit?: number | null;
+  onReorderQueue?: (playerId: string, targetIndex: number) => void;
+  onRemoveFromQueue?: (playerId: string) => void;
+  report?: ScoutingReportData | null;
+  selectedReportPlayerId?: string | null;
+  onSelectReportPlayer?: (playerId: string) => void;
 };
 
 /** @deprecated Use ScoutingHubV2ClientProps — kept for import stability during preview rollout */

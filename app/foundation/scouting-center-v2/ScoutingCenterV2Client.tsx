@@ -1,12 +1,9 @@
 "use client";
 
-import type { ScoutingHubV2ClientProps, ScoutingHubV2WatchTarget } from "@/app/foundation/scouting-center-v2/scouting-center-v2-types";
+import type { ScoutingHubV2ClientProps } from "@/app/foundation/scouting-center-v2/scouting-center-v2-types";
 import FoundationSubNav from "@/app/foundation/shell/FoundationSubNav";
-import DisciplineIcon from "@/app/foundation/DisciplineIcon";
-import FoundationPlayerPortraitCard from "@/components/foundation/player-portrait-card/FoundationPlayerPortraitCard";
-import { appendMediaImageVariant, getPlayerPortraitBrowserUrl } from "@/lib/data/mediaAssets";
-import { VeloScoutMetric } from "@/components/foundation/velo-ui";
-import { createEmptyLeaguePlayerHeatPools } from "@/lib/foundation/player-league-heat";
+import ScoutingPriorityQueue from "@/app/foundation/scouting-center-v2/ScoutingPriorityQueue";
+import ScoutingReportPanel from "@/app/foundation/scouting-center-v2/ScoutingReportPanel";
 import { useState } from "react";
 
 function renderStars(level: number) {
@@ -15,98 +12,6 @@ function renderStars(level: number) {
       ★
     </span>
   ));
-}
-
-function getPotentialBandLabel(band: string | null | undefined) {
-  if (band === "elite") return "★ Elite";
-  if (band === "high") return "↑ Hoch";
-  if (band === "medium") return "Mittel";
-  if (band === "low") return "Gering";
-  return null;
-}
-
-function formatHalfStar(value: number | null | undefined) {
-  if (value == null || !Number.isFinite(value)) return "—";
-  return `${value}★`;
-}
-
-function hasAxisStats(target: ScoutingHubV2WatchTarget) {
-  return target.pow != null || target.spe != null || target.men != null || target.soc != null;
-}
-
-function hasCaStars(target: ScoutingHubV2WatchTarget) {
-  return target.caOverall != null;
-}
-
-function getScoutingPortraitModel(target: ScoutingHubV2WatchTarget) {
-  const src = getPlayerPortraitBrowserUrl(target.playerId, null, null);
-  const initials =
-    target.playerName
-      .split(/\s+/)
-      .filter(Boolean)
-      .slice(0, 2)
-      .map((part) => part[0]?.toUpperCase() ?? "")
-      .join("") || "?";
-  return {
-    src,
-    previewSrc: appendMediaImageVariant(src, "preview"),
-    initials,
-  };
-}
-
-function renderScoutTargetCard(input: {
-  target: ScoutingHubV2WatchTarget;
-  onOpenPlayer: (playerId: string) => void;
-  testId: string;
-}) {
-  const { target, onOpenPlayer, testId } = input;
-  const isActive = target.scoutStatus !== "bookmarked";
-  const portrait = getScoutingPortraitModel(target);
-
-  return (
-    <button
-      key={target.playerId}
-      type="button"
-      className={`scouting-hub-v2-target-card${isActive ? " is-active-scout" : " is-bookmarked-only"}`}
-      onClick={() => onOpenPlayer(target.playerId)}
-      data-testid={testId}
-      title={isActive ? "Aktiv gescoutet — Klick öffnet Spielerprofil." : "Nur gemerkt — kein Scout-Slot. Im Markt entfernen oder Slot freimachen."}
-    >
-      <FoundationPlayerPortraitCard
-        playerId={target.playerId}
-        name={target.playerName}
-        portraitUrl={portrait.previewSrc ?? portrait.src}
-        portraitInitials={portrait.initials}
-        playerOvr={target.caOverall ?? null}
-        playerMvs={null}
-        playerPps={null}
-        pow={target.pow ?? null}
-        spe={target.spe ?? null}
-        men={target.men ?? null}
-        soc={target.soc ?? null}
-        leagueHeatPools={createEmptyLeaguePlayerHeatPools()}
-        variant="team"
-        context="scouting"
-        density="full"
-        highlight={isActive ? "Scout aktiv" : "Gemerkt"}
-        subMeta={[target.className, target.scoutSourceLabel, target.baseInfoSummary].filter(Boolean).join(" · ")}
-        contextData={{
-          scouting: {
-            scoutStatusLabel: isActive
-              ? `Aktiv${target.scoutCertainty != null ? ` ${target.scoutCertainty}%` : ""}`
-              : "Nur gemerkt",
-            caOverall: target.caOverall ?? null,
-            poDisplay: target.poDisplay ?? null,
-            potentialBandLabel: getPotentialBandLabel(target.potentialBand) ?? undefined,
-            scoutMilestone: isActive ? target.scoutMilestone ?? undefined : undefined,
-            sourceLabel: target.scoutSourceLabel ?? undefined,
-          },
-        }}
-        interactive={false}
-        onOpen={() => onOpenPlayer(target.playerId)}
-      />
-    </button>
-  );
 }
 
 export default function ScoutingCenterV2Client({
@@ -122,15 +27,20 @@ export default function ScoutingCenterV2Client({
   visibleAtTier,
   hiddenAtTier,
   baseInfoAlwaysVisible,
-  activeScoutTargets,
-  bookmarkedTargets = [],
-  watchTargets = [],
   scoutPipeline = null,
   activeTab: controlledActiveTab,
   onActiveTabChange,
   hideSubNav = false,
   onOpenMarket,
   onOpenPlayer,
+  queueEntries = [],
+  focusEtaLabel = null,
+  wishlistSlotLimit = null,
+  onReorderQueue,
+  onRemoveFromQueue,
+  report = null,
+  selectedReportPlayerId = null,
+  onSelectReportPlayer,
 }: ScoutingHubV2ClientProps) {
   const [internalActiveTab, setInternalActiveTab] = useState<"overview" | "reports" | "recommended">("overview");
   const activeTab = controlledActiveTab ?? internalActiveTab;
@@ -141,7 +51,8 @@ export default function ScoutingCenterV2Client({
     }
   };
   const rosterGap = rosterMinimum != null && rosterCount < rosterMinimum ? rosterMinimum - rosterCount : 0;
-  const resolvedActiveTargets = activeScoutTargets.length > 0 ? activeScoutTargets : watchTargets;
+  const readyToBuyEntries = queueEntries.filter((entry) => entry.isFullyScouted);
+  const focusEntry = queueEntries.find((entry) => entry.isFocusTarget && !entry.isFullyScouted) ?? null;
 
   return (
     <div className="scouting-center-v2-shell" data-testid="foundation-scouting-hub-v2" id="foundation-scouting-hub-v2">
@@ -164,7 +75,7 @@ export default function ScoutingCenterV2Client({
           onSelect={(id) => setActiveTab(id as typeof activeTab)}
           items={[
             { id: "overview", label: "Übersicht" },
-            { id: "reports", label: "Reports" },
+            { id: "reports", label: "Scouting Report" },
             { id: "recommended", label: "Empfehlungen" },
           ]}
         />
@@ -238,74 +149,122 @@ export default function ScoutingCenterV2Client({
             </div>
           </section>
 
-          <section className="scouting-hub-v2-watchlist">
+          <section className="scouting-hub-v2-watchlist scouting-queue-section">
             <div className="home-v2-panel-head">
-              <span className="eyebrow">Scout-Pipeline</span>
-              <h3>Aktiv gescoutet</h3>
-              {scoutPipeline ? (
-                <p className="muted">
-                  {scoutPipeline.draftSuspended
-                    ? `${resolvedActiveTargets.length} aktiv · Draft ohne Limit`
-                    : `${resolvedActiveTargets.length}/${scoutPipeline.maxSlots} Slots · 4 + 3/Stufe · +${scoutPipeline.tickGain} Intel/Spieltag`}
-                  {scoutPipeline.passiveActive > 0 ? ` · ${scoutPipeline.passiveActive} passive Scouts` : ""}
-                </p>
-              ) : null}
-            </div>
-            {resolvedActiveTargets.length > 0 ? (
-              <div className="scouting-hub-v2-target-grid">
-                {resolvedActiveTargets.map((target) =>
-                  renderScoutTargetCard({
-                    target,
-                    onOpenPlayer,
-                    testId: "scouting-watchlist-card",
-                  }),
-                )}
-              </div>
-            ) : (
+              <span className="eyebrow">Scouting-Warteschlange</span>
+              <h3>Wishlist — per Drag &amp; Drop sortieren</h3>
               <p className="muted">
-                {scoutPipeline && scoutPipeline.draftSuspended
-                  ? "Noch niemand gemerkt — im Transfermarkt Spieler auf die Wishlist setzen."
-                  : "Noch niemand aktiv gescoutet — Wishlist-Spieler erscheinen hier mit Intel-Fortschritt."}
+                {scoutPipeline
+                  ? scoutPipeline.draftSuspended
+                    ? `${queueEntries.length} auf der Wishlist · Draft ohne Limit`
+                    : `${queueEntries.length} auf der Wishlist · ${scoutPipeline.maxSlots} aktive Slots`
+                  : `${queueEntries.length} auf der Wishlist`}
+                {" — Platz 1 wird zuerst voll gescoutet, danach geht es automatisch mit dem nächsten weiter."}
               </p>
-            )}
+            </div>
+            <ScoutingPriorityQueue
+              entries={queueEntries}
+              focusEtaLabel={focusEtaLabel}
+              slotLimit={scoutPipeline?.draftSuspended ? null : (scoutPipeline?.maxSlots ?? wishlistSlotLimit)}
+              selectedReportPlayerId={selectedReportPlayerId}
+              onReorder={(playerId, targetIndex) => onReorderQueue?.(playerId, targetIndex)}
+              onOpenPlayer={onOpenPlayer}
+              onRemove={(playerId) => onRemoveFromQueue?.(playerId)}
+              onSelectReport={(playerId) => {
+                onSelectReportPlayer?.(playerId);
+                setActiveTab("reports");
+              }}
+              onOpenMarket={onOpenMarket}
+            />
           </section>
-
-          {bookmarkedTargets.length > 0 ? (
-            <section className="scouting-hub-v2-watchlist">
-              <div className="home-v2-panel-head">
-                <span className="eyebrow">Wishlist</span>
-                <h3>Nur gemerkt</h3>
-                <p className="muted">Über dem Slot-Limit — nicht aktiv gescoutet. Entfernen oder Scouting Office upgraden.</p>
-              </div>
-              <div className="scouting-hub-v2-target-grid">
-                {bookmarkedTargets.map((target) =>
-                  renderScoutTargetCard({
-                    target,
-                    onOpenPlayer,
-                    testId: "scouting-bookmarked-target-card",
-                  }),
-                )}
-              </div>
-            </section>
-          ) : null}
         </>
       ) : null}
 
-      {activeTab === "recommended" || activeTab === "reports" ? (
-        <section className="scouting-hub-v2-watchlist">
+      {activeTab === "reports" ? (
+        <section className="scouting-report-section">
+          <ScoutingReportPanel
+            report={report}
+            onOpenPlayer={onOpenPlayer}
+            onPromoteToFocus={(playerId) => onReorderQueue?.(playerId, 0)}
+            onRemove={(playerId) => onRemoveFromQueue?.(playerId)}
+            canPromoteToFocus={queueEntries.length > 1}
+          />
+          {queueEntries.length > 1 ? (
+            <div className="scouting-report-queue-picker">
+              <span className="eyebrow">Andere Wishlist-Spieler</span>
+              <div className="scouting-report-queue-picker-chips">
+                {queueEntries
+                  .filter((entry) => entry.playerId !== report?.playerId)
+                  .map((entry) => (
+                    <button
+                      key={entry.playerId}
+                      type="button"
+                      className="scouting-report-queue-chip"
+                      onClick={() => onSelectReportPlayer?.(entry.playerId)}
+                    >
+                      {entry.playerName}
+                    </button>
+                  ))}
+              </div>
+            </div>
+          ) : null}
+        </section>
+      ) : null}
+
+      {activeTab === "recommended" ? (
+        <section className="scouting-recommendations-section" data-testid="scouting-recommendations">
           <div className="home-v2-panel-head">
-            <span className="eyebrow">Top Stärken</span>
-            <h3>Top 3 Disziplinen (Scouting)</h3>
+            <span className="eyebrow">Empfehlungen</span>
+            <h3>Nächste Schritte</h3>
+            <p className="muted">
+              Voll gescoutete Wishlist-Spieler sind kaufbereit. Der Fokus in der Übersicht scoutet den nächsten Kandidaten
+              automatisch weiter.
+            </p>
           </div>
-          <div className="scouting-hub-v2-target-grid" data-testid="scouting-top-disciplines">
-            {resolvedActiveTargets.slice(0, 3).map((target) => (
-              <article key={`disc-${target.playerId}`} className="scouting-hub-v2-target-card">
-                <DisciplineIcon disciplineId={target.className?.toLowerCase()} label={target.className ?? "Flex"} showLabel />
-                <VeloScoutMetric rangeLabel={target.marketValue} tier={target.className?.slice(0, 1) ?? "?"} scoutingLevel={disclosureLevel} />
-                <strong>{target.playerName}</strong>
-              </article>
-            ))}
-          </div>
+
+          {focusEntry ? (
+            <article className="scouting-recommendations-focus-card">
+              <span className="eyebrow">Aktueller Fokus</span>
+              <strong>{focusEntry.playerName}</strong>
+              <p className="muted">
+                {focusEntry.certainty}% Intel
+                {focusEtaLabel ? ` · ${focusEtaLabel}` : ""}
+              </p>
+              <button
+                type="button"
+                className="secondary-button inline-button"
+                onClick={() => {
+                  onSelectReportPlayer?.(focusEntry.playerId);
+                  setActiveTab("reports");
+                }}
+              >
+                Scouting Report öffnen
+              </button>
+            </article>
+          ) : null}
+
+          {readyToBuyEntries.length > 0 ? (
+            <div className="scouting-recommendations-ready-grid">
+              {readyToBuyEntries.map((entry) => (
+                <article key={entry.playerId} className="scouting-recommendations-ready-card">
+                  <strong>{entry.playerName}</strong>
+                  <span className="transfer-status-pill is-ready">Kaufbereit</span>
+                  <button
+                    type="button"
+                    className="ghost-button inline-button"
+                    onClick={() => {
+                      onSelectReportPlayer?.(entry.playerId);
+                      setActiveTab("reports");
+                    }}
+                  >
+                    Report öffnen
+                  </button>
+                </article>
+              ))}
+            </div>
+          ) : (
+            <p className="muted scouting-recommendations-empty">Noch niemand vollständig gescoutet.</p>
+          )}
         </section>
       ) : null}
 

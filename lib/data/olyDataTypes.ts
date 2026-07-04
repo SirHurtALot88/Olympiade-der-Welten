@@ -1309,6 +1309,23 @@ export type AiManagerTrainingSettingRecord = {
   updatedAt: string;
 };
 
+/**
+ * Audit trail for the season-long training intensity lock: written the moment
+ * a team's training focus/intensity or per-player training modes are
+ * confirmed (via `applyTeamTrainingSettings`, `applyPlayerTrainingModes`, or
+ * the manual per-player training UI). Purely informational/"nachvollziehbar" —
+ * the actual lock is enforced live via
+ * `isTrainingIntensityLockedForSeason`/`evaluateGamePhaseAction(gameState,
+ * "set_training")` in lib/foundation/game-phase-action-policy.ts, so this
+ * record cannot go stale in a way that would bypass the block.
+ */
+export type TrainingIntensityConfirmationRecord = {
+  teamId: string;
+  seasonId: string;
+  confirmedAt: string;
+  sourcePlanId: string;
+};
+
 export type AiManagerContractStrategy =
   | "extend_core"
   | "salary_cap"
@@ -1489,6 +1506,8 @@ export type TransferWishlistEntry = {
   soc?: number | null;
   teamId?: string | null;
   createdAt: string;
+  /** Scouting focus queue order — lower rank scouts first. Falls back to createdAt for legacy entries. */
+  priorityRank?: number | null;
 };
 
 export type TransferSellMarkerEntry = {
@@ -2043,6 +2062,7 @@ export type NewGameFlowStepId =
   | "season_intro"
   | "team_confirm"
   | "roster_review"
+  | "appoint_captain"
   | "first_transfers"
   | "fill_roster"
   | "training_facilities"
@@ -2131,6 +2151,7 @@ export type SeasonState = {
   seasonSnapshots?: SeasonSnapshotRecord[];
   aiManagerBudgetReservations?: Record<string, AiManagerBudgetReservationRecord>;
   aiManagerTrainingSettings?: Record<string, AiManagerTrainingSettingRecord>;
+  trainingIntensityConfirmations?: Record<string, TrainingIntensityConfirmationRecord>;
   aiManagerContractStrategies?: Record<string, AiManagerContractStrategyRecord>;
   aiManagerSellStrategies?: Record<string, AiManagerContractStrategyRecord>;
   aiLifecyclePhaseRuns?: AiLifecyclePhaseRunRecord[];

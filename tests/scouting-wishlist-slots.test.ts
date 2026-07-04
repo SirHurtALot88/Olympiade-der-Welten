@@ -173,8 +173,11 @@ describe("scouting wishlist slots", () => {
     expect(records).toHaveLength(1);
     expect(records[0]?.source).toBe("wishlist_mirror");
 
+    // As the sole (and thus rank-1) wishlist entry, p-1 is the scouting focus
+    // target and gets the flat focus tick gain (20) instead of the regular
+    // wishlist_mirror tick rate — see Scouting Tab Rework focus queue.
     const afterTick = advanceScoutIntelTick({ gameState: refreshed, teamId: "M-M", phase: "matchday" });
-    expect(afterTick.seasonState.scoutIntelByTeamId?.["M-M"]?.[0]?.certainty).toBe(11);
+    expect(afterTick.seasonState.scoutIntelByTeamId?.["M-M"]?.[0]?.certainty).toBe(20);
     expect(getEffectiveScoutingLevel(afterTick, "M-M", "p-1")).toBeGreaterThanOrEqual(1);
   });
 

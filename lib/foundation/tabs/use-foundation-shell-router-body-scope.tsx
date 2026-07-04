@@ -186,12 +186,18 @@ import {
   getTeamTransferWishlistEntries,
 } from "@/lib/scouting/scouting-wishlist-slots";
 import { shouldAutoOpenSeasonBriefing, type GameFlowView } from "@/lib/foundation/game-flow-controller";
+import { isTrainingIntensityLockedForSeason } from "@/lib/foundation/game-phase-action-policy";
 import { formatGameFlowBlocker, formatGameFlowBlockerList } from "@/lib/foundation/game-flow-blocker-labels";
 import { buildGameInboxItems, filterGameInboxItems, getPrimaryInboxTask } from "@/lib/foundation/game-inbox-service";
 import { buildMatchdaySummary, getMatchdaySummaryOptions } from "@/lib/foundation/matchday-summary";
 import { buildSeasonReadinessChecklist } from "@/lib/foundation/season-readiness-checklist";
 import { normalizeLineupDisciplineFieldName } from "@/lib/lineups/team-discipline-ranks";
 import { buildTeamPlayerDemandMap, selectTeamCaptain } from "@/lib/morale/player-demands-service";
+import {
+  buildCaptainCandidateProfiles,
+  getTeamCaptainEffectsTooltip,
+  setTeamCaptain,
+} from "@/lib/morale/team-captain-service";
 import { buildPlayerMoraleAudit } from "@/lib/morale/player-morale-service";
 import { buildTeamRivalryLedger } from "@/lib/rivalries/team-rivalries";
 import { buildTeamRelationshipCards } from "@/lib/rivalries/team-relationship-dynamics";
@@ -211,8 +217,10 @@ import type { SponsorNegotiationProfile } from "@/lib/data/olyDataTypes";
 import { buildScoutPipelineSummary } from "@/lib/scouting/facility-scout-pipeline-service";
 import {
   canAddPlayerToTransferWishlist,
+  getNextWishlistPriorityRank,
   getScoutingWishlistSlotMessage,
   isTeamSetupDraftWishlistPhase,
+  reorderTeamTransferWishlist,
 } from "@/lib/scouting/scouting-wishlist-slots";
 import { buildScoutingWatchTargetStarFields } from "@/lib/scouting/player-star-scouting-bridge";
 import { buildScoutingHubTargetSections } from "@/lib/scouting/scouting-hub-targets-service";
@@ -229,11 +237,6 @@ import {
   PROGRESSION_ATTRIBUTE_ORDER,
   PROGRESSION_CLASS_ORDER,
 } from "@/lib/training/class-progression-config";
-import {
-  SeasonEndXpSpendPlannedUpgradeInput,
-  SeasonEndXpSpendPreview,
-  SeasonEndXpSpendApplyResult,
-} from "@/lib/progression/season-end-xp-apply-service";
 import { buildPlayerDevelopmentInsight, getPotentialBand } from "@/lib/progression/player-potential-service";
 import { buildPlayerProgressionForecast } from "@/lib/training/player-progression-forecast";
 import {
@@ -385,7 +388,6 @@ import {
   AdminSeasonSimulationRunSummary,
   CASH_APPLY_CONFIRM_TOKEN,
   ContractRenewalApiResponse,
-  EMPTY_SEASON_END_PROGRESSION_PREVIEW,
   FOUNDATION_ACTIVE_OWNER_STORAGE_KEY,
   FOUNDATION_MANAGER_TEAM_STORAGE_KEY,
   FOUNDATION_SAVE_MODE_STORAGE_KEY,
@@ -476,9 +478,6 @@ import {
   SaveActionRequest,
   SeasonCompletionApiResponse,
   SeasonCompletionSummaryResponse,
-  SeasonEndAttributeDraft,
-  SeasonEndXpSpendApiResponse,
-  SeasonEndXpSpendSummary,
   SeasonObjectiveSettlementResponse,
   SeasonReviewAwardResponse,
   SeasonReviewNamedValueResponse,
@@ -966,12 +965,11 @@ export function useFoundationShellRouterBodyScope({
     setSelectedTeamId, activeManagerTeamSource, setActiveManagerTeamSource, activeOwnerId, setActiveOwnerId, teamContextFilter, setTeamContextFilter, activeManagerTeamWarning, setActiveManagerTeamWarning, activeView,
     setActiveView, homeV2Tab, setHomeV2Tab, prizeFinanceTab, setPrizeFinanceTab, playerProfileTab, setPlayerProfileTab, playerProfileData, setPlayerProfileData, playerProfileLoading,
     setPlayerProfileLoading, inboxV2SelectedItemId, setInboxV2SelectedItemId, selectedEncyclopediaEntryId, setSelectedEncyclopediaEntryId, lineupFocusRequestKey, setLineupFocusRequestKey, lineupDraftBoardViewRequest, setLineupDraftBoardViewRequest, lineupDraftBoardView,
-    setLineupDraftBoardView, scoutingCenterTab, setScoutingCenterTab, showCommandPalette, setShowCommandPalette, commandSearch, setCommandSearch, showExtendedTeamPanels, setShowExtendedTeamPanels, showGameFlowPanel,
+    setLineupDraftBoardView, scoutingCenterTab, setScoutingCenterTab, scoutingReportSelectedPlayerId, setScoutingReportSelectedPlayerId, showCommandPalette, setShowCommandPalette, commandSearch, setCommandSearch, showExtendedTeamPanels, setShowExtendedTeamPanels, showGameFlowPanel,
     setShowGameFlowPanel, inboxCategoryFilter, setInboxCategoryFilter, inboxIncludeDone, setInboxIncludeDone, inboxIncludeDismissed, setInboxIncludeDismissed, selectedMatchdaySummaryId, setSelectedMatchdaySummaryId, teamSettingsSearch,
     setTeamSettingsSearch, showTeamDisciplines, setShowTeamDisciplines, selectedTeamDetailTab, setSelectedTeamDetailTab, showTeamContractPreviewRows, setShowTeamContractPreviewRows, teamRosterRoleFilter, setTeamRosterRoleFilter, teamRosterFocusMode,
     setTeamRosterFocusMode, showSelectedRosterPpsBreakdown, setShowSelectedRosterPpsBreakdown, trainingModeDraft, setTrainingModeDraft, trainingClassDraft, setTrainingClassDraft, trainingDevelopmentFilter, setTrainingDevelopmentFilter, trainingFacilityPreviewId,
-    setTrainingFacilityPreviewId, seasonEndAttributeDraft, setSeasonEndAttributeDraft, plannedXpUpgrades, setPlannedXpUpgrades, seasonEndXpSpendPreview, setSeasonEndXpSpendPreview, seasonEndXpSpendBusy, setSeasonEndXpSpendBusy, seasonEndXpSpendError,
-    setSeasonEndXpSpendError, seasonEndXpSpendSuccess, setSeasonEndXpSpendSuccess, seasonTableMode, setSeasonTableMode, showSeasonTopPlayerAreas, setShowSeasonTopPlayerAreas, tableSorts, setTableSorts, playerScope,
+    setTrainingFacilityPreviewId, seasonTableMode, setSeasonTableMode, showSeasonTopPlayerAreas, setShowSeasonTopPlayerAreas, tableSorts, setTableSorts, playerScope,
     setPlayerScope, playerTeamFilter, setPlayerTeamFilter, playerClassFilter, setPlayerClassFilter, playerBracketFilter, setPlayerBracketFilter, marketClassFilter, setMarketClassFilter, marketRaceFilter, setMarketRaceFilter, marketSubclassFilter,
     setMarketSubclassFilter, marketAlignmentFilter, setMarketAlignmentFilter, marketGenderFilter, setMarketGenderFilter, marketPositiveTraitFilter, setMarketPositiveTraitFilter, marketNegativeTraitFilter, setMarketNegativeTraitFilter, marketBracketFilter,
     setMarketBracketFilter, marketTeamId, setMarketTeamId, marketFocusPlayerId, setMarketFocusPlayerId, foundationPanel, setFoundationPanel, foundationFacilityTarget, setFoundationFacilityTarget, marketSearch,
@@ -1008,6 +1006,7 @@ export function useFoundationShellRouterBodyScope({
   } = foundationPageState;
 
   const [historyPage, setHistoryPage] = useState(1);
+  const [assignTeamCaptainBusy, setAssignTeamCaptainBusy] = useState(false);
   useEffect(() => {
     setHistoryPage(1);
   }, [activeSaveId]);
@@ -1028,6 +1027,7 @@ export function useFoundationShellRouterBodyScope({
   const shouldBuildPlayerProfileTrainingRow = activeView === "playerProfile" && Boolean(playerProfileData);
   const shouldBuildPlayerDirectory = activeView === "players";
   const shouldBuildMarketView = isTransferMarketViewActive;
+  const shouldBuildScoutingHubView = activeView === "scoutingCenterV2";
   const shouldBuildHomeV2Overview = activeView === "homeV2";
   const shouldBuildTransferHistoryView = isTransferHistoryViewActive;
   const shouldBuildDebugView = activeView === "debug";
@@ -1464,10 +1464,6 @@ export function useFoundationShellRouterBodyScope({
       setMatchdayAutoRunFeed,
       setWholeSeasonDryRunFeed,
       setSeasonSnapshotFeed,
-      setSeasonEndXpSpendPreview,
-      setSeasonEndXpSpendError,
-      setSeasonEndXpSpendSuccess,
-      setPlannedXpUpgrades,
       setPlayerProfileData,
       setTeamProfileTeamId,
       setFoundationActionFeedback,
@@ -1819,14 +1815,36 @@ export function useFoundationShellRouterBodyScope({
       return;
     }
 
+    if (isTrainingIntensityLockedForSeason(gameState)) {
+      window.alert(
+        "Trainingsintensitaet ist fuer diese Season bereits festgelegt (seit dem ersten Spieltag versiegelt). Aenderung erst zum naechsten Saisonstart moeglich.",
+      );
+      return;
+    }
+
     setTrainingModeDraft((current) => ({
       ...current,
       [playerId]: mode,
     }));
 
+    const teamId = gameState.rosters.find((entry) => entry.playerId === playerId)?.teamId ?? null;
     const nextGameState: GameState = {
       ...gameState,
       players: gameState.players.map((player) => (player.id === playerId ? { ...player, trainingMode: mode } : player)),
+      seasonState: teamId
+        ? {
+            ...gameState.seasonState,
+            trainingIntensityConfirmations: {
+              ...(gameState.seasonState.trainingIntensityConfirmations ?? {}),
+              [teamId]: {
+                teamId,
+                seasonId: gameState.season.id,
+                confirmedAt: new Date().toISOString(),
+                sourcePlanId: "manual_player_training_mode",
+              },
+            },
+          }
+        : gameState.seasonState,
     };
 
     setGameState(nextGameState);
@@ -2223,6 +2241,7 @@ export function useFoundationShellRouterBodyScope({
       soc: item.soc ?? null,
       teamId: marketTeamId || null,
       createdAt: new Date().toISOString(),
+      priorityRank: marketTeamId ? getNextWishlistPriorityRank(gameState, marketTeamId) : null,
     };
   }
 
@@ -2248,6 +2267,16 @@ export function useFoundationShellRouterBodyScope({
 
   function removeTransferWishlistEntry(playerId: string) {
     saveTransferWishlist((gameState.seasonState.transferWishlist ?? []).filter((entry) => entry.playerId !== playerId));
+  }
+
+  function reorderTransferWishlist(playerId: string, targetIndex: number) {
+    const teamId = marketTeamId || selectedTeam?.teamId || null;
+    if (!teamId) {
+      return;
+    }
+    saveTransferWishlist(
+      reorderTeamTransferWishlist(gameState.seasonState.transferWishlist ?? [], teamId, playerId, targetIndex),
+    );
   }
 
   function toggleScoutingWatch(item: TransfermarktFreeAgentItem) {
@@ -2627,9 +2656,13 @@ export function useFoundationShellRouterBodyScope({
       return;
     }
 
+    if (activeView !== "homeV2" && activeView !== "home") {
+      setFoundationView("homeV2", setActiveView);
+    }
+
     setSeasonBriefingOpen(true);
     setFoundationPanel("briefing");
-    syncFoundationViewInUrl(activeView, null, null, {
+    syncFoundationViewInUrl("homeV2", null, null, {
       panel: "briefing",
       push: options?.push ?? true,
       team: selectedTeamId,
@@ -3601,101 +3634,6 @@ export function useFoundationShellRouterBodyScope({
     }
   }
 
-  function addSeasonEndXpUpgrade(playerId: string, attribute: PlayerGeneratorAttributeName) {
-    if (!selectedTeamCanManage) {
-      setSeasonEndXpSpendError(`${selectedTeam?.name ?? "Dieses Team"} gehoert nicht zu deinen steuerbaren Teams. Training ist read-only.`);
-      showTeamManagementLockedNotice();
-      return;
-    }
-    const plannedPlayer = seasonEndProgressionPreview?.rows.find((row) => row.playerId === playerId)?.playerName ?? "Spieler";
-    setSeasonEndXpSpendSuccess(`Training geplant: ${plannedPlayer} +1 ${SEASON_END_ATTRIBUTE_LABELS[attribute]}. Noch nicht gespeichert.`);
-    setSeasonEndXpSpendError(null);
-    setPlannedXpUpgrades((current) => [
-      ...current,
-      {
-        playerId,
-        attribute,
-        source: "manual_xp_spend_preview",
-      },
-    ]);
-  }
-
-  function removeSeasonEndXpUpgrade(playerId: string, attribute?: PlayerGeneratorAttributeName) {
-    if (!selectedTeamCanManage) {
-      setSeasonEndXpSpendError(`${selectedTeam?.name ?? "Dieses Team"} gehoert nicht zu deinen steuerbaren Teams. Training ist read-only.`);
-      showTeamManagementLockedNotice();
-      return;
-    }
-    setSeasonEndXpSpendSuccess("Training angepasst: ein geplantes Upgrade entfernt. Noch nicht gespeichert.");
-    setSeasonEndXpSpendError(null);
-    setPlannedXpUpgrades((current) => {
-      const index = [...current]
-        .reverse()
-        .findIndex((upgrade) => upgrade.playerId === playerId && (!attribute || upgrade.attribute === attribute));
-      if (index < 0) return current;
-      const removeIndex = current.length - 1 - index;
-      return current.filter((_, candidateIndex) => candidateIndex !== removeIndex);
-    });
-  }
-
-  async function confirmSeasonEndXpSpend() {
-    if (!seasonEndXpSpendPreview?.confirmToken) {
-      setSeasonEndXpSpendError("xp_spend_preview_missing: Bitte Preview neu laden.");
-      return;
-    }
-    if (seasonEndXpSpendPreview.saveContext.saveId !== activeSaveId || seasonEndXpSpendPreview.team?.teamId !== selectedTeam.teamId) {
-      setSeasonEndXpSpendError("xp_spend_preview_stale: Save oder Team hat sich geaendert. Bitte neu planen.");
-      return;
-    }
-    if (readMeta.source === "prisma") {
-      showReadOnlyNotice();
-      return;
-    }
-    if (!selectedTeamCanManage) {
-      setSeasonEndXpSpendError(`${selectedTeam.name} gehoert nicht zu deinen steuerbaren Teams. Training ist read-only.`);
-      showTeamManagementLockedNotice();
-      return;
-    }
-
-    setSeasonEndXpSpendBusy(true);
-    setSeasonEndXpSpendError(null);
-    setSeasonEndXpSpendSuccess(null);
-
-    try {
-      const response = await fetch("/api/progression/season-end-xp-spend", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(withRoomBody({
-          source: readMeta.source,
-          saveId: activeSaveId,
-          teamId: selectedTeam.teamId,
-          plannedUpgrades: plannedXpUpgrades,
-          dryRun: false,
-          confirmToken: seasonEndXpSpendPreview.confirmToken,
-        })),
-      });
-      const payload = (await response.json()) as SeasonEndXpSpendApiResponse;
-      if (!response.ok || !payload.success || !payload.summary || !("applied" in payload.summary)) {
-        setSeasonEndXpSpendError(payload.error ?? payload.blockingReasons?.join(" · ") ?? "XP-Apply blockiert.");
-        setSeasonEndXpSpendPreview(payload.summary && "dryRun" in payload.summary ? (payload.summary as SeasonEndXpSpendPreview) : seasonEndXpSpendPreview);
-        return;
-      }
-
-      setSeasonEndXpSpendSuccess(
-        plannedXpUpgrades.length > 0
-          ? `XP-Upgrades bestaetigt: ${payload.summary.eventIds.length} Progression-Event(s) · ${plannedXpUpgrades.length} Upgrade(s) geschrieben.`
-          : `Season-XP eingesammelt: ${payload.summary.eventIds.length} Progression-Event(s) geschrieben.`,
-      );
-      setPlannedXpUpgrades([]);
-      setSeasonEndXpSpendPreview(null);
-      await loadSave(activeSaveId);
-    } catch {
-      setSeasonEndXpSpendError("XP-Apply konnte nicht ausgefuehrt werden.");
-    } finally {
-      setSeasonEndXpSpendBusy(false);
-    }
-  }
-
   async function runFinishMatchdaySimple() {
     if (readMeta.readOnly) {
       showReadOnlyNotice();
@@ -4028,63 +3966,6 @@ export function useFoundationShellRouterBodyScope({
       persistFoundationManagerTeamId(selectedTeamId, activeSaveId, activeManagerTeamSource);
     }
   }, [activeManagerTeamSource, activeSaveId, gameState.teams, initialSelectedTeamId, selectedTeamId]);
-
-  useEffect(() => {
-    setPlannedXpUpgrades([]);
-    setSeasonEndXpSpendPreview(null);
-    setSeasonEndXpSpendError(null);
-    setSeasonEndXpSpendSuccess(null);
-  }, [activeSaveId, selectedTeamId]);
-
-  useEffect(() => {
-    if (!activeSaveId || !selectedTeamId || isFoundationBootstrapState || plannedXpUpgrades.length === 0) {
-      setSeasonEndXpSpendPreview(null);
-      setSeasonEndXpSpendError(null);
-      setSeasonEndXpSpendBusy(false);
-      return undefined;
-    }
-
-    const controller = new AbortController();
-    setSeasonEndXpSpendBusy(true);
-    setSeasonEndXpSpendError(null);
-
-    fetch("/api/progression/season-end-xp-spend", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      signal: controller.signal,
-      body: JSON.stringify(withRoomBody({
-        source: readMeta.source,
-        saveId: activeSaveId,
-        teamId: selectedTeamId,
-        plannedUpgrades: plannedXpUpgrades,
-        dryRun: true,
-      })),
-    })
-      .then(async (response) => {
-        const payload = (await response.json()) as SeasonEndXpSpendApiResponse;
-        if (controller.signal.aborted) {
-          return;
-        }
-        setSeasonEndXpSpendPreview(payload.summary && "dryRun" in payload.summary ? (payload.summary as SeasonEndXpSpendPreview) : null);
-        if (!response.ok || payload.error) {
-          setSeasonEndXpSpendError(payload.error ?? payload.blockingReasons?.join(" · ") ?? "XP-Preview blockiert.");
-        }
-      })
-      .catch((error) => {
-        if (controller.signal.aborted) {
-          return;
-        }
-        setSeasonEndXpSpendError(error instanceof Error ? error.message : "XP-Preview konnte nicht geladen werden.");
-        setSeasonEndXpSpendPreview(null);
-      })
-      .finally(() => {
-        if (!controller.signal.aborted) {
-          setSeasonEndXpSpendBusy(false);
-        }
-      });
-
-    return () => controller.abort();
-  }, [activeSaveId, isFoundationBootstrapState, plannedXpUpgrades, readMeta.source, selectedTeamId]);
 
   useEffect(() => {
     if (typeof window === "undefined") {
@@ -4956,6 +4837,8 @@ export function useFoundationShellRouterBodyScope({
     );
   }
 
+  const trainingIntensityLockedForSeason = isTrainingIntensityLockedForSeason(gameState);
+
   const playerProfileTrainingReadOnly =
     readMeta.readOnly ||
     !playerProfileData?.teamId ||
@@ -5104,6 +4987,12 @@ export function useFoundationShellRouterBodyScope({
       setShowGameFlowPanel(false);
       openSeasonBriefingPanel();
       scrollToFoundationTarget("foundation-home");
+      return;
+    }
+    if (targetPanel === "captain-picker") {
+      navigateHomeTab("office");
+      setShowGameFlowPanel(false);
+      scrollToFoundationTarget("foundation-hq-captain-picker");
       return;
     }
     if (targetPanel === "sponsor-choice") {
@@ -5329,6 +5218,12 @@ export function useFoundationShellRouterBodyScope({
       setSelectedTeamDetailTab("roster");
       setFoundationView("teams", setActiveView);
       scrollToFoundationTarget("team-focus-roster");
+      return;
+    }
+
+    if (stepId === "appoint_captain") {
+      navigateHomeTab("office");
+      scrollToFoundationTarget("foundation-hq-captain-picker");
       return;
     }
 
@@ -6574,6 +6469,20 @@ export function useFoundationShellRouterBodyScope({
     () => (selectedTeam ? selectTeamCaptain(gameState, selectedTeam.teamId) : null),
     [gameState, selectedTeam?.teamId],
   );
+  const selectedTeamCaptainPlayerId = useMemo(() => {
+    if (!selectedTeam) {
+      return null;
+    }
+    return (
+      gameState.teamCaptains?.find(
+        (entry) => entry.seasonId === gameState.season.id && entry.teamId === selectedTeam.teamId,
+      )?.playerId ?? null
+    );
+  }, [gameState.season.id, gameState.teamCaptains, selectedTeam?.teamId]);
+  const selectedTeamCaptainCandidates = useMemo(
+    () => (selectedTeam ? buildCaptainCandidateProfiles(gameState, selectedTeam.teamId).slice(0, 8) : []),
+    [gameState, selectedTeam?.teamId],
+  );
   const selectedTeamRivalries = useMemo(() => {
     if (!selectedTeam) {
       return [];
@@ -7204,8 +7113,6 @@ export function useFoundationShellRouterBodyScope({
     trainingFacilityForecast,
     trainingFacilitySeasonEndFinance,
     trainingFacilityEffectPreview,
-    seasonEndFacilityInput,
-    seasonEndProgressionPreview,
     trainingV2ModeOptions,
   } = useFoundationCrossTabTraining({
     // Compact-tab derivations now live in `FoundationTrainingCompactShellHost`
@@ -7229,8 +7136,6 @@ export function useFoundationShellRouterBodyScope({
     trainingFacilityPreviewId,
     playerProfileData,
     readMeta,
-    plannedXpUpgradesLength: plannedXpUpgrades.length,
-    seasonEndAttributeDraft,
   });
 
   const { orderedIds: playerDirectoryOrderedIds, sortRows: sortPlayerDirectoryRows } =
@@ -7270,6 +7175,9 @@ export function useFoundationShellRouterBodyScope({
     transferWishlistEntriesForMarketV2,
     scoutingHubV2TargetSections,
     scoutingHubV2Visibility,
+    scoutingQueueEntries,
+    scoutingFocusSummary,
+    scoutingReport,
     hqTransferWishlistEntries,
     hqTransferSellMarkers,
     hqContractExpiringCount,
@@ -7277,12 +7185,14 @@ export function useFoundationShellRouterBodyScope({
   } = useFoundationCrossTabMarketFilters({
     activeView: activeView as FoundationViewId,
     shouldBuildMarketView,
+    shouldBuildScoutingHubView,
     shouldBuildTeamsView,
     shouldBuildHomeV2Overview,
     activeSaveId,
     gameState,
     selectedTeam,
     selectedTeamFacilityState,
+    scoutingReportSelectedPlayerId,
     selectedRosterTableRows,
   });
 
@@ -8094,15 +8004,25 @@ export function useFoundationShellRouterBodyScope({
   ]);
   const closeSeasonBriefing = (markCompleted = true) => {
     const briefingKey = buildSeasonBriefingDismissKey(activeSaveId, gameState.season.id);
+    const shouldPersistIntroStep = markCompleted && seasonBriefingStepStatus === "open";
+
     setSeasonBriefingOpen(false);
     setFoundationPanel((current) => (current === "briefing" ? null : current));
     seasonBriefingDismissedRef.current.add(briefingKey);
     seasonBriefingAutoOpenedRef.current = briefingKey;
     writeSeasonBriefingDismissedToStorage(activeSaveId, gameState.season.id);
-    if (seasonBriefingStepStatus === "open") {
-      updateNewGameFlowStepStatus("season_intro", markCompleted ? "completed" : "skipped");
+
+    if (activeView !== "homeV2" && activeView !== "home") {
+      setFoundationView("homeV2", setActiveView);
+    } else {
+      clearSeasonBriefingFromUrl();
     }
-    clearSeasonBriefingFromUrl();
+
+    if (shouldPersistIntroStep) {
+      queueMicrotask(() => {
+        updateNewGameFlowStepStatus("season_intro", "completed");
+      });
+    }
   };
   const completeSeasonBriefingAndContinue = () => {
     closeSeasonBriefing(true);
@@ -8120,7 +8040,61 @@ export function useFoundationShellRouterBodyScope({
       return;
     }
 
-    setFoundationView((seasonSetupFlow?.rosterCount ?? rosterPlayers.length) === 0 ? "marketV2" : "trainingCompact", setActiveView);
+    setFoundationView("homeV2", setActiveView);
+  };
+  const assignTeamCaptainForSelectedTeam = async (playerId: string) => {
+    if (!selectedTeam || readMeta.readOnly || assignTeamCaptainBusy) {
+      if (readMeta.readOnly) {
+        showReadOnlyNotice();
+      }
+      return;
+    }
+
+    setAssignTeamCaptainBusy(true);
+    try {
+      const optimisticGameState = setTeamCaptain(gameState, selectedTeam.teamId, playerId);
+      setGameState(optimisticGameState);
+      const response = await fetch(
+        `/api/singleplayer-state?${new URLSearchParams({
+          source: readMeta.source,
+          saveMode: foundationSaveMode,
+        }).toString()}`,
+        {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({
+            action: "assign-team-captain",
+            saveId: activeSaveId,
+            teamId: selectedTeam.teamId,
+            playerId,
+          }),
+        },
+      );
+      if (!response.ok) {
+        throw new Error("Kapitän konnte nicht gespeichert werden.");
+      }
+      updateNewGameFlowStepStatus("appoint_captain", "completed");
+      const captain = optimisticGameState.teamCaptains?.find(
+        (entry) => entry.seasonId === gameState.season.id && entry.teamId === selectedTeam.teamId,
+      );
+      setFoundationActionFeedback({
+        tone: "success",
+        title: "Kapitän ernannt",
+        detail: captain ? `${captain.playerName} führt das Team in ${gameState.season.name}.` : "Saison-Kapitän gespeichert.",
+      });
+    } catch (error) {
+      console.error(error);
+      setFoundationActionFeedback({
+        tone: "error",
+        title: "Kapitän nicht gespeichert",
+        detail: error instanceof Error ? error.message : "Bitte erneut versuchen.",
+      });
+      void reloadLiveSeasonState("manual_apply", { compactReload: true });
+    } finally {
+      setAssignTeamCaptainBusy(false);
+    }
   };
   const homeWarnings = useMemo(() => {
     if (!shouldBuildHomeV2Overview) {
@@ -9819,10 +9793,13 @@ export function useFoundationShellRouterBodyScope({
     onSetTrainingDevelopmentFilter: setTrainingDevelopmentFilter,
     selectedTeamControlMode: formatTeamControlModeLabel(selectedTeamControl?.controlMode),
     seasonLabel: canonicalSeasonLabel,
-    managementLocked: isSelectedTeamManagementLocked,
-    managementLockedReason:
-      isSelectedTeamManagementLocked && selectedTeam
+    managementLocked: isSelectedTeamManagementLocked || trainingIntensityLockedForSeason,
+    managementLockedReason: isSelectedTeamManagementLocked
+      ? selectedTeam
         ? `${selectedTeam.name} gehoert nicht zu deinen steuerbaren Teams. Training ist nur zur Ansicht offen.`
+        : null
+      : trainingIntensityLockedForSeason
+        ? "Trainingsintensitaet fuer diese Season festgelegt — Aenderung erst zum naechsten Saisonstart moeglich (versiegelt seit dem ersten Spieltag)."
         : null,
     trainingClassOptions: PROGRESSION_CLASS_ORDER.map((className) => ({ value: className, label: className })),
     onSetTrainingMode: (playerId, mode) => {
@@ -10145,6 +10122,12 @@ export function useFoundationShellRouterBodyScope({
     scoutingCenterTab,
     scoutingHubV2TargetSections,
     scoutingHubV2Visibility,
+    scoutingQueueEntries,
+    scoutingFocusSummary,
+    scoutingReport,
+    scoutingReportSelectedPlayerId,
+    setScoutingReportSelectedPlayerId,
+    reorderTransferWishlist,
     screenPrimaryAction,
     seasonBriefingData,
     seasonBriefingOpen,
@@ -10197,6 +10180,11 @@ export function useFoundationShellRouterBodyScope({
     selectedTeamAverageAxisStats,
     selectedTeamCanManage,
     selectedTeamCaptainProfile,
+    selectedTeamCaptainCandidates,
+    selectedTeamCaptainPlayerId,
+    assignTeamCaptainBusy,
+    assignTeamCaptainForSelectedTeam,
+    captainEffectsTooltip: getTeamCaptainEffectsTooltip(),
     selectedTeamContractPreviewRowCount,
     selectedTeamContractShapeMix,
     selectedTeamContractTable,

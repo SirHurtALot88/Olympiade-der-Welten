@@ -17,6 +17,23 @@ export function getScoutingWishlistSlotsForLevel(level: number) {
   return SCOUTING_WISHLIST_BASE_SLOTS + Math.max(0, level) * SCOUTING_WISHLIST_SLOTS_PER_LEVEL;
 }
 
+/**
+ * Scouting focus queue order. Lower rank = scouted first. Legacy entries
+ * without an explicit `priorityRank` fall back to their `createdAt` epoch so
+ * existing FIFO ordering is preserved until the user reorders the queue.
+ */
+export function getWishlistEntryPriorityRank(entry: TransferWishlistEntry) {
+  if (typeof entry.priorityRank === "number" && Number.isFinite(entry.priorityRank)) {
+    return entry.priorityRank;
+  }
+  const parsed = Date.parse(entry.createdAt);
+  return Number.isFinite(parsed) ? parsed : 0;
+}
+
+function sortByPriorityRank(entries: TransferWishlistEntry[]) {
+  return [...entries].sort((left, right) => getWishlistEntryPriorityRank(left) - getWishlistEntryPriorityRank(right));
+}
+
 function getSetupRosterTarget(gameState: GameState, teamId: string) {
   const identity = gameState.teamIdentities.find((entry) => entry.teamId === teamId);
   const team = gameState.teams.find((entry) => entry.teamId === teamId);
@@ -54,14 +71,50 @@ export function getTeamTransferWishlistEntries(gameState: GameState, teamId: str
 }
 
 export function getActiveScoutingWishlistEntries(gameState: GameState, teamId: string) {
-  const entries = [...getTeamTransferWishlistEntries(gameState, teamId)].sort((left, right) =>
-    left.createdAt.localeCompare(right.createdAt),
-  );
+  const entries = sortByPriorityRank(getTeamTransferWishlistEntries(gameState, teamId));
   const limit = getScoutingWishlistSlotLimit(gameState, teamId);
   if (limit == null) {
     return entries;
   }
   return entries.slice(0, limit);
+}
+
+/**
+ * Assigns a `priorityRank` to a new wishlist entry so it lands at the end of
+ * the team's scouting focus queue (lowest priority) by default.
+ */
+export function getNextWishlistPriorityRank(gameState: GameState, teamId: string) {
+  const entries = getTeamTransferWishlistEntries(gameState, teamId);
+  if (entries.length === 0) {
+    return 0;
+  }
+  const maxRank = Math.max(...entries.map(getWishlistEntryPriorityRank));
+  return maxRank + 1;
+}
+
+/**
+ * Reorders a team's scouting focus queue by moving `playerId` to
+ * `targetIndex` among the team's own wishlist entries (priority order), then
+ * re-sequences `priorityRank` for that team's entries as 0..N-1. Entries
+ * belonging to other teams are returned unchanged.
+ */
+export function reorderTeamTransferWishlist(
+  allEntries: TransferWishlistEntry[],
+  teamId: string,
+  playerId: string,
+  targetIndex: number,
+): TransferWishlistEntry[] {
+  const teamEntries = sortByPriorityRank(allEntries.filter((entry) => entry.teamId === teamId));
+  const otherEntries = allEntries.filter((entry) => entry.teamId !== teamId);
+  const movingIndex = teamEntries.findIndex((entry) => entry.playerId === playerId);
+  if (movingIndex === -1) {
+    return allEntries;
+  }
+  const [moving] = teamEntries.splice(movingIndex, 1);
+  const clampedIndex = Math.max(0, Math.min(targetIndex, teamEntries.length));
+  teamEntries.splice(clampedIndex, 0, moving);
+  const reranked = teamEntries.map((entry, index) => ({ ...entry, priorityRank: index }));
+  return [...otherEntries, ...reranked];
 }
 
 export function canAddPlayerToTransferWishlist(
@@ -126,8 +179,6 @@ export function trimTransferWishlistToSlotLimit(entries: TransferWishlistEntry[]
   if (limit == null) {
     return entries;
   }
-  const keptTeamEntries = [...teamEntries]
-    .sort((left, right) => left.createdAt.localeCompare(right.createdAt))
-    .slice(0, limit);
+  const keptTeamEntries = sortByPriorityRank(teamEntries).slice(0, limit);
   return [...otherEntries, ...keptTeamEntries];
 }

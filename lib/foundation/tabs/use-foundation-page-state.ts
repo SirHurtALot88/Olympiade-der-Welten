@@ -29,7 +29,6 @@ import type {
   PlayerGeneratorDraft,
   ContractNegotiationDraft,
   ContractShape,
-  PlayerGeneratorAttributeName,
   RosterEntry,
   Team,
   TeamControlMode,
@@ -67,11 +66,6 @@ import {
   withNormalizedTeamStrategyProfiles,
 } from "@/lib/foundation/team-strategy-profiles";
 import type { SponsorNegotiationProfile } from "@/lib/data/olyDataTypes";
-import type {
-  SeasonEndXpSpendPlannedUpgradeInput,
-  SeasonEndXpSpendPreview,
-  SeasonEndXpSpendApplyResult,
-} from "@/lib/progression/season-end-xp-apply-service";
 import {
   appendRoomContextToParams,
   readFoundationRoomContextFromLocation,
@@ -237,9 +231,6 @@ import type {
   SaveActionRequest,
   SeasonCompletionApiResponse,
   SeasonCompletionSummaryResponse,
-  SeasonEndAttributeDraft,
-  SeasonEndXpSpendApiResponse,
-  SeasonEndXpSpendSummary,
   SeasonObjectiveSettlementResponse,
   SeasonReviewAwardResponse,
   SeasonReviewNamedValueResponse,
@@ -272,7 +263,6 @@ import type {
 import {
   ADVANCE_MATCHDAY_CONFIRM_TOKEN,
   CASH_APPLY_CONFIRM_TOKEN,
-  EMPTY_SEASON_END_PROGRESSION_PREVIEW,
   FOUNDATION_ACTIVE_OWNER_STORAGE_KEY,
   FOUNDATION_MANAGER_TEAM_STORAGE_KEY,
   FOUNDATION_SAVE_MODE_STORAGE_KEY,
@@ -418,6 +408,7 @@ export function useFoundationPageState({
   const [lineupDraftBoardViewRequest, setLineupDraftBoardViewRequest] = useState<"lineup" | "formBoard" | null>(null);
   const [lineupDraftBoardView, setLineupDraftBoardView] = useState<"lineup" | "formBoard">("lineup");
   const [scoutingCenterTab, setScoutingCenterTab] = useState<"overview" | "reports" | "recommended">("overview");
+  const [scoutingReportSelectedPlayerId, setScoutingReportSelectedPlayerId] = useState<string | null>(null);
   const [showCommandPalette, setShowCommandPalette] = useState(false);
   const [commandSearch, setCommandSearch] = useState("");
   const commandSearchInputRef = useRef<HTMLInputElement | null>(null);
@@ -440,12 +431,6 @@ export function useFoundationPageState({
   const [trainingClassDraft, setTrainingClassDraft] = useState<Record<string, TrainingClassDraft>>({});
   const [trainingDevelopmentFilter, setTrainingDevelopmentFilter] = useState<TrainingDevelopmentFilter>("all");
   const [trainingFacilityPreviewId, setTrainingFacilityPreviewId] = useState<string | null>(null);
-  const [seasonEndAttributeDraft, setSeasonEndAttributeDraft] = useState<Record<string, SeasonEndAttributeDraft>>({});
-  const [plannedXpUpgrades, setPlannedXpUpgrades] = useState<SeasonEndXpSpendPlannedUpgradeInput[]>([]);
-  const [seasonEndXpSpendPreview, setSeasonEndXpSpendPreview] = useState<SeasonEndXpSpendPreview | null>(null);
-  const [seasonEndXpSpendBusy, setSeasonEndXpSpendBusy] = useState<boolean>(false);
-  const [seasonEndXpSpendError, setSeasonEndXpSpendError] = useState<string | null>(null);
-  const [seasonEndXpSpendSuccess, setSeasonEndXpSpendSuccess] = useState<string | null>(null);
   const [seasonTableMode, setSeasonTableMode] = useState<SeasonTableMode>("expert");
   const [teamsHydrationPhase, setTeamsHydrationPhase] = useState<"shell" | "full">("shell");
   const [showSeasonTopPlayerAreas, setShowSeasonTopPlayerAreas] = useState<boolean>(false);
@@ -753,6 +738,8 @@ export function useFoundationPageState({
     setLineupDraftBoardView,
     scoutingCenterTab,
     setScoutingCenterTab,
+    scoutingReportSelectedPlayerId,
+    setScoutingReportSelectedPlayerId,
     showCommandPalette,
     setShowCommandPalette,
     commandSearch,
@@ -795,18 +782,6 @@ export function useFoundationPageState({
     setTrainingDevelopmentFilter,
     trainingFacilityPreviewId,
     setTrainingFacilityPreviewId,
-    seasonEndAttributeDraft,
-    setSeasonEndAttributeDraft,
-    plannedXpUpgrades,
-    setPlannedXpUpgrades,
-    seasonEndXpSpendPreview,
-    setSeasonEndXpSpendPreview,
-    seasonEndXpSpendBusy,
-    setSeasonEndXpSpendBusy,
-    seasonEndXpSpendError,
-    setSeasonEndXpSpendError,
-    seasonEndXpSpendSuccess,
-    setSeasonEndXpSpendSuccess,
     seasonTableMode,
     setSeasonTableMode,
     teamsHydrationPhase,
