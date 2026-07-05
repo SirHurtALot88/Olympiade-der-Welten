@@ -7,7 +7,7 @@ export type LineupDraftBoardView = "lineup" | "formBoard";
 export type LineupUiVariant = "classic" | "focusV2";
 
 export function resolveLineupUiVariant(activeView: FoundationViewId): LineupUiVariant {
-  return activeView === "lineupV2" ? "focusV2" : "classic";
+  return activeView === "lineup" || activeView === "lineupV2" ? "focusV2" : "classic";
 }
 
 export function buildLineupClientKey(input: {
@@ -29,7 +29,7 @@ export function buildLineupTeamTooltip(input: {
 }): string {
   if (input.variant === "focusV2") {
     return input.selectedTeam
-      ? `${input.selectedTeam.name}: Focus-Mode Preview für die Einsatzliste.`
+      ? `${input.selectedTeam.name}: Einsatzliste mit Focus Mode — Slots, Kandidaten und Preview.`
       : "Matchday Room fuer Teamwahl, Slots und Preview.";
   }
 

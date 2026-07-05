@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { memo, useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { memo, useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 
 import { calculateLocalLegacyLineupPreviewFromContext } from "@/lib/lineups/legacy-lineup-preview-from-context";
 import LegacyLineupFocusV2Board from "@/app/foundation/legacy-lineup-lab-v2/LegacyLineupFocusV2Board";
@@ -16,6 +16,7 @@ import DisciplineIcon from "@/app/foundation/DisciplineIcon";
 import BudgetedMediaImage from "@/components/foundation/BudgetedMediaImage";
 import OptimizedMediaImage from "@/app/foundation/OptimizedMediaImage";
 import FoundationPlayerPortraitCard from "@/components/foundation/player-portrait-card/FoundationPlayerPortraitCard";
+import FoundationPlayerPortraitPreview from "@/components/foundation/player-portrait-card/FoundationPlayerPortraitPreview";
 import { VeloImpactStrip } from "@/components/foundation/velo-ui";
 import { createEmptyLeaguePlayerHeatPools } from "@/lib/foundation/player-league-heat";
 import { isFoundationTeamManagementLocked } from "@/lib/foundation/foundation-admin-dev-flags";
@@ -375,6 +376,14 @@ type LineupPlayerTableRow = {
   discipline2Score: number | null;
   appearances: number | null;
   marketValue: number | null;
+  playerOvr: number | null;
+  playerPps: number | null;
+  coreStats: {
+    pow: number;
+    spe: number;
+    men: number;
+    soc: number;
+  } | null;
   traitsPositive: string[];
   traitsNegative: string[];
   injuryStatus: "healthy" | "injured" | "recovering" | null;
@@ -443,6 +452,45 @@ type MatchdaySlotReadiness = "empty" | "optimal" | "solid" | "risky";
 type TeamdeckFilterMode = "all" | "free" | "assigned" | "blocked";
 type TeamdeckSortMode = "fit" | "top" | "d1" | "d2" | "captain" | "fatigue" | "wish";
 type TeamdeckCandidateQualityKey = "instant" | "alternative" | "fatigue" | "blocked" | "emergency";
+
+type LineupPortraitPreviewSource = Pick<
+  LineupPlayerTableRow,
+  "id" | "name" | "portraitUrl" | "className" | "playerOvr" | "playerPps" | "coreStats"
+>;
+
+function wrapLineupPortraitHoverPreview(
+  card: ReactNode,
+  player: LineupPortraitPreviewSource,
+  disabled = false,
+) {
+  if (!player.coreStats) {
+    return card;
+  }
+
+  return (
+    <FoundationPlayerPortraitPreview
+      playerId={player.id}
+      name={player.name}
+      portraitUrl={player.portraitUrl}
+      portraitInitials={player.name.slice(0, 2).toUpperCase()}
+      playerOvr={player.playerOvr}
+      playerMvs={null}
+      playerPps={player.playerPps}
+      pow={player.coreStats.pow}
+      spe={player.coreStats.spe}
+      men={player.coreStats.men}
+      soc={player.coreStats.soc}
+      leagueHeatPools={createEmptyLeaguePlayerHeatPools()}
+      variant="team"
+      context="roster"
+      previewDensity="compact"
+      playerClassName={player.className}
+      disabled={disabled}
+    >
+      {card}
+    </FoundationPlayerPortraitPreview>
+  );
+}
 
 type LineupMoraleDecision = {
   playerId: string;
@@ -2349,6 +2397,9 @@ export default function LegacyLineupLabClient(props: LegacyLineupLabClientProps)
           discipline2Score: d2DisciplineId ? scoreMap.get(`${player.id}::${d2DisciplineId}`) ?? null : null,
           appearances: context.fatigueByPlayerId?.[player.id]?.count ?? null,
           marketValue: player.displayMarketValue ?? activePlayer?.marketValue ?? null,
+          playerOvr: player.ovr ?? null,
+          playerPps: player.pps ?? null,
+          coreStats: player.coreStats ?? null,
           traitsPositive: player.traitsPositive ?? [],
           traitsNegative: player.traitsNegative ?? [],
           injuryStatus: player.injuryStatus ?? null,
@@ -7924,45 +7975,48 @@ export default function LegacyLineupLabClient(props: LegacyLineupLabClientProps)
                               ) : null}
                             </div>
                             {selectedRosterCard ? (
-                              <FoundationPlayerPortraitCard
-                                playerId={selectedRosterCard.id}
-                                name={selectedRosterCard.name}
-                                portraitUrl={selectedRosterCard.portraitUrl ?? null}
-                                portraitInitials={selectedRosterCard.name.slice(0, 2).toUpperCase()}
-                                playerOvr={null}
-                                playerMvs={null}
-                                pow={null}
-                                spe={null}
-                                men={null}
-                                soc={null}
-                                leagueHeatPools={createEmptyLeaguePlayerHeatPools()}
-                                variant="team"
-                                context="lineup"
-                                density="compact"
-                                interactive={false}
-                                contextData={{
-                                  lineup: {
-                                    d1Score: `D1: ${formatNullableScore(selectedRosterCard.discipline1Score)}`,
-                                    d2Score: `D2: ${formatNullableScore(selectedRosterCard.discipline2Score)}`,
-                                    slotProjection: slotPreview?.projected.totalProjected != null
-                                      ? formatScore(slotPreview.projected.totalProjected)
-                                      : "—",
-                                    fatigueLabel: `F ${Math.round(selectedOption?.fatigueCount ?? 0)}`,
-                                  },
-                                }}
-                                footerSlot={
-                                  <button
-                                    type="button"
-                                    className="secondary-button inline-button"
-                                    onClick={(event) => {
-                                      event.stopPropagation();
-                                      setActiveSlotKey(slot.key);
-                                    }}
-                                  >
-                                    Tauschen
-                                  </button>
-                                }
-                              />
+                              wrapLineupPortraitHoverPreview(
+                                <FoundationPlayerPortraitCard
+                                  playerId={selectedRosterCard.id}
+                                  name={selectedRosterCard.name}
+                                  portraitUrl={selectedRosterCard.portraitUrl ?? null}
+                                  portraitInitials={selectedRosterCard.name.slice(0, 2).toUpperCase()}
+                                  playerOvr={null}
+                                  playerMvs={null}
+                                  pow={null}
+                                  spe={null}
+                                  men={null}
+                                  soc={null}
+                                  leagueHeatPools={createEmptyLeaguePlayerHeatPools()}
+                                  variant="team"
+                                  context="lineup"
+                                  density="compact"
+                                  interactive={false}
+                                  contextData={{
+                                    lineup: {
+                                      d1Score: `D1: ${formatNullableScore(selectedRosterCard.discipline1Score)}`,
+                                      d2Score: `D2: ${formatNullableScore(selectedRosterCard.discipline2Score)}`,
+                                      slotProjection: slotPreview?.projected.totalProjected != null
+                                        ? formatScore(slotPreview.projected.totalProjected)
+                                        : "—",
+                                      fatigueLabel: `F ${Math.round(selectedOption?.fatigueCount ?? 0)}`,
+                                    },
+                                  }}
+                                  footerSlot={
+                                    <button
+                                      type="button"
+                                      className="secondary-button inline-button"
+                                      onClick={(event) => {
+                                        event.stopPropagation();
+                                        setActiveSlotKey(slot.key);
+                                      }}
+                                    >
+                                      Tauschen
+                                    </button>
+                                  }
+                                />,
+                                selectedRosterCard,
+                              )
                             ) : (
                               <div className="legacy-lineup-slot-candidates">
                                 {slotCandidateSummary?.topCandidates.slice(0, 2).map((candidate) => {
@@ -8416,47 +8470,48 @@ export default function LegacyLineupLabClient(props: LegacyLineupLabClientProps)
                           assignPlayerToSide(player.activePlayerId, focusedDisciplineSide);
                         }}
                       >
-                        <FoundationPlayerPortraitCard
-                          playerId={player.id}
-                          name={player.name}
-                          portraitUrl={player.portraitUrl}
-                          portraitInitials={player.name.slice(0, 2).toUpperCase()}
-                          playerOvr={null}
-                          playerMvs={null}
-                          pow={null}
-                          spe={null}
-                          men={null}
-                          soc={null}
-                          leagueHeatPools={createEmptyLeaguePlayerHeatPools()}
-                          variant="team"
-                          context="lineup"
-                          density="compact"
-                          interactive={false}
-                          playerClassName={player.className}
-                          subMeta={[player.className ?? "—", `${player.contractLength ?? "—"} Jahre`, assignmentLabel].join(" · ")}
-                          highlight={wantsActiveSlot ? `Wunsch ${activeSlot?.disciplineSide?.toUpperCase() ?? focusedDisciplineSide.toUpperCase()}-${(activeSlot?.slotIndex ?? 0) + 1}` : null}
-                          contextData={{
-                            lineup: {
-                              d1Score: `${player.discipline1Label}: ${formatNullableScore(player.discipline1Score)}`,
-                              d2Score: `${player.discipline2Label}: ${formatNullableScore(player.discipline2Score)}`,
-                              slotProjection: activeSlotCandidate
-                                ? activeSlotCandidate.blockReason
-                                  ? "nein"
-                                  : `${formatNullableScore(activeSlotCandidate.projectedScore)}${
-                                      activeSlotCandidate.scoreDelta != null
-                                        ? ` ${activeSlotCandidate.scoreDelta >= 0 ? "+" : ""}${formatDecimalScore(activeSlotCandidate.scoreDelta, 1)}`
-                                        : ""
-                                    }`
-                                : "—",
-                              qualityGroup: groupMeta.label,
-                              fatigueLabel: formatFatigueHint(
-                                Math.max(player.discipline1Score ?? 0, player.discipline2Score ?? 0),
-                                player.fatigueCount,
-                              ),
-                            },
-                          }}
-                          footerSlot={
-                            <div className="legacy-matchday-player-meta-row">
+                        {wrapLineupPortraitHoverPreview(
+                          <FoundationPlayerPortraitCard
+                            playerId={player.id}
+                            name={player.name}
+                            portraitUrl={player.portraitUrl}
+                            portraitInitials={player.name.slice(0, 2).toUpperCase()}
+                            playerOvr={null}
+                            playerMvs={null}
+                            pow={null}
+                            spe={null}
+                            men={null}
+                            soc={null}
+                            leagueHeatPools={createEmptyLeaguePlayerHeatPools()}
+                            variant="team"
+                            context="lineup"
+                            density="compact"
+                            interactive={false}
+                            playerClassName={player.className}
+                            subMeta={[player.className ?? "—", `${player.contractLength ?? "—"} Jahre`, assignmentLabel].join(" · ")}
+                            highlight={wantsActiveSlot ? `Wunsch ${activeSlot?.disciplineSide?.toUpperCase() ?? focusedDisciplineSide.toUpperCase()}-${(activeSlot?.slotIndex ?? 0) + 1}` : null}
+                            contextData={{
+                              lineup: {
+                                d1Score: `${player.discipline1Label}: ${formatNullableScore(player.discipline1Score)}`,
+                                d2Score: `${player.discipline2Label}: ${formatNullableScore(player.discipline2Score)}`,
+                                slotProjection: activeSlotCandidate
+                                  ? activeSlotCandidate.blockReason
+                                    ? "nein"
+                                    : `${formatNullableScore(activeSlotCandidate.projectedScore)}${
+                                        activeSlotCandidate.scoreDelta != null
+                                          ? ` ${activeSlotCandidate.scoreDelta >= 0 ? "+" : ""}${formatDecimalScore(activeSlotCandidate.scoreDelta, 1)}`
+                                          : ""
+                                      }`
+                                  : "—",
+                                qualityGroup: groupMeta.label,
+                                fatigueLabel: formatFatigueHint(
+                                  Math.max(player.discipline1Score ?? 0, player.discipline2Score ?? 0),
+                                  player.fatigueCount,
+                                ),
+                              },
+                            }}
+                            footerSlot={
+                              <div className="legacy-matchday-player-meta-row">
                           <span className="legacy-matchday-player-score-chip">
                             {player.fitLane === "d1" ? "D1 Fit" : player.fitLane === "d2" ? "D2 Fit" : "Flex Fit"}
                           </span>
@@ -8500,7 +8555,9 @@ export default function LegacyLineupLabClient(props: LegacyLineupLabClientProps)
                           ) : null}
                             </div>
                           }
-                        />
+                          />,
+                          player,
+                        )}
                         <div className="legacy-matchday-player-summary-grid">
                           <div className="legacy-matchday-player-summary-card">
                             <span>Beste Slots</span>

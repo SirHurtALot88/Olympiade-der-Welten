@@ -22,6 +22,7 @@ type PlayerProfileClientProps = {
   onClose?: () => void;
   onOpenTraining?: () => void;
   onOpenContractOffer?: () => void;
+  onOpenLeagueLeaders?: (categoryId: "ovr" | "pps" | "mvs") => void;
   trainingRow?: TrainingPlayerRowView | null;
   trainingModeOptions?: TrainingModeOption[];
   trainingClassOptions?: TrainingClassOption[];
@@ -37,6 +38,7 @@ export default function PlayerProfileClient({
   onClose,
   onOpenTraining,
   onOpenContractOffer,
+  onOpenLeagueLeaders,
   trainingRow = null,
   trainingModeOptions = [],
   trainingClassOptions = [],
@@ -60,6 +62,7 @@ export default function PlayerProfileClient({
         onClose?.();
       }}
       onOpenTraining={onOpenTraining}
+      onOpenLeagueLeaders={onOpenLeagueLeaders}
       trainingRow={trainingRow}
       trainingModeOptions={trainingModeOptions}
       trainingClassOptions={trainingClassOptions}

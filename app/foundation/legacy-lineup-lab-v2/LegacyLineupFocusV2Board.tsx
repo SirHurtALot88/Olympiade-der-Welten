@@ -5,6 +5,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
 import OptimizedMediaImage from "@/app/foundation/OptimizedMediaImage";
 import FoundationPlayerPortraitCard from "@/components/foundation/player-portrait-card/FoundationPlayerPortraitCard";
+import FoundationPlayerPortraitPreview from "@/components/foundation/player-portrait-card/FoundationPlayerPortraitPreview";
 import { VeloImpactStrip, VeloRangeBar } from "@/components/foundation/velo-ui";
 import { createEmptyLeaguePlayerHeatPools } from "@/lib/foundation/player-league-heat";
 import { getLegacyLineupDragFitTier, type LegacyLineupDragFitTier } from "@/lib/lineups/legacy-lineup-drag-drop";
@@ -21,7 +22,59 @@ type RosterCard = {
   className: string | null;
   discipline1Score: number | null;
   discipline2Score: number | null;
+  playerOvr?: number | null;
+  playerPps?: number | null;
+  coreStats?: {
+    pow: number;
+    spe: number;
+    men: number;
+    soc: number;
+  } | null;
 };
+
+function wrapLineupV2PortraitPreview(
+  card: ReactNode,
+  player: Pick<RosterCard, "id" | "name" | "portraitUrl" | "className" | "playerOvr" | "playerPps" | "coreStats">,
+  disabled = false,
+) {
+  if (!player.coreStats) {
+    return card;
+  }
+
+  return (
+    <FoundationPlayerPortraitPreview
+      playerId={player.id}
+      name={player.name}
+      portraitUrl={player.portraitUrl}
+      portraitInitials={player.name.slice(0, 2).toUpperCase()}
+      playerOvr={player.playerOvr}
+      playerMvs={null}
+      playerPps={player.playerPps}
+      pow={player.coreStats.pow}
+      spe={player.coreStats.spe}
+      men={player.coreStats.men}
+      soc={player.coreStats.soc}
+      leagueHeatPools={createEmptyLeaguePlayerHeatPools()}
+      variant="team"
+      context="roster"
+      previewDensity="compact"
+      playerClassName={player.className}
+      disabled={disabled}
+    >
+      {card}
+    </FoundationPlayerPortraitPreview>
+  );
+}
+
+function renderLineupV2Portrait(player: RosterCard, className: string) {
+  const portrait = player.portraitUrl ? (
+    <OptimizedMediaImage className={className} src={player.portraitUrl} alt={player.name} width={36} height={36} />
+  ) : (
+    <span className={`${className} is-placeholder`}>{player.name.slice(0, 2).toUpperCase()}</span>
+  );
+
+  return wrapLineupV2PortraitPreview(portrait, player);
+}
 
 type SlotCandidate = {
   activePlayerId: string;
@@ -453,7 +506,6 @@ export default function LegacyLineupFocusV2Board({
     <div className="legacy-lineup-v2-shell" data-testid="legacy-lineup-v2-board">
       <div className="legacy-lineup-v2-toolbar" aria-label="Matchday Toolbar">
         <div className="legacy-lineup-v2-toolbar-main">
-          <span className="legacy-lineup-v2-preview-chip">Preview</span>
           <div>
             <span>Matchday Prep</span>
             <strong>{matchdayHeaderSummary}</strong>
@@ -644,11 +696,7 @@ export default function LegacyLineupFocusV2Board({
 
                           {rosterCard ? (
                             <span className="legacy-lineup-v2-slot-player">
-                              {rosterCard.portraitUrl ? (
-                                <OptimizedMediaImage className="legacy-lineup-v2-slot-portrait" src={rosterCard.portraitUrl} alt={rosterCard.name} width={32} height={32} />
-                              ) : (
-                                <span className="legacy-lineup-v2-slot-portrait is-placeholder">{rosterCard.name.slice(0, 2).toUpperCase()}</span>
-                              )}
+                              {renderLineupV2Portrait(rosterCard, "legacy-lineup-v2-slot-portrait")}
                               <strong>{rosterCard.name}</strong>
                               {isCaptain ? <span className="legacy-lineup-v2-captain-badge">C</span> : null}
                             </span>
@@ -1017,8 +1065,9 @@ export default function LegacyLineupFocusV2Board({
                       return (
                         <div
                           key={`v2-candidate-${candidate.id}-${entry.groupKey}`}
-                          className={`legacy-lineup-v2-candidate-row${isAssigned ? " is-assigned" : ""}${isBlocked ? " is-blocked" : ""} ${getIdleTierGlowClass(entry.fitTier)}`.trim()}
+                          className={`legacy-lineup-v2-candidate-row${isAssigned ? " is-assigned" : ""}${isBlocked ? " is-blocked" : ""}${Boolean(candidate.activePlayerId) && !isBlocked ? " is-draggable" : ""} ${getIdleTierGlowClass(entry.fitTier)}`.trim()}
                           draggable={Boolean(candidate.activePlayerId) && !isBlocked}
+                          title={Boolean(candidate.activePlayerId) && !isBlocked ? "Ziehen oder klicken zum Zuweisen" : undefined}
                           onDragStart={() => candidate.activePlayerId && onDragStart(candidate.activePlayerId)}
                           onDragEnd={onDragEnd}
                         >
@@ -1036,11 +1085,7 @@ export default function LegacyLineupFocusV2Board({
                               onAssignPlayer(activeSlot.key, candidate.activePlayerId);
                             }}
                           >
-                            {candidate.portraitUrl ? (
-                              <OptimizedMediaImage className="legacy-lineup-v2-candidate-portrait" src={candidate.portraitUrl} alt={candidate.name} width={36} height={36} />
-                            ) : (
-                              <span className="legacy-lineup-v2-candidate-portrait is-placeholder">{candidate.name.slice(0, 2).toUpperCase()}</span>
-                            )}
+                            {renderLineupV2Portrait(candidate, "legacy-lineup-v2-candidate-portrait")}
                             <span className="legacy-lineup-v2-candidate-main">
                               <strong>{candidate.name}</strong>
                               <small>

@@ -221,7 +221,6 @@ export function getFoundationViewScrollTarget(view: FoundationView | GameFlowVie
     case "encyclopedia":
       return "foundation-encyclopedia";
     case "lineup":
-      return "foundation-lineup";
     case "lineupV2":
       return "foundation-lineup-v2";
     case "matchdayArena":

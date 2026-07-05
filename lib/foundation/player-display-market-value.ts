@@ -61,6 +61,31 @@ export function getPlayerSeasonZeroMarketValueReference(input: {
   });
 }
 
+export function resolveArchivedSeasonPlayerMarketValue(input: {
+  gameState: GameState;
+  seasonId: string;
+  playerId: string;
+  snapshotMarketValue: number | null | undefined;
+}): number | null {
+  const progressionEvent = (input.gameState.playerProgressionEvents ?? []).find(
+    (entry) => entry.seasonId === input.seasonId && entry.playerId === input.playerId,
+  );
+  const progressedMarketValue =
+    progressionEvent?.progressionSnapshotAfter?.marketValue ??
+    progressionEvent?.progressionSnapshotAfter?.marketValuePreview ??
+    null;
+
+  if (progressedMarketValue != null && Number.isFinite(progressedMarketValue)) {
+    return progressedMarketValue;
+  }
+
+  if (input.snapshotMarketValue != null && Number.isFinite(input.snapshotMarketValue)) {
+    return input.snapshotMarketValue;
+  }
+
+  return null;
+}
+
 export function getPlayerSeasonZeroMarketValueDelta(input: {
   player?: Player | null;
   gameState?: GameState | null;

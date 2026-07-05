@@ -91,6 +91,7 @@ export type BuildRosterOverlayInput = {
   poRangeMax?: number | null;
   showCaPo?: boolean;
   leagueHeatPools: LeaguePlayerHeatPools;
+  rankStyle?: "label" | "inline";
 };
 
 function formatNumber(value: number | null | undefined, digits = 1) {
@@ -113,27 +114,45 @@ function formatPotentialRange(min: number | null | undefined, max: number | null
   return `${formatAbility(min)}–${formatAbility(max)}`;
 }
 
+function formatMetricWithRank(value: number | null | undefined, rank: number | null | undefined, digits = 1) {
+  const formattedValue = formatNumber(value, digits);
+  return rank != null ? `${formattedValue} · #${rank}` : formattedValue;
+}
+
 function stat(label: string, value: string, extra?: Partial<PortraitOverlayStat>): PortraitOverlayStat {
   return { label, value, ...extra };
 }
 
 export function buildRosterOverlayStats(input: BuildRosterOverlayInput): PortraitOverlayStat[] {
+  const rankInline = input.rankStyle === "inline";
   const stats: PortraitOverlayStat[] = [
-    stat(formatStatLabel("OVR", input.ovrRank), formatNumber(input.playerOvr, 1), {
-      heatClass: getPoolHeatClass(input.playerOvr, input.leagueHeatPools.ovr),
-    }),
     stat(
-      formatStatLabel("PPs", input.ppsRank),
-      input.playerPps != null ? formatNumber(input.playerPps, 1) : "—",
+      rankInline ? "OVR" : formatStatLabel("OVR", input.ovrRank),
+      rankInline ? formatMetricWithRank(input.playerOvr, input.ovrRank, 1) : formatNumber(input.playerOvr, 1),
+      {
+        heatClass: getPoolHeatClass(input.playerOvr, input.leagueHeatPools.ovr),
+      },
+    ),
+    stat(
+      rankInline ? "PPs" : formatStatLabel("PPs", input.ppsRank),
+      rankInline
+        ? formatMetricWithRank(input.playerPps, input.ppsRank, 1)
+        : input.playerPps != null
+          ? formatNumber(input.playerPps, 1)
+          : "—",
       input.playerPps != null
         ? { heatClass: getPoolHeatClass(input.playerPps, input.leagueHeatPools.pps) }
         : undefined,
     ),
   ];
   stats.push(
-    stat(formatStatLabel("MVS", input.mvsRank), formatNumber(input.playerMvs, 1), {
-      heatClass: getPoolHeatClass(input.playerMvs, input.leagueHeatPools.mvs),
-    }),
+    stat(
+      rankInline ? "MVS" : formatStatLabel("MVS", input.mvsRank),
+      rankInline ? formatMetricWithRank(input.playerMvs, input.mvsRank, 1) : formatNumber(input.playerMvs, 1),
+      {
+        heatClass: getPoolHeatClass(input.playerMvs, input.leagueHeatPools.mvs),
+      },
+    ),
   );
   if (input.showCaPo && (input.caRating != null || input.poRangeMin != null || input.poRangeMax != null)) {
     stats.push(stat("CA", formatNumber(input.caRating, 0)));
@@ -262,7 +281,7 @@ export function shouldShowPortraitOrbit(
 ) {
   if (layout === "rail") return false;
   if (density === "mini") return false;
-  if (context === "market") return density === "full" || density === "compact";
+  if (context === "market") return density === "full";
   if (context === "training") return false;
   if (context === "scouting") return density === "full";
   return context === "roster" || context === "tablePreview" || context == null;

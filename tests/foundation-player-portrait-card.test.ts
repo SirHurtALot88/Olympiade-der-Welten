@@ -202,6 +202,42 @@ describe("foundation player portrait preview ui contract", () => {
   });
 });
 
+describe("lineup v2 portrait hover preview ui contract", () => {
+  it("wraps v2 roster portraits with portrait hover preview", async () => {
+    const fs = await import("node:fs/promises");
+    const path = await import("node:path");
+    const root = process.cwd();
+
+    const boardText = await fs.readFile(
+      path.join(root, "app/foundation/legacy-lineup-lab-v2/LegacyLineupFocusV2Board.tsx"),
+      "utf8",
+    );
+
+    expect(boardText).toContain("FoundationPlayerPortraitPreview");
+    expect(boardText).toContain("wrapLineupV2PortraitPreview");
+    expect(boardText).toContain('context="roster"');
+    expect(boardText).toContain("player.coreStats.pow");
+  });
+});
+
+describe("lineup portrait hover preview ui contract", () => {
+  it("wraps lineup roster cards with portrait hover preview", async () => {
+    const fs = await import("node:fs/promises");
+    const path = await import("node:path");
+    const root = process.cwd();
+
+    const lineupText = await fs.readFile(
+      path.join(root, "app/foundation/legacy-lineup-lab/LegacyLineupLabClient.tsx"),
+      "utf8",
+    );
+
+    expect(lineupText).toContain("FoundationPlayerPortraitPreview");
+    expect(lineupText).toContain("wrapLineupPortraitHoverPreview");
+    expect(lineupText).toContain('context="roster"');
+    expect(lineupText).toContain("player.coreStats.pow");
+  });
+});
+
 describe("teams portraits tab contract", () => {
   it("adds a portraits subnav tab and grid in the teams detail panel", async () => {
     const fs = await import("node:fs/promises");

@@ -81,9 +81,12 @@ export type TeamDetailDrawerHistoryRow = {
   marketValue: number | null;
   guv: number | null;
   topBuyPlayer: string | null;
+  topBuyPlayerId: string | null;
   topBuyAmount: number | null;
   topSellPlayer: string | null;
+  topSellPlayerId: string | null;
   topSellAmount: number | null;
+  topSellProfit: number | null;
   disciplineValues: Partial<Record<string, number | null>>;
 };
 
@@ -658,18 +661,34 @@ export default function TeamDetailDrawer({
                   }
                   if (columnId === "topBuy") {
                     return row.topBuyPlayer ? (
-                      <span className="team-drawer-history-transfer text-negative">
+                      <button
+                        type="button"
+                        className="team-drawer-history-transfer text-negative is-link"
+                        onClick={() => row.topBuyPlayerId && onOpenPlayer(row.topBuyPlayerId, row.topBuyPlayerId)}
+                      >
                         {row.topBuyPlayer} · {formatNumber(row.topBuyAmount, 2)}
-                      </span>
+                      </button>
                     ) : (
                       "—"
                     );
                   }
                   if (columnId === "topSell") {
                     return row.topSellPlayer ? (
-                      <span className="team-drawer-history-transfer text-positive">
+                      <button
+                        type="button"
+                        className={`team-drawer-history-transfer is-link ${row.topSellProfit != null && row.topSellProfit >= 0 ? "text-positive" : row.topSellProfit != null ? "text-negative" : "text-positive"}`}
+                        onClick={() => row.topSellPlayerId && onOpenPlayer(row.topSellPlayerId, row.topSellPlayerId)}
+                        title={
+                          row.topSellProfit != null
+                            ? row.topSellProfit >= 0
+                              ? `Verkaufsgewinn: ${formatSignedNumber(row.topSellProfit, 2)}`
+                              : `Verlust: ${formatSignedNumber(row.topSellProfit, 2)}`
+                            : undefined
+                        }
+                      >
                         {row.topSellPlayer} · {formatNumber(row.topSellAmount, 2)}
-                      </span>
+                        {row.topSellProfit != null ? ` (${formatSignedNumber(row.topSellProfit, 2)})` : ""}
+                      </button>
                     ) : (
                       "—"
                     );

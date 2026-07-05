@@ -301,6 +301,7 @@ export default function PlayerAttributeProgressChart({
       </div>
 
       {strChart ? (
+        <div data-testid="player-attribute-progress-str-line">
         <ProgressChartCollapsible
           testId="player-attribute-progress-str-line"
           title="STR (Power)"
@@ -350,6 +351,7 @@ export default function PlayerAttributeProgressChart({
             ))}
           </svg>
         </ProgressChartCollapsible>
+        </div>
       ) : null}
 
       {attributeChart ? (
@@ -430,11 +432,12 @@ export default function PlayerAttributeProgressChart({
           defaultOpen
         >
           <div className="player-attribute-progress-pp-blocks">
+            {/* Contract: data-testid="player-attribute-progress-pp-metric-pow" */}
             {ppMetricCharts.map((chart) => (
               <article
                 key={`pp-metric-${chart.metric.id}`}
                 className={`player-attribute-progress-pp-metric-block ${chart.metric.className}`}
-                data-testid={`player-attribute-progress-pp-metric-${chart.metric.id}`}
+                data-testid={chart.metric.id === "pow" ? "player-attribute-progress-pp-metric-pow" : `player-attribute-progress-pp-metric-${chart.metric.id}`}
               >
                 <header className="player-attribute-progress-pp-metric-head">
                   <strong>{chart.metric.label}</strong>
@@ -496,6 +499,7 @@ export default function PlayerAttributeProgressChart({
       ) : null}
 
       {attributeHistoryRows.length > 0 ? (
+        <div data-testid="player-attribute-progress-attribute-table">
         <ProgressChartCollapsible
           testId="player-attribute-progress-attribute-table"
           title="Attribut-Tabelle"
@@ -544,6 +548,7 @@ export default function PlayerAttributeProgressChart({
           </table>
           </div>
         </ProgressChartCollapsible>
+        </div>
       ) : null}
 
       <ProgressChartCollapsible

@@ -6,6 +6,7 @@ import { FoundationDeferredMount } from "@/lib/foundation/FoundationDeferredMoun
 import { FoundationSharedProvider } from "@/lib/foundation/foundation-shared-context";
 import { FoundationShellRouterCockpit, FoundationShellRouterHistoryV2, FoundationShellRouterMarketV2, FoundationShellRouterMatchdayResult, FoundationShellRouterPrize, FoundationShellRouterSeasonPreview, FoundationShellRouterTeams, FoundationShellRouterTraining } from "@/app/foundation/FoundationShellRouter";
 import FoundationRanksHost from "@/app/foundation/ranks-v2/FoundationRanksHost";
+import FoundationLeagueLeadersHost from "@/app/foundation/league-leaders-v2/FoundationLeagueLeadersHost";
 import FoundationDiszisHost from "@/app/foundation/ranks-v2/FoundationDiszisHost";
 import type { FoundationShellRouterBodyProps } from "@/app/foundation/foundation-shell-router-body-props";
 import {
@@ -241,6 +242,7 @@ export function FoundationShellRouterBody(props: FoundationShellRouterBodyProps)
   foundationCockpitHostProps,
   foundationPrizeFinanceShellHostProps,
   foundationRanksHostProps,
+  foundationLeagueLeadersHostProps,
   foundationDiszisHostProps,
   foundationMarketV2ShellHostProps,
   foundationMatchdayResultHostProps,
@@ -363,6 +365,7 @@ export function FoundationShellRouterBody(props: FoundationShellRouterBodyProps)
   openTeamDrawerById,
   openTeamProfileById,
   openTrainingPlayerTarget,
+  onOpenLeagueLeaders,
   orderedDisciplines,
   ownerQuickSwitchTeams,
   passiveTeams,
@@ -765,7 +768,7 @@ export function FoundationShellRouterBody(props: FoundationShellRouterBodyProps)
             <FoundationSubNav
               className="foundation-shell-subnav"
               items={[
-                { id: "lineup", label: activeView === "lineupV2" ? "Einsatzliste v2" : "Einsatzliste" },
+                { id: "lineup", label: "Einsatzliste" },
                 { id: "formBoard", label: "Formplan" },
               ]}
               activeId={lineupDraftBoardViewRequest ?? lineupDraftBoardView}
@@ -773,7 +776,7 @@ export function FoundationShellRouterBody(props: FoundationShellRouterBodyProps)
                 const nextView = id === "formBoard" ? "formBoard" : "lineup";
                 setLineupDraftBoardView(nextView);
                 setLineupDraftBoardViewRequest(null);
-                syncFoundationViewInUrl(activeView, nextView === "formBoard" ? "formplan" : "lineup", null, { push: true });
+                syncFoundationViewInUrl("lineup", nextView === "formBoard" ? "formplan" : "lineup", null, { push: true });
               }}
             />
           ) : activeView === "inboxV2" ? (
@@ -1713,6 +1716,7 @@ export function FoundationShellRouterBody(props: FoundationShellRouterBodyProps)
                 }}
                 onOpenTraining={() => openTrainingPlayerTarget(playerProfileData.playerId)}
                 onOpenContractOffer={() => setFoundationView("marketV2", setActiveView)}
+                onOpenLeagueLeaders={onOpenLeagueLeaders}
                 trainingRow={playerProfileTrainingRow}
                 trainingModeOptions={trainingV2ModeOptions}
                 trainingClassOptions={PROGRESSION_CLASS_ORDER.map((className) => ({ value: className, label: className }))}
@@ -2180,20 +2184,14 @@ export function FoundationShellRouterBody(props: FoundationShellRouterBodyProps)
             hostProps={foundationCockpitHostProps}
           />
 
-          {activeView === "lineup" ? (
+          {activeView === "lineup" || activeView === "lineupV2" ? (
           <FoundationLineupPanel
             active
-            onSwitchToFocusV2={() => setFoundationView("lineupV2", setActiveView, { push: true })}
+            uiVariant="focusV2"
             clientKey={`lineup-${activeSaveId}-${gameState.season.id}-${gameState.matchdayState.matchdayId}-${activeManagerTeamId}-${effectiveActiveOwnerId}`}
             teamTooltip={
               selectedTeam
-                ? `${selectedTeam.name}: ${
-                    selectedTeamControl?.controlMode === "ai"
-                      ? "AI-gesteuert"
-                      : selectedTeamControl?.controlMode === "passive"
-                        ? "passiv"
-                        : "manuell"
-                  }. Bestehende Settings bleiben read-only sichtbar, bis du im Adminbereich etwas änderst.`
+                ? `${selectedTeam.name}: Einsatzliste mit Focus Mode — Slots, Kandidaten und Preview.`
                 : "Matchday Room fuer Teamwahl, Slots und Preview."
             }
             client={{
@@ -2223,50 +2221,6 @@ export function FoundationShellRouterBody(props: FoundationShellRouterBodyProps)
               onLineupSaved: handleHumanLineupSaved,
               onFormCardPlanSaved: handleFormCardPlanSaved,
               onOpenArena: () => setFoundationView("matchdayArena", setActiveView),
-              roomContext,
-            }}
-          />
-          ) : null}
-
-          {activeView === "lineupV2" ? (
-          <FoundationLineupPanel
-            active
-            uiVariant="focusV2"
-            onSwitchToClassic={() => setFoundationView("lineup", setActiveView, { push: true })}
-            clientKey={`lineup-v2-${activeSaveId}-${gameState.season.id}-${gameState.matchdayState.matchdayId}-${activeManagerTeamId}-${effectiveActiveOwnerId}`}
-            teamTooltip={
-              selectedTeam
-                ? `${selectedTeam.name}: Focus-Mode Preview für die Einsatzliste.`
-                : "Matchday Room fuer Teamwahl, Slots und Preview."
-            }
-            client={{
-              embedded: true,
-              initialSource: "sqlite",
-              defaultSaveId: activeSaveId,
-              defaultSaveName: activeSaveName,
-              defaultSeasonId: gameState.season.id,
-              defaultMatchdayId: gameState.matchdayState.matchdayId,
-              defaultTeamId: activeManagerTeamId,
-              highlightMissingSlots: Boolean(lineupFocusRequestKey),
-              focusMissingRequestKey: lineupFocusRequestKey,
-              draftBoardView: lineupDraftBoardViewRequest ?? lineupDraftBoardView,
-              onDraftBoardViewChange: (view) => {
-                setLineupDraftBoardView(view);
-                setLineupDraftBoardViewRequest(null);
-                syncFoundationViewInUrl("lineupV2", view === "formBoard" ? "formplan" : "lineup", null, { push: true });
-              },
-              shellControlledDraftBoardView: true,
-              initialDraftBoardView: lineupDraftBoardViewRequest ?? undefined,
-              onDraftBoardViewApplied: () => setLineupDraftBoardViewRequest(null),
-              activeOwnerId: effectiveActiveOwnerId,
-              manageableTeamIds: foundationManageableTeamIds,
-              onTeamChange: (teamId) => setActiveManagerTeam(teamId, "manual_select"),
-              playerCatalog: gameState.players,
-              onOpenPlayerDetails: (payload) => openPlayerDrawerById(payload.playerId, payload.activePlayerId),
-              onLineupSaved: handleHumanLineupSaved,
-              onFormCardPlanSaved: handleFormCardPlanSaved,
-              onOpenArena: () => setFoundationView("matchdayArena", setActiveView),
-              onSwitchToClassic: () => setFoundationView("lineup", setActiveView, { push: true }),
               roomContext,
             }}
           />
@@ -2824,6 +2778,7 @@ export function FoundationShellRouterBody(props: FoundationShellRouterBodyProps)
             </div>
           </section>
           <FoundationRanksHost {...foundationRanksHostProps} />
+          <FoundationLeagueLeadersHost {...foundationLeagueLeadersHostProps} />
           </>
           ) : null}
 

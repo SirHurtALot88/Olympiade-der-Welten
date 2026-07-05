@@ -21,7 +21,7 @@ import {
   buildPlayerSeasonPerformanceMap,
   isCurrentSeasonLivePerformanceSummary,
 } from "@/lib/foundation/player-season-performance";
-import { getPlayerSeasonZeroMarketValueDelta, getPlayerSeasonZeroMarketValueReference } from "@/lib/foundation/player-display-market-value";
+import { getPlayerSeasonZeroMarketValueDelta, getPlayerSeasonZeroMarketValueReference, resolveArchivedSeasonPlayerMarketValue } from "@/lib/foundation/player-display-market-value";
 import { buildSeasonPointsLedger } from "@/lib/foundation/season-points-ledger";
 import { getSeasonDerivations } from "@/lib/foundation/get-season-derivations";
 import { buildSeasonDisciplinePlayerCountMap } from "@/lib/season/season-discipline-schedule";
@@ -1608,9 +1608,19 @@ function buildSeasonHistory(gameState: GameState, playerId: string, player: Play
         socRank: socRankMap.get(row.playerId) ?? null,
         mvs: row.mvs ?? null,
         mvsRank: row.mvsRank ?? null,
-        marketValue: row.marketValue ?? null,
+        marketValue: resolveArchivedSeasonPlayerMarketValue({
+          gameState,
+          seasonId: snapshot.seasonId,
+          playerId,
+          snapshotMarketValue: row.marketValue ?? null,
+        }),
         marketValueBaselineDelta: calculateMoneyDelta(
-          row.marketValue,
+          resolveArchivedSeasonPlayerMarketValue({
+            gameState,
+            seasonId: snapshot.seasonId,
+            playerId,
+            snapshotMarketValue: row.marketValue ?? null,
+          }),
           row.purchasePrice ?? referenceMarketValue,
         ),
         transferType: seasonTransfer?.type ?? null,
@@ -1821,6 +1831,7 @@ export function mergePlayerHistoryRowsWithSeasonTimeline(input: {
   rows: PlayerDrawerHistoryRow[];
   gameState: GameState;
   playerId?: string | null;
+  joinedSeasonId?: string | null;
 }): PlayerDrawerHistoryRow[] {
   const rowBySeasonId = new Map(
     input.rows
@@ -1839,13 +1850,19 @@ export function mergePlayerHistoryRowsWithSeasonTimeline(input: {
 
   timelineSeasonIds.sort((left, right) => left.localeCompare(right, "de", { numeric: true }));
 
-  if (timelineSeasonIds.length === 0) {
+  const visibleTimelineSeasonIds = input.joinedSeasonId
+    ? timelineSeasonIds.filter(
+        (seasonId) => seasonId.localeCompare(input.joinedSeasonId as string, "de", { numeric: true }) >= 0,
+      )
+    : timelineSeasonIds;
+
+  if (visibleTimelineSeasonIds.length === 0) {
     return [...input.rows].sort((left, right) =>
       (left.seasonId ?? left.seasonName).localeCompare(right.seasonId ?? right.seasonName, "de", { numeric: true }),
     );
   }
 
-  return timelineSeasonIds.map((seasonId) => {
+  return visibleTimelineSeasonIds.map((seasonId) => {
     const existing = rowBySeasonId.get(seasonId);
     if (existing) {
       return existing;
@@ -2024,6 +2041,7 @@ function buildHistoryRows(input: {
     rows: [activeSeasonRow, ...archivedRows],
     gameState: input.gameState,
     playerId: input.player.id,
+    joinedSeasonId: input.rosterEntry?.joinedSeasonId ?? null,
   });
 }
 

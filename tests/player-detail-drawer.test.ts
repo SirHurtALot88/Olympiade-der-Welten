@@ -573,6 +573,47 @@ describe("player detail drawer", () => {
     expect(archived?.pow).toBe(12.5);
   });
 
+  it("uses post-progression market value for archived season rows when snapshot MW is stale", () => {
+    const player = createPlayer({ id: "player-mw-fix", pps: 54.4 });
+    const gameState = createGameState({ player, withRoster: true, snapshotPoints: 88.8 });
+    gameState.season = {
+      id: "season-2",
+      name: "Season 2",
+      currentMatchday: 1,
+      totalMatchdays: 10,
+      isCompleted: false,
+    } as unknown as GameState["season"];
+    gameState.seasonState.seasonId = "season-2";
+    const snapshotRow = gameState.seasonState.seasonSnapshots?.[0]?.playerPerformances?.[0];
+    if (snapshotRow) {
+      snapshotRow.marketValue = 38.3;
+    }
+    gameState.playerProgressionEvents = [
+      {
+        eventId: "prog-mw-1",
+        seasonId: "season-1",
+        teamId: "team-1",
+        playerId: player.id,
+        upgrades: [],
+        xpSpent: 0,
+        timestamp: "2026-06-10T10:00:00.000Z",
+        source: "organic_season_progression",
+        progressionSnapshotAfter: {
+          marketValue: 32.2,
+        },
+      },
+    ] as unknown as NonNullable<GameState["playerProgressionEvents"]>;
+
+    const data = buildPlayerDrawerDataFromGameState({
+      gameState,
+      playerId: player.id,
+      source: "sqlite",
+    });
+    const archived = data?.historyRows.find((row) => row.seasonId === "season-1");
+
+    expect(archived?.marketValue).toBe(32.2);
+  });
+
   it("fills missing snapshot seasons in history timeline for PP charts", () => {
     const player = createPlayer({ id: "player-timeline", pps: 54.4 });
     const gameState = createGameState({ player, withRoster: true, snapshotPoints: 88.8 });
@@ -706,6 +747,7 @@ describe("player detail drawer", () => {
     if (roster) {
       roster.joinedSeasonId = "season-4";
     }
+    gameState.transferHistory = [];
     gameState.transferHistory.push({
       id: "transfer-late-join",
       playerId: player.id,

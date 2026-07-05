@@ -99,14 +99,10 @@ export default function FoundationLineupShellHost({
     lineupDraftBoardView,
   });
 
-  const isV2 = variant === "focusV2";
-
   return (
     <FoundationLineupPanel
       active
       uiVariant={variant}
-      onSwitchToFocusV2={!isV2 ? () => setFoundationView("lineupV2", setActiveView, { push: true }) : undefined}
-      onSwitchToClassic={isV2 ? () => setFoundationView("lineup", setActiveView, { push: true }) : undefined}
       clientKey={clientKey}
       teamTooltip={teamTooltip}
       client={{
@@ -137,7 +133,6 @@ export default function FoundationLineupShellHost({
         onLineupSaved: handleHumanLineupSaved,
         onFormCardPlanSaved: handleFormCardPlanSaved,
         onOpenArena: () => setFoundationView("matchdayArena", setActiveView),
-        onSwitchToClassic: isV2 ? () => setFoundationView("lineup", setActiveView, { push: true }) : undefined,
         roomContext,
       }}
     />

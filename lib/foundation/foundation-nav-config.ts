@@ -20,8 +20,7 @@ export const FOUNDATION_NAV_GROUPS: FoundationNavGroup[] = [
     items: [
       { id: "homeV2", label: "Home", tooltip: "Manager-Dashboard mit KPIs, Top-Spielern und Flow.", icon: "⌂" },
       { id: "inboxV2", label: "Inbox", tooltip: "Offene Aufgaben & Warnungen für dein Team.", icon: "✉" },
-      { id: "lineup", label: "Einsatzliste", tooltip: "Spieler setzen, Formplan und Team-Taktik.", icon: "▣" },
-      { id: "lineupV2", label: "Einsatzliste v2", tooltip: "Preview: Focus Mode mit kompakter Slot-Rail.", icon: "▣" },
+      { id: "lineup", label: "Einsatzliste", tooltip: "Spieler setzen, Formplan und Team-Taktik — Focus Mode.", icon: "▣" },
       { id: "matchdayArena", label: "Arena", tooltip: "Spieltag als Reveal/Event.", icon: "◉" },
       { id: "seasonV2", label: "Saisonstand", tooltip: "Tabelle, Cards und Teamstaerken.", icon: "▤" },
     ],
@@ -74,6 +73,7 @@ export function isFoundationNavViewActive(activeView: FoundationViewId, itemId: 
   if (itemId === "marketV2" && activeView === "market") return true;
   if (itemId === "historyV2" && activeView === "history") return true;
   if (itemId === "inboxV2" && activeView === "inbox") return true;
+  if (itemId === "lineup" && (activeView === "lineup" || activeView === "lineupV2")) return true;
   if (itemId === "players" && (activeView === "players" || activeView === "playerProfile")) return true;
   if (itemId === "teams" && (activeView === "teams" || activeView === "teamProfile")) return true;
   return false;

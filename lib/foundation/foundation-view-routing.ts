@@ -43,7 +43,7 @@ export function normalizeFoundationViewParam(view: string | null | undefined): F
   }
 
   if (view === "lineup-v2" || view === "lineupV2" || view === "einsatzliste-v2") {
-    return "lineupV2";
+    return "lineup";
   }
   if (view === "matchday-arena" || view === "matchday-arena-v2") {
     return "matchdayArena";
@@ -104,5 +104,6 @@ export function getDefaultFoundationViewTarget(view: FoundationViewId): Foundati
   if (view === "training") return "trainingCompact";
   if (view === "facilitiesOverviewV2") return "trainingV2";
   if (view === "inbox") return "inboxV2";
+  if (view === "lineupV2") return "lineup";
   return view;
 }

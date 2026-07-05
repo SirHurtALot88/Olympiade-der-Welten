@@ -329,11 +329,16 @@ import {
   shouldBuildSeasonV2PlayerRatings,
   shouldBuildSelectedStandingRow,
   shouldBuildSortedSeasonStandRows,
+  shouldBuildLeagueTrainingLeaderRows,
 } from "@/lib/foundation/tabs/season-v2-derivations";
+import { useSeasonStandRows } from "@/lib/foundation/tabs/use-season-stand-rows";
 import {
   shouldLoadPrizePreviewFeed as resolveShouldLoadPrizePreviewFeed,
 } from "@/lib/foundation/tabs/prize-v2-derivations";
-import { useSeasonStandRows } from "@/lib/foundation/tabs/use-season-stand-rows";
+import {
+  buildLeagueLeaderBoards,
+  buildLeagueTrainingLeaderRows,
+} from "@/lib/foundation/league-leaders-service";
 import { resolveShouldBuildTeamsScopedRatings } from "@/lib/foundation/tabs/teams-view-derivations";
 import type { FoundationMatchdayResultShellHostProps } from "@/app/foundation/matchday-result-v2/FoundationMatchdayResultShellHost";
 import type { FoundationHistoryV2ShellHostProps } from "@/app/foundation/transfer-history-v2/FoundationHistoryV2ShellHost";
@@ -362,6 +367,7 @@ import {
 } from "@/lib/foundation/tabs/use-standings-preview-feed";
 import type { FoundationDiszisHostProps } from "@/app/foundation/ranks-v2/FoundationDiszisHost";
 import type { FoundationRanksHostProps } from "@/app/foundation/ranks-v2/FoundationRanksHost";
+import type { FoundationLeagueLeadersHostProps } from "@/app/foundation/league-leaders-v2/FoundationLeagueLeadersHost";
 import type { FoundationMarketV2ShellHostProps } from "@/app/foundation/transfermarkt-v2/FoundationMarketV2ShellHost";
 import FoundationTeamSettingsHost from "@/app/foundation/team-settings/FoundationTeamSettingsHost";
 import FoundationTeamsViewHost from "@/app/foundation/teams-v2/FoundationTeamsViewHost";
@@ -1264,6 +1270,7 @@ export function useFoundationShellRouterBodyScope({
     activeView === "ranks" ||
     activeView === "diszis" ||
     activeView === "prize";
+  const shouldBuildLeagueLeaderBoards = activeView === "ranks";
   const shouldLoadSeasonLedger = shouldBuildPlayerDirectory;
   const shouldLoadSeasonRatings = shouldBuildPlayerRatings || shouldBuildTrainingView;
   const shouldFetchSeasonRatingsFromApi = shouldLoadSeasonRatings && !shouldLoadSeasonLedger;
@@ -2487,6 +2494,11 @@ export function useFoundationShellRouterBodyScope({
   function openTrainingPlayerTarget(playerId: string, target: "training" | "upgrade" = "training") {
     setFoundationView("trainingCompact", setActiveView);
     scrollToFoundationTarget(target === "upgrade" ? `training-upgrade-player-${playerId}` : `training-player-${playerId}`);
+  }
+
+  function onOpenLeagueLeaders(categoryId: "ovr" | "pps" | "mvs") {
+    setFoundationView("ranks", setActiveView);
+    scrollToFoundationTarget(`league-leaders-${categoryId}`);
   }
 
   function openTeamProfileById(teamId: string) {
@@ -8630,6 +8642,26 @@ export function useFoundationShellRouterBodyScope({
       }),
     [seasonTopPlayerRows, tableSorts.seasonTopPlayers],
   );
+
+  const leagueTrainingLeaderRows = useMemo(() => {
+    if (!shouldBuildLeagueTrainingLeaderRows(activeView)) {
+      return [];
+    }
+
+    return buildLeagueTrainingLeaderRows(gameState);
+  }, [activeView, gameState]);
+
+  const leagueLeaderBoards = useMemo(() => {
+    if (!shouldBuildLeagueLeaderBoards || seasonTopPlayerRows.length === 0) {
+      return [];
+    }
+
+    return buildLeagueLeaderBoards({
+      seasonRows: seasonTopPlayerRows,
+      trainingRows: leagueTrainingLeaderRows,
+    });
+  }, [leagueTrainingLeaderRows, seasonTopPlayerRows, shouldBuildLeagueLeaderBoards]);
+
   const seasonV2StandingsRows = useMemo(
     () =>
       sortedSeasonStandRows.map((row) => {
@@ -9744,6 +9776,13 @@ export function useFoundationShellRouterBodyScope({
     },
   };
 
+  const foundationLeagueLeadersHostProps: FoundationLeagueLeadersHostProps = {
+    categories: leagueLeaderBoards,
+    selectedTeamId: activeManagerTeamId,
+    seasonLabel: canonicalSeasonLabel,
+    onOpenPlayer: openPlayerProfileById,
+  };
+
   const foundationRanksHostProps: FoundationRanksHostProps = {
     sortedPpAreaRows: sortedPpAreaRows as unknown as FoundationRanksHostProps["sortedPpAreaRows"],
     ppAreaRankClassMaps,
@@ -10065,6 +10104,7 @@ export function useFoundationShellRouterBodyScope({
     openTeamDrawerById,
     openTeamProfileById,
     openTrainingPlayerTarget,
+    onOpenLeagueLeaders,
     orderedDisciplines,
     ownerQuickSwitchTeams,
     passiveTeams,
@@ -10312,6 +10352,7 @@ export function useFoundationShellRouterBodyScope({
     foundationCockpitHostProps,
     foundationPrizeFinanceShellHostProps,
     foundationRanksHostProps,
+    foundationLeagueLeadersHostProps,
     foundationDiszisHostProps,
     foundationMarketV2ShellHostProps,
     foundationTrainingCompactHostProps,

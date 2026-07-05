@@ -35,6 +35,7 @@ describe("player profile ui contract", () => {
       ]);
 
     expect(profileText).toContain("PlayerDetailDrawer");
+    expect(profileText).toContain("onOpenLeagueLeaders");
     expect(profileText).toContain("PLAYER_PROFILE_TAB_ANCHORS");
     expect(profileText).toContain("trainingRow");
     expect(profileText).toContain("onSetTrainingMode");
@@ -43,6 +44,8 @@ describe("player profile ui contract", () => {
     expect(foundationText).toContain("loadedSeasonArchiveSignatureRef");
     expect(foundationText).toContain("setPlayerProfileLoading(true)");
     expect(foundationText).toContain("PlayerProfileClient");
+    expect(foundationText).toContain("onOpenLeagueLeaders");
+    expect(foundationText).toContain("league-leaders-${categoryId}");
     expect(foundationText).toContain("playerProfileTrainingRow");
     expect(scopeText).toContain("const playerProfileTrainingReadOnly");
     expect(scopeText).toContain("!canManageTeamId(playerProfileData.teamId)");
@@ -72,6 +75,9 @@ describe("player profile ui contract", () => {
     expect(drawerText).toContain("player-drawer-ca-po-row");
     expect(drawerText).toContain('data-testid="player-drawer-ca-po-row"');
     expect(drawerText).toContain("player-drawer-hero-axis-grid");
+    expect(drawerText).toContain("player-drawer-kpi-hero-card is-interactive");
+    expect(drawerText).toContain("onOpenLeagueLeaders");
+    expect(drawerText).toContain("player-drawer-kpi-link-hint");
     expect(drawerText).toContain("showFullAxisGrid");
     expect(drawerText).toContain("showCompactAxisStrip");
     expect(drawerText).toContain("player-drawer-axis-strip");

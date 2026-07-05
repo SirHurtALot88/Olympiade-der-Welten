@@ -1400,10 +1400,38 @@ function FoundationTeamsDetailPanel({
                             );
                           }
                           if (columnId === "topBuy") {
-                            return row.topBuyPlayer ? `${row.topBuyPlayer} · ${formatNullableMoney(row.topBuyAmount)}` : "—";
+                            return row.topBuyPlayer ? (
+                              <button
+                                type="button"
+                                className="teams-v2-history-transfer-link text-negative"
+                                onClick={() => row.topBuyPlayerId && void openPlayerDrawerById(row.topBuyPlayerId)}
+                              >
+                                {row.topBuyPlayer} · {formatNullableMoney(row.topBuyAmount)}
+                              </button>
+                            ) : (
+                              "—"
+                            );
                           }
                           if (columnId === "topSell") {
-                            return row.topSellPlayer ? `${row.topSellPlayer} · ${formatNullableMoney(row.topSellAmount)}` : "—";
+                            return row.topSellPlayer ? (
+                              <button
+                                type="button"
+                                className={`teams-v2-history-transfer-link ${row.topSellProfit != null && row.topSellProfit >= 0 ? "text-positive" : row.topSellProfit != null ? "text-negative" : ""}`}
+                                onClick={() => row.topSellPlayerId && void openPlayerDrawerById(row.topSellPlayerId)}
+                                title={
+                                  row.topSellProfit != null
+                                    ? row.topSellProfit >= 0
+                                      ? `Verkaufsgewinn: ${formatSignedDisplayMoney(row.topSellProfit)}`
+                                      : `Verlust: ${formatSignedDisplayMoney(row.topSellProfit)}`
+                                    : undefined
+                                }
+                              >
+                                {row.topSellPlayer} · {formatNullableMoney(row.topSellAmount)}
+                                {row.topSellProfit != null ? ` (${formatSignedDisplayMoney(row.topSellProfit)})` : ""}
+                              </button>
+                            ) : (
+                              "—"
+                            );
                           }
                           return "—";
                         }}

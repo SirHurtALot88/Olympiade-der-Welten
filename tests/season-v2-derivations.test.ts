@@ -10,6 +10,7 @@ import {
   shouldBuildSeasonStandRows,
   shouldBuildSeasonV2PlayerRatings,
   shouldBuildSeasonTopPlayerRows,
+  shouldBuildLeagueTrainingLeaderRows,
   shouldBuildSelectedStandingRow,
   shouldEnableTeamOverviewSlice,
 } from "@/lib/foundation/tabs/season-v2-derivations";
@@ -110,6 +111,12 @@ describe("season-v2-derivations", () => {
         activeView: "players",
       }),
     ).toBe(false);
+  });
+
+  it("builds league training leader rows only on ranks", () => {
+    expect(shouldBuildLeagueTrainingLeaderRows("ranks")).toBe(true);
+    expect(shouldBuildLeagueTrainingLeaderRows("seasonV2")).toBe(false);
+    expect(shouldBuildLeagueTrainingLeaderRows("players")).toBe(false);
   });
 
   it("enables team overview slice for standings consumers", () => {

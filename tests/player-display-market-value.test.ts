@@ -7,6 +7,7 @@ import {
   getPlayerSeasonMarketValueReference,
   getPlayerSeasonZeroMarketValueDelta,
   getPlayerSeasonZeroMarketValueReference,
+  resolveArchivedSeasonPlayerMarketValue,
 } from "@/lib/foundation/player-display-market-value";
 
 function createPlayer(partial?: Partial<Player>): Player {
@@ -200,5 +201,28 @@ describe("player display market value delta", () => {
     expect(getPlayerSeasonZeroMarketValueReference({ player, gameState, currentMarketValue: 100 })).toBe(100);
     expect(getPlayerSeasonZeroMarketValueDelta({ player, gameState, currentMarketValue: 100 })).toBeNull();
     expect(getPlayerSeasonMarketValueReference({ player, rosterEntry: null, gameState, currentMarketValue: 100 })).toBe(100);
+  });
+
+  it("prefers post-progression market value for archived season display", () => {
+    const gameState = {
+      playerProgressionEvents: [
+        {
+          playerId: "player-1",
+          seasonId: "season-1",
+          progressionSnapshotAfter: {
+            marketValue: 32.2,
+          },
+        },
+      ],
+    } as GameState;
+
+    expect(
+      resolveArchivedSeasonPlayerMarketValue({
+        gameState,
+        seasonId: "season-1",
+        playerId: "player-1",
+        snapshotMarketValue: 38.3,
+      }),
+    ).toBe(32.2);
   });
 });

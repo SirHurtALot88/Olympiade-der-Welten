@@ -21,6 +21,7 @@ import {
 } from "@/lib/foundation/tabs/season-stand-render-helpers";
 import type { TeamsAreaRank } from "@/lib/foundation/tabs/teams-view-derivations";
 import { buildTransfermarktSaleFactorBreakdown } from "@/lib/market/transfermarkt-sale-factor";
+import { resolveTeamSellProfit } from "@/lib/foundation/team-transfer-history-helpers";
 import { buildTeamPlayerDemandMap, selectTeamCaptain } from "@/lib/morale/player-demands-service";
 import { getPotentialBand } from "@/lib/progression/player-potential-service";
 import { buildTeamRelationshipCards } from "@/lib/rivalries/team-relationship-dynamics";
@@ -235,9 +236,15 @@ export function useFoundationCrossTabTeamsRoster(input: {
             marketValue: teamSnapshot.marketValueTotalEnd ?? teamSnapshot.marketValueEnd ?? null,
             guv: teamSnapshot.guv ?? null,
             topBuyPlayer: topBuy?.playerName ?? null,
+            topBuyPlayerId: topBuy?.playerId ?? null,
             topBuyAmount: topBuy?.amount ?? null,
             topSellPlayer: topSell?.playerName ?? null,
+            topSellPlayerId: topSell?.playerId ?? null,
             topSellAmount: topSell?.amount ?? null,
+            topSellProfit:
+              topSell?.playerId != null
+                ? resolveTeamSellProfit(input.gameState, team.teamId, topSell.playerId, topSell.amount)
+                : null,
             disciplineValues,
           } satisfies TeamDetailDrawerHistoryRow;
         })
@@ -279,9 +286,15 @@ export function useFoundationCrossTabTeamsRoster(input: {
         marketValue: liveSeasonOverviewRow?.marketValueTotal ?? null,
         guv: liveSeasonOverviewRow?.guv ?? null,
         topBuyPlayer: currentTopBuy?.playerName ?? null,
+        topBuyPlayerId: currentTopBuy?.playerId ?? null,
         topBuyAmount: currentTopBuy?.fee ?? null,
         topSellPlayer: currentTopSell?.playerName ?? null,
+        topSellPlayerId: currentTopSell?.playerId ?? null,
         topSellAmount: currentTopSell?.fee ?? null,
+        topSellProfit:
+          currentTopSell?.playerId != null
+            ? resolveTeamSellProfit(input.gameState, team.teamId, currentTopSell.playerId, currentTopSell.fee)
+            : null,
         disciplineValues: liveDisciplineValues,
       };
       const history = [

@@ -20,7 +20,8 @@ describe("foundation lineup v2 ui contract", () => {
     expect(boardText).toContain("legacy-lineup-v2-toolbar");
     expect(boardText).toContain("legacy-lineup-v2-captain-strip");
     expect(boardText).toContain("legacy-lineup-v2-keyboard-hint");
-    expect(boardText).toContain("Rank {rank ??");
+    expect(boardText).toContain("FoundationPlayerPortraitPreview");
+    expect(boardText).toContain("wrapLineupV2PortraitPreview");
     expect(boardText).toContain("Slots");
     expect(boardText).toContain("Sofort");
     expect(boardText).toContain("Blockiert");
@@ -39,7 +40,8 @@ describe("foundation lineup v2 ui contract", () => {
     expect(v2ControlsBlock).not.toContain("Beide Diszis setzen");
 
     expect(panelText).toContain('"foundation-lineup-v2"');
-    expect(panelText).toContain('uiVariant === "focusV2"');
+    expect(panelText).toContain("Einsatzliste");
+    expect(panelText).not.toContain("Einsatzliste v2");
 
     expect(cssText).toContain(".legacy-lineup-v2-toolbar");
     expect(cssText).toContain(".legacy-lineup-v2-candidate-tabs");
@@ -47,6 +49,7 @@ describe("foundation lineup v2 ui contract", () => {
     expect(cssText).toContain(".legacy-lineup-v2-slot-clear");
     expect(cssText).toContain(".legacy-lineup-v2-intensity.is-push");
 
-    expect(routingText).toContain("lineupV2");
+    expect(routingText).toContain('return "lineup"');
+    expect(routingText).toContain("lineup-v2");
   });
 });

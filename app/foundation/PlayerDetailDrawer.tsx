@@ -1125,6 +1125,7 @@ export default function PlayerDetailDrawer({
   onClose,
   onOpenBuyPreview,
   onOpenTraining,
+  onOpenLeagueLeaders,
   trainingRow = null,
   trainingModeOptions = [],
   trainingClassOptions = [],
@@ -1143,6 +1144,7 @@ export default function PlayerDetailDrawer({
     race: string | null;
   }) => void;
   onOpenTraining?: () => void;
+  onOpenLeagueLeaders?: (categoryId: "ovr" | "pps" | "mvs") => void;
   trainingRow?: TrainingPlayerRowView | null;
   trainingModeOptions?: TrainingModeOption[];
   trainingClassOptions?: TrainingClassOption[];
@@ -1552,25 +1554,52 @@ export default function PlayerDetailDrawer({
                   </div>
                 </div>
                 <div className="player-drawer-kpi-hero-grid">
-                  {headlineMetrics.map((metric) => (
-                    <article key={metric.key} className="player-drawer-kpi-hero-card">
-                      <div className="player-drawer-kpi-header">
-                        <GameTerm term={metric.label} />
-                        <span className="player-drawer-kpi-rank">{formatRankLabel(metric.rank)}</span>
-                      </div>
-                      <strong className="player-drawer-kpi-value">{formatValue(metric.value, metric.digits)}</strong>
-                      <div className="player-drawer-kpi-footer">
-                        {metric.delta != null ? (
-                          <span className={`player-drawer-delta${getDeltaToneClass(metric.delta)}`}>
-                            {metric.delta > 0 ? "+" : ""}
-                            {formatValue(metric.delta, 1)}
-                          </span>
-                        ) : (
-                          <span className="player-drawer-kpi-missing">Kein Verlauf</span>
-                        )}
-                      </div>
-                    </article>
-                  ))}
+                  {headlineMetrics.map((metric) => {
+                    const leagueCategoryId = metric.key;
+                    const canOpenLeagueLeaders =
+                      onOpenLeagueLeaders != null &&
+                      !isFreeAgent &&
+                      metric.rank != null &&
+                      (leagueCategoryId === "ovr" || leagueCategoryId === "pps" || leagueCategoryId === "mvs");
+                    const cardBody = (
+                      <>
+                        <div className="player-drawer-kpi-header">
+                          <GameTerm term={metric.label} />
+                          <span className="player-drawer-kpi-rank">{formatRankLabel(metric.rank)}</span>
+                        </div>
+                        <strong className="player-drawer-kpi-value">{formatValue(metric.value, metric.digits)}</strong>
+                        <div className="player-drawer-kpi-footer">
+                          {metric.delta != null ? (
+                            <span className={`player-drawer-delta${getDeltaToneClass(metric.delta)}`}>
+                              {metric.delta > 0 ? "+" : ""}
+                              {formatValue(metric.delta, 1)}
+                            </span>
+                          ) : (
+                            <span className="player-drawer-kpi-missing">Kein Verlauf</span>
+                          )}
+                          {canOpenLeagueLeaders ? (
+                            <span className="player-drawer-kpi-link-hint">Liga-Leaders</span>
+                          ) : null}
+                        </div>
+                      </>
+                    );
+
+                    return canOpenLeagueLeaders ? (
+                      <button
+                        key={metric.key}
+                        type="button"
+                        className="player-drawer-kpi-hero-card is-interactive"
+                        title={`Liga-Leaders: ${metric.label} · Rang ${formatRankLabel(metric.rank)}`}
+                        onClick={() => onOpenLeagueLeaders(leagueCategoryId)}
+                      >
+                        {cardBody}
+                      </button>
+                    ) : (
+                      <article key={metric.key} className="player-drawer-kpi-hero-card">
+                        {cardBody}
+                      </article>
+                    );
+                  })}
                 </div>
               </div>
             )}
