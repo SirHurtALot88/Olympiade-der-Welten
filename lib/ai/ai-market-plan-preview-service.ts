@@ -461,6 +461,7 @@ function chooseSellCandidates(
       teamSalaryTotal: salaryTotal,
       cashPressureScore,
       teamProfile,
+      allowProfitSellsBelowMin: (identity?.boardConfidence ?? 0) < 7,
     }),
     (candidate) => candidate.activePlayerId,
   );

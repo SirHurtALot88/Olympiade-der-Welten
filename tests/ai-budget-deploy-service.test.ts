@@ -86,8 +86,9 @@ function buildRichOptTeamGameState(cash = 180): GameState {
 }
 
 describe("ai budget deploy service", () => {
-  it("uses team-aware hard cap: finance outlier up to 1.0, normal team 0.75", () => {
+  it("uses team-aware hard cap: S2–S3 planner buffer at 1.0× salary", () => {
     const rich = buildRichOptTeamGameState(180);
+    expect(getTeamCashSalaryHardCap(rich, "T-1", "season-2")).toBe(1);
     expect(getTeamCashSalaryHardCap(rich, "T-1", "season-3")).toBe(1);
     expect(getTeamCashSalarySoftTarget(rich, "T-1")).toBeGreaterThan(0.7);
     expect(getSeasonHoardCashSalaryCap("season-3")).toBe(0.75);
@@ -115,10 +116,43 @@ describe("ai budget deploy service", () => {
     expect(teamNeedsPostOptUpgradeDeploy(gameState, "T-1", "season-3")).toBe(false);
   });
 
-  it("does not run deploy pass while roster is below playerOpt", () => {
+  it("runs deploy pass for below-opt teams with excess cash (>=1.15× salary)", () => {
     const gameState = {
       season: { id: "season-2" },
       teams: [{ teamId: "T-1", shortCode: "T1", cash: 80, name: "Team" }],
+      teamIdentities: [{ teamId: "T-1", playerMin: 8, playerOpt: 12 }],
+      rosters: Array.from({ length: 8 }, (_, index) => ({
+        id: `r${index}`,
+        teamId: "T-1",
+        playerId: `p${index}`,
+        salary: 3,
+        upkeep: 3,
+        contractLength: 2,
+        currentValue: 15,
+      })),
+      players: Array.from({ length: 8 }, (_, index) => ({
+        id: `p${index}`,
+        name: `P${index}`,
+        marketValue: 15,
+        displayMarketValue: 15,
+        rating: 55,
+        fatigue: 20,
+      })),
+      seasonState: {
+        seasonStrategyStates: {
+          "T-1": { teamId: "T-1", seasonStrategy: "win_now_push", doctrineCompatibility: "green", updatedAt: "" },
+        },
+      },
+      transferHistory: [],
+    } as unknown as GameState;
+
+    expect(teamNeedsTransferBudgetDeploy(gameState, "T-1", "season-2")).toBe(true);
+  });
+
+  it("does not run deploy pass while below opt with modest cash", () => {
+    const gameState = {
+      season: { id: "season-2" },
+      teams: [{ teamId: "T-1", shortCode: "T1", cash: 30, name: "Team" }],
       teamIdentities: [{ teamId: "T-1", playerMin: 8, playerOpt: 12 }],
       rosters: Array.from({ length: 8 }, (_, index) => ({
         id: `r${index}`,

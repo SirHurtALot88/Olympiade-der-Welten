@@ -1,9 +1,12 @@
 import type { GameState, Player, RosterEntry } from "@/lib/data/olyDataTypes";
+import { evaluateAiNeeds } from "@/lib/ai/aiNeedsEngine";
+import { getTeamGeneralManager } from "@/lib/foundation/team-general-managers";
 import { getFacilityLevel, getRecoveryTrainingFatigueReductionPct, getTeamFacilityState } from "@/lib/facilities/facility-effects";
 import { buildPlayerSeasonPerformanceMap } from "@/lib/foundation/player-season-performance";
 import { MATCHDAY_FATIGUE_LOAD, getInjuryRiskPercent } from "@/lib/fatigue/fatigue-injury-service";
 import { buildTrainingModeDemand } from "@/lib/training/training-mode-demand-service";
 import { deriveAttributeAffinityProfile } from "@/lib/training/training-levelup-service";
+import { normalizeProgressionClassName, type ProgressionClassName } from "@/lib/training/class-progression-config";
 import { FATIGUE_LOAD_BY_MODE } from "@/lib/training/training-mode-presentation";
 import type { PlayerTrainingMode } from "@/lib/training/training-plan-types";
 
@@ -82,6 +85,77 @@ function isLikelyStarter(input: { appearances: number; rosterRank: number; compl
   return input.rosterRank <= 3 || input.appearances >= Math.max(6, input.completedMatchdays - 2);
 }
 
+type TeamAxis = "pow" | "spe" | "men" | "soc";
+
+const CLASS_AXIS_HINTS: Partial<Record<ProgressionClassName, TeamAxis[]>> = {
+  Berserker: ["pow"],
+  Warlord: ["pow", "soc"],
+  Tank: ["pow"],
+  Sprinter: ["spe"],
+  Rogue: ["spe"],
+  Charger: ["spe"],
+  Mage: ["men"],
+  Overseer: ["men"],
+  Templar: ["soc"],
+  Bard: ["soc"],
+  Hero: ["soc"],
+  Badass: ["pow"],
+  Tactician: ["men"],
+};
+
+function scorePlayerGapAxisFit(player: Player, gapAxes: TeamAxis[]) {
+  if (gapAxes.length === 0) {
+    return 0;
+  }
+
+  const playerClass = normalizeProgressionClassName(player.className);
+  const classAxes = playerClass ? (CLASS_AXIS_HINTS[playerClass] ?? []) : [];
+  const coreStats = player.coreStats ?? { pow: 0, spe: 0, men: 0, soc: 0 };
+
+  return gapAxes.reduce((score, axis) => {
+    let axisScore = (coreStats[axis] ?? 0) / 100;
+    if (classAxes.includes(axis)) {
+      axisScore += 0.35;
+    }
+    return score + axisScore;
+  }, 0);
+}
+
+function resolveGapAwareTrainingMode(input: {
+  player: Player;
+  teamBaselineMode: PlayerTrainingMode;
+  gapAxes: TeamAxis[];
+  gmAxisBoost: number;
+  rosterRank: number;
+  appearances: number;
+  evaluateMode: (mode: PlayerTrainingMode) => number;
+}): PlayerTrainingMode | null {
+  if (input.gapAxes.length === 0 || input.gmAxisBoost < 0.12) {
+    return null;
+  }
+
+  const gapFit = scorePlayerGapAxisFit(input.player, input.gapAxes);
+  if (gapFit < 0.45) {
+    return null;
+  }
+
+  const isDevelopmentTarget = input.rosterRank > 4 || input.appearances < 4;
+  if (!isDevelopmentTarget) {
+    return null;
+  }
+
+  const hardRisk = input.evaluateMode("hart");
+  const mediumRisk = input.evaluateMode("mittel");
+  if (input.teamBaselineMode !== "leicht" && hardRisk < 20 && gapFit + input.gmAxisBoost >= 0.85) {
+    return "hart";
+  }
+  if (mediumRisk < 16 && gapFit + input.gmAxisBoost >= 0.55) {
+    return "mittel";
+  }
+
+  return null;
+}
+
 function projectedFatigueAfterMode(input: {
   fatigue: number;
   mode: PlayerTrainingMode;
@@ -106,6 +180,8 @@ function resolveModeForPlayer(input: {
   recoveryReductionPct: number;
   demandPreferred: PlayerTrainingMode | null;
   prevSeasonStress?: boolean;
+  gapAxes?: TeamAxis[];
+  gmAxisBoost?: number;
 }): Pick<AiPlayerTrainingLoadPlan, "selectedMode" | "projectedInjuryRiskPercent" | "needsLineupRest" | "reasons"> {
   const fatigue = input.player.fatigue ?? 0;
   const currentRisk = getInjuryRiskPercent(fatigue);
@@ -213,6 +289,28 @@ function resolveModeForPlayer(input: {
     }
   }
 
+  const gapAwareMode = resolveGapAwareTrainingMode({
+    player: input.player,
+    teamBaselineMode: input.teamBaselineMode,
+    gapAxes: input.gapAxes ?? [],
+    gmAxisBoost: input.gmAxisBoost ?? 0,
+    rosterRank: input.rosterRank,
+    appearances: input.appearances,
+    evaluateMode,
+  });
+  if (gapAwareMode) {
+    const projected = evaluateMode(gapAwareMode);
+    reasons.push(
+      `Achsenlücke ${(input.gapAxes ?? []).join("/").toUpperCase()} + Klassenfit → ${gapAwareMode}`,
+    );
+    return {
+      selectedMode: gapAwareMode,
+      projectedInjuryRiskPercent: projected,
+      needsLineupRest: projected >= 18 || fatigue >= 75,
+      reasons,
+    };
+  }
+
   if (
     benchOrProspect &&
     stableTrainingLoadHash(`${input.player.id}:signature-training-load`) % 100 < 35
@@ -279,6 +377,18 @@ export function buildTeamPlayerTrainingLoadPlans(input: {
   const facilities = getTeamFacilityState(input.gameState, input.teamId);
   const recoveryCenterLevel = getFacilityLevel(facilities, "recovery_center");
   const recoveryReductionPct = getRecoveryTrainingFatigueReductionPct(facilities);
+  const teamNeeds = evaluateAiNeeds(input.gameState, input.teamId);
+  const gapAxes = teamNeeds.uncoveredNeedAxes.slice(0, 2);
+  const gm = getTeamGeneralManager(input.gameState, input.teamId);
+  const gmAxisBoost =
+    gapAxes.length > 0
+      ? Math.max(
+          gapAxes.includes("pow") ? (gm?.profile.pow ?? 5) / 10 : 0,
+          gapAxes.includes("spe") ? (gm?.profile.spe ?? 5) / 10 : 0,
+          gapAxes.includes("men") ? (gm?.profile.men ?? 5) / 10 : 0,
+          gapAxes.includes("soc") ? (gm?.profile.soc ?? 5) / 10 : 0,
+        )
+      : 0;
   const currentSchedule =
     input.gameState.seasonState.disciplineSchedule?.find(
       (entry) => entry.matchdayId === input.gameState.matchdayState.matchdayId,
@@ -310,6 +420,8 @@ export function buildTeamPlayerTrainingLoadPlans(input: {
         recoveryReductionPct,
         demandPreferred: demand?.preferredMode ?? null,
         prevSeasonStress: input.prevSeasonStress,
+        gapAxes,
+        gmAxisBoost,
       });
       const fatigue = player.fatigue ?? 0;
       return {

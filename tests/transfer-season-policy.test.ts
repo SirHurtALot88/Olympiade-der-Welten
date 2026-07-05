@@ -8,6 +8,7 @@ import {
   isSeasonOneDraftBuySource,
   isSeasonOneForbiddenBuySource,
   isTransferActionAllowed,
+  isRosterRepairPhaseAllowed,
   resolveSeasonOneMarketBuyBlocker,
 } from "@/lib/season/transfer-season-policy";
 
@@ -38,6 +39,11 @@ describe("transfer-season-policy", () => {
     ] as const) {
       expect(isTransferActionAllowed("season-2", action)).toBe(true);
     }
+  });
+
+  it("allows roster repair only in preseason phase, not at season_end post-sell", () => {
+    expect(isRosterRepairPhaseAllowed("preseason")).toBe(true);
+    expect(isRosterRepairPhaseAllowed("season_end")).toBe(false);
   });
 
   it("no longer flags any S1 buy source as forbidden (only draft-vs-market labeling remains)", () => {

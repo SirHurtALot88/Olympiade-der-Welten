@@ -4,6 +4,7 @@ import type { SponsorNegotiationProfile, SponsorOffer, SponsorOfferComponent } f
 import type { GameState } from "@/lib/data/olyDataTypes";
 import {
   buildSponsorOfferPresentation,
+  buildSponsorRankTierRows,
   getSponsorComponentKindLabel,
   type SponsorChallengeDifficulty,
 } from "@/lib/sponsor/sponsor-offer-presenter";
@@ -40,6 +41,7 @@ export function SponsorOfferCard({
   const presentation = buildSponsorOfferPresentation({ offer, gameState, teamId: offer.teamId });
   const specialComponent = adjustedComponents.find((component) => component.kind === "special") ?? null;
   const standardComponents = adjustedComponents.filter((component) => component.kind !== "special");
+  const baseCash = adjustedComponents.find((component) => component.kind === "base")?.rewardCash ?? 0;
 
   return (
     <article
@@ -99,12 +101,32 @@ export function SponsorOfferCard({
       </div>
 
       <ul className="muted sponsor-offer-component-list">
-        {standardComponents.map((component) => (
-          <li key={component.componentId}>
-            <span className="sponsor-component-kind">{getSponsorComponentKindLabel(component.kind)}</span>
-            {component.label}: {typeof component.rewardCash === "number" ? formatCash(component.rewardCash) : component.rewardCash}
-          </li>
-        ))}
+        {standardComponents.map((component) => {
+          if (component.kind === "rank") {
+            const tierRows = buildSponsorRankTierRows({ baseCash, rankCash: component.rewardCash });
+            return (
+              <li key={component.componentId} className="sponsor-rank-tier-block">
+                <span className="sponsor-component-kind">{getSponsorComponentKindLabel(component.kind)}</span>
+                <ul className="sponsor-rank-tier-list" data-testid="sponsor-rank-tier-list">
+                  {tierRows.map((row) => (
+                    <li key={row.label} className="sponsor-rank-tier-row">
+                      <span className="sponsor-rank-tier-label">{row.label}</span>
+                      <span className="sponsor-rank-tier-payout">{formatCash(row.absolutePayout)}</span>
+                    </li>
+                  ))}
+                </ul>
+              </li>
+            );
+          }
+
+          return (
+            <li key={component.componentId}>
+              <span className="sponsor-component-kind">{getSponsorComponentKindLabel(component.kind)}</span>
+              {component.label}:{" "}
+              {typeof component.rewardCash === "number" ? formatCash(component.rewardCash) : component.rewardCash}
+            </li>
+          );
+        })}
         {!presentation.isChallenge && specialComponent ? (
           <li key={specialComponent.componentId}>
             <span className="sponsor-component-kind">Sonderziel</span>

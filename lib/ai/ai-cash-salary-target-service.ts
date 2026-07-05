@@ -39,6 +39,12 @@ function getSeasonHardCapBuffer(seasonId: string) {
   return 0.1;
 }
 
+/** S2–S3: planner buffer is 1× salary — hoard/deploy threshold matches that ceiling. */
+function usesPlannerSalaryBufferCap(seasonId: string) {
+  const seasonNumber = parseSeasonNumber(seasonId);
+  return seasonNumber >= 2 && seasonNumber <= 3;
+}
+
 /** Ziel-Cash/Gehalt nach Finance: 0.25 (sparsam) bis 0.75 (finance-stark). */
 export function getTeamCashSalarySoftTarget(gameState: GameState, teamId: string) {
   const identity = gameState.teamIdentities.find((entry) => entry.teamId === teamId);
@@ -46,10 +52,13 @@ export function getTeamCashSalarySoftTarget(gameState: GameState, teamId: string
   return round(clamp(0.25 + (finances / 10) * 0.5, 0.25, 0.75), 3);
 }
 
-/** Hartes Cap: normale Teams 0.75, Finance-Ausreißer (≥8) max 1.0 (+Season-Puffer ab S4). */
+/** Hartes Cap: S2–S3 max 1.0× salary; sonst 0.75 (Finance-Ausreißer ≥8 max 1.0 + Season-Puffer ab S4). */
 export function getTeamCashSalaryHardCap(gameState: GameState, teamId: string, seasonId: string) {
   const identity = gameState.teamIdentities.find((entry) => entry.teamId === teamId);
   const finances = identity?.finances ?? 5;
+  if (usesPlannerSalaryBufferCap(seasonId)) {
+    return 1.0;
+  }
   const base = finances >= 8 ? 1.0 : 0.75;
   return round(base + getSeasonHardCapBuffer(seasonId), 3);
 }

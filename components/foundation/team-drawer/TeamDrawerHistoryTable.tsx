@@ -31,6 +31,8 @@ const TEAM_DRAWER_HISTORY_SUFFIX_COLUMNS: GlobalTableColumnConfig[] = [
   { id: "salary", label: "Gehalt", dataKey: "salary", defaultWidth: 80, minWidth: 64, align: "right", group: "finance" },
   { id: "mw", label: "MW", dataKey: "mw", defaultWidth: 76, minWidth: 60, align: "right", group: "finance" },
   { id: "guv", label: "GuV", dataKey: "guv", defaultWidth: 76, minWidth: 60, align: "right", group: "finance" },
+  { id: "injuriesCount", label: "Verletz.", dataKey: "injuriesCount", defaultWidth: 72, minWidth: 56, align: "right", group: "health" },
+  { id: "averageFatigue", label: "Ø Fatigue", dataKey: "averageFatigue", defaultWidth: 80, minWidth: 64, align: "right", group: "health" },
   { id: "topBuy", label: "Top Einkauf", dataKey: "topBuy", defaultWidth: 160, minWidth: 120, group: "detail" },
   { id: "topSell", label: "Top Verkauf", dataKey: "topSell", defaultWidth: 160, minWidth: 120, group: "detail" },
 ];

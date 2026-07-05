@@ -164,15 +164,5 @@ export function backfillPlayerInjuryHistoryFromSeasonEvents(gameState: GameState
 }
 
 export function ensurePlayerInjuryHistoryForGameState(gameState: GameState): GameState {
-  const needsBackfill = gameState.players.some(
-    (player) =>
-      (player.injuryHistory?.length ?? 0) === 0 &&
-      (gameState.seasonState.injuryEvents ?? []).some(
-        (event) => event.playerId === player.id && event.result === "injured",
-      ),
-  );
-  if (!needsBackfill) {
-    return gameState;
-  }
   return backfillPlayerInjuryHistoryFromSeasonEvents(gameState);
 }

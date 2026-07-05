@@ -28,13 +28,15 @@ export type AiKeepReasonCode =
   | "covers_need_axis"
   | "long_contract"
   | "healthy_cash"
-  | "player_demand_keep";
+  | "player_demand_keep"
+  | "high_board_confidence"
+  | "negative_net_proceeds";
 
 const SELL_REASON_PATTERNS: Array<{ code: AiSellReasonCode; patterns: string[] }> = [
   { code: "negative_cash", patterns: ["negatives Teamcash"] },
   { code: "low_cash_reserve", patterns: ["Cash-Reserve ist zu knapp"] },
   { code: "high_wage_burden", patterns: ["hohes Gehalt im Verhaeltnis"] },
-  { code: "profit_window", patterns: ["realisierbarer Gewinn", "Verkaufsfenster"] },
+  { code: "profit_window", patterns: ["realisierbarer Gewinn", "realisierbarer Netto-Gewinn", "Verkaufsfenster"] },
   { code: "underperformance", patterns: ["Performance blieb unter Erwartung", "Abgang sinnvoll"] },
   { code: "weak_contribution", patterns: ["schwache lokale Score-Beitraege"] },
   { code: "poor_team_fit", patterns: ["passt nur schwach zum Teamprofil"] },
@@ -62,6 +64,7 @@ const KEEP_REASON_PATTERNS: Array<{ code: AiKeepReasonCode; patterns: string[] }
   { code: "long_contract", patterns: ["laengerer Restvertrag"] },
   { code: "healthy_cash", patterns: ["Teamcash ist entspannt"] },
   { code: "player_demand_keep", patterns: ["offene Forderung muss eingeplant"] },
+  { code: "high_board_confidence", patterns: ["statische Board-Confidence", "Kaderzusammenhalt bevorzugen"] },
 ];
 
 export function inferSellReasonCodes(reasons: string[]): AiSellReasonCode[] {

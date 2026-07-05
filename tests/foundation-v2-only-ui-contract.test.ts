@@ -53,6 +53,8 @@ describe("foundation v2-only ui contract", () => {
     expect(foundationText).toContain("teamEconomyTiles");
     expect(teamsPanelText).toContain("teams-v2-focus-card");
     expect(teamsPanelText).toContain("TeamDrawerHistoryTable");
+    expect(teamsPanelText).toContain("injuriesCount");
+    expect(teamsPanelText).toContain("averageFatigue");
     expect(teamsPanelText).toContain("isSeasonDisciplineKey");
     expect(teamsPanelText).toContain('data-testid="team-board-objectives"');
     expect(foundationText).not.toMatch(/\{false\s*\?\s*\([\s\S]*foundation-inbox-panel/);

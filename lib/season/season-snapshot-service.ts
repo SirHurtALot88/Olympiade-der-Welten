@@ -6,7 +6,6 @@ import type {
   SeasonSnapshotTeamRecord,
   SeasonSnapshotTransferRecord,
 } from "@/lib/data/olyDataTypes";
-import { getImportedPlayerDisplayMarketValue } from "@/lib/data/player-economy-display";
 import { resolvePlayerEconomyContract } from "@/lib/foundation/player-economy-contract";
 import { buildTransfermarktSaleFactorBreakdown } from "@/lib/market/transfermarkt-sale-factor";
 import { getSeasonDerivations } from "@/lib/foundation/get-season-derivations";
@@ -19,6 +18,7 @@ import { createPersistenceService } from "@/lib/persistence/persistence-service"
 import type { PersistenceService } from "@/lib/persistence/types";
 import {
   buildAllTimeTableFromSnapshots,
+  resolveSeasonSnapshotTeamRecords,
   type SeasonSnapshotAllTimeRow,
 } from "@/lib/season/season-snapshot-helpers";
 export { buildAllTimeTableFromSnapshots, resolveSeasonSnapshotTeamRecords } from "@/lib/season/season-snapshot-helpers";
@@ -97,21 +97,13 @@ function resolveLocalSave(persistence: PersistenceService, saveId: string) {
 function getRosterMarketValue(
   gameState: GameState,
   playerId: string,
-  currentValue?: number | null,
-  purchasePrice?: number | null,
+  _currentValue?: number | null,
+  _purchasePrice?: number | null,
   playerById = new Map(gameState.players.map((entry) => [entry.id, entry] as const)),
+  rosterEntry = gameState.rosters.find((entry) => entry.playerId === playerId) ?? null,
 ) {
-  if (currentValue != null && Number.isFinite(currentValue)) {
-    return currentValue;
-  }
-  if (purchasePrice != null && Number.isFinite(purchasePrice)) {
-    return purchasePrice;
-  }
   const player = playerById.get(playerId) ?? null;
-  if (!player) {
-    return null;
-  }
-  return getImportedPlayerDisplayMarketValue(player);
+  return resolvePlayerEconomyContract({ player, rosterEntry }).marketValue;
 }
 
 function buildDisciplineCategoryMap(gameState: GameState) {
@@ -291,6 +283,7 @@ function buildSeasonSnapshotRecord(
           soc: teamResults.length > 0 ? roundValue(disciplinePointsByArea.soc, 1) : null,
         },
         cashEnd: team.cash ?? null,
+        rosterEndPostSell: roster.length,
         rosterEnd: roster.length,
         rosterCountEnd: roster.length,
         salaryEnd,
@@ -617,6 +610,112 @@ export function getSeasonSnapshots(gameState: GameState) {
 
 export function getLatestSeasonSnapshot(gameState: GameState) {
   return getSeasonSnapshots(gameState)[0] ?? null;
+}
+
+function parseSeasonNumber(seasonId: string) {
+  return Number(seasonId.match(/(\d+)$/)?.[1] ?? 1);
+}
+
+function resolvePreviousSeasonId(seasonId: string) {
+  const seasonNumber = parseSeasonNumber(seasonId);
+  if (seasonNumber <= 1) return null;
+  return `season-${seasonNumber - 1}`;
+}
+
+function buildTeamEntryEconomyFromGameState(
+  gameState: GameState,
+  teamId: string,
+  playerById = new Map(gameState.players.map((player) => [player.id, player] as const)),
+) {
+  const team = gameState.teams.find((entry) => entry.teamId === teamId);
+  const roster = gameState.rosters.filter((entry) => entry.teamId === teamId);
+  const salaryEnd =
+    roster.length > 0 ? roundValue(roster.reduce((sum, entry) => sum + entry.salary, 0), 2) : 0;
+  const marketValueEnd =
+    roster.length > 0
+      ? roundValue(
+          roster.reduce(
+            (sum, entry) =>
+              sum + (getRosterMarketValue(gameState, entry.playerId, entry.currentValue, entry.purchasePrice, playerById) ?? 0),
+            0,
+          ),
+          2,
+        )
+      : 0;
+  return {
+    cashEnd: team?.cash ?? null,
+    rosterEnd: roster.length,
+    rosterCountEnd: roster.length,
+    salaryEnd,
+    salaryTotalEnd: salaryEnd,
+    marketValueEnd,
+    marketValueTotalEnd: marketValueEnd,
+  };
+}
+
+/** Refresh the previous season snapshot's roster/cash/salary with post-preseason-buy entry state. */
+export function patchCompletedSeasonSnapshotAfterPreseasonBuy(
+  gameState: GameState,
+  currentSeasonId: string = gameState.season.id,
+): { gameState: GameState; patched: boolean; completedSeasonId: string | null; warnings: string[] } {
+  const completedSeasonId = resolvePreviousSeasonId(currentSeasonId);
+  if (!completedSeasonId) {
+    return { gameState, patched: false, completedSeasonId: null, warnings: [] };
+  }
+
+  const snapshots = gameState.seasonState.seasonSnapshots ?? [];
+  const snapshotIndex = snapshots.findIndex((entry) => entry.seasonId === completedSeasonId);
+  if (snapshotIndex < 0) {
+    return {
+      gameState,
+      patched: false,
+      completedSeasonId,
+      warnings: [`season_snapshot_missing_for_patch:${completedSeasonId}`],
+    };
+  }
+
+  const snapshot = snapshots[snapshotIndex]!;
+  const teamRecords = resolveSeasonSnapshotTeamRecords(snapshot);
+  const playerById = new Map(gameState.players.map((player) => [player.id, player] as const));
+  const patchedTeams = teamRecords.map((teamRecord) => {
+    const entry = buildTeamEntryEconomyFromGameState(gameState, teamRecord.teamId, playerById);
+    const rosterEndPostSell = teamRecord.rosterEndPostSell ?? teamRecord.rosterEnd ?? entry.rosterEnd;
+    return {
+      ...teamRecord,
+      rosterEndPostSell,
+      ...entry,
+    };
+  });
+
+  const patchedSnapshot: SeasonSnapshotRecord = {
+    ...snapshot,
+    finalStandings: patchedTeams,
+    teamSnapshots: patchedTeams,
+    entryRosterPatchedAt: new Date().toISOString(),
+    entryRosterPatchedFromSeasonId: currentSeasonId,
+    warnings: Array.from(
+      new Set([
+        ...(snapshot.warnings ?? []),
+        `entry_roster_patched_after_preseason:${currentSeasonId}`,
+      ]),
+    ),
+  };
+
+  const nextSnapshots = [...snapshots];
+  nextSnapshots[snapshotIndex] = patchedSnapshot;
+
+  return {
+    gameState: {
+      ...gameState,
+      seasonState: {
+        ...gameState.seasonState,
+        seasonSnapshots: nextSnapshots,
+      },
+    },
+    patched: true,
+    completedSeasonId,
+    warnings: [],
+  };
 }
 
 export function buildSeasonSnapshotDryRun(

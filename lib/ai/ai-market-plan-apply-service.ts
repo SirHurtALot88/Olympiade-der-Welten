@@ -1,5 +1,6 @@
 import { randomUUID } from "node:crypto";
 
+import { resolveTeamRosterMarketValue } from "@/lib/ai/planner-cash-buffer-policy";
 import {
   buildAiMarketPlanPreview,
   type AiMarketPlanBuyPlan,
@@ -37,7 +38,7 @@ import type {
   TeamStrategyProfile,
 } from "@/lib/data/olyDataTypes";
 import { getTeamControlSettings } from "@/lib/foundation/team-control-settings";
-import { deriveRosterTargets } from "@/lib/foundation/roster-limits";
+import { deriveRosterTargets, resolvePlannerRosterTargets } from "@/lib/foundation/roster-limits";
 import { isTransferActionAllowed } from "@/lib/season/transfer-season-policy";
 import { getTeamStrategyProfile } from "@/lib/foundation/team-strategy-profiles";
 import { getScoutingWatchlistForTeam } from "@/lib/scouting/scouting-watchlist-service";
@@ -565,7 +566,7 @@ function buildFinalBuyGate(input: {
   const playerOpt = input.team.currentState.playerOpt ?? minRoster;
   const atOrAboveOpt = rosterBase >= playerOpt;
   const autoUpgradeFloor =
-    atOrAboveOpt && isTeamOverCashSalarySoftTarget(input.gameState, input.team.teamId, input.gameState.season.id)
+    atOrAboveOpt && !input.postOptUpgradeDeploy && isTeamOverCashSalarySoftTarget(input.gameState, input.team.teamId, input.gameState.season.id)
       ? estimateUpgradeBuyFloorMw(input.gameState, input.team.teamId)
       : null;
   const effectiveMinUpgradeBuyPriceRaw =
@@ -638,6 +639,7 @@ function buildFinalBuyGate(input: {
       price + 0.01 < effectiveMinUpgradeBuyPrice;
     const trashFillerAtOpt =
       atOrAboveOpt &&
+      !input.postOptUpgradeDeploy &&
       isTrashMarketBuyCandidate({
         price,
         marketValue: candidate.marketValue,
@@ -1099,7 +1101,7 @@ function getTeamStateSnapshot(gameState: GameState, teamId: string) {
     cash: team?.cash ?? null,
     roster: roster.length,
     salary: roster.reduce((sum, entry) => sum + entry.salary, 0),
-    marketValue: roster.reduce((sum, entry) => sum + (entry.currentValue ?? entry.purchasePrice ?? 0), 0),
+    marketValue: resolveTeamRosterMarketValue(gameState, teamId),
   };
 }
 
@@ -1179,7 +1181,7 @@ export async function applyAiMarketPlanLocally(input: AiMarketPlanApplyParams): 
     .filter((team) => {
       const identity = preflightIdentityByTeamId.get(team.teamId) ?? null;
       const rosterCount = preflightRosterCounts.get(team.teamId) ?? 0;
-      const { playerMin, playerOpt } = deriveRosterTargets(team, identity);
+      const { playerMin, playerOpt } = resolvePlannerRosterTargets(preflightGameState, team.teamId, team, identity);
       const expiringCount = preflightGameState.rosters.filter((entry) => entry.teamId === team.teamId && (entry.contractLength ?? 99) <= 1).length;
       const rosterAfterExpiry = Math.max(0, rosterCount - expiringCount);
       if (teamNeedsPostOptUpgradeDeploy(preflightGameState, team.teamId, input.seasonId)) return true;
@@ -1191,7 +1193,7 @@ export async function applyAiMarketPlanLocally(input: AiMarketPlanApplyParams): 
     .filter((team) => {
       const identity = preflightIdentityByTeamId.get(team.teamId) ?? null;
       const rosterCount = preflightRosterCounts.get(team.teamId) ?? 0;
-      const { playerMin, playerOpt } = deriveRosterTargets(team, identity);
+      const { playerMin, playerOpt } = resolvePlannerRosterTargets(preflightGameState, team.teamId, team, identity);
       const rosterEntries = preflightGameState.rosters.filter((entry) => entry.teamId === team.teamId);
       const expiringCount = rosterEntries.filter((entry) => (entry.contractLength ?? 99) <= 1).length;
       const rosterAfterExpiry = Math.max(0, rosterCount - expiringCount);

@@ -5,6 +5,11 @@ export type TransferSeasonAction =
   | "season_end_market_sell"
   | "preseason_market_buy";
 
+/** Roster repair (hardMin/Opt refill) is preseason-only. At season_end post-sell, teams may sit below hardMin by design. */
+export function isRosterRepairPhaseAllowed(phase: "season_end" | "preseason"): boolean {
+  return phase === "preseason";
+}
+
 /** Paid draft picks in season 1 — labeled separately from later transfer-market purchases
  * purely for reporting (draft-vs-market split in audits/recaps), NOT because market buys are
  * forbidden in S1. Design principle (2026-07-04 course correction): S1 buys are NOT forbidden —

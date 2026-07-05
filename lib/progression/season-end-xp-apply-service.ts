@@ -37,6 +37,7 @@ import {
   type SeasonEndProgressionDisciplineDelta,
   type SeasonEndProgressionEconomyAudit,
 } from "@/lib/training/season-end-progression-preview";
+import { buildLeagueDisciplineRatingsWithAttributeOverrides } from "@/lib/player-formulas/discipline-rating-engine";
 
 export type SeasonEndXpSpendPreviewPlayer = {
   playerId: string;
@@ -324,12 +325,21 @@ function getSeasonXp(input: {
 function buildEconomyAudit(input: {
   gameState: GameState;
   player: Player;
+  baselinePlayer?: Player;
   previewPlayer: Player;
   context: EconomyPreviewContext;
   hasAttributeChanges: boolean;
 }): SeasonEndProgressionEconomyAudit {
-  const beforeReport = input.context.beforeReport;
-  const beforeRow = input.context.beforeRowsByPlayerId.get(input.player.id) ?? null;
+  const cachedBeforeRow = input.context.beforeRowsByPlayerId.get(input.player.id) ?? null;
+  const beforeRow =
+    input.hasAttributeChanges && input.baselinePlayer
+      ? (buildPlayerEconomyCompareReport({
+          gameState: input.gameState,
+          playerOverridesById: new Map([[input.baselinePlayer.id, input.baselinePlayer]]),
+          playerIds: [input.baselinePlayer.id],
+          includeSummary: false,
+        }).players.find((entry) => entry.playerId === input.baselinePlayer!.id) ?? cachedBeforeRow)
+      : cachedBeforeRow;
   const afterReport = input.hasAttributeChanges
     ? buildPlayerEconomyCompareReport({
         gameState: input.gameState,
@@ -337,18 +347,31 @@ function buildEconomyAudit(input: {
         playerIds: [input.previewPlayer.id],
         includeSummary: false,
       })
-    : beforeReport;
+    : input.context.beforeReport;
   const afterRow = afterReport.players.find((entry) => entry.playerId === input.player.id) ?? null;
   const rosterEntry = input.context.rosterByPlayerId.get(input.player.id) ?? null;
-  const beforeRating = input.context.beforeRatings.get(input.player.id) ?? null;
+  const baselineGameState =
+    input.hasAttributeChanges && input.baselinePlayer
+      ? {
+          ...input.gameState,
+          players: input.gameState.players.map((entry) => (entry.id === input.baselinePlayer!.id ? input.baselinePlayer! : entry)),
+        }
+      : null;
+  const beforeRating = baselineGameState
+    ? buildPlayerRatingContractMap(baselineGameState).get(input.player.id) ?? input.context.beforeRatings.get(input.player.id) ?? null
+    : input.context.beforeRatings.get(input.player.id) ?? null;
   const rankTableMarketValueBefore = resolveRankTableMarketValueFromCompareRow(beforeRow);
   const rankTableMarketValueAfter = input.hasAttributeChanges
     ? resolveRankTableMarketValueFromCompareRow(afterRow)
     : rankTableMarketValueBefore;
-  const afterRating = input.hasAttributeChanges
-    ? beforeRating
-      ? { ...beforeRating, ovrNormalized: afterRow?.ovr ?? beforeRating.ovrNormalized ?? null }
-      : null
+  const afterGameState = input.hasAttributeChanges
+    ? {
+        ...input.gameState,
+        players: input.gameState.players.map((entry) => (entry.id === input.previewPlayer.id ? input.previewPlayer : entry)),
+      }
+    : null;
+  const afterRating = afterGameState
+    ? buildPlayerRatingContractMap(afterGameState).get(input.player.id) ?? null
     : beforeRating;
   const marketValueDeltaAbs =
     beforeRow?.calculatedMarketValue != null && input.player.marketValue != null
@@ -406,7 +429,7 @@ function buildEconomyAudit(input: {
     ovrBefore: beforeRating?.ovrNormalized ?? input.player.ovr ?? input.player.rating ?? null,
     ovrAfterPreview: afterRating?.ovrNormalized ?? input.previewPlayer.ovr ?? input.previewPlayer.rating ?? null,
     mvsBefore: beforeRating?.mvs ?? null,
-    mvsAfterPreview: beforeRating?.mvs ?? null,
+    mvsAfterPreview: afterRating?.mvs ?? beforeRating?.mvs ?? null,
     bracketBefore: input.player.bracketLabel ?? getProgressionRatingTier(beforeRating?.ovrNormalized ?? input.player.ovr ?? input.player.rating ?? null),
     bracketAfterPreview: input.player.bracketLabel ?? getProgressionRatingTier(afterRating?.ovrNormalized ?? input.previewPlayer.ovr ?? input.previewPlayer.rating ?? null),
     marketValueDeltaAbs,
@@ -511,13 +534,6 @@ function buildPreviewPlayer(input: {
   });
   warnings.push(...seasonXp.warnings.map((warning) => `${input.player.id}:${warning}`));
 
-  const currentXPBefore = Math.max(0, Math.round(input.player.currentXP ?? 0));
-  const availableXP = currentXPBefore + seasonXp.earnedSeasonXP;
-  const lifetimeXPBefore = getLifetimeXPBefore(input.player);
-  const lifetimeXPAfter =
-    lifetimeXPBefore == null && seasonXp.earnedSeasonXP <= 0
-      ? null
-      : Math.max(0, Math.round(lifetimeXPBefore ?? 0) + Math.round(seasonXp.earnedSeasonXP));
   const plannedXP = 0;
   const plannedUpgrades: PlayerProgressionSpendUpgradeRecord[] = [];
   const organicProgression = attributesAfter
@@ -527,6 +543,16 @@ function buildPreviewPlayer(input: {
         facilities: input.facilities,
       }))
     : null;
+  const currentXPBefore = Math.max(0, Math.round(input.player.currentXP ?? 0));
+  const earnedSeasonXP = organicProgression ? 0 : seasonXp.earnedSeasonXP;
+  const availableXP = currentXPBefore + earnedSeasonXP;
+  const lifetimeXPBefore = getLifetimeXPBefore(input.player);
+  const lifetimeXPAfter =
+    organicProgression
+      ? lifetimeXPBefore
+      : lifetimeXPBefore == null && earnedSeasonXP <= 0
+        ? null
+        : Math.max(0, Math.round(lifetimeXPBefore ?? 0) + Math.round(earnedSeasonXP));
   if (organicProgression && attributesAfter) {
     for (const attribute of ATTRIBUTE_KEYS) {
       attributesAfter[attribute] = organicProgression.attributesAfter[attribute];
@@ -571,16 +597,28 @@ function buildPreviewPlayer(input: {
   const previewDisciplineRatings = buildPreviewDisciplineRatingsFromAttributes({
     player: input.player,
     attributesAfter,
+    leaguePlayers: input.save.gameState.players,
   });
   const baselineDisciplineRatings = buildPreviewDisciplineRatingsFromAttributes({
     player: input.player,
     attributesAfter: attributesBefore,
+    leaguePlayers: input.save.gameState.players,
   });
   const disciplineDeltas = buildSeasonEndDisciplineDeltas({
     disciplines: input.save.gameState.disciplines,
     lastSeasonDisciplineValues: baselineDisciplineRatings,
     currentDisciplineValues: previewDisciplineRatings,
   });
+  const baselinePreviewPlayer: Player = {
+    ...input.player,
+    attributeSheetStats: attributesBefore ? { ...input.player.attributeSheetStats, ...attributesBefore } : input.player.attributeSheetStats,
+    disciplineRatings: baselineDisciplineRatings,
+    coreStats: buildCoreStatsFromDisciplineRatings({
+      disciplines: input.save.gameState.disciplines,
+      disciplineRatings: baselineDisciplineRatings,
+      fallback: input.player.coreStats,
+    }),
+  };
   const previewPlayer: Player = {
     ...input.player,
     attributeSheetStats: attributesAfter ? { ...input.player.attributeSheetStats, ...attributesAfter } : input.player.attributeSheetStats,
@@ -590,12 +628,13 @@ function buildPreviewPlayer(input: {
       disciplineRatings: previewDisciplineRatings,
       fallback: input.player.coreStats,
     }),
-    previousDisciplineRatings: input.player.disciplineRatings,
+    previousDisciplineRatings: baselineDisciplineRatings,
     disciplineRatings: previewDisciplineRatings,
   };
   const economyAudit = buildEconomyAudit({
     gameState: input.save.gameState,
     player: input.player,
+    baselinePlayer: baselinePreviewPlayer,
     previewPlayer,
     context: input.economyContext,
     hasAttributeChanges: !input.skipAfterEconomyAudit && plannedUpgrades.length > 0,
@@ -603,10 +642,10 @@ function buildPreviewPlayer(input: {
   const progressionSnapshotBefore = buildProgressionSnapshot({
     player: input.player,
     attributes: attributesBefore ?? {},
-    disciplineRatings: input.player.disciplineRatings ?? {},
+    disciplineRatings: baselineDisciplineRatings,
     ovr: economyAudit.ovrBefore,
     mvs: economyAudit.mvsBefore,
-    marketValue: economyAudit.displayedMarketValue,
+    marketValue: economyAudit.calculatedMarketValue ?? economyAudit.displayedMarketValue,
     salary: economyAudit.currentContractSalary ?? economyAudit.displayedSalary,
     bracket: economyAudit.bracketBefore,
   });
@@ -631,7 +670,7 @@ function buildPreviewPlayer(input: {
     playerName: input.player.name,
     teamId: input.teamId,
     availableXP,
-    earnedSeasonXP: seasonXp.earnedSeasonXP,
+    earnedSeasonXP,
     currentXPBefore,
     plannedXP,
     remainingXP: availableXP - plannedXP,
@@ -693,7 +732,7 @@ export function previewSeasonEndXpAvailability(save: PersistedSaveGame, teamId: 
     players.push({
       playerId: player.id,
       availableXP: currentXPBefore + seasonXp.earnedSeasonXP,
-      earnedSeasonXP: seasonXp.earnedSeasonXP,
+      earnedSeasonXP,
       currentXPBefore,
       lifetimeXP: lifetimeXPBefore,
       lifetimeXPAfter,
@@ -885,7 +924,7 @@ export function applySeasonEndXpSpend(
       playerId: playerPreview.playerId,
       upgrades: playerPreview.plannedUpgrades,
       xpSpent: playerPreview.plannedXP,
-      xpEarned: playerPreview.earnedSeasonXP,
+      xpEarned: playerPreview.organicProgression ? 0 : playerPreview.earnedSeasonXP,
       currentXPBefore: playerPreview.currentXPBefore,
       currentXPAfter: playerPreview.remainingXP,
       lifetimeXPBefore: playerPreview.lifetimeXP,
@@ -911,18 +950,30 @@ export function applySeasonEndXpSpend(
     };
   });
 
+  const attributeOverridesAfter: Record<string, PlayerGeneratorAttributes> = {};
+  const attributeOverridesBefore: Record<string, PlayerGeneratorAttributes> = {};
+  for (const [playerId, playerPreview] of playersById.entries()) {
+    const player = save.gameState.players.find((entry) => entry.id === playerId);
+    if (!player) continue;
+    const attributesAfter = { ...player.attributeSheetStats, ...playerPreview.attributeValuesAfter };
+    attributeOverridesAfter[playerId] = normalizeAttributes({ ...player, attributeSheetStats: attributesAfter } as Player);
+    attributeOverridesBefore[playerId] = normalizeAttributes(player);
+  }
+  const disciplineRatingsAfterByPlayerId = buildLeagueDisciplineRatingsWithAttributeOverrides(
+    save.gameState.players,
+    attributeOverridesAfter,
+  );
+  const disciplineRatingsBeforeByPlayerId = buildLeagueDisciplineRatingsWithAttributeOverrides(
+    save.gameState.players,
+    attributeOverridesBefore,
+  );
+
   const nextPlayers = save.gameState.players.map((player) => {
     const playerPreview = playersById.get(player.id);
     if (!playerPreview) return player;
     const attributesAfter = { ...player.attributeSheetStats, ...playerPreview.attributeValuesAfter };
-    const nextDisciplineRatings = buildPreviewDisciplineRatingsFromAttributes({
-      player,
-      attributesAfter: normalizeAttributes({ ...player, attributeSheetStats: attributesAfter } as Player),
-    });
-    const baselineDisciplineRatings = buildPreviewDisciplineRatingsFromAttributes({
-      player,
-      attributesAfter: normalizeAttributes(player),
-    });
+    const nextDisciplineRatings = disciplineRatingsAfterByPlayerId.get(player.id) ?? player.disciplineRatings ?? {};
+    const baselineDisciplineRatings = disciplineRatingsBeforeByPlayerId.get(player.id) ?? player.disciplineRatings ?? {};
     const disciplineDelta = Object.fromEntries(
       Object.entries(nextDisciplineRatings).map(([disciplineId, current]) => [
         disciplineId,

@@ -6,6 +6,10 @@ import { previewFacilitySeasonEndFinance } from "@/lib/facilities/facility-seaso
 import { buildSeasonStrategyState } from "@/lib/ai/ai-manager-doctrine-service";
 import { countTeamInjuredPlayers } from "@/lib/fatigue/fatigue-injury-service";
 import { deriveRosterTargets } from "@/lib/foundation/roster-limits";
+import {
+  resolveTeamLiquidityBufferTarget,
+  usesSingleCashPlanningPolicy,
+} from "@/lib/ai/planner-cash-buffer-policy";
 import { resolvePostOptPlannerRosterTarget } from "@/lib/ai/planner-post-opt-upgrade-policy";
 import { resolvePlayerEconomyContract } from "@/lib/foundation/player-economy-contract";
 import { getTeamStrategyProfile } from "@/lib/foundation/team-strategy-profiles";
@@ -38,6 +42,9 @@ export function resolveMarketPlannerCashBuffer(
 ) {
   if (opts?.coverageFallback) return 0;
   if (isTeamRosterBelowOpt(gameState, teamId)) return 0;
+  if (usesSingleCashPlanningPolicy(gameState)) {
+    return resolveTeamLiquidityBufferTarget(gameState, teamId);
+  }
   return resolveTeamCashRunwayReserve(gameState, teamId, {
     expectedSalaryAfterPlan: opts?.expectedSalaryAfterPlan,
   });

@@ -10,7 +10,7 @@ import {
   runChunkedRedraftTopup,
 } from "@/lib/ai/chunked-redraft-topup-service";
 import type { AiSeasonStrategy, GameState } from "@/lib/data/olyDataTypes";
-import { deriveRosterTargets } from "@/lib/foundation/roster-limits";
+import { deriveRosterTargets, resolvePlannerRosterTargets } from "@/lib/foundation/roster-limits";
 import { isSeasonOne, isTransferActionAllowed } from "@/lib/season/transfer-season-policy";
 import { createPersistenceService } from "@/lib/persistence/persistence-service";
 import type { PersistenceService } from "@/lib/persistence/types";
@@ -153,9 +153,7 @@ export function getTeamHardMinRequired(gameState: GameState, teamId: string) {
 }
 
 export function getTeamOptTarget(gameState: GameState, teamId: string) {
-  const team = gameState.teams.find((entry) => entry.teamId === teamId);
-  const identity = gameState.teamIdentities.find((entry) => entry.teamId === teamId);
-  return deriveRosterTargets(team, identity).playerOpt;
+  return resolvePlannerRosterTargets(gameState, teamId).playerOpt;
 }
 
 /** Identity hard floor only — not slot depth. Prefer getTeamHardMinRequired. */

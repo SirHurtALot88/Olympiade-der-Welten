@@ -2,7 +2,7 @@
 
 import { useEffect, useMemo, useState, type DragEvent, type ReactNode } from "react";
 
-import type { PlayerDetailDrawerData } from "@/lib/foundation/player-detail-drawer";
+import type { LeagueLeaderCategoryId } from "@/lib/foundation/league-leaders-service";
 import { PLAYER_ATTRIBUTE_CHART_LABELS } from "@/lib/foundation/player-attribute-history";
 
 import PlayerAttributeProgressChart from "@/app/foundation/player-profile/PlayerAttributeProgressChart";
@@ -1126,6 +1126,7 @@ export default function PlayerDetailDrawer({
   onOpenBuyPreview,
   onOpenTraining,
   onOpenLeagueLeaders,
+  onOpenTeam,
   trainingRow = null,
   trainingModeOptions = [],
   trainingClassOptions = [],
@@ -1144,7 +1145,11 @@ export default function PlayerDetailDrawer({
     race: string | null;
   }) => void;
   onOpenTraining?: () => void;
-  onOpenLeagueLeaders?: (categoryId: "ovr" | "pps" | "mvs") => void;
+  onOpenLeagueLeaders?: (
+    categoryId: LeagueLeaderCategoryId,
+    returnContext?: { playerId: string; playerName: string },
+  ) => void;
+  onOpenTeam?: (teamId: string) => void;
   trainingRow?: TrainingPlayerRowView | null;
   trainingModeOptions?: TrainingModeOption[];
   trainingClassOptions?: TrainingClassOption[];
@@ -1590,7 +1595,12 @@ export default function PlayerDetailDrawer({
                         type="button"
                         className="player-drawer-kpi-hero-card is-interactive"
                         title={`Liga-Leaders: ${metric.label} · Rang ${formatRankLabel(metric.rank)}`}
-                        onClick={() => onOpenLeagueLeaders(leagueCategoryId)}
+                        onClick={() =>
+                          onOpenLeagueLeaders(leagueCategoryId, {
+                            playerId: data.playerId,
+                            playerName: data.name,
+                          })
+                        }
                       >
                         {cardBody}
                       </button>
@@ -1634,16 +1644,33 @@ export default function PlayerDetailDrawer({
                   </p>
                 ) : null}
                 <div className="player-drawer-category-grid player-drawer-hero-axis-grid">
-                  {data.axisCards.map((card) => (
+                  {data.axisCards.map((card) => {
+                    const canOpenAxisLeaders =
+                      onOpenLeagueLeaders != null &&
+                      !isFreeAgent &&
+                      (card.seasonPointsRank != null || card.valueRank != null);
+                    return (
                     <button
                       key={card.id}
                       type="button"
-                      className={`player-drawer-category-card player-drawer-category-button player-drawer-axis-combo-card ${getAxisToneClass(card.tone)}${selectedAxisId === card.id ? " is-selected" : ""}`}
+                      className={`player-drawer-category-card player-drawer-category-button player-drawer-axis-combo-card ${getAxisToneClass(card.tone)}${selectedAxisId === card.id ? " is-selected" : ""}${canOpenAxisLeaders ? " is-interactive" : ""}`}
                       onClick={() => {
-                        if (!isScoutedProfile) setSelectedAxisId(card.id);
+                        if (isScoutedProfile) return;
+                        if (canOpenAxisLeaders) {
+                          onOpenLeagueLeaders(card.id, {
+                            playerId: data.playerId,
+                            playerName: data.name,
+                          });
+                          return;
+                        }
+                        setSelectedAxisId(card.id);
                       }}
                       disabled={isScoutedProfile}
-                      title={`${card.label}: Statwert und echte Season-PPs jeweils mit Rank`}
+                      title={
+                        canOpenAxisLeaders
+                          ? `Liga-Leaders: ${card.label} · Stat / PPs`
+                          : `${card.label}: Statwert und echte Season-PPs jeweils mit Rank`
+                      }
                     >
                       <div className="player-drawer-category-head">
                         <span title={getGameTermTooltip(card.label) ?? undefined}>{card.label}</span>
@@ -1672,7 +1699,8 @@ export default function PlayerDetailDrawer({
                         <span title="Achsen-Rank aus dem letzten Saison-Snapshot">-1 {formatOptionalRankLabel(card.previousSeasonPointsRank)}</span>
                       </div>
                     </button>
-                  ))}
+                    );
+                  })}
                 </div>
                 {selectedAxisCard ? (
                   <div className={`player-drawer-axis-detail-panel ${getAxisToneClass(selectedAxisCard.tone)}`}>
@@ -2622,8 +2650,24 @@ export default function PlayerDetailDrawer({
                     if (columnId === "season") return entry.seasonLabel;
                     if (columnId === "date") return formatTransferHistoryDate(entry.happenedAt);
                     if (columnId === "type") return formatHistoryTransferType(entry.transferType) ?? "—";
-                    if (columnId === "from") return entry.fromTeamName ?? "—";
-                    if (columnId === "to") return entry.toTeamName ?? "—";
+                    if (columnId === "from") {
+                      return entry.fromTeamId && onOpenTeam ? (
+                        <button type="button" className="table-link-button" onClick={() => onOpenTeam(entry.fromTeamId!)}>
+                          {entry.fromTeamName ?? entry.fromTeamId}
+                        </button>
+                      ) : (
+                        entry.fromTeamName ?? "—"
+                      );
+                    }
+                    if (columnId === "to") {
+                      return entry.toTeamId && onOpenTeam ? (
+                        <button type="button" className="table-link-button" onClick={() => onOpenTeam(entry.toTeamId!)}>
+                          {entry.toTeamName ?? entry.toTeamId}
+                        </button>
+                      ) : (
+                        entry.toTeamName ?? "—"
+                      );
+                    }
                     if (columnId === "fee") return formatMoney(entry.fee);
                     if (columnId === "salary") return formatMoney(entry.salary);
                     if (columnId === "mw") return formatMoney(entry.marketValue);

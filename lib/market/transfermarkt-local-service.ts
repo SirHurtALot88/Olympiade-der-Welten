@@ -1,6 +1,7 @@
 import { randomUUID } from "node:crypto";
 
 import type { ContractShape, ContractYearSalary, GameState, Player, RosterEntry, RosterPromisedRole, TransferHistoryEntry } from "@/lib/data/olyDataTypes";
+import { resolveTeamRosterMarketValue } from "@/lib/ai/planner-cash-buffer-policy";
 import { resolvePlayerEconomyContract } from "@/lib/foundation/player-economy-contract";
 import { buildGameStateContentSignature, getSeasonDerivations } from "@/lib/foundation/get-season-derivations";
 import { getTeamPlayerMax, deriveRosterTargets } from "@/lib/foundation/roster-limits";
@@ -25,6 +26,7 @@ import { buildTransfermarktSaleFactorBreakdown, normalizeVisibleRosterMoney } fr
 import { buildTransfermarktSellCoachingView } from "@/lib/market/transfermarkt-sell-coaching-service";
 import { applySellBoardReactionToGameState } from "@/lib/market/transfermarkt-sell-board-reaction";
 import { applySellPricingPolicyToBreakdown } from "@/lib/market/transfermarkt-sell-pricing-policy";
+import { resolveTransfermarktSellProceeds } from "@/lib/market/transfermarkt-sell-proceeds";
 import {
   isPlayerTransferBuyBlocked,
   buildSoldPlayerSeasonBans,
@@ -2121,13 +2123,7 @@ function executeFastLocalTransfermarktBatchBuy(params: TransfermarktBuyParams, r
     rosterBefore,
   });
   const salaryBefore = salaryBeforeFast;
-  const marketValueBefore = roundValue(
-    rosterEntries.reduce((sum, entry) => {
-      const rosterPlayer = gameState.players.find((candidate) => candidate.id === entry.playerId);
-      return sum + (entry.currentValue ?? (rosterPlayer ? getPlayerMarketValue(rosterPlayer) : 0) ?? 0);
-    }, 0),
-    2,
-  );
+  const marketValueBefore = roundValue(resolveTeamRosterMarketValue(gameState, params.teamId), 2);
   const blockingReasons: string[] = [];
   const warnings: string[] = [];
   if (!team) blockingReasons.push("team_not_found");
@@ -2619,16 +2615,27 @@ export function previewLocalTransfermarktSell(params: TransfermarktSellParams): 
   });
   const saleFactorBreakdown = priced.breakdown;
   const salePrice = saleFactorBreakdown.salePrice ?? saleEconomy.marketValue;
-  const marketValueReference = saleFactorBreakdown.baseMarketValue ?? saleEconomy.marketValue ?? null;
-  const saleFactor = saleFactorBreakdown.saleFactor;
   const normalizedPurchasePrice = normalizeVisibleRosterMoney(
     activePlayer?.purchasePrice,
     saleEconomy.purchasePrice,
   );
-  const profit =
-    salePrice != null && normalizedPurchasePrice != null
-      ? roundValue(Math.abs(salePrice - normalizedPurchasePrice) < 0.005 ? 0 : salePrice - normalizedPurchasePrice, 2)
+  const sellProceeds =
+    activePlayer && salePrice != null
+      ? resolveTransfermarktSellProceeds({
+          rosterEntry: activePlayer,
+          grossSalePrice: salePrice,
+          purchasePrice: normalizedPurchasePrice,
+          gameState,
+        })
       : null;
+  const buyoutCost = sellProceeds?.buyoutCost ?? null;
+  const netProceeds = sellProceeds?.netProceeds ?? salePrice;
+  const marketValueReference = saleFactorBreakdown.baseMarketValue ?? saleEconomy.marketValue ?? null;
+  const saleFactor = saleFactorBreakdown.saleFactor;
+  const profit =
+    netProceeds != null && normalizedPurchasePrice != null
+      ? roundValue(Math.abs(netProceeds - normalizedPurchasePrice) < 0.005 ? 0 : netProceeds - normalizedPurchasePrice, 2)
+      : sellProceeds?.netProfitVsPurchase ?? null;
   const salaryReduction = saleEconomy.salary;
   const teamSalaryBefore = teamContext?.salaryTotal ?? 0;
   const blockingReasons: string[] = [];
@@ -2651,13 +2658,16 @@ export function previewLocalTransfermarktSell(params: TransfermarktSellParams): 
           activePlayerId: params.activePlayerId,
           playerName: player.name,
           profit:
-            salePrice != null && normalizedPurchasePrice != null
-              ? roundValue(Math.abs(salePrice - normalizedPurchasePrice) < 0.005 ? 0 : salePrice - normalizedPurchasePrice, 2)
+            netProceeds != null && normalizedPurchasePrice != null
+              ? roundValue(Math.abs(netProceeds - normalizedPurchasePrice) < 0.005 ? 0 : netProceeds - normalizedPurchasePrice, 2)
               : null,
           pricingPolicy: priced.policy,
         })
       : null;
 
+  if (netProceeds != null && netProceeds <= 0 && activePlayer && activePlayer.contractLength >= 2) {
+    warnings.push("Netto-Verkaufserloes deckt den offenen Vertrags-Buyout nicht — Verkauf lohnt sich nicht.");
+  }
   if (coaching?.gmSoftBlockStarSell && coaching.keepIntentScore != null && coaching.keepIntentScore >= 55) {
     warnings.push("GM warnt: Core-Verkauf unter Hot-Seat-Bedingungen belastet das Mandat.");
   }
@@ -2687,12 +2697,12 @@ export function previewLocalTransfermarktSell(params: TransfermarktSellParams): 
           contractLength: activePlayer.contractLength,
           salary: activePlayer.salary,
           purchasePrice: normalizedPurchasePrice,
-          currentValue: normalizeVisibleRosterMoney(activePlayer.currentValue, saleEconomy.marketValue),
+          currentValue: saleEconomy.marketValue,
           joinedSeasonId: activePlayer.joinedSeasonId,
         }
       : null,
     cashBefore,
-    cashAfter: canSell && cashBefore != null && salePrice != null ? cashBefore + salePrice : cashBefore,
+    cashAfter: canSell && cashBefore != null && netProceeds != null ? cashBefore + netProceeds : cashBefore,
     rosterBefore,
     rosterAfter: canSell ? Math.max(0, rosterBefore - 1) : rosterBefore,
     teamSalaryBefore,
@@ -2700,6 +2710,8 @@ export function previewLocalTransfermarktSell(params: TransfermarktSellParams): 
     marketValueReference,
     saleFactor,
     salePrice,
+    buyoutCost,
+    netProceeds,
     profit,
     salaryReduction,
     projectedReadinessAfterSell: "unknown",
@@ -2723,6 +2735,7 @@ export function executeLocalTransfermarktSell(params: TransfermarktSellParams): 
   }
 
   const transferHistoryId = `history-${randomUUID()}`;
+  const netProceeds = preview.netProceeds ?? preview.salePrice ?? 0;
   const salePrice = preview.salePrice ?? 0;
   let nextState: GameState = {
     ...save.gameState,
@@ -2730,7 +2743,7 @@ export function executeLocalTransfermarktSell(params: TransfermarktSellParams): 
       team.teamId === params.teamId
         ? {
             ...team,
-            cash: team.cash + salePrice,
+            cash: team.cash + netProceeds,
           }
         : team,
     ),

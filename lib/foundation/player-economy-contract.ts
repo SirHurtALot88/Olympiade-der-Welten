@@ -291,21 +291,21 @@ export function resolvePlayerEconomyContract(input: {
       : null;
 
   const marketValue =
-    visibleFinalMarketValue ??
     calculatedFinalMarketValue ??
-    rosterCurrentValue ??
+    storedCalculatedMarketValue ??
+    legacyDisplayMarketValue ??
     rosterPurchasePrice ??
     null;
   const marketValueSource =
-    storedCalculatedMarketValue != null
-          ? "calculated_stored"
-          : legacyDisplayMarketValue != null
-            ? resolveImportedMarketValueSource(player)
-            : rosterPurchasePrice != null
-              ? "active_purchase_price"
-              : calculatedFinalMarketValue != null
-                ? "calculated_preview"
-                : "missing_source";
+    calculatedFinalMarketValue != null
+      ? "calculated_preview"
+      : storedCalculatedMarketValue != null
+        ? "calculated_stored"
+        : legacyDisplayMarketValue != null
+          ? resolveImportedMarketValueSource(player)
+          : rosterPurchasePrice != null
+            ? "active_purchase_price"
+            : "missing_source";
 
   const salary =
     rosterSalary ??

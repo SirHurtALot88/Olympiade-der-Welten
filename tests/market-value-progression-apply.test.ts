@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import type { GameState, Player } from "@/lib/data/olyDataTypes";
+import type { GameState, Player, PlayerGeneratorAttributes } from "@/lib/data/olyDataTypes";
 import {
   buildPlayerEconomyCompareReport,
   resolveRankTableMarketValueFromCompareRow,
@@ -11,7 +11,27 @@ import {
   patchSeasonProgressionEventMarketValues,
 } from "@/lib/player-formulas/market-value-apply";
 
-function createPlayer(id: string, disciplineRatings: Record<string, number>, marketValue: number): Player {
+const BASE_ATTRIBUTES: PlayerGeneratorAttributes = {
+  power: 40,
+  health: 40,
+  stamina: 40,
+  intelligence: 40,
+  awareness: 40,
+  determination: 40,
+  speed: 40,
+  dexterity: 40,
+  charisma: 40,
+  will: 40,
+  spirit: 40,
+  torment: 40,
+};
+
+function createPlayer(
+  id: string,
+  disciplineRatings: Record<string, number>,
+  marketValue: number,
+  attributeOverrides: Partial<PlayerGeneratorAttributes> = {},
+): Player {
   return {
     id,
     name: id,
@@ -28,18 +48,8 @@ function createPlayer(id: string, disciplineRatings: Record<string, number>, mar
     traitsNegative: [],
     coreStats: { pow: 50, spe: 50, men: 50, soc: 50 },
     attributeSheetStats: {
-      power: 40,
-      health: 40,
-      stamina: 40,
-      intelligence: 40,
-      awareness: 40,
-      determination: 40,
-      speed: 40,
-      dexterity: 40,
-      charisma: 40,
-      will: 40,
-      spirit: 40,
-      torment: 40,
+      ...BASE_ATTRIBUTES,
+      ...attributeOverrides,
     },
     preferredDisciplineIds: [],
     disciplineRatings,
@@ -93,17 +103,22 @@ function createGameState(players: Player[]): GameState {
 }
 
 describe("market value progression apply", () => {
-  it("updates stored market values from league-wide rank table after discipline improvements", () => {
+  it("updates stored market values from league-wide rank table after attribute improvements", () => {
     const baseline = createGameState([
-      createPlayer("player-a", { tdm: 55, fechten: 50, hockey: 52 }, 12),
-      createPlayer("player-b", { tdm: 54, fechten: 49, hockey: 51 }, 11.5),
-      createPlayer("player-c", { tdm: 40, fechten: 38, hockey: 39 }, 8),
+      createPlayer("player-a", { tdm: 55, fechten: 50, hockey: 52 }, 12, { power: 55, speed: 55, dexterity: 55 }),
+      createPlayer("player-b", { tdm: 54, fechten: 49, hockey: 51 }, 11.5, { power: 54, speed: 54, dexterity: 54 }),
+      createPlayer("player-c", { tdm: 40, fechten: 38, hockey: 39 }, 8, { power: 38, speed: 38, dexterity: 38 }),
     ]);
     const beforeMap = buildRankTableMarketValueMap(baseline);
     const improvedPlayer = baseline.players.find((player) => player.id === "player-b")!;
     const boosted = {
       ...improvedPlayer,
-      disciplineRatings: { tdm: 62, fechten: 58, hockey: 60 },
+      attributeSheetStats: {
+        ...improvedPlayer.attributeSheetStats!,
+        power: 72,
+        speed: 72,
+        dexterity: 72,
+      },
     };
     const improvedState = applyRankTableMarketValuesToGameState({
       ...baseline,
@@ -121,13 +136,30 @@ describe("market value progression apply", () => {
     expect(afterPlayer.marketValue).not.toBe(improvedPlayer.marketValue);
   });
 
+  it("ranks market value by raw attribute sums, not display discipline stats alone", () => {
+    const gameState = createGameState([
+      createPlayer("player-strong", { tdm: 30 }, 10, { power: 80, speed: 80, dexterity: 80 }),
+      createPlayer("player-weak-display", { tdm: 95 }, 10, { power: 45, speed: 45, dexterity: 45 }),
+    ]);
+    const marketValues = buildRankTableMarketValueMap(gameState);
+    expect(marketValues.get("player-strong")).toBeGreaterThan(marketValues.get("player-weak-display") ?? 0);
+  });
+
   it("prefers rank-table market value over legacy stored value in compare rows", () => {
-    const player = createPlayer("player-a", { tdm: 55, fechten: 50, hockey: 52 }, 99);
+    const player = createPlayer("player-a", { tdm: 55, fechten: 50, hockey: 52 }, 99, { power: 54, speed: 54, dexterity: 54 });
     const boosted = {
       ...player,
-      disciplineRatings: { tdm: 62, fechten: 58, hockey: 60 },
+      attributeSheetStats: {
+        ...player.attributeSheetStats!,
+        power: 72,
+        speed: 72,
+        dexterity: 72,
+      },
     };
-    const gameState = createGameState([player, createPlayer("player-b", { tdm: 54, fechten: 49, hockey: 51 }, 11.5)]);
+    const gameState = createGameState([
+      player,
+      createPlayer("player-b", { tdm: 54, fechten: 49, hockey: 51 }, 11.5, { power: 53, speed: 53, dexterity: 53 }),
+    ]);
 
     const afterReport = buildPlayerEconomyCompareReport({
       gameState,
@@ -143,14 +175,22 @@ describe("market value progression apply", () => {
 
   it("patches progression snapshot market values after rank-table recalc", () => {
     const gameState = createGameState([
-      createPlayer("player-a", { tdm: 55, fechten: 50, hockey: 52 }, 12),
-      createPlayer("player-b", { tdm: 40, fechten: 38, hockey: 39 }, 8),
+      createPlayer("player-a", { tdm: 55, fechten: 50, hockey: 52 }, 12, { power: 55, speed: 55, dexterity: 55 }),
+      createPlayer("player-b", { tdm: 40, fechten: 38, hockey: 39 }, 8, { power: 38, speed: 38, dexterity: 38 }),
     ]);
     const recalculated = applyRankTableMarketValuesToGameState({
       ...gameState,
       players: gameState.players.map((player) =>
         player.id === "player-a"
-          ? { ...player, disciplineRatings: { tdm: 62, fechten: 58, hockey: 60 } }
+          ? {
+              ...player,
+              attributeSheetStats: {
+                ...player.attributeSheetStats!,
+                power: 72,
+                speed: 72,
+                dexterity: 72,
+              },
+            }
           : player,
       ),
     });

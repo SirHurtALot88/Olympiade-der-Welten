@@ -391,6 +391,71 @@ describe("ai manager apply service", () => {
     ).toBe(18);
   });
 
+  it("S2+ ignores stale budget buckets and uses 10% MW buffer", () => {
+    const state = gameState({
+      cash: 154,
+      budgetReservations: {
+        "T-1": {
+          teamId: "T-1",
+          seasonId: "season-2",
+          sourcePlanId: "test-plan",
+          cashReserve: 10,
+          salaryReserve: 15,
+          transferBudget: 0,
+          buildingBudget: 0,
+          maintenanceBudget: 10,
+          emergencyBudget: 5,
+          updatedAt: "2026-06-14T00:00:00.000Z",
+        },
+      },
+    });
+    state.season = { ...state.season, id: "season-2", name: "Season 2" };
+    state.seasonState.seasonId = "season-2";
+    state.players = [player("p1", { marketValue: 200, displayMarketValue: 200 })];
+    state.rosters = [{ id: "r1", teamId: "T-1", playerId: "p1", slot: 0, salary: 2, contractLength: 2, upkeep: 2, roleTag: "starter", joinedSeasonId: "season-2" }];
+
+    const spendable = resolveMarketSpendableCashForPlanner({
+      gameState: state,
+      teamId: "T-1",
+      teamCash: 154,
+      rosterBelowMin: false,
+    });
+
+    expect(spendable).toBe(134);
+  });
+
+  it("unlocks current cash for hard-min fill even when stale budget reservations exist", () => {
+    const state = gameState({
+      cash: 154,
+      rosters: [{ id: "r1", teamId: "T-1", playerId: "p1", slot: 0, salary: 2 }],
+      players: [player("p1")],
+      budgetReservations: {
+        "T-1": {
+          teamId: "T-1",
+          seasonId: "season-2",
+          sourcePlanId: "test-plan",
+          cashReserve: 10,
+          salaryReserve: 15,
+          transferBudget: 8,
+          buildingBudget: 5,
+          maintenanceBudget: 10,
+          emergencyBudget: 5,
+          updatedAt: "2026-06-14T00:00:00.000Z",
+        },
+      },
+    });
+
+    const spendable = resolveMarketSpendableCashForPlanner({
+      gameState: state,
+      teamId: "T-1",
+      teamCash: 154,
+      rosterBelowMin: true,
+    });
+
+    expect(spendable).toBeGreaterThan(140);
+    expect(spendable).toBeLessThan(154);
+  });
+
   it("falls back to salary runway reserve when no budget reservations exist and roster is at Opt", () => {
     const playersAtOpt = Array.from({ length: 8 }, (_, index) => player(`p-${index + 1}`));
     const state = gameState({ cash: 100, playerFatigue: playersAtOpt.map(() => 20) });

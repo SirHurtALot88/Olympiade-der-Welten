@@ -148,7 +148,7 @@ describe("repairSeasonOneEndRosterBeforeS2", () => {
     runChunkedRedraftTopup.mockClear();
   });
 
-  it("repairs all hard-min teams even when planner exhausted list is narrower", () => {
+  it("does not top up hard-min teams at S1 end — rebuild deferred to S2 preseason", () => {
     const gameState = buildSeasonOneGameState();
     expect(getAllTeamsBelowMinIds(gameState)).toEqual(["team-a", "team-b"]);
 
@@ -156,16 +156,13 @@ describe("repairSeasonOneEndRosterBeforeS2", () => {
       getSaveById: () => ({ saveId: "save-1", gameState }),
     };
 
-    repairSeasonOneEndRosterBeforeS2("save-1", persistence as never, {
+    const result = repairSeasonOneEndRosterBeforeS2("save-1", persistence as never, {
       plannerExhaustedTeamIds: ["team-a"],
     });
 
-    expect(runChunkedRedraftTopup).toHaveBeenCalledWith(
-      expect.objectContaining({
-        targetTeamIds: expect.arrayContaining(["team-a", "team-b"]),
-      }),
-    );
-    const targetTeamIds = runChunkedRedraftTopup.mock.calls[0]?.[0]?.targetTeamIds as string[];
-    expect(targetTeamIds).toHaveLength(2);
+    expect(runChunkedRedraftTopup).not.toHaveBeenCalled();
+    expect(result.repaired).toBe(false);
+    expect(result.purchases).toEqual([]);
+    expect(result.warnings.some((entry) => entry.includes("deferred_to_next_preseason"))).toBe(true);
   });
 });

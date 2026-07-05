@@ -1,24 +1,34 @@
 import type { GameState, Player } from "@/lib/data/olyDataTypes";
+import { resolvePlayerEconomyContract } from "@/lib/foundation/player-economy-contract";
 
+import { buildRawDisciplineScoresByPlayerId } from "@/lib/player-formulas/discipline-rating-engine";
 import { loadPlayerFormulaSources } from "@/lib/player-formulas/formula-source-loader";
 import { calculateMarketValueFromRankTable } from "@/lib/player-formulas/market-value-engine";
+import type { MarketValueDisciplineInput } from "@/lib/player-formulas/player-formula-types";
 
 function getPlayerMwChangeFix(player: Player) {
   const value = (player as Player & { mwChangeFix?: number | null }).mwChangeFix;
   return typeof value === "number" && Number.isFinite(value) ? value : null;
 }
 
-export function buildRankTableMarketValueMap(gameState: GameState): Map<string, number> {
-  const formulaSources = loadPlayerFormulaSources();
-  const inputs = gameState.players
-    .filter((player) =>
-      Object.values(player.disciplineRatings ?? {}).some((value) => typeof value === "number" && Number.isFinite(value)),
-    )
+/** League-wide MW ranking inputs: raw attribute sums per discipline (not display discipline stats). */
+export function buildMarketValueDisciplineInputsFromPlayers(players: Player[]): MarketValueDisciplineInput[] {
+  const rawScoresByPlayerId = buildRawDisciplineScoresByPlayerId(players);
+  return players
+    .filter((player) => {
+      const scores = rawScoresByPlayerId.get(player.id);
+      return scores != null && Object.keys(scores).length > 0;
+    })
     .map((player) => ({
       playerId: player.id,
-      scores: player.disciplineRatings ?? {},
+      scores: rawScoresByPlayerId.get(player.id)!,
       mwChangeFix: getPlayerMwChangeFix(player) ?? undefined,
     }));
+}
+
+export function buildRankTableMarketValueMap(gameState: GameState): Map<string, number> {
+  const formulaSources = loadPlayerFormulaSources();
+  const inputs = buildMarketValueDisciplineInputsFromPlayers(gameState.players);
 
   const result = calculateMarketValueFromRankTable({
     players: inputs,
@@ -60,9 +70,39 @@ export function applyRankTableMarketValuesToGameState(gameState: GameState): Gam
     };
   });
 
-  return {
+  return syncRosterMarketValuesWithPlayerEconomy({
     ...gameState,
     players: nextPlayers,
+    rosters: nextRosters,
+  });
+}
+
+/** Align roster currentValue/marketValue with canonical player economy MV (rank-table / display). */
+export function syncRosterMarketValuesWithPlayerEconomy(gameState: GameState): GameState {
+  const playerById = new Map(gameState.players.map((player) => [player.id, player] as const));
+  let changed = false;
+  const nextRosters = gameState.rosters.map((entry) => {
+    const player = playerById.get(entry.playerId);
+    const marketValue = resolvePlayerEconomyContract({ player, rosterEntry: entry }).marketValue;
+    if (marketValue == null) {
+      return entry;
+    }
+    const normalized = Number(marketValue.toFixed(2));
+    if (entry.currentValue === normalized && entry.marketValue === normalized) {
+      return entry;
+    }
+    changed = true;
+    return {
+      ...entry,
+      currentValue: normalized,
+      marketValue: normalized,
+    };
+  });
+  if (!changed) {
+    return gameState;
+  }
+  return {
+    ...gameState,
     rosters: nextRosters,
   };
 }

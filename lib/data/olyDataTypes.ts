@@ -1595,6 +1595,20 @@ export type SeasonDisciplineScheduleEntry = {
   sourceNote: string | null;
 };
 
+/** Season-end depth stress from lineup coverage; drives opt bump for the next preseason. */
+export type TeamRosterStressRecord = {
+  teamId: string;
+  sourceSeasonId: string;
+  matchdaysTotal: number;
+  matchdaysWithSlotGaps: number;
+  matchdaysWithRosterLimited: number;
+  conserveSideUses: number;
+  endedBelowBaseOpt: boolean;
+  depthStressScore: number;
+  optBump: number;
+  generatedAt: string;
+};
+
 export type FormCardPlanRecord = {
   id: string;
   saveId: string;
@@ -1730,6 +1744,8 @@ export type SeasonSnapshotTeamRecord = {
     soc: number | null;
   };
   cashEnd: number | null;
+  /** Roster size captured at season_end (post-sell). Preserved when entry roster is patched after next preseason buys. */
+  rosterEndPostSell?: number | null;
   rosterEnd: number;
   rosterCountEnd?: number | null;
   salaryEnd: number | null;
@@ -1876,6 +1892,9 @@ export type SeasonSnapshotRecord = {
   playerPerformanceSnapshots?: SeasonSnapshotPlayerPerformanceRecord[];
   transferSnapshots?: SeasonSnapshotTransferRecord[];
   gmAssignments?: SeasonSnapshotGeneralManagerRecord[];
+  /** Set when rosterEnd/cashEnd were refreshed from the next season's preseason (post-buy entry state). */
+  entryRosterPatchedAt?: string | null;
+  entryRosterPatchedFromSeasonId?: string | null;
   warnings?: string[];
 };
 
@@ -2143,6 +2162,8 @@ export type SeasonState = {
   formCardPlans?: FormCardPlanRecord[];
   teamPowers?: TeamPowerRecord[];
   lineupDrafts?: LineupDraft[];
+  /** Per-team depth stress ledger for next-season roster planning (computed at season_end). */
+  teamRosterStressByTeamId?: Record<string, TeamRosterStressRecord>;
   matchdayResults?: MatchdayResultRecord[];
   disciplineResults?: DisciplineResultRecord[];
   playerDisciplinePerformances?: PlayerDisciplinePerformanceRecord[];

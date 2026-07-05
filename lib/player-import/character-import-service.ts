@@ -18,11 +18,7 @@ import {
   PROGRESSION_CLASS_ORDER,
 } from "@/lib/training/class-progression-config";
 import { getTransfermarktTierFromPoints } from "@/lib/market/transfermarkt-sheet-stats";
-import {
-  officialDisciplineWeightMatrix,
-  officialDisciplineWeightOrder,
-  type PlayerGeneratorAttributeKey,
-} from "@/lib/player-generator/official-discipline-weights";
+import { rebuildLeagueDisciplineRatings } from "@/lib/player-formulas/discipline-rating-engine";
 
 const ATTRIBUTE_KEYS: Array<keyof PlayerGeneratorAttributes> = [
   "power",
@@ -145,34 +141,91 @@ function deriveCoreStats(attributes: PlayerGeneratorAttributes) {
   };
 }
 
-function deriveDisciplineRatings(attributes: PlayerGeneratorAttributes) {
-  const ratings: Record<string, number> = {};
-  for (const disciplineId of officialDisciplineWeightOrder) {
-    const weights = officialDisciplineWeightMatrix[disciplineId];
-    const entries = Object.entries(weights) as Array<[PlayerGeneratorAttributeKey, number]>;
-    const totalWeight = entries.reduce((sum, [, weight]) => sum + weight, 0);
-    if (totalWeight <= 0) continue;
-    const weightedValue = entries.reduce((sum, [attributeKey, weight]) => sum + attributes[attributeKey] * weight, 0);
-    ratings[disciplineId] = roundTo1(Math.min(99, Math.max(1, weightedValue / totalWeight)));
+function materializeStatsPlayerFromBrief(
+  brief: OlympiadeCharacterBrief,
+  playerId: string,
+  leaguePlayers: Player[],
+): Omit<Player, "marketValue" | "salaryDemand" | "displayMarketValue" | "displaySalary"> {
+  const attributeRow = buildAttributeRow(brief.name, brief.attributes);
+  const draftPlayer = {
+    id: playerId,
+    name: brief.name.trim(),
+    rating: 0,
+    className: brief.className,
+    race: brief.race,
+    alignment: brief.alignment,
+    gender: brief.gender,
+    subclasses: brief.subclasses ?? [],
+    traitsPositive: brief.traitsPositive ?? [],
+    traitsNegative: brief.traitsNegative ?? [],
+    coreStats: deriveCoreStats(brief.attributes),
+    attributeSheetStats: {
+      power: attributeRow.power,
+      health: attributeRow.health,
+      stamina: attributeRow.stamina,
+      intelligence: attributeRow.intelligence,
+      awareness: attributeRow.awareness,
+      determination: attributeRow.determination,
+      speed: attributeRow.speed,
+      dexterity: attributeRow.dexterity,
+      charisma: attributeRow.charisma,
+      will: attributeRow.will,
+      spirit: attributeRow.spirit,
+      torment: attributeRow.torment,
+      powerRating: attributeRow.powerRating,
+      healthRating: attributeRow.healthRating,
+      staminaRating: attributeRow.staminaRating,
+      intelligenceRating: attributeRow.intelligenceRating,
+      awarenessRating: attributeRow.awarenessRating,
+      determinationRating: attributeRow.determinationRating,
+      speedRating: attributeRow.speedRating,
+      dexterityRating: attributeRow.dexterityRating,
+      charismaRating: attributeRow.charismaRating,
+      willRating: attributeRow.willRating,
+      spiritRating: attributeRow.spiritRating,
+      tormentRating: attributeRow.tormentRating,
+    },
+    preferredDisciplineIds: [],
+    disciplineRatings: {},
+    disciplineTierCounts: { above20: 0, above40: 0, above60: 0, above80: 0 },
+    flavorEn: brief.flavorEn ?? "",
+    flavorDe: brief.flavorDe ?? "",
+    fatigue: 0,
+    form: 0,
+    potential: 0,
+    cost: brief.cost ?? 0,
+    upkeepBase: brief.upkeepBase ?? 0,
+    portraitPath: brief.portraitPath ?? null,
+    referenceClass: null,
+    imageSource: null,
+    bracketLabel: null,
+  } satisfies Omit<Player, "marketValue" | "salaryDemand" | "displayMarketValue" | "displaySalary">;
+
+  const ranked = rebuildLeagueDisciplineRatings(
+    leaguePlayers.some((player) => player.id === playerId)
+      ? leaguePlayers.map((player) => (player.id === playerId ? { ...player, ...draftPlayer } : player))
+      : [...leaguePlayers, { ...draftPlayer, marketValue: 0, salaryDemand: 0, displayMarketValue: 0, displaySalary: 0 }],
+  ).find((player) => player.id === playerId);
+
+  if (!ranked) {
+    throw new Error(`Failed to derive league discipline ratings for ${brief.name}`);
   }
-  return ratings;
-}
 
-function deriveDisciplineTierCounts(ratings: Record<string, number>) {
-  const values = Object.values(ratings);
+  const disciplineRatings = ranked.disciplineRatings;
+  const ratingValues = Object.values(disciplineRatings);
+  const rating = roundTo2(ratingValues.reduce((sum, value) => sum + value, 0) / ratingValues.length);
+  const topAverage = roundTo2(
+    [...ratingValues].sort((left, right) => right - left).slice(0, 3).reduce((sum, value) => sum + value, 0) / 3,
+  );
+
   return {
-    above20: values.filter((value) => value > 20).length,
-    above40: values.filter((value) => value > 40).length,
-    above60: values.filter((value) => value > 60).length,
-    above80: values.filter((value) => value > 80).length,
+    ...draftPlayer,
+    rating,
+    preferredDisciplineIds: ranked.preferredDisciplineIds,
+    disciplineRatings,
+    disciplineTierCounts: ranked.disciplineTierCounts,
+    potential: roundTo2(Math.max(rating, topAverage) + 4),
   };
-}
-
-function derivePreferredDisciplineIds(ratings: Record<string, number>) {
-  return Object.entries(ratings)
-    .sort((left, right) => right[1] - left[1])
-    .slice(0, 3)
-    .map(([disciplineId]) => disciplineId);
 }
 
 function deriveRating(value: number) {
@@ -207,72 +260,13 @@ function computeEconomyForPlayer(player: Player, catalogPlayers: Player[]) {
   return economy;
 }
 
-function materializeStatsPlayerFromBrief(
-  brief: OlympiadeCharacterBrief,
-  playerId: string,
-): Omit<Player, "marketValue" | "salaryDemand" | "displayMarketValue" | "displaySalary"> {
-  const disciplineRatings = deriveDisciplineRatings(brief.attributes);
-  const ratingValues = Object.values(disciplineRatings);
-  const rating = roundTo2(ratingValues.reduce((sum, value) => sum + value, 0) / ratingValues.length);
-  const topAverage = roundTo2(
-    [...ratingValues].sort((left, right) => right - left).slice(0, 3).reduce((sum, value) => sum + value, 0) / 3,
-  );
-  const attributeRow = buildAttributeRow(brief.name, brief.attributes);
-
-  return {
-    id: playerId,
-    name: brief.name.trim(),
-    rating,
-    className: brief.className,
-    race: brief.race,
-    alignment: brief.alignment,
-    gender: brief.gender,
-    subclasses: (brief.subclasses ?? []).filter(Boolean).slice(0, 4),
-    traitsPositive: (brief.traitsPositive ?? []).slice(0, 3),
-    traitsNegative: (brief.traitsNegative ?? []).slice(0, 3),
-    coreStats: deriveCoreStats(brief.attributes),
-    attributeSheetStats: {
-      height: null,
-      ...brief.attributes,
-    },
-    attributeSheetRatings: {
-      powerRating: attributeRow.powerRating,
-      healthRating: attributeRow.healthRating,
-      staminaRating: attributeRow.staminaRating,
-      intelligenceRating: attributeRow.intelligenceRating,
-      awarenessRating: attributeRow.awarenessRating,
-      determinationRating: attributeRow.determinationRating,
-      speedRating: attributeRow.speedRating,
-      dexterityRating: attributeRow.dexterityRating,
-      charismaRating: attributeRow.charismaRating,
-      willRating: attributeRow.willRating,
-      spiritRating: attributeRow.spiritRating,
-      tormentRating: attributeRow.tormentRating,
-    },
-    preferredDisciplineIds: derivePreferredDisciplineIds(disciplineRatings),
-    disciplineRatings,
-    disciplineTierCounts: deriveDisciplineTierCounts(disciplineRatings),
-    flavorEn: brief.flavorEn ?? "",
-    flavorDe: brief.flavorDe ?? "",
-    fatigue: 0,
-    form: 0,
-    potential: roundTo2(Math.max(rating, topAverage) + 4),
-    cost: brief.cost ?? 0,
-    upkeepBase: brief.upkeepBase ?? 0,
-    portraitPath: brief.portraitPath ?? null,
-    referenceClass: null,
-    imageSource: null,
-    bracketLabel: null,
-  };
-}
-
 export function buildPlayerFromBrief(
   brief: OlympiadeCharacterBrief,
   existingPlayers: Player[] = loadImportedPlayerStats(),
 ): CharacterImportResult {
   const validationIssues = validateCharacterBrief(brief);
   const playerId = brief.id ?? buildPlayerId(brief.name, existingPlayers);
-  const statsPlayer = materializeStatsPlayerFromBrief(brief, playerId);
+  const statsPlayer = materializeStatsPlayerFromBrief(brief, playerId, existingPlayers);
   const attributeRow = buildAttributeRow(brief.name, brief.attributes);
 
   const catalogPlayers = existingPlayers.some((player) => player.id === playerId)

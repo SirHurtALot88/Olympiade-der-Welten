@@ -316,8 +316,6 @@ type AiBatchPreviewEntry = {
 type LegacyLineupLabClientProps = {
   embedded?: boolean;
   uiVariant?: "classic" | "focusV2";
-  onSwitchToClassic?: () => void;
-  onSwitchToFocusV2?: () => void;
   initialSource?: "sqlite" | "prisma";
   defaultSaveId?: string;
   defaultSaveName?: string;
@@ -1541,13 +1539,34 @@ function formatLineupHintLabel(value: string) {
     return "Captain prüfen";
   }
   if (normalized.includes("fatigue") || normalized.includes("ersch")) {
+    if (normalized.includes("kostet bereits")) {
+      return "Fatigue-Malus";
+    }
     return "Fatigue-Risiko";
   }
   if (normalized.includes("form")) {
     return "Formkarten prüfen";
   }
+  if (normalized.includes("off-role") || normalized.includes("passt schwach")) {
+    return "Off-Role";
+  }
+  if (normalized.includes("starker slot-fit") || normalized.includes("playbook-profil")) {
+    return "Guter Slot-Fit";
+  }
+  if (normalized.includes("push bei stark")) {
+    return "Push riskant";
+  }
+  if (normalized.includes("rivalitaet") || normalized.includes("rivalitätsdruck")) {
+    return "Rivalitätsdruck";
+  }
+  if (normalized.includes("schwaches") && normalized.includes("strain")) {
+    return "Strain-Risiko";
+  }
+  if (normalized.includes("slotrolle fehlt")) {
+    return "Keine Rolle";
+  }
   if (normalized.includes("slot")) {
-    return "Slot-Regel prüfen";
+    return "Rollen-Hinweis";
   }
   if (normalized.includes("lineup") || normalized.includes("vollst")) {
     return "Lineup prüfen";
@@ -2511,6 +2530,20 @@ export default function LegacyLineupLabClient(props: LegacyLineupLabClientProps)
   const selectedTeamIsReady = Boolean(selectedTeamOption?.currentMatchdayReady);
   const selectedMatchdayIsReady = Boolean(selectedMatchdayOption?.isReady);
   const missingSeasonFormCards = Boolean(context && (context.formCards?.length ?? 0) === 0);
+  const focusV2FormMiniChipsBySide = useMemo(() => {
+    const buildSide = (disciplineSide: "d1" | "d2") => {
+      const primaryCard =
+        (context?.formCards ?? []).find((card) => card.id === modifiers[disciplineSide].primaryFormCardId) ?? null;
+      const secondaryCard =
+        (context?.formCards ?? []).find((card) => card.id === modifiers[disciplineSide].secondaryFormCardId) ?? null;
+      return {
+        primaryLabel: primaryCard ? `F1 ${formatFormCardValueLabel(primaryCard.value)}` : null,
+        secondaryLabel: secondaryCard ? `F2+ ${formatFormCardValueLabel(secondaryCard.value)}` : null,
+        hasSelection: Boolean(primaryCard || secondaryCard),
+      };
+    };
+    return { d1: buildSide("d1"), d2: buildSide("d2") };
+  }, [context?.formCards, modifiers]);
   const usedFormCards = useMemo(
     () => sortFormCardsForDiscipline((context?.formCards ?? []).filter((card) => card.isUsed)),
     [context?.formCards],
@@ -4893,6 +4926,10 @@ export default function LegacyLineupLabClient(props: LegacyLineupLabClientProps)
       { skipContextReload: source === "sqlite" },
     );
     if (saved) {
+      setMessage("Einsatzliste gespeichert — Wechsel zur Arena …");
+      if (typeof window !== "undefined") {
+        window.sessionStorage.setItem("lineup-v2-arena-handoff", "1");
+      }
       props.onOpenArena?.({
         saveId: params.saveId,
         seasonId: params.seasonId,
@@ -7297,7 +7334,7 @@ export default function LegacyLineupLabClient(props: LegacyLineupLabClientProps)
               className={draftBoardView === "lineup" ? "is-active" : ""}
               onClick={() => setDraftBoardView("lineup")}
             >
-              Lineup
+              Einsatzliste
             </button>
             <button
               id="legacy-lineup-tab-formplan"
@@ -7308,7 +7345,7 @@ export default function LegacyLineupLabClient(props: LegacyLineupLabClientProps)
               className={draftBoardView === "formBoard" ? "is-active" : ""}
               onClick={() => setDraftBoardView("formBoard")}
             >
-              Formplan
+              Formkarten
               {formPlanOpenCells > 0 ? <span className="legacy-lineup-draft-view-tab-badge">{formPlanOpenCells}</span> : null}
             </button>
           </div>
@@ -7335,6 +7372,7 @@ export default function LegacyLineupLabClient(props: LegacyLineupLabClientProps)
             </DraftWorkspace>
           ) : null}
 
+	          {uiVariant !== "focusV2" ? (
 	          <details className="legacy-lineup-draft-collapsible legacy-lineup-draft-footer-wrap">
 	            <summary>Audit ({lineupMiniAudit.items.length})</summary>
 	            <div className="legacy-lineup-draft-footer">
@@ -7346,8 +7384,9 @@ export default function LegacyLineupLabClient(props: LegacyLineupLabClientProps)
 	            ))}
 	            </div>
 	          </details>
+	          ) : null}
 	
-	          {aiInsightPreview ? (
+	          {uiVariant !== "focusV2" && aiInsightPreview ? (
 	            <details className="legacy-lineup-draft-collapsible legacy-lineup-ai-insight-wrap">
 	              <summary>AI-Planung · {aiInsightPreview.teamName}</summary>
 	            <section className="legacy-lineup-ai-insight" aria-label="AI-Planung">
@@ -7607,11 +7646,30 @@ export default function LegacyLineupLabClient(props: LegacyLineupLabClientProps)
           ) : null}
 
           {draftBoardView === "lineup" && uiVariant === "focusV2" ? (
+            <section className="legacy-lineup-v2-trainer-tip" data-testid="lineup-v2-trainer-tip" aria-label="Trainer-Tipp">
+              <div className="legacy-lineup-v2-trainer-tip-copy">
+                <span>Trainer-Tipp</span>
+                <strong>{teamdeckSortInsight.label}</strong>
+                <small>{teamdeckSortInsight.detail}</small>
+              </div>
+              <button
+                className="secondary-button inline-button"
+                type="button"
+                disabled={isBusy || isReadOnly || matchdayPreviewCards.openSlots === 0}
+                onClick={handleAutoFillOpenSlots}
+              >
+                Vorschlag übernehmen
+              </button>
+            </section>
+          ) : null}
+
+          {draftBoardView === "lineup" && uiVariant === "focusV2" ? (
             <LegacyLineupFocusV2Board
               context={context}
               slots={slots}
               selections={selections}
               activeSlotKey={activeSlot?.key ?? null}
+              nextOpenSlotKey={nextOpenSlotKey}
               onActiveSlotChange={(slotKey) => {
                 setActiveSlotKey(slotKey);
                 const slot = slots.find((entry) => entry.key === slotKey);
@@ -7667,6 +7725,7 @@ export default function LegacyLineupLabClient(props: LegacyLineupLabClientProps)
               lineupFlowSummary={lineupFlowSummary}
               lineupSaveCta={lineupSaveCta}
               lineupReadyToSave={lineupReadyToSave}
+              lineupFinishItems={lineupFinishItems}
               lineupMiniAuditBlockers={lineupMiniAudit.blockingItems.length}
               captainBudgetExceeded={captainBudgetExceeded}
               missingSeasonFormCards={missingSeasonFormCards}
@@ -7679,6 +7738,7 @@ export default function LegacyLineupLabClient(props: LegacyLineupLabClientProps)
               playerFilter={playerFilter}
               onPlayerFilterChange={setPlayerFilter}
               disciplineColorClassBySide={disciplineColorClassBySide}
+              formMiniChipsBySide={focusV2FormMiniChipsBySide}
               controlsSlot={
                 <>
                   <label>
@@ -8109,7 +8169,7 @@ export default function LegacyLineupLabClient(props: LegacyLineupLabClientProps)
             </section>
             </div>
           ) : null}
-          {draftBoardView === "lineup" ? (
+          {draftBoardView === "lineup" && uiVariant !== "focusV2" ? (
             <div className={`legacy-lineup-ready-panel is-${lineupSaveCta.tone}`}>
               <div className="legacy-lineup-ready-panel-main">
                 <span>Ready Check</span>

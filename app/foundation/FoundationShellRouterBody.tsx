@@ -1717,6 +1717,7 @@ export function FoundationShellRouterBody(props: FoundationShellRouterBodyProps)
                 onOpenTraining={() => openTrainingPlayerTarget(playerProfileData.playerId)}
                 onOpenContractOffer={() => setFoundationView("marketV2", setActiveView)}
                 onOpenLeagueLeaders={onOpenLeagueLeaders}
+                onOpenTeam={(teamId) => openTeamProfileById(teamId)}
                 trainingRow={playerProfileTrainingRow}
                 trainingModeOptions={trainingV2ModeOptions}
                 trainingClassOptions={PROGRESSION_CLASS_ORDER.map((className) => ({ value: className, label: className }))}

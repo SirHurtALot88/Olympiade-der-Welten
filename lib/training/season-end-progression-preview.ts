@@ -15,10 +15,9 @@ import type { PlayerProgressionForecast, PlayerProgressionRatingTier } from "@/l
 import { PLAYER_PROGRESSION_XP_CONSTANTS } from "@/lib/training/player-progression-forecast";
 import {
   officialDisciplineWeightLabels,
-  officialDisciplineWeightOrder,
-  officialDisciplineWeightTable,
   type OfficialDisciplineWeightId,
 } from "@/lib/player-generator/official-discipline-weights";
+import { buildLeagueDisciplineRatingsWithAttributeOverrides } from "@/lib/player-formulas/discipline-rating-engine";
 
 export type SeasonEndFacilityPreviewLevel = 0 | 1 | 2 | 3 | 4 | 5;
 
@@ -274,40 +273,35 @@ function toGeneratorAttributes(player: Player, override?: { attribute: PlayerGen
   return normalized;
 }
 
-function calculateDisciplineValueFromAttributes(attributes: PlayerGeneratorAttributes, disciplineId: OfficialDisciplineWeightId) {
-  const weighted = Object.entries(officialDisciplineWeightTable).reduce((sum, [attribute, weights]) => {
-    return sum + attributes[attribute as PlayerGeneratorAttributeName] * weights[disciplineId];
-  }, 0);
-  const weightSum = Object.values(officialDisciplineWeightTable).reduce((sum, weights) => sum + weights[disciplineId], 0);
-  return weightSum > 0 ? roundValue(clamp(weighted / weightSum, 1, 99), 2) : null;
-}
-
 export function buildPreviewDisciplineRatingsFromAttributes(input: {
   player: Player;
   attributesAfter: PlayerGeneratorAttributes | null;
+  leaguePlayers?: Player[];
 }) {
   if (!input.attributesAfter) {
     return input.player.disciplineRatings ?? {};
   }
 
-  const nextRatings = { ...(input.player.disciplineRatings ?? {}) };
-  for (const disciplineId of officialDisciplineWeightOrder) {
-    const next = calculateDisciplineValueFromAttributes(input.attributesAfter, disciplineId);
-    if (next != null && Object.prototype.hasOwnProperty.call(nextRatings, disciplineId)) {
-      nextRatings[disciplineId] = next;
-    }
-  }
-  return nextRatings;
+  const leaguePlayers = input.leaguePlayers ?? [input.player];
+  const ratingsByPlayerId = buildLeagueDisciplineRatingsWithAttributeOverrides(leaguePlayers, {
+    [input.player.id]: input.attributesAfter,
+  });
+  return ratingsByPlayerId.get(input.player.id) ?? input.player.disciplineRatings ?? {};
 }
 
 export function buildPreviewDisciplineRatings(input: {
   player: Player;
   attribute: PlayerGeneratorAttributeName;
   attributeAfter: number | null;
+  leaguePlayers?: Player[];
 }) {
   const attributesAfter =
     input.attributeAfter == null ? null : toGeneratorAttributes(input.player, { attribute: input.attribute, value: input.attributeAfter });
-  return buildPreviewDisciplineRatingsFromAttributes({ player: input.player, attributesAfter });
+  return buildPreviewDisciplineRatingsFromAttributes({
+    player: input.player,
+    attributesAfter,
+    leaguePlayers: input.leaguePlayers,
+  });
 }
 
 export function buildSeasonEndDisciplineDeltas(input: {
@@ -565,8 +559,14 @@ export function buildSeasonEndProgressionPreview(input: {
     const baselineDisciplineRatings = buildPreviewDisciplineRatingsFromAttributes({
       player,
       attributesAfter: baselineAttributes,
+      leaguePlayers: input.gameState.players,
     });
-    const previewDisciplineRatings = buildPreviewDisciplineRatings({ player, attribute: selectedAttribute, attributeAfter });
+    const previewDisciplineRatings = buildPreviewDisciplineRatings({
+      player,
+      attribute: selectedAttribute,
+      attributeAfter,
+      leaguePlayers: input.gameState.players,
+    });
     const disciplineDeltas = buildSeasonEndDisciplineDeltas({
       disciplines: input.gameState.disciplines,
       lastSeasonDisciplineValues: baselineDisciplineRatings,

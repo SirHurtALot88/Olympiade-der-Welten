@@ -324,7 +324,7 @@ describe("ai market plan convergence service", () => {
 
   it("skips convergence for team already at identity opt even when below slot depth", async () => {
     const gameState = buildGameState({
-      teams: [{ teamId: "team-bp", name: "BP", shortCode: "B-P", cash: 50, humanControlled: false }],
+      teams: [{ teamId: "team-bp", name: "BP", shortCode: "B-P", cash: 5, humanControlled: false }],
       teamIdentities: [{ teamId: "team-bp", playerMin: 8, playerMax: 14, playerOpt: 10 }],
       rosters: Array.from({ length: 10 }, (_, index) => ({
         id: `r-bp-${index}`,

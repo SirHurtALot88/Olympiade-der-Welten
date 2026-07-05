@@ -23,6 +23,7 @@ import {
 } from "@/lib/market/transfermarkt-fit";
 import { createPersistenceService } from "@/lib/persistence/persistence-service";
 import type { LocalTransfermarktRunContext } from "@/lib/market/transfermarkt-local-service";
+import { resolveTeamLiquidityBufferTarget, usesSingleCashPlanningPolicy } from "@/lib/ai/planner-cash-buffer-policy";
 import { buildPrizeMoneyPreview, type PrizeMoneyPreviewItem } from "@/lib/season/prize-money-preview";
 import { buildRetoolParityMatrix, type RetoolParityRow } from "@/lib/ai/retool-parity-matrix";
 import {
@@ -1748,19 +1749,19 @@ function applyGmLanePhilosophyTilt(
 
 function getSeason1OptimumSpendTargetPct(team: Team, identity: ReturnType<typeof getTeamIdentityRow>) {
   const code = normalizeTeamCode(team.shortCode || team.teamId);
-  let targetPct = 0.93;
+  let targetPct = 0.95;
   if (["M-M", "H-R", "R-R", "V-V"].includes(code)) {
     targetPct = 0.975;
   } else if (["C-C", "T-T", "N-W", "R-C"].includes(code)) {
-    targetPct = 0.88;
+    targetPct = 0.9;
   }
   const ambition = normalizeManagementValue(identity?.ambition ?? 50);
   const finances = normalizeManagementValue(identity?.finances ?? 55);
   if (!["M-M", "H-R", "R-R", "V-V", "C-C", "T-T", "N-W", "R-C"].includes(code)) {
     if (ambition >= 0.72 && finances < 0.68) {
-      targetPct = 0.96;
+      targetPct = 0.98;
     } else if (finances >= 0.72 && ambition < 0.58) {
-      targetPct = 0.88;
+      targetPct = 0.9;
     }
   }
   return targetPct;
@@ -1777,37 +1778,37 @@ function getSeason1SpendCorridor(
   const harmony = normalizeManagementValue(identity?.harmony ?? 50);
   const philosophy = getSeason1LanePhilosophy(team);
   let archetype = "normal";
-  let minPct = 0.9;
+  let minPct = 0.93;
   let maxPct = 0.95;
 
   if (code === "C-C") {
     archetype = "value_buffer";
-    minPct = 0.85;
-    maxPct = 0.92;
+    minPct = 0.87;
+    maxPct = 0.94;
   } else if (code === "B-P") {
     archetype = "small_elite_top";
-    minPct = 0.94;
+    minPct = 0.96;
     maxPct = 0.985;
   } else if (code === "A-A" || (team.budget != null && team.budget <= 180)) {
     archetype = "cash_poor_pragmatic";
-    minPct = 0.85;
+    minPct = 0.87;
     maxPct = 0.95;
   } else if (code === "C-S") {
     archetype = "disciplined_precision";
-    minPct = 0.88;
-    maxPct = 0.93;
+    minPct = 0.9;
+    maxPct = 0.95;
   } else if (code === "T-T") {
     archetype = "leaders_then_fill";
-    minPct = 0.88;
-    maxPct = 0.94;
+    minPct = 0.9;
+    maxPct = 0.96;
   } else if (["M-M", "H-R", "R-R", "V-V", "D-L"].includes(code) || ambition >= 0.78) {
     archetype = "aggressive_top";
     minPct = 0.95;
     maxPct = 1;
   } else if (finances >= 0.72 || harmony >= 0.74 || ["T-T", "N-W", "R-C"].includes(code)) {
     archetype = "cautious_or_value";
-    minPct = 0.85;
-    maxPct = 0.9;
+    minPct = 0.87;
+    maxPct = 0.92;
   }
 
   const prizeAdjustment = getPrizeTrendSpendAdjustment(expectedPrizeSignal, identity);
@@ -2113,10 +2114,24 @@ function shouldContinueSeason1OptimumDraft(input: {
   estimatedSalaryTotal: number | null;
   cashStrategy: Pick<
     AiNeedsPicksCashStrategy,
-    "startingCash" | "season1SpendMinPct" | "season1SpendTargetPct" | "season1SpendPlan"
+    | "startingCash"
+    | "season1SpendMinPct"
+    | "season1SpendTargetPct"
+    | "season1SpendPlan"
+    | "season1TargetCashLeft"
+    | "shouldSaveCash"
   >;
 }) {
   const playerMax = input.playerMax ?? input.playerOpt;
+  if (input.cashStrategy.shouldSaveCash) {
+    if (input.simulatedRosterCount == null) {
+      return false;
+    }
+    if (input.simulatedRosterCount < input.playerOpt) {
+      return true;
+    }
+    return false;
+  }
   if (input.simulatedRosterCount == null) {
     return isSeason1SpendDownRequired(input);
   }
@@ -2125,6 +2140,10 @@ function shouldContinueSeason1OptimumDraft(input: {
   }
   if (input.simulatedRosterCount >= playerMax) {
     return false;
+  }
+  const targetCashLeft = input.cashStrategy.season1TargetCashLeft ?? 0;
+  if (input.remainingCash != null && input.remainingCash > targetCashLeft + 10) {
+    return true;
   }
   return isSeason1SpendDownRequired(input);
 }
@@ -2205,7 +2224,7 @@ function findSeason1OptimumSpendCandidate(input: {
       ? 4
       : code === "C-S" || code === "G-G" || code === "M-M" || (input.team.budget ?? 0) >= 280
         ? 8
-        : 18;
+        : 10;
   if (
     !belowIdentityOpt &&
     !cashSalaryOverCap &&
@@ -4713,6 +4732,7 @@ function buildPickPlanner(input: {
 }
 
 function buildCashStrategy(input: {
+  gameState: GameState;
   team: Team;
   identity: ReturnType<typeof getTeamIdentityRow>;
   profile: TeamStrategyProfile | null;
@@ -4783,12 +4803,19 @@ function buildCashStrategy(input: {
   const season1CorridorSpendTargetPct = season1OptimumMode
     ? getAdjustedSeason1OptimumSpendTargetPct(input.team, input.identity, input.expectedPrizeSignal)
     : null;
-  // Corridor spend target is authoritative; GM buffer is telemetry only (salary float caps end cash separately).
+  // GM buffer tilts spend target within the corridor: aggressive GMs spend more (lower restcash),
+  // thrift/value GMs keep a larger end-of-draft reserve.
   const season1GmDraftBufferPct =
     season1OptimumMode && season1CorridorSpendTargetPct != null
       ? getGmDraftBufferPct(input.profile, season1CorridorSpendTargetPct)
       : null;
-  const season1SpendTargetPct = season1CorridorSpendTargetPct;
+  const season1SpendTargetPct =
+    season1OptimumMode && season1GmDraftBufferPct != null && season1SpendCorridor != null
+      ? roundValue(
+          clamp(1 - season1GmDraftBufferPct, season1SpendCorridor.minPct, season1SpendCorridor.maxPct),
+          3,
+        )
+      : season1CorridorSpendTargetPct;
   const estimatedSalaryTotal =
     season1OptimumMode && input.anchors.q50Price > 0
       ? estimateSeason1DraftSalaryTotal({
@@ -4865,18 +4892,32 @@ function buildCashStrategy(input: {
   const minCashBuffer =
     season1OptimumMode
       ? season1TargetCashLeft
-      : reserveTargetBase == null
-        ? reservedCashForMinimum
-        : roundValue(
-            Math.max(
-              reservedCashForMinimum ?? 0,
-              reserveTargetBase,
-              (reservedCashForMinimum ?? 0) + (reservedCashForDepth ?? 0) * 0.35,
-            ),
-            2,
-          );
+      : usesSingleCashPlanningPolicy(input.gameState) &&
+          missingTargetSlots > 0 &&
+          currentCash != null &&
+          currentCash > resolveTeamLiquidityBufferTarget(input.gameState, input.team.teamId)
+        ? resolveTeamLiquidityBufferTarget(input.gameState, input.team.teamId)
+        : reserveTargetBase == null
+          ? reservedCashForMinimum
+          : roundValue(
+              Math.max(
+                reservedCashForMinimum ?? 0,
+                reserveTargetBase,
+                (reservedCashForMinimum ?? 0) + (reservedCashForDepth ?? 0) * 0.35,
+              ),
+              2,
+            );
+  const liquidityBufferTarget = usesSingleCashPlanningPolicy(input.gameState)
+    ? resolveTeamLiquidityBufferTarget(input.gameState, input.team.teamId)
+    : null;
+  const hasOptHeadroom =
+    liquidityBufferTarget != null &&
+    currentCash != null &&
+    currentCash > liquidityBufferTarget &&
+    missingTargetSlots > 0;
   const shouldSaveCash =
     !season1OptimumMode &&
+    !hasOptHeadroom &&
     missingMinimumSlots === 0 &&
     missingTargetSlots > 0 &&
     (financesValue >= 0.68 || harmonyValue >= 0.68) &&
@@ -6841,6 +6882,7 @@ function buildTeamEntry(input: {
     input.prizeSignalByTeamId.get(team.teamId) ??
     toComparePrizeSignal(null, "missing_source");
   const cashStrategy = buildCashStrategy({
+    gameState: input.context.gameState,
     team,
     identity,
     profile,
@@ -7088,6 +7130,14 @@ function buildTeamEntry(input: {
         cashStrategy: stepCashStrategy,
       });
     const mustContinueTowardOptimum = shouldContinueSeason1Optimum && minimumSecured;
+    const spendDownRequiredThisStep =
+      season1OptimumMode &&
+      isSeason1SpendDownRequired({
+        remainingCash,
+        remainingSalary,
+        estimatedSalaryTotal: draftEstimatedSalaryTotal,
+        cashStrategy: stepCashStrategy,
+      });
     const scoringPool = compareCandidates.filter((entry) => !pickedPlayerIds.includes(entry.playerId));
 
     // S1 quality gate: once playerOpt is reached, only allow non-cheap picks in extra slots.
@@ -7105,13 +7155,39 @@ function buildTeamEntry(input: {
     // toward the fatigue/injury-buffered target, fall back to the full (price-unfiltered) pool
     // here so the existing downstream safety nets (reachability/corridor/emergency-pick fallbacks
     // below) still get a chance to find a legal, affordable depth pick.
-    const qualityFloorSoftened = s1PostOptReached && qualityFilteredScoringPool.length === 0 && scoringPool.length > 0;
-    const effectiveScoringPool = qualityFloorSoftened ? scoringPool : qualityFilteredScoringPool;
-    if (effectiveScoringPool.length === 0) {
-      if (s1PostOptReached) {
-        warnings.push("s1_extra_pick_quality_floor_stop");
+    const qualityFloorSoftened =
+      (s1PostOptReached || spendDownRequiredThisStep) &&
+      qualityFilteredScoringPool.length === 0 &&
+      scoringPool.length > 0;
+    let effectiveScoringPool = qualityFloorSoftened ? scoringPool : qualityFilteredScoringPool;
+    if (effectiveScoringPool.length === 0 && spendDownRequiredThisStep && scoringPool.length > 0) {
+      effectiveScoringPool = scoringPool.filter(
+        (entry) => (entry.price ?? entry.marketValue ?? 0) >= AI_CHEAP_FILL_MARKET_VALUE_CAP,
+      );
+      if (effectiveScoringPool.length > 0) {
+        warnings.push(`Schritt ${stepIndex + 1}: s1_spend_down_minimum_legal_pool_fallback`);
       }
-      break;
+    }
+    if (effectiveScoringPool.length === 0) {
+      const belowOptNeedsDepth =
+        season1OptimumMode &&
+        minimumSecured &&
+        simulatedRosterCount != null &&
+        rosterTargets.playerOpt != null &&
+        simulatedRosterCount < rosterTargets.playerOpt;
+      if ((spendDownRequiredThisStep || belowOptNeedsDepth) && scoringPool.length > 0) {
+        effectiveScoringPool = scoringPool;
+        warnings.push(
+          spendDownRequiredThisStep
+            ? `Schritt ${stepIndex + 1}: s1_spend_down_scoring_pool_expand`
+            : `Schritt ${stepIndex + 1}: s1_below_opt_quality_pool_expand`,
+        );
+      } else {
+        if (s1PostOptReached) {
+          warnings.push("s1_extra_pick_quality_floor_stop");
+        }
+        break;
+      }
     }
     if (qualityFloorSoftened) {
       warnings.push(`Schritt ${stepIndex + 1}: s1_extra_pick_quality_floor_softened`);
@@ -7689,6 +7765,35 @@ function buildTeamEntry(input: {
         warnings.push(`Schritt ${stepIndex + 1}: execute_spendable_parity_block`);
       }
     }
+    if (top && season1OptimumMode) {
+      const topEval = candidateEvaluations.find((entry) => entry.entry.playerId === top?.playerId);
+      if (topEval && !topEval.minimumReachableAfterPick) {
+        const reserveGateDowngradeEvaluations = (
+          minimumSafeCandidateEvaluations.length > 0
+            ? minimumSafeCandidateEvaluations
+            : gatedCandidateEvaluations.filter((entry) => entry.minimumReachableAfterPick)
+        )
+          .filter((entry) => entry.entry.playerId !== top?.playerId)
+          .sort((left, right) => {
+            const priceDelta =
+              (left.price ?? Number.MAX_SAFE_INTEGER) - (right.price ?? Number.MAX_SAFE_INTEGER);
+            if (priceDelta !== 0) return priceDelta;
+            const leftScore = scored.find((entry) => entry.playerId === left.entry.playerId)?.finalScore ?? 0;
+            const rightScore = scored.find((entry) => entry.playerId === right.entry.playerId)?.finalScore ?? 0;
+            return rightScore - leftScore;
+          });
+        for (const downgradeEval of reserveGateDowngradeEvaluations) {
+          const downgradeScored = scored.find((entry) => entry.playerId === downgradeEval.entry.playerId);
+          if (downgradeScored && downgradeScored.focusTeamStatus !== "blocked") {
+            warnings.push(
+              `Schritt ${stepIndex + 1}: season1_reserve_gate_downgrade:${top.price ?? "na"}→${downgradeScored.price ?? "na"}`,
+            );
+            top = downgradeScored;
+            break;
+          }
+        }
+      }
+    }
     if (!top) {
       warnings.push("Kein weiterer belastbarer Kandidat fuer die sequentielle Vorschau.");
       if (minimumSlotsBefore > 0) {
@@ -7723,6 +7828,10 @@ function buildTeamEntry(input: {
         warnings.push(
           `Schritt ${stepIndex + 1}: season1_spend_corridor_relaxed_for_target_gap:${targetSlotsBefore}`,
         );
+      } else if (spendDownRequiredThisStep) {
+        warnings.push(`Schritt ${stepIndex + 1}: season1_spend_corridor_continue_spend_down`);
+      } else if (shouldContinueSeason1Optimum && !stepCashStrategy.shouldSaveCash) {
+        warnings.push(`Schritt ${stepIndex + 1}: season1_spend_corridor_continue_opt_or_cash_target`);
       } else {
       const projectedSpend = getSeason1ProjectedSpendPct({
         candidate: top,

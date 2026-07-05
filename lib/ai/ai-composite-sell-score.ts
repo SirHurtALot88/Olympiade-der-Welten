@@ -142,6 +142,7 @@ export type CompositeSellScoreResult = {
     contract: number;
     mwDecline: number;
     performanceKeep: number;
+    boardCohesionKeep: number;
     lossResistance: number;
   };
 };
@@ -223,6 +224,12 @@ export function computeCompositeSellScore(input: CompositeSellScoreInput): Compo
     ? -round(0.6 * (0.4 + harmonyScore * 0.35 + identityLoyalty * 0.25) * weights.performanceKeep * keepMultiplier)
     : 0;
 
+  const boardConfidence = normalizeManagementValue(input.identity?.boardConfidence);
+  const boardCohesionKeep =
+    boardConfidence >= 0.65
+      ? -round((boardConfidence - 0.55) * weights.performanceKeep * 1.35 * keepMultiplier)
+      : 0;
+
   const sellBelowPurchase =
     purchasePrice != null && expectedSell != null && expectedSell < purchasePrice;
   const bottomTercile = poolEligible && rank != null && rank >= Math.ceil((pool * 2) / 3);
@@ -234,7 +241,7 @@ export function computeCompositeSellScore(input: CompositeSellScoreInput): Compo
 
   const total = round(
     clamp(
-      profit + financial + bracketLag + depthReplace + contract + mwDecline + performanceKeep + lossResistance,
+      profit + financial + bracketLag + depthReplace + contract + mwDecline + performanceKeep + boardCohesionKeep + lossResistance,
       0,
       100,
     ),
@@ -255,6 +262,7 @@ export function computeCompositeSellScore(input: CompositeSellScoreInput): Compo
       contract,
       mwDecline,
       performanceKeep,
+      boardCohesionKeep: round(boardCohesionKeep),
       lossResistance,
     },
   };
@@ -267,6 +275,8 @@ export function selectCompositeSellCandidates<T extends { expectedSellValue?: nu
     teamSalaryTotal: number;
     cashPressureScore: number;
     teamProfile: CompositeSellTeamProfile;
+    /** When true (season_end sell pass), keep taking profit-sell candidates even after cash pressure is resolved. */
+    allowProfitSellsBelowMin?: boolean;
   },
 ): T[] {
   const sorted = [...input.candidates].sort((left, right) => right.score - left.score);
@@ -291,7 +301,7 @@ export function selectCompositeSellCandidates<T extends { expectedSellValue?: nu
   };
 
   for (const entry of sorted) {
-    if (selected.length > 0 && isCashPressureResolved()) {
+    if (selected.length > 0 && isCashPressureResolved() && !input.allowProfitSellsBelowMin) {
       break;
     }
     selected.push(entry.candidate);

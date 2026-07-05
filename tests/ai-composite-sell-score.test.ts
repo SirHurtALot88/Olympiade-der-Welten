@@ -207,4 +207,21 @@ describe("ai-composite-sell-score", () => {
     expect(selected.length).toBeLessThan(candidates.length);
     expect(selected.length).toBeGreaterThan(0);
   });
+
+  it("can keep profit-selling below hardMin when allowProfitSellsBelowMin is set", () => {
+    const candidates = [
+      { candidate: { expectedSellValue: 20, salary: 5 }, score: 55 },
+      { candidate: { expectedSellValue: 18, salary: 4 }, score: 52 },
+      { candidate: { expectedSellValue: 15, salary: 3 }, score: 48 },
+    ];
+    const selected = selectCompositeSellCandidates({
+      candidates,
+      teamCash: 80,
+      teamSalaryTotal: 40,
+      cashPressureScore: 0.1,
+      teamProfile: "default",
+      allowProfitSellsBelowMin: true,
+    });
+    expect(selected).toHaveLength(3);
+  });
 });

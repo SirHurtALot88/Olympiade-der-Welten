@@ -388,22 +388,16 @@ function auditSeasonEndPackage(save: PersistedSaveGame, context: LongRunPhaseAud
   );
 
   const belowMin = getTeamsBelowRosterMin(gameState).map((row) => row.team.shortCode);
-  if (belowMin.length > 0 && seasonId === "season-1") {
-    checks.push(
-      check(
-        "roster_after_exits",
-        "WARN",
-        `${belowMin.length} Teams unter Min nach S1-Ende (Refill in S2-Preseason)`,
-        belowMin,
-      ),
-    );
-  } else {
-    checks.push(
-      belowMin.length > 0
-        ? check("roster_after_exits", "RED", `${belowMin.length} Teams unter Min nach Repair`, belowMin)
-        : check("roster_after_exits", "PASS", "Alle Teams ≥ Min"),
-    );
-  }
+  checks.push(
+    belowMin.length > 0
+      ? check(
+          "roster_after_exits",
+          "WARN",
+          `${belowMin.length} Teams unter Min nach Season-End-Verkauf (Rebuild in Preseason; kein Sell-Floor)`,
+          belowMin,
+        )
+      : check("roster_after_exits", "PASS", "Alle Teams ≥ Min"),
+  );
 
   const finance = buildTransferFinanceAudit(gameState);
   const hardFinanceViolations = finance.violations.filter(

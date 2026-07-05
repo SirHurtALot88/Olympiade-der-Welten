@@ -212,7 +212,7 @@ function buildRankedCandidates(
     }
 
     const economy = resolvePlayerEconomyContract({ player, rosterEntry });
-    const baseMarketValue = normalizeVisibleRosterMoney(rosterEntry.currentValue, economy.marketValue);
+    const baseMarketValue = economy.marketValue;
     if (baseMarketValue == null || baseMarketValue <= 0) {
       continue;
     }
@@ -283,7 +283,7 @@ export function buildTransfermarktSaleFactorBreakdown(
 ): TransfermarktSaleFactorBreakdown {
   const saveId = options?.saveId ?? null;
   const economy = resolvePlayerEconomyContract({ player, rosterEntry });
-  const baseMarketValue = normalizeVisibleRosterMoney(rosterEntry?.currentValue, economy.marketValue) ?? economy.marketValue ?? null;
+  const baseMarketValue = economy.marketValue ?? null;
 
   if (baseMarketValue == null || baseMarketValue <= 0) {
     return {

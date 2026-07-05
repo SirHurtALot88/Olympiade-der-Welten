@@ -8,7 +8,10 @@ import { resolvePlayerEconomyContract } from "@/lib/foundation/player-economy-co
 import { getTeamControlSettings } from "@/lib/foundation/team-control-settings";
 import { getTeamGeneralManager } from "@/lib/foundation/team-general-managers";
 import { buildTeamContractSeasonTable } from "@/lib/market/contract-negotiation-preview";
-import type { TeamManagementSnapshotRow } from "@/lib/foundation/team-management-overview";
+import {
+  type TeamManagementSnapshotRow,
+} from "@/lib/foundation/team-management-overview";
+import { resolveLiveSeasonStandRowsForTeamHistory } from "@/lib/foundation/team-detail-history-rows";
 import { compareTeamRosterPlayersByOvrOrMarketValue } from "@/lib/foundation/team-roster-player-sort";
 import { getPlayerPortraitModel } from "@/lib/foundation/tabs/foundation-page-module-helpers";
 import {
@@ -22,6 +25,10 @@ import {
 import type { TeamsAreaRank } from "@/lib/foundation/tabs/teams-view-derivations";
 import { buildTransfermarktSaleFactorBreakdown } from "@/lib/market/transfermarkt-sale-factor";
 import { resolveTeamSellProfit } from "@/lib/foundation/team-transfer-history-helpers";
+import {
+  computeTeamSeasonAverageMatchdayFatigue,
+  countTeamSeasonInjuries,
+} from "@/lib/foundation/team-history-health-metrics";
 import { buildTeamPlayerDemandMap, selectTeamCaptain } from "@/lib/morale/player-demands-service";
 import { getPotentialBand } from "@/lib/progression/player-potential-service";
 import { buildTeamRelationshipCards } from "@/lib/rivalries/team-relationship-dynamics";
@@ -105,6 +112,8 @@ export function useFoundationCrossTabTeamsRoster(input: {
   rosterPlayers: Array<{ entry: RosterEntry; player: Player }>;
   playerRatingsById: Map<string, FoundationPlayerRatingSnapshot>;
   seasonStandRows: TeamManagementSnapshotRow[];
+  seasonStandRowsSeasonId: string;
+  activeSaveId?: string | null;
   currentAreaRanksByTeamId: Map<string, TeamsAreaRank>;
   seasonPointsLedger: SeasonPointsLedger;
   teamObjectiveOverview: TeamObjectiveOverview;
@@ -115,6 +124,22 @@ export function useFoundationCrossTabTeamsRoster(input: {
     shouldBuildHomeV2Overview: input.shouldBuildHomeV2Overview,
     shouldBuildMarketView: input.shouldBuildMarketView,
   });
+
+  const liveSeasonStandRows = useMemo(
+    () =>
+      resolveLiveSeasonStandRowsForTeamHistory({
+        gameState: input.gameState,
+        seasonStandRows: input.seasonStandRows,
+        seasonStandRowsSeasonId: input.seasonStandRowsSeasonId,
+        activeSaveId: input.activeSaveId,
+      }),
+    [
+      input.activeSaveId,
+      input.gameState,
+      input.seasonStandRows,
+      input.seasonStandRowsSeasonId,
+    ],
+  );
 
   const selectedRosterTableRows = useMemo(() => {
     if (!shouldBuildSelectedRosterTableRows) {
@@ -181,7 +206,7 @@ export function useFoundationCrossTabTeamsRoster(input: {
       const teamControl = getTeamControlSettings(input.gameState, team.teamId);
       const logo = getTeamLogoModel(team, { variant: "preview" });
       const liveSeasonOverviewRow =
-        input.seasonStandRows.find((entry) => entry.teamId === team.teamId) ?? null;
+        liveSeasonStandRows.find((entry) => entry.teamId === team.teamId) ?? null;
       const currentAreaRanks = areaRanksByTeamId.get(team.teamId) ?? null;
       const currentTeamPointsSummary = input.seasonPointsLedger?.teamSummariesByTeamId.get(team.teamId) ?? null;
       const currentSeasonTransfers = input.gameState.transferHistory.filter(
@@ -219,6 +244,13 @@ export function useFoundationCrossTabTeamsRoster(input: {
             soc: null,
           };
           const disciplineValues = buildTeamHistoryDisciplineValuesFromSnapshot(snapshot, team.teamId);
+          const injuriesCount = countTeamSeasonInjuries(input.gameState, team.teamId, snapshot.seasonId);
+          const averageFatigue = computeTeamSeasonAverageMatchdayFatigue({
+            gameState: input.gameState,
+            teamId: team.teamId,
+            seasonId: snapshot.seasonId,
+            snapshot,
+          });
 
           return {
             seasonId: snapshot.seasonId,
@@ -245,11 +277,19 @@ export function useFoundationCrossTabTeamsRoster(input: {
               topSell?.playerId != null
                 ? resolveTeamSellProfit(input.gameState, team.teamId, topSell.playerId, topSell.amount)
                 : null,
+            injuriesCount: injuriesCount > 0 ? injuriesCount : null,
+            averageFatigue,
             disciplineValues,
           } satisfies TeamDetailDrawerHistoryRow;
         })
         .filter((entry): entry is NonNullable<typeof entry> => Boolean(entry));
       const liveDisciplineValues = buildTeamHistoryDisciplineValuesFromRecord(liveSeasonOverviewRow?.disciplineValues);
+      const currentInjuriesCount = countTeamSeasonInjuries(input.gameState, team.teamId, input.gameState.season.id);
+      const currentAverageFatigue = computeTeamSeasonAverageMatchdayFatigue({
+        gameState: input.gameState,
+        teamId: team.teamId,
+        seasonId: input.gameState.season.id,
+      });
       const currentHistoryRow: TeamDetailDrawerHistoryRow = {
         seasonId: input.gameState.season.id,
         seasonName: input.gameState.season.name,
@@ -295,6 +335,8 @@ export function useFoundationCrossTabTeamsRoster(input: {
           currentTopSell?.playerId != null
             ? resolveTeamSellProfit(input.gameState, team.teamId, currentTopSell.playerId, currentTopSell.fee)
             : null,
+        injuriesCount: currentInjuriesCount > 0 ? currentInjuriesCount : null,
+        averageFatigue: currentAverageFatigue,
         disciplineValues: liveDisciplineValues,
       };
       const history = [
@@ -540,7 +582,7 @@ export function useFoundationCrossTabTeamsRoster(input: {
       input.gameState,
       input.playerRatingsById,
       input.seasonPointsLedger,
-      input.seasonStandRows,
+      liveSeasonStandRows,
       input.teamObjectiveOverview.boardConfidence,
       input.teamObjectiveOverview.objectives,
     ],

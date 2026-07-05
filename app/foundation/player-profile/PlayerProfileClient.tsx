@@ -4,6 +4,7 @@ import { useEffect } from "react";
 
 import PlayerDetailDrawer from "@/app/foundation/PlayerDetailDrawer";
 import type { PlayerDetailDrawerData } from "@/lib/foundation/player-detail-drawer";
+import type { LeagueLeaderCategoryId } from "@/lib/foundation/league-leaders-service";
 import {
   PLAYER_PROFILE_TAB_ANCHORS,
   type PlayerProfileTabId,
@@ -22,7 +23,11 @@ type PlayerProfileClientProps = {
   onClose?: () => void;
   onOpenTraining?: () => void;
   onOpenContractOffer?: () => void;
-  onOpenLeagueLeaders?: (categoryId: "ovr" | "pps" | "mvs") => void;
+  onOpenLeagueLeaders?: (
+    categoryId: LeagueLeaderCategoryId,
+    returnContext?: { playerId: string; playerName: string },
+  ) => void;
+  onOpenTeam?: (teamId: string) => void;
   trainingRow?: TrainingPlayerRowView | null;
   trainingModeOptions?: TrainingModeOption[];
   trainingClassOptions?: TrainingClassOption[];
@@ -39,6 +44,7 @@ export default function PlayerProfileClient({
   onOpenTraining,
   onOpenContractOffer,
   onOpenLeagueLeaders,
+  onOpenTeam,
   trainingRow = null,
   trainingModeOptions = [],
   trainingClassOptions = [],
@@ -63,6 +69,7 @@ export default function PlayerProfileClient({
       }}
       onOpenTraining={onOpenTraining}
       onOpenLeagueLeaders={onOpenLeagueLeaders}
+      onOpenTeam={onOpenTeam}
       trainingRow={trainingRow}
       trainingModeOptions={trainingModeOptions}
       trainingClassOptions={trainingClassOptions}

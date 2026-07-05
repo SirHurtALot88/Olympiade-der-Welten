@@ -4,6 +4,7 @@
  * Usage:
  *   node --import tsx scripts/run-s1-draft-plus50-multi.ts
  *   node --import tsx scripts/run-s1-draft-plus50-multi.ts --runs 5 --with-baseline
+ *   node --import tsx scripts/run-s1-draft-plus50-multi.ts --runs 5 --cash-bonus 0
  */
 import fs from "node:fs";
 import path from "node:path";
@@ -179,6 +180,56 @@ function countBlockerMatches(blockers: string[], picksRunTeams: Array<{ blocking
   return count;
 }
 
+function writeFailureForensics(input: {
+  outputDir: string;
+  picksRun: Awaited<ReturnType<typeof runCanonicalSeasonOneDraftPhase>>["picksRun"];
+  blockers: string[];
+  teamsBelowMin: string[];
+}) {
+  if (input.teamsBelowMin.length === 0) {
+    return;
+  }
+  const forensics = input.teamsBelowMin.map((entry) => {
+    const [teamCode] = entry.split(":");
+    const team = input.picksRun.teams.find((row) => row.teamCode === teamCode);
+    if (!team) {
+      return { teamCode, entry, error: "team_not_found_in_picks_run" };
+    }
+    return {
+      teamCode,
+      entry,
+      rosterBefore: team.rosterBefore,
+      rosterAfter: team.rosterAfter,
+      targetRosterMin: team.targetRosterMin,
+      targetRosterSize: team.targetRosterSize,
+      teamBlockingReasons: team.blockingReasons,
+      teamWarnings: team.warnings,
+      executeWarnings: team.warnings.filter(
+        (warning) =>
+          warning.includes("partial") ||
+          warning.includes("fallback") ||
+          warning.includes("drift") ||
+          warning.includes("excluded") ||
+          warning.includes("emergency"),
+      ),
+      globalBlockers: input.picksRun.blockingReasons.filter((reason) => reason.includes(teamCode)),
+      topupBlockers: input.blockers.filter((reason) => reason.includes(teamCode)),
+      plannedPicks: team.plannedPicks.filter((pick) => pick.status !== "blocked").length,
+      appliedPicks: team.plannedPicks.filter((pick) => pick.status === "applied").length,
+      blockedPicks: team.plannedPicks.filter((pick) => pick.status === "blocked").length,
+      picks: team.plannedPicks.map((pick) => ({
+        status: pick.status,
+        playerName: pick.playerName,
+        marketValue: pick.marketValue,
+        minimumReachableAfterPick: pick.minimumReachableAfterPick,
+        warnings: pick.warnings,
+      })),
+      previewSummary: team.previewSummary,
+    };
+  });
+  fs.writeFileSync(path.join(input.outputDir, "failure-forensics.json"), JSON.stringify(forensics, null, 2));
+}
+
 function collectRunMetrics(input: {
   save: PersistedSaveGame;
   picksRun: Awaited<ReturnType<typeof runCanonicalSeasonOneDraftPhase>>["picksRun"];
@@ -329,6 +380,13 @@ async function runSingleDraft(config: RunConfig): Promise<RunResult> {
     durationMs,
   });
 
+  writeFailureForensics({
+    outputDir: config.outputDir,
+    picksRun: draftPhase.picksRun,
+    blockers: draftPhase.blockers,
+    teamsBelowMin: result.teamsBelowMin,
+  });
+
   fs.writeFileSync(path.join(config.outputDir, "run-result.json"), JSON.stringify(result, null, 2));
   log(
     `${config.label}: picks=${result.aiRosterFillBuys} min=${result.teamsAtMin}/${result.teamCount} opt=${result.teamsAtOpt}/${result.teamCount} avgCash=${result.avgCashRemaining} (${Math.round(durationMs / 1000)}s)`,
@@ -360,43 +418,47 @@ function buildLeagueTable(rows: TeamSnapshot[], title: string) {
 }
 
 function buildGermanReport(results: RunResult[], baseline: RunResult | null) {
-  const plus50 = results.filter((row) => row.cashBonus > 0);
+  const batchRuns = results;
+  const cashBonus = batchRuns[0]?.cashBonus ?? 0;
+  const batchTitle = cashBonus > 0 ? `+${cashBonus} Cash` : "Standard-Cash";
   const lines: string[] = [
-    "# S1 Draft +50 Cash Experiment (Fix: cash + budget)",
+    `# S1 Draft ${batchTitle} Experiment`,
     "",
-    "Fix: +50 wird auf `team.cash` **und** `team.budget` angewendet (startingCash für Quality Gate).",
+    cashBonus > 0
+      ? "Fix: Bonus wird auf `team.cash` **und** `team.budget` angewendet (startingCash für Quality Gate)."
+      : "Kein Start-Cash-Bonus — Teams draften mit normalem Season-1-Startbudget.",
     "",
-    "## Zusammenfassung (+50 Runs)",
+    `## Zusammenfassung (${batchTitle} Runs)`,
     "",
     "| Run | Picks | Min-Rate | Opt-Rate | Ø Cash | Σ MW | spend>starting | insufficient |",
     "| --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: |",
   ];
 
-  for (const row of plus50) {
+  for (const row of batchRuns) {
     lines.push(
       `| ${row.label} | ${row.aiRosterFillBuys} | ${row.teamsAtMin}/${row.teamCount} (${pct(row.teamsAtMin, row.teamCount)}%) | ${row.teamsAtOpt}/${row.teamCount} (${pct(row.teamsAtOpt, row.teamCount)}%) | ${row.avgCashRemaining} | ${row.sumMw} | ${row.plannedSpendExceedsStartingCashBlockers} | ${row.insufficientCashBlockers} |`,
     );
   }
 
-  if (plus50.length > 1) {
-    const avgPicks = round(plus50.reduce((sum, row) => sum + row.aiRosterFillBuys, 0) / plus50.length, 1);
-    const avgMinRate = round(plus50.reduce((sum, row) => sum + pct(row.teamsAtMin, row.teamCount), 0) / plus50.length, 1);
-    const avgOptRate = round(plus50.reduce((sum, row) => sum + pct(row.teamsAtOpt, row.teamCount), 0) / plus50.length, 1);
-    const avgCash = round(plus50.reduce((sum, row) => sum + row.avgCashRemaining, 0) / plus50.length, 1);
-    const avgMw = round(plus50.reduce((sum, row) => sum + row.sumMw, 0) / plus50.length, 0);
+  if (batchRuns.length > 1) {
+    const avgPicks = round(batchRuns.reduce((sum, row) => sum + row.aiRosterFillBuys, 0) / batchRuns.length, 1);
+    const avgMinRate = round(batchRuns.reduce((sum, row) => sum + pct(row.teamsAtMin, row.teamCount), 0) / batchRuns.length, 1);
+    const avgOptRate = round(batchRuns.reduce((sum, row) => sum + pct(row.teamsAtOpt, row.teamCount), 0) / batchRuns.length, 1);
+    const avgCash = round(batchRuns.reduce((sum, row) => sum + row.avgCashRemaining, 0) / batchRuns.length, 1);
+    const avgMw = round(batchRuns.reduce((sum, row) => sum + row.sumMw, 0) / batchRuns.length, 0);
 
     lines.push(
       "",
-      `**Mittelwerte (+50, ${plus50.length} Runs):** Picks Ø ${avgPicks} · Min-Rate Ø ${avgMinRate}% · Opt-Rate Ø ${avgOptRate}% · Ø Cash ${avgCash} · Σ MW Ø ${avgMw}`,
+      `**Mittelwerte (${batchTitle}, ${batchRuns.length} Runs):** Picks Ø ${avgPicks} · Min-Rate Ø ${avgMinRate}% · Opt-Rate Ø ${avgOptRate}% · Ø Cash ${avgCash} · Σ MW Ø ${avgMw}`,
     );
   }
 
-  for (const row of plus50) {
+  for (const row of batchRuns) {
     lines.push("", ...buildLeagueTable(row.teamRows, `${row.label} — Liga-Tabelle (32 Teams)`));
   }
 
   lines.push("", "## Edge-Case-Teams S-C · W-L · T-T", "");
-  for (const row of plus50) {
+  for (const row of batchRuns) {
     lines.push(`**${row.label}**`);
     for (const code of SPECIAL_TEAMS) {
       const team = row.specialTeams[code];
@@ -429,10 +491,10 @@ function buildGermanReport(results: RunResult[], baseline: RunResult | null) {
       "### Delta (+50 Mittel vs Baseline)",
       "",
     );
-    if (plus50.length > 0) {
-      const avgPicks = round(plus50.reduce((sum, r) => sum + r.aiRosterFillBuys, 0) / plus50.length, 1);
-      const avgOpt = round(plus50.reduce((sum, r) => sum + r.teamsAtOpt, 0) / plus50.length, 1);
-      const avgMin = round(plus50.reduce((sum, r) => sum + r.teamsAtMin, 0) / plus50.length, 1);
+    if (batchRuns.length > 0) {
+      const avgPicks = round(batchRuns.reduce((sum, r) => sum + r.aiRosterFillBuys, 0) / batchRuns.length, 1);
+      const avgOpt = round(batchRuns.reduce((sum, r) => sum + r.teamsAtOpt, 0) / batchRuns.length, 1);
+      const avgMin = round(batchRuns.reduce((sum, r) => sum + r.teamsAtMin, 0) / batchRuns.length, 1);
       lines.push(
         `- Picks: ${avgPicks} vs ${baseline.aiRosterFillBuys} (${avgPicks - baseline.aiRosterFillBuys >= 0 ? "+" : ""}${round(avgPicks - baseline.aiRosterFillBuys, 1)})`,
         `- Opt-Teams Ø: ${avgOpt} vs ${baseline.teamsAtOpt} (${avgOpt - baseline.teamsAtOpt >= 0 ? "+" : ""}${round(avgOpt - baseline.teamsAtOpt, 1)})`,
@@ -440,32 +502,32 @@ function buildGermanReport(results: RunResult[], baseline: RunResult | null) {
       );
       for (const code of SPECIAL_TEAMS) {
         const baseTeam = baseline.teamRows.find((t) => t.teamCode === code);
-        const plusTeam = plus50.at(-1)?.teamRows.find((t) => t.teamCode === code);
-        if (baseTeam && plusTeam) {
+        const batchTeam = batchRuns.at(-1)?.teamRows.find((t) => t.teamCode === code);
+        if (baseTeam && batchTeam) {
           lines.push(
-            `- **${code}** (letzter +50-Run): Opt ${plusTeam.roster}/${plusTeam.playerOpt} vs Baseline ${baseTeam.roster}/${baseTeam.playerOpt} · Cash ${plusTeam.cashAfter} vs ${baseTeam.cashAfter}`,
+            `- **${code}** (letzter Run): Opt ${batchTeam.roster}/${batchTeam.playerOpt} vs Baseline ${baseTeam.roster}/${baseTeam.playerOpt} · Cash ${batchTeam.cashAfter} vs ${baseTeam.cashAfter}`,
           );
         }
       }
     }
   }
 
-  const last = plus50.at(-1);
+  const last = batchRuns.at(-1);
   if (last) {
-    lines.push("", "## Save-Pfade (letzter +50-Run)", "", `- Output: \`${last.outputDir}\``, `- SQLite: \`${last.sqlitePath}\``, `- Save-ID: \`${last.saveId}\``);
+    lines.push("", "## Save-Pfade (letzter Run)", "", `- Output: \`${last.outputDir}\``, `- SQLite: \`${last.sqlitePath}\``, `- Save-ID: \`${last.saveId}\``);
   }
 
-  const plus50Works = plus50.every((row) => row.aiRosterFillBuys > 0);
-  const plus50Successful = plus50.filter((row) => row.aiRosterFillBuys > 0);
-  const noSpendBlockers = plus50.every((row) => row.plannedSpendExceedsStartingCashBlockers === 0);
+  const batchWorks = batchRuns.every((row) => row.aiRosterFillBuys > 0);
+  const batchSuccessful = batchRuns.filter((row) => row.aiRosterFillBuys > 0);
+  const noSpendBlockers = batchRuns.every((row) => row.plannedSpendExceedsStartingCashBlockers === 0);
   const avgOptRate =
-    plus50.length > 0
-      ? round(plus50.reduce((sum, row) => sum + pct(row.teamsAtOpt, row.teamCount), 0) / plus50.length, 1)
+    batchRuns.length > 0
+      ? round(batchRuns.reduce((sum, row) => sum + pct(row.teamsAtOpt, row.teamCount), 0) / batchRuns.length, 1)
       : 0;
   const successOptRate =
-    plus50Successful.length > 0
+    batchSuccessful.length > 0
       ? round(
-          plus50Successful.reduce((sum, row) => sum + pct(row.teamsAtOpt, row.teamCount), 0) / plus50Successful.length,
+          batchSuccessful.reduce((sum, row) => sum + pct(row.teamsAtOpt, row.teamCount), 0) / batchSuccessful.length,
           1,
         )
       : null;
@@ -477,25 +539,25 @@ function buildGermanReport(results: RunResult[], baseline: RunResult | null) {
       "✓ **Fix bestätigt:** `planned_spend_exceeds_starting_cash` = 0 in allen Runs (cash+budget synchron).",
     );
   }
-  if (!plus50Works) {
-    const failed = plus50.filter((row) => row.aiRosterFillBuys === 0);
+  if (!batchWorks) {
+    const failed = batchRuns.filter((row) => row.aiRosterFillBuys === 0);
     lines.push(
       "",
-      `${failed.length}/${plus50.length} +50-Runs scheitern am Quality Gate (z.B. \`season1_spend_floor_missed\` / \`season1_topup_below_min\`) — **nicht** mehr am startingCash-Budget-Mismatch.`,
+      `${failed.length}/${batchRuns.length} Runs scheitern am Quality Gate (z.B. \`season1_spend_floor_missed\` / \`season1_topup_below_min\`) — **nicht** mehr am startingCash-Budget-Mismatch.`,
     );
   }
   if (successOptRate != null && baselineOptRate != null) {
     const delta = round(successOptRate - baselineOptRate, 1);
     lines.push(
       "",
-      `**Erfolgreiche +50-Runs (${plus50Successful.length}/${plus50.length}):** Opt-Rate Ø ${successOptRate}% vs Baseline ${baselineOptRate}% (${delta >= 0 ? "+" : ""}${delta} pp).`,
+      `**Erfolgreiche Runs (${batchSuccessful.length}/${batchRuns.length}):** Opt-Rate Ø ${successOptRate}% vs Baseline ${baselineOptRate}% (${delta >= 0 ? "+" : ""}${delta} pp).`,
       delta >= 5
-        ? "**Ja** — +50 Start-Cash (cash+budget) verbessert die Opt-Rate in erfolgreichen Runs deutlich; Teams behalten mehr Cash und erreichen häufiger Opt-Kader."
+        ? `**Ja** — ${batchTitle} verbessert die Opt-Rate in erfolgreichen Runs deutlich.`
         : delta > 0
           ? "**Leicht ja** — Opt-Rate steigt moderat in erfolgreichen Runs."
           : "**Nein** — Opt-Rate verbessert sich nicht material.",
     );
-  } else if (plus50Works && baselineOptRate != null) {
+  } else if (batchWorks && baselineOptRate != null) {
     lines.push(
       "",
       successOptRate != null && successOptRate > baselineOptRate
@@ -507,24 +569,122 @@ function buildGermanReport(results: RunResult[], baseline: RunResult | null) {
   return lines.join("\n");
 }
 
+function buildErrorSummary(results: RunResult[]) {
+  const belowMinCounts = new Map<string, number>();
+  const belowOptCounts = new Map<string, number>();
+  const hardFailRuns: string[] = [];
+  const zeroPickRuns: string[] = [];
+  const blockerCounts = new Map<string, number>();
+
+  for (const row of results) {
+    if (row.teamsBelowMin.length > 0) {
+      hardFailRuns.push(`${row.label}: ${row.teamsBelowMin.join(", ")}`);
+    }
+    if (row.aiRosterFillBuys === 0) {
+      zeroPickRuns.push(row.label);
+    }
+    for (const entry of row.teamsBelowMin) {
+      const teamCode = entry.split(":")[0];
+      belowMinCounts.set(teamCode, (belowMinCounts.get(teamCode) ?? 0) + 1);
+    }
+    for (const entry of row.teamsBelowOpt) {
+      const teamCode = entry.split(":")[0];
+      belowOptCounts.set(teamCode, (belowOptCounts.get(teamCode) ?? 0) + 1);
+    }
+    for (const blocker of row.allBlockers) {
+      const key = blocker.split(":")[0];
+      blockerCounts.set(key, (blockerCounts.get(key) ?? 0) + 1);
+    }
+  }
+
+  const chronicBelowOpt = [...belowOptCounts.entries()]
+    .filter(([, count]) => count >= Math.max(2, Math.ceil(results.length * 0.6)))
+    .sort((left, right) => right[1] - left[1])
+    .map(([teamCode, count]) => ({ teamCode, count, runs: results.length }));
+
+  const avgMinRate = round(
+    results.reduce((sum, row) => sum + pct(row.teamsAtMin, row.teamCount), 0) / Math.max(1, results.length),
+    1,
+  );
+  const avgOptRate = round(
+    results.reduce((sum, row) => sum + pct(row.teamsAtOpt, row.teamCount), 0) / Math.max(1, results.length),
+    1,
+  );
+  const avgCash = round(
+    results.reduce((sum, row) => sum + row.avgCashRemaining, 0) / Math.max(1, results.length),
+    1,
+  );
+
+  return {
+    generatedAt: new Date().toISOString(),
+    runCount: results.length,
+    avgMinRate,
+    avgOptRate,
+    avgCash,
+    hardFailRuns,
+    zeroPickRuns,
+    chronicBelowOpt,
+    belowMinCounts: Object.fromEntries([...belowMinCounts.entries()].sort((a, b) => b[1] - a[1])),
+    belowOptCounts: Object.fromEntries([...belowOptCounts.entries()].sort((a, b) => b[1] - a[1])),
+    topBlockers: Object.fromEntries(
+      [...blockerCounts.entries()].sort((left, right) => right[1] - left[1]).slice(0, 12),
+    ),
+  };
+}
+
+function buildErrorSummaryMarkdown(summary: ReturnType<typeof buildErrorSummary>) {
+  const lines = [
+    "## Fehleranalyse (aggregiert)",
+    "",
+    `| Metrik | Wert |`,
+    `| --- | ---: |`,
+    `| Runs | ${summary.runCount} |`,
+    `| Min-Rate Ø | ${summary.avgMinRate}% |`,
+    `| Opt-Rate Ø | ${summary.avgOptRate}% |`,
+    `| Ø Cash | ${summary.avgCash} |`,
+    `| Hard-Fail Runs | ${summary.hardFailRuns.length} |`,
+    `| 0-Pick Runs | ${summary.zeroPickRuns.length} |`,
+    "",
+  ];
+  if (summary.hardFailRuns.length > 0) {
+    lines.push("### Hard-Fails", "", ...summary.hardFailRuns.map((entry) => `- ${entry}`), "");
+  }
+  if (summary.chronicBelowOpt.length > 0) {
+    lines.push("### Chronic below-opt (≥60% Runs)", "");
+    for (const entry of summary.chronicBelowOpt) {
+      lines.push(`- **${entry.teamCode}:** ${entry.count}/${entry.runs} Runs`);
+    }
+    lines.push("");
+  }
+  if (Object.keys(summary.topBlockers).length > 0) {
+    lines.push("### Top Blocker-Prefixe", "");
+    for (const [key, count] of Object.entries(summary.topBlockers)) {
+      lines.push(`- \`${key}\`: ${count}×`);
+    }
+  }
+  return lines.join("\n");
+}
+
 async function main() {
   loadEnvConfig(PROJECT_ROOT);
   const runCount = Math.max(1, Number(argValue("--runs") ?? "5") || 5);
   const withBaseline = hasFlag("--with-baseline");
+  const cashBonus = Math.max(0, Number(argValue("--cash-bonus") ?? "50") || 0);
+  const batchLabel = cashBonus > 0 ? `plus${cashBonus}` : "standard";
   const timestamp = new Date().toISOString().replace(/[:.]/g, "-").slice(0, 19);
-  const rootOutput = path.join(PROJECT_ROOT, "outputs", `s1-draft-plus50-fixed-batch-${timestamp}`);
+  const rootOutput = path.join(PROJECT_ROOT, "outputs", `s1-draft-${batchLabel}-batch-${timestamp}`);
   fs.mkdirSync(rootOutput, { recursive: true });
 
   log(`Batch output → ${rootOutput}`);
-  log(`Runs: ${runCount}${withBaseline ? " + baseline" : ""}`);
+  log(`Runs: ${runCount} (cashBonus=${cashBonus})${withBaseline ? " + baseline" : ""}`);
 
   const plus50Results: RunResult[] = [];
   for (let index = 1; index <= runCount; index += 1) {
     plus50Results.push(
       await runSingleDraft({
         label: `Run ${index}`,
-        cashBonus: 50,
-        outputDir: path.join(rootOutput, `s1-draft-plus50-run${index}-${timestamp}`),
+        cashBonus,
+        outputDir: path.join(rootOutput, `s1-draft-${batchLabel}-run${index}-${timestamp}`),
       }),
     );
   }
@@ -539,13 +699,16 @@ async function main() {
   }
 
   const report = buildGermanReport(plus50Results, baseline);
-  fs.writeFileSync(path.join(rootOutput, "report.md"), report);
+  const errorSummary = buildErrorSummary(plus50Results);
+  const fullReport = `${report}\n\n${buildErrorSummaryMarkdown(errorSummary)}`;
+  fs.writeFileSync(path.join(rootOutput, "report.md"), fullReport);
+  fs.writeFileSync(path.join(rootOutput, "error-summary.json"), JSON.stringify(errorSummary, null, 2));
   fs.writeFileSync(
     path.join(rootOutput, "results.json"),
-    JSON.stringify({ plus50Results, baseline, generatedAt: new Date().toISOString() }, null, 2),
+    JSON.stringify({ plus50Results, baseline, errorSummary, generatedAt: new Date().toISOString() }, null, 2),
   );
 
-  console.log(report);
+  console.log(fullReport);
   log(`Done → ${rootOutput}`);
 }
 

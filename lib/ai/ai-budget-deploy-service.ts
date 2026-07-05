@@ -195,7 +195,8 @@ export function teamNeedsTransferBudgetDeploy(gameState: GameState, teamId: stri
   const rosterCount = getRosterCount(gameState, teamId);
   const identity = gameState.teamIdentities.find((entry) => entry.teamId === teamId);
   const { playerOpt } = deriveRosterTargets(team, identity);
-  if (rosterCount < playerOpt) return false;
+  const cashSalaryRatio = salary > 0 ? cash / salary : 0;
+  if (rosterCount < playerOpt && cashSalaryRatio + 0.01 < 1.15) return false;
   if (teamNeedsPostOptUpgradeDeploy(gameState, teamId, seasonId)) return true;
   const optTarget = getTeamOptTarget(gameState, teamId);
   const teamMw = getTeamMarketValueSum(gameState, teamId);

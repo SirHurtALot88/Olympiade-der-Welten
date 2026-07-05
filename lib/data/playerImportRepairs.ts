@@ -1,10 +1,6 @@
 import type { Player, PlayerAttributeSheetStats, PlayerGeneratorAttributes } from "@/lib/data/olyDataTypes";
 import { materializeCalculatedEconomyForPlayers } from "@/lib/player-formulas/imported-player-economy";
-import {
-  officialDisciplineWeightMatrix,
-  officialDisciplineWeightOrder,
-  type PlayerGeneratorAttributeKey,
-} from "@/lib/player-generator/official-discipline-weights";
+import { rebuildLeagueDisciplineRatings } from "@/lib/player-formulas/discipline-rating-engine";
 
 const RILEY_LE_ROGUE_ID = "player-0154-riley-le-rouge";
 
@@ -22,11 +18,6 @@ function isFiniteNumber(value: unknown): value is number {
 
 function normalizeText(value: string | null | undefined) {
   return (value ?? "").trim().toLocaleLowerCase("de");
-}
-
-function hasOnlyEmptyDisciplineRatings(player: Player) {
-  const values = Object.values(player.disciplineRatings ?? {});
-  return values.length === 0 || values.every((value) => !isFiniteNumber(value) || value <= 0);
 }
 
 function toGeneratorAttributes(stats?: PlayerAttributeSheetStats | null): PlayerGeneratorAttributes | null {
@@ -58,21 +49,6 @@ function deriveCoreStats(attributes: PlayerGeneratorAttributes) {
     men: roundTo1((attributes.intelligence + attributes.awareness + attributes.determination + attributes.will) / 4),
     soc: roundTo1((attributes.charisma + attributes.spirit + attributes.torment) / 3),
   };
-}
-
-function deriveDisciplineRatings(attributes: PlayerGeneratorAttributes) {
-  const ratings: Record<string, number> = {};
-  for (const disciplineId of officialDisciplineWeightOrder) {
-    const weights = officialDisciplineWeightMatrix[disciplineId];
-    const entries = Object.entries(weights) as Array<[PlayerGeneratorAttributeKey, number]>;
-    const totalWeight = entries.reduce((sum, [, weight]) => sum + weight, 0);
-    if (totalWeight <= 0) continue;
-    const weightedValue = entries.reduce((sum, [attributeKey, weight]) => {
-      return sum + attributes[attributeKey] * weight;
-    }, 0);
-    ratings[disciplineId] = roundTo1(Math.min(99, Math.max(1, weightedValue / totalWeight)));
-  }
-  return ratings;
 }
 
 function tierCounts(ratings: Record<string, number>) {
@@ -116,9 +92,7 @@ function repairRileyLeRogue(player: Player): Player {
   }
 
   const coreStats = deriveCoreStats(attributes);
-  const disciplineRatings = hasOnlyEmptyDisciplineRatings(player)
-    ? deriveDisciplineRatings(attributes)
-    : player.disciplineRatings;
+  const disciplineRatings = player.disciplineRatings;
   const ratingValues = Object.values(disciplineRatings).filter(isFiniteNumber);
   const rating = roundTo2(average(ratingValues));
   const topAverage = roundTo2(
@@ -148,5 +122,6 @@ function repairRileyLeRogue(player: Player): Player {
 
 export function repairImportedPlayerData(players: Player[]) {
   const repaired = players.map(repairRileyLeRogue);
-  return materializeCalculatedEconomyForPlayers(repaired);
+  const withLeagueDisciplineRatings = rebuildLeagueDisciplineRatings(repaired);
+  return materializeCalculatedEconomyForPlayers(withLeagueDisciplineRatings);
 }

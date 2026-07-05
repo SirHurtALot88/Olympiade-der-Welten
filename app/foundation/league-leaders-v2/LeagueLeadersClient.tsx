@@ -8,6 +8,8 @@ export interface LeagueLeadersClientProps {
   categories: LeagueLeaderCategory[];
   selectedTeamId: string | null;
   seasonLabel: string;
+  returnContext?: { playerId: string; playerName: string } | null;
+  onReturnToPlayer?: () => void;
   onOpenPlayer: (playerId: string) => void;
 }
 
@@ -15,6 +17,8 @@ export default function LeagueLeadersClient({
   categories,
   selectedTeamId,
   seasonLabel,
+  returnContext,
+  onReturnToPlayer,
   onOpenPlayer,
 }: LeagueLeadersClientProps) {
   return (
@@ -33,6 +37,11 @@ export default function LeagueLeadersClient({
             Liga-Leaders
           </TooltipHeading>
           <p className="muted">{seasonLabel}</p>
+          {returnContext && onReturnToPlayer ? (
+            <button type="button" className="table-link-button league-leaders-back-link" onClick={onReturnToPlayer}>
+              ← Zurück zu {returnContext.playerName}
+            </button>
+          ) : null}
         </div>
       </div>
 

@@ -206,6 +206,8 @@ describe("foundation transfermarkt ui contract", () => {
     ]);
 
     expect(fileText).toContain("FoundationPlayerPortraitCard");
+    expect(fileText).toContain("playerRatingsById");
+    expect(fileText).toContain("ovrRank={playerRating?.ovrRank ?? null}");
     expect(fileText).toContain('context="market"');
     expect(fileText).toContain('density="compact"');
     expect(fileText).toContain('data-testid="transfer-candidate-card"');

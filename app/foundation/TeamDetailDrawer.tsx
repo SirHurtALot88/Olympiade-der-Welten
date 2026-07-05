@@ -87,6 +87,8 @@ export type TeamDetailDrawerHistoryRow = {
   topSellPlayerId: string | null;
   topSellAmount: number | null;
   topSellProfit: number | null;
+  injuriesCount: number | null;
+  averageFatigue: number | null;
   disciplineValues: Partial<Record<string, number | null>>;
 };
 
@@ -658,6 +660,12 @@ export default function TeamDetailDrawer({
                   if (columnId === "mw") return formatNumber(row.marketValue, 2);
                   if (columnId === "guv") {
                     return <span className={getMoneyDeltaClass(row.guv, "higher")}>{formatSignedNumber(row.guv, 1)}</span>;
+                  }
+                  if (columnId === "injuriesCount") {
+                    return row.injuriesCount != null ? row.injuriesCount : "—";
+                  }
+                  if (columnId === "averageFatigue") {
+                    return row.averageFatigue != null ? formatNumber(row.averageFatigue, 1) : "—";
                   }
                   if (columnId === "topBuy") {
                     return row.topBuyPlayer ? (

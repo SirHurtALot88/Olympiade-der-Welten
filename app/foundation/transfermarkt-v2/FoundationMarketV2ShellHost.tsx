@@ -57,7 +57,17 @@ export type FoundationMarketV2ShellHostProps = {
     string,
     { controlMode: TeamControlMode; ownerId?: string | null; ownerSlot?: string | null }
   >;
-  playerRatingsById: Map<string, { ppsSeason?: number | null; ovrNormalized?: number | null; mvs?: number | null }>;
+  playerRatingsById: Map<
+    string,
+    {
+      ppsSeason?: number | null;
+      ovrNormalized?: number | null;
+      mvs?: number | null;
+      ovrRank?: number | null;
+      ppsSeasonRank?: number | null;
+      mvsRank?: number | null;
+    }
+  >;
   seasonPointsLedger?: import("@/lib/foundation/season-points-ledger").SeasonPointsLedger | null;
   roomContext: FoundationRoomContext | null;
   formatGamePhaseLabel: (phase: string) => string;
@@ -190,6 +200,7 @@ export default function FoundationMarketV2ShellHost({
         teams: gameState.teams,
         disciplines: gameState.disciplines as Discipline[],
         rosterRows: transferMarketV2RosterRows,
+        playerRatingsById,
         wishlistEntries: transferWishlistEntriesForMarketV2,
         wishlistPlayerIds: transferWishlistEntriesForMarketV2.map((entry) => entry.playerId),
         boardObjectiveHighlights: selectedTransfermarktBoardObjectives,

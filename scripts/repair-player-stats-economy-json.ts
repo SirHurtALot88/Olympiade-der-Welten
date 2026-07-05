@@ -10,7 +10,9 @@ async function main() {
   const players = JSON.parse(await readFile(jsonPath, "utf8")) as Player[];
   const repaired = repairImportedPlayerData(players.map(hydratePlayerWithAttributeSheet));
 
-  let updated = 0;
+  let economyUpdated = 0;
+  let disciplineUpdated = 0;
+  let coreStatsUpdated = 0;
   for (let index = 0; index < players.length; index += 1) {
     const before = players[index];
     const after = repaired[index];
@@ -20,12 +22,20 @@ async function main() {
       before?.displayMarketValue !== after?.displayMarketValue ||
       before?.displaySalary !== after?.displaySalary
     ) {
-      updated += 1;
+      economyUpdated += 1;
+    }
+    if (JSON.stringify(before?.disciplineRatings ?? {}) !== JSON.stringify(after?.disciplineRatings ?? {})) {
+      disciplineUpdated += 1;
+    }
+    if (JSON.stringify(before?.coreStats ?? {}) !== JSON.stringify(after?.coreStats ?? {})) {
+      coreStatsUpdated += 1;
     }
   }
 
   await writeFile(jsonPath, `${JSON.stringify(repaired, null, 2)}\n`, "utf8");
-  console.log(`repairedPlayers: ${updated}`);
+  console.log(`economyUpdated: ${economyUpdated}`);
+  console.log(`disciplineUpdated: ${disciplineUpdated}`);
+  console.log(`coreStatsUpdated: ${coreStatsUpdated}`);
   console.log(`output: ${jsonPath}`);
 }
 

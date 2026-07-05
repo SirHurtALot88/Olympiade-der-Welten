@@ -188,13 +188,21 @@ export default function FormBoardPanel({
           <div className="legacy-lineup-form-deck-head">
             <span>Karten-Deck</span>
             <strong>{activeFormPickCell ? "Karte wählen" : "Zelle links aktivieren"}</strong>
+            <span className="legacy-lineup-form-deck-count">
+              {formDeckCards.filter((card) => !card.isUsed && !card.isReserved).length} frei · {formDeckCards.length} gesamt
+            </span>
           </div>
           {activeFormPickCell ? (
             <button className="secondary-button legacy-lineup-form-deck-clear" type="button" onClick={clearActiveFormPickCell} disabled={isReadOnly}>
               Auswahl leeren
             </button>
           ) : null}
-          <div className="legacy-lineup-form-deck-grid">
+          <div className="legacy-lineup-form-deck-stack" aria-hidden="true">
+            {formDeckCards.filter((card) => !card.isUsed).slice(0, 3).map((card, index) => (
+              <span key={`deck-stack-${card.id}`} className={`legacy-lineup-form-deck-stack-card is-${card.color}`} style={{ transform: `translateY(${index * 4}px)` }} />
+            ))}
+          </div>
+          <div className="legacy-lineup-form-deck-grid is-deck-feel">
             {formDeckCards.map((card) => {
               const activeCellColor = activeFormPickCell?.disciplineColor ?? null;
               const allowedDeckCardIds = activeFormPickCell

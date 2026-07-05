@@ -1,5 +1,9 @@
 import type { GameState, SponsorOffer, SponsorOfferComponent } from "@/lib/data/olyDataTypes";
 import { buildTeamSeasonOverviewRows } from "@/lib/foundation/team-management-overview";
+import {
+  getRankMilestoneBonus,
+  SPONSOR_RANK_MILESTONES,
+} from "@/lib/sponsor/sponsor-economy-calibration";
 import { getTeamDisplaySalaryTotal } from "@/lib/sponsor/sponsor-team-salary-display";
 import {
   getTeamAxisRank,
@@ -194,4 +198,34 @@ export function getSponsorComponentKindLabel(kind: SponsorOfferComponent["kind"]
   if (kind === "rank") return "Gewinnstufen";
   if (kind === "improvement") return "Tabellenziel";
   return "Sonderziel";
+}
+
+export type SponsorRankTierRow = {
+  label: string;
+  rankAt: number;
+  absolutePayout: number;
+};
+
+function roundOfferCash(value: number) {
+  return Math.round(value * 10) / 10;
+}
+
+/** Absolute sponsor cash (basis + unlocked rank share) at each Gewinnstufe threshold. */
+export function buildSponsorRankTierRows(input: {
+  baseCash: number;
+  rankCash: number;
+}): SponsorRankTierRow[] {
+  const totalMilestoneBonus = SPONSOR_RANK_MILESTONES.reduce((sum, milestone) => sum + milestone.bonusC, 0);
+  return SPONSOR_RANK_MILESTONES.map((milestone) => {
+    const unlockedBonus = getRankMilestoneBonus(milestone.maxRank, 1);
+    const rankPortion =
+      totalMilestoneBonus > 0 && input.rankCash > 0
+        ? roundOfferCash(input.rankCash * (unlockedBonus / totalMilestoneBonus))
+        : 0;
+    return {
+      label: milestone.label,
+      rankAt: milestone.maxRank,
+      absolutePayout: roundOfferCash(input.baseCash + rankPortion),
+    };
+  });
 }

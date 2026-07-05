@@ -16,6 +16,7 @@ import { buildAiTransfermarktSellPreview } from "@/lib/ai/ai-transfermarkt-sell-
 import { applyAiLegacyLineupBatchLocally } from "@/lib/ai/ai-legacy-lineup-batch-apply-service";
 import type { AiPicksRunResult } from "@/lib/ai/ai-picks-run-service";
 import { CHUNKED_REDRAFT_TOPUP_CONFIRM_TOKEN, runChunkedRedraftTopup } from "@/lib/ai/chunked-redraft-topup-service";
+import { applySeasonEndRosterStressLedger } from "@/lib/ai/season-roster-stress-service";
 import { applySeasonEndContractTick, previewSeasonEndContracts } from "@/lib/contracts/contract-renewal-service";
 import type { GameState, Player, RosterEntry, TeamControlSettings, TransferHistoryEntry } from "@/lib/data/olyDataTypes";
 import { FACILITY_CATALOG } from "@/lib/facilities/facility-catalog";
@@ -57,6 +58,7 @@ import { runSeasonEndProgressionBatch } from "@/lib/progression/season-end-progr
 import { APPLY_CONFIRM_TOKEN, LegacyMatchdayResultApplyService } from "@/lib/resolve/legacy-matchday-result-apply-service";
 import { ADVANCE_MATCHDAY_CONFIRM_TOKEN, executeMatchdayAdvance } from "@/lib/season/matchday-progress-service";
 import { applyPreSeasonNextSeasonSetupLightweight, buildPreSeasonNextSeasonSetupToken } from "@/lib/season/preseason-workflow-service";
+import { patchCompletedSeasonSnapshotAfterPreseasonBuy } from "@/lib/season/season-snapshot-service";
 import { previewCashPrizeApply } from "@/lib/season/cash-prize-apply-service";
 import { buildSeasonReview } from "@/lib/season/season-review-service";
 import { applySponsorSettlement } from "@/lib/sponsor/sponsor-settlement-service";
@@ -65,7 +67,6 @@ import { buildTransferFinanceAudit, isTransferFinanceViolationForSeason } from "
 import {
   applyCanonicalManagerPlan,
   getAllTeamsBelowMinIds,
-  repairSeasonOneEndRosterBeforeS2,
   resolveEmergencyRepairTeamIds,
   runCanonicalSeasonOneDraftPhase,
   finalizeSeasonOneDraftAuditReady,
@@ -260,8 +261,6 @@ function flushSeasonRowBuffers(input: {
   matchdayStart: number;
   performanceStart: number;
 }) {
-  const seasonEconomyRows = input.economyRows.splice(input.economyStart);
-  const seasonRosterRows = input.rosterRows.splice(input.rosterStart);
   const seasonAiMarketRows = input.aiMarketRows.splice(input.aiMarketStart);
   const seasonContractExitRows = input.contractExitRows.splice(input.contractExitStart);
   const seasonRenewalRows = input.renewalRows.splice(input.renewalStart);
@@ -274,8 +273,7 @@ function flushSeasonRowBuffers(input: {
   const seasonMatchdayRows = input.matchdayRows.splice(input.matchdayStart);
   const seasonPerformanceRows = input.performanceRows.splice(input.performanceStart);
 
-  appendCsvRows("economy-cash-flow-s1-s6.csv", seasonEconomyRows);
-  appendCsvRows("roster-size-s1-s6.csv", seasonRosterRows);
+  appendCsvRows("economy-cash-flow-s1-s6.csv", input.economyRows.splice(input.economyStart));
   appendCsvRows("ai-market-actions-s1-s6.csv", seasonAiMarketRows);
   appendCsvRows("contract-exits-s1-s6.csv", seasonContractExitRows);
   appendCsvRows("renewals-s1-s6.csv", seasonRenewalRows);
@@ -288,6 +286,16 @@ function flushSeasonRowBuffers(input: {
   appendCsvRows("long-run-matchdays-s1-s6.csv", seasonMatchdayRows);
   appendCsvRows("performance-longrun-s1-s6.csv", seasonPerformanceRows);
   appendCsvRows(`long-run-by-season/${input.seasonId}-performance.csv`, seasonPerformanceRows);
+}
+
+function flushRosterRowBuffer(input: { seasonId: string; rosterRows: Record<string, unknown>[]; rosterStart: number }) {
+  const seasonRosterRows = input.rosterRows.splice(input.rosterStart);
+  appendCsvRows("roster-size-s1-s6.csv", seasonRosterRows);
+}
+
+function rosterRowsForSeasonPhase(rows: Record<string, unknown>[], seasonId: string) {
+  const postBuy = rows.filter((row) => row.seasonId === seasonId && row.snapshotPhase === "preseason_post_buy");
+  return postBuy.length > 0 ? postBuy : rows.filter((row) => row.seasonId === seasonId);
 }
 
 function round(value: number, digits = 2) {
@@ -1334,7 +1342,12 @@ function buildStrategicTransferByTeamRows(input: {
   }
   return Array.from(seasonTeamKeys).map((key) => {
     const [seasonId, teamId] = key.split("::");
-    const roster = input.rosterRows.find((row) => row.seasonId === seasonId && row.teamId === teamId) ?? {};
+    const roster =
+      input.rosterRows.find(
+        (row) => row.seasonId === seasonId && row.teamId === teamId && row.snapshotPhase === "preseason_post_buy",
+      ) ??
+      input.rosterRows.find((row) => row.seasonId === seasonId && row.teamId === teamId) ??
+      {};
     const transfers = input.aiMarketRows.filter(
       (row) => row.seasonId === seasonId && (row.teamId === teamId || row.toTeamId === teamId || row.fromTeamId === teamId),
     );
@@ -2553,6 +2566,29 @@ async function applySeasonEnd(saveId: string, persistence: PersistenceService) {
   });
 
   save = persistence.getSaveById(saveId);
+  if (!save) throw new Error("Long-run save disappeared before roster stress ledger.");
+  console.error(`[long-run] season-end ${seasonId}: roster-stress-ledger`);
+  startedAt = Date.now();
+  const stressedGameState = applySeasonEndRosterStressLedger(save.gameState, seasonId);
+  persistence.saveSingleplayerState(saveId, stressedGameState);
+  const stressRows = Object.values(stressedGameState.seasonState.teamRosterStressByTeamId ?? {});
+  const stressWithBump = stressRows.filter((row) => row.optBump > 0);
+  recordPhase(performanceRows, {
+    seasonId,
+    phase: "season end roster stress ledger",
+    startedAt,
+    itemCount: stressWithBump.length,
+    status: "ok",
+    note: stressWithBump
+      .slice(0, 8)
+      .map((row) => {
+        const team = stressedGameState.teams.find((entry) => entry.teamId === row.teamId);
+        return `${team?.shortCode ?? row.teamId}:score=${row.depthStressScore}:bump=${row.optBump}`;
+      })
+      .join("|"),
+  });
+
+  save = persistence.getSaveById(saveId);
   if (!save) throw new Error("Long-run save disappeared before AI market.");
   console.error(`[long-run] season-end ${seasonId}: ai-market`);
   startedAt = Date.now();
@@ -2652,71 +2688,30 @@ async function applySeasonEnd(saveId: string, persistence: PersistenceService) {
     })),
   );
   let seasonEndRepairTeamIds = seasonEndEmergencyRepairTeams;
-  if (seasonEndRepairTeamIds.length > 0) {
-    const compareRescueStartedAt = Date.now();
-    const compareRescue = await runCompareRescueBeforeEmergencyRepair({
-      saveId,
-      seasonId,
-      teamIds: seasonEndRepairTeamIds,
-      persistence,
-    });
+  // Post-sell roster holes are intentional — no compare-rescue buys and no hardMin repair at season_end.
+  // Full rebuild runs in the next preseason buy convergence only (balancing-no-sell-floor policy).
+  const saveAfterMarket = persistence.getSaveById(saveId) ?? save;
+  const belowMinAfterSell = getAllTeamsBelowMinIds(saveAfterMarket.gameState);
+  if (belowMinAfterSell.length > 0 || seasonEndRepairTeamIds.length > 0) {
     recordPhase(performanceRows, {
       seasonId,
-      phase: "season end compare rescue",
-      startedAt: compareRescueStartedAt,
-      itemCount: compareRescue.appliedBuys + compareRescue.appliedSells,
+      phase: "season end post-sell roster deferral",
+      startedAt: Date.now(),
+      itemCount: belowMinAfterSell.length,
       status: "ok",
-      buyApplyCount: compareRescue.appliedBuys,
-      sellApplyCount: compareRescue.appliedSells,
-      warnings: compareRescue.warnings.join("|"),
-      note: `remainingRepairTeams:${compareRescue.remainingTeamIds.length}`,
+      note: `below_min:${belowMinAfterSell.length}|planner_exhausted:${seasonEndRepairTeamIds.length}|deferred_to_preseason`,
     });
-    seasonEndRepairTeamIds = compareRescue.remainingTeamIds;
   }
-  const finalRosterRepair = isTransferActionAllowed(seasonId, "preseason_roster_repair")
-    ? emergencyRepairRosterMinimumBeforeSeasonStart(
-        saveId,
-        seasonId,
-        persistence,
-        seasonEndRepairTeamIds,
-      )
-    : isSeasonOne(seasonId)
-      ? (() => {
-          const repair = repairSeasonOneEndRosterBeforeS2(saveId, persistence, {
-            plannerExhaustedTeamIds: seasonEndRepairTeamIds,
-            outputDir: path.join(OUTPUT_DIR, `s1-end-roster-repair-${seasonId}`),
-          });
-          const performanceRows: PhaseMetric[] = [];
-          recordPhase(performanceRows, {
-            seasonId,
-            phase: "season start emergency roster repair",
-            startedAt: Date.now(),
-            itemCount: repair.purchases.length,
-            status: repair.blockers.length > 0 ? "blocked" : repair.repaired ? "ok" : "skipped",
-            buyApplyCount: repair.purchases.length,
-            warnings: repair.warnings.join("|"),
-            errors: repair.blockers.join("|"),
-            note: `s1_end_stabilization:true|teams:${repair.purchases.length > 0 ? "repaired" : "none"}`,
-          });
-          return {
-            performanceRows,
-            blockers: repair.blockers,
-            warnings: repair.warnings,
-            purchases: repair.purchases,
-            repaired: repair.repaired,
-          };
-        })()
-      : (() => {
-        const latest = persistence.getSaveById(saveId) ?? save;
-        const belowMinIds = getAllTeamsBelowMinIds(latest.gameState);
-        return {
-          performanceRows: [] as PhaseMetric[],
-          blockers: [] as string[],
-          warnings: belowMinIds.map((teamId) => `roster_hard_gate_repair_forbidden:${seasonId}:${teamId}`),
-          purchases: [] as Array<Record<string, unknown>>,
-          repaired: false,
-        };
-      })();
+  const finalRosterRepair = {
+    performanceRows: [] as PhaseMetric[],
+    blockers: [] as string[],
+    warnings:
+      belowMinAfterSell.length > 0
+        ? [`season_end_post_sell_below_min_expected:${belowMinAfterSell.length}`]
+        : [],
+    purchases: [] as Array<Record<string, unknown>>,
+    repaired: false,
+  };
   performanceRows.push(
     ...finalRosterRepair.performanceRows.map((row) => ({
       ...row,
@@ -2880,7 +2875,12 @@ function printSeasonInterimUpdate(
   console.error(`[long-run] ===== END ${seasonId} =====\n`);
 }
 
-function collectAuditRows(save: PersistedSaveGame, seasonId: string, seasonEnd: { totalPrizeMoney: number; aiMarketStatus: string }) {
+function collectAuditRows(
+  save: PersistedSaveGame,
+  seasonId: string,
+  seasonEnd: { totalPrizeMoney: number; aiMarketStatus: string },
+  options?: { snapshotPhase?: "preseason_post_buy" | "season_end_post_sell" },
+) {
   const gameState = save.gameState;
   const standings = gameState.seasonState.standings ?? {};
   const transfers = gameState.transferHistory.filter((entry) => entry.seasonId === seasonId);
@@ -2910,6 +2910,7 @@ function collectAuditRows(save: PersistedSaveGame, seasonId: string, seasonEnd: 
     const boardTrust = gameState.seasonState.boardConfidence?.[team.teamId] ?? null;
     return {
       seasonId,
+      snapshotPhase: options?.snapshotPhase ?? "season_end_post_sell",
       teamId: team.teamId,
       teamName: team.name,
       rank: standings[team.teamId]?.rank ?? null,
@@ -3104,6 +3105,7 @@ function collectAuditRows(save: PersistedSaveGame, seasonId: string, seasonEnd: 
       aiMarketStatus: seasonEnd.aiMarketStatus,
       warnings: [
         teamRows.every((row) => row.rosterSize === 10) ? "all_rosters_exactly_10" : null,
+        teamRows.every((row) => row.rosterSize === row.playerMin) ? "season_end_all_teams_at_hard_min_post_sell" : null,
         teamRows.some((row) => Number(row.cash) > 180) ? "cash_hoarding_detected" : null,
         transfers.some((entry) => entry.source === "season1_autoprep_topup" && seasonId !== "season-1")
           ? "season1_autoprep_topup_after_s1_detected"
@@ -3349,6 +3351,25 @@ async function main() {
     if (unresolvedSlotRows.length > 0) {
       balanceIssues.push(`${seasonId}:slot_coverage_hard_unresolved:${unresolvedSlotRows.length}`);
     }
+    save = persistence.getSaveById(save.saveId) ?? save;
+    if (seasonNumber >= 2) {
+      const patchResult = patchCompletedSeasonSnapshotAfterPreseasonBuy(save.gameState, seasonId);
+      if (patchResult.patched) {
+        save = persistence.saveSingleplayerState(save.saveId, patchResult.gameState);
+        console.error(
+          `[long-run] ${patchResult.completedSeasonId} snapshot entry roster patched from ${seasonId} preseason (post-buy)`,
+        );
+      } else if (patchResult.warnings.length > 0) {
+        balanceIssues.push(...patchResult.warnings.map((warning) => `${seasonId}:${warning}`));
+      }
+    }
+    const preseasonRosterAudit = collectAuditRows(save, seasonId, {
+      totalPrizeMoney: 0,
+      aiMarketStatus: "preseason_post_buy",
+    }, { snapshotPhase: "preseason_post_buy" });
+    printSeasonInterimUpdate(save, `${seasonId} · post-buy`, preseasonRosterAudit.teamRows);
+    rosterRows.push(...preseasonRosterAudit.teamRows);
+    flushRosterRowBuffer({ seasonId, rosterRows, rosterStart });
     if (LONG_RUN_STOP_AFTER === "preseason") {
       console.error(`[long-run] STOP_AFTER=preseason — ${seasonId} Preseason abgeschlossen, Save \`${save.saveId}\`.`);
       break;
@@ -3410,7 +3431,6 @@ async function main() {
       rank: row.rank,
       points: row.points,
     })));
-    rosterRows.push(...audit.teamRows);
     aiMarketRows.push(...audit.transferRows);
     aiMarketRows.push(...seasonEnd.stabilizationPurchases ?? []);
     contractExitRows.push(...audit.contractRows.filter((row) => row.eventType === "contract_expired_exit"));
@@ -3557,12 +3577,12 @@ async function main() {
       contractExits: rowsForSeason.reduce((sum, row) => sum + Number(row.contractExits ?? 0), 0),
       plannedPicks: rowsForSeason.reduce((sum, row) => sum + Number(row.plannedPicks ?? 0), 0),
       fillerPicks: rowsForSeason.reduce((sum, row) => sum + Number(row.fillerPicks ?? 0), 0),
-      teamsBelowOpt: rosterRows.filter((row) => row.seasonId === seasonId && Number(row.rosterSize ?? 0) < Number(row.playerOpt ?? 0)).length,
-      teamsAt13Or14: rosterRows.filter((row) => row.seasonId === seasonId && Number(row.rosterSize ?? 0) >= 13 && Number(row.rosterSize ?? 0) <= 14).length,
+      teamsBelowOpt: rosterRowsForSeasonPhase(rosterRows, seasonId).filter((row) => Number(row.rosterSize ?? 0) < Number(row.playerOpt ?? 0)).length,
+      teamsAt13Or14: rosterRowsForSeasonPhase(rosterRows, seasonId).filter((row) => Number(row.rosterSize ?? 0) >= 13 && Number(row.rosterSize ?? 0) <= 14).length,
     };
   });
   const optCoverageComparisonRows = ["season-10", "season-11"].map((seasonId) => {
-    const rowsForSeason = rosterRows.filter((row) => row.seasonId === seasonId);
+    const rowsForSeason = rosterRowsForSeasonPhase(rosterRows, seasonId);
     const coverageRows = slotCoverageRows.filter((row) => row.seasonId === seasonId);
     return {
       seasonId,
@@ -3700,6 +3720,7 @@ async function main() {
   if (rosterRows.length > 0) {
     writeCsv("roster-size-s1-s6.csv", rosterRows, [
       "seasonId",
+      "snapshotPhase",
       "teamId",
       "teamName",
       "rank",

@@ -16,6 +16,9 @@ export type HomeV2TopPlayerCard = {
   contractLength: number | null;
   marketValue: number | null;
   highlight?: "top" | "prospect" | null;
+  ovrRank?: number | null;
+  mvsRank?: number | null;
+  ppsRank?: number | null;
   caRating: number | null;
   poRangeMin: number | null;
   poRangeMax: number | null;

@@ -967,7 +967,9 @@ describe("transfermarkt local service", () => {
 
     expect(preview.salePrice).toBeCloseTo(39.76, 1);
     expect(preview.activePlayer?.purchasePrice).toBe(40);
-    expect(preview.profit).toBeCloseTo(-0.24, 1);
+    expect(preview.buyoutCost).toBeGreaterThan(0);
+    expect(preview.netProceeds).toBeCloseTo((preview.salePrice ?? 0) - (preview.buyoutCost ?? 0), 1);
+    expect(preview.profit).toBeCloseTo((preview.netProceeds ?? 0) - 40, 1);
   });
 
   it("uses bracket and mvs ranking for live sale factors once discipline results exist", async () => {
@@ -1250,7 +1252,7 @@ describe("transfermarkt local service", () => {
 
     expect(preview.saleFactor).toBeCloseTo(0.994, 2);
     expect(preview.salePrice).toBeCloseTo((preview.marketValueReference ?? 0) * 0.994, 1);
-    expect(preview.profit).toBeCloseTo((preview.salePrice ?? 0) - (preview.activePlayer?.purchasePrice ?? 0), 1);
+    expect(preview.profit).toBeCloseTo((preview.netProceeds ?? 0) - (preview.activePlayer?.purchasePrice ?? 0), 1);
   });
 
   it("builds deterministic contract shapes with identical total salary", () => {

@@ -338,6 +338,7 @@ import {
 import {
   buildLeagueLeaderBoards,
   buildLeagueTrainingLeaderRows,
+  type LeagueLeaderCategoryId,
 } from "@/lib/foundation/league-leaders-service";
 import { resolveShouldBuildTeamsScopedRatings } from "@/lib/foundation/tabs/teams-view-derivations";
 import type { FoundationMatchdayResultShellHostProps } from "@/app/foundation/matchday-result-v2/FoundationMatchdayResultShellHost";
@@ -1013,6 +1014,10 @@ export function useFoundationShellRouterBodyScope({
 
   const [historyPage, setHistoryPage] = useState(1);
   const [assignTeamCaptainBusy, setAssignTeamCaptainBusy] = useState(false);
+  const [leagueLeadersReturnContext, setLeagueLeadersReturnContext] = useState<{
+    playerId: string;
+    playerName: string;
+  } | null>(null);
   useEffect(() => {
     setHistoryPage(1);
   }, [activeSaveId]);
@@ -2496,7 +2501,11 @@ export function useFoundationShellRouterBodyScope({
     scrollToFoundationTarget(target === "upgrade" ? `training-upgrade-player-${playerId}` : `training-player-${playerId}`);
   }
 
-  function onOpenLeagueLeaders(categoryId: "ovr" | "pps" | "mvs") {
+  function onOpenLeagueLeaders(
+    categoryId: LeagueLeaderCategoryId,
+    returnContext?: { playerId: string; playerName: string },
+  ) {
+    setLeagueLeadersReturnContext(returnContext ?? null);
     setFoundationView("ranks", setActiveView);
     scrollToFoundationTarget(`league-leaders-${categoryId}`);
   }
@@ -6893,6 +6902,8 @@ export function useFoundationShellRouterBodyScope({
     rosterPlayers,
     playerRatingsById,
     seasonStandRows,
+    seasonStandRowsSeasonId: seasonOverviewSeasonId || gameState.season.id,
+    activeSaveId,
     currentAreaRanksByTeamId,
     seasonPointsLedger,
     teamObjectiveOverview,
@@ -9780,6 +9791,13 @@ export function useFoundationShellRouterBodyScope({
     categories: leagueLeaderBoards,
     selectedTeamId: activeManagerTeamId,
     seasonLabel: canonicalSeasonLabel,
+    returnContext: leagueLeadersReturnContext,
+    onReturnToPlayer: leagueLeadersReturnContext
+      ? () => {
+          openPlayerProfileById(leagueLeadersReturnContext.playerId);
+          setLeagueLeadersReturnContext(null);
+        }
+      : undefined,
     onOpenPlayer: openPlayerProfileById,
   };
 

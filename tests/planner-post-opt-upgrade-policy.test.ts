@@ -74,6 +74,38 @@ describe("planner-post-opt-upgrade-policy", () => {
     );
     expect(mandate.active).toBe(false);
   });
+
+  it("allows depth repair buys below effective opt when stress ledger is active", () => {
+    const gameState = richOptGameState({ cash: 50, salary: 35, roster: 7, playerOpt: 9 });
+    gameState.seasonState = {
+      teamRosterStressByTeamId: {
+        "S-S": {
+          teamId: "S-S",
+          sourceSeasonId: "season-1",
+          matchdaysTotal: 10,
+          matchdaysWithSlotGaps: 6,
+          matchdaysWithRosterLimited: 2,
+          conserveSideUses: 4,
+          endedBelowBaseOpt: true,
+          depthStressScore: 3,
+          optBump: 2,
+          generatedAt: "2026-01-01T00:00:00.000Z",
+        },
+      },
+    };
+    const mandate = resolvePostOptUpgradeMandate(gameState, "S-S");
+    expect(mandate.active).toBe(true);
+    expect(mandate.maxBuys).toBeGreaterThanOrEqual(1);
+    expect(mandate.expandRosterTarget).toBeGreaterThan(7);
+  });
+
+  it("activates excess-cash deploy below opt when cash/salary >= 1.15", () => {
+    const gameState = richOptGameState({ cash: 100, salary: 40, roster: 8, playerOpt: 11 });
+    const mandate = resolvePostOptUpgradeMandate(gameState, "S-S");
+    expect(mandate.active).toBe(true);
+    expect(mandate.maxBuys).toBeGreaterThanOrEqual(1);
+    expect(mandate.postOptUpgradeDeploy).toBe(true);
+  });
 });
 
 describe("resolveEffectiveUpgradeBuyPriceFloor", () => {

@@ -29,6 +29,8 @@ export type LeagueTrainingLeaderSourceRow = {
 
 export type LeagueLeaderTone = "total" | "pow" | "spe" | "men" | "soc" | "mvs" | "ovr" | "training";
 
+export type LeagueLeaderCategoryId = "pps" | "pow" | "spe" | "men" | "soc" | "ovr" | "mvs" | "training";
+
 export type LeagueLeaderEntry = {
   rank: number;
   playerId: string;

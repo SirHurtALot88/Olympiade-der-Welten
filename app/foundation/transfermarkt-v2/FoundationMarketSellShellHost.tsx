@@ -121,6 +121,9 @@ export default function FoundationMarketSellShellHost({
             marketSellPreview?.salePrice != null && marketSellPreview.marketValueReference != null
               ? marketSellPreview.salePrice - marketSellPreview.marketValueReference
               : null;
+          const buyoutCost = marketSellPreview?.buyoutCost ?? 0;
+          const netProceeds = marketSellPreview?.netProceeds ?? marketSellPreview?.salePrice ?? null;
+          const hasBuyout = buyoutCost > 0;
 
           return (
             <div className="transfer-buy-player-line transfer-sell-hero-line">
@@ -158,12 +161,28 @@ export default function FoundationMarketSellShellHost({
                   </div>
                   <div className="transfer-modal-player-kpis transfer-sell-kpis">
                     <article className="transfer-modal-kpi is-money">
-                      <span>Verkaufspreis</span>
-                      <strong>{formatTransfermarktCurrency(marketSellPreview?.salePrice ?? null)}</strong>
-                      <small className={saleVsMarketValue != null ? (saleVsMarketValue >= 0 ? "text-positive" : "text-negative") : undefined}>
-                        vs. MW {saleVsMarketValue != null ? formatSignedTransfermarktCurrency(saleVsMarketValue) : "—"}
+                      <span>Netto-Erlös</span>
+                      <strong>{formatTransfermarktCurrency(netProceeds)}</strong>
+                      <small className="muted">
+                        Brutto {formatTransfermarktCurrency(marketSellPreview?.salePrice ?? null)}
+                        {hasBuyout ? ` · Buyout ${formatTransfermarktCurrency(buyoutCost)}` : null}
                       </small>
                     </article>
+                    {hasBuyout ? (
+                      <article className="transfer-modal-kpi">
+                        <span>Buyout</span>
+                        <strong>{formatTransfermarktCurrency(buyoutCost)}</strong>
+                        <small className="text-negative">Offener Vertrag</small>
+                      </article>
+                    ) : (
+                      <article className="transfer-modal-kpi">
+                        <span>Verkaufspreis</span>
+                        <strong>{formatTransfermarktCurrency(marketSellPreview?.salePrice ?? null)}</strong>
+                        <small className={saleVsMarketValue != null ? (saleVsMarketValue >= 0 ? "text-positive" : "text-negative") : undefined}>
+                          vs. MW {saleVsMarketValue != null ? formatSignedTransfermarktCurrency(saleVsMarketValue) : "—"}
+                        </small>
+                      </article>
+                    )}
                     <article className="transfer-modal-kpi">
                       <span>Faktor</span>
                       <strong>
@@ -427,6 +446,14 @@ export default function FoundationMarketSellShellHost({
               </div>
               <div className="metric-grid compact transfer-sell-metric-grid">
                 <article className="metric-card">
+                  <span>Netto-Erlös</span>
+                  <strong>{formatTransfermarktCurrency(marketSellPreview.netProceeds ?? marketSellPreview.salePrice)}</strong>
+                  <small className="muted">
+                    Brutto {formatTransfermarktCurrency(marketSellPreview.salePrice)} · Buyout{" "}
+                    {formatTransfermarktCurrency(marketSellPreview.buyoutCost ?? 0)}
+                  </small>
+                </article>
+                <article className="metric-card">
                   <span>Verkaufspreis</span>
                   <strong>{formatTransfermarktCurrency(marketSellPreview.salePrice)}</strong>
                   {(() => {
@@ -442,6 +469,13 @@ export default function FoundationMarketSellShellHost({
                     );
                   })()}
                 </article>
+                {(marketSellPreview.buyoutCost ?? 0) > 0 ? (
+                  <article className="metric-card">
+                    <span>Buyout</span>
+                    <strong>{formatTransfermarktCurrency(marketSellPreview.buyoutCost)}</strong>
+                    <small className="text-negative">Offener Vertrag wird abgezogen</small>
+                  </article>
+                ) : null}
                 <article className="metric-card">
                   <span>Gehaltsentlastung</span>
                   <strong>{formatTransfermarktCurrency(marketSellPreview.salaryReduction)}</strong>

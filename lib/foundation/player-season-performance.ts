@@ -1,6 +1,12 @@
 import type { GameState, SeasonSnapshotPlayerPerformanceRecord } from "@/lib/data/olyDataTypes";
 import { buildSeasonPointsLedger } from "@/lib/foundation/season-points-ledger";
 import type { SeasonPointsLedger } from "@/lib/foundation/season-points-ledger";
+import {
+  collectSnapshotPerformancePlayerIds,
+  findLatestArchivedSnapshotForPerformanceFallback,
+  resolveSnapshotPlayerPerformanceRow,
+  snapshotPerformanceRowHasData,
+} from "@/lib/foundation/snapshot-player-performance";
 
 export type PlayerSeasonPerformanceSummary = {
   seasonId: string | null;
@@ -116,7 +122,9 @@ function buildSummaryFromSnapshotRow(
   const breakdown = [...(row.disciplineBreakdown ?? [])].sort(
     (left, right) => (right.totalContribution ?? Number.NEGATIVE_INFINITY) - (left.totalContribution ?? Number.NEGATIVE_INFINITY),
   );
-  const hasSnapshotPointData = typeof row.totalPoints === "number" && Number.isFinite(row.totalPoints);
+  const hasSnapshotPointData =
+    (typeof row.totalPoints === "number" && Number.isFinite(row.totalPoints)) ||
+    (typeof row.totalContribution === "number" && Number.isFinite(row.totalContribution));
   const weakest = [...breakdown]
     .filter((entry) => entry.averageFinalScore != null)
     .sort((left, right) => (left.averageFinalScore ?? Number.POSITIVE_INFINITY) - (right.averageFinalScore ?? Number.POSITIVE_INFINITY))[0] ?? null;
@@ -126,7 +134,7 @@ function buildSummaryFromSnapshotRow(
     seasonName: snapshot?.seasonName ?? gameState.season.name,
     sourceLabel: "Season Snapshot",
     appearances: row.appearances,
-    totalPoints: hasSnapshotPointData ? row.totalPoints ?? null : null,
+    totalPoints: hasSnapshotPointData ? row.totalPoints ?? row.totalContribution ?? null : null,
     pointsByArea: hasSnapshotPointData
       ? buildAreaPointsFromDisciplineBreakdown(breakdown, disciplineCategoryById)
       : buildEmptyAreaPoints(),
@@ -156,20 +164,22 @@ function buildSummaryFromSnapshotRow(
   };
 }
 
-function getSnapshotPlayerPerformances(snapshot: {
-  playerPerformances?: SeasonSnapshotPlayerPerformanceRecord[];
-  playerPerformanceSnapshots?: SeasonSnapshotPlayerPerformanceRecord[];
-}) {
-  const byPlayerId = new Map<string, SeasonSnapshotPlayerPerformanceRecord>();
-  for (const row of snapshot.playerPerformances ?? []) {
-    byPlayerId.set(row.playerId, row);
+function buildSnapshotPerformanceFallbackMap(gameState: GameState) {
+  const snapshot = findLatestArchivedSnapshotForPerformanceFallback(gameState);
+  const snapshotMap = new Map<string, PlayerSeasonPerformanceSummary>();
+  if (!snapshot) {
+    return snapshotMap;
   }
-  for (const row of snapshot.playerPerformanceSnapshots ?? []) {
-    if (!byPlayerId.has(row.playerId)) {
-      byPlayerId.set(row.playerId, row);
+
+  for (const playerId of collectSnapshotPerformancePlayerIds(snapshot)) {
+    const row = resolveSnapshotPlayerPerformanceRow(gameState, snapshot, playerId);
+    if (!row || !snapshotPerformanceRowHasData(row)) {
+      continue;
     }
+    snapshotMap.set(playerId, buildSummaryFromSnapshotRow(gameState, row, snapshot));
   }
-  return [...byPlayerId.values()];
+
+  return snapshotMap;
 }
 
 export function buildPlayerSeasonPerformanceMap(gameState: GameState, seasonPointsLedger?: SeasonPointsLedger) {
@@ -310,13 +320,7 @@ export function buildPlayerSeasonPerformanceMap(gameState: GameState, seasonPoin
     performanceMap.set(entry.playerId, playerSummary);
   }
 
-  const sortedSnapshots = [...(gameState.seasonState.seasonSnapshots ?? [])].sort((left, right) =>
-    right.seasonId.localeCompare(left.seasonId, "de"),
-  );
-  const snapshot = sortedSnapshots.find((entry) => entry.status == null || entry.status === "completed") ?? null;
-  const snapshotMap = new Map(
-    (snapshot ? getSnapshotPlayerPerformances(snapshot) : []).map((row) => [row.playerId, buildSummaryFromSnapshotRow(gameState, row, snapshot)] as const),
-  );
+  const snapshotMap = buildSnapshotPerformanceFallbackMap(gameState);
 
   const summaryMap = new Map<string, PlayerSeasonPerformanceSummary>();
   for (const [playerId, entry] of performanceMap.entries()) {

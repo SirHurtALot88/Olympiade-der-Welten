@@ -48,7 +48,7 @@ const NAV_TAB_STEPS: TabStep[] = [
   { navId: "homeV2", label: "Home", readySelector: '[data-testid="foundation-home-v2"]' },
   { navId: "inboxV2", label: "Inbox", readySelector: '[data-testid="foundation-inbox-v2"]' },
   { navId: "lineup", label: "Einsatzliste", readySelector: '[data-testid="foundation-lineup"]' },
-  { navId: "lineupV2", label: "Einsatzliste v2", readySelector: '[data-testid="foundation-lineup-v2"]' },
+  { navId: "lineup", label: "Einsatzliste", readySelector: '[data-testid="foundation-lineup-v2"]' },
   { navId: "matchdayArena", label: "Arena", readySelector: "#foundation-matchday-arena:not(.foundation-section-hidden)" },
   { navId: "seasonV2", label: "Saisonstand", readySelector: '[data-testid="foundation-season-v2"]' },
   { navId: "teams", label: "Teams", readySelector: '[data-testid="foundation-teams-view"]' },

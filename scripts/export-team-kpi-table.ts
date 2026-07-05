@@ -2,6 +2,7 @@ import path from "node:path";
 import { mkdir, writeFile } from "node:fs/promises";
 import { loadEnvConfig } from "@next/env";
 import { createPersistenceService } from "@/lib/persistence/persistence-service";
+import { resolveTeamRosterMarketValue } from "@/lib/ai/planner-cash-buffer-policy";
 import { collectTeamFatigueInjuryMetrics, buildPlayerAvailabilityByPlayerId } from "@/lib/season/long-run-fatigue-collect";
 
 const PROJECT_ROOT = path.resolve(__dirname, "..");
@@ -33,10 +34,7 @@ async function main() {
 
   const rows = gs.teams.map((team) => {
     const roster = gs.rosters.filter((entry) => entry.teamId === team.teamId);
-    const mw = roster.reduce((sum, entry) => {
-      const player = playerById.get(entry.playerId);
-      return sum + (player?.displayMarketValue ?? player?.marketValue ?? 0);
-    }, 0);
+    const mw = Math.round(resolveTeamRosterMarketValue(gs, team.teamId));
     const metrics = collectTeamFatigueInjuryMetrics({
       gameState: gs,
       team,

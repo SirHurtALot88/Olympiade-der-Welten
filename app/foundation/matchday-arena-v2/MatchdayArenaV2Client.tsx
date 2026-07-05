@@ -575,8 +575,72 @@ function clampPct(value: number) {
   return Math.max(6, Math.min(100, value));
 }
 
+function ArenaAnimatedScore({ value, fractionDigits = 1 }: { value: number; fractionDigits?: number }) {
+  const [displayValue, setDisplayValue] = useState(value);
+  const previousValueRef = useRef(value);
+  const frameRef = useRef<number | null>(null);
+
+  useEffect(() => {
+    const from = previousValueRef.current;
+    const to = value;
+    if (Math.abs(from - to) < 0.01) {
+      setDisplayValue(to);
+      previousValueRef.current = to;
+      return;
+    }
+    previousValueRef.current = to;
+    const start = performance.now();
+    const duration = 420;
+
+    const tick = (now: number) => {
+      const progress = Math.min(1, (now - start) / duration);
+      const eased = 1 - Math.pow(1 - progress, 3);
+      setDisplayValue(from + (to - from) * eased);
+      if (progress < 1) {
+        frameRef.current = requestAnimationFrame(tick);
+      } else {
+        setDisplayValue(to);
+      }
+    };
+
+    frameRef.current = requestAnimationFrame(tick);
+    return () => {
+      if (frameRef.current != null) {
+        cancelAnimationFrame(frameRef.current);
+      }
+    };
+  }, [value]);
+
+  return (
+    <strong className="arena-v2-board-score is-counting">
+      {formatDecimalScore(displayValue, fractionDigits)}
+    </strong>
+  );
+}
+
 const ARENA_BOARD_ROW_STRIDE = 66;
 const ARENA_BOARD_VIRTUAL_OVERSCAN = 4;
+
+function buildFocusedArenaBoardRows<T extends { teamId: string }>(rows: T[], userTeamId: string | null | undefined): T[] {
+  if (!userTeamId || rows.length <= 10) {
+    return rows;
+  }
+  const userIndex = rows.findIndex((row) => row.teamId === userTeamId);
+  if (userIndex < 0) {
+    return rows.slice(0, 10);
+  }
+  const indices = new Set<number>();
+  for (let index = 0; index < Math.min(3, rows.length); index += 1) {
+    indices.add(index);
+  }
+  for (let index = Math.max(0, userIndex - 3); index <= Math.min(rows.length - 1, userIndex + 3); index += 1) {
+    indices.add(index);
+  }
+  return [...indices].sort((left, right) => left - right).map((index) => rows[index]!);
+}
+
+type ArenaAct = "prep" | "reveal" | "result";
+type ArenaGuidedState = "loading" | "prep" | "ready" | "reveal" | "result";
 
 type ArenaBoardRowModel = {
   teamId: string;
@@ -705,7 +769,7 @@ const ArenaBoardRow = memo(function ArenaBoardRow({
         <span className="arena-v2-board-track-rank">Rang {row.rank}</span>
       </div>
       <div className="arena-v2-board-stats">
-        <strong>{formatDecimalScore(row.score, 1)}</strong>
+        <ArenaAnimatedScore value={row.score} />
         {statSecondaryLabel ? <span>{statSecondaryLabel}</span> : null}
       </div>
       {isSelected && (row.breakdown?.length ?? 0) > 0 ? (
@@ -748,6 +812,7 @@ export default function MatchdayArenaV2Client(props: MatchdayArenaV2ClientProps)
   const [restoredRevealSessionLabel, setRestoredRevealSessionLabel] = useState<string | null>(null);
   const [isPlaying, setIsPlaying] = useState(false);
   const [revealEventActive, setRevealEventActive] = useState(false);
+  const [mvpSpotlightActive, setMvpSpotlightActive] = useState(false);
   const [speed, setSpeed] = useState<ArenaPhaseControlSpeed>(1);
   const [roomSyncRole, setRoomSyncRole] = useState<CoachRole | null>(null);
   const [roomArenaSyncState, setRoomArenaSyncState] = useState<RoomArenaState | null>(null);
@@ -763,6 +828,19 @@ export default function MatchdayArenaV2Client(props: MatchdayArenaV2ClientProps)
   const revealSignatureRef = useRef<string | null>(null);
   const [boardScrollTop, setBoardScrollTop] = useState(0);
   const [boardViewportHeight, setBoardViewportHeight] = useState(560);
+  const [showArenaHandoffBanner, setShowArenaHandoffBanner] = useState(false);
+
+  useEffect(() => {
+    if (typeof window === "undefined") {
+      return;
+    }
+    if (window.sessionStorage.getItem("lineup-v2-arena-handoff") === "1") {
+      setShowArenaHandoffBanner(true);
+      window.sessionStorage.removeItem("lineup-v2-arena-handoff");
+      const timer = window.setTimeout(() => setShowArenaHandoffBanner(false), 6500);
+      return () => window.clearTimeout(timer);
+    }
+  }, []);
   const boardScrollRafRef = useRef<number | null>(null);
   const handleBoardScroll = useCallback((event: UIEvent<HTMLDivElement>) => {
     const scrollTop = event.currentTarget.scrollTop;
@@ -1548,12 +1626,24 @@ export default function MatchdayArenaV2Client(props: MatchdayArenaV2ClientProps)
   }, [matchdayMutatorTraitsBySide]);
   const canShowResultLayer =
     isResultPhase && activeDisciplinePhase === "total" && completedDisciplinePhases.d1 && completedDisciplinePhases.d2;
+  const mvpSpotlightPlayer = ppWinnerCards[0] ?? null;
+  const isArenaEventMode = isPlaying || revealEventActive;
   const canShowFinalLayer = effectiveBoardMode !== "total" && (displayPhase === "final" || canShowResultLayer);
   const revealedPhaseIndex = Math.max(0, MATCHDAY_ARENA_PHASES.findIndex((phase) => phase.id === displayPhase));
   const isPhaseRevealed = (phaseId: (typeof MATCHDAY_ARENA_PHASES)[number]["id"]) => {
     const targetIndex = MATCHDAY_ARENA_PHASES.findIndex((phase) => phase.id === phaseId);
     return targetIndex >= 0 && targetIndex <= revealedPhaseIndex;
   };
+
+  useEffect(() => {
+    if (!canShowResultLayer || displayPhase !== "result" || !mvpSpotlightPlayer) {
+      setMvpSpotlightActive(false);
+      return;
+    }
+    setMvpSpotlightActive(true);
+    const timer = window.setTimeout(() => setMvpSpotlightActive(false), 2000);
+    return () => window.clearTimeout(timer);
+  }, [canShowResultLayer, displayPhase, mvpSpotlightPlayer?.playerId]);
 
   const d1SlotRoles = useMemo(
     () => resolveSlotRolesForDiscipline(d1Id, d1Label, d1Required),
@@ -1994,6 +2084,25 @@ export default function MatchdayArenaV2Client(props: MatchdayArenaV2ClientProps)
     () => boardRows.reduce((max, row) => Math.max(max, row.score ?? 0), 0),
     [boardRows],
   );
+
+  const isFocusedBoardMode = loadStage === "ready" && effectiveBoardMode !== "total";
+  const visibleBoardRows = useMemo(
+    () => (isFocusedBoardMode ? buildFocusedArenaBoardRows(boardRows, params.teamId) : boardRows),
+    [boardRows, isFocusedBoardMode, params.teamId],
+  );
+
+  const arenaAct: ArenaAct =
+    loadStage !== "ready" ? "prep" : canShowResultLayer ? "result" : "reveal";
+  const arenaGuidedState: ArenaGuidedState =
+    loadStage === "idle" || loadStage === "scoreboard"
+      ? "loading"
+      : loadStage === "players"
+        ? "prep"
+        : canShowResultLayer
+          ? "result"
+          : isPlaying || revealEventActive || phaseIndex > 0
+            ? "reveal"
+            : "ready";
 
   const leaderRow = boardRows[0] ?? null;
   const boardLeaderLabel = leaderRow?.teamName ?? "—";
@@ -2680,7 +2789,33 @@ export default function MatchdayArenaV2Client(props: MatchdayArenaV2ClientProps)
   };
 
   return (
-    <div className="arena-v2-shell">
+    <div className={`arena-v2-shell is-act-${arenaAct}${isArenaEventMode ? " is-event-mode" : ""}${isFocusedBoardMode ? " is-focused-board" : ""}`}>
+      {showArenaHandoffBanner ? (
+        <div className="arena-v2-handoff-banner" role="status" data-testid="arena-lineup-handoff-banner">
+          <strong>Einsatzliste gespeichert</strong>
+          <span>Reveal startet hier — Play oder Leertaste für den nächsten Schritt.</span>
+        </div>
+      ) : null}
+      {arenaGuidedState === "loading" || arenaGuidedState === "prep" || arenaGuidedState === "ready" ? (
+        <div className={`arena-v2-guided-state is-${arenaGuidedState}`} data-testid="arena-guided-empty-state" aria-live="polite">
+          {arenaGuidedState === "loading" ? (
+            <>
+              <strong>Wertung wird vorbereitet</strong>
+              <span>32 Teams, Auto-Lineups und Resolve laufen — gleich geht&apos;s los.</span>
+            </>
+          ) : arenaGuidedState === "prep" ? (
+            <>
+              <strong>Spieler-Details laden</strong>
+              <span>Portraits und Slot-Scores kommen gleich — Board folgt im nächsten Schritt.</span>
+            </>
+          ) : (
+            <>
+              <strong>Bereit für den Reveal</strong>
+              <span>Play startet die Show · Leertaste = Schritt · Fokus-Board zeigt Top 3 + dein Team ±3.</span>
+            </>
+          )}
+        </div>
+      ) : null}
       <section className="panel arena-v2-hero">
         <div className="arena-v2-hero-main">
           <div className="arena-v2-kicker-row">
@@ -2700,7 +2835,8 @@ export default function MatchdayArenaV2Client(props: MatchdayArenaV2ClientProps)
                 {d1Label} / {d2Label}
               </TooltipHeading>
               <p className="arena-v2-subline">
-                {focusModeLabel} · {boardLabel} · Phase {MATCHDAY_ARENA_PHASES.find((phase) => phase.id === displayPhase)?.label ?? "Result"}
+                {focusModeLabel} · {boardLabel} · {arenaAct === "prep" ? "Vorbereitung" : arenaAct === "result" ? "Ergebnis" : "Reveal"} ·{" "}
+                {MATCHDAY_ARENA_PHASES.find((phase) => phase.id === displayPhase)?.label ?? "Result"}
               </p>
               {loadStageHint ? <p className="arena-v2-load-hint">{loadStageHint}</p> : null}
             </div>
@@ -2894,9 +3030,13 @@ export default function MatchdayArenaV2Client(props: MatchdayArenaV2ClientProps)
               <div className="arena-v2-board-head-main">
                 <TooltipHeading
                   as="h3"
-                  tooltip="Links bleibt das Hauptboard: alle 32 Teams, direkt klickbar. Rechts sitzen die Fokus-Spieler. Vor dem Result zeigt die Arena nur die aktive Disziplin; Gesamtwertung, PPs und Top Player werden erst danach sichtbar."
+                  tooltip={
+                    isFocusedBoardMode
+                      ? "Fokus-Board: Top 3 fix, dein Team hervorgehoben, je 3 Ränge darüber/darunter — 10 Teams statt 32."
+                      : "Links bleibt das Hauptboard: alle 32 Teams, direkt klickbar. Rechts sitzen die Fokus-Spieler. Vor dem Result zeigt die Arena nur die aktive Disziplin; Gesamtwertung, PPs und Top Player werden erst danach sichtbar."
+                  }
                 >
-                  32 Teams · {boardLabel}
+                  {isFocusedBoardMode ? `${visibleBoardRows.length} Teams · Fokus-Board` : `32 Teams · ${boardLabel}`}
                 </TooltipHeading>
                 {matchdayMutatorTraitsBySide ? (
                   <div className="arena-v2-board-mutators" aria-label="Spieltag-Mutatoren">
@@ -2910,9 +3050,17 @@ export default function MatchdayArenaV2Client(props: MatchdayArenaV2ClientProps)
                 ) : null}
               </div>
               <div className="arena-v2-board-head-actions">
-                <span className="pill">{boardRows.length} Teams</span>
+                <span className="pill">{isFocusedBoardMode ? `${visibleBoardRows.length} / ${boardRows.length}` : `${boardRows.length} Teams`}</span>
               </div>
             </div>
+            {isArenaEventMode && leaderRow ? (
+              <div className="arena-v2-score-ticker" aria-live="polite" data-testid="arena-v2-score-ticker">
+                <span className="arena-v2-score-ticker-kicker">Live</span>
+                <ArenaAnimatedScore value={leaderRow.score} />
+                <strong>{boardLeaderLabel}</strong>
+                <small>{MATCHDAY_ARENA_PHASES.find((phase) => phase.id === displayPhase)?.label ?? "Slots"}</small>
+              </div>
+            ) : null}
             <div className="arena-v2-board-step-nav" aria-label="Reveal Schritt-Navigation">
               <button
                 className="secondary-button inline-button"
@@ -2968,6 +3116,57 @@ export default function MatchdayArenaV2Client(props: MatchdayArenaV2ClientProps)
                 ))}
               </div>
             </div>
+          ) : isFocusedBoardMode ? (
+          <div
+            className="arena-v2-board-list is-focused-board"
+            ref={boardListRef}
+            role="list"
+            aria-label="Arena v2 Fokusboard"
+            data-testid="arena-v2-focused-board"
+          >
+            {visibleBoardRows.map((row) => {
+              const widthPct = maxBoardScore > 0 && row.score > 0 ? clampPct((row.score / maxBoardScore) * 100) : 0;
+              const isSelected = focusTeamId === row.teamId;
+              const isActiveTeam = params.teamId === row.teamId;
+              const teamResult = matchdayWinnerByTeamId.get(row.teamId) ?? null;
+              const slotDelta = isSlotsPhase ? slotScoreByTeamId.deltaByTeamId.get(row.teamId) ?? null : null;
+              const stepRankDeltaLabel = formatArenaRankDelta(row.stepRankDelta);
+              const statSecondaryLabel =
+                row.points != null
+                  ? `${formatDecimalScore(row.points, 1)} PPs`
+                  : effectiveBoardMode === "total"
+                    ? `Saison ${formatSeasonRankChange(teamResult?.seasonRank ?? null, teamResult?.seasonRankDelta ?? null)}`
+                    : slotDelta != null
+                      ? `+${formatDecimalScore(slotDelta, 1)}`
+                      : null;
+              return (
+                <ArenaBoardRow
+                  key={`arena-v2-focused-row-${row.teamId}`}
+                  row={row}
+                  maxBoardScore={maxBoardScore}
+                  widthPct={widthPct}
+                  isSelected={isSelected}
+                  isActiveTeam={isActiveTeam}
+                  effectiveBoardMode={effectiveBoardMode}
+                  isSlotsPhase={isSlotsPhase}
+                  slotDelta={slotDelta}
+                  stepRankDeltaLabel={stepRankDeltaLabel}
+                  statSecondaryLabel={statSecondaryLabel}
+                  teamResult={teamResult}
+                  paramsTeamId={params.teamId}
+                  onTeamRowClick={handleTeamRowClick}
+                  onOpenTeam={handleTeamProfileOpen}
+                  registerRowRef={(teamId, node) => {
+                    if (node) {
+                      boardRowRefs.current.set(teamId, node);
+                    } else {
+                      boardRowRefs.current.delete(teamId);
+                    }
+                  }}
+                />
+              );
+            })}
+          </div>
           ) : (
           <div
             className="arena-v2-board-list is-virtualized"
@@ -3167,7 +3366,43 @@ export default function MatchdayArenaV2Client(props: MatchdayArenaV2ClientProps)
               )}
             </div>
           ) : (
-            <div className="arena-v2-player-stack arena-v2-winner-stack">
+            <>
+              {mvpSpotlightActive && mvpSpotlightPlayer ? (
+                <article
+                  className="arena-v2-mvp-spotlight"
+                  data-testid="arena-v2-mvp-spotlight"
+                  aria-live="polite"
+                >
+                  <span className="arena-v2-mvp-spotlight-kicker">MVP Spotlight</span>
+                  <MatchdayArenaPlayerCard
+                    rank={mvpSpotlightPlayer.rankInDiscipline}
+                    portraitUrl={mvpSpotlightPlayer.portraitUrl}
+                    playerName={mvpSpotlightPlayer.playerName}
+                    teamName={mvpSpotlightPlayer.teamName}
+                    className={mvpSpotlightPlayer.className}
+                    scoreLabel={`${formatDecimalScore(mvpSpotlightPlayer.finalPlayerScore, 1)} Score`}
+                    pointsLabel={
+                      mvpSpotlightPlayer.pointsAwarded != null
+                        ? `${formatDecimalScore(mvpSpotlightPlayer.pointsAwarded, 1)} PPs`
+                        : "—"
+                    }
+                    contributionLabel={mvpSpotlightPlayer.disciplineName}
+                    axisStats={mvpSpotlightPlayer.axisStats}
+                    badges={mvpSpotlightPlayer.badges}
+                    variant="default"
+                    onOpen={
+                      mvpSpotlightPlayer.activePlayerId
+                        ? () =>
+                            props.onOpenPlayerDetails?.({
+                              playerId: mvpSpotlightPlayer.playerId,
+                              activePlayerId: mvpSpotlightPlayer.activePlayerId,
+                            })
+                        : undefined
+                    }
+                  />
+                </article>
+              ) : null}
+              <div className="arena-v2-player-stack arena-v2-winner-stack">
               {canShowResultLayer ? (
                 ppWinnerCards.map((player) => (
                   <MatchdayArenaPlayerCard
@@ -3195,7 +3430,8 @@ export default function MatchdayArenaV2Client(props: MatchdayArenaV2ClientProps)
                   </div>
                 </article>
               )}
-            </div>
+              </div>
+            </>
           )}
         </section>
 

@@ -1,4 +1,5 @@
-import type { Team, TeamIdentity } from "@/lib/data/olyDataTypes";
+import type { GameState, Team, TeamIdentity } from "@/lib/data/olyDataTypes";
+import { getTeamRosterStressRecord } from "@/lib/ai/season-roster-stress-service";
 
 export const DEFAULT_ROSTER_MAX = 14;
 /** Fixes Kader-Minimum für jedes Team (unabhängig von Sheet-/Identity-Daten). */
@@ -38,6 +39,39 @@ export function deriveRosterTargets(
   const rawOpt = finiteRounded(identity?.playerOpt) ?? Math.max(fallbackOpt, playerMin);
   const playerOpt = Math.min(Math.max(rawOpt, playerMin), playerMax);
   return { playerMin, playerOpt, playerMax };
+}
+
+export type PlannerRosterTargets = {
+  playerMin: number;
+  playerOpt: number;
+  playerMax: number;
+  basePlayerOpt: number;
+  optBump: number;
+  depthRepairMandate: boolean;
+  depthStressScore: number;
+};
+
+export function resolvePlannerRosterTargets(
+  gameState: GameState,
+  teamId: string,
+  team?: TeamRosterLimitInput,
+  identity?: TeamRosterIdentityInput,
+): PlannerRosterTargets {
+  const teamRow = team ?? gameState.teams.find((entry) => entry.teamId === teamId);
+  const identityRow = identity ?? gameState.teamIdentities.find((entry) => entry.teamId === teamId);
+  const base = deriveRosterTargets(teamRow, identityRow);
+  const stress = getTeamRosterStressRecord(gameState, teamId);
+  const optBump = stress?.optBump ?? 0;
+  const effectiveOpt = Math.min(base.playerMax, base.playerOpt + optBump);
+  return {
+    playerMin: base.playerMin,
+    playerOpt: effectiveOpt,
+    playerMax: base.playerMax,
+    basePlayerOpt: base.playerOpt,
+    optBump,
+    depthRepairMandate: optBump > 0,
+    depthStressScore: stress?.depthStressScore ?? 0,
+  };
 }
 
 /**

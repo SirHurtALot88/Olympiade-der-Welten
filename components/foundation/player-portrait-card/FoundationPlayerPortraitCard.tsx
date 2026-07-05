@@ -144,7 +144,7 @@ export default function FoundationPlayerPortraitCard({
     poRangeMax,
     showCaPo,
     leagueHeatPools: resolvedHeatPools,
-    rankStyle: variant === "team" ? "inline" : "label",
+    rankStyle: ovrRank != null || ppsRank != null || mvsRank != null || variant === "team" ? "inline" : "label",
   });
 
   const economyRow =

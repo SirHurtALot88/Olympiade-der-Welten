@@ -45,6 +45,10 @@ export const CANONICAL_MANAGER_ACTION_TYPES: AiManagerActionType[] = [
   "mark_sell_strategy",
 ];
 
+export const S2_MANAGER_ACTION_TYPES: AiManagerActionType[] = CANONICAL_MANAGER_ACTION_TYPES.filter(
+  (actionType) => !actionType.startsWith("reserve_"),
+);
+
 const PRE_DRAFT_ROSTER_EMPTY = /team_roster_empty/;
 
 function splitPreDraftManagerBlockers(blockers: string[]) {
@@ -152,11 +156,14 @@ export function applyCanonicalManagerPlan(
 ) {
   const latest = persistence.getSaveById(save.saveId) ?? save;
   const longRunFast = isLongRunFastProfile();
+  const resolvedActionTypes =
+    actionTypes ??
+    (isSeasonOne(latest.gameState.season.id) ? CANONICAL_MANAGER_ACTION_TYPES : S2_MANAGER_ACTION_TYPES);
   const result = applyAiManagerPlan({
     save: latest,
     dryRun: false,
     teamIds: latest.gameState.teams.map((team) => team.teamId),
-    actionTypes: actionTypes ?? CANONICAL_MANAGER_ACTION_TYPES,
+    actionTypes: resolvedActionTypes,
     persistence,
     longRunFast,
   });
@@ -257,7 +264,49 @@ export async function runSeasonOnePicksDraft(
     }
   }
 
-  const latest = persistence.getSaveById(saveId) ?? save;
+  let latest = persistence.getSaveById(saveId) ?? save;
+  if (result.executed) {
+    const maxTopupPasses = 3;
+    for (let topupPass = 0; topupPass < maxTopupPasses; topupPass += 1) {
+      const belowMinAfterDraft = getAllTeamsBelowMinIds(latest.gameState);
+      if (belowMinAfterDraft.length === 0) {
+        break;
+      }
+      console.error(
+        `[long-run] S1 post-draft min topup pass ${topupPass + 1}: ${belowMinAfterDraft.length} teams`,
+      );
+      const topupResult = runChunkedRedraftTopup({
+        persistence,
+        saveId,
+        seasonId,
+        dryRun: false,
+        confirmToken: CHUNKED_REDRAFT_TOPUP_CONFIRM_TOKEN,
+        mode: "season1_initial_topup",
+        target: "playerMin",
+        targetTeamIds: belowMinAfterDraft,
+        roundLimit: 8,
+        teamTimeLimitMs: 30_000,
+        watchdogMs: 60_000,
+      });
+      latest = persistence.getSaveById(saveId) ?? latest;
+      const stillBelowMin = getAllTeamsBelowMinIds(latest.gameState);
+      for (const teamId of stillBelowMin) {
+        const team = latest.gameState.teams.find((entry) => entry.teamId === teamId);
+        const rosterCount = latest.gameState.rosters.filter((entry) => entry.teamId === teamId).length;
+        const hardMin = getTeamHardMinRequired(latest.gameState, teamId);
+        blockers.push(
+          `season1_topup_no_candidate:${team?.shortCode ?? teamId}:${rosterCount}/${hardMin}`,
+        );
+      }
+      if (topupResult.warnings.length > 0) {
+        blockers.push(...topupResult.warnings.slice(0, 8).map((warning) => `season1_topup_warning:${warning}`));
+      }
+      if (stillBelowMin.length === 0) {
+        break;
+      }
+    }
+  }
+
   blockers.push(...collectDraftTargetBlockers(latest, "season1_topup", "min"));
 
   console.error(
@@ -379,58 +428,17 @@ export function repairSeasonOneEndRosterBeforeS2(
     return { blockers: [], warnings: [], purchases: [], repaired: false };
   }
 
-  // S1 end: always repair hard-min holes; union compare-rescue remainder (never skip sell-only below-min).
+  // 2026-07-05: S1-end hardMin topup removed — it undid season_end sells by refilling every team
+  // back to playerMin before S2 preseason. Rebuild belongs exclusively in the next preseason buy pass
+  // (see .cursor/rules/balancing-no-sell-floor-full-rebuild.mdc).
   const belowMinIds = getAllTeamsBelowMinIds(save.gameState);
-  const plannerExhausted = (options?.plannerExhaustedTeamIds ?? []).filter(Boolean);
-  const teamIds = [...new Set([...belowMinIds, ...plannerExhausted])];
-  if (teamIds.length === 0) {
-    return { blockers: [], warnings: [], purchases: [], repaired: false };
-  }
-
-  console.error(`[long-run] S1-end hard-min roster repair: ${teamIds.length} teams`);
-  const result = runChunkedRedraftTopup({
-    persistence,
-    saveId,
-    seasonId: "season-1",
-    dryRun: false,
-    confirmToken: CHUNKED_REDRAFT_TOPUP_CONFIRM_TOKEN,
-    mode: "season1_initial_topup",
-    target: "playerMin",
-    targetTeamIds: teamIds,
-    roundLimit: 4,
-    teamTimeLimitMs: 30_000,
-    watchdogMs: 60_000,
-    outputDir: options?.outputDir,
-  });
-
-  const purchases = result.picks.map((pick) => ({
-    seasonId: "season-1",
-    teamId: pick.teamId,
-    playerId: pick.playerId,
-    playerName: pick.playerName,
-    fee: pick.marketValue,
-    rosterAfter: pick.rosterAfter,
-    cashAfter: pick.cashAfter,
-    source: "season1_autoprep_topup",
-    s1EndStabilization: true,
-  }));
-
-  const after = persistence.getSaveById(saveId);
-  const blockers: string[] = [];
-  if (after) {
-    for (const teamId of teamIds) {
-      const rosterCount = after.gameState.rosters.filter((entry) => entry.teamId === teamId).length;
-      const hardMin = getTeamHardMinRequired(after.gameState, teamId);
-      if (rosterCount < hardMin) {
-        blockers.push(`s1_end_roster_repair_below_min:${teamId}:${rosterCount}/${hardMin}`);
-      }
-    }
-  }
-
   return {
-    repaired: true,
-    blockers,
-    warnings: [...result.warnings.slice(0, 20), "s1_end_stabilization:true"],
-    purchases,
+    blockers: [],
+    warnings: [
+      "s1_end_roster_repair_skipped:deferred_to_next_preseason",
+      belowMinIds.length > 0 ? `post_sell_below_min_teams:${belowMinIds.length}` : "post_sell_all_at_or_above_min",
+    ],
+    purchases: [],
+    repaired: false,
   };
 }

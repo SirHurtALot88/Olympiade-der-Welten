@@ -258,4 +258,69 @@ describe("player injury history", () => {
     };
     expect(backfillPlayerInjuryHistoryFromSeasonEvents(gameStateWithEvent).players[0]?.injuryHistory).toHaveLength(1);
   });
+
+  it("backfills missing season events even when player already has later injury history", () => {
+    const s1Event: InjuryEventRecord = {
+      eventId: "evt-s1",
+      seasonId: "season-1",
+      matchdayId: "matchday-1",
+      teamId: "T-1",
+      playerId: "p1",
+      fatigueBefore: 82,
+      riskPercent: 25,
+      roll: 10,
+      result: "injured",
+      unavailableForMatchdays: 1,
+      unavailableUntil: "matchday-2",
+      normalRecovery: 20,
+      injuryRecovery: 10,
+      source: "fatigue_injury_risk_v1",
+      timestamp: "2026-06-20T00:00:00.000Z",
+    };
+    const s2Event: InjuryEventRecord = {
+      ...s1Event,
+      eventId: "evt-s2",
+      seasonId: "season-2",
+      matchdayId: "matchday-3",
+      timestamp: "2026-07-20T00:00:00.000Z",
+    };
+    const gameState = {
+      ...buildMatchdayGameState("p1"),
+      players: [
+        {
+          ...buildPlayer("p1"),
+          injuryHistory: [
+            {
+              eventId: "evt-s2",
+              seasonId: "season-2",
+              seasonName: "Season 2",
+              matchdayId: "matchday-3",
+              matchdayLabel: "Spieltag 3",
+              teamId: "T-1",
+              fatigueBefore: 80,
+              riskPercent: 20,
+              unavailableUntil: "matchday-4",
+              matchdaysMissed: 1,
+              injuryRecoveryPct: 50,
+              timestamp: "2026-07-20T00:00:00.000Z",
+            },
+          ],
+        },
+      ],
+      seasonState: {
+        ...buildMatchdayGameState("p1").seasonState,
+        injuryEvents: [s1Event, s2Event],
+      },
+    };
+
+    const hydrated = ensurePlayerInjuryHistoryForGameState(gameState);
+    const history = buildPlayerInjuryHistoryFromEvents({
+      playerId: "p1",
+      gameState: hydrated,
+      persistedHistory: hydrated.players[0]?.injuryHistory,
+    });
+
+    expect(history).toHaveLength(2);
+    expect(history.map((entry) => entry.seasonId).sort()).toEqual(["season-1", "season-2"]);
+  });
 });

@@ -250,10 +250,11 @@ describe("season-end XP spend apply service", () => {
 
     expect(preview.ok).toBe(true);
     expect(result.applied).toBe(true);
-    expect(savedPlayer?.currentXP).toBe(35 + (preview.players[0]?.earnedSeasonXP ?? 0));
+    expect(savedPlayer?.currentXP).toBe(35);
     expect(savedPlayer?.spentXP).toBe(20);
-    expect(savedPlayer?.lifetimeXP).toBe(55 + (preview.players[0]?.earnedSeasonXP ?? 0));
+    expect(savedPlayer?.lifetimeXP).toBe(55);
     expect(getSavedState()?.playerProgressionEvents?.[0]?.xpSpent).toBe(0);
+    expect(getSavedState()?.playerProgressionEvents?.[0]?.xpEarned).toBe(0);
     const organicUpgrades = getSavedState()?.playerProgressionEvents?.[0]?.upgrades ?? [];
     expect(organicUpgrades.length).toBeGreaterThan(0);
     expect(organicUpgrades.every((entry) => entry.source === "organic_season_progression")).toBe(true);
@@ -265,6 +266,60 @@ describe("season-end XP spend apply service", () => {
     });
     expect(transitionPreview.canCompleteSeason).toBe(true);
     expect(transitionPreview.steps.some((step) => step.stepId === "player_development")).toBe(true);
+  });
+
+  it("uses attribute-derived discipline baselines instead of stale stored ratings in progression snapshots", () => {
+    const highAttributes = {
+      ...baseAttributes,
+      power: 55,
+      speed: 58,
+      dexterity: 60,
+      spirit: 52,
+      intelligence: 54,
+    } satisfies PlayerGeneratorAttributes;
+    const save = createSave(
+      createPlayer({
+        attributeSheetStats: highAttributes,
+        rating: 55,
+        disciplineRatings: { tdm: 18, fechten: 20, "speed-schach": 19 },
+        currentXP: 10,
+      }),
+    );
+    save.gameState.seasonState.matchdayResults = [
+      { id: "result-1", seasonId: "season-1", matchdayId: "matchday-1", status: "preview_applied" },
+    ];
+    save.gameState.seasonState.playerDisciplinePerformances = [
+      {
+        id: "perf-1",
+        matchdayResultId: "result-1",
+        teamId: "team-1",
+        playerId: "player-1",
+        activePlayerId: null,
+        disciplineId: "tdm",
+        disciplineSide: "d1",
+        slotIndex: 0,
+        baseValue: 80,
+        finalPlayerScore: 95,
+        scoreContribution: 25,
+        rankInTeam: 1,
+        rankInDiscipline: 1,
+        isTop10: true,
+        isMvpCandidate: true,
+        storyWeight: null,
+        createdAt: "2026-06-11T00:00:00.000Z",
+      },
+    ];
+
+    const preview = previewSeasonEndXpSpend(save, "team-1");
+    const playerPreview = preview.players[0];
+    expect(preview.ok).toBe(true);
+    expect(playerPreview?.progressionSnapshotBefore.disciplineRatings.tdm).toBeGreaterThan(40);
+    const tennisBefore = playerPreview?.progressionSnapshotBefore.disciplineRatings.tdm ?? 0;
+    const tennisAfter = playerPreview?.progressionSnapshotAfter.disciplineRatings.tdm ?? 0;
+    expect(Math.abs(tennisAfter - tennisBefore)).toBeLessThan(5);
+    const mwBefore = playerPreview?.progressionSnapshotBefore.marketValue ?? 0;
+    const mwAfter = playerPreview?.progressionSnapshotAfter.marketValue ?? 0;
+    expect(Math.abs(mwAfter - mwBefore)).toBeLessThan(3);
   });
 
   it("does not materialize the same season XP twice", () => {

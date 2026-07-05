@@ -14,6 +14,7 @@ import {
   deriveBaseMarketValueFromFinal,
 } from "@/lib/player-formulas/market-value-engine";
 import { loadPlayerFormulaSources } from "@/lib/player-formulas/formula-source-loader";
+import { buildMarketValueDisciplineInputsFromPlayers } from "@/lib/player-formulas/market-value-apply";
 import { calculateSalaryFromMarketValue } from "@/lib/player-formulas/salary-engine";
 
 export type PlayerEconomyMode = "legacy" | "compare" | "calculated";
@@ -456,15 +457,9 @@ export function buildPlayerEconomyCompareReport(input: {
     gameState: effectiveGameState,
     saveId: input.saveId ?? `economy-compare:${effectiveGameState.season.id}`,
   }).ratingsById;
-  const marketValueInputs = gameState.players
-    .map((player) => input.playerOverridesById?.get(player.id) ?? player)
-    .filter((player) =>
-      Object.values(player.disciplineRatings ?? {}).some((value) => isFiniteNumber(value)),
-    )
-    .map((player) => ({
-      playerId: player.id,
-      scores: player.disciplineRatings ?? {},
-    }));
+  const marketValueInputs = buildMarketValueDisciplineInputsFromPlayers(
+    gameState.players.map((player) => input.playerOverridesById?.get(player.id) ?? player),
+  );
 
   const marketValueResult = calculateMarketValueFromRankTable({
     players: marketValueInputs,

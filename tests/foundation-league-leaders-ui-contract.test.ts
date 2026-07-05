@@ -21,7 +21,9 @@ describe("foundation league leaders ui contract", () => {
     expect(clientText).toContain('data-testid="foundation-league-leaders"');
     expect(clientText).toContain("league-leaders-grid");
     expect(clientText).toContain("is-own-team");
-    expect(clientText).toContain("league-leaders-${category.id}");
+    expect(clientText).toContain("returnContext");
+    expect(clientText).toContain("league-leaders-back-link");
+    expect(clientText).toContain("onReturnToPlayer");
     expect(clientText).toContain("data-testid={`league-leaders-card-${category.id}`}");
     expect(globalsText).toContain(".league-leaders-card.is-pow");
     expect(globalsText).toContain(".league-leaders-card:hover");

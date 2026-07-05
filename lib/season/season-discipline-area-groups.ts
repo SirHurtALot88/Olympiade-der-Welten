@@ -143,6 +143,31 @@ export function buildTeamHistoryDisciplineValuesFromRecord(
   return result;
 }
 
+function getSnapshotTeamPerformanceRows(snapshot: {
+  playerPerformances?: Array<{
+    playerId?: string;
+    teamId?: string | null;
+    disciplineBreakdown?: Array<{ disciplineId: string; totalContribution?: number | null }>;
+  }>;
+  playerPerformanceSnapshots?: Array<{
+    playerId?: string;
+    teamId?: string | null;
+    disciplineBreakdown?: Array<{ disciplineId: string; totalContribution?: number | null }>;
+  }>;
+}) {
+  const rows = [...(snapshot.playerPerformances ?? [])];
+  const seenPlayerIds = new Set(rows.map((row) => row.playerId).filter((playerId): playerId is string => Boolean(playerId)));
+
+  for (const row of snapshot.playerPerformanceSnapshots ?? []) {
+    if (row.playerId && seenPlayerIds.has(row.playerId)) {
+      continue;
+    }
+    rows.push(row);
+  }
+
+  return rows;
+}
+
 export function buildTeamHistoryDisciplineValuesFromSnapshot(
   snapshot: {
     playerPerformances?: Array<{
@@ -154,7 +179,7 @@ export function buildTeamHistoryDisciplineValuesFromSnapshot(
 ): PlayerHistoryDisciplineValues {
   const totals: PlayerHistoryDisciplineValues = {};
 
-  for (const player of snapshot.playerPerformances ?? []) {
+  for (const player of getSnapshotTeamPerformanceRows(snapshot)) {
     if (player.teamId !== teamId) {
       continue;
     }

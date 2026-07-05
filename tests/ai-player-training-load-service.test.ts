@@ -243,4 +243,58 @@ describe("ai player training load service", () => {
     expect(plans.find((plan) => plan.playerId === "star")?.selectedMode).toBe("leicht");
     expect(plans.find((plan) => plan.playerId === "star")?.needsLineupRest).toBe(true);
   });
+
+  it("prioritizes harder training for gap-axis prospects when GM bias supports the axis", () => {
+    const gameState = buildGameState({
+      players: [
+        buildPlayer("starter", {
+          fatigue: 20,
+          className: "Berserker",
+          coreStats: { pow: 82, spe: 40, men: 24, soc: 35 },
+        }),
+        buildPlayer("prospect", {
+          id: "prospect",
+          name: "prospect",
+          fatigue: 18,
+          potential: 82,
+          rating: 48,
+          className: "Mage",
+          coreStats: { pow: 20, spe: 18, men: 78, soc: 40 },
+          disciplineRatings: { tdm: 40, "mini-dm": 35 },
+        }),
+      ],
+      performances: [
+        { playerId: "starter", appearances: 8 },
+        { playerId: "prospect", appearances: 1 },
+      ],
+    });
+    gameState.teamIdentities = [
+      {
+        ...gameState.teamIdentities[0],
+        pow: 5,
+        spe: 5,
+        men: 90,
+        soc: 5,
+      },
+    ];
+    gameState.seasonState.teamGeneralManagers = {
+      "T-1": {
+        teamId: "T-1",
+        gmId: "gm-facility-architect-01",
+        assignedSeasonId: "season-1",
+        influencePct: 30,
+        source: "auto_generated",
+      },
+    };
+
+    const plans = buildTeamPlayerTrainingLoadPlans({
+      gameState,
+      teamId: "T-1",
+      teamBaselineIntensity: "normal",
+    });
+
+    const prospectPlan = plans.find((plan) => plan.playerId === "prospect");
+    expect(["hart", "mittel"]).toContain(prospectPlan?.selectedMode);
+    expect(prospectPlan?.reasons.some((reason) => reason.includes("Achsenlücke"))).toBe(true);
+  });
 });

@@ -84,6 +84,16 @@ function buildRosterEntry(overrides: Partial<RosterEntry> = {}): RosterEntry {
 }
 
 describe("player economy contract", () => {
+  it("prefers calculated market value over stale roster book value", () => {
+    const economy = resolvePlayerEconomyContract({
+      player: buildPlayer({ marketValue: 30.51, displayMarketValue: 30.51 }),
+      rosterEntry: buildRosterEntry({ currentValue: 35.82, purchasePrice: 28 }),
+    });
+
+    expect(economy.marketValue).toBeCloseTo(30.51, 2);
+    expect(economy.marketValueSource).not.toBe("active_current_value");
+  });
+
   it("matches the Torgar benchmark with salary based on the internal market value basis", () => {
     const economy = resolvePlayerEconomyContract({ player: buildPlayer() });
 

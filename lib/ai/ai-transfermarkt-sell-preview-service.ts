@@ -20,6 +20,7 @@ import { getTeamStrategyProfile, withNormalizedTeamStrategyProfiles } from "@/li
 import { normalizeTransfermarktToken } from "@/lib/market/transfermarkt-fit";
 import type { LocalTransfermarktRunContext } from "@/lib/market/transfermarkt-local-service";
 import { buildTransfermarktSaleFactorBreakdown } from "@/lib/market/transfermarkt-sale-factor";
+import { resolveTransfermarktSellProceeds } from "@/lib/market/transfermarkt-sell-proceeds";
 import { createPersistenceService } from "@/lib/persistence/persistence-service";
 import { assessTeamSellRunwayPressure, estimateBuyoutLikelihood, isAttractiveProfitSell } from "@/lib/ai/team-sell-runway-pressure";
 import { assessPlayerBoardTrust, type PlayerBoardTrustRenewalPolicy } from "@/lib/ai/player-board-trust-service";
@@ -68,6 +69,8 @@ export type AiSellPreviewCandidate = {
   salary: number | null;
   marketValue: number | null;
   expectedSellValue: number | null;
+  grossSalePrice?: number | null;
+  buyoutCost?: number | null;
   contractLength: number | null;
   rosterAfter: number | null;
   salaryAfter: number | null;
@@ -395,11 +398,31 @@ function buildSportValueSummary(player: Player, performance: PlayerPerformanceSu
 function buildExpectedSellValue(context: ResolvedPreviewContext, player: Player, roster: RosterEntry) {
   const economy = resolvePlayerEconomyContract({ player, rosterEntry: roster });
   if (context.source !== "sqlite") {
-    return economy.marketValue;
+    return {
+      grossSalePrice: economy.marketValue,
+      buyoutCost: 0,
+      expectedSellValue: economy.marketValue,
+    };
   }
 
   const saleFactorBreakdown = buildTransfermarktSaleFactorBreakdown(context.gameState, player, roster);
-  return saleFactorBreakdown.salePrice ?? economy.marketValue ?? null;
+  const grossSalePrice = saleFactorBreakdown.salePrice ?? economy.marketValue ?? null;
+  if (grossSalePrice == null) {
+    return { grossSalePrice: null, buyoutCost: null, expectedSellValue: null };
+  }
+
+  const proceeds = resolveTransfermarktSellProceeds({
+    rosterEntry: roster,
+    grossSalePrice,
+    purchasePrice: economy.purchasePrice,
+    gameState: context.gameState,
+  });
+
+  return {
+    grossSalePrice: proceeds.grossSalePrice,
+    buyoutCost: proceeds.buyoutCost,
+    expectedSellValue: proceeds.netProceeds,
+  };
 }
 
 function buildCandidate(
@@ -421,7 +444,10 @@ function buildCandidate(
   const needs = cache.needsByTeamId.get(team.teamId) ?? evaluateAiNeeds(context.gameState, team.teamId);
   cache.needsByTeamId.set(team.teamId, needs);
   const identity = context.gameState.teamIdentities.find((entry) => entry.teamId === team.teamId) ?? null;
-  const expectedSellValue = buildExpectedSellValue(context, player, roster);
+  const sellValue = buildExpectedSellValue(context, player, roster);
+  const expectedSellValue = sellValue.expectedSellValue;
+  const grossSalePrice = sellValue.grossSalePrice;
+  const buyoutCost = sellValue.buyoutCost;
   const economy = resolvePlayerEconomyContract({ player, rosterEntry: roster });
   const marketValue = economy.marketValue;
   const purchasePrice = economy.purchasePrice;
@@ -450,8 +476,20 @@ function buildCandidate(
   if (!allowSellBelowRosterMin && playerMin != null && rosterSize - 1 < playerMin) {
     warnings.push("Verkauf wuerde den Kader unter das Team-Minimum druecken.");
   }
-  if (rosterSize <= 7) {
+  if (!allowSellBelowRosterMin && rosterSize <= 7) {
     warnings.push("Kader ist bereits sehr klein.");
+  }
+  if (expectedSellValue != null && expectedSellValue <= 0) {
+    warnings.push("Netto-Verkaufserloes deckt den offenen Buyout nicht.");
+    pushKeep("negative_net_proceeds", "Verkauf bringt nach Buyout keinen positiven Cash-Zufluss");
+  } else if (
+    buyoutCost != null &&
+    buyoutCost > 0 &&
+    roster.contractLength >= 3 &&
+    expectedSellValue != null &&
+    expectedSellValue < (salary ?? 0) * 0.5
+  ) {
+    warnings.push("Mehrjahresvertrag: Netto-Erlös nach Buyout ist zu gering.");
   }
   if (expectedSellValue == null) {
     warnings.push("Kein belastbarer Verkaufswert aus der aktuellen Sell-Preview vorhanden.");
@@ -562,7 +600,7 @@ function buildCandidate(
   }
 
   if (profitDelta != null && profitDelta > 0) {
-    pushSell("profit_window", `realisierbarer Gewinn von ${roundValue(profitDelta, 1)}`);
+    pushSell("profit_window", `realisierbarer Netto-Gewinn von ${roundValue(profitDelta, 1)}`);
   } else if (profitDelta != null && profitDelta < 0) {
     pushKeep("sell_below_purchase", "aktueller Verkauf wuerde unter Einkauf liegen");
   }
@@ -691,13 +729,15 @@ function buildCandidate(
     demandPressureScore * 18 +
     strategy.avoidedHits * 6 +
     (hardNoGoHit ? 14 : 0) +
+    (expectedSellValue != null && expectedSellValue <= 0 ? -40 : 0) +
     nonStarterBonus * 50 -
     keepPerformanceScore * 22 -
     strategy.preferredHits * 5 -
     (coversNeedAxis ? 12 : 0) -
     demandKeepScore * 14 -
     (starProtection && !negativeCashPressure && !lowCashReservePressure && boardPressure < 0.65 ? 14 : 0) -
-    loyaltyBias * (roster.contractLength >= 3 ? 8 : 2);
+    loyaltyBias * (roster.contractLength >= 3 ? 8 : 2) -
+    ((identity?.boardConfidence ?? 0) >= 7 ? Math.round(((identity?.boardConfidence ?? 7) - 6) * 4) : 0);
 
   if (negativeCashPressure) {
     unshiftSell("negative_cash", "negatives Teamcash zum Seasonstart");
@@ -705,6 +745,12 @@ function buildCandidate(
     unshiftSell("low_cash_reserve", "Cash-Reserve ist zu knapp fuer sichere Kaderplanung");
   } else if (budgetPressure === "healthy") {
     pushKeep("healthy_cash", "Teamcash ist entspannt");
+  }
+  if ((identity?.boardConfidence ?? 0) >= 7) {
+    pushKeep(
+      "high_board_confidence",
+      `statische Board-Confidence ${identity?.boardConfidence ?? "?"} — Kaderzusammenhalt bevorzugen`,
+    );
   }
 
   let adjustedScoreRaw = scoreRaw;
@@ -752,6 +798,8 @@ function buildCandidate(
     salary,
     marketValue,
     expectedSellValue,
+    grossSalePrice,
+    buyoutCost,
     contractLength: roster.contractLength,
     rosterAfter,
     salaryAfter: salary != null ? Math.max(salaryTotal - salary, 0) : salaryTotal,
@@ -883,7 +931,9 @@ export async function buildAiTransfermarktSellPreview(params: AiSellPreviewParam
       : typeof params.limit === "number" && Number.isFinite(params.limit)
         ? Math.max(1, Math.round(params.limit))
         : 5;
-  const allowSellBelowRosterMin = params.allowSellBelowRosterMin ?? false;
+  const allowSellBelowRosterMin =
+    params.allowSellBelowRosterMin ??
+    (params.teamScope === "ai" || params.fullRosterCandidates === true);
   let candidateCount = 0;
 
   const requestedTeam =

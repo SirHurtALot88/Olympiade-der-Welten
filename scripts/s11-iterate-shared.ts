@@ -6,7 +6,7 @@ import path from "node:path";
 
 import Database from "better-sqlite3";
 
-import { AI_MARKET_APPLY_CONFIRM_TOKEN } from "@/lib/ai/ai-market-plan-apply-contract";
+import { resolveTeamRosterMarketValue } from "@/lib/ai/planner-cash-buffer-policy";
 import {
   getTeamHardMinRequired,
   getTeamOptTarget,
@@ -113,12 +113,7 @@ export function buildTeamRows(gameState: GameState): TeamCheckpointRow[] {
     const salary = gameState.rosters
       .filter((entry) => entry.teamId === team.teamId)
       .reduce((sum, entry) => sum + (entry.salary ?? entry.upkeep ?? 0), 0);
-    const mw = gameState.rosters
-      .filter((entry) => entry.teamId === team.teamId)
-      .reduce((sum, entry) => {
-        const player = gameState.players.find((p) => p.id === entry.playerId);
-        return sum + (player?.marketValue ?? player?.displayMarketValue ?? 0);
-      }, 0);
+    const mw = resolveTeamRosterMarketValue(gameState, team.teamId);
     return {
       teamId: team.teamId,
       teamCode: team.shortCode,

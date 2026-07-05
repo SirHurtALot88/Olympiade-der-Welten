@@ -5,7 +5,7 @@ import {
   resolveTeamSpendableCashForPlanning,
   usesSingleCashPlanningPolicy,
 } from "@/lib/ai/planner-cash-buffer-policy";
-import { deriveRosterTargets } from "@/lib/foundation/roster-limits";
+import { resolvePlannerRosterTargets } from "@/lib/foundation/roster-limits";
 
 function round(value: number, digits = 2) {
   return Number(value.toFixed(digits));
@@ -47,27 +47,69 @@ export function resolvePostOptUpgradeMandate(gameState: GameState, teamId: strin
   if (!team) return inactive;
 
   const identity = gameState.teamIdentities.find((entry) => entry.teamId === teamId);
-  const { playerOpt, playerMax } = deriveRosterTargets(team, identity);
+  const { playerOpt, playerMax, depthRepairMandate } = resolvePlannerRosterTargets(gameState, teamId, team, identity);
   const count = rosterCount(gameState, teamId);
-  if (count < playerOpt) return inactive;
 
   const salary = getTeamSalarySum(gameState, teamId);
   const cash = team.cash ?? 0;
   const spendable = resolveTeamSpendableCashForPlanning(gameState, teamId, cash);
-  if (spendable + 0.01 < 12) return inactive;
+  const cashSalaryRatio = salary > 0 ? cash / salary : 0;
+  const spendableThreshold = depthRepairMandate ? 8 : cashSalaryRatio >= 1.15 ? 6 : 12;
+
+  function buildExcessCashMandate() {
+    if (cashSalaryRatio + 0.01 < 1.1 || spendable + 0.01 < 6) return inactive;
+    const rosterHeadroom = Math.max(0, playerMax - count);
+    const slotsFromExcess = cashSalaryRatio >= 1.5 ? 3 : cashSalaryRatio >= 1.25 ? 2 : 1;
+    const gapToOpt = Math.max(0, playerOpt - count);
+    const maxBuys = Math.min(
+      slotsFromExcess,
+      rosterHeadroom > 0 ? rosterHeadroom : 1,
+      gapToOpt > 0 ? Math.max(gapToOpt, 1) : slotsFromExcess,
+    );
+    if (maxBuys <= 0) return inactive;
+    const expandTarget = Math.min(playerMax, Math.max(count + maxBuys, playerOpt));
+    return {
+      active: true,
+      mode: "expand" as const,
+      maxSells: 0,
+      maxBuys,
+      minUpgradeBuyPrice: null,
+      expandRosterTarget: expandTarget > count ? expandTarget : null,
+      postOptUpgradeDeploy: true,
+    };
+  }
+
+  if (count < playerOpt) {
+    if (depthRepairMandate && spendable + 0.01 >= spendableThreshold) {
+      const gap = playerOpt - count;
+      const maxBuys = Math.min(2, gap);
+      if (maxBuys <= 0) return buildExcessCashMandate();
+      return {
+        active: true,
+        mode: "expand",
+        maxSells: 0,
+        maxBuys,
+        minUpgradeBuyPrice: null,
+        expandRosterTarget: Math.min(playerMax, count + maxBuys),
+        postOptUpgradeDeploy: true,
+      };
+    }
+    return buildExcessCashMandate();
+  }
+
+  if (spendable + 0.01 < spendableThreshold && cashSalaryRatio + 0.01 < 1.1) return inactive;
 
   const rosterHeadroom = Math.max(0, Math.min(playerMax, playerOpt + 2) - count);
-  const cashSalaryRatio = salary > 0 ? cash / salary : 0;
-  const extraSlots = cashSalaryRatio >= 1.35 || spendable >= 28 ? 2 : 1;
+  const extraSlots = cashSalaryRatio >= 1.25 || spendable >= 20 ? 2 : 1;
   const expandTarget = Math.min(playerMax, playerOpt + extraSlots);
   const maxBuys =
     rosterHeadroom > 0
-      ? Math.min(2, rosterHeadroom, extraSlots)
-      : spendable >= 20
+      ? Math.min(extraSlots === 2 ? 3 : 2, rosterHeadroom, extraSlots)
+      : spendable >= 12
         ? 1
         : 0;
 
-  if (maxBuys <= 0) return inactive;
+  if (maxBuys <= 0) return buildExcessCashMandate();
 
   return {
     active: true,

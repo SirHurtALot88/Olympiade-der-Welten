@@ -146,7 +146,19 @@ export function resolveAllowedMarketBuyCount(input: {
     return 0;
   }
 
-  const onTopLimit = Math.min(input.maxUpgradeBuys ?? 2, 2, optionLimit);
-  if (qualityPlanned.length === 0) return 0;
+  const onTopLimit = Math.min(input.maxUpgradeBuys ?? 2, 3, optionLimit);
+  if (qualityPlanned.length === 0) {
+    const depthCandidates = input.plannedCandidates.filter(
+      (candidate) =>
+        !isTrashMarketBuyCandidate({
+          price: candidate.price,
+          marketValue: candidate.marketValue,
+          score: candidateRecommendationScore(candidate),
+          reserveFloorMw: PLANNER_RESERVE_LANE_MW_CAP * 0.35,
+        }),
+    );
+    if (depthCandidates.length === 0) return 0;
+    return Math.min(depthCandidates.length, onTopLimit);
+  }
   return Math.min(qualityPlanned.length, onTopLimit);
 }

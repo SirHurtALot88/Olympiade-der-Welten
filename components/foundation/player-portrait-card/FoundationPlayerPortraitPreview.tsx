@@ -53,15 +53,28 @@ export default function FoundationPlayerPortraitPreview({
       if (event.key === "Escape") hide();
     };
     const onScroll = () => updatePosition();
+    const onPointerDown = (event: PointerEvent) => {
+      const anchor = anchorRef.current;
+      const panel = document.getElementById(previewId);
+      if (!anchor || anchor.contains(event.target as Node)) {
+        return;
+      }
+      if (panel?.contains(event.target as Node)) {
+        return;
+      }
+      hide();
+    };
     window.addEventListener("keydown", onKeyDown);
     window.addEventListener("scroll", onScroll, true);
     window.addEventListener("resize", onScroll);
+    window.addEventListener("pointerdown", onPointerDown, true);
     return () => {
       window.removeEventListener("keydown", onKeyDown);
       window.removeEventListener("scroll", onScroll, true);
       window.removeEventListener("resize", onScroll);
+      window.removeEventListener("pointerdown", onPointerDown, true);
     };
-  }, [hide, open, updatePosition]);
+  }, [hide, open, previewId, updatePosition]);
 
   const previewPanel =
     open && position && typeof document !== "undefined"

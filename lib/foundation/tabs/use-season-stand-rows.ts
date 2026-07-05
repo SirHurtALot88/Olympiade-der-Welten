@@ -200,6 +200,9 @@ export function useSeasonStandRows(input: UseSeasonStandRowsInput): { seasonStan
     };
   }, [gameState, seasonManagementByTeamId, shouldBuildSeasonStandRows, standingsSnapshotByTeamId]);
 
+  const isArchivedSeasonView =
+    seasonOverviewSeasonId !== gameState.season.id || seasonStandingsFeed?.source.kind === "season_snapshot";
+
   const seasonStandRows = useMemo(() => {
     if (!shouldBuildSeasonStandRows) {
       return [];
@@ -212,7 +215,7 @@ export function useSeasonStandRows(input: UseSeasonStandRowsInput): { seasonStan
       });
     }
 
-    if (teamOverviewSlice.rows.length > 0 && !teamOverviewSlice.error) {
+    if (teamOverviewSlice.rows.length > 0 && !teamOverviewSlice.error && !isArchivedSeasonView) {
       return hydrateTeamOverviewSliceRows(teamOverviewSlice.rows, gameState);
     }
 
@@ -237,6 +240,7 @@ export function useSeasonStandRows(input: UseSeasonStandRowsInput): { seasonStan
     activeSaveId,
     gameState,
     mergedStandingsByTeamId,
+    isArchivedSeasonView,
     seasonOverviewSeasonId,
     seasonStandingsFeed?.source.kind,
     shouldBuildFullSeasonStandRows,

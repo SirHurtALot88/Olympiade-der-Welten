@@ -75,6 +75,10 @@ export type TransfermarktV2ClientProps = {
   teams: Team[];
   disciplines?: Discipline[];
   rosterRows?: TransfermarktV2RosterRow[];
+  playerRatingsById?: Map<
+    string,
+    { ovrRank?: number | null; ppsSeasonRank?: number | null; mvsRank?: number | null }
+  >;
   wishlistEntries?: TransferWishlistEntry[];
   wishlistPlayerIds?: string[];
   boardObjectiveHighlights?: TeamSeasonObjectiveRecord[];
@@ -1075,6 +1079,7 @@ export default function TransfermarktV2Client({
   teams,
   disciplines = [],
   rosterRows = [],
+  playerRatingsById = new Map(),
   wishlistEntries = [],
   wishlistPlayerIds = [],
   boardObjectiveHighlights = [],
@@ -2896,6 +2901,7 @@ export default function TransfermarktV2Client({
               const railDisciplineTags = item.topDisciplineScores.slice(0, 2).map((entry) =>
                 formatDisciplineScoutTag(entry, scoutingConfidence),
               );
+              const playerRating = playerRatingsById.get(item.playerId) ?? null;
               return (
                 <button
                   className={`market-v2-candidate-card${isSelected ? " is-selected" : ""}`}
@@ -2922,6 +2928,9 @@ export default function TransfermarktV2Client({
                     portraitInitials={portrait.initials}
                     playerOvr={item.ovr ?? null}
                     playerMvs={item.mvs ?? null}
+                    ovrRank={playerRating?.ovrRank ?? null}
+                    ppsRank={playerRating?.ppsSeasonRank ?? null}
+                    mvsRank={playerRating?.mvsRank ?? null}
                     pow={item.pow ?? null}
                     spe={item.spe ?? null}
                     men={item.men ?? null}

@@ -12,7 +12,7 @@ import { buildBudgetEnvelope } from "@/lib/ai/market-pick-engine/budget-envelope
 import { buildLeagueMarketBrackets } from "@/lib/ai/market-pick-engine/market-brackets";
 import { buildSeasonStrategyState } from "@/lib/ai/ai-manager-doctrine-service";
 import type { GameState } from "@/lib/data/olyDataTypes";
-import { deriveRosterTargets } from "@/lib/foundation/roster-limits";
+import { resolvePlannerRosterTargets } from "@/lib/foundation/roster-limits";
 import { getTeamStrategyProfile } from "@/lib/foundation/team-strategy-profiles";
 
 export type MarketPickPhase = "fill_to_opt" | "post_opt_upgrade";
@@ -129,7 +129,8 @@ export function resolveMarketQualityProfile(input: {
 }): MarketQualityProfile {
   const team = input.gameState.teams.find((entry) => entry.teamId === input.teamId);
   const identity = input.gameState.teamIdentities.find((entry) => entry.teamId === input.teamId);
-  const { playerMin, playerOpt } = deriveRosterTargets(team, identity);
+  const plannerTargets = resolvePlannerRosterTargets(input.gameState, input.teamId, team, identity);
+  const { playerMin, playerOpt, basePlayerOpt, depthRepairMandate } = plannerTargets;
   const strategyProfile = getTeamStrategyProfile(input.gameState, input.teamId);
   const bias = strategyProfile?.bias;
   const seasonStrategy = buildSeasonStrategyState(input.gameState)[input.teamId]?.seasonStrategy ?? "balanced_growth";
@@ -144,12 +145,13 @@ export function resolveMarketQualityProfile(input: {
   const prefersPremiumRoster =
     (bias?.starPriority ?? 5) >= 6 && (bias?.eliteSmallRosterPreference ?? 5) >= 5 && (bias?.rosterDepthPreference ?? 5) <= 6;
   const starChaser =
-    starScore >= 0.42 ||
-    seasonStrategy === "win_now_push" ||
-    (bias?.starPriority ?? 5) >= 7 ||
-    prefersPremiumRoster ||
-    ambition >= 7.5;
-  const preferDepth = depthScore >= 0.62 && starScore < 0.45;
+    !depthRepairMandate &&
+    (starScore >= 0.42 ||
+      seasonStrategy === "win_now_push" ||
+      (bias?.starPriority ?? 5) >= 7 ||
+      prefersPremiumRoster ||
+      ambition >= 7.5);
+  const preferDepth = depthRepairMandate || depthScore >= 0.62 && starScore < 0.45;
   const pickPhase = resolveMarketPickPhase({ rosterCount: input.rosterCount, identityPlayerOpt: playerOpt });
 
   const spendable =
@@ -179,7 +181,9 @@ export function resolveMarketQualityProfile(input: {
   const effectiveOptTarget =
     upgradeMandate.expandRosterTarget != null
       ? Math.max(playerMin, upgradeMandate.expandRosterTarget)
-      : Math.max(playerMin, playerOpt - (starChaser && !preferDepth ? 1 : 0));
+      : depthRepairMandate
+        ? Math.max(playerMin, playerOpt)
+        : Math.max(playerMin, playerOpt - (starChaser && !preferDepth ? 1 : 0));
 
   const starAllowed =
     starChaser && (canAffordStar || canAffordPremiumCore)
@@ -195,14 +199,17 @@ export function resolveMarketQualityProfile(input: {
       : 0;
   const coreNeeded = starChaser && canAffordCore ? 1 : preferDepth ? 0 : input.rosterCount < playerMin ? 1 : 0;
   const qualityFloorMw =
-    pickPhase === "fill_to_opt"
+    depthRepairMandate || (pickPhase === "fill_to_opt" && preferDepth)
       ? brackets.backup.floorMw
-      : canAffordStar && starChaser
-        ? brackets.star.floorMw
-        : canAffordCore
-          ? brackets.core.floorMw
-          : brackets.depth.floorMw;
+      : pickPhase === "fill_to_opt"
+        ? brackets.backup.floorMw
+        : canAffordStar && starChaser
+          ? brackets.star.floorMw
+          : canAffordCore
+            ? brackets.core.floorMw
+            : brackets.depth.floorMw;
   const disableCheapLanes =
+    !depthRepairMandate &&
     pickPhase === "post_opt_upgrade" &&
     (shouldDisableCheapLanes(spendable, anchors, input.rosterCount >= playerMin, {
       forceDisableCheap: starChaser && canAffordCore && input.rosterCount >= playerOpt,
@@ -226,7 +233,7 @@ export function resolveMarketQualityProfile(input: {
 
   return {
     playerMin,
-    identityPlayerOpt: playerOpt,
+    identityPlayerOpt: basePlayerOpt,
     effectiveOptTarget,
     comfortTarget,
     optFlexSlots,

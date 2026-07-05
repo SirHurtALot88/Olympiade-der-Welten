@@ -1399,6 +1399,12 @@ function FoundationTeamsDetailPanel({
                               </span>
                             );
                           }
+                          if (columnId === "injuriesCount") {
+                            return row.injuriesCount != null ? row.injuriesCount : "—";
+                          }
+                          if (columnId === "averageFatigue") {
+                            return row.averageFatigue != null ? formatLocalePoints(row.averageFatigue, 1) : "—";
+                          }
                           if (columnId === "topBuy") {
                             return row.topBuyPlayer ? (
                               <button

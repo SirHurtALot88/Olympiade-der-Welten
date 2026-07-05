@@ -1,6 +1,7 @@
 import { useMemo } from "react";
 
 import type { GameState } from "@/lib/data/olyDataTypes";
+import { getSnapshotPlayerPerformances } from "@/lib/foundation/snapshot-player-performance";
 import type { TeamManagementSnapshotRow } from "@/lib/foundation/team-management-overview";
 import type { SortState } from "@/lib/foundation/tabs/cockpit-types";
 import type { buildPpAreaFormBonusByTeamId } from "@/lib/foundation/pp-area-form-bonus";
@@ -71,7 +72,7 @@ export function useSeasonV2StandingsDerivations(input: UseSeasonV2StandingsDeriv
       }
     >();
 
-    for (const player of selectedSeasonSnapshot.playerPerformances ?? []) {
+    for (const player of getSnapshotPlayerPerformances(selectedSeasonSnapshot)) {
       for (const discipline of player.disciplineBreakdown ?? []) {
         const bucket = disciplineRows.get(discipline.disciplineId) ?? {
           disciplineId: discipline.disciplineId,

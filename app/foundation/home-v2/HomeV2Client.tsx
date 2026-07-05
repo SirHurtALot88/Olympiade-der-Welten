@@ -201,6 +201,9 @@ export default function HomeV2Client({
                   playerOvr={player.playerOvr}
                   playerMvs={player.playerMvs}
                   playerPps={player.playerPps}
+                  ovrRank={player.ovrRank}
+                  mvsRank={player.mvsRank}
+                  ppsRank={player.ppsRank}
                   pow={player.pow}
                   spe={player.spe}
                   men={player.men}

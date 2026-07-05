@@ -251,6 +251,7 @@ export function applySeasonBaselineProgression(gameState: GameState, options: { 
     const nextDisciplineRatings = buildPreviewDisciplineRatingsFromAttributes({
       player,
       attributesAfter,
+      leaguePlayers: gameState.players,
     });
     const currentEconomy = resolvePlayerEconomyContract({ player });
     const baselineMarketValue = getStableEconomyTarget({

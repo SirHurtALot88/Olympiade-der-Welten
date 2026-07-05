@@ -4,7 +4,7 @@ import {
   buildPreComputedSeasonXpMap,
   previewSeasonEndXpSpend,
 } from "@/lib/progression/season-end-xp-apply-service";
-import { applyRankTableMarketValuesToGameState, patchSeasonProgressionEventMarketValues } from "@/lib/player-formulas/market-value-apply";
+import { syncRosterMarketValuesWithPlayerEconomy, applyRankTableMarketValuesToGameState, patchSeasonProgressionEventMarketValues } from "@/lib/player-formulas/market-value-apply";
 import type { PersistedSaveGame, PersistenceService } from "@/lib/persistence/types";
 
 export type SeasonEndProgressionBatchResult = {
@@ -150,11 +150,13 @@ export function runSeasonEndProgressionBatch(input: {
   const progressedPlayerIds = (beforeBatchSave.gameState.playerProgressionEvents ?? [])
     .filter((event) => event.seasonId === completedSeasonId)
     .map((event) => event.playerId);
-  const batchedGameState = patchSeasonProgressionEventMarketValues({
-    gameState: applyRankTableMarketValuesToGameState(beforeBatchSave.gameState),
-    seasonId: completedSeasonId,
-    playerIds: progressedPlayerIds,
-  });
+  const batchedGameState = syncRosterMarketValuesWithPlayerEconomy(
+    patchSeasonProgressionEventMarketValues({
+      gameState: applyRankTableMarketValuesToGameState(beforeBatchSave.gameState),
+      seasonId: completedSeasonId,
+      playerIds: progressedPlayerIds,
+    }),
+  );
 
   const persistFinalState = input.persistFinalState !== false;
   if (persistFinalState) {

@@ -4,7 +4,7 @@ import { describe, expect, it } from "vitest";
 
 describe("matchday arena ui contract", () => {
   it("wires a dedicated foundation arena view with reveal controls and score lanes", async () => {
-    const [foundationPageClientText, shellRouterBodyText, shellRouterBodyScopeText, shellRouterText, routingText, arenaText, arenaPanelText, arenaHostText, resultHostText, arenaRevealPanelText, legacyLineupText, presenterText, cssText, moduleHelpersText] = await Promise.all([
+    const [foundationPageClientText, shellRouterBodyText, shellRouterBodyScopeText, shellRouterText, routingText, arenaText, arenaPanelText, arenaHostText, resultHostText, arenaRevealPanelText, arenaTimelineText, legacyLineupText, presenterText, cssText, moduleHelpersText] = await Promise.all([
       fs.readFile(
         "/Users/chrisfalk/Documents/Codex/Olympiade der Welten/app/foundation/FoundationPageClient.tsx",
         "utf8",
@@ -43,6 +43,10 @@ describe("matchday arena ui contract", () => {
       ),
       fs.readFile(
         "/Users/chrisfalk/Documents/Codex/Olympiade der Welten/app/foundation/matchday-arena-v2/ArenaRevealPlaybackPanel.tsx",
+        "utf8",
+      ),
+      fs.readFile(
+        "/Users/chrisfalk/Documents/Codex/Olympiade der Welten/components/matchday-arena/MatchdayArenaTimeline.tsx",
         "utf8",
       ),
       fs.readFile(
@@ -130,9 +134,15 @@ describe("matchday arena ui contract", () => {
     expect(arenaText).toContain("revealedSlotCountByDiscipline");
     expect(arenaText).toContain("revealEventActive");
     expect(arenaText).toContain("is-reveal-event");
+    expect(arenaText).toContain("isArenaEventMode");
+    expect(arenaText).toContain("is-event-mode");
+    expect(arenaText).toContain("ArenaAnimatedScore");
+    expect(arenaText).toContain("mvpSpotlightActive");
+    expect(arenaText).toContain('data-testid="arena-v2-mvp-spotlight"');
     expect(arenaText).toContain('data-testid="arena-reveal-timeline"');
     expect(arenaText).toContain("completedDisciplinePhases");
     expect(arenaRevealPanelText).toContain("MatchdayArenaTimeline");
+    expect(arenaTimelineText).toContain("matchday-arena-timeline-rail");
     expect(arenaText).toContain("ArenaRevealPlaybackPanel");
     expect(arenaText).toContain("MatchdayArenaPlayerCard");
     expect(arenaText).toContain("handleAdvanceArenaStep");
@@ -191,9 +201,23 @@ describe("matchday arena ui contract", () => {
     expect(arenaText).toContain('fetch(`/api/lineups/legacy/lab-context?${contextQuery.toString()}`');
     expect(arenaText).toContain('props.onOpenPlayerDetails?.({');
     expect(legacyLineupText).toContain("isScoreboardResultRevealed");
+    expect(legacyLineupText).toContain("lineup-v2-arena-handoff");
     expect(legacyLineupText).toContain("Base-Rang");
     expect(legacyLineupText).toContain(": { form: false, mutators: false },");
-    expect(presenterText).toContain("MATCHDAY_ARENA_PHASES");
+    expect(arenaText).toContain("buildFocusedArenaBoardRows");
+    expect(arenaText).toContain("isFocusedBoardMode");
+    expect(arenaText).toContain('data-testid="arena-v2-focused-board"');
+    expect(arenaText).toContain("is-act-");
+    expect(arenaText).toContain("arenaGuidedState");
+    expect(arenaText).toContain('data-testid="arena-guided-empty-state"');
+    expect(arenaText).toContain('data-testid="arena-v2-score-ticker"');
+    expect(arenaText).toContain('data-testid="arena-lineup-handoff-banner"');
+    expect(arenaTimelineText).toContain("PHASE_RAIL_SHORT_LABELS");
+    expect(arenaTimelineText).toContain("is-labels-visible");
+    expect(arenaTimelineText).toContain("matchday-arena-timeline-short-label");
+    expect(presenterText).toContain('"Intensität"');
+    expect(presenterText).toContain('"Kapitän"');
+    expect(presenterText).toContain('"Ergebnis"');
     expect(presenterText).toContain('"slots"');
     expect(presenterText).toContain('"push"');
     expect(presenterText).not.toContain('id: "base"');
@@ -218,8 +242,16 @@ describe("matchday arena ui contract", () => {
     expect(cssText).toContain(".arena-v2-board-track-wrap");
     expect(cssText).toContain(".arena-v2-panel-loading");
     expect(cssText).toContain(".arena-v2-timeline-panel.is-reveal-event");
+    expect(cssText).toContain(".arena-v2-shell.is-event-mode");
+    expect(cssText).toContain(".arena-v2-mvp-spotlight");
+    expect(cssText).toContain(".matchday-arena-timeline-rail");
     expect(cssText).toContain("@keyframes arena-v2-reveal-event");
     expect(cssText).toContain("--arena-v2-board-visible-rows");
+    expect(cssText).toContain(".arena-v2-board-list.is-focused-board");
+    expect(cssText).toContain(".arena-v2-score-ticker");
+    expect(cssText).toContain(".arena-v2-handoff-banner");
+    expect(cssText).toContain(".matchday-arena-timeline-short-label");
+    expect(presenterText).toContain("MATCHDAY_ARENA_PHASES");
     expect(cssText).toContain(".pill.is-loading");
     expect(cssText).toContain(".matchday-arena-lane");
     expect(cssText).toContain(".matchday-arena-timeline");
