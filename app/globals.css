@@ -567,6 +567,8 @@ a {
   background: rgba(8, 14, 28, 0.92);
   max-height: calc(100vh - 24px);
   overflow: auto;
+  overscroll-behavior: contain;
+  scrollbar-gutter: stable;
 }
 
 .foundation-sidebar-brand {
@@ -28633,7 +28635,7 @@ a {
 
 .market-v2-main-grid {
   display: grid;
-  grid-template-columns: minmax(116px, 0.46fr) minmax(430px, 1.38fr) minmax(300px, 0.88fr);
+  grid-template-columns: minmax(280px, 320px) minmax(430px, 1fr) minmax(300px, 360px);
   gap: 14px;
   align-items: start;
 }
@@ -28669,9 +28671,19 @@ a {
 }
 
 .market-v2-candidate-rail,
+.market-v2-focus-panel,
 .market-v2-buy-panel {
   position: sticky;
   top: 110px;
+  align-self: start;
+  max-height: calc(100vh - 130px);
+  overscroll-behavior: contain;
+}
+
+.market-v2-focus-panel,
+.market-v2-buy-panel {
+  overflow-y: auto;
+  scrollbar-gutter: stable;
 }
 
 .market-v2-rail-head,
@@ -28692,10 +28704,12 @@ a {
 }
 
 .market-v2-candidate-list {
-  max-height: min(82vh, 1180px);
+  max-height: min(calc(100vh - 220px), 1180px);
   overflow: auto;
   padding-right: 4px;
   gap: 6px;
+  overscroll-behavior: contain;
+  scrollbar-gutter: stable;
 }
 
 .market-v2-candidate-card,
@@ -30316,7 +30330,7 @@ a {
 
 @media (max-width: 1440px) {
   .market-v2-main-grid {
-    grid-template-columns: minmax(250px, 0.9fr) minmax(320px, 1.2fr) minmax(280px, 0.9fr);
+    grid-template-columns: minmax(250px, 300px) minmax(320px, 1fr) minmax(280px, 340px);
   }
 
   .market-v2-summary-grid {
@@ -30364,8 +30378,11 @@ a {
   }
 
   .market-v2-candidate-rail,
+  .market-v2-focus-panel,
   .market-v2-buy-panel {
     position: static;
+    max-height: none;
+    overflow: visible;
   }
 
   .market-v2-player-hero {
