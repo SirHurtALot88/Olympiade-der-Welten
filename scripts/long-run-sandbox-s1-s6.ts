@@ -95,6 +95,7 @@ import {
   isSoftOpenTechnicalBug,
 } from "@/lib/season/long-run-soft-blockers";
 import { buildPhaseFeedbackMarkdownDe, printPhaseFeedbackDe } from "@/lib/season/long-run-phase-feedback";
+import { ensureIsolatedLongRunDatabase } from "@/lib/season/long-run-db-isolation";
 
 const PROJECT_ROOT = path.resolve(__dirname, "..");
 const OUTPUT_DIR =
@@ -115,6 +116,14 @@ const LONG_RUN_STOP_AFTER =
     ? process.env.OLY_LONG_RUN_STOP_AFTER
     : null;
 const SUMMARY_ONLY = process.argv.includes("--summary-only");
+// 2026-07-04 incident: this script used to unconditionally call persistence.activateSave() on
+// resume/finish, which flips the shared app-wide "active save" pointer — the same pointer
+// app/api/singleplayer-state (and thus the user's live browser UI) reads via getActiveSave().
+// A background balancing run would silently steal the user's live save and never restore it,
+// so the user saw the run's season/matchday ("S3 MD1") instead of their own game. Default to
+// never touching the active-save pointer; only opt in explicitly when a human wants to inspect
+// the run's save live in the browser afterward. See outputs/real-engine-s1s5-final/progress-log.md.
+const LONG_RUN_ACTIVATE_ON_FINISH = process.env.OLY_LONG_RUN_ACTIVATE_ON_FINISH === "1";
 
 type SeasonAudit = {
   seasonId: string;
@@ -2327,6 +2336,10 @@ async function recoverNegativeCashBeforeSeasonStart(saveId: string, seasonId: st
     note: [
       `teams:${proactive.teamsAffected}`,
       ...proactive.teamResults.map((row) => `${row.shortCode}:${row.cashBefore}->${row.cashAfter}:${row.sells}`),
+      // Root-cause fix (2026-07-04, W-W chronic below-hardMin spiral): the roster-min guard
+      // declining to sell is expected, protective behavior, not a failure — logged here for
+      // visibility only, deliberately kept out of `blockers` so it never pauses the long run.
+      ...proactive.guardNotes.map((note) => `guard:${note}`),
     ].join("|"),
     errors: proactive.blockers.join("|"),
   });
@@ -3138,6 +3151,10 @@ async function assertLongRunSimEnvironment() {
 
 async function main() {
   loadEnvConfig(PROJECT_ROOT);
+  const dbIsolation = ensureIsolatedLongRunDatabase({ outputDir: OUTPUT_DIR, projectRoot: PROJECT_ROOT });
+  console.error(
+    `[long-run] DB: ${dbIsolation.sqlitePath} (isolated=${dbIsolation.isolated}${dbIsolation.clonedFromShared ? ", cloned-from-shared" : ""})`,
+  );
   await assertLongRunSimEnvironment();
   const persistence = createPersistenceService();
   const previousActiveSave = persistence.getActiveSave();
@@ -3146,6 +3163,14 @@ async function main() {
     const existing = persistence.getSaveById(RESUME_SAVE_ID);
     if (!existing) throw new Error(`Resume save ${RESUME_SAVE_ID} not found.`);
     save = existing;
+    // Several apply-services hard-require save.status === "active" (training-settings-service,
+    // facility-*-service, season-end-xp-apply-service — see save_not_active blockers), so the
+    // long-run save must be activated for its own pipeline to work. This used to hijack the
+    // shared/live DB's active pointer; now that ensureIsolatedLongRunDatabase() (see main()) has
+    // pointed OLY_APP_SQLITE_PATH at a private per-run SQLite file by the time we get here,
+    // activating inside that isolated copy is harmless — it never touches the file the live
+    // app/dev-server has open. See LONG_RUN_ACTIVATE_ON_FINISH comment above for the non-isolated
+    // opt-out path.
     persistence.activateSave(save.saveId);
     console.error(`[long-run] resume ${save.saveId}`);
     assertResumedSeasonOnePaid(save);
@@ -3167,17 +3192,14 @@ async function main() {
       save = postPhase.save;
     }
   } else {
-    // 2026-07-04 incident: createFreshSeasonOneSave defaults to status "active" + activate=true,
-    // which archives whatever save the shared dev server's live UI was showing and replaces it with
-    // this long-run/balancing save — so a background balancing run silently hijacked the save a user
-    // was actively viewing in the browser (saw "S3 MD1" instead of their own game). Long-run/balancing
-    // saves must never become the app's global "active" save; keep them archived so
-    // persistence.getActiveSave()/bootstrapSingleplayerSave() (used by app/api/singleplayer-state and
-    // friends) never resolve to one. See outputs/real-engine-s1s5-final/progress-log.md.
+    // createFreshSeasonOneSave defaults to status "active" + activate=true (required — see the
+    // save_not_active comment on the resume path above). This is safe here because main() already
+    // called ensureIsolatedLongRunDatabase(), so OLY_APP_SQLITE_PATH points at a private per-run
+    // SQLite file; activating this save only flips the pointer inside that isolated copy, never
+    // the shared file the live app/dev-server has open. See outputs/real-engine-s1s5-final/progress-log.md
+    // for the 2026-07-04 incident this isolation fixes.
     const created = persistence.createFreshSeasonOneSave({
       name: `${RUN_LABEL} ${new Date().toLocaleString("de-DE")}`,
-      status: "archived",
-      activate: false,
     });
     const reset = await runSeasonStartReset({
       source: "sqlite",
@@ -3224,7 +3246,9 @@ async function main() {
   writeSimulationStartState(save, previousActiveSave);
 
   if (LONG_RUN_STOP_AFTER === "draft" && !RESUME_SAVE_ID) {
-    persistence.activateSave(save.saveId);
+    if (LONG_RUN_ACTIVATE_ON_FINISH) {
+      persistence.activateSave(save.saveId);
+    }
     console.error(`[long-run] STOP_AFTER=draft — Save \`${save.saveId}\` bereit. S1 mit:`);
     console.error(
       `[long-run] OLY_LONG_RUN_SAVE_ID=${save.saveId} OLY_LONG_RUN_STOP_AFTER=season_end OLY_LONG_RUN_FINAL_SEASON=1 node --import tsx scripts/long-run-sandbox-s1-s6.ts`,
@@ -3456,7 +3480,16 @@ async function main() {
   }
 
   const finalSave = persistence.getSaveById(save.saveId) ?? save;
-  persistence.activateSave(finalSave.saveId);
+  if (LONG_RUN_ACTIVATE_ON_FINISH) {
+    persistence.activateSave(finalSave.saveId);
+  } else if (previousActiveSave && previousActiveSave.saveId !== finalSave.saveId) {
+    // Defense in depth: make sure whatever the user had active before this run stays/becomes
+    // active again, even if some other code path along the way flipped the pointer.
+    const stillActive = persistence.getActiveSave();
+    if (!stillActive || stillActive.saveId === finalSave.saveId) {
+      persistence.activateSave(previousActiveSave.saveId);
+    }
+  }
   const contractExpiryRiskRows = buildContractExpiryRiskRows(finalSave);
   const sellPressureRows = await buildSellPressureRows(finalSave);
   const repairPerformanceRows = buildRepairPerformanceRows(performanceRows);

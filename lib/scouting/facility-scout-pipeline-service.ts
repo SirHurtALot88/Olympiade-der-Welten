@@ -128,7 +128,7 @@ export function getScoutFocusSummary(gameState: GameState, teamId: string): Scou
   return { playerId: focus.playerId, certainty, neededCertainty, etaMatchdays };
 }
 
-function tickGainForSource(config: ScoutPipelineConfig, source: ScoutIntelSource, facilityLevel: number) {
+export function tickGainForSource(config: ScoutPipelineConfig, source: ScoutIntelSource, facilityLevel: number) {
   if (facilityLevel <= 0) {
     return 0;
   }
@@ -286,13 +286,18 @@ export function advanceScoutIntelTick(input: {
 
 export function buildScoutPipelineSummary(gameState: GameState, teamId: string) {
   const config = getScoutPipelineConfig(gameState, teamId);
+  const facilityLevel = getFacilityLevel(getTeamFacilityState(gameState, teamId), "scouting_office");
   const records = getTeamScoutIntelRecords(gameState, teamId);
   return {
     config,
+    facilityLevel,
     records,
     occupiedSlots: records.length,
     passiveActive: records.filter((entry) => entry.source === "passive_need").length,
     wishlistActive: records.filter((entry) => entry.source === "wishlist_mirror").length,
+    focusTickGain: SCOUT_FOCUS_TICK_GAIN,
+    wishlistTickGain: tickGainForSource(config, "wishlist_mirror", facilityLevel),
+    passiveTickGain: tickGainForSource(config, "passive_need", facilityLevel),
   };
 }
 

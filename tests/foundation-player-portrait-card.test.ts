@@ -29,7 +29,7 @@ describe("player league heat", () => {
 describe("player portrait stat presets", () => {
   const heatPools = createEmptyLeaguePlayerHeatPools();
 
-  it("builds training overlay stats with forecast and mode", () => {
+  it("builds training overlay stats with forecast", () => {
     const stats = buildTrainingOverlayStats({
       caRating: 72,
       poDisplay: "4.5",
@@ -38,10 +38,8 @@ describe("player portrait stat presets", () => {
       trainingModeLabel: "Intensiv",
     });
 
-    expect(stats.map((entry) => entry.label)).toEqual(["CA", "PO", "Forecast", "Risiko", "Modus"]);
+    expect(stats.map((entry) => entry.label)).toEqual(["CA", "PO", "Forecast"]);
     expect(stats[2].value).toContain("+");
-    expect(stats[3].value).toBe("hoch");
-    expect(stats[4].value).toBe("Intensiv");
   });
 
   it("builds market overlay stats with fit and economy", () => {
@@ -130,6 +128,7 @@ describe("player portrait stat presets", () => {
   });
 
   it("hides orbit for mini density and non-roster compact contexts", () => {
+    expect(shouldShowPortraitOrbit("training", "full")).toBe(false);
     expect(shouldShowPortraitOrbit("training", "compact")).toBe(false);
     expect(shouldShowPortraitOrbit("market", "compact")).toBe(false);
     expect(shouldShowPortraitOrbit("roster", "compact")).toBe(true);
@@ -185,7 +184,7 @@ describe("foundation player portrait preview ui contract", () => {
 
     const [previewText, foundationText, teamsText, marketText] = await Promise.all([
       fs.readFile(path.join(root, "components/foundation/player-portrait-card/FoundationPlayerPortraitPreview.tsx"), "utf8"),
-      fs.readFile(path.join(root, "app/foundation/FoundationPageClient.tsx"), "utf8"),
+      fs.readFile(path.join(root, "app/foundation/FoundationShellRouterBody.tsx"), "utf8"),
       fs.readFile(path.join(root, "app/foundation/teams-v2/FoundationTeamsDetailPanel.tsx"), "utf8"),
       fs.readFile(path.join(root, "app/foundation/transfermarkt-v2/TransfermarktV2Client.tsx"), "utf8"),
     ]);

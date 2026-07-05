@@ -2312,6 +2312,86 @@ function getActiveControlMode(gameState: GameState, teamId: string): TeamControl
   return getTeamControlSettings(gameState, teamId)?.controlMode ?? (gameState.teams.find((team) => team.teamId === teamId)?.humanControlled ? "manual" : "ai");
 }
 
+/** Builds the `${teamId}:${playerId}` key used to track pick-level exclusions. */
+function buildPickExclusionKey(teamId: string, playerId: string) {
+  return `${teamId}:${playerId}`;
+}
+
+/**
+ * Best-effort attribution of a `qualityGate.blockingReasons` string to the specific team (and,
+ * where possible, the specific planned pick) it concerns. Reasons are formatted as
+ * `check_name:identifier:...` where identifier is either a teamId or teamCode; many per-pick
+ * checks (e.g. `cash_reserve_gate_failed`, `lane_mismatch`) additionally carry the offending
+ * playerId right after the team identifier. When that next segment matches one of the team's own
+ * planned playerIds, the reason is pick-attributable; otherwise it's treated as team-wide.
+ * Returns null when no known team identifier is found anywhere in the reason, which marks it as
+ * "global" (not safe to attribute to a single team or pick).
+ */
+function attributeBlockingReasonToPick(
+  reason: string,
+  teams: AiPicksRunTeamResult[],
+): { teamId: string; playerId: string | null } | null {
+  const segments = reason.split(":");
+  for (let index = 0; index < segments.length; index += 1) {
+    const segment = segments[index];
+    const team = teams.find((entry) => entry.teamId === segment || entry.teamCode === segment);
+    if (!team) continue;
+    const nextSegment = segments[index + 1];
+    const matchesPlannedPick =
+      nextSegment != null && team.plannedPicks.some((pick) => pick.playerId === nextSegment);
+    return { teamId: team.teamId, playerId: matchesPlannedPick ? nextSegment : null };
+  }
+  return null;
+}
+
+/**
+ * Season-1 draft only: one team narrowly missing a per-team quality check (e.g. spend floor by a
+ * few cash) — or even just one bad pick within an otherwise-clean team (e.g. a single mismatched
+ * lane pick) — must not wipe every other team's, or that team's own other picks', draft to zero.
+ * This computes which teams must be fully excluded from execution, and which individual picks can
+ * be dropped from an otherwise-clean team's frozen trace, while letting everything else proceed.
+ * Returns null when partial execution is not safe (a league-wide/unattributable blocker exists, or
+ * every team would end up excluded anyway) — in that case the caller keeps the all-or-nothing
+ * behaviour.
+ */
+function resolveSeason1PartialExecutionPlan(input: {
+  runMode?: AiNeedsPicksRunMode | null;
+  previewTeams: AiPicksRunTeamResult[];
+  qualityGateBlockingReasons: string[];
+  preflightBlockingReasonsCount: number;
+}): { blockedTeamIds: Set<string>; blockedPickKeys: Set<string> } | null {
+  if (input.runMode !== "season1_optimum_execute" || input.preflightBlockingReasonsCount > 0) {
+    return null;
+  }
+  const blockedTeamIds = new Set<string>();
+  const blockedPickKeys = new Set<string>();
+
+  for (const team of input.previewTeams) {
+    if (team.blockingReasons.length > 0) {
+      blockedTeamIds.add(team.teamId);
+    }
+  }
+  for (const reason of input.qualityGateBlockingReasons) {
+    const attribution = attributeBlockingReasonToPick(reason, input.previewTeams);
+    if (!attribution) {
+      // Reason can't be tied to one team — treat as league-wide, keep the safe full block.
+      return null;
+    }
+    if (attribution.playerId) {
+      blockedPickKeys.add(buildPickExclusionKey(attribution.teamId, attribution.playerId));
+    } else {
+      blockedTeamIds.add(attribution.teamId);
+    }
+  }
+  if (blockedTeamIds.size >= input.previewTeams.length) {
+    return null;
+  }
+  if (blockedTeamIds.size === 0 && blockedPickKeys.size === 0) {
+    return null;
+  }
+  return { blockedTeamIds, blockedPickKeys };
+}
+
 export async function runAiPicksExecutePreview(
   params: AiPicksRunParams,
   persistence: PersistenceService = createPersistenceService(),
@@ -2444,6 +2524,25 @@ export async function runAiPicksExecutePreview(
     ...preflightBlockingReasons,
   ]);
 
+  const partialExecutionPlan = resolveSeason1PartialExecutionPlan({
+    runMode,
+    previewTeams,
+    qualityGateBlockingReasons: qualityGate.blockingReasons,
+    preflightBlockingReasonsCount: preflightBlockingReasons.length,
+  });
+  if (partialExecutionPlan) {
+    if (partialExecutionPlan.blockedTeamIds.size > 0) {
+      warnings.push(
+        `season1_partial_execute_blocked_teams:${[...partialExecutionPlan.blockedTeamIds]
+          .map((teamId) => previewTeams.find((team) => team.teamId === teamId)?.teamCode ?? teamId)
+          .join(",")}`,
+      );
+    }
+    if (partialExecutionPlan.blockedPickKeys.size > 0) {
+      warnings.push(`season1_partial_execute_blocked_picks:${partialExecutionPlan.blockedPickKeys.size}`);
+    }
+  }
+
   const preflightAutoTransfers = currentGameState.transferHistory.filter((entry) => isAiPickResettableSource(entry.source));
   const protectedTransfers = currentGameState.transferHistory.filter((entry) => !isAiPickResettableSource(entry.source));
 
@@ -2506,7 +2605,11 @@ export async function runAiPicksExecutePreview(
     blockingReasons,
   };
 
-  if (dryRun || !qualityGate.passed || preflightBlockingReasons.length > 0 || blockingReasons.length > 0) {
+  if (
+    dryRun ||
+    preflightBlockingReasons.length > 0 ||
+    (blockingReasons.length > 0 && !partialExecutionPlan)
+  ) {
     return result;
   }
 
@@ -2518,6 +2621,15 @@ export async function runAiPicksExecutePreview(
 
   for (const previewTeam of previewTeams) {
     const teamExecuteStartedAt = Date.now();
+    if (partialExecutionPlan?.blockedTeamIds.has(previewTeam.teamId)) {
+      // Season-1 partial execution: this team's own narrow blocker keeps it excluded, but must
+      // not prevent every other clean team from being applied (see resolveSeason1PartialExecutionPlan).
+      executedTeams.push({
+        ...previewTeam,
+        warnings: unique([...previewTeam.warnings, "season1_partial_execute_team_excluded"]),
+      });
+      continue;
+    }
     const latestSave = resolveStrictLocalSave(persistence, save.saveId);
     const latestTeam = latestSave.gameState.teams.find((entry) => entry.teamId === previewTeam.teamId);
     if (!latestTeam) {
@@ -2549,6 +2661,12 @@ export async function runAiPicksExecutePreview(
     const teamWarnings = [...previewTeam.warnings];
     const teamBlockingReasons = [...previewTeam.blockingReasons];
     let executedStepCount = 0;
+    const teamExcludedPickPlayerIds = previewTeam.plannedPicks
+      .filter((pick) => partialExecutionPlan?.blockedPickKeys.has(buildPickExclusionKey(previewTeam.teamId, pick.playerId)))
+      .map((pick) => pick.playerId);
+    if (teamExcludedPickPlayerIds.length > 0) {
+      teamWarnings.push(`season1_partial_execute_picks_excluded:${teamExcludedPickPlayerIds.join(",")}`);
+    }
 
     if (targetInfo.targetRosterSize == null) {
       executedTeams.push({
@@ -2560,7 +2678,10 @@ export async function runAiPicksExecutePreview(
       continue;
     }
 
-    const frozenTrace = previewTeam.plannedPicks.filter((pick) => pick.status !== "blocked").slice(0, stepsPerTeam);
+    const frozenTrace = previewTeam.plannedPicks
+      .filter((pick) => pick.status !== "blocked")
+      .filter((pick) => teamExcludedPickPlayerIds.length === 0 || !teamExcludedPickPlayerIds.includes(pick.playerId))
+      .slice(0, stepsPerTeam);
     for (const frozenPick of frozenTrace) {
       const currentTeam = teamRunContext.save.gameState.teams.find((entry) => entry.teamId === latestTeam.teamId) ?? latestTeam;
       if (buildTeamEconomySnapshot(teamRunContext.save.gameState, currentTeam).rosterCount >= targetInfo.targetRosterSize) {
@@ -2609,7 +2730,7 @@ export async function runAiPicksExecutePreview(
           transferHistoryId: buyResult.transferId,
           status: "blocked",
         });
-        teamBlockingReasons.push(...buyResult.blockingReasons, "transfer_history_missing");
+        teamBlockingReasons.push(...buyResult.blockingReasons, "preview_execute_drift_blocked");
         break;
       }
 

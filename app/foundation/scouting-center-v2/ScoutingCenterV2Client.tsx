@@ -52,6 +52,7 @@ export default function ScoutingCenterV2Client({
   onActiveTabChange,
   hideSubNav = false,
   onOpenMarket,
+  onOpenFacilities,
   onOpenPlayer,
   queueEntries = [],
   focusEtaLabel = null,
@@ -131,6 +132,76 @@ export default function ScoutingCenterV2Client({
 
       {activeTab === "overview" ? (
         <>
+          <section className="scouting-facility-power">
+            <div className="home-v2-panel-head">
+              <span className="eyebrow">Scouting Office</span>
+              <h3>Slots &amp; Speed pro Spieltag</h3>
+            </div>
+            {scoutingFacilityLevel <= 0 ? (
+              <>
+                <p className="muted">
+                  Noch kein Scouting Office gebaut — die Warteschlange läuft ohne Fortschritt. Bau eins, damit Fokus-Ziele
+                  Intel sammeln.
+                </p>
+                {onOpenFacilities ? (
+                  <button type="button" className="primary-button inline-button" onClick={onOpenFacilities}>
+                    Scouting Office bauen
+                  </button>
+                ) : null}
+              </>
+            ) : (
+              <>
+                {scoutPipeline ? (
+                  <>
+                    {scoutPipeline.draftSuspended ? (
+                      <span className="muted">Draft-Phase — Slots ohne Limit ({scoutPipeline.occupiedSlots} belegt)</span>
+                    ) : (
+                      <>
+                        <div className="scouting-facility-slot-track">
+                          <div
+                            className="scouting-facility-slot-fill"
+                            style={{
+                              width: `${Math.min(100, (scoutPipeline.occupiedSlots / Math.max(1, scoutPipeline.maxSlots)) * 100)}%`,
+                            }}
+                          />
+                        </div>
+                        <span className="muted">
+                          {scoutPipeline.occupiedSlots}/{scoutPipeline.maxSlots} Scouting-Slots belegt
+                        </span>
+                      </>
+                    )}
+                    <div className="scouting-facility-rates">
+                      <div className="scouting-facility-rate-chip">
+                        <span>Fokus · Platz 1</span>
+                        <strong>+{scoutPipeline.focusTickGain}%/Spieltag</strong>
+                      </div>
+                      <div className="scouting-facility-rate-chip">
+                        <span>Rest der Wishlist</span>
+                        <strong>+{scoutPipeline.wishlistTickGain}%/Spieltag</strong>
+                      </div>
+                      <div className="scouting-facility-rate-chip">
+                        <span>Passive Scouts</span>
+                        <strong>
+                          {scoutPipeline.passiveActive}/{scoutPipeline.passiveSlots} aktiv · +{scoutPipeline.passiveTickGain}
+                          %/Spieltag
+                        </strong>
+                      </div>
+                    </div>
+                  </>
+                ) : null}
+                {scoutingFacilityLevel < 5 ? (
+                  onOpenFacilities ? (
+                    <button type="button" className="secondary-button inline-button" onClick={onOpenFacilities}>
+                      Facility upgraden für mehr Speed
+                    </button>
+                  ) : null
+                ) : (
+                  <span className="transfer-status-pill is-ready">Max-Level erreicht</span>
+                )}
+              </>
+            )}
+          </section>
+
           <section className="scouting-reveal-section">
             <div className="home-v2-panel-head">
               <span className="eyebrow">Fog of War</span>

@@ -116,14 +116,14 @@ describe("foundation transfermarkt ui contract", () => {
     expect(cssText).toContain(".market-v2-filter-preset-chip");
   });
 
-  it("shows five colored discipline fit rows in Transfermarkt V2", async () => {
+  it("shows colored discipline fit rows in Transfermarkt V2", async () => {
     const [fileText, cssText] = await Promise.all([
       fs.readFile(transfermarktV2Path, "utf8"),
       fs.readFile(globalsPath, "utf8"),
     ]);
 
     expect(fileText).toContain("getDisciplineCategoryClass");
-    expect(fileText).toContain("topDisciplineScores.slice(0, 5)");
+    expect(fileText).toContain("topDisciplineScores.slice(0, 3)");
     expect(cssText).toContain(".market-v2-diszi-row.is-power");
     expect(cssText).toContain(".market-v2-diszi-row.is-speed");
     expect(cssText).toContain(".market-v2-diszi-row.is-mental");

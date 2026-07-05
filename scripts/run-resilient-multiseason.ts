@@ -29,6 +29,7 @@ import {
 import { runPhaseAuditDe, type PhaseAuditResult } from "@/lib/season/long-run-phase-audit";
 import { resolveBalanceProfile } from "@/lib/season/long-run-profile";
 import { filterHardOpenTechnicalBugs, isSoftPhaseAuditRed } from "@/lib/season/long-run-soft-blockers";
+import { ensureIsolatedLongRunDatabase } from "@/lib/season/long-run-db-isolation";
 
 const PROJECT_ROOT = path.resolve(__dirname, "..");
 
@@ -250,6 +251,12 @@ async function main() {
     argValue("--output-dir") ??
     path.join(PROJECT_ROOT, "outputs", "realistic-5y", `${saveId}-${Date.now()}`);
   fs.mkdirSync(outputDir, { recursive: true });
+
+  // See lib/season/long-run-db-isolation.ts: gives this run (and every long-run-sandbox-s1-s6.ts
+  // child process it spawns below, via env inheritance) its own private SQLite file so it never
+  // shares/hijacks the app's default DB + "active save" pointer that the live dev-server UI reads.
+  const dbIsolation = ensureIsolatedLongRunDatabase({ outputDir, projectRoot: PROJECT_ROOT });
+  log(`DB: ${dbIsolation.sqlitePath} (isolated=${dbIsolation.isolated}${dbIsolation.clonedFromShared ? ", cloned-from-shared" : ""})`);
 
   const persistence = createPersistenceService();
   let save = persistence.getSaveById(saveId);

@@ -4,13 +4,18 @@ import { describe, expect, it } from "vitest";
 
 describe("season standings v2 ui contract", () => {
   it("opens in data table view with gm board and no cards tab", async () => {
-    const [seasonText, foundationText] = await Promise.all([
+    const [seasonText, shellRouterBodyText, shellRouterBodyScopeText] = await Promise.all([
       fs.readFile(
         "/Users/chrisfalk/Documents/Codex/Olympiade der Welten/app/foundation/season-v2/SeasonStandingsV2Client.tsx",
         "utf8",
       ),
-      fs.readFile("/Users/chrisfalk/Documents/Codex/Olympiade der Welten/app/foundation/FoundationPageClient.tsx", "utf8"),
+      fs.readFile("/Users/chrisfalk/Documents/Codex/Olympiade der Welten/app/foundation/FoundationShellRouterBody.tsx", "utf8"),
+      fs.readFile(
+        "/Users/chrisfalk/Documents/Codex/Olympiade der Welten/lib/foundation/tabs/use-foundation-shell-router-body-scope.tsx",
+        "utf8",
+      ),
     ]);
+    const foundationText = `${shellRouterBodyText}\n${shellRouterBodyScopeText}`;
 
     expect(seasonText).toContain('const SEASON_V2_DEFAULT_MODE: SeasonV2ViewMode = "table"');
     expect(seasonText).toContain('seasonV2Mode === "table"');

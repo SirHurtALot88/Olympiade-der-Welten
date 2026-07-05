@@ -3,8 +3,10 @@ import { describe, expect, it } from "vitest";
 import type { GameState } from "@/lib/data/olyDataTypes";
 import {
   getTeamPlannerRosterTarget,
+  isTeamRosterBelowOpt,
   projectExpectedSalaryAtPlannerTarget,
   resolveHoardMultiplier,
+  resolveMarketPlannerCashBuffer,
   resolveTeamCashRunwayReserve,
 } from "@/lib/ai/ai-team-cash-reserve-service";
 
@@ -141,7 +143,7 @@ describe("ai team cash reserve service", () => {
 
   it("lowers planner target by one only after opt is reached and cash is tight", () => {
     const gameState = buildGameState({
-      teams: [{ teamId: "C-S", name: "C-S", shortCode: "C-S", cash: 20, humanControlled: false }],
+      teams: [{ teamId: "C-S", name: "C-S", shortCode: "C-S", cash: 8, humanControlled: false }],
       rosters: Array.from({ length: 12 }, (_, index) => ({
         id: `r-cs-${index}`,
         teamId: "C-S",
@@ -177,6 +179,53 @@ describe("ai team cash reserve service", () => {
       },
     });
     expect(getTeamPlannerRosterTarget(gameState, "C-S")).toBe(11);
+  });
+
+  it("zeros market planner cash buffer while roster is below Opt", () => {
+    const gameState = buildGameState({
+      teams: [{ teamId: "C-S", name: "C-S", shortCode: "C-S", cash: 45, humanControlled: false }],
+      rosters: Array.from({ length: 5 }, (_, index) => ({
+        id: `r-cs-${index}`,
+        teamId: "C-S",
+        playerId: `p-cs-${index}`,
+        slot: index,
+        salary: 4.8,
+      })),
+      players: Array.from({ length: 5 }, (_, index) => ({
+        id: `p-cs-${index}`,
+        name: `P${index}`,
+        marketValue: 15,
+        displayMarketValue: 15,
+        rating: 55,
+        salary: 4.8,
+      })),
+    });
+    expect(isTeamRosterBelowOpt(gameState, "C-S")).toBe(true);
+    expect(resolveMarketPlannerCashBuffer(gameState, "C-S")).toBe(0);
+    expect(resolveTeamCashRunwayReserve(gameState, "C-S")).toBeGreaterThan(0);
+  });
+
+  it("restores market planner cash buffer once roster reaches Opt", () => {
+    const gameState = buildGameState({
+      teams: [{ teamId: "C-S", name: "C-S", shortCode: "C-S", cash: 45, humanControlled: false }],
+      rosters: Array.from({ length: 12 }, (_, index) => ({
+        id: `r-cs-${index}`,
+        teamId: "C-S",
+        playerId: `p-cs-${index}`,
+        slot: index,
+        salary: 4.8,
+      })),
+      players: Array.from({ length: 12 }, (_, index) => ({
+        id: `p-cs-${index}`,
+        name: `P${index}`,
+        marketValue: 15,
+        displayMarketValue: 15,
+        rating: 55,
+        salary: 4.8,
+      })),
+    });
+    expect(isTeamRosterBelowOpt(gameState, "C-S")).toBe(false);
+    expect(resolveMarketPlannerCashBuffer(gameState, "C-S")).toBeGreaterThan(0);
   });
 
   it("uses a smaller reserve multiplier for spender profiles", () => {

@@ -9,7 +9,7 @@ const root = process.cwd();
 
 describe("foundation hq gm story contract", () => {
   it("surfaces gm change, hot seat and board pressure in HQ", () => {
-    const foundationSource = readFileSync(join(root, "app/foundation/FoundationPageClient.tsx"), "utf8");
+    const foundationSource = readFileSync(join(root, "app/foundation/FoundationShellRouterBody.tsx"), "utf8");
     const panelSource = readFileSync(join(root, "app/foundation/home-v2/FoundationHomeV2Panel.tsx"), "utf8");
     const officeSource = readFileSync(join(root, "app/foundation/home-v2/ManagerOfficeClient.tsx"), "utf8");
 

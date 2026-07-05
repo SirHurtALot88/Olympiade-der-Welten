@@ -200,4 +200,139 @@ describe("preseason cash recovery service", () => {
     expect(result.teamsAffected).toBe(1);
     expect(result.teamResults[0]?.cashAfter).toBeGreaterThan(result.teamResults[0]?.cashBefore ?? 0);
   });
+
+  // Root-cause fix (2026-07-04, W-W chronic below-hardMin spiral — see
+  // outputs/real-engine-s1s5-final/progress-log.md): allowSellBelowRosterMin=true made this pass
+  // sell a team's roster below its absolute minimum every season it had low-but-non-negative cash,
+  // even while the team was already AT its minimum -- undoing whatever the emergency-repair fallback
+  // had just rebuilt and perpetuating a "low cash -> fewer players -> still low cash" spiral. This
+  // test asserts a team already at playerMin with non-negative cash is skipped entirely.
+  it("does not sell a team already at its roster minimum when cash is non-negative", async () => {
+    const gameState = buildGameState({
+      rosters: Array.from({ length: 7 }, (_, index) => ({
+        id: `r-a-${index}`,
+        teamId: "team-a",
+        playerId: `p-a-${index}`,
+        slot: index,
+        salary: 5,
+        contractLength: 2,
+        currentValue: 20,
+      })),
+    });
+    const persistence = {
+      getSaveById: () => ({ saveId: "save-1", gameState }),
+    };
+
+    buildAiTransfermarktSellPreview.mockResolvedValue({
+      teams: [
+        {
+          teamId: "team-a",
+          sellCandidates: [
+            {
+              activePlayerId: "r-a-0",
+              sellPriority: 72,
+              expectedSellValue: 18,
+              marketValue: 20,
+              reasonToSell: ["Teamcash ist kritisch niedrig."],
+              warnings: [],
+            },
+          ],
+        },
+      ],
+    });
+
+    const runContext = {
+      save: { saveId: "save-1", gameState: structuredClone(gameState) },
+      deferredWrites: 0,
+    };
+    createLocalTransfermarktRunContext.mockReturnValue(runContext);
+    executeLocalTransfermarktSell.mockImplementation(({ activePlayerId }) => {
+      const team = runContext.save.gameState.teams.find((entry) => entry.teamId === "team-a");
+      if (team) team.cash += 18;
+      runContext.save.gameState.rosters = runContext.save.gameState.rosters.filter(
+        (entry) => entry.id !== activePlayerId,
+      );
+      return { canSell: true, blockingReasons: [] };
+    });
+    flushLocalTransfermarktRunContext.mockImplementation(() => runContext.save);
+
+    const result = await runPreseasonProactiveCashRecovery({
+      saveId: "save-1",
+      seasonId: "season-2",
+      persistence: persistence as never,
+    });
+
+    expect(executeLocalTransfermarktSell).not.toHaveBeenCalled();
+    expect(result.sold).toBe(0);
+    expect(result.teamsAffected).toBe(0);
+    // Roster-min guard is expected/protective behavior, not a failure — must stay out of
+    // `blockers` (which the long-run pipeline treats as a pause-worthy technical bug).
+    expect(result.blockers).toEqual([]);
+    expect(
+      result.guardNotes.some((entry) => entry.startsWith("preseason_cash_recovery_roster_min_guard:TMA")),
+    ).toBe(true);
+  });
+
+  it("still allows the last-resort sell for a genuinely negative-cash team already at its roster minimum", async () => {
+    const gameState = buildGameState({
+      teams: [
+        { teamId: "team-a", name: "Team A", shortCode: "TMA", cash: -2, humanControlled: false },
+        { teamId: "team-b", name: "Team B", shortCode: "TMB", cash: 40, humanControlled: false },
+      ],
+      rosters: Array.from({ length: 7 }, (_, index) => ({
+        id: `r-a-${index}`,
+        teamId: "team-a",
+        playerId: `p-a-${index}`,
+        slot: index,
+        salary: 5,
+        contractLength: 2,
+        currentValue: 20,
+      })),
+    });
+    const persistence = {
+      getSaveById: () => ({ saveId: "save-1", gameState }),
+    };
+
+    buildAiTransfermarktSellPreview.mockResolvedValue({
+      teams: [
+        {
+          teamId: "team-a",
+          sellCandidates: [
+            {
+              activePlayerId: "r-a-0",
+              sellPriority: 72,
+              expectedSellValue: 18,
+              marketValue: 20,
+              reasonToSell: ["negatives Teamcash."],
+              warnings: [],
+            },
+          ],
+        },
+      ],
+    });
+
+    const runContext = {
+      save: { saveId: "save-1", gameState: structuredClone(gameState) },
+      deferredWrites: 0,
+    };
+    createLocalTransfermarktRunContext.mockReturnValue(runContext);
+    executeLocalTransfermarktSell.mockImplementation(({ activePlayerId }) => {
+      const team = runContext.save.gameState.teams.find((entry) => entry.teamId === "team-a");
+      if (team) team.cash += 18;
+      runContext.save.gameState.rosters = runContext.save.gameState.rosters.filter(
+        (entry) => entry.id !== activePlayerId,
+      );
+      return { canSell: true, blockingReasons: [] };
+    });
+    flushLocalTransfermarktRunContext.mockImplementation(() => runContext.save);
+
+    const result = await runPreseasonProactiveCashRecovery({
+      saveId: "save-1",
+      seasonId: "season-2",
+      persistence: persistence as never,
+    });
+
+    expect(executeLocalTransfermarktSell).toHaveBeenCalled();
+    expect(result.sold).toBe(1);
+  });
 });

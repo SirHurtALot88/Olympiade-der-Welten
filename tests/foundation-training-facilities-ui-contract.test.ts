@@ -2,7 +2,14 @@ import fs from "node:fs/promises";
 
 import { describe, expect, it } from "vitest";
 
-const foundationClientPath = "/Users/chrisfalk/Documents/Codex/Olympiade der Welten/app/foundation/FoundationPageClient.tsx";
+const shellRouterPath = "/Users/chrisfalk/Documents/Codex/Olympiade der Welten/app/foundation/FoundationShellRouter.tsx";
+const shellRouterBodyScopePath =
+  "/Users/chrisfalk/Documents/Codex/Olympiade der Welten/lib/foundation/tabs/use-foundation-shell-router-body-scope.tsx";
+const crossTabTrainingPath =
+  "/Users/chrisfalk/Documents/Codex/Olympiade der Welten/lib/foundation/tabs/use-foundation-cross-tab-training.ts";
+const trainingPanelDerivationsPath =
+  "/Users/chrisfalk/Documents/Codex/Olympiade der Welten/lib/foundation/tabs/use-training-panel-derivations.ts";
+const facilityEffectsPath = "/Users/chrisfalk/Documents/Codex/Olympiade der Welten/lib/facilities/facility-effects.ts";
 const foundationPageTypesPath = "/Users/chrisfalk/Documents/Codex/Olympiade der Welten/lib/foundation/tabs/foundation-page-types.ts";
 const moduleHelpersPath = "/Users/chrisfalk/Documents/Codex/Olympiade der Welten/lib/foundation/tabs/foundation-page-module-helpers.tsx";
 const facilitiesV2Path = "/Users/chrisfalk/Documents/Codex/Olympiade der Welten/app/foundation/facilities-v2/FacilitiesV2Client.tsx";
@@ -12,9 +19,18 @@ const globalsPath = "/Users/chrisfalk/Documents/Codex/Olympiade der Welten/app/g
 
 describe("foundation training and facilities ui contract", () => {
   it("routes the main navigation into compact training and facilities v2 grid", async () => {
-    const fileText = await fs.readFile(foundationClientPath, "utf8");
-    const pageTypesText = await fs.readFile(foundationPageTypesPath, "utf8");
-    const moduleHelpersText = await fs.readFile(moduleHelpersPath, "utf8");
+    const [pageTypesText, moduleHelpersText, shellRouterText, trainingCompactShellHostText, shellRouterBodyText, facilitiesText] =
+      await Promise.all([
+        fs.readFile(foundationPageTypesPath, "utf8"),
+        fs.readFile(moduleHelpersPath, "utf8"),
+        fs.readFile(shellRouterPath, "utf8"),
+        fs.readFile(
+          "/Users/chrisfalk/Documents/Codex/Olympiade der Welten/app/foundation/training-compact/FoundationTrainingCompactShellHost.tsx",
+          "utf8",
+        ),
+        fs.readFile("/Users/chrisfalk/Documents/Codex/Olympiade der Welten/app/foundation/FoundationShellRouterBody.tsx", "utf8"),
+        fs.readFile(facilitiesV2Path, "utf8"),
+      ]);
 
     expect(pageTypesText).toContain('| "trainingCompact"');
     expect(pageTypesText).toContain('| "trainingV2"');
@@ -22,11 +38,10 @@ describe("foundation training and facilities ui contract", () => {
     expect(moduleHelpersText).toContain('{ id: "trainingV2", label: "Gebäude"');
     expect(moduleHelpersText).toContain('return "foundation-training-compact";');
     expect(moduleHelpersText).toContain('return "foundation-facilities-v2";');
-    expect(fileText).toContain('id="foundation-training-compact"');
-    expect(fileText).toContain('id="foundation-facilities-v2"');
-    expect(fileText).toContain("<TrainingCompactClient");
-    expect(fileText).toContain("<FacilitiesV2Client");
-    const facilitiesText = await fs.readFile(facilitiesV2Path, "utf8");
+    expect(shellRouterText).toContain('id="foundation-training-compact"');
+    expect(trainingCompactShellHostText).toContain("<TrainingCompactClient");
+    expect(shellRouterBodyText).toContain("<FacilitiesV2Client");
+    expect(facilitiesText).toContain('id="foundation-facilities-v2"');
     expect(facilitiesText).toContain('data-testid="foundation-facilities-v2"');
   });
 
@@ -58,26 +73,30 @@ describe("foundation training and facilities ui contract", () => {
   });
 
   it("still builds training and facilities around local preview services", async () => {
-    const fileText = await fs.readFile(foundationClientPath, "utf8");
+    // The training/facilities wiring this test guards moved out of the
+    // FoundationPageClient monolith into the shell-router-body scope hook and
+    // dedicated per-tab derivation hooks during the Foundation perf split.
+    const [scopeText, crossTabTrainingText, trainingDerivationsText, facilityEffectsText] = await Promise.all([
+      fs.readFile(shellRouterBodyScopePath, "utf8"),
+      fs.readFile(crossTabTrainingPath, "utf8"),
+      fs.readFile(trainingPanelDerivationsPath, "utf8"),
+      fs.readFile(facilityEffectsPath, "utf8"),
+    ]);
 
-    expect(fileText).toContain("buildPlayerProgressionForecast");
-    expect(fileText).toContain("buildOrganicSeasonProgression");
-    expect(fileText).toContain("organicByPlayerId");
-    expect(fileText).toContain("Organische Saison-Entwicklung");
-    expect(fileText).toContain("Organische Entwicklung anwenden");
-    expect(fileText).toContain("organicNetSetpoints");
-    expect(fileText).toContain("buildTrainingPlayerRowView");
-    expect(fileText).toContain("trainingModeDraft");
-    expect(fileText).toContain("async function setPlayerTrainingMode");
-    expect(fileText).toContain("player.trainingMode ?? \"mittel\"");
-    expect(fileText).toContain("persistLocalGameStateImmediately(nextGameState)");
-    expect(fileText).toContain("getTeamFacilityState");
-    expect(fileText).toContain("calculateFacilityUpkeep");
-    expect(fileText).toContain("calculateFacilityIncome");
-    expect(fileText).toContain("applyTrainingXpFacilityModifiers");
-    expect(fileText).toContain("applyRecoveryFacilityModifiers");
-    expect(fileText).toContain("applyUpgradeCostFacilityModifiers");
-    expect(fileText).toContain("/api/facilities/upgrade");
+    expect(scopeText).toContain("buildPlayerProgressionForecast");
+    expect(trainingDerivationsText).toContain("buildOrganicSeasonProgression");
+    expect(trainingDerivationsText).toContain("buildTrainingPlayerRowView");
+    expect(scopeText).toContain("trainingModeDraft");
+    expect(scopeText).toContain("async function setPlayerTrainingMode");
+    expect(trainingDerivationsText).toContain("player.trainingMode ?? \"mittel\"");
+    expect(scopeText).toContain("persistLocalGameStateImmediately(nextGameState)");
+    expect(scopeText).toContain("getTeamFacilityState");
+    expect(crossTabTrainingText).toContain("calculateFacilityUpkeep");
+    expect(crossTabTrainingText).toContain("calculateFacilityIncome");
+    expect(crossTabTrainingText).toContain("applyTrainingXpFacilityModifiers");
+    expect(crossTabTrainingText).toContain("applyRecoveryFacilityModifiers");
+    expect(facilityEffectsText).toContain("applyUpgradeCostFacilityModifiers");
+    expect(scopeText).toContain("/api/facilities/upgrade");
   });
 
   it("keeps the modern v2 layout classes wired up", async () => {

@@ -39,3 +39,18 @@ export function deriveRosterTargets(
   const playerOpt = Math.min(Math.max(rawOpt, playerMin), playerMax);
   return { playerMin, playerOpt, playerMax };
 }
+
+/**
+ * Season-1 draft only: `playerOpt` alone leaves squads without depth for in-season fatigue
+ * rotation and injury replacements, causing the draft to stop too early relative to available
+ * cash. Scales a small additive buffer with squad size (bigger target squads run more fixtures'
+ * worth of rotation risk) and clamps it to a modest 1-3 range so it never balloons the draft.
+ */
+export function resolveSeason1FatigueInjuryRosterBuffer(playerOpt: number) {
+  return Math.max(1, Math.min(3, Math.round(playerOpt * 0.18)));
+}
+
+/** `playerOpt` + Season-1 fatigue/injury buffer, capped at `playerMax`. */
+export function deriveSeason1TargetRosterSize(playerOpt: number, playerMax: number) {
+  return Math.min(playerOpt + resolveSeason1FatigueInjuryRosterBuffer(playerOpt), playerMax);
+}

@@ -27,14 +27,9 @@ import {
   resolveUnifiedMarketPickSteps,
   isUnifiedPickEnabledForMarket,
 } from "@/lib/ai/unified-pick-planner-service";
-import {
-  PRESEASON_CASH_PRESSURE_THRESHOLD,
-} from "@/lib/ai/preseason-cash-recovery-service";
-import {
-  assessTeamSellRunwayPressure,
-  getProfitWindowSellThreshold,
-  isAttractiveProfitSell,
-} from "@/lib/ai/team-sell-runway-pressure";
+import { computeCompositeSellScore, selectCompositeSellCandidates } from "@/lib/ai/ai-composite-sell-score";
+import { resolvePlayerEconomyContract } from "@/lib/foundation/player-economy-contract";
+import { getTeamStrategyProfile } from "@/lib/foundation/team-strategy-profiles";
 import {
   buildLeagueMarketAnchors,
   resolvePlannerSpendableCash,
@@ -42,8 +37,8 @@ import {
 import { resolveMarketQualityProfile } from "@/lib/ai/ai-market-quality-profile-service";
 import { buildBudgetEnvelope } from "@/lib/ai/market-pick-engine/budget-envelope";
 import { pickCandidateForSlot, reconcileEnvelopeAfterPick } from "@/lib/ai/market-pick-engine/pick-step";
-import { resolveTeamCashRunwayReserve } from "@/lib/ai/ai-team-cash-reserve-service";
-import { teamNeedsPostOptUpgradeDeploy } from "@/lib/ai/ai-budget-deploy-service";
+import { resolveMarketPlannerCashBuffer } from "@/lib/ai/ai-team-cash-reserve-service";
+import { assessTeamSellRunwayPressure } from "@/lib/ai/team-sell-runway-pressure";
 import { loadFoundationSnapshotFromPrisma } from "@/lib/db/read/foundation-read-repository";
 import { projectFoundationStateFromPrisma } from "@/lib/db/read/foundation-read-projection";
 import { withNormalizedTeamControlSettings } from "@/lib/foundation/team-control-settings";
@@ -355,217 +350,120 @@ function chooseSellCandidates(
   team: AiSellPreviewTeamEntry,
   candidatesOverride?: DoctrineAdjustedSellCandidate[],
   gameState?: GameState | null,
-  options?: { buyTopScore?: number },
+  _options?: { buyTopScore?: number },
 ) {
-  const rosterCount = team.rosterSize ?? null;
-  const playerMin = team.targetRosterMin ?? team.playerMin ?? null;
-  const playerOpt = team.targetRosterOpt ?? null;
-  const buyTopScore = options?.buyTopScore ?? 0;
   const sourceCandidates = candidatesOverride ?? team.sellCandidates;
-  const sellCapacity =
-    rosterCount != null && rosterCount > 0 ? rosterCount : sourceCandidates.length;
-  if (sourceCandidates.length === 0 || sellCapacity <= 0) {
+  if (sourceCandidates.length === 0) {
     return [];
   }
-  const topPriority = sourceCandidates[0]?.sellPriority ?? 0;
-  const topProfitRatio =
-    sourceCandidates[0]?.expectedSellValue != null &&
-    sourceCandidates[0]?.marketValue != null &&
-    sourceCandidates[0].marketValue > 0
-      ? (sourceCandidates[0].expectedSellValue - sourceCandidates[0].marketValue) / sourceCandidates[0].marketValue
-      : 0;
-  const highLoyalty =
-    team.explanation.includes("Bindet") ||
-    team.explanation.includes("Loyal") ||
-    team.explanation.includes("Mentor");
-  const hasNegativeCash = team.cash != null && Number.isFinite(team.cash) && team.cash < 0;
+  if (!gameState) {
+    return sourceCandidates.slice(0, 3);
+  }
+
+  const teamState = gameState.teams.find((entry) => entry.teamId === team.teamId) ?? null;
+  const identity = gameState.teamIdentities.find((entry) => entry.teamId === team.teamId) ?? null;
+  const profile = getTeamStrategyProfile(gameState, team.teamId);
   const salaryTotal = team.salaryTotal ?? 0;
-  const teamState = gameState?.teams.find((entry) => entry.teamId === team.teamId) ?? null;
-  const sellRunway =
-    gameState && teamState
-      ? assessTeamSellRunwayPressure({ gameState, team: teamState, salaryTotal })
-      : null;
-  const lowCashBuffer =
-    team.cash != null &&
-    Number.isFinite(team.cash) &&
-    team.cash >= 0 &&
-    team.cash < PRESEASON_CASH_PRESSURE_THRESHOLD;
-  const topReasons = sourceCandidates[0]?.reasonToSell ?? [];
-  const profitWindowThreshold = getProfitWindowSellThreshold(sellRunway?.cashPressureScore ?? 0);
-  const hasExpiringContractPressure = sourceCandidates.some((candidate) =>
-    candidate.reasonToSell.some((reason) => reason.includes("Vertrag laeuft aus") || reason.includes("kurze Restvertragslaenge")),
-  );
-  const hasProfitWindow = sourceCandidates.some((candidate) => {
-    if (candidate.expectedSellValue == null || candidate.marketValue == null || candidate.marketValue <= 0) {
-      return false;
-    }
-    const profitRatio = (candidate.expectedSellValue - candidate.marketValue) / candidate.marketValue;
-    const profitAbsolute = candidate.expectedSellValue - candidate.marketValue;
-    const cashPressure = sellRunway?.cashPressureScore ?? 0;
-    return (
-      (profitRatio >= (cashPressure >= 0.45 ? 0.08 : 0.07) &&
-        candidate.sellPriority >= (cashPressure >= 0.45 ? 30 : profitWindowThreshold)) ||
-      (profitAbsolute >= 3 && cashPressure >= 0.45 && candidate.sellPriority >= 28)
-    );
-  });
-  const hasManagementSellReason = topReasons.some(
-    (reason) =>
-      reason.includes("negatives Teamcash") ||
-      reason.includes("Performance blieb unter Erwartung") ||
-      reason.includes("Vertrag laeuft aus") ||
-      reason.includes("kurze Restvertragslaenge") ||
-      reason.includes("Teamcash ist kritisch") ||
-      reason.includes("Vorstand"),
-  );
+  const sellRunway = teamState
+    ? assessTeamSellRunwayPressure({ gameState, team: teamState, salaryTotal })
+    : null;
+  const cashPressureScore = sellRunway?.cashPressureScore ?? 0;
+  const previewByPlayerId = new Map(sourceCandidates.map((candidate) => [candidate.playerId, candidate] as const));
+  const playersById = new Map(gameState.players.map((player) => [player.id, player] as const));
 
-  let wantedCount = 0;
-  if (rosterCount != null && playerOpt != null && rosterCount > playerOpt) {
-    wantedCount = Math.min(Math.max(rosterCount - playerOpt, 1), 3);
-  } else if (hasNegativeCash && topPriority >= 25) {
-    wantedCount = 2;
-  } else if (
-    (lowCashBuffer || (sellRunway?.lowCashBuffer ?? false)) &&
-    topPriority >= 28 &&
-    (sellRunway?.cashPressureScore ?? 0) >= 0.35
-  ) {
-    wantedCount = team.cash != null && team.cash < 5 ? 2 : 1;
-  } else if (team.budgetPressure === "critical" && topPriority >= 50) {
-    wantedCount = 2;
-  } else if (!highLoyalty && hasManagementSellReason && topPriority >= 50) {
-    wantedCount = 1;
-  } else if (!highLoyalty && hasExpiringContractPressure && topPriority >= 45) {
-    wantedCount = 1;
-  } else if (!highLoyalty && topProfitRatio >= 0.08 && topPriority >= 38) {
-    wantedCount = 1;
-  } else if (!highLoyalty && topProfitRatio >= 0.12 && topPriority >= 40) {
-    wantedCount = 1;
-  } else if (
-    !highLoyalty &&
-    rosterCount != null &&
-    playerOpt != null &&
-    rosterCount === playerOpt &&
-    hasProfitWindow &&
-    topPriority >= 50
-  ) {
-    wantedCount = 1;
-  } else if (
-    !highLoyalty &&
-    rosterCount != null &&
-    playerMin != null &&
-    rosterCount === playerMin &&
-    hasProfitWindow &&
-    topPriority >= 50
-  ) {
-    wantedCount = 1;
-  } else if (!highLoyalty && topPriority >= 58) {
-    wantedCount = 1;
-  }
-
-  if (!highLoyalty && hasProfitWindow && topPriority >= profitWindowThreshold) {
-    wantedCount = Math.max(wantedCount, 1);
-  } else if (
-    !highLoyalty &&
-    sellRunway &&
-    sellRunway.cashPressureScore >= 0.55 &&
-    topProfitRatio >= 0.08 &&
-    topPriority >= profitWindowThreshold - 4
-  ) {
-    wantedCount = Math.max(wantedCount, 1);
-  } else if (
-    !highLoyalty &&
-    buyTopScore >= 52 &&
-    hasProfitWindow &&
-    topPriority >= 45 &&
-    rosterCount != null &&
-    playerOpt != null &&
-    rosterCount >= (playerMin ?? 0) &&
-    rosterCount <= playerOpt
-  ) {
-    wantedCount = Math.max(wantedCount, 1);
-  }
-
-  const proactiveCandidates = sourceCandidates.filter((candidate) => {
-    const candidateProfitRatio =
-      candidate.expectedSellValue != null && candidate.marketValue != null && candidate.marketValue > 0
-        ? (candidate.expectedSellValue - candidate.marketValue) / candidate.marketValue
-        : 0;
-    const attractiveProfit =
-      candidate.expectedSellValue != null &&
-      candidate.marketValue != null &&
-      isAttractiveProfitSell({
-        expectedSellValue: candidate.expectedSellValue,
-        marketValue: candidate.marketValue,
-        cashPressureScore: sellRunway?.cashPressureScore ?? 0,
+  const scored = gameState.rosters
+    .filter((entry) => entry.teamId === team.teamId)
+    .map((roster) => {
+      const preview = previewByPlayerId.get(roster.playerId);
+      const player = playersById.get(roster.playerId);
+      if (!player || !teamState) {
+        return preview ? { candidate: preview, score: preview.strategicSellScore ?? preview.sellPriority ?? 0, threshold: 30, teamProfile: "default" as const } : null;
+      }
+      const economy = resolvePlayerEconomyContract({ player, rosterEntry: roster });
+      const composite = computeCompositeSellScore({
+        teamId: team.teamId,
+        team: teamState,
+        identity,
+        player,
+        roster,
+        gameState,
+        saveId: gameState.season.id,
+        expectedSellValue: preview?.expectedSellValue ?? economy.marketValue,
+        marketValue: preview?.marketValue ?? economy.marketValue,
+        salary: preview?.salary ?? economy.salary,
+        teamCash: teamState.cash ?? 0,
+        teamSalaryTotal: salaryTotal,
+        cashPressureScore,
+        explanation: team.explanation,
+        sellForProfitAggression: profile?.bias.sellForProfitAggression ?? null,
       });
-    const hasStrongReason = candidate.reasonToSell.some(
-      (reason) =>
-        reason.includes("negatives Teamcash") ||
-        reason.includes("Performance blieb unter Erwartung") ||
-        reason.includes("Vertrag laeuft aus") ||
-        reason.includes("kurze Restvertragslaenge") ||
-        reason.includes("Teamcash ist kritisch") ||
-        reason.includes("Vorstand") ||
-        reason.includes("Kader liegt ueber dem Optimum") ||
-        reason.includes("Gehaltslast uebersteigt verfuegbares Cash") ||
-        reason.includes("realisierbarer Gewinn"),
-    );
-    const profitThreshold = (sellRunway?.cashPressureScore ?? 0) >= 0.5 ? 0.05 : 0.07;
-    return (
-      hasStrongReason ||
-      attractiveProfit ||
-      candidateProfitRatio >= profitThreshold ||
-      candidate.sellPriority >= 50
-    );
-  });
+      const candidate = preview ?? ({
+        activePlayerId: roster.id,
+        playerId: player.id,
+        playerName: player.name,
+        className: player.className,
+        race: player.race,
+        raceName: player.race,
+        ovr: null,
+        mvs: null,
+        salary: economy.salary ?? null,
+        marketValue: economy.marketValue ?? null,
+        expectedSellValue: economy.marketValue ?? null,
+        contractLength: roster.contractLength,
+        rosterAfter: null,
+        salaryAfter: null,
+        cashAfter: null,
+        sportValueSummary: "",
+        performanceSummary: "",
+        strategyFitSummary: "",
+        reasonToSell: [],
+        reasonToKeep: [],
+        reasonsToSell: [],
+        reasonsToKeep: [],
+        warnings: [],
+        boardTrustScore: null,
+        boardTrustSmiley: null,
+        boardTrustPolicy: "normal",
+        boardTrustReasons: [],
+        boardTrustWarnings: [],
+        salaryCapMultiplier: null,
+        sellPriority: composite.total,
+        sellPriorityScore: composite.total,
+        strategicSellScore: composite.total,
+      } satisfies AiSellPreviewCandidate);
+      return {
+        candidate: {
+          ...candidate,
+          strategicSellScore: composite.total,
+          sellPriority: composite.total,
+          sellPriorityScore: composite.total,
+        },
+        score: composite.total,
+        threshold: composite.threshold,
+        teamProfile: composite.teamProfile,
+      };
+    })
+    .filter((entry): entry is NonNullable<typeof entry> => entry != null);
 
-  const maxWantedByContext =
-    hasNegativeCash ||
-    lowCashBuffer ||
-    team.budgetPressure === "critical" ||
-    (rosterCount != null && playerOpt != null && rosterCount > playerOpt)
-      ? 3
-      : highLoyalty
-        ? 1
-        : 2;
-  const negativeCashRecoveryCandidates: AiSellPreviewCandidate[] = [];
-  if (hasNegativeCash) {
-    let projectedCash = team.cash ?? 0;
-    for (const candidate of sourceCandidates) {
-      const expectedSellValue = candidate.expectedSellValue;
-      if (!isKnownPositiveMoney(expectedSellValue)) {
-        continue;
-      }
-      negativeCashRecoveryCandidates.push(candidate);
-      projectedCash += expectedSellValue;
-      if (projectedCash > 0 || negativeCashRecoveryCandidates.length >= sellCapacity) {
-        break;
-      }
-    }
+  if (scored.length === 0) {
+    return [];
   }
 
-  const finalWantedCount = Math.min(Math.max(wantedCount, proactiveCandidates.length > 1 ? 2 : wantedCount), maxWantedByContext, sellCapacity);
-
-  if (gameState && teamNeedsPostOptUpgradeDeploy(gameState, team.teamId, gameState.season.id)) {
-    const weakest = [...sourceCandidates].sort((left, right) => {
-      const leftValue = left.marketValue ?? left.ovr ?? 0;
-      const rightValue = right.marketValue ?? right.ovr ?? 0;
-      return leftValue - rightValue;
-    });
-    if (weakest[0]) {
-      return [weakest[0]];
-    }
-  }
-
+  const effectiveThreshold = scored[0]?.threshold ?? 30;
+  const teamProfile = scored[0]?.teamProfile ?? "default";
+  const qualified = scored
+    .filter((entry) => entry.score >= effectiveThreshold)
+    .sort((left, right) => right.score - left.score || left.candidate.playerName.localeCompare(right.candidate.playerName, "de"));
   return uniqueById(
-    [...negativeCashRecoveryCandidates, ...proactiveCandidates.slice(0, finalWantedCount)],
+    selectCompositeSellCandidates({
+      candidates: qualified.map((entry) => ({ candidate: entry.candidate, score: entry.score })),
+      teamCash: teamState?.cash ?? 0,
+      teamSalaryTotal: salaryTotal,
+      cashPressureScore,
+      teamProfile,
+    }),
     (candidate) => candidate.activePlayerId,
-  )
-    .slice(0, sellCapacity)
-    .sort((left, right) => {
-      const leftScore = (left as DoctrineAdjustedSellCandidate).strategicSellScore ?? left.sellPriority ?? 0;
-      const rightScore = (right as DoctrineAdjustedSellCandidate).strategicSellScore ?? right.sellPriority ?? 0;
-      return rightScore - leftScore;
-    });
+  );
 }
 
 function normalizeMarketPlanGameState(gameState: GameState) {
@@ -747,7 +645,7 @@ function buildTeamEntry(input: {
         chosenSells.length,
         cashAfterSell,
         enrichedBuyPool,
-        input.gameState && teamId ? resolveTeamCashRunwayReserve(input.gameState, teamId) : null,
+        input.gameState && teamId ? resolveMarketPlannerCashBuffer(input.gameState, teamId) : null,
         input.gameState,
       )
     : [];
@@ -964,8 +862,11 @@ async function overlayUnifiedCompareBuyPlans(input: {
     const steps = resolveUnifiedMarketPickSteps(team);
     const poolTeam = buyByTeam.get(team.teamId);
     const pool = poolTeam?.legalCandidatePool ?? poolTeam?.recommendedBuys ?? [];
+    const rosterCount = team.currentState.rosterCount;
+    const playerOpt = team.currentState.playerOpt;
     if (
       steps <= 0 ||
+      (rosterCount != null && playerOpt != null && rosterCount >= playerOpt) ||
       !poolTeam ||
       pool.length === 0 ||
       (team.status !== "buy_only" && team.status !== "sell_then_buy" && team.status !== "warning")
@@ -1054,6 +955,7 @@ export async function buildAiMarketPlanPreview(params: AiMarketPlanPreviewParams
           ...previewParams,
           ...previewContext,
           limit: params.sellLimit ?? 6,
+          fullRosterCandidates: true,
           allowSellBelowRosterMin: true,
         }),
   ]);

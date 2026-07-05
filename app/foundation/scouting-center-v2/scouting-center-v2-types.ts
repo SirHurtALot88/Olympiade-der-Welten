@@ -42,10 +42,15 @@ export type ScoutingHubV2PipelineRecord = {
 };
 
 export type ScoutingHubV2PipelineSummary = {
+  facilityLevel: number;
   occupiedSlots: number;
   maxSlots: number;
   tickGain: number;
   passiveActive: number;
+  passiveSlots: number;
+  focusTickGain: number;
+  wishlistTickGain: number;
+  passiveTickGain: number;
   draftSuspended?: boolean;
   records: ScoutingHubV2PipelineRecord[];
 };
@@ -74,6 +79,7 @@ export type ScoutingHubV2ClientProps = {
   onActiveTabChange?: (tab: ScoutingHubV2TabId) => void;
   hideSubNav?: boolean;
   onOpenMarket: () => void;
+  onOpenFacilities?: () => void;
   onOpenPlayer: (playerId: string) => void;
   queueEntries?: ScoutingQueueRow[];
   focusEtaLabel?: string | null;

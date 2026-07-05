@@ -4,7 +4,6 @@ import { formatTransfermarktCurrency } from "@/lib/market/transfermarkt-formatti
 
 import type { FacilityRowView } from "@/app/foundation/facilities-v2/facilities-v2-types";
 import {
-  FacilityLevelRail,
   FacilityLevelStrip,
   formatFacilityStatusLabel,
   formatLocaleNumber,
@@ -31,7 +30,6 @@ export default function FacilityGridCard({ facility, selected, onSelect }: Facil
         <strong>{facility.name}</strong>
         <span className="facilities-v2-card-level">{formatFacilityStatusLabel(facility)}</span>
       </div>
-      <FacilityLevelRail level={facility.level} nextLevel={facility.nextLevel} />
       <FacilityLevelStrip facilityId={facility.id} level={facility.level} />
       <div className="facilities-v2-card-stats">
         <span title="Effizienz">{formatLocaleNumber(facility.efficiencyPct, 0)}%</span>

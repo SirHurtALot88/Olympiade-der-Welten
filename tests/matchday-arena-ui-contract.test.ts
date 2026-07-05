@@ -4,9 +4,21 @@ import { describe, expect, it } from "vitest";
 
 describe("matchday arena ui contract", () => {
   it("wires a dedicated foundation arena view with reveal controls and score lanes", async () => {
-    const [foundationText, routingText, arenaText, arenaPanelText, arenaHostText, resultHostText, arenaRevealPanelText, legacyLineupText, presenterText, cssText, moduleHelpersText] = await Promise.all([
+    const [foundationPageClientText, shellRouterBodyText, shellRouterBodyScopeText, shellRouterText, routingText, arenaText, arenaPanelText, arenaHostText, resultHostText, arenaRevealPanelText, legacyLineupText, presenterText, cssText, moduleHelpersText] = await Promise.all([
       fs.readFile(
         "/Users/chrisfalk/Documents/Codex/Olympiade der Welten/app/foundation/FoundationPageClient.tsx",
+        "utf8",
+      ),
+      fs.readFile(
+        "/Users/chrisfalk/Documents/Codex/Olympiade der Welten/app/foundation/FoundationShellRouterBody.tsx",
+        "utf8",
+      ),
+      fs.readFile(
+        "/Users/chrisfalk/Documents/Codex/Olympiade der Welten/lib/foundation/tabs/use-foundation-shell-router-body-scope.tsx",
+        "utf8",
+      ),
+      fs.readFile(
+        "/Users/chrisfalk/Documents/Codex/Olympiade der Welten/app/foundation/FoundationShellRouter.tsx",
         "utf8",
       ),
       fs.readFile(
@@ -51,6 +63,11 @@ describe("matchday arena ui contract", () => {
       ),
     ]);
 
+    // Home/router logic was split off FoundationPageClient into a shell-router body + scope
+    // hook during the V2 monolith split; the wiring these assertions guard now lives across
+    // all three files, so we check the combined text to keep the original contract intent.
+    const foundationText = `${foundationPageClientText}\n${shellRouterBodyText}\n${shellRouterBodyScopeText}\n${shellRouterText}`;
+
     expect(foundationText).toContain('"matchdayArena"');
     expect(foundationText).toContain('"matchdayResult"');
     expect(moduleHelpersText).toContain('{ id: "matchdayArena", label: "Arena"');
@@ -79,7 +96,7 @@ describe("matchday arena ui contract", () => {
     expect(arenaHostText).toContain("onOpenPlayerDetails: (payload) => openPlayerDrawerById(payload.playerId, payload.activePlayerId)");
     expect(foundationText).toContain("foundation-global-next-button");
     expect(foundationText).toContain("triggerGlobalNext");
-    expect(foundationText).toContain('active={activeView === "matchdayArena"}');
+    expect(foundationText).toContain('activeView === "matchdayArena"');
     expect(arenaPanelText).toContain('data-testid="arena-lineup-blocker"');
     expect(foundationText).toContain("lineup_not_submitted");
     expect(foundationText).toContain("homeNextMatchdayStatus");
@@ -225,9 +242,13 @@ describe("matchday arena ui contract", () => {
   });
 
   it("wires Spieltag-abschliessen button and lineup blocker in arena view", async () => {
-    const [foundationText, arenaPanelText, arenaHostText] = await Promise.all([
+    const [shellRouterBodyText, shellRouterBodyScopeText, arenaPanelText, arenaHostText] = await Promise.all([
       fs.readFile(
-        "/Users/chrisfalk/Documents/Codex/Olympiade der Welten/app/foundation/FoundationPageClient.tsx",
+        "/Users/chrisfalk/Documents/Codex/Olympiade der Welten/app/foundation/FoundationShellRouterBody.tsx",
+        "utf8",
+      ),
+      fs.readFile(
+        "/Users/chrisfalk/Documents/Codex/Olympiade der Welten/lib/foundation/tabs/use-foundation-shell-router-body-scope.tsx",
         "utf8",
       ),
       fs.readFile(
@@ -239,6 +260,7 @@ describe("matchday arena ui contract", () => {
         "utf8",
       ),
     ]);
+    const foundationText = `${shellRouterBodyText}\n${shellRouterBodyScopeText}`;
 
     expect(arenaHostText).toContain('data-testid="arena-finish-matchday-button"');
     expect(foundationText).toContain("runFinishMatchdaySimple");

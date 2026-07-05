@@ -8,7 +8,7 @@ import {
   PLAYER_ATTRIBUTE_CHART_LABELS,
   type PlayerAttributeHistoryRow,
 } from "@/lib/foundation/player-attribute-history";
-import type { PlayerProgressHistoryRow } from "@/lib/foundation/player-progress-summary";
+import type { PlayerDrawerHistoryRow } from "@/lib/foundation/player-detail-drawer";
 import {
   buildPlayerProgressSummary,
   formatProgressDelta,
@@ -16,15 +16,15 @@ import {
 } from "@/lib/foundation/player-progress-summary";
 
 type PlayerAttributeProgressChartProps = {
-  historyRows: PlayerProgressHistoryRow[];
+  historyRows: PlayerDrawerHistoryRow[];
   attributeHistoryRows?: PlayerAttributeHistoryRow[];
 };
 
 const PP_METRICS = [
-  { id: "pow" as const, label: "POW", className: "is-power" },
-  { id: "spe" as const, label: "SPE", className: "is-speed" },
-  { id: "men" as const, label: "MEN", className: "is-mental" },
-  { id: "soc" as const, label: "SOC", className: "is-social" },
+  { id: "pow" as const, label: "POW", className: "is-power", rankKey: "powRank" as const },
+  { id: "spe" as const, label: "SPE", className: "is-speed", rankKey: "speRank" as const },
+  { id: "men" as const, label: "MEN", className: "is-mental", rankKey: "menRank" as const },
+  { id: "soc" as const, label: "SOC", className: "is-social", rankKey: "socRank" as const },
 ];
 
 const ATTRIBUTE_COLORS: Record<string, string> = {
@@ -43,6 +43,15 @@ function formatChartValue(value: number | null | undefined) {
     return "—";
   }
   return new Intl.NumberFormat("de-DE", { maximumFractionDigits: 1 }).format(value);
+}
+
+function formatPpTableMetric(value: number | null | undefined, rank?: number | null) {
+  const formatted = formatChartValue(value);
+  return rank != null ? `${formatted} · #${rank}` : formatted;
+}
+
+function resolveHistoryPps(row: PlayerDrawerHistoryRow) {
+  return row.pps ?? row.totalPoints;
 }
 
 function ProgressChartCollapsible({
@@ -132,7 +141,7 @@ function formatSeasonShortLabel(seasonName: string, seasonId: string | null) {
   return seasonName.replace(/^Season\s+/i, "S");
 }
 
-function buildPpMetricBlockChartsGeometry(rows: PlayerProgressHistoryRow[]) {
+function buildPpMetricBlockChartsGeometry(rows: PlayerDrawerHistoryRow[]) {
   const width = 280;
   const height = 148;
   const paddingLeft = 28;
@@ -540,7 +549,7 @@ export default function PlayerAttributeProgressChart({
       <ProgressChartCollapsible
         testId="player-attribute-progress-pp-table"
         title="PP-Tabelle"
-        subtitle="OVR und Achsen-PPs je Saison."
+        subtitle="Gesamt-PPs, OVR und Achsen-PPs je Saison inkl. Liga-Rang."
         defaultOpen
       >
         <div className="table-shell player-attribute-progress-table-shell">
@@ -548,6 +557,7 @@ export default function PlayerAttributeProgressChart({
           <thead>
             <tr>
               <th>Saison</th>
+              <th className="player-drawer-history-axis is-neutral">PPs</th>
               <th className="player-drawer-history-axis is-neutral">OVR</th>
               {PP_METRICS.map((option) => (
                 <th key={option.id} className={`player-drawer-history-axis ${option.className}`}>
@@ -563,10 +573,13 @@ export default function PlayerAttributeProgressChart({
                   <strong>{row.seasonName}</strong>
                   {row.isActiveSeason ? <small className="player-drawer-history-tag">live</small> : null}
                 </td>
-                <td className="player-drawer-history-axis is-neutral">{formatChartValue(row.ovr)}</td>
+                <td className="player-drawer-history-axis is-neutral">
+                  {formatPpTableMetric(resolveHistoryPps(row), row.ppsRank)}
+                </td>
+                <td className="player-drawer-history-axis is-neutral">{formatPpTableMetric(row.ovr, row.ovrRank)}</td>
                 {PP_METRICS.map((option) => (
                   <td key={`${row.seasonName}-${option.id}`} className={`player-drawer-history-axis ${option.className}`}>
-                    {formatChartValue(row[option.id])}
+                    {formatPpTableMetric(row[option.id], row[option.rankKey])}
                   </td>
                 ))}
               </tr>

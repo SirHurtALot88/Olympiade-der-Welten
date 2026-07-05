@@ -16,7 +16,7 @@ import DisciplineIcon from "@/app/foundation/DisciplineIcon";
 import BudgetedMediaImage from "@/components/foundation/BudgetedMediaImage";
 import OptimizedMediaImage from "@/app/foundation/OptimizedMediaImage";
 import FoundationPlayerPortraitCard from "@/components/foundation/player-portrait-card/FoundationPlayerPortraitCard";
-import { VeloImpactStrip, VeloStatOrbitRow } from "@/components/foundation/velo-ui";
+import { VeloImpactStrip } from "@/components/foundation/velo-ui";
 import { createEmptyLeaguePlayerHeatPools } from "@/lib/foundation/player-league-heat";
 import { isFoundationTeamManagementLocked } from "@/lib/foundation/foundation-admin-dev-flags";
 import { getGameTermTooltip } from "@/components/ui/GameTerm";
@@ -8700,8 +8700,10 @@ export default function LegacyLineupLabClient(props: LegacyLineupLabClientProps)
                         {discipline?.displayName ?? "—"} ({discipline?.requiredPlayers ?? "—"} Spieler)
                       </h3>
                       <p className="muted">
-                        Ranks: {discipline?.displayName ?? "—"} {context?.teamDisciplineRanks?.[discipline?.disciplineId ?? ""]?.rank ?? "—"} (
-                        {discipline?.requiredPlayers ?? "—"})
+                        {(() => {
+                          const rank = context?.teamDisciplineRanks?.[discipline?.disciplineId ?? ""]?.rank;
+                          return rank != null ? `Liga-Rang: #${rank}` : "Liga-Rang: —";
+                        })()}
                       </p>
                       <p className="legacy-lineup-weight-band">{formatWeightInfo(sideWeightInfo)}</p>
                     </div>
@@ -8712,9 +8714,6 @@ export default function LegacyLineupLabClient(props: LegacyLineupLabClientProps)
                   <div className="legacy-lineup-side-meta">
                     <span>
                       <strong>Saisonstatus:</strong> {context?.teamStatus?.lineupFilledCount ?? 0}/{context?.teamStatus?.totalLineupSides ?? "—"}
-                    </span>
-                    <span>
-                      <strong>Room jetzt:</strong> {disciplineSide === "d1" ? lineupMeta.d1Selected : lineupMeta.d2Selected}/{discipline?.requiredPlayers ?? "—"}
                     </span>
                     <span>
                       <strong>Gespeichert:</strong> {(draft?.entries ?? []).filter((entry) => entry.disciplineSide === disciplineSide).length}/{discipline?.requiredPlayers ?? "—"}

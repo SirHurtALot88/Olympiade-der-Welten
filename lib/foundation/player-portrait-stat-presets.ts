@@ -152,10 +152,6 @@ export function buildTrainingOverlayStats(data: PlayerPortraitTrainingContextDat
     stat("Forecast", netLabel, {
       valueClass: net != null && net >= 0 ? "text-positive" : net != null && net < 0 ? "text-negative" : "",
     }),
-    stat("Risiko", data.regressionRisk === "high" ? "hoch" : data.regressionRisk ? "mittel" : "niedrig", {
-      valueClass: data.regressionRisk === "high" ? "text-negative" : "",
-    }),
-    stat("Modus", data.trainingModeLabel ?? "—"),
   ];
 }
 
@@ -267,6 +263,7 @@ export function shouldShowPortraitOrbit(
   if (layout === "rail") return false;
   if (density === "mini") return false;
   if (context === "market") return density === "full" || density === "compact";
-  if (context === "training" || context === "scouting") return density === "full";
+  if (context === "training") return false;
+  if (context === "scouting") return density === "full";
   return context === "roster" || context === "tablePreview" || context == null;
 }

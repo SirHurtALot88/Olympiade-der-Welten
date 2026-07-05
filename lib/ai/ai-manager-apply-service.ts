@@ -11,7 +11,14 @@ import {
   type AiManagementTrainingFocus,
   type AiManagementTrainingIntensity,
 } from "@/lib/ai/ai-team-management-preview-service";
-import { resolveTeamCashRunwayReserve } from "@/lib/ai/ai-team-cash-reserve-service";
+import {
+  isTeamRosterBelowOpt,
+  projectExpectedSalaryAtPlannerTarget,
+  resolveCombinedLiquidityReserve,
+  resolveTeamCashRunwayReserve,
+} from "@/lib/ai/ai-team-cash-reserve-service";
+import { getTeamObjectiveAiBias } from "@/lib/board/team-season-objectives-service";
+import { deriveRosterTargets } from "@/lib/foundation/roster-limits";
 import { previewFacilityMaintenance, applyFacilityMaintenance } from "@/lib/facilities/facility-maintenance-service";
 import { previewFacilityUpgrade, applyFacilityUpgrade } from "@/lib/facilities/facility-upgrade-service";
 import type { FacilityId } from "@/lib/facilities/facility-catalog";
@@ -744,26 +751,82 @@ export function applyAiManagerPlan(input: {
   };
 }
 
-export function getAiManagerMarketSpendableCash(gameState: GameState, teamId: string, fallbackCash: number | null | undefined) {
+export function getAiManagerMarketSpendableCash(
+  gameState: GameState,
+  teamId: string,
+  fallbackCash: number | null | undefined,
+  opts?: { includeFallbackPools?: boolean },
+) {
   const cash = fallbackCash ?? gameState.teams.find((team) => team.teamId === teamId)?.cash ?? null;
   if (cash == null) return null;
   const reservation = gameState.seasonState.aiManagerBudgetReservations?.[teamId];
   if (!reservation) return cash;
-  return round(
-    clamp(
-      Math.min(
-        reservation.transferBudget,
-        cash -
-          reservation.cashReserve -
-          reservation.salaryReserve -
-          reservation.buildingBudget -
-          reservation.maintenanceBudget -
-          reservation.emergencyBudget,
-      ),
+
+  if (opts?.includeFallbackPools) {
+    // Rebuild/draft: transfer + building + combined liquidity reserve are spendable; only emergency
+    // and maintenance stay hard-protected. Buckets are pre-sized by buildBudgetPlan with a low
+    // reserveFactor for aggressive / cash-poor teams.
+    const drawablePools =
+      reservation.transferBudget +
+      reservation.buildingBudget +
+      reservation.cashReserve +
+      reservation.salaryReserve;
+    const availableAfterProtected = Math.max(
       0,
-      cash,
-    ),
-  );
+      cash - reservation.emergencyBudget - reservation.maintenanceBudget,
+    );
+    return round(clamp(Math.min(drawablePools, availableAfterProtected), 0, cash), 2);
+  }
+
+  // Outside rebuild: only the transferBudget pool is spendable. salaryReserve / maintenanceBudget /
+  // emergencyBudget are protected buffers — but unspent buildingBudget/cashReserve still physically
+  // sit in team.cash and must not be phantom-subtracted from the transfer pool.
+  const protectedReserve = reservation.salaryReserve + reservation.maintenanceBudget + reservation.emergencyBudget;
+  const availableAfterProtected = Math.max(0, cash - protectedReserve);
+  return round(clamp(Math.min(reservation.transferBudget, availableAfterProtected), 0, cash), 2);
+}
+
+export function applyTransferBudgetSpend(gameState: GameState, teamId: string, fee: number): GameState {
+  const reservation = gameState.seasonState.aiManagerBudgetReservations?.[teamId];
+  if (!reservation || fee <= 0) return gameState;
+
+  // Spend cascades through the buckets in priority order — transferBudget first, then the fallback
+  // pools (buildingBudget, cashReserve, salaryReserve, maintenanceBudget) — so the recorded
+  // reservation never drifts from the cash actually spent. emergencyBudget is never touched here.
+  let remaining = fee;
+  const take = (available: number) => {
+    const amount = remaining > 0 ? Math.min(remaining, Math.max(0, available)) : 0;
+    remaining = round(remaining - amount, 2);
+    return amount;
+  };
+  const fromTransfer = take(reservation.transferBudget);
+  const fromBuilding = take(reservation.buildingBudget);
+  const fromCashReserve = take(reservation.cashReserve);
+  const fromSalaryReserve = take(reservation.salaryReserve);
+  const fromMaintenance = take(reservation.maintenanceBudget);
+
+  if (fromTransfer <= 0 && fromBuilding <= 0 && fromCashReserve <= 0 && fromSalaryReserve <= 0 && fromMaintenance <= 0) {
+    return gameState;
+  }
+
+  return {
+    ...gameState,
+    seasonState: {
+      ...gameState.seasonState,
+      aiManagerBudgetReservations: {
+        ...(gameState.seasonState.aiManagerBudgetReservations ?? {}),
+        [teamId]: {
+          ...reservation,
+          transferBudget: round(Math.max(0, reservation.transferBudget - fromTransfer), 2),
+          buildingBudget: round(Math.max(0, reservation.buildingBudget - fromBuilding), 2),
+          cashReserve: round(Math.max(0, reservation.cashReserve - fromCashReserve), 2),
+          salaryReserve: round(Math.max(0, reservation.salaryReserve - fromSalaryReserve), 2),
+          maintenanceBudget: round(Math.max(0, reservation.maintenanceBudget - fromMaintenance), 2),
+          updatedAt: new Date().toISOString(),
+        },
+      },
+    },
+  };
 }
 
 export function resolveMarketSpendableCashForPlanner(input: {
@@ -774,18 +837,38 @@ export function resolveMarketSpendableCashForPlanner(input: {
   forceRosterFill?: boolean;
 }) {
   const teamCash = input.teamCash ?? input.gameState.teams.find((entry) => entry.teamId === input.teamId)?.cash ?? 0;
-  const reserve = resolveTeamCashRunwayReserve(input.gameState, input.teamId);
-  const spendable = round(Math.max(0, teamCash - reserve), 2);
-  if (!input.rosterBelowMin && !input.forceRosterFill) return spendable;
-  if (spendable > 0) return spendable;
   const reservation = input.gameState.seasonState.aiManagerBudgetReservations?.[input.teamId];
-  if (!reservation) return spendable;
-  const rosterFillFloor = round(
-    clamp(
-      teamCash - (reservation.cashReserve ?? 0) - (reservation.emergencyBudget ?? 0),
-      0,
-      teamCash,
-    ),
-  );
-  return Math.max(spendable, rosterFillFloor);
+  const belowOpt = isTeamRosterBelowOpt(input.gameState, input.teamId);
+  const rebuildMode = belowOpt || Boolean(input.forceRosterFill) || input.rosterBelowMin;
+
+  // Buckets are the source of truth: spend must never exceed what's actually reserved. In rebuild
+  // mode (draft / roster fill), the draft may also draw on buildingBudget and cashReserve as a
+  // fallback pool — but salary/maintenance/emergency reserves stay protected either way.
+  if (reservation) {
+    return (
+      getAiManagerMarketSpendableCash(input.gameState, input.teamId, teamCash, {
+        includeFallbackPools: rebuildMode,
+      }) ?? 0
+    );
+  }
+
+  if (rebuildMode) {
+    const team = input.gameState.teams.find((entry) => entry.teamId === input.teamId);
+    const identity = input.gameState.teamIdentities.find((entry) => entry.teamId === input.teamId);
+    const { playerOpt } = deriveRosterTargets(team, identity);
+    const expectedSalary = projectExpectedSalaryAtPlannerTarget(input.gameState, input.teamId, playerOpt);
+    const objectiveBias = getTeamObjectiveAiBias(input.gameState, input.teamId);
+    const liquidity = resolveCombinedLiquidityReserve({
+      gameState: input.gameState,
+      teamId: input.teamId,
+      expectedSalaryAfterPlan: expectedSalary,
+      rosterBelowOpt: true,
+      buyAggression: objectiveBias?.buyAggression,
+    });
+    const emergencyPad = round(Math.max(5, teamCash * 0.08), 2);
+    return round(Math.max(0, teamCash - liquidity.salaryReserve - liquidity.cashReserve - emergencyPad), 2);
+  }
+
+  const reserve = resolveTeamCashRunwayReserve(input.gameState, input.teamId);
+  return round(Math.max(0, teamCash - reserve), 2);
 }

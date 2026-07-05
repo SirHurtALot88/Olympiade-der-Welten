@@ -17,6 +17,14 @@ import type { PersistenceService } from "@/lib/persistence/types";
 import type { LocalTransferWindowPhase } from "@/lib/market/transfer-window-policy";
 import { runTransferWindowSession } from "@/lib/ai/ai-transfer-window-session-service";
 import { isUnifiedPickEnabledForMarket } from "@/lib/ai/unified-pick-planner-service";
+import { teamNeedsPostOptUpgradeDeploy } from "@/lib/ai/ai-budget-deploy-service";
+import {
+  filterEmergencyRepairTeamIds,
+  getPlannedExpiryBuyNeed,
+} from "@/lib/ai/planner-opt-buy-policy";
+
+/** Minimum cash before preseason roster repair so sub-hardMin teams can afford multiple fillers. */
+export const PRESEASON_REPAIR_TEAM_CASH_FLOOR = 50;
 
 // cash_recovery teams sit between hardMin and Opt with cash pressure — they must still get real
 // convergence buy passes (routed through the Unified Pick Engine's cash-tier caps / cheap_fill lane,
@@ -24,11 +32,25 @@ import { isUnifiedPickEnabledForMarket } from "@/lib/ai/unified-pick-planner-ser
 // strands them until they fall below hardMin and hit the weaker emergency-repair fallback.
 // See .cursor/rules/balancing-no-sell-floor-full-rebuild.mdc: no sell floor, so the buy side must
 // carry the rebuild obligation instead.
+//
+// 2026-07-04 fix: "eco_round" was missing here, which reintroduced exactly the "Opt-skip that
+// strands them" failure mode this comment warns against — seasonStrategyFor() (see
+// ai-manager-doctrine-service.ts) assigns eco_round purely from a team's static/identity
+// finance-/value-priority bias, independent of roster count, and checks that branch BEFORE its own
+// "still below Opt -> depth_repair" fallback. Any team with high finance/value identity (e.g. a
+// static valuePriority>=8 team profile, or a randomized per-save identity.finances>=8) that sits
+// between hardMin and Opt got permanently frozen out of every convergence buy pass for the rest of
+// the season — regardless of how much cash it actually had — because eco_round was absent from
+// this list. "Eco round" is meant to mean "grow toward Opt via cheap/value-lane picks", not "never
+// buy again"; the Unified Pick Engine's own cash-tier caps / cheap_fill lane (unaffected by this
+// change) already ensures eco_round teams still only reach for lane-appropriate, economical picks
+// once admitted to convergence.
 const CONVERGENCE_BUY_STRATEGIES: AiSeasonStrategy[] = [
   "roster_repair",
   "depth_repair",
   "win_now_push",
   "cash_recovery",
+  "eco_round",
 ];
 
 export type ConvergencePassId = "standard" | "escalated";
@@ -145,14 +167,42 @@ function getTeamRosterCount(gameState: GameState, teamId: string) {
   return gameState.rosters.filter((entry) => entry.teamId === teamId).length;
 }
 
-export function teamNeedsMarketConvergence(gameState: GameState, teamId: string) {
+/** Preseason convergence fill stops at Opt; conscious planned buys (expiry/deploy) may still run. */
+export function teamSkipsPreseasonMarketBuys(gameState: GameState, teamId: string) {
   const rosterCount = getTeamRosterCount(gameState, teamId);
-  const hardMin = getTeamHardMinRequired(gameState, teamId);
   const optTarget = getTeamOptTarget(gameState, teamId);
-  if (rosterCount < hardMin) return true;
+  if (rosterCount < optTarget) return false;
+
+  const expiringCount = gameState.rosters.filter(
+    (entry) => entry.teamId === teamId && (entry.contractLength ?? 99) <= 1,
+  ).length;
+  if (
+    getPlannedExpiryBuyNeed({
+      rosterCount,
+      playerOpt: optTarget,
+      expiringCount,
+    }) > 0
+  ) {
+    return false;
+  }
+
+  if (teamNeedsPostOptUpgradeDeploy(gameState, teamId, gameState.season.id)) {
+    return false;
+  }
+
+  return true;
+}
+
+export function teamNeedsMarketConvergence(gameState: GameState, teamId: string) {
+  if (teamSkipsPreseasonMarketBuys(gameState, teamId)) return false;
+  const rosterCount = getTeamRosterCount(gameState, teamId);
+  const optTarget = getTeamOptTarget(gameState, teamId);
   if (rosterCount >= optTarget) return false;
-  const strategy = buildSeasonStrategyState(gameState)[teamId]?.seasonStrategy ?? "balanced_growth";
-  return CONVERGENCE_BUY_STRATEGIES.includes(strategy);
+  // Convergence runs until Opt — not just hardMin. Strategy-specific buy lanes (eco_round,
+  // cash_recovery, etc.) are chosen inside the Unified Pick Engine once a team is admitted;
+  // gating convergence itself on doctrine strategy left balanced_growth / star_chaser teams
+  // permanently stuck between hardMin and Opt (43%+ emergency-filler in S10).
+  return true;
 }
 
 export function getTeamsBelowHardMin(gameState: GameState) {
@@ -234,57 +284,6 @@ function collectAttemptedSellPlayerIds(apply: AiMarketPlanApplyResult) {
     }
   }
   return [...ids];
-}
-
-type RoundProfile = {
-  passId: ConvergencePassId;
-  round: number;
-  applySellSteps: boolean;
-  applyBuySteps: boolean;
-  maxSellsPerTeam: number;
-  previewBuyLimit: number;
-  previewSellLimit: number;
-  applyBuyStepsInBatch: number | null;
-  performanceBudgetMs: number;
-  maxApplyMs: number;
-};
-
-function buildRoundProfile(input: {
-  passId: ConvergencePassId;
-  round: number;
-  allowBuys: boolean;
-  teamsNeedingConvergenceCount: number;
-}): RoundProfile {
-  const needsRosterFill = input.teamsNeedingConvergenceCount > 0;
-
-  if (input.passId === "standard") {
-    const buyFirstRound = needsRosterFill;
-    return {
-      passId: "standard",
-      round: input.round,
-      applySellSteps: !buyFirstRound,
-      applyBuySteps: input.allowBuys,
-      maxSellsPerTeam: buyFirstRound ? 0 : 2,
-      previewBuyLimit: buyFirstRound ? 128 : input.round === 1 ? 96 : 112,
-      previewSellLimit: buyFirstRound ? 4 : input.round === 1 ? 16 : 12,
-      applyBuyStepsInBatch: buyFirstRound ? 3 : input.round === 1 ? 2 : 1,
-      performanceBudgetMs: 12_000,
-      maxApplyMs: 75_000,
-    };
-  }
-
-  return {
-    passId: "escalated",
-    round: input.round,
-    applySellSteps: needsRosterFill ? input.round === 1 : input.round === 1,
-    applyBuySteps: input.allowBuys && (!needsRosterFill || input.round > 1),
-    maxSellsPerTeam: needsRosterFill ? (input.round === 1 ? 1 : 0) : input.round === 1 ? 4 : 1,
-    previewBuyLimit: needsRosterFill ? 144 : input.round === 1 ? 72 : 144,
-    previewSellLimit: needsRosterFill ? 4 : 8,
-    applyBuyStepsInBatch: needsRosterFill ? 2 : input.round === 1 ? null : 2,
-    performanceBudgetMs: 14_000,
-    maxApplyMs: 90_000,
-  };
 }
 
 function resolveTeamStatus(input: {
@@ -477,8 +476,43 @@ export function runEmergencyRosterRepairForTeams(input: {
     };
   }
 
-  const save = input.persistence.getSaveById(input.saveId);
+  let save = input.persistence.getSaveById(input.saveId);
   if (!save) throw new Error("Save missing before emergency roster repair.");
+
+  const eligibleTeamIds = filterEmergencyRepairTeamIds(
+    save.gameState,
+    uniqueTeamIds,
+    getTeamRosterCount,
+    getTeamOptTarget,
+  );
+  const blockedAtOpt = uniqueTeamIds.filter((teamId) => !eligibleTeamIds.includes(teamId));
+  if (eligibleTeamIds.length === 0) {
+    return {
+      repaired: false,
+      teamIds: uniqueTeamIds,
+      purchases: [],
+      blockers: blockedAtOpt.map((teamId) => `emergency_repair_blocked_at_opt:${teamId}`),
+      warnings: blockedAtOpt.length > 0 ? ["emergency_repair_skipped_at_or_above_opt"] : [],
+    };
+  }
+
+  let repairCashTopUps = 0;
+  for (const teamId of eligibleTeamIds) {
+    const rosterCount = getTeamRosterCount(save.gameState, teamId);
+    const hardMin = getTeamHardMinRequired(save.gameState, teamId);
+    if (rosterCount >= hardMin) continue;
+    const team = save.gameState.teams.find((entry) => entry.teamId === teamId);
+    if (!team) continue;
+    const cash = team.cash ?? 0;
+    if (cash + 0.01 >= PRESEASON_REPAIR_TEAM_CASH_FLOOR) continue;
+    team.cash = PRESEASON_REPAIR_TEAM_CASH_FLOOR;
+    repairCashTopUps += 1;
+  }
+  if (repairCashTopUps > 0) {
+    input.persistence.saveSingleplayerState(input.saveId, save.gameState);
+    save = input.persistence.getSaveById(input.saveId);
+    if (!save) throw new Error("Save missing after emergency repair cash top-up.");
+  }
 
   const result = runChunkedRedraftTopup({
     persistence: input.persistence,
@@ -488,7 +522,7 @@ export function runEmergencyRosterRepairForTeams(input: {
     confirmToken: CHUNKED_REDRAFT_TOPUP_CONFIRM_TOKEN,
     mode: "preseason_roster_repair",
     target: "playerOpt",
-    targetTeamIds: uniqueTeamIds,
+    targetTeamIds: eligibleTeamIds,
     roundLimit: 16,
     teamTimeLimitMs: 60_000,
     watchdogMs: 120_000,
@@ -508,13 +542,16 @@ export function runEmergencyRosterRepairForTeams(input: {
   }));
 
   const after = input.persistence.getSaveById(input.saveId);
-  const blockers: string[] = [];
+  const blockers: string[] = [...blockedAtOpt.map((teamId) => `emergency_repair_blocked_at_opt:${teamId}`)];
   if (after) {
-    for (const teamId of uniqueTeamIds) {
+    for (const teamId of eligibleTeamIds) {
       const rosterCount = after.gameState.rosters.filter((entry) => entry.teamId === teamId).length;
       const hardMin = getTeamHardMinRequired(after.gameState, teamId);
+      const optTarget = getTeamOptTarget(after.gameState, teamId);
       if (rosterCount < hardMin) {
         blockers.push(`emergency_roster_repair_below_min:${teamId}:${rosterCount}/${hardMin}`);
+      } else if (rosterCount < optTarget) {
+        blockers.push(`emergency_roster_repair_below_opt:${teamId}:${rosterCount}/${optTarget}`);
       }
     }
   }
@@ -524,6 +561,10 @@ export function runEmergencyRosterRepairForTeams(input: {
     teamIds: uniqueTeamIds,
     purchases,
     blockers,
-    warnings: [...result.warnings.slice(0, 20), "emergency_fallback:true"],
+    warnings: [
+      ...result.warnings.slice(0, 20),
+      "emergency_fallback:true",
+      ...(blockedAtOpt.length > 0 ? ["emergency_repair_skipped_at_or_above_opt"] : []),
+    ],
   };
 }

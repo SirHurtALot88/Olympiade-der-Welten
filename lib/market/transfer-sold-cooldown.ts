@@ -1,6 +1,7 @@
 import type { GameState, TransferHistoryEntry } from "@/lib/data/olyDataTypes";
 
 export const SOLD_PLAYER_SEASON_COOLDOWN_BLOCKER = "player_sold_this_season_unavailable";
+export const SOLD_PLAYER_SEASON_COOLDOWN_OVERRIDE_WARNING = "player_sold_this_season_cooldown_override";
 
 export type SoldPlayerSeasonBan = {
   playerId: string;

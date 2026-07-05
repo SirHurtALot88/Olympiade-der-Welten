@@ -11,6 +11,9 @@ function roundValue(value: number, digits = 2) {
 }
 
 // Retool `calculateSaleFactorAndPriceSaison` bracketDefs (9 brackets).
+/** Rank bonus/malus and bracket spread apply only when the league bracket pool is at least this size. */
+export const SALE_FACTOR_MIN_RANK_POOL = 15;
+
 const SALE_FACTOR_BRACKET_RANGES = {
   1: { minFactor: 0.35, maxFactor: 1.5 },
   2: { minFactor: 0.4, maxFactor: 1.46 },
@@ -128,7 +131,11 @@ function getBracketRange(bracket: number) {
   return SALE_FACTOR_BRACKET_RANGES[normalizedBracket];
 }
 
-function getRankBonus(rank: number, total: number) {
+export function isBracketRankPoolEligible(poolSize: number) {
+  return poolSize >= SALE_FACTOR_MIN_RANK_POOL;
+}
+
+export function getRankBonus(rank: number, total: number) {
   if (rank === 1) {
     return 0.15;
   }
@@ -234,7 +241,7 @@ function buildRankedCandidates(
   return groupedCandidates;
 }
 
-function getSaleFactorRankContext(
+export function getSaleFactorRankContext(
   gameState: GameState,
   saveId?: string | null,
   playerRatingsByIdOverride?: Map<string, PlayerRatingContractRow> | null,
@@ -348,6 +355,21 @@ export function buildTransfermarktSaleFactorBreakdown(
   }
 
   const rankInBracket = rankedIndex + 1;
+  if (!isBracketRankPoolEligible(rankedGroup.length)) {
+    return {
+      bracket,
+      bracketGroupSize: rankedGroup.length,
+      baseMarketValue,
+      mvs: playerRating?.mvs ?? snapshotPoints ?? null,
+      ppsSeason: playerRating?.ppsSeason ?? snapshotPoints ?? null,
+      rankInBracket,
+      baseFactor: 1,
+      rankBonus: 0,
+      saleFactor: 1,
+      salePrice: baseMarketValue,
+      factorSource: "fallback_no_ranked_group",
+    };
+  }
   const bracketRange = getBracketRange(bracket);
   const step = (bracketRange.maxFactor - bracketRange.minFactor) / Math.max(1, rankedGroup.length - 1);
   const baseFactor = bracketRange.maxFactor - rankedIndex * step;

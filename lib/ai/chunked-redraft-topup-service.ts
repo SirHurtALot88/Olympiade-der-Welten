@@ -30,6 +30,11 @@ import {
   type RetoolAi2BudgetPlan,
   type TeamNeedState,
 } from "@/lib/ai/retool-ai2-pick-engine";
+import { resolveMarketSpendableCashForPlanner } from "@/lib/ai/ai-manager-apply-service";
+import {
+  shouldBlockEmergencyPathAtOpt,
+  strategicPoolHasReserveLaneCandidates,
+} from "@/lib/ai/planner-opt-buy-policy";
 import {
   createLocalTransfermarktRunContext,
   executeLocalTransfermarktBuy,
@@ -1874,7 +1879,14 @@ function buildRosterTargetPlan(input: {
     }).map((entry) => entry.factor),
   });
   const reserveBudget = budgetPlan.reserveTarget;
-  const spendableBudget = budgetPlan.allowedBudgetForSearch;
+  const managerBucketCap = resolveMarketSpendableCashForPlanner({
+    gameState: input.gameState,
+    teamId: input.teamId,
+    teamCash: cashStart,
+    rosterBelowMin: roster.length < coverageMinTarget,
+    forceRosterFill: input.target !== "playerOpt",
+  });
+  const spendableBudget = Math.min(budgetPlan.allowedBudgetForSearch, managerBucketCap);
   const strongAffordableCandidates = input.candidatePool.filter(
     (candidate) =>
       candidate.marketValue <= spendableBudget &&
@@ -2457,14 +2469,44 @@ function getPotentialRange(potential: number | null | undefined) {
   return "unknown";
 }
 
+function resolveTransferAffordableBudget(input: {
+  teamCash: number;
+  cashReservePct: number;
+  spendableBudget?: number | null;
+  gameState?: GameState;
+  teamId?: string;
+}) {
+  if (input.spendableBudget != null && Number.isFinite(input.spendableBudget) && input.spendableBudget > 0) {
+    return input.spendableBudget;
+  }
+  const reservation =
+    input.teamId != null
+      ? input.gameState?.seasonState.aiManagerBudgetReservations?.[input.teamId] ?? null
+      : null;
+  if (reservation?.transferBudget != null && reservation.transferBudget > 0) {
+    return reservation.transferBudget;
+  }
+  return input.teamCash * (1 - input.cashReservePct);
+}
+
 function classifyRejectedCandidate(input: {
   rejected: ScoredCandidate;
   selected: ScoredCandidate;
   phasePlan: PhasePlan;
   teamCash: number;
+  spendableBudget?: number | null;
+  gameState?: GameState;
+  teamId?: string;
 }) {
   if (input.rejected.marketValue > input.teamCash) return "too_expensive" as const;
-  if (input.rejected.marketValue > input.teamCash * (1 - input.phasePlan.cashReservePct)) return "reserve_guard" as const;
+  const affordableBudget = resolveTransferAffordableBudget({
+    teamCash: input.teamCash,
+    cashReservePct: input.phasePlan.cashReservePct,
+    spendableBudget: input.spendableBudget,
+    gameState: input.gameState,
+    teamId: input.teamId,
+  });
+  if (input.rejected.marketValue > affordableBudget + 0.01) return "reserve_guard" as const;
   if ((input.rejected.salary ?? 0) > (input.selected.salary ?? 0) * 1.8 && input.rejected.selectedScore <= input.selected.selectedScore) {
     return "salary_too_high" as const;
   }
@@ -3493,9 +3535,12 @@ export function runChunkedRedraftTopup(params: ChunkedRedraftTopupParams) {
   if (params.mode === "season1_initial_topup" && params.seasonId !== "season-1") {
     throw new Error(`season1_autoprep_topup_forbidden_after_s1:${params.seasonId}`);
   }
-  if (params.mode === "preseason_roster_repair" && params.seasonId === "season-1") {
-    throw new Error("preseason_roster_repair_forbidden_in_season_1");
-  }
+  // Note (2026-07-04 phase-separation fix): preseason_roster_repair used to be forbidden in
+  // season-1, but that contradicted the already-established policy in transfer-season-policy.ts
+  // ("S1 buys are NOT forbidden... a team that sells down below hardMin/Opt in S1 must be able
+  // to (re)buy in the very same season, exactly like any later season"). With sell/buy phase
+  // separation, season-end sell-only passes can legitimately leave S1 teams below hardMin, and
+  // they must be repairable at the following preseason start like any other season.
   if (!dryRun && params.confirmToken !== CHUNKED_REDRAFT_TOPUP_CONFIRM_TOKEN) {
     throw new Error("chunked_redraft_confirm_token_required");
   }
@@ -3840,8 +3885,18 @@ export function runChunkedRedraftTopup(params: ChunkedRedraftTopupParams) {
           rosterCount < minTarget
             ? Math.min(140, Math.max(36, Math.ceil(cashLegalCandidates.length * 0.14)))
             : Math.min(64, Math.max(18, Math.ceil(cashLegalCandidates.length * 0.06)));
+        const skipEmergencyForReserveLane = strategicPoolHasReserveLaneCandidates({
+          candidates: scoredBase.map((entry) => ({
+            marketValue: entry.marketValue,
+            price: entry.marketValue,
+          })),
+          teamCash: latestTeam.cash,
+          rosterBelowHardMin: rosterCount < minTarget,
+        });
         const emergencyFallbackBase =
-          rosterCount < desiredRosterTarget
+          rosterCount < desiredRosterTarget &&
+          !shouldBlockEmergencyPathAtOpt(rosterCount, teamTarget.playerOpt) &&
+          !skipEmergencyForReserveLane
             ? cashLegalCandidates
                 .filter((candidate) => !strategicPlayerIds.has(candidate.player.id))
                 .sort((left, right) => {
@@ -4630,6 +4685,22 @@ export function runChunkedRedraftTopup(params: ChunkedRedraftTopupParams) {
       });
       const teamRoster = rostersByTeam.get(team.teamId) ?? [];
       const teamTarget = getTeamTarget(runContext.save.gameState, team.teamId, target);
+      if (params.mode === "preseason_roster_repair" && shouldBlockEmergencyPathAtOpt(rosterCount, teamTarget.playerOpt)) {
+        warningRows.push({
+          round,
+          teamId: team.teamId,
+          reason: "emergency_repair_blocked_at_opt",
+          detail: `${rosterCount}/${teamTarget.playerOpt}`,
+        });
+        profiler.log("team_planning_end", {
+          round,
+          teamId: team.teamId,
+          rosterCount,
+          freeAgentCount: candidatePool.length,
+          warning: "emergency_repair_blocked_at_opt",
+        });
+        continue;
+      }
       const teamIdentity = runContext.save.gameState.teamIdentities.find((entry) => entry.teamId === team.teamId) ?? null;
       const strategyProfile = strategyProfiles[team.teamId] ?? null;
       const targetPlan =
@@ -4703,10 +4774,27 @@ export function runChunkedRedraftTopup(params: ChunkedRedraftTopupParams) {
           if (cashCost == null || cashCost <= 0) {
             return false;
           }
-          if (repairMode && !isPreseasonRepairCandidateEligible({ marketValue: cashCost, teamCash: latestTeam.cash })) {
-            return false;
+          if (repairMode) {
+            // Root-cause fix (2026-07-04, W-W chronically stuck below hardMin — see
+            // outputs/real-engine-s1s5-final/progress-log.md): repairMode already enforces the
+            // correct, narrow affordability check for this genuinely last-resort case (cash must
+            // cover the candidate's price, full stop). The generic `cashReservePct` "soft retool
+            // reserve" below is meant to keep some budget aside for a *later* pick in a normal
+            // phase_a_minimum pass — that tradeoff is actively harmful here: for a team whose cash
+            // barely covers the single cheapest candidate (e.g. cash 6.12 vs. price 6.00), even the
+            // fallback 7% reserve wipes out the entire affordable pool, permanently stranding the
+            // team below hardMin with no candidate ever passing. A team below its absolute minimum
+            // has no "later pick" to save for — every remaining slot is equally urgent.
+            return isPreseasonRepairCandidateEligible({ marketValue: cashCost, teamCash: latestTeam.cash });
           }
-          return latestTeam.cash * (1 - phasePlan.cashReservePct) >= cashCost;
+          const affordableBudget = resolveTransferAffordableBudget({
+            teamCash: latestTeam.cash,
+            cashReservePct: phasePlan.cashReservePct,
+            spendableBudget: targetPlan?.spendableBudget,
+            gameState: runContext.save.gameState,
+            teamId: team.teamId,
+          });
+          return affordableBudget >= cashCost;
         });
       counters.rejectedByCash += Math.max(0, candidatePool.length - cashAffordableCandidates.length);
       const teamRosterPlayers = getRosterPlayers(runContext.save.gameState, teamRoster);
@@ -4936,6 +5024,12 @@ export function runChunkedRedraftTopup(params: ChunkedRedraftTopupParams) {
           contractLength: contractOffer.contractLength,
           contractShape: contractOffer.contractShape,
           transferSource,
+          // Root-cause fix (2026-07-04, W-W chronically stuck below hardMin — see
+          // outputs/real-engine-s1s5-final/progress-log.md): only bypass the season-wide
+          // sold-cooldown for the narrow, genuinely last-resort case this repair pass exists for —
+          // a team still below its absolute roster minimum. A team that has already reached
+          // hardMin (topping up further towards Opt) keeps the normal protection.
+          bypassSoldThisSeasonCooldown: rosterCount < teamTarget.playerMin,
           fastLocalBatch: true,
           localRunContext: runContext,
           deferPersist: true,

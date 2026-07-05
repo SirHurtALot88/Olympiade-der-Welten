@@ -24,6 +24,7 @@ import {
   runEmergencyRosterRepairForTeams,
   runMarketPlanConvergence,
   teamNeedsMarketConvergence,
+  teamSkipsPreseasonMarketBuys,
 } from "@/lib/ai/ai-market-plan-convergence-service";
 
 function buildGameState(overrides?: Partial<GameState>): GameState {
@@ -112,7 +113,12 @@ describe("ai market plan convergence service", () => {
     applyAiMarketPlanLocally.mockReset();
   });
 
-  it("marks sell-only below-min teams as valid without global blockers", async () => {
+  // Design correction (2026-07-04): runMarketPlanConvergence always drives runTransferWindowSession
+  // with phase: "preseason", which is now strictly buy-only (sell and buy no longer coexist in the
+  // same cycle — see ai-transfer-window-session-service.ts). A below-Opt team that never lands a buy
+  // there is "convergence_exhausted", not "valid_sell_only_below_min" (that status now only arises
+  // from a season_end sell-only session — see tests/ai-transfer-window-session.test.ts).
+  it("keeps a below-Opt team exhausted (not blocked) when preseason buys don't land, and never attempts a sell", async () => {
     const gameState = buildGameState({
       rosters: Array.from({ length: 9 }, (_, index) => ({
         id: `r-a-${index}`,
@@ -125,10 +131,9 @@ describe("ai market plan convergence service", () => {
       getSaveById: () => ({ saveId: "save-1", gameState }),
     };
 
-    applyAiMarketPlanLocally
-      .mockResolvedValueOnce(buildApplyResult({ appliedSells: 1, rosterAfter: 9, result: "applied" }))
-      .mockResolvedValueOnce(buildApplyResult({ appliedBuys: 0, appliedSells: 0, rosterAfter: 9, result: "hold" }))
-      .mockResolvedValue(buildApplyResult({ appliedBuys: 0, appliedSells: 0, rosterAfter: 9, result: "hold" }));
+    applyAiMarketPlanLocally.mockResolvedValue(
+      buildApplyResult({ appliedBuys: 0, appliedSells: 0, rosterAfter: 9, result: "hold" }),
+    );
 
     const result = await runMarketPlanConvergence({
       saveId: "save-1",
@@ -141,8 +146,11 @@ describe("ai market plan convergence service", () => {
     });
 
     expect(result.blockingReasons).toEqual([]);
-    expect(result.perTeam[0]?.status).toBe("valid_sell_only_below_min");
+    expect(result.perTeam[0]?.status).toBe("convergence_exhausted");
     expect(result.emergencyRepairTeams).not.toContain("team-a");
+    expect(applyAiMarketPlanLocally.mock.calls.every((call) => call[0].options?.applySellSteps === false)).toBe(
+      true,
+    );
   });
 
   it("blocks teams when buys finish below playerMin", async () => {
@@ -201,7 +209,6 @@ describe("ai market plan convergence service", () => {
     applyAiMarketPlanLocally.mockImplementation(async (params) => {
       call += 1;
       if (params.options?.applySellSteps && !params.options?.applyBuySteps) {
-        expect(params.options?.maxSellsPerTeam).toBe(1);
         return buildApplyResult({ appliedSells: 1, rosterAfter: 6 });
       }
       rosterCount = 8;
@@ -270,7 +277,10 @@ describe("ai market plan convergence service", () => {
     expect(result.perTeam[0]?.status).toBe("convergence_exhausted");
   });
 
-  it("passes exclude lists to avoid repeating the same buy attempts", async () => {
+  it("passes exclude lists to avoid repeating the same blocked buy candidate for the next team", async () => {
+    // Note: buildGameState's `rosters` override replaces the whole roster list, so team-b (not
+    // overridden below) implicitly has 0 rosters here and is below hardMin — both teams need
+    // convergence and get their own buy-only preseason cycle.
     const gameState = buildGameState({
       rosters: Array.from({ length: 9 }, (_, index) => ({
         id: `r-a-${index}`,
@@ -284,20 +294,18 @@ describe("ai market plan convergence service", () => {
     };
 
     applyAiMarketPlanLocally
-      .mockResolvedValueOnce(buildApplyResult({ appliedBuys: 0, appliedSells: 0, rosterAfter: 10 }))
       .mockResolvedValueOnce({
-        ...buildApplyResult({ appliedBuys: 0, appliedSells: 0, rosterAfter: 10 }),
+        ...buildApplyResult({ appliedBuys: 0, appliedSells: 0, rosterAfter: 9 }),
         buyGateRows: [{ teamId: "team-a", playerId: "fa-blocked", reason: "cash_buffer_failed" }],
         teams: [
           {
-            ...buildApplyResult({ rosterAfter: 10 }).teams[0],
+            ...buildApplyResult({ rosterAfter: 9 }).teams[0],
             plannedBuyDetails: [{ stepType: "buy", playerId: "fa-blocked", playerName: "Blocked", amount: 10, salaryImpact: 1, rosterImpact: 1, status: "blocked", reason: "cash" }],
             skippedSteps: [],
           },
         ],
       })
-      .mockResolvedValueOnce(buildApplyResult({ appliedBuys: 1, executedBuys: 1, rosterAfter: 9 }))
-      .mockResolvedValue(buildApplyResult({ appliedBuys: 0, appliedSells: 0, rosterAfter: 9 }));
+      .mockResolvedValue(buildApplyResult({ appliedBuys: 0, appliedSells: 0, rosterAfter: 0, teamId: "team-b" }));
 
     const { runMarketPlanConvergence } = await import("@/lib/ai/ai-market-plan-convergence-service");
     await runMarketPlanConvergence({
@@ -306,12 +314,12 @@ describe("ai market plan convergence service", () => {
       persistence: persistence as never,
       transferPhase: "manual_transfer_window",
       maxPasses: 1,
-      maxRoundsPerPass: 2,
+      maxRoundsPerPass: 1,
       skipIfExistingMarketTransfers: false,
     });
 
-    const thirdCall = applyAiMarketPlanLocally.mock.calls[2]?.[0];
-    expect(thirdCall?.options?.excludeBuyPlayerIds).toContain("fa-blocked");
+    const secondCall = applyAiMarketPlanLocally.mock.calls[1]?.[0];
+    expect(secondCall?.options?.excludeBuyPlayerIds).toContain("fa-blocked");
   });
 
   it("skips convergence for team already at identity opt even when below slot depth", async () => {
@@ -402,6 +410,44 @@ describe("teamNeedsMarketConvergence", () => {
     expect(teamNeedsMarketConvergence(gameState, "team-a")).toBe(true);
   });
 
+  it("grants a buy pass to eco_round teams between hardMin and Opt (regression: gate used to freeze them out for the whole season)", () => {
+    const gameState = buildGameState({
+      teams: [{ teamId: "team-a", name: "Team A", shortCode: "TMA", cash: 100, humanControlled: false }],
+      teamIdentities: [
+        { teamId: "team-a", playerMin: 8, playerMax: 14, playerOpt: 10, finances: 9 },
+        { teamId: "team-b", playerMin: 8, playerMax: 14, playerOpt: 10 },
+      ] as GameState["teamIdentities"],
+      rosters: Array.from({ length: 9 }, (_, index) => ({
+        id: `r-a-${index}`,
+        teamId: "team-a",
+        playerId: `p-a-${index}`,
+        slot: index,
+      })),
+    });
+
+    // Roster (9) sits strictly between hardMin (8) and Opt (10), cash is healthy and positive —
+    // only the team's high identity.finances (>=8) drives the doctrine strategy to eco_round. Before
+    // the fix, eco_round was excluded from CONVERGENCE_BUY_STRATEGIES and this returned false,
+    // permanently freezing the team out of every convergence buy pass for the rest of the season
+    // regardless of how much cash it had (the exact "Opt-skip that strands them" failure mode the
+    // comment above CONVERGENCE_BUY_STRATEGIES already warns against for cash_recovery).
+    expect(teamNeedsMarketConvergence(gameState, "team-a")).toBe(true);
+  });
+
+  it("grants a buy pass to balanced_growth teams between hardMin and Opt (regression: strategy gate used to stop at hardMin)", () => {
+    const gameState = buildGameState({
+      teams: [{ teamId: "team-a", name: "Team A", shortCode: "TMA", cash: 40, humanControlled: false }],
+      rosters: Array.from({ length: 9 }, (_, index) => ({
+        id: `r-a-${index}`,
+        teamId: "team-a",
+        playerId: `p-a-${index}`,
+        slot: index,
+      })),
+    });
+
+    expect(teamNeedsMarketConvergence(gameState, "team-a")).toBe(true);
+  });
+
   it("still skips convergence once a team reaches Opt, regardless of cash pressure", () => {
     const gameState = buildGameState({
       teams: [{ teamId: "team-a", name: "Team A", shortCode: "TMA", cash: -10, humanControlled: false }],
@@ -414,6 +460,22 @@ describe("teamNeedsMarketConvergence", () => {
     });
 
     expect(teamNeedsMarketConvergence(gameState, "team-a")).toBe(false);
+    expect(teamSkipsPreseasonMarketBuys(gameState, "team-a")).toBe(true);
+  });
+
+  it("still allows market buys below Opt including emergency gap above hardMin", () => {
+    const gameState = buildGameState({
+      teams: [{ teamId: "team-a", name: "Team A", shortCode: "TMA", cash: 40, humanControlled: false }],
+      rosters: Array.from({ length: 5 }, (_, index) => ({
+        id: `r-a-${index}`,
+        teamId: "team-a",
+        playerId: `p-a-${index}`,
+        slot: index,
+      })),
+    });
+
+    expect(teamSkipsPreseasonMarketBuys(gameState, "team-a")).toBe(false);
+    expect(teamNeedsMarketConvergence(gameState, "team-a")).toBe(true);
   });
 });
 

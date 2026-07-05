@@ -1,5 +1,13 @@
 import type { GameState } from "@/lib/data/olyDataTypes";
-import { resolveTeamCashRunwayReserve } from "@/lib/ai/ai-team-cash-reserve-service";
+import { resolveMarketSpendableCashForPlanner } from "@/lib/ai/ai-manager-apply-service";
+import {
+  isTeamRosterBelowOpt,
+  projectExpectedSalaryAtPlannerTarget,
+  resolveCombinedLiquidityReserve,
+  resolveMarketPlannerCashBuffer,
+} from "@/lib/ai/ai-team-cash-reserve-service";
+import { getTeamObjectiveAiBias } from "@/lib/board/team-season-objectives-service";
+import { deriveRosterTargets } from "@/lib/foundation/roster-limits";
 import {
   buildLeagueMarketBrackets,
   classifyMarketBracket,
@@ -115,9 +123,65 @@ export function classifyMarketTier(price: number | null, anchors: LeagueMarketAn
 }
 
 export function resolvePlannerSpendableCash(gameState: GameState, teamId: string, cash?: number | null) {
-  const teamCash = cash ?? gameState.teams.find((entry) => entry.teamId === teamId)?.cash ?? 0;
-  const reserve = resolveTeamCashRunwayReserve(gameState, teamId);
-  return round(Math.max(0, teamCash - reserve), 2);
+  return resolveSimulatedPlannerSpendableCash({
+    gameState,
+    teamId,
+    teamCash: cash ?? gameState.teams.find((entry) => entry.teamId === teamId)?.cash ?? 0,
+    simulatedRosterCount: gameState.rosters.filter((entry) => entry.teamId === teamId).length,
+    simulatedSalaryTotal: null,
+  });
+}
+
+/** Mirrors execute-time buy affordability using simulated draft cash/roster state. */
+export function resolveSimulatedPlannerSpendableCash(input: {
+  gameState: GameState;
+  teamId: string;
+  teamCash: number;
+  simulatedRosterCount: number;
+  simulatedSalaryTotal?: number | null;
+}) {
+  const team = input.gameState.teams.find((entry) => entry.teamId === input.teamId);
+  const identity = input.gameState.teamIdentities.find((entry) => entry.teamId === input.teamId);
+  const { playerOpt, playerMin } = deriveRosterTargets(team, identity);
+  const rosterBelowMin = playerMin != null && input.simulatedRosterCount < playerMin;
+  const belowOpt = input.simulatedRosterCount < playerOpt;
+
+  if (input.gameState.seasonState.aiManagerBudgetReservations?.[input.teamId]) {
+    return resolveMarketSpendableCashForPlanner({
+      gameState: input.gameState,
+      teamId: input.teamId,
+      teamCash: input.teamCash,
+      rosterBelowMin,
+      forceRosterFill: belowOpt,
+    });
+  }
+
+  if (belowOpt || rosterBelowMin) {
+    const expectedSalary =
+      input.simulatedSalaryTotal != null && input.simulatedSalaryTotal > 0 && input.simulatedRosterCount > 0
+        ? (() => {
+            const avgSalary = input.simulatedSalaryTotal! / input.simulatedRosterCount;
+            const missing = Math.max(0, playerOpt - input.simulatedRosterCount);
+            const finances = identity?.finances ?? 5;
+            const salaryFloor = playerOpt * (3.6 + finances * 0.1);
+            return round(Math.max(input.simulatedSalaryTotal! + avgSalary * missing, salaryFloor), 2);
+          })()
+        : projectExpectedSalaryAtPlannerTarget(input.gameState, input.teamId, playerOpt);
+
+    const objectiveBias = getTeamObjectiveAiBias(input.gameState, input.teamId);
+    const liquidity = resolveCombinedLiquidityReserve({
+      gameState: input.gameState,
+      teamId: input.teamId,
+      expectedSalaryAfterPlan: expectedSalary,
+      rosterBelowOpt: belowOpt,
+      buyAggression: objectiveBias?.buyAggression,
+    });
+    const emergencyPad = round(Math.max(5, input.teamCash * 0.08), 2);
+    return round(Math.max(0, input.teamCash - liquidity.salaryReserve - liquidity.cashReserve - emergencyPad), 2);
+  }
+
+  const reserve = resolveMarketPlannerCashBuffer(input.gameState, input.teamId);
+  return round(Math.max(0, input.teamCash - reserve), 2);
 }
 
 /** @deprecated Prefer buildBudgetEnvelope from market-pick-engine. Premium-first slot plan. */

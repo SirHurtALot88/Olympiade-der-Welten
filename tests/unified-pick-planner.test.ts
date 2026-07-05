@@ -1,8 +1,10 @@
 import { describe, expect, it } from "vitest";
 
 import {
+  applyTightBudgetReserveLaneBias,
   isUnifiedPickEnabledForMarket,
   mapPlannedPicksToBuyCandidates,
+  OPT_REBUILD_RESERVE_BUDGET_PER_PICK_THRESHOLD,
   resolveUnifiedMarketPickSteps,
 } from "@/lib/ai/unified-pick-planner-service";
 import type { AiNeedsPicksPlannedPick } from "@/lib/ai/ai-needs-picks-compare-service";
@@ -31,6 +33,24 @@ describe("unified pick planner service", () => {
     expect(steps).toBe(2);
   });
 
+  it("returns zero unified pick steps at Opt when no legacy buy candidates remain", () => {
+    const steps = resolveUnifiedMarketPickSteps({
+      currentState: { rosterCount: 12, playerMin: 7, playerOpt: 12 },
+      sellPlan: { candidates: [] },
+      buyPlan: { candidates: [] },
+    });
+    expect(steps).toBe(0);
+  });
+
+  it("keeps legacy buy candidate count at Opt for post-opt upgrade deploy", () => {
+    const steps = resolveUnifiedMarketPickSteps({
+      currentState: { rosterCount: 12, playerMin: 7, playerOpt: 12 },
+      sellPlan: { candidates: [] },
+      buyPlan: { candidates: [{ playerId: "p1" }] },
+    });
+    expect(steps).toBe(1);
+  });
+
   it("defaults unified pick to enabled unless env disables", () => {
     const previous = process.env.OLY_UNIFIED_PICK;
     delete process.env.OLY_UNIFIED_PICK;
@@ -39,5 +59,39 @@ describe("unified pick planner service", () => {
     expect(isUnifiedPickEnabledForMarket()).toBe(false);
     if (previous == null) delete process.env.OLY_UNIFIED_PICK;
     else process.env.OLY_UNIFIED_PICK = previous;
+  });
+
+  it("prefers reserve lanes when average budget per Opt-gap pick is tight", () => {
+    const biased = applyTightBudgetReserveLaneBias({
+      rosterGap: 5,
+      missingToMin: 0,
+      cash: 45,
+      coreNeeded: 1,
+      cheapFillNeeded: 0,
+      backupNeeded: 0,
+      depthNeeded: 2,
+      specialistNeeded: 1,
+    });
+    expect(biased.preferReserveLanes).toBe(true);
+    expect(biased.avgBudgetPerPick).toBe(9);
+    expect(biased.coreNeeded).toBe(0);
+    expect(biased.cheapFillNeeded).toBe(0);
+    expect(biased.backupNeeded).toBeGreaterThan(0);
+    expect(OPT_REBUILD_RESERVE_BUDGET_PER_PICK_THRESHOLD).toBe(15);
+  });
+
+  it("keeps premium lane counts when budget per pick is comfortable", () => {
+    const biased = applyTightBudgetReserveLaneBias({
+      rosterGap: 3,
+      missingToMin: 0,
+      cash: 60,
+      coreNeeded: 1,
+      cheapFillNeeded: 0,
+      backupNeeded: 0,
+      depthNeeded: 1,
+      specialistNeeded: 0,
+    });
+    expect(biased.preferReserveLanes).toBe(false);
+    expect(biased.coreNeeded).toBe(1);
   });
 });

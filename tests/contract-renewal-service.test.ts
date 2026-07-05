@@ -456,6 +456,81 @@ describe("contract renewal service", () => {
     expect(seasonEndRow?.warnings).not.toContain("long_contract_salary_discount_guard_applied");
   });
 
+  // Root-cause regression (2026-07-04, contract-length synchronized-expiry-wave -- see
+  // outputs/real-engine-s1s5-final/progress-log.md): getRecommendedLength used to return one
+  // single fixed number per (roleTag, highValue, conservativeTeam) bucket, so every "bench"
+  // player renewed at exactly the same length every season -- turning renewals into another
+  // synchronized wave. It now reuses the same organic, trait/seed-based idealLength that new
+  // signings already get (buildPlayerContractPreference) as a baseline and only uses role/value/
+  // cash context as bounds, so otherwise-identical bench players spread across the allowed range.
+  it("spreads recommended renewal lengths across otherwise-identical bench players instead of collapsing them onto one fixed number", () => {
+    const team = createTeam({ teamId: "D-D", shortCode: "D-D", cash: 150 });
+    // These specific ids are picked because their deterministic trait/seed hash (see
+    // buildPlayerContractPreference) resolves to different idealLength values (2 vs. 3) --
+    // demonstrating that otherwise-identical bench players no longer collapse onto one number.
+    const playerIds = ["bench-1", "bench-2", "bench-9", "bench-16"];
+    const players = playerIds.map((id) => createPlayer(id, { rating: 55, marketValue: 20, displayMarketValue: 20 }));
+    const rosters = playerIds.map((id) =>
+      createRosterEntry(id, { teamId: "D-D", roleTag: "bench", contractLength: 3, salary: 5 }),
+    );
+    const save = {
+      ...createSave(createGameState({ teams: [team], players, rosters })),
+      saveId: "contract-length-diversity-bench",
+    };
+
+    const preview = previewSeasonEndContracts(save);
+    const lengths = playerIds.map((id) => preview.rows.find((row) => row.playerId === id)?.recommendedLength);
+
+    expect(lengths.every((length) => typeof length === "number")).toBe(true);
+    // Not every bench player should land on the exact same recommended length -- that uniformity
+    // is precisely what caused every renewal cohort to expire together.
+    expect(new Set(lengths).size).toBeGreaterThan(1);
+    for (const length of lengths) {
+      expect(length).toBeGreaterThanOrEqual(1);
+      expect(length).toBeLessThanOrEqual(3);
+    }
+  });
+
+  it("keeps renewal length bounded by role, quality and team cash after the organic-baseline fix", () => {
+    const cashTightTeam = createTeam({ teamId: "E-E", shortCode: "E-E", cash: 10 });
+    const benchOnTightBudget = createPlayer("bench-tight", { rating: 50, marketValue: 15, displayMarketValue: 15 });
+    const tightSave = {
+      ...createSave(
+        createGameState({
+          teams: [cashTightTeam],
+          players: [benchOnTightBudget],
+          rosters: [createRosterEntry(benchOnTightBudget.id, { teamId: "E-E", roleTag: "bench", contractLength: 3, salary: 4 })],
+        }),
+      ),
+      saveId: "contract-length-bounds-cash-tight",
+    };
+    const tightRow = previewSeasonEndContracts(tightSave).rows.find((row) => row.playerId === benchOnTightBudget.id);
+    // Cash-tight teams must still not commit long-term to a bench player, no matter what the
+    // player's own organic baseline would otherwise prefer.
+    expect(tightRow?.recommendedLength).toBeLessThanOrEqual(2);
+
+    const wealthyTeam = createTeam({ teamId: "F-F", shortCode: "F-F", cash: 200 });
+    const starPlayer = createPlayer("elite-starter", { rating: 99, marketValue: 90, displayMarketValue: 90 });
+    const fillerPlayers = ["filler-a", "filler-b", "filler-c"].map((id) => createPlayer(id, { rating: 20, marketValue: 5, displayMarketValue: 5 }));
+    const starterSave = {
+      ...createSave(
+        createGameState({
+          teams: [wealthyTeam],
+          players: [starPlayer, ...fillerPlayers],
+          rosters: [
+            createRosterEntry(starPlayer.id, { teamId: "F-F", roleTag: "starter", contractLength: 3, salary: 20 }),
+            ...fillerPlayers.map((player) => createRosterEntry(player.id, { teamId: "F-F", roleTag: "bench", contractLength: 3, salary: 2 })),
+          ],
+        }),
+      ),
+      saveId: "contract-length-bounds-highvalue-starter",
+    };
+    const starterRow = previewSeasonEndContracts(starterSave).rows.find((row) => row.playerId === starPlayer.id);
+    // A clear top-of-the-league starter on a wealthy team must still get a real multi-season
+    // commitment -- the organic baseline only adds variety, it never overrides the security floor.
+    expect(starterRow?.recommendedLength).toBeGreaterThanOrEqual(3);
+  });
+
   it("moves AI release candidates back to the free-agent pool and writes a release event", () => {
     const player = createPlayer("p1", { rating: 15, marketValue: 8, displayMarketValue: 8, salaryDemand: 14, displaySalary: 14 });
     const save = createSave(createGameState({ players: [player], rosters: [createRosterEntry("p1", { contractLength: 1, salary: 14, purchasePrice: 10, currentValue: 8 })] }));

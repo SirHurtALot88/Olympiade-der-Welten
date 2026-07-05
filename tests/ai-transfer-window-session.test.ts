@@ -40,8 +40,10 @@ function buildApplyResult(input: {
   appliedBuys?: number;
   appliedSells?: number;
   teamId?: string;
+  rosterAfter?: number;
 }) {
   const teamId = input.teamId ?? "team-a";
+  const rosterAfter = input.rosterAfter ?? 6;
   return {
     summary: {
       appliedBuys: input.appliedBuys ?? 0,
@@ -55,8 +57,8 @@ function buildApplyResult(input: {
         result: "applied",
         executedBuys: input.appliedBuys ?? 0,
         executedSells: input.appliedSells ?? 0,
-        rosterAfter: 6,
-        rosterBefore: 6,
+        rosterAfter,
+        rosterBefore: rosterAfter,
         blockingReasons: [],
         warnings: [],
         appliedBuyDetails: [],
@@ -72,12 +74,39 @@ function buildApplyResult(input: {
   };
 }
 
+function buildShrinkingSellPersistence(initialRosterSize: number) {
+  let rosterSize = initialRosterSize;
+  const gameState = () =>
+    buildGameState({
+      rosters: Array.from({ length: rosterSize }, (_, index) => ({
+        id: `r-a-${index}`,
+        teamId: "team-a",
+        playerId: `p-a-${index}`,
+        slot: index,
+      })),
+    });
+  applyAiMarketPlanLocally.mockImplementation(async () => {
+    if (rosterSize > 0) rosterSize -= 1;
+    return buildApplyResult({ appliedSells: 1, rosterAfter: rosterSize });
+  });
+  return {
+    getSaveById: () => ({ saveId: "save-1", gameState: gameState() }),
+  };
+}
+
 describe("ai transfer window session service", () => {
   beforeEach(() => {
     applyAiMarketPlanLocally.mockReset();
   });
 
-  it("runs sell then buy in a team cycle with transferWindowCycleMode", async () => {
+  // Design correction (2026-07-04): "Verkauf findet separat statt und vor allem VOR dem Kaufen" —
+  // sell and buy no longer coexist in the same team cycle. A preseason session's cycles only ever
+  // buy (the Buy-Engine pass, run at season start); a season_end session's cycles only ever sell
+  // (the Sell-Engine pass, run at season end). This replaces the old "runs sell then buy in a team
+  // cycle" test, which asserted exactly the coupled per-cycle pattern
+  // (round=N cycle=1 engine=unified sells=1 buys=1, 228+ occurrences in a real run.log) that this
+  // change fixes.
+  it("runs buy-only cycles in the preseason phase (never attempts a sell)", async () => {
     const gameState = buildGameState({
       rosters: Array.from({ length: 9 }, (_, index) => ({
         id: `r-a-${index}`,
@@ -90,9 +119,7 @@ describe("ai transfer window session service", () => {
       getSaveById: () => ({ saveId: "save-1", gameState }),
     };
 
-    applyAiMarketPlanLocally
-      .mockResolvedValueOnce(buildApplyResult({ appliedSells: 1 }))
-      .mockResolvedValueOnce(buildApplyResult({ appliedBuys: 2 }));
+    applyAiMarketPlanLocally.mockResolvedValueOnce(buildApplyResult({ appliedBuys: 2 }));
 
     const result = await runTransferWindowSession({
       saveId: "save-1",
@@ -104,13 +131,133 @@ describe("ai transfer window session service", () => {
       skipIfExistingMarketTransfers: false,
     });
 
-    expect(applyAiMarketPlanLocally).toHaveBeenCalledTimes(2);
+    expect(applyAiMarketPlanLocally).toHaveBeenCalledTimes(1);
+    expect(applyAiMarketPlanLocally.mock.calls[0]?.[0].options?.applyBuySteps).toBe(true);
+    expect(applyAiMarketPlanLocally.mock.calls[0]?.[0].options?.applySellSteps).toBe(false);
+    expect(applyAiMarketPlanLocally.mock.calls[0]?.[0].options?.transferWindowCycleMode).toBe(true);
+    expect(result.appliedSells).toBe(0);
+    expect(result.appliedBuys).toBe(2);
+  });
+
+  it("runs sell-only cycles in the season_end phase (never attempts a buy)", async () => {
+    const gameState = buildGameState({
+      rosters: Array.from({ length: 9 }, (_, index) => ({
+        id: `r-a-${index}`,
+        teamId: "team-a",
+        playerId: `p-a-${index}`,
+        slot: index,
+      })),
+    });
+    const persistence = {
+      getSaveById: () => ({ saveId: "save-1", gameState }),
+    };
+
+    applyAiMarketPlanLocally.mockResolvedValueOnce(buildApplyResult({ appliedSells: 1 }));
+
+    const result = await runTransferWindowSession({
+      saveId: "save-1",
+      seasonId: "season-2",
+      persistence: persistence as never,
+      phase: "season_end",
+      maxTeamCycles: 1,
+      maxLeagueRounds: 1,
+      skipIfExistingMarketTransfers: false,
+    });
+
+    expect(applyAiMarketPlanLocally).toHaveBeenCalledTimes(1);
     expect(applyAiMarketPlanLocally.mock.calls[0]?.[0].options?.applySellSteps).toBe(true);
     expect(applyAiMarketPlanLocally.mock.calls[0]?.[0].options?.applyBuySteps).toBe(false);
-    expect(applyAiMarketPlanLocally.mock.calls[0]?.[0].options?.transferWindowCycleMode).toBe(true);
-    expect(applyAiMarketPlanLocally.mock.calls[1]?.[0].options?.applyBuySteps).toBe(true);
     expect(result.appliedSells).toBe(1);
-    expect(result.appliedBuys).toBe(2);
+    expect(result.appliedBuys).toBe(0);
+  });
+
+  it("marks a team that sells below Opt at season end as valid_sell_only_below_min, not blocked", async () => {
+    const gameState = buildGameState({
+      rosters: Array.from({ length: 9 }, (_, index) => ({
+        id: `r-a-${index}`,
+        teamId: "team-a",
+        playerId: `p-a-${index}`,
+        slot: index,
+      })),
+    });
+    const persistence = {
+      getSaveById: () => ({ saveId: "save-1", gameState }),
+    };
+
+    applyAiMarketPlanLocally.mockResolvedValueOnce(buildApplyResult({ appliedSells: 1 }));
+
+    const result = await runTransferWindowSession({
+      saveId: "save-1",
+      seasonId: "season-2",
+      persistence: persistence as never,
+      phase: "season_end",
+      maxTeamCycles: 1,
+      maxLeagueRounds: 1,
+      skipIfExistingMarketTransfers: false,
+    });
+
+    expect(result.perTeam[0]?.status).toBe("valid_sell_only_below_min");
+    expect(result.blockingReasons).toEqual([]);
+  });
+
+  // Design correction (2026-07-04, explicit user decision — see
+  // .cursor/rules/balancing-no-sell-floor-full-rebuild.mdc): season_end has NO sell cap. A below-Opt
+  // team may sell through every legitimate preview candidate until its roster is empty or a cycle
+  // nets zero actions (exhausted). The old cap=3 tests below were removed/replaced accordingly.
+  it("allows a below-Opt team to keep selling through season_end until roster is empty (no sell cap)", async () => {
+    const persistence = buildShrinkingSellPersistence(9);
+
+    const result = await runTransferWindowSession({
+      saveId: "save-1",
+      seasonId: "season-2",
+      persistence: persistence as never,
+      phase: "season_end",
+      dryRun: true,
+      maxTeamCycles: 5,
+      maxLeagueRounds: 5,
+      skipIfExistingMarketTransfers: false,
+    });
+
+    expect(applyAiMarketPlanLocally).toHaveBeenCalledTimes(9);
+    expect(result.appliedSells).toBe(9);
+  });
+
+  it("still sells at season_end for a team only below Opt due to this season's contract-expiry tick (no involuntary-drop gate)", async () => {
+    const persistence = buildShrinkingSellPersistence(9);
+
+    const result = await runTransferWindowSession({
+      saveId: "save-1",
+      seasonId: "season-2",
+      persistence: persistence as never,
+      phase: "season_end",
+      dryRun: true,
+      maxTeamCycles: 3,
+      maxLeagueRounds: 3,
+      skipIfExistingMarketTransfers: false,
+      preContractExpiryRosterCounts: { "team-a": 10 },
+    });
+
+    expect(applyAiMarketPlanLocally).toHaveBeenCalledTimes(9);
+    expect(result.appliedSells).toBe(9);
+  });
+
+  it("allows persistently below-Opt teams the same uncapped season_end sell path", async () => {
+    const persistence = buildShrinkingSellPersistence(9);
+
+    const result = await runTransferWindowSession({
+      saveId: "save-1",
+      seasonId: "season-2",
+      persistence: persistence as never,
+      phase: "season_end",
+      dryRun: true,
+      maxTeamCycles: 5,
+      maxLeagueRounds: 5,
+      skipIfExistingMarketTransfers: false,
+      preContractExpiryRosterCounts: { "team-a": 9 },
+    });
+
+    expect(applyAiMarketPlanLocally).toHaveBeenCalledTimes(9);
+    expect(result.appliedSells).toBe(9);
   });
 
   it("stalls league rounds when no progress is made", async () => {
@@ -182,8 +329,8 @@ describe("ai transfer window session service", () => {
     expect(result.leagueRounds).toBe(1);
   });
 
-  it("passes exclude lists between cycles", async () => {
-    let rosterSize = 9;
+  it("passes exclude lists between buy cycles (preseason is buy-only, so every call here is a buy)", async () => {
+    let rosterSize = 6;
     const buildState = () =>
       buildGameState({
         rosters: Array.from({ length: rosterSize }, (_, index) => ({
@@ -199,16 +346,13 @@ describe("ai transfer window session service", () => {
 
     applyAiMarketPlanLocally
       .mockImplementationOnce(async () => {
-        rosterSize -= 1;
-        return buildApplyResult({ appliedSells: 1 });
-      })
-      .mockImplementationOnce(async () =>
-        ({
-          ...buildApplyResult({ appliedBuys: 0 }),
+        rosterSize += 1;
+        return {
+          ...buildApplyResult({ appliedBuys: 1 }),
           buyGateRows: [{ teamId: "team-a", playerId: "blocked-player", reason: "cash_buffer_failed" }],
           teams: [
             {
-              ...buildApplyResult({}).teams[0],
+              ...buildApplyResult({ appliedBuys: 1 }).teams[0],
               plannedBuyDetails: [
                 {
                   stepType: "buy",
@@ -223,15 +367,7 @@ describe("ai transfer window session service", () => {
               ],
             },
           ],
-        }),
-      )
-      .mockImplementationOnce(async () => {
-        rosterSize += 1;
-        return buildApplyResult({ appliedSells: 0 });
-      })
-      .mockImplementationOnce(async () => {
-        rosterSize += 1;
-        return buildApplyResult({ appliedBuys: 1 });
+        };
       })
       .mockImplementation(async () => buildApplyResult({ appliedBuys: 0, appliedSells: 0 }));
 
@@ -245,10 +381,71 @@ describe("ai transfer window session service", () => {
       skipIfExistingMarketTransfers: false,
     });
 
-    const buyCalls = applyAiMarketPlanLocally.mock.calls
-      .map((call) => call[0])
-      .filter((params) => params.options?.applyBuySteps);
+    const buyCalls = applyAiMarketPlanLocally.mock.calls.map((call) => call[0]);
+    expect(buyCalls.every((params) => params.options?.applyBuySteps)).toBe(true);
+    expect(buyCalls.every((params) => params.options?.applySellSteps === false)).toBe(true);
     expect(buyCalls.length).toBeGreaterThan(1);
-    expect(buyCalls.slice(1).some((params) => params.options?.excludeBuyPlayerIds?.includes("blocked-player"))).toBe(true);
+    expect(buyCalls[1]?.options?.excludeBuyPlayerIds).toContain("blocked-player");
+  });
+
+  // Root-cause fix (2026-07-04, S8 real-save regression: preseason buy volume collapsed 85->46
+  // buys league-wide despite 30-100+ unspent cash for many teams, and specific teams -- e.g. V-W,
+  // W-W on the real save -- ended the session with 0 buys even though they were deeply below Opt
+  // with cash available; see outputs/real-engine-s1s5-final/progress-log.md). A candidate that one
+  // team's own buy plan merely *considered and rejected* (skippedSteps -- team-specific cash
+  // buffer / identity fit reasons) must remain available for the *next* team in the same session;
+  // only a candidate that was actually bought/queued (appliedBuyDetails/plannedBuyDetails) or
+  // accepted by the final buy gate (buyGateRows status "accepted") is genuinely unavailable to
+  // everyone else. Before this fix, team-a's own rejected-for-team-a candidate ("skipped-for-a")
+  // was propagated into the shared excludeBuyPlayerIds set and would have starved every later team
+  // in the `needing` list of a candidate that might have suited them fine.
+  it("does not exclude a candidate that one team's buy plan merely skipped (not claimed) for the next team", async () => {
+    const gameState = buildGameState({
+      rosters: Array.from({ length: 9 }, (_, index) => ({
+        id: `r-a-${index}`,
+        teamId: "team-a",
+        playerId: `p-a-${index}`,
+        slot: index,
+      })),
+    });
+    const persistence = {
+      getSaveById: () => ({ saveId: "save-1", gameState }),
+    };
+
+    applyAiMarketPlanLocally
+      .mockResolvedValueOnce({
+        ...buildApplyResult({ appliedBuys: 1 }),
+        buyGateRows: [
+          { teamId: "team-a", playerId: "claimed-player", status: "accepted", reason: "picked" },
+          { teamId: "team-a", playerId: "skipped-for-a", status: "blocked", reason: "cash_buffer_failed" },
+        ],
+        teams: [
+          {
+            ...buildApplyResult({ appliedBuys: 1 }).teams[0],
+            appliedBuyDetails: [
+              { stepType: "buy", playerId: "claimed-player", playerName: "Claimed", amount: 10, salaryImpact: 1, rosterImpact: 1 },
+            ],
+            skippedSteps: [
+              { stepType: "buy", playerId: "skipped-for-a", playerName: "Skipped", amount: 40, salaryImpact: 4, rosterImpact: 1 },
+            ],
+          },
+        ],
+      })
+      .mockResolvedValue(buildApplyResult({ appliedBuys: 0, appliedSells: 0 }));
+
+    await runTransferWindowSession({
+      saveId: "save-1",
+      seasonId: "season-2",
+      persistence: persistence as never,
+      phase: "preseason",
+      maxTeamCycles: 2,
+      maxLeagueRounds: 1,
+      skipIfExistingMarketTransfers: false,
+    });
+
+    const buyCalls = applyAiMarketPlanLocally.mock.calls.map((call) => call[0]);
+    expect(buyCalls.length).toBeGreaterThan(1);
+    expect(buyCalls[1]?.options?.excludeBuyPlayerIds).toContain("claimed-player");
+    expect(buyCalls[1]?.options?.excludeBuyPlayerIds).not.toContain("skipped-for-a");
   });
 });

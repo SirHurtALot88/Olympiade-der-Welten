@@ -20,7 +20,12 @@ import { getTeamControlSettings } from "@/lib/foundation/team-control-settings";
 import type { PlayerRatingContractRow } from "@/lib/foundation/player-rating-contract";
 import { getTeamStrategyProfile } from "@/lib/foundation/team-strategy-profiles";
 import { resolvePlayerEconomyContract } from "@/lib/foundation/player-economy-contract";
-import { buildContractNegotiationPreview, buildContractSalarySchedule, type ContractNegotiationPreview } from "@/lib/market/contract-negotiation-preview";
+import {
+  buildContractNegotiationPreview,
+  buildContractSalarySchedule,
+  buildPlayerContractPreference,
+  type ContractNegotiationPreview,
+} from "@/lib/market/contract-negotiation-preview";
 import { buildTransfermarktSaleFactorBreakdown, normalizeVisibleRosterMoney } from "@/lib/market/transfermarkt-sale-factor";
 import { applyMoraleToSalary, assessPlayerMorale, type PlayerMoraleAssessment } from "@/lib/morale/player-morale-service";
 import { getCanonicalSeasonLabel } from "@/lib/season/season-label";
@@ -176,7 +181,28 @@ function advanceRosterContractSchedule(entry: RosterEntry, nextLength: number): 
   };
 }
 
-function getRecommendedLength(entry: RosterEntry, rating: PlayerRatingContractRow | null, team: Team | null) {
+// Root-cause fix (2026-07-04, contract-length synchronized-expiry-wave — see
+// outputs/real-engine-s1s5-final/progress-log.md, second contributor after the "fill" deal-role
+// mislabeling fixed in transfermarkt-local-service.ts): this used to return one single, fixed
+// number per (roleTag, highValue, conservativeTeam) bucket — every "bench" player on a
+// cash-tight team got exactly 1, every other "bench" player got exactly 2, with zero variety
+// within a bucket. Since a large fraction of any roster shares the same bucket in the same
+// season (most players are "bench", most teams are cash-tight right after season-end payouts),
+// that turned every renewal cycle into another wave of identically-timed re-expirations,
+// perpetuating the same synchronization the "fill" fix addresses for new signings. The fix reuses
+// the existing, already-organic (trait+seed based) idealLength from buildPlayerContractPreference
+// — the same mechanism new signings already get — as the baseline, and only uses the
+// role/value/cash context to bound it (min/max) rather than to hard-override it. This keeps every
+// existing guarantee (starters/high-value get longer, cash-tight teams get shorter) while letting
+// otherwise-identical players spread naturally across 1-5 seasons instead of collapsing onto one
+// number.
+function getRecommendedLength(
+  entry: RosterEntry,
+  player: Player | null,
+  rating: PlayerRatingContractRow | null,
+  team: Team | null,
+  teamStrategyProfile: TeamStrategyProfile | null,
+) {
   const role = entry.roleTag;
   const highValue =
     (rating?.ovrRank != null && rating.ovrRank <= 40) ||
@@ -184,10 +210,24 @@ function getRecommendedLength(entry: RosterEntry, rating: PlayerRatingContractRo
     (rating?.mvsRank != null && rating.mvsRank <= 40);
   const conservativeTeam = (team?.cash ?? 0) < 40;
 
-  if (role === "starter" && highValue && !conservativeTeam) return 4;
-  if (role === "starter") return 3;
-  if (role === "prospect") return highValue ? 3 : 2;
-  return conservativeTeam ? 1 : 2;
+  let min = 1;
+  let max = 5;
+  if (role === "starter" && highValue && !conservativeTeam) {
+    min = 3;
+    max = 5;
+  } else if (role === "starter") {
+    min = 2;
+    max = 4;
+  } else if (role === "prospect") {
+    min = highValue ? 2 : 1;
+    max = highValue ? 4 : 3;
+  } else {
+    min = 1;
+    max = conservativeTeam ? 2 : 3;
+  }
+
+  const organicBaseline = buildPlayerContractPreference(player, teamStrategyProfile)?.idealLength ?? 2;
+  return Math.max(min, Math.min(max, organicBaseline));
 }
 
 function getTeamRosterCount(gameState: GameState, teamId: string) {
@@ -497,7 +537,8 @@ function buildPreviewRow(input: {
   const controlMode = getTeamControlSettings(save.gameState, entry.teamId)?.controlMode ?? (team?.humanControlled ? "manual" : "ai");
   const tick = statusAfterSeasonTick(entry);
   const statusBeforeTick = normalizeRosterContractStatus(entry);
-  const recommendedLength = getRecommendedLength(entry, rating, team);
+  const teamStrategyProfile = getTeamStrategyProfile(save.gameState, entry.teamId);
+  const recommendedLength = getRecommendedLength(entry, player, rating, team, teamStrategyProfile);
   if (tick.nextStatus !== "out_of_contract") {
     const marketValue = player ? resolvePlayerEconomyContract({ player, rosterEntry: entry }).marketValue : null;
     return {
@@ -553,7 +594,6 @@ function buildPreviewRow(input: {
   const moraleAdjustedRenewalSalary = applyMoraleToSalary(negotiationPreview.expectedSalary, morale);
   const marketValue = player ? resolvePlayerEconomyContract({ player, rosterEntry: entry }).marketValue : null;
   const exit = buildContractExitValue(save.gameState, player, entry);
-  const teamStrategyProfile = getTeamStrategyProfile(save.gameState, entry.teamId);
   const renewalCashGate = buildAiRenewalCashGate({
     gameState: save.gameState,
     team,

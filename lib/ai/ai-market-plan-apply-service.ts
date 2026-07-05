@@ -11,7 +11,7 @@ import {
   type AiMarketPlanTeamEntry,
 } from "@/lib/ai/ai-market-plan-preview-service";
 import { resolveMarketSpendableCashForPlanner } from "@/lib/ai/ai-manager-apply-service";
-import { resolveTeamCashRunwayReserve } from "@/lib/ai/ai-team-cash-reserve-service";
+import { resolveMarketPlannerCashBuffer } from "@/lib/ai/ai-team-cash-reserve-service";
 import { getBudgetStatus } from "@/lib/ai/ai-transfermarkt-preview-service";
 import { assessTeamSellRunwayPressure } from "@/lib/ai/team-sell-runway-pressure";
 import {
@@ -20,6 +20,11 @@ import {
   isTeamOverCashSalarySoftTarget,
   teamNeedsPostOptUpgradeDeploy,
 } from "@/lib/ai/ai-budget-deploy-service";
+import {
+  candidateRecommendationScore,
+  isTrashMarketBuyCandidate,
+  resolveAllowedMarketBuyCount,
+} from "@/lib/ai/planner-opt-buy-policy";
 import type {
   GameLogEntry,
   GameState,
@@ -205,7 +210,6 @@ export type AiMarketPlanApplyParams = {
     applySellSteps?: boolean;
     applyBuySteps?: boolean;
     maxBuysPerTeam?: number | null;
-    maxSellsPerTeam?: number | null;
     previewBuyLimit?: number | null;
     previewSellLimit?: number | null;
     performanceBudgetMs?: number | null;
@@ -420,7 +424,6 @@ function getEffectiveOptions(input: AiMarketPlanApplyParams) {
     applySellSteps: input.options?.applySellSteps ?? true,
     applyBuySteps: input.options?.applyBuySteps ?? true,
     maxBuysPerTeam: clampPositiveInteger(input.options?.maxBuysPerTeam),
-    maxSellsPerTeam: clampPositiveInteger(input.options?.maxSellsPerTeam),
     previewBuyLimit: clampPositiveInteger(input.options?.previewBuyLimit) ?? 120,
     previewSellLimit: clampPositiveInteger(input.options?.previewSellLimit) ?? 6,
     performanceBudgetMs: clampPositiveInteger(input.options?.performanceBudgetMs) ?? 15_000,
@@ -530,8 +533,7 @@ function getSeasonMaxSlotNeed(gameState: GameState) {
 }
 
 function getTeamCashBuffer(gameState: GameState, teamId: string, coverageFallback: boolean) {
-  if (coverageFallback) return 0;
-  return resolveTeamCashRunwayReserve(gameState, teamId);
+  return resolveMarketPlannerCashBuffer(gameState, teamId, { coverageFallback });
 }
 
 function buildFinalBuyGate(input: {
@@ -572,15 +574,13 @@ function buildFinalBuyGate(input: {
   const convergenceCoverageFill = Boolean(input.convergenceIncrementalFill && coverageFallback);
   const profile = getTeamStrategyProfile(input.gameState, input.team.teamId);
   let cashRemaining =
-    convergenceCoverageFill
-      ? resolveMarketSpendableCashForPlanner({
-          gameState: input.gameState,
-          teamId: input.team.teamId,
-          teamCash: input.team.currentState.cash,
-          rosterBelowMin: true,
-          forceRosterFill: true,
-        }) ?? input.team.currentState.cash
-      : input.team.currentState.cash ?? null;
+    resolveMarketSpendableCashForPlanner({
+      gameState: input.gameState,
+      teamId: input.team.teamId,
+      teamCash: input.team.currentState.cash,
+      rosterBelowMin: rosterBase < minRoster,
+      forceRosterFill: convergenceCoverageFill || coverageFallback,
+    }) ?? input.team.currentState.cash ?? null;
   const classCounts = buildRosterTokenCounts({
     gameState: input.gameState,
     teamId: input.team.teamId,
@@ -619,6 +619,13 @@ function buildFinalBuyGate(input: {
       effectiveMinUpgradeBuyPrice > 0 &&
       price != null &&
       price + 0.01 < effectiveMinUpgradeBuyPrice;
+    const trashFillerAtOpt =
+      atOrAboveOpt &&
+      isTrashMarketBuyCandidate({
+        price,
+        marketValue: candidate.marketValue,
+        score: candidateRecommendationScore(candidate),
+      });
     const cashAfter = cashRemaining != null && price != null ? cashRemaining - price : candidate.cashAfter;
     const rosterAfter = rosterBase + picked.length + 1;
     const buffer = getTeamCashBuffer(input.gameState, input.team.teamId, coverageFallback);
@@ -628,6 +635,7 @@ function buildFinalBuyGate(input: {
       duplicateClaim ? "candidate_already_claimed" : null,
       hardNoGo && !convergenceCoverageFill ? "team_hard_no_go" : null,
       belowUpgradeFloor ? `below_upgrade_floor:${price}<${effectiveMinUpgradeBuyPrice}` : null,
+      trashFillerAtOpt ? "trash_filler_blocked_at_opt" : null,
       cashBlocked ? `cash_buffer_failed:${Math.round((cashAfter ?? -999) * 100) / 100}<${Math.round(buffer * 100) / 100}` : null,
     ].filter((entry): entry is string => Boolean(entry));
     const accepted = reasons.length === 0;
@@ -681,47 +689,21 @@ function getAllowedBuyCount(
   maxBuysPerTeam: number | null,
   opts?: { postOptUpgradeDeploy?: boolean; minUpgradeBuyPrice?: number | null },
 ) {
-  const optionLimit = maxBuysPerTeam ?? Number.POSITIVE_INFINITY;
-  const currentRoster = rosterBase ?? team.currentState.rosterCount ?? null;
   const playerMin = team.currentState.playerMin ?? 0;
   const playerOpt = team.currentState.playerOpt ?? playerMin;
   const expiringCount = team.sellPlan.candidates.filter((candidate) => (candidate.contractLength ?? 99) <= 1).length;
-  const plannedExpiryNeed = currentRoster == null ? 0 : Math.max(0, playerOpt - Math.max(0, currentRoster - expiringCount));
-
-  if (currentRoster == null) {
-    return optionLimit;
-  }
-
-  if (currentRoster < playerOpt) {
-    return Math.min(Math.max(playerOpt - currentRoster, plannedExpiryNeed, 0), optionLimit);
-  }
-  if (plannedExpiryNeed > 0) {
-    return Math.min(Math.max(plannedExpiryNeed, 1), optionLimit);
-  }
-
-  if (currentRoster >= playerOpt && !opts?.postOptUpgradeDeploy) {
-    return 0;
-  }
-
-  const hasAggressiveOpportunity = team.buyPlan.candidates.length > 0 && getTopBuyCandidateScore(team) >= 65;
-  const plannedSellCount = team.sellPlan.candidates.length;
-  if (opts?.postOptUpgradeDeploy) {
-    const minPrice = opts.minUpgradeBuyPrice ?? 0;
-    const upgradeCandidate = team.buyPlan.candidates.find((candidate) => {
-      const price = candidate.price ?? candidate.marketValue ?? 0;
-      return price + 0.01 >= minPrice;
-    });
-    if (upgradeCandidate && (plannedSellCount >= 1 || hasAggressiveOpportunity)) {
-      return Math.min(1, optionLimit);
-    }
-  }
-  if (plannedSellCount >= 2 && getTopBuyCandidateScore(team) >= 58) {
-    return Math.min(2, optionLimit);
-  }
-  if (plannedSellCount >= 1 && getTopBuyCandidateScore(team) >= 52) {
-    return Math.min(1, optionLimit);
-  }
-  return hasAggressiveOpportunity ? Math.min(1, optionLimit) : 0;
+  return resolveAllowedMarketBuyCount({
+    rosterBase,
+    currentRoster: team.currentState.rosterCount,
+    playerOpt,
+    expiringCount,
+    plannedCandidates: team.buyPlan.candidates,
+    maxBuysPerTeam,
+    postOptUpgradeDeploy: opts?.postOptUpgradeDeploy,
+    minUpgradeBuyPrice: opts?.minUpgradeBuyPrice,
+    topCandidateScore: getTopBuyCandidateScore(team),
+    plannedSellCount: team.sellPlan.candidates.length,
+  });
 }
 
 function hasValueSellOpportunity(
@@ -917,15 +899,11 @@ function buildResolvedBuyCandidateMap(
 function buildEffectiveSellPlan(
   team: AiMarketPlanTeamEntry,
   applySellSteps: boolean,
-  maxSellsPerTeam: number | null,
   excludeSellPlayerIds?: string[],
 ): AiMarketPlanSellPlan {
   const excludeSet = new Set(excludeSellPlayerIds ?? []);
   const candidates = applySellSteps
-    ? limitItems(
-        team.sellPlan.candidates.filter((candidate) => !excludeSet.has(candidate.playerId)),
-        maxSellsPerTeam,
-      )
+    ? team.sellPlan.candidates.filter((candidate) => !excludeSet.has(candidate.playerId))
     : [];
 
   return {
@@ -1234,8 +1212,16 @@ export async function applyAiMarketPlanLocally(input: AiMarketPlanApplyParams): 
   // Apply audits the full team set so manual/passive teams stay visible as skipped instead of disappearing.
   const teamScope = "all" as const;
   const season2PlusNeedGate = !/^season-?1$/i.test(input.seasonId);
-  const buyLimit = options.applyBuySteps && (!season2PlusNeedGate || preflightBuyNeedTeamIds.length > 0 || preflightMaintenanceTeamIds.length > 0) ? options.previewBuyLimit : 0;
-  const sellLimit = options.applySellSteps && (!season2PlusNeedGate || preflightSellNeedTeamIds.length > 0 || preflightMaintenanceTeamIds.length > 0) ? options.previewSellLimit : 0;
+  const buyLimit =
+    options.applyBuySteps &&
+    (!season2PlusNeedGate || preflightBuyNeedTeamIds.length > 0 || preflightMaintenanceTeamIds.length > 0)
+      ? options.previewBuyLimit
+      : 0;
+  // Sell scans must not be gated by the S2+ buy-need preflight: season_end passes legitimately
+  // include teams with no preflight sell-need flags (profit-window / contract maintenance sells
+  // at or above Opt). Zeroing sellLimit globally when preflightSellNeedTeamIds is empty was
+  // blocking entire season_end sell sessions despite sell pressure in preview scoring.
+  const sellLimit = options.applySellSteps ? options.previewSellLimit : 0;
   if (season2PlusNeedGate && buyLimit === 0 && sellLimit === 0) {
     const results = preflightGameState.teams.map((team) => buildPreflightTeamResult(preflightGameState, team));
     const summary: AiMarketPlanApplySummary = {
@@ -1433,12 +1419,7 @@ export async function applyAiMarketPlanLocally(input: AiMarketPlanApplyParams): 
       results.push(nextResult);
       continue;
     }
-    const effectiveSellPlan = buildEffectiveSellPlan(
-      team,
-      options.applySellSteps,
-      options.maxSellsPerTeam,
-      options.excludeSellPlayerIds,
-    );
+    const effectiveSellPlan = buildEffectiveSellPlan(team, options.applySellSteps, options.excludeSellPlayerIds);
     const effectiveBuyPlan = buildEffectiveBuyPlan(
       team,
       options.applyBuySteps,

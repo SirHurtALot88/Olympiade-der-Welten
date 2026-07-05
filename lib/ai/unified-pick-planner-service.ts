@@ -4,6 +4,10 @@ import {
   type AiNeedsPicksPlannedPick,
   type AiNeedsPicksRunMode,
 } from "@/lib/ai/ai-needs-picks-compare-service";
+import {
+  PLANNER_TIGHT_BUDGET_CASH_PER_SLOT,
+  prefersReserveLaneOverCheapFill,
+} from "@/lib/ai/planner-opt-buy-policy";
 
 export type UnifiedTeamPickPlanInput = {
   saveId: string;
@@ -67,6 +71,65 @@ export function isUnifiedPickEnabledForMarket() {
   return true;
 }
 
+/** Avg spendable cash per Opt-gap pick below this → prefer backup/cheap_fill lanes (~9C reserve bracket). */
+export const OPT_REBUILD_RESERVE_BUDGET_PER_PICK_THRESHOLD = PLANNER_TIGHT_BUDGET_CASH_PER_SLOT;
+
+export function applyTightBudgetReserveLaneBias(input: {
+  rosterGap: number;
+  missingToMin: number;
+  cash: number | null;
+  coreNeeded: number;
+  cheapFillNeeded: number;
+  backupNeeded: number;
+  depthNeeded: number;
+  specialistNeeded: number;
+  season1OptimumMode?: boolean;
+}) {
+  if (input.season1OptimumMode || input.rosterGap <= 0) {
+    return {
+      coreNeeded: input.coreNeeded,
+      cheapFillNeeded: input.cheapFillNeeded,
+      backupNeeded: input.backupNeeded,
+      depthNeeded: input.depthNeeded,
+      specialistNeeded: input.specialistNeeded,
+      preferReserveLanes: false,
+      avgBudgetPerPick: null as number | null,
+    };
+  }
+  const avgBudgetPerPick =
+    input.cash != null && Number.isFinite(input.cash) && input.cash > 0 ? input.cash / input.rosterGap : null;
+  const preferReserveLanes = prefersReserveLaneOverCheapFill({
+    rosterGap: input.rosterGap,
+    cash: input.cash,
+  });
+  if (!preferReserveLanes) {
+    return {
+      coreNeeded: input.coreNeeded,
+      cheapFillNeeded: input.cheapFillNeeded,
+      backupNeeded: input.backupNeeded,
+      depthNeeded: input.depthNeeded,
+      specialistNeeded: input.specialistNeeded,
+      preferReserveLanes: false,
+      avgBudgetPerPick,
+    };
+  }
+  const depthNeeded = Math.min(input.depthNeeded, 1);
+  const cheapFillNeeded = 0;
+  const backupNeeded = Math.max(
+    input.backupNeeded,
+    Math.max(input.missingToMin, input.rosterGap - depthNeeded - Math.min(input.specialistNeeded, 1)),
+  );
+  return {
+    coreNeeded: 0,
+    cheapFillNeeded,
+    backupNeeded,
+    depthNeeded,
+    specialistNeeded: Math.min(input.specialistNeeded, 1),
+    preferReserveLanes: true,
+    avgBudgetPerPick,
+  };
+}
+
 export function mapPlannedPicksToBuyCandidates<T extends { playerId: string }>(
   plannedPicks: AiNeedsPicksPlannedPick[],
   pool: T[],
@@ -95,6 +158,9 @@ export function resolveUnifiedMarketPickSteps(team: {
   const rosterAfterSell =
     roster != null ? roster - team.sellPlan.candidates.length : null;
   const legacyCount = team.buyPlan.candidates.length;
+  if (rosterAfterSell != null && playerOpt != null && rosterAfterSell >= playerOpt) {
+    return legacyCount > 0 ? legacyCount : 0;
+  }
   if (legacyCount > 0) return legacyCount;
   if (rosterAfterSell != null && playerMin != null && rosterAfterSell < playerMin) {
     return Math.max(1, playerMin - rosterAfterSell);

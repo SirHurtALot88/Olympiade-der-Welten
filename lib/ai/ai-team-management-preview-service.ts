@@ -32,7 +32,7 @@ import {
 } from "@/lib/ai/ai-player-training-class-service";
 import {
   projectExpectedSalaryAtPlannerTarget,
-  resolveTeamCashRunwayReserve,
+  resolveCombinedLiquidityReserve,
 } from "@/lib/ai/ai-team-cash-reserve-service";
 
 export type AiManagementStrategicIntent =
@@ -214,6 +214,42 @@ const RAW_SALARY_TO_BUDGET_UNIT = 1000;
 
 function identitySignal(value: number) {
   return value <= 10 ? value * 10 : value;
+}
+
+const REBUILD_BUILDING_BOTTOM_TIER = 8;
+const REBUILD_BUILDING_BOTTOM_MIN = 0;
+const REBUILD_BUILDING_BOTTOM_MAX = 5;
+const REBUILD_BUILDING_TOP_MAX = 25;
+const REBUILD_BUILDING_BOTTOM_CEILING = 10;
+const REBUILD_BUILDING_SEASON_GROWTH = 0.04;
+
+function parseSeasonNumber(seasonId: string | null | undefined) {
+  const match = (seasonId ?? "season-1").match(/(\d+)/);
+  return match ? Number(match[1]) : 1;
+}
+
+/** Rebuild-phase facility cap by cash rank — bottom ~8 teams land in a soft 0–5 corridor (≤10). */
+function resolveRebuildBuildingCap(gameState: GameState, teamId: string) {
+  const ranked = gameState.teams
+    .map((team) => ({ teamId: team.teamId, cash: team.cash ?? 0 }))
+    .sort((left, right) => left.cash - right.cash || left.teamId.localeCompare(right.teamId));
+  const rank = ranked.findIndex((entry) => entry.teamId === teamId);
+  if (rank < 0) return 0;
+
+  const seasonFactor = 1 + (Math.max(1, parseSeasonNumber(gameState.season?.id)) - 1) * REBUILD_BUILDING_SEASON_GROWTH;
+  let baseCap = 0;
+  if (rank < REBUILD_BUILDING_BOTTOM_TIER) {
+    const tierSpan = Math.max(1, REBUILD_BUILDING_BOTTOM_TIER - 1);
+    const tierProgress = rank / tierSpan;
+    baseCap = REBUILD_BUILDING_BOTTOM_MIN + tierProgress * (REBUILD_BUILDING_BOTTOM_MAX - REBUILD_BUILDING_BOTTOM_MIN);
+    return round(Math.min(baseCap * seasonFactor, REBUILD_BUILDING_BOTTOM_CEILING * seasonFactor), 2);
+  }
+
+  const upperStart = REBUILD_BUILDING_BOTTOM_TIER;
+  const upperSpan = Math.max(1, ranked.length - upperStart - 1);
+  const upperProgress = (rank - upperStart) / upperSpan;
+  baseCap = REBUILD_BUILDING_BOTTOM_MAX + upperProgress * (REBUILD_BUILDING_TOP_MAX - REBUILD_BUILDING_BOTTOM_MAX);
+  return round(Math.min(baseCap * seasonFactor, REBUILD_BUILDING_TOP_MAX * seasonFactor), 2);
 }
 
 function isFiniteNumber(value: unknown): value is number {
@@ -566,17 +602,25 @@ function buildBudgetPlan(gameState: GameState, context: TeamContext): AiTeamBudg
   const ambition = identitySignal(context.identity.ambition);
   const finances = identitySignal(context.identity.finances);
   const objectiveBias = context.objectiveAiBias;
+  // While rebuilding (roster below identity Opt — e.g. Season 1 draft), the player draft always
+  // wins over facility spend: buckets must not lock cash into buildings before the roster exists.
+  const rosterBelowOpt = context.rosterCount < context.identity.playerOpt;
   const expectedSalaryAtPlan = projectExpectedSalaryAtPlannerTarget(
     gameState,
     context.team.teamId,
     context.identity.playerOpt ?? undefined,
   );
-  const salaryReserve = resolveTeamCashRunwayReserve(gameState, context.team.teamId, {
+  const liquidityReserve = resolveCombinedLiquidityReserve({
+    gameState,
+    teamId: context.team.teamId,
     expectedSalaryAfterPlan: Math.max(context.expectedSalarySum, expectedSalaryAtPlan),
+    rosterBelowOpt,
+    buyAggression: objectiveBias?.buyAggression,
   });
+  const salaryReserve = liquidityReserve.salaryReserve;
   const maintenanceBudget = round(Math.max(facilityPreview.facilityUpkeepTotal, facilityMaintenanceCost, 0), 2);
   const emergencyBudget = round(Math.max(5, cash * (context.injuryCount > 0 ? 0.14 : 0.08)), 2);
-  const cashReserve = round(Math.max(5, salaryReserve * 0.08), 2);
+  const cashReserve = liquidityReserve.cashReserve;
   const rawFreeCash = Math.max(0, cash - salaryReserve - maintenanceBudget - emergencyBudget - cashReserve);
   const recoveryBuildingNeed = context.injuryCount > 0 || context.fatigueHighCount >= 2 ? 0.08 : 0;
   const buildingBias =
@@ -596,8 +640,13 @@ function buildBudgetPlan(gameState: GameState, context: TeamContext): AiTeamBudg
   // Salary / emergency / cash reserves are the only liquidity buffers — do not haircut again.
   const investableCash = rawFreeCash;
   const totalBias = Math.max(0.01, buildingBias + transferBias);
-  const buildingBudget = round(investableCash * (buildingBias / totalBias), 2);
-  const transferBudget = round(investableCash * (transferBias / totalBias), 2);
+  // During rebuild, cap facility spend by cash rank — bottom ~8 teams in a soft 0–5 corridor (≤10),
+  // richer teams up to 25; grows ~4 % per season so the band can rise over time.
+  const rebuildBuildingCap = resolveRebuildBuildingCap(gameState, context.team.teamId);
+  const buildingBudget = rosterBelowOpt
+    ? round(Math.min(rebuildBuildingCap, investableCash), 2)
+    : round(investableCash * (buildingBias / totalBias), 2);
+  const transferBudget = round(Math.max(0, investableCash - buildingBudget), 2);
   const warnings: string[] = [];
   if (maintenanceBudget > 0 && maintenanceBudget > buildingBudget && rawFreeCash < maintenanceBudget + 5) {
     warnings.push("maintenance_priority_over_upgrades");

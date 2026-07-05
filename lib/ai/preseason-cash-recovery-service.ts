@@ -41,6 +41,13 @@ export type PreseasonProactiveCashRecoveryResult = {
   sold: number;
   teamsAffected: number;
   blockers: string[];
+  /**
+   * Informational-only notes: the roster-min guard deliberately declining to sell a team further
+   * (protective, expected behavior) is not a failure and must not surface as a long-run
+   * `openTechnicalBugs` pause condition the way genuine `blockers` entries do — see
+   * `preseason_cash_recovery_roster_min_guard` usage below.
+   */
+  guardNotes: string[];
   teamResults: Array<{
     teamId: string;
     shortCode: string;
@@ -191,6 +198,7 @@ export async function runPreseasonProactiveCashRecovery(input: {
   if (!save) throw new Error("Save missing before preseason proactive cash recovery.");
 
   const blockers: string[] = [];
+  const guardNotes: string[] = [];
   const teamResults: PreseasonProactiveCashRecoveryResult["teamResults"] = [];
   let sold = 0;
   let teamsAffected = 0;
@@ -208,7 +216,7 @@ export async function runPreseasonProactiveCashRecovery(input: {
     .sort((left, right) => left.assessment.currentCash - right.assessment.currentCash);
 
   if (teamsNeedingRecovery.length === 0) {
-    return { sold: 0, teamsAffected: 0, blockers, teamResults };
+    return { sold: 0, teamsAffected: 0, blockers, guardNotes, teamResults };
   }
 
   const preview = await buildAiTransfermarktSellPreview({
@@ -230,6 +238,8 @@ export async function runPreseasonProactiveCashRecovery(input: {
     const cashBefore = getTeamCash(runContext.save.gameState, team.teamId);
     const excluded = soldPlayerIdsByTeam.get(team.teamId) ?? new Set<string>();
     const teamPreview = previewByTeamId.get(team.teamId);
+    const identity = runContext.save.gameState.teamIdentities.find((entry) => entry.teamId === team.teamId) ?? null;
+    const { playerMin: teamPlayerMin } = deriveRosterTargets(team, identity);
     let teamSells = 0;
     const maxSells = Math.min(
       assessment.maxSells,
@@ -241,6 +251,20 @@ export async function runPreseasonProactiveCashRecovery(input: {
       teamSells < maxSells &&
       getTeamCash(runContext.save.gameState, team.teamId) < assessment.targetCash
     ) {
+      // Root-cause fix (2026-07-04, W-W chronic below-hardMin spiral — see
+      // outputs/real-engine-s1s5-final/progress-log.md): allowSellBelowRosterMin=true above was
+      // unconditional, so a team already AT or BELOW its absolute roster minimum with merely low
+      // (but non-negative) cash kept getting sold further below hardMin every single season by this
+      // proactive pass — directly undoing whatever the emergency-roster-repair fallback had just
+      // rebuilt, and turning "low cash" into a self-reinforcing "low cash -> fewer players -> still
+      // low cash" spiral instead of ever letting the team stabilize. A genuinely negative-cash team
+      // still needs this as a last resort (kept below), but a team merely below its cash *buffer*
+      // target must not be shrunk past its roster *minimum* — that tradeoff never helps it.
+      const rosterCountNow = runContext.save.gameState.rosters.filter((entry) => entry.teamId === team.teamId).length;
+      if (rosterCountNow <= teamPlayerMin && getTeamCash(runContext.save.gameState, team.teamId) >= 0) {
+        guardNotes.push(`preseason_cash_recovery_roster_min_guard:${team.shortCode}:${rosterCountNow}/${teamPlayerMin}`);
+        break;
+      }
       const candidates = teamPreview
         ? pickProactiveSellCandidates(teamPreview, excluded, 1)
         : [];
@@ -295,7 +319,7 @@ export async function runPreseasonProactiveCashRecovery(input: {
 
   flushLocalTransfermarktRunContext(runContext);
 
-  return { sold, teamsAffected, blockers, teamResults };
+  return { sold, teamsAffected, blockers, guardNotes, teamResults };
 }
 
 export function getTeamsBelowPreseasonCashBuffer(gameState: GameState, seasonId = gameState.season.id) {

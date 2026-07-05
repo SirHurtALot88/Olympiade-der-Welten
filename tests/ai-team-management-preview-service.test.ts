@@ -181,8 +181,11 @@ describe("ai team management preview service", () => {
         buildPlayer("p2", { fatigue: 88 }),
         buildPlayer("p3", { fatigue: 74 }),
         buildPlayer("p4", { fatigue: 70 }),
+        buildPlayer("p5", { fatigue: 68 }),
+        buildPlayer("p6", { fatigue: 65 }),
       ],
       injuries: ["p1", "p2"],
+      team: { cash: 280 },
     });
 
     const preview = buildAiTeamManagementPreview(gameState, "T-1");
@@ -309,11 +312,14 @@ describe("ai team management preview service", () => {
 
   it("allocates all post-reserve free cash to transfer and building buckets", () => {
     const gameState = buildGameState({
-      team: { cash: 65 },
+      team: { cash: 200 },
       players: [
         buildPlayer("p1"),
         buildPlayer("p2"),
         buildPlayer("p3"),
+        buildPlayer("p4"),
+        buildPlayer("p5"),
+        buildPlayer("p6"),
       ],
     });
 
@@ -321,8 +327,45 @@ describe("ai team management preview service", () => {
     const buckets = preview?.budgetPlan.bucketsBefore;
     const freeCash = preview?.budgetPlan.freeCashAfterReserves ?? 0;
 
-    expect((buckets?.buildingBudget ?? 0)).toBeGreaterThan(0);
     expect((buckets?.transferBudget ?? 0) + (buckets?.buildingBudget ?? 0)).toBeCloseTo(freeCash, 0);
-    expect(freeCash).toBeLessThan(65);
+    expect(freeCash).toBeGreaterThan(0);
+  });
+
+  it("merges liquidity reserve during rebuild and caps building by cash rank", () => {
+    const poorTeam = buildTeam({ teamId: "T-POOR", shortCode: "PO", cash: 40 });
+    const midTeam = buildTeam({ teamId: "T-MID", shortCode: "MD", cash: 80 });
+    const richTeam = buildTeam({ teamId: "T-RICH", shortCode: "RI", cash: 140 });
+    const players = [buildPlayer("p1"), buildPlayer("p2"), buildPlayer("p3")];
+    const gameState = {
+      ...buildGameState({ team: poorTeam, players }),
+      teams: [poorTeam, midTeam, richTeam],
+      teamIdentities: [
+        buildIdentity({ teamId: "T-POOR", playerOpt: 6 }),
+        buildIdentity({ teamId: "T-MID", playerOpt: 6 }),
+        buildIdentity({ teamId: "T-RICH", playerOpt: 6 }),
+      ],
+      rosters: players.map((player, index) => ({
+        id: `r-${index + 1}`,
+        teamId: "T-POOR",
+        playerId: player.id,
+        contractLength: 2,
+        salary: 5,
+        upkeep: 5,
+        roleTag: "starter",
+        joinedSeasonId: "season-1",
+      })),
+    } as ReturnType<typeof buildGameState>;
+
+    const poorPreview = buildAiTeamManagementPreview(gameState, "T-POOR");
+    const richPreview = buildAiTeamManagementPreview(gameState, "T-RICH");
+
+    expect(poorPreview?.budgetPlan.bucketsBefore.cashReserve).toBe(0);
+    expect((poorPreview?.budgetPlan.bucketsBefore.buildingBudget ?? 0)).toBeLessThanOrEqual(5);
+    expect((richPreview?.budgetPlan.bucketsBefore.buildingBudget ?? 0)).toBeGreaterThan(
+      poorPreview?.budgetPlan.bucketsBefore.buildingBudget ?? 0,
+    );
+    expect((poorPreview?.budgetPlan.bucketsBefore.transferBudget ?? 0)).toBeGreaterThan(
+      poorPreview?.budgetPlan.bucketsBefore.salaryReserve ?? 0,
+    );
   });
 });

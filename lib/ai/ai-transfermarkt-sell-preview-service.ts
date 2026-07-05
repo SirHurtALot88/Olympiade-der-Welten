@@ -49,6 +49,8 @@ export type AiSellPreviewParams = {
   teamId?: string | null;
   teamScope?: AiSellPreviewTeamScope;
   limit?: number | null;
+  /** Score and return every roster player for AI market-plan selection (no preview slice). */
+  fullRosterCandidates?: boolean;
   /** AI/market-plan paths may sell below roster min and refill later. Default keeps UI advisory warning. */
   allowSellBelowRosterMin?: boolean;
   localRunContext?: LocalTransfermarktRunContext | null;
@@ -231,8 +233,17 @@ function teamPlayerKey(teamId: string, playerId: string) {
 
 function buildSellPreviewRunCache(gameState: GameState): SellPreviewRunCache {
   const latestSnapshot = getLatestCompletedSeasonSnapshot(gameState);
+  const appliedResultIds = new Set(
+    (gameState.seasonState.matchdayResults ?? [])
+      .filter((result) => result.seasonId === gameState.season.id && result.status === "preview_applied")
+      .map((result) => result.id),
+  );
+  const hasAppliedPerformances = appliedResultIds.size > 0;
   const grouped = new Map<string, PlayerDisciplinePerformanceRecord[]>();
   for (const performance of gameState.seasonState.playerDisciplinePerformances ?? []) {
+    if (hasAppliedPerformances && !appliedResultIds.has(performance.matchdayResultId)) {
+      continue;
+    }
     const key = teamPlayerKey(performance.teamId, performance.playerId);
     const rows = grouped.get(key) ?? [];
     rows.push(performance);
@@ -464,10 +475,11 @@ function buildCandidate(
   const hasMeaningfulPerformanceSample = performance.appearances >= 3;
   const underperformed =
     hasMeaningfulPerformanceSample &&
-    ((performance.averageContribution != null && performance.averageContribution < 30) ||
-      (performance.averageFinalScore != null &&
-        playerRating?.ovrNormalized != null &&
-        performance.averageFinalScore < playerRating.ovrNormalized * 0.48));
+    performance.averageContribution != null &&
+    performance.averageContribution < 12 &&
+    performance.averageFinalScore != null &&
+    playerRating?.ovrNormalized != null &&
+    performance.averageFinalScore < playerRating.ovrNormalized * 0.72;
   const rosterPressureScore =
     playerOpt != null && rosterSize > playerOpt ? clamp((rosterSize - playerOpt) / Math.max(playerOpt, 1), 0, 1) : 0;
   const playerAxis = getPlayerAxisLabel(player);
@@ -598,9 +610,6 @@ function buildCandidate(
   if (coversNeedAxis) {
     pushKeep("covers_need_axis", `deckt die aktuelle Achsenluecke ${playerAxis?.toUpperCase() ?? ""}`);
   }
-  if (rosterSize > (playerOpt ?? rosterSize)) {
-    pushSell("roster_over_opt", "Kader liegt ueber dem Optimum");
-  }
   if (roster.contractLength <= 1) {
     if (strategy.avoidedHits >= strategy.preferredHits || underperformed || hardNoGoHit) {
       pushSell("short_contract", "Vertrag laeuft aus und Fit/Leistung rechtfertigt keine automatische Verlaengerung");
@@ -618,20 +627,24 @@ function buildCandidate(
     pushSell("expiring_contract", "auslaufender Vertrag braucht vor Ablauf eine aktive Marktentscheidung");
   }
 
-  // Proactive early buyout (2026-07-04): a team may choose to cash out a player entering his
-  // last contract year even without acute board/cash pressure. Cost-dependent — see
-  // estimateBuyoutLikelihood — so this rarely overrides an otherwise "keep" case for teams that
-  // can't comfortably afford giving up the commitment, but roster/cash pressure always overrides.
+  // Proactive early buyout: also runs under cash/board pressure (2026-07-04 fix — previously
+  // expiringCoreDecisionPressure zeroed buyoutLikelihood entirely, blocking proactive_early_buyout
+  // for exactly the teams that need contract-year liquidity most).
+  const buyoutPressureOverride =
+    rosterPressureScore > 0 ||
+    lowCashReservePressure ||
+    negativeCashPressure ||
+    sellRunway.cashPressureScore >= 0.35;
   const buyoutLikelihood =
-    roster.contractLength === 1 && !expiringCoreDecisionPressure
+    roster.contractLength === 1
       ? estimateBuyoutLikelihood({
           buyoutCost: Math.max(0, salary ?? 0),
           teamCash: team.cash,
           baseLikelihood: 0.35 + sellAggression * 0.25,
-          pressureOverride: rosterPressureScore > 0 || lowCashReservePressure || negativeCashPressure,
+          pressureOverride: buyoutPressureOverride,
         })
       : 0;
-  if (buyoutLikelihood >= 0.4) {
+  if (buyoutLikelihood >= 0.32) {
     pushSell(
       "proactive_early_buyout",
       `letztes Vertragsjahr — vorzeitiger Marktverkauf lohnt sich (Buyout-Wahrscheinlichkeit ${Math.round(buyoutLikelihood * 100)}%)`,
@@ -854,7 +867,13 @@ export async function buildAiTransfermarktSellPreview(params: AiSellPreviewParam
   const playerRatingsById = getSeasonDerivations({ gameState: context.gameState, saveId: context.saveId }).ratingsById;
   const runCache = buildSellPreviewRunCache(context.gameState);
   const teamScope = params.teamScope === "all" ? "all" : "ai";
-  const limit = typeof params.limit === "number" && Number.isFinite(params.limit) ? Math.max(1, Math.round(params.limit)) : 5;
+  const fullRosterCandidates = params.fullRosterCandidates === true;
+  const limit =
+    fullRosterCandidates
+      ? Number.MAX_SAFE_INTEGER
+      : typeof params.limit === "number" && Number.isFinite(params.limit)
+        ? Math.max(1, Math.round(params.limit))
+        : 5;
   const allowSellBelowRosterMin = params.allowSellBelowRosterMin ?? false;
   let candidateCount = 0;
 
@@ -938,9 +957,11 @@ export async function buildAiTransfermarktSellPreview(params: AiSellPreviewParam
       .filter((entry) => entry.reasonToKeep.length > 0)
       .slice(0, Math.min(3, limit));
 
-    const sellCandidates = allCandidates
-      .filter((entry) => entry.reasonToSell.length > 0 || entry.warnings.length > 0)
-      .slice(0, limit);
+    const sellCandidates = fullRosterCandidates
+      ? allCandidates
+      : allCandidates
+          .filter((entry) => entry.reasonToSell.length > 0 || entry.warnings.length > 0)
+          .slice(0, limit);
 
     const explanation = [
       profile?.strategySummary ?? "Kein Teamprofil vorhanden.",

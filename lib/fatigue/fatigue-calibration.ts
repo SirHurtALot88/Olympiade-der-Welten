@@ -1,5 +1,9 @@
 export const FATIGUE_PERFORMANCE_CAP = 80;
 export const FATIGUE_PERFORMANCE_MAX_PENALTY_PERCENT = 25;
+export const INJURY_PERFORMANCE_PENALTY_PERCENT = 25;
+export const INJURY_PERFORMANCE_MULTIPLIER = 0.75;
+/** fatigueMult(0.75) × injuryMult(0.75) at max fatigue + same-day injury */
+export const MAX_COMBINED_FATIGUE_INJURY_MULTIPLIER = 0.5625;
 
 export const FATIGUE_INJURY_RISK_ANCHORS = [
   { fatigue: 0, riskPercent: 0 },
@@ -40,6 +44,20 @@ export function getFatiguePerformancePenaltyPercent(fatigue: number | null | und
 
 export function getFatiguePerformanceMultiplier(fatigue: number | null | undefined) {
   return roundValue(1 - getFatiguePerformancePenaltyPercent(fatigue) / 100, 4);
+}
+
+export function getInjuryPerformanceMultiplier(injuredThisMatchday: boolean) {
+  return injuredThisMatchday ? INJURY_PERFORMANCE_MULTIPLIER : 1;
+}
+
+export function getCombinedFatigueInjuryPerformanceMultiplier(
+  fatigue: number | null | undefined,
+  injuredThisMatchday: boolean,
+) {
+  return roundValue(
+    getFatiguePerformanceMultiplier(fatigue) * getInjuryPerformanceMultiplier(injuredThisMatchday),
+    4,
+  );
 }
 
 export function getInjuryRiskPercent(fatigue: number | null | undefined) {

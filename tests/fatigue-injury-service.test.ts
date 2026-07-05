@@ -4,6 +4,7 @@ import type { GameState, LineupDraft } from "@/lib/data/olyDataTypes";
 import {
   applyFatigueAndInjuryAfterMatchday,
   BASE_MATCHDAY_RECOVERY,
+  buildMatchdayInjuryRollMap,
   calculatePlayerRecovery,
   calculateTeamRecovery,
   getInjuryRiskBand,
@@ -199,6 +200,47 @@ describe("fatigue injury service", () => {
     const laterAvailability = getPlayerAvailabilityView(result.gameState, playerId, "A-A", "md-3");
     expect(laterAvailability.isUnavailable).toBe(false);
     expect(laterAvailability.injuryStatus).toBe("recovering");
+  });
+
+  it("keeps injured players available on the injury matchday but blocks the next matchday", () => {
+    const playerId = findInjuredPlayerId({ saveId: "save-1", seasonId: "season-1", matchdayId: "md-1" });
+    const gameState = createGameState(playerId, 83);
+    const result = applyFatigueAndInjuryAfterMatchday({
+      gameState,
+      saveId: "save-1",
+      seasonId: "season-1",
+      matchdayId: "md-1",
+      matchdayResultId: "result-1",
+      timestamp: "2026-06-13T00:00:00.000Z",
+    });
+
+    const injuryDayAvailability = getPlayerAvailabilityView(result.gameState, playerId, "A-A", "md-1");
+    expect(injuryDayAvailability.isUnavailable).toBe(false);
+    expect(injuryDayAvailability.injuryStatus).toBe("injured");
+  });
+
+  it("uses the same deterministic injury rolls for pre-match scoring and post-match state", () => {
+    const playerId = findInjuredPlayerId({ saveId: "save-1", seasonId: "season-1", matchdayId: "md-1" });
+    const gameState = createGameState(playerId, 83);
+    const rollMap = buildMatchdayInjuryRollMap({
+      gameState,
+      saveId: "save-1",
+      seasonId: "season-1",
+      matchdayId: "md-1",
+    });
+    const result = applyFatigueAndInjuryAfterMatchday({
+      gameState,
+      saveId: "save-1",
+      seasonId: "season-1",
+      matchdayId: "md-1",
+      matchdayResultId: "result-1",
+      timestamp: "2026-06-13T00:00:00.000Z",
+      precomputedInjuryRolls: rollMap,
+    });
+
+    expect(rollMap.get("A-A::" + playerId)?.result).toBe("injured");
+    expect(result.injuryEvents[0]?.result).toBe("injured");
+    expect(result.injuryEvents[0]?.roll).toBe(rollMap.get("A-A::" + playerId)?.roll);
   });
 
   it("supports an explicitly marked deterministic injury rehearsal mode without changing normal rates", () => {

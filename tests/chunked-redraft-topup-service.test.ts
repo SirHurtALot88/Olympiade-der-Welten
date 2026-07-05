@@ -103,6 +103,73 @@ function createSmallEmptySeasonOneSave(): PersistedSaveGame {
   };
 }
 
+/**
+ * Mirrors the real W-W chronic-below-hardMin scenario (see progress-log.md 2026-07-04): a team
+ * sitting below its absolute roster minimum with cash that barely covers the single cheapest
+ * remaining free agent (here 2.6 cash vs. a 2.52 market-value candidate — the same ~3% margin as
+ * W-W's real 6.12-cash-vs-6.0-price case). Market value is recalculated from player attributes
+ * during save hydration (not simply copied from a raw seed field), so the override is applied
+ * *after* `createSaveGameState` — the point at which `resolvePlayerEconomyContract` reads
+ * `player.marketValue` directly as the final, authoritative value.
+ */
+function createTightCashBelowHardMinSave(): PersistedSaveGame {
+  const seed = loadFreshSeasonOneSeedData();
+  const teamIds = seed.teams.slice(0, 2).map((team) => team.teamId);
+  const [teamAId] = teamIds;
+  const rosterFillerIds = [
+    "player-1053-prinz-morven",
+    "player-0281-frosttitan",
+    "player-2332-turboroll",
+    "player-1050-le-chuck",
+    "player-2335-don-promillo",
+    "player-0945-blazehoof",
+  ];
+  const cheapCandidateId = "player-2895-byrnja";
+  const players = seed.players.filter(
+    (player) => rosterFillerIds.includes(player.id) || player.id === cheapCandidateId,
+  );
+  const smallSeed = {
+    ...seed,
+    teams: seed.teams
+      .filter((team) => teamIds.includes(team.teamId))
+      .map((team) => ({
+        ...team,
+        cash: team.teamId === teamAId ? 2.6 : 250,
+        rosterLimit: 10,
+      })),
+    teamIdentities: seed.teamIdentities
+      .filter((identity) => teamIds.includes(identity.teamId))
+      .map((identity) => ({
+        ...identity,
+        playerMin: 7,
+        playerOpt: 10,
+      })),
+    players,
+    rosters: rosterFillerIds.map((playerId, index) => ({
+      id: `roster-a-${index}`,
+      teamId: teamAId,
+      playerId,
+      slot: index,
+      contractLength: 2,
+      salary: 5,
+      upkeep: 1,
+      roleTag: "bench" as const,
+      joinedSeasonId: "season-1",
+    })),
+    contracts: [],
+    transferHistory: [],
+  };
+  const save = createSaveGameState("chunked-topup-repair-test-save", smallSeed);
+  save.gameState.players = save.gameState.players.map((player) =>
+    player.id === cheapCandidateId ? { ...player, marketValue: 2.52, displayMarketValue: 2.52 } : player,
+  );
+  return {
+    ...save,
+    name: "Chunked Topup Repair Test",
+    status: "active",
+  };
+}
+
 function duplicatePlayerIds(save: PersistedSaveGame) {
   const counts = new Map<string, number>();
   for (const roster of save.gameState.rosters) {
@@ -230,6 +297,32 @@ describe("chunked redraft topup service", () => {
     expect(fs.existsSync(path.join(outputDir, "redraft-progress-log.csv"))).toBe(true);
     expect(fs.existsSync(path.join(outputDir, "redraft-candidate-counters.csv"))).toBe(true);
     expect(fs.existsSync(path.join(outputDir, "redraft-first-pick-debug.md"))).toBe(true);
+  });
+
+  it("repairs a team below hardMin whose cash barely covers the cheapest candidate (regression: soft cash reserve used to wipe out the only affordable pick)", () => {
+    const save = createTightCashBelowHardMinSave();
+    const persistence = createInMemoryPersistence(save);
+    const outputDir = fs.mkdtempSync(path.join(os.tmpdir(), "chunked-repair-tight-cash-test-"));
+    const teamAId = save.gameState.teams[0].teamId;
+    expect(save.gameState.rosters.filter((entry) => entry.teamId === teamAId)).toHaveLength(6);
+
+    const result = runChunkedRedraftTopup({
+      persistence,
+      saveId: save.saveId,
+      seasonId: "season-1",
+      dryRun: false,
+      confirmToken: CHUNKED_REDRAFT_TOPUP_CONFIRM_TOKEN,
+      mode: "preseason_roster_repair",
+      target: "playerOpt",
+      targetTeamIds: [teamAId],
+      roundLimit: 3,
+      outputDir,
+    });
+
+    const finalSave = persistence.getSaveById(save.saveId);
+    const finalRoster = finalSave?.gameState.rosters.filter((entry) => entry.teamId === teamAId) ?? [];
+    expect(result.picks.length).toBeGreaterThan(0);
+    expect(finalRoster).toHaveLength(7);
   });
 
   it("writes progress logs and candidate counters during a dry first-pick proof", () => {

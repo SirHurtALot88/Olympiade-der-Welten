@@ -2,8 +2,10 @@ import { describe, expect, it, vi } from "vitest";
 
 import {
   applyAiManagerPlan,
+  applyTransferBudgetSpend,
   buildAiManagerApplyPreview,
   getAiManagerMarketSpendableCash,
+  resolveMarketSpendableCashForPlanner,
 } from "@/lib/ai/ai-manager-apply-service";
 import { buildAiLeagueManagementPreview } from "@/lib/ai/ai-team-management-preview-service";
 import type { GameState, Player, Team, TeamIdentity } from "@/lib/data/olyDataTypes";
@@ -231,7 +233,7 @@ describe("ai manager apply service", () => {
     expect(getAiManagerMarketSpendableCash(state, "T-1", 100)).toBe(18);
   });
 
-  it("subtracts building budget before exposing AI market spendable cash", () => {
+  it("does not phantom-deduct unspent building budget from AI market spendable cash", () => {
     const state = gameState({
       cash: 100,
       budgetReservations: {
@@ -250,7 +252,190 @@ describe("ai manager apply service", () => {
       },
     });
 
-    expect(getAiManagerMarketSpendableCash(state, "T-1", 100)).toBe(25);
+    // Only salary/maintenance/emergency are protected buffers; unspent buildingBudget/cashReserve
+    // still physically sit in team.cash and must not be double-subtracted from the transfer pool.
+    expect(getAiManagerMarketSpendableCash(state, "T-1", 100)).toBe(70);
+  });
+
+  it("only opens drawable budget pools when includeFallbackPools (rebuild mode) is set", () => {
+    const state = gameState({
+      cash: 100,
+      budgetReservations: {
+        "T-1": {
+          teamId: "T-1",
+          seasonId: "season-1",
+          sourcePlanId: "test-plan",
+          cashReserve: 10,
+          salaryReserve: 10,
+          transferBudget: 5,
+          buildingBudget: 12,
+          maintenanceBudget: 15,
+          emergencyBudget: 5,
+          updatedAt: "2026-06-14T00:00:00.000Z",
+        },
+      },
+    });
+
+    expect(getAiManagerMarketSpendableCash(state, "T-1", 100)).toBe(5);
+    // Rebuild: transfer + building + combined liquidity reserve; emergency + maintenance stay protected.
+    expect(
+      getAiManagerMarketSpendableCash(state, "T-1", 100, { includeFallbackPools: true }),
+    ).toBe(37);
+  });
+
+  it("decrements transferBudget when a market buy executes", () => {
+    const state = gameState({
+      cash: 100,
+      budgetReservations: {
+        "T-1": {
+          teamId: "T-1",
+          seasonId: "season-1",
+          sourcePlanId: "test-plan",
+          cashReserve: 10,
+          salaryReserve: 10,
+          transferBudget: 40,
+          buildingBudget: 20,
+          maintenanceBudget: 10,
+          emergencyBudget: 5,
+          updatedAt: "2026-06-14T00:00:00.000Z",
+        },
+      },
+    });
+
+    const next = applyTransferBudgetSpend(state, "T-1", 12);
+    expect(next.seasonState.aiManagerBudgetReservations?.["T-1"]?.transferBudget).toBe(28);
+  });
+
+  it("cascades spend through buildingBudget, cashReserve, salaryReserve, maintenanceBudget once transferBudget is exhausted", () => {
+    const state = gameState({
+      cash: 100,
+      budgetReservations: {
+        "T-1": {
+          teamId: "T-1",
+          seasonId: "season-1",
+          sourcePlanId: "test-plan",
+          cashReserve: 10,
+          salaryReserve: 10,
+          transferBudget: 15,
+          buildingBudget: 8,
+          maintenanceBudget: 10,
+          emergencyBudget: 5,
+          updatedAt: "2026-06-14T00:00:00.000Z",
+        },
+      },
+    });
+
+    const next = applyTransferBudgetSpend(state, "T-1", 20);
+    const reservation = next.seasonState.aiManagerBudgetReservations?.["T-1"];
+    expect(reservation?.transferBudget).toBe(0);
+    expect(reservation?.buildingBudget).toBe(3);
+    expect(reservation?.cashReserve).toBe(10);
+
+    const beyondBuildingAndCashReserve = applyTransferBudgetSpend(state, "T-1", 30);
+    const reservation2 = beyondBuildingAndCashReserve.seasonState.aiManagerBudgetReservations?.["T-1"];
+    expect(reservation2?.transferBudget).toBe(0);
+    expect(reservation2?.buildingBudget).toBe(0);
+    expect(reservation2?.cashReserve).toBe(3);
+    expect(reservation2?.salaryReserve).toBe(10);
+    expect(reservation2?.emergencyBudget).toBe(5);
+
+    const beyondAllPools = applyTransferBudgetSpend(state, "T-1", 53);
+    const reservation3 = beyondAllPools.seasonState.aiManagerBudgetReservations?.["T-1"];
+    expect(reservation3?.transferBudget).toBe(0);
+    expect(reservation3?.buildingBudget).toBe(0);
+    expect(reservation3?.cashReserve).toBe(0);
+    expect(reservation3?.salaryReserve).toBe(0);
+    expect(reservation3?.maintenanceBudget).toBe(0);
+    expect(reservation3?.emergencyBudget).toBe(5);
+  });
+
+  it("caps planner market spend at transfer bucket when reservations exist and roster is at Opt", () => {
+    const playersAtOpt = Array.from({ length: 8 }, (_, index) => player(`p-${index + 1}`));
+    const state = gameState({
+      cash: 100,
+      playerFatigue: playersAtOpt.map(() => 20),
+      budgetReservations: {
+        "T-1": {
+          teamId: "T-1",
+          seasonId: "season-1",
+          sourcePlanId: "test-plan",
+          cashReserve: 10,
+          salaryReserve: 15,
+          transferBudget: 18,
+          buildingBudget: 25,
+          maintenanceBudget: 20,
+          emergencyBudget: 8,
+          updatedAt: "2026-06-14T00:00:00.000Z",
+        },
+      },
+    });
+    state.players = playersAtOpt;
+    state.rosters = playersAtOpt.map((entry, index) => ({
+      id: `r-${index + 1}`,
+      teamId: "T-1",
+      playerId: entry.id,
+      contractLength: 2,
+      salary: 5,
+      upkeep: 5,
+      roleTag: "starter",
+      joinedSeasonId: "season-1",
+    }));
+
+    expect(
+      resolveMarketSpendableCashForPlanner({
+        gameState: state,
+        teamId: "T-1",
+        teamCash: 100,
+        rosterBelowMin: false,
+      }),
+    ).toBe(18);
+  });
+
+  it("falls back to salary runway reserve when no budget reservations exist and roster is at Opt", () => {
+    const playersAtOpt = Array.from({ length: 8 }, (_, index) => player(`p-${index + 1}`));
+    const state = gameState({ cash: 100, playerFatigue: playersAtOpt.map(() => 20) });
+    state.players = playersAtOpt;
+    state.rosters = playersAtOpt.map((entry, index) => ({
+      id: `r-${index + 1}`,
+      teamId: "T-1",
+      playerId: entry.id,
+      contractLength: 2,
+      salary: 5,
+      upkeep: 5,
+      roleTag: "starter",
+      joinedSeasonId: "season-1",
+    }));
+
+    const spendable = resolveMarketSpendableCashForPlanner({
+      gameState: state,
+      teamId: "T-1",
+      teamCash: 100,
+      rosterBelowMin: false,
+    });
+
+    expect(spendable).toBeGreaterThan(0);
+    expect(spendable).toBeLessThan(100);
+  });
+
+  it("unlocks most cash for draft when roster is below Opt", () => {
+    const state = gameState({
+      cash: 50,
+      rosters: [
+        { id: "r1", teamId: "T-1", playerId: "p1", slot: 0, salary: 5 },
+        { id: "r2", teamId: "T-1", playerId: "p2", slot: 1, salary: 5 },
+      ],
+      players: [player("p1"), player("p2")],
+    });
+
+    const spendable = resolveMarketSpendableCashForPlanner({
+      gameState: state,
+      teamId: "T-1",
+      teamCash: 50,
+      rosterBelowMin: false,
+    });
+
+    expect(spendable).toBeGreaterThan(35);
+    expect(spendable).toBeLessThan(50);
   });
 
   it("applies maintenance through the facility service and restores condition", () => {

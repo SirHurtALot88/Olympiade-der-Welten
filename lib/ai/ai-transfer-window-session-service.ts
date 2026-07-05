@@ -8,6 +8,7 @@ import {
   resolveActiveConvergencePickEngine,
   resolveTeamStatus,
   teamNeedsMarketConvergence,
+  teamSkipsPreseasonMarketBuys,
   type ConvergencePickEngine,
   type ConvergenceTeamResult,
   type MarketPlanConvergenceResult,
@@ -127,7 +128,6 @@ async function runTeamCycle(input: {
         includeWarningTeams: true,
         applySellSteps: true,
         applyBuySteps: false,
-        maxSellsPerTeam: 1,
         maxBuysPerTeam: 0,
         previewSellLimit: 12,
         previewBuyLimit: 4,
@@ -154,7 +154,12 @@ async function runTeamCycle(input: {
   }
 
   const afterSellSave = input.sessionRunContext?.save ?? input.persistence.getSaveById(input.saveId);
-  if (input.allowBuys && afterSellSave && teamNeedsMarketConvergence(afterSellSave.gameState, input.teamId)) {
+  if (
+    input.allowBuys &&
+    afterSellSave &&
+    teamNeedsMarketConvergence(afterSellSave.gameState, input.teamId) &&
+    !teamSkipsPreseasonMarketBuys(afterSellSave.gameState, input.teamId)
+  ) {
     const buyApply = await applyAiMarketPlanLocally({
       source: "sqlite",
       saveId: input.saveId,
@@ -170,7 +175,6 @@ async function runTeamCycle(input: {
         includeWarningTeams: true,
         applySellSteps: false,
         applyBuySteps: true,
-        maxSellsPerTeam: 0,
         maxBuysPerTeam: null,
         applyBuyStepsInBatch: input.leagueRound > 1 ? 3 : 2,
         previewBuyLimit: input.leagueRound > 1 ? 144 : 112,
@@ -192,12 +196,32 @@ async function runTeamCycle(input: {
     appliedBuys += buyApply.summary.appliedBuys;
     warnings.push(...buyApply.warnings.slice(0, 4));
     applyResult = buyApply.teams.find((team) => team.teamId === input.teamId)?.result ?? applyResult;
+    // Root-cause fix (2026-07-04, S8 real-save regression — buy volume collapsed 85->46 despite
+    // 30-100+ unspent cash for many teams; see outputs/real-engine-s1s5-final/progress-log.md):
+    // this used to also exclude every *blocked* buyGateRow (status!=="accepted", e.g.
+    // cash_buffer_failed/team_hard_no_go/below_upgrade_floor — all team-A-specific reasons) and
+    // every skippedSteps entry (candidates a team's own buy plan considered and rejected) from the
+    // *session-wide* excludeBuyPlayerIds set shared across all 26+ teams still needing convergence.
+    // A candidate blocked for team A because of team A's cash buffer or identity fit says nothing
+    // about whether team B (different cash, different identity) could buy them — but the shared
+    // set made that candidate permanently unavailable to every other team for the rest of the whole
+    // session regardless. With ~26 teams needing convergence in the same pass (roughly double a
+    // healthy season), teams processed later in the `needing` order inherited an already-decimated
+    // pool purely from teams processed earlier "considering and passing" on candidates that would
+    // have suited them fine — observed directly on the real save: V-W and W-W got 0 buys all
+    // session (including the dedicated opt-gap-rescue pass) despite being deeply below Opt with
+    // cash, simply because every team before them in iteration order had already blocked-and-thus-
+    // excluded the viable pool. Only a candidate that was actually bought (appliedBuyDetails),
+    // queued to be bought (plannedBuyDetails) or accepted by the final buy gate (buyGateRows
+    // status "accepted") is genuinely spoken for this session; anything merely considered-and-
+    // rejected for one team must remain available to the next.
     for (const row of buyApply.buyGateRows ?? []) {
+      if (row.status !== "accepted") continue;
       const playerId = typeof row.playerId === "string" ? row.playerId : null;
       if (playerId) input.excludeBuyPlayerIds.add(playerId);
     }
     for (const team of buyApply.teams) {
-      for (const step of [...team.appliedBuyDetails, ...team.plannedBuyDetails, ...team.skippedSteps]) {
+      for (const step of [...team.appliedBuyDetails, ...team.plannedBuyDetails]) {
         if (step.stepType === "buy") input.excludeBuyPlayerIds.add(step.playerId);
       }
     }
@@ -268,22 +292,59 @@ export async function runTransferWindowSession(input: TransferWindowSessionInput
   let leagueRoundsCompleted = 0;
   const perTeamMap = new Map<string, ConvergenceTeamResult>();
   const exhaustedTeamIds = new Set<string>();
-  // A single sell-without-a-matching-buy cycle is a normal, bounded part of convergence (e.g. a
-  // deliberate cash-recovery liquidation step) and must NOT be treated as a hard failure — see the
-  // "valid_sell_only_below_min" status. But left unchecked across many cycles/rounds, a team whose
-  // buy candidates keep failing to land (lane/cash/archetype mismatch) gets sold down cycle after
-  // cycle with nothing to show for it, eventually reaching 0 players — a direct violation of the
-  // no-sell-floor rebuild guarantee (.cursor/rules/balancing-no-sell-floor-full-rebuild.mdc). Track
-  // consecutive net-negative cycles per team across the whole session (reset on any net-positive
-  // cycle) and hard-stop that team once it happens twice without recovering in between.
-  const netNegativeStrikes = new Map<string, number>();
-  const sellSpiralHaltedTeamIds = new Set<string>();
+  // Design correction (2026-07-04): sell and buy are now strictly phase-separated (see
+  // isSeasonEndSellPhase/isPreseasonBuyPhase below) — a team's main-loop cycles in a season_end
+  // session only ever sell, and its cycles in a preseason session only ever buy. The old
+  // "netNegativeStrikes"/sell-spiral-halt mechanism below existed solely to defend against the
+  // previous coupled sell-then-buy-in-the-same-cycle design (a team whose buy kept failing got sold
+  // down cycle after cycle with nothing to show for it). That failure mode is now structurally
+  // impossible: a season_end cycle never attempts a buy, so "sell without a matching buy" is the
+  // expected shape of every cycle there, not an anomaly — and a preseason cycle never attempts a
+  // sell, so the roster can never shrink there. Keeping the old strike/halt logic active would
+  // therefore misfire on every single season_end sell cycle and artificially cap a team at ~2 sells
+  // regardless of how many legitimate sell candidates (profit/contract-end/roster-cleanup) it has —
+  // an unintended intensity change, not a reordering. The mechanism is intentionally removed from
+  // this loop; each team's own sell/buy preview scoring (unchanged) is the only thing that decides
+  // how much it sells or buys, which naturally produces a heterogeneous per-team result. No new
+  // roster floor is introduced — see .cursor/rules/balancing-no-sell-floor-full-rebuild.mdc.
+  const isSeasonEndSellPhase = input.phase === "season_end";
+  const isPreseasonBuyPhase = input.phase === "preseason";
+
+  // Sell-cap mechanism removed entirely (2026-07-04, explicit user correction — see
+  // .cursor/rules/balancing-no-sell-floor-full-rebuild.mdc and
+  // outputs/real-engine-s1s5-final/progress-log.md): the previous
+  // SEASON_END_BELOW_OPT_QUALITY_SELL_CAP (originally 1, later raised to 3) and the hardMin
+  // "Rebuild-mode" sell gate below it were both, on reflection, a mistaken design: the Opt target is
+  // a checkpoint for the state *after* the preseason buy phase, not a gate on how much a team may
+  // sell at season end. A team with 12 players is free to sell all 12 and start next preseason at 0,
+  // exactly like every team starts Season 1 at 0 and rebuilds with its full cash budget via the same
+  // Unified Pick Engine convergence used here — there is no conceptual difference between "team sold
+  // itself down to 0 at season end" and "team enters the S1 draft at 0"; both must be fully rebuildable
+  // by the buy-side engine in the following preseason pass. Capping/gating sells was treating the
+  // wrong side of the pipeline as the problem. The actual, still-real question the original S3
+  // incident raised — was repeated selling itself harmful, or was the real bug that the *subsequent
+  // preseason buy phase* didn't reliably rebuild a heavily-sold-down team back to Opt — is now
+  // re-diagnosed as the latter and tracked separately (see the progress log entry for this session);
+  // fixing that properly belongs in the preseason buy convergence path, not as a sell-side limiter.
 
   for (let leagueRound = 1; leagueRound <= maxLeagueRounds; leagueRound += 1) {
     const latestSave = readLiveSave();
     if (!latestSave) throw new Error("Save missing during transfer window.");
     const coverageRiskBefore = getTeamsNeedingConvergence(latestSave.gameState).length;
-    const needing = scopeTeam(getTeamsNeedingConvergence(latestSave.gameState).map((entry) => entry.teamId));
+    // Season-end sell eligibility (2026-07-04, see the sell-cap-removal note above): the buy-phase
+    // "needing convergence" gate (rosterCount >= Opt -> excluded) is correct for buys — a team that
+    // has already reached Opt has no need to keep buying — but is the wrong gate for sells. A team
+    // at or above Opt must still be allowed into the season_end sell session; whether it actually
+    // sells anything is left entirely to its own sell-preview (poor fit / profit / contract-end
+    // candidates), not to a pre-filter on roster size vs. Opt. Every scoped team with at least one
+    // player is therefore eligible to be considered each round; a team with nothing worth selling
+    // simply nets 0 actions on its first cycle and is marked exhausted (see below), so this does not
+    // meaningfully add cost for teams that have no reason to sell.
+    const needing = isSeasonEndSellPhase
+      ? scopeTeam(latestSave.gameState.teams.map((team) => team.teamId)).filter(
+          (teamId) => rosterCount(latestSave.gameState, teamId) > 0 && !exhaustedTeamIds.has(teamId),
+        )
+      : scopeTeam(getTeamsNeedingConvergence(latestSave.gameState).map((entry) => entry.teamId));
     if (needing.length === 0) {
       leagueRoundsCompleted = leagueRound;
       break;
@@ -292,29 +353,35 @@ export async function runTransferWindowSession(input: TransferWindowSessionInput
     let roundProgress = false;
     let roundAppliedBuys = 0;
     let roundAppliedSells = 0;
+    // Strict phase separation (2026-07-04 design correction): "Verkauf findet separat statt und vor
+    // allem VOR dem Kaufen" — a season_end session's main-loop cycles only ever sell (the Sell-Engine
+    // pass, run at season end); a preseason session's main-loop cycles only ever buy (the Buy-Engine
+    // pass, run at season start, spending cash incl. the previous phase's sell proceeds). This is the
+    // direct fix for the "round=N cycle=1 engine=unified sells=1 buys=1" lateral-swap pattern (228+
+    // occurrences in outputs/real-engine-s1s5-final-run2/run.log) — sell and buy no longer coexist in
+    // the same cycle for either phase. The narrow "acute cash need during the buy phase" exception
+    // from the task brief is handled by a separate, pre-existing mechanism upstream of this session
+    // (recoverNegativeCashBeforeSeasonStart / runPreseasonProactiveCashRecovery in
+    // scripts/long-run-sandbox-s1-s6.ts, which runs before the preseason buy convergence and is
+    // itself sell-only) — it is intentionally not reintroduced here as a per-cycle reflex.
     for (const teamId of needing) {
-      // Once a team's sell/buy pairing has repeatedly failed to land (see netNegativeStrikes below),
-      // don't re-enter it in a later round — getTeamsNeedingConvergence will keep returning it (it's
-      // still short of Opt), but retrying just repeats the same failed pairing and erodes the roster
-      // further. This is intentionally narrower than "any exhausted team": teams that stall out with a
-      // clean net-zero swap (sell 1, buy 1 better replacement) are expected to keep getting fresh
-      // chances each round — only sell-without-buy spirals get hard-stopped across rounds.
-      if (sellSpiralHaltedTeamIds.has(teamId)) continue;
       for (let cycle = 1; cycle <= maxTeamCycles; cycle += 1) {
         const midSave = readLiveSave();
-        if (!midSave || !teamNeedsMarketConvergence(midSave.gameState, teamId)) break;
+        // Season-end continuation check is phase-specific (2026-07-04, sell-cap removal): buy-phase
+        // cycles still stop as soon as the team no longer needs convergence (unchanged). Sell-phase
+        // cycles must NOT stop on that condition — teamNeedsMarketConvergence is false for any team
+        // at/above Opt, which used to end a healthy team's sell attempt before it even got one cycle.
+        // A sell-phase cycle only stops once the roster is empty (nothing left to sell); running out
+        // of worthwhile candidates is handled by the natural "0 net actions -> exhausted" break below.
+        if (!midSave) break;
+        if (isSeasonEndSellPhase) {
+          if (rosterCount(midSave.gameState, teamId) <= 0) break;
+        } else if (!teamNeedsMarketConvergence(midSave.gameState, teamId)) {
+          break;
+        }
         const rosterBeforeCycle = rosterCount(midSave.gameState, teamId);
-        // Rebuild-mode (course correction 2026-07-04, req C): a team below hardMin needs pure
-        // acquisition, not sell-first-churn. Selling first here was a root cause of a net-zero
-        // churn trap for badly depleted teams (sell 1 low-value bench player, buy 1 similar-value
-        // replacement, roster count never grows) — see engine-architecture-ist.md / R-R case
-        // study. Gate on hardMin (not Opt): teams between hardMin and Opt may legitimately still
-        // sell a poor-fit player as part of roster-quality management (existing behaviour,
-        // covered by tests/ai-market-plan-convergence.test.ts's "sell-only below Opt but above
-        // hardMin" cases) — only a team that hasn't even reached hardMin yet is forced into
-        // buy-only mode.
-        const teamHardMinForCycle = getTeamHardMinRequired(midSave.gameState, teamId);
-        const allowSellsForCycle = rosterBeforeCycle >= teamHardMinForCycle;
+        const allowSellsForCycle = isSeasonEndSellPhase;
+        const allowBuysForCycle = isPreseasonBuyPhase && allowBuys;
 
         const cycleResult = await runTeamCycle({
           saveId: input.saveId,
@@ -326,7 +393,7 @@ export async function runTransferWindowSession(input: TransferWindowSessionInput
           confirmToken,
           transferPhase,
           teamScope,
-          allowBuys,
+          allowBuys: allowBuysForCycle,
           allowSells: allowSellsForCycle,
           cycleIndex: cycle,
           leagueRound,
@@ -353,21 +420,12 @@ export async function runTransferWindowSession(input: TransferWindowSessionInput
 
         if (cycleResult.appliedBuys + cycleResult.appliedSells === 0) {
           exhaustedTeamIds.add(teamId);
-        } else if (effectiveRosterAfter === rosterBeforeCycle) {
+        } else if (!isSeasonEndSellPhase && effectiveRosterAfter === rosterBeforeCycle) {
+          // Only meaningful in the buy phase: a buy cycle that applied nothing net (e.g. a blocked
+          // candidate) made no forward progress. In the sell phase a shrinking roster is the expected
+          // outcome of a successful sell cycle, not a stall — see the phase-separation note above.
           exhaustedTeamIds.add(teamId);
           warnings.push(`transfer_window_roster_stalled:${teamId}:round:${leagueRound}:cycle:${cycle}`);
-        } else if (effectiveRosterAfter < rosterBeforeCycle) {
-          const strikes = (netNegativeStrikes.get(teamId) ?? 0) + 1;
-          netNegativeStrikes.set(teamId, strikes);
-          if (strikes >= 2) {
-            exhaustedTeamIds.add(teamId);
-            sellSpiralHaltedTeamIds.add(teamId);
-            warnings.push(`transfer_window_sell_without_matching_buy_halted:${teamId}:round:${leagueRound}:cycle:${cycle}`);
-          } else {
-            warnings.push(`transfer_window_sell_without_matching_buy:${teamId}:round:${leagueRound}:cycle:${cycle}`);
-          }
-        } else {
-          netNegativeStrikes.set(teamId, 0);
         }
 
         const previous = perTeamMap.get(teamId);
@@ -436,16 +494,17 @@ export async function runTransferWindowSession(input: TransferWindowSessionInput
 
   // Opt-gap rescue (2026-07-04): teams above hardMin but still stuck well below Opt (gap>=3) at
   // this point never get a second look — the emergency repair engine further below only fires for
-  // hardMin violations, and a team can end up here simply because it hit the 2-strike sell-spiral
-  // halt (see netNegativeStrikes above) partway through the main rounds, even though a pure
-  // buy-only attempt against the pool as it stands after every other team's activity this session
-  // was never retried. This pass is buy-only (sells fully disabled) so it cannot add further
-  // net-negative strikes or reduce roster size, reuses the same fit-aware pick engine (no lowered
+  // hardMin violations, and a team can end up here simply because a pure buy-only attempt against
+  // the pool as it stands after every other team's activity this session was never retried. This
+  // pass is buy-only (sells fully disabled), reuses the same fit-aware pick engine (no lowered
   // standards / no emergency filler), and is bounded to the small subset of teams still gapped —
-  // see outputs/real-engine-s1s5-final/progress-log.md for the S1 case study (R-C) that surfaced this.
+  // see outputs/real-engine-s1s5-final/progress-log.md for the S1 case study (R-C) that surfaced
+  // this. It is a buying mechanism, so under the strict phase separation (2026-07-04 design
+  // correction — "Käufe gehören an den SAISON-START") it only runs for the preseason/buy phase; a
+  // season_end session is sell-only end to end and must not perform any buy, rescue or otherwise.
   const OPT_GAP_RESCUE_THRESHOLD = 3;
   const OPT_GAP_RESCUE_MAX_CYCLES = 2;
-  const rescueSave = readLiveSave();
+  const rescueSave = isPreseasonBuyPhase ? readLiveSave() : null;
   if (rescueSave) {
     const rescueCandidates = scopeTeam(
       rescueSave.gameState.teams

@@ -1197,7 +1197,6 @@ describe("ai market plan apply service", () => {
       options: {
         applySellSteps: true,
         applyBuySteps: false,
-        maxSellsPerTeam: 2,
       },
     });
 

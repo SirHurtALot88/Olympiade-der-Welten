@@ -7,6 +7,7 @@ import {
 import {
   assessTeamSellRunwayPressure,
   countTeamSeasonSells,
+  estimateBuyoutLikelihood,
   getProfitWindowSellThreshold,
   isAttractiveProfitSell,
 } from "@/lib/ai/team-sell-runway-pressure";
@@ -75,6 +76,16 @@ describe("team sell runway pressure", () => {
         cashPressureScore: 0.1,
       }),
     ).toBe(true);
+  });
+
+  it("uses pressureOverride to keep buyout likelihood above the proactive threshold under cash pressure", () => {
+    const likelihood = estimateBuyoutLikelihood({
+      buyoutCost: 20,
+      teamCash: 15,
+      baseLikelihood: 0.4,
+      pressureOverride: true,
+    });
+    expect(likelihood).toBeGreaterThanOrEqual(0.32);
   });
 
   it("counts season sells", () => {

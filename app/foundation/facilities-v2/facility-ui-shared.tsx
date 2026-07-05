@@ -87,20 +87,6 @@ function describeSpecialistWingVariant(variant: SpecialistWingVariant, level: nu
   return `${entry.label}: ${labels} · ${formatLocaleNumber(discountPct, 0)}% Rabatt`;
 }
 
-export function FacilityLevelRail({ level, nextLevel }: { level: number; nextLevel: number }) {
-  return (
-    <div className="training-v2-level-rail facilities-v2-level-rail" aria-label={`Level ${level} von 5`}>
-      {[1, 2, 3, 4, 5].map((step) => (
-        <span
-          key={step}
-          className={`training-v2-level-dot${step <= level ? " is-filled" : ""}${step === nextLevel && nextLevel > level ? " is-next" : ""}`}
-          title={`L${step}`}
-        />
-      ))}
-    </div>
-  );
-}
-
 export function FacilityLevelStrip({ facilityId, level }: { facilityId: FacilityId; level: number }) {
   return (
     <div className="facilities-v2-level-strip" aria-label="Stufen L1 bis L5">

@@ -1,11 +1,15 @@
 import { describe, expect, it } from "vitest";
 
 import {
+  getCombinedFatigueInjuryPerformanceMultiplier,
   getFatiguePerformanceMultiplier,
   getFatiguePerformancePenaltyPercent,
   getFatigueRiskLevel,
+  getInjuryPerformanceMultiplier,
   getInjuryRiskBand,
   getInjuryRiskPercent,
+  INJURY_PERFORMANCE_MULTIPLIER,
+  MAX_COMBINED_FATIGUE_INJURY_MULTIPLIER,
 } from "@/lib/fatigue/fatigue-calibration";
 
 describe("fatigue-calibration", () => {
@@ -15,6 +19,13 @@ describe("fatigue-calibration", () => {
     expect(getFatiguePerformancePenaltyPercent(80)).toBe(25);
     expect(getFatiguePerformancePenaltyPercent(100)).toBe(25);
     expect(getFatiguePerformanceMultiplier(80)).toBe(0.75);
+  });
+
+  it("applies same-day injury malus multiplicatively with fatigue", () => {
+    expect(getInjuryPerformanceMultiplier(false)).toBe(1);
+    expect(getInjuryPerformanceMultiplier(true)).toBe(INJURY_PERFORMANCE_MULTIPLIER);
+    expect(getCombinedFatigueInjuryPerformanceMultiplier(80, true)).toBe(MAX_COMBINED_FATIGUE_INJURY_MULTIPLIER);
+    expect(getCombinedFatigueInjuryPerformanceMultiplier(0, true)).toBe(INJURY_PERFORMANCE_MULTIPLIER);
   });
 
   it("interpolates injury risk across anchor points", () => {

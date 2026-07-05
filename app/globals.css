@@ -210,6 +210,18 @@ a {
   margin-bottom: 6px;
 }
 
+/*
+ * Baseline for foundation sub-headers. Components may still override
+ * margin/color/gradients/icons locally, but font-size/weight should stay
+ * on this single value unless a section is intentionally hero-sized
+ * (those components already set their own larger font-size, which wins
+ * here since they are declared later in this file).
+ */
+.foundation-shell h3 {
+  font-size: 1.05rem;
+  font-weight: 700;
+}
+
 .form-stack,
 .stack {
   display: grid;
@@ -1170,7 +1182,6 @@ a {
 
 .player-drawer-stats-chart h3 {
   margin: 0;
-  font-size: 1rem;
 }
 
 .player-drawer-section-block {
@@ -3139,7 +3150,6 @@ a {
 
 .foundation-season-setup-card-head h3 {
   margin: 0;
-  font-size: 1.05rem;
 }
 
 .foundation-season-setup-step-index {
@@ -3208,8 +3218,7 @@ a {
   padding: 12px;
 }
 
-.season-briefing-kpis span,
-.season-briefing-section h3 {
+.season-briefing-kpis span {
   color: var(--muted);
   font-size: 0.78rem;
   font-weight: 900;
@@ -3237,8 +3246,8 @@ a {
 .season-briefing-section h3 {
   margin: 0;
   color: var(--text);
-  font-size: 1rem;
-  text-transform: none;
+  font-weight: 900;
+  letter-spacing: 0;
 }
 
 .season-briefing-matchday-grid,
@@ -7883,6 +7892,9 @@ a {
 .transfer-panel-section h3,
 .transfer-panel-section h4 {
   margin: 0;
+}
+
+.transfer-panel-section h4 {
   font-size: 1rem;
 }
 
@@ -10349,7 +10361,6 @@ a {
 
 .season-subpanel-header h3 {
   margin: 0;
-  font-size: 0.98rem;
   color: var(--text);
 }
 
@@ -20695,7 +20706,6 @@ a {
 
 .foundation-player-generator-section-head h3 {
   margin: 0;
-  font-size: 1rem;
 }
 
 .foundation-player-generator-axis-cards .metric-card {
@@ -30190,8 +30200,6 @@ a {
 }
 
 .training-v2-hero,
-.training-v2-summary-card,
-.training-v2-story-card,
 .training-v2-lane,
 .training-v2-preview-card,
 .training-v2-upgrade-card {
@@ -30308,8 +30316,6 @@ a {
   min-width: 100%;
 }
 
-.training-v2-summary-grid,
-.training-v2-story-grid,
 .training-v2-workspace,
 .training-v2-filter-row,
 .training-v2-mode-guide,
@@ -30321,26 +30327,6 @@ a {
   gap: 14px;
 }
 
-.training-v2-summary-grid {
-  grid-template-columns: repeat(4, minmax(0, 1fr));
-}
-
-.training-v2-story-grid {
-  grid-template-columns: repeat(4, minmax(0, 1fr));
-}
-
-.training-v2-summary-card,
-.training-v2-story-card {
-  position: relative;
-  overflow: hidden;
-  display: grid;
-  gap: 6px;
-  padding: 14px 16px;
-  border-radius: 18px;
-}
-
-.training-v2-summary-card::before,
-.training-v2-story-card::before,
 .training-v2-preview-card::before {
   content: "";
   position: absolute;
@@ -30349,24 +30335,6 @@ a {
   background: rgba(111, 160, 255, 0.78);
 }
 
-.training-v2-story-card.is-growth::before {
-  background: rgba(98, 179, 110, 0.82);
-}
-
-.training-v2-story-card.is-risk::before {
-  background: rgba(215, 91, 84, 0.84);
-}
-
-.training-v2-story-card.is-facility::before {
-  background: rgba(119, 198, 184, 0.84);
-}
-
-.training-v2-story-card.is-seasonend::before {
-  background: rgba(225, 184, 92, 0.84);
-}
-
-.training-v2-summary-card span,
-.training-v2-story-card span,
 .training-v2-preview-card > span,
 .training-v2-player-metrics span,
 .training-v2-upgrade-grid span,
@@ -30378,8 +30346,6 @@ a {
   letter-spacing: 0.03em;
 }
 
-.training-v2-summary-card strong,
-.training-v2-story-card strong,
 .training-v2-preview-card strong,
 .training-v2-section-head strong,
 .training-v2-player-copy strong,
@@ -30582,6 +30548,7 @@ a {
 
 .training-v2-rider-grid {
   grid-template-columns: repeat(auto-fit, minmax(340px, 1fr));
+  align-items: start;
 }
 
 .training-v2-rider-card {
@@ -30642,6 +30609,130 @@ a {
 .training-v2-team-mode-strip small {
   color: rgba(218, 229, 245, 0.62);
   font-size: 0.74rem;
+}
+
+.training-v2-stat-strip {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 10px;
+}
+
+.training-v2-stat-chip {
+  position: relative;
+  overflow: hidden;
+  display: grid;
+  gap: 4px;
+  padding: 10px 12px;
+  border-radius: 14px;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  background: rgba(255, 255, 255, 0.035);
+}
+
+.training-v2-stat-chip::before {
+  content: "";
+  position: absolute;
+  inset: 0 auto 0 0;
+  width: 3px;
+  background: rgba(111, 160, 255, 0.78);
+}
+
+.training-v2-stat-chip span {
+  color: rgba(206, 217, 236, 0.72);
+  font-size: 0.74rem;
+  font-weight: 800;
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+}
+
+.training-v2-stat-chip strong {
+  font-size: 0.98rem;
+}
+
+.training-v2-stat-chip small {
+  color: rgba(214, 223, 238, 0.68);
+  font-size: 0.74rem;
+}
+
+.training-v2-top-risk-line {
+  margin: 0;
+  font-size: 0.82rem;
+}
+
+.training-v2-mode-guide-disclosure {
+  display: grid;
+  gap: 10px;
+}
+
+.training-v2-card-compact-badges {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  padding: 0 14px;
+}
+
+.training-v2-card-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 4px 10px;
+  border-radius: 999px;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  background: rgba(255, 255, 255, 0.045);
+  color: rgba(232, 238, 250, 0.88);
+  font-size: 0.74rem;
+  font-weight: 700;
+  white-space: nowrap;
+}
+
+.training-v2-card-badge.is-recommendation {
+  border-color: rgba(122, 164, 240, 0.4);
+  background: rgba(89, 130, 210, 0.16);
+  color: rgba(218, 231, 255, 0.94);
+}
+
+.training-v2-card-badge.is-trait.is-positive {
+  border-color: rgba(101, 182, 114, 0.4);
+  background: rgba(98, 179, 110, 0.14);
+  color: #a9e3ae;
+}
+
+.training-v2-card-badge.is-trait.is-negative {
+  border-color: rgba(214, 93, 86, 0.4);
+  background: rgba(214, 93, 86, 0.14);
+  color: #ffb4ae;
+}
+
+.training-v2-card-badge.is-demand.is-open {
+  border-color: rgba(225, 184, 92, 0.4);
+  background: rgba(225, 184, 92, 0.14);
+  color: #f3d78e;
+}
+
+.training-v2-card-badge.is-demand.is-at_risk {
+  border-color: rgba(224, 143, 84, 0.45);
+  background: rgba(224, 143, 84, 0.16);
+  color: #f6c393;
+}
+
+.training-v2-card-badge.is-demand.is-failed {
+  border-color: rgba(214, 93, 86, 0.45);
+  background: rgba(214, 93, 86, 0.16);
+  color: #ffb4ae;
+}
+
+.training-v2-card-details-wrapper {
+  display: grid;
+  gap: 10px;
+  padding: 0 14px 14px;
+}
+
+.training-v2-card-details-toggle {
+  width: fit-content;
+}
+
+.training-v2-card-details {
+  display: grid;
+  gap: 12px;
 }
 
 .training-v2-rider-orbit {
@@ -32071,29 +32162,6 @@ a {
   border-color: rgba(214, 93, 86, 0.26);
 }
 
-.training-v2-level-rail {
-  display: grid;
-  grid-template-columns: repeat(5, minmax(0, 1fr));
-  gap: 6px;
-}
-
-.training-v2-level-dot {
-  min-height: 8px;
-  border-radius: 999px;
-  border: 1px solid rgba(255, 255, 255, 0.08);
-  background: rgba(255, 255, 255, 0.045);
-}
-
-.training-v2-level-dot.is-filled {
-  border-color: rgba(111, 206, 145, 0.28);
-  background: linear-gradient(90deg, rgba(79, 151, 91, 0.9), rgba(112, 205, 130, 0.78));
-}
-
-.training-v2-level-dot.is-next {
-  border-color: rgba(225, 184, 92, 0.42);
-  background: linear-gradient(90deg, rgba(126, 101, 41, 0.62), rgba(225, 184, 92, 0.54));
-}
-
 .training-v2-level-effect-grid {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
@@ -32541,7 +32609,6 @@ a {
 .teams-v2-relationship-grid h3 {
   flex: 0 0 100%;
   margin: 0;
-  font-size: 1rem;
 }
 
 .teams-v2-relationship-grid span {
@@ -32837,8 +32904,7 @@ a {
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 
-  .training-v2-summary-grid,
-  .training-v2-story-grid {
+  .training-v2-stat-strip {
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 
@@ -32899,8 +32965,7 @@ a {
     grid-template-columns: 1fr;
   }
 
-  .training-v2-summary-grid,
-  .training-v2-story-grid,
+  .training-v2-stat-strip,
   .training-v2-filter-row,
   .training-v2-mode-guide {
     grid-template-columns: 1fr;
@@ -34900,12 +34965,37 @@ a {
 }
 
 .training-v2-rider-grid.team-portraits-grid {
-  grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+  grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
   gap: 12px;
+  contain-intrinsic-size: auto 340px;
 }
 
 .training-v2-rider-card .foundation-player-portrait-card {
   width: 100%;
+}
+
+.training-v2-rider-card .foundation-player-portrait-submeta {
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.training-v2-rider-card .home-v2-player-overlay-bottom {
+  gap: 5px;
+  padding: 16px 10px 10px;
+}
+
+.training-v2-rider-card .home-v2-player-stats {
+  gap: 5px;
+}
+
+.training-v2-rider-card .foundation-player-portrait-stat {
+  flex: 1 1 calc(33% - 5px);
+}
+
+.training-v2-rider-card .foundation-player-portrait-footer {
+  display: grid;
+  gap: 8px;
 }
 
 .training-v2-rider-card .foundation-player-portrait-footer .velo-intensity-rail {
@@ -35745,6 +35835,58 @@ a {
   margin: 2px 0;
 }
 
+.scouting-facility-power {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 10px;
+  border: 1px solid rgba(112, 138, 187, 0.16);
+  border-radius: 18px;
+  background: linear-gradient(180deg, rgba(11, 18, 32, 0.9), rgba(9, 15, 27, 0.82));
+  padding: 16px;
+}
+
+.scouting-facility-slot-track {
+  width: 100%;
+  height: 8px;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.06);
+  overflow: hidden;
+}
+
+.scouting-facility-slot-fill {
+  height: 100%;
+  border-radius: 999px;
+  background: linear-gradient(90deg, rgba(91, 145, 218, 0.85), rgba(145, 185, 244, 0.95));
+}
+
+.scouting-facility-rates {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 8px;
+  width: 100%;
+}
+
+.scouting-facility-rate-chip {
+  display: grid;
+  gap: 3px;
+  padding: 8px 10px;
+  border-radius: 12px;
+  background: rgba(255, 255, 255, 0.03);
+  border: 1px solid rgba(255, 255, 255, 0.06);
+}
+
+.scouting-facility-rate-chip span {
+  font-size: 0.66rem;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: rgba(235, 239, 247, 0.58);
+}
+
+.scouting-facility-rate-chip strong {
+  font-size: 0.82rem;
+}
+
 .scouting-reveal-section {
   display: flex;
   flex-direction: column;
@@ -36552,6 +36694,10 @@ a {
 
   .scouting-reveal-ladder {
     grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+
+  .scouting-facility-rates {
+    grid-template-columns: 1fr;
   }
 }
 

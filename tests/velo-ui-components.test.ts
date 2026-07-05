@@ -5,6 +5,8 @@ import { describe, expect, it } from "vitest";
 const veloUiPath = "/Users/chrisfalk/Documents/Codex/Olympiade der Welten/components/foundation/velo-ui";
 const globalsPath = "/Users/chrisfalk/Documents/Codex/Olympiade der Welten/app/globals.css";
 const foundationClientPath = "/Users/chrisfalk/Documents/Codex/Olympiade der Welten/app/foundation/FoundationPageClient.tsx";
+const teamsDetailPanelPath =
+  "/Users/chrisfalk/Documents/Codex/Olympiade der Welten/app/foundation/teams-v2/FoundationTeamsDetailPanel.tsx";
 
 describe("velo ui rollout contract", () => {
   it("exports shared velo components", async () => {
@@ -24,7 +26,7 @@ describe("velo ui rollout contract", () => {
   });
 
   it("wires classic teams v1 economy tiles into foundation", async () => {
-    const fileText = await fs.readFile(foundationClientPath, "utf8");
+    const fileText = await fs.readFile(teamsDetailPanelPath, "utf8");
     expect(fileText).toContain("teamEconomyTiles");
     expect(fileText).toContain("teams-v2-focus-card");
   });
@@ -37,13 +39,13 @@ describe("velo ui rollout contract", () => {
       fs.readFile(globalsPath, "utf8"),
     ]);
 
-    expect(lineupText).toContain("VeloStatOrbitRow");
+    expect(lineupText).toContain("FoundationPlayerPortraitCard");
     expect(lineupText).toContain("VeloImpactStrip");
-    expect(lineupText).toContain("legacy-lineup-fit-strip");
+    expect(lineupText).toContain("legacy-lineup-scoreboard-impact-strip");
     expect(arenaText).toContain("VeloImpactStrip");
     expect(arenaText).toContain("arena-v2-slot-impact-strip");
     expect(arenaText).toContain("mutatorBonus");
-    expect(drawerText).toContain("VeloStatOrbitRow");
+    expect(drawerText).toContain("player-drawer-axis-chip");
     expect(drawerText).toContain("player-drawer-scouting-disclosure");
     expect(cssText).toContain(".player-drawer-axis-orbit");
     expect(cssText).toContain(".arena-v2-slot-impact-strip");

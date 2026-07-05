@@ -126,6 +126,10 @@ export type PlayerDrawerHistoryRow = {
   ovrRank: number | null;
   pps: number | null;
   ppsRank: number | null;
+  powRank: number | null;
+  speRank: number | null;
+  menRank: number | null;
+  socRank: number | null;
   mvs: number | null;
   mvsRank: number | null;
   marketValue: number | null;
@@ -468,6 +472,10 @@ export type PlayerDetailDrawerData = {
     ovrRank: number | null;
     pps: number | null;
     ppsRank: number | null;
+    powRank: number | null;
+    speRank: number | null;
+    menRank: number | null;
+    socRank: number | null;
     mvs: number | null;
     mvsRank: number | null;
     marketValue: number | null;
@@ -1517,19 +1525,6 @@ function resolveSnapshotPlayerPerformanceRow(
   };
 }
 
-function resolvePlayerCareerTimelineStartSeasonId(gameState: GameState, playerId: string) {
-  const joinedSeasonId = gameState.rosters.find((entry) => entry.playerId === playerId)?.joinedSeasonId ?? null;
-  if (joinedSeasonId) {
-    return joinedSeasonId;
-  }
-
-  const firstBuySeasonId =
-    [...gameState.transferHistory]
-      .filter((entry) => entry.playerId === playerId && entry.transferType === "buy")
-      .sort((left, right) => left.seasonId.localeCompare(right.seasonId, "de", { numeric: true }))[0]?.seasonId ?? null;
-  return firstBuySeasonId;
-}
-
 function buildSeasonHistory(gameState: GameState, playerId: string, player: Player) {
   const rosterPurchasePrice =
     gameState.rosters.find((entry) => entry.playerId === playerId)?.purchasePrice ??
@@ -1560,11 +1555,31 @@ function buildSeasonHistory(gameState: GameState, playerId: string, player: Play
       const transferFee = seasonTransfer?.amount ?? null;
       const transferMarketValue = row.marketValue ?? seasonTransfer?.marketValue ?? null;
       const saleProjection = buildSnapshotSaleProjection(gameState, player, row, seasonTransfer);
+      const snapshotPerformances = getSnapshotPlayerPerformances(snapshot);
+      const resolvePerformanceAxisValue = (
+        entry: (typeof snapshotPerformances)[number],
+        area: "pow" | "spe" | "men" | "soc",
+      ) => {
+        const values = buildPlayerHistoryDisciplineValues(entry.disciplineBreakdown);
+        return resolveSeasonDisciplineAreaTotal(values, area, resolveSnapshotAxisPoints(gameState, entry, area));
+      };
       const ppsRankMap = buildSharedRankMap(
-        getSnapshotPlayerPerformances(snapshot).map((entry) => ({
+        snapshotPerformances.map((entry) => ({
           playerId: entry.playerId,
           value: entry.pps ?? entry.totalPoints ?? entry.totalContribution ?? null,
         })),
+      );
+      const powRankMap = buildSharedRankMap(
+        snapshotPerformances.map((entry) => ({ playerId: entry.playerId, value: resolvePerformanceAxisValue(entry, "pow") })),
+      );
+      const speRankMap = buildSharedRankMap(
+        snapshotPerformances.map((entry) => ({ playerId: entry.playerId, value: resolvePerformanceAxisValue(entry, "spe") })),
+      );
+      const menRankMap = buildSharedRankMap(
+        snapshotPerformances.map((entry) => ({ playerId: entry.playerId, value: resolvePerformanceAxisValue(entry, "men") })),
+      );
+      const socRankMap = buildSharedRankMap(
+        snapshotPerformances.map((entry) => ({ playerId: entry.playerId, value: resolvePerformanceAxisValue(entry, "soc") })),
       );
       const disciplineValues = buildPlayerHistoryDisciplineValues(row.disciplineBreakdown);
       return {
@@ -1587,6 +1602,10 @@ function buildSeasonHistory(gameState: GameState, playerId: string, player: Play
         ovrRank: row.ovrRank ?? null,
         pps: row.pps ?? row.totalPoints ?? row.totalContribution ?? null,
         ppsRank: row.ppsRank ?? ppsRankMap.get(row.playerId) ?? null,
+        powRank: powRankMap.get(row.playerId) ?? null,
+        speRank: speRankMap.get(row.playerId) ?? null,
+        menRank: menRankMap.get(row.playerId) ?? null,
+        socRank: socRankMap.get(row.playerId) ?? null,
         mvs: row.mvs ?? null,
         mvsRank: row.mvsRank ?? null,
         marketValue: row.marketValue ?? null,
@@ -1694,6 +1713,10 @@ function mergeSeasonHistoryWithTransferFallback(
       ovrRank: null,
       pps: 0,
       ppsRank: null,
+      powRank: null,
+      speRank: null,
+      menRank: null,
+      socRank: null,
       mvs: null,
       mvsRank: null,
       marketValue,
@@ -1765,6 +1788,10 @@ function buildEmptyHistoryRow(input: {
     ovrRank: null,
     pps: null,
     ppsRank: null,
+    powRank: null,
+    speRank: null,
+    menRank: null,
+    socRank: null,
     mvs: null,
     mvsRank: null,
     marketValue: null,
@@ -1812,21 +1839,13 @@ export function mergePlayerHistoryRowsWithSeasonTimeline(input: {
 
   timelineSeasonIds.sort((left, right) => left.localeCompare(right, "de", { numeric: true }));
 
-  const careerStartSeasonId =
-    input.playerId != null ? resolvePlayerCareerTimelineStartSeasonId(input.gameState, input.playerId) : null;
-  const filteredTimelineSeasonIds = careerStartSeasonId
-    ? timelineSeasonIds.filter(
-        (seasonId) => seasonId.localeCompare(careerStartSeasonId, "de", { numeric: true }) >= 0,
-      )
-    : timelineSeasonIds;
-
-  if (filteredTimelineSeasonIds.length === 0) {
+  if (timelineSeasonIds.length === 0) {
     return [...input.rows].sort((left, right) =>
       (left.seasonId ?? left.seasonName).localeCompare(right.seasonId ?? right.seasonName, "de", { numeric: true }),
     );
   }
 
-  return filteredTimelineSeasonIds.map((seasonId) => {
+  return timelineSeasonIds.map((seasonId) => {
     const existing = rowBySeasonId.get(seasonId);
     if (existing) {
       return existing;
@@ -1911,6 +1930,10 @@ function buildHistoryRows(input: {
       ? input.playerRating?.ppsSeason ?? input.seasonPerformance?.totalPoints ?? null
       : null,
     ppsRank: hasActiveSeasonPerformance ? input.playerRating?.ppsSeasonRank ?? null : null,
+    powRank: hasActiveSeasonPerformance ? input.playerRating?.ppPowRank ?? null : null,
+    speRank: hasActiveSeasonPerformance ? input.playerRating?.ppSpeRank ?? null : null,
+    menRank: hasActiveSeasonPerformance ? input.playerRating?.ppMenRank ?? null : null,
+    socRank: hasActiveSeasonPerformance ? input.playerRating?.ppSocRank ?? null : null,
     mvs: input.playerRating?.mvs ?? null,
     mvsRank: input.playerRating?.mvsRank ?? null,
     marketValue: input.marketValue,
@@ -1968,6 +1991,10 @@ function buildHistoryRows(input: {
       ovrRank: entry.ovrRank,
       pps: entry.pps,
       ppsRank: entry.ppsRank,
+      powRank: entry.powRank,
+      speRank: entry.speRank,
+      menRank: entry.menRank,
+      socRank: entry.socRank,
       mvs: entry.mvs,
       mvsRank: entry.mvsRank,
       marketValue: entry.marketValue,
@@ -2782,6 +2809,10 @@ export function buildPlayerDrawerDataFromLegacyContext(input: {
       ovrRank: playerRating?.ovrRank ?? null,
       pps: null,
       ppsRank: null,
+      powRank: null,
+      speRank: null,
+      menRank: null,
+      socRank: null,
       mvs: playerRating?.mvs ?? null,
       mvsRank: playerRating?.mvsRank ?? null,
       marketValue: economy.marketValue,

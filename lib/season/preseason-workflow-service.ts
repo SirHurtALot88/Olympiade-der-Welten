@@ -17,7 +17,7 @@ import { buildCoreStatsFromDisciplineRatings, buildPreviewDisciplineRatingsFromA
 import { buildSeasonEndProgressionPreview } from "@/lib/training/season-end-progression-preview";
 import { buildPrizeMoneyPreview } from "@/lib/season/prize-money-preview";
 import { buildSeasonSnapshotDryRun, upsertSeasonSnapshotRecord } from "@/lib/season/season-snapshot-service";
-import { advanceSeasonEconomyFactorWindow } from "@/lib/season/season-economy-factors";
+import { advanceSeasonEconomyFactorWindow, parseSalaryFactorPatternEnv } from "@/lib/season/season-economy-factors";
 import { refreshTeamObjectiveState } from "@/lib/board/team-season-objectives-service";
 import { advanceScoutIntelTick } from "@/lib/scouting/facility-scout-pipeline-service";
 import { advanceSponsorContractsForNewSeason } from "@/lib/sponsor/sponsor-contract-lifecycle";
@@ -221,6 +221,7 @@ export function applySeasonBaselineProgression(gameState: GameState, options: { 
     const isRostered = rosterPlayerIds.has(player.id);
     const hasSeasonEndProgression = progressedThisSeasonPlayerIds.has(player.id);
     const freeAgentRecoveryFraction = 0.12;
+    // Unrostered players drift 12% per season toward playerBaselines (attrs, MW, salary).
     const nextAttributePatch = Object.fromEntries(
       ATTRIBUTE_KEYS.map((attribute) => {
         const currentValue = toFiniteNumber(player.attributeSheetStats?.[attribute]);
@@ -451,6 +452,10 @@ function buildNextSeasonGameState(save: PersistedSaveGame): { gameState: GameSta
     fromSeasonId: save.gameState.season.id,
     toSeasonId: nextSeasonId,
     seasonState: save.gameState.seasonState,
+    // No-op for normal gameplay (env var unset outside scripted balancing runs) — lets a
+    // multi-season OLY_LONG_RUN_SALARY_FACTOR_PATTERN longer than the 5-season window stay in
+    // effect for every season it covers, not just the first 5.
+    patternFactors: parseSalaryFactorPatternEnv(),
   });
   const scheduleWarnings = [
     ...schedulePlan.warnings,

@@ -44,7 +44,6 @@ export async function POST(request: Request) {
       applySellSteps?: boolean;
       applyBuySteps?: boolean;
       maxBuysPerTeam?: number | null;
-      maxSellsPerTeam?: number | null;
       previewBuyLimit?: number | null;
       previewSellLimit?: number | null;
       performanceBudgetMs?: number | null;

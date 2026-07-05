@@ -216,7 +216,7 @@ describe("transfermarkt sale factor season start", () => {
     expect(breakdown.factorSource).toBe("fallback_no_ranked_group");
   });
 
-  it("matches Retool bracket-8 pricing for rank 2 in a five-player group", () => {
+  it("uses neutral sale factor when bracket pool is below the league minimum", () => {
     const players = Array.from({ length: 5 }, (_, index) =>
       createPlayer(`p${index + 1}`, {
         name: `Bracket Eight ${index + 1}`,
@@ -282,8 +282,79 @@ describe("transfermarkt sale factor season start", () => {
     expect(breakdown.bracket).toBe(8);
     expect(breakdown.bracketGroupSize).toBe(5);
     expect(breakdown.rankInBracket).toBe(2);
-    expect(breakdown.baseFactor).toBe(1.095);
+    expect(breakdown.saleFactor).toBe(1);
+    expect(breakdown.rankBonus).toBe(0);
+    expect(breakdown.salePrice).toBe(breakdown.baseMarketValue);
+  });
+
+  it("matches Retool bracket-8 pricing for rank 2 in a fifteen-player group", () => {
+    const players = Array.from({ length: 15 }, (_, index) =>
+      createPlayer(`p${index + 1}`, {
+        name: `Bracket Eight ${index + 1}`,
+        marketValue: 60 - index * 0.1,
+        displayMarketValue: 60 - index * 0.1,
+      }),
+    );
+    const rosters = players.map((player, index) =>
+      createRosterEntry(`r${index + 1}`, player.id, {
+        currentValue: 60 - index * 0.1,
+        purchasePrice: 60 - index * 0.1,
+      }),
+    );
+    const performances = players.map((player, index) => ({
+      id: `perf-${index + 1}`,
+      matchdayResultId: "result-1",
+      teamId: "A-A",
+      playerId: player.id,
+      activePlayerId: rosters[index]!.id,
+      disciplineId: "d1",
+      disciplineSide: "d1" as const,
+      slotIndex: index,
+      baseValue: 80,
+      finalPlayerScore: 100 - index * 5,
+      scoreContribution: 100 - index * 5,
+      rankInTeam: index + 1,
+      rankInDiscipline: index + 1,
+      isTop10: true,
+      isMvpCandidate: index === 0,
+      storyWeight: 1,
+      createdAt: "2026-06-10T12:00:00.000Z",
+    }));
+
+    const gameState = createSeasonStartGameState({
+      players,
+      rosters,
+      playerDisciplinePerformances: performances,
+    });
+    gameState.seasonState.matchdayResults = [
+      {
+        id: "result-1",
+        saveId: "save-test",
+        seasonId: "season-1",
+        matchdayId: "matchday-1",
+        status: "preview_applied",
+        sourceVersion: "test",
+        teamsTotal: 1,
+        teamsReady: 1,
+        teamsUnderfilled: 0,
+        teamsMissingLineup: 0,
+        teamsInvalidLineup: 0,
+        teamsMissingScoreCoverage: 0,
+        warningsCount: 0,
+        createdAt: "2026-06-10T12:00:00.000Z",
+        updatedAt: "2026-06-10T12:00:00.000Z",
+      },
+    ];
+
+    const targetPlayer = players[1]!;
+    const targetRoster = rosters[1]!;
+    const breakdown = buildTransfermarktSaleFactorBreakdown(gameState, targetPlayer, targetRoster);
+
+    expect(breakdown.bracket).toBe(8);
+    expect(breakdown.bracketGroupSize).toBe(15);
+    expect(breakdown.rankInBracket).toBe(2);
+    expect(breakdown.baseFactor).toBe(1.184);
     expect(breakdown.rankBonus).toBe(0.1);
-    expect(breakdown.saleFactor).toBe(1.195);
+    expect(breakdown.saleFactor).toBe(1.284);
   });
 });

@@ -29,6 +29,7 @@ import {
   isPlayerTransferBuyBlocked,
   buildSoldPlayerSeasonBans,
   SOLD_PLAYER_SEASON_COOLDOWN_BLOCKER,
+  SOLD_PLAYER_SEASON_COOLDOWN_OVERRIDE_WARNING,
 } from "@/lib/market/transfer-sold-cooldown";
 import { isTransferSellPhaseOpen, LOCAL_TRANSFER_WINDOW_PHASE } from "@/lib/market/transfer-window-policy";
 import { buildTransfermarktPoolAudit } from "@/lib/market/transfermarkt-pool-audit";
@@ -41,6 +42,10 @@ import {
 import { getCanonicalSeasonLabel } from "@/lib/season/season-label";
 import { resolveSeasonOneMarketBuyBlocker } from "@/lib/season/transfer-season-policy";
 import { recordFreeAgentFeed } from "@/lib/ai/transfer-window-profiler";
+import {
+  applyTransferBudgetSpend,
+  resolveMarketSpendableCashForPlanner,
+} from "@/lib/ai/ai-manager-apply-service";
 import { buildSeasonDisciplinePlayerCountMap } from "@/lib/season/season-discipline-schedule";
 import { getTransfermarktTierFromPoints, type TransfermarktRatingTier } from "@/lib/market/transfermarkt-sheet-stats";
 import { evaluateAiNeeds } from "@/lib/ai/aiNeedsEngine";
@@ -952,6 +957,21 @@ function buildLocalTransfermarktBuyPreviewFromContext(
   };
 }
 
+function resolveTeamMarketBuySpendableCash(input: {
+  gameState: GameState;
+  teamId: string;
+  teamCash: number;
+  rosterBefore: number;
+  playerMin: number | null;
+}) {
+  return resolveMarketSpendableCashForPlanner({
+    gameState: input.gameState,
+    teamId: input.teamId,
+    teamCash: input.teamCash,
+    rosterBelowMin: input.playerMin != null && input.rosterBefore < input.playerMin,
+  });
+}
+
 function resolveLocalTransfermarktBuyContext(params: TransfermarktBuyParams): LocalTransfermarktBuyContext {
   const runContext = getLocalRunContext(params);
   const save = runContext?.save ?? resolveLocalSave(params.saveId).save;
@@ -1030,18 +1050,32 @@ function resolveLocalTransfermarktBuyContext(params: TransfermarktBuyParams): Lo
   if (!team) blockingReasons.push("team_not_found");
   if (!player) blockingReasons.push("player_not_found");
   if (playerAlreadyOwned) blockingReasons.push("player_not_free_agent_in_scope");
-  if (
-    isPlayerTransferBuyBlocked({
-      gameState,
-      playerId: params.playerId,
-    })
-  ) {
+  const soldThisSeasonCooldownHit = isPlayerTransferBuyBlocked({
+    gameState,
+    playerId: params.playerId,
+  });
+  if (soldThisSeasonCooldownHit && !params.bypassSoldThisSeasonCooldown) {
     blockingReasons.push(SOLD_PLAYER_SEASON_COOLDOWN_BLOCKER);
+  }
+  if (soldThisSeasonCooldownHit && params.bypassSoldThisSeasonCooldown) {
+    warnings.push(SOLD_PLAYER_SEASON_COOLDOWN_OVERRIDE_WARNING);
   }
   if (purchasePrice == null || purchasePrice <= 0) blockingReasons.push("market_value_missing");
   if (salary == null || salary <= 0) blockingReasons.push("salary_demand_missing");
   if (team && rosterBefore >= getTeamPlayerMax(team, teamIdentity)) blockingReasons.push("roster_limit_reached");
-  if (team && purchasePrice != null && team.cash < purchasePrice) blockingReasons.push("insufficient_cash");
+  if (
+    team &&
+    purchasePrice != null &&
+    resolveTeamMarketBuySpendableCash({
+      gameState,
+      teamId: params.teamId,
+      teamCash: team.cash,
+      rosterBefore,
+      playerMin: teamContext?.playerMin ?? null,
+    }) < purchasePrice
+  ) {
+    blockingReasons.push("insufficient_cash");
+  }
   if (recentlySoldBySameTeam && !params.allowRecentlySoldRebuyOverride) {
     blockingReasons.push(RECENTLY_SOLD_SAME_PRESEASON_BLOCKER);
   }
@@ -2099,18 +2133,32 @@ function executeFastLocalTransfermarktBatchBuy(params: TransfermarktBuyParams, r
   if (!team) blockingReasons.push("team_not_found");
   if (!player) blockingReasons.push("player_not_found");
   if (playerAlreadyOwned) blockingReasons.push("player_not_free_agent_in_scope");
-  if (
-    isPlayerTransferBuyBlocked({
-      gameState,
-      playerId: params.playerId,
-    })
-  ) {
+  const soldThisSeasonCooldownHit = isPlayerTransferBuyBlocked({
+    gameState,
+    playerId: params.playerId,
+  });
+  if (soldThisSeasonCooldownHit && !params.bypassSoldThisSeasonCooldown) {
     blockingReasons.push(SOLD_PLAYER_SEASON_COOLDOWN_BLOCKER);
+  }
+  if (soldThisSeasonCooldownHit && params.bypassSoldThisSeasonCooldown) {
+    warnings.push(SOLD_PLAYER_SEASON_COOLDOWN_OVERRIDE_WARNING);
   }
   if (purchasePrice == null || purchasePrice <= 0) blockingReasons.push("market_value_missing");
   if (salary == null || salary <= 0) blockingReasons.push("salary_demand_missing");
   if (team && rosterEntries.length >= getTeamPlayerMax(team, teamIdentity)) blockingReasons.push("roster_limit_reached");
-  if (team && purchasePrice != null && team.cash < purchasePrice) blockingReasons.push("insufficient_cash");
+  if (
+    team &&
+    purchasePrice != null &&
+    resolveTeamMarketBuySpendableCash({
+      gameState,
+      teamId: params.teamId,
+      teamCash: team.cash,
+      rosterBefore: rosterEntries.length,
+      playerMin: teamIdentity?.playerMin ?? null,
+    }) < purchasePrice
+  ) {
+    blockingReasons.push("insufficient_cash");
+  }
   if (purchasePriceOverride != null) {
     warnings.push(params.purchasePriceOverrideReason ?? "purchase_price_override_in_effect");
   }
@@ -2206,7 +2254,7 @@ function executeFastLocalTransfermarktBatchBuy(params: TransfermarktBuyParams, r
 
   const transferHistoryId = `history-${randomUUID()}`;
   const rosterId = `roster-${randomUUID()}`;
-  const nextState: GameState = {
+  const nextStateBase: GameState = {
     ...gameState,
     teams: gameState.teams.map((entry) =>
       entry.teamId === params.teamId
@@ -2258,6 +2306,7 @@ function executeFastLocalTransfermarktBatchBuy(params: TransfermarktBuyParams, r
       ...gameState.transferHistory,
     ],
   };
+  const nextState = applyTransferBudgetSpend(nextStateBase, params.teamId, purchasePrice);
 
   runContext.save = {
     ...runContext.save,
@@ -2299,7 +2348,7 @@ export function executeLocalTransfermarktBuy(params: TransfermarktBuyParams): Tr
 
   const transferHistoryId = `history-${randomUUID()}`;
   const marketValueReference = context.marketValueReference ?? preview.currentValue ?? preview.purchasePrice;
-  const nextState: GameState = {
+  const nextStateBase: GameState = {
     ...save.gameState,
     teams: save.gameState.teams.map((team) =>
       team.teamId === params.teamId
@@ -2351,6 +2400,7 @@ export function executeLocalTransfermarktBuy(params: TransfermarktBuyParams): Tr
       ...save.gameState.transferHistory,
     ],
   };
+  const nextState = applyTransferBudgetSpend(nextStateBase, params.teamId, preview.purchasePrice!);
 
   if (runContext) {
     runContext.save = {

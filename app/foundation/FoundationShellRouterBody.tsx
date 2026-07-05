@@ -1841,10 +1841,15 @@ export function FoundationShellRouterBody(props: FoundationShellRouterBodyProps)
                 scoutPipeline={
                   selectedTeamScoutPipeline
                     ? {
+                        facilityLevel: selectedTeamScoutPipeline.facilityLevel,
                         occupiedSlots: selectedTeamScoutPipeline.occupiedSlots,
                         maxSlots: selectedTeamScoutPipeline.config.maxSlots,
                         tickGain: selectedTeamScoutPipeline.config.tickGain,
                         passiveActive: selectedTeamScoutPipeline.passiveActive,
+                        passiveSlots: selectedTeamScoutPipeline.config.passiveSlots,
+                        focusTickGain: selectedTeamScoutPipeline.focusTickGain,
+                        wishlistTickGain: selectedTeamScoutPipeline.wishlistTickGain,
+                        passiveTickGain: selectedTeamScoutPipeline.passiveTickGain,
                         draftSuspended: isTeamSetupDraftWishlistPhase(gameState, selectedTeam.teamId),
                         records: selectedTeamScoutPipeline.records.map((record) => {
                           const player = gameState.players.find((entry) => entry.id === record.playerId);
@@ -1859,6 +1864,7 @@ export function FoundationShellRouterBody(props: FoundationShellRouterBodyProps)
                     : null
                 }
                 onOpenMarket={() => setFoundationView("marketV2", setActiveView)}
+                onOpenFacilities={() => setFoundationView("facilitiesOverviewV2", setActiveView)}
                 onOpenPlayer={(playerId) => openPlayerProfileById(playerId)}
                 queueEntries={scoutingQueueEntries}
                 focusEtaLabel={

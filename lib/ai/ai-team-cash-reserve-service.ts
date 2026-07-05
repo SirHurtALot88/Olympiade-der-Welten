@@ -8,6 +8,7 @@ import { countTeamInjuredPlayers } from "@/lib/fatigue/fatigue-injury-service";
 import { deriveRosterTargets } from "@/lib/foundation/roster-limits";
 import { resolvePlayerEconomyContract } from "@/lib/foundation/player-economy-contract";
 import { getTeamStrategyProfile } from "@/lib/foundation/team-strategy-profiles";
+import { getTeamObjectiveAiBias } from "@/lib/board/team-season-objectives-service";
 
 function round(value: number, digits = 2) {
   return Number(value.toFixed(digits));
@@ -19,6 +20,26 @@ function clamp(value: number, min: number, max: number) {
 
 function getTeamRosterCount(gameState: GameState, teamId: string) {
   return gameState.rosters.filter((entry) => entry.teamId === teamId).length;
+}
+
+export function isTeamRosterBelowOpt(gameState: GameState, teamId: string) {
+  const team = gameState.teams.find((entry) => entry.teamId === teamId);
+  const identity = gameState.teamIdentities.find((entry) => entry.teamId === teamId);
+  const { playerOpt } = deriveRosterTargets(team, identity);
+  return getTeamRosterCount(gameState, teamId) < playerOpt;
+}
+
+/** Cash runway buffer for market buys — zero while rebuilding below identity Opt. */
+export function resolveMarketPlannerCashBuffer(
+  gameState: GameState,
+  teamId: string,
+  opts?: { coverageFallback?: boolean; expectedSalaryAfterPlan?: number },
+) {
+  if (opts?.coverageFallback) return 0;
+  if (isTeamRosterBelowOpt(gameState, teamId)) return 0;
+  return resolveTeamCashRunwayReserve(gameState, teamId, {
+    expectedSalaryAfterPlan: opts?.expectedSalaryAfterPlan,
+  });
 }
 
 function getTeamRosterSalarySum(gameState: GameState, teamId: string) {
@@ -57,7 +78,7 @@ export function projectExpectedSalaryAtPlannerTarget(
 export function resolveHoardMultiplier(gameState: GameState, teamId: string) {
   const identity = gameState.teamIdentities.find((entry) => entry.teamId === teamId);
   const profile = getTeamStrategyProfile(gameState, teamId);
-  const cashPriority = profile.bias.cashPriority ?? 5;
+  const cashPriority = profile?.bias.cashPriority ?? 5;
   const finances = identity?.finances ?? 5;
   const financeCap = clamp(0.35 + (finances / 10) * 0.35, 0.35, 0.7);
   return clamp(0.25 + (cashPriority / 10) * 0.25 + (finances / 10) * 0.3, 0.25, financeCap);
@@ -100,6 +121,90 @@ export function resolveTeamCashRunwayReserve(
     reserve = round(Math.max(5, Math.min(reserve * 0.45, reserve - 10)), 2);
   }
   return reserve;
+}
+
+/**
+ * Share of the combined liquidity reserve (salary runway + cash buffer) to keep protected
+ * during draft/rebuild. Lower = more cash unlocked for transfers. Aggressive and cash-poor
+ * teams get factors near 0; conservative rich teams keep more back.
+ */
+export function resolveDraftLiquidityReserveFactor(input: {
+  gameState: GameState;
+  teamId: string;
+  cash: number;
+  expectedSalary: number;
+  buyAggression?: number;
+  rosterBelowOpt?: boolean;
+}) {
+  const profile = getTeamStrategyProfile(input.gameState, input.teamId);
+  const objectiveBias = getTeamObjectiveAiBias(input.gameState, input.teamId);
+  const buyAggression = clamp((input.buyAggression ?? objectiveBias?.buyAggression ?? 0) / 10, 0, 1);
+  const starPriority = clamp((profile?.bias.starPriority ?? 5) / 10, 0, 1);
+  const riskTolerance = clamp((profile?.bias.riskTolerance ?? 5) / 10, 0, 1);
+  const cashPriority = clamp((profile?.bias.cashPriority ?? 5) / 10, 0, 1);
+  const spendAggression =
+    profile?.spendAggression === "high" ? 0.9 : profile?.spendAggression === "low" ? 0.15 : 0.45;
+
+  const cashSalaryRatio = input.expectedSalary > 0 ? input.cash / input.expectedSalary : 1;
+  const tightnessFactor = clamp(0.1 + cashSalaryRatio * 0.38, 0.06, 0.78);
+
+  const ranked = input.gameState.teams
+    .map((team) => ({ teamId: team.teamId, cash: team.cash ?? 0 }))
+    .sort((left, right) => left.cash - right.cash || left.teamId.localeCompare(right.teamId));
+  const rank = ranked.findIndex((entry) => entry.teamId === input.teamId);
+  const rankRatio = ranked.length > 1 && rank >= 0 ? rank / (ranked.length - 1) : 0.5;
+  const rankRelief = 1 - rankRatio * 0.6;
+
+  const aggressionRelief = 1 - clamp(
+    buyAggression * 0.7 + starPriority * 0.22 + riskTolerance * 0.12 + spendAggression * 0.18 - cashPriority * 0.24,
+    0,
+    0.95,
+  );
+
+  let factor = tightnessFactor * rankRelief * aggressionRelief;
+  if (input.rosterBelowOpt) {
+    factor = clamp(factor, 0.02, 0.5);
+  } else {
+    factor = clamp(factor, 0.35, 0.95);
+  }
+  return round(factor, 3);
+}
+
+/** Combined emergency/liquidity pool — salary runway plus any cash buffer, as one drawable reserve. */
+export function resolveCombinedLiquidityReserve(input: {
+  gameState: GameState;
+  teamId: string;
+  expectedSalaryAfterPlan: number;
+  rosterBelowOpt: boolean;
+  buyAggression?: number;
+}) {
+  const fullRunway = resolveTeamCashRunwayReserve(input.gameState, input.teamId, {
+    expectedSalaryAfterPlan: input.expectedSalaryAfterPlan,
+  });
+  if (!input.rosterBelowOpt) {
+    const cashBuffer = round(Math.max(5, fullRunway * 0.08), 2);
+    return {
+      salaryReserve: fullRunway,
+      cashReserve: cashBuffer,
+      fullRunway,
+      reserveFactor: 1,
+    };
+  }
+  const reserveFactor = resolveDraftLiquidityReserveFactor({
+    gameState: input.gameState,
+    teamId: input.teamId,
+    cash: input.gameState.teams.find((team) => team.teamId === input.teamId)?.cash ?? 0,
+    expectedSalary: input.expectedSalaryAfterPlan,
+    buyAggression: input.buyAggression,
+    rosterBelowOpt: true,
+  });
+  const protectedLiquidity = round(Math.max(1, fullRunway * reserveFactor), 2);
+  return {
+    salaryReserve: protectedLiquidity,
+    cashReserve: 0,
+    fullRunway,
+    reserveFactor,
+  };
 }
 
 function countTeamFatigueStress(gameState: GameState, teamId: string) {

@@ -804,6 +804,72 @@ describe("transfermarkt local service", () => {
     expect(overridePreview.blockingReasons).toContain("player_sold_this_season_unavailable");
   });
 
+  // Root-cause fix (2026-07-04, W-W chronically stuck below hardMin on the real S1-S10 save — see
+  // outputs/real-engine-s1s5-final/progress-log.md): SOLD_PLAYER_SEASON_COOLDOWN_BLOCKER had no
+  // override anywhere (unlike the same-team-specific allowRecentlySoldRebuyOverride tested above),
+  // so a team below its absolute roster minimum with an emptied-out affordable candidate pool could
+  // get permanently stuck if its one remaining legal candidate happened to be sold by an unrelated
+  // team in the same session — retrying can never fix this, since the (correct, by design) cooldown
+  // doesn't change between retries. The new bypassSoldThisSeasonCooldown flag lets a caller (only
+  // the emergency-roster-repair fallback in chunked-redraft-topup-service.ts uses it, and only for
+  // teams still below hardMin) explicitly accept that trade-off for this narrow last-resort case,
+  // without weakening the cooldown for any regular buy.
+  it("lets an explicit override bypass the season-wide sold-cooldown for a different team, unlike allowRecentlySoldRebuyOverride", async () => {
+    persistenceState.save = {
+      saveId: "save-singleplayer-dev",
+      gameState: createGameState({
+        teams: [
+          createTeam({ teamId: "A-A", shortCode: "A-A", cash: 175 }),
+          createTeam({ teamId: "B-B", shortCode: "B-B", name: "Blazing Beasts", cash: 175 }),
+        ],
+        players: [createPlayer("p1", { name: "Recently Sold", marketValue: 40, displayMarketValue: 40, salaryDemand: 10, displaySalary: 10 })],
+        transferHistory: [
+          {
+            id: "history-sell-p1",
+            playerId: "p1",
+            seasonId: "season-1",
+            matchdayId: "matchday-1",
+            phase: "manual_transfer_window",
+            source: "ai_preseason_market_sell",
+            seasonLabel: "Season 1",
+            transferType: "sell",
+            fromTeamId: "A-A",
+            toTeamId: null,
+            fee: 40,
+            salary: 10,
+            marketValue: 40,
+            remainingContractLength: 1,
+            happenedAt: "2026-06-12T10:00:00.000Z",
+          },
+        ],
+      }),
+    };
+
+    const { previewLocalTransfermarktBuy } = await import("@/lib/market/transfermarkt-local-service");
+
+    const withoutBypass = previewLocalTransfermarktBuy({
+      saveId: "save-singleplayer-dev",
+      seasonId: "season-1",
+      teamId: "B-B",
+      playerId: "p1",
+      transferSource: "preseason_roster_repair_buy",
+    });
+    expect(withoutBypass.canBuy).toBe(false);
+    expect(withoutBypass.blockingReasons).toContain("player_sold_this_season_unavailable");
+
+    const withBypass = previewLocalTransfermarktBuy({
+      saveId: "save-singleplayer-dev",
+      seasonId: "season-1",
+      teamId: "B-B",
+      playerId: "p1",
+      transferSource: "preseason_roster_repair_buy",
+      bypassSoldThisSeasonCooldown: true,
+    });
+    expect(withBypass.blockingReasons).not.toContain("player_sold_this_season_unavailable");
+    expect(withBypass.warnings).toContain("player_sold_this_season_cooldown_override");
+    expect(withBypass.canBuy).toBe(true);
+  });
+
   // Course correction (2026-07-04): S1 buys are NOT forbidden — the draft is just the first
   // ordinary application of the same acquisition engine to empty rosters with starting budget. A
   // team that sells down (or organically drops) below hardMin/Opt in S1 must be able to rebuy in

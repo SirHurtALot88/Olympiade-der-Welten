@@ -84,7 +84,6 @@ export default function FoundationTeamsPortraitsTab({
       <section className="player-drawer-section player-drawer-hero-surface team-drawer-dashboard teams-portraits-dashboard">
         <div className="team-drawer-dashboard-grid">
           <article className="team-drawer-identity-card">
-            <span className="player-drawer-overline">Kaderprofil</span>
             <h3>{selectedTeam.shortCode}</h3>
             <p>
               {filteredSelectedRosterTableRows.length} Spieler

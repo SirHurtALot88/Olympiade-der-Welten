@@ -6,7 +6,7 @@ import { getTeamLogoBrowserUrl } from "@/lib/data/mediaAssets";
 import type { Team } from "@/lib/data/olyDataTypes";
 import type { PlayerTrainingMode } from "@/lib/training/training-plan-types";
 
-import { TrainingModeGuide, TrainingPlayerLane, formatLocaleNumber, formatSignedPercent } from "@/app/foundation/training-facilities-v2/training-view-shared";
+import { TrainingModeGuideDisclosure, TrainingPlayerLane, formatLocaleNumber, formatSignedPercent } from "@/app/foundation/training-facilities-v2/training-view-shared";
 import type {
   TrainingClassOption,
   TrainingDevelopmentFilter,
@@ -116,8 +116,8 @@ export default function TrainingCompactClient({
           </div>
         </div>
 
-        <div className="training-compact-summary-grid training-v2-summary-grid">
-          <article className="training-v2-summary-card">
+        <div className="training-v2-stat-strip" id="training-compact-forecast">
+          <article className="training-v2-stat-chip">
             <span>Regeneration</span>
             <strong>
               {formatPps(summary.recoveryBeforeTraining)} → {formatPps(summary.recoveryAfterTraining)}
@@ -126,46 +126,34 @@ export default function TrainingCompactClient({
               Leicht {summary.lightModeCount} · Hart {summary.hardModeCount}
             </small>
           </article>
-          <article className="training-v2-summary-card">
-            <span>Trainings-Setpoints</span>
+          <article className="training-v2-stat-chip">
+            <span>Trainingsbudget</span>
             <strong>{formatLocaleNumber(summary.trainingXpAfter, 1)}</strong>
             <small>Facility {formatSignedPercent(summary.trainingXpModifierPct)}</small>
           </article>
-          <article className="training-v2-summary-card">
+          <article className="training-v2-stat-chip">
             <span>Performance</span>
             <strong>{formatLocaleNumber(summary.performanceXp, 1)}</strong>
             <small>Netto {formatLocaleNumber(summary.totalXp, 1)} Setpoints</small>
           </article>
-          <article className="training-v2-summary-card">
+          <article className="training-v2-stat-chip">
             <span>Entwicklung</span>
-            <strong>{developmentSummary.growth}</strong>
+            <strong>{developmentSummary.growth} steigt</strong>
             <small>
-              {developmentSummary.regression} Risiko · {developmentSummary.stable} stabil
+              {developmentSummary.stable} stabil · {developmentSummary.regression} Risiko
             </small>
           </article>
         </div>
 
-        <div className="training-compact-story-grid training-v2-story-grid" id="training-compact-forecast">
-          <article className="training-v2-story-card is-growth">
-            <span>Top Steigerer</span>
-            <strong>{topGrowth?.player.name ?? "—"}</strong>
-            <small>
-              {topGrowth
-                ? `+${formatLocaleNumber(topGrowth.organicForecast.netSetpoints, 1)} Setpoints · ${topGrowth.modeConfig.label}`
-                : "Kein aktiver Kader"}
-            </small>
-          </article>
-          <article className="training-v2-story-card is-risk">
-            <span>Groesstes Risiko</span>
-            <strong>{topRisk?.player.name ?? "—"}</strong>
-            <small>
-              {topRisk ? `Rueckschritt ${formatLocaleNumber(topRisk.forecast.regressionPressure, 0)}` : "Keine Risikodaten"}
-            </small>
-          </article>
-        </div>
+        <p className="muted training-v2-top-risk-line">
+          Top: <strong>{topGrowth?.player.name ?? "—"}</strong>
+          {topGrowth ? ` (+${formatLocaleNumber(topGrowth.organicForecast.netSetpoints, 1)})` : ""} · Risiko:{" "}
+          <strong>{topRisk?.player.name ?? "—"}</strong>
+          {topRisk ? ` (Rueckschritt ${formatLocaleNumber(topRisk.forecast.regressionPressure, 0)})` : ""}
+        </p>
 
         {managementLockedReason ? <p className="muted">{managementLockedReason}</p> : null}
-        <TrainingModeGuide trainingModeOptions={trainingModeOptions} />
+        <TrainingModeGuideDisclosure trainingModeOptions={trainingModeOptions} />
       </header>
 
       <section className="training-compact-workspace training-v2-lane training-v2-lane-training">

@@ -278,9 +278,30 @@ export function ManagerOfficeClient({
 	                eyebrow: "Diese Season",
 	                title: selectedOpenObjectives[0]?.label ?? "Board sauber halten",
 	                detail: selectedOpenObjectives[0]?.detail ?? selectedOpenObjectives[0]?.actionHint ?? "Aktive Ziele, Druck und Richtung für diese Season.",
-	                meta: `Druck ${selectedBoardConfidence?.pressure ?? "—"}/10 · Rating ${selectedBoardConfidence?.value ?? "—"}/10`,
-                  priority: (selectedBoardConfidence?.pressure ?? 0) >= 8 ? 84 : selectedOpenObjectives.length > 0 ? 70 : 42,
-	                tone: (selectedBoardConfidence?.pressure ?? 0) >= 8 ? "danger" : selectedOpenObjectives.length > 0 ? "warning" : "ready",
+                meta:
+                  (selectedBoardConfidence?.pressure ?? 0) >= 8
+                    ? "Schaden: Board verliert Geduld"
+                    : (selectedBoardConfidence?.pressure ?? 0) >= 6
+                      ? "Warnung: Board schaut hin"
+                      : selectedOpenObjectives.length > 0
+                        ? "Nutzen: Ziel-Fortschritt sichern"
+                        : "Ruhige Board-Lage",
+                  priority:
+                    (selectedBoardConfidence?.pressure ?? 0) >= 8
+                      ? 84
+                      : (selectedBoardConfidence?.pressure ?? 0) >= 6
+                        ? 76
+                        : selectedOpenObjectives.length > 0
+                          ? 70
+                          : 42,
+                tone:
+                  (selectedBoardConfidence?.pressure ?? 0) >= 8
+                    ? "danger"
+                    : (selectedBoardConfidence?.pressure ?? 0) >= 6
+                      ? "warning"
+                      : selectedOpenObjectives.length > 0
+                        ? "warning"
+                        : "ready",
 	                onClick: () => onNavigate("season"),
 	              },
 	              {
