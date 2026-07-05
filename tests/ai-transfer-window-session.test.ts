@@ -107,25 +107,30 @@ describe("ai transfer window session service", () => {
   // (round=N cycle=1 engine=unified sells=1 buys=1, 228+ occurrences in a real run.log) that this
   // change fixes.
   it("runs buy-only cycles in the preseason phase (never attempts a sell)", async () => {
-    const gameState = buildGameState({
-      rosters: Array.from({ length: 9 }, (_, index) => ({
-        id: `r-a-${index}`,
-        teamId: "team-a",
-        playerId: `p-a-${index}`,
-        slot: index,
-      })),
+    let rosterSize = 9;
+    const gameState = () =>
+      buildGameState({
+        rosters: Array.from({ length: rosterSize }, (_, index) => ({
+          id: `r-a-${index}`,
+          teamId: "team-a",
+          playerId: `p-a-${index}`,
+          slot: index,
+        })),
+      });
+    applyAiMarketPlanLocally.mockImplementation(async () => {
+      rosterSize += 1;
+      return buildApplyResult({ appliedBuys: 1, rosterAfter: rosterSize });
     });
     const persistence = {
-      getSaveById: () => ({ saveId: "save-1", gameState }),
+      getSaveById: () => ({ saveId: "save-1", gameState: gameState() }),
     };
-
-    applyAiMarketPlanLocally.mockResolvedValueOnce(buildApplyResult({ appliedBuys: 2 }));
 
     const result = await runTransferWindowSession({
       saveId: "save-1",
       seasonId: "season-2",
       persistence: persistence as never,
       phase: "preseason",
+      dryRun: true,
       maxTeamCycles: 1,
       maxLeagueRounds: 1,
       skipIfExistingMarketTransfers: false,
@@ -136,7 +141,46 @@ describe("ai transfer window session service", () => {
     expect(applyAiMarketPlanLocally.mock.calls[0]?.[0].options?.applySellSteps).toBe(false);
     expect(applyAiMarketPlanLocally.mock.calls[0]?.[0].options?.transferWindowCycleMode).toBe(true);
     expect(result.appliedSells).toBe(0);
-    expect(result.appliedBuys).toBe(2);
+    expect(result.appliedBuys).toBe(1);
+  });
+
+  it("runs a second buy pass when opt gap remains at or above OPT_GAP_RESCUE_THRESHOLD", async () => {
+    let rosterSize = 8;
+    const gameState = () =>
+      buildGameState({
+        rosters: Array.from({ length: rosterSize }, (_, index) => ({
+          id: `r-a-${index}`,
+          teamId: "team-a",
+          playerId: `p-a-${index}`,
+          slot: index,
+        })),
+      });
+    applyAiMarketPlanLocally.mockImplementation(async () => {
+      rosterSize += 1;
+      return buildApplyResult({ appliedBuys: 1, rosterAfter: rosterSize });
+    });
+    const persistence = {
+      getSaveById: () => ({ saveId: "save-1", gameState: gameState() }),
+    };
+
+    const result = await runTransferWindowSession({
+      saveId: "save-1",
+      seasonId: "season-2",
+      persistence: persistence as never,
+      phase: "preseason",
+      dryRun: true,
+      maxTeamCycles: 1,
+      maxLeagueRounds: 3,
+      skipIfExistingMarketTransfers: false,
+    });
+
+    expect(applyAiMarketPlanLocally.mock.calls.length).toBeGreaterThanOrEqual(2);
+    for (const call of applyAiMarketPlanLocally.mock.calls) {
+      expect(call[0].options?.applyBuySteps).toBe(true);
+      expect(call[0].options?.applySellSteps).toBe(false);
+    }
+    expect(result.appliedSells).toBe(0);
+    expect(result.appliedBuys).toBeGreaterThanOrEqual(2);
   });
 
   it("runs sell-only cycles in the season_end phase (never attempts a buy)", async () => {

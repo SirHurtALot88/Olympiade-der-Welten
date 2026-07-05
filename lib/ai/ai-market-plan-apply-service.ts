@@ -21,6 +21,10 @@ import {
   teamNeedsPostOptUpgradeDeploy,
 } from "@/lib/ai/ai-budget-deploy-service";
 import {
+  resolveEffectiveUpgradeBuyPriceFloor,
+  resolvePostOptUpgradeMandate,
+} from "@/lib/ai/planner-post-opt-upgrade-policy";
+import {
   candidateRecommendationScore,
   isTrashMarketBuyCandidate,
   resolveAllowedMarketBuyCount,
@@ -547,6 +551,7 @@ function buildFinalBuyGate(input: {
   playersById: Map<string, Player>;
   convergenceIncrementalFill?: boolean;
   minUpgradeBuyPrice?: number | null;
+  postOptUpgradeDeploy?: boolean;
 }) {
   const rows: Array<Record<string, unknown>> = [];
   const picked: AiMarketPlanBuyPlan["candidates"] = [];
@@ -563,7 +568,7 @@ function buildFinalBuyGate(input: {
     atOrAboveOpt && isTeamOverCashSalarySoftTarget(input.gameState, input.team.teamId, input.gameState.season.id)
       ? estimateUpgradeBuyFloorMw(input.gameState, input.team.teamId)
       : null;
-  const effectiveMinUpgradeBuyPrice =
+  const effectiveMinUpgradeBuyPriceRaw =
     input.minUpgradeBuyPrice != null && input.minUpgradeBuyPrice > 0
       ? input.minUpgradeBuyPrice
       : autoUpgradeFloor;
@@ -581,6 +586,18 @@ function buildFinalBuyGate(input: {
       rosterBelowMin: rosterBase < minRoster,
       forceRosterFill: convergenceCoverageFill || coverageFallback,
     }) ?? input.team.currentState.cash ?? null;
+  const candidatePrices = input.candidates
+    .map((candidate) => candidate.price ?? candidate.marketValue ?? 0)
+    .filter((price) => price > 0);
+  const effectiveMinUpgradeBuyPrice =
+    effectiveMinUpgradeBuyPriceRaw != null && input.postOptUpgradeDeploy
+      ? resolveEffectiveUpgradeBuyPriceFloor({
+          gameState: input.gameState,
+          strictFloor: effectiveMinUpgradeBuyPriceRaw,
+          candidatePrices,
+          spendableCash: cashRemaining ?? input.team.currentState.cash ?? 0,
+        })
+      : effectiveMinUpgradeBuyPriceRaw;
   const classCounts = buildRosterTokenCounts({
     gameState: input.gameState,
     teamId: input.team.teamId,
@@ -687,7 +704,7 @@ function getAllowedBuyCount(
   team: AiMarketPlanTeamEntry,
   rosterBase: number | null,
   maxBuysPerTeam: number | null,
-  opts?: { postOptUpgradeDeploy?: boolean; minUpgradeBuyPrice?: number | null },
+  opts?: { postOptUpgradeDeploy?: boolean; minUpgradeBuyPrice?: number | null; maxUpgradeBuys?: number | null },
 ) {
   const playerMin = team.currentState.playerMin ?? 0;
   const playerOpt = team.currentState.playerOpt ?? playerMin;
@@ -703,7 +720,30 @@ function getAllowedBuyCount(
     minUpgradeBuyPrice: opts?.minUpgradeBuyPrice,
     topCandidateScore: getTopBuyCandidateScore(team),
     plannedSellCount: team.sellPlan.candidates.length,
+    maxUpgradeBuys: opts?.maxUpgradeBuys ?? undefined,
   });
+}
+
+function resolveTeamBuyGateOpts(
+  gameState: GameState,
+  teamId: string,
+  globalOpts?: {
+    postOptUpgradeDeploy?: boolean;
+    minUpgradeBuyPrice?: number | null;
+  },
+) {
+  const mandate = resolvePostOptUpgradeMandate(gameState, teamId);
+  const postOptUpgradeDeploy = Boolean(globalOpts?.postOptUpgradeDeploy || mandate.postOptUpgradeDeploy);
+  const strictFloor = postOptUpgradeDeploy
+    ? (mandate.minUpgradeBuyPrice ??
+      globalOpts?.minUpgradeBuyPrice ??
+      estimateUpgradeBuyFloorMw(gameState, teamId))
+    : (globalOpts?.minUpgradeBuyPrice ?? null);
+  return {
+    postOptUpgradeDeploy,
+    minUpgradeBuyPrice: strictFloor,
+    maxUpgradeBuys: mandate.active ? mandate.maxBuys : null,
+  };
 }
 
 function hasValueSellOpportunity(
@@ -845,7 +885,10 @@ function buildResolvedBuyCandidateMap(
   maxBuysPerTeam: number | null,
   playersById = new Map(gameState.players.map((player) => [player.id, player] as const)),
   convergenceIncrementalFill = false,
-  buyGateOpts?: { postOptUpgradeDeploy?: boolean; minUpgradeBuyPrice?: number | null },
+  buyGateOpts?: {
+    postOptUpgradeDeploy?: boolean;
+    minUpgradeBuyPrice?: number | null;
+  },
 ) {
   const resolved = new Map<string, AiMarketPlanBuyPlan["candidates"]>();
   const gateRows: Array<Record<string, unknown>> = [];
@@ -867,11 +910,12 @@ function buildResolvedBuyCandidateMap(
   });
 
   for (const team of teamPriority) {
+    const teamGateOpts = resolveTeamBuyGateOpts(gameState, team.teamId, buyGateOpts);
     const allowedBuyCount = getAllowedBuyCount(
       team,
       team.sellPlan.rosterAfterSell ?? team.currentState.rosterCount,
       maxBuysPerTeam,
-      buyGateOpts,
+      teamGateOpts,
     );
     if (allowedBuyCount <= 0) {
       resolved.set(team.teamId, []);
@@ -887,7 +931,8 @@ function buildResolvedBuyCandidateMap(
       claimedPlayerIds,
       playersById,
       convergenceIncrementalFill,
-      minUpgradeBuyPrice: buyGateOpts?.minUpgradeBuyPrice ?? null,
+      minUpgradeBuyPrice: teamGateOpts.minUpgradeBuyPrice ?? null,
+      postOptUpgradeDeploy: teamGateOpts.postOptUpgradeDeploy,
     });
     gateRows.push(...gate.rows);
     resolved.set(team.teamId, gate.candidates);
@@ -1420,6 +1465,10 @@ export async function applyAiMarketPlanLocally(input: AiMarketPlanApplyParams): 
       continue;
     }
     const effectiveSellPlan = buildEffectiveSellPlan(team, options.applySellSteps, options.excludeSellPlayerIds);
+    const teamBuyGateOpts = resolveTeamBuyGateOpts(baselineGameState, team.teamId, {
+      postOptUpgradeDeploy: options.postOptUpgradeDeploy,
+      minUpgradeBuyPrice: options.minUpgradeBuyPrice,
+    });
     const effectiveBuyPlan = buildEffectiveBuyPlan(
       team,
       options.applyBuySteps,
@@ -1428,10 +1477,7 @@ export async function applyAiMarketPlanLocally(input: AiMarketPlanApplyParams): 
       resolvedBuyCandidateMap.get(team.teamId),
       options.applyBuyStepsInBatch,
       options.excludeBuyPlayerIds,
-      {
-        postOptUpgradeDeploy: options.postOptUpgradeDeploy,
-        minUpgradeBuyPrice: options.minUpgradeBuyPrice,
-      },
+      teamBuyGateOpts,
     );
     const effectiveProjectedState = buildEffectiveProjectedState(team.currentState, effectiveSellPlan, effectiveBuyPlan);
     nextResult.plannedSellDetails = buildPlannedSellDetails(effectiveSellPlan.candidates);

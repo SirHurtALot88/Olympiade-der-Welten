@@ -7,6 +7,7 @@ import {
   type LeagueMarketAnchors,
   type MarketPickLane,
 } from "@/lib/ai/ai-market-slot-plan-service";
+import { resolvePostOptUpgradeMandate } from "@/lib/ai/planner-post-opt-upgrade-policy";
 import { buildBudgetEnvelope } from "@/lib/ai/market-pick-engine/budget-envelope";
 import { buildLeagueMarketBrackets } from "@/lib/ai/market-pick-engine/market-brackets";
 import { buildSeasonStrategyState } from "@/lib/ai/ai-manager-doctrine-service";
@@ -166,14 +167,19 @@ export function resolveMarketQualityProfile(input: {
   const canAffordStar = spendable + 0.01 >= brackets.star.floorMw;
   const canAffordCore = spendable + 0.01 >= brackets.core.floorMw;
   const canAffordPremiumCore = spendable + 0.01 >= Math.max(brackets.core.floorMw, brackets.depth.targetMw * 1.2);
-  const aspirationalFlexSlots = starChaser && !preferDepth ? 1 : 0;
+  const upgradeMandate = resolvePostOptUpgradeMandate(input.gameState, input.teamId);
+  const aspirationalFlexSlots =
+    starChaser && !preferDepth ? 1 : upgradeMandate.mode === "expand" ? 1 : 0;
   const optFlexSlots =
     aspirationalFlexSlots > 0 &&
     input.rosterCount >= playerMin &&
-    (canAffordStar || canAffordPremiumCore)
+    (canAffordStar || canAffordPremiumCore || upgradeMandate.active)
       ? aspirationalFlexSlots
       : 0;
-  const effectiveOptTarget = Math.max(playerMin, playerOpt - aspirationalFlexSlots);
+  const effectiveOptTarget =
+    upgradeMandate.expandRosterTarget != null
+      ? Math.max(playerMin, upgradeMandate.expandRosterTarget)
+      : Math.max(playerMin, playerOpt - (starChaser && !preferDepth ? 1 : 0));
 
   const starAllowed =
     starChaser && (canAffordStar || canAffordPremiumCore)
@@ -201,9 +207,13 @@ export function resolveMarketQualityProfile(input: {
     (shouldDisableCheapLanes(spendable, anchors, input.rosterCount >= playerMin, {
       forceDisableCheap: starChaser && canAffordCore && input.rosterCount >= playerOpt,
     }) ||
-      (starChaser && input.rosterCount >= playerOpt && canAffordCore));
+      (starChaser && input.rosterCount >= playerOpt && canAffordCore) ||
+      (upgradeMandate.active && canAffordCore));
 
   const comfortTarget = (() => {
+    if (upgradeMandate.expandRosterTarget != null && upgradeMandate.expandRosterTarget > playerOpt) {
+      return upgradeMandate.expandRosterTarget;
+    }
     if (starChaser && !preferDepth && aspirationalFlexSlots > 0) {
       return effectiveOptTarget;
     }

@@ -588,6 +588,15 @@ function buildCandidate(
   if (starProtection) {
     pushKeep("star_core_protection", "Star-/Core-Spieler wird nur bei echtem Finanz- oder Boarddruck bewegt");
   }
+  const isFloorPlayer =
+    playerRating?.ovrRank != null &&
+    rosterSize >= 4 &&
+    playerRating.ovrRank >= Math.ceil((rosterSize * 2) / 3);
+  const premiumQualityGm =
+    gmProfile?.archetype === "elite_curator" || gmProfile?.archetype === "star_chaser";
+  if (premiumQualityGm && isFloorPlayer && !starProtection && !coversNeedAxis) {
+    pushSell("roster_quality_floor", "unteres Kader-Drittel — GM will Qualitaet upgraden");
+  }
   if (openDemands.length > 0) {
     const demandLabels = openDemands.slice(0, 2).map((demand) => demand.label).join(", ");
     const highPriorityDemand = openDemands.some((demand) => demand.priority === "high");

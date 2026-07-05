@@ -13,6 +13,8 @@ import {
   type ConvergenceTeamResult,
   type MarketPlanConvergenceResult,
 } from "@/lib/ai/ai-market-plan-convergence-service";
+import { getTeamsNeedingPostOptUpgradeDeploy, teamNeedsPostOptUpgradeDeploy } from "@/lib/ai/ai-budget-deploy-service";
+import { resolvePostOptUpgradeMandate } from "@/lib/ai/planner-post-opt-upgrade-policy";
 import { buildSeasonStrategyState } from "@/lib/ai/ai-manager-doctrine-service";
 import {
   createLocalTransfermarktRunContext,
@@ -109,10 +111,11 @@ async function runTeamCycle(input: {
 
   const liveSave = input.sessionRunContext?.save ?? input.persistence.getSaveById(input.saveId);
   if (!liveSave) throw new Error("Save missing before team cycle.");
-  const currentRoster = rosterCount(liveSave.gameState, input.teamId);
+  const mandate = resolvePostOptUpgradeMandate(liveSave.gameState, input.teamId);
 
-  const canSell = input.allowSells && currentRoster > 0;
-  if (canSell) {
+  async function runSellPass(sellMandate: ReturnType<typeof resolvePostOptUpgradeMandate>) {
+    const sellSave = input.sessionRunContext?.save ?? input.persistence.getSaveById(input.saveId);
+    if (!sellSave || rosterCount(sellSave.gameState, input.teamId) <= 0) return;
     const sellApply = await applyAiMarketPlanLocally({
       source: "sqlite",
       saveId: input.saveId,
@@ -142,7 +145,7 @@ async function runTeamCycle(input: {
     });
     if (!sellApply?.summary) {
       warnings.push("transfer_window_sell_apply_missing");
-      return { appliedSells, appliedBuys, warnings };
+      return;
     }
     appliedSells += sellApply.summary.appliedSells;
     warnings.push(...sellApply.warnings.slice(0, 4));
@@ -153,13 +156,15 @@ async function runTeamCycle(input: {
     }
   }
 
-  const afterSellSave = input.sessionRunContext?.save ?? input.persistence.getSaveById(input.saveId);
-  if (
-    input.allowBuys &&
-    afterSellSave &&
-    teamNeedsMarketConvergence(afterSellSave.gameState, input.teamId) &&
-    !teamSkipsPreseasonMarketBuys(afterSellSave.gameState, input.teamId)
-  ) {
+  async function runBuyPass(buyMandate: ReturnType<typeof resolvePostOptUpgradeMandate> | null) {
+    const afterSave = input.sessionRunContext?.save ?? input.persistence.getSaveById(input.saveId);
+    if (!afterSave) return;
+    const needsConvergence = teamNeedsMarketConvergence(afterSave.gameState, input.teamId);
+    const needsUpgradeDeploy = teamNeedsPostOptUpgradeDeploy(afterSave.gameState, input.teamId, input.seasonId);
+    const skipPreseasonBuys = teamSkipsPreseasonMarketBuys(afterSave.gameState, input.teamId);
+    if (!(needsConvergence || needsUpgradeDeploy) || (skipPreseasonBuys && !needsUpgradeDeploy)) {
+      return;
+    }
     const buyApply = await applyAiMarketPlanLocally({
       source: "sqlite",
       saveId: input.saveId,
@@ -175,7 +180,7 @@ async function runTeamCycle(input: {
         includeWarningTeams: true,
         applySellSteps: false,
         applyBuySteps: true,
-        maxBuysPerTeam: null,
+        maxBuysPerTeam: buyMandate?.active ? buyMandate.maxBuys : null,
         applyBuyStepsInBatch: input.leagueRound > 1 ? 3 : 2,
         previewBuyLimit: input.leagueRound > 1 ? 144 : 112,
         previewSellLimit: 4,
@@ -187,34 +192,17 @@ async function runTeamCycle(input: {
         convergenceIncrementalFill: true,
         transferWindowCycleMode: true,
         deferContextFlush: isDeferContextFlushEnabled(),
+        postOptUpgradeDeploy: buyMandate?.postOptUpgradeDeploy ?? false,
+        minUpgradeBuyPrice: buyMandate?.minUpgradeBuyPrice ?? null,
       },
     });
     if (!buyApply?.summary) {
       warnings.push("transfer_window_buy_apply_missing");
-      return { appliedSells, appliedBuys, warnings };
+      return;
     }
     appliedBuys += buyApply.summary.appliedBuys;
     warnings.push(...buyApply.warnings.slice(0, 4));
     applyResult = buyApply.teams.find((team) => team.teamId === input.teamId)?.result ?? applyResult;
-    // Root-cause fix (2026-07-04, S8 real-save regression — buy volume collapsed 85->46 despite
-    // 30-100+ unspent cash for many teams; see outputs/real-engine-s1s5-final/progress-log.md):
-    // this used to also exclude every *blocked* buyGateRow (status!=="accepted", e.g.
-    // cash_buffer_failed/team_hard_no_go/below_upgrade_floor — all team-A-specific reasons) and
-    // every skippedSteps entry (candidates a team's own buy plan considered and rejected) from the
-    // *session-wide* excludeBuyPlayerIds set shared across all 26+ teams still needing convergence.
-    // A candidate blocked for team A because of team A's cash buffer or identity fit says nothing
-    // about whether team B (different cash, different identity) could buy them — but the shared
-    // set made that candidate permanently unavailable to every other team for the rest of the whole
-    // session regardless. With ~26 teams needing convergence in the same pass (roughly double a
-    // healthy season), teams processed later in the `needing` order inherited an already-decimated
-    // pool purely from teams processed earlier "considering and passing" on candidates that would
-    // have suited them fine — observed directly on the real save: V-W and W-W got 0 buys all
-    // session (including the dedicated opt-gap-rescue pass) despite being deeply below Opt with
-    // cash, simply because every team before them in iteration order had already blocked-and-thus-
-    // excluded the viable pool. Only a candidate that was actually bought (appliedBuyDetails),
-    // queued to be bought (plannedBuyDetails) or accepted by the final buy gate (buyGateRows
-    // status "accepted") is genuinely spoken for this session; anything merely considered-and-
-    // rejected for one team must remain available to the next.
     for (const row of buyApply.buyGateRows ?? []) {
       if (row.status !== "accepted") continue;
       const playerId = typeof row.playerId === "string" ? row.playerId : null;
@@ -225,6 +213,18 @@ async function runTeamCycle(input: {
         if (step.stepType === "buy") input.excludeBuyPlayerIds.add(step.playerId);
       }
     }
+  }
+
+  // Strict phase separation: season_end cycles sell-only, preseason cycles buy-only.
+  // Replace-mode floor sells belong in the S1 season_end pass, not paired inside S2 buy cycles.
+  if (input.allowSells) {
+    await runSellPass(mandate);
+  }
+  const afterSellSave = input.sessionRunContext?.save ?? input.persistence.getSaveById(input.saveId);
+  const postSellMandate =
+    afterSellSave != null ? resolvePostOptUpgradeMandate(afterSellSave.gameState, input.teamId) : null;
+  if (input.allowBuys) {
+    await runBuyPass(postSellMandate);
   }
 
   if (input.progressLog && (appliedSells > 0 || appliedBuys > 0)) {
@@ -344,7 +344,10 @@ export async function runTransferWindowSession(input: TransferWindowSessionInput
       ? scopeTeam(latestSave.gameState.teams.map((team) => team.teamId)).filter(
           (teamId) => rosterCount(latestSave.gameState, teamId) > 0 && !exhaustedTeamIds.has(teamId),
         )
-      : scopeTeam(getTeamsNeedingConvergence(latestSave.gameState).map((entry) => entry.teamId));
+      : unique([
+          ...scopeTeam(getTeamsNeedingConvergence(latestSave.gameState).map((entry) => entry.teamId)),
+          ...scopeTeam(getTeamsNeedingPostOptUpgradeDeploy(latestSave.gameState, input.seasonId)),
+        ]);
     if (needing.length === 0) {
       leagueRoundsCompleted = leagueRound;
       break;
@@ -376,7 +379,10 @@ export async function runTransferWindowSession(input: TransferWindowSessionInput
         if (!midSave) break;
         if (isSeasonEndSellPhase) {
           if (rosterCount(midSave.gameState, teamId) <= 0) break;
-        } else if (!teamNeedsMarketConvergence(midSave.gameState, teamId)) {
+        } else if (
+          !teamNeedsMarketConvergence(midSave.gameState, teamId) &&
+          !teamNeedsPostOptUpgradeDeploy(midSave.gameState, teamId, input.seasonId)
+        ) {
           break;
         }
         const rosterBeforeCycle = rosterCount(midSave.gameState, teamId);
@@ -502,7 +508,7 @@ export async function runTransferWindowSession(input: TransferWindowSessionInput
   // this. It is a buying mechanism, so under the strict phase separation (2026-07-04 design
   // correction — "Käufe gehören an den SAISON-START") it only runs for the preseason/buy phase; a
   // season_end session is sell-only end to end and must not perform any buy, rescue or otherwise.
-  const OPT_GAP_RESCUE_THRESHOLD = 3;
+  const OPT_GAP_RESCUE_THRESHOLD = 1;
   const OPT_GAP_RESCUE_MAX_CYCLES = 2;
   const rescueSave = isPreseasonBuyPhase ? readLiveSave() : null;
   if (rescueSave) {

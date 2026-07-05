@@ -1,4 +1,9 @@
 import type { GameState } from "@/lib/data/olyDataTypes";
+import {
+  resolveTeamLiquidityBufferTarget,
+  resolveTeamSpendableCashForPlanning,
+  usesSingleCashPlanningPolicy,
+} from "@/lib/ai/planner-cash-buffer-policy";
 import { resolveMarketSpendableCashForPlanner } from "@/lib/ai/ai-manager-apply-service";
 import {
   isTeamRosterBelowOpt,
@@ -145,6 +150,14 @@ export function resolveSimulatedPlannerSpendableCash(input: {
   const { playerOpt, playerMin } = deriveRosterTargets(team, identity);
   const rosterBelowMin = playerMin != null && input.simulatedRosterCount < playerMin;
   const belowOpt = input.simulatedRosterCount < playerOpt;
+
+  if (usesSingleCashPlanningPolicy(input.gameState)) {
+    if (rosterBelowMin) {
+      const minPad = round(Math.max(3, Math.min(15, input.teamCash * 0.05)), 2);
+      return round(Math.max(0, input.teamCash - minPad), 2);
+    }
+    return resolveTeamSpendableCashForPlanning(input.gameState, input.teamId, input.teamCash);
+  }
 
   if (input.gameState.seasonState.aiManagerBudgetReservations?.[input.teamId]) {
     return resolveMarketSpendableCashForPlanner({

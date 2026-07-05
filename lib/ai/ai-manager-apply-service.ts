@@ -17,6 +17,10 @@ import {
   resolveCombinedLiquidityReserve,
   resolveTeamCashRunwayReserve,
 } from "@/lib/ai/ai-team-cash-reserve-service";
+import {
+  resolveTeamSpendableCashForPlanning,
+  usesSingleCashPlanningPolicy,
+} from "@/lib/ai/planner-cash-buffer-policy";
 import { getTeamObjectiveAiBias } from "@/lib/board/team-season-objectives-service";
 import { deriveRosterTargets } from "@/lib/foundation/roster-limits";
 import { previewFacilityMaintenance, applyFacilityMaintenance } from "@/lib/facilities/facility-maintenance-service";
@@ -25,6 +29,7 @@ import type { FacilityId } from "@/lib/facilities/facility-catalog";
 import { createPersistenceService } from "@/lib/persistence/persistence-service";
 import type { PersistedSaveGame, PersistenceService } from "@/lib/persistence/types";
 import { isLongRunFastProfile } from "@/lib/season/long-run-profile";
+import { isSeasonOne } from "@/lib/season/transfer-season-policy";
 import { applyTeamTrainingSettings, applyPlayerTrainingModes, previewPlayerTrainingModes, previewTeamTrainingSettings, applyPlayerTrainingClasses, previewPlayerTrainingClasses } from "@/lib/training/training-settings-service";
 import { applyAiTeamPlayerDemandFulfillment } from "@/lib/ai/ai-player-demand-fulfillment-service";
 
@@ -532,7 +537,11 @@ function writeManagerPlanState(
     const sourcePlanId = teamActions[0]?.sourcePlanId ?? buildPlanId(save);
     const byType = new Map(teamActions.map((action) => [action.actionType, action] as const));
     const budgetPreview = preview.teams.find((team) => team.teamId === teamId)?.budgetPlan.bucketsBefore;
-    if (budgetPreview && (byType.has("reserve_transfer_budget") || byType.has("reserve_salary_budget") || byType.has("reserve_maintenance_budget"))) {
+    if (
+      isSeasonOne(save.gameState.season.id) &&
+      budgetPreview &&
+      (byType.has("reserve_transfer_budget") || byType.has("reserve_salary_budget") || byType.has("reserve_maintenance_budget"))
+    ) {
       budgetReservations[teamId] = {
         teamId,
         seasonId: save.gameState.season.id,
@@ -841,9 +850,20 @@ export function resolveMarketSpendableCashForPlanner(input: {
   const belowOpt = isTeamRosterBelowOpt(input.gameState, input.teamId);
   const rebuildMode = belowOpt || Boolean(input.forceRosterFill) || input.rosterBelowMin;
 
-  // Buckets are the source of truth: spend must never exceed what's actually reserved. In rebuild
-  // mode (draft / roster fill), the draft may also draw on buildingBudget and cashReserve as a
-  // fallback pool — but salary/maintenance/emergency reserves stay protected either way.
+  // Hard-min fill must not be capped by stale draft-era GM buckets after season-end sells
+  // inflated team cash — spend almost all current cash to reach playerMin first.
+  if (input.rosterBelowMin) {
+    const minPad = round(Math.max(3, Math.min(15, teamCash * 0.05)), 2);
+    return round(Math.max(0, teamCash - minPad), 2);
+  }
+
+  // S2+: single cash pool — soft 10% MW buffer, ignore GM budget buckets entirely.
+  if (usesSingleCashPlanningPolicy(input.gameState)) {
+    return resolveTeamSpendableCashForPlanning(input.gameState, input.teamId, teamCash);
+  }
+
+  // S1 draft: buckets + rebuild liquidity reserves. In rebuild mode the draft may also draw on
+  // buildingBudget and cashReserve as a fallback pool.
   if (reservation) {
     return (
       getAiManagerMarketSpendableCash(input.gameState, input.teamId, teamCash, {

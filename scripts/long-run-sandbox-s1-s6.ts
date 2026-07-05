@@ -112,7 +112,9 @@ const LONG_RUN_PLANNER_MAX_LEAGUE_ROUNDS = getLongRunPlannerMaxLeagueRounds();
 const LONG_RUN_PLANNER_MAX_TEAM_CYCLES = getLongRunPlannerMaxTeamCycles();
 const LONG_RUN_SKIP_LINEUP_REAPPLY = process.env.OLY_LONG_RUN_SKIP_LINEUP_REAPPLY === "1";
 const LONG_RUN_STOP_AFTER =
-  process.env.OLY_LONG_RUN_STOP_AFTER === "draft" || process.env.OLY_LONG_RUN_STOP_AFTER === "season_end"
+  process.env.OLY_LONG_RUN_STOP_AFTER === "draft" ||
+  process.env.OLY_LONG_RUN_STOP_AFTER === "season_end" ||
+  process.env.OLY_LONG_RUN_STOP_AFTER === "preseason"
     ? process.env.OLY_LONG_RUN_STOP_AFTER
     : null;
 const SUMMARY_ONLY = process.argv.includes("--summary-only");
@@ -3346,6 +3348,10 @@ async function main() {
     const unresolvedSlotRows = preseason.slotCoverageRows.filter((row) => row.status === "hard_unresolved");
     if (unresolvedSlotRows.length > 0) {
       balanceIssues.push(`${seasonId}:slot_coverage_hard_unresolved:${unresolvedSlotRows.length}`);
+    }
+    if (LONG_RUN_STOP_AFTER === "preseason") {
+      console.error(`[long-run] STOP_AFTER=preseason — ${seasonId} Preseason abgeschlossen, Save \`${save.saveId}\`.`);
+      break;
     }
     const matchdayRun = await runSeasonMatchdays(save.saveId, persistence);
     matchdayRows.push(...matchdayRun.matchdayRows);

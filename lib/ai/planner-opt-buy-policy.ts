@@ -118,6 +118,7 @@ export function resolveAllowedMarketBuyCount(input: {
   minUpgradeBuyPrice?: number | null;
   topCandidateScore?: number;
   plannedSellCount?: number;
+  maxUpgradeBuys?: number;
 }) {
   const optionLimit = input.maxBuysPerTeam ?? Number.POSITIVE_INFINITY;
   const currentRoster = input.rosterBase ?? input.currentRoster;
@@ -141,30 +142,11 @@ export function resolveAllowedMarketBuyCount(input: {
   }
 
   const qualityPlanned = filterQualityPlannedBuyCandidates(input.plannedCandidates);
-  if (qualityPlanned.length > 0) {
-    return Math.min(qualityPlanned.length, optionLimit);
-  }
-
   if (!input.postOptUpgradeDeploy) {
     return 0;
   }
 
-  const topScore = input.topCandidateScore ?? candidateRecommendationScore(input.plannedCandidates[0] ?? {});
-  const hasAggressiveOpportunity = input.plannedCandidates.length > 0 && topScore >= 65;
-  const plannedSellCount = input.plannedSellCount ?? 0;
-  const minPrice = input.minUpgradeBuyPrice ?? 0;
-  const upgradeCandidate = input.plannedCandidates.find((candidate) => {
-    const price = candidate.price ?? candidate.marketValue ?? 0;
-    return price + 0.01 >= minPrice;
-  });
-  if (upgradeCandidate && (plannedSellCount >= 1 || hasAggressiveOpportunity)) {
-    return Math.min(1, optionLimit);
-  }
-  if (plannedSellCount >= 2 && topScore >= 58) {
-    return Math.min(2, optionLimit);
-  }
-  if (plannedSellCount >= 1 && topScore >= 52) {
-    return Math.min(1, optionLimit);
-  }
-  return hasAggressiveOpportunity ? Math.min(1, optionLimit) : 0;
+  const onTopLimit = Math.min(input.maxUpgradeBuys ?? 2, 2, optionLimit);
+  if (qualityPlanned.length === 0) return 0;
+  return Math.min(qualityPlanned.length, onTopLimit);
 }

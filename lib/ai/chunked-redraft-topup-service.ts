@@ -4765,7 +4765,9 @@ export function runChunkedRedraftTopup(params: ChunkedRedraftTopupParams) {
       });
       const minimumRosterGap = Math.max(0, (targetPlan?.minTarget ?? teamTarget.playerMin) - rosterCount);
       const phaseAMinimumGuard = phasePlan.phase === "phase_a_minimum" && minimumRosterGap > 0;
-      const repairMode = params.mode === "preseason_roster_repair" && phaseAMinimumGuard;
+      const repairMode =
+        phaseAMinimumGuard &&
+        (params.mode === "preseason_roster_repair" || params.mode === "season1_initial_topup");
       const getCandidateCashCost = (candidate: Candidate) => candidate.marketValue;
       const cashAffordableCandidates = candidatePool
         .filter((candidate) => !pickedPlayerIds.has(candidate.player.id))

@@ -500,6 +500,7 @@ function buildNextSeasonGameState(save: PersistedSaveGame): { gameState: GameSta
     standingsApplyLogs: [],
     matchdayAdvanceLogs: [],
     cashPrizeApplyLogs: save.gameState.seasonState.cashPrizeApplyLogs ?? [],
+    aiManagerBudgetReservations: undefined,
     playerAvailabilityState: [],
     newGameFlow: {
       active: true,
@@ -770,21 +771,7 @@ export function applyPreSeasonNextSeasonSetupLightweight(
   }
 
   const penaltyResult = applyFormCardPenaltyToStandings(save);
-  const snapshotResult = buildSaveWithRequiredSeasonSnapshot(penaltyResult.save);
-  if (snapshotResult.blockingReasons.length > 0) {
-    return {
-      ...basePreview,
-      dryRun: false,
-      productiveWrites: true,
-      applied: false,
-      appliedStepId: null,
-      auditLogId: null,
-      warnings: [...basePreview.warnings, ...penaltyResult.warnings, ...snapshotResult.warnings],
-      blockingReasons: snapshotResult.blockingReasons,
-    };
-  }
-
-  const progressionResult = materializeSeasonEndProgressionBeforeNextSeason(snapshotResult.save, persistence);
+  const progressionResult = materializeSeasonEndProgressionBeforeNextSeason(penaltyResult.save, persistence);
   if (progressionResult.blockingReasons.length > 0) {
     return {
       ...basePreview,
@@ -793,12 +780,26 @@ export function applyPreSeasonNextSeasonSetupLightweight(
       applied: false,
       appliedStepId: null,
       auditLogId: null,
-      warnings: [...basePreview.warnings, ...snapshotResult.warnings, ...progressionResult.warnings],
+      warnings: [...basePreview.warnings, ...penaltyResult.warnings, ...progressionResult.warnings],
       blockingReasons: progressionResult.blockingReasons,
     };
   }
 
-  const { gameState, auditLog } = buildNextSeasonGameState(progressionResult.save);
+  const snapshotResult = buildSaveWithRequiredSeasonSnapshot(progressionResult.save);
+  if (snapshotResult.blockingReasons.length > 0) {
+    return {
+      ...basePreview,
+      dryRun: false,
+      productiveWrites: true,
+      applied: false,
+      appliedStepId: null,
+      auditLogId: null,
+      warnings: [...basePreview.warnings, ...penaltyResult.warnings, ...snapshotResult.warnings, ...progressionResult.warnings],
+      blockingReasons: snapshotResult.blockingReasons,
+    };
+  }
+
+  const { gameState, auditLog } = buildNextSeasonGameState(snapshotResult.save);
   persistence.saveSingleplayerState(save.saveId, gameState);
   return {
     ...basePreview,
@@ -1096,21 +1097,7 @@ export async function applyPreSeasonNextSeasonSetup(
     };
   }
   const penaltyResult = applyFormCardPenaltyToStandings(save);
-  const snapshotResult = buildSaveWithRequiredSeasonSnapshot(penaltyResult.save);
-  if (snapshotResult.blockingReasons.length > 0) {
-    return {
-      ...preview,
-      dryRun: false,
-      productiveWrites: true,
-      applied: false,
-      appliedStepId: null,
-      auditLogId: null,
-      warnings: [...preview.warnings, ...penaltyResult.warnings, ...snapshotResult.warnings],
-      blockingReasons: snapshotResult.blockingReasons,
-    };
-  }
-
-  const progressionResult = materializeSeasonEndProgressionBeforeNextSeason(snapshotResult.save, persistence);
+  const progressionResult = materializeSeasonEndProgressionBeforeNextSeason(penaltyResult.save, persistence);
   if (progressionResult.blockingReasons.length > 0) {
     return {
       ...preview,
@@ -1119,12 +1106,26 @@ export async function applyPreSeasonNextSeasonSetup(
       applied: false,
       appliedStepId: null,
       auditLogId: null,
-      warnings: [...preview.warnings, ...snapshotResult.warnings, ...progressionResult.warnings],
+      warnings: [...preview.warnings, ...penaltyResult.warnings, ...progressionResult.warnings],
       blockingReasons: progressionResult.blockingReasons,
     };
   }
 
-  const { gameState, auditLog } = buildNextSeasonGameState(progressionResult.save);
+  const snapshotResult = buildSaveWithRequiredSeasonSnapshot(progressionResult.save);
+  if (snapshotResult.blockingReasons.length > 0) {
+    return {
+      ...preview,
+      dryRun: false,
+      productiveWrites: true,
+      applied: false,
+      appliedStepId: null,
+      auditLogId: null,
+      warnings: [...preview.warnings, ...penaltyResult.warnings, ...snapshotResult.warnings, ...progressionResult.warnings],
+      blockingReasons: snapshotResult.blockingReasons,
+    };
+  }
+
+  const { gameState, auditLog } = buildNextSeasonGameState(snapshotResult.save);
   persistence.saveSingleplayerState(save.saveId, gameState);
   const nextPreview = await buildPreSeasonWorkflowPreview({ ...progressionResult.save, gameState }, persistence);
 

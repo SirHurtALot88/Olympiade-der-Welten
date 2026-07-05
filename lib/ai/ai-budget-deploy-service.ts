@@ -21,6 +21,7 @@ import {
   projectExpectedSalaryAtPlannerTarget,
   resolveTeamCashRunwayReserve,
 } from "@/lib/ai/ai-team-cash-reserve-service";
+import { resolvePostOptUpgradeMandate } from "@/lib/ai/planner-post-opt-upgrade-policy";
 
 export {
   getTeamCashSalaryHardCap,
@@ -165,20 +166,9 @@ export function hasUpgradeSellOpportunity(gameState: GameState, teamId: string, 
   return teamNeedsPostOptUpgradeDeploy(gameState, teamId, seasonId);
 }
 
-export function teamNeedsPostOptUpgradeDeploy(gameState: GameState, teamId: string, seasonId: string) {
+export function teamNeedsPostOptUpgradeDeploy(gameState: GameState, teamId: string, _seasonId: string) {
   if (isStrategicHoardTeam(gameState, teamId)) return false;
-  const rosterCount = getRosterCount(gameState, teamId);
-  const playerOpt = getTeamOptTarget(gameState, teamId);
-  if (rosterCount < playerOpt) return false;
-  const hoarding = isCashHoardingTeam(gameState, teamId, seasonId);
-  const overSoft = isTeamOverCashSalarySoftTarget(gameState, teamId, seasonId);
-  const plannerTarget = getTeamPlannerRosterTarget(gameState, teamId);
-  if (!hoarding && !overSoft && rosterCount < plannerTarget) return false;
-  const spendable = getTeamSpendableCash(gameState, teamId);
-  const upgradeFloor = estimateUpgradeBuyFloorMw(gameState, teamId);
-  if (spendable + 0.01 < upgradeFloor && !hoarding) return false;
-  if (hoarding) return true;
-  return overSoft;
+  return resolvePostOptUpgradeMandate(gameState, teamId).active;
 }
 
 export function teamNeedsTransferBudgetDeploy(gameState: GameState, teamId: string, seasonId: string) {

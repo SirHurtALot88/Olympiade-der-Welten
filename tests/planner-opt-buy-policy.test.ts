@@ -24,6 +24,8 @@ describe("planner opt buy policy", () => {
         { playerId: "trash", price: 6, overallRecommendationScore: 20 },
       ],
       maxBuysPerTeam: 3,
+      postOptUpgradeDeploy: true,
+      maxUpgradeBuys: 2,
     });
 
     expect(allowed).toBe(1);
@@ -131,6 +133,24 @@ describe("planner opt buy policy", () => {
       maxBuysPerTeam: 4,
     });
 
+    expect(allowed).toBe(2);
+  });
+
+  it("allows up to two on-top buys at opt when deploy flag is set", () => {
+    const allowed = resolveAllowedMarketBuyCount({
+      rosterBase: 8,
+      currentRoster: 8,
+      playerOpt: 8,
+      expiringCount: 0,
+      plannedCandidates: [
+        { price: 35, overallRecommendationScore: 70 },
+        { price: 32, overallRecommendationScore: 66 },
+        { price: 30, overallRecommendationScore: 62 },
+      ],
+      maxBuysPerTeam: 4,
+      postOptUpgradeDeploy: true,
+      maxUpgradeBuys: 2,
+    });
     expect(allowed).toBe(2);
   });
 });

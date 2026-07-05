@@ -6,6 +6,7 @@ import { previewFacilitySeasonEndFinance } from "@/lib/facilities/facility-seaso
 import { buildSeasonStrategyState } from "@/lib/ai/ai-manager-doctrine-service";
 import { countTeamInjuredPlayers } from "@/lib/fatigue/fatigue-injury-service";
 import { deriveRosterTargets } from "@/lib/foundation/roster-limits";
+import { resolvePostOptPlannerRosterTarget } from "@/lib/ai/planner-post-opt-upgrade-policy";
 import { resolvePlayerEconomyContract } from "@/lib/foundation/player-economy-contract";
 import { getTeamStrategyProfile } from "@/lib/foundation/team-strategy-profiles";
 import { getTeamObjectiveAiBias } from "@/lib/board/team-season-objectives-service";
@@ -230,6 +231,7 @@ export function getTeamPlannerRosterTarget(gameState: GameState, teamId: string)
   }
 
   let target = playerOpt;
+  target = resolvePostOptPlannerRosterTarget(gameState, teamId, playerOpt);
   const { fatigued, injured } = countTeamFatigueStress(gameState, teamId);
   if (fatigued >= 2 || injured >= 2) {
     target = Math.min(playerMax, target + 1);

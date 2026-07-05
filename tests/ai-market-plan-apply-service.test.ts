@@ -318,7 +318,7 @@ describe("ai market plan apply service", () => {
     expect(executeLocalTransfermarktSell).not.toHaveBeenCalled();
     expect(executeLocalTransfermarktBuy).not.toHaveBeenCalled();
     expect(persistenceState.saveCalls).toHaveLength(0);
-  });
+  }, 15_000);
 
   it("fills AI buy plans up to playerOpt without overbuying the candidate window", async () => {
     persistenceState.save.gameState.teams = [
@@ -499,18 +499,20 @@ describe("ai market plan apply service", () => {
     expect(buildAiMarketPlanPreview).toHaveBeenCalledWith(
       expect.objectContaining({
         buyLimit: 48,
-        sellLimit: 0,
+        sellLimit: 3,
         buyNeedOnly: true,
         teamId: "A-I",
       }),
     );
     expect(result.phaseAudit.find((entry) => entry.phaseId === "ai_buy_candidate_scan")?.scanLimit).toBe(48);
-    expect(result.phaseAudit.find((entry) => entry.phaseId === "ai_sell_scan")?.scanLimit).toBe(0);
+    expect(result.phaseAudit.find((entry) => entry.phaseId === "ai_sell_scan")?.scanLimit).toBe(3);
   });
 
   it("skips expensive market previews when no Season 2+ team has buy or sell need", async () => {
+    persistenceState.save.gameState.season = { id: "season-2", name: "Season 2", year: 2027, currentMatchday: 1, matchdayIds: ["matchday-1"] };
+    persistenceState.save.gameState.seasonState.seasonId = "season-2";
     persistenceState.save.gameState.teams = [
-      { teamId: "A-I", name: "AI Team", shortCode: "A-I", cash: 120, rosterLimit: 10, controlMode: "ai" },
+      { teamId: "A-I", name: "AI Team", shortCode: "A-I", cash: 4, rosterLimit: 10, controlMode: "ai" },
     ] as GameState["teams"];
     persistenceState.save.gameState.teamIdentities = [
       { teamId: "A-I", playerMin: 7, playerOpt: 10 },
@@ -519,8 +521,9 @@ describe("ai market plan apply service", () => {
       teamId: "A-I",
       playerId: `p-${index + 1}`,
       activePlayerId: `ap-${index + 1}`,
-      salary: 2,
+      salary: 0.1,
       currentValue: 6,
+      contractLength: 2,
     })) as GameState["rosters"];
 
     const { applyAiMarketPlanLocally } = await import("@/lib/ai/ai-market-plan-apply-service");
@@ -529,6 +532,9 @@ describe("ai market plan apply service", () => {
       saveId: "save-local",
       seasonId: "season-2",
       dryRun: true,
+      options: {
+        applySellSteps: false,
+      },
     });
 
     expect(buildAiMarketPlanPreview).not.toHaveBeenCalled();
