@@ -1935,6 +1935,12 @@ export default function LegacyLineupLabClient(props: LegacyLineupLabClientProps)
   const [errors, setErrors] = useState<string[]>([]);
   const [warnings, setWarnings] = useState<string[]>([]);
   const [message, setMessage] = useState<string>("");
+  const [lineupHandoffOverlay, setLineupHandoffOverlay] = useState<{
+    teamName: string;
+    d1Label: string;
+    d2Label: string;
+    scoreLabel: string;
+  } | null>(null);
   const [sourceReadOnly, setSourceReadOnly] = useState<boolean>(source === "prisma");
   const [roomContext, setRoomContext] = useState<FoundationRoomContext | null>(null);
   const [playerFilter, setPlayerFilter] = useState("");
@@ -4926,16 +4932,39 @@ export default function LegacyLineupLabClient(props: LegacyLineupLabClientProps)
       { skipContextReload: source === "sqlite" },
     );
     if (saved) {
-      setMessage("Einsatzliste gespeichert — Wechsel zur Arena …");
+      const d1Label = context?.matchdayContract?.discipline1?.displayName ?? "D1";
+      const d2Label = context?.matchdayContract?.discipline2?.displayName ?? "D2";
+      const scoreLabel = formatProjectedMetricWindow(matchdayPreviewCards.totalRangeLow, matchdayPreviewCards.totalRangeHigh);
+      const prefersReducedMotion =
+        typeof window !== "undefined" && window.matchMedia("(prefers-reduced-motion: reduce)").matches;
       if (typeof window !== "undefined") {
         window.sessionStorage.setItem("lineup-v2-arena-handoff", "1");
       }
-      props.onOpenArena?.({
-        saveId: params.saveId,
-        seasonId: params.seasonId,
-        matchdayId: params.matchdayId,
-        teamId: params.teamId,
+      if (prefersReducedMotion || !props.onOpenArena) {
+        setMessage("Einsatzliste gespeichert — Wechsel zur Arena …");
+        props.onOpenArena?.({
+          saveId: params.saveId,
+          seasonId: params.seasonId,
+          matchdayId: params.matchdayId,
+          teamId: params.teamId,
+        });
+        return;
+      }
+      setLineupHandoffOverlay({
+        teamName: context?.team.name ?? "Team",
+        d1Label,
+        d2Label,
+        scoreLabel,
       });
+      window.setTimeout(() => {
+        setLineupHandoffOverlay(null);
+        props.onOpenArena?.({
+          saveId: params.saveId,
+          seasonId: params.seasonId,
+          matchdayId: params.matchdayId,
+          teamId: params.teamId,
+        });
+      }, 2000);
     }
   }
 
@@ -6508,6 +6537,26 @@ export default function LegacyLineupLabClient(props: LegacyLineupLabClientProps)
     }, 300);
   }
 
+  function assignFormCardToCell(input: {
+    matchdayId: string;
+    disciplineSide: "d1" | "d2";
+    disciplineId: string | null;
+    slot: "primary" | "secondary";
+    cardId: string;
+  }) {
+    if (isReadOnly) {
+      return;
+    }
+    const plan = formCardPlanByKey.get(`${input.matchdayId}:${input.disciplineSide}`) ?? null;
+    queueFormCardPlanSave({
+      matchdayId: input.matchdayId,
+      disciplineSide: input.disciplineSide,
+      disciplineId: input.disciplineId,
+      primaryFormCardId: input.slot === "primary" ? input.cardId : plan?.primaryFormCardId ?? null,
+      secondaryFormCardId: input.slot === "secondary" ? input.cardId : plan?.secondaryFormCardId ?? null,
+    });
+  }
+
   function assignFormCardFromDeck(cardId: string) {
     if (!activeFormPickCell || isReadOnly) {
       return;
@@ -6738,6 +6787,20 @@ export default function LegacyLineupLabClient(props: LegacyLineupLabClientProps)
       {message ? (
         <div className="info-banner">
           <p>{message}</p>
+        </div>
+      ) : null}
+
+      {lineupHandoffOverlay ? (
+        <div className="legacy-lineup-v2-handoff-overlay" data-testid="lineup-v2-handoff-overlay" role="status" aria-live="polite">
+          <div className="legacy-lineup-v2-handoff-card">
+            <span>Spieltag bereit</span>
+            <strong>{lineupHandoffOverlay.teamName}</strong>
+            <p>
+              {lineupHandoffOverlay.d1Label} · {lineupHandoffOverlay.d2Label}
+            </p>
+            <em>Erwartete Punkte {lineupHandoffOverlay.scoreLabel}</em>
+            <small>Wechsel zur Arena …</small>
+          </div>
         </div>
       ) : null}
 
@@ -7507,6 +7570,7 @@ export default function LegacyLineupLabClient(props: LegacyLineupLabClientProps)
               renderSelectedFormCardChip={renderSelectedFormCardChip}
               clearActiveFormPickCell={clearActiveFormPickCell}
               assignFormCardFromDeck={assignFormCardFromDeck}
+              assignFormCardToCell={assignFormCardToCell}
               setActiveFormPickCell={setActiveFormPickCell}
               skipFormCardsForSide={skipFormCardsForSide}
             />
@@ -7739,6 +7803,30 @@ export default function LegacyLineupLabClient(props: LegacyLineupLabClientProps)
               onPlayerFilterChange={setPlayerFilter}
               disciplineColorClassBySide={disciplineColorClassBySide}
               formMiniChipsBySide={focusV2FormMiniChipsBySide}
+              currentMatchdayId={params.matchdayId}
+              onAssignFormCardToSide={({ disciplineSide, slot, cardId }) => {
+                const disciplineId =
+                  disciplineSide === "d1"
+                    ? context?.matchdayContract?.discipline1?.disciplineId ?? null
+                    : context?.matchdayContract?.discipline2?.disciplineId ?? null;
+                assignFormCardToCell({
+                  matchdayId: params.matchdayId,
+                  disciplineSide,
+                  disciplineId,
+                  slot,
+                  cardId,
+                });
+              }}
+              getFormBoardCardOptionsForSide={(disciplineSide, slot) => {
+                const discipline =
+                  disciplineSide === "d1" ? context?.matchdayContract?.discipline1 : context?.matchdayContract?.discipline2;
+                const disciplineColor = getFormCardColorForCategory(discipline?.category ?? null);
+                return getFormBoardCardOptions(params.matchdayId, disciplineSide, slot, disciplineColor).map((card) => ({
+                  id: card.id,
+                  label: formatFormCardOptionLabel(card, disciplineColor),
+                  color: card.color,
+                }));
+              }}
               controlsSlot={
                 <>
                   <label>

@@ -242,6 +242,7 @@ export type LegacyLineupFocusV2BoardProps = {
     buttonLabel: string;
   };
   lineupReadyToSave: boolean;
+  lineupFinishItems: Array<{ key: string; label: string; detail: string; tone: string }>;
   lineupMiniAuditBlockers: number;
   captainBudgetExceeded: boolean;
   missingSeasonFormCards: boolean;
@@ -260,6 +261,16 @@ export type LegacyLineupFocusV2BoardProps = {
     "d1" | "d2",
     { primaryLabel: string | null; secondaryLabel: string | null; hasSelection: boolean }
   >;
+  currentMatchdayId?: string | null;
+  onAssignFormCardToSide?: (input: {
+    disciplineSide: "d1" | "d2";
+    slot: "primary" | "secondary";
+    cardId: string;
+  }) => void;
+  getFormBoardCardOptionsForSide?: (
+    disciplineSide: "d1" | "d2",
+    slot: "primary" | "secondary",
+  ) => Array<{ id: string; label: string; color: string }>;
 };
 
 function formatScore(value: number) {
@@ -283,7 +294,7 @@ function formatSignedDecimalScore(value: number | null | undefined, digits = 1) 
 }
 
 function formatIntensityLabel(intensity: MatchdayIntensityStage) {
-  if (intensity === "push") return "Push";
+  if (intensity === "push") return "Vollgas";
   if (intensity === "conserve") return "Schonen";
   return "Normal";
 }
@@ -362,6 +373,7 @@ export default function LegacyLineupFocusV2Board({
   lineupFlowSummary,
   lineupSaveCta,
   lineupReadyToSave,
+  lineupFinishItems,
   lineupMiniAuditBlockers,
   captainBudgetExceeded,
   missingSeasonFormCards,
@@ -377,11 +389,17 @@ export default function LegacyLineupFocusV2Board({
   tacticsSlot,
   disciplineColorClassBySide,
   formMiniChipsBySide,
+  currentMatchdayId,
+  onAssignFormCardToSide,
+  getFormBoardCardOptionsForSide,
 }: LegacyLineupFocusV2BoardProps) {
   const [focusedPlayerId, setFocusedPlayerId] = useState<string | null>(null);
   const [pinnedCandidateIds, setPinnedCandidateIds] = useState<string[]>([]);
   const [flashKey, setFlashKey] = useState<string | null>(null);
+  const [saveHelpOpen, setSaveHelpOpen] = useState(false);
+  const [assignAnnouncement, setAssignAnnouncement] = useState("");
   const [keyboardHintsOpen, setKeyboardHintsOpen] = useState(false);
+  const [formPickerOpen, setFormPickerOpen] = useState<{ disciplineSide: "d1" | "d2"; slot: "primary" | "secondary" } | null>(null);
   const [mobileAssignCandidateId, setMobileAssignCandidateId] = useState<string | null>(null);
   const [isTouchUi, setIsTouchUi] = useState(false);
   const [wizardMode, setWizardMode] = useState(false);
@@ -392,6 +410,9 @@ export default function LegacyLineupFocusV2Board({
       return;
     }
     setIsTouchUi(window.matchMedia("(hover: none)").matches);
+    if (window.matchMedia("(max-width: 1080px)").matches && window.localStorage.getItem("lineup-v2-wizard-off") !== "1") {
+      setWizardMode(true);
+    }
   }, []);
 
   const activeSlot = activeSlotKey ? slots.find((slot) => slot.key === activeSlotKey) ?? null : null;
@@ -459,8 +480,14 @@ export default function LegacyLineupFocusV2Board({
     if (prevAssignPulseRef.current !== assignPulse) {
       prevAssignPulseRef.current = assignPulse;
       triggerSlotFlash();
+      const slot = slots.find((entry) => entry.key === activeSlotKey);
+      const playerId = slot ? selections[slot.key] : null;
+      const playerName = playerId ? rosterCardByActivePlayerId.get(playerId)?.name : null;
+      if (slot && playerName) {
+        setAssignAnnouncement(`${playerName} in ${slot.disciplineSide.toUpperCase()}-${slot.slotIndex + 1} gesetzt`);
+      }
     }
-  }, [assignPulse, triggerSlotFlash]);
+  }, [assignPulse, triggerSlotFlash, activeSlotKey, rosterCardByActivePlayerId, selections, slots]);
 
   const filteredCandidateGroups = useMemo(
     () => filterLegacyLineupCandidateEntries(candidateGroups, candidateTab, playerFilter),
@@ -530,13 +557,25 @@ export default function LegacyLineupFocusV2Board({
     .map((id) => candidateEntryByActivePlayerId.get(id) ?? null)
     .filter((entry): entry is FocusCandidateEntry => entry != null);
 
+  const compareWinnerScore = useMemo(() => {
+    if (pinnedEntries.length < 2) return null;
+    return Math.max(
+      ...pinnedEntries.map((entry) => entry.activeSlotCandidate?.projectedScore ?? Number.NEGATIVE_INFINITY),
+    );
+  }, [pinnedEntries]);
+
+  function renderComparePlaceholderColumns() {
+    const missing = Math.max(0, 3 - pinnedEntries.length);
+    return Array.from({ length: missing }, (_, index) => <span key={`compare-empty-${index}`} />);
+  }
+
   function togglePinnedCandidate(activePlayerId: string) {
     setPinnedCandidateIds((current) => {
       if (current.includes(activePlayerId)) {
         return current.filter((id) => id !== activePlayerId);
       }
       const next = [...current, activePlayerId];
-      return next.length > 2 ? next.slice(next.length - 2) : next;
+      return next.length > 3 ? next.slice(next.length - 3) : next;
     });
   }
 
@@ -547,6 +586,9 @@ export default function LegacyLineupFocusV2Board({
 
   return (
     <div className="legacy-lineup-v2-shell" data-testid="legacy-lineup-v2-board">
+      <div className="sr-only" aria-live="polite" aria-atomic="true">
+        {assignAnnouncement}
+      </div>
       <div className="legacy-lineup-v2-toolbar" aria-label="Spieltag-Werkzeugleiste">
         <div className="legacy-lineup-v2-toolbar-main">
           <div>
@@ -558,8 +600,8 @@ export default function LegacyLineupFocusV2Board({
           <span className={matchdayPreviewCards.openSlots > 0 ? "is-warning" : "is-ready"} title="Belegte Slots">
             Slots <strong>{lineupFlowSummary.selectedCount}/{lineupFlowSummary.totalRequired || "—"}</strong>
           </span>
-          <span className="is-score" title="Projected Score">
-            Score <strong>{formatProjectedMetricWindow(matchdayPreviewCards.totalRangeLow, matchdayPreviewCards.totalRangeHigh)}</strong>
+          <span className="is-score" title="Erwartete Punkte-Spanne">
+            Punkte <strong>{formatProjectedMetricWindow(matchdayPreviewCards.totalRangeLow, matchdayPreviewCards.totalRangeHigh)}</strong>
           </span>
           <span className="legacy-lineup-v2-flow-chip is-hero" title={lineupFlowSummary.nextStep.detail}>
             Nächster Schritt <strong>{lineupFlowSummary.nextStep.label}</strong>
@@ -574,11 +616,11 @@ export default function LegacyLineupFocusV2Board({
             <span className={missingSeasonFormCards ? "is-warning" : "is-ready"} title="Formkarten">
               Form <strong>{missingSeasonFormCards ? "offen" : "ok"}</strong>
             </span>
-            <span className={matchdayPreviewCards.totalFatigue >= 40 ? "is-warning" : "is-ready"} title="Fatigue">
-              Fatigue <strong>{formatDecimalScore(matchdayPreviewCards.totalFatigue, 1)}</strong>
+            <span className={matchdayPreviewCards.totalFatigue >= 40 ? "is-warning" : "is-ready"} title="Ermüdung">
+              Ermüdung <strong>{formatDecimalScore(matchdayPreviewCards.totalFatigue, 1)}</strong>
             </span>
-            <span className={lineupMiniAuditBlockers > 0 ? "is-blocked" : "is-ready"} title="Blocker">
-              Blocker <strong>{lineupMiniAuditBlockers}</strong>
+            <span className={lineupMiniAuditBlockers > 0 ? "is-blocked" : "is-ready"} title="Hindernisse">
+              Hindernisse <strong>{lineupMiniAuditBlockers}</strong>
             </span>
             <span className={matchdayPreviewCards.riskLevel === "hoch" ? "is-blocked" : matchdayPreviewCards.riskLevel === "mittel" ? "is-warning" : "is-ready"}>
               Risiko <strong>{matchdayPreviewCards.riskLevel}</strong>
@@ -593,7 +635,7 @@ export default function LegacyLineupFocusV2Board({
               onChange={(event) => setWizardMode(event.target.checked)}
               data-testid="lineup-v2-wizard-toggle"
             />
-            <span>Wizard</span>
+            <span>Assistent</span>
           </label>
           <label className="legacy-lineup-v2-mode-toggle" title="Kandidaten-Vergleich per Checkbox">
             <input
@@ -641,18 +683,44 @@ export default function LegacyLineupFocusV2Board({
             Nächster Slot
           </button>
           <button className="secondary-button inline-button" type="button" onClick={onAutoFillOpenSlots} disabled={isBusy || matchdayPreviewCards.openSlots === 0}>
-            Auto-Fill
+            Automatisch füllen
           </button>
-          <button
-            className={`primary-button inline-button${lineupReadyToSave ? " is-ready" : ""}`}
-            type="button"
-            data-testid="lineup-v2-save-button"
-            onClick={onSaveDraft}
-            disabled={isBusy || isReadOnly}
-            title={lineupSaveCta.detail}
-          >
-            {lineupSaveCta.buttonLabel}
-          </button>
+          <div className="legacy-lineup-v2-save-wrap">
+            <button
+              className={`primary-button inline-button${lineupReadyToSave ? " is-ready" : ""}`}
+              type="button"
+              data-testid="lineup-v2-save-button"
+              onClick={() => {
+                if (!lineupReadyToSave) {
+                  setSaveHelpOpen((current) => !current);
+                  return;
+                }
+                setSaveHelpOpen(false);
+                onSaveDraft();
+              }}
+              disabled={isBusy || isReadOnly}
+              title={lineupSaveCta.detail}
+              aria-expanded={!lineupReadyToSave ? saveHelpOpen : undefined}
+            >
+              {lineupSaveCta.buttonLabel}
+            </button>
+            {!lineupReadyToSave && saveHelpOpen ? (
+              <div className="legacy-lineup-v2-save-help" data-testid="lineup-v2-save-help" role="dialog" aria-label="Offene Punkte vor dem Speichern">
+                <strong>{lineupSaveCta.label}</strong>
+                <ul>
+                  {lineupFinishItems.map((item) => (
+                    <li key={item.key} className={`is-${item.tone}`}>
+                      <span>{item.label}</span>
+                      <small>{item.detail}</small>
+                    </li>
+                  ))}
+                </ul>
+                <button className="secondary-button inline-button" type="button" onClick={() => setSaveHelpOpen(false)}>
+                  Schließen
+                </button>
+              </div>
+            ) : null}
+          </div>
         </div>
       </div>
 
@@ -766,16 +834,49 @@ export default function LegacyLineupFocusV2Board({
                     </div>
                     {sideFormChips ? (
                       <div className="legacy-lineup-v2-form-mini-chips" aria-label={`${disciplineSide.toUpperCase()} Formkarten`}>
-                        {sideFormChips.primaryLabel ? (
-                          <span className={`legacy-lineup-v2-form-mini-chip${sideFormChips.hasSelection ? " is-ready" : ""}`}>{sideFormChips.primaryLabel}</span>
-                        ) : (
-                          <span className="legacy-lineup-v2-form-mini-chip is-empty">F1 —</span>
-                        )}
-                        {sideFormChips.secondaryLabel ? (
-                          <span className={`legacy-lineup-v2-form-mini-chip is-bonus${sideFormChips.hasSelection ? " is-ready" : ""}`}>{sideFormChips.secondaryLabel}</span>
-                        ) : (
-                          <span className="legacy-lineup-v2-form-mini-chip is-empty">F2+ —</span>
-                        )}
+                        <button
+                          type="button"
+                          className={`legacy-lineup-v2-form-mini-chip${sideFormChips.hasSelection ? " is-ready" : ""}${formPickerOpen?.disciplineSide === disciplineSide && formPickerOpen.slot === "primary" ? " is-open" : ""}`}
+                          onClick={() =>
+                            setFormPickerOpen((current) =>
+                              current?.disciplineSide === disciplineSide && current.slot === "primary"
+                                ? null
+                                : { disciplineSide, slot: "primary" },
+                            )
+                          }
+                        >
+                          {sideFormChips.primaryLabel ?? "F1 —"}
+                        </button>
+                        <button
+                          type="button"
+                          className={`legacy-lineup-v2-form-mini-chip is-bonus${sideFormChips.hasSelection ? " is-ready" : ""}${formPickerOpen?.disciplineSide === disciplineSide && formPickerOpen.slot === "secondary" ? " is-open" : ""}`}
+                          onClick={() =>
+                            setFormPickerOpen((current) =>
+                              current?.disciplineSide === disciplineSide && current.slot === "secondary"
+                                ? null
+                                : { disciplineSide, slot: "secondary" },
+                            )
+                          }
+                        >
+                          {sideFormChips.secondaryLabel ?? "F2+ —"}
+                        </button>
+                        {formPickerOpen?.disciplineSide === disciplineSide && getFormBoardCardOptionsForSide && onAssignFormCardToSide ? (
+                          <div className="legacy-lineup-v2-form-mini-popover" data-testid="lineup-v2-form-mini-popover">
+                            {(getFormBoardCardOptionsForSide(disciplineSide, formPickerOpen.slot) ?? []).slice(0, 4).map((option) => (
+                              <button
+                                key={`form-mini-${option.id}`}
+                                type="button"
+                                className={`legacy-lineup-form-card-chip is-${option.color}`}
+                                onClick={() => {
+                                  onAssignFormCardToSide({ disciplineSide, slot: formPickerOpen.slot, cardId: option.id });
+                                  setFormPickerOpen(null);
+                                }}
+                              >
+                                {option.label}
+                              </button>
+                            ))}
+                          </div>
+                        ) : null}
                       </div>
                     ) : null}
                   </div>
@@ -949,7 +1050,7 @@ export default function LegacyLineupFocusV2Board({
         </section>
         ) : null}
 
-        <aside className="legacy-lineup-v2-focus" aria-label="Aktiver Slot">
+        <aside className="legacy-lineup-v2-focus is-mobile-sheet" aria-label="Aktiver Slot">
           {!activeSlot ? (
             <>
               <div className="legacy-lineup-v2-focus-empty">
@@ -1208,53 +1309,56 @@ export default function LegacyLineupFocusV2Board({
                       ×
                     </button>
                   </div>
-                  <div className="legacy-lineup-v2-compare-grid">
+                  <div className="legacy-lineup-v2-compare-grid is-three-up">
                     <span />
                     {pinnedEntries.map((entry) => (
                       <span key={`compare-name-${entry.player.activePlayerId}`} className="is-name">
                         {entry.player.name}
                       </span>
                     ))}
-                    {pinnedEntries.length === 1 ? <span /> : null}
+                    {renderComparePlaceholderColumns()}
 
                     <span>Base</span>
                     {pinnedEntries.map((entry) => (
                       <span key={`compare-base-${entry.player.activePlayerId}`}>{formatNullableScore(entry.activeSlotCandidate?.baseScore ?? null)}</span>
                     ))}
-                    {pinnedEntries.length === 1 ? <span /> : null}
+                    {renderComparePlaceholderColumns()}
 
                     <span>Rolle</span>
                     {pinnedEntries.map((entry) => (
                       <span key={`compare-role-${entry.player.activePlayerId}`}>{formatSignedDecimalScore(entry.activeSlotCandidate?.roleModifier ?? null)}</span>
                     ))}
-                    {pinnedEntries.length === 1 ? <span /> : null}
+                    {renderComparePlaceholderColumns()}
 
-                    <span>Intensity</span>
+                    <span>Einsatz</span>
                     {pinnedEntries.map((entry) => (
                       <span key={`compare-intensity-${entry.player.activePlayerId}`}>{formatIntensityLabel(getDisciplineIntensity(activeSlot.disciplineSide))}</span>
                     ))}
-                    {pinnedEntries.length === 1 ? <span /> : null}
+                    {renderComparePlaceholderColumns()}
 
-                    <span>Fatigue</span>
+                    <span>Ermüdung</span>
                     {pinnedEntries.map((entry) => (
                       <span key={`compare-fatigue-${entry.player.activePlayerId}`}>
                         -{formatDecimalScore(entry.activeSlotCandidate?.fatigueModifier ?? 0, 1)} / +{formatDecimalScore(entry.activeSlotCandidate?.additionalFatigue ?? 0, 1)}
                       </span>
                     ))}
-                    {pinnedEntries.length === 1 ? <span /> : null}
+                    {renderComparePlaceholderColumns()}
 
-                    <span>Slot-Score</span>
-                    {pinnedEntries.map((entry, index) => {
-                      const otherScore = pinnedEntries[1 - index]?.activeSlotCandidate?.projectedScore ?? null;
+                    <span>Slot-Punkte</span>
+                    {pinnedEntries.map((entry) => {
                       const thisScore = entry.activeSlotCandidate?.projectedScore ?? null;
-                      const isWinner = pinnedEntries.length === 2 && thisScore != null && otherScore != null && thisScore > otherScore;
+                      const isWinner =
+                        compareWinnerScore != null &&
+                        thisScore != null &&
+                        pinnedEntries.length >= 2 &&
+                        thisScore >= compareWinnerScore - 0.05;
                       return (
                         <span key={`compare-score-${entry.player.activePlayerId}`} className={isWinner ? "is-winner" : ""}>
                           {formatNullableScore(thisScore)}
                         </span>
                       );
                     })}
-                    {pinnedEntries.length === 1 ? <span /> : null}
+                    {renderComparePlaceholderColumns()}
                   </div>
                 </div>
               ) : null}

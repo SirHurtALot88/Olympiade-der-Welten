@@ -1,6 +1,7 @@
 "use client";
 
-import type { ReactNode } from "react";
+import type { DragEvent, ReactNode } from "react";
+import { useMemo, useState } from "react";
 
 import DisciplineIcon from "@/app/foundation/DisciplineIcon";
 import { VeloImpactStrip } from "@/components/foundation/velo-ui";
@@ -65,6 +66,13 @@ export type FormBoardPanelProps = {
   ) => ReactNode;
   clearActiveFormPickCell: () => void;
   assignFormCardFromDeck: (cardId: string) => void;
+  assignFormCardToCell: (input: {
+    matchdayId: string;
+    disciplineSide: "d1" | "d2";
+    disciplineId: string | null;
+    slot: "primary" | "secondary";
+    cardId: string;
+  }) => void;
   setActiveFormPickCell: (cell: FormBoardPickCell) => void;
   skipFormCardsForSide: (input: {
     matchdayId: string;
@@ -99,9 +107,52 @@ export default function FormBoardPanel({
   renderSelectedFormCardChip,
   clearActiveFormPickCell,
   assignFormCardFromDeck,
+  assignFormCardToCell,
   setActiveFormPickCell,
   skipFormCardsForSide,
 }: FormBoardPanelProps) {
+  const [draggedCardId, setDraggedCardId] = useState<string | null>(null);
+  const [dragOverCellId, setDragOverCellId] = useState<string | null>(null);
+  const formPlanProgress = useMemo(() => {
+    const totalCells = Math.max(1, matchdayOptions.length * 2);
+    const filledCells = (context?.formCardPlans ?? []).filter(
+      (plan) => plan.primaryFormCardId || plan.secondaryFormCardId,
+    ).length;
+    return { filledCells, totalCells };
+  }, [context?.formCardPlans, matchdayOptions.length]);
+
+  function handleDropOnCell(
+    event: DragEvent<HTMLButtonElement>,
+    input: {
+      matchdayId: string;
+      disciplineSide: "d1" | "d2";
+      disciplineId: string | null;
+      slot: "primary" | "secondary";
+      disciplineColor: LegacyFormCardOption["color"] | null;
+    },
+  ) {
+    event.preventDefault();
+    setDragOverCellId(null);
+    const cardId = event.dataTransfer.getData("text/form-card-id") || draggedCardId;
+    if (!cardId || isReadOnly) {
+      return;
+    }
+    const allowed = new Set(
+      getFormBoardCardOptions(input.matchdayId, input.disciplineSide, input.slot, input.disciplineColor).map((entry) => entry.id),
+    );
+    if (!allowed.has(cardId)) {
+      return;
+    }
+    assignFormCardToCell({
+      matchdayId: input.matchdayId,
+      disciplineSide: input.disciplineSide,
+      disciplineId: input.disciplineId,
+      slot: input.slot,
+      cardId,
+    });
+    setDraggedCardId(null);
+  }
+
   return (
     <section
       id="legacy-lineup-panel-formplan"
@@ -191,6 +242,9 @@ export default function FormBoardPanel({
             <span className="legacy-lineup-form-deck-count">
               {formDeckCards.filter((card) => !card.isUsed && !card.isReserved).length} frei · {formDeckCards.length} gesamt
             </span>
+            <span className="legacy-lineup-form-deck-progress" aria-label="Saison-Fortschritt Formplan">
+              {formPlanProgress.filledCells}/{formPlanProgress.totalCells} Spieltage geplant
+            </span>
           </div>
           {activeFormPickCell ? (
             <button className="secondary-button legacy-lineup-form-deck-clear" type="button" onClick={clearActiveFormPickCell} disabled={isReadOnly}>
@@ -226,7 +280,18 @@ export default function FormBoardPanel({
                 <button
                   key={`form-deck-${card.id}`}
                   type="button"
-                  className={`legacy-lineup-form-card-chip legacy-lineup-form-deck-chip is-${card.color}${card.isUsed ? " is-used" : ""}${card.isReserved && !isSelectedInActiveCell ? " is-reserved" : ""}`}
+                  draggable={!isReadOnly && !card.isUsed}
+                  data-testid="form-deck-chip"
+                  onDragStart={(event) => {
+                    setDraggedCardId(card.id);
+                    event.dataTransfer.setData("text/form-card-id", card.id);
+                    event.dataTransfer.effectAllowed = "copy";
+                  }}
+                  onDragEnd={() => {
+                    setDraggedCardId(null);
+                    setDragOverCellId(null);
+                  }}
+                  className={`legacy-lineup-form-card-chip legacy-lineup-form-deck-chip is-${card.color}${card.isUsed ? " is-used" : ""}${card.isReserved && !isSelectedInActiveCell ? " is-reserved" : ""}${draggedCardId === card.id ? " is-dragging" : ""}`}
                   disabled={isReadOnly || !activeFormPickCell || card.isUsed || (allowedDeckCardIds != null && !allowedDeckCardIds.has(card.id))}
                   title={
                     card.isUsed
@@ -319,8 +384,22 @@ export default function FormBoardPanel({
                           <button
                             type="button"
                             data-form-board-cell-id={`${entry.matchdayId}:${disciplineSide}:primary`}
-                            className={`legacy-lineup-form-board-pick is-primary${isPrimaryActive ? " is-active" : ""}${selectedCard ? ` is-${selectedCard.color}` : ""}`}
+                            className={`legacy-lineup-form-board-pick is-primary${isPrimaryActive ? " is-active" : ""}${selectedCard ? ` is-${selectedCard.color}` : ""}${dragOverCellId === `${entry.matchdayId}:${disciplineSide}:primary` ? " is-drag-over" : ""}`}
                             disabled={isReadOnly || formCardPlanPendingKey === pendingKey || !slot}
+                            onDragOver={(event) => {
+                              event.preventDefault();
+                              setDragOverCellId(`${entry.matchdayId}:${disciplineSide}:primary`);
+                            }}
+                            onDragLeave={() => setDragOverCellId(null)}
+                            onDrop={(event) =>
+                              handleDropOnCell(event, {
+                                matchdayId: entry.matchdayId,
+                                disciplineSide,
+                                disciplineId: slot?.disciplineId ?? null,
+                                slot: "primary",
+                                disciplineColor,
+                              })
+                            }
                             onClick={() =>
                               setActiveFormPickCell({
                                 matchdayId: entry.matchdayId,
@@ -337,8 +416,22 @@ export default function FormBoardPanel({
                           <button
                             type="button"
                             data-form-board-cell-id={`${entry.matchdayId}:${disciplineSide}:secondary`}
-                            className={`legacy-lineup-form-board-pick is-secondary${isSecondaryActive ? " is-active" : ""}${selectedBonusCard ? ` is-${selectedBonusCard.color}` : ""}`}
+                            className={`legacy-lineup-form-board-pick is-secondary${isSecondaryActive ? " is-active" : ""}${selectedBonusCard ? ` is-${selectedBonusCard.color}` : ""}${dragOverCellId === `${entry.matchdayId}:${disciplineSide}:secondary` ? " is-drag-over" : ""}`}
                             disabled={isReadOnly || formCardPlanPendingKey === pendingKey || !slot}
+                            onDragOver={(event) => {
+                              event.preventDefault();
+                              setDragOverCellId(`${entry.matchdayId}:${disciplineSide}:secondary`);
+                            }}
+                            onDragLeave={() => setDragOverCellId(null)}
+                            onDrop={(event) =>
+                              handleDropOnCell(event, {
+                                matchdayId: entry.matchdayId,
+                                disciplineSide,
+                                disciplineId: slot?.disciplineId ?? null,
+                                slot: "secondary",
+                                disciplineColor,
+                              })
+                            }
                             onClick={() =>
                               setActiveFormPickCell({
                                 matchdayId: entry.matchdayId,
