@@ -65,6 +65,9 @@ export type UseTeamsPanelDerivationsInput = {
   isTableColumnVisible: (tableId: string, columnId: string, visibleByDefault?: boolean) => boolean;
   getTablePinnedLeftIds: (tableId: string) => string[];
   getTablePinnedRightIds: (tableId: string) => string[];
+  orderedDisciplines?: Array<{ id: string; name: string }>;
+  showSelectedRosterPpsBreakdown?: boolean;
+  showTeamDisciplines?: boolean;
 };
 
 /**
@@ -127,9 +130,85 @@ export function useTeamsPanelDerivations(input: UseTeamsPanelDerivationsInput) {
     ],
   );
 
+  const selectedRosterColumns = useMemo<FoundationTableColumn[]>(
+    () => [
+      { id: "image", label: "Bild", dataKey: "image", defaultWidth: 96, minWidth: 80 },
+      { id: "name", label: "Name", dataKey: "name", defaultWidth: 220, minWidth: 170 },
+      { id: "class", label: "Klasse", dataKey: "class", defaultWidth: 130, minWidth: 110 },
+      { id: "race", label: "Rasse", dataKey: "race", defaultWidth: 120, minWidth: 96 },
+      { id: "mw", label: "MW", dataKey: "mw", defaultWidth: 110, minWidth: 90 },
+      { id: "salePrice", label: "VK", dataKey: "salePrice", defaultWidth: 104, minWidth: 86 },
+      { id: "saleFactor", label: "Faktor", dataKey: "saleFactor", defaultWidth: 84, minWidth: 72 },
+      { id: "salary", label: "Gehalt", dataKey: "salary", defaultWidth: 110, minWidth: 90 },
+      { id: "value", label: "Value", dataKey: "value", defaultWidth: 96, minWidth: 78 },
+      { id: "contract", label: "LZ", dataKey: "contract", defaultWidth: 76, minWidth: 64 },
+      { id: "ovr", label: "OVR", dataKey: "ovr", defaultWidth: 90, minWidth: 72 },
+      { id: "mvs", label: "MVS", dataKey: "mvs", defaultWidth: 90, minWidth: 72 },
+      { id: "pps", label: "PPs", dataKey: "pps", defaultWidth: 90, minWidth: 72 },
+      ...(input.showSelectedRosterPpsBreakdown
+        ? [
+            { id: "ppPow", label: "PP POW", dataKey: "ppPow", defaultWidth: 78, minWidth: 66 },
+            { id: "ppSpe", label: "PP SPE", dataKey: "ppSpe", defaultWidth: 78, minWidth: 66 },
+            { id: "ppMen", label: "PP MEN", dataKey: "ppMen", defaultWidth: 78, minWidth: 66 },
+            { id: "ppSoc", label: "PP SOC", dataKey: "ppSoc", defaultWidth: 78, minWidth: 66 },
+          ]
+        : []),
+      { id: "pow", label: "POW", dataKey: "pow", defaultWidth: 74, minWidth: 60 },
+      { id: "spe", label: "SPE", dataKey: "spe", defaultWidth: 74, minWidth: 60 },
+      { id: "men", label: "MEN", dataKey: "men", defaultWidth: 74, minWidth: 60 },
+      { id: "soc", label: "SOC", dataKey: "soc", defaultWidth: 74, minWidth: 60 },
+      ...(input.showTeamDisciplines
+        ? (input.orderedDisciplines ?? []).map((discipline) => ({
+            id: discipline.id,
+            label: discipline.name.slice(0, 3).toUpperCase(),
+            dataKey: discipline.id,
+            defaultWidth: 82,
+            minWidth: 68,
+          }))
+        : []),
+    ],
+    [input.orderedDisciplines, input.showSelectedRosterPpsBreakdown, input.showTeamDisciplines],
+  );
+
+  const visibleSelectedRosterColumns = useMemo(
+    () => {
+      const orderedColumns = applyStoredColumnOrder(
+        selectedRosterColumns,
+        input.tableColumnPreferences.selectedRosterTable?.columnOrder,
+        input.getTablePinnedLeftIds("selectedRosterTable"),
+        input.getTablePinnedRightIds("selectedRosterTable"),
+      ).filter((column) =>
+        input.isTableColumnVisible("selectedRosterTable", column.id, column.visibleByDefault),
+      );
+      const breakdownColumnIds = new Set(["ppPow", "ppSpe", "ppMen", "ppSoc"]);
+      const breakdownColumns = orderedColumns.filter((column) => breakdownColumnIds.has(column.id));
+      if (breakdownColumns.length === 0) {
+        return orderedColumns;
+      }
+      const baseColumns = orderedColumns.filter((column) => !breakdownColumnIds.has(column.id));
+      const ppsIndex = baseColumns.findIndex((column) => column.id === "pps");
+      if (ppsIndex === -1) {
+        return orderedColumns;
+      }
+      return [
+        ...baseColumns.slice(0, ppsIndex + 1),
+        ...breakdownColumns,
+        ...baseColumns.slice(ppsIndex + 1),
+      ];
+    },
+    [
+      input.getTablePinnedLeftIds,
+      input.getTablePinnedRightIds,
+      input.isTableColumnVisible,
+      input.tableColumnPreferences,
+      selectedRosterColumns,
+    ],
+  );
+
   return {
     starters,
     bench,
     visibleTeamsViewColumns,
+    visibleSelectedRosterColumns,
   };
 }

@@ -52,7 +52,6 @@ import {
 } from "@/lib/facilities/facility-effects";
 import {
   buildContractNegotiationDraft,
-  buildTeamContractSeasonTable,
   type NegotiationDemandBreakdownEntry,
   type NegotiationScoreBreakdownEntry,
   type PlayerContractPreference,
@@ -349,10 +348,9 @@ import type { FoundationCockpitHostProps } from "@/app/foundation/cockpit-v2/Fou
 import type { FoundationPrizeFinanceShellHostProps } from "@/app/foundation/prize-v2/FoundationPrizeFinanceShellHost";
 import type { FoundationPrizeV2PanelProps } from "@/app/foundation/prize-v2/FoundationPrizeV2Panel";
 import {
-  resolveShouldBuildTeamsOverviewTable,
-  resolveShouldBuildTeamsPlayerRatings,
-  shouldBuildTeamsView as resolveShouldBuildTeamsView,
+  resolveShouldBuildTeamsView as resolveShouldBuildTeamsView,
 } from "@/lib/foundation/tabs/use-teams-view-derivations";
+import { buildFoundationSeasonTableColumns } from "@/lib/foundation/tabs/season-table-column-defs";
 import FoundationShell from "@/app/foundation/shell/FoundationShell";
 import FoundationSubNav from "@/app/foundation/shell/FoundationSubNav";
 import {
@@ -1045,26 +1043,7 @@ export function useFoundationShellRouterBodyScope({
   const [matchdaySummaryTab, setMatchdaySummaryTab] = useState<"matchday" | "season">("matchday");
   const shouldBuildTeamContracts = activeView === "teams" && selectedTeamDetailTab === "contracts";
   const shouldBuildExtendedTeamPanels = activeView === "teams" && showExtendedTeamPanels;
-  const [teamsHydrationPhase, setTeamsHydrationPhase] = useState<"shell" | "full">("shell");
-  const handleTeamsHydrationPhaseChange = useCallback((phase: "shell" | "full") => {
-    setTeamsHydrationPhase(phase);
-  }, []);
   const shouldBuildTeamsView = resolveShouldBuildTeamsView(activeView);
-  const shouldBuildTeamsOverviewTable = resolveShouldBuildTeamsOverviewTable(
-    activeView,
-    selectedTeamDetailTab,
-  );
-  const shouldBuildTeamsPlayerRatings = resolveShouldBuildTeamsPlayerRatings(
-    activeView,
-    selectedTeamDetailTab,
-    shouldBuildTeamContracts,
-    shouldBuildExtendedTeamPanels,
-  );
-  useEffect(() => {
-    if (!shouldBuildTeamsView) {
-      setTeamsHydrationPhase("shell");
-    }
-  }, [shouldBuildTeamsView]);
   const shouldLoadTransferHistoryFeed = resolveShouldLoadTransferHistoryFeed(activeView as FoundationViewId);
   const shouldLoadPrizePreviewFeed = resolveShouldLoadPrizePreviewFeed(
     activeView as FoundationViewId,
@@ -5664,96 +5643,6 @@ export function useFoundationShellRouterBodyScope({
   );
 
   const rosterPlayers = useMemo(() => getRosterPlayers(gameState, selectedRoster), [gameState, selectedRoster]);
-  const selectedTeamContractTable = useMemo(
-    () =>
-      selectedTeam && shouldBuildTeamContracts
-        ? buildTeamContractSeasonTable({
-            gameState,
-            teamId: selectedTeam.teamId,
-            seasonLabelBase: canonicalSeasonLabel,
-          })
-        : null,
-    [canonicalSeasonLabel, gameState, selectedTeam, shouldBuildTeamContracts],
-  );
-  const selectedTeamContractShapeMix = useMemo(() => {
-    if (!selectedTeamContractTable) {
-      return null;
-    }
-
-    const activeRows = selectedTeamContractTable.rows.filter((row) => row.status === "active");
-    const totalCount = activeRows.length;
-    const buckets: Record<
-      ContractShape,
-      {
-        shape: ContractShape;
-        label: string;
-        count: number;
-        totalSalary: number;
-        currentDelta: number;
-        futureDelta: number;
-      }
-    > = {
-      balanced: { shape: "balanced", label: "Balanced", count: 0, totalSalary: 0, currentDelta: 0, futureDelta: 0 },
-      front_loaded: { shape: "front_loaded", label: "Front-loaded", count: 0, totalSalary: 0, currentDelta: 0, futureDelta: 0 },
-      back_loaded: { shape: "back_loaded", label: "Back-loaded", count: 0, totalSalary: 0, currentDelta: 0, futureDelta: 0 },
-    };
-
-    activeRows.forEach((row) => {
-      const shape = row.contractShape ?? "balanced";
-      const scheduleSalary = row.yearlySalarySchedule.reduce((sum, entry) => sum + (Number.isFinite(entry.salary) ? entry.salary : 0), 0);
-      const totalSalary = row.totalSalary ?? scheduleSalary;
-      if (!Number.isFinite(totalSalary) || totalSalary <= 0) {
-        buckets[shape].count += 1;
-        return;
-      }
-
-      const contractLength = Math.max(1, row.contractLength || row.yearlySalarySchedule.length || 1);
-      const balancedAnnualSalary = totalSalary / contractLength;
-      const currentSalary = row.yearlySalarySchedule[0]?.salary ?? balancedAnnualSalary;
-      const futureSalary = Math.max(0, totalSalary - currentSalary);
-      const balancedFutureSalary = Math.max(0, totalSalary - balancedAnnualSalary);
-
-      buckets[shape].count += 1;
-      buckets[shape].totalSalary += totalSalary;
-      buckets[shape].currentDelta += currentSalary - balancedAnnualSalary;
-      buckets[shape].futureDelta += futureSalary - balancedFutureSalary;
-    });
-
-    const entries = (["balanced", "front_loaded", "back_loaded"] as ContractShape[]).map((shape) => {
-      const bucket = buckets[shape];
-      return {
-        ...bucket,
-        share: totalCount > 0 ? (bucket.count / totalCount) * 100 : 0,
-        totalSalary: roundViewNumber(bucket.totalSalary, 2),
-        currentDelta: roundViewNumber(bucket.currentDelta, 2),
-        futureDelta: roundViewNumber(bucket.futureDelta, 2),
-      };
-    });
-
-    const nonBalancedCurrentDelta = entries
-      .filter((entry) => entry.shape !== "balanced")
-      .reduce((sum, entry) => sum + entry.currentDelta, 0);
-    const nonBalancedFutureDelta = entries
-      .filter((entry) => entry.shape !== "balanced")
-      .reduce((sum, entry) => sum + entry.futureDelta, 0);
-
-    return {
-      totalCount,
-      entries,
-      nonBalancedCount: entries.filter((entry) => entry.shape !== "balanced").reduce((sum, entry) => sum + entry.count, 0),
-      currentDelta: roundViewNumber(nonBalancedCurrentDelta, 2),
-      futureDelta: roundViewNumber(nonBalancedFutureDelta, 2),
-    };
-  }, [selectedTeamContractTable]);
-  const selectedTeamContractPreviewRowCount = useMemo(
-    () => selectedTeamContractTable?.rows.filter((row) => row.status === "preview").length ?? 0,
-    [selectedTeamContractTable],
-  );
-  const visibleSelectedTeamContractRows = useMemo(
-    () =>
-      selectedTeamContractTable?.rows.filter((row) => showTeamContractPreviewRows || row.status !== "preview") ?? [],
-    [selectedTeamContractTable, showTeamContractPreviewRows],
-  );
   const playerGeneratorTeamContexts = useMemo(
     () =>
       gameState.teams.map((team) => {
@@ -5769,19 +5658,6 @@ export function useFoundationShellRouterBodyScope({
         };
       }),
     [gameState],
-  );
-  const selectedAiTeamId = shouldBuildExtendedTeamPanels
-    ? selectedTeamControl?.controlMode === "ai"
-      ? selectedTeam?.teamId
-      : aiTeams[0]?.teamId
-    : null;
-  const aiPreview = useMemo(
-    () => (selectedAiTeamId && shouldBuildExtendedTeamPanels ? runAiTurn(gameState, selectedAiTeamId) : null),
-    [gameState, selectedAiTeamId, shouldBuildExtendedTeamPanels],
-  );
-  const aiMarketPreview = useMemo(
-    () => (selectedAiTeamId && shouldBuildExtendedTeamPanels ? buildAiTransferIntents(gameState, selectedAiTeamId) : []),
-    [gameState, selectedAiTeamId, shouldBuildExtendedTeamPanels],
   );
   const marketSelectedTeam = useMemo(
     () => gameState.teams.find((team) => team.teamId === marketTeamId) ?? null,
@@ -5873,28 +5749,7 @@ export function useFoundationShellRouterBodyScope({
     }
   }, [playerScope, playerTeamFilter]);
 
-  const seasonTableColumns = useMemo<FoundationTableColumn[]>(
-    () => {
-      const contractColumns = saisonstandColumnContract.columns.map((column) => ({
-        id: column.normalizedKey,
-        label: column.displayLabel,
-        dataKey: column.normalizedKey,
-        defaultWidth: Math.max(Math.round(column.columnSize ?? 96), 52),
-        minWidth: column.normalizedKey === "mannschaft" ? 150 : 52,
-        visibleByDefault: column.compactVisible,
-        tooltip:
-          column.normalizedKey === "bonuspunkte"
-            ? `${column.sourceDescription} ${column.transformNote ?? ""}`.trim()
-            : undefined,
-      }));
-
-      return [
-        ...contractColumns,
-        { id: "actions", label: "Aktion", dataKey: "actions", defaultWidth: 120, minWidth: 100, visibleByDefault: true },
-      ];
-    },
-    [],
-  );
+  const seasonTableColumns = useMemo<FoundationTableColumn[]>(() => buildFoundationSeasonTableColumns(), []);
   const playersTableColumns = useMemo<FoundationTableColumn[]>(
     () => [
       { id: "image", label: "Bild", dataKey: "image", defaultWidth: 96, minWidth: 80 },
@@ -6006,48 +5861,6 @@ export function useFoundationShellRouterBodyScope({
     ],
     [],
   );
-  const selectedRosterColumns = useMemo<FoundationTableColumn[]>(
-    () => [
-      { id: "image", label: "Bild", dataKey: "image", defaultWidth: 96, minWidth: 80 },
-      { id: "name", label: "Name", dataKey: "name", defaultWidth: 220, minWidth: 170 },
-      { id: "class", label: "Klasse", dataKey: "class", defaultWidth: 130, minWidth: 110 },
-      { id: "race", label: "Rasse", dataKey: "race", defaultWidth: 120, minWidth: 96 },
-      { id: "mw", label: "MW", dataKey: "mw", defaultWidth: 110, minWidth: 90 },
-      { id: "salePrice", label: "VK", dataKey: "salePrice", defaultWidth: 104, minWidth: 86 },
-      { id: "saleFactor", label: "Faktor", dataKey: "saleFactor", defaultWidth: 84, minWidth: 72 },
-      { id: "salary", label: "Gehalt", dataKey: "salary", defaultWidth: 110, minWidth: 90 },
-      { id: "value", label: "Value", dataKey: "value", defaultWidth: 96, minWidth: 78 },
-      { id: "contract", label: "LZ", dataKey: "contract", defaultWidth: 76, minWidth: 64 },
-      { id: "ovr", label: "OVR", dataKey: "ovr", defaultWidth: 90, minWidth: 72 },
-      { id: "mvs", label: "MVS", dataKey: "mvs", defaultWidth: 90, minWidth: 72 },
-      { id: "pps", label: "PPs", dataKey: "pps", defaultWidth: 90, minWidth: 72 },
-      ...(showSelectedRosterPpsBreakdown
-        ? [
-            { id: "ppPow", label: "PP POW", dataKey: "ppPow", defaultWidth: 78, minWidth: 66 },
-            { id: "ppSpe", label: "PP SPE", dataKey: "ppSpe", defaultWidth: 78, minWidth: 66 },
-            { id: "ppMen", label: "PP MEN", dataKey: "ppMen", defaultWidth: 78, minWidth: 66 },
-            { id: "ppSoc", label: "PP SOC", dataKey: "ppSoc", defaultWidth: 78, minWidth: 66 },
-          ]
-        : []),
-      { id: "pow", label: "POW", dataKey: "pow", defaultWidth: 74, minWidth: 60 },
-      { id: "spe", label: "SPE", dataKey: "spe", defaultWidth: 74, minWidth: 60 },
-      { id: "men", label: "MEN", dataKey: "men", defaultWidth: 74, minWidth: 60 },
-      { id: "soc", label: "SOC", dataKey: "soc", defaultWidth: 74, minWidth: 60 },
-      ...(
-        showTeamDisciplines
-          ? orderedDisciplines.map((discipline) => ({
-              id: discipline.id,
-              label: discipline.name.slice(0, 3).toUpperCase(),
-              dataKey: discipline.id,
-              defaultWidth: 82,
-              minWidth: 68,
-            }))
-          : []
-      ),
-    ],
-    [orderedDisciplines, showSelectedRosterPpsBreakdown, showTeamDisciplines],
-  );
-
   const seasonCompactPresets = useMemo<FoundationTablePreset[]>(
     () => {
       const compactOrder = [
@@ -6488,10 +6301,6 @@ export function useFoundationShellRouterBodyScope({
     selectedTeamGeneralManager,
   });
 
-  const selectedAtRiskObjectives = useMemo(
-    () => selectedTeamObjectives.filter((objective) => objective.status === "at_risk" || objective.status === "failed"),
-    [selectedTeamObjectives],
-  );
   const selectedTeamCaptainProfile = useMemo(
     () => (selectedTeam ? selectTeamCaptain(gameState, selectedTeam.teamId) : null),
     [gameState, selectedTeam?.teamId],
@@ -6510,14 +6319,6 @@ export function useFoundationShellRouterBodyScope({
     () => (selectedTeam ? buildCaptainCandidateProfiles(gameState, selectedTeam.teamId).slice(0, 8) : []),
     [gameState, selectedTeam?.teamId],
   );
-  const selectedTeamRivalries = useMemo(() => {
-    if (!selectedTeam) {
-      return [];
-    }
-    return buildTeamRivalryLedger(gameState)
-      .filter((entry) => entry.teamAId === selectedTeam.teamId || entry.teamBId === selectedTeam.teamId)
-      .slice(0, 4);
-  }, [gameState, selectedTeam?.teamId]);
   const selectedTeamPowers = useMemo(
     () =>
       selectedTeam
@@ -6530,91 +6331,6 @@ export function useFoundationShellRouterBodyScope({
         : [],
     [gameState, selectedTeam?.teamId],
   );
-  const selectedHqPriorityCards = useMemo(() => {
-    const cards: Array<{
-      key: string;
-      kicker: string;
-      title: string;
-      detail: string;
-      tone: "board" | "finance" | "lineup" | "story" | "power";
-      targetView: FoundationView;
-    }> = [];
-    const urgentObjective = selectedAtRiskObjectives[0] ?? selectedOpenObjectives[0] ?? null;
-    if (urgentObjective) {
-      cards.push({
-        key: `objective-${urgentObjective.objectiveId}`,
-        kicker: urgentObjective.status === "at_risk" || urgentObjective.status === "failed" ? "Boarddruck" : "Boardziel",
-        title: urgentObjective.label,
-        detail: urgentObjective.actionHint ?? urgentObjective.detail ?? `${String(urgentObjective.currentValue ?? "—")} / ${String(urgentObjective.targetValue ?? "—")}`,
-        tone: "board",
-        targetView: urgentObjective.category === "finance" ? "prize" : urgentObjective.category === "facility" ? "trainingV2" : "season",
-      });
-    }
-    if (selectedHqFinanceWarnings[0]) {
-      cards.push({
-        key: "finance-warning",
-        kicker: "Finanzen",
-        title: "Cash/Gehalt prüfen",
-        detail: selectedHqFinanceWarnings[0],
-        tone: "finance",
-        targetView: "prize",
-      });
-    }
-    if (selectedTeamPlayerDemands[0]) {
-      cards.push({
-        key: `demand-${selectedTeamPlayerDemands[0].demandId}`,
-        kicker: "Forderung",
-        title: selectedTeamPlayerDemands[0].playerName,
-        detail: selectedTeamPlayerDemands[0].label,
-        tone: "lineup",
-        targetView: selectedTeamPlayerDemands[0].type === "facility" ? "trainingV2" : "lineup",
-      });
-    }
-    if (selectedTeamRivalries[0]) {
-      const rivalry = selectedTeamRivalries[0];
-      const rivalId = rivalry.teamAId === selectedTeam?.teamId ? rivalry.teamBId : rivalry.teamAId;
-      const rivalTeam = gameState.teams.find((team) => team.teamId === rivalId) ?? null;
-      cards.push({
-        key: `rivalry-${rivalry.rivalryId}`,
-        kicker: "Rivalität",
-        title: rivalTeam?.name ?? "Rivale aktiv",
-        detail: `${rivalry.theme} · Intensität ${rivalry.intensity}`,
-        tone: "story",
-        targetView: "hq",
-      });
-    }
-    if (selectedTeamPowers.some((power) => power.chargesRemaining > 0)) {
-      const readyPower = selectedTeamPowers.find((power) => power.chargesRemaining > 0) ?? null;
-      cards.push({
-        key: `power-${readyPower?.id ?? "ready"}`,
-        kicker: "Team Power",
-        title: readyPower?.label ?? "Powers bereit",
-        detail: readyPower ? `${readyPower.chargesRemaining}/${readyPower.chargesTotal} Einsätze · in der Einsatzliste spielen` : "In der Einsatzliste einsetzen.",
-        tone: "power",
-        targetView: "lineup",
-      });
-    }
-    if (cards.length === 0) {
-      cards.push({
-        key: "stable",
-        kicker: "Status",
-        title: "Front Office stabil",
-        detail: "Keine akute Board-, Finanz- oder Kaderwarnung. Fokus auf Einsatzliste und Entwicklung.",
-        tone: "story",
-        targetView: "lineup",
-      });
-    }
-    return cards.slice(0, 5);
-  }, [
-    gameState.teams,
-    selectedAtRiskObjectives,
-    selectedHqFinanceWarnings,
-    selectedOpenObjectives,
-    selectedTeam?.teamId,
-    selectedTeamPlayerDemands,
-    selectedTeamPowers,
-    selectedTeamRivalries,
-  ]);
 
   const seasonDerivations = useSeasonDerivations({
     enabled: shouldLoadSeasonDerivations,
@@ -6655,28 +6371,6 @@ export function useFoundationShellRouterBodyScope({
     }
     return new Map();
   }, [fullPlayerRatingsById, rosterPlayers, shouldBuildPlayerRatings, shouldBuildTrainingView]);
-  const rosterPlayersByOvr = useMemo(
-    () =>
-      [...rosterPlayers].sort((left, right) => {
-        const leftRating = playerRatingsById.get(left.player.id);
-        const rightRating = playerRatingsById.get(right.player.id);
-        return compareTeamRosterPlayersByOvrOrMarketValue({
-          left: {
-            ovr: leftRating?.ovrNormalized,
-            marketValue: getRosterEntryDisplayMarketValue(left.entry, left.player),
-            mvs: leftRating?.mvs,
-            name: left.player.name,
-          },
-          right: {
-            ovr: rightRating?.ovrNormalized,
-            marketValue: getRosterEntryDisplayMarketValue(right.entry, right.player),
-            mvs: rightRating?.mvs,
-            name: right.player.name,
-          },
-        });
-      }),
-    [playerRatingsById, rosterPlayers],
-  );
   const {
     ppAreaRows,
     seasonHistorySnapshots,
@@ -6909,29 +6603,6 @@ export function useFoundationShellRouterBodyScope({
     teamObjectiveOverview,
     currentMatchdayDisciplineSchedule,
   });
-
-  const freeAgents = useMemo(() => {
-    if (!shouldBuildExtendedTeamPanels) {
-      return [];
-    }
-
-    const rosteredIds = new Set(gameState.rosters.map((entry) => entry.playerId));
-    return gameState.players
-      .filter((player) => !rosteredIds.has(player.id))
-      .sort((left, right) => {
-        const leftRating = playerRatingsById.get(left.id);
-        const rightRating = playerRatingsById.get(right.id);
-        const ovrDelta =
-          (rightRating?.ovrNormalized ?? Number.NEGATIVE_INFINITY) -
-          (leftRating?.ovrNormalized ?? Number.NEGATIVE_INFINITY);
-        if (ovrDelta !== 0) {
-          return ovrDelta;
-        }
-
-        return left.name.localeCompare(right.name, "de");
-      })
-      .slice(0, 6);
-  }, [gameState.players, gameState.rosters, playerRatingsById, shouldBuildExtendedTeamPanels]);
 
   const playerSeasonPerformanceMap = useMemo(
     () => {
@@ -7259,34 +6930,7 @@ export function useFoundationShellRouterBodyScope({
       ).filter((column) => isTableColumnVisible("playersTable", column.id, column.visibleByDefault)),
     [playersTableColumns, tableColumnPreferences],
   );
-  const visibleSelectedRosterColumns = useMemo(
-    () => {
-      const orderedColumns = applyStoredColumnOrder(
-        selectedRosterColumns,
-        tableColumnPreferences.selectedRosterTable?.columnOrder,
-        getTablePinnedLeftIds("selectedRosterTable"),
-        getTablePinnedRightIds("selectedRosterTable"),
-      ).filter((column) =>
-        isTableColumnVisible("selectedRosterTable", column.id, column.visibleByDefault),
-      );
-      const breakdownColumnIds = new Set(["ppPow", "ppSpe", "ppMen", "ppSoc"]);
-      const breakdownColumns = orderedColumns.filter((column) => breakdownColumnIds.has(column.id));
-      if (breakdownColumns.length === 0) {
-        return orderedColumns;
-      }
-      const baseColumns = orderedColumns.filter((column) => !breakdownColumnIds.has(column.id));
-      const ppsIndex = baseColumns.findIndex((column) => column.id === "pps");
-      if (ppsIndex === -1) {
-        return orderedColumns;
-      }
-      return [
-        ...baseColumns.slice(0, ppsIndex + 1),
-        ...breakdownColumns,
-        ...baseColumns.slice(ppsIndex + 1),
-      ];
-    },
-    [selectedRosterColumns, tableColumnPreferences],
-  );
+
   const visibleTransferHistoryColumns = useMemo(
     () =>
       applyStoredColumnOrder(
@@ -9293,7 +8937,6 @@ export function useFoundationShellRouterBodyScope({
   const isTrainingCompactOrLegacyView = activeView === "training" || activeView === "trainingCompact";
   const seasonV2HydrationPhase: "shell" | "full" = "full";
   const seasonRatingsPlayerIds: string[] = [];
-  const shouldBuildTeamsAreaRanks = teamsHydrationPhase === "full";
   void isAdminView;
   void isGeneratorView;
   void isDebugView;
@@ -9301,8 +8944,6 @@ export function useFoundationShellRouterBodyScope({
   void isMarketOfferPanelOpen;
   void seasonV2HydrationPhase;
   void seasonRatingsPlayerIds;
-  void shouldBuildTeamsPlayerRatings;
-  void shouldBuildTeamsAreaRanks;
 
   const matchdayResultSourceBadgeLabel = useMemo(
     () => getViewSourceBadgeLabel("matchdayResult", activeContextMeta),
@@ -9432,7 +9073,6 @@ export function useFoundationShellRouterBodyScope({
     teamsViewSort: tableSorts.teamsView,
     teamRosterFocusMode,
     teamRosterRoleFilter,
-    onHydrationPhaseChange: handleTeamsHydrationPhaseChange,
     rosterPlayers,
     tableColumnPreferences,
     isTableColumnVisible,
@@ -9481,17 +9121,12 @@ export function useFoundationShellRouterBodyScope({
     getSponsorNegotiationMultiplier,
     setSponsorChoiceProfiles,
     chooseTeamSponsor,
-    selectedTeamContractShapeMix,
     renderMetricBar,
     leaguePlayerHeatPools,
     setTeamRosterRoleFilter,
     setTeamRosterFocusMode,
     selectedStandingRow,
     selectedRoster,
-    visibleSelectedRosterColumns,
-    selectedTeamContractTable,
-    selectedTeamContractPreviewRowCount,
-    visibleSelectedTeamContractRows,
     showTeamContractPreviewRows,
     setShowTeamContractPreviewRows,
     contractRenewalBusy,
@@ -9508,10 +9143,7 @@ export function useFoundationShellRouterBodyScope({
     formatMoraleContractIntentLabel,
     getPlayerDisplaySalary,
     selectedIdentity,
-    freeAgents,
-    aiPreview,
-    selectedAiTeamId,
-    aiMarketPreview,
+    aiTeams,
     isPending,
     isReadOnlyMode: readMeta.readOnly,
     showReadOnlyNotice,
@@ -9951,8 +9583,6 @@ export function useFoundationShellRouterBodyScope({
     adminSimulationRun,
     adminSimulationSeasonCount,
     aiLineupApplyTeams,
-    aiMarketPreview,
-    aiPreview,
     aiTeams,
     applyNewGamePreset,
     bootstrapError,
@@ -10007,7 +9637,6 @@ export function useFoundationShellRouterBodyScope({
     foundationPanel,
     foundationSaveMode,
     foundationWarningInboxItems,
-    freeAgents,
     freshSeasonStartMessage,
     gameFlowActionStep,
     gameModeOwnershipChrisIds,
@@ -10252,9 +9881,6 @@ export function useFoundationShellRouterBodyScope({
     assignTeamCaptainBusy,
     assignTeamCaptainForSelectedTeam,
     captainEffectsTooltip: getTeamCaptainEffectsTooltip(),
-    selectedTeamContractPreviewRowCount,
-    selectedTeamContractShapeMix,
-    selectedTeamContractTable,
     selectedTeamControl,
     selectedTeamDetailTab,
     selectedTeamGeneralManager,
@@ -10425,8 +10051,6 @@ export function useFoundationShellRouterBodyScope({
     visibleFoundationCommandItems,
     visibleInboxItems,
     visiblePlayersTableColumns,
-    visibleSelectedRosterColumns,
-    visibleSelectedTeamContractRows,
     visibleTransferHistoryRows,
     wholeSeasonDryRunFeed,
     wholeSeasonIncludeWarningLineups,

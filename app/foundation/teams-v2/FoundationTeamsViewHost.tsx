@@ -1,12 +1,12 @@
 "use client";
 
-import { useLayoutEffect, useMemo } from "react";
+import { useMemo } from "react";
 
 import type { TeamDetailDrawerData } from "@/app/foundation/TeamDetailDrawer";
 import FoundationTeamsDetailPanel, {
   type FoundationTeamsDetailPanelProps,
 } from "@/app/foundation/teams-v2/FoundationTeamsDetailPanel";
-import type { GameState, Team } from "@/lib/data/olyDataTypes";
+import type { GameState, Team, TeamControlSettings } from "@/lib/data/olyDataTypes";
 import type { FoundationTableSortState } from "@/lib/foundation/foundation-table-sort";
 import type { TeamManagementSnapshotRow } from "@/lib/foundation/team-management-overview";
 import type { DisciplineRankRowInput } from "@/lib/foundation/tabs/teams-view-derivations";
@@ -20,7 +20,9 @@ import {
   type TeamsRosterPlayerPair,
   type UseTeamsPanelDerivationsInput,
 } from "@/lib/foundation/tabs/use-teams-panel-derivations";
-import { getTeamAxisRankTooltip, getTeamsViewColumnTitle } from "@/lib/foundation/tabs/teams-ui-helpers";
+import { useTeamsContractDerivations } from "@/lib/foundation/tabs/use-teams-contract-derivations";
+import { useTeamsExtendedPanelDerivations } from "@/lib/foundation/tabs/use-teams-extended-panel-derivations";
+import { buildOrderedFoundationDisciplines, getTeamAxisRankTooltip, getTeamsViewColumnTitle } from "@/lib/foundation/tabs/teams-ui-helpers";
 import {
   useTeamsRosterTableDerivations,
   type SelectedRosterTableRow,
@@ -45,6 +47,15 @@ type FoundationTeamsViewHostProps = Omit<
   | "starters"
   | "bench"
   | "visibleTeamsViewColumns"
+  | "visibleSelectedRosterColumns"
+  | "selectedTeamContractTable"
+  | "selectedTeamContractShapeMix"
+  | "selectedTeamContractPreviewRowCount"
+  | "visibleSelectedTeamContractRows"
+  | "freeAgents"
+  | "aiPreview"
+  | "selectedAiTeamId"
+  | "aiMarketPreview"
   | "getTeamsViewColumnTitle"
   | "getTeamAxisRankTooltip"
 > & {
@@ -61,7 +72,6 @@ type FoundationTeamsViewHostProps = Omit<
   teamsViewSort: FoundationTableSortState | undefined;
   teamRosterFocusMode: TeamRosterFocusMode;
   teamRosterRoleFilter: TeamRosterRoleFilter;
-  onHydrationPhaseChange: (phase: "shell" | "full") => void;
   rosterPlayers: TeamsRosterPlayerPair[];
   tableColumnPreferences: UseTeamsPanelDerivationsInput["tableColumnPreferences"];
   isTableColumnVisible: UseTeamsPanelDerivationsInput["isTableColumnVisible"];
@@ -77,6 +87,11 @@ type FoundationTeamsViewHostProps = Omit<
     entry: { salary?: number | null },
     player?: unknown,
   ) => number | null;
+  aiTeams: Team[];
+  selectedTeamControl: TeamControlSettings | null | undefined;
+  showTeamContractPreviewRows: boolean;
+  showSelectedRosterPpsBreakdown: boolean;
+  showTeamDisciplines: boolean;
 };
 
 export type { FoundationTeamsViewHostProps };
@@ -92,7 +107,6 @@ export default function FoundationTeamsViewHost({
   selectedRosterTableRows,
   teamRosterFocusMode,
   teamRosterRoleFilter,
-  onHydrationPhaseChange,
   buildTeamDetailDrawerData,
   formatMoney,
   shouldBuildTeamContracts,
@@ -111,6 +125,11 @@ export default function FoundationTeamsViewHost({
   getTablePinnedLeftIds,
   getTablePinnedRightIds,
   playerRatingsById,
+  aiTeams,
+  selectedTeamControl,
+  showTeamContractPreviewRows,
+  showSelectedRosterPpsBreakdown,
+  showTeamDisciplines,
   ...panelProps
 }: FoundationTeamsViewHostProps) {
   const {
@@ -123,10 +142,6 @@ export default function FoundationTeamsViewHost({
     shouldBuildTeamContracts: Boolean(shouldBuildTeamContracts),
     shouldBuildExtendedTeamPanels: Boolean(showExtendedTeamPanels),
   });
-
-  useLayoutEffect(() => {
-    onHydrationPhaseChange(teamsHydrationPhase);
-  }, [onHydrationPhaseChange, teamsHydrationPhase]);
 
   const shouldBuildTeamsAreaRanks = teamsHydrationPhase === "full";
   const currentAreaRanksByTeamId = useMemo(
@@ -211,7 +226,28 @@ export default function FoundationTeamsViewHost({
     ];
   }, [formatMoney, selectedTeamsHistoryData]);
 
-  const { starters, bench, visibleTeamsViewColumns } = useTeamsPanelDerivations({
+  const orderedDisciplines = useMemo(
+    () => buildOrderedFoundationDisciplines(gameState.disciplines),
+    [gameState.disciplines],
+  );
+
+  const contractDerivations = useTeamsContractDerivations({
+    enabled: Boolean(shouldBuildTeamContracts),
+    gameState,
+    selectedTeam,
+    showTeamContractPreviewRows,
+  });
+
+  const extendedPanelDerivations = useTeamsExtendedPanelDerivations({
+    enabled: Boolean(showExtendedTeamPanels),
+    gameState,
+    selectedTeam,
+    selectedTeamControl,
+    aiTeams,
+    playerRatingsById,
+  });
+
+  const { starters, bench, visibleTeamsViewColumns, visibleSelectedRosterColumns } = useTeamsPanelDerivations({
     showExtendedTeamPanels: Boolean(showExtendedTeamPanels),
     rosterPlayers,
     playerRatingsById,
@@ -221,11 +257,16 @@ export default function FoundationTeamsViewHost({
     isTableColumnVisible,
     getTablePinnedLeftIds,
     getTablePinnedRightIds,
+    orderedDisciplines,
+    showSelectedRosterPpsBreakdown,
+    showTeamDisciplines,
   });
 
   return (
     <FoundationTeamsDetailPanel
       {...panelProps}
+      {...contractDerivations}
+      {...extendedPanelDerivations}
       active
       gameState={gameState}
       selectedTeam={selectedTeam}
@@ -253,6 +294,7 @@ export default function FoundationTeamsViewHost({
       starters={starters}
       bench={bench}
       visibleTeamsViewColumns={visibleTeamsViewColumns}
+      visibleSelectedRosterColumns={visibleSelectedRosterColumns}
       getTeamsViewColumnTitle={getTeamsViewColumnTitle}
       getTeamAxisRankTooltip={getTeamAxisRankTooltip}
     />

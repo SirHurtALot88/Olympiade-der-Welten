@@ -606,9 +606,14 @@ describe("foundation performance architecture helpers", () => {
     expect(seasonHostText).toContain("use-season-v2-data");
     expect(seasonHostText).toContain("use-season-v2-standings-derivations");
     expect(seasonHostText).toContain("use-season-v2-panel-derivations");
-    expect(foundationText).toContain("handleTeamsHydrationPhaseChange");
-    expect(foundationText).toContain("shouldBuildTeamsPlayerRatings");
-    expect(foundationText).toContain("teamsHydrationPhase");
+    const teamsHostText = await fs.readFile(
+      path.join(root, "app/foundation/teams-v2/FoundationTeamsViewHost.tsx"),
+      "utf8",
+    );
+    expect(teamsHostText).toContain("useTeamsContractDerivations");
+    expect(teamsHostText).toContain("useTeamsExtendedPanelDerivations");
+    expect(teamsHostText).toContain("useTeamsHydrationPhase");
+    expect(teamsHostText).toContain("use-teams-panel-derivations");
     expect(foundationText).toContain("seasonV2HydrationPhase");
     expect(foundationText).toContain("shouldBuildSeasonV2PlayerRatings");
     const prefetchText = await fs.readFile(path.join(root, "lib/foundation/foundation-panel-prefetch.ts"), "utf8");
@@ -631,11 +636,6 @@ describe("foundation performance architecture helpers", () => {
     );
     expect(persistenceActionsText).toContain("applyCompactSeasonArchiveSentinelIfNeeded");
     expect(foundationText).toContain("marketSellBusy,");
-    const teamsHostText = await fs.readFile(
-      path.join(root, "app/foundation/teams-v2/FoundationTeamsViewHost.tsx"),
-      "utf8",
-    );
-    expect(teamsHostText).toContain("use-teams-panel-derivations");
     const inboxHostText = await fs.readFile(
       path.join(root, "app/foundation/inbox-v2/FoundationInboxV2Host.tsx"),
       "utf8",
@@ -653,8 +653,8 @@ describe("foundation performance architecture helpers", () => {
     expect(foundationText).toContain("shouldBuildSeasonHistorySnapshots");
     expect(foundationText).toContain("shouldBuildSelectedStandingRow");
     expect(foundationText).toContain("season-v2-derivations");
-    expect(foundationText).toContain("shouldBuildTeamsAreaRanks");
-    expect(foundationText).toContain("teamsHydrationPhase");
+    expect(teamsHostText).toContain("shouldBuildTeamsAreaRanks");
+    expect(teamsHostText).toContain("teamsHydrationPhase");
     expect(teamsText).toContain("FoundationTeamsPortraitsTab");
   });
 

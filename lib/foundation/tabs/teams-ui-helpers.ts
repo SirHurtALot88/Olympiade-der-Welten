@@ -1,4 +1,7 @@
+import type { Discipline } from "@/lib/data/olyDataTypes";
 import type { FoundationTableColumn } from "@/lib/foundation/tabs/cockpit-types";
+import { saisonstandDisciplineColumns } from "@/lib/foundation/saisonstand-column-contract";
+import { normalizeLineupDisciplineFieldName } from "@/lib/lineups/team-discipline-ranks";
 
 export const TEAMS_VIEW_COLUMNS: FoundationTableColumn[] = [
   { id: "team", label: "Team", dataKey: "team", defaultWidth: 240, minWidth: 180 },
@@ -38,4 +41,28 @@ export function getTeamsViewColumnTitle(columnId: string) {
   if (columnId === "bronze") return "Bronzemedaillen aus archivierten Seasons.";
   if (columnId === "seasonPoints") return "Aufklappen zeigt die Punkte des Teams pro archivierter Season.";
   return undefined;
+}
+
+export function buildOrderedFoundationDisciplines(disciplines: Discipline[]) {
+  const saisonstandOrderIndex = new Map<string, number>(
+    saisonstandDisciplineColumns.map((disciplineKey, index) => [disciplineKey, index] as const),
+  );
+
+  return [...disciplines].sort((left, right) => {
+    const leftKey = normalizeLineupDisciplineFieldName(left.id);
+    const rightKey = normalizeLineupDisciplineFieldName(right.id);
+    const leftIndex = saisonstandOrderIndex.get(leftKey) ?? Number.MAX_SAFE_INTEGER;
+    const rightIndex = saisonstandOrderIndex.get(rightKey) ?? Number.MAX_SAFE_INTEGER;
+    if (leftIndex !== rightIndex) {
+      return leftIndex - rightIndex;
+    }
+
+    const leftOrder = left.displayOrder ?? left.originalOrder ?? Number.MAX_SAFE_INTEGER;
+    const rightOrder = right.displayOrder ?? right.originalOrder ?? Number.MAX_SAFE_INTEGER;
+    if (leftOrder !== rightOrder) {
+      return leftOrder - rightOrder;
+    }
+
+    return left.name.localeCompare(right.name, "de");
+  });
 }
