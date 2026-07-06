@@ -32,4 +32,39 @@ describe("season standings v2 ui contract", () => {
     expect(foundationText).toContain('{ id: "gms", label: "Manager" }');
     expect(foundationText).not.toContain('{ id: "cards", label: "Karten" }');
   });
+
+  it("exposes sprint M form curve, mobile cards, prize preview, and pinned sticky team", async () => {
+    const [seasonText, cssText] = await Promise.all([
+      fs.readFile(
+        "/Users/chrisfalk/Documents/Codex/Olympiade der Welten/app/foundation/season-v2/SeasonStandingsV2Client.tsx",
+        "utf8",
+      ),
+      fs.readFile("/Users/chrisfalk/Documents/Codex/Olympiade der Welten/app/globals.css", "utf8"),
+    ]);
+
+    expect(seasonText).toContain("season-v2-form-curve");
+    expect(seasonText).toContain("season-v2-trend-arrow");
+    expect(seasonText).toContain('data-testid="season-v2-mobile-cards-toggle"');
+    expect(seasonText).toContain("season-v2-mobile-card-grid");
+    expect(seasonText).toContain("season-v2-prize-preview");
+    expect(seasonText).toContain("season-v2-pinned-team");
+
+    expect(cssText).toContain(".season-v2-form-curve");
+    expect(cssText).toContain(".season-v2-mobile-card-grid");
+    expect(cssText).toContain(".season-v2-prize-preview");
+  });
+
+  it("exposes transfer history timeline layout toggle", async () => {
+    const [historyText, cssText] = await Promise.all([
+      fs.readFile(
+        "/Users/chrisfalk/Documents/Codex/Olympiade der Welten/app/foundation/transfer-history-v2/TransferHistoryV2Client.tsx",
+        "utf8",
+      ),
+      fs.readFile("/Users/chrisfalk/Documents/Codex/Olympiade der Welten/app/globals.css", "utf8"),
+    ]);
+
+    expect(historyText).toContain('data-testid="transfer-history-layout-toggle"');
+    expect(historyText).toContain("historyLayout");
+    expect(cssText).toContain(".transfer-history-v2-layout-toggle");
+  });
 });

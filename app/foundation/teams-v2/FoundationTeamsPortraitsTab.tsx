@@ -3,6 +3,7 @@
 
 import FoundationPlayerPortraitCard from "@/components/foundation/player-portrait-card/FoundationPlayerPortraitCard";
 import { formatContractShapeShortLabel, rosterSalariesDifferForDisplay } from "@/lib/foundation/player-economy-contract";
+import { formatPlayerIdentitySubMeta } from "@/lib/foundation/player-identity-meta";
 
 export type FoundationTeamsPortraitsTabProps = {
   selectedTeam: unknown;
@@ -161,12 +162,14 @@ export default function FoundationTeamsPortraitsTab({
               const salaryTitle = rosterSalariesDifferForDisplay(currentSeasonSalary, annualSalary)
                 ? `Jahresgehalt ${formatDisplayMoney(annualSalary)}`
                 : undefined;
+              const portraitSubMeta = formatPlayerIdentitySubMeta(player);
               return (
                 <FoundationPlayerPortraitCard
                   key={entry.id}
                   playerId={player.id}
                   name={player.name}
-                  portraitUrl={portrait.thumbSrc ?? portrait.src}
+                  portraitUrl={portrait.src}
+                  portraitPlaceholderUrl={portrait.previewSrc ?? portrait.thumbSrc}
                   portraitInitials={portrait.initials}
                   playerOvr={playerOvr}
                   playerMvs={playerMvs}
@@ -183,7 +186,7 @@ export default function FoundationTeamsPortraitsTab({
                   roleTag={entry.roleTag}
                   playerClassName={player.className}
                   className={getClassColorClassName(player.className, "player-card-class-frame")}
-                  subMeta={`${entry.roleTag ?? "Kader"} · ${player.className ?? "—"} · ${player.race ?? "—"}`}
+                  subMeta={portraitSubMeta || null}
                   onOpen={() => void openPlayerDrawerById(player.id, entry.id)}
                   title={`${player.name} öffnen`}
                   economyStats={[

@@ -1,6 +1,7 @@
 import { randomUUID } from "node:crypto";
 
 import { resolveTeamRosterMarketValue } from "@/lib/ai/planner-cash-buffer-policy";
+import { GAMEPLAY_HARD_ROSTER_MIN } from "@/lib/foundation/roster-limits";
 import {
   buildAiMarketPlanPreview,
   type AiMarketPlanBuyPlan,
@@ -534,7 +535,7 @@ function getSeasonMaxSlotNeed(gameState: GameState) {
     .map((value) => Number(value ?? 0))
     .filter((value) => Number.isFinite(value) && value > 0);
   if (counts.length === 0) return 0;
-  return Math.max(7, Math.max(...counts) * 2);
+  return Math.max(GAMEPLAY_HARD_ROSTER_MIN, Math.max(...counts) * 2);
 }
 
 function getTeamCashBuffer(gameState: GameState, teamId: string, coverageFallback: boolean) {
@@ -562,7 +563,7 @@ function buildFinalBuyGate(input: {
 
   const slotNeed = getSeasonMaxSlotNeed(input.gameState);
   const rosterBase = input.rosterBase ?? input.team.currentState.rosterCount ?? 0;
-  const minRoster = Math.max(input.team.currentState.playerMin ?? 0, 7);
+  const minRoster = Math.max(input.team.currentState.playerMin ?? 0, GAMEPLAY_HARD_ROSTER_MIN);
   const playerOpt = input.team.currentState.playerOpt ?? minRoster;
   const atOrAboveOpt = rosterBase >= playerOpt;
   const autoUpgradeFloor =
@@ -632,7 +633,20 @@ function buildFinalBuyGate(input: {
     const player = input.playersById.get(candidate.playerId) ?? null;
     const hardNoGo = Boolean(profile && player && matchesHardNoGo(profile, player));
     const price = candidate.price ?? candidate.marketValue ?? null;
+    // The upgrade-price-floor exists for a deliberately different scenario than a normal
+    // rebuild/gap-fill buy: a team that already reached its (effective) Opt and has excess cash
+    // left over, where a "buy" should only happen if it is a genuine quality upgrade — not a
+    // trash/cheap filler that merely spends cash for its own sake. Below Opt, buying should behave
+    // exactly like the S1 draft: take the best available candidate the compare engine picked for
+    // the lane/budget/fit, regardless of price. `atOrAboveOpt` is the authoritative guard here —
+    // it must hold regardless of how `effectiveMinUpgradeBuyPrice` was derived (explicit caller
+    // option or the auto-computed fallback below), because `input.minUpgradeBuyPrice` can arrive
+    // pre-resolved from resolveTeamBuyGateOpts/resolvePostOptUpgradeMandate, which historically
+    // could report `postOptUpgradeDeploy: true` for a team still well below Opt (see the
+    // depth-repair-mandate comment in planner-post-opt-upgrade-policy.ts) — this guard makes sure
+    // that mislabeling can never block an affordable below-Opt pick again (2026-07-06).
     const belowUpgradeFloor =
+      atOrAboveOpt &&
       effectiveMinUpgradeBuyPrice != null &&
       effectiveMinUpgradeBuyPrice > 0 &&
       price != null &&
@@ -1515,11 +1529,11 @@ export async function applyAiMarketPlanLocally(input: AiMarketPlanApplyParams): 
     const identityPlayerMin =
       baselineGameState.teamIdentities.find((entry) => entry.teamId === team.teamId)?.playerMin ??
       team.currentState.playerMin ??
-      7;
+      GAMEPLAY_HARD_ROSTER_MIN;
     const identityPlayerOpt = team.currentState.playerOpt ?? identityPlayerMin;
     const coverageTargetRoster = options.convergenceIncrementalFill
-      ? Math.max(identityPlayerMin, 7, identityPlayerOpt)
-      : Math.max(identityPlayerMin, 7, slotNeedForCoverage);
+      ? Math.max(identityPlayerMin, GAMEPLAY_HARD_ROSTER_MIN, identityPlayerOpt)
+      : Math.max(identityPlayerMin, GAMEPLAY_HARD_ROSTER_MIN, slotNeedForCoverage);
     const coverageFallback = rosterBaseForCoverage < coverageTargetRoster;
     const convergenceCoverageFill = options.convergenceIncrementalFill && coverageFallback;
     const hardNoGoBuyReasons = buildHardNoGoBuyReasons(

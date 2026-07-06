@@ -1,7 +1,7 @@
 export type MediaImageVariant = "default" | "thumb" | "preview" | "full";
 
 export const MEDIA_THUMB_MAX_SIZE = 64;
-export const MEDIA_PREVIEW_MAX_SIZE = 160;
+export const MEDIA_PREVIEW_MAX_SIZE = 280;
 export const MEDIA_THUMB_QUALITY = 75;
 export const MEDIA_PREVIEW_QUALITY = 80;
 export const MEDIA_THUMB_FORMAT = "webp" as const;

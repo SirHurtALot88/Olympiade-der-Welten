@@ -4,6 +4,7 @@ export type HomeV2TopPlayerCard = {
   playerId: string;
   name: string;
   portraitUrl: string | null;
+  portraitPlaceholderUrl?: string | null;
   portraitInitials: string;
   rosterRank: number;
   playerOvr: number | null;
@@ -103,6 +104,7 @@ export type HomeV2ClientProps = {
   onOpenOffice: () => void;
   onOpenSeason: () => void;
   onOpenInbox: () => void;
+  onCompleteInboxItem?: (itemId: string) => void;
   onOpenBoardObjectives?: () => void;
   onOpenPlayer: (playerId: string) => void;
 };

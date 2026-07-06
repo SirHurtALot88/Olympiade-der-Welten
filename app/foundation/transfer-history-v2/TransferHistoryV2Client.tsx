@@ -227,6 +227,7 @@ export default function TransferHistoryV2Client({
   onLoadMore,
 }: TransferHistoryV2ClientProps) {
   const [selectedTransferId, setSelectedTransferId] = useState<string | null>(visibleRows[0]?.transferId ?? null);
+  const [historyLayout, setHistoryLayout] = useState<"timeline" | "table">("timeline");
 
   useEffect(() => {
     if (!visibleRows.some((row) => row.transferId === selectedTransferId)) {
@@ -433,8 +434,18 @@ export default function TransferHistoryV2Client({
         <section className="panel transfer-history-v2-panel">
           <div className="panel-header">
             <h3>Deal-Strom</h3>
+            <div className="transfer-history-v2-layout-toggle" data-testid="transfer-history-layout-toggle">
+              <button type="button" className={`secondary-button inline-button${historyLayout === "timeline" ? " is-active" : ""}`} onClick={() => setHistoryLayout("timeline")}>
+                Timeline
+              </button>
+              <button type="button" className={`secondary-button inline-button${historyLayout === "table" ? " is-active" : ""}`} onClick={() => setHistoryLayout("table")}>
+                Tabelle
+              </button>
+            </div>
             <span className="muted">{latestRows.length} sichtbar</span>
           </div>
+          {historyLayout === "timeline" ? (
+          <>
           <div className="transfer-history-v2-timeline">
             {latestRows.length ? (
               latestRows.map((row) => (
@@ -490,6 +501,10 @@ export default function TransferHistoryV2Client({
               </button>
             </div>
           ) : null}
+          </>
+          ) : (
+            <p className="muted">Kompakte Deal-Liste — siehe Tabelle unten.</p>
+          )}
         </section>
 
         <section className="panel transfer-history-v2-panel transfer-history-v2-spotlight">
@@ -636,6 +651,7 @@ export default function TransferHistoryV2Client({
         </section>
       </div>
 
+      {historyLayout === "table" ? (
       <section className="panel transfer-history-v2-table-panel">
         <div className="panel-header">
           <h3>Deal-Liste</h3>
@@ -711,6 +727,7 @@ export default function TransferHistoryV2Client({
           </table>
         </div>
       </section>
+      ) : null}
     </div>
   );
 }

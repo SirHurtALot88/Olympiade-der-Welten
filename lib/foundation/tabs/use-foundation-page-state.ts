@@ -428,7 +428,7 @@ export function useFoundationPageState({
   const [selectedMatchdaySummaryId, setSelectedMatchdaySummaryId] = useState<string | null>(null);
   const [teamSettingsSearch, setTeamSettingsSearch] = useState<string>("");
   const [showTeamDisciplines, setShowTeamDisciplines] = useState<boolean>(false);
-  const [selectedTeamDetailTab, setSelectedTeamDetailTab] = useState<"roster" | "contracts" | "portraits">("roster");
+  const [selectedTeamDetailTab, setSelectedTeamDetailTab] = useState<"roster" | "contracts" | "portraits" | "transfer">("roster");
   const [seasonV2HydrationPhase, setSeasonV2HydrationPhase] = useState<"shell" | "full">("shell");
   const [showTeamContractPreviewRows, setShowTeamContractPreviewRows] = useState<boolean>(false);
   const [teamRosterRoleFilter, setTeamRosterRoleFilter] = useState<TeamRosterRoleFilter>("all");

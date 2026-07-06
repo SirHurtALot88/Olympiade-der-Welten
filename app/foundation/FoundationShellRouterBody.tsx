@@ -688,14 +688,17 @@ export function FoundationShellRouterBody(props: FoundationShellRouterBodyProps)
     (
     <FoundationSharedProvider>
     <main className="app-shell foundation-shell foundation-app">
-      {bootstrapError || persistenceError || saveSyncError ? (
+      {bootstrapError && !(gameState?.teams?.length ?? 0) ? (
         <div className="foundation-persistence-banner transfer-callout is-warning" role="status">
-          <strong>{bootstrapError ?? persistenceError ?? saveSyncError}</strong>
-          {bootstrapError ? (
-            <button className="secondary-button inline-button" type="button" onClick={() => window.location.reload()}>
-              Neu laden
-            </button>
-          ) : null}
+          <strong>{bootstrapError}</strong>
+          <button className="secondary-button inline-button" type="button" onClick={() => window.location.reload()}>
+            Neu laden
+          </button>
+        </div>
+      ) : null}
+      {persistenceError || saveSyncError ? (
+        <div className="foundation-persistence-banner transfer-callout is-warning" role="status">
+          <strong>{persistenceError ?? saveSyncError}</strong>
         </div>
       ) : null}
       <FoundationShell
@@ -844,9 +847,10 @@ export function FoundationShellRouterBody(props: FoundationShellRouterBodyProps)
                 { id: "roster", label: "Kader" },
                 { id: "portraits", label: "Portraits" },
                 { id: "contracts", label: "Verträge" },
+                { id: "transfer", label: "Transfers" },
               ]}
               activeId={selectedTeamDetailTab}
-              onSelect={(id) => setSelectedTeamDetailTab(id as "roster" | "contracts" | "portraits")}
+              onSelect={(id) => setSelectedTeamDetailTab(id as "roster" | "contracts" | "portraits" | "transfer")}
             />
           ) : activeView === "trainingV2" || activeView === "facilitiesOverviewV2" ? (
             foundationPanel === "facility" && foundationFacilityTarget ? (
@@ -1259,14 +1263,25 @@ export function FoundationShellRouterBody(props: FoundationShellRouterBodyProps)
       <section className={`foundation-context-banner${isSaveBusy ? " is-loading" : ""}${showCompactHeader ? " is-compact" : ""}`} data-testid="foundation-context-banner">
         <div className="foundation-context-main">
           {activeView !== "homeV2" ? (
-            <>
-          <span className="eyebrow">Spielstand</span>
-          <strong>{isSaveBusy ? "Save-Wechsel lädt..." : activeSaveName}</strong>
-          <span className="muted">
-            {gameState.season.name} · Spieltag {activeContextMeta?.activeMatchday ?? gameState.season.currentMatchday} ·{" "}
-            {formatGamePhaseLabel(activeContextMeta?.gamePhase ?? gameState.gamePhase)}
-          </span>
-            </>
+            showCompactHeader ? (
+              <details className="foundation-save-compact-menu" data-testid="foundation-save-compact-menu">
+                <summary>{isSaveBusy ? "Save lädt…" : formatShortSaveId(activeSaveId)}</summary>
+                <strong className="foundation-save-compact-full">{activeSaveName}</strong>
+                <span className="muted">
+                  {gameState.season.name} · Spieltag {activeContextMeta?.activeMatchday ?? gameState.season.currentMatchday} ·{" "}
+                  {formatGamePhaseLabel(activeContextMeta?.gamePhase ?? gameState.gamePhase)}
+                </span>
+              </details>
+            ) : (
+              <>
+                <span className="eyebrow">Spielstand</span>
+                <strong>{isSaveBusy ? "Save-Wechsel lädt..." : activeSaveName}</strong>
+                <span className="muted">
+                  {gameState.season.name} · Spieltag {activeContextMeta?.activeMatchday ?? gameState.season.currentMatchday} ·{" "}
+                  {formatGamePhaseLabel(activeContextMeta?.gamePhase ?? gameState.gamePhase)}
+                </span>
+              </>
+            )
           ) : null}
         </div>
         {roomContext ? (
@@ -1428,7 +1443,9 @@ export function FoundationShellRouterBody(props: FoundationShellRouterBodyProps)
         <div className="foundation-context-chips" aria-label="Spielstand- und Saisonkontext">
           <span className="pill foundation-context-tag">{resolveScenarioMetaLabel(activeContextMeta)}</span>
           <span className="pill">{formatScenarioTypeLabel(activeContextMeta?.scenarioType)}</span>
-          <span className={`pill foundation-source-pill${readMeta.readOnly ? " is-readonly" : ""}`}>{activeViewSourceBadge}</span>
+          {readMeta.readOnly ? (
+            <span className="pill foundation-source-pill is-readonly">{activeViewSourceBadge}</span>
+          ) : null}
           {activeContextStatusChips.map((chip) => (
             <span
               key={chip.label}
@@ -1479,14 +1496,22 @@ export function FoundationShellRouterBody(props: FoundationShellRouterBodyProps)
         </section>
       ) : null}
 
-      {activeView === "homeV2" && foundationWarningInboxItems.length > 0 ? (
+      {activeView === "homeV2" && foundationWarningInboxItems.some((item) => item.severity === "error" || item.severity === "blocked") ? (
         <section className="foundation-warning-inbox" aria-label="Offene Hinweise">
           <div className="foundation-warning-inbox-summary">
             <span className="eyebrow">Hinweise</span>
-            <strong>{foundationWarningInboxItems.length} offen</strong>
+            <strong>
+              {
+                foundationWarningInboxItems.filter((item) => item.severity === "error" || item.severity === "blocked")
+                  .length
+              }{" "}
+              kritisch
+            </strong>
           </div>
           <div className="foundation-warning-inbox-list">
-            {foundationWarningInboxItems.map((item) => (
+            {foundationWarningInboxItems
+              .filter((item) => item.severity === "error" || item.severity === "blocked")
+              .map((item) => (
               <button
                 key={item.id}
                 className={`foundation-warning-inbox-item is-${item.severity}`}
@@ -1639,6 +1664,12 @@ export function FoundationShellRouterBody(props: FoundationShellRouterBodyProps)
               onOpenOffice: () => navigateHomeTab("office"),
               onOpenSeason: () => setFoundationView("seasonV2", setActiveView),
               onOpenInbox: () => setFoundationView("inboxV2", setActiveView),
+              onCompleteInboxItem: (itemId) => {
+                const sourceItem = visibleInboxItems.find((item) => item.itemId === itemId);
+                if (sourceItem) {
+                  updateInboxItemStatus(sourceItem, "done");
+                }
+              },
               onOpenBoardObjectives: () => {
                 setFoundationView("teams", setActiveView);
                 scrollToFoundationTarget("team-board-objectives");
@@ -2503,7 +2534,7 @@ export function FoundationShellRouterBody(props: FoundationShellRouterBodyProps)
                                 soc={row.player.coreStats.soc ?? null}
                                 leagueHeatPools={leaguePlayerHeatPools}
                                 variant="team"
-                                context="roster"
+                                context="teamGrid"
                                 playerClassName={row.player.className}
                                 subMeta={row.team?.name ?? "Free Agent"}
                               >
@@ -3145,7 +3176,7 @@ export function FoundationShellRouterBody(props: FoundationShellRouterBodyProps)
                           <p className="muted">{marketSellPreview.coaching.strategyFitSummary}</p>
                           <div className="metric-grid compact transfer-sell-metric-grid">
                             <article className="metric-card">
-                              <span>AI-Empfehlung</span>
+                              <span>Auto-Empfehlung</span>
                               <strong>{marketSellPreview.coaching.sellDecisionLabel ?? "—"}</strong>
                               <small>Prioritaet {marketSellPreview.coaching.sellPriority ?? "—"}</small>
                             </article>

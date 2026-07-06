@@ -86,5 +86,7 @@ describe("materialized season derivations", () => {
     expect(record.seasonId).toBe(gameState.season.id);
     expect(record.contentSignature).toBe(buildGameStateContentSignature(gameState));
     expect(Object.keys(record.ratingsByPlayerId).length).toBeGreaterThan(0);
+    expect(record.marketValueByPlayerId && Object.keys(record.marketValueByPlayerId).length).toBeGreaterThan(0);
+    expect(record.marketValuePlayerSignature).toBeTruthy();
   });
 });

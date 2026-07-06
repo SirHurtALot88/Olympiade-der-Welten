@@ -81,6 +81,28 @@ describe("planner-envelope-parity", () => {
     expect(envelope.brackets.star.floorMw).toBe(45);
   });
 
+  it("capExplicitCountsByBudget trims superstar before star on tight budgets", () => {
+    const brackets = buildLeagueMarketBrackets([12, 18, 22, 28, 35, 42, 48, 55, 62, 72, 95, 110]);
+    const capped = capExplicitCountsByBudget({
+      counts: {
+        superstarAllowed: 1,
+        starAllowed: 2,
+        coreNeeded: 2,
+        specialistNeeded: 0,
+        depthNeeded: 2,
+        backupNeeded: 2,
+        cheapFillNeeded: 0,
+        premiumCap: 3,
+      },
+      spendable: 130,
+      steps: 8,
+      rosterGap: 8,
+      brackets,
+    });
+    expect(capped.superstarAllowed).toBe(0);
+    expect(capped.starAllowed).toBeLessThan(2);
+  });
+
   it("capExplicitCountsByBudget shifts excess core into depth on tight budgets", () => {
     const brackets = buildLeagueMarketBrackets([12, 18, 22, 28, 35, 42, 48, 55, 62, 72, 95, 110]);
     const capped = capExplicitCountsByBudget({

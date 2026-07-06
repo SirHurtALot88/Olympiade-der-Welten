@@ -35,12 +35,12 @@ export function buildPremiumFirstSlotSequence(input: SlotSequenceInput): MarketP
     3,
   );
   if (input.premiumFirst && input.missingToMin === 0) {
-    if (input.superstarAllowed > 0 && premiumCap > 0) {
-      pushMany(slotPlan, "superstar", 1, plannedSlots);
+    if (input.starAllowed > 0 && premiumCap > 0) {
+      pushMany(slotPlan, "star", Math.min(input.starAllowed, premiumCap), plannedSlots);
     }
     const premiumUsed = slotPlan.filter((lane) => lane === "superstar" || lane === "star").length;
-    if (input.starAllowed > 0 && premiumUsed < premiumCap) {
-      pushMany(slotPlan, "star", Math.min(input.starAllowed, premiumCap - premiumUsed), plannedSlots);
+    if (input.superstarAllowed > 0 && premiumUsed < premiumCap) {
+      pushMany(slotPlan, "superstar", 1, plannedSlots);
     }
   }
 
@@ -56,11 +56,11 @@ export function buildPremiumFirstSlotSequence(input: SlotSequenceInput): MarketP
   pushMany(slotPlan, "backup", backupNeeded, plannedSlots);
 
   if (!input.premiumFirst || input.missingToMin > 0) {
-    if (input.superstarAllowed > 0 && !slotPlan.includes("superstar")) {
-      pushMany(slotPlan, "superstar", 1, plannedSlots);
-    }
     if (input.starAllowed > 0 && slotPlan.filter((lane) => lane === "star").length < input.starAllowed) {
       pushMany(slotPlan, "star", 1, plannedSlots);
+    }
+    if (input.superstarAllowed > 0 && !slotPlan.includes("superstar")) {
+      pushMany(slotPlan, "superstar", 1, plannedSlots);
     }
   }
 

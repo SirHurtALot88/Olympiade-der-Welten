@@ -23,6 +23,7 @@ import {
 } from "@/lib/ai/ai-transfer-plan-enrichment";
 import {
   mapPlannedPicksToBuyCandidates,
+  mapPlannedPicksToBuyRecommendations,
   planUnifiedTeamPicks,
   resolveUnifiedMarketPickSteps,
   isUnifiedPickEnabledForMarket,
@@ -62,6 +63,8 @@ export type AiMarketPlanPreviewParams = {
   fullScoringLimit?: number | null;
   buyNeedOnly?: boolean | null;
   forceBuyScanTeamIds?: string[] | null;
+  /** Align buy pool with compare/unified pick (default budget_wide). */
+  candidateScopeMode?: "strategic" | "budget_wide" | null;
   localRunContext?: LocalTransfermarktRunContext | null;
   gameState?: GameState | null;
 };
@@ -865,12 +868,28 @@ async function overlayUnifiedCompareBuyPlans(input: {
     const pool = poolTeam?.legalCandidatePool ?? poolTeam?.recommendedBuys ?? [];
     const rosterCount = team.currentState.rosterCount;
     const playerOpt = team.currentState.playerOpt;
+    // 2026-07-06: a team the legacy (non-unified) buy plan could only *partially* fill gets
+    // marked status="blocked" with the single reason "roster_after_market_plan_below_player_min"
+    // (see getTeamStatus/blockingReasons above) — but that is exactly the situation the Unified
+    // engine exists to fix (it plans as many steps as the roster gap needs, not just the 1-2
+    // candidates the legacy preview pool happened to find). Excluding "blocked" teams from the
+    // overlay meant the strongest rebuild candidates (e.g. a team sold down to 1 player) never
+    // got a real Unified plan at all. Any OTHER blocking reason (disabled AI preview, unresolved
+    // negative cash, etc.) still keeps the team out of the overlay — those represent situations
+    // where buying more is genuinely not safe, not an incomplete-plan artifact.
+    const blockedOnlyByIncompleteRosterFill =
+      team.status === "blocked" &&
+      team.blockingReasons.length > 0 &&
+      team.blockingReasons.every((reason) => reason === "roster_after_market_plan_below_player_min");
     if (
       steps <= 0 ||
       (rosterCount != null && playerOpt != null && rosterCount >= playerOpt) ||
-      !poolTeam ||
-      pool.length === 0 ||
-      (team.status !== "buy_only" && team.status !== "sell_then_buy" && team.status !== "warning")
+      !(
+        team.status === "buy_only" ||
+        team.status === "sell_then_buy" ||
+        team.status === "warning" ||
+        blockedOnlyByIncompleteRosterFill
+      )
     ) {
       overlayed.push(team);
       continue;
@@ -881,13 +900,28 @@ async function overlayUnifiedCompareBuyPlans(input: {
       seasonId: input.seasonId,
       teamId: team.teamId,
       steps,
-      runMode: "default",
+      // 2026-07-06: reuse the exact S1 draft planner mode for market buys too — same lane
+      // philosophy, star/superstar caps, spend corridor. The engine already accounts for the
+      // team's existing roster composition (existingStars/existingCores etc.), so it degrades
+      // gracefully from "empty roster draft" to "top up a partially filled roster" without a
+      // separate code path. See ai-needs-picks-compare-service.ts buildCashStrategy for the
+      // matching startingCash fix that keeps the spend corridor correct outside season 1.
+      runMode: "season1_optimum_execute",
     });
-    const unifiedBuys = mapPlannedPicksToBuyCandidates(planned.plannedPicks, pool);
+    // Compare already scored against budget_wide FA pool — use pick metadata directly so mapping
+    // does not depend on a narrower market-plan preview pool.
+    const fromCompare = mapPlannedPicksToBuyRecommendations(planned.plannedPicks);
+    const mappedFromPool = mapPlannedPicksToBuyCandidates(planned.plannedPicks, pool);
+    const unifiedBuys = fromCompare.length > 0 ? fromCompare : mappedFromPool;
     if (unifiedBuys.length === 0) {
       overlayed.push({
         ...team,
-        warnings: unique([...team.warnings, ...planned.warnings, "unified_pick_no_mapped_candidates"]),
+        warnings: unique([
+          ...team.warnings,
+          ...planned.warnings,
+          pool.length === 0 ? "unified_pick_empty_buy_pool" : null,
+          "unified_pick_no_mapped_candidates",
+        ]),
       });
       continue;
     }
@@ -939,6 +973,8 @@ export async function buildAiMarketPlanPreview(params: AiMarketPlanPreviewParams
     localRunContext: params.localRunContext ?? undefined,
   };
 
+  const candidateScopeMode = params.candidateScopeMode === "strategic" ? "strategic" : "budget_wide";
+
   const [buyPreview, sellPreview] = await Promise.all([
     skipBuyScan
       ? Promise.resolve(null)
@@ -949,6 +985,7 @@ export async function buildAiMarketPlanPreview(params: AiMarketPlanPreviewParams
           fullScoringLimit: params.fullScoringLimit ?? null,
           buyNeedOnly: params.buyNeedOnly ?? false,
           forceBuyScanTeamIds: params.forceBuyScanTeamIds ?? null,
+          candidateScopeMode,
         }),
     skipSellScan
       ? Promise.resolve(null)

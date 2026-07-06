@@ -1,6 +1,6 @@
 # Foundation UI/UX Top 100
 
-Stand: 2026-06-19
+Stand: 2026-07-06 (Sprints I–N abgeschlossen)
 
 Leitlinie: Mehr Spiel/App-Flow, weniger spielbare Tabellen. POW, SPE, MEN und SOC bleiben als farbige Achsen konsistent erhalten.
 
@@ -39,71 +39,72 @@ Leitlinie: Mehr Spiel/App-Flow, weniger spielbare Tabellen. POW, SPE, MEN und SO
 32. Training: Upgrade-Kompass direkt vor den Spielertraining-Karten.
 33. Arena: Ergebnis-Ende mit naechsten Schritten zu Einsatzliste, Saisonstand und Ergebnis.
 34. Top-100-Liste neu nummeriert und wieder als Arbeitsbacklog verwendbar gemacht.
+35. **Sprint I** Einsatzliste: Mikro-Schritte Waehlen/Einsetzen/Weiter am aktiven Slot und im Wizard.
+36. **Sprint I** Einsatzliste: POW/SPE/MEN/SOC-Begruendungschips an Wizard-Kandidaten.
+37. **Sprint I** Einsatzliste: Captain-Entscheidungspanel mit Empfehlung.
+38. **Sprint I** Einsatzliste: Taktikvergleich Normal/Schonen/Push als Vorher/Nachher-Karte.
+39. **Sprint I** Einsatzliste: D1/D2 Mini-Progressbars in Toolbar und Side-Head.
+40. **Sprint I** Einsatzliste: „Warum passt er?“ fitSummary in Wizard-Portraits.
+41. **Sprint I** Einsatzliste: Slot-Konflikte inline am betroffenen Slot.
+42. **Sprint I** Einsatzliste: Sticky Flow-Toolbar mit Save/Arena-Aktionen.
+43. **Sprint I** Einsatzliste: Gated Arena-CTA erst bei gespeichertem, bereitem Draft.
+44. **Sprint I** Einsatzliste: Mobile Bottom-Sheet fuer Kandidaten mit groesseren Touch-Targets.
+45. **Sprint I** Einsatzliste: D1/D2 Farbcodierung is-d1/is-d2 auf Tabs, Slots und Progress.
+46. **Sprint J** Arena: Broadcast-Modus mit vergroessertem Board und ausgeblendeten Sidepanels.
+47. **Sprint J** Arena: Slot-Pulse bei Reveal mit reduced-motion Fallback.
+48. **Sprint J** Arena: Winner-Pulse pro Slot.
+49. **Sprint J** Arena: Top-Duell Hero-Banner.
+50. **Sprint J** Arena: POW/SPE/MEN/SOC auf Reveal-Karten (context arenaReveal).
+51. **Sprint J** Arena: Ergebnisgruende Taktik/Form/Erschoepfung als Top-Team-Karten.
+52. **Sprint J** Arena: Tempo-Labels Normal/Schnell/Turbo statt x1/x2/x4.
+53. **Sprint J** Arena: Rueckkehr zur Einsatzliste mit sessionStorage open-slot focus.
+54. **Sprint J** Arena: Training-Hinweis am Ergebnisende.
+55. **Sprint K** Training: Attribut-Upgrade-Kacheln mit +1 und Kosten.
+56. **Sprint K** Training: Weak-Development-Risiko in Spielsprache.
+57. **Sprint K** Training: Signature-Sterne an Attributauswahl.
+58. **Sprint K** Training: Regression-Preview vor Apply.
+59. **Sprint K** Training: Aufklappbare „Warum?“-Gruende.
+60. **Sprint K** Training: Globaler Modus-Chip fuer alle Spieler.
+61. **Sprint K** Training: Hard/Normal/Light Vergleichskarte mit aktivem Spieler.
+62. **Sprint K** Training: XP-Apply nahe geplanten Upgrades.
+63. **Sprint K** Training: Hervorhebung nach Upgradeplanung.
+64. **Sprint K** Training: Gebaeude-Wartungskarten.
+65. **Sprint K** Training: Facility-Upgrades mit Vorher/Nachher-Visual.
+66. **Sprint L** Teams: Teamdrawer Transfer-Tab und Historie.
+67. **Sprint L** Teams: Rollen prominenter im Drawer.
+68. **Sprint L** Teams: Finanzkarten Cash/Gehalt/MW.
+69. **Sprint L** Teams: Kompakte Duellansicht.
+70. **Sprint L** Teams: Owner-/Managerfarben subtil.
+71. **Sprint L** Teams: Icon-Buttons statt Doppelklick-Hinweise.
+72. **Sprint L** Teams: Sticky Namensspalten-Aktionen.
+73. **Sprint M** Saisonstand: Formkurve in Story-Karten.
+74. **Sprint M** Saisonstand: Trendpfeile letzte Spieltage.
+75. **Sprint M** Saisonstand: Aktives Team sticky.
+76. **Sprint M** Saisonstand: Medaillen/Top5 Story-Karten.
+77. **Sprint M** Saisonstand: Bereichskarten optional.
+78. **Sprint M** Saisonstand: Rangbewegung als Pfeil/Delta.
+79. **Sprint M** Saisonstand: Story-Karten oeffnen Teamdrawer.
+80. **Sprint M** Saisonstand: Mobile Kartenansicht.
+81. **Sprint M** Saisonstand: Preisgeldausblick am Tabellenplatz.
+82. **Sprint L** Transfermarkt: Mobile Spielerpreview als Bottom-Sheet.
+83. **Sprint L** Transfermarkt: Entscheidungsboard oben.
+84. **Sprint L** Transfermarkt: Value/Risiko/Gehalt Hauptchips.
+85. **Sprint L** Transfermarkt: Sticky Filterchips.
+86. **Sprint L** Transfermarkt: Auto statt AI Labels.
+87. **Sprint L** Transfermarkt: Verkaufsideen „Warum verkaufen?“.
+88. **Sprint L** Transfermarkt: Kaufdialog Cash/Gehalt vorher-nachher.
+89. **Sprint L** Transfermarkt: Vertragslaenge Segmented Control.
+90. **Sprint L** Transfermarkt: Ablehnungsrisiko-Meter.
+91. **Sprint M** Transferhistorie: Vertikale Timeline neben Tabelle.
+92. **Sprint N** Home: Heute wichtig nach Dringlichkeit sortiert.
+93. **Sprint N** Home: Warnungen nur bei Relevanz.
+94. **Sprint N** Home: Save-Name kompakt im Menue.
+95. **Sprint N** Home: Inbox-To-dos direkt abhaken.
+96. **Sprint N** Navigation: Mobile Topnav ruhiger.
+97. **Sprint N** Allgemein: Debug/Source-Banner nur bei echten Fehlern/Read-only.
+98. **Sprint N** Performance: Grosse Tabellen virtualisiert.
+99. **Sprint N** QA: Browser-Screenshots Desktop/Mobile fuer 12 Haupttabs.
+100. **Sprint N** Motion: prefers-reduced-motion fuer Arena-Pulse und Handoff.
 
 ## Naechste Aufgaben
-35. Einsatzliste: Slot-Karten als noch deutlichere Mikro-Schritte mit sichtbarem “waehlen -> einsetzen -> naechster Slot”.
-36. Einsatzliste: Beste Kandidaten mit farbigen POW/SPE/MEN/SOC-Begruendungschips anzeigen.
-37. Einsatzliste: Captain-Auswahl als eigenes, groesseres Entscheidungspanel mit Empfehlung.
-38. Einsatzliste: Taktikvergleich Normal/Schonen/Push als Vorher/Nachher-Karte.
-39. Einsatzliste: Offene Slots als Mini-Progressbar pro D1/D2.
-40. Einsatzliste: “Warum passt der Spieler?” direkt in Quick-Assign-Karten zeigen.
-41. Einsatzliste: Slot-Konflikte noch staerker inline am betroffenen Slot zeigen.
-42. Einsatzliste: Save-Button im Flowkopf dauerhaft sticky halten.
-43. Einsatzliste: Arena-Start erst als starke CTA zeigen, wenn wirklich alles bereit ist.
-44. Einsatzliste: Mobile Bottom-Sheet fuer Kandidaten.
-45. Einsatzliste: D1/D2 Wechsel mit klarerer Farbcodierung.
-46. Arena: Broadcast-Modus noch staerker mit Vollbild-Fokus und weniger Nebentabellen.
-47. Arena: Slot-Reveal mit kleinen Pausen und sichtbarer Slot-Pulse-Animation.
-48. Arena: Winner-Pulse pro Slot und pro Disziplin.
-49. Arena: Teamduell ganz oben staerker inszenieren.
-50. Arena: POW/SPE/MEN/SOC Wirkung je Slot sichtbarer machen.
-51. Arena: Ergebnisgruende “Taktik/Form/Erschoepfung” als eigene Karten je Top-Team.
-52. Arena: Schnelltempo/Normaltempo/Revealspeed mit klareren Labels statt x1/x2/x4.
-53. Arena: Zurueck zur Einsatzliste mit aktivem Problemfokus.
-54. Arena: Ende mit direktem Training-Hinweis fuer erschoepfte oder stark performende Spieler.
-55. Training: Attribute als farbige Upgrade-Kacheln mit Kosten und +1 Button.
-56. Training: Weak-Development-Risiko deutlicher in Spielsprache erklaeren.
-57. Training: Signature-Attribute als kleine Sterne direkt neben Attributauswahl.
-58. Training: Regression-Event vor Apply klarer ankuendigen.
-59. Training: “Warum steigt/faellt er?” als aufklappbare Kurzgruende.
-60. Training: Trainingsmodus global fuer mehrere Spieler setzen.
-61. Training: Hard/Normal/Light mit Risiko-Preview in einer Vergleichskarte.
-62. Training: XP-Apply Button naeher an geplante Upgrades ziehen.
-63. Training: Nach Upgradeplanung Spielerkarte automatisch aktualisieren und hervorheben.
-64. Training: Gebaeude als Wartungskarten statt Statusmatrix weiter verdichten.
-65. Training: Facility-Upgrades mit Vorher/Nachher-Visual.
-66. Teams: Teamdrawer Transfer-Tab mit aktuellen Kaeufen/Verkaeufen.
-67. Teams: Teamdrawer Rollen prominenter machen.
-68. Teams: Teamdrawer Finanzkarten mit Cash, Gehalt, GuV und naechster Belastung.
-69. Teams: Teamvergleich als kompakte Duellansicht.
-70. Teams: Teamliste mit Owner-/Managerfarben subtil staerken.
-71. Teams: Doppelklick-Hinweise durch klare Icon-Buttons ersetzen.
-72. Teams: Tabellenaktionen sticky in der Namensspalte halten.
-73. Saisonstand: Saisonstorys um Formkurve erweitern.
-74. Saisonstand: Letzte Spieltage als Trendpfeile.
-75. Saisonstand: Aktives Team immer sticky sichtbar.
-76. Saisonstand: Medaillen/Top5 als kompakte Story-Karten.
-77. Saisonstand: Tabelle optional in Bereichskarten umschalten.
-78. Saisonstand: Rangveraenderungen als Bewegung statt nur Zahl.
-79. Saisonstand: Teamdrawer direkt aus Story-Karten.
-80. Saisonstand: Mobile Kartenansicht.
-81. Saisonstand: Preisgeldausblick direkt am Tabellenplatz.
-82. Transfermarkt: Mobile Spielerpreview als Bottom-Sheet.
-83. Transfermarkt: Kaufen/Verkaufen als Entscheidungsboard oben.
-84. Transfermarkt: Value, Risiko, Gehalt und Rolle als Hauptchips.
-85. Transfermarkt: Filterchips kompakter und sticky.
-86. Transfermarkt: Auto-Planung konsequent in “Auto” statt “AI”.
-87. Transfermarkt: Verkaufsideen mit “Warum verkaufen?” Karten.
-88. Transfermarkt: Kaufdialog mit besserem Cash-/Gehalt-vorher-nachher.
-89. Transfermarkt: Vertragslaenge als Segmented Control.
-90. Transfermarkt: Ablehnungsrisiko deutlicher visualisieren.
-91. Transferhistorie: Timeline statt nur Tabelle.
-92. Home: “Heute wichtig” nach Dringlichkeit sortieren.
-93. Home: Warnungen nur bei Relevanz zeigen.
-94. Home: Save-Name kompakter ins Menue ziehen.
-95. Home: Inbox-Hinweise direkt als To-dos abhaken.
-96. Navigation: Mobile Topnav horizontal ruhiger machen.
-97. Allgemein: Sichtbare Source/Debug/Scope-Reste weiter reduzieren.
-98. Performance: Grosse Tabellen virtualisieren.
-99. QA: Browser-Screenshots Desktop/Mobile pro Hauptseite.
-100. Motion: Alle Animationen auf reduced-motion pruefen und sauber abschwaechen.
+_(Keine offenen Top-100-Punkte — naechste Iteration startet mit neuer Liste.)_

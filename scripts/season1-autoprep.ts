@@ -94,9 +94,9 @@ type FormCardAuditRow = {
   staleCards: number;
 };
 
+const PROJECT_ROOT = path.resolve(__dirname, "..");
 const OUTPUT_DIR =
-  process.env.OLY_AUTOPREP_OUTPUT_DIR ??
-  "/Users/chrisfalk/Documents/Codex/2026-06-11/wir-machen-weiter-mit-dem-olympiade/outputs";
+  process.env.OLY_AUTOPREP_OUTPUT_DIR ?? path.join(PROJECT_ROOT, "outputs");
 const WRITE_ENABLED = process.argv.includes("--write");
 const TARGET_SAVE_ID = process.env.OLY_TARGET_SAVE_ID ?? null;
 const TARGET_SEASON_ID = process.env.OLY_TARGET_SEASON_ID ?? "season-1";

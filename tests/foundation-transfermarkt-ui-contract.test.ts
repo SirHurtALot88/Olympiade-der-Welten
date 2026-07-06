@@ -322,4 +322,34 @@ describe("foundation transfermarkt ui contract", () => {
     expect(v2Text).toContain("Letzte Deals (alle Seasons)");
     expect(cssText).toContain(".transfer-buy-preview-skeleton");
   });
+
+  it("exposes sprint L mobile preview sheet, candidate chips, contract control, rejection meter, and Auto labels", async () => {
+    const [v2Text, sellHostText, drawerText, teamsPanelText, cssText] = await Promise.all([
+      fs.readFile(transfermarktV2Path, "utf8"),
+      fs.readFile(path.join(root, "app/foundation/transfermarkt-v2/FoundationMarketSellShellHost.tsx"), "utf8"),
+      fs.readFile(teamDrawerPath, "utf8"),
+      fs.readFile(path.join(root, "app/foundation/teams-v2/FoundationTeamsDetailPanel.tsx"), "utf8"),
+      fs.readFile(globalsPath, "utf8"),
+    ]);
+
+    expect(v2Text).toContain('data-testid="market-v2-mobile-preview-sheet"');
+    expect(v2Text).toContain("market-v2-candidate-decision-chips");
+    expect(v2Text).toContain("market-v2-candidate-chip is-value");
+    expect(v2Text).toContain('data-testid="market-v2-contract-segmented"');
+    expect(v2Text).toContain('data-testid="market-v2-rejection-meter"');
+    expect(v2Text).toContain("previewCashBefore");
+    expect(v2Text).toContain("previewCashAfter");
+    expect(sellHostText).toContain("Auto-Empfehlung");
+    expect(sellHostText).not.toContain("AI-Empfehlung");
+
+    expect(drawerText).toContain('data-testid="team-drawer-tabs"');
+    expect(drawerText).toContain('data-testid="team-drawer-transfer-tab"');
+    expect(drawerText).toContain('data-testid="team-drawer-duel-card"');
+    expect(teamsPanelText).toContain('data-testid="teams-v2-transfer-tab"');
+    expect(teamsPanelText).toContain("teams-v2-name-cell is-sticky-actions");
+    expect(teamsPanelText).toContain("table-icon-button");
+
+    expect(cssText).toContain(".market-v2-mobile-preview-sheet");
+    expect(cssText).toContain(".market-v2-rejection-meter");
+  });
 });

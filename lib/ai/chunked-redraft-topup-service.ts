@@ -3,7 +3,7 @@ import path from "node:path";
 
 import type { GameState, Player, RosterEntry, TeamIdentity, TeamStrategyProfile } from "@/lib/data/olyDataTypes";
 import { resolvePlayerEconomyContract } from "@/lib/foundation/player-economy-contract";
-import { deriveRosterTargets } from "@/lib/foundation/roster-limits";
+import { deriveRosterTargets, GAMEPLAY_HARD_ROSTER_MIN } from "@/lib/foundation/roster-limits";
 import { getSeasonEconomyFactorWindow } from "@/lib/season/season-economy-factors";
 import { buildTeamStrategyScores } from "@/lib/foundation/team-strategy-score-service";
 import { buildTeamStrategyProfileMap } from "@/lib/foundation/team-strategy-profiles";
@@ -1719,7 +1719,7 @@ function buildDraftRoleBoardRows(input: {
 }
 
 function getSeasonLegalMin(playerMin: number) {
-  return Math.max(7, Math.min(playerMin, 8));
+  return Math.max(GAMEPLAY_HARD_ROSTER_MIN, playerMin);
 }
 
 function getPreferredAxes(identity: TeamIdentity | null | undefined) {

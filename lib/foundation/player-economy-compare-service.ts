@@ -14,7 +14,11 @@ import {
   deriveBaseMarketValueFromFinal,
 } from "@/lib/player-formulas/market-value-engine";
 import { loadPlayerFormulaSources } from "@/lib/player-formulas/formula-source-loader";
-import { buildMarketValueDisciplineInputsFromPlayers } from "@/lib/player-formulas/market-value-apply";
+import {
+  buildMarketValueDisciplineInputsFromPlayers,
+  resolveLeagueMarketValueMap,
+} from "@/lib/player-formulas/market-value-apply";
+import type { MarketValueFixtureResult } from "@/lib/player-formulas/player-formula-types";
 import { calculateSalaryFromMarketValue } from "@/lib/player-formulas/salary-engine";
 
 export type PlayerEconomyMode = "legacy" | "compare" | "calculated";
@@ -457,18 +461,48 @@ export function buildPlayerEconomyCompareReport(input: {
     gameState: effectiveGameState,
     saveId: input.saveId ?? `economy-compare:${effectiveGameState.season.id}`,
   }).ratingsById;
-  const marketValueInputs = buildMarketValueDisciplineInputsFromPlayers(
-    gameState.players.map((player) => input.playerOverridesById?.get(player.id) ?? player),
-  );
+  const useCachedLeagueMarketValueMap =
+    !input.playerOverridesById || input.playerOverridesById.size === 0;
 
-  const marketValueResult = calculateMarketValueFromRankTable({
-    players: marketValueInputs,
-    rankToDisciplineMarketValue: playerFormulaSources.rankToDisciplineMarketValue,
-  });
-  const marketValueByPlayerId =
-    marketValueResult.status === "ready"
-      ? new Map(marketValueResult.players.map((entry) => [entry.playerId, entry] as const))
-      : new Map<string, (typeof marketValueResult.players)[number]>();
+  let marketValueResult: ReturnType<typeof calculateMarketValueFromRankTable>;
+  let marketValueByPlayerId: Map<string, MarketValueFixtureResult>;
+
+  if (useCachedLeagueMarketValueMap) {
+    const cachedMarketValueByPlayerId = resolveLeagueMarketValueMap(gameState);
+    marketValueByPlayerId = new Map(
+      [...cachedMarketValueByPlayerId.entries()].map(([playerId, marketValueNew]) => [
+        playerId,
+        {
+          playerId,
+          disciplineRanks: {},
+          disciplineMarketValues: {},
+          rawDisciplineMarketValueSum: 0,
+          adjustedRaw: 0,
+          protectedRaw: 0,
+          marketValueBaseOffset: 0,
+          calcWithoutBaseOffset: 0,
+          marketValueNew,
+        } satisfies MarketValueFixtureResult,
+      ]),
+    );
+    marketValueResult = {
+      status: "ready",
+      players: [...marketValueByPlayerId.values()],
+      warnings: [],
+    };
+  } else {
+    const marketValueInputs = buildMarketValueDisciplineInputsFromPlayers(
+      gameState.players.map((player) => input.playerOverridesById?.get(player.id) ?? player),
+    );
+    marketValueResult = calculateMarketValueFromRankTable({
+      players: marketValueInputs,
+      rankToDisciplineMarketValue: playerFormulaSources.rankToDisciplineMarketValue,
+    });
+    marketValueByPlayerId =
+      marketValueResult.status === "ready"
+        ? new Map(marketValueResult.players.map((entry) => [entry.playerId, entry] as const))
+        : new Map<string, MarketValueFixtureResult>();
+  }
 
   const selectedPlayerIds = input.playerIds ? new Set(input.playerIds) : null;
   const rowPlayers = selectedPlayerIds

@@ -1,6 +1,5 @@
 import type { Player, PlayerAttributeSheetStats, PlayerGeneratorAttributes } from "@/lib/data/olyDataTypes";
 import { materializeCalculatedEconomyForPlayers } from "@/lib/player-formulas/imported-player-economy";
-import { rebuildLeagueDisciplineRatings } from "@/lib/player-formulas/discipline-rating-engine";
 
 const RILEY_LE_ROGUE_ID = "player-0154-riley-le-rouge";
 
@@ -122,6 +121,5 @@ function repairRileyLeRogue(player: Player): Player {
 
 export function repairImportedPlayerData(players: Player[]) {
   const repaired = players.map(repairRileyLeRogue);
-  const withLeagueDisciplineRatings = rebuildLeagueDisciplineRatings(repaired);
-  return materializeCalculatedEconomyForPlayers(withLeagueDisciplineRatings);
+  return materializeCalculatedEconomyForPlayers(repaired);
 }

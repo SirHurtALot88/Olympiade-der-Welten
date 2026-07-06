@@ -4,6 +4,7 @@ import {
   applyTightBudgetReserveLaneBias,
   isUnifiedPickEnabledForMarket,
   mapPlannedPicksToBuyCandidates,
+  mapPlannedPicksToBuyRecommendations,
   OPT_REBUILD_RESERVE_BUDGET_PER_PICK_THRESHOLD,
   resolveUnifiedMarketPickSteps,
 } from "@/lib/ai/unified-pick-planner-service";
@@ -22,6 +23,26 @@ describe("unified pick planner service", () => {
     ];
     const mapped = mapPlannedPicksToBuyCandidates(picks, pool);
     expect(mapped.map((entry) => entry.playerId)).toEqual(["p1", "p2"]);
+  });
+
+  it("prefers compare pick metadata over narrow pool mapping", () => {
+    const picks = [
+      {
+        playerId: "p9",
+        playerName: "Fallback",
+        className: "Rogue",
+        race: "Elf",
+        price: 11.5,
+        salary: 3.2,
+        ovr: 55,
+        mvs: 12,
+        laneReason: "cheap_fill",
+      },
+    ] as AiNeedsPicksPlannedPick[];
+    const mapped = mapPlannedPicksToBuyRecommendations(picks);
+    expect(mapped).toHaveLength(1);
+    expect(mapped[0]?.playerId).toBe("p9");
+    expect(mapped[0]?.price).toBe(11.5);
   });
 
   it("resolves market pick steps from roster gap below min", () => {

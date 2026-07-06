@@ -27,6 +27,7 @@ export type FoundationPlayerPortraitCardProps = {
   playerId: string;
   name: string;
   portraitUrl: string | null;
+  portraitPlaceholderUrl?: string | null;
   portraitInitials: string;
   playerOvr: number | null;
   playerMvs: number | null;
@@ -83,6 +84,7 @@ function renderOverlayStat(stat: PortraitOverlayStat) {
 export default function FoundationPlayerPortraitCard({
   name,
   portraitUrl,
+  portraitPlaceholderUrl,
   portraitInitials,
   playerOvr,
   playerMvs,
@@ -178,6 +180,7 @@ export default function FoundationPlayerPortraitCard({
     <OptimizedMediaImage
       className="home-v2-player-portrait"
       src={portraitUrl}
+      placeholderSrc={portraitPlaceholderUrl}
       alt={name}
       width={portraitLayout === "rail" ? 108 : 280}
       height={portraitLayout === "rail" ? 108 : 373}

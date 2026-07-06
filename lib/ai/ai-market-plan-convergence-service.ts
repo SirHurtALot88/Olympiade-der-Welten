@@ -5,6 +5,7 @@ import {
   type AiMarketPlanApplyTeamResult,
 } from "@/lib/ai/ai-market-plan-apply-service";
 import { buildSeasonStrategyState } from "@/lib/ai/ai-manager-doctrine-service";
+import { GAMEPLAY_HARD_ROSTER_MIN } from "@/lib/foundation/roster-limits";
 import {
   CHUNKED_REDRAFT_TOPUP_CONFIRM_TOKEN,
   runChunkedRedraftTopup,
@@ -143,7 +144,7 @@ export function getSeasonMaxRequiredSlots(gameState: GameState) {
     .map((value) => Number(value ?? 0))
     .filter((value) => Number.isFinite(value) && value > 0);
   if (counts.length === 0) return 8;
-  return Math.max(7, Math.max(...counts) * 2);
+  return Math.max(GAMEPLAY_HARD_ROSTER_MIN, Math.max(...counts) * 2);
 }
 
 export function getTeamHardMinRequired(gameState: GameState, teamId: string) {
@@ -435,6 +436,7 @@ export async function runMarketPlanConvergence(input: MarketPlanConvergenceInput
     allowBuys: input.allowBuys,
     skipIfExistingMarketTransfers: input.skipIfExistingMarketTransfers,
     progressLog: input.progressLog,
+    preseasonBuyMode: "convergence_loop",
   });
 
   return {

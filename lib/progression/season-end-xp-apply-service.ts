@@ -17,6 +17,8 @@ import {
   buildPlayerEconomyCompareReport,
   resolveRankTableMarketValueFromCompareRow,
 } from "@/lib/foundation/player-economy-compare-service";
+import { withPersistedSeasonDerivations } from "@/lib/foundation/materialize-season-derivations";
+import { ensureLeagueMarketValueSnapshot } from "@/lib/player-formulas/market-value-apply";
 import {
   applyRankTableMarketValuesToGameState,
   patchSeasonProgressionEventMarketValues,
@@ -212,7 +214,8 @@ function getPlayerRatingContext(gameState: GameState) {
 function getEconomyPreviewContext(gameState: GameState): EconomyPreviewContext {
   const cached = economyPreviewContextCache.get(gameState);
   if (cached) return cached;
-  const beforeReport = buildPlayerEconomyCompareReport({ gameState });
+  const warmedGameState = ensureLeagueMarketValueSnapshot(gameState);
+  const beforeReport = buildPlayerEconomyCompareReport({ gameState: warmedGameState });
   const context: EconomyPreviewContext = {
     beforeReport,
     beforeRowsByPlayerId: new Map(beforeReport.players.map((row) => [row.playerId, row] as const)),
@@ -1075,6 +1078,7 @@ export function applySeasonEndXpSpend(
       seasonId: save.gameState.season.id,
       playerIds: preview.players.map((player) => player.playerId),
     });
+    nextGameState = withPersistedSeasonDerivations(nextGameState);
   }
 
   persistence.saveSingleplayerState(save.saveId, nextGameState);

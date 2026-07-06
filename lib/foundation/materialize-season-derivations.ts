@@ -9,6 +9,12 @@ import type {
 } from "@/lib/foundation/season-points-ledger";
 import type { PersistenceService } from "@/lib/persistence/types";
 
+import {
+  buildLeagueMarketValuePlayerSignature,
+  computeLeagueMarketValueMapFromPlayers,
+  serializeLeagueMarketValueMap,
+} from "@/lib/player-formulas/league-market-value-snapshot";
+
 import { buildGameStateContentSignature } from "./season-derivations-signature";
 import { computeSeasonDerivationsFresh } from "./season-derivations-compute";
 import type { SeasonDerivations } from "./season-derivations-cache";
@@ -28,6 +34,10 @@ export type PersistedSeasonDerivationsRecord = {
   ledger: PersistedSeasonPointsLedger;
   ratingsByPlayerId: Record<string, PlayerRatingContractRow>;
   performanceByPlayerId: Record<string, PlayerSeasonPerformanceSummary>;
+  /** Cached league-wide rank-table MW for this season snapshot (pick / planner speed). */
+  marketValueByPlayerId?: Record<string, number>;
+  /** Invalidates MW cache when discipline scores change, not on every transfer. */
+  marketValuePlayerSignature?: string;
 };
 
 function serializeLedger(ledger: SeasonPointsLedger): PersistedSeasonPointsLedger {
@@ -101,11 +111,18 @@ export function buildPersistedSeasonDerivationsRecord(gameState: GameState): Per
   const seasonId = gameState.season.id;
   const contentSignature = buildGameStateContentSignature(gameState);
   const derivations = computeSeasonDerivationsFresh(gameState, seasonId);
-  return serializeSeasonDerivations({
-    derivations,
-    seasonId,
-    contentSignature,
-  });
+  const marketValueByPlayerId = serializeLeagueMarketValueMap(
+    computeLeagueMarketValueMapFromPlayers(gameState.players),
+  );
+  return {
+    ...serializeSeasonDerivations({
+      derivations,
+      seasonId,
+      contentSignature,
+    }),
+    marketValueByPlayerId,
+    marketValuePlayerSignature: buildLeagueMarketValuePlayerSignature(gameState.players),
+  };
 }
 
 export function withPersistedSeasonDerivations(gameState: GameState, _saveId?: string): GameState {

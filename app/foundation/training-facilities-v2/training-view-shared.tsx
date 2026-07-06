@@ -337,6 +337,49 @@ function TrainingCardCompactBadges({ row }: { row: TrainingPlayerRowView }) {
   );
 }
 
+function TrainingAttributeUpgradeStrip({ row }: { row: TrainingPlayerRowView }) {
+  const upgrades = useMemo(
+    () =>
+      [...row.attributeForecast]
+        .filter((entry) => entry.delta > 0)
+        .sort((left, right) => right.delta - left.delta)
+        .slice(0, 4),
+    [row.attributeForecast],
+  );
+  if (upgrades.length === 0) {
+    return null;
+  }
+  return (
+    <div className="training-v2-upgrade-strip" data-testid="training-attribute-upgrade-strip" aria-label="Attribut-Upgrades">
+      {upgrades.map((entry) => (
+        <button key={`upgrade-${row.player.id}-${entry.attributeKey}`} type="button" className="training-v2-upgrade-tile" title={`${entry.attribute} +1 · ca. 40 SP`}>
+          <span>{entry.attribute}</span>
+          <strong>+1</strong>
+          <small>~40 SP</small>
+        </button>
+      ))}
+    </div>
+  );
+}
+
+function TrainingWhyDisclosure({ row }: { row: TrainingPlayerRowView }) {
+  const reasons = [
+    row.organicForecast.netSetpoints >= 0 ? "Training/Performance überwiegen" : "Regression oder Fatigue drücken",
+    row.forecast.regressionRisk !== "low" ? `Rückschritt-Risiko: ${row.forecast.regressionRisk}` : "Regression aktuell ruhig",
+    row.modifiers.signatureAttributes.length > 0 ? `★ Signature: ${row.modifiers.signatureAttributes.join(", ")}` : null,
+  ].filter(Boolean);
+  return (
+    <details className="training-v2-why-disclosure">
+      <summary>Warum?</summary>
+      <ul>
+        {reasons.map((reason) => (
+          <li key={reason}>{reason}</li>
+        ))}
+      </ul>
+    </details>
+  );
+}
+
 /**
  * Full analysis for a single player card — same blocks as before the
  * compaction (trait boosts, demand banner, forecast row, PPs/MVS, impact
@@ -406,6 +449,7 @@ function TrainingCardDetails({ row }: { row: TrainingPlayerRowView }) {
           />
 
           <TrainingBudgetBreakdownDisclosure row={row} />
+          <TrainingWhyDisclosure row={row} />
 
           <VeloAttributeFocusTags primary={row.classTrainingFocus.primary} risks={row.classTrainingFocus.risks} />
 
@@ -567,6 +611,8 @@ type TrainingPlayerLaneProps = {
   onOpenPlayerDetails?: (payload: { playerId: string; activePlayerId?: string | null }) => void;
   trainingModeReadOnly?: boolean;
   showIntensityRail?: boolean;
+  onActivePlayerChange?: (playerId: string) => void;
+  activeComparePlayerId?: string | null;
 };
 
 export function TrainingPlayerLane({
@@ -582,6 +628,8 @@ export function TrainingPlayerLane({
   onOpenPlayerDetails,
   trainingModeReadOnly = false,
   showIntensityRail = true,
+  onActivePlayerChange,
+  activeComparePlayerId = null,
 }: TrainingPlayerLaneProps) {
   const modeSegments = buildTrainingModeSegments(
     trainingModeOptions.map((option) => ({
@@ -653,7 +701,7 @@ export function TrainingPlayerLane({
           const isHighRisk = row.forecast.regressionRisk === "high";
           const modePresentation = getTrainingModePresentation(row.mode);
           return (
-            <article className={`training-v2-rider-card velo-rider-card is-${tone}${isHighRisk ? " is-high-risk" : ""}`} id={`training-player-${row.player.id}`} key={row.entryId}>
+            <article className={`training-v2-rider-card velo-rider-card is-${tone}${isHighRisk ? " is-high-risk" : ""}${activeComparePlayerId === row.player.id ? " is-compare-active" : ""}`} id={`training-player-${row.player.id}`} key={row.entryId}>
               <FoundationPlayerPortraitCard
                 playerId={row.player.id}
                 name={row.player.name}
@@ -689,6 +737,7 @@ export function TrainingPlayerLane({
                 }}
                 title={`${row.player.name} Profil öffnen`}
                 testId="training-player-portrait-card"
+                onOpen={() => onActivePlayerChange?.(row.player.id)}
                 footerSlot={
                   <>
                     {onOpenPlayerDetails ? (
@@ -734,6 +783,7 @@ export function TrainingPlayerLane({
               />
 
               <TrainingCardCompactBadges row={row} />
+              <TrainingAttributeUpgradeStrip row={row} />
               <TrainingCardDetails row={row} />
             </article>
           );

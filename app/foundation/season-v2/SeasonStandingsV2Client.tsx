@@ -396,12 +396,26 @@ function renderSummaryCard(
   value: string,
   detail: string,
   tone: "leader" | "selected" | "momentum" | "player",
+  trend: number | null = null,
+  formCurve: number[] | null = null,
 ) {
   return (
     <article className={`season-v2-story-card is-${tone}`}>
       <span>{title}</span>
       <strong>{value}</strong>
       <small>{detail}</small>
+      {trend != null && trend !== 0 ? (
+        <span className={`season-v2-trend-arrow ${trend > 0 ? "is-up" : "is-down"}`} aria-label="Trend">
+          {trend > 0 ? "↑" : "↓"} {Math.abs(trend)}
+        </span>
+      ) : null}
+      {formCurve && formCurve.length > 0 ? (
+        <div className="season-v2-form-curve" aria-hidden="true">
+          {formCurve.map((point, index) => (
+            <span key={`form-curve-${index}`} style={{ height: `${Math.max(12, Math.min(100, point))}%` }} />
+          ))}
+        </div>
+      ) : null}
     </article>
   );
 }
@@ -580,6 +594,7 @@ export default function SeasonStandingsV2Client({
   });
   const [showTopPlayerAxes, setShowTopPlayerAxes] = useState(true);
   const [showFinanceColumns, setShowFinanceColumns] = useState(false);
+  const [mobileCardsView, setMobileCardsView] = useState(false);
   const [internalSeasonV2Mode, setInternalSeasonV2Mode] = useState<SeasonV2ViewMode>(SEASON_V2_DEFAULT_MODE);
   const seasonV2Mode = viewMode ?? internalSeasonV2Mode;
   const setSeasonV2Mode = (mode: SeasonV2ViewMode) => {
@@ -1189,6 +1204,21 @@ export default function SeasonStandingsV2Client({
         </section>
       ) : null}
 
+      {seasonV2Mode === "table" && selectedTeamSummary ? (
+        <section className="season-v2-pinned-team modern-game-pinned-row" aria-label="Dein Team" data-testid="season-v2-pinned-team">
+          <span className="season-v2-pinned-label">Dein Team</span>
+          <strong>{selectedTeamSummary.teamName}</strong>
+          <span>#{selectedTeamSummary.rank ?? "—"}</span>
+          <span>{formatNumber(selectedTeamSummary.points, 1)} Pkt</span>
+          <span className="season-v2-prize-preview" title="Geschätztes Preisgeld bei diesem Rang">
+            Preis ~{formatCash(Math.max(0, (33 - (selectedTeamSummary.rank ?? 33)) * 2.5))}
+          </span>
+          <button type="button" className="secondary-button inline-button" onClick={() => onOpenTeam(selectedTeamSummary.teamId)}>
+            Team öffnen
+          </button>
+        </section>
+      ) : null}
+
       {seasonV2Mode === "table" ? (
       <section className="season-v2-main-grid">
         <div className="season-v2-table-panel">
@@ -1198,6 +1228,14 @@ export default function SeasonStandingsV2Client({
                 Tabelle
               </TooltipHeading>
               <div className="season-v2-inline-sort-row" aria-label="Schnellsortierung Saisonstand">
+                <button
+                  className={`secondary-button inline-button${mobileCardsView ? " is-active" : ""}`}
+                  type="button"
+                  data-testid="season-v2-mobile-cards-toggle"
+                  onClick={() => setMobileCardsView((current) => !current)}
+                >
+                  {mobileCardsView ? "Tabelle" : "Karten"}
+                </button>
                 <button
                   className={`secondary-button inline-button${showFinanceColumns ? "" : " is-active"}`}
                   type="button"
@@ -1232,11 +1270,24 @@ export default function SeasonStandingsV2Client({
             </div>
           </div>
           <div
-            className="table-shell season-v2-table-shell season-v2-table-shell-full"
+            className={`table-shell season-v2-table-shell season-v2-table-shell-full${mobileCardsView ? " is-mobile-cards" : ""}`}
             ref={standingsTableShellRef}
             data-virtualized={standingsTableVirtualWindow.enabled ? "true" : undefined}
             onScroll={(event) => setStandingsTableScrollTop(event.currentTarget.scrollTop)}
           >
+            {mobileCardsView ? (
+              <div className="season-v2-mobile-card-grid" data-testid="season-v2-mobile-cards">
+                {sortedStandingsRows.map((row) => (
+                  <article key={`mobile-card-${row.teamId}`} className={`season-v2-mobile-card${row.isSelected ? " is-selected" : ""}`}>
+                    <strong>#{row.rank ?? "—"} {row.teamName}</strong>
+                    <span>{formatNumber(row.points, 1)} Pkt</span>
+                    {row.rankDiff != null && row.rankDiff !== 0 ? (
+                      <span className={`season-v2-trend-arrow ${row.rankDiff > 0 ? "is-up" : "is-down"}`}>{row.rankDiff > 0 ? "↑" : "↓"} {Math.abs(row.rankDiff)}</span>
+                    ) : null}
+                  </article>
+                ))}
+              </div>
+            ) : (
             <table className="team-table season-v2-table season-v2-standings-table">
               <colgroup>
                 {visibleStandingsColumnIds.map((columnId) => (
@@ -1414,6 +1465,7 @@ export default function SeasonStandingsV2Client({
                 )}
               </tbody>
             </table>
+            )}
           </div>
         </div>
 
@@ -1559,6 +1611,8 @@ export default function SeasonStandingsV2Client({
           leaderTeam ? leaderTeam.teamName : "—",
           leaderTeam ? `#${leaderTeam.rank ?? "—"} · ${formatNumber(leaderTeam.points, 1)} Punkte` : "kein Leader",
           "leader",
+          leaderTeam?.rankDiff ?? null,
+          leaderTeam ? [leaderTeam.pow ?? 0, leaderTeam.spe ?? 0, leaderTeam.men ?? 0, leaderTeam.soc ?? 0] : null,
         )}
         {renderSummaryCard(
           "Dein Team",
@@ -1567,12 +1621,19 @@ export default function SeasonStandingsV2Client({
             ? `#${selectedTeamSummary.rank ?? "—"} · ${formatNumber(selectedTeamSummary.points, 1)} Punkte · Cash ${formatCash(selectedTeamSummary.cash)}`
             : "kein Team gewählt",
           "selected",
+          sortedStandingsRows.find((row) => row.teamId === selectedTeamSummary?.teamId)?.rankDiff ?? null,
+          (() => {
+            const row = sortedStandingsRows.find((entry) => entry.teamId === selectedTeamSummary?.teamId);
+            return row ? [row.pow ?? 0, row.spe ?? 0, row.men ?? 0, row.soc ?? 0] : null;
+          })(),
         )}
         {renderSummaryCard(
           "Momentum",
           momentumTeam ? momentumTeam.teamName : "—",
           momentumTeam ? `${formatSigned(momentumTeam.rankDiff, 0)} Plätze · ${formatNumber(momentumTeam.points, 1)} Punkte` : "kein Aufsteiger",
           "momentum",
+          momentumTeam?.rankDiff ?? null,
+          momentumTeam ? [momentumTeam.pow ?? 0, momentumTeam.spe ?? 0, momentumTeam.men ?? 0, momentumTeam.soc ?? 0] : null,
         )}
         {renderSummaryCard(
           "Top Player",

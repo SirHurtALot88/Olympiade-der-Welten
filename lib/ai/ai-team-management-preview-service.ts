@@ -14,8 +14,10 @@ import { applyRecoveryFacilityModifiers, applyTrainingXpFacilityModifiers, getTe
 import { countTeamInjuredPlayers, getInjuryRiskPercent } from "@/lib/fatigue/fatigue-injury-service";
 import { assessPlayerMorale, type PlayerMoraleAssessment } from "@/lib/morale/player-morale-service";
 import { loadPlayerFormulaSources } from "@/lib/player-formulas/formula-source-loader";
-import { buildMarketValueDisciplineInputsFromPlayers } from "@/lib/player-formulas/market-value-apply";
-import { calculateMarketValueFromRankTable } from "@/lib/player-formulas/market-value-engine";
+import {
+  ensureLeagueMarketValueSnapshot,
+  resolveLeagueMarketValueMap,
+} from "@/lib/player-formulas/market-value-apply";
 import { calculateSalaryFromMarketValue } from "@/lib/player-formulas/salary-engine";
 import { buildPlayerScoutPotentialFromGameState } from "@/lib/progression/player-potential-service";
 import type { PlayerTrainingMode } from "@/lib/training/training-plan-types";
@@ -286,14 +288,8 @@ function getPlayerMwChangeFix(player: Player) {
 
 function buildCalculatedEconomyByPlayer(gameState: GameState) {
   const formulaSources = loadPlayerFormulaSources();
-  const marketValueResult = calculateMarketValueFromRankTable({
-    players: buildMarketValueDisciplineInputsFromPlayers(gameState.players),
-    rankToDisciplineMarketValue: formulaSources.rankToDisciplineMarketValue,
-  });
-  const marketValueByPlayerId =
-    marketValueResult.status === "ready"
-      ? new Map(marketValueResult.players.map((entry) => [entry.playerId, entry.marketValueNew] as const))
-      : new Map<string, number>();
+  const snapshotGameState = ensureLeagueMarketValueSnapshot(gameState);
+  const marketValueByPlayerId = resolveLeagueMarketValueMap(snapshotGameState);
 
   return new Map(
     gameState.players.map((player) => {

@@ -15,12 +15,7 @@ import type {
   HomeV2TodayCard,
   HomeV2TopPlayerCard,
 } from "@/app/foundation/home-v2/home-v2-types";
-import {
-  buildHomePlayerCardsFromRoster,
-  formatLocalePoints,
-  HOME_V2_FACILITY_IDS,
-  type HomeV2RosterTableRow,
-} from "@/lib/foundation/tabs/home-v2-ui-helpers";
+import { sortTodayCardsByUrgency } from "@/lib/foundation/player-identity-meta";
 
 type TeamObjective = {
   teamId: string;
@@ -176,33 +171,34 @@ export function useHomeV2OverviewDerivations(input: UseHomeV2OverviewDerivations
   }, [activeTeamDecisionInboxItems]);
 
   const homeTodayCards = useMemo<HomeV2TodayCard[]>(
-    () => [
-      {
-        key: "lineup",
-        kicker: "Heute wichtig",
-        title: homeNextMatchdayStatus.openSlots > 0 ? `${homeNextMatchdayStatus.openSlots} Slots offen` : "Einsatz bereit",
-        detail: homeNextMatchdayStatus.openSlots > 0 ? "erst Team setzen" : "direkt Arena spielen",
-        tone: homeNextMatchdayStatus.openSlots > 0 ? "warning" : "ready",
-      },
-      {
-        key: "team",
-        kicker: "Teamzustand",
-        title: selectedStandingRow?.rank != null ? `Rang #${selectedStandingRow.rank}` : "Team pruefen",
-        detail: selectedStandingRow?.points != null ? `${formatLocalePoints(selectedStandingRow.points, 1)} Punkte` : "Roster & Finanzen",
-        tone: "info",
-      },
-      {
-        key: "tasks",
-        kicker: "Aufgaben",
-        title: homeTasks.length > 0 ? `${homeTasks.length} Quest${homeTasks.length === 1 ? "" : "s"}` : "Keine offenen Quests",
-        detail: homeTasks[0]?.title ?? "bereit fuer den naechsten Zug",
-        tone: homeTasks.some((task) => task.severity === "critical")
-          ? "warning"
-          : homeTasks.length > 0
-            ? "info"
-            : "ready",
-      },
-    ],
+    () =>
+      sortTodayCardsByUrgency([
+        {
+          key: "lineup",
+          kicker: "Matchday",
+          title: homeNextMatchdayStatus.openSlots > 0 ? `${homeNextMatchdayStatus.openSlots} Slots offen` : "Einsatz bereit",
+          detail: homeNextMatchdayStatus.openSlots > 0 ? "Zuerst Einsatzliste füllen" : "Direkt in die Arena",
+          tone: homeNextMatchdayStatus.openSlots > 0 ? "warning" : "ready",
+        },
+        {
+          key: "tasks",
+          kicker: "Entscheidungen",
+          title: homeTasks.length > 0 ? `${homeTasks.length} offen` : "Alles erledigt",
+          detail: homeTasks[0]?.title ?? "Bereit für den nächsten Zug",
+          tone: homeTasks.some((task) => task.severity === "critical")
+            ? "warning"
+            : homeTasks.length > 0
+              ? "info"
+              : "ready",
+        },
+        {
+          key: "team",
+          kicker: "Saison",
+          title: selectedStandingRow?.rank != null ? `Rang #${selectedStandingRow.rank}` : "Team prüfen",
+          detail: selectedStandingRow?.points != null ? `${formatLocalePoints(selectedStandingRow.points, 1)} Punkte` : "Kader & Finanzen",
+          tone: "info",
+        },
+      ]),
     [homeNextMatchdayStatus.openSlots, homeTasks, selectedStandingRow?.points, selectedStandingRow?.rank],
   );
 
@@ -244,6 +240,7 @@ export function useHomeV2OverviewDerivations(input: UseHomeV2OverviewDerivations
         playerId: row.player.id,
         name: row.player.name,
         portraitUrl: row.portrait.src,
+        portraitPlaceholderUrl: row.portrait.previewSrc ?? row.portrait.thumbSrc,
         portraitInitials: row.portrait.initials,
         rosterRank: index + 1,
         playerOvr: row.playerOvr,

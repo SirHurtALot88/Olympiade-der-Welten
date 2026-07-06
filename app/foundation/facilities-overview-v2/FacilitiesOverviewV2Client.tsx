@@ -55,6 +55,17 @@ export default function FacilitiesOverviewV2Client({
             </div>
             <p className="muted">{facility.description}</p>
             <p>{facility.effectDescription}</p>
+            <div className="facilities-overview-v2-maintenance-card">
+              <span>Wartung / Saison</span>
+              <strong>{formatMoney(facility.upkeep)}</strong>
+            </div>
+            {facility.level < facility.maxLevel ? (
+              <div className="facilities-overview-v2-upgrade-preview">
+                <span>Upgrade Vorschau</span>
+                <strong>L{facility.level} → L{facility.level + 1}</strong>
+                <small>Stärkere Facility-Wirkung</small>
+              </div>
+            ) : null}
             <small>Wartung {formatMoney(facility.upkeep)}</small>
           </article>
         ))}

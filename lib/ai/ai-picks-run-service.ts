@@ -1,7 +1,7 @@
 import type { GameState, Player, Team, TeamControlMode, TeamStrategyProfile } from "@/lib/data/olyDataTypes";
 import { resolvePlayerEconomyContract } from "@/lib/foundation/player-economy-contract";
 import { getTeamControlSettings } from "@/lib/foundation/team-control-settings";
-import { deriveRosterTargets } from "@/lib/foundation/roster-limits";
+import { deriveRosterTargets, deriveSeason1TargetRosterSize } from "@/lib/foundation/roster-limits";
 import { getTeamStrategyProfile } from "@/lib/foundation/team-strategy-profiles";
 import {
   previewLocalTransfermarktBuy,
@@ -12,6 +12,7 @@ import {
   warmLocalTransfermarktFreeAgentBrowseIndex,
   type LocalTransfermarktRunContext,
 } from "@/lib/market/transfermarkt-local-service";
+import { ensureLeagueMarketValueSnapshot } from "@/lib/player-formulas/market-value-apply";
 import { createPersistenceService } from "@/lib/persistence/persistence-service";
 import type { PersistenceService } from "@/lib/persistence/types";
 
@@ -20,14 +21,19 @@ import {
   buildAiNeedsPicksCompare,
   resolveExpectedAiPickCostBandFromLane,
   normalizeAiNeedsPickLaneFamily,
+  isSeason1SpendDownRequired,
+  DRAFT_MAX_STEPS_CAP,
   type AiNeedsPicksRunMode,
   type AiNeedsPicksCompareTeamEntry,
 } from "@/lib/ai/ai-needs-picks-compare-service";
 import { AI_PICKS_RUN_CONFIRM_TOKEN } from "@/lib/ai/ai-picks-run-contract";
 import { resolveSeason1BonusDraftSteps } from "@/lib/ai/season1-draft-cash-planner";
+import type { Season1DraftSpendPlan } from "@/lib/ai/season1-draft-cash-planner";
+import { MARKET_BRACKET_DEFINITIONS } from "@/lib/ai/market-pick-engine/market-brackets";
 import { isLongRunContext } from "@/lib/season/long-run-profile";
 
 const LEGAL_MINIMUM_ROSTER_SIZE = 7;
+const AI_CHEAP_FILL_MARKET_VALUE_CAP = 15;
 
 export type AiPicksRunParams = {
   source?: "sqlite" | "prisma";
@@ -113,6 +119,7 @@ type AiPickCashStrategyRef = {
   season1SpendMinPct: number | null;
   season1SpendMaxPct: number | null;
   season1SpendArchetype: string | null;
+  season1SpendPlan: Season1DraftSpendPlan | null;
   rosterPressure: number;
   needPressure: number;
   spendArchitecture: {
@@ -207,6 +214,8 @@ type AiPickScoreBreakdown = {
   duplicateProfilePenalty: number;
   offThemePenalty: number;
   classSpamPenalty: number;
+  colorspamPenalty: number;
+  evenSpreadPenalty: number;
   mercenaryNegativeFitPenalty: number;
 };
 
@@ -668,28 +677,122 @@ function buildTeamEconomySnapshot(gameState: GameState, team: Team) {
   };
 }
 
-function resolveTargetRoster(team: Team, gameState: GameState) {
+function resolveTargetRoster(team: Team, gameState: GameState, runMode?: AiNeedsPicksRunMode | null) {
   const teamIdentity = gameState.teamIdentities.find((entry) => entry.teamId === team.teamId) ?? null;
   if (teamIdentity && Number.isFinite(teamIdentity.playerOpt) && teamIdentity.playerOpt > 0) {
     const targets = deriveRosterTargets(team, teamIdentity);
+    const targetRosterSize =
+      runMode === "season1_optimum_execute"
+        ? deriveSeason1TargetRosterSize(targets.playerOpt, targets.playerMax)
+        : targets.playerOpt;
     return {
-      targetRosterSize: targets.playerOpt,
+      targetRosterSize,
       targetSource: "team_identity_player_opt" as const,
+      playerOpt: targets.playerOpt,
+      playerMax: targets.playerMax,
     };
   }
 
   const strategyProfile = getTeamStrategyProfile(gameState, team.teamId);
   if (strategyProfile?.rosterOptTarget != null && Number.isFinite(strategyProfile.rosterOptTarget) && strategyProfile.rosterOptTarget > 0) {
+    const playerOpt = Math.round(strategyProfile.rosterOptTarget);
+    const playerMax = team.rosterLimit ?? playerOpt;
+    const targetRosterSize =
+      runMode === "season1_optimum_execute" ? deriveSeason1TargetRosterSize(playerOpt, playerMax) : playerOpt;
     return {
-      targetRosterSize: Math.round(strategyProfile.rosterOptTarget),
+      targetRosterSize,
       targetSource: "strategy_profile_roster_opt" as const,
+      playerOpt,
+      playerMax,
     };
   }
 
   return {
     targetRosterSize: null,
     targetSource: "target_roster_size_missing" as const,
+    playerOpt: null,
+    playerMax: null,
   };
+}
+
+function resolveExecuteSubstituteMaxPrice(pick: AiPicksRunPick) {
+  const lane = normalizeToken(pick.plannedLane || pick.pickLane || pick.budgetLane);
+  const bracketFloor =
+    lane === "superstar"
+      ? (MARKET_BRACKET_DEFINITIONS.find((definition) => definition.lane === "superstar")?.minMw ?? 65)
+      : lane === "star"
+        ? (MARKET_BRACKET_DEFINITIONS.find((definition) => definition.lane === "star")?.minMw ?? 45)
+        : null;
+  if (bracketFloor != null) {
+    return Math.max(
+      pick.marketValue ?? 0,
+      pick.phaseCap ?? 0,
+      pick.laneBudgetLimit ?? 0,
+      pick.effectiveLaneCap ?? 0,
+      bracketFloor,
+    );
+  }
+  return pick.marketValue ?? pick.remainingMinimumReserve ?? null;
+}
+
+function resolveSeason1ExecuteSpendDownRequired(
+  previewTeam: AiPicksRunTeamResult,
+  remainingCash: number | null,
+  remainingSalary: number | null,
+) {
+  const cashStrategy = previewTeam.cashStrategy;
+  if (!cashStrategy || remainingCash == null) {
+    return false;
+  }
+  return isSeason1SpendDownRequired({
+    remainingCash,
+    remainingSalary,
+    cashStrategy: {
+      startingCash: cashStrategy.startingCash,
+      season1SpendMinPct: cashStrategy.season1SpendMinPct,
+      season1SpendTargetPct: cashStrategy.season1SpendTargetPct,
+      season1SpendPlan: cashStrategy.season1SpendPlan ?? null,
+    },
+  });
+}
+
+function shouldStopSeason1ExecutePick(input: {
+  rosterCount: number;
+  targetRosterSize: number;
+  playerMax: number | null;
+  spendDownRequired: boolean;
+}) {
+  if (input.playerMax != null && input.rosterCount >= input.playerMax) {
+    return true;
+  }
+  return input.rosterCount >= input.targetRosterSize && !input.spendDownRequired;
+}
+
+function shouldStopTeamExecuteLoop(input: {
+  runMode: AiNeedsPicksRunMode;
+  rosterCount: number;
+  targetRosterSize: number | null;
+  playerMax: number | null;
+  previewTeam: AiPicksRunTeamResult;
+  remainingCash: number | null;
+  remainingSalary: number | null;
+}) {
+  if (input.targetRosterSize == null) {
+    return false;
+  }
+  if (input.runMode === "season1_optimum_execute") {
+    return shouldStopSeason1ExecutePick({
+      rosterCount: input.rosterCount,
+      targetRosterSize: input.targetRosterSize,
+      playerMax: input.playerMax,
+      spendDownRequired: resolveSeason1ExecuteSpendDownRequired(
+        input.previewTeam,
+        input.remainingCash,
+        input.remainingSalary,
+      ),
+    });
+  }
+  return input.rosterCount >= input.targetRosterSize;
 }
 
 function getExistingAutoTransfers(gameState: GameState, teamId: string) {
@@ -759,6 +862,7 @@ function mapCashStrategyRef(entry: AiNeedsPicksCompareTeamEntry): AiPickCashStra
     season1SpendMinPct: entry.cashStrategy.season1SpendMinPct,
     season1SpendMaxPct: entry.cashStrategy.season1SpendMaxPct,
     season1SpendArchetype: entry.cashStrategy.season1SpendArchetype,
+    season1SpendPlan: entry.cashStrategy.season1SpendPlan,
     rosterPressure: entry.cashStrategy.rosterPressure,
     needPressure: entry.cashStrategy.needPressure,
     spendArchitecture: {
@@ -1348,14 +1452,29 @@ function buildQualityGate(
           }))
       : [],
   );
-  const overspendWithoutNeed = planned.filter(
-    (pick) =>
-      pick.marketValue != null &&
-      pick.laneBudgetLimit != null &&
-      pick.marketValue > pick.laneBudgetLimit * 1.04 &&
+  const pickAuthorizedLaneBudgetLimit = (pick: GlobalPickRow) => {
+    const limits = [pick.laneBudgetLimit, pick.effectiveLaneCap, pick.phaseCap].filter(
+      (value): value is number => typeof value === "number" && Number.isFinite(value) && value > 0,
+    );
+    return limits.length > 0 ? Math.max(...limits) : pick.laneBudgetLimit;
+  };
+  const overspendWithoutNeed = planned.filter((pick) => {
+    if (pick.marketValue == null) {
+      return false;
+    }
+    const laneBudgetLimit = season1OptimumMode ? pickAuthorizedLaneBudgetLimit(pick) : pick.laneBudgetLimit;
+    if (laneBudgetLimit == null) {
+      return false;
+    }
+    if (season1OptimumMode && pick.capExceeded) {
+      return false;
+    }
+    return (
+      pick.marketValue > laneBudgetLimit * 1.04 &&
       pick.scoreBreakdown.needMatchScore < 4 &&
-      pick.scoreBreakdown.teamIdentityScore < 3,
-  );
+      pick.scoreBreakdown.teamIdentityScore < 3
+    );
+  });
   const superstarOverflowTeams = teams.filter((team) => {
     const allowed = team.planner?.superstarAllowed ?? 0;
     const plannedSuperstars = team.plannedPicks.filter((pick) => pick.status !== "blocked" && pick.isSuperstar).length;
@@ -1678,7 +1797,8 @@ function buildQualityGate(
     plannedPickCount > 0 &&
     (offThemeSharePct ?? 0) <= 0 &&
     teams.every((team) => teamExpectedMinimumReached(team));
-  if ((classSpamSharePct ?? 0) > 55) {
+  const classSpamHardBlockPct = season1OptimumMode ? 65 : 55;
+  if ((classSpamSharePct ?? 0) > classSpamHardBlockPct) {
     if (classSpamCanStayWarningOnly) {
       warnings.push("Klassenhaeufung bleibt im Season-1-Setup erlaubt, weil Minimum erreicht wird und kein Off-Theme-Pick geplant ist.");
     } else {
@@ -1962,7 +2082,7 @@ async function buildTeamPreviewEntry(input: {
   });
   const compareEntry = compare.teams[0] ?? null;
   const snapshot = buildTeamEconomySnapshot(input.gameState, input.team);
-  const targetInfo = resolveTargetRoster(input.team, input.gameState);
+  const targetInfo = resolveTargetRoster(input.team, input.gameState, input.runMode);
   const existingAutoTransfers = getExistingAutoTransfers(input.gameState, input.team.teamId);
   const controlMode =
     getTeamControlSettings(input.gameState, input.team.teamId)?.controlMode ??
@@ -2648,6 +2768,192 @@ function runSeason1ExecuteEmergencyMinFill(input: {
   return emergencyFillCount;
 }
 
+function runSeason1ExecuteSpendDownTopUp(input: {
+  saveId: string;
+  seasonId: string;
+  teamId: string;
+  teamName: string;
+  teamCode: string;
+  controlMode: TeamControlMode;
+  playerMax: number | null;
+  previewTeam: AiPicksRunTeamResult;
+  teamRunContext: LocalTransfermarktRunContext;
+  useFastBatchExecute: boolean;
+  executedPicks: AiPicksRunPick[];
+  executedGlobalRows: GlobalPickRow[];
+  transferHistoryIds: string[];
+  visibleTransferIds: string[];
+  excludedPlayerIds: Set<string>;
+  liveTakenPlayerIds: Set<string>;
+  startingStep: number;
+}) {
+  let spendDownFillCount = 0;
+  const maxAttempts = 8;
+  for (let attempt = 0; attempt < maxAttempts; attempt += 1) {
+    const currentTeam =
+      input.teamRunContext.save.gameState.teams.find((entry) => entry.teamId === input.teamId) ?? null;
+    if (!currentTeam) {
+      break;
+    }
+    const snapshot = buildTeamEconomySnapshot(input.teamRunContext.save.gameState, currentTeam);
+    if (input.playerMax != null && snapshot.rosterCount >= input.playerMax) {
+      break;
+    }
+    if (
+      !resolveSeason1ExecuteSpendDownRequired(input.previewTeam, snapshot.cash, snapshot.salaryTotal)
+    ) {
+      break;
+    }
+    const freeAgents = listLocalTransfermarktFreeAgents({
+      saveId: input.saveId,
+      seasonId: input.seasonId,
+      teamId: input.teamId,
+      limit: 250,
+      mode: "ai_preview",
+      localRunContext: input.teamRunContext,
+    });
+    const candidates = freeAgents.items
+      .filter((item) => !input.excludedPlayerIds.has(item.playerId) && !input.liveTakenPlayerIds.has(item.playerId))
+      .filter((item) => item.marketValue != null && item.marketValue >= AI_CHEAP_FILL_MARKET_VALUE_CAP)
+      .sort((left, right) => (right.marketValue ?? 0) - (left.marketValue ?? 0));
+    let bought = false;
+    for (const candidate of candidates) {
+      if (!input.useFastBatchExecute) {
+        const buyPreview = previewLocalTransfermarktBuy({
+          saveId: input.saveId,
+          seasonId: input.seasonId,
+          teamId: input.teamId,
+          playerId: candidate.playerId,
+          transferSource: "ai_roster_fill",
+          localRunContext: input.teamRunContext,
+        });
+        if (!buyPreview.canBuy) {
+          continue;
+        }
+      }
+      const buyResult = executeLocalTransfermarktBuy({
+        saveId: input.saveId,
+        seasonId: input.seasonId,
+        teamId: input.teamId,
+        playerId: candidate.playerId,
+        transferSource: "ai_roster_fill",
+        fastLocalBatch: input.useFastBatchExecute,
+        localRunContext: input.teamRunContext,
+        deferPersist: true,
+      });
+      if (!buyResult.transferCreated || !buyResult.transferId) {
+        continue;
+      }
+      const appliedPick: AiPicksRunPick = {
+        step: input.startingStep + spendDownFillCount + 1,
+        playerId: candidate.playerId,
+        playerName: candidate.name,
+        className: candidate.className,
+        race: candidate.race,
+        marketValue: buyResult.purchasePrice ?? candidate.marketValue,
+        salary: buyResult.salary ?? null,
+        ovr: candidate.ovr,
+        mvs: candidate.mvs,
+        budgetLane: "depth",
+        pickLane: "depth",
+        plannedLane: "depth",
+        laneReason: "season1_execute_spend_down_topup",
+        laneBudgetLimit: null,
+        laneBudgetUsed: null,
+        effectiveLaneCap: null,
+        phaseCap: null,
+        capExceeded: false,
+        capOverrideReason: null,
+        budgetStretchApplied: false,
+        budgetStretchReason: null,
+        budgetStretchPhaseAllowed: false,
+        budgetStretchBlockedReason: null,
+        isSuperstar: false,
+        isStar: false,
+        starPressureWarning: null,
+        cheaperAlternativeAvailable: false,
+        cheaperMinimumSafeAlternativeAvailable: false,
+        specialistNeedFilled: false,
+        coreNeedFilled: false,
+        depthNeedFilled: true,
+        minimumReachableAfterPick: true,
+        remainingMinimumReserve: null,
+        needLabel: null,
+        primaryReason: "season1_execute_spend_down_topup",
+        secondaryReason: null,
+        bestNeedDisciplineId: null,
+        aiScore: 0,
+        pickScore: 0,
+        teamFit: null,
+        budgetFit: null,
+        rosterRole: null,
+        pickPhase: "late_core_investment",
+        teamCashTier: null,
+        minimumSecured: true,
+        reserveSecured: true,
+        mustFeelRightScore: null,
+        mustFeelRightWarning: null,
+        draftSeed: null,
+        baseScore: null,
+        tieBreakJitter: null,
+        scoreWithSeed: null,
+        tieBreakBand: null,
+        strategicExceptionReason: "season1_execute_spend_down_topup",
+        pickedForFormColor: false,
+        formColorReason: null,
+        scoreBreakdown: {
+          finalScore: 0,
+          needMatchScore: 0,
+          teamIdentityScore: 0,
+          valueScore: 0,
+          disciplineCoverageScore: 0,
+          formColorCoverageScore: 0,
+        },
+        reasons: ["season1_execute_spend_down_topup"],
+        warnings: [...buyResult.warnings, "season1_execute_spend_down_topup"],
+        expectedCashAfter: buyResult.cashAfter ?? null,
+        expectedSalaryAfter: buyResult.salaryAfter ?? null,
+        expectedRosterAfter: buyResult.rosterAfter ?? null,
+        transferHistoryId: buyResult.transferId,
+        status: "applied",
+        plannedAxisNeed: null,
+        actualPlayerPrimaryAxis: null,
+        costBandExpected: "depth",
+        costBandActual: "depth",
+        laneMatch: true,
+        axisMatch: true,
+        costBandMatch: true,
+        cheapestCandidateSeen: candidate.marketValue,
+        cheapestCandidateSameAxis: null,
+        cheapestCandidateSameTeamFitBand: null,
+        cheapestCandidateSameClassFamily: null,
+        priceDeltaVsCheapest: null,
+        valueJustification: [],
+        rejectedCheaperAlternatives: [],
+        auditWarnings: [],
+      };
+      input.executedPicks.push(appliedPick);
+      input.transferHistoryIds.push(buyResult.transferId);
+      input.visibleTransferIds.push(buyResult.transferId);
+      input.excludedPlayerIds.add(candidate.playerId);
+      input.liveTakenPlayerIds.add(candidate.playerId);
+      input.executedGlobalRows.push({
+        ...appliedPick,
+        teamId: input.teamId,
+        teamName: input.teamName,
+        controlMode: input.controlMode,
+      });
+      spendDownFillCount += 1;
+      bought = true;
+      break;
+    }
+    if (!bought) {
+      break;
+    }
+  }
+  return spendDownFillCount;
+}
+
 /**
  * Best-effort attribution of a `qualityGate.blockingReasons` string to the specific team (and,
  * where possible, the specific planned pick) it concerns. Reasons are formatted as
@@ -2759,7 +3065,7 @@ export async function runAiPicksExecutePreview(
   const allowSetupAllTeams = Boolean(params.allowSetupAllTeams);
   const runMode: AiNeedsPicksRunMode = params.runMode === "season1_optimum_execute" ? "season1_optimum_execute" : "default";
   const defaultStepsPerTeam = runMode === "season1_optimum_execute" ? 14 : 5;
-  const baseStepsPerTeam = Math.max(1, Math.min(Math.round(params.stepsPerTeam ?? defaultStepsPerTeam), 16));
+  const baseStepsPerTeam = Math.max(1, Math.min(Math.round(params.stepsPerTeam ?? defaultStepsPerTeam), DRAFT_MAX_STEPS_CAP));
   const save = resolveStrictLocalSave(persistence, params.saveId);
   const draftSeed = params.draftSeed?.trim() || `${save.saveId}:draft`;
   const seasonId = params.seasonId?.trim() || save.gameState.season.id;
@@ -2767,7 +3073,9 @@ export async function runAiPicksExecutePreview(
     throw new Error(`Requested season ${seasonId} is not available in save ${save.saveId}.`);
   }
 
-  const currentGameState = resolveStrictLocalSave(persistence, save.saveId).gameState;
+  const currentGameState = ensureLeagueMarketValueSnapshot(
+    resolveStrictLocalSave(persistence, save.saveId).gameState,
+  );
   const previewRunContext = createLocalTransfermarktRunContext({
     persistence,
     save: { ...save, gameState: currentGameState },
@@ -2791,7 +3099,7 @@ export async function runAiPicksExecutePreview(
     runMode === "season1_optimum_execute"
       ? selectedTeams.reduce((max, team) => Math.max(max, resolveSeason1BonusDraftSteps(team)), 0)
       : 0;
-  const stepsPerTeam = Math.max(1, Math.min(baseStepsPerTeam + bonusDraftSteps, 16));
+  const stepsPerTeam = Math.max(1, Math.min(baseStepsPerTeam + bonusDraftSteps, DRAFT_MAX_STEPS_CAP));
   const previewTeams: AiPicksRunTeamResult[] = [];
   const previewStartedAt = Date.now();
   const teamTimings = new Map<string, {
@@ -3003,7 +3311,7 @@ export async function runAiPicksExecutePreview(
     }
 
     const beforeSnapshot = buildTeamEconomySnapshot(latestSave.gameState, latestTeam);
-    const targetInfo = resolveTargetRoster(latestTeam, latestSave.gameState);
+    const targetInfo = resolveTargetRoster(latestTeam, latestSave.gameState, runMode);
     const teamRunContext = createLocalTransfermarktRunContext({ save: latestSave, persistence });
     const useFastBatchExecute = runMode === "season1_optimum_execute";
     const executedPicks: AiPicksRunPick[] = [];
@@ -3070,7 +3378,19 @@ export async function runAiPicksExecutePreview(
     }
     for (const frozenPick of frozenTrace) {
       const currentTeam = teamRunContext.save.gameState.teams.find((entry) => entry.teamId === latestTeam.teamId) ?? latestTeam;
-      if (buildTeamEconomySnapshot(teamRunContext.save.gameState, currentTeam).rosterCount >= targetInfo.targetRosterSize) {
+      const loopSnapshot = buildTeamEconomySnapshot(teamRunContext.save.gameState, currentTeam);
+      if (
+        shouldStopSeason1ExecutePick({
+          rosterCount: loopSnapshot.rosterCount,
+          targetRosterSize: targetInfo.targetRosterSize,
+          playerMax: targetInfo.playerMax,
+          spendDownRequired: resolveSeason1ExecuteSpendDownRequired(
+            previewTeam,
+            loopSnapshot.cash,
+            loopSnapshot.salaryTotal,
+          ),
+        })
+      ) {
         break;
       }
 
@@ -3090,7 +3410,7 @@ export async function runAiPicksExecutePreview(
           liveTakenPlayerIds,
           excludedPlayerIds: teamExcludedPlayerIds,
           useFastBatchExecute,
-          maxPrice: nextPick.marketValue ?? nextPick.remainingMinimumReserve ?? null,
+          maxPrice: resolveExecuteSubstituteMaxPrice(nextPick),
         });
         if (substitute) {
           nextPick = buildSeason1ExecuteSubstitutePick(frozenPick, substitute, frozenPick.playerId);
@@ -3117,7 +3437,7 @@ export async function runAiPicksExecutePreview(
             liveTakenPlayerIds,
             excludedPlayerIds: teamExcludedPlayerIds,
             useFastBatchExecute,
-            maxPrice: nextPick.marketValue ?? nextPick.remainingMinimumReserve ?? null,
+            maxPrice: resolveExecuteSubstituteMaxPrice(nextPick),
           });
           if (substitute) {
             nextPick = buildSeason1ExecuteSubstitutePick(frozenPick, substitute, frozenPick.playerId);
@@ -3204,7 +3524,7 @@ export async function runAiPicksExecutePreview(
           liveTakenPlayerIds,
           excludedPlayerIds: teamExcludedPlayerIds,
           useFastBatchExecute,
-          maxPrice: nextPick.marketValue ?? nextPick.remainingMinimumReserve ?? null,
+          maxPrice: resolveExecuteSubstituteMaxPrice(nextPick),
         });
         if (substitute && substitute.playerId !== nextPick.playerId) {
           nextPick = buildSeason1ExecuteSubstitutePick(frozenPick, substitute, frozenPick.playerId);
@@ -3248,7 +3568,18 @@ export async function runAiPicksExecutePreview(
             const refreshedTeam =
               teamRunContext.save.gameState.teams.find((entry) => entry.teamId === latestTeam.teamId) ?? latestTeam;
             const latestSnapshot = buildTeamEconomySnapshot(teamRunContext.save.gameState, refreshedTeam);
-            if (latestSnapshot.rosterCount >= targetInfo.targetRosterSize) {
+            if (
+              shouldStopSeason1ExecutePick({
+                rosterCount: latestSnapshot.rosterCount,
+                targetRosterSize: targetInfo.targetRosterSize,
+                playerMax: targetInfo.playerMax,
+                spendDownRequired: resolveSeason1ExecuteSpendDownRequired(
+                  previewTeam,
+                  latestSnapshot.cash,
+                  latestSnapshot.salaryTotal,
+                ),
+              })
+            ) {
               break;
             }
             continue;
@@ -3303,8 +3634,48 @@ export async function runAiPicksExecutePreview(
 
       const refreshedTeam = teamRunContext.save.gameState.teams.find((entry) => entry.teamId === latestTeam.teamId) ?? latestTeam;
       const latestSnapshot = buildTeamEconomySnapshot(teamRunContext.save.gameState, refreshedTeam);
-      if (latestSnapshot.rosterCount >= targetInfo.targetRosterSize) {
+      if (
+        shouldStopSeason1ExecutePick({
+          rosterCount: latestSnapshot.rosterCount,
+          targetRosterSize: targetInfo.targetRosterSize,
+          playerMax: targetInfo.playerMax,
+          spendDownRequired: resolveSeason1ExecuteSpendDownRequired(
+            previewTeam,
+            latestSnapshot.cash,
+            latestSnapshot.salaryTotal,
+          ),
+        })
+      ) {
         break;
+      }
+    }
+
+    if (runMode === "season1_optimum_execute") {
+      const spendDownFillCount = runSeason1ExecuteSpendDownTopUp({
+        saveId: save.saveId,
+        seasonId,
+        teamId: latestTeam.teamId,
+        teamName: previewTeam.teamName,
+        teamCode: previewTeam.teamCode,
+        controlMode: activeControlMode,
+        playerMax: targetInfo.playerMax,
+        previewTeam,
+        teamRunContext,
+        useFastBatchExecute,
+        executedPicks,
+        executedGlobalRows,
+        transferHistoryIds,
+        visibleTransferIds,
+        excludedPlayerIds: new Set([
+          ...previewTeam.plannedPicks.map((pick) => pick.playerId),
+          ...executedPicks.map((pick) => pick.playerId),
+        ]),
+        liveTakenPlayerIds,
+        startingStep: executedStepCount,
+      });
+      if (spendDownFillCount > 0) {
+        executedStepCount += spendDownFillCount;
+        teamWarnings.push(`season1_execute_spend_down_topup:${spendDownFillCount}`);
       }
     }
 

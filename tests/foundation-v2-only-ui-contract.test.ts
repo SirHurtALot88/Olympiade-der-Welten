@@ -44,13 +44,14 @@ describe("foundation v2-only ui contract", () => {
   it("uses classic teams v1 with league table, history and economy tiles", async () => {
     const foundationText = await readFoundationOrchestratorSource(root);
     const teamsPanelText = await fs.readFile(`${root}/app/foundation/teams-v2/FoundationTeamsDetailPanel.tsx`, "utf8");
+    const teamsHostText = await fs.readFile(`${root}/app/foundation/teams-v2/FoundationTeamsViewHost.tsx`, "utf8");
 
     expect(foundationText).not.toContain("TeamsV2Client");
     expect(foundationText).not.toContain("teamsViewMode");
     expect(foundationText).not.toContain("V2 Übersicht");
     expect(teamsPanelText).toContain('id="teams-league-overview"');
     expect(teamsPanelText).toContain('selectedTeamDetailTab === "roster"');
-    expect(foundationText).toContain("teamEconomyTiles");
+    expect(teamsHostText).toContain("teamEconomyTiles");
     expect(teamsPanelText).toContain("teams-v2-focus-card");
     expect(teamsPanelText).toContain("TeamDrawerHistoryTable");
     expect(teamsPanelText).toContain("injuriesCount");

@@ -1,12 +1,14 @@
 "use client";
 
+import { useMemo, useState } from "react";
+
 import OptimizedMediaImage from "@/app/foundation/OptimizedMediaImage";
 import { TooltipHeading } from "@/components/ui/TooltipHeading";
 import { getTeamLogoBrowserUrl } from "@/lib/data/mediaAssets";
 import type { Team } from "@/lib/data/olyDataTypes";
 import type { PlayerTrainingMode } from "@/lib/training/training-plan-types";
 
-import { TrainingModeGuideDisclosure, TrainingPlayerLane, formatLocaleNumber, formatSignedPercent } from "@/app/foundation/training-facilities-v2/training-view-shared";
+import TrainingModeComparePanel from "@/components/foundation/modern-game/TrainingModeComparePanel";
 import type {
   TrainingClassOption,
   TrainingDevelopmentFilter,
@@ -81,6 +83,8 @@ export default function TrainingCompactClient({
         right.forecast.regressionPressure - left.forecast.regressionPressure ||
         right.organicForecast.netSetpoints - left.organicForecast.netSetpoints,
     )[0] ?? null;
+  const [compareActivePlayerId, setCompareActivePlayerId] = useState<string | null>(playerRows[0]?.player.id ?? null);
+  const compareActiveMode = playerRows.find((row) => row.player.id === compareActivePlayerId)?.mode ?? null;
 
   return (
     <section
@@ -153,6 +157,22 @@ export default function TrainingCompactClient({
         </p>
 
         {managementLockedReason ? <p className="muted">{managementLockedReason}</p> : null}
+        <div className="training-v2-global-mode-chips" data-testid="training-global-mode-chips" aria-label="Trainingsmodus für alle Spieler">
+          {trainingModeOptions.map((option) => (
+            <button
+              key={`global-mode-${option.value}`}
+              type="button"
+              className="secondary-button inline-button"
+              disabled={trainingModeReadOnly}
+              onClick={() => {
+                playerRows.forEach((row) => onSetTrainingMode(row.player.id, option.value as PlayerTrainingMode));
+              }}
+            >
+              Alle auf {option.label}
+            </button>
+          ))}
+        </div>
+        <TrainingModeComparePanel options={trainingModeOptions} activeMode={compareActiveMode} />
         <TrainingModeGuideDisclosure trainingModeOptions={trainingModeOptions} />
       </header>
 
@@ -169,6 +189,8 @@ export default function TrainingCompactClient({
           onSetTrainingClass={onSetTrainingClass}
           onOpenPlayerDetails={onOpenPlayerDetails}
           trainingModeReadOnly={trainingModeReadOnly}
+          onActivePlayerChange={setCompareActivePlayerId}
+          activeComparePlayerId={compareActivePlayerId}
         />
       </section>
     </section>

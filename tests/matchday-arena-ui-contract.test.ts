@@ -204,7 +204,10 @@ describe("matchday arena ui contract", () => {
     expect(legacyLineupText).toContain("lineup-v2-arena-handoff");
     expect(legacyLineupText).toContain("Base-Rang");
     expect(legacyLineupText).toContain(": { form: false, mutators: false },");
-    expect(arenaText).toContain("buildFocusedArenaBoardRows");
+    expect(arenaText).toContain("Fokus · 10 Teams");
+    expect(arenaText).toContain("arena-v2-act-board");
+    expect(arenaText).toContain("arena-v2-act-reveal");
+    expect(arenaText).toContain("arena-v2-act-result");
     expect(arenaText).toContain("isFocusedBoardMode");
     expect(arenaText).toContain('data-testid="arena-v2-focused-board"');
     expect(arenaText).toContain("is-act-");
@@ -249,7 +252,9 @@ describe("matchday arena ui contract", () => {
     expect(cssText).toContain("--arena-v2-board-visible-rows");
     expect(cssText).toContain(".arena-v2-board-list.is-focused-board");
     expect(cssText).toContain(".arena-v2-score-ticker");
-    expect(cssText).toContain(".arena-v2-handoff-banner");
+    expect(cssText).toContain(".arena-v2-shell.is-act-prep");
+    expect(cssText).toContain(".legacy-lineup-v2-handoff-overlay");
+    expect(cssText).toContain(".legacy-lineup-form-board-pick.is-drag-over");
     expect(cssText).toContain(".matchday-arena-timeline-short-label");
     expect(presenterText).toContain("MATCHDAY_ARENA_PHASES");
     expect(cssText).toContain(".pill.is-loading");
@@ -300,5 +305,44 @@ describe("matchday arena ui contract", () => {
     expect(arenaHostText).toContain("matchday-auto-run-execute");
     expect(arenaPanelText).toContain('data-testid="arena-lineup-blocker"');
     expect(foundationText).toContain("lineup_not_submitted");
+  });
+
+  it("exposes sprint J broadcast mode, result reasons, training hint, and return focus handoff", async () => {
+    const [arenaText, arenaHostText, legacyLineupText, cssText] = await Promise.all([
+      fs.readFile(
+        "/Users/chrisfalk/Documents/Codex/Olympiade der Welten/app/foundation/matchday-arena-v2/MatchdayArenaV2Client.tsx",
+        "utf8",
+      ),
+      fs.readFile(
+        "/Users/chrisfalk/Documents/Codex/Olympiade der Welten/app/foundation/matchday-arena-v2/FoundationMatchdayArenaShellHost.tsx",
+        "utf8",
+      ),
+      fs.readFile(
+        "/Users/chrisfalk/Documents/Codex/Olympiade der Welten/app/foundation/legacy-lineup-lab/LegacyLineupLabClient.tsx",
+        "utf8",
+      ),
+      fs.readFile("/Users/chrisfalk/Documents/Codex/Olympiade der Welten/app/globals.css", "utf8"),
+    ]);
+
+    expect(arenaText).toContain("broadcastFocusMode");
+    expect(arenaText).toContain('data-testid="arena-v2-broadcast-toggle"');
+    expect(arenaText).toContain("is-broadcast-mode");
+    expect(arenaText).toContain("is-arena-slot-pulse");
+    expect(arenaText).toContain("is-slot-winner");
+    expect(arenaText).toContain('data-testid="arena-v2-result-reasons"');
+    expect(arenaText).toContain("arena-v2-result-reason-chip is-taktik");
+    expect(arenaText).toContain("arena-v2-result-reason-chip is-form");
+    expect(arenaText).toContain("arena-v2-result-reason-chip is-fatigue");
+    expect(arenaText).toContain('data-testid="arena-v2-training-hint"');
+    expect(arenaText).toContain("lineup-v2-return-focus");
+    expect(arenaHostText).toContain("onOpenTraining");
+
+    expect(legacyLineupText).toContain("lineup-v2-return-focus");
+
+    expect(cssText).toContain("@keyframes arena-v2-slot-pulse");
+    expect(cssText).toContain(".arena-v2-shell.is-broadcast-mode");
+    expect(cssText).toContain(".arena-v2-training-hint");
+    expect(cssText).toContain("prefers-reduced-motion");
+    expect(cssText).toContain(".legacy-lineup-v2-handoff-overlay");
   });
 });

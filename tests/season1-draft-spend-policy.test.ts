@@ -41,7 +41,7 @@ describe("season1 draft spend policy", () => {
 
   it("low-budget team with high harmony stays cautious_or_value", () => {
     const policy = resolveSeason1SpendPolicy(
-      { shortCode: "N-W", teamId: "n-w", budget: 195 },
+      { shortCode: "N-W", teamId: "n-w", budget: 245 },
       { ambition: 4.5, finances: 7.5, harmony: 8.2 },
       unknownPrize,
     );
@@ -93,14 +93,14 @@ describe("season1 draft spend policy", () => {
   });
 
   it("blocks sub-floor picks during minimum_skeleton when spend budget remains", () => {
-    const team = { shortCode: "W-L", teamId: "w-l", budget: 270 };
+    const team = { shortCode: "W-L", teamId: "w-l", budget: 320 };
     expect(getSeason1BudgetTier(team)).toBe("upper");
     expect(
       shouldBlockCheapSeason1Pick({
         team,
         price: 11,
-        remainingCash: 240,
-        startingCash: 270,
+        remainingCash: 290,
+        startingCash: 320,
         spendTargetPct: 0.94,
         spendMinPct: 0.92,
         minimumSlotsBefore: 3,
@@ -114,7 +114,7 @@ describe("season1 draft spend policy", () => {
         team,
         price: 11,
         remainingCash: 18,
-        startingCash: 270,
+        startingCash: 320,
         spendTargetPct: 0.94,
         spendMinPct: 0.92,
         minimumSlotsBefore: 1,
@@ -126,15 +126,15 @@ describe("season1 draft spend policy", () => {
   });
 
   it("prefers the canonical targetCashLeft over the spendTargetPct estimate when both are given", () => {
-    const team = { shortCode: "W-L", teamId: "w-l", budget: 270 };
-    // spendTargetPct alone would say plenty of spend room remains (94% of 270 not yet spent),
+    const team = { shortCode: "W-L", teamId: "w-l", budget: 320 };
+    // spendTargetPct alone would say plenty of spend room remains (94% of 320 not yet spent),
     // but the canonical plan already says only a small gap remains — the canonical value should win.
     expect(
       shouldBlockCheapSeason1Pick({
         team,
         price: 11,
         remainingCash: 60,
-        startingCash: 270,
+        startingCash: 320,
         spendTargetPct: 0.94,
         spendMinPct: 0.92,
         targetCashLeft: 55,
@@ -148,7 +148,7 @@ describe("season1 draft spend policy", () => {
         team,
         price: 11,
         remainingCash: 60,
-        startingCash: 270,
+        startingCash: 320,
         spendTargetPct: 0.94,
         spendMinPct: 0.92,
         targetCashLeft: 10,

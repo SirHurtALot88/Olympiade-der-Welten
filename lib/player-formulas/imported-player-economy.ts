@@ -1,6 +1,5 @@
 import type { Player, PlayerAttributeSheetStats, PlayerGeneratorAttributes } from "@/lib/data/olyDataTypes";
-import { foundationSeedDisciplines } from "@/lib/data/dataAdapter";
-import { buildRankTableMarketValueMap } from "@/lib/player-formulas/market-value-apply";
+import { computeLeagueMarketValueMapFromPlayers } from "@/lib/player-formulas/league-market-value-snapshot";
 import { loadPlayerFormulaSources } from "@/lib/player-formulas/formula-source-loader";
 import { calculateSalaryFromMarketValue } from "@/lib/player-formulas/salary-engine";
 
@@ -66,12 +65,7 @@ export function calculateImportedPlayerEconomy(
 
   const resolvedMarketValueByPlayerId =
     marketValueByPlayerId ??
-    buildRankTableMarketValueMap({
-      players: catalogPlayers,
-      disciplines: foundationSeedDisciplines,
-      rosters: [],
-      teams: [],
-    } as never);
+    computeLeagueMarketValueMapFromPlayers(catalogPlayers);
 
   const marketValueRaw = resolvedMarketValueByPlayerId.get(player.id);
   if (!isFiniteNumber(marketValueRaw) || marketValueRaw <= 0) {
@@ -116,12 +110,7 @@ export function applyImportedPlayerEconomy(player: Player, economy: ImportedPlay
 
 /** Recompute rank-table MW and salary engine values for imported catalog players. */
 export function materializeCalculatedEconomyForPlayers(players: Player[]): Player[] {
-  const marketValueByPlayerId = buildRankTableMarketValueMap({
-    players,
-    disciplines: foundationSeedDisciplines,
-    rosters: [],
-    teams: [],
-  } as never);
+  const marketValueByPlayerId = computeLeagueMarketValueMapFromPlayers(players);
 
   if (marketValueByPlayerId.size === 0) {
     return players;

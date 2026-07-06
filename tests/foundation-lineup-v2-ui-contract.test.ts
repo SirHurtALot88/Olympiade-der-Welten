@@ -42,7 +42,23 @@ describe("foundation lineup v2 ui contract", () => {
     expect(boardText).toContain("Sofort");
     expect(boardText).toContain("Blockiert");
 
+    expect(boardText).toContain("Punkte");
+    expect(boardText).toContain("Automatisch füllen");
+    expect(boardText).toContain("Assistent");
+    expect(boardText).toContain("lineupFinishItems");
+    expect(boardText).toContain("lineup-v2-save-help");
+    expect(boardText).toContain("aria-live");
+    expect(boardText).toContain("next.length > 3");
+    expect(boardText).toContain('data-testid="lineup-v2-form-mini-popover"');
+    expect(boardText).toContain("lineupCandidate");
+
     expect(clientText).toContain('uiVariant === "focusV2"');
+    expect(clientText).toContain('data-testid="lineup-v2-trainer-tip"');
+    expect(clientText).toContain("Vorschlag übernehmen");
+    expect(clientText).toContain("legacy-lineup-ready-panel");
+    expect(clientText).toContain('data-testid="lineup-v2-handoff-overlay"');
+    expect(clientText).toContain("Formkarten");
+    expect(clientText).toContain("assignFormCardToCell");
     expect(clientText).toContain("nextOpenSlotKey");
     expect(clientText).toContain("slotRoleAttributesByKey={slotRoleAttributesByKey}");
     expect(clientText).toContain("candidateGroups={teamdeckCandidateGroups}");
@@ -69,9 +85,47 @@ describe("foundation lineup v2 ui contract", () => {
     expect(cssText).toContain(".legacy-lineup-v2-top-pick-chip");
     expect(cssText).toContain(".legacy-lineup-v2-slot-row.is-empty.is-next-target");
     expect(cssText).toContain(".legacy-lineup-v2-keyboard-hints-wrap");
-    expect(cssText).toContain(".legacy-lineup-v2-mobile-assign-banner");
+    expect(cssText).toContain(".legacy-lineup-v2-trainer-tip");
+    expect(cssText).toContain(".legacy-lineup-v2-save-help");
+    expect(cssText).toContain(".legacy-lineup-v2-handoff-overlay");
 
     expect(routingText).toContain('return "lineup"');
     expect(routingText).toContain("lineup-v2");
+  });
+
+  it("exposes sprint I sticky toolbar, discipline progress, tactic preview, and gated arena CTA", async () => {
+    const [boardText, clientText, cssText] = await Promise.all([
+      fs.readFile("/Users/chrisfalk/Documents/Codex/Olympiade der Welten/app/foundation/legacy-lineup-lab-v2/LegacyLineupFocusV2Board.tsx", "utf8"),
+      fs.readFile("/Users/chrisfalk/Documents/Codex/Olympiade der Welten/app/foundation/legacy-lineup-lab/LegacyLineupLabClient.tsx", "utf8"),
+      fs.readFile("/Users/chrisfalk/Documents/Codex/Olympiade der Welten/app/globals.css", "utf8"),
+    ]);
+
+    expect(boardText).toContain('data-testid="lineup-v2-sticky-toolbar"');
+    expect(boardText).toContain("legacy-lineup-v2-toolbar is-sticky");
+    expect(boardText).toContain('data-testid="lineup-v2-discipline-progress"');
+    expect(boardText).toContain("legacy-lineup-v2-toolbar-progress-chip");
+    expect(boardText).toContain("lineup-v2-tactic-preview-");
+    expect(boardText).toContain("disciplineTacticPreviewBySide");
+    expect(boardText).toContain('data-testid="lineup-v2-arena-cta"');
+    expect(boardText).toContain("arenaReady");
+    expect(boardText).toContain("onNavigateArena");
+    expect(boardText).toContain("Zur Arena");
+    expect(boardText).toContain("legacy-lineup-v2-candidate-tabs is-");
+    expect(boardText).toContain("legacy-lineup-v2-toolbar-progress-chip is-");
+    expect(boardText).toContain("LegacyLineupSlotMicroSteps");
+    expect(boardText).toContain("LegacyLineupCandidateReasonChips");
+    expect(boardText).toContain("legacy-lineup-v2-wizard-fit");
+    expect(boardText).toContain("Warum passt er?");
+
+    expect(clientText).toContain("focusV2ArenaReady");
+    expect(clientText).toContain("focusV2DisciplineTacticPreviewBySide");
+    expect(clientText).toContain("lineup-v2-return-focus");
+
+    expect(cssText).toContain(".legacy-lineup-v2-toolbar.is-sticky");
+    expect(cssText).toContain(".legacy-lineup-v2-toolbar-progress-chip.is-d1");
+    expect(cssText).toContain(".legacy-lineup-v2-tactic-preview-chip");
+    expect(cssText).toContain(".legacy-lineup-v2-arena-cta.is-ready");
+    expect(cssText).toContain(".legacy-lineup-v2-wizard-fit");
+    expect(cssText).toContain(".legacy-lineup-v2-slot-micro-steps");
   });
 });

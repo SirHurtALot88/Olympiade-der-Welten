@@ -29,7 +29,7 @@ function parseStepsPerTeam(argv: string[]) {
     const parsed = Number(argv[flagIndex + 1]);
     if (Number.isFinite(parsed) && parsed > 0) return Math.round(parsed);
   }
-  return 10;
+  return 14;
 }
 
 async function main() {

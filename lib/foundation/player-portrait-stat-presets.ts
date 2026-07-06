@@ -6,7 +6,10 @@ export type PlayerPortraitContext =
   | "market"
   | "scouting"
   | "lineup"
+  | "lineupCandidate"
   | "arena"
+  | "arenaReveal"
+  | "teamGrid"
   | "tablePreview";
 
 export type PlayerPortraitDensity = "full" | "compact" | "mini";
@@ -264,7 +267,7 @@ export function buildContextOverlayStats(options: BuildContextOverlayOptions): P
   if (context === "lineup" && options.contextData?.lineup) {
     return buildLineupOverlayStats(options.contextData.lineup).slice(0, density === "compact" ? 4 : 5);
   }
-  if (context === "arena" && options.contextData?.arena) {
+  if ((context === "arena" || context === "arenaReveal") && options.contextData?.arena) {
     return buildArenaOverlayStats(options.contextData.arena).slice(0, density === "compact" ? 3 : 4);
   }
 
@@ -284,5 +287,5 @@ export function shouldShowPortraitOrbit(
   if (context === "market") return density === "full";
   if (context === "training") return false;
   if (context === "scouting") return density === "full";
-  return context === "roster" || context === "tablePreview" || context == null;
+  return context === "roster" || context === "teamGrid" || context === "lineupCandidate" || context === "tablePreview" || context == null;
 }

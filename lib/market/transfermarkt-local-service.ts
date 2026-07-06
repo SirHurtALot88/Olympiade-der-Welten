@@ -42,7 +42,7 @@ import {
   getScoutedTraitView,
 } from "@/lib/market/transfermarkt-scouting";
 import { getCanonicalSeasonLabel } from "@/lib/season/season-label";
-import { resolveSeasonOneMarketBuyBlocker } from "@/lib/season/transfer-season-policy";
+import { resolveSeasonOneMarketBuyBlocker, isSeasonOneDraftBuySource } from "@/lib/season/transfer-season-policy";
 import { recordFreeAgentFeed } from "@/lib/ai/transfer-window-profiler";
 import {
   applyTransferBudgetSpend,
@@ -974,6 +974,27 @@ function resolveTeamMarketBuySpendableCash(input: {
   });
 }
 
+function resolveTransferBuyAffordabilityCash(input: {
+  gameState: GameState;
+  teamId: string;
+  teamCash: number;
+  rosterBefore: number;
+  playerMin: number | null;
+  seasonId: string;
+  transferSource: string | null | undefined;
+}) {
+  if (input.gameState.season.id === "season-1" && isSeasonOneDraftBuySource(input.transferSource)) {
+    return input.teamCash;
+  }
+  return resolveTeamMarketBuySpendableCash({
+    gameState: input.gameState,
+    teamId: input.teamId,
+    teamCash: input.teamCash,
+    rosterBefore: input.rosterBefore,
+    playerMin: input.playerMin,
+  });
+}
+
 function resolveLocalTransfermarktBuyContext(params: TransfermarktBuyParams): LocalTransfermarktBuyContext {
   const runContext = getLocalRunContext(params);
   const save = runContext?.save ?? resolveLocalSave(params.saveId).save;
@@ -1068,12 +1089,14 @@ function resolveLocalTransfermarktBuyContext(params: TransfermarktBuyParams): Lo
   if (
     team &&
     purchasePrice != null &&
-    resolveTeamMarketBuySpendableCash({
+    resolveTransferBuyAffordabilityCash({
       gameState,
       teamId: params.teamId,
       teamCash: team.cash,
       rosterBefore,
       playerMin: teamContext?.playerMin ?? null,
+      seasonId: gameState.season.id,
+      transferSource: params.transferSource,
     }) < purchasePrice
   ) {
     blockingReasons.push("insufficient_cash");
@@ -2145,12 +2168,14 @@ function executeFastLocalTransfermarktBatchBuy(params: TransfermarktBuyParams, r
   if (
     team &&
     purchasePrice != null &&
-    resolveTeamMarketBuySpendableCash({
+    resolveTransferBuyAffordabilityCash({
       gameState,
       teamId: params.teamId,
       teamCash: team.cash,
       rosterBefore: rosterEntries.length,
       playerMin: teamIdentity?.playerMin ?? null,
+      seasonId: gameState.season.id,
+      transferSource: params.transferSource,
     }) < purchasePrice
   ) {
     blockingReasons.push("insufficient_cash");

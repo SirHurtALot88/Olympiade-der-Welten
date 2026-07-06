@@ -43,7 +43,7 @@ describe("explicit-slot-sequence", () => {
     });
     expect(sequence.filter((lane) => lane === "superstar")).toHaveLength(1);
     expect(sequence.filter((lane) => lane === "star").length).toBeGreaterThanOrEqual(1);
-    expect(sequence[0]).toBe("superstar");
+    expect(sequence[0]).toBe("core");
     expect(sequence.filter((lane) => lane === "depth").length).toBeGreaterThanOrEqual(3);
   });
 
@@ -79,6 +79,6 @@ describe("explicit-slot-sequence", () => {
       },
       10,
     );
-    expect(plan.slice(0, 4)).toEqual(["star", "core", "depth", "backup"]);
+    expect(plan.slice(0, 4)).toEqual(["core", "star", "depth", "backup"]);
   });
 });

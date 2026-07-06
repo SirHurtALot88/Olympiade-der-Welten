@@ -46,6 +46,16 @@ export async function POST(request: Request) {
       );
     }
 
+    const persisted = materialize
+      ? (persistence.getSaveById(save.saveId)?.gameState.seasonState.persistedSeasonDerivations as
+          | { marketValueByPlayerId?: Record<string, number> }
+          | null
+          | undefined)
+      : (save.gameState.seasonState.persistedSeasonDerivations as
+          | { marketValueByPlayerId?: Record<string, number> }
+          | null
+          | undefined);
+
     return NextResponse.json({
       ok: true,
       scope: {
@@ -57,6 +67,7 @@ export async function POST(request: Request) {
         ratings: derivations.ratingsById.size,
         performances: derivations.performanceByPlayerId.size,
         ledgerEntries: derivations.ledger.pointEntries.length,
+        marketValues: Object.keys(persisted?.marketValueByPlayerId ?? {}).length,
       },
       projection: projection
         ? {

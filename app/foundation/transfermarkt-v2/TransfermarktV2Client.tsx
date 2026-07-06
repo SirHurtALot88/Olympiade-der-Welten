@@ -2593,7 +2593,7 @@ export default function TransfermarktV2Client({
         <div className="market-v2-topbar-actions" />
       </section>
 
-      <section className="market-v2-filter-board">
+      <section className="market-v2-filter-board modern-game-sticky-filters">
         <div className="market-v2-filter-panel">
           <div className="market-v2-filter-head">
             <strong>Klassen</strong>
@@ -2866,16 +2866,38 @@ export default function TransfermarktV2Client({
         </div>
       ) : null}
 
-      <section className="market-v2-budget-strip">
-        <strong>{selectedTeam ? selectedTeam.name : "Liga-Überblick"}</strong>
-        <span className="is-cash">Cash {marketContext ? formatCompactNumber(marketContext.teamCash, 1) : "—"}</span>
-        <span className="is-salary">Gehalt {marketContext ? formatCompactNumber(marketContext.teamSalary, 1) : "—"}</span>
-        <span className="is-roster">
-          Kader {marketContext?.rosterCount ?? "—"} / {selectedTeam?.rosterLimit ?? "—"}
-        </span>
-        <span className="is-market">MW max {formatCompactNumber(valueSliderMax, 1)}</span>
-        <span className="is-salary">Gehalt max {formatCompactNumber(salarySliderMax, 1)}</span>
-        <span className="is-market">Ratio top {formatCompactNumber(ratioSliderMax, 1)}</span>
+      <section className="market-v2-budget-strip modern-game-decision-board market-v2-decision-board" data-testid="market-v2-decision-board">
+        <div className="modern-game-decision-board-head">
+          <div>
+            <span className="modern-game-decision-kicker">Transfer-Entscheidungen</span>
+            <p className="muted modern-game-decision-subtitle">{selectedTeam ? selectedTeam.name : "Liga-Überblick"}</p>
+          </div>
+        </div>
+        <div className="modern-game-decision-stats market-v2-decision-stats">
+          <article className="modern-game-decision-stat is-cash">
+            <span>Cash</span>
+            <strong>{marketContext ? formatCompactNumber(marketContext.teamCash, 1) : "—"}</strong>
+          </article>
+          <article className="modern-game-decision-stat is-info">
+            <span>Gehalt</span>
+            <strong>{marketContext ? formatCompactNumber(marketContext.teamSalary, 1) : "—"}</strong>
+          </article>
+          <article className="modern-game-decision-stat is-default">
+            <span>Kader</span>
+            <strong>{marketContext?.rosterCount ?? "—"} / {selectedTeam?.rosterLimit ?? "—"}</strong>
+            {rosterGapOpenCount != null && rosterGapOpenCount > 0 ? <small>{rosterGapOpenCount} Plätze offen</small> : null}
+          </article>
+          <article className="modern-game-decision-stat is-ready">
+            <span>Wunschliste</span>
+            <strong>{wishlistEntries.length}</strong>
+            <small>{scoutingPipelineCapacity ? `${scoutingActiveWishlistPlayerIds.length}/${scoutingPipelineCapacity.max} Scouting` : "Kandidaten"}</small>
+          </article>
+          <article className="modern-game-decision-stat is-warning">
+            <span>Filter aktiv</span>
+            <strong>{selectedClassNames.length + selectedRaceNames.length + selectedAxes.length}</strong>
+            <small>MW max {formatCompactNumber(valueSliderMax, 1)}</small>
+          </article>
+        </div>
       </section>
       <section className="market-v2-main-grid">
         <aside className="market-v2-candidate-rail">
@@ -2971,6 +2993,11 @@ export default function TransfermarktV2Client({
                     }
                     onOpen={() => onOpenPlayerDetails?.({ playerId: item.playerId })}
                   />
+                  <div className="market-v2-candidate-decision-chips" aria-hidden={!isSelected}>
+                    <span className="market-v2-candidate-chip is-value">Value {formatTransfermarktRatio(item.marketValueSalaryRatio)}</span>
+                    <span className={`market-v2-candidate-chip is-risk ${getToneClass(getNeedSignal(item).tone)}`}>Risiko {formatCompactNumber(item.needMatchScore ?? 0, 0)}</span>
+                    <span className="market-v2-candidate-chip is-salary">{formatTransfermarktCurrency(item.salary)}</span>
+                  </div>
                 </button>
               );
             })}
@@ -3431,6 +3458,31 @@ export default function TransfermarktV2Client({
             </span>
           ) : null}
 
+          <div className="market-v2-contract-segmented" role="group" aria-label="Vertragslänge" data-testid="market-v2-contract-segmented">
+            {[1, 2, 3].map((length) => (
+              <button
+                key={`contract-length-${length}`}
+                type="button"
+                className={`secondary-button inline-button${contractLength === length ? " is-selected" : ""}`}
+                onClick={() => setContractLength(length)}
+              >
+                {length} Saison{length === 1 ? "" : "en"}
+              </button>
+            ))}
+          </div>
+
+          <div className="market-v2-rejection-meter" data-testid="market-v2-rejection-meter" aria-label="Ablehnungsrisiko">
+            <span>Ablehnungsrisiko</span>
+            <div className="market-v2-rejection-meter-track">
+              <span
+                style={{
+                  width: `${Math.min(100, ((buyPreview?.blockingReasons?.length ?? 0) * 25 + (buyPreview?.warnings?.length ?? 0) * 10 + (buyPreview?.canBuy ? 0 : 35)))}%`,
+                }}
+              />
+            </div>
+            <small>{buyPreview?.canBuy ? "Deal wahrscheinlich" : buyPreview?.blockingReasons?.[0] ?? "Verhandlung nötig"}</small>
+          </div>
+
           <div className="market-v2-buy-summary">
             <div>
               <span>Ablöse</span>
@@ -3533,6 +3585,14 @@ export default function TransfermarktV2Client({
           ) : null}
         </aside>
       </section>
+
+      {selectedPlayer ? (
+        <div className="market-v2-mobile-preview-sheet" data-testid="market-v2-mobile-preview-sheet" aria-label="Mobile Spielervorschau">
+          <strong>{selectedPlayer.name}</strong>
+          <span>{formatTransfermarktCurrency(selectedPlayer.marketValue)} MW · {formatTransfermarktCurrency(selectedPlayer.salary)} Gehalt</span>
+          <span className="market-v2-candidate-chip is-value">Fit {selectedPlayer.fitDisplay}</span>
+        </div>
+      ) : null}
 
       <section className="market-v2-context-grid" aria-label="Team- und Wishlist-Kontext">
         <article className="market-v2-context-panel">

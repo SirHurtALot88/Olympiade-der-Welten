@@ -239,9 +239,36 @@ export function distributeSeason1LaneSpendCaps(input: {
   );
 
   if (sumSpendCaps > input.spendBudget + 0.01) {
-    const scale = input.spendBudget / sumSpendCaps;
-    for (const lane of SEASON1_DRAFT_LANES) {
-      spendCaps[lane] = roundValue(spendCaps[lane] * scale, 2);
+    const premiumLanes: Season1DraftLane[] = ["star", "superstar"];
+    const protectedTotal = premiumLanes.reduce((sum, lane) => {
+      const count = input.slotCounts[lane] ?? 0;
+      if (count <= 0) {
+        return sum;
+      }
+      const floor = (input.lanePriceFloors?.[lane] ?? 0) * count;
+      return sum + floor;
+    }, 0);
+    const scalableBudget = Math.max(input.spendBudget - protectedTotal, 0);
+    const scalableTotal = roundValue(sumSpendCaps - protectedTotal, 2);
+    if (scalableTotal > 0) {
+      const scale = scalableBudget / scalableTotal;
+      for (const lane of SEASON1_DRAFT_LANES) {
+        const count = input.slotCounts[lane] ?? 0;
+        if (count <= 0) {
+          continue;
+        }
+        if (premiumLanes.includes(lane)) {
+          const floor = (input.lanePriceFloors?.[lane] ?? 0) * count;
+          spendCaps[lane] = roundValue(Math.max(floor, spendCaps[lane]), 2);
+          continue;
+        }
+        spendCaps[lane] = roundValue(spendCaps[lane] * scale, 2);
+      }
+    } else {
+      const scale = input.spendBudget / sumSpendCaps;
+      for (const lane of SEASON1_DRAFT_LANES) {
+        spendCaps[lane] = roundValue(spendCaps[lane] * scale, 2);
+      }
     }
     sumSpendCaps = roundValue(
       SEASON1_DRAFT_LANES.reduce((sum, lane) => sum + spendCaps[lane], 0),

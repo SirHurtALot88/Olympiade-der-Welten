@@ -77,7 +77,7 @@ export default function MatchdayArenaPlayerCard({
         soc={soc}
         leagueHeatPools={createEmptyLeaguePlayerHeatPools()}
         variant="team"
-        context="arena"
+        context="arenaReveal"
         density={variant === "compact" ? "compact" : "full"}
         subMeta={[teamName, className].filter(Boolean).join(" · ")}
         highlight={badges[0] ?? null}

@@ -115,7 +115,8 @@ const LONG_RUN_SKIP_LINEUP_REAPPLY = process.env.OLY_LONG_RUN_SKIP_LINEUP_REAPPL
 const LONG_RUN_STOP_AFTER =
   process.env.OLY_LONG_RUN_STOP_AFTER === "draft" ||
   process.env.OLY_LONG_RUN_STOP_AFTER === "season_end" ||
-  process.env.OLY_LONG_RUN_STOP_AFTER === "preseason"
+  process.env.OLY_LONG_RUN_STOP_AFTER === "preseason" ||
+  process.env.OLY_LONG_RUN_STOP_AFTER === "pre_season_end"
     ? process.env.OLY_LONG_RUN_STOP_AFTER
     : null;
 const SUMMARY_ONLY = process.argv.includes("--summary-only");
@@ -1459,6 +1460,8 @@ function prepSeasonLineups(saveId: string, seasonId: string) {
       OLY_TARGET_SAVE_ID: saveId,
       OLY_TARGET_SEASON_ID: seasonId,
       OLY_EXPORT_PREFIX: `long-run-${seasonId}`,
+      OLY_AUTOPREP_OUTPUT_DIR:
+        process.env.OLY_AUTOPREP_OUTPUT_DIR ?? process.env.OLY_LONG_RUN_OUTPUT_DIR ?? path.join(PROJECT_ROOT, "outputs"),
     },
   });
 }
@@ -3393,6 +3396,12 @@ async function main() {
       itemCount: null,
       status: "ok",
     });
+    if (LONG_RUN_STOP_AFTER === "pre_season_end") {
+      console.error(
+        `[long-run] STOP_AFTER=pre_season_end — ${seasonId} MD${save.gameState.season.matchdayIds.length} abgeschlossen (vor season_end), Save \`${save.saveId}\`.`,
+      );
+      break;
+    }
     const seasonEnd = await applySeasonEnd(save.saveId, persistence);
     performanceRows.push(...seasonEnd.performanceRows);
     plannerFinalGateRows.push(...seasonEnd.plannerFinalGateRows);

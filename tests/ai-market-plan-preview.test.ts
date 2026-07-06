@@ -231,6 +231,9 @@ describe("ai market plan preview service", () => {
       seasonId: "season-1",
     });
 
+    expect(buildAiTransfermarktPreview).toHaveBeenCalledWith(
+      expect.objectContaining({ candidateScopeMode: "budget_wide" }),
+    );
     expect(result.readOnly).toBe(true);
     expect(result.totalTeams).toBe(2);
     expect(result.aiTeams).toBe(2);

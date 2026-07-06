@@ -1,6 +1,8 @@
 "use client";
 
+import { useEffect, useMemo, useState } from "react";
 import OptimizedMediaImage from "@/app/foundation/OptimizedMediaImage";
+import FoundationGameDecisionBoard from "@/components/foundation/modern-game/FoundationGameDecisionBoard";
 import FoundationPlayerPortraitCard from "@/components/foundation/player-portrait-card/FoundationPlayerPortraitCard";
 import type { HomeV2ClientProps, HomeV2TopPlayerCard } from "@/app/foundation/home-v2/home-v2-types";
 import { HOME_V2_TOP_PLAYER_COUNT } from "@/app/foundation/home-v2/home-v2-types";
@@ -22,7 +24,7 @@ function formatMoney(value: number | null | undefined) {
 }
 
 function getPlayerHighlightLabel(card: HomeV2TopPlayerCard) {
-  if (card.highlight === "prospect") return "Prospect";
+  if (card.highlight === "prospect") return "Talent";
   if (card.highlight === "top") return "Top";
   return null;
 }
@@ -82,6 +84,7 @@ export default function HomeV2Client({
   onOpenOffice,
   onOpenSeason,
   onOpenInbox,
+  onCompleteInboxItem,
   onOpenBoardObjectives,
   onOpenPlayer,
 }: HomeV2ClientProps) {
@@ -99,8 +102,12 @@ export default function HomeV2Client({
     }
   };
 
+  const relevantWarnings = warnings.filter(
+    (warning) => !["no_active_team", "season_started_no_results"].includes(warning),
+  );
+
   return (
-    <div className="home-v2-shell home-v2-shell-compact" data-testid="foundation-home-v2" id="foundation-home-v2">
+    <div className="home-v2-shell home-v2-shell-compact modern-game-shell" data-testid="foundation-home-v2" id="foundation-home-v2">
       <header className="home-v2-hero">
         <div className="home-v2-hero-main">
           {teamLogoUrl ? (
@@ -109,7 +116,9 @@ export default function HomeV2Client({
             <span className="home-v2-logo team-logo-placeholder">{teamLogoInitials}</span>
           )}
           <div className="home-v2-hero-copy">
+            <span className="eyebrow">{seasonName} · {matchdayLabel}</span>
             <h2>{teamName}</h2>
+            <p className="muted">{teamCode} · {controlModeLabel}</p>
           </div>
         </div>
         <div className="home-v2-hero-stats" aria-label="Team KPIs">
@@ -139,32 +148,50 @@ export default function HomeV2Client({
           </div>
         </div>
         <button type="button" className="primary-button home-v2-continue" onClick={onContinue}>
-          Weiter
+          Weiter · {nextStepLabel}
         </button>
       </header>
 
-      <div className="home-v2-signal-strip" aria-label="Heute">
-        {todayCards.map((card) => (
+      <FoundationGameDecisionBoard
+        title="Heute wichtig"
+        subtitle="Priorisiert nach Dringlichkeit — FM-Style Next Actions"
+        testId="home-v2-today-board"
+        stats={todayCards.map((card, index) => ({
+          id: card.key,
+          label: card.kicker,
+          value: card.title,
+          detail: card.detail,
+          tone: card.tone === "warning" ? "warning" : card.tone === "ready" ? "ready" : "info",
+        }))}
+        actions={
+          <button type="button" className="secondary-button inline-button" onClick={() => handleTodayCardClick(todayCards[0]?.key ?? "lineup")}>
+            Zum ersten Schritt
+          </button>
+        }
+      />
+
+      <div className="home-v2-signal-strip modern-game-today-chips" aria-label="Schnellaktionen">
+        {todayCards.map((card, index) => (
           <button
             key={card.key}
             type="button"
-            className={`home-v2-signal-chip is-${card.tone}`}
+            className={`home-v2-signal-chip is-${card.tone}${index === 0 ? " is-primary" : ""}`}
             onClick={() => handleTodayCardClick(card.key)}
             title={card.detail}
           >
-            <span>{card.kicker}</span>
+            <span>{index + 1}. {card.kicker}</span>
             <strong>{card.title}</strong>
           </button>
         ))}
-        {warnings.slice(0, 2).map((warning) => (
+        {relevantWarnings.slice(0, 1).map((warning) => (
           <span key={warning} className="home-v2-signal-chip is-warning is-static">
             <span>Hinweis</span>
-            <strong>{warning}</strong>
+            <strong>{warning.replaceAll("_", " ")}</strong>
           </span>
         ))}
       </div>
 
-      <nav className="home-v2-quick-nav" aria-label="Schnellzugriff">
+      <nav className="home-v2-quick-nav modern-game-quick-nav" aria-label="Schnellzugriff">
         <button type="button" className="home-v2-quick-link" onClick={onOpenLineup}>
           Einsatzliste
         </button>
@@ -187,7 +214,7 @@ export default function HomeV2Client({
           <div className="home-v2-panel-head">
             <span className="eyebrow">Kader</span>
             <h3>Top 6 Spieler</h3>
-            <p className="muted">Die sechs stärksten Kaderwerte — gleiche Logik wie Disziplin-Top-6 in der Rangtabelle.</p>
+            <p className="muted">Stärkste Kaderwerte — Karten wie in Teams & Einsatzliste.</p>
           </div>
           <div className="home-v2-player-grid">
             {topPlayers.length > 0 ? (
@@ -197,6 +224,7 @@ export default function HomeV2Client({
                   playerId={player.playerId}
                   name={player.name}
                   portraitUrl={player.portraitUrl}
+                  portraitPlaceholderUrl={player.portraitPlaceholderUrl}
                   portraitInitials={player.portraitInitials}
                   playerOvr={player.playerOvr}
                   playerMvs={player.playerMvs}
@@ -216,6 +244,7 @@ export default function HomeV2Client({
                   poRangeMin={player.poRangeMin}
                   poRangeMax={player.poRangeMax}
                   variant="home"
+                  context="teamGrid"
                   onOpen={() => onOpenPlayer(player.playerId)}
                   title={`${player.name} öffnen · Top-6 Kader #${index + 1}`}
                 />
@@ -227,13 +256,13 @@ export default function HomeV2Client({
         </section>
 
         <aside className="home-v2-side-stack">
-          <section className="home-v2-panel home-v2-next-panel">
+          <section className="home-v2-panel home-v2-next-panel modern-game-next-panel">
             <div className="home-v2-panel-head">
-              <span className="eyebrow">Next Play</span>
+              <span className="eyebrow">Nächster Zug</span>
               <h3 title={nextStepStatus}>{nextStepLabel}</h3>
             </div>
             <span className={`transfer-status-pill ${getNextStepToneClass(nextStepStatus)}`}>{nextStepStatus}</span>
-            <p className="muted">Nutze „Weiter“ oben, um direkt hierhin zu springen.</p>
+            <p className="muted">„Weiter“ oben springt direkt zur empfohlenen Aktion.</p>
           </section>
 
           <section className="home-v2-panel home-v2-board-panel">
@@ -280,13 +309,26 @@ export default function HomeV2Client({
               </div>
               <ul className="home-v2-inbox-list">
                 {inboxItems.slice(0, 3).map((item) => (
-                  <li key={item.id}>
+                  <li key={item.id} className="home-v2-inbox-row">
                     <button type="button" className="home-v2-inbox-item" onClick={onOpenInbox}>
                       <span className={`foundation-warning-dot is-${item.severity}`} aria-hidden="true" />
                       <span>
                         <strong>{item.title}</strong>
+                        {item.detail ? <small className="muted">{item.detail}</small> : null}
                       </span>
                     </button>
+                    {onCompleteInboxItem ? (
+                      <button
+                        type="button"
+                        className="home-v2-inbox-checkoff"
+                        data-testid={`home-v2-inbox-checkoff-${item.id}`}
+                        aria-label={`${item.title} erledigt`}
+                        title="Als erledigt abhaken"
+                        onClick={() => onCompleteInboxItem(item.id)}
+                      >
+                        ✓
+                      </button>
+                    ) : null}
                   </li>
                 ))}
               </ul>
@@ -299,7 +341,7 @@ export default function HomeV2Client({
           {facilities.length > 0 ? (
             <section className="home-v2-panel home-v2-facilities-panel is-compact">
               <div className="home-v2-panel-head">
-                <span className="eyebrow">Facilities</span>
+                <span className="eyebrow">Gebäude</span>
                 <h3>Infrastruktur</h3>
               </div>
               <div className="home-v2-facility-row">

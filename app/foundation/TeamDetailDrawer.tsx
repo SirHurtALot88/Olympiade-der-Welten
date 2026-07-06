@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo } from "react";
+import { useEffect, useMemo, useState } from "react";
 
 import { getGameTermTooltip } from "@/components/ui/GameTerm";
 import TeamDrawerHistoryTable from "@/components/foundation/team-drawer/TeamDrawerHistoryTable";
@@ -380,6 +380,7 @@ export default function TeamDetailDrawer({
     [data?.players],
   );
   const resolvedHeatPools = leagueHeatPools ?? createEmptyLeaguePlayerHeatPools();
+  const [drawerTab, setDrawerTab] = useState<"overview" | "roster" | "transfers">("overview");
 
   const teamSummary = useMemo(() => {
     const players = data?.players ?? [];
@@ -404,6 +405,26 @@ export default function TeamDetailDrawer({
 
   const profileBody = (
         <div className={`player-drawer-body team-drawer-body${variant === "page" ? " team-profile-body" : ""}`}>
+          <div className="team-drawer-tab-row" data-testid="team-drawer-tabs" role="tablist" aria-label="Teamdrawer Bereiche">
+            {[
+              { id: "overview" as const, label: "Überblick" },
+              { id: "roster" as const, label: "Kader" },
+              { id: "transfers" as const, label: "Transfers" },
+            ].map((tab) => (
+              <button
+                key={tab.id}
+                type="button"
+                role="tab"
+                aria-selected={drawerTab === tab.id}
+                className={`secondary-button inline-button${drawerTab === tab.id ? " is-active" : ""}`}
+                onClick={() => setDrawerTab(tab.id)}
+              >
+                {tab.label}
+              </button>
+            ))}
+          </div>
+          {drawerTab === "overview" ? (
+          <>
           <section className="player-drawer-section player-drawer-hero-surface team-drawer-dashboard">
             <div className="team-drawer-dashboard-grid">
               <article className="team-drawer-identity-card">
@@ -438,6 +459,18 @@ export default function TeamDetailDrawer({
                   <strong>{formatNumber(data.marketValueTotal, 2)}</strong>
                 </article>
               </div>
+              {data.relationships.rivals[0] ? (
+                <article className="team-drawer-duel-card" data-testid="team-drawer-duel-card">
+                  <span className="eyebrow">Duell</span>
+                  <strong>
+                    {data.shortCode} vs {data.relationships.rivals[0].shortCode}
+                  </strong>
+                  <small className="muted">
+                    Rivalität {formatNumber(data.relationships.rivals[0].value, 1)}
+                    {data.relationships.rivals[0].changeLabel ? ` · ${data.relationships.rivals[0].changeLabel}` : ""}
+                  </small>
+                </article>
+              ) : null}
             </div>
           </section>
 
@@ -554,7 +587,10 @@ export default function TeamDetailDrawer({
               </div>
             ) : null}
           </section>
+          </>
+          ) : null}
 
+          {drawerTab === "roster" ? (
           <section className="player-drawer-section team-drawer-roster-section">
             <div className="team-drawer-card-grid team-portraits-grid">
               {visiblePlayers.map((player) => (
@@ -621,7 +657,29 @@ export default function TeamDetailDrawer({
               {visiblePlayers.length === 0 ? <p className="muted">Keine Spieler im Kader.</p> : null}
             </div>
           </section>
+          ) : null}
 
+          {drawerTab === "transfers" ? (
+          <>
+          {(() => {
+            const liveHistory = data.history.find((row) => row.isLive) ?? data.history[0] ?? null;
+            return liveHistory ? (
+              <section className="player-drawer-section team-drawer-transfer-section" data-testid="team-drawer-transfer-tab">
+                <div className="team-drawer-transfer-cards">
+                  <article className="team-drawer-transfer-card">
+                    <span>Top-Kauf</span>
+                    <strong>{liveHistory.topBuyPlayer ?? "—"}</strong>
+                    <small>{liveHistory.topBuyAmount != null ? formatNumber(liveHistory.topBuyAmount, 1) : "—"}</small>
+                  </article>
+                  <article className="team-drawer-transfer-card">
+                    <span>Top-Verkauf</span>
+                    <strong>{liveHistory.topSellPlayer ?? "—"}</strong>
+                    <small>{liveHistory.topSellAmount != null ? formatNumber(liveHistory.topSellAmount, 1) : "—"}</small>
+                  </article>
+                </div>
+              </section>
+            ) : null;
+          })()}
           <section className="player-drawer-section player-drawer-panel team-drawer-history-section">
             <div className="team-drawer-section-head">
               <div>
@@ -708,6 +766,8 @@ export default function TeamDetailDrawer({
               <p className="muted">Noch keine archivierten Team-Saisons vorhanden.</p>
             )}
           </section>
+          </>
+          ) : null}
         </div>
   );
 

@@ -968,3 +968,23 @@ describe("ai needs picks compare service", () => {
     expect(team.plannedPicks[0]?.playerName).toBeTruthy();
   });
 });
+
+describe("colorspam penalty", () => {
+  it("ramps linearly −4 per card from the 6th onward", async () => {
+    const { computeColorspamPenalty } = await import("@/lib/ai/ai-needs-picks-compare-service");
+    expect(computeColorspamPenalty(3)).toBe(0);
+    expect(computeColorspamPenalty(4)).toBe(0);
+    expect(computeColorspamPenalty(5)).toBe(-4);
+    expect(computeColorspamPenalty(6)).toBe(-8);
+    expect(computeColorspamPenalty(7)).toBe(-12);
+    expect(computeColorspamPenalty(8)).toBe(-16);
+    expect(computeColorspamPenalty(9)).toBe(-20);
+  });
+
+  it("applies the same linear ramp for identity-primary colors", async () => {
+    const { computeColorspamPenalty } = await import("@/lib/ai/ai-needs-picks-compare-service");
+    expect(computeColorspamPenalty(4, { identityPrimaryColor: true })).toBe(0);
+    expect(computeColorspamPenalty(6, { identityPrimaryColor: true })).toBe(-8);
+    expect(computeColorspamPenalty(7, { identityPrimaryColor: true })).toBe(-12);
+  });
+});

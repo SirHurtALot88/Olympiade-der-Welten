@@ -515,7 +515,7 @@ export default function FoundationMarketSellShellHost({
                 <p className="muted">{marketSellPreview.coaching.strategyFitSummary}</p>
                 <div className="metric-grid compact transfer-sell-metric-grid">
                   <article className="metric-card">
-                    <span>AI-Empfehlung</span>
+                    <span>Auto-Empfehlung</span>
                     <strong>{marketSellPreview.coaching.sellDecisionLabel ?? "—"}</strong>
                     <small>Prioritaet {marketSellPreview.coaching.sellPriority ?? "—"}</small>
                   </article>

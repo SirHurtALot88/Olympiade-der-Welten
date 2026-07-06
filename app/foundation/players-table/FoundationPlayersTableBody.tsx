@@ -223,7 +223,8 @@ export default function FoundationPlayersTableBody({
                           {portrait.src ? (
                             <BudgetedMediaImage
                               className="transfermarkt-portrait"
-                              src={portrait.thumbSrc ?? portrait.src}
+                              src={portrait.src}
+                              placeholderSrc={portrait.previewSrc ?? portrait.thumbSrc}
                               alt={row.player.name}
                               width={56}
                               height={56}

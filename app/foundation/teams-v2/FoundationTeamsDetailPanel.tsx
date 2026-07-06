@@ -12,6 +12,7 @@ import { TooltipHeading } from "@/components/ui/TooltipHeading";
 import BudgetedMediaImage from "@/components/foundation/BudgetedMediaImage";
 import FoundationPlayerPortraitPreview from "@/components/foundation/player-portrait-card/FoundationPlayerPortraitPreview";
 import { formatContractShapeShortLabel, rosterSalariesDifferForDisplay } from "@/lib/foundation/player-economy-contract";
+import { formatPlayerIdentitySubMeta } from "@/lib/foundation/player-identity-meta";
 import TeamDrawerHistoryTable from "@/components/foundation/team-drawer/TeamDrawerHistoryTable";
 import { isSeasonDisciplineKey } from "@/lib/season/season-discipline-area-groups";
 import { TEAM_BOARD_PRESSURE_TOOLTIP, TEAM_BOARD_RATING_TOOLTIP } from "@/lib/foundation/team-board-tooltips";
@@ -431,7 +432,7 @@ function FoundationTeamsDetailPanel({
                     <p className="eyebrow">{selectedTeamDetailTab === "portraits" ? "Kaderprofil" : "Team Fokus"}</p>
                     <h2>
                       {selectedTeam.name}
-                      {selectedTeamDetailTab === "portraits" ? "" : selectedTeamDetailTab === "contracts" ? " · Verträge" : " · Kader"}
+                      {selectedTeamDetailTab === "portraits" ? "" : selectedTeamDetailTab === "contracts" ? " · Verträge" : selectedTeamDetailTab === "transfer" ? " · Transfers" : " · Kader"}
                     </h2>
                     </div>
                   </div>
@@ -552,7 +553,7 @@ function FoundationTeamsDetailPanel({
                                             soc={player.coreStats.soc ?? null}
                                             leagueHeatPools={leaguePlayerHeatPools}
                                             variant="team"
-                                            context="roster"
+                                            context="teamGrid"
                                             roleTag={entry.roleTag}
                                             playerClassName={player.className}
                                           >
@@ -579,7 +580,7 @@ function FoundationTeamsDetailPanel({
                                   }
                                   if (column.id === "name") {
                                     return (
-                                      <td key={column.id}>
+                                      <td key={column.id} className="teams-v2-name-cell is-sticky-actions">
                                         <div className="table-player-cell">
                                           <button
                                             className="table-link-button"
@@ -591,12 +592,14 @@ function FoundationTeamsDetailPanel({
                                           >
                                             {player.name}
                                           </button>
-                                          <span>{entry.roleTag}</span>
+                                          <small className="muted table-player-identity">{formatPlayerIdentitySubMeta(player)}</small>
                                           {selectedTeamRosterActionsAvailable ? (
-                                            <div className="transfermarkt-inline-actions">
+                                            <div className="transfermarkt-inline-actions teams-v2-row-icon-actions">
                                               <button
-                                                className="secondary-button inline-button"
+                                                className="table-icon-button"
                                                 type="button"
+                                                title="Verkaufen"
+                                                aria-label={`${player.name} verkaufen`}
                                                 disabled={marketSellBusy}
                                                 onClick={(event) => {
                                                   event.stopPropagation();
@@ -610,12 +613,14 @@ function FoundationTeamsDetailPanel({
                                                   }, selectedTeam?.teamId);
                                                 }}
                                               >
-                                                Verkaufen
+                                                ⇄
                                               </button>
                                               {isContractExpiring && selectedTeam ? (
                                                 <button
-                                                  className="secondary-button inline-button"
+                                                  className="table-icon-button"
                                                   type="button"
+                                                  title="Verlängern"
+                                                  aria-label={`${player.name} verlängern`}
                                                   disabled={contractRenewalBusy != null}
                                                   onClick={(event) => {
                                                     event.stopPropagation();
@@ -627,7 +632,7 @@ function FoundationTeamsDetailPanel({
                                                     });
                                                   }}
                                                 >
-                                                  Verlängern
+                                                  ↻
                                                 </button>
                                               ) : null}
                                             </div>
@@ -846,6 +851,72 @@ function FoundationTeamsDetailPanel({
                     portraitAvgSalary={portraitAvgSalary}
                     contractExpiringCount={portraitExpiringCount}
                   />
+                ) : selectedTeamDetailTab === "transfer" ? (
+                  <div className="teams-v2-transfer-tab" data-testid="teams-v2-transfer-tab">
+                    <div className="teams-v2-finance-role-cards">
+                      <article className="metric-card teams-v2-role-card">
+                        <span>Cash</span>
+                        <strong>{selectedStandingRow?.cash != null ? formatMoney(selectedStandingRow.cash) : "—"}</strong>
+                      </article>
+                      <article className="metric-card teams-v2-role-card">
+                        <span>Gehalt</span>
+                        <strong>{selectedStandingRow?.salaryTotal != null ? formatLocalePoints(selectedStandingRow.salaryTotal, 2) : "—"}</strong>
+                      </article>
+                      <article className="metric-card teams-v2-role-card">
+                        <span>GuV</span>
+                        <strong className={selectedStandingRow?.guv != null && selectedStandingRow.guv < 0 ? "text-negative" : "text-positive"}>
+                          {selectedStandingRow?.guv != null ? formatSignedDisplayMoney(selectedStandingRow.guv) : "—"}
+                        </strong>
+                      </article>
+                    </div>
+                    {(() => {
+                      const liveHistory = selectedTeamsHistoryData?.history?.find((row) => row.isLive) ?? selectedTeamsHistoryData?.history?.[0] ?? null;
+                      const duelRival = sortedTeamsViewRows?.find(
+                        (row) => row.teamId !== selectedTeam.teamId && row.rank != null && selectedStandingRow?.rank != null && Math.abs(row.rank - selectedStandingRow.rank) <= 2,
+                      ) ?? null;
+                      return (
+                        <>
+                          {duelRival ? (
+                            <article className="teams-v2-duel-card" data-testid="teams-v2-duel-card">
+                              <span className="eyebrow">Duell</span>
+                              <strong>
+                                #{selectedStandingRow?.rank ?? "—"} {selectedTeam.shortCode} vs #{duelRival.rank ?? "—"} {duelRival.shortCode}
+                              </strong>
+                              <small className="muted">
+                                {formatLocalePoints(selectedStandingRow?.points ?? 0, 1)} vs {formatLocalePoints(duelRival.points ?? 0, 1)} Punkte
+                              </small>
+                            </article>
+                          ) : null}
+                          <div className="teams-v2-transfer-cards">
+                            <article className="teams-v2-transfer-card">
+                              <span>Top-Kauf</span>
+                              <strong>
+                                {liveHistory?.topBuyPlayer ? (
+                                  <button type="button" className="table-link-button" onClick={() => liveHistory.topBuyPlayerId && void openPlayerDrawerById(liveHistory.topBuyPlayerId)}>
+                                    {liveHistory.topBuyPlayer} · {formatNullableMoney(liveHistory.topBuyAmount)}
+                                  </button>
+                                ) : (
+                                  "—"
+                                )}
+                              </strong>
+                            </article>
+                            <article className="teams-v2-transfer-card">
+                              <span>Top-Verkauf</span>
+                              <strong>
+                                {liveHistory?.topSellPlayer ? (
+                                  <button type="button" className="table-link-button" onClick={() => liveHistory.topSellPlayerId && void openPlayerDrawerById(liveHistory.topSellPlayerId)}>
+                                    {liveHistory.topSellPlayer} · {formatNullableMoney(liveHistory.topSellAmount)}
+                                  </button>
+                                ) : (
+                                  "—"
+                                )}
+                              </strong>
+                            </article>
+                          </div>
+                        </>
+                      );
+                    })()}
+                  </div>
                 ) : (
                   <div className="team-contracts-layout">
                     <div className="team-contracts-summary-grid">
@@ -1528,7 +1599,7 @@ function FoundationTeamsDetailPanel({
                           leagueHeatPools={leaguePlayerHeatPools}
                           variant="team"
                           className={getClassColorClassName(player.className, "player-card-class-frame")}
-                          subMeta={`${entry.roleTag ?? "Starter"} · ${player.className ?? "—"} · ${player.race ?? "—"}`}
+                          subMeta={formatPlayerIdentitySubMeta(player) || null}
                           onOpen={() => void openPlayerDrawerById(player.id, entry.id)}
                           title="Spielerprofil öffnen"
                           economyStats={[
@@ -1589,7 +1660,7 @@ function FoundationTeamsDetailPanel({
                           leagueHeatPools={leaguePlayerHeatPools}
                           variant="team"
                           className={getClassColorClassName(player.className, "player-card-class-frame")}
-                          subMeta={`${entry.roleTag ?? "Bank"} · ${player.className ?? "—"} · ${player.race ?? "—"}`}
+                          subMeta={formatPlayerIdentitySubMeta(player) || null}
                           onOpen={() => void openPlayerDrawerById(player.id, entry.id)}
                           title="Spielerprofil öffnen"
                           economyStats={[

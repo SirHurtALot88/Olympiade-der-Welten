@@ -8271,6 +8271,7 @@ export function useFoundationShellRouterBodyScope({
         detail: homeNextMatchdayStatus.openSlots > 0 ? "erst Team setzen" : "direkt Arena spielen",
         tone: homeNextMatchdayStatus.openSlots > 0 ? "warning" : "ready",
         view: homeNextMatchdayStatus.openSlots > 0 ? "lineup" : "matchdayArena",
+        urgency: homeNextMatchdayStatus.openSlots > 0 ? 0 : 2,
       },
       {
         key: "team",
@@ -8279,6 +8280,7 @@ export function useFoundationShellRouterBodyScope({
         detail: selectedStandingRow?.points != null ? `${formatLocalePoints(selectedStandingRow.points, 1)} Punkte` : "Roster & Finanzen",
         tone: "info",
         view: "teams",
+        urgency: 3,
       },
       {
         key: "tasks",
@@ -8291,8 +8293,9 @@ export function useFoundationShellRouterBodyScope({
             ? "info"
             : "ready",
         view: homeTasks.length > 0 ? "inboxV2" : "home",
+        urgency: homeTasks.some((task) => task.severity === "critical") ? 1 : homeTasks.length > 0 ? 4 : 5,
       },
-    ];
+    ].sort((left, right) => left.urgency - right.urgency);
     },
     [homeNextMatchdayStatus.openSlots, homeTasks, selectedStandingRow?.points, selectedStandingRow?.rank, shouldBuildHomeV2Overview],
   );

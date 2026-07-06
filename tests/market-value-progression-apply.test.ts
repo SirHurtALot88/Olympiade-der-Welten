@@ -103,7 +103,7 @@ function createGameState(players: Player[]): GameState {
 }
 
 describe("market value progression apply", () => {
-  it("updates stored market values from league-wide rank table after attribute improvements", () => {
+  it("updates stored market values from league-wide rank table after discipline improvements", () => {
     const baseline = createGameState([
       createPlayer("player-a", { tdm: 55, fechten: 50, hockey: 52 }, 12, { power: 55, speed: 55, dexterity: 55 }),
       createPlayer("player-b", { tdm: 54, fechten: 49, hockey: 51 }, 11.5, { power: 54, speed: 54, dexterity: 54 }),
@@ -113,11 +113,11 @@ describe("market value progression apply", () => {
     const improvedPlayer = baseline.players.find((player) => player.id === "player-b")!;
     const boosted = {
       ...improvedPlayer,
-      attributeSheetStats: {
-        ...improvedPlayer.attributeSheetStats!,
-        power: 72,
-        speed: 72,
-        dexterity: 72,
+      disciplineRatings: {
+        ...improvedPlayer.disciplineRatings,
+        tdm: 72,
+        fechten: 70,
+        hockey: 71,
       },
     };
     const improvedState = applyRankTableMarketValuesToGameState({
@@ -136,10 +136,10 @@ describe("market value progression apply", () => {
     expect(afterPlayer.marketValue).not.toBe(improvedPlayer.marketValue);
   });
 
-  it("ranks market value by raw attribute sums, not display discipline stats alone", () => {
+  it("ranks market value by discipline display stats", () => {
     const gameState = createGameState([
-      createPlayer("player-strong", { tdm: 30 }, 10, { power: 80, speed: 80, dexterity: 80 }),
-      createPlayer("player-weak-display", { tdm: 95 }, 10, { power: 45, speed: 45, dexterity: 45 }),
+      createPlayer("player-strong", { tdm: 80 }, 10, { power: 45, speed: 45, dexterity: 45 }),
+      createPlayer("player-weak-display", { tdm: 30 }, 10, { power: 80, speed: 80, dexterity: 80 }),
     ]);
     const marketValues = buildRankTableMarketValueMap(gameState);
     expect(marketValues.get("player-strong")).toBeGreaterThan(marketValues.get("player-weak-display") ?? 0);
@@ -149,11 +149,11 @@ describe("market value progression apply", () => {
     const player = createPlayer("player-a", { tdm: 55, fechten: 50, hockey: 52 }, 99, { power: 54, speed: 54, dexterity: 54 });
     const boosted = {
       ...player,
-      attributeSheetStats: {
-        ...player.attributeSheetStats!,
-        power: 72,
-        speed: 72,
-        dexterity: 72,
+      disciplineRatings: {
+        ...player.disciplineRatings,
+        tdm: 72,
+        fechten: 70,
+        hockey: 71,
       },
     };
     const gameState = createGameState([
@@ -184,11 +184,11 @@ describe("market value progression apply", () => {
         player.id === "player-a"
           ? {
               ...player,
-              attributeSheetStats: {
-                ...player.attributeSheetStats!,
-                power: 72,
-                speed: 72,
-                dexterity: 72,
+              disciplineRatings: {
+                ...player.disciplineRatings,
+                tdm: 72,
+                fechten: 70,
+                hockey: 71,
               },
             }
           : player,

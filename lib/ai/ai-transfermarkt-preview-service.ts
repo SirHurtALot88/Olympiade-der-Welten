@@ -24,6 +24,7 @@ import {
   normalizeTransfermarktToken,
 } from "@/lib/market/transfermarkt-fit";
 import { createPersistenceService } from "@/lib/persistence/persistence-service";
+import { ensureLeagueMarketValueSnapshot } from "@/lib/player-formulas/market-value-apply";
 import {
   annotateBuyRecommendations,
   loadDoctrineContext,
@@ -1112,7 +1113,7 @@ async function resolvePreviewContext(params: AiTransferPreviewParams): Promise<R
       source,
       saveId: runContext.save.saveId,
       seasonId: runContext.save.gameState.season.id,
-      gameState: normalizeGameState(runContext.save.gameState),
+      gameState: normalizeGameState(ensureLeagueMarketValueSnapshot(runContext.save.gameState)),
       localRunContext: runContext,
     };
   }
@@ -1136,7 +1137,7 @@ async function resolvePreviewContext(params: AiTransferPreviewParams): Promise<R
     source,
     saveId: save.saveId,
     seasonId: save.gameState.season.id,
-    gameState: normalizeGameState(save.gameState),
+    gameState: normalizeGameState(ensureLeagueMarketValueSnapshot(save.gameState)),
     localRunContext: createLocalTransfermarktRunContext({ persistence, save }),
   };
 }

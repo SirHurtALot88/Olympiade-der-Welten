@@ -121,6 +121,50 @@ export default function FormBoardPanel({
     return { filledCells, totalCells };
   }, [context?.formCardPlans, matchdayOptions.length]);
 
+  function cellAcceptsDraggedCard(input: {
+    matchdayId: string;
+    disciplineSide: "d1" | "d2";
+    slot: "primary" | "secondary";
+    disciplineColor: LegacyFormCardOption["color"] | null;
+  }) {
+    if (!draggedCardId) {
+      return false;
+    }
+    const allowed = new Set(
+      getFormBoardCardOptions(input.matchdayId, input.disciplineSide, input.slot, input.disciplineColor).map((entry) => entry.id),
+    );
+    return allowed.has(draggedCardId);
+  }
+
+  function getDragOverClassName(
+    cellId: string,
+    input: {
+      matchdayId: string;
+      disciplineSide: "d1" | "d2";
+      slot: "primary" | "secondary";
+      disciplineColor: LegacyFormCardOption["color"] | null;
+    },
+  ) {
+    if (dragOverCellId !== cellId || !draggedCardId) {
+      return "";
+    }
+    return cellAcceptsDraggedCard(input) ? " is-drag-over" : " is-drag-invalid";
+  }
+
+  function handleDragOverCell(
+    event: DragEvent<HTMLButtonElement>,
+    cellId: string,
+    input: {
+      matchdayId: string;
+      disciplineSide: "d1" | "d2";
+      slot: "primary" | "secondary";
+      disciplineColor: LegacyFormCardOption["color"] | null;
+    },
+  ) {
+    event.preventDefault();
+    setDragOverCellId(cellId);
+    event.dataTransfer.dropEffect = cellAcceptsDraggedCard(input) ? "copy" : "none";
+  }
   function handleDropOnCell(
     event: DragEvent<HTMLButtonElement>,
     input: {
@@ -384,12 +428,21 @@ export default function FormBoardPanel({
                           <button
                             type="button"
                             data-form-board-cell-id={`${entry.matchdayId}:${disciplineSide}:primary`}
-                            className={`legacy-lineup-form-board-pick is-primary${isPrimaryActive ? " is-active" : ""}${selectedCard ? ` is-${selectedCard.color}` : ""}${dragOverCellId === `${entry.matchdayId}:${disciplineSide}:primary` ? " is-drag-over" : ""}`}
+                            className={`legacy-lineup-form-board-pick is-primary${isPrimaryActive ? " is-active" : ""}${selectedCard ? ` is-${selectedCard.color}` : ""}${getDragOverClassName(`${entry.matchdayId}:${disciplineSide}:primary`, {
+                              matchdayId: entry.matchdayId,
+                              disciplineSide,
+                              slot: "primary",
+                              disciplineColor,
+                            })}`}
                             disabled={isReadOnly || formCardPlanPendingKey === pendingKey || !slot}
-                            onDragOver={(event) => {
-                              event.preventDefault();
-                              setDragOverCellId(`${entry.matchdayId}:${disciplineSide}:primary`);
-                            }}
+                            onDragOver={(event) =>
+                              handleDragOverCell(event, `${entry.matchdayId}:${disciplineSide}:primary`, {
+                                matchdayId: entry.matchdayId,
+                                disciplineSide,
+                                slot: "primary",
+                                disciplineColor,
+                              })
+                            }
                             onDragLeave={() => setDragOverCellId(null)}
                             onDrop={(event) =>
                               handleDropOnCell(event, {
@@ -416,12 +469,21 @@ export default function FormBoardPanel({
                           <button
                             type="button"
                             data-form-board-cell-id={`${entry.matchdayId}:${disciplineSide}:secondary`}
-                            className={`legacy-lineup-form-board-pick is-secondary${isSecondaryActive ? " is-active" : ""}${selectedBonusCard ? ` is-${selectedBonusCard.color}` : ""}${dragOverCellId === `${entry.matchdayId}:${disciplineSide}:secondary` ? " is-drag-over" : ""}`}
+                            className={`legacy-lineup-form-board-pick is-secondary${isSecondaryActive ? " is-active" : ""}${selectedBonusCard ? ` is-${selectedBonusCard.color}` : ""}${getDragOverClassName(`${entry.matchdayId}:${disciplineSide}:secondary`, {
+                              matchdayId: entry.matchdayId,
+                              disciplineSide,
+                              slot: "secondary",
+                              disciplineColor,
+                            })}`}
                             disabled={isReadOnly || formCardPlanPendingKey === pendingKey || !slot}
-                            onDragOver={(event) => {
-                              event.preventDefault();
-                              setDragOverCellId(`${entry.matchdayId}:${disciplineSide}:secondary`);
-                            }}
+                            onDragOver={(event) =>
+                              handleDragOverCell(event, `${entry.matchdayId}:${disciplineSide}:secondary`, {
+                                matchdayId: entry.matchdayId,
+                                disciplineSide,
+                                slot: "secondary",
+                                disciplineColor,
+                              })
+                            }
                             onDragLeave={() => setDragOverCellId(null)}
                             onDrop={(event) =>
                               handleDropOnCell(event, {

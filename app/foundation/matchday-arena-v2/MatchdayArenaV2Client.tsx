@@ -66,6 +66,7 @@ type MatchdayArenaV2ClientProps = {
   onBackToLineup?: (() => void) | null;
   onOpenMatchdayResult?: (() => void) | null;
   onOpenSeason?: (() => void) | null;
+  onOpenTraining?: (() => void) | null;
 };
 
 type ArenaLabOptions = {
@@ -829,6 +830,19 @@ export default function MatchdayArenaV2Client(props: MatchdayArenaV2ClientProps)
   const [boardScrollTop, setBoardScrollTop] = useState(0);
   const [boardViewportHeight, setBoardViewportHeight] = useState(560);
   const [showArenaHandoffBanner, setShowArenaHandoffBanner] = useState(false);
+  const [arenaShowAllTeams, setArenaShowAllTeams] = useState(false);
+  const [broadcastFocusMode, setBroadcastFocusMode] = useState(false);
+
+  const handleBackToLineup = useCallback(() => {
+    if (typeof window !== "undefined") {
+      const openSlots = Math.max(0, (context?.matchdayContract?.discipline1?.requiredPlayers ?? 0) + (context?.matchdayContract?.discipline2?.requiredPlayers ?? 0));
+      window.sessionStorage.setItem(
+        "lineup-v2-return-focus",
+        JSON.stringify({ matchdayId: params.matchdayId, teamId: params.teamId, openSlotsHint: openSlots }),
+      );
+    }
+    props.onBackToLineup?.();
+  }, [context?.matchdayContract?.discipline1?.requiredPlayers, context?.matchdayContract?.discipline2?.requiredPlayers, params.matchdayId, params.teamId, props.onBackToLineup]);
 
   useEffect(() => {
     if (typeof window === "undefined") {
@@ -2086,9 +2100,10 @@ export default function MatchdayArenaV2Client(props: MatchdayArenaV2ClientProps)
   );
 
   const isFocusedBoardMode = loadStage === "ready" && effectiveBoardMode !== "total";
+  const isArenaFocusedTenTeamView = isFocusedBoardMode && !arenaShowAllTeams;
   const visibleBoardRows = useMemo(
-    () => (isFocusedBoardMode ? buildFocusedArenaBoardRows(boardRows, params.teamId) : boardRows),
-    [boardRows, isFocusedBoardMode, params.teamId],
+    () => (isArenaFocusedTenTeamView ? buildFocusedArenaBoardRows(boardRows, params.teamId) : boardRows),
+    [boardRows, isArenaFocusedTenTeamView, params.teamId],
   );
 
   const arenaAct: ArenaAct =
@@ -2668,7 +2683,7 @@ export default function MatchdayArenaV2Client(props: MatchdayArenaV2ClientProps)
           return (
           <article
             key={`${disciplineLabel}-${entry.playerId}-${entry.slotIndex}`}
-            className={`arena-v2-slot-card is-compact is-tier-${getArenaFocusEntryCardTier(entry, entryRankPools)}${entry.isCaptain ? " is-captain" : ""}`}
+            className={`arena-v2-slot-card is-compact is-tier-${getArenaFocusEntryCardTier(entry, entryRankPools)}${entry.isCaptain ? " is-captain" : ""}${revealEventActive ? " is-arena-slot-pulse" : ""}${entry.rankInSlotBase === 1 ? " is-slot-winner" : ""}`}
             role={entry.activePlayerId ? "button" : undefined}
             tabIndex={entry.activePlayerId ? 0 : undefined}
             onClick={() => entry.activePlayerId && props.onOpenPlayerDetails?.({ playerId: entry.playerId, activePlayerId: entry.activePlayerId })}
@@ -2789,7 +2804,7 @@ export default function MatchdayArenaV2Client(props: MatchdayArenaV2ClientProps)
   };
 
   return (
-    <div className={`arena-v2-shell is-act-${arenaAct}${isArenaEventMode ? " is-event-mode" : ""}${isFocusedBoardMode ? " is-focused-board" : ""}`}>
+    <div className={`arena-v2-shell is-act-${arenaAct}${isArenaEventMode ? " is-event-mode" : ""}${isFocusedBoardMode ? " is-focused-board" : ""}${broadcastFocusMode ? " is-broadcast-mode" : ""}`}>
       {showArenaHandoffBanner ? (
         <div className="arena-v2-handoff-banner" role="status" data-testid="arena-lineup-handoff-banner">
           <strong>Einsatzliste gespeichert</strong>
@@ -2841,8 +2856,17 @@ export default function MatchdayArenaV2Client(props: MatchdayArenaV2ClientProps)
               {loadStageHint ? <p className="arena-v2-load-hint">{loadStageHint}</p> : null}
             </div>
             <div className="arena-v2-hero-actions">
+              <button
+                className={`secondary-button inline-button${broadcastFocusMode ? " is-selected" : ""}`}
+                type="button"
+                data-testid="arena-v2-broadcast-toggle"
+                onClick={() => setBroadcastFocusMode((current) => !current)}
+                title={broadcastFocusMode ? "Broadcast-Modus aus — Seitenpanels wieder an" : "Broadcast-Modus — Board vergrößern, Nebenpanels ausblenden"}
+              >
+                {broadcastFocusMode ? "Fokus aus" : "Broadcast"}
+              </button>
               {props.onBackToLineup ? (
-                <button className="secondary-button inline-button" type="button" onClick={props.onBackToLineup}>
+                <button className="secondary-button inline-button" type="button" onClick={handleBackToLineup}>
                   Einsatzliste
                 </button>
               ) : null}
@@ -2913,7 +2937,7 @@ export default function MatchdayArenaV2Client(props: MatchdayArenaV2ClientProps)
         </section>
       )}
 
-      <section className={`panel arena-v2-timeline-panel${revealEventActive ? " is-reveal-event" : ""}`} data-testid="arena-reveal-timeline">
+      <section className={`panel arena-v2-timeline-panel arena-v2-act-reveal${revealEventActive ? " is-reveal-event" : ""}`} data-testid="arena-reveal-timeline">
         <div className="arena-v2-timeline-head">
           <div>
             <strong>Reveal-Fortschritt</strong>
@@ -2960,16 +2984,17 @@ export default function MatchdayArenaV2Client(props: MatchdayArenaV2ClientProps)
                   {isPlaying ? "Pause" : "Play"}
                 </button>
                 <button className="secondary-button inline-button" type="button" disabled={!canControlArenaReveal} onClick={resetArenaReveal}>
-                  Reset
+                  Zurücksetzen
                 </button>
                 {[1, 2, 4].map((entry) => (
                   <button
                     key={`speed-${entry}`}
                     className={`secondary-button inline-button${speed === entry ? " is-selected" : ""}`}
                     type="button"
+                    title={entry === 1 ? "Normaltempo" : entry === 2 ? "Schnell" : "Turbo-Reveal"}
                     onClick={() => setSpeed(entry as ArenaPhaseControlSpeed)}
                   >
-                    x{entry}
+                    {entry === 1 ? "Normal" : entry === 2 ? "Schnell" : "Turbo"}
                   </button>
                 ))}
               </div>
@@ -3023,7 +3048,7 @@ export default function MatchdayArenaV2Client(props: MatchdayArenaV2ClientProps)
         </section>
       ) : null}
 
-      <section className={`arena-v2-main-grid is-full-stage${canShowResultLayer ? "" : " is-single-discipline"}`}>
+      <section className={`arena-v2-main-grid is-full-stage arena-v2-act-board${canShowResultLayer ? "" : " is-single-discipline"}${broadcastFocusMode ? " is-broadcast-mode" : ""}`}>
         <section className="panel arena-v2-board-panel">
           <div className="arena-v2-board-sticky-stack">
             <div className="arena-v2-board-head">
@@ -3032,11 +3057,17 @@ export default function MatchdayArenaV2Client(props: MatchdayArenaV2ClientProps)
                   as="h3"
                   tooltip={
                     isFocusedBoardMode
-                      ? "Fokus-Board: Top 3 fix, dein Team hervorgehoben, je 3 Ränge darüber/darunter — 10 Teams statt 32."
+                      ? arenaShowAllTeams
+                        ? "Fokus-Board mit allen 32 Teams — dein Team bleibt hervorgehoben."
+                        : "Fokus-Board: Top 3 fix, dein Team hervorgehoben, je 3 Ränge darüber/darunter — 10 Teams statt 32."
                       : "Links bleibt das Hauptboard: alle 32 Teams, direkt klickbar. Rechts sitzen die Fokus-Spieler. Vor dem Result zeigt die Arena nur die aktive Disziplin; Gesamtwertung, PPs und Top Player werden erst danach sichtbar."
                   }
                 >
-                  {isFocusedBoardMode ? `${visibleBoardRows.length} Teams · Fokus-Board` : `32 Teams · ${boardLabel}`}
+                  {isFocusedBoardMode
+                    ? arenaShowAllTeams
+                      ? "Fokus · Alle Teams"
+                      : "Fokus · 10 Teams"
+                    : `32 Teams · ${boardLabel}`}
                 </TooltipHeading>
                 {matchdayMutatorTraitsBySide ? (
                   <div className="arena-v2-board-mutators" aria-label="Spieltag-Mutatoren">
@@ -3050,6 +3081,17 @@ export default function MatchdayArenaV2Client(props: MatchdayArenaV2ClientProps)
                 ) : null}
               </div>
               <div className="arena-v2-board-head-actions">
+                {isFocusedBoardMode ? (
+                  <button
+                    type="button"
+                    className="secondary-button inline-button"
+                    data-testid="arena-v2-show-all-teams-toggle"
+                    title={arenaShowAllTeams ? "Auf 10 relevante Teams einschränken" : "Alle 32 Teams im Fokus-Board anzeigen"}
+                    onClick={() => setArenaShowAllTeams((current) => !current)}
+                  >
+                    {arenaShowAllTeams ? "10 Teams" : "Alle Teams"}
+                  </button>
+                ) : null}
                 <span className="pill">{isFocusedBoardMode ? `${visibleBoardRows.length} / ${boardRows.length}` : `${boardRows.length} Teams`}</span>
               </div>
             </div>
@@ -3435,7 +3477,7 @@ export default function MatchdayArenaV2Client(props: MatchdayArenaV2ClientProps)
           )}
         </section>
 
-        <section className="arena-v2-lower-section arena-v2-insight-panel">
+        <section className="arena-v2-lower-section arena-v2-insight-panel arena-v2-act-result">
           <div className="arena-v2-panel-title">
             <strong>Was Arena v2 gerade zeigt</strong>
             <small>Mehr Kontext, weniger Tabellenblindflug.</small>
@@ -3484,6 +3526,68 @@ export default function MatchdayArenaV2Client(props: MatchdayArenaV2ClientProps)
                   />
                 </article>
               ))}
+            </div>
+          ) : null}
+          {isResultPhase && canShowResultLayer ? (
+            <div className="arena-v2-result-reason-grid" data-testid="arena-v2-result-reasons" aria-label="Ergebnisgründe Top-Teams">
+              {boardRows.slice(0, 3).map((row) => {
+                const sourceRow =
+                  effectiveBoardMode === "d2"
+                    ? d2ScoreboardView.find((entry) => entry.teamId === row.teamId)
+                    : effectiveBoardMode === "d1"
+                      ? d1ScoreboardView.find((entry) => entry.teamId === row.teamId)
+                      : matchdayWinnerRows.find((entry) => entry.teamId === row.teamId) ?? d1ScoreboardView.find((entry) => entry.teamId === row.teamId);
+                const taktikLabel =
+                  sourceRow?.intensity === "push"
+                    ? "Push"
+                    : sourceRow?.intensity === "conserve"
+                      ? "Schonen"
+                      : sourceRow?.intensity
+                        ? "Normal"
+                        : "—";
+                const formLabel =
+                  sourceRow?.formCardStatus === "ready" && sourceRow.formCardModifier != null
+                    ? formatSignedDelta(sourceRow.formCardModifier)
+                    : "—";
+                const fatigueLabel =
+                  sourceRow?.fatigueAdjustedScore != null && sourceRow.score != null
+                    ? formatSignedDelta(Number((sourceRow.fatigueAdjustedScore - sourceRow.score).toFixed(1)))
+                    : "—";
+                return (
+                  <article key={`arena-result-reason-${row.teamId}`} className="arena-v2-result-reason-card">
+                    <strong>{row.teamName}</strong>
+                    <div className="arena-v2-result-reason-chips">
+                      <span className="arena-v2-result-reason-chip is-taktik">Taktik {taktikLabel}</span>
+                      <span className="arena-v2-result-reason-chip is-form">Form {formLabel}</span>
+                      <span className="arena-v2-result-reason-chip is-fatigue">Erschöpfung {fatigueLabel}</span>
+                    </div>
+                  </article>
+                );
+              })}
+            </div>
+          ) : null}
+          {isResultPhase && canShowResultLayer && activeFocusEntries.length > 0 ? (
+            <div className="arena-v2-training-hint" data-testid="arena-v2-training-hint">
+              <strong>Training-Hinweis</strong>
+              <span>
+                {[
+                  ...activeFocusEntries
+                    .filter((entry) => entry.warnings.some((warning) => /fatigue|ermüd|push|belast/i.test(warning)))
+                    .slice(0, 1)
+                    .map((entry) => `${entry.playerName} erschöpft`),
+                  ...[...activeFocusEntries]
+                    .sort((left, right) => (right.finalPlayerScore ?? 0) - (left.finalPlayerScore ?? 0))
+                    .slice(0, 1)
+                    .map((entry) => `${entry.playerName} Top-Performer`),
+                ]
+                  .filter(Boolean)
+                  .join(" · ") || "Regeneration im Training prüfen"}
+              </span>
+              {props.onOpenTraining ? (
+                <button type="button" className="secondary-button inline-button" onClick={props.onOpenTraining}>
+                  Zum Training
+                </button>
+              ) : null}
             </div>
           ) : null}
         </section>

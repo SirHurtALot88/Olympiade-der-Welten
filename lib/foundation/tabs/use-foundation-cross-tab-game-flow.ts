@@ -381,7 +381,7 @@ export function useFoundationCrossTabGameFlow(input: {
       });
     }
 
-    return items.slice(0, 4);
+    return items.filter((item) => item.severity === "blocked" || item.severity === "warning").slice(0, 4);
   }, [
     gameFlowActionStep,
     input.activeManagerTeamWarning,

@@ -121,6 +121,7 @@ export default function FoundationMatchdayArenaShellHost({
           }, 40);
         },
         onOpenSeason: () => setFoundationView("seasonV2", setActiveView),
+        onOpenTraining: () => setFoundationView("trainingCompact", setActiveView),
       }}
       resultSummary={
         <section className="panel arena-result-summary" id="arena-result-summary" data-testid="arena-result-summary">

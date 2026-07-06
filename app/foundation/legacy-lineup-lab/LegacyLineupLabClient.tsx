@@ -2963,6 +2963,32 @@ export default function LegacyLineupLabClient(props: LegacyLineupLabClientProps)
   }, [activeSlotKey, nextOpenSlotKey]);
 
   useEffect(() => {
+    if (typeof window === "undefined" || uiVariant !== "focusV2") {
+      return;
+    }
+    const raw = window.sessionStorage.getItem("lineup-v2-return-focus");
+    if (!raw) {
+      return;
+    }
+    try {
+      const payload = JSON.parse(raw) as { matchdayId?: string; teamId?: string };
+      if (payload.matchdayId && payload.matchdayId !== params.matchdayId) {
+        return;
+      }
+      if (payload.teamId && payload.teamId !== params.teamId) {
+        return;
+      }
+      window.sessionStorage.removeItem("lineup-v2-return-focus");
+      if (nextOpenSlotKey) {
+        setActiveSlotKey(nextOpenSlotKey);
+        window.setTimeout(() => scrollLineupTarget(`lineup-slot-${nextOpenSlotKey}`), 120);
+      }
+    } catch {
+      window.sessionStorage.removeItem("lineup-v2-return-focus");
+    }
+  }, [nextOpenSlotKey, params.matchdayId, params.teamId, uiVariant]);
+
+  useEffect(() => {
     const requestKey = props.focusMissingRequestKey ?? null;
     if (!props.highlightMissingSlots || !requestKey || lastMissingFocusRequestKeyRef.current === requestKey || slots.length === 0) {
       return;
@@ -3772,6 +3798,32 @@ export default function LegacyLineupLabClient(props: LegacyLineupLabClientProps)
     slots,
   ]);
 
+  const focusV2DisciplineTacticPreviewBySide = useMemo(() => {
+    const buildForSide = (disciplineSide: "d1" | "d2") => {
+      const filledCount = slots.filter((slot) => slot.disciplineSide === disciplineSide && selections[slot.key]).length;
+      const currentIntensity = getDisciplineIntensity(disciplineSide);
+      const currentTotal = disciplineSide === "d1" ? matchdayPreviewCards.d1Projected : matchdayPreviewCards.d2Projected;
+      const estimate = (targetIntensity: MatchdayIntensityStage) => {
+        if (filledCount === 0 || currentTotal == null) return null;
+        const deltaPerSlot =
+          getMatchdayIntensityConfig(targetIntensity).scoreModifier - getMatchdayIntensityConfig(currentIntensity).scoreModifier;
+        return Number((currentTotal + deltaPerSlot * filledCount).toFixed(1));
+      };
+      return {
+        conserve: estimate("conserve"),
+        normal: estimate("normal"),
+        push: estimate("push"),
+      };
+    };
+    return { d1: buildForSide("d1"), d2: buildForSide("d2") };
+  }, [
+    getDisciplineIntensity,
+    matchdayPreviewCards.d1Projected,
+    matchdayPreviewCards.d2Projected,
+    selections,
+    slots,
+  ]);
+
   const allAvailablePlayersDeployed = useMemo(() => {
     const totalActive = context?.activePlayers?.length ?? 0;
     if (totalActive === 0) return false;
@@ -4388,6 +4440,10 @@ export default function LegacyLineupLabClient(props: LegacyLineupLabClientProps)
     };
   }, [allAvailablePlayersDeployed, captainBudgetExceeded, captainDraftUsedCount, captainSeasonLimit, captainUsedBeforeCurrentDraft, captains.d1, captains.d2, draft, duplicateSelections.length, lineupReadyToSave, matchdayPreviewCards.openSlots]);
   const lineupFinishItems = useMemo(() => lineupMiniAudit.items.slice(0, 6), [lineupMiniAudit]);
+  const focusV2ArenaReady = useMemo(
+    () => Boolean(draft) && lineupMiniAudit.blockingItems.length === 0 && matchdayPreviewCards.openSlots === 0,
+    [draft, lineupMiniAudit.blockingItems.length, matchdayPreviewCards.openSlots],
+  );
   const activeSlotIssues = activeSlot ? slotIssuesByKey.get(activeSlot.key) ?? [] : [];
   const teamdeckSortInsight = useMemo(() => {
     const activeLabel = activeSlot ? `${activeSlot.disciplineSide.toUpperCase()}-${activeSlot.slotIndex + 1}` : "Auto";
@@ -7827,6 +7883,23 @@ export default function LegacyLineupLabClient(props: LegacyLineupLabClientProps)
                   color: card.color,
                 }));
               }}
+              arenaReady={focusV2ArenaReady}
+              onNavigateArena={
+                props.onOpenArena
+                  ? () => {
+                      if (typeof window !== "undefined") {
+                        window.sessionStorage.setItem("lineup-v2-arena-handoff", "1");
+                      }
+                      props.onOpenArena?.({
+                        saveId: params.saveId,
+                        seasonId: params.seasonId,
+                        matchdayId: params.matchdayId,
+                        teamId: params.teamId,
+                      });
+                    }
+                  : undefined
+              }
+              disciplineTacticPreviewBySide={focusV2DisciplineTacticPreviewBySide}
               controlsSlot={
                 <>
                   <label>

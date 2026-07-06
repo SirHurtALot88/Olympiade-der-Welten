@@ -60,8 +60,10 @@ describe("foundation home v2 ui contract", () => {
     expect(fileText).toContain("Office");
     expect(fileText).not.toContain("Manager Overview V2");
     expect(fileText).not.toContain("HQ öffnen");
-    expect(fileText).toContain("Facilities");
-    expect(fileText).toContain("Inbox");
+    expect(fileText).toContain("FoundationGameDecisionBoard");
+    expect(fileText).toContain('testId="home-v2-today-board"');
+    expect(fileText).toContain("Gebäude");
+    expect(fileText).toContain("Entscheidungen");
     expect(fileText).toContain('data-testid="foundation-home-v2"');
   });
 
@@ -184,5 +186,39 @@ describe("foundation ui v2 roadmap contract", () => {
     expect(fileText).toContain("inbox-v2-layout");
     expect(fileText).toContain("Entscheidungen");
     expect(fileText).not.toContain("Inbox Classic");
+  });
+
+  it("exposes sprint N urgency sort, inbox checkoffs, compact save menu, and quieter mobile nav", async () => {
+    const [homeText, shellText, scopeText, auditText, cssText, crossTabFlowText] = await Promise.all([
+      fs.readFile(homeV2Path, "utf8"),
+      fs.readFile(shellRouterBodyPath, "utf8"),
+      fs.readFile(shellScopePath, "utf8"),
+      fs.readFile(path.join(root, "scripts/tmp-ux-audit-play.ts"), "utf8"),
+      fs.readFile(globalsPath, "utf8"),
+      fs.readFile(path.join(root, "lib/foundation/tabs/use-foundation-cross-tab-game-flow.ts"), "utf8"),
+    ]);
+
+    expect(homeText).toContain("relevantWarnings");
+    expect(homeText).toContain("home-v2-inbox-checkoff");
+    expect(homeText).toContain("onCompleteInboxItem");
+
+    expect(scopeText).toContain("homeTodayCards");
+    expect(scopeText).toContain("urgency");
+    expect(scopeText).toContain(".sort((left, right) => left.urgency - right.urgency)");
+
+    expect(shellText).toContain('data-testid="foundation-save-compact-menu"');
+    expect(shellText).toContain("formatShortSaveId(activeSaveId)");
+    expect(shellText).toContain("onCompleteInboxItem");
+
+    expect(crossTabFlowText).toContain('item.severity === "blocked" || item.severity === "warning"');
+
+    expect(auditText).toContain("AUDIT_VIEWS");
+    expect(auditText).toContain("home-v2");
+    expect(auditText).toContain("history-v2");
+    expect(auditText).toContain('"desktop"');
+    expect(auditText).toContain('"mobile"');
+
+    expect(cssText).toContain(".foundation-subnav-item");
+    expect(cssText).toContain("prefers-reduced-motion");
   });
 });

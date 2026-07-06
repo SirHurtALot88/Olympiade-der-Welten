@@ -91,7 +91,16 @@ export function resolvePostOptUpgradeMandate(gameState: GameState, teamId: strin
         maxBuys,
         minUpgradeBuyPrice: null,
         expandRosterTarget: Math.min(playerMax, count + maxBuys),
-        postOptUpgradeDeploy: true,
+        // 2026-07-06: this is a normal gap-fill toward the stress-elevated `playerOpt` (which
+        // already includes the depth-stress optBump — see resolvePlannerRosterTargets), NOT a
+        // "team already at/above Opt, spend excess cash on a real upgrade" situation. It used to
+        // report postOptUpgradeDeploy: true here, which — via resolveTeamBuyGateOpts's fallback
+        // to estimateUpgradeBuyFloorMw — could impose a real-upgrade price floor onto a team that
+        // may still be far below even hardMin (e.g. a team sold down to 1 player after a mass
+        // sell-off). buildFinalBuyGate now also guards belowUpgradeFloor on atOrAboveOpt directly,
+        // but keeping this flag accurate at the source avoids the same mislabeling affecting any
+        // other postOptUpgradeDeploy consumer in the future.
+        postOptUpgradeDeploy: false,
       };
     }
     return buildExcessCashMandate();

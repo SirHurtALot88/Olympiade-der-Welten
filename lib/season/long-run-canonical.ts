@@ -9,6 +9,7 @@ import {
 } from "@/lib/ai/chunked-redraft-topup-service";
 import { getTeamHardMinRequired } from "@/lib/ai/ai-market-plan-convergence-service";
 import { withNormalizedTeamGeneralManagers } from "@/lib/foundation/team-general-managers";
+import { withPersistedSeasonDerivations } from "@/lib/foundation/materialize-season-derivations";
 import { deriveRosterTargets } from "@/lib/foundation/roster-limits";
 import type { PersistedSaveGame, PersistenceService } from "@/lib/persistence/types";
 import { isLongRunFastProfile } from "@/lib/season/long-run-profile";
@@ -222,7 +223,7 @@ function collectDraftTargetBlockers(save: PersistedSaveGame, prefix: string, mod
 export async function runSeasonOnePicksDraft(
   saveId: string,
   persistence: PersistenceService,
-  options?: { teamIds?: string[]; stepsPerTeam?: number; seedSuffix?: string },
+  options?: { teamIds?: string[]; stepsPerTeam?: number; seedSuffix?: string; draftSeed?: string },
 ): Promise<{ blockers: string[]; purchases: Array<Record<string, unknown>>; result: AiPicksRunResult }> {
   const save = persistence.getSaveById(saveId);
   if (!save) throw new Error("Long-run save missing before S1 draft.");
@@ -236,6 +237,7 @@ export async function runSeasonOnePicksDraft(
 
   const seasonId = save.gameState.season.id;
   const seedSuffix = options?.seedSuffix ?? "long-run";
+  persistence.saveSingleplayerState(saveId, withPersistedSeasonDerivations(save.gameState));
   console.error(`[long-run] S1 draft via picks-run season1_optimum_execute (${saveId}${options?.teamIds?.length ? ` teams=${options.teamIds.length}` : ""})`);
   const result = await runAiPicksExecutePreview(
     {
@@ -247,9 +249,9 @@ export async function runSeasonOnePicksDraft(
       teamScope: "all",
       allowSetupAllTeams: true,
       teamIds: options?.teamIds,
-      stepsPerTeam: options?.stepsPerTeam ?? 16,
+      stepsPerTeam: options?.stepsPerTeam ?? Number(process.env.OLY_LONG_RUN_DRAFT_STEPS ?? 16),
       runMode: "season1_optimum_execute",
-      draftSeed: `${saveId}:${seasonId}:${seedSuffix}`,
+      draftSeed: options?.draftSeed ?? process.env.OLY_LONG_RUN_DRAFT_SEED ?? `${saveId}:${seasonId}:${seedSuffix}`,
     },
     persistence,
   );

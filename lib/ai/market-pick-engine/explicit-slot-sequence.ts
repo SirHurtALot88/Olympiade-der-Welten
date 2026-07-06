@@ -48,13 +48,10 @@ function resolvePremiumCounts(input: ExplicitSlotSequenceInput, plannedSlots: nu
     Math.max(plannedSlots - 7, 0),
     Math.max(input.premiumCap ?? 2, 0),
   );
-  if (input.superstarAllowed > 0 && premiumSlots > 0) {
+  counts.star = Math.min(input.starAllowed, premiumSlots);
+  if (input.superstarAllowed > 0 && premiumSlots > counts.star) {
     counts.superstar = 1;
   }
-  counts.star = Math.min(
-    input.starAllowed,
-    Math.max(premiumSlots - counts.superstar, 0),
-  );
   return counts;
 }
 
@@ -66,9 +63,9 @@ export function interleaveLanePyramid(counts: LaneCounts, maxLength: number): Ma
   const plan: MarketPickLane[] = [];
   const remaining = { ...counts };
   const waveOrder: MarketPickLane[] = [
-    "superstar",
-    "star",
     "core",
+    "star",
+    "superstar",
     "depth",
     "backup",
     "specialist",

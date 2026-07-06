@@ -128,4 +128,35 @@ describe("foundation training and facilities ui contract", () => {
     expect(trainingText).toContain("team-portraits-grid");
     expect(cssText).toContain(".foundation-player-portrait-card.is-density-compact");
   });
+
+  it("exposes sprint K global mode chips, upgrade strip, why disclosure, and facility maintenance preview", async () => {
+    const [trainingCompactText, trainingSharedText, facilitiesOverviewText, cssText] = await Promise.all([
+      fs.readFile(trainingCompactPath, "utf8"),
+      fs.readFile(trainingViewSharedPath, "utf8"),
+      fs.readFile(
+        "/Users/chrisfalk/Documents/Codex/Olympiade der Welten/app/foundation/facilities-overview-v2/FacilitiesOverviewV2Client.tsx",
+        "utf8",
+      ),
+      fs.readFile(globalsPath, "utf8"),
+    ]);
+
+    expect(trainingCompactText).toContain('data-testid="training-global-mode-chips"');
+    expect(trainingCompactText).toContain("Alle auf");
+    expect(trainingCompactText).toContain("TrainingModeComparePanel");
+    expect(trainingCompactText).toContain("compareActivePlayerId");
+
+    expect(trainingSharedText).toContain("TrainingAttributeUpgradeStrip");
+    expect(trainingSharedText).toContain("TrainingWhyDisclosure");
+    expect(trainingSharedText).toContain("is-compare-active");
+    expect(trainingSharedText).toContain("is-signature");
+    expect(trainingSharedText).toContain("regressionRisk");
+
+    expect(facilitiesOverviewText).toContain("facilities-overview-v2-maintenance-card");
+    expect(facilitiesOverviewText).toContain("facilities-overview-v2-upgrade-preview");
+
+    expect(cssText).toContain(".training-v2-global-mode-chips");
+    expect(cssText).toContain(".training-v2-upgrade-strip");
+    expect(cssText).toContain(".training-v2-rider-card.is-compare-active");
+    expect(cssText).toContain(".facilities-overview-v2-maintenance-card");
+  });
 });

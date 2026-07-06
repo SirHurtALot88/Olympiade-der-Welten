@@ -3,8 +3,8 @@ import { getTeamRosterStressRecord } from "@/lib/ai/season-roster-stress-service
 
 export const DEFAULT_ROSTER_MAX = 14;
 /** Fixes Kader-Minimum für jedes Team (unabhängig von Sheet-/Identity-Daten). */
-export const FIXED_ROSTER_MIN = 7;
-/** Hartes Gameplay-Minimum bleibt 7, auch wenn Identity-Sheets höher planen. */
+export const FIXED_ROSTER_MIN = 8;
+/** Hartes Gameplay-Minimum — offiziell 8 für alle Teams. */
 export const GAMEPLAY_HARD_ROSTER_MIN = FIXED_ROSTER_MIN;
 export const DEFAULT_ROSTER_MIN_FLOOR = FIXED_ROSTER_MIN;
 

@@ -4,6 +4,7 @@ import {
   type AiNeedsPicksPlannedPick,
   type AiNeedsPicksRunMode,
 } from "@/lib/ai/ai-needs-picks-compare-service";
+import type { AiTransferPreviewRecommendation } from "@/lib/ai/ai-transfermarkt-preview-service";
 import {
   PLANNER_TIGHT_BUDGET_CASH_PER_SLOT,
   prefersReserveLaneOverCheapFill,
@@ -143,6 +144,47 @@ export function mapPlannedPicksToBuyCandidates<T extends { playerId: string }>(
     if (!candidate) continue;
     selected.push(candidate);
     used.add(pick.playerId);
+  }
+  return selected;
+}
+
+/** Fallback when market-plan pool and compare pool diverge — use compare pick metadata directly. */
+export function mapPlannedPicksToBuyRecommendations(
+  plannedPicks: AiNeedsPicksPlannedPick[],
+): AiTransferPreviewRecommendation[] {
+  const selected: AiTransferPreviewRecommendation[] = [];
+  const used = new Set<string>();
+  for (const pick of plannedPicks) {
+    if (!pick.playerId || used.has(pick.playerId)) continue;
+    if (pick.price == null || pick.price <= 0) continue;
+    used.add(pick.playerId);
+    selected.push({
+      playerId: pick.playerId,
+      playerName: pick.playerName,
+      name: pick.playerName,
+      className: pick.className,
+      race: pick.race,
+      ovr: pick.ovr,
+      mvs: pick.mvs,
+      price: pick.price,
+      marketValue: pick.price,
+      salary: pick.salary,
+      contractLength: null,
+      cashAfter: null,
+      rosterAfter: null,
+      salaryAfter: null,
+      teamFit: pick.focusTeamFitScore ?? null,
+      fitSummary: pick.laneReason || "Unified compare pick",
+      sportsSummary: "",
+      budgetReason: [],
+      warnings: [],
+      overallRecommendationScore: 0,
+      score: 0,
+      reason: pick.laneReason || "unified_compare_pick",
+      fitNotes: [],
+      riskNotes: [],
+      strategyNotes: [],
+    });
   }
   return selected;
 }

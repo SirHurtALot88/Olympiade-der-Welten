@@ -54,7 +54,7 @@ function wrapLineupV2PortraitPreview(
       soc={player.coreStats.soc}
       leagueHeatPools={createEmptyLeaguePlayerHeatPools()}
       variant="team"
-      context="roster"
+      context="lineupCandidate"
       previewDensity="compact"
       playerClassName={player.className}
       disabled={disabled}
@@ -71,6 +71,16 @@ function wrapLineupV2PlayerHover(
   return wrapLineupV2PortraitPreview(content, player);
 }
 
+type CandidateAxisReasonChip = {
+  axis: string;
+  label: string;
+  rating: string | null;
+  tone: string;
+  detail: string;
+};
+
+type SlotMicroStepState = "done" | "current" | "open";
+
 type SlotCandidate = {
   activePlayerId: string;
   name: string;
@@ -78,6 +88,7 @@ type SlotCandidate = {
   scoreDelta: number | null;
   fitSummary: string;
   fitDetail: string;
+  reasonChips?: CandidateAxisReasonChip[];
   roleModifier?: number | null;
   rangeLow?: number | null;
   rangeHigh?: number | null;
@@ -271,6 +282,14 @@ export type LegacyLineupFocusV2BoardProps = {
     disciplineSide: "d1" | "d2",
     slot: "primary" | "secondary",
   ) => Array<{ id: string; label: string; color: string }>;
+  /** Draft saved + no blockers + all slots filled — enables gated Arena CTA. */
+  arenaReady?: boolean;
+  onNavigateArena?: () => void;
+  /** Per-side projected totals at Schonen/Normal/Push for tactic preview cards. */
+  disciplineTacticPreviewBySide?: Record<
+    "d1" | "d2",
+    { conserve: number | null; normal: number | null; push: number | null }
+  >;
 };
 
 function formatScore(value: number) {
@@ -297,6 +316,65 @@ function formatIntensityLabel(intensity: MatchdayIntensityStage) {
   if (intensity === "push") return "Vollgas";
   if (intensity === "conserve") return "Schonen";
   return "Normal";
+}
+
+function resolveSlotMicroStepStates(input: {
+  hasSelection: boolean;
+  isActiveSlot: boolean;
+  isRecentlyAssigned: boolean;
+}): Record<"choose" | "assign" | "next", SlotMicroStepState> {
+  if (input.hasSelection) {
+    return {
+      choose: "done",
+      assign: "done",
+      next: input.isRecentlyAssigned ? "current" : "done",
+    };
+  }
+  if (!input.isActiveSlot) {
+    return { choose: "open", assign: "open", next: "open" };
+  }
+  return { choose: "current", assign: "open", next: "open" };
+}
+
+function LegacyLineupCandidateReasonChips({ chips }: { chips: CandidateAxisReasonChip[] }) {
+  if (!chips.length) {
+    return null;
+  }
+
+  return (
+    <div className="legacy-lineup-candidate-reason-chips legacy-lineup-v2-axis-reason-chips" aria-label="Achsen-Begründung">
+      {chips.map((chip) => (
+        <span key={`${chip.axis}-${chip.label}`} className={`legacy-lineup-candidate-reason-chip ${chip.tone}`} title={chip.detail}>
+          {chip.label} {chip.rating ?? "—"}
+        </span>
+      ))}
+    </div>
+  );
+}
+
+function LegacyLineupSlotMicroSteps({
+  stepStates,
+}: {
+  stepStates: Record<"choose" | "assign" | "next", SlotMicroStepState>;
+}) {
+  const steps = [
+    { key: "choose" as const, label: "Wählen" },
+    { key: "assign" as const, label: "Einsetzen" },
+    { key: "next" as const, label: "Weiter" },
+  ];
+
+  return (
+    <div className="legacy-lineup-slot-micro-steps legacy-lineup-v2-slot-micro-steps" aria-label="Slot Mikro-Schritte">
+      {steps.map((step, index) => (
+        <span
+          key={step.key}
+          className={`legacy-lineup-slot-micro-step is-${stepStates[step.key]}${index < steps.length - 1 ? " has-arrow" : ""}`}
+        >
+          <strong>{step.label}</strong>
+        </span>
+      ))}
+    </div>
+  );
 }
 
 function getSlotReadinessLabel(hasSelection: boolean, projected: number | null, topPickScore: number | null) {
@@ -392,6 +470,9 @@ export default function LegacyLineupFocusV2Board({
   currentMatchdayId,
   onAssignFormCardToSide,
   getFormBoardCardOptionsForSide,
+  arenaReady = false,
+  onNavigateArena,
+  disciplineTacticPreviewBySide,
 }: LegacyLineupFocusV2BoardProps) {
   const [focusedPlayerId, setFocusedPlayerId] = useState<string | null>(null);
   const [pinnedCandidateIds, setPinnedCandidateIds] = useState<string[]>([]);
@@ -404,6 +485,7 @@ export default function LegacyLineupFocusV2Board({
   const [isTouchUi, setIsTouchUi] = useState(false);
   const [wizardMode, setWizardMode] = useState(false);
   const [compareMode, setCompareMode] = useState(false);
+  const [recentlyAssignedSlotKey, setRecentlyAssignedSlotKey] = useState<string | null>(null);
 
   useEffect(() => {
     if (typeof window === "undefined") {
@@ -485,6 +567,8 @@ export default function LegacyLineupFocusV2Board({
       const playerName = playerId ? rosterCardByActivePlayerId.get(playerId)?.name : null;
       if (slot && playerName) {
         setAssignAnnouncement(`${playerName} in ${slot.disciplineSide.toUpperCase()}-${slot.slotIndex + 1} gesetzt`);
+        setRecentlyAssignedSlotKey(slot.key);
+        window.setTimeout(() => setRecentlyAssignedSlotKey((current) => (current === slot.key ? null : current)), 1200);
       }
     }
   }, [assignPulse, triggerSlotFlash, activeSlotKey, rosterCardByActivePlayerId, selections, slots]);
@@ -589,12 +673,27 @@ export default function LegacyLineupFocusV2Board({
       <div className="sr-only" aria-live="polite" aria-atomic="true">
         {assignAnnouncement}
       </div>
-      <div className="legacy-lineup-v2-toolbar" aria-label="Spieltag-Werkzeugleiste">
+      <div className="legacy-lineup-v2-toolbar is-sticky" aria-label="Spieltag-Werkzeugleiste" data-testid="lineup-v2-sticky-toolbar">
         <div className="legacy-lineup-v2-toolbar-main">
           <div>
             <span>Spieltag-Vorbereitung</span>
             <strong>{matchdayHeaderSummary}</strong>
           </div>
+        </div>
+        <div className="legacy-lineup-v2-toolbar-discipline-progress" data-testid="lineup-v2-discipline-progress">
+          {(["d1", "d2"] as const).map((disciplineSide) => {
+            const selectedCount = disciplineSide === "d1" ? lineupMeta.d1Selected : lineupMeta.d2Selected;
+            const requiredCount = disciplineSide === "d1" ? d1Required : d2Required;
+            const progressPercent = requiredCount > 0 ? Math.min(100, Math.round((selectedCount / requiredCount) * 100)) : 0;
+            return (
+              <span key={`toolbar-progress-${disciplineSide}`} className={`legacy-lineup-v2-toolbar-progress-chip is-${disciplineSide}`} title={`${disciplineSide.toUpperCase()} ${selectedCount}/${requiredCount || "—"} Slots`}>
+                {disciplineSide.toUpperCase()} <strong>{selectedCount}/{requiredCount || "—"}</strong>
+                <span className="legacy-lineup-progress-track legacy-lineup-v2-progress is-toolbar" aria-hidden="true">
+                  <span style={{ width: `${progressPercent}%` }} />
+                </span>
+              </span>
+            );
+          })}
         </div>
         <div className="legacy-lineup-v2-toolbar-hero-metrics" data-testid="lineup-v2-hero-metrics">
           <span className={matchdayPreviewCards.openSlots > 0 ? "is-warning" : "is-ready"} title="Belegte Slots">
@@ -676,15 +775,28 @@ export default function LegacyLineupFocusV2Board({
               </div>
             ) : null}
           </div>
-          <span className="legacy-lineup-v2-flow-chip" title={lineupFlowSummary.nextStep.detail}>
-            {lineupFlowSummary.nextStep.label}
-          </span>
           <button className="secondary-button inline-button" type="button" onClick={onFocusNextOpenSlot} disabled={isBusy || matchdayPreviewCards.openSlots === 0}>
             Nächster Slot
           </button>
           <button className="secondary-button inline-button" type="button" onClick={onAutoFillOpenSlots} disabled={isBusy || matchdayPreviewCards.openSlots === 0}>
             Automatisch füllen
           </button>
+          {onNavigateArena ? (
+            <button
+              className={`secondary-button inline-button legacy-lineup-v2-arena-cta${arenaReady ? " is-ready" : ""}`}
+              type="button"
+              data-testid="lineup-v2-arena-cta"
+              disabled={!arenaReady || isBusy || isReadOnly}
+              title={
+                arenaReady
+                  ? "Einsatzliste gespeichert — zur Arena wechseln"
+                  : "Erst speichern und alle Blocker lösen, dann Arena"
+              }
+              onClick={() => arenaReady && onNavigateArena()}
+            >
+              Zur Arena
+            </button>
+          ) : null}
           <div className="legacy-lineup-v2-save-wrap">
             <button
               className={`primary-button inline-button${lineupReadyToSave ? " is-ready" : ""}`}
@@ -755,11 +867,23 @@ export default function LegacyLineupFocusV2Board({
               <span>{activeSlot.disciplineSide.toUpperCase()}-{activeSlot.slotIndex + 1}</span>
               <strong>{activeRole?.label ?? "Slot"}</strong>
               <small>{activeRole?.description ?? "Nächsten Spieler wählen"}</small>
+              <LegacyLineupSlotMicroSteps
+                stepStates={resolveSlotMicroStepStates({
+                  hasSelection: Boolean(activeRosterCard),
+                  isActiveSlot: true,
+                  isRecentlyAssigned: recentlyAssignedSlotKey === activeSlot.key,
+                })}
+              />
             </header>
             <div className="legacy-lineup-v2-wizard-portraits">
               {wizardTopCandidates.map((entry, index) => {
                 const candidate = entry.player;
                 const projectedScore = entry.activeSlotCandidate?.projectedScore ?? null;
+                const summaryCandidate = slotCandidateSummaryByKey
+                  .get(activeSlot.key)
+                  ?.topCandidates.find((topCandidate) => topCandidate.activePlayerId === candidate.activePlayerId);
+                const fitSummary = entry.activeSlotCandidate?.fitSummary ?? summaryCandidate?.fitSummary ?? entry.detail;
+                const reasonChips = summaryCandidate?.reasonChips ?? [];
                 return (
                   <button
                     key={`wizard-candidate-${candidate.id}-${index}`}
@@ -772,6 +896,10 @@ export default function LegacyLineupFocusV2Board({
                       <span className="legacy-lineup-v2-wizard-portrait-card">
                         <strong>{candidate.name}</strong>
                         <em>{formatNullableScore(projectedScore)}</em>
+                        <small className="legacy-lineup-v2-wizard-fit" title={fitSummary}>
+                          Warum passt er? {fitSummary}
+                        </small>
+                        <LegacyLineupCandidateReasonChips chips={reasonChips} />
                       </span>,
                       candidate,
                     )}
@@ -832,6 +960,34 @@ export default function LegacyLineupFocusV2Board({
                         </button>
                       ))}
                     </div>
+                    {disciplineTacticPreviewBySide?.[disciplineSide] ? (
+                      <div className="legacy-lineup-v2-tactic-preview" data-testid={`lineup-v2-tactic-preview-${disciplineSide}`} aria-label={`${disciplineSide.toUpperCase()} Taktik-Vorschau`}>
+                        {(["conserve", "normal", "push"] as const).map((intensity) => {
+                          const previewScore = disciplineTacticPreviewBySide[disciplineSide][intensity];
+                          const currentIntensity = getDisciplineIntensity(disciplineSide);
+                          const currentScore = disciplineTacticPreviewBySide[disciplineSide][currentIntensity];
+                          const delta =
+                            previewScore != null && currentScore != null && intensity !== currentIntensity
+                              ? Number((previewScore - currentScore).toFixed(1))
+                              : null;
+                          return (
+                            <span
+                              key={`tactic-${disciplineSide}-${intensity}`}
+                              className={`legacy-lineup-v2-tactic-preview-chip${currentIntensity === intensity ? " is-active" : ""}`}
+                            >
+                              {formatIntensityLabel(intensity)}{" "}
+                              <strong>{formatNullableScore(previewScore)}</strong>
+                              {delta != null ? (
+                                <em className={delta >= 0 ? "is-positive" : "is-negative"}>
+                                  {delta >= 0 ? "+" : ""}
+                                  {formatDecimalScore(delta, 1)}
+                                </em>
+                              ) : null}
+                            </span>
+                          );
+                        })}
+                      </div>
+                    ) : null}
                     {sideFormChips ? (
                       <div className="legacy-lineup-v2-form-mini-chips" aria-label={`${disciplineSide.toUpperCase()} Formkarten`}>
                         <button
@@ -977,13 +1133,23 @@ export default function LegacyLineupFocusV2Board({
                           )}
 
                           <span className="legacy-lineup-v2-slot-metrics">
-                            <em>Base {formatNullableScore(selectedScore)}</em>
+                            <em>Basis {formatNullableScore(selectedScore)}</em>
                             <strong>Slot {formatNullableScore(projected ?? topCandidate?.projectedScore ?? null)}</strong>
                             <small>F {Math.round(selectedOption?.fatigueCount ?? 0)}</small>
                           </span>
 
                           <span className={`legacy-lineup-v2-slot-state is-${readiness === "Offen" ? "open" : "ready"}`}>{readiness}</span>
                         </button>
+
+                        {isActive ? (
+                          <LegacyLineupSlotMicroSteps
+                            stepStates={resolveSlotMicroStepStates({
+                              hasSelection: Boolean(rosterCard),
+                              isActiveSlot: true,
+                              isRecentlyAssigned: recentlyAssignedSlotKey === slot.key,
+                            })}
+                          />
+                        ) : null}
 
                         {isNextOpenTarget ? (
                           <span className="legacy-lineup-v2-slot-micro-hint" role="note">
@@ -1097,6 +1263,13 @@ export default function LegacyLineupFocusV2Board({
                   <span>{activeSlot.disciplineSide.toUpperCase()}-{activeSlot.slotIndex + 1}</span>
                   <strong>{activeRole?.label ?? "Slot"}</strong>
                   <small>{activeRole?.description ?? "Standard-Rolle"}</small>
+                  <LegacyLineupSlotMicroSteps
+                    stepStates={resolveSlotMicroStepStates({
+                      hasSelection: Boolean(activeRosterCard),
+                      isActiveSlot: true,
+                      isRecentlyAssigned: recentlyAssignedSlotKey === activeSlot.key,
+                    })}
+                  />
                 </div>
                 <div className="legacy-lineup-v2-focus-actions">
                   {topPickForActiveSlot && !activeRosterCard && !isReadOnly ? (
@@ -1134,7 +1307,7 @@ export default function LegacyLineupFocusV2Board({
 
               <section className="legacy-lineup-v2-candidates" aria-label="Kandidaten für aktiven Slot">
                 <div className="legacy-lineup-v2-candidates-head">
-                  <div className="legacy-lineup-v2-candidate-tabs" role="tablist" data-testid="lineup-v2-candidate-tabs">
+                  <div className={`legacy-lineup-v2-candidate-tabs is-${activeSlot.disciplineSide}`} role="tablist" data-testid="lineup-v2-candidate-tabs">
                     {([
                       { key: "all" as const, label: "Alle" },
                       { key: "instant" as const, label: "Sofort" },
@@ -1224,7 +1397,7 @@ export default function LegacyLineupFocusV2Board({
                             <span className="legacy-lineup-v2-candidate-main">
                               <strong>{candidate.name}</strong>
                               <small>
-                                Base {formatNullableScore(entry.activeSlotCandidate?.baseScore ?? null)}
+                                Basis {formatNullableScore(entry.activeSlotCandidate?.baseScore ?? null)}
                                 {entry.groupMeta.label ? ` · ${entry.groupMeta.label}` : ""}
                                 {entry.wantsActiveSlot ? " · Wunsch" : ""}
                                 {entry.shortReason ? ` · ${entry.shortReason}` : ""}
@@ -1318,7 +1491,7 @@ export default function LegacyLineupFocusV2Board({
                     ))}
                     {renderComparePlaceholderColumns()}
 
-                    <span>Base</span>
+                    <span>Basis</span>
                     {pinnedEntries.map((entry) => (
                       <span key={`compare-base-${entry.player.activePlayerId}`}>{formatNullableScore(entry.activeSlotCandidate?.baseScore ?? null)}</span>
                     ))}
@@ -1368,7 +1541,7 @@ export default function LegacyLineupFocusV2Board({
                   <span className="legacy-lineup-v2-assigned-kicker">Aktuell im Slot</span>
                   <strong>{activeRosterCard.name}</strong>
                   <small>
-                    Base {formatNullableScore(activeSlotPreview?.selectedScore ?? null)} · Slot{" "}
+                    Basis {formatNullableScore(activeSlotPreview?.selectedScore ?? null)} · Slot{" "}
                     {formatNullableScore(activeSlotPreview?.projected.totalProjected ?? null)} · F{" "}
                     {Math.round(activeSelectedOption?.fatigueCount ?? 0)}
                   </small>
@@ -1391,7 +1564,7 @@ export default function LegacyLineupFocusV2Board({
                   items={[
                     {
                       key: "base",
-                      label: "Base",
+                      label: "Basis",
                       value: formatNullableScore(activeSlotPreview.selectedScore ?? null),
                       tone: "neutral",
                     },

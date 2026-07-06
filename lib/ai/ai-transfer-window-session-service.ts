@@ -15,6 +15,8 @@ import {
 } from "@/lib/ai/ai-market-plan-convergence-service";
 import { getTeamsNeedingPostOptUpgradeDeploy, teamNeedsPostOptUpgradeDeploy } from "@/lib/ai/ai-budget-deploy-service";
 import { resolvePostOptUpgradeMandate } from "@/lib/ai/planner-post-opt-upgrade-policy";
+import { runPreseasonBatchPickRebuild } from "@/lib/ai/preseason-batch-pick-rebuild-service";
+import { isUnifiedPickEnabledForMarket } from "@/lib/ai/unified-pick-planner-service";
 import { buildSeasonStrategyState } from "@/lib/ai/ai-manager-doctrine-service";
 import {
   createLocalTransfermarktRunContext,
@@ -24,6 +26,7 @@ import {
 import { createPersistenceService } from "@/lib/persistence/persistence-service";
 import type { PersistedSaveGame, PersistenceService } from "@/lib/persistence/types";
 import type { GameState } from "@/lib/data/olyDataTypes";
+import { resolvePlannerRosterTargets } from "@/lib/foundation/roster-limits";
 import type { LocalTransferWindowPhase } from "@/lib/market/transfer-window-policy";
 
 export type TransferWindowPhase = "preseason" | "season_end";
@@ -43,6 +46,12 @@ export type TransferWindowSessionInput = {
   allowBuys?: boolean;
   skipIfExistingMarketTransfers?: boolean;
   progressLog?: boolean;
+  /**
+   * Preseason buy orchestration. Production/default: same path as the S1 draft (batch plan + apply).
+   * `convergence_loop` keeps the legacy incremental applyAiMarketPlanLocally cycles — only for
+   * unit tests / diagnostics that mock the market apply layer.
+   */
+  preseasonBuyMode?: "s1_draft_batch" | "convergence_loop";
 };
 
 export type TransferWindowSessionResult = MarketPlanConvergenceResult & {
@@ -84,6 +93,22 @@ function rosterCountsByTeam(gameState: GameState) {
     counts.set(entry.teamId, (counts.get(entry.teamId) ?? 0) + 1);
   }
   return counts;
+}
+
+/** Buy cycles cannot exceed roster headroom — if the planner plans 10 picks, 10 rounds suffice. */
+const MAX_PRESEASON_BUY_CYCLES_PER_TEAM = 14;
+
+function resolvePreseasonBuyCycleCap(
+  gameState: GameState,
+  teamId: string,
+  configuredMax: number,
+): number {
+  const roster = rosterCount(gameState, teamId);
+  const targets = resolvePlannerRosterTargets(gameState, teamId);
+  const optGap = Math.max(getTeamOptTarget(gameState, teamId) - roster, 0);
+  const headroom = Math.max(targets.playerMax - roster, 0);
+  const meaningfulGap = Math.max(optGap, headroom, 1);
+  return Math.max(1, Math.min(configuredMax, meaningfulGap, MAX_PRESEASON_BUY_CYCLES_PER_TEAM));
 }
 
 async function runTeamCycle(input: {
@@ -327,7 +352,81 @@ export async function runTransferWindowSession(input: TransferWindowSessionInput
   // re-diagnosed as the latter and tracked separately (see the progress log entry for this session);
   // fixing that properly belongs in the preseason buy convergence path, not as a sell-side limiter.
 
-  for (let leagueRound = 1; leagueRound <= maxLeagueRounds; leagueRound += 1) {
+  const preseasonBuyMode = input.preseasonBuyMode ?? "s1_draft_batch";
+  const usePreseasonS1DraftBatch =
+    isPreseasonBuyPhase && allowBuys && isUnifiedPickEnabledForMarket() && preseasonBuyMode === "s1_draft_batch";
+
+  if (usePreseasonS1DraftBatch) {
+    const batchSave = readLiveSave();
+    if (batchSave) {
+      const batchTeamIds = scopeTeam(
+        getTeamsNeedingConvergence(batchSave.gameState).map((entry) => entry.teamId),
+      );
+      if (batchTeamIds.length > 0) {
+        if (input.progressLog) {
+          console.error(
+            `[transfer-window] ${input.seasonId} preseason s1-draft-batch teams=${batchTeamIds.length}`,
+          );
+        }
+        const batchResult = await runPreseasonBatchPickRebuild({
+          saveId: input.saveId,
+          seasonId: input.seasonId,
+          teamIds: batchTeamIds,
+          persistence,
+          stepsPerTeam: 14,
+          draftSeedSuffix: "preseason-batch",
+        });
+        totalAppliedBuys += batchResult.appliedPicks + batchResult.topupAppliedPicks;
+        leagueRoundsCompleted = 1;
+        warnings.push(
+          `preseason_s1_draft_batch:teams:${batchResult.batchTeamIds.length}:picks:${batchResult.appliedPicks}:topup:${batchResult.topupAppliedPicks}`,
+          ...batchResult.warnings.slice(0, 8),
+        );
+        blockingReasons.push(...batchResult.blockingReasons.slice(0, 8));
+        const afterBatchSave = readLiveSave();
+        if (afterBatchSave) {
+          for (const teamId of batchTeamIds) {
+            const team = afterBatchSave.gameState.teams.find((entry) => entry.teamId === teamId);
+            const rosterAfter = rosterCount(afterBatchSave.gameState, teamId);
+            const hardMin = getTeamHardMinRequired(afterBatchSave.gameState, teamId);
+            const optTarget = getTeamOptTarget(afterBatchSave.gameState, teamId);
+            const needsConvergence = teamNeedsMarketConvergence(afterBatchSave.gameState, teamId);
+            perTeamMap.set(teamId, {
+              teamId,
+              teamName: team?.name ?? teamId,
+              status: resolveTeamStatus({
+                team: { executedBuys: 0, executedSells: 0, result: "applied" },
+                rosterAfter,
+                hardMin,
+                optTarget,
+                needsConvergence,
+                exhausted: false,
+              }),
+              pickEngine: "unified",
+              passes: 1,
+              rounds: 1,
+              appliedBuys: 0,
+              appliedSells: 0,
+              rosterAfter,
+              hardMin,
+              optTarget,
+              minRequired: hardMin,
+              doctrineStrategy:
+                buildSeasonStrategyState(afterBatchSave.gameState)[teamId]?.seasonStrategy ?? "balanced_growth",
+              blockingReasons: [],
+              warnings: ["preseason_s1_draft_batch"],
+              roundHistory: [],
+            });
+          }
+        }
+        if (sessionRunContext && sessionRunContext.deferredWrites > 0) {
+          flushLocalTransfermarktRunContext(sessionRunContext);
+        }
+      }
+    }
+  }
+
+  if (!usePreseasonS1DraftBatch) for (let leagueRound = 1; leagueRound <= maxLeagueRounds; leagueRound += 1) {
     const latestSave = readLiveSave();
     if (!latestSave) throw new Error("Save missing during transfer window.");
     const coverageRiskBefore = getTeamsNeedingConvergence(latestSave.gameState).length;
@@ -368,7 +467,12 @@ export async function runTransferWindowSession(input: TransferWindowSessionInput
     // scripts/long-run-sandbox-s1-s6.ts, which runs before the preseason buy convergence and is
     // itself sell-only) — it is intentionally not reintroduced here as a per-cycle reflex.
     for (const teamId of needing) {
-      for (let cycle = 1; cycle <= maxTeamCycles; cycle += 1) {
+      const cycleSave = readLiveSave();
+      if (!cycleSave) break;
+      const teamCycleCap = isPreseasonBuyPhase
+        ? resolvePreseasonBuyCycleCap(cycleSave.gameState, teamId, maxTeamCycles)
+        : maxTeamCycles;
+      for (let cycle = 1; cycle <= teamCycleCap; cycle += 1) {
         const midSave = readLiveSave();
         // Season-end continuation check is phase-specific (2026-07-04, sell-cap removal): buy-phase
         // cycles still stop as soon as the team no longer needs convergence (unchanged). Sell-phase
@@ -510,7 +614,7 @@ export async function runTransferWindowSession(input: TransferWindowSessionInput
   // season_end session is sell-only end to end and must not perform any buy, rescue or otherwise.
   const OPT_GAP_RESCUE_THRESHOLD = 1;
   const OPT_GAP_RESCUE_MAX_CYCLES = 2;
-  const rescueSave = isPreseasonBuyPhase ? readLiveSave() : null;
+  const rescueSave = isPreseasonBuyPhase && !usePreseasonS1DraftBatch ? readLiveSave() : null;
   if (rescueSave) {
     const rescueCandidates = scopeTeam(
       rescueSave.gameState.teams

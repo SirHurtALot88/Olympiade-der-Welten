@@ -48,6 +48,7 @@ function runLongRunSandbox(input: {
     ...process.env,
     NODE_OPTIONS: nodeOptions,
     OLY_LONG_RUN_OUTPUT_DIR: input.outputDir,
+    OLY_AUTOPREP_OUTPUT_DIR: process.env.OLY_AUTOPREP_OUTPUT_DIR ?? input.outputDir,
     OLY_LONG_RUN_FINAL_SEASON: String(input.finalSeason),
     OLY_LONG_RUN_STOP_AFTER: input.stopAfter,
     OLY_LONG_RUN_LABEL: input.label,

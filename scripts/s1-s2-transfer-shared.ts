@@ -4,6 +4,8 @@
 import fs from "node:fs";
 import path from "node:path";
 
+import Database from "better-sqlite3";
+
 import { AI_MARKET_APPLY_CONFIRM_TOKEN } from "@/lib/ai/ai-market-plan-apply-contract";
 import {
   getTeamHardMinRequired,
@@ -22,6 +24,7 @@ import type { GameState, TeamControlSettings } from "@/lib/data/olyDataTypes";
 import { deriveRosterTargets } from "@/lib/foundation/roster-limits";
 import { resolvePlayerEconomyContract } from "@/lib/foundation/player-economy-contract";
 import { createPersistenceService } from "@/lib/persistence/persistence-service";
+import { closeDatabaseForMaintenance } from "@/lib/persistence/sqlite";
 import { previewCashPrizeApply, type CashPrizeApplyResult } from "@/lib/season/cash-prize-apply-service";
 import {
   formatPhaseAuditSummaryDe,
@@ -474,17 +477,20 @@ export async function applyQuickSimSeasonEndStack(
   return { save: current, prizePreview };
 }
 
+/** Deep-copy SQLite via VACUUM INTO — avoids hardlink/WAL pollution between batch runs. */
 export function cloneSourceDatabase(sourceDbPath: string, outputDir: string): string {
   fs.mkdirSync(outputDir, { recursive: true });
   const targetPath = path.join(outputDir, "balancing-run.sqlite");
+  closeDatabaseForMaintenance();
+  const db = new Database(sourceDbPath, { readonly: true });
   try {
-    fs.linkSync(sourceDbPath, targetPath);
-  } catch {
-    fs.copyFileSync(sourceDbPath, targetPath);
-    for (const suffix of ["-wal", "-shm"]) {
-      const sidecar = `${sourceDbPath}${suffix}`;
-      if (fs.existsSync(sidecar)) fs.copyFileSync(sidecar, `${targetPath}${suffix}`);
-    }
+    db.exec(`VACUUM INTO '${targetPath.replace(/'/g, "''")}'`);
+  } finally {
+    db.close();
+  }
+  for (const suffix of ["-wal", "-shm"]) {
+    const sidecar = `${targetPath}${suffix}`;
+    if (fs.existsSync(sidecar)) fs.unlinkSync(sidecar);
   }
   process.env.OLY_APP_SQLITE_PATH = targetPath;
   return targetPath;
